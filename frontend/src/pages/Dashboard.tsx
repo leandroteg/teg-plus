@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { FileText, Clock, CheckCircle, DollarSign, AlertTriangle, Building2, Wifi, WifiOff, Sparkles } from 'lucide-react'
+import { FileText, Clock, CheckCircle, DollarSign, AlertTriangle, Building2, Sparkles, RefreshCw } from 'lucide-react'
 import { useDashboard } from '../hooks/useDashboard'
 import KpiCard from '../components/KpiCard'
 import StatusBadge from '../components/StatusBadge'
@@ -12,11 +12,6 @@ const fmt = (v: number) =>
 const fmtData = (d: string) =>
   new Date(d).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })
 
-const isDemo = (): boolean => {
-  const url = import.meta.env.VITE_SUPABASE_URL || ''
-  return url === '' || url.includes('placeholder')
-}
-
 const EMPTY_KPIS: DashboardData['kpis'] = {
   total_mes: 0, aguardando_aprovacao: 0, aprovadas_mes: 0,
   rejeitadas_mes: 0, valor_total_mes: 0, tempo_medio_aprovacao_horas: 0,
@@ -24,9 +19,26 @@ const EMPTY_KPIS: DashboardData['kpis'] = {
 
 export default function Dashboard() {
   const [periodo, setPeriodo] = useState('mes')
-  const { data, isLoading } = useDashboard(periodo)
+  const { data, isLoading, isError, error, refetch } = useDashboard(periodo)
 
   if (isLoading) return <Loader />
+
+  if (isError) {
+    return (
+      <div className="flex flex-col items-center justify-center py-16 gap-4">
+        <div className="text-center">
+          <p className="text-gray-700 font-medium mb-1">Erro ao carregar dados</p>
+          <p className="text-xs text-gray-400">{String(error)}</p>
+        </div>
+        <button
+          onClick={() => refetch()}
+          className="flex items-center gap-2 px-4 py-2 bg-violet-100 text-violet-700 rounded-lg text-sm font-medium hover:bg-violet-200 transition"
+        >
+          <RefreshCw className="w-4 h-4" /> Tentar novamente
+        </button>
+      </div>
+    )
+  }
 
   const kpis = data?.kpis ?? EMPTY_KPIS
   const por_obra = data?.por_obra ?? []
@@ -34,19 +46,6 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-4">
-      {/* Demo banner */}
-      {isDemo() && (
-        <div className="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 flex items-center gap-2 text-xs text-amber-700">
-          <WifiOff className="w-4 h-4 flex-shrink-0" />
-          <span>Modo demonstracao - Configure Supabase nas env vars da Vercel para dados reais</span>
-        </div>
-      )}
-      {!isDemo() && (
-        <div className="bg-green-50 border border-green-200 rounded-lg px-3 py-2 flex items-center gap-2 text-xs text-green-700">
-          <Wifi className="w-4 h-4 flex-shrink-0" />
-          <span>Conectado ao Supabase</span>
-        </div>
-      )}
 
       {/* ApprovaAi Link */}
       <Link
