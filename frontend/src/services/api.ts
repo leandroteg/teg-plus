@@ -1,4 +1,4 @@
-import type { NovaRequisicaoPayload } from '../types'
+import type { NovaRequisicaoPayload, AiParseResult, NovaCotacaoPayload } from '../types'
 
 const BASE = import.meta.env.VITE_N8N_WEBHOOK_URL || ''
 
@@ -15,11 +15,20 @@ export const api = {
   criarRequisicao: (data: NovaRequisicaoPayload) =>
     request<unknown>('/compras/requisicao', { method: 'POST', body: JSON.stringify(data) }),
 
+  parseRequisicaoAi: (texto: string, solicitante_nome?: string) =>
+    request<AiParseResult>('/compras/requisicao-ai', {
+      method: 'POST',
+      body: JSON.stringify({ texto, solicitante_nome }),
+    }),
+
   processarAprovacao: (token: string, decisao: 'aprovada' | 'rejeitada', observacao?: string) =>
     request<unknown>('/compras/aprovacao', {
       method: 'POST',
       body: JSON.stringify({ token, decisao, observacao }),
     }),
+
+  submeterCotacao: (data: NovaCotacaoPayload) =>
+    request<unknown>('/compras/cotacao', { method: 'POST', body: JSON.stringify(data) }),
 
   getDashboard: (params?: { periodo?: string; obra_id?: string }) => {
     const qs = params ? new URLSearchParams(params as Record<string, string>).toString() : ''

@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { FileText, Clock, CheckCircle, DollarSign, AlertTriangle, Building2, Wifi, WifiOff } from 'lucide-react'
+import { Link } from 'react-router-dom'
+import { FileText, Clock, CheckCircle, DollarSign, AlertTriangle, Building2, Wifi, WifiOff, Sparkles } from 'lucide-react'
 import { useDashboard } from '../hooks/useDashboard'
 import KpiCard from '../components/KpiCard'
 import StatusBadge from '../components/StatusBadge'
@@ -46,6 +47,27 @@ export default function Dashboard() {
           <span>Conectado ao Supabase</span>
         </div>
       )}
+
+      {/* ApprovaAi Link */}
+      <Link
+        to="/aprovaai"
+        className="block bg-gradient-to-r from-violet-600 to-indigo-600 rounded-xl p-4 shadow-lg shadow-violet-200 active:scale-[0.98] transition-all"
+      >
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="bg-white/20 rounded-lg p-2">
+              <Sparkles className="w-5 h-5 text-white" />
+            </div>
+            <div>
+              <h3 className="text-white font-bold text-sm">ApprovaAi</h3>
+              <p className="text-violet-200 text-xs">Aprovacoes pendentes</p>
+            </div>
+          </div>
+          <div className="bg-white/20 backdrop-blur-sm rounded-full px-3 py-1">
+            <span className="text-white text-sm font-bold">{kpis.aguardando_aprovacao}</span>
+          </div>
+        </div>
+      </Link>
 
       {/* Periodo */}
       <div className="flex gap-2">

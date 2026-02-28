@@ -1,0 +1,73 @@
+{
+  "name": "TEG+ | Compras - AI Parse Requisicao",
+  "nodes": [
+    {
+      "parameters": {
+        "path": "compras/requisicao-ai",
+        "httpMethod": "POST",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "ai-parse-webhook",
+      "name": "AI Parse Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [250, 300],
+      "onError": {
+        "errorMode": "continueRegularOutput"
+      }
+    },
+    {
+      "parameters": {
+        "language": "javaScript",
+        "jsCode": "const body = $input.first().json.body || $input.first().json;\nconst texto = body.texto || '';\nconst lower = texto.toLowerCase();\n\n// Detect obra\nconst obraMap = {frutal:'SE Frutal',paracatu:'SE Paracatu',perdizes:'SE Perdizes','tres marias':'SE Tres Marias','rio paranaiba':'SE Rio Paranaiba',ituiutaba:'SE Ituiutaba'};\nlet obra_sugerida = '';\nfor (const [key, val] of Object.entries(obraMap)) {\n  if (lower.includes(key)) { obra_sugerida = val; break; }\n}\n\n// Detect urgencia\nlet urgencia_sugerida = 'normal';\nif (lower.includes('critica') || lower.includes('emergencia') || lower.includes('imediato')) urgencia_sugerida = 'critica';\nelse if (lower.includes('urgente') || lower.includes('urgencia') || lower.includes('rapido')) urgencia_sugerida = 'urgente';\n\n// Detect categoria\nconst catKeywords = {\n  eletrico: ['cabo','fio','condutor','xlpe','disjuntor','transformador','isolador','conector','terminal','tc','tp','barramento'],\n  epi: ['epi','luva','capacete','bota','oculos','cinto','mascara','uniforme'],\n  civil: ['cimento','areia','brita','concreto','ferro','forma','madeira','tijolo','tubo','pvc'],\n  ferramentas: ['chave','alicate','martelo','furadeira','serra','esmerilhadeira','multimetro','ferramenta'],\n  servicos: ['locacao','aluguel','guindaste','munck','caminhao','transporte','frete','topografia'],\n  consumo: ['papel','toner','limpeza','agua','combustivel','diesel','tinta','oleo'],\n};\nlet categoria_sugerida = 'consumo';\nfor (const [cat, kws] of Object.entries(catKeywords)) {\n  if (kws.some(kw => lower.includes(kw))) { categoria_sugerida = cat; break; }\n}\n\n// Map to comprador\nconst compradorMap = {\n  eletrico: { id: 'comp-1', nome: 'Marcos Almeida' },\n  ferramentas: { id: 'comp-1', nome: 'Marcos Almeida' },\n  civil: { id: 'comp-2', nome: 'Patricia Souza' },\n  consumo: { id: 'comp-2', nome: 'Patricia Souza' },\n  epi: { id: 'comp-3', nome: 'Ricardo Santos' },\n  servicos: { id: 'comp-3', nome: 'Ricardo Santos' },\n};\nconst comprador_sugerido = compradorMap[categoria_sugerida];\n\n// Parse items\nconst parts = texto.split(/[,\\n]+/).map(p => p.trim()).filter(p => p.length > 2);\nconst itens = parts.map(part => {\n  const qtyMatch = part.match(/(\\d+[\\.,]?\\d*)\\s*(un|kg|m2|m3|m|l|pc|cx|und|pcs|unid|sacos?|rolos?|pares?|jogos?|kits?|caixas?|dias?)/i);\n  let quantidade = 1;\n  let unidade = 'un';\n  if (qtyMatch) {\n    quantidade = parseFloat(qtyMatch[1].replace(',', '.'));\n    const rawUnit = qtyMatch[2].toLowerCase();\n    const unitMap = {und:'un',unid:'un',pcs:'un',saco:'un',sacos:'un',rolo:'un',rolos:'un',par:'un',pares:'un',jogo:'un',jogos:'un',kit:'un',kits:'un',caixa:'cx',caixas:'cx',dia:'un',dias:'un'};\n    unidade = unitMap[rawUnit] || rawUnit;\n  }\n  let descricao = part;\n  if (qtyMatch) {\n    descricao = part.replace(qtyMatch[0], '').trim();\n  }\n  // Remove obra and urgencia keywords from description\n  for (const key of Object.keys(obraMap)) {\n    descricao = descricao.replace(new RegExp('(para\\\\s+)?(a\\\\s+)?SE\\\\s+' + key, 'gi'), '').trim();\n  }\n  descricao = descricao.replace(/\\b(urgente|critica|emergencia|imediato|rapido)\\b/gi, '').trim();\n  descricao = descricao.replace(/^[\\s,\\-]+|[\\s,\\-]+$/g, '');\n  if (!descricao) descricao = part;\n  return { descricao, quantidade, unidade, valor_unitario_estimado: 0 };\n}).filter(i => i.descricao.length > 1);\n\nreturn [{\n  json: {\n    itens: itens.length > 0 ? itens : [{ descricao: texto.substring(0, 200), quantidade: 1, unidade: 'un', valor_unitario_estimado: 0 }],\n    obra_sugerida,\n    urgencia_sugerida,\n    categoria_sugerida,\n    comprador_sugerido,\n    justificativa_sugerida: 'Requisicao criada via IA - ' + categoria_sugerida,\n    confianca: obra_sugerida ? 0.85 : 0.65,\n  }\n}];"
+      },
+      "id": "parse-com-ia",
+      "name": "Parse com IA",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [480, 300],
+      "onError": {
+        "errorMode": "continueRegularOutput"
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "allIncomingItems",
+        "options": {}
+      },
+      "id": "responder",
+      "name": "Responder",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [700, 300]
+    }
+  ],
+  "connections": {
+    "AI Parse Webhook": {
+      "main": [
+        [
+          {
+            "node": "Parse com IA",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse com IA": {
+      "main": [
+        [
+          {
+            "node": "Responder",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

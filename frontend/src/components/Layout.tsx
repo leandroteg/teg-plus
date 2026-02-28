@@ -1,10 +1,11 @@
 import { NavLink, Outlet } from 'react-router-dom'
-import { LayoutDashboard, PlusCircle, List, User } from 'lucide-react'
+import { LayoutDashboard, PlusCircle, List, ShoppingCart, User } from 'lucide-react'
 
 const nav = [
   { to: '/',            icon: LayoutDashboard, label: 'Painel' },
   { to: '/nova',        icon: PlusCircle,      label: 'Nova RC' },
   { to: '/requisicoes', icon: List,            label: 'Lista' },
+  { to: '/cotacoes',    icon: ShoppingCart,    label: 'Cotacoes' },
   { to: '/perfil',      icon: User,            label: 'Perfil' },
 ]
 

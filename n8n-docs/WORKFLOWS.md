@@ -84,11 +84,46 @@
 
 ---
 
-### 4. TEG+ | Suprimentos - AI Agent (pre-existente)
+### 4. TEG+ | Compras - AI Parse Requisicao
+- **ID:** (importar de `workflow-ai-parse-requisicao.json`)
+- **Webhook:** POST `/compras/requisicao-ai`
+- **Nodes:** 3
+- **Fluxo:** AI Parse Webhook -> Parse com IA -> Responder
+
+**Payload esperado:**
+```json
+{
+  "texto": "Preciso de 500m de cabo XLPE 15kV e 20 terminais para SE Frutal urgente",
+  "solicitante_nome": "Joao Silva"
+}
+```
+
+**Resposta:**
+```json
+{
+  "itens": [
+    { "descricao": "cabo XLPE 15kV", "quantidade": 500, "unidade": "m", "valor_unitario_estimado": 0 },
+    { "descricao": "terminais", "quantidade": 20, "unidade": "un", "valor_unitario_estimado": 0 }
+  ],
+  "obra_sugerida": "SE Frutal",
+  "urgencia_sugerida": "urgente",
+  "categoria_sugerida": "eletrico",
+  "comprador_sugerido": { "id": "comp-1", "nome": "Marcos Almeida" },
+  "justificativa_sugerida": "Requisicao criada via IA - eletrico",
+  "confianca": 0.85
+}
+```
+
+**Categorias detectadas:** eletrico, epi, civil, ferramentas, servicos, consumo
+**Obras detectadas:** SE Frutal, SE Paracatu, SE Perdizes, SE Tres Marias, SE Rio Paranaiba, SE Ituiutaba
+
+---
+
+### 5. TEG+ | Suprimentos - AI Agent (pre-existente)
 - **ID:** 6Dh8b6VOP09GpH0x
 - **Nodes:** 6
 
-### 5. TEG+ | Suprimentos - Notificacoes de Status (pre-existente)
+### 6. TEG+ | Suprimentos - Notificacoes de Status (pre-existente)
 - **ID:** UYgLUU9v7cfMJN8k
 - **Nodes:** 6
 
@@ -112,4 +147,6 @@ Apos configurar credenciais:
 
 ### URLs dos Webhooks (apos ativar)
 - **Producao:** `https://seu-n8n.com/webhook/compras/requisicao`
+- **Producao (AI Parse):** `https://seu-n8n.com/webhook/compras/requisicao-ai`
 - **Teste:** `https://seu-n8n.com/webhook-test/compras/requisicao`
+- **Teste (AI Parse):** `https://seu-n8n.com/webhook-test/compras/requisicao-ai`
