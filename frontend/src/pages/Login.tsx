@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { Navigate, useSearchParams } from 'react-router-dom'
 import { Mail, Lock, ArrowRight, Zap, AlertCircle, CheckCircle, Eye, EyeOff } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
+import LogoTeg from '../components/LogoTeg'
 
 type Mode = 'password' | 'magic'
 type View = 'login' | 'reset' | 'nova-senha' | 'magic-sent'
@@ -164,9 +165,8 @@ export default function Login() {
 
         {/* Logo / Branding */}
         <div className="text-center mb-7">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl
-            bg-navy text-white text-2xl font-black mb-3 shadow-xl">
-            T+
+          <div className="inline-flex items-center justify-center mb-3">
+            <LogoTeg size={72} animated glowing={false} />
           </div>
           <h1 className="text-2xl font-black text-navy tracking-tight">TEG+</h1>
           <p className="text-xs text-slate-400 mt-0.5 font-medium tracking-wide uppercase">

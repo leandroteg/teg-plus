@@ -1,43 +1,46 @@
 import { NavLink, Outlet, useNavigate } from 'react-router-dom'
-import { LayoutDashboard, PlusCircle, List, ShoppingCart, User, LogOut, Shield } from 'lucide-react'
+import {
+  LayoutDashboard, PlusCircle, List, ShoppingCart,
+  User, LogOut, Shield, LayoutGrid,
+} from 'lucide-react'
 import { useAuth, ROLE_LABEL, ROLE_COLOR } from '../contexts/AuthContext'
+import LogoTeg from './LogoTeg'
 
-const nav = [
-  { to: '/',            icon: LayoutDashboard, label: 'Painel' },
-  { to: '/nova',        icon: PlusCircle,      label: 'Nova RC' },
-  { to: '/requisicoes', icon: List,            label: 'Lista' },
-  { to: '/cotacoes',    icon: ShoppingCart,    label: 'Cotações' },
-  { to: '/perfil',      icon: User,            label: 'Perfil' },
+// ── Navigation items ───────────────────────────────────────────────────────────
+const NAV = [
+  { to: '/compras',     icon: LayoutDashboard, label: 'Painel',      end: true  },
+  { to: '/nova',        icon: PlusCircle,      label: 'Nova RC',     end: false },
+  { to: '/requisicoes', icon: List,            label: 'Requisições', end: false },
+  { to: '/cotacoes',    icon: ShoppingCart,    label: 'Cotações',    end: false },
+  { to: '/perfil',      icon: User,            label: 'Perfil',      end: false },
 ]
 
-// Cores determinísticas para o avatar (baseadas no nome)
+// ── Avatar helpers ─────────────────────────────────────────────────────────────
 const AVATAR_COLORS = [
   'bg-violet-500', 'bg-indigo-500', 'bg-blue-500', 'bg-cyan-500',
-  'bg-teal-500',   'bg-emerald-500','bg-amber-500', 'bg-rose-500',
+  'bg-teal-500', 'bg-emerald-500', 'bg-amber-500', 'bg-rose-500',
 ]
 
-function getAvatarColor(name: string) {
-  let hash = 0
-  for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash)
-  return AVATAR_COLORS[Math.abs(hash) % AVATAR_COLORS.length]
+function getAvatarColor(name: string): string {
+  let h = 0
+  for (let i = 0; i < name.length; i++) h = name.charCodeAt(i) + ((h << 5) - h)
+  return AVATAR_COLORS[Math.abs(h) % AVATAR_COLORS.length]
 }
 
-function getInitials(name: string) {
+function getInitials(name: string): string {
   const parts = name.trim().split(/\s+/)
   if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase()
   return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
 }
 
+// ── Component ──────────────────────────────────────────────────────────────────
 export default function Layout() {
-  const { perfil, isAdmin, signOut } = useAuth()
+  const { perfil, isAdmin, signOut, role } = useAuth()
   const navigate = useNavigate()
 
-  const nome    = perfil?.nome    ?? 'Usuário'
-  const role    = perfil?.role    ?? 'requisitante'
-  const initials = getInitials(nome)
-  const avatarBg = getAvatarColor(nome)
-
-  // Primeiro nome para exibição compacta
+  const nome      = perfil?.nome ?? 'Usuário'
+  const initials  = getInitials(nome)
+  const avatarBg  = getAvatarColor(nome)
   const firstName = nome.split(' ')[0]
 
   async function handleLogout() {
@@ -45,102 +48,199 @@ export default function Layout() {
     navigate('/login', { replace: true })
   }
 
+  // ── Nav link class factory (reused for sidebar and bottom nav) ─────────────
+  function sidebarLinkClass({ isActive }: { isActive: boolean }) {
+    const base = 'flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold transition-all duration-150 border'
+    if (isActive)
+      return `${base} bg-teal-500/15 text-teal-300 border-teal-500/25`
+    return `${base} text-slate-400 hover:text-slate-100 hover:bg-white/6 border-transparent`
+  }
+
+  function bottomLinkClass({ isActive }: { isActive: boolean }) {
+    const base = 'flex flex-col items-center py-2 px-2.5 rounded-xl text-[10px] font-semibold transition-all duration-150 min-w-[46px]'
+    if (isActive)
+      return `${base} text-teal-400 bg-teal-400/10`
+    return `${base} text-slate-500 hover:text-slate-300`
+  }
+
   return (
-    <div className="min-h-screen bg-slate-100 pb-24">
+    <div className="min-h-screen bg-slate-100">
 
-      {/* ── Header ────────────────────────────────────────────────── */}
-      <header
-        className="bg-navy text-white px-5 py-3 sticky top-0 z-30"
-        style={{ boxShadow: '0 2px 16px rgba(0,0,0,0.25)' }}
+      {/* ══════════════════════════════════════════════════════════════
+           DESKTOP SIDEBAR  (hidden on mobile, visible ≥ lg)
+      ══════════════════════════════════════════════════════════════ */}
+      <aside
+        className="hidden lg:flex flex-col fixed left-0 top-0 h-full w-64 bg-[#0B1523] z-40"
+        style={{ boxShadow: '4px 0 24px rgba(0,0,0,0.4)' }}
       >
-        <div className="max-w-lg mx-auto flex items-center justify-between gap-3">
-
-          {/* Branding */}
-          <div className="min-w-0">
-            <h1 className="text-base font-bold tracking-tight leading-none">TEG+ Compras</h1>
-            <p className="text-[10px] text-slate-400 mt-0.5 font-medium">Sistema de Requisições</p>
+        {/* ── Top: brand + module badge ───────────────────────── */}
+        <div className="px-4 pt-5 pb-4 border-b border-white/[0.06]">
+          {/* Logo + wordmark */}
+          <div className="flex items-center gap-3 mb-4">
+            <LogoTeg size={38} animated={false} />
+            <div>
+              <p className="text-white font-black text-lg tracking-tight leading-none">TEG+</p>
+              <p className="text-[10px] text-slate-500 font-medium mt-0.5">ERP Sistema</p>
+            </div>
           </div>
 
-          {/* Usuário */}
-          <div className="flex items-center gap-2 shrink-0">
+          {/* Active module badge — click to go back to module selector */}
+          <button
+            onClick={() => navigate('/')}
+            className="w-full flex items-center gap-2.5 bg-teal-500/10 border border-teal-500/25
+              rounded-xl px-3 py-2.5 hover:bg-teal-500/18 hover:border-teal-500/40
+              transition-all duration-150 group"
+            title="Trocar módulo"
+          >
+            <span className="text-lg leading-none">🛒</span>
+            <div className="flex-1 text-left">
+              <p className="text-xs font-bold text-teal-300 leading-none">Compras</p>
+              <p className="text-[9px] text-teal-500/60 mt-0.5">Módulo ativo</p>
+            </div>
+            <LayoutGrid
+              size={13}
+              className="text-teal-500/50 group-hover:text-teal-400 transition-colors shrink-0"
+            />
+          </button>
+        </div>
 
-            {/* Badge Admin */}
-            {isAdmin && (
-              <div
-                className="hidden sm:flex items-center gap-1 bg-amber-400/20 border border-amber-400/30
-                  text-amber-300 rounded-full px-2 py-0.5 text-[10px] font-semibold"
+        {/* ── Navigation ────────────────────────────────────── */}
+        <nav className="flex-1 px-3 py-3 space-y-0.5 overflow-y-auto styled-scrollbar">
+          {NAV.map(({ to, icon: Icon, label, end }) => (
+            <NavLink key={to} to={to} end={end} className={sidebarLinkClass}>
+              <Icon size={16} className="shrink-0" />
+              <span>{label}</span>
+            </NavLink>
+          ))}
+
+          {/* Admin link */}
+          {isAdmin && (
+            <>
+              <div className="h-px bg-white/[0.05] mx-2 my-2" />
+              <NavLink
+                to="/admin/usuarios"
+                className={({ isActive }) =>
+                  `flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold
+                  transition-all duration-150 border
+                  ${isActive
+                    ? 'bg-amber-500/12 text-amber-300 border-amber-500/25'
+                    : 'text-slate-500 hover:text-slate-300 hover:bg-white/5 border-transparent'
+                  }`
+                }
               >
-                <Shield size={10} />
-                Admin
-              </div>
-            )}
+                <Shield size={16} className="shrink-0" />
+                <span>Administração</span>
+              </NavLink>
+            </>
+          )}
+        </nav>
 
-            {/* Nome + Role — visível em telas maiores */}
-            <div className="hidden sm:block text-right">
-              <p className="text-xs font-semibold text-white leading-none">{firstName}</p>
+        {/* ── Bottom: user card + logout ─────────────────────── */}
+        <div className="px-3 pb-4 pt-2 border-t border-white/[0.06]">
+          {/* User info */}
+          <div className="flex items-center gap-2.5 px-2 py-2.5 rounded-xl hover:bg-white/4 transition-colors">
+            <button
+              onClick={() => navigate('/perfil')}
+              className={`w-9 h-9 rounded-full flex items-center justify-center
+                text-white text-xs font-extrabold shrink-0 ring-2 ring-white/10
+                transition-transform active:scale-90 ${avatarBg}`}
+              title="Ver perfil"
+            >
+              {initials}
+            </button>
+
+            <div className="flex-1 min-w-0">
+              <p className="text-[13px] font-semibold text-slate-200 truncate leading-none">
+                {firstName}
+              </p>
               <span
-                className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full mt-0.5 inline-block
-                  ${ROLE_COLOR[role].bg} ${ROLE_COLOR[role].text}`}
+                className={`text-[10px] font-medium mt-0.5 inline-block
+                  ${ROLE_COLOR[role].text}`}
               >
                 {ROLE_LABEL[role]}
               </span>
             </div>
 
-            {/* Avatar — clicável → Perfil */}
-            <button
-              onClick={() => navigate('/perfil')}
-              className={`w-8 h-8 rounded-full flex items-center justify-center
-                text-white text-xs font-extrabold ring-2 ring-white/20
-                transition-transform active:scale-90 ${avatarBg}`}
-              title={`${nome} · ${ROLE_LABEL[role]}`}
-            >
-              {initials}
-            </button>
-
-            {/* Logout rápido */}
             <button
               onClick={handleLogout}
-              className="w-7 h-7 rounded-full bg-white/10 flex items-center justify-center
-                text-slate-400 hover:text-white hover:bg-white/20 transition-all active:scale-90"
+              className="w-7 h-7 rounded-lg bg-white/5 flex items-center justify-center
+                text-slate-500 hover:text-red-400 hover:bg-red-400/10 transition-all shrink-0"
               title="Sair"
             >
               <LogOut size={13} />
             </button>
           </div>
         </div>
-      </header>
+      </aside>
 
-      {/* ── Content ───────────────────────────────────────────────── */}
-      <main className="px-4 py-5 max-w-lg mx-auto">
-        <Outlet />
-      </main>
+      {/* ══════════════════════════════════════════════════════════════
+           MAIN CONTENT  (offset for sidebar on desktop)
+      ══════════════════════════════════════════════════════════════ */}
+      <div className="lg:ml-64 flex flex-col min-h-screen">
 
-      {/* ── Bottom Nav ────────────────────────────────────────────── */}
-      <nav
-        className="fixed bottom-0 inset-x-0 bg-white border-t border-gray-100 z-40"
-        style={{ boxShadow: '0 -4px 20px rgba(0,0,0,0.06)' }}
-      >
-        <div className="flex justify-around max-w-lg mx-auto px-2 py-1.5">
-          {nav.map(({ to, icon: Icon, label }) => (
-            <NavLink
-              key={to}
-              to={to}
-              end={to === '/'}
-              className={({ isActive }) =>
-                `flex flex-col items-center py-1.5 px-3 rounded-xl text-[10px] font-semibold
-                 transition-all duration-150 ${
-                   isActive
-                     ? 'text-primary bg-primary/10'
-                     : 'text-gray-400 hover:text-gray-600'
-                 }`
-              }
-            >
-              <Icon className="w-5 h-5 mb-0.5" />
-              {label}
-            </NavLink>
-          ))}
-        </div>
-      </nav>
+        {/* ── Mobile-only header ──────────────────────────────── */}
+        <header
+          className="lg:hidden bg-[#0B1523] text-white px-4 py-3 sticky top-0 z-30
+            flex items-center gap-3"
+          style={{ boxShadow: '0 2px 20px rgba(0,0,0,0.4)' }}
+        >
+          {/* Logo */}
+          <button onClick={() => navigate('/')} className="shrink-0" title="Trocar módulo">
+            <LogoTeg size={30} animated={false} />
+          </button>
+
+          {/* Brand */}
+          <div className="flex-1 min-w-0">
+            <div className="flex items-baseline gap-1.5">
+              <h1 className="text-sm font-black text-white leading-none">TEG+</h1>
+              <span className="text-[9px] text-teal-400/70 font-semibold">Compras</span>
+            </div>
+          </div>
+
+          {/* Avatar */}
+          <button
+            onClick={() => navigate('/perfil')}
+            className={`w-8 h-8 rounded-full flex items-center justify-center
+              text-white text-xs font-extrabold ring-2 ring-white/10
+              shrink-0 transition-transform active:scale-90 ${avatarBg}`}
+            title={`${nome} · ${ROLE_LABEL[role]}`}
+          >
+            {initials}
+          </button>
+
+          {/* Logout */}
+          <button
+            onClick={handleLogout}
+            className="w-7 h-7 rounded-lg bg-white/10 flex items-center justify-center
+              text-slate-400 hover:text-white hover:bg-white/20 transition-all shrink-0"
+            title="Sair"
+          >
+            <LogOut size={13} />
+          </button>
+        </header>
+
+        {/* ── Page content ─────────────────────────────────────── */}
+        <main className="flex-1 px-4 py-5 pb-28 lg:pb-8">
+          <div className="max-w-4xl mx-auto">
+            <Outlet />
+          </div>
+        </main>
+
+        {/* ── Mobile bottom nav (hidden on desktop) ────────────── */}
+        <nav
+          className="lg:hidden fixed bottom-0 inset-x-0 z-40 glass-dark border-t border-white/[0.06]"
+          style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
+        >
+          <div className="flex justify-around max-w-lg mx-auto px-1 py-1">
+            {NAV.map(({ to, icon: Icon, label, end }) => (
+              <NavLink key={to} to={to} end={end} className={bottomLinkClass}>
+                <Icon className="w-5 h-5 mb-0.5" />
+                {label}
+              </NavLink>
+            ))}
+          </div>
+        </nav>
+      </div>
     </div>
   )
 }

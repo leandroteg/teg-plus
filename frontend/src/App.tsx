@@ -7,6 +7,7 @@ import Layout from './components/Layout'
 import Login from './pages/Login'
 
 // Páginas privadas
+import ModuloSelector from './pages/ModuloSelector'
 import Dashboard from './pages/Dashboard'
 import NovaRequisicao from './pages/NovaRequisicao'
 import ListaRequisicoes from './pages/ListaRequisicoes'
@@ -23,7 +24,7 @@ export default function App() {
   return (
     <AuthProvider>
       <Routes>
-        {/* ── Pública: login / auth ──────────────────────────── */}
+        {/* ── Públicas ──────────────────────────────────────── */}
         <Route path="/login"      element={<Login />} />
         <Route path="/nova-senha" element={<Login />} />
 
@@ -31,10 +32,15 @@ export default function App() {
         <Route path="/aprovacao/:token" element={<Aprovacao />} />
         <Route path="/aprovaai"         element={<AprovAi />} />
 
-        {/* ── Privadas: requerem login ───────────────────────── */}
+        {/* ── Privadas ──────────────────────────────────────── */}
         <Route element={<PrivateRoute />}>
+
+          {/* Seletor de módulos: tela inicial (sem Layout) */}
+          <Route path="/" element={<ModuloSelector />} />
+
+          {/* Módulo Compras: usa sidebar/Layout */}
           <Route element={<Layout />}>
-            <Route path="/"            element={<Dashboard />} />
+            <Route path="/compras"     element={<Dashboard />} />
             <Route path="/nova"        element={<NovaRequisicao />} />
             <Route path="/requisicoes" element={<ListaRequisicoes />} />
             <Route path="/cotacoes"    element={<FilaCotacoes />} />
@@ -43,7 +49,7 @@ export default function App() {
           </Route>
         </Route>
 
-        {/* ── Admin: apenas role = 'admin' ──────────────────── */}
+        {/* ── Admin ─────────────────────────────────────────── */}
         <Route element={<AdminRoute />}>
           <Route element={<Layout />}>
             <Route path="/admin/usuarios" element={<AdminUsuarios />} />
