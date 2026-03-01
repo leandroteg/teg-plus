@@ -16,7 +16,8 @@ export function useRequisicoes(status?: string, search?: string) {
           id, numero, solicitante_nome, obra_nome, obra_id,
           descricao, justificativa, valor_estimado, urgencia, status,
           alcada_nivel, categoria, comprador_id, texto_original, ai_confianca,
-          created_at
+          created_at,
+          comprador:cmp_compradores(nome, email)
         `)
         .order('created_at', { ascending: false })
         .limit(100)
@@ -26,7 +27,13 @@ export function useRequisicoes(status?: string, search?: string) {
 
       const { data, error } = await query
       if (error) throw error
-      return (data ?? []) as Requisicao[]
+
+      // Flattens o join: comprador.nome → comprador_nome
+      return ((data ?? []) as any[]).map(r => ({
+        ...r,
+        comprador_nome: r.comprador?.nome ?? undefined,
+        comprador: undefined,
+      })) as Requisicao[]
     },
     refetchInterval: 30_000,
     retry: 1,
