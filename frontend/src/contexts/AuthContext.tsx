@@ -79,6 +79,7 @@ interface AuthContextType {
   perfil: Perfil | null
   session: Session | null
   loading: boolean
+  perfilReady: boolean   // true após loadPerfil finalizar (sucesso ou falha)
 
   // Ações de auth
   signIn: (email: string, password: string) => Promise<{ error: string | null }>
@@ -107,10 +108,11 @@ const AuthContext = createContext<AuthContextType | null>(null)
 // ── Provider ───────────────────────────────────────────────────────────────────
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user,    setUser]    = useState<User | null>(null)
-  const [session, setSession] = useState<Session | null>(null)
-  const [perfil,  setPerfil]  = useState<Perfil | null>(null)
-  const [loading, setLoading] = useState(true)
+  const [user,        setUser]        = useState<User | null>(null)
+  const [session,     setSession]     = useState<Session | null>(null)
+  const [perfil,      setPerfil]      = useState<Perfil | null>(null)
+  const [loading,     setLoading]     = useState(true)
+  const [perfilReady, setPerfilReady] = useState(false)
 
   // Carrega perfil do Supabase (com auto-provisionamento)
   const loadPerfil = useCallback(async (authId: string) => {
@@ -124,15 +126,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (data) {
         setPerfil(data as Perfil)
         supabase.rpc('registrar_acesso', { p_auth_id: authId })
+        setPerfilReady(true)
         return
       }
 
       // Perfil não existe (usuário criado antes do trigger) → cria automaticamente
       if (error?.code === 'PGRST116') {
-        const { data: { user: authUser } } = await supabase.auth.getUser()
-        const email = authUser?.email ?? ''
-        const nome = (authUser?.user_metadata?.full_name as string)
-          || (authUser?.user_metadata?.nome as string)
+        const { data: { user: authUser }, error: sessErr } = await supabase.auth.getUser()
+
+        // Sessão inválida (usuário foi deletado do Supabase) → force logout
+        if (sessErr || !authUser) {
+          await supabase.auth.signOut()
+          setPerfilReady(true)
+          return
+        }
+
+        const email = authUser.email ?? ''
+        const nome = (authUser.user_metadata?.full_name as string)
+          || (authUser.user_metadata?.nome as string)
           || email.split('@')[0]
 
         const { data: criado, error: errCriar } = await supabase
@@ -144,11 +155,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (!errCriar && criado) {
           setPerfil(criado as Perfil)
         }
-        // Se INSERT falhou (sem policy), perfil fica null — app funciona sem crash
       }
       // Outros erros (tabela não existe etc.) → perfil null, sem crash
     } catch {
       // Silencioso: app funciona degradado sem perfil
+    } finally {
+      setPerfilReady(true)
     }
   }, [])
 
@@ -244,6 +256,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     perfil,
     session,
     loading,
+    perfilReady,
     signIn,
     signInMagicLink,
     signOut,

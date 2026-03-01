@@ -219,7 +219,11 @@ function SenhaModal({
 // ── Página Principal ───────────────────────────────────────────────────────────
 
 export default function Perfil() {
-  const { perfil, role, roleLabel, isAdmin, signOut, updatePerfil, updatePassword } = useAuth()
+  const {
+    perfil, role, roleLabel, isAdmin,
+    signOut, updatePerfil, updatePassword,
+    loading, perfilReady, reloadPerfil,
+  } = useAuth()
   const navigate = useNavigate()
 
   const [editOpen,   setEditOpen]   = useState(false)
@@ -228,10 +232,43 @@ export default function Perfil() {
   const [editError,  setEditError]  = useState<string | null>(null)
   const [senhaError, setSenhaError] = useState<string | null>(null)
   const [toast,      setToast]      = useState<string | null>(null)
+  const [retrying,   setRetrying]   = useState(false)
 
-  if (!perfil) return (
-    <div className="flex items-center justify-center h-40">
+  // Ainda carregando auth ou perfil
+  if (loading || !perfilReady) return (
+    <div className="flex flex-col items-center justify-center h-40 gap-3">
       <span className="w-6 h-6 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
+      <p className="text-xs text-slate-400">Carregando perfil...</p>
+    </div>
+  )
+
+  // Auth ok mas perfil não carregou (tabela não existe ou sem permissão)
+  if (!perfil) return (
+    <div className="flex flex-col items-center justify-center h-52 gap-4 text-center">
+      <div className="w-14 h-14 rounded-2xl bg-amber-100 flex items-center justify-center">
+        <AlertCircle size={24} className="text-amber-500" />
+      </div>
+      <div>
+        <p className="font-bold text-navy text-sm">Perfil não encontrado</p>
+        <p className="text-xs text-slate-400 mt-1 max-w-[220px]">
+          Execute o SQL de setup no Supabase ou aguarde a sincronização.
+        </p>
+      </div>
+      <button
+        disabled={retrying}
+        onClick={async () => {
+          setRetrying(true)
+          await reloadPerfil()
+          setRetrying(false)
+        }}
+        className="flex items-center gap-2 px-4 py-2 rounded-xl bg-primary text-white text-xs font-semibold
+          hover:bg-indigo-500 transition-colors disabled:opacity-60"
+      >
+        {retrying
+          ? <span className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+          : null}
+        Tentar novamente
+      </button>
     </div>
   )
 

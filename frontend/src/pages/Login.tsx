@@ -6,19 +6,99 @@ import { useAuth } from '../contexts/AuthContext'
 type Mode = 'password' | 'magic'
 type View = 'login' | 'reset' | 'nova-senha' | 'magic-sent'
 
+// ── Sub-componentes fora do Login para evitar remount a cada render ──────────
+// IMPORTANTE: definir componentes DENTRO do componente pai faz React
+// desmontar/remontar a cada re-render, causando perda de foco nos inputs.
+
+interface InputFieldProps {
+  label: string
+  type?: string
+  value: string
+  onChange: (v: string) => void
+  placeholder: string
+  autoFocus?: boolean
+  icon: React.ElementType
+  suffix?: React.ReactNode
+}
+
+function InputField({
+  label, type = 'text', value, onChange, placeholder, autoFocus, icon: Icon, suffix,
+}: InputFieldProps) {
+  return (
+    <div>
+      <label className="block text-xs font-semibold text-slate-600 mb-1.5">{label}</label>
+      <div className="relative">
+        <Icon size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+        <input
+          type={type}
+          value={value}
+          onChange={e => onChange(e.target.value)}
+          placeholder={placeholder}
+          autoFocus={autoFocus}
+          required
+          className="w-full pl-9 pr-10 py-2.5 rounded-xl border border-slate-200 text-sm
+            focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary
+            transition-all bg-slate-50 focus:bg-white"
+        />
+        {suffix && (
+          <div className="absolute right-3 top-1/2 -translate-y-1/2">{suffix}</div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function Feedback({ error, success }: { error: string | null; success: string | null }) {
+  return (
+    <>
+      {error && (
+        <div className="flex items-start gap-2 bg-red-50 border border-red-100 text-red-700 rounded-xl px-3 py-2.5 text-sm">
+          <AlertCircle size={15} className="mt-0.5 shrink-0" />
+          <span>{error}</span>
+        </div>
+      )}
+      {success && (
+        <div className="flex items-start gap-2 bg-green-50 border border-green-100 text-green-700 rounded-xl px-3 py-2.5 text-sm">
+          <CheckCircle size={15} className="mt-0.5 shrink-0" />
+          <span>{success}</span>
+        </div>
+      )}
+    </>
+  )
+}
+
+function SubmitBtn({ label, busy }: { label: string; busy: boolean }) {
+  return (
+    <button
+      type="submit"
+      disabled={busy}
+      className="w-full py-3 rounded-xl bg-primary text-white font-semibold text-sm
+        flex items-center justify-center gap-2
+        hover:bg-indigo-500 active:scale-[0.98] transition-all disabled:opacity-60"
+    >
+      {busy
+        ? <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+        : <><span>{label}</span><ArrowRight size={14} /></>
+      }
+    </button>
+  )
+}
+
+// ── Componente principal ─────────────────────────────────────────────────────
+
 export default function Login() {
   const { user, loading, signIn, signInMagicLink, resetPassword, updatePassword } = useAuth()
   const [searchParams] = useSearchParams()
 
-  const [mode,       setMode]       = useState<Mode>('password')
-  const [view,       setView]       = useState<View>('login')
-  const [email,      setEmail]      = useState('')
-  const [password,   setPassword]   = useState('')
-  const [newPass,    setNewPass]    = useState('')
-  const [showPass,   setShowPass]   = useState(false)
-  const [busy,       setBusy]       = useState(false)
-  const [error,      setError]      = useState<string | null>(null)
-  const [success,    setSuccess]    = useState<string | null>(null)
+  const [mode,     setMode]     = useState<Mode>('password')
+  const [view,     setView]     = useState<View>('login')
+  const [email,    setEmail]    = useState('')
+  const [password, setPassword] = useState('')
+  const [newPass,  setNewPass]  = useState('')
+  const [showPass, setShowPass] = useState(false)
+  const [busy,     setBusy]     = useState(false)
+  const [error,    setError]    = useState<string | null>(null)
+  const [success,  setSuccess]  = useState<string | null>(null)
 
   // Detecta se é um link de "nova senha" (type=recovery na URL)
   useEffect(() => {
@@ -70,75 +150,6 @@ export default function Login() {
     setTimeout(() => setView('login'), 2000)
   }
 
-  // ── UI helpers ────────────────────────────────────────────────────
-
-  const InputField = ({
-    label, type = 'text', value, onChange, placeholder, autoFocus, icon: Icon,
-    suffix,
-  }: {
-    label: string
-    type?: string
-    value: string
-    onChange: (v: string) => void
-    placeholder: string
-    autoFocus?: boolean
-    icon: React.ElementType
-    suffix?: React.ReactNode
-  }) => (
-    <div>
-      <label className="block text-xs font-semibold text-slate-600 mb-1.5">{label}</label>
-      <div className="relative">
-        <Icon size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
-        <input
-          type={type}
-          value={value}
-          onChange={e => { onChange(e.target.value); clr() }}
-          placeholder={placeholder}
-          autoFocus={autoFocus}
-          required
-          className="w-full pl-9 pr-10 py-2.5 rounded-xl border border-slate-200 text-sm
-            focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary
-            transition-all bg-slate-50 focus:bg-white"
-        />
-        {suffix && (
-          <div className="absolute right-3 top-1/2 -translate-y-1/2">{suffix}</div>
-        )}
-      </div>
-    </div>
-  )
-
-  const Feedback = () => (
-    <>
-      {error && (
-        <div className="flex items-start gap-2 bg-red-50 border border-red-100 text-red-700 rounded-xl px-3 py-2.5 text-sm">
-          <AlertCircle size={15} className="mt-0.5 shrink-0" />
-          <span>{error}</span>
-        </div>
-      )}
-      {success && (
-        <div className="flex items-start gap-2 bg-green-50 border border-green-100 text-green-700 rounded-xl px-3 py-2.5 text-sm">
-          <CheckCircle size={15} className="mt-0.5 shrink-0" />
-          <span>{success}</span>
-        </div>
-      )}
-    </>
-  )
-
-  const SubmitBtn = ({ label }: { label: string }) => (
-    <button
-      type="submit"
-      disabled={busy}
-      className="w-full py-3 rounded-xl bg-primary text-white font-semibold text-sm
-        flex items-center justify-center gap-2
-        hover:bg-indigo-500 active:scale-[0.98] transition-all disabled:opacity-60"
-    >
-      {busy
-        ? <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-        : <><span>{label}</span><ArrowRight size={14} /></>
-      }
-    </button>
-  )
-
   // ── Views ─────────────────────────────────────────────────────────
 
   return (
@@ -166,9 +177,9 @@ export default function Login() {
               {/* Tabs modo */}
               <div className="flex gap-1 bg-slate-100 m-5 mb-0 rounded-xl p-1">
                 {([
-                  { m: 'password' as Mode, label: 'Senha',       icon: null },
-                  { m: 'magic'    as Mode, label: 'Link Mágico', icon: Zap  },
-                ] as const).map(({ m, label, icon: Icon }) => (
+                  { m: 'password' as Mode, label: 'Senha',       Icon: null as React.ElementType | null },
+                  { m: 'magic'    as Mode, label: 'Link Mágico', Icon: Zap  as React.ElementType | null },
+                ]).map(({ m, label, Icon }) => (
                   <button key={m}
                     type="button"
                     onClick={() => { setMode(m); clr() }}
@@ -190,7 +201,7 @@ export default function Login() {
                   label="E-mail corporativo"
                   type="email"
                   value={email}
-                  onChange={setEmail}
+                  onChange={v => { setEmail(v); clr() }}
                   placeholder="voce@teguniao.com.br"
                   icon={Mail}
                   autoFocus
@@ -201,7 +212,7 @@ export default function Login() {
                     label="Senha"
                     type={showPass ? 'text' : 'password'}
                     value={password}
-                    onChange={setPassword}
+                    onChange={v => { setPassword(v); clr() }}
                     placeholder="••••••••"
                     icon={Lock}
                     suffix={
@@ -223,8 +234,8 @@ export default function Login() {
                   </div>
                 )}
 
-                <Feedback />
-                <SubmitBtn label={mode === 'magic' ? 'Enviar link de acesso' : 'Entrar'} />
+                <Feedback error={error} success={success} />
+                <SubmitBtn label={mode === 'magic' ? 'Enviar link de acesso' : 'Entrar'} busy={busy} />
 
                 {mode === 'magic' && (
                   <p className="text-center text-xs text-slate-400">
@@ -269,12 +280,13 @@ export default function Login() {
               </div>
               <InputField
                 label="Seu e-mail" type="email"
-                value={email} onChange={setEmail}
+                value={email}
+                onChange={v => { setEmail(v); clr() }}
                 placeholder="voce@teguniao.com.br"
                 icon={Mail} autoFocus
               />
-              <Feedback />
-              <SubmitBtn label="Enviar link de recuperação" />
+              <Feedback error={error} success={success} />
+              <SubmitBtn label="Enviar link de recuperação" busy={busy} />
               <button type="button"
                 onClick={() => { setView('login'); clr() }}
                 className="w-full text-center text-xs text-slate-500 hover:text-navy transition-colors">
@@ -295,7 +307,8 @@ export default function Login() {
               <InputField
                 label="Nova senha"
                 type={showPass ? 'text' : 'password'}
-                value={newPass} onChange={setNewPass}
+                value={newPass}
+                onChange={v => { setNewPass(v); clr() }}
                 placeholder="mínimo 6 caracteres"
                 icon={Lock} autoFocus
                 suffix={
@@ -305,8 +318,8 @@ export default function Login() {
                   </button>
                 }
               />
-              <Feedback />
-              <SubmitBtn label="Salvar nova senha" />
+              <Feedback error={error} success={success} />
+              <SubmitBtn label="Salvar nova senha" busy={busy} />
             </form>
           )}
 
