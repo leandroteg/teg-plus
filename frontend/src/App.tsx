@@ -18,6 +18,13 @@ import AprovAi from './pages/AprovAi'
 import Perfil from './pages/Perfil'
 import Pedidos from './pages/Pedidos'
 
+// Módulos stub
+import Financeiro from './pages/Financeiro'
+import RH from './pages/RH'
+import SSMA from './pages/SSMA'
+import Estoque from './pages/Estoque'
+import Contratos from './pages/Contratos'
+
 // Admin
 import AdminUsuarios from './pages/AdminUsuarios'
 
@@ -38,6 +45,13 @@ export default function App() {
 
           {/* Seletor de módulos: tela inicial (sem Layout) */}
           <Route path="/" element={<ModuloSelector />} />
+
+          {/* Módulos stub: sem Layout (tela cheia própria) */}
+          <Route path="/financeiro" element={<Financeiro />} />
+          <Route path="/rh"         element={<RH />} />
+          <Route path="/ssma"       element={<SSMA />} />
+          <Route path="/estoque"    element={<Estoque />} />
+          <Route path="/contratos"  element={<Contratos />} />
 
           {/* Módulo Compras: usa sidebar/Layout */}
           <Route element={<Layout />}>

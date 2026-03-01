@@ -43,16 +43,17 @@ function RoleBadge({ role }: { role: Role }) {
 // ── Hooks ──────────────────────────────────────────────────────────────────────
 function usePerfis() {
   return useQuery({
-    queryKey: ['sys_perfis'],
+    queryKey: ['perfis'],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('sys_perfis')
         .select('*')
-        .order('created_at', { ascending: false })
+        .order('nome')
       if (error) throw error
       return data as Perfil[]
     },
     staleTime: 30_000,
+    retry: false,
   })
 }
 
@@ -70,7 +71,7 @@ function useUpdateUser() {
       if (error) throw error
       return updated as Perfil
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['sys_perfis'] }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['perfis'] }),
   })
 }
 
