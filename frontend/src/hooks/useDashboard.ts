@@ -104,22 +104,31 @@ export function useDashboard(periodo = 'mes', obraId?: string) {
   return useQuery<DashboardData>({
     queryKey: ['dashboard', periodo, obraId],
     queryFn: async () => {
-      // Tenta RPC primeiro (uma chamada, mais eficiente)
-      const { data: rpcData, error: rpcError } = await supabase
-        .rpc('get_dashboard_compras', {
-          p_periodo: periodo,
-          p_obra_id: obraId ?? null,
-        })
+      // RPC com timeout de 12s para evitar loading eterno
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => controller.abort(), 12_000)
 
-      if (!rpcError && rpcData) {
-        return mapRpcToDashboard(rpcData as Record<string, unknown>)
+      try {
+        const { data: rpcData, error: rpcError } = await supabase
+          .rpc('get_dashboard_compras', {
+            p_periodo: periodo,
+            p_obra_id: obraId ?? null,
+          })
+
+        if (!rpcError && rpcData) {
+          return mapRpcToDashboard(rpcData as Record<string, unknown>)
+        }
+      } catch {
+        // timeout ou erro de rede → fallback
+      } finally {
+        clearTimeout(timeoutId)
       }
 
-      // Fallback: consultas diretas nas tabelas
+      // Fallback: consultas diretas (sem RPC)
       return fetchDashboardDireto(periodo)
     },
-    refetchInterval: 30_000,
-    retry: 1,
-    staleTime: 10_000,
+    refetchInterval: 60_000,   // 60s reduz carga em 50 usuários
+    retry: false,              // sem retry automático (evita thundering herd)
+    staleTime: 30_000,
   })
 }

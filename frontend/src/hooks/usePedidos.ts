@@ -29,9 +29,9 @@ export function usePedidos(status?: string) {
         comprador: p.comprador ? { nome: p.comprador.nome } : undefined,
       })) as Pedido[]
     },
-    refetchInterval: 30_000,
-    retry: 1,
-    staleTime: 10_000,
+    refetchInterval: 60_000,
+    retry: false,
+    staleTime: 30_000,
   })
 }
 

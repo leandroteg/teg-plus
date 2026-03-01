@@ -44,9 +44,9 @@ export function useCotacoes(compradorId?: string, status?: string) {
         return { ...cot, comprador_nome: comprador?.nome ?? '' } as Cotacao
       })
     },
-    refetchInterval: 30_000,
-    retry: 1,
-    staleTime: 10_000,
+    refetchInterval: 60_000,
+    retry: false,
+    staleTime: 30_000,
   })
 }
 
@@ -68,7 +68,7 @@ export function useCotacao(id?: string) {
       const comprador = cot.comprador as Record<string, string> | null
       return { ...cot, comprador_nome: comprador?.nome ?? '' } as Cotacao
     },
-    retry: 1,
+    retry: false,
   })
 }
 

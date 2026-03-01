@@ -71,7 +71,7 @@ function KpiCard({ titulo, valor, icon: Icon, cor, subtitulo }: {
 
 export default function Dashboard() {
   const nav = useNavigate()
-  const [periodo, setPeriodo] = useState('mes')
+  const [periodo, setPeriodo] = useState('trimestre')
   const [pipelineFilter, setPipelineFilter] = useState<number | null>(null)
   const { data, isLoading, isError, error, refetch } = useDashboard(periodo)
   const { data: todasReqs } = useRequisicoes()
@@ -151,7 +151,7 @@ export default function Dashboard() {
 
       {/* ── Período ────────────────────────────────────────────────────── */}
       <div className="flex gap-2">
-        {[['semana', 'Semana'], ['mes', 'Mês'], ['trimestre', 'Trimestre']].map(([val, lbl]) => (
+        {[['semana', 'Semana'], ['mes', 'Mês'], ['trimestre', 'Trimestre'], ['tudo', 'Tudo']].map(([val, lbl]) => (
           <button key={val} onClick={() => setPeriodo(val)}
             className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-all ${
               periodo === val ? 'bg-slate-800 text-white shadow-sm' : 'bg-white text-slate-500 border border-slate-200'

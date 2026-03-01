@@ -35,9 +35,9 @@ export function useRequisicoes(status?: string, search?: string) {
         comprador: undefined,
       })) as Requisicao[]
     },
-    refetchInterval: 30_000,
-    retry: 1,
-    staleTime: 10_000,
+    refetchInterval: 60_000,
+    retry: false,
+    staleTime: 30_000,
   })
 }
 
@@ -69,6 +69,27 @@ export function useCriarRequisicao() {
 
       const alcadaNivel = valorEstimado > 2000 ? 2 : 1
 
+      // Resolve comprador_id pelo nome da categoria quando não informado
+      let compradorId = payload.comprador_id || null
+      if (!compradorId && payload.categoria) {
+        try {
+          const { data: cat } = await supabase
+            .from('cmp_categorias')
+            .select('comprador_nome')
+            .eq('codigo', payload.categoria)
+            .maybeSingle()
+          if (cat?.comprador_nome) {
+            const { data: comp } = await supabase
+              .from('cmp_compradores')
+              .select('id')
+              .ilike('nome', `%${cat.comprador_nome.split(' ')[0]}%`)
+              .limit(1)
+              .maybeSingle()
+            compradorId = comp?.id ?? null
+          }
+        } catch { /* non-critical */ }
+      }
+
       const { data: req, error: reqError } = await supabase
         .from('cmp_requisicoes')
         .insert({
@@ -81,7 +102,7 @@ export function useCriarRequisicao() {
           urgencia:         payload.urgencia,
           status:           'pendente',
           categoria:        payload.categoria  || null,
-          comprador_id:     payload.comprador_id || null,
+          comprador_id:     compradorId,
           alcada_nivel:     alcadaNivel,
           texto_original:   payload.texto_original || null,
           ai_confianca:     payload.ai_confianca  ?? null,

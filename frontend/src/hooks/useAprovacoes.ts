@@ -43,9 +43,9 @@ export function useAprovacoesPendentes() {
         } as AprovacaoPendente
       })
     },
-    refetchInterval: 15_000,
-    retry: 1,
-    staleTime: 5_000,
+    refetchInterval: 30_000,
+    retry: false,
+    staleTime: 15_000,
   })
 }
 
