@@ -30,22 +30,25 @@ const STATUS_BORDER: Record<string, string> = {
   rascunho:     'border-l-gray-300',
 }
 
-function CompradorChip({ nome }: { nome: string }) {
-  const colors = [
-    ['bg-violet-100', 'text-violet-700'],
-    ['bg-indigo-100', 'text-indigo-700'],
-    ['bg-sky-100', 'text-sky-700'],
-    ['bg-emerald-100', 'text-emerald-700'],
-    ['bg-amber-100', 'text-amber-700'],
-    ['bg-rose-100', 'text-rose-700'],
-  ]
-  const [bg, text] = colors[nome.charCodeAt(0) % colors.length]
+const AVATAR_COLORS = [
+  ['bg-violet-500', 'bg-violet-50', 'text-violet-700'],
+  ['bg-indigo-500', 'bg-indigo-50', 'text-indigo-700'],
+  ['bg-sky-500',    'bg-sky-50',    'text-sky-700'   ],
+  ['bg-emerald-500','bg-emerald-50','text-emerald-700'],
+  ['bg-amber-500',  'bg-amber-50',  'text-amber-700' ],
+  ['bg-rose-500',   'bg-rose-50',   'text-rose-700'  ],
+]
+
+function CompradorRow({ nome }: { nome: string }) {
+  const [avatarBg, chipBg, chipText] = AVATAR_COLORS[nome.charCodeAt(0) % AVATAR_COLORS.length]
   const initials = nome.split(' ').slice(0, 2).map(n => n[0]).join('').toUpperCase()
   return (
-    <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-bold ${bg} ${text}`}>
-      <span>{initials}</span>
-      <span className="font-medium">{nome.split(' ')[0]}</span>
-    </span>
+    <div className={`flex items-center gap-1.5 px-2 py-1 rounded-lg ${chipBg}`}>
+      <div className={`w-5 h-5 rounded-full ${avatarBg} flex items-center justify-center flex-shrink-0`}>
+        <span className="text-white text-[9px] font-extrabold">{initials}</span>
+      </div>
+      <span className={`text-xs font-semibold ${chipText}`}>{nome.split(' ')[0]}</span>
+    </div>
   )
 }
 
@@ -129,14 +132,19 @@ export default function ListaRequisicoes() {
                 <span className="text-sm font-extrabold text-primary">{fmt(r.valor_estimado)}</span>
               </div>
 
-              {/* Solicitante + Data + Comprador */}
-              <div className="flex items-center justify-between mt-1.5 gap-2">
-                <div className="flex items-center gap-1.5 min-w-0">
-                  <span className="text-xs text-gray-400 truncate">{r.solicitante_nome}</span>
-                  <span className="text-gray-200">·</span>
-                  <span className="text-xs text-gray-400 flex-shrink-0">{fmtData(r.created_at)}</span>
-                </div>
-                {r.comprador_nome && <CompradorChip nome={r.comprador_nome} />}
+              {/* Solicitante + Data */}
+              <div className="flex items-center gap-1.5 mt-1.5">
+                <span className="text-xs text-gray-400 truncate">{r.solicitante_nome}</span>
+                <span className="text-gray-200">·</span>
+                <span className="text-xs text-gray-400 flex-shrink-0">{fmtData(r.created_at)}</span>
+              </div>
+
+              {/* Comprador em destaque */}
+              <div className="flex items-center justify-between mt-2 pt-2 border-t border-gray-50">
+                {r.comprador_nome
+                  ? <CompradorRow nome={r.comprador_nome} />
+                  : <span className="text-xs text-gray-300 italic">Sem comprador alocado</span>
+                }
               </div>
 
               {/* Urgência */}

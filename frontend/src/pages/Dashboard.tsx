@@ -213,16 +213,16 @@ export default function Dashboard() {
         </section>
       )}
 
-      {/* Recentes */}
+      {/* Recentes — usa todasReqs pois já tem join comprador */}
       <section>
         <h2 className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-2 flex items-center gap-1.5">
           <TrendingUp className="w-3.5 h-3.5" /> Recentes
         </h2>
         <div className="space-y-2">
-          {requisicoes_recentes.map(r => (
+          {(todasReqs ?? requisicoes_recentes).slice(0, 10).map(r => (
             <RecentCard key={r.id} r={r} />
           ))}
-          {requisicoes_recentes.length === 0 && (
+          {(todasReqs ?? requisicoes_recentes).length === 0 && (
             <p className="text-center text-gray-400 text-sm py-8">Nenhuma requisição encontrada</p>
           )}
         </div>
@@ -231,36 +231,51 @@ export default function Dashboard() {
   )
 }
 
+const STATUS_BORDER: Record<string, string> = {
+  pendente:     'border-l-amber-400',
+  em_aprovacao: 'border-l-blue-400',
+  aprovada:     'border-l-emerald-400',
+  rejeitada:    'border-l-red-400',
+  em_cotacao:   'border-l-violet-400',
+  comprada:     'border-l-green-400',
+  cancelada:    'border-l-gray-300',
+  rascunho:     'border-l-gray-300',
+}
+
 function RecentCard({ r }: { r: any }) {
-  const STATUS_BORDER: Record<string, string> = {
-    pendente: 'border-l-amber-400',
-    em_aprovacao: 'border-l-blue-400',
-    aprovada: 'border-l-emerald-400',
-    rejeitada: 'border-l-red-400',
-    em_cotacao: 'border-l-violet-400',
-    comprada: 'border-l-green-400',
-    cancelada: 'border-l-gray-300',
-    rascunho: 'border-l-gray-300',
-  }
-  const fmt = (v: number) =>
+  const fmtCard = (v: number) =>
     v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 })
   const fmtData = (d: string) =>
     new Date(d).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })
 
   return (
     <div className={`bg-white rounded-2xl shadow-card border-l-4 ${STATUS_BORDER[r.status] ?? 'border-l-gray-200'} pl-3 pr-4 py-3`}>
-      <div className="flex justify-between items-start gap-2">
-        <span className="text-[10px] font-mono text-gray-400 mt-0.5">{r.numero}</span>
+      {/* Número + Status */}
+      <div className="flex justify-between items-center gap-2">
+        <span className="text-[10px] font-mono text-gray-400">{r.numero}</span>
         <StatusBadge status={r.status as StatusRequisicao} />
       </div>
+
+      {/* Descrição */}
       <p className="text-sm font-semibold text-gray-800 mt-1 line-clamp-1">{r.descricao}</p>
-      <div className="flex items-center justify-between mt-2">
-        <span className="text-xs text-gray-400">{r.obra_nome}</span>
-        <span className="text-sm font-bold text-primary">{fmt(r.valor_estimado)}</span>
+
+      {/* Obra + Valor */}
+      <div className="flex items-center justify-between mt-1.5">
+        <span className="text-xs text-gray-400 truncate max-w-[55%]">{r.obra_nome}</span>
+        <span className="text-sm font-extrabold text-primary">{fmtCard(r.valor_estimado)}</span>
       </div>
-      <div className="flex items-center justify-between mt-1">
-        <span className="text-xs text-gray-400">{r.solicitante_nome}</span>
-        <span className="text-xs text-gray-400">{fmtData(r.created_at)}</span>
+
+      {/* Comprador + Data */}
+      <div className="flex items-center justify-between mt-2 pt-2 border-t border-gray-50">
+        {r.comprador_nome ? (
+          <div className="flex items-center gap-1.5">
+            <Avatar nome={r.comprador_nome} size="sm" />
+            <span className="text-xs font-semibold text-gray-700">{r.comprador_nome.split(' ')[0]}</span>
+          </div>
+        ) : (
+          <span className="text-xs text-gray-300 italic">Sem comprador</span>
+        )}
+        <span className="text-xs text-gray-400">{r.solicitante_nome} · {fmtData(r.created_at)}</span>
       </div>
     </div>
   )
