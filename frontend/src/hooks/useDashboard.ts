@@ -39,11 +39,16 @@ async function fetchDashboardDireto(periodo: string): Promise<DashboardData> {
     dataInicio = new Date(agora)
     dataInicio.setDate(agora.getDate() - agora.getDay())
     dataInicio.setHours(0, 0, 0, 0)
+  } else if (periodo === 'mes') {
+    dataInicio = new Date(agora.getFullYear(), agora.getMonth(), 1)
   } else if (periodo === 'trimestre') {
     const mes = Math.floor(agora.getMonth() / 3) * 3
     dataInicio = new Date(agora.getFullYear(), mes, 1)
+  } else if (periodo === 'ano') {
+    dataInicio = new Date(agora.getFullYear(), 0, 1)
   } else {
-    dataInicio = new Date(agora.getFullYear(), agora.getMonth(), 1)
+    // 'tudo' e qualquer outro: retorna desde 2000
+    dataInicio = new Date('2000-01-01T00:00:00Z')
   }
 
   const [reqRes, aprRes] = await Promise.all([
@@ -100,10 +105,16 @@ async function fetchDashboardDireto(periodo: string): Promise<DashboardData> {
   }
 }
 
-export function useDashboard(periodo = 'mes', obraId?: string) {
+export function useDashboard(periodo = 'trimestre', obraId?: string) {
   return useQuery<DashboardData>({
     queryKey: ['dashboard', periodo, obraId],
     queryFn: async () => {
+      // Para 'tudo' e 'ano', o RPC antigo tem bug no DB (ELSE mapeia para mês atual).
+      // Usar direto fetchDashboardDireto que trata todos os períodos corretamente.
+      if (periodo === 'tudo' || periodo === 'ano') {
+        return fetchDashboardDireto(periodo)
+      }
+
       // RPC com timeout de 12s para evitar loading eterno
       const controller = new AbortController()
       const timeoutId = setTimeout(() => controller.abort(), 12_000)
