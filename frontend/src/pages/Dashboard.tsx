@@ -1,9 +1,10 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { FileText, Clock, CheckCircle, DollarSign, AlertTriangle, Building2, Sparkles, RefreshCw } from 'lucide-react'
+import { FileText, Clock, CheckCircle, DollarSign, AlertTriangle, Building2, Sparkles, RefreshCw, Settings } from 'lucide-react'
 import { useDashboard } from '../hooks/useDashboard'
 import KpiCard from '../components/KpiCard'
 import StatusBadge from '../components/StatusBadge'
+import { isPlaceholder } from '../services/supabase'
 import type { StatusRequisicao, DashboardData } from '../types'
 
 const fmt = (v: number) =>
@@ -21,14 +22,26 @@ export default function Dashboard() {
   const [periodo, setPeriodo] = useState('mes')
   const { data, isLoading, isError, error, refetch } = useDashboard(periodo)
 
+  // Detecta ambiente sem variáveis de ambiente configuradas
+  if (isPlaceholder) return <SetupRequired />
+
   if (isLoading) return <Loader />
 
   if (isError) {
+    // Extrai mensagem legível de PostgrestError ou qualquer tipo de erro
+    const errObj = error as Record<string, unknown> | null
+    const errMsg =
+      (errObj?.message as string) ||
+      (errObj?.details as string) ||
+      (typeof error === 'string' ? error : 'Erro desconhecido')
+    const errCode = (errObj?.code as string) || (errObj?.hint as string) || ''
+
     return (
       <div className="flex flex-col items-center justify-center py-16 gap-4">
-        <div className="text-center">
+        <div className="text-center max-w-xs">
           <p className="text-gray-700 font-medium mb-1">Erro ao carregar dados</p>
-          <p className="text-xs text-gray-400">{String(error)}</p>
+          <p className="text-xs text-red-500 font-mono mb-1">{errMsg}</p>
+          {errCode && <p className="text-xs text-gray-400 font-mono">{errCode}</p>}
         </div>
         <button
           onClick={() => refetch()}
@@ -152,6 +165,48 @@ function Loader() {
   return (
     <div className="flex items-center justify-center py-20">
       <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+    </div>
+  )
+}
+
+function SetupRequired() {
+  return (
+    <div className="flex flex-col items-center justify-center py-10 gap-4 px-4">
+      <div className="bg-amber-50 border border-amber-200 rounded-2xl p-6 w-full max-w-sm space-y-4">
+        <div className="flex items-center gap-3">
+          <Settings className="w-6 h-6 text-amber-500 shrink-0" />
+          <h2 className="font-bold text-gray-800">Configuração necessária</h2>
+        </div>
+        <p className="text-sm text-gray-600">
+          As variáveis de ambiente do Supabase não foram configuradas no Vercel.
+        </p>
+        <div className="space-y-2 text-xs font-mono bg-gray-900 text-green-400 rounded-lg p-3">
+          <p className="text-gray-400"># Vercel → Settings → Environment Variables</p>
+          <p>VITE_SUPABASE_URL</p>
+          <p className="text-gray-500 pl-2">https://uzfjfucrinokeuwpbeie.supabase.co</p>
+          <p className="mt-2">VITE_SUPABASE_ANON_KEY</p>
+          <p className="text-gray-500 pl-2">← copiar do Supabase Dashboard</p>
+        </div>
+        <a
+          href="https://supabase.com/dashboard/project/uzfjfucrinokeuwpbeie/settings/api"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="block text-center text-xs bg-primary text-white rounded-lg py-2 px-4 font-medium hover:opacity-90"
+        >
+          1. Copiar Anon Key no Supabase →
+        </a>
+        <a
+          href="https://vercel.com/dashboard"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="block text-center text-xs bg-gray-800 text-white rounded-lg py-2 px-4 font-medium hover:opacity-90"
+        >
+          2. Configurar no Vercel →
+        </a>
+        <p className="text-xs text-gray-400 text-center">
+          Após salvar, faça um novo deploy e atualize esta página.
+        </p>
+      </div>
     </div>
   )
 }

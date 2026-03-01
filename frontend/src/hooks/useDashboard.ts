@@ -61,6 +61,7 @@ async function fetchDashboardDireto(periodo: string): Promise<DashboardData> {
       .limit(10),
   ])
 
+  // Apenas requisições são obrigatórias; aprovações são opcionais (tabela sem FK)
   if (reqRes.error) throw reqRes.error
 
   const requisicoes = (reqRes.data ?? []) as Requisicao[]
