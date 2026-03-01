@@ -234,15 +234,15 @@ export default function Perfil() {
   const [toast,      setToast]      = useState<string | null>(null)
   const [retrying,   setRetrying]   = useState(false)
 
-  // Ainda carregando auth ou perfil
-  if (loading || !perfilReady) return (
+  // loading=true → auth ainda inicializando (onAuthStateChange não disparou ainda)
+  if (loading) return (
     <div className="flex flex-col items-center justify-center h-40 gap-3">
       <span className="w-6 h-6 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
       <p className="text-xs text-slate-400">Carregando perfil...</p>
     </div>
   )
 
-  // Auth ok mas perfil não carregou (tabela não existe ou sem permissão)
+  // loading=false mas perfil=null → tabela não existe ou sem permissão
   if (!perfil) return (
     <div className="flex flex-col items-center justify-center h-52 gap-4 text-center">
       <div className="w-14 h-14 rounded-2xl bg-amber-100 flex items-center justify-center">

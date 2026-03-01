@@ -24,6 +24,11 @@ interface InputFieldProps {
 function InputField({
   label, type = 'text', value, onChange, placeholder, autoFocus, icon: Icon, suffix,
 }: InputFieldProps) {
+  // autoComplete correto evita que o browser autofill pule de campo
+  const autoComplete = type === 'password' ? 'current-password'
+    : type === 'email'    ? 'username email'
+    : 'off'
+
   return (
     <div>
       <label className="block text-xs font-semibold text-slate-600 mb-1.5">{label}</label>
@@ -35,6 +40,7 @@ function InputField({
           onChange={e => onChange(e.target.value)}
           placeholder={placeholder}
           autoFocus={autoFocus}
+          autoComplete={autoComplete}
           required
           className="w-full pl-9 pr-10 py-2.5 rounded-xl border border-slate-200 text-sm
             focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary

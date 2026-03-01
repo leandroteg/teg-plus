@@ -1,6 +1,6 @@
 import {
   createContext, useContext, useEffect, useState,
-  useCallback, ReactNode,
+  useCallback, useRef, ReactNode,
 } from 'react'
 import { User, Session } from '@supabase/supabase-js'
 import { supabase } from '../services/supabase'
@@ -29,7 +29,6 @@ export const ROLE_COLOR: Record<Role, { bg: string; text: string; dot: string }>
   visitante:    { bg: 'bg-slate-100',  text: 'text-slate-600',  dot: 'bg-slate-400'  },
 }
 
-// Hierarquia numérica: quanto maior, mais acesso
 export const ROLE_NIVEL: Record<Role, number> = {
   admin: 5, gerente: 4, aprovador: 3,
   comprador: 2, requisitante: 1, visitante: 0,
@@ -61,7 +60,6 @@ export interface Perfil {
   updated_at: string
 }
 
-// Módulos do ERP (extensível)
 export const MODULOS_ERP = [
   { key: 'compras',     label: 'Compras',     icon: '🛒' },
   { key: 'financeiro',  label: 'Financeiro',  icon: '💰' },
@@ -74,30 +72,26 @@ export const MODULOS_ERP = [
 // ── Context ────────────────────────────────────────────────────────────────────
 
 interface AuthContextType {
-  // Estado
   user: User | null
   perfil: Perfil | null
   session: Session | null
   loading: boolean
-  perfilReady: boolean   // true após loadPerfil finalizar (sucesso ou falha)
+  perfilReady: boolean
 
-  // Ações de auth
   signIn: (email: string, password: string) => Promise<{ error: string | null }>
   signInMagicLink: (email: string) => Promise<{ error: string | null }>
   signOut: () => Promise<void>
   resetPassword: (email: string) => Promise<{ error: string | null }>
   updatePassword: (newPassword: string) => Promise<{ error: string | null }>
 
-  // Ações de perfil
   updatePerfil: (data: Partial<Pick<Perfil, 'nome' | 'cargo' | 'departamento'>>) => Promise<{ error: string | null }>
   reloadPerfil: () => Promise<void>
 
-  // Helpers de permissão (uso nos componentes)
   role: Role
   roleLabel: string
   isAdmin: boolean
-  isGerente: boolean       // gerente ou acima
-  canManage: boolean       // pode gerenciar usuários
+  isGerente: boolean
+  canManage: boolean
   hasModule: (mod: string) => boolean
   canApprove: (nivel: number) => boolean
   atLeast: (role: Role) => boolean
@@ -114,8 +108,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading,     setLoading]     = useState(true)
   const [perfilReady, setPerfilReady] = useState(false)
 
-  // Carrega perfil do Supabase (com auto-provisionamento)
+  // Guard: evita chamadas concorrentes a loadPerfil
+  const loadingRef = useRef(false)
+
+  // ── loadPerfil ───────────────────────────────────────────────────
+  // Busca perfil do DB. Se não existir, tenta criar (auto-provisionamento).
+  // Se sessão inválida (user deletado), força logout.
   const loadPerfil = useCallback(async (authId: string) => {
+    if (loadingRef.current) return
+    loadingRef.current = true
+
     try {
       const { data, error } = await supabase
         .from('sys_perfis')
@@ -126,74 +128,79 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (data) {
         setPerfil(data as Perfil)
         supabase.rpc('registrar_acesso', { p_auth_id: authId })
-        setPerfilReady(true)
         return
       }
 
-      // Perfil não existe (usuário criado antes do trigger) → cria automaticamente
+      // PGRST116 = nenhuma linha encontrada → tenta criar perfil
       if (error?.code === 'PGRST116') {
+        // Verifica se a sessão ainda é válida (servidor)
         const { data: { user: authUser }, error: sessErr } = await supabase.auth.getUser()
 
-        // Sessão inválida (usuário foi deletado do Supabase) → force logout
         if (sessErr || !authUser) {
+          // Sessão inválida (user foi deletado) → limpa localmente e redireciona
           await supabase.auth.signOut()
-          setPerfilReady(true)
           return
         }
 
         const email = authUser.email ?? ''
-        const nome = (authUser.user_metadata?.full_name as string)
+        const nome  = (authUser.user_metadata?.full_name as string)
           || (authUser.user_metadata?.nome as string)
           || email.split('@')[0]
 
-        const { data: criado, error: errCriar } = await supabase
+        const { data: criado } = await supabase
           .from('sys_perfis')
           .insert({ auth_id: authId, nome, email })
           .select()
           .single()
 
-        if (!errCriar && criado) {
-          setPerfil(criado as Perfil)
-        }
+        if (criado) setPerfil(criado as Perfil)
       }
-      // Outros erros (tabela não existe etc.) → perfil null, sem crash
+      // Outros erros (tabela não criada etc.) → perfil null, sem crash
     } catch {
-      // Silencioso: app funciona degradado sem perfil
+      // Silencioso
     } finally {
+      loadingRef.current = false
       setPerfilReady(true)
     }
   }, [])
 
   const reloadPerfil = useCallback(async () => {
+    setPerfilReady(false)
     if (user?.id) await loadPerfil(user.id)
   }, [user, loadPerfil])
 
-  // Inicializa sessão e ouve mudanças
+  // ── Inicialização: ÚNICO source of truth = onAuthStateChange ────
+  // NÃO usar getSession().then() junto — causa race condition onde
+  // loadPerfil é chamado duas vezes e setLoading(false) fica em conflito.
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session)
-      setUser(session?.user ?? null)
-      if (session?.user) {
-        loadPerfil(session.user.id).finally(() => setLoading(false))
-      } else {
-        setLoading(false)
-      }
-    })
-
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
+      async (_event, session) => {
         setSession(session)
         setUser(session?.user ?? null)
+
         if (session?.user) {
           await loadPerfil(session.user.id)
         } else {
+          // Sem sessão (logout, user deletado, não logado)
           setPerfil(null)
+          setPerfilReady(true)
         }
+
         setLoading(false)
       }
     )
 
-    return () => subscription.unsubscribe()
+    // Safety net: se onAuthStateChange não disparar em 8s (rede lenta, etc.)
+    // força loading=false para não travar o app
+    const safety = setTimeout(() => {
+      setLoading(false)
+      setPerfilReady(true)
+    }, 8000)
+
+    return () => {
+      subscription.unsubscribe()
+      clearTimeout(safety)
+    }
   }, [loadPerfil])
 
   // ── Auth actions ─────────────────────────────────────────────────
@@ -213,9 +220,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signOut = async () => {
     await supabase.auth.signOut()
-    setPerfil(null)
-    setUser(null)
-    setSession(null)
+    // onAuthStateChange(SIGNED_OUT) vai limpar o resto
   }
 
   const resetPassword = async (email: string) => {
@@ -265,7 +270,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     updatePerfil,
     reloadPerfil,
     role,
-    roleLabel: ROLE_LABEL[role],
+    roleLabel:  ROLE_LABEL[role],
     isAdmin:    role === 'admin',
     isGerente:  ROLE_NIVEL[role] >= ROLE_NIVEL['gerente'],
     canManage:  role === 'admin',
@@ -293,8 +298,8 @@ function translateError(msg: string): string {
   if (msg.includes('Too many requests'))           return 'Muitas tentativas. Aguarde um momento'
   if (msg.includes('User already registered'))     return 'Este e-mail já está cadastrado'
   if (msg.includes('Email rate limit exceeded'))   return 'Limite de e-mails atingido. Tente mais tarde'
-  if (msg.includes('Password should be'))         return 'A senha deve ter pelo menos 6 caracteres'
-  if (msg.includes('New password should be'))     return 'A nova senha deve ter pelo menos 6 caracteres'
-  if (msg.includes('same password'))              return 'A nova senha deve ser diferente da atual'
+  if (msg.includes('Password should be'))          return 'A senha deve ter pelo menos 6 caracteres'
+  if (msg.includes('New password should be'))      return 'A nova senha deve ter pelo menos 6 caracteres'
+  if (msg.includes('same password'))               return 'A nova senha deve ser diferente da atual'
   return msg
 }
