@@ -112,18 +112,43 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [perfil,  setPerfil]  = useState<Perfil | null>(null)
   const [loading, setLoading] = useState(true)
 
-  // Carrega perfil do Supabase
+  // Carrega perfil do Supabase (com auto-provisionamento)
   const loadPerfil = useCallback(async (authId: string) => {
-    const { data, error } = await supabase
-      .from('sys_perfis')
-      .select('*')
-      .eq('auth_id', authId)
-      .single()
+    try {
+      const { data, error } = await supabase
+        .from('sys_perfis')
+        .select('*')
+        .eq('auth_id', authId)
+        .single()
 
-    if (!error && data) {
-      setPerfil(data as Perfil)
-      // Registra acesso em background (sem await para não bloquear UI)
-      supabase.rpc('registrar_acesso', { p_auth_id: authId })
+      if (data) {
+        setPerfil(data as Perfil)
+        supabase.rpc('registrar_acesso', { p_auth_id: authId })
+        return
+      }
+
+      // Perfil não existe (usuário criado antes do trigger) → cria automaticamente
+      if (error?.code === 'PGRST116') {
+        const { data: { user: authUser } } = await supabase.auth.getUser()
+        const email = authUser?.email ?? ''
+        const nome = (authUser?.user_metadata?.full_name as string)
+          || (authUser?.user_metadata?.nome as string)
+          || email.split('@')[0]
+
+        const { data: criado, error: errCriar } = await supabase
+          .from('sys_perfis')
+          .insert({ auth_id: authId, nome, email })
+          .select()
+          .single()
+
+        if (!errCriar && criado) {
+          setPerfil(criado as Perfil)
+        }
+        // Se INSERT falhou (sem policy), perfil fica null — app funciona sem crash
+      }
+      // Outros erros (tabela não existe etc.) → perfil null, sem crash
+    } catch {
+      // Silencioso: app funciona degradado sem perfil
     }
   }, [])
 
