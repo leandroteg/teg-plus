@@ -3,28 +3,41 @@ import type { Cotacao, NovaCotacaoPayload } from '../types'
 import { supabase } from '../services/supabase'
 import { api } from '../services/api'
 
+// Tabelas: cmp_cotacoes, cmp_cotacao_fornecedores (módulo Compras)
+const TABLE_COT  = 'cmp_cotacoes'
+const TABLE_FORN = 'cmp_cotacao_fornecedores'
+
+const SELECT_COTACAO = `
+  id, requisicao_id, comprador_id, status,
+  fornecedor_selecionado_id, valor_selecionado, fornecedor_selecionado_nome,
+  observacao, data_limite, data_conclusao, created_at,
+  requisicao:cmp_requisicoes(
+    id, numero, solicitante_nome, obra_nome, descricao,
+    valor_estimado, urgencia, status, alcada_nivel, categoria, created_at
+  ),
+  comprador:cmp_compradores(nome, email)
+`
+
+const SELECT_COTACAO_FULL = `
+  ${SELECT_COTACAO},
+  fornecedores:cmp_cotacao_fornecedores(*)
+`
+
 export function useCotacoes(compradorId?: string, status?: string) {
   return useQuery<Cotacao[]>({
     queryKey: ['cotacoes', compradorId, status],
     queryFn: async () => {
       let query = supabase
-        .from('cotacoes')
-        .select(`
-          id, requisicao_id, comprador_id, status,
-          fornecedor_selecionado_id, valor_selecionado,
-          observacao, data_limite, data_conclusao, created_at,
-          requisicao:requisicoes(id, numero, solicitante_nome, obra_nome, descricao, valor_estimado, urgencia, status, alcada_nivel, categoria, created_at),
-          comprador:compradores(nome, email)
-        `)
+        .from(TABLE_COT)
+        .select(SELECT_COTACAO)
         .order('created_at', { ascending: false })
 
       if (compradorId) query = query.eq('comprador_id', compradorId)
-      if (status) query = query.eq('status', status)
+      if (status)      query = query.eq('status', status)
 
       const { data, error } = await query
       if (error) throw error
 
-      // Flatten comprador nome
       return ((data ?? []) as unknown[]).map((c: unknown) => {
         const cot = c as Record<string, unknown>
         const comprador = cot.comprador as Record<string, string> | null
@@ -43,15 +56,8 @@ export function useCotacao(id?: string) {
     enabled: !!id,
     queryFn: async () => {
       const { data, error } = await supabase
-        .from('cotacoes')
-        .select(`
-          id, requisicao_id, comprador_id, status,
-          fornecedor_selecionado_id, valor_selecionado,
-          observacao, data_limite, data_conclusao, created_at,
-          requisicao:requisicoes(id, numero, solicitante_nome, obra_nome, descricao, valor_estimado, urgencia, status, alcada_nivel, categoria, created_at),
-          comprador:compradores(nome, email),
-          fornecedores:cotacao_fornecedores(*)
-        `)
+        .from(TABLE_COT)
+        .select(SELECT_COTACAO_FULL)
         .eq('id', id!)
         .single()
 

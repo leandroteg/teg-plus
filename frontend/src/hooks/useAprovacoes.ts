@@ -3,25 +3,35 @@ import type { AprovacaoPendente } from '../types'
 import { supabase } from '../services/supabase'
 import { api } from '../services/api'
 
+// Tabelas: apr_aprovacoes (módulo Aprovações — ApprovaAi)
+const TABLE_APR = 'apr_aprovacoes'
+const TABLE_REQ = 'cmp_requisicoes'
+
 export function useAprovacoesPendentes() {
   return useQuery<AprovacaoPendente[]>({
     queryKey: ['aprovacoes-pendentes'],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from('aprovacoes')
+        .from(TABLE_APR)
         .select(`
-          id, requisicao_id, aprovador_nome, aprovador_email,
+          id, entidade_id, aprovador_nome, aprovador_email,
           nivel, status, observacao, token, data_limite,
-          requisicao:requisicoes(
+          requisicao:cmp_requisicoes(
             id, numero, solicitante_nome, obra_nome, descricao,
             valor_estimado, urgencia, status, alcada_nivel, categoria, created_at
           )
         `)
         .eq('status', 'pendente')
+        .eq('modulo', 'cmp')
         .order('created_at', { ascending: false })
 
       if (error) throw error
-      return (data ?? []) as unknown as AprovacaoPendente[]
+
+      // Mapeia entidade_id → requisicao_id para compatibilidade com o tipo
+      return ((data ?? []) as unknown[]).map((a: unknown) => {
+        const apr = a as Record<string, unknown>
+        return { ...apr, requisicao_id: apr.entidade_id } as AprovacaoPendente
+      })
     },
     refetchInterval: 15_000,
     retry: 1,

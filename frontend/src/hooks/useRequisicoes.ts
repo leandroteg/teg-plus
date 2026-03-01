@@ -3,13 +3,21 @@ import type { Requisicao, NovaRequisicaoPayload } from '../types'
 import { supabase } from '../services/supabase'
 import { api } from '../services/api'
 
+// Tabelas: cmp_requisicoes (módulo Compras)
+const TABLE = 'cmp_requisicoes'
+
 export function useRequisicoes(status?: string, search?: string) {
   return useQuery<Requisicao[]>({
     queryKey: ['requisicoes', status, search],
     queryFn: async () => {
       let query = supabase
-        .from('requisicoes')
-        .select('id, numero, solicitante_nome, obra_nome, obra_id, descricao, justificativa, valor_estimado, urgencia, status, alcada_nivel, categoria, comprador_id, texto_original, ai_confianca, created_at')
+        .from(TABLE)
+        .select(`
+          id, numero, solicitante_nome, obra_nome, obra_id,
+          descricao, justificativa, valor_estimado, urgencia, status,
+          alcada_nivel, categoria, comprador_id, texto_original, ai_confianca,
+          created_at
+        `)
         .order('created_at', { ascending: false })
         .limit(100)
 
