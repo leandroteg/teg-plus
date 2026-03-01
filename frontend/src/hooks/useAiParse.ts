@@ -19,28 +19,48 @@ function parseLocal(texto: string): AiParseResult {
   if (lower.match(/critica|emergencia|imediato/)) urgencia_sugerida = 'critica'
   else if (lower.match(/urgente|urgencia|rapido/)) urgencia_sugerida = 'urgente'
 
+  // Categorias reais do PDF (12 categorias → 3 compradores)
   const catKeywords: Record<string, string[]> = {
-    eletrico: ['cabo', 'fio', 'condutor', 'xlpe', 'disjuntor', 'transformador', 'isolador', 'conector', 'terminal', 'tc', 'tp', 'barramento'],
-    epi: ['epi', 'luva', 'capacete', 'bota', 'oculos', 'cinto', 'mascara', 'uniforme'],
-    civil: ['cimento', 'areia', 'brita', 'concreto', 'ferro', 'forma', 'madeira', 'tijolo', 'tubo', 'pvc'],
-    ferramentas: ['chave', 'alicate', 'martelo', 'furadeira', 'serra', 'esmerilhadeira', 'multimetro'],
-    servicos: ['locacao', 'aluguel', 'guindaste', 'munck', 'caminhao', 'transporte', 'frete', 'topografia'],
-    consumo: ['papel', 'toner', 'limpeza', 'agua', 'combustivel', 'diesel', 'tinta', 'oleo'],
+    // Lauany — Materiais de Obra
+    materiais_obra:  ['cabo', 'fio', 'condutor', 'xlpe', 'disjuntor', 'transformador', 'isolador', 'conector', 'terminal', 'tc', 'tp', 'barramento', 'cimento', 'areia', 'brita', 'concreto', 'ferro', 'forma', 'madeira', 'tijolo', 'tubo', 'pvc', 'eletroduto'],
+    // Lauany — EPI e EPC
+    epi_epc:         ['epi', 'luva', 'capacete', 'bota', 'oculos', 'cinto', 'mascara', 'uniforme', 'colete', 'epc', 'protetor'],
+    // Lauany — Ferramental
+    ferramental:     ['chave', 'alicate', 'martelo', 'furadeira', 'serra', 'esmerilhadeira', 'multimetro', 'ferramenta', 'talha', 'andaime'],
+    // Fernando — Frota e Equipamentos
+    frota_equip:     ['veiculo', 'caminhao', 'guincho', 'guindaste', 'munck', 'trator', 'maquina', 'equipamento', 'frota', 'onibus'],
+    // Fernando — Contratação de Serviços
+    servicos:        ['locacao', 'aluguel', 'topografia', 'servico', 'contratacao', 'manutencao', 'limpeza_industrial', 'vigilancia'],
+    // Fernando — Locação Veículos
+    locacao_veic:    ['locacao veiculo', 'aluguel carro', 'locadora', 'frete', 'transporte', 'transfer'],
+    // Aline — Mobilização
+    mobilizacao:     ['mobilizacao', 'deslocamento', 'passagem', 'aerea', 'hotel'],
+    // Aline — Alimentação
+    alimentacao:     ['alimentacao', 'refeicao', 'marmita', 'restaurante', 'agua', 'coffee', 'lanche', 'cafe'],
+    // Aline — Escritório
+    escritorio:      ['papel', 'toner', 'impressao', 'cartucho', 'material escritorio', 'caneta', 'limpeza'],
+    // Lauany — Centro de Distribuição / outros
+    consumo:         ['combustivel', 'diesel', 'gasolina', 'oleo', 'tinta', 'solvente', 'graxa'],
   }
-  let categoria_sugerida = 'consumo'
+  let categoria_sugerida = 'materiais_obra'
   for (const [cat, kws] of Object.entries(catKeywords)) {
     if (kws.some(kw => lower.includes(kw))) { categoria_sugerida = cat; break }
   }
 
+  // Compradores reais (Lauany / Fernando / Aline)
   const compradorMap: Record<string, { id: string; nome: string }> = {
-    eletrico: { id: 'comp-1', nome: 'Marcos Almeida' },
-    ferramentas: { id: 'comp-1', nome: 'Marcos Almeida' },
-    civil: { id: 'comp-2', nome: 'Patricia Souza' },
-    consumo: { id: 'comp-2', nome: 'Patricia Souza' },
-    epi: { id: 'comp-3', nome: 'Ricardo Santos' },
-    servicos: { id: 'comp-3', nome: 'Ricardo Santos' },
+    materiais_obra: { id: 'lauany',   nome: 'Lauany'   },
+    epi_epc:        { id: 'lauany',   nome: 'Lauany'   },
+    ferramental:    { id: 'lauany',   nome: 'Lauany'   },
+    frota_equip:    { id: 'fernando', nome: 'Fernando' },
+    servicos:       { id: 'fernando', nome: 'Fernando' },
+    locacao_veic:   { id: 'fernando', nome: 'Fernando' },
+    mobilizacao:    { id: 'aline',    nome: 'Aline'    },
+    alimentacao:    { id: 'aline',    nome: 'Aline'    },
+    escritorio:     { id: 'aline',    nome: 'Aline'    },
+    consumo:        { id: 'lauany',   nome: 'Lauany'   },
   }
-  const comprador_sugerido = compradorMap[categoria_sugerida]
+  const comprador_sugerido = compradorMap[categoria_sugerida] ?? { id: 'lauany', nome: 'Lauany' }
 
   const parts = texto.split(/[,\n]+/).map(p => p.trim()).filter(p => p.length > 2)
   const itens = parts.map(part => {
@@ -62,7 +82,7 @@ function parseLocal(texto: string): AiParseResult {
     urgencia_sugerida,
     categoria_sugerida,
     comprador_sugerido,
-    justificativa_sugerida: `Requisicao ${categoria_sugerida}`,
+    justificativa_sugerida: `Requisição de ${categoria_sugerida.replace(/_/g, ' ')}`,
     confianca: obra_sugerida ? 0.72 : 0.55,
   }
 }

@@ -19,8 +19,8 @@ const ETAPAS: Etapa[] = [
     statuses:   ['rascunho', 'pendente'],
   },
   {
-    label:      'Aprov. RC',
-    shortLabel: 'Aprov',
+    label:      'Valid. Técnica',
+    shortLabel: 'Val.T',
     statuses:   ['em_aprovacao', 'aprovada'],
   },
   {
