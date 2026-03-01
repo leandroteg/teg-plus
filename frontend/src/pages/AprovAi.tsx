@@ -1,17 +1,19 @@
 import { useState } from 'react'
 import {
   CheckCircle, XCircle, ChevronDown, ChevronUp,
-  Clock, Building, AlertTriangle, Sparkles,
+  Clock, Building, Sparkles, Shield, AlertTriangle,
 } from 'lucide-react'
 import { useAprovacoesPendentes, useProcessarAprovacaoAi } from '../hooks/useAprovacoes'
+import CotacaoComparativo from '../components/CotacaoComparativo'
+import FluxoTimeline from '../components/FluxoTimeline'
 import type { AprovacaoPendente } from '../types'
 
 const fmt = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
 
 const urgenciaConfig: Record<string, { bg: string; text: string; label: string }> = {
-  normal: { bg: 'bg-gray-100', text: 'text-gray-600', label: 'Normal' },
-  urgente: { bg: 'bg-amber-100', text: 'text-amber-700', label: 'Urgente' },
-  critica: { bg: 'bg-red-100', text: 'text-red-700', label: 'Critica' },
+  normal:  { bg: 'bg-slate-100',  text: 'text-slate-600',  label: 'Normal'  },
+  urgente: { bg: 'bg-amber-100',  text: 'text-amber-700',  label: 'Urgente' },
+  critica: { bg: 'bg-red-100',    text: 'text-red-700',    label: '⚡ Crítica' },
 }
 
 function timeLeft(dateStr?: string): string {
@@ -23,156 +25,177 @@ function timeLeft(dateStr?: string): string {
   return `${Math.floor(hours / 24)}d ${hours % 24}h`
 }
 
+// Determina nível e aprovador com base no valor
+function getAlcada(valor: number, nivel: number) {
+  if (valor <= 2000) return { label: `Alçada 1`, sublabel: `Welton ou Claudinor ≤ R$2.000` }
+  if (nivel <= 2)    return { label: 'Alçada 2', sublabel: 'Laucídio > R$2.000' }
+  return { label: 'Aprovação de Pagamento', sublabel: 'Laucídio — etapa final' }
+}
+
 function AprovacaoCard({ aprovacao }: { aprovacao: AprovacaoPendente }) {
   const mutation = useProcessarAprovacaoAi()
   const [expanded, setExpanded] = useState(false)
   const [observacao, setObservacao] = useState('')
   const [action, setAction] = useState<'aprovada' | 'rejeitada' | null>(null)
 
-  const req = aprovacao.requisicao
-  const cot = aprovacao.cotacao_resumo
-  const urg = urgenciaConfig[req.urgencia] || urgenciaConfig.normal
+  const req  = aprovacao.requisicao
+  const cot  = aprovacao.cotacao_resumo
+  const urg  = urgenciaConfig[req.urgencia] || urgenciaConfig.normal
+  const alc  = getAlcada(req.valor_estimado, aprovacao.nivel)
 
   const handleDecision = async (decisao: 'aprovada' | 'rejeitada') => {
     try {
       await mutation.mutateAsync({ token: aprovacao.token, decisao, observacao })
-    } catch {
-      // error displayed below
-    }
+    } catch { /* error handled */ }
   }
 
+  // ── Resultado ─────────────────────────────────────────────────────────────
   if (mutation.isSuccess) {
     return (
       <div className={`rounded-2xl p-6 text-center ${
         action === 'aprovada' ? 'bg-emerald-50 border-2 border-emerald-200' : 'bg-red-50 border-2 border-red-200'
       }`}>
-        {action === 'aprovada' ? (
-          <CheckCircle className="w-10 h-10 text-emerald-500 mx-auto mb-2" />
-        ) : (
-          <XCircle className="w-10 h-10 text-red-500 mx-auto mb-2" />
-        )}
-        <p className={`text-sm font-semibold ${action === 'aprovada' ? 'text-emerald-700' : 'text-red-700'}`}>
-          {req.numero} — {action === 'aprovada' ? 'Aprovada' : 'Rejeitada'}
+        {action === 'aprovada'
+          ? <CheckCircle size={44} className="text-emerald-500 mx-auto mb-3" />
+          : <XCircle    size={44} className="text-red-500    mx-auto mb-3" />}
+        <p className={`font-bold text-base ${action === 'aprovada' ? 'text-emerald-700' : 'text-red-700'}`}>
+          {req.numero} — {action === 'aprovada' ? 'Aprovada ✓' : 'Rejeitada'}
         </p>
+        <p className="text-xs text-slate-500 mt-1">Aprovador notificado automaticamente</p>
       </div>
     )
   }
 
+  // ── Card principal ────────────────────────────────────────────────────────
   return (
-    <div className="bg-white rounded-2xl shadow-md border border-gray-100 overflow-hidden">
+    <div className="bg-white rounded-2xl shadow-md border border-slate-100 overflow-hidden">
+      {/* Badge de nível / tipo */}
+      <div className="bg-indigo-600 px-4 py-2.5 flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <Shield size={14} className="text-indigo-200" />
+          <span className="text-xs font-bold text-white">{alc.label}</span>
+          <span className="text-indigo-300 text-[10px]">· {alc.sublabel}</span>
+        </div>
+        {aprovacao.data_limite && (
+          <span className="text-[10px] text-indigo-200 font-semibold flex items-center gap-1">
+            <Clock size={10} /> {timeLeft(aprovacao.data_limite)}
+          </span>
+        )}
+      </div>
+
       {/* Header */}
       <div className="p-4 pb-3">
         <div className="flex justify-between items-start mb-2">
           <div>
-            <p className="text-sm font-bold text-gray-800">{req.numero}</p>
-            <p className="text-xs text-gray-500">{req.solicitante_nome}</p>
+            <p className="text-sm font-bold text-slate-800">{req.numero}</p>
+            <p className="text-xs text-slate-500">{req.solicitante_nome}</p>
           </div>
           <span className={`px-2.5 py-1 rounded-full text-[10px] font-semibold ${urg.bg} ${urg.text}`}>
             {urg.label}
           </span>
         </div>
 
-        <p className="text-sm text-gray-700 mb-2">{req.descricao}</p>
+        <p className="text-sm text-slate-700 mb-3">{req.descricao}</p>
 
-        <div className="flex items-center gap-3 text-xs text-gray-500 mb-3">
-          <span className="flex items-center gap-1">
-            <Building className="w-3.5 h-3.5" /> {req.obra_nome}
-          </span>
-          {aprovacao.data_limite && (
-            <span className="flex items-center gap-1">
-              <Clock className="w-3.5 h-3.5" /> {timeLeft(aprovacao.data_limite)}
-            </span>
-          )}
-        </div>
-
-        {/* Valor + Cotacao */}
-        <div className="bg-gray-50 rounded-xl p-3 space-y-2">
-          <div className="flex justify-between items-center">
-            <span className="text-xs text-gray-500">Valor estimado</span>
-            <span className="text-base font-bold text-violet-600">{fmt(req.valor_estimado)}</span>
-          </div>
-          {cot && (
+        {/* Obra */}
+        <div className="flex items-center gap-1.5 text-xs text-slate-500 mb-3">
+          <Building size={12} /> {req.obra_nome}
+          {req.categoria && (
             <>
-              <div className="border-t border-gray-200 pt-2">
-                <div className="flex justify-between items-center">
-                  <span className="text-xs text-gray-500">Menor cotacao</span>
-                  <span className="text-base font-bold text-emerald-600">{fmt(cot.valor)}</span>
-                </div>
-                <div className="flex justify-between items-center mt-1">
-                  <span className="text-[10px] text-gray-400">{cot.fornecedor_nome}</span>
-                  <span className="text-[10px] text-gray-400">
-                    {cot.prazo_dias}d | {cot.total_cotados} cotados
-                  </span>
-                </div>
-              </div>
-              {cot.valor < req.valor_estimado && (
-                <div className="flex items-center gap-1 text-xs text-emerald-600">
-                  <Sparkles className="w-3 h-3" />
-                  Economia de {fmt(req.valor_estimado - cot.valor)} ({Math.round((1 - cot.valor / req.valor_estimado) * 100)}%)
-                </div>
-              )}
+              <span className="text-slate-300">·</span>
+              <span className="bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded">
+                {req.categoria.replace(/_/g, ' ')}
+              </span>
             </>
           )}
         </div>
 
-        {/* Expand */}
-        <button
-          type="button"
-          onClick={() => setExpanded(!expanded)}
-          className="flex items-center gap-1 text-xs text-violet-500 mt-2 mx-auto"
-        >
-          {expanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
-          {expanded ? 'Menos detalhes' : 'Mais detalhes'}
+        {/* FluxoTimeline compact */}
+        <FluxoTimeline status={req.status} compact className="mb-3" />
+
+        {/* Valor + Cotação */}
+        <div className="bg-slate-50 rounded-2xl p-3.5 space-y-2">
+          <div className="flex justify-between items-center">
+            <span className="text-xs text-slate-500">Valor estimado</span>
+            <span className="text-lg font-extrabold text-indigo-600">{fmt(req.valor_estimado)}</span>
+          </div>
+
+          {cot && (
+            <div className="border-t border-slate-200 pt-2 space-y-1.5">
+              <div className="flex justify-between items-center">
+                <span className="text-xs text-slate-500">Menor cotação</span>
+                <span className="text-lg font-extrabold text-emerald-600">{fmt(cot.valor)}</span>
+              </div>
+              <div className="flex justify-between text-[11px] text-slate-400">
+                <span>{cot.fornecedor_nome}</span>
+                <span>{cot.prazo_dias}d · {cot.total_cotados} cotado{cot.total_cotados !== 1 ? 's' : ''}</span>
+              </div>
+              {cot.valor < req.valor_estimado && (
+                <div className="flex items-center gap-1 text-xs text-emerald-600 font-semibold">
+                  <Sparkles size={11} />
+                  Economia de {fmt(req.valor_estimado - cot.valor)}{' '}
+                  ({Math.round((1 - cot.valor / req.valor_estimado) * 100)}%)
+                </div>
+              )}
+            </div>
+          )}
+
+          {!cot && req.valor_estimado > 2000 && (
+            <div className="flex items-center gap-1.5 text-[11px] text-amber-600">
+              <AlertTriangle size={11} /> Valor acima de R$2.000 — alçada Laucídio
+            </div>
+          )}
+        </div>
+
+        {/* Expandir para observação */}
+        <button type="button" onClick={() => setExpanded(!expanded)}
+          className="flex items-center gap-1 text-xs text-indigo-500 mt-3 mx-auto font-semibold">
+          {expanded ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
+          {expanded ? 'Menos detalhes' : 'Adicionar observação'}
         </button>
 
         {expanded && (
-          <div className="mt-3 space-y-2">
-            <div>
-              <label className="text-xs text-gray-400">Observacao (opcional)</label>
-              <textarea
-                rows={2}
-                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm mt-1"
-                placeholder="Adicionar observacao..."
-                value={observacao}
-                onChange={e => setObservacao(e.target.value)}
-              />
-            </div>
+          <div className="mt-3">
+            <label className="text-xs text-slate-400">Observação (opcional)</label>
+            <textarea
+              rows={2}
+              className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm mt-1 focus:ring-2 focus:ring-indigo-300 outline-none"
+              placeholder="Motivo da decisão..."
+              value={observacao}
+              onChange={e => setObservacao(e.target.value)}
+            />
           </div>
         )}
       </div>
 
-      {/* Action Buttons */}
-      <div className="grid grid-cols-2 border-t border-gray-100">
+      {/* Botões de ação — grandes para mobile */}
+      <div className="grid grid-cols-2 border-t border-slate-100">
         <button
           type="button"
           disabled={mutation.isPending}
           onClick={() => { setAction('rejeitada'); handleDecision('rejeitada') }}
-          className="flex items-center justify-center gap-2 py-4 text-sm font-semibold text-red-500 hover:bg-red-50 active:bg-red-100 transition border-r border-gray-100 disabled:opacity-50"
+          className="flex items-center justify-center gap-2 py-5 text-sm font-bold text-red-500 hover:bg-red-50 active:bg-red-100 transition border-r border-slate-100 disabled:opacity-50"
         >
-          {mutation.isPending && action === 'rejeitada' ? (
-            <div className="w-4 h-4 border-2 border-red-400 border-t-transparent rounded-full animate-spin" />
-          ) : (
-            <XCircle className="w-5 h-5" />
-          )}
-          Rejeitar
+          {mutation.isPending && action === 'rejeitada'
+            ? <div className="w-5 h-5 border-2 border-red-400 border-t-transparent rounded-full animate-spin" />
+            : <XCircle size={22} />}
+          <span className="text-base">Rejeitar</span>
         </button>
         <button
           type="button"
           disabled={mutation.isPending}
           onClick={() => { setAction('aprovada'); handleDecision('aprovada') }}
-          className="flex items-center justify-center gap-2 py-4 text-sm font-semibold text-emerald-600 hover:bg-emerald-50 active:bg-emerald-100 transition disabled:opacity-50"
+          className="flex items-center justify-center gap-2 py-5 text-sm font-bold text-emerald-600 hover:bg-emerald-50 active:bg-emerald-100 transition disabled:opacity-50"
         >
-          {mutation.isPending && action === 'aprovada' ? (
-            <div className="w-4 h-4 border-2 border-emerald-400 border-t-transparent rounded-full animate-spin" />
-          ) : (
-            <CheckCircle className="w-5 h-5" />
-          )}
-          Aprovar
+          {mutation.isPending && action === 'aprovada'
+            ? <div className="w-5 h-5 border-2 border-emerald-400 border-t-transparent rounded-full animate-spin" />
+            : <CheckCircle size={22} />}
+          <span className="text-base">Aprovar</span>
         </button>
       </div>
 
       {mutation.isError && (
-        <p className="text-red-500 text-xs text-center py-2">Erro ao processar. Tente novamente.</p>
+        <p className="text-red-500 text-xs text-center py-2 border-t border-red-100">Erro ao processar. Tente novamente.</p>
       )}
     </div>
   )
@@ -182,26 +205,28 @@ export default function AprovAi() {
   const { data: aprovacoes, isLoading } = useAprovacoesPendentes()
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-violet-600 via-indigo-600 to-violet-700">
+    <div className="min-h-screen"
+      style={{ background: 'linear-gradient(160deg, #312e81 0%, #4f46e5 40%, #6d28d9 100%)' }}>
+
       {/* Header */}
       <header className="px-4 pt-8 pb-6 text-center">
         <div className="flex items-center justify-center gap-2 mb-1">
-          <Sparkles className="w-6 h-6 text-violet-200" />
+          <Sparkles size={22} className="text-indigo-200" />
           <h1 className="text-2xl font-extrabold text-white tracking-tight">
-            Aprova<span className="text-violet-200">Ai</span>
+            Aprov<span className="text-indigo-200">Ai</span>
           </h1>
         </div>
-        <p className="text-violet-200 text-xs">Aprovacoes inteligentes com 1 toque</p>
+        <p className="text-indigo-300 text-xs font-medium">Aprovações inteligentes com 1 toque</p>
         {aprovacoes && (
-          <div className="mt-3 inline-flex items-center gap-1.5 bg-white/20 backdrop-blur-sm rounded-full px-4 py-1.5">
-            <span className="text-white text-sm font-bold">{aprovacoes.length}</span>
-            <span className="text-violet-200 text-xs">pendente{aprovacoes.length !== 1 ? 's' : ''}</span>
+          <div className="mt-3 inline-flex items-center gap-2 bg-white/15 backdrop-blur-sm rounded-full px-4 py-1.5">
+            <span className="text-white text-lg font-extrabold">{aprovacoes.length}</span>
+            <span className="text-indigo-200 text-xs">pendente{aprovacoes.length !== 1 ? 's' : ''}</span>
           </div>
         )}
       </header>
 
       {/* Content */}
-      <div className="px-4 pb-8 space-y-4">
+      <div className="px-4 pb-12 space-y-4">
         {isLoading && (
           <div className="flex justify-center py-12">
             <div className="w-8 h-8 border-3 border-white border-t-transparent rounded-full animate-spin" />
@@ -209,10 +234,10 @@ export default function AprovAi() {
         )}
 
         {!isLoading && (!aprovacoes || aprovacoes.length === 0) && (
-          <div className="text-center py-12">
-            <CheckCircle className="w-12 h-12 text-violet-300 mx-auto mb-3" />
-            <p className="text-white text-sm font-medium">Tudo aprovado!</p>
-            <p className="text-violet-200 text-xs mt-1">Nenhuma aprovacao pendente</p>
+          <div className="text-center py-14">
+            <CheckCircle size={52} className="text-indigo-300 mx-auto mb-3 opacity-80" />
+            <p className="text-white text-base font-bold">Tudo em dia!</p>
+            <p className="text-indigo-300 text-sm mt-1">Nenhuma aprovação pendente</p>
           </div>
         )}
 
@@ -221,9 +246,8 @@ export default function AprovAi() {
         ))}
       </div>
 
-      {/* Footer */}
-      <footer className="text-center pb-6">
-        <p className="text-violet-300 text-[10px]">TEG+ | TEG Uniao Engenharia</p>
+      <footer className="text-center pb-8">
+        <p className="text-indigo-400 text-[10px]">TEG+ · TEG União Engenharia</p>
       </footer>
     </div>
   )

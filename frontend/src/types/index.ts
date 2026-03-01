@@ -1,6 +1,9 @@
 export type StatusRequisicao =
   | 'rascunho' | 'pendente' | 'em_aprovacao'
   | 'aprovada' | 'rejeitada' | 'em_cotacao'
+  | 'cotacao_enviada' | 'cotacao_aprovada' | 'cotacao_rejeitada'
+  | 'pedido_emitido' | 'em_entrega' | 'entregue'
+  | 'aguardando_pgto' | 'pago'
   | 'comprada' | 'cancelada'
 
 export type Urgencia = 'normal' | 'urgente' | 'critica'
@@ -21,6 +24,32 @@ export interface CategoriaMaterial {
   keywords: string[]
   cor: string
   icone: string
+  // Dados reais (007_fluxo_real.sql)
+  comprador_nome?: string
+  alcada1_aprovador?: string
+  alcada1_limite?: number
+  cotacoes_regras?: { ate_500: number; '501_a_2k': number; acima_2k: number }
+  politica_resumo?: string
+}
+
+export interface Pedido {
+  id: string
+  requisicao_id?: string
+  cotacao_id?: string
+  comprador_id?: string
+  numero_pedido?: string
+  fornecedor_nome: string
+  valor_total?: number
+  status: 'emitido' | 'confirmado' | 'em_entrega' | 'entregue' | 'cancelado'
+  data_pedido?: string
+  data_prevista_entrega?: string
+  data_entrega_real?: string
+  nf_numero?: string
+  observacoes?: string
+  created_at: string
+  // Joins
+  requisicao?: Pick<Requisicao, 'numero' | 'descricao' | 'obra_nome' | 'categoria'>
+  comprador?: Pick<Comprador, 'nome'>
 }
 
 export interface Comprador {

@@ -1,7 +1,7 @@
 import { NavLink, Outlet, useNavigate } from 'react-router-dom'
 import {
   LayoutDashboard, PlusCircle, List, ShoppingCart,
-  User, LogOut, Shield, LayoutGrid,
+  User, LogOut, Shield, LayoutGrid, Truck,
 } from 'lucide-react'
 import { useAuth, ROLE_LABEL, ROLE_COLOR } from '../contexts/AuthContext'
 import LogoTeg from './LogoTeg'
@@ -12,6 +12,7 @@ const NAV = [
   { to: '/nova',        icon: PlusCircle,      label: 'Nova RC',     end: false },
   { to: '/requisicoes', icon: List,            label: 'Requisições', end: false },
   { to: '/cotacoes',    icon: ShoppingCart,    label: 'Cotações',    end: false },
+  { to: '/pedidos',     icon: Truck,           label: 'Pedidos',     end: false },
   { to: '/perfil',      icon: User,            label: 'Perfil',      end: false },
 ]
 

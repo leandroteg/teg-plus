@@ -16,6 +16,7 @@ import CotacaoForm from './pages/CotacaoForm'
 import Aprovacao from './pages/Aprovacao'
 import AprovAi from './pages/AprovAi'
 import Perfil from './pages/Perfil'
+import Pedidos from './pages/Pedidos'
 
 // Admin
 import AdminUsuarios from './pages/AdminUsuarios'
@@ -45,6 +46,7 @@ export default function App() {
             <Route path="/requisicoes" element={<ListaRequisicoes />} />
             <Route path="/cotacoes"    element={<FilaCotacoes />} />
             <Route path="/cotacoes/:id" element={<CotacaoForm />} />
+            <Route path="/pedidos"     element={<Pedidos />} />
             <Route path="/perfil"      element={<Perfil />} />
           </Route>
         </Route>
