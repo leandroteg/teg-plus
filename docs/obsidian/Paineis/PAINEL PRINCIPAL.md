@@ -138,6 +138,7 @@ LIMIT 8
 
 | Painel | |
 |--------|---|
+| [[BI Dashboard\|📊 BI Dashboard]] | Visão executiva visual |
 | [[Tasks Board\|📋 Tasks Board]] | Kanban de tarefas |
 | [[Roadmap Board\|🗺️ Roadmap]] | Timeline de milestones |
 | [[Issues Board\|🐛 Issues]] | Tracker de bugs |
