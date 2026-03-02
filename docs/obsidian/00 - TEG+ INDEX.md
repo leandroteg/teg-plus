@@ -14,7 +14,21 @@ atualizado: 2026-03-02
 
 ---
 
-## Navegação Rápida
+## 🏠 Painéis de Gestão
+
+| Painel | Descrição |
+|--------|-----------|
+| [[Paineis/PAINEL PRINCIPAL\|🏠 Painel Principal]] | Central de comando — KPIs, status, alertas |
+| [[Paineis/Tasks Board\|📋 Tasks Board]] | Kanban de tarefas por status e sprint |
+| [[Paineis/Roadmap Board\|🗺️ Roadmap]] | Timeline de milestones e progresso |
+| [[Paineis/Issues Board\|🐛 Issues Board]] | Tracker de bugs e problemas |
+| [[Paineis/Requisitos Board\|📦 Requisitos]] | Rastreabilidade de requisitos |
+
+> **Como usar:** edite os arquivos em `Database/Tarefas/`, `Database/Issues/`, `Database/Requisitos/` ou `Database/Milestones/` — os painéis atualizam automaticamente via Dataview.
+
+---
+
+## 📖 Documentação Técnica
 
 | Área | Nota |
 |------|------|
