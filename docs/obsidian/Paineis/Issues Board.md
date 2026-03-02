@@ -8,27 +8,26 @@ atualizado: 2026-03-02
 # 🐛 Issues Board — TEG+ ERP
 
 > Atualize `status` nas notas `ISSUE-XXX` para movimentar entre colunas.
-> **Status válidos:** `aberto` · `em-andamento` · `resolvido` · `wontfix`
 
 ---
 
 ## 🚨 Saúde do Projeto
 
 ```dataviewjs
-const issues    = dv.pages('').where(p => p.tipo === "issue");
-const abertos   = issues.where(i => i.status === "aberto");
-const criticos  = abertos.where(i => i.severidade === "critica");
-const altos     = abertos.where(i => i.severidade === "alta");
-const medios    = abertos.where(i => i.severidade === "media");
-const baixos    = abertos.where(i => i.severidade === "baixa");
-const resolvidos= issues.where(i => i.status === "resolvido");
+const issues     = dv.pages('"obsidian/Database/Issues"');
+const abertos    = issues.where(i => i.status === "aberto");
+const criticos   = abertos.where(i => i.severidade === "critica");
+const altos      = abertos.where(i => i.severidade === "alta");
+const medios     = abertos.where(i => i.severidade === "media");
+const baixos     = abertos.where(i => i.severidade === "baixa");
+const resolvidos = issues.where(i => i.status === "resolvido");
 
 const saude = criticos.length > 0 ? "🔴 ATENÇÃO" :
               altos.length > 1    ? "🟠 MODERADO" :
               abertos.length > 0  ? "🟡 ESTÁVEL"  : "✅ SAUDÁVEL";
 
 dv.paragraph(`
-| Estado | Issues Abertas | 🔴 Críticas | 🟠 Altas | 🟡 Médias | 🟢 Baixas | ✅ Resolvidas |
+| Estado | Abertas | 🔴 Críticas | 🟠 Altas | 🟡 Médias | 🟢 Baixas | ✅ Resolvidas |
 |:---:|:---:|:---:|:---:|:---:|:---:|:---:|
 | **${saude}** | **${abertos.length}** | ${criticos.length} | ${altos.length} | ${medios.length} | ${baixos.length} | ${resolvidos.length} |
 `);
@@ -44,8 +43,8 @@ TABLE WITHOUT ID
   modulo AS "Módulo",
   reportado_por AS "Por",
   data_report AS "Data"
-FROM ""
-WHERE tipo = "issue" AND status = "aberto" AND severidade = "critica"
+FROM "obsidian/Database/Issues"
+WHERE status = "aberto" AND severidade = "critica"
 SORT data_report ASC
 ```
 
@@ -59,8 +58,8 @@ TABLE WITHOUT ID
   modulo AS "Módulo",
   reportado_por AS "Por",
   data_report AS "Data"
-FROM ""
-WHERE tipo = "issue" AND status = "aberto" AND severidade = "alta"
+FROM "obsidian/Database/Issues"
+WHERE status = "aberto" AND severidade = "alta"
 SORT data_report ASC
 ```
 
@@ -74,8 +73,8 @@ TABLE WITHOUT ID
   modulo AS "Módulo",
   sprint AS "Sprint Alvo",
   data_report AS "Data"
-FROM ""
-WHERE tipo = "issue" AND status = "aberto" AND severidade = "media"
+FROM "obsidian/Database/Issues"
+WHERE status = "aberto" AND severidade = "media"
 SORT data_report ASC
 ```
 
@@ -88,8 +87,8 @@ TABLE WITHOUT ID
   ("[[" + file.name + "|" + titulo + "]]") AS "Issue",
   modulo AS "Módulo",
   sprint AS "Sprint Alvo"
-FROM ""
-WHERE tipo = "issue" AND status = "aberto" AND severidade = "baixa"
+FROM "obsidian/Database/Issues"
+WHERE status = "aberto" AND severidade = "baixa"
 ```
 
 ---
@@ -101,8 +100,8 @@ TABLE WITHOUT ID
   ("[[" + file.name + "|" + titulo + "]]") AS "Issue",
   choice(severidade = "critica","🔴 Crítica", choice(severidade = "alta","🟠 Alta", choice(severidade = "media","🟡 Média","🟢 Baixa"))) AS "Severidade",
   modulo AS "Módulo"
-FROM ""
-WHERE tipo = "issue" AND status = "em-andamento"
+FROM "obsidian/Database/Issues"
+WHERE status = "em-andamento"
 ```
 
 ---
@@ -114,8 +113,8 @@ TABLE WITHOUT ID
   ("[[" + file.name + "|" + titulo + "]]") AS "Issue",
   choice(severidade = "critica","🔴", choice(severidade = "alta","🟠", choice(severidade = "media","🟡","🟢"))) AS "Sev",
   modulo AS "Módulo"
-FROM ""
-WHERE tipo = "issue" AND status = "resolvido"
+FROM "obsidian/Database/Issues"
+WHERE status = "resolvido"
 SORT data_report DESC
 LIMIT 5
 ```
@@ -125,21 +124,22 @@ LIMIT 5
 ## 📊 Por Módulo
 
 ```dataviewjs
-const issues  = dv.pages('').where(p => p.tipo === "issue");
+const issues  = dv.pages('"obsidian/Database/Issues"');
 const modulos = [...new Set(issues.map(i => i.modulo).filter(Boolean))].sort();
 
-const rows = modulos.map(mod => {
-  const ms = issues.where(i => i.modulo === mod);
-  const crit = ms.where(i=>i.severidade==="critica"&&i.status==="aberto").length;
-  const alt  = ms.where(i=>i.severidade==="alta"&&i.status==="aberto").length;
-  return [
-    mod.charAt(0).toUpperCase() + mod.slice(1),
-    crit > 0 ? `🔴 ${crit}` : "—",
-    alt  > 0 ? `🟠 ${alt}`  : "—",
-    ms.where(i=>i.status==="aberto").length,
-    ms.where(i=>i.status==="resolvido").length
-  ];
-});
-
-dv.table(["Módulo","Críticas","Altas","Total Abertas","Resolvidas"], rows);
+dv.table(
+  ["Módulo","🔴 Críticas","🟠 Altas","Total Abertas","✅ Resolvidas"],
+  modulos.map(mod => {
+    const ms   = issues.where(i => i.modulo === mod);
+    const crit = ms.where(i=>i.severidade==="critica"&&i.status==="aberto").length;
+    const alt  = ms.where(i=>i.severidade==="alta"&&i.status==="aberto").length;
+    return [
+      mod.charAt(0).toUpperCase() + mod.slice(1),
+      crit > 0 ? `🔴 ${crit}` : "—",
+      alt  > 0 ? `🟠 ${alt}`  : "—",
+      ms.where(i=>i.status==="aberto").length,
+      ms.where(i=>i.status==="resolvido").length
+    ];
+  })
+);
 ```
