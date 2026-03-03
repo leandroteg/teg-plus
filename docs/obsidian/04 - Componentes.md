@@ -4,6 +4,7 @@ type: frontend
 status: ativo
 tags: [frontend, componentes, react, ui]
 criado: 2026-03-02
+atualizado: 2026-03-03
 relacionado: ["[[02 - Frontend Stack]]", "[[03 - Páginas e Rotas]]"]
 ---
 
@@ -13,47 +14,114 @@ relacionado: ["[[02 - Frontend Stack]]", "[[03 - Páginas e Rotas]]"]
 
 ```
 src/components/
-├── Layout.tsx           → Wrapper com sidebar e navegação
-├── PrivateRoute.tsx     → Guards de autenticação
-├── LogoTeg.tsx          → Logo animado TEG+
-├── CategoryCard.tsx     → Card de seleção de categoria
-├── CotacaoComparativo.tsx → Tabela comparativa de cotações
-├── FluxoTimeline.tsx    → Timeline visual do fluxo
-├── KpiCard.tsx          → Card de métrica KPI
-└── StatusBadge.tsx      → Badge de status colorido
+│
+├── ── Layouts de Módulo ──────────────────────────────────────────
+│   ├── Layout.tsx               → Sidebar Compras (teal)
+│   ├── FinanceiroLayout.tsx     → Sidebar Financeiro (emerald)
+│   ├── EstoqueLayout.tsx        → Sidebar Estoque (blue)
+│   ├── LogisticaLayout.tsx      → Sidebar Logística (orange)
+│   ├── FrotasLayout.tsx         → Sidebar Frotas (rose)
+│   └── RHLayout.tsx             → Sidebar RH (violet) [novo]
+│
+├── ── Auth & Navegação ───────────────────────────────────────────
+│   └── PrivateRoute.tsx         → Guards (PrivateRoute + AdminRoute)
+│
+├── ── UI / Feature ───────────────────────────────────────────────
+│   ├── BannerSlideshow.tsx      → Slideshow da tela inicial [novo]
+│   ├── LogoTeg.tsx              → Logo animado TEG+
+│   ├── CategoryCard.tsx         → Card de categoria (wizard)
+│   ├── CotacaoComparativo.tsx   → Tabela comparativa de cotações
+│   ├── FluxoTimeline.tsx        → Timeline do fluxo de requisição
+│   ├── KpiCard.tsx              → Card de métrica KPI
+│   └── StatusBadge.tsx          → Badge de status colorido
 ```
 
 ---
 
-## Componentes de Layout
+## Layouts de Módulo
 
-### `Layout.tsx`
-**Wrapper principal** do módulo Compras.
+Todos os layouts seguem o mesmo padrão arquitetural:
 
 ```
-┌─────────────────────────────────┐
-│  [Logo TEG+]  Sidebar Nav       │
-│  ─────────────────────────────  │
-│  • Dashboard                    │
-│  • Nova Requisição              │
-│  • Requisições                  │
-│  • Cotações                     │
-│  • Pedidos                      │
-│  ─────────────────────────────  │
-│  [Perfil]  [Sair]               │
-│─────────────────────────────────│
-│                                 │
-│     <Outlet /> (página)         │
-│                                 │
-└─────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────┐
+│  DESKTOP (md+)                                                  │
+│  ┌──────────────┬──────────────────────────────────────────┐   │
+│  │  Sidebar     │                                          │   │
+│  │  [Badge mod] │           <Outlet />                     │   │
+│  │  [Nav items] │        (conteúdo da página)              │   │
+│  │  [Footer]    │                                          │   │
+│  └──────────────┴──────────────────────────────────────────┘   │
+│                                                                 │
+│  MOBILE (< md)                                                  │
+│  ┌─────────────────────────────────────────────────────────┐   │
+│  │  Header: ícone + nome + ≡ menu                          │   │
+│  ├─────────────────────────────────────────────────────────┤   │
+│  │  [Drawer: nav items ao abrir ≡]                         │   │
+│  ├─────────────────────────────────────────────────────────┤   │
+│  │                  <Outlet />                             │   │
+│  └─────────────────────────────────────────────────────────┘   │
+└─────────────────────────────────────────────────────────────────┘
 ```
 
-Props: `children: ReactNode`
-Theme: Dark navy background, teal accent
+| Layout | Módulo | Accent | Nav items |
+|--------|--------|--------|-----------|
+| `Layout.tsx` | Compras | teal `#14B8A6` | Dashboard, Nova Req, Requisições, Cotações, Pedidos |
+| `FinanceiroLayout.tsx` | Financeiro | emerald `#10B981` | Painel, CP, CR, Aprovações, Conciliação, Relatórios, Fornecedores, Config |
+| `EstoqueLayout.tsx` | Estoque | blue `#3B82F6` | Painel, Itens, Movimentações, Inventário, Patrimonial |
+| `LogisticaLayout.tsx` | Logística | orange `#EA580C` | Painel, Transportes, Recebimentos, Expedição, Solicitações, Transportadoras |
+| `FrotasLayout.tsx` | Frotas | rose `#F43F5E` | Painel, Veículos, Ordens, Checklists, Abastecimentos, Telemetria |
+| `RHLayout.tsx` | RH | violet `#8B5CF6` | Painel, Mural de Recados (admin only 🔐) |
 
 ---
 
-### `PrivateRoute.tsx`
+## `BannerSlideshow.tsx` ⭐ (novo)
+
+**Slideshow cinematográfico** exibido entre o hero e a grade de módulos na tela inicial.
+
+```
+┌────────────────────────────────────────────────────────────┐
+│  [← prev]  [ imagem full-bleed · Ken Burns zoom ]  [next →] │
+│                                       ┌─────────────────┐  │
+│                                       │ 📌 Comunicado   │  │  ← badge tipo
+│  TEG+ Comunicados ·                   └─────────────────┘  │
+│  TÍTULO DO BANNER                                           │  ← eyebrow + título
+│  Subtítulo descritivo...                                    │  ← subtítulo
+│                                                             │
+│  ●○○  2/3 ▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬░░░░░░░░                    │  ← dots + progress
+└────────────────────────────────────────────────────────────┘
+  aspect-ratio: 21/8
+```
+
+**Funcionalidades:**
+| Feature | Implementação |
+|---------|--------------|
+| Ken Burns | `@keyframes kenBurns` — scale 1→1.10, 10s infinite alternate |
+| Crossfade | Stack de layers, `opacity` transition 700ms |
+| Progress bar | `@keyframes slideProgress` width 0→100%, reinicia via `key` prop |
+| Dot indicators | Pill ativo `w-5 h-1.5` + bolinhas `w-1.5 h-1.5` |
+| Arrows | Glassmorphic, `opacity-0` → `opacity-100` no hover (desktop) |
+| Touch/swipe | diff > 48px detecta direção |
+| Teclado | `ArrowLeft` / `ArrowRight` globais |
+| Pause on hover | Timer limpo + indicator "pausado" |
+| Auto-advance | Intervalo 5.5s |
+| Default slides | 3 banners padrão quando banco vazio |
+
+**Hook:** `useBanners()` — carrega apenas banners ativos e vigentes. Ver [[25 - Mural de Recados]].
+
+---
+
+## `RHLayout.tsx` (novo)
+
+Layout violet para o módulo RH. Comportamento: oculta o item "Mural de Recados" do nav quando `isAdmin === false`.
+
+```tsx
+const visibleNav = NAV.filter(n => !n.adminOnly || isAdmin)
+```
+
+---
+
+## `PrivateRoute.tsx`
+
 Dois tipos de guards:
 
 ```tsx
@@ -72,25 +140,22 @@ Usa: `AuthContext` → verifica `user` e `perfil.role`
 
 ---
 
-### `LogoTeg.tsx`
-- Logo animado com efeito **glow teal**
-- Usa `animate-pulse-glow` (Tailwind custom)
-- Variantes de tamanho: `sm`, `md`, `lg`
+## `LogoTeg.tsx`
+
+- Logo animado com efeito glow teal
+- Variantes de tamanho (`size` prop em px)
+- Props: `animated`, `glowing`
 
 ---
 
-## Componentes de Feature
-
-### `KpiCard.tsx`
-Card de métrica do dashboard.
+## `KpiCard.tsx`
 
 ```
 ┌──────────────────────────┐
 │  📦  [Ícone]             │
-│                          │
 │  142          [Título]   │
 │  Total Requisições       │
-│  ↑ 12% vs mês anterior  │
+│  ↑ 12% vs mês anterior   │
 └──────────────────────────┘
 ```
 
@@ -108,8 +173,7 @@ Card de métrica do dashboard.
 
 ---
 
-### `StatusBadge.tsx`
-Badge colorido para status de requisições.
+## `StatusBadge.tsx`
 
 | Status | Cor | Label |
 |--------|-----|-------|
@@ -126,7 +190,8 @@ Badge colorido para status de requisições.
 
 ---
 
-### `CategoryCard.tsx`
+## `CategoryCard.tsx`
+
 Card de seleção de categoria no wizard.
 
 ```
@@ -139,18 +204,10 @@ Card de seleção de categoria no wizard.
 └─────────────────────────┘
 ```
 
-**Props:**
-```ts
-{
-  categoria: Categoria
-  selected: boolean
-  onClick: () => void
-}
-```
-
 ---
 
-### `CotacaoComparativo.tsx`
+## `CotacaoComparativo.tsx`
+
 Tabela de comparação de fornecedores.
 
 ```
@@ -164,12 +221,9 @@ Tabela de comparação de fornecedores.
 └──────────┴──────────┴──────────┴──────────┘
 ```
 
-Destaca o menor preço por item em verde.
-
 ---
 
-### `FluxoTimeline.tsx`
-Timeline visual do fluxo de uma requisição.
+## `FluxoTimeline.tsx`
 
 ```
 ● Criada          2026-02-01 10:00
@@ -184,31 +238,24 @@ Timeline visual do fluxo de uma requisição.
 ○ Entregue        (pendente)
 ```
 
-**Props:**
-```ts
-{
-  requisicao: Requisicao
-  aprovacoes: Aprovacao[]
-  atividades: AtividadeLog[]
-}
-```
-
 ---
 
 ## Padrões de Composição
 
 ```tsx
-// Página típica do módulo Compras
-<Layout>
-  <div className="p-6 space-y-6">
-    <div className="grid grid-cols-4 gap-4">
-      <KpiCard ... />
-      <KpiCard ... />
-    </div>
-    <FluxoTimeline ... />
-    <StatusBadge status="aprovada" />
+// Módulo com layout (ex. RH)
+<RHLayout>          // ← sidebar violet
+  <RHHome />        // → /rh
+</RHLayout>
+
+// Página com KPIs
+<div className="p-6 space-y-6">
+  <div className="grid grid-cols-4 gap-4">
+    <KpiCard ... />
   </div>
-</Layout>
+  <FluxoTimeline ... />
+  <StatusBadge status="aprovada" />
+</div>
 ```
 
 ---
@@ -217,5 +264,5 @@ Timeline visual do fluxo de uma requisição.
 
 - [[02 - Frontend Stack]] — Stack e dependências
 - [[03 - Páginas e Rotas]] — Onde os componentes são usados
-- [[05 - Hooks Customizados]] — Dados consumidos pelos componentes
-- [[14 - Compradores e Categorias]] — Dados do CategoryCard
+- [[05 - Hooks Customizados]] — Dados consumidos
+- [[25 - Mural de Recados]] — BannerSlideshow e RHLayout

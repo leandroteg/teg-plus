@@ -4,6 +4,7 @@ type: banco-de-dados
 status: ativo
 tags: [supabase, migrations, sql, schema]
 criado: 2026-03-02
+atualizado: 2026-03-03
 relacionado: ["[[06 - Supabase]]", "[[07 - Schema Database]]", "[[19 - Integração Omie]]", "[[21 - Fluxo Pagamento]]"]
 ---
 
@@ -11,23 +12,28 @@ relacionado: ["[[06 - Supabase]]", "[[07 - Schema Database]]", "[[19 - Integraç
 
 ## Localização
 ```
-supabase/migrations/
-├── 001_schema_compras.sql
-├── 002_seed_usuarios.sql
-├── 003_rpc_dashboard.sql
-├── 004_schema_cotacoes.sql
-├── 005_public_read_policy.sql
-├── 006_auth_sistema.sql
-├── 006b_auth_fix_perfil.sql
-├── 007_fluxo_real.sql
-├── 008_fixes_escalabilidade.sql
-├── 009_admin_rls_fix.sql
-├── 010_dashboard_fix.sql
-├── 011_categorias.sql
-├── 012_fix_rls_perfis.sql
-├── 013_omie_integracao.sql
-├── 014_fluxo_pagamento.sql
-└── SCHEMA_v2.sql           ← Rebuild completo (referência)
+supabase/
+├── 001_schema_compras.sql       → Compras: schema base, enums, views, RLS
+├── 002_seed_usuarios.sql        → Seed usuários iniciais
+├── 003_rpc_dashboard.sql        → RPC get_dashboard_compras()
+├── 004_schema_cotacoes.sql      → Cotações: tabelas e regras
+├── 005_public_read_policy.sql   → Policies de leitura pública (aprovação por token)
+├── 006_auth_sistema.sql         → Integração Supabase Auth ↔ perfis
+├── 006b_auth_fix_perfil.sql     → Fix trigger auto-provisionamento
+├── 007_fluxo_real.sql           → Dados reais: 12 categorias, 3 compradores, 6 obras
+├── 008_fixes_escalabilidade.sql → Índices de performance
+├── 009_admin_rls_fix.sql        → Fix RLS para role admin
+├── 010_dashboard_fix.sql        → Otimização RPC e views dashboard
+├── 011_schema_financeiro.sql    → Financeiro: fin_contas_pagar, fin_contas_receber
+├── 012_fix_rls_perfis.sql       → Fix loop recursivo RLS em perfis
+├── 013_omie_integracao.sql      → sys_config, fin_sync_log, get_omie_config()
+├── 014_fluxo_pagamento.sql      → Ciclo Compras→Financeiro, triggers, anexos
+├── 015_estoque_patrimonial.sql  → Estoque: almoxarifado, inventário, imobilizados
+├── 016_logistica_transportes.sql→ Logística: transportes, NF-e, 9 etapas
+├── 017_frotas_manutencao.sql    → Frotas: veículos, OS, checklists, telemetria
+├── 018_mural_recados.sql        → Mural: banners, RLS, seed 3 slides [novo]
+├── EXECUTAR_NO_SUPABASE.sql     → Runner completo (aplica todas as migrations)
+└── SCHEMA_v2.sql                → Rebuild completo de referência
 ```
 
 ---
@@ -161,12 +167,13 @@ Ver detalhes em [[14 - Compradores e Categorias]].
 
 ---
 
-### `011_categorias.sql` — Categorias de Compras
-**Cria/Atualiza:** Categorias com regras de cotação e alçadas.
+### `011_schema_financeiro.sql` — Módulo Financeiro
+**Cria:** Schema completo do módulo financeiro.
 
-- Tabela `cmp_categorias` com campos `cotacoes_regras` (JSONB) e alçadas por nível
-- Seed com 12 categorias reais (EPI/EPC, Ferramental, Material Elétrico, etc.)
-- `get_alerta_cotacao(p_requisicao_id)` — RPC que verifica se cotação foi enviada sem mínimo de fornecedores
+- Tabelas: `fin_contas_pagar`, `fin_contas_receber`, `fin_centros_custo`, `fin_bancos`
+- Enums: `status_cp`, `status_cr`, `tipo_lancamento`
+- RLS por role: financeiro e admin
+- Views: `vw_cp_vencimentos`, `vw_cr_recebimentos`, `vw_dre_simplificado`
 
 ---
 
@@ -212,6 +219,52 @@ Ver detalhes em [[14 - Compradores e Categorias]].
 
 ---
 
+### `015_estoque_patrimonial.sql` — Módulo Estoque e Patrimonial
+**Cria:** Schema completo de estoque e gestão de ativos.
+
+- Tabelas: `est_itens`, `est_movimentacoes`, `est_inventario`, `est_imobilizados`, `est_depreciacoes`
+- Controle de entrada/saída por almoxarifado, inventário periódico
+- Depreciação linear de imobilizados com cálculo automático
+- Ver [[22 - Módulo Estoque e Patrimonial]]
+
+---
+
+### `016_logistica_transportes.sql` — Módulo Logística
+**Cria:** Schema de transportes e movimentação de materiais.
+
+- Tabelas: `log_solicitacoes`, `log_transportes`, `log_etapas`, `log_nfe`, `log_transportadoras`
+- 9 etapas de rastreamento do transporte
+- Integração NF-e, avaliação de transportadoras
+- Ver [[23 - Módulo Logística e Transportes]]
+
+---
+
+### `017_frotas_manutencao.sql` — Módulo Frotas
+**Cria:** Schema de gestão de frotas e manutenção veicular.
+
+- Tabelas: `fro_veiculos`, `fro_ordens_servico`, `fro_checklists`, `fro_abastecimentos`, `fro_telemetria`
+- OS de manutenção preventiva/corretiva, checklist diário de inspeção
+- Controle de combustível e KPIs de telemetria
+- Ver [[24 - Módulo Frotas e Manutenção]]
+
+---
+
+### `018_mural_recados.sql` — Mural de Recados ⭐ (novo)
+**Cria:** Sistema de banners para comunicação corporativa na tela inicial.
+
+- Enum: `mural_tipo` (`fixa` | `campanha`)
+- Tabela: `mural_banners` com constraints de integridade para campanhas
+- Índices: `ativo`, `tipo`, `ordem`, `(data_inicio, data_fim)`
+- Trigger: `updated_at` automático
+- RLS:
+  - Usuários autenticados: leem apenas banners ativos e vigentes
+  - Admin: acesso total (SELECT inclui inativos + fora do período)
+- View: `mural_banners_vigentes` — atalho sem considerar RLS
+- Seed: 3 banners fixos padrão (boas-vindas, módulos, segurança)
+- Ver [[25 - Mural de Recados]]
+
+---
+
 ### `SCHEMA_v2.sql` — Rebuild Completo (Referência)
 **Propósito:** Schema completamente refatorado com convenções de nomenclatura.
 
@@ -242,7 +295,7 @@ supabase db push
 # SQL Editor → colar e executar em ordem
 ```
 
-**Ordem obrigatória:** 001 → 002 → 003 → 004 → 005 → 006 → 006b → 007 → 008 → 009 → 010 → 011 → 012 → 013 → 014
+**Ordem obrigatória:** 001 → 002 → 003 → 004 → 005 → 006 → 006b → 007 → 008 → 009 → 010 → 011 → 012 → 013 → 014 → 015 → 016 → 017 → 018
 
 ---
 
@@ -252,3 +305,7 @@ supabase db push
 - [[07 - Schema Database]] — Tabelas detalhadas
 - [[13 - Alçadas]] — Dados de alçadas (migration 001 e 007)
 - [[14 - Compradores e Categorias]] — Dados reais (migration 007)
+- [[22 - Módulo Estoque e Patrimonial]] — migration 015
+- [[23 - Módulo Logística e Transportes]] — migration 016
+- [[24 - Módulo Frotas e Manutenção]] — migration 017
+- [[25 - Mural de Recados]] — migration 018
