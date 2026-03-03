@@ -4,7 +4,7 @@ id: REQ-015
 titulo: "Integrações Internas — Financeiro com demais módulos TEG+"
 categoria: funcional
 prioridade: critica
-status: em_andamento
+status: em-andamento
 modulo: financeiro
 sprint: Sprint-4
 milestone: MS-004

@@ -2,7 +2,7 @@
 tipo: milestone
 id: MS-004
 titulo: "Módulo Financeiro — Omie como Core"
-status: em_andamento
+status: em-andamento
 fase: Q2-2026
 data_alvo: 2026-09-30
 progresso: 25

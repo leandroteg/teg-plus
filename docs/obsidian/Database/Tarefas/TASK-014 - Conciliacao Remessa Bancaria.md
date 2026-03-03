@@ -2,7 +2,7 @@
 tipo: tarefa
 id: TASK-014
 titulo: "Conciliação Bancária Automática e Remessa em Lote"
-status: em_andamento
+status: em-andamento
 prioridade: critica
 modulo: financeiro
 sprint: Sprint-4

@@ -3,7 +3,7 @@ tipo: milestone
 id: MS-006
 titulo: "Módulo Estoque e Patrimonial"
 progresso: 60
-status: em_andamento
+status: em-andamento
 sprint: Sprint-5
 data_inicio: 2026-03-03
 data_fim_prevista: 2026-04-15

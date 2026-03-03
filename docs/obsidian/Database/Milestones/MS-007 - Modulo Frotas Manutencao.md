@@ -1,12 +1,12 @@
 ---
-title: "MS-007 — Módulo Frotas e Manutenção"
-type: milestone
+tipo: milestone
+id: MS-007
+titulo: "Módulo Frotas e Manutenção"
 status: concluido
+fase: Q1-2026
+data_alvo: 2026-03-03
 progresso: 100
-data_inicio: 2026-03-03
-data_fim: 2026-03-03
 modulo: frotas
-responsavel: claude
 tags: [milestone, frotas, manutencao, telemetria, checklist]
 ---
 

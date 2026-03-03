@@ -1,12 +1,12 @@
 ---
-title: "MS-006 — Módulo Logística e Transportes"
-type: milestone
+tipo: milestone
+id: MS-006b
+titulo: "Módulo Logística e Transportes"
 status: concluido
+fase: Q1-2026
+data_alvo: 2026-03-03
 progresso: 100
-data_inicio: 2026-03-03
-data_fim: 2026-03-03
 modulo: logistica
-responsavel: claude
 tags: [milestone, logistica, transportes, nfe]
 ---
 
