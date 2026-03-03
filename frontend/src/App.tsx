@@ -19,9 +19,13 @@ import Perfil from './pages/Perfil'
 import Pedidos from './pages/Pedidos'
 
 // Módulos stub
-import RH from './pages/RH'
 import SSMA from './pages/SSMA'
 import Contratos from './pages/Contratos'
+
+// Módulo RH
+import RHLayout from './components/RHLayout'
+import RHHome from './pages/rh/RHHome'
+import MuralAdmin from './pages/rh/MuralAdmin'
 
 // Módulo Financeiro
 import FinanceiroLayout from './components/FinanceiroLayout'
@@ -122,8 +126,13 @@ export default function App() {
             <Route path="/frotas/telemetria"           element={<Telemetria />} />
           </Route>
 
+          {/* Módulo RH: usa RHLayout */}
+          <Route element={<RHLayout />}>
+            <Route path="/rh"        element={<RHHome />} />
+            <Route path="/rh/mural"  element={<MuralAdmin />} />
+          </Route>
+
           {/* Módulos stub */}
-          <Route path="/rh"         element={<RH />} />
           <Route path="/ssma"       element={<SSMA />} />
           <Route path="/contratos"  element={<Contratos />} />
 

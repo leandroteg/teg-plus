@@ -56,6 +56,7 @@ atualizado: 2026-03-03
 | Módulo Estoque e Patrimonial | [[22 - Módulo Estoque e Patrimonial]] |
 | Módulo Logística | [[23 - Módulo Logística e Transportes]] |
 | Módulo Frotas | [[24 - Módulo Frotas e Manutenção]] |
+| Mural de Recados | [[25 - Mural de Recados]] |
 
 ---
 
@@ -131,7 +132,7 @@ graph LR
 | Aprovações multi-nível | ✅ Entregue | 4 alçadas, token-based |
 | ApprovaAi (mobile) | ✅ Entregue | Interface responsiva |
 | Dashboard KPIs | ✅ Entregue | RPC + realtime |
-| Schema Supabase | ✅ Entregue | 17 migrations |
+| Schema Supabase | ✅ Entregue | 18 migrations |
 | AI Parse requisições | ✅ Entregue | Keywords + n8n |
 | Cotações | ✅ Entregue | Regras de alçada + bypass sem mínimo |
 | PO — PDF e Compartilhamento | ✅ Entregue | Sem deps externas, WhatsApp + E-mail |
@@ -140,6 +141,7 @@ graph LR
 | Estoque e Patrimonial | ✅ Entregue | Almoxarifado, inventário, imobilizados, depreciação |
 | Logística e Transportes | ✅ Entregue | 9 etapas, NF-e, rastreamento, avaliações |
 | Frotas e Manutenção | ✅ Entregue | OS, checklist, abastecimento, telemetria |
+| Mural de Recados | ✅ Entregue | Slideshow corporativo + gestão admin RH |
 | WhatsApp (Evolution API) | 🔜 Planejado | Notificações automáticas |
 | AI TEG+ (Claude API) | 🔜 Planejado | Agente conversacional |
 | Monday.com PMO | 🔜 Planejado | Gestão de portfólio |

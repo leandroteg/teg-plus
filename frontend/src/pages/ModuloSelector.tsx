@@ -2,6 +2,7 @@ import { useNavigate } from 'react-router-dom'
 import { ChevronRight, LogOut, Clock } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import LogoTeg from '../components/LogoTeg'
+import BannerSlideshow from '../components/BannerSlideshow'
 
 // ── Module definitions ─────────────────────────────────────────────────────────
 // active=true → can be accessed now; active=false → "Em breve"
@@ -98,7 +99,7 @@ const MODULOS = [
 
 // ── Component ──────────────────────────────────────────────────────────────────
 export default function ModuloSelector() {
-  const { perfil, hasModule, signOut } = useAuth()
+  const { perfil, hasModule, signOut, isAdmin } = useAuth()
   const navigate = useNavigate()
 
   const primeiroNome = (perfil?.nome ?? 'Usuário').split(' ')[0]
@@ -106,8 +107,11 @@ export default function ModuloSelector() {
   const saudacao = hora < 12 ? 'Bom dia' : hora < 18 ? 'Boa tarde' : 'Boa noite'
 
   function canAccess(mod: (typeof MODULOS)[number]) {
-    if (!mod.active) return false
-    // core modules always accessible
+    if (!mod.active) {
+      // Admin pode acessar RH para gerenciar o Mural de Recados
+      return isAdmin && mod.key === 'rh'
+    }
+    // Módulos core: sempre acessíveis
     if (['compras', 'financeiro', 'estoque', 'logistica', 'frotas'].includes(mod.key as string)) return true
     return hasModule(mod.key as string)
   }
@@ -170,7 +174,7 @@ export default function ModuloSelector() {
       </header>
 
       {/* ── Hero ──────────────────────────────────────────────── */}
-      <section className="relative z-10 flex flex-col items-center px-5 pt-10 pb-8">
+      <section className="relative z-10 flex flex-col items-center px-5 pt-10 pb-6">
 
         {/* Logo with glow ring */}
         <div
@@ -188,7 +192,7 @@ export default function ModuloSelector() {
           TEG+
         </h1>
 
-        <p className="text-sm font-medium text-slate-500 mt-1.5 mb-7 animate-fade-in-up delay-200 tracking-wide">
+        <p className="text-sm font-medium text-slate-500 mt-1.5 mb-5 animate-fade-in-up delay-200 tracking-wide">
           Enterprise Resource Planning
         </p>
 
@@ -198,27 +202,33 @@ export default function ModuloSelector() {
             {saudacao},{' '}
             <span className="text-gradient-teal">{primeiroNome}</span>
           </p>
-          <p className="text-slate-500 text-sm mt-1.5">
+          <p className="text-slate-500 text-sm mt-1">
             Selecione um módulo para acessar o sistema
           </p>
         </div>
 
-        {/* Subtle divider */}
+        {/* Divider */}
         <div
-          className="mt-8 w-32 h-px animate-fade-in delay-400"
+          className="mt-6 w-32 h-px animate-fade-in delay-400"
           style={{
             background: 'linear-gradient(90deg, transparent, rgba(20,184,166,0.5), transparent)',
           }}
         />
       </section>
 
+      {/* ── Banner Slideshow — Comunicação Empresarial ──────────── */}
+      <div className="relative z-10 pb-5">
+        <BannerSlideshow />
+      </div>
+
       {/* ── Module grid ──────────────────────────────────────── */}
       <section className="relative z-10 flex-1 px-4 sm:px-6 pb-10 max-w-2xl mx-auto w-full">
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-4">
           {MODULOS.map((mod, i) => {
             const accessible = canAccess(mod)
-            const isCompras = mod.key === 'compras'
-            const delay = 340 + i * 75
+            const isCompras  = mod.key === 'compras'
+            const isAdminRH  = isAdmin && mod.key === 'rh' && !mod.active
+            const delay      = 340 + i * 75
 
             return (
               <button
@@ -235,6 +245,9 @@ export default function ModuloSelector() {
                   isCompras && accessible
                     ? 'border-teal-500/40 bg-teal-500/[0.06]'
                     : '',
+                  isAdminRH
+                    ? 'border-violet-500/30 bg-violet-500/[0.04] opacity-100'
+                    : '',
                 ].join(' ')}
                 style={{ animationDelay: `${delay}ms` }}
               >
@@ -246,6 +259,13 @@ export default function ModuloSelector() {
                       boxShadow: '0 0 28px rgba(20,184,166,0.18), inset 0 1px 0 rgba(20,184,166,0.25)',
                     }}
                   />
+                )}
+
+                {/* Admin-only badge */}
+                {isAdminRH && (
+                  <div className="absolute top-2 right-2 text-[8px] font-bold px-1.5 py-0.5 rounded-md bg-violet-500/20 text-violet-300 border border-violet-500/25">
+                    Admin
+                  </div>
                 )}
 
                 {/* Icon container */}
@@ -287,13 +307,15 @@ export default function ModuloSelector() {
                         px-2 py-0.5 rounded-full uppercase tracking-wider">
                         Disponível
                       </span>
+                    ) : isAdminRH ? (
+                      <span className="text-[9px] font-semibold text-violet-400">Mural Admin</span>
                     ) : (
                       <span className="text-[9px] font-semibold text-slate-500">Acessar</span>
                     )}
                     <ChevronRight
                       size={13}
                       className={`transition-transform duration-200 group-hover:translate-x-0.5
-                        ${isCompras ? 'text-teal-400' : 'text-slate-500'}`}
+                        ${isCompras ? 'text-teal-400' : isAdminRH ? 'text-violet-400' : 'text-slate-500'}`}
                     />
                   </div>
                 ) : (
