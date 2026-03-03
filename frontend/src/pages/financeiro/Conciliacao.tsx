@@ -1,8 +1,7 @@
 import { useState } from 'react'
 import {
-  Landmark, Search, Calendar, CheckCircle2,
-  Clock, ArrowLeftRight, Upload, Download,
-  FileSpreadsheet, AlertTriangle, Link2,
+  Landmark, CheckCircle2, Clock, ArrowLeftRight,
+  Upload, Download, FileSpreadsheet, Link2,
 } from 'lucide-react'
 import { useContasPagar } from '../../hooks/useFinanceiro'
 

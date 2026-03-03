@@ -1,23 +1,25 @@
 import { useState } from 'react'
 import {
-  BarChart3, TrendingUp, TrendingDown, DollarSign,
-  Calendar, Download, FileText, PieChart, ArrowUpRight,
-  ArrowDownRight, Minus, Filter,
+  BarChart3, TrendingUp, Calendar, Download,
+  PieChart, ArrowUpRight, ArrowDownRight, Minus,
 } from 'lucide-react'
 import { useContasPagar, useContasReceber } from '../../hooks/useFinanceiro'
 
 const fmt = (v: number) =>
   v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 })
 
-const fmtPct = (v: number) => `${v >= 0 ? '+' : ''}${v.toFixed(1)}%`
-
 type ReportType = 'dre' | 'fluxo' | 'cc' | 'aging'
 
-const REPORTS: { key: ReportType; label: string; desc: string; icon: typeof BarChart3; color: string }[] = [
-  { key: 'dre',   label: 'DRE',             desc: 'Demonstrativo de Resultado',  icon: BarChart3,   color: 'emerald' },
-  { key: 'fluxo', label: 'Fluxo de Caixa',  desc: 'Entradas e saídas previstas', icon: TrendingUp,  color: 'blue'    },
-  { key: 'cc',    label: 'Centro de Custo',  desc: 'Gastos por CC / Projeto',     icon: PieChart,    color: 'violet'  },
-  { key: 'aging', label: 'Aging',            desc: 'Títulos por vencimento',      icon: Calendar,    color: 'amber'   },
+interface ReportDef {
+  key: ReportType; label: string; desc: string; icon: typeof BarChart3
+  activeBg: string; activeBorder: string; activeIcon: string; activeLabel: string
+}
+
+const REPORTS: ReportDef[] = [
+  { key: 'dre',   label: 'DRE',            desc: 'Demonstrativo de Resultado',  icon: BarChart3,  activeBg: 'bg-emerald-50', activeBorder: 'border-emerald-200', activeIcon: 'text-emerald-600', activeLabel: 'text-emerald-700' },
+  { key: 'fluxo', label: 'Fluxo de Caixa', desc: 'Entradas e saídas previstas', icon: TrendingUp, activeBg: 'bg-blue-50',    activeBorder: 'border-blue-200',    activeIcon: 'text-blue-600',    activeLabel: 'text-blue-700'    },
+  { key: 'cc',    label: 'Centro de Custo', desc: 'Gastos por CC / Projeto',     icon: PieChart,   activeBg: 'bg-violet-50',  activeBorder: 'border-violet-200',  activeIcon: 'text-violet-600',  activeLabel: 'text-violet-700'  },
+  { key: 'aging', label: 'Aging',           desc: 'Títulos por vencimento',      icon: Calendar,   activeBg: 'bg-amber-50',   activeBorder: 'border-amber-200',   activeIcon: 'text-amber-600',   activeLabel: 'text-amber-700'   },
 ]
 
 export default function Relatorios() {
@@ -83,20 +85,23 @@ export default function Relatorios() {
 
       {/* ── Report selector ─────────────────────────────────── */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-        {REPORTS.map(r => (
-          <button key={r.key} onClick={() => setActiveReport(r.key)}
-            className={`rounded-2xl p-3 text-left transition-all border
-              ${activeReport === r.key
-                ? `bg-${r.color}-50 border-${r.color}-200 shadow-sm`
-                : 'bg-white border-slate-200 hover:border-slate-300'
-              }`}>
-            <r.icon size={16} className={activeReport === r.key ? `text-${r.color}-600` : 'text-slate-400'} />
-            <p className={`text-[11px] font-bold mt-1.5 ${activeReport === r.key ? `text-${r.color}-700` : 'text-slate-700'}`}>
-              {r.label}
-            </p>
-            <p className="text-[9px] text-slate-400 mt-0.5">{r.desc}</p>
-          </button>
-        ))}
+        {REPORTS.map(r => {
+          const isActive = activeReport === r.key
+          return (
+            <button key={r.key} onClick={() => setActiveReport(r.key)}
+              className={`rounded-2xl p-3 text-left transition-all border
+                ${isActive
+                  ? `${r.activeBg} ${r.activeBorder} shadow-sm`
+                  : 'bg-white border-slate-200 hover:border-slate-300'
+                }`}>
+              <r.icon size={16} className={isActive ? r.activeIcon : 'text-slate-400'} />
+              <p className={`text-[11px] font-bold mt-1.5 ${isActive ? r.activeLabel : 'text-slate-700'}`}>
+                {r.label}
+              </p>
+              <p className="text-[9px] text-slate-400 mt-0.5">{r.desc}</p>
+            </button>
+          )
+        })}
       </div>
 
       {/* ── Report content ──────────────────────────────────── */}
@@ -158,7 +163,8 @@ export default function Relatorios() {
               <FluxoBar label="Receitas Previstas"
                 value={cr.filter(c => !['recebido', 'conciliado', 'cancelado'].includes(c.status))
                   .reduce((s, c) => s + c.valor_original, 0)}
-                color="emerald" max={Math.max(
+                textColor="text-emerald-600" barColor="bg-emerald-500"
+                max={Math.max(
                   cr.filter(c => !['recebido', 'conciliado', 'cancelado'].includes(c.status))
                     .reduce((s, c) => s + c.valor_original, 0),
                   cp.filter(c => !['pago', 'conciliado', 'cancelado'].includes(c.status))
@@ -168,7 +174,8 @@ export default function Relatorios() {
               <FluxoBar label="Pagamentos Previstos"
                 value={cp.filter(c => !['pago', 'conciliado', 'cancelado'].includes(c.status))
                   .reduce((s, c) => s + c.valor_original, 0)}
-                color="red" max={Math.max(
+                textColor="text-red-600" barColor="bg-red-500"
+                max={Math.max(
                   cr.filter(c => !['recebido', 'conciliado', 'cancelado'].includes(c.status))
                     .reduce((s, c) => s + c.valor_original, 0),
                   cp.filter(c => !['pago', 'conciliado', 'cancelado'].includes(c.status))
@@ -318,19 +325,19 @@ function DRERow({ label, value, bold, isPositive, sub, highlight }: {
   )
 }
 
-function FluxoBar({ label, value, color, max }: {
-  label: string; value: number; color: string; max: number
+function FluxoBar({ label, value, textColor, barColor, max }: {
+  label: string; value: number; textColor: string; barColor: string; max: number
 }) {
   const pct = max > 0 ? (value / max) * 100 : 0
   return (
     <div>
       <div className="flex items-center justify-between mb-1">
         <p className="text-xs font-semibold text-slate-600">{label}</p>
-        <p className={`text-xs font-bold text-${color}-600`}>{fmt(value)}</p>
+        <p className={`text-xs font-bold ${textColor}`}>{fmt(value)}</p>
       </div>
       <div className="h-3 bg-slate-100 rounded-full overflow-hidden">
         <div
-          className={`h-full rounded-full bg-${color}-500 transition-all`}
+          className={`h-full rounded-full ${barColor} transition-all`}
           style={{ width: `${pct}%` }}
         />
       </div>

@@ -214,8 +214,8 @@ BEGIN
         'valor_pago_periodo',   COALESCE(SUM(valor_pago) FILTER (WHERE status IN ('pago','conciliado') AND data_pagamento >= dt_inicio), 0),
         'valor_a_vencer_7d',    COALESCE(SUM(valor_original) FILTER (WHERE status NOT IN ('pago','conciliado','cancelado') AND data_vencimento BETWEEN CURRENT_DATE AND CURRENT_DATE + 7), 0),
         'aguardando_aprovacao', COUNT(*) FILTER (WHERE status = 'aguardando_aprovacao'),
-        'total_cr',             0,
-        'valor_cr_aberto',      0
+        'total_cr',             (SELECT COUNT(*) FROM fin_contas_receber WHERE status NOT IN ('cancelado')),
+        'valor_cr_aberto',      (SELECT COALESCE(SUM(valor_original),0) FROM fin_contas_receber WHERE status NOT IN ('recebido','conciliado','cancelado'))
       )
       FROM fin_contas_pagar
     ),
@@ -274,21 +274,35 @@ ALTER TABLE fin_contas_receber ENABLE ROW LEVEL SECURITY;
 ALTER TABLE fin_documentos ENABLE ROW LEVEL SECURITY;
 
 -- Leitura pública (autenticados)
-CREATE POLICY IF NOT EXISTS "fornecedores_read" ON cmp_fornecedores
+DROP POLICY IF EXISTS "fornecedores_read" ON cmp_fornecedores;
+CREATE POLICY "fornecedores_read" ON cmp_fornecedores
   FOR SELECT TO authenticated USING (true);
-CREATE POLICY IF NOT EXISTS "fin_cp_read" ON fin_contas_pagar
+
+DROP POLICY IF EXISTS "fin_cp_read" ON fin_contas_pagar;
+CREATE POLICY "fin_cp_read" ON fin_contas_pagar
   FOR SELECT TO authenticated USING (true);
-CREATE POLICY IF NOT EXISTS "fin_cr_read" ON fin_contas_receber
+
+DROP POLICY IF EXISTS "fin_cr_read" ON fin_contas_receber;
+CREATE POLICY "fin_cr_read" ON fin_contas_receber
   FOR SELECT TO authenticated USING (true);
-CREATE POLICY IF NOT EXISTS "fin_docs_read" ON fin_documentos
+
+DROP POLICY IF EXISTS "fin_docs_read" ON fin_documentos;
+CREATE POLICY "fin_docs_read" ON fin_documentos
   FOR SELECT TO authenticated USING (true);
 
 -- Escrita via service_role (n8n)
-CREATE POLICY IF NOT EXISTS "fornecedores_write" ON cmp_fornecedores
+DROP POLICY IF EXISTS "fornecedores_write" ON cmp_fornecedores;
+CREATE POLICY "fornecedores_write" ON cmp_fornecedores
   FOR ALL TO service_role USING (true) WITH CHECK (true);
-CREATE POLICY IF NOT EXISTS "fin_cp_write" ON fin_contas_pagar
+
+DROP POLICY IF EXISTS "fin_cp_write" ON fin_contas_pagar;
+CREATE POLICY "fin_cp_write" ON fin_contas_pagar
   FOR ALL TO service_role USING (true) WITH CHECK (true);
-CREATE POLICY IF NOT EXISTS "fin_cr_write" ON fin_contas_receber
+
+DROP POLICY IF EXISTS "fin_cr_write" ON fin_contas_receber;
+CREATE POLICY "fin_cr_write" ON fin_contas_receber
   FOR ALL TO service_role USING (true) WITH CHECK (true);
-CREATE POLICY IF NOT EXISTS "fin_docs_write" ON fin_documentos
+
+DROP POLICY IF EXISTS "fin_docs_write" ON fin_documentos;
+CREATE POLICY "fin_docs_write" ON fin_documentos
   FOR ALL TO service_role USING (true) WITH CHECK (true);

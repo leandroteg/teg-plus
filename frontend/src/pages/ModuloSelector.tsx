@@ -83,11 +83,11 @@ export default function ModuloSelector() {
   const hora = new Date().getHours()
   const saudacao = hora < 12 ? 'Bom dia' : hora < 18 ? 'Boa tarde' : 'Boa noite'
 
-  function canAccess(mod: typeof MODULOS[number]) {
+  function canAccess(mod: (typeof MODULOS)[number]) {
     if (!mod.active) return false
     // compras & financeiro are core modules, always accessible
     if (mod.key === 'compras' || mod.key === 'financeiro') return true
-    return hasModule(mod.key)
+    return hasModule(mod.key as string)
   }
 
   async function handleLogout() {

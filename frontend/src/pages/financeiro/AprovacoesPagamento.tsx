@@ -1,8 +1,7 @@
 import { useState } from 'react'
 import {
   FileCheck2, Search, Calendar, AlertTriangle,
-  CheckCircle2, XCircle, Clock, Receipt,
-  Shield, ChevronRight, Eye,
+  CheckCircle2, XCircle, Clock, Eye,
 } from 'lucide-react'
 import { useContasPagar } from '../../hooks/useFinanceiro'
 
@@ -39,10 +38,10 @@ export default function AprovacoesPagamento() {
 
   const totalPendente = pendentes.reduce((s, cp) => s + cp.valor_original, 0)
 
-  const tabs: { key: Tab; label: string; count: number; color: string }[] = [
-    { key: 'pendentes',  label: 'Pendentes',  count: pendentes.length,  color: 'amber'   },
-    { key: 'aprovadas',  label: 'Aprovadas',  count: aprovadas.length,  color: 'emerald' },
-    { key: 'rejeitadas', label: 'Rejeitadas', count: rejeitadas.length, color: 'red'     },
+  const tabs: { key: Tab; label: string; count: number; active: string }[] = [
+    { key: 'pendentes',  label: 'Pendentes',  count: pendentes.length,  active: 'bg-amber-600 text-white shadow-sm'   },
+    { key: 'aprovadas',  label: 'Aprovadas',  count: aprovadas.length,  active: 'bg-emerald-600 text-white shadow-sm' },
+    { key: 'rejeitadas', label: 'Rejeitadas', count: rejeitadas.length, active: 'bg-red-600 text-white shadow-sm'     },
   ]
 
   return (
@@ -87,7 +86,7 @@ export default function AprovacoesPagamento() {
           <button key={t.key} onClick={() => setTab(t.key)}
             className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-[11px] font-semibold transition-all
               ${tab === t.key
-                ? `bg-${t.color}-600 text-white shadow-sm`
+                ? t.active
                 : 'bg-white text-slate-500 border border-slate-200'
               }`}>
             {t.label}

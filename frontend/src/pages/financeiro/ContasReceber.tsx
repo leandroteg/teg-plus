@@ -1,10 +1,8 @@
 import { useState } from 'react'
 import {
-  DollarSign, Search, Calendar, AlertTriangle,
-  CheckCircle2, Clock, FileText, TrendingUp,
+  DollarSign, Search, Calendar, AlertTriangle, TrendingUp,
 } from 'lucide-react'
 import { useContasReceber } from '../../hooks/useFinanceiro'
-import type { StatusCR } from '../../types/financeiro'
 
 const fmt = (v: number) =>
   v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 })

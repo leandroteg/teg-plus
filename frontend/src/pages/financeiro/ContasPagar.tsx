@@ -1,10 +1,9 @@
 import { useState } from 'react'
 import {
-  Receipt, Search, Filter, Calendar, AlertTriangle,
-  CheckCircle2, Clock, ArrowUpDown, FileText,
+  Receipt, Search, Calendar, AlertTriangle,
+  CheckCircle2, Clock, FileText,
 } from 'lucide-react'
 import { useContasPagar } from '../../hooks/useFinanceiro'
-import type { StatusCP } from '../../types/financeiro'
 
 const fmt = (v: number) =>
   v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 })
