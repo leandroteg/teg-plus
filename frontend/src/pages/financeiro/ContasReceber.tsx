@@ -1,8 +1,62 @@
 import { useState } from 'react'
 import {
   DollarSign, Search, Calendar, AlertTriangle, TrendingUp,
+  RefreshCw, Zap, XCircle, CheckCircle2,
 } from 'lucide-react'
 import { useContasReceber } from '../../hooks/useFinanceiro'
+import { useLastSync, useTriggerSync, useOmieConfig } from '../../hooks/useOmie'
+
+// ── SyncBar ───────────────────────────────────────────────────────────────────
+
+function SyncBar() {
+  const { data: config } = useOmieConfig()
+  const { data: log, isLoading } = useLastSync('contas_receber')
+  const trigger = useTriggerSync('contas_receber')
+
+  const webhookUrl = config?.n8n_webhook_url ?? ''
+  const omieEnabled = config?.omie_enabled === 'true'
+  if (!omieEnabled) return null
+
+  const status = log?.status
+  const isPending = trigger.isPending || status === 'running'
+
+  const lastSyncText = log?.executado_em
+    ? new Date(log.executado_em).toLocaleDateString('pt-BR', {
+        day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit',
+      })
+    : 'Nunca sincronizado'
+
+  return (
+    <div className="flex items-center gap-3 bg-emerald-50 border border-emerald-200 rounded-xl px-4 py-2.5">
+      {isLoading || isPending ? (
+        <RefreshCw size={13} className="text-emerald-500 animate-spin shrink-0" />
+      ) : status === 'success' ? (
+        <CheckCircle2 size={13} className="text-emerald-500 shrink-0" />
+      ) : status === 'error' ? (
+        <XCircle size={13} className="text-red-500 shrink-0" />
+      ) : (
+        <Zap size={13} className="text-emerald-400 shrink-0" />
+      )}
+      <div className="flex-1 min-w-0">
+        <p className="text-[11px] font-semibold text-emerald-700 leading-none">
+          {isPending ? 'Sincronizando com Omie...' : 'Omie'}
+        </p>
+        <p className="text-[10px] text-emerald-600/70 mt-0.5">
+          {isPending ? 'Aguarde a conclusão' : lastSyncText}
+        </p>
+      </div>
+      <button
+        onClick={() => webhookUrl && trigger.mutate({ webhookUrl })}
+        disabled={isPending || !webhookUrl}
+        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 text-white
+          text-[10px] font-bold hover:bg-emerald-700 transition-all shrink-0
+          disabled:opacity-50 disabled:cursor-not-allowed">
+        <RefreshCw size={10} className={isPending ? 'animate-spin' : ''} />
+        {isPending ? 'Aguarde' : 'Sincronizar Omie'}
+      </button>
+    </div>
+  )
+}
 
 const fmt = (v: number) =>
   v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 })
@@ -66,6 +120,9 @@ export default function ContasReceber() {
         </h1>
         <p className="text-xs text-slate-400 mt-0.5">Faturamento e recebimentos</p>
       </div>
+
+      {/* ── Omie Sync Status ─────────────────────────────────── */}
+      <SyncBar />
 
       {/* ── Resumo ──────────────────────────────────────────── */}
       <div className="grid grid-cols-3 gap-3">

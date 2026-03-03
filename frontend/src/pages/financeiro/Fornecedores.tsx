@@ -2,9 +2,75 @@ import { useState } from 'react'
 import {
   Users, Search, Plus, Building2, Phone, Mail,
   CreditCard, CheckCircle2, XCircle, ChevronRight,
-  ExternalLink, FileText,
+  ExternalLink, RefreshCw, Zap,
 } from 'lucide-react'
 import { useFornecedores } from '../../hooks/useFinanceiro'
+import { useLastSync, useTriggerSync, useOmieConfig } from '../../hooks/useOmie'
+
+// ── SyncBar ───────────────────────────────────────────────────────────────────
+
+function SyncBar() {
+  const { data: config } = useOmieConfig()
+  const { data: log, isLoading } = useLastSync('fornecedores')
+  const trigger = useTriggerSync('fornecedores')
+
+  const webhookUrl = config?.n8n_webhook_url ?? ''
+  const omieEnabled = config?.omie_enabled === 'true'
+
+  if (!omieEnabled) return null
+
+  const status = log?.status
+  const isPending = trigger.isPending || status === 'running'
+
+  const lastSyncText = log?.executado_em
+    ? new Date(log.executado_em).toLocaleDateString('pt-BR', {
+        day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit',
+      })
+    : 'Nunca sincronizado'
+
+  function handleSync() {
+    if (!webhookUrl) return
+    trigger.mutate({ webhookUrl })
+  }
+
+  return (
+    <div className="flex items-center gap-3 bg-emerald-50 border border-emerald-200 rounded-xl px-4 py-2.5">
+      {/* Status icon */}
+      {isLoading || isPending ? (
+        <RefreshCw size={13} className="text-emerald-500 animate-spin shrink-0" />
+      ) : status === 'success' ? (
+        <CheckCircle2 size={13} className="text-emerald-500 shrink-0" />
+      ) : status === 'error' ? (
+        <XCircle size={13} className="text-red-500 shrink-0" />
+      ) : (
+        <Zap size={13} className="text-emerald-400 shrink-0" />
+      )}
+
+      {/* Text */}
+      <div className="flex-1 min-w-0">
+        <p className="text-[11px] font-semibold text-emerald-700 leading-none">
+          {isPending ? 'Sincronizando com Omie...' : 'Omie'}
+        </p>
+        <p className="text-[10px] text-emerald-600/70 mt-0.5">
+          {isPending ? 'Aguarde a conclusão' : lastSyncText}
+        </p>
+      </div>
+
+      {/* Sync button */}
+      <button
+        onClick={handleSync}
+        disabled={isPending || !webhookUrl}
+        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 text-white
+          text-[10px] font-bold hover:bg-emerald-700 transition-all shrink-0
+          disabled:opacity-50 disabled:cursor-not-allowed">
+        <RefreshCw size={10} className={isPending ? 'animate-spin' : ''} />
+        {isPending ? 'Aguarde' : 'Sincronizar Omie'}
+      </button>
+    </div>
+  )
+}
+
+// ── Main Page ─────────────────────────────────────────────────────────────────
 
 export default function Fornecedores() {
   const [busca, setBusca] = useState('')
@@ -40,6 +106,9 @@ export default function Fornecedores() {
           Novo
         </button>
       </div>
+
+      {/* ── Sync Bar ─────────────────────────────────────────── */}
+      <SyncBar />
 
       {/* ── Resumo ──────────────────────────────────────────── */}
       <div className="grid grid-cols-3 gap-3">

@@ -1,0 +1,297 @@
+{
+  "name": "TEG+ | Omie - Aprovação de Pagamento",
+  "nodes": [
+    {
+      "parameters": {
+        "path": "omie/aprovacao-pagamento",
+        "httpMethod": "POST",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "webhook-trigger",
+      "name": "Webhook Trigger",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "language": "javaScript",
+        "jsCode": "const body = $input.first().json.body || $input.first().json;\n\nconst omie_cp_id = body.omie_cp_id || body.record?.omie_cp_id || null;\nconst record_id = body.id || body.record?.id || null;\n\nif (!omie_cp_id) {\n  throw new Error('Payload invalido: omie_cp_id e obrigatorio para aprovacao de pagamento');\n}\n\nreturn [{\n  json: {\n    omie_cp_id: String(omie_cp_id),\n    record_id: record_id,\n    raw_payload: body\n  }\n}];"
+      },
+      "id": "validate-payload",
+      "name": "Validar Payload",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [460, 300]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $vars.supabase_url }}/rest/v1/sys_config?select=chave,valor&chave=in.(omie_app_key,omie_app_secret)",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "={{ $vars.supabase_service_role_key }}"
+            },
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $vars.supabase_service_role_key }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "get-omie-credentials",
+      "name": "Get Omie Credentials",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [680, 300]
+    },
+    {
+      "parameters": {
+        "language": "javaScript",
+        "jsCode": "const items = $input.all();\nconst configArr = items.map(i => i.json);\nconst config = {};\nfor (const row of configArr) {\n  config[row.chave] = row.valor;\n}\n\nconst validatedData = $('Validar Payload').first().json;\n\nreturn [{\n  json: {\n    omie_app_key: config.omie_app_key,\n    omie_app_secret: config.omie_app_secret,\n    omie_cp_id: validatedData.omie_cp_id,\n    record_id: validatedData.record_id\n  }\n}];"
+      },
+      "id": "merge-credentials",
+      "name": "Merge Credentials e Payload",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [900, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://app.omie.com.br/api/v1/financas/contapagar/",
+        "sendBody": true,
+        "contentType": "json",
+        "body": "={\n  \"call\": \"AlterarStatusCP\",\n  \"app_key\": \"{{ $json.omie_app_key }}\",\n  \"app_secret\": \"{{ $json.omie_app_secret }}\",\n  \"param\": [\n    {\n      \"nCodCP\": \"{{ $json.omie_cp_id }}\",\n      \"cStatus\": \"APROVADO\"\n    }\n  ]\n}",
+        "options": {}
+      },
+      "id": "call-omie-alterar-status",
+      "name": "Omie - Alterar Status CP",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1120, 300]
+    },
+    {
+      "parameters": {
+        "language": "javaScript",
+        "jsCode": "const omieResponse = $input.first().json;\nconst mergedData = $('Merge Credentials e Payload').first().json;\n\n// Check if Omie returned an error\nif (omieResponse.faultstring || omieResponse.faultcode) {\n  throw new Error(`Omie API error: ${omieResponse.faultstring || omieResponse.faultcode}`);\n}\n\nreturn [{\n  json: {\n    omie_cp_id: mergedData.omie_cp_id,\n    record_id: mergedData.record_id,\n    omie_response: omieResponse\n  }\n}];"
+      },
+      "id": "check-omie-response",
+      "name": "Verificar Resposta Omie",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1340, 300]
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "={{ $vars.supabase_url }}/rest/v1/fin_contas_pagar?omie_cp_id=eq.{{ $json.omie_cp_id }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "={{ $vars.supabase_service_role_key }}"
+            },
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $vars.supabase_service_role_key }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Prefer",
+              "value": "return=representation"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "json",
+        "body": "={{ JSON.stringify({ status: 'aprovado_pgto' }) }}",
+        "options": {}
+      },
+      "id": "update-status-supabase",
+      "name": "Atualizar Status Supabase",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1560, 300]
+    },
+    {
+      "parameters": {
+        "language": "javaScript",
+        "jsCode": "const verifiedData = $('Verificar Resposta Omie').first().json;\nreturn [{\n  json: {\n    dominio: 'aprovacao_pagamento',\n    status: 'sucesso',\n    registros: 1,\n    mensagem: `Aprovacao de pagamento para CP ${verifiedData.omie_cp_id} concluida com sucesso`,\n    executado_em: new Date().toISOString(),\n    executado_por: 'n8n'\n  }\n}];"
+      },
+      "id": "build-sync-log",
+      "name": "Preparar Sync Log",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1780, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $vars.supabase_url }}/rest/v1/fin_sync_log",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "={{ $vars.supabase_service_role_key }}"
+            },
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $vars.supabase_service_role_key }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Prefer",
+              "value": "return=representation"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "json",
+        "body": "={{ JSON.stringify($json) }}",
+        "options": {}
+      },
+      "id": "insert-sync-log",
+      "name": "Inserir Sync Log",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2000, 300]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ success: true, message: 'Aprovacao de pagamento processada com sucesso', omie_cp_id: $('Verificar Resposta Omie').first().json.omie_cp_id }) }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "respond-success",
+      "name": "Responder Sucesso",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [2220, 300]
+    }
+  ],
+  "connections": {
+    "Webhook Trigger": {
+      "main": [
+        [
+          {
+            "node": "Validar Payload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validar Payload": {
+      "main": [
+        [
+          {
+            "node": "Get Omie Credentials",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Omie Credentials": {
+      "main": [
+        [
+          {
+            "node": "Merge Credentials e Payload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge Credentials e Payload": {
+      "main": [
+        [
+          {
+            "node": "Omie - Alterar Status CP",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Omie - Alterar Status CP": {
+      "main": [
+        [
+          {
+            "node": "Verificar Resposta Omie",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Verificar Resposta Omie": {
+      "main": [
+        [
+          {
+            "node": "Atualizar Status Supabase",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Atualizar Status Supabase": {
+      "main": [
+        [
+          {
+            "node": "Preparar Sync Log",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Preparar Sync Log": {
+      "main": [
+        [
+          {
+            "node": "Inserir Sync Log",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Inserir Sync Log": {
+      "main": [
+        [
+          {
+            "node": "Responder Sucesso",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "tags": [
+    { "name": "omie" },
+    { "name": "financeiro" }
+  ]
+}

@@ -1,19 +1,20 @@
 import { NavLink, Outlet, useNavigate } from 'react-router-dom'
 import {
   LayoutDashboard, Receipt, Landmark, FileCheck2,
-  BarChart3, Users, LogOut, LayoutGrid, DollarSign,
+  BarChart3, Users, LogOut, LayoutGrid, DollarSign, Settings,
 } from 'lucide-react'
 import { useAuth, ROLE_LABEL, ROLE_COLOR } from '../contexts/AuthContext'
 import LogoTeg from './LogoTeg'
 
 const NAV = [
-  { to: '/financeiro',            icon: LayoutDashboard, label: 'Painel',        end: true  },
-  { to: '/financeiro/cp',         icon: Receipt,         label: 'Contas a Pagar', end: false },
-  { to: '/financeiro/cr',         icon: DollarSign,      label: 'A Receber',     end: false },
-  { to: '/financeiro/aprovacoes', icon: FileCheck2,      label: 'Aprovações',    end: false },
-  { to: '/financeiro/conciliacao',icon: Landmark,        label: 'Conciliação',   end: false },
-  { to: '/financeiro/relatorios', icon: BarChart3,       label: 'Relatórios',    end: false },
-  { to: '/financeiro/fornecedores', icon: Users,         label: 'Fornecedores',  end: false },
+  { to: '/financeiro',                icon: LayoutDashboard, label: 'Painel',          end: true  },
+  { to: '/financeiro/cp',             icon: Receipt,         label: 'Contas a Pagar',  end: false },
+  { to: '/financeiro/cr',             icon: DollarSign,      label: 'A Receber',       end: false },
+  { to: '/financeiro/aprovacoes',     icon: FileCheck2,      label: 'Aprovações',      end: false },
+  { to: '/financeiro/conciliacao',    icon: Landmark,        label: 'Conciliação',     end: false },
+  { to: '/financeiro/relatorios',     icon: BarChart3,       label: 'Relatórios',      end: false },
+  { to: '/financeiro/fornecedores',   icon: Users,           label: 'Fornecedores',    end: false },
+  { to: '/financeiro/configuracoes',  icon: Settings,        label: 'Configurações',   end: false },
 ]
 
 const AVATAR_COLORS = [

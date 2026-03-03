@@ -1,0 +1,325 @@
+{
+  "name": "TEG+ | Omie - Sync Contas a Receber",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours",
+              "hoursInterval": 6
+            }
+          ]
+        }
+      },
+      "id": "schedule-trigger",
+      "name": "Schedule Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [240, 200]
+    },
+    {
+      "parameters": {
+        "path": "omie/sync/contas-receber",
+        "httpMethod": "POST",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "webhook-trigger",
+      "name": "Webhook Trigger",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [240, 400]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $vars.supabase_url }}/rest/v1/sys_config?select=chave,valor&chave=in.(omie_app_key,omie_app_secret)",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "={{ $vars.supabase_service_role_key }}"
+            },
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $vars.supabase_service_role_key }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "get-omie-credentials",
+      "name": "Get Omie Credentials",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [500, 300]
+    },
+    {
+      "parameters": {
+        "language": "javaScript",
+        "jsCode": "const items = $input.all();\nconst configArr = items.map(i => i.json);\nconst config = {};\nfor (const row of configArr) {\n  config[row.chave] = row.valor;\n}\nreturn [{ json: { omie_app_key: config.omie_app_key, omie_app_secret: config.omie_app_secret } }];"
+      },
+      "id": "extract-credentials",
+      "name": "Extract Credentials",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [720, 300]
+    },
+    {
+      "parameters": {
+        "language": "javaScript",
+        "jsCode": "const now = new Date();\n\nconst dateMinus30 = new Date(now);\ndateMinus30.setDate(dateMinus30.getDate() - 30);\n\nconst datePlus60 = new Date(now);\ndatePlus60.setDate(datePlus60.getDate() + 60);\n\nfunction formatDate(d) {\n  const dd = String(d.getDate()).padStart(2, '0');\n  const mm = String(d.getMonth() + 1).padStart(2, '0');\n  const yyyy = d.getFullYear();\n  return `${dd}/${mm}/${yyyy}`;\n}\n\nreturn [{\n  json: {\n    ...($input.first().json),\n    data_de: formatDate(dateMinus30),\n    data_ate: formatDate(datePlus60)\n  }\n}];"
+      },
+      "id": "build-date-range",
+      "name": "Calcular Intervalo de Datas",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [940, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://app.omie.com.br/api/v1/financas/contareceber/",
+        "sendBody": true,
+        "contentType": "json",
+        "body": "={\n  \"call\": \"ListarContasReceber\",\n  \"app_key\": \"{{ $json.omie_app_key }}\",\n  \"app_secret\": \"{{ $json.omie_app_secret }}\",\n  \"param\": [\n    {\n      \"pagina\": 1,\n      \"registros_por_pagina\": 500,\n      \"filtrar_por_data_de\": \"{{ $json.data_de }}\",\n      \"filtrar_por_data_ate\": \"{{ $json.data_ate }}\"\n    }\n  ]\n}",
+        "options": {}
+      },
+      "id": "call-omie-cr",
+      "name": "Omie - Listar Contas a Receber",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1160, 300]
+    },
+    {
+      "parameters": {
+        "language": "javaScript",
+        "jsCode": "const data = $input.first().json;\nconst registros = data.conta_receber_cadastro || data.cadastros || [];\n\nfunction parseOmieDate(dateStr) {\n  if (!dateStr) return null;\n  // Omie returns DD/MM/YYYY\n  const parts = dateStr.split('/');\n  if (parts.length !== 3) return null;\n  const [dd, mm, yyyy] = parts;\n  return `${yyyy}-${mm}-${dd}`;\n}\n\nfunction mapStatus(statusCode) {\n  const statusMap = {\n    '0': 'previsto',\n    '1': 'previsto',\n    '2': 'recebido'\n  };\n  return statusMap[String(statusCode)] || 'previsto';\n}\n\nconst mapped = registros.map(cr => {\n  return {\n    omie_cr_id: cr.nCodCR ? String(cr.nCodCR) : null,\n    cliente_nome: cr.cCliente || cr.cliente_nome || '',\n    valor_original: parseFloat(cr.nValorDocumento || 0),\n    data_vencimento: parseOmieDate(cr.dDataVencimento),\n    status: mapStatus(cr.nStatusCR || cr.status || 0)\n  };\n}).filter(cr => cr.omie_cr_id);\n\nreturn mapped.map(cr => ({ json: cr }));"
+      },
+      "id": "map-contas-receber",
+      "name": "Mapear Contas a Receber",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1380, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $vars.supabase_url }}/rest/v1/fin_contas_receber?onConflict=omie_cr_id",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "={{ $vars.supabase_service_role_key }}"
+            },
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $vars.supabase_service_role_key }}"
+            },
+            {
+              "name": "Prefer",
+              "value": "resolution=merge-duplicates"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "json",
+        "body": "={{ JSON.stringify($json) }}",
+        "options": {}
+      },
+      "id": "upsert-contas-receber",
+      "name": "Upsert Contas a Receber Supabase",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1600, 300]
+    },
+    {
+      "parameters": {
+        "language": "javaScript",
+        "jsCode": "const allItems = $input.all();\nreturn [{\n  json: {\n    dominio: 'contas_receber',\n    status: 'sucesso',\n    registros: allItems.length,\n    mensagem: 'Sync de contas a receber concluido com sucesso',\n    executado_em: new Date().toISOString(),\n    executado_por: 'n8n'\n  }\n}];"
+      },
+      "id": "build-sync-log",
+      "name": "Preparar Sync Log",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1820, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $vars.supabase_url }}/rest/v1/fin_sync_log",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "={{ $vars.supabase_service_role_key }}"
+            },
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $vars.supabase_service_role_key }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Prefer",
+              "value": "return=representation"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "json",
+        "body": "={{ JSON.stringify($json) }}",
+        "options": {}
+      },
+      "id": "insert-sync-log",
+      "name": "Inserir Sync Log",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2040, 300]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ success: true, message: 'Sync de contas a receber concluido', registros: $('Preparar Sync Log').first().json.registros }) }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "respond-success",
+      "name": "Responder Sucesso",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [2260, 300]
+    }
+  ],
+  "connections": {
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Get Omie Credentials",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook Trigger": {
+      "main": [
+        [
+          {
+            "node": "Get Omie Credentials",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Omie Credentials": {
+      "main": [
+        [
+          {
+            "node": "Extract Credentials",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Credentials": {
+      "main": [
+        [
+          {
+            "node": "Calcular Intervalo de Datas",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Calcular Intervalo de Datas": {
+      "main": [
+        [
+          {
+            "node": "Omie - Listar Contas a Receber",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Omie - Listar Contas a Receber": {
+      "main": [
+        [
+          {
+            "node": "Mapear Contas a Receber",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mapear Contas a Receber": {
+      "main": [
+        [
+          {
+            "node": "Upsert Contas a Receber Supabase",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upsert Contas a Receber Supabase": {
+      "main": [
+        [
+          {
+            "node": "Preparar Sync Log",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Preparar Sync Log": {
+      "main": [
+        [
+          {
+            "node": "Inserir Sync Log",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Inserir Sync Log": {
+      "main": [
+        [
+          {
+            "node": "Responder Sucesso",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "tags": [
+    { "name": "omie" },
+    { "name": "financeiro" }
+  ]
+}

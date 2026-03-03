@@ -1,0 +1,277 @@
+{
+  "name": "TEG+ | Omie - Sync Fornecedores",
+  "nodes": [
+    {
+      "parameters": {
+        "path": "omie/sync/fornecedores",
+        "httpMethod": "POST",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "trigger-webhook",
+      "name": "Trigger",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $vars.supabase_url }}/rest/v1/sys_config?select=chave,valor&chave=in.(omie_app_key,omie_app_secret)",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "={{ $vars.supabase_service_role_key }}"
+            },
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $vars.supabase_service_role_key }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "get-omie-credentials",
+      "name": "Get Omie Credentials",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [460, 300]
+    },
+    {
+      "parameters": {
+        "language": "javaScript",
+        "jsCode": "const items = $input.all();\nconst configArr = items.map(i => i.json);\nconst config = {};\nfor (const row of configArr) {\n  config[row.chave] = row.valor;\n}\nreturn [{ json: { omie_app_key: config.omie_app_key, omie_app_secret: config.omie_app_secret } }];"
+      },
+      "id": "extract-credentials",
+      "name": "Extract Credentials",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [680, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://app.omie.com.br/api/v1/geral/fornecedores/",
+        "sendBody": true,
+        "contentType": "json",
+        "body": "={\n  \"call\": \"ListarFornecedores\",\n  \"app_key\": \"{{ $json.omie_app_key }}\",\n  \"app_secret\": \"{{ $json.omie_app_secret }}\",\n  \"param\": [\n    {\n      \"pagina\": 1,\n      \"registros_por_pagina\": 500,\n      \"filtrar_apenas_ativo\": \"S\"\n    }\n  ]\n}",
+        "options": {}
+      },
+      "id": "call-omie-fornecedores",
+      "name": "Omie - Listar Fornecedores",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [900, 300]
+    },
+    {
+      "parameters": {
+        "language": "javaScript",
+        "jsCode": "const data = $input.first().json;\nconst fornecedores = data.cadastros || data.fornecedor_cadastro || [];\n\nconst mapped = fornecedores.map(f => {\n  const tag = f.tags ? f.tags[0] : {};\n  const cnpj = (f.cnpj_cpf || '').replace(/[^\\d]/g, '');\n  return {\n    omie_id: f.nCodFornecedor ? String(f.nCodFornecedor) : null,\n    razao_social: f.razao_social || f.cRazaoSocial || '',\n    nome_fantasia: f.nome_fantasia || f.cNomeFantasia || '',\n    cnpj: cnpj || null,\n    email: f.email || f.cEmail || null,\n    telefone: f.telefone1_numero || f.cTelefone || null\n  };\n}).filter(f => f.omie_id && f.razao_social);\n\nreturn mapped.map(f => ({ json: f }));"
+      },
+      "id": "map-fornecedores",
+      "name": "Mapear Fornecedores",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1120, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $vars.supabase_url }}/rest/v1/cmp_fornecedores?onConflict=omie_id",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "={{ $vars.supabase_service_role_key }}"
+            },
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $vars.supabase_service_role_key }}"
+            },
+            {
+              "name": "Prefer",
+              "value": "resolution=merge-duplicates"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "json",
+        "body": "={{ JSON.stringify($json) }}",
+        "options": {}
+      },
+      "id": "upsert-fornecedores",
+      "name": "Upsert Fornecedores Supabase",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1340, 300]
+    },
+    {
+      "parameters": {
+        "language": "javaScript",
+        "jsCode": "const allItems = $input.all();\nreturn [{\n  json: {\n    dominio: 'fornecedores',\n    status: 'sucesso',\n    registros: allItems.length,\n    mensagem: 'Sync de fornecedores concluido com sucesso',\n    executado_em: new Date().toISOString(),\n    executado_por: 'n8n'\n  }\n}];"
+      },
+      "id": "build-sync-log",
+      "name": "Preparar Sync Log",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1560, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $vars.supabase_url }}/rest/v1/fin_sync_log",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "={{ $vars.supabase_service_role_key }}"
+            },
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $vars.supabase_service_role_key }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Prefer",
+              "value": "return=representation"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "json",
+        "body": "={{ JSON.stringify($json) }}",
+        "options": {}
+      },
+      "id": "insert-sync-log",
+      "name": "Inserir Sync Log",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1780, 300]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ success: true, message: 'Sync de fornecedores concluido', registros: $('Preparar Sync Log').first().json.registros }) }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "respond-success",
+      "name": "Responder Sucesso",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [2000, 300]
+    }
+  ],
+  "connections": {
+    "Trigger": {
+      "main": [
+        [
+          {
+            "node": "Get Omie Credentials",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Omie Credentials": {
+      "main": [
+        [
+          {
+            "node": "Extract Credentials",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Credentials": {
+      "main": [
+        [
+          {
+            "node": "Omie - Listar Fornecedores",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Omie - Listar Fornecedores": {
+      "main": [
+        [
+          {
+            "node": "Mapear Fornecedores",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mapear Fornecedores": {
+      "main": [
+        [
+          {
+            "node": "Upsert Fornecedores Supabase",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upsert Fornecedores Supabase": {
+      "main": [
+        [
+          {
+            "node": "Preparar Sync Log",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Preparar Sync Log": {
+      "main": [
+        [
+          {
+            "node": "Inserir Sync Log",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Inserir Sync Log": {
+      "main": [
+        [
+          {
+            "node": "Responder Sucesso",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "tags": [
+    { "name": "omie" },
+    { "name": "financeiro" }
+  ]
+}
