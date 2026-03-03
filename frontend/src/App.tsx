@@ -25,6 +25,15 @@ import Contratos from './pages/Contratos'
 
 // Módulo Financeiro
 import FinanceiroLayout from './components/FinanceiroLayout'
+
+// Módulo Logística
+import LogisticaLayout from './components/LogisticaLayout'
+import LogisticaHome from './pages/logistica/LogisticaHome'
+import Solicitacoes from './pages/logistica/Solicitacoes'
+import Expedicao from './pages/logistica/Expedicao'
+import TransportesLog from './pages/logistica/Transportes'
+import Recebimentos from './pages/logistica/Recebimentos'
+import TransportadorasLog from './pages/logistica/Transportadoras'
 import DashboardFinanceiro from './pages/financeiro/DashboardFinanceiro'
 import ContasPagar from './pages/financeiro/ContasPagar'
 import ContasReceber from './pages/financeiro/ContasReceber'
@@ -82,6 +91,16 @@ export default function App() {
             <Route path="/estoque/movimentacoes" element={<Movimentacoes />} />
             <Route path="/estoque/inventario"    element={<Inventario />} />
             <Route path="/estoque/patrimonial"   element={<Patrimonial />} />
+          </Route>
+
+          {/* Módulo Logística: usa LogisticaLayout */}
+          <Route element={<LogisticaLayout />}>
+            <Route path="/logistica"                   element={<LogisticaHome />} />
+            <Route path="/logistica/solicitacoes"      element={<Solicitacoes />} />
+            <Route path="/logistica/expedicao"         element={<Expedicao />} />
+            <Route path="/logistica/transportes"       element={<TransportesLog />} />
+            <Route path="/logistica/recebimentos"      element={<Recebimentos />} />
+            <Route path="/logistica/transportadoras"   element={<TransportadorasLog />} />
           </Route>
 
           {/* Módulos stub */}

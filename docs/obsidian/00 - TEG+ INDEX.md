@@ -54,6 +54,7 @@ atualizado: 2026-03-03
 | Módulo Financeiro | [[20 - Módulo Financeiro]] |
 | Fluxo de Pagamento | [[21 - Fluxo Pagamento]] |
 | Módulo Estoque e Patrimonial | [[22 - Módulo Estoque e Patrimonial]] |
+| Módulo Logística | [[23 - Módulo Logística e Transportes]] |
 
 ---
 
@@ -84,6 +85,7 @@ graph TD
 graph LR
     M[TEG+ ERP] --> C[✅ Compras]
     M --> F[✅ Financeiro]
+    M --> L[✅ Logística]
     M --> R[🔜 RH]
     M --> S[🔜 SSMA]
     M --> E[✅ Estoque]
@@ -98,9 +100,15 @@ graph LR
     E --> E2[Inventário]
     E --> E3[Patrimonial]
 
+    L --> L1[Solicitações]
+    L --> L2[Expedição]
+    L --> L3[Transportes]
+    L --> L4[Recebimentos]
+
     style C fill:#10B981,color:#fff
     style F fill:#10B981,color:#fff
     style E fill:#3B82F6,color:#fff
+    style L fill:#EA580C,color:#fff
     style R fill:#64748B,color:#fff
     style S fill:#64748B,color:#fff
     style K fill:#64748B,color:#fff
@@ -123,6 +131,7 @@ graph LR
 | Fluxo Pagamento (Compras→Fin) | ✅ Entregue | Triggers, anexos, comprovante |
 | Financeiro (Omie ERP) | ✅ Entregue | CP, CR, Fornecedores, 4 squads n8n |
 | Estoque e Patrimonial | ✅ Entregue | Almoxarifado, inventário, imobilizados, depreciação |
+| Logística e Transportes | ✅ Entregue | 9 etapas, NF-e, GPS, avaliações |
 | WhatsApp (Evolution API) | 🔜 Planejado | Notificações automáticas |
 | AI TEG+ (Claude API) | 🔜 Planejado | Agente conversacional |
 | Monday.com PMO | 🔜 Planejado | Gestão de portfólio |

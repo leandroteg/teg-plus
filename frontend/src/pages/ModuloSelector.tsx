@@ -62,6 +62,17 @@ const MODULOS = [
     route: '/estoque',
   },
   {
+    key: 'logistica',
+    label: 'Logística',
+    icon: '🚛',
+    description: 'Transportes, NF-e e rastreamento',
+    iconBg: 'bg-gradient-to-br from-orange-500/25 to-amber-500/25',
+    iconBorder: 'border-orange-500/50',
+    accentColor: 'rgba(234,88,12,0.2)',
+    active: true,
+    route: '/logistica',
+  },
+  {
     key: 'contratos',
     label: 'Contratos',
     icon: '📋',
@@ -86,7 +97,7 @@ export default function ModuloSelector() {
   function canAccess(mod: (typeof MODULOS)[number]) {
     if (!mod.active) return false
     // core modules always accessible
-    if (mod.key === 'compras' || mod.key === 'financeiro' || mod.key === 'estoque') return true
+    if (mod.key === 'compras' || mod.key === 'financeiro' || mod.key === 'estoque' || mod.key === 'logistica') return true
     return hasModule(mod.key as string)
   }
 
