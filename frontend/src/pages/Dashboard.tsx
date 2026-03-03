@@ -26,7 +26,7 @@ const EMPTY_KPIS: DashboardData['kpis'] = {
 // ── Funil pipeline — 7 etapas ──────────────────────────────────────────────
 const PIPELINE_ETAPAS = [
   { label: 'Pendentes',  statuses: ['rascunho', 'pendente'],                color: 'text-amber-600',  bg: 'bg-amber-50',  border: 'border-amber-200'   },
-  { label: 'Aprovação',  statuses: ['em_aprovacao'],                        color: 'text-blue-600',   bg: 'bg-blue-50',   border: 'border-blue-200'    },
+  { label: 'Valid. Téc.',statuses: ['em_aprovacao'],                        color: 'text-blue-600',   bg: 'bg-blue-50',   border: 'border-blue-200'    },
   { label: 'Cotação',    statuses: ['aprovada', 'em_cotacao', 'cotacao_enviada'], color: 'text-violet-600', bg: 'bg-violet-50', border: 'border-violet-200' },
   { label: 'Aprov. Fin.',statuses: ['cotacao_aprovada'],                    color: 'text-indigo-600', bg: 'bg-indigo-50', border: 'border-indigo-200'   },
   { label: 'Pedido',     statuses: ['pedido_emitido'],                      color: 'text-cyan-600',   bg: 'bg-cyan-50',   border: 'border-cyan-200'    },
