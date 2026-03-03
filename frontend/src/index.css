@@ -96,6 +96,13 @@
     background-size: 48px 48px;
   }
 
+  /* ── Form input base ─────────────────── */
+  .input-base {
+    @apply w-full px-3 py-2 rounded-xl border border-slate-200 bg-white text-sm
+      focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400
+      transition-colors placeholder:text-slate-400;
+  }
+
   /* ── Shimmer button ───────────────────── */
   .btn-shimmer {
     background: linear-gradient(90deg, #0F766E, #14B8A6, #22D3EE, #14B8A6, #0F766E);

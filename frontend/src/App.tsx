@@ -21,7 +21,6 @@ import Pedidos from './pages/Pedidos'
 // Módulos stub
 import RH from './pages/RH'
 import SSMA from './pages/SSMA'
-import Estoque from './pages/Estoque'
 import Contratos from './pages/Contratos'
 
 // Módulo Financeiro
@@ -34,6 +33,14 @@ import Conciliacao from './pages/financeiro/Conciliacao'
 import Relatorios from './pages/financeiro/Relatorios'
 import Fornecedores from './pages/financeiro/Fornecedores'
 import Configuracoes from './pages/financeiro/Configuracoes'
+
+// Módulo Estoque
+import EstoqueLayout from './components/EstoqueLayout'
+import EstoqueHome from './pages/estoque/EstoqueHome'
+import Itens from './pages/estoque/Itens'
+import Movimentacoes from './pages/estoque/Movimentacoes'
+import Inventario from './pages/estoque/Inventario'
+import Patrimonial from './pages/estoque/Patrimonial'
 
 // Admin
 import AdminUsuarios from './pages/AdminUsuarios'
@@ -68,10 +75,18 @@ export default function App() {
             <Route path="/financeiro/configuracoes" element={<Configuracoes />} />
           </Route>
 
+          {/* Módulo Estoque: usa EstoqueLayout */}
+          <Route element={<EstoqueLayout />}>
+            <Route path="/estoque"               element={<EstoqueHome />} />
+            <Route path="/estoque/itens"         element={<Itens />} />
+            <Route path="/estoque/movimentacoes" element={<Movimentacoes />} />
+            <Route path="/estoque/inventario"    element={<Inventario />} />
+            <Route path="/estoque/patrimonial"   element={<Patrimonial />} />
+          </Route>
+
           {/* Módulos stub */}
           <Route path="/rh"         element={<RH />} />
           <Route path="/ssma"       element={<SSMA />} />
-          <Route path="/estoque"    element={<Estoque />} />
           <Route path="/contratos"  element={<Contratos />} />
 
           {/* Módulo Compras: usa sidebar/Layout */}

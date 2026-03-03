@@ -54,11 +54,11 @@ const MODULOS = [
     key: 'estoque',
     label: 'Estoque',
     icon: '📦',
-    description: 'Movimentação e inventário',
+    description: 'Almoxarifado, inventário e patrimônio',
     iconBg: 'bg-gradient-to-br from-blue-500/20 to-indigo-500/20',
     iconBorder: 'border-blue-500/30',
     accentColor: 'rgba(99,102,241,0.15)',
-    active: false,
+    active: true,
     route: '/estoque',
   },
   {
@@ -85,8 +85,8 @@ export default function ModuloSelector() {
 
   function canAccess(mod: (typeof MODULOS)[number]) {
     if (!mod.active) return false
-    // compras & financeiro are core modules, always accessible
-    if (mod.key === 'compras' || mod.key === 'financeiro') return true
+    // core modules always accessible
+    if (mod.key === 'compras' || mod.key === 'financeiro' || mod.key === 'estoque') return true
     return hasModule(mod.key as string)
   }
 
