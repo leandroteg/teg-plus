@@ -226,7 +226,7 @@ w.innerHTML = `
   </div>
 
   <!-- ── BOTTOM ROW ──────────────────────────────────── -->
-  <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+  <div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:12px;">
 
     ${card(`
       ${secHead('⚡ Em Andamento', 'Tasks Board')}
