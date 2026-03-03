@@ -73,13 +73,24 @@ const MODULOS = [
     route: '/logistica',
   },
   {
+    key: 'frotas',
+    label: 'Frotas',
+    icon: '🚗',
+    description: 'Manutenção, checklist e telemetria',
+    iconBg: 'bg-gradient-to-br from-rose-500/25 to-pink-500/25',
+    iconBorder: 'border-rose-500/50',
+    accentColor: 'rgba(244,63,94,0.2)',
+    active: true,
+    route: '/frotas',
+  },
+  {
     key: 'contratos',
     label: 'Contratos',
     icon: '📋',
     description: 'Gestão de contratos e SLAs',
-    iconBg: 'bg-gradient-to-br from-rose-500/20 to-pink-500/20',
-    iconBorder: 'border-rose-500/30',
-    accentColor: 'rgba(244,63,94,0.15)',
+    iconBg: 'bg-gradient-to-br from-slate-500/20 to-gray-500/20',
+    iconBorder: 'border-slate-500/30',
+    accentColor: 'rgba(100,116,139,0.15)',
     active: false,
     route: '/contratos',
   },
@@ -97,7 +108,7 @@ export default function ModuloSelector() {
   function canAccess(mod: (typeof MODULOS)[number]) {
     if (!mod.active) return false
     // core modules always accessible
-    if (mod.key === 'compras' || mod.key === 'financeiro' || mod.key === 'estoque' || mod.key === 'logistica') return true
+    if (['compras', 'financeiro', 'estoque', 'logistica', 'frotas'].includes(mod.key as string)) return true
     return hasModule(mod.key as string)
   }
 

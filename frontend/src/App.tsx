@@ -25,15 +25,6 @@ import Contratos from './pages/Contratos'
 
 // Módulo Financeiro
 import FinanceiroLayout from './components/FinanceiroLayout'
-
-// Módulo Logística
-import LogisticaLayout from './components/LogisticaLayout'
-import LogisticaHome from './pages/logistica/LogisticaHome'
-import Solicitacoes from './pages/logistica/Solicitacoes'
-import Expedicao from './pages/logistica/Expedicao'
-import TransportesLog from './pages/logistica/Transportes'
-import Recebimentos from './pages/logistica/Recebimentos'
-import TransportadorasLog from './pages/logistica/Transportadoras'
 import DashboardFinanceiro from './pages/financeiro/DashboardFinanceiro'
 import ContasPagar from './pages/financeiro/ContasPagar'
 import ContasReceber from './pages/financeiro/ContasReceber'
@@ -50,6 +41,24 @@ import Itens from './pages/estoque/Itens'
 import Movimentacoes from './pages/estoque/Movimentacoes'
 import Inventario from './pages/estoque/Inventario'
 import Patrimonial from './pages/estoque/Patrimonial'
+
+// Módulo Logística
+import LogisticaLayout from './components/LogisticaLayout'
+import LogisticaHome from './pages/logistica/LogisticaHome'
+import Solicitacoes from './pages/logistica/Solicitacoes'
+import Expedicao from './pages/logistica/Expedicao'
+import TransportesLog from './pages/logistica/Transportes'
+import Recebimentos from './pages/logistica/Recebimentos'
+import TransportadorasLog from './pages/logistica/Transportadoras'
+
+// Módulo Frotas
+import FrotasLayout from './components/FrotasLayout'
+import FrotasHome from './pages/frotas/FrotasHome'
+import Veiculos from './pages/frotas/Veiculos'
+import Ordens from './pages/frotas/Ordens'
+import Checklists from './pages/frotas/Checklists'
+import Abastecimentos from './pages/frotas/Abastecimentos'
+import Telemetria from './pages/frotas/Telemetria'
 
 // Admin
 import AdminUsuarios from './pages/AdminUsuarios'
@@ -101,6 +110,16 @@ export default function App() {
             <Route path="/logistica/transportes"       element={<TransportesLog />} />
             <Route path="/logistica/recebimentos"      element={<Recebimentos />} />
             <Route path="/logistica/transportadoras"   element={<TransportadorasLog />} />
+          </Route>
+
+          {/* Módulo Frotas: usa FrotasLayout */}
+          <Route element={<FrotasLayout />}>
+            <Route path="/frotas"                      element={<FrotasHome />} />
+            <Route path="/frotas/veiculos"             element={<Veiculos />} />
+            <Route path="/frotas/ordens"               element={<Ordens />} />
+            <Route path="/frotas/checklists"           element={<Checklists />} />
+            <Route path="/frotas/abastecimentos"       element={<Abastecimentos />} />
+            <Route path="/frotas/telemetria"           element={<Telemetria />} />
           </Route>
 
           {/* Módulos stub */}
