@@ -4,7 +4,7 @@ type: banco-de-dados
 status: ativo
 tags: [supabase, migrations, sql, schema]
 criado: 2026-03-02
-relacionado: ["[[06 - Supabase]]", "[[07 - Schema Database]]"]
+relacionado: ["[[06 - Supabase]]", "[[07 - Schema Database]]", "[[19 - Integração Omie]]", "[[21 - Fluxo Pagamento]]"]
 ---
 
 # Migrações SQL — TEG+ ERP
@@ -23,6 +23,10 @@ supabase/migrations/
 ├── 008_fixes_escalabilidade.sql
 ├── 009_admin_rls_fix.sql
 ├── 010_dashboard_fix.sql
+├── 011_categorias.sql
+├── 012_fix_rls_perfis.sql
+├── 013_omie_integracao.sql
+├── 014_fluxo_pagamento.sql
 └── SCHEMA_v2.sql           ← Rebuild completo (referência)
 ```
 
@@ -157,6 +161,57 @@ Ver detalhes em [[14 - Compradores e Categorias]].
 
 ---
 
+### `011_categorias.sql` — Categorias de Compras
+**Cria/Atualiza:** Categorias com regras de cotação e alçadas.
+
+- Tabela `cmp_categorias` com campos `cotacoes_regras` (JSONB) e alçadas por nível
+- Seed com 12 categorias reais (EPI/EPC, Ferramental, Material Elétrico, etc.)
+- `get_alerta_cotacao(p_requisicao_id)` — RPC que verifica se cotação foi enviada sem mínimo de fornecedores
+
+---
+
+### `012_fix_rls_perfis.sql` — Fix RLS Perfis
+**Corrige:** Loop infinito de RLS na tabela `sys_perfis`.
+
+- Função `is_admin()` com `SECURITY DEFINER` para evitar recursão
+- Políticas RLS reescritas usando a função helper
+- Fix para `SELECT` do próprio perfil sem recursão
+
+---
+
+### `013_omie_integracao.sql` — Integração Omie ERP
+**Cria:** Infraestrutura de integração com Omie.
+
+- Tabela `sys_config` — armazenamento de credenciais e configurações
+- Tabela `fin_sync_log` — histórico de sincronizações por domínio
+- Função `get_omie_config()` com `SECURITY DEFINER` — retorna credenciais sem expor via RLS
+- RLS: apenas admin escreve em `sys_config`; autenticados leem via função
+- Seed de chaves iniciais (`omie_app_key`, `omie_app_secret`, `omie_habilitado`, `n8n_base_url`)
+
+---
+
+### `014_fluxo_pagamento.sql` — Fluxo Completo de Pagamento
+**Cria:** Tudo relacionado ao ciclo Compras → Financeiro.
+
+**Novas colunas em `cmp_pedidos`:**
+- `status_pagamento` — null / `liberado` / `pago`
+- `liberado_pagamento_em`, `liberado_pagamento_por`
+- `pago_em`, `nf_numero`
+
+**Nova tabela `cmp_pedidos_anexos`:**
+- Upload de NF, comprovantes, medições, contratos
+- Campo `origem` (`compras` / `financeiro`)
+- RLS: usuários autenticados leem; donos e financeiro escrevem
+
+**Storage bucket `pedidos-anexos`:**
+- Acesso autenticado; max 50 MB
+
+**Triggers:**
+- `trig_criar_cp_ao_emitir_pedido` — cria CP em `fin_contas_pagar` ao inserir PO
+- `trig_atualizar_cp_ao_liberar` — propaga mudanças de `status_pagamento` → `fin_contas_pagar`
+
+---
+
 ### `SCHEMA_v2.sql` — Rebuild Completo (Referência)
 **Propósito:** Schema completamente refatorado com convenções de nomenclatura.
 
@@ -187,7 +242,7 @@ supabase db push
 # SQL Editor → colar e executar em ordem
 ```
 
-**Ordem obrigatória:** 001 → 002 → 003 → 004 → 005 → 006 → 006b → 007 → 008 → 009 → 010
+**Ordem obrigatória:** 001 → 002 → 003 → 004 → 005 → 006 → 006b → 007 → 008 → 009 → 010 → 011 → 012 → 013 → 014
 
 ---
 

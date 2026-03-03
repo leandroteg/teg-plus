@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../services/supabase'
 import type {
   ContaPagar, ContaReceber, Fornecedor,
@@ -74,5 +74,26 @@ export function useFornecedores() {
       if (error) return []
       return (data ?? []) as Fornecedor[]
     },
+  })
+}
+
+// ── Marcar CP como Pago ────────────────────────────────────────────────────
+// Atualiza diretamente fin_contas_pagar quando não há pedido vinculado,
+// ou quando o financeiro quer forçar status independente do fluxo de compras.
+
+export function useMarcarCPPago() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ cpId, dataPagamento }: { cpId: string; dataPagamento?: string }) => {
+      const { error } = await supabase
+        .from('fin_contas_pagar')
+        .update({
+          status: 'pago',
+          data_pagamento: dataPagamento ?? new Date().toISOString().split('T')[0],
+        })
+        .eq('id', cpId)
+      if (error) throw error
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['contas-pagar'] }),
   })
 }

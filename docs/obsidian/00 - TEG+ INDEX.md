@@ -4,7 +4,7 @@ type: index
 status: ativo
 tags: [teg-plus, erp, moc, index]
 criado: 2026-03-02
-atualizado: 2026-03-02
+atualizado: 2026-03-03
 ---
 
 # TEG+ ERP — Mapa da Aplicação
@@ -50,6 +50,9 @@ atualizado: 2026-03-02
 | Variáveis de Ambiente | [[16 - Variáveis de Ambiente]] |
 | Roadmap | [[17 - Roadmap]] |
 | Glossário | [[18 - Glossário]] |
+| Integração Omie ERP | [[19 - Integração Omie]] |
+| Módulo Financeiro | [[20 - Módulo Financeiro]] |
+| Fluxo de Pagamento | [[21 - Fluxo Pagamento]] |
 
 ---
 
@@ -79,7 +82,7 @@ graph TD
 ```mermaid
 graph LR
     M[TEG+ ERP] --> C[✅ Compras]
-    M --> F[🔜 Financeiro]
+    M --> F[✅ Financeiro]
     M --> R[🔜 RH]
     M --> S[🔜 SSMA]
     M --> E[🔜 Estoque]
@@ -91,7 +94,7 @@ graph LR
     C --> C4[Pedidos]
 
     style C fill:#10B981,color:#fff
-    style F fill:#64748B,color:#fff
+    style F fill:#10B981,color:#fff
     style R fill:#64748B,color:#fff
     style S fill:#64748B,color:#fff
     style E fill:#64748B,color:#fff
@@ -108,11 +111,13 @@ graph LR
 | Aprovações multi-nível | ✅ Entregue | 4 alçadas, token-based |
 | ApprovaAi (mobile) | ✅ Entregue | Interface responsiva |
 | Dashboard KPIs | ✅ Entregue | RPC + realtime |
-| Schema Supabase | ✅ Entregue | 11 migrations |
+| Schema Supabase | ✅ Entregue | 14 migrations |
 | AI Parse requisições | ✅ Entregue | Keywords + n8n |
-| Cotações | 🔄 Parcial | UI básica, sem n8n completo |
-| WhatsApp (Evolution API) | 🔜 Planejado | Notificações |
-| Financeiro (Omie ERP) | 🔜 Planejado | NF-e, Contas a Pagar |
+| Cotações | ✅ Entregue | Regras de alçada + bypass sem mínimo |
+| PO — PDF e Compartilhamento | ✅ Entregue | Sem deps externas, WhatsApp + E-mail |
+| Fluxo Pagamento (Compras→Fin) | ✅ Entregue | Triggers, anexos, comprovante |
+| Financeiro (Omie ERP) | ✅ Entregue | CP, CR, Fornecedores, 4 squads n8n |
+| WhatsApp (Evolution API) | 🔜 Planejado | Notificações automáticas |
 | AI TEG+ (Claude API) | 🔜 Planejado | Agente conversacional |
 | Monday.com PMO | 🔜 Planejado | Gestão de portfólio |
 
