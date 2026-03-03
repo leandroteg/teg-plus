@@ -80,10 +80,10 @@ DO $$ BEGIN
   CREATE POLICY "mural_banners_admin_all" ON mural_banners
     FOR ALL TO authenticated
     USING (
-      EXISTS (SELECT 1 FROM perfis WHERE auth_id = auth.uid() AND role = 'admin')
+      EXISTS (SELECT 1 FROM sys_perfis WHERE auth_id = auth.uid() AND role = 'admin')
     )
     WITH CHECK (
-      EXISTS (SELECT 1 FROM perfis WHERE auth_id = auth.uid() AND role = 'admin')
+      EXISTS (SELECT 1 FROM sys_perfis WHERE auth_id = auth.uid() AND role = 'admin')
     );
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
