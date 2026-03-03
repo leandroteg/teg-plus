@@ -75,12 +75,28 @@ export function useCotacao(id?: string) {
 export function useSubmeterCotacao() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: (payload: NovaCotacaoPayload) => api.submeterCotacao(payload),
+    mutationFn: (payload: NovaCotacaoPayload & {
+      sem_cotacoes_minimas?: boolean
+      justificativa_sem_cotacoes?: string
+    }) => api.submeterCotacao(payload),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['cotacoes'] })
       qc.invalidateQueries({ queryKey: ['cotacao'] })
       qc.invalidateQueries({ queryKey: ['requisicoes'] })
       qc.invalidateQueries({ queryKey: ['dashboard'] })
     },
+  })
+}
+
+export function useAlertaCotacao(requisicaoId: string | undefined) {
+  return useQuery<{ sem_cotacoes_minimas: boolean; justificativa: string | null }>({
+    queryKey: ['alerta-cotacao', requisicaoId],
+    enabled: !!requisicaoId,
+    queryFn: async () => {
+      const { data } = await supabase
+        .rpc('get_alerta_cotacao', { p_requisicao_id: requisicaoId! })
+      return data ?? { sem_cotacoes_minimas: false, justificativa: null }
+    },
+    staleTime: 30_000,
   })
 }

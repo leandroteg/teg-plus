@@ -47,6 +47,11 @@ export interface Pedido {
   nf_numero?: string
   observacoes?: string
   created_at: string
+  // Payment flow fields
+  status_pagamento?: 'liberado' | 'pago' | null
+  liberado_pagamento_em?: string
+  liberado_pagamento_por?: string
+  pago_em?: string
   // Joins
   requisicao?: Pick<Requisicao, 'numero' | 'descricao' | 'obra_nome' | 'categoria'>
   comprador?: Pick<Comprador, 'nome'>

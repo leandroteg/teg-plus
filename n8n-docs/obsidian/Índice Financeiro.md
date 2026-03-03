@@ -13,6 +13,7 @@ Página índice do módulo Financeiro do TEG+. Navegue pelas subpáginas para do
 | [[TEG+ Integração Omie]] | Arquitetura, mapeamentos e troubleshooting da integração Omie | Rascunho |
 | [[Setup Integração Omie]] | Guia passo a passo para configurar a integração | Rascunho |
 | [[Arquitetura Agent Squads]] | Como os squads de agentes n8n funcionam | Rascunho |
+| [[Fluxo de Pagamento]] | Ciclo completo Compras → Financeiro: cotação, PO, liberação, comprovante | Implementado |
 
 ---
 
@@ -107,16 +108,19 @@ ORDER BY dominio, executado_em DESC;
 - [x] Arquitetura da integração definida
 - [x] Mapeamento de campos Omie → Supabase documentado
 - [x] Workflow de sync de fornecedores (Squad 1)
-- [x] Documentação técnica (esta seção)
+- [x] Workflow de sync de contas a pagar (Squad 2)
+- [x] Workflow de sync de contas a receber (Squad 3)
+- [x] Workflow de aprovação de pagamento (Squad 4)
+- [x] Tela Financeiro → Fornecedores no Frontend
+- [x] Tela Financeiro → Contas a Pagar no Frontend (+ anexos + comprovante pgto)
+- [x] Tela Financeiro → Contas a Receber no Frontend
+- [x] Tela Financeiro → Configurações Omie no Frontend
+- [x] Fluxo de pagamento: cotação sem mínimo + PDF PO + liberar pgto + comprovante
+- [x] Documentação técnica (esta seção + [[Fluxo de Pagamento]])
 
 ### Em Desenvolvimento
 
-- [ ] Workflow de sync de contas a pagar (Squad 2)
-- [ ] Workflow de sync de contas a receber (Squad 3)
-- [ ] Workflow de aprovação de pagamento (Squad 4)
-- [ ] Tela Financeiro → Fornecedores no Frontend
-- [ ] Tela Financeiro → Contas a Pagar no Frontend
-- [ ] Tela Financeiro → Contas a Receber no Frontend
+- [ ] E-mail automático ao financeiro quando CP → aguardando_aprovacao
 
 ### Planejado (Futuro)
 

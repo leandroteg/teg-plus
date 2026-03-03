@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import {
-  ChevronLeft, PlusCircle, Trash2, Send, CheckCircle, Info,
+  ChevronLeft, PlusCircle, Trash2, Send, CheckCircle, Info, AlertTriangle,
 } from 'lucide-react'
 import { useCotacao, useSubmeterCotacao } from '../hooks/useCotacoes'
 import CotacaoComparativo from '../components/CotacaoComparativo'
@@ -40,6 +40,8 @@ export default function CotacaoForm() {
   const [fornecedores, setFornecedores] = useState<FornecedorForm[]>([
     emptyFornecedor(), emptyFornecedor(),
   ])
+  const [semCotacoesMinimas, setSemCotacoesMinimas] = useState(false)
+  const [justificativa, setJustificativa] = useState('')
 
   const updateFornecedor = (idx: number, field: keyof FornecedorForm, value: string | number) =>
     setFornecedores(prev => prev.map((f, i) => i === idx ? { ...f, [field]: value } : f))
@@ -50,11 +52,15 @@ export default function CotacaoForm() {
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!id || validos.length < minCot) return
+    if (!id) return
+    if (!semCotacoesMinimas && validos.length < minCot) return
+    if (semCotacoesMinimas && !justificativa.trim()) return
     try {
       await submitMutation.mutateAsync({
         cotacao_id: id,
         fornecedores: validos.map(f => ({ ...f, itens_precos: [] })),
+        sem_cotacoes_minimas: semCotacoesMinimas,
+        justificativa_sem_cotacoes: semCotacoesMinimas ? justificativa.trim() : undefined,
       })
       nav('/cotacoes')
     } catch { /* handled */ }
@@ -248,10 +254,40 @@ export default function CotacaoForm() {
         />
       )}
 
+      {/* Opção de envio sem cotações mínimas */}
+      {validos.length < minCot && (
+        <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 space-y-3">
+          <label className="flex items-start gap-3 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={semCotacoesMinimas}
+              onChange={e => setSemCotacoesMinimas(e.target.checked)}
+              className="mt-0.5 w-4 h-4 rounded accent-amber-500"
+            />
+            <div>
+              <p className="text-sm font-bold text-amber-800">Enviar para aprovação sem todas as cotações</p>
+              <p className="text-[11px] text-amber-600 mt-0.5">
+                Será exibido um alerta para o aprovador informando que o número mínimo de cotações não foi atingido.
+              </p>
+            </div>
+          </label>
+          {semCotacoesMinimas && (
+            <textarea
+              required
+              value={justificativa}
+              onChange={e => setJustificativa(e.target.value)}
+              placeholder="Justificativa obrigatória para envio sem cotações mínimas..."
+              rows={3}
+              className="w-full border border-amber-300 bg-white rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-amber-300 outline-none resize-none"
+            />
+          )}
+        </div>
+      )}
+
       {/* Submit */}
       <button
         type="submit"
-        disabled={submitMutation.isPending || validos.length < minCot}
+        disabled={submitMutation.isPending || (!semCotacoesMinimas && validos.length < minCot) || (semCotacoesMinimas && !justificativa.trim())}
         className="w-full bg-teal-500 text-white rounded-2xl py-4 font-extrabold flex items-center justify-center gap-2 disabled:opacity-50 shadow-xl shadow-teal-500/25 active:scale-[0.98] transition-all"
       >
         {submitMutation.isPending ? (
@@ -261,9 +297,9 @@ export default function CotacaoForm() {
         )}
       </button>
 
-      {validos.length < minCot && (
+      {!semCotacoesMinimas && validos.length < minCot && (
         <p className="text-xs text-amber-600 text-center">
-          Adicione pelo menos {minCot} fornecedor{minCot > 1 ? 'es' : ''} com nome e valor preenchidos.
+          Adicione pelo menos {minCot} fornecedor{minCot > 1 ? 'es' : ''} ou marque a opção acima para enviar sem o mínimo.
         </p>
       )}
 

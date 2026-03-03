@@ -1,10 +1,15 @@
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import {
   Receipt, Search, Calendar, AlertTriangle,
   CheckCircle2, Clock, FileText, RefreshCw, Zap, XCircle,
+  ChevronDown, ChevronUp, Upload, Paperclip, ExternalLink, Banknote, X,
 } from 'lucide-react'
-import { useContasPagar } from '../../hooks/useFinanceiro'
+import { useContasPagar, useMarcarCPPago } from '../../hooks/useFinanceiro'
 import { useLastSync, useTriggerSync, useOmieConfig } from '../../hooks/useOmie'
+import { useAnexosPedido, useUploadAnexo, TIPO_LABEL } from '../../hooks/useAnexos'
+import { useRegistrarPagamento } from '../../hooks/usePedidos'
+import type { PedidoAnexo } from '../../hooks/useAnexos'
+import type { ContaPagar } from '../../types/financeiro'
 
 // ── SyncBar ───────────────────────────────────────────────────────────────────
 
@@ -58,6 +63,225 @@ function SyncBar() {
   )
 }
 
+// ── AnexoRow ──────────────────────────────────────────────────────────────────
+
+function AnexoIcon({ mime }: { mime: string | null }) {
+  if (!mime) return <Paperclip size={13} className="text-slate-400" />
+  if (mime === 'application/pdf') return <FileText size={13} className="text-red-500" />
+  if (mime.startsWith('image/')) return <FileText size={13} className="text-blue-500" />
+  if (mime.includes('sheet') || mime.includes('excel')) return <FileText size={13} className="text-green-600" />
+  return <Paperclip size={13} className="text-slate-400" />
+}
+
+function AnexosList({ pedidoId }: { pedidoId: string }) {
+  const { data: anexos, isLoading } = useAnexosPedido(pedidoId)
+
+  if (isLoading) return (
+    <div className="flex justify-center py-3">
+      <div className="w-4 h-4 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin" />
+    </div>
+  )
+
+  if (!anexos?.length) return (
+    <p className="text-[11px] text-slate-400 italic py-2">Nenhum anexo enviado ainda.</p>
+  )
+
+  return (
+    <div className="space-y-1.5">
+      {anexos.map((a: PedidoAnexo) => {
+        const isComprovante = a.tipo === 'comprovante_pagamento'
+        return (
+          <a
+            key={a.id}
+            href={a.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className={`flex items-center gap-2 px-3 py-2 rounded-lg border transition-all hover:shadow-sm group ${
+              isComprovante
+                ? 'bg-emerald-50 border-emerald-200'
+                : 'bg-white border-slate-200 hover:border-slate-300'
+            }`}
+          >
+            <AnexoIcon mime={a.mime_type} />
+            <div className="flex-1 min-w-0">
+              <p className={`text-[11px] font-semibold truncate ${isComprovante ? 'text-emerald-700' : 'text-slate-700'}`}>
+                {a.nome_arquivo}
+              </p>
+              <div className="flex items-center gap-1.5 mt-0.5">
+                <span className={`text-[9px] font-semibold rounded-full px-1.5 py-0.5 ${
+                  isComprovante ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'
+                }`}>
+                  {TIPO_LABEL[a.tipo]}
+                </span>
+                <span className={`text-[9px] rounded-full px-1.5 py-0.5 font-semibold ${
+                  a.origem === 'financeiro' ? 'bg-purple-100 text-purple-600' : 'bg-teal-100 text-teal-600'
+                }`}>
+                  {a.origem === 'financeiro' ? 'Financeiro' : 'Compras'}
+                </span>
+                <span className="text-[9px] text-slate-400">
+                  {new Date(a.uploaded_at).toLocaleDateString('pt-BR')}
+                </span>
+              </div>
+            </div>
+            <ExternalLink size={11} className="text-slate-300 group-hover:text-slate-500 shrink-0" />
+          </a>
+        )
+      })}
+    </div>
+  )
+}
+
+// ── RegistrarPgtoModal ────────────────────────────────────────────────────────
+
+interface RegistrarPgtoModalProps {
+  cp: ContaPagar
+  onClose: () => void
+}
+
+function RegistrarPgtoModal({ cp, onClose }: RegistrarPgtoModalProps) {
+  const fileRef = useRef<HTMLInputElement>(null)
+  const [arquivo, setArquivo] = useState<File | null>(null)
+  const [observacao, setObservacao] = useState('')
+  const [erro, setErro] = useState('')
+  const [loading, setLoading] = useState(false)
+
+  const uploadAnexo = useUploadAnexo()
+  const registrarPag = useRegistrarPagamento()  // for cmp_pedidos (triggers fin_contas_pagar)
+  const marcarCPPago = useMarcarCPPago()         // direct update of fin_contas_pagar
+
+  const handleConfirm = async () => {
+    setErro('')
+    setLoading(true)
+    try {
+      // 1. Upload comprovante if a file was selected
+      if (arquivo && cp.pedido_id) {
+        await uploadAnexo.mutateAsync({
+          pedidoId: cp.pedido_id,
+          file: arquivo,
+          tipo: 'comprovante_pagamento',
+          observacao: observacao || undefined,
+          origem: 'financeiro',
+        })
+      }
+
+      // 2. Register payment
+      if (cp.pedido_id) {
+        // Via cmp_pedidos trigger chain
+        await registrarPag.mutateAsync(cp.pedido_id)
+      } else {
+        // Direct CP update (Omie-imported or manual)
+        await marcarCPPago.mutateAsync({ cpId: cp.id })
+      }
+
+      onClose()
+    } catch (e: unknown) {
+      setErro(e instanceof Error ? e.message : 'Erro ao registrar pagamento')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md">
+        {/* Header */}
+        <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
+          <div className="flex items-center gap-2">
+            <Banknote size={18} className="text-emerald-600" />
+            <h3 className="text-base font-bold text-slate-800">Registrar Pagamento</h3>
+          </div>
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-600">
+            <X size={18} />
+          </button>
+        </div>
+
+        <div className="p-5 space-y-4">
+          {/* CP Summary */}
+          <div className="bg-slate-50 rounded-xl p-3 text-sm space-y-1">
+            <p className="font-bold text-slate-800">{cp.fornecedor_nome}</p>
+            <p className="text-slate-500 text-xs">{cp.descricao}</p>
+            <p className="text-emerald-700 font-extrabold">
+              {cp.valor_original.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+            </p>
+          </div>
+
+          {/* Comprovante upload */}
+          {cp.pedido_id && (
+            <div>
+              <p className="text-xs font-semibold text-slate-600 mb-2">
+                Comprovante de Pagamento <span className="text-slate-400 font-normal">(opcional)</span>
+              </p>
+              <input
+                ref={fileRef}
+                type="file"
+                accept=".pdf,.jpg,.jpeg,.png,.webp"
+                className="hidden"
+                onChange={e => setArquivo(e.target.files?.[0] ?? null)}
+              />
+              <button
+                onClick={() => fileRef.current?.click()}
+                className={`w-full flex flex-col items-center gap-2 py-4 rounded-xl border-2 border-dashed transition-all ${
+                  arquivo
+                    ? 'border-emerald-400 bg-emerald-50'
+                    : 'border-slate-300 hover:border-emerald-400 hover:bg-emerald-50/50'
+                }`}
+              >
+                <Upload size={20} className={arquivo ? 'text-emerald-500' : 'text-slate-400'} />
+                <span className={`text-xs font-semibold ${arquivo ? 'text-emerald-700' : 'text-slate-500'}`}>
+                  {arquivo
+                    ? `${arquivo.name} (${(arquivo.size / 1024).toFixed(0)} KB)`
+                    : 'Clique para anexar comprovante'}
+                </span>
+              </button>
+
+              <textarea
+                value={observacao}
+                onChange={e => setObservacao(e.target.value)}
+                placeholder="Observação sobre o pagamento (opcional)"
+                rows={2}
+                className="mt-2 w-full px-3 py-2 rounded-xl border border-slate-200 text-xs
+                  text-slate-700 placeholder-slate-400 focus:outline-none focus:ring-2
+                  focus:ring-emerald-500/30 focus:border-emerald-400 resize-none"
+              />
+            </div>
+          )}
+
+          {erro && (
+            <div className="flex items-start gap-2 bg-red-50 border border-red-200 rounded-xl px-3 py-2">
+              <AlertTriangle size={13} className="text-red-500 mt-0.5 shrink-0" />
+              <p className="text-xs text-red-700">{erro}</p>
+            </div>
+          )}
+
+          {/* Actions */}
+          <div className="flex gap-2 pt-1">
+            <button
+              onClick={onClose}
+              className="flex-1 py-3 rounded-xl border border-slate-200 text-sm font-semibold
+                text-slate-600 hover:bg-slate-50 transition-all"
+            >
+              Cancelar
+            </button>
+            <button
+              onClick={handleConfirm}
+              disabled={loading}
+              className="flex-1 py-3 rounded-xl bg-emerald-600 text-white text-sm font-bold
+                hover:bg-emerald-700 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+            >
+              {loading
+                ? <div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+                : <CheckCircle2 size={15} />}
+              Confirmar Pagamento
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ── Formatters ────────────────────────────────────────────────────────────────
+
 const fmt = (v: number) =>
   v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 })
 
@@ -86,9 +310,143 @@ const FILTROS_STATUS: { label: string; value: string }[] = [
   { label: 'Conciliados',     value: 'conciliado' },
 ]
 
+// ── CPCard ────────────────────────────────────────────────────────────────────
+
+function CPCard({ cp, onRegistrarPgto }: { cp: ContaPagar; onRegistrarPgto: (cp: ContaPagar) => void }) {
+  const [expanded, setExpanded] = useState(false)
+  const vencido = !['pago', 'conciliado', 'cancelado'].includes(cp.status) &&
+    new Date(cp.data_vencimento + 'T00:00:00') < new Date()
+  const isPago = ['pago', 'conciliado'].includes(cp.status)
+  const canPay = cp.status === 'aguardando_aprovacao' || cp.status === 'aprovado_pgto'
+  const cfg = STATUS_CONFIG[cp.status]
+
+  return (
+    <div className={`bg-white rounded-2xl border shadow-sm transition-all hover:shadow-md ${
+      vencido ? 'border-red-200' : isPago ? 'border-emerald-200' : 'border-slate-200'
+    }`}>
+      {/* Main content */}
+      <div className="p-4">
+        <div className="flex items-start gap-3">
+          <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${
+            vencido ? 'bg-red-50' : isPago ? 'bg-emerald-50' : 'bg-emerald-50'
+          }`}>
+            {vencido
+              ? <AlertTriangle size={16} className="text-red-500" />
+              : isPago
+                ? <CheckCircle2 size={16} className="text-emerald-600" />
+                : <Receipt size={16} className="text-emerald-600" />
+            }
+          </div>
+
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center justify-between gap-2 mb-1">
+              <p className="text-sm font-bold text-slate-800 truncate">{cp.fornecedor_nome}</p>
+              <p className={`text-sm font-extrabold shrink-0 ${vencido ? 'text-red-600' : 'text-emerald-600'}`}>
+                {fmt(cp.valor_original)}
+              </p>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2 text-[10px]">
+              <span className={`inline-flex items-center gap-1 rounded-full font-semibold px-2 py-0.5 ${cfg?.bg} ${cfg?.text}`}>
+                <span className={`w-1.5 h-1.5 rounded-full ${cfg?.dot}`} />
+                {cfg?.label ?? cp.status}
+              </span>
+              {cp.numero_documento && (
+                <span className="text-slate-400 font-mono">{cp.numero_documento}</span>
+              )}
+              {cp.natureza && (
+                <span className="text-slate-400">{cp.natureza}</span>
+              )}
+              {cp.pedido_id && (
+                <span className="text-teal-600 font-semibold">Compras</span>
+              )}
+            </div>
+
+            <div className="flex items-center gap-3 mt-2 text-[10px] text-slate-400">
+              <span className="flex items-center gap-1">
+                <Calendar size={10} />
+                Venc. {fmtData(cp.data_vencimento)}
+              </span>
+              {cp.centro_custo && (
+                <span>CC: {cp.centro_custo}</span>
+              )}
+              {cp.data_pagamento && (
+                <span className="text-emerald-600 font-medium">
+                  Pago em {fmtData(cp.data_pagamento)}
+                </span>
+              )}
+            </div>
+          </div>
+
+          {/* Expand toggle */}
+          {cp.pedido_id && (
+            <button
+              onClick={() => setExpanded(v => !v)}
+              className="text-slate-400 hover:text-slate-600 shrink-0"
+            >
+              {expanded ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
+            </button>
+          )}
+        </div>
+
+        {/* Action buttons */}
+        <div className="flex gap-2 mt-3">
+          {cp.pedido_id && !expanded && (
+            <button
+              onClick={() => setExpanded(true)}
+              className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl
+                bg-slate-50 border border-slate-200 text-[11px] font-semibold text-slate-500
+                hover:bg-slate-100 transition-all"
+            >
+              <Paperclip size={11} />
+              Anexos
+            </button>
+          )}
+          {canPay && !isPago && (
+            <button
+              onClick={() => onRegistrarPgto(cp)}
+              className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl
+                bg-emerald-600 text-white text-[11px] font-bold hover:bg-emerald-700 transition-all"
+            >
+              <Banknote size={11} />
+              Registrar Pagamento
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Expanded: Attachments */}
+      {expanded && cp.pedido_id && (
+        <div className="border-t border-slate-100 px-4 pb-4 pt-3 space-y-3">
+          <div className="flex items-center justify-between">
+            <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wide flex items-center gap-1.5">
+              <Paperclip size={11} />
+              Histórico de Anexos
+            </p>
+            {canPay && !isPago && (
+              <button
+                onClick={() => onRegistrarPgto(cp)}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 text-white
+                  text-[10px] font-bold hover:bg-emerald-700 transition-all"
+              >
+                <Banknote size={10} />
+                Registrar Pagamento
+              </button>
+            )}
+          </div>
+          <AnexosList pedidoId={cp.pedido_id} />
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ── ContasPagar (main page) ───────────────────────────────────────────────────
+
 export default function ContasPagar() {
   const [statusFilter, setStatusFilter] = useState('')
   const [busca, setBusca] = useState('')
+  const [pgtoModal, setPgtoModal] = useState<ContaPagar | null>(null)
   const { data: contas = [], isLoading } = useContasPagar(
     statusFilter ? { status: statusFilter } : undefined
   )
@@ -177,68 +535,18 @@ export default function ContasPagar() {
         </div>
       ) : (
         <div className="space-y-2">
-          {filtered.map(cp => {
-            const vencido = !['pago', 'conciliado', 'cancelado'].includes(cp.status) &&
-              new Date(cp.data_vencimento) < new Date()
-            const cfg = STATUS_CONFIG[cp.status]
-
-            return (
-              <div key={cp.id} className={`bg-white rounded-2xl border shadow-sm p-4
-                transition-all hover:shadow-md
-                ${vencido ? 'border-red-200' : 'border-slate-200'}`}>
-
-                {/* Top line */}
-                <div className="flex items-start gap-3">
-                  <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0
-                    ${vencido ? 'bg-red-50' : 'bg-emerald-50'}`}>
-                    {vencido
-                      ? <AlertTriangle size={16} className="text-red-500" />
-                      : <Receipt size={16} className="text-emerald-600" />
-                    }
-                  </div>
-
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between gap-2 mb-1">
-                      <p className="text-sm font-bold text-slate-800 truncate">{cp.fornecedor_nome}</p>
-                      <p className={`text-sm font-extrabold shrink-0
-                        ${vencido ? 'text-red-600' : 'text-emerald-600'}`}>
-                        {fmt(cp.valor_original)}
-                      </p>
-                    </div>
-
-                    <div className="flex flex-wrap items-center gap-2 text-[10px]">
-                      <span className={`inline-flex items-center gap-1 rounded-full font-semibold px-2 py-0.5 ${cfg?.bg} ${cfg?.text}`}>
-                        <span className={`w-1.5 h-1.5 rounded-full ${cfg?.dot}`} />
-                        {cfg?.label ?? cp.status}
-                      </span>
-                      {cp.numero_documento && (
-                        <span className="text-slate-400 font-mono">{cp.numero_documento}</span>
-                      )}
-                      {cp.natureza && (
-                        <span className="text-slate-400">{cp.natureza}</span>
-                      )}
-                    </div>
-
-                    <div className="flex items-center gap-3 mt-2 text-[10px] text-slate-400">
-                      <span className="flex items-center gap-1">
-                        <Calendar size={10} />
-                        Venc. {fmtData(cp.data_vencimento)}
-                      </span>
-                      {cp.centro_custo && (
-                        <span>CC: {cp.centro_custo}</span>
-                      )}
-                      {cp.data_pagamento && (
-                        <span className="text-emerald-600 font-medium">
-                          Pago em {fmtData(cp.data_pagamento)}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )
-          })}
+          {filtered.map(cp => (
+            <CPCard key={cp.id} cp={cp} onRegistrarPgto={setPgtoModal} />
+          ))}
         </div>
+      )}
+
+      {/* ── Modal: Registrar Pagamento ───────────────────────── */}
+      {pgtoModal && (
+        <RegistrarPgtoModal
+          cp={pgtoModal}
+          onClose={() => setPgtoModal(null)}
+        />
       )}
     </div>
   )

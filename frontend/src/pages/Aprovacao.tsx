@@ -210,6 +210,7 @@ export default function Aprovacao() {
   const [decisao, setDecisao]         = useState<DecisaoTipo | null>(null)
   const [observacao, setObservacao]   = useState('')
   const [mostrarItens, setMostrarItens] = useState(false)
+  const [alertaCotacao, setAlertaCotacao] = useState<{ sem_cotacoes_minimas: boolean; justificativa?: string } | null>(null)
 
   // ── Carrega dados ao montar ───────────────────────────────────────────────
 
@@ -274,6 +275,13 @@ export default function Aprovacao() {
     }
 
     setReq(reqData as RequisicaoCompleta)
+
+    // 5) Busca alerta de cotação (sem_cotacoes_minimas)
+    const { data: alertaData } = await supabase.rpc('get_alerta_cotacao', {
+      p_requisicao_id: aprovRow.entidade_id,
+    })
+    setAlertaCotacao(alertaData)
+
     setPageState('pendente')
   }, [token])
 
@@ -598,6 +606,30 @@ export default function Aprovacao() {
             </div>
           )}
         </div>
+
+        {/* Alerta de cotação sem mínimo de fornecedores */}
+        {alertaCotacao?.sem_cotacoes_minimas && (
+          <div className="bg-amber-50 border-2 border-amber-400 rounded-2xl p-4 flex gap-3">
+            <div className="w-10 h-10 bg-amber-100 rounded-xl flex items-center justify-center shrink-0">
+              <AlertTriangle size={20} className="text-amber-600" />
+            </div>
+            <div>
+              <p className="text-sm font-extrabold text-amber-800">
+                ⚠️ Atenção: Cotação enviada sem número mínimo de fornecedores
+              </p>
+              <p className="text-xs text-amber-700 mt-1 leading-relaxed">
+                O comprador enviou esta cotação sem atingir o número mínimo de fornecedores exigido para esta categoria.
+                Avalie com cautela antes de aprovar.
+              </p>
+              {alertaCotacao.justificativa && (
+                <div className="mt-2 bg-white border border-amber-200 rounded-xl px-3 py-2">
+                  <p className="text-[10px] font-semibold text-amber-600 uppercase tracking-wide mb-0.5">Justificativa do comprador:</p>
+                  <p className="text-xs text-amber-800 italic">"{alertaCotacao.justificativa}"</p>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* Bloco de decisão */}
         {!isConfirmando && !isProcessando && (
