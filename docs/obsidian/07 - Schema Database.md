@@ -4,7 +4,7 @@ type: banco-de-dados
 status: ativo
 tags: [supabase, postgresql, schema, tabelas, sql]
 criado: 2026-03-02
-relacionado: ["[[06 - Supabase]]", "[[08 - Migrações SQL]]", "[[13 - Alçadas]]", "[[14 - Compradores e Categorias]]"]
+relacionado: ["[[06 - Supabase]]", "[[08 - Migrações SQL]]", "[[13 - Alçadas]]", "[[14 - Compradores e Categorias]]", "[[19 - Integração Omie]]", "[[21 - Fluxo Pagamento]]"]
 ---
 
 # Schema do Banco de Dados — TEG+ ERP
@@ -132,6 +132,25 @@ erDiagram
 | `chave` | VARCHAR PK | Chave de config |
 | `valor` | JSONB | Valor (inclui contador RC) |
 
+### `sys_config`
+| Coluna | Tipo | Descrição |
+|--------|------|-----------|
+| `chave` | VARCHAR PK | Chave (ex: `omie_app_key`) |
+| `valor` | TEXT | Valor da configuração |
+| `atualizado_em` | TIMESTAMPTZ | Última atualização |
+
+> Acesso via `get_omie_config()` (SECURITY DEFINER). Escrita restrita a admins.
+
+### `fin_sync_log`
+| Coluna | Tipo | Descrição |
+|--------|------|-----------|
+| `id` | UUID PK | — |
+| `dominio` | VARCHAR | fornecedores / contas-pagar / contas-receber |
+| `status` | VARCHAR | sucesso / erro / parcial |
+| `registros` | INTEGER | Qtd de registros processados |
+| `executado_em` | TIMESTAMPTZ | Timestamp da execução |
+| `detalhes` | JSONB | Erros ou dados adicionais |
+
 ---
 
 ## Tabelas de Compras (`cmp_*`)
@@ -170,17 +189,99 @@ Ver detalhes em [[14 - Compradores e Categorias]].
 ### `cmp_compradores`
 Ver detalhes em [[14 - Compradores e Categorias]].
 
+### `cmp_cotacoes`
+| Coluna | Tipo | Descrição |
+|--------|------|-----------|
+| `id` | UUID PK | — |
+| `requisicao_id` | UUID FK | → cmp_requisicoes |
+| `comprador_id` | UUID FK | → cmp_compradores |
+| `status` | ENUM | pendente / em_andamento / concluida / cancelada |
+| `data_limite` | DATE | Prazo para propostas |
+| `fornecedor_selecionado_nome` | TEXT | Vencedor |
+| `valor_selecionado` | NUMERIC | Valor da proposta vencedora |
+| `sem_cotacoes_minimas` | BOOLEAN | Bypass do mínimo de fornecedores |
+| `justificativa_sem_cotacoes` | TEXT | Justificativa obrigatória para bypass |
+
+### `cmp_cotacao_fornecedores`
+| Coluna | Tipo | Descrição |
+|--------|------|-----------|
+| `id` | UUID PK | — |
+| `cotacao_id` | UUID FK | → cmp_cotacoes |
+| `fornecedor_nome` | TEXT | Nome do fornecedor |
+| `fornecedor_cnpj` | VARCHAR | CNPJ |
+| `valor_total` | NUMERIC | Proposta total |
+| `prazo_entrega_dias` | INTEGER | Prazo em dias |
+| `condicao_pagamento` | TEXT | Ex: 30/60/90 dias |
+| `itens_precos` | JSONB | Array de preços por item |
+| `selecionado` | BOOLEAN | Fornecedor vencedor |
+
 ### `cmp_pedidos`
 | Coluna | Tipo | Descrição |
 |--------|------|-----------|
 | `id` | UUID PK | — |
 | `requisicao_id` | UUID FK | → cmp_requisicoes |
-| `numero_pedido` | VARCHAR | PO-YYYYMM-XXXX |
-| `fornecedor` | VARCHAR | Nome do fornecedor |
+| `numero_pedido` | VARCHAR | PO-AAAA-NNNNN |
+| `fornecedor_nome` | TEXT | Nome do fornecedor |
 | `valor_total` | NUMERIC | Valor final contratado |
-| `status` | VARCHAR | emitido/parcial/entregue |
-| `prazo_entrega` | DATE | Data prevista |
-| `criado_em` | TIMESTAMP | — |
+| `status` | ENUM | emitido / confirmado / em_entrega / entregue / cancelado |
+| `data_pedido` | DATE | Data de emissão |
+| `data_prevista_entrega` | DATE | Prazo previsto |
+| `data_entrega_real` | DATE | Data efetiva |
+| `nf_numero` | VARCHAR | Número da nota fiscal |
+| `status_pagamento` | VARCHAR | null / `liberado` / `pago` |
+| `liberado_pagamento_em` | TIMESTAMPTZ | Quando foi liberado |
+| `liberado_pagamento_por` | TEXT | Quem liberou |
+| `pago_em` | TIMESTAMPTZ | Quando foi pago |
+| `criado_em` | TIMESTAMPTZ | — |
+
+### `cmp_pedidos_anexos`
+| Coluna | Tipo | Descrição |
+|--------|------|-----------|
+| `id` | UUID PK | — |
+| `pedido_id` | UUID FK | → cmp_pedidos |
+| `tipo` | ENUM | nota_fiscal / comprovante_entrega / medicao / comprovante_pagamento / contrato / outro |
+| `nome_arquivo` | TEXT | Nome original do arquivo |
+| `url` | TEXT | URL pública no Storage |
+| `mime_type` | VARCHAR | Tipo MIME |
+| `origem` | VARCHAR | `compras` / `financeiro` |
+| `uploaded_by_nome` | TEXT | Nome de quem enviou |
+| `uploaded_at` | TIMESTAMPTZ | Quando foi enviado |
+| `observacao` | TEXT | Obs opcional |
+
+---
+
+## Tabelas Financeiras (`fin_*`)
+
+### `fin_contas_pagar`
+| Coluna | Tipo | Descrição |
+|--------|------|-----------|
+| `id` | UUID PK | — |
+| `omie_id` | BIGINT | ID Omie (sync key) |
+| `pedido_id` | UUID FK | → cmp_pedidos |
+| `fornecedor_nome` | TEXT | Nome do fornecedor |
+| `valor` | NUMERIC | Valor da conta |
+| `data_vencimento` | DATE | Data de vencimento |
+| `data_pagamento` | DATE | Data efetiva de pagamento |
+| `status` | VARCHAR | previsto / aguardando_aprovacao / aprovado / pago / rejeitado |
+| `categoria` | VARCHAR | Categoria do gasto |
+| `centro_custo` | VARCHAR | Obra / centro de custo |
+| `descricao` | TEXT | Descrição |
+| `natureza` | VARCHAR | material / serviço / outros |
+| `comprovante_url` | TEXT | URL do comprovante |
+| `omie_sincronizado` | BOOLEAN | Confirmado no Omie |
+| `criado_em` | TIMESTAMPTZ | — |
+
+### `fin_contas_receber`
+| Coluna | Tipo | Descrição |
+|--------|------|-----------|
+| `id` | UUID PK | — |
+| `omie_id` | BIGINT | ID Omie (sync key) |
+| `cliente_nome` | TEXT | Nome do cliente |
+| `valor` | NUMERIC | Valor a receber |
+| `data_vencimento` | DATE | Vencimento |
+| `data_recebimento` | DATE | Recebimento efetivo |
+| `status` | VARCHAR | previsto / recebido / atrasado / cancelado |
+| `descricao` | TEXT | Descrição |
 
 ---
 
@@ -263,6 +364,29 @@ SELECT determinar_alcada(15000);  -- → 2 (Gerente)
 -- RPC que retorna JSON com KPIs agregados
 SELECT get_dashboard_compras('30d', NULL);
 ```
+
+### `get_omie_config()`
+```sql
+-- Retorna credenciais Omie sem expor via RLS (SECURITY DEFINER)
+SELECT get_omie_config();
+-- → { "app_key": "...", "app_secret": "...", "habilitado": true, "n8n_base_url": "..." }
+```
+
+### `get_alerta_cotacao(p_requisicao_id UUID)`
+```sql
+-- Verifica se cotação foi enviada sem mínimo de fornecedores
+SELECT get_alerta_cotacao('uuid-da-requisicao');
+-- → { "sem_cotacoes_minimas": true, "justificativa": "Fornecedor exclusivo" }
+```
+
+---
+
+## Triggers
+
+| Trigger | Tabela | Evento | Função |
+|---------|--------|--------|--------|
+| `trig_criar_cp_ao_emitir_pedido` | `cmp_pedidos` | AFTER INSERT | Cria CP em `fin_contas_pagar` com status `previsto` |
+| `trig_atualizar_cp_ao_liberar` | `cmp_pedidos` | AFTER UPDATE | Propaga `status_pagamento` → `fin_contas_pagar` |
 
 ---
 

@@ -4,7 +4,7 @@ type: automação
 status: ativo
 tags: [n8n, automação, webhooks, workflows, integração]
 criado: 2026-03-02
-relacionado: ["[[01 - Arquitetura Geral]]", "[[11 - Fluxo Requisição]]", "[[12 - Fluxo Aprovação]]"]
+relacionado: ["[[01 - Arquitetura Geral]]", "[[11 - Fluxo Requisição]]", "[[12 - Fluxo Aprovação]]", "[[19 - Integração Omie]]", "[[20 - Módulo Financeiro]]"]
 ---
 
 # n8n Workflows — TEG+ ERP
@@ -233,13 +233,61 @@ async criarRequisicao(payload) {
 
 ---
 
+---
+
+## Squads Omie ERP (Módulo Financeiro)
+
+Quatro workflows dedicados à integração com o Omie ERP. Detalhes completos em [[19 - Integração Omie]].
+
+### 5. TEG+ | Omie — Sync Fornecedores
+**Arquivo:** `n8n-docs/workflow-omie-sync-fornecedores.json`
+**Webhook:** `POST /omie/sync/fornecedores`
+
+```mermaid
+flowchart LR
+    W[Webhook] --> CF[get_omie_config\nRPC] --> OL[Omie API\nListarFornecedores] --> UP[Upsert\ncmp_fornecedores] --> LOG[fin_sync_log]
+```
+
+---
+
+### 6. TEG+ | Omie — Sync Contas a Pagar
+**Arquivo:** `n8n-docs/workflow-omie-sync-cp.json`
+**Webhook:** `POST /omie/sync/contas-pagar`
+**Trigger:** Schedule 6h + Manual
+
+```mermaid
+flowchart LR
+    W[Schedule\nou Webhook] --> CF[get_omie_config] --> OL[Omie API\nListarContasPagar] --> UP[Upsert\nfin_contas_pagar] --> LOG[fin_sync_log]
+```
+
+---
+
+### 7. TEG+ | Omie — Sync Contas a Receber
+**Arquivo:** `n8n-docs/workflow-omie-sync-cr.json`
+**Webhook:** `POST /omie/sync/contas-receber`
+**Trigger:** Schedule 6h + Manual
+
+Mesmo padrão do Squad 6, aplicado a `fin_contas_receber`.
+
+---
+
+### 8. TEG+ | Omie — Aprovar Pagamento
+**Arquivo:** `n8n-docs/workflow-omie-aprovacao-pgto.json`
+**Webhook:** `POST /omie/aprovar-pagamento`
+
+```mermaid
+flowchart LR
+    W[Webhook\ncp_id] --> CF[get_omie_config] --> OA[Omie API\nAlterarStatusCP] --> UP[omie_sincronizado=true] --> LOG[fin_sync_log]
+```
+
+---
+
 ## Workflows Futuros
 
 | Workflow | Trigger | Função |
 |----------|---------|--------|
 | WhatsApp Notificações | Nova aprovação | Envia link WhatsApp via Evolution API |
 | Email Aprovação | Nova aprovação | Email Outlook com link de aprovação |
-| Sync Omie ERP | Pedido emitido | Cria lançamento financeiro no Omie |
 | AI TEG+ Agent | Mensagem WhatsApp | Responde dúvidas e cria requisições |
 
 ---
@@ -249,5 +297,6 @@ async criarRequisicao(payload) {
 - [[01 - Arquitetura Geral]] — Posição do n8n na arquitetura
 - [[11 - Fluxo Requisição]] — Fluxo detalhado de criação
 - [[12 - Fluxo Aprovação]] — Fluxo detalhado de aprovação
+- [[19 - Integração Omie]] — Squads Omie detalhados
 - [[05 - Hooks Customizados]] — Como o frontend chama os webhooks
 - [[17 - Roadmap]] — Integrações futuras planejadas
