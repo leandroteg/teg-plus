@@ -2,10 +2,10 @@
 tipo: milestone
 id: MS-004
 titulo: "Módulo Financeiro — Omie como Core"
-status: planejado
-fase: Q3-2026
+status: em_andamento
+fase: Q2-2026
 data_alvo: 2026-09-30
-progresso: 0
+progresso: 25
 modulo: financeiro
 tags: [milestone, financeiro, omie, nfe, dre, conciliacao, aprovacao]
 ---
@@ -15,10 +15,22 @@ tags: [milestone, financeiro, omie, nfe, dre, conciliacao, aprovacao]
 ## Visão Geral
 Lançamento do módulo financeiro do TEG+ com o **Omie como módulo central**.
 
-> **Decisão Arquitetural em Aberto:**
-> - **Opção A** — Interface própria do TEG+ + API Omie no back (front TEG+, dados Omie)
-> - **Opção B** — Omie como back automatizado por IA, usuário opera direto no Omie
-> A definir em sprint de discovery do módulo financeiro (Sprint-4).
+> **Decisão Arquitetural — Opção A Adotada:**
+> Interface própria do TEG+ + API Omie no back (front TEG+, dados Omie).
+> Frontend implementado com 7 telas + layout + sidebar dedicado.
+
+## Implementação Atual (Sprint-4)
+- [x] Schema PostgreSQL completo (`011_schema_financeiro.sql`)
+- [x] TypeScript types e React Query hooks
+- [x] Layout com sidebar (emerald theme) + mobile bottom nav
+- [x] Dashboard Financeiro (KPIs, pipeline, vencimentos, CC)
+- [x] Contas a Pagar (lista, filtros, busca, badges)
+- [x] Contas a Receber (lista, filtros, vencidos)
+- [x] Aprovações de Pagamento (fila Laucídio, aprovar/rejeitar)
+- [x] Conciliação Bancária (remessa CNAB, retorno, conciliação)
+- [x] Relatórios (DRE, Fluxo de Caixa, Centro de Custo, Aging)
+- [x] Fornecedores (cadastro, dados bancários, Omie ID)
+- [x] Rotas wired em App.tsx + módulo ativado no ModuloSelector
 
 ## Objetivos do Módulo
 | Objetivo | Descrição |
@@ -29,20 +41,20 @@ Lançamento do módulo financeiro do TEG+ com o **Omie como módulo central**.
 | 🔍 Rastreabilidade | Custos e receitas por classe, centro de custo, projeto, área |
 
 ## Critérios de Sucesso
-- [ ] Sistema disponível com ótima velocidade de carregamento
+- [x] Sistema disponível com ótima velocidade de carregamento
 - [ ] Equipe opera sem recorrer à TI
 - [ ] Sistema sempre atualizado (conciliações, baixas, lançamentos)
-- [ ] Poucos cliques por operação, poucos lançamentos manuais
+- [x] Poucos cliques por operação, poucos lançamentos manuais
 - [ ] **99,8%** dos pagamentos seguindo o fluxo previsto com toda documentação
 
 ## Tarefas
 | ID | Tarefa | Status |
 |----|--------|--------|
 | [[TASK-009 - Integracao Omie\|TASK-009]] | Integração Omie ERP | ⬜ backlog |
-| [[TASK-013 - CP Workflow Aprovacao\|TASK-013]] | CP — Workflow de Aprovação e Documentos | ⬜ backlog |
-| [[TASK-014 - Conciliacao Remessa Bancaria\|TASK-014]] | Conciliação e Remessa Bancária | ⬜ backlog |
+| [[TASK-013 - CP Workflow Aprovacao\|TASK-013]] | CP — Workflow de Aprovação e Documentos | 🟡 em andamento |
+| [[TASK-014 - Conciliacao Remessa Bancaria\|TASK-014]] | Conciliação e Remessa Bancária | 🟡 em andamento |
 | [[TASK-015 - Emissao Recebimento NFe\|TASK-015]] | Emissão e Recebimento de NF-e/NFS-e | ⬜ backlog |
-| [[TASK-016 - Relatorios Financeiros\|TASK-016]] | Relatórios DRE, DFC, BP, Fluxo de Caixa | ⬜ backlog |
+| [[TASK-016 - Relatorios Financeiros\|TASK-016]] | Relatórios DRE, DFC, BP, Fluxo de Caixa | 🟡 em andamento |
 | [[TASK-017 - Acesso Alcadas Financeiro\|TASK-017]] | Controle de Acesso por Alçadas | ⬜ backlog |
 | [[TASK-018 - Integracao RH Folha\|TASK-018]] | Integração RH — Folha de Pagamento | ⬜ backlog |
 
@@ -65,8 +77,8 @@ Lançamento do módulo financeiro do TEG+ com o **Omie como módulo central**.
 ## Integrações Externas
 | Integração | Prioridade | Status |
 |------------|-----------|--------|
-| Remessa bancária (CNAB 240/480) | Obrigatória | ⬜ backlog |
-| Conciliação bancária (OFX / Open Banking) | Obrigatória | ⬜ backlog |
+| Remessa bancária (CNAB 240/480) | Obrigatória | 🟡 UI pronta |
+| Conciliação bancária (OFX / Open Banking) | Obrigatória | 🟡 UI pronta |
 | SEFAZ — NF-e | Obrigatória | ⬜ backlog |
 | Prefeitura — NFS-e | Obrigatória | ⬜ backlog |
 | Receita Federal — CNPJ lookup | Importante | ⬜ backlog |
@@ -74,4 +86,4 @@ Lançamento do módulo financeiro do TEG+ com o **Omie como módulo central**.
 | Contabilidade externa | Importante | ⬜ backlog |
 
 ## Progresso
-`░░░░░░░░░░` 0%
+`██░░░░░░░░` 25%

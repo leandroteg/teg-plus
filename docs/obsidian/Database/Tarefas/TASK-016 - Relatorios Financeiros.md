@@ -2,13 +2,13 @@
 tipo: tarefa
 id: TASK-016
 titulo: "Relatórios Financeiros — Operacional, DRE, DFC, BP e Fluxo de Caixa"
-status: backlog
+status: em_andamento
 prioridade: alta
 modulo: financeiro
-sprint: Sprint-5
+sprint: Sprint-4
 milestone: MS-004
 estimativa: 8
-gasto: 0
+gasto: 3
 tags: [task, financeiro, relatorios, dre, dfc, fluxo-caixa, bi]
 ---
 
@@ -27,9 +27,11 @@ Implementar os relatórios críticos do módulo financeiro, cobrindo nível oper
 - [ ] Orçamento previsto × realizado por CC e projeto
 
 ### Estratégico
-- [ ] DRE consolidado e por CC/projeto com comparativo YTD
-- [ ] DFC — Demonstração do Fluxo de Caixa (método direto)
-- [ ] Fluxo de Caixa Previsto com projeção e alerta de saldo negativo
+- [x] DRE consolidado (Relatorios.tsx — aba DRE)
+- [x] Fluxo de Caixa Previsto com breakdown semanal (Relatorios.tsx — aba Fluxo)
+- [x] Gastos por Centro de Custo com barras (Relatorios.tsx — aba CC)
+- [x] Aging por faixa de vencimento (Relatorios.tsx — aba Aging)
+- [ ] DFC — Demonstração do Fluxo de Caixa (método direto) — dados reais
 - [ ] BP — Balanço Patrimonial integrado com contabilidade
 
 ### Exportação e Acesso

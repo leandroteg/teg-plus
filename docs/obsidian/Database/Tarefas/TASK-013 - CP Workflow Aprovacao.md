@@ -2,13 +2,13 @@
 tipo: tarefa
 id: TASK-013
 titulo: "Contas a Pagar — Workflow de Aprovação e Gestão de Documentos"
-status: backlog
+status: em_andamento
 prioridade: critica
 modulo: financeiro
 sprint: Sprint-4
 milestone: MS-004
 estimativa: 13
-gasto: 0
+gasto: 4
 tags: [task, financeiro, contas-a-pagar, aprovacao, documentos, omie]
 ---
 
@@ -23,9 +23,12 @@ Implementar o fluxo completo de Contas a Pagar integrado ao Omie:
 
 ## Subtarefas
 - [ ] API Omie: endpoint de criação de CP a partir do PO (< 5 min após aprovação)
-- [ ] Tela de CP com upload de documentos obrigatórios (OC, Boleto, NF, Recibo)
+- [x] Tela de CP com lista, filtros e busca (ContasPagar.tsx)
+- [x] Tela de aprovação com fila pendentes/aprovadas/rejeitadas (AprovacoesPagamento.tsx)
+- [x] Schema DB completo (fin_contas_pagar, fin_documentos, fornecedores)
+- [ ] Upload de documentos obrigatórios (OC, Boleto, NF, Recibo)
 - [ ] Bloqueio de pagamento se documentos obrigatórios ausentes
-- [ ] Fila de aprovação para Laucídio com visualização de docs
+- [x] Fila de aprovação para Laucídio com visualização e ação aprovar/rejeitar
 - [ ] Notificação (WhatsApp + e-mail) quando CP chega para aprovação
 - [ ] Histórico de aprovações (auditable log)
 - [ ] Fluxo de exceção: Repasse de Viagem

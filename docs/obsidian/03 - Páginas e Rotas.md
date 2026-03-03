@@ -18,7 +18,13 @@ graph TD
     AUTH -->|Sim| MOD["/\nModuloSelector.tsx"]
 
     MOD --> COMPRAS["/compras\nDashboard.tsx"]
-    MOD --> FIN["/financeiro\nFinanceiro.tsx 🔜"]
+    MOD --> FIN["/financeiro\nDashboardFinanceiro.tsx"]
+    FIN --> FINCP["/financeiro/cp\nContasPagar.tsx"]
+    FIN --> FINCR["/financeiro/cr\nContasReceber.tsx"]
+    FIN --> FINAP["/financeiro/aprovacoes\nAprovacoesPagamento.tsx"]
+    FIN --> FINCO["/financeiro/conciliacao\nConciliacao.tsx"]
+    FIN --> FINRE["/financeiro/relatorios\nRelatorios.tsx"]
+    FIN --> FINFO["/financeiro/fornecedores\nFornecedores.tsx"]
     MOD --> RH["/rh\nRH.tsx 🔜"]
     MOD --> SSMA["/ssma\nSSMA.tsx 🔜"]
     MOD --> EST["/estoque\nEstoque.tsx 🔜"]
@@ -58,10 +64,20 @@ graph TD
 |------|-----------|-----------|
 | `/` | `ModuloSelector.tsx` | Dashboard de seleção de módulos |
 
+### Módulo Financeiro (com FinanceiroLayout/Sidebar)
+| Rota | Componente | Descrição |
+|------|-----------|-----------|
+| `/financeiro` | `DashboardFinanceiro.tsx` | KPIs, pipeline, vencimentos, centro de custo |
+| `/financeiro/cp` | `ContasPagar.tsx` | Lista CP, filtros por status, busca |
+| `/financeiro/cr` | `ContasReceber.tsx` | Lista CR, filtros, vencidos |
+| `/financeiro/aprovacoes` | `AprovacoesPagamento.tsx` | Fila aprovação Diretoria, aprovar/rejeitar |
+| `/financeiro/conciliacao` | `Conciliacao.tsx` | Remessa CNAB, retorno, conciliação |
+| `/financeiro/relatorios` | `Relatorios.tsx` | DRE, Fluxo de Caixa, CC, Aging |
+| `/financeiro/fornecedores` | `Fornecedores.tsx` | Cadastro, dados bancários, Omie |
+
 ### Módulos Stub (UI pronta, lógica pendente)
 | Rota | Componente | Status |
 |------|-----------|--------|
-| `/financeiro` | `Financeiro.tsx` | 🔜 Stub |
 | `/rh` | `RH.tsx` | 🔜 Stub |
 | `/ssma` | `SSMA.tsx` | 🔜 Stub |
 | `/estoque` | `Estoque.tsx` | 🔜 Stub |
