@@ -36,10 +36,10 @@ function AuthLoading() {
 
 // ── Guard: usuário autenticado ─────────────────────────────────────────────────
 export function PrivateRoute() {
-  const { user, loading } = useAuth()
+  const { user, loading, perfilReady } = useAuth()
   const location = useLocation()
 
-  if (loading) return <AuthLoading />
+  if (loading || !perfilReady) return <AuthLoading />
 
   if (!user) {
     return <Navigate to="/login" state={{ from: location }} replace />
@@ -50,10 +50,10 @@ export function PrivateRoute() {
 
 // ── Guard: apenas admins ───────────────────────────────────────────────────────
 export function AdminRoute() {
-  const { user, loading, isAdmin } = useAuth()
+  const { user, loading, perfilReady, isAdmin } = useAuth()
   const location = useLocation()
 
-  if (loading) return <AuthLoading />
+  if (loading || !perfilReady) return <AuthLoading />
 
   if (!user) {
     return <Navigate to="/login" state={{ from: location }} replace />

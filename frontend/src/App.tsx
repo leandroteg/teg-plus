@@ -33,6 +33,7 @@ import AprovacoesPagamento from './pages/financeiro/AprovacoesPagamento'
 import Conciliacao from './pages/financeiro/Conciliacao'
 import Relatorios from './pages/financeiro/Relatorios'
 import Fornecedores from './pages/financeiro/Fornecedores'
+import Configuracoes from './pages/financeiro/Configuracoes'
 
 // Admin
 import AdminUsuarios from './pages/AdminUsuarios'
@@ -63,7 +64,8 @@ export default function App() {
             <Route path="/financeiro/aprovacoes"   element={<AprovacoesPagamento />} />
             <Route path="/financeiro/conciliacao"  element={<Conciliacao />} />
             <Route path="/financeiro/relatorios"   element={<Relatorios />} />
-            <Route path="/financeiro/fornecedores" element={<Fornecedores />} />
+            <Route path="/financeiro/fornecedores"   element={<Fornecedores />} />
+            <Route path="/financeiro/configuracoes" element={<Configuracoes />} />
           </Route>
 
           {/* Módulos stub */}

@@ -150,3 +150,199 @@ Apos configurar credenciais:
 - **Producao (AI Parse):** `https://seu-n8n.com/webhook/compras/requisicao-ai`
 - **Teste:** `https://seu-n8n.com/webhook-test/compras/requisicao`
 - **Teste (AI Parse):** `https://seu-n8n.com/webhook-test/compras/requisicao-ai`
+
+---
+
+## Modulo Financeiro - Omie
+
+Workflows de integracao com o Omie ERP para sincronizacao de dados financeiros.
+Todos os workflows deste modulo leem as credenciais Omie do `sys_config` no Supabase
+e registram cada execucao no `fin_sync_log`.
+
+**Documentacao detalhada:** ver pasta `n8n-docs/obsidian/`
+
+---
+
+### 7. TEG+ | Omie - Sync Fornecedores
+- **Arquivo:** `workflow-omie-sync-fornecedores.json`
+- **Webhook:** POST `/omie/sync/fornecedores`
+- **Nodes:** 9
+- **Fluxo:** Trigger -> Get Omie Credentials -> Extract Credentials -> Omie ListarFornecedores -> Mapear Fornecedores -> Upsert Supabase (cmp_fornecedores) -> Preparar Sync Log -> Inserir fin_sync_log -> Responder Sucesso
+
+**Payload:** Nenhum body necessario (disparado sem parametros)
+
+**Resposta:**
+```json
+{
+  "success": true,
+  "message": "Sync de fornecedores concluido",
+  "registros": 42
+}
+```
+
+**Mapeamento de campos:**
+| Campo Omie | Campo Supabase |
+|------------|----------------|
+| `nCodFornecedor` | `omie_id` (text) |
+| `cRazaoSocial` | `razao_social` |
+| `cNomeFantasia` | `nome_fantasia` |
+| `cnpj_cpf` | `cnpj` (so digitos) |
+| `cEmail` | `email` |
+| `telefone1_numero` | `telefone` |
+
+**Upsert key:** `omie_id` (onConflict=omie_id + Prefer: resolution=merge-duplicates)
+
+**Credenciais necessarias no n8n:**
+- Supabase Service Role Key (via credential "TEG+ Supabase")
+- Variaveis: `$vars.supabase_url`, `$vars.supabase_service_role_key`
+
+---
+
+### 8. TEG+ | Omie - Sync Contas a Pagar
+- **Arquivo:** `workflow-omie-sync-contas-pagar.json` _(a criar)_
+- **Webhook:** POST `/omie/sync/contas-pagar`
+- **Nodes:** ~10
+- **Fluxo:** Trigger -> Get Omie Credentials -> Omie ListarContasPagar -> Mapear Contas -> Preservar Status Aprovado -> Upsert Supabase (fin_contas_pagar) -> Log -> Responder
+
+**Payload:** Nenhum body necessario (pode receber filtros opcionais)
+
+**Payload opcional:**
+```json
+{
+  "pagina": 1,
+  "registros_por_pagina": 500,
+  "filtrar_status": "ABERTO"
+}
+```
+
+**Mapeamento de campos:**
+| Campo Omie | Campo Supabase |
+|------------|----------------|
+| `nCodCP` | `omie_cp_id` |
+| `cFornecedor` | `fornecedor_nome` |
+| `nCodFornecedor` | `fornecedor_omie_id` |
+| `nValorDocumento` | `valor_original` |
+| `nValorPago` | `valor_pago` |
+| `nValorAberto` | `valor_aberto` |
+| `dDataVencimento` | `data_vencimento` (parse DD/MM/AAAA) |
+| `dDataEmissao` | `data_emissao` |
+| `dDataPagamento` | `data_pagamento` |
+| `cNumeroDocumento` | `numero_documento` |
+| `cStatus` | `status_omie` + `status` (mapeado) |
+
+**Mapeamento de status:**
+| Status Omie | Status TEG+ |
+|-------------|-------------|
+| `ABERTO` | `pendente` |
+| `VENCIDO` | `vencido` |
+| `PAGO` | `pago` |
+| `CANCELADO` | `cancelado` |
+
+**Regra especial:** se `status` atual for `aprovado` ou `aguardando_aprovacao`, o sync nao sobrescreve.
+
+**Upsert key:** `omie_cp_id`
+
+---
+
+### 9. TEG+ | Omie - Sync Contas a Receber
+- **Arquivo:** `workflow-omie-sync-contas-receber.json` _(a criar)_
+- **Webhook:** POST `/omie/sync/contas-receber`
+- **Nodes:** ~9
+- **Fluxo:** Trigger -> Get Omie Credentials -> Omie ListarContasReceber -> Mapear Contas -> Upsert Supabase (fin_contas_receber) -> Log -> Responder
+
+**Payload:** Nenhum body necessario
+
+**Mapeamento de campos:**
+| Campo Omie | Campo Supabase |
+|------------|----------------|
+| `nCodCR` | `omie_cr_id` |
+| `cCliente` | `cliente_nome` |
+| `nCodCliente` | `cliente_omie_id` |
+| `nValorDocumento` | `valor_original` |
+| `nValorRecebido` | `valor_recebido` |
+| `nValorAberto` | `valor_aberto` |
+| `dDataVencimento` | `data_vencimento` |
+| `dDataRecebimento` | `data_recebimento` |
+| `cStatus` | `status_omie` + `status` (mapeado) |
+
+**Mapeamento de status:**
+| Status Omie | Status TEG+ |
+|-------------|-------------|
+| `ABERTO` | `pendente` |
+| `VENCIDO` | `vencido` |
+| `RECEBIDO` | `recebido` |
+| `CANCELADO` | `cancelado` |
+
+**Upsert key:** `omie_cr_id`
+
+---
+
+### 10. TEG+ | Omie - Aprovar Pagamento
+- **Arquivo:** `workflow-omie-aprovar-pagamento.json` _(a criar)_
+- **Webhook:** POST `/omie/aprovar-pagamento`
+- **Nodes:** ~11
+- **Fluxo:** Trigger -> Buscar Conta Supabase -> Validar Status -> Get Omie Credentials -> Omie AlterarContaPagar -> Atualizar Supabase (status=aprovado) -> Inserir fin_aprovacoes -> Log -> Responder
+
+**Payload esperado:**
+```json
+{
+  "conta_id": "uuid-da-conta-no-supabase",
+  "aprovado_por": "uuid-do-usuario",
+  "observacao": "Aprovado conforme alçada financeira"
+}
+```
+
+**Resposta (sucesso):**
+```json
+{
+  "success": true,
+  "message": "Pagamento aprovado com sucesso",
+  "conta_id": "uuid-da-conta-no-supabase",
+  "omie_cp_id": "123456",
+  "aprovado_em": "2026-03-03T14:30:00.000Z"
+}
+```
+
+**Resposta (erro - status invalido):**
+```json
+{
+  "success": false,
+  "error": "Conta nao esta em status aprovavel",
+  "status_atual": "pago"
+}
+```
+
+**Logica de validacao:**
+- Conta deve ter status `pendente` ou `aguardando_aprovacao`
+- Contas ja `aprovado`, `pago` ou `cancelado` sao rejeitadas
+- Falha na chamada Omie nao atualiza o Supabase (consistencia)
+
+**Tabelas afetadas:**
+- `fin_contas_pagar` - UPDATE status → `aprovado`, preenche `aprovado_por` e `aprovado_em`
+- `fin_aprovacoes` - INSERT com registro da aprovacao
+- `fin_sync_log` - INSERT com log da execucao
+
+---
+
+### Configuracao dos Workflows Omie
+
+**Variaveis necessarias no n8n (Settings > Variables):**
+| Variavel | Valor |
+|----------|-------|
+| `supabase_url` | URL base do projeto Supabase |
+| `supabase_service_role_key` | Service Role Key do Supabase |
+
+**Credenciais Omie:** armazenadas no Supabase (`sys_config`), nao no n8n.
+Os workflows buscam `omie_app_key` e `omie_app_secret` dinamicamente a cada execucao.
+
+**URLs dos Webhooks Omie (apos ativar):**
+- **Sync Fornecedores:** `https://seu-n8n.com/webhook/omie/sync/fornecedores`
+- **Sync Contas a Pagar:** `https://seu-n8n.com/webhook/omie/sync/contas-pagar`
+- **Sync Contas a Receber:** `https://seu-n8n.com/webhook/omie/sync/contas-receber`
+- **Aprovar Pagamento:** `https://seu-n8n.com/webhook/omie/aprovar-pagamento`
+
+**Agendamento recomendado (Cron):**
+- Fornecedores: `0 2 * * *` (diario, 02:00)
+- Contas a Pagar: `0 */4 * * *` (a cada 4 horas)
+- Contas a Receber: `0 6 * * *` (diario, 06:00)
+- Aprovacao: on-demand (sem agendamento)
