@@ -21,11 +21,11 @@ const MODULOS = [
     key: 'financeiro',
     label: 'Financeiro',
     icon: '💰',
-    description: 'Fluxo de caixa e pagamentos',
-    iconBg: 'bg-gradient-to-br from-emerald-500/20 to-green-500/20',
-    iconBorder: 'border-emerald-500/30',
-    accentColor: 'rgba(16,185,129,0.15)',
-    active: false,
+    description: 'Contas, aprovações e conciliação',
+    iconBg: 'bg-gradient-to-br from-emerald-500/25 to-green-500/25',
+    iconBorder: 'border-emerald-500/50',
+    accentColor: 'rgba(16,185,129,0.2)',
+    active: true,
     route: '/financeiro',
   },
   {
@@ -83,11 +83,11 @@ export default function ModuloSelector() {
   const hora = new Date().getHours()
   const saudacao = hora < 12 ? 'Bom dia' : hora < 18 ? 'Boa tarde' : 'Boa noite'
 
-  function canAccess(mod: typeof MODULOS[number]) {
+  function canAccess(mod: (typeof MODULOS)[number]) {
     if (!mod.active) return false
-    // compras is the default module, always accessible if ativo
-    if (mod.key === 'compras') return true
-    return hasModule(mod.key)
+    // compras & financeiro are core modules, always accessible
+    if (mod.key === 'compras' || mod.key === 'financeiro') return true
+    return hasModule(mod.key as string)
   }
 
   async function handleLogout() {

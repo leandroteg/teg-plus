@@ -19,11 +19,20 @@ import Perfil from './pages/Perfil'
 import Pedidos from './pages/Pedidos'
 
 // Módulos stub
-import Financeiro from './pages/Financeiro'
 import RH from './pages/RH'
 import SSMA from './pages/SSMA'
 import Estoque from './pages/Estoque'
 import Contratos from './pages/Contratos'
+
+// Módulo Financeiro
+import FinanceiroLayout from './components/FinanceiroLayout'
+import DashboardFinanceiro from './pages/financeiro/DashboardFinanceiro'
+import ContasPagar from './pages/financeiro/ContasPagar'
+import ContasReceber from './pages/financeiro/ContasReceber'
+import AprovacoesPagamento from './pages/financeiro/AprovacoesPagamento'
+import Conciliacao from './pages/financeiro/Conciliacao'
+import Relatorios from './pages/financeiro/Relatorios'
+import Fornecedores from './pages/financeiro/Fornecedores'
 
 // Admin
 import AdminUsuarios from './pages/AdminUsuarios'
@@ -46,8 +55,18 @@ export default function App() {
           {/* Seletor de módulos: tela inicial (sem Layout) */}
           <Route path="/" element={<ModuloSelector />} />
 
-          {/* Módulos stub: sem Layout (tela cheia própria) */}
-          <Route path="/financeiro" element={<Financeiro />} />
+          {/* Módulo Financeiro: usa FinanceiroLayout */}
+          <Route element={<FinanceiroLayout />}>
+            <Route path="/financeiro"              element={<DashboardFinanceiro />} />
+            <Route path="/financeiro/cp"           element={<ContasPagar />} />
+            <Route path="/financeiro/cr"           element={<ContasReceber />} />
+            <Route path="/financeiro/aprovacoes"   element={<AprovacoesPagamento />} />
+            <Route path="/financeiro/conciliacao"  element={<Conciliacao />} />
+            <Route path="/financeiro/relatorios"   element={<Relatorios />} />
+            <Route path="/financeiro/fornecedores" element={<Fornecedores />} />
+          </Route>
+
+          {/* Módulos stub */}
           <Route path="/rh"         element={<RH />} />
           <Route path="/ssma"       element={<SSMA />} />
           <Route path="/estoque"    element={<Estoque />} />
