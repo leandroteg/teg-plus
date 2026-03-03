@@ -62,10 +62,11 @@ CREATE TABLE IF NOT EXISTS est_localizacoes (
 -- =============================================================================
 -- 3. est_itens — Catálogo de itens
 -- =============================================================================
-CREATE TYPE IF NOT EXISTS est_curva_abc AS ENUM ('A', 'B', 'C');
-CREATE TYPE IF NOT EXISTS est_unidade   AS ENUM (
+DO $$ BEGIN CREATE TYPE est_curva_abc AS ENUM ('A', 'B', 'C');
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN CREATE TYPE est_unidade AS ENUM (
   'UN', 'M', 'M2', 'M3', 'KG', 'TON', 'L', 'CX', 'PCT', 'RL', 'PR', 'JG'
-);
+); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 CREATE TABLE IF NOT EXISTS est_itens (
   id                    UUID          PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -134,16 +135,16 @@ CREATE TABLE IF NOT EXISTS est_saldos (
 -- =============================================================================
 -- 5. est_movimentacoes — Registro de todas as movimentações
 -- =============================================================================
-CREATE TYPE IF NOT EXISTS est_tipo_mov AS ENUM (
-  'entrada',          -- Recebimento de material
-  'saida',            -- Consumo por obra/CC
-  'transferencia_out',-- Transferência saindo desta base
-  'transferencia_in', -- Transferência chegando nesta base
-  'ajuste_positivo',  -- Ajuste de inventário +
-  'ajuste_negativo',  -- Ajuste de inventário -
-  'devolucao',        -- Devolução de obra para estoque
-  'baixa'             -- Baixa por perda/avaria/descarte
-);
+DO $$ BEGIN CREATE TYPE est_tipo_mov AS ENUM (
+  'entrada',
+  'saida',
+  'transferencia_out',
+  'transferencia_in',
+  'ajuste_positivo',
+  'ajuste_negativo',
+  'devolucao',
+  'baixa'
+); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 CREATE TABLE IF NOT EXISTS est_movimentacoes (
   id                UUID              PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -182,9 +183,9 @@ CREATE TABLE IF NOT EXISTS est_movimentacoes (
 -- =============================================================================
 -- 6. est_solicitacoes — Solicitações de material de obra
 -- =============================================================================
-CREATE TYPE IF NOT EXISTS est_status_solicitacao AS ENUM (
+DO $$ BEGIN CREATE TYPE est_status_solicitacao AS ENUM (
   'aberta', 'aprovada', 'em_separacao', 'atendida', 'parcial', 'cancelada'
-);
+); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 CREATE TABLE IF NOT EXISTS est_solicitacoes (
   id               UUID                    PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -235,11 +236,9 @@ CREATE TRIGGER trig_numero_solicitacao
 -- =============================================================================
 -- 7. est_inventarios — Sessões de inventário
 -- =============================================================================
-CREATE TYPE IF NOT EXISTS est_tipo_inventario AS ENUM (
-  'ciclico',    -- Contagem parcial por curva ABC
-  'periodico',  -- Inventário anual completo
-  'surpresa'    -- Inventário surpresa de alto valor
-);
+DO $$ BEGIN CREATE TYPE est_tipo_inventario AS ENUM (
+  'ciclico', 'periodico', 'surpresa'
+); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 CREATE TABLE IF NOT EXISTS est_inventarios (
   id              UUID                  PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -287,9 +286,9 @@ CREATE TABLE IF NOT EXISTS est_inventario_itens (
 -- =============================================================================
 -- 9. pat_imobilizados — Cadastro de imobilizados
 -- =============================================================================
-CREATE TYPE IF NOT EXISTS pat_status_imob AS ENUM (
+DO $$ BEGIN CREATE TYPE pat_status_imob AS ENUM (
   'ativo', 'em_manutencao', 'cedido', 'baixado', 'em_transferencia'
-);
+); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 CREATE TABLE IF NOT EXISTS pat_imobilizados (
   id                    UUID              PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -1627,19 +1626,17 @@ VALUES (
   'mural-banners',
   'mural-banners',
   true,
-  5242880,  -- 5 MB
+  5242880,
   ARRAY['image/jpeg','image/png','image/webp','image/gif']
 )
 ON CONFLICT (id) DO NOTHING;
 
--- Policy: qualquer autenticado pode ler (bucket é público)
 DO $$ BEGIN
   CREATE POLICY "mural_storage_read" ON storage.objects
     FOR SELECT TO authenticated
     USING (bucket_id = 'mural-banners');
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
--- Policy: apenas admin pode fazer upload
 DO $$ BEGIN
   CREATE POLICY "mural_storage_admin_write" ON storage.objects
     FOR INSERT TO authenticated
