@@ -4,7 +4,7 @@ id: REQ-006
 titulo: "Integração financeira com Omie ERP"
 categoria: funcional
 prioridade: alta
-status: em_andamento
+status: em-andamento
 modulo: financeiro
 sprint: Sprint-4
 milestone: MS-004

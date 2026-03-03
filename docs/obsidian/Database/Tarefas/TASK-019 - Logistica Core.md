@@ -1,15 +1,16 @@
 ---
-title: "TASK-019 — Logística Core"
-type: tarefa
+tipo: tarefa
+id: TASK-021
+titulo: "Logística Core — Schema, Hooks e Páginas"
 status: concluido
 prioridade: alta
 modulo: logistica
-sprint: 8
+milestone: MS-006b
+sprint: Sprint-8
 estimativa: 20
 gasto: 20
 data_inicio: 2026-03-03
 data_fim: 2026-03-03
-responsavel: claude
 tags: [tarefa, logistica, transportes, nfe, expedicao, recebimento]
 ---
 

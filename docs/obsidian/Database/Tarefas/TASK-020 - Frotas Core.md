@@ -1,15 +1,16 @@
 ---
-title: "TASK-020 — Frotas Core"
-type: tarefa
+tipo: tarefa
+id: TASK-022
+titulo: "Frotas Core — Schema, Hooks e Páginas"
 status: concluido
 prioridade: alta
 modulo: frotas
-sprint: 9
+milestone: MS-007
+sprint: Sprint-9
 estimativa: 22
 gasto: 22
 data_inicio: 2026-03-03
 data_fim: 2026-03-03
-responsavel: claude
 tags: [tarefa, frotas, manutencao, os, checklist, telemetria, abastecimento]
 ---
 

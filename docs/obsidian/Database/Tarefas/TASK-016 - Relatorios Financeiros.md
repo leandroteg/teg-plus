@@ -2,7 +2,7 @@
 tipo: tarefa
 id: TASK-016
 titulo: "Relatórios Financeiros — Operacional, DRE, DFC, BP e Fluxo de Caixa"
-status: em_andamento
+status: em-andamento
 prioridade: alta
 modulo: financeiro
 sprint: Sprint-4
