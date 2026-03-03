@@ -96,7 +96,7 @@ CREATE TABLE IF NOT EXISTS fro_veiculos (
   status                   fro_status_veiculo NOT NULL DEFAULT 'disponivel',
   hodometro_atual          INTEGER NOT NULL DEFAULT 0,
   capacidade_carga_kg      INTEGER,
-  base_id                  UUID REFERENCES bases(id),
+  base_id                  UUID REFERENCES est_bases(id),
   motorista_responsavel_id UUID REFERENCES auth.users(id),
   valor_fipe               NUMERIC(12,2),
   data_aquisicao           DATE,
