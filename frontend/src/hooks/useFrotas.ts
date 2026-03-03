@@ -2,7 +2,7 @@
 // hooks/useFrotas.ts — Módulo Manutenção e Uso de Frotas
 // ─────────────────────────────────────────────────────────────────────────────
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { supabase } from '../lib/supabase'
+import { supabase } from '../services/supabase'
 import type {
   FroVeiculo, FroFornecedor, FroOrdemServico, FroItemOS,
   FroCotacaoOS, FroChecklist, FroAbastecimento,
