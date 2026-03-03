@@ -96,10 +96,37 @@
     background-size: 48px 48px;
   }
 
+  /* ── Form input base ─────────────────── */
+  .input-base {
+    @apply w-full px-3 py-2 rounded-xl border border-slate-200 bg-white text-sm
+      focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400
+      transition-colors placeholder:text-slate-400;
+  }
+
   /* ── Shimmer button ───────────────────── */
   .btn-shimmer {
     background: linear-gradient(90deg, #0F766E, #14B8A6, #22D3EE, #14B8A6, #0F766E);
     background-size: 300% auto;
     animation: shimmer 3s linear infinite;
   }
+}
+
+/* ── Keyframes globais ──────────────────────────────────────────────────────── */
+
+/* Ken Burns — zoom suave nas imagens do slideshow */
+@keyframes kenBurns {
+  0%   { transform: scale(1)    translate(0%,    0%); }
+  100% { transform: scale(1.10) translate(-1.5%, -0.8%); }
+}
+
+/* Barra de progresso do slideshow */
+@keyframes slideProgress {
+  from { width: 0%; }
+  to   { width: 100%; }
+}
+
+/* Fade in up — usado no BannerSlideshow */
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(24px); }
+  to   { opacity: 1; transform: translateY(0); }
 }

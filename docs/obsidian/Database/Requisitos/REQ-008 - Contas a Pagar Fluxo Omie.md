@@ -4,7 +4,7 @@ id: REQ-008
 titulo: "Contas a Pagar — Fluxo Completo com Omie"
 categoria: funcional
 prioridade: critica
-status: planejado
+status: em_andamento
 modulo: financeiro
 sprint: Sprint-4
 milestone: MS-004
@@ -16,29 +16,31 @@ tags: [requisito, financeiro, contas-a-pagar, omie, pagamento]
 ## Objetivo
 Garantir governança total sobre pagamentos: pagar somente o que deve ser pago, sem erros, no prazo correto, com toda documentação obrigatória e rastreabilidade por classe, CC e projeto.
 
-## Contexto — Papel do Omie
-O Omie será o **módulo central financeiro**. O TEG+ pode atuar como:
-- **Opção A** — Interface própria do TEG+ consumindo API do Omie (front TEG+, back Omie)
-- **Opção B** — Omie como back automatizado por IA, com o usuário operando o próprio Omie
-> Decisão arquitetural a definir em sprint de discovery do módulo financeiro.
+## Contexto — Decisão Arquitetural
+**Opção A adotada:** Interface própria do TEG+ + API Omie no back (front TEG+, dados Omie).
 
-## Fluxo Previsto
+## Fluxo Implementado
 ```
-PO Aprovado (TEG+)
-  └─► Lançamento CP no Omie (automático via API)
-        └─► NF/Boleto anexado + documentos obrigatórios
-              └─► Aprovação Diretor Presidente (Laucídio)
-                    └─► Remessa bancária em lote
-                          └─► Baixa automática + conciliação
+PO Emitido (TEG+)
+  └─► CP criado automaticamente via TRIGGER (status: previsto) ✅
+        └─► Comprador confirma entrega + libera para pagamento ✅
+              └─► CP → aguardando_aprovacao (TRIGGER) ✅
+                    └─► Financeiro registra pagamento + comprovante ✅
+                          └─► CP → pago | PO → pago (TRIGGER) ✅
+                                └─► Comprovante visível ao comprador ✅
+                                      └─► [pendente] Remessa bancária em lote
 ```
 
 ## Critérios de Aceite
-- [ ] PO aprovado gera CP no Omie em < 5 minutos via API
-- [ ] Sistema bloqueia pagamento sem documentos obrigatórios anexados
-- [ ] Pagamento não sai sem aprovação do Diretor Presidente
-- [ ] Rastreabilidade completa: classe financeira, centro de custo, projeto
+- [x] PO emitido → CP criado automaticamente (status: previsto) ✅
+- [x] Comprador pode liberar para pagamento com upload de NF ✅
+- [x] Financeiro registra pagamento com comprovante ✅
+- [x] Comprovante visível ao comprador no módulo Compras ✅
+- [x] Rastreabilidade: status visível em ambos os módulos ✅
+- [ ] Sistema bloqueia pagamento sem documentos obrigatórios
+- [ ] Aprovação formal do Diretor Presidente (alçada)
 - [ ] 99,8% dos pagamentos seguindo o fluxo previsto documentado
-- [ ] Equipe opera sem sobrecarga (poucos cliques por operação, poucos lançamentos manuais)
+- [ ] Remessa bancária em lote
 
 ## Documentos Obrigatórios por Pagamento
 - Ordem de Compra ou Contrato

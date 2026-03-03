@@ -53,6 +53,10 @@ atualizado: 2026-03-03
 | Integração Omie ERP | [[19 - Integração Omie]] |
 | Módulo Financeiro | [[20 - Módulo Financeiro]] |
 | Fluxo de Pagamento | [[21 - Fluxo Pagamento]] |
+| Módulo Estoque e Patrimonial | [[22 - Módulo Estoque e Patrimonial]] |
+| Módulo Logística | [[23 - Módulo Logística e Transportes]] |
+| Módulo Frotas | [[24 - Módulo Frotas e Manutenção]] |
+| Mural de Recados | [[25 - Mural de Recados]] |
 
 ---
 
@@ -83,9 +87,11 @@ graph TD
 graph LR
     M[TEG+ ERP] --> C[✅ Compras]
     M --> F[✅ Financeiro]
+    M --> E[✅ Estoque]
+    M --> L[✅ Logística]
+    M --> FR[✅ Frotas]
     M --> R[🔜 RH]
     M --> S[🔜 SSMA]
-    M --> E[🔜 Estoque]
     M --> K[🔜 Contratos]
 
     C --> C1[Requisições]
@@ -93,12 +99,27 @@ graph LR
     C --> C3[Aprovações]
     C --> C4[Pedidos]
 
-    style C fill:#10B981,color:#fff
-    style F fill:#10B981,color:#fff
-    style R fill:#64748B,color:#fff
-    style S fill:#64748B,color:#fff
-    style E fill:#64748B,color:#fff
-    style K fill:#64748B,color:#fff
+    E --> E1[Almoxarifado]
+    E --> E2[Inventário]
+    E --> E3[Patrimonial]
+
+    L --> L1[Solicitações]
+    L --> L2[Expedição]
+    L --> L3[Transportes]
+    L --> L4[Recebimentos]
+
+    FR --> FR1[OS Manutenção]
+    FR --> FR2[Checklists]
+    FR --> FR3[Telemetria]
+
+    style C  fill:#10B981,color:#fff
+    style F  fill:#10B981,color:#fff
+    style E  fill:#3B82F6,color:#fff
+    style L  fill:#EA580C,color:#fff
+    style FR fill:#F43F5E,color:#fff
+    style R  fill:#64748B,color:#fff
+    style S  fill:#64748B,color:#fff
+    style K  fill:#64748B,color:#fff
 ```
 
 ---
@@ -111,12 +132,16 @@ graph LR
 | Aprovações multi-nível | ✅ Entregue | 4 alçadas, token-based |
 | ApprovaAi (mobile) | ✅ Entregue | Interface responsiva |
 | Dashboard KPIs | ✅ Entregue | RPC + realtime |
-| Schema Supabase | ✅ Entregue | 14 migrations |
+| Schema Supabase | ✅ Entregue | 18 migrations |
 | AI Parse requisições | ✅ Entregue | Keywords + n8n |
 | Cotações | ✅ Entregue | Regras de alçada + bypass sem mínimo |
 | PO — PDF e Compartilhamento | ✅ Entregue | Sem deps externas, WhatsApp + E-mail |
 | Fluxo Pagamento (Compras→Fin) | ✅ Entregue | Triggers, anexos, comprovante |
 | Financeiro (Omie ERP) | ✅ Entregue | CP, CR, Fornecedores, 4 squads n8n |
+| Estoque e Patrimonial | ✅ Entregue | Almoxarifado, inventário, imobilizados, depreciação |
+| Logística e Transportes | ✅ Entregue | 9 etapas, NF-e, rastreamento, avaliações |
+| Frotas e Manutenção | ✅ Entregue | OS, checklist, abastecimento, telemetria |
+| Mural de Recados | ✅ Entregue | Slideshow corporativo + gestão admin RH |
 | WhatsApp (Evolution API) | 🔜 Planejado | Notificações automáticas |
 | AI TEG+ (Claude API) | 🔜 Planejado | Agente conversacional |
 | Monday.com PMO | 🔜 Planejado | Gestão de portfólio |

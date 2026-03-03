@@ -19,10 +19,13 @@ import Perfil from './pages/Perfil'
 import Pedidos from './pages/Pedidos'
 
 // Módulos stub
-import RH from './pages/RH'
 import SSMA from './pages/SSMA'
-import Estoque from './pages/Estoque'
 import Contratos from './pages/Contratos'
+
+// Módulo RH
+import RHLayout from './components/RHLayout'
+import RHHome from './pages/rh/RHHome'
+import MuralAdmin from './pages/rh/MuralAdmin'
 
 // Módulo Financeiro
 import FinanceiroLayout from './components/FinanceiroLayout'
@@ -34,6 +37,32 @@ import Conciliacao from './pages/financeiro/Conciliacao'
 import Relatorios from './pages/financeiro/Relatorios'
 import Fornecedores from './pages/financeiro/Fornecedores'
 import Configuracoes from './pages/financeiro/Configuracoes'
+
+// Módulo Estoque
+import EstoqueLayout from './components/EstoqueLayout'
+import EstoqueHome from './pages/estoque/EstoqueHome'
+import Itens from './pages/estoque/Itens'
+import Movimentacoes from './pages/estoque/Movimentacoes'
+import Inventario from './pages/estoque/Inventario'
+import Patrimonial from './pages/estoque/Patrimonial'
+
+// Módulo Logística
+import LogisticaLayout from './components/LogisticaLayout'
+import LogisticaHome from './pages/logistica/LogisticaHome'
+import Solicitacoes from './pages/logistica/Solicitacoes'
+import Expedicao from './pages/logistica/Expedicao'
+import TransportesLog from './pages/logistica/Transportes'
+import Recebimentos from './pages/logistica/Recebimentos'
+import TransportadorasLog from './pages/logistica/Transportadoras'
+
+// Módulo Frotas
+import FrotasLayout from './components/FrotasLayout'
+import FrotasHome from './pages/frotas/FrotasHome'
+import Veiculos from './pages/frotas/Veiculos'
+import Ordens from './pages/frotas/Ordens'
+import Checklists from './pages/frotas/Checklists'
+import Abastecimentos from './pages/frotas/Abastecimentos'
+import Telemetria from './pages/frotas/Telemetria'
 
 // Admin
 import AdminUsuarios from './pages/AdminUsuarios'
@@ -68,10 +97,43 @@ export default function App() {
             <Route path="/financeiro/configuracoes" element={<Configuracoes />} />
           </Route>
 
+          {/* Módulo Estoque: usa EstoqueLayout */}
+          <Route element={<EstoqueLayout />}>
+            <Route path="/estoque"               element={<EstoqueHome />} />
+            <Route path="/estoque/itens"         element={<Itens />} />
+            <Route path="/estoque/movimentacoes" element={<Movimentacoes />} />
+            <Route path="/estoque/inventario"    element={<Inventario />} />
+            <Route path="/estoque/patrimonial"   element={<Patrimonial />} />
+          </Route>
+
+          {/* Módulo Logística: usa LogisticaLayout */}
+          <Route element={<LogisticaLayout />}>
+            <Route path="/logistica"                   element={<LogisticaHome />} />
+            <Route path="/logistica/solicitacoes"      element={<Solicitacoes />} />
+            <Route path="/logistica/expedicao"         element={<Expedicao />} />
+            <Route path="/logistica/transportes"       element={<TransportesLog />} />
+            <Route path="/logistica/recebimentos"      element={<Recebimentos />} />
+            <Route path="/logistica/transportadoras"   element={<TransportadorasLog />} />
+          </Route>
+
+          {/* Módulo Frotas: usa FrotasLayout */}
+          <Route element={<FrotasLayout />}>
+            <Route path="/frotas"                      element={<FrotasHome />} />
+            <Route path="/frotas/veiculos"             element={<Veiculos />} />
+            <Route path="/frotas/ordens"               element={<Ordens />} />
+            <Route path="/frotas/checklists"           element={<Checklists />} />
+            <Route path="/frotas/abastecimentos"       element={<Abastecimentos />} />
+            <Route path="/frotas/telemetria"           element={<Telemetria />} />
+          </Route>
+
+          {/* Módulo RH: usa RHLayout */}
+          <Route element={<RHLayout />}>
+            <Route path="/rh"        element={<RHHome />} />
+            <Route path="/rh/mural"  element={<MuralAdmin />} />
+          </Route>
+
           {/* Módulos stub */}
-          <Route path="/rh"         element={<RH />} />
           <Route path="/ssma"       element={<SSMA />} />
-          <Route path="/estoque"    element={<Estoque />} />
           <Route path="/contratos"  element={<Contratos />} />
 
           {/* Módulo Compras: usa sidebar/Layout */}

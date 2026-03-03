@@ -4,7 +4,7 @@ id: REQ-015
 titulo: "Integrações Internas — Financeiro com demais módulos TEG+"
 categoria: funcional
 prioridade: critica
-status: planejado
+status: em_andamento
 modulo: financeiro
 sprint: Sprint-4
 milestone: MS-004
@@ -19,9 +19,10 @@ O módulo financeiro deve ser integrado com os demais módulos do TEG+ para elim
 ## Integrações Obrigatórias
 
 ### Compras → Financeiro
-- [ ] **PO aprovado** gera automaticamente Conta a Pagar no Omie (previsto)
-- [ ] Status do pagamento visível para Suprimentos no TEG+ (pago, pendente, aprovação)
-- [ ] Suprimentos acessa comprovante de pagamento do PO direto no TEG+
+- [x] **PO emitido** → CP criado automaticamente via trigger (status: previsto) ✅
+- [x] Status do pagamento visível ao comprador (badges: Aguard. Pgto / Pago) ✅
+- [x] Comprovante de pagamento acessível ao comprador nos Anexos do PO ✅
+- [x] Liberar para Pagamento com upload de NF/comprovante de entrega ✅
 
 ### Vendas / NF de Venda → Financeiro
 - [ ] **NF de Venda emitida** gera automaticamente Conta a Receber no Omie
