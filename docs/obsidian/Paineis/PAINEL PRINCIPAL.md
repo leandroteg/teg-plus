@@ -2,7 +2,7 @@
 title: "🏠 PAINEL PRINCIPAL"
 type: painel
 tags: [painel, dashboard, moc, gestao]
-atualizado: 2026-03-02
+atualizado: 2026-03-03
 ---
 
 # 🏠 TEG+ ERP — Central de Gestão

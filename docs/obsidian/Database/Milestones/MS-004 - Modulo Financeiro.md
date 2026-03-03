@@ -20,17 +20,18 @@ Lançamento do módulo financeiro do TEG+ com o **Omie como módulo central**.
 > Frontend implementado com 7 telas + layout + sidebar dedicado.
 
 ## Implementação Atual (Sprint-4)
-- [x] Schema PostgreSQL completo (`011_schema_financeiro.sql`)
+- [x] Schema PostgreSQL completo (migrations 013 + 014)
 - [x] TypeScript types e React Query hooks
 - [x] Layout com sidebar (emerald theme) + mobile bottom nav
-- [x] Dashboard Financeiro (KPIs, pipeline, vencimentos, CC)
-- [x] Contas a Pagar (lista, filtros, busca, badges)
+- [x] Contas a Pagar (lista, filtros, busca, badges, registrar pagamento)
 - [x] Contas a Receber (lista, filtros, vencidos)
-- [x] Aprovações de Pagamento (fila Laucídio, aprovar/rejeitar)
-- [x] Conciliação Bancária (remessa CNAB, retorno, conciliação)
-- [x] Relatórios (DRE, Fluxo de Caixa, Centro de Custo, Aging)
-- [x] Fornecedores (cadastro, dados bancários, Omie ID)
-- [x] Rotas wired em App.tsx + módulo ativado no ModuloSelector
+- [x] Fornecedores (cadastro, sync Omie)
+- [x] Configurações (credenciais Omie, toggle, status de sync)
+- [x] SyncBar em CP, CR e Fornecedores
+- [x] Integração Omie — 4 squads n8n funcionais (TASK-009 ✅)
+- [x] Fluxo Compras → Financeiro: trigger PO → CP → liberar → pago (TASK-013 parcial)
+- [x] Upload de NF/comprovante no módulo Compras e Financeiro
+- [x] Comprovante de pagamento visível ao comprador
 
 ## Objetivos do Módulo
 | Objetivo | Descrição |
@@ -50,8 +51,8 @@ Lançamento do módulo financeiro do TEG+ com o **Omie como módulo central**.
 ## Tarefas
 | ID | Tarefa | Status |
 |----|--------|--------|
-| [[TASK-009 - Integracao Omie\|TASK-009]] | Integração Omie ERP | ⬜ backlog |
-| [[TASK-013 - CP Workflow Aprovacao\|TASK-013]] | CP — Workflow de Aprovação e Documentos | 🟡 em andamento |
+| [[TASK-009 - Integracao Omie\|TASK-009]] | Integração Omie ERP | ✅ concluído |
+| [[TASK-013 - CP Workflow Aprovacao\|TASK-013]] | CP — Workflow de Aprovação e Documentos | 🔵 em andamento |
 | [[TASK-014 - Conciliacao Remessa Bancaria\|TASK-014]] | Conciliação e Remessa Bancária | 🟡 em andamento |
 | [[TASK-015 - Emissao Recebimento NFe\|TASK-015]] | Emissão e Recebimento de NF-e/NFS-e | ⬜ backlog |
 | [[TASK-016 - Relatorios Financeiros\|TASK-016]] | Relatórios DRE, DFC, BP, Fluxo de Caixa | 🟡 em andamento |
@@ -86,4 +87,4 @@ Lançamento do módulo financeiro do TEG+ com o **Omie como módulo central**.
 | Contabilidade externa | Importante | ⬜ backlog |
 
 ## Progresso
-`██░░░░░░░░` 25%
+`█████░░░░░` 50%
