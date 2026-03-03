@@ -4,6 +4,7 @@ type: frontend
 status: ativo
 tags: [frontend, rotas, react-router, páginas]
 criado: 2026-03-02
+atualizado: 2026-03-03
 relacionado: ["[[02 - Frontend Stack]]", "[[04 - Componentes]]", "[[09 - Auth Sistema]]"]
 ---
 
@@ -14,34 +15,40 @@ relacionado: ["[[02 - Frontend Stack]]", "[[04 - Componentes]]", "[[09 - Auth Si
 ```mermaid
 graph TD
     ROOT["/"] --> AUTH{Autenticado?}
-    AUTH -->|Não| LOGIN["/login\nLogin.tsx"]
-    AUTH -->|Sim| MOD["/\nModuloSelector.tsx"]
+    AUTH -->|Não| LOGIN["/login"]
+    AUTH -->|Sim| MOD["/\nModuloSelector\n+ BannerSlideshow"]
 
-    MOD --> COMPRAS["/compras\nDashboard.tsx"]
-    MOD --> FIN["/financeiro\nDashboardFinanceiro.tsx"]
-    FIN --> FINCP["/financeiro/cp\nContasPagar.tsx"]
-    FIN --> FINCR["/financeiro/cr\nContasReceber.tsx"]
-    FIN --> FINAP["/financeiro/aprovacoes\nAprovacoesPagamento.tsx"]
-    FIN --> FINCO["/financeiro/conciliacao\nConciliacao.tsx"]
-    FIN --> FINRE["/financeiro/relatorios\nRelatorios.tsx"]
-    FIN --> FINFO["/financeiro/fornecedores\nFornecedores.tsx"]
-    MOD --> RH["/rh\nRH.tsx 🔜"]
-    MOD --> SSMA["/ssma\nSSMA.tsx 🔜"]
-    MOD --> EST["/estoque\nEstoque.tsx 🔜"]
-    MOD --> CON["/contratos\nContratos.tsx 🔜"]
+    MOD --> COMPRAS["/compras\nDashboard"]
+    MOD --> FIN["/financeiro\nDashboardFinanceiro"]
+    MOD --> EST["/estoque\nEstoqueHome"]
+    MOD --> LOG["/logistica\nLogisticaHome"]
+    MOD --> FR["/frotas\nFrotasHome"]
+    MOD --> RH["/rh\nRHHome"]
 
-    COMPRAS --> NOVA["/nova\nNovaRequisicao.tsx"]
-    COMPRAS --> LIST["/requisicoes\nListaRequisicoes.tsx"]
-    COMPRAS --> COT["/cotacoes\nFilaCotacoes.tsx"]
-    COMPRAS --> COTF["/cotacoes/:id\nCotacaoForm.tsx"]
-    COMPRAS --> PED["/pedidos\nPedidos.tsx"]
-    COMPRAS --> PERF["/perfil\nPerfil.tsx"]
+    RH --> MURAL["/rh/mural\nMuralAdmin 🔐"]
 
-    ROOT --> APROV["/aprovacao/:token\nAprovacao.tsx 🔓"]
-    ROOT --> APAI["/aprovaai\nAprovAi.tsx 🔓"]
-    ROOT --> NSENHA["/nova-senha\n🔓"]
+    FIN --> FINCP["/financeiro/cp"]
+    FIN --> FINCR["/financeiro/cr"]
+    FIN --> FINAP["/financeiro/aprovacoes"]
+    FIN --> FINCO["/financeiro/conciliacao"]
+    FIN --> FINRE["/financeiro/relatorios"]
+    FIN --> FINFO["/financeiro/fornecedores"]
 
-    ROOT --> ADMIN["/admin/usuarios\nAdminUsuarios.tsx 🔐"]
+    EST --> EST1["/estoque/itens"]
+    EST --> EST2["/estoque/movimentacoes"]
+    EST --> EST3["/estoque/inventario"]
+    EST --> EST4["/estoque/patrimonial"]
+
+    FR --> FR1["/frotas/veiculos"]
+    FR --> FR2["/frotas/ordens"]
+    FR --> FR3["/frotas/checklists"]
+    FR --> FR4["/frotas/abastecimentos"]
+    FR --> FR5["/frotas/telemetria"]
+
+    MOD --> SSMA["/ssma 🔜"]
+    MOD --> CON["/contratos 🔜"]
+    ROOT --> APROV["/aprovacao/:token 🔓"]
+    ROOT --> ADMIN["/admin/usuarios 🔐"]
 ```
 
 ---
@@ -60,30 +67,67 @@ graph TD
 ## Rotas Privadas (requerem auth)
 
 ### Módulo Seletor
+
 | Rota | Componente | Descrição |
 |------|-----------|-----------|
-| `/` | `ModuloSelector.tsx` | Dashboard de seleção de módulos |
+| `/` | `ModuloSelector.tsx` | Dashboard + **BannerSlideshow** entre saudação e grade de módulos |
 
-### Módulo Financeiro (com FinanceiroLayout/Sidebar)
+### Módulo RH (com `RHLayout` — violet)
+
+| Rota | Componente | Acesso |
+|------|-----------|--------|
+| `/rh` | `RHHome.tsx` | Todos autenticados |
+| `/rh/mural` | `MuralAdmin.tsx` | **Admin only** — gestão de banners |
+
+> O módulo RH aparece como `active: false` para usuários comuns ("Em breve"). Admins veem o card habilitado com badge "Admin" e acesso direto ao Mural.
+
+### Módulo Financeiro (com `FinanceiroLayout`)
+
 | Rota | Componente | Descrição |
 |------|-----------|-----------|
 | `/financeiro` | `DashboardFinanceiro.tsx` | KPIs, pipeline, vencimentos, centro de custo |
-| `/financeiro/cp` | `ContasPagar.tsx` | Lista CP, filtros por status, busca |
-| `/financeiro/cr` | `ContasReceber.tsx` | Lista CR, filtros, vencidos |
-| `/financeiro/aprovacoes` | `AprovacoesPagamento.tsx` | Fila aprovação Diretoria, aprovar/rejeitar |
-| `/financeiro/conciliacao` | `Conciliacao.tsx` | Remessa CNAB, retorno, conciliação |
-| `/financeiro/relatorios` | `Relatorios.tsx` | DRE, Fluxo de Caixa, CC, Aging |
+| `/financeiro/cp` | `ContasPagar.tsx` | Lista CP, filtros por status |
+| `/financeiro/cr` | `ContasReceber.tsx` | Lista CR, vencidos |
+| `/financeiro/aprovacoes` | `AprovacoesPagamento.tsx` | Fila aprovação Diretoria |
+| `/financeiro/conciliacao` | `Conciliacao.tsx` | Remessa CNAB, retorno |
+| `/financeiro/relatorios` | `Relatorios.tsx` | DRE, Fluxo de Caixa, Aging |
 | `/financeiro/fornecedores` | `Fornecedores.tsx` | Cadastro, dados bancários, Omie |
+| `/financeiro/configuracoes` | `Configuracoes.tsx` | Config do módulo |
 
-### Módulos Stub (UI pronta, lógica pendente)
-| Rota | Componente | Status |
-|------|-----------|--------|
-| `/rh` | `RH.tsx` | 🔜 Stub |
-| `/ssma` | `SSMA.tsx` | 🔜 Stub |
-| `/estoque` | `Estoque.tsx` | 🔜 Stub |
-| `/contratos` | `Contratos.tsx` | 🔜 Stub |
+### Módulo Estoque (com `EstoqueLayout`)
 
-### Módulo Compras (com Layout/Sidebar)
+| Rota | Componente | Descrição |
+|------|-----------|-----------|
+| `/estoque` | `EstoqueHome.tsx` | Dashboard de estoque |
+| `/estoque/itens` | `Itens.tsx` | Catálogo de itens |
+| `/estoque/movimentacoes` | `Movimentacoes.tsx` | Entradas e saídas |
+| `/estoque/inventario` | `Inventario.tsx` | Inventário físico |
+| `/estoque/patrimonial` | `Patrimonial.tsx` | Imobilizados e depreciação |
+
+### Módulo Logística (com `LogisticaLayout`)
+
+| Rota | Componente | Descrição |
+|------|-----------|-----------|
+| `/logistica` | `LogisticaHome.tsx` | Painel de transportes |
+| `/logistica/transportes` | `Transportes.tsx` | Solicitações de transporte |
+| `/logistica/recebimentos` | `Recebimentos.tsx` | Recebimento de materiais |
+| `/logistica/expedicao` | `Expedicao.tsx` | Expedição e entregas |
+| `/logistica/solicitacoes` | `Solicitacoes.tsx` | Fila de solicitações |
+| `/logistica/transportadoras` | `Transportadoras.tsx` | Cadastro de transportadoras |
+
+### Módulo Frotas (com `FrotasLayout`)
+
+| Rota | Componente | Descrição |
+|------|-----------|-----------|
+| `/frotas` | `FrotasHome.tsx` | Dashboard de frotas |
+| `/frotas/veiculos` | `Veiculos.tsx` | Cadastro de veículos |
+| `/frotas/ordens` | `Ordens.tsx` | Ordens de serviço |
+| `/frotas/checklists` | `Checklists.tsx` | Checklists de inspeção |
+| `/frotas/abastecimentos` | `Abastecimentos.tsx` | Controle de combustível |
+| `/frotas/telemetria` | `Telemetria.tsx` | KPIs e rastreamento |
+
+### Módulo Compras (com `Layout`)
+
 | Rota | Componente | Descrição |
 |------|-----------|-----------|
 | `/compras` | `Dashboard.tsx` | KPIs, pipeline, analytics |
@@ -94,63 +138,18 @@ graph TD
 | `/pedidos` | `Pedidos.tsx` | Ordens de compra |
 | `/perfil` | `Perfil.tsx` | Perfil e preferências |
 
-### Admin (requer role admin)
-| Rota | Componente | Descrição |
-|------|-----------|-----------|
-| `/admin/usuarios` | `AdminUsuarios.tsx` | Gestão de usuários |
+### Módulos Stub (em desenvolvimento)
 
----
+| Rota | Status |
+|------|--------|
+| `/ssma` | 🔜 Planejado |
+| `/contratos` | 🔜 Planejado |
 
-## Detalhamento por Página
+### Admin
 
-### `Dashboard.tsx` — `/compras`
-- KPIs em tempo real (total, pendentes, aprovadas, valor)
-- Pipeline visual de requisições por status
-- Gráfico por obra
-- Últimas atividades
-- Usa: [[05 - Hooks Customizados#useDashboard]]
-
-### `NovaRequisicao.tsx` — `/nova`
-**Wizard em 3 etapas:**
-1. Identificação (obra, categoria, urgência)
-2. Itens (descrição, quantidade, valor estimado)
-3. Revisão e envio
-
-**AI Mode:**
-- Campo de texto livre
-- Envia para `POST /compras/requisicao-ai`
-- Retorna: itens estruturados, obra sugerida, categoria, comprador, score de confiança
-- Usa: [[05 - Hooks Customizados#useAiParse]]
-
-### `ListaRequisicoes.tsx` — `/requisicoes`
-- Lista paginada de requisições
-- Filtros: status, obra, período
-- Badge de status colorido
-- Usa: [[05 - Hooks Customizados#useRequisicoes]]
-
-### `FilaCotacoes.tsx` — `/cotacoes`
-- Fila de requisições aguardando cotação
-- Atribuídas ao comprador logado
-- Usa: [[05 - Hooks Customizados#useCotacoes]]
-
-### `Aprovacao.tsx` — `/aprovacao/:token`
-- **Pública** (não requer login)
-- Carrega dados via token da URL
-- Botões: Aprovar / Rejeitar + campo de observação
-- Chama `POST /compras/aprovacao`
-- Fluxo: [[12 - Fluxo Aprovação]]
-
-### `AprovAi.tsx` — `/aprovaai`
-- Interface mobile otimizada
-- Branded como "ApprovaAi"
-- Lista de aprovações pendentes
-- Ação rápida por swipe/botão
-
-### `AdminUsuarios.tsx` — `/admin/usuarios`
-- Listagem de todos os usuários
-- Edição de role e alçada
-- Requer role: `admin`
-- Guarda: `AdminRoute` component
+| Rota | Componente | Acesso |
+|------|-----------|--------|
+| `/admin/usuarios` | `AdminUsuarios.tsx` | Admin only |
 
 ---
 
@@ -162,19 +161,39 @@ graph TD
   <Dashboard />
 </PrivateRoute>
 
-// AdminRoute — redireciona se não for admin
+// AdminRoute — redireciona para /compras se não for admin
 <AdminRoute>
   <AdminUsuarios />
 </AdminRoute>
+
+// MuralAdmin — verificação inline via isAdmin do AuthContext
+// Exibe "Acesso restrito" se não for admin (não redireciona)
 ```
+
+---
+
+## BannerSlideshow na Tela Inicial
+
+O `ModuloSelector.tsx` renderiza o componente `BannerSlideshow` **entre** o hero de saudação e a grade de módulos:
+
+```
+[Header]
+  ↓
+[Hero: logo + TEG+ + saudação personalizada]
+  ↓
+[BannerSlideshow]   ← banners do mural (auto-advance 5.5s, Ken Burns)
+  ↓
+[Grade de Módulos: 2×4 grid responsivo]
+```
+
+Sem banners no banco, exibe 3 slides padrão. Gerenciado em `/rh/mural`. Ver [[25 - Mural de Recados]].
 
 ---
 
 ## Links Relacionados
 
 - [[02 - Frontend Stack]] — Stack e configuração
-- [[04 - Componentes]] — Componentes utilizados nas páginas
+- [[04 - Componentes]] — Layouts e componentes
 - [[05 - Hooks Customizados]] — Hooks de dados
 - [[09 - Auth Sistema]] — Autenticação e guards
-- [[11 - Fluxo Requisição]] — Fluxo de criação
-- [[12 - Fluxo Aprovação]] — Fluxo de aprovação
+- [[25 - Mural de Recados]] — Slideshow e gestão de banners

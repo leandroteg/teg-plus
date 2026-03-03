@@ -4,12 +4,32 @@ type: frontend
 status: ativo
 tags: [frontend, hooks, react-query, dados]
 criado: 2026-03-02
+atualizado: 2026-03-03
 relacionado: ["[[02 - Frontend Stack]]", "[[06 - Supabase]]", "[[10 - n8n Workflows]]"]
 ---
 
 # Hooks Customizados — TEG+ ERP
 
 > Todos os hooks usam **TanStack Query v5** para cache, refetch e loading states.
+
+```
+src/hooks/
+├── useDashboard.ts        → KPIs e pipeline do dashboard Compras
+├── useRequisicoes.ts      → CRUD de requisições
+├── useAprovacoes.ts       → Listagem e processamento de aprovações
+├── useCotacoes.ts         → Fila de cotações do comprador
+├── usePedidos.ts          → Ordens de compra
+├── useCategorias.ts       → Categorias com regras e compradores
+├── useAiParse.ts          → Parse de texto livre → requisição estruturada
+├── useAnexos.ts           → Upload e listagem de anexos
+├── useOmie.ts             → Integração Omie ERP (sync, fornecedores)
+├── useFinanceiro.ts       → CP, CR, aprovações de pagamento
+├── useEstoque.ts          → Almoxarifado, inventário, patrimonial
+├── useLogistica.ts        → Transportes, expedição, recebimentos
+├── usePatrimonial.ts      → Imobilizados e depreciação
+├── useFrotas.ts           → Veículos, OS, checklists, abastecimentos
+└── useMural.ts            → Banners do Mural de Recados [novo]
+```
 
 ---
 
@@ -198,28 +218,76 @@ parse({
 
 ---
 
+## `useMural` ⭐ (novo)
+
+**Arquivo:** `src/hooks/useMural.ts`
+
+Gestão completa dos banners do Mural de Recados. Usado em `BannerSlideshow` (tela inicial) e `MuralAdmin` (admin RH).
+
+### `useBanners()` — Slideshow
+```ts
+const { data: banners } = useBanners()
+// banners ativos e vigentes, ordem ASC
+// fixa=sempre; campanha=data_inicio≤hoje≤data_fim (filtro client-side)
+// staleTime: 5 min | queryKey: ['mural-banners-active']
+```
+
+### `useBannersAdmin()` — Gestão
+```ts
+const { data: banners } = useBannersAdmin()
+// TODOS os banners, inclusive inativos e fora do período
+// queryKey: ['mural-banners-admin']
+```
+
+### Mutations
+```ts
+useSalvarBanner()          // INSERT (sem id) ou UPDATE (com id)
+useToggleBanner()          // toggle ativo/inativo inline: { id, ativo }
+useExcluirBanner()         // DELETE por id
+useUploadBannerImagem()    // upload → bucket 'mural-banners' → publicUrl
+```
+
+**Tipo exportado:**
+```ts
+interface MuralBanner {
+  id: string; titulo: string; subtitulo?: string; imagem_url: string
+  tipo: 'fixa' | 'campanha'; ativo: boolean; ordem: number
+  data_inicio?: string; data_fim?: string   // 'YYYY-MM-DD'
+  cor_titulo?: string; cor_subtitulo?: string; criado_por?: string
+  created_at: string; updated_at: string
+}
+```
+
+Ver [[25 - Mural de Recados]] para documentação completa.
+
+---
+
 ## Diagrama de Dependências
 
 ```mermaid
 graph LR
+    MOD[ModuloSelector] --> UB[useBanners]
+    MA[MuralAdmin] --> UBA[useBannersAdmin]
+    MA --> USB[useSalvarBanner]
+    MA --> UTB[useToggleBanner]
+    MA --> UEB[useExcluirBanner]
+
     D[Dashboard.tsx] --> UD[useDashboard]
-    NR[NovaRequisicao.tsx] --> UR[useRequisicoes]
+    NR[NovaRequisicao] --> UR[useRequisicoes]
     NR --> UC[useCategorias]
     NR --> UA[useAiParse]
-    LR[ListaRequisicoes.tsx] --> UR
-    FC[FilaCotacoes.tsx] --> UCT[useCotacoes]
-    CF[CotacaoForm.tsx] --> UCT
-    PD[Pedidos.tsx] --> UP[usePedidos]
-    AI[AprovAi.tsx] --> UAP[useAprovacoes]
-    APV[Aprovacao.tsx] --> UAP
+    LR[ListaRequisicoes] --> UR
+    FC[FilaCotacoes] --> UCT[useCotacoes]
+    AI[AprovAi] --> UAP[useAprovacoes]
+    APV[Aprovacao] --> UAP
 
-    UD --> SB[(Supabase RPC)]
+    UB --> SB[(Supabase\nmural_banners)]
+    UD --> SB2[(Supabase RPC)]
     UR --> N8N[n8n Webhooks]
     UA --> N8N
     UAP --> N8N
     UCT --> N8N
-    UC --> SB
-    UP --> SB
+    UC --> SB2
 ```
 
 ---
@@ -231,3 +299,4 @@ graph LR
 - [[10 - n8n Workflows]] — Webhooks chamados pelas mutations
 - [[11 - Fluxo Requisição]] — Fluxo de criação
 - [[12 - Fluxo Aprovação]] — Fluxo de aprovação
+- [[25 - Mural de Recados]] — useMural detalhado

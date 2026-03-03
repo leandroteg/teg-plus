@@ -4,6 +4,7 @@ type: estratégia
 status: ativo
 tags: [roadmap, planejamento, futuro, módulos, integrações]
 criado: 2026-03-02
+atualizado: 2026-03-03
 relacionado: ["[[00 - TEG+ INDEX]]", "[[01 - Arquitetura Geral]]"]
 ---
 
@@ -19,11 +20,30 @@ relacionado: ["[[00 - TEG+ INDEX]]", "[[01 - Arquitetura Geral]]"]
 | Aprovações Multi-nível | 4 alçadas, token-based, pública |
 | ApprovaAi Mobile | Interface responsiva para aprovadores |
 | Dashboard KPIs | RPC + realtime + gráficos |
-| Schema Supabase | 11 migrations, RLS, views, funções |
+| Schema Supabase | 18 migrations, RLS, views, funções |
 | n8n Workflows | Nova req, aprovação, dashboard, AI parse |
 | Auth Sistema | Magic link + email/senha, 6 roles |
 | 12 Categorias Reais | Com compradores e regras configuradas |
 | 6 Obras Reais | SE's de Minas Gerais |
+| **Módulo Financeiro** | CP, CR, Aprovações, Conciliação, Omie ERP |
+| **Módulo Estoque** | Almoxarifado, inventário, patrimonial/depreciação |
+| **Módulo Logística** | Transportes, NF-e, 9 etapas, transportadoras |
+| **Módulo Frotas** | OS, checklists, abastecimento, telemetria |
+| **Mural de Recados** | Slideshow corporativo na tela inicial + gestão admin RH |
+
+---
+
+---
+
+## Entregue Adicionalmente (Março 2026)
+
+> Módulos implementados que avançam além do escopo original do Q1.
+
+- **Módulo Financeiro** — CP, CR, Aprovações de pagamento, Conciliação CNAB, Omie ERP, 4 workflows n8n
+- **Módulo Estoque e Patrimonial** — Almoxarifado, inventário, imobilizados com depreciação linear
+- **Módulo Logística** — Solicitações, expedição, rastreamento 9 etapas, NF-e, avaliação de transportadoras
+- **Módulo Frotas** — Veículos, OS preventiva/corretiva, checklists, abastecimentos, telemetria
+- **Mural de Recados** — Slideshow cinematográfico na tela inicial (Ken Burns, progress bar, swipe); admin RH gerencia Imagens Fixas + Campanhas com vigência programada
 
 ---
 
@@ -157,12 +177,13 @@ Corporativo:
 
 ### 9. Módulos Pendentes (stubs)
 
-| Módulo | Prioridade | Integrações |
-|--------|-----------|-------------|
-| RH | Média | eSocial, Folha, HHt App |
-| SSMA | Média | Registro de acidentes, ASO, NRs |
-| Estoque | Alta | Integração com Compras |
-| Contratos | Baixa | Jurídico, fornecedores, SLA |
+| Módulo | Prioridade | Status | Integrações |
+|--------|-----------|--------|-------------|
+| RH | Alta | 🔜 Em desenvolvimento (Q2 2026) | eSocial, Folha, HHt App |
+| SSMA | Média | 🔜 Planejado | Registro de acidentes, ASO, NRs |
+| Contratos | Baixa | 🔜 Planejado | Jurídico, fornecedores, SLA |
+
+> **RH:** Mural de Recados já entregue (gestão de banners). Colaboradores, Ponto e Folha → Q2 2026.
 
 ---
 
