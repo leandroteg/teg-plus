@@ -8,11 +8,14 @@ dist/
 build/
 *.tsbuildinfo
 
-# Environment
+# Environment (NUNCA commitar credenciais!)
 .env
 .env.local
 .env.production
+.env.development
 frontend/.env
+frontend/.env.local
+frontend/.env.production
 
 # IDE
 .vscode/
