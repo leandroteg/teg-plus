@@ -10,6 +10,17 @@
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     background-color: #F1F5F9;
+    transition: background-color 0.25s ease, color 0.25s ease;
+  }
+
+  /* ── Dark theme: body background ──────────────────────────── */
+  [data-theme="dark"] body {
+    background-color: #0c1222;
+  }
+
+  /* ── Light theme: slightly lighter body ───────────────────── */
+  [data-theme="light"] body {
+    background-color: #f8fafc;
   }
 }
 
@@ -63,6 +74,13 @@
     border: 1px solid rgba(255, 255, 255, 0.07);
   }
 
+  .glass-light {
+    background: rgba(255, 255, 255, 0.85);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid rgba(0, 0, 0, 0.06);
+  }
+
   /* Base glass card — no hover (add hover via Tailwind in JSX) */
   .glass-card {
     background: rgba(255, 255, 255, 0.04);
@@ -111,7 +129,101 @@
   }
 }
 
-/* ── Keyframes globais ──────────────────────────────────────────────────────── */
+/* ══════════════════════════════════════════════════════════════════════════════
+   DARK THEME — Automatic content adaptations
+   These override common Tailwind classes so content pages adapt automatically
+   without needing per-component changes.
+   ══════════════════════════════════════════════════════════════════════════════ */
+
+/* ── Surfaces ──────────────────────────────────────────────── */
+[data-theme="dark"] .bg-white {
+  background-color: #1e293b;
+}
+[data-theme="dark"] .bg-slate-50 {
+  background-color: #172033;
+}
+[data-theme="dark"] .bg-gray-50 {
+  background-color: #172033;
+}
+[data-theme="dark"] .bg-gray-100 {
+  background-color: #1e293b;
+}
+
+/* ── Primary text (dark-on-light → light-on-dark) ──────────── */
+[data-theme="dark"] .text-slate-800 { color: #e2e8f0; }
+[data-theme="dark"] .text-slate-700 { color: #cbd5e1; }
+[data-theme="dark"] .text-navy      { color: #e2e8f0; }
+
+/* ── Borders ───────────────────────────────────────────────── */
+[data-theme="dark"] .border-slate-200 { border-color: rgba(255,255,255,0.08); }
+[data-theme="dark"] .border-slate-100 { border-color: rgba(255,255,255,0.06); }
+[data-theme="dark"] .border-slate-50  { border-color: rgba(255,255,255,0.05); }
+[data-theme="dark"] .border-gray-50   { border-color: rgba(255,255,255,0.06); }
+
+/* ── Shadows ───────────────────────────────────────────────── */
+[data-theme="dark"] .shadow-card {
+  box-shadow: 0 1px 3px rgba(0,0,0,0.3), 0 1px 2px -1px rgba(0,0,0,0.2);
+}
+[data-theme="dark"] .shadow-card-md {
+  box-shadow: 0 4px 12px rgba(0,0,0,0.25);
+}
+
+/* ── Form inputs ───────────────────────────────────────────── */
+[data-theme="dark"] .input-base {
+  background-color: #0f172a;
+  border-color: rgba(255,255,255,0.1);
+  color: #e2e8f0;
+}
+[data-theme="dark"] .input-base::placeholder {
+  color: #475569;
+}
+
+/* ── Status badge light backgrounds → translucent ──────────── */
+[data-theme="dark"] .bg-amber-50   { background-color: rgba(245,158,11,0.15); }
+[data-theme="dark"] .bg-blue-50    { background-color: rgba(59,130,246,0.15); }
+[data-theme="dark"] .bg-emerald-50 { background-color: rgba(16,185,129,0.15); }
+[data-theme="dark"] .bg-red-50     { background-color: rgba(239,68,68,0.15); }
+[data-theme="dark"] .bg-green-50   { background-color: rgba(34,197,94,0.15); }
+[data-theme="dark"] .bg-violet-50  { background-color: rgba(139,92,246,0.15); }
+[data-theme="dark"] .bg-indigo-50  { background-color: rgba(99,102,241,0.15); }
+[data-theme="dark"] .bg-teal-50    { background-color: rgba(20,184,166,0.15); }
+[data-theme="dark"] .bg-cyan-50    { background-color: rgba(6,182,212,0.15); }
+[data-theme="dark"] .bg-orange-50  { background-color: rgba(249,115,22,0.15); }
+[data-theme="dark"] .bg-rose-50    { background-color: rgba(244,63,94,0.15); }
+
+/* ── Role badge backgrounds → translucent ──────────────────── */
+[data-theme="dark"] .bg-violet-100 { background-color: rgba(139,92,246,0.18); }
+[data-theme="dark"] .bg-indigo-100 { background-color: rgba(99,102,241,0.18); }
+[data-theme="dark"] .bg-amber-100  { background-color: rgba(245,158,11,0.18); }
+[data-theme="dark"] .bg-green-100  { background-color: rgba(34,197,94,0.18); }
+[data-theme="dark"] .bg-sky-100    { background-color: rgba(14,165,233,0.18); }
+[data-theme="dark"] .bg-slate-100  { background-color: rgba(100,116,139,0.18); }
+
+/* ── Scrollbar in dark mode ────────────────────────────────── */
+[data-theme="dark"] .styled-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(100, 116, 139, 0.35);
+}
+[data-theme="dark"] .styled-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(100, 116, 139, 0.55);
+}
+
+/* ── CategoryCard / selection borders in dark mode ─────────── */
+[data-theme="dark"] .border-slate-200 { border-color: rgba(255,255,255,0.08); }
+
+
+/* ══════════════════════════════════════════════════════════════════════════════
+   LIGHT THEME — Glass card variant for ModuloSelector
+   ══════════════════════════════════════════════════════════════════════════════ */
+
+[data-theme="light"] .glass-card {
+  background: rgba(255, 255, 255, 0.7);
+  border: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+
+/* ══════════════════════════════════════════════════════════════════════════════
+   Keyframes globais
+   ══════════════════════════════════════════════════════════════════════════════ */
 
 /* Ken Burns — zoom suave nas imagens do slideshow */
 @keyframes kenBurns {

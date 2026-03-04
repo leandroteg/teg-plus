@@ -1,5 +1,6 @@
 import { Routes, Route } from 'react-router-dom'
 import { AuthProvider } from './contexts/AuthContext'
+import { ThemeProvider } from './contexts/ThemeContext'
 import { PrivateRoute, AdminRoute } from './components/PrivateRoute'
 import Layout from './components/Layout'
 
@@ -70,6 +71,7 @@ import AdminUsuarios from './pages/AdminUsuarios'
 
 export default function App() {
   return (
+    <ThemeProvider>
     <AuthProvider>
       <Routes>
         {/* ── Públicas ──────────────────────────────────────── */}
@@ -158,5 +160,6 @@ export default function App() {
         </Route>
       </Routes>
     </AuthProvider>
+    </ThemeProvider>
   )
 }
