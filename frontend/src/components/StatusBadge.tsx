@@ -6,7 +6,7 @@ const config: Record<string, { dot: string; bg: string; text: string; label: str
   pendente:          { dot: 'bg-amber-400',   bg: 'bg-amber-50',    text: 'text-amber-700',   label: 'Aguard. Aprovação' },
   // ── Etapa 2: Aprovação RC ──────────────────────────────────────────────────
   em_aprovacao:      { dot: 'bg-blue-500',    bg: 'bg-blue-50',     text: 'text-blue-700',    label: 'Em Aprovação'      },
-  aprovada:          { dot: 'bg-emerald-400', bg: 'bg-emerald-50',  text: 'text-emerald-700', label: 'RC Aprovada'       },
+  aprovada:          { dot: 'bg-emerald-400', bg: 'bg-emerald-50',  text: 'text-emerald-700', label: 'RC Validada'       },
   rejeitada:         { dot: 'bg-red-500',     bg: 'bg-red-50',      text: 'text-red-700',     label: 'Reprovada'         },
   em_esclarecimento: { dot: 'bg-amber-500',   bg: 'bg-amber-50',    text: 'text-amber-700',   label: 'Em Esclarecimento' },
   // ── Etapa 3: Cotação ───────────────────────────────────────────────────────
