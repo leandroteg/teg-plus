@@ -41,6 +41,10 @@ function AprovacaoCard({ aprovacao }: { aprovacao: AprovacaoPendente }) {
 
   const req  = aprovacao.requisicao
   const cot  = aprovacao.cotacao_resumo
+
+  // Guard: requisição pode ser null se entidade_id não tem match
+  if (!req) return null
+
   const urg  = urgenciaConfig[req.urgencia] || urgenciaConfig.normal
   const alc  = getAlcada(req.valor_estimado, aprovacao.nivel)
 
@@ -249,7 +253,7 @@ function AprovacaoCard({ aprovacao }: { aprovacao: AprovacaoPendente }) {
 }
 
 export default function AprovAi() {
-  const { data: aprovacoes, isLoading } = useAprovacoesPendentes()
+  const { data: aprovacoes, isLoading, isError, refetch } = useAprovacoesPendentes()
 
   return (
     <div className="min-h-screen"
@@ -264,7 +268,7 @@ export default function AprovAi() {
           </h1>
         </div>
         <p className="text-indigo-300 text-xs font-medium">Aprovações inteligentes com 1 toque</p>
-        {aprovacoes && (
+        {aprovacoes && !isError && (
           <div className="mt-3 inline-flex items-center gap-2 bg-white/15 backdrop-blur-sm rounded-full px-4 py-1.5">
             <span className="text-white text-lg font-extrabold">{aprovacoes.length}</span>
             <span className="text-indigo-200 text-xs">pendente{aprovacoes.length !== 1 ? 's' : ''}</span>
@@ -280,7 +284,22 @@ export default function AprovAi() {
           </div>
         )}
 
-        {!isLoading && (!aprovacoes || aprovacoes.length === 0) && (
+        {/* Error state */}
+        {!isLoading && isError && (
+          <div className="text-center py-14">
+            <AlertTriangle size={44} className="text-amber-300 mx-auto mb-3" />
+            <p className="text-white text-base font-bold">Erro ao carregar</p>
+            <p className="text-indigo-300 text-sm mt-1 mb-4">Não foi possível buscar as aprovações</p>
+            <button
+              onClick={() => refetch()}
+              className="bg-white/20 text-white text-sm font-bold px-5 py-2.5 rounded-xl hover:bg-white/30 transition"
+            >
+              Tentar novamente
+            </button>
+          </div>
+        )}
+
+        {!isLoading && !isError && (!aprovacoes || aprovacoes.length === 0) && (
           <div className="text-center py-14">
             <CheckCircle size={52} className="text-indigo-300 mx-auto mb-3 opacity-80" />
             <p className="text-white text-base font-bold">Tudo em dia!</p>

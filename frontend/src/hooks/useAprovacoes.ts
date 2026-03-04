@@ -33,19 +33,49 @@ export function useAprovacoesPendentes() {
 
       const reqMap = new Map((reqData ?? []).map(r => [r.id, r]))
 
-      // 3. Mescla aprovações com dados da requisição
-      return aprData.map(a => {
-        const req = reqMap.get(a.entidade_id)
-        return {
-          ...a,
-          requisicao_id: a.entidade_id,
-          requisicao: req ?? null,
-        } as AprovacaoPendente
-      })
+      // 3. Busca dados de cotação para cotacao_resumo (fornecedor vencedor, valor, total cotados)
+      const { data: cotData } = await supabase
+        .from('cmp_cotacoes')
+        .select('requisicao_id, fornecedor_selecionado_nome, valor_selecionado, fornecedores:cmp_cotacao_fornecedores!cotacao_id(id, prazo_entrega_dias)')
+        .in('requisicao_id', entidadeIds)
+        .eq('status', 'concluida')
+
+      const cotMap = new Map<string, {
+        fornecedor_nome: string
+        valor: number
+        prazo_dias: number
+        total_cotados: number
+      }>()
+      for (const c of cotData ?? []) {
+        const cot = c as Record<string, unknown>
+        const fornecedores = (cot.fornecedores ?? []) as { id: string; prazo_entrega_dias?: number }[]
+        const selecionado = fornecedores.find(() => true) // primeiro
+        cotMap.set(cot.requisicao_id as string, {
+          fornecedor_nome: (cot.fornecedor_selecionado_nome as string) ?? 'N/A',
+          valor: (cot.valor_selecionado as number) ?? 0,
+          prazo_dias: selecionado?.prazo_entrega_dias ?? 0,
+          total_cotados: fornecedores.length,
+        })
+      }
+
+      // 4. Mescla aprovações com dados da requisição + cotação
+      return aprData
+        .map(a => {
+          const req = reqMap.get(a.entidade_id)
+          if (!req) return null // Ignora aprovações sem requisição válida
+          return {
+            ...a,
+            requisicao_id: a.entidade_id,
+            requisicao: req,
+            cotacao_resumo: cotMap.get(a.entidade_id) ?? undefined,
+          } as AprovacaoPendente
+        })
+        .filter((a): a is AprovacaoPendente => a !== null)
     },
-    refetchInterval: 30_000,
-    retry: false,
-    staleTime: 15_000,
+    refetchInterval: 15_000,
+    refetchOnMount: 'always',
+    retry: 1,
+    staleTime: 10_000,
   })
 }
 
@@ -137,6 +167,14 @@ export function useDecisaoRequisicao() {
 
       // Non-critical: log warning but don't throw
       if (aprError) console.warn('Aviso: apr_aprovacoes não inserido:', aprError.message)
+
+      // 2b. Marca aprovações pendentes anteriores como resolvidas (para limpar do AprovAi)
+      await supabase
+        .from(TABLE_APR)
+        .update({ status: aprStatus, data_decisao: new Date().toISOString() })
+        .eq('entidade_id', requisicaoId)
+        .eq('modulo', 'cmp')
+        .eq('status', 'pendente')
 
       // 3. Auto-criar cotação quando aprovação técnica é concedida
       if (decisao === 'aprovada' && !isFinancialApproval) {
