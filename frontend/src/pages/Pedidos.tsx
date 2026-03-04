@@ -5,8 +5,8 @@ import {
   Banknote, ExternalLink,
 } from 'lucide-react'
 import { usePedidos, useAtualizarPedido, useLiberarPagamento } from '../hooks/usePedidos'
-import { useAnexosPedido, useUploadAnexo, TIPO_LABEL } from '../hooks/useAnexos'
-import type { PedidoAnexo } from '../hooks/useAnexos'
+import { useAnexosPedido, useUploadAnexo, useCotacaoDocs, TIPO_LABEL } from '../hooks/useAnexos'
+import type { PedidoAnexo, CotacaoDoc } from '../hooks/useAnexos'
 import FluxoTimeline from '../components/FluxoTimeline'
 import type { Pedido } from '../types'
 

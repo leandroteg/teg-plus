@@ -17,6 +17,14 @@ export interface PedidoAnexo {
   observacao: string | null
 }
 
+export interface CotacaoDoc {
+  name: string
+  url: string
+  size: number
+  mime: string | null
+  created: string
+}
+
 export const TIPO_LABEL: Record<PedidoAnexo['tipo'], string> = {
   nota_fiscal:           'Nota Fiscal',
   comprovante_entrega:   'Comprovante de Entrega',
@@ -99,5 +107,42 @@ export function useUploadAnexo() {
     onSuccess: (_data, { pedidoId }) => {
       qc.invalidateQueries({ queryKey: ['pedido-anexos', pedidoId] })
     },
+  })
+}
+
+// ── Documentos da Cotação (listados do bucket cotacoes-docs) ─────────────────
+
+export function useCotacaoDocs(cotacaoId?: string) {
+  return useQuery<CotacaoDoc[]>({
+    queryKey: ['cotacao-docs', cotacaoId],
+    enabled: !!cotacaoId,
+    queryFn: async () => {
+      // List files in the cotação folder
+      const { data: files, error } = await supabase.storage
+        .from('cotacoes-docs')
+        .list(cotacaoId!, { limit: 50, sortBy: { column: 'created_at', order: 'desc' } })
+
+      if (error) throw error
+      if (!files || files.length === 0) return []
+
+      // Filter out placeholder/empty entries
+      const realFiles = files.filter(f => f.name !== '.emptyFolderPlaceholder' && f.id)
+      if (realFiles.length === 0) return []
+
+      // Generate signed URLs in batch
+      const paths = realFiles.map(f => `${cotacaoId}/${f.name}`)
+      const { data: signedData } = await supabase.storage
+        .from('cotacoes-docs')
+        .createSignedUrls(paths, 3600)
+
+      return realFiles.map((f, i) => ({
+        name: f.name.replace(/^\d+_/, ''), // Remove timestamp prefix for display
+        url: signedData?.[i]?.signedUrl ?? '',
+        size: (f.metadata as Record<string, any>)?.size ?? 0,
+        mime: ((f.metadata as Record<string, any>)?.mimetype as string) ?? null,
+        created: f.created_at,
+      })).filter(d => d.url)
+    },
+    staleTime: 60_000,
   })
 }
