@@ -136,6 +136,7 @@ LIMIT 8
 
 ## 🔗 Navegação
 
+### Painéis Gerais
 | Painel | |
 |--------|---|
 | [[BI Dashboard\|📊 BI Dashboard]] | Visão executiva visual |
@@ -144,3 +145,13 @@ LIMIT 8
 | [[Issues Board\|🐛 Issues]] | Tracker de bugs |
 | [[Requisitos Board\|📦 Requisitos]] | Rastreabilidade |
 | [[00 - TEG+ INDEX\|🏗️ Arquitetura]] | Documentação técnica |
+
+### Dashboards por Módulo
+| Dashboard | Completude |
+|-----------|-----------|
+| [[Compras Dashboard\|🛒 Compras]] | 95% |
+| [[Financeiro Dashboard\|💰 Financeiro]] | 50% |
+| [[Estoque Dashboard\|📦 Estoque]] | 60% |
+| [[Logistica Dashboard\|🚚 Logística]] | 85% |
+| [[Frotas Dashboard\|🚛 Frotas]] | 80% |
+| [[RH Dashboard\|👥 RH]] | 5% |

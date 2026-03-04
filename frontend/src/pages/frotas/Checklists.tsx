@@ -92,7 +92,7 @@ function NovaChecklistModal({ onClose }: { onClose: () => void }) {
             <button
               key={item.key}
               type="button"
-              onClick={() => toggleItem(item.key)}
+              onClick={() => toggleItem(item.key as keyof typeof form)}
               className={`w-full flex items-center gap-3 p-3 rounded-xl text-left text-sm transition-all border ${
                 form[item.key as keyof typeof form]
                   ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300'

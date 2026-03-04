@@ -109,7 +109,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [perfilReady, setPerfilReady] = useState(false)
 
   // Guard: evita chamadas concorrentes a loadPerfil
-  const loadingRef = useRef(false)
+  const loadingRef    = useRef(false)
+  // Rastreia se o usuário foi autenticado e se o perfil carregou com sucesso
+  // (usados no safety net para detectar lock travado do Supabase)
+  const userRef        = useRef<User | null>(null)
+  const perfilLoadedRef = useRef(false)
 
   // ── loadPerfil ───────────────────────────────────────────────────
   // Busca perfil do DB. Se não existir, tenta criar (auto-provisionamento).
@@ -127,6 +131,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       if (data) {
         setPerfil(data as Perfil)
+        perfilLoadedRef.current = true
         supabase.rpc('registrar_acesso', { p_auth_id: authId })
         return
       }
@@ -153,7 +158,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           .select()
           .single()
 
-        if (criado) setPerfil(criado as Perfil)
+        if (criado) {
+          setPerfil(criado as Perfil)
+          perfilLoadedRef.current = true
+        }
       }
       // Outros erros (tabela não criada etc.) → perfil null, sem crash
     } catch {
@@ -173,10 +181,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // NÃO usar getSession().then() junto — causa race condition onde
   // loadPerfil é chamado duas vezes e setLoading(false) fica em conflito.
   useEffect(() => {
+    // Resetar refs a cada montagem do provider
+    perfilLoadedRef.current = false
+    userRef.current = null
+
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (_event, session) => {
         setSession(session)
         setUser(session?.user ?? null)
+        userRef.current = session?.user ?? null
 
         if (session?.user) {
           await loadPerfil(session.user.id)
@@ -191,8 +204,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     )
 
     // Safety net: se onAuthStateChange não disparar em 8s (rede lenta, etc.)
-    // força loading=false para não travar o app
-    const safety = setTimeout(() => {
+    // OU se loadPerfil travar (ex: lock do Supabase em refresh de token inválido),
+    // força logout local para nunca mostrar "Boa tarde, Usuário" sem perfil real.
+    const safety = setTimeout(async () => {
+      if (userRef.current && !perfilLoadedRef.current) {
+        // Usuário autenticado mas perfil nunca carregou → sessão problemática.
+        // signOut({ scope: 'local' }) limpa o storage SEM chamada de API,
+        // contornando qualquer lock travado do cliente Supabase.
+        try {
+          await supabase.auth.signOut({ scope: 'local' })
+        } catch { /* ignora */ }
+        setUser(null)
+        setSession(null)
+        setPerfil(null)
+      }
       setLoading(false)
       setPerfilReady(true)
     }, 8000)

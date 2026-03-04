@@ -80,7 +80,7 @@ export default function Dashboard() {
   if (isLoading)    return <Loader />
 
   if (isError) {
-    const errObj = error as Record<string, unknown> | null
+    const errObj = error as unknown as Record<string, unknown>
     const errMsg = (errObj?.message as string) || (errObj?.details as string) || 'Erro desconhecido'
     return (
       <div className="flex flex-col items-center justify-center py-16 gap-4">

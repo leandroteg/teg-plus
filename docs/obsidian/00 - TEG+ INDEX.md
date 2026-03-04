@@ -10,7 +10,7 @@ atualizado: 2026-03-03
 # TEG+ ERP — Mapa da Aplicação
 
 > Sistema ERP modular para gestão de obras de engenharia elétrica/transmissão.
-> Foco atual: **Módulo de Compras** com fluxo completo de requisições e aprovações.
+> **6 módulos operacionais** · 3 em planejamento · 12 milestones · 30 tarefas
 
 ---
 
@@ -19,10 +19,22 @@ atualizado: 2026-03-03
 | Painel | Descrição |
 |--------|-----------|
 | [[Paineis/PAINEL PRINCIPAL\|🏠 Painel Principal]] | Central de comando — KPIs, status, alertas |
+| [[Paineis/BI Dashboard\|📊 BI Dashboard]] | Visão executiva visual com gráficos |
 | [[Paineis/Tasks Board\|📋 Tasks Board]] | Kanban de tarefas por status e sprint |
 | [[Paineis/Roadmap Board\|🗺️ Roadmap]] | Timeline de milestones e progresso |
 | [[Paineis/Issues Board\|🐛 Issues Board]] | Tracker de bugs e problemas |
 | [[Paineis/Requisitos Board\|📦 Requisitos]] | Rastreabilidade de requisitos |
+
+### Dashboards por Módulo
+
+| Dashboard | Completude | Status |
+|-----------|-----------|--------|
+| [[Paineis/Compras Dashboard\|🛒 Compras]] | 95% | ✅ Operacional |
+| [[Paineis/Financeiro Dashboard\|💰 Financeiro]] | 50% | 🔵 Em evolução |
+| [[Paineis/Estoque Dashboard\|📦 Estoque]] | 60% | 🔵 Em evolução |
+| [[Paineis/Logistica Dashboard\|🚚 Logística]] | 85% | ✅ Operacional |
+| [[Paineis/Frotas Dashboard\|🚛 Frotas]] | 80% | ✅ Operacional |
+| [[Paineis/RH Dashboard\|👥 RH]] | 5% | 🔜 Q2 2026 |
 
 > **Como usar:** edite os arquivos em `Database/Tarefas/`, `Database/Issues/`, `Database/Requisitos/` ou `Database/Milestones/` — os painéis atualizam automaticamente via Dataview.
 
@@ -142,9 +154,13 @@ graph LR
 | Logística e Transportes | ✅ Entregue | 9 etapas, NF-e, rastreamento, avaliações |
 | Frotas e Manutenção | ✅ Entregue | OS, checklist, abastecimento, telemetria |
 | Mural de Recados | ✅ Entregue | Slideshow corporativo + gestão admin RH |
-| WhatsApp (Evolution API) | 🔜 Planejado | Notificações automáticas |
-| AI TEG+ (Claude API) | 🔜 Planejado | Agente conversacional |
-| Monday.com PMO | 🔜 Planejado | Gestão de portfólio |
+| WhatsApp (Evolution API) | 🔜 Q1 2026 | Notificações automáticas |
+| RH Completo | 🔜 Q2 2026 | Colaboradores, ponto, folha, eSocial |
+| AI TEG+ (Claude API) | 🔜 Q2-Q3 2026 | Agente conversacional + RAG |
+| SSMA | 🔜 Q3 2026 | Segurança, NRs, DDS, EPI |
+| Contratos e Medições | 🔜 Q3 2026 | Gestão de contratos, BM, aditivos |
+| Controladoria e BI | 🔜 Q3 2026 | DRE, orçado vs realizado, EBITDA |
+| Monday.com PMO | 🔜 Q4 2026 | Gestão de portfólio das 6 obras |
 
 ---
 

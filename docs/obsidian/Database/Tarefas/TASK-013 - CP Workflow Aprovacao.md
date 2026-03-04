@@ -1,7 +1,7 @@
 ---
 tipo: tarefa
 id: TASK-013
-titulo: "Contas a Pagar — Workflow de Aprovação e Gestão de Documentos"
+titulo: Contas a Pagar — Workflow
 status: em-andamento
 prioridade: critica
 modulo: financeiro
@@ -9,10 +9,16 @@ sprint: Sprint-4
 milestone: MS-004
 estimativa: 13
 gasto: 9
-tags: [task, financeiro, contas-a-pagar, aprovacao, documentos, omie]
+tags:
+  - task
+  - financeiro
+  - contas-a-pagar
+  - aprovacao
+  - documentos
+  - omie
 ---
 
-# 🔵 TASK-013 — Contas a Pagar — Workflow de Aprovação
+# 🔵 TASK-013 — Contas a Pagar — Workflow
 
 ## Descrição
 Implementar o fluxo completo de Contas a Pagar integrado ao Omie:

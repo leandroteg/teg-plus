@@ -76,7 +76,7 @@ export default function Inventario() {
               inventario={inv}
               isExpanded={selectedId === inv.id}
               onToggle={() => setSelectedId(selectedId === inv.id ? null : inv.id)}
-              onConcluir={() => concluir.mutateAsync(inv.id)}
+              onConcluir={() => concluir.mutateAsync({ inventario_id: inv.id, aprovado_por: '' })}
               concluding={concluir.isPending}
             />
           ))}

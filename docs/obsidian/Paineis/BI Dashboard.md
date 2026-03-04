@@ -4,13 +4,13 @@ type: painel-bi
 tags: [painel, bi, dashboard, kpi]
 atualizado: 2026-03-02
 ---
-
+	
 ```dataviewjs
 // ── DATA ────────────────────────────────────────────────────
+const req     = dv.pages('"obsidian/Database/Requisitos"');
+const milest  = dv.pages('"obsidian/Database/Milestones"');
 const tarefas = dv.pages('"obsidian/Database/Tarefas"');
 const issues  = dv.pages('"obsidian/Database/Issues"');
-const milest  = dv.pages('"obsidian/Database/Milestones"');
-const req     = dv.pages('"obsidian/Database/Requisitos"');
 
 // ── HELPERS ─────────────────────────────────────────────────
 const pct  = (a, b) => b ? Math.round((a / b) * 100) : 0;
