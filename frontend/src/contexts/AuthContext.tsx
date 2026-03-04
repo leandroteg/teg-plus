@@ -178,50 +178,50 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [user, loadPerfil])
 
   // ── Inicialização: ÚNICO source of truth = onAuthStateChange ────
-  // NÃO usar getSession().then() junto — causa race condition onde
-  // loadPerfil é chamado duas vezes e setLoading(false) fica em conflito.
+  //
+  // REGRA CRÍTICA: o callback NÃO pode ser async!
+  // O GoTrueClient do Supabase usa um lock interno para serializar eventos.
+  // Se o callback for async e fizer await (ex: await loadPerfil), o lock
+  // fica preso até o await resolver — impedindo qualquer novo evento
+  // (SIGNED_IN, SIGNED_OUT, TOKEN_REFRESHED) de ser processado.
+  // Isso causa deadlock quando: token expira → refresh trava → signOut trava.
+  //
+  // Solução: callback síncrono + loadPerfil fire-and-forget com .finally().
   useEffect(() => {
-    // Resetar refs a cada montagem do provider
     perfilLoadedRef.current = false
     userRef.current = null
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (_event, session) => {
+      (_event, session) => {
         setSession(session)
         setUser(session?.user ?? null)
         userRef.current = session?.user ?? null
 
         if (session?.user) {
-          await loadPerfil(session.user.id)
+          // Reset mutex — chamada anterior pode ter travado sem resetar
+          loadingRef.current = false
+          loadPerfil(session.user.id).finally(() => setLoading(false))
         } else {
-          // Sem sessão (logout, user deletado, não logado)
           setPerfil(null)
           setPerfilReady(true)
+          setLoading(false)
         }
-
-        setLoading(false)
       }
     )
 
-    // Safety net: se onAuthStateChange não disparar em 8s (rede lenta, etc.)
-    // OU se loadPerfil travar (ex: lock do Supabase em refresh de token inválido),
-    // força logout local para nunca mostrar "Boa tarde, Usuário" sem perfil real.
-    //
-    // IMPORTANTE: NÃO usar async/await aqui! O signOut usa o lock interno do
-    // GoTrueClient, que pode estar travado pelo handler de onAuthStateChange.
-    // Fazer fire-and-forget para garantir que setLoading/setPerfilReady executem.
+    // Safety net: se após 4s o perfil não carregou, força estado limpo.
+    // Cenários: rede lenta, Supabase fora, token refresh loop.
     const safety = setTimeout(() => {
       if (userRef.current && !perfilLoadedRef.current) {
-        // Usuário autenticado mas perfil nunca carregou → sessão problemática.
-        // Fire-and-forget: limpa storage em background, sem bloquear.
         supabase.auth.signOut({ scope: 'local' }).catch(() => {})
         setUser(null)
         setSession(null)
         setPerfil(null)
       }
+      loadingRef.current = false
       setLoading(false)
       setPerfilReady(true)
-    }, 8000)
+    }, 4000)
 
     return () => {
       subscription.unsubscribe()
