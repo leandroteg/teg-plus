@@ -20,7 +20,7 @@ const SELECT_COTACAO = `
 
 const SELECT_COTACAO_FULL = `
   ${SELECT_COTACAO},
-  fornecedores:cmp_cotacao_fornecedores(*)
+  fornecedores:cmp_cotacao_fornecedores!cotacao_id(*)
 `
 
 export function useCotacoes(compradorId?: string, status?: string) {
