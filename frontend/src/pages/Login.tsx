@@ -2,7 +2,9 @@ import { useState, useEffect } from 'react'
 import { Navigate, useSearchParams } from 'react-router-dom'
 import { Mail, Lock, ArrowRight, Zap, AlertCircle, CheckCircle, Eye, EyeOff } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
+import { useTheme } from '../contexts/ThemeContext'
 import LogoTeg from '../components/LogoTeg'
+import ThemeToggle from '../components/ThemeToggle'
 
 type Mode = 'password' | 'magic'
 type View = 'login' | 'reset' | 'nova-senha' | 'magic-sent'
@@ -95,6 +97,7 @@ function SubmitBtn({ label, busy }: { label: string; busy: boolean }) {
 
 export default function Login() {
   const { user, loading, signIn, signInMagicLink, resetPassword, updatePassword } = useAuth()
+  const { isDark, isLightSidebar: isLight } = useTheme()
   const [searchParams] = useSearchParams()
 
   const [mode,     setMode]     = useState<Mode>('password')
@@ -160,28 +163,37 @@ export default function Login() {
   // ── Views ─────────────────────────────────────────────────────────
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-100 to-slate-200 flex items-center justify-center p-4">
+    <div className={`min-h-screen flex items-center justify-center p-4 ${
+      isDark
+        ? 'bg-[#0c1222]'
+        : 'bg-gradient-to-br from-slate-100 to-slate-200'
+    }`}>
       <div className="w-full max-w-sm">
+
+        {/* Theme toggle */}
+        <div className="flex justify-center mb-4">
+          <ThemeToggle variant={isDark ? 'dark' : 'light'} compact />
+        </div>
 
         {/* Logo / Branding */}
         <div className="text-center mb-7">
           <div className="inline-flex items-center justify-center mb-3">
             <LogoTeg size={72} animated glowing={false} />
           </div>
-          <h1 className="text-2xl font-black text-navy tracking-tight">TEG+</h1>
+          <h1 className={`text-2xl font-black tracking-tight ${isDark ? 'text-white' : 'text-navy'}`}>TEG+</h1>
           <p className="text-xs text-slate-400 mt-0.5 font-medium tracking-wide uppercase">
             Sistema ERP · Acesso Restrito
           </p>
         </div>
 
         {/* Card principal */}
-        <div className="bg-white rounded-2xl shadow-card overflow-hidden">
+        <div className={`rounded-2xl shadow-card overflow-hidden ${isDark ? 'bg-[#1e293b] border border-white/[0.06]' : 'bg-white'}`}>
 
           {/* ── View: LOGIN ── */}
           {view === 'login' && (
             <>
               {/* Tabs modo */}
-              <div className="flex gap-1 bg-slate-100 m-5 mb-0 rounded-xl p-1">
+              <div className={`flex gap-1 m-5 mb-0 rounded-xl p-1 ${isDark ? 'bg-white/5' : 'bg-slate-100'}`}>
                 {([
                   { m: 'password' as Mode, label: 'Senha',       Icon: null as React.ElementType | null },
                   { m: 'magic'    as Mode, label: 'Link Mágico', Icon: Zap  as React.ElementType | null },
@@ -192,8 +204,8 @@ export default function Login() {
                     className={`flex-1 flex items-center justify-center gap-1.5 py-2 px-3 rounded-lg
                       text-xs font-semibold transition-all duration-150
                       ${mode === m
-                        ? 'bg-white shadow text-navy'
-                        : 'text-slate-500 hover:text-navy'
+                        ? isDark ? 'bg-white/10 shadow text-white' : 'bg-white shadow text-navy'
+                        : isDark ? 'text-slate-400 hover:text-white' : 'text-slate-500 hover:text-navy'
                       }`}
                   >
                     {Icon && <Icon size={12} />}
