@@ -1,7 +1,9 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ShoppingCart, Clock, CheckCircle, AlertTriangle, ChevronRight, Info } from 'lucide-react'
+import { ShoppingCart, Clock, CheckCircle, AlertTriangle, ChevronRight, Info, XCircle, MessageSquare, ChevronDown, ChevronUp } from 'lucide-react'
 import { useCotacoes } from '../hooks/useCotacoes'
+import { useDecisaoRequisicao } from '../hooks/useAprovacoes'
+import { useAuth } from '../contexts/AuthContext'
 import type { StatusCotacao } from '../types'
 
 const fmt = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
@@ -54,9 +56,63 @@ export default function FilaCotacoes() {
   const nav = useNavigate()
   const [statusFilter, setStatusFilter] = useState<StatusCotacao | ''>('')
   const { data: cotacoes, isLoading } = useCotacoes(undefined, statusFilter || undefined)
+  const { isAdmin, perfil } = useAuth()
+  const decisaoMutation = useDecisaoRequisicao()
+
+  // Estado para card expandido (comentário) e toast
+  const [expandedCard, setExpandedCard] = useState<string | null>(null)
+  const [observacao, setObservacao] = useState('')
+  const [toast, setToast] = useState<{ type: 'success' | 'error'; msg: string } | null>(null)
+
+  const handleDecisao = (
+    reqId: string, numero: string, alcada: number,
+    decisao: 'aprovada' | 'rejeitada' | 'esclarecimento',
+    categoria?: string, currentStatus?: string,
+  ) => {
+    if (!perfil) return
+    if (decisao === 'esclarecimento' && !observacao.trim()) {
+      setExpandedCard(reqId)
+      return
+    }
+    decisaoMutation.mutate({
+      requisicaoId: reqId,
+      decisao,
+      observacao: observacao.trim() || undefined,
+      requisicaoNumero: numero,
+      alcadaNivel: alcada,
+      aprovadorNome: perfil.nome,
+      aprovadorEmail: perfil.email,
+      categoria,
+      currentStatus,
+    }, {
+      onSuccess: () => {
+        setExpandedCard(null)
+        setObservacao('')
+        const label = decisao === 'aprovada' ? 'Aprovada ✓' : decisao === 'rejeitada' ? 'Rejeitada' : 'Esclarecimento solicitado'
+        setToast({ type: 'success', msg: `${numero}: ${label}` })
+        setTimeout(() => setToast(null), 4000)
+      },
+      onError: () => {
+        setToast({ type: 'error', msg: `Erro ao processar ${numero}. Tente novamente.` })
+        setTimeout(() => setToast(null), 5000)
+      },
+    })
+  }
 
   return (
     <div className="space-y-4">
+      {/* Toast feedback */}
+      {toast && (
+        <div className={`fixed top-4 left-1/2 -translate-x-1/2 z-50 px-4 py-2.5 rounded-2xl shadow-lg text-sm font-bold flex items-center gap-2 animate-[slideDown_0.3s_ease] ${
+          toast.type === 'success'
+            ? 'bg-emerald-500 text-white shadow-emerald-500/30'
+            : 'bg-red-500 text-white shadow-red-500/30'
+        }`}>
+          {toast.type === 'success' ? <CheckCircle size={16} /> : <XCircle size={16} />}
+          {toast.msg}
+        </div>
+      )}
+
       <h2 className="text-lg font-extrabold text-slate-800 tracking-tight flex items-center gap-2">
         <ShoppingCart size={18} className="text-teal-500" />
         Fila de Cotações
@@ -156,7 +212,86 @@ export default function FilaCotacoes() {
                     {cot.requisicao.categoria.replace(/_/g, ' ')}
                   </span>
                 )}
+
+                {/* Status de aprovação financeira */}
+                {concluida && cot.requisicao?.status === 'cotacao_enviada' && (
+                  <span className="inline-flex items-center gap-1 text-[10px] bg-teal-50 text-teal-600 border border-teal-200 rounded-full px-2 py-0.5 font-semibold">
+                    <Clock size={10} /> Aguard. Aprovação Financeira
+                  </span>
+                )}
+                {concluida && cot.requisicao?.status === 'cotacao_aprovada' && (
+                  <span className="inline-flex items-center gap-1 text-[10px] bg-emerald-50 text-emerald-600 border border-emerald-200 rounded-full px-2 py-0.5 font-semibold">
+                    <CheckCircle size={10} /> Aprovada ✓
+                  </span>
+                )}
               </div>
+
+              {/* Botões de aprovação financeira — admin + cotação concluída + aguardando */}
+              {isAdmin && concluida && cot.requisicao?.status === 'cotacao_enviada' && cot.requisicao?.id && (() => {
+                const req = cot.requisicao!
+                const isExpanded = expandedCard === req.id
+                const isProcessing = decisaoMutation.isPending && decisaoMutation.variables?.requisicaoId === req.id
+                return (
+                  <div className="px-4 py-3 border-t border-teal-100 bg-teal-50/30 space-y-2">
+                    <p className="text-[10px] text-teal-600 font-bold text-center uppercase tracking-wide">Aprovação Financeira</p>
+
+                    {/* Toggle comentário */}
+                    <button
+                      onClick={() => {
+                        if (isExpanded) { setExpandedCard(null); setObservacao('') }
+                        else { setExpandedCard(req.id); setObservacao('') }
+                      }}
+                      className="flex items-center gap-1 text-xs text-indigo-500 font-semibold mx-auto"
+                    >
+                      {isExpanded ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+                      {isExpanded ? 'Ocultar' : 'Comentário'}
+                    </button>
+
+                    {isExpanded && (
+                      <textarea
+                        rows={2}
+                        className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-300 outline-none"
+                        placeholder="Observação / motivo..."
+                        value={observacao}
+                        onChange={e => setObservacao(e.target.value)}
+                      />
+                    )}
+
+                    <div className="flex gap-2">
+                      <button
+                        disabled={isProcessing}
+                        onClick={() => handleDecisao(req.id, req.numero, req.alcada_nivel, 'rejeitada', req.categoria, 'cotacao_enviada')}
+                        className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-bold
+                          text-red-500 bg-red-50 border border-red-200 hover:bg-red-100 active:scale-[0.98]
+                          transition-all disabled:opacity-50"
+                      >
+                        <XCircle size={14} /> Rejeitar
+                      </button>
+                      <button
+                        disabled={isProcessing}
+                        onClick={() => handleDecisao(req.id, req.numero, req.alcada_nivel, 'esclarecimento', req.categoria, 'cotacao_enviada')}
+                        className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-bold
+                          text-amber-600 bg-amber-50 border border-amber-200 hover:bg-amber-100 active:scale-[0.98]
+                          transition-all disabled:opacity-50"
+                      >
+                        <MessageSquare size={14} /> Esclarecer
+                      </button>
+                      <button
+                        disabled={isProcessing}
+                        onClick={() => handleDecisao(req.id, req.numero, req.alcada_nivel, 'aprovada', req.categoria, 'cotacao_enviada')}
+                        className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-bold
+                          text-emerald-600 bg-emerald-50 border border-emerald-200 hover:bg-emerald-100 active:scale-[0.98]
+                          transition-all disabled:opacity-50"
+                      >
+                        {isProcessing
+                          ? <div className="w-3.5 h-3.5 border-2 border-emerald-400 border-t-transparent rounded-full animate-spin" />
+                          : <CheckCircle size={14} />}
+                        Aprovar
+                      </button>
+                    </div>
+                  </div>
+                )
+              })()}
 
               {/* Botão de ação */}
               <button onClick={() => nav(`/cotacoes/${cot.id}`)}
