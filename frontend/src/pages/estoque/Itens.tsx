@@ -28,7 +28,7 @@ export default function Itens() {
   const [editItem, setEditItem] = useState<Partial<EstItem> | null>(null)
 
   const { data: itens = [], isLoading } = useEstoqueItens(
-    curvaFiltro ? { curva_abc: curvaFiltro as 'A' | 'B' | 'C' } : undefined
+    curvaFiltro ? { curva: curvaFiltro as 'A' | 'B' | 'C' } : undefined
   )
   const salvar = useSalvarItem()
 

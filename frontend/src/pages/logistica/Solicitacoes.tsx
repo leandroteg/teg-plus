@@ -290,7 +290,6 @@ export default function Solicitacoes() {
                   <select
                     onChange={e => {
                       const r = rotas.find(r => r.id === e.target.value)
-                      if (r) set('origem', r.origem) || set('destino', r.destino)
                       setForm(p => ({ ...p, origem: r?.origem ?? p.origem, destino: r?.destino ?? p.destino }))
                     }}
                     className="input-base"

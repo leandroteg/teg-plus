@@ -36,10 +36,15 @@ function AuthLoading() {
 
 // ── Guard: usuário autenticado ─────────────────────────────────────────────────
 export function PrivateRoute() {
-  const { user, loading, perfilReady } = useAuth()
+  const { user, loading, perfilReady, perfil } = useAuth()
   const location = useLocation()
 
+  // Enquanto carrega ou enquanto o safety net aguarda → spinner
   if (loading || !perfilReady) return <AuthLoading />
+
+  // Usuário autenticado mas perfil não carregou → o safety net já iniciou
+  // o logout local; enquanto isso, mantemos o spinner (nunca mostra conteúdo)
+  if (user && !perfil) return <AuthLoading />
 
   if (!user) {
     return <Navigate to="/login" state={{ from: location }} replace />
@@ -50,10 +55,12 @@ export function PrivateRoute() {
 
 // ── Guard: apenas admins ───────────────────────────────────────────────────────
 export function AdminRoute() {
-  const { user, loading, perfilReady, isAdmin } = useAuth()
+  const { user, loading, perfilReady, perfil, isAdmin } = useAuth()
   const location = useLocation()
 
   if (loading || !perfilReady) return <AuthLoading />
+
+  if (user && !perfil) return <AuthLoading />
 
   if (!user) {
     return <Navigate to="/login" state={{ from: location }} replace />
