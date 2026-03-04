@@ -11,6 +11,21 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
   return res.json() as Promise<T>
 }
 
+export interface ParseCotacaoResult {
+  success: boolean
+  error?: string
+  fornecedores: {
+    fornecedor_nome: string
+    fornecedor_cnpj?: string
+    fornecedor_contato?: string
+    valor_total: number
+    prazo_entrega_dias?: number
+    condicao_pagamento?: string
+    itens?: { descricao: string; qtd: number; valor_unitario: number; valor_total: number }[]
+    observacao?: string
+  }[]
+}
+
 export const api = {
   criarRequisicao: (data: NovaRequisicaoPayload) =>
     request<unknown>('/compras/requisicao', { method: 'POST', body: JSON.stringify(data) }),
@@ -29,6 +44,12 @@ export const api = {
 
   submeterCotacao: (data: NovaCotacaoPayload) =>
     request<unknown>('/compras/cotacao', { method: 'POST', body: JSON.stringify(data) }),
+
+  parseCotacaoFile: (data: { file_base64: string; file_name: string; mime_type: string }) =>
+    request<ParseCotacaoResult>('/compras/parse-cotacao', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
 
   getDashboard: (params?: { periodo?: string; obra_id?: string }) => {
     const qs = params ? new URLSearchParams(params as Record<string, string>).toString() : ''

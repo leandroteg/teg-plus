@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import {
   ChevronLeft, PlusCircle, Trash2, Send, CheckCircle, Info, AlertTriangle,
@@ -6,6 +6,7 @@ import {
 import { useCotacao, useFinalizarCotacao } from '../hooks/useCotacoes'
 import CotacaoComparativo from '../components/CotacaoComparativo'
 import FluxoTimeline from '../components/FluxoTimeline'
+import UploadCotacao from '../components/UploadCotacao'
 
 const fmt = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
 
@@ -45,6 +46,49 @@ export default function CotacaoForm() {
 
   const updateFornecedor = (idx: number, field: keyof FornecedorForm, value: string | number) =>
     setFornecedores(prev => prev.map((f, i) => i === idx ? { ...f, [field]: value } : f))
+
+  // ── AI Upload: preenche fornecedores automaticamente ───────────────────────
+  const handleAiParsed = useCallback((parsed: {
+    fornecedor_nome: string
+    fornecedor_cnpj?: string
+    fornecedor_contato?: string
+    valor_total: number
+    prazo_entrega_dias?: number
+    condicao_pagamento?: string
+    observacao?: string
+  }[]) => {
+    setFornecedores(prev => {
+      // Slots vazios disponíveis
+      const vazios = prev.filter(f => !f.fornecedor_nome.trim() && f.valor_total === 0)
+      const preenchidos = prev.filter(f => f.fornecedor_nome.trim() || f.valor_total > 0)
+
+      const novos: FornecedorForm[] = parsed.map(p => ({
+        fornecedor_nome: p.fornecedor_nome || '',
+        fornecedor_cnpj: p.fornecedor_cnpj || '',
+        fornecedor_contato: p.fornecedor_contato || '',
+        valor_total: p.valor_total || 0,
+        prazo_entrega_dias: p.prazo_entrega_dias || 0,
+        condicao_pagamento: p.condicao_pagamento || '',
+        observacao: p.observacao || '',
+      }))
+
+      // Preenche slots vazios primeiro, depois adiciona novos
+      const result = [...preenchidos]
+      let slotIdx = 0
+      for (const novo of novos) {
+        if (slotIdx < vazios.length) {
+          result.push(novo) // Substitui slot vazio
+          slotIdx++
+        } else {
+          result.push(novo) // Adiciona novo
+        }
+      }
+
+      // Garante mínimo de 2 slots
+      while (result.length < 2) result.push(emptyFornecedor())
+      return result
+    })
+  }, [])
 
   const validos = fornecedores.filter(f => f.fornecedor_nome.trim() && f.valor_total > 0)
   const valorRef = (cotacao?.requisicao as any)?.valor_estimado ?? 0
@@ -142,6 +186,12 @@ export default function CotacaoForm() {
           </p>
         </div>
       )}
+
+      {/* Upload inteligente com IA */}
+      <UploadCotacao
+        onParsed={handleAiParsed}
+        disabled={cotacao?.status === 'concluida'}
+      />
 
       {/* Progresso de fornecedores */}
       <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm">

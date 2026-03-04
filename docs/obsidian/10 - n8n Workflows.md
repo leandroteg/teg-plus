@@ -213,6 +213,56 @@ flowchart LR
 
 ---
 
+### 4b. TEG+ | AI Parse Cotação
+**Webhook:** `POST /compras/parse-cotacao`
+**ID n8n:** `P5xDZQJ2Hh6mVXO0`
+**Nodes:** 5 (Webhook → Gemini Flash → Respond + Error Handler)
+**Status:** Ativo
+
+```mermaid
+flowchart LR
+    W[Webhook\nPOST file_base64] --> G[Gemini 2.5 Flash\nMultimodal]
+    G -->|Sucesso| R[Respond\nFornecedores JSON]
+    G -->|Erro| E[Error Handler] --> RE[Respond Erro]
+```
+
+**Payload de entrada:**
+```json
+{
+  "file_base64": "base64-encoded-file",
+  "file_name": "cotacao-fornecedor.pdf",
+  "mime_type": "application/pdf"
+}
+```
+
+**Formatos aceitos:** JPG, PNG, WebP, PDF (até 10 MB)
+
+**Resposta de sucesso:**
+```json
+{
+  "success": true,
+  "fornecedores": [
+    {
+      "fornecedor_nome": "Eletro Sul Materiais LTDA",
+      "fornecedor_cnpj": "12.345.678/0001-99",
+      "fornecedor_contato": "(34) 99999-1234",
+      "valor_total": 15750.00,
+      "prazo_entrega_dias": 15,
+      "condicao_pagamento": "30/60 dias",
+      "itens": [
+        {"descricao": "Cabo XLPE 240mm", "qtd": 500, "valor_unitario": 25.50, "valor_total": 12750.00},
+        {"descricao": "Terminal compressão", "qtd": 20, "valor_unitario": 150.00, "valor_total": 3000.00}
+      ],
+      "observacao": "Frete incluso"
+    }
+  ]
+}
+```
+
+**Componente frontend:** `UploadCotacao.tsx` — Drag & drop com auto-preenchimento via IA.
+
+---
+
 ## Fallback Strategy
 
 Se o n8n estiver **indisponível**:
