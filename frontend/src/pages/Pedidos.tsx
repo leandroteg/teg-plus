@@ -6,7 +6,7 @@ import {
 } from 'lucide-react'
 import { usePedidos, useAtualizarPedido, useLiberarPagamento } from '../hooks/usePedidos'
 import { useAnexosPedido, useUploadAnexo, useCotacaoDocs, TIPO_LABEL } from '../hooks/useAnexos'
-import type { PedidoAnexo, CotacaoDoc } from '../hooks/useAnexos'
+import type { PedidoAnexo } from '../hooks/useAnexos'
 import FluxoTimeline from '../components/FluxoTimeline'
 import type { Pedido } from '../types'
 
@@ -422,73 +422,250 @@ function LiberarPagamentoModal({
   )
 }
 
-// ─── AnexosList ───────────────────────────────────────────────────────────────
+// ─── DocSection — seção agrupada de documentos ──────────────────────────────
 
-function AnexosList({ pedidoId }: { pedidoId: string }) {
-  const { data: anexos, isLoading } = useAnexosPedido(pedidoId)
+const SECTION_COLORS: Record<string, { bg: string; border: string; text: string; badge: string }> = {
+  violet:  { bg: 'bg-violet-50',  border: 'border-violet-200',  text: 'text-violet-700',  badge: 'bg-violet-100 text-violet-600' },
+  amber:   { bg: 'bg-amber-50',   border: 'border-amber-200',   text: 'text-amber-700',   badge: 'bg-amber-100 text-amber-600' },
+  cyan:    { bg: 'bg-cyan-50',    border: 'border-cyan-200',    text: 'text-cyan-700',    badge: 'bg-cyan-100 text-cyan-600' },
+  emerald: { bg: 'bg-emerald-50', border: 'border-emerald-200', text: 'text-emerald-700', badge: 'bg-emerald-100 text-emerald-600' },
+}
+
+function DocSection({
+  title, icon, color, count, children,
+}: {
+  title: string; icon: React.ReactNode; color: string; count: number; children: React.ReactNode
+}) {
+  const c = SECTION_COLORS[color] ?? SECTION_COLORS.cyan
+  return (
+    <div className={`rounded-xl border ${c.border} overflow-hidden`}>
+      <div className={`${c.bg} px-3 py-2 flex items-center gap-2 border-b ${c.border}`}>
+        {icon}
+        <span className={`text-[11px] font-bold ${c.text}`}>{title}</span>
+        <span className={`ml-auto text-[10px] font-bold px-1.5 py-0.5 rounded-full ${c.badge}`}>
+          {count}
+        </span>
+      </div>
+      <div className="divide-y divide-slate-100 bg-white">{children}</div>
+    </div>
+  )
+}
+
+function DocItem({
+  name, url, mime, tipo, date, origem,
+}: {
+  name: string; url: string; mime?: string | null; tipo?: string; date?: string; origem?: string
+}) {
+  return (
+    <a
+      href={url}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="flex items-center gap-2.5 px-3 py-2.5 hover:bg-slate-50 transition-colors group"
+    >
+      <AnexoIcon mime={mime ?? null} />
+      <div className="min-w-0 flex-1">
+        <p className="text-xs font-semibold text-slate-700 truncate">{name}</p>
+        <div className="flex flex-wrap items-center gap-1.5 mt-0.5">
+          {tipo && (
+            <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-500">
+              {tipo}
+            </span>
+          )}
+          {origem && (
+            <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-semibold ${
+              origem === 'financeiro' ? 'bg-purple-100 text-purple-600' : 'bg-teal-100 text-teal-600'
+            }`}>
+              {origem === 'financeiro' ? 'Financeiro' : 'Compras'}
+            </span>
+          )}
+          {date && (
+            <span className="text-[10px] text-slate-400">
+              {new Date(date).toLocaleDateString('pt-BR')}
+            </span>
+          )}
+        </div>
+      </div>
+      <ExternalLink size={11} className="flex-shrink-0 text-slate-300 group-hover:text-slate-500 transition-colors" />
+    </a>
+  )
+}
+
+// ─── UploadAnexoInline — botão rápido para anexar docs ──────────────────────
+
+function UploadAnexoInline({ pedidoId }: { pedidoId: string }) {
+  const uploadAnexo = useUploadAnexo()
+  const fileRef     = useRef<HTMLInputElement>(null)
+  const [tipo, setTipo]       = useState<PedidoAnexo['tipo']>('nota_fiscal')
+  const [loading, setLoading] = useState(false)
+  const [success, setSuccess] = useState(false)
+
+  const handleFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setLoading(true)
+    try {
+      await uploadAnexo.mutateAsync({ pedidoId, file, tipo, origem: 'compras' })
+      setSuccess(true)
+      setTimeout(() => setSuccess(false), 2500)
+    } catch {
+      // error handled by mutation
+    } finally {
+      setLoading(false)
+      if (fileRef.current) fileRef.current.value = ''
+    }
+  }
+
+  return (
+    <div className="flex items-center gap-2 pt-2">
+      <select
+        value={tipo}
+        onChange={e => setTipo(e.target.value as PedidoAnexo['tipo'])}
+        className="text-[11px] border border-slate-200 rounded-lg px-2 py-1.5 bg-white text-slate-600 focus:outline-none focus:ring-1 focus:ring-teal-300"
+      >
+        {TIPO_OPTIONS.map(o => (
+          <option key={o.value} value={o.value}>{o.label}</option>
+        ))}
+      </select>
+      <button
+        onClick={() => fileRef.current?.click()}
+        disabled={loading}
+        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-semibold text-teal-600 bg-teal-50 border border-teal-200 hover:bg-teal-100 transition-colors disabled:opacity-50"
+      >
+        {loading ? (
+          <div className="w-3 h-3 border-2 border-teal-400 border-t-transparent rounded-full animate-spin" />
+        ) : success ? (
+          <CheckCircle size={12} className="text-emerald-500" />
+        ) : (
+          <Upload size={12} />
+        )}
+        {loading ? 'Enviando...' : success ? 'Anexado!' : 'Anexar'}
+      </button>
+      <input
+        ref={fileRef}
+        type="file"
+        accept=".pdf,.jpg,.jpeg,.png,.xls,.xlsx"
+        onChange={handleFile}
+        className="hidden"
+      />
+    </div>
+  )
+}
+
+// ─── AnexosOrganizados — documentos agrupados por categoria ─────────────────
+
+function AnexosOrganizados({ pedidoId, cotacaoId }: { pedidoId: string; cotacaoId?: string }) {
+  const { data: anexos, isLoading: loadingAnexos }  = useAnexosPedido(pedidoId)
+  const { data: cotDocs, isLoading: loadingCot }     = useCotacaoDocs(cotacaoId)
+
+  const isLoading = loadingAnexos || (cotacaoId ? loadingCot : false)
 
   if (isLoading) {
     return (
       <div className="flex items-center gap-2 py-2 text-xs text-slate-400">
         <div className="w-3.5 h-3.5 border-2 border-slate-300 border-t-transparent rounded-full animate-spin" />
-        Carregando anexos...
+        Carregando documentos...
       </div>
     )
   }
 
-  if (!anexos || anexos.length === 0) {
+  const cotacaoDocs   = cotDocs ?? []
+  const nfDocs        = anexos?.filter(a => a.tipo === 'nota_fiscal') ?? []
+  const pedidoAnexos  = anexos?.filter(a => a.tipo !== 'nota_fiscal' && a.tipo !== 'comprovante_pagamento') ?? []
+  const pagamentoDocs = anexos?.filter(a => a.tipo === 'comprovante_pagamento') ?? []
+  const totalDocs     = cotacaoDocs.length + nfDocs.length + pedidoAnexos.length + pagamentoDocs.length
+
+  if (totalDocs === 0) {
     return (
-      <p className="text-xs text-slate-400 italic py-1">Nenhum anexo encontrado.</p>
+      <div>
+        <p className="text-xs text-slate-400 italic py-1">Nenhum documento encontrado.</p>
+        <UploadAnexoInline pedidoId={pedidoId} />
+      </div>
     )
   }
 
   return (
-    <div className="space-y-2">
-      {anexos.map(a => {
-        const isPagamento = a.tipo === 'comprovante_pagamento'
-        return (
-          <a
-            key={a.id}
-            href={a.url}
-            target="_blank"
-            rel="noopener noreferrer"
-            className={`flex items-start gap-2.5 p-2.5 rounded-xl border transition-colors group ${
-              isPagamento
-                ? 'bg-emerald-50 border-emerald-200 hover:bg-emerald-100'
-                : 'bg-slate-50 border-slate-200 hover:bg-slate-100'
-            }`}
-          >
-            <div className={`mt-0.5 flex-shrink-0 ${isPagamento ? 'text-emerald-500' : ''}`}>
-              <AnexoIcon mime={a.mime_type} />
-            </div>
-            <div className="min-w-0 flex-1">
-              <p className={`text-xs font-semibold truncate ${isPagamento ? 'text-emerald-800' : 'text-slate-700'}`}>
-                {a.nome_arquivo}
-              </p>
-              <div className="flex flex-wrap items-center gap-1.5 mt-0.5">
-                <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${
-                  isPagamento
-                    ? 'bg-emerald-200 text-emerald-700'
-                    : 'bg-slate-200 text-slate-600'
-                }`}>
-                  {TIPO_LABEL[a.tipo]}
-                </span>
-                <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-semibold ${
-                  a.origem === 'financeiro'
-                    ? 'bg-purple-100 text-purple-600'
-                    : 'bg-teal-100 text-teal-600'
-                }`}>
-                  {a.origem === 'financeiro' ? 'Financeiro' : 'Compras'}
-                </span>
-                <span className="text-[10px] text-slate-400">
-                  {new Date(a.uploaded_at).toLocaleDateString('pt-BR')}
-                </span>
-              </div>
-            </div>
-            <ExternalLink size={12} className="flex-shrink-0 mt-0.5 text-slate-300 group-hover:text-slate-500 transition-colors" />
-          </a>
-        )
-      })}
+    <div className="space-y-3">
+      {/* Cotação Aprovada */}
+      {cotacaoDocs.length > 0 && (
+        <DocSection
+          title="Cotação Aprovada"
+          icon={<FileText size={13} className="text-violet-500" />}
+          color="violet"
+          count={cotacaoDocs.length}
+        >
+          {cotacaoDocs.map((doc, i) => (
+            <DocItem key={i} name={doc.name} url={doc.url} mime={doc.mime} date={doc.created} />
+          ))}
+        </DocSection>
+      )}
+
+      {/* Nota Fiscal */}
+      {nfDocs.length > 0 && (
+        <DocSection
+          title="Nota Fiscal"
+          icon={<FileText size={13} className="text-amber-500" />}
+          color="amber"
+          count={nfDocs.length}
+        >
+          {nfDocs.map(a => (
+            <DocItem
+              key={a.id}
+              name={a.nome_arquivo}
+              url={a.url}
+              mime={a.mime_type}
+              date={a.uploaded_at}
+              origem={a.origem}
+            />
+          ))}
+        </DocSection>
+      )}
+
+      {/* Pedido (comprovante entrega, medição, contrato, outro) */}
+      {pedidoAnexos.length > 0 && (
+        <DocSection
+          title="Pedido"
+          icon={<Package size={13} className="text-cyan-500" />}
+          color="cyan"
+          count={pedidoAnexos.length}
+        >
+          {pedidoAnexos.map(a => (
+            <DocItem
+              key={a.id}
+              name={a.nome_arquivo}
+              url={a.url}
+              mime={a.mime_type}
+              tipo={TIPO_LABEL[a.tipo]}
+              date={a.uploaded_at}
+              origem={a.origem}
+            />
+          ))}
+        </DocSection>
+      )}
+
+      {/* Pagamento */}
+      {pagamentoDocs.length > 0 && (
+        <DocSection
+          title="Pagamento"
+          icon={<Banknote size={13} className="text-emerald-500" />}
+          color="emerald"
+          count={pagamentoDocs.length}
+        >
+          {pagamentoDocs.map(a => (
+            <DocItem
+              key={a.id}
+              name={a.nome_arquivo}
+              url={a.url}
+              mime={a.mime_type}
+              date={a.uploaded_at}
+              origem={a.origem}
+            />
+          ))}
+        </DocSection>
+      )}
+
+      {/* Upload rápido */}
+      <UploadAnexoInline pedidoId={pedidoId} />
     </div>
   )
 }
@@ -687,12 +864,12 @@ function PedidoCard({
               </div>
             )}
 
-            {/* Anexos */}
+            {/* Documentos organizados por categoria */}
             <div>
               <p className="text-[11px] text-slate-400 font-semibold uppercase tracking-wide mb-2 flex items-center gap-1">
-                <Paperclip size={11} /> Anexos
+                <Paperclip size={11} /> Documentos
               </p>
-              <AnexosList pedidoId={pedido.id} />
+              <AnexosOrganizados pedidoId={pedido.id} cotacaoId={pedido.cotacao_id} />
             </div>
           </div>
         )}
