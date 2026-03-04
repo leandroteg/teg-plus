@@ -1,4 +1,5 @@
 import { useState, useRef } from 'react'
+import { useNavigate } from 'react-router-dom'
 import {
   Receipt, Search, Calendar, AlertTriangle,
   CheckCircle2, Clock, FileText, RefreshCw, Zap, XCircle,
@@ -318,6 +319,7 @@ function CPCard({ cp, onRegistrarPgto, onAprovarPgto }: {
   onRegistrarPgto: (cp: ContaPagar) => void
   onAprovarPgto: (cp: ContaPagar) => void
 }) {
+  const nav = useNavigate()
   const [expanded, setExpanded] = useState(false)
   const vencido = !['pago', 'conciliado', 'cancelado'].includes(cp.status) &&
     new Date(cp.data_vencimento + 'T00:00:00') < new Date()
@@ -368,10 +370,13 @@ function CPCard({ cp, onRegistrarPgto, onAprovarPgto }: {
                 <span className={`w-1.5 h-1.5 rounded-full ${cfg?.dot}`} />
                 {cfg?.label ?? cp.status}
               </span>
-              {pedidoNum && (
-                <span className="inline-flex items-center gap-0.5 bg-teal-50 text-teal-700 font-semibold rounded-full px-2 py-0.5">
+              {pedidoNum && cp.pedido_id && (
+                <button
+                  onClick={(e) => { e.stopPropagation(); nav(`/pedidos?pedido=${cp.pedido_id}`) }}
+                  className="inline-flex items-center gap-0.5 bg-teal-50 text-teal-700 font-semibold rounded-full px-2 py-0.5 hover:bg-teal-100 hover:ring-1 hover:ring-teal-300 transition-all cursor-pointer"
+                >
                   <FileText size={9} /> {pedidoNum}
-                </span>
+                </button>
               )}
               {reqNum && (
                 <span className="inline-flex items-center gap-0.5 bg-indigo-50 text-indigo-600 font-semibold rounded-full px-2 py-0.5">
@@ -476,8 +481,16 @@ function CPCard({ cp, onRegistrarPgto, onAprovarPgto }: {
             <div className="bg-slate-50 rounded-xl p-3 space-y-1.5">
               <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Detalhes</p>
               <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-[11px]">
-                {pedidoNum && (
-                  <div><span className="text-slate-400">Pedido:</span> <span className="font-semibold text-teal-700">{pedidoNum}</span></div>
+                {pedidoNum && cp.pedido_id && (
+                  <div>
+                    <span className="text-slate-400">Pedido:</span>{' '}
+                    <button
+                      onClick={() => nav(`/pedidos?pedido=${cp.pedido_id}`)}
+                      className="font-semibold text-teal-700 underline decoration-teal-300 hover:text-teal-800 hover:decoration-teal-500 transition-colors"
+                    >
+                      {pedidoNum}
+                    </button>
+                  </div>
                 )}
                 {reqNum && (
                   <div><span className="text-slate-400">RC:</span> <span className="font-semibold text-indigo-600">{reqNum}</span></div>

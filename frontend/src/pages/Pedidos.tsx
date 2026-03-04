@@ -1,9 +1,10 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import {
   Package, Truck, CheckCircle, Clock, AlertTriangle, ChevronDown, ChevronUp,
   FileText, Share2, Download, MessageCircle, Mail, Upload, X, Paperclip,
   Banknote, ExternalLink,
 } from 'lucide-react'
+import { useSearchParams } from 'react-router-dom'
 import { usePedidos, useAtualizarPedido, useLiberarPagamento } from '../hooks/usePedidos'
 import { useAnexosPedido, useUploadAnexo, useCotacaoDocs, TIPO_LABEL } from '../hooks/useAnexos'
 import type { PedidoAnexo } from '../hooks/useAnexos'
@@ -676,13 +677,15 @@ function PedidoCard({
   pedido,
   onCompartilhar,
   onLiberarPagamento,
+  initialExpanded = false,
 }: {
   pedido: Pedido
   onCompartilhar: (p: Pedido) => void
   onLiberarPagamento: (id: string) => void
+  initialExpanded?: boolean
 }) {
   const mutation   = useAtualizarPedido()
-  const [expanded, setExpanded]     = useState(false)
+  const [expanded, setExpanded]     = useState(initialExpanded)
   const [confirmando, setConfirmando] = useState(false)
 
   const dias     = diasRestantes(pedido.data_prevista_entrega)
@@ -929,9 +932,22 @@ function PedidoCard({
 // ─── Pedidos page ─────────────────────────────────────────────────────────────
 
 export default function Pedidos() {
+  const [searchParams, setSearchParams] = useSearchParams()
+  const highlightPedidoId = searchParams.get('pedido')
+
   const [statusFilter, setStatusFilter]         = useState('')
   const [compartilharPedido, setCompartilhar]   = useState<Pedido | null>(null)
   const [showLiberarModal, setShowLiberarModal] = useState<string | null>(null)
+
+  // Limpar o query param após exibir para não manter na URL
+  useEffect(() => {
+    if (highlightPedidoId) {
+      const timeout = setTimeout(() => {
+        setSearchParams({}, { replace: true })
+      }, 2000)
+      return () => clearTimeout(timeout)
+    }
+  }, [highlightPedidoId, setSearchParams])
 
   const { data: pedidos, isLoading } = usePedidos(
     statusFilter === 'liberado_pagamento' || statusFilter === 'pago'
@@ -1009,6 +1025,7 @@ export default function Pedidos() {
             <PedidoCard
               key={p.id}
               pedido={p}
+              initialExpanded={p.id === highlightPedidoId}
               onCompartilhar={setCompartilhar}
               onLiberarPagamento={id => setShowLiberarModal(id)}
             />
