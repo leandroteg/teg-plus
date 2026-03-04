@@ -17,6 +17,7 @@ import Aprovacao from './pages/Aprovacao'
 import AprovAi from './pages/AprovAi'
 import Perfil from './pages/Perfil'
 import Pedidos from './pages/Pedidos'
+import RequisicaoDetalhe from './pages/RequisicaoDetalhe'
 
 // Módulos stub
 import SSMA from './pages/SSMA'
@@ -141,6 +142,7 @@ export default function App() {
             <Route path="/compras"     element={<Dashboard />} />
             <Route path="/nova"        element={<NovaRequisicao />} />
             <Route path="/requisicoes" element={<ListaRequisicoes />} />
+            <Route path="/requisicoes/:id" element={<RequisicaoDetalhe />} />
             <Route path="/cotacoes"    element={<FilaCotacoes />} />
             <Route path="/cotacoes/:id" element={<CotacaoForm />} />
             <Route path="/pedidos"     element={<Pedidos />} />

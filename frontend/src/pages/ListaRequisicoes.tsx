@@ -1,12 +1,11 @@
 import { useState, useMemo } from 'react'
-import { Search, SlidersHorizontal, CheckCircle, XCircle } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
+import { Search, SlidersHorizontal, CheckCircle, XCircle, MessageSquare, ChevronDown, ChevronUp } from 'lucide-react'
 import { useRequisicoes } from '../hooks/useRequisicoes'
-import { useAprovacoesPendentes } from '../hooks/useAprovacoes'
+import { useAprovacoesPendentes, useDecisaoRequisicao } from '../hooks/useAprovacoes'
 import { useAuth } from '../contexts/AuthContext'
 import StatusBadge from '../components/StatusBadge'
 import FluxoTimeline from '../components/FluxoTimeline'
-import { supabase } from '../services/supabase'
-import { useQueryClient } from '@tanstack/react-query'
 import type { StatusRequisicao, Aprovacao } from '../types'
 
 const fmt = (v: number) =>
@@ -17,17 +16,18 @@ const fmtData = (d: string) =>
 
 // Pipeline tabs (etapas do fluxo)
 const PIPELINE_TABS = [
-  { value: '',                label: 'Todos' },
-  { value: 'pendente',        label: 'Pendentes' },
-  { value: 'em_aprovacao',    label: 'Em Aprov.' },
-  { value: 'em_cotacao',      label: 'Em Cotação' },
-  { value: 'cotacao_enviada', label: 'Cot. Enviada' },
-  { value: 'cotacao_aprovada',label: 'Aprov. Fin.' },
-  { value: 'pedido_emitido',  label: 'Pedido' },
-  { value: 'em_entrega',      label: 'Entrega' },
-  { value: 'pago',            label: 'Pago' },
-  { value: 'rejeitada',       label: 'Reprovadas' },
-  { value: 'cancelada',       label: 'Canceladas' },
+  { value: '',                    label: 'Todos' },
+  { value: 'pendente',            label: 'Pendentes' },
+  { value: 'em_aprovacao',        label: 'Em Aprov.' },
+  { value: 'em_esclarecimento',   label: 'Esclarec.' },
+  { value: 'em_cotacao',          label: 'Em Cotação' },
+  { value: 'cotacao_enviada',     label: 'Cot. Enviada' },
+  { value: 'cotacao_aprovada',    label: 'Aprov. Fin.' },
+  { value: 'pedido_emitido',      label: 'Pedido' },
+  { value: 'em_entrega',          label: 'Entrega' },
+  { value: 'pago',                label: 'Pago' },
+  { value: 'rejeitada',           label: 'Reprovadas' },
+  { value: 'cancelada',           label: 'Canceladas' },
 ]
 
 const AVATAR_COLORS: Record<string, string> = {
@@ -45,9 +45,10 @@ const NIVEL_LABEL: Record<number, string> = {
 
 /** Label específico da etapa de aprovação */
 function getApprovalStatusLabel(status: string): string | undefined {
-  if (status === 'pendente')         return 'Aguard. Valid. Técnica'
-  if (status === 'em_aprovacao')     return 'Em Validação Técnica'
-  if (status === 'cotacao_aprovada') return 'Aguard. Aprov. Financeira'
+  if (status === 'pendente')            return 'Aguard. Valid. Técnica'
+  if (status === 'em_aprovacao')        return 'Em Validação Técnica'
+  if (status === 'cotacao_aprovada')    return 'Aguard. Aprov. Financeira'
+  if (status === 'em_esclarecimento')   return 'Em Esclarecimento'
   return undefined
 }
 
@@ -63,12 +64,18 @@ function CompradorBadge({ nome }: { nome: string }) {
   )
 }
 
-// Chip contextual por status — mostra aprovador ou nível de alçada
-function StatusChip({ status, aprovacao, alcadaNivel, dataPrevista }: {
-  status: string; aprovacao?: Aprovacao; alcadaNivel?: number; dataPrevista?: string
+// Chip contextual por status — mostra aprovador, nível de alçada, ou esclarecimento
+function StatusChip({ status, aprovacao, alcadaNivel, dataPrevista, esclarecimentoMsg }: {
+  status: string; aprovacao?: Aprovacao; alcadaNivel?: number; dataPrevista?: string; esclarecimentoMsg?: string
 }) {
+  if (status === 'em_esclarecimento') {
+    return (
+      <span className="text-[10px] bg-amber-50 text-amber-600 border border-amber-200 rounded-full px-2 py-0.5 font-semibold truncate max-w-[180px]">
+        ⚠ {esclarecimentoMsg ? esclarecimentoMsg.slice(0, 40) : 'Esclarecimento'}
+      </span>
+    )
+  }
   if (status === 'pendente' || status === 'rascunho' || status === 'em_aprovacao') {
-    // Prioridade: 1) aprovador específico 2) nível de alçada da RC
     if (aprovacao) {
       const nivel = NIVEL_LABEL[aprovacao.nivel] ?? ''
       return (
@@ -84,7 +91,7 @@ function StatusChip({ status, aprovacao, alcadaNivel, dataPrevista }: {
         </span>
       )
     }
-    return null // badge já informa o status, sem chip duplicado
+    return null
   }
   if (status === 'em_cotacao' || status === 'aprovada') {
     return <span className="text-[10px] bg-violet-50 text-violet-600 border border-violet-200 rounded-full px-2 py-0.5 font-semibold">Comprador cotando</span>
@@ -100,34 +107,18 @@ function StatusChip({ status, aprovacao, alcadaNivel, dataPrevista }: {
 }
 
 export default function ListaRequisicoes() {
+  const navigate = useNavigate()
   const [statusFilter, setStatusFilter] = useState('')
   const [busca, setBusca] = useState('')
   const [showFilters, setShowFilters] = useState(false)
   const { data: requisicoes, isLoading } = useRequisicoes(statusFilter || undefined)
   const { data: aprovacoes } = useAprovacoesPendentes()
   const { isAdmin, perfil } = useAuth()
-  const queryClient = useQueryClient()
-  const [processing, setProcessing] = useState<string | null>(null) // id da RC em processamento
+  const decisaoMutation = useDecisaoRequisicao()
 
-  // Admin aprova/rejeita diretamente (sem token, sem apr_aprovacoes)
-  const handleAdminDecision = async (reqId: string, decisao: 'aprovada' | 'rejeitada') => {
-    setProcessing(reqId)
-    try {
-      const novoStatus = decisao === 'aprovada' ? 'aprovada' : 'rejeitada'
-      const updates: Record<string, unknown> = { status: novoStatus }
-      if (decisao === 'aprovada') updates.data_aprovacao = new Date().toISOString()
-      const { error } = await supabase
-        .from('cmp_requisicoes')
-        .update(updates)
-        .eq('id', reqId)
-      if (!error) {
-        queryClient.invalidateQueries({ queryKey: ['requisicoes'] })
-        queryClient.invalidateQueries({ queryKey: ['dashboard'] })
-      }
-    } finally {
-      setProcessing(null)
-    }
-  }
+  // Card expandido para comentário + esclarecimento
+  const [expandedCard, setExpandedCard] = useState<string | null>(null)
+  const [observacao, setObservacao] = useState('')
 
   // Mapa: requisicao_id → aprovação pendente (para mostrar aprovador no card)
   const aprovacaoMap = useMemo(() => {
@@ -150,6 +141,28 @@ export default function ListaRequisicoes() {
       (r.categoria ?? '').toLowerCase().includes(termo)
     )
   })
+
+  const handleDecisao = (reqId: string, numero: string, alcada: number, decisao: 'aprovada' | 'rejeitada' | 'esclarecimento') => {
+    if (!perfil) return
+    if (decisao === 'esclarecimento' && !observacao.trim()) {
+      setExpandedCard(reqId)
+      return
+    }
+    decisaoMutation.mutate({
+      requisicaoId: reqId,
+      decisao,
+      observacao: observacao.trim() || undefined,
+      requisicaoNumero: numero,
+      alcadaNivel: alcada,
+      aprovadorNome: perfil.nome,
+      aprovadorEmail: perfil.email,
+    }, {
+      onSuccess: () => {
+        setExpandedCard(null)
+        setObservacao('')
+      },
+    })
+  }
 
   return (
     <div className="space-y-3">
@@ -200,8 +213,15 @@ export default function ListaRequisicoes() {
           {filtradas.map(r => {
             const apr = aprovacaoMap.get(r.id)
             const approvalLabel = getApprovalStatusLabel(r.status)
+            const isExpanded = expandedCard === r.id
+            const isProcessing = decisaoMutation.isPending && decisaoMutation.variables?.requisicaoId === r.id
+            const canDecide = isAdmin && ['pendente', 'em_aprovacao', 'em_esclarecimento'].includes(r.status)
+
             return (
-              <div key={r.id} className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 space-y-3">
+              <div key={r.id}
+                onClick={() => navigate(`/requisicoes/${r.id}`)}
+                className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 space-y-3 cursor-pointer hover:border-teal-300 hover:shadow-md transition-all active:scale-[0.99]"
+              >
                 {/* Linha 1: número + urgência + status */}
                 <div className="flex justify-between items-center gap-2">
                   <div className="flex items-center gap-2 min-w-0">
@@ -234,44 +254,83 @@ export default function ListaRequisicoes() {
                   <span className="text-sm font-extrabold text-teal-600">{fmt(r.valor_estimado)}</span>
                 </div>
 
-                {/* Comprador + data + chip contextual com aprovador */}
+                {/* Comprador + data + chip contextual */}
                 <div className="flex items-center justify-between pt-2 border-t border-slate-50">
                   <div className="flex items-center gap-2">
                     {r.comprador_nome
                       ? <CompradorBadge nome={r.comprador_nome} />
                       : <span className="text-xs text-slate-300 italic">Sem comprador</span>
                     }
-                    <StatusChip status={r.status} aprovacao={apr} alcadaNivel={r.alcada_nivel} />
+                    <StatusChip
+                      status={r.status}
+                      aprovacao={apr}
+                      alcadaNivel={r.alcada_nivel}
+                      esclarecimentoMsg={r.esclarecimento_msg}
+                    />
                   </div>
                   <span className="text-xs text-slate-400 flex-shrink-0">
                     {r.solicitante_nome.split(' ')[0]} · {fmtData(r.created_at)}
                   </span>
                 </div>
 
-                {/* Botões de aprovação rápida — só para admins em RCs pendentes */}
-                {isAdmin && ['pendente', 'em_aprovacao'].includes(r.status) && (
-                  <div className="flex gap-2 pt-2 border-t border-slate-100">
+                {/* Botões de ação rápida — admins em RCs pendentes/em_esclarecimento */}
+                {canDecide && (
+                  <div className="pt-2 border-t border-slate-100 space-y-2" onClick={e => e.stopPropagation()}>
+                    {/* Toggle observação */}
                     <button
-                      disabled={processing === r.id}
-                      onClick={() => handleAdminDecision(r.id, 'rejeitada')}
-                      className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-bold
-                        text-red-500 bg-red-50 border border-red-200 hover:bg-red-100 active:scale-[0.98]
-                        transition-all disabled:opacity-50"
+                      onClick={() => {
+                        if (isExpanded) { setExpandedCard(null); setObservacao('') }
+                        else { setExpandedCard(r.id); setObservacao('') }
+                      }}
+                      className="flex items-center gap-1 text-xs text-indigo-500 font-semibold mx-auto"
                     >
-                      <XCircle size={14} /> Rejeitar
+                      {isExpanded ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+                      {isExpanded ? 'Ocultar' : 'Comentário'}
                     </button>
-                    <button
-                      disabled={processing === r.id}
-                      onClick={() => handleAdminDecision(r.id, 'aprovada')}
-                      className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-bold
-                        text-emerald-600 bg-emerald-50 border border-emerald-200 hover:bg-emerald-100 active:scale-[0.98]
-                        transition-all disabled:opacity-50"
-                    >
-                      {processing === r.id
-                        ? <div className="w-3.5 h-3.5 border-2 border-emerald-400 border-t-transparent rounded-full animate-spin" />
-                        : <CheckCircle size={14} />}
-                      Aprovar
-                    </button>
+
+                    {isExpanded && (
+                      <textarea
+                        rows={2}
+                        className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-300 outline-none"
+                        placeholder="Observação / motivo do esclarecimento..."
+                        value={observacao}
+                        onChange={e => setObservacao(e.target.value)}
+                        onClick={e => e.stopPropagation()}
+                      />
+                    )}
+
+                    <div className="flex gap-2">
+                      <button
+                        disabled={isProcessing}
+                        onClick={() => handleDecisao(r.id, r.numero, r.alcada_nivel, 'rejeitada')}
+                        className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-bold
+                          text-red-500 bg-red-50 border border-red-200 hover:bg-red-100 active:scale-[0.98]
+                          transition-all disabled:opacity-50"
+                      >
+                        <XCircle size={14} /> Rejeitar
+                      </button>
+                      <button
+                        disabled={isProcessing}
+                        onClick={() => handleDecisao(r.id, r.numero, r.alcada_nivel, 'esclarecimento')}
+                        className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-bold
+                          text-amber-600 bg-amber-50 border border-amber-200 hover:bg-amber-100 active:scale-[0.98]
+                          transition-all disabled:opacity-50"
+                      >
+                        <MessageSquare size={14} /> Esclarecer
+                      </button>
+                      <button
+                        disabled={isProcessing}
+                        onClick={() => handleDecisao(r.id, r.numero, r.alcada_nivel, 'aprovada')}
+                        className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-bold
+                          text-emerald-600 bg-emerald-50 border border-emerald-200 hover:bg-emerald-100 active:scale-[0.98]
+                          transition-all disabled:opacity-50"
+                      >
+                        {isProcessing
+                          ? <div className="w-3.5 h-3.5 border-2 border-emerald-400 border-t-transparent rounded-full animate-spin" />
+                          : <CheckCircle size={14} />}
+                        Aprovar
+                      </button>
+                    </div>
                   </div>
                 )}
               </div>
