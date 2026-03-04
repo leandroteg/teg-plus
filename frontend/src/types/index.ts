@@ -139,10 +139,13 @@ export interface Cotacao {
   comprador_nome?: string
   status: StatusCotacao
   valor_selecionado?: number
+  fornecedor_selecionado_id?: string
   fornecedor_selecionado_nome?: string
   observacao?: string
   data_limite?: string
   data_conclusao?: string
+  sem_cotacoes_minimas?: boolean
+  justificativa_sem_cotacoes?: string
   created_at: string
   requisicao?: Requisicao
   fornecedores?: CotacaoFornecedor[]

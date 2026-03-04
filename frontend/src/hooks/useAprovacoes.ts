@@ -72,6 +72,8 @@ export interface DecisaoPayload {
   alcadaNivel: number
   aprovadorNome: string
   aprovadorEmail: string
+  categoria?: string       // para resolver comprador automaticamente
+  currentStatus?: string   // para decisão contextual (técnica vs financeira)
 }
 
 export function useDecisaoRequisicao() {
@@ -81,16 +83,25 @@ export function useDecisaoRequisicao() {
       const {
         requisicaoId, decisao, observacao,
         requisicaoNumero, alcadaNivel, aprovadorNome, aprovadorEmail,
+        categoria, currentStatus,
       } = payload
 
       // 1. Update cmp_requisicoes status
       const updates: Record<string, unknown> = {}
+      const isFinancialApproval = currentStatus === 'cotacao_enviada'
 
       if (decisao === 'aprovada') {
-        updates.status = 'aprovada'
         updates.data_aprovacao = new Date().toISOString()
+
+        if (isFinancialApproval) {
+          // Aprovação financeira pós-cotação → cotacao_aprovada
+          updates.status = 'cotacao_aprovada'
+        } else {
+          // Aprovação técnica → em_cotacao (auto-cria cotação)
+          updates.status = 'em_cotacao'
+        }
       } else if (decisao === 'rejeitada') {
-        updates.status = 'rejeitada'
+        updates.status = isFinancialApproval ? 'cotacao_rejeitada' : 'rejeitada'
       } else if (decisao === 'esclarecimento') {
         updates.status = 'em_esclarecimento'
         updates.esclarecimento_msg = observacao || 'Esclarecimento solicitado'
@@ -127,12 +138,45 @@ export function useDecisaoRequisicao() {
       // Non-critical: log warning but don't throw
       if (aprError) console.warn('Aviso: apr_aprovacoes não inserido:', aprError.message)
 
+      // 3. Auto-criar cotação quando aprovação técnica é concedida
+      if (decisao === 'aprovada' && !isFinancialApproval) {
+        try {
+          // Resolve comprador pela categoria
+          let compradorId: string | null = null
+          if (categoria) {
+            const { data: compradores } = await supabase
+              .from('cmp_compradores')
+              .select('id, categorias')
+            const match = compradores?.find(
+              (c: { id: string; categorias: string[] }) =>
+                c.categorias?.includes(categoria)
+            )
+            compradorId = match?.id ?? null
+          }
+
+          // Data limite: 5 dias úteis
+          const dataLimite = new Date()
+          dataLimite.setDate(dataLimite.getDate() + 5)
+
+          await supabase.from('cmp_cotacoes').insert({
+            requisicao_id: requisicaoId,
+            comprador_id: compradorId,
+            status: 'pendente',
+            data_limite: dataLimite.toISOString(),
+          })
+        } catch (e) {
+          console.warn('Aviso: cotação não criada automaticamente:', e)
+        }
+      }
+
       return { decisao }
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['requisicoes'] })
       qc.invalidateQueries({ queryKey: ['requisicao'] })
       qc.invalidateQueries({ queryKey: ['aprovacoes-pendentes'] })
+      qc.invalidateQueries({ queryKey: ['cotacoes'] })
+      qc.invalidateQueries({ queryKey: ['cotacao'] })
       qc.invalidateQueries({ queryKey: ['dashboard'] })
     },
   })

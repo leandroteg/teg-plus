@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import {
   ChevronLeft, PlusCircle, Trash2, Send, CheckCircle, Info, AlertTriangle,
 } from 'lucide-react'
-import { useCotacao, useSubmeterCotacao } from '../hooks/useCotacoes'
+import { useCotacao, useFinalizarCotacao } from '../hooks/useCotacoes'
 import CotacaoComparativo from '../components/CotacaoComparativo'
 import FluxoTimeline from '../components/FluxoTimeline'
 
@@ -35,7 +35,7 @@ export default function CotacaoForm() {
   const { id } = useParams<{ id: string }>()
   const nav = useNavigate()
   const { data: cotacao, isLoading } = useCotacao(id)
-  const submitMutation = useSubmeterCotacao()
+  const submitMutation = useFinalizarCotacao()
 
   const [fornecedores, setFornecedores] = useState<FornecedorForm[]>([
     emptyFornecedor(), emptyFornecedor(),
@@ -52,13 +52,14 @@ export default function CotacaoForm() {
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!id) return
+    if (!id || !cotacao) return
     if (!semCotacoesMinimas && validos.length < minCot) return
     if (semCotacoesMinimas && !justificativa.trim()) return
     try {
       await submitMutation.mutateAsync({
         cotacao_id: id,
-        fornecedores: validos.map(f => ({ ...f, itens_precos: [] })),
+        requisicao_id: cotacao.requisicao_id,
+        fornecedores: validos,
         sem_cotacoes_minimas: semCotacoesMinimas,
         justificativa_sem_cotacoes: semCotacoesMinimas ? justificativa.trim() : undefined,
       })
@@ -293,7 +294,7 @@ export default function CotacaoForm() {
         {submitMutation.isPending ? (
           <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
         ) : (
-          <><Send size={18} /> Enviar para Aprovação Técnica</>
+          <><Send size={18} /> Enviar para Aprovação Financeira</>
         )}
       </button>
 
@@ -305,7 +306,7 @@ export default function CotacaoForm() {
 
       {submitMutation.isSuccess && (
         <div className="flex items-center gap-2 bg-emerald-50 border border-emerald-200 rounded-2xl px-4 py-3 text-emerald-700 text-sm font-semibold">
-          <CheckCircle size={16} /> Cotação enviada para aprovação!
+          <CheckCircle size={16} /> Cotação enviada para aprovação financeira!
         </div>
       )}
 

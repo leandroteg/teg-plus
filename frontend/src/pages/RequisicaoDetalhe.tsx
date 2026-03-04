@@ -3,13 +3,16 @@ import { useParams, useNavigate } from 'react-router-dom'
 import {
   ArrowLeft, Building, User, Calendar, Tag, Package,
   CheckCircle, XCircle, MessageSquare, AlertTriangle,
-  ChevronDown, ChevronUp,
+  ChevronDown, ChevronUp, ShoppingCart, UserCog, ExternalLink,
 } from 'lucide-react'
 import { useRequisicao } from '../hooks/useRequisicoes'
 import { useDecisaoRequisicao } from '../hooks/useAprovacoes'
+import { useCotacaoByRequisicao } from '../hooks/useCotacoes'
 import { useAuth } from '../contexts/AuthContext'
+import { supabase } from '../services/supabase'
 import StatusBadge from '../components/StatusBadge'
 import FluxoTimeline from '../components/FluxoTimeline'
+import CotacaoComparativo from '../components/CotacaoComparativo'
 import type { StatusRequisicao } from '../types'
 
 const fmt = (v: number) =>
@@ -31,12 +34,20 @@ export default function RequisicaoDetalhe() {
   const decisaoMutation = useDecisaoRequisicao()
   const { isAdmin, perfil } = useAuth()
 
+  // Cotação vinculada à RC
+  const showCotacao = req && ['em_cotacao', 'cotacao_enviada', 'cotacao_aprovada', 'cotacao_rejeitada'].includes(req.status)
+  const { data: cotacao } = useCotacaoByRequisicao(showCotacao ? id : undefined)
+
   const [observacao, setObservacao] = useState('')
   const [showObservacao, setShowObservacao] = useState(false)
   const [showItens, setShowItens] = useState(true)
   const [pendingAction, setPendingAction] = useState<'aprovada' | 'rejeitada' | 'esclarecimento' | null>(null)
 
-  const canDecide = isAdmin && req && ['pendente', 'em_aprovacao', 'em_esclarecimento'].includes(req.status)
+  // Decisão técnica (pendente/em_aprovacao/esclarecimento) OU financeira (cotacao_enviada)
+  const canDecide = isAdmin && req && (
+    ['pendente', 'em_aprovacao', 'em_esclarecimento'].includes(req.status) ||
+    req.status === 'cotacao_enviada'
+  )
 
   const handleDecisao = (decisao: 'aprovada' | 'rejeitada' | 'esclarecimento') => {
     if (!req || !perfil) return
@@ -54,6 +65,8 @@ export default function RequisicaoDetalhe() {
       alcadaNivel: req.alcada_nivel,
       aprovadorNome: perfil.nome,
       aprovadorEmail: perfil.email,
+      categoria: req.categoria,
+      currentStatus: req.status,
     })
   }
 
@@ -245,10 +258,68 @@ export default function RequisicaoDetalhe() {
         </div>
       )}
 
+      {/* ── Cotação / Comparativo ──────────────────────────────────────────────── */}
+      {req.status === 'em_cotacao' && cotacao && (
+        <div className="bg-violet-50 border-2 border-violet-200 rounded-2xl p-4 space-y-3">
+          <div className="flex items-center gap-2">
+            <ShoppingCart size={16} className="text-violet-600" />
+            <span className="text-sm font-bold text-violet-700">Em Cotação</span>
+            <span className="text-[10px] text-violet-500">
+              {cotacao.comprador_nome ? `Comprador: ${cotacao.comprador_nome}` : 'Sem comprador'}
+            </span>
+          </div>
+          <p className="text-xs text-violet-600">
+            Aguardando o comprador inserir propostas de fornecedores.
+          </p>
+          <a
+            href={`/cotacoes/${cotacao.id}`}
+            className="inline-flex items-center gap-1.5 text-xs font-bold text-violet-600 hover:text-violet-800 transition"
+          >
+            <ExternalLink size={12} /> Ir para formulário de cotação
+          </a>
+        </div>
+      )}
+
+      {/* Comparativo de fornecedores — aprovação financeira */}
+      {req.status === 'cotacao_enviada' && cotacao?.fornecedores && cotacao.fornecedores.length > 0 && (
+        <div className="space-y-3">
+          <div className="flex items-center gap-2 px-1">
+            <ShoppingCart size={14} className="text-teal-600" />
+            <span className="text-xs font-bold text-slate-600 uppercase tracking-wider">
+              Cotações Recebidas — Aprovação Financeira
+            </span>
+          </div>
+          <CotacaoComparativo fornecedores={cotacao.fornecedores} readOnly />
+          {cotacao.sem_cotacoes_minimas && (
+            <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 flex items-start gap-2">
+              <AlertTriangle size={14} className="text-amber-600 flex-shrink-0 mt-0.5" />
+              <div>
+                <p className="text-xs font-bold text-amber-700">Cotação sem mínimo de fornecedores</p>
+                {cotacao.justificativa_sem_cotacoes && (
+                  <p className="text-xs text-amber-600 mt-1">{cotacao.justificativa_sem_cotacoes}</p>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Cotação aprovada/rejeitada — resultado */}
+      {(req.status === 'cotacao_aprovada' || req.status === 'cotacao_rejeitada') && cotacao?.fornecedores && cotacao.fornecedores.length > 0 && (
+        <div className="space-y-2">
+          <span className="text-xs font-bold text-slate-500 uppercase tracking-wider px-1">
+            {req.status === 'cotacao_aprovada' ? '✓ Cotação Aprovada' : '✗ Cotação Rejeitada'}
+          </span>
+          <CotacaoComparativo fornecedores={cotacao.fornecedores} readOnly />
+        </div>
+      )}
+
       {/* ── Decisão Admin ──────────────────────────────────────────────────────── */}
       {canDecide && (
         <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 space-y-3">
-          <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">Decisão</p>
+          <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+            {req.status === 'cotacao_enviada' ? 'Aprovação Financeira' : 'Decisão'}
+          </p>
 
           {/* Sucesso */}
           {decisaoMutation.isSuccess && (

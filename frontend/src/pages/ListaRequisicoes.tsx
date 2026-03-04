@@ -47,7 +47,8 @@ const NIVEL_LABEL: Record<number, string> = {
 function getApprovalStatusLabel(status: string): string | undefined {
   if (status === 'pendente')            return 'Aguard. Valid. Técnica'
   if (status === 'em_aprovacao')        return 'Em Validação Técnica'
-  if (status === 'cotacao_aprovada')    return 'Aguard. Aprov. Financeira'
+  if (status === 'cotacao_enviada')     return 'Aguard. Aprov. Financeira'
+  if (status === 'cotacao_aprovada')    return 'Cotação Aprovada'
   if (status === 'em_esclarecimento')   return 'Em Esclarecimento'
   return undefined
 }
@@ -96,6 +97,12 @@ function StatusChip({ status, aprovacao, alcadaNivel, dataPrevista, esclarecimen
   if (status === 'em_cotacao' || status === 'aprovada') {
     return <span className="text-[10px] bg-violet-50 text-violet-600 border border-violet-200 rounded-full px-2 py-0.5 font-semibold">Comprador cotando</span>
   }
+  if (status === 'cotacao_enviada') {
+    return <span className="text-[10px] bg-teal-50 text-teal-600 border border-teal-200 rounded-full px-2 py-0.5 font-semibold">Aguard. Aprov. Financeira</span>
+  }
+  if (status === 'cotacao_aprovada') {
+    return <span className="text-[10px] bg-emerald-50 text-emerald-600 border border-emerald-200 rounded-full px-2 py-0.5 font-semibold">Cotação aprovada ✓</span>
+  }
   if (status === 'pedido_emitido') {
     return <span className="text-[10px] bg-cyan-50 text-cyan-600 border border-cyan-200 rounded-full px-2 py-0.5 font-semibold">Pedido emitido</span>
   }
@@ -142,7 +149,7 @@ export default function ListaRequisicoes() {
     )
   })
 
-  const handleDecisao = (reqId: string, numero: string, alcada: number, decisao: 'aprovada' | 'rejeitada' | 'esclarecimento') => {
+  const handleDecisao = (reqId: string, numero: string, alcada: number, decisao: 'aprovada' | 'rejeitada' | 'esclarecimento', categoria?: string, currentStatus?: string) => {
     if (!perfil) return
     if (decisao === 'esclarecimento' && !observacao.trim()) {
       setExpandedCard(reqId)
@@ -156,6 +163,8 @@ export default function ListaRequisicoes() {
       alcadaNivel: alcada,
       aprovadorNome: perfil.nome,
       aprovadorEmail: perfil.email,
+      categoria,
+      currentStatus,
     }, {
       onSuccess: () => {
         setExpandedCard(null)
@@ -215,7 +224,7 @@ export default function ListaRequisicoes() {
             const approvalLabel = getApprovalStatusLabel(r.status)
             const isExpanded = expandedCard === r.id
             const isProcessing = decisaoMutation.isPending && decisaoMutation.variables?.requisicaoId === r.id
-            const canDecide = isAdmin && ['pendente', 'em_aprovacao', 'em_esclarecimento'].includes(r.status)
+            const canDecide = isAdmin && ['pendente', 'em_aprovacao', 'em_esclarecimento', 'cotacao_enviada'].includes(r.status)
 
             return (
               <div key={r.id}
@@ -299,10 +308,13 @@ export default function ListaRequisicoes() {
                       />
                     )}
 
+                    {r.status === 'cotacao_enviada' && (
+                      <p className="text-[10px] text-teal-600 font-semibold text-center">Aprovação Financeira</p>
+                    )}
                     <div className="flex gap-2">
                       <button
                         disabled={isProcessing}
-                        onClick={() => handleDecisao(r.id, r.numero, r.alcada_nivel, 'rejeitada')}
+                        onClick={() => handleDecisao(r.id, r.numero, r.alcada_nivel, 'rejeitada', r.categoria, r.status)}
                         className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-bold
                           text-red-500 bg-red-50 border border-red-200 hover:bg-red-100 active:scale-[0.98]
                           transition-all disabled:opacity-50"
@@ -311,7 +323,7 @@ export default function ListaRequisicoes() {
                       </button>
                       <button
                         disabled={isProcessing}
-                        onClick={() => handleDecisao(r.id, r.numero, r.alcada_nivel, 'esclarecimento')}
+                        onClick={() => handleDecisao(r.id, r.numero, r.alcada_nivel, 'esclarecimento', r.categoria, r.status)}
                         className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-bold
                           text-amber-600 bg-amber-50 border border-amber-200 hover:bg-amber-100 active:scale-[0.98]
                           transition-all disabled:opacity-50"
@@ -320,7 +332,7 @@ export default function ListaRequisicoes() {
                       </button>
                       <button
                         disabled={isProcessing}
-                        onClick={() => handleDecisao(r.id, r.numero, r.alcada_nivel, 'aprovada')}
+                        onClick={() => handleDecisao(r.id, r.numero, r.alcada_nivel, 'aprovada', r.categoria, r.status)}
                         className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-bold
                           text-emerald-600 bg-emerald-50 border border-emerald-200 hover:bg-emerald-100 active:scale-[0.98]
                           transition-all disabled:opacity-50"
