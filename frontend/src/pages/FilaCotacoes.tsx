@@ -154,9 +154,21 @@ export default function FilaCotacoes() {
         </div>
       )}
 
-      {/* Cards */}
+      {/* Cards — filtra cotações já processadas (pedido emitido+) */}
       <div className="space-y-3">
-        {cotacoes?.map(cot => {
+        {cotacoes
+          ?.filter(cot => {
+            // Mostra cotações pendentes/em andamento sempre
+            if (cot.status !== 'concluida') return true
+            // Para concluídas: só mostra se a RC ainda está no estágio de cotação
+            const reqStatus = cot.requisicao?.status
+            const statusesFinalizados = [
+              'pedido_emitido', 'em_entrega', 'entregue',
+              'comprada', 'cancelada', 'aguardando_pgto', 'pago',
+            ]
+            return !reqStatus || !statusesFinalizados.includes(reqStatus)
+          })
+          .map(cot => {
           const st = statusCotConfig[cot.status] || statusCotConfig.pendente
           const urgCfg = cot.requisicao?.urgencia ? urgenciaConfig[cot.requisicao.urgencia] : urgenciaConfig.normal
           const valor = cot.valor_selecionado ?? (cot.requisicao as any)?.valor_estimado ?? 0

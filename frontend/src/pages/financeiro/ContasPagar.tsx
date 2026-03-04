@@ -3,8 +3,9 @@ import {
   Receipt, Search, Calendar, AlertTriangle,
   CheckCircle2, Clock, FileText, RefreshCw, Zap, XCircle,
   ChevronDown, ChevronUp, Upload, Paperclip, ExternalLink, Banknote, X,
+  ShieldCheck, Building2, Tag, Briefcase, Hash,
 } from 'lucide-react'
-import { useContasPagar, useMarcarCPPago } from '../../hooks/useFinanceiro'
+import { useContasPagar, useMarcarCPPago, useAprovarPagamento } from '../../hooks/useFinanceiro'
 import { useLastSync, useTriggerSync, useOmieConfig } from '../../hooks/useOmie'
 import { useAnexosPedido, useUploadAnexo, TIPO_LABEL } from '../../hooks/useAnexos'
 import { useRegistrarPagamento } from '../../hooks/usePedidos'
@@ -312,29 +313,44 @@ const FILTROS_STATUS: { label: string; value: string }[] = [
 
 // ── CPCard ────────────────────────────────────────────────────────────────────
 
-function CPCard({ cp, onRegistrarPgto }: { cp: ContaPagar; onRegistrarPgto: (cp: ContaPagar) => void }) {
+function CPCard({ cp, onRegistrarPgto, onAprovarPgto }: {
+  cp: ContaPagar
+  onRegistrarPgto: (cp: ContaPagar) => void
+  onAprovarPgto: (cp: ContaPagar) => void
+}) {
   const [expanded, setExpanded] = useState(false)
   const vencido = !['pago', 'conciliado', 'cancelado'].includes(cp.status) &&
     new Date(cp.data_vencimento + 'T00:00:00') < new Date()
   const isPago = ['pago', 'conciliado'].includes(cp.status)
-  const canPay = cp.status === 'aguardando_aprovacao' || cp.status === 'aprovado_pgto'
+  const canApprove = cp.status === 'aguardando_aprovacao'
+  const canPay = cp.status === 'aprovado_pgto'
   const cfg = STATUS_CONFIG[cp.status]
+
+  // Dados enriquecidos via JOINs
+  const pedidoNum = cp.pedido?.numero_pedido
+  const reqNum = cp.requisicao?.numero
+  const obraNome = cp.requisicao?.obra_nome
+  const categoria = cp.requisicao?.categoria
+  const classeFinanceira = cp.classe_financeira || cp.requisicao?.classe_financeira
+  const centroCusto = cp.centro_custo || cp.requisicao?.centro_custo
 
   return (
     <div className={`bg-white rounded-2xl border shadow-sm transition-all hover:shadow-md ${
-      vencido ? 'border-red-200' : isPago ? 'border-emerald-200' : 'border-slate-200'
+      vencido ? 'border-red-200' : isPago ? 'border-emerald-200' : canApprove ? 'border-orange-200' : 'border-slate-200'
     }`}>
       {/* Main content */}
       <div className="p-4">
         <div className="flex items-start gap-3">
           <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${
-            vencido ? 'bg-red-50' : isPago ? 'bg-emerald-50' : 'bg-emerald-50'
+            vencido ? 'bg-red-50' : isPago ? 'bg-emerald-50' : canApprove ? 'bg-orange-50' : 'bg-emerald-50'
           }`}>
             {vencido
               ? <AlertTriangle size={16} className="text-red-500" />
               : isPago
                 ? <CheckCircle2 size={16} className="text-emerald-600" />
-                : <Receipt size={16} className="text-emerald-600" />
+                : canApprove
+                  ? <ShieldCheck size={16} className="text-orange-500" />
+                  : <Receipt size={16} className="text-emerald-600" />
             }
           </div>
 
@@ -346,29 +362,57 @@ function CPCard({ cp, onRegistrarPgto }: { cp: ContaPagar; onRegistrarPgto: (cp:
               </p>
             </div>
 
-            <div className="flex flex-wrap items-center gap-2 text-[10px]">
+            {/* Status + badges */}
+            <div className="flex flex-wrap items-center gap-1.5 text-[10px]">
               <span className={`inline-flex items-center gap-1 rounded-full font-semibold px-2 py-0.5 ${cfg?.bg} ${cfg?.text}`}>
                 <span className={`w-1.5 h-1.5 rounded-full ${cfg?.dot}`} />
                 {cfg?.label ?? cp.status}
               </span>
-              {cp.numero_documento && (
-                <span className="text-slate-400 font-mono">{cp.numero_documento}</span>
+              {pedidoNum && (
+                <span className="inline-flex items-center gap-0.5 bg-teal-50 text-teal-700 font-semibold rounded-full px-2 py-0.5">
+                  <FileText size={9} /> {pedidoNum}
+                </span>
+              )}
+              {reqNum && (
+                <span className="inline-flex items-center gap-0.5 bg-indigo-50 text-indigo-600 font-semibold rounded-full px-2 py-0.5">
+                  <Hash size={9} /> {reqNum}
+                </span>
               )}
               {cp.natureza && (
                 <span className="text-slate-400">{cp.natureza}</span>
               )}
-              {cp.pedido_id && (
-                <span className="text-teal-600 font-semibold">Compras</span>
-              )}
             </div>
 
-            <div className="flex items-center gap-3 mt-2 text-[10px] text-slate-400">
+            {/* Descrição */}
+            {cp.descricao && (
+              <p className="text-[11px] text-slate-500 mt-1.5 line-clamp-1">{cp.descricao}</p>
+            )}
+
+            {/* Detalhes: obra, categoria, classe, CC */}
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-2 text-[10px] text-slate-400">
               <span className="flex items-center gap-1">
                 <Calendar size={10} />
                 Venc. {fmtData(cp.data_vencimento)}
               </span>
-              {cp.centro_custo && (
-                <span>CC: {cp.centro_custo}</span>
+              {obraNome && (
+                <span className="flex items-center gap-1 text-slate-500">
+                  <Building2 size={9} /> {obraNome}
+                </span>
+              )}
+              {categoria && (
+                <span className="flex items-center gap-1">
+                  <Tag size={9} /> {categoria.replace(/_/g, ' ')}
+                </span>
+              )}
+              {centroCusto && (
+                <span className="flex items-center gap-1 font-medium text-slate-500">
+                  <Briefcase size={9} /> CC: {centroCusto}
+                </span>
+              )}
+              {classeFinanceira && (
+                <span className="text-violet-500 font-medium">
+                  {classeFinanceira}
+                </span>
               )}
               {cp.data_pagamento && (
                 <span className="text-emerald-600 font-medium">
@@ -379,19 +423,17 @@ function CPCard({ cp, onRegistrarPgto }: { cp: ContaPagar; onRegistrarPgto: (cp:
           </div>
 
           {/* Expand toggle */}
-          {cp.pedido_id && (
-            <button
-              onClick={() => setExpanded(v => !v)}
-              className="text-slate-400 hover:text-slate-600 shrink-0"
-            >
-              {expanded ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
-            </button>
-          )}
+          <button
+            onClick={() => setExpanded(v => !v)}
+            className="text-slate-400 hover:text-slate-600 shrink-0"
+          >
+            {expanded ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
+          </button>
         </div>
 
         {/* Action buttons */}
         <div className="flex gap-2 mt-3">
-          {cp.pedido_id && !expanded && (
+          {!expanded && (
             <button
               onClick={() => setExpanded(true)}
               className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl
@@ -399,7 +441,18 @@ function CPCard({ cp, onRegistrarPgto }: { cp: ContaPagar; onRegistrarPgto: (cp:
                 hover:bg-slate-100 transition-all"
             >
               <Paperclip size={11} />
-              Anexos
+              Detalhes
+            </button>
+          )}
+          {canApprove && (
+            <button
+              onClick={() => onAprovarPgto(cp)}
+              className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl
+                bg-orange-500 text-white text-[11px] font-bold hover:bg-orange-600 transition-all
+                shadow-sm shadow-orange-500/20"
+            >
+              <ShieldCheck size={12} />
+              Autorizar Pagamento
             </button>
           )}
           {canPay && !isPago && (
@@ -415,26 +468,74 @@ function CPCard({ cp, onRegistrarPgto }: { cp: ContaPagar; onRegistrarPgto: (cp:
         </div>
       </div>
 
-      {/* Expanded: Attachments */}
-      {expanded && cp.pedido_id && (
+      {/* Expanded: Details + Attachments */}
+      {expanded && (
         <div className="border-t border-slate-100 px-4 pb-4 pt-3 space-y-3">
-          <div className="flex items-center justify-between">
-            <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wide flex items-center gap-1.5">
-              <Paperclip size={11} />
-              Histórico de Anexos
-            </p>
-            {canPay && !isPago && (
-              <button
-                onClick={() => onRegistrarPgto(cp)}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 text-white
-                  text-[10px] font-bold hover:bg-emerald-700 transition-all"
-              >
-                <Banknote size={10} />
-                Registrar Pagamento
-              </button>
-            )}
-          </div>
-          <AnexosList pedidoId={cp.pedido_id} />
+          {/* Detalhes do pedido/requisição */}
+          {(pedidoNum || reqNum || obraNome || centroCusto || classeFinanceira) && (
+            <div className="bg-slate-50 rounded-xl p-3 space-y-1.5">
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Detalhes</p>
+              <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-[11px]">
+                {pedidoNum && (
+                  <div><span className="text-slate-400">Pedido:</span> <span className="font-semibold text-teal-700">{pedidoNum}</span></div>
+                )}
+                {reqNum && (
+                  <div><span className="text-slate-400">RC:</span> <span className="font-semibold text-indigo-600">{reqNum}</span></div>
+                )}
+                {obraNome && (
+                  <div><span className="text-slate-400">Obra:</span> <span className="font-semibold text-slate-700">{obraNome}</span></div>
+                )}
+                {categoria && (
+                  <div><span className="text-slate-400">Categoria:</span> <span className="font-medium text-slate-600">{categoria.replace(/_/g, ' ')}</span></div>
+                )}
+                {centroCusto && (
+                  <div><span className="text-slate-400">Centro Custo:</span> <span className="font-semibold text-slate-700">{centroCusto}</span></div>
+                )}
+                {classeFinanceira && (
+                  <div><span className="text-slate-400">Classe Fin.:</span> <span className="font-semibold text-violet-600">{classeFinanceira}</span></div>
+                )}
+                {cp.pedido?.data_prevista_entrega && (
+                  <div><span className="text-slate-400">Prev. Entrega:</span> <span className="font-medium text-slate-600">{fmtData(cp.pedido.data_prevista_entrega)}</span></div>
+                )}
+                {cp.numero_documento && (
+                  <div><span className="text-slate-400">Doc:</span> <span className="font-mono text-slate-600">{cp.numero_documento}</span></div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Anexos */}
+          {cp.pedido_id && (
+            <>
+              <div className="flex items-center justify-between">
+                <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wide flex items-center gap-1.5">
+                  <Paperclip size={11} />
+                  Anexos
+                </p>
+                {canApprove && (
+                  <button
+                    onClick={() => onAprovarPgto(cp)}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-orange-500 text-white
+                      text-[10px] font-bold hover:bg-orange-600 transition-all"
+                  >
+                    <ShieldCheck size={10} />
+                    Autorizar Pgto
+                  </button>
+                )}
+                {canPay && !isPago && (
+                  <button
+                    onClick={() => onRegistrarPgto(cp)}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 text-white
+                      text-[10px] font-bold hover:bg-emerald-700 transition-all"
+                  >
+                    <Banknote size={10} />
+                    Registrar Pagamento
+                  </button>
+                )}
+              </div>
+              <AnexosList pedidoId={cp.pedido_id} />
+            </>
+          )}
         </div>
       )}
     </div>
@@ -447,9 +548,25 @@ export default function ContasPagar() {
   const [statusFilter, setStatusFilter] = useState('')
   const [busca, setBusca] = useState('')
   const [pgtoModal, setPgtoModal] = useState<ContaPagar | null>(null)
+  const [toast, setToast] = useState<{ type: 'success' | 'error'; msg: string } | null>(null)
   const { data: contas = [], isLoading } = useContasPagar(
     statusFilter ? { status: statusFilter } : undefined
   )
+  const aprovarMutation = useAprovarPagamento()
+
+  const handleAprovarPgto = (cp: ContaPagar) => {
+    if (!confirm(`Autorizar pagamento de ${fmt(cp.valor_original)} para ${cp.fornecedor_nome}?`)) return
+    aprovarMutation.mutate({ cpId: cp.id }, {
+      onSuccess: () => {
+        setToast({ type: 'success', msg: `Pagamento autorizado ✓ — ${cp.fornecedor_nome}` })
+        setTimeout(() => setToast(null), 4000)
+      },
+      onError: () => {
+        setToast({ type: 'error', msg: 'Erro ao autorizar pagamento' })
+        setTimeout(() => setToast(null), 5000)
+      },
+    })
+  }
 
   const filtered = contas.filter(cp =>
     !busca || cp.fornecedor_nome.toLowerCase().includes(busca.toLowerCase())
@@ -466,6 +583,18 @@ export default function ContasPagar() {
 
   return (
     <div className="space-y-5">
+
+      {/* Toast feedback */}
+      {toast && (
+        <div className={`fixed top-4 left-1/2 -translate-x-1/2 z-50 px-4 py-2.5 rounded-2xl shadow-lg text-sm font-bold flex items-center gap-2 animate-[slideDown_0.3s_ease] ${
+          toast.type === 'success'
+            ? 'bg-emerald-500 text-white shadow-emerald-500/30'
+            : 'bg-red-500 text-white shadow-red-500/30'
+        }`}>
+          {toast.type === 'success' ? <CheckCircle2 size={16} /> : <XCircle size={16} />}
+          {toast.msg}
+        </div>
+      )}
 
       {/* ── Header ──────────────────────────────────────────── */}
       <div>
@@ -536,7 +665,7 @@ export default function ContasPagar() {
       ) : (
         <div className="space-y-2">
           {filtered.map(cp => (
-            <CPCard key={cp.id} cp={cp} onRegistrarPgto={setPgtoModal} />
+            <CPCard key={cp.id} cp={cp} onRegistrarPgto={setPgtoModal} onAprovarPgto={handleAprovarPgto} />
           ))}
         </div>
       )}

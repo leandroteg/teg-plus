@@ -57,6 +57,24 @@ export interface ContaPagar {
   descricao?: string
   observacoes?: string
   created_at: string
+  // Joined data from cmp_pedidos
+  pedido?: {
+    numero_pedido: string
+    status: string
+    data_pedido: string
+    data_prevista_entrega?: string
+    status_pagamento?: string
+  } | null
+  // Joined data from cmp_requisicoes
+  requisicao?: {
+    numero: string
+    descricao: string
+    obra_nome?: string
+    categoria?: string
+    centro_custo?: string
+    classe_financeira?: string
+    projeto_id?: string
+  } | null
 }
 
 export interface ContaReceber {

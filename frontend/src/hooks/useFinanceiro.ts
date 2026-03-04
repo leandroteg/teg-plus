@@ -30,13 +30,19 @@ export function useFinanceiroDashboard(periodo = '30d') {
 }
 
 // ── Contas a Pagar ───────────────────────────────────────────────────────────
+const SELECT_CP = `
+  *,
+  pedido:cmp_pedidos!pedido_id(numero_pedido, status, data_pedido, data_prevista_entrega, status_pagamento),
+  requisicao:cmp_requisicoes!requisicao_id(numero, descricao, obra_nome, categoria, centro_custo, classe_financeira, projeto_id)
+`
+
 export function useContasPagar(filters?: { status?: string; centro_custo?: string }) {
   return useQuery<ContaPagar[]>({
     queryKey: ['contas-pagar', filters],
     queryFn: async () => {
       let q = supabase
         .from('fin_contas_pagar')
-        .select('*')
+        .select(SELECT_CP)
         .order('data_vencimento', { ascending: true })
       if (filters?.status) q = q.eq('status', filters.status)
       if (filters?.centro_custo) q = q.eq('centro_custo', filters.centro_custo)
@@ -73,6 +79,30 @@ export function useFornecedores() {
         .order('razao_social')
       if (error) return []
       return (data ?? []) as Fornecedor[]
+    },
+  })
+}
+
+// ── Aprovar Pagamento (AP): aguardando_aprovacao → aprovado_pgto ──────────
+// Autorização de Pagamento: o financeiro aprova a CP para pagamento efetivo.
+
+export function useAprovarPagamento() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ cpId, aprovadorNome }: { cpId: string; aprovadorNome?: string }) => {
+      const { error } = await supabase
+        .from('fin_contas_pagar')
+        .update({
+          status: 'aprovado_pgto',
+          aprovado_por: aprovadorNome ?? 'Financeiro',
+          aprovado_em: new Date().toISOString(),
+        })
+        .eq('id', cpId)
+      if (error) throw error
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['contas-pagar'] })
+      qc.invalidateQueries({ queryKey: ['financeiro-dashboard'] })
     },
   })
 }

@@ -78,7 +78,8 @@
       }
     ],
     "direction": "horizontal",
-    "width": 300
+    "width": 300,
+    "collapsed": true
   },
   "right": {
     "id": "4c94cf6ee553823e",
@@ -211,8 +212,9 @@
   },
   "active": "a4bc148162b73016",
   "lastOpenFiles": [
-    "obsidian/Paineis/Logistica Dashboard.md",
+    "obsidian/Paineis/Compras Dashboard.md",
     "obsidian/Paineis/BI Dashboard.md",
+    "obsidian/Paineis/Logistica Dashboard.md",
     "obsidian/26 - Upload Inteligente Cotacao.md",
     "obsidian/10 - n8n Workflows.md.tmp.28700.1772635214153",
     "obsidian/00 - TEG+ INDEX.md",
@@ -228,7 +230,6 @@
     "obsidian/Paineis/Frotas Dashboard.md",
     "obsidian/Paineis/Financeiro Dashboard.md",
     "obsidian/Paineis/Estoque Dashboard.md",
-    "obsidian/Paineis/Compras Dashboard.md",
     "obsidian/Paineis/test_hook.md",
     "obsidian/Paineis/test.md",
     "obsidian/Database/Tarefas/TASK-030 - Testes CI CD.md",

@@ -163,6 +163,20 @@ w.innerHTML = `
   <!-- ── KPI ROW ─────────────────────────────────────── -->
   <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:12px;">
     ${kpi(
+      `${ptsDone}<span style="font-size:.44em;opacity:.5;font-weight:400;"> / ${pts} pts</span>`,
+      'Story Points', C.purple,
+      `📋 ${req.length} requisitos &nbsp;·&nbsp; ${rEnt} entregues`,
+      pct(ptsDone, pts),
+      'Requisitos Board'
+    )}
+    ${kpi(
+      mAtivo,
+      'Milestones Ativos', C.green,
+      `✅ ${mDone} entregue(s) &nbsp;·&nbsp; ${milest.length} total`,
+      pct(mDone, milest.length),
+      'Roadmap Board'
+    )}
+    ${kpi(
       `${tDone}<span style="font-size:.44em;opacity:.5;font-weight:400;"> / ${tTotal}</span>`,
       'Tarefas Concluídas', C.blue,
       `🔵 ${tWip} andamento &nbsp;·&nbsp; ⬜ ${tBack} backlog`,
@@ -175,20 +189,6 @@ w.innerHTML = `
       iCrit > 0 ? `🔴 ${iCrit} crítica(s) em aberto` : '✅ Nenhuma crítica aberta',
       undefined,
       'Issues Board'
-    )}
-    ${kpi(
-      mAtivo,
-      'Milestones Ativos', C.green,
-      `✅ ${mDone} entregue(s) &nbsp;·&nbsp; ${milest.length} total`,
-      pct(mDone, milest.length),
-      'Roadmap Board'
-    )}
-    ${kpi(
-      `${ptsDone}<span style="font-size:.44em;opacity:.5;font-weight:400;"> / ${pts} pts</span>`,
-      'Story Points', C.purple,
-      `📋 ${req.length} requisitos &nbsp;·&nbsp; ${rEnt} entregues`,
-      pct(ptsDone, pts),
-      'Requisitos Board'
     )}
   </div>
 
