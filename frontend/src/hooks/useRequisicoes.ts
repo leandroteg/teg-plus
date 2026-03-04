@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import type { Requisicao, NovaRequisicaoPayload } from '../types'
+import type { Requisicao, NovaRequisicaoPayload, RequisicaoItem } from '../types'
 import { supabase } from '../services/supabase'
 import { api } from '../services/api'
 
