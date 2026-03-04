@@ -2,6 +2,7 @@ import { useState } from 'react'
 import {
   CheckCircle, XCircle, ChevronDown, ChevronUp,
   Clock, Building, Sparkles, Shield, AlertTriangle,
+  MessageSquare, ExternalLink,
 } from 'lucide-react'
 import { useAprovacoesPendentes, useProcessarAprovacaoAi } from '../hooks/useAprovacoes'
 import CotacaoComparativo from '../components/CotacaoComparativo'
@@ -36,7 +37,7 @@ function AprovacaoCard({ aprovacao }: { aprovacao: AprovacaoPendente }) {
   const mutation = useProcessarAprovacaoAi()
   const [expanded, setExpanded] = useState(false)
   const [observacao, setObservacao] = useState('')
-  const [action, setAction] = useState<'aprovada' | 'rejeitada' | null>(null)
+  const [action, setAction] = useState<'aprovada' | 'rejeitada' | 'esclarecimento' | null>(null)
 
   const req  = aprovacao.requisicao
   const cot  = aprovacao.cotacao_resumo
@@ -49,17 +50,40 @@ function AprovacaoCard({ aprovacao }: { aprovacao: AprovacaoPendente }) {
     } catch { /* error handled */ }
   }
 
+  // Para esclarecimento usamos API direta (token-based) com decisão 'rejeitada' + observação de esclarecimento
+  // TODO: quando backend suportar esclarecimento via token, trocar para decisao: 'esclarecimento'
+  const handleEsclarecimento = async () => {
+    if (!observacao.trim()) {
+      setExpanded(true)
+      setAction('esclarecimento')
+      return
+    }
+    setAction('esclarecimento')
+    try {
+      // Por enquanto usa rejeitada com obs indicando esclarecimento
+      await mutation.mutateAsync({
+        token: aprovacao.token,
+        decisao: 'rejeitada',
+        observacao: `[ESCLARECIMENTO] ${observacao}`,
+      })
+    } catch { /* error handled */ }
+  }
+
   // ── Resultado ─────────────────────────────────────────────────────────────
   if (mutation.isSuccess) {
+    const colors = action === 'aprovada'
+      ? { bg: 'bg-emerald-50 border-emerald-200', icon: 'text-emerald-500', text: 'text-emerald-700', msg: 'Aprovada ✓' }
+      : action === 'esclarecimento'
+      ? { bg: 'bg-amber-50 border-amber-200', icon: 'text-amber-500', text: 'text-amber-700', msg: 'Esclarecimento solicitado' }
+      : { bg: 'bg-red-50 border-red-200', icon: 'text-red-500', text: 'text-red-700', msg: 'Rejeitada' }
+
     return (
-      <div className={`rounded-2xl p-6 text-center ${
-        action === 'aprovada' ? 'bg-emerald-50 border-2 border-emerald-200' : 'bg-red-50 border-2 border-red-200'
-      }`}>
-        {action === 'aprovada'
-          ? <CheckCircle size={44} className="text-emerald-500 mx-auto mb-3" />
-          : <XCircle    size={44} className="text-red-500    mx-auto mb-3" />}
-        <p className={`font-bold text-base ${action === 'aprovada' ? 'text-emerald-700' : 'text-red-700'}`}>
-          {req.numero} — {action === 'aprovada' ? 'Aprovada ✓' : 'Rejeitada'}
+      <div className={`rounded-2xl p-6 text-center border-2 ${colors.bg}`}>
+        {action === 'aprovada' && <CheckCircle size={44} className={`${colors.icon} mx-auto mb-3`} />}
+        {action === 'rejeitada' && <XCircle size={44} className={`${colors.icon} mx-auto mb-3`} />}
+        {action === 'esclarecimento' && <MessageSquare size={44} className={`${colors.icon} mx-auto mb-3`} />}
+        <p className={`font-bold text-base ${colors.text}`}>
+          {req.numero} — {colors.msg}
         </p>
         <p className="text-xs text-slate-500 mt-1">Aprovador notificado automaticamente</p>
       </div>
@@ -95,7 +119,17 @@ function AprovacaoCard({ aprovacao }: { aprovacao: AprovacaoPendente }) {
           </span>
         </div>
 
-        <p className="text-sm text-slate-700 mb-3">{req.descricao}</p>
+        <p className="text-sm text-slate-700 mb-2">{req.descricao}</p>
+
+        {/* Ver detalhes link */}
+        <a
+          href={`/requisicoes/${req.id}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex items-center gap-1 text-xs text-indigo-400 font-semibold hover:text-indigo-600 transition mb-3"
+        >
+          <ExternalLink size={11} /> Ver detalhes completos
+        </a>
 
         {/* Obra */}
         <div className="flex items-center gap-1.5 text-xs text-slate-500 mb-3">
@@ -156,11 +190,13 @@ function AprovacaoCard({ aprovacao }: { aprovacao: AprovacaoPendente }) {
 
         {expanded && (
           <div className="mt-3">
-            <label className="text-xs text-slate-400">Observação (opcional)</label>
+            <label className="text-xs text-slate-400">
+              {action === 'esclarecimento' ? 'Descreva o esclarecimento necessário (obrigatório)' : 'Observação (opcional)'}
+            </label>
             <textarea
               rows={2}
               className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm mt-1 focus:ring-2 focus:ring-indigo-300 outline-none"
-              placeholder="Motivo da decisão..."
+              placeholder={action === 'esclarecimento' ? 'O que precisa ser esclarecido...' : 'Motivo da decisão...'}
               value={observacao}
               onChange={e => setObservacao(e.target.value)}
             />
@@ -168,29 +204,40 @@ function AprovacaoCard({ aprovacao }: { aprovacao: AprovacaoPendente }) {
         )}
       </div>
 
-      {/* Botões de ação — grandes para mobile */}
-      <div className="grid grid-cols-2 border-t border-slate-100">
+      {/* Botões de ação — 3 colunas para mobile */}
+      <div className="grid grid-cols-3 border-t border-slate-100">
         <button
           type="button"
           disabled={mutation.isPending}
           onClick={() => { setAction('rejeitada'); handleDecision('rejeitada') }}
-          className="flex items-center justify-center gap-2 py-5 text-sm font-bold text-red-500 hover:bg-red-50 active:bg-red-100 transition border-r border-slate-100 disabled:opacity-50"
+          className="flex flex-col items-center justify-center gap-1 py-4 text-xs font-bold text-red-500 hover:bg-red-50 active:bg-red-100 transition border-r border-slate-100 disabled:opacity-50"
         >
           {mutation.isPending && action === 'rejeitada'
             ? <div className="w-5 h-5 border-2 border-red-400 border-t-transparent rounded-full animate-spin" />
-            : <XCircle size={22} />}
-          <span className="text-base">Rejeitar</span>
+            : <XCircle size={20} />}
+          <span>Rejeitar</span>
+        </button>
+        <button
+          type="button"
+          disabled={mutation.isPending}
+          onClick={handleEsclarecimento}
+          className="flex flex-col items-center justify-center gap-1 py-4 text-xs font-bold text-amber-600 hover:bg-amber-50 active:bg-amber-100 transition border-r border-slate-100 disabled:opacity-50"
+        >
+          {mutation.isPending && action === 'esclarecimento'
+            ? <div className="w-5 h-5 border-2 border-amber-400 border-t-transparent rounded-full animate-spin" />
+            : <MessageSquare size={20} />}
+          <span>Esclarecer</span>
         </button>
         <button
           type="button"
           disabled={mutation.isPending}
           onClick={() => { setAction('aprovada'); handleDecision('aprovada') }}
-          className="flex items-center justify-center gap-2 py-5 text-sm font-bold text-emerald-600 hover:bg-emerald-50 active:bg-emerald-100 transition disabled:opacity-50"
+          className="flex flex-col items-center justify-center gap-1 py-4 text-xs font-bold text-emerald-600 hover:bg-emerald-50 active:bg-emerald-100 transition disabled:opacity-50"
         >
           {mutation.isPending && action === 'aprovada'
             ? <div className="w-5 h-5 border-2 border-emerald-400 border-t-transparent rounded-full animate-spin" />
-            : <CheckCircle size={22} />}
-          <span className="text-base">Aprovar</span>
+            : <CheckCircle size={20} />}
+          <span>Aprovar</span>
         </button>
       </div>
 

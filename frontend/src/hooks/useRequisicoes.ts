@@ -16,6 +16,7 @@ export function useRequisicoes(status?: string, search?: string) {
           id, numero, solicitante_nome, obra_nome, obra_id,
           descricao, justificativa, valor_estimado, urgencia, status,
           alcada_nivel, categoria, comprador_id, texto_original, ai_confianca,
+          esclarecimento_msg, esclarecimento_por, esclarecimento_em,
           created_at,
           comprador:cmp_compradores(nome, email)
         `)
