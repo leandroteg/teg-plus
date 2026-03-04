@@ -1,9 +1,12 @@
 import { useState, useMemo } from 'react'
-import { Search, SlidersHorizontal } from 'lucide-react'
+import { Search, SlidersHorizontal, CheckCircle, XCircle } from 'lucide-react'
 import { useRequisicoes } from '../hooks/useRequisicoes'
 import { useAprovacoesPendentes } from '../hooks/useAprovacoes'
+import { useAuth } from '../contexts/AuthContext'
 import StatusBadge from '../components/StatusBadge'
 import FluxoTimeline from '../components/FluxoTimeline'
+import { supabase } from '../services/supabase'
+import { useQueryClient } from '@tanstack/react-query'
 import type { StatusRequisicao, Aprovacao } from '../types'
 
 const fmt = (v: number) =>
@@ -60,9 +63,12 @@ function CompradorBadge({ nome }: { nome: string }) {
   )
 }
 
-// Chip contextual por status — agora mostra o aprovador quando disponível
-function StatusChip({ status, aprovacao, dataPrevista }: { status: string; aprovacao?: Aprovacao; dataPrevista?: string }) {
+// Chip contextual por status — mostra aprovador ou nível de alçada
+function StatusChip({ status, aprovacao, alcadaNivel, dataPrevista }: {
+  status: string; aprovacao?: Aprovacao; alcadaNivel?: number; dataPrevista?: string
+}) {
   if (status === 'pendente' || status === 'rascunho' || status === 'em_aprovacao') {
+    // Prioridade: 1) aprovador específico 2) nível de alçada da RC
     if (aprovacao) {
       const nivel = NIVEL_LABEL[aprovacao.nivel] ?? ''
       return (
@@ -71,7 +77,14 @@ function StatusChip({ status, aprovacao, dataPrevista }: { status: string; aprov
         </span>
       )
     }
-    return <span className="text-[10px] bg-amber-50 text-amber-600 border border-amber-200 rounded-full px-2 py-0.5 font-semibold">Aguardando aprovação</span>
+    if (alcadaNivel && NIVEL_LABEL[alcadaNivel]) {
+      return (
+        <span className="text-[10px] bg-amber-50 text-amber-600 border border-amber-200 rounded-full px-2 py-0.5 font-semibold">
+          Aguard. {NIVEL_LABEL[alcadaNivel]}
+        </span>
+      )
+    }
+    return null // badge já informa o status, sem chip duplicado
   }
   if (status === 'em_cotacao' || status === 'aprovada') {
     return <span className="text-[10px] bg-violet-50 text-violet-600 border border-violet-200 rounded-full px-2 py-0.5 font-semibold">Comprador cotando</span>
@@ -92,6 +105,29 @@ export default function ListaRequisicoes() {
   const [showFilters, setShowFilters] = useState(false)
   const { data: requisicoes, isLoading } = useRequisicoes(statusFilter || undefined)
   const { data: aprovacoes } = useAprovacoesPendentes()
+  const { isAdmin, perfil } = useAuth()
+  const queryClient = useQueryClient()
+  const [processing, setProcessing] = useState<string | null>(null) // id da RC em processamento
+
+  // Admin aprova/rejeita diretamente (sem token, sem apr_aprovacoes)
+  const handleAdminDecision = async (reqId: string, decisao: 'aprovada' | 'rejeitada') => {
+    setProcessing(reqId)
+    try {
+      const novoStatus = decisao === 'aprovada' ? 'aprovada' : 'rejeitada'
+      const updates: Record<string, unknown> = { status: novoStatus }
+      if (decisao === 'aprovada') updates.data_aprovacao = new Date().toISOString()
+      const { error } = await supabase
+        .from('cmp_requisicoes')
+        .update(updates)
+        .eq('id', reqId)
+      if (!error) {
+        queryClient.invalidateQueries({ queryKey: ['requisicoes'] })
+        queryClient.invalidateQueries({ queryKey: ['dashboard'] })
+      }
+    } finally {
+      setProcessing(null)
+    }
+  }
 
   // Mapa: requisicao_id → aprovação pendente (para mostrar aprovador no card)
   const aprovacaoMap = useMemo(() => {
@@ -205,12 +241,39 @@ export default function ListaRequisicoes() {
                       ? <CompradorBadge nome={r.comprador_nome} />
                       : <span className="text-xs text-slate-300 italic">Sem comprador</span>
                     }
-                    <StatusChip status={r.status} aprovacao={apr} />
+                    <StatusChip status={r.status} aprovacao={apr} alcadaNivel={r.alcada_nivel} />
                   </div>
                   <span className="text-xs text-slate-400 flex-shrink-0">
                     {r.solicitante_nome.split(' ')[0]} · {fmtData(r.created_at)}
                   </span>
                 </div>
+
+                {/* Botões de aprovação rápida — só para admins em RCs pendentes */}
+                {isAdmin && ['pendente', 'em_aprovacao'].includes(r.status) && (
+                  <div className="flex gap-2 pt-2 border-t border-slate-100">
+                    <button
+                      disabled={processing === r.id}
+                      onClick={() => handleAdminDecision(r.id, 'rejeitada')}
+                      className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-bold
+                        text-red-500 bg-red-50 border border-red-200 hover:bg-red-100 active:scale-[0.98]
+                        transition-all disabled:opacity-50"
+                    >
+                      <XCircle size={14} /> Rejeitar
+                    </button>
+                    <button
+                      disabled={processing === r.id}
+                      onClick={() => handleAdminDecision(r.id, 'aprovada')}
+                      className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-bold
+                        text-emerald-600 bg-emerald-50 border border-emerald-200 hover:bg-emerald-100 active:scale-[0.98]
+                        transition-all disabled:opacity-50"
+                    >
+                      {processing === r.id
+                        ? <div className="w-3.5 h-3.5 border-2 border-emerald-400 border-t-transparent rounded-full animate-spin" />
+                        : <CheckCircle size={14} />}
+                      Aprovar
+                    </button>
+                  </div>
+                )}
               </div>
             )
           })}
