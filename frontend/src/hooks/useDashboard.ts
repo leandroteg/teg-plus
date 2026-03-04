@@ -62,8 +62,7 @@ async function fetchDashboardDireto(periodo: string): Promise<DashboardData> {
       .select('id, entidade_id, aprovador_nome, aprovador_email, nivel, status, token, data_limite')
       .eq('status', 'pendente')
       .eq('modulo', 'cmp')
-      .order('created_at', { ascending: false })
-      .limit(10),
+      .order('created_at', { ascending: false }),
   ])
 
   // Apenas requisições são obrigatórias; aprovações são opcionais (tabela sem FK)
@@ -76,7 +75,7 @@ async function fetchDashboardDireto(periodo: string): Promise<DashboardData> {
   })
 
   const total_mes            = requisicoes.length
-  const aguardando_aprovacao = requisicoes.filter(r => r.status === 'em_aprovacao').length
+  const aguardando_aprovacao = aprovacoes.length // contagem real de apr_aprovacoes pendentes
   const aprovadas_mes        = requisicoes.filter(r => r.status === 'aprovada').length
   const rejeitadas_mes       = requisicoes.filter(r => r.status === 'rejeitada').length
   const valor_total_mes      = requisicoes.reduce((s, r) => s + (r.valor_estimado ?? 0), 0)
