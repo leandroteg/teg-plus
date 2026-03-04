@@ -61,3 +61,79 @@ export function useProcessarAprovacaoAi() {
     },
   })
 }
+
+// ── Decisão centralizada (admin): atualiza RC + cria registro apr_aprovacoes ──
+
+export interface DecisaoPayload {
+  requisicaoId: string
+  decisao: 'aprovada' | 'rejeitada' | 'esclarecimento'
+  observacao?: string
+  requisicaoNumero: string
+  alcadaNivel: number
+  aprovadorNome: string
+  aprovadorEmail: string
+}
+
+export function useDecisaoRequisicao() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (payload: DecisaoPayload) => {
+      const {
+        requisicaoId, decisao, observacao,
+        requisicaoNumero, alcadaNivel, aprovadorNome, aprovadorEmail,
+      } = payload
+
+      // 1. Update cmp_requisicoes status
+      const updates: Record<string, unknown> = {}
+
+      if (decisao === 'aprovada') {
+        updates.status = 'aprovada'
+        updates.data_aprovacao = new Date().toISOString()
+      } else if (decisao === 'rejeitada') {
+        updates.status = 'rejeitada'
+      } else if (decisao === 'esclarecimento') {
+        updates.status = 'em_esclarecimento'
+        updates.esclarecimento_msg = observacao || 'Esclarecimento solicitado'
+        updates.esclarecimento_por = aprovadorNome
+        updates.esclarecimento_em = new Date().toISOString()
+      }
+
+      const { error: reqError } = await supabase
+        .from(TABLE_REQ)
+        .update(updates)
+        .eq('id', requisicaoId)
+
+      if (reqError) throw reqError
+
+      // 2. Create apr_aprovacoes record (audit trail + feeds AprovAi)
+      const aprStatus = decisao === 'aprovada' ? 'aprovada'
+                      : decisao === 'rejeitada' ? 'rejeitada'
+                      : 'esclarecimento'
+
+      const { error: aprError } = await supabase
+        .from(TABLE_APR)
+        .insert({
+          modulo: 'cmp',
+          entidade_id: requisicaoId,
+          entidade_numero: requisicaoNumero,
+          aprovador_nome: aprovadorNome,
+          aprovador_email: aprovadorEmail,
+          nivel: alcadaNivel,
+          status: aprStatus,
+          observacao: observacao || null,
+          data_decisao: new Date().toISOString(),
+        })
+
+      // Non-critical: log warning but don't throw
+      if (aprError) console.warn('Aviso: apr_aprovacoes não inserido:', aprError.message)
+
+      return { decisao }
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['requisicoes'] })
+      qc.invalidateQueries({ queryKey: ['requisicao'] })
+      qc.invalidateQueries({ queryKey: ['aprovacoes-pendentes'] })
+      qc.invalidateQueries({ queryKey: ['dashboard'] })
+    },
+  })
+}

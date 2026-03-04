@@ -153,3 +153,44 @@ export function useProcessarAprovacao() {
     },
   })
 }
+
+// ── Single requisicao with items ─────────────────────────────────────────────
+
+export interface RequisicaoDetalhe extends Requisicao {
+  itens: RequisicaoItem[]
+}
+
+export function useRequisicao(id?: string) {
+  return useQuery<RequisicaoDetalhe | null>({
+    queryKey: ['requisicao', id],
+    queryFn: async () => {
+      if (!id) return null
+
+      const { data, error } = await supabase
+        .from(TABLE)
+        .select(`
+          id, numero, solicitante_nome, obra_nome, obra_id,
+          descricao, justificativa, valor_estimado, urgencia, status,
+          alcada_nivel, categoria, comprador_id, texto_original, ai_confianca,
+          created_at, esclarecimento_msg, esclarecimento_por, esclarecimento_em,
+          comprador:cmp_compradores(nome, email),
+          itens:cmp_requisicao_itens(id, descricao, quantidade, unidade, valor_unitario_estimado)
+        `)
+        .eq('id', id)
+        .single()
+
+      if (error) throw error
+      if (!data) return null
+
+      const d = data as any
+      return {
+        ...d,
+        comprador_nome: d.comprador?.nome ?? undefined,
+        comprador: undefined,
+        itens: d.itens ?? [],
+      } as RequisicaoDetalhe
+    },
+    enabled: !!id,
+    staleTime: 15_000,
+  })
+}
