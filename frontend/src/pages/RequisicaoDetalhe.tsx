@@ -4,10 +4,12 @@ import {
   ArrowLeft, Building, User, Calendar, Tag, Package,
   CheckCircle, XCircle, MessageSquare, AlertTriangle,
   ChevronDown, ChevronUp, ShoppingCart, UserCog, ExternalLink,
+  FileText, Ban,
 } from 'lucide-react'
 import { useRequisicao } from '../hooks/useRequisicoes'
 import { useDecisaoRequisicao } from '../hooks/useAprovacoes'
 import { useCotacaoByRequisicao } from '../hooks/useCotacoes'
+import { useEmitirPedido, useCancelarRequisicao } from '../hooks/usePedidos'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../services/supabase'
 import StatusBadge from '../components/StatusBadge'
@@ -32,16 +34,19 @@ export default function RequisicaoDetalhe() {
   const navigate = useNavigate()
   const { data: req, isLoading, error } = useRequisicao(id)
   const decisaoMutation = useDecisaoRequisicao()
+  const emitirPedidoMutation = useEmitirPedido()
+  const cancelarMutation = useCancelarRequisicao()
   const { isAdmin, perfil } = useAuth()
 
   // Cotação vinculada à RC
-  const showCotacao = req && ['em_cotacao', 'cotacao_enviada', 'cotacao_aprovada', 'cotacao_rejeitada'].includes(req.status)
+  const showCotacao = req && ['em_cotacao', 'cotacao_enviada', 'cotacao_aprovada', 'cotacao_rejeitada', 'pedido_emitido'].includes(req.status)
   const { data: cotacao } = useCotacaoByRequisicao(showCotacao ? id : undefined)
 
   const [observacao, setObservacao] = useState('')
   const [showObservacao, setShowObservacao] = useState(false)
   const [showItens, setShowItens] = useState(true)
   const [pendingAction, setPendingAction] = useState<'aprovada' | 'rejeitada' | 'esclarecimento' | null>(null)
+  const [pedidoToast, setPedidoToast] = useState<{ type: 'success' | 'error'; msg: string } | null>(null)
 
   // Decisão técnica (pendente/em_aprovacao/esclarecimento) OU financeira (cotacao_enviada)
   const canDecide = isAdmin && req && (
@@ -311,6 +316,122 @@ export default function RequisicaoDetalhe() {
             {req.status === 'cotacao_aprovada' ? '✓ Cotação Aprovada' : '✗ Cotação Rejeitada'}
           </span>
           <CotacaoComparativo fornecedores={cotacao.fornecedores} readOnly />
+        </div>
+      )}
+
+      {/* ── Emitir Pedido / Cancelar — cotação aprovada ───────────────────────── */}
+      {isAdmin && req.status === 'cotacao_aprovada' && (
+        <div className="bg-white rounded-2xl border-2 border-teal-200 shadow-sm overflow-hidden">
+          <div className="bg-teal-50 px-4 py-3 border-b border-teal-100">
+            <p className="text-xs font-bold text-teal-700 uppercase tracking-wider flex items-center gap-2">
+              <FileText size={14} />
+              Próximo Passo — Emissão de Pedido
+            </p>
+          </div>
+
+          <div className="p-4 space-y-3">
+            {/* Resumo da cotação vencedora */}
+            {cotacao?.fornecedor_selecionado_nome && (
+              <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3">
+                <div className="flex justify-between items-center">
+                  <div>
+                    <p className="text-[10px] text-emerald-500 font-semibold uppercase">Fornecedor Vencedor</p>
+                    <p className="text-sm font-bold text-emerald-700">{cotacao.fornecedor_selecionado_nome}</p>
+                  </div>
+                  <p className="text-lg font-extrabold text-emerald-600">
+                    {fmt(cotacao.valor_selecionado ?? req.valor_estimado)}
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {/* Toast feedback */}
+            {pedidoToast && (
+              <div className={`flex items-center gap-2 rounded-xl px-3 py-2.5 text-sm font-semibold ${
+                pedidoToast.type === 'success'
+                  ? 'bg-emerald-50 border border-emerald-200 text-emerald-700'
+                  : 'bg-red-50 border border-red-200 text-red-700'
+              }`}>
+                {pedidoToast.type === 'success' ? <CheckCircle size={16} /> : <XCircle size={16} />}
+                {pedidoToast.msg}
+              </div>
+            )}
+
+            {/* Botões */}
+            {!emitirPedidoMutation.isSuccess && !cancelarMutation.isSuccess && (
+              <div className="grid grid-cols-2 gap-3">
+                <button
+                  disabled={cancelarMutation.isPending || emitirPedidoMutation.isPending}
+                  onClick={() => {
+                    if (!confirm('Cancelar esta requisição? Esta ação não pode ser desfeita.')) return
+                    cancelarMutation.mutate(req.id, {
+                      onSuccess: () => {
+                        setPedidoToast({ type: 'success', msg: 'Requisição cancelada' })
+                        setTimeout(() => setPedidoToast(null), 4000)
+                      },
+                      onError: () => {
+                        setPedidoToast({ type: 'error', msg: 'Erro ao cancelar. Tente novamente.' })
+                        setTimeout(() => setPedidoToast(null), 5000)
+                      },
+                    })
+                  }}
+                  className="flex items-center justify-center gap-2 py-3.5 rounded-xl text-sm font-bold
+                    text-red-500 bg-red-50 border-2 border-red-200 hover:bg-red-100 active:scale-[0.98]
+                    transition-all disabled:opacity-50"
+                >
+                  {cancelarMutation.isPending
+                    ? <div className="w-4 h-4 border-2 border-red-400 border-t-transparent rounded-full animate-spin" />
+                    : <Ban size={16} />}
+                  Cancelar RC
+                </button>
+
+                <button
+                  disabled={emitirPedidoMutation.isPending || cancelarMutation.isPending}
+                  onClick={() => {
+                    emitirPedidoMutation.mutate({
+                      requisicaoId: req.id,
+                      cotacaoId: cotacao?.id ?? '',
+                      fornecedorNome: cotacao?.fornecedor_selecionado_nome ?? 'N/A',
+                      valorTotal: cotacao?.valor_selecionado ?? req.valor_estimado,
+                      compradorId: cotacao?.comprador_id,
+                    }, {
+                      onSuccess: (pedido) => {
+                        setPedidoToast({ type: 'success', msg: `Pedido ${pedido.numero_pedido} emitido ✓` })
+                      },
+                      onError: () => {
+                        setPedidoToast({ type: 'error', msg: 'Erro ao emitir pedido. Tente novamente.' })
+                        setTimeout(() => setPedidoToast(null), 5000)
+                      },
+                    })
+                  }}
+                  className="flex items-center justify-center gap-2 py-3.5 rounded-xl text-sm font-bold
+                    text-white bg-teal-500 border-2 border-teal-500 hover:bg-teal-600 shadow-lg shadow-teal-500/20
+                    active:scale-[0.98] transition-all disabled:opacity-50"
+                >
+                  {emitirPedidoMutation.isPending
+                    ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    : <FileText size={16} />}
+                  Emitir Pedido
+                </button>
+              </div>
+            )}
+
+            {/* Success state */}
+            {emitirPedidoMutation.isSuccess && (
+              <div className="text-center py-2">
+                <CheckCircle size={36} className="text-emerald-500 mx-auto mb-2" />
+                <p className="text-sm font-bold text-emerald-700">Pedido Emitido!</p>
+                <p className="text-xs text-slate-500 mt-1">O pedido aparece na tela de Pedidos</p>
+              </div>
+            )}
+
+            {cancelarMutation.isSuccess && (
+              <div className="text-center py-2">
+                <Ban size={36} className="text-red-400 mx-auto mb-2" />
+                <p className="text-sm font-bold text-red-600">Requisição Cancelada</p>
+              </div>
+            )}
+          </div>
         </div>
       )}
 

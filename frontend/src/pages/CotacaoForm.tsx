@@ -2,9 +2,12 @@ import { useState, useCallback, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import {
   ChevronLeft, PlusCircle, Trash2, Send, CheckCircle, Info, AlertTriangle,
-  Paperclip, FileText, X, Loader2, Eye,
+  Paperclip, FileText, X, Loader2, Eye, Ban,
 } from 'lucide-react'
 import { useCotacao, useFinalizarCotacao } from '../hooks/useCotacoes'
+import { useEmitirPedido, useCancelarRequisicao } from '../hooks/usePedidos'
+import { useAuth } from '../contexts/AuthContext'
+import type { Cotacao } from '../types'
 import CotacaoComparativo from '../components/CotacaoComparativo'
 import FluxoTimeline from '../components/FluxoTimeline'
 import UploadCotacao from '../components/UploadCotacao'
@@ -37,6 +40,176 @@ function getMinCot(valor: number) {
   if (valor <= 500)  return 1
   if (valor <= 2000) return 2
   return 3
+}
+
+// ── Cotação Concluída (com botões Emitir Pedido / Cancelar) ─────────────────
+
+function CotacaoConcluida({ cotacao, nav }: { cotacao: Cotacao; nav: ReturnType<typeof useNavigate> }) {
+  const { isAdmin } = useAuth()
+  const emitirMutation = useEmitirPedido()
+  const cancelarMutation = useCancelarRequisicao()
+  const [pedidoToast, setPedidoToast] = useState<{ type: 'success' | 'error'; msg: string } | null>(null)
+
+  const req = cotacao.requisicao
+  const canEmitPedido = isAdmin && req?.status === 'cotacao_aprovada'
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center gap-2">
+        <button onClick={() => nav('/cotacoes')} className="p-1">
+          <ChevronLeft size={18} className="text-slate-500" />
+        </button>
+        <h2 className="text-lg font-extrabold text-slate-800">Cotação Concluída</h2>
+      </div>
+
+      {/* RC Info */}
+      <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm">
+        <p className="text-xs text-slate-400 font-mono mb-1">{req?.numero}</p>
+        <p className="text-sm font-bold text-slate-800">{req?.descricao}</p>
+        <div className="flex justify-between items-center mt-1">
+          <p className="text-xs text-slate-400">{req?.obra_nome}</p>
+          <p className="text-sm font-extrabold text-teal-600">{fmt(cotacao.valor_selecionado ?? req?.valor_estimado ?? 0)}</p>
+        </div>
+      </div>
+
+      {/* Timeline */}
+      {req && <FluxoTimeline status={req.status ?? 'cotacao_aprovada'} />}
+
+      {/* Comparativo */}
+      {cotacao.fornecedores && <CotacaoComparativo fornecedores={cotacao.fornecedores} readOnly />}
+
+      {/* ── Emitir Pedido / Cancelar ────────────────────────────────────── */}
+      {canEmitPedido && (
+        <div className="bg-white rounded-2xl border-2 border-teal-200 shadow-sm overflow-hidden">
+          <div className="bg-teal-50 px-4 py-3 border-b border-teal-100">
+            <p className="text-xs font-bold text-teal-700 uppercase tracking-wider flex items-center gap-2">
+              <FileText size={14} />
+              Próximo Passo — Emissão de Pedido
+            </p>
+          </div>
+
+          <div className="p-4 space-y-3">
+            {/* Fornecedor vencedor */}
+            {cotacao.fornecedor_selecionado_nome && (
+              <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3">
+                <div className="flex justify-between items-center">
+                  <div>
+                    <p className="text-[10px] text-emerald-500 font-semibold uppercase">Fornecedor Vencedor</p>
+                    <p className="text-sm font-bold text-emerald-700">{cotacao.fornecedor_selecionado_nome}</p>
+                  </div>
+                  <p className="text-lg font-extrabold text-emerald-600">
+                    {fmt(cotacao.valor_selecionado ?? 0)}
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {/* Toast */}
+            {pedidoToast && (
+              <div className={`flex items-center gap-2 rounded-xl px-3 py-2.5 text-sm font-semibold ${
+                pedidoToast.type === 'success'
+                  ? 'bg-emerald-50 border border-emerald-200 text-emerald-700'
+                  : 'bg-red-50 border border-red-200 text-red-700'
+              }`}>
+                {pedidoToast.type === 'success' ? <CheckCircle size={16} /> : <AlertTriangle size={16} />}
+                {pedidoToast.msg}
+              </div>
+            )}
+
+            {/* Botões */}
+            {!emitirMutation.isSuccess && !cancelarMutation.isSuccess && (
+              <div className="grid grid-cols-2 gap-3">
+                <button
+                  disabled={cancelarMutation.isPending || emitirMutation.isPending}
+                  onClick={() => {
+                    if (!confirm('Cancelar esta requisição? Esta ação não pode ser desfeita.')) return
+                    cancelarMutation.mutate(req!.id, {
+                      onSuccess: () => {
+                        setPedidoToast({ type: 'success', msg: 'Requisição cancelada' })
+                        setTimeout(() => nav('/cotacoes'), 1500)
+                      },
+                      onError: () => {
+                        setPedidoToast({ type: 'error', msg: 'Erro ao cancelar.' })
+                        setTimeout(() => setPedidoToast(null), 5000)
+                      },
+                    })
+                  }}
+                  className="flex items-center justify-center gap-2 py-3.5 rounded-xl text-sm font-bold
+                    text-red-500 bg-red-50 border-2 border-red-200 hover:bg-red-100 active:scale-[0.98]
+                    transition-all disabled:opacity-50"
+                >
+                  {cancelarMutation.isPending
+                    ? <div className="w-4 h-4 border-2 border-red-400 border-t-transparent rounded-full animate-spin" />
+                    : <Ban size={16} />}
+                  Cancelar RC
+                </button>
+
+                <button
+                  disabled={emitirMutation.isPending || cancelarMutation.isPending}
+                  onClick={() => {
+                    emitirMutation.mutate({
+                      requisicaoId: req!.id,
+                      cotacaoId: cotacao.id,
+                      fornecedorNome: cotacao.fornecedor_selecionado_nome ?? 'N/A',
+                      valorTotal: cotacao.valor_selecionado ?? req!.valor_estimado,
+                      compradorId: cotacao.comprador_id,
+                    }, {
+                      onSuccess: (pedido) => {
+                        setPedidoToast({ type: 'success', msg: `Pedido ${pedido.numero_pedido} emitido ✓` })
+                      },
+                      onError: () => {
+                        setPedidoToast({ type: 'error', msg: 'Erro ao emitir pedido.' })
+                        setTimeout(() => setPedidoToast(null), 5000)
+                      },
+                    })
+                  }}
+                  className="flex items-center justify-center gap-2 py-3.5 rounded-xl text-sm font-bold
+                    text-white bg-teal-500 border-2 border-teal-500 hover:bg-teal-600 shadow-lg shadow-teal-500/20
+                    active:scale-[0.98] transition-all disabled:opacity-50"
+                >
+                  {emitirMutation.isPending
+                    ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    : <FileText size={16} />}
+                  Emitir Pedido
+                </button>
+              </div>
+            )}
+
+            {emitirMutation.isSuccess && (
+              <div className="text-center py-2">
+                <CheckCircle size={36} className="text-emerald-500 mx-auto mb-2" />
+                <p className="text-sm font-bold text-emerald-700">Pedido Emitido!</p>
+                <p className="text-xs text-slate-500 mt-1">O pedido aparece na tela de Pedidos</p>
+              </div>
+            )}
+
+            {cancelarMutation.isSuccess && (
+              <div className="text-center py-2">
+                <Ban size={36} className="text-red-400 mx-auto mb-2" />
+                <p className="text-sm font-bold text-red-600">Requisição Cancelada</p>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Status badges for non-admin or non-approved states */}
+      {req?.status === 'cotacao_enviada' && (
+        <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 text-center">
+          <p className="text-sm font-bold text-amber-700">⏳ Aguardando Aprovação Financeira</p>
+          <p className="text-xs text-amber-500 mt-1">A cotação foi enviada para aprovação do gestor</p>
+        </div>
+      )}
+
+      {req?.status === 'pedido_emitido' && (
+        <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-4 text-center">
+          <CheckCircle size={28} className="text-emerald-500 mx-auto mb-2" />
+          <p className="text-sm font-bold text-emerald-700">Pedido Emitido ✓</p>
+          <p className="text-xs text-emerald-500 mt-1">O pedido foi emitido e está em andamento</p>
+        </div>
+      )}
+    </div>
+  )
 }
 
 export default function CotacaoForm() {
@@ -210,29 +383,7 @@ export default function CotacaoForm() {
   // ── Cotação já concluída ──────────────────────────────────────────────────
   if (cotacao?.status === 'concluida' && cotacao.fornecedores) {
     return (
-      <div className="space-y-4">
-        <div className="flex items-center gap-2">
-          <button onClick={() => nav('/cotacoes')} className="p-1">
-            <ChevronLeft size={18} className="text-slate-500" />
-          </button>
-          <h2 className="text-lg font-extrabold text-slate-800">Cotação Concluída</h2>
-        </div>
-
-        {/* RC Info */}
-        <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm">
-          <p className="text-xs text-slate-400 font-mono mb-1">{cotacao.requisicao?.numero}</p>
-          <p className="text-sm font-bold text-slate-800">{cotacao.requisicao?.descricao}</p>
-          <p className="text-xs text-slate-400 mt-1">{cotacao.requisicao?.obra_nome}</p>
-        </div>
-
-        {/* Timeline */}
-        {cotacao.requisicao && (
-          <FluxoTimeline status={cotacao.requisicao.status ?? 'cotacao_aprovada'} />
-        )}
-
-        {/* Comparativo */}
-        <CotacaoComparativo fornecedores={cotacao.fornecedores} readOnly />
-      </div>
+      <CotacaoConcluida cotacao={cotacao} nav={nav} />
     )
   }
 

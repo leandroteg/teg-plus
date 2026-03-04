@@ -90,3 +90,101 @@ export function useRegistrarPagamento() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ['pedidos'] }),
   })
 }
+
+// ── Emitir Pedido: cria pedido a partir de cotação aprovada ────────────────
+
+export interface EmitirPedidoPayload {
+  requisicaoId: string
+  cotacaoId: string
+  fornecedorNome: string
+  valorTotal: number
+  compradorId?: string
+  condicaoPagamento?: string
+  observacoes?: string
+  dataPrevistaEntrega?: string
+}
+
+export function useEmitirPedido() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (payload: EmitirPedidoPayload) => {
+      const {
+        requisicaoId, cotacaoId, fornecedorNome, valorTotal,
+        compradorId, condicaoPagamento, observacoes, dataPrevistaEntrega,
+      } = payload
+
+      // 1. Gera número do pedido: PO-YYYYMM-XXXX
+      const now = new Date()
+      const prefix = `PO-${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}`
+      const { count } = await supabase
+        .from('cmp_pedidos')
+        .select('id', { count: 'exact', head: true })
+        .like('numero_pedido', `${prefix}%`)
+      const seq = String((count ?? 0) + 1).padStart(4, '0')
+      const numeroPedido = `${prefix}-${seq}`
+
+      // 2. Cria o pedido
+      const { data: pedido, error: pedError } = await supabase
+        .from('cmp_pedidos')
+        .insert({
+          requisicao_id: requisicaoId,
+          cotacao_id: cotacaoId,
+          comprador_id: compradorId || null,
+          numero_pedido: numeroPedido,
+          fornecedor_nome: fornecedorNome,
+          valor_total: valorTotal,
+          status: 'emitido',
+          data_pedido: now.toISOString().split('T')[0],
+          data_prevista_entrega: dataPrevistaEntrega || null,
+          condicao_pagamento: condicaoPagamento || null,
+          observacoes: observacoes || null,
+        })
+        .select('id, numero_pedido')
+        .single()
+
+      if (pedError) throw pedError
+
+      // 3. Atualiza RC → pedido_emitido
+      const { error: reqError } = await supabase
+        .from('cmp_requisicoes')
+        .update({ status: 'pedido_emitido' })
+        .eq('id', requisicaoId)
+
+      if (reqError) console.warn('Aviso: RC não atualizada:', reqError.message)
+
+      return pedido
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['pedidos'] })
+      qc.invalidateQueries({ queryKey: ['requisicoes'] })
+      qc.invalidateQueries({ queryKey: ['requisicao'] })
+      qc.invalidateQueries({ queryKey: ['cotacoes'] })
+      qc.invalidateQueries({ queryKey: ['cotacao'] })
+      qc.invalidateQueries({ queryKey: ['cotacao-req'] })
+      qc.invalidateQueries({ queryKey: ['dashboard'] })
+    },
+  })
+}
+
+// ── Cancelar Requisição ────────────────────────────────────────────────────
+
+export function useCancelarRequisicao() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (requisicaoId: string) => {
+      const { error } = await supabase
+        .from('cmp_requisicoes')
+        .update({ status: 'cancelada' })
+        .eq('id', requisicaoId)
+      if (error) throw error
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['requisicoes'] })
+      qc.invalidateQueries({ queryKey: ['requisicao'] })
+      qc.invalidateQueries({ queryKey: ['cotacoes'] })
+      qc.invalidateQueries({ queryKey: ['cotacao'] })
+      qc.invalidateQueries({ queryKey: ['cotacao-req'] })
+      qc.invalidateQueries({ queryKey: ['dashboard'] })
+    },
+  })
+}

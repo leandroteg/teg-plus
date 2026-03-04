@@ -1,8 +1,9 @@
 import { useState, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Search, SlidersHorizontal, CheckCircle, XCircle, MessageSquare, ChevronDown, ChevronUp } from 'lucide-react'
+import { Search, SlidersHorizontal, CheckCircle, XCircle, MessageSquare, ChevronDown, ChevronUp, FileText, Ban } from 'lucide-react'
 import { useRequisicoes } from '../hooks/useRequisicoes'
 import { useAprovacoesPendentes, useDecisaoRequisicao } from '../hooks/useAprovacoes'
+import { useEmitirPedido, useCancelarRequisicao } from '../hooks/usePedidos'
 import { useAuth } from '../contexts/AuthContext'
 import StatusBadge from '../components/StatusBadge'
 import FluxoTimeline from '../components/FluxoTimeline'
@@ -122,6 +123,8 @@ export default function ListaRequisicoes() {
   const { data: aprovacoes } = useAprovacoesPendentes()
   const { isAdmin, perfil } = useAuth()
   const decisaoMutation = useDecisaoRequisicao()
+  const emitirPedidoMutation = useEmitirPedido()
+  const cancelarMutation = useCancelarRequisicao()
 
   // Card expandido para comentário + esclarecimento
   const [expandedCard, setExpandedCard] = useState<string | null>(null)
@@ -370,6 +373,71 @@ export default function ListaRequisicoes() {
                     </div>
                   </div>
                 )}
+
+                {/* Botões Emitir Pedido / Cancelar — admin + cotacao_aprovada */}
+                {isAdmin && r.status === 'cotacao_aprovada' && (() => {
+                  const isEmitting = emitirPedidoMutation.isPending && emitirPedidoMutation.variables?.requisicaoId === r.id
+                  const isCancelling = cancelarMutation.isPending && cancelarMutation.variables === r.id
+                  return (
+                    <div className="pt-2 border-t border-teal-100 space-y-2" onClick={e => e.stopPropagation()}>
+                      <p className="text-[10px] text-teal-600 font-bold text-center uppercase tracking-wide">Emissão de Pedido</p>
+                      <div className="flex gap-2">
+                        <button
+                          disabled={isCancelling || isEmitting}
+                          onClick={() => {
+                            if (!confirm('Cancelar esta requisição?')) return
+                            cancelarMutation.mutate(r.id, {
+                              onSuccess: () => {
+                                setToast({ type: 'success', msg: `${r.numero}: Cancelada` })
+                                setTimeout(() => setToast(null), 4000)
+                              },
+                              onError: () => {
+                                setToast({ type: 'error', msg: `Erro ao cancelar ${r.numero}` })
+                                setTimeout(() => setToast(null), 5000)
+                              },
+                            })
+                          }}
+                          className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-bold
+                            text-red-500 bg-red-50 border border-red-200 hover:bg-red-100 active:scale-[0.98]
+                            transition-all disabled:opacity-50"
+                        >
+                          {isCancelling
+                            ? <div className="w-3.5 h-3.5 border-2 border-red-400 border-t-transparent rounded-full animate-spin" />
+                            : <Ban size={14} />}
+                          Cancelar
+                        </button>
+                        <button
+                          disabled={isEmitting || isCancelling}
+                          onClick={() => {
+                            emitirPedidoMutation.mutate({
+                              requisicaoId: r.id,
+                              cotacaoId: '', // will be resolved from DB trigger
+                              fornecedorNome: r.comprador_nome ?? 'N/A',
+                              valorTotal: r.valor_estimado,
+                            }, {
+                              onSuccess: (pedido) => {
+                                setToast({ type: 'success', msg: `${pedido.numero_pedido} emitido ✓` })
+                                setTimeout(() => setToast(null), 4000)
+                              },
+                              onError: () => {
+                                setToast({ type: 'error', msg: `Erro ao emitir pedido para ${r.numero}` })
+                                setTimeout(() => setToast(null), 5000)
+                              },
+                            })
+                          }}
+                          className="flex-[2] flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-bold
+                            text-white bg-teal-500 border border-teal-500 hover:bg-teal-600 shadow-sm shadow-teal-500/20
+                            active:scale-[0.98] transition-all disabled:opacity-50"
+                        >
+                          {isEmitting
+                            ? <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                            : <FileText size={14} />}
+                          Emitir Pedido
+                        </button>
+                      </div>
+                    </div>
+                  )
+                })()}
               </div>
             )
           })}
