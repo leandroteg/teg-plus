@@ -1,6 +1,8 @@
 // CotacaoComparativo.tsx — Tabela comparativa de fornecedores (cotação)
-import { Check, Trophy } from 'lucide-react'
+import { useCallback } from 'react'
+import { Check, Trophy, FileText, ExternalLink } from 'lucide-react'
 import type { CotacaoFornecedor } from '../types'
+import { supabase } from '../services/supabase'
 
 function formatBRL(val: number) {
   return val.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
@@ -13,6 +15,11 @@ interface Props {
 }
 
 export default function CotacaoComparativo({ fornecedores, onSelect, readOnly = false }: Props) {
+  const viewFile = useCallback(async (path: string) => {
+    const { data } = await supabase.storage.from('cotacoes-docs').createSignedUrl(path, 3600)
+    if (data?.signedUrl) window.open(data.signedUrl, '_blank')
+  }, [])
+
   if (fornecedores.length === 0) return null
 
   // Menor valor total → badge de destaque
@@ -76,6 +83,16 @@ export default function CotacaoComparativo({ fornecedores, onSelect, readOnly = 
                 {f.fornecedor_contato && (
                   <div className="col-span-2"><span className="text-slate-400">Contato:</span> {f.fornecedor_contato}</div>
                 )}
+                {f.arquivo_url && (
+                  <button
+                    onClick={(e) => { e.stopPropagation(); viewFile(f.arquivo_url!) }}
+                    className="col-span-2 flex items-center gap-1.5 text-violet-600 hover:text-violet-800 font-semibold transition"
+                  >
+                    <FileText size={12} />
+                    <span>Ver cotação anexa</span>
+                    <ExternalLink size={10} />
+                  </button>
+                )}
               </div>
 
               {!readOnly && onSelect && !isSelected && (
@@ -100,6 +117,7 @@ export default function CotacaoComparativo({ fornecedores, onSelect, readOnly = 
               <th className="px-4 py-2.5 text-right">Valor Total</th>
               <th className="px-4 py-2.5 text-center">Prazo</th>
               <th className="px-4 py-2.5">Pagamento</th>
+              <th className="px-4 py-2.5 text-center">Anexo</th>
               {!readOnly && onSelect && <th className="px-4 py-2.5" />}
             </tr>
           </thead>
@@ -149,6 +167,20 @@ export default function CotacaoComparativo({ fornecedores, onSelect, readOnly = 
                   </td>
                   <td className="px-4 py-3 text-slate-600 text-[12px]">
                     {f.condicao_pagamento ?? <span className="text-slate-300">—</span>}
+                  </td>
+                  <td className="px-4 py-3 text-center">
+                    {f.arquivo_url ? (
+                      <button
+                        onClick={(e) => { e.stopPropagation(); viewFile(f.arquivo_url!) }}
+                        className="inline-flex items-center gap-1 text-[11px] text-violet-600 hover:text-violet-800 font-semibold transition"
+                        title="Abrir cotação"
+                      >
+                        <FileText size={13} />
+                        <ExternalLink size={10} />
+                      </button>
+                    ) : (
+                      <span className="text-slate-300">—</span>
+                    )}
                   </td>
                   {!readOnly && onSelect && (
                     <td className="px-4 py-3 text-right">

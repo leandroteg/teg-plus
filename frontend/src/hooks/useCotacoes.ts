@@ -140,6 +140,7 @@ export interface FinalizarCotacaoPayload {
     prazo_entrega_dias?: number
     condicao_pagamento?: string
     observacao?: string
+    arquivo_url?: string
   }[]
   sem_cotacoes_minimas?: boolean
   justificativa_sem_cotacoes?: string
@@ -162,6 +163,7 @@ export function useFinalizarCotacao() {
         condicao_pagamento: f.condicao_pagamento || null,
         itens_precos: [],
         observacao: f.observacao || null,
+        arquivo_url: f.arquivo_url || null,
         selecionado: false,
       }))
 

@@ -149,8 +149,13 @@ export default function ListaRequisicoes() {
     )
   })
 
+  const [toast, setToast] = useState<{ type: 'success' | 'error'; msg: string } | null>(null)
+
   const handleDecisao = (reqId: string, numero: string, alcada: number, decisao: 'aprovada' | 'rejeitada' | 'esclarecimento', categoria?: string, currentStatus?: string) => {
-    if (!perfil) return
+    if (!perfil) {
+      console.warn('[ListaRequisicoes] perfil null — ação bloqueada')
+      return
+    }
     if (decisao === 'esclarecimento' && !observacao.trim()) {
       setExpandedCard(reqId)
       return
@@ -169,12 +174,32 @@ export default function ListaRequisicoes() {
       onSuccess: () => {
         setExpandedCard(null)
         setObservacao('')
+        const label = decisao === 'aprovada' ? 'Aprovada ✓' : decisao === 'rejeitada' ? 'Rejeitada' : 'Esclarecimento solicitado'
+        setToast({ type: 'success', msg: `${numero}: ${label}` })
+        setTimeout(() => setToast(null), 4000)
+      },
+      onError: (err) => {
+        console.error('[ListaRequisicoes] Erro na decisão:', err)
+        setToast({ type: 'error', msg: `Erro ao processar ${numero}. Tente novamente.` })
+        setTimeout(() => setToast(null), 5000)
       },
     })
   }
 
   return (
     <div className="space-y-3">
+      {/* Toast feedback */}
+      {toast && (
+        <div className={`fixed top-4 left-1/2 -translate-x-1/2 z-50 px-4 py-2.5 rounded-2xl shadow-lg text-sm font-bold flex items-center gap-2 animate-[slideDown_0.3s_ease] ${
+          toast.type === 'success'
+            ? 'bg-emerald-500 text-white shadow-emerald-500/30'
+            : 'bg-red-500 text-white shadow-red-500/30'
+        }`}>
+          {toast.type === 'success' ? <CheckCircle size={16} /> : <XCircle size={16} />}
+          {toast.msg}
+        </div>
+      )}
+
       <div className="flex items-center justify-between">
         <h2 className="text-lg font-extrabold text-slate-800 tracking-tight">Requisições</h2>
         <button onClick={() => setShowFilters(!showFilters)}

@@ -1,14 +1,19 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import {
   ChevronLeft, PlusCircle, Trash2, Send, CheckCircle, Info, AlertTriangle,
+  Paperclip, FileText, X, Loader2, Eye,
 } from 'lucide-react'
 import { useCotacao, useFinalizarCotacao } from '../hooks/useCotacoes'
 import CotacaoComparativo from '../components/CotacaoComparativo'
 import FluxoTimeline from '../components/FluxoTimeline'
 import UploadCotacao from '../components/UploadCotacao'
+import { supabase } from '../services/supabase'
 
 const fmt = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
+
+const FILE_ACCEPTED = ['image/jpeg', 'image/png', 'image/webp', 'application/pdf']
+const FILE_MAX_SIZE = 10 * 1024 * 1024
 
 interface FornecedorForm {
   fornecedor_nome:    string
@@ -18,11 +23,13 @@ interface FornecedorForm {
   prazo_entrega_dias: number
   condicao_pagamento: string
   observacao:         string
+  arquivo_url:        string
 }
 
 const emptyFornecedor = (): FornecedorForm => ({
   fornecedor_nome: '', fornecedor_contato: '', fornecedor_cnpj: '',
   valor_total: 0, prazo_entrega_dias: 0, condicao_pagamento: '', observacao: '',
+  arquivo_url: '',
 })
 
 // Cotações mínimas pelo valor
@@ -70,6 +77,7 @@ export default function CotacaoForm() {
         prazo_entrega_dias: p.prazo_entrega_dias || 0,
         condicao_pagamento: p.condicao_pagamento || '',
         observacao: p.observacao || '',
+        arquivo_url: '',
       }))
 
       // Preenche slots vazios primeiro, depois adiciona novos
@@ -90,6 +98,51 @@ export default function CotacaoForm() {
     })
   }, [])
 
+  // ── Upload de arquivo por fornecedor ──────────────────────────────────────
+  const [uploading, setUploading] = useState<Record<number, boolean>>({})
+  const [uploadError, setUploadError] = useState<Record<number, string>>({})
+  const fileInputRefs = useRef<Record<number, HTMLInputElement | null>>({})
+
+  const handleFileUpload = useCallback(async (idx: number, file: File) => {
+    if (!id) return
+    if (!FILE_ACCEPTED.includes(file.type)) {
+      setUploadError(prev => ({ ...prev, [idx]: 'Use JPG, PNG, WebP ou PDF' }))
+      return
+    }
+    if (file.size > FILE_MAX_SIZE) {
+      setUploadError(prev => ({ ...prev, [idx]: 'Máximo 10 MB' }))
+      return
+    }
+
+    setUploading(prev => ({ ...prev, [idx]: true }))
+    setUploadError(prev => ({ ...prev, [idx]: '' }))
+
+    try {
+      const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_')
+      const path = `${id}/${Date.now()}_${safeName}`
+      const { error } = await supabase.storage.from('cotacoes-docs').upload(path, file)
+      if (error) throw error
+      updateFornecedor(idx, 'arquivo_url', path)
+    } catch (err) {
+      setUploadError(prev => ({ ...prev, [idx]: err instanceof Error ? err.message : 'Erro no upload' }))
+    } finally {
+      setUploading(prev => ({ ...prev, [idx]: false }))
+    }
+  }, [id, updateFornecedor])
+
+  const removeFile = useCallback(async (idx: number) => {
+    const path = fornecedores[idx]?.arquivo_url
+    if (path) {
+      await supabase.storage.from('cotacoes-docs').remove([path]).catch(() => {})
+    }
+    updateFornecedor(idx, 'arquivo_url', '')
+  }, [fornecedores, updateFornecedor])
+
+  const viewFile = useCallback(async (path: string) => {
+    const { data } = await supabase.storage.from('cotacoes-docs').createSignedUrl(path, 3600)
+    if (data?.signedUrl) window.open(data.signedUrl, '_blank')
+  }, [])
+
   const validos = fornecedores.filter(f => f.fornecedor_nome.trim() && f.valor_total > 0)
   const valorRef = (cotacao?.requisicao as any)?.valor_estimado ?? 0
   const minCot   = getMinCot(valorRef)
@@ -103,12 +156,23 @@ export default function CotacaoForm() {
       await submitMutation.mutateAsync({
         cotacao_id: id,
         requisicao_id: cotacao.requisicao_id,
-        fornecedores: validos,
+        fornecedores: validos.map(f => ({
+          fornecedor_nome: f.fornecedor_nome,
+          fornecedor_contato: f.fornecedor_contato || undefined,
+          fornecedor_cnpj: f.fornecedor_cnpj || undefined,
+          valor_total: f.valor_total,
+          prazo_entrega_dias: f.prazo_entrega_dias || undefined,
+          condicao_pagamento: f.condicao_pagamento || undefined,
+          observacao: f.observacao || undefined,
+          arquivo_url: f.arquivo_url || undefined,
+        })),
         sem_cotacoes_minimas: semCotacoesMinimas,
         justificativa_sem_cotacoes: semCotacoesMinimas ? justificativa.trim() : undefined,
       })
       nav('/cotacoes')
-    } catch { /* handled */ }
+    } catch (err) {
+      console.error('[CotacaoForm] Erro ao enviar:', err)
+    }
   }
 
   if (isLoading) {
@@ -213,67 +277,139 @@ export default function CotacaoForm() {
 
       {/* Fornecedores */}
       {fornecedores.map((forn, idx) => (
-        <div key={idx} className="bg-white border border-slate-200 rounded-2xl p-4 space-y-3 shadow-sm">
-          <div className="flex justify-between items-center">
-            <span className="text-xs font-bold text-slate-600">Fornecedor {idx + 1}</span>
+        <div key={idx} className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
+          {/* Header do card */}
+          <div className="flex justify-between items-center px-4 pt-4 pb-2">
+            <div className="flex items-center gap-2">
+              <span className="w-6 h-6 rounded-lg bg-gradient-to-br from-teal-500 to-teal-600 flex items-center justify-center text-[10px] font-black text-white">
+                {idx + 1}
+              </span>
+              <span className="text-xs font-bold text-slate-700">Fornecedor {idx + 1}</span>
+              {forn.fornecedor_nome.trim() && forn.valor_total > 0 && (
+                <span className="text-[9px] font-bold bg-emerald-50 text-emerald-600 px-1.5 py-0.5 rounded-full">✓ Válido</span>
+              )}
+            </div>
             {fornecedores.length > 2 && (
-              <button type="button" onClick={() => setFornecedores(p => p.filter((_, i) => i !== idx))}>
+              <button type="button" onClick={() => setFornecedores(p => p.filter((_, i) => i !== idx))}
+                className="p-1 rounded-lg hover:bg-red-50 transition">
                 <Trash2 size={14} className="text-slate-300 hover:text-red-500 transition" />
               </button>
             )}
           </div>
 
-          <input
-            required={idx < minCot}
-            className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-teal-300 focus:border-teal-400 outline-none"
-            placeholder="Nome do fornecedor *"
-            value={forn.fornecedor_nome}
-            onChange={e => updateFornecedor(idx, 'fornecedor_nome', e.target.value)}
-          />
-
-          <div className="grid grid-cols-2 gap-2">
+          <div className="px-4 pb-4 space-y-3">
             <input
-              className="border border-slate-200 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-teal-300 outline-none"
-              placeholder="CNPJ"
-              value={forn.fornecedor_cnpj}
-              onChange={e => updateFornecedor(idx, 'fornecedor_cnpj', e.target.value)}
+              required={idx < minCot}
+              className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm font-semibold focus:ring-2 focus:ring-teal-300 focus:border-teal-400 outline-none transition-shadow"
+              placeholder="Nome do fornecedor *"
+              value={forn.fornecedor_nome}
+              onChange={e => updateFornecedor(idx, 'fornecedor_nome', e.target.value)}
             />
-            <input
-              className="border border-slate-200 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-teal-300 outline-none"
-              placeholder="Contato (tel/e-mail)"
-              value={forn.fornecedor_contato}
-              onChange={e => updateFornecedor(idx, 'fornecedor_contato', e.target.value)}
-            />
-          </div>
 
-          <div className="grid grid-cols-2 gap-2">
-            <div>
-              <label className="text-[10px] text-slate-400 font-semibold">Valor Total (R$) *</label>
+            <div className="grid grid-cols-2 gap-2">
               <input
-                required={idx < minCot}
-                type="number" min="0.01" step="0.01"
-                className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-teal-300 outline-none"
-                value={forn.valor_total || ''}
-                onChange={e => updateFornecedor(idx, 'valor_total', parseFloat(e.target.value) || 0)}
+                className="border border-slate-200 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-teal-300 outline-none transition-shadow"
+                placeholder="CNPJ"
+                value={forn.fornecedor_cnpj}
+                onChange={e => updateFornecedor(idx, 'fornecedor_cnpj', e.target.value)}
+              />
+              <input
+                className="border border-slate-200 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-teal-300 outline-none transition-shadow"
+                placeholder="Contato (tel/e-mail)"
+                value={forn.fornecedor_contato}
+                onChange={e => updateFornecedor(idx, 'fornecedor_contato', e.target.value)}
               />
             </div>
-            <div>
-              <label className="text-[10px] text-slate-400 font-semibold">Prazo (dias)</label>
+
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <label className="text-[10px] text-slate-400 font-semibold">Valor Total (R$) *</label>
+                <input
+                  required={idx < minCot}
+                  type="number" min="0.01" step="0.01"
+                  className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm font-semibold focus:ring-2 focus:ring-teal-300 outline-none transition-shadow"
+                  value={forn.valor_total || ''}
+                  onChange={e => updateFornecedor(idx, 'valor_total', parseFloat(e.target.value) || 0)}
+                />
+              </div>
+              <div>
+                <label className="text-[10px] text-slate-400 font-semibold">Prazo (dias)</label>
+                <input
+                  type="number" min="1"
+                  className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-teal-300 outline-none transition-shadow"
+                  value={forn.prazo_entrega_dias || ''}
+                  onChange={e => updateFornecedor(idx, 'prazo_entrega_dias', parseInt(e.target.value) || 0)}
+                />
+              </div>
+            </div>
+
+            <input
+              className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-teal-300 outline-none transition-shadow"
+              placeholder="Condição de pagamento (ex: 30 dias, à vista)"
+              value={forn.condicao_pagamento}
+              onChange={e => updateFornecedor(idx, 'condicao_pagamento', e.target.value)}
+            />
+
+            {/* ── Anexo da Cotação ─────────────────────────────────────────── */}
+            <div className="pt-1">
               <input
-                type="number" min="1"
-                className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-teal-300 outline-none"
-                value={forn.prazo_entrega_dias || ''}
-                onChange={e => updateFornecedor(idx, 'prazo_entrega_dias', parseInt(e.target.value) || 0)}
+                ref={el => { fileInputRefs.current[idx] = el }}
+                type="file"
+                accept={FILE_ACCEPTED.join(',')}
+                className="hidden"
+                onChange={e => {
+                  const file = e.target.files?.[0]
+                  if (file) handleFileUpload(idx, file)
+                  if (fileInputRefs.current[idx]) fileInputRefs.current[idx]!.value = ''
+                }}
               />
+
+              {forn.arquivo_url ? (
+                /* Arquivo anexado */
+                <div className="flex items-center gap-2 bg-emerald-50 border border-emerald-200 rounded-xl px-3 py-2">
+                  <FileText size={16} className="text-emerald-600 flex-shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-bold text-emerald-700 truncate">
+                      Cotação anexada
+                    </p>
+                    <p className="text-[10px] text-emerald-500 truncate">
+                      {forn.arquivo_url.split('/').pop()?.replace(/^\d+_/, '') ?? 'arquivo'}
+                    </p>
+                  </div>
+                  <button type="button" onClick={() => viewFile(forn.arquivo_url)}
+                    className="p-1.5 rounded-lg hover:bg-emerald-100 transition" title="Visualizar">
+                    <Eye size={14} className="text-emerald-600" />
+                  </button>
+                  <button type="button" onClick={() => removeFile(idx)}
+                    className="p-1.5 rounded-lg hover:bg-red-50 transition" title="Remover">
+                    <X size={14} className="text-red-400 hover:text-red-600" />
+                  </button>
+                </div>
+              ) : uploading[idx] ? (
+                /* Fazendo upload */
+                <div className="flex items-center gap-2 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2.5">
+                  <Loader2 size={16} className="text-amber-600 animate-spin flex-shrink-0" />
+                  <p className="text-xs font-semibold text-amber-700">Enviando arquivo...</p>
+                </div>
+              ) : (
+                /* Botão de upload */
+                <button
+                  type="button"
+                  onClick={() => fileInputRefs.current[idx]?.click()}
+                  className="w-full flex items-center gap-2 border border-dashed border-slate-300 rounded-xl px-3 py-2.5 hover:border-violet-400 hover:bg-violet-50/30 transition-all group"
+                >
+                  <Paperclip size={14} className="text-slate-400 group-hover:text-violet-500 transition" />
+                  <span className="text-xs text-slate-400 group-hover:text-violet-600 font-semibold transition">
+                    Anexar cotação (PDF, foto)
+                  </span>
+                </button>
+              )}
+
+              {uploadError[idx] && (
+                <p className="text-[11px] text-red-500 mt-1 pl-1">{uploadError[idx]}</p>
+              )}
             </div>
           </div>
-
-          <input
-            className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-teal-300 outline-none"
-            placeholder="Condição de pagamento (ex: 30 dias, à vista)"
-            value={forn.condicao_pagamento}
-            onChange={e => updateFornecedor(idx, 'condicao_pagamento', e.target.value)}
-          />
         </div>
       ))}
 
@@ -300,6 +436,7 @@ export default function CotacaoForm() {
             prazo_entrega_dias: f.prazo_entrega_dias || undefined,
             condicao_pagamento: f.condicao_pagamento || undefined,
             itens_precos: [],
+            arquivo_url: f.arquivo_url || undefined,
             selecionado: f.valor_total === Math.min(...validos.map(x => x.valor_total)),
           }))}
         />
