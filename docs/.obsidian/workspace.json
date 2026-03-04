@@ -13,12 +13,12 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "obsidian/Paineis/Logistica Dashboard.md",
+                "file": "obsidian/Paineis/BI Dashboard.md",
                 "mode": "source",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "Logistica Dashboard"
+              "title": "BI Dashboard"
             }
           }
         ]
@@ -211,6 +211,7 @@
   },
   "active": "a4bc148162b73016",
   "lastOpenFiles": [
+    "obsidian/Paineis/Logistica Dashboard.md",
     "obsidian/Paineis/BI Dashboard.md",
     "obsidian/26 - Upload Inteligente Cotacao.md",
     "obsidian/10 - n8n Workflows.md.tmp.28700.1772635214153",
@@ -223,7 +224,6 @@
     "obsidian/Paineis/Roadmap Board.md",
     "obsidian/Paineis/RH Dashboard.md",
     "obsidian/Paineis/PAINEL PRINCIPAL.md",
-    "obsidian/Paineis/Logistica Dashboard.md",
     "obsidian/Paineis/Issues Board.md",
     "obsidian/Paineis/Frotas Dashboard.md",
     "obsidian/Paineis/Financeiro Dashboard.md",
