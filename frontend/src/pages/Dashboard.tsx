@@ -10,7 +10,7 @@ import { useRequisicoes } from '../hooks/useRequisicoes'
 import StatusBadge from '../components/StatusBadge'
 import FluxoTimeline from '../components/FluxoTimeline'
 import { isPlaceholder } from '../services/supabase'
-import type { StatusRequisicao, DashboardData } from '../types'
+import type { StatusRequisicao, DashboardData, Aprovacao } from '../types'
 
 const fmt = (v: number) =>
   v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 })
@@ -96,10 +96,16 @@ export default function Dashboard() {
     )
   }
 
-  const kpis                = data?.kpis ?? EMPTY_KPIS
-  const por_obra            = data?.por_obra ?? []
-  const requisicoes_recentes = data?.requisicoes_recentes ?? []
-  const reqs                = todasReqs ?? requisicoes_recentes
+  const kpis                  = data?.kpis ?? EMPTY_KPIS
+  const por_obra              = data?.por_obra ?? []
+  const requisicoes_recentes  = data?.requisicoes_recentes ?? []
+  const aprovacoes_pendentes  = data?.aprovacoes_pendentes ?? []
+  const reqs                  = todasReqs ?? requisicoes_recentes
+
+  // Mapa: requisicao_id → aprovação pendente (para mostrar aprovador no card)
+  const aprovacaoMap = new Map<string, Aprovacao>(
+    aprovacoes_pendentes.map(a => [a.requisicao_id, a])
+  )
 
   // Contagem por etapa do pipeline
   const pipelineContagens = PIPELINE_ETAPAS.map(etapa =>
@@ -280,7 +286,9 @@ export default function Dashboard() {
           {recentes.length === 0 ? (
             <p className="text-center text-slate-400 text-sm py-8">Nenhuma requisição encontrada</p>
           ) : (
-            recentes.slice(0, 8).map(r => <RecentCard key={r.id} r={r} />)
+            recentes.slice(0, 8).map(r => (
+              <RecentCard key={r.id} r={r} aprovacao={aprovacaoMap.get(r.id)} />
+            ))
           )}
         </div>
       </section>
@@ -288,17 +296,46 @@ export default function Dashboard() {
   )
 }
 
-function RecentCard({ r }: { r: any }) {
+// ── Helpers de aprovação ─────────────────────────────────────────────────────
+const NIVEL_LABEL: Record<number, string> = {
+  1: 'Coordenador',
+  2: 'Gerente',
+  3: 'Diretor',
+  4: 'CEO',
+}
+
+/** Retorna label específico do passo de aprovação, ou undefined se não aplicável */
+function getApprovalStatusLabel(status: string): string | undefined {
+  if (status === 'pendente')      return 'Aguard. Valid. Técnica'
+  if (status === 'em_aprovacao')  return 'Em Validação Técnica'
+  if (status === 'cotacao_aprovada') return 'Aguard. Aprov. Financeira'
+  return undefined
+}
+
+function RecentCard({ r, aprovacao }: { r: any; aprovacao?: Aprovacao }) {
+  const approvalLabel = getApprovalStatusLabel(r.status)
+
   return (
     <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4">
       {/* Linha 1: número + status */}
       <div className="flex justify-between items-center gap-2 mb-2">
         <span className="text-[10px] font-mono text-slate-400">{r.numero}</span>
-        <StatusBadge status={r.status as StatusRequisicao} size="sm" />
+        <StatusBadge status={r.status as StatusRequisicao} size="sm" customLabel={approvalLabel} />
       </div>
 
       {/* Descrição */}
       <p className="text-sm font-semibold text-slate-800 line-clamp-1 mb-2">{r.descricao}</p>
+
+      {/* Info do aprovador pendente */}
+      {aprovacao && (
+        <div className="flex items-center gap-1.5 mb-2 px-2 py-1.5 bg-amber-50 rounded-lg border border-amber-100">
+          <Clock size={11} className="text-amber-500 flex-shrink-0" />
+          <span className="text-[10px] text-amber-700 font-medium truncate">
+            Aguardando {aprovacao.aprovador_nome}
+            {aprovacao.nivel ? ` (${NIVEL_LABEL[aprovacao.nivel] ?? `Nível ${aprovacao.nivel}`})` : ''}
+          </span>
+        </div>
+      )}
 
       {/* FluxoTimeline compact */}
       <FluxoTimeline status={r.status} compact className="mb-2" />
