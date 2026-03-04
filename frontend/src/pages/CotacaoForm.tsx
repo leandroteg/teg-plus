@@ -50,6 +50,7 @@ export default function CotacaoForm() {
   ])
   const [semCotacoesMinimas, setSemCotacoesMinimas] = useState(false)
   const [justificativa, setJustificativa] = useState('')
+  const [toast, setToast] = useState<{ type: 'success' | 'error'; msg: string } | null>(null)
 
   const updateFornecedor = (idx: number, field: keyof FornecedorForm, value: string | number) =>
     setFornecedores(prev => prev.map((f, i) => i === idx ? { ...f, [field]: value } : f))
@@ -147,11 +148,31 @@ export default function CotacaoForm() {
   const valorRef = (cotacao?.requisicao as any)?.valor_estimado ?? 0
   const minCot   = getMinCot(valorRef)
 
+  // Validação + feedback claro em cada etapa
+  const canSubmit = validos.length > 0 && (semCotacoesMinimas || validos.length >= minCot) && (!semCotacoesMinimas || justificativa.trim().length > 0)
+
   const submit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!id || !cotacao) return
-    if (!semCotacoesMinimas && validos.length < minCot) return
-    if (semCotacoesMinimas && !justificativa.trim()) return
+    setToast(null)
+
+    // Validações com feedback explícito
+    if (!id || !cotacao) {
+      setToast({ type: 'error', msg: 'Cotação não encontrada. Recarregue a página.' })
+      return
+    }
+    if (validos.length === 0) {
+      setToast({ type: 'error', msg: 'Preencha ao menos 1 fornecedor (nome + valor total).' })
+      return
+    }
+    if (!semCotacoesMinimas && validos.length < minCot) {
+      setToast({ type: 'error', msg: `Mínimo de ${minCot} fornecedor${minCot > 1 ? 'es' : ''} obrigatório${minCot > 1 ? 's' : ''}, ou marque a opção para enviar sem o mínimo.` })
+      return
+    }
+    if (semCotacoesMinimas && !justificativa.trim()) {
+      setToast({ type: 'error', msg: 'Preencha a justificativa para envio sem cotações mínimas.' })
+      return
+    }
+
     try {
       await submitMutation.mutateAsync({
         cotacao_id: id,
@@ -169,9 +190,12 @@ export default function CotacaoForm() {
         sem_cotacoes_minimas: semCotacoesMinimas,
         justificativa_sem_cotacoes: semCotacoesMinimas ? justificativa.trim() : undefined,
       })
-      nav('/cotacoes')
+      setToast({ type: 'success', msg: 'Cotação enviada para aprovação!' })
+      setTimeout(() => nav('/cotacoes'), 800)
     } catch (err) {
       console.error('[CotacaoForm] Erro ao enviar:', err)
+      const msg = err instanceof Error ? err.message : 'Erro desconhecido'
+      setToast({ type: 'error', msg: `Erro ao enviar cotação: ${msg}` })
     }
   }
 
@@ -214,7 +238,7 @@ export default function CotacaoForm() {
 
   // ── Formulário de nova cotação ────────────────────────────────────────────
   return (
-    <form onSubmit={submit} className="space-y-4">
+    <form onSubmit={submit} noValidate className="space-y-4">
       <div className="flex items-center gap-2">
         <button type="button" onClick={() => nav('/cotacoes')} className="p-1">
           <ChevronLeft size={18} className="text-slate-500" />
@@ -299,7 +323,7 @@ export default function CotacaoForm() {
 
           <div className="px-4 pb-4 space-y-3">
             <input
-              required={idx < minCot}
+              required={idx < minCot && !semCotacoesMinimas}
               className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm font-semibold focus:ring-2 focus:ring-teal-300 focus:border-teal-400 outline-none transition-shadow"
               placeholder="Nome do fornecedor *"
               value={forn.fornecedor_nome}
@@ -325,7 +349,7 @@ export default function CotacaoForm() {
               <div>
                 <label className="text-[10px] text-slate-400 font-semibold">Valor Total (R$) *</label>
                 <input
-                  required={idx < minCot}
+                  required={idx < minCot && !semCotacoesMinimas}
                   type="number" min="0.01" step="0.01"
                   className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm font-semibold focus:ring-2 focus:ring-teal-300 outline-none transition-shadow"
                   value={forn.valor_total || ''}
@@ -472,33 +496,46 @@ export default function CotacaoForm() {
         </div>
       )}
 
-      {/* Submit */}
-      <button
-        type="submit"
-        disabled={submitMutation.isPending || (!semCotacoesMinimas && validos.length < minCot) || (semCotacoesMinimas && !justificativa.trim())}
-        className="w-full bg-teal-500 text-white rounded-2xl py-4 font-extrabold flex items-center justify-center gap-2 disabled:opacity-50 shadow-xl shadow-teal-500/25 active:scale-[0.98] transition-all"
-      >
-        {submitMutation.isPending ? (
-          <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-        ) : (
-          <><Send size={18} /> Enviar para Aprovação Financeira</>
-        )}
-      </button>
-
-      {!semCotacoesMinimas && validos.length < minCot && (
-        <p className="text-xs text-amber-600 text-center">
-          Adicione pelo menos {minCot} fornecedor{minCot > 1 ? 'es' : ''} ou marque a opção acima para enviar sem o mínimo.
-        </p>
-      )}
-
-      {submitMutation.isSuccess && (
-        <div className="flex items-center gap-2 bg-emerald-50 border border-emerald-200 rounded-2xl px-4 py-3 text-emerald-700 text-sm font-semibold">
-          <CheckCircle size={16} /> Cotação enviada para aprovação financeira!
+      {/* Toast de feedback */}
+      {toast && (
+        <div className={`flex items-center gap-2 rounded-2xl px-4 py-3 text-sm font-semibold animate-in fade-in slide-in-from-bottom-2 ${
+          toast.type === 'success'
+            ? 'bg-emerald-50 border border-emerald-200 text-emerald-700'
+            : 'bg-red-50 border border-red-200 text-red-700'
+        }`}>
+          {toast.type === 'success' ? <CheckCircle size={16} /> : <AlertTriangle size={16} />}
+          {toast.msg}
         </div>
       )}
 
-      {submitMutation.isError && (
-        <p className="text-red-500 text-sm text-center">Erro ao enviar. Tente novamente.</p>
+      {/* Submit */}
+      <button
+        type="submit"
+        disabled={submitMutation.isPending || !canSubmit}
+        className={`w-full rounded-2xl py-4 font-extrabold flex items-center justify-center gap-2 shadow-xl active:scale-[0.98] transition-all ${
+          canSubmit && !submitMutation.isPending
+            ? 'bg-teal-500 text-white shadow-teal-500/25 hover:bg-teal-600'
+            : 'bg-slate-300 text-slate-500 shadow-slate-200/25 cursor-not-allowed'
+        }`}
+      >
+        {submitMutation.isPending ? (
+          <><div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" /> Enviando...</>
+        ) : (
+          <><Send size={18} /> Enviar para Aprovação</>
+        )}
+      </button>
+
+      {!canSubmit && !submitMutation.isPending && (
+        <p className="text-xs text-slate-400 text-center">
+          {validos.length === 0
+            ? 'Preencha ao menos 1 fornecedor (nome + valor) para habilitar o envio.'
+            : !semCotacoesMinimas && validos.length < minCot
+              ? `Adicione pelo menos ${minCot} fornecedor${minCot > 1 ? 'es' : ''} ou marque a opção acima para enviar sem o mínimo.`
+              : semCotacoesMinimas && !justificativa.trim()
+                ? 'Preencha a justificativa para prosseguir.'
+                : ''
+          }
+        </p>
       )}
     </form>
   )
