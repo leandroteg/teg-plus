@@ -206,14 +206,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // Safety net: se onAuthStateChange não disparar em 8s (rede lenta, etc.)
     // OU se loadPerfil travar (ex: lock do Supabase em refresh de token inválido),
     // força logout local para nunca mostrar "Boa tarde, Usuário" sem perfil real.
-    const safety = setTimeout(async () => {
+    //
+    // IMPORTANTE: NÃO usar async/await aqui! O signOut usa o lock interno do
+    // GoTrueClient, que pode estar travado pelo handler de onAuthStateChange.
+    // Fazer fire-and-forget para garantir que setLoading/setPerfilReady executem.
+    const safety = setTimeout(() => {
       if (userRef.current && !perfilLoadedRef.current) {
         // Usuário autenticado mas perfil nunca carregou → sessão problemática.
-        // signOut({ scope: 'local' }) limpa o storage SEM chamada de API,
-        // contornando qualquer lock travado do cliente Supabase.
-        try {
-          await supabase.auth.signOut({ scope: 'local' })
-        } catch { /* ignora */ }
+        // Fire-and-forget: limpa storage em background, sem bloquear.
+        supabase.auth.signOut({ scope: 'local' }).catch(() => {})
         setUser(null)
         setSession(null)
         setPerfil(null)
