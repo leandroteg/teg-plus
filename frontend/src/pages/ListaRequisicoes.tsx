@@ -1,9 +1,10 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { Search, SlidersHorizontal } from 'lucide-react'
 import { useRequisicoes } from '../hooks/useRequisicoes'
+import { useAprovacoesPendentes } from '../hooks/useAprovacoes'
 import StatusBadge from '../components/StatusBadge'
 import FluxoTimeline from '../components/FluxoTimeline'
-import type { StatusRequisicao } from '../types'
+import type { StatusRequisicao, Aprovacao } from '../types'
 
 const fmt = (v: number) =>
   v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 })
@@ -32,6 +33,21 @@ const AVATAR_COLORS: Record<string, string> = {
   Aline:    'bg-emerald-500',
 }
 
+const NIVEL_LABEL: Record<number, string> = {
+  1: 'Coordenador',
+  2: 'Gerente',
+  3: 'Diretor',
+  4: 'CEO',
+}
+
+/** Label específico da etapa de aprovação */
+function getApprovalStatusLabel(status: string): string | undefined {
+  if (status === 'pendente')         return 'Aguard. Valid. Técnica'
+  if (status === 'em_aprovacao')     return 'Em Validação Técnica'
+  if (status === 'cotacao_aprovada') return 'Aguard. Aprov. Financeira'
+  return undefined
+}
+
 function CompradorBadge({ nome }: { nome: string }) {
   const bg = AVATAR_COLORS[nome.split(' ')[0]] ?? 'bg-slate-500'
   return (
@@ -44,9 +60,17 @@ function CompradorBadge({ nome }: { nome: string }) {
   )
 }
 
-// Chip contextual por status
-function StatusChip({ status, dataPrevista }: { status: string; dataPrevista?: string }) {
-  if (status === 'pendente' || status === 'rascunho') {
+// Chip contextual por status — agora mostra o aprovador quando disponível
+function StatusChip({ status, aprovacao, dataPrevista }: { status: string; aprovacao?: Aprovacao; dataPrevista?: string }) {
+  if (status === 'pendente' || status === 'rascunho' || status === 'em_aprovacao') {
+    if (aprovacao) {
+      const nivel = NIVEL_LABEL[aprovacao.nivel] ?? ''
+      return (
+        <span className="text-[10px] bg-amber-50 text-amber-600 border border-amber-200 rounded-full px-2 py-0.5 font-semibold truncate max-w-[200px]">
+          Aguard. {aprovacao.aprovador_nome.split(' ')[0]}{nivel ? ` (${nivel})` : ''}
+        </span>
+      )
+    }
     return <span className="text-[10px] bg-amber-50 text-amber-600 border border-amber-200 rounded-full px-2 py-0.5 font-semibold">Aguardando aprovação</span>
   }
   if (status === 'em_cotacao' || status === 'aprovada') {
@@ -67,6 +91,16 @@ export default function ListaRequisicoes() {
   const [busca, setBusca] = useState('')
   const [showFilters, setShowFilters] = useState(false)
   const { data: requisicoes, isLoading } = useRequisicoes(statusFilter || undefined)
+  const { data: aprovacoes } = useAprovacoesPendentes()
+
+  // Mapa: requisicao_id → aprovação pendente (para mostrar aprovador no card)
+  const aprovacaoMap = useMemo(() => {
+    const map = new Map<string, Aprovacao>()
+    for (const a of aprovacoes ?? []) {
+      map.set(a.requisicao_id, a)
+    }
+    return map
+  }, [aprovacoes])
 
   const filtradas = (requisicoes ?? []).filter(r => {
     if (!busca) return true
@@ -127,55 +161,59 @@ export default function ListaRequisicoes() {
         <p className="text-center text-slate-400 text-sm py-10">Nenhuma requisição encontrada</p>
       ) : (
         <div className="space-y-2">
-          {filtradas.map(r => (
-            <div key={r.id} className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 space-y-3">
-              {/* Linha 1: número + urgência + status */}
-              <div className="flex justify-between items-center gap-2">
-                <div className="flex items-center gap-2 min-w-0">
-                  <span className="text-[10px] font-mono text-slate-400 flex-shrink-0">{r.numero}</span>
-                  {r.urgencia !== 'normal' && (
-                    <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded uppercase flex-shrink-0 ${
-                      r.urgencia === 'critica' ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700'
-                    }`}>
-                      ⚡ {r.urgencia}
-                    </span>
-                  )}
-                  {r.categoria && (
-                    <span className="text-[10px] text-slate-400 bg-slate-100 rounded px-1.5 py-0.5 truncate max-w-[80px]">
-                      {r.categoria.replace(/_/g, ' ')}
-                    </span>
-                  )}
+          {filtradas.map(r => {
+            const apr = aprovacaoMap.get(r.id)
+            const approvalLabel = getApprovalStatusLabel(r.status)
+            return (
+              <div key={r.id} className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 space-y-3">
+                {/* Linha 1: número + urgência + status */}
+                <div className="flex justify-between items-center gap-2">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className="text-[10px] font-mono text-slate-400 flex-shrink-0">{r.numero}</span>
+                    {r.urgencia !== 'normal' && (
+                      <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded uppercase flex-shrink-0 ${
+                        r.urgencia === 'critica' ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700'
+                      }`}>
+                        ⚡ {r.urgencia}
+                      </span>
+                    )}
+                    {r.categoria && (
+                      <span className="text-[10px] text-slate-400 bg-slate-100 rounded px-1.5 py-0.5 truncate max-w-[80px]">
+                        {r.categoria.replace(/_/g, ' ')}
+                      </span>
+                    )}
+                  </div>
+                  <StatusBadge status={r.status as StatusRequisicao} size="sm" customLabel={approvalLabel} />
                 </div>
-                <StatusBadge status={r.status as StatusRequisicao} size="sm" />
-              </div>
 
-              {/* Descrição */}
-              <p className="text-sm font-semibold text-slate-800 line-clamp-2 leading-snug">{r.descricao}</p>
+                {/* Descrição */}
+                <p className="text-sm font-semibold text-slate-800 line-clamp-2 leading-snug">{r.descricao}</p>
 
-              {/* FluxoTimeline compact */}
-              <FluxoTimeline status={r.status} compact />
+                {/* FluxoTimeline compact */}
+                <FluxoTimeline status={r.status} compact />
 
-              {/* Obra + Valor */}
-              <div className="flex items-center justify-between">
-                <span className="text-xs text-slate-400 truncate max-w-[55%]">{r.obra_nome}</span>
-                <span className="text-sm font-extrabold text-teal-600">{fmt(r.valor_estimado)}</span>
-              </div>
-
-              {/* Comprador + data + chip contextual */}
-              <div className="flex items-center justify-between pt-2 border-t border-slate-50">
-                <div className="flex items-center gap-2">
-                  {r.comprador_nome
-                    ? <CompradorBadge nome={r.comprador_nome} />
-                    : <span className="text-xs text-slate-300 italic">Sem comprador</span>
-                  }
-                  <StatusChip status={r.status} />
+                {/* Obra + Valor */}
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-slate-400 truncate max-w-[55%]">{r.obra_nome}</span>
+                  <span className="text-sm font-extrabold text-teal-600">{fmt(r.valor_estimado)}</span>
                 </div>
-                <span className="text-xs text-slate-400 flex-shrink-0">
-                  {r.solicitante_nome.split(' ')[0]} · {fmtData(r.created_at)}
-                </span>
+
+                {/* Comprador + data + chip contextual com aprovador */}
+                <div className="flex items-center justify-between pt-2 border-t border-slate-50">
+                  <div className="flex items-center gap-2">
+                    {r.comprador_nome
+                      ? <CompradorBadge nome={r.comprador_nome} />
+                      : <span className="text-xs text-slate-300 italic">Sem comprador</span>
+                    }
+                    <StatusChip status={r.status} aprovacao={apr} />
+                  </div>
+                  <span className="text-xs text-slate-400 flex-shrink-0">
+                    {r.solicitante_nome.split(' ')[0]} · {fmtData(r.created_at)}
+                  </span>
+                </div>
               </div>
-            </div>
-          ))}
+            )
+          })}
         </div>
       )}
 

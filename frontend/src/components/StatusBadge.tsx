@@ -30,9 +30,11 @@ const config: Record<string, { dot: string; bg: string; text: string; label: str
 interface Props {
   status: StatusRequisicao | string
   size?: 'sm' | 'md'
+  /** Override do label padrão (ex: "Aguard. Valid. Técnica") */
+  customLabel?: string
 }
 
-export default function StatusBadge({ status, size = 'md' }: Props) {
+export default function StatusBadge({ status, size = 'md', customLabel }: Props) {
   const c = config[status] ?? { dot: 'bg-gray-400', bg: 'bg-gray-100', text: 'text-gray-600', label: status }
   const sizeClass = size === 'sm'
     ? 'text-[10px] px-1.5 py-px gap-1'
@@ -40,7 +42,7 @@ export default function StatusBadge({ status, size = 'md' }: Props) {
   return (
     <span className={`inline-flex items-center rounded-full font-semibold ${sizeClass} ${c.bg} ${c.text}`}>
       <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${c.dot}`} />
-      {c.label}
+      {customLabel ?? c.label}
     </span>
   )
 }
