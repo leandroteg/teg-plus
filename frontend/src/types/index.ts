@@ -66,6 +66,7 @@ export interface Comprador {
 }
 
 export interface RequisicaoItem {
+  id?: string
   descricao: string
   quantidade: number
   unidade: string
