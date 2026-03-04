@@ -6,7 +6,13 @@
       "mcp__n8n-mcp__n8n_create_workflow",
       "mcp__n8n-mcp__n8n_update_partial_workflow",
       "mcp__n8n-mcp__n8n_validate_workflow",
-      "mcp__n8n-mcp__n8n_autofix_workflow"
+      "mcp__n8n-mcp__n8n_autofix_workflow",
+      "mcp__583e747e-41a6-44a8-8350-893e67616b75__search_workflows",
+      "mcp__n8n-mcp__search_nodes",
+      "mcp__583e747e-41a6-44a8-8350-893e67616b75__get_workflow_details",
+      "mcp__n8n-mcp__n8n_get_workflow",
+      "mcp__n8n-mcp__n8n_update_full_workflow",
+      "mcp__n8n-mcp__n8n_test_workflow"
     ]
   }
 }
