@@ -114,13 +114,11 @@ export default function ListaRequisicoes() {
     setProcessing(reqId)
     try {
       const novoStatus = decisao === 'aprovada' ? 'aprovada' : 'rejeitada'
+      const updates: Record<string, unknown> = { status: novoStatus }
+      if (decisao === 'aprovada') updates.data_aprovacao = new Date().toISOString()
       const { error } = await supabase
         .from('cmp_requisicoes')
-        .update({
-          status: novoStatus,
-          aprovado_por: perfil?.nome ?? 'Admin',
-          aprovado_em: new Date().toISOString(),
-        })
+        .update(updates)
         .eq('id', reqId)
       if (!error) {
         queryClient.invalidateQueries({ queryKey: ['requisicoes'] })
