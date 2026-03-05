@@ -122,7 +122,7 @@ export default function MuralSidebar() {
   }, [paused, slides.length, goNext])
 
   return (
-    <aside className="flex flex-col h-[520px] py-2">
+    <aside className="flex flex-col py-2">
       {/* ── Sidebar header ──────────────────────────────────────── */}
       <div className="px-1 mb-4">
         <div className="flex items-center gap-2.5 mb-1">
@@ -144,12 +144,13 @@ export default function MuralSidebar() {
         </div>
       </div>
 
-      {/* ── Banner card slideshow ─────────────────────────────── */}
-      <div className="flex-1 flex flex-col min-h-0">
+      {/* ── Banner card slideshow (9:16 portrait ratio) ────── */}
+      <div className="flex flex-col min-h-0">
         <div
-          className={`relative flex-1 rounded-2xl overflow-hidden select-none ring-1 ${
+          className={`relative rounded-2xl overflow-hidden select-none ring-1 ${
             isLight ? 'ring-slate-200/80' : 'ring-white/[0.07]'
           }`}
+          style={{ aspectRatio: '9 / 16' }}
           onMouseEnter={() => setPaused(true)}
           onMouseLeave={() => setPaused(false)}
           onTouchStart={e => { touchStartY.current = e.touches[0].clientY }}
