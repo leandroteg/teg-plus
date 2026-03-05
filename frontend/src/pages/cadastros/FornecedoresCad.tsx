@@ -51,8 +51,17 @@ export default function FornecedoresCad() {
 
   async function handleSave() {
     if (!editItem) return
-    await salvar.mutateAsync(editItem)
-    closeForm()
+    if (!editItem.razao_social?.trim()) {
+      alert('Razão Social é obrigatória')
+      return
+    }
+    try {
+      await salvar.mutateAsync(editItem)
+      closeForm()
+    } catch (err: any) {
+      console.error('Erro ao salvar fornecedor:', err)
+      alert(err?.message || 'Erro ao salvar fornecedor. Tente novamente.')
+    }
   }
 
   async function handleAiParse(input: { type: string; content: string; base64?: string; filename?: string }) {

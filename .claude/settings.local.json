@@ -12,7 +12,8 @@
       "mcp__583e747e-41a6-44a8-8350-893e67616b75__get_workflow_details",
       "mcp__n8n-mcp__n8n_get_workflow",
       "mcp__n8n-mcp__n8n_update_full_workflow",
-      "mcp__n8n-mcp__n8n_test_workflow"
+      "mcp__n8n-mcp__n8n_test_workflow",
+      "mcp__402c23fe-4707-49e1-a558-76f47f37d917__list_tables"
     ]
   }
 }
