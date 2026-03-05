@@ -1,10 +1,10 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // components/MuralSidebar.tsx — Mural de Recados (desktop sidebar)
-// Vertical banner slideshow for the right column of the split layout
+// Elegant card panel matching the mobile popup aesthetic
 // ─────────────────────────────────────────────────────────────────────────────
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import {
-  ChevronLeft, ChevronRight, ChevronUp, ChevronDown,
+  ChevronLeft, ChevronRight,
   Megaphone, Pin, Calendar, Newspaper,
 } from 'lucide-react'
 import { useBanners, type MuralBanner } from '../hooks/useMural'
@@ -100,7 +100,6 @@ export default function MuralSidebar() {
 
   const [current, setCurrent] = useState(0)
   const [paused, setPaused]   = useState(false)
-  const touchStartY           = useRef(0)
 
   const goNext = useCallback(
     () => setCurrent(c => (c + 1) % slides.length),
@@ -121,192 +120,193 @@ export default function MuralSidebar() {
     return () => clearInterval(id)
   }, [paused, slides.length, goNext])
 
+  // Keyboard navigation
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (e.key === 'ArrowRight') goNext()
+      if (e.key === 'ArrowLeft') goPrev()
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [goNext, goPrev])
+
   return (
-    <aside className="flex flex-col py-2">
-      {/* ── Sidebar header ──────────────────────────────────────── */}
-      <div className="px-1 mb-4">
-        <div className="flex items-center gap-2.5 mb-1">
+    <aside
+      className={`flex flex-col rounded-2xl overflow-hidden border ${
+        isLight
+          ? 'bg-white border-slate-200/80 shadow-lg shadow-slate-200/50'
+          : 'bg-[#0A1020] border-white/[0.08] shadow-2xl shadow-black/30'
+      }`}
+      onMouseEnter={() => setPaused(true)}
+      onMouseLeave={() => setPaused(false)}
+    >
+      {/* ── Card header ──────────────────────────────────────────── */}
+      <div className="flex items-center justify-between px-4 pt-4 pb-3">
+        <div className="flex items-center gap-2.5">
           <div className={`w-8 h-8 rounded-xl flex items-center justify-center ${
             isLight
               ? 'bg-teal-50 border border-teal-100'
               : 'bg-teal-500/10 border border-teal-500/20'
           }`}>
-            <Newspaper size={15} className={isLight ? 'text-teal-600' : 'text-teal-400'} />
+            <Newspaper size={14} className={isLight ? 'text-teal-600' : 'text-teal-400'} />
           </div>
           <div>
             <h2 className={`text-sm font-bold tracking-tight ${isLight ? 'text-slate-800' : 'text-white'}`}>
               Mural de Recados
             </h2>
             <p className={`text-[10px] ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>
-              Comunicados e avisos internos
+              {slides.length} comunicado{slides.length !== 1 ? 's' : ''}
             </p>
           </div>
         </div>
+
+        {/* Paused indicator */}
+        {paused && slides.length > 1 && (
+          <div className={`flex items-center gap-1 px-2 py-1 rounded-full text-[8px] font-medium ${
+            isLight
+              ? 'bg-slate-100 text-slate-400'
+              : 'bg-white/5 text-white/30'
+          }`}>
+            <span className="flex gap-0.5">
+              <span className={`w-[2px] h-2.5 rounded-full ${isLight ? 'bg-slate-300' : 'bg-white/30'}`} />
+              <span className={`w-[2px] h-2.5 rounded-full ${isLight ? 'bg-slate-300' : 'bg-white/30'}`} />
+            </span>
+            pausado
+          </div>
+        )}
       </div>
 
-      {/* ── Banner card slideshow (9:16 portrait ratio) ────── */}
-      <div className="flex flex-col min-h-0">
-        <div
-          className={`relative rounded-2xl overflow-hidden select-none ring-1 ${
-            isLight ? 'ring-slate-200/80' : 'ring-white/[0.07]'
-          }`}
-          style={{ aspectRatio: '9 / 16' }}
-          onMouseEnter={() => setPaused(true)}
-          onMouseLeave={() => setPaused(false)}
-          onTouchStart={e => { touchStartY.current = e.touches[0].clientY }}
-          onTouchEnd={e => {
-            const diff = touchStartY.current - e.changedTouches[0].clientY
-            if (Math.abs(diff) > 48) diff > 0 ? goNext() : goPrev()
-          }}
-        >
-          {/* ── Slide stack ──────────────────────────────────── */}
-          {slides.map((slide, i) => {
-            const isActive = i === current
-            return (
+      {/* ── Banner slideshow (16:10 horizontal) ─────────────────── */}
+      <div
+        className="relative mx-3 mb-4 rounded-xl overflow-hidden ring-1 ring-white/[0.07]"
+        style={{ aspectRatio: '16 / 10' }}
+      >
+        {slides.map((slide, i) => {
+          const isActive = i === current
+          return (
+            <div
+              key={slide.id}
+              className="absolute inset-0 transition-opacity duration-600"
+              style={{ opacity: isActive ? 1 : 0, zIndex: isActive ? 10 : 1 }}
+              aria-hidden={!isActive}
+            >
+              {/* Image */}
+              <img
+                src={slide.imagem_url}
+                alt={slide.titulo}
+                className="absolute inset-0 w-full h-full object-cover"
+                loading={i === 0 ? 'eager' : 'lazy'}
+              />
+
+              {/* Gradient overlay */}
+              <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/25 to-black/5" />
+
+              {/* Type badge — top right */}
+              <div className="absolute top-3 right-3 z-20">
+                <TypeBadge banner={slide} />
+              </div>
+
+              {/* Text content — bottom */}
               <div
-                key={slide.id}
-                className="absolute inset-0 transition-opacity duration-700"
-                style={{ opacity: isActive ? 1 : 0, zIndex: isActive ? 10 : 1 }}
-                aria-hidden={!isActive}
+                className="absolute bottom-0 left-0 right-0 px-4 pb-4 z-10"
+                style={{
+                  opacity: isActive ? 1 : 0,
+                  transform: isActive ? 'translateY(0)' : 'translateY(10px)',
+                  transition: 'opacity 0.5s 0.1s ease, transform 0.5s 0.1s ease',
+                }}
               >
-                {/* Image */}
-                <img
-                  src={slide.imagem_url}
-                  alt={slide.titulo}
-                  className="absolute inset-0 w-full h-full object-cover"
-                  style={{
-                    animation: 'kenBurns 14s ease-in-out infinite alternate',
-                    animationPlayState: isActive ? 'running' : 'paused',
-                    transformOrigin: '55% 45%',
-                  }}
-                  loading={i === 0 ? 'eager' : 'lazy'}
-                />
-
-                {/* Gradient overlays */}
-                <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/30 to-black/5" />
-                <div className="absolute inset-0 bg-gradient-to-r from-black/40 via-transparent to-transparent" />
-                <div
-                  className="absolute inset-0"
-                  style={{
-                    background: 'radial-gradient(ellipse 100% 100% at 50% 50%, transparent 50%, rgba(0,0,0,0.3) 100%)',
-                  }}
-                />
-
-                {/* Type badge — top right */}
-                <div className="absolute top-3 right-3 z-20">
-                  <TypeBadge banner={slide} />
+                {/* Eyebrow */}
+                <div className="flex items-center gap-1.5 mb-1">
+                  <Megaphone size={8} className="text-teal-400/80" />
+                  <span className="text-[8px] font-bold uppercase tracking-[0.18em] text-teal-400/70">
+                    TEG+ Comunicados
+                  </span>
                 </div>
 
-                {/* Text content — bottom */}
-                <div
-                  className="absolute bottom-0 left-0 right-0 px-5 pb-4 z-10"
-                  style={{
-                    opacity: isActive ? 1 : 0,
-                    transform: isActive ? 'translateY(0)' : 'translateY(12px)',
-                    transition: 'opacity 0.6s 0.15s ease, transform 0.6s 0.15s ease',
-                  }}
+                {/* Title */}
+                <h3
+                  className="text-sm font-black text-white leading-tight"
+                  style={{ textShadow: '0 2px 10px rgba(0,0,0,0.5)' }}
                 >
-                  {/* Eyebrow */}
-                  <div className="flex items-center gap-1.5 mb-1.5">
-                    <Megaphone size={8} className="text-teal-400/80" />
-                    <span className="text-[8px] font-bold uppercase tracking-[0.2em] text-teal-400/70">
-                      TEG+ Comunicados
+                  {slide.titulo}
+                </h3>
+
+                {/* Subtitle */}
+                {slide.subtitulo && (
+                  <p className="text-[10px] text-white/55 mt-1 leading-relaxed line-clamp-2">
+                    {slide.subtitulo}
+                  </p>
+                )}
+
+                {/* Controls */}
+                {slides.length > 1 && (
+                  <div className="flex items-center gap-2.5 mt-2.5">
+                    <Dots total={slides.length} current={current} onSelect={setCurrent} />
+                    <span className="text-[9px] text-white/25 font-medium tabular-nums">
+                      {current + 1}/{slides.length}
                     </span>
-                  </div>
-
-                  {/* Title */}
-                  <h3
-                    className="text-base font-black text-white leading-tight"
-                    style={{ textShadow: '0 2px 10px rgba(0,0,0,0.5)' }}
-                  >
-                    {slide.titulo}
-                  </h3>
-
-                  {/* Subtitle */}
-                  {slide.subtitulo && (
-                    <p className="text-[11px] text-white/55 mt-1 leading-relaxed line-clamp-2">
-                      {slide.subtitulo}
-                    </p>
-                  )}
-
-                  {/* Controls */}
-                  {slides.length > 1 && (
-                    <div className="flex items-center gap-2.5 mt-3">
-                      <Dots total={slides.length} current={current} onSelect={setCurrent} />
-                      <span className="text-[9px] text-white/25 font-medium tabular-nums">
-                        {current + 1}/{slides.length}
-                      </span>
-                    </div>
-                  )}
-                </div>
-
-                {/* Progress bar */}
-                {slides.length > 1 && isActive && (
-                  <div className="absolute bottom-0 left-0 right-0 h-[2px] bg-white/8 z-20">
-                    <div
-                      key={`${current}-${paused ? 'p' : 'r'}`}
-                      className="h-full bg-gradient-to-r from-teal-400 via-cyan-300 to-teal-400"
-                      style={{
-                        animation: paused
-                          ? 'none'
-                          : `slideProgress ${SLIDE_DURATION}ms linear forwards`,
-                      }}
-                    />
                   </div>
                 )}
               </div>
-            )
-          })}
 
-          {/* Navigation arrows (visible on hover) */}
-          {slides.length > 1 && (
-            <>
-              <button
-                onClick={goPrev}
-                className={[
-                  'absolute top-3 left-3 z-30',
-                  'flex w-7 h-7 items-center justify-center',
-                  'rounded-full bg-black/50 backdrop-blur-sm border border-white/15',
-                  'text-white transition-all duration-300',
-                  'hover:bg-black/70 hover:border-white/30 hover:scale-110 active:scale-95',
-                  paused ? 'opacity-100' : 'opacity-0 pointer-events-none',
-                ].join(' ')}
-                aria-label="Anterior"
-              >
-                <ChevronUp size={14} strokeWidth={2.5} />
-              </button>
-
-              <button
-                onClick={goNext}
-                className={[
-                  'absolute bottom-10 left-3 z-30',
-                  'flex w-7 h-7 items-center justify-center',
-                  'rounded-full bg-black/50 backdrop-blur-sm border border-white/15',
-                  'text-white transition-all duration-300',
-                  'hover:bg-black/70 hover:border-white/30 hover:scale-110 active:scale-95',
-                  paused ? 'opacity-100' : 'opacity-0 pointer-events-none',
-                ].join(' ')}
-                aria-label="Próximo"
-              >
-                <ChevronDown size={14} strokeWidth={2.5} />
-              </button>
-            </>
-          )}
-
-          {/* Paused indicator */}
-          {paused && slides.length > 1 && (
-            <div className="absolute top-3 left-12 z-30 flex items-center gap-1
-              px-2 py-1 rounded-full bg-black/40 backdrop-blur-sm border border-white/10
-              text-[8px] text-white/35">
-              <span className="flex gap-0.5">
-                <span className="w-[2px] h-2.5 bg-white/40 rounded-full" />
-                <span className="w-[2px] h-2.5 bg-white/40 rounded-full" />
-              </span>
-              pausado
+              {/* Progress bar */}
+              {slides.length > 1 && isActive && (
+                <div className="absolute bottom-0 left-0 right-0 h-[2px] bg-white/8 z-20">
+                  <div
+                    key={`${current}-${paused ? 'p' : 'r'}`}
+                    className="h-full bg-gradient-to-r from-teal-400 via-cyan-300 to-teal-400"
+                    style={{
+                      animation: paused
+                        ? 'none'
+                        : `slideProgress ${SLIDE_DURATION}ms linear forwards`,
+                    }}
+                  />
+                </div>
+              )}
             </div>
-          )}
-        </div>
+          )
+        })}
+
+        {/* Navigation arrows — left/right, visible on hover */}
+        {slides.length > 1 && (
+          <>
+            <button
+              onClick={goPrev}
+              className={[
+                'absolute left-2 top-1/2 -translate-y-1/2 z-30',
+                'flex w-7 h-7 items-center justify-center',
+                'rounded-full bg-black/50 backdrop-blur-sm border border-white/15',
+                'text-white transition-all duration-300',
+                'hover:bg-black/70 hover:border-white/30 hover:scale-110 active:scale-95',
+                paused ? 'opacity-100' : 'opacity-0 pointer-events-none',
+              ].join(' ')}
+              aria-label="Anterior"
+            >
+              <ChevronLeft size={14} strokeWidth={2.5} />
+            </button>
+
+            <button
+              onClick={goNext}
+              className={[
+                'absolute right-2 top-1/2 -translate-y-1/2 z-30',
+                'flex w-7 h-7 items-center justify-center',
+                'rounded-full bg-black/50 backdrop-blur-sm border border-white/15',
+                'text-white transition-all duration-300',
+                'hover:bg-black/70 hover:border-white/30 hover:scale-110 active:scale-95',
+                paused ? 'opacity-100' : 'opacity-0 pointer-events-none',
+              ].join(' ')}
+              aria-label="Próximo"
+            >
+              <ChevronRight size={14} strokeWidth={2.5} />
+            </button>
+          </>
+        )}
       </div>
+
+      {/* ── Footer hint ──────────────────────────────────────────── */}
+      <p className={`text-center text-[9px] pb-3 ${isLight ? 'text-slate-400' : 'text-slate-600'}`}>
+        Passe o mouse para pausar · ← → para navegar
+      </p>
     </aside>
   )
 }

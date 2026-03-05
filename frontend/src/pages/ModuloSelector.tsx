@@ -477,7 +477,7 @@ export default function ModuloSelector() {
       </section>
 
       {/* ── Right Column: Mural de Recados (desktop only) ─────── */}
-      <div className="hidden lg:flex lg:items-center">
+      <div className="hidden lg:flex lg:items-center lg:py-4">
         <MuralSidebar />
       </div>
 
