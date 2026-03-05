@@ -472,7 +472,7 @@ export default function ModuloSelector() {
 
           {/* Panel */}
           <div
-            className={`relative z-10 w-full max-w-xl mx-4 my-auto rounded-3xl overflow-visible border ${
+            className={`relative z-10 w-full max-w-2xl mx-4 my-auto rounded-3xl overflow-visible border ${
               isLight ? 'border-slate-200/80' : 'border-white/10'
             }`}
             style={{
@@ -548,9 +548,9 @@ function SubMandalaView({ pillar, onNav, canAccess, visible, isLight }: {
   const subs = pillar.subs
   const count = subs.length
 
-  // Dynamic radius based on number of modules
-  const R = count <= 2 ? 100 : count <= 3 ? 115 : 130
-  const SIZE = R * 2 + 160
+  // Dynamic radius based on number of modules — bigger for readability
+  const R = count <= 2 ? 130 : count <= 3 ? 148 : 165
+  const SIZE = R * 2 + 190
 
   const cx = SIZE / 2
   const cy = SIZE / 2
@@ -629,10 +629,10 @@ function SubMandalaView({ pillar, onNav, canAccess, visible, isLight }: {
         <div
           className="absolute z-10"
           style={{
-            left: cx - 40,
-            top: cy - 40,
-            width: 80,
-            height: 80,
+            left: cx - 46,
+            top: cy - 46,
+            width: 92,
+            height: 92,
           }}
         >
           <div
@@ -649,7 +649,7 @@ function SubMandalaView({ pillar, onNav, canAccess, visible, isLight }: {
               transition: 'transform 0.5s cubic-bezier(0.175,0.885,0.32,1.275), box-shadow 0.6s ease',
             }}
           >
-            <pillar.Icon size={34} style={{ color: pillar.accent }} />
+            <pillar.Icon size={40} style={{ color: pillar.accent }} />
           </div>
         </div>
 
@@ -660,12 +660,12 @@ function SubMandalaView({ pillar, onNav, canAccess, visible, isLight }: {
           const y = R * Math.sin(angle)
           const accessible = canAccess(sub)
           const isAdminAccess = !sub.active && accessible
+          const isFuture = !accessible
 
           return (
             <button
               key={sub.key}
-              onClick={() => accessible && onNav(sub.route)}
-              disabled={!accessible}
+              onClick={() => accessible ? onNav(sub.route) : undefined}
               className="absolute z-20 group"
               style={{
                 left: cx,
@@ -677,48 +677,40 @@ function SubMandalaView({ pillar, onNav, canAccess, visible, isLight }: {
               }}
             >
               <div className="flex flex-col items-center gap-2">
-                {/* Node icon */}
+                {/* Node icon — all look active, full styling */}
                 <div
                   className={[
                     'rounded-2xl flex items-center justify-center border transition-all duration-200',
-                    accessible
-                      ? isLight
-                        ? 'bg-white shadow-card border-slate-200/80 group-hover:scale-110 group-hover:-translate-y-1 group-hover:shadow-card-md cursor-pointer'
-                        : 'glass-card group-hover:scale-110 group-hover:-translate-y-1 cursor-pointer'
-                      : isLight
-                        ? 'bg-slate-50 border-slate-200/50 opacity-40 cursor-not-allowed'
-                        : 'bg-white/[0.02] border-white/[0.05] opacity-40 cursor-not-allowed',
+                    isLight
+                      ? 'bg-white shadow-card border-slate-200/80 group-hover:scale-110 group-hover:-translate-y-1 group-hover:shadow-card-md cursor-pointer'
+                      : 'glass-card group-hover:scale-110 group-hover:-translate-y-1 cursor-pointer',
                   ].join(' ')}
                   style={{
-                    width: 62,
-                    height: 62,
-                    borderColor: accessible && !isLight ? pillar.accent + '35' : undefined,
-                    boxShadow: accessible && !isLight
+                    width: 72,
+                    height: 72,
+                    borderColor: !isLight ? pillar.accent + '35' : undefined,
+                    boxShadow: !isLight
                       ? `0 0 20px ${pillar.glow}, 0 0 40px ${pillar.glow.replace(/[\d.]+\)$/, '0.08)')}`
                       : 'none',
                   }}
                 >
-                  <sub.Icon size={28} style={{ color: accessible ? pillar.accent : '#475569' }} />
+                  <sub.Icon size={32} style={{ color: pillar.accent }} />
                 </div>
 
-                {/* Label */}
-                <span className={`text-[13px] font-bold whitespace-nowrap leading-tight ${
-                  accessible
-                    ? isLight ? 'text-slate-800' : 'text-white'
-                    : isLight ? 'text-slate-400' : 'text-slate-600'
-                }`}>
+                {/* Label — always full color */}
+                <span className={`text-[14px] font-bold whitespace-nowrap leading-tight ${isLight ? 'text-slate-800' : 'text-white'}`}>
                   {sub.label}
                 </span>
 
                 {/* Status badge */}
-                {accessible ? (
+                {isFuture ? (
+                  <span className={`text-[9px] font-medium ${isLight ? 'text-slate-400/70' : 'text-slate-500/60'}`}>
+                    Em breve
+                  </span>
+                ) : (
                   <span className="text-[10px] font-semibold flex items-center gap-1" style={{ color: pillar.accent }}>
                     <div className="w-1.5 h-1.5 rounded-full" style={{ background: pillar.accent }} />
                     {isAdminAccess ? 'Admin' : 'Ativo'}
-                  </span>
-                ) : (
-                  <span className={`text-[10px] flex items-center gap-1 ${isLight ? 'text-slate-400' : 'text-slate-600'}`}>
-                    <Lock size={9} /> Em breve
                   </span>
                 )}
               </div>
