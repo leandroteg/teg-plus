@@ -87,7 +87,7 @@ const PILLARS: Pillar[] = [
     subs: [
       { key: 'tesouraria', label: 'Tesouraria', desc: 'Contas, aprovações e conciliação', Icon: Banknote, active: true, route: '/financeiro' },
       { key: 'controladoria', label: 'Controladoria', desc: 'Indicadores e relatórios gerenciais', Icon: BarChart3, active: false, route: '' },
-      { key: 'contratos', label: 'Contratos', desc: 'Gestão de contratos e SLAs', Icon: FileText, active: false, route: '/contratos' },
+      { key: 'contratos', label: 'Contratos', desc: 'Gestão de contratos e SLAs', Icon: FileText, active: true, route: '/contratos' },
     ],
   },
   {

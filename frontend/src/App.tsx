@@ -22,7 +22,13 @@ import RequisicaoDetalhe from './pages/RequisicaoDetalhe'
 
 // Módulos stub
 import SSMA from './pages/SSMA'
-import Contratos from './pages/Contratos'
+
+// Módulo Contratos
+import ContratosLayout from './components/ContratosLayout'
+import DashboardContratos from './pages/contratos/DashboardContratos'
+import ListaContratos from './pages/contratos/ListaContratos'
+import NovoContrato from './pages/contratos/NovoContrato'
+import ParcelasContratos from './pages/contratos/Parcelas'
 
 // Módulo RH
 import RHLayout from './components/RHLayout'
@@ -135,9 +141,16 @@ export default function App() {
             <Route path="/rh/mural"  element={<MuralAdmin />} />
           </Route>
 
+          {/* Módulo Contratos: usa ContratosLayout */}
+          <Route element={<ContratosLayout />}>
+            <Route path="/contratos"            element={<DashboardContratos />} />
+            <Route path="/contratos/lista"      element={<ListaContratos />} />
+            <Route path="/contratos/novo"       element={<NovoContrato />} />
+            <Route path="/contratos/parcelas"   element={<ParcelasContratos />} />
+          </Route>
+
           {/* Módulos stub */}
           <Route path="/ssma"       element={<SSMA />} />
-          <Route path="/contratos"  element={<Contratos />} />
 
           {/* Módulo Compras: usa sidebar/Layout */}
           <Route element={<Layout />}>
