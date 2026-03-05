@@ -164,6 +164,19 @@ export default function ModuloSelector() {
     return () => clearTimeout(t)
   }, [])
 
+  // Auto-open Mural popup on mobile (once per session)
+  useEffect(() => {
+    const isMobile = window.innerWidth < 1024 // matches lg breakpoint
+    const alreadyShown = sessionStorage.getItem('mural_auto_shown')
+    if (isMobile && !alreadyShown) {
+      const t = setTimeout(() => {
+        setMuralOpen(true)
+        sessionStorage.setItem('mural_auto_shown', '1')
+      }, 800) // small delay so mandala animates first
+      return () => clearTimeout(t)
+    }
+  }, [])
+
   function canAccessSub(sub: SubMod) {
     if (sub.adminOnly && isAdmin) return true
     return sub.active
