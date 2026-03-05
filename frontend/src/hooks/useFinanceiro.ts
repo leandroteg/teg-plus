@@ -127,3 +127,167 @@ export function useMarcarCPPago() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ['contas-pagar'] }),
   })
 }
+
+// ── Classificação em lote (CP) ────────────────────────────────────────────
+export function useClassificarCPBatch() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async ({
+      ids,
+      centro_custo,
+      classe_financeira,
+      projeto_id,
+    }: {
+      ids: string[]
+      centro_custo?: string
+      classe_financeira?: string
+      projeto_id?: string
+    }) => {
+      const updates: Record<string, string | undefined> = {}
+      if (centro_custo !== undefined) updates.centro_custo = centro_custo
+      if (classe_financeira !== undefined) updates.classe_financeira = classe_financeira
+      if (projeto_id !== undefined) updates.projeto_id = projeto_id
+      if (Object.keys(updates).length === 0) return
+
+      const { error } = await supabase
+        .from('fin_contas_pagar')
+        .update(updates)
+        .in('id', ids)
+      if (error) throw error
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['contas-pagar'] })
+      qc.invalidateQueries({ queryKey: ['financeiro-dashboard'] })
+    },
+  })
+}
+
+// ── Conciliar em lote (CP) ────────────────────────────────────────────────
+export function useConciliarCPBatch() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ ids }: { ids: string[] }) => {
+      const { error } = await supabase
+        .from('fin_contas_pagar')
+        .update({ status: 'conciliado' })
+        .in('id', ids)
+      if (error) throw error
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['contas-pagar'] })
+      qc.invalidateQueries({ queryKey: ['financeiro-dashboard'] })
+    },
+  })
+}
+
+// ── Classificação em lote (CR) ────────────────────────────────────────────
+export function useClassificarCRBatch() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async ({
+      ids,
+      centro_custo,
+      classe_financeira,
+      projeto_id,
+    }: {
+      ids: string[]
+      centro_custo?: string
+      classe_financeira?: string
+      projeto_id?: string
+    }) => {
+      const updates: Record<string, string | undefined> = {}
+      if (centro_custo !== undefined) updates.centro_custo = centro_custo
+      if (classe_financeira !== undefined) updates.classe_financeira = classe_financeira
+      if (projeto_id !== undefined) updates.projeto_id = projeto_id
+      if (Object.keys(updates).length === 0) return
+
+      const { error } = await supabase
+        .from('fin_contas_receber')
+        .update(updates)
+        .in('id', ids)
+      if (error) throw error
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['contas-receber'] })
+      qc.invalidateQueries({ queryKey: ['financeiro-dashboard'] })
+    },
+  })
+}
+
+// ── Conciliar em lote (CR) ────────────────────────────────────────────────
+export function useConciliarCRBatch() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ ids }: { ids: string[] }) => {
+      const { error } = await supabase
+        .from('fin_contas_receber')
+        .update({ status: 'conciliado' })
+        .in('id', ids)
+      if (error) throw error
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['contas-receber'] })
+      qc.invalidateQueries({ queryKey: ['financeiro-dashboard'] })
+    },
+  })
+}
+
+// ── Valores distintos para autocomplete ───────────────────────────────────
+export function useDistinctCentroCusto() {
+  return useQuery<string[]>({
+    queryKey: ['distinct-centro-custo'],
+    queryFn: async () => {
+      const { data: cp } = await supabase
+        .from('fin_contas_pagar')
+        .select('centro_custo')
+        .not('centro_custo', 'is', null)
+        .limit(500)
+      const { data: cr } = await supabase
+        .from('fin_contas_receber')
+        .select('centro_custo')
+        .not('centro_custo', 'is', null)
+        .limit(500)
+      const all = [...(cp ?? []), ...(cr ?? [])]
+      const unique = [...new Set(all.map(r => r.centro_custo).filter(Boolean))] as string[]
+      return unique.sort()
+    },
+    staleTime: 60_000,
+  })
+}
+
+export function useDistinctClasseFinanceira() {
+  return useQuery<string[]>({
+    queryKey: ['distinct-classe-financeira'],
+    queryFn: async () => {
+      const { data: cp } = await supabase
+        .from('fin_contas_pagar')
+        .select('classe_financeira')
+        .not('classe_financeira', 'is', null)
+        .limit(500)
+      const { data: cr } = await supabase
+        .from('fin_contas_receber')
+        .select('classe_financeira')
+        .not('classe_financeira', 'is', null)
+        .limit(500)
+      const all = [...(cp ?? []), ...(cr ?? [])]
+      const unique = [...new Set(all.map(r => r.classe_financeira).filter(Boolean))] as string[]
+      return unique.sort()
+    },
+    staleTime: 60_000,
+  })
+}
+
+export function useObras() {
+  return useQuery<{ id: string; nome: string; codigo: string }[]>({
+    queryKey: ['obras'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('sys_obras')
+        .select('id, nome, codigo')
+        .order('nome')
+      if (error) return []
+      return data ?? []
+    },
+    staleTime: 300_000,
+  })
+}
