@@ -1,11 +1,12 @@
 import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import {
   CheckCircle, XCircle, ChevronDown, ChevronUp,
   Clock, Building, Sparkles, Shield, AlertTriangle,
-  MessageSquare, ExternalLink,
+  MessageSquare, ExternalLink, ArrowLeft,
 } from 'lucide-react'
-import { useAprovacoesPendentes, useProcessarAprovacaoAi } from '../hooks/useAprovacoes'
-import CotacaoComparativo from '../components/CotacaoComparativo'
+import { useAuth } from '../contexts/AuthContext'
+import { useAprovacoesPendentes, useDecisaoRequisicao } from '../hooks/useAprovacoes'
 import FluxoTimeline from '../components/FluxoTimeline'
 import type { AprovacaoPendente } from '../types'
 
@@ -33,8 +34,12 @@ function getAlcada(valor: number, nivel: number) {
   return { label: 'Aprovação de Pagamento', sublabel: 'Laucídio — etapa final' }
 }
 
-function AprovacaoCard({ aprovacao }: { aprovacao: AprovacaoPendente }) {
-  const mutation = useProcessarAprovacaoAi()
+function AprovacaoCard({ aprovacao, aprovadorNome, aprovadorEmail }: {
+  aprovacao: AprovacaoPendente
+  aprovadorNome: string
+  aprovadorEmail: string
+}) {
+  const mutation = useDecisaoRequisicao()
   const [expanded, setExpanded] = useState(false)
   const [observacao, setObservacao] = useState('')
   const [action, setAction] = useState<'aprovada' | 'rejeitada' | 'esclarecimento' | null>(null)
@@ -49,13 +54,22 @@ function AprovacaoCard({ aprovacao }: { aprovacao: AprovacaoPendente }) {
   const alc  = getAlcada(req.valor_estimado, aprovacao.nivel)
 
   const handleDecision = async (decisao: 'aprovada' | 'rejeitada') => {
+    setAction(decisao)
     try {
-      await mutation.mutateAsync({ token: aprovacao.token, decisao, observacao })
-    } catch { /* error handled */ }
+      await mutation.mutateAsync({
+        requisicaoId: aprovacao.requisicao_id,
+        decisao,
+        observacao: observacao || undefined,
+        requisicaoNumero: req.numero,
+        alcadaNivel: aprovacao.nivel,
+        aprovadorNome,
+        aprovadorEmail,
+        categoria: req.categoria,
+        currentStatus: req.status,
+      })
+    } catch { /* error handled by mutation state */ }
   }
 
-  // Para esclarecimento usamos API direta (token-based) com decisão 'rejeitada' + observação de esclarecimento
-  // TODO: quando backend suportar esclarecimento via token, trocar para decisao: 'esclarecimento'
   const handleEsclarecimento = async () => {
     if (!observacao.trim()) {
       setExpanded(true)
@@ -64,13 +78,18 @@ function AprovacaoCard({ aprovacao }: { aprovacao: AprovacaoPendente }) {
     }
     setAction('esclarecimento')
     try {
-      // Por enquanto usa rejeitada com obs indicando esclarecimento
       await mutation.mutateAsync({
-        token: aprovacao.token,
-        decisao: 'rejeitada',
-        observacao: `[ESCLARECIMENTO] ${observacao}`,
+        requisicaoId: aprovacao.requisicao_id,
+        decisao: 'esclarecimento',
+        observacao,
+        requisicaoNumero: req.numero,
+        alcadaNivel: aprovacao.nivel,
+        aprovadorNome,
+        aprovadorEmail,
+        categoria: req.categoria,
+        currentStatus: req.status,
       })
-    } catch { /* error handled */ }
+    } catch { /* error handled by mutation state */ }
   }
 
   // ── Resultado ─────────────────────────────────────────────────────────────
@@ -213,7 +232,7 @@ function AprovacaoCard({ aprovacao }: { aprovacao: AprovacaoPendente }) {
         <button
           type="button"
           disabled={mutation.isPending}
-          onClick={() => { setAction('rejeitada'); handleDecision('rejeitada') }}
+          onClick={() => handleDecision('rejeitada')}
           className="flex flex-col items-center justify-center gap-1 py-4 text-xs font-bold text-red-500 hover:bg-red-50 active:bg-red-100 transition border-r border-slate-100 disabled:opacity-50"
         >
           {mutation.isPending && action === 'rejeitada'
@@ -235,7 +254,7 @@ function AprovacaoCard({ aprovacao }: { aprovacao: AprovacaoPendente }) {
         <button
           type="button"
           disabled={mutation.isPending}
-          onClick={() => { setAction('aprovada'); handleDecision('aprovada') }}
+          onClick={() => handleDecision('aprovada')}
           className="flex flex-col items-center justify-center gap-1 py-4 text-xs font-bold text-emerald-600 hover:bg-emerald-50 active:bg-emerald-100 transition disabled:opacity-50"
         >
           {mutation.isPending && action === 'aprovada'
@@ -246,34 +265,52 @@ function AprovacaoCard({ aprovacao }: { aprovacao: AprovacaoPendente }) {
       </div>
 
       {mutation.isError && (
-        <p className="text-red-500 text-xs text-center py-2 border-t border-red-100">Erro ao processar. Tente novamente.</p>
+        <p className="text-red-500 text-xs text-center py-2 border-t border-red-100">
+          Erro ao processar: {mutation.error?.message || 'Tente novamente.'}
+        </p>
       )}
     </div>
   )
 }
 
 export default function AprovAi() {
+  const navigate = useNavigate()
+  const { perfil } = useAuth()
   const { data: aprovacoes, isLoading, isError, refetch } = useAprovacoesPendentes()
+
+  const aprovadorNome = perfil?.nome ?? 'Aprovador'
+  const aprovadorEmail = perfil?.email ?? ''
 
   return (
     <div className="min-h-screen"
       style={{ background: 'linear-gradient(160deg, #312e81 0%, #4f46e5 40%, #6d28d9 100%)' }}>
 
       {/* Header */}
-      <header className="px-4 pt-8 pb-6 text-center">
-        <div className="flex items-center justify-center gap-2 mb-1">
-          <Sparkles size={22} className="text-indigo-200" />
-          <h1 className="text-2xl font-extrabold text-white tracking-tight">
-            Aprov<span className="text-indigo-200">Ai</span>
-          </h1>
-        </div>
-        <p className="text-indigo-300 text-xs font-medium">Aprovações inteligentes com 1 toque</p>
-        {aprovacoes && !isError && (
-          <div className="mt-3 inline-flex items-center gap-2 bg-white/15 backdrop-blur-sm rounded-full px-4 py-1.5">
-            <span className="text-white text-lg font-extrabold">{aprovacoes.length}</span>
-            <span className="text-indigo-200 text-xs">pendente{aprovacoes.length !== 1 ? 's' : ''}</span>
+      <header className="px-4 pt-6 pb-5">
+        {/* Back button */}
+        <button
+          onClick={() => navigate(-1)}
+          className="flex items-center gap-1.5 text-indigo-300 hover:text-white transition-colors mb-4"
+        >
+          <ArrowLeft size={18} />
+          <span className="text-xs font-semibold">Voltar</span>
+        </button>
+
+        <div className="text-center">
+          <div className="flex items-center justify-center gap-2 mb-1">
+            <Sparkles size={22} className="text-indigo-200" />
+            <h1 className="text-2xl font-extrabold text-white tracking-tight">
+              Aprov<span className="text-indigo-200">Ai</span>
+            </h1>
           </div>
-        )}
+          <p className="text-indigo-300 text-xs font-medium">Aprovações inteligentes com 1 toque</p>
+          {aprovacoes && !isError && (
+            <div className="mt-3 inline-flex items-center gap-2 bg-white/15 backdrop-blur-sm rounded-full px-4 py-1.5">
+              <span className="text-white text-lg font-extrabold">{aprovacoes.length}</span>
+              <span className="text-indigo-200 text-xs">pendente{aprovacoes.length !== 1 ? 's' : ''}</span>
+            </div>
+          )}
+        </div>
       </header>
 
       {/* Content */}
@@ -308,7 +345,12 @@ export default function AprovAi() {
         )}
 
         {aprovacoes?.map(apr => (
-          <AprovacaoCard key={apr.id} aprovacao={apr} />
+          <AprovacaoCard
+            key={apr.id}
+            aprovacao={apr}
+            aprovadorNome={aprovadorNome}
+            aprovadorEmail={aprovadorEmail}
+          />
         ))}
       </div>
 

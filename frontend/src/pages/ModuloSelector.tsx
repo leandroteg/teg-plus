@@ -259,16 +259,16 @@ export default function ModuloSelector() {
       </header>
 
       {/* ── Main Mandala — Logo center + 6 pillars orbiting ───── */}
-      <section className="relative z-10 flex-1 flex flex-col items-center justify-center px-4 py-6 sm:py-8">
+      <section className="relative z-10 flex-1 flex flex-col items-center justify-center px-4 py-2 sm:py-8">
 
         {/* Mobile greeting (hidden on sm+) */}
-        <p className={`text-sm font-semibold mb-4 sm:hidden ${isLight ? 'text-slate-700' : 'text-white/90'}`}>
+        <p className={`text-sm font-semibold mb-1 sm:hidden ${isLight ? 'text-slate-700' : 'text-white/90'}`}>
           {saudacao}, <span className="text-gradient-teal">{primeiroNome}</span>
         </p>
 
         {/* Mandala container with responsive scaling */}
         <div
-          className="relative origin-center scale-[0.54] xs:scale-[0.62] sm:scale-[0.78] md:scale-90 lg:scale-100"
+          className="relative origin-center scale-[0.68] sm:scale-[0.78] md:scale-90 lg:scale-100"
           style={{ width: SIZE, height: SIZE }}
         >
           {/* Slow rotating decorative conic gradient */}
