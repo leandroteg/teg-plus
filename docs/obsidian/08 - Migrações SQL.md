@@ -4,7 +4,7 @@ type: banco-de-dados
 status: ativo
 tags: [supabase, migrations, sql, schema]
 criado: 2026-03-02
-atualizado: 2026-03-03
+atualizado: 2026-03-05
 relacionado: ["[[06 - Supabase]]", "[[07 - Schema Database]]", "[[19 - Integração Omie]]", "[[21 - Fluxo Pagamento]]"]
 ---
 
@@ -31,7 +31,10 @@ supabase/
 ├── 015_estoque_patrimonial.sql  → Estoque: almoxarifado, inventário, imobilizados
 ├── 016_logistica_transportes.sql→ Logística: transportes, NF-e, 9 etapas
 ├── 017_frotas_manutencao.sql    → Frotas: veículos, OS, checklists, telemetria
-├── 018_mural_recados.sql        → Mural: banners, RLS, seed 3 slides [novo]
+├── 018_mural_recados.sql        → Mural: banners, RLS, seed 3 slides
+├── 022_contratos.sql            → Contratos: clientes, contratos, medições, pleitos
+├── 024_contratos_gestao.sql     → Contratos: itens, parcelas, anexos, triggers financeiro
+├── 025_cadastros_master.sql     → Cadastros: classes financeiras, centros custo, colaboradores [novo]
 ├── EXECUTAR_NO_SUPABASE.sql     → Runner completo (aplica todas as migrations)
 └── SCHEMA_v2.sql                → Rebuild completo de referência
 ```
@@ -265,6 +268,38 @@ Ver detalhes em [[14 - Compradores e Categorias]].
 
 ---
 
+### `022_contratos.sql` — Módulo Contratos Base
+**Cria:** Schema inicial de contratos.
+
+- Tabelas: `con_clientes`, `con_contratos`, `con_medicoes`, `con_medicao_itens`, `con_pleitos`, `con_alertas`
+- RLS e triggers padrão
+- Ver [[27 - Módulo Contratos Gestão]]
+
+---
+
+### `024_contratos_gestao.sql` — Contratos: Gestão de Parcelas
+**Cria:** Extensão do módulo de contratos com gestão de pagamentos.
+
+- Tabelas: `con_contrato_itens`, `con_parcelas`, `con_parcela_anexos`
+- Triggers: criação automática de previsão financeira (CP/CR)
+- Função: `con_gerar_parcelas_recorrentes()`
+- Ver [[27 - Módulo Contratos Gestão]]
+
+---
+
+### `025_cadastros_master.sql` — Cadastros Master Data ⭐ (novo)
+**Cria:** Tabelas de dados mestres para o módulo de configurações.
+
+- Tabela `fin_classes_financeiras` — Classes financeiras (código, descrição, tipo receita/despesa)
+- Tabela `sys_centros_custo` — Centros de custo vinculados a obras
+- Tabela `rh_colaboradores` — Colaboradores (nome, CPF, cargo, obra, admissão)
+- RLS: SELECT/INSERT/UPDATE para autenticados
+- Triggers: `updated_at` automático
+- Índices: `ativo`, `obra_id`
+- Ver [[28 - Módulo Cadastros AI]]
+
+---
+
 ### `SCHEMA_v2.sql` — Rebuild Completo (Referência)
 **Propósito:** Schema completamente refatorado com convenções de nomenclatura.
 
@@ -295,7 +330,7 @@ supabase db push
 # SQL Editor → colar e executar em ordem
 ```
 
-**Ordem obrigatória:** 001 → 002 → 003 → 004 → 005 → 006 → 006b → 007 → 008 → 009 → 010 → 011 → 012 → 013 → 014 → 015 → 016 → 017 → 018
+**Ordem obrigatória:** 001 → 002 → 003 → 004 → 005 → 006 → 006b → 007 → 008 → 009 → 010 → 011 → 012 → 013 → 014 → 015 → 016 → 017 → 018 → 022 → 024 → 025
 
 ---
 
@@ -309,3 +344,5 @@ supabase db push
 - [[23 - Módulo Logística e Transportes]] — migration 016
 - [[24 - Módulo Frotas e Manutenção]] — migration 017
 - [[25 - Mural de Recados]] — migration 018
+- [[27 - Módulo Contratos Gestão]] — migrations 022, 024
+- [[28 - Módulo Cadastros AI]] — migration 025

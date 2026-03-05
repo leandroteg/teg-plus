@@ -4,13 +4,13 @@ type: index
 status: ativo
 tags: [teg-plus, erp, moc, index]
 criado: 2026-03-02
-atualizado: 2026-03-03
+atualizado: 2026-03-05
 ---
 
 # TEG+ ERP — Mapa da Aplicação
 
 > Sistema ERP modular para gestão de obras de engenharia elétrica/transmissão.
-> **6 módulos operacionais** · 3 em planejamento · 12 milestones · 30 tarefas
+> **7 módulos operacionais** · 3 em planejamento · 14 milestones · 30 tarefas
 
 ---
 
@@ -35,6 +35,7 @@ atualizado: 2026-03-03
 | [[Paineis/Logistica Dashboard\|🚚 Logística]] | 85% | ✅ Operacional |
 | [[Paineis/Frotas Dashboard\|🚛 Frotas]] | 80% | ✅ Operacional |
 | [[Paineis/RH Dashboard\|👥 RH]] | 5% | 🔜 Q2 2026 |
+| [[Paineis/Cadastros Dashboard\|⚙️ Cadastros]] | 100% | ✅ Operacional |
 
 > **Como usar:** edite os arquivos em `Database/Tarefas/`, `Database/Issues/`, `Database/Requisitos/` ou `Database/Milestones/` — os painéis atualizam automaticamente via Dataview.
 
@@ -69,6 +70,9 @@ atualizado: 2026-03-03
 | Módulo Logística | [[23 - Módulo Logística e Transportes]] |
 | Módulo Frotas | [[24 - Módulo Frotas e Manutenção]] |
 | Mural de Recados | [[25 - Mural de Recados]] |
+| Upload Inteligente Cotação | [[26 - Upload Inteligente Cotacao]] |
+| Módulo Contratos | [[27 - Módulo Contratos Gestão]] |
+| Módulo Cadastros AI | [[28 - Módulo Cadastros AI]] |
 
 ---
 
@@ -105,6 +109,14 @@ graph LR
     M --> R[🔜 RH]
     M --> S[🔜 SSMA]
     M --> K[🔜 Contratos]
+    M --> CAD[✅ Cadastros]
+
+    CAD --> CAD1[Fornecedores 🤖]
+    CAD --> CAD2[Itens]
+    CAD --> CAD3[Classes Fin.]
+    CAD --> CAD4[C. Custo]
+    CAD --> CAD5[Obras 🤖]
+    CAD --> CAD6[Colaboradores 🤖]
 
     C --> C1[Requisições]
     C --> C2[Cotações]
@@ -132,6 +144,7 @@ graph LR
     style R  fill:#64748B,color:#fff
     style S  fill:#64748B,color:#fff
     style K  fill:#64748B,color:#fff
+    style CAD fill:#8B5CF6,color:#fff
 ```
 
 ---
@@ -144,7 +157,7 @@ graph LR
 | Aprovações multi-nível | ✅ Entregue | 4 alçadas, token-based |
 | ApprovaAi (mobile) | ✅ Entregue | Interface responsiva |
 | Dashboard KPIs | ✅ Entregue | RPC + realtime |
-| Schema Supabase | ✅ Entregue | 18 migrations |
+| Schema Supabase | ✅ Entregue | 25 migrations |
 | AI Parse requisições | ✅ Entregue | Keywords + n8n |
 | Cotações | ✅ Entregue | Regras de alçada + bypass sem mínimo |
 | PO — PDF e Compartilhamento | ✅ Entregue | Sem deps externas, WhatsApp + E-mail |
@@ -154,6 +167,8 @@ graph LR
 | Logística e Transportes | ✅ Entregue | 9 etapas, NF-e, rastreamento, avaliações |
 | Frotas e Manutenção | ✅ Entregue | OS, checklist, abastecimento, telemetria |
 | Mural de Recados | ✅ Entregue | Slideshow corporativo + gestão admin RH |
+| Contratos e Parcelas | ✅ Entregue | Gestão de contratos, parcelas recorrentes, integração financeiro |
+| Cadastros AI (Master Data) | ✅ Entregue | 6 entidades, MagicModal AI/Manual, CNPJ/CPF lookup, ⚙️ em todos os módulos |
 | WhatsApp (Evolution API) | 🔜 Q1 2026 | Notificações automáticas |
 | RH Completo | 🔜 Q2 2026 | Colaboradores, ponto, folha, eSocial |
 | AI TEG+ (Claude API) | 🔜 Q2-Q3 2026 | Agente conversacional + RAG |

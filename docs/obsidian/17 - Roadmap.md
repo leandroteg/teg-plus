@@ -4,7 +4,7 @@ type: estratégia
 status: ativo
 tags: [roadmap, planejamento, futuro, módulos, integrações, erp]
 criado: 2026-03-02
-atualizado: 2026-03-03
+atualizado: 2026-03-05
 relacionado: ["[[00 - TEG+ INDEX]]", "[[01 - Arquitetura Geral]]"]
 ---
 
@@ -19,13 +19,15 @@ relacionado: ["[[00 - TEG+ INDEX]]", "[[01 - Arquitetura Geral]]"]
 
 ```mermaid
 graph LR
-    subgraph ENTREGUE["✅ Entregue (6 módulos)"]
+    subgraph ENTREGUE["✅ Entregue (8 módulos)"]
         C[Compras]
         F[Financeiro]
         E[Estoque]
         L[Logística]
         FR[Frotas]
         MU[Mural RH]
+        CT2[Contratos Base]
+        CAD[Cadastros AI]
     end
 
     subgraph EVOLUIR["🔵 Evoluir (Q1-Q2)"]
@@ -57,6 +59,8 @@ graph LR
     style L fill:#10B981,color:#fff
     style FR fill:#10B981,color:#fff
     style MU fill:#10B981,color:#fff
+    style CT2 fill:#10B981,color:#fff
+    style CAD fill:#10B981,color:#fff
     style RH fill:#F59E0B,color:#fff
     style SS fill:#F59E0B,color:#fff
     style CT fill:#F59E0B,color:#fff
@@ -68,7 +72,7 @@ graph LR
 
 ## Status Atual — Março 2026
 
-### Entregue ✅ (6 Módulos Operacionais)
+### Entregue ✅ (8 Módulos Operacionais)
 
 | Módulo | Completude | Funcionalidades |
 |--------|-----------|-----------------|
@@ -78,16 +82,18 @@ graph LR
 | **Logística** | 85% | Solicitações 9 etapas, expedição, recebimentos, NF-e, transportadoras |
 | **Frotas** | 80% | Veículos, OS manutenção, checklists, abastecimentos, telemetria (stub) |
 | **Mural RH** | 100% | Slideshow Ken Burns, gestão admin, campanhas com vigência |
+| **Contratos** | 70% | Contratos base, parcelas, medições, pleitos, integração financeiro |
+| **Cadastros AI** | 100% | 6 entidades, MagicModal AI/Manual, CNPJ/CPF lookup, ⚙️ cross-module |
 
 ### Infraestrutura Entregue ✅
 
 | Item | Detalhes |
 |------|----------|
-| Schema Supabase | 18 migrations, RLS, views, funções, triggers |
+| Schema Supabase | 25 migrations, RLS, views, funções, triggers |
 | Auth | Magic link + email/senha, 6 roles |
 | n8n Workflows | 8 workflows ativos (compras, financeiro, AI parse) |
 | Deploy | Vercel (frontend) + Easypanel (n8n) |
-| Obsidian Vault | 25+ docs, 6 painéis Dataview |
+| Obsidian Vault | 28+ docs, 7 painéis Dataview |
 
 ---
 
@@ -259,6 +265,7 @@ graph TD
         M7[SSMA]
         M8[Contratos]
         M9[Controladoria]
+        M10[Cadastros AI]
     end
 
     subgraph DATA["🗄️ Dados & Integrações"]
@@ -284,7 +291,7 @@ graph TD
 
 | Indicador | Atual (Mar/26) | Meta Q2 | Meta Q4 |
 |---|---|---|---|
-| Módulos operacionais | 6 | 8 (+ RH, AI) | 11 (todos) |
+| Módulos operacionais | 8 | 10 (+ RH, AI) | 12 (todos) |
 | Tabelas no schema | ~63 | ~90 | ~120 |
 | Workflows n8n | 8 | 15 | 25 |
 | Tempo aprovação compra | < 4h | < 2h | < 1h |
@@ -305,9 +312,12 @@ graph TD
     EST --> LOG[Logística ✅]
     RH[RH 🟡] --> FIN
     RH --> SSMA[SSMA 🟡]
-    CONT[Contratos 🟡] --> FIN
+    CONT[Contratos ✅] --> FIN
     CONT --> CTRL
     FROT[Frotas ✅] --> EST
+    CAD[Cadastros AI ✅] --> COMP
+    CAD --> FIN
+    CAD --> EST
     AI[AI Agent 🟡] --> COMP
     AI --> FIN
     MON[Monday PMO 🟣] --> CONT
@@ -332,6 +342,7 @@ graph TD
 | [[MS-011 - AI TEG+ Agent\|MS-011]] | AI TEG+ Agent | Q2-Q3 | ⬜ 0% |
 | [[MS-012 - Controladoria BI\|MS-012]] | Controladoria e BI | Q3-2026 | ⬜ 0% |
 | [[MS-013 - Monday PMO\|MS-013]] | Monday.com PMO | Q4-2026 | ⬜ 0% |
+| [[MS-014 - Modulo Cadastros AI\|MS-014]] | Cadastros AI (Master Data) | Q1-2026 | ✅ 100% |
 
 ---
 
@@ -341,4 +352,6 @@ graph TD
 - [[01 - Arquitetura Geral]] — Arquitetura técnica
 - [[10 - n8n Workflows]] — Workflows existentes e futuros
 - [[Paineis/BI Dashboard|📊 BI Dashboard]] — Painel executivo visual
+- [[27 - Módulo Contratos Gestão]] — Contratos e parcelas
+- [[28 - Módulo Cadastros AI]] — Cadastros AI com MagicModal
 - [[Paineis/Roadmap Board|🗺️ Roadmap Board]] — Timeline interativa

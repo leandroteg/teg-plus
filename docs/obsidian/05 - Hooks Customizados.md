@@ -4,7 +4,7 @@ type: frontend
 status: ativo
 tags: [frontend, hooks, react-query, dados]
 criado: 2026-03-02
-atualizado: 2026-03-03
+atualizado: 2026-03-05
 relacionado: ["[[02 - Frontend Stack]]", "[[06 - Supabase]]", "[[10 - n8n Workflows]]"]
 ---
 
@@ -28,7 +28,9 @@ src/hooks/
 ├── useLogistica.ts        → Transportes, expedição, recebimentos
 ├── usePatrimonial.ts      → Imobilizados e depreciação
 ├── useFrotas.ts           → Veículos, OS, checklists, abastecimentos
-└── useMural.ts            → Banners do Mural de Recados [novo]
+├── useMural.ts            → Banners do Mural de Recados
+├── useContratos.ts        → Contratos, parcelas, liberação, pagamento
+└── useCadastros.ts        → Master data: 6 entidades + AI parse [novo]
 ```
 
 ---
@@ -262,6 +264,51 @@ Ver [[25 - Mural de Recados]] para documentação completa.
 
 ---
 
+## `useCadastros` ⭐ (novo)
+
+**Arquivo:** `src/hooks/useCadastros.ts`
+
+Módulo unificado com **13 hooks** para gerenciamento de dados mestres + AI parsing.
+
+### Query Hooks (10)
+```ts
+useCadFornecedores()       // → cmp_fornecedores (SELECT *)
+useCadClasses()            // → fin_classes_financeiras (SELECT * ORDER BY codigo)
+useCadCentrosCusto()       // → sys_centros_custo + join obras
+useCadObras()              // → obras (SELECT *)
+useCadColaboradores()      // → rh_colaboradores + join obras
+```
+
+### Mutation Hooks (5)
+```ts
+useSalvarFornecedor()      // → upsert cmp_fornecedores | invalida ['cad-fornecedores', 'fornecedores']
+useSalvarClasse()          // → upsert fin_classes_financeiras | invalida ['cad-classes']
+useSalvarCentroCusto()     // → upsert sys_centros_custo | invalida ['cad-centros-custo']
+useSalvarObra()            // → upsert obras | invalida ['cad-obras', 'obras']
+useSalvarColaborador()     // → upsert rh_colaboradores | invalida ['cad-colaboradores']
+```
+
+### AI Hook
+```ts
+const { mutateAsync: parse, isPending } = useAiCadastroParse()
+
+// Uso:
+parse({ entity: 'fornecedor', content: '12.345.678/0001-90' })
+// → Tenta BrasilAPI (CNPJ) → n8n webhook → regex fallback
+// → Retorna: { fields: [{ name, value, confidence }], raw }
+```
+
+**Estratégia AI (3 camadas):**
+1. **CNPJ** → `brasilapi.com.br/api/cnpj/v1/{cnpj}` (grátis, 95% confidence)
+2. **Arquivo/Texto** → `n8n POST /cadastros/ai-parse` (LLM extraction)
+3. **Fallback** → Regex local (50-60% confidence)
+
+**Cross-module invalidation:** Mutations invalidam cache do cadastros E do módulo original.
+
+Ver [[28 - Módulo Cadastros AI]] para documentação completa.
+
+---
+
 ## Diagrama de Dependências
 
 ```mermaid
@@ -288,6 +335,14 @@ graph LR
     UAP --> N8N
     UCT --> N8N
     UC --> SB2
+
+    CADH[CadastrosHome] --> UCF[useCadFornecedores]
+    FORNC[FornecedoresCad] --> UCF
+    FORNC --> USF[useSalvarFornecedor]
+    FORNC --> UAIP[useAiCadastroParse]
+    UAIP --> BAPI[BrasilAPI]
+    UAIP --> N8N
+    UCF --> SB2
 ```
 
 ---
@@ -300,3 +355,5 @@ graph LR
 - [[11 - Fluxo Requisição]] — Fluxo de criação
 - [[12 - Fluxo Aprovação]] — Fluxo de aprovação
 - [[25 - Mural de Recados]] — useMural detalhado
+- [[27 - Módulo Contratos Gestão]] — useContratos detalhado
+- [[28 - Módulo Cadastros AI]] — useCadastros detalhado

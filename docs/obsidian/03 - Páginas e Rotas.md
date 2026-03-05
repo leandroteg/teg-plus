@@ -4,7 +4,7 @@ type: frontend
 status: ativo
 tags: [frontend, rotas, react-router, páginas]
 criado: 2026-03-02
-atualizado: 2026-03-03
+atualizado: 2026-03-05
 relacionado: ["[[02 - Frontend Stack]]", "[[04 - Componentes]]", "[[09 - Auth Sistema]]"]
 ---
 
@@ -24,8 +24,16 @@ graph TD
     MOD --> LOG["/logistica\nLogisticaHome"]
     MOD --> FR["/frotas\nFrotasHome"]
     MOD --> RH["/rh\nRHHome"]
+    MOD -.->|⚙️ via sidebar| CAD["/cadastros\nCadastrosHome"]
 
     RH --> MURAL["/rh/mural\nMuralAdmin 🔐"]
+
+    CAD --> CADF["/cadastros/fornecedores 🤖"]
+    CAD --> CADI["/cadastros/itens"]
+    CAD --> CADC["/cadastros/classes"]
+    CAD --> CADCC["/cadastros/centros-custo"]
+    CAD --> CADO["/cadastros/obras 🤖"]
+    CAD --> CADCL["/cadastros/colaboradores 🤖"]
 
     FIN --> FINCP["/financeiro/cp"]
     FIN --> FINCR["/financeiro/cr"]
@@ -138,12 +146,34 @@ graph TD
 | `/pedidos` | `Pedidos.tsx` | Ordens de compra |
 | `/perfil` | `Perfil.tsx` | Perfil e preferências |
 
+### Módulo Contratos (com `ContratosLayout`)
+
+| Rota | Componente | Descrição |
+|------|-----------|-----------|
+| `/contratos` | `DashboardContratos.tsx` | Painel com KPIs e parcelas |
+| `/contratos/lista` | `ListaContratos.tsx` | Lista de contratos |
+| `/contratos/novo` | `NovoContrato.tsx` | Formulário de criação |
+| `/contratos/parcelas` | `Parcelas.tsx` | Gestão de parcelas |
+
+### Módulo Cadastros (com `CadastrosLayout` — ⚙️ via sidebar de todos os módulos)
+
+| Rota | Componente | Descrição | AI? |
+|------|-----------|-----------|-----|
+| `/cadastros` | `CadastrosHome.tsx` | Dashboard 2×3 grid de entidades | — |
+| `/cadastros/fornecedores` | `FornecedoresCad.tsx` | Cards + MagicModal CNPJ | 🤖 |
+| `/cadastros/itens` | `ItensCad.tsx` | Tabela CRUD, filtro Curva ABC | — |
+| `/cadastros/classes` | `ClassesFinanceiras.tsx` | Tabela CRUD | — |
+| `/cadastros/centros-custo` | `CentrosCusto.tsx` | Tabela CRUD | — |
+| `/cadastros/obras` | `ObrasCad.tsx` | Cards + MagicModal | 🤖 |
+| `/cadastros/colaboradores` | `ColaboradoresCad.tsx` | Cards + MagicModal CPF | 🤖 |
+
+> Acessível de qualquer módulo via ícone ⚙️ "Cadastros" na sidebar. Ver [[28 - Módulo Cadastros AI]].
+
 ### Módulos Stub (em desenvolvimento)
 
 | Rota | Status |
 |------|--------|
 | `/ssma` | 🔜 Planejado |
-| `/contratos` | 🔜 Planejado |
 
 ### Admin
 
@@ -197,3 +227,5 @@ Sem banners no banco, exibe 3 slides padrão. Gerenciado em `/rh/mural`. Ver [[2
 - [[05 - Hooks Customizados]] — Hooks de dados
 - [[09 - Auth Sistema]] — Autenticação e guards
 - [[25 - Mural de Recados]] — Slideshow e gestão de banners
+- [[27 - Módulo Contratos Gestão]] — Rotas do módulo de contratos
+- [[28 - Módulo Cadastros AI]] — Rotas do módulo de cadastros AI
