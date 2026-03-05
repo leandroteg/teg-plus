@@ -134,6 +134,12 @@ const PILLARS: Pillar[] = [
   },
 ]
 
+// Brand accent for the main mandala
+const BRAND = {
+  accent: '#2DD4BF',
+  glow: 'rgba(20,184,166,0.22)',
+}
+
 // ═══════════════════════════════════════════════════════════════════════════════
 //  MAIN COMPONENT
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -144,10 +150,17 @@ export default function ModuloSelector() {
   const navigate = useNavigate()
   const [openPillar, setOpenPillar] = useState<Pillar | null>(null)
   const [overlayVisible, setOverlayVisible] = useState(false)
+  const [entered, setEntered] = useState(false)
 
   const primeiroNome = (perfil?.nome ?? 'Usuário').split(' ')[0]
   const hora = new Date().getHours()
   const saudacao = hora < 12 ? 'Bom dia' : hora < 18 ? 'Boa tarde' : 'Boa noite'
+
+  // Staggered entrance for main mandala
+  useEffect(() => {
+    const t = setTimeout(() => setEntered(true), 250)
+    return () => clearTimeout(t)
+  }, [])
 
   function canAccessSub(sub: SubMod) {
     if (sub.adminOnly && isAdmin) return true
@@ -196,6 +209,12 @@ export default function ModuloSelector() {
     return () => { document.body.style.overflow = '' }
   }, [openPillar])
 
+  // ── Main mandala geometry ───────────────────────────────────
+  const R = 178
+  const SIZE = R * 2 + 200
+  const cx = SIZE / 2
+  const cy = SIZE / 2
+
   return (
     <div className={`min-h-screen relative overflow-x-hidden flex flex-col ${isLight ? 'bg-slate-50' : 'bg-[#060D1B]'}`}>
 
@@ -219,6 +238,11 @@ export default function ModuloSelector() {
         </div>
 
         <div className="flex items-center gap-3">
+          {/* Greeting — moved here */}
+          <p className={`text-sm font-semibold hidden sm:block ${isLight ? 'text-slate-700' : 'text-white/90'}`}>
+            {saudacao}, <span className="text-gradient-teal">{primeiroNome}</span>
+          </p>
+          <span className={`hidden sm:block w-px h-4 ${isLight ? 'bg-slate-200' : 'bg-slate-700'}`} />
           <ThemeToggle variant={isLight ? 'light' : 'dark'} compact />
           <button
             onClick={handleLogout}
@@ -234,30 +258,189 @@ export default function ModuloSelector() {
         </div>
       </header>
 
-      {/* ── Hero (compact) ──────────────────────────────────────── */}
-      <section className="relative z-10 flex flex-col items-center px-5 pt-8 pb-4">
-        <div
-          className="animate-fade-in delay-100 mb-3"
-          style={{ animation: 'fadeIn 0.6s ease-out both 0.1s, pulseGlow 3s ease-in-out infinite 0.8s' }}
-        >
-          <LogoTeg size={72} animated glowing={false} />
-        </div>
-        <h1 className="text-5xl font-black tracking-tighter text-gradient leading-none animate-fade-in-up delay-150">
-          TEG+
-        </h1>
-        <p className={`text-xs font-medium mt-1 mb-4 animate-fade-in-up delay-200 tracking-wide ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>
-          Enterprise Resource Planning
+      {/* ── Main Mandala — Logo center + 6 pillars orbiting ───── */}
+      <section className="relative z-10 flex-1 flex flex-col items-center justify-center px-4 py-6 sm:py-8">
+
+        {/* Mobile greeting (hidden on sm+) */}
+        <p className={`text-sm font-semibold mb-4 sm:hidden ${isLight ? 'text-slate-700' : 'text-white/90'}`}>
+          {saudacao}, <span className="text-gradient-teal">{primeiroNome}</span>
         </p>
-        <div className="text-center animate-fade-in-up delay-250">
-          <p className={`text-lg font-bold ${isLight ? 'text-slate-800' : 'text-white'}`}>
-            {saudacao}, <span className="text-gradient-teal">{primeiroNome}</span>
-          </p>
-          <p className={`text-xs mt-0.5 ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>Selecione uma área para acessar</p>
-        </div>
+
+        {/* Mandala container with responsive scaling */}
         <div
-          className="mt-4 w-24 h-px animate-fade-in delay-400"
-          style={{ background: 'linear-gradient(90deg, transparent, rgba(20,184,166,0.4), transparent)' }}
-        />
+          className="relative origin-center scale-[0.54] xs:scale-[0.62] sm:scale-[0.78] md:scale-90 lg:scale-100"
+          style={{ width: SIZE, height: SIZE }}
+        >
+          {/* Slow rotating decorative conic gradient */}
+          <div
+            className="absolute rounded-full pointer-events-none"
+            style={{
+              left: cx - R - 60,
+              top: cy - R - 60,
+              width: (R + 60) * 2,
+              height: (R + 60) * 2,
+              background: `conic-gradient(from 0deg, ${BRAND.accent}06, transparent 25%, ${BRAND.accent}04, transparent 50%, ${BRAND.accent}06, transparent 75%)`,
+              opacity: entered ? 1 : 0,
+              animation: entered ? 'spin 60s linear infinite' : 'none',
+              transition: 'opacity 1s ease',
+            }}
+          />
+
+          {/* SVG decorative elements */}
+          <svg className="absolute inset-0 w-full h-full" style={{ overflow: 'visible' }}>
+            {/* Outer decorative ring */}
+            <circle
+              cx={cx} cy={cy} r={R + 50}
+              fill="none" stroke={BRAND.accent}
+              strokeWidth="0.4" strokeDasharray="4 12"
+              opacity={entered ? 0.15 : 0}
+              style={{ transition: 'opacity 0.8s ease 0.1s' }}
+            />
+
+            {/* Orbital ring */}
+            <circle
+              cx={cx} cy={cy} r={R}
+              fill="none" stroke={BRAND.accent}
+              strokeWidth="0.4" strokeDasharray="2 6"
+              opacity={entered ? 0.1 : 0}
+              style={{ transition: 'opacity 0.8s ease 0.2s' }}
+            />
+
+            {/* Inner decorative ring */}
+            <circle
+              cx={cx} cy={cy} r={R * 0.45}
+              fill="none" stroke={BRAND.accent}
+              strokeWidth="0.3"
+              opacity={entered ? 0.06 : 0}
+              style={{ transition: 'opacity 0.8s ease 0.3s' }}
+            />
+
+            {/* Connecting lines from center to each pillar + midpoint dots */}
+            {PILLARS.map((p, i) => {
+              const angle = (-90 + (360 / 6) * i) * (Math.PI / 180)
+              const ex = cx + R * Math.cos(angle)
+              const ey = cy + R * Math.sin(angle)
+              const mx = (cx + ex) / 2
+              const my = (cy + ey) / 2
+
+              return (
+                <g key={i}>
+                  <line
+                    x1={cx} y1={cy} x2={ex} y2={ey}
+                    stroke={p.accent} strokeWidth="1" strokeDasharray="4 6"
+                    opacity={entered ? (isLight ? 0.2 : 0.14) : 0}
+                    style={{ transition: `opacity 0.5s ease ${300 + i * 80}ms` }}
+                  />
+                  {/* Midpoint energy dot */}
+                  <circle
+                    cx={mx} cy={my} r="3"
+                    fill={p.accent}
+                    opacity={entered ? (isLight ? 0.35 : 0.25) : 0}
+                    style={{ transition: `opacity 0.4s ease ${450 + i * 80}ms` }}
+                  />
+                </g>
+              )
+            })}
+          </svg>
+
+          {/* ── Center node: Logo TEG+ ──────────────────────────── */}
+          <div
+            className="absolute z-10"
+            style={{
+              left: cx - 42,
+              top: cy - 42,
+              width: 84,
+              height: 84,
+            }}
+          >
+            <div
+              className="w-full h-full rounded-full flex items-center justify-center border"
+              style={{
+                background: isLight
+                  ? 'radial-gradient(circle, rgba(20,184,166,0.08), rgba(255,255,255,0.95))'
+                  : `radial-gradient(circle, ${BRAND.glow}, rgba(6,15,28,0.92))`,
+                borderColor: BRAND.accent + '40',
+                boxShadow: entered
+                  ? `0 0 40px ${BRAND.glow}, 0 0 80px ${BRAND.glow}`
+                  : 'none',
+                transform: entered ? 'scale(1)' : 'scale(0)',
+                transition: 'transform 0.6s cubic-bezier(0.175,0.885,0.32,1.275), box-shadow 0.8s ease',
+              }}
+            >
+              <LogoTeg size={48} animated={false} glowing={false} />
+            </div>
+          </div>
+
+          {/* ── Orbital pillar nodes ────────────────────────────── */}
+          {PILLARS.map((p, i) => {
+            const angle = (-90 + (360 / 6) * i) * (Math.PI / 180)
+            const x = R * Math.cos(angle)
+            const y = R * Math.sin(angle)
+            const active = activeCount(p)
+            const total = p.subs.length
+            const hasActive = active > 0
+
+            return (
+              <button
+                key={p.key}
+                onClick={() => handleOpenPillar(p)}
+                className="absolute z-20 group"
+                style={{
+                  left: cx,
+                  top: cy,
+                  transform: entered
+                    ? `translate(calc(-50% + ${x}px), calc(-50% + ${y}px)) scale(1)`
+                    : 'translate(-50%, -50%) scale(0)',
+                  transition: `transform 0.5s cubic-bezier(0.175,0.885,0.32,1.275) ${350 + i * 90}ms`,
+                }}
+              >
+                <div className="flex flex-col items-center gap-1.5 cursor-pointer">
+                  {/* Pillar icon node */}
+                  <div
+                    className={[
+                      'rounded-2xl flex items-center justify-center border transition-all duration-250',
+                      isLight
+                        ? 'bg-white shadow-card group-hover:shadow-card-md group-hover:scale-110 group-hover:-translate-y-1'
+                        : 'glass-card group-hover:scale-110 group-hover:-translate-y-1',
+                    ].join(' ')}
+                    style={{
+                      width: 68,
+                      height: 68,
+                      borderColor: isLight ? undefined : p.accent + '30',
+                      boxShadow: !isLight
+                        ? `0 0 24px ${p.glow}, 0 0 48px ${p.glow.replace(/[\d.]+\)$/, '0.06)')}`
+                        : undefined,
+                    }}
+                  >
+                    <p.Icon size={28} style={{ color: p.accent }} />
+                  </div>
+
+                  {/* Pillar label */}
+                  <span className={`text-[13px] font-bold whitespace-nowrap leading-tight ${isLight ? 'text-slate-800' : 'text-white'}`}>
+                    {p.label}
+                  </span>
+
+                  {/* Active count badge */}
+                  {hasActive ? (
+                    <span className="text-[10px] font-semibold flex items-center gap-1" style={{ color: p.accent }}>
+                      <div className="w-1.5 h-1.5 rounded-full" style={{ background: p.accent }} />
+                      {active}/{total}
+                    </span>
+                  ) : (
+                    <span className={`text-[10px] flex items-center gap-1 ${isLight ? 'text-slate-400' : 'text-slate-600'}`}>
+                      <Lock size={9} /> Em breve
+                    </span>
+                  )}
+                </div>
+              </button>
+            )
+          })}
+        </div>
+
+        {/* Subtitle below mandala */}
+        <p className={`text-[11px] font-medium tracking-wide mt-2 ${isLight ? 'text-slate-400' : 'text-slate-600'}`}>
+          Selecione uma área para acessar
+        </p>
       </section>
 
       {/* ── Banner Slideshow ────────────────────────────────────── */}
@@ -265,97 +448,12 @@ export default function ModuloSelector() {
         <BannerSlideshow />
       </div>
 
-      {/* ── Pillar Grid ────────────────────────────────────────── */}
-      <section className="relative z-10 flex-1 px-4 sm:px-6 pb-10 max-w-3xl mx-auto w-full">
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-4">
-          {PILLARS.map((p, i) => {
-            const active = activeCount(p)
-            const total  = p.subs.length
-            const delay  = 320 + i * 80
-            const hasActive = active > 0
-            const isFeatured = p.key === 'suprimentos'
+      {/* Footer */}
+      <p className={`text-center text-[10px] pb-6 ${isLight ? 'text-slate-400' : 'text-slate-700'}`}>
+        Acesso restrito a colaboradores autorizados · TEG+ ERP v2.0
+      </p>
 
-            return (
-              <button
-                key={p.key}
-                onClick={() => handleOpenPillar(p)}
-                className={[
-                  'group relative rounded-2xl p-4 sm:p-5 text-left',
-                  isLight
-                    ? 'bg-white border border-slate-200/80 shadow-card animate-scale-in cursor-pointer hover:-translate-y-1 hover:shadow-card-md hover:border-teal-300 transition-all duration-250'
-                    : 'glass-card animate-scale-in cursor-pointer hover:-translate-y-1.5 hover:shadow-glow-card transition-all duration-300',
-                  isFeatured && !isLight ? 'border-teal-500/30 bg-teal-500/[0.04]' : '',
-                  isFeatured && isLight ? 'border-teal-300 bg-teal-50/30' : '',
-                ].join(' ')}
-                style={{ animationDelay: `${delay}ms` }}
-              >
-                {/* Top accent line */}
-                <div
-                  className={`absolute top-0 left-4 right-4 h-[2px] rounded-full bg-gradient-to-r ${p.grad} opacity-50 group-hover:opacity-100 transition-opacity duration-300`}
-                />
-
-                {/* Featured glow ring (dark only) */}
-                {isFeatured && !isLight && (
-                  <div
-                    className="absolute inset-0 rounded-2xl pointer-events-none"
-                    style={{ boxShadow: '0 0 24px rgba(20,184,166,0.12), inset 0 1px 0 rgba(20,184,166,0.18)' }}
-                  />
-                )}
-
-                {/* Icon */}
-                <div
-                  className={`w-11 h-11 rounded-xl flex items-center justify-center mb-3 bg-gradient-to-br ${p.grad} border ${p.border} group-hover:scale-110 transition-transform duration-300`}
-                >
-                  <p.Icon size={22} style={{ color: p.accent }} />
-                </div>
-
-                {/* Label */}
-                <p className={`text-[14px] font-bold mb-0.5 leading-tight ${isLight ? 'text-slate-800' : 'text-white'}`}>{p.label}</p>
-                <p className={`text-[10px] leading-snug mb-3 ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>{p.tagline}</p>
-
-                {/* Footer */}
-                <div className="flex items-center justify-between">
-                  {hasActive ? (
-                    <div className="flex items-center gap-1.5">
-                      <div className="w-1.5 h-1.5 rounded-full bg-teal-400" />
-                      <span className={`text-[9px] font-semibold ${isLight ? 'text-teal-600' : 'text-teal-400'}`}>
-                        {active}/{total} {active === 1 ? 'ativo' : 'ativos'}
-                      </span>
-                    </div>
-                  ) : (
-                    <div className="flex items-center gap-1">
-                      <Lock size={9} className={isLight ? 'text-slate-400' : 'text-slate-600'} />
-                      <span className={`text-[9px] font-medium ${isLight ? 'text-slate-400' : 'text-slate-600'}`}>Em breve</span>
-                    </div>
-                  )}
-                  <ChevronRight
-                    size={13}
-                    className={isLight
-                      ? 'text-slate-400 group-hover:text-teal-500 group-hover:translate-x-0.5 transition-all duration-200'
-                      : 'text-slate-600 group-hover:text-slate-400 group-hover:translate-x-0.5 transition-all duration-200'
-                    }
-                  />
-                </div>
-
-                {/* Hover glow overlay (dark only) */}
-                {!isLight && (
-                  <div
-                    className="absolute inset-0 rounded-2xl pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity duration-300"
-                    style={{ boxShadow: `0 0 32px ${p.glow}, inset 0 1px 0 ${p.glow}` }}
-                  />
-                )}
-              </button>
-            )
-          })}
-        </div>
-
-        {/* Footer */}
-        <p className={`text-center text-[10px] mt-8 animate-fade-in delay-1000 ${isLight ? 'text-slate-400' : 'text-slate-700'}`}>
-          Acesso restrito a colaboradores autorizados · TEG+ ERP v2.0
-        </p>
-      </section>
-
-      {/* ── Category Overlay — Mandala Radial ──────────────────── */}
+      {/* ── Category Overlay — Sub-module Mandala ────────────────── */}
       {openPillar && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto"
@@ -415,9 +513,9 @@ export default function ModuloSelector() {
               style={{ background: `linear-gradient(90deg, transparent, ${openPillar.accent}35, transparent)` }}
             />
 
-            {/* Mandala Content */}
+            {/* Sub-module Mandala Content */}
             <div className="px-4 py-6 flex justify-center">
-              <MandalaView pillar={openPillar} onNav={handleNav} canAccess={canAccessSub} visible={overlayVisible} isLight={isLight} />
+              <SubMandalaView pillar={openPillar} onNav={handleNav} canAccess={canAccessSub} visible={overlayVisible} isLight={isLight} />
             </div>
           </div>
         </div>
@@ -427,10 +525,10 @@ export default function ModuloSelector() {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-//  MANDALA VIEW — Radial layout for all categories
+//  SUB-MODULE MANDALA VIEW — Radial layout inside overlay
 // ═══════════════════════════════════════════════════════════════════════════════
 
-function MandalaView({ pillar, onNav, canAccess, visible, isLight }: {
+function SubMandalaView({ pillar, onNav, canAccess, visible, isLight }: {
   pillar: Pillar
   onNav: (r: string) => void
   canAccess: (s: SubMod) => boolean
