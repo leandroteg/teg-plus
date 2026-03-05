@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
-  LogOut, X, Lock, ChevronRight,
+  LogOut, X, Lock, Megaphone,
   // Category icons
   FolderKanban, Layers, Wallet, Users, Monitor, Rocket,
   // Sub-module icons
@@ -13,7 +13,8 @@ import {
 import { useAuth } from '../contexts/AuthContext'
 import { useTheme } from '../contexts/ThemeContext'
 import LogoTeg from '../components/LogoTeg'
-import BannerSlideshow from '../components/BannerSlideshow'
+import MuralSidebar from '../components/MuralSidebar'
+import MuralPopup from '../components/MuralPopup'
 import ThemeToggle from '../components/ThemeToggle'
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -151,6 +152,7 @@ export default function ModuloSelector() {
   const [openPillar, setOpenPillar] = useState<Pillar | null>(null)
   const [overlayVisible, setOverlayVisible] = useState(false)
   const [entered, setEntered] = useState(false)
+  const [muralOpen, setMuralOpen] = useState(false)
 
   const primeiroNome = (perfil?.nome ?? 'Usuário').split(' ')[0]
   const hora = new Date().getHours()
@@ -238,7 +240,22 @@ export default function ModuloSelector() {
         </div>
 
         <div className="flex items-center gap-3">
-          {/* Greeting — moved here */}
+          {/* Mural button — mobile only */}
+          <button
+            onClick={() => setMuralOpen(true)}
+            className={`lg:hidden relative flex items-center gap-1.5 text-xs transition-colors py-1.5 px-2.5 rounded-lg ${
+              isLight
+                ? 'text-teal-600 hover:bg-teal-50'
+                : 'text-teal-400 hover:bg-teal-500/10'
+            }`}
+          >
+            <Megaphone size={14} />
+            <span className="hidden sm:inline text-[11px] font-semibold">Mural</span>
+            {/* Notification dot */}
+            <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-teal-400 animate-pulse" />
+          </button>
+
+          {/* Greeting */}
           <p className={`text-sm font-semibold hidden sm:block ${isLight ? 'text-slate-700' : 'text-white/90'}`}>
             {saudacao}, <span className="text-gradient-teal">{primeiroNome}</span>
           </p>
@@ -258,8 +275,11 @@ export default function ModuloSelector() {
         </div>
       </header>
 
-      {/* ── Main Mandala — Logo center + 6 pillars orbiting ───── */}
-      <section className="relative z-10 flex-1 flex flex-col items-center justify-center px-4 py-2 sm:py-8">
+      {/* ── Split Layout: Mandala (left) + Mural (right on lg+) ── */}
+      <div className="relative z-10 flex-1 flex flex-col lg:grid lg:grid-cols-[1fr_380px] lg:gap-4 lg:px-8 lg:pb-4">
+
+      {/* ── Left Column: Main Mandala ─────────────────────────── */}
+      <section className="flex-1 flex flex-col items-center justify-center px-4 py-2 sm:py-8 lg:py-4">
 
         {/* Mobile greeting (hidden on sm+) */}
         <p className={`text-sm font-semibold mb-1 sm:hidden ${isLight ? 'text-slate-700' : 'text-white/90'}`}>
@@ -268,7 +288,7 @@ export default function ModuloSelector() {
 
         {/* Mandala container with responsive scaling */}
         <div
-          className="relative origin-center scale-[0.68] sm:scale-[0.78] md:scale-90 lg:scale-100"
+          className="relative origin-center scale-[0.68] sm:scale-[0.78] md:scale-[0.85] lg:scale-[0.92] xl:scale-100"
           style={{ width: SIZE, height: SIZE }}
         >
           {/* Slow rotating decorative conic gradient */}
@@ -443,15 +463,20 @@ export default function ModuloSelector() {
         </p>
       </section>
 
-      {/* ── Banner Slideshow ────────────────────────────────────── */}
-      <div className="relative z-10 pb-4">
-        <BannerSlideshow />
+      {/* ── Right Column: Mural de Recados (desktop only) ─────── */}
+      <div className="hidden lg:block">
+        <MuralSidebar />
       </div>
 
+      </div>{/* end split layout grid */}
+
       {/* Footer */}
-      <p className={`text-center text-[10px] pb-6 ${isLight ? 'text-slate-400' : 'text-slate-700'}`}>
+      <p className={`relative z-10 text-center text-[10px] pb-4 ${isLight ? 'text-slate-400' : 'text-slate-700'}`}>
         Acesso restrito a colaboradores autorizados · TEG+ ERP v2.0
       </p>
+
+      {/* ── Mobile Mural Popup ───────────────────────────────────── */}
+      <MuralPopup open={muralOpen} onClose={() => setMuralOpen(false)} />
 
       {/* ── Category Overlay — Sub-module Mandala ────────────────── */}
       {openPillar && (
