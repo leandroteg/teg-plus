@@ -13,7 +13,6 @@ import {
 import { useAuth } from '../contexts/AuthContext'
 import { useTheme } from '../contexts/ThemeContext'
 import LogoTeg from '../components/LogoTeg'
-import MuralSidebar from '../components/MuralSidebar'
 import MuralPopup from '../components/MuralPopup'
 import ThemeToggle from '../components/ThemeToggle'
 
@@ -164,11 +163,10 @@ export default function ModuloSelector() {
     return () => clearTimeout(t)
   }, [])
 
-  // Auto-open Mural popup on mobile (once per session)
+  // Auto-open Mural popup (once per session, all devices)
   useEffect(() => {
-    const isMobile = window.innerWidth < 1024 // matches lg breakpoint
     const alreadyShown = sessionStorage.getItem('mural_auto_shown')
-    if (isMobile && !alreadyShown) {
+    if (!alreadyShown) {
       const t = setTimeout(() => {
         setMuralOpen(true)
         sessionStorage.setItem('mural_auto_shown', '1')
@@ -253,10 +251,10 @@ export default function ModuloSelector() {
         </div>
 
         <div className="flex items-center gap-3">
-          {/* Mural button — mobile only */}
+          {/* Mural button */}
           <button
             onClick={() => setMuralOpen(true)}
-            className={`lg:hidden relative flex items-center gap-1.5 text-xs transition-colors py-1.5 px-2.5 rounded-lg ${
+            className={`relative flex items-center gap-1.5 text-xs transition-colors py-1.5 px-2.5 rounded-lg ${
               isLight
                 ? 'text-teal-600 hover:bg-teal-50'
                 : 'text-teal-400 hover:bg-teal-500/10'
@@ -288,11 +286,8 @@ export default function ModuloSelector() {
         </div>
       </header>
 
-      {/* ── Split Layout: Mandala (left) + Mural (right on lg+) ── */}
-      <div className="relative z-10 flex-1 flex flex-col lg:grid lg:grid-cols-[1fr_340px] lg:gap-6 lg:pb-4 lg:px-8 lg:max-w-[1080px] lg:mx-auto lg:w-full">
-
-      {/* ── Left Column: Main Mandala ─────────────────────────── */}
-      <section className="flex-1 flex flex-col items-center justify-center px-4 py-2 sm:py-8 lg:py-4">
+      {/* ── Main content ────────────────────────────────────────── */}
+      <section className="relative z-10 flex-1 flex flex-col items-center justify-center px-4 py-2 sm:py-8 lg:py-4">
 
         {/* Mobile greeting (hidden on sm+) */}
         <p className={`text-sm font-semibold mb-1 sm:hidden ${isLight ? 'text-slate-700' : 'text-white/90'}`}>
@@ -476,19 +471,12 @@ export default function ModuloSelector() {
         </p>
       </section>
 
-      {/* ── Right Column: Mural de Recados (desktop only) ─────── */}
-      <div className="hidden lg:flex lg:items-center lg:py-4">
-        <MuralSidebar />
-      </div>
-
-      </div>{/* end split layout grid */}
-
       {/* Footer */}
       <p className={`relative z-10 text-center text-[10px] pb-4 ${isLight ? 'text-slate-400' : 'text-slate-700'}`}>
         Acesso restrito a colaboradores autorizados · TEG+ ERP v2.0
       </p>
 
-      {/* ── Mobile Mural Popup ───────────────────────────────────── */}
+      {/* ── Mural Popup (mobile: bottom-sheet · desktop: centered modal) ── */}
       <MuralPopup open={muralOpen} onClose={() => setMuralOpen(false)} />
 
       {/* ── Category Overlay — Sub-module Mandala ────────────────── */}

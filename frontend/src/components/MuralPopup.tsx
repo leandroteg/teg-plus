@@ -1,8 +1,9 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// components/MuralPopup.tsx — Mural de Recados (mobile bottom-sheet)
+// components/MuralPopup.tsx — Mural de Recados
+// Mobile: bottom-sheet · Desktop: centered floating modal
 // ─────────────────────────────────────────────────────────────────────────────
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { X, ChevronLeft, ChevronRight, Megaphone, Pin, Calendar } from 'lucide-react'
+import { X, ChevronLeft, ChevronRight, Megaphone, Pin, Calendar, Newspaper } from 'lucide-react'
 import { useBanners, type MuralBanner } from '../hooks/useMural'
 import { useTheme } from '../contexts/ThemeContext'
 
@@ -96,6 +97,7 @@ export default function MuralPopup({ open, onClose }: { open: boolean; onClose: 
 
   const [current, setCurrent] = useState(0)
   const [visible, setVisible] = useState(false)
+  const [paused, setPaused]   = useState(false)
   const touchStartX = useRef(0)
   const touchStartY = useRef(0)
 
@@ -121,7 +123,7 @@ export default function MuralPopup({ open, onClose }: { open: boolean; onClose: 
     return () => { document.body.style.overflow = '' }
   }, [open])
 
-  // ESC to close
+  // ESC + Arrow key navigation
   useEffect(() => {
     if (!open) return
     function onKey(e: KeyboardEvent) {
@@ -135,16 +137,16 @@ export default function MuralPopup({ open, onClose }: { open: boolean; onClose: 
 
   // Auto-advance
   useEffect(() => {
-    if (!open || slides.length <= 1) return
+    if (!open || paused || slides.length <= 1) return
     const id = setInterval(goNext, SLIDE_DURATION)
     return () => clearInterval(id)
-  }, [open, slides.length, goNext])
+  }, [open, paused, slides.length, goNext])
 
   if (!open) return null
 
   return (
     <div className="fixed inset-0 z-[60]">
-      {/* Backdrop */}
+      {/* ── Backdrop ──────────────────────────────────────────── */}
       <div
         className="absolute inset-0 transition-opacity duration-300"
         style={{
@@ -156,60 +158,105 @@ export default function MuralPopup({ open, onClose }: { open: boolean; onClose: 
         onClick={onClose}
       />
 
-      {/* Bottom sheet */}
+      {/* ── Mobile: Bottom sheet · Desktop: Centered modal ──── */}
       <div
-        className="absolute bottom-0 left-0 right-0 z-10 flex flex-col"
+        className={[
+          // Base
+          'absolute z-10 flex flex-col',
+          // Mobile: bottom sheet
+          'bottom-0 left-0 right-0',
+          // Desktop: centered modal with max dimensions
+          'lg:bottom-auto lg:left-1/2 lg:right-auto lg:top-1/2',
+          'lg:w-[520px] lg:max-h-[85vh]',
+        ].join(' ')}
         style={{
-          maxHeight: '75vh',
-          transform: visible ? 'translateY(0)' : 'translateY(100%)',
-          transition: 'transform 0.35s cubic-bezier(0.22, 1, 0.36, 1)',
+          // Mobile: slide up from bottom
+          // Desktop: scale + fade from center
+          ...(typeof window !== 'undefined' && window.innerWidth >= 1024
+            ? {
+                transform: visible
+                  ? 'translate(-50%, -50%) scale(1)'
+                  : 'translate(-50%, -50%) scale(0.95)',
+                opacity: visible ? 1 : 0,
+                transition: 'transform 0.3s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.3s ease',
+              }
+            : {
+                maxHeight: '75vh',
+                transform: visible ? 'translateY(0)' : 'translateY(100%)',
+                transition: 'transform 0.35s cubic-bezier(0.22, 1, 0.36, 1)',
+              }),
         }}
+        onMouseEnter={() => setPaused(true)}
+        onMouseLeave={() => setPaused(false)}
       >
-        {/* Sheet body */}
-        <div className={`rounded-t-3xl overflow-hidden border-t ${
+        {/* ── Sheet/Modal body ──────────────────────────────── */}
+        <div className={[
+          'overflow-hidden border',
+          // Mobile: rounded top only (bottom sheet)
+          'rounded-t-3xl',
+          // Desktop: fully rounded (floating modal)
+          'lg:rounded-3xl',
           isLight
-            ? 'bg-white border-slate-200/80'
-            : 'bg-[#0A1020] border-white/10'
-        }`}>
-          {/* Drag handle */}
-          <div className="flex justify-center pt-3 pb-2">
+            ? 'bg-white border-slate-200/80 lg:shadow-2xl lg:shadow-slate-300/50'
+            : 'bg-[#0A1020] border-white/10 lg:shadow-2xl lg:shadow-black/50',
+        ].join(' ')}>
+
+          {/* Drag handle — mobile only */}
+          <div className="flex justify-center pt-3 pb-2 lg:hidden">
             <div className={`w-10 h-1 rounded-full ${isLight ? 'bg-slate-200' : 'bg-slate-700'}`} />
           </div>
 
-          {/* Header */}
-          <div className="flex items-center justify-between px-5 pb-3">
+          {/* ── Header ───────────────────────────────────────── */}
+          <div className="flex items-center justify-between px-5 pb-3 lg:pt-5 lg:pb-4">
             <div className="flex items-center gap-2.5">
-              <div className={`w-8 h-8 rounded-xl flex items-center justify-center ${
+              <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${
                 isLight
                   ? 'bg-teal-50 border border-teal-100'
                   : 'bg-teal-500/10 border border-teal-500/20'
               }`}>
-                <Megaphone size={14} className={isLight ? 'text-teal-600' : 'text-teal-400'} />
+                <Newspaper size={16} className={isLight ? 'text-teal-600' : 'text-teal-400'} />
               </div>
               <div>
                 <h2 className={`text-sm font-bold ${isLight ? 'text-slate-800' : 'text-white'}`}>
                   Mural de Recados
                 </h2>
                 <p className={`text-[10px] ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>
-                  {slides.length} comunicado{slides.length !== 1 ? 's' : ''}
+                  {slides.length} comunicado{slides.length !== 1 ? 's' : ''} · TEG+ Comunicados
                 </p>
               </div>
             </div>
-            <button
-              onClick={onClose}
-              className={`w-8 h-8 rounded-xl flex items-center justify-center transition-colors ${
-                isLight
-                  ? 'text-slate-400 hover:text-slate-700 hover:bg-slate-100'
-                  : 'text-slate-500 hover:text-white hover:bg-white/10'
-              }`}
-            >
-              <X size={16} />
-            </button>
+
+            <div className="flex items-center gap-2">
+              {/* Paused indicator */}
+              {paused && slides.length > 1 && (
+                <div className={`hidden lg:flex items-center gap-1 px-2 py-1 rounded-full text-[8px] font-medium ${
+                  isLight ? 'bg-slate-100 text-slate-400' : 'bg-white/5 text-white/30'
+                }`}>
+                  <span className="flex gap-0.5">
+                    <span className={`w-[2px] h-2.5 rounded-full ${isLight ? 'bg-slate-300' : 'bg-white/30'}`} />
+                    <span className={`w-[2px] h-2.5 rounded-full ${isLight ? 'bg-slate-300' : 'bg-white/30'}`} />
+                  </span>
+                  pausado
+                </div>
+              )}
+
+              {/* Close button */}
+              <button
+                onClick={onClose}
+                className={`w-8 h-8 rounded-xl flex items-center justify-center transition-colors ${
+                  isLight
+                    ? 'text-slate-400 hover:text-slate-700 hover:bg-slate-100'
+                    : 'text-slate-500 hover:text-white hover:bg-white/10'
+                }`}
+              >
+                <X size={16} />
+              </button>
+            </div>
           </div>
 
-          {/* Banner slideshow */}
+          {/* ── Banner slideshow ──────────────────────────────── */}
           <div
-            className="relative mx-4 mb-5 rounded-2xl overflow-hidden ring-1 ring-white/[0.07]"
+            className="relative mx-4 mb-4 rounded-2xl overflow-hidden ring-1 ring-white/[0.07]"
             style={{ aspectRatio: '16 / 10' }}
             onTouchStart={e => {
               touchStartX.current = e.touches[0].clientX
@@ -267,14 +314,14 @@ export default function MuralPopup({ open, onClose }: { open: boolean; onClose: 
                     </div>
 
                     <h3
-                      className="text-base font-black text-white leading-tight"
+                      className="text-base lg:text-lg font-black text-white leading-tight"
                       style={{ textShadow: '0 2px 10px rgba(0,0,0,0.5)' }}
                     >
                       {slide.titulo}
                     </h3>
 
                     {slide.subtitulo && (
-                      <p className="text-[11px] text-white/55 mt-1 leading-relaxed line-clamp-2">
+                      <p className="text-[11px] lg:text-xs text-white/55 mt-1 leading-relaxed line-clamp-2">
                         {slide.subtitulo}
                       </p>
                     )}
@@ -293,10 +340,12 @@ export default function MuralPopup({ open, onClose }: { open: boolean; onClose: 
                   {slides.length > 1 && isActive && (
                     <div className="absolute bottom-0 left-0 right-0 h-[2px] bg-white/8 z-20">
                       <div
-                        key={`popup-${current}`}
+                        key={`popup-${current}-${paused ? 'p' : 'r'}`}
                         className="h-full bg-gradient-to-r from-teal-400 via-cyan-300 to-teal-400"
                         style={{
-                          animation: `slideProgress ${SLIDE_DURATION}ms linear forwards`,
+                          animation: paused
+                            ? 'none'
+                            : `slideProgress ${SLIDE_DURATION}ms linear forwards`,
                         }}
                       />
                     </div>
@@ -310,20 +359,32 @@ export default function MuralPopup({ open, onClose }: { open: boolean; onClose: 
               <>
                 <button
                   onClick={goPrev}
-                  className="absolute left-2 top-1/2 -translate-y-1/2 z-30
-                    flex w-8 h-8 items-center justify-center
-                    rounded-full bg-black/50 backdrop-blur-sm border border-white/15
-                    text-white active:scale-90"
+                  className={[
+                    'absolute left-2 top-1/2 -translate-y-1/2 z-30',
+                    'flex w-8 h-8 items-center justify-center',
+                    'rounded-full bg-black/50 backdrop-blur-sm border border-white/15',
+                    'text-white transition-all duration-300',
+                    'hover:bg-black/70 hover:border-white/30 hover:scale-110 active:scale-90',
+                    // Mobile: always visible · Desktop: show on hover
+                    'lg:opacity-0 lg:pointer-events-none',
+                    paused ? 'lg:!opacity-100 lg:!pointer-events-auto' : '',
+                  ].join(' ')}
                   aria-label="Anterior"
                 >
                   <ChevronLeft size={15} strokeWidth={2.5} />
                 </button>
                 <button
                   onClick={goNext}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 z-30
-                    flex w-8 h-8 items-center justify-center
-                    rounded-full bg-black/50 backdrop-blur-sm border border-white/15
-                    text-white active:scale-90"
+                  className={[
+                    'absolute right-2 top-1/2 -translate-y-1/2 z-30',
+                    'flex w-8 h-8 items-center justify-center',
+                    'rounded-full bg-black/50 backdrop-blur-sm border border-white/15',
+                    'text-white transition-all duration-300',
+                    'hover:bg-black/70 hover:border-white/30 hover:scale-110 active:scale-90',
+                    // Mobile: always visible · Desktop: show on hover
+                    'lg:opacity-0 lg:pointer-events-none',
+                    paused ? 'lg:!opacity-100 lg:!pointer-events-auto' : '',
+                  ].join(' ')}
                   aria-label="Próximo"
                 >
                   <ChevronRight size={15} strokeWidth={2.5} />
@@ -332,9 +393,10 @@ export default function MuralPopup({ open, onClose }: { open: boolean; onClose: 
             )}
           </div>
 
-          {/* Swipe hint */}
+          {/* ── Footer ───────────────────────────────────────── */}
           <p className={`text-center text-[10px] pb-4 ${isLight ? 'text-slate-400' : 'text-slate-600'}`}>
-            Deslize para navegar · Puxe para baixo para fechar
+            <span className="lg:hidden">Deslize para navegar · Puxe para baixo para fechar</span>
+            <span className="hidden lg:inline">Passe o mouse para pausar · ← → para navegar · ESC para fechar</span>
           </p>
         </div>
       </div>
