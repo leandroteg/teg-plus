@@ -1,7 +1,7 @@
 import { NavLink, Outlet, useNavigate } from 'react-router-dom'
 import {
   LayoutDashboard, Car, Wrench, ClipboardCheck,
-  Fuel, Radio, ChevronLeft, Menu, X,
+  Fuel, Radio, ChevronLeft, Menu, X, Settings,
 } from 'lucide-react'
 import { useState } from 'react'
 import { useTheme } from '../contexts/ThemeContext'
@@ -71,6 +71,16 @@ export default function FrotasLayout() {
               {n.label}
             </NavLink>
           ))}
+
+          {/* Cadastros (Master Data) */}
+          <div className={`h-px mx-1 my-2 ${ls ? 'bg-slate-100' : 'bg-white/5'}`} />
+          <NavLink
+            to="/cadastros"
+            className={({ isActive }) => navLinkClass(isActive)}
+          >
+            <Settings size={16} />
+            Cadastros
+          </NavLink>
         </nav>
 
         {/* Theme toggle + Footer */}
@@ -115,6 +125,15 @@ export default function FrotasLayout() {
                 {n.label}
               </NavLink>
             ))}
+            <div className={`h-px mx-1 my-1 ${ls ? 'bg-slate-100' : 'bg-white/5'}`} />
+            <NavLink
+              to="/cadastros"
+              onClick={() => setOpen(false)}
+              className={({ isActive }) => navLinkClass(isActive)}
+            >
+              <Settings size={16} />
+              Cadastros
+            </NavLink>
           </nav>
         )}
 

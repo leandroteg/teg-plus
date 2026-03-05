@@ -2,7 +2,7 @@
 // components/RHLayout.tsx — Layout do Módulo RH (Violet theme)
 // ─────────────────────────────────────────────────────────────────────────────
 import { NavLink, Outlet, useNavigate } from 'react-router-dom'
-import { LayoutDashboard, ImagePlay, ChevronLeft, Menu, X, Shield } from 'lucide-react'
+import { LayoutDashboard, ImagePlay, ChevronLeft, Menu, X, Shield, Settings } from 'lucide-react'
 import { useState } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import { useTheme } from '../contexts/ThemeContext'
@@ -82,6 +82,16 @@ export default function RHLayout() {
               )}
             </NavLink>
           ))}
+
+          {/* Cadastros (Master Data) */}
+          <div className={`h-px mx-1 my-2 ${ls ? 'bg-slate-100' : 'bg-white/5'}`} />
+          <NavLink
+            to="/cadastros"
+            className={({ isActive }) => navLinkClass(isActive)}
+          >
+            <Settings size={16} />
+            <span className="flex-1">Cadastros</span>
+          </NavLink>
         </nav>
 
         {/* Theme toggle + Footer */}
@@ -125,6 +135,15 @@ export default function RHLayout() {
                 {n.label}
               </NavLink>
             ))}
+            <div className={`h-px mx-1 my-1 ${ls ? 'bg-slate-100' : 'bg-white/5'}`} />
+            <NavLink
+              to="/cadastros"
+              onClick={() => setOpen(false)}
+              className={({ isActive }) => navLinkClass(isActive)}
+            >
+              <Settings size={16} />
+              <span className="flex-1">Cadastros</span>
+            </NavLink>
           </nav>
         )}
 

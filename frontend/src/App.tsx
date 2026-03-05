@@ -30,6 +30,16 @@ import ListaContratos from './pages/contratos/ListaContratos'
 import NovoContrato from './pages/contratos/NovoContrato'
 import ParcelasContratos from './pages/contratos/Parcelas'
 
+// Módulo Cadastros (Configurações Gerais)
+import CadastrosLayout from './components/CadastrosLayout'
+import CadastrosHome from './pages/cadastros/CadastrosHome'
+import FornecedoresCad from './pages/cadastros/FornecedoresCad'
+import ItensCad from './pages/cadastros/ItensCad'
+import ClassesFinanceiras from './pages/cadastros/ClassesFinanceiras'
+import CentrosCusto from './pages/cadastros/CentrosCusto'
+import ObrasCad from './pages/cadastros/ObrasCad'
+import ColaboradoresCad from './pages/cadastros/ColaboradoresCad'
+
 // Módulo RH
 import RHLayout from './components/RHLayout'
 import RHHome from './pages/rh/RHHome'
@@ -147,6 +157,17 @@ export default function App() {
             <Route path="/contratos/lista"      element={<ListaContratos />} />
             <Route path="/contratos/novo"       element={<NovoContrato />} />
             <Route path="/contratos/parcelas"   element={<ParcelasContratos />} />
+          </Route>
+
+          {/* Módulo Cadastros (Configurações Gerais) */}
+          <Route element={<CadastrosLayout />}>
+            <Route path="/cadastros"                element={<CadastrosHome />} />
+            <Route path="/cadastros/fornecedores"   element={<FornecedoresCad />} />
+            <Route path="/cadastros/itens"          element={<ItensCad />} />
+            <Route path="/cadastros/classes"        element={<ClassesFinanceiras />} />
+            <Route path="/cadastros/centros-custo"  element={<CentrosCusto />} />
+            <Route path="/cadastros/obras"          element={<ObrasCad />} />
+            <Route path="/cadastros/colaboradores"  element={<ColaboradoresCad />} />
           </Route>
 
           {/* Módulos stub */}

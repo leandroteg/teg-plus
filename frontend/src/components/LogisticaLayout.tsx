@@ -1,7 +1,7 @@
 import { NavLink, Outlet, useNavigate } from 'react-router-dom'
 import {
   LayoutDashboard, ClipboardList, Package2,
-  Truck, CheckCircle2, Building2, LogOut, LayoutGrid,
+  Truck, CheckCircle2, Building2, LogOut, LayoutGrid, Settings,
 } from 'lucide-react'
 import { useAuth, ROLE_LABEL, ROLE_COLOR } from '../contexts/AuthContext'
 import { useTheme } from '../contexts/ThemeContext'
@@ -109,6 +109,13 @@ export default function LogisticaLayout() {
               <span>{label}</span>
             </NavLink>
           ))}
+
+          {/* Cadastros (Master Data) */}
+          <div className={`h-px mx-2 my-2 ${ls ? 'bg-slate-100' : 'bg-white/[0.05]'}`} />
+          <NavLink to="/cadastros" className={sidebarLinkClass}>
+            <Settings size={16} className="shrink-0" />
+            <span>Cadastros</span>
+          </NavLink>
         </nav>
 
         {/* Theme toggle */}

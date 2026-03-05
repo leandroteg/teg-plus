@@ -1,7 +1,7 @@
 import { NavLink, Outlet, useNavigate } from 'react-router-dom'
 import {
-  LayoutDashboard, FileText, FilePlus, CalendarDays,
-  LogOut, LayoutGrid, Settings,
+  LayoutDashboard, Building2, Package2, Tag,
+  Target, HardHat, Users, LogOut, LayoutGrid,
 } from 'lucide-react'
 import { useAuth, ROLE_LABEL, ROLE_COLOR } from '../contexts/AuthContext'
 import { useTheme } from '../contexts/ThemeContext'
@@ -9,10 +9,13 @@ import LogoTeg from './LogoTeg'
 import ThemeToggle from './ThemeToggle'
 
 const NAV = [
-  { to: '/contratos',            icon: LayoutDashboard, label: 'Painel',      end: true  },
-  { to: '/contratos/lista',      icon: FileText,        label: 'Contratos',   end: false },
-  { to: '/contratos/novo',       icon: FilePlus,        label: 'Novo',        end: false },
-  { to: '/contratos/parcelas',   icon: CalendarDays,    label: 'Parcelas',    end: false },
+  { to: '/cadastros',               icon: LayoutDashboard, label: 'Painel',        end: true  },
+  { to: '/cadastros/fornecedores',  icon: Building2,       label: 'Fornecedores',  end: false },
+  { to: '/cadastros/itens',         icon: Package2,        label: 'Itens',         end: false },
+  { to: '/cadastros/classes',       icon: Tag,             label: 'Classes Fin.',  end: false },
+  { to: '/cadastros/centros-custo', icon: Target,          label: 'C. Custo',      end: false },
+  { to: '/cadastros/obras',         icon: HardHat,         label: 'Obras',         end: false },
+  { to: '/cadastros/colaboradores', icon: Users,           label: 'Colaboradores', end: false },
 ]
 
 const AVATAR_COLORS = [
@@ -32,12 +35,12 @@ function getInitials(name: string): string {
   return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
 }
 
-export default function ContratosLayout() {
+export default function CadastrosLayout() {
   const { perfil, signOut, role } = useAuth()
   const { isDark, isLightSidebar } = useTheme()
   const navigate = useNavigate()
 
-  const nome      = perfil?.nome ?? 'Usuário'
+  const nome      = perfil?.nome ?? 'Usuario'
   const initials  = getInitials(nome)
   const avatarBg  = getAvatarColor(nome)
   const firstName = nome.split(' ')[0]
@@ -51,14 +54,14 @@ export default function ContratosLayout() {
   function sidebarLinkClass({ isActive }: { isActive: boolean }) {
     const base = 'flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold transition-all duration-150 border'
     if (isActive)
-      return `${base} ${ls ? 'bg-indigo-50 text-indigo-700 border-indigo-200' : 'bg-indigo-500/15 text-indigo-300 border-indigo-500/25'}`
+      return `${base} ${ls ? 'bg-violet-50 text-violet-700 border-violet-200' : 'bg-violet-500/15 text-violet-300 border-violet-500/25'}`
     return `${base} ${ls ? 'text-slate-500 hover:text-slate-800 hover:bg-slate-50 border-transparent' : 'text-slate-400 hover:text-slate-100 hover:bg-white/6 border-transparent'}`
   }
 
   function bottomLinkClass({ isActive }: { isActive: boolean }) {
     const base = 'flex flex-col items-center py-2 px-1.5 rounded-xl text-[9px] font-semibold transition-all duration-150 min-w-[40px]'
     if (isActive)
-      return `${base} ${ls ? 'text-indigo-600 bg-indigo-50' : 'text-indigo-400 bg-indigo-400/10'}`
+      return `${base} ${ls ? 'text-violet-600 bg-violet-50' : 'text-violet-400 bg-violet-400/10'}`
     return `${base} ${ls ? 'text-slate-400 hover:text-slate-600' : 'text-slate-500 hover:text-slate-300'}`
   }
 
@@ -80,22 +83,22 @@ export default function ContratosLayout() {
             </div>
           </div>
           <button
-            onClick={() => navigate('/')}
+            onClick={() => navigate(-1)}
             className={`w-full flex items-center gap-2.5 rounded-xl px-3 py-2.5 transition-all duration-150 group border
               ${ls
-                ? 'bg-indigo-50 border-indigo-200 hover:bg-indigo-100 hover:border-indigo-300'
-                : 'bg-indigo-500/10 border-indigo-500/25 hover:bg-indigo-500/18 hover:border-indigo-500/40'
+                ? 'bg-violet-50 border-violet-200 hover:bg-violet-100 hover:border-violet-300'
+                : 'bg-violet-500/10 border-violet-500/25 hover:bg-violet-500/18 hover:border-violet-500/40'
               }`}
-            title="Trocar módulo"
+            title="Voltar ao modulo"
           >
-            <span className="text-lg leading-none">📋</span>
+            <span className="text-lg leading-none">⚙️</span>
             <div className="flex-1 text-left">
-              <p className={`text-xs font-bold leading-none ${ls ? 'text-indigo-700' : 'text-indigo-300'}`}>Contratos</p>
-              <p className={`text-[9px] mt-0.5 ${ls ? 'text-indigo-500/60' : 'text-indigo-500/60'}`}>Módulo ativo</p>
+              <p className={`text-xs font-bold leading-none ${ls ? 'text-violet-700' : 'text-violet-300'}`}>Cadastros</p>
+              <p className={`text-[9px] mt-0.5 ${ls ? 'text-violet-500/60' : 'text-violet-500/60'}`}>Configuracoes</p>
             </div>
             <LayoutGrid
               size={13}
-              className={`transition-colors shrink-0 ${ls ? 'text-indigo-400 group-hover:text-indigo-500' : 'text-indigo-500/50 group-hover:text-indigo-400'}`}
+              className={`transition-colors shrink-0 ${ls ? 'text-violet-400 group-hover:text-violet-500' : 'text-violet-500/50 group-hover:text-violet-400'}`}
             />
           </button>
         </div>
@@ -107,16 +110,8 @@ export default function ContratosLayout() {
               <span>{label}</span>
             </NavLink>
           ))}
-
-          {/* Cadastros (Master Data) */}
-          <div className={`h-px mx-2 my-2 ${ls ? 'bg-slate-100' : 'bg-white/[0.05]'}`} />
-          <NavLink to="/cadastros" className={sidebarLinkClass}>
-            <Settings size={16} className="shrink-0" />
-            <span>Cadastros</span>
-          </NavLink>
         </nav>
 
-        {/* Theme toggle */}
         <div className={`px-3 py-2 border-t ${ls ? 'border-slate-100' : 'border-white/[0.06]'}`}>
           <ThemeToggle variant={ls ? 'light' : 'dark'} />
         </div>
@@ -150,19 +145,18 @@ export default function ContratosLayout() {
       {/* ── MAIN CONTENT ──────────────────────────────────────── */}
       <div className="lg:ml-64 flex flex-col min-h-screen">
 
-        {/* Mobile header */}
         <header
           className={`lg:hidden px-4 py-3 sticky top-0 z-30 flex items-center gap-3
             ${ls ? 'bg-white border-b border-slate-200' : 'bg-[#0B1523] text-white'}`}
           style={{ boxShadow: ls ? '0 1px 3px rgba(0,0,0,0.05)' : '0 2px 20px rgba(0,0,0,0.4)' }}
         >
-          <button onClick={() => navigate('/')} className="shrink-0" title="Trocar módulo">
+          <button onClick={() => navigate(-1)} className="shrink-0" title="Voltar">
             <LogoTeg size={30} animated={false} />
           </button>
           <div className="flex-1 min-w-0">
             <div className="flex items-baseline gap-1.5">
               <h1 className={`text-sm font-black leading-none ${ls ? 'text-slate-800' : 'text-white'}`}>TEG+</h1>
-              <span className={`text-[9px] font-semibold ${ls ? 'text-indigo-500' : 'text-indigo-400/70'}`}>Contratos</span>
+              <span className={`text-[9px] font-semibold ${ls ? 'text-violet-500' : 'text-violet-400/70'}`}>Cadastros</span>
             </div>
           </div>
           <div className={`w-8 h-8 rounded-full flex items-center justify-center
@@ -182,17 +176,16 @@ export default function ContratosLayout() {
           </div>
         </main>
 
-        {/* Mobile bottom nav */}
         <nav
           className={`lg:hidden fixed bottom-0 inset-x-0 z-40 border-t
             ${ls ? 'glass-light border-slate-200' : 'glass-dark border-white/[0.06]'}`}
           style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
         >
           <div className="flex justify-around max-w-lg mx-auto px-1 py-1">
-            {NAV.map(({ to, icon: Icon, label, end }) => (
+            {NAV.slice(0, 6).map(({ to, icon: Icon, label, end }) => (
               <NavLink key={to} to={to} end={end} className={bottomLinkClass}>
                 <Icon className="w-5 h-5 mb-0.5" />
-                {label}
+                {label.length > 8 ? label.slice(0, 8) + '.' : label}
               </NavLink>
             ))}
           </div>
