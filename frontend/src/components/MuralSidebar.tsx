@@ -122,7 +122,7 @@ export default function MuralSidebar() {
   }, [paused, slides.length, goNext])
 
   return (
-    <aside className="flex flex-col h-full max-h-[560px] py-2">
+    <aside className="flex flex-col h-[520px] py-2">
       {/* ── Sidebar header ──────────────────────────────────────── */}
       <div className="px-1 mb-4">
         <div className="flex items-center gap-2.5 mb-1">
