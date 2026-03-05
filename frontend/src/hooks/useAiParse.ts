@@ -2,7 +2,63 @@ import { useMutation } from '@tanstack/react-query'
 import type { AiParseResult } from '../types'
 import { api } from '../services/api'
 
-// Fallback local para quando o n8n nao estiver configurado
+// ── Tipos de arquivo aceitos ────────────────────────────────────────────────
+const BINARY_EXTS = /\.(pdf|xlsx|xls|jpg|jpeg|png|gif|webp|bmp|heic)$/i
+const IMAGE_EXTS  = /\.(jpg|jpeg|png|gif|webp|bmp|heic)$/i
+
+// ── File reader utilities ───────────────────────────────────────────────────
+function readFileAsBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => {
+      const result = reader.result as string
+      // Remove data URL prefix (e.g., "data:image/png;base64,")
+      const base64 = result.includes(',') ? result.split(',')[1] : result
+      resolve(base64)
+    }
+    reader.onerror = reject
+    reader.readAsDataURL(file)
+  })
+}
+
+function readFileAsText(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => resolve(reader.result as string)
+    reader.onerror = reject
+    reader.readAsText(file)
+  })
+}
+
+export function isBinaryFile(fileName: string) {
+  return BINARY_EXTS.test(fileName)
+}
+
+export function isImageFile(fileName: string) {
+  return IMAGE_EXTS.test(fileName)
+}
+
+// ── Read file content (auto-detect text vs binary) ──────────────────────────
+export async function readFileForAi(file: File): Promise<{
+  texto?: string
+  arquivo?: { base64: string; nome: string; mime: string }
+}> {
+  if (isBinaryFile(file.name)) {
+    const base64 = await readFileAsBase64(file)
+    return {
+      arquivo: {
+        base64,
+        nome: file.name,
+        mime: file.type || 'application/octet-stream',
+      },
+    }
+  }
+  // Text files: CSV, TXT, etc.
+  const texto = await readFileAsText(file)
+  return { texto }
+}
+
+// ── Fallback local para quando o n8n nao estiver configurado ────────────────
 function parseLocal(texto: string): AiParseResult {
   const lower = texto.toLowerCase()
 
@@ -87,23 +143,39 @@ function parseLocal(texto: string): AiParseResult {
   }
 }
 
+// ── Hook principal ──────────────────────────────────────────────────────────
+export interface AiParseVars {
+  texto: string
+  solicitante_nome?: string
+  arquivo?: { base64: string; nome: string; mime: string }
+}
+
 export function useAiParse() {
   return useMutation({
-    mutationFn: async (vars: { texto: string; solicitante_nome?: string }): Promise<AiParseResult> => {
+    mutationFn: async (vars: AiParseVars): Promise<AiParseResult> => {
       const n8nUrl = import.meta.env.VITE_N8N_WEBHOOK_URL || ''
 
       if (n8nUrl) {
-        // Tenta o endpoint real de IA
+        // Tenta o endpoint real de IA (suporta texto + arquivo/imagem)
         try {
-          return await api.parseRequisicaoAi(vars.texto, vars.solicitante_nome)
+          return await api.parseRequisicaoAi(vars.texto, vars.solicitante_nome, vars.arquivo)
         } catch {
-          // Cai no parser local se n8n falhar
+          // Se tem arquivo binário e n8n falhou, não tem fallback local
+          if (vars.arquivo) {
+            throw new Error('Processamento de imagens/PDF requer o serviço de IA (n8n). Tente com texto ou CSV.')
+          }
+          // Cai no parser local se n8n falhar (só texto)
           await new Promise(r => setTimeout(r, 800))
           return parseLocal(vars.texto)
         }
       }
 
-      // Sem n8n configurado: usa parser local com delay simulado
+      // Sem n8n configurado
+      if (vars.arquivo) {
+        throw new Error('Processamento de imagens/PDF requer o serviço de IA (n8n). Use texto ou CSV por enquanto.')
+      }
+
+      // Usa parser local com delay simulado
       await new Promise(r => setTimeout(r, 1200))
       return parseLocal(vars.texto)
     },

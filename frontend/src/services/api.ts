@@ -30,10 +30,10 @@ export const api = {
   criarRequisicao: (data: NovaRequisicaoPayload) =>
     request<unknown>('/compras/requisicao', { method: 'POST', body: JSON.stringify(data) }),
 
-  parseRequisicaoAi: (texto: string, solicitante_nome?: string) =>
+  parseRequisicaoAi: (texto: string, solicitante_nome?: string, arquivo?: { base64: string; nome: string; mime: string }) =>
     request<AiParseResult>('/compras/requisicao-ai', {
       method: 'POST',
-      body: JSON.stringify({ texto, solicitante_nome }),
+      body: JSON.stringify({ texto, solicitante_nome, arquivo }),
     }),
 
   processarAprovacao: (token: string, decisao: 'aprovada' | 'rejeitada', observacao?: string) =>
