@@ -289,7 +289,7 @@ export default function ModuloSelector() {
       </header>
 
       {/* ── Split Layout: Mandala (left) + Mural (right on lg+) ── */}
-      <div className="relative z-10 flex-1 flex flex-col lg:grid lg:grid-cols-[1fr_380px] lg:gap-4 lg:px-8 lg:pb-4">
+      <div className="relative z-10 flex-1 flex flex-col lg:grid lg:grid-cols-[1fr_380px] lg:gap-6 lg:pb-4 lg:px-8 lg:max-w-[1100px] lg:mx-auto lg:w-full">
 
       {/* ── Left Column: Main Mandala ─────────────────────────── */}
       <section className="flex-1 flex flex-col items-center justify-center px-4 py-2 sm:py-8 lg:py-4">
