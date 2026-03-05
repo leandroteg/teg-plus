@@ -88,6 +88,8 @@ export interface ContaReceber {
   data_vencimento: string
   data_recebimento?: string
   centro_custo?: string
+  classe_financeira?: string
+  projeto_id?: string
   natureza?: string
   status: StatusCR
   descricao?: string
