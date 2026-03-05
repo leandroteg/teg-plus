@@ -301,7 +301,7 @@ export default function ModuloSelector() {
 
         {/* Mandala container with responsive scaling */}
         <div
-          className="relative origin-center scale-[0.68] sm:scale-[0.78] md:scale-[0.85] lg:scale-100 xl:scale-105"
+          className="relative origin-center scale-[0.78] sm:scale-[0.82] md:scale-[0.88] lg:scale-100 xl:scale-105"
           style={{ width: SIZE, height: SIZE }}
         >
           {/* Slow rotating decorative conic gradient */}
