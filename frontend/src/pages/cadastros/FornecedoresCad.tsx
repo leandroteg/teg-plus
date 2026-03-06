@@ -8,6 +8,7 @@ import type { Fornecedor } from '../../types/financeiro'
 import type { AiCadastroResult } from '../../types/cadastros'
 import MagicModal from '../../components/MagicModal'
 import ConfidenceField from '../../components/ConfidenceField'
+import SmartTextField from '../../components/SmartTextField'
 
 const EMPTY: Partial<Fornecedor> = {
   razao_social: '', nome_fantasia: '', cnpj: '',
@@ -185,10 +186,20 @@ export default function FornecedoresCad() {
         >
           <div className="space-y-4">
             <div className="grid grid-cols-2 gap-3">
-              <ConfidenceField label="Razao Social" value={editItem.razao_social ?? ''} onChange={v => set('razao_social', v)}
-                confidence={confidence.razao_social} required placeholder="Razao social da empresa" />
-              <ConfidenceField label="Nome Fantasia" value={editItem.nome_fantasia ?? ''} onChange={v => set('nome_fantasia', v)}
-                confidence={confidence.nome_fantasia} placeholder="Nome fantasia" />
+              {confidence.razao_social !== undefined ? (
+                <ConfidenceField label="Razao Social" value={editItem.razao_social ?? ''} onChange={v => set('razao_social', v)}
+                  confidence={confidence.razao_social} required placeholder="Razao social da empresa" />
+              ) : (
+                <SmartTextField table="cmp_fornecedores" column="razao_social" value={editItem.razao_social ?? ''}
+                  onChange={v => set('razao_social', v)} label="Razao Social" placeholder="Razao social da empresa" required />
+              )}
+              {confidence.nome_fantasia !== undefined ? (
+                <ConfidenceField label="Nome Fantasia" value={editItem.nome_fantasia ?? ''} onChange={v => set('nome_fantasia', v)}
+                  confidence={confidence.nome_fantasia} placeholder="Nome fantasia" />
+              ) : (
+                <SmartTextField table="cmp_fornecedores" column="nome_fantasia" value={editItem.nome_fantasia ?? ''}
+                  onChange={v => set('nome_fantasia', v)} label="Nome Fantasia" placeholder="Nome fantasia" />
+              )}
             </div>
             <div className="grid grid-cols-2 gap-3">
               <ConfidenceField label="CNPJ" value={editItem.cnpj ?? ''} onChange={v => set('cnpj', v)}

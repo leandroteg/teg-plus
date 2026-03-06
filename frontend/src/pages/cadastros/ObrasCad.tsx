@@ -1,13 +1,15 @@
 import { useState } from 'react'
 import { HardHat, Plus, Search, ChevronRight, MapPin, User } from 'lucide-react'
-import { useCadObras, useSalvarObra, useAiCadastroParse } from '../../hooks/useCadastros'
+import { useCadObras, useSalvarObra, useCadCentrosCusto, useAiCadastroParse } from '../../hooks/useCadastros'
 import type { Obra } from '../../types/cadastros'
 import MagicModal from '../../components/MagicModal'
 import ConfidenceField from '../../components/ConfidenceField'
+import AutoCodeField from '../../components/AutoCodeField'
+import SmartTextField from '../../components/SmartTextField'
 
 const EMPTY: Partial<Obra> = {
   codigo: '', nome: '', municipio: '', uf: '', status: 'ativo',
-  responsavel_nome: '', responsavel_email: '',
+  responsavel_nome: '', responsavel_email: '', centro_custo_id: undefined,
 }
 const STATUS_MAP: Record<string, { label: string; bg: string; text: string }> = {
   ativo:     { label: 'Ativo',     bg: 'bg-emerald-100', text: 'text-emerald-700' },
@@ -22,6 +24,7 @@ export default function ObrasCad() {
   const [confidence, setConfidence] = useState<Record<string, number>>({})
 
   const { data: obras = [], isLoading } = useCadObras()
+  const { data: centros = [] } = useCadCentrosCusto()
   const salvar = useSalvarObra()
   const aiParse = useAiCadastroParse()
 
@@ -32,7 +35,16 @@ export default function ObrasCad() {
   function openNew() { setEditItem({ ...EMPTY }); setConfidence({}); setShowForm(true) }
   function openEdit(o: Obra) { setEditItem({ ...o }); setConfidence({}); setShowForm(true) }
   function closeForm() { setShowForm(false); setEditItem(null); setConfidence({}) }
-  async function handleSave() { if (!editItem) return; await salvar.mutateAsync(editItem); closeForm() }
+
+  async function handleSave() {
+    if (!editItem) return
+    try {
+      await salvar.mutateAsync(editItem)
+      closeForm()
+    } catch (err: any) {
+      alert(err?.message || 'Erro ao salvar obra')
+    }
+  }
 
   async function handleAiParse(input: any) {
     try {
@@ -95,6 +107,7 @@ export default function ObrasCad() {
                     </div>
                     <span className="bg-slate-50 text-slate-500 px-2 py-0.5 rounded-full font-mono text-[10px]">{o.codigo}</span>
                     <div className="flex items-center gap-3 mt-2 text-[10px] text-slate-400">
+                      {o.centro_custo?.descricao && <span className="bg-cyan-50 text-cyan-600 px-2 py-0.5 rounded-full font-semibold">{o.centro_custo.descricao}</span>}
                       {o.municipio && <span className="flex items-center gap-1"><MapPin size={10} />{o.municipio}/{o.uf}</span>}
                       {o.responsavel_nome && <span className="flex items-center gap-1"><User size={10} />{o.responsavel_nome}</span>}
                     </div>
@@ -114,10 +127,17 @@ export default function ObrasCad() {
           aiDone={Object.keys(confidence).length > 0}>
           <div className="space-y-4">
             <div className="grid grid-cols-2 gap-3">
-              <ConfidenceField label="Codigo" value={editItem.codigo ?? ''} onChange={v => set('codigo', v)}
-                confidence={confidence.codigo} required placeholder="SE-001" />
-              <ConfidenceField label="Nome" value={editItem.nome ?? ''} onChange={v => set('nome', v)}
-                confidence={confidence.nome} required placeholder="SE Frutal" />
+              <AutoCodeField prefix="OBR" table="sys_obras" value={editItem.codigo ?? ''} onChange={v => set('codigo', v)}
+                disabled={!!editItem.id} />
+              <SmartTextField table="sys_obras" column="nome" value={editItem.nome ?? ''} onChange={v => set('nome', v)}
+                label="Nome" placeholder="SE Frutal" required />
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-slate-600 mb-1">Centro de Custo</label>
+              <select value={editItem.centro_custo_id ?? ''} onChange={e => set('centro_custo_id', e.target.value || undefined)} className="input-base">
+                <option value="">Nenhum</option>
+                {centros.map(cc => <option key={cc.id} value={cc.id}>{cc.codigo} — {cc.descricao}</option>)}
+              </select>
             </div>
             <div className="grid grid-cols-3 gap-3">
               <ConfidenceField label="Municipio" value={editItem.municipio ?? ''} onChange={v => set('municipio', v)}

@@ -1,7 +1,40 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../services/supabase'
 import type { Fornecedor } from '../types/financeiro'
-import type { ClasseFinanceira, CentroCusto, Obra, Colaborador, AiCadastroResult } from '../types/cadastros'
+import type {
+  Empresa, ClasseFinanceira, CentroCusto, Obra, Colaborador,
+  GrupoFinanceiro, CategoriaFinanceira, AiCadastroResult,
+} from '../types/cadastros'
+
+// ── Empresas ─────────────────────────────────────────────────────────────────
+export function useCadEmpresas() {
+  return useQuery<Empresa[]>({
+    queryKey: ['cad-empresas'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('sys_empresas').select('*').order('razao_social')
+      if (error) return []
+      return (data ?? []) as Empresa[]
+    },
+  })
+}
+
+export function useSalvarEmpresa() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (payload: Partial<Empresa> & { id?: string }) => {
+      const { id, ...rest } = payload
+      if (id) {
+        const { error } = await supabase.from('sys_empresas').update(rest).eq('id', id)
+        if (error) throw error
+      } else {
+        const { error } = await supabase.from('sys_empresas').insert(rest)
+        if (error) throw error
+      }
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['cad-empresas'] }),
+  })
+}
 
 // ── Fornecedores ────────────────────────────────────────────────────────────
 export function useCadFornecedores(filtros?: { ativo?: boolean }) {
@@ -37,12 +70,79 @@ export function useSalvarFornecedor() {
   })
 }
 
+// ── Grupos Financeiros ──────────────────────────────────────────────────────
+export function useCadGrupos() {
+  return useQuery<GrupoFinanceiro[]>({
+    queryKey: ['cad-grupos'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('fin_grupos_financeiros').select('*').order('codigo')
+      if (error) return []
+      return (data ?? []) as GrupoFinanceiro[]
+    },
+  })
+}
+
+export function useSalvarGrupo() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (payload: Partial<GrupoFinanceiro> & { id?: string }) => {
+      const { id, ...rest } = payload
+      if (id) {
+        const { error } = await supabase.from('fin_grupos_financeiros').update(rest).eq('id', id)
+        if (error) throw error
+      } else {
+        const { error } = await supabase.from('fin_grupos_financeiros').insert(rest)
+        if (error) throw error
+      }
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['cad-grupos'] }),
+  })
+}
+
+// ── Categorias Financeiras ──────────────────────────────────────────────────
+export function useCadCategorias(filtros?: { grupo_id?: string }) {
+  return useQuery<CategoriaFinanceira[]>({
+    queryKey: ['cad-categorias', filtros],
+    queryFn: async () => {
+      let q = supabase
+        .from('fin_categorias_financeiras')
+        .select('*, grupo:fin_grupos_financeiros!grupo_id(id, codigo, descricao)')
+        .order('codigo')
+      if (filtros?.grupo_id) q = q.eq('grupo_id', filtros.grupo_id)
+      const { data, error } = await q
+      if (error) return []
+      return (data ?? []) as CategoriaFinanceira[]
+    },
+  })
+}
+
+export function useSalvarCategoria() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (payload: Partial<CategoriaFinanceira> & { id?: string }) => {
+      const { id, grupo, ...rest } = payload as any
+      if (id) {
+        const { error } = await supabase.from('fin_categorias_financeiras').update(rest).eq('id', id)
+        if (error) throw error
+      } else {
+        const { error } = await supabase.from('fin_categorias_financeiras').insert(rest)
+        if (error) throw error
+      }
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['cad-categorias'] }),
+  })
+}
+
 // ── Classes Financeiras ─────────────────────────────────────────────────────
 export function useCadClasses(filtros?: { tipo?: string }) {
   return useQuery<ClasseFinanceira[]>({
     queryKey: ['cad-classes', filtros],
     queryFn: async () => {
-      let q = supabase.from('fin_classes_financeiras').select('*').order('codigo')
+      let q = supabase
+        .from('fin_classes_financeiras')
+        .select('*, categoria:fin_categorias_financeiras!categoria_id(id, codigo, descricao)')
+        .order('codigo')
       if (filtros?.tipo) q = q.eq('tipo', filtros.tipo)
       const { data, error } = await q
       if (error) return []
@@ -55,7 +155,7 @@ export function useSalvarClasse() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (payload: Partial<ClasseFinanceira> & { id?: string }) => {
-      const { id, ...rest } = payload
+      const { id, categoria, ...rest } = payload as any
       if (id) {
         const { error } = await supabase.from('fin_classes_financeiras').update(rest).eq('id', id)
         if (error) throw error
@@ -75,7 +175,7 @@ export function useCadCentrosCusto() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('sys_centros_custo')
-        .select('*, obra:sys_obras!obra_id(id, codigo, nome)')
+        .select('*, empresa:sys_empresas!empresa_id(id, codigo, razao_social)')
         .order('codigo')
       if (error) return []
       return (data ?? []) as CentroCusto[]
@@ -87,7 +187,7 @@ export function useSalvarCentroCusto() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (payload: Partial<CentroCusto> & { id?: string }) => {
-      const { id, obra, ...rest } = payload as any
+      const { id, empresa, ...rest } = payload as any
       if (id) {
         const { error } = await supabase.from('sys_centros_custo').update(rest).eq('id', id)
         if (error) throw error
@@ -105,7 +205,10 @@ export function useCadObras() {
   return useQuery<Obra[]>({
     queryKey: ['cad-obras'],
     queryFn: async () => {
-      const { data, error } = await supabase.from('sys_obras').select('*').order('nome')
+      const { data, error } = await supabase
+        .from('sys_obras')
+        .select('*, centro_custo:sys_centros_custo!centro_custo_id(id, codigo, descricao)')
+        .order('nome')
       if (error) return []
       return (data ?? []) as Obra[]
     },
@@ -116,7 +219,7 @@ export function useSalvarObra() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (payload: Partial<Obra> & { id?: string }) => {
-      const { id, ...rest } = payload
+      const { id, centro_custo, ...rest } = payload as any
       if (id) {
         const { error } = await supabase.from('sys_obras').update(rest).eq('id', id)
         if (error) throw error

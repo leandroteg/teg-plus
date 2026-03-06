@@ -1,9 +1,11 @@
 import { useState } from 'react'
 import { Tag, Plus, Search, X, Save, Loader2 } from 'lucide-react'
-import { useCadClasses, useSalvarClasse } from '../../hooks/useCadastros'
+import { useCadClasses, useSalvarClasse, useCadCategorias } from '../../hooks/useCadastros'
 import type { ClasseFinanceira } from '../../types/cadastros'
+import AutoCodeField from '../../components/AutoCodeField'
+import SmartTextField from '../../components/SmartTextField'
 
-const EMPTY: Partial<ClasseFinanceira> = { codigo: '', descricao: '', tipo: 'ambos', ativo: true }
+const EMPTY: Partial<ClasseFinanceira> = { codigo: '', descricao: '', tipo: 'ambos', categoria_id: undefined, ativo: true }
 const TIPO_LABEL: Record<string, { label: string; bg: string; text: string }> = {
   receita: { label: 'Receita', bg: 'bg-emerald-100', text: 'text-emerald-700' },
   despesa: { label: 'Despesa', bg: 'bg-rose-100',    text: 'text-rose-700' },
@@ -16,6 +18,7 @@ export default function ClassesFinanceiras() {
   const [editItem, setEditItem] = useState<Partial<ClasseFinanceira> | null>(null)
 
   const { data: classes = [], isLoading } = useCadClasses()
+  const { data: categorias = [] } = useCadCategorias()
   const salvar = useSalvarClasse()
 
   const filtrados = busca.trim()
@@ -28,10 +31,16 @@ export default function ClassesFinanceiras() {
   function openNew() { setEditItem({ ...EMPTY }); setShowForm(true) }
   function openEdit(item: ClasseFinanceira) { setEditItem({ ...item }); setShowForm(true) }
   function closeForm() { setShowForm(false); setEditItem(null) }
+
   async function handleSave() {
     if (!editItem) return
-    await salvar.mutateAsync(editItem)
-    closeForm()
+    if (!editItem.descricao?.trim()) { alert('Descricao e obrigatoria'); return }
+    try {
+      await salvar.mutateAsync(editItem)
+      closeForm()
+    } catch (err: any) {
+      alert(err?.message || 'Erro ao salvar classe')
+    }
   }
 
   return (
@@ -73,6 +82,7 @@ export default function ClassesFinanceiras() {
               <tr className="border-b border-slate-100 bg-slate-50">
                 <th className="text-left px-4 py-3 text-[10px] font-bold text-slate-500 uppercase tracking-widest">Codigo</th>
                 <th className="text-left px-4 py-3 text-[10px] font-bold text-slate-500 uppercase tracking-widest">Descricao</th>
+                <th className="text-left px-4 py-3 text-[10px] font-bold text-slate-500 uppercase tracking-widest hidden md:table-cell">Categoria</th>
                 <th className="text-left px-4 py-3 text-[10px] font-bold text-slate-500 uppercase tracking-widest">Tipo</th>
                 <th className="text-center px-4 py-3 text-[10px] font-bold text-slate-500 uppercase tracking-widest">Status</th>
                 <th className="px-4 py-3" />
@@ -85,6 +95,9 @@ export default function ClassesFinanceiras() {
                   <tr key={c.id} className="hover:bg-slate-50 transition-colors">
                     <td className="px-4 py-3 font-mono text-xs text-slate-600">{c.codigo}</td>
                     <td className="px-4 py-3 font-semibold text-slate-800">{c.descricao}</td>
+                    <td className="px-4 py-3 text-xs text-slate-500 hidden md:table-cell">
+                      {c.categoria ? `${c.categoria.codigo} — ${c.categoria.descricao}` : '—'}
+                    </td>
                     <td className="px-4 py-3">
                       <span className={`inline-flex items-center rounded-full text-[10px] font-bold px-2 py-0.5 ${t.bg} ${t.text}`}>
                         {t.label}
@@ -118,11 +131,8 @@ export default function ClassesFinanceiras() {
             </div>
             <div className="p-6 space-y-4">
               <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-bold text-slate-600 mb-1">Codigo *</label>
-                  <input value={editItem.codigo ?? ''} onChange={e => setEditItem({ ...editItem, codigo: e.target.value })}
-                    className="input-base" placeholder="REC-001" />
-                </div>
+                <AutoCodeField prefix="CLS" table="fin_classes_financeiras" value={editItem.codigo ?? ''}
+                  onChange={v => setEditItem({ ...editItem, codigo: v })} disabled={!!editItem.id} />
                 <div>
                   <label className="block text-xs font-bold text-slate-600 mb-1">Tipo *</label>
                   <select value={editItem.tipo ?? 'ambos'} onChange={e => setEditItem({ ...editItem, tipo: e.target.value as any })}
@@ -133,10 +143,16 @@ export default function ClassesFinanceiras() {
                   </select>
                 </div>
               </div>
+              <SmartTextField table="fin_classes_financeiras" column="descricao"
+                value={editItem.descricao ?? ''} onChange={v => setEditItem({ ...editItem, descricao: v })}
+                label="Descricao" placeholder="Nome da classe financeira" required />
               <div>
-                <label className="block text-xs font-bold text-slate-600 mb-1">Descricao *</label>
-                <input value={editItem.descricao ?? ''} onChange={e => setEditItem({ ...editItem, descricao: e.target.value })}
-                  className="input-base" placeholder="Nome da classe financeira" />
+                <label className="block text-xs font-bold text-slate-600 mb-1">Categoria</label>
+                <select value={editItem.categoria_id ?? ''} onChange={e => setEditItem({ ...editItem, categoria_id: e.target.value || undefined })}
+                  className="input-base">
+                  <option value="">Selecione uma categoria</option>
+                  {categorias.map(cat => <option key={cat.id} value={cat.id}>{cat.codigo} — {cat.descricao}</option>)}
+                </select>
               </div>
               <label className="flex items-center gap-2 cursor-pointer">
                 <input type="checkbox" checked={editItem.ativo ?? true}

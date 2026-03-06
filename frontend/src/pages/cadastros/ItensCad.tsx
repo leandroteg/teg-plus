@@ -2,6 +2,8 @@ import { useState } from 'react'
 import { Package2, Plus, Search, X, Save, Loader2 } from 'lucide-react'
 import { useEstoqueItens, useSalvarItem } from '../../hooks/useEstoque'
 import type { EstItem } from '../../types/estoque'
+import AutoCodeField from '../../components/AutoCodeField'
+import SmartTextField from '../../components/SmartTextField'
 
 const UNIDADES = ['UN', 'M', 'M2', 'M3', 'KG', 'TON', 'L', 'CX', 'PCT', 'RL', 'PR', 'JG']
 const CURVA_COLOR = {
@@ -127,10 +129,8 @@ export default function ItensCad() {
             </div>
             <div className="p-6 space-y-4">
               <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-bold text-slate-600 mb-1">Codigo *</label>
-                  <input value={editItem.codigo ?? ''} onChange={e => setEditItem({ ...editItem, codigo: e.target.value })} className="input-base" placeholder="EX-0001" />
-                </div>
+                <AutoCodeField prefix="ITM" table="est_itens" value={editItem.codigo ?? ''}
+                  onChange={v => setEditItem({ ...editItem, codigo: v })} disabled={!!editItem.id} />
                 <div>
                   <label className="block text-xs font-bold text-slate-600 mb-1">Unidade *</label>
                   <select value={editItem.unidade ?? 'UN'} onChange={e => setEditItem({ ...editItem, unidade: e.target.value as import('../../types/estoque').UnidadeEstoque })} className="input-base">
@@ -138,10 +138,9 @@ export default function ItensCad() {
                   </select>
                 </div>
               </div>
-              <div>
-                <label className="block text-xs font-bold text-slate-600 mb-1">Descricao *</label>
-                <input value={editItem.descricao ?? ''} onChange={e => setEditItem({ ...editItem, descricao: e.target.value })} className="input-base" placeholder="Nome completo do item" />
-              </div>
+              <SmartTextField table="est_itens" column="descricao"
+                value={editItem.descricao ?? ''} onChange={v => setEditItem({ ...editItem, descricao: v })}
+                label="Descricao" placeholder="Nome completo do item" required />
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-bold text-slate-600 mb-1">Categoria</label>

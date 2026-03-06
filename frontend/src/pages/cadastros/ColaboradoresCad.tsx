@@ -4,6 +4,7 @@ import { useCadColaboradores, useSalvarColaborador, useCadObras, useAiCadastroPa
 import type { Colaborador } from '../../types/cadastros'
 import MagicModal from '../../components/MagicModal'
 import ConfidenceField from '../../components/ConfidenceField'
+import SmartTextField from '../../components/SmartTextField'
 
 const EMPTY: Partial<Colaborador> = {
   nome: '', cpf: '', cargo: '', departamento: '', obra_id: undefined,
@@ -107,16 +108,21 @@ export default function ColaboradoresCad() {
           aiDone={Object.keys(confidence).length > 0}>
           <div className="space-y-4">
             <div className="grid grid-cols-2 gap-3">
-              <ConfidenceField label="Nome" value={editItem.nome ?? ''} onChange={v => set('nome', v)}
-                confidence={confidence.nome} required placeholder="Nome completo" />
+              {confidence.nome !== undefined ? (
+                <ConfidenceField label="Nome" value={editItem.nome ?? ''} onChange={v => set('nome', v)}
+                  confidence={confidence.nome} required placeholder="Nome completo" />
+              ) : (
+                <SmartTextField table="rh_colaboradores" column="nome" value={editItem.nome ?? ''}
+                  onChange={v => set('nome', v)} label="Nome" placeholder="Nome completo" required />
+              )}
               <ConfidenceField label="CPF" value={editItem.cpf ?? ''} onChange={v => set('cpf', v)}
                 confidence={confidence.cpf} placeholder="000.000.000-00" />
             </div>
             <div className="grid grid-cols-2 gap-3">
-              <ConfidenceField label="Cargo" value={editItem.cargo ?? ''} onChange={v => set('cargo', v)}
-                confidence={confidence.cargo} placeholder="Eletricista, Engenheiro..." />
-              <ConfidenceField label="Departamento" value={editItem.departamento ?? ''} onChange={v => set('departamento', v)}
-                confidence={confidence.departamento} placeholder="Engenharia, Compras..." />
+              <SmartTextField table="rh_colaboradores" column="cargo" value={editItem.cargo ?? ''}
+                onChange={v => set('cargo', v)} label="Cargo" placeholder="Eletricista, Engenheiro..." />
+              <SmartTextField table="rh_colaboradores" column="departamento" value={editItem.departamento ?? ''}
+                onChange={v => set('departamento', v)} label="Departamento" placeholder="Engenharia, Compras..." />
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>

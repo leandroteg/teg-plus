@@ -1,30 +1,34 @@
 import { useState } from 'react'
-import { Target, Plus, Search, X, Save, Loader2 } from 'lucide-react'
-import { useCadCentrosCusto, useSalvarCentroCusto, useCadEmpresas } from '../../hooks/useCadastros'
-import type { CentroCusto } from '../../types/cadastros'
+import { Layers, Plus, Search, X, Save, Loader2 } from 'lucide-react'
+import { useCadGrupos, useSalvarGrupo } from '../../hooks/useCadastros'
+import type { GrupoFinanceiro } from '../../types/cadastros'
 import AutoCodeField from '../../components/AutoCodeField'
 import SmartTextField from '../../components/SmartTextField'
 
-const EMPTY: Partial<CentroCusto> = { codigo: '', descricao: '', empresa_id: undefined, ativo: true }
+const EMPTY: Partial<GrupoFinanceiro> = { codigo: '', descricao: '', tipo: 'ambos', ativo: true }
+const TIPO_LABEL: Record<string, { label: string; bg: string; text: string }> = {
+  receita: { label: 'Receita', bg: 'bg-emerald-100', text: 'text-emerald-700' },
+  despesa: { label: 'Despesa', bg: 'bg-rose-100',    text: 'text-rose-700' },
+  ambos:   { label: 'Ambos',   bg: 'bg-slate-100',   text: 'text-slate-600' },
+}
 
-export default function CentrosCusto() {
+export default function GruposFinanceiros() {
   const [busca, setBusca] = useState('')
   const [showForm, setShowForm] = useState(false)
-  const [editItem, setEditItem] = useState<Partial<CentroCusto> | null>(null)
+  const [editItem, setEditItem] = useState<Partial<GrupoFinanceiro> | null>(null)
 
-  const { data: centros = [], isLoading } = useCadCentrosCusto()
-  const { data: empresas = [] } = useCadEmpresas()
-  const salvar = useSalvarCentroCusto()
+  const { data: grupos = [], isLoading } = useCadGrupos()
+  const salvar = useSalvarGrupo()
 
   const filtrados = busca.trim()
-    ? centros.filter(c =>
-        c.codigo.toLowerCase().includes(busca.toLowerCase()) ||
-        c.descricao.toLowerCase().includes(busca.toLowerCase())
+    ? grupos.filter(g =>
+        g.codigo.toLowerCase().includes(busca.toLowerCase()) ||
+        g.descricao.toLowerCase().includes(busca.toLowerCase())
       )
-    : centros
+    : grupos
 
   function openNew() { setEditItem({ ...EMPTY }); setShowForm(true) }
-  function openEdit(item: CentroCusto) { setEditItem({ ...item }); setShowForm(true) }
+  function openEdit(item: GrupoFinanceiro) { setEditItem({ ...item }); setShowForm(true) }
   function closeForm() { setShowForm(false); setEditItem(null) }
 
   async function handleSave() {
@@ -34,7 +38,7 @@ export default function CentrosCusto() {
       await salvar.mutateAsync(editItem)
       closeForm()
     } catch (err: any) {
-      alert(err?.message || 'Erro ao salvar centro de custo')
+      alert(err?.message || 'Erro ao salvar grupo')
     }
   }
 
@@ -42,13 +46,13 @@ export default function CentrosCusto() {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-extrabold text-slate-800">Centros de Custo</h1>
-          <p className="text-xs text-slate-400 mt-0.5">{filtrados.length} centros</p>
+          <h1 className="text-xl font-extrabold text-slate-800">Grupos Financeiros</h1>
+          <p className="text-xs text-slate-400 mt-0.5">{filtrados.length} grupos</p>
         </div>
         <button onClick={openNew}
           className="flex items-center gap-1.5 bg-violet-600 hover:bg-violet-700 text-white
             text-sm font-semibold px-4 py-2 rounded-xl transition-colors shadow-sm">
-          <Plus size={15} /> Novo Centro
+          <Plus size={15} /> Novo Grupo
         </button>
       </div>
 
@@ -66,9 +70,9 @@ export default function CentrosCusto() {
         </div>
       ) : filtrados.length === 0 ? (
         <div className="bg-white rounded-2xl border border-slate-200 p-12 text-center">
-          <Target size={40} className="text-slate-200 mx-auto mb-3" />
-          <p className="text-slate-500 font-semibold">Nenhum centro de custo encontrado</p>
-          <p className="text-slate-400 text-sm mt-1">Cadastre o primeiro centro de custo</p>
+          <Layers size={40} className="text-slate-200 mx-auto mb-3" />
+          <p className="text-slate-500 font-semibold">Nenhum grupo encontrado</p>
+          <p className="text-slate-400 text-sm mt-1">Cadastre o primeiro grupo financeiro</p>
         </div>
       ) : (
         <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
@@ -77,26 +81,33 @@ export default function CentrosCusto() {
               <tr className="border-b border-slate-100 bg-slate-50">
                 <th className="text-left px-4 py-3 text-[10px] font-bold text-slate-500 uppercase tracking-widest">Codigo</th>
                 <th className="text-left px-4 py-3 text-[10px] font-bold text-slate-500 uppercase tracking-widest">Descricao</th>
-                <th className="text-left px-4 py-3 text-[10px] font-bold text-slate-500 uppercase tracking-widest hidden md:table-cell">Empresa</th>
+                <th className="text-left px-4 py-3 text-[10px] font-bold text-slate-500 uppercase tracking-widest">Tipo</th>
                 <th className="text-center px-4 py-3 text-[10px] font-bold text-slate-500 uppercase tracking-widest">Status</th>
                 <th className="px-4 py-3" />
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-50">
-              {filtrados.map(c => (
-                <tr key={c.id} className="hover:bg-slate-50 transition-colors">
-                  <td className="px-4 py-3 font-mono text-xs text-slate-600">{c.codigo}</td>
-                  <td className="px-4 py-3 font-semibold text-slate-800">{c.descricao}</td>
-                  <td className="px-4 py-3 text-xs text-slate-500 hidden md:table-cell">{c.empresa?.razao_social ?? '—'}</td>
-                  <td className="px-4 py-3 text-center">
-                    <span className={`inline-block w-2 h-2 rounded-full ${c.ativo ? 'bg-emerald-400' : 'bg-slate-300'}`} />
-                  </td>
-                  <td className="px-4 py-3">
-                    <button onClick={() => openEdit(c)}
-                      className="text-[10px] text-violet-600 font-semibold hover:underline">Editar</button>
-                  </td>
-                </tr>
-              ))}
+              {filtrados.map(g => {
+                const t = TIPO_LABEL[g.tipo] || TIPO_LABEL.ambos
+                return (
+                  <tr key={g.id} className="hover:bg-slate-50 transition-colors">
+                    <td className="px-4 py-3 font-mono text-xs text-slate-600">{g.codigo}</td>
+                    <td className="px-4 py-3 font-semibold text-slate-800">{g.descricao}</td>
+                    <td className="px-4 py-3">
+                      <span className={`inline-flex items-center rounded-full text-[10px] font-bold px-2 py-0.5 ${t.bg} ${t.text}`}>
+                        {t.label}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-center">
+                      <span className={`inline-block w-2 h-2 rounded-full ${g.ativo ? 'bg-emerald-400' : 'bg-slate-300'}`} />
+                    </td>
+                    <td className="px-4 py-3">
+                      <button onClick={() => openEdit(g)}
+                        className="text-[10px] text-violet-600 font-semibold hover:underline">Editar</button>
+                    </td>
+                  </tr>
+                )
+              })}
             </tbody>
           </table>
         </div>
@@ -107,26 +118,29 @@ export default function CentrosCusto() {
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md">
             <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
               <h2 className="text-lg font-extrabold text-slate-800">
-                {editItem.id ? 'Editar Centro de Custo' : 'Novo Centro de Custo'}
+                {editItem.id ? 'Editar Grupo' : 'Novo Grupo'}
               </h2>
               <button onClick={closeForm} className="w-8 h-8 rounded-lg hover:bg-slate-100 flex items-center justify-center">
                 <X size={16} />
               </button>
             </div>
             <div className="p-6 space-y-4">
-              <AutoCodeField prefix="CC" table="sys_centros_custo" value={editItem.codigo ?? ''}
-                onChange={v => setEditItem({ ...editItem, codigo: v })} disabled={!!editItem.id} />
-              <SmartTextField table="sys_centros_custo" column="descricao"
-                value={editItem.descricao ?? ''} onChange={v => setEditItem({ ...editItem, descricao: v })}
-                label="Descricao" placeholder="Ex: Diretoria, RH, Polo 03 - Frutal" required />
-              <div>
-                <label className="block text-xs font-bold text-slate-600 mb-1">Empresa</label>
-                <select value={editItem.empresa_id ?? ''} onChange={e => setEditItem({ ...editItem, empresa_id: e.target.value || undefined })}
-                  className="input-base">
-                  <option value="">Nenhuma</option>
-                  {empresas.map(emp => <option key={emp.id} value={emp.id}>{emp.codigo} — {emp.razao_social}</option>)}
-                </select>
+              <div className="grid grid-cols-2 gap-3">
+                <AutoCodeField prefix="GRP" table="fin_grupos_financeiros" value={editItem.codigo ?? ''}
+                  onChange={v => setEditItem({ ...editItem, codigo: v })} disabled={!!editItem.id} />
+                <div>
+                  <label className="block text-xs font-bold text-slate-600 mb-1">Tipo *</label>
+                  <select value={editItem.tipo ?? 'ambos'} onChange={e => setEditItem({ ...editItem, tipo: e.target.value as any })}
+                    className="input-base">
+                    <option value="receita">Receita</option>
+                    <option value="despesa">Despesa</option>
+                    <option value="ambos">Ambos</option>
+                  </select>
+                </div>
               </div>
+              <SmartTextField table="fin_grupos_financeiros" column="descricao"
+                value={editItem.descricao ?? ''} onChange={v => setEditItem({ ...editItem, descricao: v })}
+                label="Descricao" placeholder="Nome do grupo financeiro" required />
               <label className="flex items-center gap-2 cursor-pointer">
                 <input type="checkbox" checked={editItem.ativo ?? true}
                   onChange={e => setEditItem({ ...editItem, ativo: e.target.checked })}

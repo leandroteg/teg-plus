@@ -1,0 +1,203 @@
+import { useState } from 'react'
+import { Building, Plus, Search, ChevronRight, X, Save, Loader2 } from 'lucide-react'
+import { useCadEmpresas, useSalvarEmpresa } from '../../hooks/useCadastros'
+import type { Empresa } from '../../types/cadastros'
+import AutoCodeField from '../../components/AutoCodeField'
+import SmartTextField from '../../components/SmartTextField'
+
+const EMPTY: Partial<Empresa> = {
+  codigo: '', razao_social: '', nome_fantasia: '', cnpjs: [], ativo: true,
+}
+
+export default function EmpresasCad() {
+  const [busca, setBusca] = useState('')
+  const [showForm, setShowForm] = useState(false)
+  const [editItem, setEditItem] = useState<Partial<Empresa> | null>(null)
+
+  const { data: empresas = [], isLoading } = useCadEmpresas()
+  const salvar = useSalvarEmpresa()
+
+  const filtered = busca.trim()
+    ? empresas.filter(e =>
+        e.razao_social.toLowerCase().includes(busca.toLowerCase()) ||
+        e.nome_fantasia?.toLowerCase().includes(busca.toLowerCase()) ||
+        e.codigo.toLowerCase().includes(busca.toLowerCase())
+      )
+    : empresas
+
+  function openNew() { setEditItem({ ...EMPTY, cnpjs: [] }); setShowForm(true) }
+  function openEdit(e: Empresa) { setEditItem({ ...e, cnpjs: [...(e.cnpjs || [])] }); setShowForm(true) }
+  function closeForm() { setShowForm(false); setEditItem(null) }
+
+  async function handleSave() {
+    if (!editItem) return
+    if (!editItem.razao_social?.trim()) { alert('Razao Social e obrigatoria'); return }
+    try {
+      await salvar.mutateAsync(editItem)
+      closeForm()
+    } catch (err: any) {
+      alert(err?.message || 'Erro ao salvar empresa')
+    }
+  }
+
+  const set = (k: string, v: any) => setEditItem(prev => prev ? { ...prev, [k]: v } : prev)
+
+  function addCnpj() {
+    if (!editItem) return
+    set('cnpjs', [...(editItem.cnpjs || []), ''])
+  }
+  function removeCnpj(idx: number) {
+    if (!editItem) return
+    const arr = [...(editItem.cnpjs || [])]
+    arr.splice(idx, 1)
+    set('cnpjs', arr)
+  }
+  function setCnpj(idx: number, val: string) {
+    if (!editItem) return
+    const arr = [...(editItem.cnpjs || [])]
+    arr[idx] = val.replace(/\D/g, '').slice(0, 14)
+    set('cnpjs', arr)
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-xl font-extrabold text-slate-800">Empresas</h1>
+          <p className="text-xs text-slate-400 mt-0.5">{filtered.length} empresas</p>
+        </div>
+        <button onClick={openNew}
+          className="flex items-center gap-1.5 bg-violet-600 hover:bg-violet-700 text-white
+            text-sm font-semibold px-4 py-2 rounded-xl transition-colors shadow-sm">
+          <Plus size={15} /> Nova Empresa
+        </button>
+      </div>
+
+      <div className="relative">
+        <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+        <input value={busca} onChange={e => setBusca(e.target.value)}
+          placeholder="Buscar por nome ou codigo..."
+          className="w-full pl-9 pr-4 py-2 rounded-xl border border-slate-200 bg-white text-sm
+            focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400" />
+      </div>
+
+      {isLoading ? (
+        <div className="flex items-center justify-center py-16">
+          <div className="w-8 h-8 border-[3px] border-violet-500 border-t-transparent rounded-full animate-spin" />
+        </div>
+      ) : filtered.length === 0 ? (
+        <div className="bg-white rounded-2xl border border-slate-200 p-12 text-center">
+          <Building size={40} className="text-slate-200 mx-auto mb-3" />
+          <p className="text-slate-500 font-semibold">Nenhuma empresa encontrada</p>
+          <p className="text-slate-400 text-sm mt-1">Cadastre a primeira empresa</p>
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {filtered.map(e => (
+            <div key={e.id} onClick={() => openEdit(e)}
+              className={`bg-white rounded-2xl border shadow-sm p-4 hover:shadow-md cursor-pointer group transition-all
+                ${e.ativo ? 'border-slate-200' : 'border-slate-200 opacity-60'}`}>
+              <div className="flex items-start gap-3">
+                <div className="w-10 h-10 rounded-xl bg-teal-50 flex items-center justify-center shrink-0">
+                  <Building size={16} className="text-teal-600" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-0.5">
+                    <p className="text-sm font-bold text-slate-800 truncate">{e.razao_social}</p>
+                    <span className="bg-slate-50 text-slate-500 px-2 py-0.5 rounded-full font-mono text-[10px]">{e.codigo}</span>
+                  </div>
+                  {e.nome_fantasia && <p className="text-[10px] text-slate-400">{e.nome_fantasia}</p>}
+                  {e.cnpjs?.length > 0 && (
+                    <div className="flex gap-1.5 mt-1.5 flex-wrap">
+                      {e.cnpjs.map((c, i) => (
+                        <span key={i} className="bg-slate-50 text-slate-500 px-2 py-0.5 rounded-full font-mono text-[10px]">
+                          {c.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, '$1.$2.$3/$4-$5')}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                <ChevronRight size={14} className="text-slate-300 shrink-0 mt-2 group-hover:text-violet-500 transition-colors" />
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {showForm && editItem && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
+          onClick={e => { if (e.target === e.currentTarget) closeForm() }}>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
+              <h2 className="text-lg font-extrabold text-slate-800">
+                {editItem.id ? 'Editar Empresa' : 'Nova Empresa'}
+              </h2>
+              <button onClick={closeForm} className="w-8 h-8 rounded-lg hover:bg-slate-100 flex items-center justify-center">
+                <X size={16} />
+              </button>
+            </div>
+            <div className="p-6 space-y-4">
+              <AutoCodeField prefix="EMP" table="sys_empresas" value={editItem.codigo ?? ''} onChange={v => set('codigo', v)}
+                disabled={!!editItem.id} />
+              <SmartTextField table="sys_empresas" column="razao_social" value={editItem.razao_social ?? ''}
+                onChange={v => set('razao_social', v)} label="Razao Social" placeholder="Nome completo da empresa" required />
+              <div>
+                <label className="block text-xs font-bold text-slate-600 mb-1">Nome Fantasia</label>
+                <input value={editItem.nome_fantasia ?? ''} onChange={e => set('nome_fantasia', e.target.value)}
+                  className="input-base" placeholder="Nome fantasia" />
+              </div>
+
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <label className="text-xs font-bold text-slate-600">CNPJs</label>
+                  <button type="button" onClick={addCnpj}
+                    className="text-[10px] font-bold text-violet-600 hover:text-violet-700 flex items-center gap-0.5">
+                    <Plus size={10} /> Adicionar CNPJ
+                  </button>
+                </div>
+                {(editItem.cnpjs || []).length === 0 && (
+                  <p className="text-xs text-slate-400 italic">Nenhum CNPJ cadastrado</p>
+                )}
+                <div className="space-y-2">
+                  {(editItem.cnpjs || []).map((c, i) => (
+                    <div key={i} className="flex items-center gap-2">
+                      <input
+                        value={c.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, '$1.$2.$3/$4-$5')}
+                        onChange={e => setCnpj(i, e.target.value)}
+                        className="input-base flex-1 font-mono text-sm"
+                        placeholder="00.000.000/0000-00"
+                      />
+                      <button type="button" onClick={() => removeCnpj(i)}
+                        className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-400 hover:text-red-500 hover:bg-red-50 transition-colors">
+                        <X size={12} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input type="checkbox" checked={editItem.ativo ?? true}
+                  onChange={e => set('ativo', e.target.checked)}
+                  className="rounded border-slate-300 text-violet-600 focus:ring-violet-500" />
+                <span className="text-xs font-semibold text-slate-600">Ativo</span>
+              </label>
+            </div>
+            <div className="px-6 py-4 border-t border-slate-100 flex justify-end gap-2">
+              <button onClick={closeForm}
+                className="px-4 py-2 rounded-xl border border-slate-200 text-sm font-semibold text-slate-600 hover:bg-slate-50">
+                Cancelar
+              </button>
+              <button onClick={handleSave} disabled={salvar.isPending}
+                className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-violet-600 hover:bg-violet-700
+                  text-white text-sm font-semibold transition-colors disabled:opacity-60 shadow-sm">
+                {salvar.isPending ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
+                Salvar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}

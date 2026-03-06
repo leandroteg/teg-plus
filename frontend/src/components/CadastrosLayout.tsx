@@ -1,21 +1,47 @@
 import { NavLink, Outlet, useNavigate } from 'react-router-dom'
 import {
-  LayoutDashboard, Building2, Package2, Tag,
+  LayoutDashboard, Building, Building2, Package2, Tag,
   Target, HardHat, Users, LogOut, LayoutGrid,
+  Layers, FolderTree,
 } from 'lucide-react'
 import { useAuth, ROLE_LABEL, ROLE_COLOR } from '../contexts/AuthContext'
 import { useTheme } from '../contexts/ThemeContext'
 import LogoTeg from './LogoTeg'
 import ThemeToggle from './ThemeToggle'
 
-const NAV = [
-  { to: '/cadastros',               icon: LayoutDashboard, label: 'Painel',        end: true  },
-  { to: '/cadastros/fornecedores',  icon: Building2,       label: 'Fornecedores',  end: false },
-  { to: '/cadastros/itens',         icon: Package2,        label: 'Itens',         end: false },
-  { to: '/cadastros/classes',       icon: Tag,             label: 'Classes Fin.',  end: false },
-  { to: '/cadastros/centros-custo', icon: Target,          label: 'C. Custo',      end: false },
-  { to: '/cadastros/obras',         icon: HardHat,         label: 'Obras',         end: false },
-  { to: '/cadastros/colaboradores', icon: Users,           label: 'Colaboradores', end: false },
+const NAV_SECTIONS = [
+  {
+    label: 'Estrutura',
+    items: [
+      { to: '/cadastros/empresas',      icon: Building,  label: 'Empresas'    },
+      { to: '/cadastros/centros-custo',  icon: Target,    label: 'C. Custo'    },
+      { to: '/cadastros/obras',          icon: HardHat,   label: 'Obras'       },
+    ],
+  },
+  {
+    label: 'Financeiro',
+    items: [
+      { to: '/cadastros/grupos',      icon: Layers,    label: 'Grupos'      },
+      { to: '/cadastros/categorias',   icon: FolderTree,label: 'Categorias'  },
+      { to: '/cadastros/classes',      icon: Tag,       label: 'Classes'     },
+    ],
+  },
+  {
+    label: 'Entidades',
+    items: [
+      { to: '/cadastros/fornecedores',  icon: Building2, label: 'Fornecedores'  },
+      { to: '/cadastros/colaboradores', icon: Users,     label: 'Colaboradores' },
+      { to: '/cadastros/itens',         icon: Package2,  label: 'Itens'         },
+    ],
+  },
+]
+
+const MOBILE_NAV = [
+  { to: '/cadastros',              icon: LayoutDashboard, label: 'Painel',  end: true  },
+  { to: '/cadastros/empresas',     icon: Building,        label: 'Empresas',end: false },
+  { to: '/cadastros/centros-custo',icon: Target,          label: 'C.Custo', end: false },
+  { to: '/cadastros/fornecedores', icon: Building2,       label: 'Fornec.', end: false },
+  { to: '/cadastros/classes',      icon: Tag,             label: 'Classes', end: false },
 ]
 
 const AVATAR_COLORS = [
@@ -68,7 +94,7 @@ export default function CadastrosLayout() {
   return (
     <div className={`min-h-screen ${isDark ? 'bg-[#0c1222]' : ls ? 'bg-slate-50' : 'bg-slate-100'}`}>
 
-      {/* ── DESKTOP SIDEBAR ────────────────────────────────────── */}
+      {/* -- DESKTOP SIDEBAR ------------------------------------------------ */}
       <aside
         className={`hidden lg:flex flex-col fixed left-0 top-0 h-full w-64 z-40
           ${ls ? 'bg-white border-r border-slate-200/80' : 'bg-[#0B1523]'}`}
@@ -91,7 +117,7 @@ export default function CadastrosLayout() {
               }`}
             title="Voltar ao modulo"
           >
-            <span className="text-lg leading-none">⚙️</span>
+            <span className="text-lg leading-none">&#9881;&#65039;</span>
             <div className="flex-1 text-left">
               <p className={`text-xs font-bold leading-none ${ls ? 'text-violet-700' : 'text-violet-300'}`}>Cadastros</p>
               <p className={`text-[9px] mt-0.5 ${ls ? 'text-violet-500/60' : 'text-violet-500/60'}`}>Configuracoes</p>
@@ -103,12 +129,27 @@ export default function CadastrosLayout() {
           </button>
         </div>
 
-        <nav className="flex-1 px-3 py-3 space-y-0.5 overflow-y-auto styled-scrollbar">
-          {NAV.map(({ to, icon: Icon, label, end }) => (
-            <NavLink key={to} to={to} end={end} className={sidebarLinkClass}>
-              <Icon size={16} className="shrink-0" />
-              <span>{label}</span>
-            </NavLink>
+        <nav className="flex-1 px-3 py-3 overflow-y-auto styled-scrollbar space-y-1">
+          {/* Painel link */}
+          <NavLink to="/cadastros" end className={sidebarLinkClass}>
+            <LayoutDashboard size={16} className="shrink-0" />
+            <span>Painel</span>
+          </NavLink>
+
+          {/* Sectioned nav */}
+          {NAV_SECTIONS.map(section => (
+            <div key={section.label}>
+              <p className={`text-[9px] font-bold uppercase tracking-[0.15em] px-3 pt-4 pb-1.5
+                ${ls ? 'text-slate-400' : 'text-slate-600'}`}>
+                {section.label}
+              </p>
+              {section.items.map(({ to, icon: Icon, label }) => (
+                <NavLink key={to} to={to} className={sidebarLinkClass}>
+                  <Icon size={16} className="shrink-0" />
+                  <span>{label}</span>
+                </NavLink>
+              ))}
+            </div>
           ))}
         </nav>
 
@@ -142,7 +183,7 @@ export default function CadastrosLayout() {
         </div>
       </aside>
 
-      {/* ── MAIN CONTENT ──────────────────────────────────────── */}
+      {/* -- MAIN CONTENT -------------------------------------------------- */}
       <div className="lg:ml-64 flex flex-col min-h-screen">
 
         <header
@@ -182,10 +223,10 @@ export default function CadastrosLayout() {
           style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
         >
           <div className="flex justify-around max-w-lg mx-auto px-1 py-1">
-            {NAV.slice(0, 6).map(({ to, icon: Icon, label, end }) => (
+            {MOBILE_NAV.map(({ to, icon: Icon, label, end }) => (
               <NavLink key={to} to={to} end={end} className={bottomLinkClass}>
                 <Icon className="w-5 h-5 mb-0.5" />
-                {label.length > 8 ? label.slice(0, 8) + '.' : label}
+                {label}
               </NavLink>
             ))}
           </div>
