@@ -56,18 +56,68 @@ export const api = {
     return request<unknown>(`/painel/compras${qs ? `?${qs}` : ''}`)
   },
 
-  // ── Consultas BrasilAPI (via n8n proxy + cache) ──────────────────────────
-  consultarCNPJ: (cnpj: string) =>
-    request<CnpjResult>('/consulta-cnpj', {
-      method: 'POST',
-      body: JSON.stringify({ valor: cnpj.replace(/\D/g, '') }),
-    }),
+  // ── Consultas BrasilAPI (n8n proxy → fallback direto BrasilAPI) ──────────
+  consultarCNPJ: async (cnpj: string): Promise<CnpjResult> => {
+    const limpo = cnpj.replace(/\D/g, '')
+    // Tenta n8n primeiro (cache + monitoramento)
+    if (BASE) {
+      try {
+        return await request<CnpjResult>('/consulta-cnpj', {
+          method: 'POST',
+          body: JSON.stringify({ valor: limpo }),
+        })
+      } catch { /* fallback abaixo */ }
+    }
+    // Fallback: BrasilAPI direto
+    const res = await fetch(`https://brasilapi.com.br/api/cnpj/v1/${limpo}`)
+    if (!res.ok) {
+      return { cnpj: limpo, razao_social: '', nome_fantasia: '', situacao: '', endereco: { cep: '', logradouro: '', numero: '', complemento: '', bairro: '', cidade: '', uf: '' }, telefone: '', email: '', error: true, message: `CNPJ não encontrado (${res.status})` }
+    }
+    const r = await res.json()
+    return {
+      cnpj: String(r.cnpj ?? '').replace(/\D/g, ''),
+      razao_social: r.razao_social ?? '',
+      nome_fantasia: r.nome_fantasia ?? '',
+      situacao: r.descricao_situacao_cadastral ?? r.situacao_cadastral ?? '',
+      endereco: {
+        cep: String(r.cep ?? '').replace(/\D/g, ''),
+        logradouro: [r.descricao_tipo_de_logradouro, r.logradouro].filter(Boolean).join(' '),
+        numero: r.numero ?? '',
+        complemento: r.complemento ?? '',
+        bairro: r.bairro ?? '',
+        cidade: r.municipio ?? '',
+        uf: r.uf ?? '',
+      },
+      telefone: String(r.ddd_telefone_1 ?? '').replace(/\D/g, ''),
+      email: (r.email ?? '').toLowerCase(),
+    }
+  },
 
-  consultarCEP: (cep: string) =>
-    request<CepResult>('/consulta-cep', {
-      method: 'POST',
-      body: JSON.stringify({ valor: cep.replace(/\D/g, '') }),
-    }),
+  consultarCEP: async (cep: string): Promise<CepResult> => {
+    const limpo = cep.replace(/\D/g, '')
+    // Tenta n8n primeiro
+    if (BASE) {
+      try {
+        return await request<CepResult>('/consulta-cep', {
+          method: 'POST',
+          body: JSON.stringify({ valor: limpo }),
+        })
+      } catch { /* fallback abaixo */ }
+    }
+    // Fallback: BrasilAPI direto
+    const res = await fetch(`https://brasilapi.com.br/api/cep/v2/${limpo}`)
+    if (!res.ok) {
+      return { cep: limpo, logradouro: '', bairro: '', cidade: '', uf: '', error: true, message: `CEP não encontrado (${res.status})` }
+    }
+    const r = await res.json()
+    return {
+      cep: String(r.cep ?? '').replace(/\D/g, ''),
+      logradouro: r.street ?? '',
+      bairro: r.neighborhood ?? '',
+      cidade: r.city ?? '',
+      uf: r.state ?? '',
+    }
+  },
 }
 
 // ── Types para consultas externas ────────────────────────────────────────

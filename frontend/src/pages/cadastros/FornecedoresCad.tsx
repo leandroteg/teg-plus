@@ -90,6 +90,21 @@ export default function FornecedoresCad() {
   }
 
   async function handleAiParse(input: { type: string; content: string; base64?: string; filename?: string }) {
+    // Interceptar CNPJ → consulta BrasilAPI em vez de AI parse
+    const cleanDigits = input.content.replace(/\D/g, '')
+    const isCnpjLike = input.type === 'cnpj' || (input.type === 'text' && /^\d{11,14}$/.test(cleanDigits))
+    if (isCnpjLike) {
+      set('cnpj', cleanDigits)
+      setConfidence(prev => ({ ...prev, cnpj: 1.0 }))   // Mostra formulário (aiDone=true)
+      if (cleanDigits.length === 14) {
+        cnpjLookup.consultar(cleanDigits)
+      } else {
+        cnpjLookup.limpar()
+        alert(`CNPJ deve ter 14 dígitos (digitou ${cleanDigits.length}). Verifique e corrija no campo abaixo.`)
+      }
+      return
+    }
+
     try {
       const result = await aiParse.mutateAsync({
         entity_type: 'fornecedor',
