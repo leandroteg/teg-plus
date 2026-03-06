@@ -78,8 +78,7 @@
       }
     ],
     "direction": "horizontal",
-    "width": 300,
-    "collapsed": true
+    "width": 300
   },
   "right": {
     "id": "4c94cf6ee553823e",
@@ -95,7 +94,7 @@
             "state": {
               "type": "backlink",
               "state": {
-                "file": "obsidian/Paineis/BI Dashboard.md",
+                "file": "obsidian/Paineis/Estoque Dashboard.md",
                 "collapseAll": false,
                 "extraContext": false,
                 "sortOrder": "alphabetical",
@@ -105,7 +104,7 @@
                 "unlinkedCollapsed": true
               },
               "icon": "links-coming-in",
-              "title": "Links inversos para BI Dashboard"
+              "title": "Links inversos para Estoque Dashboard"
             }
           },
           {
@@ -190,7 +189,8 @@
       }
     ],
     "direction": "horizontal",
-    "width": 300
+    "width": 300,
+    "collapsed": true
   },
   "left-ribbon": {
     "hiddenItems": {
@@ -209,11 +209,13 @@
       "publish:Publicar mudanças": false
     }
   },
-  "active": "f8042ee1e2b7391e",
+  "active": "a4bc148162b73016",
   "lastOpenFiles": [
-    "obsidian/27 - Módulo Contratos Gestão.md",
+    "obsidian/Paineis/Estoque Dashboard.md",
     "obsidian/Paineis/Compras Dashboard.md",
+    "obsidian/Paineis/Cadastros Dashboard.md",
     "obsidian/Paineis/BI Dashboard.md",
+    "obsidian/27 - Módulo Contratos Gestão.md",
     "obsidian/Paineis/Logistica Dashboard.md",
     "obsidian/26 - Upload Inteligente Cotacao.md",
     "obsidian/10 - n8n Workflows.md.tmp.28700.1772635214153",
@@ -229,7 +231,6 @@
     "obsidian/Paineis/Issues Board.md",
     "obsidian/Paineis/Frotas Dashboard.md",
     "obsidian/Paineis/Financeiro Dashboard.md",
-    "obsidian/Paineis/Estoque Dashboard.md",
     "obsidian/Paineis/test_hook.md",
     "obsidian/Paineis/test.md",
     "obsidian/Database/Tarefas/TASK-030 - Testes CI CD.md",
@@ -238,7 +239,6 @@
     "obsidian/Database/Tarefas/TASK-027 - Estoque Solicitacoes Transferencias.md",
     "obsidian/Database/Tarefas/TASK-026 - AI Agent Claude.md",
     "obsidian/Database/Tarefas/TASK-025 - Contratos Gestao Medicoes.md",
-    "obsidian/Database/Tarefas/TASK-024 - SSMA EPI Inspecoes.md",
     "obsidian/Paineis",
     "obsidian/Database/Tarefas",
     "obsidian/Database/Requisitos",
