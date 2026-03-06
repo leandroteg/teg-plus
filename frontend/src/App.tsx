@@ -39,6 +39,9 @@ import ClassesFinanceiras from './pages/cadastros/ClassesFinanceiras'
 import CentrosCusto from './pages/cadastros/CentrosCusto'
 import ObrasCad from './pages/cadastros/ObrasCad'
 import ColaboradoresCad from './pages/cadastros/ColaboradoresCad'
+import EmpresasCad from './pages/cadastros/EmpresasCad'
+import GruposFinanceiros from './pages/cadastros/GruposFinanceiros'
+import CategoriasFinanceiras from './pages/cadastros/CategoriasFinanceiras'
 
 // Módulo RH
 import RHLayout from './components/RHLayout'
@@ -55,6 +58,7 @@ import Conciliacao from './pages/financeiro/Conciliacao'
 import Relatorios from './pages/financeiro/Relatorios'
 import Fornecedores from './pages/financeiro/Fornecedores'
 import Configuracoes from './pages/financeiro/Configuracoes'
+import NotasFiscais from './pages/financeiro/NotasFiscais'
 
 // Módulo Estoque
 import EstoqueLayout from './components/EstoqueLayout'
@@ -114,6 +118,7 @@ export default function App() {
             <Route path="/financeiro/relatorios"   element={<Relatorios />} />
             <Route path="/financeiro/fornecedores"   element={<Fornecedores />} />
             <Route path="/financeiro/configuracoes" element={<Configuracoes />} />
+            <Route path="/financeiro/notas-fiscais" element={<NotasFiscais />} />
           </Route>
 
           {/* Módulo Estoque: usa EstoqueLayout */}
@@ -168,6 +173,9 @@ export default function App() {
             <Route path="/cadastros/centros-custo"  element={<CentrosCusto />} />
             <Route path="/cadastros/obras"          element={<ObrasCad />} />
             <Route path="/cadastros/colaboradores"  element={<ColaboradoresCad />} />
+            <Route path="/cadastros/empresas"       element={<EmpresasCad />} />
+            <Route path="/cadastros/grupos"          element={<GruposFinanceiros />} />
+            <Route path="/cadastros/categorias"      element={<CategoriasFinanceiras />} />
           </Route>
 
           {/* Módulos stub */}

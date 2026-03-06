@@ -1,7 +1,7 @@
 import { NavLink, Outlet, useNavigate } from 'react-router-dom'
 import {
   LayoutDashboard, Receipt, Landmark, FileCheck2,
-  BarChart3, Users, LogOut, LayoutGrid, DollarSign, Settings,
+  BarChart3, Users, LogOut, LayoutGrid, DollarSign, Settings, FileText,
 } from 'lucide-react'
 import { useAuth, ROLE_LABEL, ROLE_COLOR } from '../contexts/AuthContext'
 import { useTheme } from '../contexts/ThemeContext'
@@ -16,6 +16,7 @@ const NAV = [
   { to: '/financeiro/conciliacao',    icon: Landmark,        label: 'Conciliação',     end: false },
   { to: '/financeiro/relatorios',     icon: BarChart3,       label: 'Relatórios',      end: false },
   { to: '/financeiro/fornecedores',   icon: Users,           label: 'Fornecedores',    end: false },
+  { to: '/financeiro/notas-fiscais', icon: FileText,        label: 'Notas Fiscais',   end: false },
   { to: '/financeiro/configuracoes',  icon: Settings,        label: 'Configurações',   end: false },
 ]
 
