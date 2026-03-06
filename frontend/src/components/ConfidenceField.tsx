@@ -10,11 +10,12 @@ interface ConfidenceFieldProps {
   required?: boolean
   disabled?: boolean
   children?: React.ReactNode
+  onBlur?: () => void
 }
 
 export default function ConfidenceField({
   label, value, onChange, confidence, type = 'text',
-  placeholder, required, disabled, children,
+  placeholder, required, disabled, children, onBlur,
 }: ConfidenceFieldProps) {
   const has = confidence !== undefined
 
@@ -56,6 +57,7 @@ export default function ConfidenceField({
           type={type}
           value={value ?? ''}
           onChange={e => onChange(e.target.value)}
+          onBlur={onBlur}
           placeholder={placeholder}
           disabled={disabled}
           className={`input-base border-l-4 ${borderColor} ${bgColor} transition-all`}

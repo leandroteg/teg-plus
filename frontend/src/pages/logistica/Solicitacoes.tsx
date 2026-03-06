@@ -1,13 +1,14 @@
-import { useState } from 'react'
+import { useState, useCallback } from 'react'
 import {
   ClipboardList, Plus, Search, X, Save, Loader2,
-  ChevronDown, AlertTriangle, FileInput, ExternalLink,
+  ChevronDown, AlertTriangle, FileInput, ExternalLink, CheckCircle2,
 } from 'lucide-react'
 import {
   useSolicitacoes, useCriarSolicitacao, useAtualizarStatusSolicitacao,
   useAprovarSolicitacao, usePlanejaarSolicitacao, useTransportadoras, useRotas,
 } from '../../hooks/useLogistica'
 import { useCriarSolicitacao as useCriarSolicitacaoNF } from '../../hooks/useSolicitacoesNF'
+import { useConsultaCNPJ } from '../../hooks/useConsultas'
 import { StatusBadge } from './LogisticaHome'
 import type { CriarSolicitacaoPayload, TipoTransporte, StatusSolicitacao } from '../../types/logistica'
 import { useNavigate } from 'react-router-dom'
@@ -62,6 +63,12 @@ export default function Solicitacoes() {
   const aprovar = useAprovarSolicitacao()
   const planejar = usePlanejaarSolicitacao()
   const criarNF = useCriarSolicitacaoNF()
+  const cnpjLookup = useConsultaCNPJ(useCallback((r) => {
+    setNfForm(prev => ({
+      ...prev,
+      fornecedor_nome: prev.fornecedor_nome || r.razao_social,
+    }))
+  }, []))
 
   const filtradas = busca.trim()
     ? solicitacoes.filter(s =>
@@ -573,11 +580,26 @@ export default function Solicitacoes() {
                   Sera enviada ao modulo Fiscal como &quot;Pendente&quot;
                 </p>
               </div>
-              <div>
+              <div className="relative">
                 <label className="block text-xs font-bold text-slate-600 mb-1">CNPJ do Fornecedor *</label>
                 <input value={nfForm.fornecedor_cnpj}
                   onChange={e => setNfForm(p => ({ ...p, fornecedor_cnpj: e.target.value }))}
+                  onBlur={() => cnpjLookup.consultar(nfForm.fornecedor_cnpj)}
                   className="input-base" placeholder="00.000.000/0000-00" />
+                {cnpjLookup.loading && (
+                  <div className="absolute right-2 top-7 flex items-center gap-1 text-amber-500">
+                    <Loader2 size={12} className="animate-spin" />
+                    <span className="text-[9px] font-semibold">Buscando...</span>
+                  </div>
+                )}
+                {cnpjLookup.dados && !cnpjLookup.erro && (
+                  <p className="text-[9px] text-emerald-600 mt-0.5 flex items-center gap-1">
+                    <CheckCircle2 size={9} /> {cnpjLookup.dados.situacao}
+                  </p>
+                )}
+                {cnpjLookup.erro && (
+                  <p className="text-[9px] text-red-500 mt-0.5">{cnpjLookup.erro}</p>
+                )}
               </div>
               <div>
                 <label className="block text-xs font-bold text-slate-600 mb-1">Nome / Razao Social *</label>

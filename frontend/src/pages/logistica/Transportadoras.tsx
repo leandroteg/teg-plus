@@ -1,6 +1,7 @@
-import { useState } from 'react'
-import { Building2, Plus, Search, Star, X, Save, Loader2 } from 'lucide-react'
+import { useState, useCallback } from 'react'
+import { Building2, Plus, Search, Star, X, Save, Loader2, CheckCircle2 } from 'lucide-react'
 import { useTransportadoras, useSalvarTransportadora } from '../../hooks/useLogistica'
+import { useConsultaCNPJ } from '../../hooks/useConsultas'
 import type { LogTransportadora } from '../../types/logistica'
 
 const EMPTY: Partial<LogTransportadora> = {
@@ -22,6 +23,16 @@ export default function Transportadoras() {
 
   const { data: transportadoras = [], isLoading } = useTransportadoras()
   const salvar = useSalvarTransportadora()
+
+  const cnpjLookup = useConsultaCNPJ(useCallback((r) => {
+    setForm(prev => ({
+      ...prev,
+      razao_social: prev.razao_social || r.razao_social,
+      nome_fantasia: prev.nome_fantasia || r.nome_fantasia,
+      telefone: prev.telefone || r.telefone,
+      email: prev.email || r.email,
+    }))
+  }, []))
 
   const filtradas = busca.trim()
     ? transportadoras.filter(t =>
@@ -161,10 +172,25 @@ export default function Transportadoras() {
                   <input value={form.nome_fantasia ?? ''} onChange={e => set('nome_fantasia', e.target.value)}
                     className="input-base" />
                 </div>
-                <div>
+                <div className="relative">
                   <label className="block text-xs font-bold text-slate-600 mb-1">CNPJ *</label>
                   <input value={form.cnpj ?? ''} onChange={e => set('cnpj', e.target.value)}
+                    onBlur={() => cnpjLookup.consultar(form.cnpj ?? '')}
                     className="input-base" placeholder="00.000.000/0001-00" />
+                  {cnpjLookup.loading && (
+                    <div className="absolute right-2 top-7 flex items-center gap-1 text-orange-500">
+                      <Loader2 size={12} className="animate-spin" />
+                      <span className="text-[9px] font-semibold">Buscando...</span>
+                    </div>
+                  )}
+                  {cnpjLookup.dados && !cnpjLookup.erro && (
+                    <p className="text-[9px] text-emerald-600 mt-0.5 flex items-center gap-1">
+                      <CheckCircle2 size={9} /> {cnpjLookup.dados.situacao}
+                    </p>
+                  )}
+                  {cnpjLookup.erro && (
+                    <p className="text-[9px] text-red-500 mt-0.5">{cnpjLookup.erro}</p>
+                  )}
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-3">

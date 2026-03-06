@@ -1,6 +1,7 @@
-import { useState } from 'react'
-import { Building, Plus, Search, ChevronRight, X, Save, Loader2 } from 'lucide-react'
+import { useState, useCallback } from 'react'
+import { Building, Plus, Search, ChevronRight, X, Save, Loader2, CheckCircle2 } from 'lucide-react'
 import { useCadEmpresas, useSalvarEmpresa } from '../../hooks/useCadastros'
+import { useConsultaCNPJ } from '../../hooks/useConsultas'
 import type { Empresa } from '../../types/cadastros'
 import AutoCodeField from '../../components/AutoCodeField'
 import SmartTextField from '../../components/SmartTextField'
@@ -16,6 +17,14 @@ export default function EmpresasCad() {
 
   const { data: empresas = [], isLoading } = useCadEmpresas()
   const salvar = useSalvarEmpresa()
+
+  const cnpjLookup = useConsultaCNPJ(useCallback((r) => {
+    setEditItem(prev => prev ? {
+      ...prev,
+      razao_social: prev.razao_social || r.razao_social,
+      nome_fantasia: prev.nome_fantasia || r.nome_fantasia,
+    } : prev)
+  }, []))
 
   const filtered = busca.trim()
     ? empresas.filter(e =>
@@ -160,17 +169,36 @@ export default function EmpresasCad() {
                 )}
                 <div className="space-y-2">
                   {(editItem.cnpjs || []).map((c, i) => (
-                    <div key={i} className="flex items-center gap-2">
-                      <input
-                        value={c.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, '$1.$2.$3/$4-$5')}
-                        onChange={e => setCnpj(i, e.target.value)}
-                        className="input-base flex-1 font-mono text-sm"
-                        placeholder="00.000.000/0000-00"
-                      />
-                      <button type="button" onClick={() => removeCnpj(i)}
-                        className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-400 hover:text-red-500 hover:bg-red-50 transition-colors">
-                        <X size={12} />
-                      </button>
+                    <div key={i}>
+                      <div className="flex items-center gap-2">
+                        <div className="relative flex-1">
+                          <input
+                            value={c.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, '$1.$2.$3/$4-$5')}
+                            onChange={e => setCnpj(i, e.target.value)}
+                            onBlur={() => { if (i === 0) cnpjLookup.consultar(c) }}
+                            className="input-base flex-1 font-mono text-sm"
+                            placeholder="00.000.000/0000-00"
+                          />
+                          {i === 0 && cnpjLookup.loading && (
+                            <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1 text-violet-500">
+                              <Loader2 size={12} className="animate-spin" />
+                              <span className="text-[9px] font-semibold">Buscando...</span>
+                            </div>
+                          )}
+                        </div>
+                        <button type="button" onClick={() => removeCnpj(i)}
+                          className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-400 hover:text-red-500 hover:bg-red-50 transition-colors">
+                          <X size={12} />
+                        </button>
+                      </div>
+                      {i === 0 && cnpjLookup.dados && !cnpjLookup.erro && (
+                        <p className="text-[9px] text-emerald-600 mt-0.5 ml-1 flex items-center gap-1">
+                          <CheckCircle2 size={9} /> {cnpjLookup.dados.razao_social} — {cnpjLookup.dados.situacao}
+                        </p>
+                      )}
+                      {i === 0 && cnpjLookup.erro && (
+                        <p className="text-[9px] text-red-500 mt-0.5 ml-1">{cnpjLookup.erro}</p>
+                      )}
                     </div>
                   ))}
                 </div>

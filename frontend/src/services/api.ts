@@ -55,4 +55,48 @@ export const api = {
     const qs = params ? new URLSearchParams(params as Record<string, string>).toString() : ''
     return request<unknown>(`/painel/compras${qs ? `?${qs}` : ''}`)
   },
+
+  // ── Consultas BrasilAPI (via n8n proxy + cache) ──────────────────────────
+  consultarCNPJ: (cnpj: string) =>
+    request<CnpjResult>('/consulta-cnpj', {
+      method: 'POST',
+      body: JSON.stringify({ valor: cnpj.replace(/\D/g, '') }),
+    }),
+
+  consultarCEP: (cep: string) =>
+    request<CepResult>('/consulta-cep', {
+      method: 'POST',
+      body: JSON.stringify({ valor: cep.replace(/\D/g, '') }),
+    }),
+}
+
+// ── Types para consultas externas ────────────────────────────────────────
+export interface CnpjResult {
+  cnpj: string
+  razao_social: string
+  nome_fantasia: string
+  situacao: string
+  endereco: {
+    cep: string
+    logradouro: string
+    numero: string
+    complemento: string
+    bairro: string
+    cidade: string
+    uf: string
+  }
+  telefone: string
+  email: string
+  error?: boolean
+  message?: string
+}
+
+export interface CepResult {
+  cep: string
+  logradouro: string
+  bairro: string
+  cidade: string
+  uf: string
+  error?: boolean
+  message?: string
 }

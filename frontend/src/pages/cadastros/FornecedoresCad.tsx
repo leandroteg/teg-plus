@@ -1,9 +1,10 @@
-import { useState } from 'react'
+import { useState, useCallback } from 'react'
 import {
   Building2, Plus, Search, ChevronRight, CheckCircle2,
-  Phone, Mail, MapPin,
+  Phone, Mail, MapPin, Loader2,
 } from 'lucide-react'
 import { useCadFornecedores, useSalvarFornecedor, useAiCadastroParse } from '../../hooks/useCadastros'
+import { useConsultaCNPJ, useConsultaCEP } from '../../hooks/useConsultas'
 import type { Fornecedor } from '../../types/financeiro'
 import type { AiCadastroResult } from '../../types/cadastros'
 import MagicModal from '../../components/MagicModal'
@@ -27,6 +28,29 @@ export default function FornecedoresCad() {
   const { data: fornecedores = [], isLoading } = useCadFornecedores()
   const salvar = useSalvarFornecedor()
   const aiParse = useAiCadastroParse()
+
+  const cnpjLookup = useConsultaCNPJ(useCallback((r) => {
+    setEditItem(prev => prev ? {
+      ...prev,
+      razao_social: prev.razao_social || r.razao_social,
+      nome_fantasia: prev.nome_fantasia || r.nome_fantasia,
+      telefone: prev.telefone || r.telefone,
+      email: prev.email || r.email,
+      cep: (prev as any).cep || r.endereco?.cep,
+      endereco: (prev as any).endereco || [r.endereco?.logradouro, r.endereco?.numero].filter(Boolean).join(', '),
+      cidade: (prev as any).cidade || r.endereco?.cidade,
+      uf: (prev as any).uf || r.endereco?.uf,
+    } : prev)
+  }, []))
+
+  const cepLookup = useConsultaCEP(useCallback((r) => {
+    setEditItem(prev => prev ? {
+      ...prev,
+      endereco: (prev as any).endereco || r.logradouro,
+      cidade: (prev as any).cidade || r.cidade,
+      uf: (prev as any).uf || r.uf,
+    } : prev)
+  }, []))
 
   const filtered = fornecedores
     .filter(f => showInactive || f.ativo)
@@ -202,8 +226,25 @@ export default function FornecedoresCad() {
               )}
             </div>
             <div className="grid grid-cols-2 gap-3">
-              <ConfidenceField label="CNPJ" value={editItem.cnpj ?? ''} onChange={v => set('cnpj', v)}
-                confidence={confidence.cnpj} placeholder="00.000.000/0000-00" />
+              <div className="relative">
+                <ConfidenceField label="CNPJ" value={editItem.cnpj ?? ''} onChange={v => set('cnpj', v)}
+                  confidence={confidence.cnpj} placeholder="00.000.000/0000-00"
+                  onBlur={() => cnpjLookup.consultar(editItem.cnpj ?? '')} />
+                {cnpjLookup.loading && (
+                  <div className="absolute right-2 top-7 flex items-center gap-1 text-violet-500">
+                    <Loader2 size={12} className="animate-spin" />
+                    <span className="text-[9px] font-semibold">Buscando...</span>
+                  </div>
+                )}
+                {cnpjLookup.erro && (
+                  <p className="text-[9px] text-red-500 mt-0.5">{cnpjLookup.erro}</p>
+                )}
+                {cnpjLookup.dados && !cnpjLookup.erro && (
+                  <p className="text-[9px] text-emerald-600 mt-0.5 flex items-center gap-1">
+                    <CheckCircle2 size={9} /> {cnpjLookup.dados.situacao}
+                  </p>
+                )}
+              </div>
               <ConfidenceField label="Contato" value={editItem.contato_nome ?? ''} onChange={v => set('contato_nome', v)}
                 confidence={confidence.contato_nome} placeholder="Nome do contato" />
             </div>
@@ -212,8 +253,20 @@ export default function FornecedoresCad() {
                 confidence={confidence.telefone} type="tel" placeholder="(00) 0000-0000" />
               <ConfidenceField label="Email" value={editItem.email ?? ''} onChange={v => set('email', v)}
                 confidence={confidence.email} type="email" placeholder="email@empresa.com" />
-              <ConfidenceField label="CEP" value={(editItem as any).cep ?? ''} onChange={v => set('cep', v)}
-                confidence={confidence.cep} placeholder="00000-000" />
+              <div className="relative">
+                <ConfidenceField label="CEP" value={(editItem as any).cep ?? ''} onChange={v => set('cep', v)}
+                  confidence={confidence.cep} placeholder="00000-000"
+                  onBlur={() => cepLookup.consultar((editItem as any).cep ?? '')} />
+                {cepLookup.loading && (
+                  <div className="absolute right-2 top-7 flex items-center gap-1 text-violet-500">
+                    <Loader2 size={12} className="animate-spin" />
+                    <span className="text-[9px] font-semibold">Buscando...</span>
+                  </div>
+                )}
+                {cepLookup.erro && (
+                  <p className="text-[9px] text-red-500 mt-0.5">{cepLookup.erro}</p>
+                )}
+              </div>
             </div>
             <ConfidenceField label="Endereco" value={(editItem as any).endereco ?? ''} onChange={v => set('endereco', v)}
               confidence={confidence.endereco} placeholder="Rua, numero, complemento" />
