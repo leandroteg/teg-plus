@@ -7,7 +7,7 @@ import {
   // Sub-module icons
   Settings, HardHat, ShieldCheck, ShoppingCart, Truck,
   Package, Building2, Car, Banknote, BarChart3, FileText,
-  UserCog, Server, Bot, Target, Store,
+  UserCog, Server, Bot, Target, Store, Receipt,
   type LucideIcon,
 } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
@@ -86,6 +86,7 @@ const PILLARS: Pillar[] = [
     accent: '#34D399',
     subs: [
       { key: 'tesouraria', label: 'Tesouraria', desc: 'Contas, aprovações e conciliação', Icon: Banknote, active: true, route: '/financeiro' },
+      { key: 'fiscal', label: 'Fiscal', desc: 'Notas fiscais e créditos PIS/COFINS', Icon: Receipt, active: true, route: '/financeiro/notas-fiscais' },
       { key: 'controladoria', label: 'Controladoria', desc: 'Indicadores e relatórios gerenciais', Icon: BarChart3, active: false, route: '' },
       { key: 'contratos', label: 'Contratos', desc: 'Gestão de contratos e SLAs', Icon: FileText, active: true, route: '/contratos' },
     ],
