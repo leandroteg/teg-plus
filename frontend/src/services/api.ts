@@ -1,6 +1,6 @@
 import type { NovaRequisicaoPayload, AiParseResult, NovaCotacaoPayload } from '../types'
 
-const BASE = import.meta.env.VITE_N8N_WEBHOOK_URL || ''
+const BASE = import.meta.env.VITE_N8N_WEBHOOK_URL || 'https://teg-agents-n8n.nmmcas.easypanel.host/webhook'
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
   const res = await fetch(`${BASE}${path}`, {
