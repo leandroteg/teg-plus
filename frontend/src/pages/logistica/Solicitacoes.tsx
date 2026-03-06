@@ -1,14 +1,16 @@
 import { useState } from 'react'
 import {
   ClipboardList, Plus, Search, X, Save, Loader2,
-  ChevronDown, AlertTriangle,
+  ChevronDown, AlertTriangle, FileInput, ExternalLink,
 } from 'lucide-react'
 import {
   useSolicitacoes, useCriarSolicitacao, useAtualizarStatusSolicitacao,
   useAprovarSolicitacao, usePlanejaarSolicitacao, useTransportadoras, useRotas,
 } from '../../hooks/useLogistica'
+import { useCriarSolicitacao as useCriarSolicitacaoNF } from '../../hooks/useSolicitacoesNF'
 import { StatusBadge } from './LogisticaHome'
 import type { CriarSolicitacaoPayload, TipoTransporte, StatusSolicitacao } from '../../types/logistica'
+import { useNavigate } from 'react-router-dom'
 
 const TIPO_LABEL: Record<TipoTransporte, string> = {
   viagem:                  'Viagem',
@@ -46,6 +48,9 @@ export default function Solicitacoes() {
   const [motivoReprovacao, setMotivoReprovacao] = useState('')
   const [planejamentoModal, setPlanejamentoModal] = useState<string | null>(null)
   const [planejForm, setPlanejForm] = useState<any>({})
+  const [nfModal, setNfModal] = useState<{ solId: string; descricao: string; valor: number; transportadora?: string; cnpj?: string } | null>(null)
+  const [nfForm, setNfForm] = useState({ fornecedor_cnpj: '', fornecedor_nome: '', valor_total: 0, descricao: '' })
+  const navigate = useNavigate()
 
   const { data: solicitacoes = [], isLoading } = useSolicitacoes(
     statusFiltro ? { status: statusFiltro as StatusSolicitacao } : undefined
@@ -56,6 +61,7 @@ export default function Solicitacoes() {
   const atualizarStatus = useAtualizarStatusSolicitacao()
   const aprovar = useAprovarSolicitacao()
   const planejar = usePlanejaarSolicitacao()
+  const criarNF = useCriarSolicitacaoNF()
 
   const filtradas = busca.trim()
     ? solicitacoes.filter(s =>
@@ -94,6 +100,32 @@ export default function Solicitacoes() {
     await aprovar.mutateAsync({ id: aprovacaoModal.id, aprovado, motivo: motivoReprovacao })
     setAprovacaoModal(null)
     setMotivoReprovacao('')
+  }
+
+  function openNfModal(s: typeof solicitacoes[0]) {
+    const transp = s.transportadora
+    setNfForm({
+      fornecedor_cnpj: transp?.cnpj ?? '',
+      fornecedor_nome: transp?.nome_fantasia ?? transp?.razao_social ?? '',
+      valor_total: s.custo_estimado ?? 0,
+      descricao: `Transporte ${s.numero} — ${s.origem} → ${s.destino}`,
+    })
+    setNfModal({ solId: s.id, descricao: s.numero, valor: s.custo_estimado ?? 0, transportadora: transp?.razao_social, cnpj: transp?.cnpj })
+  }
+
+  async function handleSolicitarNF() {
+    if (!nfModal) return
+    await criarNF.mutateAsync({
+      fornecedor_cnpj: nfForm.fornecedor_cnpj,
+      fornecedor_nome: nfForm.fornecedor_nome,
+      valor_total: nfForm.valor_total,
+      descricao: nfForm.descricao,
+      origem: 'logistica',
+      solicitacao_log_id: nfModal.solId,
+    })
+    // Avançar status para nfe_emitida
+    await atualizarStatus.mutateAsync({ id: nfModal.solId, status: 'nfe_emitida' })
+    setNfModal(null)
   }
 
   return (
@@ -246,6 +278,20 @@ export default function Solicitacoes() {
                             onClick={() => setAprovacaoModal({ id: s.id, titulo: s.numero })}
                           />
                         </>
+                      )}
+                      {s.status === 'aprovado' && (
+                        <button onClick={() => openNfModal(s)}
+                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-700
+                            text-white text-xs font-semibold transition-colors shadow-sm">
+                          <FileInput size={12} /> Solicitar NF
+                        </button>
+                      )}
+                      {s.status === 'nfe_emitida' && (
+                        <button onClick={() => navigate('/fiscal/solicitacao')}
+                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-500/10 hover:bg-amber-500/20
+                            text-amber-700 text-xs font-semibold transition-colors border border-amber-200">
+                          <ExternalLink size={12} /> Ver no Fiscal
+                        </button>
                       )}
                       {(s.status === 'solicitado' || s.status === 'validando' || s.status === 'planejado') && (
                         <ActionBtn
@@ -501,6 +547,76 @@ export default function Solicitacoes() {
               <button onClick={() => handleAprovar(true)} disabled={aprovar.isPending}
                 className="flex-1 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold transition-colors disabled:opacity-60">
                 Aprovar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* ── Modal Solicitar NF ──────────────────────────────── */}
+      {nfModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
+              <div>
+                <h2 className="text-lg font-extrabold text-slate-800">Solicitar Nota Fiscal</h2>
+                <p className="text-xs text-slate-400 mt-0.5">Transporte {nfModal.descricao}</p>
+              </div>
+              <button onClick={() => setNfModal(null)}
+                className="w-8 h-8 rounded-lg hover:bg-slate-100 flex items-center justify-center">
+                <X size={16} />
+              </button>
+            </div>
+            <div className="p-6 space-y-4">
+              <div className="bg-amber-50 border border-amber-200 rounded-xl px-3 py-2.5">
+                <p className="text-xs text-amber-700 font-semibold flex items-center gap-1.5">
+                  <FileInput size={13} />
+                  Sera enviada ao modulo Fiscal como &quot;Pendente&quot;
+                </p>
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-slate-600 mb-1">CNPJ do Fornecedor *</label>
+                <input value={nfForm.fornecedor_cnpj}
+                  onChange={e => setNfForm(p => ({ ...p, fornecedor_cnpj: e.target.value }))}
+                  className="input-base" placeholder="00.000.000/0000-00" />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-slate-600 mb-1">Nome / Razao Social *</label>
+                <input value={nfForm.fornecedor_nome}
+                  onChange={e => setNfForm(p => ({ ...p, fornecedor_nome: e.target.value }))}
+                  className="input-base" placeholder="Nome do fornecedor" />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-slate-600 mb-1">Valor Total (R$) *</label>
+                  <input type="number" min={0} step={0.01}
+                    value={nfForm.valor_total}
+                    onChange={e => setNfForm(p => ({ ...p, valor_total: Number(e.target.value) }))}
+                    className="input-base" />
+                </div>
+                <div className="flex items-end pb-0.5">
+                  <p className="text-[10px] text-slate-400">
+                    Pre-preenchido com custo estimado do transporte
+                  </p>
+                </div>
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-slate-600 mb-1">Descricao</label>
+                <textarea value={nfForm.descricao}
+                  onChange={e => setNfForm(p => ({ ...p, descricao: e.target.value }))}
+                  rows={2} className="input-base resize-none" />
+              </div>
+            </div>
+            <div className="px-6 py-4 border-t border-slate-100 flex justify-end gap-2">
+              <button onClick={() => setNfModal(null)}
+                className="px-4 py-2 rounded-xl border border-slate-200 text-sm font-semibold text-slate-600 hover:bg-slate-50">
+                Cancelar
+              </button>
+              <button onClick={handleSolicitarNF}
+                disabled={criarNF.isPending || atualizarStatus.isPending || !nfForm.fornecedor_nome || !nfForm.fornecedor_cnpj}
+                className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-amber-600 hover:bg-amber-700
+                  text-white text-sm font-semibold transition-colors disabled:opacity-60 shadow-sm">
+                {(criarNF.isPending || atualizarStatus.isPending) ? <Loader2 size={14} className="animate-spin" /> : <FileInput size={14} />}
+                Enviar ao Fiscal
               </button>
             </div>
           </div>
