@@ -56,9 +56,13 @@ import ContasReceber from './pages/financeiro/ContasReceber'
 import AprovacoesPagamento from './pages/financeiro/AprovacoesPagamento'
 import Conciliacao from './pages/financeiro/Conciliacao'
 import Relatorios from './pages/financeiro/Relatorios'
-import Fornecedores from './pages/financeiro/Fornecedores'
 import Configuracoes from './pages/financeiro/Configuracoes'
+
+// Módulo Fiscal
+import FiscalLayout from './components/FiscalLayout'
 import NotasFiscais from './pages/financeiro/NotasFiscais'
+import SolicitacaoNF from './pages/fiscal/SolicitacaoNF'
+import EmissaoNF from './pages/fiscal/EmissaoNF'
 
 // Módulo Estoque
 import EstoqueLayout from './components/EstoqueLayout'
@@ -116,9 +120,14 @@ export default function App() {
             <Route path="/financeiro/aprovacoes"   element={<AprovacoesPagamento />} />
             <Route path="/financeiro/conciliacao"  element={<Conciliacao />} />
             <Route path="/financeiro/relatorios"   element={<Relatorios />} />
-            <Route path="/financeiro/fornecedores"   element={<Fornecedores />} />
             <Route path="/financeiro/configuracoes" element={<Configuracoes />} />
-            <Route path="/financeiro/notas-fiscais" element={<NotasFiscais />} />
+          </Route>
+
+          {/* Módulo Fiscal: usa FiscalLayout */}
+          <Route element={<FiscalLayout />}>
+            <Route path="/fiscal"              element={<NotasFiscais />} />
+            <Route path="/fiscal/solicitacao"  element={<SolicitacaoNF />} />
+            <Route path="/fiscal/emissao"      element={<EmissaoNF />} />
           </Route>
 
           {/* Módulo Estoque: usa EstoqueLayout */}

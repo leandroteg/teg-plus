@@ -1,7 +1,7 @@
 import { NavLink, Outlet, useNavigate } from 'react-router-dom'
 import {
-  LayoutDashboard, Receipt, Landmark, FileCheck2,
-  BarChart3, LogOut, LayoutGrid, DollarSign, Settings,
+  ClipboardList, FileInput, FileOutput,
+  LogOut, LayoutGrid, Settings,
 } from 'lucide-react'
 import { useAuth, ROLE_LABEL, ROLE_COLOR } from '../contexts/AuthContext'
 import { useTheme } from '../contexts/ThemeContext'
@@ -9,13 +9,9 @@ import LogoTeg from './LogoTeg'
 import ThemeToggle from './ThemeToggle'
 
 const NAV = [
-  { to: '/financeiro',                icon: LayoutDashboard, label: 'Painel',          end: true  },
-  { to: '/financeiro/cp',             icon: Receipt,         label: 'Contas a Pagar',  end: false },
-  { to: '/financeiro/cr',             icon: DollarSign,      label: 'A Receber',       end: false },
-  { to: '/financeiro/aprovacoes',     icon: FileCheck2,      label: 'Aprovações',      end: false },
-  { to: '/financeiro/conciliacao',    icon: Landmark,        label: 'Conciliação',     end: false },
-  { to: '/financeiro/relatorios',     icon: BarChart3,       label: 'Relatórios',      end: false },
-  { to: '/financeiro/configuracoes',  icon: Settings,        label: 'Configurações',   end: false },
+  { to: '/fiscal',             icon: ClipboardList, label: 'Histórico NF',     end: true  },
+  { to: '/fiscal/solicitacao', icon: FileInput,     label: 'Solicitação NF',   end: false },
+  { to: '/fiscal/emissao',     icon: FileOutput,    label: 'Emissão NF',       end: false },
 ]
 
 const AVATAR_COLORS = [
@@ -35,7 +31,7 @@ function getInitials(name: string): string {
   return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
 }
 
-export default function FinanceiroLayout() {
+export default function FiscalLayout() {
   const { perfil, signOut, role } = useAuth()
   const { isDark, isLightSidebar } = useTheme()
   const navigate = useNavigate()
@@ -54,14 +50,14 @@ export default function FinanceiroLayout() {
   function sidebarLinkClass({ isActive }: { isActive: boolean }) {
     const base = 'flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold transition-all duration-150 border'
     if (isActive)
-      return `${base} ${ls ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-emerald-500/15 text-emerald-300 border-emerald-500/25'}`
+      return `${base} ${ls ? 'bg-amber-50 text-amber-700 border-amber-200' : 'bg-amber-500/15 text-amber-300 border-amber-500/25'}`
     return `${base} ${ls ? 'text-slate-500 hover:text-slate-800 hover:bg-slate-50 border-transparent' : 'text-slate-400 hover:text-slate-100 hover:bg-white/6 border-transparent'}`
   }
 
   function bottomLinkClass({ isActive }: { isActive: boolean }) {
     const base = 'flex flex-col items-center py-2 px-1.5 rounded-xl text-[9px] font-semibold transition-all duration-150 min-w-[40px]'
     if (isActive)
-      return `${base} ${ls ? 'text-emerald-600 bg-emerald-50' : 'text-emerald-400 bg-emerald-400/10'}`
+      return `${base} ${ls ? 'text-amber-600 bg-amber-50' : 'text-amber-400 bg-amber-400/10'}`
     return `${base} ${ls ? 'text-slate-400 hover:text-slate-600' : 'text-slate-500 hover:text-slate-300'}`
   }
 
@@ -86,19 +82,19 @@ export default function FinanceiroLayout() {
             onClick={() => navigate('/')}
             className={`w-full flex items-center gap-2.5 rounded-xl px-3 py-2.5 transition-all duration-150 group border
               ${ls
-                ? 'bg-emerald-50 border-emerald-200 hover:bg-emerald-100 hover:border-emerald-300'
-                : 'bg-emerald-500/10 border-emerald-500/25 hover:bg-emerald-500/18 hover:border-emerald-500/40'
+                ? 'bg-amber-50 border-amber-200 hover:bg-amber-100 hover:border-amber-300'
+                : 'bg-amber-500/10 border-amber-500/25 hover:bg-amber-500/18 hover:border-amber-500/40'
               }`}
             title="Trocar módulo"
           >
-            <span className="text-lg leading-none">💰</span>
+            <span className="text-lg leading-none">🧾</span>
             <div className="flex-1 text-left">
-              <p className={`text-xs font-bold leading-none ${ls ? 'text-emerald-700' : 'text-emerald-300'}`}>Financeiro</p>
-              <p className={`text-[9px] mt-0.5 ${ls ? 'text-emerald-500/60' : 'text-emerald-500/60'}`}>Módulo ativo</p>
+              <p className={`text-xs font-bold leading-none ${ls ? 'text-amber-700' : 'text-amber-300'}`}>Fiscal</p>
+              <p className={`text-[9px] mt-0.5 ${ls ? 'text-amber-500/60' : 'text-amber-500/60'}`}>Módulo ativo</p>
             </div>
             <LayoutGrid
               size={13}
-              className={`transition-colors shrink-0 ${ls ? 'text-emerald-400 group-hover:text-emerald-500' : 'text-emerald-500/50 group-hover:text-emerald-400'}`}
+              className={`transition-colors shrink-0 ${ls ? 'text-amber-400 group-hover:text-amber-500' : 'text-amber-500/50 group-hover:text-amber-400'}`}
             />
           </button>
         </div>
@@ -165,7 +161,7 @@ export default function FinanceiroLayout() {
           <div className="flex-1 min-w-0">
             <div className="flex items-baseline gap-1.5">
               <h1 className={`text-sm font-black leading-none ${ls ? 'text-slate-800' : 'text-white'}`}>TEG+</h1>
-              <span className={`text-[9px] font-semibold ${ls ? 'text-emerald-500' : 'text-emerald-400/70'}`}>Financeiro</span>
+              <span className={`text-[9px] font-semibold ${ls ? 'text-amber-500' : 'text-amber-400/70'}`}>Fiscal</span>
             </div>
           </div>
           <div className={`w-8 h-8 rounded-full flex items-center justify-center
@@ -192,10 +188,10 @@ export default function FinanceiroLayout() {
           style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
         >
           <div className="flex justify-around max-w-lg mx-auto px-1 py-1">
-            {NAV.slice(0, 6).map(({ to, icon: Icon, label, end }) => (
+            {NAV.map(({ to, icon: Icon, label, end }) => (
               <NavLink key={to} to={to} end={end} className={bottomLinkClass}>
                 <Icon className="w-5 h-5 mb-0.5" />
-                {label.length > 8 ? label.slice(0, 8) + '.' : label}
+                {label}
               </NavLink>
             ))}
           </div>
