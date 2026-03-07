@@ -96,6 +96,7 @@ import Telemetria from './pages/frotas/Telemetria'
 
 // Admin
 import AdminUsuarios from './pages/AdminUsuarios'
+import Desenvolvimento from './pages/Desenvolvimento'
 
 export default function App() {
   return (
@@ -231,6 +232,7 @@ export default function App() {
         <Route element={<AdminRoute />}>
           <Route element={<Layout />}>
             <Route path="/admin/usuarios" element={<AdminUsuarios />} />
+            <Route path="/admin/desenvolvimento" element={<Desenvolvimento />} />
           </Route>
         </Route>
       </Routes>

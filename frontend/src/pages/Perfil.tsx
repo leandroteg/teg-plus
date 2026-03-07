@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import {
   User, Mail, Briefcase, Building2, Shield, Lock,
   LogOut, Edit3, Check, X, ChevronRight,
-  AlertCircle, CheckCircle, Settings,
+  AlertCircle, CheckCircle, Settings, Code2,
 } from 'lucide-react'
 import {
   useAuth, ROLE_LABEL, ROLE_COLOR, ALCADA_LABEL, MODULOS_ERP, type Role,
@@ -447,7 +447,7 @@ export default function Perfil() {
           <Section title="Administração">
             <button
               onClick={() => navigate('/admin/usuarios')}
-              className="w-full flex items-center gap-3 px-4 py-3 hover:bg-slate-50 transition-colors text-left"
+              className="w-full flex items-center gap-3 px-4 py-3 hover:bg-slate-50 transition-colors text-left border-b border-slate-50"
             >
               <div className="w-8 h-8 rounded-lg bg-violet-100 flex items-center justify-center shrink-0">
                 <Settings size={15} className="text-violet-600" />
@@ -455,6 +455,19 @@ export default function Perfil() {
               <div className="flex-1">
                 <p className="text-sm font-semibold text-navy">Gerenciar Usuários</p>
                 <p className="text-xs text-slate-400">Convitar, editar roles e permissões</p>
+              </div>
+              <ChevronRight size={15} className="text-slate-300" />
+            </button>
+            <button
+              onClick={() => navigate('/admin/desenvolvimento')}
+              className="w-full flex items-center gap-3 px-4 py-3 hover:bg-slate-50 transition-colors text-left"
+            >
+              <div className="w-8 h-8 rounded-lg bg-indigo-100 flex items-center justify-center shrink-0">
+                <Code2 size={15} className="text-indigo-600" />
+              </div>
+              <div className="flex-1">
+                <p className="text-sm font-semibold text-navy">Desenvolvimento</p>
+                <p className="text-xs text-slate-400">Issues, specs AI e task management</p>
               </div>
               <ChevronRight size={15} className="text-slate-300" />
             </button>
