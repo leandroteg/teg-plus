@@ -26,11 +26,17 @@ export function useSuperTEG() {
 
   useEffect(() => {
     try {
-      sessionStorage.setItem('superteg-history', JSON.stringify(messages.slice(-20)))
+      if (messages.length === 0) {
+        sessionStorage.removeItem('superteg-history')
+      } else {
+        sessionStorage.setItem('superteg-history', JSON.stringify(messages.slice(-20)))
+      }
+      sessionStorage.setItem('superteg-session-id', sessionRef.current)
     } catch { /* storage cheio */ }
   }, [messages])
   const busyRef = useRef(false)
   const sessionRef = useRef(
+    sessionStorage.getItem('superteg-session-id') ??
     `web_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`
   )
 
@@ -86,6 +92,7 @@ export function useSuperTEG() {
   const clearMessages = useCallback(() => {
     setMessages([])
     sessionStorage.removeItem('superteg-history')
+    sessionStorage.removeItem('superteg-session-id')
     sessionRef.current = `web_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`
   }, [])
 
