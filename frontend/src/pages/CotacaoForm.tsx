@@ -420,7 +420,7 @@ export default function CotacaoForm() {
             <p className="text-xs font-bold text-amber-700 uppercase tracking-wide">Política da Categoria</p>
           </div>
           <p className="text-[11px] text-amber-800">
-            Categoria: <strong>{(cotacao.requisicao as any).categoria.replace(/_/g, ' ')}</strong>
+            Categoria: <strong>{(cotacao?.requisicao as any).categoria.replace(/_/g, ' ')}</strong>
             {' · '}Mínimo: <strong>{minCot} cotação{minCot > 1 ? 'ões' : ''}</strong> para valor {fmt(valorRef)}
           </p>
         </div>

@@ -219,8 +219,8 @@ export function useCalcularDepreciacao() {
 
       if (!imobs || imobs.length === 0) return
 
-      const registros = []
-      const updates = []
+      const registros: { imobilizado_id: any; competencia: string; valor_depreciacao: number; valor_anterior: any; valor_apos: number }[] = []
+      const updates: { id: any; valor_atual: number }[] = []
 
       for (const imob of imobs as any[]) {
         const mensal = (imob.valor_aquisicao * imob.taxa_depreciacao_anual) / 100 / 12

@@ -33,7 +33,7 @@ export default function Inventario() {
   const concluir = useConcluirInventario()
 
   async function handleAbrir() {
-    await abrirInventario.mutateAsync({ tipo, base_id: baseId || undefined, responsavel: responsavel || undefined })
+    await abrirInventario.mutateAsync({ tipo, base_id: baseId || undefined, responsavel: responsavel })
     setShowForm(false)
     setBaseId('')
     setResponsavel('')
