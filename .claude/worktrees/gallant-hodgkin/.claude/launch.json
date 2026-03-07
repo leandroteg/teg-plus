@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "teg-frontend",
+      "runtimeExecutable": "cmd",
+      "runtimeArgs": ["/c", "cd", "C:\\teg-plus\\frontend", "&&", "C:\\Users\\owner\\Documents\\nodejs\\npm.cmd", "run", "dev"],
+      "port": 5173
+    }
+  ]
+}
