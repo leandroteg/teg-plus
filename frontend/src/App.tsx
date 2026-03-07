@@ -2,6 +2,7 @@ import { Routes, Route } from 'react-router-dom'
 import { AuthProvider } from './contexts/AuthContext'
 import { ThemeProvider } from './contexts/ThemeContext'
 import { PrivateRoute, AdminRoute } from './components/PrivateRoute'
+import ModuleRoute from './components/ModuleRoute'
 import Layout from './components/Layout'
 
 // Páginas públicas
@@ -112,94 +113,112 @@ export default function App() {
           {/* Seletor de módulos: tela inicial (sem Layout) */}
           <Route path="/" element={<ModuloSelector />} />
 
-          {/* Módulo Financeiro: usa FinanceiroLayout */}
-          <Route element={<FinanceiroLayout />}>
-            <Route path="/financeiro"              element={<DashboardFinanceiro />} />
-            <Route path="/financeiro/cp"           element={<ContasPagar />} />
-            <Route path="/financeiro/cr"           element={<ContasReceber />} />
-            <Route path="/financeiro/aprovacoes"   element={<AprovacoesPagamento />} />
-            <Route path="/financeiro/conciliacao"  element={<Conciliacao />} />
-            <Route path="/financeiro/relatorios"   element={<Relatorios />} />
-            <Route path="/financeiro/configuracoes" element={<Configuracoes />} />
+          {/* Módulo Financeiro */}
+          <Route element={<ModuleRoute moduleKey="financeiro" />}>
+            <Route element={<FinanceiroLayout />}>
+              <Route path="/financeiro"              element={<DashboardFinanceiro />} />
+              <Route path="/financeiro/cp"           element={<ContasPagar />} />
+              <Route path="/financeiro/cr"           element={<ContasReceber />} />
+              <Route path="/financeiro/aprovacoes"   element={<AprovacoesPagamento />} />
+              <Route path="/financeiro/conciliacao"  element={<Conciliacao />} />
+              <Route path="/financeiro/relatorios"   element={<Relatorios />} />
+              <Route path="/financeiro/configuracoes" element={<Configuracoes />} />
+            </Route>
           </Route>
 
-          {/* Módulo Fiscal: usa FiscalLayout */}
-          <Route element={<FiscalLayout />}>
-            <Route path="/fiscal"              element={<NotasFiscais />} />
-            <Route path="/fiscal/solicitacao"  element={<SolicitacaoNF />} />
-            <Route path="/fiscal/emissao"      element={<EmissaoNF />} />
+          {/* Módulo Fiscal */}
+          <Route element={<ModuleRoute moduleKey="fiscal" />}>
+            <Route element={<FiscalLayout />}>
+              <Route path="/fiscal"              element={<NotasFiscais />} />
+              <Route path="/fiscal/solicitacao"  element={<SolicitacaoNF />} />
+              <Route path="/fiscal/emissao"      element={<EmissaoNF />} />
+            </Route>
           </Route>
 
-          {/* Módulo Estoque: usa EstoqueLayout */}
-          <Route element={<EstoqueLayout />}>
-            <Route path="/estoque"               element={<EstoqueHome />} />
-            <Route path="/estoque/itens"         element={<Itens />} />
-            <Route path="/estoque/movimentacoes" element={<Movimentacoes />} />
-            <Route path="/estoque/inventario"    element={<Inventario />} />
-            <Route path="/estoque/patrimonial"   element={<Patrimonial />} />
+          {/* Módulo Estoque */}
+          <Route element={<ModuleRoute moduleKey="estoque" />}>
+            <Route element={<EstoqueLayout />}>
+              <Route path="/estoque"               element={<EstoqueHome />} />
+              <Route path="/estoque/itens"         element={<Itens />} />
+              <Route path="/estoque/movimentacoes" element={<Movimentacoes />} />
+              <Route path="/estoque/inventario"    element={<Inventario />} />
+              <Route path="/estoque/patrimonial"   element={<Patrimonial />} />
+            </Route>
           </Route>
 
-          {/* Módulo Logística: usa LogisticaLayout */}
-          <Route element={<LogisticaLayout />}>
-            <Route path="/logistica"                   element={<LogisticaHome />} />
-            <Route path="/logistica/solicitacoes"      element={<Solicitacoes />} />
-            <Route path="/logistica/expedicao"         element={<Expedicao />} />
-            <Route path="/logistica/transportes"       element={<TransportesLog />} />
-            <Route path="/logistica/recebimentos"      element={<Recebimentos />} />
-            <Route path="/logistica/transportadoras"   element={<TransportadorasLog />} />
+          {/* Módulo Logística */}
+          <Route element={<ModuleRoute moduleKey="logistica" />}>
+            <Route element={<LogisticaLayout />}>
+              <Route path="/logistica"                   element={<LogisticaHome />} />
+              <Route path="/logistica/solicitacoes"      element={<Solicitacoes />} />
+              <Route path="/logistica/expedicao"         element={<Expedicao />} />
+              <Route path="/logistica/transportes"       element={<TransportesLog />} />
+              <Route path="/logistica/recebimentos"      element={<Recebimentos />} />
+              <Route path="/logistica/transportadoras"   element={<TransportadorasLog />} />
+            </Route>
           </Route>
 
-          {/* Módulo Frotas: usa FrotasLayout */}
-          <Route element={<FrotasLayout />}>
-            <Route path="/frotas"                      element={<FrotasHome />} />
-            <Route path="/frotas/veiculos"             element={<Veiculos />} />
-            <Route path="/frotas/ordens"               element={<Ordens />} />
-            <Route path="/frotas/checklists"           element={<Checklists />} />
-            <Route path="/frotas/abastecimentos"       element={<Abastecimentos />} />
-            <Route path="/frotas/telemetria"           element={<Telemetria />} />
+          {/* Módulo Frotas */}
+          <Route element={<ModuleRoute moduleKey="frotas" />}>
+            <Route element={<FrotasLayout />}>
+              <Route path="/frotas"                      element={<FrotasHome />} />
+              <Route path="/frotas/veiculos"             element={<Veiculos />} />
+              <Route path="/frotas/ordens"               element={<Ordens />} />
+              <Route path="/frotas/checklists"           element={<Checklists />} />
+              <Route path="/frotas/abastecimentos"       element={<Abastecimentos />} />
+              <Route path="/frotas/telemetria"           element={<Telemetria />} />
+            </Route>
           </Route>
 
-          {/* Módulo RH: usa RHLayout */}
-          <Route element={<RHLayout />}>
-            <Route path="/rh"        element={<RHHome />} />
-            <Route path="/rh/mural"  element={<MuralAdmin />} />
+          {/* Módulo RH */}
+          <Route element={<ModuleRoute moduleKey="rh" />}>
+            <Route element={<RHLayout />}>
+              <Route path="/rh"        element={<RHHome />} />
+              <Route path="/rh/mural"  element={<MuralAdmin />} />
+            </Route>
           </Route>
 
-          {/* Módulo Contratos: usa ContratosLayout */}
-          <Route element={<ContratosLayout />}>
-            <Route path="/contratos"            element={<DashboardContratos />} />
-            <Route path="/contratos/lista"      element={<ListaContratos />} />
-            <Route path="/contratos/novo"       element={<NovoContrato />} />
-            <Route path="/contratos/parcelas"   element={<ParcelasContratos />} />
+          {/* Módulo Contratos */}
+          <Route element={<ModuleRoute moduleKey="contratos" />}>
+            <Route element={<ContratosLayout />}>
+              <Route path="/contratos"            element={<DashboardContratos />} />
+              <Route path="/contratos/lista"      element={<ListaContratos />} />
+              <Route path="/contratos/novo"       element={<NovoContrato />} />
+              <Route path="/contratos/parcelas"   element={<ParcelasContratos />} />
+            </Route>
           </Route>
 
           {/* Módulo Cadastros (Configurações Gerais) */}
-          <Route element={<CadastrosLayout />}>
-            <Route path="/cadastros"                element={<CadastrosHome />} />
-            <Route path="/cadastros/fornecedores"   element={<FornecedoresCad />} />
-            <Route path="/cadastros/itens"          element={<ItensCad />} />
-            <Route path="/cadastros/classes"        element={<ClassesFinanceiras />} />
-            <Route path="/cadastros/centros-custo"  element={<CentrosCusto />} />
-            <Route path="/cadastros/obras"          element={<ObrasCad />} />
-            <Route path="/cadastros/colaboradores"  element={<ColaboradoresCad />} />
-            <Route path="/cadastros/empresas"       element={<EmpresasCad />} />
-            <Route path="/cadastros/grupos"          element={<GruposFinanceiros />} />
-            <Route path="/cadastros/categorias"      element={<CategoriasFinanceiras />} />
+          <Route element={<ModuleRoute moduleKey="cadastros" />}>
+            <Route element={<CadastrosLayout />}>
+              <Route path="/cadastros"                element={<CadastrosHome />} />
+              <Route path="/cadastros/fornecedores"   element={<FornecedoresCad />} />
+              <Route path="/cadastros/itens"          element={<ItensCad />} />
+              <Route path="/cadastros/classes"        element={<ClassesFinanceiras />} />
+              <Route path="/cadastros/centros-custo"  element={<CentrosCusto />} />
+              <Route path="/cadastros/obras"          element={<ObrasCad />} />
+              <Route path="/cadastros/colaboradores"  element={<ColaboradoresCad />} />
+              <Route path="/cadastros/empresas"       element={<EmpresasCad />} />
+              <Route path="/cadastros/grupos"          element={<GruposFinanceiros />} />
+              <Route path="/cadastros/categorias"      element={<CategoriasFinanceiras />} />
+            </Route>
           </Route>
 
           {/* Módulos stub */}
           <Route path="/ssma"       element={<SSMA />} />
 
-          {/* Módulo Compras: usa sidebar/Layout */}
-          <Route element={<Layout />}>
-            <Route path="/compras"     element={<Dashboard />} />
-            <Route path="/nova"        element={<NovaRequisicao />} />
-            <Route path="/requisicoes" element={<ListaRequisicoes />} />
-            <Route path="/requisicoes/:id" element={<RequisicaoDetalhe />} />
-            <Route path="/cotacoes"    element={<FilaCotacoes />} />
-            <Route path="/cotacoes/:id" element={<CotacaoForm />} />
-            <Route path="/pedidos"     element={<Pedidos />} />
-            <Route path="/perfil"      element={<Perfil />} />
+          {/* Módulo Compras */}
+          <Route element={<ModuleRoute moduleKey="compras" />}>
+            <Route element={<Layout />}>
+              <Route path="/compras"     element={<Dashboard />} />
+              <Route path="/nova"        element={<NovaRequisicao />} />
+              <Route path="/requisicoes" element={<ListaRequisicoes />} />
+              <Route path="/requisicoes/:id" element={<RequisicaoDetalhe />} />
+              <Route path="/cotacoes"    element={<FilaCotacoes />} />
+              <Route path="/cotacoes/:id" element={<CotacaoForm />} />
+              <Route path="/pedidos"     element={<Pedidos />} />
+              <Route path="/perfil"      element={<Perfil />} />
+            </Route>
           </Route>
         </Route>
 
