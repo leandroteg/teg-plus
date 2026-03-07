@@ -1,8 +1,9 @@
 import { useState, useCallback, useRef } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 
-const N8N_URL = import.meta.env.VITE_N8N_URL || 'https://teg-agents-n8n.nmmcas.easypanel.host'
-const WEBHOOK_PATH = '/webhook/superteg/chat'
+const WEBHOOK_URL =
+  import.meta.env.VITE_SUPERTEG_WEBHOOK_URL ||
+  'https://teg-agents-n8n.nmmcas.easypanel.host/webhook/superteg/chat'
 
 // ── Types ───────────────────────────────────────────────────────────────────────
 
@@ -19,15 +20,17 @@ export function useSuperTEG() {
   const { perfil } = useAuth()
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [isLoading, setIsLoading] = useState(false)
+  const busyRef = useRef(false)
   const sessionRef = useRef(
     `web_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`
   )
 
   const sendMessage = useCallback(
     async (text: string) => {
-      if (!text.trim() || isLoading) return
+      if (!text.trim() || busyRef.current) return
+      busyRef.current = true
+      setIsLoading(true)
 
-      // Add user message immediately
       const userMsg: ChatMessage = {
         id: `u_${Date.now()}`,
         role: 'user',
@@ -35,10 +38,9 @@ export function useSuperTEG() {
         timestamp: new Date().toISOString(),
       }
       setMessages(prev => [...prev, userMsg])
-      setIsLoading(true)
 
       try {
-        const res = await fetch(`${N8N_URL}${WEBHOOK_PATH}`, {
+        const res = await fetch(WEBHOOK_URL, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -48,40 +50,28 @@ export function useSuperTEG() {
           }),
         })
 
-        if (!res.ok) throw new Error(`HTTP ${res.status}`)
+        const raw = await res.json()
+        const data = Array.isArray(raw) ? raw[0] : raw
 
-        const data = await res.json()
-
-        // Handle both direct response and array response from n8n
-        const resposta =
-          Array.isArray(data)
-            ? data[0]?.resposta || data[0]?.output || data[0]?.text
-            : data.resposta || data.output || data.text
-
-        const botMsg: ChatMessage = {
+        setMessages(prev => [...prev, {
           id: `a_${Date.now()}`,
           role: 'assistant',
-          content:
-            resposta || 'Desculpe, não consegui processar sua mensagem.',
-          timestamp:
-            (Array.isArray(data) ? data[0]?.timestamp : data.timestamp) ||
-            new Date().toISOString(),
-        }
-        setMessages(prev => [...prev, botMsg])
+          content: data?.resposta || data?.output || data?.text || 'Sem resposta.',
+          timestamp: data?.timestamp || new Date().toISOString(),
+        }])
       } catch {
-        const errorMsg: ChatMessage = {
+        setMessages(prev => [...prev, {
           id: `e_${Date.now()}`,
           role: 'assistant',
-          content:
-            '⚠️ Não foi possível conectar ao SuperTEG. Tente novamente em instantes.',
+          content: '⚠️ Não foi possível conectar ao SuperTEG. Tente novamente.',
           timestamp: new Date().toISOString(),
-        }
-        setMessages(prev => [...prev, errorMsg])
+        }])
       } finally {
+        busyRef.current = false
         setIsLoading(false)
       }
     },
-    [perfil, isLoading]
+    [perfil]
   )
 
   const clearMessages = useCallback(() => {
