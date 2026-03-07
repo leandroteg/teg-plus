@@ -1,11 +1,10 @@
 import { NavLink, Outlet, useNavigate } from 'react-router-dom'
-import { LayoutGrid, LogOut, Shield, Settings, ChevronLeft, Menu, X } from 'lucide-react'
+import { LayoutGrid, LogOut, Shield, Settings, ChevronLeft, Menu, X, User } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useAuth, ROLE_LABEL, ROLE_COLOR } from '../contexts/AuthContext'
 import { useTheme } from '../contexts/ThemeContext'
 import LogoTeg from './LogoTeg'
-import ThemeToggle from './ThemeToggle'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -32,12 +31,10 @@ export interface ModuleConfig {
   mobileNav?: NavItem[]
   variant?: 'full' | 'compact'
   showCadastrosLink?: boolean
-  showAdminLink?: boolean
   maxWidth?: string
   moduleSubtitle?: string
   mobileModuleName?: string
   backRoute?: string | number
-  profileRoute?: string
   bottomNavCompact?: boolean
   truncateBottomLabels?: boolean
   bottomNavMaxItems?: number
@@ -237,21 +234,37 @@ const ACCENT_CLASSES: Record<string, AccentClasses> = {
 export default function ModuleLayout({
   variant = 'full',
   showCadastrosLink = true,
-  showAdminLink = false,
   maxWidth = 'max-w-5xl',
   moduleSubtitle = 'Módulo ativo',
   mobileModuleName,
   backRoute = '/',
-  profileRoute,
   bottomNavCompact = true,
   truncateBottomLabels = false,
   bottomNavMaxItems,
   ...config
 }: ModuleConfig) {
   const { perfil, isAdmin, signOut, role } = useAuth()
-  const { isDark, isLightSidebar } = useTheme()
+  const { isDark, isLightSidebar, theme, setTheme } = useTheme()
   const navigate = useNavigate()
   const [drawerOpen, setDrawerOpen] = useState(false)
+  const [avatarOpen, setAvatarOpen] = useState(false)
+
+  // Close avatar dropdown on click outside or Escape
+  useEffect(() => {
+    if (!avatarOpen) return
+    function onClickOutside(e: MouseEvent) {
+      if (!(e.target as HTMLElement).closest('[data-avatar-menu]')) setAvatarOpen(false)
+    }
+    function onEscape(e: KeyboardEvent) {
+      if (e.key === 'Escape') setAvatarOpen(false)
+    }
+    document.addEventListener('mousedown', onClickOutside)
+    document.addEventListener('keydown', onEscape)
+    return () => {
+      document.removeEventListener('mousedown', onClickOutside)
+      document.removeEventListener('keydown', onEscape)
+    }
+  }, [avatarOpen])
 
   const ls = isLightSidebar
   const a = ACCENT_CLASSES[config.accent] ?? ACCENT_CLASSES.teal
@@ -360,6 +373,124 @@ export default function ModuleLayout({
     )
   }
 
+  // ── Avatar + Dropdown ──────────────────────────────────────────────────────
+
+  const THEME_OPTS = [
+    { value: 'original' as const, icon: '🖥️', label: 'Auto' },
+    { value: 'dark' as const, icon: '🌙', label: 'Dark' },
+    { value: 'light' as const, icon: '☀️', label: 'Light' },
+  ]
+
+  function renderAvatarButton(size: 'sm' | 'md' = 'md') {
+    const dim = size === 'sm' ? 'w-8 h-8 text-[11px]' : 'w-9 h-9 text-xs'
+    return (
+      <button
+        onClick={() => setAvatarOpen(o => !o)}
+        className={[
+          dim, 'rounded-full flex items-center justify-center',
+          'text-white font-extrabold shrink-0 ring-2 transition-all duration-200',
+          'hover:scale-105 active:scale-95 cursor-pointer select-none',
+          avatarBg,
+          ls ? 'ring-slate-200/60 hover:ring-slate-300' : 'ring-white/10 hover:ring-white/25',
+          avatarOpen ? (ls ? 'ring-slate-400 scale-105' : 'ring-white/40 scale-105') : '',
+        ].join(' ')}
+        title={`${nome} · ${ROLE_LABEL[role]}`}
+      >
+        {initials}
+      </button>
+    )
+  }
+
+  function renderAvatarDropdown(position: 'sidebar' | 'header' = 'sidebar') {
+    if (!avatarOpen) return null
+    const pos = position === 'sidebar'
+      ? 'absolute right-0 top-12 z-[100]'
+      : 'absolute right-0 top-full mt-2 z-[100]'
+
+    return (
+      <div
+        className={[
+          pos, 'w-60 rounded-2xl border overflow-hidden',
+          'shadow-xl transition-all',
+          ls
+            ? 'bg-white border-slate-200/80 shadow-slate-200/40'
+            : 'bg-[#111827] border-white/10 shadow-black/50',
+        ].join(' ')}
+        style={{ animation: 'fadeSlideIn 150ms ease-out' }}
+      >
+        {/* ── User info ── */}
+        <div className={`px-4 pt-3.5 pb-3 border-b ${ls ? 'border-slate-100' : 'border-white/[0.06]'}`}>
+          <div className="flex items-center gap-3">
+            <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white text-sm font-extrabold shrink-0 ${avatarBg}`}>
+              {initials}
+            </div>
+            <div className="min-w-0">
+              <p className={`text-[13px] font-semibold truncate ${ls ? 'text-slate-800' : 'text-slate-100'}`}>{nome}</p>
+              <span className={`text-[11px] font-medium ${ROLE_COLOR[role].text}`}>{ROLE_LABEL[role]}</span>
+            </div>
+          </div>
+        </div>
+
+        {/* ── Links ── */}
+        <div className="py-1">
+          <button
+            onClick={() => { setAvatarOpen(false); navigate('/perfil') }}
+            className={`w-full flex items-center gap-3 px-4 py-2.5 text-[13px] font-medium transition-colors
+              ${ls ? 'text-slate-600 hover:bg-slate-50 hover:text-slate-900' : 'text-slate-300 hover:bg-white/[0.04] hover:text-white'}`}
+          >
+            <User size={15} className="shrink-0 opacity-50" />
+            Meu Perfil
+          </button>
+
+          {isAdmin && (
+            <button
+              onClick={() => { setAvatarOpen(false); navigate('/admin/usuarios') }}
+              className={`w-full flex items-center gap-3 px-4 py-2.5 text-[13px] font-medium transition-colors
+                ${ls ? 'text-slate-600 hover:bg-slate-50 hover:text-slate-900' : 'text-slate-300 hover:bg-white/[0.04] hover:text-white'}`}
+            >
+              <Shield size={15} className="shrink-0 opacity-50" />
+              Administração
+            </button>
+          )}
+        </div>
+
+        {/* ── Theme switcher ── */}
+        <div className={`px-3 py-2.5 border-t ${ls ? 'border-slate-100' : 'border-white/[0.06]'}`}>
+          <div className={`flex items-center gap-0.5 p-0.5 rounded-lg border w-full
+            ${ls ? 'bg-slate-100/80 border-slate-200' : 'bg-white/5 border-white/[0.06]'}`}>
+            {THEME_OPTS.map(({ value, icon, label }) => (
+              <button
+                key={value}
+                onClick={() => setTheme(value)}
+                className={[
+                  'flex-1 flex items-center justify-center gap-1 rounded-md px-1.5 py-1.5 text-[10px] font-semibold transition-all duration-150',
+                  theme === value
+                    ? ls ? 'bg-white text-slate-700 shadow-sm' : 'bg-white/10 text-white shadow-sm'
+                    : ls ? 'text-slate-400 hover:text-slate-600' : 'text-slate-500 hover:text-slate-300',
+                ].join(' ')}
+              >
+                <span className="text-[11px]">{icon}</span>
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* ── Logout ── */}
+        <div className={`border-t ${ls ? 'border-slate-100' : 'border-white/[0.06]'}`}>
+          <button
+            onClick={handleLogout}
+            className={`w-full flex items-center gap-3 px-4 py-2.5 text-[13px] font-medium transition-colors
+              ${ls ? 'text-red-500 hover:bg-red-50' : 'text-red-400 hover:bg-red-500/10'}`}
+          >
+            <LogOut size={15} className="shrink-0 opacity-60" />
+            Sair
+          </button>
+        </div>
+      </div>
+    )
+  }
+
   // ══════════════════════════════════════════════════════════════════════════════
   //  COMPACT VARIANT  (Frotas, RH — md breakpoint, drawer mobile, no user card)
   // ══════════════════════════════════════════════════════════════════════════════
@@ -400,10 +531,13 @@ export default function ModuleLayout({
             {renderCadastrosLink()}
           </nav>
 
-          {/* Theme toggle + Footer */}
+          {/* Avatar + Footer */}
           <div className="mt-auto space-y-3">
-            <ThemeToggle variant={ls ? 'light' : 'dark'} compact />
-            <div className={`pt-4 border-t ${ls ? 'border-slate-100' : 'border-white/5'}`}>
+            <div className="relative flex justify-center" data-avatar-menu>
+              {renderAvatarButton('sm')}
+              {renderAvatarDropdown()}
+            </div>
+            <div className={`pt-3 border-t ${ls ? 'border-slate-100' : 'border-white/5'}`}>
               <p className={`text-[10px] text-center ${ls ? 'text-slate-400' : 'text-slate-600'}`}>
                 TEG+ ERP · {headerModuleName}
               </p>
@@ -425,9 +559,15 @@ export default function ModuleLayout({
                 {headerModuleName}
               </span>
             </div>
-            <button onClick={() => setDrawerOpen(o => !o)} className={`${ls ? 'text-slate-500 hover:text-slate-700' : 'text-slate-400 hover:text-white'}`}>
-              {drawerOpen ? <X size={20} /> : <Menu size={20} />}
-            </button>
+            <div className="flex items-center gap-2">
+              <div className="relative" data-avatar-menu>
+                {renderAvatarButton('sm')}
+                {renderAvatarDropdown('header')}
+              </div>
+              <button onClick={() => setDrawerOpen(o => !o)} className={`${ls ? 'text-slate-500 hover:text-slate-700' : 'text-slate-400 hover:text-white'}`}>
+                {drawerOpen ? <X size={20} /> : <Menu size={20} />}
+              </button>
+            </div>
           </header>
 
           {/* Mobile drawer */}
@@ -494,9 +634,13 @@ export default function ModuleLayout({
           {/* Logo + wordmark */}
           <div className="flex items-center gap-3 mb-4">
             <LogoTeg size={38} animated={false} />
-            <div>
+            <div className="flex-1 min-w-0">
               <p className={`font-black text-lg tracking-tight leading-none ${ls ? 'text-slate-800' : 'text-white'}`}>TEG+</p>
               <p className={`text-[10px] font-medium mt-0.5 ${ls ? 'text-slate-400' : 'text-slate-500'}`}>ERP Sistema</p>
+            </div>
+            <div className="relative" data-avatar-menu>
+              {renderAvatarButton()}
+              {renderAvatarDropdown()}
             </div>
           </div>
 
@@ -527,75 +671,8 @@ export default function ModuleLayout({
           {config.navSections ? renderSectionedNav() : renderNavItems()}
           {renderCadastrosLink()}
 
-          {/* Admin link */}
-          {showAdminLink && isAdmin && (
-            <>
-              <div className={`h-px mx-2 my-2 ${ls ? 'bg-slate-100' : 'bg-white/[0.05]'}`} />
-              <NavLink
-                to="/admin/usuarios"
-                className={({ isActive }) =>
-                  `flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold
-                  transition-all duration-150 border
-                  ${isActive
-                    ? ls ? 'bg-amber-50 text-amber-700 border-amber-200' : 'bg-amber-500/12 text-amber-300 border-amber-500/25'
-                    : ls ? 'text-slate-500 hover:text-slate-700 hover:bg-slate-50 border-transparent' : 'text-slate-500 hover:text-slate-300 hover:bg-white/5 border-transparent'
-                  }`
-                }
-              >
-                <Shield size={16} className="shrink-0" />
-                <span>Administração</span>
-              </NavLink>
-            </>
-          )}
         </nav>
 
-        {/* ── Theme toggle ──────────────────────────────────── */}
-        <div className={`px-3 py-2 border-t ${ls ? 'border-slate-100' : 'border-white/[0.06]'}`}>
-          <ThemeToggle variant={ls ? 'light' : 'dark'} />
-        </div>
-
-        {/* ── Bottom: user card + logout ─────────────────────── */}
-        <div className={`px-3 pb-4 pt-2 border-t ${ls ? 'border-slate-100' : 'border-white/[0.06]'}`}>
-          <div className={`flex items-center gap-2.5 px-2 py-2.5 rounded-xl transition-colors ${ls ? 'hover:bg-slate-50' : 'hover:bg-white/4'}`}>
-            {profileRoute ? (
-              <button
-                onClick={() => navigate(profileRoute)}
-                className={`w-9 h-9 rounded-full flex items-center justify-center
-                  text-white text-xs font-extrabold shrink-0 ring-2
-                  transition-transform active:scale-90 ${avatarBg} ${ls ? 'ring-slate-200' : 'ring-white/10'}`}
-                title="Ver perfil"
-              >
-                {initials}
-              </button>
-            ) : (
-              <div className={`w-9 h-9 rounded-full flex items-center justify-center
-                text-white text-xs font-extrabold shrink-0 ring-2 ${ls ? 'ring-slate-200' : 'ring-white/10'} ${avatarBg}`}>
-                {initials}
-              </div>
-            )}
-
-            <div className="flex-1 min-w-0">
-              <p className={`text-[13px] font-semibold truncate leading-none ${ls ? 'text-slate-700' : 'text-slate-200'}`}>
-                {firstName}
-              </p>
-              <span
-                className={`text-[10px] font-medium mt-0.5 inline-block
-                  ${ROLE_COLOR[role].text}`}
-              >
-                {ROLE_LABEL[role]}
-              </span>
-            </div>
-
-            <button
-              onClick={handleLogout}
-              className={`w-7 h-7 rounded-lg flex items-center justify-center transition-all shrink-0
-                ${ls ? 'bg-slate-100 text-slate-400 hover:text-red-500 hover:bg-red-50' : 'bg-white/5 text-slate-500 hover:text-red-400 hover:bg-red-400/10'}`}
-              title="Sair"
-            >
-              <LogOut size={13} />
-            </button>
-          </div>
-        </div>
       </aside>
 
       {/* ══════════════════════════════════════════════════════════════
@@ -622,33 +699,11 @@ export default function ModuleLayout({
             </div>
           </div>
 
-          {/* Avatar */}
-          {profileRoute ? (
-            <button
-              onClick={() => navigate(profileRoute)}
-              className={`w-8 h-8 rounded-full flex items-center justify-center
-                text-white text-xs font-extrabold ring-2
-                shrink-0 transition-transform active:scale-90 ${avatarBg} ${ls ? 'ring-slate-200' : 'ring-white/10'}`}
-              title={`${nome} · ${ROLE_LABEL[role]}`}
-            >
-              {initials}
-            </button>
-          ) : (
-            <div className={`w-8 h-8 rounded-full flex items-center justify-center
-              text-white text-xs font-extrabold ring-2 ${ls ? 'ring-slate-200' : 'ring-white/10'} ${avatarBg}`}>
-              {initials}
-            </div>
-          )}
-
-          {/* Logout */}
-          <button
-            onClick={handleLogout}
-            className={`w-7 h-7 rounded-lg flex items-center justify-center transition-all shrink-0
-              ${ls ? 'bg-slate-100 text-slate-400 hover:text-slate-600 hover:bg-slate-200' : 'bg-white/10 text-slate-400 hover:text-white hover:bg-white/20'}`}
-            title="Sair"
-          >
-            <LogOut size={13} />
-          </button>
+          {/* Avatar dropdown */}
+          <div className="relative" data-avatar-menu>
+            {renderAvatarButton('sm')}
+            {renderAvatarDropdown('header')}
+          </div>
         </header>
 
         {/* ── Page content ─────────────────────────────────────── */}

@@ -113,6 +113,9 @@ export default function App() {
           {/* Seletor de módulos: tela inicial (sem Layout) */}
           <Route path="/" element={<ModuloSelector />} />
 
+          {/* Global: Perfil (accessible from avatar dropdown in any module) */}
+          <Route path="/perfil" element={<Perfil />} />
+
           {/* Módulo Financeiro */}
           <Route element={<ModuleRoute moduleKey="financeiro" />}>
             <Route element={<FinanceiroLayout />}>
@@ -217,7 +220,6 @@ export default function App() {
               <Route path="/cotacoes"    element={<FilaCotacoes />} />
               <Route path="/cotacoes/:id" element={<CotacaoForm />} />
               <Route path="/pedidos"     element={<Pedidos />} />
-              <Route path="/perfil"      element={<Perfil />} />
             </Route>
           </Route>
         </Route>
