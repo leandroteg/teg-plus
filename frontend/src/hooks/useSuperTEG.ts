@@ -1,9 +1,7 @@
 import { useState, useCallback, useRef } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 
-const WEBHOOK_URL =
-  import.meta.env.VITE_SUPERTEG_WEBHOOK_URL ||
-  'https://teg-agents-n8n.nmmcas.easypanel.host/webhook/superteg/chat'
+const WEBHOOK_URL = 'https://teg-agents-n8n.nmmcas.easypanel.host/webhook/superteg/chat'
 
 // ── Types ───────────────────────────────────────────────────────────────────────
 
