@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useState, useEffect } from 'react'
+import { useNavigate, useLocation } from 'react-router-dom'
 import {
   DollarSign, TrendingDown, TrendingUp, AlertTriangle,
   Clock, CheckCircle2, RefreshCw, ArrowRight,
@@ -53,7 +53,12 @@ const ACTIONS = [
 // ── Component ────────────────────────────────────────────────────────────────
 export default function DashboardFinanceiro() {
   const nav = useNavigate()
+  const location = useLocation()
   const [periodo, setPeriodo] = useState('30d')
+
+  useEffect(() => {
+    setPeriodo('30d')
+  }, [location.key])
   const { data, isLoading, refetch } = useFinanceiroDashboard(periodo)
 
   const kpis = data?.kpis ?? EMPTY_KPIS
