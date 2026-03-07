@@ -40,13 +40,16 @@ export interface Pedido {
   numero_pedido?: string
   fornecedor_nome: string
   valor_total?: number
-  status: 'emitido' | 'confirmado' | 'em_entrega' | 'entregue' | 'cancelado'
+  status: 'emitido' | 'confirmado' | 'em_entrega' | 'parcialmente_recebido' | 'entregue' | 'cancelado'
   data_pedido?: string
   data_prevista_entrega?: string
   data_entrega_real?: string
   nf_numero?: string
   observacoes?: string
   created_at: string
+  // Recebimento tracking
+  qtd_itens_total?: number
+  qtd_itens_recebidos?: number
   // Payment flow fields
   status_pagamento?: 'liberado' | 'pago' | null
   liberado_pagamento_em?: string

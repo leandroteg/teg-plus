@@ -17,7 +17,7 @@ export type TipoMovimentacao =
 export type StatusSolicitacao = 'aberta' | 'aprovada' | 'em_separacao' | 'atendida' | 'parcial' | 'cancelada'
 export type TipoInventario = 'ciclico' | 'periodico' | 'surpresa'
 export type StatusInventario = 'aberto' | 'em_contagem' | 'concluido' | 'cancelado'
-export type StatusImobilizado = 'ativo' | 'em_manutencao' | 'cedido' | 'baixado' | 'em_transferencia'
+export type StatusImobilizado = 'ativo' | 'em_manutencao' | 'cedido' | 'baixado' | 'em_transferencia' | 'pendente_registro'
 
 // ── Bases ─────────────────────────────────────────────────────────────────────
 export interface EstBase {
@@ -305,4 +305,53 @@ export interface PatrimonialKPIs {
   imobilizados_cedidos: number
   imobilizados_depreciados: number  // 100% depreciados
   termos_pendentes: number
+}
+
+// =============================================================================
+// Recebimento Types (Compras ↔ Estoque ↔ Patrimonial)
+// =============================================================================
+
+export type TipoDestino = 'consumo' | 'patrimonial'
+
+export interface CmpRecebimento {
+  id: string
+  pedido_id: string
+  base_id?: string
+  recebido_por?: string
+  nf_numero?: string
+  nf_chave?: string
+  data_recebimento: string
+  observacao?: string
+  created_at: string
+  // Joins
+  base?: Pick<EstBase, 'codigo' | 'nome'>
+  itens?: CmpRecebimentoItem[]
+}
+
+export interface CmpRecebimentoItem {
+  id: string
+  recebimento_id: string
+  requisicao_item_id?: string
+  item_estoque_id?: string
+  descricao: string
+  quantidade_esperada: number
+  quantidade_recebida: number
+  valor_unitario: number
+  lote?: string
+  numero_serie?: string
+  data_validade?: string
+  tipo_destino: TipoDestino
+}
+
+export interface RecebimentoItemForm {
+  requisicao_item_id?: string
+  item_estoque_id?: string
+  descricao: string
+  quantidade_esperada: number
+  quantidade_recebida: number
+  valor_unitario: number
+  lote?: string
+  numero_serie?: string
+  data_validade?: string
+  tipo_destino: TipoDestino
 }

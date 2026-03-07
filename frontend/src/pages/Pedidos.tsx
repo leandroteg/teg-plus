@@ -9,6 +9,7 @@ import { usePedidos, useAtualizarPedido, useLiberarPagamento } from '../hooks/us
 import { useAnexosPedido, useUploadAnexo, useCotacaoDocs, TIPO_LABEL } from '../hooks/useAnexos'
 import type { PedidoAnexo } from '../hooks/useAnexos'
 import FluxoTimeline from '../components/FluxoTimeline'
+import RecebimentoModal from '../components/RecebimentoModal'
 import type { Pedido } from '../types'
 
 // ─── Formatters ──────────────────────────────────────────────────────────────
@@ -30,21 +31,23 @@ function diasRestantes(data?: string): number | null {
 // ─── Status config ────────────────────────────────────────────────────────────
 
 const STATUS_TABS = [
-  { value: '',                    label: 'Todos'              },
-  { value: 'emitido',             label: 'Emitidos'           },
-  { value: 'confirmado',          label: 'Confirmados'        },
-  { value: 'em_entrega',          label: 'Em Entrega'         },
-  { value: 'entregue',            label: 'Entregues'          },
-  { value: 'liberado_pagamento',  label: 'Aguard. Pagamento'  },
-  { value: 'pago',                label: 'Pagos'              },
+  { value: '',                         label: 'Todos'              },
+  { value: 'emitido',                  label: 'Emitidos'           },
+  { value: 'confirmado',               label: 'Confirmados'        },
+  { value: 'em_entrega',               label: 'Em Entrega'         },
+  { value: 'parcialmente_recebido',    label: 'Parcial'            },
+  { value: 'entregue',                 label: 'Entregues'          },
+  { value: 'liberado_pagamento',       label: 'Aguard. Pagamento'  },
+  { value: 'pago',                     label: 'Pagos'              },
 ]
 
 const statusConfig: Record<string, { bg: string; text: string; label: string }> = {
-  emitido:    { bg: 'bg-cyan-100',    text: 'text-cyan-700',    label: 'Emitido'    },
-  confirmado: { bg: 'bg-blue-100',    text: 'text-blue-700',    label: 'Confirmado' },
-  em_entrega: { bg: 'bg-teal-100',    text: 'text-teal-700',    label: 'Em Entrega' },
-  entregue:   { bg: 'bg-emerald-100', text: 'text-emerald-700', label: 'Entregue'   },
-  cancelado:  { bg: 'bg-gray-100',    text: 'text-gray-500',    label: 'Cancelado'  },
+  emitido:                 { bg: 'bg-cyan-100',    text: 'text-cyan-700',    label: 'Emitido'    },
+  confirmado:              { bg: 'bg-blue-100',    text: 'text-blue-700',    label: 'Confirmado' },
+  em_entrega:              { bg: 'bg-teal-100',    text: 'text-teal-700',    label: 'Em Entrega' },
+  parcialmente_recebido:   { bg: 'bg-amber-100',   text: 'text-amber-700',   label: 'Parcial'    },
+  entregue:                { bg: 'bg-emerald-100', text: 'text-emerald-700', label: 'Entregue'   },
+  cancelado:               { bg: 'bg-gray-100',    text: 'text-gray-500',    label: 'Cancelado'  },
 }
 
 // ─── PDF / Share helpers ──────────────────────────────────────────────────────
@@ -677,11 +680,13 @@ function PedidoCard({
   pedido,
   onCompartilhar,
   onLiberarPagamento,
+  onReceber,
   initialExpanded = false,
 }: {
   pedido: Pedido
   onCompartilhar: (p: Pedido) => void
   onLiberarPagamento: (id: string) => void
+  onReceber: (p: Pedido) => void
   initialExpanded?: boolean
 }) {
   const mutation   = useAtualizarPedido()
@@ -690,8 +695,14 @@ function PedidoCard({
 
   const dias     = diasRestantes(pedido.data_prevista_entrega)
   const st       = statusConfig[pedido.status] || statusConfig.emitido
-  const atrasado = dias !== null && dias < 0 && pedido.status !== 'entregue'
   const entregue = pedido.status === 'entregue'
+  const parcial  = pedido.status === 'parcialmente_recebido'
+  const atrasado = dias !== null && dias < 0 && !entregue && !parcial
+
+  // Recebimento: can receive if confirmado, em_entrega, or parcialmente_recebido
+  const podeReceber = ['confirmado', 'em_entrega', 'parcialmente_recebido'].includes(pedido.status)
+  const qtdTotal     = pedido.qtd_itens_total ?? 0
+  const qtdRecebidos = pedido.qtd_itens_recebidos ?? 0
 
   // Payment status helpers
   const statusPgto     = (pedido as any).status_pagamento as string | undefined
@@ -879,17 +890,42 @@ function PedidoCard({
 
         {/* Action buttons */}
         <div className="space-y-2 pt-1">
-          {/* Confirmar entrega */}
-          {!entregue && pedido.status !== 'cancelado' && (
+          {/* Receber pedido (new flow) */}
+          {podeReceber && (
+            <button
+              onClick={() => onReceber(pedido)}
+              className="w-full flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-bold bg-teal-50 text-teal-700 border border-teal-300 hover:bg-teal-500 hover:text-white transition-all"
+            >
+              <Package size={16} />
+              {parcial ? 'Receber Restante' : 'Receber'}
+            </button>
+          )}
+          {/* Recebimento progress */}
+          {parcial && qtdTotal > 0 && (
+            <div className="space-y-1">
+              <div className="flex items-center justify-between text-[10px]">
+                <span className="text-amber-600 font-bold">Recebido parcialmente</span>
+                <span className="text-slate-400 font-semibold">{qtdRecebidos}/{qtdTotal} itens</span>
+              </div>
+              <div className="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-amber-400 rounded-full transition-all"
+                  style={{ width: `${Math.min(100, (qtdRecebidos / qtdTotal) * 100)}%` }}
+                />
+              </div>
+            </div>
+          )}
+          {/* Confirmar entrega (legacy / direct) */}
+          {pedido.status === 'emitido' && (
             <button
               onClick={confirmarEntrega}
               disabled={confirmando || mutation.isPending}
-              className="w-full flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-bold bg-teal-50 text-teal-700 border border-teal-300 hover:bg-teal-500 hover:text-white transition-all disabled:opacity-50"
+              className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-semibold bg-slate-50 text-slate-500 border border-slate-200 hover:bg-slate-100 transition-all disabled:opacity-50"
             >
               {confirmando
-                ? <div className="w-4 h-4 border-2 border-teal-400 border-t-transparent rounded-full animate-spin" />
-                : <CheckCircle size={16} />}
-              Confirmar Entrega
+                ? <div className="w-3.5 h-3.5 border-2 border-slate-400 border-t-transparent rounded-full animate-spin" />
+                : <CheckCircle size={14} />}
+              Confirmar Entrega (sem recebimento)
             </button>
           )}
 
@@ -938,6 +974,7 @@ export default function Pedidos() {
   const [statusFilter, setStatusFilter]         = useState('')
   const [compartilharPedido, setCompartilhar]   = useState<Pedido | null>(null)
   const [showLiberarModal, setShowLiberarModal] = useState<string | null>(null)
+  const [receberPedido, setReceberPedido]       = useState<Pedido | null>(null)
 
   // Limpar o query param após exibir para não manter na URL
   useEffect(() => {
@@ -1028,6 +1065,7 @@ export default function Pedidos() {
               initialExpanded={p.id === highlightPedidoId}
               onCompartilhar={setCompartilhar}
               onLiberarPagamento={id => setShowLiberarModal(id)}
+              onReceber={setReceberPedido}
             />
           ))}
         </div>
@@ -1050,6 +1088,14 @@ export default function Pedidos() {
         <LiberarPagamentoModal
           pedido={liberarPedido}
           onClose={() => setShowLiberarModal(null)}
+        />
+      )}
+
+      {/* Recebimento modal */}
+      {receberPedido && (
+        <RecebimentoModal
+          pedido={receberPedido}
+          onClose={() => setReceberPedido(null)}
         />
       )}
     </div>

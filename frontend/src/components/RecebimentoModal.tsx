@@ -1,0 +1,386 @@
+import { useState, useMemo } from 'react'
+import {
+  X, Package, ChevronDown, ChevronUp, Check,
+  AlertTriangle, Warehouse, FileText, Hash,
+} from 'lucide-react'
+import type { Pedido } from '../types'
+import type { RecebimentoItemForm } from '../types/estoque'
+import {
+  useItensRequisicao,
+  useBases,
+  useCriarRecebimento,
+} from '../hooks/useRecebimento'
+
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
+const fmt = (v?: number) =>
+  v != null ? v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) : '—'
+
+// ─── Component ───────────────────────────────────────────────────────────────
+
+export default function RecebimentoModal({
+  pedido,
+  onClose,
+}: {
+  pedido: Pedido
+  onClose: () => void
+}) {
+  const { data: itensRC, isLoading: loadingItens } = useItensRequisicao(pedido.requisicao_id)
+  const { data: bases, isLoading: loadingBases }   = useBases()
+  const criarRecebimento = useCriarRecebimento()
+
+  // Form state
+  const [baseId, setBaseId]                 = useState('')
+  const [nfNumero, setNfNumero]             = useState('')
+  const [nfChave, setNfChave]               = useState('')
+  const [observacao, setObservacao]          = useState('')
+  const [erro, setErro]                     = useState('')
+  const [showAdvanced, setShowAdvanced]     = useState(false)
+  const [success, setSuccess]               = useState(false)
+
+  // Items state — initialized from RC items
+  const [itens, setItens] = useState<RecebimentoItemForm[]>([])
+  const [initialized, setInitialized]       = useState(false)
+
+  // Initialize items when RC items load
+  if (itensRC && !initialized) {
+    setItens(
+      itensRC.map(item => ({
+        requisicao_item_id: item.id,
+        descricao: item.descricao,
+        quantidade_esperada: item.quantidade,
+        quantidade_recebida: item.quantidade, // pre-fill with full qty
+        valor_unitario: item.valor_unitario_estimado,
+        tipo_destino: 'consumo' as const,
+      }))
+    )
+    setInitialized(true)
+  }
+
+  // Computed
+  const totalRecebido = useMemo(
+    () => itens.reduce((sum, i) => sum + i.quantidade_recebida * i.valor_unitario, 0),
+    [itens],
+  )
+  const temPatrimonial = itens.some(i => i.tipo_destino === 'patrimonial')
+  const qtdComRecebimento = itens.filter(i => i.quantidade_recebida > 0).length
+
+  // Item updaters
+  const updateItem = (idx: number, patch: Partial<RecebimentoItemForm>) => {
+    setItens(prev => prev.map((it, i) => (i === idx ? { ...it, ...patch } : it)))
+  }
+
+  const handleSubmit = async () => {
+    if (qtdComRecebimento === 0) {
+      setErro('Informe a quantidade recebida em pelo menos 1 item.')
+      return
+    }
+    setErro('')
+    try {
+      await criarRecebimento.mutateAsync({
+        pedidoId: pedido.id,
+        baseId: baseId || undefined,
+        nfNumero: nfNumero || undefined,
+        nfChave: nfChave || undefined,
+        dataRecebimento: new Date().toISOString().split('T')[0],
+        observacao: observacao || undefined,
+        itens,
+      })
+      setSuccess(true)
+      setTimeout(() => onClose(), 1200)
+    } catch (e: any) {
+      setErro(e?.message ?? 'Erro ao registrar recebimento.')
+    }
+  }
+
+  const isLoading = loadingItens || loadingBases
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md max-h-[90vh] flex flex-col overflow-hidden animate-in slide-in-from-bottom-4 duration-200">
+        {/* ── Header ────────────────────────────────────────────── */}
+        <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100 flex-shrink-0">
+          <div className="flex items-center gap-2.5">
+            <div className="w-9 h-9 rounded-xl bg-teal-100 flex items-center justify-center flex-shrink-0">
+              <Package size={17} className="text-teal-600" />
+            </div>
+            <div>
+              <p className="text-sm font-bold text-slate-800">Receber Pedido</p>
+              <p className="text-[11px] text-slate-400">
+                #{pedido.numero_pedido ?? pedido.id.slice(0, 8).toUpperCase()}
+                {' · '}
+                <span className="text-slate-500 font-medium">{pedido.fornecedor_nome}</span>
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors"
+          >
+            <X size={16} />
+          </button>
+        </div>
+
+        {/* ── Body (scrollable) ──────────────────────────────── */}
+        <div className="flex-1 overflow-y-auto styled-scrollbar p-5 space-y-4">
+          {isLoading ? (
+            <div className="flex justify-center py-10">
+              <div className="w-6 h-6 border-[3px] border-teal-500 border-t-transparent rounded-full animate-spin" />
+            </div>
+          ) : success ? (
+            <div className="flex flex-col items-center py-10 gap-3">
+              <div className="w-14 h-14 rounded-full bg-emerald-100 flex items-center justify-center">
+                <Check size={28} className="text-emerald-600" />
+              </div>
+              <p className="text-sm font-bold text-emerald-700">Recebimento registrado!</p>
+              <p className="text-xs text-slate-400">Estoque e patrimonial atualizados automaticamente.</p>
+            </div>
+          ) : (
+            <>
+              {/* ── Base de destino ──────────────────────────────── */}
+              <div>
+                <label className="block text-xs font-semibold text-slate-600 mb-1.5">
+                  <Warehouse size={12} className="inline mr-1 -mt-0.5" />
+                  Base / Almoxarifado
+                </label>
+                <select
+                  value={baseId}
+                  onChange={e => setBaseId(e.target.value)}
+                  className="w-full text-sm border border-slate-200 rounded-xl px-3 py-2.5 bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-teal-400 focus:border-teal-400"
+                >
+                  <option value="">Selecione a base...</option>
+                  {(bases ?? []).map(b => (
+                    <option key={b.id} value={b.id}>
+                      {b.codigo} — {b.nome}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* ── NF fields ────────────────────────────────────── */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-600 mb-1.5">
+                    <FileText size={12} className="inline mr-1 -mt-0.5" />
+                    NF Fornecedor
+                  </label>
+                  <input
+                    type="text"
+                    value={nfNumero}
+                    onChange={e => setNfNumero(e.target.value)}
+                    placeholder="000.000"
+                    className="w-full text-sm border border-slate-200 rounded-xl px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-teal-400 focus:border-teal-400 placeholder:text-slate-300"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-600 mb-1.5">
+                    <Hash size={12} className="inline mr-1 -mt-0.5" />
+                    Chave NFe
+                  </label>
+                  <input
+                    type="text"
+                    value={nfChave}
+                    onChange={e => setNfChave(e.target.value)}
+                    placeholder="44 dígitos..."
+                    maxLength={44}
+                    className="w-full text-sm border border-slate-200 rounded-xl px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-teal-400 focus:border-teal-400 placeholder:text-slate-300"
+                  />
+                </div>
+              </div>
+
+              {/* ── Items table ───────────────────────────────────── */}
+              <div>
+                <p className="text-xs font-semibold text-slate-600 mb-2 flex items-center gap-1">
+                  <Package size={12} />
+                  Itens ({itens.length})
+                </p>
+                <div className="space-y-2">
+                  {itens.map((item, idx) => (
+                    <ItemRow
+                      key={idx}
+                      item={item}
+                      onChange={patch => updateItem(idx, patch)}
+                    />
+                  ))}
+                </div>
+              </div>
+
+              {/* ── Advanced: obs ─────────────────────────────────── */}
+              <button
+                type="button"
+                onClick={() => setShowAdvanced(!showAdvanced)}
+                className="flex items-center gap-1 text-xs text-slate-400 hover:text-slate-600 transition-colors"
+              >
+                {showAdvanced ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+                Observacoes
+              </button>
+              {showAdvanced && (
+                <textarea
+                  value={observacao}
+                  onChange={e => setObservacao(e.target.value)}
+                  rows={2}
+                  placeholder="Observacoes sobre o recebimento..."
+                  className="w-full text-sm border border-slate-200 rounded-xl px-3 py-2 resize-none focus:outline-none focus:ring-2 focus:ring-teal-400 placeholder:text-slate-300"
+                />
+              )}
+
+              {/* ── Patrimonial notice ────────────────────────────── */}
+              {temPatrimonial && (
+                <div className="flex items-start gap-2 bg-violet-50 border border-violet-200 rounded-xl px-3 py-2.5 text-xs text-violet-700">
+                  <AlertTriangle size={14} className="flex-shrink-0 mt-0.5" />
+                  <p>
+                    <span className="font-bold">Itens patrimoniais</span> serão registrados como pendentes
+                    no módulo Patrimonial para complementação de dados (vida útil, taxa, responsável).
+                  </p>
+                </div>
+              )}
+
+              {/* ── Error ─────────────────────────────────────────── */}
+              {erro && (
+                <p className="text-xs text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+                  {erro}
+                </p>
+              )}
+            </>
+          )}
+        </div>
+
+        {/* ── Footer ────────────────────────────────────────────── */}
+        {!success && !isLoading && (
+          <div className="px-5 py-4 border-t border-slate-100 flex-shrink-0 space-y-2">
+            {/* Total */}
+            <div className="flex items-center justify-between text-xs">
+              <span className="text-slate-400">
+                {qtdComRecebimento} de {itens.length} itens
+              </span>
+              <span className="font-bold text-teal-700 text-sm">{fmt(totalRecebido)}</span>
+            </div>
+
+            <button
+              onClick={handleSubmit}
+              disabled={criarRecebimento.isPending || qtdComRecebimento === 0}
+              className="w-full flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-bold bg-teal-600 text-white hover:bg-teal-700 transition-colors disabled:opacity-50"
+            >
+              {criarRecebimento.isPending ? (
+                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+              ) : (
+                <Package size={16} />
+              )}
+              {criarRecebimento.isPending ? 'Processando...' : 'Confirmar Recebimento'}
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// ─── ItemRow ─────────────────────────────────────────────────────────────────
+
+function ItemRow({
+  item,
+  onChange,
+}: {
+  item: RecebimentoItemForm
+  onChange: (patch: Partial<RecebimentoItemForm>) => void
+}) {
+  const [expanded, setExpanded] = useState(false)
+  const parcial = item.quantidade_recebida < item.quantidade_esperada && item.quantidade_recebida > 0
+  const zero = item.quantidade_recebida === 0
+
+  return (
+    <div className={`border rounded-xl overflow-hidden transition-colors ${
+      zero ? 'border-slate-100 bg-slate-50/50 opacity-60' : parcial ? 'border-amber-200 bg-amber-50/30' : 'border-slate-200'
+    }`}>
+      {/* Main row */}
+      <div className="px-3 py-2.5 flex items-center gap-2">
+        <div className="flex-1 min-w-0">
+          <p className="text-xs font-semibold text-slate-700 truncate">{item.descricao}</p>
+          <p className="text-[10px] text-slate-400 mt-0.5">
+            Esperado: {item.quantidade_esperada} · {fmt(item.valor_unitario)}/un
+          </p>
+        </div>
+
+        {/* Quantity input */}
+        <div className="flex items-center gap-1.5 flex-shrink-0">
+          <input
+            type="number"
+            min={0}
+            max={item.quantidade_esperada}
+            step={1}
+            value={item.quantidade_recebida}
+            onChange={e => onChange({ quantidade_recebida: Math.max(0, Number(e.target.value)) })}
+            className="w-16 text-center text-sm font-bold border border-slate-200 rounded-lg py-1.5 focus:outline-none focus:ring-2 focus:ring-teal-400 focus:border-teal-400"
+          />
+        </div>
+
+        {/* Patrimonial toggle */}
+        <button
+          type="button"
+          onClick={() => onChange({
+            tipo_destino: item.tipo_destino === 'consumo' ? 'patrimonial' : 'consumo',
+          })}
+          title={item.tipo_destino === 'patrimonial' ? 'Patrimonial' : 'Consumo'}
+          className={`flex-shrink-0 w-7 h-7 rounded-lg flex items-center justify-center text-[10px] font-bold transition-all ${
+            item.tipo_destino === 'patrimonial'
+              ? 'bg-violet-100 text-violet-700 border border-violet-300'
+              : 'bg-slate-100 text-slate-400 border border-slate-200 hover:border-violet-200'
+          }`}
+        >
+          P
+        </button>
+
+        {/* Expand */}
+        <button
+          type="button"
+          onClick={() => setExpanded(!expanded)}
+          className="flex-shrink-0 p-1 rounded text-slate-300 hover:text-slate-500"
+        >
+          {expanded ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+        </button>
+      </div>
+
+      {/* Expanded: lote, série, validade */}
+      {expanded && (
+        <div className="px-3 pb-3 pt-1 border-t border-slate-100 grid grid-cols-3 gap-2">
+          <div>
+            <label className="block text-[10px] text-slate-400 mb-0.5">Lote</label>
+            <input
+              type="text"
+              value={item.lote ?? ''}
+              onChange={e => onChange({ lote: e.target.value })}
+              className="w-full text-xs border border-slate-200 rounded-lg px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-teal-300"
+            />
+          </div>
+          <div>
+            <label className="block text-[10px] text-slate-400 mb-0.5">N. Série</label>
+            <input
+              type="text"
+              value={item.numero_serie ?? ''}
+              onChange={e => onChange({ numero_serie: e.target.value })}
+              className="w-full text-xs border border-slate-200 rounded-lg px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-teal-300"
+            />
+          </div>
+          <div>
+            <label className="block text-[10px] text-slate-400 mb-0.5">Validade</label>
+            <input
+              type="date"
+              value={item.data_validade ?? ''}
+              onChange={e => onChange({ data_validade: e.target.value })}
+              className="w-full text-xs border border-slate-200 rounded-lg px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-teal-300"
+            />
+          </div>
+        </div>
+      )}
+
+      {/* Partial badge */}
+      {parcial && (
+        <div className="px-3 pb-2">
+          <span className="text-[10px] font-bold text-amber-600 bg-amber-100 px-2 py-0.5 rounded-full">
+            Parcial: {item.quantidade_recebida}/{item.quantidade_esperada}
+          </span>
+        </div>
+      )}
+    </div>
+  )
+}
