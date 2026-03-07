@@ -118,6 +118,7 @@ export default function NovaRequisicao() {
   const [compradorSugerido, setCompradorSugerido] = useState<{ id: string; nome: string } | null>(null)
   const [confianca, setConfianca]           = useState(0)
   const [stepErrors, setStepErrors]         = useState<string[]>([])
+  const [submitError, setSubmitError]       = useState<string | null>(null)
 
   const total  = itens.reduce((s, i) => s + i.quantidade * i.valor_unitario_estimado, 0)
   const minCot = categoria ? minCotacoes(total, categoria.cotacoes_regras) : 1
@@ -201,9 +202,14 @@ export default function NovaRequisicao() {
     setItens(prev => prev.map((item, i) => i === idx ? { ...item, [field]: value } : item))
 
   const submit = async () => {
-    const timeoutPromise = new Promise<never>((_, reject) =>
-      setTimeout(() => reject(new Error('Tempo limite excedido. Verifique sua conexao e tente novamente.')), 20_000)
-    )
+    setSubmitError(null)
+    let timeoutHandle: ReturnType<typeof setTimeout>
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      timeoutHandle = setTimeout(
+        () => reject(new Error('Tempo limite excedido. Verifique sua conexao e tente novamente.')),
+        20_000
+      )
+    })
     try {
       await Promise.race([
         mutation.mutateAsync({
@@ -222,7 +228,14 @@ export default function NovaRequisicao() {
         timeoutPromise,
       ])
       nav('/requisicoes')
-    } catch { /* handled by mutation.isError */ }
+    } catch (err) {
+      if ((err as Error)?.message?.includes('Tempo limite')) {
+        setSubmitError((err as Error).message)
+      }
+      // else: let mutation.isError handle it
+    } finally {
+      clearTimeout(timeoutHandle!)
+    }
   }
 
   // ═══════════════════════════════════════
@@ -659,7 +672,7 @@ export default function NovaRequisicao() {
   return (
     <div className="space-y-5">
       <Stepper step={3} />
-      <button onClick={() => setStep(2)} className="flex items-center gap-1 text-slate-500 text-sm -mt-2">
+      <button onClick={() => { setStep(2); setStepErrors([]) }} className="flex items-center gap-1 text-slate-500 text-sm -mt-2">
         <ChevronLeft size={16} /> Editar
       </button>
 
@@ -754,8 +767,10 @@ export default function NovaRequisicao() {
           : <><Send size={18} /> Enviar Requisição</>}
       </button>
 
-      {mutation.isError && (
-        <p className="text-red-500 text-sm text-center bg-red-50 rounded-xl py-2">Erro ao enviar. Tente novamente.</p>
+      {(mutation.isError || submitError) && (
+        <p className="text-red-500 text-sm text-center bg-red-50 rounded-xl py-2">
+          {submitError ?? 'Erro ao enviar. Tente novamente.'}
+        </p>
       )}
     </div>
   )
