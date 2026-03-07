@@ -332,6 +332,72 @@ flowchart LR
 
 ---
 
+### 9. TEG+ | Consulta CNPJ
+**Webhook:** `POST /consulta-cnpj`
+**ID n8n:** `6rfMdHdRdJefrKB3`
+**Nodes:** 10
+**Criado:** 2026-03-06
+**Status:** Ativo
+
+```mermaid
+flowchart LR
+    W[Webhook\nPOST] --> EX[Extrair CNPJ\n14 dígitos]
+    EX --> V{Válido?}
+    V -->|Não| ERR[Respond 400\nErro]
+    V -->|Sim| CC[Verificar Cache\nCode node]
+    CC --> TC{Cache hit?}
+    TC -->|Sim| RC[Respond\nCache]
+    TC -->|Não| BA[BrasilAPI\nGET /cnpj/v1]
+    BA --> TS[Transformar\n+ Salvar Cache]
+    TS --> RA[Respond\nDados CNPJ]
+```
+
+**Payload:** `{ "valor": "59460450000100" }`
+
+**Resposta:**
+```json
+{
+  "cnpj": "59460450000100",
+  "razao_social": "EMPRESA LTDA",
+  "nome_fantasia": "EMPRESA",
+  "situacao": "ATIVA",
+  "endereco": { "cep": "...", "logradouro": "...", "numero": "...", "bairro": "...", "cidade": "...", "uf": "..." },
+  "telefone": "1199999999",
+  "email": "contato@empresa.com"
+}
+```
+
+**Notas técnicas:**
+- "Verificar Cache" é Code node (NÃO HTTP Request) — sempre retorna dados, evita pipeline parar
+- Cache salvo via fire-and-forget (não bloqueia resposta)
+- Cache: tabela `cache_consultas` no Supabase, TTL 7 dias
+- Frontend fallback: se n8n falhar, consulta BrasilAPI direto
+
+---
+
+### 10. TEG+ | Consulta CEP
+**Webhook:** `POST /consulta-cep`
+**ID n8n:** `iZGk3HiN35xGxe7K`
+**Nodes:** 12 (precisa mesma fix do cache do CNPJ)
+**Criado:** 2026-03-06
+**Status:** Ativo (com bug no cache — HTTP Request retorna 0 items)
+
+Mesmo padrão do Consulta CNPJ. Payload: `{ "valor": "01001000" }`.
+**TODO:** Aplicar mesma fix do CNPJ (trocar HTTP Request cache por Code node).
+
+---
+
+## Configuração EasyPanel
+
+| Variável | Valor |
+|----------|-------|
+| `WEBHOOK_URL` | `https://teg-agents-n8n.nmmcas.easypanel.host` |
+| Domínio | `https://teg-agents-n8n.nmmcas.easypanel.host/` → `http://teg-agents_n8n:5678/` |
+
+**IMPORTANTE:** Updates via API (REST ou MCP) só alteram o DRAFT do workflow. Para ativar webhooks de produção, é obrigatório **Publicar via UI do editor n8n**.
+
+---
+
 ## Workflows Futuros
 
 | Workflow | Trigger | Função |
