@@ -13,12 +13,12 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "obsidian/22 - Módulo Estoque e Patrimonial.md",
+                "file": "obsidian/Paineis/Dev Hub BI.md",
                 "mode": "source",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "22 - Módulo Estoque e Patrimonial"
+              "title": "Dev Hub BI"
             }
           }
         ]
@@ -94,7 +94,7 @@
             "state": {
               "type": "backlink",
               "state": {
-                "file": "obsidian/Paineis/Estoque Dashboard.md",
+                "file": "obsidian/Paineis/Dev Hub BI.md",
                 "collapseAll": false,
                 "extraContext": false,
                 "sortOrder": "alphabetical",
@@ -104,7 +104,7 @@
                 "unlinkedCollapsed": true
               },
               "icon": "links-coming-in",
-              "title": "Links inversos para Estoque Dashboard"
+              "title": "Links inversos para Dev Hub BI"
             }
           },
           {
@@ -113,12 +113,12 @@
             "state": {
               "type": "outgoing-link",
               "state": {
-                "file": "Sem título.base",
+                "file": "obsidian/Paineis/Dev Hub BI.md",
                 "linksCollapsed": false,
                 "unlinkedCollapsed": true
               },
               "icon": "links-going-out",
-              "title": "Links de saída para Sem título"
+              "title": "Links de saída para Dev Hub BI"
             }
           },
           {
@@ -185,7 +185,8 @@
               "title": "Source Control"
             }
           }
-        ]
+        ],
+        "currentTab": 6
       }
     ],
     "direction": "horizontal",
@@ -211,15 +212,16 @@
   },
   "active": "a4bc148162b73016",
   "lastOpenFiles": [
+    "obsidian/Paineis/Estoque Dashboard.md",
+    "obsidian/Paineis/Dev Hub BI.md",
+    "obsidian/22 - Módulo Estoque e Patrimonial.md",
     "obsidian/Paineis/Relatorio Desenvolvimento.md",
     "obsidian/Paineis/Execucao Board.md",
-    "obsidian/Paineis/Dev Hub BI.md",
     "obsidian/Database/Issues/ISSUE-008 - Botao salvar requisicao travado.md",
     "obsidian/Database/Issues/ISSUE-007 - GH14 Melhoria layout chat AI.md",
     "obsidian/Database/Issues/ISSUE-006 - GH13 Filtro datas dashboard financeiro.md",
     "obsidian/00 - TEG+ INDEX.md",
     "obsidian/Paineis/BI Dashboard.md",
-    "obsidian/Paineis/Estoque Dashboard.md",
     "obsidian/Paineis/Compras Dashboard.md",
     "obsidian/Paineis/Cadastros Dashboard.md",
     "obsidian/27 - Módulo Contratos Gestão.md",
@@ -238,7 +240,6 @@
     "obsidian/Paineis/Frotas Dashboard.md",
     "obsidian/Paineis/Financeiro Dashboard.md",
     "obsidian/Paineis/test_hook.md",
-    "obsidian/Paineis/test.md",
     "obsidian/Paineis",
     "obsidian/Database/Tarefas",
     "obsidian/Database/Requisitos",
