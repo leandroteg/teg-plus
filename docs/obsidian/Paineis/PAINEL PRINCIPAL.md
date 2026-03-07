@@ -136,15 +136,18 @@ LIMIT 8
 
 ## 🔗 Navegação
 
-### Painéis Gerais
+### Paineis Gerais
 | Painel | |
 |--------|---|
-| [[BI Dashboard\|📊 BI Dashboard]] | Visão executiva visual |
+| [[BI Dashboard\|📊 BI Dashboard]] | Visao executiva visual |
 | [[Tasks Board\|📋 Tasks Board]] | Kanban de tarefas |
 | [[Roadmap Board\|🗺️ Roadmap]] | Timeline de milestones |
 | [[Issues Board\|🐛 Issues]] | Tracker de bugs |
 | [[Requisitos Board\|📦 Requisitos]] | Rastreabilidade |
-| [[00 - TEG+ INDEX\|🏗️ Arquitetura]] | Documentação técnica |
+| [[00 - TEG+ INDEX\|🏗️ Arquitetura]] | Documentacao tecnica |
+| **[[Dev Hub BI\|🚀 Dev Hub BI]]** | **BI + GitHub Issues + AI Specs** |
+| **[[Execucao Board\|⚡ Execucao Board]]** | **Pipeline de bugs & melhorias** |
+| **[[Relatorio Desenvolvimento\|📈 Relatorio Dev]]** | **Report semanal consolidado** |
 
 ### Dashboards por Módulo
 | Dashboard | Completude |
