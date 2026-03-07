@@ -221,61 +221,82 @@ function stripModulePrefix(title: string): string {
   return title.replace(/^\[[A-Z]+\]\s*/, '')
 }
 
-/** Generate an AI specification prompt for an issue */
-function generateSpecPrompt(issue: GHIssueDetail): string {
+/** Call SuperTEG AI Agent (Gemini Flash) to generate a real implementation spec */
+const N8N_BASE = import.meta.env.VITE_N8N_WEBHOOK_URL || 'https://teg-agents-n8n.nmmcas.easypanel.host/webhook'
+
+async function generateAISpec(issue: GHIssueDetail): Promise<string> {
   const module = extractModule(issue.title) || 'GERAL'
   const tipo = issue.labels.find(l => l.name === 'bug') ? 'Bug Fix' :
     issue.labels.find(l => l.name === 'enhancement') ? 'Feature/Enhancement' : 'Task'
+  const labelsStr = issue.labels.map(l => l.name).join(', ') || 'none'
 
-  return `## 🤖 AI Specification
+  // Build a rich prompt for the SuperTEG Agent (Gemini Flash)
+  const aiPrompt = `Você é um arquiteto de software sênior do TEG+ ERP. Gere uma especificação técnica DETALHADA de implementação para esta GitHub Issue.
 
-### Context
-**Issue:** #${issue.number} — ${issue.title}
-**Type:** ${tipo}
-**Module:** ${module}
-**Reporter:** @${issue.user}
-**Created:** ${new Date(issue.created_at).toLocaleDateString('pt-BR')}
+## Issue #${issue.number}: ${issue.title}
+- **Tipo:** ${tipo}
+- **Módulo:** ${module}
+- **Labels:** ${labelsStr}
+- **Autor:** @${issue.user}
+- **Criada em:** ${new Date(issue.created_at).toLocaleDateString('pt-BR')}
 
-### Problem Statement
-${issue.body || 'No description provided.'}
+### Descrição Original:
+${issue.body || 'Sem descrição fornecida.'}
+
+---
+
+## Stack do projeto TEG+ ERP:
+- Frontend: React 18 + Vite + TypeScript + Tailwind CSS + TanStack Query v5 + React Router v6
+- Backend: Supabase (PostgreSQL 15 + Auth + RLS + Realtime)
+- Automação: n8n (webhooks)
+- Deploy: Vercel
+- Estrutura: frontend/src/pages/, frontend/src/hooks/ (15 hooks), frontend/src/services/api.ts, frontend/src/services/supabase.ts
+- Módulos: Compras, Financeiro, Estoque, Logística, Frotas, RH, Cadastros, Fiscal, SSMA, Contratos
+- Padrão UI: rounded-2xl, shadow-card, navy/teal/violet palette, lucide-react icons
+
+## GERE a especificação com:
+1. **Objetivo** — O que resolver e por quê
+2. **Análise Técnica** — Arquivos afetados, dependências, riscos
+3. **Plano de Implementação** — Passos numerados e detalhados
+4. **Schema/Dados** — Se envolve DB: tabelas, colunas, RLS policies, migrations
+5. **Critérios de Aceite** — Lista com checkboxes específicos e testáveis
+6. **Notas para o Desenvolvedor** — Edge cases, patterns a seguir, armadilhas a evitar
+
+Responda em Markdown formatado. Seja específico e técnico, não genérico.`
+
+  const response = await fetch(`${N8N_BASE}/superteg/chat`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      message: aiPrompt,
+      session_id: `devhub_spec_${issue.number}_${Date.now()}`,
+    }),
+  })
+
+  if (!response.ok) {
+    throw new Error(`SuperTEG AI respondeu com status ${response.status}`)
+  }
+
+  const data = await response.json()
+  // The SuperTEG webhook returns: { resposta, session_id, user_nome, timestamp }
+  // Handle both array and object responses
+  const result = Array.isArray(data) ? data[0]?.json || data[0] : data
+  const aiText = result?.resposta || result?.json?.resposta || result?.output || ''
+
+  if (!aiText || aiText.length < 50) {
+    throw new Error('Resposta da IA muito curta ou vazia')
+  }
+
+  return `## 🤖 AI Specification — Issue #${issue.number}
+
+> Gerado por **SuperTEG AI** (Google Gemini Flash) · ${new Date().toISOString().split('T')[0]}
 
 ---
 
-### 📋 Implementation Specification
-
-#### 1. Scope & Objective
-> Implement a solution for issue #${issue.number} in the **${module}** module.
-> ${tipo === 'Bug Fix' ? 'Fix the reported bug ensuring no regressions.' : 'Add the requested feature following existing patterns.'}
-
-#### 2. Technical Requirements
-- [ ] Identify affected files in \`frontend/src/\`
-- [ ] Follow existing TEG+ ERP patterns (TanStack Query, Tailwind, Supabase/n8n)
-- [ ] Maintain consistency with module's existing components
-- [ ] Ensure RLS policies are respected for any DB changes
-- [ ] Add proper TypeScript types
-
-#### 3. Acceptance Criteria
-- [ ] The described behavior works correctly
-- [ ] No console errors or warnings introduced
-- [ ] Responsive design maintained (mobile + desktop)
-- [ ] Loading & error states handled properly
-${tipo === 'Bug Fix' ? '- [ ] Root cause identified and documented\n- [ ] Edge cases covered' : '- [ ] Feature matches the specified requirements\n- [ ] UI follows WORLD CLASS design directive'}
-
-#### 4. Files to Investigate
-- \`frontend/src/pages/${module.toLowerCase()}/\` — Module pages
-- \`frontend/src/hooks/\` — Related custom hooks
-- \`frontend/src/services/api.ts\` — API client if n8n involved
-- \`frontend/src/services/supabase.ts\` — DB queries if applicable
-
-#### 5. Implementation Notes
-> This spec was auto-generated. Developer or AI agent should:
-> 1. Read the issue context and comments thoroughly
-> 2. Explore the codebase for related patterns
-> 3. Implement incrementally with verification
-> 4. Test edge cases before completing
+${aiText}
 
 ---
-*🤖 Generated by TEG+ Dev Hub AI · ${new Date().toISOString().split('T')[0]}*`
+*🤖 Powered by SuperTEG AI Agent · TEG+ Dev Hub*`
 }
 
 // ── Sub-Components ───────────────────────────────────────────────────────────────
@@ -434,17 +455,24 @@ function IssueDetailPanel({
   const [specSuccess, setSpecSuccess] = useState(false)
   const [newComment, setNewComment] = useState('')
 
+  const [specError, setSpecError] = useState<string | null>(null)
+
   const handleGenerateSpec = useCallback(async () => {
     if (!issue) return
     setGeneratingSpec(true)
     setSpecSuccess(false)
+    setSpecError(null)
     try {
-      const spec = generateSpecPrompt(issue)
+      // 1. Call SuperTEG AI Agent (Gemini Flash) to generate spec
+      const spec = await generateAISpec(issue)
+      // 2. Post the AI-generated spec as a GitHub comment
       await postComment.mutateAsync({ number: issue.number, comment: spec })
       setSpecSuccess(true)
       setTimeout(() => setSpecSuccess(false), 4000)
-    } catch {
-      // error handled by mutation
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Erro ao gerar spec com IA'
+      setSpecError(msg)
+      setTimeout(() => setSpecError(null), 6000)
     } finally {
       setGeneratingSpec(false)
     }
@@ -577,15 +605,19 @@ function IssueDetailPanel({
                     transition-all duration-300 active:scale-[0.98]
                     ${specSuccess
                       ? 'bg-emerald-500 text-white'
-                      : 'bg-gradient-to-r from-violet-600 to-indigo-600 text-white hover:from-violet-500 hover:to-indigo-500 shadow-lg hover:shadow-xl'
+                      : specError
+                        ? 'bg-red-500 text-white'
+                        : 'bg-gradient-to-r from-violet-600 to-indigo-600 text-white hover:from-violet-500 hover:to-indigo-500 shadow-lg hover:shadow-xl'
                     } disabled:opacity-70`}
                 >
                   {specSuccess ? (
                     <><CheckCircle size={16} /> Spec gerada e postada!</>
+                  ) : specError ? (
+                    <><AlertCircle size={16} /> {specError}</>
                   ) : generatingSpec ? (
-                    <><Loader2 size={16} className="animate-spin" /> Gerando especificação AI...</>
+                    <><Loader2 size={16} className="animate-spin" /> 🧠 Gerando com Gemini AI...</>
                   ) : (
-                    <><Sparkles size={16} /> Gerar Especificação AI</>
+                    <><Sparkles size={16} /> Gerar Especificação AI (Gemini)</>
                   )}
                 </button>
                 <p className="text-center text-[10px] text-slate-400 mt-1.5">
