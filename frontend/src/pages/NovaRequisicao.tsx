@@ -117,6 +117,7 @@ export default function NovaRequisicao() {
   const [itens, setItens]                   = useState<RequisicaoItem[]>([emptyItem()])
   const [compradorSugerido, setCompradorSugerido] = useState<{ id: string; nome: string } | null>(null)
   const [confianca, setConfianca]           = useState(0)
+  const [stepErrors, setStepErrors]         = useState<string[]>([])
 
   const total  = itens.reduce((s, i) => s + i.quantidade * i.valor_unitario_estimado, 0)
   const minCot = categoria ? minCotacoes(total, categoria.cotacoes_regras) : 1
@@ -200,22 +201,28 @@ export default function NovaRequisicao() {
     setItens(prev => prev.map((item, i) => i === idx ? { ...item, [field]: value } : item))
 
   const submit = async () => {
+    const timeoutPromise = new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error('Tempo limite excedido. Verifique sua conexao e tente novamente.')), 20_000)
+    )
     try {
-      await mutation.mutateAsync({
-        solicitante_nome: solicitante,
-        obra_nome:        obraNome,
-        descricao,
-        justificativa,
-        urgencia,
-        categoria:        categoria?.codigo,
-        itens,
-        data_necessidade: dataNecessidade || undefined,
-        texto_original:   textoAi || undefined,
-        comprador_id:     compradorSugerido?.id,
-        ai_confianca:     confianca,
-      })
+      await Promise.race([
+        mutation.mutateAsync({
+          solicitante_nome: solicitante,
+          obra_nome:        obraNome,
+          descricao,
+          justificativa,
+          urgencia,
+          categoria:        categoria?.codigo,
+          itens,
+          data_necessidade: dataNecessidade || undefined,
+          texto_original:   textoAi || undefined,
+          comprador_id:     compradorSugerido?.id,
+          ai_confianca:     confianca,
+        }),
+        timeoutPromise,
+      ])
       nav('/requisicoes')
-    } catch { /* handled */ }
+    } catch { /* handled by mutation.isError */ }
   }
 
   // ═══════════════════════════════════════
@@ -479,7 +486,7 @@ export default function NovaRequisicao() {
   if (step === 2) return (
     <div className="space-y-5">
       <Stepper step={2} />
-      <button onClick={() => setStep(1)} className="flex items-center gap-1 text-slate-500 text-sm -mt-2">
+      <button onClick={() => { setStep(1); setStepErrors([]) }} className="flex items-center gap-1 text-slate-500 text-sm -mt-2">
         <ChevronLeft size={16} /> Voltar
       </button>
 
@@ -618,13 +625,31 @@ export default function NovaRequisicao() {
         </div>
       )}
 
-      <button onClick={() => {
-        if (!solicitante.trim() || !obraNome || !descricao.trim()) return
-        setStep(3)
-      }}
-        className="w-full bg-teal-500 text-white rounded-2xl py-3.5 font-bold flex items-center justify-center gap-2 shadow-lg shadow-teal-500/25 active:scale-[0.98] transition-all">
-        Revisar e Confirmar <ChevronRight size={16} />
-      </button>
+      <div className="space-y-3">
+        {stepErrors.length > 0 && (
+          <div className="bg-red-50 border border-red-200 rounded-xl p-3 space-y-1">
+            {stepErrors.map(err => (
+              <p key={err} className="text-red-600 text-xs font-medium flex items-center gap-1.5">
+                <AlertCircle size={12} className="shrink-0" /> {err}
+              </p>
+            ))}
+          </div>
+        )}
+        <button
+          onClick={() => {
+            const errs: string[] = []
+            if (!solicitante.trim()) errs.push('Informe o nome do solicitante')
+            if (!obraNome) errs.push('Selecione a obra')
+            if (!descricao.trim()) errs.push('Informe a descricao do que precisa ser comprado')
+            if (itens.every(i => !i.descricao.trim())) errs.push('Adicione ao menos um item com descricao')
+            setStepErrors(errs)
+            if (errs.length === 0) setStep(3)
+          }}
+          className="w-full bg-teal-500 text-white rounded-2xl py-3.5 font-bold flex items-center justify-center gap-2 shadow-lg shadow-teal-500/25 active:scale-[0.98] transition-all"
+        >
+          Revisar e Confirmar <ChevronRight size={16} />
+        </button>
+      </div>
     </div>
   )
 
