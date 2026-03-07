@@ -1,5 +1,5 @@
 import {
-  useState, useRef, useEffect, useCallback, Fragment,
+  useState, useRef, useEffect, useCallback,
   type KeyboardEvent,
 } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
@@ -256,18 +256,42 @@ function Bubble({ msg, onNav }: { msg: ChatMessage; onNav: (p: string) => void }
   )
 }
 
-// ── Content Renderer (handles markdown links + bold) ────────────────────────────
+// ── Content Renderer (handles code blocks, headers, markdown links + bold) ───────
 
 function Content({ text, onNav, isUser }: { text: string; onNav: (p: string) => void; isUser: boolean }) {
-  const lines = text.split('\n')
+  // Separar code blocks do texto normal usando matchAll
+  const codePattern = /```(\w*)\n?([\s\S]*?)```/g
+  const parts: Array<{ kind: 'text' | 'code'; content: string; lang?: string }> = []
+  let cursor = 0
+  for (const m of text.matchAll(codePattern)) {
+    if (m.index! > cursor) parts.push({ kind: 'text', content: text.slice(cursor, m.index) })
+    parts.push({ kind: 'code', content: m[2].trim(), lang: m[1] || undefined })
+    cursor = m.index! + m[0].length
+  }
+  if (cursor < text.length) parts.push({ kind: 'text', content: text.slice(cursor) })
+
   return (
     <>
-      {lines.map((line, i) => (
-        <Fragment key={i}>
-          {i > 0 && <br />}
-          <Line line={line} onNav={onNav} isUser={isUser} />
-        </Fragment>
-      ))}
+      {parts.map((part, i) =>
+        part.kind === 'code' ? (
+          <pre key={i} className="my-2 p-3 rounded-xl bg-black/40 border border-white/10 overflow-x-auto text-[11px] font-mono text-emerald-300 leading-relaxed whitespace-pre-wrap">
+            {part.lang && (
+              <span className="block text-[9px] text-slate-500 mb-1.5 uppercase tracking-wider">{part.lang}</span>
+            )}
+            {part.content}
+          </pre>
+        ) : (
+          <span key={i}>
+            {part.content.split('\n').map((line, j) => {
+              const h2 = line.match(/^##\s+(.+)/)
+              const h3 = line.match(/^###\s+(.+)/)
+              if (h2) return <p key={j} className="font-bold text-white/90 text-[14px] mt-2 mb-1">{h2[1]}</p>
+              if (h3) return <p key={j} className="font-semibold text-white/80 text-[13px] mt-1.5 mb-0.5">{h3[1]}</p>
+              return <span key={j}>{j > 0 && <br />}<Line line={line} onNav={onNav} isUser={isUser} /></span>
+            })}
+          </span>
+        )
+      )}
     </>
   )
 }

@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from 'react'
+import { useState, useCallback, useRef, useEffect } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 
 const WEBHOOK_URL = 'https://teg-agents-n8n.nmmcas.easypanel.host/webhook/superteg/chat'
@@ -16,8 +16,19 @@ export interface ChatMessage {
 
 export function useSuperTEG() {
   const { perfil } = useAuth()
-  const [messages, setMessages] = useState<ChatMessage[]>([])
+  const [messages, setMessages] = useState<ChatMessage[]>(() => {
+    try {
+      const saved = sessionStorage.getItem('superteg-history')
+      return saved ? (JSON.parse(saved) as ChatMessage[]) : []
+    } catch { return [] }
+  })
   const [isLoading, setIsLoading] = useState(false)
+
+  useEffect(() => {
+    try {
+      sessionStorage.setItem('superteg-history', JSON.stringify(messages.slice(-20)))
+    } catch { /* storage cheio */ }
+  }, [messages])
   const busyRef = useRef(false)
   const sessionRef = useRef(
     `web_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`
@@ -74,6 +85,7 @@ export function useSuperTEG() {
 
   const clearMessages = useCallback(() => {
     setMessages([])
+    sessionStorage.removeItem('superteg-history')
     sessionRef.current = `web_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`
   }, [])
 
