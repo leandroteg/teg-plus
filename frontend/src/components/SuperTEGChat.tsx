@@ -283,10 +283,10 @@ function Content({ text, onNav, isUser }: { text: string; onNav: (p: string) => 
         ) : (
           <span key={i}>
             {part.content.split('\n').map((line, j) => {
-              const h2 = line.match(/^##\s+(.+)/)
               const h3 = line.match(/^###\s+(.+)/)
-              if (h2) return <p key={j} className="font-bold text-white/90 text-[14px] mt-2 mb-1">{h2[1]}</p>
+              const h2 = line.match(/^##\s+(.+)/)
               if (h3) return <p key={j} className="font-semibold text-white/80 text-[13px] mt-1.5 mb-0.5">{h3[1]}</p>
+              if (h2) return <p key={j} className="font-bold text-white/90 text-[14px] mt-2 mb-1">{h2[1]}</p>
               return <span key={j}>{j > 0 && <br />}<Line line={line} onNav={onNav} isUser={isUser} /></span>
             })}
           </span>
