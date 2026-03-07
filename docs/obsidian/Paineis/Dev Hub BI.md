@@ -88,6 +88,12 @@ function card(inner, cols) {
   return '<div style="' + span + 'background:var(--background-secondary);border:1px solid rgba(128,128,128,.14);border-radius:12px;padding:18px;">' + inner + '</div>';
 }
 
+// Tag helper: Dataview returns tags with # prefix
+function hasTag(item, tag) {
+  if (!item.tags) return false;
+  return item.tags.includes(tag) || item.tags.includes('#' + tag);
+}
+
 // ── METRICS ─────────────────────────────────────────────────
 var total      = issues.length;
 var abertos    = issues.where(function(i){return i.status === "aberto"}).length;
@@ -95,8 +101,8 @@ var emAndam    = issues.where(function(i){return i.status === "em-andamento"}).l
 var resolvidos = issues.where(function(i){return i.status === "resolvido"}).length;
 var pendentes  = abertos + emAndam;
 
-var bugs    = issues.where(function(i){return i.tags && i.tags.includes("bug")}).length;
-var enh     = issues.where(function(i){return i.tags && i.tags.includes("enhancement")}).length;
+var bugs    = issues.where(function(i){return hasTag(i, "bug")}).length;
+var enh     = issues.where(function(i){return hasTag(i, "enhancement")}).length;
 var outros  = total - bugs - enh;
 
 var ghCount    = issues.where(function(i){return i.github_issue}).length;
@@ -110,15 +116,15 @@ var baixos   = issues.where(function(i){return i.status !== "resolvido" && i.sev
 
 var resolveRate = pct(resolvidos, total);
 
-var bugsResolved = issues.where(function(i){return i.tags && i.tags.includes("bug") && i.status === "resolvido"}).length;
-var enhResolved  = issues.where(function(i){return i.tags && i.tags.includes("enhancement") && i.status === "resolvido"}).length;
+var bugsResolved = issues.where(function(i){return hasTag(i, "bug") && i.status === "resolvido"}).length;
+var enhResolved  = issues.where(function(i){return hasTag(i, "enhancement") && i.status === "resolvido"}).length;
 
 var modulos    = [...new Set(issues.map(function(i){return i.modulo}).filter(Boolean))].sort();
 var modEmoji   = { compras:'🛒', financeiro:'💰', estoque:'📦', logistica:'🚛', frotas:'🚗', geral:'⚙️', infra:'🔧' };
 
 var sevOrder = {"critica": 0, "alta": 1, "media": 2, "baixa": 3};
 var topIssues = issues.where(function(i){return i.status !== "resolvido"})
-  .sort(function(i){return sevOrder[i.severidade] || 9}, "asc").array().slice(0, 6);
+  .sort(function(i){var v = sevOrder[i.severidade]; return v !== undefined ? v : 9;}, "asc").array().slice(0, 6);
 
 // ── COLORS ──────────────────────────────────────────────────
 var C = {
@@ -246,8 +252,8 @@ if (topIssues.length) {
   topIssues.forEach(function(i) {
     var sv = sevStyle(i.severidade);
     var ic = sv[0]; var col = sv[1];
-    var tipo = i.tags && i.tags.includes("bug") ? "🐛"
-             : i.tags && i.tags.includes("enhancement") ? "💡" : "📋";
+    var tipo = hasTag(i, "bug") ? "🐛"
+             : hasTag(i, "enhancement") ? "💡" : "📋";
     var gh = i.github_issue ? '<span style="font-size:.7em;opacity:.6;margin-left:4px;">GH#' + i.github_issue + '</span>' : '';
     var orig = i.origem === "superteg-agent" ? ' 🤖' : '';
     var stLabel = i.status === "em-andamento" ? "🔵 DEV" : "ABERTA";
@@ -437,7 +443,7 @@ if (ghIssues.length === 0) {
       const stIcon = i.status === "resolvido" ? "✅" :
                      i.status === "em-andamento" ? "🔵" : "🔴";
       const ghLink = `[#${i.github_issue}](${i.github_url})`;
-      const labels = i.tags ? i.tags.filter(t => t !== "issue" && t !== "github").join(", ") : "—";
+      const labels = i.tags ? i.tags.filter(t => t !== "issue" && t !== "github" && t !== "#issue" && t !== "#github").map(t => t.replace(/^#/, '')).join(", ") : "—";
       return [
         ghLink,
         dv.fileLink(i.file.name, false, i.titulo),
@@ -463,8 +469,9 @@ if (agentIssues.length === 0) {
   dv.table(
     ["Data", "Tipo", "Issue", "Modulo", "Status"],
     agentIssues.sort(i => i.data_report, "desc").map(i => {
-      const tipo = i.tags && i.tags.includes("bug") ? "🐛 Bug" :
-                   i.tags && i.tags.includes("enhancement") ? "💡 Melhoria" : "📋 Tarefa";
+      const ht = (item, tag) => item.tags && (item.tags.includes(tag) || item.tags.includes('#' + tag));
+      const tipo = ht(i, "bug") ? "🐛 Bug" :
+                   ht(i, "enhancement") ? "💡 Melhoria" : "📋 Tarefa";
       const stIcon = i.status === "resolvido" ? "✅" :
                      i.status === "em-andamento" ? "🔵" : "🔴";
       return [

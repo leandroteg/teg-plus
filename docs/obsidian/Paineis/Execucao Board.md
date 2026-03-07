@@ -20,8 +20,9 @@ const total = issues.length;
 const abertos = issues.where(i => i.status === "aberto").length;
 const andamento = issues.where(i => i.status === "em-andamento").length;
 const resolvidos = issues.where(i => i.status === "resolvido").length;
-const bugs = issues.where(i => i.tags && i.tags.includes("bug")).length;
-const enh = issues.where(i => i.tags && i.tags.includes("enhancement")).length;
+const ht = (item, tag) => item.tags && (item.tags.includes(tag) || item.tags.includes('#' + tag));
+const bugs = issues.where(i => ht(i, "bug")).length;
+const enh = issues.where(i => ht(i, "enhancement")).length;
 
 const bar = v => "█".repeat(Math.round(v / 5)) + "░".repeat(20 - Math.round(v / 5));
 const pctDone = total > 0 ? Math.round((resolvidos / total) * 100) : 0;
@@ -62,8 +63,8 @@ if (sorted.length === 0) {
       const icon = i.severidade === "critica" ? "🔴 CRITICA" :
                    i.severidade === "alta" ? "🟠 ALTA" :
                    i.severidade === "media" ? "🟡 MEDIA" : "🟢 BAIXA";
-      const tipo = i.tags && i.tags.includes("bug") ? "🐛 Bug" :
-                   i.tags && i.tags.includes("enhancement") ? "💡 Melhoria" : "📋 Task";
+      const tipo = i.tags && (i.tags.includes("bug") || i.tags.includes("#bug")) ? "🐛 Bug" :
+                   i.tags && (i.tags.includes("enhancement") || i.tags.includes("#enhancement")) ? "💡 Melhoria" : "📋 Task";
       const gh = i.github_issue ? `[GH#${i.github_issue}](${i.github_url})` : "—";
       return [
         icon,
@@ -130,8 +131,8 @@ if (issues.length === 0) {
   dv.table(
     ["Data", "Issue", "Tipo", "Modulo"],
     issues.map(i => {
-      const tipo = i.tags && i.tags.includes("bug") ? "🐛" :
-                   i.tags && i.tags.includes("enhancement") ? "💡" : "📋";
+      const tipo = i.tags && (i.tags.includes("bug") || i.tags.includes("#bug")) ? "🐛" :
+                   i.tags && (i.tags.includes("enhancement") || i.tags.includes("#enhancement")) ? "💡" : "📋";
       return [
         i.data_report || "—",
         dv.fileLink(i.file.name, false, "✅ " + (i.titulo || "").substring(0, 55)),
@@ -150,9 +151,10 @@ if (issues.length === 0) {
 ```dataviewjs
 const issues = dv.pages('"obsidian/Database/Issues"');
 
-const bugs = issues.where(i => i.tags && i.tags.includes("bug"));
-const enh = issues.where(i => i.tags && i.tags.includes("enhancement"));
-const outros = issues.where(i => !i.tags || (!i.tags.includes("bug") && !i.tags.includes("enhancement")));
+const ht = (item, tag) => item.tags && (item.tags.includes(tag) || item.tags.includes('#' + tag));
+const bugs = issues.where(i => ht(i, "bug"));
+const enh = issues.where(i => ht(i, "enhancement"));
+const outros = issues.where(i => !ht(i, "bug") && !ht(i, "enhancement"));
 
 const bugsOpen = bugs.where(i => i.status !== "resolvido").length;
 const bugsDone = bugs.where(i => i.status === "resolvido").length;
