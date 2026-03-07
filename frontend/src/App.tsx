@@ -65,6 +65,9 @@ import NotasFiscais from './pages/financeiro/NotasFiscais'
 import SolicitacaoNF from './pages/fiscal/SolicitacaoNF'
 import EmissaoNF from './pages/fiscal/EmissaoNF'
 
+// SuperTEG AI Chat
+import SuperTEGChat from './components/SuperTEGChat'
+
 // Módulo Estoque
 import EstoqueLayout from './components/EstoqueLayout'
 import EstoqueHome from './pages/estoque/EstoqueHome'
@@ -231,6 +234,7 @@ export default function App() {
           </Route>
         </Route>
       </Routes>
+      <SuperTEGChat />
     </AuthProvider>
     </ThemeProvider>
   )
