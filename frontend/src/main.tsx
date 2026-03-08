@@ -3,7 +3,16 @@ import ReactDOM from 'react-dom/client'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { BrowserRouter } from 'react-router-dom'
 import App from './App'
+import ErrorBoundary from './components/ErrorBoundary'
 import './index.css'
+
+// ── Global error reporting (swap for Sentry in production) ──────────────────
+window.addEventListener('error', (e) => {
+  console.error('[TEG+ Error]', { message: e.message, filename: e.filename, line: e.lineno, col: e.colno })
+})
+window.addEventListener('unhandledrejection', (e) => {
+  console.error('[TEG+ Unhandled Promise]', e.reason)
+})
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -15,7 +24,9 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <QueryClientProvider client={queryClient}>
       <BrowserRouter>
-        <App />
+        <ErrorBoundary>
+          <App />
+        </ErrorBoundary>
       </BrowserRouter>
     </QueryClientProvider>
   </React.StrictMode>

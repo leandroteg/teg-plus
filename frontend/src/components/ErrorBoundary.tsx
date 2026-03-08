@@ -20,7 +20,13 @@ export default class ErrorBoundary extends Component<Props, State> {
   }
 
   componentDidCatch(error: Error, info: React.ErrorInfo) {
-    console.error(`[ErrorBoundary${this.props.moduleName ? ` - ${this.props.moduleName}` : ''}]`, error, info.componentStack)
+    const module = this.props.moduleName || 'unknown'
+    console.error('[TEG+ ErrorBoundary]', {
+      module,
+      message: error.message,
+      stack: error.stack,
+      componentStack: info.componentStack,
+    })
   }
 
   handleRetry = () => {
