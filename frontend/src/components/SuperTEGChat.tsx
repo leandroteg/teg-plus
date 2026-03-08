@@ -5,8 +5,9 @@ import {
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { useSuperTEG, type ChatMessage } from '../hooks/useSuperTEG'
+import { useVoiceRecorder } from '../hooks/useVoiceRecorder'
 import {
-  Sparkles, X, RotateCcw, Send,
+  Sparkles, X, RotateCcw, Send, Mic, Square, XCircle,
   BarChart3, ClipboardList, Package, Lightbulb,
   type LucideIcon,
 } from 'lucide-react'
@@ -28,7 +29,8 @@ export default function SuperTEGChat() {
   const location      = useLocation()
   const [isOpen, setIsOpen]   = useState(false)
   const [input, setInput]     = useState('')
-  const { messages, isLoading, sendMessage, clearMessages } = useSuperTEG()
+  const { messages, isLoading, sendMessage, sendAudio, clearMessages } = useSuperTEG()
+  const voice = useVoiceRecorder()
   const scrollRef = useRef<HTMLDivElement>(null)
   const inputRef  = useRef<HTMLInputElement>(null)
 
@@ -52,6 +54,20 @@ export default function SuperTEGChat() {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend() }
   }
 
+  const handleMicPress = useCallback(async () => {
+    if (voice.state === 'idle') {
+      await voice.startRecording()
+    }
+  }, [voice])
+
+  const handleMicStop = useCallback(async () => {
+    if (voice.state !== 'recording') return
+    const { blob, transcript } = await voice.stopRecording()
+    if (blob.size > 0) {
+      sendAudio(blob, transcript)
+    }
+  }, [voice, sendAudio])
+
   const nav = useCallback((path: string) => {
     navigate(path)
     setIsOpen(false)
@@ -61,6 +77,7 @@ export default function SuperTEGChat() {
   if (!perfil || location.pathname === '/login' || location.pathname === '/nova-senha') return null
 
   const firstName = perfil.nome?.split(' ')[0] || 'Usuário'
+  const isRecording = voice.state === 'recording'
 
   return (
     <>
@@ -134,7 +151,7 @@ export default function SuperTEGChat() {
           </div>
 
           {/* Quick actions (compact, visible after first message) */}
-          {messages.length > 0 && !isLoading && (
+          {messages.length > 0 && !isLoading && !isRecording && (
             <div className="px-3 pb-1.5 pt-1.5 flex gap-1.5 overflow-x-auto shrink-0 bg-white border-t border-slate-100/60" style={{ scrollbarWidth: 'none' }}>
               {QUICK_ACTIONS.map(a => (
                 <button
@@ -149,27 +166,80 @@ export default function SuperTEGChat() {
             </div>
           )}
 
-          {/* Input */}
+          {/* Input area */}
           <div className="px-3 pb-3 pt-2 shrink-0 bg-white">
-            <div className="flex items-center gap-2 bg-slate-50 rounded-xl px-3.5 py-2.5 border border-slate-200/80 focus-within:border-teal-400 focus-within:ring-2 focus-within:ring-teal-50 transition-all duration-200">
-              <input
-                ref={inputRef}
-                type="text"
-                value={input}
-                onChange={e => setInput(e.target.value)}
-                onKeyDown={handleKey}
-                placeholder="Digite sua mensagem..."
-                className="flex-1 bg-transparent text-slate-700 text-[13px] placeholder-slate-400 outline-none min-w-0"
-                disabled={isLoading}
-              />
-              <button
-                onClick={handleSend}
-                disabled={!input.trim() || isLoading}
-                className="w-8 h-8 rounded-lg bg-teal-600 text-white flex items-center justify-center shrink-0 disabled:opacity-20 disabled:cursor-not-allowed hover:bg-teal-500 active:scale-90 transition-all duration-150"
-              >
-                <Send className="w-3.5 h-3.5" strokeWidth={2.2} />
-              </button>
-            </div>
+            {isRecording ? (
+              /* ── Recording state ─────────────────────────────── */
+              <div className="flex items-center gap-2 bg-red-50 rounded-xl px-3.5 py-2.5 border border-red-200/60 transition-all duration-200">
+                {/* Pulsing red dot + timer */}
+                <div className="flex items-center gap-2 min-w-0 flex-1">
+                  <span className="relative flex items-center justify-center w-3 h-3 shrink-0">
+                    <span className="absolute w-3 h-3 rounded-full bg-red-400 animate-ping opacity-75" />
+                    <span className="relative w-2 h-2 rounded-full bg-red-500" />
+                  </span>
+                  <span className="text-red-600 text-[12px] font-mono font-medium tabular-nums shrink-0">
+                    {voice.formatDuration(voice.duration)}
+                  </span>
+                  {/* Live transcript preview */}
+                  <span className="text-slate-500 text-[12px] truncate min-w-0">
+                    {voice.transcript || 'Ouvindo...'}
+                  </span>
+                </div>
+
+                {/* Cancel */}
+                <button
+                  onClick={voice.cancelRecording}
+                  className="p-1.5 rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-100 transition-colors duration-150 shrink-0"
+                  title="Cancelar"
+                >
+                  <XCircle className="w-4 h-4" strokeWidth={2} />
+                </button>
+
+                {/* Stop & send */}
+                <button
+                  onClick={handleMicStop}
+                  className="w-8 h-8 rounded-lg bg-red-500 text-white flex items-center justify-center shrink-0 hover:bg-red-600 active:scale-90 transition-all duration-150"
+                  title="Enviar áudio"
+                >
+                  <Square className="w-3 h-3" fill="currentColor" strokeWidth={0} />
+                </button>
+              </div>
+            ) : (
+              /* ── Normal input state ──────────────────────────── */
+              <div className="flex items-center gap-2 bg-slate-50 rounded-xl px-3.5 py-2.5 border border-slate-200/80 focus-within:border-teal-400 focus-within:ring-2 focus-within:ring-teal-50 transition-all duration-200">
+                <input
+                  ref={inputRef}
+                  type="text"
+                  value={input}
+                  onChange={e => setInput(e.target.value)}
+                  onKeyDown={handleKey}
+                  placeholder="Digite ou envie áudio..."
+                  className="flex-1 bg-transparent text-slate-700 text-[13px] placeholder-slate-400 outline-none min-w-0"
+                  disabled={isLoading}
+                />
+
+                {/* Mic button (visible when input is empty) */}
+                {!input.trim() && voice.isSupported && (
+                  <button
+                    onClick={handleMicPress}
+                    disabled={isLoading}
+                    className="w-8 h-8 rounded-lg text-slate-400 flex items-center justify-center shrink-0 disabled:opacity-20 hover:text-teal-600 hover:bg-teal-50 active:scale-90 transition-all duration-150"
+                    title="Gravar áudio"
+                  >
+                    <Mic className="w-4 h-4" strokeWidth={2} />
+                  </button>
+                )}
+
+                {/* Send button */}
+                <button
+                  onClick={handleSend}
+                  disabled={!input.trim() || isLoading}
+                  className="w-8 h-8 rounded-lg bg-teal-600 text-white flex items-center justify-center shrink-0 disabled:opacity-20 disabled:cursor-not-allowed hover:bg-teal-500 active:scale-90 transition-all duration-150"
+                >
+                  <Send className="w-3.5 h-3.5" strokeWidth={2.2} />
+                </button>
+              </div>
+            )}
             <p className="text-center text-[9px] text-slate-300 mt-1.5 select-none tracking-wide">
               SuperTEG · Powered by AI
             </p>
@@ -265,6 +335,7 @@ function WelcomeState({ name, onAction }: { name: string; onAction: (p: string) 
 
 function Bubble({ msg, onNav }: { msg: ChatMessage; onNav: (p: string) => void }) {
   const isUser = msg.role === 'user'
+  const isAudio = msg.type === 'audio'
   return (
     <div
       className={`flex ${isUser ? 'justify-end' : 'justify-start'}`}
@@ -282,6 +353,11 @@ function Bubble({ msg, onNav }: { msg: ChatMessage; onNav: (p: string) => void }
             : 'bg-white text-slate-600 border border-slate-100 rounded-2xl rounded-bl-md shadow-sm shadow-black/[.02]'
         }`}
       >
+        {isAudio && isUser && (
+          <span className="inline-flex items-center gap-1 mr-1 opacity-70">
+            <Mic className="w-3 h-3 inline" strokeWidth={2} />
+          </span>
+        )}
         <Content text={msg.content} onNav={onNav} isUser={isUser} />
       </div>
     </div>
