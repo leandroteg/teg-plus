@@ -5,11 +5,21 @@ const WEBHOOK_URL = 'https://teg-agents-n8n.nmmcas.easypanel.host/webhook/supert
 
 // ── Types ───────────────────────────────────────────────────────────────────────
 
+export interface ChatAction {
+  type: 'navigate' | 'notify_admins' | 'open_url'
+  path?: string
+  url?: string
+  label?: string
+  entity?: string
+  pre_cadastro_id?: string
+}
+
 export interface ChatMessage {
   id: string
   role: 'user' | 'assistant'
   content: string
   type?: 'text' | 'audio'
+  actions?: ChatAction[]
   timestamp: string
 }
 
@@ -24,6 +34,7 @@ export function useSuperTEG() {
     } catch { return [] }
   })
   const [isLoading, setIsLoading] = useState(false)
+  const [pendingAction, setPendingAction] = useState<ChatAction | null>(null)
 
   useEffect(() => {
     try {
@@ -40,6 +51,29 @@ export function useSuperTEG() {
     sessionStorage.getItem('superteg-session-id') ??
     `web_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`
   )
+
+  /** Parse structured actions from n8n response */
+  function parseResponse(data: Record<string, unknown>): { content: string; actions: ChatAction[] } {
+    const content = (data?.resposta || data?.output || data?.text || 'Sem resposta.') as string
+    let actions: ChatAction[] = []
+
+    // Try to get actions from response
+    if (Array.isArray(data?.actions)) {
+      actions = data.actions as ChatAction[]
+    }
+
+    // Auto-detect navigation intents from markdown links in content
+    // Pattern: [label](/path) — extract as navigate actions
+    const linkPattern = /\[([^\]]+)\]\((\/[^)]+)\)/g
+    for (const m of content.matchAll(linkPattern)) {
+      const alreadyExists = actions.some(a => a.path === m[2])
+      if (!alreadyExists) {
+        actions.push({ type: 'navigate', path: m[2], label: m[1] })
+      }
+    }
+
+    return { content, actions }
+  }
 
   const sendMessage = useCallback(
     async (text: string) => {
@@ -68,18 +102,26 @@ export function useSuperTEG() {
 
         const raw = await res.json()
         const data = Array.isArray(raw) ? raw[0] : raw
+        const { content, actions } = parseResponse(data)
 
         setMessages(prev => [...prev, {
           id: `a_${Date.now()}`,
           role: 'assistant',
-          content: data?.resposta || data?.output || data?.text || 'Sem resposta.',
+          content,
+          actions: actions.length > 0 ? actions : undefined,
           timestamp: data?.timestamp || new Date().toISOString(),
         }])
+
+        // Auto-navigate if there's exactly one navigate action
+        const navActions = actions.filter(a => a.type === 'navigate')
+        if (navActions.length === 1) {
+          setPendingAction(navActions[0])
+        }
       } catch {
         setMessages(prev => [...prev, {
           id: `e_${Date.now()}`,
           role: 'assistant',
-          content: 'Não foi possível conectar ao SuperTEG. Tente novamente.',
+          content: 'Nao foi possivel conectar ao SuperTEG. Tente novamente.',
           timestamp: new Date().toISOString(),
         }])
       } finally {
@@ -96,7 +138,7 @@ export function useSuperTEG() {
       busyRef.current = true
       setIsLoading(true)
 
-      const displayText = transcript || 'Mensagem de áudio'
+      const displayText = transcript || 'Mensagem de audio'
       const tempId = `u_${Date.now()}`
       const userMsg: ChatMessage = {
         id: tempId,
@@ -108,7 +150,6 @@ export function useSuperTEG() {
       setMessages(prev => [...prev, userMsg])
 
       try {
-        /* convert blob to base64 */
         const buffer = await blob.arrayBuffer()
         const bytes = new Uint8Array(buffer)
         let binary = ''
@@ -132,7 +173,6 @@ export function useSuperTEG() {
         const raw = await res.json()
         const data = Array.isArray(raw) ? raw[0] : raw
 
-        /* update user message with server transcription if available */
         const serverTranscript = data?.transcription
         if (serverTranscript && serverTranscript !== transcript) {
           setMessages(prev => prev.map(m =>
@@ -140,17 +180,25 @@ export function useSuperTEG() {
           ))
         }
 
+        const { content, actions } = parseResponse(data)
+
         setMessages(prev => [...prev, {
           id: `a_${Date.now()}`,
           role: 'assistant',
-          content: data?.resposta || data?.output || data?.text || 'Sem resposta.',
+          content,
+          actions: actions.length > 0 ? actions : undefined,
           timestamp: data?.timestamp || new Date().toISOString(),
         }])
+
+        const navActions = actions.filter(a => a.type === 'navigate')
+        if (navActions.length === 1) {
+          setPendingAction(navActions[0])
+        }
       } catch {
         setMessages(prev => [...prev, {
           id: `e_${Date.now()}`,
           role: 'assistant',
-          content: 'Não foi possível processar o áudio. Tente novamente.',
+          content: 'Nao foi possivel processar o audio. Tente novamente.',
           timestamp: new Date().toISOString(),
         }])
       } finally {
@@ -168,5 +216,11 @@ export function useSuperTEG() {
     sessionRef.current = `web_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`
   }, [])
 
-  return { messages, isLoading, sendMessage, sendAudio, clearMessages }
+  const consumePendingAction = useCallback(() => {
+    const action = pendingAction
+    setPendingAction(null)
+    return action
+  }, [pendingAction])
+
+  return { messages, isLoading, sendMessage, sendAudio, clearMessages, pendingAction, consumePendingAction }
 }

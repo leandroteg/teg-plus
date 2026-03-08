@@ -4,21 +4,22 @@ import {
 } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
-import { useSuperTEG, type ChatMessage } from '../hooks/useSuperTEG'
+import { useSuperTEG, type ChatMessage, type ChatAction } from '../hooks/useSuperTEG'
 import { useVoiceRecorder } from '../hooks/useVoiceRecorder'
 import {
   Sparkles, X, RotateCcw, Send, Mic, Square, XCircle,
-  BarChart3, ClipboardList, Package, Lightbulb,
+  BarChart3, ClipboardList, Package, Lightbulb, ExternalLink,
+  ArrowRight, Minus,
   type LucideIcon,
 } from 'lucide-react'
 
 // ── Quick-action chips (Lucide icons, zero emojis) ──────────────────────────────
 
 const QUICK_ACTIONS: { icon: LucideIcon; label: string; prompt: string }[] = [
-  { icon: BarChart3,     label: 'Resumo',       prompt: 'Me dê um resumo geral do sistema — KPIs e status' },
-  { icon: ClipboardList, label: 'Requisições',   prompt: 'Quais requisições de compra estão abertas?' },
+  { icon: BarChart3,     label: 'Resumo',       prompt: 'Me de um resumo geral do sistema — KPIs e status' },
+  { icon: ClipboardList, label: 'Requisicoes',   prompt: 'Quais requisicoes de compra estao abertas?' },
   { icon: Package,       label: 'Pedidos',       prompt: 'Qual o status dos pedidos em andamento?' },
-  { icon: Lightbulb,     label: 'Ajuda',         prompt: 'O que você pode fazer por mim?' },
+  { icon: Lightbulb,     label: 'Ajuda',         prompt: 'O que voce pode fazer por mim?' },
 ]
 
 // ── Main Component ──────────────────────────────────────────────────────────────
@@ -29,7 +30,8 @@ export default function SuperTEGChat() {
   const location      = useLocation()
   const [isOpen, setIsOpen]   = useState(false)
   const [input, setInput]     = useState('')
-  const { messages, isLoading, sendMessage, sendAudio, clearMessages } = useSuperTEG()
+  const [toast, setToast]     = useState<string | null>(null)
+  const { messages, isLoading, sendMessage, sendAudio, clearMessages, pendingAction, consumePendingAction } = useSuperTEG()
   const voice = useVoiceRecorder()
   const scrollRef = useRef<HTMLDivElement>(null)
   const inputRef  = useRef<HTMLInputElement>(null)
@@ -43,6 +45,27 @@ export default function SuperTEGChat() {
   useEffect(() => {
     if (isOpen) setTimeout(() => inputRef.current?.focus(), 150)
   }, [isOpen])
+
+  /* Auto-navigate on pending action */
+  useEffect(() => {
+    if (!pendingAction || pendingAction.type !== 'navigate' || !pendingAction.path) return
+
+    const label = pendingAction.label || 'pagina'
+    setToast(`Abrindo ${label}...`)
+
+    const timer = setTimeout(() => {
+      const action = consumePendingAction()
+      if (action?.path) {
+        navigate(action.path)
+        // Minimize chat instead of closing
+        setIsOpen(false)
+      }
+      // Clear toast after navigation
+      setTimeout(() => setToast(null), 1500)
+    }, 1800)
+
+    return () => clearTimeout(timer)
+  }, [pendingAction, consumePendingAction, navigate])
 
   const handleSend = useCallback(() => {
     if (!input.trim() || isLoading) return
@@ -68,16 +91,26 @@ export default function SuperTEGChat() {
     }
   }, [voice, sendAudio])
 
+  const handleActionClick = useCallback((action: ChatAction) => {
+    if (action.type === 'navigate' && action.path) {
+      navigate(action.path)
+      setIsOpen(false) // minimize
+    } else if (action.type === 'open_url' && action.url) {
+      window.open(action.url, '_blank')
+    }
+  }, [navigate])
+
   const nav = useCallback((path: string) => {
     navigate(path)
-    setIsOpen(false)
+    setIsOpen(false) // minimize, keeps session
   }, [navigate])
 
   /* hide for unauthenticated / login page */
   if (!perfil || location.pathname === '/login' || location.pathname === '/nova-senha') return null
 
-  const firstName = perfil.nome?.split(' ')[0] || 'Usuário'
+  const firstName = perfil.nome?.split(' ')[0] || 'Usuario'
   const isRecording = voice.state === 'recording'
+  const hasMessages = messages.length > 0
 
   return (
     <>
@@ -88,10 +121,27 @@ export default function SuperTEGChat() {
           className="fixed bottom-6 right-6 z-[9999] group"
           aria-label="Abrir SuperTEG"
         >
-          <span className="relative flex items-center justify-center w-14 h-14 rounded-full bg-gradient-to-br from-teal-500 to-teal-600 text-white shadow-lg shadow-teal-500/25 group-hover:shadow-xl group-hover:shadow-teal-500/40 group-hover:scale-105 active:scale-95 transition-all duration-200">
+          <span className={`relative flex items-center justify-center w-14 h-14 rounded-full bg-gradient-to-br from-teal-500 to-teal-600 text-white shadow-lg shadow-teal-500/25 group-hover:shadow-xl group-hover:shadow-teal-500/40 group-hover:scale-105 active:scale-95 transition-all duration-200 ${
+            hasMessages ? 'ring-2 ring-teal-300 ring-offset-2' : ''
+          }`}>
             <Sparkles className="w-6 h-6" strokeWidth={1.8} />
+            {/* Session indicator dot */}
+            {hasMessages && (
+              <span className="absolute top-0 right-0 w-3 h-3 rounded-full bg-green-400 border-2 border-white" />
+            )}
           </span>
         </button>
+      )}
+
+      {/* ── Toast ─────────────────────────────────────────── */}
+      {toast && (
+        <div
+          className="fixed bottom-24 right-6 z-[10000] px-4 py-2.5 rounded-xl bg-slate-800 text-white text-[13px] font-medium shadow-lg flex items-center gap-2"
+          style={{ animation: 'steg-msg-in 0.3s ease-out both' }}
+        >
+          <ArrowRight className="w-4 h-4 text-teal-400" />
+          {toast}
+        </div>
       )}
 
       {/* ── Chat Panel ─────────────────────────────────────── */}
@@ -128,9 +178,9 @@ export default function SuperTEGChat() {
               <button
                 onClick={() => setIsOpen(false)}
                 className="p-2 rounded-lg text-slate-300 hover:text-slate-500 hover:bg-slate-50 transition-colors duration-150"
-                title="Fechar"
+                title="Minimizar"
               >
-                <X className="w-4 h-4" strokeWidth={2} />
+                <Minus className="w-4 h-4" strokeWidth={2} />
               </button>
             </div>
           </div>
@@ -142,7 +192,7 @@ export default function SuperTEGChat() {
             ) : (
               <>
                 {messages.map(m => (
-                  <Bubble key={m.id} msg={m} onNav={nav} />
+                  <Bubble key={m.id} msg={m} onNav={nav} onAction={handleActionClick} />
                 ))}
                 {isLoading && <Typing />}
                 <div ref={scrollRef} />
@@ -169,9 +219,8 @@ export default function SuperTEGChat() {
           {/* Input area */}
           <div className="px-3 pb-3 pt-2 shrink-0 bg-white">
             {isRecording ? (
-              /* ── Recording state ─────────────────────────────── */
+              /* Recording state */
               <div className="flex items-center gap-2 bg-red-50 rounded-xl px-3.5 py-2.5 border border-red-200/60 transition-all duration-200">
-                {/* Pulsing red dot + timer */}
                 <div className="flex items-center gap-2 min-w-0 flex-1">
                   <span className="relative flex items-center justify-center w-3 h-3 shrink-0">
                     <span className="absolute w-3 h-3 rounded-full bg-red-400 animate-ping opacity-75" />
@@ -180,13 +229,10 @@ export default function SuperTEGChat() {
                   <span className="text-red-600 text-[12px] font-mono font-medium tabular-nums shrink-0">
                     {voice.formatDuration(voice.duration)}
                   </span>
-                  {/* Live transcript preview */}
                   <span className="text-slate-500 text-[12px] truncate min-w-0">
                     {voice.transcript || 'Ouvindo...'}
                   </span>
                 </div>
-
-                {/* Cancel */}
                 <button
                   onClick={voice.cancelRecording}
                   className="p-1.5 rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-100 transition-colors duration-150 shrink-0"
@@ -194,18 +240,16 @@ export default function SuperTEGChat() {
                 >
                   <XCircle className="w-4 h-4" strokeWidth={2} />
                 </button>
-
-                {/* Stop & send */}
                 <button
                   onClick={handleMicStop}
                   className="w-8 h-8 rounded-lg bg-red-500 text-white flex items-center justify-center shrink-0 hover:bg-red-600 active:scale-90 transition-all duration-150"
-                  title="Enviar áudio"
+                  title="Enviar audio"
                 >
                   <Square className="w-3 h-3" fill="currentColor" strokeWidth={0} />
                 </button>
               </div>
             ) : (
-              /* ── Normal input state ──────────────────────────── */
+              /* Normal input state */
               <div className="flex items-center gap-2 bg-slate-50 rounded-xl px-3.5 py-2.5 border border-slate-200/80 focus-within:border-teal-400 focus-within:ring-2 focus-within:ring-teal-50 transition-all duration-200">
                 <input
                   ref={inputRef}
@@ -213,24 +257,20 @@ export default function SuperTEGChat() {
                   value={input}
                   onChange={e => setInput(e.target.value)}
                   onKeyDown={handleKey}
-                  placeholder="Digite ou envie áudio..."
+                  placeholder="Digite ou envie audio..."
                   className="flex-1 bg-transparent text-slate-700 text-[13px] placeholder-slate-400 outline-none min-w-0"
                   disabled={isLoading}
                 />
-
-                {/* Mic button (visible when input is empty) */}
                 {!input.trim() && voice.isSupported && (
                   <button
                     onClick={handleMicPress}
                     disabled={isLoading}
                     className="w-8 h-8 rounded-lg text-slate-400 flex items-center justify-center shrink-0 disabled:opacity-20 hover:text-teal-600 hover:bg-teal-50 active:scale-90 transition-all duration-150"
-                    title="Gravar áudio"
+                    title="Gravar audio"
                   >
                     <Mic className="w-4 h-4" strokeWidth={2} />
                   </button>
                 )}
-
-                {/* Send button */}
                 <button
                   onClick={handleSend}
                   disabled={!input.trim() || isLoading}
@@ -303,11 +343,11 @@ function WelcomeState({ name, onAction }: { name: string; onAction: (p: string) 
       </div>
 
       <h4 className="text-slate-800 font-semibold text-lg mb-1 tracking-[-0.02em]">
-        Olá, {name}!
+        Ola, {name}!
       </h4>
       <p className="text-slate-400 text-[13px] mb-8 max-w-[280px] leading-relaxed">
         Sou o SuperTEG, seu assistente inteligente. Posso navegar pelo sistema,
-        consultar dados e registrar problemas.
+        consultar dados, fazer cadastros e registrar problemas.
       </p>
 
       <div className="grid grid-cols-2 gap-2.5 w-full max-w-[300px]">
@@ -333,9 +373,11 @@ function WelcomeState({ name, onAction }: { name: string; onAction: (p: string) 
 
 // ── Message Bubble ──────────────────────────────────────────────────────────────
 
-function Bubble({ msg, onNav }: { msg: ChatMessage; onNav: (p: string) => void }) {
+function Bubble({ msg, onNav, onAction }: { msg: ChatMessage; onNav: (p: string) => void; onAction: (a: ChatAction) => void }) {
   const isUser = msg.role === 'user'
   const isAudio = msg.type === 'audio'
+  const actions = msg.actions || []
+
   return (
     <div
       className={`flex ${isUser ? 'justify-end' : 'justify-start'}`}
@@ -346,25 +388,44 @@ function Bubble({ msg, onNav }: { msg: ChatMessage; onNav: (p: string) => void }
           <BotAvatar size="sm" />
         </div>
       )}
-      <div
-        className={`max-w-[82%] px-3.5 py-2.5 text-[13px] leading-relaxed ${
-          isUser
-            ? 'bg-teal-600 text-white rounded-2xl rounded-br-md shadow-sm shadow-teal-600/10'
-            : 'bg-white text-slate-600 border border-slate-100 rounded-2xl rounded-bl-md shadow-sm shadow-black/[.02]'
-        }`}
-      >
-        {isAudio && isUser && (
-          <span className="inline-flex items-center gap-1 mr-1 opacity-70">
-            <Mic className="w-3 h-3 inline" strokeWidth={2} />
-          </span>
+      <div className="max-w-[82%]">
+        <div
+          className={`px-3.5 py-2.5 text-[13px] leading-relaxed ${
+            isUser
+              ? 'bg-teal-600 text-white rounded-2xl rounded-br-md shadow-sm shadow-teal-600/10'
+              : 'bg-white text-slate-600 border border-slate-100 rounded-2xl rounded-bl-md shadow-sm shadow-black/[.02]'
+          }`}
+        >
+          {isAudio && isUser && (
+            <span className="inline-flex items-center gap-1 mr-1 opacity-70">
+              <Mic className="w-3 h-3 inline" strokeWidth={2} />
+            </span>
+          )}
+          <Content text={msg.content} onNav={onNav} isUser={isUser} />
+        </div>
+
+        {/* Action buttons (below bubble) */}
+        {!isUser && actions.length > 0 && (
+          <div className="flex flex-wrap gap-1.5 mt-1.5">
+            {actions.map((a, i) => (
+              <button
+                key={i}
+                onClick={() => onAction(a)}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-teal-50 text-teal-700 text-[11px] font-medium border border-teal-200/60 hover:bg-teal-100 hover:border-teal-300 active:scale-[0.97] transition-all duration-150"
+              >
+                {a.type === 'navigate' && <ArrowRight className="w-3 h-3" strokeWidth={2.5} />}
+                {a.type === 'open_url' && <ExternalLink className="w-3 h-3" strokeWidth={2.5} />}
+                {a.label || a.path || 'Abrir'}
+              </button>
+            ))}
+          </div>
         )}
-        <Content text={msg.content} onNav={onNav} isUser={isUser} />
       </div>
     </div>
   )
 }
 
-// ── Content Renderer (handles code blocks, headers, markdown links + bold) ─────
+// ── Content Renderer ────────────────────────────────────────────────────────────
 
 function Content({ text, onNav, isUser }: { text: string; onNav: (p: string) => void; isUser: boolean }) {
   const codePattern = /```(\w*)\n?([\s\S]*?)```/g
@@ -409,7 +470,6 @@ function Line({ line, onNav, isUser }: { line: string; onNav: (p: string) => voi
   return (
     <>
       {tokens.map((tok, i) => {
-        /* bold link: **[text](url)** */
         const blink = tok.match(/\*\*\[(.*?)\]\((.*?)\)\*\*/)
         if (blink) {
           return (
@@ -427,7 +487,6 @@ function Line({ line, onNav, isUser }: { line: string; onNav: (p: string) => voi
           )
         }
 
-        /* regular link: [text](url) */
         const link = tok.match(/\[(.*?)\]\((.*?)\)/)
         if (link) {
           return (
@@ -445,7 +504,6 @@ function Line({ line, onNav, isUser }: { line: string; onNav: (p: string) => voi
           )
         }
 
-        /* bold: **text** */
         const bold = tok.match(/\*\*(.*?)\*\*/)
         if (bold) return <strong key={i} className="font-semibold">{bold[1]}</strong>
 

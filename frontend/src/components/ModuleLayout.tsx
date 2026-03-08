@@ -5,6 +5,7 @@ import { useState, useEffect } from 'react'
 import { useAuth, ROLE_LABEL, ROLE_COLOR } from '../contexts/AuthContext'
 import { useTheme } from '../contexts/ThemeContext'
 import LogoTeg from './LogoTeg'
+import NotificationBell from './NotificationBell'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -541,11 +542,14 @@ export default function ModuleLayout({
             {renderCadastrosLink()}
           </nav>
 
-          {/* Avatar + Footer */}
+          {/* Avatar + Notifications + Footer */}
           <div className="mt-auto space-y-3">
-            <div className="relative flex justify-center" data-avatar-menu>
-              {renderAvatarButton('sm')}
-              {renderAvatarDropdown()}
+            <div className="flex items-center justify-center gap-2">
+              <NotificationBell isDark={!ls} />
+              <div className="relative" data-avatar-menu>
+                {renderAvatarButton('sm')}
+                {renderAvatarDropdown()}
+              </div>
             </div>
             <div className={`pt-3 border-t ${ls ? 'border-slate-100' : 'border-white/5'}`}>
               <p className={`text-[10px] text-center ${ls ? 'text-slate-400' : 'text-slate-600'}`}>
@@ -570,6 +574,7 @@ export default function ModuleLayout({
               </span>
             </div>
             <div className="flex items-center gap-2">
+              <NotificationBell isDark={!ls} />
               <div className="relative" data-avatar-menu>
                 {renderAvatarButton('sm')}
                 {renderAvatarDropdown('header')}
@@ -648,6 +653,7 @@ export default function ModuleLayout({
               <p className={`font-black text-lg tracking-tight leading-none ${ls ? 'text-slate-800' : 'text-white'}`}>TEG+</p>
               <p className={`text-[10px] font-medium mt-0.5 ${ls ? 'text-slate-400' : 'text-slate-500'}`}>ERP Sistema</p>
             </div>
+            <NotificationBell isDark={!ls} />
             <div className="relative" data-avatar-menu>
               {renderAvatarButton()}
               {renderAvatarDropdown()}
@@ -709,7 +715,8 @@ export default function ModuleLayout({
             </div>
           </div>
 
-          {/* Avatar dropdown */}
+          {/* Notifications + Avatar */}
+          <NotificationBell isDark={!ls} />
           <div className="relative" data-avatar-menu>
             {renderAvatarButton('sm')}
             {renderAvatarDropdown('header')}
