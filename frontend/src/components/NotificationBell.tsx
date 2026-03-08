@@ -25,7 +25,7 @@ export default function NotificationBell({ isDark = false }: { isDark?: boolean 
       rightVal = (window.innerWidth - panelW) / 2
     }
     setPos({
-      top: r.bottom + 8,
+      top: r.bottom + 4,
       right: Math.max(8, rightVal),
     })
   }, [])

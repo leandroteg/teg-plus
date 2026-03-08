@@ -118,16 +118,15 @@ export default function SuperTEGChat() {
       {!isOpen && (
         <button
           onClick={() => setIsOpen(true)}
-          className="fixed bottom-6 right-6 z-[9999] group"
+          className="fixed bottom-20 right-4 sm:bottom-6 sm:right-6 z-[9999] group"
           aria-label="Abrir SuperTEG"
         >
-          <span className={`relative flex items-center justify-center w-14 h-14 rounded-full bg-gradient-to-br from-teal-500 to-teal-600 text-white shadow-lg shadow-teal-500/25 group-hover:shadow-xl group-hover:shadow-teal-500/40 group-hover:scale-105 active:scale-95 transition-all duration-200 ${
+          <span className={`relative flex items-center justify-center w-12 h-12 sm:w-14 sm:h-14 rounded-full bg-gradient-to-br from-teal-500 to-teal-600 text-white shadow-lg shadow-teal-500/25 group-hover:shadow-xl group-hover:shadow-teal-500/40 group-hover:scale-105 active:scale-95 transition-all duration-200 ${
             hasMessages ? 'ring-2 ring-teal-300 ring-offset-2' : ''
           }`}>
-            <Sparkles className="w-6 h-6" strokeWidth={1.8} />
-            {/* Session indicator dot */}
+            <Sparkles className="w-5 h-5 sm:w-6 sm:h-6" strokeWidth={1.8} />
             {hasMessages && (
-              <span className="absolute top-0 right-0 w-3 h-3 rounded-full bg-green-400 border-2 border-white" />
+              <span className="absolute top-0 right-0 w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full bg-green-400 border-2 border-white" />
             )}
           </span>
         </button>
@@ -136,7 +135,7 @@ export default function SuperTEGChat() {
       {/* ── Toast ─────────────────────────────────────────── */}
       {toast && (
         <div
-          className="fixed bottom-24 right-6 z-[10000] px-4 py-2.5 rounded-xl bg-slate-800 text-white text-[13px] font-medium shadow-lg flex items-center gap-2"
+          className="fixed bottom-36 right-4 sm:bottom-24 sm:right-6 z-[10000] px-4 py-2.5 rounded-xl bg-slate-800 text-white text-[13px] font-medium shadow-lg flex items-center gap-2"
           style={{ animation: 'steg-msg-in 0.3s ease-out both' }}
         >
           <ArrowRight className="w-4 h-4 text-teal-400" />
