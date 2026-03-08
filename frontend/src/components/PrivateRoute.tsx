@@ -37,7 +37,7 @@ function AuthLoading() {
 
 // ── Guard: usuário autenticado ─────────────────────────────────────────────────
 export function PrivateRoute() {
-  const { user, loading, perfilReady, perfil } = useAuth()
+  const { user, loading, perfilReady, perfil, pendingPasswordReset } = useAuth()
   const location = useLocation()
 
   // Enquanto carrega ou enquanto o safety net aguarda → spinner
@@ -51,6 +51,11 @@ export function PrivateRoute() {
     return <Navigate to="/login" state={{ from: location }} replace />
   }
 
+  // Recovery link: redireciona para tela dedicada de redefinição de senha
+  if (pendingPasswordReset) {
+    return <Navigate to="/nova-senha" replace />
+  }
+
   return (
     <>
       {perfil && !perfil.senha_definida && <SetPasswordModal />}
@@ -61,7 +66,7 @@ export function PrivateRoute() {
 
 // ── Guard: apenas admins ───────────────────────────────────────────────────────
 export function AdminRoute() {
-  const { user, loading, perfilReady, perfil, isAdmin } = useAuth()
+  const { user, loading, perfilReady, perfil, isAdmin, pendingPasswordReset } = useAuth()
   const location = useLocation()
 
   if (loading || !perfilReady) return <AuthLoading />
@@ -70,6 +75,11 @@ export function AdminRoute() {
 
   if (!user) {
     return <Navigate to="/login" state={{ from: location }} replace />
+  }
+
+  // Recovery link: redireciona para tela dedicada de redefinição de senha
+  if (pendingPasswordReset) {
+    return <Navigate to="/nova-senha" replace />
   }
 
   if (!isAdmin) {
