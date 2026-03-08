@@ -13,64 +13,16 @@ export function useAprovacoesPendentes() {
   return useQuery<AprovacaoPendente[]>({
     queryKey: ['aprovacoes-pendentes'],
     queryFn: async () => {
-      // 1. Busca aprovações pendentes do módulo compras
-      const { data: aprData, error: aprError } = await supabase
-        .from(TABLE_APR)
-        .select('id, entidade_id, aprovador_nome, aprovador_email, nivel, status, observacao, token, data_limite, created_at')
-        .eq('status', 'pendente')
-        .eq('modulo', 'cmp')
-        .order('created_at', { ascending: false })
+      // Single RPC call replaces 3 sequential queries
+      const { data, error } = await supabase.rpc('get_aprovacoes_pendentes_compras')
 
-      if (aprError) throw aprError
-      if (!aprData || aprData.length === 0) return []
+      if (error) throw error
+      if (!data || !Array.isArray(data) || data.length === 0) return []
 
-      // 2. Busca as requisições relacionadas pelos IDs
-      const entidadeIds = aprData.map(a => a.entidade_id).filter(Boolean)
-      const { data: reqData } = await supabase
-        .from(TABLE_REQ)
-        .select('id, numero, solicitante_nome, obra_nome, descricao, valor_estimado, urgencia, status, alcada_nivel, categoria, created_at')
-        .in('id', entidadeIds)
-
-      const reqMap = new Map((reqData ?? []).map(r => [r.id, r]))
-
-      // 3. Busca dados de cotação para cotacao_resumo (fornecedor vencedor, valor, total cotados)
-      const { data: cotData } = await supabase
-        .from('cmp_cotacoes')
-        .select('requisicao_id, fornecedor_selecionado_nome, valor_selecionado, fornecedores:cmp_cotacao_fornecedores!cotacao_id(id, prazo_entrega_dias)')
-        .in('requisicao_id', entidadeIds)
-        .eq('status', 'concluida')
-
-      const cotMap = new Map<string, {
-        fornecedor_nome: string
-        valor: number
-        prazo_dias: number
-        total_cotados: number
-      }>()
-      for (const c of cotData ?? []) {
-        const cot = c as Record<string, unknown>
-        const fornecedores = (cot.fornecedores ?? []) as { id: string; prazo_entrega_dias?: number }[]
-        const selecionado = fornecedores.find(() => true) // primeiro
-        cotMap.set(cot.requisicao_id as string, {
-          fornecedor_nome: (cot.fornecedor_selecionado_nome as string) ?? 'N/A',
-          valor: (cot.valor_selecionado as number) ?? 0,
-          prazo_dias: selecionado?.prazo_entrega_dias ?? 0,
-          total_cotados: fornecedores.length,
-        })
-      }
-
-      // 4. Mescla aprovações com dados da requisição + cotação
-      return aprData
-        .map(a => {
-          const req = reqMap.get(a.entidade_id)
-          if (!req) return null // Ignora aprovações sem requisição válida
-          return {
-            ...a,
-            requisicao_id: a.entidade_id,
-            requisicao: req,
-            cotacao_resumo: cotMap.get(a.entidade_id) ?? undefined,
-          } as AprovacaoPendente
-        })
-        .filter((a): a is AprovacaoPendente => a !== null)
+      return (data as Record<string, unknown>[]).map(a => ({
+        ...a,
+        requisicao_id: a.entidade_id,
+      })) as AprovacaoPendente[]
     },
     refetchInterval: 15_000,
     refetchIntervalInBackground: false,
