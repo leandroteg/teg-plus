@@ -2,13 +2,48 @@ import type { NovaRequisicaoPayload, AiParseResult, NovaCotacaoPayload } from '.
 
 const BASE = import.meta.env.VITE_N8N_WEBHOOK_URL || 'https://teg-agents-n8n.nmmcas.easypanel.host/webhook'
 
+// ── Rate limiter: max concurrent requests + retry with backoff ──────────────
+const MAX_CONCURRENT = 10
+let activeRequests = 0
+const queue: Array<() => void> = []
+
+function acquireSlot(): Promise<void> {
+  if (activeRequests < MAX_CONCURRENT) {
+    activeRequests++
+    return Promise.resolve()
+  }
+  return new Promise(resolve => queue.push(resolve))
+}
+
+function releaseSlot() {
+  activeRequests--
+  const next = queue.shift()
+  if (next) { activeRequests++; next() }
+}
+
+async function fetchWithRetry(url: string, init?: RequestInit, retries = 2): Promise<Response> {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      return await fetch(url, init)
+    } catch (err) {
+      if (attempt >= retries) throw err
+      await new Promise(r => setTimeout(r, 1000 * 2 ** attempt))
+    }
+  }
+}
+
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
-  const res = await fetch(`${BASE}${path}`, {
-    headers: { 'Content-Type': 'application/json' },
-    ...options,
-  })
-  if (!res.ok) throw new Error(`Erro ${res.status}: ${res.statusText}`)
-  return res.json() as Promise<T>
+  await acquireSlot()
+  try {
+    const res = await fetchWithRetry(`${BASE}${path}`, {
+      headers: { 'Content-Type': 'application/json' },
+      ...options,
+    })
+    if (!res.ok) throw new Error(`Erro ${res.status}: ${res.statusText}`)
+    return res.json() as Promise<T>
+  } finally {
+    releaseSlot()
+  }
 }
 
 export interface ParseCotacaoResult {

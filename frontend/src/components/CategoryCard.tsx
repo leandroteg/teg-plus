@@ -4,6 +4,7 @@ import {
   Truck, Briefcase, Car, MapPin, Home, Utensils, Monitor,
   type LucideIcon,
 } from 'lucide-react'
+import { memo } from 'react'
 import type { CategoriaMaterial } from '../types'
 
 // Mapeamento nome do ícone → componente Lucide
@@ -43,7 +44,7 @@ interface Props {
   onClick?: () => void
 }
 
-export default function CategoryCard({ categoria, selected = false, onClick }: Props) {
+function CategoryCard({ categoria, selected = false, onClick }: Props) {
   const Icon = ICON_MAP[categoria.icone] ?? Package
   const corFundo = categoria.cor ?? '#6b7280'
 
@@ -118,3 +119,5 @@ export default function CategoryCard({ categoria, selected = false, onClick }: P
     </button>
   )
 }
+
+export default memo(CategoryCard)

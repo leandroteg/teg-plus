@@ -1,3 +1,4 @@
+import { memo } from 'react'
 import type { LucideIcon } from 'lucide-react'
 
 interface Props {
@@ -15,7 +16,7 @@ const COR_TO_HEX: Record<string, string> = {
   'text-danger':   '#EF4444',
 }
 
-export default function KpiCard({ titulo, valor, icon: Icon, cor = 'text-primary', subtitulo }: Props) {
+function KpiCard({ titulo, valor, icon: Icon, cor = 'text-primary', subtitulo }: Props) {
   const hex = COR_TO_HEX[cor] ?? '#6366F1'
 
   return (
@@ -33,3 +34,5 @@ export default function KpiCard({ titulo, valor, icon: Icon, cor = 'text-primary
     </div>
   )
 }
+
+export default memo(KpiCard)
