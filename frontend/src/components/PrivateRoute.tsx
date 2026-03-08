@@ -1,6 +1,7 @@
 import { Navigate, Outlet, useLocation } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import LogoTeg from './LogoTeg'
+import SetPasswordModal from './SetPasswordModal'
 
 // ── Spinner de loading ─────────────────────────────────────────────────────────
 function AuthLoading() {
@@ -50,7 +51,12 @@ export function PrivateRoute() {
     return <Navigate to="/login" state={{ from: location }} replace />
   }
 
-  return <Outlet />
+  return (
+    <>
+      {perfil && !perfil.senha_definida && <SetPasswordModal />}
+      <Outlet />
+    </>
+  )
 }
 
 // ── Guard: apenas admins ───────────────────────────────────────────────────────
@@ -70,5 +76,10 @@ export function AdminRoute() {
     return <Navigate to="/" replace />
   }
 
-  return <Outlet />
+  return (
+    <>
+      {perfil && !perfil.senha_definida && <SetPasswordModal />}
+      <Outlet />
+    </>
+  )
 }

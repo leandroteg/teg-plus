@@ -55,6 +55,7 @@ export interface Perfil {
   modulos: Record<string, boolean>
   preferencias: Record<string, unknown>
   ativo: boolean
+  senha_definida: boolean
   ultimo_acesso: string | null
   created_at: string
   updated_at: string
@@ -86,6 +87,7 @@ interface AuthContextType {
 
   updatePerfil: (data: Partial<Pick<Perfil, 'nome' | 'cargo' | 'departamento'>>) => Promise<{ error: string | null }>
   reloadPerfil: () => Promise<void>
+  markSenhaDefinida: () => Promise<{ error: string | null }>
 
   role: Role
   roleLabel: string
@@ -278,6 +280,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return { error: null }
   }
 
+  const markSenhaDefinida = async () => {
+    if (!user) return { error: 'Não autenticado' }
+    const { error } = await supabase
+      .from('sys_perfis')
+      .update({ senha_definida: true })
+      .eq('auth_id', user.id)
+    if (error) return { error: error.message }
+    setPerfil(prev => prev ? { ...prev, senha_definida: true } : prev)
+    return { error: null }
+  }
+
   // ── Permission helpers ───────────────────────────────────────────
 
   const role: Role = perfil?.role ?? 'visitante'
@@ -295,6 +308,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     updatePassword,
     updatePerfil,
     reloadPerfil,
+    markSenhaDefinida,
     role,
     roleLabel:  ROLE_LABEL[role],
     isAdmin:    role === 'admin',

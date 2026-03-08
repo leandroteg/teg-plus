@@ -1,13 +1,12 @@
 import { useState, useEffect } from 'react'
 import { Navigate, useSearchParams } from 'react-router-dom'
-import { Mail, Lock, ArrowRight, Zap, AlertCircle, CheckCircle, Eye, EyeOff } from 'lucide-react'
+import { Mail, Lock, ArrowRight, AlertCircle, CheckCircle, Eye, EyeOff } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { useTheme } from '../contexts/ThemeContext'
 import LogoTeg from '../components/LogoTeg'
 import ThemeToggle from '../components/ThemeToggle'
 
-type Mode = 'password' | 'magic'
-type View = 'login' | 'reset' | 'nova-senha' | 'magic-sent'
+type View = 'login' | 'reset' | 'nova-senha'
 
 // ── Sub-componentes fora do Login para evitar remount a cada render ──────────
 // IMPORTANTE: definir componentes DENTRO do componente pai faz React
@@ -96,11 +95,10 @@ function SubmitBtn({ label, busy }: { label: string; busy: boolean }) {
 // ── Componente principal ─────────────────────────────────────────────────────
 
 export default function Login() {
-  const { user, loading, signIn, signInMagicLink, resetPassword, updatePassword } = useAuth()
+  const { user, loading, signIn, resetPassword, updatePassword } = useAuth()
   const { isDark, isLightSidebar: isLight } = useTheme()
   const [searchParams] = useSearchParams()
 
-  const [mode,     setMode]     = useState<Mode>('password')
   const [view,     setView]     = useState<View>('login')
   const [email,    setEmail]    = useState('')
   const [password, setPassword] = useState('')
@@ -127,16 +125,9 @@ export default function Login() {
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault(); clr(); setBusy(true)
-    if (mode === 'magic') {
-      const { error } = await signInMagicLink(email)
-      setBusy(false)
-      if (error) { setError(error); return }
-      setView('magic-sent')
-    } else {
-      const { error } = await signIn(email, password)
-      setBusy(false)
-      if (error) setError(error)
-    }
+    const { error } = await signIn(email, password)
+    setBusy(false)
+    if (error) setError(error)
   }
 
   const handleReset = async (e: React.FormEvent) => {
@@ -191,100 +182,43 @@ export default function Login() {
 
           {/* ── View: LOGIN ── */}
           {view === 'login' && (
-            <>
-              {/* Tabs modo */}
-              <div className={`flex gap-1 m-5 mb-0 rounded-xl p-1 ${isDark ? 'bg-white/5' : 'bg-slate-100'}`}>
-                {([
-                  { m: 'password' as Mode, label: 'Senha',       Icon: null as React.ElementType | null },
-                  { m: 'magic'    as Mode, label: 'Link Mágico', Icon: Zap  as React.ElementType | null },
-                ]).map(({ m, label, Icon }) => (
-                  <button key={m}
-                    type="button"
-                    onClick={() => { setMode(m); clr() }}
-                    className={`flex-1 flex items-center justify-center gap-1.5 py-2 px-3 rounded-lg
-                      text-xs font-semibold transition-all duration-150
-                      ${mode === m
-                        ? isDark ? 'bg-white/10 shadow text-white' : 'bg-white shadow text-navy'
-                        : isDark ? 'text-slate-400 hover:text-white' : 'text-slate-500 hover:text-navy'
-                      }`}
-                  >
-                    {Icon && <Icon size={12} />}
-                    {label}
+            <form onSubmit={handleLogin} className="p-5 space-y-4">
+              <InputField
+                label="E-mail corporativo"
+                type="email"
+                value={email}
+                onChange={v => { setEmail(v); clr() }}
+                placeholder="voce@teguniao.com.br"
+                icon={Mail}
+                autoFocus
+              />
+
+              <InputField
+                label="Senha"
+                type={showPass ? 'text' : 'password'}
+                value={password}
+                onChange={v => { setPassword(v); clr() }}
+                placeholder="••••••••"
+                icon={Lock}
+                suffix={
+                  <button type="button" onClick={() => setShowPass(v => !v)}
+                    className="text-slate-400 hover:text-slate-600 transition-colors">
+                    {showPass ? <EyeOff size={14} /> : <Eye size={14} />}
                   </button>
-                ))}
+                }
+              />
+
+              <div className="text-right -mt-1">
+                <button type="button"
+                  onClick={() => { setView('reset'); clr() }}
+                  className="text-xs text-primary hover:underline font-medium">
+                  Esqueci a senha
+                </button>
               </div>
 
-              <form onSubmit={handleLogin} className="p-5 space-y-4">
-                <InputField
-                  label="E-mail corporativo"
-                  type="email"
-                  value={email}
-                  onChange={v => { setEmail(v); clr() }}
-                  placeholder="voce@teguniao.com.br"
-                  icon={Mail}
-                  autoFocus
-                />
-
-                {mode === 'password' && (
-                  <InputField
-                    label="Senha"
-                    type={showPass ? 'text' : 'password'}
-                    value={password}
-                    onChange={v => { setPassword(v); clr() }}
-                    placeholder="••••••••"
-                    icon={Lock}
-                    suffix={
-                      <button type="button" onClick={() => setShowPass(v => !v)}
-                        className="text-slate-400 hover:text-slate-600 transition-colors">
-                        {showPass ? <EyeOff size={14} /> : <Eye size={14} />}
-                      </button>
-                    }
-                  />
-                )}
-
-                {mode === 'password' && (
-                  <div className="text-right -mt-1">
-                    <button type="button"
-                      onClick={() => { setView('reset'); clr() }}
-                      className="text-xs text-primary hover:underline font-medium">
-                      Esqueci a senha
-                    </button>
-                  </div>
-                )}
-
-                <Feedback error={error} success={success} />
-                <SubmitBtn label={mode === 'magic' ? 'Enviar link de acesso' : 'Entrar'} busy={busy} />
-
-                {mode === 'magic' && (
-                  <p className="text-center text-xs text-slate-400">
-                    Você receberá um link seguro por e-mail — sem precisar de senha
-                  </p>
-                )}
-              </form>
-            </>
-          )}
-
-          {/* ── View: LINK ENVIADO ── */}
-          {view === 'magic-sent' && (
-            <div className="p-8 text-center space-y-4">
-              <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mx-auto">
-                <Mail size={28} className="text-primary" />
-              </div>
-              <div>
-                <p className="font-bold text-navy text-lg">E-mail enviado!</p>
-                <p className="text-sm text-slate-500 mt-1">
-                  Acesse o link que enviamos para <br />
-                  <span className="font-semibold text-navy">{email}</span>
-                </p>
-              </div>
-              <p className="text-xs text-slate-400">
-                Não encontrou? Verifique a pasta de spam.
-              </p>
-              <button onClick={() => { setView('login'); setMode('password'); clr() }}
-                className="text-xs text-primary hover:underline">
-                Usar senha em vez disso
-              </button>
-            </div>
+              <Feedback error={error} success={success} />
+              <SubmitBtn label="Entrar" busy={busy} />
+            </form>
           )}
 
           {/* ── View: RECUPERAR SENHA ── */}
