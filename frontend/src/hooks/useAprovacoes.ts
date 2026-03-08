@@ -73,6 +73,7 @@ export function useAprovacoesPendentes() {
         .filter((a): a is AprovacaoPendente => a !== null)
     },
     refetchInterval: 15_000,
+    refetchIntervalInBackground: false,
     refetchOnMount: 'always',
     retry: 1,
     staleTime: 10_000,

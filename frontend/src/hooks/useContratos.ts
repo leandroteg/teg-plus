@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../services/supabase'
+import type { PaginationControls } from './usePagination'
 import type {
   Contrato, Parcela, ParcelaAnexo, ContratoItem,
   ContratosDashboardData, ContratoCliente,
@@ -23,6 +24,7 @@ export function useContratosDashboard() {
       return data as ContratosDashboardData
     },
     refetchInterval: 30_000,
+    refetchIntervalInBackground: false,
   })
 }
 
@@ -50,18 +52,20 @@ const SELECT_CONTRATO = `
   obra:sys_obras!obra_id(id, codigo, nome)
 `
 
-export function useContratos(filters?: { status?: string; tipo_contrato?: string }) {
+export function useContratos(filters?: { status?: string; tipo_contrato?: string }, pagination?: PaginationControls) {
   return useQuery<Contrato[]>({
-    queryKey: ['contratos', filters],
+    queryKey: ['contratos', filters, pagination?.page, pagination?.pageSize],
     queryFn: async () => {
       let q = supabase
         .from('con_contratos')
-        .select(SELECT_CONTRATO)
+        .select(SELECT_CONTRATO, { count: 'exact' })
         .order('created_at', { ascending: false })
       if (filters?.status) q = q.eq('status', filters.status)
       if (filters?.tipo_contrato) q = q.eq('tipo_contrato', filters.tipo_contrato)
-      const { data, error } = await q
+      if (pagination) q = q.range(...pagination.range)
+      const { data, error, count } = await q
       if (error) return []
+      if (pagination && count != null) pagination.setTotalCount(count)
       return (data ?? []) as Contrato[]
     },
   })
@@ -139,21 +143,23 @@ export function useContratoItens(contratoId: string | undefined) {
 }
 
 // ── Parcelas ────────────────────────────────────────────────────────────────
-export function useParcelas(contratoId?: string, filters?: { status?: string }) {
+export function useParcelas(contratoId?: string, filters?: { status?: string }, pagination?: PaginationControls) {
   return useQuery<Parcela[]>({
-    queryKey: ['parcelas', contratoId, filters],
+    queryKey: ['parcelas', contratoId, filters, pagination?.page, pagination?.pageSize],
     queryFn: async () => {
       let q = supabase
         .from('con_parcelas')
         .select(`
           *,
           contrato:con_contratos!contrato_id(numero, objeto, tipo_contrato, status)
-        `)
+        `, { count: 'exact' })
         .order('data_vencimento', { ascending: true })
       if (contratoId) q = q.eq('contrato_id', contratoId)
       if (filters?.status) q = q.eq('status', filters.status)
-      const { data, error } = await q
+      if (pagination) q = q.range(...pagination.range)
+      const { data, error, count } = await q
       if (error) return []
+      if (pagination && count != null) pagination.setTotalCount(count)
       return (data ?? []) as Parcela[]
     },
   })

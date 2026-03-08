@@ -138,6 +138,7 @@ export function useDashboard(periodo = 'trimestre', obraId?: string) {
       return fetchDashboardDireto(periodo)
     },
     refetchInterval: 60_000,   // 60s reduz carga em 50 usuários
+    refetchIntervalInBackground: false,
     retry: false,              // sem retry automático (evita thundering herd)
     staleTime: 30_000,
   })

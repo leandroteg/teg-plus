@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../services/supabase'
+import type { PaginationControls } from './usePagination'
 import type {
   ContaPagar, ContaReceber, Fornecedor,
   FinanceiroDashboardData, FinanceiroKPIs,
@@ -26,6 +27,7 @@ export function useFinanceiroDashboard(periodo = '30d') {
       return data as FinanceiroDashboardData
     },
     refetchInterval: 30_000,
+    refetchIntervalInBackground: false,
   })
 }
 
@@ -36,33 +38,38 @@ const SELECT_CP = `
   requisicao:cmp_requisicoes!requisicao_id(numero, descricao, obra_nome, categoria, centro_custo, classe_financeira, projeto_id)
 `
 
-export function useContasPagar(filters?: { status?: string; centro_custo?: string }) {
+export function useContasPagar(filters?: { status?: string; centro_custo?: string }, pagination?: PaginationControls) {
   return useQuery<ContaPagar[]>({
-    queryKey: ['contas-pagar', filters],
+    queryKey: ['contas-pagar', filters, pagination?.page, pagination?.pageSize],
     queryFn: async () => {
       let q = supabase
         .from('fin_contas_pagar')
-        .select(SELECT_CP)
+        .select(SELECT_CP, { count: 'exact' })
         .order('data_vencimento', { ascending: true })
       if (filters?.status) q = q.eq('status', filters.status)
       if (filters?.centro_custo) q = q.eq('centro_custo', filters.centro_custo)
-      const { data, error } = await q
+      if (pagination) q = q.range(...pagination.range)
+      const { data, error, count } = await q
       if (error) return []
+      if (pagination && count != null) pagination.setTotalCount(count)
       return (data ?? []) as ContaPagar[]
     },
   })
 }
 
 // ── Contas a Receber ─────────────────────────────────────────────────────────
-export function useContasReceber() {
+export function useContasReceber(pagination?: PaginationControls) {
   return useQuery<ContaReceber[]>({
-    queryKey: ['contas-receber'],
+    queryKey: ['contas-receber', pagination?.page, pagination?.pageSize],
     queryFn: async () => {
-      const { data, error } = await supabase
+      let q = supabase
         .from('fin_contas_receber')
-        .select('*')
+        .select('*', { count: 'exact' })
         .order('data_vencimento', { ascending: true })
+      if (pagination) q = q.range(...pagination.range)
+      const { data, error, count } = await q
       if (error) return []
+      if (pagination && count != null) pagination.setTotalCount(count)
       return (data ?? []) as ContaReceber[]
     },
   })

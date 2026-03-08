@@ -37,6 +37,7 @@ export function useRequisicoes(status?: string, search?: string) {
       })) as Requisicao[]
     },
     refetchInterval: 60_000,
+    refetchIntervalInBackground: false,
     retry: false,
     staleTime: 30_000,
   })

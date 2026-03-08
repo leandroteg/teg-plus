@@ -221,7 +221,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       loadingRef.current = false
       setLoading(false)
       setPerfilReady(true)
-    }, 4000)
+    }, 10_000)
 
     return () => {
       subscription.unsubscribe()

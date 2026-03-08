@@ -38,6 +38,7 @@ export function useLastSync(dominio: string) {
       return data ?? null
     },
     refetchInterval: 10_000, // faz polling a cada 10s para acompanhar status 'running'
+    refetchIntervalInBackground: false,
     retry: false,
   })
 }

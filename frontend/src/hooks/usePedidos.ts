@@ -32,6 +32,7 @@ export function usePedidos(status?: string) {
       })) as Pedido[]
     },
     refetchInterval: 60_000,
+    refetchIntervalInBackground: false,
     retry: false,
     staleTime: 30_000,
   })

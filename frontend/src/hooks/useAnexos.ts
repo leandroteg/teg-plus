@@ -48,6 +48,7 @@ export function useAnexosPedido(pedidoId: string | undefined) {
       return (data ?? []) as PedidoAnexo[]
     },
     refetchInterval: 15_000,
+    refetchIntervalInBackground: false,
   })
 }
 

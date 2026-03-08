@@ -45,6 +45,7 @@ export function useCotacoes(compradorId?: string, status?: string) {
       })
     },
     refetchInterval: 60_000,
+    refetchIntervalInBackground: false,
     retry: false,
     staleTime: 30_000,
   })

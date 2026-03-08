@@ -66,5 +66,26 @@ export default {
       },
     },
   },
+  // Safelist dynamic color classes used by ModuleLayout via c(color) helper.
+  // Without this, Tailwind purges classes built with template literals.
+  safelist: (() => {
+    const colors = ['teal', 'emerald', 'blue', 'orange', 'rose', 'indigo', 'violet']
+    const patterns = []
+    for (const color of colors) {
+      patterns.push(
+        `bg-${color}-50`, `bg-${color}-100`,
+        `bg-${color}-500/15`, `bg-${color}-500/10`, `bg-${color}-400/10`,
+        `text-${color}-300`, `text-${color}-400`, `text-${color}-500`,
+        `text-${color}-600`, `text-${color}-700`,
+        `text-${color}-500/60`, `text-${color}-400/70`,
+        `border-${color}-200`, `border-${color}-300`,
+        `border-${color}-500/25`, `border-${color}-500/40`,
+        `hover:bg-${color}-100`, `hover:bg-${color}-500/18`,
+        `hover:border-${color}-300`,
+        `group-hover:text-${color}-400`, `group-hover:text-${color}-500`,
+      )
+    }
+    return patterns
+  })(),
   plugins: [],
 }

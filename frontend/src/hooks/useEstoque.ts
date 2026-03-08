@@ -97,6 +97,7 @@ export function useSaldos(baseId?: string) {
       return (data ?? []) as EstSaldo[]
     },
     refetchInterval: 60_000,
+    refetchIntervalInBackground: false,
   })
 }
 
@@ -418,5 +419,6 @@ export function useEstoqueKPIs() {
       }
     },
     refetchInterval: 60_000,
+    refetchIntervalInBackground: false,
   })
 }
