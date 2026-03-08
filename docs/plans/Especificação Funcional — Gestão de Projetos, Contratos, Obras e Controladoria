@@ -1,0 +1,1738 @@
+# Especificação Funcional — Gestão de Projetos, Contratos, Obras e Controladoria — TEG+ ERP
+
+> **Especificação Funcional Completa — 4 Módulos Integrados**
+> Versão 2.0 | Março 2026
+> Baseado nos modelos operacionais reais do EGP, Funcionograma e repositório GitHub TEG+
+
+---
+
+## Sumário
+
+### PARTE A — Gestão de Projetos (EGP/PMO)
+
+1. [Visão Geral e Objetivo](#1-visão-geral-e-objetivo)
+2. [Contexto dos Modelos de Referência](#2-contexto-dos-modelos-de-referência)
+3. [Submodulo: Portfólio de Projetos](#3-submodulo-portfólio-de-projetos)
+4. [Submodulo: TAP — Termo de Abertura do Projeto](#4-submodulo-tap--termo-de-abertura-do-projeto)
+5. [Submodulo: EAP — Estrutura Analítica do Projeto](#5-submodulo-eap--estrutura-analítica-do-projeto)
+6. [Submodulo: Cronograma Gantt](#6-submodulo-cronograma-gantt)
+7. [Submodulo: Controle de Medições](#7-submodulo-controle-de-medições)
+8. [Submodulo: Histograma de Recursos](#8-submodulo-histograma-de-recursos)
+9. [Submodulo: Fluxo de Processos de Obra](#9-submodulo-fluxo-de-processos-de-obra)
+10. [Submodulo: Status Report](#10-submodulo-status-report)
+11. [Submodulo: Controle de Multas e Riscos](#11-submodulo-controle-de-multas-e-riscos)
+12. [Submodulo: Rotina de Reuniões](#12-submodulo-rotina-de-reuniões)
+13. [Submodulo: Solicitação de Mudanças](#13-submodulo-solicitação-de-mudanças)
+14. [Submodulo: Indicadores e KPIs do PMO](#14-submodulo-indicadores-e-kpis)
+
+### PARTE B — Contratos com Cliente (MS-010)
+
+15. [Gestão de Contratos com Cliente](#15-gestão-de-contratos-com-cliente)
+16. [Faturamento e Medições de Obra](#16-faturamento-e-medições-de-obra)
+17. [Aditivos e Reajustes Contratuais](#17-aditivos-e-reajustes-contratuais)
+18. [Cronograma Físico-Financeiro por Contrato](#18-cronograma-físico-financeiro-por-contrato)
+19. [SLA, Penalidades e Alertas Contratuais](#19-sla-penalidades-e-alertas-contratuais)
+
+### PARTE C — Gestão de Obras
+
+20. [Apontamento de Produção e Avanço Físico](#20-apontamento-de-produção-e-avanço-físico)
+21. [Diário de Obra (RDO)](#21-diário-de-obra-rdo)
+22. [Prestação de Contas de Obra](#22-prestação-de-contas-de-obra)
+23. [Gestão de Equipes e Mobilização](#23-gestão-de-equipes-e-mobilização)
+24. [Dashboard de Obras](#24-dashboard-de-obras)
+
+### PARTE D — Controladoria (MS-012)
+
+25. [Planejamento e Controle Orçamentário](#25-planejamento-e-controle-orçamentário)
+26. [DRE por Obra e Consolidado](#26-dre-por-obra-e-consolidado)
+27. [Orçado vs Realizado](#27-orçado-vs-realizado)
+28. [Forecast de Caixa e EBITDA](#28-forecast-de-caixa-e-ebitda)
+29. [Dashboard Executivo (CEO View)](#29-dashboard-executivo-ceo-view)
+
+### PARTE E — Consolidação Técnica
+
+30. [Modelo de Dados Consolidado (Schema SQL)](#30-modelo-de-dados-consolidado-schema-sql)
+31. [Rotas e Telas (Frontend) — Todos os Módulos](#31-rotas-e-telas-frontend--todos-os-módulos)
+32. [Integrações entre Módulos](#32-integrações-entre-módulos)
+33. [Regras de Negócio e Alçadas](#33-regras-de-negócio-e-alçadas)
+34. [Workflows n8n](#34-workflows-n8n)
+35. [Cronograma de Entrega](#35-cronograma-de-entrega)
+
+---
+
+## 1. Visão Geral e Objetivo
+
+### Missão (do Funcionograma)
+
+> Garantir o sucesso dos projetos da empresa, cumprindo contratos e entregando no prazo e orçamento previsto.
+
+### Objetivo do Módulo
+
+Digitalizar e padronizar toda a gestão de projetos da TEG União, replicando fielmente os modelos operacionais utilizados atualmente pelo EGP (Escritório de Gerenciamento de Portfólio), incluindo:
+
+- Planilha de Portfólio com visão consolidada de todas as OSCs
+- TAP (Termo de Abertura do Projeto) padronizado
+- EAP (WBS) com fases do projeto CEMIG
+- Cronograma Gantt com planejado vs real
+- Controle de Medições (visão gerente + visão engenheiro)
+- Histograma de mão de obra e maquinário
+- Fluxo de processos CEMIG (OS → Execução → Encerramento)
+- Status Report por OS/contrato
+- Controle de multas e riscos contratuais
+- Rotinas de reunião padronizadas
+- Indicadores financeiros, operacionais, documentais e SSMA
+
+### Relação com Milestone Existente
+
+- **MS-010** (Contratos e Medições) — Medições alimentam o Portfólio
+- **MS-012** (Controladoria) — Custo orçado vs realizado por projeto
+- **MS-013** (Monday.com PMO) — Sync bidirecional de status e cronograma
+
+---
+
+## 2. Contexto dos Modelos de Referência
+
+Os modelos abaixo foram extraídos dos arquivos reais do EGP e servem como especificação de campo-a-campo para o sistema:
+
+| Arquivo | Modelo | Uso |
+|---------|--------|-----|
+| `MODELO_Planilha_de_Portfólio_230226.xlsx` | Portfólio de OSCs | Visão consolidada de todos os projetos |
+| `Modelo_TAP_TEG_UNIÃO_COMPLETA_060226.xlsx` | TAP modelo | Template padrão de abertura de projeto |
+| `CEMIG_GERAL_TAP_TEG_UNIÃO_180626__1_.xlsx` | TAP preenchido CEMIG | Exemplo real com contrato CEMIG |
+| `EAP_CONSTRUÇÃO_CEMIG_250226__1_.jpg` | EAP/WBS | Fases de construção CEMIG |
+| `MODELO_Cronograma_Gantt_200226.xlsx` | Gantt + Macro Cronograma | Tarefas, status, responsáveis, datas |
+| `Controle_Medição.xlsx` | Medições (2 visões) | Visão Gerente + Visão Engenheiro por item |
+| `MODELO_Histograma_250226.xlsx` | Histograma | MOD, MOI, Maquinário por semana |
+| `FLUXO_CEMIG_PROCESSOS_OBRA_AS_IS_12026.jpeg` | Fluxo BPMN | Recebimento OS → Checagem → Início |
+
+---
+
+## 3. Submodulo: Portfólio de Projetos
+
+### Referência: `MODELO_Planilha_de_Portfólio_230226.xlsx` — Sheet "Portfólio"
+
+### 3.1 Visão Funcional
+
+O Portfólio consolida todas as OSCs (Ordens de Serviço Contratadas) em uma visão executiva unificada com seções: Informações Gerais, Gestão de Prazos, Gestão de Faturamento, Gestão de Custos e Risco de Multa.
+
+### 3.2 Tabela: `pmo_portfolio`
+
+| Campo | Tipo | Obrigatório | Descrição |
+|-------|------|-------------|-----------|
+| `id` | UUID PK | Sim | Identificador |
+| `obra_id` | UUID FK → sys_obras | Sim | Obra vinculada |
+| `contrato_id` | UUID FK → con_contratos | Não | Contrato vinculado |
+| `numero_osc` | TEXT | Sim | Número da Ordem de Serviço Contratada |
+| `nome_obra` | TEXT | Sim | Nome descritivo da obra |
+| `tipo_osc` | ENUM | Sim | `obra` / `manutencao` |
+| `resumo_osc` | TEXT | Não | Resumo do escopo da OS |
+| `cluster` | TEXT | Não | Agrupamento regional |
+| `cidade_estado` | TEXT | Não | Localização |
+| `status` | ENUM | Sim | (ver tabela de status abaixo) |
+| — | — | — | **GESTÃO DE PRAZOS** |
+| `data_inicio_contratual` | DATE | Sim | Data de início conforme contrato |
+| `data_termino_contratual` | DATE | Sim | Data de término conforme contrato |
+| `data_inicio_real` | DATE | Não | Data de início efetivo |
+| `data_termino_real` | DATE | Não | Data de término efetivo |
+| — | — | — | **GESTÃO DE FATURAMENTO** |
+| `valor_total_osc` | NUMERIC(15,2) | Sim | Valor total da OSC (R$) |
+| `valor_faturado` | NUMERIC(15,2) | Não | Valor já faturado (R$) |
+| `saldo_faturar` | NUMERIC(15,2) | Calculado | `valor_total_osc - valor_faturado` |
+| `percentual_faturado` | NUMERIC(5,2) | Calculado | `(valor_faturado / valor_total_osc) * 100` |
+| `percentual_saldo` | NUMERIC(5,2) | Calculado | `100 - percentual_faturado` |
+| — | — | — | **GESTÃO DE CUSTOS** |
+| `custo_orcado` | NUMERIC(15,2) | Não | Custo orçado na proposta |
+| `custo_planejado` | NUMERIC(15,2) | Não | Custo planejado (revisado) |
+| `custo_real` | NUMERIC(15,2) | Não | Custo realizado acumulado |
+| `margem_orcada` | NUMERIC(5,2) | Calculado | % margem sobre orçado |
+| `margem_planejada` | NUMERIC(5,2) | Calculado | % margem sobre planejado |
+| `margem_real` | NUMERIC(5,2) | Calculado | % margem real |
+| — | — | — | **RISCO DE MULTA** |
+| `multa_previsao` | ENUM | Não | `baixo` / `medio` / `alto` / `critico` |
+| `multa_motivo` | TEXT | Não | Motivo do risco de multa |
+| `multa_valor_estimado` | NUMERIC(15,2) | Não | Valor estimado de multa |
+
+### 3.3 Status do Portfólio
+
+| Status | Cor Sugerida | Descrição |
+|--------|-------------|-----------|
+| `em_analise_ate` | 🔵 Azul | ATE (Avaliação Técnica Empreiteira) em análise |
+| `revisao_cliente` | 🟡 Amarelo | Cliente revisando/devolveu com comentários |
+| `liberado_iniciar` | 🟢 Verde claro | Liberado para início dos serviços |
+| `obra_andamento` | 🟢 Verde | Obra em execução |
+| `obra_paralisada` | 🔴 Vermelho | Obra paralisada (chuva, falta material, etc.) |
+| `obra_concluida` | ⚫ Cinza | Obra finalizada |
+| `cancelada` | ⬛ Preto | OS cancelada |
+
+### 3.4 Dashboard do Portfólio
+
+Painel visual replicando a planilha com:
+
+- Cards de resumo: Total OSCs, Em Andamento, Concluídas, Paralisadas
+- Barra de progresso por OSC (% faturado)
+- Tabela interativa com todas as colunas do modelo
+- Filtros: status, cluster, cidade, tipo de OSC
+- Semáforo de margem: verde (>15%), amarelo (5-15%), vermelho (<5%)
+- Semáforo de risco de multa por OSC
+
+---
+
+## 4. Submodulo: TAP — Termo de Abertura do Projeto
+
+### Referência: `Modelo_TAP_TEG_UNIÃO_COMPLETA_060226.xlsx` + `CEMIG_GERAL_TAP_TEG_UNIÃO_180626__1_.xlsx`
+
+### 4.1 Visão Funcional
+
+O TAP é o documento de formalização de abertura de cada projeto/contrato. O modelo TEG possui 12 seções padronizadas que devem ser replicadas como formulário digital com geração de PDF.
+
+### 4.2 Tabela: `pmo_tap`
+
+| Campo | Tipo | Obrigatório | Seção TAP | Descrição |
+|-------|------|-------------|-----------|-----------|
+| `id` | UUID PK | Sim | — | Identificador |
+| `portfolio_id` | UUID FK | Sim | — | Vínculo com pmo_portfolio |
+| — | — | — | **1. IDENTIFICAÇÃO** | — |
+| `nome_projeto` | TEXT | Sim | 1 | Título completo do projeto |
+| `numero_projeto` | TEXT | Sim | 1 | Código interno |
+| `cliente` | TEXT | Sim | 1 | Nome do cliente |
+| `data_abertura` | DATE | Sim | 1 | Data de formalização |
+| `patrocinador_cliente` | TEXT | Sim | 1 | Executivo que aprova/financia |
+| `gerente_projeto` | TEXT | Sim | 1 | Responsável pela execução |
+| — | — | — | **CLASSIFICAÇÃO** | — |
+| `classificacao_urgencia` | ENUM | Sim | 1 | `baixa` / `media` / `alta` |
+| `classificacao_complexidade` | ENUM | Sim | 1 | `baixa` / `media` / `alta` |
+| `classificacao_faturamento` | ENUM | Sim | 1 | `baixo` / `medio` / `alto` |
+| `classificacao_duracao` | ENUM | Sim | 1 | `baixa` / `media` / `alta` |
+| `tipo_projeto` | TEXT | Não | 1 | Tipo/natureza |
+| — | — | — | **2. OBJETIVO** | — |
+| `objetivo` | TEXT | Sim | 2 | Descrição SMART do objetivo |
+| — | — | — | **3. ESCOPO** | — |
+| `escopo_inclui` | TEXT[] | Sim | 3 | Lista do que está incluído |
+| `escopo_nao_inclui` | TEXT[] | Não | 3 | Lista do que está fora |
+| — | — | — | **4. PREMISSAS E RESTRIÇÕES** | — |
+| `premissas` | TEXT[] | Não | 4 | Condições assumidas |
+| `restricoes` | TEXT[] | Não | 4 | Limitações do projeto |
+| — | — | — | **5. RISCOS** | — |
+| `riscos_principais` | JSONB | Não | 5 | Array de {descricao, impacto, mitigacao} |
+| — | — | — | **6. STAKEHOLDERS** | — |
+| `stakeholder_patrocinador` | TEXT | Não | 6 | Nome do patrocinador |
+| `stakeholder_cliente_chave` | TEXT | Não | 6 | Beneficiários principais |
+| `stakeholders_outros` | TEXT[] | Não | 6 | Outras partes interessadas |
+| — | — | — | **7. CRONOGRAMA MACRO** | — |
+| `marcos_cronograma` | JSONB | Não | 7 | Array de {marco, data_inicio, data_termino} |
+| — | — | — | **8. ORÇAMENTO** | — |
+| `orcamento_total` | NUMERIC(15,2) | Sim | 8 | Valor total estimado |
+| `orcamento_referencia` | TEXT | Não | 8 | Base de cálculo (ex: "209.530 US × R$ 1.090/US") |
+| `orcamento_grupos` | JSONB | Não | 8 | Array de {grupo, descricao, valor} |
+| — | — | — | **9. MARCOS DE PAGAMENTO** | — |
+| `marcos_pagamento` | JSONB | Não | 9 | Array de {condicao, percentual, valor} |
+| — | — | — | **10. CRITÉRIOS DE SUCESSO** | — |
+| `criterios_sucesso` | TEXT[] | Não | 10 | KPIs e entregas |
+| — | — | — | **11. EQUIPE** | — |
+| `equipe` | JSONB | Não | 11 | Array de {nome, funcao} |
+| — | — | — | **12. APROVAÇÃO** | — |
+| `aprovado_por` | TEXT | Não | 12 | Nome do aprovador |
+| `aprovado_cargo` | TEXT | Não | 12 | Cargo |
+| `aprovado_data` | DATE | Não | 12 | Data de aprovação |
+| `aprovado_assinatura_url` | TEXT | Não | 12 | URL da assinatura digital |
+| `observacoes` | TEXT | Não | — | Notas adicionais |
+| `status` | ENUM | Sim | — | `rascunho` / `em_aprovacao` / `aprovado` / `rejeitado` |
+
+### 4.3 Critérios de Classificação (lookup)
+
+Conforme aba "Critérios de Classificação" do modelo:
+
+| Dimensão | Baixa | Média | Alta |
+|----------|-------|-------|------|
+| **Duração** | Até 30 dias | 30 a 90 dias | Acima de 90 dias |
+| **Urgência** | Iniciar após 60 dias | Iniciar entre 16-60 dias | Iniciar em até 15 dias |
+| **Complexidade** | 1 área envolvida | 2-3 áreas | 4+ áreas |
+| **Faturamento** | Até R$ 300k | R$ 300k a R$ 1M | Acima de R$ 1M |
+
+### 4.4 Exemplo Real — TAP CEMIG
+
+Dados extraídos do `CEMIG_GERAL_TAP_TEG_UNIÃO_180626__1_.xlsx`:
+
+- **Objetivo:** Prestar serviços de construção, recapacitação, manutenção, montagem e desmontagem em Linhas de Distribuição CEMIG. Valor estimado R$ 228.388.212,30 (209.530,47 US × R$ 1.090,00/US). Prazo: 35 meses.
+- **Escopo inclui:** Construção LD, Recapacitação LD, Manutenção preventiva/corretiva, Montagem/desmontagem estruturas, Relatórios SSMA mensais, Gestão de subcontratados, Emissão ART/CEI/CND
+- **Escopo NÃO inclui:** Redes de transmissão (AT), Fornecimento de materiais (salvo OS específica), Serviços sem OS formal, Obras fora dos limites contratuais
+- **Premissas-chave:** OS emitidas tempestivamente, ATE aprovada sem atraso, Início em até 5 dias após ATE, Subcontratação com 10 dias antecedência
+- **Restrições-chave:** 35 meses fixos, Acréscimos até 25%, Paralisações travam medições, CND obrigatória para última medição, Multas cumulativas
+- **Marcos:** Assinatura contrato → ART/CEI/Seguro → ATE → Execução mensal → Reajuste → Encerramento → CND → TQRD → Encerramento 35 meses
+- **Orçamento por Grupos:** Mão de obra própria, Subcontratação, Equipamentos/ferramentas, SSMA, Administrativo/Overhead, Contingência
+
+### 4.5 Funcionalidades da Tela
+
+- Formulário digital com as 12 seções em abas ou accordion
+- Preenchimento assistido com campos JSONB (adicionar/remover itens dinamicamente)
+- Classificação automática com base nos critérios definidos
+- Geração de PDF no formato original (layout xlsx)
+- Workflow de aprovação: Gerente PMO → Diretor → Assinatura digital
+- Versionamento: cada edição gera nova versão com diff
+
+---
+
+## 5. Submodulo: EAP — Estrutura Analítica do Projeto
+
+### Referência: `EAP_CONSTRUÇÃO_CEMIG_250226__1_.jpg`
+
+### 5.1 Fases do Projeto CEMIG (EAP Real)
+
+A EAP de Serviços de Construção CEMIG possui 5 fases com atividades específicas:
+
+```
+EAP SERV. CONSTRUÇÃO — CEMIG
+├── 1. INICIAÇÃO
+│   ├── Emissão da OS
+│   ├── TAP
+│   ├── Formalização Início de Obra
+│   ├── Regularização Ambiental
+│   ├── Emissão de ART
+│   └── Emissão de Seguros
+├── 2. PLANEJAMENTO
+│   ├── Cronograma Execução
+│   ├── Cronograma Físico-Financeiro
+│   └── Equipe/Maquinário
+├── 3. EXECUÇÃO
+│   ├── Obra
+│   │   ├── Mobilização [OBR] [MAN]
+│   │   ├── Topografia e Locação [OBR]
+│   │   ├── Supressão Vegetal e Acessos [OBR]
+│   │   ├── Fundações [OBR]
+│   │   ├── Montagem de Estruturas [OBR]
+│   │   ├── Lançamento de Cabos e Isoladores [OBR] [MAN]
+│   │   ├── Sistema Complementares [OBR] [OPC]
+│   │   ├── Aterramento e Malha de Terra [OBR] [OPC]
+│   │   ├── Implantação de Defenser [OPC]
+│   │   ├── Substituição/Manutenção [MAN]
+│   │   └── Comissionamento [OBR] [MAN]
+│   ├── Projetos e Listas
+│   │   ├── Lista de Materiais CEMIG
+│   │   └── Lista de Materiais TEG
+│   ├── Supply
+│   │   ├── Compra da Lista de Materiais
+│   │   └── Logística de Envio
+│   └── SSMA
+│       └── Relatório de Acidentes e Horas Trabalhadas
+├── 4. MONITORAMENTO/CONTROLE
+│   ├── Medição
+│   ├── Reuniões
+│   └── Reajustes
+└── 5. ENCERRAMENTO
+    ├── Desmobilização
+    │   ├── Retirada Equipamentos
+    │   ├── Retirada de canteiro
+    │   └── Limpeza final
+    └── Documentação Final
+        ├── Aceite Provisório dos Serviços
+        ├── Termo de Quitação e Recebimento Definitivo (TQRD)
+        ├── Emissão do Termo de Quitação Final
+        ├── Emissão do Atestado de Capacidade Técnica
+        └── Apresentação da CND de baixa da matrícula CEI no INSS
+```
+
+### 5.2 Tabela: `pmo_eap`
+
+| Campo | Tipo | Descrição |
+|-------|------|-----------|
+| `id` | UUID PK | Identificador |
+| `portfolio_id` | UUID FK | Projeto vinculado |
+| `parent_id` | UUID FK → pmo_eap | Pai na hierarquia (NULL = raiz) |
+| `codigo` | TEXT | Código WBS (ex: "3.1.4") |
+| `titulo` | TEXT | Nome da atividade |
+| `fase` | ENUM | `iniciacao` / `planejamento` / `execucao` / `monitoramento` / `encerramento` |
+| `tipo_servico` | TEXT[] | Tags: `OBR` (obra), `MAN` (manutenção), `OPC` (opcional) |
+| `ordem` | INTEGER | Ordem de exibição |
+| `descricao` | TEXT | Detalhamento |
+| `responsavel` | TEXT | Área/pessoa responsável |
+| `entregaveis` | TEXT[] | Deliverables da atividade |
+| `criterio_conclusao` | TEXT | Como determinar que está concluída |
+| `peso_percentual` | NUMERIC(5,2) | Peso no projeto total |
+
+### 5.3 Funcionalidades
+
+- Visualização em árvore hierárquica (tree view) interativa
+- Drag & drop para reordenar/mover itens
+- Template: EAP padrão CEMIG pré-carregada ao criar novo projeto
+- Vinculação de cada nó da EAP com itens do cronograma e itens de medição
+- Cálculo automático de peso por fase (soma dos filhos)
+- Indicação visual do tipo de serviço (OBR/MAN/OPC) com badges coloridos
+
+---
+
+## 6. Submodulo: Cronograma Gantt
+
+### Referência: `MODELO_Cronograma_Gantt_200226.xlsx` — Sheets "MODELO GANTT" e "MODELO GANTT (4)"
+
+### 6.1 Visão Funcional
+
+O Cronograma Gantt é a ferramenta principal de planejamento e controle temporal. O modelo TEG possui:
+
+- Campos: ID, Tarefa, Prioridade, Status, Responsável, Início, Término, Duração, Início Real, Término Real
+- Gráfico de Gantt visual com barras por dia da semana
+- Suporte a tarefas-pai (agrupamentos) e subtarefas
+- Múltiplas visões: EGP, Contrato CEMIG, Macro Estratégico
+
+### 6.2 Tabela: `pmo_tarefas`
+
+| Campo | Tipo | Obrigatório | Descrição |
+|-------|------|-------------|-----------|
+| `id` | UUID PK | Sim | Identificador |
+| `portfolio_id` | UUID FK | Sim | Projeto vinculado |
+| `eap_id` | UUID FK → pmo_eap | Não | Vínculo com nó da EAP |
+| `parent_id` | UUID FK → pmo_tarefas | Não | Tarefa-pai (para hierarquia) |
+| `codigo` | TEXT | Não | ID visual (1, 1.1, 2, etc.) |
+| `tarefa` | TEXT | Sim | Descrição da tarefa |
+| `prioridade` | ENUM | Sim | `alta` / `media` / `baixa` |
+| `status` | ENUM | Sim | `a_fazer` / `em_andamento` / `concluido` / `nao_iniciado` / `cancelado` |
+| `responsavel` | TEXT | Não | Nome ou equipe responsável |
+| `responsavel_id` | UUID FK → sys_perfis | Não | Vínculo com usuário do sistema |
+| `data_inicio_planejado` | DATE | Sim | Início previsto |
+| `data_termino_planejado` | DATE | Sim | Término previsto |
+| `duracao_dias` | INTEGER | Calculado | Dias entre início e término |
+| `data_inicio_real` | DATE | Não | Início real |
+| `data_termino_real` | DATE | Não | Término real |
+| `percentual_concluido` | NUMERIC(5,2) | Não | % de conclusão (0-100) |
+| `dependencias` | UUID[] | Não | IDs de tarefas predecessoras |
+| `tipo_dependencia` | ENUM | Não | `fim_inicio` / `inicio_inicio` / `fim_fim` |
+| `notas` | TEXT | Não | Observações |
+| `ordem` | INTEGER | Sim | Ordem de exibição |
+
+### 6.3 Dados Reais Extraídos — Cronograma EGP
+
+Tarefas reais do modelo GANTT (4) — Implantação EGP + Contrato CEMIG:
+
+| ID | Tarefa | Prioridade | Status |
+|----|--------|-----------|--------|
+| **1** | **IMPLANTAÇÃO - EGP** | — | — |
+| 1.1 | Definir objetivo | Alta | Em Andamento |
+| 1.2 | Criar macro processo | Alta | Em Andamento |
+| 1.3 | Processo detalhado | Média | Não Iniciado |
+| 1.4 | Sistema de gestão de tarefas | Média | Não Iniciado |
+| 1.5 | Sistema de metas | Média | Não Iniciado |
+| 1.6 | Indicadores | Baixa | Não Iniciado |
+| 1.7 | Definição do time | Média | Não Iniciado |
+| 1.8 | POP (Procedimento Operacional) | Baixa | Não Iniciado |
+| 1.9 | Treinamento | Baixa | Não Iniciado |
+| **2** | **CONTRATO CEMIG** | — | — |
+| 2.1 | Entendimento do contrato | Alta | Concluído |
+| 2.2 | Estrutura Planilha de Portfólio | Alta | Em Andamento |
+| 2.3 | Preencher Planilha de Portfólio | Alta | Em Andamento |
+| 2.4 | Indicadores contrato CEMIG | Média | Em Andamento |
+| 2.5 | Organograma do projeto | Alta | Em Andamento |
+| **3** | **Mapeamento dos processos** | Alta | Em Andamento |
+| 3.1 | Macro | Alta | Em Andamento |
+| 3.2 | Detalhado | Média | Não Iniciado |
+| **4** | **Metodologia de Gestão de Projetos** | Alta | Em Andamento |
+| 4.1 | Definir fases do projeto | Alta | Em Andamento |
+| 4.2 | Estrutura Plano de gerenciamento | Alta | Em Andamento |
+| 4.3 | TAP | Alta | Concluído |
+| 4.4 | EAP | Média | Em Andamento |
+| 4.5 | Cronograma execução | Alta | Em Andamento |
+| 4.6 | Cronograma físico-financeiro | Alta | Não Iniciado |
+| 4.7 | Gestão de Custos | Média | Não Iniciado |
+| 4.8 | Controle de Interfaces | Baixa | Não Iniciado |
+| 4.9 | Mapa de documentos | Baixa | Não Iniciado |
+| 4.10 | Riscos | Baixa | Não Iniciado |
+| 4.11 | Histograma | Alta | Concluído |
+| 4.12 | Plano de comunicação | Baixa | Não Iniciado |
+| 4.13 | Plano de ação | Alta | Em Andamento |
+| 4.14 | Controle de multas | Alta | Concluído |
+| 4.15 | Mudanças | Baixa | Não Iniciado |
+| 4.16 | RACI | Baixa | Não Iniciado |
+| 4.17 | Rotina de reuniões - CEMIG | Alta | Em Andamento |
+| 4.18 | Status Report Reuniões - CEMIG | Alta | Em Andamento |
+| 4.19 | Sistema de metas (trimestral) | Média | Não Iniciado |
+| **5** | **Integração das informações** | Média | Não Iniciado |
+| 5.1 | Dashboard metas | Baixa | Não Iniciado |
+| 5.2 | Dashboard obras | Média | Não Iniciado |
+| 5.3 | Dashboard contratos | Alta | Não Iniciado |
+
+### 6.4 Funcionalidades da Tela
+
+- Gantt interativo com barras de planejado (azul) vs real (verde/vermelho)
+- Arrastar para reposicionar datas
+- Collapse/expand de tarefas-pai
+- Filtro por: status, prioridade, responsável
+- Caminho crítico destacado
+- Linha de hoje (today line) vertical
+- Visão por dia, semana ou mês
+- Seed de template padrão CEMIG ao criar novo projeto
+
+---
+
+## 7. Submodulo: Controle de Medições
+
+### Referência: `Controle_Medição.xlsx` — 2 visões
+
+### 7.1 Visão Gerente — `pmo_medicao_resumo`
+
+Painel consolidado de todas as OSCs com colunas:
+
+| Campo | Tipo | Descrição |
+|-------|------|-----------|
+| `id` | UUID PK | — |
+| `portfolio_id` | UUID FK | Projeto/OSC |
+| `cliente` | TEXT | Nome do cliente |
+| `numero_osc` | TEXT | Nº OSC |
+| `nome_obra` | TEXT | Nome da obra |
+| `valor_contrato` | NUMERIC(15,2) | Valor total |
+| `prazo` | TEXT | Prazo do contrato |
+| `total_medido_valor` | NUMERIC(15,2) | Soma medido (R$) |
+| `total_medido_pct` | NUMERIC(5,2) | % medido |
+| `total_a_medir_valor` | NUMERIC(15,2) | Saldo (R$) |
+| `total_a_medir_pct` | NUMERIC(5,2) | % a medir |
+
+**Controle de Desempenho Mensal** (colunas dinâmicas por mês):
+
+Para cada mês (jan/26 a dez/26) e para cada OSC, 3 linhas:
+- **PREVISTO:** valor previsto de medição no mês
+- **REALIZADO:** valor efetivamente medido/aprovado
+- **DELTA:** diferença (realizado - previsto)
+
+### 7.2 Visão Engenheiro — `pmo_medicao_itens`
+
+Controle detalhado por item de medição dentro de uma OSC:
+
+| Campo | Tipo | Descrição |
+|-------|------|-----------|
+| `id` | UUID PK | — |
+| `portfolio_id` | UUID FK | OSC vinculada |
+| `contrato_item_id` | UUID FK → con_contrato_itens | Item do contrato |
+| `numero_medicao` | INTEGER | Sequencial da medição |
+| `item_descricao` | TEXT | Ex: "Atividade 1", "Montagem de torre" |
+| `unidade` | TEXT | t, m³, m, un, etc. |
+| `quantidade_prevista` | NUMERIC | Qtd total contratada |
+| `preco_unitario` | NUMERIC(15,2) | R$/unidade |
+| `valor_total` | NUMERIC(15,2) | qtd × preço |
+
+**Colunas por período de medição** (repetidas para cada mês):
+
+| Campo | Tipo | Descrição |
+|-------|------|-----------|
+| `status_periodo` | ENUM | `cemig_aprovada` / `teg_em_andamento` / `teg_a_fazer` / `teg_revisao_final` / `cemig_em_analise` / `cemig_comentarios` / `cemig_recebida` |
+| `qtd_executada_acum` | NUMERIC | Quantidade executada acumulada |
+| `valor_medir` | NUMERIC(15,2) | Valor a medir (R$) |
+| `valor_medir_pct` | NUMERIC(5,2) | % do item |
+
+**Resumo da medição** (calculado):
+- Total Medido (R$) e (%)
+- A Faturar (R$) e (%)
+
+### 7.3 Status de Medição
+
+| Status | Responsável | Descrição |
+|--------|------------|-----------|
+| `teg_a_fazer` | TEG | Medição a preparar |
+| `teg_em_andamento` | TEG | Engenheiro consolidando |
+| `teg_revisao_final` | TEG | Em revisão final interna |
+| `cemig_recebida` | CEMIG | Enviada, aguardando análise |
+| `cemig_em_analise` | CEMIG | Em análise pelo fiscal |
+| `cemig_comentarios` | CEMIG | Devolvida com comentários |
+| `cemig_aprovada` | CEMIG | Aprovada para faturamento |
+
+---
+
+## 8. Submodulo: Histograma de Recursos
+
+### Referência: `MODELO_Histograma_250226.xlsx`
+
+### 8.1 Visão Funcional
+
+O Histograma controla a alocação de mão de obra e maquinário por semana ao longo da obra, com 3 categorias:
+
+1. **MOD — Mão de Obra Direta:** Mestre de Obras, Eletricista Predial, Eletricista FC, Auxiliar Eletricista, Montador, Auxiliar Montagem, Pedreiro, Ajudante, Carpinteiro, Pintor, Armador, Aux. Administrativo, Almoxarife, Aux. Serviços Gerais, Segurança
+2. **MOI — Mão de Obra Indireta:** Supervisor de Obras (Site Manager), Supervisor Elétrica, Supervisor Montagem, Engenheiro Elétrico (Comissionamento), Téc. Segurança, Administrativo, Topógrafo
+3. **Maquinário:** Retro, Munck, Patrol
+
+### 8.2 Tabela: `pmo_histograma`
+
+| Campo | Tipo | Descrição |
+|-------|------|-----------|
+| `id` | UUID PK | — |
+| `portfolio_id` | UUID FK | OSC vinculada |
+| `categoria` | ENUM | `mod` / `moi` / `maquinario` |
+| `funcao` | TEXT | Nome da função (ex: "Eletricista PREDIAL") |
+| `semana` | TEXT | Identificador da semana (ex: "S7") |
+| `mes` | TEXT | Mês de referência (ex: "Mar/26") |
+| `data_inicio_semana` | DATE | Início da semana |
+| `quantidade_planejada` | INTEGER | Qtd planejada de pessoas/equipamentos |
+| `quantidade_real` | INTEGER | Qtd real alocada |
+| `custo_unitario_hora` | NUMERIC(10,2) | Custo/hora da função |
+| `horas_semana` | NUMERIC(5,2) | Horas planejadas na semana |
+
+### 8.3 Views Calculadas
+
+- **Total MOD por semana:** soma de todas as funções MOD
+- **Total MOI por semana:** soma de todas as funções MOI
+- **Mão de Obra Total:** MOD + MOI
+- **Total Maquinário por semana**
+- **Gráfico de barras empilhadas** por semana (eixo X = semanas, Y = headcount)
+- **Curva de efetivo:** linha mostrando planejado vs real
+
+### 8.4 Seed — Funções Padrão CEMIG
+
+```json
+{
+  "mod": [
+    "Mestre de Obras", "Eletricista PREDIAL", "Eletricista FC",
+    "Auxiliar de Eletricista", "Montador", "Auxiliar de Montagem",
+    "Pedreiro", "Ajudante", "Carpinteiro", "Pintor", "Armador",
+    "Aux. Administrativo", "Almoxarife", "Aux. Serviços Gerais", "Segurança"
+  ],
+  "moi": [
+    "Supervisor de Obras (Site Manager)", "Supervisor de Elétrica",
+    "Supervisor de Montagem", "Engenheiro Elétrico (Comissionamento)",
+    "Téc. Segurança", "Administrativo", "Topógrafo"
+  ],
+  "maquinario": ["Retro", "Munck", "Patrol"]
+}
+```
+
+---
+
+## 9. Submodulo: Fluxo de Processos de Obra
+
+### Referência: `FLUXO_CEMIG_PROCESSOS_OBRA_AS_IS_12026.jpeg`
+
+### 9.1 Fluxo AS-IS Mapeado (BPMN)
+
+O fluxo de processos CEMIG possui 3 raias principais:
+
+#### Raia 1: Recebimento e Classificação Inicial
+```
+Recebimento da OS pelo Diretor
+  → Classificação inicial da OS
+  → [Tipo de serviço?] → [Tipo de obra?]
+  → Encaminhar OS ao Coordenador de Obras
+```
+
+#### Raia 2: Análise e Validação
+```
+Análise de escopo e prazo pelo Coordenador
+  → [Informações completas?]
+    → NÃO: Devolver OS ao Diretor com comentários
+             → Retornar OS ao cliente para ajuste
+             → [Comentários aceitos?]
+               → NÃO: OS Cancelada
+               → SIM: Volta ao planejamento
+    → SIM: → Planejamento de logística
+            → Planejamento da lista de materiais
+```
+
+#### Raia 3: Checagem de Materiais e Aprovisionamento
+```
+[Tipo de obra nova?]
+  → SIM: [Materiais do cliente disponíveis em obra?]
+    → SIM: Iniciar atividades ✅
+    → NÃO: Verificar disponibilidade em campo
+      → [Materiais do cliente disponíveis?]
+        → SIM: Iniciar atividades ✅
+        → NÃO: Gerar requisição para Suprimentos
+          → [Materiais disponíveis após compra?]
+            → SIM: Iniciar atividades ✅
+  → NÃO (obra já iniciada): [Material da CEMIG em campo?]
+    → SIM: [Materiais do cliente disponíveis?] → ...
+    → NÃO: Solicitar envio de material à CEMIG → ...
+```
+
+### 9.2 Tabela: `pmo_fluxo_os`
+
+Registro do status de cada OS conforme as etapas do fluxo:
+
+| Campo | Tipo | Descrição |
+|-------|------|-----------|
+| `id` | UUID PK | — |
+| `portfolio_id` | UUID FK | OSC vinculada |
+| `numero_os` | TEXT | Número da OS |
+| `etapa_atual` | ENUM | (ver etapas abaixo) |
+| `tipo_servico` | TEXT | Classificação do serviço |
+| `tipo_obra` | ENUM | `nova` / `em_andamento` |
+| `analise_coordenador` | JSONB | {escopo, prazo, observacoes} |
+| `informacoes_completas` | BOOLEAN | Se a OS está completa |
+| `materiais_cliente_disponiveis` | BOOLEAN | Materiais CEMIG no local |
+| `materiais_cemig_campo` | BOOLEAN | Material CEMIG em campo |
+| `requisicao_suprimentos_id` | UUID FK | Vínculo com cmp_requisicoes |
+| `data_recebimento` | TIMESTAMPTZ | Quando a OS foi recebida |
+| `data_inicio_atividades` | TIMESTAMPTZ | Quando as atividades iniciaram |
+| `observacoes` | TEXT | Notas |
+
+**Etapas do Fluxo:**
+
+| Etapa | Descrição |
+|-------|-----------|
+| `recebida` | OS recebida pelo Diretor |
+| `classificada` | Classificada (tipo serviço + tipo obra) |
+| `em_analise` | Em análise pelo Coordenador |
+| `devolvida_comentarios` | Devolvida com comentários ao Diretor |
+| `retornada_cliente` | Retornada ao cliente para ajuste |
+| `cancelada` | OS cancelada |
+| `planejamento_logistica` | Planejamento de logística |
+| `planejamento_materiais` | Planejamento de lista de materiais |
+| `checagem_materiais` | Verificando disponibilidade de materiais |
+| `aguardando_suprimentos` | Requisição gerada para Compras |
+| `aguardando_material_cemig` | Solicitado envio à CEMIG |
+| `pronta_iniciar` | Todos materiais ok, pronta para iniciar |
+| `em_execucao` | Atividades iniciadas |
+
+---
+
+## 10. Submodulo: Status Report
+
+### Referência: `MODELO_Cronograma_Gantt_200226.xlsx` — Sheet "Status Report"
+
+### 10.1 Estrutura do Report
+
+| Seção | Campos |
+|-------|--------|
+| **OS Metas** | Total, A Iniciar, Em Andamento, Concluídas, Paralisadas |
+| **Faturamento** | Meta Faturamento, Faturamento Atual, Delta |
+| **Detalhamento OS** | OS número, Status, Região, Equipe, % Planejada, % Executada, % Delta, Justificativa |
+| **Atividades** | Ação, Status, Setor, Responsável, Data Conclusão, Observação |
+| **Riscos** | Descrição, Impacto, Probabilidade, Plano de mitigação |
+| **Multas** | Tipo, Valor, Status, Ações |
+
+### 10.2 Tabela: `pmo_status_report`
+
+| Campo | Tipo | Descrição |
+|-------|------|-----------|
+| `id` | UUID PK | — |
+| `portfolio_id` | UUID FK | Projeto |
+| `periodo` | TEXT | Ex: "Mar/2026" |
+| `data_report` | DATE | Data de geração |
+| `os_total` | INTEGER | Total de OS |
+| `os_a_iniciar` | INTEGER | — |
+| `os_em_andamento` | INTEGER | — |
+| `os_concluidas` | INTEGER | — |
+| `os_paralisadas` | INTEGER | — |
+| `meta_faturamento` | NUMERIC(15,2) | Meta do período |
+| `faturamento_atual` | NUMERIC(15,2) | Faturamento realizado |
+| `delta_faturamento` | NUMERIC(15,2) | Diferença |
+| `detalhamento_os` | JSONB | Array de OS detalhadas |
+| `atividades` | JSONB | Plano de ação |
+| `riscos` | JSONB | Riscos identificados |
+| `multas` | JSONB | Multas e penalidades |
+| `gerado_por` | UUID FK | Quem gerou o report |
+| `status` | ENUM | `rascunho` / `publicado` |
+
+---
+
+## 11. Submodulo: Controle de Multas e Riscos
+
+### Referência: Gantt sheets + Indicadores + TAP CEMIG
+
+### 11.1 Tabela: `pmo_multas`
+
+| Campo | Tipo | Descrição |
+|-------|------|-----------|
+| `id` | UUID PK | — |
+| `portfolio_id` | UUID FK | OSC vinculada |
+| `tipo_multa` | ENUM | `atraso_prazo` / `qualidade` / `ssma` / `documental` / `subcontratacao` / `outra` |
+| `descricao` | TEXT | Detalhamento |
+| `base_contratual` | TEXT | Cláusula do contrato |
+| `valor_estimado` | NUMERIC(15,2) | Valor estimado |
+| `valor_confirmado` | NUMERIC(15,2) | Valor efetivo |
+| `status` | ENUM | `risco` / `notificada` / `contestada` / `confirmada` / `paga` / `cancelada` |
+| `data_notificacao` | DATE | Quando foi notificada |
+| `data_vencimento` | DATE | Prazo para regularização |
+| `acao_mitigacao` | TEXT | Plano de ação |
+| `responsavel` | TEXT | Responsável pela tratativa |
+
+### 11.2 Regras do Contrato CEMIG
+
+Conforme TAP real:
+- Multas **cumulativas e independentes** entre si
+- Podem ser **descontadas das faturas**
+- Limite de multa: **10% do saldo residual**
+- Atraso CEMIG gera juros de **0,5%/mês** a favor da TEG
+- Alerta automático quando acumulado > 5% do saldo
+
+---
+
+## 12. Submodulo: Rotina de Reuniões
+
+### Referência: `MODELO_Cronograma_Gantt_200226.xlsx` — Sheet "Rotina de Reuniões"
+
+### 12.1 Tabela: `pmo_reunioes`
+
+| Campo | Tipo | Descrição |
+|-------|------|-----------|
+| `id` | UUID PK | — |
+| `portfolio_id` | UUID FK | Projeto (NULL = empresa) |
+| `tipo` | ENUM | `dds` / `alinhamento_semanal` / `gestao_mensal` / `cliente_mensal` / `analise_trimestral` |
+| `data` | TIMESTAMPTZ | Data/hora da reunião |
+| `participantes` | TEXT[] | Lista de participantes |
+| `pauta` | TEXT | Pauta |
+| `ata` | TEXT | Ata/notas |
+| `ata_url` | TEXT | URL do documento de ata |
+| `decisoes` | JSONB | Array de {decisao, responsavel, prazo} |
+| `status` | ENUM | `agendada` / `realizada` / `cancelada` |
+| `duracao_minutos` | INTEGER | Duração planejada |
+
+### 12.2 Cadências Padrão (Seed)
+
+| Cadência | Quem | Pauta | Duração |
+|----------|------|-------|---------|
+| **Diária (DDS)** | Encarregados + equipe campo | Riscos do dia, EPI, condições do local | 15 min |
+| **Semanal** | Gerente Contratos + Coord. Campo + SSMA | Andamento OS, ocorrências, pendências, programação semanal | 45 min |
+| **Mensal (Gestão)** | Toda equipe gestão + Dir. Operações | KPIs, multas, documentos, medição, riscos, reajuste | 1h30 |
+| **Mensal (Cliente)** | Gerente Contratos + Gestor CEMIG | Desempenho, pendências, OS planejadas, notificações | 1h |
+| **Trimestral** | Dir. Operações + Gerente + equipe | KPIs trimestre, projeção financeira, riscos, revisão equipe, alinhamento estratégico | 2h |
+
+---
+
+## 13. Submodulo: Solicitação de Mudanças
+
+### Referência: `MODELO_Histograma_250226.xlsx` — Sheet "LEGENDAS"
+
+### 13.1 Tabela: `pmo_mudancas`
+
+| Campo | Tipo | Descrição |
+|-------|------|-----------|
+| `id` | UUID PK | — |
+| `portfolio_id` | UUID FK | Projeto |
+| `tipo` | ENUM | `mudanca_escopo` / `mudanca_lider` / `mudanca_orcamento` / `mudanca_prazo` |
+| `descricao` | TEXT | Descrição da mudança |
+| `justificativa` | TEXT | Motivo |
+| `esforco_estimado` | ENUM | `baixo` (<5%) / `medio` (5-10%) / `alto` (>10%) |
+| `custo_estimado` | ENUM | `baixo` (<5%) / `medio` (5-10%) / `alto` (>10%) |
+| `impacto_prazo` | ENUM | `baixo` (<5 dias) / `medio` (5-30 dias) / `alto` (>30 dias) |
+| `parecer` | ENUM | `pendente` / `aprovado` / `reprovado` |
+| `aprovado_por` | TEXT | Quem aprovou |
+| `data_solicitacao` | DATE | Data do pedido |
+| `data_parecer` | DATE | Data da decisão |
+| `solicitado_por` | UUID FK | Quem solicitou |
+
+---
+
+## 14. Submodulo: Indicadores e KPIs
+
+### Referência: `MODELO_Cronograma_Gantt_200226.xlsx` — Sheet "Indicadores"
+
+### 14.1 Indicadores Financeiros
+
+| Indicador | Fórmula / Descrição | Meta |
+|-----------|---------------------|------|
+| % valor contrato executado vs planejado | Medido acum. / Previsto acum. × 100 | Aderência ao ritmo de 209.530 US em 35 meses |
+| Valor medido no mês vs meta mensal | valor_medido_mes / meta_mensal × 100 | ≥ 100% |
+| Valor de multas acumuladas | SUM(multas confirmadas) | < 10% do saldo residual |
+| Dias atraso pgto CEMIG | dias_desde_vencimento_CR | Para cobrança de juros 0,5%/mês |
+| IDC (Índice de Desempenho de Custo) | Valor Agregado / Custo Real | ≥ 1.0 |
+| IDP (Índice de Desempenho de Prazo) | Valor Agregado / Valor Planejado | ≥ 1.0 |
+
+### 14.2 Indicadores Operacionais
+
+| Indicador | Fórmula / Descrição | Meta |
+|-----------|---------------------|------|
+| US executadas vs planejadas | US_exec_mes / US_plan_mes × 100 | ≥ 100% |
+| OS abertas vs concluídas vs em atraso | Contagem por status | Zero em atraso |
+| % subcontratação | Valor subcontratado / Valor total | ≤ 30% (limite contratual) |
+| Prazo médio início após ATE | AVG(data_inicio - data_ate) | ≤ 5 dias |
+| Produção mensal (R$) | Soma medições aprovadas | ≥ R$ 7,5M/mês |
+
+### 14.3 Indicadores de Conformidade Documental
+
+| Indicador | Fórmula / Descrição | Meta |
+|-----------|---------------------|------|
+| % docs obrigatórios no prazo | Docs entregues / Docs devidos × 100 | 100% |
+| Notificações CEMIG no mês | Contagem | Zero |
+| Multas: notificadas / contestadas / pagas | Pipeline de multas | Minimizar |
+
+### 14.4 Indicadores SSMA
+
+| Indicador | Fórmula / Descrição | Meta |
+|-----------|---------------------|------|
+| Taxa de Frequência (TF) | (Acidentes × 1.000.000) / HH | Benchmarking CEMIG |
+| Taxa de Gravidade (TG) | (Dias perdidos × 1.000.000) / HH | Benchmarking CEMIG |
+| Horas trabalhadas no mês | SUM(hh_lancamentos) | Relatório obrigatório |
+| Acidentes graves/fatais | Contagem | **ZERO** |
+
+---
+
+---
+
+# PARTE B — Contratos com Cliente (MS-010)
+
+---
+
+## 15. Gestão de Contratos com Cliente
+
+### Missão (Funcionograma)
+
+> Garantir segurança jurídica, conformidade nas relações contratuais e redução de riscos da empresa.
+
+### 15.1 Cadastro de Contratos
+
+O cadastro suporta contratos de receita (clientes como CEMIG) e despesa (fornecedores/subempreiteiros), vinculados obrigatoriamente a obra e centro de custo.
+
+| Campo | Tipo | Obrigatório | Descrição |
+|-------|------|-------------|-----------|
+| `id` | UUID PK | Sim | Identificador |
+| `numero` | TEXT | Sim | Identificador único (ex: CT-2026-001) |
+| `tipo_contrato` | ENUM | Sim | `receita` / `despesa` / `misto` |
+| `cliente_id` | UUID FK → con_clientes | Se receita | Vínculo com cliente |
+| `fornecedor_id` | UUID FK → cmp_fornecedores | Se despesa | Vínculo com fornecedor |
+| `obra_id` | UUID FK → sys_obras | Sim | Obra vinculada |
+| `centro_custo` | TEXT | Sim | Centro de custo para classificação financeira |
+| `classe_financeira` | TEXT | Não | Classificação contábil |
+| `objeto` | TEXT | Sim | Descrição do objeto contratual |
+| `valor_total` | NUMERIC(15,2) | Sim | Valor original do contrato |
+| `valor_aditivos` | NUMERIC(15,2) | Não | Soma acumulada de aditivos |
+| `valor_medido` | NUMERIC(15,2) | Não | Valor acumulado já medido |
+| `data_inicio` | DATE | Sim | Início de vigência |
+| `data_fim_previsto` | DATE | Sim | Término previsto |
+| `recorrencia` | ENUM | Sim | `mensal` / `quinzenal` / `semanal` / `unica` / `personalizado` |
+| `dia_vencimento` | INTEGER | Se recorrente | Dia fixo (1-31) |
+| `status` | ENUM | Sim | `em_negociacao` / `ativo` / `suspenso` / `encerrado` / `cancelado` |
+| `indice_reajuste` | ENUM | Não | `IGPM` / `IPCA` / `INCC` / `outro` / `nenhum` |
+| `periodicidade_reajuste` | ENUM | Não | `anual` / `semestral` / `contratual` |
+| `sla_dias_pagamento` | INTEGER | Não | Prazo para pagamento após medição |
+| `penalidade_atraso_pct` | NUMERIC(5,2) | Não | Percentual de multa por atraso |
+
+### 15.2 Itens do Contrato (`con_contrato_itens`)
+
+| Campo | Tipo | Descrição |
+|-------|------|-----------|
+| `contrato_id` | UUID FK | Vínculo com con_contratos |
+| `descricao` | TEXT | Descrição do item/serviço |
+| `unidade` | TEXT | Unidade de medida (km, un, m², vb) |
+| `quantidade` | NUMERIC | Quantidade contratada |
+| `valor_unitario` | NUMERIC(15,2) | Preço unitário |
+| `valor_total` | NUMERIC(15,2) | Calculado: quantidade × valor_unitario |
+| `ordem` | INTEGER | Ordem de exibição |
+
+### 15.3 Ciclo de Vida do Contrato
+
+| De | Para | Ação / Trigger | Permissão |
+|----|------|---------------|-----------|
+| `em_negociacao` | `ativo` | Assinatura confirmada + upload contrato | Gestor Contratos / Diretor |
+| `ativo` | `suspenso` | Suspensão por inadimplência/judicial | Diretor |
+| `suspenso` | `ativo` | Regularização e retomada | Diretor |
+| `ativo` | `encerrado` | Todas medições concluídas + distrato | Gestor Contratos |
+| `qualquer` | `cancelado` | Cancelamento formal com justificativa | Diretor / Admin |
+
+### 15.4 Parcelas e Integração Financeira
+
+O fluxo de parcelas já implementado (migration 024) segue:
+
+```
+Cadastro Contrato → Gera Parcelas (recorrentes ou personalizadas)
+  → Trigger cria previsão em fin_contas_pagar ou fin_contas_receber
+  → Data chega → Status: pendente
+  → Liberação (NF/medição anexada) → Status: liberado
+  → Financeiro confirma → Status: pago
+  → Trigger atualiza financeiro → CP/CR: pago/recebido
+```
+
+---
+
+## 16. Faturamento e Medições de Obra
+
+### 16.1 Boletim de Medição (BM) — `con_medicoes`
+
+| Campo | Tipo | Descrição |
+|-------|------|-----------|
+| `contrato_id` | UUID FK | Contrato de referência |
+| `numero_bm` | TEXT | Número sequencial (BM-001, BM-002) |
+| `periodo_inicio` | DATE | Início do período de medição |
+| `periodo_fim` | DATE | Fim do período |
+| `valor_medido` | NUMERIC(15,2) | Valor total do boletim |
+| `valor_retencao` | NUMERIC(15,2) | Retenção contratual (ex: 5%) |
+| `valor_liquido` | NUMERIC(15,2) | Valor a faturar (medido − retenção) |
+| `status` | ENUM | `rascunho` / `em_aprovacao` / `aprovado` / `rejeitado` / `faturado` |
+| `aprovado_por` | TEXT | Fiscal/responsável |
+| `aprovado_em` | TIMESTAMPTZ | Data de aprovação |
+
+### 16.2 Itens da Medição — `con_medicao_itens`
+
+| Campo | Tipo | Descrição |
+|-------|------|-----------|
+| `medicao_id` | UUID FK | Vínculo com con_medicoes |
+| `contrato_item_id` | UUID FK | Vínculo com con_contrato_itens |
+| `quantidade_medida` | NUMERIC | Quantidade executada no período |
+| `valor_unitario` | NUMERIC(15,2) | Preço unitário (do contrato) |
+| `valor_total` | NUMERIC(15,2) | Calculado: qtd × preço |
+| `percentual_acumulado` | NUMERIC(5,2) | % acumulado do item contratual |
+
+### 16.3 Fluxo da Medição ao Faturamento
+
+1. **Coleta de Campo (Obras):** Supervisores medem quantitativos e coletam evidências fotográficas
+2. **Consolidação do BM (Obras + PMO):** Engenheiro consolida BM mensal. Meta: entrega até dia 5
+3. **Validação com Cliente (PMO):** Submete ao cliente, acompanha contestações
+4. **Rateio e Emissão de NF (Contratos):** Valida OSC, rateia por CC, confere certidões/ART/seguros, emite NF
+5. **Recebimento (Financeiro):** Monitora CR, identifica bloqueios, registra pagamento
+6. **Análise (Controladoria):** Receita medida vs custos realizados = margem bruta
+
+### 16.4 Integração com Medição PMO
+
+As medições de engenheiro (seção 7 — Controle de Medições PMO) alimentam diretamente os BMs de contrato:
+
+```
+pmo_medicao_itens (status: cemig_aprovada)
+  → Consolida em con_medicoes (status: aprovado)
+  → Trigger: UPDATE con_contratos.valor_medido
+  → Trigger: INSERT fin_contas_receber
+```
+
+---
+
+## 17. Aditivos e Reajustes Contratuais
+
+### 17.1 Aditivos — `con_aditivos` (NOVA)
+
+| Campo | Tipo | Descrição |
+|-------|------|-----------|
+| `contrato_id` | UUID FK | Contrato original |
+| `numero_aditivo` | TEXT | Sequencial (ADT-001) |
+| `tipo` | ENUM | `escopo` / `prazo` / `valor` / `misto` |
+| `descricao` | TEXT | Objeto do aditivo |
+| `valor_acrescimo` | NUMERIC(15,2) | Valor adicionado (positivo ou negativo) |
+| `nova_data_fim` | DATE | Nova data de término, se aplicável |
+| `status` | ENUM | `rascunho` / `em_aprovacao` / `aprovado` / `rejeitado` |
+| `aprovado_por` | TEXT | Responsável |
+| `documento_url` | TEXT | URL do aditivo assinado |
+
+**Trigger:** Ao aprovar aditivo de valor, `con_contratos.valor_aditivos += valor_acrescimo` automaticamente.
+
+### 17.2 Reajustes — `con_reajustes` (NOVA)
+
+| Campo | Tipo | Descrição |
+|-------|------|-----------|
+| `contrato_id` | UUID FK | Contrato |
+| `data_base` | DATE | Data-base do reajuste |
+| `indice_nome` | TEXT | IGPM, IPCA, INCC |
+| `percentual_aplicado` | NUMERIC(5,4) | % de reajuste |
+| `valor_antes` | NUMERIC(15,2) | Valor antes do reajuste |
+| `valor_depois` | NUMERIC(15,2) | Valor depois do reajuste |
+| `aplicado_em` | TIMESTAMPTZ | Quando foi aplicado |
+| `aplicado_por` | UUID FK | Quem aplicou |
+
+O sistema busca o índice via API (IBGE/BC) ou permite cadastro manual. Alerta 30 dias antes da data-base.
+
+---
+
+## 18. Cronograma Físico-Financeiro por Contrato
+
+### `con_cronograma` (NOVA)
+
+| Campo | Tipo | Descrição |
+|-------|------|-----------|
+| `contrato_id` | UUID FK | Contrato vinculado |
+| `etapa` | TEXT | Descrição (ex: Fundações, Montagem, Comissionamento) |
+| `peso_percentual` | NUMERIC(5,2) | Peso da etapa no contrato total |
+| `data_inicio_prevista` | DATE | Início planejado |
+| `data_fim_prevista` | DATE | Fim planejado |
+| `data_inicio_real` | DATE | Início real |
+| `data_fim_real` | DATE | Fim real |
+| `valor_previsto` | NUMERIC(15,2) | Valor associado à etapa |
+| `valor_realizado` | NUMERIC(15,2) | Valor efetivamente medido/faturado |
+| `percentual_fisico` | NUMERIC(5,2) | Avanço físico real (%) |
+| `status` | ENUM | `nao_iniciada` / `em_andamento` / `concluida` / `atrasada` |
+
+Alimenta a Curva S do PMO e indicadores SPI/CPI.
+
+---
+
+## 19. SLA, Penalidades e Alertas Contratuais
+
+| Tipo de Alerta | Trigger | Destinatário | Canal |
+|---------------|---------|-------------|-------|
+| Vencimento de contrato | 60, 30 e 15 dias antes | Gestor Contratos + Diretor | Email + in-app |
+| Medição pendente | Dia 3 do mês sem BM submetido | Engenheiro + PMO | Email + WhatsApp |
+| Pagamento atrasado | N dias após vencimento da parcela | Financeiro + Contratos | in-app |
+| Reajuste próximo | 30 dias antes da data-base | Gestor Contratos | Email |
+| Aditivo pendente | Escopo excedido sem aditivo formal | Gestor + Diretor | Notificação crítica |
+| Documentação vencida | Certidões, ART, seguros próximos do vencimento | Gestor Contratos | Email |
+
+Penalidades calculadas automaticamente: `valor_parcela × penalidade_atraso_pct × dias_atraso / 30`.
+
+---
+
+# PARTE C — Gestão de Obras
+
+---
+
+## 20. Apontamento de Produção e Avanço Físico
+
+### 20.1 Tabela: `obr_apontamentos`
+
+| Campo | Tipo | Descrição |
+|-------|------|-----------|
+| `id` | UUID PK | Identificador |
+| `obra_id` | UUID FK → sys_obras | Obra vinculada |
+| `frente_trabalho` | TEXT | Identificação da frente (ex: LT-01, SE-02) |
+| `data_apontamento` | DATE | Data da execução |
+| `atividade` | TEXT | Descrição da atividade |
+| `contrato_item_id` | UUID FK → con_contrato_itens | Vínculo com item do contrato (para medição) |
+| `quantidade_executada` | NUMERIC | Quantidade realizada |
+| `unidade` | TEXT | Unidade de medida |
+| `equipe_responsavel` | TEXT | Equipe/turma executora |
+| `horas_trabalhadas` | NUMERIC(5,2) | Total de HH |
+| `observacoes` | TEXT | Notas de campo |
+| `evidencia_fotos` | TEXT[] | URLs de fotos (Supabase Storage) |
+| `status` | ENUM | `rascunho` / `confirmado` / `validado` |
+| `apontado_por` | UUID FK | Supervisor responsável |
+| `validado_por` | UUID FK | Engenheiro que validou |
+| `validado_em` | TIMESTAMPTZ | Data de validação |
+
+### 20.2 Regras de Negócio
+
+- Apontamento diário pelo supervisor/encarregado
+- Engenheiro valida em até 48 horas
+- Apontamentos validados alimentam avanço físico semanal: `(SUM(qtd_executada) / qtd_contratada) × 100`
+- Vínculo com item do contrato viabiliza geração automática de BM
+- Fotos obrigatórias para atividades críticas (configurável)
+
+---
+
+## 21. Diário de Obra (RDO)
+
+### `obr_rdo`
+
+| Campo | Tipo | Descrição |
+|-------|------|-----------|
+| `obra_id` | UUID FK | Obra |
+| `data` | DATE | Data do diário |
+| `condicao_climatica` | ENUM | `sol` / `nublado` / `chuva` / `chuva_forte` / `tempestade` |
+| `efetivo_proprio` | INTEGER | Colaboradores próprios |
+| `efetivo_terceiro` | INTEGER | Terceirizados |
+| `equipamentos_operando` | INTEGER | Em operação |
+| `equipamentos_parados` | INTEGER | Parados (manutenção/chuva) |
+| `resumo_atividades` | TEXT | Atividades do dia |
+| `ocorrencias` | TEXT | Incidentes, desvios, paradas |
+| `horas_improdutivas` | NUMERIC(5,2) | Horas perdidas |
+| `motivo_improdutividade` | TEXT | Justificativa |
+| `fotos` | TEXT[] | Evidências fotográficas |
+| `responsavel` | UUID FK | Engenheiro responsável |
+| `status` | ENUM | `rascunho` / `finalizado` |
+
+---
+
+## 22. Prestação de Contas de Obra
+
+### Problema Endereçado
+
+Gastos realizados diretamente na obra (combustível, alimentação, pequenas compras locais, serviços de terceiros, manutenções emergenciais) **que não passam pelo módulo de Compras** precisam ser registrados, classificados corretamente no centro de custo, classe financeira e projeto, e aprovados para garantir governança e rastreabilidade no DRE.
+
+### 22.1 Tabela: `obr_prestacao_contas`
+
+| Campo | Tipo | Obrigatório | Descrição |
+|-------|------|-------------|-----------|
+| `id` | UUID PK | Sim | Identificador |
+| `obra_id` | UUID FK → sys_obras | Sim | Obra onde o gasto ocorreu |
+| `centro_custo_id` | UUID FK → sys_centros_custo | Sim | Centro de custo (vinculado à obra) |
+| `classe_financeira_id` | UUID FK → fin_classes_financeiras | Sim | Classe financeira para DRE |
+| `categoria` | ENUM | Sim | (ver tabela abaixo) |
+| `descricao` | TEXT | Sim | Descrição detalhada do gasto |
+| `valor` | NUMERIC(15,2) | Sim | Valor total do gasto |
+| `data_gasto` | DATE | Sim | Quando o gasto ocorreu |
+| `fornecedor_nome` | TEXT | Não | Quem recebeu o pagamento |
+| `fornecedor_cnpj_cpf` | TEXT | Não | CNPJ ou CPF do favorecido |
+| `forma_pagamento` | ENUM | Sim | `dinheiro` / `cartao_corporativo` / `pix` / `transferencia` / `adiantamento` |
+| `numero_nf` | TEXT | Não | Número da NF/cupom fiscal |
+| `comprovante_urls` | TEXT[] | Sim | Fotos/PDFs dos comprovantes (NF, recibo, cupom) |
+| `adiantamento_id` | UUID FK → obr_adiantamentos | Não | Vínculo se veio de adiantamento |
+| `solicitante_id` | UUID FK → sys_perfis | Sim | Quem está prestando contas |
+| `solicitante_nome` | TEXT | Sim | Nome do solicitante |
+| `status` | ENUM | Sim | (ver fluxo abaixo) |
+| `aprovador_id` | UUID FK → sys_perfis | Não | Quem aprovou |
+| `aprovado_em` | TIMESTAMPTZ | Não | Data de aprovação |
+| `motivo_rejeicao` | TEXT | Não | Se rejeitada, motivo |
+| `fin_conta_pagar_id` | UUID FK → fin_contas_pagar | Não | CP gerado após aprovação |
+| `created_at` | TIMESTAMPTZ | Sim | — |
+
+### 22.2 Categorias de Gasto em Obra
+
+| Categoria | Descrição | Exemplos |
+|-----------|-----------|----------|
+| `combustivel` | Combustível e lubrificantes | Abastecimento de veículos, gerador |
+| `alimentacao` | Alimentação e refeições | Marmitex, restaurante, água |
+| `hospedagem` | Hospedagem e alojamento | Hotel, aluguel temporário |
+| `transporte` | Transporte e deslocamento | Táxi, frete local, pedágio |
+| `material_consumo` | Material de consumo imediato | Parafusos, fita isolante, EPI avulso |
+| `manutencao_emergencial` | Manutenção urgente | Reparo de equipamento em campo |
+| `servico_terceiro` | Serviço de terceiro local | Borracheiro, eletricista local |
+| `locacao_equipamento` | Locação avulsa | Gerador, betoneira por dia |
+| `telefonia_internet` | Comunicação | Chip, recarga, internet |
+| `outro` | Outros gastos justificados | — |
+
+### 22.3 Fluxo de Aprovação
+
+```
+Gasto ocorre em campo
+  → Responsável registra no sistema (fotos + classificação)
+  → Status: pendente
+  → Engenheiro da obra revisa e classifica CC + classe financeira
+  → Status: em_analise
+  → Aprovador (Gerente/Coordenador) aprova ou rejeita
+    → Se aprovada:
+      → Status: aprovada
+      → Trigger: cria CP em fin_contas_pagar (se forma_pgto != adiantamento)
+      → Alimenta ctrl_dre como custo da obra
+    → Se rejeitada:
+      → Status: rejeitada (com motivo)
+      → Valor é cobrado do solicitante via RH (se adiantamento)
+```
+
+**Status possíveis:**
+
+| Status | Descrição |
+|--------|-----------|
+| `pendente` | Registrada pelo solicitante |
+| `em_analise` | Em revisão pelo engenheiro |
+| `aprovada` | Aprovada — gerará CP no financeiro |
+| `rejeitada` | Rejeitada — valor não reconhecido |
+| `compensada` | Usou adiantamento — sem CP novo |
+
+### 22.4 Adiantamentos de Obra — `obr_adiantamentos`
+
+Adiantamento de valores para gastos previstos na obra:
+
+| Campo | Tipo | Descrição |
+|-------|------|-----------|
+| `id` | UUID PK | — |
+| `obra_id` | UUID FK | Obra |
+| `solicitante_id` | UUID FK | Quem solicita |
+| `valor_solicitado` | NUMERIC(15,2) | Valor pedido |
+| `valor_aprovado` | NUMERIC(15,2) | Valor efetivamente liberado |
+| `valor_prestado_contas` | NUMERIC(15,2) | Quanto já foi prestado contas |
+| `saldo_pendente` | NUMERIC(15,2) | Calculado: aprovado − prestado |
+| `finalidade` | TEXT | Motivo do adiantamento |
+| `data_solicitacao` | DATE | — |
+| `data_limite_prestacao` | DATE | Prazo para prestar contas (padrão: 5 dias úteis) |
+| `status` | ENUM | `solicitado` / `aprovado` / `parcial` / `prestado` / `vencido` |
+| `aprovado_por` | UUID FK | Diretor que aprovou |
+
+**Regras:**
+- Prazo para prestação de contas: 5 dias úteis (conforme funcionograma seção 7.5)
+- Diferença (sobra) deve ser devolvida ou gera desconto em folha
+- Alerta automático quando prazo vence sem prestação completa
+- Adiantamento só aprovado por Diretor (alçada 3+)
+
+### 22.5 Integração com Financeiro e Controladoria
+
+```
+obr_prestacao_contas (status: aprovada)
+  → INSERT fin_contas_pagar (
+      centro_custo = obra.centro_custo,
+      classe_financeira = prestacao.classe_financeira_id,
+      categoria = prestacao.categoria,
+      natureza = 'despesa_obra',
+      status = 'aprovado'
+    )
+  → ctrl_dre recebe via vw_ctrl_custo_por_obra (soma prestações + POs + HHt)
+```
+
+**Visibilidade na Controladoria:** A view `vw_ctrl_custo_por_obra` é expandida para incluir uma CTE de prestações de contas aprovadas:
+
+```sql
+custo_prestacoes AS (
+  SELECT
+    pc.obra_id,
+    COALESCE(SUM(pc.valor), 0) AS custo_prestacoes
+  FROM obr_prestacao_contas pc
+  WHERE pc.status = 'aprovada'
+  GROUP BY pc.obra_id
+)
+```
+
+Isso garante que gastos de campo aparecem no DRE e no Orçado vs Realizado mesmo sem terem passado por Compras.
+
+---
+
+## 23. Gestão de Equipes e Mobilização
+
+### 23.1 Mobilização/Desmobilização — `obr_mobilizacoes`
+
+| Campo | Tipo | Descrição |
+|-------|------|-----------|
+| `obra_id` | UUID FK | Obra |
+| `tipo` | ENUM | `mobilizacao` / `desmobilizacao` |
+| `colaboradores` | JSONB | Array de {nome, cargo, data_prevista, data_real} |
+| `equipamentos` | JSONB | Array de {tipo, placa, data_prevista, data_real} |
+| `status` | ENUM | `planejada` / `em_andamento` / `concluida` |
+| `data_prevista` | DATE | Previsão |
+| `data_real` | DATE | Efetiva |
+| `responsavel` | TEXT | Coordenador |
+| `observacoes` | TEXT | Notas |
+
+Meta conforme funcionograma: mobilização em até 15 dias, 100% recursos na data planejada.
+
+### 23.2 Equipes — `obr_equipes`
+
+| Campo | Tipo | Descrição |
+|-------|------|-----------|
+| `obra_id` | UUID FK | Obra |
+| `frente_trabalho` | TEXT | Identificação da frente |
+| `colaborador_id` | UUID FK → rh_colaboradores | Colaborador |
+| `funcao` | TEXT | Função na obra |
+| `data_inicio` | DATE | Início da alocação |
+| `data_fim` | DATE | Fim da alocação |
+| `ativo` | BOOLEAN | Em alocação ativa |
+
+---
+
+## 24. Dashboard de Obras
+
+Painel por obra mostrando:
+
+- Avanço físico acumulado (%) vs planejado (Curva S)
+- Efetivo atual (próprio + terceiro) vs dimensionado
+- Equipamentos operacionais vs parados
+- Produção do mês (R$) vs meta (R$ 7,5M)
+- Desvio de prazo e custo (SPI e CPI)
+- **Prestações de contas:** pendentes, aprovadas no mês, valor total
+- Próximas entregas e marcos críticos
+- Alertas de SSMA
+
+---
+
+# PARTE D — Controladoria (MS-012)
+
+---
+
+## 25. Planejamento e Controle Orçamentário
+
+### Missão (Funcionograma)
+
+> Garantir a lucratividade da empresa, através do planejamento orçamentário, análises financeiras e de indicadores, e desenvolvimento de planos de redução de custos.
+
+### 25.1 Orçamento por Obra — `ctrl_orcamentos` (existente, migration 023)
+
+| Categoria de Custo | Campo | Fonte de Dados Real |
+|--------------------|-------|---------------------|
+| Mão de obra | `valor_mao_obra` | HHt aprovado × custo/hora (hht_lancamentos) |
+| Materiais | `valor_materiais` | cmp_pedidos emitidos por obra |
+| Equipamentos | `valor_equipamentos` | fro_ordens_servico + locações |
+| Serviços PJ | `valor_servicos_pj` | con_contratos tipo despesa por obra |
+| Custos indiretos | `valor_indirect` | Rateio definido pela Controladoria |
+| **Gastos de campo** | — (novo) | **obr_prestacao_contas aprovadas** |
+| Receita contrato | `valor_contrato` | con_contratos tipo receita por obra |
+| Margem-alvo | `margem_alvo` | Definido na proposta comercial |
+
+**Campo novo sugerido:** `valor_gastos_campo` em `ctrl_orcamentos` para planejamento de despesas de campo (combustível, alimentação, etc.) que serão comparadas com prestações de contas aprovadas.
+
+Meta: Orçamento anual aprovado em fevereiro. Desvios corrigidos no mês ≥ 80%.
+
+---
+
+## 26. DRE por Obra e Consolidado
+
+### 26.1 DRE Mensal — `ctrl_dre` (existente, migration 023)
+
+| Linha DRE | Fonte | Cálculo |
+|-----------|-------|---------|
+| (+) Receita Medida | con_medicoes aprovadas | SUM(valor_medido) WHERE status = aprovado |
+| (+) Receita Faturada | NFs emitidas | SUM(valor_nf) |
+| (+) Receita Recebida | fin_contas_receber pagas | SUM(valor_pago) WHERE status = recebido |
+| (−) Custo Mão de Obra | hht_lancamentos aprovados | SUM(custo_calculado) |
+| (−) Custo Materiais | cmp_pedidos pagos | SUM(valor_total) de POs por obra |
+| (−) Custo Equipamentos | fro_ordens_servico + locações | SUM(custo) de OS por obra |
+| (−) Custo Serviços PJ | con_parcelas pagas (despesa) | SUM(valor) de parcelas pagas |
+| **(−) Gastos de Campo** | **obr_prestacao_contas aprovadas** | **SUM(valor) por obra no período** |
+| (−) Outros Custos | Lançamentos manuais | Rateios e ajustes |
+| (=) Margem Bruta | Calculado | Receita Medida − Custo Total |
+| (%) Margem | Calculado | (Margem / Receita) × 100 |
+
+### 26.2 DRE Consolidado — `vw_ctrl_dre_consolidado`
+
+View existente que agrega por ano/mês com: obras ativas, receita total, faturamento, custo total, margem bruta e % margem.
+
+### 26.3 Novo campo no DRE
+
+Adicionar `custo_gastos_campo` em `ctrl_dre` para capturar prestações de contas:
+
+```sql
+ALTER TABLE ctrl_dre ADD COLUMN IF NOT EXISTS custo_gastos_campo NUMERIC(15,2) DEFAULT 0;
+
+-- Atualizar GENERATED column custo_total para incluir:
+-- custo_mao_obra + custo_materiais + custo_equipamentos + 
+-- custo_servicos_pj + custo_gastos_campo + custo_outros
+```
+
+---
+
+## 27. Orçado vs Realizado
+
+### 27.1 Indicadores de Desvio
+
+| Indicador | Fórmula | Alerta |
+|-----------|---------|--------|
+| Desvio de Custo Total | (Realizado − Orçado) / Orçado × 100 | > 5% amarelo, > 10% vermelho |
+| Desvio por Categoria | Idem, por linha (MO, materiais, **campo**, etc.) | Drill-down por CC |
+| CPI | Valor Agregado / Custo Real | < 1.0 = estouro; meta ≥ 0.95 |
+| SPI | Valor Agregado / Valor Planejado | < 1.0 = atraso; meta ≥ 0.95 |
+| EAC | BAC / CPI | Projeção de custo total final |
+| Margem Real vs Alvo | Margem Real − Margem Alvo | Delta negativo = plano de ação |
+
+### 27.2 Detalhamento de Gastos de Campo no Realizado
+
+A Controladoria deve ter visibilidade detalhada dos gastos de campo por:
+
+- **Centro de Custo:** qual obra gerou o gasto
+- **Classe Financeira:** em qual conta contábil (combustível, alimentação, etc.)
+- **Categoria:** tipo de gasto (conforme enum de prestação de contas)
+- **Período:** mensal para comparar com orçamento mensal planejado
+
+View sugerida:
+
+```sql
+CREATE VIEW vw_ctrl_gastos_campo_por_cc AS
+SELECT
+  o.nome AS obra,
+  cc.codigo AS centro_custo,
+  cf.descricao AS classe_financeira,
+  pc.categoria,
+  DATE_TRUNC('month', pc.data_gasto) AS mes,
+  SUM(pc.valor) AS total_gasto,
+  COUNT(*) AS qtd_lancamentos
+FROM obr_prestacao_contas pc
+JOIN sys_obras o ON o.id = pc.obra_id
+JOIN sys_centros_custo cc ON cc.id = pc.centro_custo_id
+LEFT JOIN fin_classes_financeiras cf ON cf.id = pc.classe_financeira_id
+WHERE pc.status = 'aprovada'
+GROUP BY o.nome, cc.codigo, cf.descricao, pc.categoria, DATE_TRUNC('month', pc.data_gasto);
+```
+
+---
+
+## 28. Forecast de Caixa e EBITDA
+
+### 28.1 Forecast de Caixa (30/60/90 dias)
+
+Projeta entradas e saídas futuras com base em:
+
+- Parcelas de contratos de receita pendentes (con_parcelas)
+- Parcelas de contratos de despesa previstas (con_parcelas)
+- Contas a pagar previstas (fin_contas_pagar)
+- Contas a receber pendentes (fin_contas_receber)
+- Folha de pagamento prevista (custo fixo mensal)
+- Empréstimos e financiamentos (parcelas fixas)
+- **Média histórica de gastos de campo por obra** (obr_prestacao_contas)
+
+Alerta de saldo insuficiente projetado.
+
+### 28.2 EBITDA
+
+- EBITDA = Lucro Operacional + Depreciações + Amortizações
+- Margem EBITDA = EBITDA / Receita Líquida × 100
+- Acompanhamento mensal com gráfico de tendência
+
+---
+
+## 29. Dashboard Executivo (CEO View)
+
+Acessível por Diretores e CEO sem acionar TI (requisito do funcionograma).
+
+### 29.1 KPIs do Painel
+
+| KPI | Fonte | Visualização |
+|-----|-------|-------------|
+| Faturamento Mensal (R$) | con_medicoes faturadas | Card com variação MoM |
+| Margem Bruta (%) | ctrl_dre consolidado | Gauge (meta vs real) |
+| EBITDA (R$) | DRE + depreciações | Card com tendência |
+| Produção por Obra (R$) | obr_apontamentos valorizados | Barras por obra |
+| Orçado vs Realizado | ctrl_orcamentos vs ctrl_dre | Barras agrupadas |
+| **Gastos de Campo Acumulados** | obr_prestacao_contas | **Card por obra + total** |
+| Forecast de Caixa | Projeção 90 dias | Gráfico de área |
+| Obras Ativas | sys_obras ativas | Cards com % avanço |
+| Top 5 Desvios | Maiores desvios orçamentários | Tabela com drill-down |
+| Inadimplência (CR) | fin_contas_receber vencidas | Aging por faixa |
+
+### 29.2 Cenários e Simulação (`ctrl_cenarios`)
+
+- Cenário otimista: +10% receita, custos mantidos
+- Cenário base: projeção conforme tendência
+- Cenário conservador: −10% receita, +5% custos
+
+---
+
+# PARTE E — Consolidação Técnica
+
+---
+
+## 30. Modelo de Dados Consolidado (Schema SQL)
+
+### 30.1 Tabelas PMO (migration `033_pmo_gestao_projetos.sql`)
+
+| Tabela | Descrição |
+|--------|-----------|
+| `pmo_portfolio` | Portfólio de OSCs |
+| `pmo_tap` | Termos de Abertura |
+| `pmo_eap` | Estrutura Analítica (WBS) |
+| `pmo_tarefas` | Cronograma Gantt |
+| `pmo_medicao_resumo` | Medições visão gerente |
+| `pmo_medicao_periodo` | Desempenho mensal (previsto/real/delta) |
+| `pmo_medicao_itens` | Medições visão engenheiro |
+| `pmo_medicao_item_periodo` | Detalhe por item por período |
+| `pmo_histograma` | Alocação de recursos por semana |
+| `pmo_fluxo_os` | Tracking do fluxo de OS |
+| `pmo_status_report` | Reports periódicos |
+| `pmo_multas` | Controle de multas |
+| `pmo_reunioes` | Reuniões e atas |
+| `pmo_mudancas` | Solicitações de mudança |
+| `pmo_indicadores_snapshot` | Snapshots periódicos de KPIs |
+
+### 30.2 Tabelas de Contratos (migration `030_contratos_completo.sql`)
+
+| Tabela | Status | Descrição |
+|--------|--------|-----------|
+| `con_clientes` | Existe (022) | Clientes de contratos de receita |
+| `con_contratos` | Existe — expandir (022/024) | Contratos receita e despesa |
+| `con_contrato_itens` | Existe (024) | Itens detalhados |
+| `con_parcelas` | Existe (024) | Parcelas com link financeiro |
+| `con_parcela_anexos` | Existe (024) | Anexos (NF, medição, recibo) |
+| `con_medicoes` | Existe (022) | Boletins de Medição |
+| `con_medicao_itens` | Existe (022) | Itens medidos por BM |
+| `con_aditivos` | **NOVA** | Aditivos contratuais |
+| `con_reajustes` | **NOVA** | Histórico de reajustes |
+| `con_cronograma` | **NOVA** | Cronograma físico-financeiro |
+
+### 30.3 Tabelas de Obras (migration `031_obras_gestao.sql`)
+
+| Tabela | Descrição |
+|--------|-----------|
+| `obr_apontamentos` | Apontamentos diários de produção |
+| `obr_rdo` | Diário de Obra (RDO) |
+| `obr_prestacao_contas` | **Prestação de contas de gastos de campo** |
+| `obr_adiantamentos` | **Adiantamentos para obras** |
+| `obr_frentes` | Frentes de trabalho por obra |
+| `obr_equipes` | Equipes alocadas por frente |
+| `obr_mobilizacoes` | Mobilizações/desmobilizações |
+
+### 30.4 Tabelas de Controladoria (migration `032_controladoria_v2.sql`)
+
+| Tabela | Status | Descrição |
+|--------|--------|-----------|
+| `ctrl_orcamentos` | Existe (023) — expandir | Orçamento base (+ `valor_gastos_campo`) |
+| `ctrl_dre` | Existe (023) — expandir | DRE mensal (+ `custo_gastos_campo`) |
+| `ctrl_kpis_snapshot` | Existe (023) | KPIs periódicos |
+| `ctrl_cenarios` | Existe (023) | Simulações |
+| `ctrl_orcamento_linhas` | **NOVA** | Detalhamento por categoria/mês |
+| `ctrl_alertas_desvio` | **NOVA** | Alertas automáticos de desvio |
+
+### 30.5 Views Consolidadas
+
+| View | Descrição |
+|------|-----------|
+| `vw_pmo_portfolio_resumo` | Portfólio com margens e semáforos |
+| `vw_pmo_avanco_portfolio` | % avanço e faturamento por OSC |
+| `vw_pmo_histograma_totais` | MOD/MOI/Maquinário por semana |
+| `vw_ctrl_custo_por_obra` | Existe (023) — **expandir com prestações de contas** |
+| `vw_ctrl_dre_consolidado` | Existe (023) — DRE agregado |
+| `vw_ctrl_gastos_campo_por_cc` | **NOVA** — Gastos de campo por CC/classe/categoria |
+| `vw_obr_avanco_fisico` | Avanço físico por obra/frente |
+| `vw_obr_prestacao_resumo` | Prestações por obra/mês/status |
+| `vw_con_contratos_resumo` | Contratos com saldo e % medido |
+| `vw_ctrl_forecast_caixa` | Projeção 90 dias incluindo média de gastos campo |
+
+---
+
+## 31. Rotas e Telas (Frontend) — Todos os Módulos
+
+### PMO
+
+| Rota | Componente | Descrição |
+|------|-----------|-----------|
+| `/pmo` | DashboardPMO | Visão geral |
+| `/pmo/portfolio` | Portfolio | Tabela completa de OSCs |
+| `/pmo/portfolio/:id` | DetalheOSC | TAP + EAP + Gantt + medições |
+| `/pmo/tap/:id` | DetalheTAP | Formulário 12 seções |
+| `/pmo/eap/:id` | EAPTree | Árvore WBS |
+| `/pmo/gantt/:id` | GanttChart | Cronograma interativo |
+| `/pmo/medicoes` | MedicoesGerente | Visão consolidada |
+| `/pmo/medicoes/:id` | MedicoesEngenheiro | Detalhada por item |
+| `/pmo/histograma/:id` | Histograma | Gráfico de recursos |
+| `/pmo/fluxo-os` | FluxoOS | Pipeline visual Kanban |
+| `/pmo/status-report` | StatusReports | Reports gerados |
+| `/pmo/multas` | ControleMultas | Dashboard de multas |
+| `/pmo/reunioes` | Reunioes | Calendário e atas |
+| `/pmo/mudancas` | Mudancas | Registro e aprovação |
+| `/pmo/indicadores` | Indicadores | Dashboard KPIs |
+
+### Contratos
+
+| Rota | Componente | Descrição |
+|------|-----------|-----------|
+| `/contratos` | DashboardContratos | KPIs, parcelas pendentes, vencimentos |
+| `/contratos/lista` | ListaContratos | Filtros: status, tipo, obra |
+| `/contratos/novo` | NovoContrato | Formulário com itens e recorrência |
+| `/contratos/:id` | DetalheContrato | Dados, itens, parcelas, medições, aditivos |
+| `/contratos/:id/medicoes` | MedicoesContrato | BMs com status e valores |
+| `/contratos/:id/medicoes/nova` | NovaMedicao | Criação de BM |
+| `/contratos/:id/aditivos` | AditivosContrato | Aditivos |
+| `/contratos/:id/cronograma` | CronogramaContrato | Gantt simplificado |
+| `/contratos/parcelas` | Parcelas | Fluxo de liberação/pagamento |
+| `/contratos/faturamento` | Faturamento | NFs a emitir e emitidas |
+
+### Obras
+
+| Rota | Componente | Descrição |
+|------|-----------|-----------|
+| `/obras` | DashboardObras | Painel: avanço, produção, efetivo, alertas |
+| `/obras/:id` | DetalheObra | Curva S, equipes, frentes |
+| `/obras/:id/apontamentos` | Apontamentos | Lista e criação diária |
+| `/obras/:id/apontamentos/novo` | NovoApontamento | Formulário mobile-friendly |
+| `/obras/:id/rdo` | DiarioObra | RDOs por data |
+| `/obras/:id/rdo/novo` | NovoRDO | Formulário |
+| `/obras/:id/prestacao-contas` | **PrestacaoContas** | **Lista de prestações + criação** |
+| `/obras/:id/prestacao-contas/nova` | **NovaPrestacao** | **Formulário com upload, CC, classe** |
+| `/obras/:id/adiantamentos` | **Adiantamentos** | **Solicitação e acompanhamento** |
+| `/obras/:id/equipes` | EquipesObra | Alocações |
+| `/obras/:id/recursos` | RecursosObra | Requisições e consumos |
+
+### Controladoria
+
+| Rota | Componente | Descrição |
+|------|-----------|-----------|
+| `/controladoria` | DashboardControladoria | CEO View com KPIs |
+| `/controladoria/orcamentos` | Orcamentos | Cadastro/edição por obra |
+| `/controladoria/dre` | DREView | DRE por obra e consolidado |
+| `/controladoria/orcado-realizado` | OrcadoRealizado | Comparativo com drill-down |
+| `/controladoria/gastos-campo` | **GastosCampo** | **Visão de prestações aprovadas por CC/classe** |
+| `/controladoria/forecast` | ForecastCaixa | Projeção 30/60/90 dias |
+| `/controladoria/indicadores` | Indicadores | SPI, CPI, EAC, margens |
+| `/controladoria/cenarios` | Cenarios | Simulação |
+| `/controladoria/endividamento` | Endividamento | Composição de dívida |
+
+---
+
+## 32. Integrações entre Módulos
+
+| Origem | Destino | Dados | Mecanismo |
+|--------|---------|-------|-----------|
+| PMO (medição engenheiro) | Contratos (BM) | Medição aprovada pelo cliente | Trigger/RPC |
+| Contratos (BM aprovado) | Financeiro (CR) | Gera conta a receber | Trigger SQL |
+| Contratos (parcela liberada) | Financeiro (CP) | Gera conta a pagar | Trigger existente |
+| **Obras (prestação aprovada)** | **Financeiro (CP)** | **Gera conta a pagar com CC/classe** | **Trigger SQL** |
+| **Obras (prestação aprovada)** | **Controladoria (DRE)** | **Alimenta custo_gastos_campo** | **View/RPC** |
+| Obras (apontamentos) | PMO (avanço) | Avanço físico semanal | View |
+| Obras (apontamentos) | Contratos (BM rascunho) | Gera BM automaticamente | n8n cron |
+| Compras (PO pago) | Controladoria | Custo materiais por obra | View existente |
+| RH (folha) | Controladoria | Custo mão de obra | hht_lancamentos |
+| Frotas (OS) | Controladoria | Custo equipamentos | View existente |
+| Controladoria (DRE) | PMO (indicadores) | IDC, IDP, margens | View |
+| PMO (Gantt) | Monday.com | Sync bidirecional | n8n |
+
+---
+
+## 33. Regras de Negócio e Alçadas
+
+### PMO
+
+| Ação | Nível Mínimo |
+|------|-------------|
+| Criar OSC no portfólio | Analista PMO |
+| Aprovar TAP | Diretor de Operações |
+| Atualizar Gantt | Analista PMO / Responsável |
+| Aprovar medição (antes de enviar ao cliente) | Gerente PMO |
+| Gerar Status Report | Gerente PMO |
+| Aprovar solicitação de mudança (alto impacto) | Diretor / CEO |
+
+### Contratos
+
+| Ação | Nível Mínimo |
+|------|-------------|
+| Criar contrato | Gestor Contratos |
+| Aprovar contrato > R$ 100k | Diretor (alçada 3+) |
+| Criar/editar aditivo | Gestor Contratos |
+| Aprovar aditivo | Diretor |
+| Emitir NF | Gestor Contratos (Faturamento) |
+
+### Obras
+
+| Ação | Nível Mínimo |
+|------|-------------|
+| Apontar produção | Supervisor / Encarregado |
+| Validar apontamento | Engenheiro de Obra |
+| Criar RDO | Engenheiro de Obra |
+| **Registrar prestação de contas** | **Qualquer colaborador alocado na obra** |
+| **Classificar CC/classe da prestação** | **Engenheiro da obra** |
+| **Aprovar prestação de contas** | **Gerente/Coordenador (alçada 2+)** |
+| **Solicitar adiantamento** | **Engenheiro de Obra** |
+| **Aprovar adiantamento** | **Diretor (alçada 3+)** |
+
+### Controladoria
+
+| Ação | Nível Mínimo |
+|------|-------------|
+| Editar orçamento | Controller |
+| Visualizar DRE | Gerente+ / Controller |
+| Dashboard CEO | Diretor / Admin |
+| Aprovar rateio de custos indiretos | Controller + Diretor |
+
+---
+
+## 34. Workflows n8n
+
+### PMO
+
+| Workflow | Frequência | Descrição |
+|----------|-----------|-----------|
+| `pmo_alertas_prazo_os` | Diário | Alerta OSCs com prazo vencendo |
+| `pmo_gerar_status_report` | Mensal (dia 5) | Rascunho automático |
+| `pmo_sync_monday` | Diário (18h) | Sync tarefas ↔ Monday.com |
+| `pmo_snapshot_indicadores` | Semanal | Grava KPIs |
+| `pmo_lembrete_reunioes` | Diário (07h) | Notifica reuniões do dia |
+
+### Contratos
+
+| Workflow | Frequência | Descrição |
+|----------|-----------|-----------|
+| `con_verificar_parcelas_vencendo` | Diário (08h) | Muda previstas → pendentes |
+| `con_alertas_vencimento` | Diário (09h) | Contratos/docs próximos do vencimento |
+| `con_buscar_indice_reajuste` | Mensal | Busca IGPM/IPCA via API |
+
+### Obras
+
+| Workflow | Frequência | Descrição |
+|----------|-----------|-----------|
+| `obr_consolidar_medicao` | Dia 1 do mês | Gera BM rascunho de apontamentos validados |
+| `obr_alerta_adiantamento_vencido` | Diário (09h) | **Alerta adiantamentos sem prestação de contas** |
+| `obr_sync_prestacao_financeiro` | Ao aprovar | **Cria CP no financeiro para prestações aprovadas** |
+
+### Controladoria
+
+| Workflow | Frequência | Descrição |
+|----------|-----------|-----------|
+| `ctrl_calcular_dre_mensal` | Dia 15 | Consolida custos + receitas **+ gastos campo** |
+| `ctrl_snapshot_kpis` | Semanal | Grava KPIs |
+| `ctrl_forecast_caixa` | Diário (07h) | Projeção 90 dias |
+| `ctrl_alerta_desvio` | Semanal | Alerta se desvio > threshold |
+
+---
+
+## 35. Cronograma de Entrega
+
+### Q3 2026 (Jul → Set)
+
+| Sprint | Período | Entregas |
+|--------|---------|----------|
+| **Sprint 9** | Jul S1-S3 | Migrations 030-033. Cadastro Contratos completo. Portfolio PMO + TAP + seed CEMIG |
+| **Sprint 10** | Jul S4 — Ago S2 | BMs/Medições. Aditivos. EAP + Gantt. Fluxo OS. Cronograma físico-financeiro |
+| **Sprint 11** | Ago S3-S4 | **Módulo Obras**: apontamentos, RDO, **prestação de contas**, adiantamentos, equipes |
+| **Sprint 12** | Set S1-S2 | **Controladoria**: DRE (com gastos campo), orçado vs real, forecast, dashboard CEO |
+| **Sprint 13** | Set S3-S4 | Status Report, multas, reuniões, mudanças. Integrações Monday + n8n. Testes E2E |
+
+### Indicadores de Sucesso
+
+| Indicador | Meta |
+|-----------|------|
+| 100% OSCs cadastradas no portfólio | 30 dias após deploy |
+| TAP digital para novos projetos | 100% a partir do deploy |
+| Contratos ativos no sistema | 100% em 30 dias |
+| Medições via sistema (vs manual) | ≥ 80% em 60 dias |
+| **Prestações de contas via sistema** | **≥ 90% em 60 dias** |
+| **Adiantamentos com prestação no prazo** | **≥ 95%** |
+| Apontamentos diários | ≥ 90% dos dias úteis |
+| DRE mensal automático (incluindo gastos campo) | 100% a partir out/26 |
+| Desvio orçamentário visível em < 48h | 100% obras |
+| Dashboard CEO sem TI | 100% |
+| Indicadores IDC/IDP automáticos | 100% |
+
+---
+
+> **TEG+ ERP** — Especificação Funcional Consolidada
+> Módulos: Gestão de Projetos (PMO) + Contratos + Obras + Controladoria
+> Baseado nos modelos operacionais reais da TEG União Engenharia.
+> Documento gerado em Março 2026 — Versão 2.0
