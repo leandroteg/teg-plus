@@ -3,8 +3,8 @@
   "configurations": [
     {
       "name": "teg-frontend",
-      "runtimeExecutable": "cmd",
-      "runtimeArgs": ["/c", "npm run dev"],
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["C:/Users/owner/Documents/nodejs/node_modules/npm/bin/npm-cli.js", "run", "dev"],
       "cwd": "C:/teg-plus/frontend",
       "port": 5173
     }
