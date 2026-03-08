@@ -1,12 +1,12 @@
-import { useState, useEffect } from 'react'
-import { Navigate, useSearchParams } from 'react-router-dom'
+import { useState } from 'react'
+import { Navigate } from 'react-router-dom'
 import { Mail, Lock, ArrowRight, AlertCircle, CheckCircle, Eye, EyeOff } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { useTheme } from '../contexts/ThemeContext'
 import LogoTeg from '../components/LogoTeg'
 import ThemeToggle from '../components/ThemeToggle'
 
-type View = 'login' | 'reset' | 'nova-senha'
+type View = 'login' | 'reset'
 
 // ── Sub-componentes fora do Login para evitar remount a cada render ──────────
 // IMPORTANTE: definir componentes DENTRO do componente pai faz React
@@ -95,27 +95,18 @@ function SubmitBtn({ label, busy }: { label: string; busy: boolean }) {
 // ── Componente principal ─────────────────────────────────────────────────────
 
 export default function Login() {
-  const { user, loading, signIn, resetPassword, updatePassword } = useAuth()
+  const { user, loading, signIn, resetPassword } = useAuth()
   const { isDark, isLightSidebar: isLight } = useTheme()
-  const [searchParams] = useSearchParams()
 
   const [view,     setView]     = useState<View>('login')
   const [email,    setEmail]    = useState('')
   const [password, setPassword] = useState('')
-  const [newPass,  setNewPass]  = useState('')
   const [showPass, setShowPass] = useState(false)
   const [busy,     setBusy]     = useState(false)
   const [error,    setError]    = useState<string | null>(null)
   const [success,  setSuccess]  = useState<string | null>(null)
 
-  // Detecta se é um link de "nova senha" (type=recovery na URL)
-  useEffect(() => {
-    if (searchParams.get('type') === 'recovery') {
-      setView('nova-senha')
-    }
-  }, [searchParams])
-
-  if (!loading && user && view !== 'nova-senha') {
+  if (!loading && user) {
     return <Navigate to="/" replace />
   }
 
@@ -136,19 +127,6 @@ export default function Login() {
     setBusy(false)
     if (error) { setError(error); return }
     setSuccess('Link de recuperação enviado! Verifique seu e-mail.')
-  }
-
-  const handleNewPassword = async (e: React.FormEvent) => {
-    e.preventDefault(); clr(); setBusy(true)
-    if (newPass.length < 6) {
-      setError('A senha deve ter pelo menos 6 caracteres')
-      setBusy(false); return
-    }
-    const { error } = await updatePassword(newPass)
-    setBusy(false)
-    if (error) { setError(error); return }
-    setSuccess('Senha atualizada! Redirecionando...')
-    setTimeout(() => setView('login'), 2000)
   }
 
   // ── Views ─────────────────────────────────────────────────────────
@@ -244,34 +222,6 @@ export default function Login() {
                 className="w-full text-center text-xs text-slate-500 hover:text-navy transition-colors">
                 ← Voltar ao login
               </button>
-            </form>
-          )}
-
-          {/* ── View: NOVA SENHA (link de recovery) ── */}
-          {view === 'nova-senha' && (
-            <form onSubmit={handleNewPassword} className="p-5 space-y-4">
-              <div>
-                <p className="font-bold text-navy">Criar nova senha</p>
-                <p className="text-xs text-slate-500 mt-0.5">
-                  Escolha uma senha segura para sua conta
-                </p>
-              </div>
-              <InputField
-                label="Nova senha"
-                type={showPass ? 'text' : 'password'}
-                value={newPass}
-                onChange={v => { setNewPass(v); clr() }}
-                placeholder="mínimo 6 caracteres"
-                icon={Lock} autoFocus
-                suffix={
-                  <button type="button" onClick={() => setShowPass(v => !v)}
-                    className="text-slate-400 hover:text-slate-600">
-                    {showPass ? <EyeOff size={14} /> : <Eye size={14} />}
-                  </button>
-                }
-              />
-              <Feedback error={error} success={success} />
-              <SubmitBtn label="Salvar nova senha" busy={busy} />
             </form>
           )}
 

@@ -89,6 +89,9 @@ interface AuthContextType {
   reloadPerfil: () => Promise<void>
   markSenhaDefinida: () => Promise<{ error: string | null }>
 
+  pendingPasswordReset: boolean
+  clearPasswordReset: () => void
+
   role: Role
   roleLabel: string
   isAdmin: boolean
@@ -109,6 +112,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [perfil,      setPerfil]      = useState<Perfil | null>(null)
   const [loading,     setLoading]     = useState(true)
   const [perfilReady, setPerfilReady] = useState(false)
+  const [pendingPasswordReset, setPendingPasswordReset] = useState(false)
 
   // Guard: evita chamadas concorrentes a loadPerfil
   const loadingRef    = useRef(false)
@@ -199,6 +203,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setUser(session?.user ?? null)
         userRef.current = session?.user ?? null
 
+        // Detecta redirecionamento de recovery link
+        if (_event === 'PASSWORD_RECOVERY') {
+          setPendingPasswordReset(true)
+        }
+
         if (session?.user) {
           // Reset mutex — chamada anterior pode ter travado sem resetar
           loadingRef.current = false
@@ -280,6 +289,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return { error: null }
   }
 
+  const clearPasswordReset = () => setPendingPasswordReset(false)
+
   const markSenhaDefinida = async () => {
     if (!user) return { error: 'Não autenticado' }
     const { error } = await supabase
@@ -309,6 +320,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     updatePerfil,
     reloadPerfil,
     markSenhaDefinida,
+    pendingPasswordReset,
+    clearPasswordReset,
     role,
     roleLabel:  ROLE_LABEL[role],
     isAdmin:    role === 'admin',
