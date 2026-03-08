@@ -17,9 +17,16 @@ export default function NotificationBell({ isDark = false }: { isDark?: boolean 
   const updatePos = useCallback(() => {
     if (!btnRef.current) return
     const r = btnRef.current.getBoundingClientRect()
+    const panelW = Math.min(320, window.innerWidth - 16)
+    // Center panel horizontally on mobile, right-align on desktop
+    let rightVal = window.innerWidth - r.right
+    if (rightVal + panelW > window.innerWidth - 8) {
+      // Panel would overflow left — center it instead
+      rightVal = (window.innerWidth - panelW) / 2
+    }
     setPos({
       top: r.bottom + 8,
-      right: Math.max(8, window.innerWidth - r.right),
+      right: Math.max(8, rightVal),
     })
   }, [])
 
