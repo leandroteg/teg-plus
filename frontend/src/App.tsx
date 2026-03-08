@@ -1,83 +1,98 @@
+import { lazy, Suspense } from 'react'
 import { Routes, Route } from 'react-router-dom'
 import { AuthProvider } from './contexts/AuthContext'
 import { ThemeProvider } from './contexts/ThemeContext'
 import { PrivateRoute, AdminRoute } from './components/PrivateRoute'
 import ModuleLayout from './components/ModuleLayout'
 import ModuleRoute from './components/ModuleRoute'
+import ErrorBoundary from './components/ErrorBoundary'
 import {
   COMPRAS_CONFIG, FINANCEIRO_CONFIG, ESTOQUE_CONFIG,
   LOGISTICA_CONFIG, FROTAS_CONFIG, CONTRATOS_CONFIG, RH_CONFIG,
 } from './config/modules'
 
-// Páginas públicas
-import Login from './pages/Login'
+// ── Loading spinner ─────────────────────────────────────────────────────────
+function PageLoader() {
+  return (
+    <div className="flex items-center justify-center min-h-[60vh]">
+      <div className="w-8 h-8 border-3 border-slate-200 dark:border-slate-700 border-t-slate-600 dark:border-t-slate-300 rounded-full animate-spin" />
+    </div>
+  )
+}
 
-// Páginas privadas
-import ModuloSelector from './pages/ModuloSelector'
-import Dashboard from './pages/Dashboard'
-import NovaRequisicao from './pages/NovaRequisicao'
-import ListaRequisicoes from './pages/ListaRequisicoes'
-import FilaCotacoes from './pages/FilaCotacoes'
-import CotacaoForm from './pages/CotacaoForm'
-import Aprovacao from './pages/Aprovacao'
-import AprovAi from './pages/AprovAi'
-import Perfil from './pages/Perfil'
-import Pedidos from './pages/Pedidos'
-import RequisicaoDetalhe from './pages/RequisicaoDetalhe'
+// ── Lazy pages ──────────────────────────────────────────────────────────────
 
-// Módulos stub
-import SSMA from './pages/SSMA'
+// Públicas
+const Login = lazy(() => import('./pages/Login'))
+const Aprovacao = lazy(() => import('./pages/Aprovacao'))
+const AprovAi = lazy(() => import('./pages/AprovAi'))
 
-// Módulo Contratos
-import DashboardContratos from './pages/contratos/DashboardContratos'
-import ListaContratos from './pages/contratos/ListaContratos'
-import NovoContrato from './pages/contratos/NovoContrato'
-import ParcelasContratos from './pages/contratos/Parcelas'
+// Privadas – raiz
+const ModuloSelector = lazy(() => import('./pages/ModuloSelector'))
+const Perfil = lazy(() => import('./pages/Perfil'))
+const AdminUsuarios = lazy(() => import('./pages/AdminUsuarios'))
+const SSMA = lazy(() => import('./pages/SSMA'))
 
-// Módulo RH
-import RHHome from './pages/rh/RHHome'
-import MuralAdmin from './pages/rh/MuralAdmin'
+// Compras
+const Dashboard = lazy(() => import('./pages/Dashboard'))
+const NovaRequisicao = lazy(() => import('./pages/NovaRequisicao'))
+const ListaRequisicoes = lazy(() => import('./pages/ListaRequisicoes'))
+const RequisicaoDetalhe = lazy(() => import('./pages/RequisicaoDetalhe'))
+const FilaCotacoes = lazy(() => import('./pages/FilaCotacoes'))
+const CotacaoForm = lazy(() => import('./pages/CotacaoForm'))
+const Pedidos = lazy(() => import('./pages/Pedidos'))
 
-// Módulo Financeiro
-import DashboardFinanceiro from './pages/financeiro/DashboardFinanceiro'
-import ContasPagar from './pages/financeiro/ContasPagar'
-import ContasReceber from './pages/financeiro/ContasReceber'
-import AprovacoesPagamento from './pages/financeiro/AprovacoesPagamento'
-import Conciliacao from './pages/financeiro/Conciliacao'
-import Relatorios from './pages/financeiro/Relatorios'
-import Fornecedores from './pages/financeiro/Fornecedores'
-import Configuracoes from './pages/financeiro/Configuracoes'
+// Contratos
+const DashboardContratos = lazy(() => import('./pages/contratos/DashboardContratos'))
+const ListaContratos = lazy(() => import('./pages/contratos/ListaContratos'))
+const NovoContrato = lazy(() => import('./pages/contratos/NovoContrato'))
+const ParcelasContratos = lazy(() => import('./pages/contratos/Parcelas'))
 
-// Módulo Estoque
-import EstoqueHome from './pages/estoque/EstoqueHome'
-import Itens from './pages/estoque/Itens'
-import Movimentacoes from './pages/estoque/Movimentacoes'
-import Inventario from './pages/estoque/Inventario'
-import Patrimonial from './pages/estoque/Patrimonial'
+// RH
+const RHHome = lazy(() => import('./pages/rh/RHHome'))
+const MuralAdmin = lazy(() => import('./pages/rh/MuralAdmin'))
 
-// Módulo Logística
-import LogisticaHome from './pages/logistica/LogisticaHome'
-import Solicitacoes from './pages/logistica/Solicitacoes'
-import Expedicao from './pages/logistica/Expedicao'
-import TransportesLog from './pages/logistica/Transportes'
-import Recebimentos from './pages/logistica/Recebimentos'
-import TransportadorasLog from './pages/logistica/Transportadoras'
+// Financeiro
+const DashboardFinanceiro = lazy(() => import('./pages/financeiro/DashboardFinanceiro'))
+const ContasPagar = lazy(() => import('./pages/financeiro/ContasPagar'))
+const ContasReceber = lazy(() => import('./pages/financeiro/ContasReceber'))
+const AprovacoesPagamento = lazy(() => import('./pages/financeiro/AprovacoesPagamento'))
+const Conciliacao = lazy(() => import('./pages/financeiro/Conciliacao'))
+const Relatorios = lazy(() => import('./pages/financeiro/Relatorios'))
+const Fornecedores = lazy(() => import('./pages/financeiro/Fornecedores'))
+const Configuracoes = lazy(() => import('./pages/financeiro/Configuracoes'))
 
-// Módulo Frotas
-import FrotasHome from './pages/frotas/FrotasHome'
-import Veiculos from './pages/frotas/Veiculos'
-import Ordens from './pages/frotas/Ordens'
-import Checklists from './pages/frotas/Checklists'
-import Abastecimentos from './pages/frotas/Abastecimentos'
-import Telemetria from './pages/frotas/Telemetria'
+// Estoque
+const EstoqueHome = lazy(() => import('./pages/estoque/EstoqueHome'))
+const Itens = lazy(() => import('./pages/estoque/Itens'))
+const Movimentacoes = lazy(() => import('./pages/estoque/Movimentacoes'))
+const Inventario = lazy(() => import('./pages/estoque/Inventario'))
+const Patrimonial = lazy(() => import('./pages/estoque/Patrimonial'))
 
-// Admin
-import AdminUsuarios from './pages/AdminUsuarios'
+// Logística
+const LogisticaHome = lazy(() => import('./pages/logistica/LogisticaHome'))
+const Solicitacoes = lazy(() => import('./pages/logistica/Solicitacoes'))
+const Expedicao = lazy(() => import('./pages/logistica/Expedicao'))
+const TransportesLog = lazy(() => import('./pages/logistica/Transportes'))
+const Recebimentos = lazy(() => import('./pages/logistica/Recebimentos'))
+const TransportadorasLog = lazy(() => import('./pages/logistica/Transportadoras'))
+
+// Frotas
+const FrotasHome = lazy(() => import('./pages/frotas/FrotasHome'))
+const Veiculos = lazy(() => import('./pages/frotas/Veiculos'))
+const Ordens = lazy(() => import('./pages/frotas/Ordens'))
+const Checklists = lazy(() => import('./pages/frotas/Checklists'))
+const Abastecimentos = lazy(() => import('./pages/frotas/Abastecimentos'))
+const Telemetria = lazy(() => import('./pages/frotas/Telemetria'))
+
+// ── App ─────────────────────────────────────────────────────────────────────
 
 export default function App() {
   return (
     <ThemeProvider>
     <AuthProvider>
+    <ErrorBoundary moduleName="Aplicação">
+    <Suspense fallback={<PageLoader />}>
       <Routes>
         {/* ── Públicas ──────────────────────────────────────── */}
         <Route path="/login"      element={<Login />} />
@@ -96,7 +111,7 @@ export default function App() {
           {/* Módulo Compras */}
           <Route element={<ModuleRoute module="compras" />}>
             <Route element={<ModuleLayout config={COMPRAS_CONFIG} />}>
-              <Route path="/compras"     element={<Dashboard />} />
+              <Route path="/compras"     element={<ErrorBoundary moduleName="Compras"><Dashboard /></ErrorBoundary>} />
               <Route path="/nova"        element={<NovaRequisicao />} />
               <Route path="/requisicoes" element={<ListaRequisicoes />} />
               <Route path="/requisicoes/:id" element={<RequisicaoDetalhe />} />
@@ -110,7 +125,7 @@ export default function App() {
           {/* Módulo Financeiro */}
           <Route element={<ModuleRoute module="financeiro" />}>
             <Route element={<ModuleLayout config={FINANCEIRO_CONFIG} />}>
-              <Route path="/financeiro"              element={<DashboardFinanceiro />} />
+              <Route path="/financeiro"              element={<ErrorBoundary moduleName="Financeiro"><DashboardFinanceiro /></ErrorBoundary>} />
               <Route path="/financeiro/cp"           element={<ContasPagar />} />
               <Route path="/financeiro/cr"           element={<ContasReceber />} />
               <Route path="/financeiro/aprovacoes"   element={<AprovacoesPagamento />} />
@@ -124,7 +139,7 @@ export default function App() {
           {/* Módulo Estoque */}
           <Route element={<ModuleRoute module="estoque" />}>
             <Route element={<ModuleLayout config={ESTOQUE_CONFIG} />}>
-              <Route path="/estoque"               element={<EstoqueHome />} />
+              <Route path="/estoque"               element={<ErrorBoundary moduleName="Estoque"><EstoqueHome /></ErrorBoundary>} />
               <Route path="/estoque/itens"         element={<Itens />} />
               <Route path="/estoque/movimentacoes" element={<Movimentacoes />} />
               <Route path="/estoque/inventario"    element={<Inventario />} />
@@ -135,7 +150,7 @@ export default function App() {
           {/* Módulo Logística */}
           <Route element={<ModuleRoute module="logistica" />}>
             <Route element={<ModuleLayout config={LOGISTICA_CONFIG} />}>
-              <Route path="/logistica"                   element={<LogisticaHome />} />
+              <Route path="/logistica"                   element={<ErrorBoundary moduleName="Logística"><LogisticaHome /></ErrorBoundary>} />
               <Route path="/logistica/solicitacoes"      element={<Solicitacoes />} />
               <Route path="/logistica/expedicao"         element={<Expedicao />} />
               <Route path="/logistica/transportes"       element={<TransportesLog />} />
@@ -147,7 +162,7 @@ export default function App() {
           {/* Módulo Frotas */}
           <Route element={<ModuleRoute module="frotas" />}>
             <Route element={<ModuleLayout config={FROTAS_CONFIG} />}>
-              <Route path="/frotas"                      element={<FrotasHome />} />
+              <Route path="/frotas"                      element={<ErrorBoundary moduleName="Frotas"><FrotasHome /></ErrorBoundary>} />
               <Route path="/frotas/veiculos"             element={<Veiculos />} />
               <Route path="/frotas/ordens"               element={<Ordens />} />
               <Route path="/frotas/checklists"           element={<Checklists />} />
@@ -159,7 +174,7 @@ export default function App() {
           {/* Módulo RH */}
           <Route element={<ModuleRoute module="rh" />}>
             <Route element={<ModuleLayout config={RH_CONFIG} />}>
-              <Route path="/rh"        element={<RHHome />} />
+              <Route path="/rh"        element={<ErrorBoundary moduleName="RH"><RHHome /></ErrorBoundary>} />
               <Route path="/rh/mural"  element={<MuralAdmin />} />
             </Route>
           </Route>
@@ -167,7 +182,7 @@ export default function App() {
           {/* Módulo Contratos */}
           <Route element={<ModuleRoute module="contratos" />}>
             <Route element={<ModuleLayout config={CONTRATOS_CONFIG} />}>
-              <Route path="/contratos"            element={<DashboardContratos />} />
+              <Route path="/contratos"            element={<ErrorBoundary moduleName="Contratos"><DashboardContratos /></ErrorBoundary>} />
               <Route path="/contratos/lista"      element={<ListaContratos />} />
               <Route path="/contratos/novo"       element={<NovoContrato />} />
               <Route path="/contratos/parcelas"   element={<ParcelasContratos />} />
@@ -185,6 +200,8 @@ export default function App() {
           </Route>
         </Route>
       </Routes>
+    </Suspense>
+    </ErrorBoundary>
     </AuthProvider>
     </ThemeProvider>
   )

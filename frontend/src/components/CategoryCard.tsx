@@ -1,4 +1,5 @@
 // CategoryCard.tsx — Card de seleção de categoria com dados reais do comprador
+import { memo } from 'react'
 import {
   Building2, ShieldCheck, Wrench, Package, ShoppingBag,
   Truck, Briefcase, Car, MapPin, Home, Utensils, Monitor,
@@ -43,7 +44,7 @@ interface Props {
   onClick?: () => void
 }
 
-export default function CategoryCard({ categoria, selected = false, onClick }: Props) {
+export default memo(function CategoryCard({ categoria, selected = false, onClick }: Props) {
   const Icon = ICON_MAP[categoria.icone] ?? Package
   const corFundo = categoria.cor ?? '#6b7280'
 
@@ -117,4 +118,4 @@ export default function CategoryCard({ categoria, selected = false, onClick }: P
       )}
     </button>
   )
-}
+})

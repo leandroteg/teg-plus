@@ -1,3 +1,4 @@
+import { memo } from 'react'
 import type { StatusRequisicao } from '../types'
 
 const config: Record<string, { dot: string; bg: string; text: string; label: string }> = {
@@ -35,7 +36,7 @@ interface Props {
   customLabel?: string
 }
 
-export default function StatusBadge({ status, size = 'md', customLabel }: Props) {
+export default memo(function StatusBadge({ status, size = 'md', customLabel }: Props) {
   const c = config[status] ?? { dot: 'bg-gray-400', bg: 'bg-gray-100', text: 'text-gray-600', label: status }
   const sizeClass = size === 'sm'
     ? 'text-[10px] px-1.5 py-px gap-1'
@@ -46,4 +47,4 @@ export default function StatusBadge({ status, size = 'md', customLabel }: Props)
       {customLabel ?? c.label}
     </span>
   )
-}
+})

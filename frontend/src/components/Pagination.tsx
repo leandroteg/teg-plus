@@ -1,3 +1,4 @@
+import { memo } from 'react'
 import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from 'lucide-react'
 import type { PaginationControls } from '../hooks/usePagination'
 
@@ -13,7 +14,7 @@ interface Props {
  * Usage:
  *   <Pagination pagination={pagination} />
  */
-export default function Pagination({ pagination, showTotal = true }: Props) {
+export default memo(function Pagination({ pagination, showTotal = true }: Props) {
   const { page, totalPages, totalCount, hasPrev, hasNext, setPage, prevPage, nextPage } = pagination
 
   if (totalPages <= 1) return null
@@ -74,4 +75,4 @@ export default function Pagination({ pagination, showTotal = true }: Props) {
       </div>
     </div>
   )
-}
+})
