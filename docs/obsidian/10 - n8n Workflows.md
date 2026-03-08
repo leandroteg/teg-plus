@@ -1,418 +1,493 @@
 ---
 title: n8n Workflows
-type: automação
+type: automacao
 status: ativo
-tags: [n8n, automação, webhooks, workflows, integração]
+tags: [n8n, automacao, webhooks, workflows, integracao, ai, superteg]
 criado: 2026-03-02
-relacionado: ["[[01 - Arquitetura Geral]]", "[[11 - Fluxo Requisição]]", "[[12 - Fluxo Aprovação]]", "[[19 - Integração Omie]]", "[[20 - Módulo Financeiro]]"]
+atualizado: 2026-03-08
+relacionado: ["[[01 - Arquitetura Geral]]", "[[07 - Schema Database]]", "[[11 - Fluxo Requisicao]]", "[[12 - Fluxo Aprovacao]]", "[[19 - Integracao Omie]]", "[[20 - Modulo Financeiro]]", "[[28 - Modulo Cadastros AI]]"]
 ---
 
-# n8n Workflows — TEG+ ERP
+# n8n Workflows - TEG+ ERP
 
-## Visão Geral
+> **31 workflows** totais: 16 ativos, 13 inativos, 2 defasados
+> Instancia: https://teg-agents-n8n.nmmcas.easypanel.host
+> Versao: 2.35.6 | EasyPanel (Docker)
+> Atualizado em 2026-03-08
 
-O n8n é o **hub de orquestração** do TEG+. Toda lógica de negócio complexa passa por aqui antes de chegar ao Supabase.
+---
+
+## Visao Geral da Arquitetura
+
+O n8n e o **hub de orquestracao** do TEG+. Toda logica complexa passa por aqui antes de chegar ao Supabase.
 
 ```mermaid
-graph LR
-    FE[Frontend] -->|Webhook calls| N8N[n8n Hub]
-    N8N -->|service_role| DB[(Supabase)]
-    N8N -->|LLM| AI[AI Parse]
-    N8N -->|Futuro| WA[WhatsApp]
-    N8N -->|Futuro| EMAIL[Email]
+graph TB
+    subgraph Frontend
+        FE[React App]
+    end
+
+    subgraph n8n Hub
+        WH[Webhooks]
+        AI[AI Parse / Gemini]
+        AGENT[SuperTEG Agent]
+        OCR[OCR Documentos]
+        CNPJ[Consulta CNPJ/CEP]
+        WA[WhatsApp Gateway]
+        OMIE[Sync Omie]
+        CRON[Cron Jobs]
+    end
+
+    subgraph Servicos Externos
+        BA[BrasilAPI]
+        GEM[Google Gemini]
+        GH[GitHub API]
+        EVO[Evolution API WhatsApp]
+        OM[Omie ERP]
+    end
+
+    subgraph Supabase
+        DB[(PostgreSQL)]
+        AUTH[Auth]
+        STOR[Storage]
+    end
+
+    FE -->|POST webhooks| WH
+    WH --> AI
+    WH --> AGENT
+    WH --> OCR
+    WH --> CNPJ
+    CNPJ --> BA
+    AI --> GEM
+    AGENT --> GEM
+    OCR --> GEM
+    WA --> EVO
+    AGENT -->|sub-agents| GH
+    OMIE --> OM
+    CRON -->|schedule| DB
+    WH -->|service_role| DB
 ```
 
 ---
 
-## Configuração
+## Configuracao
 
-```env
-# .env
-VITE_N8N_WEBHOOK_URL=https://seu-n8n.com/webhook
-```
+### Infraestrutura
 
-**Credenciais no n8n:**
-- Supabase: `service_role key` (bypass RLS)
-- LLM API: configurado para AI parse
+| Item | Valor |
+|------|-------|
+| URL Base | https://teg-agents-n8n.nmmcas.easypanel.host |
+| Webhook Base | https://teg-agents-n8n.nmmcas.easypanel.host/webhook |
+| Hospedagem | EasyPanel (Docker) em 104.236.46.36 |
+| Env var | WEBHOOK_URL=https://teg-agents-n8n.nmmcas.easypanel.host |
+| Versao | 2.35.6 |
+
+### Credenciais configuradas no n8n
+
+| Credencial | Uso |
+|-----------|-----|
+| Supabase service_role key | Bypass RLS em todas as operacoes |
+| Google Gemini API Key | AI Parse, OCR, SuperTEG Agent |
+| GitHub Personal Access Token | Dev Hub, Agent Feedback |
+| Evolution API (WhatsApp) | Gateway WhatsApp |
+| Omie app_key + app_secret | Sync financeiro (via sys_config) |
+
+### Regras Importantes
+
+- Updates via API (REST ou MCP) so alteram o **DRAFT** do workflow
+- Para ativar webhooks de producao, e obrigatorio **Publicar via UI** do editor n8n
+- Apos restart do container EasyPanel, webhooks sao re-registrados automaticamente
+- Frontend fallback: se n8n falhar, consulta BrasilAPI/Supabase direto
 
 ---
 
-## Workflows Documentados
+## Inventario Completo de Workflows
 
-### 1. TEG+ | Nova Requisição
-**Webhook:** `POST /compras/requisicao`
-**ID n8n:** `8NjfiPcQHHZxSKUp`
-**Nodes:** 9
+### Ativos (16)
+
+| # | ID | Nome | Webhook | Nodes | Descricao |
+|---|-----|------|---------|-------|-----------|
+| 1 | 6rfMdHdRdJefrKB3 | Consulta CNPJ | POST /consulta-cnpj | 10 | Consulta CNPJ via BrasilAPI com cache |
+| 2 | iZGk3HiN35xGxe7K | Consulta CEP | POST /consulta-cep | 12 | Consulta CEP via BrasilAPI com cache |
+| 3 | eorVVBHlkNrRWILU | AI Parse Requisicao | POST /compras/requisicao-ai | 3 | Extrai itens de texto livre via Gemini |
+| 4 | P5xDZQJ2Hh6mVXO0 | AI Parse Cotacao | POST /compras/parse-cotacao | 5 | Parse de orcamentos PDF/imagem via Gemini |
+| 5 | hQcdcPpLhvnGGYxF | Compras OCR Documentos | POST /compras/ocr | 7 | OCR de documentos com Gemini multimodal |
+| 6 | 2OxlIc2UcvuYyt5H | WhatsApp Notificacoes | POST /whatsapp/notificar | 8 | Envia notificacoes via Evolution API |
+| 7 | cpiy9UzgmDUSYESQ | WhatsApp Gateway | POST /whatsapp/gateway | 10 | Recebe msgs WhatsApp e roteia para AI |
+| 8 | KJUlWGP1ItQkUQOB | **SuperTEG AI Agent** | POST /superteg/chat | 11 | Agent conversacional principal |
+| 9 | WAkswySm6FNrISs4 | Agent Feedback | — (sub-agent) | 4 | Registra issues no GitHub via API |
+| 10 | IIRQPZwOb8SIKvKe | Agent Consulta Dados | — (sub-agent) | 4 | Busca dados no Supabase por modulo |
+| 11 | BrqB98dDsv7KKoMF | Agent Dashboard KPIs | — (sub-agent) | 4 | Agrega metricas financeiro/compras/estoque |
+| 12 | mrGPcuWzcVPUwMPA | Agent Pre-Cadastro | — (sub-agent) | 7 | Cria pre-cadastros com enriquecimento CNPJ |
+| 13 | fY781S723TYNMYdU | Dev Hub | POST /dev-hub | 3 | Backend para tela Desenvolvimento |
+| 14 | pxhj2bgacHUC1Jsc | Expiracao de Aprovacoes | Cron (diario) | 6 | Expira aprovacoes vencidas automaticamente |
+
+### Inativos (13)
+
+| # | ID | Nome | Nodes | Motivo |
+|---|-----|------|-------|--------|
+| 1 | 8NjfiPcQHHZxSKUp | Nova Requisicao | 10 | Substituido por insert direto Supabase |
+| 2 | mdpXcMsQonwnQuT6 | Processar Aprovacao | 17 | Substituido por insert direto Supabase |
+| 3 | fb6kSj7ZSxPU2TjO | Dashboard API Compras | 8 | Frontend usa RPC direto |
+| 4 | TArMjd2faXDgdAOx | Aprovacoes Pendentes | 3 | Funcionalidade absorvida pelo frontend |
+| 5 | wlwnMleVkg7FEgnd | Submeter Cotacao | 4 | Frontend faz insert direto |
+| 6 | UYgLUU9v7cfMJN8k | Notificacoes de Status | 6 | Substituido por WhatsApp Notificacoes |
+| 7 | 6Dh8b6VOP09GpH0x | E-mail AI Agent | 7 | Prototipo descontinuado |
+| 8 | rUoNHA8xSoGSpwKR | AI Agent Compras | 15 | Substituido por SuperTEG AI Agent |
+| 9 | 8hSUspdhb1EwuFFg | Omie - Sync Fornecedores | 9 | Planejado para reativacao |
+| 10 | wvnoOFS0QxHOq7cB | Omie - Sync CP | 11 | Planejado para reativacao |
+| 11 | j682f59Mlg6Ta6oN | Omie - Sync CR | 11 | Planejado para reativacao |
+| 12 | XDKGIEUvjsf4nlWJ | Omie - Aprovacao Pagamento | 10 | Planejado para reativacao |
+| 13 | mb5ff29QyHfs09ij | AI Personal Assistant | 76 | Template original, arquivado |
+
+### Defasados (2) - NAO USAR
+
+| ID | Nome | Motivo |
+|----|------|--------|
+| 5mtQRzoZWfmNtXyE | Planilha - Sync Automatico | Google Sheets → Supabase (fase prototipal) |
+| rVIjII1INC3g7S52 | Sync Google Sheets → Supabase | Idem, versao alternativa |
+
+---
+
+## Workflows Detalhados
+
+### 1. Consulta CNPJ (`6rfMdHdRdJefrKB3`)
+
+**Webhook:** `POST /consulta-cnpj`
+**Payload:** `{ "valor": "59460450000100" }`
 
 ```mermaid
 flowchart LR
-    W[Webhook\nPOST] --> V[Validate\nPayload]
-    V --> GN[Gerar Número\nRC-YYYYMM-XXXX]
-    GN --> SI[Save to\nSupabase]
-    SI --> DA[Determinar\nAlçada]
-    DA --> CA[Create\nAprovação]
-    CA --> LOG[Log\nAtividade]
-    LOG --> R[Respond\n201 Created]
+    W[Webhook POST] --> EX[Extrair CNPJ]
+    EX --> V{Valido?}
+    V -->|Nao| ERR[Respond 400]
+    V -->|Sim| CC[Verificar Cache\nCode node]
+    CC --> TC{Hit?}
+    TC -->|Sim| RC[Respond Cache]
+    TC -->|Nao| BA[BrasilAPI\n/cnpj/v1]
+    BA --> TS[Transformar + Salvar Cache\nfire-and-forget]
+    TS --> RA[Respond Dados]
 ```
 
-**Payload de entrada:**
-```json
-{
-  "solicitante_id": "uuid",
-  "obra_id": "uuid",
-  "categoria": "string",
-  "urgencia": "normal|urgente|critica",
-  "valor_estimado": 15000.00,
-  "descricao": "Justificativa...",
-  "itens": [
-    {
-      "descricao": "Cabo ACSR 250MCM",
-      "quantidade": 500,
-      "unidade": "M",
-      "valor_unitario_estimado": 25.00
-    }
-  ]
-}
-```
-
-**Resposta de sucesso:**
-```json
-{
-  "success": true,
-  "requisicao": {
-    "id": "uuid",
-    "numero": "RC-202602-0042",
-    "status": "em_aprovacao",
-    "alcada_nivel": 2
-  },
-  "aprovacao": {
-    "aprovador": "Gerente",
-    "prazo_horas": 24,
-    "token": "approval-token-uuid"
-  }
-}
-```
+**Notas tecnicas:**
+- "Verificar Cache" e Code node (nao HTTP Request) - sempre retorna, nao para o pipeline
+- Cache: tabela `cache_consultas` no Supabase, TTL 7 dias
+- Frontend fallback: se n8n falhar, consulta BrasilAPI direto via `api.ts`
 
 ---
 
-### 2. TEG+ | Processar Aprovação
-**Webhook:** `POST /compras/aprovacao`
-**ID n8n:** `mdpXcMsQonwnQuT6`
-**Nodes:** 16
+### 2. Consulta CEP (`iZGk3HiN35xGxe7K`)
 
-```mermaid
-flowchart TD
-    W[Webhook\nPOST token] --> FT[Find Aprovacao\nby Token]
-    FT --> VT{Token\nVálido?}
-    VT -->|Não| E[Error 404]
-    VT -->|Sim| VE{Expirado?}
-    VE -->|Sim| EX[Mark Expirado\n→ Error]
-    VE -->|Não| UD[Update Status\naprovada/rejeitada]
-    UD --> REJ{Rejeitada?}
-    REJ -->|Sim| CR[Cancel\nRequisição\n→ Fim]
-    REJ -->|Não| NL{Próximo\nNível?}
-    NL -->|Sim| NA[Create Next\nAprovação\n→ Notificar]
-    NL -->|Não| FA[Finalizar\nRequisição\n→ Aprovada]
-    FA --> LOG[Log Atividade]
-    LOG --> R[Respond 200]
-```
+**Webhook:** `POST /consulta-cep`
+**Payload:** `{ "valor": "01001000" }`
 
-**Payload de entrada:**
-```json
-{
-  "token": "approval-token-uuid",
-  "decisao": "aprovada|rejeitada",
-  "observacao": "Aprovado conforme orçamento."
-}
-```
+Mesmo padrao do CNPJ. **Bug conhecido:** cache usa HTTP Request ao inves de Code node (precisa mesma fix do CNPJ).
 
 ---
 
-### 3. TEG+ | Dashboard API
-**Webhook:** `GET /painel/compras`
-**ID n8n:** `fb6kSj7ZSxPU2TjO`
-**Nodes:** 6
+### 3. AI Parse Requisicao (`eorVVBHlkNrRWILU`)
 
-**Query params aceitos:**
-```
-?status=pendente
-?obra_id=uuid
-?periodo=30d           (7d | 30d | 90d)
-?page=1
-?limit=20
-```
-
-**Resposta:**
-```json
-{
-  "kpis": {
-    "total": 142,
-    "pendentes": 23,
-    "aprovadas": 89,
-    "em_cotacao": 15,
-    "valor_total": 1850000.00,
-    "valor_aprovado": 1200000.00
-  },
-  "por_status": [
-    { "status": "pendente", "count": 23, "percentual": 16.2 }
-  ],
-  "por_obra": [
-    { "obra": "SE Frutal", "count": 34, "valor": 420000.00 }
-  ],
-  "recentes": [...]
-}
-```
-
----
-
-### 4. TEG+ | AI Parse Requisição
 **Webhook:** `POST /compras/requisicao-ai`
-**ID n8n:** (configurado)
 
 ```mermaid
 flowchart LR
-    W[Webhook\nPOST texto] --> LLM[LLM / Claude\nExtrai entidades]
-    LLM --> MAP[Mapear\nCategorias + Obras]
-    MAP --> CONF[Calcular\nConfiança]
-    CONF --> R[Respond\nItens estruturados]
+    W[Webhook POST] --> LLM[Gemini Flash\nExtrai entidades]
+    LLM --> R[Respond\nItens estruturados]
 ```
 
-**Payload de entrada:**
+**Payload entrada:**
 ```json
 {
-  "texto": "Preciso de 10 capacetes amarelos e 5 pares de luvas de raspa para obra de Frutal urgente",
-  "solicitante_nome": "João Silva"
+  "texto": "Preciso de 10 capacetes e 5 luvas para Frutal urgente",
+  "solicitante_nome": "Joao Silva"
 }
 ```
 
-**Resposta:**
-```json
-{
-  "itens": [
-    {
-      "descricao": "Capacete de segurança amarelo",
-      "quantidade": 10,
-      "unidade": "UN",
-      "categoria_sugerida": "EPI/EPC"
-    },
-    {
-      "descricao": "Luvas de raspa",
-      "quantidade": 5,
-      "unidade": "PAR",
-      "categoria_sugerida": "EPI/EPC"
-    }
-  ],
-  "obra_sugerida": "SE Frutal",
-  "categoria_sugerida": "EPI/EPC",
-  "comprador_sugerido": "Lauany",
-  "urgencia_detectada": "urgente",
-  "confianca": 0.92,
-  "observacoes": "Obra identificada por menção direta. Urgência detectada."
-}
-```
+**Resposta:** Array de itens com descricao, quantidade, unidade, categoria_sugerida, obra_sugerida, urgencia_detectada, confianca (0-1).
+
+**Usado por:** `useAiParse` hook no frontend (wizard de requisicao step 1).
 
 ---
 
-### 4b. TEG+ | AI Parse Cotação
+### 4. AI Parse Cotacao (`P5xDZQJ2Hh6mVXO0`)
+
 **Webhook:** `POST /compras/parse-cotacao`
-**ID n8n:** `P5xDZQJ2Hh6mVXO0`
-**Nodes:** 5 (Webhook → Gemini Flash → Respond + Error Handler)
-**Status:** Ativo
 
 ```mermaid
 flowchart LR
-    W[Webhook\nPOST file_base64] --> G[Gemini 2.5 Flash\nMultimodal]
+    W[Webhook POST\nfile_base64] --> G[Gemini 2.5 Flash\nMultimodal]
     G -->|Sucesso| R[Respond\nFornecedores JSON]
     G -->|Erro| E[Error Handler] --> RE[Respond Erro]
 ```
 
-**Payload de entrada:**
+**Payload:** `{ "file_base64": "...", "file_name": "cotacao.pdf", "mime_type": "application/pdf" }`
+**Formatos aceitos:** JPG, PNG, WebP, PDF (ate 10 MB)
+**Resposta:** Array de fornecedores com nome, CNPJ, valor_total, prazo, itens com precos.
+**Usado por:** `UploadCotacao.tsx` (drag & drop com auto-preenchimento).
+
+---
+
+### 5. Compras OCR Documentos (`hQcdcPpLhvnGGYxF`)
+
+**Webhook:** `POST /compras/ocr`
+
+```mermaid
+flowchart LR
+    W[Webhook OCR] --> MP[Marcar Processando\nCode] --> AG[Analisar Gemini\nCode] --> SR[Salvar Resultado\nCode] --> RS[Respond Sucesso]
+    AG -->|Erro| TE[Tratar Erro] --> RE[Respond Erro]
+```
+
+Processa documentos anexados a compras (NF, orcamentos) via Gemini multimodal. Salva resultado em `cmp_anexos.llm_dados`.
+
+---
+
+### 6. WhatsApp Notificacoes (`2OxlIc2UcvuYyt5H`)
+
+**Webhook:** `POST /whatsapp/notificar`
+
+```mermaid
+flowchart LR
+    W[Webhook] --> BT[Buscar Telefone\nCode] --> TP{Tem?}
+    TP -->|Sim| MM[Montar Msg] --> EW[Enviar WhatsApp\nEvolution API] --> LN[Log] --> RS[Sucesso]
+    TP -->|Nao| RST[Sem Telefone]
+```
+
+Envia notificacoes de aprovacao, status de pedido, etc. via Evolution API (WhatsApp). Log em `sys_whatsapp_log`.
+
+---
+
+### 7. WhatsApp Gateway (`cpiy9UzgmDUSYESQ`)
+
+**Webhook:** `POST /whatsapp/gateway`
+
+```mermaid
+flowchart LR
+    W[Webhook WhatsApp] --> FM[Filtrar Msgs] --> ED[Extrair Dados\nCode]
+    ED --> LE[Log Entrada] --> CA[Chamar AI Agent\nHTTP] --> PR[Preparar Resposta\nCode]
+    PR --> LS[Log Saida] --> EW[Enviar WhatsApp\nEvolution API] --> RW[Respond OK]
+```
+
+Recebe mensagens do WhatsApp via webhook Evolution API. Roteia para SuperTEG Agent. Envia resposta de volta.
+
+---
+
+### 8. SuperTEG AI Agent (`KJUlWGP1ItQkUQOB`) ⭐
+
+**Webhook:** `POST /superteg/chat`
+**LLM:** Google Gemini 2.5 Flash
+**Criado:** 2026-03-07
+
+```mermaid
+flowchart TB
+    W[Webhook POST\nmessage + perfil_id] --> ID[Identificar Usuario\nCode]
+    ID --> AG[SuperTEG Agent\nGemini Flash + System Prompt]
+    AG --> FR[Formatar Resposta\nCode: actions + links]
+    FR --> R[Respond]
+
+    AG -.->|tool| F[Agent Feedback\nGitHub Issues]
+    AG -.->|tool| C[Agent Consulta\nSupabase Queries]
+    AG -.->|tool| K[Agent KPIs\nMetricas Agregadas]
+    AG -.->|tool| P[Agent Pre-Cadastro\nCNPJ + Staging]
+```
+
+**Payload:**
 ```json
 {
-  "file_base64": "base64-encoded-file",
-  "file_name": "cotacao-fornecedor.pdf",
-  "mime_type": "application/pdf"
+  "chatInput": "Qual o status das compras da obra Frutal?",
+  "sessionId": "user-uuid-session",
+  "perfil_id": "user-uuid",
+  "perfil_nome": "Joao Silva",
+  "perfil_role": "admin"
 }
 ```
 
-**Formatos aceitos:** JPG, PNG, WebP, PDF (até 10 MB)
+**System Prompt:** Assistente ERP especialista em engenharia eletrica/transmissao. Responde em PT-BR, usa structured actions protocol.
 
-**Resposta de sucesso:**
-```json
-{
-  "success": true,
-  "fornecedores": [
-    {
-      "fornecedor_nome": "Eletro Sul Materiais LTDA",
-      "fornecedor_cnpj": "12.345.678/0001-99",
-      "fornecedor_contato": "(34) 99999-1234",
-      "valor_total": 15750.00,
-      "prazo_entrega_dias": 15,
-      "condicao_pagamento": "30/60 dias",
-      "itens": [
-        {"descricao": "Cabo XLPE 240mm", "qtd": 500, "valor_unitario": 25.50, "valor_total": 12750.00},
-        {"descricao": "Terminal compressão", "qtd": 20, "valor_unitario": 150.00, "valor_total": 3000.00}
-      ],
-      "observacao": "Frete incluso"
-    }
-  ]
-}
+**Structured Actions Protocol:**
+- Links markdown `[texto](url)` sao extraidos como botoes de navegacao
+- Pre-cadastros geram `notify_admins` action para NotificationBell
+- Resposta formatada com `text` + `actions[]` array
+
+**Componente frontend:** `SuperTEGChat.tsx` (FAB no canto inferior direito).
+
+---
+
+### 9-12. Sub-Agents do SuperTEG
+
+#### Agent Feedback (`WAkswySm6FNrISs4`)
+- **Funcao:** Registra bugs/sugestoes como issues no GitHub
+- **Nodes:** Webhook Execute → Code (GitHub API) → Salvar sys_feedbacks → Respond
+- **Saida:** Issue URL + numero
+
+#### Agent Consulta Dados (`IIRQPZwOb8SIKvKe`)
+- **Funcao:** Busca dados no Supabase por modulo
+- **Nodes:** Webhook Execute → Code (Query Builder) → Supabase REST → Respond
+- **Modulos:** compras, financeiro, estoque, logistica, frotas, contratos
+
+#### Agent Dashboard KPIs (`BrqB98dDsv7KKoMF`)
+- **Funcao:** Agrega metricas de todos os modulos
+- **Nodes:** Webhook Execute → Code (Aggregate Queries) → Supabase → Respond
+- **Metricas:** totais, por status, por obra, por periodo
+
+#### Agent Pre-Cadastro (`mrGPcuWzcVPUwMPA`)
+- **Funcao:** Cria pre-cadastros com enriquecimento CNPJ
+- **Nodes:** Webhook Execute → Extrair Dados → Tem CNPJ? → BrasilAPI → Inserir Pre-Cadastro → Respond
+- **Tabela destino:** `sys_pre_cadastros` (staging, admin revisa via NotificationBell)
+- **Entidades:** fornecedor, transportadora, item_estoque
+
+```mermaid
+flowchart LR
+    WE[Webhook Execute] --> ED[Extrair Dados\nCode]
+    ED --> TC{Tem CNPJ?}
+    TC -->|Sim| BA[BrasilAPI\nEnriquecer] --> IP[Inserir\nsys_pre_cadastros]
+    TC -->|Nao| IP
+    IP --> R[Respond]
 ```
 
-**Componente frontend:** `UploadCotacao.tsx` — Drag & drop com auto-preenchimento via IA.
+---
+
+### 13. Dev Hub (`fY781S723TYNMYdU`)
+
+**Webhook:** `POST /dev-hub`
+
+Backend auxiliar para tela de Desenvolvimento (`/admin/desenvolvimento`). Na pratica, o frontend chama a GitHub API diretamente (CORS OK). Workflow criado como backup.
+
+---
+
+### 14. Expiracao de Aprovacoes (`pxhj2bgacHUC1Jsc`)
+
+**Trigger:** Cron (execucao diaria)
+
+```mermaid
+flowchart LR
+    CR[Cron Trigger\nDiario] --> BV[Buscar Vencidas\nSupabase] --> TV{Tem?}
+    TV -->|Sim| MK[Marcar Expiradas\nUPDATE status] --> LOG[Log Atividade]
+    TV -->|Nao| FIM[Nada a fazer]
+```
+
+Busca aprovacoes com `data_limite < now()` e `status = 'pendente'`. Atualiza para `expirada`.
+
+---
+
+## Workflows Omie (Inativos - Planejados para Reativacao)
+
+Quatro workflows dedicados a integracao com Omie ERP. Detalhes completos em [[19 - Integracao Omie]].
+
+### Sync Fornecedores (`8hSUspdhb1EwuFFg`)
+```
+Webhook/Schedule → get_omie_config() RPC → Omie API ListarFornecedores → Upsert cmp_fornecedores → fin_sync_log
+```
+
+### Sync Contas a Pagar (`wvnoOFS0QxHOq7cB`)
+```
+Schedule 6h → get_omie_config() → Omie API ListarContasPagar → Upsert fin_contas_pagar → fin_sync_log
+```
+
+### Sync Contas a Receber (`j682f59Mlg6Ta6oN`)
+```
+Schedule 6h → get_omie_config() → Omie API ListarContasReceber → Upsert fin_contas_receber → fin_sync_log
+```
+
+### Aprovacao Pagamento (`XDKGIEUvjsf4nlWJ`)
+```
+Webhook POST cp_id → get_omie_config() → Omie API AlterarStatusCP → UPDATE omie_sincronizado=true → fin_sync_log
+```
+
+---
+
+## Workflows Inativos Legados
+
+| Workflow | Motivo Inativacao | Substituido por |
+|---------|-------------------|-----------------|
+| Nova Requisicao | Frontend faz insert direto no Supabase via hooks | `useRequisicoes` hook |
+| Processar Aprovacao | Frontend faz update direto + token validation | `useAprovacoes` hook |
+| Dashboard API Compras | Frontend usa RPC `get_dashboard_compras()` | `useDashboard` hook |
+| Aprovacoes Pendentes | Funcionalidade absorvida pelo frontend | `useAprovacoes` hook |
+| Submeter Cotacao | Frontend faz insert direto | `useCotacoes` hook |
+| Notificacoes de Status | Substituido por WhatsApp Notificacoes | Workflow 2OxlIc2UcvuYyt5H |
+| E-mail AI Agent | Prototipo descontinuado | SuperTEG Agent via WhatsApp |
+| AI Agent Compras | Prototipo inicial | SuperTEG AI Agent |
+| AI Personal Assistant | Template original n8n | Arquivado |
 
 ---
 
 ## Fallback Strategy
 
-Se o n8n estiver **indisponível**:
+Se o n8n estiver **indisponivel**, o frontend tem fallback automatico:
 
-```ts
-// src/services/api.ts
-async criarRequisicao(payload) {
-  try {
-    // Tenta n8n primeiro
-    return await fetch(`${N8N_URL}/compras/requisicao`, ...)
-  } catch (e) {
-    // Fallback: insert direto no Supabase
-    console.warn('n8n indisponível, usando Supabase direto')
-    return await supabase.from('requisicoes').insert(payload)
-  }
-}
+```
+Frontend api.ts
+├── consultarCNPJ → POST n8n /consulta-cnpj → FALLBACK → GET brasilapi.com.br/api/cnpj/v1/{cnpj}
+├── consultarCEP  → POST n8n /consulta-cep  → FALLBACK → GET brasilapi.com.br/api/cep/v2/{cep}
+├── SuperTEG Chat → POST n8n /superteg/chat → FALLBACK → Mensagem de indisponibilidade
+└── Demais ops    → Direto Supabase (hooks TanStack Query)
 ```
 
----
+Hooks como `useRequisicoes`, `useCotacoes`, `useEstoque` etc. fazem operacoes diretamente no Supabase sem passar pelo n8n.
 
 ---
 
-## Squads Omie ERP (Módulo Financeiro)
-
-Quatro workflows dedicados à integração com o Omie ERP. Detalhes completos em [[19 - Integração Omie]].
-
-### 5. TEG+ | Omie — Sync Fornecedores
-**Arquivo:** `n8n-docs/workflow-omie-sync-fornecedores.json`
-**Webhook:** `POST /omie/sync/fornecedores`
+## Diagrama de Comunicacao Frontend → n8n
 
 ```mermaid
-flowchart LR
-    W[Webhook] --> CF[get_omie_config\nRPC] --> OL[Omie API\nListarFornecedores] --> UP[Upsert\ncmp_fornecedores] --> LOG[fin_sync_log]
+sequenceDiagram
+    participant FE as Frontend
+    participant N8N as n8n Hub
+    participant DB as Supabase
+    participant EXT as APIs Externas
+
+    Note over FE,DB: Fluxo SuperTEG Chat
+    FE->>N8N: POST /superteg/chat
+    N8N->>N8N: Identificar Usuario
+    N8N->>EXT: Gemini Flash (LLM)
+    N8N->>DB: Sub-agent queries
+    N8N-->>FE: {text, actions[]}
+
+    Note over FE,DB: Fluxo Consulta CNPJ
+    FE->>N8N: POST /consulta-cnpj
+    N8N->>DB: Verificar cache
+    alt Cache hit
+        N8N-->>FE: Dados do cache
+    else Cache miss
+        N8N->>EXT: BrasilAPI /cnpj
+        N8N->>DB: Salvar cache (async)
+        N8N-->>FE: Dados da API
+    end
+
+    Note over FE,DB: Fluxo AI Parse
+    FE->>N8N: POST /compras/requisicao-ai
+    N8N->>EXT: Gemini Flash
+    N8N-->>FE: Itens estruturados
+
+    Note over FE,DB: Operacoes Diretas (sem n8n)
+    FE->>DB: INSERT/UPDATE/SELECT (via hooks)
+    DB-->>FE: Dados com RLS
 ```
 
 ---
 
-### 6. TEG+ | Omie — Sync Contas a Pagar
-**Arquivo:** `n8n-docs/workflow-omie-sync-cp.json`
-**Webhook:** `POST /omie/sync/contas-pagar`
-**Trigger:** Schedule 6h + Manual
+## Webhooks Ativos - Referencia Rapida
 
-```mermaid
-flowchart LR
-    W[Schedule\nou Webhook] --> CF[get_omie_config] --> OL[Omie API\nListarContasPagar] --> UP[Upsert\nfin_contas_pagar] --> LOG[fin_sync_log]
-```
-
----
-
-### 7. TEG+ | Omie — Sync Contas a Receber
-**Arquivo:** `n8n-docs/workflow-omie-sync-cr.json`
-**Webhook:** `POST /omie/sync/contas-receber`
-**Trigger:** Schedule 6h + Manual
-
-Mesmo padrão do Squad 6, aplicado a `fin_contas_receber`.
-
----
-
-### 8. TEG+ | Omie — Aprovar Pagamento
-**Arquivo:** `n8n-docs/workflow-omie-aprovacao-pgto.json`
-**Webhook:** `POST /omie/aprovar-pagamento`
-
-```mermaid
-flowchart LR
-    W[Webhook\ncp_id] --> CF[get_omie_config] --> OA[Omie API\nAlterarStatusCP] --> UP[omie_sincronizado=true] --> LOG[fin_sync_log]
-```
-
----
-
-### 9. TEG+ | Consulta CNPJ
-**Webhook:** `POST /consulta-cnpj`
-**ID n8n:** `6rfMdHdRdJefrKB3`
-**Nodes:** 10
-**Criado:** 2026-03-06
-**Status:** Ativo
-
-```mermaid
-flowchart LR
-    W[Webhook\nPOST] --> EX[Extrair CNPJ\n14 dígitos]
-    EX --> V{Válido?}
-    V -->|Não| ERR[Respond 400\nErro]
-    V -->|Sim| CC[Verificar Cache\nCode node]
-    CC --> TC{Cache hit?}
-    TC -->|Sim| RC[Respond\nCache]
-    TC -->|Não| BA[BrasilAPI\nGET /cnpj/v1]
-    BA --> TS[Transformar\n+ Salvar Cache]
-    TS --> RA[Respond\nDados CNPJ]
-```
-
-**Payload:** `{ "valor": "59460450000100" }`
-
-**Resposta:**
-```json
-{
-  "cnpj": "59460450000100",
-  "razao_social": "EMPRESA LTDA",
-  "nome_fantasia": "EMPRESA",
-  "situacao": "ATIVA",
-  "endereco": { "cep": "...", "logradouro": "...", "numero": "...", "bairro": "...", "cidade": "...", "uf": "..." },
-  "telefone": "1199999999",
-  "email": "contato@empresa.com"
-}
-```
-
-**Notas técnicas:**
-- "Verificar Cache" é Code node (NÃO HTTP Request) — sempre retorna dados, evita pipeline parar
-- Cache salvo via fire-and-forget (não bloqueia resposta)
-- Cache: tabela `cache_consultas` no Supabase, TTL 7 dias
-- Frontend fallback: se n8n falhar, consulta BrasilAPI direto
-
----
-
-### 10. TEG+ | Consulta CEP
-**Webhook:** `POST /consulta-cep`
-**ID n8n:** `iZGk3HiN35xGxe7K`
-**Nodes:** 12 (precisa mesma fix do cache do CNPJ)
-**Criado:** 2026-03-06
-**Status:** Ativo (com bug no cache — HTTP Request retorna 0 items)
-
-Mesmo padrão do Consulta CNPJ. Payload: `{ "valor": "01001000" }`.
-**TODO:** Aplicar mesma fix do CNPJ (trocar HTTP Request cache por Code node).
-
----
-
-## Configuração EasyPanel
-
-| Variável | Valor |
-|----------|-------|
-| `WEBHOOK_URL` | `https://teg-agents-n8n.nmmcas.easypanel.host` |
-| Domínio | `https://teg-agents-n8n.nmmcas.easypanel.host/` → `http://teg-agents_n8n:5678/` |
-
-**IMPORTANTE:** Updates via API (REST ou MCP) só alteram o DRAFT do workflow. Para ativar webhooks de produção, é obrigatório **Publicar via UI do editor n8n**.
-
----
-
-## Workflows Futuros
-
-| Workflow | Trigger | Função |
-|----------|---------|--------|
-| WhatsApp Notificações | Nova aprovação | Envia link WhatsApp via Evolution API |
-| Email Aprovação | Nova aprovação | Email Outlook com link de aprovação |
-| AI TEG+ Agent | Mensagem WhatsApp | Responde dúvidas e cria requisições |
+| Metodo | Path | Workflow | Descricao |
+|--------|------|----------|-----------|
+| POST | /consulta-cnpj | Consulta CNPJ | Consulta + cache |
+| POST | /consulta-cep | Consulta CEP | Consulta + cache |
+| POST | /compras/requisicao-ai | AI Parse Requisicao | Parse texto → itens |
+| POST | /compras/parse-cotacao | AI Parse Cotacao | Parse PDF/imagem |
+| POST | /compras/ocr | OCR Documentos | OCR multimodal |
+| POST | /superteg/chat | SuperTEG Agent | Chat AI principal |
+| POST | /dev-hub | Dev Hub | Backend dev tools |
+| POST | /whatsapp/notificar | WhatsApp Notif. | Enviar notificacao |
+| POST | /whatsapp/gateway | WhatsApp Gateway | Receber mensagem |
+| CRON | — (diario) | Expiracao Aprov. | Job automatico |
 
 ---
 
 ## Links Relacionados
 
-- [[01 - Arquitetura Geral]] — Posição do n8n na arquitetura
-- [[11 - Fluxo Requisição]] — Fluxo detalhado de criação
-- [[12 - Fluxo Aprovação]] — Fluxo detalhado de aprovação
-- [[19 - Integração Omie]] — Squads Omie detalhados
-- [[05 - Hooks Customizados]] — Como o frontend chama os webhooks
-- [[17 - Roadmap]] — Integrações futuras planejadas
+- [[01 - Arquitetura Geral]] - Posicao do n8n na arquitetura
+- [[07 - Schema Database]] - Tabelas utilizadas pelos workflows
+- [[11 - Fluxo Requisicao]] - Fluxo detalhado de criacao
+- [[12 - Fluxo Aprovacao]] - Fluxo detalhado de aprovacao
+- [[19 - Integracao Omie]] - Squads Omie detalhados
+- [[28 - Modulo Cadastros AI]] - Pre-cadastros via SuperTEG
