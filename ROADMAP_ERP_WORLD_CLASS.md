@@ -1,5 +1,5 @@
 # 🏗️ TEG+ ERP World-Class — Avaliação Estratégica Completa
-**TEG União Engenharia | Fev/2026**
+**TEG União Energia | Fev/2026**
 *Baseado na Arquitetura Oficial — Págs. 02 e 03 do SistemaTEGPlus_Documentacao.pdf*
 
 ---

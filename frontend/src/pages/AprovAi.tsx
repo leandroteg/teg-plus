@@ -355,7 +355,7 @@ export default function AprovAi() {
       </div>
 
       <footer className="text-center pb-8">
-        <p className="text-indigo-400 text-[10px]">TEG+ · TEG União Engenharia</p>
+        <p className="text-indigo-400 text-[10px]">TEG+ · TEG União Energia</p>
       </footer>
     </div>
   )

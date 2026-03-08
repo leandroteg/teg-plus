@@ -1,6 +1,6 @@
 -- ============================================================
 -- TEG+ | Schema de Compras e Aprovações
--- Sistema TEG Plus - TEG União Engenharia
+-- Sistema TEG Plus - TEG União Energia
 -- Executar no Supabase SQL Editor
 -- ============================================================
 

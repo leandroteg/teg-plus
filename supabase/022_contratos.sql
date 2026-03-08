@@ -29,7 +29,7 @@ CREATE TABLE IF NOT EXISTS con_clientes (
 
 INSERT INTO con_clientes (nome, cnpj, tipo) VALUES
   ('CEMIG – Companhia Energética de Minas Gerais', '17.155.730/0001-64', 'publico'),
-  ('TEG União Engenharia (interno)',               NULL,                  'privado')
+  ('TEG União Energia (interno)',               NULL,                  'privado')
 ON CONFLICT (cnpj) DO NOTHING;
 
 -- ── 2. Contratos ──────────────────────────────────────────────────────────────
