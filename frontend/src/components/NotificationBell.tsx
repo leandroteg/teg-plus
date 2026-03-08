@@ -1,4 +1,5 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
+import { createPortal } from 'react-dom'
 import { Bell, Check, X, Edit3, AlertCircle, ChevronRight, UserPlus } from 'lucide-react'
 import { usePreCadastros, getEntityLabel, type PreCadastro } from '../hooks/usePreCadastros'
 
@@ -8,26 +9,49 @@ export default function NotificationBell({ isDark = false }: { isDark?: boolean 
   const { pendentes, count, isAdminOrDirector } = usePreCadastros()
   const [open, setOpen] = useState(false)
   const [selected, setSelected] = useState<PreCadastro | null>(null)
-  const ref = useRef<HTMLDivElement>(null)
+  const btnRef = useRef<HTMLButtonElement>(null)
+  const panelRef = useRef<HTMLDivElement>(null)
+  const [pos, setPos] = useState({ top: 0, right: 0 })
+
+  // Calculate position from button rect
+  const updatePos = useCallback(() => {
+    if (!btnRef.current) return
+    const r = btnRef.current.getBoundingClientRect()
+    setPos({
+      top: r.bottom + 8,
+      right: Math.max(8, window.innerWidth - r.right),
+    })
+  }, [])
 
   // Close on click outside
   useEffect(() => {
     if (!open) return
+    updatePos()
     function onClickOutside(e: MouseEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) {
-        setOpen(false)
-        setSelected(null)
-      }
+      if (
+        btnRef.current?.contains(e.target as Node) ||
+        panelRef.current?.contains(e.target as Node)
+      ) return
+      setOpen(false)
+      setSelected(null)
     }
+    function onScroll() { updatePos() }
     document.addEventListener('mousedown', onClickOutside)
-    return () => document.removeEventListener('mousedown', onClickOutside)
-  }, [open])
+    window.addEventListener('scroll', onScroll, true)
+    window.addEventListener('resize', updatePos)
+    return () => {
+      document.removeEventListener('mousedown', onClickOutside)
+      window.removeEventListener('scroll', onScroll, true)
+      window.removeEventListener('resize', updatePos)
+    }
+  }, [open, updatePos])
 
   if (!isAdminOrDirector) return null
 
   return (
-    <div className="relative" ref={ref}>
+    <>
       <button
+        ref={btnRef}
         onClick={() => { setOpen(o => !o); setSelected(null) }}
         className={`relative p-2 rounded-lg transition-colors duration-150 ${
           isDark
@@ -46,14 +70,20 @@ export default function NotificationBell({ isDark = false }: { isDark?: boolean 
         )}
       </button>
 
-      {open && (
+      {open && createPortal(
         <div
-          className={`absolute right-0 top-full mt-2 z-[200] w-80 max-h-[420px] rounded-2xl border overflow-hidden shadow-xl ${
+          ref={panelRef}
+          className={`fixed z-[9999] w-80 max-h-[420px] rounded-2xl border overflow-hidden shadow-xl ${
             isDark
               ? 'bg-[#111827] border-white/10 shadow-black/50'
               : 'bg-white border-slate-200/80 shadow-slate-200/40'
           }`}
-          style={{ animation: 'notif-slide 0.2s ease-out' }}
+          style={{
+            top: pos.top,
+            right: pos.right,
+            maxWidth: 'calc(100vw - 16px)',
+            animation: 'notif-slide 0.2s ease-out',
+          }}
         >
           {/* Header */}
           <div className={`px-4 py-3 border-b flex items-center justify-between ${
@@ -116,7 +146,7 @@ export default function NotificationBell({ isDark = false }: { isDark?: boolean 
             )}
           </div>
         </div>
-      )}
+      , document.body)}
 
       <style>{`
         @keyframes notif-pop {
@@ -129,7 +159,7 @@ export default function NotificationBell({ isDark = false }: { isDark?: boolean 
           to   { opacity: 1; transform: translateY(0); }
         }
       `}</style>
-    </div>
+    </>
   )
 }
 
