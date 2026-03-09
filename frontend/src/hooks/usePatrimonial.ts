@@ -262,15 +262,17 @@ export function usePatrimonialKPIs() {
     queryFn: async () => {
       const { data } = await supabase
         .from('pat_imobilizados')
-        .select('status, valor_aquisicao, valor_atual')
+        .select('status, valor_aquisicao, valor_atual, taxa_depreciacao_anual')
 
       const imobs = (data ?? []) as any[]
       const ativos = imobs.filter(i => i.status !== 'baixado')
 
       const valor_bruto  = ativos.reduce((a, i) => a + (i.valor_aquisicao ?? 0), 0)
       const valor_liquido = ativos.reduce((a, i) => a + (i.valor_atual ?? i.valor_aquisicao ?? 0), 0)
+      // FIX: usa taxa individual ao invés de 20% fixo (BACKUP: era * 0.2 / 12)
       const depre_mensal  = ativos.reduce((a, i) => {
-        return a + ((i.valor_aquisicao ?? 0) * 0.2 / 12)
+        const taxa = (i.taxa_depreciacao_anual ?? 20) / 100
+        return a + ((i.valor_aquisicao ?? 0) * taxa / 12)
       }, 0)
 
       const { count: termos_pendentes } = await supabase

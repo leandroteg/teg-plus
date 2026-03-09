@@ -376,14 +376,14 @@ export default function ModuloSelector() {
           <div
             className="absolute z-10"
             style={{
-              left: cx - 42,
-              top: cy - 42,
-              width: 84,
-              height: 84,
+              left: cx - 52,
+              top: cy - 52,
+              width: 104,
+              height: 104,
             }}
           >
             <div
-              className="w-full h-full rounded-full flex items-center justify-center border"
+              className="w-full h-full rounded-full flex items-center justify-center border overflow-hidden"
               style={{
                 background: isLight
                   ? 'radial-gradient(circle, rgba(20,184,166,0.08), rgba(255,255,255,0.95))'
@@ -396,7 +396,7 @@ export default function ModuloSelector() {
                 transition: 'transform 0.6s cubic-bezier(0.175,0.885,0.32,1.275), box-shadow 0.8s ease',
               }}
             >
-              <LogoTeg size={48} animated={false} glowing={false} />
+              <LogoTeg size={88} animated={false} glowing={false} />
             </div>
           </div>
 
