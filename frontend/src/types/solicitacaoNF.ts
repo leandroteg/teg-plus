@@ -63,6 +63,8 @@ export interface SolicitacaoNF {
 
   // Joined data (from select with joins)
   fornecedor?: { id: string; razao_social: string; cnpj?: string }
+  obra?: { id: string; codigo: string; nome: string; municipio?: string; uf?: string }
+  empresa?: { id: string; codigo: string; razao_social: string }
 }
 
 export interface SolicitacaoNFFilters {
@@ -107,4 +109,19 @@ export interface EmitirNFPayload {
   chave_acesso?: string
   data_emissao: string
   danfe_url?: string
+  cfop?: string
+  natureza_operacao?: string
+  emitente_cnpj?: string
+  emitente_nome?: string
+  destinatario_cnpj?: string
+  destinatario_nome?: string
+  destinatario_uf?: string
+  items?: Array<{ descricao: string; quantidade: number; unidade: string; valor_unitario?: number }>
+  valor_total?: number
+  valor_frete?: number
+  valor_seguro?: number
+  valor_desconto_nf?: number
+  icms_base?: number
+  icms_valor?: number
+  info_complementar?: string
 }

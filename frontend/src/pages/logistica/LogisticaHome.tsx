@@ -20,6 +20,7 @@ const STATUS_LABEL: Record<string, { label: string; dot: string; bg: string; tex
   planejado:              { label: 'Planejado',       dot: 'bg-blue-400',    bg: 'bg-blue-50',     text: 'text-blue-700'    },
   aguardando_aprovacao:   { label: 'Aguard. Aprov.',  dot: 'bg-amber-400',   bg: 'bg-amber-50',    text: 'text-amber-700'   },
   aprovado:               { label: 'Aprovado',        dot: 'bg-indigo-400',  bg: 'bg-indigo-50',   text: 'text-indigo-700'  },
+  romaneio_emitido:       { label: 'Romaneio',        dot: 'bg-teal-400',    bg: 'bg-teal-50',     text: 'text-teal-700'    },
   nfe_emitida:            { label: 'NF-e Emitida',    dot: 'bg-violet-400',  bg: 'bg-violet-50',   text: 'text-violet-700'  },
   em_transito:            { label: 'Em Trânsito',     dot: 'bg-orange-400',  bg: 'bg-orange-50',   text: 'text-orange-700'  },
   entregue:               { label: 'Entregue',        dot: 'bg-teal-400',    bg: 'bg-teal-50',     text: 'text-teal-700'    },

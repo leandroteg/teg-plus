@@ -12,7 +12,9 @@ import type {
 // ── Select com joins ────────────────────────────────────────────────────────
 const SELECT_SOL = `
   *,
-  fornecedor:cmp_fornecedores!fornecedor_id(id, razao_social, cnpj)
+  fornecedor:cmp_fornecedores!fornecedor_id(id, razao_social, cnpj),
+  obra:sys_obras!obra_id(id, codigo, nome, municipio, uf),
+  empresa:sys_empresas!empresa_id(id, codigo, razao_social)
 `
 
 // ── Listar Solicitações NF ──────────────────────────────────────────────────
@@ -130,6 +132,22 @@ export function useEmitirNF() {
           serie: payload.serie ?? null,
           chave_acesso: payload.chave_acesso ?? null,
           data_emissao: payload.data_emissao,
+          danfe_url: payload.danfe_url ?? null,
+          cfop: payload.cfop ?? null,
+          natureza_operacao: payload.natureza_operacao ?? null,
+          emitente_cnpj: payload.emitente_cnpj ?? null,
+          emitente_nome: payload.emitente_nome ?? null,
+          destinatario_cnpj: payload.destinatario_cnpj ?? null,
+          destinatario_nome: payload.destinatario_nome ?? null,
+          destinatario_uf: payload.destinatario_uf ?? null,
+          items: payload.items ?? null,
+          valor_total: payload.valor_total ?? null,
+          valor_frete: payload.valor_frete ?? null,
+          valor_seguro: payload.valor_seguro ?? null,
+          valor_desconto_nf: payload.valor_desconto_nf ?? null,
+          icms_base: payload.icms_base ?? null,
+          icms_valor: payload.icms_valor ?? null,
+          info_complementar: payload.info_complementar ?? null,
           status: 'aguardando_aprovacao',
         })
         .eq('id', id)
@@ -141,6 +159,24 @@ export function useEmitirNF() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['solicitacoes-nf'] })
     },
+  })
+}
+
+// ── Upload DANFE ────────────────────────────────────────────────────────────
+export function useUploadDANFE() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ id, danfe_url }: { id: string; danfe_url: string }) => {
+      const { data, error } = await supabase
+        .from('fis_solicitacoes_nf')
+        .update({ danfe_url })
+        .eq('id', id)
+        .select()
+        .single()
+      if (error) throw error
+      return data as SolicitacaoNF
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['solicitacoes-nf'] }),
   })
 }
 

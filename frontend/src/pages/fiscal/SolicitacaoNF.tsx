@@ -4,6 +4,8 @@ import {
   ArrowRight, Edit3, Send, ThumbsUp, ThumbsDown, Building2,
   Calendar, Hash, AlertTriangle, Loader2, X, FileText,
   Truck, ShoppingCart, PenLine, Eye, ChevronDown, Key,
+  Package, DollarSign, Info, Paperclip, Plus, Trash2, Users,
+  MapPin, FileCheck,
 } from 'lucide-react'
 import type {
   SolicitacaoNF as SolicitacaoNFType,
@@ -51,6 +53,11 @@ const fmtCnpj = (cnpj: string) => {
   return `${c.slice(0, 2)}.${c.slice(2, 5)}.${c.slice(5, 8)}/${c.slice(8, 12)}-${c.slice(12)}`
 }
 
+const parseNum = (v: string) => {
+  const n = parseFloat(v.replace(',', '.'))
+  return isNaN(n) ? 0 : n
+}
+
 // ── Constants ───────────────────────────────────────────────────────────────
 
 const MESES = [
@@ -66,6 +73,11 @@ const MESES = [
   { value: 10, label: 'Outubro' },
   { value: 11, label: 'Novembro' },
   { value: 12, label: 'Dezembro' },
+]
+
+const UF_LIST = [
+  'AC','AL','AP','AM','BA','CE','DF','ES','GO','MA','MT','MS','MG',
+  'PA','PB','PR','PE','PI','RJ','RN','RS','RO','RR','SC','SP','SE','TO',
 ]
 
 const STATUS_CONFIG: Record<StatusSolicitacaoNF, {
@@ -192,7 +204,86 @@ function SkeletonCard({ isDark }: { isDark: boolean }) {
   )
 }
 
-// ── Emission Form (inline) ──────────────────────────────────────────────────
+// ── Shared styles helper ────────────────────────────────────────────────────
+
+function useFormStyles(isDark: boolean) {
+  const labelCls = `text-[11px] font-semibold mb-1 block ${isDark ? 'text-slate-400' : 'text-slate-500'}`
+  const inputCls = `w-full rounded-xl border px-3 py-2 text-sm transition-all duration-200
+    focus:outline-none focus:ring-2 focus:ring-amber-500/30 focus:border-amber-400 ${
+    isDark
+      ? 'bg-slate-900/60 border-slate-700 text-slate-200 placeholder-slate-600'
+      : 'bg-white border-slate-200 text-slate-700 placeholder-slate-400'
+  }`
+  const sectionBorder = isDark ? 'border-slate-700/50' : 'border-slate-100'
+  return { labelCls, inputCls, sectionBorder }
+}
+
+// ── Collapsible Section ─────────────────────────────────────────────────────
+
+function FormSection({
+  title, icon: Icon, isDark, defaultOpen = false, badge, children,
+}: {
+  title: string
+  icon: typeof Users
+  isDark: boolean
+  defaultOpen?: boolean
+  badge?: string
+  children: React.ReactNode
+}) {
+  const [open, setOpen] = useState(defaultOpen)
+  return (
+    <div className={`border rounded-xl overflow-hidden transition-colors ${
+      isDark ? 'border-slate-700/50' : 'border-slate-200/80'
+    }`}>
+      <button
+        type="button"
+        onClick={() => setOpen(!open)}
+        className={`w-full flex items-center justify-between gap-2 px-3.5 py-2.5 text-left transition-colors ${
+          isDark
+            ? 'hover:bg-slate-800/50'
+            : 'hover:bg-slate-50'
+        }`}
+      >
+        <div className="flex items-center gap-2">
+          <Icon size={13} className={isDark ? 'text-amber-400/70' : 'text-amber-500/70'} />
+          <span className={`text-xs font-bold ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>
+            {title}
+          </span>
+          {badge && (
+            <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-md ${
+              isDark ? 'bg-amber-500/10 text-amber-400' : 'bg-amber-50 text-amber-600'
+            }`}>
+              {badge}
+            </span>
+          )}
+        </div>
+        <ChevronDown size={14} className={`transition-transform duration-200 ${
+          open ? 'rotate-180' : ''
+        } ${isDark ? 'text-slate-500' : 'text-slate-400'}`} />
+      </button>
+      {open && (
+        <div className={`px-3.5 pb-3.5 pt-1 animate-[fadeSlideIn_0.2s_ease] border-t ${
+          isDark ? 'border-slate-700/50' : 'border-slate-100'
+        }`}>
+          {children}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ── Item row type ───────────────────────────────────────────────────────────
+
+interface NFItem {
+  descricao: string
+  quantidade: number
+  unidade: string
+  valor_unitario: number
+}
+
+const emptyItem = (): NFItem => ({ descricao: '', quantidade: 1, unidade: 'UN', valor_unitario: 0 })
+
+// ── Emission Form (world-class, 6 collapsible sections) ─────────────────────
 
 interface EmissionFormProps {
   sol: SolicitacaoNFType
@@ -203,102 +294,407 @@ interface EmissionFormProps {
 }
 
 function EmissionForm({ sol, isDark, onSubmit, onCancel, isPending }: EmissionFormProps) {
+  const { labelCls, inputCls } = useFormStyles(isDark)
+
+  // Section 1: Partes
+  const [emitenteCnpj, setEmitenteCnpj] = useState(sol.emitente_cnpj || sol.empresa?.razao_social ? '' : '')
+  const [emitenteNome, setEmitenteNome] = useState(sol.emitente_nome || '')
+  const [destCnpj, setDestCnpj] = useState(sol.destinatario_cnpj || sol.fornecedor_cnpj || '')
+  const [destNome, setDestNome] = useState(sol.destinatario_nome || sol.fornecedor_nome || '')
+  const [destUf, setDestUf] = useState(sol.destinatario_uf || '')
+
+  // Pre-fill emitente from empresa join
+  useState(() => {
+    if (!emitenteCnpj && sol.empresa) {
+      setEmitenteCnpj('')
+      setEmitenteNome(sol.empresa.razao_social || '')
+    }
+    if (!emitenteCnpj && sol.emitente_cnpj) {
+      setEmitenteCnpj(sol.emitente_cnpj)
+    }
+    if (!emitenteNome && sol.emitente_nome) {
+      setEmitenteNome(sol.emitente_nome)
+    }
+  })
+
+  // Section 2: Items
+  const initialItems: NFItem[] = sol.items && sol.items.length > 0
+    ? sol.items.map(it => ({
+        descricao: it.descricao,
+        quantidade: it.quantidade,
+        unidade: it.unidade,
+        valor_unitario: it.valor_unitario ?? 0,
+      }))
+    : [emptyItem()]
+  const [items, setItems] = useState<NFItem[]>(initialItems)
+
+  const updateItem = (idx: number, field: keyof NFItem, value: string | number) => {
+    setItems(prev => prev.map((it, i) => i === idx ? { ...it, [field]: value } : it))
+  }
+  const addItem = () => setItems(prev => [...prev, emptyItem()])
+  const removeItem = (idx: number) => {
+    if (items.length <= 1) return
+    setItems(prev => prev.filter((_, i) => i !== idx))
+  }
+
+  const totalProdutos = useMemo(
+    () => items.reduce((acc, it) => acc + it.quantidade * it.valor_unitario, 0),
+    [items]
+  )
+
+  // Section 3: Valores
+  const [frete, setFrete] = useState(sol.valor_frete?.toString() || '0')
+  const [seguro, setSeguro] = useState(sol.valor_seguro?.toString() || '0')
+  const [desconto, setDesconto] = useState(sol.valor_desconto_nf?.toString() || '0')
+  const [icmsBase, setIcmsBase] = useState(sol.icms_base?.toString() || '0')
+  const [icmsValor, setIcmsValor] = useState(sol.icms_valor?.toString() || '0')
+
+  const valorTotalNF = useMemo(
+    () => totalProdutos + parseNum(frete) + parseNum(seguro) - parseNum(desconto),
+    [totalProdutos, frete, seguro, desconto]
+  )
+
+  // Section 4: Dados da NF
   const [numero, setNumero] = useState(sol.numero_nf || '')
   const [serie, setSerie] = useState(sol.serie || '1')
-  const [chave, setChave] = useState(sol.chave_acesso || '')
   const [dataEmissao, setDataEmissao] = useState(
     sol.data_emissao || new Date().toISOString().split('T')[0]
   )
-  const [formError, setFormError] = useState('')
+  const [chave, setChave] = useState(sol.chave_acesso || '')
 
-  const labelCls = `text-[11px] font-semibold mb-1 block ${isDark ? 'text-slate-400' : 'text-slate-500'}`
-  const inputCls = `w-full rounded-xl border px-3 py-2 text-sm transition-all duration-200
-    focus:outline-none focus:ring-2 focus:ring-amber-500/30 focus:border-amber-400 ${
-    isDark
-      ? 'bg-slate-900/60 border-slate-700 text-slate-200 placeholder-slate-600'
-      : 'bg-white border-slate-200 text-slate-700 placeholder-slate-400'
-  }`
+  // Smart CFOP default: 5.949 if same UF, 6.949 if different
+  const obraUf = sol.obra?.uf || ''
+  const defaultCfop = useMemo(() => {
+    if (sol.cfop) return sol.cfop
+    if (!destUf || !obraUf) return '5.949'
+    return destUf === obraUf ? '5.949' : '6.949'
+  }, [sol.cfop, destUf, obraUf])
+  const [cfop, setCfop] = useState(defaultCfop)
+  const [natOp, setNatOp] = useState(sol.natureza_operacao || 'Prestacao de Servico')
+
+  // Section 5: Info Complementar
+  const [infoComplementar, setInfoComplementar] = useState(sol.info_complementar || '')
+
+  // Section 6: Anexos
+  const [danfeUrl, setDanfeUrl] = useState(sol.danfe_url || '')
+
+  // Form error
+  const [formError, setFormError] = useState('')
 
   const handleSubmit = () => {
     if (!numero.trim()) { setFormError('Numero da NF obrigatorio'); return }
     if (!dataEmissao) { setFormError('Data de emissao obrigatoria'); return }
+    if (chave.trim() && chave.replace(/\D/g, '').length !== 44 && chave.trim().length > 0) {
+      setFormError('Chave de acesso deve ter 44 digitos'); return
+    }
     setFormError('')
+
+    const validItems = items.filter(it => it.descricao.trim())
     onSubmit({
       numero_nf: numero.trim(),
       serie: serie.trim() || undefined,
       chave_acesso: chave.trim() || undefined,
       data_emissao: dataEmissao,
+      danfe_url: danfeUrl.trim() || undefined,
+      cfop: cfop.trim() || undefined,
+      natureza_operacao: natOp.trim() || undefined,
+      emitente_cnpj: emitenteCnpj.trim() || undefined,
+      emitente_nome: emitenteNome.trim() || undefined,
+      destinatario_cnpj: destCnpj.trim() || undefined,
+      destinatario_nome: destNome.trim() || undefined,
+      destinatario_uf: destUf.trim() || undefined,
+      items: validItems.length > 0 ? validItems : undefined,
+      valor_total: valorTotalNF || undefined,
+      valor_frete: parseNum(frete) || undefined,
+      valor_seguro: parseNum(seguro) || undefined,
+      valor_desconto_nf: parseNum(desconto) || undefined,
+      icms_base: parseNum(icmsBase) || undefined,
+      icms_valor: parseNum(icmsValor) || undefined,
+      info_complementar: infoComplementar.trim() || undefined,
     })
   }
 
   return (
-    <div className={`mt-3 pt-3 border-t space-y-3 animate-[fadeSlideIn_0.25s_ease] ${
+    <div className={`mt-3 pt-3 border-t space-y-2.5 animate-[fadeSlideIn_0.25s_ease] ${
       isDark ? 'border-slate-700/60' : 'border-slate-100'
     }`}>
-      <div className="flex items-center gap-2 mb-1">
-        <Edit3 size={13} className={isDark ? 'text-amber-400' : 'text-amber-600'} />
-        <span className={`text-xs font-bold ${isDark ? 'text-amber-400' : 'text-amber-700'}`}>
-          Dados da Nota Fiscal
-        </span>
+      {/* Header */}
+      <div className="flex items-center justify-between mb-1">
+        <div className="flex items-center gap-2">
+          <Edit3 size={13} className={isDark ? 'text-amber-400' : 'text-amber-600'} />
+          <span className={`text-xs font-bold ${isDark ? 'text-amber-400' : 'text-amber-700'}`}>
+            Emissao de Nota Fiscal
+          </span>
+        </div>
+        {valorTotalNF > 0 && (
+          <span className={`text-sm font-extrabold ${isDark ? 'text-amber-400' : 'text-amber-600'}`}>
+            {fmt(valorTotalNF)}
+          </span>
+        )}
       </div>
 
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <div>
-          <label className={labelCls}>Numero NF *</label>
-          <div className="relative">
-            <Hash size={13} className={`absolute left-3 top-1/2 -translate-y-1/2 ${
-              isDark ? 'text-slate-600' : 'text-slate-400'
-            }`} />
-            <input
-              type="text"
-              value={numero}
-              onChange={e => setNumero(e.target.value)}
-              placeholder="000123"
-              className={`${inputCls} pl-8`}
-            />
+      {/* Section 1: Partes */}
+      <FormSection title="Partes (Emitente / Destinatario)" icon={Users} isDark={isDark} defaultOpen={false}
+        badge={emitenteCnpj || emitenteNome ? 'preenchido' : undefined}>
+        <div className="space-y-3 mt-2">
+          <p className={`text-[10px] font-semibold uppercase tracking-wider ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+            Emitente
+          </p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label className={labelCls}>CNPJ Emitente</label>
+              <input type="text" value={emitenteCnpj} onChange={e => setEmitenteCnpj(e.target.value)}
+                placeholder="00.000.000/0000-00" className={inputCls} />
+            </div>
+            <div>
+              <label className={labelCls}>Razao Social Emitente</label>
+              <input type="text" value={emitenteNome} onChange={e => setEmitenteNome(e.target.value)}
+                placeholder="Nome da empresa emitente" className={inputCls} />
+            </div>
           </div>
-        </div>
-        <div>
-          <label className={labelCls}>Serie</label>
-          <input
-            type="text"
-            value={serie}
-            onChange={e => setSerie(e.target.value)}
-            placeholder="1"
-            className={inputCls}
-          />
-        </div>
-        <div className="col-span-2 sm:col-span-1">
-          <label className={labelCls}>Data Emissao *</label>
-          <div className="relative">
-            <Calendar size={13} className={`absolute left-3 top-1/2 -translate-y-1/2 ${
-              isDark ? 'text-slate-600' : 'text-slate-400'
-            }`} />
-            <input
-              type="date"
-              value={dataEmissao}
-              onChange={e => setDataEmissao(e.target.value)}
-              className={`${inputCls} pl-8`}
-            />
-          </div>
-        </div>
-        <div className="col-span-2 sm:col-span-1">
-          <label className={labelCls}>Chave de Acesso</label>
-          <div className="relative">
-            <Key size={13} className={`absolute left-3 top-1/2 -translate-y-1/2 ${
-              isDark ? 'text-slate-600' : 'text-slate-400'
-            }`} />
-            <input
-              type="text"
-              value={chave}
-              onChange={e => setChave(e.target.value)}
-              placeholder="44 digitos (opcional)"
-              className={`${inputCls} pl-8`}
-            />
-          </div>
-        </div>
-      </div>
 
+          <p className={`text-[10px] font-semibold uppercase tracking-wider pt-2 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+            Destinatario
+          </p>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div>
+              <label className={labelCls}>CNPJ Destinatario</label>
+              <input type="text" value={destCnpj} onChange={e => setDestCnpj(e.target.value)}
+                placeholder="00.000.000/0000-00" className={inputCls} />
+            </div>
+            <div>
+              <label className={labelCls}>Razao Social Destinatario</label>
+              <input type="text" value={destNome} onChange={e => setDestNome(e.target.value)}
+                placeholder="Nome do destinatario" className={inputCls} />
+            </div>
+            <div>
+              <label className={labelCls}>UF Destinatario</label>
+              <select value={destUf} onChange={e => setDestUf(e.target.value)} className={inputCls}>
+                <option value="">Selecione</option>
+                {UF_LIST.map(uf => <option key={uf} value={uf}>{uf}</option>)}
+              </select>
+            </div>
+          </div>
+        </div>
+      </FormSection>
+
+      {/* Section 2: Itens */}
+      <FormSection title="Itens da NF" icon={Package} isDark={isDark} defaultOpen={items.some(it => it.descricao.trim() !== '')}
+        badge={`${items.filter(it => it.descricao.trim()).length} ${items.filter(it => it.descricao.trim()).length === 1 ? 'item' : 'itens'}`}>
+        <div className="space-y-2 mt-2">
+          {/* Table header */}
+          <div className={`hidden sm:grid grid-cols-[1fr_80px_70px_100px_90px_32px] gap-2 text-[10px] font-semibold uppercase tracking-wider px-1 ${
+            isDark ? 'text-slate-500' : 'text-slate-400'
+          }`}>
+            <span>Descricao</span>
+            <span>Qtd</span>
+            <span>Unidade</span>
+            <span>Vlr Unit.</span>
+            <span>Subtotal</span>
+            <span />
+          </div>
+
+          {items.map((item, idx) => (
+            <div key={idx} className={`grid grid-cols-1 sm:grid-cols-[1fr_80px_70px_100px_90px_32px] gap-2 items-end rounded-lg p-2 ${
+              isDark ? 'bg-slate-800/30' : 'bg-slate-50/60'
+            }`}>
+              <div>
+                <label className={`sm:hidden ${labelCls}`}>Descricao</label>
+                <input type="text" value={item.descricao}
+                  onChange={e => updateItem(idx, 'descricao', e.target.value)}
+                  placeholder="Descricao do item" className={inputCls} />
+              </div>
+              <div>
+                <label className={`sm:hidden ${labelCls}`}>Qtd</label>
+                <input type="number" min="0" step="0.01" value={item.quantidade}
+                  onChange={e => updateItem(idx, 'quantidade', parseNum(e.target.value))}
+                  className={`${inputCls} text-center`} />
+              </div>
+              <div>
+                <label className={`sm:hidden ${labelCls}`}>Unidade</label>
+                <input type="text" value={item.unidade}
+                  onChange={e => updateItem(idx, 'unidade', e.target.value)}
+                  placeholder="UN" className={`${inputCls} text-center`} />
+              </div>
+              <div>
+                <label className={`sm:hidden ${labelCls}`}>Vlr Unit.</label>
+                <input type="number" min="0" step="0.01" value={item.valor_unitario || ''}
+                  onChange={e => updateItem(idx, 'valor_unitario', parseNum(e.target.value))}
+                  placeholder="0,00" className={`${inputCls} text-right`} />
+              </div>
+              <div className={`text-right text-xs font-bold py-2 ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
+                {fmt(item.quantidade * item.valor_unitario)}
+              </div>
+              <button type="button" onClick={() => removeItem(idx)} disabled={items.length <= 1}
+                className={`p-1.5 rounded-lg transition-colors self-end mb-1 ${
+                  items.length <= 1
+                    ? 'opacity-20 cursor-not-allowed'
+                    : isDark
+                      ? 'text-slate-500 hover:text-red-400 hover:bg-red-500/10'
+                      : 'text-slate-400 hover:text-red-500 hover:bg-red-50'
+                }`}>
+                <Trash2 size={13} />
+              </button>
+            </div>
+          ))}
+
+          <div className="flex items-center justify-between pt-1">
+            <button type="button" onClick={addItem}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all ${
+                isDark
+                  ? 'text-amber-400 border border-amber-500/20 hover:bg-amber-500/10'
+                  : 'text-amber-600 border border-amber-200 hover:bg-amber-50'
+              }`}>
+              <Plus size={12} />
+              Adicionar Item
+            </button>
+            <div className={`text-xs font-bold ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
+              Total Produtos: <span className={isDark ? 'text-amber-400' : 'text-amber-600'}>{fmt(totalProdutos)}</span>
+            </div>
+          </div>
+        </div>
+      </FormSection>
+
+      {/* Section 3: Valores */}
+      <FormSection title="Valores" icon={DollarSign} isDark={isDark} defaultOpen={false}
+        badge={valorTotalNF > 0 ? fmt(valorTotalNF) : undefined}>
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mt-2">
+          <div>
+            <label className={labelCls}>Total Produtos</label>
+            <div className={`px-3 py-2 rounded-xl border text-sm font-semibold ${
+              isDark ? 'bg-slate-800/40 border-slate-700 text-amber-400' : 'bg-amber-50/50 border-amber-200/60 text-amber-700'
+            }`}>
+              {fmt(totalProdutos)}
+            </div>
+          </div>
+          <div>
+            <label className={labelCls}>Frete (R$)</label>
+            <input type="text" value={frete} onChange={e => setFrete(e.target.value)}
+              placeholder="0,00" className={`${inputCls} text-right`} />
+          </div>
+          <div>
+            <label className={labelCls}>Seguro (R$)</label>
+            <input type="text" value={seguro} onChange={e => setSeguro(e.target.value)}
+              placeholder="0,00" className={`${inputCls} text-right`} />
+          </div>
+          <div>
+            <label className={labelCls}>Desconto (R$)</label>
+            <input type="text" value={desconto} onChange={e => setDesconto(e.target.value)}
+              placeholder="0,00" className={`${inputCls} text-right`} />
+          </div>
+          <div>
+            <label className={labelCls}>ICMS Base (R$)</label>
+            <input type="text" value={icmsBase} onChange={e => setIcmsBase(e.target.value)}
+              placeholder="0,00" className={`${inputCls} text-right`} />
+          </div>
+          <div>
+            <label className={labelCls}>ICMS Valor (R$)</label>
+            <input type="text" value={icmsValor} onChange={e => setIcmsValor(e.target.value)}
+              placeholder="0,00" className={`${inputCls} text-right`} />
+          </div>
+        </div>
+        <div className={`mt-3 flex items-center justify-end gap-2 pt-2 border-t ${
+          isDark ? 'border-slate-700/50' : 'border-slate-100'
+        }`}>
+          <span className={`text-xs font-semibold ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+            Valor Total NF:
+          </span>
+          <span className={`text-base font-extrabold ${isDark ? 'text-amber-400' : 'text-amber-600'}`}>
+            {fmt(valorTotalNF)}
+          </span>
+        </div>
+      </FormSection>
+
+      {/* Section 4: Dados da NF */}
+      <FormSection title="Dados da NF" icon={FileCheck} isDark={isDark} defaultOpen={true}>
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mt-2">
+          <div>
+            <label className={labelCls}>Numero NF *</label>
+            <div className="relative">
+              <Hash size={13} className={`absolute left-3 top-1/2 -translate-y-1/2 ${
+                isDark ? 'text-slate-600' : 'text-slate-400'
+              }`} />
+              <input type="text" value={numero} onChange={e => setNumero(e.target.value)}
+                placeholder="000123" className={`${inputCls} pl-8`} />
+            </div>
+          </div>
+          <div>
+            <label className={labelCls}>Serie</label>
+            <input type="text" value={serie} onChange={e => setSerie(e.target.value)}
+              placeholder="1" className={inputCls} />
+          </div>
+          <div>
+            <label className={labelCls}>Data Emissao *</label>
+            <div className="relative">
+              <Calendar size={13} className={`absolute left-3 top-1/2 -translate-y-1/2 ${
+                isDark ? 'text-slate-600' : 'text-slate-400'
+              }`} />
+              <input type="date" value={dataEmissao} onChange={e => setDataEmissao(e.target.value)}
+                className={`${inputCls} pl-8`} />
+            </div>
+          </div>
+          <div className="col-span-2 sm:col-span-1">
+            <label className={labelCls}>CFOP</label>
+            <input type="text" value={cfop} onChange={e => setCfop(e.target.value)}
+              placeholder="5.949" className={inputCls} />
+            {obraUf && destUf && obraUf !== destUf && (
+              <p className={`text-[10px] mt-0.5 ${isDark ? 'text-blue-400/70' : 'text-blue-500/70'}`}>
+                UFs diferentes - sugestao 6.xxx
+              </p>
+            )}
+          </div>
+          <div className="col-span-2">
+            <label className={labelCls}>Natureza da Operacao</label>
+            <input type="text" value={natOp} onChange={e => setNatOp(e.target.value)}
+              placeholder="Prestacao de Servico" className={inputCls} />
+          </div>
+          <div className="col-span-2 sm:col-span-3">
+            <label className={labelCls}>Chave de Acesso (44 digitos)</label>
+            <div className="relative">
+              <Key size={13} className={`absolute left-3 top-1/2 -translate-y-1/2 ${
+                isDark ? 'text-slate-600' : 'text-slate-400'
+              }`} />
+              <input type="text" value={chave} onChange={e => setChave(e.target.value)}
+                placeholder="44 digitos (opcional)" maxLength={50}
+                className={`${inputCls} pl-8 font-mono text-xs tracking-wider`} />
+            </div>
+            {chave.trim() && (
+              <p className={`text-[10px] mt-0.5 font-mono ${
+                chave.replace(/\D/g, '').length === 44
+                  ? isDark ? 'text-green-400/70' : 'text-green-600/70'
+                  : isDark ? 'text-amber-400/70' : 'text-amber-600/70'
+              }`}>
+                {chave.replace(/\D/g, '').length}/44 digitos
+              </p>
+            )}
+          </div>
+        </div>
+      </FormSection>
+
+      {/* Section 5: Info Complementar */}
+      <FormSection title="Informacoes Complementares" icon={Info} isDark={isDark} defaultOpen={false}
+        badge={infoComplementar.trim() ? 'preenchido' : undefined}>
+        <div className="mt-2">
+          <textarea value={infoComplementar} onChange={e => setInfoComplementar(e.target.value)}
+            rows={3} placeholder="Informacoes complementares da NF-e..."
+            className={`${inputCls} resize-none`} />
+        </div>
+      </FormSection>
+
+      {/* Section 6: Anexos */}
+      <FormSection title="Anexos / DANFE" icon={Paperclip} isDark={isDark} defaultOpen={false}
+        badge={danfeUrl.trim() ? '1 anexo' : undefined}>
+        <div className="mt-2">
+          <label className={labelCls}>URL do DANFE (PDF)</label>
+          <input type="url" value={danfeUrl} onChange={e => setDanfeUrl(e.target.value)}
+            placeholder="https://... (URL do arquivo DANFE)" className={inputCls} />
+          <p className={`text-[10px] mt-1 ${isDark ? 'text-slate-600' : 'text-slate-400'}`}>
+            Cole a URL do arquivo DANFE armazenado ou faça upload manual no storage
+          </p>
+        </div>
+      </FormSection>
+
+      {/* Form Error */}
       {formError && (
         <div className={`flex items-center gap-2 rounded-xl px-3 py-2 border text-xs ${
           isDark ? 'bg-red-500/10 border-red-500/20 text-red-400' : 'bg-red-50 border-red-200 text-red-700'
@@ -308,25 +704,21 @@ function EmissionForm({ sol, isDark, onSubmit, onCancel, isPending }: EmissionFo
         </div>
       )}
 
+      {/* Actions */}
       <div className="flex items-center gap-2 pt-1">
-        <button
-          onClick={handleSubmit}
-          disabled={isPending}
+        <button onClick={handleSubmit} disabled={isPending}
           className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-amber-600 text-white
             text-xs font-bold hover:bg-amber-700 transition-all disabled:opacity-50
-            shadow-sm shadow-amber-600/20"
-        >
+            shadow-sm shadow-amber-600/20">
           {isPending ? <Loader2 size={13} className="animate-spin" /> : <Send size={13} />}
           Enviar para Aprovacao
         </button>
-        <button
-          onClick={onCancel}
+        <button onClick={onCancel}
           className={`px-4 py-2 rounded-xl text-xs font-semibold border transition-all ${
             isDark
               ? 'border-slate-700 text-slate-400 hover:bg-slate-700/50'
               : 'border-slate-200 text-slate-500 hover:bg-slate-50'
-          }`}
-        >
+          }`}>
           Cancelar
         </button>
       </div>
@@ -478,6 +870,7 @@ function SolCard({
   iniciarPending, emitirPending, aprovarPending,
 }: SolCardProps) {
   const isExpanded = expandedId === sol.id
+  const itemCount = sol.items?.length ?? 0
 
   return (
     <div className={`group rounded-2xl border shadow-sm transition-all duration-200 hover:shadow-md ${
@@ -509,13 +902,34 @@ function SolCard({
               </span>
             )}
           </div>
-          <div className="flex items-center gap-1.5 shrink-0">
+          <div className="flex items-center gap-1.5 shrink-0 flex-wrap justify-end">
+            {/* Logistica badge */}
+            {sol.solicitacao_log_id && (
+              <span className={`inline-flex items-center gap-1 text-[10px] font-semibold rounded-full px-2 py-0.5 border ${
+                isDark
+                  ? 'bg-blue-500/10 text-blue-400 border-blue-500/20'
+                  : 'bg-blue-50 text-blue-600 border-blue-200'
+              }`}>
+                <Package size={9} />
+                Via Logistica
+              </span>
+            )}
+            {/* Items count badge */}
+            {itemCount > 0 && (
+              <span className={`inline-flex items-center gap-1 text-[10px] font-semibold rounded-full px-2 py-0.5 border ${
+                isDark
+                  ? 'bg-violet-500/10 text-violet-400 border-violet-500/20'
+                  : 'bg-violet-50 text-violet-600 border-violet-200'
+              }`}>
+                {itemCount} {itemCount === 1 ? 'item' : 'itens'}
+              </span>
+            )}
             <OrigemBadge origem={sol.origem} isDark={isDark} />
             <StatusBadge status={sol.status} isDark={isDark} />
           </div>
         </div>
 
-        {/* Row 2: Value + CFOP + Natureza + Descricao */}
+        {/* Row 2: Value + CFOP + Natureza + Obra */}
         <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 mb-2.5">
           {sol.valor_total != null && (
             <span className={`text-sm font-extrabold ${isDark ? 'text-amber-400' : 'text-amber-600'}`}>
@@ -530,6 +944,12 @@ function SolCard({
           {sol.natureza_operacao && (
             <span className={`text-xs ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
               {sol.natureza_operacao}
+            </span>
+          )}
+          {sol.obra && (
+            <span className={`flex items-center gap-1 text-[11px] ${isDark ? 'text-teal-400/70' : 'text-teal-600/70'}`}>
+              <MapPin size={10} />
+              {sol.obra.nome}
             </span>
           )}
         </div>
@@ -565,6 +985,18 @@ function SolCard({
                 <Key size={9} />
                 {sol.chave_acesso.slice(0, 12)}...
               </span>
+            )}
+            {/* Prominent DANFE link for emitted NFs */}
+            {(sol.status === 'emitida' || sol.status === 'aprovada') && sol.danfe_url && (
+              <a href={sol.danfe_url} target="_blank" rel="noopener noreferrer"
+                className={`flex items-center gap-1 font-semibold transition-colors ${
+                  isDark
+                    ? 'text-green-400 hover:text-green-300'
+                    : 'text-green-600 hover:text-green-700'
+                }`}>
+                <FileText size={10} />
+                DANFE
+              </a>
             )}
           </div>
         )}
