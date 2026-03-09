@@ -70,6 +70,37 @@ export function useCriarApontamento() {
   })
 }
 
+export function useAtualizarApontamento() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ id, ...payload }: Partial<ObraApontamento> & { id: string }) => {
+      const { error } = await supabase
+        .from('obr_apontamentos')
+        .update({ ...payload, updated_at: new Date().toISOString() })
+        .eq('id', id)
+      if (error) throw error
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['obr-apontamentos'] })
+      qc.invalidateQueries({ queryKey: ['obr-kpis'] })
+    },
+  })
+}
+
+export function useExcluirApontamento() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from('obr_apontamentos').delete().eq('id', id)
+      if (error) throw error
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['obr-apontamentos'] })
+      qc.invalidateQueries({ queryKey: ['obr-kpis'] })
+    },
+  })
+}
+
 // ── RDO (Relatorio Diario de Obra) ──────────────────────────────────────────
 
 export function useRDOs(filters?: { obra_id?: string }) {
@@ -99,6 +130,37 @@ export function useCriarRDO() {
         .single()
       if (error) throw error
       return data as ObraRDO
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['obr-rdos'] })
+      qc.invalidateQueries({ queryKey: ['obr-kpis'] })
+    },
+  })
+}
+
+export function useAtualizarRDO() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ id, ...payload }: Partial<ObraRDO> & { id: string }) => {
+      const { error } = await supabase
+        .from('obr_rdo')
+        .update({ ...payload, updated_at: new Date().toISOString() })
+        .eq('id', id)
+      if (error) throw error
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['obr-rdos'] })
+      qc.invalidateQueries({ queryKey: ['obr-kpis'] })
+    },
+  })
+}
+
+export function useExcluirRDO() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from('obr_rdo').delete().eq('id', id)
+      if (error) throw error
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['obr-rdos'] })
@@ -137,6 +199,53 @@ export function useCriarAdiantamento() {
         .single()
       if (error) throw error
       return data as ObraAdiantamento
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['obr-adiantamentos'] })
+      qc.invalidateQueries({ queryKey: ['obr-kpis'] })
+    },
+  })
+}
+
+export function useAtualizarAdiantamento() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ id, ...payload }: Partial<ObraAdiantamento> & { id: string }) => {
+      const { error } = await supabase
+        .from('obr_adiantamentos')
+        .update({ ...payload, updated_at: new Date().toISOString() })
+        .eq('id', id)
+      if (error) throw error
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['obr-adiantamentos'] })
+      qc.invalidateQueries({ queryKey: ['obr-kpis'] })
+    },
+  })
+}
+
+export function useAprovarAdiantamento() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async ({
+      id,
+      aprovado_por,
+      valor_aprovado,
+    }: {
+      id: string
+      aprovado_por: string
+      valor_aprovado: number
+    }) => {
+      const { error } = await supabase
+        .from('obr_adiantamentos')
+        .update({
+          status: 'aprovado',
+          aprovado_por,
+          valor_aprovado,
+          aprovado_em: new Date().toISOString(),
+        })
+        .eq('id', id)
+      if (error) throw error
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['obr-adiantamentos'] })
@@ -204,6 +313,36 @@ export function useAprovarPrestacao() {
           status: 'aprovada',
           aprovador_id,
           aprovado_em: new Date().toISOString(),
+        })
+        .eq('id', id)
+      if (error) throw error
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['obr-prestacao'] })
+      qc.invalidateQueries({ queryKey: ['obr-kpis'] })
+    },
+  })
+}
+
+export function useRejeitarPrestacao() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async ({
+      id,
+      aprovador_id,
+      motivo_rejeicao,
+    }: {
+      id: string
+      aprovador_id: string
+      motivo_rejeicao: string
+    }) => {
+      const { error } = await supabase
+        .from('obr_prestacao_contas')
+        .update({
+          status: 'rejeitada',
+          aprovador_id,
+          aprovado_em: new Date().toISOString(),
+          motivo_rejeicao,
         })
         .eq('id', id)
       if (error) throw error

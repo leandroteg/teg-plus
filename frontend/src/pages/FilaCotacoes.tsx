@@ -56,7 +56,7 @@ function AlertaCotacoes({ valor }: { valor: number }) {
 export default function FilaCotacoes() {
   const nav = useNavigate()
   const [statusFilter, setStatusFilter] = useState<StatusCotacao | ''>('')
-  const { data: cotacoes, isLoading } = useCotacoes(undefined, statusFilter || undefined)
+  const { data: cotacoes, isLoading, error: cotError } = useCotacoes(undefined, statusFilter || undefined)
   const { isAdmin, perfil } = useAuth()
   const decisaoMutation = useDecisaoRequisicao()
   const emitirPedidoMutation = useEmitirPedido()
@@ -146,8 +146,16 @@ export default function FilaCotacoes() {
         </div>
       )}
 
+      {/* Error */}
+      {cotError && (
+        <div className="bg-red-50 border border-red-200 rounded-2xl p-4 text-center">
+          <p className="text-red-600 text-sm font-semibold">Erro ao carregar cotacoes</p>
+          <p className="text-red-400 text-xs mt-1">{(cotError as any)?.message ?? 'Erro desconhecido'}</p>
+        </div>
+      )}
+
       {/* Empty */}
-      {!isLoading && (!cotacoes || cotacoes.length === 0) && (
+      {!isLoading && !cotError && (!cotacoes || cotacoes.length === 0) && (
         <div className="text-center py-12 text-slate-400">
           <ShoppingCart size={32} className="mx-auto mb-2 opacity-30" />
           <p className="text-sm">Nenhuma cotação encontrada</p>

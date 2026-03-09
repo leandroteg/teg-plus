@@ -34,7 +34,7 @@ export default function SuperTEGChat() {
   const { messages, isLoading, sendMessage, sendAudio, clearMessages, pendingAction, consumePendingAction } = useSuperTEG()
   const voice = useVoiceRecorder()
   const scrollRef = useRef<HTMLDivElement>(null)
-  const inputRef  = useRef<HTMLInputElement>(null)
+  const inputRef  = useRef<HTMLTextAreaElement>(null)
 
   /* auto-scroll on new messages */
   useEffect(() => {
@@ -71,11 +71,23 @@ export default function SuperTEGChat() {
     if (!input.trim() || isLoading) return
     sendMessage(input)
     setInput('')
+    // Reset textarea height after send
+    if (inputRef.current) {
+      inputRef.current.style.height = 'auto'
+    }
   }, [input, isLoading, sendMessage])
 
-  const handleKey = (e: KeyboardEvent<HTMLInputElement>) => {
+  const handleKey = (e: KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend() }
   }
+
+  // Auto-resize textarea to fit content
+  const autoResize = useCallback(() => {
+    const el = inputRef.current
+    if (!el) return
+    el.style.height = 'auto'
+    el.style.height = `${Math.min(el.scrollHeight, 120)}px`
+  }, [])
 
   const handleMicPress = useCallback(async () => {
     if (voice.state === 'idle') {
@@ -249,15 +261,16 @@ export default function SuperTEGChat() {
               </div>
             ) : (
               /* Normal input state */
-              <div className="flex items-center gap-2 bg-slate-50 rounded-xl px-3.5 py-2.5 border border-slate-200/80 focus-within:border-teal-400 focus-within:ring-2 focus-within:ring-teal-50 transition-all duration-200">
-                <input
+              <div className="flex items-end gap-2 bg-slate-50 rounded-xl px-3.5 py-2.5 border border-slate-200/80 focus-within:border-teal-400 focus-within:ring-2 focus-within:ring-teal-50 transition-all duration-200">
+                <textarea
                   ref={inputRef}
-                  type="text"
+                  rows={1}
                   value={input}
-                  onChange={e => setInput(e.target.value)}
+                  onChange={e => { setInput(e.target.value); autoResize() }}
                   onKeyDown={handleKey}
-                  placeholder="Digite ou envie audio..."
-                  className="flex-1 bg-transparent text-slate-700 text-[13px] placeholder-slate-400 outline-none min-w-0"
+                  placeholder="Digite ou envie audio... (Shift+Enter = nova linha)"
+                  className="flex-1 bg-transparent text-slate-700 text-[13px] placeholder-slate-400 outline-none min-w-0 resize-none leading-relaxed max-h-[120px] overflow-y-auto"
+                  style={{ scrollbarWidth: 'thin' }}
                   disabled={isLoading}
                 />
                 {!input.trim() && voice.isSupported && (

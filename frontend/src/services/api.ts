@@ -23,11 +23,19 @@ function releaseSlot() {
 
 async function fetchWithRetry(url: string, init?: RequestInit, retries = 2): Promise<Response> {
   for (let attempt = 0; ; attempt++) {
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), 15_000) // 15s per-request timeout
     try {
-      return await fetch(url, init)
+      return await fetch(url, { ...init, signal: controller.signal })
     } catch (err) {
       if (attempt >= retries) throw err
+      // Don't retry if it was an abort (timeout)
+      if (err instanceof DOMException && err.name === 'AbortError') {
+        if (attempt >= retries) throw new Error('Tempo limite de conexao excedido')
+      }
       await new Promise(r => setTimeout(r, 1000 * 2 ** attempt))
+    } finally {
+      clearTimeout(timeoutId)
     }
   }
 }

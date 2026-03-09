@@ -42,6 +42,8 @@ import Orcamentos from './pages/controladoria/Orcamentos'
 import DRE from './pages/controladoria/DRE'
 import KPIs from './pages/controladoria/KPIs'
 import Cenarios from './pages/controladoria/Cenarios'
+import PlanoOrcamentario from './pages/controladoria/PlanoOrcamentario'
+import ControleOrcamentario from './pages/controladoria/ControleOrcamentario'
 
 // Módulo Obras
 import ObrasLayout from './components/ObrasLayout'
@@ -244,6 +246,8 @@ export default function App() {
               <Route path="/controladoria/dre"          element={<DRE />} />
               <Route path="/controladoria/kpis"         element={<KPIs />} />
               <Route path="/controladoria/cenarios"     element={<Cenarios />} />
+              <Route path="/controladoria/plano-orcamentario" element={<PlanoOrcamentario />} />
+              <Route path="/controladoria/controle-orcamentario" element={<ControleOrcamentario />} />
             </Route>
           </Route>
 

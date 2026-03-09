@@ -2,7 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../services/supabase'
 import type {
   PMOPortfolio, PMOTAP, PMOEAP, PMOTarefa,
-  PMOMedicaoResumo, PMOMedicaoPeriodo, PMOMedicaoItem,
+  PMOMedicaoResumo, PMOMedicaoPeriodo, PMOMedicaoItem, PMOMedicaoItemPeriodo,
   PMOHistograma, PMOFluxoOS, PMOStatusReport,
   PMOMulta, PMOReuniao, PMOMudanca, PMOIndicadoresSnapshot,
 } from '../types/pmo'
@@ -237,6 +237,24 @@ export function useMedicaoItens(portfolioId: string | undefined) {
         .order('numero_medicao')
       if (error) return []
       return (data ?? []) as PMOMedicaoItem[]
+    },
+  })
+}
+
+// ── Medicao Item Periodos ────────────────────────────────────────────────────
+
+export function useMedicaoItemPeriodos(medicaoItemId: string | undefined) {
+  return useQuery<PMOMedicaoItemPeriodo[]>({
+    queryKey: ['pmo-medicao-item-periodos', medicaoItemId],
+    enabled: !!medicaoItemId,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('pmo_medicao_item_periodo')
+        .select('*')
+        .eq('medicao_item_id', medicaoItemId!)
+        .order('periodo')
+      if (error) return []
+      return (data ?? []) as PMOMedicaoItemPeriodo[]
     },
   })
 }

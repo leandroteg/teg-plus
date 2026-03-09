@@ -1,7 +1,7 @@
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeft, BarChart3, TrendingUp, TrendingDown, DollarSign } from 'lucide-react'
+import { ArrowLeft, BarChart3, TrendingUp, TrendingDown, DollarSign, CalendarDays } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
-import { useMedicaoResumo, useMedicaoItens, usePortfolio } from '../../hooks/usePMO'
+import { useMedicaoResumo, useMedicaoItens, useMedicaoPeriodos, usePortfolio } from '../../hooks/usePMO'
 
 const fmt = (v: number) =>
   v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 2 })
@@ -16,8 +16,9 @@ export default function Medicoes() {
   const { data: portfolio } = usePortfolio(portfolioId)
   const { data: resumo, isLoading: loadingResumo } = useMedicaoResumo(portfolioId)
   const { data: itens, isLoading: loadingItens } = useMedicaoItens(portfolioId)
+  const { data: periodos, isLoading: loadingPeriodos } = useMedicaoPeriodos(resumo?.id)
 
-  const isLoading = loadingResumo || loadingItens
+  const isLoading = loadingResumo || loadingItens || loadingPeriodos
 
   if (isLoading) {
     return (
@@ -69,6 +70,78 @@ export default function Medicoes() {
           <p className={`text-sm ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>
             Nenhum resumo de medicao disponivel
           </p>
+        </div>
+      )}
+
+      {/* Periodos */}
+      {(periodos ?? []).length > 0 && (
+        <div className={`rounded-2xl border overflow-hidden ${
+          isLight ? 'bg-white border-slate-200 shadow-sm' : 'bg-white/[0.03] border-white/[0.06]'
+        }`}>
+          <div className={`px-4 py-3 border-b flex items-center gap-2 ${isLight ? 'border-slate-100' : 'border-white/[0.04]'}`}>
+            <CalendarDays size={14} className="text-blue-500" />
+            <h2 className={`text-sm font-bold ${isLight ? 'text-slate-800' : 'text-white'}`}>
+              Periodos de Medicao ({periodos!.length})
+            </h2>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className={isLight ? 'bg-slate-50 text-slate-600' : 'bg-white/[0.02] text-slate-400'}>
+                  <th className="text-left font-semibold px-4 py-3">Periodo</th>
+                  <th className="text-right font-semibold px-4 py-3">Previsto</th>
+                  <th className="text-right font-semibold px-4 py-3">Realizado</th>
+                  <th className="text-right font-semibold px-4 py-3">Delta</th>
+                  <th className="text-left font-semibold px-4 py-3 w-32">Variacao</th>
+                </tr>
+              </thead>
+              <tbody>
+                {periodos!.map(p => {
+                  const deltaPct = p.valor_previsto > 0 ? ((p.valor_realizado - p.valor_previsto) / p.valor_previsto) * 100 : 0
+                  const isPositive = p.delta >= 0
+                  return (
+                    <tr key={p.id} className={`border-t transition-colors ${
+                      isLight ? 'border-slate-100 hover:bg-slate-50' : 'border-white/[0.04] hover:bg-white/[0.02]'
+                    }`}>
+                      <td className={`px-4 py-3 font-medium ${isLight ? 'text-slate-800' : 'text-white'}`}>
+                        {p.periodo}
+                      </td>
+                      <td className={`px-4 py-3 text-right ${isLight ? 'text-slate-600' : 'text-slate-300'}`}>
+                        {fmt(p.valor_previsto)}
+                      </td>
+                      <td className={`px-4 py-3 text-right font-semibold ${isLight ? 'text-slate-800' : 'text-white'}`}>
+                        {fmt(p.valor_realizado)}
+                      </td>
+                      <td className={`px-4 py-3 text-right font-semibold ${
+                        isPositive
+                          ? (isLight ? 'text-emerald-600' : 'text-emerald-400')
+                          : (isLight ? 'text-red-600' : 'text-red-400')
+                      }`}>
+                        {isPositive ? '+' : ''}{fmt(p.delta)}
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-2">
+                          <div className={`flex-1 h-1.5 rounded-full overflow-hidden ${isLight ? 'bg-slate-100' : 'bg-white/[0.06]'}`}>
+                            <div
+                              className={`h-full rounded-full transition-all ${
+                                p.valor_previsto > 0 && p.valor_realizado >= p.valor_previsto
+                                  ? 'bg-emerald-500'
+                                  : 'bg-amber-500'
+                              }`}
+                              style={{ width: `${Math.min(p.valor_previsto > 0 ? (p.valor_realizado / p.valor_previsto) * 100 : 0, 100)}%` }}
+                            />
+                          </div>
+                          <span className={`text-[10px] font-semibold w-12 text-right ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>
+                            {deltaPct > 0 ? '+' : ''}{deltaPct.toFixed(1)}%
+                          </span>
+                        </div>
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
 

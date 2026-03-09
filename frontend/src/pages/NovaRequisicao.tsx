@@ -182,10 +182,40 @@ export default function NovaRequisicao() {
         solicitante_nome: solicitante,
         arquivo: arquivoPayload,
       })
-      setItens(result.itens.length > 0 ? result.itens : [emptyItem()])
-      if (result.obra_sugerida)           setObraNome(result.obra_sugerida)
-      if (result.urgencia_sugerida)       setUrgencia(result.urgencia_sugerida)
-      if (result.justificativa_sugerida)  setJustificativa(result.justificativa_sugerida)
+
+      // Sanitize items: ensure correct types and non-empty descriptions
+      const sanitizedItens = (result.itens ?? [])
+        .map(item => ({
+          descricao: String(item.descricao ?? '').trim(),
+          quantidade: typeof item.quantidade === 'number' ? item.quantidade : parseFloat(String(item.quantidade)) || 1,
+          unidade: String(item.unidade || 'un').toLowerCase(),
+          valor_unitario_estimado: typeof item.valor_unitario_estimado === 'number'
+            ? item.valor_unitario_estimado
+            : parseFloat(String(item.valor_unitario_estimado)) || 0,
+        }))
+        .filter(item => item.descricao.length > 0)
+
+      setItens(sanitizedItens.length > 0 ? sanitizedItens : [emptyItem()])
+
+      // Match obra_sugerida against OBRAS list (accent-insensitive)
+      if (result.obra_sugerida) {
+        const sugerida = result.obra_sugerida.trim()
+        const normalizeStr = (s: string) => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
+        const obraMatch = OBRAS.find(o =>
+          o.nome === sugerida ||
+          normalizeStr(o.nome) === normalizeStr(sugerida) ||
+          normalizeStr(o.nome).includes(normalizeStr(sugerida)) ||
+          normalizeStr(sugerida).includes(normalizeStr(o.nome))
+        )
+        if (obraMatch) setObraNome(obraMatch.nome)
+      }
+
+      // Validate urgencia before setting
+      if (result.urgencia_sugerida && ['normal', 'urgente', 'critica'].includes(result.urgencia_sugerida)) {
+        setUrgencia(result.urgencia_sugerida)
+      }
+
+      if (result.justificativa_sugerida)  setJustificativa(String(result.justificativa_sugerida))
       if (result.comprador_sugerido)      setCompradorSugerido(result.comprador_sugerido)
       if (result.categoria_sugerida) {
         const catEncontrada = categorias.find(c =>
@@ -194,7 +224,7 @@ export default function NovaRequisicao() {
         )
         if (catEncontrada) setCategoria(catEncontrada)
       }
-      setConfianca(result.confianca)
+      setConfianca(typeof result.confianca === 'number' ? result.confianca : 0.5)
       if (!descricao.trim()) setDescricao(textoAi || `Requisição processada via IA (${selectedFile?.name ?? ''})`)
       setStep(2)
     } catch { /* handled by aiParse.isError */ }
@@ -203,40 +233,31 @@ export default function NovaRequisicao() {
   const updateItem = (idx: number, field: keyof RequisicaoItem, value: string | number) =>
     setItens(prev => prev.map((item, i) => i === idx ? { ...item, [field]: value } : item))
 
+  const [submitting, setSubmitting] = useState(false)
+
   const submit = async () => {
     setSubmitError(null)
-    let timeoutHandle: ReturnType<typeof setTimeout>
-    const timeoutPromise = new Promise<never>((_, reject) => {
-      timeoutHandle = setTimeout(
-        () => reject(new Error('Tempo limite excedido. Verifique sua conexao e tente novamente.')),
-        20_000
-      )
-    })
+    setSubmitting(true)
     try {
-      await Promise.race([
-        mutation.mutateAsync({
-          solicitante_nome: solicitante,
-          obra_nome:        obraNome,
-          descricao,
-          justificativa,
-          urgencia,
-          categoria:        categoria?.codigo,
-          itens,
-          data_necessidade: dataNecessidade || undefined,
-          texto_original:   textoAi || undefined,
-          comprador_id:     compradorSugerido?.id,
-          ai_confianca:     confianca,
-        }),
-        timeoutPromise,
-      ])
+      await mutation.mutateAsync({
+        solicitante_nome: solicitante,
+        obra_nome:        obraNome,
+        descricao,
+        justificativa,
+        urgencia,
+        categoria:        categoria?.codigo,
+        itens,
+        data_necessidade: dataNecessidade || undefined,
+        texto_original:   textoAi || undefined,
+        comprador_id:     compradorSugerido?.id,
+        ai_confianca:     confianca,
+      })
       nav('/requisicoes')
     } catch (err) {
-      if ((err as Error)?.message?.includes('Tempo limite')) {
-        setSubmitError((err as Error).message)
-      }
-      // else: let mutation.isError handle it
+      const msg = (err as Error)?.message || 'Erro ao enviar. Tente novamente.'
+      setSubmitError(msg)
     } finally {
-      clearTimeout(timeoutHandle!)
+      setSubmitting(false)
     }
   }
 
@@ -773,16 +794,16 @@ export default function NovaRequisicao() {
         </div>
       )}
 
-      <button onClick={submit} disabled={mutation.isPending}
+      <button onClick={submit} disabled={submitting}
         className="w-full bg-teal-500 text-white rounded-2xl py-4 font-extrabold text-base flex items-center justify-center gap-2 disabled:opacity-50 shadow-xl shadow-teal-500/30 active:scale-[0.98] transition-all">
-        {mutation.isPending
+        {submitting
           ? <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
           : <><Send size={18} /> Enviar Requisição</>}
       </button>
 
-      {(mutation.isError || submitError) && (
+      {submitError && (
         <p className="text-red-500 text-sm text-center bg-red-50 rounded-xl py-2">
-          {submitError ?? 'Erro ao enviar. Tente novamente.'}
+          {submitError}
         </p>
       )}
     </div>

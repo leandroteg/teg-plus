@@ -35,6 +35,9 @@ export interface CtrlOrcamentoLinha {
   valor_planejado: number
   valor_realizado: number
   observacao?: string
+  premissa?: string
+  desvio_explicacao?: string
+  plano_acao?: string
   created_at: string
 }
 
@@ -102,4 +105,20 @@ export interface CtrlAlertaDesvio {
   resolvido: boolean
   created_at: string
   obra?: { id: string; nome: string }
+}
+
+export interface CtrlIndicadorProducao {
+  id: string
+  obra_id?: string
+  mes: string
+  tipo_indicador: string
+  categoria: string
+  label: string
+  valor_unitario: number
+  volume: number
+  custo_total: number
+  pct_faturamento: number
+  unidade?: string
+  detalhe?: string
+  created_at: string
 }

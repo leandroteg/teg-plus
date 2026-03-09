@@ -71,6 +71,17 @@ function parseLocal(texto: string): AiParseResult {
     if (lower.includes(key)) { obra_sugerida = val; break }
   }
 
+  // Normalize accents to match OBRAS constant in NovaRequisicao
+  const obraNormMap: Record<string, string> = {
+    'SE Tres Marias':    'SE Três Marias',
+    'SE Rio Paranaiba':  'Rio Paranaíba',
+    'Rio Paranaiba':     'Rio Paranaíba',
+    'SE Ituiutaba':      'SE Ituiutaba',
+  }
+  if (obra_sugerida && obraNormMap[obra_sugerida]) {
+    obra_sugerida = obraNormMap[obra_sugerida]
+  }
+
   let urgencia_sugerida: 'normal' | 'urgente' | 'critica' = 'normal'
   if (lower.match(/critica|emergencia|imediato/)) urgencia_sugerida = 'critica'
   else if (lower.match(/urgente|urgencia|rapido/)) urgencia_sugerida = 'urgente'

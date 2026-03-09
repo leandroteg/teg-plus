@@ -562,7 +562,7 @@ export default function ContasPagar() {
   const [busca, setBusca] = useState('')
   const [pgtoModal, setPgtoModal] = useState<ContaPagar | null>(null)
   const [toast, setToast] = useState<{ type: 'success' | 'error'; msg: string } | null>(null)
-  const { data: contas = [], isLoading } = useContasPagar(
+  const { data: contas = [], isLoading, error: cpError } = useContasPagar(
     statusFilter ? { status: statusFilter } : undefined
   )
   const aprovarMutation = useAprovarPagamento()
@@ -606,6 +606,14 @@ export default function ContasPagar() {
         }`}>
           {toast.type === 'success' ? <CheckCircle2 size={16} /> : <XCircle size={16} />}
           {toast.msg}
+        </div>
+      )}
+
+      {/* ── Error ──────────────────────────────────────────── */}
+      {cpError && (
+        <div className="bg-red-50 border border-red-200 rounded-2xl p-4 text-center">
+          <p className="text-red-600 text-sm font-semibold">Erro ao carregar pagamentos</p>
+          <p className="text-red-400 text-xs mt-1">{(cpError as any)?.message ?? 'Erro desconhecido'}</p>
         </div>
       )}
 

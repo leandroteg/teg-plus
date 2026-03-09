@@ -14,7 +14,6 @@ export function usePedidos(status?: string) {
           numero_pedido, fornecedor_nome, valor_total, status,
           data_pedido, data_prevista_entrega, data_entrega_real,
           nf_numero, observacoes, created_at,
-          qtd_itens_total, qtd_itens_recebidos,
           status_pagamento, liberado_pagamento_em, liberado_pagamento_por, pago_em,
           requisicao:cmp_requisicoes(numero, descricao, obra_nome, categoria),
           comprador:cmp_compradores(nome)

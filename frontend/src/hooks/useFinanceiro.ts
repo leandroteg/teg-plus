@@ -47,9 +47,10 @@ export function useContasPagar(filters?: { status?: string; centro_custo?: strin
       if (filters?.status) q = q.eq('status', filters.status)
       if (filters?.centro_custo) q = q.eq('centro_custo', filters.centro_custo)
       const { data, error } = await q
-      if (error) return []
+      if (error) throw error
       return (data ?? []) as ContaPagar[]
     },
+    retry: false,
   })
 }
 
@@ -62,9 +63,10 @@ export function useContasReceber() {
         .from('fin_contas_receber')
         .select('*')
         .order('data_vencimento', { ascending: true })
-      if (error) return []
+      if (error) throw error
       return (data ?? []) as ContaReceber[]
     },
+    retry: false,
   })
 }
 
