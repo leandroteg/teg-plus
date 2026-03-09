@@ -299,6 +299,58 @@ export type TipoMinuta = 'modelo' | 'rascunho' | 'revisado' | 'final' | 'assinad
 export type StatusMinuta = 'rascunho' | 'em_revisao' | 'aprovado' | 'obsoleto'
 export type StatusResumo = 'rascunho' | 'enviado' | 'aprovado' | 'rejeitado'
 
+export interface MinutaAiRisco {
+  titulo: string
+  severidade: 'baixo' | 'medio' | 'alto' | 'critico'
+  descricao: string
+  clausula_ref?: string
+  sugestao_mitigacao?: string
+}
+
+export interface MinutaAiSugestao {
+  titulo: string
+  prioridade: 'baixa' | 'media' | 'alta'
+  descricao: string
+  texto_sugerido?: string
+}
+
+export interface MinutaAiClausula {
+  nome: string
+  status: 'ok' | 'atencao' | 'risco' | 'ausente'
+  comentario: string
+}
+
+export interface MinutaAiConformidade {
+  clausulas_obrigatorias?: boolean
+  penalidades_adequadas?: boolean
+  prazos_razoaveis?: boolean
+  garantias_previstas?: boolean
+  seguro_previsto?: boolean
+  ssma_previsto?: boolean
+  anticorrupcao_previsto?: boolean
+  reajuste_definido?: boolean
+}
+
+export interface MinutaAiAnalise {
+  score: number
+  resumo?: string
+  riscos: MinutaAiRisco[]
+  sugestoes: MinutaAiSugestao[]
+  clausulas_analisadas?: MinutaAiClausula[]
+  conformidade?: MinutaAiConformidade
+}
+
+export interface ConfigAnalise {
+  id: string
+  chave: string
+  valor: string
+  descricao?: string
+  tipo: 'texto' | 'numero' | 'lista' | 'booleano'
+  categoria: 'geral' | 'clausulas' | 'limites' | 'penalidades' | 'compliance'
+  ativo: boolean
+  updated_at: string
+}
+
 export interface Solicitacao {
   id: string
   numero: string
@@ -367,7 +419,7 @@ export interface Minuta {
   onedrive_id?: string
   onedrive_url?: string
   sharepoint_path?: string
-  ai_analise?: { riscos: unknown[]; sugestoes: unknown[]; score: number }
+  ai_analise?: MinutaAiAnalise
   ai_analisado_em?: string
   status: StatusMinuta
   created_at: string

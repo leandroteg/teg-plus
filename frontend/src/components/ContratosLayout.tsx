@@ -9,7 +9,7 @@ const NAV = [
   { to: '/contratos/lista',        icon: FileText,         label: 'Contratos'       },
   { to: '/contratos/novo',         icon: FilePlus,         label: 'Novo'            },
   { to: '/contratos/solicitacoes', icon: ClipboardList,    label: 'Solicitacoes'    },
-  { to: '/contratos/previsao',     icon: Wallet,           label: 'Prev. Financeira'},
+  { to: '/contratos/previsao',     icon: Wallet,           label: 'Provisionado'   },
   { to: '/contratos/aditivos',     icon: FileSignature,    label: 'Aditivos'        },
   { to: '/contratos/reajustes',    icon: TrendingUp,       label: 'Reajustes'       },
 ]

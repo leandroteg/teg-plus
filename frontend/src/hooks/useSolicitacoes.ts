@@ -10,6 +10,8 @@ import type {
   ResumoExecutivo,
   NovaSolicitacaoPayload,
   EtapaSolicitacao,
+  ConfigAnalise,
+  MinutaAiAnalise,
 } from '../types/contratos'
 
 // ── Lista de Solicitacoes ────────────────────────────────────────────────────
@@ -382,6 +384,82 @@ export function useAtualizarResumo() {
     },
     onSuccess: (_d, vars) => {
       qc.invalidateQueries({ queryKey: ['con-resumo-executivo', vars.solicitacao_id] })
+    },
+  })
+}
+
+// ── Config Analise IA ─────────────────────────────────────────────────────
+
+const N8N_BASE = import.meta.env.VITE_N8N_WEBHOOK_URL || 'https://teg-agents-n8n.nmmcas.easypanel.host/webhook'
+
+export function useConfigAnalise() {
+  return useQuery<ConfigAnalise[]>({
+    queryKey: ['con-config-analise'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('con_config_analise')
+        .select('*')
+        .order('categoria')
+        .order('chave')
+      if (error) return []
+      return (data ?? []) as ConfigAnalise[]
+    },
+  })
+}
+
+export function useAtualizarConfigAnalise() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (payload: { id: string; valor: string; ativo?: boolean }) => {
+      const { id, ...rest } = payload
+      const { data, error } = await supabase
+        .from('con_config_analise')
+        .update({ ...rest, updated_at: new Date().toISOString() })
+        .eq('id', id)
+        .select('*')
+        .single()
+      if (error) throw error
+      return data as ConfigAnalise
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['con-config-analise'] })
+    },
+  })
+}
+
+export function useAnalisarMinuta() {
+  const qc = useQueryClient()
+  return useMutation<
+    { success: boolean; analise: MinutaAiAnalise },
+    Error,
+    {
+      minuta_id: string
+      solicitacao_id: string
+      texto_minuta?: string
+      descricao_minuta?: string
+      contexto: {
+        objeto?: string
+        contraparte?: string
+        valor?: number
+        tipo_contrato?: string
+        data_inicio?: string
+        data_fim?: string
+        obra?: string
+      }
+      regras: ConfigAnalise[]
+    }
+  >({
+    mutationFn: async (payload) => {
+      const res = await fetch(`${N8N_BASE}/contratos/analisar-minuta`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      })
+      if (!res.ok) throw new Error(`Erro na analise: ${res.status}`)
+      return res.json()
+    },
+    onSuccess: (_d, vars) => {
+      qc.invalidateQueries({ queryKey: ['con-minutas', vars.solicitacao_id] })
     },
   })
 }

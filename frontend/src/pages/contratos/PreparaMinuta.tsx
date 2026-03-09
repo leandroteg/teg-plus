@@ -3,14 +3,20 @@ import { useParams, useNavigate } from 'react-router-dom'
 import {
   ArrowLeft, FileText, Plus, Upload, ExternalLink, Check,
   ChevronRight, Clock, Tag, Building2, DollarSign, Calendar,
+  Sparkles, ShieldAlert, Lightbulb, CheckCircle2, XCircle,
+  AlertTriangle, ChevronDown, ChevronUp, Settings2, ToggleLeft, ToggleRight,
+  Loader2, Brain, Scale, FileSearch,
 } from 'lucide-react'
 import {
   useSolicitacao,
   useMinutas,
   useCriarMinuta,
   useAvancarEtapa,
+  useAnalisarMinuta,
+  useConfigAnalise,
+  useAtualizarConfigAnalise,
 } from '../../hooks/useSolicitacoes'
-import type { Minuta, TipoMinuta, StatusMinuta } from '../../types/contratos'
+import type { Minuta, TipoMinuta, StatusMinuta, MinutaAiAnalise, ConfigAnalise } from '../../types/contratos'
 
 // ── Formatters ──────────────────────────────────────────────────────────────────
 
@@ -79,7 +85,306 @@ function StatusBadge({ status }: { status: string }) {
   )
 }
 
-function MinutaCard({ minuta }: { minuta: Minuta }) {
+// ── Score helpers ─────────────────────────────────────────────────────────────
+
+function scoreColor(score: number) {
+  if (score >= 80) return { bg: 'bg-emerald-500', text: 'text-emerald-700', ring: 'ring-emerald-200', light: 'bg-emerald-50' }
+  if (score >= 60) return { bg: 'bg-amber-500', text: 'text-amber-700', ring: 'ring-amber-200', light: 'bg-amber-50' }
+  return { bg: 'bg-red-500', text: 'text-red-700', ring: 'ring-red-200', light: 'bg-red-50' }
+}
+
+const SEV_CONFIG: Record<string, { label: string; bg: string; text: string; icon: typeof ShieldAlert }> = {
+  critico: { label: 'Critico', bg: 'bg-red-100', text: 'text-red-700', icon: XCircle },
+  alto:    { label: 'Alto',    bg: 'bg-orange-100', text: 'text-orange-700', icon: AlertTriangle },
+  medio:   { label: 'Medio',   bg: 'bg-amber-100', text: 'text-amber-700', icon: AlertTriangle },
+  baixo:   { label: 'Baixo',   bg: 'bg-slate-100', text: 'text-slate-600', icon: ShieldAlert },
+}
+
+const PRIO_CONFIG: Record<string, { label: string; bg: string; text: string }> = {
+  alta:  { label: 'Alta',  bg: 'bg-red-50',   text: 'text-red-700' },
+  media: { label: 'Media', bg: 'bg-amber-50', text: 'text-amber-700' },
+  baixa: { label: 'Baixa', bg: 'bg-slate-50', text: 'text-slate-600' },
+}
+
+const CL_STATUS: Record<string, { label: string; bg: string; text: string; icon: typeof CheckCircle2 }> = {
+  ok:      { label: 'OK',      bg: 'bg-emerald-50', text: 'text-emerald-700', icon: CheckCircle2 },
+  atencao: { label: 'Atencao', bg: 'bg-amber-50',   text: 'text-amber-700',   icon: AlertTriangle },
+  risco:   { label: 'Risco',   bg: 'bg-red-50',     text: 'text-red-700',     icon: XCircle },
+  ausente: { label: 'Ausente', bg: 'bg-slate-100',  text: 'text-slate-500',   icon: XCircle },
+}
+
+// ── AI Analysis Panel ───────────────────────────────────────────────────────
+
+function AnalisePanel({ analise }: { analise: MinutaAiAnalise }) {
+  const [tab, setTab] = useState<'riscos' | 'sugestoes' | 'clausulas' | 'conformidade'>('riscos')
+  const sc = scoreColor(analise.score)
+
+  return (
+    <div className="mt-3 rounded-2xl border border-indigo-100 bg-gradient-to-br from-indigo-50/50 to-white overflow-hidden">
+      {/* Score header */}
+      <div className="px-4 py-3 flex items-center gap-3 border-b border-indigo-100">
+        <div className={`w-11 h-11 rounded-xl ${sc.light} ring-2 ${sc.ring} flex items-center justify-center`}>
+          <span className={`text-base font-extrabold ${sc.text}`}>{analise.score}</span>
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-1.5">
+            <Brain size={12} className="text-indigo-500" />
+            <p className="text-xs font-extrabold text-slate-800">Analise por IA</p>
+          </div>
+          {analise.resumo && (
+            <p className="text-[11px] text-slate-500 mt-0.5 line-clamp-2 leading-snug">{analise.resumo}</p>
+          )}
+        </div>
+        <div className="flex flex-col items-end gap-0.5 shrink-0">
+          <span className="text-[10px] font-bold text-red-600 bg-red-50 rounded-full px-2 py-0.5">
+            {analise.riscos?.length ?? 0} riscos
+          </span>
+          <span className="text-[10px] font-bold text-amber-600 bg-amber-50 rounded-full px-2 py-0.5">
+            {analise.sugestoes?.length ?? 0} sugestoes
+          </span>
+        </div>
+      </div>
+
+      {/* Tabs */}
+      <div className="flex border-b border-indigo-100 px-2">
+        {([
+          { key: 'riscos' as const, label: 'Riscos', icon: ShieldAlert, count: analise.riscos?.length },
+          { key: 'sugestoes' as const, label: 'Sugestoes', icon: Lightbulb, count: analise.sugestoes?.length },
+          { key: 'clausulas' as const, label: 'Clausulas', icon: FileSearch, count: analise.clausulas_analisadas?.length },
+          { key: 'conformidade' as const, label: 'Conformidade', icon: Scale, count: undefined as number | undefined },
+        ]).map(t => (
+          <button
+            key={t.key}
+            onClick={() => setTab(t.key)}
+            className={`flex items-center gap-1 px-3 py-2 text-[10px] font-bold border-b-2 transition-all ${
+              tab === t.key
+                ? 'border-indigo-500 text-indigo-700'
+                : 'border-transparent text-slate-400 hover:text-slate-600'
+            }`}
+          >
+            <t.icon size={10} />
+            {t.label}
+            {t.count != null && (
+              <span className="bg-slate-100 rounded-full px-1.5 text-[9px]">{t.count}</span>
+            )}
+          </button>
+        ))}
+      </div>
+
+      {/* Tab content */}
+      <div className="p-3 max-h-80 overflow-y-auto">
+        {tab === 'riscos' && (
+          <div className="space-y-2">
+            {(analise.riscos ?? []).length === 0 ? (
+              <p className="text-[11px] text-slate-400 text-center py-4">Nenhum risco identificado</p>
+            ) : analise.riscos.map((r, i) => {
+              const sev = SEV_CONFIG[r.severidade] ?? SEV_CONFIG.baixo
+              const Icon = sev.icon
+              return (
+                <div key={i} className={`rounded-xl ${sev.bg} p-3`}>
+                  <div className="flex items-start gap-2">
+                    <Icon size={13} className={sev.text} />
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-1.5">
+                        <p className={`text-[11px] font-bold ${sev.text}`}>{r.titulo}</p>
+                        <span className={`text-[9px] font-semibold ${sev.bg} ${sev.text} border rounded-full px-1.5 py-0.5`}>
+                          {sev.label}
+                        </span>
+                      </div>
+                      <p className="text-[10px] text-slate-600 mt-1 leading-snug">{r.descricao}</p>
+                      {r.clausula_ref && (
+                        <p className="text-[9px] text-slate-400 mt-1 font-mono">Ref: {r.clausula_ref}</p>
+                      )}
+                      {r.sugestao_mitigacao && (
+                        <p className="text-[10px] text-emerald-700 mt-1.5 bg-emerald-50 rounded-lg px-2 py-1">
+                          Mitigacao: {r.sugestao_mitigacao}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        )}
+
+        {tab === 'sugestoes' && (
+          <div className="space-y-2">
+            {(analise.sugestoes ?? []).length === 0 ? (
+              <p className="text-[11px] text-slate-400 text-center py-4">Nenhuma sugestao</p>
+            ) : analise.sugestoes.map((s, i) => {
+              const pr = PRIO_CONFIG[s.prioridade] ?? PRIO_CONFIG.baixa
+              return (
+                <div key={i} className={`rounded-xl ${pr.bg} p-3`}>
+                  <div className="flex items-center gap-1.5">
+                    <Lightbulb size={11} className={pr.text} />
+                    <p className={`text-[11px] font-bold ${pr.text}`}>{s.titulo}</p>
+                    <span className={`text-[9px] font-semibold rounded-full px-1.5 py-0.5 ${pr.bg} ${pr.text} border`}>
+                      {pr.label}
+                    </span>
+                  </div>
+                  <p className="text-[10px] text-slate-600 mt-1 leading-snug">{s.descricao}</p>
+                  {s.texto_sugerido && (
+                    <div className="mt-2 bg-white/60 rounded-lg px-2.5 py-1.5 border border-slate-200">
+                      <p className="text-[9px] text-slate-400 font-semibold uppercase mb-0.5">Texto sugerido</p>
+                      <p className="text-[10px] text-slate-700 italic leading-snug">{s.texto_sugerido}</p>
+                    </div>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+        )}
+
+        {tab === 'clausulas' && (
+          <div className="space-y-1.5">
+            {(analise.clausulas_analisadas ?? []).length === 0 ? (
+              <p className="text-[11px] text-slate-400 text-center py-4">Nenhuma clausula analisada</p>
+            ) : analise.clausulas_analisadas!.map((c, i) => {
+              const st = CL_STATUS[c.status] ?? CL_STATUS.ok
+              const Icon = st.icon
+              return (
+                <div key={i} className={`flex items-start gap-2 rounded-xl ${st.bg} px-3 py-2`}>
+                  <Icon size={12} className={`${st.text} mt-0.5 shrink-0`} />
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-1.5">
+                      <p className={`text-[11px] font-bold ${st.text}`}>{c.nome}</p>
+                      <span className={`text-[9px] font-semibold rounded-full px-1.5 py-0.5 ${st.bg} ${st.text} border`}>
+                        {st.label}
+                      </span>
+                    </div>
+                    <p className="text-[10px] text-slate-600 mt-0.5 leading-snug">{c.comentario}</p>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        )}
+
+        {tab === 'conformidade' && (
+          <div className="grid grid-cols-2 gap-2">
+            {analise.conformidade ? Object.entries(analise.conformidade).map(([key, val]) => {
+              const label = key.replace(/_/g, ' ').replace(/^\w/, c => c.toUpperCase())
+              return (
+                <div key={key} className={`flex items-center gap-2 rounded-xl px-3 py-2 ${
+                  val ? 'bg-emerald-50' : 'bg-red-50'
+                }`}>
+                  {val
+                    ? <CheckCircle2 size={13} className="text-emerald-600 shrink-0" />
+                    : <XCircle size={13} className="text-red-500 shrink-0" />}
+                  <p className={`text-[10px] font-semibold ${val ? 'text-emerald-700' : 'text-red-700'}`}>
+                    {label}
+                  </p>
+                </div>
+              )
+            }) : (
+              <p className="text-[11px] text-slate-400 col-span-2 text-center py-4">Sem dados de conformidade</p>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// ── Config Rules Panel ──────────────────────────────────────────────────────
+
+function RegrasConfig({ regras, onUpdate }: {
+  regras: ConfigAnalise[]
+  onUpdate: (id: string, valor: string, ativo?: boolean) => void
+}) {
+  const [open, setOpen] = useState(false)
+  const categorias = ['geral', 'clausulas', 'limites', 'penalidades', 'compliance'] as const
+  const CATEG_LABELS: Record<string, string> = {
+    geral: 'Geral', clausulas: 'Clausulas', limites: 'Limites', penalidades: 'Penalidades', compliance: 'Compliance',
+  }
+
+  return (
+    <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+      <button
+        onClick={() => setOpen(v => !v)}
+        className="w-full flex items-center justify-between px-4 py-3 hover:bg-slate-50 transition-colors"
+      >
+        <div className="flex items-center gap-2">
+          <Settings2 size={13} className="text-indigo-500" />
+          <span className="text-xs font-extrabold text-slate-800">Regras de Analise IA</span>
+          <span className="text-[10px] text-slate-400 font-medium">
+            ({regras.filter(r => r.ativo).length} ativas)
+          </span>
+        </div>
+        {open ? <ChevronUp size={14} className="text-slate-400" /> : <ChevronDown size={14} className="text-slate-400" />}
+      </button>
+
+      {open && (
+        <div className="border-t border-slate-100 px-4 py-3 space-y-4 max-h-96 overflow-y-auto">
+          {categorias.map(cat => {
+            const items = regras.filter(r => r.categoria === cat)
+            if (items.length === 0) return null
+            return (
+              <div key={cat}>
+                <p className="text-[10px] font-extrabold text-slate-500 uppercase tracking-wider mb-2">
+                  {CATEG_LABELS[cat]}
+                </p>
+                <div className="space-y-2">
+                  {items.map(r => (
+                    <div key={r.id} className="flex items-start gap-2 rounded-xl bg-slate-50 px-3 py-2">
+                      <button
+                        onClick={() => onUpdate(r.id, r.valor, !r.ativo)}
+                        className="mt-0.5 shrink-0"
+                      >
+                        {r.ativo
+                          ? <ToggleRight size={18} className="text-indigo-500" />
+                          : <ToggleLeft size={18} className="text-slate-300" />}
+                      </button>
+                      <div className="flex-1 min-w-0">
+                        <p className={`text-[11px] font-bold ${r.ativo ? 'text-slate-700' : 'text-slate-400'}`}>
+                          {r.descricao || r.chave}
+                        </p>
+                        <div className="flex items-center gap-2 mt-1">
+                          {r.tipo === 'booleano' ? (
+                            <select
+                              value={r.valor}
+                              onChange={e => onUpdate(r.id, e.target.value)}
+                              disabled={!r.ativo}
+                              className="text-[10px] px-2 py-1 rounded-lg border border-slate-200 bg-white text-slate-600 disabled:opacity-50"
+                            >
+                              <option value="true">Sim</option>
+                              <option value="false">Nao</option>
+                            </select>
+                          ) : (
+                            <input
+                              value={r.valor}
+                              onChange={e => onUpdate(r.id, e.target.value)}
+                              disabled={!r.ativo}
+                              className="text-[10px] px-2 py-1 rounded-lg border border-slate-200 bg-white text-slate-600
+                                w-full max-w-[200px] disabled:opacity-50"
+                            />
+                          )}
+                          <span className="text-[9px] text-slate-400 font-mono shrink-0">{r.chave}</span>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ── MinutaCard ───────────────────────────────────────────────────────────────
+
+function MinutaCard({ minuta, onAnalisar, analisando }: {
+  minuta: Minuta
+  onAnalisar: (m: Minuta) => void
+  analisando: boolean
+}) {
+  const [showAnalise, setShowAnalise] = useState(false)
+  const hasAnalise = minuta.ai_analise && typeof minuta.ai_analise.score === 'number'
+
   return (
     <div className="bg-white rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition-all p-4">
       <div className="flex items-start gap-3">
@@ -120,24 +425,47 @@ function MinutaCard({ minuta }: { minuta: Minuta }) {
             <p className="text-[10px] text-slate-400">{fmtDataHora(minuta.created_at)}</p>
           </div>
 
-          {/* AI Analysis indicator */}
-          {minuta.ai_analise && typeof minuta.ai_analise.score === 'number' && (
-            <div className="mt-3 bg-slate-50 rounded-xl p-2.5 flex items-center gap-2">
-              <div className={`w-7 h-7 rounded-lg flex items-center justify-center text-[10px] font-extrabold ${
-                minuta.ai_analise.score >= 80 ? 'bg-emerald-100 text-emerald-700'
-                : minuta.ai_analise.score >= 50 ? 'bg-amber-100 text-amber-700'
-                : 'bg-red-100 text-red-700'
-              }`}>
-                {minuta.ai_analise.score}
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-[10px] font-semibold text-slate-600">Analise AI</p>
-                <p className="text-[9px] text-slate-400">
-                  {Array.isArray(minuta.ai_analise.riscos) ? minuta.ai_analise.riscos.length : 0} riscos,{' '}
-                  {Array.isArray(minuta.ai_analise.sugestoes) ? minuta.ai_analise.sugestoes.length : 0} sugestoes
-                </p>
-              </div>
-            </div>
+          {/* AI Action row */}
+          <div className="flex items-center gap-2 mt-3">
+            <button
+              onClick={() => onAnalisar(minuta)}
+              disabled={analisando}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[10px] font-bold
+                bg-gradient-to-r from-violet-600 to-indigo-600 text-white shadow-sm
+                hover:from-violet-700 hover:to-indigo-700 transition-all disabled:opacity-50"
+            >
+              {analisando
+                ? <Loader2 size={11} className="animate-spin" />
+                : <Sparkles size={11} />}
+              {analisando ? 'Analisando...' : hasAnalise ? 'Re-analisar com IA' : 'Analisar com IA'}
+            </button>
+
+            {hasAnalise && (
+              <button
+                onClick={() => setShowAnalise(v => !v)}
+                className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-[10px] font-bold
+                  bg-indigo-50 text-indigo-600 hover:bg-indigo-100 transition-all"
+              >
+                {showAnalise ? <ChevronUp size={10} /> : <ChevronDown size={10} />}
+                {showAnalise ? 'Ocultar' : 'Ver Analise'}
+                <span className={`ml-1 w-5 h-5 rounded-md flex items-center justify-center text-[9px] font-extrabold ${
+                  scoreColor(minuta.ai_analise!.score).light
+                } ${scoreColor(minuta.ai_analise!.score).text}`}>
+                  {minuta.ai_analise!.score}
+                </span>
+              </button>
+            )}
+
+            {minuta.ai_analisado_em && (
+              <p className="text-[9px] text-slate-400 ml-auto">
+                Analisado: {fmtDataHora(minuta.ai_analisado_em)}
+              </p>
+            )}
+          </div>
+
+          {/* Expanded analysis */}
+          {showAnalise && hasAnalise && (
+            <AnalisePanel analise={minuta.ai_analise!} />
           )}
         </div>
       </div>
@@ -153,8 +481,11 @@ export default function PreparaMinuta() {
 
   const { data: solicitacao, isLoading: loadingSol } = useSolicitacao(id)
   const { data: minutas = [], isLoading: loadingMinutas } = useMinutas(id)
+  const { data: regras = [] } = useConfigAnalise()
   const criarMinuta = useCriarMinuta()
   const avancarEtapa = useAvancarEtapa()
+  const analisarMinuta = useAnalisarMinuta()
+  const atualizarConfig = useAtualizarConfigAnalise()
 
   // Form state
   const [titulo, setTitulo] = useState('')
@@ -164,6 +495,7 @@ export default function PreparaMinuta() {
   const [arquivoNome, setArquivoNome] = useState('')
   const [formError, setFormError] = useState('')
   const [showForm, setShowForm] = useState(false)
+  const [analisandoId, setAnalisandoId] = useState<string | null>(null)
 
   const isLoading = loadingSol || loadingMinutas
 
@@ -201,6 +533,37 @@ export default function PreparaMinuta() {
     } catch (e: unknown) {
       setFormError(e instanceof Error ? e.message : 'Erro ao criar minuta')
     }
+  }
+
+  const handleAnalisarMinuta = async (minuta: Minuta) => {
+    if (!solicitacao || analisandoId) return
+    setAnalisandoId(minuta.id)
+    try {
+      await analisarMinuta.mutateAsync({
+        minuta_id: minuta.id,
+        solicitacao_id: solicitacao.id,
+        texto_minuta: minuta.descricao,
+        descricao_minuta: minuta.titulo,
+        contexto: {
+          objeto: solicitacao.objeto,
+          contraparte: solicitacao.contraparte_nome,
+          valor: solicitacao.valor_estimado ?? undefined,
+          tipo_contrato: solicitacao.tipo_contrato,
+          data_inicio: solicitacao.data_inicio_prevista ?? undefined,
+          data_fim: solicitacao.data_fim_prevista ?? undefined,
+          obra: solicitacao.obra?.nome ?? undefined,
+        },
+        regras: regras.filter(r => r.ativo),
+      })
+    } catch {
+      // Mutation error is handled by TanStack Query
+    } finally {
+      setAnalisandoId(null)
+    }
+  }
+
+  const handleUpdateConfig = (ruleId: string, valor: string, ativo?: boolean) => {
+    atualizarConfig.mutate({ id: ruleId, valor, ativo })
   }
 
   const handleAvancarResumo = async () => {
@@ -475,9 +838,19 @@ export default function PreparaMinuta() {
           ) : (
             <div className="space-y-3">
               {minutas.map(m => (
-                <MinutaCard key={m.id} minuta={m} />
+                <MinutaCard
+                  key={m.id}
+                  minuta={m}
+                  onAnalisar={handleAnalisarMinuta}
+                  analisando={analisandoId === m.id}
+                />
               ))}
             </div>
+          )}
+
+          {/* Regras de Analise IA */}
+          {regras.length > 0 && (
+            <RegrasConfig regras={regras} onUpdate={handleUpdateConfig} />
           )}
         </div>
       </div>

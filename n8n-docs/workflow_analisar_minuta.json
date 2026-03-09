@@ -1,0 +1,142 @@
+{
+  "name": "Contratos - Analisar Minuta IA",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "contratos/analisar-minuta",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "webhook-trigger",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [220, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "const input = $input.first().json.body;\nconst minuta_id = input.minuta_id;\nconst contexto = input.contexto || {};\nconst regras = input.regras || [];\n\nlet regrasTexto = '';\nfor (const r of regras) {\n  if (r.ativo) regrasTexto += '- ' + r.descricao + ': ' + r.valor + '\\n';\n}\n\nconst systemPrompt = [\n  'Voce e um Analista Juridico Senior especializado em contratos de engenharia eletrica e transmissao de energia, atuando como consultor interno da TEG Uniao.',\n  '',\n  '## IDENTIDADE',\n  '- Nome: TEG+ Contract Analyzer',\n  '- Empresa: TEG Uniao Engenharia e Transmissao',\n  '- Expertise: Contratos de obra civil/eletrica, prestacao de servicos em subestacoes de transmissao, fornecimento de materiais eletricos, EPC',\n  '- Normas: NBR, NR-10, NR-35, regulamentacoes ANEEL/ONS',\n  '',\n  '## CONTEXTO DO CONTRATO',\n  '- Objeto: ' + (contexto.objeto || 'Nao informado'),\n  '- Contraparte: ' + (contexto.contraparte || 'Nao informada'),\n  '- Valor Estimado: R$ ' + (contexto.valor ? Number(contexto.valor).toLocaleString('pt-BR') : 'Nao informado'),\n  '- Tipo: ' + (contexto.tipo_contrato || 'Nao informado'),\n  '- Vigencia: ' + (contexto.data_inicio || '?') + ' a ' + (contexto.data_fim || '?'),\n  '- Obra/Local: ' + (contexto.obra || 'Nao informado'),\n  '',\n  '## REGRAS E LIMITES CONFIGURADOS',\n  regrasTexto || 'Nenhuma regra configurada',\n  '',\n  '## BOAS PRATICAS OBRIGATORIAS',\n  '1. Clausulas claras de objeto, vigencia, valor, pagamento, rescisao e foro',\n  '2. Penalidades proporcionais e reciprocas',\n  '3. Prazos de pagamento atrelados a medicoes verificaveis',\n  '4. Clausulas SSMA obrigatorias para obras',\n  '5. Garantias proporcionais ao risco (caucao, seguro-garantia ou fianca)',\n  '6. Confidencialidade e propriedade intelectual para projetos tecnicos',\n  '7. Reajuste com indice e periodicidade definidos',\n  '8. Clausula anticorrupcao e compliance obrigatoria',\n  '9. Definicao clara de responsabilidades por tributos e encargos',\n  '10. Mecanismo de resolucao de disputas (mediacao antes de arbitragem)',\n  '',\n  '## INSTRUCOES',\n  'Analise o texto da minuta contratual. Retorne EXCLUSIVAMENTE JSON valido (sem markdown, sem backticks):',\n  '{',\n  '  \"score\": <0-100>,',\n  '  \"resumo\": \"<resumo executivo 2-3 frases>\",',\n  '  \"riscos\": [{ \"titulo\": \"\", \"severidade\": \"baixo|medio|alto|critico\", \"descricao\": \"\", \"clausula_ref\": \"\", \"sugestao_mitigacao\": \"\" }],',\n  '  \"sugestoes\": [{ \"titulo\": \"\", \"prioridade\": \"baixa|media|alta\", \"descricao\": \"\", \"texto_sugerido\": \"\" }],',\n  '  \"clausulas_analisadas\": [{ \"nome\": \"\", \"status\": \"ok|atencao|risco|ausente\", \"comentario\": \"\" }],',\n  '  \"conformidade\": { \"clausulas_obrigatorias\": bool, \"penalidades_adequadas\": bool, \"prazos_razoaveis\": bool, \"garantias_previstas\": bool, \"seguro_previsto\": bool, \"ssma_previsto\": bool, \"anticorrupcao_previsto\": bool, \"reajuste_definido\": bool }',\n  '}',\n  'Se a minuta for incompleta, analise o disponivel e indique clausulas ausentes.'\n].join('\\n');\n\nconst userMessage = input.texto_minuta || input.descricao_minuta || 'Minuta nao fornecida - analisar com base no contexto disponivel';\n\nreturn { json: { minuta_id, systemPrompt, userMessage, contexto } };"
+      },
+      "id": "code-prepare",
+      "name": "Preparar Prompt",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [440, 300]
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "value": "models/gemini-1.5-pro",
+          "mode": "list",
+          "cachedResultName": "models/gemini-1.5-pro"
+        },
+        "options": {
+          "temperature": 0.2,
+          "maxOutputTokens": 4096
+        }
+      },
+      "id": "gemini-model",
+      "name": "Gemini 1.5 Pro",
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1,
+      "position": [770, 500],
+      "credentials": {
+        "googlePalmApi": {
+          "id": "HGlVWIMt9rZrgCof",
+          "name": "TEG+ - Google Gemini(PaLM) API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "prompt": "={{ $json.userMessage }}",
+        "hasOutputParser": false,
+        "messages": {
+          "messageValues": [
+            {
+              "message": "={{ $json.systemPrompt }}",
+              "type": "system"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "chain-llm",
+      "name": "Analisar Contrato",
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.4,
+      "position": [660, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "const raw = $input.first().json.text || $input.first().json.response || '';\nconst minuta_id = $('Preparar Prompt').first().json.minuta_id;\n\nlet analise;\ntry {\n  const jsonMatch = raw.match(/\\{[\\s\\S]*\\}/);\n  if (jsonMatch) {\n    analise = JSON.parse(jsonMatch[0]);\n  } else {\n    throw new Error('No JSON found');\n  }\n} catch (e) {\n  analise = {\n    score: 50,\n    resumo: 'Analise parcial - resposta nao estruturada. ' + raw.substring(0, 200),\n    riscos: [{ titulo: 'Erro na analise', severidade: 'medio', descricao: 'O modelo retornou resposta nao estruturada. Tente novamente.', clausula_ref: '', sugestao_mitigacao: 'Reprocessar' }],\n    sugestoes: [],\n    clausulas_analisadas: [],\n    conformidade: {}\n  };\n}\n\nif (typeof analise.score !== 'number' || analise.score < 0 || analise.score > 100) analise.score = 50;\n\nreturn { json: { minuta_id, analise, analyzed_at: new Date().toISOString() } };"
+      },
+      "id": "code-parse",
+      "name": "Processar Resultado",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [880, 300]
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "tableId": "con_minutas",
+        "filterType": "string",
+        "filterString": "id=eq.{{ $json.minuta_id }}",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldName": "ai_analise",
+              "fieldValue": "={{ JSON.stringify($json.analise) }}"
+            }
+          ]
+        }
+      },
+      "id": "supabase-update",
+      "name": "Salvar Analise",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [1100, 300],
+      "credentials": {
+        "supabaseApi": {
+          "id": "Ay3ugNAecarq6tnF",
+          "name": "TEG+ - Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ success: true, minuta_id: $('Processar Resultado').first().json.minuta_id, analise: $('Processar Resultado').first().json.analise }) }}"
+      },
+      "id": "respond-webhook",
+      "name": "Responder",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [1320, 300]
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [[{ "node": "Preparar Prompt", "type": "main", "index": 0 }]]
+    },
+    "Preparar Prompt": {
+      "main": [[{ "node": "Analisar Contrato", "type": "main", "index": 0 }]]
+    },
+    "Gemini 1.5 Pro": {
+      "ai_languageModel": [[{ "node": "Analisar Contrato", "type": "ai_languageModel", "index": 0 }]]
+    },
+    "Analisar Contrato": {
+      "main": [[{ "node": "Processar Resultado", "type": "main", "index": 0 }]]
+    },
+    "Processar Resultado": {
+      "main": [[{ "node": "Salvar Analise", "type": "main", "index": 0 }]]
+    },
+    "Salvar Analise": {
+      "main": [[{ "node": "Responder", "type": "main", "index": 0 }]]
+    }
+  },
+  "settings": { "executionOrder": "v1" }
+}

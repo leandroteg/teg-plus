@@ -464,10 +464,10 @@ export default function ParcelasPage() {
       <div>
         <h1 className="text-xl font-extrabold text-slate-800 flex items-center gap-2">
           <Wallet size={20} className="text-indigo-600" />
-          Previsao Financeira
+          Provisionado
         </h1>
         <p className="text-xs text-slate-400 mt-0.5">
-          {contratoId ? 'Previsao financeira deste contrato' : 'Recebiveis e compromissos dos contratos'}
+          {contratoId ? 'Provisionado deste contrato' : 'Recebiveis e compromissos dos contratos'}
         </p>
       </div>
 
@@ -543,7 +543,7 @@ export default function ParcelasPage() {
           <div className="w-16 h-16 rounded-2xl bg-indigo-50 flex items-center justify-center mx-auto mb-4">
             <Wallet size={28} className="text-indigo-300" />
           </div>
-          <p className="text-sm font-semibold text-slate-500">Nenhuma previsao encontrada</p>
+          <p className="text-sm font-semibold text-slate-500">Nenhum provisionado encontrado</p>
           <p className="text-xs text-slate-400 mt-1">Recebiveis e compromissos aparecerão aqui quando contratos forem criados</p>
         </div>
       ) : (
