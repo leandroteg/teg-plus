@@ -1,6 +1,6 @@
 import {
   LayoutDashboard, Calculator, TrendingUp, Activity,
-  Lightbulb, ClipboardList, Scale, BarChart3,
+  Lightbulb, ClipboardList, Scale, BarChart3, AlertTriangle,
 } from 'lucide-react'
 import ModuleLayout from './ModuleLayout'
 
@@ -13,6 +13,7 @@ const NAV = [
   { to: '/controladoria/dre', icon: TrendingUp, label: 'DRE' },
   { to: '/controladoria/kpis', icon: Activity, label: 'KPIs' },
   { to: '/controladoria/cenarios', icon: Lightbulb, label: 'Cenários' },
+  { to: '/controladoria/alertas',  icon: AlertTriangle, label: 'Alertas' },
 ]
 
 export default function ControladoriaLayout() {

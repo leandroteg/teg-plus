@@ -50,6 +50,7 @@ import Cenarios from './pages/controladoria/Cenarios'
 import PlanoOrcamentario from './pages/controladoria/PlanoOrcamentario'
 import ControleOrcamentario from './pages/controladoria/ControleOrcamentario'
 import PainelIndicadores from './pages/controladoria/PainelIndicadores'
+import AlertasDesvio from './pages/controladoria/AlertasDesvio'
 
 // Módulo Obras
 import ObrasLayout from './components/ObrasLayout'
@@ -77,6 +78,9 @@ import HistogramaHub from './pages/pmo/HistogramaHub'
 import ControleCustos from './pages/pmo/ControleCustos'
 import CustosHub from './pages/pmo/CustosHub'
 import FluxoOS from './pages/pmo/FluxoOS'
+import ReunioesEGP from './pages/pmo/Reunioes'
+import MultasEGP from './pages/pmo/Multas'
+import StatusReportList from './pages/pmo/StatusReportList'
 
 // Módulo Cadastros (Configurações Gerais)
 import CadastrosLayout from './components/CadastrosLayout'
@@ -261,6 +265,7 @@ export default function App() {
               <Route path="/controladoria/plano-orcamentario" element={<PlanoOrcamentario />} />
               <Route path="/controladoria/controle-orcamentario" element={<ControleOrcamentario />} />
               <Route path="/controladoria/indicadores" element={<PainelIndicadores />} />
+              <Route path="/controladoria/alertas"     element={<AlertasDesvio />} />
             </Route>
           </Route>
 
@@ -294,6 +299,9 @@ export default function App() {
               <Route path="/egp/custos"                       element={<CustosHub />} />
               <Route path="/egp/custos/:portfolioId"          element={<ControleCustos />} />
               <Route path="/egp/fluxo-os"                     element={<FluxoOS />} />
+              <Route path="/egp/reunioes"                     element={<ReunioesEGP />} />
+              <Route path="/egp/multas"                       element={<MultasEGP />} />
+              <Route path="/egp/indicadores"                  element={<StatusReportList />} />
             </Route>
           </Route>
 

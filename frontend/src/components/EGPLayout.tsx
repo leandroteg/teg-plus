@@ -1,6 +1,7 @@
 import {
   LayoutDashboard, FolderKanban, Workflow,
   GitBranch, CalendarDays, BarChart3, Users, DollarSign,
+  FileText, AlertTriangle, Activity,
 } from 'lucide-react'
 import ModuleLayout from './ModuleLayout'
 
@@ -13,6 +14,9 @@ const NAV = [
   { to: '/egp/histograma', icon: Users,           label: 'Histograma' },
   { to: '/egp/custos',     icon: DollarSign,      label: 'Custos' },
   { to: '/egp/fluxo-os',   icon: Workflow,        label: 'Fluxo OS' },
+  { to: '/egp/reunioes',   icon: FileText,        label: 'Reunioes' },
+  { to: '/egp/multas',     icon: AlertTriangle,   label: 'Multas' },
+  { to: '/egp/indicadores', icon: Activity,       label: 'Indicadores' },
 ]
 
 export default function EGPLayout() {
