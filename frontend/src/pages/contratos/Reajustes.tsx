@@ -27,7 +27,9 @@ export default function ReajustesPage() {
       const q = busca.toLowerCase()
       return (
         r.indice_nome.toLowerCase().includes(q) ||
-        r.observacoes?.toLowerCase().includes(q)
+        r.observacoes?.toLowerCase().includes(q) ||
+        r.contrato?.numero?.toLowerCase().includes(q) ||
+        r.contrato?.objeto?.toLowerCase().includes(q)
       )
     }
     return true
@@ -86,7 +88,7 @@ export default function ReajustesPage() {
             type="text"
             value={busca}
             onChange={e => setBusca(e.target.value)}
-            placeholder="Buscar indice, observacao..."
+            placeholder="Buscar indice, contrato, observacao..."
             className={`w-full pl-9 pr-4 py-2.5 rounded-xl border text-sm placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-400
               ${isLight ? 'border-slate-200 bg-white text-slate-700' : 'border-white/[0.08] bg-white/[0.03] text-slate-200'}`}
           />
@@ -112,14 +114,6 @@ export default function ReajustesPage() {
         <div className="flex items-center justify-center py-16">
           <div className="w-8 h-8 border-[3px] border-indigo-500 border-t-transparent rounded-full animate-spin" />
         </div>
-      ) : !contratoFilter ? (
-        <div className="text-center py-16">
-          <div className={`w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4 ${isLight ? 'bg-indigo-50' : 'bg-indigo-500/10'}`}>
-            <TrendingUp size={28} className={isLight ? 'text-indigo-300' : 'text-indigo-400/50'} />
-          </div>
-          <p className={`text-sm font-semibold ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>Selecione um contrato</p>
-          <p className={`text-xs mt-1 ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>Use o filtro acima para visualizar os reajustes de um contrato</p>
-        </div>
       ) : filtered.length === 0 ? (
         <div className="text-center py-16">
           <div className={`w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4 ${isLight ? 'bg-indigo-50' : 'bg-indigo-500/10'}`}>
@@ -134,6 +128,7 @@ export default function ReajustesPage() {
             <table className="w-full text-left">
               <thead>
                 <tr className={thCls}>
+                  {!contratoFilter && <th className="px-4 py-3">Contrato</th>}
                   <th className="px-4 py-3">Data Base</th>
                   <th className="px-4 py-3">Indice</th>
                   <th className="px-4 py-3 text-right">Percentual</th>
@@ -149,6 +144,16 @@ export default function ReajustesPage() {
                   const isPositive = r.percentual_aplicado >= 0
                   return (
                     <tr key={r.id} className={trCls}>
+                      {!contratoFilter && (
+                        <td className="px-4 py-3">
+                          <p className={`text-xs font-bold ${isLight ? 'text-slate-800' : 'text-slate-200'}`}>
+                            {r.contrato?.numero ?? '-'}
+                          </p>
+                          <p className={`text-[10px] truncate max-w-[160px] ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>
+                            {r.contrato?.objeto}
+                          </p>
+                        </td>
+                      )}
                       <td className={`px-4 py-3 text-xs font-semibold ${isLight ? 'text-slate-700' : 'text-slate-300'}`}>
                         {fmtData(r.data_base)}
                       </td>

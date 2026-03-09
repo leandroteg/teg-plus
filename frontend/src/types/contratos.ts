@@ -256,6 +256,7 @@ export interface ContratoReajuste {
   aplicado_por?: string
   observacoes?: string
   created_at: string
+  contrato?: Pick<Contrato, 'numero' | 'objeto'>
 }
 
 export interface ContratoCronograma {

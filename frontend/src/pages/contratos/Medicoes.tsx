@@ -1,6 +1,7 @@
 import { useState } from 'react'
-import { Receipt, Search, Filter } from 'lucide-react'
-import { useMedicoes, useContratos } from '../../hooks/useContratos'
+import { Receipt, Search, Filter, CheckCircle2, XCircle, AlertTriangle } from 'lucide-react'
+import { useMedicoes, useContratos, useAtualizarMedicao } from '../../hooks/useContratos'
+import { useAuth } from '../../contexts/AuthContext'
 import { useTheme } from '../../contexts/ThemeContext'
 import type { StatusMedicao } from '../../types/contratos'
 
@@ -41,12 +42,15 @@ function StatusBadge({ status, isLight }: { status: StatusMedicao; isLight: bool
 
 export default function MedicoesPage() {
   const { isLightSidebar: isLight } = useTheme()
+  const { perfil } = useAuth()
   const [contratoFilter, setContratoFilter] = useState('')
   const [statusFilter, setStatusFilter] = useState('')
   const [busca, setBusca] = useState('')
+  const [toast, setToast] = useState<{ type: 'success' | 'error'; msg: string } | null>(null)
 
   const { data: medicoes = [], isLoading } = useMedicoes(contratoFilter || undefined)
   const { data: contratos = [] } = useContratos()
+  const atualizarMedicao = useAtualizarMedicao()
 
   const filtered = medicoes.filter(m => {
     if (statusFilter && m.status !== statusFilter) return false
@@ -64,12 +68,46 @@ export default function MedicoesPage() {
   const totalMedido = filtered.reduce((s, m) => s + m.valor_medido, 0)
   const totalLiquido = filtered.reduce((s, m) => s + m.valor_liquido, 0)
 
+  const handleStatusChange = (id: string, status: StatusMedicao) => {
+    const label = status === 'aprovado' ? 'aprovar' : status === 'rejeitado' ? 'rejeitar' : status
+    if (!confirm(`Deseja ${label} esta medicao?`)) return
+    atualizarMedicao.mutate(
+      {
+        id,
+        status,
+        ...(status === 'aprovado' ? { aprovado_por: perfil?.nome ?? 'Sistema', aprovado_em: new Date().toISOString() } : {}),
+      },
+      {
+        onSuccess: () => {
+          setToast({ type: 'success', msg: `Medicao ${status === 'aprovado' ? 'aprovada' : status === 'rejeitado' ? 'rejeitada' : 'atualizada'} com sucesso` })
+          setTimeout(() => setToast(null), 4000)
+        },
+        onError: () => {
+          setToast({ type: 'error', msg: 'Erro ao atualizar medicao' })
+          setTimeout(() => setToast(null), 5000)
+        },
+      }
+    )
+  }
+
   const cardCls = `rounded-2xl border ${isLight ? 'bg-white border-slate-200 shadow-sm' : 'bg-white/[0.03] border-white/[0.06]'}`
   const thCls = `${isLight ? 'bg-slate-50 text-slate-600' : 'bg-white/[0.02] text-slate-400'} text-xs font-semibold uppercase tracking-wider`
   const trCls = `border-b ${isLight ? 'border-slate-100 hover:bg-slate-50' : 'border-white/[0.04] hover:bg-white/[0.02]'}`
 
   return (
     <div className="space-y-5">
+      {/* Toast */}
+      {toast && (
+        <div className={`fixed top-4 left-1/2 -translate-x-1/2 z-50 px-4 py-2.5 rounded-2xl shadow-lg text-sm font-bold flex items-center gap-2 animate-[slideDown_0.3s_ease] ${
+          toast.type === 'success'
+            ? 'bg-emerald-500 text-white shadow-emerald-500/30'
+            : 'bg-red-500 text-white shadow-red-500/30'
+        }`}>
+          {toast.type === 'success' ? <CheckCircle2 size={16} /> : <AlertTriangle size={16} />}
+          {toast.msg}
+        </div>
+      )}
+
       {/* Header */}
       <div>
         <h1 className={`text-xl font-extrabold flex items-center gap-2 ${isLight ? 'text-slate-800' : 'text-white'}`}>
@@ -170,6 +208,7 @@ export default function MedicoesPage() {
                   <th className="px-4 py-3 text-right">Retencao</th>
                   <th className="px-4 py-3 text-right">Valor Liquido</th>
                   <th className="px-4 py-3 text-center">Status</th>
+                  <th className="px-4 py-3 text-center">Acoes</th>
                 </tr>
               </thead>
               <tbody>
@@ -200,6 +239,63 @@ export default function MedicoesPage() {
                     </td>
                     <td className="px-4 py-3 text-center">
                       <StatusBadge status={m.status} isLight={isLight} />
+                    </td>
+                    <td className="px-4 py-3 text-center">
+                      <div className="flex items-center justify-center gap-1">
+                        {m.status === 'em_aprovacao' && (
+                          <>
+                            <button
+                              onClick={() => handleStatusChange(m.id, 'aprovado')}
+                              disabled={atualizarMedicao.isPending}
+                              title="Aprovar"
+                              className="w-7 h-7 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center
+                                hover:bg-emerald-100 transition-all disabled:opacity-50"
+                            >
+                              <CheckCircle2 size={13} />
+                            </button>
+                            <button
+                              onClick={() => handleStatusChange(m.id, 'rejeitado')}
+                              disabled={atualizarMedicao.isPending}
+                              title="Rejeitar"
+                              className="w-7 h-7 rounded-lg bg-red-50 text-red-500 flex items-center justify-center
+                                hover:bg-red-100 transition-all disabled:opacity-50"
+                            >
+                              <XCircle size={13} />
+                            </button>
+                          </>
+                        )}
+                        {m.status === 'rascunho' && (
+                          <button
+                            onClick={() => handleStatusChange(m.id, 'em_aprovacao')}
+                            disabled={atualizarMedicao.isPending}
+                            title="Enviar para aprovacao"
+                            className={`px-2 py-1 rounded-lg text-[10px] font-semibold transition-all disabled:opacity-50
+                              ${isLight
+                                ? 'bg-amber-50 text-amber-600 hover:bg-amber-100'
+                                : 'bg-amber-500/15 text-amber-400 hover:bg-amber-500/25'
+                              }`}
+                          >
+                            Enviar
+                          </button>
+                        )}
+                        {m.status === 'aprovado' && (
+                          <button
+                            onClick={() => handleStatusChange(m.id, 'faturado')}
+                            disabled={atualizarMedicao.isPending}
+                            title="Marcar como faturado"
+                            className={`px-2 py-1 rounded-lg text-[10px] font-semibold transition-all disabled:opacity-50
+                              ${isLight
+                                ? 'bg-blue-50 text-blue-600 hover:bg-blue-100'
+                                : 'bg-blue-500/15 text-blue-400 hover:bg-blue-500/25'
+                              }`}
+                          >
+                            Faturar
+                          </button>
+                        )}
+                        {(m.status === 'faturado' || m.status === 'rejeitado') && (
+                          <span className={`text-[10px] ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>—</span>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))}

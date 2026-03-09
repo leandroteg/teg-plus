@@ -398,17 +398,145 @@ export function useCriarAditivo() {
   })
 }
 
-// ── Reajustes ───────────────────────────────────────────────────────────────
-export function useReajustes(contratoId: string | undefined) {
-  return useQuery<ContratoReajuste[]>({
-    queryKey: ['con-reajustes', contratoId],
-    enabled: !!contratoId,
-    queryFn: async () => {
+// ── Atualizar Contrato ─────────────────────────────────────────────────────
+export function useAtualizarContrato() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ id, ...updates }: Partial<Contrato> & { id: string }) => {
+      const { data, error } = await supabase
+        .from('con_contratos')
+        .update(updates)
+        .eq('id', id)
+        .select()
+        .single()
+      if (error) throw error
+      return data as Contrato
+    },
+    onSuccess: (data) => {
+      qc.invalidateQueries({ queryKey: ['contratos'] })
+      qc.invalidateQueries({ queryKey: ['contrato', data.id] })
+      qc.invalidateQueries({ queryKey: ['contratos-dashboard'] })
+    },
+  })
+}
+
+// ── Atualizar Medição ──────────────────────────────────────────────────────
+export function useAtualizarMedicao() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ id, ...updates }: Partial<ContratoMedicao> & { id: string }) => {
+      const { data, error } = await supabase
+        .from('con_medicoes')
+        .update(updates)
+        .eq('id', id)
+        .select()
+        .single()
+      if (error) throw error
+      return data as ContratoMedicao
+    },
+    onSuccess: (data) => {
+      qc.invalidateQueries({ queryKey: ['con-medicoes'] })
+      qc.invalidateQueries({ queryKey: ['con-medicoes', data.contrato_id] })
+      qc.invalidateQueries({ queryKey: ['contratos-dashboard'] })
+    },
+  })
+}
+
+// ── Criar Itens de Medição ─────────────────────────────────────────────────
+export function useCriarMedicaoItens() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (itens: Omit<ContratoMedicaoItem, 'id' | 'created_at'>[]) => {
+      const { data, error } = await supabase
+        .from('con_medicao_itens')
+        .insert(itens)
+        .select()
+      if (error) throw error
+      return data as ContratoMedicaoItem[]
+    },
+    onSuccess: (data) => {
+      if (data.length > 0) {
+        qc.invalidateQueries({ queryKey: ['con-medicao-itens', data[0].medicao_id] })
+      }
+    },
+  })
+}
+
+// ── Atualizar Aditivo ──────────────────────────────────────────────────────
+export function useAtualizarAditivo() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ id, ...updates }: Partial<ContratoAditivo> & { id: string }) => {
+      const { data, error } = await supabase
+        .from('con_aditivos')
+        .update(updates)
+        .eq('id', id)
+        .select()
+        .single()
+      if (error) throw error
+      return data as ContratoAditivo
+    },
+    onSuccess: (data) => {
+      qc.invalidateQueries({ queryKey: ['con-aditivos'] })
+      qc.invalidateQueries({ queryKey: ['con-aditivos', data.contrato_id] })
+      qc.invalidateQueries({ queryKey: ['contratos-dashboard'] })
+    },
+  })
+}
+
+// ── Criar Reajuste ─────────────────────────────────────────────────────────
+export function useCriarReajuste() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (payload: Omit<ContratoReajuste, 'id' | 'created_at' | 'contrato'>) => {
       const { data, error } = await supabase
         .from('con_reajustes')
-        .select('*')
-        .eq('contrato_id', contratoId!)
+        .insert(payload)
+        .select()
+        .single()
+      if (error) throw error
+      return data as ContratoReajuste
+    },
+    onSuccess: (data) => {
+      qc.invalidateQueries({ queryKey: ['con-reajustes'] })
+      qc.invalidateQueries({ queryKey: ['con-reajustes', data.contrato_id] })
+      qc.invalidateQueries({ queryKey: ['contratos-dashboard'] })
+    },
+  })
+}
+
+// ── Atualizar Parcela ──────────────────────────────────────────────────────
+export function useAtualizarParcela() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ id, ...updates }: Partial<Parcela> & { id: string }) => {
+      const { data, error } = await supabase
+        .from('con_parcelas')
+        .update(updates)
+        .eq('id', id)
+        .select()
+        .single()
+      if (error) throw error
+      return data as Parcela
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['parcelas'] })
+      qc.invalidateQueries({ queryKey: ['contratos-dashboard'] })
+    },
+  })
+}
+
+// ── Reajustes ───────────────────────────────────────────────────────────────
+export function useReajustes(contratoId?: string) {
+  return useQuery<ContratoReajuste[]>({
+    queryKey: ['con-reajustes', contratoId],
+    queryFn: async () => {
+      let q = supabase
+        .from('con_reajustes')
+        .select('*, contrato:con_contratos!contrato_id(numero, objeto)')
         .order('data_base', { ascending: false })
+      if (contratoId) q = q.eq('contrato_id', contratoId)
+      const { data, error } = await q
       if (error) return []
       return (data ?? []) as ContratoReajuste[]
     },

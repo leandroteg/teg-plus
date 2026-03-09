@@ -44,6 +44,7 @@ import KPIs from './pages/controladoria/KPIs'
 import Cenarios from './pages/controladoria/Cenarios'
 import PlanoOrcamentario from './pages/controladoria/PlanoOrcamentario'
 import ControleOrcamentario from './pages/controladoria/ControleOrcamentario'
+import PainelIndicadores from './pages/controladoria/PainelIndicadores'
 
 // Módulo Obras
 import ObrasLayout from './components/ObrasLayout'
@@ -248,6 +249,7 @@ export default function App() {
               <Route path="/controladoria/cenarios"     element={<Cenarios />} />
               <Route path="/controladoria/plano-orcamentario" element={<PlanoOrcamentario />} />
               <Route path="/controladoria/controle-orcamentario" element={<ControleOrcamentario />} />
+              <Route path="/controladoria/indicadores" element={<PainelIndicadores />} />
             </Route>
           </Route>
 

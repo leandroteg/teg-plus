@@ -1,6 +1,7 @@
 import { useState } from 'react'
-import { FileSignature, Search } from 'lucide-react'
-import { useAditivos } from '../../hooks/useContratos'
+import { FileSignature, Search, CheckCircle2, XCircle, AlertTriangle } from 'lucide-react'
+import { useAditivos, useAtualizarAditivo } from '../../hooks/useContratos'
+import { useAuth } from '../../contexts/AuthContext'
 import { useTheme } from '../../contexts/ThemeContext'
 import type { StatusAditivo, TipoAditivo } from '../../types/contratos'
 
@@ -52,10 +53,13 @@ function TipoBadge({ tipo, isLight }: { tipo: TipoAditivo; isLight: boolean }) {
 
 export default function AditivosPage() {
   const { isLightSidebar: isLight } = useTheme()
+  const { perfil } = useAuth()
   const [statusFilter, setStatusFilter] = useState('')
   const [busca, setBusca] = useState('')
+  const [toast, setToast] = useState<{ type: 'success' | 'error'; msg: string } | null>(null)
 
   const { data: aditivos = [], isLoading } = useAditivos()
+  const atualizarAditivo = useAtualizarAditivo()
 
   const filtered = aditivos.filter(a => {
     if (statusFilter && a.status !== statusFilter) return false
@@ -75,12 +79,46 @@ export default function AditivosPage() {
     .filter(a => a.status === 'aprovado')
     .reduce((s, a) => s + a.valor_acrescimo, 0)
 
+  const handleStatusChange = (id: string, status: StatusAditivo) => {
+    const label = status === 'aprovado' ? 'aprovar' : status === 'rejeitado' ? 'rejeitar' : status
+    if (!confirm(`Deseja ${label} este aditivo?`)) return
+    atualizarAditivo.mutate(
+      {
+        id,
+        status,
+        ...(status === 'aprovado' ? { aprovado_por: perfil?.nome ?? 'Sistema', aprovado_em: new Date().toISOString() } : {}),
+      },
+      {
+        onSuccess: () => {
+          setToast({ type: 'success', msg: `Aditivo ${status === 'aprovado' ? 'aprovado' : status === 'rejeitado' ? 'rejeitado' : 'atualizado'} com sucesso` })
+          setTimeout(() => setToast(null), 4000)
+        },
+        onError: () => {
+          setToast({ type: 'error', msg: 'Erro ao atualizar aditivo' })
+          setTimeout(() => setToast(null), 5000)
+        },
+      }
+    )
+  }
+
   const cardCls = `rounded-2xl border ${isLight ? 'bg-white border-slate-200 shadow-sm' : 'bg-white/[0.03] border-white/[0.06]'}`
   const thCls = `${isLight ? 'bg-slate-50 text-slate-600' : 'bg-white/[0.02] text-slate-400'} text-xs font-semibold uppercase tracking-wider`
   const trCls = `border-b ${isLight ? 'border-slate-100 hover:bg-slate-50' : 'border-white/[0.04] hover:bg-white/[0.02]'}`
 
   return (
     <div className="space-y-5">
+      {/* Toast */}
+      {toast && (
+        <div className={`fixed top-4 left-1/2 -translate-x-1/2 z-50 px-4 py-2.5 rounded-2xl shadow-lg text-sm font-bold flex items-center gap-2 animate-[slideDown_0.3s_ease] ${
+          toast.type === 'success'
+            ? 'bg-emerald-500 text-white shadow-emerald-500/30'
+            : 'bg-red-500 text-white shadow-red-500/30'
+        }`}>
+          {toast.type === 'success' ? <CheckCircle2 size={16} /> : <AlertTriangle size={16} />}
+          {toast.msg}
+        </div>
+      )}
+
       {/* Header */}
       <div>
         <h1 className={`text-xl font-extrabold flex items-center gap-2 ${isLight ? 'text-slate-800' : 'text-white'}`}>
@@ -168,6 +206,7 @@ export default function AditivosPage() {
                   <th className="px-4 py-3">Descricao</th>
                   <th className="px-4 py-3 text-right">Valor Acrescimo</th>
                   <th className="px-4 py-3 text-center">Status</th>
+                  <th className="px-4 py-3 text-center">Acoes</th>
                 </tr>
               </thead>
               <tbody>
@@ -199,6 +238,49 @@ export default function AditivosPage() {
                     </td>
                     <td className="px-4 py-3 text-center">
                       <StatusBadge status={a.status} isLight={isLight} />
+                    </td>
+                    <td className="px-4 py-3 text-center">
+                      <div className="flex items-center justify-center gap-1">
+                        {a.status === 'em_aprovacao' && (
+                          <>
+                            <button
+                              onClick={() => handleStatusChange(a.id, 'aprovado')}
+                              disabled={atualizarAditivo.isPending}
+                              title="Aprovar"
+                              className="w-7 h-7 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center
+                                hover:bg-emerald-100 transition-all disabled:opacity-50"
+                            >
+                              <CheckCircle2 size={13} />
+                            </button>
+                            <button
+                              onClick={() => handleStatusChange(a.id, 'rejeitado')}
+                              disabled={atualizarAditivo.isPending}
+                              title="Rejeitar"
+                              className="w-7 h-7 rounded-lg bg-red-50 text-red-500 flex items-center justify-center
+                                hover:bg-red-100 transition-all disabled:opacity-50"
+                            >
+                              <XCircle size={13} />
+                            </button>
+                          </>
+                        )}
+                        {a.status === 'rascunho' && (
+                          <button
+                            onClick={() => handleStatusChange(a.id, 'em_aprovacao')}
+                            disabled={atualizarAditivo.isPending}
+                            title="Enviar para aprovacao"
+                            className={`px-2 py-1 rounded-lg text-[10px] font-semibold transition-all disabled:opacity-50
+                              ${isLight
+                                ? 'bg-amber-50 text-amber-600 hover:bg-amber-100'
+                                : 'bg-amber-500/15 text-amber-400 hover:bg-amber-500/25'
+                              }`}
+                          >
+                            Enviar
+                          </button>
+                        )}
+                        {(a.status === 'aprovado' || a.status === 'rejeitado') && (
+                          <span className={`text-[10px] ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>—</span>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))}
