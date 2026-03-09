@@ -31,6 +31,36 @@ import DashboardContratos from './pages/contratos/DashboardContratos'
 import ListaContratos from './pages/contratos/ListaContratos'
 import NovoContrato from './pages/contratos/NovoContrato'
 import ParcelasContratos from './pages/contratos/Parcelas'
+import MedicoesContratos from './pages/contratos/Medicoes'
+import AditivosContratos from './pages/contratos/Aditivos'
+import ReajustesContratos from './pages/contratos/Reajustes'
+
+// Módulo Controladoria
+import ControladoriaLayout from './components/ControladoriaLayout'
+import ControladoriaHome from './pages/controladoria/ControladoriaHome'
+import Orcamentos from './pages/controladoria/Orcamentos'
+import DRE from './pages/controladoria/DRE'
+import KPIs from './pages/controladoria/KPIs'
+import Cenarios from './pages/controladoria/Cenarios'
+
+// Módulo Obras
+import ObrasLayout from './components/ObrasLayout'
+import ObrasHome from './pages/obras/ObrasHome'
+import Apontamentos from './pages/obras/Apontamentos'
+import RDO from './pages/obras/RDO'
+import AdiantamentosObras from './pages/obras/Adiantamentos'
+import PrestacaoContas from './pages/obras/PrestacaoContas'
+
+// Módulo PMO
+import PMOLayout from './components/PMOLayout'
+import PMOHome from './pages/pmo/PMOHome'
+import Portfolio from './pages/pmo/Portfolio'
+import PortfolioDetalhe from './pages/pmo/PortfolioDetalhe'
+import EAP from './pages/pmo/EAP'
+import CronogramaPMO from './pages/pmo/Cronograma'
+import MedicoesPMO from './pages/pmo/Medicoes'
+import HistogramaPMO from './pages/pmo/Histograma'
+import FluxoOS from './pages/pmo/FluxoOS'
 
 // Módulo Cadastros (Configurações Gerais)
 import CadastrosLayout from './components/CadastrosLayout'
@@ -193,6 +223,45 @@ export default function App() {
               <Route path="/contratos/lista"      element={<ListaContratos />} />
               <Route path="/contratos/novo"       element={<NovoContrato />} />
               <Route path="/contratos/parcelas"   element={<ParcelasContratos />} />
+              <Route path="/contratos/medicoes"   element={<MedicoesContratos />} />
+              <Route path="/contratos/aditivos"   element={<AditivosContratos />} />
+              <Route path="/contratos/reajustes"  element={<ReajustesContratos />} />
+            </Route>
+          </Route>
+
+          {/* Módulo Controladoria */}
+          <Route element={<ModuleRoute moduleKey="controladoria" />}>
+            <Route element={<ControladoriaLayout />}>
+              <Route path="/controladoria"              element={<ControladoriaHome />} />
+              <Route path="/controladoria/orcamentos"   element={<Orcamentos />} />
+              <Route path="/controladoria/dre"          element={<DRE />} />
+              <Route path="/controladoria/kpis"         element={<KPIs />} />
+              <Route path="/controladoria/cenarios"     element={<Cenarios />} />
+            </Route>
+          </Route>
+
+          {/* Módulo Obras */}
+          <Route element={<ModuleRoute moduleKey="obras" />}>
+            <Route element={<ObrasLayout />}>
+              <Route path="/obras"                    element={<ObrasHome />} />
+              <Route path="/obras/apontamentos"       element={<Apontamentos />} />
+              <Route path="/obras/rdo"                element={<RDO />} />
+              <Route path="/obras/adiantamentos"      element={<AdiantamentosObras />} />
+              <Route path="/obras/prestacao"          element={<PrestacaoContas />} />
+            </Route>
+          </Route>
+
+          {/* Módulo PMO */}
+          <Route element={<ModuleRoute moduleKey="pmo" />}>
+            <Route element={<PMOLayout />}>
+              <Route path="/pmo"                      element={<PMOHome />} />
+              <Route path="/pmo/portfolio"            element={<Portfolio />} />
+              <Route path="/pmo/portfolio/:id"        element={<PortfolioDetalhe />} />
+              <Route path="/pmo/eap/:portfolioId"     element={<EAP />} />
+              <Route path="/pmo/cronograma/:portfolioId" element={<CronogramaPMO />} />
+              <Route path="/pmo/medicoes/:portfolioId" element={<MedicoesPMO />} />
+              <Route path="/pmo/histograma"           element={<HistogramaPMO />} />
+              <Route path="/pmo/fluxo-os"             element={<FluxoOS />} />
             </Route>
           </Route>
 

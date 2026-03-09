@@ -190,3 +190,88 @@ export interface NovaParcelaPayload {
   data_vencimento: string
   observacoes?: string
 }
+
+// ── Contratos Expansion Types ───────────────────────────────────────────────
+
+export type StatusMedicao = 'rascunho' | 'em_aprovacao' | 'aprovado' | 'rejeitado' | 'faturado'
+export type TipoAditivo = 'escopo' | 'prazo' | 'valor' | 'misto'
+export type StatusAditivo = 'rascunho' | 'em_aprovacao' | 'aprovado' | 'rejeitado'
+export type StatusCronograma = 'nao_iniciada' | 'em_andamento' | 'concluida' | 'atrasada'
+
+export interface ContratoMedicao {
+  id: string
+  contrato_id: string
+  numero_bm: string
+  periodo_inicio: string
+  periodo_fim: string
+  valor_medido: number
+  valor_retencao: number
+  valor_liquido: number
+  status: StatusMedicao
+  aprovado_por?: string
+  aprovado_em?: string
+  observacoes?: string
+  created_at: string
+  updated_at: string
+  contrato?: Pick<Contrato, 'numero' | 'objeto'>
+}
+
+export interface ContratoMedicaoItem {
+  id: string
+  medicao_id: string
+  contrato_item_id?: string
+  quantidade_medida: number
+  valor_unitario: number
+  valor_total: number
+  percentual_acumulado: number
+  created_at: string
+}
+
+export interface ContratoAditivo {
+  id: string
+  contrato_id: string
+  numero_aditivo: string
+  tipo: TipoAditivo
+  descricao: string
+  valor_acrescimo: number
+  nova_data_fim?: string
+  status: StatusAditivo
+  aprovado_por?: string
+  aprovado_em?: string
+  documento_url?: string
+  created_at: string
+  updated_at: string
+  contrato?: Pick<Contrato, 'numero' | 'objeto'>
+}
+
+export interface ContratoReajuste {
+  id: string
+  contrato_id: string
+  data_base: string
+  indice_nome: string
+  percentual_aplicado: number
+  valor_antes: number
+  valor_depois: number
+  aplicado_em: string
+  aplicado_por?: string
+  observacoes?: string
+  created_at: string
+}
+
+export interface ContratoCronograma {
+  id: string
+  contrato_id: string
+  etapa: string
+  peso_percentual: number
+  data_inicio_prevista?: string
+  data_fim_prevista?: string
+  data_inicio_real?: string
+  data_fim_real?: string
+  valor_previsto: number
+  valor_realizado: number
+  percentual_fisico: number
+  status: StatusCronograma
+  ordem: number
+  created_at: string
+  updated_at: string
+}

@@ -4,6 +4,8 @@ import type {
   Contrato, Parcela, ParcelaAnexo, ContratoItem,
   ContratosDashboardData, ContratoCliente,
   NovoContratoPayload, NovaParcelaPayload,
+  ContratoMedicao, ContratoMedicaoItem, ContratoAditivo,
+  ContratoReajuste, ContratoCronograma,
 } from '../types/contratos'
 
 // ── Dashboard ────────────────────────────────────────────────────────────────
@@ -302,6 +304,194 @@ export function useAnexosParcela(parcelaId: string | undefined) {
         .order('uploaded_at', { ascending: false })
       if (error) return []
       return (data ?? []) as ParcelaAnexo[]
+    },
+  })
+}
+
+// ── Medições ────────────────────────────────────────────────────────────────
+export function useMedicoes(contratoId?: string) {
+  return useQuery<ContratoMedicao[]>({
+    queryKey: ['con-medicoes', contratoId],
+    queryFn: async () => {
+      let q = supabase
+        .from('con_medicoes')
+        .select('*, contrato:con_contratos!contrato_id(numero, objeto)')
+        .order('created_at', { ascending: false })
+      if (contratoId) q = q.eq('contrato_id', contratoId)
+      const { data, error } = await q
+      if (error) return []
+      return (data ?? []) as ContratoMedicao[]
+    },
+  })
+}
+
+export function useMedicaoItens(medicaoId: string | undefined) {
+  return useQuery<ContratoMedicaoItem[]>({
+    queryKey: ['con-medicao-itens', medicaoId],
+    enabled: !!medicaoId,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('con_medicao_itens')
+        .select('*')
+        .eq('medicao_id', medicaoId!)
+        .order('created_at')
+      if (error) return []
+      return (data ?? []) as ContratoMedicaoItem[]
+    },
+  })
+}
+
+export function useCriarMedicao() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (payload: Omit<ContratoMedicao, 'id' | 'created_at' | 'updated_at' | 'contrato'>) => {
+      const { data, error } = await supabase
+        .from('con_medicoes')
+        .insert(payload)
+        .select()
+        .single()
+      if (error) throw error
+      return data as ContratoMedicao
+    },
+    onSuccess: (_, vars) => {
+      qc.invalidateQueries({ queryKey: ['con-medicoes'] })
+      qc.invalidateQueries({ queryKey: ['con-medicoes', vars.contrato_id] })
+      qc.invalidateQueries({ queryKey: ['contratos-dashboard'] })
+    },
+  })
+}
+
+// ── Aditivos ────────────────────────────────────────────────────────────────
+export function useAditivos(contratoId?: string) {
+  return useQuery<ContratoAditivo[]>({
+    queryKey: ['con-aditivos', contratoId],
+    queryFn: async () => {
+      let q = supabase
+        .from('con_aditivos')
+        .select('*, contrato:con_contratos!contrato_id(numero, objeto)')
+        .order('created_at', { ascending: false })
+      if (contratoId) q = q.eq('contrato_id', contratoId)
+      const { data, error } = await q
+      if (error) return []
+      return (data ?? []) as ContratoAditivo[]
+    },
+  })
+}
+
+export function useCriarAditivo() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (payload: Omit<ContratoAditivo, 'id' | 'created_at' | 'updated_at' | 'contrato'>) => {
+      const { data, error } = await supabase
+        .from('con_aditivos')
+        .insert(payload)
+        .select()
+        .single()
+      if (error) throw error
+      return data as ContratoAditivo
+    },
+    onSuccess: (_, vars) => {
+      qc.invalidateQueries({ queryKey: ['con-aditivos'] })
+      qc.invalidateQueries({ queryKey: ['con-aditivos', vars.contrato_id] })
+      qc.invalidateQueries({ queryKey: ['contratos-dashboard'] })
+    },
+  })
+}
+
+// ── Reajustes ───────────────────────────────────────────────────────────────
+export function useReajustes(contratoId: string | undefined) {
+  return useQuery<ContratoReajuste[]>({
+    queryKey: ['con-reajustes', contratoId],
+    enabled: !!contratoId,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('con_reajustes')
+        .select('*')
+        .eq('contrato_id', contratoId!)
+        .order('data_base', { ascending: false })
+      if (error) return []
+      return (data ?? []) as ContratoReajuste[]
+    },
+  })
+}
+
+// ── Cronograma ──────────────────────────────────────────────────────────────
+export function useCronograma(contratoId: string | undefined) {
+  return useQuery<ContratoCronograma[]>({
+    queryKey: ['con-cronograma', contratoId],
+    enabled: !!contratoId,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('con_cronograma')
+        .select('*')
+        .eq('contrato_id', contratoId!)
+        .order('ordem')
+      if (error) return []
+      return (data ?? []) as ContratoCronograma[]
+    },
+  })
+}
+
+export function useCriarEtapaCronograma() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (payload: Omit<ContratoCronograma, 'id' | 'created_at' | 'updated_at'>) => {
+      const { data, error } = await supabase
+        .from('con_cronograma')
+        .insert(payload)
+        .select()
+        .single()
+      if (error) throw error
+      return data as ContratoCronograma
+    },
+    onSuccess: (_, vars) => {
+      qc.invalidateQueries({ queryKey: ['con-cronograma', vars.contrato_id] })
+    },
+  })
+}
+
+export function useAtualizarEtapaCronograma() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ id, ...updates }: Partial<ContratoCronograma> & { id: string }) => {
+      const { data, error } = await supabase
+        .from('con_cronograma')
+        .update(updates)
+        .eq('id', id)
+        .select()
+        .single()
+      if (error) throw error
+      return data as ContratoCronograma
+    },
+    onSuccess: (data) => {
+      qc.invalidateQueries({ queryKey: ['con-cronograma', data.contrato_id] })
+    },
+  })
+}
+
+// ── Resumo (view) ───────────────────────────────────────────────────────────
+export interface ContratoResumo {
+  id: string
+  numero: string
+  objeto: string
+  valor_total: number
+  valor_aditivos: number
+  valor_medido: number
+  percentual_fisico: number
+  status: string
+  data_fim_previsto: string
+}
+
+export function useContratosResumo() {
+  return useQuery<ContratoResumo[]>({
+    queryKey: ['con-resumo'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('vw_con_contratos_resumo')
+        .select('*')
+        .order('numero')
+      if (error) return []
+      return (data ?? []) as ContratoResumo[]
     },
   })
 }

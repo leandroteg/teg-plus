@@ -53,8 +53,8 @@ const PILLARS: Pillar[] = [
     glow: 'rgba(99,102,241,0.18)',
     accent: '#818CF8',
     subs: [
-      { key: 'gestao', label: 'Gestão', desc: 'PMO e planejamento de projetos', Icon: Settings, active: false, route: '' },
-      { key: 'obras', label: 'Obras', desc: 'Acompanhamento de obras ativas', Icon: HardHat, active: false, route: '' },
+      { key: 'pmo', label: 'PMO', desc: 'Escritório de projetos e portfolio', Icon: Settings, active: true, route: '/pmo' },
+      { key: 'obras', label: 'Obras', desc: 'Acompanhamento de obras ativas', Icon: HardHat, active: true, route: '/obras' },
       { key: 'ssma', label: 'SS/MA', desc: 'Saúde, segurança e meio ambiente', Icon: ShieldCheck, active: false, route: '/ssma' },
     ],
   },
@@ -87,7 +87,7 @@ const PILLARS: Pillar[] = [
     subs: [
       { key: 'tesouraria', label: 'Tesouraria', desc: 'Contas, aprovações e conciliação', Icon: Banknote, active: true, route: '/financeiro' },
       { key: 'fiscal', label: 'Fiscal', desc: 'Notas fiscais e créditos PIS/COFINS', Icon: Receipt, active: true, route: '/fiscal' },
-      { key: 'controladoria', label: 'Controladoria', desc: 'Indicadores e relatórios gerenciais', Icon: BarChart3, active: false, route: '' },
+      { key: 'controladoria', label: 'Controladoria', desc: 'Indicadores e relatórios gerenciais', Icon: BarChart3, active: true, route: '/controladoria' },
       { key: 'contratos', label: 'Contratos', desc: 'Gestão de contratos e SLAs', Icon: FileText, active: true, route: '/contratos' },
     ],
   },
@@ -101,7 +101,7 @@ const PILLARS: Pillar[] = [
     glow: 'rgba(139,92,246,0.16)',
     accent: '#A78BFA',
     subs: [
-      { key: 'rh', label: 'Recursos Humanos', desc: 'Colaboradores, férias e mural', Icon: UserCog, active: false, route: '/rh', adminOnly: true },
+      { key: 'rh', label: 'Recursos Humanos', desc: 'Colaboradores, férias e mural', Icon: UserCog, active: true, route: '/rh', adminOnly: true },
       { key: 'dp', label: 'Depto. Pessoal', desc: 'Folha, ponto e benefícios', Icon: Users, active: false, route: '' },
     ],
   },
