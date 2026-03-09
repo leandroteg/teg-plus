@@ -34,6 +34,11 @@ import ParcelasContratos from './pages/contratos/Parcelas'
 import MedicoesContratos from './pages/contratos/Medicoes'
 import AditivosContratos from './pages/contratos/Aditivos'
 import ReajustesContratos from './pages/contratos/Reajustes'
+import SolicitacoesLista from './pages/contratos/SolicitacoesLista'
+import NovaSolicitacao from './pages/contratos/NovaSolicitacao'
+import SolicitacaoDetalhe from './pages/contratos/SolicitacaoDetalhe'
+import PreparaMinuta from './pages/contratos/PreparaMinuta'
+import ResumoExecutivoPage from './pages/contratos/ResumoExecutivo'
 
 // Módulo Controladoria
 import ControladoriaLayout from './components/ControladoriaLayout'
@@ -236,6 +241,11 @@ export default function App() {
               <Route path="/contratos/medicoes"   element={<MedicoesContratos />} />
               <Route path="/contratos/aditivos"   element={<AditivosContratos />} />
               <Route path="/contratos/reajustes"  element={<ReajustesContratos />} />
+              <Route path="/contratos/solicitacoes"       element={<SolicitacoesLista />} />
+              <Route path="/contratos/solicitacoes/nova"  element={<NovaSolicitacao />} />
+              <Route path="/contratos/solicitacoes/:id"   element={<SolicitacaoDetalhe />} />
+              <Route path="/contratos/solicitacoes/:id/minuta" element={<PreparaMinuta />} />
+              <Route path="/contratos/solicitacoes/:id/resumo" element={<ResumoExecutivoPage />} />
             </Route>
           </Route>
 

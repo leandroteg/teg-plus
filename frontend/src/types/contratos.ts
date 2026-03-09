@@ -276,3 +276,147 @@ export interface ContratoCronograma {
   created_at: string
   updated_at: string
 }
+
+// ── Contratos V2: Fluxo de Assinatura ───────────────────────────────
+
+export type EtapaSolicitacao =
+  | 'solicitacao' | 'preparar_minuta' | 'resumo_executivo'
+  | 'aprovacao_diretoria' | 'enviar_assinatura' | 'arquivar'
+  | 'liberar_execucao' | 'concluido' | 'cancelado'
+
+export type StatusSolicitacao =
+  | 'rascunho' | 'em_andamento' | 'aguardando_aprovacao'
+  | 'aprovado' | 'rejeitado' | 'cancelado' | 'concluido'
+
+export type TipoContraparte = 'fornecedor' | 'cliente' | 'pj'
+export type TipoContratoV2 = 'receita' | 'despesa' | 'pj'
+export type CategoriaContrato =
+  | 'prestacao_servico' | 'fornecimento' | 'locacao' | 'empreitada'
+  | 'consultoria' | 'pj_pessoa_fisica' | 'outro'
+export type UrgenciaSolicitacao = 'baixa' | 'normal' | 'alta' | 'critica'
+
+export type TipoMinuta = 'modelo' | 'rascunho' | 'revisado' | 'final' | 'assinado'
+export type StatusMinuta = 'rascunho' | 'em_revisao' | 'aprovado' | 'obsoleto'
+export type StatusResumo = 'rascunho' | 'enviado' | 'aprovado' | 'rejeitado'
+
+export interface Solicitacao {
+  id: string
+  numero: string
+  solicitante_id?: string
+  solicitante_nome: string
+  departamento?: string
+  obra_id?: string
+  tipo_contraparte: TipoContraparte
+  contraparte_nome: string
+  contraparte_cnpj?: string
+  contraparte_id?: string
+  tipo_contrato: TipoContratoV2
+  categoria_contrato: CategoriaContrato
+  objeto: string
+  descricao_escopo?: string
+  justificativa?: string
+  valor_estimado?: number
+  forma_pagamento?: string
+  data_inicio_prevista?: string
+  data_fim_prevista?: string
+  prazo_meses?: number
+  centro_custo?: string
+  classe_financeira?: string
+  indice_reajuste?: string
+  urgencia: UrgenciaSolicitacao
+  data_necessidade?: string
+  documentos_ref: Array<{ nome: string; url: string; tipo: string }>
+  etapa_atual: EtapaSolicitacao
+  status: StatusSolicitacao
+  observacoes?: string
+  motivo_cancelamento?: string
+  responsavel_id?: string
+  responsavel_nome?: string
+  created_at: string
+  updated_at: string
+  created_by?: string
+  // Joined
+  obra?: { id: string; nome: string }
+}
+
+export interface SolicitacaoHistorico {
+  id: string
+  solicitacao_id: string
+  etapa_de: string
+  etapa_para: string
+  executado_por?: string
+  executado_nome?: string
+  observacao?: string
+  dados_etapa?: Record<string, unknown>
+  created_at: string
+}
+
+export interface Minuta {
+  id: string
+  solicitacao_id?: string
+  contrato_id?: string
+  tipo: TipoMinuta
+  categoria?: string
+  titulo: string
+  descricao?: string
+  versao: number
+  arquivo_url: string
+  arquivo_nome: string
+  mime_type?: string
+  tamanho_bytes?: number
+  onedrive_id?: string
+  onedrive_url?: string
+  sharepoint_path?: string
+  ai_analise?: { riscos: unknown[]; sugestoes: unknown[]; score: number }
+  ai_analisado_em?: string
+  status: StatusMinuta
+  created_at: string
+  updated_at: string
+  created_by?: string
+}
+
+export interface ResumoExecutivo {
+  id: string
+  solicitacao_id: string
+  titulo: string
+  partes_envolvidas: string
+  objeto_resumo: string
+  valor_total?: number
+  vigencia?: string
+  riscos: Array<{ nivel: string; descricao: string; mitigacao?: string }>
+  oportunidades: Array<{ descricao: string; impacto?: string }>
+  recomendacao?: string
+  aprovacao_id?: string
+  status: StatusResumo
+  arquivo_url?: string
+  created_at: string
+  updated_at: string
+  created_by?: string
+}
+
+export interface NovaSolicitacaoPayload {
+  solicitante_id?: string
+  solicitante_nome: string
+  departamento?: string
+  obra_id?: string
+  tipo_contraparte: TipoContraparte
+  contraparte_nome: string
+  contraparte_cnpj?: string
+  contraparte_id?: string
+  tipo_contrato: TipoContratoV2
+  categoria_contrato: CategoriaContrato
+  objeto: string
+  descricao_escopo?: string
+  justificativa?: string
+  valor_estimado?: number
+  forma_pagamento?: string
+  data_inicio_prevista?: string
+  data_fim_prevista?: string
+  prazo_meses?: number
+  centro_custo?: string
+  classe_financeira?: string
+  indice_reajuste?: string
+  urgencia?: UrgenciaSolicitacao
+  data_necessidade?: string
+  observacoes?: string
+}
