@@ -367,7 +367,7 @@ export default function Aprovacao() {
       <header className="bg-white border-b border-slate-100 shadow-sm sticky top-0 z-10">
         <div className="max-w-2xl mx-auto px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-2.5">
-            <LogoTeg size={72} animated={false} />
+            <LogoTeg size={32} animated={false} />
             <div>
               <p className="text-sm font-extrabold text-slate-800 leading-none">TEG+</p>
               <p className="text-[10px] text-slate-400 leading-none mt-0.5">ERP de Compras</p>

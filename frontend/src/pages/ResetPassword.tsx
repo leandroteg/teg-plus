@@ -60,7 +60,7 @@ export default function ResetPassword() {
         {/* Logo */}
         <div className="text-center mb-7">
           <div className="inline-flex items-center justify-center mb-3">
-            <LogoTeg size={216} animated glowing={false} />
+            <LogoTeg size={72} animated glowing={false} />
           </div>
           <h1 className={`text-2xl font-black tracking-tight ${isDark ? 'text-white' : 'text-navy'}`}>TEG+</h1>
           <p className="text-xs text-slate-400 mt-0.5 font-medium tracking-wide uppercase">

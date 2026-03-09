@@ -650,7 +650,7 @@ export default function ModuleLayout({
         <div className={`px-4 pt-5 pb-4 border-b ${ls ? 'border-slate-100' : 'border-white/[0.06]'}`}>
           {/* Logo + wordmark */}
           <div className="flex items-center gap-3 mb-4">
-            <LogoTeg size={72} animated={false} />
+            <LogoTeg size={36} animated={false} />
             <div className="flex-1 min-w-0">
               <p className={`font-black text-lg tracking-tight leading-none ${ls ? 'text-slate-800' : 'text-white'}`}>TEG+</p>
               <p className={`text-[10px] font-medium mt-0.5 ${ls ? 'text-slate-400' : 'text-slate-500'}`}>ERP Sistema</p>
@@ -706,7 +706,7 @@ export default function ModuleLayout({
         >
           {/* Logo */}
           <button onClick={goBack} className="shrink-0" title="Trocar módulo">
-            <LogoTeg size={52} animated={false} />
+            <LogoTeg size={28} animated={false} />
           </button>
 
           {/* Brand */}

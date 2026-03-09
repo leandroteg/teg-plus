@@ -21,7 +21,7 @@ function AuthLoading() {
 
       {/* Animated logo */}
       <div className="relative animate-pulse-glow rounded-[28px] p-2">
-        <LogoTeg size={240} animated glowing={false} />
+        <LogoTeg size={80} animated glowing={false} />
       </div>
 
       {/* Loading indicator */}

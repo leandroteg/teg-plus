@@ -7,12 +7,12 @@ interface LogoTegProps {
 
 /**
  * TEG+ brand logo — uses the official PNG image.
- * The source image is landscape (2816x1536), so `size` controls the width
+ * The source image is cropped tight (195x215), so `size` controls the width
  * and height scales proportionally.
  * Backup SVG version available at LogoTeg.backup.tsx for rollback.
  */
 export default function LogoTeg({
-  size = 360,
+  size = 100,
   animated = true,
   className = '',
   glowing = false,

@@ -147,7 +147,7 @@ export default function Login() {
         {/* Logo / Branding */}
         <div className="text-center mb-7">
           <div className="inline-flex items-center justify-center mb-2">
-            <LogoTeg size={420} animated={false} glowing={false} />
+            <LogoTeg size={120} animated={false} glowing={false} />
           </div>
           <p className="text-xs text-slate-400 mt-0.5 font-medium tracking-wide uppercase">
             Sistema ERP · Acesso Restrito
