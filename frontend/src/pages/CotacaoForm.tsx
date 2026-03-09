@@ -2,7 +2,7 @@ import { useState, useCallback, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import {
   ChevronLeft, PlusCircle, Trash2, Send, CheckCircle, Info, AlertTriangle,
-  Paperclip, FileText, X, Loader2, Eye, Ban,
+  Paperclip, FileText, X, Loader2, Eye, Ban, CheckCircle2,
 } from 'lucide-react'
 import { useCotacao, useFinalizarCotacao } from '../hooks/useCotacoes'
 import { useEmitirPedido, useCancelarRequisicao } from '../hooks/usePedidos'
@@ -12,6 +12,8 @@ import CotacaoComparativo from '../components/CotacaoComparativo'
 import FluxoTimeline from '../components/FluxoTimeline'
 import UploadCotacao from '../components/UploadCotacao'
 import { supabase } from '../services/supabase'
+import { api } from '../services/api'
+import type { CnpjResult } from '../services/api'
 
 const fmt = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
 
@@ -40,6 +42,16 @@ function getMinCot(valor: number) {
   if (valor <= 500)  return 1
   if (valor <= 2000) return 2
   return 3
+}
+
+// ── CNPJ mask: XX.XXX.XXX/XXXX-XX ────────────────────────────────────────────
+function maskCNPJ(value: string): string {
+  const digits = value.replace(/\D/g, '').slice(0, 14)
+  if (digits.length <= 2) return digits
+  if (digits.length <= 5) return `${digits.slice(0, 2)}.${digits.slice(2)}`
+  if (digits.length <= 8) return `${digits.slice(0, 2)}.${digits.slice(2, 5)}.${digits.slice(5)}`
+  if (digits.length <= 12) return `${digits.slice(0, 2)}.${digits.slice(2, 5)}.${digits.slice(5, 8)}/${digits.slice(8)}`
+  return `${digits.slice(0, 2)}.${digits.slice(2, 5)}.${digits.slice(5, 8)}/${digits.slice(8, 12)}-${digits.slice(12)}`
 }
 
 // ── Cotação Concluída (com botões Emitir Pedido / Cancelar) ─────────────────
@@ -225,6 +237,53 @@ export default function CotacaoForm() {
   const [justificativa, setJustificativa] = useState('')
   const [toast, setToast] = useState<{ type: 'success' | 'error'; msg: string } | null>(null)
 
+  // ── CNPJ auto-lookup state per fornecedor ─────────────────────────────────
+  const [cnpjLoading, setCnpjLoading] = useState<Record<number, boolean>>({})
+  const [cnpjStatus, setCnpjStatus] = useState<Record<number, { ok: boolean; msg: string }>>({})
+  const cnpjLastRef = useRef<Record<number, string>>({})
+
+  const handleCnpjLookup = useCallback(async (idx: number, rawCnpj: string) => {
+    const digits = rawCnpj.replace(/\D/g, '')
+    if (digits.length !== 14) return
+    if (cnpjLastRef.current[idx] === digits) return
+    cnpjLastRef.current[idx] = digits
+
+    setCnpjLoading(prev => ({ ...prev, [idx]: true }))
+    setCnpjStatus(prev => ({ ...prev, [idx]: { ok: false, msg: '' } }))
+
+    try {
+      const result: CnpjResult = await api.consultarCNPJ(digits)
+      if (result.error) {
+        setCnpjStatus(prev => ({ ...prev, [idx]: { ok: false, msg: result.message || 'CNPJ nao encontrado' } }))
+      } else {
+        setCnpjStatus(prev => ({ ...prev, [idx]: { ok: true, msg: result.situacao || 'Ativa' } }))
+        // Auto-fill name and contact if empty
+        setFornecedores(prev => prev.map((f, i) => {
+          if (i !== idx) return f
+          return {
+            ...f,
+            fornecedor_nome: f.fornecedor_nome.trim() ? f.fornecedor_nome : (result.nome_fantasia || result.razao_social),
+            fornecedor_contato: f.fornecedor_contato.trim() ? f.fornecedor_contato : [result.telefone, result.email].filter(Boolean).join(' / '),
+          }
+        }))
+      }
+    } catch {
+      setCnpjStatus(prev => ({ ...prev, [idx]: { ok: false, msg: 'Erro na consulta' } }))
+    } finally {
+      setCnpjLoading(prev => ({ ...prev, [idx]: false }))
+    }
+  }, [])
+
+  const handleCnpjChange = useCallback((idx: number, raw: string) => {
+    const masked = maskCNPJ(raw)
+    setFornecedores(prev => prev.map((f, i) => i === idx ? { ...f, fornecedor_cnpj: masked } : f))
+    // Auto-lookup when 14 digits reached
+    const digits = raw.replace(/\D/g, '')
+    if (digits.length === 14) {
+      handleCnpjLookup(idx, raw)
+    }
+  }, [handleCnpjLookup])
+
   const updateFornecedor = (idx: number, field: keyof FornecedorForm, value: string | number) =>
     setFornecedores(prev => prev.map((f, i) => i === idx ? { ...f, [field]: value } : f))
 
@@ -245,7 +304,7 @@ export default function CotacaoForm() {
 
       const novos: FornecedorForm[] = parsed.map(p => ({
         fornecedor_nome: p.fornecedor_nome || '',
-        fornecedor_cnpj: p.fornecedor_cnpj || '',
+        fornecedor_cnpj: p.fornecedor_cnpj ? maskCNPJ(p.fornecedor_cnpj) : '',
         fornecedor_contato: p.fornecedor_contato || '',
         valor_total: p.valor_total || 0,
         prazo_entrega_dias: p.prazo_entrega_dias || 0,
@@ -482,12 +541,30 @@ export default function CotacaoForm() {
             />
 
             <div className="grid grid-cols-2 gap-2">
-              <input
-                className="border border-slate-200 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-teal-300 outline-none transition-shadow"
-                placeholder="CNPJ"
-                value={forn.fornecedor_cnpj}
-                onChange={e => updateFornecedor(idx, 'fornecedor_cnpj', e.target.value)}
-              />
+              <div className="relative">
+                <input
+                  className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-teal-300 outline-none transition-shadow font-mono"
+                  placeholder="00.000.000/0000-00"
+                  value={forn.fornecedor_cnpj}
+                  onChange={e => handleCnpjChange(idx, e.target.value)}
+                  onBlur={() => handleCnpjLookup(idx, forn.fornecedor_cnpj)}
+                  maxLength={18}
+                />
+                {cnpjLoading[idx] && (
+                  <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1 text-violet-500">
+                    <Loader2 size={12} className="animate-spin" />
+                    <span className="text-[9px] font-semibold">Buscando...</span>
+                  </div>
+                )}
+                {cnpjStatus[idx]?.ok && (
+                  <p className="text-[9px] text-emerald-600 mt-0.5 flex items-center gap-1">
+                    <CheckCircle2 size={9} /> {cnpjStatus[idx].msg}
+                  </p>
+                )}
+                {cnpjStatus[idx] && !cnpjStatus[idx].ok && cnpjStatus[idx].msg && (
+                  <p className="text-[9px] text-red-500 mt-0.5">{cnpjStatus[idx].msg}</p>
+                )}
+              </div>
               <input
                 className="border border-slate-200 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-teal-300 outline-none transition-shadow"
                 placeholder="Contato (tel/e-mail)"
