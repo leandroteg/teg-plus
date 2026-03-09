@@ -170,12 +170,25 @@ export function useAprovarOS() {
         }).eq('id', params.id)
         if (error) throw error
       } else {
+        // FIX: ao rejeitar OS, restaura veículo para 'disponivel'
+        // BACKUP: antes não restaurava — veículo ficava em 'em_manutencao' indefinidamente
+        const { data: os } = await supabase.from('fro_ordens_servico')
+          .select('veiculo_id').eq('id', params.id).single()
+
         const { error } = await supabase.from('fro_ordens_servico').update({
           status: 'rejeitada',
           motivo_rejeicao: params.motivo,
           rejeitado_por: params.userId,
         }).eq('id', params.id)
         if (error) throw error
+
+        // Restaura veículo para disponível após rejeição da OS
+        if (os?.veiculo_id) {
+          await supabase.from('fro_veiculos')
+            .update({ status: 'disponivel' })
+            .eq('id', os.veiculo_id)
+            .eq('status', 'em_manutencao')
+        }
       }
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['fro_os'] }),

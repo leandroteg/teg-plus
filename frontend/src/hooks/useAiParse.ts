@@ -118,7 +118,8 @@ function parseLocal(texto: string): AiParseResult {
   }
   const comprador_sugerido = compradorMap[categoria_sugerida] ?? { id: 'lauany', nome: 'Lauany' }
 
-  const parts = texto.split(/[,\n]+/).map(p => p.trim()).filter(p => p.length > 2)
+  // Split por newline ou vírgula NÃO seguida de dígito (preserva decimais como "2,5 kg")
+  const parts = texto.split(/\n+|,(?!\d)/).map(p => p.trim()).filter(p => p.length > 2)
   const itens = parts.map(part => {
     const qtyMatch = part.match(/(\d+[\.,]?\d*)\s*(un|kg|m2|m3|m|l|pc|cx|und|pcs)/i)
     let quantidade = 1
