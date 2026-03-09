@@ -236,6 +236,7 @@ export default function CotacaoForm() {
   const [semCotacoesMinimas, setSemCotacoesMinimas] = useState(false)
   const [justificativa, setJustificativa] = useState('')
   const [toast, setToast] = useState<{ type: 'success' | 'error'; msg: string } | null>(null)
+  const [triedSubmit, setTriedSubmit] = useState(false)
 
   // ── CNPJ auto-lookup state per fornecedor ─────────────────────────────────
   const [cnpjLoading, setCnpjLoading] = useState<Record<number, boolean>>({})
@@ -386,6 +387,7 @@ export default function CotacaoForm() {
   const submit = async (e: React.FormEvent) => {
     e.preventDefault()
     setToast(null)
+    setTriedSubmit(true)
 
     // Validações com feedback explícito
     if (!id || !cotacao) {
@@ -534,7 +536,10 @@ export default function CotacaoForm() {
           <div className="px-4 pb-4 space-y-3">
             <input
               required={idx < minCot && !semCotacoesMinimas}
-              className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm font-semibold focus:ring-2 focus:ring-teal-300 focus:border-teal-400 outline-none transition-shadow"
+              className={`w-full border rounded-xl px-3 py-2.5 text-sm font-semibold focus:ring-2 focus:ring-teal-300 focus:border-teal-400 outline-none transition-shadow ${
+                triedSubmit && !forn.fornecedor_nome.trim() && idx < minCot && !semCotacoesMinimas
+                  ? 'border-red-300 bg-red-50/30' : 'border-slate-200'
+              }`}
               placeholder="Nome do fornecedor *"
               value={forn.fornecedor_nome}
               onChange={e => updateFornecedor(idx, 'fornecedor_nome', e.target.value)}
@@ -575,14 +580,20 @@ export default function CotacaoForm() {
 
             <div className="grid grid-cols-2 gap-2">
               <div>
-                <label className="text-[10px] text-slate-400 font-semibold">Valor Total (R$) *</label>
-                <input
-                  required={idx < minCot && !semCotacoesMinimas}
-                  type="number" min="0.01" step="0.01"
-                  className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm font-semibold focus:ring-2 focus:ring-teal-300 outline-none transition-shadow"
-                  value={forn.valor_total || ''}
-                  onChange={e => updateFornecedor(idx, 'valor_total', parseFloat(e.target.value) || 0)}
-                />
+                <label className="text-[10px] text-slate-400 font-semibold">Valor Total *</label>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-slate-400 font-semibold">R$</span>
+                  <input
+                    required={idx < minCot && !semCotacoesMinimas}
+                    type="number" min="0.01" step="0.01"
+                    className={`w-full border rounded-xl pl-9 pr-3 py-2 text-sm font-semibold focus:ring-2 focus:ring-teal-300 outline-none transition-shadow ${
+                      triedSubmit && !forn.valor_total && idx < minCot && !semCotacoesMinimas
+                        ? 'border-red-300 bg-red-50/30' : 'border-slate-200'
+                    }`}
+                    value={forn.valor_total || ''}
+                    onChange={e => updateFornecedor(idx, 'valor_total', parseFloat(e.target.value) || 0)}
+                  />
+                </div>
               </div>
               <div>
                 <label className="text-[10px] text-slate-400 font-semibold">Prazo (dias)</label>
@@ -595,12 +606,28 @@ export default function CotacaoForm() {
               </div>
             </div>
 
-            <input
-              className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-teal-300 outline-none transition-shadow"
-              placeholder="Condição de pagamento (ex: 30 dias, à vista)"
-              value={forn.condicao_pagamento}
-              onChange={e => updateFornecedor(idx, 'condicao_pagamento', e.target.value)}
-            />
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              <input
+                className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-teal-300 outline-none transition-shadow"
+                placeholder="Condição de pgto (30 dias, à vista...)"
+                value={forn.condicao_pagamento}
+                onChange={e => updateFornecedor(idx, 'condicao_pagamento', e.target.value)}
+              />
+              <div className="relative">
+                <input
+                  className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-teal-300 outline-none transition-shadow"
+                  placeholder="Observação (frete, garantia...)"
+                  maxLength={200}
+                  value={forn.observacao}
+                  onChange={e => updateFornecedor(idx, 'observacao', e.target.value)}
+                />
+                {forn.observacao.length > 0 && (
+                  <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[9px] text-slate-300">
+                    {forn.observacao.length}/200
+                  </span>
+                )}
+              </div>
+            </div>
 
             {/* ── Anexo da Cotação ─────────────────────────────────────────── */}
             <div className="pt-1">

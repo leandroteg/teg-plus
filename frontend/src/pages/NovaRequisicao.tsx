@@ -8,6 +8,7 @@ import {
 import { useCriarRequisicao } from '../hooks/useRequisicoes'
 import { useAiParse, readFileForAi, isBinaryFile, isImageFile } from '../hooks/useAiParse'
 import { useCategorias } from '../hooks/useCategorias'
+import { useAuth } from '../contexts/AuthContext'
 import CategoryCard from '../components/CategoryCard'
 import type { RequisicaoItem, Urgencia, AiParseResult, CategoriaMaterial } from '../types'
 
@@ -97,6 +98,7 @@ export default function NovaRequisicao() {
   const mutation = useCriarRequisicao()
   const aiParse = useAiParse()
   const { data: categorias = [], isLoading: catLoading } = useCategorias()
+  const { perfil } = useAuth()
 
   const fileInputRef = useRef<HTMLInputElement>(null)
 
@@ -108,7 +110,7 @@ export default function NovaRequisicao() {
   const [dragOver, setDragOver]         = useState(false)
 
   const [categoria, setCategoria]           = useState<CategoriaMaterial | null>(null)
-  const [solicitante, setSolicitante]       = useState('')
+  const [solicitante, setSolicitante]       = useState(perfil?.nome ?? '')
   const [obraNome, setObraNome]             = useState('')
   const [descricao, setDescricao]           = useState('')
   const [justificativa, setJustificativa]   = useState('')
@@ -522,13 +524,17 @@ export default function NovaRequisicao() {
 
       <div>
         <label className="text-xs font-semibold text-slate-500 mb-1 block">Solicitante *</label>
-        <input required className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-teal-300 outline-none"
+        <input required className={`w-full border rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-teal-300 outline-none ${
+          stepErrors.some(e => e.includes('solicitante')) ? 'border-red-300 bg-red-50/30' : 'border-slate-200'
+        }`}
           placeholder="Seu nome completo" value={solicitante} onChange={e => setSolicitante(e.target.value)} />
       </div>
 
       <div>
         <label className="text-xs font-semibold text-slate-500 mb-1 block">Obra *</label>
-        <select required className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm bg-white focus:ring-2 focus:ring-teal-300 outline-none"
+        <select required className={`w-full border rounded-xl px-3 py-2.5 text-sm bg-white focus:ring-2 focus:ring-teal-300 outline-none ${
+          stepErrors.some(e => e.includes('obra')) ? 'border-red-300 bg-red-50/30' : 'border-slate-200'
+        }`}
           value={obraNome} onChange={e => setObraNome(e.target.value)}>
           <option value="">Selecione a obra</option>
           {OBRAS.map(o => <option key={o.id} value={o.nome}>{o.nome}</option>)}
@@ -538,7 +544,9 @@ export default function NovaRequisicao() {
       <div>
         <label className="text-xs font-semibold text-slate-500 mb-1 block">Descrição *</label>
         <textarea required rows={2}
-          className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-teal-300 outline-none"
+          className={`w-full border rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-teal-300 outline-none ${
+            stepErrors.some(e => e.includes('descricao')) ? 'border-red-300 bg-red-50/30' : 'border-slate-200'
+          }`}
           placeholder="Resumo do que precisa ser comprado"
           value={descricao} onChange={e => setDescricao(e.target.value)} />
       </div>
@@ -572,6 +580,7 @@ export default function NovaRequisicao() {
       <div>
         <label className="text-xs font-semibold text-slate-500 mb-1 block">Data de necessidade</label>
         <input type="date"
+          min={new Date().toISOString().split('T')[0]}
           className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-teal-300 outline-none"
           value={dataNecessidade} onChange={e => setDataNecessidade(e.target.value)} />
       </div>
@@ -655,6 +664,10 @@ export default function NovaRequisicao() {
             if (!obraNome) errs.push('Selecione a obra')
             if (!descricao.trim()) errs.push('Informe a descricao do que precisa ser comprado')
             if (itens.every(i => !i.descricao.trim())) errs.push('Adicione ao menos um item com descricao')
+            if (dataNecessidade) {
+              const today = new Date().toISOString().split('T')[0]
+              if (dataNecessidade < today) errs.push('Data de necessidade nao pode ser no passado')
+            }
             setStepErrors(errs)
             if (errs.length === 0) setStep(3)
           }}
