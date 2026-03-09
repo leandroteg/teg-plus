@@ -35,7 +35,8 @@ export function useSolicitacoes(filtros?: {
           transportadora:log_transportadoras(id, nome_fantasia, razao_social, avaliacao_media),
           nfe:log_nfe(id, numero, status, chave_acesso, valor_total),
           transporte:log_transportes(id, hora_saida, hora_chegada, eta_atual, placa, motorista_nome),
-          recebimento:log_recebimentos(id, status, confirmado_em)
+          recebimento:log_recebimentos(id, status, confirmado_em),
+          itens:log_itens_solicitacao(id, descricao, quantidade, unidade, peso_kg, volume_m3, numero_serie, observacao)
         `)
         .order('criado_em', { ascending: false })
 
@@ -315,6 +316,91 @@ export function useCancelarNFe() {
     },
     onSuccess: (_, vars) => {
       qc.invalidateQueries({ queryKey: ['log_nfe', vars.solicitacao_id] })
+    },
+  })
+}
+
+// ── Romaneio ─────────────────────────────────────────────────────────────────
+
+export function useEmitirRomaneio() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (payload: {
+      solicitacao_id: string
+      romaneio_url: string
+    }) => {
+      const { data, error } = await supabase
+        .from('log_solicitacoes')
+        .update({
+          status: 'romaneio_emitido',
+          romaneio_url: payload.romaneio_url,
+          doc_fiscal_tipo: 'romaneio',
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', payload.solicitacao_id)
+        .select()
+        .single()
+      if (error) throw error
+      return data as LogSolicitacao
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['log_solicitacoes'] })
+    },
+  })
+}
+
+// ── Solicitar NF ao Fiscal ───────────────────────────────────────────────────
+
+export function useSolicitarNFFiscal() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (payload: {
+      solicitacao_id: string
+      fornecedor_cnpj?: string
+      fornecedor_nome: string
+      valor_total: number
+      cfop?: string
+      natureza_operacao?: string
+      descricao?: string
+      destinatario_cnpj?: string
+      destinatario_nome?: string
+      destinatario_uf?: string
+      emitente_cnpj?: string
+      emitente_nome?: string
+      items?: any[]
+      obra_id?: string
+    }) => {
+      const { data: { user } } = await supabase.auth.getUser()
+      const { solicitacao_id, ...rest } = payload
+
+      // 1. Create fiscal solicitation linked back to logistica
+      const { data, error } = await supabase
+        .from('fis_solicitacoes_nf')
+        .insert({
+          ...rest,
+          solicitacao_log_id: solicitacao_id,
+          origem: 'logistica',
+          status: 'pendente',
+          solicitado_por: user?.id,
+        })
+        .select()
+        .single()
+      if (error) throw error
+
+      // 2. Mark logistica solicitacao as NF requested
+      await supabase
+        .from('log_solicitacoes')
+        .update({
+          doc_fiscal_tipo: 'nf',
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', solicitacao_id)
+
+      return data
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['log_solicitacoes'] })
+      qc.invalidateQueries({ queryKey: ['solicitacoes-nf'] })
     },
   })
 }
@@ -655,10 +741,4 @@ export function useLogisticaKPIs() {
         urgentes_pendentes: urgentes.count ?? 0,
         nfe_emitidas_mes: nfeMes.count ?? 0,
         custo_total_mes: 0,
-        taxa_entrega_prazo: 0,
-        taxa_avarias: 0,
-        tempo_medio_confirmacao_h: 0,
-      } as LogisticaKPIs
-    },
-  })
-}
+        taxa_entre

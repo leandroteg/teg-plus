@@ -18,7 +18,10 @@
       "mcp__n8n-mcp__n8n_health_check",
       "mcp__n8n-mcp__n8n_workflow_versions",
       "mcp__n8n-mcp__n8n_executions",
-      "mcp__n8n-mcp__tools_documentation"
+      "mcp__n8n-mcp__tools_documentation",
+      "Skill(commit-commands:commit-push-pr)",
+      "Skill(commit-commands:commit-push-pr:*)",
+      "mcp__402c23fe-4707-49e1-a558-76f47f37d917__get_logs"
     ]
   }
 }

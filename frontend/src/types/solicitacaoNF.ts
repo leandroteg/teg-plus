@@ -46,6 +46,21 @@ export interface SolicitacaoNF {
   emitido_em?: string
   updated_at: string
 
+  destinatario_cnpj?: string
+  destinatario_nome?: string
+  destinatario_uf?: string
+  emitente_cnpj?: string
+  emitente_nome?: string
+  items?: Array<{ descricao: string; quantidade: number; unidade: string; valor_unitario?: number }>
+  valor_frete?: number
+  valor_seguro?: number
+  valor_desconto_nf?: number
+  icms_base?: number
+  icms_valor?: number
+  info_complementar?: string
+  obra_id?: string
+  empresa_id?: string
+
   // Joined data (from select with joins)
   fornecedor?: { id: string; razao_social: string; cnpj?: string }
 }
@@ -70,6 +85,20 @@ export interface CriarSolicitacaoPayload {
   observacoes?: string
   solicitacao_log_id?: string
   origem?: OrigemSolicitacaoNF
+  destinatario_cnpj?: string
+  destinatario_nome?: string
+  destinatario_uf?: string
+  emitente_cnpj?: string
+  emitente_nome?: string
+  items?: Array<{ descricao: string; quantidade: number; unidade: string; valor_unitario?: number }>
+  valor_frete?: number
+  valor_seguro?: number
+  valor_desconto_nf?: number
+  icms_base?: number
+  icms_valor?: number
+  info_complementar?: string
+  obra_id?: string
+  empresa_id?: string
 }
 
 export interface EmitirNFPayload {
@@ -77,4 +106,5 @@ export interface EmitirNFPayload {
   serie?: string
   chave_acesso?: string
   data_emissao: string
+  danfe_url?: string
 }

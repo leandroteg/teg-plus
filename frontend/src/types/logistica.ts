@@ -19,6 +19,7 @@ export type StatusSolicitacao =
   | 'planejado'
   | 'aguardando_aprovacao'
   | 'aprovado'
+  | 'romaneio_emitido'
   | 'nfe_emitida'
   | 'em_transito'
   | 'entregue'
@@ -44,6 +45,8 @@ export type StatusNFe =
   | 'cancelada'
   | 'denegada'
   | 'rejeitada'
+
+export type DocFiscalTipo = 'nenhum' | 'romaneio' | 'nf'
 
 // ── Transportadora ────────────────────────────────────────────────────────────
 
@@ -150,6 +153,10 @@ export interface LogSolicitacao {
   observacoes?: string
   criado_em: string
   updated_at: string
+
+  romaneio_url?: string
+  doc_fiscal_tipo?: DocFiscalTipo
+  danfe_url?: string
 
   // Joined
   itens?: LogItemSolicitacao[]
