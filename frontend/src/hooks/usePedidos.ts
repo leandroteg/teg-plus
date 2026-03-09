@@ -137,15 +137,30 @@ export function useEmitirPedido() {
         }
       }
 
-      // 1. Gera número do pedido: PO-YYYYMM-XXXX
+      // 1. Gera número do pedido: PO-YYYYMM-XXXX (usa MAX para evitar colisões)
       const now = new Date()
       const prefix = `PO-${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}`
-      const { count } = await supabase
+
+      const { data: lastPedido, error: seqError } = await supabase
         .from('cmp_pedidos')
-        .select('id', { count: 'exact', head: true })
+        .select('numero_pedido')
         .like('numero_pedido', `${prefix}%`)
-      const seq = String((count ?? 0) + 1).padStart(4, '0')
-      const numeroPedido = `${prefix}-${seq}`
+        .order('numero_pedido', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+
+      if (seqError) {
+        console.error('Erro ao buscar último PO:', seqError)
+        throw new Error(`Erro ao gerar número do pedido: ${seqError.message}`)
+      }
+
+      let nextSeq = 1
+      if (lastPedido?.numero_pedido) {
+        const parts = lastPedido.numero_pedido.split('-')
+        const lastNum = parseInt(parts[parts.length - 1], 10)
+        if (!isNaN(lastNum)) nextSeq = lastNum + 1
+      }
+      const numeroPedido = `${prefix}-${String(nextSeq).padStart(4, '0')}`
 
       // 2. Cria o pedido
       const { data: pedido, error: pedError } = await supabase
@@ -166,7 +181,10 @@ export function useEmitirPedido() {
         .select('id, numero_pedido')
         .single()
 
-      if (pedError) throw pedError
+      if (pedError) {
+        console.error('Erro Supabase ao criar pedido:', pedError)
+        throw new Error(pedError.message || 'Falha ao criar pedido no banco de dados')
+      }
 
       // 3. Atualiza RC → pedido_emitido
       const { error: reqError } = await supabase

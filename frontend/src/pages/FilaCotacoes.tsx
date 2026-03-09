@@ -362,8 +362,8 @@ export default function FilaCotacoes() {
                               setToast({ type: 'success', msg: `${pedido.numero_pedido} emitido ✓` })
                               setTimeout(() => setToast(null), 4000)
                             },
-                            onError: () => {
-                              setToast({ type: 'error', msg: `Erro ao emitir pedido para ${req.numero}` })
+                            onError: (err: any) => {
+                              setToast({ type: 'error', msg: `Erro ao emitir pedido: ${err?.message || 'erro desconhecido'}` })
                               setTimeout(() => setToast(null), 5000)
                             },
                           })

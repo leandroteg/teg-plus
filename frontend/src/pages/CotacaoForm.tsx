@@ -157,8 +157,8 @@ function CotacaoConcluida({ cotacao, nav }: { cotacao: Cotacao; nav: ReturnType<
                       onSuccess: (pedido) => {
                         setPedidoToast({ type: 'success', msg: `Pedido ${pedido.numero_pedido} emitido ✓` })
                       },
-                      onError: () => {
-                        setPedidoToast({ type: 'error', msg: 'Erro ao emitir pedido.' })
+                      onError: (err: any) => {
+                        setPedidoToast({ type: 'error', msg: `Erro ao emitir pedido: ${err?.message || 'erro desconhecido'}` })
                         setTimeout(() => setPedidoToast(null), 5000)
                       },
                     })
