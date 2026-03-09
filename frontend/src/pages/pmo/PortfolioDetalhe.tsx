@@ -51,7 +51,7 @@ export default function PortfolioDetalhe() {
     return (
       <div className="flex flex-col items-center justify-center py-20 gap-3">
         <p className={`text-sm ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>Portfolio nao encontrado</p>
-        <button onClick={() => nav('/pmo/portfolio')}
+        <button onClick={() => nav('/egp/portfolio')}
           className="text-sm text-blue-500 hover:underline flex items-center gap-1">
           <ArrowLeft size={14} /> Voltar
         </button>
@@ -64,7 +64,7 @@ export default function PortfolioDetalhe() {
   return (
     <div className="space-y-6 p-4 md:p-6">
       {/* Back */}
-      <button onClick={() => nav('/pmo/portfolio')}
+      <button onClick={() => nav('/egp/portfolio')}
         className={`flex items-center gap-1 text-sm transition-colors ${
           isLight ? 'text-slate-400 hover:text-slate-700' : 'text-slate-500 hover:text-slate-300'
         }`}>
@@ -125,9 +125,9 @@ export default function PortfolioDetalhe() {
         isLight ? 'bg-white border-slate-200 shadow-sm' : 'bg-white/[0.03] border-white/[0.06]'
       }`}>
         {tab === 'tap' && <TabTAP portfolioId={portfolio.id} isLight={isLight} nav={nav} />}
-        {tab === 'eap' && <TabLink isLight={isLight} nav={nav} to={`/pmo/eap/${portfolio.id}`} label="Abrir EAP completa" desc="Visualize a Estrutura Analitica do Projeto" />}
-        {tab === 'cronograma' && <TabLink isLight={isLight} nav={nav} to={`/pmo/cronograma/${portfolio.id}`} label="Abrir Cronograma" desc="Visualize as tarefas e o progresso do projeto" />}
-        {tab === 'medicoes' && <TabLink isLight={isLight} nav={nav} to={`/pmo/medicoes/${portfolio.id}`} label="Abrir Medicoes" desc="Visualize o resumo e itens de medicao" />}
+        {tab === 'eap' && <TabLink isLight={isLight} nav={nav} to={`/egp/eap/${portfolio.id}`} label="Abrir EAP completa" desc="Visualize a Estrutura Analitica do Projeto" />}
+        {tab === 'cronograma' && <TabLink isLight={isLight} nav={nav} to={`/egp/cronograma/${portfolio.id}`} label="Abrir Cronograma" desc="Visualize as tarefas e o progresso do projeto" />}
+        {tab === 'medicoes' && <TabLink isLight={isLight} nav={nav} to={`/egp/medicoes/${portfolio.id}`} label="Abrir Medicoes" desc="Visualize o resumo e itens de medicao" />}
       </div>
     </div>
   )
@@ -159,7 +159,7 @@ function TabTAP({ portfolioId, isLight, nav }: { portfolioId: string; isLight: b
         Termo de Abertura do Projeto (TAP) para este portfolio.
       </p>
       <button
-        onClick={() => nav(`/pmo/status-report/${portfolioId}`)}
+        onClick={() => nav(`/egp/status-report/${portfolioId}`)}
         className="text-sm text-blue-500 hover:underline"
       >
         Ver Status Reports deste portfolio

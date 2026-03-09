@@ -69,7 +69,7 @@ export default function Portfolio() {
           </p>
         </div>
         <button
-          onClick={() => nav('/pmo/portfolio/novo')}
+          onClick={() => nav('/egp/portfolio/novo')}
           className="bg-blue-600 hover:bg-blue-500 text-white rounded-xl px-4 py-2 text-sm font-semibold flex items-center gap-1.5 transition-colors"
         >
           <Plus size={14} /> Novo Portfolio
@@ -138,7 +138,7 @@ export default function Portfolio() {
                   return (
                     <tr
                       key={p.id}
-                      onClick={() => nav(`/pmo/portfolio/${p.id}`)}
+                      onClick={() => nav(`/egp/portfolio/${p.id}`)}
                       className={`cursor-pointer border-t transition-colors ${
                         isLight ? 'border-slate-100 hover:bg-slate-50' : 'border-white/[0.04] hover:bg-white/[0.02]'
                       }`}

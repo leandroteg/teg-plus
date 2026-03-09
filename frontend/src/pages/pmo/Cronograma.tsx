@@ -56,7 +56,7 @@ export default function Cronograma() {
   return (
     <div className="space-y-6 p-4 md:p-6">
       {/* Back */}
-      <button onClick={() => nav(portfolioId ? `/pmo/portfolio/${portfolioId}` : '/pmo/portfolio')}
+      <button onClick={() => nav(portfolioId ? `/egp/portfolio/${portfolioId}` : '/egp/portfolio')}
         className={`flex items-center gap-1 text-sm transition-colors ${
           isLight ? 'text-slate-400 hover:text-slate-700' : 'text-slate-500 hover:text-slate-300'
         }`}>

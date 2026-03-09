@@ -33,12 +33,12 @@ const STATUS_COLORS: Record<string, { bg: string; text: string; dot: string }> =
 }
 
 const QUICK_LINKS = [
-  { icon: FolderKanban, label: 'Portfolios',  to: '/pmo/portfolio',    color: 'text-indigo-600', bg: 'bg-indigo-50' },
-  { icon: ClipboardList, label: 'Fluxo OS',   to: '/pmo/fluxo-os',    color: 'text-blue-600',   bg: 'bg-blue-50' },
-  { icon: BarChart3,     label: 'Indicadores', to: '/pmo/indicadores', color: 'text-emerald-600', bg: 'bg-emerald-50' },
-  { icon: FileText,      label: 'Reunioes',   to: '/pmo/reunioes',    color: 'text-violet-600', bg: 'bg-violet-50' },
-  { icon: AlertTriangle, label: 'Multas',     to: '/pmo/multas',      color: 'text-amber-600',  bg: 'bg-amber-50' },
-  { icon: Users,         label: 'Histograma', to: '/pmo/histograma',  color: 'text-teal-600',   bg: 'bg-teal-50' },
+  { icon: FolderKanban, label: 'Portfolios',  to: '/egp/portfolio',    color: 'text-indigo-600', bg: 'bg-indigo-50' },
+  { icon: ClipboardList, label: 'Fluxo OS',   to: '/egp/fluxo-os',    color: 'text-blue-600',   bg: 'bg-blue-50' },
+  { icon: BarChart3,     label: 'Indicadores', to: '/egp/indicadores', color: 'text-emerald-600', bg: 'bg-emerald-50' },
+  { icon: FileText,      label: 'Reunioes',   to: '/egp/reunioes',    color: 'text-violet-600', bg: 'bg-violet-50' },
+  { icon: AlertTriangle, label: 'Multas',     to: '/egp/multas',      color: 'text-amber-600',  bg: 'bg-amber-50' },
+  { icon: Users,         label: 'Histograma', to: '/egp/histograma',  color: 'text-teal-600',   bg: 'bg-teal-50' },
 ]
 
 export default function PMOHome() {
@@ -68,7 +68,7 @@ export default function PMOHome() {
         <div>
           <h1 className={`text-xl font-bold flex items-center gap-2 ${isLight ? 'text-slate-800' : 'text-white'}`}>
             <LayoutDashboard size={20} className="text-indigo-500" />
-            PMO - Escritorio de Projetos
+            EGP - Escritorio de Gestao de Projetos
           </h1>
           <p className={`text-sm mt-1 ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
             Visao geral do portfolio de obras e indicadores
@@ -119,7 +119,7 @@ export default function PMOHome() {
           <h2 className={`text-sm font-bold flex items-center gap-1.5 ${isLight ? 'text-slate-800' : 'text-white'}`}>
             <FolderKanban size={14} className="text-indigo-500" /> Portfolios Recentes
           </h2>
-          <button onClick={() => nav('/pmo/portfolio')}
+          <button onClick={() => nav('/egp/portfolio')}
             className="text-[10px] text-indigo-500 font-semibold flex items-center gap-0.5 hover:underline">
             Ver todos <ArrowRight size={10} />
           </button>
@@ -134,7 +134,7 @@ export default function PMOHome() {
               const sc = STATUS_COLORS[p.status] ?? STATUS_COLORS.cancelada
               return (
                 <button key={p.id}
-                  onClick={() => nav(`/pmo/portfolio/${p.id}`)}
+                  onClick={() => nav(`/egp/portfolio/${p.id}`)}
                   className={`w-full flex items-center gap-3 px-4 py-3 text-left transition-colors ${
                     isLight ? 'hover:bg-slate-50' : 'hover:bg-white/[0.02]'
                   }`}>

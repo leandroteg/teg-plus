@@ -134,6 +134,37 @@ export interface ObraEquipe {
   frente?: Pick<ObraFrente, 'id' | 'nome'>
 }
 
+// ── Planejamento de Equipe (integrado EGP) ─────────────────────────────────
+
+export type CategoriaEquipePlan = 'mod' | 'moi' | 'maquinario' | 'terceirizado'
+export type StatusEquipePlan = 'planejado' | 'mobilizado' | 'ativo' | 'desmobilizado' | 'cancelado'
+export type TurnoEquipePlan = 'diurno' | 'noturno' | 'revezamento'
+
+export interface ObraPlanejamentoEquipe {
+  id: string
+  obra_id: string
+  portfolio_id?: string
+  nome: string
+  funcao: string
+  categoria: CategoriaEquipePlan
+  data_inicio: string
+  data_fim?: string
+  tarefa_id?: string
+  turno: TurnoEquipePlan
+  horas_dia: number
+  status: StatusEquipePlan
+  custo_hora: number
+  custo_diaria: number
+  observacoes?: string
+  created_at: string
+  updated_at: string
+  created_by?: string
+  // Joins
+  obra?: { id: string; nome: string }
+  portfolio?: { id: string; nome_obra: string; numero_osc: string }
+  tarefa?: { id: string; nome: string }
+}
+
 export interface ObraMobilizacao {
   id: string
   obra_id: string

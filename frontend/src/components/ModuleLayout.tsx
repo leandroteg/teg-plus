@@ -402,11 +402,13 @@ export default function ModuleLayout({
     )
   }
 
-  function renderAvatarDropdown(position: 'sidebar' | 'header' = 'sidebar') {
+  function renderAvatarDropdown(position: 'sidebar' | 'header' | 'compact-sidebar' = 'sidebar') {
     if (!avatarOpen) return null
-    const pos = position === 'sidebar'
-      ? 'absolute right-0 top-12 z-[100]'
-      : 'absolute right-0 top-full mt-2 z-[100]'
+    const pos = position === 'compact-sidebar'
+      ? 'absolute right-0 bottom-12 z-[100]'
+      : position === 'sidebar'
+        ? 'absolute right-0 top-12 z-[100]'
+        : 'absolute right-0 top-full mt-2 z-[100]'
 
     return (
       <div
@@ -548,7 +550,7 @@ export default function ModuleLayout({
               <NotificationBell isDark={!ls} />
               <div className="relative" data-avatar-menu>
                 {renderAvatarButton('sm')}
-                {renderAvatarDropdown()}
+                {renderAvatarDropdown('compact-sidebar')}
               </div>
             </div>
             <div className={`pt-3 border-t ${ls ? 'border-slate-100' : 'border-white/5'}`}>

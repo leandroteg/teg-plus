@@ -50,16 +50,17 @@ import Apontamentos from './pages/obras/Apontamentos'
 import RDO from './pages/obras/RDO'
 import AdiantamentosObras from './pages/obras/Adiantamentos'
 import PrestacaoContas from './pages/obras/PrestacaoContas'
+import PlanejamentoEquipe from './pages/obras/PlanejamentoEquipe'
 
-// Módulo PMO
-import PMOLayout from './components/PMOLayout'
-import PMOHome from './pages/pmo/PMOHome'
+// Módulo EGP (Escritório de Gestão de Projetos)
+import EGPLayout from './components/EGPLayout'
+import EGPHome from './pages/pmo/PMOHome'
 import Portfolio from './pages/pmo/Portfolio'
 import PortfolioDetalhe from './pages/pmo/PortfolioDetalhe'
 import EAP from './pages/pmo/EAP'
-import CronogramaPMO from './pages/pmo/Cronograma'
-import MedicoesPMO from './pages/pmo/Medicoes'
-import HistogramaPMO from './pages/pmo/Histograma'
+import CronogramaEGP from './pages/pmo/Cronograma'
+import MedicoesEGP from './pages/pmo/Medicoes'
+import HistogramaEGP from './pages/pmo/Histograma'
 import FluxoOS from './pages/pmo/FluxoOS'
 
 // Módulo Cadastros (Configurações Gerais)
@@ -248,20 +249,21 @@ export default function App() {
               <Route path="/obras/rdo"                element={<RDO />} />
               <Route path="/obras/adiantamentos"      element={<AdiantamentosObras />} />
               <Route path="/obras/prestacao"          element={<PrestacaoContas />} />
+              <Route path="/obras/equipe"            element={<PlanejamentoEquipe />} />
             </Route>
           </Route>
 
-          {/* Módulo PMO */}
-          <Route element={<ModuleRoute moduleKey="pmo" />}>
-            <Route element={<PMOLayout />}>
-              <Route path="/pmo"                      element={<PMOHome />} />
-              <Route path="/pmo/portfolio"            element={<Portfolio />} />
-              <Route path="/pmo/portfolio/:id"        element={<PortfolioDetalhe />} />
-              <Route path="/pmo/eap/:portfolioId"     element={<EAP />} />
-              <Route path="/pmo/cronograma/:portfolioId" element={<CronogramaPMO />} />
-              <Route path="/pmo/medicoes/:portfolioId" element={<MedicoesPMO />} />
-              <Route path="/pmo/histograma"           element={<HistogramaPMO />} />
-              <Route path="/pmo/fluxo-os"             element={<FluxoOS />} />
+          {/* Módulo EGP (Escritório de Gestão de Projetos) */}
+          <Route element={<ModuleRoute moduleKey="egp" />}>
+            <Route element={<EGPLayout />}>
+              <Route path="/egp"                              element={<EGPHome />} />
+              <Route path="/egp/portfolio"                    element={<Portfolio />} />
+              <Route path="/egp/portfolio/:id"                element={<PortfolioDetalhe />} />
+              <Route path="/egp/eap/:portfolioId"             element={<EAP />} />
+              <Route path="/egp/cronograma/:portfolioId"      element={<CronogramaEGP />} />
+              <Route path="/egp/medicoes/:portfolioId"        element={<MedicoesEGP />} />
+              <Route path="/egp/histograma/:portfolioId"      element={<HistogramaEGP />} />
+              <Route path="/egp/fluxo-os"                     element={<FluxoOS />} />
             </Route>
           </Route>
 

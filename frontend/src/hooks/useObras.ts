@@ -11,6 +11,7 @@ import type {
   ObraPrestacaoContas,
   ObraEquipe,
   ObraMobilizacao,
+  ObraPlanejamentoEquipe,
 } from '../types/obras'
 
 // ── Frentes ──────────────────────────────────────────────────────────────────
@@ -264,6 +265,66 @@ export function useCriarMobilizacao() {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['obr-mobilizacoes'] })
+    },
+  })
+}
+
+// ── Planejamento de Equipe (integrado EGP) ──────────────────────────────────
+
+export function usePlanejamentoEquipe(filters?: {
+  obra_id?: string
+  status?: string
+  categoria?: string
+}) {
+  return useQuery<ObraPlanejamentoEquipe[]>({
+    queryKey: ['obr-plan-equipe', filters],
+    queryFn: async () => {
+      let q = supabase
+        .from('obr_planejamento_equipe')
+        .select('*, obra:sys_obras!obra_id(id, nome), portfolio:pmo_portfolio!portfolio_id(id, nome_obra, numero_osc), tarefa:pmo_tarefas!tarefa_id(id, nome)')
+        .order('data_inicio', { ascending: true })
+      if (filters?.obra_id) q = q.eq('obra_id', filters.obra_id)
+      if (filters?.status) q = q.eq('status', filters.status)
+      if (filters?.categoria) q = q.eq('categoria', filters.categoria)
+      const { data, error } = await q
+      if (error) return []
+      return (data ?? []) as ObraPlanejamentoEquipe[]
+    },
+  })
+}
+
+export function useCriarPlanEquipe() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (payload: Partial<ObraPlanejamentoEquipe>) => {
+      const { data, error } = await supabase
+        .from('obr_planejamento_equipe')
+        .insert(payload)
+        .select()
+        .single()
+      if (error) throw error
+      return data as ObraPlanejamentoEquipe
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['obr-plan-equipe'] })
+      qc.invalidateQueries({ queryKey: ['obr-kpis'] })
+    },
+  })
+}
+
+export function useAtualizarPlanEquipe() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ id, ...payload }: Partial<ObraPlanejamentoEquipe> & { id: string }) => {
+      const { error } = await supabase
+        .from('obr_planejamento_equipe')
+        .update({ ...payload, updated_at: new Date().toISOString() })
+        .eq('id', id)
+      if (error) throw error
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['obr-plan-equipe'] })
+      qc.invalidateQueries({ queryKey: ['obr-kpis'] })
     },
   })
 }
