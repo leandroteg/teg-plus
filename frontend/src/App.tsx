@@ -31,7 +31,6 @@ import DashboardContratos from './pages/contratos/DashboardContratos'
 import ListaContratos from './pages/contratos/ListaContratos'
 import NovoContrato from './pages/contratos/NovoContrato'
 import ParcelasContratos from './pages/contratos/Parcelas'
-import MedicoesContratos from './pages/contratos/Medicoes'
 import AditivosContratos from './pages/contratos/Aditivos'
 import ReajustesContratos from './pages/contratos/Reajustes'
 import SolicitacoesLista from './pages/contratos/SolicitacoesLista'
@@ -242,8 +241,7 @@ export default function App() {
               <Route path="/contratos"            element={<DashboardContratos />} />
               <Route path="/contratos/lista"      element={<ListaContratos />} />
               <Route path="/contratos/novo"       element={<NovoContrato />} />
-              <Route path="/contratos/parcelas"   element={<ParcelasContratos />} />
-              <Route path="/contratos/medicoes"   element={<MedicoesContratos />} />
+              <Route path="/contratos/previsao"   element={<ParcelasContratos />} />
               <Route path="/contratos/aditivos"   element={<AditivosContratos />} />
               <Route path="/contratos/reajustes"  element={<ReajustesContratos />} />
               <Route path="/contratos/solicitacoes"       element={<SolicitacoesLista />} />

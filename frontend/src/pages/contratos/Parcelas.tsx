@@ -1,9 +1,9 @@
 import { useState, useRef } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import {
-  CalendarDays, Search, Clock, CheckCircle2, AlertTriangle,
+  Wallet, Search, Clock, CheckCircle2, AlertTriangle,
   Upload, X, Banknote, FileText, TrendingUp, TrendingDown,
-  Paperclip, ExternalLink, ChevronDown, ChevronUp,
+  Paperclip, ExternalLink, ChevronDown, ChevronUp, CalendarDays,
 } from 'lucide-react'
 import {
   useParcelas, useLiberarParcela, useConfirmarPagamento,
@@ -300,9 +300,9 @@ function ParcelaCard({ parcela, onLiberar, onConfirmarPgto }: {
                 </span>
               )}
               <span className={`font-semibold rounded-full px-2 py-0.5 ${
-                isDespesa ? 'bg-red-50 text-red-600' : 'bg-emerald-50 text-emerald-600'
+                isDespesa ? 'bg-amber-50 text-amber-600' : 'bg-emerald-50 text-emerald-600'
               }`}>
-                {isDespesa ? 'Pagar' : 'Receber'}
+                {isDespesa ? 'Compromissado' : 'Recebivel'}
               </span>
             </div>
 
@@ -390,11 +390,19 @@ function ParcelaCard({ parcela, onLiberar, onConfirmarPgto }: {
   )
 }
 
+// ── Tipo Tabs ─────────────────────────────────────────────────────────────────
+const TIPO_TABS = [
+  { label: 'Todos',          value: '' },
+  { label: 'Recebiveis',     value: 'receita',  desc: 'A receber' },
+  { label: 'Compromissado',  value: 'despesa',  desc: 'A pagar' },
+]
+
 // ── Page ─────────────────────────────────────────────────────────────────────
 export default function ParcelasPage() {
   const [searchParams] = useSearchParams()
   const contratoId = searchParams.get('contrato') ?? undefined
 
+  const [tipoFilter, setTipoFilter] = useState('')
   const [statusFilter, setStatusFilter] = useState('')
   const [busca, setBusca] = useState('')
   const [liberarModal, setLiberarModal] = useState<Parcela | null>(null)
@@ -419,11 +427,16 @@ export default function ParcelasPage() {
     })
   }
 
-  const filtered = parcelas.filter(p =>
-    !busca || p.contrato?.numero?.toLowerCase().includes(busca.toLowerCase())
-      || p.contrato?.objeto?.toLowerCase().includes(busca.toLowerCase())
-      || p.nf_numero?.toLowerCase().includes(busca.toLowerCase())
-  )
+  const filtered = parcelas.filter(p => {
+    if (tipoFilter && p.contrato?.tipo_contrato !== tipoFilter) return false
+    if (busca) {
+      const q = busca.toLowerCase()
+      return p.contrato?.numero?.toLowerCase().includes(q)
+        || p.contrato?.objeto?.toLowerCase().includes(q)
+        || p.nf_numero?.toLowerCase().includes(q)
+    }
+    return true
+  })
 
   const totalAberto = filtered
     .filter(p => !['pago', 'cancelado'].includes(p.status))
@@ -450,12 +463,31 @@ export default function ParcelasPage() {
       {/* ── Header ──────────────────────────────────────────── */}
       <div>
         <h1 className="text-xl font-extrabold text-slate-800 flex items-center gap-2">
-          <CalendarDays size={20} className="text-indigo-600" />
-          Parcelas
+          <Wallet size={20} className="text-indigo-600" />
+          Previsao Financeira
         </h1>
         <p className="text-xs text-slate-400 mt-0.5">
-          {contratoId ? 'Parcelas deste contrato' : 'Todas as parcelas de contratos'}
+          {contratoId ? 'Previsao financeira deste contrato' : 'Recebiveis e compromissos dos contratos'}
         </p>
+      </div>
+
+      {/* ── Tipo Tabs ─────────────────────────────────────────── */}
+      <div className="flex gap-1">
+        {TIPO_TABS.map(t => (
+          <button key={t.value} onClick={() => setTipoFilter(t.value)}
+            className={`flex-1 py-2.5 rounded-2xl text-xs font-bold transition-all ${
+              tipoFilter === t.value
+                ? t.value === 'receita'
+                  ? 'bg-emerald-600 text-white shadow-sm shadow-emerald-500/20'
+                  : t.value === 'despesa'
+                    ? 'bg-amber-600 text-white shadow-sm shadow-amber-500/20'
+                    : 'bg-indigo-600 text-white shadow-sm shadow-indigo-500/20'
+                : 'bg-white text-slate-500 border border-slate-200'
+            }`}>
+            <span>{t.label}</span>
+            {t.desc && <span className="block text-[9px] font-normal opacity-70 mt-0.5">{t.desc}</span>}
+          </button>
+        ))}
       </div>
 
       {/* ── Resumo ──────────────────────────────────────────── */}
@@ -466,12 +498,14 @@ export default function ParcelasPage() {
           <p className="text-[10px] text-slate-400">parcelas</p>
         </div>
         <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm">
-          <p className="text-[10px] text-amber-500 font-semibold uppercase tracking-widest">Em Aberto</p>
+          <p className="text-[10px] text-amber-500 font-semibold uppercase tracking-widest">Compromissado</p>
           <p className="text-lg font-extrabold text-amber-600 mt-1">{fmt(totalAberto)}</p>
+          <p className="text-[10px] text-slate-400">em aberto</p>
         </div>
         <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm">
-          <p className="text-[10px] text-emerald-500 font-semibold uppercase tracking-widest">Pago</p>
+          <p className="text-[10px] text-emerald-500 font-semibold uppercase tracking-widest">Recebiveis</p>
           <p className="text-lg font-extrabold text-emerald-600 mt-1">{fmt(totalPago)}</p>
+          <p className="text-[10px] text-slate-400">recebido</p>
         </div>
       </div>
 
@@ -507,10 +541,10 @@ export default function ParcelasPage() {
       ) : filtered.length === 0 ? (
         <div className="text-center py-16">
           <div className="w-16 h-16 rounded-2xl bg-indigo-50 flex items-center justify-center mx-auto mb-4">
-            <CalendarDays size={28} className="text-indigo-300" />
+            <Wallet size={28} className="text-indigo-300" />
           </div>
-          <p className="text-sm font-semibold text-slate-500">Nenhuma parcela encontrada</p>
-          <p className="text-xs text-slate-400 mt-1">As parcelas aparecerão aqui quando contratos forem criados</p>
+          <p className="text-sm font-semibold text-slate-500">Nenhuma previsao encontrada</p>
+          <p className="text-xs text-slate-400 mt-1">Recebiveis e compromissos aparecerão aqui quando contratos forem criados</p>
         </div>
       ) : (
         <div className="space-y-2">
