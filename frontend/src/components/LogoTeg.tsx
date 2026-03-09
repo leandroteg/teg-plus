@@ -12,7 +12,7 @@ interface LogoTegProps {
  * Backup SVG version available at LogoTeg.backup.tsx for rollback.
  */
 export default function LogoTeg({
-  size = 120,
+  size = 360,
   animated = true,
   className = '',
   glowing = false,

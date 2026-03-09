@@ -58,9 +58,15 @@ import EGPHome from './pages/pmo/PMOHome'
 import Portfolio from './pages/pmo/Portfolio'
 import PortfolioDetalhe from './pages/pmo/PortfolioDetalhe'
 import EAP from './pages/pmo/EAP'
+import EAPHub from './pages/pmo/EAPHub'
 import CronogramaEGP from './pages/pmo/Cronograma'
+import CronogramaHub from './pages/pmo/CronogramaHub'
 import MedicoesEGP from './pages/pmo/Medicoes'
+import MedicoesHub from './pages/pmo/MedicoesHub'
 import HistogramaEGP from './pages/pmo/Histograma'
+import HistogramaHub from './pages/pmo/HistogramaHub'
+import ControleCustos from './pages/pmo/ControleCustos'
+import CustosHub from './pages/pmo/CustosHub'
 import FluxoOS from './pages/pmo/FluxoOS'
 
 // Módulo Cadastros (Configurações Gerais)
@@ -259,10 +265,16 @@ export default function App() {
               <Route path="/egp"                              element={<EGPHome />} />
               <Route path="/egp/portfolio"                    element={<Portfolio />} />
               <Route path="/egp/portfolio/:id"                element={<PortfolioDetalhe />} />
+              <Route path="/egp/eap"                          element={<EAPHub />} />
               <Route path="/egp/eap/:portfolioId"             element={<EAP />} />
+              <Route path="/egp/cronograma"                   element={<CronogramaHub />} />
               <Route path="/egp/cronograma/:portfolioId"      element={<CronogramaEGP />} />
+              <Route path="/egp/medicoes"                     element={<MedicoesHub />} />
               <Route path="/egp/medicoes/:portfolioId"        element={<MedicoesEGP />} />
+              <Route path="/egp/histograma"                   element={<HistogramaHub />} />
               <Route path="/egp/histograma/:portfolioId"      element={<HistogramaEGP />} />
+              <Route path="/egp/custos"                       element={<CustosHub />} />
+              <Route path="/egp/custos/:portfolioId"          element={<ControleCustos />} />
               <Route path="/egp/fluxo-os"                     element={<FluxoOS />} />
             </Route>
           </Route>

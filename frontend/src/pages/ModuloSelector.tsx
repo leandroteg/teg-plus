@@ -376,10 +376,10 @@ export default function ModuloSelector() {
           <div
             className="absolute z-10"
             style={{
-              left: cx - 52,
-              top: cy - 52,
-              width: 104,
-              height: 104,
+              left: cx - 132,
+              top: cy - 132,
+              width: 264,
+              height: 264,
             }}
           >
             <div
@@ -396,7 +396,7 @@ export default function ModuloSelector() {
                 transition: 'transform 0.6s cubic-bezier(0.175,0.885,0.32,1.275), box-shadow 0.8s ease',
               }}
             >
-              <LogoTeg size={88} animated={false} glowing={false} />
+              <LogoTeg size={264} animated={false} glowing={false} />
             </div>
           </div>
 
