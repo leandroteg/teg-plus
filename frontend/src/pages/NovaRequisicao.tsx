@@ -1,9 +1,10 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   Sparkles, Send, PlusCircle, Trash2, ChevronLeft, ChevronRight,
   AlertCircle, Check, Layers, FileText, Search, Upload, FileUp,
-  ChevronDown, X, FileImage,
+  ChevronDown, X, FileImage, Eye, Pencil, CheckCircle2, Loader2,
+  Package, MapPin, Zap,
 } from 'lucide-react'
 import { useCriarRequisicao } from '../hooks/useRequisicoes'
 import { useAiParse, readFileForAi, isBinaryFile, isImageFile } from '../hooks/useAiParse'
@@ -122,6 +123,12 @@ export default function NovaRequisicao() {
   const [stepErrors, setStepErrors]         = useState<string[]>([])
   const [submitError, setSubmitError]       = useState<string | null>(null)
 
+  // ── Issue #17: AI progress + preview state ─────────────────────────────────
+  const [aiProgress, setAiProgress]         = useState<'idle' | 'reading' | 'parsing' | 'done' | 'error'>('idle')
+  const [aiPreview, setAiPreview]           = useState<AiParseResult | null>(null)
+  const [previewItens, setPreviewItens]     = useState<RequisicaoItem[]>([])
+  const [showPreview, setShowPreview]       = useState(false)
+
   const total  = itens.reduce((s, i) => s + i.quantidade * i.valor_unitario_estimado, 0)
   const minCot = categoria ? minCotacoes(total, categoria.cotacoes_regras) : 1
 
@@ -132,14 +139,73 @@ export default function NovaRequisicao() {
     (cat.keywords ?? []).some((kw: string) => kw.toLowerCase().includes(searchCat.toLowerCase()))
   )
 
-  // ── AI Parse Handler ──────────────────────────────────────────────────────
+  // ── Sanitize AI parsed items (reusable) ──────────────────────────────────
+  const sanitizeItems = useCallback((items: RequisicaoItem[]): RequisicaoItem[] =>
+    (items ?? [])
+      .map(item => ({
+        descricao: String(item.descricao ?? '').trim(),
+        quantidade: typeof item.quantidade === 'number' ? item.quantidade : parseFloat(String(item.quantidade)) || 1,
+        unidade: String(item.unidade || 'un').toLowerCase(),
+        valor_unitario_estimado: typeof item.valor_unitario_estimado === 'number'
+          ? item.valor_unitario_estimado
+          : parseFloat(String(item.valor_unitario_estimado)) || 0,
+      }))
+      .filter(item => item.descricao.length > 0)
+  , [])
+
+  // ── Apply AI result to the form (shared between direct-apply and preview-confirm)
+  const applyAiResult = useCallback((result: AiParseResult, parsedItens: RequisicaoItem[], textoOriginal: string) => {
+    setItens(parsedItens.length > 0 ? parsedItens : [emptyItem()])
+
+    // Issue #18: Auto-fill solicitante with current user's name
+    if (perfil?.nome && !solicitante.trim()) {
+      setSolicitante(perfil.nome)
+    }
+
+    // Match obra_sugerida against OBRAS list (accent-insensitive)
+    if (result.obra_sugerida) {
+      const sugerida = result.obra_sugerida.trim()
+      const normalizeStr = (s: string) => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
+      const obraMatch = OBRAS.find(o =>
+        o.nome === sugerida ||
+        normalizeStr(o.nome) === normalizeStr(sugerida) ||
+        normalizeStr(o.nome).includes(normalizeStr(sugerida)) ||
+        normalizeStr(sugerida).includes(normalizeStr(o.nome))
+      )
+      if (obraMatch) setObraNome(obraMatch.nome)
+    }
+
+    // Validate urgencia before setting
+    if (result.urgencia_sugerida && ['normal', 'urgente', 'critica'].includes(result.urgencia_sugerida)) {
+      setUrgencia(result.urgencia_sugerida)
+    }
+
+    if (result.justificativa_sugerida)  setJustificativa(String(result.justificativa_sugerida))
+    if (result.comprador_sugerido)      setCompradorSugerido(result.comprador_sugerido)
+    if (result.categoria_sugerida) {
+      const catEncontrada = categorias.find(c =>
+        c.codigo === result.categoria_sugerida ||
+        c.nome.toLowerCase().includes((result.categoria_sugerida ?? '').toLowerCase())
+      )
+      if (catEncontrada) setCategoria(catEncontrada)
+    }
+    setConfianca(typeof result.confianca === 'number' ? result.confianca : 0.5)
+    if (!descricao.trim()) setDescricao(textoOriginal || `Requisição processada via IA (${parsedItens.length} itens)`)
+    setStep(2)
+  }, [perfil, solicitante, categorias, descricao])
+
+  // ── AI Parse Handler (with progress + preview) ──────────────────────────────
   const handleAiParse = async () => {
     let textoFinal = textoAi
     let arquivoPayload: { base64: string; nome: string; mime: string } | undefined
 
+    setAiProgress('reading')
+    setAiPreview(null)
+    setShowPreview(false)
+
     if (selectedFile) {
       try {
-        // CSV fast path — parse directly without AI
+        // CSV fast path -- parse directly without AI
         if (selectedFile.name.match(/\.csv$/i)) {
           const fileText = await new Promise<string>((resolve, reject) => {
             const reader = new FileReader()
@@ -152,83 +218,75 @@ export default function NovaRequisicao() {
             setItens(csvItems)
             if (!descricao.trim()) setDescricao(`Itens importados de ${selectedFile.name} (${csvItems.length} itens)`)
             setConfianca(0.95)
-            setStep(2)
+            // Issue #18: Auto-fill solicitante
+            if (perfil?.nome && !solicitante.trim()) setSolicitante(perfil.nome)
+            setAiProgress('done')
+            setTimeout(() => { setAiProgress('idle'); setStep(2) }, 600)
             return
           }
         }
 
-        // Read file (auto-detect: binary → base64, text → string)
+        // Read file (auto-detect: binary -> base64, text -> string)
         const fileData = await readFileForAi(selectedFile)
 
         if (fileData.arquivo) {
-          // Binary file (image, PDF, Excel) → send as base64 to n8n
           arquivoPayload = fileData.arquivo
         } else if (fileData.texto) {
-          // Text file → merge with user text
           textoFinal = textoFinal
-            ? `${textoFinal}\n\nConteúdo do arquivo ${selectedFile.name}:\n${fileData.texto}`
+            ? `${textoFinal}\n\nConteudo do arquivo ${selectedFile.name}:\n${fileData.texto}`
             : fileData.texto
         }
       } catch {
-        // File read error → continue with text only
+        // File read error -> continue with text only
       }
     }
 
-    if (!textoFinal.trim() && !arquivoPayload) return
+    if (!textoFinal.trim() && !arquivoPayload) {
+      setAiProgress('idle')
+      return
+    }
+
+    setAiProgress('parsing')
 
     try {
       const result: AiParseResult = await aiParse.mutateAsync({
         texto: textoFinal,
-        solicitante_nome: solicitante,
+        solicitante_nome: perfil?.nome || solicitante,
         arquivo: arquivoPayload,
       })
 
-      // Sanitize items: ensure correct types and non-empty descriptions
-      const sanitizedItens = (result.itens ?? [])
-        .map(item => ({
-          descricao: String(item.descricao ?? '').trim(),
-          quantidade: typeof item.quantidade === 'number' ? item.quantidade : parseFloat(String(item.quantidade)) || 1,
-          unidade: String(item.unidade || 'un').toLowerCase(),
-          valor_unitario_estimado: typeof item.valor_unitario_estimado === 'number'
-            ? item.valor_unitario_estimado
-            : parseFloat(String(item.valor_unitario_estimado)) || 0,
-        }))
-        .filter(item => item.descricao.length > 0)
+      const sanitized = sanitizeItems(result.itens)
+      setAiProgress('done')
 
-      setItens(sanitizedItens.length > 0 ? sanitizedItens : [emptyItem()])
-
-      // Match obra_sugerida against OBRAS list (accent-insensitive)
-      if (result.obra_sugerida) {
-        const sugerida = result.obra_sugerida.trim()
-        const normalizeStr = (s: string) => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
-        const obraMatch = OBRAS.find(o =>
-          o.nome === sugerida ||
-          normalizeStr(o.nome) === normalizeStr(sugerida) ||
-          normalizeStr(o.nome).includes(normalizeStr(sugerida)) ||
-          normalizeStr(sugerida).includes(normalizeStr(o.nome))
-        )
-        if (obraMatch) setObraNome(obraMatch.nome)
-      }
-
-      // Validate urgencia before setting
-      if (result.urgencia_sugerida && ['normal', 'urgente', 'critica'].includes(result.urgencia_sugerida)) {
-        setUrgencia(result.urgencia_sugerida)
-      }
-
-      if (result.justificativa_sugerida)  setJustificativa(String(result.justificativa_sugerida))
-      if (result.comprador_sugerido)      setCompradorSugerido(result.comprador_sugerido)
-      if (result.categoria_sugerida) {
-        const catEncontrada = categorias.find(c =>
-          c.codigo === result.categoria_sugerida ||
-          c.nome.toLowerCase().includes((result.categoria_sugerida ?? '').toLowerCase())
-        )
-        if (catEncontrada) setCategoria(catEncontrada)
-      }
-      setConfianca(typeof result.confianca === 'number' ? result.confianca : 0.5)
-      if (!descricao.trim()) setDescricao(textoAi || `Requisição processada via IA (${selectedFile?.name ?? ''})`)
-      setStep(2)
-    } catch { /* handled by aiParse.isError */ }
+      // Issue #17: Show preview before applying
+      setAiPreview(result)
+      setPreviewItens(sanitized.length > 0 ? sanitized : [emptyItem()])
+      setShowPreview(true)
+    } catch {
+      setAiProgress('error')
+      setTimeout(() => setAiProgress('idle'), 3000)
+    }
   }
+
+  // ── Confirm preview: apply AI results to form ──────────────────────────
+  const confirmPreview = () => {
+    if (!aiPreview) return
+    applyAiResult(aiPreview, previewItens, textoAi || `Requisicao processada via IA`)
+    setShowPreview(false)
+    setAiProgress('idle')
+  }
+
+  // ── Dismiss preview ─────────────────────────────────────────────────────
+  const dismissPreview = () => {
+    setShowPreview(false)
+    setAiPreview(null)
+    setPreviewItens([])
+    setAiProgress('idle')
+  }
+
+  // ── Update preview item (editable in preview) ──────────────────────────
+  const updatePreviewItem = (idx: number, field: keyof RequisicaoItem, value: string | number) =>
+    setPreviewItens(prev => prev.map((item, i) => i === idx ? { ...item, [field]: value } : item))
 
   const updateItem = (idx: number, field: keyof RequisicaoItem, value: string | number) =>
     setItens(prev => prev.map((item, i) => i === idx ? { ...item, [field]: value } : item))
@@ -479,16 +537,55 @@ export default function NovaRequisicao() {
               </div>
             </div>
 
+            {/* AI Progress Steps Indicator */}
+            {aiProgress !== 'idle' && aiProgress !== 'error' && (
+              <div className="bg-gradient-to-r from-violet-50 to-indigo-50 border border-violet-200 rounded-xl p-3 space-y-2">
+                <div className="flex items-center gap-3">
+                  {[
+                    { key: 'reading', label: 'Lendo arquivo', icon: FileUp },
+                    { key: 'parsing', label: 'Processando IA', icon: Sparkles },
+                    { key: 'done',    label: 'Concluido',      icon: CheckCircle2 },
+                  ].map((s, i) => {
+                    const isActive = s.key === aiProgress
+                    const isDone = (aiProgress === 'parsing' && s.key === 'reading')
+                      || (aiProgress === 'done' && (s.key === 'reading' || s.key === 'parsing'))
+                    const Icon = s.icon
+                    return (
+                      <div key={s.key} className="flex items-center gap-1.5 flex-1 min-w-0">
+                        <div className={`w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 transition-all duration-300 ${
+                          isDone ? 'bg-violet-500' : isActive ? 'bg-violet-400 ring-2 ring-violet-200' : 'bg-slate-200'
+                        }`}>
+                          {isDone ? <Check size={10} strokeWidth={3} className="text-white" />
+                            : isActive ? <Loader2 size={10} className="text-white animate-spin" />
+                            : <Icon size={10} className="text-slate-400" />}
+                        </div>
+                        <span className={`text-[10px] font-semibold truncate ${
+                          isDone ? 'text-violet-600' : isActive ? 'text-violet-700' : 'text-slate-400'
+                        }`}>{s.label}</span>
+                        {i < 2 && <div className={`flex-shrink-0 w-4 h-px ${isDone ? 'bg-violet-400' : 'bg-slate-200'}`} />}
+                      </div>
+                    )
+                  })}
+                </div>
+                {aiProgress === 'parsing' && (
+                  <div className="h-1 bg-violet-100 rounded-full overflow-hidden">
+                    <div className="h-full bg-gradient-to-r from-violet-400 to-indigo-500 rounded-full animate-pulse" style={{ width: '70%' }} />
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* Process Button */}
             <button onClick={handleAiParse}
-              disabled={(!textoAi.trim() && !selectedFile) || aiParse.isPending}
+              disabled={(!textoAi.trim() && !selectedFile) || aiParse.isPending || aiProgress !== 'idle'}
               className="w-full bg-gradient-to-r from-violet-600 to-indigo-600 text-white rounded-xl py-3 font-bold text-sm flex items-center justify-center gap-2 disabled:opacity-40 shadow-lg shadow-violet-500/20 active:scale-[0.98] transition-all">
-              {aiParse.isPending
+              {aiParse.isPending || (aiProgress !== 'idle' && aiProgress !== 'error')
                 ? <><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> Processando...</>
                 : <><Sparkles size={15} /> Processar com IA</>}
             </button>
 
-            {aiParse.isError && (
+            {/* Error feedback */}
+            {(aiParse.isError || aiProgress === 'error') && (
               <div className="bg-red-50 border border-red-200 rounded-xl p-3">
                 <p className="text-red-600 text-xs text-center font-medium">
                   {(aiParse.error as Error)?.message || 'Erro ao processar. Tente novamente.'}
@@ -496,9 +593,120 @@ export default function NovaRequisicao() {
               </div>
             )}
 
+            {/* ── AI Preview Modal (Issue #17) ──────────────────────────────── */}
+            {showPreview && aiPreview && (
+              <div className="bg-white border-2 border-violet-300 rounded-2xl shadow-xl overflow-hidden animate-in fade-in slide-in-from-bottom-2 duration-300">
+                {/* Preview header */}
+                <div className="bg-gradient-to-r from-violet-500 to-indigo-500 px-4 py-3 flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Eye size={15} className="text-white" />
+                    <p className="text-sm font-bold text-white">Resultado da IA</p>
+                    <span className="text-[10px] bg-white/20 text-white px-2 py-0.5 rounded-full font-semibold">
+                      {Math.round((aiPreview.confianca ?? 0.5) * 100)}% confianca
+                    </span>
+                  </div>
+                  <button type="button" onClick={dismissPreview} className="text-white/80 hover:text-white">
+                    <X size={16} />
+                  </button>
+                </div>
+
+                {/* Preview summary */}
+                <div className="p-4 space-y-3">
+                  {/* Metadata chips */}
+                  <div className="flex flex-wrap gap-1.5">
+                    {aiPreview.obra_sugerida && (
+                      <span className="flex items-center gap-1 text-[10px] font-semibold bg-teal-50 text-teal-700 px-2 py-1 rounded-lg border border-teal-200">
+                        <MapPin size={10} /> {aiPreview.obra_sugerida}
+                      </span>
+                    )}
+                    {aiPreview.urgencia_sugerida && aiPreview.urgencia_sugerida !== 'normal' && (
+                      <span className={`flex items-center gap-1 text-[10px] font-semibold px-2 py-1 rounded-lg border ${
+                        aiPreview.urgencia_sugerida === 'critica'
+                          ? 'bg-red-50 text-red-700 border-red-200'
+                          : 'bg-amber-50 text-amber-700 border-amber-200'
+                      }`}>
+                        <Zap size={10} /> {aiPreview.urgencia_sugerida === 'critica' ? 'Critica' : 'Urgente'}
+                      </span>
+                    )}
+                    {aiPreview.categoria_sugerida && (
+                      <span className="flex items-center gap-1 text-[10px] font-semibold bg-violet-50 text-violet-700 px-2 py-1 rounded-lg border border-violet-200">
+                        <Layers size={10} /> {aiPreview.categoria_sugerida.replace(/_/g, ' ')}
+                      </span>
+                    )}
+                    <span className="flex items-center gap-1 text-[10px] font-semibold bg-slate-50 text-slate-700 px-2 py-1 rounded-lg border border-slate-200">
+                      <Package size={10} /> {previewItens.filter(i => i.descricao.trim()).length} iten{previewItens.filter(i => i.descricao.trim()).length !== 1 ? 's' : ''}
+                    </span>
+                  </div>
+
+                  {/* Editable items list */}
+                  <div className="space-y-1.5 max-h-[240px] overflow-y-auto pr-1" style={{ scrollbarWidth: 'thin' }}>
+                    {previewItens.map((item, idx) => (
+                      <div key={idx} className="bg-slate-50 border border-slate-200 rounded-xl p-2.5 space-y-1.5">
+                        <div className="flex items-center gap-2">
+                          <span className="text-[9px] font-bold text-slate-400 flex-shrink-0">#{idx + 1}</span>
+                          <input
+                            className="flex-1 bg-white border border-slate-200 rounded-lg px-2 py-1 text-xs font-semibold text-slate-800 focus:ring-1 focus:ring-violet-300 outline-none"
+                            value={item.descricao}
+                            onChange={e => updatePreviewItem(idx, 'descricao', e.target.value)}
+                          />
+                          {previewItens.length > 1 && (
+                            <button type="button" onClick={() => setPreviewItens(p => p.filter((_, i) => i !== idx))}
+                              className="text-slate-300 hover:text-red-500 transition flex-shrink-0">
+                              <Trash2 size={12} />
+                            </button>
+                          )}
+                        </div>
+                        <div className="grid grid-cols-3 gap-1.5">
+                          <input type="number" min="0.01" step="0.01"
+                            className="bg-white border border-slate-200 rounded-lg px-2 py-1 text-[11px] focus:ring-1 focus:ring-violet-300 outline-none"
+                            placeholder="Qtd"
+                            value={item.quantidade || ''}
+                            onChange={e => updatePreviewItem(idx, 'quantidade', parseFloat(e.target.value) || 0)} />
+                          <select className="bg-white border border-slate-200 rounded-lg px-1.5 py-1 text-[11px] focus:ring-1 focus:ring-violet-300 outline-none"
+                            value={item.unidade}
+                            onChange={e => updatePreviewItem(idx, 'unidade', e.target.value)}>
+                            {['un', 'kg', 'm', 'm2', 'm3', 'L', 'pc', 'cx', 'hr', 'vb'].map(u => <option key={u} value={u}>{u}</option>)}
+                          </select>
+                          <input type="number" min="0" step="0.01"
+                            className="bg-white border border-slate-200 rounded-lg px-2 py-1 text-[11px] focus:ring-1 focus:ring-violet-300 outline-none"
+                            placeholder="R$ unit."
+                            value={item.valor_unitario_estimado || ''}
+                            onChange={e => updatePreviewItem(idx, 'valor_unitario_estimado', parseFloat(e.target.value) || 0)} />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Preview total */}
+                  {previewItens.some(i => i.valor_unitario_estimado > 0) && (
+                    <div className="flex justify-between items-center text-xs bg-teal-50 border border-teal-200 rounded-lg px-3 py-2">
+                      <span className="text-teal-600 font-semibold">Total estimado</span>
+                      <span className="font-extrabold text-teal-700">
+                        {fmt(previewItens.reduce((s, i) => s + i.quantidade * i.valor_unitario_estimado, 0))}
+                      </span>
+                    </div>
+                  )}
+
+                  {/* Action buttons */}
+                  <div className="grid grid-cols-2 gap-2 pt-1">
+                    <button type="button" onClick={dismissPreview}
+                      className="px-4 py-2.5 rounded-xl text-sm font-bold border-2 border-slate-200 text-slate-600 hover:bg-slate-50 active:scale-[0.98] transition-all">
+                      Descartar
+                    </button>
+                    <button type="button" onClick={confirmPreview}
+                      className="px-4 py-2.5 rounded-xl text-sm font-bold bg-gradient-to-r from-violet-600 to-indigo-600 text-white shadow-lg shadow-violet-500/20 active:scale-[0.98] transition-all flex items-center justify-center gap-1.5">
+                      <Check size={14} strokeWidth={3} /> Aplicar
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* Skip AI link */}
             <button type="button" onClick={() => {
               if (textoAi.trim()) setDescricao(textoAi)
+              // Issue #18: Auto-fill solicitante when skipping AI too
+              if (perfil?.nome && !solicitante.trim()) setSolicitante(perfil.nome)
               setStep(2)
             }}
               className="w-full text-xs text-slate-400 text-center py-0.5 hover:text-slate-600 transition">
