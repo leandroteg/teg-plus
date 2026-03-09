@@ -22,14 +22,14 @@ const STATUS_LABELS: Record<string, string> = {
   cancelada: 'Cancelada',
 }
 
-const STATUS_COLORS: Record<string, { bg: string; text: string; dot: string }> = {
-  em_analise_ate:    { bg: 'bg-amber-100 dark:bg-amber-500/15', text: 'text-amber-700 dark:text-amber-400', dot: 'bg-amber-500' },
-  revisao_cliente:   { bg: 'bg-purple-100 dark:bg-purple-500/15', text: 'text-purple-700 dark:text-purple-400', dot: 'bg-purple-500' },
-  liberado_iniciar:  { bg: 'bg-blue-100 dark:bg-blue-500/15', text: 'text-blue-700 dark:text-blue-400', dot: 'bg-blue-500' },
-  obra_andamento:    { bg: 'bg-emerald-100 dark:bg-emerald-500/15', text: 'text-emerald-700 dark:text-emerald-400', dot: 'bg-emerald-500' },
-  obra_paralisada:   { bg: 'bg-red-100 dark:bg-red-500/15', text: 'text-red-700 dark:text-red-400', dot: 'bg-red-500' },
-  obra_concluida:    { bg: 'bg-slate-100 dark:bg-slate-500/15', text: 'text-slate-600 dark:text-slate-400', dot: 'bg-slate-500' },
-  cancelada:         { bg: 'bg-gray-100 dark:bg-gray-500/15', text: 'text-gray-600 dark:text-gray-400', dot: 'bg-gray-400' },
+const STATUS_COLORS: Record<string, { light: string; dark: string; dot: string }> = {
+  em_analise_ate:    { light: 'bg-amber-100 text-amber-700',      dark: 'bg-amber-500/15 text-amber-400',    dot: 'bg-amber-500' },
+  revisao_cliente:   { light: 'bg-purple-100 text-purple-700',    dark: 'bg-purple-500/15 text-purple-400',  dot: 'bg-purple-500' },
+  liberado_iniciar:  { light: 'bg-blue-100 text-blue-700',        dark: 'bg-blue-500/15 text-blue-400',      dot: 'bg-blue-500' },
+  obra_andamento:    { light: 'bg-emerald-100 text-emerald-700',  dark: 'bg-emerald-500/15 text-emerald-400', dot: 'bg-emerald-500' },
+  obra_paralisada:   { light: 'bg-red-100 text-red-700',          dark: 'bg-red-500/15 text-red-400',        dot: 'bg-red-500' },
+  obra_concluida:    { light: 'bg-slate-100 text-slate-600',      dark: 'bg-slate-500/15 text-slate-400',    dot: 'bg-slate-500' },
+  cancelada:         { light: 'bg-gray-100 text-gray-600',        dark: 'bg-gray-500/15 text-gray-400',      dot: 'bg-gray-400' },
 }
 
 const QUICK_LINKS = [
@@ -149,7 +149,7 @@ export default function PMOHome() {
                     </p>
                     <div className="flex items-center gap-1.5 mt-0.5">
                       <span className={`text-[10px] ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>{p.numero_osc}</span>
-                      <span className={`inline-flex items-center gap-1 rounded-full text-[10px] font-semibold px-2 py-0.5 ${isLight ? sc.bg.split(' ')[0] : sc.bg.split(' ')[1] ?? sc.bg.split(' ')[0]} ${isLight ? sc.text.split(' ')[0] : sc.text.split(' ')[1] ?? sc.text.split(' ')[0]}`}>
+                      <span className={`inline-flex items-center gap-1 rounded-full text-[10px] font-semibold px-2 py-0.5 ${isLight ? sc.light : sc.dark}`}>
                         <span className={`w-1.5 h-1.5 rounded-full ${sc.dot}`} />
                         {STATUS_LABELS[p.status] ?? p.status}
                       </span>

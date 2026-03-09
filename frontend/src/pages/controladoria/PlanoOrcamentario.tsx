@@ -124,24 +124,25 @@ export default function PlanoOrcamentario() {
     return { fat, meta, desvio, margem }
   }, [grandTotal])
 
-  // ── Year options ─────────────────────────────────────────────────
+  // ── Year options ─────────────────────────────────────────────
   const years = Array.from({ length: 5 }, (_, i) => currentYear - 2 + i)
 
   // ── Render ─────────────────────────────────────────────────────────────────
 
   const cellCls = `px-3 py-2.5 text-right font-mono text-xs whitespace-nowrap`
-  const headerCellCls = `px-3 py-3 text-center text-[11px] font-bold uppercase tracking-wider`
+  const headerCellCls = `px-3 py-2.5 text-center text-[10px] font-semibold uppercase tracking-wider`
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-6 p-4 md:p-6">
 
       {/* ── Page Header ──────────────────────────────────────── */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className={`text-xl font-extrabold ${isLight ? 'text-slate-800' : 'text-white'}`}>
+          <h1 className={`text-xl font-bold flex items-center gap-2 ${isLight ? 'text-slate-800' : 'text-white'}`}>
+            <Target size={20} className="text-violet-500" />
             Plano Orcamentario
           </h1>
-          <p className={`text-xs mt-0.5 ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>
+          <p className={`text-sm mt-1 ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
             Visao executiva de custos e despesas por trimestre
           </p>
         </div>
@@ -151,8 +152,8 @@ export default function PlanoOrcamentario() {
             onChange={e => setAno(Number(e.target.value))}
             className={`appearance-none pl-4 pr-9 py-2 rounded-xl text-sm font-semibold border cursor-pointer transition-all ${
               isLight
-                ? 'bg-white border-slate-200 text-slate-700 hover:border-orange-300 shadow-sm'
-                : 'bg-white/[0.06] border-white/[0.1] text-white hover:border-orange-500/50'
+                ? 'bg-white border-slate-200 text-slate-700 hover:border-violet-300 shadow-sm'
+                : 'bg-white/[0.06] border-white/[0.1] text-white hover:border-violet-500/50'
             }`}
           >
             {years.map(y => (
@@ -166,39 +167,43 @@ export default function PlanoOrcamentario() {
       </div>
 
       {/* ── Table ─────────────────────────────────────────────── */}
-      <div className={`rounded-2xl overflow-hidden border ${
-        isLight ? 'border-slate-200 shadow-sm' : 'border-white/[0.06]'
+      <div className={`rounded-2xl overflow-hidden border shadow-sm ${
+        isLight ? 'bg-white border-slate-200' : 'bg-slate-800/60 border-slate-700'
       }`}>
         {isLoading ? (
           <div className="flex items-center justify-center py-20">
-            <div className="w-7 h-7 border-[3px] border-orange-500 border-t-transparent rounded-full animate-spin" />
+            <div className="w-6 h-6 border-2 border-violet-500/30 border-t-violet-500 rounded-full animate-spin" />
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full">
+            <table className="w-full text-sm">
 
-              {/* ── Orange gradient header ─────────────────────── */}
+              {/* ── Violet gradient header ─────────────────────── */}
               <thead>
                 <tr>
-                  <th colSpan={6} className="px-5 py-3.5 text-left bg-gradient-to-r from-orange-500 to-amber-500">
-                    <span className="text-white font-extrabold text-sm tracking-wide uppercase">
+                  <th colSpan={6} className={`px-5 py-3 text-left ${
+                    isLight
+                      ? 'bg-gradient-to-r from-violet-600 to-purple-500'
+                      : 'bg-gradient-to-r from-violet-700 to-purple-600'
+                  }`}>
+                    <span className="text-white font-bold text-sm tracking-wide uppercase">
                       Custos e Despesas &mdash; {ano}
                     </span>
                   </th>
                 </tr>
 
                 {/* ── Column headers ───────────────────────────── */}
-                <tr className="bg-slate-900 text-white">
-                  <th className={`${headerCellCls} text-left min-w-[260px]`}>Centro de Custo</th>
-                  <th className={headerCellCls}>1o Tri</th>
-                  <th className={headerCellCls}>2o Tri</th>
-                  <th className={headerCellCls}>3o Tri</th>
-                  <th className={headerCellCls}>4o Tri</th>
-                  <th className={headerCellCls}>Total Ano</th>
+                <tr className={isLight ? 'bg-slate-50' : 'bg-slate-700/50'}>
+                  <th className={`${headerCellCls} text-left min-w-[260px] ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>Centro de Custo</th>
+                  <th className={`${headerCellCls} ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>1o Tri</th>
+                  <th className={`${headerCellCls} ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>2o Tri</th>
+                  <th className={`${headerCellCls} ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>3o Tri</th>
+                  <th className={`${headerCellCls} ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>4o Tri</th>
+                  <th className={`${headerCellCls} ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>Total Ano</th>
                 </tr>
               </thead>
 
-              <tbody>
+              <tbody className={`divide-y ${isLight ? 'divide-slate-100' : 'divide-slate-700'}`}>
                 {SECTIONS.map((section, si) => {
                   const st = sectionTotal(section.items)
                   return (
@@ -208,7 +213,7 @@ export default function PlanoOrcamentario() {
                         ? 'bg-slate-100 border-b border-slate-200'
                         : 'bg-white/[0.04] border-b border-white/[0.06]'
                       }>
-                        <td colSpan={6} className={`px-5 py-2.5 text-xs font-extrabold uppercase tracking-wider ${
+                        <td colSpan={6} className={`px-5 py-2.5 text-xs font-bold uppercase tracking-wider ${
                           isLight ? 'text-slate-700' : 'text-slate-200'
                         }`}>
                           {section.title}
@@ -222,14 +227,14 @@ export default function PlanoOrcamentario() {
                         return (
                           <tr
                             key={item}
-                            className={`border-b transition-colors ${
+                            className={`transition-colors ${
                               isLight
-                                ? `${isEven ? 'bg-white' : 'bg-slate-50/50'} border-slate-100 hover:bg-orange-50/40`
-                                : `${isEven ? 'bg-transparent' : 'bg-white/[0.01]'} border-white/[0.04] hover:bg-white/[0.03]`
+                                ? `${isEven ? 'bg-white' : 'bg-slate-50/50'} hover:bg-violet-50/40`
+                                : `${isEven ? 'bg-transparent' : 'bg-white/[0.01]'} hover:bg-slate-700/30`
                             }`}
                           >
                             <td className={`px-5 py-2.5 text-xs ${isLight ? 'text-slate-600' : 'text-slate-300'}`}>
-                              <span className="text-orange-400 mr-2">&bull;</span>
+                              <span className="text-violet-400 mr-2">&bull;</span>
                               {item}
                             </td>
                             <td className={`${cellCls} ${isLight ? 'text-slate-600' : 'text-slate-300'}`}>
@@ -254,27 +259,27 @@ export default function PlanoOrcamentario() {
                       {/* ── Section subtotal ─────────────────────── */}
                       <tr className={
                         isLight
-                          ? 'bg-orange-50/60 border-b-2 border-orange-200/60'
-                          : 'bg-orange-950/20 border-b-2 border-orange-500/20'
+                          ? 'bg-violet-50/60 border-b-2 border-violet-200/60'
+                          : 'bg-violet-950/20 border-b-2 border-violet-500/20'
                       }>
                         <td className={`px-5 py-2 text-xs font-bold ${
-                          isLight ? 'text-orange-700' : 'text-orange-400'
+                          isLight ? 'text-violet-700' : 'text-violet-400'
                         }`}>
                           Subtotal
                         </td>
-                        <td className={`${cellCls} font-bold ${isLight ? 'text-orange-700' : 'text-orange-400'}`}>
+                        <td className={`${cellCls} font-bold ${isLight ? 'text-violet-700' : 'text-violet-400'}`}>
                           {fmtM(st.tri1)}
                         </td>
-                        <td className={`${cellCls} font-bold ${isLight ? 'text-orange-700' : 'text-orange-400'}`}>
+                        <td className={`${cellCls} font-bold ${isLight ? 'text-violet-700' : 'text-violet-400'}`}>
                           {fmtM(st.tri2)}
                         </td>
-                        <td className={`${cellCls} font-bold ${isLight ? 'text-orange-700' : 'text-orange-400'}`}>
+                        <td className={`${cellCls} font-bold ${isLight ? 'text-violet-700' : 'text-violet-400'}`}>
                           {fmtM(st.tri3)}
                         </td>
-                        <td className={`${cellCls} font-bold ${isLight ? 'text-orange-700' : 'text-orange-400'}`}>
+                        <td className={`${cellCls} font-bold ${isLight ? 'text-violet-700' : 'text-violet-400'}`}>
                           {fmtM(st.tri4)}
                         </td>
-                        <td className={`${cellCls} font-bold ${isLight ? 'text-orange-800' : 'text-orange-300'}`}>
+                        <td className={`${cellCls} font-bold ${isLight ? 'text-violet-800' : 'text-violet-300'}`}>
                           {fmtM(st.total)}
                         </td>
                       </tr>
@@ -283,23 +288,27 @@ export default function PlanoOrcamentario() {
                 })}
 
                 {/* ── Grand Total ──────────────────────────────── */}
-                <tr className="bg-gradient-to-r from-slate-900 to-slate-800">
-                  <td className="px-5 py-3.5 text-xs font-extrabold text-white uppercase tracking-wide">
+                <tr className={
+                  isLight
+                    ? 'bg-gradient-to-r from-violet-600 to-purple-500'
+                    : 'bg-gradient-to-r from-violet-700 to-purple-600'
+                }>
+                  <td className="px-5 py-3.5 text-xs font-bold text-white uppercase tracking-wide">
                     Total Custos + Impostos
                   </td>
-                  <td className={`${cellCls} font-extrabold text-orange-400`}>
+                  <td className={`${cellCls} font-bold text-violet-200`}>
                     {fmtM(grandTotal.tri1)}
                   </td>
-                  <td className={`${cellCls} font-extrabold text-orange-400`}>
+                  <td className={`${cellCls} font-bold text-violet-200`}>
                     {fmtM(grandTotal.tri2)}
                   </td>
-                  <td className={`${cellCls} font-extrabold text-orange-400`}>
+                  <td className={`${cellCls} font-bold text-violet-200`}>
                     {fmtM(grandTotal.tri3)}
                   </td>
-                  <td className={`${cellCls} font-extrabold text-orange-400`}>
+                  <td className={`${cellCls} font-bold text-violet-200`}>
                     {fmtM(grandTotal.tri4)}
                   </td>
-                  <td className={`${cellCls} font-extrabold text-white text-sm`}>
+                  <td className={`${cellCls} font-bold text-white text-sm`}>
                     {fmtM(grandTotal.total)}
                   </td>
                 </tr>
@@ -373,22 +382,22 @@ function KPICard({
     emerald: {
       iconBg: isLight ? 'bg-emerald-50' : 'bg-emerald-500/10',
       iconText: 'text-emerald-500',
-      valueCls: 'text-emerald-600',
+      valueCls: isLight ? 'text-emerald-600' : 'text-emerald-400',
     },
     red: {
       iconBg: isLight ? 'bg-red-50' : 'bg-red-500/10',
       iconText: 'text-red-500',
-      valueCls: 'text-red-500',
+      valueCls: isLight ? 'text-red-600' : 'text-red-400',
     },
     amber: {
       iconBg: isLight ? 'bg-amber-50' : 'bg-amber-500/10',
       iconText: 'text-amber-500',
-      valueCls: 'text-amber-600',
+      valueCls: isLight ? 'text-amber-600' : 'text-amber-400',
     },
-    orange: {
-      iconBg: isLight ? 'bg-orange-50' : 'bg-orange-500/10',
-      iconText: 'text-orange-500',
-      valueCls: 'text-orange-600',
+    violet: {
+      iconBg: isLight ? 'bg-violet-50' : 'bg-violet-500/10',
+      iconText: 'text-violet-500',
+      valueCls: isLight ? 'text-violet-600' : 'text-violet-400',
     },
   }
 
@@ -398,7 +407,7 @@ function KPICard({
     <div className={`rounded-2xl border p-4 transition-all hover:scale-[1.01] ${
       isLight
         ? 'bg-white border-slate-200 shadow-sm hover:shadow-md'
-        : 'bg-white/[0.03] border-white/[0.06] hover:border-white/[0.1]'
+        : 'bg-slate-800/60 border-slate-700 hover:border-slate-600'
     }`}>
       <div className="flex items-center gap-3 mb-3">
         <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${c.iconBg} ${c.iconText}`}>

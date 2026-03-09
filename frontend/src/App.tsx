@@ -65,6 +65,7 @@ import EGPLayout from './components/EGPLayout'
 import EGPHome from './pages/pmo/PMOHome'
 import Portfolio from './pages/pmo/Portfolio'
 import PortfolioDetalhe from './pages/pmo/PortfolioDetalhe'
+import NovoPortfolio from './pages/pmo/NovoPortfolio'
 import EAP from './pages/pmo/EAP'
 import EAPHub from './pages/pmo/EAPHub'
 import CronogramaEGP from './pages/pmo/Cronograma'
@@ -280,6 +281,7 @@ export default function App() {
             <Route element={<EGPLayout />}>
               <Route path="/egp"                              element={<EGPHome />} />
               <Route path="/egp/portfolio"                    element={<Portfolio />} />
+              <Route path="/egp/portfolio/novo"               element={<NovoPortfolio />} />
               <Route path="/egp/portfolio/:id"                element={<PortfolioDetalhe />} />
               <Route path="/egp/eap"                          element={<EAPHub />} />
               <Route path="/egp/eap/:portfolioId"             element={<EAP />} />

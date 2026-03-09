@@ -102,7 +102,7 @@ const FALLBACK_INDICADORES: IndicadorCard[] = [
     num: '06',
     tipo: 'FROTA',
     categoria: 'COMBUSTIVEL',
-    tagColor: 'orange',
+    tagColor: 'violet',
     label: 'Custo Combustivel / Producao',
     valorPrincipal: '6,0%',
     descricao: 'Percentual de combustivel sobre a producao mensal',
@@ -191,15 +191,16 @@ export default function PainelIndicadores() {
   const donutPctSaldo = 100 - donutPctSaidas
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 p-4 md:p-6">
 
       {/* ── Page Header ──────────────────────────────────────── */}
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
-          <h1 className={`text-xl font-extrabold ${isLight ? 'text-slate-800' : 'text-white'}`}>
+          <h1 className={`text-xl font-bold flex items-center gap-2 ${isLight ? 'text-slate-800' : 'text-white'}`}>
+            <BarChart3 size={20} className="text-violet-500" />
             Painel de Indicadores
           </h1>
-          <p className={`text-xs mt-0.5 ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>
+          <p className={`text-sm mt-1 ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
             Dashboard executivo de custos unitarios e indicadores de producao
           </p>
         </div>
@@ -211,8 +212,8 @@ export default function PainelIndicadores() {
               onChange={e => setMes(Number(e.target.value))}
               className={`appearance-none pl-4 pr-9 py-2 rounded-xl text-sm font-semibold border cursor-pointer transition-all ${
                 isLight
-                  ? 'bg-white border-slate-200 text-slate-700 hover:border-orange-300 shadow-sm'
-                  : 'bg-white/[0.06] border-white/[0.1] text-white hover:border-orange-500/50'
+                  ? 'bg-white border-slate-200 text-slate-700 hover:border-violet-300 shadow-sm'
+                  : 'bg-slate-700 border-slate-600 text-white hover:border-violet-500/50'
               }`}
             >
               {MONTHS.map((m, i) => (
@@ -230,8 +231,8 @@ export default function PainelIndicadores() {
               onChange={e => setAno(Number(e.target.value))}
               className={`appearance-none pl-4 pr-9 py-2 rounded-xl text-sm font-semibold border cursor-pointer transition-all ${
                 isLight
-                  ? 'bg-white border-slate-200 text-slate-700 hover:border-orange-300 shadow-sm'
-                  : 'bg-white/[0.06] border-white/[0.1] text-white hover:border-orange-500/50'
+                  ? 'bg-white border-slate-200 text-slate-700 hover:border-violet-300 shadow-sm'
+                  : 'bg-slate-700 border-slate-600 text-white hover:border-violet-500/50'
               }`}
             >
               {years.map(y => (
@@ -246,8 +247,8 @@ export default function PainelIndicadores() {
       </div>
 
       {isLoading ? (
-        <div className="flex items-center justify-center py-24">
-          <div className="w-8 h-8 border-[3px] border-orange-500 border-t-transparent rounded-full animate-spin" />
+        <div className="flex items-center justify-center py-20">
+          <div className="w-6 h-6 border-2 border-violet-500/30 border-t-violet-500 rounded-full animate-spin" />
         </div>
       ) : (
         <>
@@ -317,7 +318,7 @@ export default function PainelIndicadores() {
                       value={fmtBRL(resumo.saldo)}
                     />
                     <div className={`text-[11px] font-medium pt-1 border-t ${
-                      isLight ? 'border-slate-100 text-slate-500' : 'border-white/[0.06] text-slate-400'
+                      isLight ? 'border-slate-100 text-slate-500' : 'border-slate-700 text-slate-400'
                     }`}>
                       Entradas {fmtBRL(resumo.total_entradas)}
                     </div>
@@ -413,8 +414,8 @@ export default function PainelIndicadores() {
           {/* ── INDICADORES POR UNIDADE DE PRODUCAO ─────────────── */}
           <div>
             <div className="flex items-center gap-2 mb-4">
-              <BarChart3 size={18} className={isLight ? 'text-orange-500' : 'text-orange-400'} />
-              <h2 className={`text-sm font-extrabold uppercase tracking-wider ${
+              <BarChart3 size={18} className="text-violet-500" />
+              <h2 className={`text-sm font-bold uppercase tracking-wider ${
                 isLight ? 'text-slate-700' : 'text-slate-200'
               }`}>
                 Indicadores por Unidade de Producao
@@ -440,7 +441,7 @@ function SummaryCard({ isLight, children }: { isLight: boolean; children: React.
     <div className={`rounded-2xl border p-5 transition-all ${
       isLight
         ? 'bg-white border-slate-200 shadow-sm hover:shadow-md'
-        : 'bg-white/[0.03] border-white/[0.06] hover:border-white/[0.1]'
+        : 'bg-slate-800/60 border-slate-700 hover:border-slate-600'
     }`}>
       {children}
     </div>
@@ -470,7 +471,7 @@ function SubMetric({
 }: { isLight: boolean; icon: React.ReactNode; label: string; value: string; valueColor?: string }) {
   return (
     <div className={`rounded-xl p-2.5 ${
-      isLight ? 'bg-slate-50' : 'bg-white/[0.03]'
+      isLight ? 'bg-slate-50' : 'bg-slate-700/30'
     }`}>
       <div className="flex items-center gap-1.5 mb-1">
         <span className={isLight ? 'text-slate-400' : 'text-slate-500'}>{icon}</span>
@@ -499,10 +500,10 @@ function MiniKPI({
     red: isLight ? 'bg-red-50' : 'bg-red-500/10',
   }
   const textMap: Record<string, string> = {
-    emerald: 'text-emerald-600',
+    emerald: isLight ? 'text-emerald-600' : 'text-emerald-400',
     amber: isLight ? 'text-amber-600' : 'text-amber-400',
     blue: isLight ? 'text-blue-600' : 'text-blue-400',
-    red: 'text-red-500',
+    red: isLight ? 'text-red-600' : 'text-red-400',
   }
   return (
     <div className={`rounded-xl p-2 text-center ${bgMap[color] ?? bgMap.emerald}`}>
@@ -537,7 +538,7 @@ function IndicadorCardUI({
     emerald: isLight ? 'bg-emerald-100 text-emerald-700' : 'bg-emerald-500/20 text-emerald-400',
     amber: isLight ? 'bg-amber-100 text-amber-700' : 'bg-amber-500/20 text-amber-400',
     rose: isLight ? 'bg-rose-100 text-rose-700' : 'bg-rose-500/20 text-rose-400',
-    orange: isLight ? 'bg-orange-100 text-orange-700' : 'bg-orange-500/20 text-orange-400',
+    violet: isLight ? 'bg-violet-100 text-violet-700' : 'bg-violet-500/20 text-violet-400',
     blue: isLight ? 'bg-blue-100 text-blue-700' : 'bg-blue-500/20 text-blue-400',
     slate: isLight ? 'bg-slate-100 text-slate-600' : 'bg-slate-500/20 text-slate-400',
   }
@@ -546,7 +547,7 @@ function IndicadorCardUI({
     emerald: 'bg-emerald-500',
     amber: 'bg-amber-500',
     rose: 'bg-rose-500',
-    orange: 'bg-orange-500',
+    violet: 'bg-violet-500',
     blue: 'bg-blue-500',
     slate: 'bg-slate-500',
   }
@@ -558,15 +559,15 @@ function IndicadorCardUI({
     <div className={`group rounded-2xl border p-5 transition-all hover:scale-[1.01] ${
       isLight
         ? 'bg-white border-slate-200 shadow-sm hover:shadow-lg'
-        : 'bg-white/[0.03] border-white/[0.06] hover:border-white/[0.12]'
+        : 'bg-slate-800/60 border-slate-700 hover:border-slate-600'
     }`}>
       {/* Top: number badge + category tag */}
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2.5">
           <span className={`w-8 h-8 rounded-lg flex items-center justify-center text-xs font-black ${
             isLight
-              ? 'bg-gradient-to-br from-slate-800 to-slate-700 text-white'
-              : 'bg-gradient-to-br from-slate-600 to-slate-700 text-white'
+              ? 'bg-violet-100 text-violet-700'
+              : 'bg-violet-500/20 text-violet-400'
           }`}>
             {num}
           </span>
@@ -607,7 +608,7 @@ function IndicadorCardUI({
           </span>
         </div>
         <div className={`w-full h-2 rounded-full overflow-hidden ${
-          isLight ? 'bg-slate-100' : 'bg-white/[0.06]'
+          isLight ? 'bg-slate-100' : 'bg-slate-700/50'
         }`}>
           <div
             className={`h-full rounded-full transition-all duration-700 ${barColorMap[tagColor] ?? barColorMap.slate}`}
@@ -618,7 +619,7 @@ function IndicadorCardUI({
 
       {/* Bottom metrics */}
       <div className={`flex items-center justify-between text-[11px] pt-3 border-t ${
-        isLight ? 'border-slate-100' : 'border-white/[0.06]'
+        isLight ? 'border-slate-100' : 'border-slate-700'
       }`}>
         <div className="flex items-center gap-1.5">
           <DollarSign size={12} className={isLight ? 'text-slate-300' : 'text-slate-600'} />

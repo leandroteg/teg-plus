@@ -137,129 +137,142 @@ export default function ControleOrcamentario() {
   // ── Render ─────────────────────────────────────────────────────────────────
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-6 p-4 md:p-6">
 
-      {/* ── Dark Navy Header ──────────────────────────────────── */}
-      <div className="rounded-2xl overflow-hidden bg-gradient-to-br from-slate-900 via-[#0f172a] to-[#1e1b4b] border border-white/[0.06] shadow-2xl">
-        <div className="px-6 py-5">
-          <div className="flex items-start justify-between">
-            <div>
-              <h1 className="text-lg font-extrabold text-white tracking-tight flex items-center gap-2">
-                <span className="text-indigo-400">TEG</span>
-                <span className="text-white/30">&middot;</span>
-                <span>ORCADO vs. REALIZADO</span>
-                <span className="text-white/30">&middot;</span>
-                <span className="text-sky-400 uppercase">{mesLabel} / {ano}</span>
-              </h1>
-              <p className="text-[11px] text-slate-400 mt-1 tracking-wide">
-                Painel Executivo de Acompanhamento Orcamentario &middot; Visao Diretoria
-              </p>
-              <p className="text-[10px] text-amber-400/80 mt-1.5 flex items-center gap-1.5">
-                <Star size={10} className="fill-amber-400 text-amber-400" />
-                Contas marcadas com <span className="font-bold">&#9733;</span> possuem Plano de Acao ativo
-              </p>
-            </div>
-
-            {/* ── Month / Year selectors ───────────────────── */}
-            <div className="flex items-center gap-2">
-              <div className="relative">
-                <select
-                  value={mes}
-                  onChange={e => setMes(Number(e.target.value))}
-                  className="appearance-none pl-3 pr-8 py-2 rounded-xl text-xs font-semibold border cursor-pointer transition-all bg-white/[0.06] border-white/[0.1] text-white hover:border-indigo-500/50"
-                >
-                  {MONTHS.map((m, i) => (
-                    <option key={i} value={i + 1} className="bg-slate-900 text-white">{m}</option>
-                  ))}
-                </select>
-                <ChevronDown size={12} className="absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none text-slate-500" />
-              </div>
-              <div className="relative">
-                <select
-                  value={ano}
-                  onChange={e => setAno(Number(e.target.value))}
-                  className="appearance-none pl-3 pr-8 py-2 rounded-xl text-xs font-semibold border cursor-pointer transition-all bg-white/[0.06] border-white/[0.1] text-white hover:border-indigo-500/50"
-                >
-                  {years.map(y => (
-                    <option key={y} value={y} className="bg-slate-900 text-white">{y}</option>
-                  ))}
-                </select>
-                <ChevronDown size={12} className="absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none text-slate-500" />
-              </div>
-            </div>
-          </div>
+      {/* ── Page Header ──────────────────────────────────────── */}
+      <div className="flex items-start justify-between flex-wrap gap-3">
+        <div>
+          <h1 className={`text-xl font-bold flex items-center gap-2 ${isLight ? 'text-slate-800' : 'text-white'}`}>
+            <Target size={20} className="text-violet-500" />
+            Orcado vs. Realizado
+          </h1>
+          <p className={`text-sm mt-1 ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
+            Painel Executivo de Acompanhamento Orcamentario &middot; {mesLabel} / {ano}
+          </p>
+          <p className={`text-[10px] mt-1.5 flex items-center gap-1.5 ${isLight ? 'text-amber-600' : 'text-amber-400/80'}`}>
+            <Star size={10} className="fill-amber-400 text-amber-400" />
+            Contas marcadas com <span className="font-bold">&#9733;</span> possuem Plano de Acao ativo
+          </p>
         </div>
 
-        {/* ── KPI Strip ──────────────────────────────────────── */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 border-t border-white/[0.06]">
-          <KPIStrip
-            icon={<Target size={14} />}
-            label="Desvio Total"
-            value={`${kpis.desvioTotal >= 0 ? '+' : ''}${kpis.desvioTotal.toFixed(1)}%`}
-            color={Math.abs(kpis.desvioTotal) <= 5 ? 'emerald' : 'red'}
-          />
-          <KPIStrip
-            icon={<TrendingDown size={14} />}
-            label="Favoraveis"
-            value={`${kpis.favoravelCount} contas`}
-            color="emerald"
-          />
-          <KPIStrip
-            icon={<TrendingUp size={14} />}
-            label="Desfavoraveis"
-            value={`${kpis.desfavoravelCount} contas`}
-            color="red"
-          />
-          <KPIStrip
-            icon={<Star size={14} className="fill-amber-400 text-amber-400" />}
-            label="Planos de Acao"
-            value={`${kpis.planoAcaoCount} ativos`}
-            color="amber"
-          />
+        {/* ── Month / Year selectors ───────────────────── */}
+        <div className="flex items-center gap-2">
+          <div className="relative">
+            <select
+              value={mes}
+              onChange={e => setMes(Number(e.target.value))}
+              className={`appearance-none pl-3 pr-8 py-2 rounded-xl text-xs font-semibold border cursor-pointer transition-all ${
+                isLight
+                  ? 'bg-white border-slate-200 text-slate-700 hover:border-violet-300 shadow-sm'
+                  : 'bg-slate-700 border-slate-600 text-white hover:border-violet-500/50'
+              }`}
+            >
+              {MONTHS.map((m, i) => (
+                <option key={i} value={i + 1}>{m}</option>
+              ))}
+            </select>
+            <ChevronDown size={12} className={`absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none ${
+              isLight ? 'text-slate-400' : 'text-slate-500'
+            }`} />
+          </div>
+          <div className="relative">
+            <select
+              value={ano}
+              onChange={e => setAno(Number(e.target.value))}
+              className={`appearance-none pl-3 pr-8 py-2 rounded-xl text-xs font-semibold border cursor-pointer transition-all ${
+                isLight
+                  ? 'bg-white border-slate-200 text-slate-700 hover:border-violet-300 shadow-sm'
+                  : 'bg-slate-700 border-slate-600 text-white hover:border-violet-500/50'
+              }`}
+            >
+              {years.map(y => (
+                <option key={y} value={y}>{y}</option>
+              ))}
+            </select>
+            <ChevronDown size={12} className={`absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none ${
+              isLight ? 'text-slate-400' : 'text-slate-500'
+            }`} />
+          </div>
         </div>
       </div>
 
+      {/* ── KPI Cards ──────────────────────────────────────── */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <KPICard
+          isLight={isLight}
+          icon={<Target size={14} />}
+          label="Desvio Total"
+          value={`${kpis.desvioTotal >= 0 ? '+' : ''}${kpis.desvioTotal.toFixed(1)}%`}
+          color={Math.abs(kpis.desvioTotal) <= 5 ? 'emerald' : 'red'}
+        />
+        <KPICard
+          isLight={isLight}
+          icon={<TrendingDown size={14} />}
+          label="Favoraveis"
+          value={`${kpis.favoravelCount} contas`}
+          color="emerald"
+        />
+        <KPICard
+          isLight={isLight}
+          icon={<TrendingUp size={14} />}
+          label="Desfavoraveis"
+          value={`${kpis.desfavoravelCount} contas`}
+          color="red"
+        />
+        <KPICard
+          isLight={isLight}
+          icon={<Star size={14} className="fill-amber-400 text-amber-400" />}
+          label="Planos de Acao"
+          value={`${kpis.planoAcaoCount} ativos`}
+          color="amber"
+        />
+      </div>
+
       {/* ── Table ─────────────────────────────────────────────── */}
-      <div className={`rounded-2xl overflow-hidden border ${
-        isLight ? 'border-slate-200 shadow-sm' : 'border-white/[0.06]'
+      <div className={`rounded-2xl overflow-hidden border shadow-sm ${
+        isLight ? 'bg-white border-slate-200' : 'bg-slate-800/60 border-slate-700'
       }`}>
         {isLoading ? (
           <div className="flex items-center justify-center py-20">
-            <div className="w-7 h-7 border-[3px] border-indigo-500 border-t-transparent rounded-full animate-spin" />
+            <div className="w-6 h-6 border-2 border-violet-500/30 border-t-violet-500 rounded-full animate-spin" />
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full">
+            <table className="w-full text-sm">
 
               {/* ── Column headers ───────────────────────────── */}
               <thead>
                 <tr>
-                  <th colSpan={7} className="px-5 py-3 text-left bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900">
-                    <span className="text-white font-extrabold text-xs tracking-wide uppercase">
+                  <th colSpan={7} className={`px-5 py-3 text-left ${
+                    isLight
+                      ? 'bg-gradient-to-r from-violet-600 to-purple-500'
+                      : 'bg-gradient-to-r from-violet-700 to-purple-600'
+                  }`}>
+                    <span className="text-white font-bold text-xs tracking-wide uppercase">
                       Controle Orcamentario &mdash; {mesLabel} / {ano}
                     </span>
                   </th>
                 </tr>
-                <tr className="bg-slate-900 text-white">
-                  <th className="px-4 py-3 text-left text-[10px] font-bold uppercase tracking-wider min-w-[200px]">
+                <tr className={isLight ? 'bg-slate-50' : 'bg-slate-700/50'}>
+                  <th className={`px-4 py-2.5 text-left text-[10px] font-semibold uppercase tracking-wider min-w-[200px] ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
                     Conta / Descricao
                   </th>
-                  <th className="px-3 py-3 text-left text-[10px] font-bold uppercase tracking-wider min-w-[180px]">
+                  <th className={`px-3 py-2.5 text-left text-[10px] font-semibold uppercase tracking-wider min-w-[180px] ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
                     Premissa do Orcamento
                   </th>
-                  <th className="px-3 py-3 text-center text-[10px] font-bold uppercase tracking-wider whitespace-nowrap">
+                  <th className={`px-3 py-2.5 text-center text-[10px] font-semibold uppercase tracking-wider whitespace-nowrap ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
                     Orcado {mes}/{ano}
                   </th>
-                  <th className="px-3 py-3 text-center text-[10px] font-bold uppercase tracking-wider whitespace-nowrap">
+                  <th className={`px-3 py-2.5 text-center text-[10px] font-semibold uppercase tracking-wider whitespace-nowrap ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
                     Realizado {mes}/{ano}
                   </th>
-                  <th className="px-3 py-3 text-center text-[10px] font-bold uppercase tracking-wider min-w-[110px]">
+                  <th className={`px-3 py-2.5 text-center text-[10px] font-semibold uppercase tracking-wider min-w-[110px] ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
                     Variacao (R$)
                   </th>
-                  <th className="px-3 py-3 text-left text-[10px] font-bold uppercase tracking-wider min-w-[180px]">
+                  <th className={`px-3 py-2.5 text-left text-[10px] font-semibold uppercase tracking-wider min-w-[180px] ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
                     Desvio / Variacao
                   </th>
-                  <th className="px-3 py-3 text-left text-[10px] font-bold uppercase tracking-wider min-w-[180px]">
+                  <th className={`px-3 py-2.5 text-left text-[10px] font-semibold uppercase tracking-wider min-w-[180px] ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
                     <span className="flex items-center gap-1">
                       <Star size={10} className="fill-amber-400 text-amber-400" />
                       Plano de Acao
@@ -268,7 +281,7 @@ export default function ControleOrcamentario() {
                 </tr>
               </thead>
 
-              <tbody>
+              <tbody className={`divide-y ${isLight ? 'divide-slate-100' : 'divide-slate-700'}`}>
                 {SECTIONS.map((section, si) => {
                   const st = sectionTotal(section.items)
                   return (
@@ -278,7 +291,7 @@ export default function ControleOrcamentario() {
                         ? 'bg-slate-100 border-b border-slate-200'
                         : 'bg-white/[0.04] border-b border-white/[0.06]'
                       }>
-                        <td colSpan={7} className={`px-5 py-2.5 text-[10px] font-extrabold uppercase tracking-wider ${
+                        <td colSpan={7} className={`px-5 py-2.5 text-[10px] font-bold uppercase tracking-wider ${
                           isLight ? 'text-slate-700' : 'text-slate-200'
                         }`}>
                           {section.title}
@@ -300,10 +313,10 @@ export default function ControleOrcamentario() {
                         return (
                           <tr
                             key={item}
-                            className={`border-b transition-colors ${
+                            className={`transition-colors ${
                               isLight
-                                ? `${isEven ? 'bg-white' : 'bg-slate-50/50'} ${goldHighlightLight} border-slate-100 hover:bg-indigo-50/40`
-                                : `${isEven ? 'bg-transparent' : 'bg-white/[0.01]'} ${goldHighlightDark} border-white/[0.04] hover:bg-white/[0.03]`
+                                ? `${isEven ? 'bg-white' : 'bg-slate-50/50'} ${goldHighlightLight} hover:bg-violet-50/40`
+                                : `${isEven ? 'bg-transparent' : 'bg-white/[0.01]'} ${goldHighlightDark} hover:bg-slate-700/30`
                             }`}
                           >
                             {/* Conta */}
@@ -312,14 +325,14 @@ export default function ControleOrcamentario() {
                                 {hasPlano && (
                                   <Star size={11} className="fill-amber-400 text-amber-400 flex-shrink-0" />
                                 )}
-                                <span className={`${isLight ? 'text-indigo-500' : 'text-indigo-400'} mr-1`}>&bull;</span>
+                                <span className={`${isLight ? 'text-violet-500' : 'text-violet-400'} mr-1`}>&bull;</span>
                                 {item}
                               </span>
                             </td>
 
                             {/* Premissa */}
                             <td className={`px-3 py-2.5 text-[10px] leading-tight ${isLight ? 'text-slate-500' : 'text-slate-500'}`}>
-                              {r.premissa || <span className="text-slate-400/40 italic">---</span>}
+                              {r.premissa || <span className={`italic ${isLight ? 'text-slate-300' : 'text-slate-600'}`}>---</span>}
                             </td>
 
                             {/* Orcado */}
@@ -336,9 +349,9 @@ export default function ControleOrcamentario() {
                             <td className="px-3 py-2.5 text-right font-mono text-xs whitespace-nowrap">
                               <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[11px] font-bold ${
                                 isFavoravel
-                                  ? 'bg-emerald-500/10 text-emerald-500'
+                                  ? (isLight ? 'bg-emerald-100 text-emerald-700' : 'bg-emerald-500/15 text-emerald-400')
                                   : isDesfavoravel
-                                    ? 'bg-red-500/10 text-red-500'
+                                    ? (isLight ? 'bg-red-100 text-red-700' : 'bg-red-500/15 text-red-400')
                                     : isLight ? 'text-slate-400' : 'text-slate-500'
                               }`}>
                                 {isFavoravel && <TrendingDown size={10} />}
@@ -349,14 +362,14 @@ export default function ControleOrcamentario() {
 
                             {/* Desvio explicacao */}
                             <td className={`px-3 py-2.5 text-[10px] leading-tight ${isLight ? 'text-slate-500' : 'text-slate-500'}`}>
-                              {r.desvio_explicacao || <span className="text-slate-400/40 italic">---</span>}
+                              {r.desvio_explicacao || <span className={`italic ${isLight ? 'text-slate-300' : 'text-slate-600'}`}>---</span>}
                             </td>
 
                             {/* Plano de acao */}
                             <td className={`px-3 py-2.5 text-[10px] leading-tight ${
                               hasPlano
-                                ? 'text-amber-600 dark:text-amber-400 font-medium'
-                                : isLight ? 'text-slate-400/40' : 'text-slate-600'
+                                ? (isLight ? 'text-amber-600 font-medium' : 'text-amber-400 font-medium')
+                                : isLight ? 'text-slate-300' : 'text-slate-600'
                             }`}>
                               {r.plano_acao || <span className="italic">---</span>}
                             </td>
@@ -367,27 +380,30 @@ export default function ControleOrcamentario() {
                       {/* ── Section subtotal ─────────────────────── */}
                       <tr className={
                         isLight
-                          ? 'bg-indigo-50/60 border-b-2 border-indigo-200/60'
-                          : 'bg-indigo-950/20 border-b-2 border-indigo-500/20'
+                          ? 'bg-violet-50/60 border-b-2 border-violet-200/60'
+                          : 'bg-violet-950/20 border-b-2 border-violet-500/20'
                       }>
                         <td className={`px-5 py-2 text-xs font-bold ${
-                          isLight ? 'text-indigo-700' : 'text-indigo-400'
+                          isLight ? 'text-violet-700' : 'text-violet-400'
                         }`}>
                           Subtotal
                         </td>
                         <td />
                         <td className={`px-3 py-2 text-right font-mono text-xs font-bold ${
-                          isLight ? 'text-indigo-700' : 'text-indigo-400'
+                          isLight ? 'text-violet-700' : 'text-violet-400'
                         }`}>
                           {fmtBRL(st.orcado)}
                         </td>
                         <td className={`px-3 py-2 text-right font-mono text-xs font-bold ${
-                          isLight ? 'text-indigo-700' : 'text-indigo-400'
+                          isLight ? 'text-violet-700' : 'text-violet-400'
                         }`}>
                           {fmtBRL(st.realizado)}
                         </td>
                         <td className="px-3 py-2 text-right font-mono text-xs font-bold">
-                          <span className={st.variacao >= 0 ? 'text-emerald-500' : 'text-red-500'}>
+                          <span className={st.variacao >= 0
+                            ? (isLight ? 'text-emerald-600' : 'text-emerald-400')
+                            : (isLight ? 'text-red-600' : 'text-red-400')
+                          }>
                             {fmtVariacao(st.variacao)}
                           </span>
                         </td>
@@ -399,22 +415,26 @@ export default function ControleOrcamentario() {
                 })}
 
                 {/* ── Grand Total ──────────────────────────────── */}
-                <tr className="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900">
-                  <td className="px-5 py-3.5 text-xs font-extrabold text-white uppercase tracking-wide">
+                <tr className={
+                  isLight
+                    ? 'bg-gradient-to-r from-violet-600 to-purple-500'
+                    : 'bg-gradient-to-r from-violet-700 to-purple-600'
+                }>
+                  <td className="px-5 py-3.5 text-xs font-bold text-white uppercase tracking-wide">
                     Total Geral
                   </td>
                   <td />
-                  <td className="px-3 py-3.5 text-right font-mono text-xs font-extrabold text-indigo-300">
+                  <td className="px-3 py-3.5 text-right font-mono text-xs font-bold text-violet-200">
                     {fmtBRL(grandTotal.orcado)}
                   </td>
-                  <td className="px-3 py-3.5 text-right font-mono text-xs font-extrabold text-white">
+                  <td className="px-3 py-3.5 text-right font-mono text-xs font-bold text-white">
                     {fmtBRL(grandTotal.realizado)}
                   </td>
-                  <td className="px-3 py-3.5 text-right font-mono text-xs font-extrabold">
+                  <td className="px-3 py-3.5 text-right font-mono text-xs font-bold">
                     <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs ${
                       grandTotal.variacao >= 0
-                        ? 'bg-emerald-500/20 text-emerald-400'
-                        : 'bg-red-500/20 text-red-400'
+                        ? 'bg-emerald-500/20 text-emerald-300'
+                        : 'bg-red-500/20 text-red-300'
                     }`}>
                       {grandTotal.variacao >= 0 ? <CheckCircle2 size={12} /> : <AlertTriangle size={12} />}
                       {fmtVariacao(grandTotal.variacao)}
@@ -431,7 +451,7 @@ export default function ControleOrcamentario() {
 
       {/* ── Legend ──────────────────────────────────────────── */}
       <div className={`flex flex-wrap items-center gap-5 px-4 py-3 rounded-xl text-[10px] ${
-        isLight ? 'bg-slate-50 text-slate-500' : 'bg-white/[0.02] text-slate-500'
+        isLight ? 'bg-slate-50 text-slate-500' : 'bg-slate-800/60 text-slate-500'
       }`}>
         <span className="flex items-center gap-1.5">
           <span className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
@@ -446,7 +466,7 @@ export default function ControleOrcamentario() {
           Plano de Acao ativo
         </span>
         <span className="flex items-center gap-1.5">
-          <span className="w-2.5 h-2.5 rounded-full bg-indigo-500" />
+          <span className="w-2.5 h-2.5 rounded-full bg-violet-500" />
           Subtotais de secao
         </span>
       </div>
@@ -454,33 +474,63 @@ export default function ControleOrcamentario() {
   )
 }
 
-// ── KPI Strip Item ─────────────────────────────────────────────────────────────
+// ── KPI Card ─────────────────────────────────────────────────────────────────
 
-function KPIStrip({
+function KPICard({
+  isLight,
   icon,
   label,
   value,
   color,
 }: {
+  isLight: boolean
   icon: React.ReactNode
   label: string
   value: string
-  color: 'emerald' | 'red' | 'amber' | 'indigo'
+  color: 'emerald' | 'red' | 'amber' | 'violet'
 }) {
   const colorMap = {
-    emerald: 'text-emerald-400',
-    red: 'text-red-400',
-    amber: 'text-amber-400',
-    indigo: 'text-indigo-400',
+    emerald: {
+      iconBg: isLight ? 'bg-emerald-50' : 'bg-emerald-500/10',
+      iconText: 'text-emerald-500',
+      valueCls: isLight ? 'text-emerald-600' : 'text-emerald-400',
+    },
+    red: {
+      iconBg: isLight ? 'bg-red-50' : 'bg-red-500/10',
+      iconText: 'text-red-500',
+      valueCls: isLight ? 'text-red-600' : 'text-red-400',
+    },
+    amber: {
+      iconBg: isLight ? 'bg-amber-50' : 'bg-amber-500/10',
+      iconText: 'text-amber-500',
+      valueCls: isLight ? 'text-amber-600' : 'text-amber-400',
+    },
+    violet: {
+      iconBg: isLight ? 'bg-violet-50' : 'bg-violet-500/10',
+      iconText: 'text-violet-500',
+      valueCls: isLight ? 'text-violet-600' : 'text-violet-400',
+    },
   }
 
+  const c = colorMap[color] ?? colorMap.emerald
+
   return (
-    <div className="flex items-center gap-2.5 px-5 py-3 border-r border-white/[0.06] last:border-r-0">
-      <div className={`${colorMap[color]}`}>{icon}</div>
-      <div>
-        <div className={`text-sm font-extrabold ${colorMap[color]}`}>{value}</div>
-        <div className="text-[10px] text-slate-500 uppercase tracking-wider">{label}</div>
+    <div className={`rounded-2xl border p-4 transition-all ${
+      isLight
+        ? 'bg-white border-slate-200 shadow-sm'
+        : 'bg-slate-800/60 border-slate-700'
+    }`}>
+      <div className="flex items-center gap-2.5 mb-2">
+        <div className={`w-8 h-8 rounded-xl flex items-center justify-center ${c.iconBg} ${c.iconText}`}>
+          {icon}
+        </div>
+        <span className={`text-[10px] font-semibold uppercase tracking-wider ${
+          isLight ? 'text-slate-400' : 'text-slate-500'
+        }`}>
+          {label}
+        </span>
       </div>
+      <div className={`text-lg font-extrabold ${c.valueCls}`}>{value}</div>
     </div>
   )
 }
