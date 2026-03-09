@@ -411,8 +411,8 @@ export default function ListaRequisicoes() {
                           onClick={() => {
                             emitirPedidoMutation.mutate({
                               requisicaoId: r.id,
-                              cotacaoId: '', // will be resolved from DB trigger
-                              fornecedorNome: r.comprador_nome ?? 'N/A',
+                              cotacaoId: '',
+                              fornecedorNome: 'N/A',
                               valorTotal: r.valor_estimado,
                             }, {
                               onSuccess: (pedido) => {

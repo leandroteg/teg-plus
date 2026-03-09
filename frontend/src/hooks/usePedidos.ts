@@ -109,10 +109,33 @@ export function useEmitirPedido() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (payload: EmitirPedidoPayload) => {
-      const {
+      let {
         requisicaoId, cotacaoId, fornecedorNome, valorTotal,
         compradorId, condicaoPagamento, observacoes, dataPrevistaEntrega,
       } = payload
+
+      // 0. Resolve cotação a partir da RC se não informada
+      if (!cotacaoId) {
+        const { data: cot } = await supabase
+          .from('cmp_cotacoes')
+          .select('id, comprador_id, fornecedor_selecionado_nome, valor_selecionado')
+          .eq('requisicao_id', requisicaoId)
+          .eq('status', 'concluida')
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle()
+
+        if (!cot) throw new Error('Cotação concluída não encontrada para esta requisição.')
+
+        cotacaoId = cot.id
+        if (!compradorId) compradorId = cot.comprador_id ?? undefined
+        if (cot.fornecedor_selecionado_nome && fornecedorNome === 'N/A') {
+          fornecedorNome = cot.fornecedor_selecionado_nome
+        }
+        if (cot.valor_selecionado && cot.valor_selecionado > 0) {
+          valorTotal = cot.valor_selecionado
+        }
+      }
 
       // 1. Gera número do pedido: PO-YYYYMM-XXXX
       const now = new Date()

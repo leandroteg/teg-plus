@@ -393,7 +393,7 @@ export default function RequisicaoDetalhe() {
                       cotacaoId: cotacao?.id ?? '',
                       fornecedorNome: cotacao?.fornecedor_selecionado_nome ?? 'N/A',
                       valorTotal: cotacao?.valor_selecionado ?? req.valor_estimado,
-                      compradorId: cotacao?.comprador_id,
+                      compradorId: cotacao?.comprador_id ?? undefined,
                     }, {
                       onSuccess: (pedido) => {
                         setPedidoToast({ type: 'success', msg: `Pedido ${pedido.numero_pedido} emitido ✓` })
