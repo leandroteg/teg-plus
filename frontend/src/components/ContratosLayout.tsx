@@ -1,17 +1,16 @@
 import {
-  LayoutDashboard, FileText, FilePlus, CalendarDays,
-  FileSignature, TrendingUp, ClipboardList, Wallet,
+  LayoutDashboard, FilePlus, ClipboardList,
+  FileSignature, Briefcase, Users,
 } from 'lucide-react'
 import ModuleLayout from './ModuleLayout'
 
 const NAV = [
   { to: '/contratos',              icon: LayoutDashboard,  label: 'Painel',          end: true  },
-  { to: '/contratos/lista',        icon: FileText,         label: 'Contratos'       },
-  { to: '/contratos/novo',         icon: FilePlus,         label: 'Novo'            },
+  { to: '/contratos/novo',         icon: FilePlus,         label: 'Novo Contrato'   },
   { to: '/contratos/solicitacoes', icon: ClipboardList,    label: 'Solicitacoes'    },
-  { to: '/contratos/previsao',     icon: Wallet,           label: 'Provisionado'   },
-  { to: '/contratos/aditivos',     icon: FileSignature,    label: 'Aditivos'        },
-  { to: '/contratos/reajustes',    icon: TrendingUp,       label: 'Reajustes'       },
+  { to: '/contratos/assinaturas',  icon: FileSignature,    label: 'Assinaturas'     },
+  { to: '/contratos/gestao',       icon: Briefcase,        label: 'Gestao'          },
+  { to: '/contratos/equipe-pj',    icon: Users,            label: 'Equipe PJ'       },
 ]
 
 export default function ContratosLayout() {
@@ -22,7 +21,7 @@ export default function ContratosLayout() {
       moduleEmoji="📋"
       accent="indigo"
       nav={NAV}
-      bottomNavMaxItems={5}
+      bottomNavMaxItems={6}
     />
   )
 }
