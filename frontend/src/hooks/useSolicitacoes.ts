@@ -537,11 +537,20 @@ export function useMelhorarMinuta() {
   })
 }
 
+// ── Minuta Texto Estruturado (retornado pelo n8n AI) ─────────────────────────
+
+export interface MinutaTextoGerado {
+  preambulo: string
+  clausulas: Array<{ numero: string; titulo: string; conteudo: string }>
+  disposicoes_finais: string
+  local_data: string
+}
+
 // ── Gerar Minuta PDF via AI (n8n webhook) ────────────────────────────────────
 
 export function useGerarMinutaPDF() {
   return useMutation<
-    { success: boolean; html: string; titulo: string },
+    { success: boolean; minuta_texto: MinutaTextoGerado; titulo: string; parse_fallback?: boolean },
     Error,
     {
       titulo: string

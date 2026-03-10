@@ -1,8 +1,10 @@
 import { useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeft, CalendarDays, Filter } from 'lucide-react'
+import { ArrowLeft, CalendarDays, Filter, Sparkles, Loader2, CheckCircle2, AlertTriangle } from 'lucide-react'
+import { useQueryClient } from '@tanstack/react-query'
 import { useTheme } from '../../contexts/ThemeContext'
-import { useTarefas, usePortfolio } from '../../hooks/usePMO'
+import { useTarefas, usePortfolio, useEAP, useTAP, useGerarCronogramaIA } from '../../hooks/usePMO'
+import { supabase } from '../../services/supabase'
 import type { StatusTarefa, PrioridadeTarefa } from '../../types/pmo'
 
 const fmtData = (d?: string) =>
@@ -35,6 +37,7 @@ export default function Cronograma() {
   const { isLightSidebar: isLight } = useTheme()
   const { portfolioId } = useParams<{ portfolioId: string }>()
   const nav = useNavigate()
+  const qc = useQueryClient()
   const [statusFilter, setStatusFilter] = useState('')
 
   const { data: portfolio } = usePortfolio(portfolioId)
@@ -42,6 +45,50 @@ export default function Cronograma() {
     portfolioId,
     statusFilter ? { status: statusFilter } : undefined
   )
+  const { data: eapItens } = useEAP(portfolioId)
+  const { data: tap } = useTAP(portfolioId)
+  const gerarIA = useGerarCronogramaIA()
+
+  const [gerando, setGerando] = useState(false)
+  const [aiMsg, setAiMsg] = useState<string | null>(null)
+  const [confirmGerar, setConfirmGerar] = useState(false)
+
+  const doGerarCronograma = async () => {
+    if (!portfolioId || !portfolio) return
+    setConfirmGerar(false)
+    setGerando(true)
+    setAiMsg(null)
+    try {
+      const result = await gerarIA.mutateAsync({
+        portfolio_id: portfolioId,
+        obra_nome: portfolio.nome_obra,
+        eap_itens: eapItens ?? undefined,
+        tap_dados: tap ?? undefined,
+      })
+      // Delete existing tasks and insert AI-generated ones
+      if ((tarefas ?? []).length > 0) {
+        await supabase.from('pmo_tarefas').delete().eq('portfolio_id', portfolioId)
+      }
+      if (Array.isArray(result) && result.length > 0) {
+        const rows = result.map((it, idx) => ({
+          ...it,
+          portfolio_id: portfolioId,
+          ordem: idx + 1,
+          percentual_concluido: it.percentual_concluido ?? 0,
+          status: it.status ?? 'a_fazer',
+          prioridade: it.prioridade ?? 'media',
+          tipo_dependencia: it.tipo_dependencia ?? 'fim_inicio',
+        }))
+        await supabase.from('pmo_tarefas').insert(rows)
+      }
+      qc.invalidateQueries({ queryKey: ['pmo-tarefas', portfolioId] })
+      setAiMsg('Cronograma gerado com sucesso via IA! Revise as tarefas.')
+    } catch {
+      setAiMsg('Erro ao gerar cronograma via IA. Tente novamente.')
+    } finally {
+      setGerando(false)
+    }
+  }
 
   if (isLoading) {
     return (
@@ -76,21 +123,67 @@ export default function Cronograma() {
             </p>
           )}
         </div>
-        <div className={`flex items-center gap-2 rounded-xl border px-3 py-2 ${
-          isLight ? 'bg-white border-slate-200' : 'bg-white/[0.03] border-white/[0.06]'
-        }`}>
-          <Filter size={14} className={isLight ? 'text-slate-400' : 'text-slate-500'} />
-          <select
-            value={statusFilter}
-            onChange={e => setStatusFilter(e.target.value)}
-            className={`bg-transparent text-sm outline-none ${isLight ? 'text-slate-700' : 'text-slate-200'}`}
+        <div className="flex items-center gap-2 flex-wrap">
+          <button
+            onClick={() => items.length > 0 ? setConfirmGerar(true) : doGerarCronograma()}
+            disabled={gerando}
+            className="inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-500 to-indigo-500 text-white rounded-xl text-sm font-semibold hover:from-blue-600 hover:to-indigo-600 transition-all shadow-lg shadow-blue-500/25 disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {STATUS_OPTIONS.map(o => (
-              <option key={o.value} value={o.value}>{o.label}</option>
-            ))}
-          </select>
+            {gerando ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />}
+            {gerando ? 'Gerando...' : 'Gerar com IA'}
+          </button>
+          <div className={`flex items-center gap-2 rounded-xl border px-3 py-2 ${
+            isLight ? 'bg-white border-slate-200' : 'bg-white/[0.03] border-white/[0.06]'
+          }`}>
+            <Filter size={14} className={isLight ? 'text-slate-400' : 'text-slate-500'} />
+            <select
+              value={statusFilter}
+              onChange={e => setStatusFilter(e.target.value)}
+              className={`bg-transparent text-sm outline-none ${isLight ? 'text-slate-700' : 'text-slate-200'}`}
+            >
+              {STATUS_OPTIONS.map(o => (
+                <option key={o.value} value={o.value}>{o.label}</option>
+              ))}
+            </select>
+          </div>
         </div>
       </div>
+
+      {/* Confirmation modal */}
+      {confirmGerar && (
+        <div className={`rounded-xl border px-4 py-3 text-sm flex items-center justify-between gap-3 ${
+          isLight ? 'bg-amber-50 border-amber-200 text-amber-800' : 'bg-amber-500/10 border-amber-500/20 text-amber-300'
+        }`}>
+          <span className="flex items-center gap-2">
+            <AlertTriangle size={14} />
+            O cronograma existente sera substituido. Deseja continuar?
+          </span>
+          <div className="flex items-center gap-2">
+            <button onClick={() => setConfirmGerar(false)}
+              className={`px-3 py-1 rounded-lg text-xs font-semibold transition-colors ${
+                isLight ? 'hover:bg-amber-100' : 'hover:bg-amber-500/20'
+              }`}>
+              Cancelar
+            </button>
+            <button onClick={doGerarCronograma}
+              className="px-3 py-1 rounded-lg text-xs font-semibold bg-amber-600 text-white hover:bg-amber-700 transition-colors">
+              Confirmar
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* AI feedback */}
+      {aiMsg && (
+        <div className={`rounded-xl border px-4 py-3 text-sm font-medium flex items-center gap-2 ${
+          aiMsg.includes('Erro')
+            ? (isLight ? 'bg-red-50 border-red-200 text-red-700' : 'bg-red-500/10 border-red-500/20 text-red-400')
+            : (isLight ? 'bg-emerald-50 border-emerald-200 text-emerald-700' : 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400')
+        }`}>
+          {aiMsg.includes('Erro') ? <AlertTriangle size={14} /> : <CheckCircle2 size={14} />}
+          {aiMsg}
+        </div>
+      )}
 
       {/* Table */}
       <div className={`rounded-2xl border overflow-hidden ${

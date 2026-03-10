@@ -7,6 +7,8 @@ import type {
   PMOMulta, PMOReuniao, PMOMudanca, PMOIndicadoresSnapshot,
 } from '../types/pmo'
 
+const N8N_BASE = import.meta.env.VITE_N8N_WEBHOOK_URL || 'https://teg-agents-n8n.nmmcas.easypanel.host/webhook'
+
 // ── Portfolio ────────────────────────────────────────────────────────────────
 
 export function usePortfolios(filters?: { status?: string; obra_id?: string }) {
@@ -400,6 +402,65 @@ export function useIndicadores(portfolioId: string | undefined) {
         .order('data_snapshot', { ascending: false })
       if (error) return []
       return (data ?? []) as PMOIndicadoresSnapshot[]
+    },
+  })
+}
+
+// ── AI Generation Hooks ─────────────────────────────────────────────────────
+
+export function useGerarTAPIA() {
+  return useMutation({
+    mutationFn: async (payload: {
+      portfolio_id: string
+      obra_nome: string
+      numero_osc?: string
+      resumo_osc?: string
+      tipo_osc?: string
+    }) => {
+      const res = await fetch(`${N8N_BASE}/egp/gerar-tap`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      })
+      if (!res.ok) throw new Error('Erro ao gerar TAP via IA')
+      return res.json() as Promise<Partial<PMOTAP>>
+    },
+  })
+}
+
+export function useGerarEAPIA() {
+  return useMutation({
+    mutationFn: async (payload: {
+      portfolio_id: string
+      obra_nome: string
+      tap_dados?: Partial<PMOTAP>
+    }) => {
+      const res = await fetch(`${N8N_BASE}/egp/gerar-eap`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      })
+      if (!res.ok) throw new Error('Erro ao gerar EAP via IA')
+      return res.json() as Promise<Partial<PMOEAP>[]>
+    },
+  })
+}
+
+export function useGerarCronogramaIA() {
+  return useMutation({
+    mutationFn: async (payload: {
+      portfolio_id: string
+      obra_nome: string
+      eap_itens?: PMOEAP[]
+      tap_dados?: Partial<PMOTAP>
+    }) => {
+      const res = await fetch(`${N8N_BASE}/egp/gerar-cronograma`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      })
+      if (!res.ok) throw new Error('Erro ao gerar cronograma via IA')
+      return res.json() as Promise<Partial<PMOTarefa>[]>
     },
   })
 }

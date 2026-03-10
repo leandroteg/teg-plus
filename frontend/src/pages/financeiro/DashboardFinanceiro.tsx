@@ -3,7 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom'
 import {
   DollarSign, TrendingDown, TrendingUp, AlertTriangle,
   Clock, CheckCircle2, RefreshCw, ArrowRight,
-  Receipt, FileCheck2, Landmark, BarChart3,
+  Receipt,
 } from 'lucide-react'
 import { useFinanceiroDashboard } from '../../hooks/useFinanceiro'
 import type { ContaPagar, FinanceiroKPIs } from '../../types/financeiro'
@@ -41,14 +41,6 @@ function StatusBadge({ status }: { status: string }) {
     </span>
   )
 }
-
-// ── Quick Action Cards ───────────────────────────────────────────────────────
-const ACTIONS = [
-  { icon: Receipt,    label: 'Contas a Pagar',  to: '/financeiro/cp',          color: 'text-emerald-600', bg: 'bg-emerald-50' },
-  { icon: FileCheck2, label: 'Aprovações',       to: '/financeiro/aprovacoes',  color: 'text-orange-600',  bg: 'bg-orange-50'  },
-  { icon: Landmark,   label: 'Conciliação',      to: '/financeiro/conciliacao', color: 'text-blue-600',    bg: 'bg-blue-50'    },
-  { icon: BarChart3,  label: 'Relatórios',       to: '/financeiro/relatorios',  color: 'text-violet-600',  bg: 'bg-violet-50'  },
-]
 
 // ── Component ────────────────────────────────────────────────────────────────
 export default function DashboardFinanceiro() {
@@ -115,21 +107,6 @@ export default function DashboardFinanceiro() {
           icon={AlertTriangle} cor={kpis.cp_vencidas > 0 ? 'text-red-600' : 'text-slate-400'}
           hexCor={kpis.cp_vencidas > 0 ? '#DC2626' : '#94A3B8'}
           subtitulo={kpis.cp_vencidas > 0 ? 'Atenção!' : 'Nenhuma'} />
-      </div>
-
-      {/* ── Quick Actions ─────────────────────────────────────── */}
-      <div className="grid grid-cols-4 gap-2">
-        {ACTIONS.map(({ icon: Icon, label, to, color, bg }) => (
-          <button key={to} onClick={() => nav(to)}
-            className="bg-white rounded-2xl p-3 border border-slate-200 shadow-sm
-              hover:shadow-md hover:-translate-y-0.5 transition-all text-center group">
-            <div className={`w-9 h-9 ${bg} rounded-xl flex items-center justify-center mx-auto mb-2
-              group-hover:scale-110 transition-transform`}>
-              <Icon size={16} className={color} />
-            </div>
-            <p className="text-[10px] font-bold text-slate-600">{label}</p>
-          </button>
-        ))}
       </div>
 
       {/* ── Status Pipeline ───────────────────────────────────── */}

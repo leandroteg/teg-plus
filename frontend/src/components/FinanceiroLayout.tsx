@@ -1,6 +1,6 @@
 import {
   LayoutDashboard, Receipt, DollarSign, FileCheck2,
-  Landmark, BarChart3, Settings,
+  Landmark, BarChart3,
 } from 'lucide-react'
 import ModuleLayout from './ModuleLayout'
 
@@ -11,7 +11,6 @@ const NAV = [
   { to: '/financeiro/aprovacoes',     icon: FileCheck2,      label: 'Aprovações',      end: false },
   { to: '/financeiro/conciliacao',    icon: Landmark,        label: 'Conciliação',     end: false },
   { to: '/financeiro/relatorios',     icon: BarChart3,       label: 'Relatórios',      end: false },
-  { to: '/financeiro/configuracoes',  icon: Settings,        label: 'Configurações',   end: false },
 ]
 
 export default function FinanceiroLayout() {
@@ -22,7 +21,7 @@ export default function FinanceiroLayout() {
       moduleEmoji="💰"
       accent="emerald"
       nav={NAV}
-      bottomNavMaxItems={6}
+      bottomNavMaxItems={5}
       truncateBottomLabels
     />
   )

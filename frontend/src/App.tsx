@@ -1,4 +1,4 @@
-import { Routes, Route } from 'react-router-dom'
+import { Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider } from './contexts/AuthContext'
 import { ThemeProvider } from './contexts/ThemeContext'
 import { PrivateRoute, AdminRoute } from './components/PrivateRoute'
@@ -183,7 +183,7 @@ export default function App() {
               <Route path="/financeiro/aprovacoes"   element={<AprovacoesPagamento />} />
               <Route path="/financeiro/conciliacao"  element={<Conciliacao />} />
               <Route path="/financeiro/relatorios"   element={<Relatorios />} />
-              <Route path="/financeiro/configuracoes" element={<Configuracoes />} />
+              <Route path="/financeiro/configuracoes" element={<Navigate to="/admin/integracoes" replace />} />
             </Route>
           </Route>
 
@@ -348,6 +348,7 @@ export default function App() {
         <Route element={<AdminRoute />}>
           <Route element={<Layout />}>
             <Route path="/admin/usuarios" element={<AdminUsuarios />} />
+            <Route path="/admin/integracoes" element={<Configuracoes />} />
             <Route path="/admin/desenvolvimento" element={<Desenvolvimento />} />
           </Route>
         </Route>

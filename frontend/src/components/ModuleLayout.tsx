@@ -1,5 +1,5 @@
 import { NavLink, Outlet, useNavigate } from 'react-router-dom'
-import { LayoutGrid, LogOut, Shield, Settings, ChevronLeft, Menu, X, User, Code2 } from 'lucide-react'
+import { LayoutGrid, LogOut, Shield, Settings, ChevronLeft, Menu, X, User, Code2, Link2 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { useState, useEffect } from 'react'
 import { useAuth, ROLE_LABEL, ROLE_COLOR } from '../contexts/AuthContext'
@@ -447,13 +447,30 @@ export default function ModuleLayout({
 
           {isAdmin && (
             <>
+              <div className={`h-px mx-3 my-1 ${ls ? 'bg-slate-100' : 'bg-white/[0.06]'}`} />
               <button
                 onClick={() => { setAvatarOpen(false); navigate('/admin/usuarios') }}
                 className={`w-full flex items-center gap-3 px-4 py-2.5 text-[13px] font-medium transition-colors
                   ${ls ? 'text-slate-600 hover:bg-slate-50 hover:text-slate-900' : 'text-slate-300 hover:bg-white/[0.04] hover:text-white'}`}
               >
                 <Shield size={15} className="shrink-0 opacity-50" />
-                Administração
+                Usuarios
+              </button>
+              <button
+                onClick={() => { setAvatarOpen(false); navigate('/cadastros') }}
+                className={`w-full flex items-center gap-3 px-4 py-2.5 text-[13px] font-medium transition-colors
+                  ${ls ? 'text-slate-600 hover:bg-slate-50 hover:text-slate-900' : 'text-slate-300 hover:bg-white/[0.04] hover:text-white'}`}
+              >
+                <Settings size={15} className="shrink-0 opacity-50" />
+                Cadastros
+              </button>
+              <button
+                onClick={() => { setAvatarOpen(false); navigate('/admin/integracoes') }}
+                className={`w-full flex items-center gap-3 px-4 py-2.5 text-[13px] font-medium transition-colors
+                  ${ls ? 'text-slate-600 hover:bg-slate-50 hover:text-slate-900' : 'text-slate-300 hover:bg-white/[0.04] hover:text-white'}`}
+              >
+                <Link2 size={15} className="shrink-0 opacity-50" />
+                Integracoes
               </button>
               <button
                 onClick={() => { setAvatarOpen(false); navigate('/admin/desenvolvimento') }}

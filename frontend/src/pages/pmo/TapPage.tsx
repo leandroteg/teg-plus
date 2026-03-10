@@ -3,10 +3,10 @@ import { useParams, useNavigate } from 'react-router-dom'
 import {
   ArrowLeft, ClipboardCheck, ChevronDown, Plus, Trash2, Save, CheckCircle2,
   Target, FileText, ShieldAlert, Milestone, Users, DollarSign, Sparkles,
-  AlertTriangle, Info,
+  AlertTriangle, Info, Loader2,
 } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
-import { usePortfolio, useTAP, useSalvarTAP } from '../../hooks/usePMO'
+import { usePortfolio, useTAP, useSalvarTAP, useGerarTAPIA } from '../../hooks/usePMO'
 import type { PMOTAP, StatusTAP, ClassificacaoNivel } from '../../types/pmo'
 
 // ── Status config ─────────────────────────────────────────────────────────────
@@ -77,6 +77,9 @@ export default function TapPage() {
   const { data: portfolio } = usePortfolio(portfolioId)
   const { data: existingTap, isLoading } = useTAP(portfolioId)
   const salvar = useSalvarTAP()
+  const gerarIA = useGerarTAPIA()
+  const [gerando, setGerando] = useState(false)
+  const [aiMsg, setAiMsg] = useState<string | null>(null)
 
   const [form, setForm] = useState<Partial<PMOTAP> & { portfolio_id: string }>(
     emptyTap(portfolioId ?? '')
@@ -174,6 +177,40 @@ export default function TapPage() {
     }
   }
 
+  // AI Generation handler
+  const handleGerarTAP = async () => {
+    if (!portfolioId || !portfolio) return
+    setGerando(true)
+    setAiMsg(null)
+    try {
+      const result = await gerarIA.mutateAsync({
+        portfolio_id: portfolioId,
+        obra_nome: portfolio.nome_obra,
+        numero_osc: portfolio.numero_osc,
+        resumo_osc: portfolio.resumo_osc ?? '',
+        tipo_osc: portfolio.tipo_osc,
+      })
+      // Merge AI result into form
+      const merged = {
+        ...form,
+        ...result,
+        portfolio_id: portfolioId,
+        status: form.status ?? 'rascunho',
+      } as Partial<PMOTAP> & { portfolio_id: string }
+      setForm(merged)
+      initialized.current = true
+      setOpenSections(prev => ({ ...prev, identificacao: true, objetivo: true, classificacao: true }))
+      setAiMsg('TAP gerado com sucesso via IA! Revise e ajuste os dados.')
+      // Auto-save AI result
+      await salvar.mutateAsync(merged)
+      setLastSaved(new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }))
+    } catch {
+      setAiMsg('Erro ao gerar TAP via IA. Tente novamente.')
+    } finally {
+      setGerando(false)
+    }
+  }
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-20">
@@ -257,15 +294,25 @@ export default function TapPage() {
           <p className={`text-sm mb-6 ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>
             Crie o Termo de Abertura para este portfólio
           </p>
-          <button
-            onClick={() => {
-              initialized.current = true
-              setOpenSections(prev => ({ ...prev, identificacao: true }))
-            }}
-            className="inline-flex items-center gap-2 px-6 py-2.5 bg-indigo-600 text-white rounded-xl text-sm font-semibold hover:bg-indigo-700 transition-colors shadow-lg shadow-indigo-500/25"
-          >
-            <Plus size={16} /> Criar TAP
-          </button>
+          <div className="flex items-center gap-3 justify-center flex-wrap">
+            <button
+              onClick={() => {
+                initialized.current = true
+                setOpenSections(prev => ({ ...prev, identificacao: true }))
+              }}
+              className="inline-flex items-center gap-2 px-6 py-2.5 bg-indigo-600 text-white rounded-xl text-sm font-semibold hover:bg-indigo-700 transition-colors shadow-lg shadow-indigo-500/25"
+            >
+              <Plus size={16} /> Criar TAP
+            </button>
+            <button
+              onClick={handleGerarTAP}
+              disabled={gerando}
+              className="inline-flex items-center gap-2 px-6 py-2.5 bg-gradient-to-r from-blue-500 to-indigo-500 text-white rounded-xl text-sm font-semibold hover:from-blue-600 hover:to-indigo-600 transition-all shadow-lg shadow-blue-500/25 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {gerando ? <Loader2 size={16} className="animate-spin" /> : <Sparkles size={16} />}
+              {gerando ? 'Gerando...' : 'Gerar com IA'}
+            </button>
+          </div>
         </div>
       ) : (
         <>
@@ -298,7 +345,28 @@ export default function TapPage() {
                 <CheckCircle2 size={14} /> Aprovar TAP
               </button>
             )}
+
+            <button
+              onClick={handleGerarTAP}
+              disabled={gerando}
+              className="inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-500 to-indigo-500 text-white rounded-xl text-sm font-semibold hover:from-blue-600 hover:to-indigo-600 transition-all shadow-lg shadow-blue-500/25 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {gerando ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />}
+              {gerando ? 'Gerando...' : 'Gerar com IA'}
+            </button>
           </div>
+
+          {/* AI feedback message */}
+          {aiMsg && (
+            <div className={`rounded-xl border px-4 py-3 text-sm font-medium flex items-center gap-2 ${
+              aiMsg.includes('Erro')
+                ? (isLight ? 'bg-red-50 border-red-200 text-red-700' : 'bg-red-500/10 border-red-500/20 text-red-400')
+                : (isLight ? 'bg-emerald-50 border-emerald-200 text-emerald-700' : 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400')
+            }`}>
+              {aiMsg.includes('Erro') ? <AlertTriangle size={14} /> : <CheckCircle2 size={14} />}
+              {aiMsg}
+            </div>
+          )}
 
           {/* ── Accordions ──────────────────────────────────────────────────── */}
           <div className="space-y-3">

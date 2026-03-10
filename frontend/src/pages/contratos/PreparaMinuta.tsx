@@ -15,11 +15,12 @@ import {
   useAvancarEtapa,
   useAnalisarMinuta,
   useMelhorarMinuta,
+  useGerarMinutaPDF,
   useConfigAnalise,
   useAtualizarConfigAnalise,
   useUploadMinutaFile,
 } from '../../hooks/useSolicitacoes'
-import type { MelhoriaMinuta } from '../../hooks/useSolicitacoes'
+import type { MelhoriaMinuta, MinutaTexto } from '../../hooks/useSolicitacoes'
 import type { Minuta, TipoMinuta, StatusMinuta, MinutaAiAnalise, ConfigAnalise } from '../../types/contratos'
 import { supabase } from '../../services/supabase'
 import { jsPDF } from 'jspdf'
@@ -1375,6 +1376,7 @@ export default function PreparaMinuta() {
   const atualizarConfig = useAtualizarConfigAnalise()
   const uploadFile = useUploadMinutaFile()
   const melhorarMinuta = useMelhorarMinuta()
+  const gerarMinutaPDF = useGerarMinutaPDF()
 
   // Form state
   const [titulo, setTitulo] = useState('')
@@ -1598,278 +1600,210 @@ export default function PreparaMinuta() {
 
   const handleGerarNovaMinuta = async (minuta: Minuta) => {
     if (gerandoMinutaId || !solicitacao) return
-    // Use edited melhorias if available, otherwise original
     const mel = editedMelhoriasMap[minuta.id] ?? melhoriasMap[minuta.id]
     if (!mel) return
     setGerandoMinutaId(minuta.id)
     try {
-      // ── Generate professional PDF natively with jsPDF ──────────────
-      const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
-      const pw = pdf.internal.pageSize.getWidth()
-      const ph = pdf.internal.pageSize.getHeight()
-      const mx = 20          // margin x
-      const usable = pw - 2 * mx
-      let y = 25             // current y position
-      const lineH = 5        // line height for body
-      const gapSm = 3
-      const gapMd = 8
-      const gapLg = 14
-
-      const ensureSpace = (need: number) => {
-        if (y + need > ph - 20) { pdf.addPage(); y = 20 }
-      }
-
-      // Helper: wrap and print text
-      const printText = (text: string, fontSize: number, opts?: { bold?: boolean; color?: [number,number,number]; indent?: number }) => {
-        const fs = opts?.bold ? 'bold' : 'normal'
-        const col = opts?.color ?? [30, 30, 30]
-        const ind = opts?.indent ?? 0
-        pdf.setFont('helvetica', fs)
-        pdf.setFontSize(fontSize)
-        pdf.setTextColor(col[0], col[1], col[2])
-        const lines = pdf.splitTextToSize(text, usable - ind)
-        for (const line of lines) {
-          ensureSpace(lineH + 1)
-          pdf.text(line, mx + ind, y)
-          y += lineH
+      // ── Helper: build PDF from AI-generated structured text ──────────
+      const buildPdfFromAi = (mt: MinutaTextoGerado) => {
+        const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
+        const pw = pdf.internal.pageSize.getWidth()
+        const ph = pdf.internal.pageSize.getHeight()
+        const mx = 20; const usable = pw - 2 * mx
+        let y = 25; const lineH = 5; const gapSm = 3; const gapMd = 8; const gapLg = 14
+        const ensureSpace = (need: number) => { if (y + need > ph - 20) { pdf.addPage(); y = 20 } }
+        const printText = (text: string, fontSize: number, opts?: { bold?: boolean; color?: [number,number,number]; indent?: number }) => {
+          pdf.setFont('helvetica', opts?.bold ? 'bold' : 'normal'); pdf.setFontSize(fontSize)
+          const col = opts?.color ?? [30, 30, 30]; pdf.setTextColor(col[0], col[1], col[2])
+          const ind = opts?.indent ?? 0
+          for (const line of pdf.splitTextToSize(text, usable - ind)) { ensureSpace(lineH + 1); pdf.text(line, mx + ind, y); y += lineH }
         }
-      }
+        const hr = (color?: [number,number,number]) => {
+          ensureSpace(4); const c = color ?? [200, 200, 200]
+          pdf.setDrawColor(c[0], c[1], c[2]); pdf.setLineWidth(0.3); pdf.line(mx, y, pw - mx, y); y += 3
+        }
 
-      // Helper: horizontal rule
-      const hr = (color?: [number,number,number]) => {
-        ensureSpace(4)
-        const c = color ?? [200, 200, 200]
-        pdf.setDrawColor(c[0], c[1], c[2])
-        pdf.setLineWidth(0.3)
-        pdf.line(mx, y, pw - mx, y)
-        y += 3
-      }
+        // HEADER
+        pdf.setFillColor(15, 118, 110); pdf.rect(0, 0, pw, 40, 'F')
+        pdf.setFont('helvetica', 'bold'); pdf.setFontSize(9); pdf.setTextColor(200, 240, 230); pdf.text('TEG+', mx, 12)
+        pdf.setFontSize(18); pdf.setTextColor(255, 255, 255); pdf.text('MINUTA CONTRATUAL', pw / 2, 18, { align: 'center' })
+        pdf.setFontSize(10); pdf.setTextColor(200, 240, 230)
+        pdf.text(pdf.splitTextToSize(`${minuta.titulo} — Versao Melhorada via IA`, usable), pw / 2, 28, { align: 'center' })
+        y = 50
 
-      // ═══════ HEADER ═══════
-      pdf.setFillColor(15, 118, 110) // teal-700
-      pdf.rect(0, 0, pw, 40, 'F')
-      pdf.setFont('helvetica', 'bold')
-      pdf.setFontSize(18)
-      pdf.setTextColor(255, 255, 255)
-      pdf.text('MINUTA CONTRATUAL', pw / 2, 18, { align: 'center' })
-      pdf.setFontSize(10)
-      pdf.setTextColor(200, 240, 230)
-      const headerLines = pdf.splitTextToSize(`${minuta.titulo} — Versao Melhorada`, usable)
-      pdf.text(headerLines, pw / 2, 28, { align: 'center' })
-      y = 50
+        // INFO BOX
+        pdf.setFillColor(245, 248, 250); pdf.roundedRect(mx, y, usable, 32, 2, 2, 'F')
+        const bxY = y + 6
+        pdf.setFont('helvetica', 'bold'); pdf.setFontSize(8); pdf.setTextColor(100, 116, 139); pdf.text('OBJETO', mx + 4, bxY)
+        pdf.setFont('helvetica', 'normal'); pdf.setFontSize(9); pdf.setTextColor(30, 41, 59)
+        pdf.text(pdf.splitTextToSize(solicitacao.objeto, usable / 2 - 8).slice(0, 2), mx + 4, bxY + 5)
+        pdf.setFont('helvetica', 'bold'); pdf.setFontSize(8); pdf.setTextColor(100, 116, 139); pdf.text('CONTRAPARTE', usable / 2 + mx + 4, bxY)
+        pdf.setFont('helvetica', 'normal'); pdf.setFontSize(9); pdf.setTextColor(30, 41, 59); pdf.text(solicitacao.contraparte_nome, usable / 2 + mx + 4, bxY + 5)
+        if (solicitacao.valor_estimado) {
+          pdf.setFont('helvetica', 'bold'); pdf.setFontSize(8); pdf.setTextColor(100, 116, 139); pdf.text('VALOR', usable / 2 + mx + 4, bxY + 14)
+          pdf.setFont('helvetica', 'normal'); pdf.setFontSize(9); pdf.setTextColor(15, 118, 110); pdf.text(fmt(solicitacao.valor_estimado), usable / 2 + mx + 4, bxY + 19)
+        }
+        const dataStr = new Date().toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' })
+        pdf.setFont('helvetica', 'bold'); pdf.setFontSize(8); pdf.setTextColor(100, 116, 139); pdf.text('DATA', mx + 4, bxY + 14)
+        pdf.setFont('helvetica', 'normal'); pdf.setFontSize(9); pdf.setTextColor(30, 41, 59); pdf.text(dataStr, mx + 4, bxY + 19)
+        y += 38
 
-      // ═══════ INFO BOX ═══════
-      pdf.setFillColor(245, 248, 250)
-      pdf.roundedRect(mx, y, usable, 32, 2, 2, 'F')
-      const boxY = y + 6
-      pdf.setFont('helvetica', 'bold')
-      pdf.setFontSize(8)
-      pdf.setTextColor(100, 116, 139)
+        // Score badge
+        if (mel.score_estimado) {
+          ensureSpace(12)
+          const sc: [number,number,number] = mel.score_estimado >= 80 ? [16, 185, 129] : mel.score_estimado >= 60 ? [245, 158, 11] : [239, 68, 68]
+          pdf.setFillColor(sc[0], sc[1], sc[2]); pdf.roundedRect(mx, y, 50, 8, 2, 2, 'F')
+          pdf.setFont('helvetica', 'bold'); pdf.setFontSize(8); pdf.setTextColor(255, 255, 255)
+          pdf.text(`SCORE: ${mel.score_estimado}/100`, mx + 25, y + 5.5, { align: 'center' }); y += 12
+        }
 
-      pdf.text('OBJETO', mx + 4, boxY)
-      pdf.setFont('helvetica', 'normal')
-      pdf.setFontSize(9)
-      pdf.setTextColor(30, 41, 59)
-      const objetoLines = pdf.splitTextToSize(solicitacao.objeto, usable / 2 - 8)
-      pdf.text(objetoLines.slice(0, 2), mx + 4, boxY + 5)
+        // PREAMBULO
+        if (mt.preambulo) { printText(mt.preambulo, 9, { color: [30, 41, 59] }); y += gapLg }
 
-      pdf.setFont('helvetica', 'bold')
-      pdf.setFontSize(8)
-      pdf.setTextColor(100, 116, 139)
-      pdf.text('CONTRAPARTE', usable / 2 + mx + 4, boxY)
-      pdf.setFont('helvetica', 'normal')
-      pdf.setFontSize(9)
-      pdf.setTextColor(30, 41, 59)
-      pdf.text(solicitacao.contraparte_nome, usable / 2 + mx + 4, boxY + 5)
-
-      if (solicitacao.valor_estimado) {
-        pdf.setFont('helvetica', 'bold')
-        pdf.setFontSize(8)
-        pdf.setTextColor(100, 116, 139)
-        pdf.text('VALOR', usable / 2 + mx + 4, boxY + 14)
-        pdf.setFont('helvetica', 'normal')
-        pdf.setFontSize(9)
-        pdf.setTextColor(15, 118, 110)
-        pdf.text(fmt(solicitacao.valor_estimado), usable / 2 + mx + 4, boxY + 19)
-      }
-
-      const dataStr = new Date().toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' })
-      pdf.setFont('helvetica', 'bold')
-      pdf.setFontSize(8)
-      pdf.setTextColor(100, 116, 139)
-      pdf.text('DATA', mx + 4, boxY + 14)
-      pdf.setFont('helvetica', 'normal')
-      pdf.setFontSize(9)
-      pdf.setTextColor(30, 41, 59)
-      pdf.text(dataStr, mx + 4, boxY + 19)
-
-      y += 38
-
-      // Score badge
-      if (mel.score_estimado) {
-        ensureSpace(12)
-        const scoreCol: [number,number,number] = mel.score_estimado >= 80 ? [16, 185, 129] : mel.score_estimado >= 60 ? [245, 158, 11] : [239, 68, 68]
-        pdf.setFillColor(scoreCol[0], scoreCol[1], scoreCol[2])
-        pdf.roundedRect(mx, y, 50, 8, 2, 2, 'F')
-        pdf.setFont('helvetica', 'bold')
-        pdf.setFontSize(8)
-        pdf.setTextColor(255, 255, 255)
-        pdf.text(`SCORE: ${mel.score_estimado}/100`, mx + 25, y + 5.5, { align: 'center' })
-        y += 12
-      }
-
-      // Resumo
-      if (mel.resumo_melhorias) {
-        printText(mel.resumo_melhorias, 9, { color: [71, 85, 105] })
-        y += gapMd
-      }
-
-      // ═══════ CLAUSULAS MELHORADAS ═══════
-      if (mel.clausulas_melhoradas?.length) {
-        hr([15, 118, 110])
-        y += gapSm
-        printText('CLAUSULAS MELHORADAS', 12, { bold: true, color: [15, 118, 110] })
-        y += gapMd
-
-        mel.clausulas_melhoradas.forEach((c, i) => {
-          ensureSpace(20)
-          // Clause header
-          printText(`${i + 1}. ${c.nome}`, 10, { bold: true })
-          y += gapSm
-
-          // Action badge
-          pdf.setFillColor(240, 253, 244)
-          pdf.roundedRect(mx + 4, y - 3.5, pdf.getTextWidth(c.acao) + 6, 6, 1, 1, 'F')
-          pdf.setFont('helvetica', 'bold')
-          pdf.setFontSize(7)
-          pdf.setTextColor(22, 101, 52)
-          pdf.text(c.acao, mx + 7, y)
-          y += gapSm
-
-          // Justificativa
-          printText(c.justificativa, 8, { color: [100, 116, 139], indent: 4 })
-          y += gapSm
-
-          // Texto melhorado box
-          ensureSpace(10)
-          pdf.setFillColor(240, 253, 244)
-          const textLines = pdf.splitTextToSize(c.texto_melhorado, usable - 16)
-          const boxH = textLines.length * lineH + 8
-          ensureSpace(boxH + 2)
-          pdf.roundedRect(mx + 4, y - 2, usable - 8, boxH, 1.5, 1.5, 'F')
-          pdf.setFont('helvetica', 'normal')
-          pdf.setFontSize(8.5)
-          pdf.setTextColor(30, 41, 59)
-          for (const line of textLines) {
-            ensureSpace(lineH + 1)
-            pdf.text(line, mx + 8, y + 3)
-            y += lineH
+        // CLAUSULAS (AI-generated)
+        if (mt.clausulas?.length) {
+          hr([15, 118, 110]); y += gapSm
+          for (const cl of mt.clausulas) {
+            ensureSpace(20)
+            printText(`${cl.numero} — ${cl.titulo}`, 11, { bold: true, color: [15, 118, 110] }); y += gapSm
+            printText(cl.conteudo, 9, { color: [30, 41, 59], indent: 2 }); y += gapLg
           }
-          y += gapLg
+        }
+
+        // DISPOSICOES FINAIS
+        if (mt.disposicoes_finais) {
+          hr([100, 116, 139]); y += gapSm
+          printText('DISPOSICOES FINAIS', 11, { bold: true, color: [71, 85, 105] }); y += gapSm
+          printText(mt.disposicoes_finais, 9, { color: [30, 41, 59] }); y += gapLg
+        }
+
+        // SIGNATURE BLOCK
+        ensureSpace(50); hr(); y += gapMd
+        const localData = mt.local_data || `${solicitacao.obra?.nome ?? 'Local'}, ${dataStr}`
+        printText(localData, 9, { color: [100, 116, 139] }); y += 20
+        const sigW = usable / 2 - 10
+        pdf.setDrawColor(100, 116, 139); pdf.setLineWidth(0.2)
+        pdf.line(mx, y, mx + sigW, y); pdf.line(pw - mx - sigW, y, pw - mx, y); y += 5
+        pdf.setFont('helvetica', 'bold'); pdf.setFontSize(8); pdf.setTextColor(71, 85, 105)
+        pdf.text('CONTRATANTE', mx + sigW / 2, y, { align: 'center' }); pdf.text('CONTRATADA', pw - mx - sigW / 2, y, { align: 'center' }); y += 4
+        pdf.setFont('helvetica', 'normal'); pdf.setFontSize(7); pdf.setTextColor(148, 163, 184)
+        pdf.text('TEG Uniao Engenharia', mx + sigW / 2, y, { align: 'center' }); pdf.text(solicitacao.contraparte_nome, pw - mx - sigW / 2, y, { align: 'center' })
+        // Testemunhas
+        y += 20; ensureSpace(20); pdf.setDrawColor(148, 163, 184); pdf.setLineWidth(0.15)
+        pdf.line(mx, y, mx + sigW, y); pdf.line(pw - mx - sigW, y, pw - mx, y); y += 4
+        pdf.setFont('helvetica', 'normal'); pdf.setFontSize(7); pdf.setTextColor(148, 163, 184)
+        pdf.text('Testemunha 1', mx + sigW / 2, y, { align: 'center' }); pdf.text('Testemunha 2', pw - mx - sigW / 2, y, { align: 'center' })
+
+        // FOOTER
+        const totalPages = pdf.getNumberOfPages()
+        for (let p = 1; p <= totalPages; p++) {
+          pdf.setPage(p); pdf.setFont('helvetica', 'normal'); pdf.setFontSize(7); pdf.setTextColor(148, 163, 184)
+          pdf.text('TEG+ ERP — Minuta gerada por IA', mx, ph - 8); pdf.text(`Pagina ${p} de ${totalPages}`, pw - mx, ph - 8, { align: 'right' })
+        }
+        return pdf
+      }
+
+      // ── Helper: fallback PDF from melhorias (no AI) ──────────────────
+      const buildPdfFallback = () => {
+        const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
+        const pw = pdf.internal.pageSize.getWidth(); const ph = pdf.internal.pageSize.getHeight()
+        const mx = 20; const usable = pw - 2 * mx; let y = 25; const lineH = 5; const gapSm = 3; const gapMd = 8; const gapLg = 14
+        const ensureSpace = (need: number) => { if (y + need > ph - 20) { pdf.addPage(); y = 20 } }
+        const printText = (text: string, fontSize: number, opts?: { bold?: boolean; color?: [number,number,number]; indent?: number }) => {
+          pdf.setFont('helvetica', opts?.bold ? 'bold' : 'normal'); pdf.setFontSize(fontSize)
+          const col = opts?.color ?? [30, 30, 30]; pdf.setTextColor(col[0], col[1], col[2]); const ind = opts?.indent ?? 0
+          for (const line of pdf.splitTextToSize(text, usable - ind)) { ensureSpace(lineH + 1); pdf.text(line, mx + ind, y); y += lineH }
+        }
+        const hr = (color?: [number,number,number]) => { ensureSpace(4); const c = color ?? [200, 200, 200]; pdf.setDrawColor(c[0], c[1], c[2]); pdf.setLineWidth(0.3); pdf.line(mx, y, pw - mx, y); y += 3 }
+
+        // HEADER
+        pdf.setFillColor(15, 118, 110); pdf.rect(0, 0, pw, 40, 'F')
+        pdf.setFont('helvetica', 'bold'); pdf.setFontSize(18); pdf.setTextColor(255, 255, 255); pdf.text('MINUTA CONTRATUAL', pw / 2, 18, { align: 'center' })
+        pdf.setFontSize(10); pdf.setTextColor(200, 240, 230); pdf.text(pdf.splitTextToSize(`${minuta.titulo} — Versao Melhorada`, usable), pw / 2, 28, { align: 'center' }); y = 50
+
+        // INFO BOX
+        pdf.setFillColor(245, 248, 250); pdf.roundedRect(mx, y, usable, 32, 2, 2, 'F'); const bxY = y + 6
+        pdf.setFont('helvetica', 'bold'); pdf.setFontSize(8); pdf.setTextColor(100, 116, 139); pdf.text('OBJETO', mx + 4, bxY)
+        pdf.setFont('helvetica', 'normal'); pdf.setFontSize(9); pdf.setTextColor(30, 41, 59); pdf.text(pdf.splitTextToSize(solicitacao.objeto, usable / 2 - 8).slice(0, 2), mx + 4, bxY + 5)
+        pdf.setFont('helvetica', 'bold'); pdf.setFontSize(8); pdf.setTextColor(100, 116, 139); pdf.text('CONTRAPARTE', usable / 2 + mx + 4, bxY)
+        pdf.setFont('helvetica', 'normal'); pdf.setFontSize(9); pdf.setTextColor(30, 41, 59); pdf.text(solicitacao.contraparte_nome, usable / 2 + mx + 4, bxY + 5)
+        if (solicitacao.valor_estimado) { pdf.setFont('helvetica', 'bold'); pdf.setFontSize(8); pdf.setTextColor(100, 116, 139); pdf.text('VALOR', usable / 2 + mx + 4, bxY + 14); pdf.setFont('helvetica', 'normal'); pdf.setFontSize(9); pdf.setTextColor(15, 118, 110); pdf.text(fmt(solicitacao.valor_estimado), usable / 2 + mx + 4, bxY + 19) }
+        const dataStr = new Date().toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' })
+        pdf.setFont('helvetica', 'bold'); pdf.setFontSize(8); pdf.setTextColor(100, 116, 139); pdf.text('DATA', mx + 4, bxY + 14)
+        pdf.setFont('helvetica', 'normal'); pdf.setFontSize(9); pdf.setTextColor(30, 41, 59); pdf.text(dataStr, mx + 4, bxY + 19); y += 38
+
+        // Score badge
+        if (mel.score_estimado) { ensureSpace(12); const sc: [number,number,number] = mel.score_estimado >= 80 ? [16, 185, 129] : mel.score_estimado >= 60 ? [245, 158, 11] : [239, 68, 68]; pdf.setFillColor(sc[0], sc[1], sc[2]); pdf.roundedRect(mx, y, 50, 8, 2, 2, 'F'); pdf.setFont('helvetica', 'bold'); pdf.setFontSize(8); pdf.setTextColor(255, 255, 255); pdf.text(`SCORE: ${mel.score_estimado}/100`, mx + 25, y + 5.5, { align: 'center' }); y += 12 }
+        if (mel.resumo_melhorias) { printText(mel.resumo_melhorias, 9, { color: [71, 85, 105] }); y += gapMd }
+
+        // CLAUSULAS MELHORADAS
+        if (mel.clausulas_melhoradas?.length) {
+          hr([15, 118, 110]); y += gapSm; printText('CLAUSULAS MELHORADAS', 12, { bold: true, color: [15, 118, 110] }); y += gapMd
+          mel.clausulas_melhoradas.forEach((c, i) => {
+            ensureSpace(20); printText(`${i + 1}. ${c.nome}`, 10, { bold: true }); y += gapSm
+            pdf.setFillColor(240, 253, 244); pdf.roundedRect(mx + 4, y - 3.5, pdf.getTextWidth(c.acao) + 6, 6, 1, 1, 'F')
+            pdf.setFont('helvetica', 'bold'); pdf.setFontSize(7); pdf.setTextColor(22, 101, 52); pdf.text(c.acao, mx + 7, y); y += gapSm
+            printText(c.justificativa, 8, { color: [100, 116, 139], indent: 4 }); y += gapSm
+            ensureSpace(10); pdf.setFillColor(240, 253, 244); const tl = pdf.splitTextToSize(c.texto_melhorado, usable - 16); const bH = tl.length * lineH + 8; ensureSpace(bH + 2)
+            pdf.roundedRect(mx + 4, y - 2, usable - 8, bH, 1.5, 1.5, 'F'); pdf.setFont('helvetica', 'normal'); pdf.setFontSize(8.5); pdf.setTextColor(30, 41, 59)
+            for (const l of tl) { ensureSpace(lineH + 1); pdf.text(l, mx + 8, y + 3); y += lineH }; y += gapLg
+          })
+        }
+        // CLAUSULAS NOVAS
+        if (mel.clausulas_novas?.length) {
+          hr([37, 99, 235]); y += gapSm; printText('CLAUSULAS NOVAS', 12, { bold: true, color: [37, 99, 235] }); y += gapMd
+          mel.clausulas_novas.forEach((c, i) => {
+            ensureSpace(20); printText(`${i + 1}. ${c.nome}`, 10, { bold: true, color: [30, 64, 175] }); y += gapSm
+            printText(`Motivo: ${c.motivo}`, 8, { color: [100, 116, 139], indent: 4 })
+            if (c.base_legal) printText(`Base Legal: ${c.base_legal}`, 8, { color: [79, 70, 229], indent: 4 }); y += gapSm
+            ensureSpace(10); pdf.setFillColor(239, 246, 255); const tl = pdf.splitTextToSize(c.texto, usable - 16); const bH = tl.length * lineH + 8; ensureSpace(bH + 2)
+            pdf.roundedRect(mx + 4, y - 2, usable - 8, bH, 1.5, 1.5, 'F'); pdf.setFont('helvetica', 'normal'); pdf.setFontSize(8.5); pdf.setTextColor(30, 41, 59)
+            for (const l of tl) { ensureSpace(lineH + 1); pdf.text(l, mx + 8, y + 3); y += lineH }; y += gapLg
+          })
+        }
+        // RISCOS MITIGADOS
+        if (mel.riscos_mitigados?.length) {
+          hr([239, 68, 68]); y += gapSm; printText('RISCOS MITIGADOS', 12, { bold: true, color: [185, 28, 28] }); y += gapMd
+          mel.riscos_mitigados.forEach((r, i) => { ensureSpace(16); printText(`${i + 1}. ${r.risco_original}`, 9, { bold: true }); y += gapSm; printText(`Severidade: ${r.severidade_original}  ->  ${r.severidade_apos}`, 8, { color: [100, 116, 139], indent: 4 }); printText(`Acao: ${r.acao_tomada}`, 8, { color: [71, 85, 105], indent: 4 }); y += gapMd })
+        }
+        if (mel.observacoes_gerais) { hr(); y += gapSm; printText('OBSERVACOES GERAIS', 10, { bold: true, color: [71, 85, 105] }); y += gapSm; printText(mel.observacoes_gerais, 9, { color: [71, 85, 105] }); y += gapLg }
+
+        // SIGNATURE BLOCK
+        ensureSpace(50); hr(); y += gapLg; printText(`${solicitacao.obra?.nome ?? 'Local'}, ${dataStr}`, 9, { color: [100, 116, 139] }); y += 20
+        const sigW = usable / 2 - 10; pdf.setDrawColor(100, 116, 139); pdf.setLineWidth(0.2)
+        pdf.line(mx, y, mx + sigW, y); pdf.line(pw - mx - sigW, y, pw - mx, y); y += 5
+        pdf.setFont('helvetica', 'bold'); pdf.setFontSize(8); pdf.setTextColor(71, 85, 105)
+        pdf.text('CONTRATANTE', mx + sigW / 2, y, { align: 'center' }); pdf.text('CONTRATADA', pw - mx - sigW / 2, y, { align: 'center' }); y += 4
+        pdf.setFont('helvetica', 'normal'); pdf.setFontSize(7); pdf.setTextColor(148, 163, 184)
+        pdf.text('TEG Uniao Engenharia', mx + sigW / 2, y, { align: 'center' }); pdf.text(solicitacao.contraparte_nome, pw - mx - sigW / 2, y, { align: 'center' })
+
+        // FOOTER
+        const totalPages = pdf.getNumberOfPages()
+        for (let p = 1; p <= totalPages; p++) { pdf.setPage(p); pdf.setFont('helvetica', 'normal'); pdf.setFontSize(7); pdf.setTextColor(148, 163, 184); pdf.text('TEG+ ERP — Minuta gerada automaticamente', mx, ph - 8); pdf.text(`Pagina ${p} de ${totalPages}`, pw - mx, ph - 8, { align: 'right' }) }
+        return pdf
+      }
+
+      // ── Step 1: Try n8n AI, fallback to local ───────────────────────
+      let pdf: jsPDF | null = null
+      try {
+        const aiResult = await gerarMinutaPDF.mutateAsync({
+          titulo: minuta.titulo,
+          objeto: solicitacao.objeto,
+          contraparte: solicitacao.contraparte_nome,
+          valor: solicitacao.valor_estimado ?? undefined,
+          melhorias: mel,
         })
+        if (aiResult.success && aiResult.minuta_texto) {
+          pdf = buildPdfFromAi(aiResult.minuta_texto)
+        }
+      } catch (n8nErr) {
+        console.warn('n8n AI generation failed, falling back to local PDF:', n8nErr)
+      }
+      if (!pdf) {
+        pdf = buildPdfFallback()
       }
 
-      // ═══════ CLAUSULAS NOVAS ═══════
-      if (mel.clausulas_novas?.length) {
-        hr([37, 99, 235])
-        y += gapSm
-        printText('CLAUSULAS NOVAS', 12, { bold: true, color: [37, 99, 235] })
-        y += gapMd
-
-        mel.clausulas_novas.forEach((c, i) => {
-          ensureSpace(20)
-          printText(`${i + 1}. ${c.nome}`, 10, { bold: true, color: [30, 64, 175] })
-          y += gapSm
-          printText(`Motivo: ${c.motivo}`, 8, { color: [100, 116, 139], indent: 4 })
-          if (c.base_legal) {
-            printText(`Base Legal: ${c.base_legal}`, 8, { color: [79, 70, 229], indent: 4 })
-          }
-          y += gapSm
-
-          // Texto box
-          ensureSpace(10)
-          pdf.setFillColor(239, 246, 255)
-          const textLines = pdf.splitTextToSize(c.texto, usable - 16)
-          const boxH = textLines.length * lineH + 8
-          ensureSpace(boxH + 2)
-          pdf.roundedRect(mx + 4, y - 2, usable - 8, boxH, 1.5, 1.5, 'F')
-          pdf.setFont('helvetica', 'normal')
-          pdf.setFontSize(8.5)
-          pdf.setTextColor(30, 41, 59)
-          for (const line of textLines) {
-            ensureSpace(lineH + 1)
-            pdf.text(line, mx + 8, y + 3)
-            y += lineH
-          }
-          y += gapLg
-        })
-      }
-
-      // ═══════ RISCOS MITIGADOS ═══════
-      if (mel.riscos_mitigados?.length) {
-        hr([239, 68, 68])
-        y += gapSm
-        printText('RISCOS MITIGADOS', 12, { bold: true, color: [185, 28, 28] })
-        y += gapMd
-
-        mel.riscos_mitigados.forEach((r, i) => {
-          ensureSpace(16)
-          printText(`${i + 1}. ${r.risco_original}`, 9, { bold: true })
-          y += gapSm
-          printText(`Severidade: ${r.severidade_original}  →  ${r.severidade_apos}`, 8, { color: [100, 116, 139], indent: 4 })
-          printText(`Acao: ${r.acao_tomada}`, 8, { color: [71, 85, 105], indent: 4 })
-          y += gapMd
-        })
-      }
-
-      // ═══════ OBSERVACOES ═══════
-      if (mel.observacoes_gerais) {
-        hr()
-        y += gapSm
-        printText('OBSERVACOES GERAIS', 10, { bold: true, color: [71, 85, 105] })
-        y += gapSm
-        printText(mel.observacoes_gerais, 9, { color: [71, 85, 105] })
-        y += gapLg
-      }
-
-      // ═══════ SIGNATURE BLOCK ═══════
-      ensureSpace(50)
-      hr()
-      y += gapLg
-      printText(`${solicitacao.obra?.nome ?? 'Local'}, ${dataStr}`, 9, { color: [100, 116, 139] })
-      y += 20
-
-      // Signature lines
-      const sigW = usable / 2 - 10
-      pdf.setDrawColor(100, 116, 139)
-      pdf.setLineWidth(0.2)
-      pdf.line(mx, y, mx + sigW, y)
-      pdf.line(pw - mx - sigW, y, pw - mx, y)
-      y += 5
-      pdf.setFont('helvetica', 'bold')
-      pdf.setFontSize(8)
-      pdf.setTextColor(71, 85, 105)
-      pdf.text('CONTRATANTE', mx + sigW / 2, y, { align: 'center' })
-      pdf.text('CONTRATADA', pw - mx - sigW / 2, y, { align: 'center' })
-      y += 4
-      pdf.setFont('helvetica', 'normal')
-      pdf.setFontSize(7)
-      pdf.setTextColor(148, 163, 184)
-      pdf.text('TEG Uniao Engenharia', mx + sigW / 2, y, { align: 'center' })
-      pdf.text(solicitacao.contraparte_nome, pw - mx - sigW / 2, y, { align: 'center' })
-
-      // ═══════ FOOTER on all pages ═══════
-      const totalPages = pdf.getNumberOfPages()
-      for (let p = 1; p <= totalPages; p++) {
-        pdf.setPage(p)
-        pdf.setFont('helvetica', 'normal')
-        pdf.setFontSize(7)
-        pdf.setTextColor(148, 163, 184)
-        pdf.text(`TEG+ ERP — Minuta gerada automaticamente`, mx, ph - 8)
-        pdf.text(`Pagina ${p} de ${totalPages}`, pw - mx, ph - 8, { align: 'right' })
-      }
-
-      // ── Upload to Supabase Storage ──
+      // ── Step 2: Upload to Supabase Storage ──────────────────────────
       const pdfBlob = pdf.output('blob')
       const safeName = minuta.titulo.replace(/[^a-zA-Z0-9._-]/g, '_').substring(0, 40)
       const pdfFile = new File([pdfBlob], `minuta_melhorada_${safeName}.pdf`, { type: 'application/pdf' })
@@ -1879,7 +1813,6 @@ export default function PreparaMinuta() {
         solicitacaoId: solicitacao.id,
       })
 
-      // Update minuta record with PDF URL
       await supabase
         .from('con_minutas')
         .update({
@@ -1890,7 +1823,6 @@ export default function PreparaMinuta() {
         })
         .eq('id', minuta.id)
 
-      // Store PDF URL in state
       setPdfUrlMap(prev => ({ ...prev, [minuta.id]: uploaded.arquivo_url }))
 
     } catch (e) {

@@ -1,8 +1,10 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeft, GitBranch, ChevronRight, Layers } from 'lucide-react'
+import { ArrowLeft, GitBranch, ChevronRight, Layers, Sparkles, Loader2, CheckCircle2, AlertTriangle } from 'lucide-react'
+import { useQueryClient } from '@tanstack/react-query'
 import { useTheme } from '../../contexts/ThemeContext'
-import { useEAP, usePortfolio } from '../../hooks/usePMO'
+import { useEAP, usePortfolio, useTAP, useGerarEAPIA } from '../../hooks/usePMO'
+import { supabase } from '../../services/supabase'
 import type { PMOEAP, FaseEAP } from '../../types/pmo'
 
 const FASE_MAP: Record<FaseEAP, { label: string; light: string; dark: string }> = {
@@ -33,11 +35,51 @@ export default function EAP() {
   const { isLightSidebar: isLight } = useTheme()
   const { portfolioId } = useParams<{ portfolioId: string }>()
   const nav = useNavigate()
+  const qc = useQueryClient()
 
   const { data: portfolio } = usePortfolio(portfolioId)
   const { data: items, isLoading } = useEAP(portfolioId)
+  const { data: tap } = useTAP(portfolioId)
+  const gerarIA = useGerarEAPIA()
+
+  const [gerando, setGerando] = useState(false)
+  const [aiMsg, setAiMsg] = useState<string | null>(null)
+  const [confirmGerar, setConfirmGerar] = useState(false)
 
   const tree = useMemo(() => buildTree(items ?? []), [items])
+
+  const doGerarEAP = async () => {
+    if (!portfolioId || !portfolio) return
+    setConfirmGerar(false)
+    setGerando(true)
+    setAiMsg(null)
+    try {
+      const result = await gerarIA.mutateAsync({
+        portfolio_id: portfolioId,
+        obra_nome: portfolio.nome_obra,
+        tap_dados: tap ?? undefined,
+      })
+      // Delete existing EAP items and insert AI-generated ones
+      if ((items ?? []).length > 0) {
+        await supabase.from('pmo_eap').delete().eq('portfolio_id', portfolioId)
+      }
+      if (Array.isArray(result) && result.length > 0) {
+        const rows = result.map((it, idx) => ({
+          ...it,
+          portfolio_id: portfolioId,
+          ordem: idx + 1,
+          peso_percentual: it.peso_percentual ?? 0,
+        }))
+        await supabase.from('pmo_eap').insert(rows)
+      }
+      qc.invalidateQueries({ queryKey: ['pmo-eap', portfolioId] })
+      setAiMsg('EAP gerada com sucesso via IA! Revise a estrutura.')
+    } catch {
+      setAiMsg('Erro ao gerar EAP via IA. Tente novamente.')
+    } finally {
+      setGerando(false)
+    }
+  }
 
   if (isLoading) {
     return (
@@ -58,17 +100,63 @@ export default function EAP() {
       </button>
 
       {/* Header */}
-      <div>
-        <h1 className={`text-xl font-bold flex items-center gap-2 ${isLight ? 'text-slate-800' : 'text-white'}`}>
-          <GitBranch size={20} className="text-violet-500" />
-          Estrutura Analitica do Projeto (EAP)
-        </h1>
-        {portfolio && (
-          <p className={`text-sm mt-1 ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
-            {portfolio.nome_obra} - {portfolio.numero_osc}
-          </p>
-        )}
+      <div className="flex items-center justify-between flex-wrap gap-3">
+        <div>
+          <h1 className={`text-xl font-bold flex items-center gap-2 ${isLight ? 'text-slate-800' : 'text-white'}`}>
+            <GitBranch size={20} className="text-violet-500" />
+            Estrutura Analitica do Projeto (EAP)
+          </h1>
+          {portfolio && (
+            <p className={`text-sm mt-1 ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
+              {portfolio.nome_obra} - {portfolio.numero_osc}
+            </p>
+          )}
+        </div>
+        <button
+          onClick={() => (items ?? []).length > 0 ? setConfirmGerar(true) : doGerarEAP()}
+          disabled={gerando}
+          className="inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-violet-500 to-indigo-500 text-white rounded-xl text-sm font-semibold hover:from-violet-600 hover:to-indigo-600 transition-all shadow-lg shadow-violet-500/25 disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          {gerando ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />}
+          {gerando ? 'Gerando...' : 'Gerar com IA'}
+        </button>
       </div>
+
+      {/* Confirmation modal */}
+      {confirmGerar && (
+        <div className={`rounded-xl border px-4 py-3 text-sm flex items-center justify-between gap-3 ${
+          isLight ? 'bg-amber-50 border-amber-200 text-amber-800' : 'bg-amber-500/10 border-amber-500/20 text-amber-300'
+        }`}>
+          <span className="flex items-center gap-2">
+            <AlertTriangle size={14} />
+            A EAP existente sera substituida. Deseja continuar?
+          </span>
+          <div className="flex items-center gap-2">
+            <button onClick={() => setConfirmGerar(false)}
+              className={`px-3 py-1 rounded-lg text-xs font-semibold transition-colors ${
+                isLight ? 'hover:bg-amber-100' : 'hover:bg-amber-500/20'
+              }`}>
+              Cancelar
+            </button>
+            <button onClick={doGerarEAP}
+              className="px-3 py-1 rounded-lg text-xs font-semibold bg-amber-600 text-white hover:bg-amber-700 transition-colors">
+              Confirmar
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* AI feedback */}
+      {aiMsg && (
+        <div className={`rounded-xl border px-4 py-3 text-sm font-medium flex items-center gap-2 ${
+          aiMsg.includes('Erro')
+            ? (isLight ? 'bg-red-50 border-red-200 text-red-700' : 'bg-red-500/10 border-red-500/20 text-red-400')
+            : (isLight ? 'bg-emerald-50 border-emerald-200 text-emerald-700' : 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400')
+        }`}>
+          {aiMsg.includes('Erro') ? <AlertTriangle size={14} /> : <CheckCircle2 size={14} />}
+          {aiMsg}
+        </div>
+      )}
 
       {/* Tree */}
       <div className={`rounded-2xl border p-4 ${

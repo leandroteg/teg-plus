@@ -35,10 +35,22 @@ export default function NovoPortfolio() {
     },
   })
 
+  const { data: contratos } = useQuery({
+    queryKey: ['contratos-dropdown'],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('con_contratos')
+        .select('id, titulo, contraparte, numero_contrato')
+        .order('titulo')
+      return data ?? []
+    },
+  })
+
   const [form, setForm] = useState({
     nome_obra: '',
     numero_osc: '',
     obra_id: '',
+    contrato_id: '',
     tipo_osc: 'obra' as TipoOSC,
     status: 'em_analise_ate' as StatusPortfolio,
     cidade_estado: '',
@@ -85,6 +97,7 @@ export default function NovoPortfolio() {
         multa_valor_estimado: 0,
       }
       if (form.obra_id) payload.obra_id = form.obra_id
+      if (form.contrato_id) payload.contrato_id = form.contrato_id
       if (form.cidade_estado.trim()) payload.cidade_estado = form.cidade_estado.trim()
       if (form.cluster.trim()) payload.cluster = form.cluster.trim()
       if (form.data_inicio_contratual) payload.data_inicio_contratual = form.data_inicio_contratual
@@ -192,6 +205,29 @@ export default function NovoPortfolio() {
                 <option value="">Selecione uma obra</option>
                 {(obras ?? []).map(o => (
                   <option key={o.id} value={o.id}>{o.nome}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Contrato Vinculado */}
+            <div>
+              <label className={`block text-xs font-semibold mb-1.5 ${isLight ? 'text-slate-600' : 'text-slate-300'}`}>
+                Contrato Vinculado
+              </label>
+              <select
+                value={form.contrato_id}
+                onChange={e => handleChange('contrato_id', e.target.value)}
+                className={`w-full rounded-xl border px-3 py-2.5 text-sm outline-none transition-colors focus:ring-2 focus:ring-blue-500/30 ${
+                  isLight
+                    ? 'bg-white border-slate-200 text-slate-800'
+                    : 'bg-slate-700 border-slate-600 text-white'
+                }`}
+              >
+                <option value="">Nenhum contrato</option>
+                {(contratos ?? []).map(c => (
+                  <option key={c.id} value={c.id}>
+                    {c.titulo}{c.contraparte ? ` - ${c.contraparte}` : ''}{c.numero_contrato ? ` (${c.numero_contrato})` : ''}
+                  </option>
                 ))}
               </select>
             </div>
