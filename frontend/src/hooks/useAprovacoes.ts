@@ -251,6 +251,63 @@ export function useProcessarAprovacaoAi() {
   })
 }
 
+// ── Decisao generica (admin): cotacao, autorizacao_pagamento, minuta_contratual ──
+
+export interface DecisaoGenericaPayload {
+  aprovacaoId: string
+  entidadeId: string
+  entidadeNumero?: string
+  tipoAprovacao: TipoAprovacao
+  modulo: string
+  nivel: number
+  decisao: 'aprovada' | 'rejeitada'
+  observacao?: string
+  aprovadorNome: string
+  aprovadorEmail: string
+}
+
+export function useDecisaoGenerica() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (payload: DecisaoGenericaPayload) => {
+      const {
+        aprovacaoId, entidadeId, decisao, observacao,
+      } = payload
+
+      // 1. Update the specific aprovacao record
+      const { error: updateError } = await supabase
+        .from(TABLE_APR)
+        .update({
+          status: decisao,
+          observacao: observacao || null,
+          data_decisao: new Date().toISOString(),
+        })
+        .eq('id', aprovacaoId)
+
+      if (updateError) throw updateError
+
+      // 2. Also resolve any other pending aprovacoes for the same entity
+      await supabase
+        .from(TABLE_APR)
+        .update({
+          status: decisao,
+          data_decisao: new Date().toISOString(),
+        })
+        .eq('entidade_id', entidadeId)
+        .eq('status', 'pendente')
+        .neq('id', aprovacaoId)
+
+      return { decisao }
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['aprovacoes-pendentes'] })
+      qc.invalidateQueries({ queryKey: ['aprovacoes-historico'] })
+      qc.invalidateQueries({ queryKey: ['aprovacoes-kpis'] })
+      qc.invalidateQueries({ queryKey: ['dashboard'] })
+    },
+  })
+}
+
 // ── Decisao centralizada (admin): atualiza RC + cria registro apr_aprovacoes ──
 
 export interface DecisaoPayload {

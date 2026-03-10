@@ -83,7 +83,6 @@ import ControleCustos from './pages/pmo/ControleCustos'
 import CustosHub from './pages/pmo/CustosHub'
 import FluxoOS from './pages/pmo/FluxoOS'
 import ReunioesEGP from './pages/pmo/Reunioes'
-import MultasEGP from './pages/pmo/Multas'
 import StatusReportList from './pages/pmo/StatusReportList'
 
 // Módulo Cadastros (Configurações Gerais)
@@ -308,7 +307,6 @@ export default function App() {
               <Route path="/egp/custos/:portfolioId"          element={<ControleCustos />} />
               <Route path="/egp/fluxo-os"                     element={<FluxoOS />} />
               <Route path="/egp/reunioes"                     element={<ReunioesEGP />} />
-              <Route path="/egp/multas"                       element={<MultasEGP />} />
               <Route path="/egp/indicadores"                  element={<StatusReportList />} />
             </Route>
           </Route>

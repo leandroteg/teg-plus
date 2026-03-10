@@ -12,6 +12,7 @@ import { useAuth } from '../contexts/AuthContext'
 import {
   useAprovacoesPendentes,
   useDecisaoRequisicao,
+  useDecisaoGenerica,
   useHistoricoAprovacoes,
   useAprovacaoKPIs,
 } from '../hooks/useAprovacoes'
@@ -357,9 +358,55 @@ function AprovacaoCard({ aprovacao, aprovadorNome, aprovadorEmail }: {
 
 // ── GenericPendingCard (cotacao, autorizacao_pagamento, minuta_contratual) ─────
 
-function GenericPendingCard({ aprovacao }: { aprovacao: AprovacaoPendente }) {
+function GenericPendingCard({ aprovacao, aprovadorNome, aprovadorEmail }: {
+  aprovacao: AprovacaoPendente
+  aprovadorNome: string
+  aprovadorEmail: string
+}) {
+  const mutation = useDecisaoGenerica()
+  const [expanded, setExpanded] = useState(false)
+  const [observacao, setObservacao] = useState('')
+  const [action, setAction] = useState<'aprovada' | 'rejeitada' | null>(null)
+
   const tipo = tipoConfig[aprovacao.tipo_aprovacao] || tipoConfig.requisicao_compra
   const IconComp = tipo.icon
+
+  const handleDecision = async (decisao: 'aprovada' | 'rejeitada') => {
+    setAction(decisao)
+    try {
+      await mutation.mutateAsync({
+        aprovacaoId: aprovacao.id,
+        entidadeId: aprovacao.entidade_id,
+        entidadeNumero: aprovacao.entidade_numero,
+        tipoAprovacao: aprovacao.tipo_aprovacao,
+        modulo: aprovacao.modulo,
+        nivel: aprovacao.nivel,
+        decisao,
+        observacao: observacao || undefined,
+        aprovadorNome,
+        aprovadorEmail,
+      })
+    } catch { /* error handled by mutation state */ }
+  }
+
+  // Resultado pos-decisao
+  if (mutation.isSuccess) {
+    const colors = action === 'aprovada'
+      ? { bg: 'bg-emerald-50 border-emerald-200', icon: 'text-emerald-500', text: 'text-emerald-700', msg: 'Aprovada' }
+      : { bg: 'bg-red-50 border-red-200', icon: 'text-red-500', text: 'text-red-700', msg: 'Rejeitada' }
+
+    return (
+      <div className={`rounded-2xl p-6 text-center border-2 ${colors.bg}`}>
+        {action === 'aprovada'
+          ? <CheckCircle size={44} className={`${colors.icon} mx-auto mb-3`} />
+          : <XCircle size={44} className={`${colors.icon} mx-auto mb-3`} />}
+        <p className={`font-bold text-base ${colors.text}`}>
+          {aprovacao.entidade_numero || tipo.label} — {colors.msg}
+        </p>
+        <p className="text-xs text-slate-500 mt-1">Decisao registrada com sucesso</p>
+      </div>
+    )
+  }
 
   return (
     <div className={`bg-white rounded-2xl shadow-md border ${tipo.borderColor} overflow-hidden`}>
@@ -395,21 +442,57 @@ function GenericPendingCard({ aprovacao }: { aprovacao: AprovacaoPendente }) {
             </span>
           </div>
         )}
+
+        {/* Expandir para observacao */}
+        <button type="button" onClick={() => setExpanded(!expanded)}
+          className="flex items-center gap-1 text-xs text-indigo-500 mt-3 mx-auto font-semibold">
+          {expanded ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
+          {expanded ? 'Menos detalhes' : 'Adicionar observacao'}
+        </button>
+
+        {expanded && (
+          <div className="mt-3">
+            <label className="text-xs text-slate-400">Observacao (opcional)</label>
+            <textarea
+              rows={2}
+              className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm mt-1 focus:ring-2 focus:ring-indigo-300 outline-none"
+              placeholder="Motivo da decisao..."
+              value={observacao}
+              onChange={e => setObservacao(e.target.value)}
+            />
+          </div>
+        )}
       </div>
       <div className="grid grid-cols-2 border-t border-slate-100">
         <button
           type="button"
-          className="flex items-center justify-center gap-2 py-3.5 text-xs font-bold text-red-500 hover:bg-red-50 active:bg-red-100 transition border-r border-slate-100"
+          disabled={mutation.isPending}
+          onClick={() => handleDecision('rejeitada')}
+          className="flex items-center justify-center gap-2 py-3.5 text-xs font-bold text-red-500 hover:bg-red-50 active:bg-red-100 transition border-r border-slate-100 disabled:opacity-50"
         >
-          <XCircle size={18} /> Rejeitar
+          {mutation.isPending && action === 'rejeitada'
+            ? <div className="w-5 h-5 border-2 border-red-400 border-t-transparent rounded-full animate-spin" />
+            : <XCircle size={18} />}
+          Rejeitar
         </button>
         <button
           type="button"
-          className="flex items-center justify-center gap-2 py-3.5 text-xs font-bold text-emerald-600 hover:bg-emerald-50 active:bg-emerald-100 transition"
+          disabled={mutation.isPending}
+          onClick={() => handleDecision('aprovada')}
+          className="flex items-center justify-center gap-2 py-3.5 text-xs font-bold text-emerald-600 hover:bg-emerald-50 active:bg-emerald-100 transition disabled:opacity-50"
         >
-          <CheckCircle size={18} /> Aprovar
+          {mutation.isPending && action === 'aprovada'
+            ? <div className="w-5 h-5 border-2 border-emerald-400 border-t-transparent rounded-full animate-spin" />
+            : <CheckCircle size={18} />}
+          Aprovar
         </button>
       </div>
+
+      {mutation.isError && (
+        <p className="text-red-500 text-xs text-center py-2 border-t border-red-100">
+          Erro ao processar: {mutation.error?.message || 'Tente novamente.'}
+        </p>
+      )}
     </div>
   )
 }
@@ -470,7 +553,7 @@ function AccordionSection({
                 aprovadorEmail={aprovadorEmail}
               />
             ) : (
-              <GenericPendingCard key={apr.id} aprovacao={apr} />
+              <GenericPendingCard key={apr.id} aprovacao={apr} aprovadorNome={aprovadorNome} aprovadorEmail={aprovadorEmail} />
             )
           )}
         </div>
