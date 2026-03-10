@@ -1152,6 +1152,46 @@ function MinutaCard({ minuta, onAnalisar, onMelhorar, onGerarMinuta, analisando,
         </div>
       )}
 
+      {/* Melhorias status bar — shows inline summary when melhorias exist but collapsed */}
+      {melhorias && !showMelhorias && !melhorando && (
+        <div
+          className="mx-4 mt-3 rounded-xl bg-gradient-to-r from-teal-50 to-emerald-50 border border-teal-100 px-3.5 py-2.5 cursor-pointer
+            hover:border-teal-200 hover:shadow-sm transition-all"
+          onClick={() => setShowMelhorias(true)}
+        >
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-1.5">
+              <Wand2 size={11} className="text-teal-500" />
+              <span className="text-[10px] font-bold text-teal-700">
+                Melhorias IA: Score {melhorias.score_estimado}/100
+              </span>
+            </div>
+            <span className="text-[10px] text-slate-500">•</span>
+            <span className="text-[10px] text-teal-600 font-semibold">
+              {melhorias.clausulas_melhoradas?.length ?? 0} melhorada{(melhorias.clausulas_melhoradas?.length ?? 0) !== 1 ? 's' : ''}
+            </span>
+            <span className="text-[10px] text-slate-500">•</span>
+            <span className="text-[10px] text-blue-600 font-semibold">
+              {melhorias.clausulas_novas?.length ?? 0} nova{(melhorias.clausulas_novas?.length ?? 0) !== 1 ? 's' : ''}
+            </span>
+            <span className="text-[10px] text-slate-500">•</span>
+            <span className="text-[10px] text-emerald-600 font-semibold">
+              {melhorias.riscos_mitigados?.length ?? 0} risco{(melhorias.riscos_mitigados?.length ?? 0) !== 1 ? 's' : ''} mitigado{(melhorias.riscos_mitigados?.length ?? 0) !== 1 ? 's' : ''}
+            </span>
+            {minuta.ai_melhorado_em && (
+              <span className="text-[9px] text-slate-400 ml-auto">{fmtDataHora(minuta.ai_melhorado_em)}</span>
+            )}
+          </div>
+          {pdfUrl && (
+            <div className="flex items-center gap-1.5 mt-1.5">
+              <CheckCircle2 size={10} className="text-emerald-500" />
+              <span className="text-[10px] font-bold text-emerald-600">PDF gerado — pronto para aprovacao</span>
+            </div>
+          )}
+          <p className="text-[9px] text-teal-400 mt-1">Clique para expandir</p>
+        </div>
+      )}
+
       {/* Melhorando animation */}
       {melhorando && (
         <div className="mx-4 mt-3 rounded-xl bg-gradient-to-r from-teal-50 to-emerald-50 border border-teal-200 px-4 py-3">
