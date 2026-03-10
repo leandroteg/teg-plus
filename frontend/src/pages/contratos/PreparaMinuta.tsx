@@ -222,6 +222,19 @@ function AnalisePanel({ analise, onMelhorar, melhorando }: {
   const conformTotal = conformEntries.length
   const papelInfo = PAPEL_TEG[analise.papel_teg || 'indefinido'] ?? PAPEL_TEG.indefinido
 
+  // Safeguard: if resumo contains stringified JSON, extract the real resumo from it
+  const resumoText = (() => {
+    const r = analise.resumo
+    if (!r) return null
+    if (typeof r === 'string' && r.startsWith('{')) {
+      try {
+        const parsed = JSON.parse(r)
+        return typeof parsed.resumo === 'string' ? parsed.resumo : null
+      } catch { return r.length > 200 ? null : r }
+    }
+    return r
+  })()
+
   return (
     <div className="mt-4 rounded-2xl border border-indigo-100 bg-white overflow-hidden shadow-sm">
       {/* Hero header with score ring */}
@@ -250,8 +263,8 @@ function AnalisePanel({ analise, onMelhorar, melhorando }: {
               </div>
             )}
 
-            {analise.resumo && (
-              <p className="text-[11px] text-white/75 leading-snug line-clamp-2">{analise.resumo}</p>
+            {resumoText && (
+              <p className="text-[11px] text-white/75 leading-snug line-clamp-2">{resumoText}</p>
             )}
             {/* Metric pills */}
             <div className="flex flex-wrap items-center gap-1.5 mt-2">
