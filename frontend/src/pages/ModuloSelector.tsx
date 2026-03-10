@@ -77,7 +77,7 @@ const PILLARS: Pillar[] = [
   },
   {
     key: 'financeiro',
-    label: 'Financeiro',
+    label: 'Backoffice',
     tagline: 'Finanças e controladoria',
     Icon: Wallet,
     grad: 'from-emerald-500/20 to-green-600/20',
@@ -85,7 +85,7 @@ const PILLARS: Pillar[] = [
     glow: 'rgba(16,185,129,0.18)',
     accent: '#34D399',
     subs: [
-      { key: 'tesouraria', label: 'Tesouraria', desc: 'Contas, aprovações e conciliação', Icon: Banknote, active: true, route: '/financeiro' },
+      { key: 'financeiro', label: 'Financeiro', desc: 'Contas, aprovações e conciliação', Icon: Banknote, active: true, route: '/financeiro' },
       { key: 'fiscal', label: 'Fiscal', desc: 'Notas fiscais e créditos PIS/COFINS', Icon: Receipt, active: true, route: '/fiscal' },
       { key: 'controladoria', label: 'Controladoria', desc: 'Indicadores e relatórios gerenciais', Icon: BarChart3, active: true, route: '/controladoria' },
       { key: 'contratos', label: 'Contratos', desc: 'Gestão de contratos e SLAs', Icon: FileText, active: true, route: '/contratos' },
