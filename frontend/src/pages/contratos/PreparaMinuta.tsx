@@ -5,7 +5,7 @@ import {
   ChevronRight, Clock, Tag, Building2, DollarSign, Calendar,
   Sparkles, ShieldAlert, Lightbulb, CheckCircle2, XCircle,
   AlertTriangle, ChevronDown, ChevronUp, Settings2, ToggleLeft, ToggleRight,
-  Loader2, Brain, Scale, FileSearch, FileUp, X,
+  Loader2, Brain, Scale, FileSearch, FileUp, X, Wand2,
 } from 'lucide-react'
 import {
   useSolicitacao,
@@ -13,10 +13,12 @@ import {
   useCriarMinuta,
   useAvancarEtapa,
   useAnalisarMinuta,
+  useMelhorarMinuta,
   useConfigAnalise,
   useAtualizarConfigAnalise,
   useUploadMinutaFile,
 } from '../../hooks/useSolicitacoes'
+import type { MelhoriaMinuta } from '../../hooks/useSolicitacoes'
 import type { Minuta, TipoMinuta, StatusMinuta, MinutaAiAnalise, ConfigAnalise } from '../../types/contratos'
 
 // ── Formatters ──────────────────────────────────────────────────────────────────
@@ -376,14 +378,154 @@ function RegrasConfig({ regras, onUpdate }: {
   )
 }
 
+// ── Melhorias Panel ──────────────────────────────────────────────────────────
+
+function MelhoriasPanel({ melhorias }: { melhorias: MelhoriaMinuta }) {
+  const [tab, setTab] = useState<'clausulas' | 'riscos' | 'novas'>('clausulas')
+  const sc = scoreColor(melhorias.score_estimado)
+
+  return (
+    <div className="mt-3 rounded-2xl border border-teal-100 bg-gradient-to-br from-teal-50/50 to-white overflow-hidden">
+      {/* Score header */}
+      <div className="px-4 py-3 flex items-center gap-3 border-b border-teal-100">
+        <div className={`w-11 h-11 rounded-xl ${sc.light} ring-2 ${sc.ring} flex items-center justify-center`}>
+          <span className={`text-base font-extrabold ${sc.text}`}>{melhorias.score_estimado}</span>
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-1.5">
+            <Wand2 size={12} className="text-teal-500" />
+            <p className="text-xs font-extrabold text-slate-800">Melhorias por IA</p>
+          </div>
+          <p className="text-[11px] text-slate-500 mt-0.5 line-clamp-2 leading-snug">{melhorias.resumo_melhorias}</p>
+        </div>
+        <div className="flex flex-col items-end gap-0.5 shrink-0">
+          <span className="text-[10px] font-bold text-teal-600 bg-teal-50 rounded-full px-2 py-0.5">
+            {melhorias.clausulas_melhoradas?.length ?? 0} melhoradas
+          </span>
+          <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 rounded-full px-2 py-0.5">
+            {melhorias.clausulas_novas?.length ?? 0} novas
+          </span>
+        </div>
+      </div>
+
+      {/* Tabs */}
+      <div className="flex border-b border-teal-100 px-2">
+        {([
+          { key: 'clausulas' as const, label: 'Melhoradas', count: melhorias.clausulas_melhoradas?.length },
+          { key: 'riscos' as const, label: 'Riscos Mitigados', count: melhorias.riscos_mitigados?.length },
+          { key: 'novas' as const, label: 'Novas Clausulas', count: melhorias.clausulas_novas?.length },
+        ]).map(t => (
+          <button
+            key={t.key}
+            onClick={() => setTab(t.key)}
+            className={`flex items-center gap-1 px-3 py-2 text-[10px] font-bold border-b-2 transition-all ${
+              tab === t.key
+                ? 'border-teal-500 text-teal-700'
+                : 'border-transparent text-slate-400 hover:text-slate-600'
+            }`}
+          >
+            {t.label}
+            {t.count != null && (
+              <span className="bg-slate-100 rounded-full px-1.5 text-[9px]">{t.count}</span>
+            )}
+          </button>
+        ))}
+      </div>
+
+      {/* Tab content */}
+      <div className="p-3 max-h-96 overflow-y-auto">
+        {tab === 'clausulas' && (
+          <div className="space-y-2">
+            {(melhorias.clausulas_melhoradas ?? []).length === 0 ? (
+              <p className="text-[11px] text-slate-400 text-center py-4">Nenhuma clausula melhorada</p>
+            ) : melhorias.clausulas_melhoradas.map((c, i) => (
+              <div key={i} className="rounded-xl bg-teal-50 border border-teal-100 p-3">
+                <div className="flex items-center gap-1.5 mb-1.5">
+                  <Wand2 size={10} className="text-teal-600" />
+                  <p className="text-[11px] font-bold text-teal-800">{c.nome}</p>
+                  <span className="text-[9px] font-semibold bg-teal-100 text-teal-600 rounded-full px-1.5 py-0.5">
+                    {c.acao}
+                  </span>
+                </div>
+                <p className="text-[10px] text-slate-500 italic mb-2">{c.justificativa}</p>
+                <div className="bg-white/70 rounded-lg px-3 py-2 border border-teal-100">
+                  <p className="text-[9px] text-teal-600 font-bold uppercase mb-1">Texto Melhorado</p>
+                  <p className="text-[10px] text-slate-700 leading-snug whitespace-pre-wrap">{c.texto_melhorado}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {tab === 'riscos' && (
+          <div className="space-y-2">
+            {(melhorias.riscos_mitigados ?? []).length === 0 ? (
+              <p className="text-[11px] text-slate-400 text-center py-4">Nenhum risco mitigado</p>
+            ) : melhorias.riscos_mitigados.map((r, i) => (
+              <div key={i} className="rounded-xl bg-emerald-50 border border-emerald-100 p-3">
+                <p className="text-[11px] font-bold text-emerald-800">{r.risco_original}</p>
+                <div className="flex items-center gap-2 mt-1">
+                  <span className="text-[9px] font-bold text-red-600 bg-red-50 rounded-full px-1.5 py-0.5">
+                    {r.severidade_original}
+                  </span>
+                  <ChevronRight size={10} className="text-slate-400" />
+                  <span className="text-[9px] font-bold text-emerald-600 bg-emerald-100 rounded-full px-1.5 py-0.5">
+                    {r.severidade_apos}
+                  </span>
+                </div>
+                <p className="text-[10px] text-slate-600 mt-1.5 leading-snug">{r.acao_tomada}</p>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {tab === 'novas' && (
+          <div className="space-y-2">
+            {(melhorias.clausulas_novas ?? []).length === 0 ? (
+              <p className="text-[11px] text-slate-400 text-center py-4">Nenhuma clausula nova sugerida</p>
+            ) : melhorias.clausulas_novas.map((c, i) => (
+              <div key={i} className="rounded-xl bg-blue-50 border border-blue-100 p-3">
+                <div className="flex items-center gap-1.5 mb-1.5">
+                  <Plus size={10} className="text-blue-600" />
+                  <p className="text-[11px] font-bold text-blue-800">{c.nome}</p>
+                </div>
+                <p className="text-[10px] text-slate-500 italic mb-1">{c.motivo}</p>
+                {c.base_legal && (
+                  <p className="text-[9px] text-blue-500 font-mono mb-2">Base: {c.base_legal}</p>
+                )}
+                <div className="bg-white/70 rounded-lg px-3 py-2 border border-blue-100">
+                  <p className="text-[9px] text-blue-600 font-bold uppercase mb-1">Texto da Clausula</p>
+                  <p className="text-[10px] text-slate-700 leading-snug whitespace-pre-wrap">{c.texto}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Observacoes */}
+      {melhorias.observacoes_gerais && (
+        <div className="px-4 py-3 border-t border-teal-100 bg-slate-50/50">
+          <p className="text-[9px] text-slate-400 font-semibold uppercase mb-0.5">Observacoes do Revisor IA</p>
+          <p className="text-[10px] text-slate-600 leading-snug">{melhorias.observacoes_gerais}</p>
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ── MinutaCard ───────────────────────────────────────────────────────────────
 
-function MinutaCard({ minuta, onAnalisar, analisando }: {
+function MinutaCard({ minuta, onAnalisar, onMelhorar, analisando, melhorando, melhorias }: {
   minuta: Minuta
   onAnalisar: (m: Minuta) => void
+  onMelhorar: (m: Minuta) => void
   analisando: boolean
+  melhorando: boolean
+  melhorias?: MelhoriaMinuta | null
 }) {
   const [showAnalise, setShowAnalise] = useState(false)
+  const [showMelhorias, setShowMelhorias] = useState(false)
   const hasAnalise = minuta.ai_analise && typeof minuta.ai_analise.score === 'number'
 
   return (
@@ -442,17 +584,46 @@ function MinutaCard({ minuta, onAnalisar, analisando }: {
             </button>
 
             {hasAnalise && (
+              <>
+                <button
+                  onClick={() => onMelhorar(minuta)}
+                  disabled={melhorando || analisando}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[10px] font-bold
+                    bg-gradient-to-r from-teal-600 to-emerald-600 text-white shadow-sm
+                    hover:from-teal-700 hover:to-emerald-700 transition-all disabled:opacity-50"
+                >
+                  {melhorando
+                    ? <Loader2 size={11} className="animate-spin" />
+                    : <Wand2 size={11} />}
+                  {melhorando ? 'Melhorando...' : 'Melhorar com IA'}
+                </button>
+
+                <button
+                  onClick={() => setShowAnalise(v => !v)}
+                  className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-[10px] font-bold
+                    bg-indigo-50 text-indigo-600 hover:bg-indigo-100 transition-all"
+                >
+                  {showAnalise ? <ChevronUp size={10} /> : <ChevronDown size={10} />}
+                  {showAnalise ? 'Ocultar' : 'Ver Analise'}
+                  <span className={`ml-1 w-5 h-5 rounded-md flex items-center justify-center text-[9px] font-extrabold ${
+                    scoreColor(minuta.ai_analise!.score).light
+                  } ${scoreColor(minuta.ai_analise!.score).text}`}>
+                    {minuta.ai_analise!.score}
+                  </span>
+                </button>
+              </>
+            )}
+
+            {melhorias && (
               <button
-                onClick={() => setShowAnalise(v => !v)}
+                onClick={() => setShowMelhorias(v => !v)}
                 className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-[10px] font-bold
-                  bg-indigo-50 text-indigo-600 hover:bg-indigo-100 transition-all"
+                  bg-teal-50 text-teal-600 hover:bg-teal-100 transition-all"
               >
-                {showAnalise ? <ChevronUp size={10} /> : <ChevronDown size={10} />}
-                {showAnalise ? 'Ocultar' : 'Ver Analise'}
-                <span className={`ml-1 w-5 h-5 rounded-md flex items-center justify-center text-[9px] font-extrabold ${
-                  scoreColor(minuta.ai_analise!.score).light
-                } ${scoreColor(minuta.ai_analise!.score).text}`}>
-                  {minuta.ai_analise!.score}
+                {showMelhorias ? <ChevronUp size={10} /> : <ChevronDown size={10} />}
+                {showMelhorias ? 'Ocultar' : 'Ver Melhorias'}
+                <span className="ml-1 w-5 h-5 rounded-md flex items-center justify-center text-[9px] font-extrabold bg-teal-100 text-teal-700">
+                  {melhorias.score_estimado}
                 </span>
               </button>
             )}
@@ -467,6 +638,11 @@ function MinutaCard({ minuta, onAnalisar, analisando }: {
           {/* Expanded analysis */}
           {showAnalise && hasAnalise && (
             <AnalisePanel analise={minuta.ai_analise!} />
+          )}
+
+          {/* Expanded melhorias */}
+          {showMelhorias && melhorias && (
+            <MelhoriasPanel melhorias={melhorias} />
           )}
         </div>
       </div>
@@ -488,6 +664,7 @@ export default function PreparaMinuta() {
   const analisarMinuta = useAnalisarMinuta()
   const atualizarConfig = useAtualizarConfigAnalise()
   const uploadFile = useUploadMinutaFile()
+  const melhorarMinuta = useMelhorarMinuta()
 
   // Form state
   const [titulo, setTitulo] = useState('')
@@ -498,6 +675,8 @@ export default function PreparaMinuta() {
   const [formError, setFormError] = useState('')
   const [showForm, setShowForm] = useState(false)
   const [analisandoId, setAnalisandoId] = useState<string | null>(null)
+  const [melhorandoId, setMelhorandoId] = useState<string | null>(null)
+  const [melhoriasMap, setMelhoriasMap] = useState<Record<string, MelhoriaMinuta>>({})
   const [uploadProgress, setUploadProgress] = useState<'idle' | 'uploading' | 'done'>('idle')
 
   const isLoading = loadingSol || loadingMinutas
@@ -600,6 +779,34 @@ export default function PreparaMinuta() {
       // Mutation error is handled by TanStack Query
     } finally {
       setAnalisandoId(null)
+    }
+  }
+
+  const handleMelhorarMinuta = async (minuta: Minuta) => {
+    if (!solicitacao || melhorandoId) return
+    setMelhorandoId(minuta.id)
+    try {
+      const result = await melhorarMinuta.mutateAsync({
+        solicitacao_id: solicitacao.id,
+        minuta_id: minuta.id,
+        arquivo_url: minuta.arquivo_url ?? undefined,
+        titulo: minuta.titulo,
+        analise: minuta.ai_analise ?? undefined,
+        contexto: {
+          objeto: solicitacao.objeto,
+          contraparte: solicitacao.contraparte_nome,
+          valor: solicitacao.valor_estimado ?? undefined,
+          tipo_contrato: solicitacao.tipo_contrato,
+          data_inicio: solicitacao.data_inicio_prevista ?? undefined,
+          data_fim: solicitacao.data_fim_prevista ?? undefined,
+          obra: solicitacao.obra?.nome ?? undefined,
+        },
+      })
+      setMelhoriasMap(prev => ({ ...prev, [minuta.id]: result.melhorias }))
+    } catch {
+      // Mutation error handled by TanStack Query
+    } finally {
+      setMelhorandoId(null)
     }
   }
 
@@ -939,7 +1146,10 @@ export default function PreparaMinuta() {
                   key={m.id}
                   minuta={m}
                   onAnalisar={handleAnalisarMinuta}
+                  onMelhorar={handleMelhorarMinuta}
                   analisando={analisandoId === m.id}
+                  melhorando={melhorandoId === m.id}
+                  melhorias={melhoriasMap[m.id]}
                 />
               ))}
             </div>

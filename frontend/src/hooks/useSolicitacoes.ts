@@ -456,6 +456,132 @@ export function useUploadMinutaFile() {
   })
 }
 
+// ── Melhorar Minuta via AI (n8n webhook) ────────────────────────────────────
+
+export interface MelhoriaMinuta {
+  resumo_melhorias: string
+  score_estimado: number
+  clausulas_melhoradas: Array<{
+    nome: string
+    status_anterior: string
+    acao: string
+    texto_original?: string
+    texto_melhorado: string
+    justificativa: string
+  }>
+  riscos_mitigados: Array<{
+    risco_original: string
+    severidade_original: string
+    severidade_apos: string
+    acao_tomada: string
+  }>
+  clausulas_novas: Array<{
+    nome: string
+    texto: string
+    motivo: string
+    base_legal?: string
+  }>
+  observacoes_gerais?: string
+  solicitacao_id?: string
+  minuta_id?: string
+  data_geracao?: string
+}
+
+export function useMelhorarMinuta() {
+  return useMutation<
+    { success: boolean; melhorias: MelhoriaMinuta },
+    Error,
+    {
+      solicitacao_id: string
+      minuta_id: string
+      arquivo_url?: string
+      titulo?: string
+      analise?: MinutaAiAnalise
+      contexto: {
+        objeto?: string
+        contraparte?: string
+        valor?: number
+        tipo_contrato?: string
+        data_inicio?: string
+        data_fim?: string
+        obra?: string
+      }
+    }
+  >({
+    mutationFn: async (payload) => {
+      const res = await fetch(`${N8N_BASE}/contratos/melhorar-minuta`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      })
+      if (!res.ok) throw new Error(`Erro ao melhorar minuta: ${res.status}`)
+      return res.json()
+    },
+  })
+}
+
+// ── Gerar Resumo Executivo via AI (n8n webhook) ─────────────────────────────
+
+export interface ResumoAiGerado {
+  titulo: string
+  partes_envolvidas: Array<{ nome: string; papel: string; cnpj?: string }> | string
+  objeto_resumo: string
+  valor_total?: number
+  prazo_meses?: number
+  score_analise?: number
+  riscos: Array<{
+    descricao: string
+    impacto?: string
+    probabilidade?: string
+    mitigacao?: string
+    nivel?: string
+  }>
+  oportunidades: Array<{
+    descricao: string
+    beneficio?: string
+    impacto?: string
+    prioridade?: string
+  }>
+  recomendacao?: string
+  parecer_juridico?: string
+  solicitacao_id?: string
+  status?: string
+  data_geracao?: string
+}
+
+export function useGerarResumoAI() {
+  return useMutation<
+    { success: boolean; resumo: ResumoAiGerado },
+    Error,
+    {
+      solicitacao_id: string
+      analise?: MinutaAiAnalise
+      dados_contrato: {
+        contratante?: string
+        contratada?: string
+        objeto?: string
+        valor_total?: number
+        prazo_meses?: number
+        titulo?: string
+        cnpj_contratante?: string
+        cnpj_contratada?: string
+      }
+    }
+  >({
+    mutationFn: async (payload) => {
+      const res = await fetch(`${N8N_BASE}/contratos/gerar-resumo`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      })
+      if (!res.ok) throw new Error(`Erro ao gerar resumo: ${res.status}`)
+      return res.json()
+    },
+  })
+}
+
+// ── Analisar Minuta via AI (n8n webhook) ────────────────────────────────────
+
 export function useAnalisarMinuta() {
   const qc = useQueryClient()
   return useMutation<

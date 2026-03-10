@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import {
   ArrowLeft, FileText, Plus, Trash2, Save, Send,
   AlertTriangle, Shield, Lightbulb, CheckCircle2,
-  Clock, ChevronRight, Eye,
+  Clock, ChevronRight, Eye, Sparkles, Loader2, Brain,
 } from 'lucide-react'
 import {
   useSolicitacao,
@@ -11,7 +11,10 @@ import {
   useCriarResumo,
   useAtualizarResumo,
   useAvancarEtapa,
+  useMinutas,
+  useGerarResumoAI,
 } from '../../hooks/useSolicitacoes'
+import type { ResumoAiGerado } from '../../hooks/useSolicitacoes'
 import type { ResumoExecutivo as TResumo, StatusResumo } from '../../types/contratos'
 
 // ── Formatters ──────────────────────────────────────────────────────────────────
@@ -215,9 +218,11 @@ export default function ResumoExecutivoPage() {
 
   const { data: solicitacao, isLoading: loadingSol } = useSolicitacao(id)
   const { data: resumo, isLoading: loadingResumo } = useResumoExecutivo(id)
+  const { data: minutas = [] } = useMinutas(id)
   const criarResumo = useCriarResumo()
   const atualizarResumo = useAtualizarResumo()
   const avancarEtapa = useAvancarEtapa()
+  const gerarResumoAI = useGerarResumoAI()
 
   // Form state
   const [titulo, setTitulo] = useState('')
@@ -372,6 +377,75 @@ export default function ResumoExecutivoPage() {
 
   const isSaving = criarResumo.isPending || atualizarResumo.isPending
   const isSending = avancarEtapa.isPending
+  const isGerandoIA = gerarResumoAI.isPending
+
+  // ── Gerar Resumo com IA ─────────────────────────────────────────────
+  const handleGerarComIA = async () => {
+    if (!solicitacao || isGerandoIA) return
+    try {
+      // Find latest minuta with analysis
+      const minutaComAnalise = minutas
+        .filter(m => m.ai_analise)
+        .sort((a, b) => b.versao - a.versao)[0]
+
+      const result = await gerarResumoAI.mutateAsync({
+        solicitacao_id: solicitacao.id,
+        analise: minutaComAnalise?.ai_analise ?? undefined,
+        dados_contrato: {
+          contratante: solicitacao.obra?.nome ?? 'TEG Engenharia',
+          contratada: solicitacao.contraparte_nome,
+          objeto: solicitacao.objeto,
+          valor_total: solicitacao.valor_estimado ?? undefined,
+          prazo_meses: solicitacao.prazo_meses ?? undefined,
+          titulo: `Resumo Executivo — ${solicitacao.objeto}`,
+          cnpj_contratante: undefined,
+          cnpj_contratada: solicitacao.contraparte_cnpj ?? undefined,
+        },
+      })
+
+      // Pre-fill form with AI-generated data
+      const r = result.resumo
+      if (r.titulo) setTitulo(r.titulo)
+      if (r.objeto_resumo) setObjetoResumo(r.objeto_resumo)
+      if (r.valor_total != null) setValorTotal(String(r.valor_total))
+      if (r.prazo_meses) setVigencia(`${r.prazo_meses} meses`)
+      if (r.recomendacao) setRecomendacao(r.recomendacao)
+
+      // partes_envolvidas can be string or array
+      if (r.partes_envolvidas) {
+        if (typeof r.partes_envolvidas === 'string') {
+          setPartesEnvolvidas(r.partes_envolvidas)
+        } else if (Array.isArray(r.partes_envolvidas)) {
+          setPartesEnvolvidas(
+            r.partes_envolvidas.map(p => `${p.papel}: ${p.nome}${p.cnpj ? ` (${p.cnpj})` : ''}`).join('\n')
+          )
+        }
+      }
+
+      // Map riscos
+      if (r.riscos && r.riscos.length > 0) {
+        setRiscos(
+          r.riscos.map(rk => ({
+            nivel: rk.nivel ?? rk.impacto?.toLowerCase() ?? 'medio',
+            descricao: rk.descricao,
+            mitigacao: rk.mitigacao ?? '',
+          }))
+        )
+      }
+
+      // Map oportunidades
+      if (r.oportunidades && r.oportunidades.length > 0) {
+        setOportunidades(
+          r.oportunidades.map(op => ({
+            descricao: op.descricao,
+            impacto: op.impacto ?? op.beneficio ?? '',
+          }))
+        )
+      }
+    } catch {
+      setFormError('Erro ao gerar resumo com IA. Tente novamente.')
+    }
+  }
 
   // ── Loading ────────────────────────────────────────────────────────────
   if (isLoading) {
@@ -430,6 +504,55 @@ export default function ResumoExecutivoPage() {
       {/* ── Edit / Create Form ──────────────────────────────────────── */}
       {!showViewMode && (
         <div className="space-y-5">
+
+          {/* AI Generate Banner */}
+          <div className="bg-gradient-to-r from-violet-50 via-indigo-50 to-teal-50 rounded-2xl border border-indigo-200 p-5">
+            <div className="flex items-center justify-between flex-wrap gap-3">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-violet-500 to-indigo-600 flex items-center justify-center shadow-sm">
+                  <Brain size={18} className="text-white" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-extrabold text-slate-800">Gerar com Inteligencia Artificial</h3>
+                  <p className="text-[10px] text-slate-500 mt-0.5">
+                    Preenche automaticamente todos os campos com base na analise da minuta
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={handleGerarComIA}
+                disabled={isGerandoIA}
+                className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-bold
+                  bg-gradient-to-r from-violet-600 to-indigo-600 text-white
+                  hover:from-violet-700 hover:to-indigo-700 transition-all shadow-sm
+                  disabled:opacity-60 disabled:cursor-not-allowed"
+              >
+                {isGerandoIA ? (
+                  <>
+                    <Loader2 size={14} className="animate-spin" />
+                    Gerando...
+                  </>
+                ) : (
+                  <>
+                    <Sparkles size={14} />
+                    Gerar com IA
+                  </>
+                )}
+              </button>
+            </div>
+            {gerarResumoAI.isSuccess && (
+              <div className="mt-3 flex items-center gap-2 text-[10px] text-emerald-700 font-semibold bg-emerald-50 rounded-lg px-3 py-1.5">
+                <CheckCircle2 size={12} />
+                Resumo gerado com sucesso! Revise e ajuste os campos abaixo antes de salvar.
+              </div>
+            )}
+            {gerarResumoAI.isError && (
+              <div className="mt-3 flex items-center gap-2 text-[10px] text-red-700 font-semibold bg-red-50 rounded-lg px-3 py-1.5">
+                <AlertTriangle size={12} />
+                Erro ao gerar resumo. Verifique se existe uma minuta analisada.
+              </div>
+            )}
+          </div>
 
           {/* Main fields */}
           <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 space-y-4">
