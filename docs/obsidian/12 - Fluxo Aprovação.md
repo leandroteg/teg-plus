@@ -2,9 +2,10 @@
 title: Fluxo de Aprovação
 type: processo
 status: ativo
-tags: [aprovação, alçada, token, workflow, multi-nível]
+tags: [aprovação, alçada, token, workflow, multi-nível, aprovaai, multi-tipo]
 criado: 2026-03-02
-relacionado: ["[[11 - Fluxo Requisição]]", "[[13 - Alçadas]]", "[[10 - n8n Workflows]]", "[[09 - Auth Sistema]]"]
+atualizado: 2026-03-10
+relacionado: ["[[11 - Fluxo Requisição]]", "[[13 - Alçadas]]", "[[10 - n8n Workflows]]", "[[09 - Auth Sistema]]", "[[27 - Módulo Contratos Gestão]]", "[[20 - Módulo Financeiro]]"]
 ---
 
 # Fluxo de Aprovação — TEG+ ERP
@@ -163,31 +164,59 @@ const token = crypto.randomUUID()  // Ex: 550e8400-e29b-41d4-a716-446655440000
 
 ---
 
-## AprovAi — Interface Mobile
+## AprovAi — Central de Aprovacoes Multi-tipo
 
 Rota: `/aprovaai`
 
-Interface alternativa otimizada para **mobile**:
-- Lista de aprovações pendentes do usuário logado
-- Card compacto por requisição
-- Botão rápido Aprovar/Rejeitar
-- Sem necessidade de abrir link externo
+Interface unificada para **todas as aprovacoes** do sistema, agrupadas por tipo com cores distintas.
 
-```
-┌─────────────────────────────┐
-│  ApprovaAi           [👤]   │
-│  ─────────────────────────  │
-│  3 pendentes                │
-│                             │
-│  ┌─────────────────────┐   │
-│  │ RC-202602-0042      │   │
-│  │ SE Frutal • Urgente │   │
-│  │ EPI/EPC • R$250,00  │   │
-│  │ João Silva          │   │
-│  │ [✅ Aprovar] [❌]   │   │
-│  └─────────────────────┘   │
-└─────────────────────────────┘
-```
+### 4 Tipos de Aprovacao
+
+| Tipo | Label | Cor | Origem | Icone |
+|------|-------|-----|--------|-------|
+| `cotacao` | Aprovacao Compras | Azul | Cotacoes de compras | FileSearch |
+| `autorizacao_pagamento` | Autorizacoes de Pagamento | Amber | Financeiro (`syncCPsParaAprovacao`) | Banknote |
+| `minuta_contratual` | Minutas Contratuais | Violeta | Contratos (analise AI) | FileSignature |
+| `requisicao_compra` | Validacao Tec. Requisicao de Compra | Teal | Requisicoes de compras | ShoppingCart |
+
+### ApprovalBadge (Header Global)
+
+Componente `ApprovalBadge` exibido no header de todos os modulos:
+- Badge circular com contador de aprovacoes pendentes
+- Cor teal com animacao de pulse quando ha pendencias
+- Clique navega para `/aprovaai`
+- Presente em `ModuloSelector.tsx` e `ModuleLayout.tsx`
+
+### Integracao Financeiro → AprovAi
+
+A funcao `syncCPsParaAprovacao()` em `useFinanceiro.ts`:
+1. Busca CPs com `status = 'aguardando_aprovacao'` que ainda nao tem registro em `apr_aprovacoes`
+2. Cria registros `apr_aprovacoes` com `tipo = 'autorizacao_pagamento'`
+3. Executada automaticamente ao carregar aprovacoes pendentes no AprovAi
+
+### Integracao Contratos → AprovAi
+
+Minutas contratuais analisadas pela AI geram registro em `apr_aprovacoes`:
+- `tipo = 'minuta_contratual'`
+- Vinculado ao contrato/solicitacao
+- Card violeta na tela AprovAi com dados do contrato
+
+### Hooks
+
+| Hook | Descricao |
+|------|-----------|
+| `useAprovacoesPendentes(tipo?)` | Lista aprovacoes pendentes, opcionalmente filtrada por tipo |
+| `useDecisaoRequisicao()` | Aprovar/rejeitar requisicao (tipo cotacao/requisicao_compra) |
+| `useDecisaoGenerica()` | Aprovar/rejeitar aprovacao generica (pagamento, minuta) |
+| `useHistoricoAprovacoes(filtros)` | Historico com filtros por tipo, data, status |
+| `useAprovacaoKPIs()` | KPIs: total pendentes, tempo medio, taxa aprovacao |
+
+### KPIs e Historico
+
+A tela AprovAi inclui:
+- Cards de KPIs (total pendentes, taxa de aprovacao, tempo medio)
+- Aba de historico com filtros por tipo, periodo e status
+- Timeline de fluxo (`FluxoTimeline` component)
 
 ---
 

@@ -2,19 +2,20 @@
 tipo: issue
 id: ISSUE-006
 titulo: "Filtro de datas no dashboard financeiro nao reseta ao trocar de obra"
-status: aberto
+status: resolvida
 severidade: media
 modulo: financeiro
 reportado_por: SuperTEG AI Agent
 data_report: 2026-03-07
+data_resolucao: 2026-03-07
 sprint: Sprint-3
 github_issue: 13
 github_url: "https://github.com/leandroteg/teg-plus/issues/13"
 origem: superteg-agent
-tags: [issue, bug, financeiro, dashboard, filtro, github]
+tags: [issue, bug, financeiro, dashboard, filtro, github, resolvida]
 ---
 
-# 🟡 ISSUE-006 — Filtro de datas no dashboard financeiro nao reseta
+# ✅ ISSUE-006 — Filtro de datas no dashboard financeiro nao reseta (RESOLVIDA)
 
 > **GitHub Issue:** [#13](https://github.com/leandroteg/teg-plus/issues/13) | **Origem:** SuperTEG AI Agent
 
@@ -36,6 +37,13 @@ O filtro de datas no dashboard financeiro nao reseta quando troca de obra, fica 
 - `frontend/src/pages/financeiro/DashboardFinanceiro.tsx`
 - `frontend/src/hooks/useFinanceiro.ts`
 
+## Resolucao
+
+Implementado em 2026-03-07 via commit `f7033b9`:
+- Reset do filtro de periodo ao navegar entre dashboards
+- State dos filtros de data limpo ao trocar de obra
+- Parametros de data no TanStack Query key atualizados corretamente
+
 ## Links
-- [[08 - Modulo Financeiro]]
+- [[20 - Módulo Financeiro]]
 - [[TASK-008 - Dashboard financeiro basico]]

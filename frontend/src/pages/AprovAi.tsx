@@ -6,7 +6,7 @@ import {
   MessageSquare, ExternalLink, ArrowLeft,
   FileSearch, Banknote, FileSignature, ShoppingCart,
   History, ListChecks, Timer, TrendingUp, Filter,
-  Calendar,
+  Calendar, FileText, Download,
 } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import {
@@ -431,10 +431,17 @@ function GenericPendingCard({ aprovacao, aprovadorNome, aprovadorEmail }: {
         <p className="text-xs text-slate-500 mb-2">
           Nivel {aprovacao.nivel} | Aprovador: {aprovacao.aprovador_nome}
         </p>
-        <p className="text-sm text-slate-600">
-          {aprovacao.requisicao?.descricao || `Aguardando aprovacao ${tipo.label.toLowerCase()}`}
-        </p>
-        {aprovacao.requisicao?.valor_estimado > 0 && (
+
+        {/* ── Resumo Executivo para Minuta Contratual ── */}
+        {aprovacao.tipo_aprovacao === 'minuta_contratual' && aprovacao.minuta_resumo ? (
+          <MinutaExecutiveSummary resumo={aprovacao.minuta_resumo} />
+        ) : (
+          <p className="text-sm text-slate-600">
+            {aprovacao.requisicao?.descricao || `Aguardando aprovacao ${tipo.label.toLowerCase()}`}
+          </p>
+        )}
+
+        {aprovacao.requisicao?.valor_estimado > 0 && aprovacao.tipo_aprovacao !== 'minuta_contratual' && (
           <div className="mt-3 bg-slate-50 rounded-xl p-3 flex justify-between items-center">
             <span className="text-xs text-slate-500">Valor</span>
             <span className={`text-lg font-extrabold ${tipo.textColor}`}>
@@ -492,6 +499,93 @@ function GenericPendingCard({ aprovacao, aprovadorNome, aprovadorEmail }: {
         <p className="text-red-500 text-xs text-center py-2 border-t border-red-100">
           Erro ao processar: {mutation.error?.message || 'Tente novamente.'}
         </p>
+      )}
+    </div>
+  )
+}
+
+// ── Minuta Executive Summary (inline in GenericPendingCard) ───────────────────
+
+function MinutaExecutiveSummary({ resumo }: {
+  resumo: NonNullable<AprovacaoPendente['minuta_resumo']>
+}) {
+  const fmtDate = (d: string) => d ? new Date(d).toLocaleDateString('pt-BR') : '—'
+
+  return (
+    <div className="space-y-3">
+      {/* Key info grid */}
+      <div className="bg-indigo-50/60 rounded-xl p-3 space-y-2">
+        <div className="flex items-center gap-2 mb-1">
+          <FileSignature size={13} className="text-indigo-500" />
+          <span className="text-[11px] font-bold text-indigo-600 uppercase tracking-wider">Resumo Executivo</span>
+        </div>
+        <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-xs">
+          <div>
+            <span className="text-slate-400">Contraparte</span>
+            <p className="font-semibold text-slate-800">{resumo.contraparte || '—'}</p>
+          </div>
+          <div>
+            <span className="text-slate-400">Valor Estimado</span>
+            <p className="font-extrabold text-indigo-700">{resumo.valor_estimado > 0 ? fmt(resumo.valor_estimado) : '—'}</p>
+          </div>
+          <div className="col-span-2">
+            <span className="text-slate-400">Objeto</span>
+            <p className="font-medium text-slate-700 leading-snug">{resumo.objeto || '—'}</p>
+          </div>
+          {resumo.tipo_contrato && (
+            <div>
+              <span className="text-slate-400">Tipo</span>
+              <p className="font-medium text-slate-700 capitalize">{resumo.tipo_contrato.replace(/_/g, ' ')}</p>
+            </div>
+          )}
+          {(resumo.vigencia_inicio || resumo.vigencia_fim) && (
+            <div>
+              <span className="text-slate-400">Vigencia</span>
+              <p className="font-medium text-slate-700">{fmtDate(resumo.vigencia_inicio)} — {fmtDate(resumo.vigencia_fim)}</p>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* AI Analysis summary */}
+      {resumo.ai_resumo && (
+        <div className="bg-violet-50/60 rounded-xl p-3">
+          <div className="flex items-center gap-2 mb-1.5">
+            <Sparkles size={13} className="text-violet-500" />
+            <span className="text-[11px] font-bold text-violet-600 uppercase tracking-wider">Analise IA</span>
+            {typeof resumo.ai_score === 'number' && (
+              <span className={`ml-auto text-[11px] font-extrabold px-2 py-0.5 rounded-full ${
+                resumo.ai_score >= 80 ? 'bg-emerald-100 text-emerald-700' :
+                resumo.ai_score >= 60 ? 'bg-amber-100 text-amber-700' :
+                'bg-red-100 text-red-700'
+              }`}>
+                Score {resumo.ai_score}/100
+              </span>
+            )}
+          </div>
+          <p className="text-xs text-slate-600 leading-relaxed line-clamp-4">{resumo.ai_resumo}</p>
+        </div>
+      )}
+
+      {/* PDF attachment link */}
+      {resumo.arquivo_url && (
+        <a
+          href={resumo.arquivo_url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex items-center gap-2 px-3 py-2.5 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-xl transition-colors group"
+        >
+          <div className="w-8 h-8 rounded-lg bg-red-500/10 flex items-center justify-center shrink-0">
+            <FileText size={16} className="text-red-500" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-xs font-semibold text-slate-700 truncate">
+              {resumo.arquivo_nome || resumo.minuta_titulo || 'Minuta PDF'}
+            </p>
+            <p className="text-[10px] text-slate-400">Clique para visualizar a minuta</p>
+          </div>
+          <Download size={14} className="text-slate-400 group-hover:text-indigo-500 transition-colors shrink-0" />
+        </a>
       )}
     </div>
   )

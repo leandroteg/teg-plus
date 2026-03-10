@@ -4,13 +4,13 @@ type: index
 status: ativo
 tags: [teg-plus, erp, moc, index]
 criado: 2026-03-02
-atualizado: 2026-03-05
+atualizado: 2026-03-10
 ---
 
 # TEG+ ERP — Mapa da Aplicação
 
 > Sistema ERP modular para gestão de obras de engenharia elétrica/transmissão.
-> **7 módulos operacionais** · 3 em planejamento · 14 milestones · 30 tarefas
+> **8 módulos operacionais** · 2 em planejamento · 14 milestones · 30 tarefas
 
 ---
 
@@ -30,7 +30,7 @@ atualizado: 2026-03-05
 | Dashboard | Completude | Status |
 |-----------|-----------|--------|
 | [[Paineis/Compras Dashboard\|🛒 Compras]] | 95% | ✅ Operacional |
-| [[Paineis/Financeiro Dashboard\|💰 Financeiro]] | 50% | 🔵 Em evolução |
+| [[Paineis/Financeiro Dashboard\|💰 Financeiro]] | 65% | 🔵 Em evolução |
 | [[Paineis/Estoque Dashboard\|📦 Estoque]] | 60% | 🔵 Em evolução |
 | [[Paineis/Logistica Dashboard\|🚚 Logística]] | 85% | ✅ Operacional |
 | [[Paineis/Frotas Dashboard\|🚛 Frotas]] | 80% | ✅ Operacional |
@@ -108,7 +108,7 @@ graph LR
     M --> FR[✅ Frotas]
     M --> R[🔜 RH]
     M --> S[🔜 SSMA]
-    M --> K[🔜 Contratos]
+    M --> K[✅ Contratos]
     M --> CAD[✅ Cadastros]
 
     CAD --> CAD1[Fornecedores 🤖]
@@ -143,7 +143,7 @@ graph LR
     style FR fill:#F43F5E,color:#fff
     style R  fill:#64748B,color:#fff
     style S  fill:#64748B,color:#fff
-    style K  fill:#64748B,color:#fff
+    style K  fill:#8B5CF6,color:#fff
     style CAD fill:#8B5CF6,color:#fff
 ```
 
@@ -167,13 +167,15 @@ graph LR
 | Logística e Transportes | ✅ Entregue | 9 etapas, NF-e, rastreamento, avaliações |
 | Frotas e Manutenção | ✅ Entregue | OS, checklist, abastecimento, telemetria |
 | Mural de Recados | ✅ Entregue | Slideshow corporativo + gestão admin RH |
-| Contratos e Parcelas | ✅ Entregue | Gestão de contratos, parcelas recorrentes, integração financeiro |
-| Cadastros AI (Master Data) | ✅ Entregue | 6 entidades, MagicModal AI/Manual, CNPJ/CPF lookup, ⚙️ em todos os módulos |
+| Contratos v2 | ✅ Entregue | Fluxo 7 etapas, solicitacoes, minutas AI, analise juridica, PDF, AprovAi |
+| AprovAi Multi-tipo | ✅ Entregue | 4 tipos: Compras, Pagamentos, Minutas Contratuais, Validacao Tec. Requisicao |
+| ApprovalBadge (Header) | ✅ Entregue | Badge com contador de pendencias no header global |
+| Cadastros AI (Master Data) | ✅ Entregue | 6 entidades, MagicModal AI/Manual, CNPJ/CPF lookup, em todos os modulos |
 | WhatsApp (Evolution API) | 🔜 Q1 2026 | Notificações automáticas |
 | RH Completo | 🔜 Q2 2026 | Colaboradores, ponto, folha, eSocial |
 | AI TEG+ (Claude API) | 🔜 Q2-Q3 2026 | Agente conversacional + RAG |
 | SSMA | 🔜 Q3 2026 | Segurança, NRs, DDS, EPI |
-| Contratos e Medições | 🔜 Q3 2026 | Gestão de contratos, BM, aditivos |
+| Contratos — Medicoes e Aditivos | 🔜 Q3 2026 | BM, aditivos, reajustes (extensao do modulo Contratos v2) |
 | Controladoria e BI | 🔜 Q3 2026 | DRE, orçado vs realizado, EBITDA |
 | Monday.com PMO | 🔜 Q4 2026 | Gestão de portfólio das 6 obras |
 
@@ -190,4 +192,4 @@ graph LR
 
 ---
 
-*Vault gerado automaticamente em 2026-03-02 a partir do código-fonte.*
+*Vault gerado em 2026-03-02 a partir do codigo-fonte. Ultima atualizacao: 2026-03-10.*

@@ -2,10 +2,10 @@
 title: Módulo Financeiro
 type: módulo
 status: ativo
-tags: [financeiro, contas-a-pagar, contas-a-receber, fornecedores, omie]
+tags: [financeiro, contas-a-pagar, contas-a-receber, fornecedores, omie, aprovacao]
 criado: 2026-03-03
-atualizado: 2026-03-03
-relacionado: ["[[19 - Integração Omie]]", "[[21 - Fluxo Pagamento]]", "[[07 - Schema Database]]", "[[11 - Fluxo Requisição]]"]
+atualizado: 2026-03-10
+relacionado: ["[[19 - Integração Omie]]", "[[21 - Fluxo Pagamento]]", "[[07 - Schema Database]]", "[[11 - Fluxo Requisição]]", "[[12 - Fluxo Aprovação]]"]
 ---
 
 # Módulo Financeiro — TEG+
@@ -137,11 +137,36 @@ previsto → aguardando_aprovacao → aprovado → pago
 | `useRegistrarPagamento` | useFinanceiro.ts | Marca CP como pago + upload comprovante |
 | `useContasReceber` | useFinanceiro.ts | Lista CR |
 | `useFornecedores` | useFinanceiro.ts | Lista fornecedores |
-| `useOmieConfig` | useOmie.ts | Lê config Omie de sys_config |
+| `syncCPsParaAprovacao` | useFinanceiro.ts | Sync CPs aguardando_aprovacao → apr_aprovacoes |
+| `useOmieConfig` | useOmie.ts | Le config Omie de sys_config |
 | `useSaveOmieConfig` | useOmie.ts | Salva credenciais Omie |
 | `useTriggerSync` | useOmie.ts | Dispara webhook de sync no n8n |
-| `useLastSync` | useOmie.ts | Última execução de sync por domínio |
+| `useLastSync` | useOmie.ts | Ultima execucao de sync por dominio |
 | `useTestOmieConnection` | useOmie.ts | Testa credenciais contra API Omie |
+
+---
+
+## Integracao com AprovAi (Autorizacoes de Pagamento)
+
+A partir de 2026-03-10, CPs com status `aguardando_aprovacao` sao automaticamente sincronizados para o sistema unificado de aprovacoes (`apr_aprovacoes`), tornando-os visiveis na tela AprovAi.
+
+### Fluxo
+
+```
+CP status: aguardando_aprovacao
+    → syncCPsParaAprovacao() verifica se ja existe apr_aprovacoes para esse CP
+    → Se nao existe: INSERT apr_aprovacoes (tipo='autorizacao_pagamento')
+    → Visivel no AprovAi com card amber "Autorizacoes de Pagamento"
+    → Aprovador pode aprovar/rejeitar com observacao
+```
+
+### Funcao `syncCPsParaAprovacao()`
+- Localizada em `useFinanceiro.ts`
+- Chamada automaticamente ao carregar aprovacoes pendentes no AprovAi
+- Cria registros em `apr_aprovacoes` com `tipo = 'autorizacao_pagamento'`
+- Non-blocking: falha silenciosa nao impede carregamento das aprovacoes
+
+Ver [[12 - Fluxo Aprovação]] para detalhes do sistema multi-tipo.
 
 ---
 
@@ -194,35 +219,38 @@ sequenceDiagram
 
 ## Status de Implementação
 
-### Concluído ✅
+### Concluido
 
 - [x] Tela Contas a Pagar com filtros e badges de status
 - [x] Tela Contas a Receber
 - [x] Tela Fornecedores (com sync Omie)
-- [x] Tela Configurações (credenciais Omie, toggle, status sync)
+- [x] Tela Configuracoes (credenciais Omie, toggle, status sync)
 - [x] SyncBar em CP, CR e Fornecedores
 - [x] Registro de pagamento com upload de comprovante
-- [x] Trigger automático: PO emitido → CP previsto
-- [x] Trigger automático: PO liberado → CP aguardando_aprovacao
-- [x] Trigger automático: pagamento registrado → PO.status_pagamento=pago
-- [x] Comprovante visível no módulo Compras (Pedidos)
-- [x] Integração Omie — 4 squads n8n funcionais
+- [x] Trigger automatico: PO emitido → CP previsto
+- [x] Trigger automatico: PO liberado → CP aguardando_aprovacao
+- [x] Trigger automatico: pagamento registrado → PO.status_pagamento=pago
+- [x] Comprovante visivel no modulo Compras (Pedidos)
+- [x] Integracao Omie — 4 squads n8n funcionais
+- [x] Integracao AprovAi — CPs aguardando_aprovacao visiveis no AprovAi como "Autorizacoes de Pagamento"
+- [x] Reset de filtro de datas ao trocar de obra (ISSUE-006)
 
 ### Planejado (Futuro)
 
-- [ ] E-mail automático ao financeiro quando CP → aguardando_aprovacao
+- [ ] E-mail automatico ao financeiro quando CP → aguardando_aprovacao
 - [ ] Squad 5: Agent NF (notas fiscais)
 - [ ] Squad 6: Agent Remessa (CNAB)
-- [ ] Squad 7: Agent Conciliação (extrato bancário)
+- [ ] Squad 7: Agent Conciliacao (extrato bancario)
 - [ ] Dashboard financeiro com KPIs (DRE, fluxo de caixa)
-- [ ] Relatórios de aging (inadimplência)
+- [ ] Relatorios de aging (inadimplencia)
 
 ---
 
 ## Links Relacionados
 
-- [[19 - Integração Omie]] — Squads n8n e configuração técnica
+- [[19 - Integração Omie]] — Squads n8n e configuracao tecnica
 - [[21 - Fluxo Pagamento]] — Ciclo completo compras → pagamento
-- [[07 - Schema Database]] — Tabelas `fin_*`, `sys_config`
+- [[12 - Fluxo Aprovação]] — AprovAi multi-tipo (autorizacoes de pagamento)
+- [[07 - Schema Database]] — Tabelas `fin_*`, `sys_config`, `apr_aprovacoes`
 - [[08 - Migrações SQL]] — Migrations 013 e 014
 - [[11 - Fluxo Requisição]] — Como o CP nasce de um PO

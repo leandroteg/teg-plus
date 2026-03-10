@@ -126,6 +126,19 @@ export interface AprovacaoPendente extends Aprovacao {
     prazo_dias: number
     total_cotados: number
   }
+  minuta_resumo?: {
+    objeto: string
+    contraparte: string
+    tipo_contrato: string
+    vigencia_inicio: string
+    vigencia_fim: string
+    valor_estimado: number
+    minuta_titulo: string
+    arquivo_url: string
+    arquivo_nome: string
+    ai_resumo: string | null
+    ai_score: number | null
+  }
 }
 
 export interface AprovacaoHistorico {

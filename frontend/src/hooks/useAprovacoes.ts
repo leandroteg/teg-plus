@@ -86,6 +86,7 @@ export function useAprovacoesPendentes(tipo?: TipoAprovacao) {
         .filter(Boolean)
 
       const conMap = new Map<string, Record<string, unknown>>()
+      const minutaMap = new Map<string, Record<string, unknown>>()
       if (conIds.length > 0) {
         const { data: conData } = await supabase
           .from('con_solicitacoes')
@@ -93,6 +94,19 @@ export function useAprovacoesPendentes(tipo?: TipoAprovacao) {
           .in('id', conIds)
         for (const c of conData ?? []) {
           conMap.set(c.id, c)
+        }
+
+        // Busca minuta mais recente de cada solicitacao (com PDF + analise AI)
+        const { data: minutaData } = await supabase
+          .from('con_minutas')
+          .select('id, solicitacao_id, titulo, arquivo_url, arquivo_nome, ai_analise, status')
+          .in('solicitacao_id', conIds)
+          .order('created_at', { ascending: false })
+        for (const m of minutaData ?? []) {
+          // Guarda apenas a mais recente por solicitacao
+          if (!minutaMap.has(m.solicitacao_id)) {
+            minutaMap.set(m.solicitacao_id, m)
+          }
         }
       }
 
@@ -123,6 +137,23 @@ export function useAprovacoesPendentes(tipo?: TipoAprovacao) {
             requisicao = req
           } else if (a.tipo_aprovacao === 'minuta_contratual') {
             const con = conMap.get(a.entidade_id)
+            const minuta = minutaMap.get(a.entidade_id)
+            const aiAnalise = minuta?.ai_analise as Record<string, unknown> | null
+
+            // Parse resumo: can be string or stringified JSON
+            let aiResumo: string | null = null
+            const rawResumo = aiAnalise?.resumo
+            if (typeof rawResumo === 'string') {
+              if (rawResumo.startsWith('{')) {
+                try {
+                  const parsed = JSON.parse(rawResumo)
+                  aiResumo = typeof parsed.resumo === 'string' ? parsed.resumo : null
+                } catch { aiResumo = rawResumo.length > 200 ? null : rawResumo }
+              } else {
+                aiResumo = rawResumo
+              }
+            }
+
             requisicao = {
               id: a.entidade_id,
               numero: con?.numero ?? a.entidade_numero ?? 'N/A',
@@ -134,6 +165,21 @@ export function useAprovacoesPendentes(tipo?: TipoAprovacao) {
               status: 'em_aprovacao',
               alcada_nivel: a.nivel,
               created_at: a.created_at,
+            }
+
+            // Attach minuta_resumo at the top-level for AprovAi card
+            ;(a as Record<string, unknown>)._minuta_resumo = {
+              objeto: (con?.objeto as string) ?? '',
+              contraparte: (con?.contraparte_nome as string) ?? '',
+              tipo_contrato: (con?.tipo_contrato as string) ?? '',
+              vigencia_inicio: '',
+              vigencia_fim: '',
+              valor_estimado: Number(con?.valor_estimado) || 0,
+              minuta_titulo: (minuta?.titulo as string) ?? '',
+              arquivo_url: (minuta?.arquivo_url as string) ?? '',
+              arquivo_nome: (minuta?.arquivo_nome as string) ?? '',
+              ai_resumo: aiResumo,
+              ai_score: typeof aiAnalise?.score === 'number' ? aiAnalise.score : null,
             }
           } else if (a.tipo_aprovacao === 'autorizacao_pagamento') {
             const fin = finMap.get(a.entidade_id)
@@ -164,6 +210,9 @@ export function useAprovacoesPendentes(tipo?: TipoAprovacao) {
             }
           }
 
+          const minutaResumo = (a as Record<string, unknown>)._minuta_resumo as AprovacaoPendente['minuta_resumo']
+          delete (a as Record<string, unknown>)._minuta_resumo
+
           return {
             ...a,
             requisicao_id: a.entidade_id,
@@ -171,6 +220,7 @@ export function useAprovacoesPendentes(tipo?: TipoAprovacao) {
             modulo: a.modulo || 'cmp',
             requisicao,
             cotacao_resumo: cotMap.get(a.entidade_id) ?? undefined,
+            minuta_resumo: minutaResumo ?? undefined,
           } as unknown as AprovacaoPendente
         })
         .filter((a): a is AprovacaoPendente => a !== null)

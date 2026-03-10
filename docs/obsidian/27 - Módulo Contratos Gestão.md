@@ -2,43 +2,86 @@
 title: Módulo Contratos — Gestão
 type: módulo
 status: ativo
-tags: [contratos, parcelas, pagamento, recebimento, financeiro, fornecedores]
+tags: [contratos, parcelas, pagamento, recebimento, financeiro, fornecedores, ai, minuta, pdf]
 criado: 2026-03-05
-atualizado: 2026-03-05
-relacionado: ["[[20 - Módulo Financeiro]]", "[[07 - Schema Database]]", "[[21 - Fluxo Pagamento]]"]
+atualizado: 2026-03-10
+relacionado: ["[[20 - Módulo Financeiro]]", "[[07 - Schema Database]]", "[[21 - Fluxo Pagamento]]", "[[12 - Fluxo Aprovação]]"]
 ---
 
-# Módulo Contratos — Gestão de Pagamentos e Recebimentos
+# Módulo Contratos v2 — Gestão Completa com AI
 
 ## Visão Geral
 
-O módulo de Contratos permite cadastrar contratos vinculados a **fornecedores** (despesa) ou **clientes** (receita), com itens, prazos e parcelas que podem ser **recorrentes** (mensal, bimestral, trimestral, semestral, anual) ou **personalizadas** (valores e datas customizados).
+O módulo de Contratos v2 implementa um fluxo completo de **7 etapas** para gestao contratual, desde a solicitacao ate a assinatura, com integracao de **analise juridica por IA**, **geracao de PDF formal**, e **aprovacao via AprovAi**.
 
-Ao chegar na data de vencimento, o sistema gera automaticamente um **Pagamento Pendente** ou **Recebimento Pendente**, criando uma previsão no módulo Financeiro (fin_contas_pagar / fin_contas_receber).
-
-O usuário de contratos então **Libera o Pagamento** (ou Recebimento), anexando a medição, NF ou recibo.
+### Funcionalidades Principais
+- **Solicitacoes de Contrato**: fluxo estruturado com dados do contratante e contratado
+- **Preparacao de Minuta**: upload de arquivo + edicao inline + analise AI
+- **Analise Juridica por IA**: score, riscos, sugestoes, conformidade, papel TEG, poder de barganha
+- **Melhorias AI**: geracao automatica de melhorias baseadas na analise
+- **Geracao de PDF Formal**: PDF nativo (jsPDF) com layout profissional TEG+
+- **Aprovacao via AprovAi**: minutas contratuais integradas ao sistema `apr_aprovacoes`
+- **Resumo Executivo**: visao consolidada por contrato
+- **Gestao Financeira**: parcelas recorrentes + integracao com Financeiro (CP/CR)
 
 ```mermaid
 graph TD
-    CONT[Cadastro Contrato] -->|itens + recorrência| PARC[Parcelas Geradas]
-    PARC -->|trigger insert| FIN[Previsão Financeira]
+    SOL[Solicitacao] -->|dados contrato| MIN[Preparar Minuta]
+    MIN -->|upload + edicao| AI[Analise AI]
+    AI -->|score + riscos| MEL[Melhorias AI]
+    MEL -->|PDF gerado| APR[Aprovacao AprovAi]
+    APR -->|aprovada| RES[Resumo Executivo]
+    RES -->|assinatura| ASS[Contrato Ativo]
+    ASS -->|parcelas| PARC[Parcelas Geradas]
+    PARC -->|trigger insert| FIN[Previsao Financeira]
     PARC -->|data chega| PEND[Status: Pendente]
-    PEND -->|Liberar + anexar NF/medição| LIB[Status: Liberado]
-    LIB -->|Aguardando aprovação| FINAP[Financeiro: Aguard. Aprovação]
+    PEND -->|Liberar + anexar NF| LIB[Status: Liberado]
+    LIB -->|apr_aprovacoes| FINAP[Financeiro: Aguard. Aprovacao]
     LIB -->|Confirmar pgto| PAGO[Status: Pago]
-    PAGO -->|trigger update| FINPG[Financeiro: Pago/Recebido]
 ```
 
 ---
 
 ## Rotas e Telas
 
-| Rota | Componente | Descrição |
+| Rota | Componente | Descricao |
 |------|-----------|-----------|
-| `/contratos` | DashboardContratos | Painel com KPIs, parcelas pendentes e próximos vencimentos |
-| `/contratos/lista` | ListaContratos | Lista completa de contratos com filtros por status e tipo |
-| `/contratos/novo` | NovoContrato | Formulário de cadastro com itens e recorrência |
-| `/contratos/parcelas` | Parcelas | Gestão de parcelas com fluxo de liberação e pagamento |
+| `/contratos` | DashboardContratos | Painel com KPIs e visao geral |
+| `/contratos/gestao` | GestaoContratos | Gestao consolidada (lista + detalhes + acoes) |
+| `/contratos/solicitacoes` | SolicitacoesLista | Lista de solicitacoes de contrato |
+| `/contratos/solicitacoes/nova` | NovaSolicitacao | Formulario com CNPJ auto-fill |
+| `/contratos/solicitacoes/:id` | SolicitacaoDetalhe | Detalhe + acoes da solicitacao |
+| `/contratos/minuta/:id` | PreparaMinuta | Upload, edicao, analise AI, melhorias, PDF |
+| `/contratos/resumo/:id` | ResumoExecutivo | Resumo executivo do contrato |
+| `/contratos/previsao` | Parcelas | Previsao financeira (parcelas) |
+| `/contratos/equipe` | EquipePJ | Equipe PJ vinculada |
+| `/contratos/aditivos` | Aditivos | Aditivos contratuais |
+
+---
+
+## Funcionalidades AI
+
+### Analise Juridica por IA
+- Endpoint n8n: `POST /webhook/contratos/analisar-minuta`
+- Recebe texto da minuta + contexto TEG (contratante/contratado)
+- Retorna: `score` (0-100), `resumo`, `riscos[]`, `sugestoes[]`, `oportunidades[]`, `clausulas_analisadas[]`, `conformidade{}`, `papel_teg`, `poder_barganha`
+- UI: painel AnalisePanel com ScoreRing, cards por categoria, badges de severidade
+
+### Melhorias AI
+- Endpoint n8n: `POST /webhook/contratos/melhorar-minuta`
+- 3 agentes paralelos: n8n minuta AI + EGP AI + layout improvements
+- Retorna texto melhorado com sugestoes integradas
+- UI: status bar com progresso (mesmo padrao UX da analise)
+
+### Geracao de PDF Formal
+- Implementado nativamente com `jsPDF` (sem dependencias externas)
+- Layout profissional: cabecalho TEG+, dados das partes, clausulas formatadas
+- Gerado no frontend a partir do texto da minuta
+
+### Integracao AprovAi
+- Minutas aprovadas via analise geram registro em `apr_aprovacoes` com `tipo = 'minuta_contratual'`
+- Visivel na tela AprovAi com card violeta dedicado
+- Aprovadores podem aprovar/rejeitar com observacao
 
 ---
 
@@ -121,15 +164,37 @@ graph TD
 
 ```
 frontend/src/
-├── types/contratos.ts          # Tipos TypeScript
-├── hooks/useContratos.ts       # React Query hooks
+├── types/contratos.ts             # Tipos TypeScript (Minuta, MinutaAiAnalise, etc.)
+├── hooks/useContratos.ts          # React Query hooks (contratos, parcelas)
+├── hooks/useSolicitacoes.ts       # Hooks de solicitacoes + minutas + AI
 ├── components/ContratosLayout.tsx  # Layout com sidebar indigo
 └── pages/contratos/
-    ├── DashboardContratos.tsx   # Painel principal
-    ├── ListaContratos.tsx       # Lista de contratos
-    ├── NovoContrato.tsx         # Formulário de criação
-    └── Parcelas.tsx             # Gestão de parcelas
+    ├── DashboardContratos.tsx      # Painel principal
+    ├── GestaoContratos.tsx         # Gestao consolidada
+    ├── SolicitacoesLista.tsx       # Lista de solicitacoes
+    ├── NovaSolicitacao.tsx         # Nova solicitacao (CNPJ auto-fill)
+    ├── SolicitacaoDetalhe.tsx      # Detalhe + acoes
+    ├── PreparaMinuta.tsx           # Upload, edicao, analise AI, melhorias, PDF
+    ├── ResumoExecutivo.tsx         # Resumo executivo
+    ├── Parcelas.tsx                # Previsao financeira
+    ├── EquipePJ.tsx                # Equipe PJ
+    ├── Aditivos.tsx                # Aditivos contratuais
+    ├── Medicoes.tsx                # Medicoes (placeholder)
+    ├── Reajustes.tsx               # Reajustes (placeholder)
+    ├── Assinaturas.tsx             # Assinaturas (placeholder)
+    ├── ListaContratos.tsx          # Lista legacy
+    └── NovoContrato.tsx            # Formulario legacy
 
 supabase/
-└── 024_contratos_gestao.sql    # Migração SQL
+├── 022_contratos.sql               # Schema original
+└── 024_contratos_gestao.sql        # Extensao gestao v2
 ```
+
+---
+
+## Links Relacionados
+
+- [[20 - Módulo Financeiro]] — Integracao CP/CR via parcelas
+- [[12 - Fluxo Aprovação]] — Aprovacao de minutas via AprovAi
+- [[07 - Schema Database]] — Tabelas `con_*`, `apr_aprovacoes`
+- [[21 - Fluxo Pagamento]] — Ciclo parcela → pagamento

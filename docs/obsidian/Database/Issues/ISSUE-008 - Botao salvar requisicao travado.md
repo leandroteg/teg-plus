@@ -2,17 +2,18 @@
 tipo: issue
 id: ISSUE-008
 titulo: "Botao salvar nao funciona na tela de nova requisicao"
-status: aberto
+status: resolvida
 severidade: alta
 modulo: compras
 reportado_por: Usuario via SuperTEG
 data_report: 2026-03-07
+data_resolucao: 2026-03-08
 sprint: Sprint-3
 origem: superteg-agent
-tags: [issue, bug, compras, requisicao, botao, ux]
+tags: [issue, bug, compras, requisicao, botao, ux, resolvida]
 ---
 
-# 🟠 ISSUE-008 — Botao salvar travado na tela de nova requisicao
+# ✅ ISSUE-008 — Botao salvar travado na tela de nova requisicao (RESOLVIDA)
 
 > **Origem:** Feedback via SuperTEG AI Agent (2 reports independentes)
 
@@ -40,6 +41,14 @@ O botao de salvar na tela de nova requisicao de compras nao funciona — fica tr
 - `frontend/src/pages/compras/NovaRequisicao.tsx`
 - `frontend/src/hooks/useRequisicoes.ts`
 - `frontend/src/services/api.ts` (endpoint de criacao)
+
+## Resolucao
+
+Implementado em 2026-03-08 via commits `f2465b7` e `6bbdc8e`:
+- Adicionado feedback de validacao no wizard (erro visivel ao usuario)
+- Adicionado timeout no submit para evitar estado loading permanente
+- Limpeza de `stepErrors` ao voltar no wizard
+- Handle de timeout limpo corretamente no unmount
 
 ## Links
 - [[05 - Modulo Compras]]
