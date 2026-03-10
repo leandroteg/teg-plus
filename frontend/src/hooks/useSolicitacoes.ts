@@ -541,9 +541,15 @@ export function useMelhorarMinuta() {
 
 export interface MinutaTextoGerado {
   preambulo: string
-  clausulas: Array<{ numero: string; titulo: string; conteudo: string }>
-  disposicoes_finais: string
-  local_data: string
+  /** n8n returns "secoes", frontend alias "clausulas" — accept both */
+  secoes?: Array<{ titulo: string; conteudo: string }>
+  clausulas?: Array<{ numero?: string; titulo: string; conteudo: string }>
+  /** n8n returns "clausulas_finais", frontend alias "disposicoes_finais" */
+  clausulas_finais?: string
+  disposicoes_finais?: string
+  /** n8n returns "local_assinatura", frontend alias "local_data" */
+  local_assinatura?: string
+  local_data?: string
 }
 
 // ── Gerar Minuta PDF via AI (n8n webhook) ────────────────────────────────────

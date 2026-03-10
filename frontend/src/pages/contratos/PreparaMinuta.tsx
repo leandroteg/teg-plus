@@ -20,7 +20,7 @@ import {
   useAtualizarConfigAnalise,
   useUploadMinutaFile,
 } from '../../hooks/useSolicitacoes'
-import type { MelhoriaMinuta, MinutaTexto } from '../../hooks/useSolicitacoes'
+import type { MelhoriaMinuta, MinutaTextoGerado } from '../../hooks/useSolicitacoes'
 import type { Minuta, TipoMinuta, StatusMinuta, MinutaAiAnalise, ConfigAnalise } from '../../types/contratos'
 import { supabase } from '../../services/supabase'
 import { jsPDF } from 'jspdf'
@@ -1605,7 +1605,17 @@ export default function PreparaMinuta() {
     setGerandoMinutaId(minuta.id)
     try {
       // ── Helper: build PDF from AI-generated structured text ──────────
-      const buildPdfFromAi = (mt: MinutaTextoGerado) => {
+      const buildPdfFromAi = (mtRaw: MinutaTextoGerado) => {
+        // Normalize field names: n8n returns secoes/clausulas_finais/local_assinatura
+        // but older code used clausulas/disposicoes_finais/local_data — accept both
+        const clausulas = (mtRaw.secoes ?? mtRaw.clausulas ?? []).map((s, i) => ({
+          numero: ('numero' in s && s.numero) ? s.numero : `CLAUSULA ${String(i + 1).padStart(2, '0')}`,
+          titulo: s.titulo,
+          conteudo: s.conteudo,
+        }))
+        const disposicoes = mtRaw.clausulas_finais ?? mtRaw.disposicoes_finais ?? ''
+        const localAssinatura = mtRaw.local_assinatura ?? mtRaw.local_data ?? ''
+
         const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
         const pw = pdf.internal.pageSize.getWidth()
         const ph = pdf.internal.pageSize.getHeight()
@@ -1658,28 +1668,28 @@ export default function PreparaMinuta() {
         }
 
         // PREAMBULO
-        if (mt.preambulo) { printText(mt.preambulo, 9, { color: [30, 41, 59] }); y += gapLg }
+        if (mtRaw.preambulo) { printText(mtRaw.preambulo, 9, { color: [30, 41, 59] }); y += gapLg }
 
-        // CLAUSULAS (AI-generated)
-        if (mt.clausulas?.length) {
+        // CLAUSULAS (AI-generated — normalized from secoes/clausulas)
+        if (clausulas.length) {
           hr([15, 118, 110]); y += gapSm
-          for (const cl of mt.clausulas) {
+          for (const cl of clausulas) {
             ensureSpace(20)
             printText(`${cl.numero} — ${cl.titulo}`, 11, { bold: true, color: [15, 118, 110] }); y += gapSm
             printText(cl.conteudo, 9, { color: [30, 41, 59], indent: 2 }); y += gapLg
           }
         }
 
-        // DISPOSICOES FINAIS
-        if (mt.disposicoes_finais) {
+        // DISPOSICOES FINAIS / CLAUSULAS FINAIS
+        if (disposicoes) {
           hr([100, 116, 139]); y += gapSm
           printText('DISPOSICOES FINAIS', 11, { bold: true, color: [71, 85, 105] }); y += gapSm
-          printText(mt.disposicoes_finais, 9, { color: [30, 41, 59] }); y += gapLg
+          printText(disposicoes, 9, { color: [30, 41, 59] }); y += gapLg
         }
 
         // SIGNATURE BLOCK
         ensureSpace(50); hr(); y += gapMd
-        const localData = mt.local_data || `${solicitacao.obra?.nome ?? 'Local'}, ${dataStr}`
+        const localData = localAssinatura || `${solicitacao.obra?.nome ?? 'Local'}, ${dataStr}`
         printText(localData, 9, { color: [100, 116, 139] }); y += 20
         const sigW = usable / 2 - 10
         pdf.setDrawColor(100, 116, 139); pdf.setLineWidth(0.2)
