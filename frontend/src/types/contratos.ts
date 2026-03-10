@@ -321,7 +321,16 @@ export interface MinutaAiRisco {
 export interface MinutaAiSugestao {
   titulo: string
   prioridade: 'baixa' | 'media' | 'alta'
+  categoria?: 'importante' | 'recomendada' | 'opcional'
   descricao: string
+  texto_sugerido?: string
+  beneficio_teg?: string
+}
+
+export interface MinutaAiOportunidade {
+  titulo: string
+  descricao: string
+  impacto?: 'alto' | 'medio' | 'baixo'
   texto_sugerido?: string
 }
 
@@ -345,8 +354,11 @@ export interface MinutaAiConformidade {
 export interface MinutaAiAnalise {
   score: number
   resumo?: string
+  papel_teg?: 'contratante' | 'contratada' | 'indefinido'
+  poder_barganha?: { nivel: 'alto' | 'medio' | 'baixo'; justificativa?: string }
   riscos: MinutaAiRisco[]
   sugestoes: MinutaAiSugestao[]
+  oportunidades?: MinutaAiOportunidade[]
   clausulas_analisadas?: MinutaAiClausula[]
   conformidade?: MinutaAiConformidade
 }
@@ -438,6 +450,8 @@ export interface Minuta {
   sharepoint_path?: string
   ai_analise?: MinutaAiAnalise
   ai_analisado_em?: string
+  ai_melhorias?: Record<string, unknown>
+  ai_melhorado_em?: string
   status: StatusMinuta
   created_at: string
   updated_at: string

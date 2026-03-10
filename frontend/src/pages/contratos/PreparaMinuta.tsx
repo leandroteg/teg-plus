@@ -6,7 +6,7 @@ import {
   Sparkles, ShieldAlert, Lightbulb, CheckCircle2, XCircle,
   AlertTriangle, ChevronDown, ChevronUp, Settings2, ToggleLeft, ToggleRight,
   Loader2, Brain, Scale, FileSearch, FileUp, X, Wand2,
-  TrendingUp, ArrowRight, Shield,
+  TrendingUp, ArrowRight, Shield, Edit3, FileDown, Target, Crown, Zap,
 } from 'lucide-react'
 import {
   useSolicitacao,
@@ -110,6 +110,18 @@ const PRIO_CONFIG: Record<string, { label: string; bg: string; text: string }> =
   baixa: { label: 'Baixa', bg: 'bg-slate-50', text: 'text-slate-600' },
 }
 
+const CATEG_CONFIG: Record<string, { label: string; bg: string; text: string; border: string }> = {
+  importante:  { label: 'Importante',  bg: 'bg-red-50',    text: 'text-red-700',   border: 'border-red-200' },
+  recomendada: { label: 'Recomendada', bg: 'bg-amber-50',  text: 'text-amber-700', border: 'border-amber-200' },
+  opcional:    { label: 'Opcional',    bg: 'bg-slate-50',  text: 'text-slate-600', border: 'border-slate-200' },
+}
+
+const PAPEL_TEG: Record<string, { label: string; icon: typeof Crown; color: string }> = {
+  contratante: { label: 'TEG Contratante', icon: Crown, color: 'text-emerald-600' },
+  contratada:  { label: 'TEG Contratada',  icon: Target, color: 'text-blue-600' },
+  indefinido:  { label: 'Papel Indefinido', icon: Target, color: 'text-slate-500' },
+}
+
 const CL_STATUS: Record<string, { label: string; bg: string; text: string; icon: typeof CheckCircle2 }> = {
   ok:      { label: 'OK',      bg: 'bg-emerald-50', text: 'text-emerald-700', icon: CheckCircle2 },
   atencao: { label: 'Atencao', bg: 'bg-amber-50',   text: 'text-amber-700',   icon: AlertTriangle },
@@ -196,14 +208,16 @@ function AnalisePanel({ analise, onMelhorar, melhorando }: {
   onMelhorar?: () => void
   melhorando?: boolean
 }) {
-  const [tab, setTab] = useState<'riscos' | 'sugestoes' | 'clausulas' | 'conformidade'>('riscos')
+  const [tab, setTab] = useState<'riscos' | 'sugestoes' | 'oportunidades' | 'clausulas' | 'conformidade'>('riscos')
 
   const nRiscos = analise.riscos?.length ?? 0
   const nSugestoes = analise.sugestoes?.length ?? 0
+  const nOportunidades = analise.oportunidades?.length ?? 0
   const nClausulas = analise.clausulas_analisadas?.length ?? 0
   const conformEntries = analise.conformidade ? Object.entries(analise.conformidade) : []
   const conformOk = conformEntries.filter(([, v]) => v).length
   const conformTotal = conformEntries.length
+  const papelInfo = PAPEL_TEG[analise.papel_teg || 'indefinido'] ?? PAPEL_TEG.indefinido
 
   return (
     <div className="mt-4 rounded-2xl border border-indigo-100 bg-white overflow-hidden shadow-sm">
@@ -218,6 +232,21 @@ function AnalisePanel({ analise, onMelhorar, melhorando }: {
               <Brain size={14} className="text-white/80" />
               <p className="text-sm font-extrabold text-white">Analise Juridica por IA</p>
             </div>
+
+            {/* TEG Role Badge */}
+            {analise.papel_teg && analise.papel_teg !== 'indefinido' && (
+              <div className="flex items-center gap-2 mb-1.5">
+                <span className="flex items-center gap-1 text-[10px] font-bold bg-white/25 text-white rounded-lg px-2.5 py-1 backdrop-blur-sm">
+                  <papelInfo.icon size={10} /> {papelInfo.label}
+                </span>
+                {analise.poder_barganha && (
+                  <span className="text-[9px] font-semibold text-white/70">
+                    Barganha: {analise.poder_barganha.nivel}
+                  </span>
+                )}
+              </div>
+            )}
+
             {analise.resumo && (
               <p className="text-[11px] text-white/75 leading-snug line-clamp-2">{analise.resumo}</p>
             )}
@@ -229,6 +258,11 @@ function AnalisePanel({ analise, onMelhorar, melhorando }: {
               <span className="flex items-center gap-1 text-[9px] font-bold bg-white/20 text-white rounded-full px-2 py-0.5 backdrop-blur-sm">
                 <Lightbulb size={9} /> {nSugestoes} sugestao{nSugestoes !== 1 ? 'es' : ''}
               </span>
+              {nOportunidades > 0 && (
+                <span className="flex items-center gap-1 text-[9px] font-bold bg-emerald-400/30 text-white rounded-full px-2 py-0.5 backdrop-blur-sm">
+                  <Zap size={9} /> {nOportunidades} oportunidade{nOportunidades !== 1 ? 's' : ''}
+                </span>
+              )}
               <span className="flex items-center gap-1 text-[9px] font-bold bg-white/20 text-white rounded-full px-2 py-0.5 backdrop-blur-sm">
                 <FileSearch size={9} /> {nClausulas} clausula{nClausulas !== 1 ? 's' : ''}
               </span>
@@ -260,17 +294,18 @@ function AnalisePanel({ analise, onMelhorar, melhorando }: {
       </div>
 
       {/* Tabs */}
-      <div className="flex border-b border-slate-100 px-1 bg-slate-50/50">
+      <div className="flex border-b border-slate-100 px-1 bg-slate-50/50 overflow-x-auto">
         {([
           { key: 'riscos' as const, label: 'Riscos', icon: ShieldAlert, count: nRiscos, accent: 'red' },
           { key: 'sugestoes' as const, label: 'Sugestoes', icon: Lightbulb, count: nSugestoes, accent: 'amber' },
+          ...(nOportunidades > 0 ? [{ key: 'oportunidades' as const, label: 'Oportunidades', icon: Zap, count: nOportunidades, accent: 'emerald' }] : []),
           { key: 'clausulas' as const, label: 'Clausulas', icon: FileSearch, count: nClausulas, accent: 'blue' },
           { key: 'conformidade' as const, label: 'Conformidade', icon: Scale, count: conformTotal || undefined, accent: 'emerald' },
         ]).map(t => (
           <button
             key={t.key}
             onClick={() => setTab(t.key)}
-            className={`flex items-center gap-1 px-3 py-2.5 text-[10px] font-bold border-b-2 transition-all ${
+            className={`flex items-center gap-1 px-3 py-2.5 text-[10px] font-bold border-b-2 transition-all whitespace-nowrap ${
               tab === t.key
                 ? 'border-indigo-500 text-indigo-700 bg-white'
                 : 'border-transparent text-slate-400 hover:text-slate-600'
@@ -340,21 +375,67 @@ function AnalisePanel({ analise, onMelhorar, melhorando }: {
                 <p className="text-xs text-slate-500 font-medium">Nenhuma sugestao adicional</p>
               </div>
             ) : analise.sugestoes.map((s, i) => {
+              const cat = CATEG_CONFIG[s.categoria || 'opcional'] ?? CATEG_CONFIG.opcional
               const pr = PRIO_CONFIG[s.prioridade] ?? PRIO_CONFIG.baixa
               return (
-                <div key={i} className={`rounded-xl border ${pr.bg} p-3.5`}>
+                <div key={i} className={`rounded-xl border ${cat.border} ${cat.bg} p-3.5`}>
                   <div className="flex items-center gap-1.5 flex-wrap">
-                    <Lightbulb size={11} className={pr.text} />
-                    <p className={`text-[11px] font-bold ${pr.text}`}>{s.titulo}</p>
-                    <span className={`text-[9px] font-semibold rounded-full px-1.5 py-0.5 ${pr.bg} ${pr.text} border`}>
-                      {pr.label}
+                    <Lightbulb size={11} className={cat.text} />
+                    <p className={`text-[11px] font-bold ${cat.text}`}>{s.titulo}</p>
+                    <span className={`text-[9px] font-semibold rounded-full px-1.5 py-0.5 ${cat.bg} ${cat.text} border ${cat.border}`}>
+                      {cat.label}
                     </span>
+                    {s.prioridade && s.prioridade !== (s.categoria === 'importante' ? 'alta' : s.categoria === 'recomendada' ? 'media' : 'baixa') && (
+                      <span className={`text-[9px] font-semibold rounded-full px-1.5 py-0.5 ${pr.bg} ${pr.text} border`}>
+                        {pr.label}
+                      </span>
+                    )}
                   </div>
                   <p className="text-[10px] text-slate-600 mt-1.5 leading-relaxed">{s.descricao}</p>
+                  {s.beneficio_teg && (
+                    <div className="mt-1.5 flex items-start gap-1.5">
+                      <Crown size={9} className="text-emerald-500 shrink-0 mt-0.5" />
+                      <p className="text-[9px] text-emerald-700 font-medium leading-snug">{s.beneficio_teg}</p>
+                    </div>
+                  )}
                   {s.texto_sugerido && (
                     <div className="mt-2.5 bg-white/70 rounded-lg px-3 py-2 border border-slate-200">
                       <p className="text-[9px] text-indigo-500 font-bold uppercase mb-0.5">Texto sugerido</p>
                       <p className="text-[10px] text-slate-700 italic leading-snug">{s.texto_sugerido}</p>
+                    </div>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+        )}
+
+        {tab === 'oportunidades' && (
+          <div className="space-y-2">
+            {nOportunidades === 0 ? (
+              <div className="text-center py-6">
+                <Zap size={24} className="text-slate-300 mx-auto mb-2" />
+                <p className="text-xs text-slate-500 font-medium">Nenhuma oportunidade identificada</p>
+              </div>
+            ) : analise.oportunidades!.map((o, i) => {
+              const impacto = o.impacto || 'medio'
+              const colors = impacto === 'alto' ? 'bg-emerald-50 border-emerald-200 text-emerald-700'
+                : impacto === 'medio' ? 'bg-teal-50 border-teal-200 text-teal-700'
+                : 'bg-slate-50 border-slate-200 text-slate-600'
+              return (
+                <div key={i} className={`rounded-xl border p-3.5 ${colors.split(' ').slice(0,2).join(' ')}`}>
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <Zap size={11} className="text-emerald-500" />
+                    <p className="text-[11px] font-bold text-emerald-800">{o.titulo}</p>
+                    <span className={`text-[9px] font-semibold rounded-full px-1.5 py-0.5 bg-emerald-100 text-emerald-600 border border-emerald-200`}>
+                      Impacto {impacto}
+                    </span>
+                  </div>
+                  <p className="text-[10px] text-slate-600 mt-1.5 leading-relaxed">{o.descricao}</p>
+                  {o.texto_sugerido && (
+                    <div className="mt-2.5 bg-white/70 rounded-lg px-3 py-2 border border-emerald-100">
+                      <p className="text-[9px] text-emerald-600 font-bold uppercase mb-0.5">Estrategia sugerida</p>
+                      <p className="text-[10px] text-slate-700 italic leading-snug">{o.texto_sugerido}</p>
                     </div>
                   )}
                 </div>
@@ -512,8 +593,21 @@ function RegrasConfig({ regras, onUpdate }: {
 
 // ── Melhorias Panel ──────────────────────────────────────────────────────────
 
-function MelhoriasPanel({ melhorias, scoreOriginal }: { melhorias: MelhoriaMinuta; scoreOriginal?: number }) {
+function MelhoriasPanel({ melhorias, scoreOriginal, onGerarMinuta, gerandoMinuta }: {
+  melhorias: MelhoriaMinuta
+  scoreOriginal?: number
+  onGerarMinuta?: () => void
+  gerandoMinuta?: boolean
+}) {
   const [tab, setTab] = useState<'clausulas' | 'riscos' | 'novas'>('clausulas')
+  const [editing, setEditing] = useState(false)
+  const [editData, setEditData] = useState<{
+    clausulas: Record<number, string>
+    novas: Record<number, string>
+  }>({ clausulas: {}, novas: {} })
+
+  const getClausulaText = (i: number, original: string) => editData.clausulas[i] ?? original
+  const getNovaText = (i: number, original: string) => editData.novas[i] ?? original
 
   const nMelhoradas = melhorias.clausulas_melhoradas?.length ?? 0
   const nMitigados = melhorias.riscos_mitigados?.length ?? 0
@@ -607,8 +701,29 @@ function MelhoriasPanel({ melhorias, scoreOriginal }: { melhorias: MelhoriaMinut
                 </div>
                 <p className="text-[10px] text-slate-500 italic mb-2.5 leading-relaxed">{c.justificativa}</p>
                 <div className="bg-white/80 rounded-lg px-3 py-2.5 border border-teal-100">
-                  <p className="text-[9px] text-teal-600 font-bold uppercase mb-1">Texto Melhorado</p>
-                  <p className="text-[10px] text-slate-700 leading-relaxed whitespace-pre-wrap">{c.texto_melhorado}</p>
+                  <div className="flex items-center justify-between mb-1">
+                    <p className="text-[9px] text-teal-600 font-bold uppercase">Texto Melhorado</p>
+                    {editing && (
+                      <span className="text-[8px] font-semibold text-teal-400 bg-teal-50 rounded px-1.5 py-0.5">Editavel</span>
+                    )}
+                  </div>
+                  {editing ? (
+                    <textarea
+                      value={getClausulaText(i, c.texto_melhorado)}
+                      onChange={e => setEditData(prev => ({
+                        ...prev,
+                        clausulas: { ...prev.clausulas, [i]: e.target.value }
+                      }))}
+                      rows={4}
+                      className="w-full text-[10px] text-slate-700 leading-relaxed bg-white rounded-lg px-2.5 py-2
+                        border border-teal-200 focus:outline-none focus:ring-2 focus:ring-teal-300/50 resize-y
+                        placeholder:text-slate-400"
+                    />
+                  ) : (
+                    <p className="text-[10px] text-slate-700 leading-relaxed whitespace-pre-wrap">
+                      {getClausulaText(i, c.texto_melhorado)}
+                    </p>
+                  )}
                 </div>
               </div>
             ))}
@@ -662,8 +777,29 @@ function MelhoriasPanel({ melhorias, scoreOriginal }: { melhorias: MelhoriaMinut
                   </p>
                 )}
                 <div className="bg-white/80 rounded-lg px-3 py-2.5 border border-blue-100">
-                  <p className="text-[9px] text-blue-600 font-bold uppercase mb-1">Texto da Clausula</p>
-                  <p className="text-[10px] text-slate-700 leading-relaxed whitespace-pre-wrap">{c.texto}</p>
+                  <div className="flex items-center justify-between mb-1">
+                    <p className="text-[9px] text-blue-600 font-bold uppercase">Texto da Clausula</p>
+                    {editing && (
+                      <span className="text-[8px] font-semibold text-blue-400 bg-blue-50 rounded px-1.5 py-0.5">Editavel</span>
+                    )}
+                  </div>
+                  {editing ? (
+                    <textarea
+                      value={getNovaText(i, c.texto)}
+                      onChange={e => setEditData(prev => ({
+                        ...prev,
+                        novas: { ...prev.novas, [i]: e.target.value }
+                      }))}
+                      rows={4}
+                      className="w-full text-[10px] text-slate-700 leading-relaxed bg-white rounded-lg px-2.5 py-2
+                        border border-blue-200 focus:outline-none focus:ring-2 focus:ring-blue-300/50 resize-y
+                        placeholder:text-slate-400"
+                    />
+                  ) : (
+                    <p className="text-[10px] text-slate-700 leading-relaxed whitespace-pre-wrap">
+                      {getNovaText(i, c.texto)}
+                    </p>
+                  )}
                 </div>
               </div>
             ))}
@@ -683,18 +819,60 @@ function MelhoriasPanel({ melhorias, scoreOriginal }: { melhorias: MelhoriaMinut
           </div>
         </div>
       )}
+
+      {/* Action Buttons */}
+      <div className="px-5 py-4 border-t border-teal-100 bg-gradient-to-r from-white to-teal-50/30">
+        <div className="flex items-center gap-2.5 flex-wrap">
+          <button
+            onClick={() => setEditing(v => !v)}
+            className={`flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-[11px] font-bold transition-all ${
+              editing
+                ? 'bg-teal-600 text-white shadow-sm hover:bg-teal-700'
+                : 'bg-white text-teal-700 border border-teal-200 hover:bg-teal-50 hover:border-teal-300 shadow-sm'
+            }`}
+          >
+            <Edit3 size={12} />
+            {editing ? 'Salvar Edicoes' : 'Editar Modificacoes'}
+          </button>
+
+          {onGerarMinuta && (
+            <button
+              onClick={onGerarMinuta}
+              disabled={gerandoMinuta}
+              className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-[11px] font-bold
+                bg-gradient-to-r from-teal-600 to-emerald-600 text-white shadow-sm
+                hover:from-teal-700 hover:to-emerald-700 hover:shadow-md transition-all
+                disabled:opacity-50"
+            >
+              {gerandoMinuta ? (
+                <><Loader2 size={12} className="animate-spin" /> Gerando documento...</>
+              ) : (
+                <><FileDown size={12} /> Gerar Nova Minuta</>
+              )}
+            </button>
+          )}
+        </div>
+        {editing && (
+          <p className="text-[9px] text-teal-500 mt-2.5 flex items-center gap-1">
+            <Edit3 size={8} />
+            Modo edicao ativo — ajuste os textos nas abas Melhoradas e Novas Clausulas, depois clique em &quot;Salvar Edicoes&quot;
+          </p>
+        )}
+      </div>
     </div>
   )
 }
 
 // ── MinutaCard ───────────────────────────────────────────────────────────────
 
-function MinutaCard({ minuta, onAnalisar, onMelhorar, analisando, melhorando, melhorias, analiseLocal, autoExpand }: {
+function MinutaCard({ minuta, onAnalisar, onMelhorar, onGerarMinuta, analisando, melhorando, gerandoMinuta, melhorias, analiseLocal, autoExpand }: {
   minuta: Minuta
   onAnalisar: (m: Minuta) => void
   onMelhorar: (m: Minuta) => void
+  onGerarMinuta?: (m: Minuta) => void
   analisando: boolean
   melhorando: boolean
+  gerandoMinuta?: boolean
   melhorias?: MelhoriaMinuta | null
   analiseLocal?: MinutaAiAnalise | null
   autoExpand?: boolean
@@ -905,7 +1083,12 @@ function MinutaCard({ minuta, onAnalisar, onMelhorar, analisando, melhorando, me
 
       {showMelhorias && melhorias && (
         <div className="px-4 pb-4">
-          <MelhoriasPanel melhorias={melhorias} scoreOriginal={analise?.score} />
+          <MelhoriasPanel
+            melhorias={melhorias}
+            scoreOriginal={analise?.score}
+            onGerarMinuta={onGerarMinuta ? () => onGerarMinuta(minuta) : undefined}
+            gerandoMinuta={gerandoMinuta}
+          />
         </div>
       )}
     </div>
@@ -941,6 +1124,7 @@ export default function PreparaMinuta() {
   const [melhoriasMap, setMelhoriasMap] = useState<Record<string, MelhoriaMinuta>>({})
   const [analiseMap, setAnaliseMap] = useState<Record<string, MinutaAiAnalise>>({})
   const [autoExpandId, setAutoExpandId] = useState<string | null>(null)
+  const [gerandoMinutaId, setGerandoMinutaId] = useState<string | null>(null)
   const [uploadProgress, setUploadProgress] = useState<'idle' | 'uploading' | 'done'>('idle')
 
   const isLoading = loadingSol || loadingMinutas
@@ -1055,12 +1239,14 @@ export default function PreparaMinuta() {
     if (!solicitacao || melhorandoId) return
     setMelhorandoId(minuta.id)
     try {
+      // Use local analise first (may not be saved to Supabase yet), fallback to minuta.ai_analise
+      const analise = analiseMap[minuta.id] ?? minuta.ai_analise ?? undefined
       const result = await melhorarMinuta.mutateAsync({
         solicitacao_id: solicitacao.id,
         minuta_id: minuta.id,
         arquivo_url: minuta.arquivo_url ?? undefined,
         titulo: minuta.titulo,
-        analise: minuta.ai_analise ?? undefined,
+        analise,
         contexto: {
           objeto: solicitacao.objeto,
           contraparte: solicitacao.contraparte_nome,
@@ -1071,7 +1257,9 @@ export default function PreparaMinuta() {
           obra: solicitacao.obra?.nome ?? undefined,
         },
       })
-      setMelhoriasMap(prev => ({ ...prev, [minuta.id]: result.melhorias }))
+      if (result.success && result.melhorias) {
+        setMelhoriasMap(prev => ({ ...prev, [minuta.id]: result.melhorias }))
+      }
     } catch {
       // Mutation error handled by TanStack Query
     } finally {
@@ -1092,6 +1280,37 @@ export default function PreparaMinuta() {
       observacao: 'Minuta final registrada, avancando para resumo executivo',
     })
     nav(`/contratos/solicitacoes/${id}`)
+  }
+
+  const handleGerarNovaMinuta = async (minuta: Minuta) => {
+    if (gerandoMinutaId) return
+    const mel = melhoriasMap[minuta.id]
+    if (!mel) return
+    setGerandoMinutaId(minuta.id)
+    try {
+      // Build document content from melhorias
+      const docContent = {
+        titulo: `${minuta.titulo} - Versao Melhorada`,
+        score_original: analiseMap[minuta.id]?.score ?? minuta.ai_analise?.score,
+        score_estimado: mel.score_estimado,
+        resumo: mel.resumo_melhorias,
+        clausulas_melhoradas: mel.clausulas_melhoradas,
+        clausulas_novas: mel.clausulas_novas,
+        riscos_mitigados: mel.riscos_mitigados,
+        observacoes: mel.observacoes_gerais,
+        gerado_em: new Date().toISOString(),
+      }
+      // Download as JSON reference document (future: n8n PDF generation endpoint)
+      const blob = new Blob([JSON.stringify(docContent, null, 2)], { type: 'application/json' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `minuta_melhorada_${minuta.titulo.replace(/\s+/g, '_').substring(0, 40)}.json`
+      a.click()
+      URL.revokeObjectURL(url)
+    } finally {
+      setGerandoMinutaId(null)
+    }
   }
 
   // ── Loading ────────────────────────────────────────────────────────────
@@ -1416,8 +1635,10 @@ export default function PreparaMinuta() {
                   minuta={m}
                   onAnalisar={handleAnalisarMinuta}
                   onMelhorar={handleMelhorarMinuta}
+                  onGerarMinuta={handleGerarNovaMinuta}
                   analisando={analisandoId === m.id}
                   melhorando={melhorandoId === m.id}
+                  gerandoMinuta={gerandoMinutaId === m.id}
                   melhorias={melhoriasMap[m.id]}
                   analiseLocal={analiseMap[m.id]}
                   autoExpand={autoExpandId === m.id}

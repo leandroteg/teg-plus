@@ -488,6 +488,7 @@ export interface MelhoriaMinuta {
 }
 
 export function useMelhorarMinuta() {
+  const qc = useQueryClient()
   return useMutation<
     { success: boolean; melhorias: MelhoriaMinuta },
     Error,
@@ -515,7 +516,23 @@ export function useMelhorarMinuta() {
         body: JSON.stringify(payload),
       })
       if (!res.ok) throw new Error(`Erro ao melhorar minuta: ${res.status}`)
-      return res.json()
+      const result = await res.json()
+
+      // Save melhorias to Supabase
+      if (result.success && result.melhorias) {
+        await supabase
+          .from('con_minutas')
+          .update({
+            ai_melhorias: result.melhorias,
+            ai_melhorado_em: new Date().toISOString(),
+          })
+          .eq('id', payload.minuta_id)
+      }
+
+      return result
+    },
+    onSuccess: (_d, vars) => {
+      qc.invalidateQueries({ queryKey: ['con-minutas', vars.solicitacao_id] })
     },
   })
 }
