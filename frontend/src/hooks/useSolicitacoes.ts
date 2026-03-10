@@ -537,6 +537,32 @@ export function useMelhorarMinuta() {
   })
 }
 
+// ── Gerar Minuta PDF via AI (n8n webhook) ────────────────────────────────────
+
+export function useGerarMinutaPDF() {
+  return useMutation<
+    { success: boolean; html: string; titulo: string },
+    Error,
+    {
+      titulo: string
+      objeto: string
+      contraparte: string
+      valor?: number
+      melhorias: MelhoriaMinuta
+    }
+  >({
+    mutationFn: async (payload) => {
+      const res = await fetch(`${N8N_BASE}/contratos/gerar-minuta-pdf`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      })
+      if (!res.ok) throw new Error(`Erro ao gerar minuta: ${res.status}`)
+      return res.json()
+    },
+  })
+}
+
 // ── Gerar Resumo Executivo via AI (n8n webhook) ─────────────────────────────
 
 export interface ResumoAiGerado {

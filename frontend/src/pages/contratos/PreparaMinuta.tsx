@@ -21,6 +21,8 @@ import {
 } from '../../hooks/useSolicitacoes'
 import type { MelhoriaMinuta } from '../../hooks/useSolicitacoes'
 import type { Minuta, TipoMinuta, StatusMinuta, MinutaAiAnalise, ConfigAnalise } from '../../types/contratos'
+import { supabase } from '../../services/supabase'
+import { jsPDF } from 'jspdf'
 
 // ── Formatters ──────────────────────────────────────────────────────────────────
 
@@ -593,11 +595,15 @@ function RegrasConfig({ regras, onUpdate }: {
 
 // ── Melhorias Panel ──────────────────────────────────────────────────────────
 
-function MelhoriasPanel({ melhorias, scoreOriginal, onGerarMinuta, gerandoMinuta }: {
+function MelhoriasPanel({ melhorias, scoreOriginal, onGerarMinuta, gerandoMinuta, onMelhoriasChange, pdfUrl, onEnviarAprovacao, enviandoAprovacao }: {
   melhorias: MelhoriaMinuta
   scoreOriginal?: number
   onGerarMinuta?: () => void
   gerandoMinuta?: boolean
+  onMelhoriasChange?: (edited: MelhoriaMinuta) => void
+  pdfUrl?: string | null
+  onEnviarAprovacao?: () => void
+  enviandoAprovacao?: boolean
 }) {
   const [tab, setTab] = useState<'clausulas' | 'riscos' | 'novas'>('clausulas')
   const [editing, setEditing] = useState(false)
@@ -605,13 +611,94 @@ function MelhoriasPanel({ melhorias, scoreOriginal, onGerarMinuta, gerandoMinuta
     clausulas: Record<number, string>
     novas: Record<number, string>
   }>({ clausulas: {}, novas: {} })
+  const [deletedClausulas, setDeletedClausulas] = useState<Set<number>>(new Set())
+  const [deletedNovas, setDeletedNovas] = useState<Set<number>>(new Set())
 
   const getClausulaText = (i: number, original: string) => editData.clausulas[i] ?? original
   const getNovaText = (i: number, original: string) => editData.novas[i] ?? original
 
-  const nMelhoradas = melhorias.clausulas_melhoradas?.length ?? 0
+  // Build edited melhorias and notify parent
+  const propagateChanges = (
+    newEditData?: typeof editData,
+    newDeletedCl?: Set<number>,
+    newDeletedNo?: Set<number>,
+  ) => {
+    if (!onMelhoriasChange) return
+    const ed = newEditData ?? editData
+    const delCl = newDeletedCl ?? deletedClausulas
+    const delNo = newDeletedNo ?? deletedNovas
+
+    const edited: MelhoriaMinuta = {
+      ...melhorias,
+      clausulas_melhoradas: melhorias.clausulas_melhoradas
+        .filter((_, i) => !delCl.has(i))
+        .map((c, _oi) => {
+          // Find original index
+          let origIdx = -1
+          let count = 0
+          for (let j = 0; j < melhorias.clausulas_melhoradas.length; j++) {
+            if (!delCl.has(j)) {
+              if (count === _oi) { origIdx = j; break }
+              count++
+            }
+          }
+          return {
+            ...c,
+            texto_melhorado: ed.clausulas[origIdx] ?? c.texto_melhorado,
+          }
+        }),
+      clausulas_novas: melhorias.clausulas_novas
+        .filter((_, i) => !delNo.has(i))
+        .map((c, _oi) => {
+          let origIdx = -1
+          let count = 0
+          for (let j = 0; j < melhorias.clausulas_novas.length; j++) {
+            if (!delNo.has(j)) {
+              if (count === _oi) { origIdx = j; break }
+              count++
+            }
+          }
+          return {
+            ...c,
+            texto: ed.novas[origIdx] ?? c.texto,
+          }
+        }),
+    }
+    onMelhoriasChange(edited)
+  }
+
+  const handleDeleteClausula = (i: number) => {
+    const next = new Set(deletedClausulas)
+    next.add(i)
+    setDeletedClausulas(next)
+    propagateChanges(undefined, next, undefined)
+  }
+
+  const handleDeleteNova = (i: number) => {
+    const next = new Set(deletedNovas)
+    next.add(i)
+    setDeletedNovas(next)
+    propagateChanges(undefined, undefined, next)
+  }
+
+  const handleEditClausula = (i: number, value: string) => {
+    const next = { ...editData, clausulas: { ...editData.clausulas, [i]: value } }
+    setEditData(next)
+    propagateChanges(next, undefined, undefined)
+  }
+
+  const handleEditNova = (i: number, value: string) => {
+    const next = { ...editData, novas: { ...editData.novas, [i]: value } }
+    setEditData(next)
+    propagateChanges(next, undefined, undefined)
+  }
+
+  const visibleClausulas = melhorias.clausulas_melhoradas?.filter((_, i) => !deletedClausulas.has(i)) ?? []
+  const visibleNovas = melhorias.clausulas_novas?.filter((_, i) => !deletedNovas.has(i)) ?? []
+
+  const nMelhoradas = visibleClausulas.length
   const nMitigados = melhorias.riscos_mitigados?.length ?? 0
-  const nNovas = melhorias.clausulas_novas?.length ?? 0
+  const nNovas = visibleNovas.length
 
   return (
     <div className="mt-4 rounded-2xl border border-teal-100 bg-white overflow-hidden shadow-sm">
@@ -688,45 +775,55 @@ function MelhoriasPanel({ melhorias, scoreOriginal, onGerarMinuta, gerandoMinuta
                 <FileSearch size={24} className="text-slate-300 mx-auto mb-2" />
                 <p className="text-xs text-slate-500 font-medium">Nenhuma clausula melhorada</p>
               </div>
-            ) : melhorias.clausulas_melhoradas.map((c, i) => (
-              <div key={i} className="rounded-xl bg-teal-50 border border-teal-100 p-3.5">
-                <div className="flex items-center gap-1.5 mb-2">
-                  <div className="w-6 h-6 rounded-md bg-teal-100 flex items-center justify-center shrink-0">
-                    <Wand2 size={11} className="text-teal-600" />
-                  </div>
-                  <p className="text-[11px] font-bold text-teal-800">{c.nome}</p>
-                  <span className="text-[9px] font-semibold bg-teal-100 text-teal-600 rounded-full px-1.5 py-0.5">
-                    {c.acao}
-                  </span>
-                </div>
-                <p className="text-[10px] text-slate-500 italic mb-2.5 leading-relaxed">{c.justificativa}</p>
-                <div className="bg-white/80 rounded-lg px-3 py-2.5 border border-teal-100">
-                  <div className="flex items-center justify-between mb-1">
-                    <p className="text-[9px] text-teal-600 font-bold uppercase">Texto Melhorado</p>
+            ) : melhorias.clausulas_melhoradas.map((c, i) => {
+              if (deletedClausulas.has(i)) return null
+              return (
+                <div key={i} className="rounded-xl bg-teal-50 border border-teal-100 p-3.5 transition-all animate-in fade-in">
+                  <div className="flex items-center gap-1.5 mb-2">
+                    <div className="w-6 h-6 rounded-md bg-teal-100 flex items-center justify-center shrink-0">
+                      <Wand2 size={11} className="text-teal-600" />
+                    </div>
+                    <p className="text-[11px] font-bold text-teal-800 flex-1">{c.nome}</p>
+                    <span className="text-[9px] font-semibold bg-teal-100 text-teal-600 rounded-full px-1.5 py-0.5">
+                      {c.acao}
+                    </span>
                     {editing && (
-                      <span className="text-[8px] font-semibold text-teal-400 bg-teal-50 rounded px-1.5 py-0.5">Editavel</span>
+                      <button
+                        onClick={() => handleDeleteClausula(i)}
+                        className="w-6 h-6 rounded-md bg-red-50 border border-red-200 flex items-center justify-center
+                          text-red-400 hover:text-red-600 hover:bg-red-100 transition-all shrink-0"
+                        title="Remover esta clausula"
+                      >
+                        <X size={11} />
+                      </button>
                     )}
                   </div>
-                  {editing ? (
-                    <textarea
-                      value={getClausulaText(i, c.texto_melhorado)}
-                      onChange={e => setEditData(prev => ({
-                        ...prev,
-                        clausulas: { ...prev.clausulas, [i]: e.target.value }
-                      }))}
-                      rows={4}
-                      className="w-full text-[10px] text-slate-700 leading-relaxed bg-white rounded-lg px-2.5 py-2
-                        border border-teal-200 focus:outline-none focus:ring-2 focus:ring-teal-300/50 resize-y
-                        placeholder:text-slate-400"
-                    />
-                  ) : (
-                    <p className="text-[10px] text-slate-700 leading-relaxed whitespace-pre-wrap">
-                      {getClausulaText(i, c.texto_melhorado)}
-                    </p>
-                  )}
+                  <p className="text-[10px] text-slate-500 italic mb-2.5 leading-relaxed">{c.justificativa}</p>
+                  <div className="bg-white/80 rounded-lg px-3 py-2.5 border border-teal-100">
+                    <div className="flex items-center justify-between mb-1">
+                      <p className="text-[9px] text-teal-600 font-bold uppercase">Texto Melhorado</p>
+                      {editing && (
+                        <span className="text-[8px] font-semibold text-teal-400 bg-teal-50 rounded px-1.5 py-0.5">Editavel</span>
+                      )}
+                    </div>
+                    {editing ? (
+                      <textarea
+                        value={getClausulaText(i, c.texto_melhorado)}
+                        onChange={e => handleEditClausula(i, e.target.value)}
+                        rows={4}
+                        className="w-full text-[10px] text-slate-700 leading-relaxed bg-white rounded-lg px-2.5 py-2
+                          border border-teal-200 focus:outline-none focus:ring-2 focus:ring-teal-300/50 resize-y
+                          placeholder:text-slate-400"
+                      />
+                    ) : (
+                      <p className="text-[10px] text-slate-700 leading-relaxed whitespace-pre-wrap">
+                        {getClausulaText(i, c.texto_melhorado)}
+                      </p>
+                    )}
+                  </div>
                 </div>
-              </div>
-            ))}
+              )
+            })}
           </div>
         )}
 
@@ -762,47 +859,57 @@ function MelhoriasPanel({ melhorias, scoreOriginal, onGerarMinuta, gerandoMinuta
                 <Plus size={24} className="text-slate-300 mx-auto mb-2" />
                 <p className="text-xs text-slate-500 font-medium">Nenhuma clausula nova sugerida</p>
               </div>
-            ) : melhorias.clausulas_novas.map((c, i) => (
-              <div key={i} className="rounded-xl bg-blue-50 border border-blue-100 p-3.5">
-                <div className="flex items-center gap-1.5 mb-2">
-                  <div className="w-6 h-6 rounded-md bg-blue-100 flex items-center justify-center shrink-0">
-                    <Plus size={11} className="text-blue-600" />
-                  </div>
-                  <p className="text-[11px] font-bold text-blue-800">{c.nome}</p>
-                </div>
-                <p className="text-[10px] text-slate-500 italic mb-1.5 leading-relaxed">{c.motivo}</p>
-                {c.base_legal && (
-                  <p className="text-[9px] text-blue-500 font-mono mb-2.5 bg-blue-100/50 rounded-md px-2 py-1 inline-block">
-                    Base: {c.base_legal}
-                  </p>
-                )}
-                <div className="bg-white/80 rounded-lg px-3 py-2.5 border border-blue-100">
-                  <div className="flex items-center justify-between mb-1">
-                    <p className="text-[9px] text-blue-600 font-bold uppercase">Texto da Clausula</p>
+            ) : melhorias.clausulas_novas.map((c, i) => {
+              if (deletedNovas.has(i)) return null
+              return (
+                <div key={i} className="rounded-xl bg-blue-50 border border-blue-100 p-3.5 transition-all animate-in fade-in">
+                  <div className="flex items-center gap-1.5 mb-2">
+                    <div className="w-6 h-6 rounded-md bg-blue-100 flex items-center justify-center shrink-0">
+                      <Plus size={11} className="text-blue-600" />
+                    </div>
+                    <p className="text-[11px] font-bold text-blue-800 flex-1">{c.nome}</p>
                     {editing && (
-                      <span className="text-[8px] font-semibold text-blue-400 bg-blue-50 rounded px-1.5 py-0.5">Editavel</span>
+                      <button
+                        onClick={() => handleDeleteNova(i)}
+                        className="w-6 h-6 rounded-md bg-red-50 border border-red-200 flex items-center justify-center
+                          text-red-400 hover:text-red-600 hover:bg-red-100 transition-all shrink-0"
+                        title="Remover esta clausula"
+                      >
+                        <X size={11} />
+                      </button>
                     )}
                   </div>
-                  {editing ? (
-                    <textarea
-                      value={getNovaText(i, c.texto)}
-                      onChange={e => setEditData(prev => ({
-                        ...prev,
-                        novas: { ...prev.novas, [i]: e.target.value }
-                      }))}
-                      rows={4}
-                      className="w-full text-[10px] text-slate-700 leading-relaxed bg-white rounded-lg px-2.5 py-2
-                        border border-blue-200 focus:outline-none focus:ring-2 focus:ring-blue-300/50 resize-y
-                        placeholder:text-slate-400"
-                    />
-                  ) : (
-                    <p className="text-[10px] text-slate-700 leading-relaxed whitespace-pre-wrap">
-                      {getNovaText(i, c.texto)}
+                  <p className="text-[10px] text-slate-500 italic mb-1.5 leading-relaxed">{c.motivo}</p>
+                  {c.base_legal && (
+                    <p className="text-[9px] text-blue-500 font-mono mb-2.5 bg-blue-100/50 rounded-md px-2 py-1 inline-block">
+                      Base: {c.base_legal}
                     </p>
                   )}
+                  <div className="bg-white/80 rounded-lg px-3 py-2.5 border border-blue-100">
+                    <div className="flex items-center justify-between mb-1">
+                      <p className="text-[9px] text-blue-600 font-bold uppercase">Texto da Clausula</p>
+                      {editing && (
+                        <span className="text-[8px] font-semibold text-blue-400 bg-blue-50 rounded px-1.5 py-0.5">Editavel</span>
+                      )}
+                    </div>
+                    {editing ? (
+                      <textarea
+                        value={getNovaText(i, c.texto)}
+                        onChange={e => handleEditNova(i, e.target.value)}
+                        rows={4}
+                        className="w-full text-[10px] text-slate-700 leading-relaxed bg-white rounded-lg px-2.5 py-2
+                          border border-blue-200 focus:outline-none focus:ring-2 focus:ring-blue-300/50 resize-y
+                          placeholder:text-slate-400"
+                      />
+                    ) : (
+                      <p className="text-[10px] text-slate-700 leading-relaxed whitespace-pre-wrap">
+                        {getNovaText(i, c.texto)}
+                      </p>
+                    )}
+                  </div>
                 </div>
-              </div>
-            ))}
+              )
+            })}
           </div>
         )}
       </div>
@@ -820,22 +927,49 @@ function MelhoriasPanel({ melhorias, scoreOriginal, onGerarMinuta, gerandoMinuta
         </div>
       )}
 
+      {/* PDF Preview */}
+      {pdfUrl && (
+        <div className="px-5 py-4 border-t border-emerald-100 bg-gradient-to-r from-emerald-50/50 to-teal-50/30">
+          <div className="flex items-center gap-3 mb-3">
+            <div className="w-10 h-10 rounded-xl bg-emerald-100 flex items-center justify-center shrink-0">
+              <CheckCircle2 size={18} className="text-emerald-600" />
+            </div>
+            <div className="flex-1">
+              <p className="text-sm font-bold text-emerald-800">Minuta Gerada com Sucesso</p>
+              <p className="text-[10px] text-emerald-600">PDF disponivel para download e envio para aprovacao</p>
+            </div>
+            <a
+              href={pdfUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-[10px] font-bold
+                bg-white text-emerald-700 border border-emerald-200 hover:bg-emerald-50 transition-all shadow-sm"
+            >
+              <ExternalLink size={11} />
+              Abrir PDF
+            </a>
+          </div>
+        </div>
+      )}
+
       {/* Action Buttons */}
       <div className="px-5 py-4 border-t border-teal-100 bg-gradient-to-r from-white to-teal-50/30">
         <div className="flex items-center gap-2.5 flex-wrap">
-          <button
-            onClick={() => setEditing(v => !v)}
-            className={`flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-[11px] font-bold transition-all ${
-              editing
-                ? 'bg-teal-600 text-white shadow-sm hover:bg-teal-700'
-                : 'bg-white text-teal-700 border border-teal-200 hover:bg-teal-50 hover:border-teal-300 shadow-sm'
-            }`}
-          >
-            <Edit3 size={12} />
-            {editing ? 'Salvar Edicoes' : 'Editar Modificacoes'}
-          </button>
+          {!pdfUrl && (
+            <button
+              onClick={() => setEditing(v => !v)}
+              className={`flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-[11px] font-bold transition-all ${
+                editing
+                  ? 'bg-teal-600 text-white shadow-sm hover:bg-teal-700'
+                  : 'bg-white text-teal-700 border border-teal-200 hover:bg-teal-50 hover:border-teal-300 shadow-sm'
+              }`}
+            >
+              <Edit3 size={12} />
+              {editing ? 'Salvar Edicoes' : 'Editar Melhorias'}
+            </button>
+          )}
 
-          {onGerarMinuta && (
+          {onGerarMinuta && !pdfUrl && (
             <button
               onClick={onGerarMinuta}
               disabled={gerandoMinuta}
@@ -845,19 +979,42 @@ function MelhoriasPanel({ melhorias, scoreOriginal, onGerarMinuta, gerandoMinuta
                 disabled:opacity-50"
             >
               {gerandoMinuta ? (
-                <><Loader2 size={12} className="animate-spin" /> Gerando documento...</>
+                <><Loader2 size={12} className="animate-spin" /> Gerando minuta...</>
               ) : (
-                <><FileDown size={12} /> Gerar Nova Minuta</>
+                <><FileDown size={12} /> Gerar Minuta</>
+              )}
+            </button>
+          )}
+
+          {pdfUrl && onEnviarAprovacao && (
+            <button
+              onClick={onEnviarAprovacao}
+              disabled={enviandoAprovacao}
+              className="flex items-center gap-2 px-5 py-3 rounded-xl text-xs font-bold
+                bg-gradient-to-r from-emerald-600 to-green-600 text-white shadow-md
+                hover:from-emerald-700 hover:to-green-700 hover:shadow-lg transition-all
+                disabled:opacity-50"
+            >
+              {enviandoAprovacao ? (
+                <><Loader2 size={14} className="animate-spin" /> Enviando...</>
+              ) : (
+                <><ChevronRight size={14} /> Enviar para Aprovacao</>
               )}
             </button>
           )}
         </div>
-        {editing && (
+        {editing && !pdfUrl && (
           <p className="text-[9px] text-teal-500 mt-2.5 flex items-center gap-1">
             <Edit3 size={8} />
-            Modo edicao ativo — ajuste os textos nas abas Melhoradas e Novas Clausulas, depois clique em &quot;Salvar Edicoes&quot;
+            Modo edicao ativo — edite textos ou remova sugestoes com o X vermelho, depois clique em &quot;Salvar Edicoes&quot;
           </p>
         )}
+        {deletedClausulas.size > 0 || deletedNovas.size > 0 ? (
+          <p className="text-[9px] text-amber-600 mt-1.5 flex items-center gap-1">
+            <AlertTriangle size={8} />
+            {deletedClausulas.size + deletedNovas.size} sugestao(oes) removida(s) da minuta final
+          </p>
+        ) : null}
       </div>
     </div>
   )
@@ -865,7 +1022,7 @@ function MelhoriasPanel({ melhorias, scoreOriginal, onGerarMinuta, gerandoMinuta
 
 // ── MinutaCard ───────────────────────────────────────────────────────────────
 
-function MinutaCard({ minuta, onAnalisar, onMelhorar, onGerarMinuta, analisando, melhorando, gerandoMinuta, melhorias, analiseLocal, autoExpand }: {
+function MinutaCard({ minuta, onAnalisar, onMelhorar, onGerarMinuta, analisando, melhorando, gerandoMinuta, melhorias, analiseLocal, autoExpand, onMelhoriasChange, pdfUrl, onEnviarAprovacao, enviandoAprovacao }: {
   minuta: Minuta
   onAnalisar: (m: Minuta) => void
   onMelhorar: (m: Minuta) => void
@@ -876,6 +1033,10 @@ function MinutaCard({ minuta, onAnalisar, onMelhorar, onGerarMinuta, analisando,
   melhorias?: MelhoriaMinuta | null
   analiseLocal?: MinutaAiAnalise | null
   autoExpand?: boolean
+  onMelhoriasChange?: (minutaId: string, edited: MelhoriaMinuta) => void
+  pdfUrl?: string | null
+  onEnviarAprovacao?: () => void
+  enviandoAprovacao?: boolean
 }) {
   const [showAnalise, setShowAnalise] = useState(false)
   const [showMelhorias, setShowMelhorias] = useState(false)
@@ -1088,6 +1249,10 @@ function MinutaCard({ minuta, onAnalisar, onMelhorar, onGerarMinuta, analisando,
             scoreOriginal={analise?.score}
             onGerarMinuta={onGerarMinuta ? () => onGerarMinuta(minuta) : undefined}
             gerandoMinuta={gerandoMinuta}
+            onMelhoriasChange={onMelhoriasChange ? (edited) => onMelhoriasChange(minuta.id, edited) : undefined}
+            pdfUrl={pdfUrl}
+            onEnviarAprovacao={onEnviarAprovacao}
+            enviandoAprovacao={enviandoAprovacao}
           />
         </div>
       )}
@@ -1126,8 +1291,43 @@ export default function PreparaMinuta() {
   const [autoExpandId, setAutoExpandId] = useState<string | null>(null)
   const [gerandoMinutaId, setGerandoMinutaId] = useState<string | null>(null)
   const [uploadProgress, setUploadProgress] = useState<'idle' | 'uploading' | 'done'>('idle')
+  const [editedMelhoriasMap, setEditedMelhoriasMap] = useState<Record<string, MelhoriaMinuta>>({})
+  const [pdfUrlMap, setPdfUrlMap] = useState<Record<string, string>>({})
 
   const isLoading = loadingSol || loadingMinutas
+
+  // ── Persist melhorias: load from DB when minutas arrive ────────────
+  useEffect(() => {
+    if (!minutas.length) return
+    const newMelhorias: Record<string, MelhoriaMinuta> = {}
+    const newAnalise: Record<string, MinutaAiAnalise> = {}
+    const newPdfUrls: Record<string, string> = {}
+    let changed = false
+
+    for (const m of minutas) {
+      // Restore melhorias from ai_melhorias (saved by useMelhorarMinuta)
+      if (m.ai_melhorias && typeof m.ai_melhorias === 'object' && !melhoriasMap[m.id]) {
+        newMelhorias[m.id] = m.ai_melhorias as unknown as MelhoriaMinuta
+        changed = true
+      }
+      // Restore analise from ai_analise
+      if (m.ai_analise && typeof m.ai_analise === 'object' && typeof m.ai_analise.score === 'number' && !analiseMap[m.id]) {
+        newAnalise[m.id] = m.ai_analise
+        changed = true
+      }
+      // Restore pdfUrl if minuta was already generated (status em_revisao and has pdf)
+      if (m.status === 'em_revisao' && m.arquivo_url && m.arquivo_nome?.includes('minuta_melhorada') && !pdfUrlMap[m.id]) {
+        newPdfUrls[m.id] = m.arquivo_url
+        changed = true
+      }
+    }
+
+    if (changed) {
+      if (Object.keys(newMelhorias).length) setMelhoriasMap(prev => ({ ...prev, ...newMelhorias }))
+      if (Object.keys(newAnalise).length) setAnaliseMap(prev => ({ ...prev, ...newAnalise }))
+      if (Object.keys(newPdfUrls).length) setPdfUrlMap(prev => ({ ...prev, ...newPdfUrls }))
+    }
+  }, [minutas]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const inputClass =
     'w-full px-3 py-2.5 rounded-xl border border-slate-200 bg-white text-sm text-slate-700 ' +
@@ -1267,6 +1467,18 @@ export default function PreparaMinuta() {
     }
   }
 
+  const handleMelhoriasChange = (minutaId: string, edited: MelhoriaMinuta) => {
+    setEditedMelhoriasMap(prev => ({ ...prev, [minutaId]: edited }))
+    // Also persist to melhoriasMap so it's available for PDF generation
+    setMelhoriasMap(prev => ({ ...prev, [minutaId]: edited }))
+    // Persist edited melhorias to Supabase (debounced by React batching)
+    supabase
+      .from('con_minutas')
+      .update({ ai_melhorias: edited, ai_melhorado_em: new Date().toISOString() })
+      .eq('id', minutaId)
+      .then(() => {}) // fire and forget
+  }
+
   const handleUpdateConfig = (ruleId: string, valor: string, ativo?: boolean) => {
     atualizarConfig.mutate({ id: ruleId, valor, ativo })
   }
@@ -1283,31 +1495,305 @@ export default function PreparaMinuta() {
   }
 
   const handleGerarNovaMinuta = async (minuta: Minuta) => {
-    if (gerandoMinutaId) return
-    const mel = melhoriasMap[minuta.id]
+    if (gerandoMinutaId || !solicitacao) return
+    // Use edited melhorias if available, otherwise original
+    const mel = editedMelhoriasMap[minuta.id] ?? melhoriasMap[minuta.id]
     if (!mel) return
     setGerandoMinutaId(minuta.id)
     try {
-      // Build document content from melhorias
-      const docContent = {
-        titulo: `${minuta.titulo} - Versao Melhorada`,
-        score_original: analiseMap[minuta.id]?.score ?? minuta.ai_analise?.score,
-        score_estimado: mel.score_estimado,
-        resumo: mel.resumo_melhorias,
-        clausulas_melhoradas: mel.clausulas_melhoradas,
-        clausulas_novas: mel.clausulas_novas,
-        riscos_mitigados: mel.riscos_mitigados,
-        observacoes: mel.observacoes_gerais,
-        gerado_em: new Date().toISOString(),
+      // ── Generate professional PDF natively with jsPDF ──────────────
+      const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
+      const pw = pdf.internal.pageSize.getWidth()
+      const ph = pdf.internal.pageSize.getHeight()
+      const mx = 20          // margin x
+      const usable = pw - 2 * mx
+      let y = 25             // current y position
+      const lineH = 5        // line height for body
+      const gapSm = 3
+      const gapMd = 8
+      const gapLg = 14
+
+      const ensureSpace = (need: number) => {
+        if (y + need > ph - 20) { pdf.addPage(); y = 20 }
       }
-      // Download as JSON reference document (future: n8n PDF generation endpoint)
-      const blob = new Blob([JSON.stringify(docContent, null, 2)], { type: 'application/json' })
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = `minuta_melhorada_${minuta.titulo.replace(/\s+/g, '_').substring(0, 40)}.json`
-      a.click()
-      URL.revokeObjectURL(url)
+
+      // Helper: wrap and print text
+      const printText = (text: string, fontSize: number, opts?: { bold?: boolean; color?: [number,number,number]; indent?: number }) => {
+        const fs = opts?.bold ? 'bold' : 'normal'
+        const col = opts?.color ?? [30, 30, 30]
+        const ind = opts?.indent ?? 0
+        pdf.setFont('helvetica', fs)
+        pdf.setFontSize(fontSize)
+        pdf.setTextColor(col[0], col[1], col[2])
+        const lines = pdf.splitTextToSize(text, usable - ind)
+        for (const line of lines) {
+          ensureSpace(lineH + 1)
+          pdf.text(line, mx + ind, y)
+          y += lineH
+        }
+      }
+
+      // Helper: horizontal rule
+      const hr = (color?: [number,number,number]) => {
+        ensureSpace(4)
+        const c = color ?? [200, 200, 200]
+        pdf.setDrawColor(c[0], c[1], c[2])
+        pdf.setLineWidth(0.3)
+        pdf.line(mx, y, pw - mx, y)
+        y += 3
+      }
+
+      // ═══════ HEADER ═══════
+      pdf.setFillColor(15, 118, 110) // teal-700
+      pdf.rect(0, 0, pw, 40, 'F')
+      pdf.setFont('helvetica', 'bold')
+      pdf.setFontSize(18)
+      pdf.setTextColor(255, 255, 255)
+      pdf.text('MINUTA CONTRATUAL', pw / 2, 18, { align: 'center' })
+      pdf.setFontSize(10)
+      pdf.setTextColor(200, 240, 230)
+      const headerLines = pdf.splitTextToSize(`${minuta.titulo} — Versao Melhorada`, usable)
+      pdf.text(headerLines, pw / 2, 28, { align: 'center' })
+      y = 50
+
+      // ═══════ INFO BOX ═══════
+      pdf.setFillColor(245, 248, 250)
+      pdf.roundedRect(mx, y, usable, 32, 2, 2, 'F')
+      const boxY = y + 6
+      pdf.setFont('helvetica', 'bold')
+      pdf.setFontSize(8)
+      pdf.setTextColor(100, 116, 139)
+
+      pdf.text('OBJETO', mx + 4, boxY)
+      pdf.setFont('helvetica', 'normal')
+      pdf.setFontSize(9)
+      pdf.setTextColor(30, 41, 59)
+      const objetoLines = pdf.splitTextToSize(solicitacao.objeto, usable / 2 - 8)
+      pdf.text(objetoLines.slice(0, 2), mx + 4, boxY + 5)
+
+      pdf.setFont('helvetica', 'bold')
+      pdf.setFontSize(8)
+      pdf.setTextColor(100, 116, 139)
+      pdf.text('CONTRAPARTE', usable / 2 + mx + 4, boxY)
+      pdf.setFont('helvetica', 'normal')
+      pdf.setFontSize(9)
+      pdf.setTextColor(30, 41, 59)
+      pdf.text(solicitacao.contraparte_nome, usable / 2 + mx + 4, boxY + 5)
+
+      if (solicitacao.valor_estimado) {
+        pdf.setFont('helvetica', 'bold')
+        pdf.setFontSize(8)
+        pdf.setTextColor(100, 116, 139)
+        pdf.text('VALOR', usable / 2 + mx + 4, boxY + 14)
+        pdf.setFont('helvetica', 'normal')
+        pdf.setFontSize(9)
+        pdf.setTextColor(15, 118, 110)
+        pdf.text(fmt(solicitacao.valor_estimado), usable / 2 + mx + 4, boxY + 19)
+      }
+
+      const dataStr = new Date().toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' })
+      pdf.setFont('helvetica', 'bold')
+      pdf.setFontSize(8)
+      pdf.setTextColor(100, 116, 139)
+      pdf.text('DATA', mx + 4, boxY + 14)
+      pdf.setFont('helvetica', 'normal')
+      pdf.setFontSize(9)
+      pdf.setTextColor(30, 41, 59)
+      pdf.text(dataStr, mx + 4, boxY + 19)
+
+      y += 38
+
+      // Score badge
+      if (mel.score_estimado) {
+        ensureSpace(12)
+        const scoreCol: [number,number,number] = mel.score_estimado >= 80 ? [16, 185, 129] : mel.score_estimado >= 60 ? [245, 158, 11] : [239, 68, 68]
+        pdf.setFillColor(scoreCol[0], scoreCol[1], scoreCol[2])
+        pdf.roundedRect(mx, y, 50, 8, 2, 2, 'F')
+        pdf.setFont('helvetica', 'bold')
+        pdf.setFontSize(8)
+        pdf.setTextColor(255, 255, 255)
+        pdf.text(`SCORE: ${mel.score_estimado}/100`, mx + 25, y + 5.5, { align: 'center' })
+        y += 12
+      }
+
+      // Resumo
+      if (mel.resumo_melhorias) {
+        printText(mel.resumo_melhorias, 9, { color: [71, 85, 105] })
+        y += gapMd
+      }
+
+      // ═══════ CLAUSULAS MELHORADAS ═══════
+      if (mel.clausulas_melhoradas?.length) {
+        hr([15, 118, 110])
+        y += gapSm
+        printText('CLAUSULAS MELHORADAS', 12, { bold: true, color: [15, 118, 110] })
+        y += gapMd
+
+        mel.clausulas_melhoradas.forEach((c, i) => {
+          ensureSpace(20)
+          // Clause header
+          printText(`${i + 1}. ${c.nome}`, 10, { bold: true })
+          y += gapSm
+
+          // Action badge
+          pdf.setFillColor(240, 253, 244)
+          pdf.roundedRect(mx + 4, y - 3.5, pdf.getTextWidth(c.acao) + 6, 6, 1, 1, 'F')
+          pdf.setFont('helvetica', 'bold')
+          pdf.setFontSize(7)
+          pdf.setTextColor(22, 101, 52)
+          pdf.text(c.acao, mx + 7, y)
+          y += gapSm
+
+          // Justificativa
+          printText(c.justificativa, 8, { color: [100, 116, 139], indent: 4 })
+          y += gapSm
+
+          // Texto melhorado box
+          ensureSpace(10)
+          pdf.setFillColor(240, 253, 244)
+          const textLines = pdf.splitTextToSize(c.texto_melhorado, usable - 16)
+          const boxH = textLines.length * lineH + 8
+          ensureSpace(boxH + 2)
+          pdf.roundedRect(mx + 4, y - 2, usable - 8, boxH, 1.5, 1.5, 'F')
+          pdf.setFont('helvetica', 'normal')
+          pdf.setFontSize(8.5)
+          pdf.setTextColor(30, 41, 59)
+          for (const line of textLines) {
+            ensureSpace(lineH + 1)
+            pdf.text(line, mx + 8, y + 3)
+            y += lineH
+          }
+          y += gapLg
+        })
+      }
+
+      // ═══════ CLAUSULAS NOVAS ═══════
+      if (mel.clausulas_novas?.length) {
+        hr([37, 99, 235])
+        y += gapSm
+        printText('CLAUSULAS NOVAS', 12, { bold: true, color: [37, 99, 235] })
+        y += gapMd
+
+        mel.clausulas_novas.forEach((c, i) => {
+          ensureSpace(20)
+          printText(`${i + 1}. ${c.nome}`, 10, { bold: true, color: [30, 64, 175] })
+          y += gapSm
+          printText(`Motivo: ${c.motivo}`, 8, { color: [100, 116, 139], indent: 4 })
+          if (c.base_legal) {
+            printText(`Base Legal: ${c.base_legal}`, 8, { color: [79, 70, 229], indent: 4 })
+          }
+          y += gapSm
+
+          // Texto box
+          ensureSpace(10)
+          pdf.setFillColor(239, 246, 255)
+          const textLines = pdf.splitTextToSize(c.texto, usable - 16)
+          const boxH = textLines.length * lineH + 8
+          ensureSpace(boxH + 2)
+          pdf.roundedRect(mx + 4, y - 2, usable - 8, boxH, 1.5, 1.5, 'F')
+          pdf.setFont('helvetica', 'normal')
+          pdf.setFontSize(8.5)
+          pdf.setTextColor(30, 41, 59)
+          for (const line of textLines) {
+            ensureSpace(lineH + 1)
+            pdf.text(line, mx + 8, y + 3)
+            y += lineH
+          }
+          y += gapLg
+        })
+      }
+
+      // ═══════ RISCOS MITIGADOS ═══════
+      if (mel.riscos_mitigados?.length) {
+        hr([239, 68, 68])
+        y += gapSm
+        printText('RISCOS MITIGADOS', 12, { bold: true, color: [185, 28, 28] })
+        y += gapMd
+
+        mel.riscos_mitigados.forEach((r, i) => {
+          ensureSpace(16)
+          printText(`${i + 1}. ${r.risco_original}`, 9, { bold: true })
+          y += gapSm
+          printText(`Severidade: ${r.severidade_original}  →  ${r.severidade_apos}`, 8, { color: [100, 116, 139], indent: 4 })
+          printText(`Acao: ${r.acao_tomada}`, 8, { color: [71, 85, 105], indent: 4 })
+          y += gapMd
+        })
+      }
+
+      // ═══════ OBSERVACOES ═══════
+      if (mel.observacoes_gerais) {
+        hr()
+        y += gapSm
+        printText('OBSERVACOES GERAIS', 10, { bold: true, color: [71, 85, 105] })
+        y += gapSm
+        printText(mel.observacoes_gerais, 9, { color: [71, 85, 105] })
+        y += gapLg
+      }
+
+      // ═══════ SIGNATURE BLOCK ═══════
+      ensureSpace(50)
+      hr()
+      y += gapLg
+      printText(`${solicitacao.obra?.nome ?? 'Local'}, ${dataStr}`, 9, { color: [100, 116, 139] })
+      y += 20
+
+      // Signature lines
+      const sigW = usable / 2 - 10
+      pdf.setDrawColor(100, 116, 139)
+      pdf.setLineWidth(0.2)
+      pdf.line(mx, y, mx + sigW, y)
+      pdf.line(pw - mx - sigW, y, pw - mx, y)
+      y += 5
+      pdf.setFont('helvetica', 'bold')
+      pdf.setFontSize(8)
+      pdf.setTextColor(71, 85, 105)
+      pdf.text('CONTRATANTE', mx + sigW / 2, y, { align: 'center' })
+      pdf.text('CONTRATADA', pw - mx - sigW / 2, y, { align: 'center' })
+      y += 4
+      pdf.setFont('helvetica', 'normal')
+      pdf.setFontSize(7)
+      pdf.setTextColor(148, 163, 184)
+      pdf.text('TEG Uniao Engenharia', mx + sigW / 2, y, { align: 'center' })
+      pdf.text(solicitacao.contraparte_nome, pw - mx - sigW / 2, y, { align: 'center' })
+
+      // ═══════ FOOTER on all pages ═══════
+      const totalPages = pdf.getNumberOfPages()
+      for (let p = 1; p <= totalPages; p++) {
+        pdf.setPage(p)
+        pdf.setFont('helvetica', 'normal')
+        pdf.setFontSize(7)
+        pdf.setTextColor(148, 163, 184)
+        pdf.text(`TEG+ ERP — Minuta gerada automaticamente`, mx, ph - 8)
+        pdf.text(`Pagina ${p} de ${totalPages}`, pw - mx, ph - 8, { align: 'right' })
+      }
+
+      // ── Upload to Supabase Storage ──
+      const pdfBlob = pdf.output('blob')
+      const safeName = minuta.titulo.replace(/[^a-zA-Z0-9._-]/g, '_').substring(0, 40)
+      const pdfFile = new File([pdfBlob], `minuta_melhorada_${safeName}.pdf`, { type: 'application/pdf' })
+
+      const uploaded = await uploadFile.mutateAsync({
+        file: pdfFile,
+        solicitacaoId: solicitacao.id,
+      })
+
+      // Update minuta record with PDF URL
+      await supabase
+        .from('con_minutas')
+        .update({
+          arquivo_url: uploaded.arquivo_url,
+          arquivo_nome: pdfFile.name,
+          tamanho_bytes: pdfFile.size,
+          status: 'em_revisao',
+        })
+        .eq('id', minuta.id)
+
+      // Store PDF URL in state
+      setPdfUrlMap(prev => ({ ...prev, [minuta.id]: uploaded.arquivo_url }))
+
+    } catch (e) {
+      console.error('Erro ao gerar minuta PDF:', e)
+      alert(e instanceof Error ? e.message : 'Erro ao gerar minuta PDF')
     } finally {
       setGerandoMinutaId(null)
     }
@@ -1642,6 +2128,10 @@ export default function PreparaMinuta() {
                   melhorias={melhoriasMap[m.id]}
                   analiseLocal={analiseMap[m.id]}
                   autoExpand={autoExpandId === m.id}
+                  onMelhoriasChange={handleMelhoriasChange}
+                  pdfUrl={pdfUrlMap[m.id]}
+                  onEnviarAprovacao={pdfUrlMap[m.id] ? handleAvancarResumo : undefined}
+                  enviandoAprovacao={avancarEtapa.isPending}
                 />
               ))}
             </div>
