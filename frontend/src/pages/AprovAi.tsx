@@ -42,7 +42,7 @@ const tipoConfig: Record<TipoAprovacao, {
   headerBg: string
 }> = {
   cotacao: {
-    label: 'Cotacoes',
+    label: 'Aprovacao Compras',
     icon: FileSearch,
     color: 'blue',
     bgLight: 'bg-blue-50',
@@ -75,7 +75,7 @@ const tipoConfig: Record<TipoAprovacao, {
     headerBg: 'bg-gradient-to-r from-violet-600 to-violet-500',
   },
   requisicao_compra: {
-    label: 'Requisicoes de Compra',
+    label: 'Validacao Tec. Requisicao de Compra',
     icon: ShoppingCart,
     color: 'teal',
     bgLight: 'bg-teal-50',

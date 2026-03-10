@@ -15,6 +15,7 @@ import { useTheme } from '../contexts/ThemeContext'
 import LogoTeg from '../components/LogoTeg'
 import MuralPopup from '../components/MuralPopup'
 import ThemeToggle from '../components/ThemeToggle'
+import ApprovalBadge from '../components/ApprovalBadge'
 
 // ═══════════════════════════════════════════════════════════════════════════════
 //  DATA
@@ -266,6 +267,9 @@ export default function ModuloSelector() {
             {/* Notification dot */}
             <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-teal-400 animate-pulse" />
           </button>
+
+          {/* Approval badge */}
+          <ApprovalBadge isDark={!isLight} />
 
           {/* Greeting */}
           <p className={`text-sm font-semibold hidden sm:block ${isLight ? 'text-slate-700' : 'text-white/90'}`}>

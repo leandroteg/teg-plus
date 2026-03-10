@@ -6,6 +6,7 @@ import { useAuth, ROLE_LABEL, ROLE_COLOR } from '../contexts/AuthContext'
 import { useTheme } from '../contexts/ThemeContext'
 import LogoTeg from './LogoTeg'
 import NotificationBell from './NotificationBell'
+import ApprovalBadge from './ApprovalBadge'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -564,6 +565,7 @@ export default function ModuleLayout({
           {/* Avatar + Notifications + Footer */}
           <div className="mt-auto space-y-3">
             <div className="flex items-center justify-center gap-2">
+              <ApprovalBadge isDark={!ls} />
               <NotificationBell isDark={!ls} />
               <div className="relative" data-avatar-menu>
                 {renderAvatarButton('sm')}
@@ -593,6 +595,7 @@ export default function ModuleLayout({
               </span>
             </div>
             <div className="flex items-center gap-2">
+              <ApprovalBadge isDark={!ls} />
               <NotificationBell isDark={!ls} />
               <div className="relative" data-avatar-menu>
                 {renderAvatarButton('sm')}
@@ -672,7 +675,8 @@ export default function ModuleLayout({
               <p className={`font-black text-lg tracking-tight leading-none ${ls ? 'text-slate-800' : 'text-white'}`}>TEG+</p>
               <p className={`text-[10px] font-medium mt-0.5 ${ls ? 'text-slate-400' : 'text-slate-500'}`}>ERP Sistema</p>
             </div>
-            <NotificationBell isDark={!ls} />
+            <ApprovalBadge isDark={!ls} />
+              <NotificationBell isDark={!ls} />
             <div className="relative" data-avatar-menu>
               {renderAvatarButton()}
               {renderAvatarDropdown()}
@@ -735,7 +739,8 @@ export default function ModuleLayout({
           </div>
 
           {/* Notifications + Avatar */}
-          <NotificationBell isDark={!ls} />
+          <ApprovalBadge isDark={!ls} />
+              <NotificationBell isDark={!ls} />
           <div className="relative" data-avatar-menu>
             {renderAvatarButton('sm')}
             {renderAvatarDropdown('header')}
