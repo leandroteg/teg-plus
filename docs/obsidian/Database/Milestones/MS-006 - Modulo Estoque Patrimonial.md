@@ -2,8 +2,9 @@
 tipo: milestone
 id: MS-006
 titulo: "Módulo Estoque e Patrimonial"
-progresso: 60
+progresso: 90
 status: em-andamento
+updated: 2026-03-10
 sprint: Sprint-5
 data_inicio: 2026-03-03
 data_fim_prevista: 2026-04-15
@@ -15,16 +16,23 @@ tags: [milestone, estoque, patrimonial, almoxarifado]
 ## Objetivo
 Lançar o módulo completo de gestão de almoxarifado e patrimônio fixo, com rastreabilidade de movimentações, inventário cíclico e depreciação automática.
 
-## Progresso: 60%
+## Progresso: 90%
 
 ## Tarefas
 
 | Tarefa | Status | Sprint |
 |--------|--------|--------|
 | [[TASK-019 - Estoque Core]] | ✅ concluído | Sprint-5 |
+| [[TASK-027 - Estoque Solicitacoes Transferencias]] | ⬜ backlog | Sprint-7 |
 | TASK-020 - Inventário Avançado | ⬜ backlog | Sprint-6 |
 | TASK-021 - Termos Responsabilidade PDF | ⬜ backlog | Sprint-6 |
 | TASK-022 - Relatórios Estoque | ⬜ backlog | Sprint-7 |
+
+## Notas (2026-03-10)
+- Core 100% operacional: itens, movimentações, inventário, patrimonial com depreciação
+- Módulo visível e acessível no ModuloSelector
+- Solicitações inter-bases e transferências com aprovação pendentes (TASK-027)
+- Integração Compras → Estoque (PO → entrada automática) pendente
 
 ## Entregas
 

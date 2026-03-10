@@ -4,20 +4,28 @@ id: REQ-018
 titulo: "Controle de Acesso por Alçadas — Módulo Financeiro"
 categoria: nao-funcional
 prioridade: alta
-status: planejado
+status: em-andamento
 modulo: financeiro
 sprint: Sprint-4
 milestone: MS-004
-tags: [requisito, financeiro, acesso, alcadas, usuarios, permissoes]
+updated: 2026-03-10
+tags: [requisito, financeiro, acesso, alcadas, usuarios, permissoes, aprovaai]
 ---
 
-# 📋 REQ-018 — Controle de Acesso por Alçadas
+# 🟡 REQ-018 — Controle de Acesso por Alçadas
 
 ## Descrição
 O módulo financeiro é acessado por perfis distintos com permissões diferentes. A equipe financeira opera, os demais visualizam conforme suas alçadas.
 
-## Perfis e Permissões
+## Implementação Atual (2026-03-10)
+- [x] AprovAi como centro unificado de aprovações (4 tipos)
+- [x] Admin users com acesso universal a aprovações
+- [x] Rotas admin-only protegidas (AdminRoute)
+- [ ] Perfis RBAC configuráveis via painel admin
+- [ ] Restrição de menus/telas por perfil no frontend
+- [ ] Log de auditoria por ação/usuário
 
+## Perfis e Permissões
 | Perfil | Módulo | Permissão |
 |--------|--------|-----------|
 | Equipe Financeira | Todos os submodulos financeiros | Operar (criar, editar, executar) |
@@ -35,10 +43,6 @@ O módulo financeiro é acessado por perfis distintos com permissões diferentes
 - [ ] Diretoria e Controladoria acessam relatórios sem acionar TI
 - [ ] Suprimentos visualiza comprovante de pagamento do seu PO sem ver dados de outros POs
 - [ ] Equipe financeira opera com produtividade: poucos cliques, sem sobrecarga
-
-## Critérios de Sucesso Ligados a este Requisito
-- Equipe sabe utilizar o sistema, recorrendo raramente à TI
-- 99,8% dos pagamentos seguindo o fluxo previsto com toda documentação
 
 ## Tarefas Relacionadas
 - [[TASK-017 - Acesso Alcadas Financeiro]]

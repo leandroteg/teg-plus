@@ -5,7 +5,8 @@ titulo: "Módulo Financeiro — Omie como Core"
 status: em-andamento
 fase: Q2-2026
 data_alvo: 2026-09-30
-progresso: 25
+progresso: 70
+updated: 2026-03-10
 modulo: financeiro
 tags: [milestone, financeiro, omie, nfe, dre, conciliacao, aprovacao]
 ---
@@ -52,11 +53,11 @@ Lançamento do módulo financeiro do TEG+ com o **Omie como módulo central**.
 | ID | Tarefa | Status |
 |----|--------|--------|
 | [[TASK-009 - Integracao Omie\|TASK-009]] | Integração Omie ERP | ✅ concluído |
-| [[TASK-013 - CP Workflow Aprovacao\|TASK-013]] | CP — Workflow de Aprovação e Documentos | 🔵 em andamento |
-| [[TASK-014 - Conciliacao Remessa Bancaria\|TASK-014]] | Conciliação e Remessa Bancária | 🟡 em andamento |
+| [[TASK-013 - CP Workflow Aprovacao\|TASK-013]] | CP — Workflow de Aprovação e Documentos | 🟡 parcial (core done, exceções pendentes) |
+| [[TASK-014 - Conciliacao Remessa Bancaria\|TASK-014]] | Conciliação e Remessa Bancária | 🟡 em andamento (UI pronta) |
 | [[TASK-015 - Emissao Recebimento NFe\|TASK-015]] | Emissão e Recebimento de NF-e/NFS-e | ⬜ backlog |
-| [[TASK-016 - Relatorios Financeiros\|TASK-016]] | Relatórios DRE, DFC, BP, Fluxo de Caixa | 🟡 em andamento |
-| [[TASK-017 - Acesso Alcadas Financeiro\|TASK-017]] | Controle de Acesso por Alçadas | ⬜ backlog |
+| [[TASK-016 - Relatorios Financeiros\|TASK-016]] | Relatórios DRE, DFC, BP, Fluxo de Caixa | 🟡 parcial (DRE/Fluxo/CC/Aging UI prontos) |
+| [[TASK-017 - Acesso Alcadas Financeiro\|TASK-017]] | Controle de Acesso por Alçadas | 🟡 parcial (AprovAi com 4 tipos) |
 | [[TASK-018 - Integracao RH Folha\|TASK-018]] | Integração RH — Folha de Pagamento | ⬜ backlog |
 
 ## Requisitos
@@ -86,5 +87,12 @@ Lançamento do módulo financeiro do TEG+ com o **Omie como módulo central**.
 | Gestão de Obras (previsto × realizado) | Importante | ⬜ backlog |
 | Contabilidade externa | Importante | ⬜ backlog |
 
+## Notas (2026-03-10)
+- CP approval flow wired into apr_aprovacoes via syncCPsParaAprovacao
+- AprovAi (Centro de Aprovacoes) implementado com 4 tipos: cotacao, autorizacao_pagamento, minuta_contratual, requisicao_compra
+- ApprovalBadge no header global para admin users
+- Telas CP, CR, Aprovacoes, Conciliacao, Relatorios, Fornecedores todas operacionais
+- Pendente: integracao SEFAZ, remessa bancaria real, exceções de pagamento, RBAC completo
+
 ## Progresso
-`█████░░░░░` 50%
+`███████░░░` 70%
