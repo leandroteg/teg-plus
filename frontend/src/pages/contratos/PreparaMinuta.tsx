@@ -607,6 +607,8 @@ function MelhoriasPanel({ melhorias, scoreOriginal, onGerarMinuta, gerandoMinuta
 }) {
   const [tab, setTab] = useState<'clausulas' | 'riscos' | 'novas'>('clausulas')
   const [editing, setEditing] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [saveSuccess, setSaveSuccess] = useState(false)
   const [editData, setEditData] = useState<{
     clausulas: Record<number, string>
     novas: Record<number, string>
@@ -617,18 +619,17 @@ function MelhoriasPanel({ melhorias, scoreOriginal, onGerarMinuta, gerandoMinuta
   const getClausulaText = (i: number, original: string) => editData.clausulas[i] ?? original
   const getNovaText = (i: number, original: string) => editData.novas[i] ?? original
 
-  // Build edited melhorias and notify parent
-  const propagateChanges = (
+  // Build edited melhorias object from current state
+  const buildEdited = (
     newEditData?: typeof editData,
     newDeletedCl?: Set<number>,
     newDeletedNo?: Set<number>,
-  ) => {
-    if (!onMelhoriasChange) return
+  ): MelhoriaMinuta => {
     const ed = newEditData ?? editData
     const delCl = newDeletedCl ?? deletedClausulas
     const delNo = newDeletedNo ?? deletedNovas
 
-    const edited: MelhoriaMinuta = {
+    return {
       ...melhorias,
       clausulas_melhoradas: melhorias.clausulas_melhoradas
         .filter((_, i) => !delCl.has(i))
@@ -664,7 +665,33 @@ function MelhoriasPanel({ melhorias, scoreOriginal, onGerarMinuta, gerandoMinuta
           }
         }),
     }
+  }
+
+  // Notify parent of changes (for local state)
+  const propagateChanges = (
+    newEditData?: typeof editData,
+    newDeletedCl?: Set<number>,
+    newDeletedNo?: Set<number>,
+  ) => {
+    if (!onMelhoriasChange) return
+    onMelhoriasChange(buildEdited(newEditData, newDeletedCl, newDeletedNo))
+  }
+
+  // Explicit save: build final version + notify parent (which persists to Supabase)
+  const handleSave = () => {
+    if (!onMelhoriasChange) return
+    setSaving(true)
+    setSaveSuccess(false)
+    const edited = buildEdited()
     onMelhoriasChange(edited)
+    // Brief delay to show feedback, then exit editing mode
+    setTimeout(() => {
+      setSaving(false)
+      setSaveSuccess(true)
+      setEditing(false)
+      // Hide success after 3s
+      setTimeout(() => setSaveSuccess(false), 3000)
+    }, 400)
   }
 
   const handleDeleteClausula = (i: number) => {
@@ -952,20 +979,53 @@ function MelhoriasPanel({ melhorias, scoreOriginal, onGerarMinuta, gerandoMinuta
         </div>
       )}
 
+      {/* Save success feedback */}
+      {saveSuccess && (
+        <div className="px-5 py-2.5 border-t border-emerald-100 bg-emerald-50">
+          <div className="flex items-center gap-2">
+            <CheckCircle2 size={12} className="text-emerald-500" />
+            <p className="text-[10px] font-bold text-emerald-700">Edicoes salvas com sucesso!</p>
+          </div>
+        </div>
+      )}
+
       {/* Action Buttons */}
       <div className="px-5 py-4 border-t border-teal-100 bg-gradient-to-r from-white to-teal-50/30">
         <div className="flex items-center gap-2.5 flex-wrap">
-          {!pdfUrl && (
+          {!pdfUrl && editing && (
             <button
-              onClick={() => setEditing(v => !v)}
-              className={`flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-[11px] font-bold transition-all ${
-                editing
-                  ? 'bg-teal-600 text-white shadow-sm hover:bg-teal-700'
-                  : 'bg-white text-teal-700 border border-teal-200 hover:bg-teal-50 hover:border-teal-300 shadow-sm'
-              }`}
+              onClick={handleSave}
+              disabled={saving}
+              className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-[11px] font-bold transition-all
+                bg-teal-600 text-white shadow-sm hover:bg-teal-700 disabled:opacity-50"
+            >
+              {saving ? (
+                <><Loader2 size={12} className="animate-spin" /> Salvando...</>
+              ) : (
+                <><Check size={12} /> Salvar Edicoes</>
+              )}
+            </button>
+          )}
+
+          {!pdfUrl && editing && (
+            <button
+              onClick={() => setEditing(false)}
+              className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-[11px] font-bold transition-all
+                bg-white text-slate-500 border border-slate-200 hover:bg-slate-50 shadow-sm"
+            >
+              <X size={12} />
+              Cancelar
+            </button>
+          )}
+
+          {!pdfUrl && !editing && (
+            <button
+              onClick={() => setEditing(true)}
+              className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-[11px] font-bold transition-all
+                bg-white text-teal-700 border border-teal-200 hover:bg-teal-50 hover:border-teal-300 shadow-sm"
             >
               <Edit3 size={12} />
-              {editing ? 'Salvar Edicoes' : 'Editar Melhorias'}
+              Editar Melhorias
             </button>
           )}
 
@@ -1507,16 +1567,18 @@ export default function PreparaMinuta() {
     }
   }
 
-  const handleMelhoriasChange = (minutaId: string, edited: MelhoriaMinuta) => {
+  const handleMelhoriasChange = async (minutaId: string, edited: MelhoriaMinuta) => {
     setEditedMelhoriasMap(prev => ({ ...prev, [minutaId]: edited }))
     // Also persist to melhoriasMap so it's available for PDF generation
     setMelhoriasMap(prev => ({ ...prev, [minutaId]: edited }))
-    // Persist edited melhorias to Supabase (debounced by React batching)
-    supabase
+    // Persist edited melhorias to Supabase
+    const { error } = await supabase
       .from('con_minutas')
-      .update({ ai_melhorias: edited, ai_melhorado_em: new Date().toISOString() })
+      .update({ ai_melhorias: edited as unknown as Record<string, unknown>, ai_melhorado_em: new Date().toISOString() })
       .eq('id', minutaId)
-      .then(() => {}) // fire and forget
+    if (error) {
+      console.error('Erro ao salvar melhorias:', error)
+    }
   }
 
   const handleUpdateConfig = (ruleId: string, valor: string, ativo?: boolean) => {
