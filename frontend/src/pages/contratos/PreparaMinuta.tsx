@@ -5,7 +5,7 @@ import {
   ChevronRight, Clock, Tag, Building2, DollarSign, Calendar,
   Sparkles, ShieldAlert, Lightbulb, CheckCircle2, XCircle,
   AlertTriangle, ChevronDown, ChevronUp, Settings2, ToggleLeft, ToggleRight,
-  Loader2, Brain, Scale, FileSearch,
+  Loader2, Brain, Scale, FileSearch, FileUp, X,
 } from 'lucide-react'
 import {
   useSolicitacao,
@@ -15,6 +15,7 @@ import {
   useAnalisarMinuta,
   useConfigAnalise,
   useAtualizarConfigAnalise,
+  useUploadMinutaFile,
 } from '../../hooks/useSolicitacoes'
 import type { Minuta, TipoMinuta, StatusMinuta, MinutaAiAnalise, ConfigAnalise } from '../../types/contratos'
 
@@ -486,16 +487,18 @@ export default function PreparaMinuta() {
   const avancarEtapa = useAvancarEtapa()
   const analisarMinuta = useAnalisarMinuta()
   const atualizarConfig = useAtualizarConfigAnalise()
+  const uploadFile = useUploadMinutaFile()
 
   // Form state
   const [titulo, setTitulo] = useState('')
   const [tipo, setTipo] = useState<TipoMinuta>('rascunho')
   const [descricao, setDescricao] = useState('')
-  const [arquivoUrl, setArquivoUrl] = useState('')
-  const [arquivoNome, setArquivoNome] = useState('')
+  const [selectedFile, setSelectedFile] = useState<File | null>(null)
+  const [isDragOver, setIsDragOver] = useState(false)
   const [formError, setFormError] = useState('')
   const [showForm, setShowForm] = useState(false)
   const [analisandoId, setAnalisandoId] = useState<string | null>(null)
+  const [uploadProgress, setUploadProgress] = useState<'idle' | 'uploading' | 'done'>('idle')
 
   const isLoading = loadingSol || loadingMinutas
 
@@ -507,30 +510,68 @@ export default function PreparaMinuta() {
   const hasFinalMinuta = minutas.some(m => m.tipo === 'final')
   const nextVersion = minutas.length > 0 ? Math.max(...minutas.map(m => m.versao)) + 1 : 1
 
+  const ACCEPTED_TYPES = [
+    'application/pdf',
+    'application/msword',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    'application/vnd.oasis.opendocument.text',
+    'text/plain',
+  ]
+  const ACCEPT_EXT = '.pdf,.doc,.docx,.odt,.txt'
+  const MAX_SIZE_MB = 50
+
+  const handleFileDrop = (files: FileList | null) => {
+    if (!files || files.length === 0) return
+    const f = files[0]
+    if (f.size > MAX_SIZE_MB * 1024 * 1024) {
+      setFormError(`Arquivo muito grande (max ${MAX_SIZE_MB}MB)`)
+      return
+    }
+    setSelectedFile(f)
+    setFormError('')
+    // Auto-fill titulo if empty
+    if (!titulo.trim()) {
+      const nameNoExt = f.name.replace(/\.[^.]+$/, '').replace(/[_-]/g, ' ')
+      setTitulo(nameNoExt)
+    }
+  }
+
   const handleCriarMinuta = async () => {
     setFormError('')
     if (!titulo.trim()) return setFormError('Informe o titulo da minuta')
-    if (!arquivoUrl.trim()) return setFormError('Informe a URL do arquivo')
-    if (!arquivoNome.trim()) return setFormError('Informe o nome do arquivo')
+    if (!selectedFile) return setFormError('Selecione o arquivo da minuta')
 
     try {
+      setUploadProgress('uploading')
+
+      // 1. Upload file to Supabase Storage
+      const uploaded = await uploadFile.mutateAsync({
+        file: selectedFile,
+        solicitacaoId: id!,
+      })
+
+      setUploadProgress('done')
+
+      // 2. Create minuta record with uploaded URL
       await criarMinuta.mutateAsync({
         solicitacao_id: id!,
         titulo: titulo.trim(),
         tipo,
         descricao: descricao.trim() || undefined,
-        arquivo_url: arquivoUrl.trim(),
-        arquivo_nome: arquivoNome.trim(),
+        arquivo_url: uploaded.arquivo_url,
+        arquivo_nome: uploaded.arquivo_nome,
         versao: nextVersion,
       })
+
       // Reset form
       setTitulo('')
       setTipo('rascunho')
       setDescricao('')
-      setArquivoUrl('')
-      setArquivoNome('')
+      setSelectedFile(null)
+      setUploadProgress('idle')
       setShowForm(false)
     } catch (e: unknown) {
+      setUploadProgress('idle')
       setFormError(e instanceof Error ? e.message : 'Erro ao criar minuta')
     }
   }
@@ -737,6 +778,63 @@ export default function PreparaMinuta() {
                 </div>
               </div>
 
+              {/* Drag & Drop file zone */}
+              <div>
+                <label className={labelClass}>Arquivo da Minuta *</label>
+                {!selectedFile ? (
+                  <div
+                    onDragOver={e => { e.preventDefault(); setIsDragOver(true) }}
+                    onDragLeave={() => setIsDragOver(false)}
+                    onDrop={e => { e.preventDefault(); setIsDragOver(false); handleFileDrop(e.dataTransfer.files) }}
+                    onClick={() => {
+                      const inp = document.createElement('input')
+                      inp.type = 'file'
+                      inp.accept = ACCEPT_EXT
+                      inp.onchange = () => handleFileDrop(inp.files)
+                      inp.click()
+                    }}
+                    className={`flex flex-col items-center justify-center py-8 rounded-2xl border-2 border-dashed
+                      cursor-pointer transition-all ${
+                        isDragOver
+                          ? 'border-indigo-500 bg-indigo-50/60 scale-[1.01]'
+                          : 'border-slate-200 bg-slate-50/50 hover:border-indigo-300 hover:bg-indigo-50/30'
+                      }`}
+                  >
+                    <div className={`w-12 h-12 rounded-2xl flex items-center justify-center mb-3 transition-all ${
+                      isDragOver ? 'bg-indigo-100' : 'bg-white border border-slate-200'
+                    }`}>
+                      <FileUp size={20} className={isDragOver ? 'text-indigo-600' : 'text-slate-400'} />
+                    </div>
+                    <p className="text-sm font-bold text-slate-700">
+                      {isDragOver ? 'Solte o arquivo aqui' : 'Arraste o arquivo ou clique para selecionar'}
+                    </p>
+                    <p className="text-[10px] text-slate-400 mt-1">
+                      PDF, DOC, DOCX, ODT, TXT — max {MAX_SIZE_MB}MB
+                    </p>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-3 rounded-2xl bg-emerald-50 border border-emerald-200 px-4 py-3">
+                    <div className="w-10 h-10 rounded-xl bg-emerald-100 flex items-center justify-center shrink-0">
+                      <FileText size={16} className="text-emerald-600" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-bold text-emerald-800 truncate">{selectedFile.name}</p>
+                      <p className="text-[10px] text-emerald-600">
+                        {fmtBytes(selectedFile.size)} — {selectedFile.type || 'documento'}
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => { setSelectedFile(null); setUploadProgress('idle') }}
+                      className="w-7 h-7 rounded-lg bg-white border border-emerald-200 flex items-center
+                        justify-center text-emerald-600 hover:bg-red-50 hover:text-red-500 hover:border-red-200
+                        transition-all shrink-0"
+                    >
+                      <X size={12} />
+                    </button>
+                  </div>
+                )}
+              </div>
+
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="sm:col-span-2">
                   <label className={labelClass}>Titulo *</label>
@@ -760,25 +858,12 @@ export default function PreparaMinuta() {
                   </select>
                 </div>
                 <div>
-                  <label className={labelClass}>Nome do Arquivo *</label>
+                  <label className={labelClass}>Arquivo selecionado</label>
                   <input
-                    value={arquivoNome}
-                    onChange={e => setArquivoNome(e.target.value)}
-                    placeholder="minuta-v1.pdf"
-                    className={inputClass}
+                    value={selectedFile?.name ?? 'Nenhum arquivo'}
+                    disabled
+                    className={`${inputClass} bg-slate-50 text-slate-500`}
                   />
-                </div>
-                <div className="sm:col-span-2">
-                  <label className={labelClass}>URL do Arquivo *</label>
-                  <input
-                    value={arquivoUrl}
-                    onChange={e => setArquivoUrl(e.target.value)}
-                    placeholder="https://storage.example.com/minutas/arquivo.pdf"
-                    className={inputClass}
-                  />
-                  <p className="text-[10px] text-slate-400 mt-1">
-                    Upload de arquivo sera disponibilizado em breve. Por enquanto, cole a URL do documento.
-                  </p>
                 </div>
                 <div className="sm:col-span-2">
                   <label className={labelClass}>Descricao</label>
@@ -801,15 +886,27 @@ export default function PreparaMinuta() {
 
               <button
                 onClick={handleCriarMinuta}
-                disabled={criarMinuta.isPending}
+                disabled={criarMinuta.isPending || uploadProgress === 'uploading'}
                 className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-indigo-600
                   text-white text-sm font-bold hover:bg-indigo-700 transition-all shadow-sm
                   disabled:opacity-50"
               >
-                {criarMinuta.isPending
-                  ? <div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
-                  : <Plus size={14} />}
-                Adicionar Minuta
+                {uploadProgress === 'uploading' ? (
+                  <>
+                    <Loader2 size={14} className="animate-spin" />
+                    Enviando arquivo...
+                  </>
+                ) : criarMinuta.isPending ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+                    Salvando...
+                  </>
+                ) : (
+                  <>
+                    <Upload size={14} />
+                    Enviar Minuta
+                  </>
+                )}
               </button>
             </div>
           )}

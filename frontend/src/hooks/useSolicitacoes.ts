@@ -427,6 +427,35 @@ export function useAtualizarConfigAnalise() {
   })
 }
 
+// ── Upload Arquivo Minuta (Supabase Storage) ──────────────────────────────
+
+export function useUploadMinutaFile() {
+  return useMutation({
+    mutationFn: async ({ file, solicitacaoId }: { file: File; solicitacaoId: string }) => {
+      const ext = file.name.split('.').pop() ?? 'bin'
+      const ts = Date.now()
+      const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_')
+      const path = `minutas/${solicitacaoId}/${ts}_${safeName}`
+
+      const { error: uploadError } = await supabase.storage
+        .from('contratos-anexos')
+        .upload(path, file, { upsert: false, contentType: file.type })
+      if (uploadError) throw new Error('Falha no upload: ' + uploadError.message)
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('contratos-anexos')
+        .getPublicUrl(path)
+
+      return {
+        arquivo_url: publicUrl,
+        arquivo_nome: file.name,
+        mime_type: file.type,
+        tamanho_bytes: file.size,
+      }
+    },
+  })
+}
+
 export function useAnalisarMinuta() {
   const qc = useQueryClient()
   return useMutation<
