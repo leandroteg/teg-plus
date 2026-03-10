@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import {
   ArrowLeft, FileText, Plus, Upload, ExternalLink, Check,
@@ -6,6 +6,7 @@ import {
   Sparkles, ShieldAlert, Lightbulb, CheckCircle2, XCircle,
   AlertTriangle, ChevronDown, ChevronUp, Settings2, ToggleLeft, ToggleRight,
   Loader2, Brain, Scale, FileSearch, FileUp, X, Wand2,
+  TrendingUp, ArrowRight, Shield,
 } from 'lucide-react'
 import {
   useSolicitacao,
@@ -116,92 +117,212 @@ const CL_STATUS: Record<string, { label: string; bg: string; text: string; icon:
   ausente: { label: 'Ausente', bg: 'bg-slate-100',  text: 'text-slate-500',   icon: XCircle },
 }
 
-// ── AI Analysis Panel ───────────────────────────────────────────────────────
+// ── Score Ring SVG ──────────────────────────────────────────────────────────
 
-function AnalisePanel({ analise }: { analise: MinutaAiAnalise }) {
-  const [tab, setTab] = useState<'riscos' | 'sugestoes' | 'clausulas' | 'conformidade'>('riscos')
-  const sc = scoreColor(analise.score)
+function ScoreRing({ score, size = 56, strokeWidth = 5 }: { score: number; size?: number; strokeWidth?: number }) {
+  const sc = scoreColor(score)
+  const radius = (size - strokeWidth) / 2
+  const circumference = 2 * Math.PI * radius
+  const progress = (score / 100) * circumference
+  const colorMap: Record<string, string> = {
+    'bg-emerald-500': '#10b981',
+    'bg-amber-500': '#f59e0b',
+    'bg-red-500': '#ef4444',
+  }
+  const strokeColor = colorMap[sc.bg] || '#6366f1'
 
   return (
-    <div className="mt-3 rounded-2xl border border-indigo-100 bg-gradient-to-br from-indigo-50/50 to-white overflow-hidden">
-      {/* Score header */}
-      <div className="px-4 py-3 flex items-center gap-3 border-b border-indigo-100">
-        <div className={`w-11 h-11 rounded-xl ${sc.light} ring-2 ${sc.ring} flex items-center justify-center`}>
-          <span className={`text-base font-extrabold ${sc.text}`}>{analise.score}</span>
-        </div>
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-1.5">
-            <Brain size={12} className="text-indigo-500" />
-            <p className="text-xs font-extrabold text-slate-800">Analise por IA</p>
+    <div className="relative" style={{ width: size, height: size }}>
+      <svg width={size} height={size} className="-rotate-90">
+        <circle
+          cx={size / 2}
+          cy={size / 2}
+          r={radius}
+          fill="none"
+          stroke="currentColor"
+          strokeWidth={strokeWidth}
+          className="text-slate-100"
+        />
+        <circle
+          cx={size / 2}
+          cy={size / 2}
+          r={radius}
+          fill="none"
+          stroke={strokeColor}
+          strokeWidth={strokeWidth}
+          strokeDasharray={circumference}
+          strokeDashoffset={circumference - progress}
+          strokeLinecap="round"
+          className="transition-all duration-1000 ease-out"
+        />
+      </svg>
+      <div className="absolute inset-0 flex items-center justify-center">
+        <span className={`text-sm font-black ${sc.text}`}>{score}</span>
+      </div>
+    </div>
+  )
+}
+
+// ── Animated Score Badge ────────────────────────────────────────────────────
+
+function ScoreComparison({ before, after }: { before: number; after: number }) {
+  const diff = after - before
+  const bcol = scoreColor(before)
+  const acol = scoreColor(after)
+
+  return (
+    <div className="flex items-center gap-2">
+      <div className={`flex items-center gap-1 px-2 py-1 rounded-lg ${bcol.light}`}>
+        <span className={`text-[10px] font-bold ${bcol.text}`}>{before}</span>
+      </div>
+      <ArrowRight size={12} className="text-slate-400" />
+      <div className={`flex items-center gap-1 px-2 py-1 rounded-lg ${acol.light}`}>
+        <span className={`text-[10px] font-bold ${acol.text}`}>{after}</span>
+      </div>
+      {diff > 0 && (
+        <span className="flex items-center gap-0.5 text-[9px] font-bold text-emerald-600 bg-emerald-50 rounded-full px-1.5 py-0.5">
+          <TrendingUp size={9} />
+          +{diff}
+        </span>
+      )}
+    </div>
+  )
+}
+
+// ── AI Analysis Panel ───────────────────────────────────────────────────────
+
+function AnalisePanel({ analise, onMelhorar, melhorando }: {
+  analise: MinutaAiAnalise
+  onMelhorar?: () => void
+  melhorando?: boolean
+}) {
+  const [tab, setTab] = useState<'riscos' | 'sugestoes' | 'clausulas' | 'conformidade'>('riscos')
+
+  const nRiscos = analise.riscos?.length ?? 0
+  const nSugestoes = analise.sugestoes?.length ?? 0
+  const nClausulas = analise.clausulas_analisadas?.length ?? 0
+  const conformEntries = analise.conformidade ? Object.entries(analise.conformidade) : []
+  const conformOk = conformEntries.filter(([, v]) => v).length
+  const conformTotal = conformEntries.length
+
+  return (
+    <div className="mt-4 rounded-2xl border border-indigo-100 bg-white overflow-hidden shadow-sm">
+      {/* Hero header with score ring */}
+      <div className="bg-gradient-to-r from-indigo-600 via-violet-600 to-purple-600 px-5 py-4">
+        <div className="flex items-center gap-4">
+          <div className="bg-white/15 backdrop-blur-sm rounded-2xl p-2">
+            <ScoreRing score={analise.score} size={64} strokeWidth={5} />
           </div>
-          {analise.resumo && (
-            <p className="text-[11px] text-slate-500 mt-0.5 line-clamp-2 leading-snug">{analise.resumo}</p>
-          )}
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 mb-1">
+              <Brain size={14} className="text-white/80" />
+              <p className="text-sm font-extrabold text-white">Analise Juridica por IA</p>
+            </div>
+            {analise.resumo && (
+              <p className="text-[11px] text-white/75 leading-snug line-clamp-2">{analise.resumo}</p>
+            )}
+            {/* Metric pills */}
+            <div className="flex flex-wrap items-center gap-1.5 mt-2">
+              <span className="flex items-center gap-1 text-[9px] font-bold bg-white/20 text-white rounded-full px-2 py-0.5 backdrop-blur-sm">
+                <ShieldAlert size={9} /> {nRiscos} risco{nRiscos !== 1 ? 's' : ''}
+              </span>
+              <span className="flex items-center gap-1 text-[9px] font-bold bg-white/20 text-white rounded-full px-2 py-0.5 backdrop-blur-sm">
+                <Lightbulb size={9} /> {nSugestoes} sugestao{nSugestoes !== 1 ? 'es' : ''}
+              </span>
+              <span className="flex items-center gap-1 text-[9px] font-bold bg-white/20 text-white rounded-full px-2 py-0.5 backdrop-blur-sm">
+                <FileSearch size={9} /> {nClausulas} clausula{nClausulas !== 1 ? 's' : ''}
+              </span>
+              {conformTotal > 0 && (
+                <span className="flex items-center gap-1 text-[9px] font-bold bg-white/20 text-white rounded-full px-2 py-0.5 backdrop-blur-sm">
+                  <Shield size={9} /> {conformOk}/{conformTotal} conforme
+                </span>
+              )}
+            </div>
+          </div>
         </div>
-        <div className="flex flex-col items-end gap-0.5 shrink-0">
-          <span className="text-[10px] font-bold text-red-600 bg-red-50 rounded-full px-2 py-0.5">
-            {analise.riscos?.length ?? 0} riscos
-          </span>
-          <span className="text-[10px] font-bold text-amber-600 bg-amber-50 rounded-full px-2 py-0.5">
-            {analise.sugestoes?.length ?? 0} sugestoes
-          </span>
-        </div>
+
+        {/* CTA for improvement */}
+        {onMelhorar && (
+          <button
+            onClick={onMelhorar}
+            disabled={melhorando}
+            className="mt-3 w-full flex items-center justify-center gap-2 py-2.5 rounded-xl
+              bg-white/20 hover:bg-white/30 backdrop-blur-sm text-white text-xs font-bold
+              transition-all disabled:opacity-50 border border-white/20"
+          >
+            {melhorando ? (
+              <><Loader2 size={13} className="animate-spin" /> Melhorando minuta com IA...</>
+            ) : (
+              <><Wand2 size={13} /> Melhorar minuta com base nesta analise</>
+            )}
+          </button>
+        )}
       </div>
 
       {/* Tabs */}
-      <div className="flex border-b border-indigo-100 px-2">
+      <div className="flex border-b border-slate-100 px-1 bg-slate-50/50">
         {([
-          { key: 'riscos' as const, label: 'Riscos', icon: ShieldAlert, count: analise.riscos?.length },
-          { key: 'sugestoes' as const, label: 'Sugestoes', icon: Lightbulb, count: analise.sugestoes?.length },
-          { key: 'clausulas' as const, label: 'Clausulas', icon: FileSearch, count: analise.clausulas_analisadas?.length },
-          { key: 'conformidade' as const, label: 'Conformidade', icon: Scale, count: undefined as number | undefined },
+          { key: 'riscos' as const, label: 'Riscos', icon: ShieldAlert, count: nRiscos, accent: 'red' },
+          { key: 'sugestoes' as const, label: 'Sugestoes', icon: Lightbulb, count: nSugestoes, accent: 'amber' },
+          { key: 'clausulas' as const, label: 'Clausulas', icon: FileSearch, count: nClausulas, accent: 'blue' },
+          { key: 'conformidade' as const, label: 'Conformidade', icon: Scale, count: conformTotal || undefined, accent: 'emerald' },
         ]).map(t => (
           <button
             key={t.key}
             onClick={() => setTab(t.key)}
-            className={`flex items-center gap-1 px-3 py-2 text-[10px] font-bold border-b-2 transition-all ${
+            className={`flex items-center gap-1 px-3 py-2.5 text-[10px] font-bold border-b-2 transition-all ${
               tab === t.key
-                ? 'border-indigo-500 text-indigo-700'
+                ? 'border-indigo-500 text-indigo-700 bg-white'
                 : 'border-transparent text-slate-400 hover:text-slate-600'
             }`}
           >
             <t.icon size={10} />
             {t.label}
             {t.count != null && (
-              <span className="bg-slate-100 rounded-full px-1.5 text-[9px]">{t.count}</span>
+              <span className={`rounded-full px-1.5 text-[9px] ${
+                tab === t.key ? 'bg-indigo-100 text-indigo-600' : 'bg-slate-100 text-slate-500'
+              }`}>{t.count}</span>
             )}
           </button>
         ))}
       </div>
 
       {/* Tab content */}
-      <div className="p-3 max-h-80 overflow-y-auto">
+      <div className="p-4 max-h-96 overflow-y-auto">
         {tab === 'riscos' && (
           <div className="space-y-2">
-            {(analise.riscos ?? []).length === 0 ? (
-              <p className="text-[11px] text-slate-400 text-center py-4">Nenhum risco identificado</p>
+            {nRiscos === 0 ? (
+              <div className="text-center py-6">
+                <CheckCircle2 size={24} className="text-emerald-400 mx-auto mb-2" />
+                <p className="text-xs text-slate-500 font-medium">Nenhum risco identificado</p>
+              </div>
             ) : analise.riscos.map((r, i) => {
               const sev = SEV_CONFIG[r.severidade] ?? SEV_CONFIG.baixo
               const Icon = sev.icon
               return (
-                <div key={i} className={`rounded-xl ${sev.bg} p-3`}>
-                  <div className="flex items-start gap-2">
-                    <Icon size={13} className={sev.text} />
+                <div key={i} className={`rounded-xl border ${sev.bg} p-3.5 border-opacity-50`}
+                  style={{ borderColor: `var(--tw-${sev.text}-opacity, rgba(0,0,0,0.1))` }}
+                >
+                  <div className="flex items-start gap-2.5">
+                    <div className={`w-7 h-7 rounded-lg ${sev.bg} flex items-center justify-center shrink-0 mt-0.5`}>
+                      <Icon size={14} className={sev.text} />
+                    </div>
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-1.5">
+                      <div className="flex items-center gap-1.5 flex-wrap">
                         <p className={`text-[11px] font-bold ${sev.text}`}>{r.titulo}</p>
                         <span className={`text-[9px] font-semibold ${sev.bg} ${sev.text} border rounded-full px-1.5 py-0.5`}>
                           {sev.label}
                         </span>
                       </div>
-                      <p className="text-[10px] text-slate-600 mt-1 leading-snug">{r.descricao}</p>
+                      <p className="text-[10px] text-slate-600 mt-1 leading-relaxed">{r.descricao}</p>
                       {r.clausula_ref && (
                         <p className="text-[9px] text-slate-400 mt-1 font-mono">Ref: {r.clausula_ref}</p>
                       )}
                       {r.sugestao_mitigacao && (
-                        <p className="text-[10px] text-emerald-700 mt-1.5 bg-emerald-50 rounded-lg px-2 py-1">
-                          Mitigacao: {r.sugestao_mitigacao}
-                        </p>
+                        <div className="mt-2 flex items-start gap-1.5 bg-emerald-50 rounded-lg px-2.5 py-2 border border-emerald-100">
+                          <Lightbulb size={10} className="text-emerald-600 shrink-0 mt-0.5" />
+                          <p className="text-[10px] text-emerald-700 leading-snug">{r.sugestao_mitigacao}</p>
+                        </div>
                       )}
                     </div>
                   </div>
@@ -213,23 +334,26 @@ function AnalisePanel({ analise }: { analise: MinutaAiAnalise }) {
 
         {tab === 'sugestoes' && (
           <div className="space-y-2">
-            {(analise.sugestoes ?? []).length === 0 ? (
-              <p className="text-[11px] text-slate-400 text-center py-4">Nenhuma sugestao</p>
+            {nSugestoes === 0 ? (
+              <div className="text-center py-6">
+                <CheckCircle2 size={24} className="text-emerald-400 mx-auto mb-2" />
+                <p className="text-xs text-slate-500 font-medium">Nenhuma sugestao adicional</p>
+              </div>
             ) : analise.sugestoes.map((s, i) => {
               const pr = PRIO_CONFIG[s.prioridade] ?? PRIO_CONFIG.baixa
               return (
-                <div key={i} className={`rounded-xl ${pr.bg} p-3`}>
-                  <div className="flex items-center gap-1.5">
+                <div key={i} className={`rounded-xl border ${pr.bg} p-3.5`}>
+                  <div className="flex items-center gap-1.5 flex-wrap">
                     <Lightbulb size={11} className={pr.text} />
                     <p className={`text-[11px] font-bold ${pr.text}`}>{s.titulo}</p>
                     <span className={`text-[9px] font-semibold rounded-full px-1.5 py-0.5 ${pr.bg} ${pr.text} border`}>
                       {pr.label}
                     </span>
                   </div>
-                  <p className="text-[10px] text-slate-600 mt-1 leading-snug">{s.descricao}</p>
+                  <p className="text-[10px] text-slate-600 mt-1.5 leading-relaxed">{s.descricao}</p>
                   {s.texto_sugerido && (
-                    <div className="mt-2 bg-white/60 rounded-lg px-2.5 py-1.5 border border-slate-200">
-                      <p className="text-[9px] text-slate-400 font-semibold uppercase mb-0.5">Texto sugerido</p>
+                    <div className="mt-2.5 bg-white/70 rounded-lg px-3 py-2 border border-slate-200">
+                      <p className="text-[9px] text-indigo-500 font-bold uppercase mb-0.5">Texto sugerido</p>
                       <p className="text-[10px] text-slate-700 italic leading-snug">{s.texto_sugerido}</p>
                     </div>
                   )}
@@ -241,14 +365,19 @@ function AnalisePanel({ analise }: { analise: MinutaAiAnalise }) {
 
         {tab === 'clausulas' && (
           <div className="space-y-1.5">
-            {(analise.clausulas_analisadas ?? []).length === 0 ? (
-              <p className="text-[11px] text-slate-400 text-center py-4">Nenhuma clausula analisada</p>
+            {nClausulas === 0 ? (
+              <div className="text-center py-6">
+                <FileSearch size={24} className="text-slate-300 mx-auto mb-2" />
+                <p className="text-xs text-slate-500 font-medium">Nenhuma clausula analisada</p>
+              </div>
             ) : analise.clausulas_analisadas!.map((c, i) => {
               const st = CL_STATUS[c.status] ?? CL_STATUS.ok
               const Icon = st.icon
               return (
-                <div key={i} className={`flex items-start gap-2 rounded-xl ${st.bg} px-3 py-2`}>
-                  <Icon size={12} className={`${st.text} mt-0.5 shrink-0`} />
+                <div key={i} className={`flex items-start gap-2.5 rounded-xl ${st.bg} px-3.5 py-2.5 border`}>
+                  <div className={`w-6 h-6 rounded-md ${st.bg} flex items-center justify-center shrink-0 mt-0.5`}>
+                    <Icon size={12} className={st.text} />
+                  </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-1.5">
                       <p className={`text-[11px] font-bold ${st.text}`}>{c.nome}</p>
@@ -266,22 +395,25 @@ function AnalisePanel({ analise }: { analise: MinutaAiAnalise }) {
 
         {tab === 'conformidade' && (
           <div className="grid grid-cols-2 gap-2">
-            {analise.conformidade ? Object.entries(analise.conformidade).map(([key, val]) => {
+            {conformTotal > 0 ? conformEntries.map(([key, val]) => {
               const label = key.replace(/_/g, ' ').replace(/^\w/, c => c.toUpperCase())
               return (
-                <div key={key} className={`flex items-center gap-2 rounded-xl px-3 py-2 ${
-                  val ? 'bg-emerald-50' : 'bg-red-50'
+                <div key={key} className={`flex items-center gap-2.5 rounded-xl px-3.5 py-2.5 border ${
+                  val ? 'bg-emerald-50 border-emerald-100' : 'bg-red-50 border-red-100'
                 }`}>
                   {val
-                    ? <CheckCircle2 size={13} className="text-emerald-600 shrink-0" />
-                    : <XCircle size={13} className="text-red-500 shrink-0" />}
+                    ? <CheckCircle2 size={14} className="text-emerald-600 shrink-0" />
+                    : <XCircle size={14} className="text-red-500 shrink-0" />}
                   <p className={`text-[10px] font-semibold ${val ? 'text-emerald-700' : 'text-red-700'}`}>
                     {label}
                   </p>
                 </div>
               )
             }) : (
-              <p className="text-[11px] text-slate-400 col-span-2 text-center py-4">Sem dados de conformidade</p>
+              <div className="col-span-2 text-center py-6">
+                <Scale size={24} className="text-slate-300 mx-auto mb-2" />
+                <p className="text-xs text-slate-500 font-medium">Sem dados de conformidade</p>
+              </div>
             )}
           </div>
         )}
@@ -380,77 +512,103 @@ function RegrasConfig({ regras, onUpdate }: {
 
 // ── Melhorias Panel ──────────────────────────────────────────────────────────
 
-function MelhoriasPanel({ melhorias }: { melhorias: MelhoriaMinuta }) {
+function MelhoriasPanel({ melhorias, scoreOriginal }: { melhorias: MelhoriaMinuta; scoreOriginal?: number }) {
   const [tab, setTab] = useState<'clausulas' | 'riscos' | 'novas'>('clausulas')
-  const sc = scoreColor(melhorias.score_estimado)
+
+  const nMelhoradas = melhorias.clausulas_melhoradas?.length ?? 0
+  const nMitigados = melhorias.riscos_mitigados?.length ?? 0
+  const nNovas = melhorias.clausulas_novas?.length ?? 0
 
   return (
-    <div className="mt-3 rounded-2xl border border-teal-100 bg-gradient-to-br from-teal-50/50 to-white overflow-hidden">
-      {/* Score header */}
-      <div className="px-4 py-3 flex items-center gap-3 border-b border-teal-100">
-        <div className={`w-11 h-11 rounded-xl ${sc.light} ring-2 ${sc.ring} flex items-center justify-center`}>
-          <span className={`text-base font-extrabold ${sc.text}`}>{melhorias.score_estimado}</span>
-        </div>
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-1.5">
-            <Wand2 size={12} className="text-teal-500" />
-            <p className="text-xs font-extrabold text-slate-800">Melhorias por IA</p>
+    <div className="mt-4 rounded-2xl border border-teal-100 bg-white overflow-hidden shadow-sm">
+      {/* Hero header */}
+      <div className="bg-gradient-to-r from-teal-600 via-emerald-600 to-cyan-600 px-5 py-4">
+        <div className="flex items-center gap-4">
+          <div className="bg-white/15 backdrop-blur-sm rounded-2xl p-2">
+            <ScoreRing score={melhorias.score_estimado} size={64} strokeWidth={5} />
           </div>
-          <p className="text-[11px] text-slate-500 mt-0.5 line-clamp-2 leading-snug">{melhorias.resumo_melhorias}</p>
-        </div>
-        <div className="flex flex-col items-end gap-0.5 shrink-0">
-          <span className="text-[10px] font-bold text-teal-600 bg-teal-50 rounded-full px-2 py-0.5">
-            {melhorias.clausulas_melhoradas?.length ?? 0} melhoradas
-          </span>
-          <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 rounded-full px-2 py-0.5">
-            {melhorias.clausulas_novas?.length ?? 0} novas
-          </span>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 mb-1">
+              <Wand2 size={14} className="text-white/80" />
+              <p className="text-sm font-extrabold text-white">Melhorias pela IA</p>
+            </div>
+            <p className="text-[11px] text-white/75 leading-snug line-clamp-2">{melhorias.resumo_melhorias}</p>
+            {/* Score comparison + metric pills */}
+            <div className="flex flex-wrap items-center gap-1.5 mt-2">
+              {scoreOriginal != null && (
+                <span className="flex items-center gap-1 text-[9px] font-bold bg-white/20 text-white rounded-full px-2 py-0.5 backdrop-blur-sm">
+                  <TrendingUp size={9} /> {scoreOriginal} → {melhorias.score_estimado}
+                  {melhorias.score_estimado > scoreOriginal && (
+                    <span className="text-emerald-200">+{melhorias.score_estimado - scoreOriginal}</span>
+                  )}
+                </span>
+              )}
+              <span className="flex items-center gap-1 text-[9px] font-bold bg-white/20 text-white rounded-full px-2 py-0.5 backdrop-blur-sm">
+                <Wand2 size={9} /> {nMelhoradas} melhorada{nMelhoradas !== 1 ? 's' : ''}
+              </span>
+              <span className="flex items-center gap-1 text-[9px] font-bold bg-white/20 text-white rounded-full px-2 py-0.5 backdrop-blur-sm">
+                <Shield size={9} /> {nMitigados} mitigado{nMitigados !== 1 ? 's' : ''}
+              </span>
+              {nNovas > 0 && (
+                <span className="flex items-center gap-1 text-[9px] font-bold bg-white/20 text-white rounded-full px-2 py-0.5 backdrop-blur-sm">
+                  <Plus size={9} /> {nNovas} nova{nNovas !== 1 ? 's' : ''}
+                </span>
+              )}
+            </div>
+          </div>
         </div>
       </div>
 
       {/* Tabs */}
-      <div className="flex border-b border-teal-100 px-2">
+      <div className="flex border-b border-slate-100 px-1 bg-slate-50/50">
         {([
-          { key: 'clausulas' as const, label: 'Melhoradas', count: melhorias.clausulas_melhoradas?.length },
-          { key: 'riscos' as const, label: 'Riscos Mitigados', count: melhorias.riscos_mitigados?.length },
-          { key: 'novas' as const, label: 'Novas Clausulas', count: melhorias.clausulas_novas?.length },
+          { key: 'clausulas' as const, label: 'Melhoradas', count: nMelhoradas },
+          { key: 'riscos' as const, label: 'Riscos Mitigados', count: nMitigados },
+          { key: 'novas' as const, label: 'Novas Clausulas', count: nNovas },
         ]).map(t => (
           <button
             key={t.key}
             onClick={() => setTab(t.key)}
-            className={`flex items-center gap-1 px-3 py-2 text-[10px] font-bold border-b-2 transition-all ${
+            className={`flex items-center gap-1 px-3 py-2.5 text-[10px] font-bold border-b-2 transition-all ${
               tab === t.key
-                ? 'border-teal-500 text-teal-700'
+                ? 'border-teal-500 text-teal-700 bg-white'
                 : 'border-transparent text-slate-400 hover:text-slate-600'
             }`}
           >
             {t.label}
             {t.count != null && (
-              <span className="bg-slate-100 rounded-full px-1.5 text-[9px]">{t.count}</span>
+              <span className={`rounded-full px-1.5 text-[9px] ${
+                tab === t.key ? 'bg-teal-100 text-teal-600' : 'bg-slate-100 text-slate-500'
+              }`}>{t.count}</span>
             )}
           </button>
         ))}
       </div>
 
       {/* Tab content */}
-      <div className="p-3 max-h-96 overflow-y-auto">
+      <div className="p-4 max-h-96 overflow-y-auto">
         {tab === 'clausulas' && (
-          <div className="space-y-2">
-            {(melhorias.clausulas_melhoradas ?? []).length === 0 ? (
-              <p className="text-[11px] text-slate-400 text-center py-4">Nenhuma clausula melhorada</p>
+          <div className="space-y-2.5">
+            {nMelhoradas === 0 ? (
+              <div className="text-center py-6">
+                <FileSearch size={24} className="text-slate-300 mx-auto mb-2" />
+                <p className="text-xs text-slate-500 font-medium">Nenhuma clausula melhorada</p>
+              </div>
             ) : melhorias.clausulas_melhoradas.map((c, i) => (
-              <div key={i} className="rounded-xl bg-teal-50 border border-teal-100 p-3">
-                <div className="flex items-center gap-1.5 mb-1.5">
-                  <Wand2 size={10} className="text-teal-600" />
+              <div key={i} className="rounded-xl bg-teal-50 border border-teal-100 p-3.5">
+                <div className="flex items-center gap-1.5 mb-2">
+                  <div className="w-6 h-6 rounded-md bg-teal-100 flex items-center justify-center shrink-0">
+                    <Wand2 size={11} className="text-teal-600" />
+                  </div>
                   <p className="text-[11px] font-bold text-teal-800">{c.nome}</p>
                   <span className="text-[9px] font-semibold bg-teal-100 text-teal-600 rounded-full px-1.5 py-0.5">
                     {c.acao}
                   </span>
                 </div>
-                <p className="text-[10px] text-slate-500 italic mb-2">{c.justificativa}</p>
-                <div className="bg-white/70 rounded-lg px-3 py-2 border border-teal-100">
+                <p className="text-[10px] text-slate-500 italic mb-2.5 leading-relaxed">{c.justificativa}</p>
+                <div className="bg-white/80 rounded-lg px-3 py-2.5 border border-teal-100">
                   <p className="text-[9px] text-teal-600 font-bold uppercase mb-1">Texto Melhorado</p>
-                  <p className="text-[10px] text-slate-700 leading-snug whitespace-pre-wrap">{c.texto_melhorado}</p>
+                  <p className="text-[10px] text-slate-700 leading-relaxed whitespace-pre-wrap">{c.texto_melhorado}</p>
                 </div>
               </div>
             ))}
@@ -458,44 +616,54 @@ function MelhoriasPanel({ melhorias }: { melhorias: MelhoriaMinuta }) {
         )}
 
         {tab === 'riscos' && (
-          <div className="space-y-2">
-            {(melhorias.riscos_mitigados ?? []).length === 0 ? (
-              <p className="text-[11px] text-slate-400 text-center py-4">Nenhum risco mitigado</p>
+          <div className="space-y-2.5">
+            {nMitigados === 0 ? (
+              <div className="text-center py-6">
+                <Shield size={24} className="text-slate-300 mx-auto mb-2" />
+                <p className="text-xs text-slate-500 font-medium">Nenhum risco mitigado</p>
+              </div>
             ) : melhorias.riscos_mitigados.map((r, i) => (
-              <div key={i} className="rounded-xl bg-emerald-50 border border-emerald-100 p-3">
-                <p className="text-[11px] font-bold text-emerald-800">{r.risco_original}</p>
-                <div className="flex items-center gap-2 mt-1">
-                  <span className="text-[9px] font-bold text-red-600 bg-red-50 rounded-full px-1.5 py-0.5">
+              <div key={i} className="rounded-xl bg-emerald-50 border border-emerald-100 p-3.5">
+                <p className="text-[11px] font-bold text-emerald-800 mb-1.5">{r.risco_original}</p>
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="text-[9px] font-bold text-red-600 bg-red-50 rounded-full px-2 py-0.5 border border-red-100">
                     {r.severidade_original}
                   </span>
-                  <ChevronRight size={10} className="text-slate-400" />
-                  <span className="text-[9px] font-bold text-emerald-600 bg-emerald-100 rounded-full px-1.5 py-0.5">
+                  <ArrowRight size={11} className="text-emerald-400" />
+                  <span className="text-[9px] font-bold text-emerald-600 bg-emerald-100 rounded-full px-2 py-0.5 border border-emerald-200">
                     {r.severidade_apos}
                   </span>
                 </div>
-                <p className="text-[10px] text-slate-600 mt-1.5 leading-snug">{r.acao_tomada}</p>
+                <p className="text-[10px] text-slate-600 leading-relaxed">{r.acao_tomada}</p>
               </div>
             ))}
           </div>
         )}
 
         {tab === 'novas' && (
-          <div className="space-y-2">
-            {(melhorias.clausulas_novas ?? []).length === 0 ? (
-              <p className="text-[11px] text-slate-400 text-center py-4">Nenhuma clausula nova sugerida</p>
+          <div className="space-y-2.5">
+            {nNovas === 0 ? (
+              <div className="text-center py-6">
+                <Plus size={24} className="text-slate-300 mx-auto mb-2" />
+                <p className="text-xs text-slate-500 font-medium">Nenhuma clausula nova sugerida</p>
+              </div>
             ) : melhorias.clausulas_novas.map((c, i) => (
-              <div key={i} className="rounded-xl bg-blue-50 border border-blue-100 p-3">
-                <div className="flex items-center gap-1.5 mb-1.5">
-                  <Plus size={10} className="text-blue-600" />
+              <div key={i} className="rounded-xl bg-blue-50 border border-blue-100 p-3.5">
+                <div className="flex items-center gap-1.5 mb-2">
+                  <div className="w-6 h-6 rounded-md bg-blue-100 flex items-center justify-center shrink-0">
+                    <Plus size={11} className="text-blue-600" />
+                  </div>
                   <p className="text-[11px] font-bold text-blue-800">{c.nome}</p>
                 </div>
-                <p className="text-[10px] text-slate-500 italic mb-1">{c.motivo}</p>
+                <p className="text-[10px] text-slate-500 italic mb-1.5 leading-relaxed">{c.motivo}</p>
                 {c.base_legal && (
-                  <p className="text-[9px] text-blue-500 font-mono mb-2">Base: {c.base_legal}</p>
+                  <p className="text-[9px] text-blue-500 font-mono mb-2.5 bg-blue-100/50 rounded-md px-2 py-1 inline-block">
+                    Base: {c.base_legal}
+                  </p>
                 )}
-                <div className="bg-white/70 rounded-lg px-3 py-2 border border-blue-100">
+                <div className="bg-white/80 rounded-lg px-3 py-2.5 border border-blue-100">
                   <p className="text-[9px] text-blue-600 font-bold uppercase mb-1">Texto da Clausula</p>
-                  <p className="text-[10px] text-slate-700 leading-snug whitespace-pre-wrap">{c.texto}</p>
+                  <p className="text-[10px] text-slate-700 leading-relaxed whitespace-pre-wrap">{c.texto}</p>
                 </div>
               </div>
             ))}
@@ -505,9 +673,14 @@ function MelhoriasPanel({ melhorias }: { melhorias: MelhoriaMinuta }) {
 
       {/* Observacoes */}
       {melhorias.observacoes_gerais && (
-        <div className="px-4 py-3 border-t border-teal-100 bg-slate-50/50">
-          <p className="text-[9px] text-slate-400 font-semibold uppercase mb-0.5">Observacoes do Revisor IA</p>
-          <p className="text-[10px] text-slate-600 leading-snug">{melhorias.observacoes_gerais}</p>
+        <div className="px-5 py-3.5 border-t border-teal-100 bg-gradient-to-r from-slate-50 to-teal-50/30">
+          <div className="flex items-start gap-2">
+            <Brain size={12} className="text-teal-500 shrink-0 mt-0.5" />
+            <div>
+              <p className="text-[9px] text-teal-500 font-bold uppercase mb-0.5">Observacoes do Revisor IA</p>
+              <p className="text-[10px] text-slate-600 leading-relaxed">{melhorias.observacoes_gerais}</p>
+            </div>
+          </div>
         </div>
       )}
     </div>
@@ -516,136 +689,225 @@ function MelhoriasPanel({ melhorias }: { melhorias: MelhoriaMinuta }) {
 
 // ── MinutaCard ───────────────────────────────────────────────────────────────
 
-function MinutaCard({ minuta, onAnalisar, onMelhorar, analisando, melhorando, melhorias }: {
+function MinutaCard({ minuta, onAnalisar, onMelhorar, analisando, melhorando, melhorias, analiseLocal, autoExpand }: {
   minuta: Minuta
   onAnalisar: (m: Minuta) => void
   onMelhorar: (m: Minuta) => void
   analisando: boolean
   melhorando: boolean
   melhorias?: MelhoriaMinuta | null
+  analiseLocal?: MinutaAiAnalise | null
+  autoExpand?: boolean
 }) {
   const [showAnalise, setShowAnalise] = useState(false)
   const [showMelhorias, setShowMelhorias] = useState(false)
-  const hasAnalise = minuta.ai_analise && typeof minuta.ai_analise.score === 'number'
+
+  // Use local analysis if available (instant), otherwise from Supabase
+  const analise = analiseLocal ?? minuta.ai_analise
+  const hasAnalise = analise && typeof analise.score === 'number'
+
+  // Auto-expand when analysis or melhorias arrive
+  useEffect(() => {
+    if (autoExpand && hasAnalise) setShowAnalise(true)
+  }, [autoExpand, hasAnalise])
+
+  useEffect(() => {
+    if (melhorias) setShowMelhorias(true)
+  }, [melhorias])
 
   return (
-    <div className="bg-white rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition-all p-4">
-      <div className="flex items-start gap-3">
-        <div className="w-10 h-10 rounded-xl bg-indigo-50 flex items-center justify-center shrink-0">
-          <FileText size={16} className="text-indigo-600" />
-        </div>
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center justify-between gap-2">
-            <p className="text-sm font-bold text-slate-800 truncate">{minuta.titulo}</p>
-            <span className="text-[10px] font-mono font-bold text-slate-400 bg-slate-50 rounded-full px-2 py-0.5 shrink-0">
-              v{minuta.versao}
-            </span>
-          </div>
-
-          <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
-            <TipoBadge tipo={minuta.tipo} />
-            <StatusBadge status={minuta.status} />
-          </div>
-
-          {minuta.descricao && (
-            <p className="text-[11px] text-slate-500 mt-2 line-clamp-2 leading-snug">{minuta.descricao}</p>
+    <div className={`bg-white rounded-2xl border shadow-sm hover:shadow-md transition-all overflow-hidden ${
+      hasAnalise ? 'border-indigo-200' : 'border-slate-200'
+    }`}>
+      {/* Card header */}
+      <div className="p-4 pb-0">
+        <div className="flex items-start gap-3">
+          {/* Icon / Score ring toggle */}
+          {hasAnalise ? (
+            <div className="shrink-0">
+              <ScoreRing score={analise!.score} size={44} strokeWidth={4} />
+            </div>
+          ) : (
+            <div className="w-10 h-10 rounded-xl bg-indigo-50 flex items-center justify-center shrink-0">
+              <FileText size={16} className="text-indigo-600" />
+            </div>
           )}
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-sm font-bold text-slate-800 truncate">{minuta.titulo}</p>
+              <span className="text-[10px] font-mono font-bold text-slate-400 bg-slate-50 rounded-full px-2 py-0.5 shrink-0">
+                v{minuta.versao}
+              </span>
+            </div>
 
-          <div className="flex items-center justify-between mt-3">
-            <a
-              href={minuta.arquivo_url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-indigo-600
-                hover:text-indigo-800 transition-colors group"
-            >
-              <ExternalLink size={11} className="group-hover:scale-110 transition-transform" />
-              {minuta.arquivo_nome}
-              {minuta.tamanho_bytes != null && (
-                <span className="text-slate-400 font-normal">({fmtBytes(minuta.tamanho_bytes)})</span>
+            <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
+              <TipoBadge tipo={minuta.tipo} />
+              <StatusBadge status={minuta.status} />
+              {hasAnalise && melhorias && (
+                <ScoreComparison before={analise!.score} after={melhorias.score_estimado} />
               )}
-            </a>
-            <p className="text-[10px] text-slate-400">{fmtDataHora(minuta.created_at)}</p>
-          </div>
+            </div>
 
-          {/* AI Action row */}
-          <div className="flex items-center gap-2 mt-3">
-            <button
-              onClick={() => onAnalisar(minuta)}
-              disabled={analisando}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[10px] font-bold
-                bg-gradient-to-r from-violet-600 to-indigo-600 text-white shadow-sm
-                hover:from-violet-700 hover:to-indigo-700 transition-all disabled:opacity-50"
-            >
-              {analisando
-                ? <Loader2 size={11} className="animate-spin" />
-                : <Sparkles size={11} />}
-              {analisando ? 'Analisando...' : hasAnalise ? 'Re-analisar com IA' : 'Analisar com IA'}
-            </button>
-
-            {hasAnalise && (
-              <>
-                <button
-                  onClick={() => onMelhorar(minuta)}
-                  disabled={melhorando || analisando}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[10px] font-bold
-                    bg-gradient-to-r from-teal-600 to-emerald-600 text-white shadow-sm
-                    hover:from-teal-700 hover:to-emerald-700 transition-all disabled:opacity-50"
-                >
-                  {melhorando
-                    ? <Loader2 size={11} className="animate-spin" />
-                    : <Wand2 size={11} />}
-                  {melhorando ? 'Melhorando...' : 'Melhorar com IA'}
-                </button>
-
-                <button
-                  onClick={() => setShowAnalise(v => !v)}
-                  className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-[10px] font-bold
-                    bg-indigo-50 text-indigo-600 hover:bg-indigo-100 transition-all"
-                >
-                  {showAnalise ? <ChevronUp size={10} /> : <ChevronDown size={10} />}
-                  {showAnalise ? 'Ocultar' : 'Ver Analise'}
-                  <span className={`ml-1 w-5 h-5 rounded-md flex items-center justify-center text-[9px] font-extrabold ${
-                    scoreColor(minuta.ai_analise!.score).light
-                  } ${scoreColor(minuta.ai_analise!.score).text}`}>
-                    {minuta.ai_analise!.score}
-                  </span>
-                </button>
-              </>
+            {minuta.descricao && (
+              <p className="text-[11px] text-slate-500 mt-2 line-clamp-2 leading-snug">{minuta.descricao}</p>
             )}
 
-            {melhorias && (
-              <button
-                onClick={() => setShowMelhorias(v => !v)}
-                className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-[10px] font-bold
-                  bg-teal-50 text-teal-600 hover:bg-teal-100 transition-all"
+            <div className="flex items-center justify-between mt-2.5">
+              <a
+                href={minuta.arquivo_url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-indigo-600
+                  hover:text-indigo-800 transition-colors group"
               >
-                {showMelhorias ? <ChevronUp size={10} /> : <ChevronDown size={10} />}
-                {showMelhorias ? 'Ocultar' : 'Ver Melhorias'}
-                <span className="ml-1 w-5 h-5 rounded-md flex items-center justify-center text-[9px] font-extrabold bg-teal-100 text-teal-700">
-                  {melhorias.score_estimado}
-                </span>
-              </button>
-            )}
-
-            {minuta.ai_analisado_em && (
-              <p className="text-[9px] text-slate-400 ml-auto">
-                Analisado: {fmtDataHora(minuta.ai_analisado_em)}
-              </p>
-            )}
+                <ExternalLink size={11} className="group-hover:scale-110 transition-transform" />
+                {minuta.arquivo_nome}
+                {minuta.tamanho_bytes != null && (
+                  <span className="text-slate-400 font-normal">({fmtBytes(minuta.tamanho_bytes)})</span>
+                )}
+              </a>
+              <p className="text-[10px] text-slate-400">{fmtDataHora(minuta.created_at)}</p>
+            </div>
           </div>
-
-          {/* Expanded analysis */}
-          {showAnalise && hasAnalise && (
-            <AnalisePanel analise={minuta.ai_analise!} />
-          )}
-
-          {/* Expanded melhorias */}
-          {showMelhorias && melhorias && (
-            <MelhoriasPanel melhorias={melhorias} />
-          )}
         </div>
       </div>
+
+      {/* AI status bar — shows inline summary when analyzed */}
+      {hasAnalise && !showAnalise && (
+        <div className="mx-4 mt-3 rounded-xl bg-gradient-to-r from-indigo-50 to-violet-50 border border-indigo-100 px-3.5 py-2.5">
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-1.5">
+              <Brain size={11} className="text-indigo-500" />
+              <span className="text-[10px] font-bold text-indigo-700">IA: Score {analise!.score}/100</span>
+            </div>
+            <span className="text-[10px] text-slate-500">•</span>
+            <span className="text-[10px] text-red-600 font-semibold">{analise!.riscos?.length ?? 0} riscos</span>
+            <span className="text-[10px] text-slate-500">•</span>
+            <span className="text-[10px] text-amber-600 font-semibold">{analise!.sugestoes?.length ?? 0} sugestoes</span>
+            {minuta.ai_analisado_em && (
+              <span className="text-[9px] text-slate-400 ml-auto">{fmtDataHora(minuta.ai_analisado_em)}</span>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Analyzing animation */}
+      {analisando && (
+        <div className="mx-4 mt-3 rounded-xl bg-gradient-to-r from-violet-50 to-indigo-50 border border-violet-200 px-4 py-3">
+          <div className="flex items-center gap-3">
+            <div className="relative">
+              <div className="w-10 h-10 rounded-xl bg-violet-100 flex items-center justify-center">
+                <Sparkles size={16} className="text-violet-600" />
+              </div>
+              <div className="absolute -top-0.5 -right-0.5 w-3 h-3 rounded-full bg-violet-500 animate-ping" />
+            </div>
+            <div className="flex-1">
+              <p className="text-xs font-bold text-violet-800">Analisando minuta com IA...</p>
+              <p className="text-[10px] text-violet-500 mt-0.5">Verificando clausulas, riscos, conformidade e sugestoes de melhoria</p>
+            </div>
+            <Loader2 size={18} className="text-violet-500 animate-spin" />
+          </div>
+          <div className="mt-2 h-1 rounded-full bg-violet-100 overflow-hidden">
+            <div className="h-full bg-gradient-to-r from-violet-500 to-indigo-500 rounded-full animate-pulse w-2/3" />
+          </div>
+        </div>
+      )}
+
+      {/* Melhorando animation */}
+      {melhorando && (
+        <div className="mx-4 mt-3 rounded-xl bg-gradient-to-r from-teal-50 to-emerald-50 border border-teal-200 px-4 py-3">
+          <div className="flex items-center gap-3">
+            <div className="relative">
+              <div className="w-10 h-10 rounded-xl bg-teal-100 flex items-center justify-center">
+                <Wand2 size={16} className="text-teal-600" />
+              </div>
+              <div className="absolute -top-0.5 -right-0.5 w-3 h-3 rounded-full bg-teal-500 animate-ping" />
+            </div>
+            <div className="flex-1">
+              <p className="text-xs font-bold text-teal-800">Melhorando minuta com IA...</p>
+              <p className="text-[10px] text-teal-500 mt-0.5">Reescrevendo clausulas, mitigando riscos e adicionando protecoes</p>
+            </div>
+            <Loader2 size={18} className="text-teal-500 animate-spin" />
+          </div>
+          <div className="mt-2 h-1 rounded-full bg-teal-100 overflow-hidden">
+            <div className="h-full bg-gradient-to-r from-teal-500 to-emerald-500 rounded-full animate-pulse w-2/3" />
+          </div>
+        </div>
+      )}
+
+      {/* Action buttons */}
+      <div className="px-4 py-3 flex items-center gap-2 flex-wrap">
+        {!analisando && (
+          <button
+            onClick={() => onAnalisar(minuta)}
+            disabled={analisando || melhorando}
+            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-[10px] font-bold
+              bg-gradient-to-r from-violet-600 to-indigo-600 text-white shadow-sm
+              hover:from-violet-700 hover:to-indigo-700 hover:shadow-md transition-all disabled:opacity-50"
+          >
+            <Sparkles size={11} />
+            {hasAnalise ? 'Re-analisar' : 'Analisar com IA'}
+          </button>
+        )}
+
+        {hasAnalise && !melhorando && (
+          <button
+            onClick={() => onMelhorar(minuta)}
+            disabled={melhorando || analisando}
+            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-[10px] font-bold
+              bg-gradient-to-r from-teal-600 to-emerald-600 text-white shadow-sm
+              hover:from-teal-700 hover:to-emerald-700 hover:shadow-md transition-all disabled:opacity-50"
+          >
+            <Wand2 size={11} />
+            {melhorias ? 'Re-melhorar' : 'Melhorar com IA'}
+          </button>
+        )}
+
+        {hasAnalise && (
+          <button
+            onClick={() => setShowAnalise(v => !v)}
+            className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-[10px] font-bold transition-all ${
+              showAnalise
+                ? 'bg-indigo-600 text-white shadow-sm'
+                : 'bg-indigo-50 text-indigo-600 hover:bg-indigo-100'
+            }`}
+          >
+            {showAnalise ? <ChevronUp size={10} /> : <ChevronDown size={10} />}
+            {showAnalise ? 'Ocultar Analise' : 'Ver Analise'}
+          </button>
+        )}
+
+        {melhorias && (
+          <button
+            onClick={() => setShowMelhorias(v => !v)}
+            className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-[10px] font-bold transition-all ${
+              showMelhorias
+                ? 'bg-teal-600 text-white shadow-sm'
+                : 'bg-teal-50 text-teal-600 hover:bg-teal-100'
+            }`}
+          >
+            {showMelhorias ? <ChevronUp size={10} /> : <ChevronDown size={10} />}
+            {showMelhorias ? 'Ocultar Melhorias' : 'Ver Melhorias'}
+          </button>
+        )}
+      </div>
+
+      {/* Expanded panels */}
+      {showAnalise && hasAnalise && (
+        <div className="px-4 pb-4">
+          <AnalisePanel
+            analise={analise!}
+            onMelhorar={!melhorias ? () => onMelhorar(minuta) : undefined}
+            melhorando={melhorando}
+          />
+        </div>
+      )}
+
+      {showMelhorias && melhorias && (
+        <div className="px-4 pb-4">
+          <MelhoriasPanel melhorias={melhorias} scoreOriginal={analise?.score} />
+        </div>
+      )}
     </div>
   )
 }
@@ -677,6 +939,8 @@ export default function PreparaMinuta() {
   const [analisandoId, setAnalisandoId] = useState<string | null>(null)
   const [melhorandoId, setMelhorandoId] = useState<string | null>(null)
   const [melhoriasMap, setMelhoriasMap] = useState<Record<string, MelhoriaMinuta>>({})
+  const [analiseMap, setAnaliseMap] = useState<Record<string, MinutaAiAnalise>>({})
+  const [autoExpandId, setAutoExpandId] = useState<string | null>(null)
   const [uploadProgress, setUploadProgress] = useState<'idle' | 'uploading' | 'done'>('idle')
 
   const isLoading = loadingSol || loadingMinutas
@@ -759,7 +1023,7 @@ export default function PreparaMinuta() {
     if (!solicitacao || analisandoId) return
     setAnalisandoId(minuta.id)
     try {
-      await analisarMinuta.mutateAsync({
+      const result = await analisarMinuta.mutateAsync({
         minuta_id: minuta.id,
         solicitacao_id: solicitacao.id,
         texto_minuta: minuta.descricao,
@@ -775,6 +1039,11 @@ export default function PreparaMinuta() {
         },
         regras: regras.filter(r => r.ativo),
       })
+      // Store analysis immediately in local state for instant display
+      if (result.success && result.analise) {
+        setAnaliseMap(prev => ({ ...prev, [minuta.id]: result.analise }))
+        setAutoExpandId(minuta.id)
+      }
     } catch {
       // Mutation error is handled by TanStack Query
     } finally {
@@ -1150,6 +1419,8 @@ export default function PreparaMinuta() {
                   analisando={analisandoId === m.id}
                   melhorando={melhorandoId === m.id}
                   melhorias={melhoriasMap[m.id]}
+                  analiseLocal={analiseMap[m.id]}
+                  autoExpand={autoExpandId === m.id}
                 />
               ))}
             </div>

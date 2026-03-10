@@ -605,13 +605,27 @@ export function useAnalisarMinuta() {
     }
   >({
     mutationFn: async (payload) => {
+      // 1. Call n8n webhook for AI analysis
       const res = await fetch(`${N8N_BASE}/contratos/analisar-minuta`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       })
       if (!res.ok) throw new Error(`Erro na analise: ${res.status}`)
-      return res.json()
+      const result = await res.json()
+
+      // 2. Save analysis result to Supabase
+      if (result.success && result.analise) {
+        await supabase
+          .from('con_minutas')
+          .update({
+            ai_analise: result.analise,
+            ai_analisado_em: new Date().toISOString(),
+          })
+          .eq('id', payload.minuta_id)
+      }
+
+      return result
     },
     onSuccess: (_d, vars) => {
       qc.invalidateQueries({ queryKey: ['con-minutas', vars.solicitacao_id] })
