@@ -4,9 +4,9 @@ import {
   Briefcase, Search, FileText, FileSignature, TrendingUp, CalendarClock,
   TrendingDown, Calendar, Building2, ChevronDown, ChevronUp,
   CalendarDays, CheckCircle2, XCircle, AlertTriangle, ArrowUpRight,
-  ArrowDownRight, Filter, Clock,
+  ArrowDownRight, Filter, Clock, Banknote, CreditCard,
 } from 'lucide-react'
-import { useContratos, useAditivos, useAtualizarAditivo, useReajustes } from '../../hooks/useContratos'
+import { useContratos, useAditivos, useAtualizarAditivo, useReajustes, useParcelas } from '../../hooks/useContratos'
 import { useAuth } from '../../contexts/AuthContext'
 import type { Contrato } from '../../types/contratos'
 import type { StatusAditivo, TipoAditivo } from '../../types/contratos'
@@ -25,13 +25,15 @@ const fmtPct = (v: number) =>
   `${v >= 0 ? '+' : ''}${v.toFixed(2)}%`
 
 // ── Tabs ────────────────────────────────────────────────────────────────────
-type Tab = 'contratos' | 'aditivos' | 'reajustes' | 'vencimentos'
+type Tab = 'contratos' | 'aditivos' | 'reajustes' | 'vencimentos' | 'recebiveis' | 'provisionado'
 
 const TABS: { key: Tab; label: string; icon: typeof FileText }[] = [
-  { key: 'contratos',   label: 'Contratos',   icon: FileText },
-  { key: 'aditivos',    label: 'Aditivos',    icon: FileSignature },
-  { key: 'reajustes',   label: 'Reajustes',   icon: TrendingUp },
-  { key: 'vencimentos', label: 'Vencimentos', icon: CalendarClock },
+  { key: 'contratos',    label: 'Contratos',    icon: FileText },
+  { key: 'recebiveis',   label: 'Recebiveis',   icon: Banknote },
+  { key: 'provisionado', label: 'Provisionado', icon: CreditCard },
+  { key: 'aditivos',     label: 'Aditivos',     icon: FileSignature },
+  { key: 'reajustes',    label: 'Reajustes',    icon: TrendingUp },
+  { key: 'vencimentos',  label: 'Vencimentos',  icon: CalendarClock },
 ]
 
 // ── Status configs ──────────────────────────────────────────────────────────
@@ -644,6 +646,250 @@ function TabVencimentos() {
   )
 }
 
+// ── Tab: Recebiveis (A Receber) ──────────────────────────────────────────────
+function TabRecebiveis() {
+  const [statusFilter, setStatusFilter] = useState('')
+  const { data: parcelas = [], isLoading } = useParcelas()
+
+  // Only receita parcels
+  const recebiveis = parcelas.filter(p => p.contrato?.tipo_contrato === 'receita')
+
+  const filtered = recebiveis.filter(p => {
+    if (statusFilter && p.status !== statusFilter) return false
+    return true
+  })
+
+  const totalEmAberto = recebiveis
+    .filter(p => p.status !== 'pago' && p.status !== 'cancelado')
+    .reduce((s, p) => s + p.valor, 0)
+  const totalRecebido = recebiveis
+    .filter(p => p.status === 'pago')
+    .reduce((s, p) => s + p.valor, 0)
+  const pendentes = recebiveis.filter(p => p.status === 'pendente' || p.status === 'liberado').length
+  const atrasadas = recebiveis.filter(p =>
+    p.status !== 'pago' && p.status !== 'cancelado' &&
+    new Date(p.data_vencimento).getTime() < Date.now()
+  ).length
+
+  const STATUS_PARCELA: Record<string, { label: string; dot: string; bg: string; text: string }> = {
+    previsto:  { label: 'Previsto',  dot: 'bg-slate-400',   bg: 'bg-slate-100',   text: 'text-slate-600' },
+    pendente:  { label: 'Pendente',  dot: 'bg-amber-400',   bg: 'bg-amber-50',    text: 'text-amber-700' },
+    liberado:  { label: 'Liberado',  dot: 'bg-blue-400',    bg: 'bg-blue-50',     text: 'text-blue-700' },
+    pago:      { label: 'Recebido',  dot: 'bg-emerald-500', bg: 'bg-emerald-50',  text: 'text-emerald-700' },
+    cancelado: { label: 'Cancelado', dot: 'bg-red-400',     bg: 'bg-red-50',      text: 'text-red-600' },
+  }
+
+  const FILTROS = [
+    { label: 'Todos', value: '' },
+    { label: 'Previsto', value: 'previsto' },
+    { label: 'Pendente', value: 'pendente' },
+    { label: 'Liberado', value: 'liberado' },
+    { label: 'Recebido', value: 'pago' },
+  ]
+
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <div className="bg-emerald-50 rounded-2xl border border-emerald-200 p-3 text-center">
+          <p className="text-[10px] font-bold text-emerald-600 uppercase">Em Aberto</p>
+          <p className="text-lg font-extrabold text-emerald-700 mt-1">{fmt(totalEmAberto)}</p>
+        </div>
+        <div className="bg-blue-50 rounded-2xl border border-blue-200 p-3 text-center">
+          <p className="text-[10px] font-bold text-blue-600 uppercase">Recebido</p>
+          <p className="text-lg font-extrabold text-blue-700 mt-1">{fmt(totalRecebido)}</p>
+        </div>
+        <div className="bg-amber-50 rounded-2xl border border-amber-200 p-3 text-center">
+          <p className="text-[10px] font-bold text-amber-600 uppercase">Pendentes</p>
+          <p className="text-xl font-extrabold text-amber-700 mt-1">{pendentes}</p>
+        </div>
+        <div className="bg-red-50 rounded-2xl border border-red-200 p-3 text-center">
+          <p className="text-[10px] font-bold text-red-500 uppercase">Atrasadas</p>
+          <p className="text-xl font-extrabold text-red-600 mt-1">{atrasadas}</p>
+        </div>
+      </div>
+
+      <div className="flex gap-1.5 overflow-x-auto hide-scrollbar">
+        {FILTROS.map(f => (
+          <button key={f.value} onClick={() => setStatusFilter(f.value)}
+            className={`px-3 py-2 rounded-xl text-[11px] font-semibold whitespace-nowrap transition-all
+              ${statusFilter === f.value
+                ? 'bg-emerald-600 text-white shadow-sm'
+                : 'bg-white text-slate-500 border border-slate-200'}`}>
+            {f.label}
+          </button>
+        ))}
+      </div>
+
+      {isLoading ? (
+        <div className="flex items-center justify-center py-16">
+          <div className="w-8 h-8 border-[3px] border-emerald-500 border-t-transparent rounded-full animate-spin" />
+        </div>
+      ) : filtered.length === 0 ? (
+        <div className="text-center py-16">
+          <div className="w-14 h-14 rounded-2xl bg-emerald-50 flex items-center justify-center mx-auto mb-3">
+            <Banknote size={24} className="text-emerald-300" />
+          </div>
+          <p className="text-sm font-semibold text-slate-500">Nenhum recebivel encontrado</p>
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {filtered.map(p => {
+            const sc = STATUS_PARCELA[p.status] ?? STATUS_PARCELA.previsto
+            const vencido = p.status !== 'pago' && p.status !== 'cancelado' && new Date(p.data_vencimento).getTime() < Date.now()
+            return (
+              <div key={p.id} className={`bg-white rounded-2xl border shadow-sm p-4 hover:shadow-md transition-all ${vencido ? 'border-red-200' : 'border-slate-200'}`}>
+                <div className="flex items-center gap-3">
+                  <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${vencido ? 'bg-red-50' : 'bg-emerald-50'}`}>
+                    {vencido ? <AlertTriangle size={16} className="text-red-500" /> : <TrendingUp size={16} className="text-emerald-600" />}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-sm font-bold text-slate-800 truncate">{p.contrato?.objeto ?? 'Parcela'}</p>
+                      <p className="text-sm font-extrabold text-emerald-600 shrink-0">{fmtFull(p.valor)}</p>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-1.5 mt-1 text-[10px]">
+                      <span className={`inline-flex items-center gap-1 rounded-full font-semibold px-2 py-0.5 ${sc.bg} ${sc.text}`}>
+                        <span className={`w-1.5 h-1.5 rounded-full ${sc.dot}`} />{sc.label}
+                      </span>
+                      <span className="bg-slate-100 text-slate-600 font-mono font-semibold rounded-full px-2 py-0.5">
+                        {p.contrato?.numero} — #{p.numero}
+                      </span>
+                      <span className="text-slate-400">Vence: {fmtData(p.data_vencimento)}</span>
+                      {vencido && <span className="text-red-500 font-bold">VENCIDO</span>}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ── Tab: Provisionado (A Pagar) ──────────────────────────────────────────────
+function TabProvisionado() {
+  const [statusFilter, setStatusFilter] = useState('')
+  const { data: parcelas = [], isLoading } = useParcelas()
+
+  // Only despesa parcels
+  const compromissos = parcelas.filter(p => p.contrato?.tipo_contrato === 'despesa')
+
+  const filtered = compromissos.filter(p => {
+    if (statusFilter && p.status !== statusFilter) return false
+    return true
+  })
+
+  const totalEmAberto = compromissos
+    .filter(p => p.status !== 'pago' && p.status !== 'cancelado')
+    .reduce((s, p) => s + p.valor, 0)
+  const totalPago = compromissos
+    .filter(p => p.status === 'pago')
+    .reduce((s, p) => s + p.valor, 0)
+  const pendentes = compromissos.filter(p => p.status === 'pendente' || p.status === 'liberado').length
+  const atrasadas = compromissos.filter(p =>
+    p.status !== 'pago' && p.status !== 'cancelado' &&
+    new Date(p.data_vencimento).getTime() < Date.now()
+  ).length
+
+  const STATUS_PARCELA: Record<string, { label: string; dot: string; bg: string; text: string }> = {
+    previsto:  { label: 'Previsto',  dot: 'bg-slate-400',   bg: 'bg-slate-100',   text: 'text-slate-600' },
+    pendente:  { label: 'Pendente',  dot: 'bg-amber-400',   bg: 'bg-amber-50',    text: 'text-amber-700' },
+    liberado:  { label: 'Liberado',  dot: 'bg-blue-400',    bg: 'bg-blue-50',     text: 'text-blue-700' },
+    pago:      { label: 'Pago',      dot: 'bg-emerald-500', bg: 'bg-emerald-50',  text: 'text-emerald-700' },
+    cancelado: { label: 'Cancelado', dot: 'bg-red-400',     bg: 'bg-red-50',      text: 'text-red-600' },
+  }
+
+  const FILTROS = [
+    { label: 'Todos', value: '' },
+    { label: 'Previsto', value: 'previsto' },
+    { label: 'Pendente', value: 'pendente' },
+    { label: 'Liberado', value: 'liberado' },
+    { label: 'Pago', value: 'pago' },
+  ]
+
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <div className="bg-amber-50 rounded-2xl border border-amber-200 p-3 text-center">
+          <p className="text-[10px] font-bold text-amber-600 uppercase">Compromissado</p>
+          <p className="text-lg font-extrabold text-amber-700 mt-1">{fmt(totalEmAberto)}</p>
+        </div>
+        <div className="bg-emerald-50 rounded-2xl border border-emerald-200 p-3 text-center">
+          <p className="text-[10px] font-bold text-emerald-600 uppercase">Pago</p>
+          <p className="text-lg font-extrabold text-emerald-700 mt-1">{fmt(totalPago)}</p>
+        </div>
+        <div className="bg-blue-50 rounded-2xl border border-blue-200 p-3 text-center">
+          <p className="text-[10px] font-bold text-blue-600 uppercase">Pendentes</p>
+          <p className="text-xl font-extrabold text-blue-700 mt-1">{pendentes}</p>
+        </div>
+        <div className="bg-red-50 rounded-2xl border border-red-200 p-3 text-center">
+          <p className="text-[10px] font-bold text-red-500 uppercase">Atrasados</p>
+          <p className="text-xl font-extrabold text-red-600 mt-1">{atrasadas}</p>
+        </div>
+      </div>
+
+      <div className="flex gap-1.5 overflow-x-auto hide-scrollbar">
+        {FILTROS.map(f => (
+          <button key={f.value} onClick={() => setStatusFilter(f.value)}
+            className={`px-3 py-2 rounded-xl text-[11px] font-semibold whitespace-nowrap transition-all
+              ${statusFilter === f.value
+                ? 'bg-amber-600 text-white shadow-sm'
+                : 'bg-white text-slate-500 border border-slate-200'}`}>
+            {f.label}
+          </button>
+        ))}
+      </div>
+
+      {isLoading ? (
+        <div className="flex items-center justify-center py-16">
+          <div className="w-8 h-8 border-[3px] border-amber-500 border-t-transparent rounded-full animate-spin" />
+        </div>
+      ) : filtered.length === 0 ? (
+        <div className="text-center py-16">
+          <div className="w-14 h-14 rounded-2xl bg-amber-50 flex items-center justify-center mx-auto mb-3">
+            <CreditCard size={24} className="text-amber-300" />
+          </div>
+          <p className="text-sm font-semibold text-slate-500">Nenhum compromisso encontrado</p>
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {filtered.map(p => {
+            const sc = STATUS_PARCELA[p.status] ?? STATUS_PARCELA.previsto
+            const vencido = p.status !== 'pago' && p.status !== 'cancelado' && new Date(p.data_vencimento).getTime() < Date.now()
+            return (
+              <div key={p.id} className={`bg-white rounded-2xl border shadow-sm p-4 hover:shadow-md transition-all ${vencido ? 'border-red-200' : 'border-slate-200'}`}>
+                <div className="flex items-center gap-3">
+                  <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${vencido ? 'bg-red-50' : 'bg-amber-50'}`}>
+                    {vencido ? <AlertTriangle size={16} className="text-red-500" /> : <TrendingDown size={16} className="text-amber-600" />}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-sm font-bold text-slate-800 truncate">{p.contrato?.objeto ?? 'Parcela'}</p>
+                      <p className="text-sm font-extrabold text-amber-600 shrink-0">{fmtFull(p.valor)}</p>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-1.5 mt-1 text-[10px]">
+                      <span className={`inline-flex items-center gap-1 rounded-full font-semibold px-2 py-0.5 ${sc.bg} ${sc.text}`}>
+                        <span className={`w-1.5 h-1.5 rounded-full ${sc.dot}`} />{sc.label}
+                      </span>
+                      <span className="bg-slate-100 text-slate-600 font-mono font-semibold rounded-full px-2 py-0.5">
+                        {p.contrato?.numero} — #{p.numero}
+                      </span>
+                      <span className="text-slate-400">Vence: {fmtData(p.data_vencimento)}</span>
+                      {vencido && <span className="text-red-500 font-bold">VENCIDO</span>}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ── Main ────────────────────────────────────────────────────────────────────
 export default function GestaoContratos() {
   const [tab, setTab] = useState<Tab>('contratos')
@@ -714,6 +960,8 @@ export default function GestaoContratos() {
 
       {/* Tab Content */}
       {tab === 'contratos' && <TabContratos />}
+      {tab === 'recebiveis' && <TabRecebiveis />}
+      {tab === 'provisionado' && <TabProvisionado />}
       {tab === 'aditivos' && <TabAditivos />}
       {tab === 'reajustes' && <TabReajustes />}
       {tab === 'vencimentos' && <TabVencimentos />}

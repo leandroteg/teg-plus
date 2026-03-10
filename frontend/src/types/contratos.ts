@@ -290,8 +290,19 @@ export type StatusSolicitacao =
 
 export type TipoContraparte = 'fornecedor' | 'cliente' | 'pj'
 export type TipoContratoV2 = 'receita' | 'despesa' | 'pj'
+export type TipoSolicitacao = 'novo_contrato' | 'aditivo_contratual' | 'distrato_rescisao'
+
 export type CategoriaContrato =
-  | 'prestacao_servico' | 'fornecimento' | 'locacao' | 'empreitada'
+  | 'alimentacao_restaurante' | 'aquisicao_equipamentos' | 'aquisicao_ferramental'
+  | 'aquisicao_imovel' | 'aquisicao_veiculos' | 'arrendamento_comodato'
+  | 'contabilidade' | 'frete_transportes' | 'hospedagem'
+  | 'internet_telefonia' | 'juridico_advocacia'
+  | 'locacao_equipamentos' | 'locacao_ferramental'
+  | 'locacao_imovel_alojamento' | 'locacao_imovel_canteiro' | 'locacao_imovel_deposito'
+  | 'locacao_veiculos' | 'prestacao_servico' | 'seguros'
+  | 'servicos_medicos' | 'software_ti' | 'subcontratacao'
+  | 'vigilancia_monitoramento'
+  | 'fornecimento' | 'locacao' | 'empreitada'
   | 'consultoria' | 'pj_pessoa_fisica' | 'outro'
 export type UrgenciaSolicitacao = 'baixa' | 'normal' | 'alta' | 'critica'
 
@@ -358,10 +369,16 @@ export interface Solicitacao {
   solicitante_nome: string
   departamento?: string
   obra_id?: string
+  tipo_solicitacao?: TipoSolicitacao
   tipo_contraparte: TipoContraparte
   contraparte_nome: string
   contraparte_cnpj?: string
+  contraparte_telefone?: string
+  contraparte_email?: string
   contraparte_id?: string
+  fornecedor_cadastrado?: string
+  contrato_vigente_fornecedor?: string
+  responsavel_aprovacao?: string
   tipo_contrato: TipoContratoV2
   categoria_contrato: CategoriaContrato
   objeto: string
@@ -451,10 +468,16 @@ export interface NovaSolicitacaoPayload {
   solicitante_nome: string
   departamento?: string
   obra_id?: string
+  tipo_solicitacao?: TipoSolicitacao
   tipo_contraparte: TipoContraparte
   contraparte_nome: string
   contraparte_cnpj?: string
+  contraparte_telefone?: string
+  contraparte_email?: string
   contraparte_id?: string
+  fornecedor_cadastrado?: string
+  contrato_vigente_fornecedor?: string
+  responsavel_aprovacao?: string
   tipo_contrato: TipoContratoV2
   categoria_contrato: CategoriaContrato
   objeto: string
