@@ -19,7 +19,7 @@ export default function ApprovalBadge({ isDark = false }: { isDark?: boolean }) 
 
   return (
     <button
-      onClick={() => navigate('/aprovacoes')}
+      onClick={() => navigate('/aprovaai')}
       className={`relative p-2 rounded-lg transition-colors duration-150 ${
         isDark
           ? 'text-slate-400 hover:text-violet-300 hover:bg-violet-500/10'
