@@ -70,6 +70,8 @@ import Portfolio from './pages/pmo/Portfolio'
 import PortfolioDetalhe from './pages/pmo/PortfolioDetalhe'
 import NovoPortfolio from './pages/pmo/NovoPortfolio'
 import EAP from './pages/pmo/EAP'
+import TapHub from './pages/pmo/TapHub'
+import TapPage from './pages/pmo/TapPage'
 import EAPHub from './pages/pmo/EAPHub'
 import CronogramaEGP from './pages/pmo/Cronograma'
 import CronogramaHub from './pages/pmo/CronogramaHub'
@@ -292,6 +294,8 @@ export default function App() {
               <Route path="/egp/portfolio"                    element={<Portfolio />} />
               <Route path="/egp/portfolio/novo"               element={<NovoPortfolio />} />
               <Route path="/egp/portfolio/:id"                element={<PortfolioDetalhe />} />
+              <Route path="/egp/tap"                          element={<TapHub />} />
+              <Route path="/egp/tap/:portfolioId"              element={<TapPage />} />
               <Route path="/egp/eap"                          element={<EAPHub />} />
               <Route path="/egp/eap/:portfolioId"             element={<EAP />} />
               <Route path="/egp/cronograma"                   element={<CronogramaHub />} />

@@ -1,13 +1,14 @@
 import {
   LayoutDashboard, FolderKanban, Workflow,
   GitBranch, CalendarDays, BarChart3, Users, DollarSign,
-  FileText, AlertTriangle, Activity,
+  FileText, AlertTriangle, Activity, ClipboardCheck,
 } from 'lucide-react'
 import ModuleLayout from './ModuleLayout'
 
 const NAV = [
   { to: '/egp',            icon: LayoutDashboard, label: 'Painel',       end: true },
   { to: '/egp/portfolio',  icon: FolderKanban,    label: 'Portfólio' },
+  { to: '/egp/tap',        icon: ClipboardCheck,  label: 'TAP' },
   { to: '/egp/eap',        icon: GitBranch,       label: 'EAP' },
   { to: '/egp/cronograma', icon: CalendarDays,    label: 'Cronograma' },
   { to: '/egp/medicoes',   icon: BarChart3,       label: 'Medições' },

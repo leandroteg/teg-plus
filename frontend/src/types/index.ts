@@ -98,9 +98,15 @@ export interface Requisicao {
   esclarecimento_em?: string
 }
 
+export type TipoAprovacao = 'requisicao_compra' | 'cotacao' | 'autorizacao_pagamento' | 'minuta_contratual'
+
 export interface Aprovacao {
   id: string
   requisicao_id: string
+  entidade_id: string
+  entidade_numero?: string
+  modulo: string
+  tipo_aprovacao: TipoAprovacao
   aprovador_nome: string
   aprovador_email: string
   nivel: number
@@ -108,6 +114,8 @@ export interface Aprovacao {
   observacao?: string
   token: string
   data_limite?: string
+  data_decisao?: string
+  created_at: string
 }
 
 export interface AprovacaoPendente extends Aprovacao {
@@ -118,6 +126,21 @@ export interface AprovacaoPendente extends Aprovacao {
     prazo_dias: number
     total_cotados: number
   }
+}
+
+export interface AprovacaoHistorico {
+  id: string
+  modulo: string
+  tipo_aprovacao: TipoAprovacao
+  entidade_id: string
+  entidade_numero?: string
+  aprovador_nome: string
+  aprovador_email: string
+  nivel: number
+  status: 'aprovada' | 'rejeitada' | 'expirada' | 'esclarecimento'
+  observacao?: string
+  data_decisao?: string
+  created_at: string
 }
 
 export interface CotacaoFornecedor {

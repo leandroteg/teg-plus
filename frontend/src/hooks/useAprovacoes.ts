@@ -1,72 +1,103 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import type { AprovacaoPendente } from '../types'
+import type { AprovacaoPendente, AprovacaoHistorico, TipoAprovacao } from '../types'
 import { supabase } from '../services/supabase'
 import { api } from '../services/api'
 
-// Tabelas: apr_aprovacoes (módulo Aprovações — ApprovaAi)
-// NOTE: apr_aprovacoes.entidade_id NAO tem FK para cmp_requisicoes (design genérico).
-// Por isso NÃO usamos PostgREST join — fazemos duas queries separadas.
+// Tabelas: apr_aprovacoes (modulo Aprovacoes -- AprovAi)
+// NOTE: apr_aprovacoes.entidade_id NAO tem FK para cmp_requisicoes (design generico).
+// Por isso NAO usamos PostgREST join -- fazemos duas queries separadas.
 const TABLE_APR = 'apr_aprovacoes'
 const TABLE_REQ = 'cmp_requisicoes'
 
-export function useAprovacoesPendentes() {
+// ── Aprovacoes Pendentes (multi-tipo) ──────────────────────────────────────────
+
+export function useAprovacoesPendentes(tipo?: TipoAprovacao) {
   return useQuery<AprovacaoPendente[]>({
-    queryKey: ['aprovacoes-pendentes'],
+    queryKey: ['aprovacoes-pendentes', tipo],
     queryFn: async () => {
-      // 1. Busca aprovações pendentes do módulo compras
-      const { data: aprData, error: aprError } = await supabase
+      // 1. Busca aprovacoes pendentes — filtra por tipo se fornecido
+      let query = supabase
         .from(TABLE_APR)
-        .select('id, entidade_id, aprovador_nome, aprovador_email, nivel, status, observacao, token, data_limite, created_at')
+        .select('id, entidade_id, entidade_numero, modulo, tipo_aprovacao, aprovador_nome, aprovador_email, nivel, status, observacao, token, data_limite, created_at')
         .eq('status', 'pendente')
-        .eq('modulo', 'cmp')
         .order('created_at', { ascending: false })
+
+      if (tipo) {
+        query = query.eq('tipo_aprovacao', tipo)
+      }
+
+      const { data: aprData, error: aprError } = await query
 
       if (aprError) throw aprError
       if (!aprData || aprData.length === 0) return []
 
-      // 2. Busca as requisições relacionadas pelos IDs
-      const entidadeIds = aprData.map(a => a.entidade_id).filter(Boolean)
-      const { data: reqData } = await supabase
-        .from(TABLE_REQ)
-        .select('id, numero, solicitante_nome, obra_nome, descricao, valor_estimado, urgencia, status, alcada_nivel, categoria, created_at')
-        .in('id', entidadeIds)
+      // 2. Busca as requisicoes relacionadas pelos IDs (somente para tipo requisicao_compra / cotacao)
+      const cmpIds = aprData
+        .filter(a => a.modulo === 'cmp' || !a.modulo)
+        .map(a => a.entidade_id)
+        .filter(Boolean)
 
-      const reqMap = new Map((reqData ?? []).map(r => [r.id, r]))
+      let reqMap = new Map<string, Record<string, unknown>>()
 
-      // 3. Busca dados de cotação para cotacao_resumo (fornecedor vencedor, valor, total cotados)
-      const { data: cotData } = await supabase
-        .from('cmp_cotacoes')
-        .select('requisicao_id, fornecedor_selecionado_nome, valor_selecionado, fornecedores:cmp_cotacao_fornecedores!cotacao_id(id, prazo_entrega_dias)')
-        .in('requisicao_id', entidadeIds)
-        .eq('status', 'concluida')
+      if (cmpIds.length > 0) {
+        const { data: reqData } = await supabase
+          .from(TABLE_REQ)
+          .select('id, numero, solicitante_nome, obra_nome, descricao, valor_estimado, urgencia, status, alcada_nivel, categoria, created_at')
+          .in('id', cmpIds)
+        reqMap = new Map((reqData ?? []).map(r => [r.id, r]))
+      }
 
+      // 3. Busca dados de cotacao para cotacao_resumo (fornecedor vencedor, valor, total cotados)
       const cotMap = new Map<string, {
         fornecedor_nome: string
         valor: number
         prazo_dias: number
         total_cotados: number
       }>()
-      for (const c of cotData ?? []) {
-        const cot = c as Record<string, unknown>
-        const fornecedores = (cot.fornecedores ?? []) as { id: string; prazo_entrega_dias?: number }[]
-        const selecionado = fornecedores.find(() => true) // primeiro
-        cotMap.set(cot.requisicao_id as string, {
-          fornecedor_nome: (cot.fornecedor_selecionado_nome as string) ?? 'N/A',
-          valor: (cot.valor_selecionado as number) ?? 0,
-          prazo_dias: selecionado?.prazo_entrega_dias ?? 0,
-          total_cotados: fornecedores.length,
-        })
+
+      if (cmpIds.length > 0) {
+        const { data: cotData } = await supabase
+          .from('cmp_cotacoes')
+          .select('requisicao_id, fornecedor_selecionado_nome, valor_selecionado, fornecedores:cmp_cotacao_fornecedores!cotacao_id(id, prazo_entrega_dias)')
+          .in('requisicao_id', cmpIds)
+          .eq('status', 'concluida')
+
+        for (const c of cotData ?? []) {
+          const cot = c as Record<string, unknown>
+          const fornecedores = (cot.fornecedores ?? []) as { id: string; prazo_entrega_dias?: number }[]
+          const selecionado = fornecedores.find(() => true)
+          cotMap.set(cot.requisicao_id as string, {
+            fornecedor_nome: (cot.fornecedor_selecionado_nome as string) ?? 'N/A',
+            valor: (cot.valor_selecionado as number) ?? 0,
+            prazo_dias: selecionado?.prazo_entrega_dias ?? 0,
+            total_cotados: fornecedores.length,
+          })
+        }
       }
 
-      // 4. Mescla aprovações com dados da requisição + cotação
+      // 4. Mescla aprovacoes com dados da requisicao + cotacao
       return aprData
         .map(a => {
           const req = reqMap.get(a.entidade_id)
-          if (!req) return null // Ignora aprovações sem requisição válida
+          // Para tipos que nao sao de compras, criar um requisicao placeholder
+          const requisicao = req ?? {
+            id: a.entidade_id,
+            numero: a.entidade_numero || 'N/A',
+            solicitante_nome: a.aprovador_nome,
+            obra_nome: '',
+            descricao: `Aprovacao ${a.tipo_aprovacao?.replace(/_/g, ' ') ?? 'pendente'}`,
+            valor_estimado: 0,
+            urgencia: 'normal',
+            status: 'em_aprovacao',
+            alcada_nivel: a.nivel,
+            created_at: a.created_at,
+          }
           return {
             ...a,
             requisicao_id: a.entidade_id,
-            requisicao: req,
+            tipo_aprovacao: a.tipo_aprovacao || 'requisicao_compra',
+            modulo: a.modulo || 'cmp',
+            requisicao,
             cotacao_resumo: cotMap.get(a.entidade_id) ?? undefined,
           } as AprovacaoPendente
         })
@@ -79,6 +110,132 @@ export function useAprovacoesPendentes() {
   })
 }
 
+// ── Historico de Aprovacoes ────────────────────────────────────────────────────
+
+export interface HistoricoFiltros {
+  tipo?: TipoAprovacao | TipoAprovacao[]
+  periodo?: '7d' | '30d' | '90d' | 'todos'
+  decisao?: 'aprovada' | 'rejeitada'
+}
+
+export function useHistoricoAprovacoes(filtros?: HistoricoFiltros) {
+  return useQuery<AprovacaoHistorico[]>({
+    queryKey: ['aprovacoes-historico', filtros],
+    queryFn: async () => {
+      let query = supabase
+        .from(TABLE_APR)
+        .select('id, modulo, tipo_aprovacao, entidade_id, entidade_numero, aprovador_nome, aprovador_email, nivel, status, observacao, data_decisao, created_at')
+        .neq('status', 'pendente')
+        .order('data_decisao', { ascending: false })
+        .limit(200)
+
+      // Filtro por tipo(s)
+      if (filtros?.tipo) {
+        if (Array.isArray(filtros.tipo)) {
+          if (filtros.tipo.length > 0) {
+            query = query.in('tipo_aprovacao', filtros.tipo)
+          }
+        } else {
+          query = query.eq('tipo_aprovacao', filtros.tipo)
+        }
+      }
+
+      // Filtro por decisao
+      if (filtros?.decisao) {
+        query = query.eq('status', filtros.decisao)
+      }
+
+      // Filtro por periodo
+      if (filtros?.periodo && filtros.periodo !== 'todos') {
+        const days = filtros.periodo === '7d' ? 7 : filtros.periodo === '30d' ? 30 : 90
+        const since = new Date()
+        since.setDate(since.getDate() - days)
+        query = query.gte('created_at', since.toISOString())
+      }
+
+      const { data, error } = await query
+      if (error) throw error
+      return (data ?? []).map(d => ({
+        ...d,
+        tipo_aprovacao: d.tipo_aprovacao || 'requisicao_compra',
+      })) as AprovacaoHistorico[]
+    },
+    staleTime: 30_000,
+    retry: 1,
+  })
+}
+
+// ── KPIs de Aprovacoes ─────────────────────────────────────────────────────────
+
+export interface AprovacaoKPIs {
+  totalPendentes: number
+  aprovadasHoje: number
+  rejeitadasHoje: number
+  tempoMedioHoras: number
+}
+
+export function useAprovacaoKPIs() {
+  return useQuery<AprovacaoKPIs>({
+    queryKey: ['aprovacoes-kpis'],
+    queryFn: async () => {
+      const today = new Date()
+      today.setHours(0, 0, 0, 0)
+      const todayISO = today.toISOString()
+
+      // Pendentes
+      const { count: totalPendentes } = await supabase
+        .from(TABLE_APR)
+        .select('id', { count: 'exact', head: true })
+        .eq('status', 'pendente')
+
+      // Aprovadas hoje
+      const { count: aprovadasHoje } = await supabase
+        .from(TABLE_APR)
+        .select('id', { count: 'exact', head: true })
+        .eq('status', 'aprovada')
+        .gte('data_decisao', todayISO)
+
+      // Rejeitadas hoje
+      const { count: rejeitadasHoje } = await supabase
+        .from(TABLE_APR)
+        .select('id', { count: 'exact', head: true })
+        .eq('status', 'rejeitada')
+        .gte('data_decisao', todayISO)
+
+      // Tempo medio: ultimas 50 aprovacoes com data_decisao
+      const { data: recentes } = await supabase
+        .from(TABLE_APR)
+        .select('created_at, data_decisao')
+        .neq('status', 'pendente')
+        .not('data_decisao', 'is', null)
+        .order('data_decisao', { ascending: false })
+        .limit(50)
+
+      let tempoMedioHoras = 0
+      if (recentes && recentes.length > 0) {
+        const diffs = recentes
+          .filter(r => r.data_decisao && r.created_at)
+          .map(r => new Date(r.data_decisao!).getTime() - new Date(r.created_at).getTime())
+          .filter(d => d > 0)
+        if (diffs.length > 0) {
+          tempoMedioHoras = Math.round(diffs.reduce((a, b) => a + b, 0) / diffs.length / 3600000 * 10) / 10
+        }
+      }
+
+      return {
+        totalPendentes: totalPendentes ?? 0,
+        aprovadasHoje: aprovadasHoje ?? 0,
+        rejeitadasHoje: rejeitadasHoje ?? 0,
+        tempoMedioHoras,
+      }
+    },
+    refetchInterval: 30_000,
+    staleTime: 15_000,
+  })
+}
+
+// ── Processar aprovacao via token (link externo) ──────────────────────────────
+
 export function useProcessarAprovacaoAi() {
   const qc = useQueryClient()
   return useMutation({
@@ -86,13 +243,15 @@ export function useProcessarAprovacaoAi() {
       api.processarAprovacao(vars.token, vars.decisao, vars.observacao),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['aprovacoes-pendentes'] })
+      qc.invalidateQueries({ queryKey: ['aprovacoes-historico'] })
+      qc.invalidateQueries({ queryKey: ['aprovacoes-kpis'] })
       qc.invalidateQueries({ queryKey: ['requisicoes'] })
       qc.invalidateQueries({ queryKey: ['dashboard'] })
     },
   })
 }
 
-// ── Decisão centralizada (admin): atualiza RC + cria registro apr_aprovacoes ──
+// ── Decisao centralizada (admin): atualiza RC + cria registro apr_aprovacoes ──
 
 export interface DecisaoPayload {
   requisicaoId: string
@@ -103,7 +262,7 @@ export interface DecisaoPayload {
   aprovadorNome: string
   aprovadorEmail: string
   categoria?: string       // para resolver comprador automaticamente
-  currentStatus?: string   // para decisão contextual (técnica vs financeira)
+  currentStatus?: string   // para decisao contextual (tecnica vs financeira)
 }
 
 export function useDecisaoRequisicao() {
@@ -124,10 +283,8 @@ export function useDecisaoRequisicao() {
         updates.data_aprovacao = new Date().toISOString()
 
         if (isFinancialApproval) {
-          // Aprovação financeira pós-cotação → cotacao_aprovada
           updates.status = 'cotacao_aprovada'
         } else {
-          // Aprovação técnica → em_cotacao (auto-cria cotação)
           updates.status = 'em_cotacao'
         }
       } else if (decisao === 'rejeitada') {
@@ -155,6 +312,7 @@ export function useDecisaoRequisicao() {
         .from(TABLE_APR)
         .insert({
           modulo: 'cmp',
+          tipo_aprovacao: 'requisicao_compra',
           entidade_id: requisicaoId,
           entidade_numero: requisicaoNumero,
           aprovador_nome: aprovadorNome,
@@ -166,9 +324,9 @@ export function useDecisaoRequisicao() {
         })
 
       // Non-critical: log warning but don't throw
-      if (aprError) console.warn('Aviso: apr_aprovacoes não inserido:', aprError.message)
+      if (aprError) console.warn('Aviso: apr_aprovacoes nao inserido:', aprError.message)
 
-      // 2b. Marca aprovações pendentes anteriores como resolvidas (para limpar do AprovAi)
+      // 2b. Marca aprovacoes pendentes anteriores como resolvidas
       await supabase
         .from(TABLE_APR)
         .update({ status: aprStatus, data_decisao: new Date().toISOString() })
@@ -176,10 +334,9 @@ export function useDecisaoRequisicao() {
         .eq('modulo', 'cmp')
         .eq('status', 'pendente')
 
-      // 3. Auto-criar cotação quando aprovação técnica é concedida
+      // 3. Auto-criar cotacao quando aprovacao tecnica e concedida
       if (decisao === 'aprovada' && !isFinancialApproval) {
         try {
-          // Resolve comprador pela categoria
           let compradorId: string | null = null
           if (categoria) {
             const { data: compradores } = await supabase
@@ -192,7 +349,6 @@ export function useDecisaoRequisicao() {
             compradorId = match?.id ?? null
           }
 
-          // Data limite: 5 dias úteis
           const dataLimite = new Date()
           dataLimite.setDate(dataLimite.getDate() + 5)
 
@@ -203,7 +359,7 @@ export function useDecisaoRequisicao() {
             data_limite: dataLimite.toISOString(),
           })
         } catch (e) {
-          console.warn('Aviso: cotação não criada automaticamente:', e)
+          console.warn('Aviso: cotacao nao criada automaticamente:', e)
         }
       }
 
@@ -213,6 +369,8 @@ export function useDecisaoRequisicao() {
       qc.invalidateQueries({ queryKey: ['requisicoes'] })
       qc.invalidateQueries({ queryKey: ['requisicao'] })
       qc.invalidateQueries({ queryKey: ['aprovacoes-pendentes'] })
+      qc.invalidateQueries({ queryKey: ['aprovacoes-historico'] })
+      qc.invalidateQueries({ queryKey: ['aprovacoes-kpis'] })
       qc.invalidateQueries({ queryKey: ['cotacoes'] })
       qc.invalidateQueries({ queryKey: ['cotacao'] })
       qc.invalidateQueries({ queryKey: ['dashboard'] })
