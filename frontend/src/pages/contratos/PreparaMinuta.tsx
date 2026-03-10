@@ -1713,84 +1713,49 @@ export default function PreparaMinuta() {
         return pdf
       }
 
-      // ── Helper: fallback PDF from melhorias (no AI) ──────────────────
+      // ── Helper: fallback PDF — formal contract from melhorias (when AI unavailable) ──
       const buildPdfFallback = () => {
-        const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
-        const pw = pdf.internal.pageSize.getWidth(); const ph = pdf.internal.pageSize.getHeight()
-        const mx = 20; const usable = pw - 2 * mx; let y = 25; const lineH = 5; const gapSm = 3; const gapMd = 8; const gapLg = 14
-        const ensureSpace = (need: number) => { if (y + need > ph - 20) { pdf.addPage(); y = 20 } }
-        const printText = (text: string, fontSize: number, opts?: { bold?: boolean; color?: [number,number,number]; indent?: number }) => {
-          pdf.setFont('helvetica', opts?.bold ? 'bold' : 'normal'); pdf.setFontSize(fontSize)
-          const col = opts?.color ?? [30, 30, 30]; pdf.setTextColor(col[0], col[1], col[2]); const ind = opts?.indent ?? 0
-          for (const line of pdf.splitTextToSize(text, usable - ind)) { ensureSpace(lineH + 1); pdf.text(line, mx + ind, y); y += lineH }
-        }
-        const hr = (color?: [number,number,number]) => { ensureSpace(4); const c = color ?? [200, 200, 200]; pdf.setDrawColor(c[0], c[1], c[2]); pdf.setLineWidth(0.3); pdf.line(mx, y, pw - mx, y); y += 3 }
-
-        // HEADER
-        pdf.setFillColor(15, 118, 110); pdf.rect(0, 0, pw, 40, 'F')
-        pdf.setFont('helvetica', 'bold'); pdf.setFontSize(18); pdf.setTextColor(255, 255, 255); pdf.text('MINUTA CONTRATUAL', pw / 2, 18, { align: 'center' })
-        pdf.setFontSize(10); pdf.setTextColor(200, 240, 230); pdf.text(pdf.splitTextToSize(`${minuta.titulo} — Versao Melhorada`, usable), pw / 2, 28, { align: 'center' }); y = 50
-
-        // INFO BOX
-        pdf.setFillColor(245, 248, 250); pdf.roundedRect(mx, y, usable, 32, 2, 2, 'F'); const bxY = y + 6
-        pdf.setFont('helvetica', 'bold'); pdf.setFontSize(8); pdf.setTextColor(100, 116, 139); pdf.text('OBJETO', mx + 4, bxY)
-        pdf.setFont('helvetica', 'normal'); pdf.setFontSize(9); pdf.setTextColor(30, 41, 59); pdf.text(pdf.splitTextToSize(solicitacao.objeto, usable / 2 - 8).slice(0, 2), mx + 4, bxY + 5)
-        pdf.setFont('helvetica', 'bold'); pdf.setFontSize(8); pdf.setTextColor(100, 116, 139); pdf.text('CONTRAPARTE', usable / 2 + mx + 4, bxY)
-        pdf.setFont('helvetica', 'normal'); pdf.setFontSize(9); pdf.setTextColor(30, 41, 59); pdf.text(solicitacao.contraparte_nome, usable / 2 + mx + 4, bxY + 5)
-        if (solicitacao.valor_estimado) { pdf.setFont('helvetica', 'bold'); pdf.setFontSize(8); pdf.setTextColor(100, 116, 139); pdf.text('VALOR', usable / 2 + mx + 4, bxY + 14); pdf.setFont('helvetica', 'normal'); pdf.setFontSize(9); pdf.setTextColor(15, 118, 110); pdf.text(fmt(solicitacao.valor_estimado), usable / 2 + mx + 4, bxY + 19) }
+        // Build a MinutaTextoGerado-like structure from the melhorias data
         const dataStr = new Date().toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' })
-        pdf.setFont('helvetica', 'bold'); pdf.setFontSize(8); pdf.setTextColor(100, 116, 139); pdf.text('DATA', mx + 4, bxY + 14)
-        pdf.setFont('helvetica', 'normal'); pdf.setFontSize(9); pdf.setTextColor(30, 41, 59); pdf.text(dataStr, mx + 4, bxY + 19); y += 38
+        const valorStr = solicitacao.valor_estimado ? fmt(solicitacao.valor_estimado) : 'conforme proposta'
+        const cnpjContraparte = solicitacao.contraparte_cnpj || 'conforme cadastro'
 
-        // Score badge
-        if (mel.score_estimado) { ensureSpace(12); const sc: [number,number,number] = mel.score_estimado >= 80 ? [16, 185, 129] : mel.score_estimado >= 60 ? [245, 158, 11] : [239, 68, 68]; pdf.setFillColor(sc[0], sc[1], sc[2]); pdf.roundedRect(mx, y, 50, 8, 2, 2, 'F'); pdf.setFont('helvetica', 'bold'); pdf.setFontSize(8); pdf.setTextColor(255, 255, 255); pdf.text(`SCORE: ${mel.score_estimado}/100`, mx + 25, y + 5.5, { align: 'center' }); y += 12 }
-        if (mel.resumo_melhorias) { printText(mel.resumo_melhorias, 9, { color: [71, 85, 105] }); y += gapMd }
+        const preambulo = `Pelo presente instrumento particular, de um lado, TEG UNIAO ENGENHARIA LTDA, pessoa juridica de direito privado, inscrita no CNPJ sob o no 10.482.352/0001-18, com sede na Rua Bernardo Guimaraes, 245, Sala 301, Funcionarios, Belo Horizonte/MG, CEP 30140-080, neste ato representada por seu Diretor, Leandro Mallet, doravante denominada CONTRATANTE; e, de outro lado, ${solicitacao.contraparte_nome}, inscrita no CNPJ sob o no ${cnpjContraparte}, doravante denominada CONTRATADA; tem entre si justo e contratado o presente instrumento, que se regera pelas clausulas e condicoes seguintes.`
 
-        // CLAUSULAS MELHORADAS
+        // Build clausulas from melhorias
+        const secoes: Array<{ titulo: string; conteudo: string }> = []
+        let num = 1
+
+        // Objeto
+        secoes.push({ titulo: `CLAUSULA ${num++} - DO OBJETO`, conteudo: `O presente Contrato tem por objeto ${solicitacao.objeto}.${solicitacao.descricao_escopo ? ' ' + solicitacao.descricao_escopo : ''}` })
+
+        // Preco
+        secoes.push({ titulo: `CLAUSULA ${num++} - DO PRECO E CONDICOES DE PAGAMENTO`, conteudo: `Pela execucao dos servicos, a CONTRATANTE pagara a CONTRATADA o valor global de ${valorStr}.${solicitacao.forma_pagamento ? ' Forma de pagamento: ' + solicitacao.forma_pagamento + '.' : ' O pagamento sera efetuado mediante medicoes mensais, no prazo de 30 dias.'}` })
+
+        // Prazo
+        const prazoTxt = solicitacao.prazo_meses ? `${solicitacao.prazo_meses} meses` : 'conforme cronograma aprovado'
+        secoes.push({ titulo: `CLAUSULA ${num++} - DO PRAZO`, conteudo: `O prazo para execucao dos servicos e de ${prazoTxt}, contados a partir da assinatura deste instrumento ou emissao da Ordem de Servico.` })
+
+        // Add all melhorias clausulas_melhoradas as formal contract clauses
         if (mel.clausulas_melhoradas?.length) {
-          hr([15, 118, 110]); y += gapSm; printText('CLAUSULAS MELHORADAS', 12, { bold: true, color: [15, 118, 110] }); y += gapMd
-          mel.clausulas_melhoradas.forEach((c, i) => {
-            ensureSpace(20); printText(`${i + 1}. ${c.nome}`, 10, { bold: true }); y += gapSm
-            pdf.setFillColor(240, 253, 244); pdf.roundedRect(mx + 4, y - 3.5, pdf.getTextWidth(c.acao) + 6, 6, 1, 1, 'F')
-            pdf.setFont('helvetica', 'bold'); pdf.setFontSize(7); pdf.setTextColor(22, 101, 52); pdf.text(c.acao, mx + 7, y); y += gapSm
-            printText(c.justificativa, 8, { color: [100, 116, 139], indent: 4 }); y += gapSm
-            ensureSpace(10); pdf.setFillColor(240, 253, 244); const tl = pdf.splitTextToSize(c.texto_melhorado, usable - 16); const bH = tl.length * lineH + 8; ensureSpace(bH + 2)
-            pdf.roundedRect(mx + 4, y - 2, usable - 8, bH, 1.5, 1.5, 'F'); pdf.setFont('helvetica', 'normal'); pdf.setFontSize(8.5); pdf.setTextColor(30, 41, 59)
-            for (const l of tl) { ensureSpace(lineH + 1); pdf.text(l, mx + 8, y + 3); y += lineH }; y += gapLg
-          })
+          for (const c of mel.clausulas_melhoradas) {
+            secoes.push({ titulo: `CLAUSULA ${num++} - ${c.nome.toUpperCase()}`, conteudo: c.texto_melhorado })
+          }
         }
-        // CLAUSULAS NOVAS
+
+        // Add clausulas_novas
         if (mel.clausulas_novas?.length) {
-          hr([37, 99, 235]); y += gapSm; printText('CLAUSULAS NOVAS', 12, { bold: true, color: [37, 99, 235] }); y += gapMd
-          mel.clausulas_novas.forEach((c, i) => {
-            ensureSpace(20); printText(`${i + 1}. ${c.nome}`, 10, { bold: true, color: [30, 64, 175] }); y += gapSm
-            printText(`Motivo: ${c.motivo}`, 8, { color: [100, 116, 139], indent: 4 })
-            if (c.base_legal) printText(`Base Legal: ${c.base_legal}`, 8, { color: [79, 70, 229], indent: 4 }); y += gapSm
-            ensureSpace(10); pdf.setFillColor(239, 246, 255); const tl = pdf.splitTextToSize(c.texto, usable - 16); const bH = tl.length * lineH + 8; ensureSpace(bH + 2)
-            pdf.roundedRect(mx + 4, y - 2, usable - 8, bH, 1.5, 1.5, 'F'); pdf.setFont('helvetica', 'normal'); pdf.setFontSize(8.5); pdf.setTextColor(30, 41, 59)
-            for (const l of tl) { ensureSpace(lineH + 1); pdf.text(l, mx + 8, y + 3); y += lineH }; y += gapLg
-          })
+          for (const c of mel.clausulas_novas) {
+            secoes.push({ titulo: `CLAUSULA ${num++} - ${c.nome.toUpperCase()}`, conteudo: c.texto })
+          }
         }
-        // RISCOS MITIGADOS
-        if (mel.riscos_mitigados?.length) {
-          hr([239, 68, 68]); y += gapSm; printText('RISCOS MITIGADOS', 12, { bold: true, color: [185, 28, 28] }); y += gapMd
-          mel.riscos_mitigados.forEach((r, i) => { ensureSpace(16); printText(`${i + 1}. ${r.risco_original}`, 9, { bold: true }); y += gapSm; printText(`Severidade: ${r.severidade_original}  ->  ${r.severidade_apos}`, 8, { color: [100, 116, 139], indent: 4 }); printText(`Acao: ${r.acao_tomada}`, 8, { color: [71, 85, 105], indent: 4 }); y += gapMd })
-        }
-        if (mel.observacoes_gerais) { hr(); y += gapSm; printText('OBSERVACOES GERAIS', 10, { bold: true, color: [71, 85, 105] }); y += gapSm; printText(mel.observacoes_gerais, 9, { color: [71, 85, 105] }); y += gapLg }
 
-        // SIGNATURE BLOCK
-        ensureSpace(50); hr(); y += gapLg; printText(`${solicitacao.obra?.nome ?? 'Local'}, ${dataStr}`, 9, { color: [100, 116, 139] }); y += 20
-        const sigW = usable / 2 - 10; pdf.setDrawColor(100, 116, 139); pdf.setLineWidth(0.2)
-        pdf.line(mx, y, mx + sigW, y); pdf.line(pw - mx - sigW, y, pw - mx, y); y += 5
-        pdf.setFont('helvetica', 'bold'); pdf.setFontSize(8); pdf.setTextColor(71, 85, 105)
-        pdf.text('CONTRATANTE', mx + sigW / 2, y, { align: 'center' }); pdf.text('CONTRATADA', pw - mx - sigW / 2, y, { align: 'center' }); y += 4
-        pdf.setFont('helvetica', 'normal'); pdf.setFontSize(7); pdf.setTextColor(148, 163, 184)
-        pdf.text('TEG Uniao Engenharia', mx + sigW / 2, y, { align: 'center' }); pdf.text(solicitacao.contraparte_nome, pw - mx - sigW / 2, y, { align: 'center' })
+        // Foro
+        const disposicoes = `As Partes elegem o foro da Comarca de Belo Horizonte, Estado de Minas Gerais, para dirimir quaisquer duvidas ou litigios decorrentes deste Contrato.`
+        const localAssinatura = `Belo Horizonte, ${dataStr}.\n\n_______________\nTEG UNIAO ENGENHARIA LTDA\nLeandro Mallet - Diretor\nCNPJ: 10.482.352/0001-18\n\n_______________\n${solicitacao.contraparte_nome}\nCNPJ: ${cnpjContraparte}\n\nTESTEMUNHAS:\n1. _______________\nNome:\nCPF:\n\n2. _______________\nNome:\nCPF:`
 
-        // FOOTER
-        const totalPages = pdf.getNumberOfPages()
-        for (let p = 1; p <= totalPages; p++) { pdf.setPage(p); pdf.setFont('helvetica', 'normal'); pdf.setFontSize(7); pdf.setTextColor(148, 163, 184); pdf.text('TEG+ ERP — Minuta gerada automaticamente', mx, ph - 8); pdf.text(`Pagina ${p} de ${totalPages}`, pw - mx, ph - 8, { align: 'right' }) }
-        return pdf
+        // Reuse buildPdfFromAi with the constructed data
+        return buildPdfFromAi({ preambulo, secoes, clausulas_finais: disposicoes, local_assinatura: localAssinatura })
       }
 
       // ── Step 1: Try n8n AI, fallback to local ───────────────────────
@@ -1799,8 +1764,22 @@ export default function PreparaMinuta() {
         const aiResult = await gerarMinutaPDF.mutateAsync({
           titulo: minuta.titulo,
           objeto: solicitacao.objeto,
+          descricao_escopo: solicitacao.descricao_escopo ?? undefined,
           contraparte: solicitacao.contraparte_nome,
+          contraparte_cnpj: solicitacao.contraparte_cnpj ?? undefined,
+          contraparte_email: solicitacao.contraparte_email ?? undefined,
+          contraparte_telefone: solicitacao.contraparte_telefone ?? undefined,
           valor: solicitacao.valor_estimado ?? undefined,
+          forma_pagamento: solicitacao.forma_pagamento ?? undefined,
+          prazo_meses: solicitacao.prazo_meses ?? undefined,
+          data_inicio_prevista: solicitacao.data_inicio_prevista ?? undefined,
+          data_fim_prevista: solicitacao.data_fim_prevista ?? undefined,
+          indice_reajuste: solicitacao.indice_reajuste ?? undefined,
+          tipo_contrato: solicitacao.tipo_contrato ?? undefined,
+          categoria_contrato: solicitacao.categoria_contrato ?? undefined,
+          obra_nome: solicitacao.obra?.nome ?? undefined,
+          centro_custo: solicitacao.centro_custo ?? undefined,
+          justificativa: solicitacao.justificativa ?? undefined,
           melhorias: mel,
         })
         if (aiResult.success && aiResult.minuta_texto) {

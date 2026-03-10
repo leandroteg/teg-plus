@@ -554,26 +554,49 @@ export interface MinutaTextoGerado {
 
 // ── Gerar Minuta PDF via AI (n8n webhook) ────────────────────────────────────
 
+export interface GerarMinutaPayload {
+  titulo: string
+  objeto: string
+  descricao_escopo?: string
+  contraparte: string
+  contraparte_cnpj?: string
+  contraparte_email?: string
+  contraparte_telefone?: string
+  valor?: number
+  forma_pagamento?: string
+  prazo_meses?: number
+  data_inicio_prevista?: string
+  data_fim_prevista?: string
+  indice_reajuste?: string
+  tipo_contrato?: string
+  categoria_contrato?: string
+  obra_nome?: string
+  centro_custo?: string
+  justificativa?: string
+  melhorias: MelhoriaMinuta
+}
+
 export function useGerarMinutaPDF() {
   return useMutation<
     { success: boolean; minuta_texto: MinutaTextoGerado; titulo: string; parse_fallback?: boolean },
     Error,
-    {
-      titulo: string
-      objeto: string
-      contraparte: string
-      valor?: number
-      melhorias: MelhoriaMinuta
-    }
+    GerarMinutaPayload
   >({
     mutationFn: async (payload) => {
-      const res = await fetch(`${N8N_BASE}/contratos/gerar-minuta-pdf`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      })
-      if (!res.ok) throw new Error(`Erro ao gerar minuta: ${res.status}`)
-      return res.json()
+      const controller = new AbortController()
+      const timeout = setTimeout(() => controller.abort(), 120_000) // 2min timeout
+      try {
+        const res = await fetch(`${N8N_BASE}/contratos/gerar-minuta-pdf`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+          signal: controller.signal,
+        })
+        if (!res.ok) throw new Error(`Erro ao gerar minuta: ${res.status}`)
+        return res.json()
+      } finally {
+        clearTimeout(timeout)
+      }
     },
   })
 }
