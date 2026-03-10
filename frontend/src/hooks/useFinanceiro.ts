@@ -92,21 +92,138 @@ export function useAprovarPagamento() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async ({ cpId, aprovadorNome }: { cpId: string; aprovadorNome?: string }) => {
+      const nome = aprovadorNome ?? 'Financeiro'
+
+      // 1. Update CP status
       const { error } = await supabase
         .from('fin_contas_pagar')
         .update({
           status: 'aprovado_pgto',
-          aprovado_por: aprovadorNome ?? 'Financeiro',
+          aprovado_por: nome,
           aprovado_em: new Date().toISOString(),
         })
         .eq('id', cpId)
       if (error) throw error
+
+      // 2. Resolve any pending apr_aprovacoes for this CP
+      await supabase
+        .from('apr_aprovacoes')
+        .update({
+          status: 'aprovada',
+          data_decisao: new Date().toISOString(),
+        })
+        .eq('entidade_id', cpId)
+        .eq('tipo_aprovacao', 'autorizacao_pagamento')
+        .eq('status', 'pendente')
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['contas-pagar'] })
       qc.invalidateQueries({ queryKey: ['financeiro-dashboard'] })
+      qc.invalidateQueries({ queryKey: ['aprovacoes-pendentes'] })
+      qc.invalidateQueries({ queryKey: ['aprovacoes-kpis'] })
     },
   })
+}
+
+// ── Solicitar Aprovação de Pagamento: cria registro em apr_aprovacoes ─────
+// Deve ser chamado quando uma CP entra em status aguardando_aprovacao.
+export function useSolicitarAprovacaoPagamento() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ cpId }: { cpId: string }) => {
+      // Busca dados da CP
+      const { data: cp } = await supabase
+        .from('fin_contas_pagar')
+        .select('id, fornecedor_nome, valor_original, numero_documento, descricao, centro_custo')
+        .eq('id', cpId)
+        .single()
+
+      if (!cp) throw new Error('CP nao encontrada')
+
+      const valor = cp.valor_original ?? 0
+      const nivel = valor > 100000 ? 4 : valor > 25000 ? 3 : valor > 5000 ? 2 : 1
+      const aprovadorNome = valor > 25000 ? 'Laucidio' : 'Welton'
+
+      // Verifica se ja existe aprovacao pendente para esta CP
+      const { data: existing } = await supabase
+        .from('apr_aprovacoes')
+        .select('id')
+        .eq('entidade_id', cpId)
+        .eq('tipo_aprovacao', 'autorizacao_pagamento')
+        .eq('status', 'pendente')
+        .limit(1)
+
+      if (existing && existing.length > 0) return // Ja existe
+
+      const { error } = await supabase
+        .from('apr_aprovacoes')
+        .insert({
+          modulo: 'fin',
+          tipo_aprovacao: 'autorizacao_pagamento',
+          entidade_id: cpId,
+          entidade_numero: cp.numero_documento ?? '',
+          aprovador_nome: aprovadorNome,
+          aprovador_email: '',
+          nivel,
+          status: 'pendente',
+          observacao: `Autorizacao pagamento — ${cp.fornecedor_nome} — ${valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}`,
+          data_limite: new Date(Date.now() + 72 * 3600_000).toISOString(),
+        })
+
+      if (error) console.warn('Aviso: apr_aprovacoes nao criado para CP:', error.message)
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['aprovacoes-pendentes'] })
+      qc.invalidateQueries({ queryKey: ['aprovacoes-kpis'] })
+    },
+  })
+}
+
+// ── Sync CPs pendentes → apr_aprovacoes (garante visibilidade no AprovAi) ──
+// Cria registros apr_aprovacoes para CPs aguardando_aprovacao que ainda nao tem.
+export async function syncCPsParaAprovacao() {
+  // 1. Busca CPs aguardando_aprovacao
+  const { data: cps } = await supabase
+    .from('fin_contas_pagar')
+    .select('id, fornecedor_nome, valor_original, numero_documento')
+    .eq('status', 'aguardando_aprovacao')
+
+  if (!cps || cps.length === 0) return 0
+
+  // 2. Busca quais ja tem apr_aprovacoes pendentes
+  const { data: existing } = await supabase
+    .from('apr_aprovacoes')
+    .select('entidade_id')
+    .eq('tipo_aprovacao', 'autorizacao_pagamento')
+    .eq('status', 'pendente')
+    .in('entidade_id', cps.map(c => c.id))
+
+  const existingIds = new Set((existing ?? []).map(e => e.entidade_id))
+  const missing = cps.filter(cp => !existingIds.has(cp.id))
+
+  if (missing.length === 0) return 0
+
+  // 3. Cria registros faltantes
+  const inserts = missing.map(cp => {
+    const valor = cp.valor_original ?? 0
+    const nivel = valor > 100000 ? 4 : valor > 25000 ? 3 : valor > 5000 ? 2 : 1
+    return {
+      modulo: 'fin',
+      tipo_aprovacao: 'autorizacao_pagamento',
+      entidade_id: cp.id,
+      entidade_numero: cp.numero_documento ?? '',
+      aprovador_nome: valor > 25000 ? 'Laucidio' : 'Welton',
+      aprovador_email: '',
+      nivel,
+      status: 'pendente',
+      observacao: `Autorizacao pagamento — ${cp.fornecedor_nome} — ${valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}`,
+      data_limite: new Date(Date.now() + 72 * 3600_000).toISOString(),
+    }
+  })
+
+  const { error } = await supabase.from('apr_aprovacoes').insert(inserts)
+  if (error) console.warn('Aviso: sync CPs → apr_aprovacoes falhou:', error.message)
+  return missing.length
 }
 
 // ── Marcar CP como Pago ────────────────────────────────────────────────────

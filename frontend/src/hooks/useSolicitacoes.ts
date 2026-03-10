@@ -207,12 +207,50 @@ export function useAvancarEtapa() {
           observacao: payload.observacao,
         })
       if (histErr) throw histErr
+
+      // ── Criar aprovacao pendente quando avança para aprovacao_diretoria ──
+      if (payload.etapaPara === 'aprovacao_diretoria') {
+        try {
+          // Busca dados da solicitacao para preencher a aprovacao
+          const { data: sol } = await supabase
+            .from('con_solicitacoes')
+            .select('numero, objeto, contraparte_nome, valor_estimado')
+            .eq('id', payload.solicitacaoId)
+            .single()
+
+          if (sol) {
+            const valor = sol.valor_estimado ?? 0
+            // Determina nivel/aprovador pela alcada de valor
+            const nivel = valor > 100000 ? 4 : valor > 25000 ? 3 : valor > 5000 ? 2 : 1
+            const aprovadorNome = valor > 25000 ? 'Laucidio' : 'Welton'
+
+            await supabase
+              .from('apr_aprovacoes')
+              .insert({
+                modulo: 'con',
+                tipo_aprovacao: 'minuta_contratual',
+                entidade_id: payload.solicitacaoId,
+                entidade_numero: sol.numero ?? '',
+                aprovador_nome: aprovadorNome,
+                aprovador_email: '',
+                nivel,
+                status: 'pendente',
+                observacao: `Aprovacao minuta contratual — ${sol.contraparte_nome ?? ''} — ${sol.objeto ?? ''}`,
+                data_limite: new Date(Date.now() + 72 * 3600_000).toISOString(),
+              })
+          }
+        } catch (e) {
+          console.warn('Aviso: apr_aprovacoes nao criado para contrato:', e)
+        }
+      }
     },
     onSuccess: (_d, vars) => {
       qc.invalidateQueries({ queryKey: ['con-solicitacoes'] })
       qc.invalidateQueries({ queryKey: ['con-solicitacao', vars.solicitacaoId] })
       qc.invalidateQueries({ queryKey: ['con-solicitacao-historico', vars.solicitacaoId] })
       qc.invalidateQueries({ queryKey: ['con-solicitacoes-dashboard'] })
+      qc.invalidateQueries({ queryKey: ['aprovacoes-pendentes'] })
+      qc.invalidateQueries({ queryKey: ['aprovacoes-kpis'] })
     },
   })
 }

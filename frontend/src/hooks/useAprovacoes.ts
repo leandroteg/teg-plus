@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import type { AprovacaoPendente, AprovacaoHistorico, TipoAprovacao } from '../types'
 import { supabase } from '../services/supabase'
 import { api } from '../services/api'
+import { syncCPsParaAprovacao } from './useFinanceiro'
 
 // Tabelas: apr_aprovacoes (modulo Aprovacoes -- AprovAi)
 // NOTE: apr_aprovacoes.entidade_id NAO tem FK para cmp_requisicoes (design generico).
@@ -15,6 +16,9 @@ export function useAprovacoesPendentes(tipo?: TipoAprovacao) {
   return useQuery<AprovacaoPendente[]>({
     queryKey: ['aprovacoes-pendentes', tipo],
     queryFn: async () => {
+      // 0. Sync: garante que CPs aguardando_aprovacao tenham apr_aprovacoes
+      try { await syncCPsParaAprovacao() } catch { /* non-critical */ }
+
       // 1. Busca aprovacoes pendentes — filtra por tipo se fornecido
       let query = supabase
         .from(TABLE_APR)
@@ -75,23 +79,91 @@ export function useAprovacoesPendentes(tipo?: TipoAprovacao) {
         }
       }
 
-      // 4. Mescla aprovacoes com dados da requisicao + cotacao
+      // 4. Busca dados de contratos (minuta_contratual)
+      const conIds = aprData
+        .filter(a => a.tipo_aprovacao === 'minuta_contratual')
+        .map(a => a.entidade_id)
+        .filter(Boolean)
+
+      const conMap = new Map<string, Record<string, unknown>>()
+      if (conIds.length > 0) {
+        const { data: conData } = await supabase
+          .from('con_solicitacoes')
+          .select('id, numero, objeto, contraparte_nome, valor_estimado, tipo_contrato, etapa_atual')
+          .in('id', conIds)
+        for (const c of conData ?? []) {
+          conMap.set(c.id, c)
+        }
+      }
+
+      // 5. Busca dados de financeiro (autorizacao_pagamento)
+      const finIds = aprData
+        .filter(a => a.tipo_aprovacao === 'autorizacao_pagamento')
+        .map(a => a.entidade_id)
+        .filter(Boolean)
+
+      const finMap = new Map<string, Record<string, unknown>>()
+      if (finIds.length > 0) {
+        const { data: finData } = await supabase
+          .from('fin_contas_pagar')
+          .select('id, fornecedor_nome, valor_original, numero_documento, descricao, data_vencimento, centro_custo')
+          .in('id', finIds)
+        for (const f of finData ?? []) {
+          finMap.set(f.id, f)
+        }
+      }
+
+      // 6. Mescla aprovacoes com dados da requisicao/contrato/CP + cotacao
       return aprData
         .map(a => {
+          let requisicao: Record<string, unknown>
           const req = reqMap.get(a.entidade_id)
-          // Para tipos que nao sao de compras, criar um requisicao placeholder
-          const requisicao = req ?? {
-            id: a.entidade_id,
-            numero: a.entidade_numero || 'N/A',
-            solicitante_nome: a.aprovador_nome,
-            obra_nome: '',
-            descricao: `Aprovacao ${a.tipo_aprovacao?.replace(/_/g, ' ') ?? 'pendente'}`,
-            valor_estimado: 0,
-            urgencia: 'normal',
-            status: 'em_aprovacao',
-            alcada_nivel: a.nivel,
-            created_at: a.created_at,
+
+          if (req) {
+            requisicao = req
+          } else if (a.tipo_aprovacao === 'minuta_contratual') {
+            const con = conMap.get(a.entidade_id)
+            requisicao = {
+              id: a.entidade_id,
+              numero: con?.numero ?? a.entidade_numero ?? 'N/A',
+              solicitante_nome: (con?.contraparte_nome as string) ?? '',
+              obra_nome: '',
+              descricao: `Minuta Contratual — ${(con?.objeto as string) ?? ''} — ${(con?.contraparte_nome as string) ?? ''}`,
+              valor_estimado: (con?.valor_estimado as number) ?? 0,
+              urgencia: 'normal',
+              status: 'em_aprovacao',
+              alcada_nivel: a.nivel,
+              created_at: a.created_at,
+            }
+          } else if (a.tipo_aprovacao === 'autorizacao_pagamento') {
+            const fin = finMap.get(a.entidade_id)
+            requisicao = {
+              id: a.entidade_id,
+              numero: fin?.numero_documento ?? a.entidade_numero ?? 'N/A',
+              solicitante_nome: (fin?.fornecedor_nome as string) ?? '',
+              obra_nome: (fin?.centro_custo as string) ?? '',
+              descricao: `Autorizacao Pagamento — ${(fin?.fornecedor_nome as string) ?? ''} — ${(fin?.descricao as string) ?? ''}`,
+              valor_estimado: (fin?.valor_original as number) ?? 0,
+              urgencia: 'normal',
+              status: 'em_aprovacao',
+              alcada_nivel: a.nivel,
+              created_at: a.created_at,
+            }
+          } else {
+            requisicao = {
+              id: a.entidade_id,
+              numero: a.entidade_numero || 'N/A',
+              solicitante_nome: a.aprovador_nome,
+              obra_nome: '',
+              descricao: `Aprovacao ${a.tipo_aprovacao?.replace(/_/g, ' ') ?? 'pendente'}`,
+              valor_estimado: 0,
+              urgencia: 'normal',
+              status: 'em_aprovacao',
+              alcada_nivel: a.nivel,
+              created_at: a.created_at,
+            }
           }
+
           return {
             ...a,
             requisicao_id: a.entidade_id,
@@ -99,7 +171,7 @@ export function useAprovacoesPendentes(tipo?: TipoAprovacao) {
             modulo: a.modulo || 'cmp',
             requisicao,
             cotacao_resumo: cotMap.get(a.entidade_id) ?? undefined,
-          } as AprovacaoPendente
+          } as unknown as AprovacaoPendente
         })
         .filter((a): a is AprovacaoPendente => a !== null)
     },
@@ -271,7 +343,7 @@ export function useDecisaoGenerica() {
   return useMutation({
     mutationFn: async (payload: DecisaoGenericaPayload) => {
       const {
-        aprovacaoId, entidadeId, decisao, observacao,
+        aprovacaoId, entidadeId, tipoAprovacao, decisao, observacao, aprovadorNome,
       } = payload
 
       // 1. Update the specific aprovacao record
@@ -297,6 +369,53 @@ export function useDecisaoGenerica() {
         .eq('status', 'pendente')
         .neq('id', aprovacaoId)
 
+      // 3. Atualizar entidade fonte conforme tipo de aprovacao
+      try {
+        if (tipoAprovacao === 'minuta_contratual') {
+          // Avanca etapa da solicitacao de contrato
+          const nextEtapa = decisao === 'aprovada' ? 'enviar_assinatura' : 'preparar_minuta'
+          await supabase
+            .from('con_solicitacoes')
+            .update({
+              etapa_atual: nextEtapa,
+              status: decisao === 'rejeitada' ? 'em_andamento' : 'em_andamento',
+              updated_at: new Date().toISOString(),
+            })
+            .eq('id', entidadeId)
+
+          // Registra historico
+          await supabase
+            .from('con_solicitacao_historico')
+            .insert({
+              solicitacao_id: entidadeId,
+              etapa_de: 'aprovacao_diretoria',
+              etapa_para: nextEtapa,
+              observacao: decisao === 'aprovada'
+                ? `Aprovado por ${aprovadorNome}`
+                : `Rejeitado por ${aprovadorNome}: ${observacao ?? ''}`,
+            })
+        } else if (tipoAprovacao === 'autorizacao_pagamento') {
+          // Atualiza status da CP
+          if (decisao === 'aprovada') {
+            await supabase
+              .from('fin_contas_pagar')
+              .update({
+                status: 'aprovado_pgto',
+                aprovado_por: aprovadorNome,
+                aprovado_em: new Date().toISOString(),
+              })
+              .eq('id', entidadeId)
+          } else {
+            await supabase
+              .from('fin_contas_pagar')
+              .update({ status: 'cancelado' })
+              .eq('id', entidadeId)
+          }
+        }
+      } catch (e) {
+        console.warn('Aviso: entidade fonte nao atualizada:', e)
+      }
+
       return { decisao }
     },
     onSuccess: () => {
@@ -304,6 +423,10 @@ export function useDecisaoGenerica() {
       qc.invalidateQueries({ queryKey: ['aprovacoes-historico'] })
       qc.invalidateQueries({ queryKey: ['aprovacoes-kpis'] })
       qc.invalidateQueries({ queryKey: ['dashboard'] })
+      qc.invalidateQueries({ queryKey: ['con-solicitacoes'] })
+      qc.invalidateQueries({ queryKey: ['con-solicitacoes-dashboard'] })
+      qc.invalidateQueries({ queryKey: ['contas-pagar'] })
+      qc.invalidateQueries({ queryKey: ['financeiro-dashboard'] })
     },
   })
 }
