@@ -7,6 +7,7 @@ import {
 import { useSearchParams } from 'react-router-dom'
 import { usePedidos, useAtualizarPedido, useLiberarPagamento } from '../hooks/usePedidos'
 import { api } from '../services/api'
+import { supabase } from '../services/supabase'
 import { useAnexosPedido, useUploadAnexo, useCotacaoDocs, TIPO_LABEL } from '../hooks/useAnexos'
 import type { PedidoAnexo } from '../hooks/useAnexos'
 import FluxoTimeline from '../components/FluxoTimeline'
@@ -53,8 +54,8 @@ const statusConfig: Record<string, { bg: string; text: string; label: string }> 
 
 // ─── PDF / Share helpers ──────────────────────────────────────────────────────
 
-function gerarPdfPedido(pedido: Pedido) {
-  const html = `
+function gerarPdfHtml(pedido: Pedido): string {
+  return `
     <!DOCTYPE html>
     <html>
     <head>
@@ -131,12 +132,17 @@ function gerarPdfPedido(pedido: Pedido) {
     </body>
     </html>
   `
-  const win = window.open('', '_blank', 'width=900,height=700')
-  if (!win) return
-  win.document.write(html)
-  win.document.close()
-  win.focus()
-  setTimeout(() => win.print(), 500)
+}
+
+function gerarPdfPedido(pedido: Pedido) {
+  const html = gerarPdfHtml(pedido)
+  const printWin = window.open('', '_blank', 'width=900,height=700')
+  if (!printWin) return
+  printWin.document.open()
+  printWin.document.writeln(html)
+  printWin.document.close()
+  printWin.focus()
+  setTimeout(() => printWin.print(), 500)
 }
 
 function compartilharWhatsApp(pedido: Pedido) {
@@ -160,17 +166,40 @@ async function compartilharEmail(pedido: Pedido, email?: string) {
     `Para visualizar o pedido completo com anexos, acesse o sistema TEG+.\n\n` +
     `Atenciosamente,\nEquipe de Compras TEG+`
 
-  // Tenta enviar via n8n (com anexos)
+  // Busca anexos do pedido para enviar junto ao e-mail (#34)
+  let anexosUrls: { url: string; nome: string; tipo: string }[] = []
+  try {
+    const { data: anexos } = await supabase
+      .from('cmp_pedidos_anexos')
+      .select('url, nome_arquivo, tipo, mime_type')
+      .eq('pedido_id', pedido.id)
+    if (anexos && anexos.length > 0) {
+      anexosUrls = anexos.map(a => ({
+        url: a.url,
+        nome: a.nome_arquivo ?? `anexo-${a.tipo}`,
+        tipo: a.mime_type ?? 'application/octet-stream',
+      }))
+    }
+  } catch {
+    // Se falhar ao buscar anexos, envia sem eles
+  }
+
+  // Gera HTML do pedido para PDF inline
+  const pdfHtml = gerarPdfHtml(pedido)
+
+  // Tenta enviar via n8n (com anexos e PDF)
   try {
     const res = await api.enviarEmailPedido({
       pedido_id: pedido.id,
       email_destinatario: email ?? '',
       subject,
       body,
+      anexos_urls: anexosUrls,
+      pdf_html: pdfHtml,
     })
     if (res?.ok) return // sucesso via n8n
   } catch {
-    // n8n indisponível — fallback mailto
+    // n8n indisponivel -- fallback mailto
   }
 
   // Fallback: abre mailto (sem anexos)

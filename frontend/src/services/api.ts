@@ -94,7 +94,14 @@ export const api = {
       body: JSON.stringify(data),
     }),
 
-  enviarEmailPedido: (data: { pedido_id: string; email_destinatario: string; subject: string; body: string }) =>
+  enviarEmailPedido: (data: {
+    pedido_id: string;
+    email_destinatario: string;
+    subject: string;
+    body: string;
+    anexos_urls?: { url: string; nome: string; tipo: string }[];
+    pdf_html?: string;
+  }) =>
     request<{ ok: boolean }>('/compras/email-pedido', { method: 'POST', body: JSON.stringify(data) }),
 
   getDashboard: (params?: { periodo?: string; obra_id?: string }) => {
