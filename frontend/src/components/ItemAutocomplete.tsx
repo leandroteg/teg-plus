@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { Search, Plus, Loader2, Check, Package } from 'lucide-react'
-import { useItemCatalogSearch, useSalvarItem } from '../hooks/useEstoque'
+import { useItemCatalogSearch } from '../hooks/useEstoque'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../services/supabase'
 import type { EstItem } from '../types/estoque'
@@ -72,8 +72,7 @@ export default function ItemAutocomplete({
   const hasAutocomplete = categoriasEstoque.length > 0
 
   const { data: results = [], isLoading } = useItemCatalogSearch(categoriasEstoque, search)
-  const salvarItem = useSalvarItem()
-  const { isAdmin, perfil } = useAuth()
+  const { perfil } = useAuth()
 
   // Close on outside click
   useEffect(() => {
@@ -120,7 +119,6 @@ export default function ItemAutocomplete({
     setSaving(true)
     try {
       const categoria = categoriasEstoque[0] || 'Almoxarifado Geral'
-      // Generate a unique code
       const prefix = categoria === 'Material Elétrico' ? 'ME'
         : categoria === 'EPI/EPC' ? 'EP'
         : categoria === 'Ferramental' ? 'FE'
@@ -128,50 +126,47 @@ export default function ItemAutocomplete({
         : 'AG'
       const code = `${prefix}-${Date.now().toString(36).toUpperCase()}`
 
-      if (isAdmin) {
-        // Direct insert
-        const { data, error } = await supabase
-          .from('est_itens')
-          .insert({
-            codigo: code,
+      // 1. Call n8n SuperTEG to standardize nomenclature (fix typos, casing)
+      let descPadronizada = newDesc.trim()
+      try {
+        const N8N_URL = import.meta.env.VITE_N8N_WEBHOOK_URL || 'https://teg-agents-n8n.nmmcas.easypanel.host/webhook'
+        const res = await fetch(`${N8N_URL}/padronizar-item`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
             descricao: newDesc.trim(),
             categoria,
             unidade: newUnidade,
-            ativo: true,
-            valor_medio: 0,
-          })
-          .select('id, codigo, descricao, unidade, valor_medio')
-          .single()
-        if (error) throw error
-
-        const createdUnit = (data.unidade || 'UN').toUpperCase()
-        onSelectCatalog({
-          id: data.id,
-          codigo: data.codigo,
-          descricao: data.descricao,
-          unidade: UNIDADE_DB_TO_RC[createdUnit] || createdUnit.toLowerCase(),
-          valor_medio: 0,
+          }),
+          signal: AbortSignal.timeout(8000),
         })
-      } else {
-        // Pre-cadastro
-        await supabase.from('sys_pre_cadastros').insert({
-          entidade: 'itens',
-          tabela_destino: 'est_itens',
-          dados: {
-            codigo: code,
-            descricao: newDesc.trim(),
-            categoria,
-            unidade: newUnidade,
-            ativo: true,
-            valor_medio: 0,
-          },
-          status: 'pendente',
-          solicitado_por: perfil?.auth_id,
-          solicitante_nome: perfil?.nome,
-        })
-        // Just use the typed description
-        onChange(newDesc.trim())
+        if (res.ok) {
+          const json = await res.json()
+          if (json.descricao) descPadronizada = json.descricao
+        }
+      } catch {
+        // n8n indisponível — usa descrição original
       }
+
+      // 2. Sempre cria pré-cadastro para aprovação do admin
+      await supabase.from('sys_pre_cadastros').insert({
+        entidade: 'itens',
+        tabela_destino: 'est_itens',
+        dados: {
+          codigo: code,
+          descricao: descPadronizada,
+          categoria,
+          unidade: newUnidade,
+          ativo: true,
+          valor_medio: 0,
+        },
+        status: 'pendente',
+        solicitado_por: perfil?.auth_id,
+        solicitante_nome: perfil?.nome,
+      })
+
+      // Use a descrição padronizada no campo
+      onChange(descPadronizada)
 
       setShowDropdown(false)
       setShowCreateForm(false)
@@ -271,7 +266,7 @@ export default function ItemAutocomplete({
               className={`w-full text-left px-3 py-2.5 text-sm font-semibold text-teal-600 ${hoverBg} transition-colors flex items-center gap-2 border-t ${isDark ? 'border-slate-600' : 'border-slate-200'}`}
             >
               <Plus size={14} />
-              {isAdmin ? 'Cadastrar novo item' : 'Solicitar cadastro de item'}
+              Solicitar cadastro de item
             </button>
           )}
 
@@ -279,7 +274,7 @@ export default function ItemAutocomplete({
           {showCreateForm && (
             <div className={`p-3 border-t ${isDark ? 'border-slate-600 bg-slate-750' : 'border-slate-200 bg-slate-50'} space-y-2`}>
               <div className={`text-[10px] font-bold uppercase tracking-wider ${mutedText}`}>
-                {isAdmin ? 'Novo Item' : 'Pré-cadastro'}
+                Pré-cadastro de Item
               </div>
               <input
                 value={newDesc}
@@ -305,14 +300,12 @@ export default function ItemAutocomplete({
                   className="flex-1 flex items-center justify-center gap-1.5 bg-teal-600 text-white text-sm font-semibold rounded-lg px-3 py-1.5 hover:bg-teal-700 disabled:opacity-50 transition"
                 >
                   {saving ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}
-                  {isAdmin ? 'Criar' : 'Enviar'}
+                  Enviar
                 </button>
               </div>
-              {!isAdmin && (
-                <p className={`text-[10px] ${mutedText}`}>
-                  Será enviado para aprovação do administrador
-                </p>
-              )}
+              <p className={`text-[10px] ${mutedText}`}>
+                A nomenclatura será padronizada e enviada para aprovação
+              </p>
             </div>
           )}
         </div>
