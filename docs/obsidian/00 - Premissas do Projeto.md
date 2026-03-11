@@ -12,7 +12,7 @@ relacionado: ["[[00 - TEG+ INDEX]]", "[[01 - Arquitetura Geral]]", "[[17 - Roadm
 ## 1. Premissas de Negocio
 
 - **ERP modular para gestao de obras de engenharia eletrica e transmissao**
-- 6 Polos operacionais totalizando 19 obras cadastradas (16 LDs + CD + DC + SEDE)
+- 6 Polos operacionais totalizando 19 obras de construção cadastradas (16 LDs + CD + DC + SEDE)
 - Todas as obras em Minas Gerais, com SEDE em Campo Grande/MS
 - **Cobertura completa** — 13 modulos implementados:
 
@@ -41,7 +41,7 @@ relacionado: ["[[00 - TEG+ INDEX]]", "[[01 - Arquitetura Geral]]", "[[17 - Roadm
 
 ## 2. Premissas de Design
 
-> **WORLD CLASS TOP TIER** em UI/UX, estetica e retencao
+> **#1 WORLD CLASS TOP TIER** em UI/UX, estetica e retencao
 
 - Cada tela deve ser **visualmente impecavel**, com micro-interacoes e feedback claro
 - Padrao visual: `rounded-2xl`, shadows suaves, paleta consistente (**teal/violet/slate**)
