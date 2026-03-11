@@ -74,8 +74,6 @@ export interface RequisicaoItem {
   quantidade: number
   unidade: string
   valor_unitario_estimado: number
-  est_item_id?: string
-  est_item_codigo?: string
 }
 
 export interface Requisicao {
@@ -142,20 +140,6 @@ export interface AprovacaoPendente extends Aprovacao {
     arquivo_nome: string
     ai_resumo: string | null
     ai_score: number | null
-  }
-  pagamento_detalhes?: {
-    fornecedor_nome: string
-    valor_original: number
-    valor_pago: number
-    numero_documento: string
-    descricao: string
-    data_vencimento: string
-    data_emissao: string
-    centro_custo: string
-    classe_financeira: string
-    natureza: string
-    forma_pagamento: string
-    status_cp: string
   }
 }
 
