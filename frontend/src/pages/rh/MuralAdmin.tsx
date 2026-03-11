@@ -400,7 +400,7 @@ function BannerCard({ banner, onEdit }: { banner: MuralBanner; onEdit: () => voi
           <button
             onClick={() => setConfirmDel(true)}
             title="Excluir"
-            className="p-1.5 rounded-lg hover:bg-white/6 transition-colors text-slate-400 hover:text-red-400"
+            className="p-1.5 rounded-lg hover:bg-white/6 transition-colors text-red-400 hover:text-red-500"
           >
             <Trash2 size={14} />
           </button>

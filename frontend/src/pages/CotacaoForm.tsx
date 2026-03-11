@@ -259,11 +259,13 @@ export default function CotacaoForm() {
       } else {
         setCnpjStatus(prev => ({ ...prev, [idx]: { ok: true, msg: result.situacao || 'Ativa' } }))
         // Auto-fill name and contact if empty
+        // Prefer razao_social (always present) over nome_fantasia (often empty)
+        const nomePreenchido = result.razao_social || result.nome_fantasia || ''
         setFornecedores(prev => prev.map((f, i) => {
           if (i !== idx) return f
           return {
             ...f,
-            fornecedor_nome: f.fornecedor_nome.trim() ? f.fornecedor_nome : (result.nome_fantasia || result.razao_social),
+            fornecedor_nome: f.fornecedor_nome.trim() ? f.fornecedor_nome : nomePreenchido,
             fornecedor_contato: f.fornecedor_contato.trim() ? f.fornecedor_contato : [result.telefone, result.email].filter(Boolean).join(' / '),
           }
         }))
@@ -528,7 +530,7 @@ export default function CotacaoForm() {
             {fornecedores.length > 2 && (
               <button type="button" onClick={() => setFornecedores(p => p.filter((_, i) => i !== idx))}
                 className="p-1 rounded-lg hover:bg-red-50 transition">
-                <Trash2 size={14} className="text-slate-300 hover:text-red-500 transition" />
+                <Trash2 size={14} className="text-red-400 hover:text-red-600 transition" />
               </button>
             )}
           </div>
