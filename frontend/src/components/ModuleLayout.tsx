@@ -235,7 +235,7 @@ const ACCENT_CLASSES: Record<string, AccentClasses> = {
 
 export default function ModuleLayout({
   variant = 'full',
-  showCadastrosLink = true,
+  showCadastrosLink = false,
   maxWidth = 'max-w-5xl',
   moduleSubtitle = 'Módulo ativo',
   mobileModuleName,
