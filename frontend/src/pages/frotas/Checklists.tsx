@@ -61,7 +61,7 @@ function NovaChecklistModal({ onClose, isLight }: { onClose: () => void; isLight
       onClose()
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Erro ao registrar checklist'
-      setErro(msg.includes('row-level security') ? 'Sem permissao para registrar checklist. Verifique seu perfil de acesso.' : msg)
+      setErro(msg.includes('row-level security') ? 'Voce nao tem permissao para registrar checklists. Contate o administrador.' : msg)
     }
   }
 
@@ -138,9 +138,9 @@ function NovaChecklistModal({ onClose, isLight }: { onClose: () => void; isLight
         </div>
 
         {erro && (
-          <div className="flex items-center gap-2 p-3 rounded-xl bg-red-500/10 border border-red-500/30">
-            <AlertTriangle size={14} className="text-red-400 shrink-0" />
-            <p className="text-xs text-red-400 font-medium">{erro}</p>
+          <div className="flex items-center gap-2 p-3 rounded-2xl bg-red-500/10 border border-red-500/30">
+            <AlertTriangle size={16} className="text-red-400 shrink-0" />
+            <p className="text-sm text-red-400 font-medium">{erro}</p>
           </div>
         )}
 
