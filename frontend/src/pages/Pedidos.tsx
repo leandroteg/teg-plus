@@ -2,9 +2,10 @@ import { useState, useRef, useEffect } from 'react'
 import {
   Package, Truck, CheckCircle, Clock, AlertTriangle, ChevronDown, ChevronUp,
   FileText, Share2, Download, MessageCircle, Mail, Upload, X, Paperclip,
-  Banknote, ExternalLink,
+  Banknote, ExternalLink, Loader2,
 } from 'lucide-react'
 import { useSearchParams } from 'react-router-dom'
+import jsPDF from 'jspdf'
 import { usePedidos, useAtualizarPedido, useLiberarPagamento } from '../hooks/usePedidos'
 import { api } from '../services/api'
 import { supabase } from '../services/supabase'
@@ -146,15 +147,112 @@ function gerarPdfPedido(pedido: Pedido) {
   setTimeout(() => printWin.print(), 500)
 }
 
-function compartilharWhatsApp(pedido: Pedido) {
+function gerarPdfBlob(pedido: Pedido): Blob {
+  const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
+  const W = 210
+  const M = 15
+  const CW = W - 2 * M
+  let y = M
+
+  const TEAL = [13, 148, 136] as const
+  const DARK = [30, 41, 59] as const
+  const MID  = [100, 116, 139] as const
+  const LIGHT = [226, 232, 240] as const
+
+  // Header bar
+  doc.setFillColor(...TEAL)
+  doc.rect(0, 0, W, 28, 'F')
+  doc.setFont('helvetica', 'bold')
+  doc.setFontSize(18)
+  doc.setTextColor(255, 255, 255)
+  doc.text('TEG+', M, 14)
+  doc.setFontSize(10)
+  doc.text('Pedido de Compra', M, 22)
+
+  const numero = pedido.numero_pedido ?? pedido.id.slice(0, 8).toUpperCase()
+  doc.setFontSize(14)
+  doc.text(`#${numero}`, W - M, 14, { align: 'right' })
+  doc.setFontSize(9)
+  doc.text(new Date().toLocaleDateString('pt-BR'), W - M, 22, { align: 'right' })
+  y = 36
+
+  // Helper: label + value row
+  const addField = (label: string, value: string, bold = false) => {
+    doc.setFont('helvetica', 'normal')
+    doc.setFontSize(9)
+    doc.setTextColor(...MID)
+    doc.text(label, M, y)
+    doc.setFont('helvetica', bold ? 'bold' : 'normal')
+    doc.setFontSize(11)
+    doc.setTextColor(...DARK)
+    doc.text(value || '—', M + 45, y)
+    y += 7
+  }
+
+  addField('Fornecedor', pedido.fornecedor_nome, true)
+  addField('Valor Total', pedido.valor_total?.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) ?? '—', true)
+  if (pedido.requisicao) {
+    addField('Requisicao', `${pedido.requisicao.numero} — ${pedido.requisicao.descricao}`)
+    if (pedido.requisicao.obra_nome) addField('Obra', pedido.requisicao.obra_nome)
+  }
+  addField('Data Pedido', pedido.data_pedido ? new Date(pedido.data_pedido).toLocaleDateString('pt-BR') : '—')
+  addField('Prev. Entrega', pedido.data_prevista_entrega ? new Date(pedido.data_prevista_entrega + 'T00:00:00').toLocaleDateString('pt-BR') : '—')
+  if (pedido.nf_numero) addField('NF', pedido.nf_numero)
+  if (pedido.observacoes) {
+    y += 3
+    doc.setFont('helvetica', 'normal')
+    doc.setFontSize(9)
+    doc.setTextColor(...MID)
+    doc.text('Observacoes', M, y)
+    y += 5
+    doc.setTextColor(...DARK)
+    doc.setFontSize(10)
+    const lines = doc.splitTextToSize(pedido.observacoes, CW)
+    doc.text(lines, M, y)
+    y += lines.length * 5
+  }
+
+  // Footer
+  y = 282
+  doc.setDrawColor(...LIGHT)
+  doc.line(M, y - 4, W - M, y - 4)
+  doc.setFontSize(8)
+  doc.setTextColor(...MID)
+  doc.text(`TEG+ ERP · Pedido de Compra · Emitido em ${new Date().toLocaleString('pt-BR')}`, W / 2, y, { align: 'center' })
+
+  return doc.output('blob')
+}
+
+async function compartilharWhatsApp(pedido: Pedido): Promise<boolean> {
+  const numero = pedido.numero_pedido ?? pedido.id.slice(0, 8)
   const text =
     `*Pedido de Compra TEG+*\n` +
-    `Número: #${pedido.numero_pedido ?? pedido.id.slice(0, 8)}\n` +
+    `Número: #${numero}\n` +
     `Fornecedor: ${pedido.fornecedor_nome}\n` +
     `Valor: ${pedido.valor_total?.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}\n` +
     `Previsão: ${pedido.data_prevista_entrega ? new Date(pedido.data_prevista_entrega + 'T00:00:00').toLocaleDateString('pt-BR') : '—'}\n` +
     `\n_Gerado pelo sistema TEG+ ERP_`
+
+  // Try Web Share API with PDF attachment (works on mobile browsers / WhatsApp)
+  if (navigator.share && navigator.canShare) {
+    try {
+      const blob = gerarPdfBlob(pedido)
+      const file = new File([blob], `Pedido_${numero}.pdf`, { type: 'application/pdf' })
+      const shareData = { text, files: [file] }
+
+      if (navigator.canShare(shareData)) {
+        await navigator.share(shareData)
+        return true
+      }
+    } catch (err) {
+      // User cancelled or share failed — fall through to wa.me link
+      if (err instanceof DOMException && err.name === 'AbortError') return false
+    }
+  }
+
+  // Fallback: text-only wa.me link (no attachment possible)
   window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank')
+  return true
 }
 
 async function compartilharEmail(pedido: Pedido, email?: string) {
@@ -221,6 +319,17 @@ function AnexoIcon({ mime }: { mime: string | null }) {
 // ─── CompartilharModal ────────────────────────────────────────────────────────
 
 function CompartilharModal({ pedido, onClose }: { pedido: Pedido; onClose: () => void }) {
+  const [sharing, setSharing] = useState(false)
+
+  const handleWhatsApp = async () => {
+    setSharing(true)
+    try {
+      await compartilharWhatsApp(pedido)
+    } finally {
+      setSharing(false)
+    }
+  }
+
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden animate-in slide-in-from-bottom-4 duration-200">
@@ -275,11 +384,14 @@ function CompartilharModal({ pedido, onClose }: { pedido: Pedido; onClose: () =>
           </button>
 
           <button
-            onClick={() => compartilharWhatsApp(pedido)}
-            className="w-full flex items-center gap-3 px-4 py-3 rounded-xl bg-green-50 border border-green-200 text-green-700 text-sm font-semibold hover:bg-green-100 transition-colors"
+            onClick={handleWhatsApp}
+            disabled={sharing}
+            className="w-full flex items-center gap-3 px-4 py-3 rounded-xl bg-green-50 border border-green-200 text-green-700 text-sm font-semibold hover:bg-green-100 transition-colors disabled:opacity-60"
           >
-            <MessageCircle size={16} className="flex-shrink-0" />
-            <span>Compartilhar no WhatsApp</span>
+            {sharing
+              ? <Loader2 size={16} className="flex-shrink-0 animate-spin" />
+              : <MessageCircle size={16} className="flex-shrink-0" />}
+            <span>{sharing ? 'Gerando PDF...' : 'Compartilhar no WhatsApp'}</span>
           </button>
 
           <button
