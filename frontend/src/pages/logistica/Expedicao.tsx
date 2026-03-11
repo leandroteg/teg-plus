@@ -106,6 +106,32 @@ export default function Expedicao() {
     setRomaneioModal(null)
   }
 
+  function downloadRomaneio(s: LogSolicitacao) {
+    const url = gerarRomaneioPDF({
+      numero: s.numero,
+      origem: s.origem,
+      destino: s.destino,
+      obra_nome: s.obra_nome,
+      solicitante: s.solicitante_nome,
+      motorista_nome: s.motorista_nome,
+      veiculo_placa: s.veiculo_placa,
+      peso_total_kg: s.peso_total_kg,
+      volumes_total: s.volumes_total,
+      observacoes: s.observacoes_carga,
+      itens: (s.itens ?? []).map(i => ({
+        descricao: i.descricao,
+        quantidade: i.quantidade,
+        unidade: i.unidade,
+        peso_kg: i.peso_kg,
+      })),
+    })
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `romaneio-${s.numero}.pdf`
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
   // ── Solicitar NF handler ──
 
   async function handleSolicitarNF() {
@@ -656,11 +682,11 @@ function getDocStatus(s: LogSolicitacao) {
         </span>
       ),
       rightInfo: s.romaneio_url ? (
-        <a href={s.romaneio_url} target="_blank" rel="noreferrer"
+        <button
           className="text-[10px] text-teal-600 hover:text-teal-700 font-semibold flex items-center gap-1"
-          onClick={e => e.stopPropagation()}>
+          onClick={e => { e.stopPropagation(); downloadRomaneio(s) }}>
           <Download size={10} /> Download
-        </a>
+        </button>
       ) : null,
     }
   }
@@ -814,10 +840,10 @@ function ExpedicaoDetail({
               </div>
             </div>
             {solicitacao.romaneio_url && (
-              <a href={solicitacao.romaneio_url} target="_blank" rel="noreferrer"
+              <button onClick={() => downloadRomaneio(solicitacao)}
                 className="inline-flex items-center gap-1 text-[10px] text-teal-700 hover:text-teal-800 font-semibold mt-1 ml-5">
                 <Download size={9} /> Download Romaneio
-              </a>
+              </button>
             )}
           </div>
         )
