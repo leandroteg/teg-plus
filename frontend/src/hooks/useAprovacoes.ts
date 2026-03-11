@@ -87,6 +87,7 @@ export function useAprovacoesPendentes(tipo?: TipoAprovacao) {
 
       const conMap = new Map<string, Record<string, unknown>>()
       const minutaMap = new Map<string, Record<string, unknown>>()
+      const resumoMap = new Map<string, Record<string, unknown>>()
       if (conIds.length > 0) {
         const { data: conData } = await supabase
           .from('con_solicitacoes')
@@ -116,7 +117,6 @@ export function useAprovacoesPendentes(tipo?: TipoAprovacao) {
           .select('id, solicitacao_id, titulo, objeto_resumo, partes_envolvidas, valor_total, vigencia, riscos, oportunidades, recomendacao, status')
           .in('solicitacao_id', conIds)
           .order('created_at', { ascending: false })
-        const resumoMap = new Map<string, Record<string, unknown>>()
         for (const r of resumoData ?? []) {
           if (!resumoMap.has(r.solicitacao_id as string)) {
             resumoMap.set(r.solicitacao_id as string, r)
