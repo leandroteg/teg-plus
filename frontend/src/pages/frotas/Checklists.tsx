@@ -55,9 +55,10 @@ function NovaChecklistModal({ onClose, isLight }: { onClose: () => void; isLight
     onClose()
   }
 
-  const inp = `w-full px-3 py-2 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-rose-500/30 ${
-    isLight ? 'bg-slate-50 border border-slate-200 text-slate-800' : 'bg-white/6 border border-white/10 text-white'
+  const inp = `w-full px-3 py-2 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-teal-400/40 ${
+    isLight ? 'bg-white border border-slate-200 shadow-sm text-slate-800 hover:border-slate-300' : 'bg-white/6 border border-white/12 text-white hover:border-white/20'
   }`
+  const lbl = 'block text-xs font-medium mb-1 ' + (isLight ? 'text-slate-600' : 'text-slate-300')
   const sel = inp + (isLight ? '' : ' [&>option]:bg-slate-900')
 
   return (
@@ -67,7 +68,7 @@ function NovaChecklistModal({ onClose, isLight }: { onClose: () => void; isLight
 
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <label className="text-[11px] text-slate-400">Veiculo *</label>
+            <label className={lbl}>Veiculo *</label>
             <select className={sel} value={form.veiculo_id} onChange={e => setForm(f => ({ ...f, veiculo_id: e.target.value }))} required>
               <option value="">Selecione...</option>
               {veiculos.filter(v => v.status !== 'baixado').map(v => (
@@ -76,7 +77,7 @@ function NovaChecklistModal({ onClose, isLight }: { onClose: () => void; isLight
             </select>
           </div>
           <div>
-            <label className="text-[11px] text-slate-400">Tipo</label>
+            <label className={lbl}>Tipo</label>
             <select className={sel} value={form.tipo} onChange={e => setForm(f => ({ ...f, tipo: e.target.value as TipoChecklist }))}>
               {Object.entries(TIPO_LABEL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
             </select>
@@ -84,13 +85,13 @@ function NovaChecklistModal({ onClose, isLight }: { onClose: () => void; isLight
         </div>
 
         <div>
-          <label className="text-[11px] text-slate-400">Hodometro atual (km)</label>
+          <label className={lbl}>Hodometro atual (km)</label>
           <input type="number" className={inp} value={form.hodometro} onChange={e => setForm(f => ({ ...f, hodometro: e.target.value }))} placeholder="Ex: 55432" />
         </div>
 
         {/* Itens */}
         <div className="space-y-2">
-          <label className="text-[11px] text-slate-400 uppercase tracking-wider">Itens de Verificacao</label>
+          <label className={lbl + ' uppercase tracking-wider'}>Itens de Verificacao</label>
           {ITENS_CHECKLIST.map(item => (
             <button
               key={item.key}
@@ -122,15 +123,15 @@ function NovaChecklistModal({ onClose, isLight }: { onClose: () => void; isLight
         </div>
 
         <div>
-          <label className="text-[11px] text-slate-400">Observacoes</label>
+          <label className={lbl}>Observacoes</label>
           <textarea className={inp + ' resize-none'} rows={2} value={form.observacoes} onChange={e => setForm(f => ({ ...f, observacoes: e.target.value }))} placeholder="Anomalias, observacoes adicionais..." />
         </div>
 
         <div className="flex gap-2">
-          <button type="button" onClick={onClose} className={`flex-1 py-2 rounded-xl border text-sm ${
+          <button type="button" onClick={onClose} className={`flex-1 py-2.5 rounded-xl border text-sm font-medium ${
             isLight ? 'border-slate-200 text-slate-500 hover:bg-slate-50' : 'border-white/10 text-slate-400 hover:bg-white/5'
           }`}>Cancelar</button>
-          <button type="submit" disabled={criar.isPending || !form.veiculo_id} className="flex-1 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-sm text-white font-semibold disabled:opacity-50">
+          <button type="submit" disabled={criar.isPending || !form.veiculo_id} className="flex-1 py-2 rounded-xl bg-gradient-to-r from-teal-500 to-teal-600 hover:from-teal-400 hover:to-teal-500 shadow-sm shadow-teal-500/20 text-sm text-white font-semibold disabled:opacity-50">
             {criar.isPending ? 'Registrando...' : 'Registrar Checklist'}
           </button>
         </div>
@@ -191,13 +192,13 @@ export default function Checklists() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className={`text-xl font-bold flex items-center gap-2 ${isLight ? 'text-slate-800' : 'text-white'}`}>
-            <ClipboardCheck size={20} className="text-rose-400" /> Checklists
+            <ClipboardCheck size={20} className="text-teal-500" /> Checklists
           </h1>
           <p className="text-sm text-slate-500">
             {liberados} liberados · <span className="text-red-400">{naoLiberados} nao liberados</span>
           </p>
         </div>
-        <button onClick={() => setModal(true)} className="flex items-center gap-2 px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-sm text-white font-semibold">
+        <button onClick={() => setModal(true)} className="flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-teal-500 to-teal-600 hover:from-teal-400 hover:to-teal-500 shadow-sm shadow-teal-500/20 text-sm text-white font-semibold">
           <Plus size={15} /> Novo Checklist
         </button>
       </div>
@@ -205,22 +206,22 @@ export default function Checklists() {
       {/* Filtros */}
       <div className="flex gap-3 flex-wrap">
         <div>
-          <label className="text-[10px] text-slate-500 block mb-1">Data</label>
+          <label className="text-xs font-medium text-slate-500 block mb-1">Data</label>
           <input
             type="date"
             value={dataFiltro}
             onChange={e => setDataFiltro(e.target.value)}
-            className={`px-3 py-2 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-rose-500/30 ${
+            className={`px-3 py-2 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-teal-400/40 ${
               isLight ? 'bg-slate-50 border border-slate-200 text-slate-800' : 'bg-white/6 border border-white/10 text-white'
             }`}
           />
         </div>
         <div>
-          <label className="text-[10px] text-slate-500 block mb-1">Tipo</label>
+          <label className="text-xs font-medium text-slate-500 block mb-1">Tipo</label>
           <select
             value={tipoFiltro}
             onChange={e => setTipoFiltro(e.target.value as TipoChecklist | '')}
-            className={`px-3 py-2 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-rose-500/30 ${
+            className={`px-3 py-2 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-teal-400/40 ${
               isLight ? 'bg-slate-50 border border-slate-200 text-slate-800' : 'bg-white/6 border border-white/10 text-white [&>option]:bg-slate-900'
             }`}
           >

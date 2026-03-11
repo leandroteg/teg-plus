@@ -49,9 +49,10 @@ function NovoAbastecimentoModal({ onClose, isLight }: { onClose: () => void; isL
     onClose()
   }
 
-  const inp = `w-full px-3 py-2 rounded-xl text-sm placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-rose-500/30 ${
-    isLight ? 'bg-slate-50 border border-slate-200 text-slate-800' : 'bg-white/6 border border-white/10 text-white'
+  const inp = `w-full px-3 py-2 rounded-xl text-sm placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-teal-400/40 ${
+    isLight ? 'bg-white border border-slate-200 shadow-sm text-slate-800 hover:border-slate-300' : 'bg-white/6 border border-white/12 text-white hover:border-white/20'
   }`
+  const lbl = 'block text-xs font-medium mb-1 ' + (isLight ? 'text-slate-600' : 'text-slate-300')
   const sel = inp + (isLight ? '' : ' [&>option]:bg-slate-900')
 
   return (
@@ -61,7 +62,7 @@ function NovoAbastecimentoModal({ onClose, isLight }: { onClose: () => void; isL
 
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <label className="text-[11px] text-slate-400">Veiculo *</label>
+            <label className={lbl}>Veiculo *</label>
             <select className={sel} value={form.veiculo_id} onChange={e => setForm(f => ({ ...f, veiculo_id: e.target.value }))} required>
               <option value="">Selecione...</option>
               {veiculos.filter(v => v.status !== 'baixado').map(v => (
@@ -70,18 +71,18 @@ function NovoAbastecimentoModal({ onClose, isLight }: { onClose: () => void; isL
             </select>
           </div>
           <div>
-            <label className="text-[11px] text-slate-400">Data *</label>
+            <label className={lbl}>Data *</label>
             <input type="date" className={inp} value={form.data_abastecimento} onChange={e => setForm(f => ({ ...f, data_abastecimento: e.target.value }))} required />
           </div>
         </div>
 
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <label className="text-[11px] text-slate-400">Posto</label>
+            <label className={lbl}>Posto</label>
             <input className={inp} value={form.posto} onChange={e => setForm(f => ({ ...f, posto: e.target.value }))} placeholder="Nome do posto" />
           </div>
           <div>
-            <label className="text-[11px] text-slate-400">Combustivel</label>
+            <label className={lbl}>Combustivel</label>
             <select className={sel} value={form.combustivel} onChange={e => setForm(f => ({ ...f, combustivel: e.target.value as CombustivelVeiculo }))}>
               {Object.entries(COMB_LABEL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
             </select>
@@ -90,15 +91,15 @@ function NovoAbastecimentoModal({ onClose, isLight }: { onClose: () => void; isL
 
         <div className="grid grid-cols-3 gap-3">
           <div>
-            <label className="text-[11px] text-slate-400">Hodometro (km) *</label>
+            <label className={lbl}>Hodometro (km) *</label>
             <input type="number" className={inp} value={form.hodometro} onChange={e => setForm(f => ({ ...f, hodometro: e.target.value }))} required placeholder="55432" />
           </div>
           <div>
-            <label className="text-[11px] text-slate-400">Litros *</label>
+            <label className={lbl}>Litros *</label>
             <input type="number" className={inp} step="0.001" value={form.litros} onChange={e => setForm(f => ({ ...f, litros: e.target.value }))} required placeholder="40.000" />
           </div>
           <div>
-            <label className="text-[11px] text-slate-400">R$/litro *</label>
+            <label className={lbl}>R$/litro *</label>
             <input type="number" className={inp} step="0.001" value={form.valor_litro} onChange={e => setForm(f => ({ ...f, valor_litro: e.target.value }))} required placeholder="5.890" />
           </div>
         </div>
@@ -113,22 +114,22 @@ function NovoAbastecimentoModal({ onClose, isLight }: { onClose: () => void; isL
 
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <label className="text-[11px] text-slate-400">Forma de pagamento</label>
+            <label className={lbl}>Forma de pagamento</label>
             <select className={sel} value={form.forma_pagamento} onChange={e => setForm(f => ({ ...f, forma_pagamento: e.target.value as TipoPagamento }))}>
               {Object.entries(PAG_LABEL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
             </select>
           </div>
           <div>
-            <label className="text-[11px] text-slate-400">No do cupom</label>
+            <label className={lbl}>No do cupom</label>
             <input className={inp} value={form.numero_cupom} onChange={e => setForm(f => ({ ...f, numero_cupom: e.target.value }))} placeholder="0000001" />
           </div>
         </div>
 
         <div className="flex gap-2">
-          <button type="button" onClick={onClose} className={`flex-1 py-2 rounded-xl border text-sm ${
+          <button type="button" onClick={onClose} className={`flex-1 font-medium py-2.5 rounded-xl border text-sm ${
             isLight ? 'border-slate-200 text-slate-500 hover:bg-slate-50' : 'border-white/10 text-slate-400 hover:bg-white/5'
           }`}>Cancelar</button>
-          <button type="submit" disabled={registrar.isPending} className="flex-1 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-sm text-white font-semibold disabled:opacity-50">
+          <button type="submit" disabled={registrar.isPending} className="flex-1 py-2.5 rounded-xl bg-gradient-to-r from-teal-500 to-teal-600 hover:from-teal-400 hover:to-teal-500 shadow-sm shadow-teal-500/20 text-sm text-white font-semibold disabled:opacity-50">
             {registrar.isPending ? 'Registrando...' : 'Registrar'}
           </button>
         </div>
@@ -162,11 +163,11 @@ export default function Abastecimentos() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className={`text-xl font-bold flex items-center gap-2 ${isLight ? 'text-slate-800' : 'text-white'}`}>
-            <Fuel size={20} className="text-rose-400" /> Abastecimentos
+            <Fuel size={20} className="text-teal-500" /> Abastecimentos
           </h1>
           <p className="text-sm text-slate-500">{abastecimentos.length} registros no mes</p>
         </div>
-        <button onClick={() => setModal(true)} className="flex items-center gap-2 px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-sm text-white font-semibold">
+        <button onClick={() => setModal(true)} className="flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-teal-500 to-teal-600 hover:from-teal-400 hover:to-teal-500 shadow-sm shadow-teal-500/20 text-sm text-white font-semibold">
           <Plus size={15} /> Registrar
         </button>
       </div>
@@ -176,7 +177,7 @@ export default function Abastecimentos() {
         <div>
           <label className="text-[10px] text-slate-500 block mb-1">Mes</label>
           <input type="month" value={mesFiltro} onChange={e => setMesFiltro(e.target.value)}
-            className={`px-3 py-2 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-rose-500/30 ${
+            className={`px-3 py-2 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-teal-400/40 ${
               isLight ? 'bg-slate-50 border border-slate-200 text-slate-800' : 'bg-white/6 border border-white/10 text-white'
             }`} />
         </div>
@@ -185,7 +186,7 @@ export default function Abastecimentos() {
           <select
             value={veiculoFiltro}
             onChange={e => setVeiculoFiltro(e.target.value)}
-            className={`px-3 py-2 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-rose-500/30 ${
+            className={`px-3 py-2 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-teal-400/40 ${
               isLight ? 'bg-slate-50 border border-slate-200 text-slate-800' : 'bg-white/6 border border-white/10 text-white [&>option]:bg-slate-900'
             }`}
           >
@@ -199,7 +200,7 @@ export default function Abastecimentos() {
 
       {/* KPI Cards */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <div className="glass-card rounded-xl p-3 border-l-4 border-l-rose-500">
+        <div className="glass-card rounded-xl p-3 border-l-4 border-l-teal-500">
           <p className="text-[10px] text-slate-500 uppercase mb-1">Custo Total</p>
           <p className={`text-lg font-black ${isLight ? 'text-slate-800' : 'text-white'}`}>{BRL(totalCusto)}</p>
         </div>

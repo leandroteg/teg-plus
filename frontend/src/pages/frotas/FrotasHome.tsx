@@ -23,17 +23,28 @@ const STATUS_VEICULO_DOT: Record<string, string> = {
 }
 
 // ── KPI Card ──────────────────────────────────────────────────────────────────
+const ACCENT_BORDER: Record<string, string> = {
+  teal: 'border-l-teal-500',
+  emerald: 'border-l-emerald-500',
+  orange: 'border-l-orange-500',
+  amber: 'border-l-amber-500',
+  red: 'border-l-red-500',
+  blue: 'border-l-blue-500',
+  violet: 'border-l-violet-500',
+  rose: 'border-l-rose-500',
+}
+
 function KpiCard({
-  label, value, sub, accent = 'rose', warn = false, isLight = false,
+  label, value, sub, accent = 'teal', warn = false, isLight = false,
 }: {
   label: string; value: string | number; sub?: string; accent?: string; warn?: boolean; isLight?: boolean
 }) {
-  const border = warn ? 'border-l-red-500' : `border-l-${accent}-500`
+  const border = warn ? 'border-l-red-500' : (ACCENT_BORDER[accent] ?? 'border-l-teal-500')
   return (
     <div className={`glass-card rounded-2xl p-4 border-l-4 ${border}`}>
-      <p className="text-[11px] text-slate-500 uppercase tracking-wider mb-1">{label}</p>
+      <p className="text-xs text-slate-500 uppercase tracking-wider mb-1">{label}</p>
       <p className={`text-2xl font-black ${isLight ? 'text-slate-800' : 'text-white'}`}>{value}</p>
-      {sub && <p className="text-[11px] text-slate-500 mt-0.5">{sub}</p>}
+      {sub && <p className="text-xs text-slate-500 mt-0.5">{sub}</p>}
     </div>
   )
 }
@@ -96,7 +107,7 @@ export default function FrotasHome() {
       ) : (
         <>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            <KpiCard label="Total da Frota"    value={k?.total_veiculos ?? 0} sub={`${k?.disponiveis ?? 0} disponiveis`} accent="rose" isLight={isLight} />
+            <KpiCard label="Total da Frota"    value={k?.total_veiculos ?? 0} sub={`${k?.disponiveis ?? 0} disponiveis`} accent="teal" isLight={isLight} />
             <KpiCard label="Disponibilidade"   value={`${k?.taxa_disponibilidade ?? 0}%`} sub={`${k?.em_uso ?? 0} em uso`} accent="emerald" isLight={isLight} />
             <KpiCard label="OS Abertas"        value={k?.os_abertas ?? 0} sub={`${k?.os_criticas ?? 0} criticas`} accent="orange" warn={(k?.os_criticas ?? 0) > 0} isLight={isLight} />
             <KpiCard label="Em Manutencao"     value={(k?.em_manutencao ?? 0) + (k?.bloqueados ?? 0)} sub={`${k?.bloqueados ?? 0} bloqueados`} accent="amber" isLight={isLight} />
@@ -105,7 +116,7 @@ export default function FrotasHome() {
           <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
             <KpiCard label="Prev. Vencidas"    value={k?.preventivas_vencidas ?? 0} sub="atencao imediata" accent="red" warn={(k?.preventivas_vencidas ?? 0) > 0} isLight={isLight} />
             <KpiCard label="Prev. em 7 dias"   value={k?.preventivas_proximas_7d ?? 0} sub="programar" accent="amber" isLight={isLight} />
-            <KpiCard label="Custo Manutencao"  value={BRL(k?.custo_manutencao_mes ?? 0)} sub="mes atual" accent="rose" isLight={isLight} />
+            <KpiCard label="Custo Manutencao"  value={BRL(k?.custo_manutencao_mes ?? 0)} sub="mes atual" accent="teal" isLight={isLight} />
             <KpiCard label="Custo Abastecimento" value={BRL(k?.custo_abastecimento_mes ?? 0)} sub="mes atual" accent="blue" isLight={isLight} />
             <KpiCard label="Ocorrencias" value={k?.ocorrencias_abertas ?? 0} sub="pendentes" accent="violet" warn={(k?.ocorrencias_abertas ?? 0) > 0} isLight={isLight} />
           </div>
@@ -117,7 +128,7 @@ export default function FrotasHome() {
         <div className="glass-card rounded-2xl p-4">
           <div className="flex items-center justify-between mb-3">
             <h2 className={`text-sm font-semibold flex items-center gap-2 ${isLight ? 'text-slate-800' : 'text-white'}`}>
-              <Car size={15} className="text-rose-400" />
+              <Car size={15} className="text-teal-500" />
               Status da Frota
             </h2>
             <div className="flex items-center gap-3 text-[10px] text-slate-500">
@@ -189,10 +200,10 @@ export default function FrotasHome() {
         {/* Ocorrencias Telemetria */}
         <div className="glass-card rounded-2xl p-4 space-y-2">
           <h2 className={`text-sm font-semibold flex items-center gap-2 mb-3 ${isLight ? 'text-slate-800' : 'text-white'}`}>
-            <Radio size={15} className="text-rose-400" />
+            <Radio size={15} className="text-teal-500" />
             Ocorrencias Pendentes
             {otelPendentes.length > 0 && (
-              <span className="ml-auto text-[10px] bg-rose-500/15 text-rose-300 border border-rose-500/30 px-2 py-0.5 rounded-full">
+              <span className="ml-auto text-[10px] bg-red-500/15 text-red-300 border border-red-500/30 px-2 py-0.5 rounded-full">
                 {otelPendentes.length}
               </span>
             )}
