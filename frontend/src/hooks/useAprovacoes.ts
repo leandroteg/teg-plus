@@ -120,7 +120,7 @@ export function useAprovacoesPendentes(tipo?: TipoAprovacao) {
       if (finIds.length > 0) {
         const { data: finData } = await supabase
           .from('fin_contas_pagar')
-          .select('id, fornecedor_nome, valor_original, numero_documento, descricao, data_vencimento, centro_custo')
+          .select('id, fornecedor_nome, valor_original, valor_pago, numero_documento, descricao, data_vencimento, data_emissao, centro_custo, classe_financeira, natureza, forma_pagamento, status')
           .in('id', finIds)
         for (const f of finData ?? []) {
           finMap.set(f.id, f)
@@ -195,6 +195,23 @@ export function useAprovacoesPendentes(tipo?: TipoAprovacao) {
               alcada_nivel: a.nivel,
               created_at: a.created_at,
             }
+            // Issue #35: Attach enriched payment details for AprovAi card
+            if (fin) {
+              ;(a as Record<string, unknown>)._pagamento_detalhes = {
+                fornecedor_nome: (fin.fornecedor_nome as string) ?? '',
+                valor_original: (fin.valor_original as number) ?? 0,
+                valor_pago: (fin.valor_pago as number) ?? 0,
+                numero_documento: (fin.numero_documento as string) ?? '',
+                descricao: (fin.descricao as string) ?? '',
+                data_vencimento: (fin.data_vencimento as string) ?? '',
+                data_emissao: (fin.data_emissao as string) ?? '',
+                centro_custo: (fin.centro_custo as string) ?? '',
+                classe_financeira: (fin.classe_financeira as string) ?? '',
+                natureza: (fin.natureza as string) ?? '',
+                forma_pagamento: (fin.forma_pagamento as string) ?? '',
+                status_cp: (fin.status as string) ?? '',
+              }
+            }
           } else {
             requisicao = {
               id: a.entidade_id,
@@ -212,6 +229,8 @@ export function useAprovacoesPendentes(tipo?: TipoAprovacao) {
 
           const minutaResumo = (a as Record<string, unknown>)._minuta_resumo as AprovacaoPendente['minuta_resumo']
           delete (a as Record<string, unknown>)._minuta_resumo
+          const pagamentoDetalhes = (a as Record<string, unknown>)._pagamento_detalhes as AprovacaoPendente['pagamento_detalhes']
+          delete (a as Record<string, unknown>)._pagamento_detalhes
 
           return {
             ...a,
@@ -221,6 +240,7 @@ export function useAprovacoesPendentes(tipo?: TipoAprovacao) {
             requisicao,
             cotacao_resumo: cotMap.get(a.entidade_id) ?? undefined,
             minuta_resumo: minutaResumo ?? undefined,
+            pagamento_detalhes: pagamentoDetalhes ?? undefined,
           } as unknown as AprovacaoPendente
         })
         .filter((a): a is AprovacaoPendente => a !== null)

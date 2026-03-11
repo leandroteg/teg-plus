@@ -6,7 +6,7 @@ import {
   MessageSquare, ExternalLink, ArrowLeft,
   FileSearch, Banknote, FileSignature, ShoppingCart,
   History, ListChecks, Timer, TrendingUp, Filter,
-  Calendar, FileText, Download,
+  Calendar, FileText, Download, Eye, HelpCircle,
 } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import {
@@ -435,6 +435,8 @@ function GenericPendingCard({ aprovacao, aprovadorNome, aprovadorEmail }: {
         {/* ── Resumo Executivo para Minuta Contratual ── */}
         {aprovacao.tipo_aprovacao === 'minuta_contratual' && aprovacao.minuta_resumo ? (
           <MinutaExecutiveSummary resumo={aprovacao.minuta_resumo} />
+        ) : aprovacao.tipo_aprovacao === 'autorizacao_pagamento' && aprovacao.pagamento_detalhes ? (
+          <PagamentoDetalhesCard detalhes={aprovacao.pagamento_detalhes} />
         ) : aprovacao.tipo_aprovacao === 'autorizacao_pagamento' && aprovacao.requisicao ? (
           <div className="space-y-2">
             <div className="bg-slate-50 rounded-xl p-3 space-y-1.5">
@@ -537,6 +539,113 @@ function GenericPendingCard({ aprovacao, aprovadorNome, aprovadorEmail }: {
   )
 }
 
+// ── Issue #35: Pagamento Detalhes Card ────────────────────────────────────────
+
+function PagamentoDetalhesCard({ detalhes }: {
+  detalhes: NonNullable<AprovacaoPendente['pagamento_detalhes']>
+}) {
+  const [showEntender, setShowEntender] = useState(false)
+  const fmtDate = (d: string) => d ? new Date(d + 'T00:00:00').toLocaleDateString('pt-BR') : '—'
+  const isVencida = detalhes.data_vencimento && new Date(detalhes.data_vencimento) < new Date()
+
+  return (
+    <div className="space-y-2.5">
+      {/* Valor destaque */}
+      <div className={`rounded-xl p-3 flex justify-between items-center ${isVencida ? 'bg-red-50 border border-red-200' : 'bg-amber-50 border border-amber-200'}`}>
+        <div>
+          <span className={`text-xs font-medium ${isVencida ? 'text-red-700' : 'text-amber-700'}`}>
+            Valor a Pagar
+          </span>
+          {isVencida && (
+            <span className="ml-2 text-[10px] font-bold text-red-600 bg-red-100 px-1.5 py-0.5 rounded-full">VENCIDA</span>
+          )}
+        </div>
+        <span className={`text-lg font-extrabold ${isVencida ? 'text-red-700' : 'text-amber-700'}`}>
+          {fmt(detalhes.valor_original)}
+        </span>
+      </div>
+
+      {/* Info grid */}
+      <div className="bg-slate-50 rounded-xl p-3 space-y-1.5">
+        <div className="flex items-center gap-2 mb-1">
+          <Banknote size={13} className="text-teal-500" />
+          <span className="text-[11px] font-bold text-teal-600 uppercase tracking-wider">Detalhes do Pagamento</span>
+        </div>
+        <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-xs">
+          <div>
+            <span className="text-slate-400">Fornecedor</span>
+            <p className="font-semibold text-slate-800">{detalhes.fornecedor_nome || '—'}</p>
+          </div>
+          <div>
+            <span className="text-slate-400">Documento</span>
+            <p className="font-medium text-slate-700">{detalhes.numero_documento || '—'}</p>
+          </div>
+          <div className="col-span-2">
+            <span className="text-slate-400">Descricao</span>
+            <p className="font-medium text-slate-700 leading-snug">{detalhes.descricao || '—'}</p>
+          </div>
+          <div>
+            <span className="text-slate-400">Vencimento</span>
+            <p className={`font-medium ${isVencida ? 'text-red-600' : 'text-slate-700'}`}>{fmtDate(detalhes.data_vencimento)}</p>
+          </div>
+          <div>
+            <span className="text-slate-400">Emissao</span>
+            <p className="font-medium text-slate-700">{fmtDate(detalhes.data_emissao)}</p>
+          </div>
+          {detalhes.centro_custo && (
+            <div>
+              <span className="text-slate-400">Centro de Custo</span>
+              <p className="font-medium text-slate-700">{detalhes.centro_custo}</p>
+            </div>
+          )}
+          {detalhes.classe_financeira && (
+            <div>
+              <span className="text-slate-400">Classe Financeira</span>
+              <p className="font-medium text-slate-700">{detalhes.classe_financeira}</p>
+            </div>
+          )}
+          {detalhes.natureza && (
+            <div>
+              <span className="text-slate-400">Natureza</span>
+              <p className="font-medium text-slate-700 capitalize">{detalhes.natureza.replace(/_/g, ' ')}</p>
+            </div>
+          )}
+          {detalhes.forma_pagamento && (
+            <div>
+              <span className="text-slate-400">Forma Pagamento</span>
+              <p className="font-medium text-slate-700 capitalize">{detalhes.forma_pagamento.replace(/_/g, ' ')}</p>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Entender esta autorizacao */}
+      <button
+        type="button"
+        onClick={() => setShowEntender(!showEntender)}
+        className="flex items-center gap-1.5 text-[11px] text-indigo-500 hover:text-indigo-700 font-semibold transition-colors"
+      >
+        <HelpCircle size={12} />
+        {showEntender ? 'Ocultar explicacao' : 'Entender esta autorizacao'}
+      </button>
+      {showEntender && (
+        <div className="bg-indigo-50/60 border border-indigo-100 rounded-xl p-3 text-xs text-indigo-800 leading-relaxed">
+          <p>
+            Esta e uma <strong>Autorizacao de Pagamento</strong> para o fornecedor <strong>{detalhes.fornecedor_nome}</strong> no
+            valor de <strong>{fmt(detalhes.valor_original)}</strong>
+            {detalhes.data_vencimento && <>, com vencimento em <strong>{fmtDate(detalhes.data_vencimento)}</strong></>}.
+            {detalhes.centro_custo && <> O gasto sera alocado no centro de custo <strong>{detalhes.centro_custo}</strong>.</>}
+            {isVencida && <> <span className="text-red-600 font-bold">Atencao: esta conta ja esta vencida.</span></>}
+          </p>
+          <p className="mt-1.5">
+            Ao aprovar, o financeiro podera efetuar o pagamento. Ao rejeitar, a CP voltara para revisao.
+          </p>
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ── Minuta Executive Summary (inline in GenericPendingCard) ───────────────────
 
 function MinutaExecutiveSummary({ resumo }: {
@@ -580,12 +689,12 @@ function MinutaExecutiveSummary({ resumo }: {
         </div>
       </div>
 
-      {/* AI Analysis summary */}
+      {/* Issue #43: Executive summary as structured single text box */}
       {resumo.ai_resumo && (
         <div className="bg-violet-50/60 rounded-xl p-3">
-          <div className="flex items-center gap-2 mb-1.5">
+          <div className="flex items-center gap-2 mb-2">
             <Sparkles size={13} className="text-violet-500" />
-            <span className="text-[11px] font-bold text-violet-600 uppercase tracking-wider">Analise IA</span>
+            <span className="text-[11px] font-bold text-violet-600 uppercase tracking-wider">Parecer / Resumo Executivo</span>
             {typeof resumo.ai_score === 'number' && (
               <span className={`ml-auto text-[11px] font-extrabold px-2 py-0.5 rounded-full ${
                 resumo.ai_score >= 80 ? 'bg-emerald-100 text-emerald-700' :
@@ -596,7 +705,21 @@ function MinutaExecutiveSummary({ resumo }: {
               </span>
             )}
           </div>
-          <p className="text-xs text-slate-600 leading-relaxed line-clamp-4">{resumo.ai_resumo}</p>
+          <div className="bg-white/80 border border-violet-100 rounded-lg p-3 space-y-2.5 max-h-64 overflow-y-auto text-xs text-slate-700 leading-relaxed">
+            {resumo.ai_resumo.split('\n\n').map((section, idx) => {
+              const lines = section.split('\n')
+              const isHeader = lines[0] === lines[0].toUpperCase() && lines.length > 1
+              if (isHeader) {
+                return (
+                  <div key={idx}>
+                    <p className="text-[10px] font-bold text-violet-500 uppercase tracking-wider mb-0.5">{lines[0]}</p>
+                    <p className="whitespace-pre-line">{lines.slice(1).join('\n')}</p>
+                  </div>
+                )
+              }
+              return <p key={idx} className="whitespace-pre-line">{section}</p>
+            })}
+          </div>
         </div>
       )}
 

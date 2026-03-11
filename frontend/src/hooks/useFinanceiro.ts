@@ -85,6 +85,25 @@ export function useFornecedores() {
   })
 }
 
+// ── Fornecedor por ID (Issue #36: dados bancarios/PIX) ──────────────────────
+export function useFornecedorById(fornecedorId?: string | null) {
+  return useQuery<Fornecedor | null>({
+    queryKey: ['fornecedor', fornecedorId],
+    queryFn: async () => {
+      if (!fornecedorId) return null
+      const { data, error } = await supabase
+        .from('cmp_fornecedores')
+        .select('*')
+        .eq('id', fornecedorId)
+        .single()
+      if (error) return null
+      return data as Fornecedor
+    },
+    enabled: !!fornecedorId,
+    staleTime: 300_000,
+  })
+}
+
 // ── Aprovar Pagamento (AP): aguardando_aprovacao → aprovado_pgto ──────────
 // Autorização de Pagamento: o financeiro aprova a CP para pagamento efetivo.
 

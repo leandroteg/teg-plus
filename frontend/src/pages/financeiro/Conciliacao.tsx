@@ -136,6 +136,8 @@ export default function Conciliacao() {
   const [dataFim, setDataFim] = useState('')
   const [filtroSemCC, setFiltroSemCC] = useState(false)
   const [filtroSemClasse, setFiltroSemClasse] = useState(false)
+  const [filtroCC, setFiltroCC] = useState('')
+  const [filtroClasse, setFiltroClasse] = useState('')
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [showClassModal, setShowClassModal] = useState(false)
   const [toast, setToast] = useState<{ type: 'success' | 'error'; msg: string } | null>(null)
@@ -214,9 +216,11 @@ export default function Conciliacao() {
       if (dataFim && r.vencimento > dataFim) return false
       if (filtroSemCC && r.centroCusto) return false
       if (filtroSemClasse && r.classeFinanceira) return false
+      if (filtroCC && r.centroCusto !== filtroCC) return false
+      if (filtroClasse && r.classeFinanceira !== filtroClasse) return false
       return true
     })
-  }, [rows, busca, dataInicio, dataFim, filtroSemCC, filtroSemClasse])
+  }, [rows, busca, dataInicio, dataFim, filtroSemCC, filtroSemClasse, filtroCC, filtroClasse])
 
   // Selection helpers
   const allSelected = filtered.length > 0 && filtered.every(r => selected.has(r.id))
@@ -249,6 +253,8 @@ export default function Conciliacao() {
     setDataFim('')
     setFiltroSemCC(false)
     setFiltroSemClasse(false)
+    setFiltroCC('')
+    setFiltroClasse('')
   }
 
   const showToast = (type: 'success' | 'error', msg: string) => {
@@ -474,8 +480,35 @@ export default function Conciliacao() {
               />
             </div>
           </div>
+          {/* Issue #37: CC and Classe dropdowns */}
+          <div className="flex gap-2">
+            <select
+              value={filtroCC}
+              onChange={e => { setFiltroCC(e.target.value); if (e.target.value) setFiltroSemCC(false) }}
+              className={`px-3 py-2.5 rounded-xl border text-xs
+                focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-400
+                ${isDark ? 'bg-white/[0.03] border-white/[0.06] text-slate-300' : 'border-slate-200 bg-slate-50 text-slate-600'}`}
+            >
+              <option value="">Centro de Custo</option>
+              {ccSuggestions.map(cc => (
+                <option key={cc} value={cc}>{cc}</option>
+              ))}
+            </select>
+            <select
+              value={filtroClasse}
+              onChange={e => { setFiltroClasse(e.target.value); if (e.target.value) setFiltroSemClasse(false) }}
+              className={`px-3 py-2.5 rounded-xl border text-xs
+                focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-400
+                ${isDark ? 'bg-white/[0.03] border-white/[0.06] text-slate-300' : 'border-slate-200 bg-slate-50 text-slate-600'}`}
+            >
+              <option value="">Classe Financeira</option>
+              {classeSuggestions.map(cl => (
+                <option key={cl} value={cl}>{cl}</option>
+              ))}
+            </select>
+          </div>
         </div>
-        {(busca || dataInicio || dataFim || filtroSemCC || filtroSemClasse) && (
+        {(busca || dataInicio || dataFim || filtroSemCC || filtroSemClasse || filtroCC || filtroClasse) && (
           <div className="flex items-center gap-2 flex-wrap">
             <span className="text-[10px] text-slate-400">Filtros ativos:</span>
             {busca && (
@@ -513,8 +546,22 @@ export default function Conciliacao() {
                 <button onClick={() => setFiltroSemClasse(false)}><X size={9} /></button>
               </span>
             )}
+            {filtroCC && (
+              <span className="inline-flex items-center gap-1 bg-teal-100 text-teal-700 text-[10px] font-semibold
+                rounded-full px-2 py-0.5">
+                CC: {filtroCC}
+                <button onClick={() => setFiltroCC('')}><X size={9} /></button>
+              </span>
+            )}
+            {filtroClasse && (
+              <span className="inline-flex items-center gap-1 bg-purple-100 text-purple-700 text-[10px] font-semibold
+                rounded-full px-2 py-0.5">
+                Classe: {filtroClasse}
+                <button onClick={() => setFiltroClasse('')}><X size={9} /></button>
+              </span>
+            )}
             <button
-              onClick={() => { setBusca(''); setDataInicio(''); setDataFim(''); setFiltroSemCC(false); setFiltroSemClasse(false) }}
+              onClick={() => { setBusca(''); setDataInicio(''); setDataFim(''); setFiltroSemCC(false); setFiltroSemClasse(false); setFiltroCC(''); setFiltroClasse('') }}
               className="text-[10px] text-red-500 font-semibold hover:underline"
             >
               Limpar tudo

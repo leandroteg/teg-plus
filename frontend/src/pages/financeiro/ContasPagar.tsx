@@ -7,7 +7,7 @@ import {
   ShieldCheck, Building2, Tag, Briefcase, Hash,
 } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
-import { useContasPagar, useMarcarCPPago, useAprovarPagamento } from '../../hooks/useFinanceiro'
+import { useContasPagar, useMarcarCPPago, useAprovarPagamento, useFornecedorById } from '../../hooks/useFinanceiro'
 import { useLastSync, useTriggerSync, useOmieConfig } from '../../hooks/useOmie'
 import { useAnexosPedido, useUploadAnexo, TIPO_LABEL } from '../../hooks/useAnexos'
 import { useRegistrarPagamento } from '../../hooks/usePedidos'
@@ -312,6 +312,70 @@ const FILTROS_STATUS: { label: string; value: string }[] = [
   { label: 'Conciliados',     value: 'conciliado' },
 ]
 
+// ── Issue #36: Dados bancarios/PIX do fornecedor ──────────────────────────────
+
+function FornecedorPagamentoInfo({ fornecedorId, isDark }: { fornecedorId: string; isDark: boolean }) {
+  const { data: forn, isLoading } = useFornecedorById(fornecedorId)
+
+  if (isLoading) {
+    return (
+      <div className={`rounded-xl p-3 ${isDark ? 'bg-white/[0.04]' : 'bg-blue-50/60'}`}>
+        <p className="text-[10px] text-slate-400 animate-pulse">Carregando dados bancarios...</p>
+      </div>
+    )
+  }
+
+  if (!forn) return null
+  const hasBankData = forn.banco_nome || forn.agencia || forn.conta || forn.pix_chave
+  if (!hasBankData) return null
+
+  return (
+    <div className={`rounded-xl p-3 space-y-1.5 ${isDark ? 'bg-white/[0.04]' : 'bg-blue-50/60'}`}>
+      <p className="text-[10px] font-bold text-blue-500 uppercase tracking-wider flex items-center gap-1.5">
+        <Banknote size={10} /> Dados de Pagamento do Fornecedor
+      </p>
+      <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-[11px]">
+        {forn.razao_social && (
+          <div className="col-span-2">
+            <span className="text-slate-400">Razao Social:</span>{' '}
+            <span className="font-semibold text-slate-700">{forn.razao_social}</span>
+          </div>
+        )}
+        {forn.cnpj && (
+          <div>
+            <span className="text-slate-400">CNPJ:</span>{' '}
+            <span className="font-mono text-slate-600">{forn.cnpj}</span>
+          </div>
+        )}
+        {forn.banco_nome && (
+          <div>
+            <span className="text-slate-400">Banco:</span>{' '}
+            <span className="font-semibold text-slate-700">{forn.banco_nome}</span>
+          </div>
+        )}
+        {forn.agencia && (
+          <div>
+            <span className="text-slate-400">Agencia:</span>{' '}
+            <span className="font-mono text-slate-700">{forn.agencia}</span>
+          </div>
+        )}
+        {forn.conta && (
+          <div>
+            <span className="text-slate-400">Conta:</span>{' '}
+            <span className="font-mono text-slate-700">{forn.conta}</span>
+          </div>
+        )}
+        {forn.pix_chave && (
+          <div className="col-span-2">
+            <span className="text-slate-400">PIX ({forn.pix_tipo || 'chave'}):</span>{' '}
+            <span className="font-mono text-blue-700 font-semibold">{forn.pix_chave}</span>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
 // ── CPCard ────────────────────────────────────────────────────────────────────
 
 function CPCard({ cp, onRegistrarPgto, onAprovarPgto, isDark }: {
@@ -516,6 +580,11 @@ function CPCard({ cp, onRegistrarPgto, onAprovarPgto, isDark }: {
                 )}
               </div>
             </div>
+          )}
+
+          {/* Issue #36: Dados bancarios/PIX do fornecedor */}
+          {cp.fornecedor_id && (
+            <FornecedorPagamentoInfo fornecedorId={cp.fornecedor_id} isDark={isDark} />
           )}
 
           {/* Anexos */}
