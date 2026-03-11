@@ -75,13 +75,16 @@ function NovaOSModal({ onClose, isLight }: { onClose: () => void; isLight: boole
     isLight ? 'bg-white border border-slate-200 shadow-sm text-slate-800 hover:border-slate-300' : 'bg-white/6 border border-white/12 text-white hover:border-white/20'
   }`
   const sel = inp + (isLight ? '' : ' [&>option]:bg-slate-900')
-  const lbl = `block text-xs font-medium mb-1 ${isLight ? 'text-slate-600' : 'text-slate-300'}`
+  const lbl = `block text-xs font-bold mb-1 ${isLight ? 'text-slate-600' : 'text-slate-300'}`
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-      <form onSubmit={handleSubmit} className="glass-card rounded-2xl p-6 w-full max-w-2xl space-y-4 max-h-[90vh] overflow-y-auto styled-scrollbar">
-        <h2 className={`text-lg font-bold ${isLight ? 'text-slate-800' : 'text-white'}`}>Nova Ordem de Servico</h2>
+      <form onSubmit={handleSubmit} className={`rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto styled-scrollbar ${isLight ? 'bg-white border border-slate-200' : 'bg-[#1e293b] border border-white/[0.06]'}`}>
+        <div className={`px-6 py-4 border-b ${isLight ? 'border-slate-100' : 'border-white/[0.06]'}`}>
+          <h2 className={`text-lg font-extrabold ${isLight ? 'text-slate-800' : 'text-white'}`}>Nova Ordem de Servico</h2>
+        </div>
 
+        <div className="p-5 space-y-4">
         <div className="grid grid-cols-2 gap-3">
           <div>
             <label className={lbl}>Veiculo *</label>
@@ -145,7 +148,9 @@ function NovaOSModal({ onClose, isLight }: { onClose: () => void; isLight: boole
           ))}
         </div>
 
-        <div className="flex gap-2 pt-2">
+        </div>
+
+        <div className={`px-6 py-4 border-t flex gap-2 ${isLight ? 'border-slate-100' : 'border-white/[0.06]'}`}>
           <button type="button" onClick={onClose} className={`flex-1 py-2.5 rounded-xl border text-sm font-medium transition-colors ${
             isLight ? 'border-slate-200 text-slate-600 hover:bg-slate-50 hover:border-slate-300' : 'border-white/12 text-slate-300 hover:bg-white/5 hover:border-white/20'
           }`}>Cancelar</button>
@@ -269,10 +274,10 @@ function OSCard({ os, isLight }: { os: FroOrdemServico; isLight: boolean }) {
   const modalInp = `w-full px-3 py-2.5 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-teal-400/40 resize-none ${
     isLight ? 'bg-white border border-slate-200 shadow-sm text-slate-800' : 'bg-white/6 border border-white/12 text-white'
   }`
-  const lbl = `block text-xs font-medium mb-1 ${isLight ? 'text-slate-600' : 'text-slate-300'}`
+  const lbl = `block text-xs font-bold mb-1 ${isLight ? 'text-slate-600' : 'text-slate-300'}`
 
   return (
-    <div className={`glass-card rounded-2xl border ${os.prioridade === 'critica' ? 'border-red-500/30' : isLight ? 'border-slate-200' : 'border-white/6'}`}>
+    <div className={`rounded-2xl border ${os.prioridade === 'critica' ? 'border-red-500/30' : isLight ? 'border-slate-200' : 'border-white/[0.06]'} ${isLight ? 'bg-white shadow-sm' : 'bg-[#1e293b]'}`}>
       <button className="w-full p-4 text-left" onClick={() => setExpanded(e => !e)}>
         <div className="flex items-start gap-3">
           <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded border uppercase shrink-0 ${pCfg.cls}`}>
@@ -364,7 +369,7 @@ function OSCard({ os, isLight }: { os: FroOrdemServico; isLight: boolean }) {
       {/* Modal Aprovar/Rejeitar */}
       {aprovModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60">
-          <div className="glass-card rounded-2xl p-5 w-full max-w-sm space-y-3">
+          <div className={`rounded-2xl shadow-2xl p-5 w-full max-w-sm space-y-3 ${isLight ? 'bg-white border border-slate-200' : 'bg-[#1e293b] border border-white/[0.06]'}`}>
             <h3 className={`text-sm font-bold ${isLight ? 'text-slate-800' : 'text-white'}`}>
               {aprovModal === 'aprovar' ? 'Confirmar Aprovacao' : 'Rejeitar OS'}
             </h3>
@@ -394,7 +399,7 @@ function OSCard({ os, isLight }: { os: FroOrdemServico; isLight: boolean }) {
       {/* Modal Concluir */}
       {concluirModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60">
-          <div className="glass-card rounded-2xl p-5 w-full max-w-sm space-y-3">
+          <div className={`rounded-2xl shadow-2xl p-5 w-full max-w-sm space-y-3 ${isLight ? 'bg-white border border-slate-200' : 'bg-[#1e293b] border border-white/[0.06]'}`}>
             <h3 className={`text-sm font-bold ${isLight ? 'text-slate-800' : 'text-white'}`}>Concluir OS {os.numero_os}</h3>
             <div className="grid grid-cols-2 gap-3">
               <div>
@@ -471,7 +476,7 @@ export default function Ordens() {
 
       {/* Content */}
       {isLoading ? (
-        <div className="space-y-2">{Array.from({ length: 4 }).map((_, i) => <div key={i} className="glass-card rounded-2xl h-20 animate-pulse" />)}</div>
+        <div className="space-y-2">{Array.from({ length: 4 }).map((_, i) => <div key={i} className={`rounded-2xl h-20 animate-pulse ${isLight ? 'bg-slate-100' : 'bg-white/5'}`} />)}</div>
       ) : os.length === 0 ? (
         <p className="text-sm text-slate-500 text-center py-12">Nenhuma OS nesta aba</p>
       ) : (

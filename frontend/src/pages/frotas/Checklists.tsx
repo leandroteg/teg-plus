@@ -58,13 +58,13 @@ function NovaChecklistModal({ onClose, isLight }: { onClose: () => void; isLight
   const inp = `w-full px-3 py-2 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-teal-400/40 ${
     isLight ? 'bg-white border border-slate-200 shadow-sm text-slate-800 hover:border-slate-300' : 'bg-white/6 border border-white/12 text-white hover:border-white/20'
   }`
-  const lbl = 'block text-xs font-medium mb-1 ' + (isLight ? 'text-slate-600' : 'text-slate-300')
+  const lbl = 'block text-xs font-bold mb-1 ' + (isLight ? 'text-slate-600' : 'text-slate-300')
   const sel = inp + (isLight ? '' : ' [&>option]:bg-slate-900')
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-      <form onSubmit={handleSubmit} className="glass-card rounded-2xl p-6 w-full max-w-lg space-y-4 max-h-[90vh] overflow-y-auto styled-scrollbar">
-        <h2 className={`text-base font-bold ${isLight ? 'text-slate-800' : 'text-white'}`}>Novo Checklist</h2>
+      <form onSubmit={handleSubmit} className={`rounded-2xl shadow-2xl p-6 w-full max-w-lg space-y-4 max-h-[90vh] overflow-y-auto styled-scrollbar ${isLight ? 'bg-white border border-slate-200' : 'bg-[#1e293b] border border-white/[0.06]'}`}>
+        <h2 className={`text-lg font-extrabold ${isLight ? 'text-slate-800' : 'text-white'}`}>Novo Checklist</h2>
 
         <div className="grid grid-cols-2 gap-3">
           <div>
@@ -146,7 +146,7 @@ function ChecklistRow({ ck, isLight }: { ck: FroChecklist; isLight: boolean }) {
   const total   = ITENS_CHECKLIST.length
 
   return (
-    <div className="glass-card rounded-xl px-4 py-3 flex items-center gap-4">
+    <div className={`rounded-xl shadow-sm px-4 py-3 flex items-center gap-4 ${isLight ? 'bg-white border border-slate-200' : 'bg-[#1e293b] border border-white/[0.06]'}`}>
       <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${ck.liberado ? 'bg-emerald-500/20' : 'bg-red-500/20'}`}>
         {ck.liberado
           ? <CheckCircle size={16} className="text-emerald-400" />
@@ -233,7 +233,7 @@ export default function Checklists() {
 
       {/* Lista */}
       {isLoading ? (
-        <div className="space-y-2">{Array.from({ length: 5 }).map((_, i) => <div key={i} className="glass-card rounded-xl h-16 animate-pulse" />)}</div>
+        <div className="space-y-2">{Array.from({ length: 5 }).map((_, i) => <div key={i} className={`rounded-xl h-16 animate-pulse ${isLight ? 'bg-white border border-slate-200' : 'bg-[#1e293b] border border-white/[0.06]'}`} />)}</div>
       ) : checklists.length === 0 ? (
         <p className="text-sm text-slate-500 text-center py-12">Nenhum checklist encontrado para esta data</p>
       ) : (

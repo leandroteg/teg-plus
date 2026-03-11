@@ -52,13 +52,13 @@ function NovoAbastecimentoModal({ onClose, isLight }: { onClose: () => void; isL
   const inp = `w-full px-3 py-2 rounded-xl text-sm placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-teal-400/40 ${
     isLight ? 'bg-white border border-slate-200 shadow-sm text-slate-800 hover:border-slate-300' : 'bg-white/6 border border-white/12 text-white hover:border-white/20'
   }`
-  const lbl = 'block text-xs font-medium mb-1 ' + (isLight ? 'text-slate-600' : 'text-slate-300')
+  const lbl = 'block text-xs font-bold mb-1 ' + (isLight ? 'text-slate-600' : 'text-slate-300')
   const sel = inp + (isLight ? '' : ' [&>option]:bg-slate-900')
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-      <form onSubmit={handleSubmit} className="glass-card rounded-2xl p-6 w-full max-w-lg space-y-4">
-        <h2 className={`text-base font-bold ${isLight ? 'text-slate-800' : 'text-white'}`}>Registrar Abastecimento</h2>
+      <form onSubmit={handleSubmit} className={`rounded-2xl shadow-2xl p-6 w-full max-w-lg space-y-4 ${isLight ? 'bg-white border border-slate-200' : 'bg-[#1e293b] border border-white/[0.06]'}`}>
+        <h2 className={`text-lg font-extrabold ${isLight ? 'text-slate-800' : 'text-white'}`}>Registrar Abastecimento</h2>
 
         <div className="grid grid-cols-2 gap-3">
           <div>
@@ -200,19 +200,19 @@ export default function Abastecimentos() {
 
       {/* KPI Cards */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <div className="glass-card rounded-xl p-3 border-l-4 border-l-teal-500">
+        <div className={`rounded-xl shadow-sm p-3 border-l-4 border-l-teal-500 ${isLight ? 'bg-white border border-slate-200' : 'bg-[#1e293b] border border-white/[0.06]'}`}>
           <p className="text-[10px] text-slate-500 uppercase mb-1">Custo Total</p>
           <p className={`text-lg font-black ${isLight ? 'text-slate-800' : 'text-white'}`}>{BRL(totalCusto)}</p>
         </div>
-        <div className="glass-card rounded-xl p-3 border-l-4 border-l-sky-500">
+        <div className={`rounded-xl shadow-sm p-3 border-l-4 border-l-sky-500 ${isLight ? 'bg-white border border-slate-200' : 'bg-[#1e293b] border border-white/[0.06]'}`}>
           <p className="text-[10px] text-slate-500 uppercase mb-1">Total Litros</p>
           <p className={`text-lg font-black ${isLight ? 'text-slate-800' : 'text-white'}`}>{totalLitros.toLocaleString('pt-BR', { maximumFractionDigits: 0 })} L</p>
         </div>
-        <div className="glass-card rounded-xl p-3 border-l-4 border-l-emerald-500">
+        <div className={`rounded-xl shadow-sm p-3 border-l-4 border-l-emerald-500 ${isLight ? 'bg-white border border-slate-200' : 'bg-[#1e293b] border border-white/[0.06]'}`}>
           <p className="text-[10px] text-slate-500 uppercase mb-1">Media km/L</p>
           <p className={`text-lg font-black ${isLight ? 'text-slate-800' : 'text-white'}`}>{mediaKmL ? mediaKmL.toFixed(2) : '—'}</p>
         </div>
-        <div className={`glass-card rounded-xl p-3 border-l-4 ${desvios.length > 0 ? 'border-l-red-500' : 'border-l-slate-600'}`}>
+        <div className={`rounded-xl shadow-sm p-3 border-l-4 ${desvios.length > 0 ? 'border-l-red-500' : 'border-l-slate-600'} ${isLight ? 'bg-white border border-slate-200' : 'bg-[#1e293b] border border-white/[0.06]'}`}>
           <p className="text-[10px] text-slate-500 uppercase mb-1">Desvios</p>
           <p className={`text-lg font-black ${desvios.length > 0 ? 'text-red-400' : isLight ? 'text-slate-800' : 'text-white'}`}>{desvios.length}</p>
         </div>
@@ -220,7 +220,7 @@ export default function Abastecimentos() {
 
       {/* Alertas de desvio */}
       {desvios.length > 0 && (
-        <div className="glass-card rounded-xl p-3 border border-red-500/30 bg-red-500/5 space-y-1">
+        <div className={`rounded-xl shadow-sm p-3 border border-red-500/30 bg-red-500/5 space-y-1 ${isLight ? 'bg-white' : 'bg-[#1e293b]'}`}>
           <p className="text-xs font-semibold text-red-400 flex items-center gap-1.5 mb-2">
             <AlertTriangle size={13} /> Desvios de Consumo Detectados
           </p>
@@ -237,13 +237,13 @@ export default function Abastecimentos() {
 
       {/* Tabela */}
       {isLoading ? (
-        <div className="space-y-2">{Array.from({ length: 6 }).map((_, i) => <div key={i} className="glass-card rounded-xl h-14 animate-pulse" />)}</div>
+        <div className="space-y-2">{Array.from({ length: 6 }).map((_, i) => <div key={i} className={`rounded-xl h-14 animate-pulse ${isLight ? 'bg-white border border-slate-200' : 'bg-[#1e293b] border border-white/[0.06]'}`} />)}</div>
       ) : abastecimentos.length === 0 ? (
         <p className="text-sm text-slate-500 text-center py-12">Nenhum abastecimento neste mes</p>
       ) : (
         <div className="space-y-2">
           {abastecimentos.map(ab => (
-            <div key={ab.id} className={`glass-card rounded-xl px-4 py-3 flex items-center gap-4 ${ab.desvio_detectado ? 'border border-red-500/30' : ''}`}>
+            <div key={ab.id} className={`rounded-xl shadow-sm px-4 py-3 flex items-center gap-4 ${isLight ? 'bg-white border border-slate-200' : 'bg-[#1e293b] border border-white/[0.06]'} ${ab.desvio_detectado ? 'border-red-500/30' : ''}`}>
               {ab.desvio_detectado && <AlertTriangle size={14} className="text-red-400 shrink-0" />}
               <div className="w-20 shrink-0">
                 <p className={`text-sm font-bold ${isLight ? 'text-slate-800' : 'text-white'}`}>{ab.veiculo?.placa}</p>

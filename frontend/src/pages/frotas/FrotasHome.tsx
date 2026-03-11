@@ -41,7 +41,7 @@ function KpiCard({
 }) {
   const border = warn ? 'border-l-red-500' : (ACCENT_BORDER[accent] ?? 'border-l-teal-500')
   return (
-    <div className={`glass-card rounded-2xl p-4 border-l-4 ${border}`}>
+    <div className={`${isLight ? 'bg-white border-slate-200 shadow-sm' : 'bg-[#1e293b] border-white/[0.06]'} rounded-2xl border p-4 border-l-4 ${border}`}>
       <p className="text-xs text-slate-500 uppercase tracking-wider mb-1">{label}</p>
       <p className={`text-2xl font-black ${isLight ? 'text-slate-800' : 'text-white'}`}>{value}</p>
       {sub && <p className="text-xs text-slate-500 mt-0.5">{sub}</p>}
@@ -101,7 +101,7 @@ export default function FrotasHome() {
       {isLoading ? (
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           {Array.from({ length: 8 }).map((_, i) => (
-            <div key={i} className="glass-card rounded-2xl h-20 animate-pulse" />
+            <div key={i} className={`${isLight ? 'bg-white border-slate-200 shadow-sm' : 'bg-[#1e293b] border-white/[0.06]'} rounded-2xl border h-20 animate-pulse`} />
           ))}
         </div>
       ) : (
@@ -125,7 +125,7 @@ export default function FrotasHome() {
 
       {/* ── Status dos Veiculos ───────────────────────────────── */}
       {(veiculos ?? []).length > 0 && (
-        <div className="glass-card rounded-2xl p-4">
+        <div className={`${isLight ? 'bg-white border-slate-200 shadow-sm' : 'bg-[#1e293b] border-white/[0.06]'} rounded-2xl border p-4`}>
           <div className="flex items-center justify-between mb-3">
             <h2 className={`text-sm font-semibold flex items-center gap-2 ${isLight ? 'text-slate-800' : 'text-white'}`}>
               <Car size={15} className="text-teal-500" />
@@ -153,7 +153,7 @@ export default function FrotasHome() {
                 className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] ${
                   isLight
                     ? 'bg-slate-100 border border-slate-200 text-slate-600'
-                    : 'bg-white/4 border border-white/5 text-slate-300'
+                    : 'bg-white/[0.04] border border-white/[0.06] text-slate-300'
                 }`}
               >
                 <span className={`w-2 h-2 rounded-full ${STATUS_VEICULO_DOT[v.status] ?? 'bg-slate-600'}`} />
@@ -168,7 +168,7 @@ export default function FrotasHome() {
       <div className="grid sm:grid-cols-2 gap-4">
 
         {/* OS Criticas/Altas */}
-        <div className="glass-card rounded-2xl p-4 space-y-2">
+        <div className={`${isLight ? 'bg-white border-slate-200 shadow-sm' : 'bg-[#1e293b] border-white/[0.06]'} rounded-2xl border p-4 space-y-2`}>
           <h2 className={`text-sm font-semibold flex items-center gap-2 mb-3 ${isLight ? 'text-slate-800' : 'text-white'}`}>
             <Wrench size={15} className="text-orange-400" />
             OS Criticas / Altas Abertas
@@ -183,7 +183,7 @@ export default function FrotasHome() {
             <p className="text-xs text-slate-500 text-center py-4">Nenhuma OS critica ou alta aberta</p>
           ) : osCriticasAltas.map(os => (
             <div key={os.id} className={`flex items-start gap-3 p-2.5 rounded-xl ${
-              isLight ? 'bg-slate-50 border border-slate-200' : 'bg-white/3 border border-white/5'
+              isLight ? 'bg-slate-50 border border-slate-200' : 'bg-white/[0.04] border border-white/[0.06]'
             }`}>
               <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded border uppercase ${PRIORIDADE_COLOR[os.prioridade]}`}>
                 {os.prioridade}
@@ -198,7 +198,7 @@ export default function FrotasHome() {
         </div>
 
         {/* Ocorrencias Telemetria */}
-        <div className="glass-card rounded-2xl p-4 space-y-2">
+        <div className={`${isLight ? 'bg-white border-slate-200 shadow-sm' : 'bg-[#1e293b] border-white/[0.06]'} rounded-2xl border p-4 space-y-2`}>
           <h2 className={`text-sm font-semibold flex items-center gap-2 mb-3 ${isLight ? 'text-slate-800' : 'text-white'}`}>
             <Radio size={15} className="text-teal-500" />
             Ocorrencias Pendentes
@@ -213,7 +213,7 @@ export default function FrotasHome() {
             <p className="text-xs text-slate-500 text-center py-4">Nenhuma ocorrencia pendente</p>
           ) : otelPendentes.map(oc => (
             <div key={oc.id} className={`flex items-start gap-3 p-2.5 rounded-xl ${
-              isLight ? 'bg-slate-50 border border-slate-200' : 'bg-white/3 border border-white/5'
+              isLight ? 'bg-slate-50 border border-slate-200' : 'bg-white/[0.04] border border-white/[0.06]'
             }`}>
               <AlertTriangle size={13} className="text-amber-400 mt-0.5 shrink-0" />
               <div className="min-w-0">
@@ -230,7 +230,7 @@ export default function FrotasHome() {
 
       {/* ── Disponibilidade Visual ────────────────────────────── */}
       {k && (
-        <div className="glass-card rounded-2xl p-4">
+        <div className={`${isLight ? 'bg-white border-slate-200 shadow-sm' : 'bg-[#1e293b] border-white/[0.06]'} rounded-2xl border p-4`}>
           <h2 className={`text-sm font-semibold flex items-center gap-2 mb-4 ${isLight ? 'text-slate-800' : 'text-white'}`}>
             <TrendingUp size={15} className="text-emerald-400" />
             Composicao da Frota
