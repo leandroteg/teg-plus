@@ -96,16 +96,30 @@ export function useAprovacoesPendentes(tipo?: TipoAprovacao) {
           conMap.set(c.id, c)
         }
 
-        // Busca minuta mais recente de cada solicitacao (com PDF + analise AI)
+        // Busca minuta mais recente de cada solicitacao (com PDF)
         const { data: minutaData } = await supabase
           .from('con_minutas')
-          .select('id, solicitacao_id, titulo, arquivo_url, arquivo_nome, ai_analise, status')
+          .select('id, solicitacao_id, titulo, arquivo_url, arquivo_nome, status')
           .in('solicitacao_id', conIds)
           .order('created_at', { ascending: false })
         for (const m of minutaData ?? []) {
           // Guarda apenas a mais recente por solicitacao
           if (!minutaMap.has(m.solicitacao_id)) {
             minutaMap.set(m.solicitacao_id, m)
+          }
+        }
+
+        // Busca resumo executivo mais recente de cada solicitacao
+        // Issue #44: aprovacao deve exibir o resumo executivo, nao a analise antiga da minuta
+        const { data: resumoData } = await supabase
+          .from('con_resumos_executivos')
+          .select('id, solicitacao_id, titulo, objeto_resumo, partes_envolvidas, valor_total, vigencia, riscos, oportunidades, recomendacao, status')
+          .in('solicitacao_id', conIds)
+          .order('created_at', { ascending: false })
+        const resumoMap = new Map<string, Record<string, unknown>>()
+        for (const r of resumoData ?? []) {
+          if (!resumoMap.has(r.solicitacao_id as string)) {
+            resumoMap.set(r.solicitacao_id as string, r)
           }
         }
       }
@@ -138,20 +152,36 @@ export function useAprovacoesPendentes(tipo?: TipoAprovacao) {
           } else if (a.tipo_aprovacao === 'minuta_contratual') {
             const con = conMap.get(a.entidade_id)
             const minuta = minutaMap.get(a.entidade_id)
-            const aiAnalise = minuta?.ai_analise as Record<string, unknown> | null
+            const resumoExec = resumoMap.get(a.entidade_id)
 
-            // Parse resumo: can be string or stringified JSON
+            // Issue #44: Usar resumo executivo (nao analise antiga da minuta)
+            // Issue #43: Formatar como texto estruturado com secoes claras
             let aiResumo: string | null = null
-            const rawResumo = aiAnalise?.resumo
-            if (typeof rawResumo === 'string') {
-              if (rawResumo.startsWith('{')) {
-                try {
-                  const parsed = JSON.parse(rawResumo)
-                  aiResumo = typeof parsed.resumo === 'string' ? parsed.resumo : null
-                } catch { aiResumo = rawResumo.length > 200 ? null : rawResumo }
-              } else {
-                aiResumo = rawResumo
+            if (resumoExec) {
+              const sections: string[] = []
+              if (resumoExec.objeto_resumo) {
+                sections.push(`OBJETO\n${resumoExec.objeto_resumo as string}`)
               }
+              const partes = resumoExec.partes_envolvidas as string | null
+              if (partes) {
+                sections.push(`PARTES ENVOLVIDAS\n${partes}`)
+              }
+              const vigencia = resumoExec.vigencia as string | null
+              if (vigencia) {
+                sections.push(`VIGENCIA\n${vigencia}`)
+              }
+              const riscos = resumoExec.riscos as Array<{ descricao: string; nivel?: string }> | null
+              if (riscos && riscos.length > 0) {
+                sections.push(`RISCOS\n${riscos.map(r => `• [${(r.nivel ?? 'medio').toUpperCase()}] ${r.descricao}`).join('\n')}`)
+              }
+              const oportunidades = resumoExec.oportunidades as Array<{ descricao: string }> | null
+              if (oportunidades && oportunidades.length > 0) {
+                sections.push(`OPORTUNIDADES\n${oportunidades.map(o => `• ${o.descricao}`).join('\n')}`)
+              }
+              if (resumoExec.recomendacao) {
+                sections.push(`RECOMENDACAO\n${resumoExec.recomendacao as string}`)
+              }
+              aiResumo = sections.join('\n\n') || null
             }
 
             requisicao = {
@@ -168,18 +198,20 @@ export function useAprovacoesPendentes(tipo?: TipoAprovacao) {
             }
 
             // Attach minuta_resumo at the top-level for AprovAi card
+            // Usa dados do resumo executivo quando disponivel, com fallback para dados da solicitacao
+            const resumoValor = resumoExec?.valor_total as number | undefined
             ;(a as Record<string, unknown>)._minuta_resumo = {
-              objeto: (con?.objeto as string) ?? '',
+              objeto: (resumoExec?.objeto_resumo as string) ?? (con?.objeto as string) ?? '',
               contraparte: (con?.contraparte_nome as string) ?? '',
               tipo_contrato: (con?.tipo_contrato as string) ?? '',
               vigencia_inicio: '',
               vigencia_fim: '',
-              valor_estimado: Number(con?.valor_estimado) || 0,
-              minuta_titulo: (minuta?.titulo as string) ?? '',
+              valor_estimado: resumoValor ?? (Number(con?.valor_estimado) || 0),
+              minuta_titulo: (resumoExec?.titulo as string) ?? (minuta?.titulo as string) ?? '',
               arquivo_url: (minuta?.arquivo_url as string) ?? '',
               arquivo_nome: (minuta?.arquivo_nome as string) ?? '',
               ai_resumo: aiResumo,
-              ai_score: typeof aiAnalise?.score === 'number' ? aiAnalise.score : null,
+              ai_score: null,
             }
           } else if (a.tipo_aprovacao === 'autorizacao_pagamento') {
             const fin = finMap.get(a.entidade_id)

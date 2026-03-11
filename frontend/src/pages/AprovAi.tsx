@@ -611,12 +611,12 @@ function MinutaExecutiveSummary({ resumo }: {
         </div>
       </div>
 
-      {/* AI Analysis summary */}
+      {/* Issue #43: Executive summary as structured single text box */}
       {resumo.ai_resumo && (
         <div className="bg-violet-50/60 rounded-xl p-3">
-          <div className="flex items-center gap-2 mb-1.5">
+          <div className="flex items-center gap-2 mb-2">
             <Sparkles size={13} className="text-violet-500" />
-            <span className="text-[11px] font-bold text-violet-600 uppercase tracking-wider">Analise IA</span>
+            <span className="text-[11px] font-bold text-violet-600 uppercase tracking-wider">Parecer / Resumo Executivo</span>
             {typeof resumo.ai_score === 'number' && (
               <span className={`ml-auto text-[11px] font-extrabold px-2 py-0.5 rounded-full ${
                 resumo.ai_score >= 80 ? 'bg-emerald-100 text-emerald-700' :
@@ -627,7 +627,21 @@ function MinutaExecutiveSummary({ resumo }: {
               </span>
             )}
           </div>
-          <p className="text-xs text-slate-600 leading-relaxed line-clamp-4">{resumo.ai_resumo}</p>
+          <div className="bg-white/80 border border-violet-100 rounded-lg p-3 space-y-2.5 max-h-64 overflow-y-auto text-xs text-slate-700 leading-relaxed">
+            {resumo.ai_resumo.split('\n\n').map((section, idx) => {
+              const lines = section.split('\n')
+              const isHeader = lines[0] === lines[0].toUpperCase() && lines.length > 1
+              if (isHeader) {
+                return (
+                  <div key={idx}>
+                    <p className="text-[10px] font-bold text-violet-500 uppercase tracking-wider mb-0.5">{lines[0]}</p>
+                    <p className="whitespace-pre-line">{lines.slice(1).join('\n')}</p>
+                  </div>
+                )
+              }
+              return <p key={idx} className="whitespace-pre-line">{section}</p>
+            })}
+          </div>
         </div>
       )}
 

@@ -4,7 +4,7 @@ import {
   ArrowLeft, FileText, ExternalLink, Clock, CheckCircle2,
   XCircle, AlertTriangle, ChevronRight, Send,
   Archive, Unlock, Ban, Eye, Pencil, Building2, Calendar,
-  DollarSign, User, Briefcase, Tag, ShieldCheck, Info,
+  DollarSign, User, Briefcase, Tag, ShieldCheck, Info, PenTool, X,
 } from 'lucide-react'
 import {
   useSolicitacao,
@@ -249,13 +249,83 @@ function CancelModal({ open, onClose, onConfirm, isPending }: {
   )
 }
 
+// ── Certisign Modal ──────────────────────────────────────────────────────────────
+
+function CertisignModal({ open, onClose, onConfirm, isPending }: {
+  open: boolean
+  onClose: () => void
+  onConfirm: () => void
+  isPending: boolean
+}) {
+  if (!open) return null
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div className="fixed inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-md p-6 space-y-4 animate-in fade-in zoom-in-95 duration-200">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-teal-500 to-teal-600 flex items-center justify-center shadow-sm">
+              <PenTool size={18} className="text-white" />
+            </div>
+            <div>
+              <h3 className="text-base font-extrabold text-slate-800">Enviar para Assinatura</h3>
+              <p className="text-xs text-slate-400">Integracao com Certisign</p>
+            </div>
+          </div>
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-600 transition-colors">
+            <X size={18} />
+          </button>
+        </div>
+
+        <div className="bg-amber-50 rounded-xl border border-amber-200 px-4 py-3">
+          <div className="flex items-start gap-2">
+            <AlertTriangle size={14} className="text-amber-500 mt-0.5 shrink-0" />
+            <div>
+              <p className="text-xs font-semibold text-amber-700">Integracao em Desenvolvimento</p>
+              <p className="text-[11px] text-amber-600 mt-1 leading-relaxed">
+                A integracao com a plataforma Certisign para assinatura digital esta em desenvolvimento.
+                Por enquanto, voce pode avancar a etapa manualmente e enviar o contrato para assinatura por outros meios.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div className="flex gap-3">
+          <button
+            onClick={onClose}
+            className="flex-1 py-2.5 rounded-xl border border-slate-200 text-sm font-semibold
+              text-slate-600 hover:bg-slate-50 transition-all"
+          >
+            Voltar
+          </button>
+          <button
+            onClick={onConfirm}
+            disabled={isPending}
+            className="flex-1 py-2.5 rounded-xl bg-gradient-to-r from-teal-500 to-teal-600
+              text-white text-sm font-semibold shadow-sm
+              hover:from-teal-600 hover:to-teal-700 transition-all disabled:opacity-50
+              flex items-center justify-center gap-2"
+          >
+            {isPending
+              ? <div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+              : <Send size={14} />}
+            Confirmar Envio
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ── Etapa Actions ───────────────────────────────────────────────────────────────
 
-function EtapaActions({ etapa, solicitacaoId, onAvancar, onCancel, isPending, nav }: {
+function EtapaActions({ etapa, solicitacaoId, onAvancar, onCancel, onEnviarAssinatura, isPending, nav }: {
   etapa: EtapaSolicitacao
   solicitacaoId: string
   onAvancar: (etapaPara: EtapaSolicitacao, obs?: string) => void
   onCancel: () => void
+  onEnviarAssinatura: () => void
   isPending: boolean
   nav: ReturnType<typeof useNavigate>
 }) {
@@ -347,8 +417,20 @@ function EtapaActions({ etapa, solicitacaoId, onAvancar, onCancel, isPending, na
     case 'enviar_assinatura':
       return (
         <>
-          <button disabled className={`${btnPrimary} bg-blue-100 text-blue-700 cursor-not-allowed`}>
-            <Send size={13} /> Aguardando Assinatura...
+          <button
+            onClick={onEnviarAssinatura}
+            className={`${btnPrimary} bg-gradient-to-r from-teal-500 to-teal-600 text-white
+              hover:from-teal-600 hover:to-teal-700 shadow-sm`}
+          >
+            <PenTool size={13} /> Enviar para Assinatura
+          </button>
+          <button
+            onClick={() => onAvancar('arquivar')}
+            disabled={isPending}
+            className={`${btnSecondary} border-slate-200 text-slate-600 hover:bg-slate-50`}
+          >
+            {isPending ? spinnerDark : <ChevronRight size={12} />}
+            Pular para Arquivamento
           </button>
           {cancelBtn}
         </>
@@ -401,6 +483,7 @@ export default function SolicitacaoDetalhe() {
   const cancelarSolicitacao = useCancelarSolicitacao()
 
   const [showCancelModal, setShowCancelModal] = useState(false)
+  const [showCertisignModal, setShowCertisignModal] = useState(false)
 
   // ── Loading ────────────────────────────────────────────────────────────
   if (isLoading) {
@@ -633,6 +716,7 @@ export default function SolicitacaoDetalhe() {
                   solicitacaoId={s.id}
                   onAvancar={handleAvancar}
                   onCancel={() => setShowCancelModal(true)}
+                  onEnviarAssinatura={() => setShowCertisignModal(true)}
                   isPending={avancarEtapa.isPending}
                   nav={nav}
                 />
@@ -713,6 +797,17 @@ export default function SolicitacaoDetalhe() {
         onClose={() => setShowCancelModal(false)}
         onConfirm={handleCancelar}
         isPending={cancelarSolicitacao.isPending}
+      />
+
+      {/* ── Certisign Modal ──────────────────────────────────────────── */}
+      <CertisignModal
+        open={showCertisignModal}
+        onClose={() => setShowCertisignModal(false)}
+        onConfirm={() => {
+          handleAvancar('arquivar')
+          setShowCertisignModal(false)
+        }}
+        isPending={avancarEtapa.isPending}
       />
     </div>
   )
