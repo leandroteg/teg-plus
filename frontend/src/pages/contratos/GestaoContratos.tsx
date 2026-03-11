@@ -207,7 +207,7 @@ function ContratoCard({ contrato, onToast }: { contrato: Contrato; onToast: (typ
         {/* Action buttons */}
         <div className="flex flex-wrap gap-2 mt-3">
           <button
-            onClick={() => nav(`/contratos/parcelas?contrato=${contrato.id}`)}
+            onClick={() => nav(`/contratos/previsao?contrato=${contrato.id}`)}
             className="flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl
               bg-indigo-50 border border-indigo-200 text-[11px] font-semibold text-indigo-600
               hover:bg-indigo-100 transition-all"
