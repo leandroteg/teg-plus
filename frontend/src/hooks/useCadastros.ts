@@ -280,7 +280,7 @@ export function useAiCadastroParse() {
       base64?: string
       filename?: string
     }): Promise<AiCadastroResult> => {
-      const n8nUrl = import.meta.env.VITE_N8N_WEBHOOK_URL || ''
+      const n8nUrl = import.meta.env.VITE_N8N_WEBHOOK_URL || 'https://teg-agents-n8n.nmmcas.easypanel.host/webhook'
 
       if (vars.input_type === 'cnpj') {
         const clean = vars.content.replace(/\D/g, '')
