@@ -208,6 +208,48 @@ export function useAvancarEtapa() {
         })
       if (histErr) throw histErr
 
+      // ── Criar contrato em con_contratos ao liberar execucao ──
+      if (payload.etapaPara === 'concluido') {
+        try {
+          const { data: sol } = await supabase
+            .from('con_solicitacoes')
+            .select('*')
+            .eq('id', payload.solicitacaoId)
+            .single()
+
+          if (sol) {
+            const today = new Date().toISOString().slice(0, 10)
+            const tipoMap: Record<string, 'receita' | 'despesa'> = {
+              servico: 'despesa', fornecimento: 'despesa', locacao: 'despesa',
+              consultoria: 'despesa', obra: 'despesa', receita: 'receita',
+            }
+
+            await supabase
+              .from('con_contratos')
+              .insert({
+                numero:             sol.numero,
+                tipo_contrato:      tipoMap[sol.tipo_contrato] ?? 'despesa',
+                tipo_categoria:     sol.categoria_contrato ?? sol.tipo_contrato,
+                fornecedor_id:      sol.contraparte_id ?? undefined,
+                obra_id:            sol.obra_id ?? undefined,
+                objeto:             sol.objeto,
+                descricao:          sol.descricao_escopo ?? undefined,
+                valor_total:        sol.valor_estimado ?? 0,
+                data_assinatura:    today,
+                data_inicio:        sol.data_inicio_prevista ?? today,
+                data_fim_previsto:  sol.data_fim_prevista ?? today,
+                centro_custo:       sol.centro_custo ?? undefined,
+                classe_financeira:  sol.classe_financeira ?? undefined,
+                indice_reajuste:    sol.indice_reajuste ?? undefined,
+                status:             'vigente',
+                solicitacao_id:     payload.solicitacaoId,
+              })
+          }
+        } catch (e) {
+          console.warn('Aviso: con_contratos nao criado ao liberar execucao:', e)
+        }
+      }
+
       // ── Criar aprovacao pendente quando avança para aprovacao_diretoria ──
       if (payload.etapaPara === 'aprovacao_diretoria') {
         try {
@@ -251,6 +293,8 @@ export function useAvancarEtapa() {
       qc.invalidateQueries({ queryKey: ['con-solicitacoes-dashboard'] })
       qc.invalidateQueries({ queryKey: ['aprovacoes-pendentes'] })
       qc.invalidateQueries({ queryKey: ['aprovacoes-kpis'] })
+      qc.invalidateQueries({ queryKey: ['contratos'] })
+      qc.invalidateQueries({ queryKey: ['contratos-dashboard'] })
     },
   })
 }
