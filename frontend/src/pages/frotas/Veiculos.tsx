@@ -1,7 +1,8 @@
-import { useState } from 'react'
-import { Plus, Search, AlertTriangle, Car, Edit2 } from 'lucide-react'
+import { useState, useCallback, useRef } from 'react'
+import { Plus, Search, AlertTriangle, Car, Edit2, Loader2, Sparkles } from 'lucide-react'
 import { useVeiculos, useSalvarVeiculo } from '../../hooks/useFrotas'
 import { useTheme } from '../../contexts/ThemeContext'
+import { api } from '../../services/api'
 import type { FroVeiculo, StatusVeiculo, CategoriaVeiculo, CombustivelVeiculo, PropriedadeVeiculo } from '../../types/frotas'
 
 // ── Maps ──────────────────────────────────────────────────────────────────────
@@ -51,8 +52,41 @@ function VeiculoModal({
     hodometro_atual: 0,
     ...inicial,
   })
+  const [placaLoading, setPlacaLoading] = useState(false)
+  const [placaMsg, setPlacaMsg] = useState('')
+  const placaTimer = useRef<ReturnType<typeof setTimeout>>()
 
   const set = (k: keyof FroVeiculo, v: unknown) => setForm(f => ({ ...f, [k]: v }))
+
+  const handlePlacaChange = useCallback((raw: string) => {
+    const val = raw.toUpperCase()
+    set('placa', val)
+    setPlacaMsg('')
+    if (placaTimer.current) clearTimeout(placaTimer.current)
+    const limpa = val.replace(/[^A-Z0-9]/g, '')
+    if (limpa.length === 7 && !inicial?.id) {
+      placaTimer.current = setTimeout(async () => {
+        setPlacaLoading(true)
+        try {
+          const r = await api.consultarPlaca(limpa)
+          if (!r.error && r.marca) {
+            setForm(f => ({
+              ...f,
+              marca: r.marca || f.marca,
+              modelo: r.modelo || f.modelo,
+              ano_fab: r.ano_fab ?? f.ano_fab,
+              ano_mod: r.ano_mod ?? f.ano_mod,
+              cor: r.cor || f.cor,
+              combustivel: (r.combustivel as CombustivelVeiculo) || f.combustivel,
+              categoria: (r.categoria as CategoriaVeiculo) || f.categoria,
+            }))
+            setPlacaMsg('Dados preenchidos automaticamente')
+          }
+        } catch { /* silencioso */ }
+        setPlacaLoading(false)
+      }, 400)
+    }
+  }, [inicial?.id])
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -82,8 +116,8 @@ function VeiculoModal({
         {/* Linha 1 */}
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
           <div>
-            <label className={lbl}>Placa *</label>
-            <input className={inp} value={form.placa} onChange={e => set('placa', e.target.value.toUpperCase())} required placeholder="ABC-1234" />
+            <label className={lbl}>Placa * {placaLoading && <Loader2 size={12} className="inline animate-spin text-teal-400 ml-1" />}{placaMsg && <span className="text-[10px] text-emerald-400 ml-1"><Sparkles size={10} className="inline -mt-0.5 mr-0.5" />{placaMsg}</span>}</label>
+            <input className={inp} value={form.placa} onChange={e => handlePlacaChange(e.target.value)} required placeholder="ABC-1234" />
           </div>
           <div>
             <label className={lbl}>Renavam</label>
