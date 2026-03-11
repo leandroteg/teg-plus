@@ -12,9 +12,7 @@ import type {
 // ── Select com joins ────────────────────────────────────────────────────────
 const SELECT_SOL = `
   *,
-  fornecedor:cmp_fornecedores!fornecedor_id(id, razao_social, cnpj),
-  obra:sys_obras!obra_id(id, codigo, nome, municipio, uf),
-  empresa:sys_empresas!empresa_id(id, codigo, razao_social)
+  fornecedor:cmp_fornecedores!fornecedor_id(id, razao_social, cnpj)
 `
 
 // ── Listar Solicitações NF ──────────────────────────────────────────────────
