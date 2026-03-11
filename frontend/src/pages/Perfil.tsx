@@ -2,12 +2,13 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   User, Mail, Briefcase, Building2, Shield, Lock,
-  LogOut, Edit3, Check, X, ChevronRight,
+  LogOut, Edit3, Check, X, ChevronRight, Eye, EyeOff,
   AlertCircle, CheckCircle, Settings, Code2,
 } from 'lucide-react'
 import {
   useAuth, ROLE_LABEL, ROLE_COLOR, ALCADA_LABEL, MODULOS_ERP, type Role,
 } from '../contexts/AuthContext'
+import { PasswordStrengthBar } from '../components/SetPasswordModal'
 
 // ── Avatar ─────────────────────────────────────────────────────────────────────
 const AVATAR_COLORS = [
@@ -149,6 +150,7 @@ function SenhaModal({
 }) {
   const [newPass,    setNewPass]    = useState('')
   const [confirm,    setConfirm]    = useState('')
+  const [showPass,   setShowPass]   = useState(false)
   const [localError, setLocalError] = useState<string | null>(null)
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -171,25 +173,45 @@ function SenhaModal({
           </button>
         </div>
         <form onSubmit={handleSubmit} className="p-5 space-y-4">
-          {[
-            { label: 'Nova senha',          val: newPass,  set: setNewPass  },
-            { label: 'Confirmar nova senha', val: confirm,  set: setConfirm  },
-          ].map(({ label, val, set }) => (
-            <div key={label}>
-              <label className="block text-xs font-semibold text-slate-600 mb-1.5">{label}</label>
-              <div className="relative">
-                <Lock size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                <input
-                  type="password"
-                  value={val}
-                  onChange={e => set(e.target.value)}
-                  placeholder="••••••••"
-                  className="w-full pl-9 pr-3 py-2.5 rounded-xl border border-slate-200 text-sm
-                    focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary bg-slate-50 focus:bg-white"
-                />
-              </div>
+          <div>
+            <label className="block text-xs font-semibold text-slate-600 mb-1.5">Nova senha</label>
+            <div className="relative">
+              <Lock size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+              <input
+                type={showPass ? 'text' : 'password'}
+                value={newPass}
+                onChange={e => { setNewPass(e.target.value); setLocalError(null) }}
+                placeholder="Mínimo 6 caracteres"
+                className="w-full pl-9 pr-10 py-2.5 rounded-xl border border-slate-200 text-sm
+                  focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary bg-slate-50 focus:bg-white"
+              />
+              <button type="button" onClick={() => setShowPass(v => !v)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors">
+                {showPass ? <EyeOff size={14} /> : <Eye size={14} />}
+              </button>
             </div>
-          ))}
+            <div className="mt-2">
+              <PasswordStrengthBar password={newPass} />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-slate-600 mb-1.5">Confirmar nova senha</label>
+            <div className="relative">
+              <Lock size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+              <input
+                type={showPass ? 'text' : 'password'}
+                value={confirm}
+                onChange={e => { setConfirm(e.target.value); setLocalError(null) }}
+                placeholder="Repita a senha"
+                className="w-full pl-9 pr-3 py-2.5 rounded-xl border border-slate-200 text-sm
+                  focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary bg-slate-50 focus:bg-white"
+              />
+            </div>
+            {confirm && newPass && confirm !== newPass && (
+              <p className="text-[11px] text-red-500 mt-1 ml-1">As senhas não coincidem</p>
+            )}
+          </div>
 
           {msg && (
             <div className="flex items-center gap-2 bg-red-50 text-red-600 rounded-xl px-3 py-2 text-xs">

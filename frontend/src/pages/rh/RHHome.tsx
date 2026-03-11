@@ -7,6 +7,7 @@ import {
 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthContext'
+import { useTheme } from '../../contexts/ThemeContext'
 
 const FEATURES = [
   { icon: UserCheck,    name: 'Cadastro de colaboradores',    desc: 'Ficha completa com dados pessoais, contratuais e documentos digitalizados' },
@@ -27,6 +28,7 @@ const TIMELINE = [
 
 export default function RHHome() {
   const { isAdmin } = useAuth()
+  const { isLightSidebar: isLight } = useTheme()
   const navigate    = useNavigate()
 
   return (
@@ -35,14 +37,17 @@ export default function RHHome() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-bold text-white flex items-center gap-2">
+          <h1 className={`text-xl font-bold flex items-center gap-2 ${isLight ? 'text-slate-800' : 'text-white'}`}>
             <Users size={20} className="text-violet-400" />
-            Módulo RH
+            Modulo RH
           </h1>
-          <p className="text-sm text-slate-500">Gestão de pessoas e organização</p>
+          <p className={`text-sm ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>Gestao de pessoas e organizacao</p>
         </div>
-        <span className="flex items-center gap-1.5 text-[11px] font-bold px-3 py-1.5 rounded-full
-          bg-amber-500/15 text-amber-300 border border-amber-500/30">
+        <span className={`flex items-center gap-1.5 text-[11px] font-bold px-3 py-1.5 rounded-full border ${
+          isLight
+            ? 'bg-amber-50 text-amber-600 border-amber-200'
+            : 'bg-amber-500/15 text-amber-300 border-amber-500/30'
+        }`}>
           <Clock size={11} />
           Em Desenvolvimento
         </span>
@@ -52,42 +57,55 @@ export default function RHHome() {
       {isAdmin && (
         <button
           onClick={() => navigate('/rh/mural')}
-          className="w-full flex items-center gap-4 p-4 rounded-2xl
-            bg-violet-500/10 border border-violet-500/25
-            hover:bg-violet-500/15 hover:border-violet-500/40 transition-all group"
+          className={`w-full flex items-center gap-4 p-4 rounded-2xl border transition-all group ${
+            isLight
+              ? 'bg-violet-50 border-violet-200 hover:bg-violet-100 hover:border-violet-300'
+              : 'bg-violet-500/10 border-violet-500/25 hover:bg-violet-500/15 hover:border-violet-500/40'
+          }`}
         >
-          <div className="w-10 h-10 rounded-xl bg-violet-500/20 border border-violet-500/30
-            flex items-center justify-center shrink-0
-            group-hover:scale-110 transition-transform">
-            <ImagePlay size={18} className="text-violet-300" />
+          <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0
+            group-hover:scale-110 transition-transform ${
+            isLight
+              ? 'bg-violet-100 border border-violet-200'
+              : 'bg-violet-500/20 border border-violet-500/30'
+          }`}>
+            <ImagePlay size={18} className={isLight ? 'text-violet-600' : 'text-violet-300'} />
           </div>
           <div className="text-left">
-            <p className="text-sm font-bold text-white">Mural de Recados</p>
-            <p className="text-xs text-slate-400">Gerencie banners e campanhas da tela inicial</p>
+            <p className={`text-sm font-bold ${isLight ? 'text-slate-800' : 'text-white'}`}>Mural de Recados</p>
+            <p className={`text-xs ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>Gerencie banners e campanhas da tela inicial</p>
           </div>
-          <div className="ml-auto text-[10px] font-bold px-2 py-1 rounded-lg
-            bg-violet-500/20 text-violet-300 border border-violet-500/20">
+          <div className={`ml-auto text-[10px] font-bold px-2 py-1 rounded-lg border ${
+            isLight
+              ? 'bg-violet-100 text-violet-600 border-violet-200'
+              : 'bg-violet-500/20 text-violet-300 border-violet-500/20'
+          }`}>
             Admin
           </div>
         </button>
       )}
 
       {/* Funcionalidades planejadas */}
-      <div className="glass-card rounded-2xl overflow-hidden">
-        <div className="px-5 py-4 border-b border-white/6">
-          <h2 className="text-sm font-bold text-white">Funcionalidades Planejadas</h2>
-          <p className="text-xs text-slate-500 mt-0.5">O que estará disponível no lançamento completo</p>
+      <div className={`rounded-2xl border overflow-hidden ${
+        isLight ? 'bg-white border-slate-200 shadow-sm' : 'bg-white/[0.03] border-white/[0.06]'
+      }`}>
+        <div className={`px-5 py-4 border-b ${isLight ? 'border-slate-100' : 'border-white/[0.06]'}`}>
+          <h2 className={`text-sm font-bold ${isLight ? 'text-slate-800' : 'text-white'}`}>Funcionalidades Planejadas</h2>
+          <p className={`text-xs mt-0.5 ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>O que estara disponivel no lancamento completo</p>
         </div>
-        <ul className="divide-y divide-white/4">
+        <ul className={`divide-y ${isLight ? 'divide-slate-100' : 'divide-white/[0.04]'}`}>
           {FEATURES.map(({ icon: Icon, name, desc }) => (
-            <li key={name} className="flex items-start gap-4 px-5 py-3.5 hover:bg-white/3 transition-colors">
-              <div className="w-8 h-8 rounded-lg bg-violet-500/15 border border-violet-500/20
-                flex items-center justify-center shrink-0 mt-0.5">
-                <Icon size={14} className="text-violet-400" />
+            <li key={name} className={`flex items-start gap-4 px-5 py-3.5 transition-colors ${
+              isLight ? 'hover:bg-slate-50' : 'hover:bg-white/[0.02]'
+            }`}>
+              <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 mt-0.5 ${
+                isLight ? 'bg-violet-50 border border-violet-100' : 'bg-violet-500/15 border border-violet-500/20'
+              }`}>
+                <Icon size={14} className={isLight ? 'text-violet-600' : 'text-violet-400'} />
               </div>
               <div>
-                <p className="text-sm font-semibold text-slate-200">{name}</p>
-                <p className="text-[11px] text-slate-500 mt-0.5 leading-relaxed">{desc}</p>
+                <p className={`text-sm font-semibold ${isLight ? 'text-slate-700' : 'text-slate-200'}`}>{name}</p>
+                <p className={`text-[11px] mt-0.5 leading-relaxed ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>{desc}</p>
               </div>
             </li>
           ))}
@@ -95,10 +113,12 @@ export default function RHHome() {
       </div>
 
       {/* Timeline */}
-      <div className="glass-card rounded-2xl overflow-hidden">
-        <div className="px-5 py-4 border-b border-white/6">
-          <h2 className="text-sm font-bold text-white">Timeline de Lançamento</h2>
-          <p className="text-xs text-slate-500 mt-0.5">Previsão de entregas por trimestre</p>
+      <div className={`rounded-2xl border overflow-hidden ${
+        isLight ? 'bg-white border-slate-200 shadow-sm' : 'bg-white/[0.03] border-white/[0.06]'
+      }`}>
+        <div className={`px-5 py-4 border-b ${isLight ? 'border-slate-100' : 'border-white/[0.06]'}`}>
+          <h2 className={`text-sm font-bold ${isLight ? 'text-slate-800' : 'text-white'}`}>Timeline de Lancamento</h2>
+          <p className={`text-xs mt-0.5 ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>Previsao de entregas por trimestre</p>
         </div>
         <div className="px-5 py-4 space-y-4">
           {TIMELINE.map(({ quarter, label, done }, idx) => (
@@ -109,22 +129,28 @@ export default function RHHome() {
                     done
                       ? 'bg-violet-500/20 border-violet-500 text-violet-300'
                       : idx === 0
-                        ? 'bg-violet-500/10 border-violet-500/50 text-violet-400'
-                        : 'bg-white/4 border-white/15 text-slate-500'
+                        ? isLight
+                          ? 'bg-violet-50 border-violet-300 text-violet-600'
+                          : 'bg-violet-500/10 border-violet-500/50 text-violet-400'
+                        : isLight
+                          ? 'bg-slate-50 border-slate-200 text-slate-400'
+                          : 'bg-white/[0.04] border-white/[0.15] text-slate-500'
                   }`}>
                   {done ? <CheckCircle2 size={14} /> : <span>{idx + 1}</span>}
                 </div>
                 {idx < TIMELINE.length - 1 && (
-                  <div className="w-px h-5 bg-white/8 mt-1" />
+                  <div className={`w-px h-5 mt-1 ${isLight ? 'bg-slate-200' : 'bg-white/[0.08]'}`} />
                 )}
               </div>
               <div className="pb-1">
                 <span className={`text-[10px] font-bold uppercase tracking-wider ${
-                  idx === 0 ? 'text-violet-400' : 'text-slate-500'
+                  idx === 0
+                    ? isLight ? 'text-violet-600' : 'text-violet-400'
+                    : isLight ? 'text-slate-400' : 'text-slate-500'
                 }`}>
                   {quarter}
                 </span>
-                <p className="text-sm font-semibold text-slate-300 mt-0.5">{label}</p>
+                <p className={`text-sm font-semibold mt-0.5 ${isLight ? 'text-slate-700' : 'text-slate-300'}`}>{label}</p>
               </div>
             </div>
           ))}

@@ -1,6 +1,63 @@
-import { useState } from 'react'
-import { Lock, Eye, EyeOff, ShieldCheck, AlertCircle } from 'lucide-react'
+import { useState, useMemo } from 'react'
+import { Lock, Eye, EyeOff, ShieldCheck, AlertCircle, Check } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
+
+// ── Password strength utils (shared) ─────────────────────────────────────────
+export function getPasswordStrength(pw: string) {
+  let score = 0
+  if (pw.length >= 6) score++
+  if (pw.length >= 8) score++
+  if (/[A-Z]/.test(pw)) score++
+  if (/[0-9]/.test(pw)) score++
+  if (/[^A-Za-z0-9]/.test(pw)) score++
+  return score // 0-5
+}
+
+const STRENGTH_CONFIG = [
+  { label: 'Muito fraca', color: 'bg-red-500',    text: 'text-red-600' },
+  { label: 'Fraca',       color: 'bg-orange-500', text: 'text-orange-600' },
+  { label: 'Regular',     color: 'bg-amber-500',  text: 'text-amber-600' },
+  { label: 'Boa',         color: 'bg-lime-500',   text: 'text-lime-600' },
+  { label: 'Forte',       color: 'bg-green-500',  text: 'text-green-600' },
+  { label: 'Excelente',   color: 'bg-emerald-500',text: 'text-emerald-600' },
+]
+
+export function PasswordStrengthBar({ password }: { password: string }) {
+  const score = getPasswordStrength(password)
+  if (!password) return null
+  const cfg = STRENGTH_CONFIG[score]
+  const checks = [
+    { ok: password.length >= 6,      label: 'Mín. 6 caracteres' },
+    { ok: password.length >= 8,      label: '8+ caracteres' },
+    { ok: /[A-Z]/.test(password),    label: 'Letra maiúscula' },
+    { ok: /[0-9]/.test(password),    label: 'Número' },
+    { ok: /[^A-Za-z0-9]/.test(password), label: 'Caractere especial' },
+  ]
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center gap-2">
+        <div className="flex-1 flex gap-0.5">
+          {[0, 1, 2, 3, 4].map(i => (
+            <div key={i} className={`h-1 flex-1 rounded-full transition-colors duration-300 ${
+              i < score ? cfg.color : 'bg-slate-200'
+            }`} />
+          ))}
+        </div>
+        <span className={`text-[10px] font-bold ${cfg.text}`}>{cfg.label}</span>
+      </div>
+      <div className="flex flex-wrap gap-x-3 gap-y-0.5">
+        {checks.map(({ ok, label }) => (
+          <span key={label} className={`flex items-center gap-1 text-[10px] transition-colors ${
+            ok ? 'text-green-600' : 'text-slate-400'
+          }`}>
+            <Check size={9} className={ok ? 'opacity-100' : 'opacity-0'} />
+            {label}
+          </span>
+        ))}
+      </div>
+    </div>
+  )
+}
 
 /**
  * Modal bloqueante exibido quando o usuário faz login via magic link
@@ -14,6 +71,8 @@ export default function SetPasswordModal() {
   const [showPass, setShowPass] = useState(false)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  const strength = useMemo(() => getPasswordStrength(password), [password])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -83,6 +142,9 @@ export default function SetPasswordModal() {
                 {showPass ? <EyeOff size={14} /> : <Eye size={14} />}
               </button>
             </div>
+            <div className="mt-2">
+              <PasswordStrengthBar password={password} />
+            </div>
           </div>
 
           <div>
@@ -100,6 +162,9 @@ export default function SetPasswordModal() {
                   bg-slate-50 focus:bg-white transition-all"
               />
             </div>
+            {confirm && password && confirm !== password && (
+              <p className="text-[11px] text-red-500 mt-1 ml-1">As senhas não coincidem</p>
+            )}
           </div>
 
           {error && (

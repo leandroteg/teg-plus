@@ -34,3 +34,7 @@ npm-debug.log*
 # Cache
 .cache/
 .parcel-cache/
+
+# Temp workflow dumps (contain API tokens)
+wf_*.json
+fix_melhorar_n8n.py

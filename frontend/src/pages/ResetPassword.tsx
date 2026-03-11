@@ -1,9 +1,10 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Lock, Eye, EyeOff, ShieldCheck, AlertCircle, CheckCircle, ArrowRight } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { useTheme } from '../contexts/ThemeContext'
 import LogoTeg from '../components/LogoTeg'
+import { PasswordStrengthBar } from '../components/SetPasswordModal'
 
 /**
  * Página dedicada para redefinição de senha.
@@ -112,6 +113,9 @@ export default function ResetPassword() {
                     className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors">
                     {showPass ? <EyeOff size={14} /> : <Eye size={14} />}
                   </button>
+                </div>
+                <div className="mt-2">
+                  <PasswordStrengthBar password={password} />
                 </div>
               </div>
 

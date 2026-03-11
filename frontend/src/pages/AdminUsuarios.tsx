@@ -2,8 +2,9 @@ import { useState, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   Users, UserPlus, Search, ChevronLeft, Shield,
-  Check, X, AlertCircle, Mail, RefreshCw, MoreVertical,
-  CheckCircle, Power, Edit3,
+  Check, X, AlertCircle, Mail, RefreshCw,
+  CheckCircle, Power, Edit3, ChevronDown, ChevronUp,
+  Calendar, Clock, Briefcase, Building2, Eye,
 } from 'lucide-react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../services/supabase'
@@ -18,14 +19,17 @@ const AVATAR_COLORS = [
   'bg-violet-500', 'bg-indigo-500', 'bg-sky-500',
   'bg-emerald-500', 'bg-amber-500', 'bg-rose-500',
 ]
-function Avatar({ nome, size = 'md' }: { nome: string; size?: 'sm' | 'md' }) {
+function Avatar({ nome, size = 'md' }: { nome: string; size?: 'sm' | 'md' | 'lg' }) {
   const color = AVATAR_COLORS[nome.charCodeAt(0) % AVATAR_COLORS.length]
   const ini = nome.trim().split(/\s+/).slice(0, 2).map(n => n[0]).join('').toUpperCase()
+  const sizeClasses = {
+    sm: 'w-8 h-8 text-xs',
+    md: 'w-10 h-10 text-sm',
+    lg: 'w-14 h-14 text-lg',
+  }
   return (
-    <div className={`${color} rounded-xl flex items-center justify-center shrink-0 ${
-      size === 'sm' ? 'w-8 h-8' : 'w-10 h-10'
-    }`}>
-      <span className={`text-white font-extrabold ${size === 'sm' ? 'text-xs' : 'text-sm'}`}>{ini}</span>
+    <div className={`${color} rounded-xl flex items-center justify-center shrink-0 ${sizeClasses[size]}`}>
+      <span className="text-white font-extrabold">{ini}</span>
     </div>
   )
 }
@@ -84,7 +88,6 @@ function useConvidarUsuario() {
       email: string; nome: string; role: Role
       alcada_nivel: number; modulos: Record<string, boolean>
     }) => {
-      // 1. Salva convite pré-configurado
       const { error: convErr } = await supabase
         .from('sys_convites')
         .insert({
@@ -94,7 +97,6 @@ function useConvidarUsuario() {
         })
       if (convErr) throw convErr
 
-      // 2. Envia magic link (cria usuário se não existir)
       const { error: otpErr } = await supabase.auth.signInWithOtp({
         email,
         options: { emailRedirectTo: window.location.origin },
@@ -104,11 +106,12 @@ function useConvidarUsuario() {
   })
 }
 
-// ── Modal: Editar usuário ──────────────────────────────────────────────────────
-function EditModal({
+// ── Expanded User Detail + Inline Edit ────────────────────────────────────────
+function UserDetailPanel({
   user, onClose,
 }: { user: Perfil; onClose: () => void }) {
   const update = useUpdateUser()
+  const [editing, setEditing] = useState(false)
   const [role,    setRole]    = useState<Role>(user.role)
   const [alcada,  setAlcada]  = useState(user.alcada_nivel)
   const [ativo,   setAtivo]   = useState(user.ativo)
@@ -121,38 +124,115 @@ function EditModal({
   const handleSave = async () => {
     await update.mutateAsync({ id: user.id, role, alcada_nivel: alcada, ativo, modulos })
     setSuccess(true)
-    setTimeout(onClose, 1200)
+    setTimeout(() => { setSuccess(false); setEditing(false) }, 1200)
   }
 
+  const handleCancel = () => {
+    setRole(user.role)
+    setAlcada(user.alcada_nivel)
+    setAtivo(user.ativo)
+    setModulos(user.modulos ?? {})
+    setEditing(false)
+  }
+
+  const fmtDate = (s: string | null) =>
+    s ? new Date(s).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—'
+
   return (
-    <div className="fixed inset-0 bg-black/40 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
-      <div className="bg-white w-full sm:max-w-md rounded-t-3xl sm:rounded-2xl shadow-2xl overflow-hidden">
-        {/* Header */}
-        <div className="flex items-center gap-3 px-5 py-4 border-b border-slate-100">
-          <Avatar nome={user.nome} size="sm" />
-          <div className="flex-1 min-w-0">
-            <p className="font-bold text-navy text-sm truncate">{user.nome}</p>
-            <p className="text-xs text-slate-400 truncate">{user.email}</p>
+    <div className="border-t border-slate-100 bg-slate-50/50">
+      {/* User info section */}
+      <div className="px-4 py-4 space-y-3">
+        {/* Basic Info Row */}
+        <div className="grid grid-cols-2 gap-3">
+          <div className="flex items-center gap-2 text-xs">
+            <Mail size={12} className="text-slate-400 shrink-0" />
+            <span className="text-slate-600 truncate">{user.email}</span>
           </div>
-          <button onClick={onClose} className="text-slate-400 hover:text-slate-600">
-            <X size={18} />
-          </button>
+          <div className="flex items-center gap-2 text-xs">
+            <Briefcase size={12} className="text-slate-400 shrink-0" />
+            <span className="text-slate-600 truncate">{user.cargo || '—'}</span>
+          </div>
+          <div className="flex items-center gap-2 text-xs">
+            <Building2 size={12} className="text-slate-400 shrink-0" />
+            <span className="text-slate-600 truncate">{user.departamento || '—'}</span>
+          </div>
+          <div className="flex items-center gap-2 text-xs">
+            <Shield size={12} className="text-slate-400 shrink-0" />
+            <span className="text-slate-600">{ALCADA_LABEL[user.alcada_nivel]}</span>
+          </div>
+          <div className="flex items-center gap-2 text-xs">
+            <Calendar size={12} className="text-slate-400 shrink-0" />
+            <span className="text-slate-400">Desde: </span>
+            <span className="text-slate-600">{fmtDate(user.created_at)}</span>
+          </div>
+          <div className="flex items-center gap-2 text-xs">
+            <Clock size={12} className="text-slate-400 shrink-0" />
+            <span className="text-slate-400">Acesso: </span>
+            <span className="text-slate-600">{fmtDate(user.ultimo_acesso)}</span>
+          </div>
         </div>
 
-        <div className="p-5 space-y-5 max-h-[70vh] overflow-y-auto">
+        {/* Módulos atuais */}
+        {!editing && user.modulos && Object.values(user.modulos).some(Boolean) && (
+          <div>
+            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Módulos</p>
+            <div className="flex gap-1 flex-wrap">
+              {MODULOS_ERP.map(({ key, label, icon }) => (
+                <span key={key} className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md text-[10px] font-semibold ${
+                  user.modulos?.[key]
+                    ? 'bg-primary/10 text-primary'
+                    : 'bg-slate-100 text-slate-300'
+                }`}>
+                  <span className="text-[9px]">{icon}</span> {label}
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Senha definida status */}
+        <div className="flex items-center gap-2 text-xs">
+          <span className={`w-2 h-2 rounded-full ${user.senha_definida ? 'bg-green-500' : 'bg-amber-500'}`} />
+          <span className="text-slate-500">
+            {user.senha_definida ? 'Senha definida' : 'Senha pendente (magic link)'}
+          </span>
+        </div>
+      </div>
+
+      {/* Action bar or Edit form */}
+      {!editing ? (
+        <div className="px-4 pb-3 flex gap-2">
+          <button onClick={() => setEditing(true)}
+            className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl bg-primary text-white text-xs font-bold hover:bg-indigo-500 active:scale-[0.98] transition-all">
+            <Edit3 size={12} /> Editar Permissões
+          </button>
+          <button onClick={async () => {
+            await update.mutateAsync({ id: user.id, ativo: !user.ativo })
+          }}
+            disabled={update.isPending}
+            className={`flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold border-2 transition-all
+              ${user.ativo
+                ? 'border-red-200 text-red-600 hover:bg-red-50'
+                : 'border-green-200 text-green-600 hover:bg-green-50'
+              }`}>
+            <Power size={12} /> {user.ativo ? 'Desativar' : 'Ativar'}
+          </button>
+        </div>
+      ) : (
+        <div className="px-4 pb-4 space-y-4 border-t border-slate-100 pt-4">
           {/* Role */}
           <div>
-            <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">
+            <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-2">
               Perfil de Acesso
             </label>
-            <div className="grid grid-cols-2 gap-1.5">
+            <div className="grid grid-cols-3 gap-1.5">
               {(Object.keys(ROLE_LABEL) as Role[]).map(r => {
                 const c = ROLE_COLOR[r]
                 return (
                   <button key={r} onClick={() => setRole(r)}
-                    className={`flex items-center gap-2 px-3 py-2 rounded-xl border-2 text-left transition-all text-sm font-semibold
+                    className={`flex items-center gap-1.5 px-2.5 py-2 rounded-xl border-2 text-left transition-all text-xs font-semibold
                       ${role === r ? `${c.bg} ${c.text} border-current` : 'border-slate-100 text-slate-600 hover:border-slate-200'}`}>
-                    <span className={`w-2 h-2 rounded-full ${c.dot}`} />
+                    <span className={`w-1.5 h-1.5 rounded-full ${c.dot}`} />
                     {ROLE_LABEL[r]}
                   </button>
                 )
@@ -162,17 +242,17 @@ function EditModal({
 
           {/* Alçada */}
           <div>
-            <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">
+            <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-2">
               Alçada de Aprovação
             </label>
-            <div className="space-y-1">
+            <div className="grid grid-cols-1 gap-1">
               {([0, 1, 2, 3, 4] as const).map(n => (
                 <button key={n} onClick={() => setAlcada(n)}
-                  className={`w-full flex items-center gap-2 px-3 py-2.5 rounded-xl border-2 text-left transition-all
+                  className={`w-full flex items-center gap-2 px-3 py-2 rounded-xl border-2 text-left transition-all
                     ${alcada === n ? 'border-primary bg-primary/5 text-primary' : 'border-slate-100 text-slate-600 hover:border-slate-200'}`}>
-                  <Shield size={13} />
-                  <span className="text-sm font-semibold">{ALCADA_LABEL[n]}</span>
-                  {alcada === n && <Check size={13} className="ml-auto" />}
+                  <Shield size={12} />
+                  <span className="text-xs font-semibold">{ALCADA_LABEL[n]}</span>
+                  {alcada === n && <Check size={12} className="ml-auto" />}
                 </button>
               ))}
             </div>
@@ -180,30 +260,30 @@ function EditModal({
 
           {/* Módulos */}
           <div>
-            <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">
+            <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-2">
               Módulos Habilitados
             </label>
             <div className="grid grid-cols-2 gap-1.5">
               {MODULOS_ERP.map(({ key, label, icon }) => (
                 <button key={key} onClick={() => toggleMod(key)}
-                  className={`flex items-center gap-2 px-3 py-2.5 rounded-xl border-2 text-sm font-semibold transition-all
+                  className={`flex items-center gap-2 px-3 py-2 rounded-xl border-2 text-xs font-semibold transition-all
                     ${modulos[key] ? 'border-primary bg-primary/5 text-primary' : 'border-slate-100 text-slate-500 hover:border-slate-200'}`}>
                   <span>{icon}</span>
                   <span className="flex-1 text-left">{label}</span>
-                  {modulos[key] && <Check size={12} />}
+                  {modulos[key] && <Check size={11} />}
                 </button>
               ))}
             </div>
           </div>
 
           {/* Ativo/inativo */}
-          <div className="flex items-center justify-between bg-slate-50 rounded-xl px-4 py-3">
+          <div className="flex items-center justify-between bg-white rounded-xl px-4 py-3">
             <div>
-              <p className="text-sm font-semibold text-navy">Conta ativa</p>
-              <p className="text-xs text-slate-400">Usuário pode fazer login</p>
+              <p className="text-xs font-semibold text-navy">Conta ativa</p>
+              <p className="text-[10px] text-slate-400">Usuário pode fazer login</p>
             </div>
             <button onClick={() => setAtivo(v => !v)}
-              className={`w-12 h-6 rounded-full transition-colors relative ${ativo ? 'bg-green-500' : 'bg-slate-300'}`}>
+              className={`w-11 h-6 rounded-full transition-colors relative ${ativo ? 'bg-green-500' : 'bg-slate-300'}`}>
               <span className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-all ${ativo ? 'right-0.5' : 'left-0.5'}`} />
             </button>
           </div>
@@ -211,24 +291,28 @@ function EditModal({
           {/* Error */}
           {update.isError && (
             <div className="flex items-center gap-2 bg-red-50 text-red-600 rounded-xl px-3 py-2 text-xs">
-              <AlertCircle size={13} /> Erro ao salvar. Tente novamente.
+              <AlertCircle size={12} /> Erro ao salvar. Tente novamente.
             </div>
           )}
-        </div>
 
-        {/* Footer */}
-        <div className="px-5 pb-5 pt-2 border-t border-slate-100">
-          <button onClick={handleSave} disabled={update.isPending || success}
-            className="w-full py-3 rounded-xl bg-primary text-white font-semibold text-sm
-              flex items-center justify-center gap-2 hover:bg-indigo-500 disabled:opacity-60">
-            {success
-              ? <><CheckCircle size={15} /> Salvo!</>
-              : update.isPending
-                ? <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                : <><Check size={15} /> Salvar alterações</>}
-          </button>
+          {/* Buttons */}
+          <div className="flex gap-2">
+            <button onClick={handleCancel}
+              className="flex-1 py-2.5 rounded-xl border border-slate-200 text-xs font-semibold text-slate-600 hover:bg-white transition-colors">
+              Cancelar
+            </button>
+            <button onClick={handleSave} disabled={update.isPending || success}
+              className="flex-1 py-2.5 rounded-xl bg-primary text-white font-semibold text-xs
+                flex items-center justify-center gap-1.5 hover:bg-indigo-500 disabled:opacity-60 transition-all">
+              {success
+                ? <><CheckCircle size={13} /> Salvo!</>
+                : update.isPending
+                  ? <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  : <><Check size={13} /> Salvar alterações</>}
+            </button>
+          </div>
         </div>
-      </div>
+      )}
     </div>
   )
 }
@@ -378,11 +462,10 @@ export default function AdminUsuarios() {
   const { data: perfis, isLoading, refetch, isFetching } = usePerfis()
   const update = useUpdateUser()
 
-  const [search,      setSearch]      = useState('')
-  const [filterRole,  setFilterRole]  = useState<Role | 'todos'>('todos')
-  const [editUser,    setEditUser]    = useState<Perfil | null>(null)
-  const [showConvite, setShowConvite] = useState(false)
-  const [menuOpen,    setMenuOpen]    = useState<string | null>(null)
+  const [search,       setSearch]       = useState('')
+  const [filterRole,   setFilterRole]   = useState<Role | 'todos'>('todos')
+  const [expandedUser, setExpandedUser] = useState<string | null>(null)
+  const [showConvite,  setShowConvite]  = useState(false)
 
   const filtered = useMemo(() => {
     if (!perfis) return []
@@ -395,10 +478,6 @@ export default function AdminUsuarios() {
     })
   }, [perfis, search, filterRole])
 
-  const toggleAtivo = async (p: Perfil) => {
-    await update.mutateAsync({ id: p.id, ativo: !p.ativo })
-  }
-
   const stats = useMemo(() => {
     if (!perfis) return {}
     return perfis.reduce((acc, p) => {
@@ -407,9 +486,11 @@ export default function AdminUsuarios() {
     }, {} as Record<string, number>)
   }, [perfis])
 
+  const toggleExpand = (id: string) =>
+    setExpandedUser(prev => prev === id ? null : id)
+
   return (
     <>
-      {editUser    && <EditModal    user={editUser}       onClose={() => setEditUser(null)} />}
       {showConvite && <ConviteModal onClose={() => { setShowConvite(false); refetch() }} />}
 
       <div className="space-y-4">
@@ -485,63 +566,55 @@ export default function AdminUsuarios() {
           </div>
         ) : (
           <div className="space-y-2">
-            {filtered.map(p => (
-              <div key={p.id} className={`bg-white rounded-2xl shadow-card overflow-hidden transition-opacity ${!p.ativo ? 'opacity-60' : ''}`}>
-                <div className="flex items-center gap-3 px-4 py-3">
-                  <Avatar nome={p.nome} />
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <p className="text-sm font-bold text-navy truncate">{p.nome}</p>
-                      {!p.ativo && <span className="text-xs bg-red-100 text-red-600 rounded-full px-1.5 py-0.5 font-semibold">Inativo</span>}
+            {filtered.map(p => {
+              const isExpanded = expandedUser === p.id
+              return (
+                <div key={p.id} className={`bg-white rounded-2xl shadow-card overflow-hidden transition-all ${!p.ativo ? 'opacity-60' : ''}`}>
+                  {/* Card header - clickable */}
+                  <button
+                    onClick={() => toggleExpand(p.id)}
+                    className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-slate-50/50 transition-colors"
+                  >
+                    <Avatar nome={p.nome} />
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <p className="text-sm font-bold text-navy truncate">{p.nome}</p>
+                        {!p.ativo && <span className="text-[10px] bg-red-100 text-red-600 rounded-full px-1.5 py-0.5 font-semibold">Inativo</span>}
+                      </div>
+                      <p className="text-xs text-slate-400 truncate">{p.email}</p>
+                      <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
+                        <RoleBadge role={p.role} />
+                        {p.alcada_nivel > 0 && (
+                          <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-navy/10 text-navy text-[10px] font-semibold">
+                            <Shield size={9} /> N{p.alcada_nivel}
+                          </span>
+                        )}
+                        {p.modulos && (
+                          <span className="text-[10px] text-slate-400">
+                            {Object.values(p.modulos).filter(Boolean).length} módulos
+                          </span>
+                        )}
+                      </div>
                     </div>
-                    <p className="text-xs text-slate-400 truncate">{p.email}</p>
-                    <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
-                      <RoleBadge role={p.role} />
-                      {p.alcada_nivel > 0 && (
-                        <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-navy/10 text-navy text-[10px] font-semibold">
-                          <Shield size={9} /> N{p.alcada_nivel}
-                        </span>
-                      )}
-                    </div>
-                  </div>
 
-                  {/* Ações */}
-                  <div className="relative">
-                    <button onClick={() => setMenuOpen(menuOpen === p.id ? null : p.id)}
-                      className="w-8 h-8 rounded-lg hover:bg-slate-100 flex items-center justify-center text-slate-400">
-                      <MoreVertical size={15} />
-                    </button>
-                    {menuOpen === p.id && (
-                      <>
-                        <div className="fixed inset-0 z-40" onClick={() => setMenuOpen(null)} />
-                        <div className="absolute right-0 top-9 z-50 bg-white rounded-xl shadow-xl border border-slate-100 py-1 w-40">
-                          <button onClick={() => { setEditUser(p); setMenuOpen(null) }}
-                            className="w-full flex items-center gap-2 px-3 py-2 text-sm text-slate-700 hover:bg-slate-50">
-                            <Edit3 size={13} /> Editar permissões
-                          </button>
-                          <button onClick={() => { toggleAtivo(p); setMenuOpen(null) }}
-                            className={`w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-slate-50
-                              ${p.ativo ? 'text-red-600' : 'text-green-600'}`}>
-                            <Power size={13} /> {p.ativo ? 'Desativar' : 'Ativar'}
-                          </button>
-                        </div>
-                      </>
-                    )}
-                  </div>
+                    {/* Expand indicator */}
+                    <div className={`w-7 h-7 rounded-lg flex items-center justify-center transition-colors ${
+                      isExpanded ? 'bg-primary/10 text-primary' : 'text-slate-300'
+                    }`}>
+                      {isExpanded ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
+                    </div>
+                  </button>
+
+                  {/* Expanded detail panel */}
+                  {isExpanded && (
+                    <UserDetailPanel
+                      user={p}
+                      onClose={() => setExpandedUser(null)}
+                    />
+                  )}
                 </div>
-
-                {/* Módulos */}
-                {p.modulos && Object.values(p.modulos).some(Boolean) && (
-                  <div className="px-4 pb-3 flex gap-1 flex-wrap">
-                    {MODULOS_ERP.filter(m => p.modulos?.[m.key]).map(({ key, label, icon }) => (
-                      <span key={key} className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md bg-primary/8 text-primary text-[10px] font-semibold">
-                        <span className="text-[9px]">{icon}</span> {label}
-                      </span>
-                    ))}
-                  </div>
-                )}
-              </div>
-            ))}
+              )
+            })}
           </div>
         )}
       </div>
