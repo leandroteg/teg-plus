@@ -11,14 +11,16 @@ export function useItemCatalogSearch(categorias: string[], search: string) {
     queryKey: ['est-itens-catalog', categorias, search],
     enabled: search.length >= 2 && categorias.length > 0,
     queryFn: async () => {
+      // Case-insensitive search across descricao, descricao_complementar, and codigo (#49)
+      const term = `%${search}%`
       const { data, error } = await supabase
         .from('est_itens')
         .select('id, codigo, descricao, descricao_complementar, categoria, unidade, valor_medio')
         .in('categoria', categorias)
         .eq('ativo', true)
-        .ilike('descricao', `%${search}%`)
+        .or(`descricao.ilike.${term},descricao_complementar.ilike.${term},codigo.ilike.${term}`)
         .order('descricao')
-        .limit(10)
+        .limit(15)
       if (error) return []
       return (data ?? []) as EstItem[]
     },

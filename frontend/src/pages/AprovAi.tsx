@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   CheckCircle, XCircle, ChevronDown, ChevronRight,
@@ -9,6 +9,7 @@ import {
   Calendar, FileText, Download,
 } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
+import { supabase } from '../services/supabase'
 import {
   useAprovacoesPendentes,
   useDecisaoRequisicao,
@@ -128,9 +129,18 @@ function AprovacaoCard({ aprovacao, aprovadorNome, aprovadorEmail }: {
   const [expanded, setExpanded] = useState(false)
   const [observacao, setObservacao] = useState('')
   const [action, setAction] = useState<'aprovada' | 'rejeitada' | 'esclarecimento' | null>(null)
+  const [alertaCotacao, setAlertaCotacao] = useState<{ sem_cotacoes_minimas: boolean; justificativa?: string } | null>(null)
 
   const req  = aprovacao.requisicao
   const cot  = aprovacao.cotacao_resumo
+
+  // Busca alerta de cotacoes obrigatorias faltantes (#38)
+  useEffect(() => {
+    if (!aprovacao.requisicao_id) return
+    supabase.rpc('get_alerta_cotacao', { p_requisicao_id: aprovacao.requisicao_id })
+      .then(({ data }) => { if (data) setAlertaCotacao(data) })
+      .catch(() => { /* non-critical */ })
+  }, [aprovacao.requisicao_id])
 
   if (!req) return null
 
@@ -286,6 +296,27 @@ function AprovacaoCard({ aprovacao, aprovadorNome, aprovadorEmail }: {
             </div>
           )}
         </div>
+
+        {/* Alerta: cotacoes obrigatorias faltantes (#38) */}
+        {alertaCotacao?.sem_cotacoes_minimas && (
+          <div className="mt-3 bg-amber-50 border border-amber-300 rounded-xl p-3 flex gap-2.5">
+            <AlertTriangle size={16} className="text-amber-600 shrink-0 mt-0.5" />
+            <div>
+              <p className="text-xs font-bold text-amber-800">
+                Cotacao sem numero minimo de fornecedores
+              </p>
+              <p className="text-[11px] text-amber-700 mt-0.5 leading-relaxed">
+                O comprador enviou esta cotacao sem atingir o minimo exigido. Avalie com cautela.
+              </p>
+              {alertaCotacao.justificativa && (
+                <div className="mt-1.5 bg-white border border-amber-200 rounded-lg px-2.5 py-1.5">
+                  <p className="text-[10px] font-semibold text-amber-600 uppercase tracking-wide mb-0.5">Justificativa:</p>
+                  <p className="text-[11px] text-amber-800 italic">{alertaCotacao.justificativa}</p>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* Expandir para observacao */}
         <button type="button" onClick={() => setExpanded(!expanded)}

@@ -7,6 +7,7 @@ import {
 import { useSearchParams } from 'react-router-dom'
 import { usePedidos, useAtualizarPedido, useLiberarPagamento } from '../hooks/usePedidos'
 import { api } from '../services/api'
+import { supabase } from '../services/supabase'
 import { useAnexosPedido, useUploadAnexo, useCotacaoDocs, TIPO_LABEL } from '../hooks/useAnexos'
 import type { PedidoAnexo } from '../hooks/useAnexos'
 import FluxoTimeline from '../components/FluxoTimeline'
@@ -53,13 +54,14 @@ const statusConfig: Record<string, { bg: string; text: string; label: string }> 
 
 // ─── PDF / Share helpers ──────────────────────────────────────────────────────
 
-function gerarPdfPedido(pedido: Pedido) {
-  const html = `
+function gerarPdfHtml(pedido: Pedido): string {
+  const esc = (s: string) => s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c] ?? c))
+  return `
     <!DOCTYPE html>
     <html>
     <head>
       <meta charset="UTF-8">
-      <title>Pedido de Compra #${pedido.numero_pedido}</title>
+      <title>Pedido de Compra #${esc(pedido.numero_pedido ?? '')}</title>
       <style>
         body { font-family: Arial, sans-serif; padding: 40px; color: #1e293b; }
         .header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 32px; border-bottom: 2px solid #0d9488; padding-bottom: 20px; }
@@ -83,7 +85,7 @@ function gerarPdfPedido(pedido: Pedido) {
         </div>
         <div style="text-align:right">
           <div class="title">Pedido de Compra</div>
-          <div style="font-size:13px;font-weight:700;color:#0d9488">#${pedido.numero_pedido ?? pedido.id.slice(0, 8).toUpperCase()}</div>
+          <div style="font-size:13px;font-weight:700;color:#0d9488">#${esc(pedido.numero_pedido ?? pedido.id.slice(0, 8).toUpperCase())}</div>
           <div style="font-size:11px;color:#64748b;margin-top:4px">${new Date().toLocaleDateString('pt-BR')}</div>
         </div>
       </div>
@@ -92,7 +94,7 @@ function gerarPdfPedido(pedido: Pedido) {
         <div class="field-row">
           <div class="field">
             <div class="label">Fornecedor</div>
-            <div class="value">${pedido.fornecedor_nome}</div>
+            <div class="value">${esc(pedido.fornecedor_nome)}</div>
           </div>
           <div class="field">
             <div class="label">Valor Total</div>
@@ -103,11 +105,11 @@ function gerarPdfPedido(pedido: Pedido) {
         <div class="field-row">
           <div class="field">
             <div class="label">Requisição</div>
-            <div class="value">${pedido.requisicao.numero} — ${pedido.requisicao.descricao}</div>
+            <div class="value">${esc(pedido.requisicao.numero)} — ${esc(pedido.requisicao.descricao)}</div>
           </div>
           <div class="field">
             <div class="label">Obra / Projeto</div>
-            <div class="value">${pedido.requisicao.obra_nome ?? '—'}</div>
+            <div class="value">${esc(pedido.requisicao.obra_nome ?? '—')}</div>
           </div>
         </div>` : ''}
         <div class="field-row">
@@ -119,9 +121,9 @@ function gerarPdfPedido(pedido: Pedido) {
             <div class="label">Previsão de Entrega</div>
             <div class="value">${pedido.data_prevista_entrega ? new Date(pedido.data_prevista_entrega + 'T00:00:00').toLocaleDateString('pt-BR') : '—'}</div>
           </div>
-          ${pedido.nf_numero ? `<div class="field"><div class="label">NF</div><div class="value">${pedido.nf_numero}</div></div>` : ''}
+          ${pedido.nf_numero ? `<div class="field"><div class="label">NF</div><div class="value">${esc(pedido.nf_numero)}</div></div>` : ''}
         </div>
-        ${pedido.observacoes ? `<div class="field"><div class="label">Observações</div><div class="value">${pedido.observacoes}</div></div>` : ''}
+        ${pedido.observacoes ? `<div class="field"><div class="label">Observações</div><div class="value">${esc(pedido.observacoes)}</div></div>` : ''}
       </div>
 
       <div class="footer">
@@ -131,12 +133,17 @@ function gerarPdfPedido(pedido: Pedido) {
     </body>
     </html>
   `
-  const win = window.open('', '_blank', 'width=900,height=700')
-  if (!win) return
-  win.document.write(html)
-  win.document.close()
-  win.focus()
-  setTimeout(() => win.print(), 500)
+}
+
+function gerarPdfPedido(pedido: Pedido) {
+  const html = gerarPdfHtml(pedido)
+  const printWin = window.open('', '_blank', 'width=900,height=700')
+  if (!printWin) return
+  printWin.document.open()
+  printWin.document.writeln(html)
+  printWin.document.close()
+  printWin.focus()
+  setTimeout(() => printWin.print(), 500)
 }
 
 function compartilharWhatsApp(pedido: Pedido) {
@@ -160,17 +167,40 @@ async function compartilharEmail(pedido: Pedido, email?: string) {
     `Para visualizar o pedido completo com anexos, acesse o sistema TEG+.\n\n` +
     `Atenciosamente,\nEquipe de Compras TEG+`
 
-  // Tenta enviar via n8n (com anexos)
+  // Busca anexos do pedido para enviar junto ao e-mail (#34)
+  let anexosUrls: { url: string; nome: string; tipo: string }[] = []
+  try {
+    const { data: anexos } = await supabase
+      .from('cmp_pedidos_anexos')
+      .select('url, nome_arquivo, tipo, mime_type')
+      .eq('pedido_id', pedido.id)
+    if (anexos && anexos.length > 0) {
+      anexosUrls = anexos.map(a => ({
+        url: a.url,
+        nome: a.nome_arquivo ?? `anexo-${a.tipo}`,
+        tipo: a.mime_type ?? 'application/octet-stream',
+      }))
+    }
+  } catch {
+    // Se falhar ao buscar anexos, envia sem eles
+  }
+
+  // Gera HTML do pedido para PDF inline
+  const pdfHtml = gerarPdfHtml(pedido)
+
+  // Tenta enviar via n8n (com anexos e PDF)
   try {
     const res = await api.enviarEmailPedido({
       pedido_id: pedido.id,
       email_destinatario: email ?? '',
       subject,
       body,
+      anexos_urls: anexosUrls,
+      pdf_html: pdfHtml,
     })
     if (res?.ok) return // sucesso via n8n
   } catch {
-    // n8n indisponível — fallback mailto
+    // n8n indisponivel -- fallback mailto
   }
 
   // Fallback: abre mailto (sem anexos)
