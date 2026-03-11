@@ -105,7 +105,8 @@ export default function NovaRequisicao() {
 
   const [categoria, setCategoria]           = useState<CategoriaMaterial | null>(null)
   const [solicitante, setSolicitante]       = useState(perfil?.nome ?? '')
-  const [obraNome, setObraNome]             = useState('')
+  const [obraId, setObraId]                 = useState('')
+  const obraNome = obras.find(o => o.id === obraId)?.nome ?? ''
   const [descricao, setDescricao]           = useState('')
   const [justificativa, setJustificativa]   = useState('')
   const [urgencia, setUrgencia]             = useState<Urgencia>('normal')
@@ -165,7 +166,7 @@ export default function NovaRequisicao() {
         normalizeStr(o.nome).includes(normalizeStr(sugerida)) ||
         normalizeStr(sugerida).includes(normalizeStr(o.nome))
       )
-      if (obraMatch) setObraNome(obraMatch.nome)
+      if (obraMatch) setObraId(obraMatch.id)
     }
 
     // Validate urgencia before setting
@@ -293,6 +294,7 @@ export default function NovaRequisicao() {
       await mutation.mutateAsync({
         solicitante_nome: solicitante,
         obra_nome:        obraNome,
+        obra_id:          obraId || undefined,
         descricao,
         justificativa,
         urgencia,
@@ -757,9 +759,9 @@ export default function NovaRequisicao() {
         <select required className={`w-full border rounded-xl px-3 py-2.5 text-sm bg-white focus:ring-2 focus:ring-teal-300 outline-none ${
           stepErrors.some(e => e.includes('obra')) ? 'border-red-300 bg-red-50/30' : 'border-slate-200'
         }`}
-          value={obraNome} onChange={e => setObraNome(e.target.value)}>
+          value={obraId} onChange={e => setObraId(e.target.value)}>
           <option value="">Selecione a obra</option>
-          {obras.map(o => <option key={o.id} value={o.nome}>{o.nome}</option>)}
+          {obras.map(o => <option key={o.id} value={o.id}>{o.codigo ? `${o.codigo} - ` : ''}{o.nome}</option>)}
         </select>
       </div>
 
