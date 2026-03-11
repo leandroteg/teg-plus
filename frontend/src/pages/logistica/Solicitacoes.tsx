@@ -2,6 +2,7 @@ import { useState, useCallback } from 'react'
 import {
   ClipboardList, Plus, Search, X, Save, Loader2,
   ChevronDown, AlertTriangle, FileInput, ExternalLink, CheckCircle2,
+  Trash2, Package2,
 } from 'lucide-react'
 import {
   useSolicitacoes, useCriarSolicitacao, useAtualizarStatusSolicitacao,
@@ -62,6 +63,7 @@ export default function Solicitacoes() {
   const [planejForm, setPlanejForm] = useState<PlanejamentoForm>({})
   const [nfModal, setNfModal] = useState<{ solId: string; descricao: string; valor: number; transportadora?: string; cnpj?: string } | null>(null)
   const [nfForm, setNfForm] = useState({ fornecedor_cnpj: '', fornecedor_nome: '', valor_total: 0, descricao: '' })
+  const [itensForm, setItensForm] = useState<{ descricao: string; quantidade: number; unidade: string; peso_kg?: number; volume_m3?: number }[]>([])
   const navigate = useNavigate()
 
   const { data: solicitacoes = [], isLoading } = useSolicitacoes(
@@ -93,9 +95,10 @@ export default function Solicitacoes() {
   const set = (k: keyof CriarSolicitacaoPayload, v: any) => setForm(p => ({ ...p, [k]: v }))
 
   async function handleCriar() {
-    await criar.mutateAsync(form)
+    await criar.mutateAsync({ ...form, itens: itensForm.length > 0 ? itensForm : undefined })
     setShowForm(false)
     setForm({ ...EMPTY_FORM })
+    setItensForm([])
   }
 
   async function handleValidar(id: string) {
@@ -296,18 +299,39 @@ export default function Solicitacoes() {
                         </>
                       )}
                       {s.status === 'aprovado' && (
-                        <button onClick={() => openNfModal(s)}
-                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-700
+                        <>
+                          <button onClick={() => navigate('/logistica/expedicao')}
+                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700
+                              text-white text-xs font-semibold transition-colors shadow-sm">
+                            <Package2 size={12} /> Ir para Expedição
+                          </button>
+                          <button onClick={() => openNfModal(s)}
+                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-700
+                              text-white text-xs font-semibold transition-colors shadow-sm">
+                            <FileInput size={12} /> Solicitar NF
+                          </button>
+                        </>
+                      )}
+                      {s.status === 'romaneio_emitido' && (
+                        <button onClick={() => navigate('/logistica/expedicao')}
+                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700
                             text-white text-xs font-semibold transition-colors shadow-sm">
-                          <FileInput size={12} /> Solicitar NF
+                          <Package2 size={12} /> Ir para Expedição
                         </button>
                       )}
                       {s.status === 'nfe_emitida' && (
-                        <button onClick={() => navigate('/fiscal/solicitacao')}
-                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-500/10 hover:bg-amber-500/20
-                            text-amber-700 text-xs font-semibold transition-colors border border-amber-200">
-                          <ExternalLink size={12} /> Ver no Fiscal
-                        </button>
+                        <>
+                          <button onClick={() => navigate('/logistica/expedicao')}
+                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700
+                              text-white text-xs font-semibold transition-colors shadow-sm">
+                            <Package2 size={12} /> Ir para Expedição
+                          </button>
+                          <button onClick={() => navigate('/fiscal/solicitacao')}
+                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-500/10 hover:bg-amber-500/20
+                              text-amber-700 text-xs font-semibold transition-colors border border-amber-200">
+                            <ExternalLink size={12} /> Ver no Fiscal
+                          </button>
+                        </>
                       )}
                       {(s.status === 'solicitado' || s.status === 'validando' || s.status === 'planejado') && (
                         <ActionBtn
@@ -416,6 +440,58 @@ export default function Solicitacoes() {
                     className="input-base" />
                 </div>
               </div>
+              {/* Itens da Carga */}
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <label className={`text-xs font-bold ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>Itens da Carga</label>
+                  <button type="button"
+                    onClick={() => setItensForm(p => [...p, { descricao: '', quantidade: 1, unidade: 'un' }])}
+                    className="flex items-center gap-1 text-[10px] font-semibold text-orange-600 hover:text-orange-700">
+                    <Plus size={10} /> Adicionar Item
+                  </button>
+                </div>
+                {itensForm.length > 0 ? (
+                  <div className="space-y-2">
+                    {itensForm.map((item, idx) => (
+                      <div key={idx} className={`rounded-xl p-3 ${isDark ? 'bg-white/5 border border-white/[0.06]' : 'bg-slate-50 border border-slate-100'}`}>
+                        <div className="flex gap-2 mb-2">
+                          <input value={item.descricao}
+                            onChange={e => setItensForm(p => p.map((it, i) => i === idx ? { ...it, descricao: e.target.value } : it))}
+                            placeholder="Descrição do item *" className="input-base flex-1 text-xs" />
+                          <button onClick={() => setItensForm(p => p.filter((_, i) => i !== idx))}
+                            className="text-red-400 hover:text-red-600 shrink-0 p-1">
+                            <Trash2 size={12} />
+                          </button>
+                        </div>
+                        <div className="grid grid-cols-4 gap-2">
+                          <input type="number" min={1} value={item.quantidade}
+                            onChange={e => setItensForm(p => p.map((it, i) => i === idx ? { ...it, quantidade: Number(e.target.value) } : it))}
+                            placeholder="Qtd" className="input-base text-xs" />
+                          <select value={item.unidade}
+                            onChange={e => setItensForm(p => p.map((it, i) => i === idx ? { ...it, unidade: e.target.value } : it))}
+                            className="input-base text-xs">
+                            {['un','pç','kg','m','m²','m³','L','cx','rl','pct','bd','tb'].map(u => (
+                              <option key={u} value={u}>{u}</option>
+                            ))}
+                          </select>
+                          <input type="number" min={0} step={0.1} value={item.peso_kg ?? ''}
+                            onChange={e => setItensForm(p => p.map((it, i) => i === idx ? { ...it, peso_kg: e.target.value ? Number(e.target.value) : undefined } : it))}
+                            placeholder="Peso (kg)" className="input-base text-xs" />
+                          <input type="number" min={0} step={0.01} value={item.volume_m3 ?? ''}
+                            onChange={e => setItensForm(p => p.map((it, i) => i === idx ? { ...it, volume_m3: e.target.value ? Number(e.target.value) : undefined } : it))}
+                            placeholder="Vol (m³)" className="input-base text-xs" />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className={`rounded-xl px-4 py-3 text-center ${isDark ? 'bg-white/5 border border-white/[0.06]' : 'bg-slate-50 border border-slate-100'}`}>
+                    <Package2 size={16} className={`mx-auto mb-1 ${isDark ? 'text-slate-600' : 'text-slate-300'}`} />
+                    <p className={`text-[10px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Nenhum item adicionado (opcional)</p>
+                  </div>
+                )}
+              </div>
+
               <div className="flex gap-4">
                 <label className="flex items-center gap-2 cursor-pointer">
                   <input type="checkbox" checked={form.urgente ?? false} onChange={e => set('urgente', e.target.checked)}

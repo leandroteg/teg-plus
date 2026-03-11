@@ -102,11 +102,12 @@ export default function FrotasHome() {
             <KpiCard label="Em Manutencao"     value={(k?.em_manutencao ?? 0) + (k?.bloqueados ?? 0)} sub={`${k?.bloqueados ?? 0} bloqueados`} accent="amber" isLight={isLight} />
           </div>
 
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
             <KpiCard label="Prev. Vencidas"    value={k?.preventivas_vencidas ?? 0} sub="atencao imediata" accent="red" warn={(k?.preventivas_vencidas ?? 0) > 0} isLight={isLight} />
             <KpiCard label="Prev. em 7 dias"   value={k?.preventivas_proximas_7d ?? 0} sub="programar" accent="amber" isLight={isLight} />
             <KpiCard label="Custo Manutencao"  value={BRL(k?.custo_manutencao_mes ?? 0)} sub="mes atual" accent="rose" isLight={isLight} />
             <KpiCard label="Custo Abastecimento" value={BRL(k?.custo_abastecimento_mes ?? 0)} sub="mes atual" accent="blue" isLight={isLight} />
+            <KpiCard label="Ocorrencias" value={k?.ocorrencias_abertas ?? 0} sub="pendentes" accent="violet" warn={(k?.ocorrencias_abertas ?? 0) > 0} isLight={isLight} />
           </div>
         </>
       )}

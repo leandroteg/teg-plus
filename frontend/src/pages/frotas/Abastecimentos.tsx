@@ -143,8 +143,13 @@ export default function Abastecimentos() {
   const [modal, setModal]     = useState(false)
   const mesAtual = new Date().toISOString().slice(0, 7)
   const [mesFiltro, setMesFiltro] = useState(mesAtual)
+  const [veiculoFiltro, setVeiculoFiltro] = useState('')
+  const { data: veiculosList = [] } = useVeiculos()
 
-  const { data: abastecimentos = [], isLoading } = useAbastecimentos({ mes: mesFiltro })
+  const { data: abastecimentos = [], isLoading } = useAbastecimentos({
+    mes: mesFiltro,
+    veiculo_id: veiculoFiltro || undefined,
+  })
 
   const desvios       = abastecimentos.filter(a => a.desvio_detectado)
   const totalLitros   = abastecimentos.reduce((s, a) => s + (a.litros ?? 0), 0)
@@ -166,13 +171,30 @@ export default function Abastecimentos() {
         </button>
       </div>
 
-      {/* Filtro mes */}
-      <div className="flex items-center gap-3">
-        <label className="text-xs text-slate-500">Mes:</label>
-        <input type="month" value={mesFiltro} onChange={e => setMesFiltro(e.target.value)}
-          className={`px-3 py-2 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-rose-500/30 ${
-            isLight ? 'bg-slate-50 border border-slate-200 text-slate-800' : 'bg-white/6 border border-white/10 text-white'
-          }`} />
+      {/* Filtros */}
+      <div className="flex items-end gap-3 flex-wrap">
+        <div>
+          <label className="text-[10px] text-slate-500 block mb-1">Mes</label>
+          <input type="month" value={mesFiltro} onChange={e => setMesFiltro(e.target.value)}
+            className={`px-3 py-2 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-rose-500/30 ${
+              isLight ? 'bg-slate-50 border border-slate-200 text-slate-800' : 'bg-white/6 border border-white/10 text-white'
+            }`} />
+        </div>
+        <div>
+          <label className="text-[10px] text-slate-500 block mb-1">Veiculo</label>
+          <select
+            value={veiculoFiltro}
+            onChange={e => setVeiculoFiltro(e.target.value)}
+            className={`px-3 py-2 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-rose-500/30 ${
+              isLight ? 'bg-slate-50 border border-slate-200 text-slate-800' : 'bg-white/6 border border-white/10 text-white [&>option]:bg-slate-900'
+            }`}
+          >
+            <option value="">Todos</option>
+            {veiculosList.filter(v => v.status !== 'baixado').map(v => (
+              <option key={v.id} value={v.id}>{v.placa} — {v.marca} {v.modelo}</option>
+            ))}
+          </select>
+        </div>
       </div>
 
       {/* KPI Cards */}

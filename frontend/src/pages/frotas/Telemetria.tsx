@@ -1,6 +1,6 @@
 import { useState } from 'react'
-import { Radio, AlertTriangle, CheckCircle, MessageSquare, XCircle } from 'lucide-react'
-import { useOcorrenciasTel, useAtualizarOcorrencia } from '../../hooks/useFrotas'
+import { Plus, Radio, AlertTriangle, CheckCircle, MessageSquare, XCircle } from 'lucide-react'
+import { useOcorrenciasTel, useAtualizarOcorrencia, useRegistrarOcorrencia, useVeiculos } from '../../hooks/useFrotas'
 import { useTheme } from '../../contexts/ThemeContext'
 import type { FroOcorrenciaTel, StatusOcorrenciaTel, TipoOcorrenciaTel } from '../../types/frotas'
 
@@ -153,6 +153,92 @@ function OcorrenciaRow({ oc, onSelect, isLight }: { oc: FroOcorrenciaTel; onSele
   )
 }
 
+// ── Nova Ocorrência Modal ─────────────────────────────────────────────────────
+function NovaOcorrenciaModal({ onClose, isLight }: { onClose: () => void; isLight: boolean }) {
+  const registrar = useRegistrarOcorrencia()
+  const { data: veiculos = [] } = useVeiculos()
+  const [form, setForm] = useState({
+    veiculo_id: '', tipo_ocorrencia: 'excesso_velocidade' as TipoOcorrenciaTel,
+    velocidade: '', endereco: '', data_ocorrencia: new Date().toISOString().slice(0, 16),
+    observacoes: '',
+  })
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    await registrar.mutateAsync({
+      veiculo_id: form.veiculo_id,
+      tipo_ocorrencia: form.tipo_ocorrencia,
+      velocidade: form.velocidade ? +form.velocidade : undefined,
+      endereco: form.endereco || undefined,
+      data_ocorrencia: form.data_ocorrencia ? new Date(form.data_ocorrencia).toISOString() : new Date().toISOString(),
+      status: 'registrada',
+      observacoes: form.observacoes || undefined,
+    })
+    onClose()
+  }
+
+  const inp = `w-full px-3 py-2 rounded-xl text-sm placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-rose-500/30 ${
+    isLight ? 'bg-slate-50 border border-slate-200 text-slate-800' : 'bg-white/6 border border-white/10 text-white'
+  }`
+  const sel = inp + (isLight ? '' : ' [&>option]:bg-slate-900')
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+      <form onSubmit={handleSubmit} className="glass-card rounded-2xl p-6 w-full max-w-lg space-y-4">
+        <h2 className={`text-base font-bold ${isLight ? 'text-slate-800' : 'text-white'}`}>Registrar Ocorrencia</h2>
+
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="text-[11px] text-slate-400">Veiculo *</label>
+            <select className={sel} value={form.veiculo_id} onChange={e => setForm(f => ({ ...f, veiculo_id: e.target.value }))} required>
+              <option value="">Selecione...</option>
+              {veiculos.filter(v => v.status !== 'baixado').map(v => (
+                <option key={v.id} value={v.id}>{v.placa} — {v.marca} {v.modelo}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="text-[11px] text-slate-400">Tipo *</label>
+            <select className={sel} value={form.tipo_ocorrencia} onChange={e => setForm(f => ({ ...f, tipo_ocorrencia: e.target.value as TipoOcorrenciaTel }))}>
+              {Object.entries(TIPO_CFG).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
+            </select>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="text-[11px] text-slate-400">Data/hora *</label>
+            <input type="datetime-local" className={inp} value={form.data_ocorrencia} onChange={e => setForm(f => ({ ...f, data_ocorrencia: e.target.value }))} required />
+          </div>
+          <div>
+            <label className="text-[11px] text-slate-400">Velocidade (km/h)</label>
+            <input type="number" className={inp} value={form.velocidade} onChange={e => setForm(f => ({ ...f, velocidade: e.target.value }))} placeholder="Ex: 120" />
+          </div>
+        </div>
+
+        <div>
+          <label className="text-[11px] text-slate-400">Endereco / Local</label>
+          <input className={inp} value={form.endereco} onChange={e => setForm(f => ({ ...f, endereco: e.target.value }))} placeholder="Rodovia BR-040, km 512" />
+        </div>
+
+        <div>
+          <label className="text-[11px] text-slate-400">Observacoes</label>
+          <textarea className={inp + ' resize-none'} rows={2} value={form.observacoes} onChange={e => setForm(f => ({ ...f, observacoes: e.target.value }))} placeholder="Detalhes adicionais..." />
+        </div>
+
+        <div className="flex gap-2">
+          <button type="button" onClick={onClose} className={`flex-1 py-2 rounded-xl border text-sm ${
+            isLight ? 'border-slate-200 text-slate-500 hover:bg-slate-50' : 'border-white/10 text-slate-400 hover:bg-white/5'
+          }`}>Cancelar</button>
+          <button type="submit" disabled={registrar.isPending} className="flex-1 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-sm text-white font-semibold disabled:opacity-50">
+            {registrar.isPending ? 'Registrando...' : 'Registrar'}
+          </button>
+        </div>
+      </form>
+    </div>
+  )
+}
+
 // ── Main ──────────────────────────────────────────────────────────────────────
 const TABS: Array<{ key: StatusOcorrenciaTel | 'todas'; label: string }> = [
   { key: 'registrada',    label: 'Pendentes' },
@@ -165,17 +251,23 @@ export default function Telemetria() {
   const { isLightSidebar: isLight } = useTheme()
   const [tabIdx, setTabIdx]   = useState(0)
   const [selected, setSelected] = useState<FroOcorrenciaTel | null>(null)
+  const [novaModal, setNovaModal] = useState(false)
 
   const tabKey = TABS[tabIdx].key as StatusOcorrenciaTel
   const { data: ocorrencias = [], isLoading } = useOcorrenciasTel({ status: tabKey })
 
   return (
     <div className="p-4 sm:p-6 space-y-4">
-      <div>
-        <h1 className={`text-xl font-bold flex items-center gap-2 ${isLight ? 'text-slate-800' : 'text-white'}`}>
-          <Radio size={20} className="text-rose-400" /> Telemetria e Compliance
-        </h1>
-        <p className="text-sm text-slate-500">Ocorrencias registradas pelo sistema de rastreamento</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className={`text-xl font-bold flex items-center gap-2 ${isLight ? 'text-slate-800' : 'text-white'}`}>
+            <Radio size={20} className="text-rose-400" /> Telemetria e Compliance
+          </h1>
+          <p className="text-sm text-slate-500">Ocorrencias registradas pelo sistema de rastreamento</p>
+        </div>
+        <button onClick={() => setNovaModal(true)} className="flex items-center gap-2 px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-sm text-white font-semibold">
+          <Plus size={15} /> Registrar Ocorrencia
+        </button>
       </div>
 
       {/* Tabs */}
@@ -227,6 +319,7 @@ export default function Telemetria() {
       )}
 
       {selected && <OcorrenciaModal oc={selected} onClose={() => setSelected(null)} isLight={isLight} />}
+      {novaModal && <NovaOcorrenciaModal onClose={() => setNovaModal(false)} isLight={isLight} />}
     </div>
   )
 }

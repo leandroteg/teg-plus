@@ -4,7 +4,7 @@ import {
   CheckCircle2, XCircle, Clock, Eye,
 } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
-import { useContasPagar } from '../../hooks/useFinanceiro'
+import { useContasPagar, useAprovarPagamento } from '../../hooks/useFinanceiro'
 
 const fmt = (v: number) =>
   v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 })
@@ -18,7 +18,9 @@ export default function AprovacoesPagamento() {
   const { isDark } = useTheme()
   const [tab, setTab] = useState<Tab>('pendentes')
   const [busca, setBusca] = useState('')
+  const [toast, setToast] = useState<{ type: 'success' | 'error'; msg: string } | null>(null)
   const { data: contas = [], isLoading } = useContasPagar()
+  const aprovarMutation = useAprovarPagamento()
 
   const pendentes = contas.filter(cp =>
     cp.status === 'aguardando_aprovacao' || cp.status === 'aguardando_docs'
@@ -46,8 +48,40 @@ export default function AprovacoesPagamento() {
     { key: 'rejeitadas', label: 'Rejeitadas', count: rejeitadas.length, active: 'bg-red-600 text-white shadow-sm'     },
   ]
 
+  const showToast = (type: 'success' | 'error', msg: string) => {
+    setToast({ type, msg })
+    setTimeout(() => setToast(null), 4000)
+  }
+
+  const handleAprovar = (cp: typeof contas[0]) => {
+    if (!confirm(`Aprovar pagamento de ${fmt(cp.valor_original)} para ${cp.fornecedor_nome}?`)) return
+    aprovarMutation.mutate({ cpId: cp.id }, {
+      onSuccess: () => showToast('success', `Pagamento aprovado — ${cp.fornecedor_nome}`),
+      onError: () => showToast('error', 'Erro ao aprovar pagamento'),
+    })
+  }
+
+  const handleRejeitar = (cp: typeof contas[0]) => {
+    if (!confirm(`Rejeitar pagamento de ${fmt(cp.valor_original)} para ${cp.fornecedor_nome}?`)) return
+    // Rejection is a status change to 'cancelado' — uses direct supabase update
+    // For now we just show feedback; full rejection flow requires a dedicated hook
+    showToast('error', 'Rejeição não implementada — use o módulo Contas a Pagar')
+  }
+
   return (
     <div className="space-y-5">
+
+      {/* Toast feedback */}
+      {toast && (
+        <div className={`fixed top-4 left-1/2 -translate-x-1/2 z-50 px-4 py-2.5 rounded-2xl shadow-lg text-sm font-bold flex items-center gap-2 animate-[slideDown_0.3s_ease] ${
+          toast.type === 'success'
+            ? 'bg-emerald-500 text-white shadow-emerald-500/30'
+            : 'bg-red-500 text-white shadow-red-500/30'
+        }`}>
+          {toast.type === 'success' ? <CheckCircle2 size={16} /> : <XCircle size={16} />}
+          {toast.msg}
+        </div>
+      )}
 
       {/* ── Header ──────────────────────────────────────────── */}
       <div>
@@ -196,20 +230,28 @@ export default function AprovacoesPagamento() {
                 {/* Action bar for pending items */}
                 {isPendente && (
                   <div className={`flex ${isDark ? 'border-t border-white/[0.06]' : 'border-t border-slate-100'}`}>
-                    <button className={`flex-1 flex items-center justify-center gap-1.5 py-2.5
+                    <button
+                      onClick={() => window.open(`/financeiro/cp`, '_self')}
+                      className={`flex-1 flex items-center justify-center gap-1.5 py-2.5
                       text-[11px] font-semibold transition-all ${isDark ? 'text-slate-500 hover:text-slate-300 hover:bg-white/[0.03]' : 'text-slate-400 hover:text-slate-600 hover:bg-slate-50'}`}>
                       <Eye size={12} />
                       Ver Docs
                     </button>
                     <div className={`w-px ${isDark ? 'bg-white/[0.06]' : 'bg-slate-100'}`} />
-                    <button className={`flex-1 flex items-center justify-center gap-1.5 py-2.5
-                      text-[11px] font-semibold text-red-400 hover:text-red-600 transition-all ${isDark ? 'hover:bg-red-500/10' : 'hover:bg-red-50'}`}>
+                    <button
+                      onClick={() => handleRejeitar(cp)}
+                      disabled={aprovarMutation.isPending}
+                      className={`flex-1 flex items-center justify-center gap-1.5 py-2.5
+                      text-[11px] font-semibold text-red-400 hover:text-red-600 transition-all disabled:opacity-50 ${isDark ? 'hover:bg-red-500/10' : 'hover:bg-red-50'}`}>
                       <XCircle size={12} />
                       Rejeitar
                     </button>
                     <div className={`w-px ${isDark ? 'bg-white/[0.06]' : 'bg-slate-100'}`} />
-                    <button className={`flex-1 flex items-center justify-center gap-1.5 py-2.5
-                      text-[11px] font-bold text-emerald-600 hover:text-emerald-700 transition-all ${isDark ? 'hover:bg-emerald-500/10' : 'hover:bg-emerald-50'}`}>
+                    <button
+                      onClick={() => handleAprovar(cp)}
+                      disabled={aprovarMutation.isPending}
+                      className={`flex-1 flex items-center justify-center gap-1.5 py-2.5
+                      text-[11px] font-bold text-emerald-600 hover:text-emerald-700 transition-all disabled:opacity-50 ${isDark ? 'hover:bg-emerald-500/10' : 'hover:bg-emerald-50'}`}>
                       <CheckCircle2 size={12} />
                       Aprovar
                     </button>

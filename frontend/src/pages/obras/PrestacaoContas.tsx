@@ -1,8 +1,14 @@
 import { useState } from 'react'
-import { Receipt, Filter } from 'lucide-react'
+import { Receipt, Plus, Filter, CheckCircle2, XCircle, X, Save } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
-import { usePrestacaoContas } from '../../hooks/useObras'
+import {
+  usePrestacaoContas,
+  useCriarPrestacao,
+  useAprovarPrestacao,
+  useRejeitarPrestacao,
+} from '../../hooks/useObras'
 import { useLookupObras } from '../../hooks/useLookups'
+import { supabase } from '../../services/supabase'
 import type { CategoriaPrestacao, StatusPrestacao, FormaPagamentoPrestacao } from '../../types/obras'
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -42,6 +48,17 @@ const FORMA_PAG_LABEL: Record<FormaPagamentoPrestacao, string> = {
   adiantamento:       'Adiantamento',
 }
 
+const EMPTY_FORM = {
+  obra_id: '',
+  categoria: 'outro' as CategoriaPrestacao,
+  descricao: '',
+  valor: 0,
+  data_gasto: new Date().toISOString().split('T')[0],
+  fornecedor_nome: '',
+  forma_pagamento: 'dinheiro' as FormaPagamentoPrestacao,
+  numero_nf: '',
+}
+
 // ── Component ────────────────────────────────────────────────────────────────
 
 export default function PrestacaoContas() {
@@ -56,7 +73,60 @@ export default function PrestacaoContas() {
     status: statusFilter || undefined,
   })
 
-  // Summary by status
+  const criarPrestacao = useCriarPrestacao()
+  const aprovarPrestacao = useAprovarPrestacao()
+  const rejeitarPrestacao = useRejeitarPrestacao()
+
+  const [showCreateModal, setShowCreateModal] = useState(false)
+  const [form, setForm] = useState(EMPTY_FORM)
+  const [rejectTarget, setRejectTarget] = useState<string | null>(null)
+  const [motivoRejeicao, setMotivoRejeicao] = useState('')
+
+  const openCreate = () => {
+    setForm(EMPTY_FORM)
+    setShowCreateModal(true)
+  }
+
+  const handleCreate = async () => {
+    const { data: { user } } = await supabase.auth.getUser()
+    const perfil = user?.user_metadata
+    await criarPrestacao.mutateAsync({
+      obra_id: form.obra_id,
+      categoria: form.categoria,
+      descricao: form.descricao,
+      valor: Number(form.valor),
+      data_gasto: form.data_gasto,
+      fornecedor_nome: form.fornecedor_nome || null,
+      forma_pagamento: form.forma_pagamento,
+      numero_nf: form.numero_nf || null,
+      solicitante_id: user?.id ?? '',
+      solicitante_nome: perfil?.nome ?? perfil?.full_name ?? user?.email ?? '',
+      status: 'pendente',
+    })
+    setShowCreateModal(false)
+  }
+
+  const handleApprove = async (id: string) => {
+    const { data: { user } } = await supabase.auth.getUser()
+    await aprovarPrestacao.mutateAsync({
+      id,
+      aprovador_id: user?.id ?? '',
+    })
+  }
+
+  const handleReject = async () => {
+    if (!rejectTarget || !motivoRejeicao.trim()) return
+    const { data: { user } } = await supabase.auth.getUser()
+    await rejeitarPrestacao.mutateAsync({
+      id: rejectTarget,
+      aprovador_id: user?.id ?? '',
+      motivo_rejeicao: motivoRejeicao,
+    })
+    setRejectTarget(null)
+    setMotivoRejeicao('')
+  }
+
+  // Summary
   const totalPendente = prestacoes
     .filter(p => p.status === 'pendente' || p.status === 'em_analise')
     .reduce((s, p) => s + p.valor, 0)
@@ -73,18 +143,36 @@ export default function PrestacaoContas() {
     : 'bg-white/[0.06] border border-white/[0.1] text-slate-300 [&>option]:bg-slate-900'
   }`
 
+  const inputClass = `w-full px-3 py-2 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-teal-500/30 ${isLight
+    ? 'border border-slate-200 bg-white text-slate-700'
+    : 'bg-white/[0.06] border border-white/[0.1] text-slate-200 placeholder:text-slate-500'
+  }`
+
+  const labelClass = `block text-xs font-semibold mb-1 ${isLight ? 'text-slate-600' : 'text-slate-400'}`
+
   return (
     <div className="p-4 sm:p-6 space-y-5">
 
       {/* Header */}
-      <div>
-        <h1 className={`text-xl font-bold flex items-center gap-2 ${isLight ? 'text-slate-800' : 'text-white'}`}>
-          <Receipt size={20} className={isLight ? 'text-rose-600' : 'text-rose-400'} />
-          Prestacao de Contas
-        </h1>
-        <p className={`text-sm mt-0.5 ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
-          {prestacoes.length} registros
-        </p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className={`text-xl font-bold flex items-center gap-2 ${isLight ? 'text-slate-800' : 'text-white'}`}>
+            <Receipt size={20} className={isLight ? 'text-rose-600' : 'text-rose-400'} />
+            Prestacao de Contas
+          </h1>
+          <p className={`text-sm mt-0.5 ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
+            {prestacoes.length} registros
+          </p>
+        </div>
+        <button
+          onClick={openCreate}
+          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold text-white transition-colors ${isLight
+            ? 'bg-teal-600 hover:bg-teal-700 shadow-sm'
+            : 'bg-teal-600 hover:bg-teal-500'
+          }`}
+        >
+          <Plus size={15} /> Nova Prestacao
+        </button>
       </div>
 
       {/* Summary Cards */}
@@ -165,12 +253,14 @@ export default function PrestacaoContas() {
                   <th className="text-left px-4 py-3">Pagamento</th>
                   <th className="text-left px-4 py-3">Fornecedor</th>
                   <th className="text-center px-4 py-3">Status</th>
+                  <th className="text-center px-4 py-3">Acoes</th>
                 </tr>
               </thead>
               <tbody>
                 {prestacoes.map(p => {
                   const st = STATUS_CONFIG[p.status] ?? STATUS_CONFIG.pendente
                   const cat = CATEGORIA_CONFIG[p.categoria] ?? CATEGORIA_CONFIG.outro
+                  const canReview = p.status === 'pendente' || p.status === 'em_analise'
                   return (
                     <tr
                       key={p.id}
@@ -183,7 +273,7 @@ export default function PrestacaoContas() {
                         {fmtDate(p.data_gasto)}
                       </td>
                       <td className={`px-4 py-3 text-sm ${isLight ? 'text-slate-600' : 'text-slate-300'}`}>
-                        {p.obra?.nome ?? '—'}
+                        {p.obra?.nome ?? '\u2014'}
                       </td>
                       <td className="px-4 py-3 text-center">
                         <span className={`px-2.5 py-0.5 rounded-full text-xs font-semibold ${isLight ? cat.light : cat.dark}`}>
@@ -200,18 +290,182 @@ export default function PrestacaoContas() {
                         {FORMA_PAG_LABEL[p.forma_pagamento] ?? p.forma_pagamento}
                       </td>
                       <td className={`px-4 py-3 text-sm max-w-[140px] truncate ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
-                        {p.fornecedor_nome ?? '—'}
+                        {p.fornecedor_nome ?? '\u2014'}
                       </td>
                       <td className="px-4 py-3 text-center">
                         <span className={`px-2.5 py-0.5 rounded-full text-xs font-semibold ${isLight ? st.light : st.dark}`}>
                           {st.label}
                         </span>
                       </td>
+                      <td className="px-4 py-3">
+                        {canReview && (
+                          <div className="flex items-center justify-center gap-1">
+                            <button
+                              onClick={() => handleApprove(p.id)}
+                              disabled={aprovarPrestacao.isPending}
+                              className={`p-1.5 rounded-lg transition-colors ${isLight
+                                ? 'hover:bg-emerald-50 text-emerald-600'
+                                : 'hover:bg-emerald-500/10 text-emerald-400'
+                              }`}
+                              title="Aprovar"
+                            >
+                              <CheckCircle2 size={16} />
+                            </button>
+                            <button
+                              onClick={() => { setRejectTarget(p.id); setMotivoRejeicao('') }}
+                              className={`p-1.5 rounded-lg transition-colors ${isLight
+                                ? 'hover:bg-red-50 text-red-500'
+                                : 'hover:bg-red-500/10 text-red-400'
+                              }`}
+                              title="Rejeitar"
+                            >
+                              <XCircle size={16} />
+                            </button>
+                          </div>
+                        )}
+                      </td>
                     </tr>
                   )
                 })}
               </tbody>
             </table>
+          </div>
+        </div>
+      )}
+
+      {/* Create Modal */}
+      {showCreateModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setShowCreateModal(false)} />
+          <div className={`relative w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-2xl border shadow-xl p-6 ${isLight
+            ? 'bg-white border-slate-200'
+            : 'bg-[#1e293b] border-white/[0.06]'
+          }`}>
+            <div className="flex items-center justify-between mb-5">
+              <h2 className={`text-lg font-bold ${isLight ? 'text-slate-800' : 'text-white'}`}>Nova Prestacao de Contas</h2>
+              <button onClick={() => setShowCreateModal(false)} className={`p-1.5 rounded-lg transition-colors ${isLight
+                ? 'hover:bg-slate-100 text-slate-400'
+                : 'hover:bg-white/[0.06] text-slate-500'
+              }`}>
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className={labelClass}>Obra *</label>
+                  <select value={form.obra_id} onChange={e => setForm(f => ({ ...f, obra_id: e.target.value }))} className={inputClass}>
+                    <option value="">Selecione...</option>
+                    {obras.map(o => <option key={o.id} value={o.id}>{o.nome}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className={labelClass}>Categoria *</label>
+                  <select value={form.categoria} onChange={e => setForm(f => ({ ...f, categoria: e.target.value as CategoriaPrestacao }))} className={inputClass}>
+                    {Object.entries(CATEGORIA_CONFIG).map(([k, v]) => (
+                      <option key={k} value={k}>{v.label}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+              <div>
+                <label className={labelClass}>Descricao *</label>
+                <textarea value={form.descricao} onChange={e => setForm(f => ({ ...f, descricao: e.target.value }))} rows={2} placeholder="Descreva o gasto..." className={inputClass} />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className={labelClass}>Valor (R$) *</label>
+                  <input type="number" value={form.valor} onChange={e => setForm(f => ({ ...f, valor: Number(e.target.value) }))} className={inputClass} min={0} step="0.01" />
+                </div>
+                <div>
+                  <label className={labelClass}>Data do Gasto *</label>
+                  <input type="date" value={form.data_gasto} onChange={e => setForm(f => ({ ...f, data_gasto: e.target.value }))} className={inputClass} />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className={labelClass}>Forma de Pagamento</label>
+                  <select value={form.forma_pagamento} onChange={e => setForm(f => ({ ...f, forma_pagamento: e.target.value as FormaPagamentoPrestacao }))} className={inputClass}>
+                    {Object.entries(FORMA_PAG_LABEL).map(([k, v]) => (
+                      <option key={k} value={k}>{v}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className={labelClass}>Numero NF</label>
+                  <input type="text" value={form.numero_nf} onChange={e => setForm(f => ({ ...f, numero_nf: e.target.value }))} placeholder="Opcional" className={inputClass} />
+                </div>
+              </div>
+              <div>
+                <label className={labelClass}>Fornecedor</label>
+                <input type="text" value={form.fornecedor_nome} onChange={e => setForm(f => ({ ...f, fornecedor_nome: e.target.value }))} placeholder="Nome do fornecedor" className={inputClass} />
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-3 mt-6">
+              <button onClick={() => setShowCreateModal(false)} className={`px-4 py-2 rounded-xl text-sm font-semibold transition-colors ${isLight
+                ? 'text-slate-600 hover:bg-slate-100'
+                : 'text-slate-400 hover:bg-white/[0.06]'
+              }`}>
+                Cancelar
+              </button>
+              <button
+                onClick={handleCreate}
+                disabled={!form.obra_id || !form.descricao || form.valor <= 0 || criarPrestacao.isPending}
+                className="flex items-center gap-2 px-5 py-2 rounded-xl text-sm font-semibold text-white bg-teal-600 hover:bg-teal-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              >
+                <Save size={15} />
+                {criarPrestacao.isPending ? 'Salvando...' : 'Registrar Prestacao'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Reject Modal (requires motivo) */}
+      {rejectTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setRejectTarget(null)} />
+          <div className={`relative w-full max-w-sm rounded-2xl border shadow-xl p-6 ${isLight
+            ? 'bg-white border-slate-200'
+            : 'bg-[#1e293b] border-white/[0.06]'
+          }`}>
+            <div className="flex items-center justify-between mb-5">
+              <h2 className={`text-lg font-bold ${isLight ? 'text-slate-800' : 'text-white'}`}>Rejeitar Prestacao</h2>
+              <button onClick={() => setRejectTarget(null)} className={`p-1.5 rounded-lg transition-colors ${isLight
+                ? 'hover:bg-slate-100 text-slate-400'
+                : 'hover:bg-white/[0.06] text-slate-500'
+              }`}>
+                <X size={18} />
+              </button>
+            </div>
+            <div>
+              <label className={labelClass}>Motivo da Rejeicao *</label>
+              <textarea
+                value={motivoRejeicao}
+                onChange={e => setMotivoRejeicao(e.target.value)}
+                rows={3}
+                placeholder="Informe o motivo da rejeicao..."
+                className={inputClass}
+              />
+            </div>
+            <div className="flex justify-end gap-3 mt-6">
+              <button onClick={() => setRejectTarget(null)} className={`px-4 py-2 rounded-xl text-sm font-semibold transition-colors ${isLight
+                ? 'text-slate-600 hover:bg-slate-100'
+                : 'text-slate-400 hover:bg-white/[0.06]'
+              }`}>
+                Cancelar
+              </button>
+              <button
+                onClick={handleReject}
+                disabled={!motivoRejeicao.trim() || rejeitarPrestacao.isPending}
+                className="flex items-center gap-2 px-5 py-2 rounded-xl text-sm font-semibold text-white bg-red-600 hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              >
+                <XCircle size={15} />
+                {rejeitarPrestacao.isPending ? 'Rejeitando...' : 'Confirmar Rejeicao'}
+              </button>
+            </div>
           </div>
         </div>
       )}

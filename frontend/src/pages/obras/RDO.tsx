@@ -1,9 +1,14 @@
 import { useState } from 'react'
-import { CloudSun, Plus, Filter, Users, Wrench } from 'lucide-react'
+import { CloudSun, Plus, Filter, Users, Wrench, Pencil, Trash2, X, Check, Save } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
-import { useRDOs } from '../../hooks/useObras'
+import {
+  useRDOs,
+  useCriarRDO,
+  useAtualizarRDO,
+  useExcluirRDO,
+} from '../../hooks/useObras'
 import { useLookupObras } from '../../hooks/useLookups'
-import type { CondicaoClimatica, StatusRDO } from '../../types/obras'
+import type { ObraRDO, CondicaoClimatica, StatusRDO } from '../../types/obras'
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -31,6 +36,21 @@ const STATUS_CONFIG: Record<StatusRDO, { label: string; light: string; dark: str
   finalizado: { label: 'Finalizado', light: 'bg-emerald-100 text-emerald-700', dark: 'bg-emerald-500/15 text-emerald-300' },
 }
 
+const EMPTY_FORM = {
+  obra_id: '',
+  data: new Date().toISOString().split('T')[0],
+  condicao_climatica: 'sol' as CondicaoClimatica,
+  efetivo_proprio: 0,
+  efetivo_terceiro: 0,
+  equipamentos_operando: 0,
+  equipamentos_parados: 0,
+  resumo_atividades: '',
+  ocorrencias: '',
+  horas_improdutivas: 0,
+  motivo_improdutividade: '',
+  status: 'rascunho' as StatusRDO,
+}
+
 // ── Component ────────────────────────────────────────────────────────────────
 
 export default function RDO() {
@@ -43,10 +63,81 @@ export default function RDO() {
     obra_id: obraFilter || undefined,
   })
 
+  const criarRDO = useCriarRDO()
+  const atualizarRDO = useAtualizarRDO()
+  const excluirRDO = useExcluirRDO()
+
+  const [showModal, setShowModal] = useState(false)
+  const [editing, setEditing] = useState<ObraRDO | null>(null)
+  const [form, setForm] = useState(EMPTY_FORM)
+  const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null)
+
+  const openCreate = () => {
+    setEditing(null)
+    setForm(EMPTY_FORM)
+    setShowModal(true)
+  }
+
+  const openEdit = (rdo: ObraRDO) => {
+    setEditing(rdo)
+    setForm({
+      obra_id: rdo.obra_id,
+      data: rdo.data,
+      condicao_climatica: rdo.condicao_climatica,
+      efetivo_proprio: rdo.efetivo_proprio,
+      efetivo_terceiro: rdo.efetivo_terceiro,
+      equipamentos_operando: rdo.equipamentos_operando,
+      equipamentos_parados: rdo.equipamentos_parados,
+      resumo_atividades: rdo.resumo_atividades ?? '',
+      ocorrencias: rdo.ocorrencias ?? '',
+      horas_improdutivas: rdo.horas_improdutivas,
+      motivo_improdutividade: rdo.motivo_improdutividade ?? '',
+      status: rdo.status,
+    })
+    setShowModal(true)
+  }
+
+  const handleSave = async () => {
+    const payload = {
+      obra_id: form.obra_id,
+      data: form.data,
+      condicao_climatica: form.condicao_climatica,
+      efetivo_proprio: Number(form.efetivo_proprio),
+      efetivo_terceiro: Number(form.efetivo_terceiro),
+      equipamentos_operando: Number(form.equipamentos_operando),
+      equipamentos_parados: Number(form.equipamentos_parados),
+      resumo_atividades: form.resumo_atividades || null,
+      ocorrencias: form.ocorrencias || null,
+      horas_improdutivas: Number(form.horas_improdutivas),
+      motivo_improdutividade: form.motivo_improdutividade || null,
+      status: form.status,
+    }
+    if (editing) {
+      await atualizarRDO.mutateAsync({ id: editing.id, ...payload })
+    } else {
+      await criarRDO.mutateAsync(payload)
+    }
+    setShowModal(false)
+  }
+
+  const handleDelete = async (id: string) => {
+    await excluirRDO.mutateAsync(id)
+    setDeleteConfirm(null)
+  }
+
   const selectClass = `px-3 py-2 rounded-xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-teal-500/30 ${isLight
     ? 'border border-slate-200 bg-white text-slate-600'
     : 'bg-white/[0.06] border border-white/[0.1] text-slate-300 [&>option]:bg-slate-900'
   }`
+
+  const inputClass = `w-full px-3 py-2 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-teal-500/30 ${isLight
+    ? 'border border-slate-200 bg-white text-slate-700'
+    : 'bg-white/[0.06] border border-white/[0.1] text-slate-200 placeholder:text-slate-500'
+  }`
+
+  const labelClass = `block text-xs font-semibold mb-1 ${isLight ? 'text-slate-600' : 'text-slate-400'}`
+
+  const isSaving = criarRDO.isPending || atualizarRDO.isPending
 
   return (
     <div className="p-4 sm:p-6 space-y-5">
@@ -63,6 +154,7 @@ export default function RDO() {
           </p>
         </div>
         <button
+          onClick={openCreate}
           className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold text-white transition-colors ${isLight
             ? 'bg-teal-600 hover:bg-teal-700 shadow-sm'
             : 'bg-teal-600 hover:bg-teal-500'
@@ -129,6 +221,7 @@ export default function RDO() {
                   </th>
                   <th className="text-right px-4 py-3">Hrs Improd.</th>
                   <th className="text-center px-4 py-3">Status</th>
+                  <th className="text-center px-4 py-3">Acoes</th>
                 </tr>
               </thead>
               <tbody>
@@ -148,11 +241,11 @@ export default function RDO() {
                         {fmtDate(rdo.data)}
                       </td>
                       <td className={`px-4 py-3 text-sm ${isLight ? 'text-slate-600' : 'text-slate-300'}`}>
-                        {rdo.obra?.nome ?? '—'}
+                        {rdo.obra?.nome ?? '\u2014'}
                       </td>
                       <td className="px-4 py-3 text-center">
                         <span className="text-lg" title={WEATHER_LABEL[rdo.condicao_climatica]}>
-                          {WEATHER_ICON[rdo.condicao_climatica] ?? '—'}
+                          {WEATHER_ICON[rdo.condicao_climatica] ?? '\u2014'}
                         </span>
                         <p className={`text-[10px] mt-0.5 ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>
                           {WEATHER_LABEL[rdo.condicao_climatica]}
@@ -180,18 +273,182 @@ export default function RDO() {
                         ? 'text-red-500 font-bold'
                         : isLight ? 'text-slate-500' : 'text-slate-400'
                       }`}>
-                        {rdo.horas_improdutivas > 0 ? `${rdo.horas_improdutivas}h` : '—'}
+                        {rdo.horas_improdutivas > 0 ? `${rdo.horas_improdutivas}h` : '\u2014'}
                       </td>
                       <td className="px-4 py-3 text-center">
                         <span className={`px-2.5 py-0.5 rounded-full text-xs font-semibold ${isLight ? st.light : st.dark}`}>
                           {st.label}
                         </span>
                       </td>
+                      <td className="px-4 py-3">
+                        <div className="flex items-center justify-center gap-1">
+                          <button
+                            onClick={() => openEdit(rdo)}
+                            className={`p-1.5 rounded-lg transition-colors ${isLight
+                              ? 'hover:bg-slate-100 text-slate-400 hover:text-blue-600'
+                              : 'hover:bg-white/[0.06] text-slate-500 hover:text-blue-400'
+                            }`}
+                            title="Editar"
+                          >
+                            <Pencil size={14} />
+                          </button>
+                          {deleteConfirm === rdo.id ? (
+                            <div className="flex items-center gap-1">
+                              <button
+                                onClick={() => handleDelete(rdo.id)}
+                                className="p-1.5 rounded-lg bg-red-500/10 text-red-500 hover:bg-red-500/20 transition-colors"
+                                title="Confirmar exclusao"
+                              >
+                                <Check size={14} />
+                              </button>
+                              <button
+                                onClick={() => setDeleteConfirm(null)}
+                                className={`p-1.5 rounded-lg transition-colors ${isLight
+                                  ? 'hover:bg-slate-100 text-slate-400'
+                                  : 'hover:bg-white/[0.06] text-slate-500'
+                                }`}
+                                title="Cancelar"
+                              >
+                                <X size={14} />
+                              </button>
+                            </div>
+                          ) : (
+                            <button
+                              onClick={() => setDeleteConfirm(rdo.id)}
+                              className={`p-1.5 rounded-lg transition-colors ${isLight
+                                ? 'hover:bg-red-50 text-slate-400 hover:text-red-600'
+                                : 'hover:bg-red-500/10 text-slate-500 hover:text-red-400'
+                              }`}
+                              title="Excluir"
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          )}
+                        </div>
+                      </td>
                     </tr>
                   )
                 })}
               </tbody>
             </table>
+          </div>
+        </div>
+      )}
+
+      {/* Create / Edit Modal */}
+      {showModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setShowModal(false)} />
+          <div className={`relative w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-2xl border shadow-xl p-6 ${isLight
+            ? 'bg-white border-slate-200'
+            : 'bg-[#1e293b] border-white/[0.06]'
+          }`}>
+            <div className="flex items-center justify-between mb-5">
+              <h2 className={`text-lg font-bold ${isLight ? 'text-slate-800' : 'text-white'}`}>
+                {editing ? 'Editar RDO' : 'Novo RDO'}
+              </h2>
+              <button onClick={() => setShowModal(false)} className={`p-1.5 rounded-lg transition-colors ${isLight
+                ? 'hover:bg-slate-100 text-slate-400'
+                : 'hover:bg-white/[0.06] text-slate-500'
+              }`}>
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className={labelClass}>Obra *</label>
+                  <select value={form.obra_id} onChange={e => setForm(f => ({ ...f, obra_id: e.target.value }))} className={inputClass}>
+                    <option value="">Selecione...</option>
+                    {obras.map(o => <option key={o.id} value={o.id}>{o.nome}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className={labelClass}>Data *</label>
+                  <input type="date" value={form.data} onChange={e => setForm(f => ({ ...f, data: e.target.value }))} className={inputClass} />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className={labelClass}>Condicao Climatica</label>
+                  <select value={form.condicao_climatica} onChange={e => setForm(f => ({ ...f, condicao_climatica: e.target.value as CondicaoClimatica }))} className={inputClass}>
+                    {Object.entries(WEATHER_LABEL).map(([k, v]) => (
+                      <option key={k} value={k}>{v}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className={labelClass}>Status</label>
+                  <select value={form.status} onChange={e => setForm(f => ({ ...f, status: e.target.value as StatusRDO }))} className={inputClass}>
+                    {Object.entries(STATUS_CONFIG).map(([k, v]) => (
+                      <option key={k} value={k}>{v.label}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className={labelClass}>Efetivo Proprio</label>
+                  <input type="number" value={form.efetivo_proprio} onChange={e => setForm(f => ({ ...f, efetivo_proprio: Number(e.target.value) }))} className={inputClass} min={0} />
+                </div>
+                <div>
+                  <label className={labelClass}>Efetivo Terceiro</label>
+                  <input type="number" value={form.efetivo_terceiro} onChange={e => setForm(f => ({ ...f, efetivo_terceiro: Number(e.target.value) }))} className={inputClass} min={0} />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className={labelClass}>Equip. Operando</label>
+                  <input type="number" value={form.equipamentos_operando} onChange={e => setForm(f => ({ ...f, equipamentos_operando: Number(e.target.value) }))} className={inputClass} min={0} />
+                </div>
+                <div>
+                  <label className={labelClass}>Equip. Parados</label>
+                  <input type="number" value={form.equipamentos_parados} onChange={e => setForm(f => ({ ...f, equipamentos_parados: Number(e.target.value) }))} className={inputClass} min={0} />
+                </div>
+              </div>
+
+              <div>
+                <label className={labelClass}>Resumo de Atividades</label>
+                <textarea value={form.resumo_atividades} onChange={e => setForm(f => ({ ...f, resumo_atividades: e.target.value }))} rows={2} placeholder="Principais atividades do dia..." className={inputClass} />
+              </div>
+
+              <div>
+                <label className={labelClass}>Ocorrencias</label>
+                <textarea value={form.ocorrencias} onChange={e => setForm(f => ({ ...f, ocorrencias: e.target.value }))} rows={2} placeholder="Ocorrencias relevantes..." className={inputClass} />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className={labelClass}>Horas Improdutivas</label>
+                  <input type="number" value={form.horas_improdutivas} onChange={e => setForm(f => ({ ...f, horas_improdutivas: Number(e.target.value) }))} className={inputClass} min={0} step="0.5" />
+                </div>
+                <div>
+                  <label className={labelClass}>Motivo Improdutividade</label>
+                  <input type="text" value={form.motivo_improdutividade} onChange={e => setForm(f => ({ ...f, motivo_improdutividade: e.target.value }))} placeholder="Se houver..." className={inputClass} />
+                </div>
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-3 mt-6">
+              <button onClick={() => setShowModal(false)} className={`px-4 py-2 rounded-xl text-sm font-semibold transition-colors ${isLight
+                ? 'text-slate-600 hover:bg-slate-100'
+                : 'text-slate-400 hover:bg-white/[0.06]'
+              }`}>
+                Cancelar
+              </button>
+              <button
+                onClick={handleSave}
+                disabled={!form.obra_id || isSaving}
+                className="flex items-center gap-2 px-5 py-2 rounded-xl text-sm font-semibold text-white bg-teal-600 hover:bg-teal-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              >
+                <Save size={15} />
+                {isSaving ? 'Salvando...' : editing ? 'Salvar Alteracoes' : 'Criar RDO'}
+              </button>
+            </div>
           </div>
         </div>
       )}

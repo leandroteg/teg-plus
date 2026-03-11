@@ -29,6 +29,7 @@ export default function Recebimentos() {
   })
   const [statusReceb, setStatusReceb] = useState<'confirmado' | 'parcial' | 'recusado'>('confirmado')
   const [divergencias, setDivergencias] = useState('')
+  const [avaliacaoQualidade, setAvaliacaoQualidade] = useState(5)
   const [avaliacao, setAvaliacao] = useState({ prazo: 5, qualidade: 5, comunicacao: 5, comentario: '' })
 
   const { data: recebimentos = [], isLoading } = useRecebimentos(statusFiltro ? { status: statusFiltro } : undefined)
@@ -43,10 +44,12 @@ export default function Recebimentos() {
       checklist,
       status: statusReceb,
       divergencias: divergencias || undefined,
+      avaliacao_qualidade: avaliacaoQualidade,
     })
     setConfirmModal(null)
     setChecklist({ quantidades_conferidas: false, estado_verificado: false, seriais_conferidos: false, temperatura_verificada: false })
     setDivergencias('')
+    setAvaliacaoQualidade(5)
   }
 
   async function handleAvaliar() {
@@ -248,6 +251,23 @@ export default function Recebimentos() {
                     rows={2} className="input-base resize-none" placeholder="Descreva as divergências encontradas..." />
                 </div>
               )}
+
+              <div>
+                <label className={`block text-xs font-bold mb-1.5 ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>Avaliação de Qualidade</label>
+                <div className="flex gap-1.5">
+                  {[1, 2, 3, 4, 5].map(n => (
+                    <button key={n} onClick={() => setAvaliacaoQualidade(n)}
+                      className={`w-9 h-9 rounded-lg text-sm font-bold transition-all ${
+                        avaliacaoQualidade >= n
+                          ? 'bg-amber-400 text-white shadow-sm'
+                          : isDark ? 'bg-white/10 text-slate-500 hover:bg-amber-500/20' : 'bg-slate-100 text-slate-400 hover:bg-amber-100'
+                      }`}>
+                      <Star size={14} className="mx-auto" fill={avaliacaoQualidade >= n ? 'currentColor' : 'none'} />
+                    </button>
+                  ))}
+                  <span className={`text-xs self-center ml-1 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{avaliacaoQualidade}/5</span>
+                </div>
+              </div>
             </div>
             <div className={`px-6 py-4 flex justify-end gap-2 ${isDark ? 'border-t border-white/[0.06]' : 'border-t border-slate-100'}`}>
               <button onClick={() => setConfirmModal(null)}

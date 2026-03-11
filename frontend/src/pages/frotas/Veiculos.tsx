@@ -202,7 +202,12 @@ export default function Veiculos() {
   const { isLightSidebar: isLight } = useTheme()
   const [busca, setBusca]     = useState('')
   const [modal, setModal]     = useState<Partial<FroVeiculo> | null>(null)
-  const { data: veiculos = [], isLoading } = useVeiculos()
+  const [statusFiltro, setStatusFiltro] = useState<StatusVeiculo | ''>('')
+  const [catFiltro, setCatFiltro] = useState<CategoriaVeiculo | ''>('')
+  const { data: veiculos = [], isLoading } = useVeiculos({
+    status: statusFiltro || undefined,
+    categoria: catFiltro || undefined,
+  })
 
   const filtrados = veiculos.filter(v => {
     const q = busca.toLowerCase()
@@ -232,19 +237,47 @@ export default function Veiculos() {
         </button>
       </div>
 
-      {/* Busca */}
-      <div className="relative max-w-xs">
-        <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
-        <input
-          className={`w-full pl-9 pr-3 py-2 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-rose-500/30 ${
-            isLight
-              ? 'bg-slate-50 border border-slate-200 text-slate-800 placeholder:text-slate-400'
-              : 'bg-white/6 border border-white/10 text-white placeholder:text-slate-600'
-          }`}
-          placeholder="Buscar placa, marca, modelo..."
-          value={busca}
-          onChange={e => setBusca(e.target.value)}
-        />
+      {/* Busca + Filtros */}
+      <div className="flex gap-3 flex-wrap items-end">
+        <div className="relative max-w-xs flex-1 min-w-[200px]">
+          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
+          <input
+            className={`w-full pl-9 pr-3 py-2 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-rose-500/30 ${
+              isLight
+                ? 'bg-slate-50 border border-slate-200 text-slate-800 placeholder:text-slate-400'
+                : 'bg-white/6 border border-white/10 text-white placeholder:text-slate-600'
+            }`}
+            placeholder="Buscar placa, marca, modelo..."
+            value={busca}
+            onChange={e => setBusca(e.target.value)}
+          />
+        </div>
+        <div>
+          <label className="text-[10px] text-slate-500 block mb-1">Status</label>
+          <select
+            value={statusFiltro}
+            onChange={e => setStatusFiltro(e.target.value as StatusVeiculo | '')}
+            className={`px-3 py-2 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-rose-500/30 ${
+              isLight ? 'bg-slate-50 border border-slate-200 text-slate-800' : 'bg-white/6 border border-white/10 text-white [&>option]:bg-slate-900'
+            }`}
+          >
+            <option value="">Todos</option>
+            {Object.entries(STATUS_CFG).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
+          </select>
+        </div>
+        <div>
+          <label className="text-[10px] text-slate-500 block mb-1">Categoria</label>
+          <select
+            value={catFiltro}
+            onChange={e => setCatFiltro(e.target.value as CategoriaVeiculo | '')}
+            className={`px-3 py-2 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-rose-500/30 ${
+              isLight ? 'bg-slate-50 border border-slate-200 text-slate-800' : 'bg-white/6 border border-white/10 text-white [&>option]:bg-slate-900'
+            }`}
+          >
+            <option value="">Todas</option>
+            {Object.entries(CATEGORIA_LABEL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+          </select>
+        </div>
       </div>
 
       {/* Tabela */}

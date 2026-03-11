@@ -130,6 +130,7 @@ import Itens from './pages/estoque/Itens'
 import Movimentacoes from './pages/estoque/Movimentacoes'
 import Inventario from './pages/estoque/Inventario'
 import Patrimonial from './pages/estoque/Patrimonial'
+import SolicitacoesEstoque from './pages/estoque/Solicitacoes'
 
 // Módulo Logística
 import LogisticaLayout from './components/LogisticaLayout'
@@ -206,6 +207,7 @@ export default function App() {
               <Route path="/estoque/movimentacoes" element={<Movimentacoes />} />
               <Route path="/estoque/inventario"    element={<Inventario />} />
               <Route path="/estoque/patrimonial"   element={<Patrimonial />} />
+              <Route path="/estoque/solicitacoes" element={<SolicitacoesEstoque />} />
             </Route>
           </Route>
 

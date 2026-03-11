@@ -1,6 +1,6 @@
 import {
   LayoutDashboard, Package2, ArrowLeftRight,
-  ClipboardList, Landmark,
+  ClipboardList, Landmark, FileBox,
 } from 'lucide-react'
 import ModuleLayout from './ModuleLayout'
 
@@ -10,6 +10,7 @@ const NAV = [
   { to: '/estoque/movimentacoes', icon: ArrowLeftRight,  label: 'Movimentações',   end: false },
   { to: '/estoque/inventario',    icon: ClipboardList,   label: 'Inventário',      end: false },
   { to: '/estoque/patrimonial',   icon: Landmark,        label: 'Patrimonial',     end: false },
+  { to: '/estoque/solicitacoes', icon: FileBox,         label: 'Solicitações',   end: false },
 ]
 
 export default function EstoqueLayout() {

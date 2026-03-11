@@ -2,11 +2,11 @@ import { useState, useMemo } from 'react'
 import {
   Package2, FileText, Truck, CheckCircle2, X, Loader2,
   AlertTriangle, ChevronDown, Download, ClipboardList,
-  ExternalLink, MapPin, Clock, ScrollText,
+  ExternalLink, MapPin, Clock, ScrollText, XCircle,
 } from 'lucide-react'
 import {
   useSolicitacoes, useChecklistExpedicao, useSalvarChecklistExpedicao,
-  useNFe, useIniciarTransporte, useEmitirRomaneio, useSolicitarNFFiscal,
+  useNFe, useCancelarNFe, useIniciarTransporte, useEmitirRomaneio, useSolicitarNFFiscal,
 } from '../../hooks/useLogistica'
 import { gerarRomaneioPDF } from '../../utils/romaneio-pdf'
 import { StatusBadge } from './LogisticaHome'
@@ -67,6 +67,7 @@ export default function Expedicao() {
 
   const emitirRomaneio = useEmitirRomaneio()
   const solicitarNF = useSolicitarNFFiscal()
+  const cancelarNFe = useCancelarNFe()
   const iniciarTransporte = useIniciarTransporte()
 
   // ── Romaneio handler ──
@@ -275,6 +276,8 @@ export default function Expedicao() {
                     solicitacao={s}
                     onEmitirRomaneio={() => setRomaneioModal(s)}
                     onSolicitarNF={() => openNfModal(s)}
+                    onCancelarNFe={nfeId => cancelarNFe.mutate({ id: nfeId, motivo: 'Cancelamento pela expedição', solicitacao_id: s.id })}
+                    cancelandoNFe={cancelarNFe.isPending}
                     onDespachar={() => {
                       setDespachoModal(s.id)
                       setDespachoForm({
@@ -704,11 +707,13 @@ function InfoField({ label, value }: { label: string; value?: string | null }) {
 // ── Detail panel with checklist + smart buttons ─────────────────────────────
 
 function ExpedicaoDetail({
-  solicitacao, onEmitirRomaneio, onSolicitarNF, onDespachar,
+  solicitacao, onEmitirRomaneio, onSolicitarNF, onCancelarNFe, cancelandoNFe, onDespachar,
 }: {
   solicitacao: LogSolicitacao
   onEmitirRomaneio: () => void
   onSolicitarNF: () => void
+  onCancelarNFe: (nfeId: string) => void
+  cancelandoNFe: boolean
   onDespachar: () => void
 }) {
   const { data: checklist } = useChecklistExpedicao(solicitacao.id)
@@ -784,12 +789,20 @@ function ExpedicaoDetail({
                 {nfe?.chave_acesso && <p className="text-[10px] text-emerald-600 font-mono">{nfe.chave_acesso}</p>}
               </div>
             </div>
-            {solicitacao.danfe_url && (
-              <a href={solicitacao.danfe_url} target="_blank" rel="noreferrer"
-                className="inline-flex items-center gap-1 text-[10px] text-violet-600 hover:text-violet-700 font-semibold mt-1 ml-5">
-                <ExternalLink size={9} /> Ver DANFE
-              </a>
-            )}
+            <div className="flex items-center gap-3 mt-1 ml-5">
+              {solicitacao.danfe_url && (
+                <a href={solicitacao.danfe_url} target="_blank" rel="noreferrer"
+                  className="inline-flex items-center gap-1 text-[10px] text-violet-600 hover:text-violet-700 font-semibold">
+                  <ExternalLink size={9} /> Ver DANFE
+                </a>
+              )}
+              {nfe?.id && (
+                <button onClick={() => onCancelarNFe(nfe.id)} disabled={cancelandoNFe}
+                  className="inline-flex items-center gap-1 text-[10px] text-red-500 hover:text-red-700 font-semibold disabled:opacity-50">
+                  {cancelandoNFe ? <Loader2 size={9} className="animate-spin" /> : <XCircle size={9} />} Cancelar NF-e
+                </button>
+              )}
+            </div>
           </div>
         ) : (
           <div className="bg-teal-50 border border-teal-200 rounded-xl px-3 py-2.5">

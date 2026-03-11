@@ -27,6 +27,7 @@ export default function Inventario() {
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [tipo, setTipo] = useState<TipoInventario>('ciclico')
   const [baseId, setBaseId] = useState('')
+  const [curvaFiltro, setCurvaFiltro] = useState('')
   const [responsavel, setResponsavel] = useState('')
 
   const { data: inventarios = [], isLoading } = useInventarios()
@@ -35,9 +36,15 @@ export default function Inventario() {
   const concluir = useConcluirInventario()
 
   async function handleAbrir() {
-    await abrirInventario.mutateAsync({ tipo, base_id: baseId || undefined, responsavel: responsavel })
+    await abrirInventario.mutateAsync({
+      tipo,
+      base_id: baseId || undefined,
+      curva_filtro: curvaFiltro ? curvaFiltro as 'A' | 'B' | 'C' : undefined,
+      responsavel,
+    })
     setShowForm(false)
     setBaseId('')
+    setCurvaFiltro('')
     setResponsavel('')
   }
 
@@ -124,6 +131,16 @@ export default function Inventario() {
                   className={inputCls}>
                   <option value="">Todas as bases</option>
                   {bases.map(b => <option key={b.id} value={b.id}>{b.nome}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className={`block text-xs font-bold mb-1 ${labelCls}`}>Filtrar por Curva ABC</label>
+                <select value={curvaFiltro} onChange={e => setCurvaFiltro(e.target.value)}
+                  className={inputCls}>
+                  <option value="">Todas as curvas</option>
+                  <option value="A">Curva A</option>
+                  <option value="B">Curva B</option>
+                  <option value="C">Curva C</option>
                 </select>
               </div>
               <div>

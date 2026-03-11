@@ -32,12 +32,14 @@ export default function Movimentacoes() {
   const { isLightSidebar: isLight } = useTheme()
   const [busca, setBusca] = useState('')
   const [tipoFiltro, setTipoFiltro] = useState<string>('')
+  const [page, setPage] = useState(1)
   const [showForm, setShowForm] = useState(false)
   const [payload, setPayload] = useState<Partial<NovaMovimentacaoPayload>>({ ...EMPTY_PAYLOAD })
 
-  const { data: movs = [], isLoading } = useMovimentacoes(
-    tipoFiltro ? { tipo: tipoFiltro as TipoMovimentacao } : undefined
-  )
+  const { data: movs = [], isLoading } = useMovimentacoes({
+    ...(tipoFiltro ? { tipo: tipoFiltro as TipoMovimentacao } : {}),
+    page,
+  })
   const registrar = useRegistrarMovimentacao()
   const { data: itens = [] } = useEstoqueItens()
   const { data: bases = [] } = useBases()
@@ -157,6 +159,33 @@ export default function Movimentacoes() {
               </div>
             )
           })}
+        </div>
+      )}
+
+      {/* -- Paginacao ----------------------------------------------- */}
+      {!isLoading && filtradas.length > 0 && (
+        <div className="flex items-center justify-between pt-1">
+          <p className={`text-xs ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>
+            Pagina {page}
+          </p>
+          <div className="flex gap-2">
+            <button
+              onClick={() => setPage(p => Math.max(1, p - 1))}
+              disabled={page <= 1}
+              className={`px-3 py-1.5 rounded-lg border text-xs font-semibold transition-colors disabled:opacity-40
+                ${isLight ? 'border-slate-200 text-slate-600 hover:bg-slate-50' : 'border-white/[0.08] text-slate-400 hover:bg-white/[0.04]'}`}
+            >
+              Anterior
+            </button>
+            <button
+              onClick={() => setPage(p => p + 1)}
+              disabled={filtradas.length < 50}
+              className={`px-3 py-1.5 rounded-lg border text-xs font-semibold transition-colors disabled:opacity-40
+                ${isLight ? 'border-slate-200 text-slate-600 hover:bg-slate-50' : 'border-white/[0.08] text-slate-400 hover:bg-white/[0.04]'}`}
+            >
+              Proxima
+            </button>
+          </div>
         </div>
       )}
 
