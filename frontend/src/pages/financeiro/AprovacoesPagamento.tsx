@@ -12,6 +12,9 @@ const fmt = (v: number) =>
 const fmtData = (d: string) =>
   new Date(d + 'T00:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit' })
 
+const fmtTimestamp = (d: string) =>
+  new Date(d).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit' })
+
 type Tab = 'pendentes' | 'aprovadas' | 'rejeitadas'
 
 export default function AprovacoesPagamento() {
@@ -219,7 +222,7 @@ export default function AprovacoesPagamento() {
                         )}
                         {cp.aprovado_em && (
                           <span className="text-emerald-600 font-medium">
-                            Aprovado em {fmtData(cp.aprovado_em)}
+                            Aprovado em {fmtTimestamp(cp.aprovado_em)}
                           </span>
                         )}
                       </div>

@@ -250,7 +250,7 @@ export default function Abastecimentos() {
               </div>
               <div className="flex-1 min-w-0">
                 <p className={`text-xs ${isLight ? 'text-slate-600' : 'text-slate-300'}`}>{ab.posto ?? 'Posto nao informado'}</p>
-                <p className="text-[11px] text-slate-500">{COMB_LABEL[ab.combustivel]} · {ab.litros.toFixed(3)} L · {ab.hodometro.toLocaleString('pt-BR')} km</p>
+                <p className="text-[11px] text-slate-500">{COMB_LABEL[ab.combustivel]} · {ab.litros % 1 === 0 ? ab.litros : ab.litros.toFixed(1)} L · {ab.hodometro.toLocaleString('pt-BR')} km</p>
               </div>
               <div className="hidden sm:block text-right">
                 <p className="text-xs text-slate-400">
@@ -260,7 +260,7 @@ export default function Abastecimentos() {
               </div>
               <div className="text-right shrink-0">
                 <p className={`text-sm font-bold ${isLight ? 'text-slate-800' : 'text-white'}`}>{BRL(ab.valor_total ?? 0)}</p>
-                <p className="text-[10px] text-slate-500">R$ {ab.valor_litro.toFixed(3)}/L</p>
+                <p className="text-[10px] text-slate-500">R$ {ab.valor_litro.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 3 })}/L</p>
               </div>
             </div>
           ))}
