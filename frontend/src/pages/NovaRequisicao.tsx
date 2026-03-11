@@ -9,21 +9,12 @@ import {
 import { useCriarRequisicao } from '../hooks/useRequisicoes'
 import { useAiParse, readFileForAi, isBinaryFile, isImageFile } from '../hooks/useAiParse'
 import { useCategorias } from '../hooks/useCategorias'
+import { useLookupObras } from '../hooks/useLookups'
 import { useAuth } from '../contexts/AuthContext'
 import CategoryCard from '../components/CategoryCard'
 import ItemAutocomplete from '../components/ItemAutocomplete'
 import type { RequisicaoItem, Urgencia, AiParseResult, CategoriaMaterial } from '../types'
 
-// ── Obras fixas (alinhadas com seed do SQL) ────────────────────────────────
-const OBRAS = [
-  { id: 'FRUTAL',      nome: 'SE Frutal'       },
-  { id: 'PARACATU',   nome: 'SE Paracatu'     },
-  { id: 'PERDIZES',   nome: 'SE Perdizes'     },
-  { id: 'TRESMARIAS', nome: 'SE Três Marias'  },
-  { id: 'RIOPAR',     nome: 'Rio Paranaíba'   },
-  { id: 'ITUIUTABA',  nome: 'SE Ituiutaba'    },
-  { id: 'CD_MATRIZ',  nome: 'CD — Matriz'     },
-]
 
 const fmt = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
 const emptyItem = (): RequisicaoItem => ({ descricao: '', quantidade: 1, unidade: 'un', valor_unitario_estimado: 0 })
@@ -100,6 +91,7 @@ export default function NovaRequisicao() {
   const mutation = useCriarRequisicao()
   const aiParse = useAiParse()
   const { data: categorias = [], isLoading: catLoading } = useCategorias()
+  const obras = useLookupObras()
   const { perfil } = useAuth()
 
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -163,11 +155,11 @@ export default function NovaRequisicao() {
       setSolicitante(perfil.nome)
     }
 
-    // Match obra_sugerida against OBRAS list (accent-insensitive)
+    // Match obra_sugerida against obras list (accent-insensitive)
     if (result.obra_sugerida) {
       const sugerida = result.obra_sugerida.trim()
       const normalizeStr = (s: string) => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
-      const obraMatch = OBRAS.find(o =>
+      const obraMatch = obras.find(o =>
         o.nome === sugerida ||
         normalizeStr(o.nome) === normalizeStr(sugerida) ||
         normalizeStr(o.nome).includes(normalizeStr(sugerida)) ||
@@ -767,7 +759,7 @@ export default function NovaRequisicao() {
         }`}
           value={obraNome} onChange={e => setObraNome(e.target.value)}>
           <option value="">Selecione a obra</option>
-          {OBRAS.map(o => <option key={o.id} value={o.nome}>{o.nome}</option>)}
+          {obras.map(o => <option key={o.id} value={o.nome}>{o.nome}</option>)}
         </select>
       </div>
 
