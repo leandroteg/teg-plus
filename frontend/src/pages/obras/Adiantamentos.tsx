@@ -21,6 +21,14 @@ const STATUS_CONFIG: Record<StatusAdiantamento, { label: string; light: string; 
   vencido:    { label: 'Vencido',    light: 'bg-red-100 text-red-700',         dark: 'bg-red-500/15 text-red-300' },
 }
 
+// ── Summary Card accent map (static classes for Tailwind JIT) ────────────────
+
+const BORDER_ACCENT: Record<string, string> = {
+  blue: 'border-l-blue-500',
+  emerald: 'border-l-emerald-500',
+  amber: 'border-l-amber-500',
+}
+
 // ── Summary Card ─────────────────────────────────────────────────────────────
 
 function SummaryCard({
@@ -28,10 +36,11 @@ function SummaryCard({
 }: {
   label: string; value: string; accent: string; isLight: boolean
 }) {
+  const borderAccent = BORDER_ACCENT[accent] ?? 'border-l-blue-500'
   return (
-    <div className={`rounded-2xl border p-4 border-l-4 ${isLight
-      ? `bg-white border-slate-200 shadow-sm border-l-${accent}-500`
-      : `bg-white/[0.03] border-white/[0.06] border-l-${accent}-500`
+    <div className={`rounded-2xl border p-4 border-l-4 ${borderAccent} ${isLight
+      ? 'bg-white border-slate-200 shadow-sm'
+      : 'bg-white/[0.03] border-white/[0.06]'
     }`}>
       <p className={`text-[11px] uppercase tracking-wider mb-1 ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
         {label}

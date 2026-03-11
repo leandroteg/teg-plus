@@ -6,6 +6,7 @@ import {
   ChevronDown, ChevronUp, Upload, Paperclip, ExternalLink, Banknote, X,
   ShieldCheck, Building2, Tag, Briefcase, Hash,
 } from 'lucide-react'
+import { useTheme } from '../../contexts/ThemeContext'
 import { useContasPagar, useMarcarCPPago, useAprovarPagamento } from '../../hooks/useFinanceiro'
 import { useLastSync, useTriggerSync, useOmieConfig } from '../../hooks/useOmie'
 import { useAnexosPedido, useUploadAnexo, TIPO_LABEL } from '../../hooks/useAnexos'
@@ -15,7 +16,7 @@ import type { ContaPagar } from '../../types/financeiro'
 
 // ── SyncBar ───────────────────────────────────────────────────────────────────
 
-function SyncBar() {
+function SyncBar({ isDark }: { isDark: boolean }) {
   const { data: config } = useOmieConfig()
   const { data: log, isLoading } = useLastSync('contas_pagar')
   const trigger = useTriggerSync('contas_pagar')
@@ -34,7 +35,7 @@ function SyncBar() {
     : 'Nunca sincronizado'
 
   return (
-    <div className="flex items-center gap-3 bg-emerald-50 border border-emerald-200 rounded-xl px-4 py-2.5">
+    <div className={`flex items-center gap-3 rounded-xl px-4 py-2.5 ${isDark ? 'bg-emerald-500/10 border border-emerald-500/20' : 'bg-emerald-50 border border-emerald-200'}`}>
       {isLoading || isPending ? (
         <RefreshCw size={13} className="text-emerald-500 animate-spin shrink-0" />
       ) : status === 'success' ? (
@@ -140,7 +141,7 @@ interface RegistrarPgtoModalProps {
   onClose: () => void
 }
 
-function RegistrarPgtoModal({ cp, onClose }: RegistrarPgtoModalProps) {
+function RegistrarPgtoModal({ cp, onClose, isDark }: RegistrarPgtoModalProps & { isDark: boolean }) {
   const fileRef = useRef<HTMLInputElement>(null)
   const [arquivo, setArquivo] = useState<File | null>(null)
   const [observacao, setObservacao] = useState('')
@@ -185,12 +186,12 @@ function RegistrarPgtoModal({ cp, onClose }: RegistrarPgtoModalProps) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md">
+      <div className={`rounded-2xl shadow-2xl w-full max-w-md ${isDark ? 'bg-[#1e293b]' : 'bg-white'}`}>
         {/* Header */}
-        <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
+        <div className={`flex items-center justify-between px-5 py-4 border-b ${isDark ? 'border-white/[0.06]' : 'border-slate-100'}`}>
           <div className="flex items-center gap-2">
             <Banknote size={18} className="text-emerald-600" />
-            <h3 className="text-base font-bold text-slate-800">Registrar Pagamento</h3>
+            <h3 className={`text-base font-bold ${isDark ? 'text-white' : 'text-slate-800'}`}>Registrar Pagamento</h3>
           </div>
           <button onClick={onClose} className="text-slate-400 hover:text-slate-600">
             <X size={18} />
@@ -199,9 +200,9 @@ function RegistrarPgtoModal({ cp, onClose }: RegistrarPgtoModalProps) {
 
         <div className="p-5 space-y-4">
           {/* CP Summary */}
-          <div className="bg-slate-50 rounded-xl p-3 text-sm space-y-1">
-            <p className="font-bold text-slate-800">{cp.fornecedor_nome}</p>
-            <p className="text-slate-500 text-xs">{cp.descricao}</p>
+          <div className={`rounded-xl p-3 text-sm space-y-1 ${isDark ? 'bg-white/[0.04]' : 'bg-slate-50'}`}>
+            <p className={`font-bold ${isDark ? 'text-white' : 'text-slate-800'}`}>{cp.fornecedor_nome}</p>
+            <p className={`text-xs ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{cp.descricao}</p>
             <p className="text-emerald-700 font-extrabold">
               {cp.valor_original.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
             </p>
@@ -259,8 +260,7 @@ function RegistrarPgtoModal({ cp, onClose }: RegistrarPgtoModalProps) {
           <div className="flex gap-2 pt-1">
             <button
               onClick={onClose}
-              className="flex-1 py-3 rounded-xl border border-slate-200 text-sm font-semibold
-                text-slate-600 hover:bg-slate-50 transition-all"
+              className={`flex-1 py-3 rounded-xl border text-sm font-semibold transition-all ${isDark ? 'border-white/[0.06] text-slate-300 hover:bg-white/[0.03]' : 'border-slate-200 text-slate-600 hover:bg-slate-50'}`}
             >
               Cancelar
             </button>
@@ -314,10 +314,11 @@ const FILTROS_STATUS: { label: string; value: string }[] = [
 
 // ── CPCard ────────────────────────────────────────────────────────────────────
 
-function CPCard({ cp, onRegistrarPgto, onAprovarPgto }: {
+function CPCard({ cp, onRegistrarPgto, onAprovarPgto, isDark }: {
   cp: ContaPagar
   onRegistrarPgto: (cp: ContaPagar) => void
   onAprovarPgto: (cp: ContaPagar) => void
+  isDark: boolean
 }) {
   const nav = useNavigate()
   const [expanded, setExpanded] = useState(false)
@@ -337,14 +338,14 @@ function CPCard({ cp, onRegistrarPgto, onAprovarPgto }: {
   const centroCusto = cp.centro_custo || cp.requisicao?.centro_custo
 
   return (
-    <div className={`bg-white rounded-2xl border shadow-sm transition-all hover:shadow-md ${
-      vencido ? 'border-red-200' : isPago ? 'border-emerald-200' : canApprove ? 'border-orange-200' : 'border-slate-200'
+    <div className={`rounded-2xl border shadow-sm transition-all hover:shadow-md ${isDark ? 'bg-[#1e293b]' : 'bg-white'} ${
+      vencido ? 'border-red-200' : isPago ? 'border-emerald-200' : canApprove ? 'border-orange-200' : isDark ? 'border-white/[0.06]' : 'border-slate-200'
     }`}>
       {/* Main content */}
       <div className="p-4">
         <div className="flex items-start gap-3">
           <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${
-            vencido ? 'bg-red-50' : isPago ? 'bg-emerald-50' : canApprove ? 'bg-orange-50' : 'bg-emerald-50'
+            vencido ? (isDark ? 'bg-red-500/10' : 'bg-red-50') : isPago ? (isDark ? 'bg-emerald-500/10' : 'bg-emerald-50') : canApprove ? (isDark ? 'bg-orange-500/10' : 'bg-orange-50') : (isDark ? 'bg-emerald-500/10' : 'bg-emerald-50')
           }`}>
             {vencido
               ? <AlertTriangle size={16} className="text-red-500" />
@@ -358,7 +359,7 @@ function CPCard({ cp, onRegistrarPgto, onAprovarPgto }: {
 
           <div className="flex-1 min-w-0">
             <div className="flex items-center justify-between gap-2 mb-1">
-              <p className="text-sm font-bold text-slate-800 truncate">{cp.fornecedor_nome}</p>
+              <p className={`text-sm font-bold truncate ${isDark ? 'text-white' : 'text-slate-800'}`}>{cp.fornecedor_nome}</p>
               <p className={`text-sm font-extrabold shrink-0 ${vencido ? 'text-red-600' : 'text-emerald-600'}`}>
                 {fmt(cp.valor_original)}
               </p>
@@ -475,10 +476,10 @@ function CPCard({ cp, onRegistrarPgto, onAprovarPgto }: {
 
       {/* Expanded: Details + Attachments */}
       {expanded && (
-        <div className="border-t border-slate-100 px-4 pb-4 pt-3 space-y-3">
+        <div className={`border-t px-4 pb-4 pt-3 space-y-3 ${isDark ? 'border-white/[0.06]' : 'border-slate-100'}`}>
           {/* Detalhes do pedido/requisição */}
           {(pedidoNum || reqNum || obraNome || centroCusto || classeFinanceira) && (
-            <div className="bg-slate-50 rounded-xl p-3 space-y-1.5">
+            <div className={`rounded-xl p-3 space-y-1.5 ${isDark ? 'bg-white/[0.04]' : 'bg-slate-50'}`}>
               <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Detalhes</p>
               <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-[11px]">
                 {pedidoNum && cp.pedido_id && (
@@ -558,6 +559,7 @@ function CPCard({ cp, onRegistrarPgto, onAprovarPgto }: {
 // ── ContasPagar (main page) ───────────────────────────────────────────────────
 
 export default function ContasPagar() {
+  const { isDark } = useTheme()
   const [statusFilter, setStatusFilter] = useState('')
   const [busca, setBusca] = useState('')
   const [pgtoModal, setPgtoModal] = useState<ContaPagar | null>(null)
@@ -611,36 +613,36 @@ export default function ContasPagar() {
 
       {/* ── Error ──────────────────────────────────────────── */}
       {cpError && (
-        <div className="bg-red-50 border border-red-200 rounded-2xl p-4 text-center">
+        <div className={`border rounded-2xl p-4 text-center ${isDark ? 'bg-red-500/10 border-red-500/20' : 'bg-red-50 border-red-200'}`}>
           <p className="text-red-600 text-sm font-semibold">Erro ao carregar pagamentos</p>
-          <p className="text-red-400 text-xs mt-1">{(cpError as any)?.message ?? 'Erro desconhecido'}</p>
+          <p className="text-red-400 text-xs mt-1">{cpError instanceof Error ? cpError.message : 'Erro desconhecido'}</p>
         </div>
       )}
 
       {/* ── Header ──────────────────────────────────────────── */}
       <div>
-        <h1 className="text-xl font-extrabold text-slate-800 flex items-center gap-2">
+        <h1 className={`text-xl font-extrabold flex items-center gap-2 ${isDark ? 'text-white' : 'text-slate-800'}`}>
           <Receipt size={20} className="text-emerald-600" />
           Contas a Pagar
         </h1>
-        <p className="text-xs text-slate-400 mt-0.5">Gestão de pagamentos e obrigações</p>
+        <p className={`text-xs mt-0.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Gestão de pagamentos e obrigações</p>
       </div>
 
       {/* ── Omie Sync Status ─────────────────────────────────── */}
-      <SyncBar />
+      <SyncBar isDark={isDark} />
 
       {/* ── Resumo ──────────────────────────────────────────── */}
       <div className="grid grid-cols-3 gap-3">
-        <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm">
+        <div className={`rounded-2xl p-4 border shadow-sm ${isDark ? 'bg-[#1e293b] border-white/[0.06]' : 'bg-white border-slate-200'}`}>
           <p className="text-[10px] text-slate-400 font-semibold uppercase tracking-widest">Total</p>
-          <p className="text-lg font-extrabold text-slate-800 mt-1">{filtered.length}</p>
+          <p className={`text-lg font-extrabold mt-1 ${isDark ? 'text-white' : 'text-slate-800'}`}>{filtered.length}</p>
           <p className="text-[10px] text-slate-400">títulos</p>
         </div>
-        <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm">
+        <div className={`rounded-2xl p-4 border shadow-sm ${isDark ? 'bg-[#1e293b] border-white/[0.06]' : 'bg-white border-slate-200'}`}>
           <p className="text-[10px] text-amber-500 font-semibold uppercase tracking-widest">Em Aberto</p>
           <p className="text-lg font-extrabold text-amber-600 mt-1">{fmt(totalAberto)}</p>
         </div>
-        <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm">
+        <div className={`rounded-2xl p-4 border shadow-sm ${isDark ? 'bg-[#1e293b] border-white/[0.06]' : 'bg-white border-slate-200'}`}>
           <p className="text-[10px] text-emerald-500 font-semibold uppercase tracking-widest">Pago</p>
           <p className="text-lg font-extrabold text-emerald-600 mt-1">{fmt(totalPago)}</p>
         </div>
@@ -652,9 +654,9 @@ export default function ContasPagar() {
           <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
           <input type="text" value={busca} onChange={e => setBusca(e.target.value)}
             placeholder="Buscar fornecedor, documento..."
-            className="w-full pl-9 pr-4 py-2.5 rounded-xl border border-slate-200 bg-white
-              text-sm text-slate-700 placeholder-slate-400 focus:outline-none
-              focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-400" />
+            className={`w-full pl-9 pr-4 py-2.5 rounded-xl border text-sm placeholder-slate-400 focus:outline-none
+              focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-400
+              ${isDark ? 'bg-[#1e293b] border-white/[0.06] text-slate-200' : 'border-slate-200 bg-white text-slate-700'}`} />
         </div>
         <div className="flex gap-1.5 overflow-x-auto hide-scrollbar">
           {FILTROS_STATUS.map(f => (
@@ -662,7 +664,7 @@ export default function ContasPagar() {
               className={`px-3 py-2 rounded-xl text-[11px] font-semibold whitespace-nowrap transition-all
                 ${statusFilter === f.value
                   ? 'bg-emerald-600 text-white shadow-sm'
-                  : 'bg-white text-slate-500 border border-slate-200'
+                  : isDark ? 'bg-[#1e293b] text-slate-400 border border-white/[0.06]' : 'bg-white text-slate-500 border border-slate-200'
                 }`}>
               {f.label}
             </button>
@@ -677,16 +679,16 @@ export default function ContasPagar() {
         </div>
       ) : filtered.length === 0 ? (
         <div className="text-center py-16">
-          <div className="w-16 h-16 rounded-2xl bg-emerald-50 flex items-center justify-center mx-auto mb-4">
+          <div className={`w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4 ${isDark ? 'bg-emerald-500/10' : 'bg-emerald-50'}`}>
             <Receipt size={28} className="text-emerald-300" />
           </div>
-          <p className="text-sm font-semibold text-slate-500">Nenhuma conta encontrada</p>
-          <p className="text-xs text-slate-400 mt-1">As contas a pagar aparecerão aqui quando criadas</p>
+          <p className={`text-sm font-semibold ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Nenhuma conta encontrada</p>
+          <p className={`text-xs mt-1 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>As contas a pagar aparecerão aqui quando criadas</p>
         </div>
       ) : (
         <div className="space-y-2">
           {filtered.map(cp => (
-            <CPCard key={cp.id} cp={cp} onRegistrarPgto={setPgtoModal} onAprovarPgto={handleAprovarPgto} />
+            <CPCard key={cp.id} cp={cp} onRegistrarPgto={setPgtoModal} onAprovarPgto={handleAprovarPgto} isDark={isDark} />
           ))}
         </div>
       )}
@@ -696,6 +698,7 @@ export default function ContasPagar() {
         <RegistrarPgtoModal
           cp={pgtoModal}
           onClose={() => setPgtoModal(null)}
+          isDark={isDark}
         />
       )}
     </div>

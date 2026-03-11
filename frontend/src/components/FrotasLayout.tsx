@@ -21,7 +21,6 @@ export default function FrotasLayout() {
       moduleEmoji="🚗"
       accent="rose"
       nav={NAV}
-      variant="compact"
       moduleSubtitle="Manutenção & Uso"
     />
   )

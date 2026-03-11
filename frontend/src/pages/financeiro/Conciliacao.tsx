@@ -5,6 +5,7 @@ import {
   CheckSquare, Square, Minus, ArrowUpDown, AlertTriangle,
   Layers, XCircle,
 } from 'lucide-react'
+import { useTheme } from '../../contexts/ThemeContext'
 import {
   useContasPagar, useContasReceber,
   useClassificarCPBatch, useConciliarCPBatch,
@@ -75,6 +76,7 @@ function AutocompleteField({
   onChange,
   suggestions,
   placeholder,
+  isDark,
 }: {
   label: string
   icon: typeof Tag
@@ -82,6 +84,7 @@ function AutocompleteField({
   onChange: (v: string) => void
   suggestions: string[]
   placeholder: string
+  isDark: boolean
 }) {
   const [open, setOpen] = useState(false)
   const filtered = suggestions.filter(s =>
@@ -100,19 +103,19 @@ function AutocompleteField({
         onFocus={() => setOpen(true)}
         onBlur={() => setTimeout(() => setOpen(false), 150)}
         placeholder={placeholder}
-        className="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm text-slate-700
-          placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/30
-          focus:border-emerald-400"
+        className={`w-full px-3 py-2 rounded-lg border text-sm placeholder-slate-400
+          focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-400
+          ${isDark ? 'bg-[#1e293b] border-white/[0.06] text-slate-200' : 'border-slate-200 text-slate-700'}`}
       />
       {open && filtered.length > 0 && (
-        <div className="absolute z-50 mt-1 w-full bg-white border border-slate-200 rounded-lg shadow-lg
-          max-h-36 overflow-y-auto">
+        <div className={`absolute z-50 mt-1 w-full rounded-lg shadow-lg max-h-36 overflow-y-auto
+          ${isDark ? 'bg-[#1e293b] border border-white/[0.06]' : 'bg-white border border-slate-200'}`}>
           {filtered.map(s => (
             <button
               key={s}
               onMouseDown={() => { onChange(s); setOpen(false) }}
-              className="w-full text-left px-3 py-1.5 text-xs text-slate-700 hover:bg-emerald-50
-                hover:text-emerald-700 transition-colors"
+              className={`w-full text-left px-3 py-1.5 text-xs transition-colors
+                ${isDark ? 'text-slate-300 hover:bg-emerald-500/10 hover:text-emerald-400' : 'text-slate-700 hover:bg-emerald-50 hover:text-emerald-700'}`}
             >
               {s}
             </button>
@@ -126,6 +129,7 @@ function AutocompleteField({
 // ── Main Component ───────────────────────────────────────────────────────────
 
 export default function Conciliacao() {
+  const { isDark } = useTheme()
   const [tab, setTab] = useState<Tab>('cp')
   const [busca, setBusca] = useState('')
   const [dataInicio, setDataInicio] = useState('')
@@ -339,30 +343,30 @@ export default function Conciliacao() {
 
       {/* ── Header ──────────────────────────────────────────── */}
       <div>
-        <h1 className="text-xl font-extrabold text-slate-800 flex items-center gap-2">
+        <h1 className={`text-xl font-extrabold flex items-center gap-2 ${isDark ? 'text-white' : 'text-slate-800'}`}>
           <Landmark size={20} className="text-emerald-600" />
           Conciliação Manual
         </h1>
-        <p className="text-xs text-slate-400 mt-0.5">
+        <p className={`text-xs mt-0.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
           Classificação em lote — centro de custo, classe financeira e projeto
         </p>
       </div>
 
       {/* ── KPIs ────────────────────────────────────────────── */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <div className="bg-white rounded-2xl p-3.5 border border-slate-200 shadow-sm">
+        <div className={`rounded-2xl p-3.5 border shadow-sm ${isDark ? 'bg-[#1e293b] border-white/[0.06]' : 'bg-white border-slate-200'}`}>
           <div className="flex items-center gap-1.5 mb-1">
             <Layers size={12} className="text-slate-400" />
             <p className="text-[10px] text-slate-400 font-semibold uppercase tracking-widest">Total</p>
           </div>
-          <p className="text-lg font-extrabold text-slate-800">{rows.length}</p>
+          <p className={`text-lg font-extrabold ${isDark ? 'text-white' : 'text-slate-800'}`}>{rows.length}</p>
         </div>
         <button
           onClick={() => { setFiltroSemCC(v => !v); setFiltroSemClasse(false) }}
           className={`rounded-2xl p-3.5 border shadow-sm text-left transition-all ${
             filtroSemCC
               ? 'bg-amber-50 border-amber-300 ring-2 ring-amber-400/30'
-              : 'bg-white border-slate-200 hover:border-amber-300'
+              : isDark ? 'bg-[#1e293b] border-white/[0.06] hover:border-amber-500/30' : 'bg-white border-slate-200 hover:border-amber-300'
           }`}
         >
           <div className="flex items-center gap-1.5 mb-1">
@@ -376,7 +380,7 @@ export default function Conciliacao() {
           className={`rounded-2xl p-3.5 border shadow-sm text-left transition-all ${
             filtroSemClasse
               ? 'bg-violet-50 border-violet-300 ring-2 ring-violet-400/30'
-              : 'bg-white border-slate-200 hover:border-violet-300'
+              : isDark ? 'bg-[#1e293b] border-white/[0.06] hover:border-violet-500/30' : 'bg-white border-slate-200 hover:border-violet-300'
           }`}
         >
           <div className="flex items-center gap-1.5 mb-1">
@@ -385,7 +389,7 @@ export default function Conciliacao() {
           </div>
           <p className="text-lg font-extrabold text-violet-600">{totalSemClasse}</p>
         </button>
-        <div className="bg-white rounded-2xl p-3.5 border border-slate-200 shadow-sm">
+        <div className={`rounded-2xl p-3.5 border shadow-sm ${isDark ? 'bg-[#1e293b] border-white/[0.06]' : 'bg-white border-slate-200'}`}>
           <div className="flex items-center gap-1.5 mb-1">
             <CheckCircle2 size={12} className="text-emerald-500" />
             <p className="text-[10px] text-emerald-500 font-semibold uppercase tracking-widest">Conciliados</p>
@@ -401,12 +405,12 @@ export default function Conciliacao() {
           className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-[11px] font-semibold transition-all ${
             tab === 'cp'
               ? 'bg-emerald-600 text-white shadow-sm'
-              : 'bg-white text-slate-500 border border-slate-200'
+              : isDark ? 'bg-[#1e293b] text-slate-400 border border-white/[0.06]' : 'bg-white text-slate-500 border border-slate-200'
           }`}
         >
           Contas a Pagar
           <span className={`px-1.5 py-0.5 rounded-md text-[10px] font-bold ${
-            tab === 'cp' ? 'bg-emerald-500' : 'bg-slate-100 text-slate-400'
+            tab === 'cp' ? 'bg-emerald-500' : isDark ? 'bg-white/[0.06] text-slate-500' : 'bg-slate-100 text-slate-400'
           }`}>
             {contasCP.length}
           </span>
@@ -416,12 +420,12 @@ export default function Conciliacao() {
           className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-[11px] font-semibold transition-all ${
             tab === 'cr'
               ? 'bg-emerald-600 text-white shadow-sm'
-              : 'bg-white text-slate-500 border border-slate-200'
+              : isDark ? 'bg-[#1e293b] text-slate-400 border border-white/[0.06]' : 'bg-white text-slate-500 border border-slate-200'
           }`}
         >
           Contas a Receber
           <span className={`px-1.5 py-0.5 rounded-md text-[10px] font-bold ${
-            tab === 'cr' ? 'bg-emerald-500' : 'bg-slate-100 text-slate-400'
+            tab === 'cr' ? 'bg-emerald-500' : isDark ? 'bg-white/[0.06] text-slate-500' : 'bg-slate-100 text-slate-400'
           }`}>
             {contasCR.length}
           </span>
@@ -429,7 +433,7 @@ export default function Conciliacao() {
       </div>
 
       {/* ── Filters ─────────────────────────────────────────── */}
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-3 space-y-3">
+      <div className={`rounded-2xl border shadow-sm p-3 space-y-3 ${isDark ? 'bg-[#1e293b] border-white/[0.06]' : 'bg-white border-slate-200'}`}>
         <div className="flex items-center gap-2 text-[10px] text-slate-400 font-semibold uppercase tracking-wider">
           <Filter size={11} /> Filtros
         </div>
@@ -441,9 +445,9 @@ export default function Conciliacao() {
               value={busca}
               onChange={e => setBusca(e.target.value)}
               placeholder={tab === 'cp' ? 'Fornecedor, documento, CC, classe...' : 'Cliente, NF, CC, classe...'}
-              className="w-full pl-9 pr-4 py-2.5 rounded-xl border border-slate-200 bg-slate-50
-                text-sm text-slate-700 placeholder-slate-400 focus:outline-none
-                focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-400"
+              className={`w-full pl-9 pr-4 py-2.5 rounded-xl border text-sm placeholder-slate-400
+                focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-400
+                ${isDark ? 'bg-white/[0.03] border-white/[0.06] text-slate-200' : 'border-slate-200 bg-slate-50 text-slate-700'}`}
             />
           </div>
           <div className="flex gap-2">
@@ -453,9 +457,9 @@ export default function Conciliacao() {
                 type="date"
                 value={dataInicio}
                 onChange={e => setDataInicio(e.target.value)}
-                className="pl-8 pr-2 py-2.5 rounded-xl border border-slate-200 bg-slate-50
-                  text-xs text-slate-600 focus:outline-none focus:ring-2 focus:ring-emerald-500/30
-                  focus:border-emerald-400"
+                className={`pl-8 pr-2 py-2.5 rounded-xl border text-xs
+                  focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-400
+                  ${isDark ? 'bg-white/[0.03] border-white/[0.06] text-slate-300' : 'border-slate-200 bg-slate-50 text-slate-600'}`}
               />
             </div>
             <div className="relative">
@@ -464,9 +468,9 @@ export default function Conciliacao() {
                 type="date"
                 value={dataFim}
                 onChange={e => setDataFim(e.target.value)}
-                className="pl-8 pr-2 py-2.5 rounded-xl border border-slate-200 bg-slate-50
-                  text-xs text-slate-600 focus:outline-none focus:ring-2 focus:ring-emerald-500/30
-                  focus:border-emerald-400"
+                className={`pl-8 pr-2 py-2.5 rounded-xl border text-xs
+                  focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-400
+                  ${isDark ? 'bg-white/[0.03] border-white/[0.06] text-slate-300' : 'border-slate-200 bg-slate-50 text-slate-600'}`}
               />
             </div>
           </div>
@@ -475,22 +479,22 @@ export default function Conciliacao() {
           <div className="flex items-center gap-2 flex-wrap">
             <span className="text-[10px] text-slate-400">Filtros ativos:</span>
             {busca && (
-              <span className="inline-flex items-center gap-1 bg-slate-100 text-slate-600 text-[10px] font-semibold
-                rounded-full px-2 py-0.5">
+              <span className={`inline-flex items-center gap-1 text-[10px] font-semibold rounded-full px-2 py-0.5
+                ${isDark ? 'bg-white/[0.06] text-slate-300' : 'bg-slate-100 text-slate-600'}`}>
                 "{busca}"
                 <button onClick={() => setBusca('')}><X size={9} /></button>
               </span>
             )}
             {dataInicio && (
-              <span className="inline-flex items-center gap-1 bg-slate-100 text-slate-600 text-[10px] font-semibold
-                rounded-full px-2 py-0.5">
+              <span className={`inline-flex items-center gap-1 text-[10px] font-semibold rounded-full px-2 py-0.5
+                ${isDark ? 'bg-white/[0.06] text-slate-300' : 'bg-slate-100 text-slate-600'}`}>
                 De {fmtData(dataInicio)}
                 <button onClick={() => setDataInicio('')}><X size={9} /></button>
               </span>
             )}
             {dataFim && (
-              <span className="inline-flex items-center gap-1 bg-slate-100 text-slate-600 text-[10px] font-semibold
-                rounded-full px-2 py-0.5">
+              <span className={`inline-flex items-center gap-1 text-[10px] font-semibold rounded-full px-2 py-0.5
+                ${isDark ? 'bg-white/[0.06] text-slate-300' : 'bg-slate-100 text-slate-600'}`}>
                 Até {fmtData(dataFim)}
                 <button onClick={() => setDataFim('')}><X size={9} /></button>
               </span>
@@ -520,7 +524,7 @@ export default function Conciliacao() {
       </div>
 
       {/* ── Table Header ────────────────────────────────────── */}
-      <div className="bg-slate-50 rounded-xl border border-slate-200 px-3 py-2 flex items-center gap-2">
+      <div className={`rounded-xl border px-3 py-2 flex items-center gap-2 ${isDark ? 'bg-white/[0.02] border-white/[0.06]' : 'bg-slate-50 border-slate-200'}`}>
         <button onClick={toggleAll} className="shrink-0 text-slate-400 hover:text-emerald-600 transition-colors">
           {allSelected ? (
             <CheckSquare size={16} className="text-emerald-600" />
@@ -550,11 +554,11 @@ export default function Conciliacao() {
         </div>
       ) : filtered.length === 0 ? (
         <div className="text-center py-16">
-          <div className="w-16 h-16 rounded-2xl bg-slate-50 flex items-center justify-center mx-auto mb-4">
-            <Landmark size={28} className="text-slate-200" />
+          <div className={`w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4 ${isDark ? 'bg-emerald-500/10' : 'bg-slate-50'}`}>
+            <Landmark size={28} className={isDark ? 'text-emerald-300' : 'text-slate-200'} />
           </div>
-          <p className="text-sm font-semibold text-slate-500">Nenhum título encontrado</p>
-          <p className="text-xs text-slate-400 mt-1">Ajuste os filtros para ver resultados</p>
+          <p className={`text-sm font-semibold ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Nenhum título encontrado</p>
+          <p className={`text-xs mt-1 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Ajuste os filtros para ver resultados</p>
         </div>
       ) : (
         <div className="space-y-1">
@@ -572,7 +576,7 @@ export default function Conciliacao() {
                   transition-all ${
                   isSelected
                     ? 'bg-emerald-50 border-emerald-300 ring-1 ring-emerald-400/30'
-                    : 'bg-white border-slate-200 hover:border-slate-300 hover:shadow-sm'
+                    : isDark ? 'bg-[#1e293b] border-white/[0.06] hover:border-white/[0.12] hover:shadow-sm' : 'bg-white border-slate-200 hover:border-slate-300 hover:shadow-sm'
                 }`}
               >
                 <div className="shrink-0">
@@ -586,7 +590,7 @@ export default function Conciliacao() {
                 <div className="flex-1 min-w-0 grid grid-cols-12 gap-2 items-center">
                   {/* Name + doc */}
                   <div className="col-span-10 sm:col-span-3 min-w-0">
-                    <p className="text-sm font-bold text-slate-800 truncate">{row.nome}</p>
+                    <p className={`text-sm font-bold truncate ${isDark ? 'text-white' : 'text-slate-800'}`}>{row.nome}</p>
                     <div className="flex items-center gap-2 mt-0.5">
                       {row.documento && (
                         <span className="text-[10px] text-slate-400 font-mono truncate">{row.documento}</span>
@@ -599,7 +603,7 @@ export default function Conciliacao() {
 
                   {/* Vencimento */}
                   <div className="col-span-2 hidden sm:block">
-                    <span className="text-xs text-slate-600">{fmtData(row.vencimento)}</span>
+                    <span className={`text-xs ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>{fmtData(row.vencimento)}</span>
                   </div>
 
                   {/* Status */}
@@ -613,7 +617,7 @@ export default function Conciliacao() {
                   {/* Centro Custo */}
                   <div className="col-span-2 hidden md:block">
                     {row.centroCusto ? (
-                      <span className="text-[10px] text-slate-600 font-medium truncate block">{row.centroCusto}</span>
+                      <span className={`text-[10px] font-medium truncate block ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>{row.centroCusto}</span>
                     ) : (
                       <span className="inline-flex items-center gap-0.5 text-[10px] text-amber-500 font-medium">
                         <AlertTriangle size={9} /> Vazio
@@ -634,7 +638,7 @@ export default function Conciliacao() {
 
                   {/* Valor */}
                   <div className="col-span-2 text-right">
-                    <p className="text-sm font-extrabold text-slate-800">{fmt(row.valor)}</p>
+                    <p className={`text-sm font-extrabold ${isDark ? 'text-white' : 'text-slate-800'}`}>{fmt(row.valor)}</p>
                     {/* Mobile: show missing fields */}
                     <div className="flex items-center justify-end gap-1 mt-0.5 sm:hidden">
                       {semCC && (
@@ -655,16 +659,16 @@ export default function Conciliacao() {
       {/* ── Batch Action Bar (sticky bottom) ────────────────── */}
       {selectedCount > 0 && (
         <div className="fixed bottom-0 left-0 right-0 lg:left-64 z-40">
-          <div className="bg-white/95 backdrop-blur-lg border-t border-slate-200 shadow-[0_-4px_20px_rgba(0,0,0,0.08)]
-            px-4 py-3">
+          <div className={`backdrop-blur-lg border-t shadow-[0_-4px_20px_rgba(0,0,0,0.08)] px-4 py-3
+            ${isDark ? 'bg-[#1e293b]/95 border-white/[0.06]' : 'bg-white/95 border-slate-200'}`}>
             <div className="max-w-4xl mx-auto flex items-center gap-3 flex-wrap">
               {/* Selection info */}
               <div className="flex items-center gap-2 flex-1 min-w-0">
-                <div className="w-8 h-8 rounded-lg bg-emerald-100 flex items-center justify-center shrink-0">
+                <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${isDark ? 'bg-emerald-500/20' : 'bg-emerald-100'}`}>
                   <CheckSquare size={14} className="text-emerald-600" />
                 </div>
                 <div>
-                  <p className="text-sm font-bold text-slate-800">
+                  <p className={`text-sm font-bold ${isDark ? 'text-white' : 'text-slate-800'}`}>
                     {selectedCount} {selectedCount === 1 ? 'selecionado' : 'selecionados'}
                   </p>
                   <p className="text-[10px] text-slate-400">{fmtFull(valorSelected)}</p>
@@ -674,8 +678,8 @@ export default function Conciliacao() {
               {/* Actions */}
               <button
                 onClick={() => setSelected(new Set())}
-                className="px-3 py-2 rounded-xl border border-slate-200 text-[11px] font-semibold
-                  text-slate-500 hover:bg-slate-50 transition-all"
+                className={`px-3 py-2 rounded-xl border text-[11px] font-semibold transition-all
+                  ${isDark ? 'border-white/[0.06] text-slate-400 hover:bg-white/[0.03]' : 'border-slate-200 text-slate-500 hover:bg-slate-50'}`}
               >
                 Limpar
               </button>
@@ -716,13 +720,13 @@ export default function Conciliacao() {
       {/* ── Classification Modal ────────────────────────────── */}
       {showClassModal && (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md">
+          <div className={`rounded-2xl shadow-2xl w-full max-w-md ${isDark ? 'bg-[#1e293b]' : 'bg-white'}`}>
             {/* Header */}
-            <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
+            <div className={`flex items-center justify-between px-5 py-4 border-b ${isDark ? 'border-white/[0.06]' : 'border-slate-100'}`}>
               <div className="flex items-center gap-2">
                 <Tag size={18} className="text-violet-600" />
                 <div>
-                  <h3 className="text-base font-bold text-slate-800">Classificar em Lote</h3>
+                  <h3 className={`text-base font-bold ${isDark ? 'text-white' : 'text-slate-800'}`}>Classificar em Lote</h3>
                   <p className="text-[10px] text-slate-400">
                     {selectedCount} {selectedCount === 1 ? 'título' : 'títulos'} — {fmtFull(valorSelected)}
                   </p>
@@ -734,11 +738,12 @@ export default function Conciliacao() {
             </div>
 
             <div className="p-5 space-y-4">
-              <p className="text-xs text-slate-500">
+              <p className={`text-xs ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
                 Preencha os campos que deseja aplicar. Campos vazios não serão alterados.
               </p>
 
               <AutocompleteField
+                isDark={isDark}
                 label="Centro de Custo"
                 icon={Briefcase}
                 value={batchCC}
@@ -748,6 +753,7 @@ export default function Conciliacao() {
               />
 
               <AutocompleteField
+                isDark={isDark}
                 label="Classe Financeira"
                 icon={Tag}
                 value={batchClasse}
@@ -764,9 +770,9 @@ export default function Conciliacao() {
                   <select
                     value={batchProjeto}
                     onChange={e => setBatchProjeto(e.target.value)}
-                    className="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm text-slate-700
+                    className={`w-full px-3 py-2 rounded-lg border text-sm appearance-none
                       focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-400
-                      appearance-none bg-white"
+                      ${isDark ? 'bg-[#1e293b] border-white/[0.06] text-slate-200' : 'border-slate-200 text-slate-700 bg-white'}`}
                   >
                     <option value="">— Não alterar —</option>
                     {obras.map(o => (
@@ -781,8 +787,8 @@ export default function Conciliacao() {
               <div className="flex gap-2 pt-2">
                 <button
                   onClick={() => setShowClassModal(false)}
-                  className="flex-1 py-3 rounded-xl border border-slate-200 text-sm font-semibold
-                    text-slate-600 hover:bg-slate-50 transition-all"
+                  className={`flex-1 py-3 rounded-xl border text-sm font-semibold transition-all
+                    ${isDark ? 'border-white/[0.06] text-slate-400 hover:bg-white/[0.03]' : 'border-slate-200 text-slate-600 hover:bg-slate-50'}`}
                 >
                   Cancelar
                 </button>

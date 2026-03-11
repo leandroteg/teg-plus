@@ -5,6 +5,7 @@ import {
   Clock,
 } from 'lucide-react'
 import { useLogisticaKPIs, useSolicitacoes } from '../../hooks/useLogistica'
+import { useTheme } from '../../contexts/ThemeContext'
 import type { LogisticaKPIs } from '../../types/logistica'
 
 const EMPTY_KPIS: LogisticaKPIs = {
@@ -31,9 +32,10 @@ const STATUS_LABEL: Record<string, { label: string; dot: string; bg: string; tex
 }
 
 export function StatusBadge({ status }: { status: string }) {
+  const { isDark } = useTheme()
   const c = STATUS_LABEL[status] ?? { label: status, dot: 'bg-gray-400', bg: 'bg-gray-100', text: 'text-gray-600' }
   return (
-    <span className={`inline-flex items-center gap-1 rounded-full text-[10px] font-semibold px-2 py-0.5 ${c.bg} ${c.text}`}>
+    <span className={`inline-flex items-center gap-1 rounded-full text-[10px] font-semibold px-2 py-0.5 ${isDark ? 'bg-white/10' : c.bg} ${isDark ? 'text-slate-200' : c.text}`}>
       <span className={`w-1.5 h-1.5 rounded-full ${c.dot}`} />
       {c.label}
     </span>
@@ -56,6 +58,7 @@ const ACTIONS = [
 
 export default function LogisticaHome() {
   const nav = useNavigate()
+  const { isDark } = useTheme()
   const { data: kpis = EMPTY_KPIS, isLoading, refetch } = useLogisticaKPIs()
   const { data: urgentes = [] } = useSolicitacoes({
     urgente: true,
@@ -77,11 +80,11 @@ export default function LogisticaHome() {
       {/* ── Header ────────────────────────────────────────────── */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-extrabold text-slate-800">Painel — Logística</h1>
-          <p className="text-xs text-slate-400 mt-0.5">Transportes, NF-e e rastreamento de entregas</p>
+          <h1 className={`text-xl font-extrabold ${isDark ? 'text-white' : 'text-navy'}`}>Painel — Logística</h1>
+          <p className={`text-xs mt-0.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Transportes, NF-e e rastreamento de entregas</p>
         </div>
         <button onClick={() => refetch()}
-          className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-orange-600 transition-colors">
+          className={`flex items-center gap-1.5 text-xs transition-colors ${isDark ? 'text-slate-500 hover:text-orange-400' : 'text-slate-400 hover:text-orange-600'}`}>
           <RefreshCw size={12} /> Atualizar
         </button>
       </div>
@@ -103,23 +106,23 @@ export default function LogisticaHome() {
 
       {/* ── Entregas do dia ───────────────────────────────────── */}
       <div className="grid grid-cols-2 gap-3">
-        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4">
+        <div className={`rounded-2xl shadow-sm p-4 ${isDark ? 'bg-[#1e293b] border border-white/[0.06]' : 'bg-white border border-slate-200'}`}>
           <div className="flex items-center gap-2 mb-3">
             <Truck size={14} className="text-teal-500" />
-            <p className="text-xs font-bold text-slate-500 uppercase tracking-widest">Entregues Hoje</p>
+            <p className={`text-xs font-bold uppercase tracking-widest ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Entregues Hoje</p>
           </div>
           <p className="text-3xl font-extrabold text-teal-600">{kpis.entregues_hoje}</p>
-          <p className="text-[10px] text-slate-400 mt-1">{kpis.confirmadas_hoje} confirmadas</p>
+          <p className={`text-[10px] mt-1 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{kpis.confirmadas_hoje} confirmadas</p>
         </div>
-        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4">
+        <div className={`rounded-2xl shadow-sm p-4 ${isDark ? 'bg-[#1e293b] border border-white/[0.06]' : 'bg-white border border-slate-200'}`}>
           <div className="flex items-center gap-2 mb-3">
             <Clock size={14} className="text-amber-500" />
-            <p className="text-xs font-bold text-slate-500 uppercase tracking-widest">Aguard. Confirmação</p>
+            <p className={`text-xs font-bold uppercase tracking-widest ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Aguard. Confirmação</p>
           </div>
-          <p className={`text-3xl font-extrabold ${kpis.entregues_hoje - kpis.confirmadas_hoje > 0 ? 'text-amber-600' : 'text-slate-400'}`}>
+          <p className={`text-3xl font-extrabold ${kpis.entregues_hoje - kpis.confirmadas_hoje > 0 ? 'text-amber-600' : isDark ? 'text-slate-500' : 'text-slate-400'}`}>
             {Math.max(0, kpis.entregues_hoje - kpis.confirmadas_hoje)}
           </p>
-          <p className="text-[10px] text-slate-400 mt-1">SLA: até 4h após entrega</p>
+          <p className={`text-[10px] mt-1 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>SLA: até 4h após entrega</p>
         </div>
       </div>
 
@@ -127,22 +130,21 @@ export default function LogisticaHome() {
       <div className="grid grid-cols-4 gap-2">
         {ACTIONS.map(({ icon: Icon, label, to, color, bg }) => (
           <button key={to} onClick={() => nav(to)}
-            className="bg-white rounded-2xl p-3 border border-slate-200 shadow-sm
-              hover:shadow-md hover:-translate-y-0.5 transition-all text-center group">
-            <div className={`w-9 h-9 ${bg} rounded-xl flex items-center justify-center mx-auto mb-2
+            className={`rounded-2xl p-3 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all text-center group ${isDark ? 'bg-[#1e293b] border border-white/[0.06]' : 'bg-white border border-slate-200'}`}>
+            <div className={`w-9 h-9 ${isDark ? 'bg-white/10' : bg} rounded-xl flex items-center justify-center mx-auto mb-2
               group-hover:scale-110 transition-transform`}>
               <Icon size={16} className={color} />
             </div>
-            <p className="text-[10px] font-bold text-slate-600">{label}</p>
+            <p className={`text-[10px] font-bold ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>{label}</p>
           </button>
         ))}
       </div>
 
       {/* ── Em Trânsito ───────────────────────────────────────── */}
       {emTransito.length > 0 && (
-        <section className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-          <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between">
-            <h2 className="text-sm font-extrabold text-slate-800 flex items-center gap-1.5">
+        <section className={`rounded-2xl shadow-sm overflow-hidden ${isDark ? 'bg-[#1e293b] border border-white/[0.06]' : 'bg-white border border-slate-200'}`}>
+          <div className={`px-4 py-3 flex items-center justify-between ${isDark ? 'border-b border-white/[0.06]' : 'border-b border-slate-100'}`}>
+            <h2 className={`text-sm font-extrabold flex items-center gap-1.5 ${isDark ? 'text-white' : 'text-slate-800'}`}>
               <Truck size={14} className="text-orange-500" /> Em Trânsito Agora
             </h2>
             <button onClick={() => nav('/logistica/transportes')}
@@ -150,27 +152,27 @@ export default function LogisticaHome() {
               Ver todos <ArrowRight size={10} />
             </button>
           </div>
-          <div className="divide-y divide-slate-50">
+          <div className={`divide-y ${isDark ? 'divide-white/[0.04]' : 'divide-slate-50'}`}>
             {emTransito.slice(0, 5).map(s => (
-              <div key={s.id} className="flex items-center gap-3 px-4 py-3 hover:bg-slate-50 transition-colors">
-                <div className="w-8 h-8 rounded-lg bg-orange-50 flex items-center justify-center shrink-0">
+              <div key={s.id} className={`flex items-center gap-3 px-4 py-3 transition-colors ${isDark ? 'hover:bg-white/[0.03]' : 'hover:bg-slate-50'}`}>
+                <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${isDark ? 'bg-orange-500/10' : 'bg-orange-50'}`}>
                   <Truck size={14} className="text-orange-500" />
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-1.5">
-                    <p className="text-xs font-extrabold text-slate-700 font-mono">{s.numero}</p>
+                    <p className={`text-xs font-extrabold font-mono ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>{s.numero}</p>
                     {s.urgente && <span className="text-[9px] bg-red-100 text-red-700 font-bold px-1.5 py-0.5 rounded-full">URGENTE</span>}
                   </div>
-                  <p className="text-[10px] text-slate-400 truncate">
+                  <p className={`text-[10px] truncate ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
                     {s.origem} → {s.destino}
                     {s.obra_nome ? ` · ${s.obra_nome}` : ''}
                   </p>
                 </div>
                 <div className="text-right shrink-0">
-                  <p className="text-xs font-semibold text-slate-600">
+                  <p className={`text-xs font-semibold ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
                     {s.transporte?.motorista_nome ?? s.motorista_nome ?? '—'}
                   </p>
-                  <p className="text-[10px] text-slate-400">{s.transporte?.placa ?? s.veiculo_placa ?? '—'}</p>
+                  <p className={`text-[10px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{s.transporte?.placa ?? s.veiculo_placa ?? '—'}</p>
                 </div>
               </div>
             ))}
@@ -180,9 +182,9 @@ export default function LogisticaHome() {
 
       {/* ── Urgentes Pendentes ────────────────────────────────── */}
       {urgentes.length > 0 && (
-        <section className="bg-white rounded-2xl border border-red-200 shadow-sm overflow-hidden">
-          <div className="px-4 py-3 border-b border-red-100 flex items-center justify-between">
-            <h2 className="text-sm font-extrabold text-red-800 flex items-center gap-1.5">
+        <section className={`rounded-2xl shadow-sm overflow-hidden ${isDark ? 'bg-[#1e293b] border border-red-500/30' : 'bg-white border border-red-200'}`}>
+          <div className={`px-4 py-3 flex items-center justify-between ${isDark ? 'border-b border-red-500/20' : 'border-b border-red-100'}`}>
+            <h2 className={`text-sm font-extrabold flex items-center gap-1.5 ${isDark ? 'text-red-400' : 'text-red-800'}`}>
               <AlertTriangle size={14} className="text-red-500" /> Solicitações Urgentes
             </h2>
             <button onClick={() => nav('/logistica/solicitacoes')}
@@ -190,22 +192,22 @@ export default function LogisticaHome() {
               Ver todas <ArrowRight size={10} />
             </button>
           </div>
-          <div className="divide-y divide-red-50">
+          <div className={`divide-y ${isDark ? 'divide-white/[0.04]' : 'divide-red-50'}`}>
             {urgentes.slice(0, 4).map(s => (
-              <div key={s.id} className="flex items-center gap-3 px-4 py-3 hover:bg-red-50/50 transition-colors">
-                <div className="w-8 h-8 rounded-lg bg-red-50 flex items-center justify-center shrink-0">
+              <div key={s.id} className={`flex items-center gap-3 px-4 py-3 transition-colors ${isDark ? 'hover:bg-white/[0.03]' : 'hover:bg-red-50/50'}`}>
+                <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${isDark ? 'bg-red-500/10' : 'bg-red-50'}`}>
                   <AlertTriangle size={14} className="text-red-500" />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="text-xs font-extrabold text-slate-700 font-mono">{s.numero}</p>
-                  <p className="text-[10px] text-slate-400 truncate">
+                  <p className={`text-xs font-extrabold font-mono ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>{s.numero}</p>
+                  <p className={`text-[10px] truncate ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
                     {TIPO_LABEL[s.tipo] ?? s.tipo} · {s.origem} → {s.destino}
                   </p>
                 </div>
                 <div className="text-right shrink-0">
                   <StatusBadge status={s.status} />
                   {s.data_desejada && (
-                    <p className="text-[9px] text-slate-400 mt-0.5">
+                    <p className={`text-[9px] mt-0.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
                       Prazo: {new Date(s.data_desejada + 'T00:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}
                     </p>
                   )}
@@ -223,8 +225,9 @@ function KpiCard({ titulo, valor, icon: Icon, cor, hexCor, subtitulo }: {
   titulo: string; valor: number | string; icon: typeof ClipboardList;
   cor: string; hexCor: string; subtitulo?: string
 }) {
+  const { isDark } = useTheme()
   return (
-    <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden flex">
+    <div className={`rounded-2xl shadow-sm overflow-hidden flex ${isDark ? 'bg-[#1e293b] border border-white/[0.06]' : 'bg-white border border-slate-200'}`}>
       <div className="w-[3px] shrink-0" style={{ backgroundColor: hexCor }} />
       <div className="p-4 flex-1 min-w-0">
         <div className="w-8 h-8 rounded-xl flex items-center justify-center mb-2"
@@ -232,8 +235,8 @@ function KpiCard({ titulo, valor, icon: Icon, cor, hexCor, subtitulo }: {
           <Icon size={14} className={cor} />
         </div>
         <p className={`text-xl font-extrabold ${cor} leading-none`}>{valor}</p>
-        <p className="text-[10px] text-slate-400 font-semibold mt-1 uppercase tracking-widest">{titulo}</p>
-        {subtitulo && <p className="text-[10px] text-slate-400 mt-0.5">{subtitulo}</p>}
+        <p className={`text-[10px] font-semibold mt-1 uppercase tracking-widest ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{titulo}</p>
+        {subtitulo && <p className={`text-[10px] mt-0.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{subtitulo}</p>}
       </div>
     </div>
   )

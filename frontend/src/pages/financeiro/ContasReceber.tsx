@@ -3,12 +3,13 @@ import {
   DollarSign, Search, Calendar, AlertTriangle, TrendingUp,
   RefreshCw, Zap, XCircle, CheckCircle2,
 } from 'lucide-react'
+import { useTheme } from '../../contexts/ThemeContext'
 import { useContasReceber } from '../../hooks/useFinanceiro'
 import { useLastSync, useTriggerSync, useOmieConfig } from '../../hooks/useOmie'
 
 // ── SyncBar ───────────────────────────────────────────────────────────────────
 
-function SyncBar() {
+function SyncBar({ isDark }: { isDark: boolean }) {
   const { data: config } = useOmieConfig()
   const { data: log, isLoading } = useLastSync('contas_receber')
   const trigger = useTriggerSync('contas_receber')
@@ -27,7 +28,7 @@ function SyncBar() {
     : 'Nunca sincronizado'
 
   return (
-    <div className="flex items-center gap-3 bg-emerald-50 border border-emerald-200 rounded-xl px-4 py-2.5">
+    <div className={`flex items-center gap-3 rounded-xl px-4 py-2.5 ${isDark ? 'bg-emerald-500/10 border border-emerald-500/20' : 'bg-emerald-50 border border-emerald-200'}`}>
       {isLoading || isPending ? (
         <RefreshCw size={13} className="text-emerald-500 animate-spin shrink-0" />
       ) : status === 'success' ? (
@@ -84,6 +85,7 @@ const FILTROS: { label: string; value: string }[] = [
 ]
 
 export default function ContasReceber() {
+  const { isDark } = useTheme()
   const [statusFilter, setStatusFilter] = useState('')
   const [busca, setBusca] = useState('')
   const { data: contas = [], isLoading } = useContasReceber()
@@ -114,36 +116,36 @@ export default function ContasReceber() {
 
       {/* ── Header ──────────────────────────────────────────── */}
       <div>
-        <h1 className="text-xl font-extrabold text-slate-800 flex items-center gap-2">
+        <h1 className={`text-xl font-extrabold flex items-center gap-2 ${isDark ? 'text-white' : 'text-slate-800'}`}>
           <DollarSign size={20} className="text-emerald-600" />
           Contas a Receber
         </h1>
-        <p className="text-xs text-slate-400 mt-0.5">Faturamento e recebimentos</p>
+        <p className={`text-xs mt-0.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Faturamento e recebimentos</p>
       </div>
 
       {/* ── Omie Sync Status ─────────────────────────────────── */}
-      <SyncBar />
+      <SyncBar isDark={isDark} />
 
       {/* ── Resumo ──────────────────────────────────────────── */}
       <div className="grid grid-cols-3 gap-3">
-        <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm">
+        <div className={`rounded-2xl p-4 border shadow-sm ${isDark ? 'bg-[#1e293b] border-white/[0.06]' : 'bg-white border-slate-200'}`}>
           <p className="text-[10px] text-slate-400 font-semibold uppercase tracking-widest">Total</p>
-          <p className="text-lg font-extrabold text-slate-800 mt-1">{filtered.length}</p>
+          <p className={`text-lg font-extrabold mt-1 ${isDark ? 'text-white' : 'text-slate-800'}`}>{filtered.length}</p>
           <p className="text-[10px] text-slate-400">títulos</p>
         </div>
-        <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm">
+        <div className={`rounded-2xl p-4 border shadow-sm ${isDark ? 'bg-[#1e293b] border-white/[0.06]' : 'bg-white border-slate-200'}`}>
           <p className="text-[10px] text-blue-500 font-semibold uppercase tracking-widest">Em Aberto</p>
           <p className="text-lg font-extrabold text-blue-600 mt-1">{fmt(totalAberto)}</p>
         </div>
-        <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm">
+        <div className={`rounded-2xl p-4 border shadow-sm ${isDark ? 'bg-[#1e293b] border-white/[0.06]' : 'bg-white border-slate-200'}`}>
           <p className="text-[10px] text-emerald-500 font-semibold uppercase tracking-widest">Recebido</p>
           <p className="text-lg font-extrabold text-emerald-600 mt-1">{fmt(totalRecebido)}</p>
         </div>
       </div>
 
       {totalVencido > 0 && (
-        <div className="bg-red-50 border border-red-200 rounded-2xl p-4 flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-red-100 flex items-center justify-center shrink-0">
+        <div className={`border rounded-2xl p-4 flex items-center gap-3 ${isDark ? 'bg-red-500/10 border-red-500/20' : 'bg-red-50 border-red-200'}`}>
+          <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${isDark ? 'bg-red-500/20' : 'bg-red-100'}`}>
             <AlertTriangle size={18} className="text-red-500" />
           </div>
           <div>
@@ -159,9 +161,9 @@ export default function ContasReceber() {
           <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
           <input type="text" value={busca} onChange={e => setBusca(e.target.value)}
             placeholder="Buscar cliente, NF, descrição..."
-            className="w-full pl-9 pr-4 py-2.5 rounded-xl border border-slate-200 bg-white
-              text-sm text-slate-700 placeholder-slate-400 focus:outline-none
-              focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-400" />
+            className={`w-full pl-9 pr-4 py-2.5 rounded-xl border text-sm placeholder-slate-400 focus:outline-none
+              focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-400
+              ${isDark ? 'bg-[#1e293b] border-white/[0.06] text-slate-200' : 'border-slate-200 bg-white text-slate-700'}`} />
         </div>
         <div className="flex gap-1.5 overflow-x-auto hide-scrollbar">
           {FILTROS.map(f => (
@@ -169,7 +171,7 @@ export default function ContasReceber() {
               className={`px-3 py-2 rounded-xl text-[11px] font-semibold whitespace-nowrap transition-all
                 ${statusFilter === f.value
                   ? 'bg-emerald-600 text-white shadow-sm'
-                  : 'bg-white text-slate-500 border border-slate-200'
+                  : isDark ? 'bg-[#1e293b] text-slate-400 border border-white/[0.06]' : 'bg-white text-slate-500 border border-slate-200'
                 }`}>
               {f.label}
             </button>
@@ -184,11 +186,11 @@ export default function ContasReceber() {
         </div>
       ) : filtered.length === 0 ? (
         <div className="text-center py-16">
-          <div className="w-16 h-16 rounded-2xl bg-emerald-50 flex items-center justify-center mx-auto mb-4">
+          <div className={`w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4 ${isDark ? 'bg-emerald-500/10' : 'bg-emerald-50'}`}>
             <DollarSign size={28} className="text-emerald-300" />
           </div>
-          <p className="text-sm font-semibold text-slate-500">Nenhum título encontrado</p>
-          <p className="text-xs text-slate-400 mt-1">As contas a receber aparecerão aqui</p>
+          <p className={`text-sm font-semibold ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Nenhum título encontrado</p>
+          <p className={`text-xs mt-1 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>As contas a receber aparecerão aqui</p>
         </div>
       ) : (
         <div className="space-y-2">
@@ -198,13 +200,14 @@ export default function ContasReceber() {
             const cfg = STATUS_CONFIG[cr.status]
 
             return (
-              <div key={cr.id} className={`bg-white rounded-2xl border shadow-sm p-4
+              <div key={cr.id} className={`rounded-2xl border shadow-sm p-4
                 transition-all hover:shadow-md
-                ${vencido ? 'border-red-200' : 'border-slate-200'}`}>
+                ${isDark ? 'bg-[#1e293b]' : 'bg-white'}
+                ${vencido ? 'border-red-200' : isDark ? 'border-white/[0.06]' : 'border-slate-200'}`}>
 
                 <div className="flex items-start gap-3">
                   <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0
-                    ${vencido ? 'bg-red-50' : 'bg-blue-50'}`}>
+                    ${vencido ? (isDark ? 'bg-red-500/10' : 'bg-red-50') : (isDark ? 'bg-blue-500/10' : 'bg-blue-50')}`}>
                     {vencido
                       ? <AlertTriangle size={16} className="text-red-500" />
                       : <TrendingUp size={16} className="text-blue-600" />
@@ -213,7 +216,7 @@ export default function ContasReceber() {
 
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between gap-2 mb-1">
-                      <p className="text-sm font-bold text-slate-800 truncate">{cr.cliente_nome}</p>
+                      <p className={`text-sm font-bold truncate ${isDark ? 'text-white' : 'text-slate-800'}`}>{cr.cliente_nome}</p>
                       <p className={`text-sm font-extrabold shrink-0
                         ${vencido ? 'text-red-600' : 'text-blue-600'}`}>
                         {fmt(cr.valor_original)}

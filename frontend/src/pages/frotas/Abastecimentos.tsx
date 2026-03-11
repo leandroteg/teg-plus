@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Plus, Fuel, AlertTriangle, TrendingDown } from 'lucide-react'
 import { useAbastecimentos, useRegistrarAbastecimento, useVeiculos } from '../../hooks/useFrotas'
+import { useTheme } from '../../contexts/ThemeContext'
 import type { CombustivelVeiculo, TipoPagamento } from '../../types/frotas'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -8,15 +9,15 @@ const BRL = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', curren
 
 const COMB_LABEL: Record<CombustivelVeiculo, string> = {
   flex: 'Flex', gasolina: 'Gasolina', diesel: 'Diesel',
-  etanol: 'Etanol', eletrico: 'Elétrico', gnv: 'GNV',
+  etanol: 'Etanol', eletrico: 'Eletrico', gnv: 'GNV',
 }
 
 const PAG_LABEL: Record<TipoPagamento, string> = {
-  cartao_frota: 'Cartão Frota', dinheiro: 'Dinheiro', pix: 'PIX', boleto: 'Boleto',
+  cartao_frota: 'Cartao Frota', dinheiro: 'Dinheiro', pix: 'PIX', boleto: 'Boleto',
 }
 
 // ── Novo Abastecimento Modal ──────────────────────────────────────────────────
-function NovoAbastecimentoModal({ onClose }: { onClose: () => void }) {
+function NovoAbastecimentoModal({ onClose, isLight }: { onClose: () => void; isLight: boolean }) {
   const registrar = useRegistrarAbastecimento()
   const { data: veiculos = [] } = useVeiculos()
   const [form, setForm] = useState({
@@ -48,19 +49,21 @@ function NovoAbastecimentoModal({ onClose }: { onClose: () => void }) {
     onClose()
   }
 
-  const inp = 'w-full px-3 py-2 rounded-xl bg-white/6 border border-white/10 text-sm text-white placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-rose-500/30'
-  const sel = inp + ' [&>option]:bg-slate-900'
+  const inp = `w-full px-3 py-2 rounded-xl text-sm placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-rose-500/30 ${
+    isLight ? 'bg-slate-50 border border-slate-200 text-slate-800' : 'bg-white/6 border border-white/10 text-white'
+  }`
+  const sel = inp + (isLight ? '' : ' [&>option]:bg-slate-900')
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
       <form onSubmit={handleSubmit} className="glass-card rounded-2xl p-6 w-full max-w-lg space-y-4">
-        <h2 className="text-base font-bold text-white">Registrar Abastecimento</h2>
+        <h2 className={`text-base font-bold ${isLight ? 'text-slate-800' : 'text-white'}`}>Registrar Abastecimento</h2>
 
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <label className="text-[11px] text-slate-400">Veículo *</label>
+            <label className="text-[11px] text-slate-400">Veiculo *</label>
             <select className={sel} value={form.veiculo_id} onChange={e => setForm(f => ({ ...f, veiculo_id: e.target.value }))} required>
-              <option value="">Selecione…</option>
+              <option value="">Selecione...</option>
               {veiculos.filter(v => v.status !== 'baixado').map(v => (
                 <option key={v.id} value={v.id}>{v.placa} — {v.marca} {v.modelo}</option>
               ))}
@@ -78,7 +81,7 @@ function NovoAbastecimentoModal({ onClose }: { onClose: () => void }) {
             <input className={inp} value={form.posto} onChange={e => setForm(f => ({ ...f, posto: e.target.value }))} placeholder="Nome do posto" />
           </div>
           <div>
-            <label className="text-[11px] text-slate-400">Combustível</label>
+            <label className="text-[11px] text-slate-400">Combustivel</label>
             <select className={sel} value={form.combustivel} onChange={e => setForm(f => ({ ...f, combustivel: e.target.value as CombustivelVeiculo }))}>
               {Object.entries(COMB_LABEL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
             </select>
@@ -87,7 +90,7 @@ function NovoAbastecimentoModal({ onClose }: { onClose: () => void }) {
 
         <div className="grid grid-cols-3 gap-3">
           <div>
-            <label className="text-[11px] text-slate-400">Hodômetro (km) *</label>
+            <label className="text-[11px] text-slate-400">Hodometro (km) *</label>
             <input type="number" className={inp} value={form.hodometro} onChange={e => setForm(f => ({ ...f, hodometro: e.target.value }))} required placeholder="55432" />
           </div>
           <div>
@@ -101,9 +104,11 @@ function NovoAbastecimentoModal({ onClose }: { onClose: () => void }) {
         </div>
 
         {/* Total estimado */}
-        <div className="flex items-center justify-between p-3 rounded-xl bg-white/4 border border-white/8">
+        <div className={`flex items-center justify-between p-3 rounded-xl ${
+          isLight ? 'bg-slate-50 border border-slate-200' : 'bg-white/4 border border-white/8'
+        }`}>
           <span className="text-xs text-slate-400">Total estimado</span>
-          <span className="text-sm font-black text-white">{totalEstimado}</span>
+          <span className={`text-sm font-black ${isLight ? 'text-slate-800' : 'text-white'}`}>{totalEstimado}</span>
         </div>
 
         <div className="grid grid-cols-2 gap-3">
@@ -114,15 +119,17 @@ function NovoAbastecimentoModal({ onClose }: { onClose: () => void }) {
             </select>
           </div>
           <div>
-            <label className="text-[11px] text-slate-400">Nº do cupom</label>
+            <label className="text-[11px] text-slate-400">No do cupom</label>
             <input className={inp} value={form.numero_cupom} onChange={e => setForm(f => ({ ...f, numero_cupom: e.target.value }))} placeholder="0000001" />
           </div>
         </div>
 
         <div className="flex gap-2">
-          <button type="button" onClick={onClose} className="flex-1 py-2 rounded-xl border border-white/10 text-sm text-slate-400">Cancelar</button>
+          <button type="button" onClick={onClose} className={`flex-1 py-2 rounded-xl border text-sm ${
+            isLight ? 'border-slate-200 text-slate-500 hover:bg-slate-50' : 'border-white/10 text-slate-400 hover:bg-white/5'
+          }`}>Cancelar</button>
           <button type="submit" disabled={registrar.isPending} className="flex-1 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-sm text-white font-semibold disabled:opacity-50">
-            {registrar.isPending ? 'Registrando…' : 'Registrar'}
+            {registrar.isPending ? 'Registrando...' : 'Registrar'}
           </button>
         </div>
       </form>
@@ -132,6 +139,7 @@ function NovoAbastecimentoModal({ onClose }: { onClose: () => void }) {
 
 // ── Main ──────────────────────────────────────────────────────────────────────
 export default function Abastecimentos() {
+  const { isLightSidebar: isLight } = useTheme()
   const [modal, setModal]     = useState(false)
   const mesAtual = new Date().toISOString().slice(0, 7)
   const [mesFiltro, setMesFiltro] = useState(mesAtual)
@@ -148,40 +156,42 @@ export default function Abastecimentos() {
 
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-bold text-white flex items-center gap-2">
+          <h1 className={`text-xl font-bold flex items-center gap-2 ${isLight ? 'text-slate-800' : 'text-white'}`}>
             <Fuel size={20} className="text-rose-400" /> Abastecimentos
           </h1>
-          <p className="text-sm text-slate-500">{abastecimentos.length} registros no mês</p>
+          <p className="text-sm text-slate-500">{abastecimentos.length} registros no mes</p>
         </div>
         <button onClick={() => setModal(true)} className="flex items-center gap-2 px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-sm text-white font-semibold">
           <Plus size={15} /> Registrar
         </button>
       </div>
 
-      {/* Filtro mês */}
+      {/* Filtro mes */}
       <div className="flex items-center gap-3">
-        <label className="text-xs text-slate-500">Mês:</label>
+        <label className="text-xs text-slate-500">Mes:</label>
         <input type="month" value={mesFiltro} onChange={e => setMesFiltro(e.target.value)}
-          className="px-3 py-2 rounded-xl bg-white/6 border border-white/10 text-sm text-white focus:outline-none focus:ring-2 focus:ring-rose-500/30" />
+          className={`px-3 py-2 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-rose-500/30 ${
+            isLight ? 'bg-slate-50 border border-slate-200 text-slate-800' : 'bg-white/6 border border-white/10 text-white'
+          }`} />
       </div>
 
       {/* KPI Cards */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <div className="glass-card rounded-xl p-3 border-l-4 border-l-rose-500">
           <p className="text-[10px] text-slate-500 uppercase mb-1">Custo Total</p>
-          <p className="text-lg font-black text-white">{BRL(totalCusto)}</p>
+          <p className={`text-lg font-black ${isLight ? 'text-slate-800' : 'text-white'}`}>{BRL(totalCusto)}</p>
         </div>
         <div className="glass-card rounded-xl p-3 border-l-4 border-l-sky-500">
           <p className="text-[10px] text-slate-500 uppercase mb-1">Total Litros</p>
-          <p className="text-lg font-black text-white">{totalLitros.toLocaleString('pt-BR', { maximumFractionDigits: 0 })} L</p>
+          <p className={`text-lg font-black ${isLight ? 'text-slate-800' : 'text-white'}`}>{totalLitros.toLocaleString('pt-BR', { maximumFractionDigits: 0 })} L</p>
         </div>
         <div className="glass-card rounded-xl p-3 border-l-4 border-l-emerald-500">
-          <p className="text-[10px] text-slate-500 uppercase mb-1">Média km/L</p>
-          <p className="text-lg font-black text-white">{mediaKmL ? mediaKmL.toFixed(2) : '—'}</p>
+          <p className="text-[10px] text-slate-500 uppercase mb-1">Media km/L</p>
+          <p className={`text-lg font-black ${isLight ? 'text-slate-800' : 'text-white'}`}>{mediaKmL ? mediaKmL.toFixed(2) : '—'}</p>
         </div>
         <div className={`glass-card rounded-xl p-3 border-l-4 ${desvios.length > 0 ? 'border-l-red-500' : 'border-l-slate-600'}`}>
           <p className="text-[10px] text-slate-500 uppercase mb-1">Desvios</p>
-          <p className={`text-lg font-black ${desvios.length > 0 ? 'text-red-400' : 'text-white'}`}>{desvios.length}</p>
+          <p className={`text-lg font-black ${desvios.length > 0 ? 'text-red-400' : isLight ? 'text-slate-800' : 'text-white'}`}>{desvios.length}</p>
         </div>
       </div>
 
@@ -192,10 +202,10 @@ export default function Abastecimentos() {
             <AlertTriangle size={13} /> Desvios de Consumo Detectados
           </p>
           {desvios.map(d => (
-            <div key={d.id} className="flex items-center justify-between text-xs text-slate-300">
+            <div key={d.id} className={`flex items-center justify-between text-xs ${isLight ? 'text-slate-600' : 'text-slate-300'}`}>
               <span>{d.veiculo?.placa} · {new Date(d.data_abastecimento).toLocaleDateString('pt-BR')}</span>
               <span className="text-red-400 font-semibold flex items-center gap-1">
-                <TrendingDown size={11} /> {d.percentual_desvio?.toFixed(1)}% abaixo da média
+                <TrendingDown size={11} /> {d.percentual_desvio?.toFixed(1)}% abaixo da media
               </span>
             </div>
           ))}
@@ -206,18 +216,18 @@ export default function Abastecimentos() {
       {isLoading ? (
         <div className="space-y-2">{Array.from({ length: 6 }).map((_, i) => <div key={i} className="glass-card rounded-xl h-14 animate-pulse" />)}</div>
       ) : abastecimentos.length === 0 ? (
-        <p className="text-sm text-slate-500 text-center py-12">Nenhum abastecimento neste mês</p>
+        <p className="text-sm text-slate-500 text-center py-12">Nenhum abastecimento neste mes</p>
       ) : (
         <div className="space-y-2">
           {abastecimentos.map(ab => (
             <div key={ab.id} className={`glass-card rounded-xl px-4 py-3 flex items-center gap-4 ${ab.desvio_detectado ? 'border border-red-500/30' : ''}`}>
               {ab.desvio_detectado && <AlertTriangle size={14} className="text-red-400 shrink-0" />}
               <div className="w-20 shrink-0">
-                <p className="text-sm font-bold text-white">{ab.veiculo?.placa}</p>
+                <p className={`text-sm font-bold ${isLight ? 'text-slate-800' : 'text-white'}`}>{ab.veiculo?.placa}</p>
                 <p className="text-[10px] text-slate-500">{new Date(ab.data_abastecimento).toLocaleDateString('pt-BR')}</p>
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-xs text-slate-300">{ab.posto ?? 'Posto não informado'}</p>
+                <p className={`text-xs ${isLight ? 'text-slate-600' : 'text-slate-300'}`}>{ab.posto ?? 'Posto nao informado'}</p>
                 <p className="text-[11px] text-slate-500">{COMB_LABEL[ab.combustivel]} · {ab.litros.toFixed(3)} L · {ab.hodometro.toLocaleString('pt-BR')} km</p>
               </div>
               <div className="hidden sm:block text-right">
@@ -227,7 +237,7 @@ export default function Abastecimentos() {
                 <p className="text-[10px] text-slate-500">{PAG_LABEL[ab.forma_pagamento]}</p>
               </div>
               <div className="text-right shrink-0">
-                <p className="text-sm font-bold text-white">{BRL(ab.valor_total ?? 0)}</p>
+                <p className={`text-sm font-bold ${isLight ? 'text-slate-800' : 'text-white'}`}>{BRL(ab.valor_total ?? 0)}</p>
                 <p className="text-[10px] text-slate-500">R$ {ab.valor_litro.toFixed(3)}/L</p>
               </div>
             </div>
@@ -235,7 +245,7 @@ export default function Abastecimentos() {
         </div>
       )}
 
-      {modal && <NovoAbastecimentoModal onClose={() => setModal(false)} />}
+      {modal && <NovoAbastecimentoModal onClose={() => setModal(false)} isLight={isLight} />}
     </div>
   )
 }

@@ -5,6 +5,7 @@ import {
   Clock, CheckCircle2, RefreshCw, ArrowRight,
   Receipt,
 } from 'lucide-react'
+import { useTheme } from '../../contexts/ThemeContext'
 import { useFinanceiroDashboard } from '../../hooks/useFinanceiro'
 import type { ContaPagar, FinanceiroKPIs } from '../../types/financeiro'
 
@@ -32,10 +33,10 @@ const STATUS_LABEL: Record<string, { label: string; dot: string; bg: string; tex
   cancelado:             { label: 'Cancelado',      dot: 'bg-gray-400',    bg: 'bg-gray-100',    text: 'text-gray-500'    },
 }
 
-function StatusBadge({ status }: { status: string }) {
+function StatusBadge({ status, isDark }: { status: string; isDark?: boolean }) {
   const c = STATUS_LABEL[status] ?? { label: status, dot: 'bg-gray-400', bg: 'bg-gray-100', text: 'text-gray-600' }
   return (
-    <span className={`inline-flex items-center gap-1 rounded-full text-[10px] font-semibold px-2 py-0.5 ${c.bg} ${c.text}`}>
+    <span className={`inline-flex items-center gap-1 rounded-full text-[10px] font-semibold px-2 py-0.5 ${isDark ? 'bg-white/[0.06]' : c.bg} ${c.text}`}>
       <span className={`w-1.5 h-1.5 rounded-full ${c.dot}`} />
       {c.label}
     </span>
@@ -44,6 +45,7 @@ function StatusBadge({ status }: { status: string }) {
 
 // ── Component ────────────────────────────────────────────────────────────────
 export default function DashboardFinanceiro() {
+  const { isDark } = useTheme()
   const nav = useNavigate()
   const location = useLocation()
   const [periodo, setPeriodo] = useState('30d')
@@ -73,11 +75,11 @@ export default function DashboardFinanceiro() {
       {/* ── Header ────────────────────────────────────────────── */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-extrabold text-slate-800">Painel Financeiro</h1>
-          <p className="text-xs text-slate-400 mt-0.5">Visão geral de pagamentos e recebimentos</p>
+          <h1 className={`text-xl font-extrabold ${isDark ? 'text-white' : 'text-slate-800'}`}>Painel Financeiro</h1>
+          <p className={`text-xs mt-0.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Visão geral de pagamentos e recebimentos</p>
         </div>
         <button onClick={() => refetch()}
-          className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-emerald-600 transition-colors">
+          className={`flex items-center gap-1.5 text-xs transition-colors ${isDark ? 'text-slate-500 hover:text-emerald-400' : 'text-slate-400 hover:text-emerald-600'}`}>
           <RefreshCw size={12} /> Atualizar
         </button>
       </div>
@@ -87,7 +89,11 @@ export default function DashboardFinanceiro() {
         {[['7d', '7 dias'], ['30d', '30 dias'], ['90d', '90 dias'], ['365d', 'Ano']].map(([val, lbl]) => (
           <button key={val} onClick={() => setPeriodo(val)}
             className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-all ${
-              periodo === val ? 'bg-emerald-600 text-white shadow-sm' : 'bg-white text-slate-500 border border-slate-200'
+              periodo === val
+                ? 'bg-emerald-600 text-white shadow-sm'
+                : isDark
+                  ? 'bg-[#1e293b] text-slate-400 border border-white/[0.06]'
+                  : 'bg-white text-slate-500 border border-slate-200'
             }`}>
             {lbl}
           </button>
@@ -97,32 +103,32 @@ export default function DashboardFinanceiro() {
       {/* ── KPIs ──────────────────────────────────────────────── */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         <KpiCard titulo="Saldo em Aberto" valor={fmt(kpis.valor_total_aberto)}
-          icon={DollarSign} cor="text-emerald-600" hexCor="#10B981" />
+          icon={DollarSign} cor="text-emerald-600" hexCor="#10B981" isDark={isDark} />
         <KpiCard titulo="Pago no Período" valor={fmt(kpis.valor_pago_periodo)}
-          icon={CheckCircle2} cor="text-teal-600" hexCor="#14B8A6" />
+          icon={CheckCircle2} cor="text-teal-600" hexCor="#14B8A6" isDark={isDark} />
         <KpiCard titulo="Vence em 7 dias" valor={fmt(kpis.valor_a_vencer_7d)}
           icon={Clock} cor="text-amber-600" hexCor="#D97706"
-          subtitulo={`${kpis.cp_a_vencer} títulos`} />
+          subtitulo={`${kpis.cp_a_vencer} títulos`} isDark={isDark} />
         <KpiCard titulo="Vencidas" valor={kpis.cp_vencidas}
           icon={AlertTriangle} cor={kpis.cp_vencidas > 0 ? 'text-red-600' : 'text-slate-400'}
           hexCor={kpis.cp_vencidas > 0 ? '#DC2626' : '#94A3B8'}
-          subtitulo={kpis.cp_vencidas > 0 ? 'Atenção!' : 'Nenhuma'} />
+          subtitulo={kpis.cp_vencidas > 0 ? 'Atenção!' : 'Nenhuma'} isDark={isDark} />
       </div>
 
       {/* ── Status Pipeline ───────────────────────────────────── */}
       {porStatus.length > 0 && (
         <section>
-          <h2 className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-2 flex items-center gap-1.5">
+          <h2 className={`text-xs font-bold uppercase tracking-widest mb-2 flex items-center gap-1.5 ${isDark ? 'text-slate-500' : 'text-slate-500'}`}>
             <TrendingUp size={12} /> Por Status
           </h2>
           <div className="grid grid-cols-3 lg:grid-cols-5 gap-2">
             {porStatus.map(s => {
               const cfg = STATUS_LABEL[s.status]
               return (
-                <div key={s.status} className="bg-white rounded-xl p-3 border border-slate-200 shadow-sm">
-                  <StatusBadge status={s.status} />
-                  <p className="text-lg font-extrabold text-slate-800 mt-2">{s.total}</p>
-                  <p className="text-[10px] text-slate-400 mt-0.5">{fmt(s.valor)}</p>
+                <div key={s.status} className={`rounded-xl p-3 shadow-sm ${isDark ? 'bg-[#1e293b] border border-white/[0.06]' : 'bg-white border border-slate-200'}`}>
+                  <StatusBadge status={s.status} isDark={isDark} />
+                  <p className={`text-lg font-extrabold mt-2 ${isDark ? 'text-white' : 'text-slate-800'}`}>{s.total}</p>
+                  <p className={`text-[10px] mt-0.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{fmt(s.valor)}</p>
                 </div>
               )
             })}
@@ -134,9 +140,9 @@ export default function DashboardFinanceiro() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
 
         {/* Próximos vencimentos */}
-        <section className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-          <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between">
-            <h2 className="text-sm font-extrabold text-slate-800 flex items-center gap-1.5">
+        <section className={`rounded-2xl shadow-sm overflow-hidden ${isDark ? 'bg-[#1e293b] border border-white/[0.06]' : 'bg-white border border-slate-200'}`}>
+          <div className={`px-4 py-3 flex items-center justify-between ${isDark ? 'border-b border-white/[0.06]' : 'border-b border-slate-100'}`}>
+            <h2 className={`text-sm font-extrabold flex items-center gap-1.5 ${isDark ? 'text-white' : 'text-slate-800'}`}>
               <Clock size={14} className="text-amber-500" /> Próximos Vencimentos
             </h2>
             <button onClick={() => nav('/financeiro/cp')}
@@ -144,27 +150,27 @@ export default function DashboardFinanceiro() {
               Ver todos <ArrowRight size={10} />
             </button>
           </div>
-          <div className="divide-y divide-slate-50">
+          <div className={`divide-y ${isDark ? 'divide-white/[0.04]' : 'divide-slate-50'}`}>
             {proximos.length === 0 ? (
-              <p className="text-center text-slate-400 text-sm py-8">Nenhum vencimento próximo</p>
+              <p className={`text-center text-sm py-8 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Nenhum vencimento próximo</p>
             ) : (
               proximos.slice(0, 6).map((cp: ContaPagar) => {
                 const vencido = new Date(cp.data_vencimento) < new Date()
                 return (
-                  <div key={cp.id} className="flex items-center gap-3 px-4 py-3 hover:bg-slate-50 transition-colors">
+                  <div key={cp.id} className={`flex items-center gap-3 px-4 py-3 transition-colors ${isDark ? 'hover:bg-white/[0.03]' : 'hover:bg-slate-50'}`}>
                     <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold
-                      ${vencido ? 'bg-red-50 text-red-600' : 'bg-emerald-50 text-emerald-600'}`}>
+                      ${vencido ? 'bg-red-50 text-red-600' : isDark ? 'bg-emerald-500/10 text-emerald-400' : 'bg-emerald-50 text-emerald-600'}`}>
                       {fmtData(cp.data_vencimento).split('/')[0]}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-semibold text-slate-700 truncate">{cp.fornecedor_nome}</p>
-                      <p className="text-[10px] text-slate-400">{cp.natureza ?? 'Geral'}</p>
+                      <p className={`text-sm font-semibold truncate ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>{cp.fornecedor_nome}</p>
+                      <p className={`text-[10px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{cp.natureza ?? 'Geral'}</p>
                     </div>
                     <div className="text-right shrink-0">
-                      <p className={`text-sm font-extrabold ${vencido ? 'text-red-600' : 'text-slate-700'}`}>
+                      <p className={`text-sm font-extrabold ${vencido ? 'text-red-600' : isDark ? 'text-slate-200' : 'text-slate-700'}`}>
                         {fmt(cp.valor_original)}
                       </p>
-                      <p className={`text-[10px] font-medium ${vencido ? 'text-red-500' : 'text-slate-400'}`}>
+                      <p className={`text-[10px] font-medium ${vencido ? 'text-red-500' : isDark ? 'text-slate-500' : 'text-slate-400'}`}>
                         {fmtData(cp.data_vencimento)}
                       </p>
                     </div>
@@ -176,15 +182,15 @@ export default function DashboardFinanceiro() {
         </section>
 
         {/* Por Centro de Custo */}
-        <section className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-          <div className="px-4 py-3 border-b border-slate-100">
-            <h2 className="text-sm font-extrabold text-slate-800 flex items-center gap-1.5">
+        <section className={`rounded-2xl shadow-sm overflow-hidden ${isDark ? 'bg-[#1e293b] border border-white/[0.06]' : 'bg-white border border-slate-200'}`}>
+          <div className={`px-4 py-3 ${isDark ? 'border-b border-white/[0.06]' : 'border-b border-slate-100'}`}>
+            <h2 className={`text-sm font-extrabold flex items-center gap-1.5 ${isDark ? 'text-white' : 'text-slate-800'}`}>
               <TrendingDown size={14} className="text-violet-500" /> Por Centro de Custo
             </h2>
           </div>
           <div className="px-4 py-3 space-y-3">
             {porCC.length === 0 ? (
-              <p className="text-center text-slate-400 text-sm py-6">Nenhum dado por CC</p>
+              <p className={`text-center text-sm py-6 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Nenhum dado por CC</p>
             ) : (
               porCC.slice(0, 6).map(cc => {
                 const maxVal = Math.max(...porCC.map(c => c.valor), 1)
@@ -193,14 +199,14 @@ export default function DashboardFinanceiro() {
                 return (
                   <div key={cc.centro_custo}>
                     <div className="flex justify-between mb-1">
-                      <span className="text-xs font-bold text-slate-700">{cc.centro_custo}</span>
-                      <span className="text-xs font-semibold text-slate-500">{fmt(cc.valor)}</span>
+                      <span className={`text-xs font-bold ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>{cc.centro_custo}</span>
+                      <span className={`text-xs font-semibold ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{fmt(cc.valor)}</span>
                     </div>
-                    <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
+                    <div className={`h-2 rounded-full overflow-hidden ${isDark ? 'bg-white/[0.06]' : 'bg-slate-100'}`}>
                       <div className="h-full rounded-full bg-gradient-to-r from-emerald-500 to-teal-400 transition-all duration-500"
                         style={{ width: `${pct}%` }} />
                     </div>
-                    <p className="text-[10px] text-slate-400 mt-0.5">{pctPago}% pago · {cc.total} títulos</p>
+                    <p className={`text-[10px] mt-0.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{pctPago}% pago · {cc.total} títulos</p>
                   </div>
                 )
               })
@@ -212,7 +218,7 @@ export default function DashboardFinanceiro() {
       {/* ── Lançamentos Recentes ──────────────────────────────── */}
       <section>
         <div className="flex items-center justify-between mb-2">
-          <h2 className="text-xs font-bold text-slate-500 uppercase tracking-widest">Recentes</h2>
+          <h2 className={`text-xs font-bold uppercase tracking-widest ${isDark ? 'text-slate-500' : 'text-slate-500'}`}>Recentes</h2>
           <button onClick={() => nav('/financeiro/cp')}
             className="text-[10px] text-emerald-600 font-semibold flex items-center gap-0.5">
             Ver todos <ArrowRight size={10} />
@@ -220,23 +226,22 @@ export default function DashboardFinanceiro() {
         </div>
         <div className="space-y-2">
           {recentes.length === 0 ? (
-            <p className="text-center text-slate-400 text-sm py-6">Nenhum lançamento registrado</p>
+            <p className={`text-center text-sm py-6 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Nenhum lançamento registrado</p>
           ) : (
             recentes.slice(0, 6).map((cp: ContaPagar) => (
-              <div key={cp.id} className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4
-                flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-emerald-50 flex items-center justify-center shrink-0">
+              <div key={cp.id} className={`rounded-2xl shadow-sm p-4 flex items-center gap-3 ${isDark ? 'bg-[#1e293b] border border-white/[0.06]' : 'bg-white border border-slate-200'}`}>
+                <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${isDark ? 'bg-emerald-500/10' : 'bg-emerald-50'}`}>
                   <Receipt size={16} className="text-emerald-600" />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-semibold text-slate-800 truncate">{cp.fornecedor_nome}</p>
-                  <p className="text-[10px] text-slate-400 mt-0.5">
+                  <p className={`text-sm font-semibold truncate ${isDark ? 'text-white' : 'text-slate-800'}`}>{cp.fornecedor_nome}</p>
+                  <p className={`text-[10px] mt-0.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
                     {cp.centro_custo ?? '—'} · Venc. {fmtData(cp.data_vencimento)}
                   </p>
                 </div>
                 <div className="text-right shrink-0">
                   <p className="text-sm font-extrabold text-emerald-600">{fmt(cp.valor_original)}</p>
-                  <StatusBadge status={cp.status} />
+                  <StatusBadge status={cp.status} isDark={isDark} />
                 </div>
               </div>
             ))
@@ -248,12 +253,12 @@ export default function DashboardFinanceiro() {
 }
 
 // ── KPI Card ─────────────────────────────────────────────────────────────────
-function KpiCard({ titulo, valor, icon: Icon, cor, hexCor, subtitulo }: {
+function KpiCard({ titulo, valor, icon: Icon, cor, hexCor, subtitulo, isDark }: {
   titulo: string; valor: number | string; icon: typeof DollarSign;
-  cor: string; hexCor: string; subtitulo?: string
+  cor: string; hexCor: string; subtitulo?: string; isDark?: boolean
 }) {
   return (
-    <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden flex">
+    <div className={`rounded-2xl shadow-sm overflow-hidden flex ${isDark ? 'bg-[#1e293b] border border-white/[0.06]' : 'bg-white border border-slate-200'}`}>
       <div className="w-[3px] shrink-0" style={{ backgroundColor: hexCor }} />
       <div className="p-4 flex-1 min-w-0">
         <div className="w-8 h-8 rounded-xl flex items-center justify-center mb-2"
@@ -261,8 +266,8 @@ function KpiCard({ titulo, valor, icon: Icon, cor, hexCor, subtitulo }: {
           <Icon size={14} className={cor} />
         </div>
         <p className={`text-xl font-extrabold ${cor} leading-none`}>{valor}</p>
-        <p className="text-[10px] text-slate-400 font-semibold mt-1 uppercase tracking-widest">{titulo}</p>
-        {subtitulo && <p className="text-[10px] text-slate-400 mt-0.5">{subtitulo}</p>}
+        <p className={`text-[10px] font-semibold mt-1 uppercase tracking-widest ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{titulo}</p>
+        {subtitulo && <p className={`text-[10px] mt-0.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{subtitulo}</p>}
       </div>
     </div>
   )

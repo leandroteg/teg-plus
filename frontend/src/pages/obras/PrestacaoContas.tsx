@@ -90,16 +90,16 @@ export default function PrestacaoContas() {
       {/* Summary Cards */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {[
-          { label: 'Total Geral', val: BRL(totalGeral), accent: 'slate' },
-          { label: 'Pendente / Em Analise', val: BRL(totalPendente), accent: 'amber' },
-          { label: 'Aprovadas', val: BRL(totalAprovada), accent: 'emerald' },
-          { label: 'Rejeitadas', val: BRL(totalRejeitada), accent: 'red' },
+          { label: 'Total Geral', val: BRL(totalGeral), border: 'border-l-slate-500' },
+          { label: 'Pendente / Em Analise', val: BRL(totalPendente), border: 'border-l-amber-500' },
+          { label: 'Aprovadas', val: BRL(totalAprovada), border: 'border-l-emerald-500' },
+          { label: 'Rejeitadas', val: BRL(totalRejeitada), border: 'border-l-red-500' },
         ].map(card => (
           <div
             key={card.label}
-            className={`rounded-2xl border p-4 border-l-4 ${isLight
-              ? `bg-white border-slate-200 shadow-sm border-l-${card.accent}-500`
-              : `bg-white/[0.03] border-white/[0.06] border-l-${card.accent}-500`
+            className={`rounded-2xl border p-4 border-l-4 ${card.border} ${isLight
+              ? 'bg-white border-slate-200 shadow-sm'
+              : 'bg-white/[0.03] border-white/[0.06]'
             }`}
           >
             <p className={`text-[10px] uppercase tracking-wider mb-1 ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>

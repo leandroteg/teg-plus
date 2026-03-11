@@ -1,6 +1,6 @@
 import {
   HardHat, ClipboardList, CloudSun, Wallet, Receipt,
-  Users, ArrowRight, Loader2,
+  Users, ArrowRight,
 } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { useTheme } from '../../contexts/ThemeContext'
@@ -17,6 +17,15 @@ const STATUS_APONTAMENTO: Record<string, { label: string; light: string; dark: s
   validado:   { label: 'Validado',   light: 'bg-emerald-100 text-emerald-700', dark: 'bg-emerald-500/15 text-emerald-300' },
 }
 
+// ── KPI accent map (static classes for Tailwind JIT) ─────────────────────────
+
+const ACCENT_MAP: Record<string, { iconBgLight: string; iconBgDark: string; iconText: string }> = {
+  blue:   { iconBgLight: 'bg-blue-50',   iconBgDark: 'bg-blue-500/10',   iconText: 'text-blue-500' },
+  amber:  { iconBgLight: 'bg-amber-50',  iconBgDark: 'bg-amber-500/10',  iconText: 'text-amber-500' },
+  violet: { iconBgLight: 'bg-violet-50', iconBgDark: 'bg-violet-500/10', iconText: 'text-violet-500' },
+  rose:   { iconBgLight: 'bg-rose-50',   iconBgDark: 'bg-rose-500/10',   iconText: 'text-rose-500' },
+}
+
 // ── KPI Card ─────────────────────────────────────────────────────────────────
 
 function KpiCard({
@@ -29,6 +38,7 @@ function KpiCard({
   accent: string
   isLight: boolean
 }) {
+  const a = ACCENT_MAP[accent] ?? ACCENT_MAP.blue
   return (
     <div className={`rounded-2xl border p-5 ${isLight
       ? 'bg-white border-slate-200 shadow-sm'
@@ -36,10 +46,10 @@ function KpiCard({
     }`}>
       <div className="flex items-center gap-3 mb-3">
         <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${isLight
-          ? `bg-${accent}-50`
-          : `bg-${accent}-500/10`
+          ? a.iconBgLight
+          : a.iconBgDark
         }`}>
-          <Icon size={18} className={`text-${accent}-500`} />
+          <Icon size={18} className={a.iconText} />
         </div>
         <p className={`text-xs font-semibold uppercase tracking-wider ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
           {label}
@@ -216,8 +226,7 @@ export default function ObrasHome() {
           <QuickLink to="/obras/rdo" label="RDO" desc="Relatorio diario de obra" icon={CloudSun} isLight={isLight} />
           <QuickLink to="/obras/adiantamentos" label="Adiantamentos" desc="Solicitacoes e prestacao de contas" icon={Wallet} isLight={isLight} />
           <QuickLink to="/obras/prestacao" label="Prestacao de Contas" desc="Despesas e reembolsos" icon={Receipt} isLight={isLight} />
-          <QuickLink to="/obras/equipes" label="Equipes" desc="Colaboradores por obra e frente" icon={Users} isLight={isLight} />
-          <QuickLink to="/obras/mobilizacoes" label="Mobilizacoes" desc="Mobilizacao e desmobilizacao" icon={HardHat} isLight={isLight} />
+          <QuickLink to="/obras/equipe" label="Equipes" desc="Colaboradores por obra e frente" icon={Users} isLight={isLight} />
         </div>
       </div>
     </div>

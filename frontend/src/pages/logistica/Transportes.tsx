@@ -7,6 +7,7 @@ import {
   useTransportes, useRegistrarOcorrencia, useResolverOcorrencia,
   useConfirmarEntregaFisica,
 } from '../../hooks/useLogistica'
+import { useTheme } from '../../contexts/ThemeContext'
 import { StatusBadge } from './LogisticaHome'
 import type { TipoOcorrencia } from '../../types/logistica'
 
@@ -28,6 +29,7 @@ const fmtDataHora = (d?: string) =>
   d ? new Date(d).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '—'
 
 export default function Transportes() {
+  const { isDark } = useTheme()
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const [ocorrenciaModal, setOcorrenciaModal] = useState<{ transporte_id: string; solicitacao_id: string } | null>(null)
   const [ocForm, setOcForm] = useState<{ tipo: TipoOcorrencia; descricao: string; localizacao?: string }>({
@@ -61,8 +63,8 @@ export default function Transportes() {
 
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-extrabold text-slate-800">Transportes em Trânsito</h1>
-          <p className="text-xs text-slate-400 mt-0.5">{transportes.length} transporte(s) ativo(s)</p>
+          <h1 className={`text-xl font-extrabold ${isDark ? 'text-white' : 'text-navy'}`}>Transportes em Trânsito</h1>
+          <p className={`text-xs mt-0.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{transportes.length} transporte(s) ativo(s)</p>
         </div>
       </div>
 
@@ -71,10 +73,10 @@ export default function Transportes() {
           <div className="w-8 h-8 border-[3px] border-orange-500 border-t-transparent rounded-full animate-spin" />
         </div>
       ) : transportes.length === 0 ? (
-        <div className="bg-white rounded-2xl border border-slate-200 p-12 text-center">
-          <Truck size={40} className="text-slate-200 mx-auto mb-3" />
-          <p className="text-slate-500 font-semibold">Nenhum transporte em trânsito</p>
-          <p className="text-slate-400 text-sm mt-1">Quando uma carga for despachada, ela aparecerá aqui</p>
+        <div className={`rounded-2xl p-12 text-center ${isDark ? 'bg-[#1e293b] border border-white/[0.06]' : 'bg-white border border-slate-200'}`}>
+          <Truck size={40} className={`mx-auto mb-3 ${isDark ? 'text-slate-600' : 'text-slate-200'}`} />
+          <p className={`font-semibold ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Nenhum transporte em trânsito</p>
+          <p className={`text-sm mt-1 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Quando uma carga for despachada, ela aparecerá aqui</p>
         </div>
       ) : (
         <div className="space-y-3">
@@ -86,9 +88,9 @@ export default function Transportes() {
             const atrasado = t.eta_atual && new Date(t.eta_atual) < new Date()
 
             return (
-              <div key={t.id} className={`bg-white rounded-2xl border shadow-sm overflow-hidden ${ocAberta.length > 0 ? 'border-red-200' : atrasado ? 'border-amber-200' : 'border-slate-200'}`}>
+              <div key={t.id} className={`rounded-2xl border shadow-sm overflow-hidden ${isDark ? `bg-[#1e293b] ${ocAberta.length > 0 ? 'border-red-500/30' : atrasado ? 'border-amber-500/30' : 'border-white/[0.06]'}` : `bg-white ${ocAberta.length > 0 ? 'border-red-200' : atrasado ? 'border-amber-200' : 'border-slate-200'}`}`}>
                 <div
-                  className="flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-slate-50"
+                  className={`flex items-center gap-3 px-4 py-3 cursor-pointer ${isDark ? 'hover:bg-white/[0.03]' : 'hover:bg-slate-50'}`}
                   onClick={() => setExpandedId(isExp ? null : t.id)}
                 >
                   <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${ocAberta.length > 0 ? 'bg-red-50' : 'bg-orange-50'}`}>
@@ -99,7 +101,7 @@ export default function Transportes() {
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
-                      <p className="text-sm font-extrabold text-slate-800 font-mono">{s?.numero}</p>
+                      <p className={`text-sm font-extrabold font-mono ${isDark ? 'text-white' : 'text-slate-800'}`}>{s?.numero}</p>
                       {s?.urgente && <span className="text-[9px] bg-red-100 text-red-700 font-bold px-1.5 py-0.5 rounded-full">URGENTE</span>}
                       {ocAberta.length > 0 && (
                         <span className="text-[9px] bg-red-100 text-red-700 font-bold px-1.5 py-0.5 rounded-full">
@@ -110,14 +112,14 @@ export default function Transportes() {
                         <span className="text-[9px] bg-amber-100 text-amber-700 font-bold px-1.5 py-0.5 rounded-full">ATRASADO</span>
                       )}
                     </div>
-                    <p className="text-[10px] text-slate-400">
+                    <p className={`text-[10px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
                       {s?.origem} → {s?.destino}
                       {s?.obra_nome ? ` · ${s?.obra_nome}` : ''}
                     </p>
                   </div>
                   <div className="text-right shrink-0 mr-2 hidden sm:block">
-                    <p className="text-xs font-semibold text-slate-700">{t.motorista_nome ?? '—'}</p>
-                    <p className="text-[10px] text-slate-400">{t.placa ?? '—'}</p>
+                    <p className={`text-xs font-semibold ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>{t.motorista_nome ?? '—'}</p>
+                    <p className={`text-[10px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{t.placa ?? '—'}</p>
                     {t.eta_atual && (
                       <p className={`text-[10px] font-semibold ${atrasado ? 'text-red-500' : 'text-slate-400'}`}>
                         ETA: {fmtDataHora(t.eta_atual)}
@@ -128,7 +130,7 @@ export default function Transportes() {
                 </div>
 
                 {isExp && (
-                  <div className="border-t border-slate-100 px-4 py-4 space-y-4">
+                  <div className={`px-4 py-4 space-y-4 ${isDark ? 'border-t border-white/[0.06]' : 'border-t border-slate-100'}`}>
                     {/* Info do transporte */}
                     <div className="grid grid-cols-3 gap-3">
                       <Detail label="Saída" value={fmtDataHora(t.hora_saida)} />
@@ -209,9 +211,9 @@ export default function Transportes() {
       {/* ── Modal Ocorrência ───────────────────────────────────── */}
       {ocorrenciaModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
-              <h2 className="text-lg font-extrabold text-slate-800">Registrar Ocorrência</h2>
+          <div className={`rounded-2xl shadow-2xl w-full max-w-md ${isDark ? 'bg-[#1e293b]' : 'bg-white'}`}>
+            <div className={`flex items-center justify-between px-6 py-4 ${isDark ? 'border-b border-white/[0.06]' : 'border-b border-slate-100'}`}>
+              <h2 className={`text-lg font-extrabold ${isDark ? 'text-white' : 'text-slate-800'}`}>Registrar Ocorrência</h2>
               <button onClick={() => setOcorrenciaModal(null)}
                 className="w-8 h-8 rounded-lg hover:bg-slate-100 flex items-center justify-center">
                 <X size={16} />
@@ -257,13 +259,13 @@ export default function Transportes() {
       {/* ── Modal Confirmar Entrega ────────────────────────────── */}
       {entregaModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm">
+          <div className={`rounded-2xl shadow-2xl w-full max-w-sm ${isDark ? 'bg-[#1e293b]' : 'bg-white'}`}>
             <div className="px-6 py-5 text-center">
-              <div className="w-14 h-14 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-3">
+              <div className={`w-14 h-14 rounded-full flex items-center justify-center mx-auto mb-3 ${isDark ? 'bg-emerald-500/20' : 'bg-emerald-100'}`}>
                 <CheckCircle2 size={24} className="text-emerald-600" />
               </div>
-              <h2 className="text-lg font-extrabold text-slate-800 mb-2">Confirmar Entrega Física</h2>
-              <p className="text-sm text-slate-500">
+              <h2 className={`text-lg font-extrabold mb-2 ${isDark ? 'text-white' : 'text-slate-800'}`}>Confirmar Entrega Física</h2>
+              <p className={`text-sm ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
                 Confirmar que a carga <strong>{entregaModal.numero}</strong> foi entregue fisicamente no destino.
                 O destinatário deverá confirmar o recebimento via checklist.
               </p>
@@ -288,10 +290,11 @@ export default function Transportes() {
 }
 
 function Detail({ label, value }: { label: string; value: string }) {
+  const { isDark } = useTheme()
   return (
-    <div className="bg-slate-50 rounded-lg px-3 py-2">
-      <p className="text-[9px] text-slate-400 uppercase tracking-wider">{label}</p>
-      <p className="text-xs font-semibold text-slate-700 mt-0.5">{value}</p>
+    <div className={`rounded-lg px-3 py-2 ${isDark ? 'bg-white/5' : 'bg-slate-50'}`}>
+      <p className={`text-[9px] uppercase tracking-wider ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{label}</p>
+      <p className={`text-xs font-semibold mt-0.5 ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>{value}</p>
     </div>
   )
 }

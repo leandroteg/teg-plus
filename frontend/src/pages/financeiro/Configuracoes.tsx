@@ -3,6 +3,7 @@ import {
   Settings, Key, Link, RefreshCw, CheckCircle2, XCircle,
   Eye, EyeOff, Save, Zap, AlertTriangle, Clock,
 } from 'lucide-react'
+import { useTheme } from '../../contexts/ThemeContext'
 import { useAuth } from '../../contexts/AuthContext'
 import {
   useOmieConfig,
@@ -31,9 +32,10 @@ interface SyncRowProps {
   webhookUrl: string
   log: OmieSyncLog | null | undefined
   isLoadingLog: boolean
+  isDark: boolean
 }
 
-function SyncRow({ label, dominio, webhookUrl, log, isLoadingLog }: SyncRowProps) {
+function SyncRow({ label, dominio, webhookUrl, log, isLoadingLog, isDark }: SyncRowProps) {
   const trigger = useTriggerSync(dominio)
 
   function handleSync() {
@@ -45,15 +47,15 @@ function SyncRow({ label, dominio, webhookUrl, log, isLoadingLog }: SyncRowProps
   const isPending = trigger.isPending || status === 'running'
 
   return (
-    <div className="flex items-center gap-3 py-3 border-b border-slate-100 last:border-0">
+    <div className={`flex items-center gap-3 py-3 border-b last:border-0 ${isDark ? 'border-white/[0.04]' : 'border-slate-100'}`}>
       {/* Domain name */}
       <div className="w-36 shrink-0">
-        <p className="text-sm font-semibold text-slate-700">{label}</p>
+        <p className={`text-sm font-semibold ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>{label}</p>
       </div>
 
       {/* Last sync */}
       <div className="flex-1 min-w-0">
-        <p className="text-xs text-slate-500 flex items-center gap-1">
+        <p className={`text-xs flex items-center gap-1 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
           <Clock size={10} className="shrink-0" />
           {isLoadingLog ? '...' : fmtDate(log?.executado_em)}
         </p>
@@ -61,7 +63,7 @@ function SyncRow({ label, dominio, webhookUrl, log, isLoadingLog }: SyncRowProps
 
       {/* Records */}
       <div className="w-20 text-center">
-        <p className="text-xs font-mono text-slate-600">
+        <p className={`text-xs font-mono ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
           {log?.registros != null ? log.registros.toLocaleString('pt-BR') : '–'}
         </p>
         <p className="text-[9px] text-slate-400">registros</p>
@@ -126,7 +128,7 @@ const SYNC_DOMAINS = [
 
 // ── SyncSection ───────────────────────────────────────────────────────────────
 
-function SyncSection({ webhookUrl }: { webhookUrl: string }) {
+function SyncSection({ webhookUrl, isDark }: { webhookUrl: string; isDark: boolean }) {
   const fornLog  = useLastSync('fornecedores')
   const pagarLog = useLastSync('contas_pagar')
   const receberLog = useLastSync('contas_receber')
@@ -134,10 +136,10 @@ function SyncSection({ webhookUrl }: { webhookUrl: string }) {
   const logs = [fornLog, pagarLog, receberLog]
 
   return (
-    <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-      <div className="px-5 py-4 border-b border-slate-100 flex items-center gap-2">
+    <div className={`rounded-2xl border shadow-sm overflow-hidden ${isDark ? 'bg-[#1e293b] border-white/[0.06]' : 'bg-white border-slate-200'}`}>
+      <div className={`px-5 py-4 border-b flex items-center gap-2 ${isDark ? 'border-white/[0.06]' : 'border-slate-100'}`}>
         <RefreshCw size={16} className="text-emerald-600" />
-        <h2 className="text-sm font-extrabold text-slate-800">Sincronização</h2>
+        <h2 className={`text-sm font-extrabold ${isDark ? 'text-white' : 'text-slate-800'}`}>Sincronização</h2>
       </div>
 
       <div className="px-5">
@@ -149,13 +151,14 @@ function SyncSection({ webhookUrl }: { webhookUrl: string }) {
             webhookUrl={webhookUrl}
             log={logs[idx].data}
             isLoadingLog={logs[idx].isLoading}
+            isDark={isDark}
           />
         ))}
       </div>
 
       {!webhookUrl && (
-        <div className="mx-5 mb-4 mt-1 flex items-center gap-2 bg-amber-50 border border-amber-200
-          rounded-xl px-3 py-2">
+        <div className={`mx-5 mb-4 mt-1 flex items-center gap-2 border rounded-xl px-3 py-2
+          ${isDark ? 'bg-amber-500/10 border-amber-500/20' : 'bg-amber-50 border-amber-200'}`}>
           <AlertTriangle size={13} className="text-amber-500 shrink-0" />
           <p className="text-[11px] text-amber-700">
             Configure a URL do webhook n8n para habilitar a sincronização.
@@ -169,6 +172,7 @@ function SyncSection({ webhookUrl }: { webhookUrl: string }) {
 // ── Main Page ─────────────────────────────────────────────────────────────────
 
 export default function Configuracoes() {
+  const { isDark } = useTheme()
   const { isAdmin } = useAuth()
   const { data: config, isLoading: isLoadingConfig } = useOmieConfig()
   const saveConfig     = useSaveOmieConfig()
@@ -236,17 +240,17 @@ export default function Configuracoes() {
 
       {/* ── Header ──────────────────────────────────────────── */}
       <div>
-        <h1 className="text-xl font-extrabold text-slate-800 flex items-center gap-2">
+        <h1 className={`text-xl font-extrabold flex items-center gap-2 ${isDark ? 'text-white' : 'text-slate-800'}`}>
           <Settings size={20} className="text-emerald-600" />
           Configurações
         </h1>
-        <p className="text-xs text-slate-400 mt-0.5">Integração Omie e automações n8n</p>
+        <p className={`text-xs mt-0.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Integração Omie e automações n8n</p>
       </div>
 
       {/* ── Access restriction ─────────────────────────────── */}
       {!isAdmin && (
-        <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-amber-100 flex items-center justify-center shrink-0">
+        <div className={`border rounded-2xl p-4 flex items-center gap-3 ${isDark ? 'bg-amber-500/10 border-amber-500/20' : 'bg-amber-50 border-amber-200'}`}>
+          <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${isDark ? 'bg-amber-500/20' : 'bg-amber-100'}`}>
             <AlertTriangle size={18} className="text-amber-500" />
           </div>
           <div>
@@ -259,10 +263,10 @@ export default function Configuracoes() {
       )}
 
       {/* ── Section 1: Integração Omie ─────────────────────── */}
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-        <div className="px-5 py-4 border-b border-slate-100 flex items-center gap-2">
+      <div className={`rounded-2xl border shadow-sm overflow-hidden ${isDark ? 'bg-[#1e293b] border-white/[0.06]' : 'bg-white border-slate-200'}`}>
+        <div className={`px-5 py-4 border-b flex items-center gap-2 ${isDark ? 'border-white/[0.06]' : 'border-slate-100'}`}>
           <Key size={16} className="text-emerald-600" />
-          <h2 className="text-sm font-extrabold text-slate-800">Integração Omie</h2>
+          <h2 className={`text-sm font-extrabold ${isDark ? 'text-white' : 'text-slate-800'}`}>Integração Omie</h2>
         </div>
 
         {isLoadingConfig ? (
@@ -273,10 +277,10 @@ export default function Configuracoes() {
           <div className="px-5 py-5 space-y-4">
 
             {/* Enabled toggle */}
-            <div className="flex items-center justify-between p-3 rounded-xl bg-slate-50 border border-slate-200">
+            <div className={`flex items-center justify-between p-3 rounded-xl border ${isDark ? 'bg-white/[0.02] border-white/[0.06]' : 'bg-slate-50 border-slate-200'}`}>
               <div>
-                <p className="text-sm font-semibold text-slate-700">Integração habilitada</p>
-                <p className="text-xs text-slate-400">Ativa a sincronização automática com o Omie</p>
+                <p className={`text-sm font-semibold ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>Integração habilitada</p>
+                <p className={`text-xs ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Ativa a sincronização automática com o Omie</p>
               </div>
               <button
                 disabled={!isAdmin}
@@ -293,7 +297,7 @@ export default function Configuracoes() {
 
             {/* App Key */}
             <div>
-              <label className="block text-xs font-semibold text-slate-600 mb-1.5">
+              <label className={`block text-xs font-semibold mb-1.5 ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>
                 App Key (omie_app_key)
               </label>
               <div className="relative">
@@ -303,10 +307,10 @@ export default function Configuracoes() {
                   onChange={e => handleChange('omie_app_key', e.target.value)}
                   disabled={!isAdmin}
                   placeholder="Cole a App Key do Omie..."
-                  className="w-full pr-10 px-3 py-2.5 rounded-xl border border-slate-200 bg-white
-                    text-sm text-slate-700 placeholder-slate-400 focus:outline-none font-mono
-                    focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-400
-                    disabled:bg-slate-50 disabled:text-slate-400 disabled:cursor-not-allowed"
+                  className={`w-full pr-10 px-3 py-2.5 rounded-xl border text-sm placeholder-slate-400
+                    focus:outline-none font-mono focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-400
+                    disabled:opacity-50 disabled:cursor-not-allowed
+                    ${isDark ? 'bg-white/[0.03] border-white/[0.06] text-slate-200' : 'border-slate-200 bg-white text-slate-700'}`}
                 />
                 <button
                   type="button"
@@ -319,7 +323,7 @@ export default function Configuracoes() {
 
             {/* App Secret */}
             <div>
-              <label className="block text-xs font-semibold text-slate-600 mb-1.5">
+              <label className={`block text-xs font-semibold mb-1.5 ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>
                 App Secret (omie_app_secret)
               </label>
               <div className="relative">
@@ -329,10 +333,10 @@ export default function Configuracoes() {
                   onChange={e => handleChange('omie_app_secret', e.target.value)}
                   disabled={!isAdmin}
                   placeholder="Cole o App Secret do Omie..."
-                  className="w-full pr-10 px-3 py-2.5 rounded-xl border border-slate-200 bg-white
-                    text-sm text-slate-700 placeholder-slate-400 focus:outline-none font-mono
-                    focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-400
-                    disabled:bg-slate-50 disabled:text-slate-400 disabled:cursor-not-allowed"
+                  className={`w-full pr-10 px-3 py-2.5 rounded-xl border text-sm placeholder-slate-400
+                    focus:outline-none font-mono focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-400
+                    disabled:opacity-50 disabled:cursor-not-allowed
+                    ${isDark ? 'bg-white/[0.03] border-white/[0.06] text-slate-200' : 'border-slate-200 bg-white text-slate-700'}`}
                 />
                 <button
                   type="button"
@@ -345,7 +349,7 @@ export default function Configuracoes() {
 
             {/* n8n Webhook URL */}
             <div>
-              <label className="block text-xs font-semibold text-slate-600 mb-1.5">
+              <label className={`block text-xs font-semibold mb-1.5 ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>
                 URL Base do Webhook n8n
               </label>
               <input
@@ -354,10 +358,10 @@ export default function Configuracoes() {
                 onChange={e => handleChange('n8n_webhook_url', e.target.value)}
                 disabled={!isAdmin}
                 placeholder="https://n8n.exemplo.com/webhook/..."
-                className="w-full px-3 py-2.5 rounded-xl border border-slate-200 bg-white
-                  text-sm text-slate-700 placeholder-slate-400 focus:outline-none
-                  focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-400
-                  disabled:bg-slate-50 disabled:text-slate-400 disabled:cursor-not-allowed"
+                className={`w-full px-3 py-2.5 rounded-xl border text-sm placeholder-slate-400
+                  focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-400
+                  disabled:opacity-50 disabled:cursor-not-allowed
+                  ${isDark ? 'bg-white/[0.03] border-white/[0.06] text-slate-200' : 'border-slate-200 bg-white text-slate-700'}`}
               />
             </div>
 
@@ -406,9 +410,9 @@ export default function Configuracoes() {
                 <button
                   onClick={handleTest}
                   disabled={testConnection.isPending || !form.n8n_webhook_url}
-                  className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-white border border-slate-200
-                    text-[11px] font-bold text-slate-600 hover:border-emerald-400 hover:text-emerald-600
-                    transition-all disabled:opacity-50 disabled:cursor-not-allowed">
+                  className={`flex items-center gap-1.5 px-4 py-2 rounded-xl border text-[11px] font-bold
+                    transition-all disabled:opacity-50 disabled:cursor-not-allowed
+                    ${isDark ? 'bg-[#1e293b] border-white/[0.06] text-slate-300 hover:border-emerald-400 hover:text-emerald-500' : 'bg-white border-slate-200 text-slate-600 hover:border-emerald-400 hover:text-emerald-600'}`}>
                   {testConnection.isPending
                     ? <RefreshCw size={12} className="animate-spin" />
                     : <Zap size={12} />
@@ -422,23 +426,23 @@ export default function Configuracoes() {
       </div>
 
       {/* ── Section 2: Sincronização ────────────────────────── */}
-      <SyncSection webhookUrl={form.n8n_webhook_url} />
+      <SyncSection webhookUrl={form.n8n_webhook_url} isDark={isDark} />
 
       {/* ── Section 3: Webhooks n8n ─────────────────────────── */}
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-        <div className="px-5 py-4 border-b border-slate-100 flex items-center gap-2">
+      <div className={`rounded-2xl border shadow-sm overflow-hidden ${isDark ? 'bg-[#1e293b] border-white/[0.06]' : 'bg-white border-slate-200'}`}>
+        <div className={`px-5 py-4 border-b flex items-center gap-2 ${isDark ? 'border-white/[0.06]' : 'border-slate-100'}`}>
           <Link size={16} className="text-emerald-600" />
-          <h2 className="text-sm font-extrabold text-slate-800">Webhooks n8n</h2>
+          <h2 className={`text-sm font-extrabold ${isDark ? 'text-white' : 'text-slate-800'}`}>Webhooks n8n</h2>
         </div>
 
         <div className="px-5 py-5 space-y-3">
           {!webhookBase ? (
-            <p className="text-xs text-slate-400 italic">
+            <p className={`text-xs italic ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
               Configure a URL base do webhook para ver os endpoints.
             </p>
           ) : (
             <>
-              <p className="text-xs text-slate-500 mb-3">
+              <p className={`text-xs mb-3 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
                 Endpoints gerados automaticamente a partir da URL base configurada:
               </p>
 
@@ -448,14 +452,14 @@ export default function Configuracoes() {
                 { label: 'Sync Contas a Pagar',     path: '/omie/sync/contas_pagar',      method: 'POST' },
                 { label: 'Sync Contas a Receber',   path: '/omie/sync/contas_receber',    method: 'POST' },
               ].map(({ label, path, method }) => (
-                <div key={path} className="rounded-xl bg-slate-50 border border-slate-200 px-3 py-2.5">
+                <div key={path} className={`rounded-xl border px-3 py-2.5 ${isDark ? 'bg-white/[0.02] border-white/[0.06]' : 'bg-slate-50 border-slate-200'}`}>
                   <div className="flex items-center gap-2 mb-1">
-                    <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 uppercase tracking-wide">
+                    <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wide ${isDark ? 'bg-emerald-500/20 text-emerald-400' : 'bg-emerald-100 text-emerald-700'}`}>
                       {method}
                     </span>
-                    <p className="text-[11px] font-semibold text-slate-600">{label}</p>
+                    <p className={`text-[11px] font-semibold ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>{label}</p>
                   </div>
-                  <p className="text-[11px] font-mono text-slate-500 break-all">
+                  <p className={`text-[11px] font-mono break-all ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
                     {webhookBase}{path}
                   </p>
                 </div>

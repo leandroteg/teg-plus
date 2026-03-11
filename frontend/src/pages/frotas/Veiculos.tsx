@@ -1,25 +1,26 @@
 import { useState } from 'react'
 import { Plus, Search, AlertTriangle, Car, Edit2 } from 'lucide-react'
 import { useVeiculos, useSalvarVeiculo } from '../../hooks/useFrotas'
+import { useTheme } from '../../contexts/ThemeContext'
 import type { FroVeiculo, StatusVeiculo, CategoriaVeiculo, CombustivelVeiculo, PropriedadeVeiculo } from '../../types/frotas'
 
 // ── Maps ──────────────────────────────────────────────────────────────────────
 const STATUS_CFG: Record<StatusVeiculo, { label: string; cls: string }> = {
-  disponivel:    { label: 'Disponível',   cls: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30' },
+  disponivel:    { label: 'Disponivel',   cls: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30' },
   em_uso:        { label: 'Em Uso',       cls: 'bg-sky-500/15 text-sky-300 border-sky-500/30' },
-  em_manutencao: { label: 'Manutenção',   cls: 'bg-amber-500/15 text-amber-300 border-amber-500/30' },
+  em_manutencao: { label: 'Manutencao',   cls: 'bg-amber-500/15 text-amber-300 border-amber-500/30' },
   bloqueado:     { label: 'Bloqueado',    cls: 'bg-red-500/15 text-red-300 border-red-500/30' },
   baixado:       { label: 'Baixado',      cls: 'bg-slate-500/10 text-slate-500 border-slate-500/20' },
 }
 
 const CATEGORIA_LABEL: Record<CategoriaVeiculo, string> = {
   passeio: 'Passeio', pickup: 'Pickup', van: 'Van', vuc: 'VUC',
-  truck: 'Truck', carreta: 'Carreta', moto: 'Moto', onibus: 'Ônibus',
+  truck: 'Truck', carreta: 'Carreta', moto: 'Moto', onibus: 'Onibus',
 }
 
 const COMBUSTIVEL_LABEL: Record<CombustivelVeiculo, string> = {
   flex: 'Flex', gasolina: 'Gasolina', diesel: 'Diesel',
-  etanol: 'Etanol', eletrico: 'Elétrico', gnv: 'GNV',
+  etanol: 'Etanol', eletrico: 'Eletrico', gnv: 'GNV',
 }
 
 // ── Doc expiry helper ──────────────────────────────────────────────────────────
@@ -37,9 +38,11 @@ function docStatus(dateStr?: string) {
 function VeiculoModal({
   inicial,
   onClose,
+  isLight,
 }: {
   inicial?: Partial<FroVeiculo>
   onClose: () => void
+  isLight: boolean
 }) {
   const salvar = useSalvarVeiculo()
   const [form, setForm] = useState<Partial<FroVeiculo>>({
@@ -57,8 +60,12 @@ function VeiculoModal({
     onClose()
   }
 
-  const inp = 'w-full px-3 py-2 rounded-xl bg-white/6 border border-white/10 text-sm text-white placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-rose-500/30 focus:border-rose-400/50'
-  const sel = inp + ' [&>option]:bg-slate-900'
+  const inp = `w-full px-3 py-2 rounded-xl text-sm placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-rose-500/30 ${
+    isLight
+      ? 'bg-slate-50 border border-slate-200 text-slate-800 focus:border-rose-400/50'
+      : 'bg-white/6 border border-white/10 text-white focus:border-rose-400/50'
+  }`
+  const sel = inp + (isLight ? '' : ' [&>option]:bg-slate-900')
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
@@ -66,7 +73,7 @@ function VeiculoModal({
         onSubmit={handleSubmit}
         className="glass-card rounded-2xl p-6 w-full max-w-2xl space-y-4 max-h-[90vh] overflow-y-auto styled-scrollbar"
       >
-        <h2 className="text-base font-bold text-white">{inicial?.id ? 'Editar' : 'Novo'} Veículo</h2>
+        <h2 className={`text-base font-bold ${isLight ? 'text-slate-800' : 'text-white'}`}>{inicial?.id ? 'Editar' : 'Novo'} Veiculo</h2>
 
         {/* Linha 1 */}
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
@@ -123,7 +130,7 @@ function VeiculoModal({
             </select>
           </div>
           <div>
-            <label className="text-[11px] text-slate-400">Combustível</label>
+            <label className="text-[11px] text-slate-400">Combustivel</label>
             <select className={sel} value={form.combustivel} onChange={e => set('combustivel', e.target.value as CombustivelVeiculo)}>
               {Object.entries(COMBUSTIVEL_LABEL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
             </select>
@@ -131,25 +138,25 @@ function VeiculoModal({
           <div>
             <label className="text-[11px] text-slate-400">Propriedade</label>
             <select className={sel} value={form.propriedade} onChange={e => set('propriedade', e.target.value as PropriedadeVeiculo)}>
-              <option value="propria">Própria</option>
+              <option value="propria">Propria</option>
               <option value="locada">Locada</option>
               <option value="cedida">Cedida</option>
             </select>
           </div>
         </div>
 
-        {/* Hodômetro */}
+        {/* Hodometro */}
         <div className="grid grid-cols-3 gap-3">
           <div>
-            <label className="text-[11px] text-slate-400">Hodômetro atual (km)</label>
+            <label className="text-[11px] text-slate-400">Hodometro atual (km)</label>
             <input type="number" className={inp} value={form.hodometro_atual} onChange={e => set('hodometro_atual', +e.target.value)} />
           </div>
           <div>
-            <label className="text-[11px] text-slate-400">Próxima prev. (km)</label>
+            <label className="text-[11px] text-slate-400">Proxima prev. (km)</label>
             <input type="number" className={inp} value={form.km_proxima_preventiva ?? ''} onChange={e => set('km_proxima_preventiva', +e.target.value)} placeholder="55000" />
           </div>
           <div>
-            <label className="text-[11px] text-slate-400">Próxima prev. (data)</label>
+            <label className="text-[11px] text-slate-400">Proxima prev. (data)</label>
             <input type="date" className={inp} value={form.data_proxima_preventiva ?? ''} onChange={e => set('data_proxima_preventiva', e.target.value)} />
           </div>
         </div>
@@ -165,22 +172,24 @@ function VeiculoModal({
             <input type="date" className={inp} value={form.vencimento_seguro ?? ''} onChange={e => set('vencimento_seguro', e.target.value)} />
           </div>
           <div>
-            <label className="text-[11px] text-slate-400">Venc. Tacógrafo</label>
+            <label className="text-[11px] text-slate-400">Venc. Tacografo</label>
             <input type="date" className={inp} value={form.vencimento_tacografo ?? ''} onChange={e => set('vencimento_tacografo', e.target.value)} />
           </div>
         </div>
 
         <div>
-          <label className="text-[11px] text-slate-400">Observações</label>
+          <label className="text-[11px] text-slate-400">Observacoes</label>
           <textarea className={inp + ' resize-none'} rows={2} value={form.observacoes ?? ''} onChange={e => set('observacoes', e.target.value)} />
         </div>
 
         <div className="flex gap-2 pt-2">
-          <button type="button" onClick={onClose} className="flex-1 py-2 rounded-xl border border-white/10 text-sm text-slate-400 hover:bg-white/5">
+          <button type="button" onClick={onClose} className={`flex-1 py-2 rounded-xl border text-sm ${
+            isLight ? 'border-slate-200 text-slate-500 hover:bg-slate-50' : 'border-white/10 text-slate-400 hover:bg-white/5'
+          }`}>
             Cancelar
           </button>
           <button type="submit" disabled={salvar.isPending} className="flex-1 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-sm text-white font-semibold disabled:opacity-50">
-            {salvar.isPending ? 'Salvando…' : 'Salvar'}
+            {salvar.isPending ? 'Salvando...' : 'Salvar'}
           </button>
         </div>
       </form>
@@ -190,6 +199,7 @@ function VeiculoModal({
 
 // ── Main ──────────────────────────────────────────────────────────────────────
 export default function Veiculos() {
+  const { isLightSidebar: isLight } = useTheme()
   const [busca, setBusca]     = useState('')
   const [modal, setModal]     = useState<Partial<FroVeiculo> | null>(null)
   const { data: veiculos = [], isLoading } = useVeiculos()
@@ -209,16 +219,16 @@ export default function Veiculos() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-bold text-white flex items-center gap-2">
-            <Car size={20} className="text-rose-400" /> Veículos
+          <h1 className={`text-xl font-bold flex items-center gap-2 ${isLight ? 'text-slate-800' : 'text-white'}`}>
+            <Car size={20} className="text-rose-400" /> Veiculos
           </h1>
-          <p className="text-sm text-slate-500">{veiculos.length} veículo{veiculos.length !== 1 ? 's' : ''} cadastrado{veiculos.length !== 1 ? 's' : ''}</p>
+          <p className="text-sm text-slate-500">{veiculos.length} veiculo{veiculos.length !== 1 ? 's' : ''} cadastrado{veiculos.length !== 1 ? 's' : ''}</p>
         </div>
         <button
           onClick={() => setModal({})}
           className="flex items-center gap-2 px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-sm text-white font-semibold transition-colors"
         >
-          <Plus size={15} /> Novo Veículo
+          <Plus size={15} /> Novo Veiculo
         </button>
       </div>
 
@@ -226,8 +236,12 @@ export default function Veiculos() {
       <div className="relative max-w-xs">
         <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
         <input
-          className="w-full pl-9 pr-3 py-2 rounded-xl bg-white/6 border border-white/10 text-sm text-white placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-rose-500/30"
-          placeholder="Buscar placa, marca, modelo…"
+          className={`w-full pl-9 pr-3 py-2 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-rose-500/30 ${
+            isLight
+              ? 'bg-slate-50 border border-slate-200 text-slate-800 placeholder:text-slate-400'
+              : 'bg-white/6 border border-white/10 text-white placeholder:text-slate-600'
+          }`}
+          placeholder="Buscar placa, marca, modelo..."
           value={busca}
           onChange={e => setBusca(e.target.value)}
         />
@@ -241,7 +255,7 @@ export default function Veiculos() {
           ))}
         </div>
       ) : filtrados.length === 0 ? (
-        <p className="text-sm text-slate-500 text-center py-12">Nenhum veículo encontrado</p>
+        <p className="text-sm text-slate-500 text-center py-12">Nenhum veiculo encontrado</p>
       ) : (
         <div className="space-y-2">
           {filtrados.map(v => {
@@ -256,20 +270,20 @@ export default function Veiculos() {
 
                 {/* Placa */}
                 <div className="w-24 shrink-0">
-                  <p className="text-sm font-black text-white tracking-widest">{v.placa}</p>
+                  <p className={`text-sm font-black tracking-widest ${isLight ? 'text-slate-800' : 'text-white'}`}>{v.placa}</p>
                   <p className="text-[10px] text-slate-500">{CATEGORIA_LABEL[v.categoria]}</p>
                 </div>
 
                 {/* Modelo */}
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-semibold text-white truncate">{v.marca} {v.modelo}</p>
+                  <p className={`text-sm font-semibold truncate ${isLight ? 'text-slate-800' : 'text-white'}`}>{v.marca} {v.modelo}</p>
                   <p className="text-[11px] text-slate-500">{v.ano_fab}/{v.ano_mod} · {COMBUSTIVEL_LABEL[v.combustivel]}</p>
                 </div>
 
-                {/* Hodômetro */}
+                {/* Hodometro */}
                 <div className="hidden sm:block w-24 text-right">
-                  <p className="text-sm font-semibold text-white">{v.hodometro_atual.toLocaleString('pt-BR')} km</p>
-                  {warnPrev && <p className="text-[10px] text-amber-400">prev. próxima</p>}
+                  <p className={`text-sm font-semibold ${isLight ? 'text-slate-800' : 'text-white'}`}>{v.hodometro_atual.toLocaleString('pt-BR')} km</p>
+                  {warnPrev && <p className="text-[10px] text-amber-400">prev. proxima</p>}
                 </div>
 
                 {/* Alertas de documentos */}
@@ -308,7 +322,7 @@ export default function Veiculos() {
       )}
 
       {modal !== null && (
-        <VeiculoModal inicial={modal} onClose={() => setModal(null)} />
+        <VeiculoModal inicial={modal} onClose={() => setModal(null)} isLight={isLight} />
       )}
     </div>
   )

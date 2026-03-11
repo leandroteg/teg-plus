@@ -10,6 +10,7 @@ import {
 } from '../../hooks/useLogistica'
 import { gerarRomaneioPDF } from '../../utils/romaneio-pdf'
 import { StatusBadge } from './LogisticaHome'
+import { useTheme } from '../../contexts/ThemeContext'
 import type { IniciarTransportePayload, LogSolicitacao } from '../../types/logistica'
 
 // ── UF Detection ──────────────────────────────────────────────────────────────
@@ -40,6 +41,7 @@ function getDocLabel(uf: 'MG' | 'outro' | 'indefinido'): string {
 // ── Main Component ────────────────────────────────────────────────────────────
 
 export default function Expedicao() {
+  const { isDark } = useTheme()
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const [romaneioModal, setRomaneioModal] = useState<LogSolicitacao | null>(null)
   const [nfModal, setNfModal] = useState<LogSolicitacao | null>(null)
@@ -183,8 +185,8 @@ export default function Expedicao() {
       {/* ── Header ──────────────────────────────────────────────── */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-extrabold text-slate-800">Expedição</h1>
-          <p className="text-xs text-slate-400 mt-0.5">Checklist, documento fiscal e despacho de cargas</p>
+          <h1 className={`text-xl font-extrabold ${isDark ? 'text-white' : 'text-navy'}`}>Expedição</h1>
+          <p className={`text-xs mt-0.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Checklist, documento fiscal e despacho de cargas</p>
         </div>
       </div>
 
@@ -192,22 +194,22 @@ export default function Expedicao() {
       {!isLoading && counts.total > 0 && (
         <div className="flex flex-wrap gap-2">
           {counts.aprovado > 0 && (
-            <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold px-2.5 py-1 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-100">
+            <span className={`inline-flex items-center gap-1.5 text-[11px] font-semibold px-2.5 py-1 rounded-full ${isDark ? 'bg-indigo-500/10 text-indigo-400 border border-indigo-500/20' : 'bg-indigo-50 text-indigo-700 border border-indigo-100'}`}>
               <span className="w-1.5 h-1.5 rounded-full bg-indigo-400" />{counts.aprovado} aguardando doc fiscal
             </span>
           )}
           {counts.nfPendente > 0 && (
-            <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold px-2.5 py-1 rounded-full bg-amber-50 text-amber-700 border border-amber-100">
+            <span className={`inline-flex items-center gap-1.5 text-[11px] font-semibold px-2.5 py-1 rounded-full ${isDark ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20' : 'bg-amber-50 text-amber-700 border border-amber-100'}`}>
               <Clock size={10} />{counts.nfPendente} NF solicitada
             </span>
           )}
           {counts.romaneio > 0 && (
-            <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold px-2.5 py-1 rounded-full bg-teal-50 text-teal-700 border border-teal-100">
+            <span className={`inline-flex items-center gap-1.5 text-[11px] font-semibold px-2.5 py-1 rounded-full ${isDark ? 'bg-teal-500/10 text-teal-400 border border-teal-500/20' : 'bg-teal-50 text-teal-700 border border-teal-100'}`}>
               <ScrollText size={10} />{counts.romaneio} romaneio emitido
             </span>
           )}
           {counts.nfe > 0 && (
-            <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-100">
+            <span className={`inline-flex items-center gap-1.5 text-[11px] font-semibold px-2.5 py-1 rounded-full ${isDark ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-emerald-50 text-emerald-700 border border-emerald-100'}`}>
               <CheckCircle2 size={10} />{counts.nfe} NF-e emitida
             </span>
           )}
@@ -215,9 +217,9 @@ export default function Expedicao() {
       )}
 
       {/* ── Alert banner ───────────────────────────────────────── */}
-      <div className="bg-amber-50 border border-amber-200 rounded-2xl px-4 py-3 flex items-start gap-2.5">
-        <AlertTriangle size={16} className="text-amber-600 shrink-0 mt-0.5" />
-        <p className="text-xs text-amber-700 font-medium">
+      <div className={`rounded-2xl px-4 py-3 flex items-start gap-2.5 ${isDark ? 'bg-amber-500/10 border border-amber-500/20' : 'bg-amber-50 border border-amber-200'}`}>
+        <AlertTriangle size={16} className={`shrink-0 mt-0.5 ${isDark ? 'text-amber-400' : 'text-amber-600'}`} />
+        <p className={`text-xs font-medium ${isDark ? 'text-amber-400' : 'text-amber-700'}`}>
           <strong>Regra obrigatória:</strong> Nenhuma carga pode ser despachada sem documento fiscal (Romaneio para MG ou NF-e interestadual).
           O sistema bloqueia o despacho até o documento ser emitido.
         </p>
@@ -229,10 +231,10 @@ export default function Expedicao() {
           <div className="w-8 h-8 border-[3px] border-teal-500 border-t-transparent rounded-full animate-spin" />
         </div>
       ) : solicitacoes.length === 0 ? (
-        <div className="bg-white rounded-2xl border border-slate-200 p-12 text-center">
-          <Package2 size={40} className="text-slate-200 mx-auto mb-3" />
-          <p className="text-slate-500 font-semibold">Nenhuma solicitação aguardando expedição</p>
-          <p className="text-slate-400 text-sm mt-1">Solicitações aprovadas aparecerão aqui para emissão de documento fiscal e despacho</p>
+        <div className={`rounded-2xl p-12 text-center ${isDark ? 'bg-[#1e293b] border border-white/[0.06]' : 'bg-white border border-slate-200'}`}>
+          <Package2 size={40} className={`mx-auto mb-3 ${isDark ? 'text-slate-600' : 'text-slate-200'}`} />
+          <p className={`font-semibold ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Nenhuma solicitação aguardando expedição</p>
+          <p className={`text-sm mt-1 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Solicitações aprovadas aparecerão aqui para emissão de documento fiscal e despacho</p>
         </div>
       ) : (
         <div className="space-y-3">
@@ -240,10 +242,10 @@ export default function Expedicao() {
             const isExp = expandedId === s.id
             const docStatus = getDocStatus(s)
             return (
-              <div key={s.id} className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden transition-shadow hover:shadow-md">
+              <div key={s.id} className={`rounded-2xl shadow-sm overflow-hidden transition-shadow hover:shadow-md ${isDark ? 'bg-[#1e293b] border border-white/[0.06]' : 'bg-white border border-slate-200'}`}>
                 {/* ── Row header ── */}
                 <div
-                  className="flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-slate-50/60 transition-colors"
+                  className={`flex items-center gap-3 px-4 py-3 cursor-pointer transition-colors ${isDark ? 'hover:bg-white/[0.03]' : 'hover:bg-slate-50/60'}`}
                   onClick={() => setExpandedId(isExp ? null : s.id)}
                 >
                   <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 transition-colors ${docStatus.iconBg}`}>
@@ -251,14 +253,14 @@ export default function Expedicao() {
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <p className="text-sm font-extrabold text-slate-800 font-mono">{s.numero}</p>
+                      <p className={`text-sm font-extrabold font-mono ${isDark ? 'text-white' : 'text-slate-800'}`}>{s.numero}</p>
                       <StatusBadge status={s.status} />
                       {s.urgente && <span className="text-[9px] bg-red-100 text-red-700 font-bold px-1.5 py-0.5 rounded-full uppercase tracking-wider">Urgente</span>}
                       {docStatus.badge}
                     </div>
                     <div className="flex items-center gap-1 mt-0.5">
-                      <MapPin size={10} className="text-slate-300" />
-                      <p className="text-[10px] text-slate-400">{s.origem} → {s.destino}{s.obra_nome ? ` · ${s.obra_nome}` : ''}</p>
+                      <MapPin size={10} className={isDark ? 'text-slate-600' : 'text-slate-300'} />
+                      <p className={`text-[10px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{s.origem} → {s.destino}{s.obra_nome ? ` · ${s.obra_nome}` : ''}</p>
                     </div>
                   </div>
                   <div className="text-right shrink-0 mr-2">
@@ -295,33 +297,33 @@ export default function Expedicao() {
       {/* ═══════════════════════════════════════════════════════════════════════ */}
       {romaneioModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
+          <div className={`rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto ${isDark ? 'bg-[#1e293b]' : 'bg-white'}`}>
+            <div className={`flex items-center justify-between px-6 py-4 ${isDark ? 'border-b border-white/[0.06]' : 'border-b border-slate-100'}`}>
               <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-lg bg-teal-50 flex items-center justify-center">
+                <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${isDark ? 'bg-teal-500/10' : 'bg-teal-50'}`}>
                   <ScrollText size={16} className="text-teal-600" />
                 </div>
                 <div>
-                  <h2 className="text-lg font-extrabold text-slate-800">Emitir Romaneio</h2>
-                  <p className="text-[10px] text-slate-400">Documento de carga MG → MG</p>
+                  <h2 className={`text-lg font-extrabold ${isDark ? 'text-white' : 'text-slate-800'}`}>Emitir Romaneio</h2>
+                  <p className={`text-[10px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Documento de carga MG → MG</p>
                 </div>
               </div>
               <button onClick={() => setRomaneioModal(null)}
-                className="w-8 h-8 rounded-lg hover:bg-slate-100 flex items-center justify-center transition-colors">
+                className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors ${isDark ? 'hover:bg-white/10 text-slate-400' : 'hover:bg-slate-100'}`}>
                 <X size={16} />
               </button>
             </div>
             <div className="p-6 space-y-4">
               {/* Route info */}
-              <div className="bg-teal-50/60 border border-teal-100 rounded-xl px-4 py-3">
+              <div className={`rounded-xl px-4 py-3 ${isDark ? 'bg-teal-500/10 border border-teal-500/20' : 'bg-teal-50/60 border border-teal-100'}`}>
                 <div className="flex items-center gap-2 text-sm">
                   <MapPin size={14} className="text-teal-600" />
-                  <span className="font-bold text-teal-800">{romaneioModal.origem}</span>
+                  <span className={`font-bold ${isDark ? 'text-teal-400' : 'text-teal-800'}`}>{romaneioModal.origem}</span>
                   <span className="text-teal-400">→</span>
-                  <span className="font-bold text-teal-800">{romaneioModal.destino}</span>
+                  <span className={`font-bold ${isDark ? 'text-teal-400' : 'text-teal-800'}`}>{romaneioModal.destino}</span>
                 </div>
                 {romaneioModal.obra_nome && (
-                  <p className="text-[11px] text-teal-600 mt-1 ml-5">Obra: {romaneioModal.obra_nome}</p>
+                  <p className={`text-[11px] mt-1 ml-5 ${isDark ? 'text-teal-400' : 'text-teal-600'}`}>Obra: {romaneioModal.obra_nome}</p>
                 )}
               </div>
 
@@ -340,28 +342,28 @@ export default function Expedicao() {
 
               {/* Items list */}
               <div>
-                <p className="text-xs font-bold text-slate-600 mb-2 flex items-center gap-1.5">
+                <p className={`text-xs font-bold mb-2 flex items-center gap-1.5 ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
                   <ClipboardList size={12} />
                   Itens ({romaneioModal.itens?.length ?? 0})
                 </p>
                 {(romaneioModal.itens?.length ?? 0) > 0 ? (
-                  <div className="bg-slate-50 rounded-xl border border-slate-100 divide-y divide-slate-100 max-h-48 overflow-y-auto">
+                  <div className={`rounded-xl max-h-48 overflow-y-auto ${isDark ? 'bg-white/5 border border-white/[0.06] divide-y divide-white/[0.04]' : 'bg-slate-50 border border-slate-100 divide-y divide-slate-100'}`}>
                     {romaneioModal.itens!.map((item, i) => (
                       <div key={item.id ?? i} className="px-3 py-2 flex items-center justify-between text-xs">
                         <div className="flex-1 min-w-0">
-                          <p className="text-slate-700 font-medium truncate">{item.descricao}</p>
-                          {item.numero_serie && <p className="text-[9px] text-slate-400 font-mono">S/N: {item.numero_serie}</p>}
+                          <p className={`font-medium truncate ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>{item.descricao}</p>
+                          {item.numero_serie && <p className={`text-[9px] font-mono ${isDark ? 'text-slate-600' : 'text-slate-400'}`}>S/N: {item.numero_serie}</p>}
                         </div>
-                        <div className="text-right shrink-0 ml-3 text-slate-500">
+                        <div className={`text-right shrink-0 ml-3 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
                           {item.quantidade} {item.unidade}
-                          {item.peso_kg ? <span className="text-slate-400 ml-1">({item.peso_kg} kg)</span> : null}
+                          {item.peso_kg ? <span className={`ml-1 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>({item.peso_kg} kg)</span> : null}
                         </div>
                       </div>
                     ))}
                   </div>
                 ) : (
-                  <div className="bg-slate-50 rounded-xl border border-slate-100 px-4 py-6 text-center">
-                    <p className="text-xs text-slate-400">Nenhum item registrado na solicitação</p>
+                  <div className={`rounded-xl px-4 py-6 text-center ${isDark ? 'bg-white/5 border border-white/[0.06]' : 'bg-slate-50 border border-slate-100'}`}>
+                    <p className={`text-xs ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Nenhum item registrado na solicitação</p>
                   </div>
                 )}
               </div>
@@ -369,20 +371,20 @@ export default function Expedicao() {
               {/* Obs */}
               {romaneioModal.observacoes_carga && (
                 <div>
-                  <p className="text-xs font-bold text-slate-600 mb-1">Observações de Carga</p>
-                  <p className="text-xs text-slate-500 bg-slate-50 rounded-lg px-3 py-2 border border-slate-100">{romaneioModal.observacoes_carga}</p>
+                  <p className={`text-xs font-bold mb-1 ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>Observações de Carga</p>
+                  <p className={`text-xs rounded-lg px-3 py-2 ${isDark ? 'text-slate-400 bg-white/5 border border-white/[0.06]' : 'text-slate-500 bg-slate-50 border border-slate-100'}`}>{romaneioModal.observacoes_carga}</p>
                 </div>
               )}
 
-              <div className="bg-blue-50 border border-blue-200 rounded-xl px-3 py-2">
-                <p className="text-[10px] text-blue-700">
+              <div className={`rounded-xl px-3 py-2 ${isDark ? 'bg-blue-500/10 border border-blue-500/20' : 'bg-blue-50 border border-blue-200'}`}>
+                <p className={`text-[10px] ${isDark ? 'text-blue-400' : 'text-blue-700'}`}>
                   O romaneio será gerado como PDF e aberto em nova aba. A solicitação passará para status "Romaneio Emitido", liberando o despacho.
                 </p>
               </div>
             </div>
-            <div className="px-6 py-4 border-t border-slate-100 flex justify-end gap-2">
+            <div className={`px-6 py-4 flex justify-end gap-2 ${isDark ? 'border-t border-white/[0.06]' : 'border-t border-slate-100'}`}>
               <button onClick={() => setRomaneioModal(null)}
-                className="px-4 py-2 rounded-xl border border-slate-200 text-sm font-semibold text-slate-600 hover:bg-slate-50 transition-colors">
+                className={`px-4 py-2 rounded-xl text-sm font-semibold transition-colors ${isDark ? 'border border-white/[0.06] text-slate-400 hover:bg-white/5' : 'border border-slate-200 text-slate-600 hover:bg-slate-50'}`}>
                 Cancelar
               </button>
               <button onClick={handleGerarRomaneio}
@@ -402,39 +404,39 @@ export default function Expedicao() {
       {/* ═══════════════════════════════════════════════════════════════════════ */}
       {nfModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
+          <div className={`rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto ${isDark ? 'bg-[#1e293b]' : 'bg-white'}`}>
+            <div className={`flex items-center justify-between px-6 py-4 ${isDark ? 'border-b border-white/[0.06]' : 'border-b border-slate-100'}`}>
               <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-lg bg-violet-50 flex items-center justify-center">
+                <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${isDark ? 'bg-violet-500/10' : 'bg-violet-50'}`}>
                   <FileText size={16} className="text-violet-600" />
                 </div>
                 <div>
-                  <h2 className="text-lg font-extrabold text-slate-800">Solicitar NF</h2>
-                  <p className="text-[10px] text-slate-400">Enviar solicitação ao setor Fiscal</p>
+                  <h2 className={`text-lg font-extrabold ${isDark ? 'text-white' : 'text-slate-800'}`}>Solicitar NF</h2>
+                  <p className={`text-[10px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Enviar solicitação ao setor Fiscal</p>
                 </div>
               </div>
               <button onClick={() => setNfModal(null)}
-                className="w-8 h-8 rounded-lg hover:bg-slate-100 flex items-center justify-center transition-colors">
+                className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors ${isDark ? 'hover:bg-white/10 text-slate-400' : 'hover:bg-slate-100'}`}>
                 <X size={16} />
               </button>
             </div>
             <div className="p-6 space-y-4">
               {/* Route info */}
-              <div className="bg-violet-50/60 border border-violet-100 rounded-xl px-4 py-3">
+              <div className={`rounded-xl px-4 py-3 ${isDark ? 'bg-violet-500/10 border border-violet-500/20' : 'bg-violet-50/60 border border-violet-100'}`}>
                 <div className="flex items-center gap-2 text-sm">
                   <MapPin size={14} className="text-violet-600" />
-                  <span className="font-bold text-violet-800">{nfModal.origem}</span>
+                  <span className={`font-bold ${isDark ? 'text-violet-400' : 'text-violet-800'}`}>{nfModal.origem}</span>
                   <span className="text-violet-400">→</span>
-                  <span className="font-bold text-violet-800">{nfModal.destino}</span>
+                  <span className={`font-bold ${isDark ? 'text-violet-400' : 'text-violet-800'}`}>{nfModal.destino}</span>
                 </div>
-                <p className="text-[11px] text-violet-600 mt-1 ml-5">
+                <p className={`text-[11px] mt-1 ml-5 ${isDark ? 'text-violet-400' : 'text-violet-600'}`}>
                   {detectUF(nfModal.destino) === 'outro' ? 'Transporte interestadual — NF obrigatória' : 'NF solicitada manualmente'}
                 </p>
               </div>
 
               {/* Emitente */}
               <fieldset className="space-y-3">
-                <legend className="text-xs font-bold text-slate-600 mb-1">Emitente</legend>
+                <legend className={`text-xs font-bold mb-1 ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>Emitente</legend>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="block text-[10px] font-bold text-slate-500 mb-1">CNPJ Emitente *</label>
@@ -451,7 +453,7 @@ export default function Expedicao() {
 
               {/* Destinatario */}
               <fieldset className="space-y-3">
-                <legend className="text-xs font-bold text-slate-600 mb-1">Destinatário</legend>
+                <legend className={`text-xs font-bold mb-1 ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>Destinatário</legend>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="block text-[10px] font-bold text-slate-500 mb-1">CNPJ Destinatário</label>
@@ -501,12 +503,12 @@ export default function Expedicao() {
               {/* Items preview */}
               {(nfModal.itens?.length ?? 0) > 0 && (
                 <div>
-                  <p className="text-xs font-bold text-slate-600 mb-1.5 flex items-center gap-1.5">
+                  <p className={`text-xs font-bold mb-1.5 flex items-center gap-1.5 ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
                     <ClipboardList size={11} /> {nfModal.itens!.length} iten{nfModal.itens!.length > 1 ? 's' : ''} serão incluídos
                   </p>
-                  <div className="bg-slate-50 rounded-lg border border-slate-100 px-3 py-2 max-h-28 overflow-y-auto">
+                  <div className={`rounded-lg px-3 py-2 max-h-28 overflow-y-auto ${isDark ? 'bg-white/5 border border-white/[0.06]' : 'bg-slate-50 border border-slate-100'}`}>
                     {nfModal.itens!.map((it, i) => (
-                      <p key={it.id ?? i} className="text-[10px] text-slate-500 truncate">
+                      <p key={it.id ?? i} className={`text-[10px] truncate ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
                         {it.quantidade}x {it.descricao}
                       </p>
                     ))}
@@ -514,16 +516,16 @@ export default function Expedicao() {
                 </div>
               )}
 
-              <div className="bg-violet-50 border border-violet-200 rounded-xl px-3 py-2">
-                <p className="text-[10px] text-violet-700">
+              <div className={`rounded-xl px-3 py-2 ${isDark ? 'bg-violet-500/10 border border-violet-500/20' : 'bg-violet-50 border border-violet-200'}`}>
+                <p className={`text-[10px] ${isDark ? 'text-violet-400' : 'text-violet-700'}`}>
                   A solicitação será enviada ao setor Fiscal para emissão da NF-e.
                   Após a emissão pelo Fiscal, o despacho será liberado automaticamente.
                 </p>
               </div>
             </div>
-            <div className="px-6 py-4 border-t border-slate-100 flex justify-end gap-2">
+            <div className={`px-6 py-4 flex justify-end gap-2 ${isDark ? 'border-t border-white/[0.06]' : 'border-t border-slate-100'}`}>
               <button onClick={() => setNfModal(null)}
-                className="px-4 py-2 rounded-xl border border-slate-200 text-sm font-semibold text-slate-600 hover:bg-slate-50 transition-colors">
+                className={`px-4 py-2 rounded-xl text-sm font-semibold transition-colors ${isDark ? 'border border-white/[0.06] text-slate-400 hover:bg-white/5' : 'border border-slate-200 text-slate-600 hover:bg-slate-50'}`}>
                 Cancelar
               </button>
               <button onClick={handleSolicitarNF}
@@ -543,54 +545,54 @@ export default function Expedicao() {
       {/* ═══════════════════════════════════════════════════════════════════════ */}
       {despachoModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
+          <div className={`rounded-2xl shadow-2xl w-full max-w-md ${isDark ? 'bg-[#1e293b]' : 'bg-white'}`}>
+            <div className={`flex items-center justify-between px-6 py-4 ${isDark ? 'border-b border-white/[0.06]' : 'border-b border-slate-100'}`}>
               <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-lg bg-orange-50 flex items-center justify-center">
+                <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${isDark ? 'bg-orange-500/10' : 'bg-orange-50'}`}>
                   <Truck size={16} className="text-orange-600" />
                 </div>
-                <h2 className="text-lg font-extrabold text-slate-800">Despachar Carga</h2>
+                <h2 className={`text-lg font-extrabold ${isDark ? 'text-white' : 'text-slate-800'}`}>Despachar Carga</h2>
               </div>
               <button onClick={() => setDespachoModal(null)}
-                className="w-8 h-8 rounded-lg hover:bg-slate-100 flex items-center justify-center transition-colors">
+                className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors ${isDark ? 'hover:bg-white/10 text-slate-400' : 'hover:bg-slate-100'}`}>
                 <X size={16} />
               </button>
             </div>
             <div className="p-6 space-y-4">
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-bold text-slate-600 mb-1">Placa *</label>
+                  <label className={`block text-xs font-bold mb-1 ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>Placa *</label>
                   <input value={despachoForm.placa ?? ''} onChange={e => setDespachoForm(p => ({ ...p, placa: e.target.value }))}
                     className="input-base" placeholder="ABC-1234" />
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-slate-600 mb-1">Motorista *</label>
+                  <label className={`block text-xs font-bold mb-1 ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>Motorista *</label>
                   <input value={despachoForm.motorista_nome ?? ''} onChange={e => setDespachoForm(p => ({ ...p, motorista_nome: e.target.value }))}
                     className="input-base" placeholder="Nome do motorista" />
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-bold text-slate-600 mb-1">Tel. Motorista</label>
+                  <label className={`block text-xs font-bold mb-1 ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>Tel. Motorista</label>
                   <input value={despachoForm.motorista_telefone ?? ''} onChange={e => setDespachoForm(p => ({ ...p, motorista_telefone: e.target.value }))}
                     className="input-base" placeholder="(34) 99999-0000" />
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-slate-600 mb-1">ETA Previsto *</label>
+                  <label className={`block text-xs font-bold mb-1 ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>ETA Previsto *</label>
                   <input type="datetime-local" value={despachoForm.eta_original ?? ''}
                     onChange={e => setDespachoForm(p => ({ ...p, eta_original: e.target.value }))}
                     className="input-base" />
                 </div>
               </div>
               <div>
-                <label className="block text-xs font-bold text-slate-600 mb-1">Código Rastreio</label>
+                <label className={`block text-xs font-bold mb-1 ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>Código Rastreio</label>
                 <input value={despachoForm.codigo_rastreio ?? ''} onChange={e => setDespachoForm(p => ({ ...p, codigo_rastreio: e.target.value }))}
                   className="input-base" placeholder="Código da transportadora..." />
               </div>
             </div>
-            <div className="px-6 py-4 border-t border-slate-100 flex justify-end gap-2">
+            <div className={`px-6 py-4 flex justify-end gap-2 ${isDark ? 'border-t border-white/[0.06]' : 'border-t border-slate-100'}`}>
               <button onClick={() => setDespachoModal(null)}
-                className="px-4 py-2 rounded-xl border border-slate-200 text-sm font-semibold text-slate-600 hover:bg-slate-50 transition-colors">
+                className={`px-4 py-2 rounded-xl text-sm font-semibold transition-colors ${isDark ? 'border border-white/[0.06] text-slate-400 hover:bg-white/5' : 'border border-slate-200 text-slate-600 hover:bg-slate-50'}`}>
                 Cancelar
               </button>
               <button onClick={handleIniciarTransporte}
@@ -690,10 +692,11 @@ function getDocStatus(s: LogSolicitacao) {
 // ── Info field micro-component ──────────────────────────────────────────────
 
 function InfoField({ label, value }: { label: string; value?: string | null }) {
+  const { isDark } = useTheme()
   return (
     <div>
-      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{label}</p>
-      <p className="text-xs text-slate-700 font-medium mt-0.5">{value || 'N/A'}</p>
+      <p className={`text-[10px] font-bold uppercase tracking-wider ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{label}</p>
+      <p className={`text-xs font-medium mt-0.5 ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>{value || 'N/A'}</p>
     </div>
   )
 }
@@ -739,12 +742,14 @@ function ExpedicaoDetail({
     })
   }
 
+  const { isDark } = useTheme()
+
   return (
-    <div className="border-t border-slate-100 px-4 py-4 space-y-4">
+    <div className={`px-4 py-4 space-y-4 ${isDark ? 'border-t border-white/[0.06]' : 'border-t border-slate-100'}`}>
       {/* ── Checklist ── */}
       <div>
-        <p className="text-xs font-bold text-slate-600 mb-2 flex items-center gap-1.5">
-          <ClipboardList size={12} className="text-slate-400" />
+        <p className={`text-xs font-bold mb-2 flex items-center gap-1.5 ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
+          <ClipboardList size={12} className={isDark ? 'text-slate-500' : 'text-slate-400'} />
           Checklist de Expedição
         </p>
         <div className="space-y-1.5">
@@ -758,7 +763,7 @@ function ExpedicaoDetail({
                   onChange={e => toggle(key, e.target.checked)}
                   className="rounded border-slate-300 text-teal-600 focus:ring-teal-500 transition-colors"
                 />
-                <span className={`text-xs transition-colors ${checked ? 'text-emerald-700 line-through opacity-70' : 'text-slate-600 group-hover:text-slate-800'}`}>
+                <span className={`text-xs transition-colors ${checked ? (isDark ? 'text-emerald-400 line-through opacity-70' : 'text-emerald-700 line-through opacity-70') : (isDark ? 'text-slate-400 group-hover:text-slate-300' : 'text-slate-600 group-hover:text-slate-800')}`}>
                   {label}
                 </span>
               </label>

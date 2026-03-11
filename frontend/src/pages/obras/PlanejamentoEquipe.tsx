@@ -133,17 +133,20 @@ export default function PlanejamentoEquipe() {
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className={isLight ? 'bg-slate-50 text-slate-600' : 'bg-white/[0.02] text-slate-400'}>
-                  <th className="text-left font-semibold px-4 py-3">Nome</th>
-                  <th className="text-left font-semibold px-4 py-3">Funcao</th>
-                  <th className="text-left font-semibold px-4 py-3">Categoria</th>
-                  <th className="text-left font-semibold px-4 py-3">Obra</th>
-                  <th className="text-left font-semibold px-4 py-3">Periodo</th>
-                  <th className="text-left font-semibold px-4 py-3">Turno</th>
-                  <th className="text-right font-semibold px-4 py-3">H/dia</th>
-                  <th className="text-right font-semibold px-4 py-3">Custo/dia</th>
-                  <th className="text-left font-semibold px-4 py-3">Tarefa EGP</th>
-                  <th className="text-left font-semibold px-4 py-3">Status</th>
+                <tr className={`${isLight
+                  ? 'bg-slate-50 text-slate-600'
+                  : 'bg-white/[0.02] text-slate-400'
+                } text-xs font-semibold uppercase tracking-wider`}>
+                  <th className="text-left px-4 py-3">Nome</th>
+                  <th className="text-left px-4 py-3">Funcao</th>
+                  <th className="text-left px-4 py-3">Categoria</th>
+                  <th className="text-left px-4 py-3">Obra</th>
+                  <th className="text-left px-4 py-3">Periodo</th>
+                  <th className="text-left px-4 py-3">Turno</th>
+                  <th className="text-right px-4 py-3">H/dia</th>
+                  <th className="text-right px-4 py-3">Custo/dia</th>
+                  <th className="text-left px-4 py-3">Tarefa EGP</th>
+                  <th className="text-left px-4 py-3">Status</th>
                 </tr>
               </thead>
               <tbody>
@@ -231,8 +234,8 @@ function KpiCard({ isLight, label, value, icon: Icon, color }: {
   isLight: boolean; label: string; value: string; icon: typeof Users2; color: string
 }) {
   return (
-    <div className={`rounded-xl border p-3 ${
-      isLight ? 'bg-white border-slate-200' : 'bg-white/[0.03] border-white/[0.06]'
+    <div className={`rounded-2xl border p-3 ${
+      isLight ? 'bg-white border-slate-200 shadow-sm' : 'bg-white/[0.03] border-white/[0.06]'
     }`}>
       <div className="flex items-center gap-2 mb-1">
         <Icon size={13} className={color} />

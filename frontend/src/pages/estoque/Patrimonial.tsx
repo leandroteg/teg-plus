@@ -10,13 +10,14 @@ import {
   useMovimentacoesPatrimonial, useTermosResponsabilidade,
 } from '../../hooks/usePatrimonial'
 import { useBases } from '../../hooks/useEstoque'
+import { useTheme } from '../../contexts/ThemeContext'
 import type { PatImobilizado, StatusImobilizado } from '../../types/estoque'
 
 const STATUS_CONFIG: Record<StatusImobilizado, { label: string; bg: string; text: string; dot: string }> = {
   ativo:            { label: 'Ativo',            bg: 'bg-emerald-50', text: 'text-emerald-700', dot: 'bg-emerald-500' },
-  em_manutencao:    { label: 'Em Manutenção',    bg: 'bg-amber-50',   text: 'text-amber-700',   dot: 'bg-amber-500'   },
+  em_manutencao:    { label: 'Em Manutencao',    bg: 'bg-amber-50',   text: 'text-amber-700',   dot: 'bg-amber-500'   },
   cedido:           { label: 'Cedido',           bg: 'bg-blue-50',    text: 'text-blue-700',    dot: 'bg-blue-500'    },
-  em_transferencia:  { label: 'Em Transferência', bg: 'bg-indigo-50',  text: 'text-indigo-700',  dot: 'bg-indigo-500'  },
+  em_transferencia:  { label: 'Em Transferencia', bg: 'bg-indigo-50',  text: 'text-indigo-700',  dot: 'bg-indigo-500'  },
   baixado:           { label: 'Baixado',          bg: 'bg-slate-100',  text: 'text-slate-500',   dot: 'bg-slate-400'   },
   pendente_registro: { label: 'Pendente',         bg: 'bg-violet-50',  text: 'text-violet-700',  dot: 'bg-violet-500'  },
 }
@@ -36,6 +37,7 @@ const COMPETENCIA = (() => {
 })()
 
 export default function Patrimonial() {
+  const { isLightSidebar: isLight } = useTheme()
   const [busca, setBusca] = useState('')
   const [statusFiltro, setStatusFiltro] = useState<string>('')
   const [showForm, setShowForm] = useState(false)
@@ -77,22 +79,32 @@ export default function Patrimonial() {
 
   const set = (k: keyof PatImobilizado, v: any) => setEditItem(p => ({ ...p, [k]: v }))
 
+  const card = isLight
+    ? 'bg-white border-slate-200 shadow-sm'
+    : 'bg-white/[0.03] border-white/[0.06]'
+
+  const inputCls = isLight
+    ? 'input-base'
+    : 'input-base bg-white/[0.04] border-white/[0.08] text-slate-200 placeholder:text-slate-500'
+
+  const labelCls = isLight ? 'text-slate-600' : 'text-slate-300'
+
   return (
     <div className="space-y-4">
 
-      {/* ── Header ──────────────────────────────────────────────── */}
+      {/* -- Header --------------------------------------------------- */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-extrabold text-slate-800">Patrimonial</h1>
-          <p className="text-xs text-slate-400 mt-0.5">{filtrados.length} imobilizados</p>
+          <h1 className={`text-xl font-extrabold ${isLight ? 'text-slate-800' : 'text-white'}`}>Patrimonial</h1>
+          <p className={`text-xs mt-0.5 ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>{filtrados.length} imobilizados</p>
         </div>
         <div className="flex gap-2">
           <button
             onClick={() => calcDeprec.mutate(COMPETENCIA)}
             disabled={calcDeprec.isPending}
-            title={`Calcular depreciação ${COMPETENCIA}`}
-            className="flex items-center gap-1.5 bg-white hover:bg-slate-50 border border-slate-200
-              text-slate-600 text-sm font-semibold px-3 py-2 rounded-xl transition-colors"
+            title={`Calcular depreciacao ${COMPETENCIA}`}
+            className={`flex items-center gap-1.5 border text-sm font-semibold px-3 py-2 rounded-xl transition-colors
+              ${isLight ? 'bg-white hover:bg-slate-50 border-slate-200 text-slate-600' : 'bg-white/[0.03] hover:bg-white/[0.05] border-white/[0.08] text-slate-300'}`}
           >
             {calcDeprec.isPending ? <Loader2 size={14} className="animate-spin" /> : <TrendingDown size={14} />}
             Depreciar
@@ -107,57 +119,45 @@ export default function Patrimonial() {
         </div>
       </div>
 
-      {/* ── KPI Summary ─────────────────────────────────────────── */}
+      {/* -- KPI Summary -------------------------------------------- */}
       {kpis && (
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex">
-            <div className="w-[3px] bg-blue-500 shrink-0" />
-            <div className="p-3 flex-1">
-              <p className="text-lg font-extrabold text-blue-600">{kpis.total_imobilizados}</p>
-              <p className="text-[10px] text-slate-400 uppercase tracking-widest">Total Ativos</p>
+          {[
+            { color: 'bg-blue-500',   val: kpis.total_imobilizados, valCls: 'text-blue-600',   lbl: 'Total Ativos' },
+            { color: 'bg-indigo-500', val: fmt(kpis.valor_total_liquido), valCls: 'text-indigo-600', lbl: 'Valor Liquido' },
+            { color: 'bg-amber-500',  val: kpis.imobilizados_em_manutencao, valCls: 'text-amber-600', lbl: 'Em Manutencao' },
+            { color: 'bg-red-500',    val: kpis.termos_pendentes, valCls: 'text-red-600',    lbl: 'Termos Pendentes' },
+          ].map(({ color, val, valCls, lbl }) => (
+            <div key={lbl} className={`rounded-2xl border overflow-hidden flex ${card}`}>
+              <div className={`w-[3px] ${color} shrink-0`} />
+              <div className="p-3 flex-1">
+                <p className={`text-lg font-extrabold ${valCls}`}>{val}</p>
+                <p className={`text-[10px] uppercase tracking-widest ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>{lbl}</p>
+              </div>
             </div>
-          </div>
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex">
-            <div className="w-[3px] bg-indigo-500 shrink-0" />
-            <div className="p-3 flex-1">
-              <p className="text-lg font-extrabold text-indigo-600">{fmt(kpis.valor_total_liquido)}</p>
-              <p className="text-[10px] text-slate-400 uppercase tracking-widest">Valor Líquido</p>
-            </div>
-          </div>
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex">
-            <div className="w-[3px] bg-amber-500 shrink-0" />
-            <div className="p-3 flex-1">
-              <p className="text-lg font-extrabold text-amber-600">{kpis.imobilizados_em_manutencao}</p>
-              <p className="text-[10px] text-slate-400 uppercase tracking-widest">Em Manutenção</p>
-            </div>
-          </div>
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex">
-            <div className="w-[3px] bg-red-500 shrink-0" />
-            <div className="p-3 flex-1">
-              <p className="text-lg font-extrabold text-red-600">{kpis.termos_pendentes}</p>
-              <p className="text-[10px] text-slate-400 uppercase tracking-widest">Termos Pendentes</p>
-            </div>
-          </div>
+          ))}
         </div>
       )}
 
-      {/* ── Filtros ─────────────────────────────────────────────── */}
+      {/* -- Filtros ------------------------------------------------- */}
       <div className="flex gap-2 flex-wrap">
         <div className="relative flex-1 min-w-[200px]">
           <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
           <input
             value={busca}
             onChange={e => setBusca(e.target.value)}
-            placeholder="Buscar por patrimônio, descrição ou categoria..."
-            className="w-full pl-9 pr-4 py-2 rounded-xl border border-slate-200 bg-white text-sm
-              focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400"
+            placeholder="Buscar por patrimonio, descricao ou categoria..."
+            className={`w-full pl-9 pr-4 py-2 rounded-xl border text-sm
+              focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400
+              ${isLight ? 'border-slate-200 bg-white text-slate-800' : 'border-white/[0.08] bg-white/[0.03] text-slate-200 placeholder:text-slate-500'}`}
           />
         </div>
         <select
           value={statusFiltro}
           onChange={e => setStatusFiltro(e.target.value)}
-          className="px-3 py-2 rounded-xl border border-slate-200 bg-white text-xs font-semibold
-            text-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+          className={`px-3 py-2 rounded-xl border text-xs font-semibold
+            focus:outline-none focus:ring-2 focus:ring-blue-500/30
+            ${isLight ? 'border-slate-200 bg-white text-slate-600' : 'border-white/[0.08] bg-white/[0.03] text-slate-300'}`}
         >
           <option value="">Todos os status</option>
           {Object.entries(STATUS_CONFIG).map(([k, v]) => (
@@ -166,15 +166,15 @@ export default function Patrimonial() {
         </select>
       </div>
 
-      {/* ── Lista ───────────────────────────────────────────────── */}
+      {/* -- Lista --------------------------------------------------- */}
       {isLoading ? (
         <div className="flex items-center justify-center py-16">
           <div className="w-8 h-8 border-[3px] border-blue-500 border-t-transparent rounded-full animate-spin" />
         </div>
       ) : filtrados.length === 0 ? (
-        <div className="bg-white rounded-2xl border border-slate-200 p-12 text-center">
-          <Landmark size={40} className="text-slate-200 mx-auto mb-3" />
-          <p className="text-slate-500 font-semibold">Nenhum imobilizado cadastrado</p>
+        <div className={`rounded-2xl border p-12 text-center ${card}`}>
+          <Landmark size={40} className={isLight ? 'text-slate-200' : 'text-slate-600'} />
+          <p className={`font-semibold mt-3 ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>Nenhum imobilizado cadastrado</p>
         </div>
       ) : (
         <div className="space-y-2">
@@ -183,9 +183,9 @@ export default function Patrimonial() {
             const isExpanded = expandedId === imob.id
             const pctDeprec = imob.percentual_depreciado ?? 0
             return (
-              <div key={imob.id} className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+              <div key={imob.id} className={`rounded-2xl border overflow-hidden ${card}`}>
                 <div
-                  className="flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-slate-50 transition-colors"
+                  className={`flex items-center gap-3 px-4 py-3 cursor-pointer transition-colors ${isLight ? 'hover:bg-slate-50' : 'hover:bg-white/[0.02]'}`}
                   onClick={() => setExpandedId(isExpanded ? null : imob.id)}
                 >
                   <div className="w-10 h-10 rounded-xl bg-cyan-50 flex items-center justify-center shrink-0">
@@ -193,29 +193,29 @@ export default function Patrimonial() {
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
-                      <p className="text-sm font-extrabold text-slate-800 font-mono">{imob.numero_patrimonio}</p>
+                      <p className={`text-sm font-extrabold font-mono ${isLight ? 'text-slate-800' : 'text-white'}`}>{imob.numero_patrimonio}</p>
                       <span className={`inline-flex items-center gap-1 rounded-full text-[10px] font-semibold px-2 py-0.5 ${cfg.bg} ${cfg.text}`}>
                         <span className={`w-1.5 h-1.5 rounded-full ${cfg.dot}`} />
                         {cfg.label}
                       </span>
                     </div>
-                    <p className="text-xs text-slate-600 mt-0.5 truncate">{imob.descricao}</p>
-                    <p className="text-[10px] text-slate-400">
+                    <p className={`text-xs mt-0.5 truncate ${isLight ? 'text-slate-600' : 'text-slate-300'}`}>{imob.descricao}</p>
+                    <p className={`text-[10px] ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>
                       {imob.categoria}
-                      {imob.responsavel_nome ? ` · ${imob.responsavel_nome}` : ''}
-                      {imob.base_nome ? ` · ${imob.base_nome}` : ''}
+                      {imob.responsavel_nome ? ` - ${imob.responsavel_nome}` : ''}
+                      {imob.base_nome ? ` - ${imob.base_nome}` : ''}
                     </p>
                   </div>
                   <div className="text-right shrink-0 mr-2 hidden sm:block">
-                    <p className="text-sm font-extrabold text-slate-700">{fmt(imob.valor_atual ?? imob.valor_aquisicao)}</p>
+                    <p className={`text-sm font-extrabold ${isLight ? 'text-slate-700' : 'text-slate-200'}`}>{fmt(imob.valor_atual ?? imob.valor_aquisicao)}</p>
                     <div className="flex items-center gap-1 mt-1 justify-end">
-                      <div className="w-16 h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                      <div className={`w-16 h-1.5 rounded-full overflow-hidden ${isLight ? 'bg-slate-100' : 'bg-white/[0.08]'}`}>
                         <div
                           className={`h-full rounded-full transition-all ${pctDeprec >= 80 ? 'bg-red-500' : pctDeprec >= 50 ? 'bg-amber-500' : 'bg-blue-500'}`}
                           style={{ width: `${pctDeprec}%` }}
                         />
                       </div>
-                      <span className="text-[10px] text-slate-400">{pctDeprec}%</span>
+                      <span className={`text-[10px] ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>{pctDeprec}%</span>
                     </div>
                   </div>
                   {isExpanded ? <ChevronDown size={16} className="text-slate-400 shrink-0" /> : <ChevronRight size={16} className="text-slate-400 shrink-0" />}
@@ -226,6 +226,7 @@ export default function Patrimonial() {
                     imob={imob}
                     onEdit={() => { setEditItem({ ...imob }); setShowForm(true) }}
                     onBaixa={() => setShowBaixaModal(imob.id)}
+                    isLight={isLight}
                   />
                 )}
               </div>
@@ -234,7 +235,7 @@ export default function Patrimonial() {
         </div>
       )}
 
-      {/* ── Modal Cadastro ─────────────────────────────────────── */}
+      {/* -- Modal Cadastro ----------------------------------------- */}
       {showForm && editItem && (
         <ImobilizadoFormModal
           item={editItem}
@@ -243,34 +244,35 @@ export default function Patrimonial() {
           onSave={handleSave}
           onClose={() => { setShowForm(false); setEditItem(null) }}
           saving={salvar.isPending}
+          isLight={isLight}
         />
       )}
 
-      {/* ── Modal Baixa ────────────────────────────────────────── */}
+      {/* -- Modal Baixa -------------------------------------------- */}
       {showBaixaModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
-              <h2 className="text-lg font-extrabold text-slate-800">Registrar Baixa</h2>
+          <div className={`rounded-2xl shadow-2xl w-full max-w-sm ${isLight ? 'bg-white' : 'bg-[#111827]'}`}>
+            <div className={`flex items-center justify-between px-6 py-4 border-b ${isLight ? 'border-slate-100' : 'border-white/[0.06]'}`}>
+              <h2 className={`text-lg font-extrabold ${isLight ? 'text-slate-800' : 'text-white'}`}>Registrar Baixa</h2>
               <button onClick={() => setShowBaixaModal(null)}
-                className="w-8 h-8 rounded-lg hover:bg-slate-100 flex items-center justify-center">
+                className={`w-8 h-8 rounded-lg flex items-center justify-center ${isLight ? 'hover:bg-slate-100 text-slate-500' : 'hover:bg-white/[0.06] text-slate-400'}`}>
                 <X size={16} />
               </button>
             </div>
             <div className="p-6 space-y-4">
               <div>
-                <label className="block text-xs font-bold text-slate-600 mb-1">Motivo da Baixa *</label>
+                <label className={`block text-xs font-bold mb-1 ${labelCls}`}>Motivo da Baixa *</label>
                 <textarea
                   value={motivoBaixa}
                   onChange={e => setMotivoBaixa(e.target.value)}
-                  rows={3} className="input-base resize-none"
+                  rows={3} className={`${inputCls} resize-none`}
                   placeholder="Descreva o motivo da baixa..." />
               </div>
             </div>
-            <div className="px-6 py-4 border-t border-slate-100 flex justify-end gap-2">
+            <div className={`px-6 py-4 border-t flex justify-end gap-2 ${isLight ? 'border-slate-100' : 'border-white/[0.06]'}`}>
               <button onClick={() => setShowBaixaModal(null)}
-                className="px-4 py-2 rounded-xl border border-slate-200 text-sm font-semibold
-                  text-slate-600 hover:bg-slate-50 transition-colors">
+                className={`px-4 py-2 rounded-xl border text-sm font-semibold transition-colors
+                  ${isLight ? 'border-slate-200 text-slate-600 hover:bg-slate-50' : 'border-white/[0.08] text-slate-400 hover:bg-white/[0.04]'}`}>
                 Cancelar
               </button>
               <button onClick={handleBaixa} disabled={baixar.isPending || !motivoBaixa}
@@ -287,52 +289,55 @@ export default function Patrimonial() {
   )
 }
 
-// ── Detalhe do Imobilizado ────────────────────────────────────────────────────
+// -- Detalhe do Imobilizado --------------------------------------------------------
 function ImobilizadoDetail({
-  imob, onEdit, onBaixa
-}: { imob: PatImobilizado; onEdit: () => void; onBaixa: () => void }) {
+  imob, onEdit, onBaixa, isLight
+}: { imob: PatImobilizado; onEdit: () => void; onBaixa: () => void; isLight: boolean }) {
   const { data: movs = [] } = useMovimentacoesPatrimonial(imob.id)
   const { data: termos = [] } = useTermosResponsabilidade(imob.id)
 
+  const detailBg = isLight ? 'bg-slate-50' : 'bg-white/[0.03]'
+  const subtext = isLight ? 'text-slate-400' : 'text-slate-500'
+
   return (
-    <div className="border-t border-slate-100 px-4 py-4 space-y-4">
+    <div className={`border-t px-4 py-4 space-y-4 ${isLight ? 'border-slate-100' : 'border-white/[0.04]'}`}>
       {/* Detalhes financeiros */}
       <div className="grid grid-cols-3 gap-3">
-        <div className="bg-slate-50 rounded-xl p-3">
-          <p className="text-[10px] text-slate-400 uppercase tracking-widest">Valor Aquisição</p>
-          <p className="text-sm font-extrabold text-slate-700 mt-1">{(imob.valor_aquisicao ?? 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>
+        <div className={`rounded-xl p-3 ${detailBg}`}>
+          <p className={`text-[10px] uppercase tracking-widest ${subtext}`}>Valor Aquisicao</p>
+          <p className={`text-sm font-extrabold mt-1 ${isLight ? 'text-slate-700' : 'text-slate-200'}`}>{(imob.valor_aquisicao ?? 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>
         </div>
-        <div className="bg-slate-50 rounded-xl p-3">
-          <p className="text-[10px] text-slate-400 uppercase tracking-widest">Valor Atual</p>
+        <div className={`rounded-xl p-3 ${detailBg}`}>
+          <p className={`text-[10px] uppercase tracking-widest ${subtext}`}>Valor Atual</p>
           <p className="text-sm font-extrabold text-blue-600 mt-1">{(imob.valor_atual ?? imob.valor_aquisicao ?? 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>
         </div>
-        <div className="bg-slate-50 rounded-xl p-3">
-          <p className="text-[10px] text-slate-400 uppercase tracking-widest">Depreciado</p>
-          <p className={`text-sm font-extrabold mt-1 ${(imob.percentual_depreciado ?? 0) >= 80 ? 'text-red-600' : 'text-slate-700'}`}>
+        <div className={`rounded-xl p-3 ${detailBg}`}>
+          <p className={`text-[10px] uppercase tracking-widest ${subtext}`}>Depreciado</p>
+          <p className={`text-sm font-extrabold mt-1 ${(imob.percentual_depreciado ?? 0) >= 80 ? 'text-red-600' : isLight ? 'text-slate-700' : 'text-slate-200'}`}>
             {imob.percentual_depreciado ?? 0}%
           </p>
         </div>
       </div>
 
-      {/* Informações adicionais */}
-      <div className="text-[10px] text-slate-400 space-y-1">
-        {imob.marca && <p>Marca: <span className="text-slate-600 font-semibold">{imob.marca}</span>{imob.modelo ? ` — ${imob.modelo}` : ''}</p>}
-        {imob.numero_serie && <p>N° Série: <span className="text-slate-600 font-semibold font-mono">{imob.numero_serie}</span></p>}
-        {imob.taxa_depreciacao_anual && <p>Taxa depreciação: <span className="text-slate-600 font-semibold">{imob.taxa_depreciacao_anual}% a.a.</span> · Vida útil: <span className="text-slate-600 font-semibold">{imob.vida_util_meses} meses</span></p>}
-        {imob.data_aquisicao && <p>Adquirido em: <span className="text-slate-600 font-semibold">{new Date(imob.data_aquisicao + 'T00:00:00').toLocaleDateString('pt-BR')}</span></p>}
+      {/* Informacoes adicionais */}
+      <div className={`text-[10px] space-y-1 ${subtext}`}>
+        {imob.marca && <p>Marca: <span className={`font-semibold ${isLight ? 'text-slate-600' : 'text-slate-300'}`}>{imob.marca}</span>{imob.modelo ? ` -- ${imob.modelo}` : ''}</p>}
+        {imob.numero_serie && <p>N. Serie: <span className={`font-semibold font-mono ${isLight ? 'text-slate-600' : 'text-slate-300'}`}>{imob.numero_serie}</span></p>}
+        {imob.taxa_depreciacao_anual && <p>Taxa depreciacao: <span className={`font-semibold ${isLight ? 'text-slate-600' : 'text-slate-300'}`}>{imob.taxa_depreciacao_anual}% a.a.</span> - Vida util: <span className={`font-semibold ${isLight ? 'text-slate-600' : 'text-slate-300'}`}>{imob.vida_util_meses} meses</span></p>}
+        {imob.data_aquisicao && <p>Adquirido em: <span className={`font-semibold ${isLight ? 'text-slate-600' : 'text-slate-300'}`}>{new Date(imob.data_aquisicao + 'T00:00:00').toLocaleDateString('pt-BR')}</span></p>}
       </div>
 
-      {/* Movimentações recentes */}
+      {/* Movimentacoes recentes */}
       {movs.length > 0 && (
         <div>
-          <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2 flex items-center gap-1">
-            <ArrowLeftRight size={10} /> Movimentações
+          <p className={`text-[10px] font-bold uppercase tracking-widest mb-2 flex items-center gap-1 ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
+            <ArrowLeftRight size={10} /> Movimentacoes
           </p>
           <div className="space-y-1">
             {movs.slice(0, 3).map(m => (
-              <div key={m.id} className="flex items-center justify-between text-xs py-1 border-b border-slate-50">
-                <span className="text-slate-600 capitalize">{m.tipo}</span>
-                <span className="text-slate-400">{new Date(m.data_movimentacao).toLocaleDateString('pt-BR')}</span>
+              <div key={m.id} className={`flex items-center justify-between text-xs py-1 border-b ${isLight ? 'border-slate-50' : 'border-white/[0.04]'}`}>
+                <span className={`capitalize ${isLight ? 'text-slate-600' : 'text-slate-300'}`}>{m.tipo}</span>
+                <span className={subtext}>{new Date(m.data_movimentacao).toLocaleDateString('pt-BR')}</span>
                 {m.confirmado ? (
                   <span className="text-emerald-600 flex items-center gap-0.5"><CheckCircle2 size={10} /> Conf.</span>
                 ) : (
@@ -347,14 +352,14 @@ function ImobilizadoDetail({
       {/* Termos de responsabilidade */}
       {termos.length > 0 && (
         <div>
-          <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2 flex items-center gap-1">
+          <p className={`text-[10px] font-bold uppercase tracking-widest mb-2 flex items-center gap-1 ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
             <FileText size={10} /> Termos de Responsabilidade
           </p>
           <div className="space-y-1">
             {termos.slice(0, 2).map(t => (
-              <div key={t.id} className="flex items-center justify-between text-xs py-1 border-b border-slate-50">
-                <span className="text-slate-600">{t.responsavel_nome}</span>
-                <span className="text-slate-400">{t.tipo}</span>
+              <div key={t.id} className={`flex items-center justify-between text-xs py-1 border-b ${isLight ? 'border-slate-50' : 'border-white/[0.04]'}`}>
+                <span className={isLight ? 'text-slate-600' : 'text-slate-300'}>{t.responsavel_nome}</span>
+                <span className={subtext}>{t.tipo}</span>
                 {t.assinado ? (
                   <span className="text-emerald-600 flex items-center gap-0.5"><CheckCircle2 size={10} /> Assinado</span>
                 ) : (
@@ -366,7 +371,7 @@ function ImobilizadoDetail({
         </div>
       )}
 
-      {/* Ações */}
+      {/* Acoes */}
       <div className="flex gap-2 pt-1">
         <button onClick={onEdit}
           className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-50 hover:bg-blue-100
@@ -385,9 +390,9 @@ function ImobilizadoDetail({
   )
 }
 
-// ── Form Modal ────────────────────────────────────────────────────────────────
+// -- Form Modal ------------------------------------------------------------------
 function ImobilizadoFormModal({
-  item, bases, onChange, onSave, onClose, saving
+  item, bases, onChange, onSave, onClose, saving, isLight
 }: {
   item: Partial<PatImobilizado>
   bases: any[]
@@ -395,17 +400,25 @@ function ImobilizadoFormModal({
   onSave: () => void
   onClose: () => void
   saving: boolean
+  isLight: boolean
 }) {
   const set = (k: keyof PatImobilizado, v: any) => onChange({ ...item, [k]: v })
 
+  const modalBg = isLight ? 'bg-white' : 'bg-[#111827]'
+  const borderB = isLight ? 'border-slate-100' : 'border-white/[0.06]'
+  const labelCls = isLight ? 'text-slate-600' : 'text-slate-300'
+  const inputCls = isLight
+    ? 'input-base'
+    : 'input-base bg-white/[0.04] border-white/[0.08] text-slate-200 placeholder:text-slate-500'
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-xl max-h-[90vh] overflow-y-auto">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
-          <h2 className="text-lg font-extrabold text-slate-800">
+      <div className={`${modalBg} rounded-2xl shadow-2xl w-full max-w-xl max-h-[90vh] overflow-y-auto`}>
+        <div className={`flex items-center justify-between px-6 py-4 border-b ${borderB}`}>
+          <h2 className={`text-lg font-extrabold ${isLight ? 'text-slate-800' : 'text-white'}`}>
             {item.id ? 'Editar Imobilizado' : 'Novo Imobilizado'}
           </h2>
-          <button onClick={onClose} className="w-8 h-8 rounded-lg hover:bg-slate-100 flex items-center justify-center">
+          <button onClick={onClose} className={`w-8 h-8 rounded-lg flex items-center justify-center ${isLight ? 'hover:bg-slate-100 text-slate-500' : 'hover:bg-white/[0.06] text-slate-400'}`}>
             <X size={16} />
           </button>
         </div>
@@ -413,14 +426,14 @@ function ImobilizadoFormModal({
         <div className="p-6 space-y-4">
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-bold text-slate-600 mb-1">N° Patrimônio *</label>
+              <label className={`block text-xs font-bold mb-1 ${labelCls}`}>N. Patrimonio *</label>
               <input value={item.numero_patrimonio ?? ''} onChange={e => set('numero_patrimonio', e.target.value)}
-                className="input-base" placeholder="PAT-0001" />
+                className={inputCls} placeholder="PAT-0001" />
             </div>
             <div>
-              <label className="block text-xs font-bold text-slate-600 mb-1">Status</label>
+              <label className={`block text-xs font-bold mb-1 ${labelCls}`}>Status</label>
               <select value={item.status ?? 'ativo'} onChange={e => set('status', e.target.value)}
-                className="input-base">
+                className={inputCls}>
                 {Object.entries(STATUS_CONFIG).map(([k, v]) => (
                   <option key={k} value={k}>{v.label}</option>
                 ))}
@@ -429,21 +442,21 @@ function ImobilizadoFormModal({
           </div>
 
           <div>
-            <label className="block text-xs font-bold text-slate-600 mb-1">Descrição *</label>
+            <label className={`block text-xs font-bold mb-1 ${labelCls}`}>Descricao *</label>
             <input value={item.descricao ?? ''} onChange={e => set('descricao', e.target.value)}
-              className="input-base" placeholder="Ex: Notebook Dell Inspiron 15..." />
+              className={inputCls} placeholder="Ex: Notebook Dell Inspiron 15..." />
           </div>
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-bold text-slate-600 mb-1">Categoria</label>
+              <label className={`block text-xs font-bold mb-1 ${labelCls}`}>Categoria</label>
               <input value={item.categoria ?? ''} onChange={e => set('categoria', e.target.value)}
-                className="input-base" placeholder="Ex: Veículos, TI..." />
+                className={inputCls} placeholder="Ex: Veiculos, TI..." />
             </div>
             <div>
-              <label className="block text-xs font-bold text-slate-600 mb-1">Base</label>
+              <label className={`block text-xs font-bold mb-1 ${labelCls}`}>Base</label>
               <select value={item.base_id ?? ''} onChange={e => set('base_id', e.target.value)}
-                className="input-base">
+                className={inputCls}>
                 <option value="">Sem base</option>
                 {bases.map(b => <option key={b.id} value={b.id}>{b.nome}</option>)}
               </select>
@@ -452,64 +465,64 @@ function ImobilizadoFormModal({
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-bold text-slate-600 mb-1">Marca</label>
+              <label className={`block text-xs font-bold mb-1 ${labelCls}`}>Marca</label>
               <input value={item.marca ?? ''} onChange={e => set('marca', e.target.value)}
-                className="input-base" placeholder="Ex: Dell, Toyota..." />
+                className={inputCls} placeholder="Ex: Dell, Toyota..." />
             </div>
             <div>
-              <label className="block text-xs font-bold text-slate-600 mb-1">Modelo</label>
+              <label className={`block text-xs font-bold mb-1 ${labelCls}`}>Modelo</label>
               <input value={item.modelo ?? ''} onChange={e => set('modelo', e.target.value)}
-                className="input-base" placeholder="Ex: Corolla 2023..." />
+                className={inputCls} placeholder="Ex: Corolla 2023..." />
             </div>
           </div>
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-bold text-slate-600 mb-1">Valor Aquisição (R$) *</label>
+              <label className={`block text-xs font-bold mb-1 ${labelCls}`}>Valor Aquisicao (R$) *</label>
               <input type="number" min={0} step={0.01} value={item.valor_aquisicao ?? 0}
                 onChange={e => set('valor_aquisicao', Number(e.target.value))}
-                className="input-base" />
+                className={inputCls} />
             </div>
             <div>
-              <label className="block text-xs font-bold text-slate-600 mb-1">Data Aquisição</label>
+              <label className={`block text-xs font-bold mb-1 ${labelCls}`}>Data Aquisicao</label>
               <input type="date" value={item.data_aquisicao ?? ''}
                 onChange={e => set('data_aquisicao', e.target.value)}
-                className="input-base" />
+                className={inputCls} />
             </div>
           </div>
 
           <div className="grid grid-cols-3 gap-3">
             <div>
-              <label className="block text-xs font-bold text-slate-600 mb-1">Vida Útil (meses)</label>
+              <label className={`block text-xs font-bold mb-1 ${labelCls}`}>Vida Util (meses)</label>
               <input type="number" min={1} value={item.vida_util_meses ?? 60}
                 onChange={e => set('vida_util_meses', Number(e.target.value))}
-                className="input-base" />
+                className={inputCls} />
             </div>
             <div>
-              <label className="block text-xs font-bold text-slate-600 mb-1">Taxa Deprec. (% a.a.)</label>
+              <label className={`block text-xs font-bold mb-1 ${labelCls}`}>Taxa Deprec. (% a.a.)</label>
               <input type="number" min={0} max={100} step={0.1} value={item.taxa_depreciacao_anual ?? 20}
                 onChange={e => set('taxa_depreciacao_anual', Number(e.target.value))}
-                className="input-base" />
+                className={inputCls} />
             </div>
             <div>
-              <label className="block text-xs font-bold text-slate-600 mb-1">Valor Residual (R$)</label>
+              <label className={`block text-xs font-bold mb-1 ${labelCls}`}>Valor Residual (R$)</label>
               <input type="number" min={0} step={0.01} value={item.valor_residual ?? 0}
                 onChange={e => set('valor_residual', Number(e.target.value))}
-                className="input-base" />
+                className={inputCls} />
             </div>
           </div>
 
           <div>
-            <label className="block text-xs font-bold text-slate-600 mb-1">Responsável</label>
+            <label className={`block text-xs font-bold mb-1 ${labelCls}`}>Responsavel</label>
             <input value={item.responsavel_nome ?? ''} onChange={e => set('responsavel_nome', e.target.value)}
-              className="input-base" placeholder="Nome do responsável..." />
+              className={inputCls} placeholder="Nome do responsavel..." />
           </div>
         </div>
 
-        <div className="px-6 py-4 border-t border-slate-100 flex justify-end gap-2">
+        <div className={`px-6 py-4 border-t flex justify-end gap-2 ${borderB}`}>
           <button onClick={onClose}
-            className="px-4 py-2 rounded-xl border border-slate-200 text-sm font-semibold
-              text-slate-600 hover:bg-slate-50 transition-colors">
+            className={`px-4 py-2 rounded-xl border text-sm font-semibold transition-colors
+              ${isLight ? 'border-slate-200 text-slate-600 hover:bg-slate-50' : 'border-white/[0.08] text-slate-400 hover:bg-white/[0.04]'}`}>
             Cancelar
           </button>
           <button onClick={onSave} disabled={saving}

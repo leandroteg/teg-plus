@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Radio, AlertTriangle, CheckCircle, MessageSquare, XCircle } from 'lucide-react'
 import { useOcorrenciasTel, useAtualizarOcorrencia } from '../../hooks/useFrotas'
+import { useTheme } from '../../contexts/ThemeContext'
 import type { FroOcorrenciaTel, StatusOcorrenciaTel, TipoOcorrenciaTel } from '../../types/frotas'
 
 // ── Maps ──────────────────────────────────────────────────────────────────────
@@ -29,7 +30,7 @@ const STATUS_BADGE: Record<StatusOcorrenciaTel, string> = {
 }
 
 // ── Detail Modal ──────────────────────────────────────────────────────────────
-function OcorrenciaModal({ oc, onClose }: { oc: FroOcorrenciaTel; onClose: () => void }) {
+function OcorrenciaModal({ oc, onClose, isLight }: { oc: FroOcorrenciaTel; onClose: () => void; isLight: boolean }) {
   const [observacoes, setObs] = useState(oc.observacoes ?? '')
   const atualizar = useAtualizarOcorrencia()
   const flow = STATUS_FLOW[oc.status]
@@ -40,19 +41,21 @@ function OcorrenciaModal({ oc, onClose }: { oc: FroOcorrenciaTel; onClose: () =>
     onClose()
   }
 
+  const valCls = isLight ? 'text-slate-800' : 'text-white'
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
       <div className="glass-card rounded-2xl p-6 w-full max-w-md space-y-4">
         <div className="flex items-start justify-between">
-          <h2 className="text-base font-bold text-white">Ocorrência de Telemetria</h2>
-          <button onClick={onClose} className="text-slate-500 hover:text-white"><XCircle size={18} /></button>
+          <h2 className={`text-base font-bold ${isLight ? 'text-slate-800' : 'text-white'}`}>Ocorrencia de Telemetria</h2>
+          <button onClick={onClose} className={`${isLight ? 'text-slate-400 hover:text-slate-700' : 'text-slate-500 hover:text-white'}`}><XCircle size={18} /></button>
         </div>
 
         {/* Info */}
         <div className="space-y-2 text-sm">
           <div className="flex justify-between">
-            <span className="text-slate-400">Veículo</span>
-            <span className="text-white font-semibold">{oc.veiculo?.placa} — {oc.veiculo?.marca} {oc.veiculo?.modelo}</span>
+            <span className="text-slate-400">Veiculo</span>
+            <span className={`${valCls} font-semibold`}>{oc.veiculo?.placa} — {oc.veiculo?.marca} {oc.veiculo?.modelo}</span>
           </div>
           <div className="flex justify-between">
             <span className="text-slate-400">Tipo</span>
@@ -62,7 +65,7 @@ function OcorrenciaModal({ oc, onClose }: { oc: FroOcorrenciaTel; onClose: () =>
           </div>
           <div className="flex justify-between">
             <span className="text-slate-400">Data</span>
-            <span className="text-white">{new Date(oc.data_ocorrencia).toLocaleString('pt-BR')}</span>
+            <span className={valCls}>{new Date(oc.data_ocorrencia).toLocaleString('pt-BR')}</span>
           </div>
           {oc.velocidade && (
             <div className="flex justify-between">
@@ -73,28 +76,30 @@ function OcorrenciaModal({ oc, onClose }: { oc: FroOcorrenciaTel; onClose: () =>
           {oc.endereco && (
             <div className="flex justify-between">
               <span className="text-slate-400">Local</span>
-              <span className="text-white text-right text-xs max-w-[60%]">{oc.endereco}</span>
+              <span className={`${valCls} text-right text-xs max-w-[60%]`}>{oc.endereco}</span>
             </div>
           )}
           {oc.analisado_em && (
             <div className="flex justify-between">
               <span className="text-slate-400">Analisado em</span>
-              <span className="text-white">{new Date(oc.analisado_em).toLocaleDateString('pt-BR')}</span>
+              <span className={valCls}>{new Date(oc.analisado_em).toLocaleDateString('pt-BR')}</span>
             </div>
           )}
           {oc.rh_comunicado_em && (
             <div className="flex justify-between">
               <span className="text-slate-400">RH comunicado em</span>
-              <span className="text-white">{new Date(oc.rh_comunicado_em).toLocaleDateString('pt-BR')}</span>
+              <span className={valCls}>{new Date(oc.rh_comunicado_em).toLocaleDateString('pt-BR')}</span>
             </div>
           )}
         </div>
 
-        {/* Observações */}
+        {/* Observacoes */}
         <div>
-          <label className="text-[11px] text-slate-400">Observações / Tratativa</label>
+          <label className="text-[11px] text-slate-400">Observacoes / Tratativa</label>
           <textarea
-            className="w-full px-3 py-2 rounded-xl bg-white/6 border border-white/10 text-sm text-white focus:outline-none focus:ring-2 focus:ring-rose-500/30 resize-none mt-1"
+            className={`w-full px-3 py-2 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-rose-500/30 resize-none mt-1 ${
+              isLight ? 'bg-slate-50 border border-slate-200 text-slate-800' : 'bg-white/6 border border-white/10 text-white'
+            }`}
             rows={3}
             value={observacoes}
             onChange={e => setObs(e.target.value)}
@@ -103,7 +108,9 @@ function OcorrenciaModal({ oc, onClose }: { oc: FroOcorrenciaTel; onClose: () =>
         </div>
 
         <div className="flex gap-2">
-          <button onClick={onClose} className="flex-1 py-2 rounded-xl border border-white/10 text-sm text-slate-400">Fechar</button>
+          <button onClick={onClose} className={`flex-1 py-2 rounded-xl border text-sm ${
+            isLight ? 'border-slate-200 text-slate-500 hover:bg-slate-50' : 'border-white/10 text-slate-400 hover:bg-white/5'
+          }`}>Fechar</button>
           {oc.status !== 'encerrada' && (
             <button
               onClick={handleAdvance}
@@ -111,7 +118,7 @@ function OcorrenciaModal({ oc, onClose }: { oc: FroOcorrenciaTel; onClose: () =>
               className={`flex-1 py-2 rounded-xl text-sm font-semibold flex items-center justify-center gap-2 ${flow.cls}`}
             >
               <flow.icon size={14} />
-              {atualizar.isPending ? 'Salvando…' : flow.label}
+              {atualizar.isPending ? 'Salvando...' : flow.label}
             </button>
           )}
         </div>
@@ -121,16 +128,18 @@ function OcorrenciaModal({ oc, onClose }: { oc: FroOcorrenciaTel; onClose: () =>
 }
 
 // ── Ocorrência Row ────────────────────────────────────────────────────────────
-function OcorrenciaRow({ oc, onSelect }: { oc: FroOcorrenciaTel; onSelect: () => void }) {
+function OcorrenciaRow({ oc, onSelect, isLight }: { oc: FroOcorrenciaTel; onSelect: () => void; isLight: boolean }) {
   const tipoCfg = TIPO_CFG[oc.tipo_ocorrencia]
   const badgeCls = STATUS_BADGE[oc.status]
   const statusLabel = { registrada: 'Registrada', analisada: 'Analisada', comunicado_rh: 'Comunicado RH', encerrada: 'Encerrada' }[oc.status]
 
   return (
-    <button onClick={onSelect} className="glass-card w-full rounded-xl px-4 py-3 flex items-center gap-4 text-left hover:bg-white/5 transition-colors">
+    <button onClick={onSelect} className={`glass-card w-full rounded-xl px-4 py-3 flex items-center gap-4 text-left transition-colors ${
+      isLight ? 'hover:bg-slate-50' : 'hover:bg-white/5'
+    }`}>
       <AlertTriangle size={15} className={oc.status === 'registrada' ? 'text-red-400' : oc.status === 'encerrada' ? 'text-slate-600' : 'text-amber-400'} />
       <div className="flex-1 min-w-0">
-        <p className="text-sm font-semibold text-white">{oc.veiculo?.placa} — {oc.veiculo?.marca} {oc.veiculo?.modelo}</p>
+        <p className={`text-sm font-semibold ${isLight ? 'text-slate-800' : 'text-white'}`}>{oc.veiculo?.placa} — {oc.veiculo?.marca} {oc.veiculo?.modelo}</p>
         <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded border ${tipoCfg.cls}`}>{tipoCfg.label}</span>
       </div>
       {oc.velocidade && (
@@ -153,6 +162,7 @@ const TABS: Array<{ key: StatusOcorrenciaTel | 'todas'; label: string }> = [
 ]
 
 export default function Telemetria() {
+  const { isLightSidebar: isLight } = useTheme()
   const [tabIdx, setTabIdx]   = useState(0)
   const [selected, setSelected] = useState<FroOcorrenciaTel | null>(null)
 
@@ -162,20 +172,26 @@ export default function Telemetria() {
   return (
     <div className="p-4 sm:p-6 space-y-4">
       <div>
-        <h1 className="text-xl font-bold text-white flex items-center gap-2">
+        <h1 className={`text-xl font-bold flex items-center gap-2 ${isLight ? 'text-slate-800' : 'text-white'}`}>
           <Radio size={20} className="text-rose-400" /> Telemetria e Compliance
         </h1>
-        <p className="text-sm text-slate-500">Ocorrências registradas pelo sistema de rastreamento</p>
+        <p className="text-sm text-slate-500">Ocorrencias registradas pelo sistema de rastreamento</p>
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-1 p-1 rounded-xl bg-white/4 border border-white/8 w-fit flex-wrap">
+      <div className={`flex gap-1 p-1 rounded-xl w-fit flex-wrap ${
+        isLight ? 'bg-slate-100 border border-slate-200' : 'bg-white/4 border border-white/8'
+      }`}>
         {TABS.map((t, i) => (
           <button
             key={t.key}
             onClick={() => setTabIdx(i)}
             className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
-              tabIdx === i ? 'bg-rose-600 text-white' : 'text-slate-400 hover:text-white'
+              tabIdx === i
+                ? 'bg-rose-600 text-white'
+                : isLight
+                  ? 'text-slate-500 hover:text-slate-800'
+                  : 'text-slate-400 hover:text-white'
             }`}
           >
             {t.label}
@@ -200,17 +216,17 @@ export default function Telemetria() {
       ) : ocorrencias.length === 0 ? (
         <div className="text-center py-12">
           <CheckCircle size={32} className="text-emerald-400 mx-auto mb-2 opacity-60" />
-          <p className="text-sm text-slate-500">Nenhuma ocorrência nesta categoria</p>
+          <p className="text-sm text-slate-500">Nenhuma ocorrencia nesta categoria</p>
         </div>
       ) : (
         <div className="space-y-2">
           {ocorrencias.map(oc => (
-            <OcorrenciaRow key={oc.id} oc={oc} onSelect={() => setSelected(oc)} />
+            <OcorrenciaRow key={oc.id} oc={oc} onSelect={() => setSelected(oc)} isLight={isLight} />
           ))}
         </div>
       )}
 
-      {selected && <OcorrenciaModal oc={selected} onClose={() => setSelected(null)} />}
+      {selected && <OcorrenciaModal oc={selected} onClose={() => setSelected(null)} isLight={isLight} />}
     </div>
   )
 }

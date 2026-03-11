@@ -5,6 +5,7 @@ import {
   ArrowLeftRight, Landmark, CheckCircle2,
 } from 'lucide-react'
 import { useEstoqueKPIs, useSaldosAbaixoMinimo } from '../../hooks/useEstoque'
+import { useTheme } from '../../contexts/ThemeContext'
 import type { EstoqueKPIs } from '../../types/estoque'
 
 const fmt = (v: number) =>
@@ -21,14 +22,15 @@ const EMPTY_KPIS: EstoqueKPIs = {
 }
 
 const ACTIONS = [
-  { icon: Package2,       label: 'Itens',          to: '/estoque/itens',         color: 'text-blue-600',   bg: 'bg-blue-50'   },
-  { icon: ArrowLeftRight, label: 'Movimentações',   to: '/estoque/movimentacoes', color: 'text-indigo-600', bg: 'bg-indigo-50' },
-  { icon: ClipboardList,  label: 'Inventário',      to: '/estoque/inventario',    color: 'text-violet-600', bg: 'bg-violet-50' },
-  { icon: Landmark,       label: 'Patrimonial',     to: '/estoque/patrimonial',   color: 'text-cyan-600',   bg: 'bg-cyan-50'   },
+  { icon: Package2,       label: 'Itens',          to: '/estoque/itens',         color: 'text-blue-600',   bg: 'bg-blue-50',   bgDark: 'bg-blue-500/15'   },
+  { icon: ArrowLeftRight, label: 'Movimentacoes',   to: '/estoque/movimentacoes', color: 'text-indigo-600', bg: 'bg-indigo-50', bgDark: 'bg-indigo-500/15' },
+  { icon: ClipboardList,  label: 'Inventario',      to: '/estoque/inventario',    color: 'text-violet-600', bg: 'bg-violet-50', bgDark: 'bg-violet-500/15' },
+  { icon: Landmark,       label: 'Patrimonial',     to: '/estoque/patrimonial',   color: 'text-cyan-600',   bg: 'bg-cyan-50',   bgDark: 'bg-cyan-500/15'   },
 ]
 
 export default function EstoqueHome() {
   const nav = useNavigate()
+  const { isLightSidebar: isLight } = useTheme()
   const { data: kpis = EMPTY_KPIS, isLoading, refetch } = useEstoqueKPIs()
   const { data: abaixoMinimo = [] } = useSaldosAbaixoMinimo()
 
@@ -40,22 +42,26 @@ export default function EstoqueHome() {
     )
   }
 
+  const card = isLight
+    ? 'bg-white border-slate-200 shadow-sm'
+    : 'bg-white/[0.03] border-white/[0.06]'
+
   return (
     <div className="space-y-5">
 
-      {/* ── Header ────────────────────────────────────────────── */}
+      {/* -- Header --------------------------------------------------- */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-extrabold text-slate-800">Painel — Estoque</h1>
-          <p className="text-xs text-slate-400 mt-0.5">Visão geral do almoxarifado e patrimônio</p>
+          <h1 className={`text-xl font-extrabold ${isLight ? 'text-slate-800' : 'text-white'}`}>Painel -- Estoque</h1>
+          <p className={`text-xs mt-0.5 ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>Visao geral do almoxarifado e patrimonio</p>
         </div>
         <button onClick={() => refetch()}
-          className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-blue-600 transition-colors">
+          className={`flex items-center gap-1.5 text-xs transition-colors ${isLight ? 'text-slate-400 hover:text-blue-600' : 'text-slate-500 hover:text-blue-400'}`}>
           <RefreshCw size={12} /> Atualizar
         </button>
       </div>
 
-      {/* ── KPIs ──────────────────────────────────────────────── */}
+      {/* -- KPIs --------------------------------------------------- */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         <KpiCard
           titulo="Total de Itens"
@@ -63,14 +69,16 @@ export default function EstoqueHome() {
           icon={Package2}
           cor="text-blue-600"
           hexCor="#2563EB"
+          isLight={isLight}
         />
         <KpiCard
-          titulo="Abaixo do Mínimo"
+          titulo="Abaixo do Minimo"
           valor={kpis.itens_abaixo_minimo}
           icon={AlertTriangle}
           cor={kpis.itens_abaixo_minimo > 0 ? 'text-red-600' : 'text-slate-400'}
           hexCor={kpis.itens_abaixo_minimo > 0 ? '#DC2626' : '#94A3B8'}
-          subtitulo={kpis.itens_abaixo_minimo > 0 ? 'Reposição urgente' : 'Tudo ok'}
+          subtitulo={kpis.itens_abaixo_minimo > 0 ? 'Reposicao urgente' : 'Tudo ok'}
+          isLight={isLight}
         />
         <KpiCard
           titulo="Valor em Estoque"
@@ -78,90 +86,93 @@ export default function EstoqueHome() {
           icon={DollarSign}
           cor="text-indigo-600"
           hexCor="#4F46E5"
+          isLight={isLight}
         />
         <KpiCard
-          titulo="Moviment. no Mês"
+          titulo="Moviment. no Mes"
           valor={kpis.movimentacoes_mes}
           icon={BarChart3}
           cor="text-cyan-600"
           hexCor="#0891B2"
           subtitulo={`${kpis.solicitacoes_abertas} sol. abertas`}
+          isLight={isLight}
         />
       </div>
 
-      {/* ── Acurácia + Itens Parados ──────────────────────────── */}
+      {/* -- Acuracia + Itens Parados -------------------------------- */}
       <div className="grid grid-cols-2 gap-3">
-        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-4">
+        <div className={`rounded-2xl border p-4 ${card}`}>
           <div className="flex items-center gap-2 mb-3">
             <CheckCircle2 size={14} className="text-emerald-500" />
-            <p className="text-xs font-bold text-slate-500 uppercase tracking-widest">Acurácia Inventário</p>
+            <p className={`text-xs font-bold uppercase tracking-widest ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>Acuracia Inventario</p>
           </div>
           <p className="text-3xl font-extrabold text-emerald-600">
             {kpis.acuracia_ultimo_inventario != null
               ? `${kpis.acuracia_ultimo_inventario.toFixed(1)}%`
-              : '—'
+              : '--'
             }
           </p>
-          <p className="text-[10px] text-slate-400 mt-1">Último inventário concluído</p>
+          <p className={`text-[10px] mt-1 ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>Ultimo inventario concluido</p>
         </div>
 
-        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-4">
+        <div className={`rounded-2xl border p-4 ${card}`}>
           <div className="flex items-center gap-2 mb-3">
             <TrendingDown size={14} className="text-amber-500" />
-            <p className="text-xs font-bold text-slate-500 uppercase tracking-widest">Itens Parados</p>
+            <p className={`text-xs font-bold uppercase tracking-widest ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>Itens Parados</p>
           </div>
-          <p className={`text-3xl font-extrabold ${kpis.itens_parados > 0 ? 'text-amber-600' : 'text-slate-400'}`}>
+          <p className={`text-3xl font-extrabold ${kpis.itens_parados > 0 ? 'text-amber-600' : isLight ? 'text-slate-400' : 'text-slate-500'}`}>
             {kpis.itens_parados}
           </p>
-          <p className="text-[10px] text-slate-400 mt-1">Sem movimentação há 90+ dias</p>
+          <p className={`text-[10px] mt-1 ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>Sem movimentacao ha 90+ dias</p>
         </div>
       </div>
 
-      {/* ── Quick Actions ─────────────────────────────────────── */}
+      {/* -- Quick Actions ------------------------------------------ */}
       <div className="grid grid-cols-4 gap-2">
-        {ACTIONS.map(({ icon: Icon, label, to, color, bg }) => (
+        {ACTIONS.map(({ icon: Icon, label, to, color, bg, bgDark }) => (
           <button key={to} onClick={() => nav(to)}
-            className="bg-white rounded-2xl p-3 border border-slate-200 shadow-sm
-              hover:shadow-md hover:-translate-y-0.5 transition-all text-center group">
-            <div className={`w-9 h-9 ${bg} rounded-xl flex items-center justify-center mx-auto mb-2
-              group-hover:scale-110 transition-transform`}>
+            className={`rounded-2xl p-3 border shadow-sm
+              hover:shadow-md hover:-translate-y-0.5 transition-all text-center group
+              ${isLight ? 'bg-white border-slate-200' : 'bg-white/[0.03] border-white/[0.06]'}`}>
+            <div className={`w-9 h-9 rounded-xl flex items-center justify-center mx-auto mb-2
+              group-hover:scale-110 transition-transform ${isLight ? bg : bgDark}`}>
               <Icon size={16} className={color} />
             </div>
-            <p className="text-[10px] font-bold text-slate-600">{label}</p>
+            <p className={`text-[10px] font-bold ${isLight ? 'text-slate-600' : 'text-slate-300'}`}>{label}</p>
           </button>
         ))}
       </div>
 
-      {/* ── Alertas: Itens Abaixo do Mínimo ──────────────────── */}
+      {/* -- Alertas: Itens Abaixo do Minimo ------------------------ */}
       {abaixoMinimo.length > 0 && (
-        <section className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-          <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between">
-            <h2 className="text-sm font-extrabold text-slate-800 flex items-center gap-1.5">
+        <section className={`rounded-2xl border overflow-hidden ${card}`}>
+          <div className={`px-4 py-3 border-b flex items-center justify-between ${isLight ? 'border-slate-100' : 'border-white/[0.04]'}`}>
+            <h2 className={`text-sm font-extrabold flex items-center gap-1.5 ${isLight ? 'text-slate-800' : 'text-white'}`}>
               <AlertTriangle size={14} className="text-red-500" />
-              Itens para Reposição
+              Itens para Reposicao
             </h2>
             <button onClick={() => nav('/estoque/itens')}
               className="text-[10px] text-blue-600 font-semibold flex items-center gap-0.5">
               Ver todos <ArrowRight size={10} />
             </button>
           </div>
-          <div className="divide-y divide-slate-50">
+          <div className={`divide-y ${isLight ? 'divide-slate-50' : 'divide-white/[0.04]'}`}>
             {abaixoMinimo.slice(0, 8).map(saldo => (
-              <div key={saldo.id} className="flex items-center gap-3 px-4 py-3 hover:bg-slate-50 transition-colors">
+              <div key={saldo.id} className={`flex items-center gap-3 px-4 py-3 transition-colors ${isLight ? 'hover:bg-slate-50' : 'hover:bg-white/[0.02]'}`}>
                 <div className="w-8 h-8 rounded-lg bg-red-50 flex items-center justify-center shrink-0">
                   <Package2 size={14} className="text-red-500" />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-semibold text-slate-700 truncate">
-                    {saldo.item?.descricao ?? '—'}
+                  <p className={`text-sm font-semibold truncate ${isLight ? 'text-slate-700' : 'text-slate-200'}`}>
+                    {saldo.item?.descricao ?? '--'}
                   </p>
-                  <p className="text-[10px] text-slate-400">
-                    {saldo.base?.nome ?? '—'} · Cód: {saldo.item?.codigo ?? '—'}
+                  <p className={`text-[10px] ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>
+                    {saldo.base?.nome ?? '--'} - Cod: {saldo.item?.codigo ?? '--'}
                   </p>
                 </div>
                 <div className="text-right shrink-0">
                   <p className="text-sm font-extrabold text-red-600">{saldo.saldo} {saldo.item?.unidade}</p>
-                  <p className="text-[10px] text-slate-400">mín: {saldo.item?.estoque_minimo}</p>
+                  <p className={`text-[10px] ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>min: {saldo.item?.estoque_minimo}</p>
                 </div>
               </div>
             ))}
@@ -172,13 +183,15 @@ export default function EstoqueHome() {
   )
 }
 
-// ── KPI Card ─────────────────────────────────────────────────────────────────
-function KpiCard({ titulo, valor, icon: Icon, cor, hexCor, subtitulo }: {
+// -- KPI Card -------------------------------------------------------------------
+function KpiCard({ titulo, valor, icon: Icon, cor, hexCor, subtitulo, isLight }: {
   titulo: string; valor: number | string; icon: typeof Package2;
-  cor: string; hexCor: string; subtitulo?: string
+  cor: string; hexCor: string; subtitulo?: string; isLight: boolean
 }) {
   return (
-    <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden flex">
+    <div className={`rounded-2xl border overflow-hidden flex ${
+      isLight ? 'bg-white border-slate-200 shadow-sm' : 'bg-white/[0.03] border-white/[0.06]'
+    }`}>
       <div className="w-[3px] shrink-0" style={{ backgroundColor: hexCor }} />
       <div className="p-4 flex-1 min-w-0">
         <div className="w-8 h-8 rounded-xl flex items-center justify-center mb-2"
@@ -186,8 +199,8 @@ function KpiCard({ titulo, valor, icon: Icon, cor, hexCor, subtitulo }: {
           <Icon size={14} className={cor} />
         </div>
         <p className={`text-xl font-extrabold ${cor} leading-none`}>{valor}</p>
-        <p className="text-[10px] text-slate-400 font-semibold mt-1 uppercase tracking-widest">{titulo}</p>
-        {subtitulo && <p className="text-[10px] text-slate-400 mt-0.5">{subtitulo}</p>}
+        <p className={`text-[10px] font-semibold mt-1 uppercase tracking-widest ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>{titulo}</p>
+        {subtitulo && <p className={`text-[10px] mt-0.5 ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>{subtitulo}</p>}
       </div>
     </div>
   )

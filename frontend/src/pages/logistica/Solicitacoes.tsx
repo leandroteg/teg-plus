@@ -10,6 +10,7 @@ import {
 import { useCriarSolicitacao as useCriarSolicitacaoNF } from '../../hooks/useSolicitacoesNF'
 import { useConsultaCNPJ } from '../../hooks/useConsultas'
 import { StatusBadge } from './LogisticaHome'
+import { useTheme } from '../../contexts/ThemeContext'
 import type { CriarSolicitacaoPayload, TipoTransporte, StatusSolicitacao } from '../../types/logistica'
 import { useNavigate } from 'react-router-dom'
 
@@ -34,12 +35,22 @@ const ALÇADAS = [
   { limite: Infinity, label: 'Acima de R$ 2.000', aprovador: 'Diretoria' },
 ]
 
+interface PlanejamentoForm {
+  modal?: string
+  transportadora_id?: string
+  veiculo_placa?: string
+  motorista_nome?: string
+  data_prevista_saida?: string
+  custo_estimado?: number
+}
+
 function getAlcada(valor?: number) {
   if (!valor) return ALÇADAS[0]
   return ALÇADAS.find(a => valor <= a.limite) ?? ALÇADAS[2]
 }
 
 export default function Solicitacoes() {
+  const { isDark } = useTheme()
   const [busca, setBusca] = useState('')
   const [statusFiltro, setStatusFiltro] = useState<string>('')
   const [showForm, setShowForm] = useState(false)
@@ -48,7 +59,7 @@ export default function Solicitacoes() {
   const [aprovacaoModal, setAprovacaoModal] = useState<{ id: string; titulo: string } | null>(null)
   const [motivoReprovacao, setMotivoReprovacao] = useState('')
   const [planejamentoModal, setPlanejamentoModal] = useState<string | null>(null)
-  const [planejForm, setPlanejForm] = useState<any>({})
+  const [planejForm, setPlanejForm] = useState<PlanejamentoForm>({})
   const [nfModal, setNfModal] = useState<{ solId: string; descricao: string; valor: number; transportadora?: string; cnpj?: string } | null>(null)
   const [nfForm, setNfForm] = useState({ fornecedor_cnpj: '', fornecedor_nome: '', valor_total: 0, descricao: '' })
   const navigate = useNavigate()
@@ -141,8 +152,8 @@ export default function Solicitacoes() {
       {/* ── Header ──────────────────────────────────────────────── */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-extrabold text-slate-800">Solicitações</h1>
-          <p className="text-xs text-slate-400 mt-0.5">{filtradas.length} registros</p>
+          <h1 className={`text-xl font-extrabold ${isDark ? 'text-white' : 'text-navy'}`}>Solicitações</h1>
+          <p className={`text-xs mt-0.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{filtradas.length} registros</p>
         </div>
         <button onClick={() => setShowForm(true)}
           className="flex items-center gap-1.5 bg-orange-600 hover:bg-orange-700 text-white
@@ -157,12 +168,10 @@ export default function Solicitacoes() {
           <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
           <input value={busca} onChange={e => setBusca(e.target.value)}
             placeholder="Buscar por número, origem, destino ou obra..."
-            className="w-full pl-9 pr-4 py-2 rounded-xl border border-slate-200 bg-white text-sm
-              focus:outline-none focus:ring-2 focus:ring-orange-500/30 focus:border-orange-400" />
+            className={`w-full pl-9 pr-4 py-2 rounded-xl border text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/30 focus:border-orange-400 ${isDark ? 'border-white/[0.06] bg-white/5 text-white placeholder:text-slate-600' : 'border-slate-200 bg-white'}`} />
         </div>
         <select value={statusFiltro} onChange={e => setStatusFiltro(e.target.value)}
-          className="px-3 py-2 rounded-xl border border-slate-200 bg-white text-xs font-semibold
-            text-slate-600 focus:outline-none">
+          className={`px-3 py-2 rounded-xl border text-xs font-semibold focus:outline-none ${isDark ? 'border-white/[0.06] bg-white/5 text-slate-300' : 'border-slate-200 bg-white text-slate-600'}`}>
           <option value="">Todos os status</option>
           {[
             ['solicitado','Solicitado'],['validando','Validando'],['planejado','Planejado'],
@@ -180,9 +189,9 @@ export default function Solicitacoes() {
           <div className="w-8 h-8 border-[3px] border-orange-500 border-t-transparent rounded-full animate-spin" />
         </div>
       ) : filtradas.length === 0 ? (
-        <div className="bg-white rounded-2xl border border-slate-200 p-12 text-center">
-          <ClipboardList size={40} className="text-slate-200 mx-auto mb-3" />
-          <p className="text-slate-500 font-semibold">Nenhuma solicitação encontrada</p>
+        <div className={`rounded-2xl p-12 text-center ${isDark ? 'bg-[#1e293b] border border-white/[0.06]' : 'bg-white border border-slate-200'}`}>
+          <ClipboardList size={40} className={`mx-auto mb-3 ${isDark ? 'text-slate-600' : 'text-slate-200'}`} />
+          <p className={`font-semibold ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Nenhuma solicitação encontrada</p>
         </div>
       ) : (
         <div className="space-y-2">
@@ -190,14 +199,14 @@ export default function Solicitacoes() {
             const isExp = expandedId === s.id
             const alcada = getAlcada(s.custo_estimado)
             return (
-              <div key={s.id} className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+              <div key={s.id} className={`rounded-2xl shadow-sm overflow-hidden ${isDark ? 'bg-[#1e293b] border border-white/[0.06]' : 'bg-white border border-slate-200'}`}>
                 <div
-                  className="flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-slate-50 transition-colors"
+                  className={`flex items-center gap-3 px-4 py-3 cursor-pointer transition-colors ${isDark ? 'hover:bg-white/[0.03]' : 'hover:bg-slate-50'}`}
                   onClick={() => setExpandedId(isExp ? null : s.id)}
                 >
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <p className="text-sm font-extrabold text-slate-800 font-mono">{s.numero}</p>
+                      <p className={`text-sm font-extrabold font-mono ${isDark ? 'text-white' : 'text-slate-800'}`}>{s.numero}</p>
                       <StatusBadge status={s.status} />
                       {s.urgente && (
                         <span className="text-[9px] bg-red-100 text-red-700 font-bold px-1.5 py-0.5 rounded-full flex items-center gap-0.5">
@@ -205,22 +214,22 @@ export default function Solicitacoes() {
                         </span>
                       )}
                     </div>
-                    <p className="text-xs text-slate-600 mt-0.5">
+                    <p className={`text-xs mt-0.5 ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>
                       {TIPO_LABEL[s.tipo]} · {s.origem} → {s.destino}
                     </p>
-                    <p className="text-[10px] text-slate-400">
+                    <p className={`text-[10px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
                       {s.obra_nome ?? '—'} · {s.centro_custo ?? '—'}
                       {s.solicitante_nome ? ` · por ${s.solicitante_nome}` : ''}
                     </p>
                   </div>
                   <div className="text-right shrink-0 hidden sm:block">
                     {s.custo_estimado ? (
-                      <p className="text-sm font-extrabold text-slate-700">
+                      <p className={`text-sm font-extrabold ${isDark ? 'text-white' : 'text-slate-700'}`}>
                         {s.custo_estimado.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
                       </p>
                     ) : null}
                     {s.data_desejada && (
-                      <p className="text-[10px] text-slate-400">
+                      <p className={`text-[10px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
                         Prazo: {new Date(s.data_desejada + 'T00:00:00').toLocaleDateString('pt-BR')}
                       </p>
                     )}
@@ -229,7 +238,7 @@ export default function Solicitacoes() {
                 </div>
 
                 {isExp && (
-                  <div className="border-t border-slate-100 px-4 py-4 space-y-3">
+                  <div className={`px-4 py-4 space-y-3 ${isDark ? 'border-t border-white/[0.06]' : 'border-t border-slate-100'}`}>
                     {/* Detalhes */}
                     <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-xs">
                       <Detail label="Tipo" value={TIPO_LABEL[s.tipo]} />
@@ -247,7 +256,7 @@ export default function Solicitacoes() {
                       {s.oc_numero && <Detail label="OC Vinculada" value={s.oc_numero} />}
                     </div>
                     {s.descricao && (
-                      <p className="text-xs text-slate-500 bg-slate-50 rounded-lg px-3 py-2">{s.descricao}</p>
+                      <p className={`text-xs rounded-lg px-3 py-2 ${isDark ? 'text-slate-400 bg-white/5' : 'text-slate-500 bg-slate-50'}`}>{s.descricao}</p>
                     )}
 
                     {/* Ações por status */}
@@ -320,18 +329,18 @@ export default function Solicitacoes() {
       {/* ── Modal Nova Solicitação ─────────────────────────────── */}
       {showForm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-xl max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
-              <h2 className="text-lg font-extrabold text-slate-800">Nova Solicitação</h2>
+          <div className={`rounded-2xl shadow-2xl w-full max-w-xl max-h-[90vh] overflow-y-auto ${isDark ? 'bg-[#1e293b]' : 'bg-white'}`}>
+            <div className={`flex items-center justify-between px-6 py-4 ${isDark ? 'border-b border-white/[0.06]' : 'border-b border-slate-100'}`}>
+              <h2 className={`text-lg font-extrabold ${isDark ? 'text-white' : 'text-slate-800'}`}>Nova Solicitação</h2>
               <button onClick={() => setShowForm(false)}
-                className="w-8 h-8 rounded-lg hover:bg-slate-100 flex items-center justify-center">
+                className={`w-8 h-8 rounded-lg flex items-center justify-center ${isDark ? 'hover:bg-white/10 text-slate-400' : 'hover:bg-slate-100'}`}>
                 <X size={16} />
               </button>
             </div>
             <div className="p-6 space-y-4">
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-bold text-slate-600 mb-1">Tipo *</label>
+                  <label className={`block text-xs font-bold mb-1 ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>Tipo *</label>
                   <select value={form.tipo} onChange={e => set('tipo', e.target.value)} className="input-base">
                     {Object.entries(TIPO_LABEL).map(([k, v]) => (
                       <option key={k} value={k}>{v}</option>
@@ -339,7 +348,7 @@ export default function Solicitacoes() {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-slate-600 mb-1">Rota Padrão</label>
+                  <label className={`block text-xs font-bold mb-1 ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>Rota Padrão</label>
                   <select
                     onChange={e => {
                       const r = rotas.find(r => r.id === e.target.value)
@@ -354,54 +363,54 @@ export default function Solicitacoes() {
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-bold text-slate-600 mb-1">Origem *</label>
+                  <label className={`block text-xs font-bold mb-1 ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>Origem *</label>
                   <input value={form.origem} onChange={e => set('origem', e.target.value)}
                     className="input-base" placeholder="Cidade / Depósito" />
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-slate-600 mb-1">Destino *</label>
+                  <label className={`block text-xs font-bold mb-1 ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>Destino *</label>
                   <input value={form.destino} onChange={e => set('destino', e.target.value)}
                     className="input-base" placeholder="Obra / Cidade" />
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-bold text-slate-600 mb-1">Obra / Projeto</label>
+                  <label className={`block text-xs font-bold mb-1 ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>Obra / Projeto</label>
                   <input value={form.obra_nome ?? ''} onChange={e => set('obra_nome', e.target.value)}
                     className="input-base" placeholder="SE Frutal..." />
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-slate-600 mb-1">Centro de Custo</label>
+                  <label className={`block text-xs font-bold mb-1 ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>Centro de Custo</label>
                   <input value={form.centro_custo ?? ''} onChange={e => set('centro_custo', e.target.value)}
                     className="input-base" placeholder="CC-001" />
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-bold text-slate-600 mb-1">OC Vinculada</label>
+                  <label className={`block text-xs font-bold mb-1 ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>OC Vinculada</label>
                   <input value={form.oc_numero ?? ''} onChange={e => set('oc_numero', e.target.value)}
                     className="input-base" placeholder="OC-2026-0001" />
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-slate-600 mb-1">Data Desejada</label>
+                  <label className={`block text-xs font-bold mb-1 ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>Data Desejada</label>
                   <input type="date" value={form.data_desejada ?? ''} onChange={e => set('data_desejada', e.target.value)}
                     className="input-base" />
                 </div>
               </div>
               <div>
-                <label className="block text-xs font-bold text-slate-600 mb-1">Descrição da Carga</label>
+                <label className={`block text-xs font-bold mb-1 ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>Descrição da Carga</label>
                 <textarea value={form.descricao ?? ''} onChange={e => set('descricao', e.target.value)}
                   rows={2} className="input-base resize-none" placeholder="Lista de materiais, equipamentos..." />
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-bold text-slate-600 mb-1">Peso Total (kg)</label>
+                  <label className={`block text-xs font-bold mb-1 ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>Peso Total (kg)</label>
                   <input type="number" min={0} value={form.peso_total_kg ?? ''}
                     onChange={e => set('peso_total_kg', e.target.value ? Number(e.target.value) : undefined)}
                     className="input-base" />
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-slate-600 mb-1">N° de Volumes</label>
+                  <label className={`block text-xs font-bold mb-1 ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>N° de Volumes</label>
                   <input type="number" min={0} value={form.volumes_total ?? ''}
                     onChange={e => set('volumes_total', e.target.value ? Number(e.target.value) : undefined)}
                     className="input-base" />
@@ -411,25 +420,25 @@ export default function Solicitacoes() {
                 <label className="flex items-center gap-2 cursor-pointer">
                   <input type="checkbox" checked={form.urgente ?? false} onChange={e => set('urgente', e.target.checked)}
                     className="rounded border-slate-300 text-orange-600 focus:ring-orange-500" />
-                  <span className="text-xs font-semibold text-slate-600">Urgente</span>
+                  <span className={`text-xs font-semibold ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>Urgente</span>
                 </label>
                 <label className="flex items-center gap-2 cursor-pointer">
                   <input type="checkbox" checked={form.carga_especial ?? false} onChange={e => set('carga_especial', e.target.checked)}
                     className="rounded border-slate-300 text-orange-600 focus:ring-orange-500" />
-                  <span className="text-xs font-semibold text-slate-600">Carga Especial</span>
+                  <span className={`text-xs font-semibold ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>Carga Especial</span>
                 </label>
               </div>
               {form.urgente && (
                 <div>
-                  <label className="block text-xs font-bold text-slate-600 mb-1">Justificativa da Urgência *</label>
+                  <label className={`block text-xs font-bold mb-1 ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>Justificativa da Urgência *</label>
                   <textarea value={form.justificativa_urgencia ?? ''} onChange={e => set('justificativa_urgencia', e.target.value)}
                     rows={2} className="input-base resize-none" placeholder="Motivo da urgência..." />
                 </div>
               )}
             </div>
-            <div className="px-6 py-4 border-t border-slate-100 flex justify-end gap-2">
+            <div className={`px-6 py-4 flex justify-end gap-2 ${isDark ? 'border-t border-white/[0.06]' : 'border-t border-slate-100'}`}>
               <button onClick={() => setShowForm(false)}
-                className="px-4 py-2 rounded-xl border border-slate-200 text-sm font-semibold text-slate-600 hover:bg-slate-50">
+                className={`px-4 py-2 rounded-xl text-sm font-semibold ${isDark ? 'border border-white/[0.06] text-slate-400 hover:bg-white/5' : 'border border-slate-200 text-slate-600 hover:bg-slate-50'}`}>
                 Cancelar
               </button>
               <button onClick={handleCriar} disabled={criar.isPending || !form.origem || !form.destino}
@@ -446,18 +455,18 @@ export default function Solicitacoes() {
       {/* ── Modal Planejamento ─────────────────────────────────── */}
       {planejamentoModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
-              <h2 className="text-lg font-extrabold text-slate-800">Planejar Transporte</h2>
+          <div className={`rounded-2xl shadow-2xl w-full max-w-md ${isDark ? 'bg-[#1e293b]' : 'bg-white'}`}>
+            <div className={`flex items-center justify-between px-6 py-4 ${isDark ? 'border-b border-white/[0.06]' : 'border-b border-slate-100'}`}>
+              <h2 className={`text-lg font-extrabold ${isDark ? 'text-white' : 'text-slate-800'}`}>Planejar Transporte</h2>
               <button onClick={() => setPlanejamentoModal(null)}
-                className="w-8 h-8 rounded-lg hover:bg-slate-100 flex items-center justify-center">
+                className={`w-8 h-8 rounded-lg flex items-center justify-center ${isDark ? 'hover:bg-white/10 text-slate-400' : 'hover:bg-slate-100'}`}>
                 <X size={16} />
               </button>
             </div>
             <div className="p-6 space-y-4">
               <div>
-                <label className="block text-xs font-bold text-slate-600 mb-1">Modal</label>
-                <select value={planejForm.modal ?? ''} onChange={e => setPlanejForm((p: any) => ({ ...p, modal: e.target.value }))}
+                <label className={`block text-xs font-bold mb-1 ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>Modal</label>
+                <select value={planejForm.modal ?? ''} onChange={e => setPlanejForm((p: PlanejamentoForm) => ({ ...p, modal: e.target.value }))}
                   className="input-base">
                   <option value="">Selecione...</option>
                   {[['frota_propria','Frota Própria'],['frota_locada','Frota Locada'],['transportadora','Transportadora'],['motoboy','Motoboy'],['correios','Correios']].map(([k,v]) => (
@@ -467,8 +476,8 @@ export default function Solicitacoes() {
               </div>
               {planejForm.modal === 'transportadora' && (
                 <div>
-                  <label className="block text-xs font-bold text-slate-600 mb-1">Transportadora</label>
-                  <select value={planejForm.transportadora_id ?? ''} onChange={e => setPlanejForm((p: any) => ({ ...p, transportadora_id: e.target.value }))}
+                  <label className={`block text-xs font-bold mb-1 ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>Transportadora</label>
+                  <select value={planejForm.transportadora_id ?? ''} onChange={e => setPlanejForm((p: PlanejamentoForm) => ({ ...p, transportadora_id: e.target.value }))}
                     className="input-base">
                     <option value="">Selecione...</option>
                     {transportadoras.filter(t => t.ativo).map(t => (
@@ -479,42 +488,42 @@ export default function Solicitacoes() {
               )}
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-bold text-slate-600 mb-1">Placa do Veículo</label>
-                  <input value={planejForm.veiculo_placa ?? ''} onChange={e => setPlanejForm((p: any) => ({ ...p, veiculo_placa: e.target.value }))}
+                  <label className={`block text-xs font-bold mb-1 ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>Placa do Veículo</label>
+                  <input value={planejForm.veiculo_placa ?? ''} onChange={e => setPlanejForm((p: PlanejamentoForm) => ({ ...p, veiculo_placa: e.target.value }))}
                     className="input-base" placeholder="ABC-1234" />
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-slate-600 mb-1">Motorista</label>
-                  <input value={planejForm.motorista_nome ?? ''} onChange={e => setPlanejForm((p: any) => ({ ...p, motorista_nome: e.target.value }))}
+                  <label className={`block text-xs font-bold mb-1 ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>Motorista</label>
+                  <input value={planejForm.motorista_nome ?? ''} onChange={e => setPlanejForm((p: PlanejamentoForm) => ({ ...p, motorista_nome: e.target.value }))}
                     className="input-base" placeholder="Nome do motorista" />
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-bold text-slate-600 mb-1">Data Prevista</label>
+                  <label className={`block text-xs font-bold mb-1 ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>Data Prevista</label>
                   <input type="datetime-local" value={planejForm.data_prevista_saida ?? ''}
-                    onChange={e => setPlanejForm((p: any) => ({ ...p, data_prevista_saida: e.target.value }))}
+                    onChange={e => setPlanejForm((p: PlanejamentoForm) => ({ ...p, data_prevista_saida: e.target.value }))}
                     className="input-base" />
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-slate-600 mb-1">Custo Estimado (R$)</label>
+                  <label className={`block text-xs font-bold mb-1 ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>Custo Estimado (R$)</label>
                   <input type="number" min={0} step={0.01} value={planejForm.custo_estimado ?? ''}
-                    onChange={e => setPlanejForm((p: any) => ({ ...p, custo_estimado: Number(e.target.value) }))}
+                    onChange={e => setPlanejForm((p: PlanejamentoForm) => ({ ...p, custo_estimado: Number(e.target.value) }))}
                     className="input-base" />
                 </div>
               </div>
               {planejForm.custo_estimado > 0 && (
-                <div className="bg-amber-50 border border-amber-200 rounded-xl px-3 py-2">
-                  <p className="text-xs text-amber-700 font-semibold">
+                <div className={`rounded-xl px-3 py-2 ${isDark ? 'bg-amber-500/10 border border-amber-500/20' : 'bg-amber-50 border border-amber-200'}`}>
+                  <p className={`text-xs font-semibold ${isDark ? 'text-amber-400' : 'text-amber-700'}`}>
                     Alçada: {getAlcada(planejForm.custo_estimado).aprovador}
                     {planejForm.custo_estimado > 500 && ' — Requer aprovação formal'}
                   </p>
                 </div>
               )}
             </div>
-            <div className="px-6 py-4 border-t border-slate-100 flex justify-end gap-2">
+            <div className={`px-6 py-4 flex justify-end gap-2 ${isDark ? 'border-t border-white/[0.06]' : 'border-t border-slate-100'}`}>
               <button onClick={() => setPlanejamentoModal(null)}
-                className="px-4 py-2 rounded-xl border border-slate-200 text-sm font-semibold text-slate-600 hover:bg-slate-50">
+                className={`px-4 py-2 rounded-xl text-sm font-semibold ${isDark ? 'border border-white/[0.06] text-slate-400 hover:bg-white/5' : 'border border-slate-200 text-slate-600 hover:bg-slate-50'}`}>
                 Cancelar
               </button>
               <button onClick={handlePlanejar} disabled={planejar.isPending}
@@ -531,22 +540,22 @@ export default function Solicitacoes() {
       {/* ── Modal Aprovação ────────────────────────────────────── */}
       {aprovacaoModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
-              <h2 className="text-lg font-extrabold text-slate-800">Aprovação — {aprovacaoModal.titulo}</h2>
+          <div className={`rounded-2xl shadow-2xl w-full max-w-sm ${isDark ? 'bg-[#1e293b]' : 'bg-white'}`}>
+            <div className={`flex items-center justify-between px-6 py-4 ${isDark ? 'border-b border-white/[0.06]' : 'border-b border-slate-100'}`}>
+              <h2 className={`text-lg font-extrabold ${isDark ? 'text-white' : 'text-slate-800'}`}>Aprovação — {aprovacaoModal.titulo}</h2>
               <button onClick={() => setAprovacaoModal(null)}
-                className="w-8 h-8 rounded-lg hover:bg-slate-100 flex items-center justify-center">
+                className={`w-8 h-8 rounded-lg flex items-center justify-center ${isDark ? 'hover:bg-white/10 text-slate-400' : 'hover:bg-slate-100'}`}>
                 <X size={16} />
               </button>
             </div>
             <div className="p-6 space-y-4">
               <div>
-                <label className="block text-xs font-bold text-slate-600 mb-1">Motivo (se reprovar)</label>
+                <label className={`block text-xs font-bold mb-1 ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>Motivo (se reprovar)</label>
                 <textarea value={motivoReprovacao} onChange={e => setMotivoReprovacao(e.target.value)}
                   rows={2} className="input-base resize-none" placeholder="Justificativa da reprovação..." />
               </div>
             </div>
-            <div className="px-6 py-4 border-t border-slate-100 flex gap-2">
+            <div className={`px-6 py-4 flex gap-2 ${isDark ? 'border-t border-white/[0.06]' : 'border-t border-slate-100'}`}>
               <button onClick={() => handleAprovar(false)} disabled={aprovar.isPending}
                 className="flex-1 py-2 rounded-xl bg-red-600 hover:bg-red-700 text-white text-sm font-semibold transition-colors disabled:opacity-60">
                 Reprovar
@@ -562,26 +571,26 @@ export default function Solicitacoes() {
       {/* ── Modal Solicitar NF ──────────────────────────────── */}
       {nfModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
+          <div className={`rounded-2xl shadow-2xl w-full max-w-md ${isDark ? 'bg-[#1e293b]' : 'bg-white'}`}>
+            <div className={`flex items-center justify-between px-6 py-4 ${isDark ? 'border-b border-white/[0.06]' : 'border-b border-slate-100'}`}>
               <div>
-                <h2 className="text-lg font-extrabold text-slate-800">Solicitar Nota Fiscal</h2>
-                <p className="text-xs text-slate-400 mt-0.5">Transporte {nfModal.descricao}</p>
+                <h2 className={`text-lg font-extrabold ${isDark ? 'text-white' : 'text-slate-800'}`}>Solicitar Nota Fiscal</h2>
+                <p className={`text-xs mt-0.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Transporte {nfModal.descricao}</p>
               </div>
               <button onClick={() => setNfModal(null)}
-                className="w-8 h-8 rounded-lg hover:bg-slate-100 flex items-center justify-center">
+                className={`w-8 h-8 rounded-lg flex items-center justify-center ${isDark ? 'hover:bg-white/10 text-slate-400' : 'hover:bg-slate-100'}`}>
                 <X size={16} />
               </button>
             </div>
             <div className="p-6 space-y-4">
-              <div className="bg-amber-50 border border-amber-200 rounded-xl px-3 py-2.5">
-                <p className="text-xs text-amber-700 font-semibold flex items-center gap-1.5">
+              <div className={`rounded-xl px-3 py-2.5 ${isDark ? 'bg-amber-500/10 border border-amber-500/20' : 'bg-amber-50 border border-amber-200'}`}>
+                <p className={`text-xs font-semibold flex items-center gap-1.5 ${isDark ? 'text-amber-400' : 'text-amber-700'}`}>
                   <FileInput size={13} />
                   Sera enviada ao modulo Fiscal como &quot;Pendente&quot;
                 </p>
               </div>
               <div className="relative">
-                <label className="block text-xs font-bold text-slate-600 mb-1">CNPJ do Fornecedor *</label>
+                <label className={`block text-xs font-bold mb-1 ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>CNPJ do Fornecedor *</label>
                 <input value={nfForm.fornecedor_cnpj}
                   onChange={e => setNfForm(p => ({ ...p, fornecedor_cnpj: e.target.value }))}
                   onBlur={() => cnpjLookup.consultar(nfForm.fornecedor_cnpj)}
@@ -602,35 +611,35 @@ export default function Solicitacoes() {
                 )}
               </div>
               <div>
-                <label className="block text-xs font-bold text-slate-600 mb-1">Nome / Razao Social *</label>
+                <label className={`block text-xs font-bold mb-1 ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>Nome / Razao Social *</label>
                 <input value={nfForm.fornecedor_nome}
                   onChange={e => setNfForm(p => ({ ...p, fornecedor_nome: e.target.value }))}
                   className="input-base" placeholder="Nome do fornecedor" />
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-bold text-slate-600 mb-1">Valor Total (R$) *</label>
+                  <label className={`block text-xs font-bold mb-1 ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>Valor Total (R$) *</label>
                   <input type="number" min={0} step={0.01}
                     value={nfForm.valor_total}
                     onChange={e => setNfForm(p => ({ ...p, valor_total: Number(e.target.value) }))}
                     className="input-base" />
                 </div>
                 <div className="flex items-end pb-0.5">
-                  <p className="text-[10px] text-slate-400">
+                  <p className={`text-[10px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
                     Pre-preenchido com custo estimado do transporte
                   </p>
                 </div>
               </div>
               <div>
-                <label className="block text-xs font-bold text-slate-600 mb-1">Descricao</label>
+                <label className={`block text-xs font-bold mb-1 ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>Descricao</label>
                 <textarea value={nfForm.descricao}
                   onChange={e => setNfForm(p => ({ ...p, descricao: e.target.value }))}
                   rows={2} className="input-base resize-none" />
               </div>
             </div>
-            <div className="px-6 py-4 border-t border-slate-100 flex justify-end gap-2">
+            <div className={`px-6 py-4 flex justify-end gap-2 ${isDark ? 'border-t border-white/[0.06]' : 'border-t border-slate-100'}`}>
               <button onClick={() => setNfModal(null)}
-                className="px-4 py-2 rounded-xl border border-slate-200 text-sm font-semibold text-slate-600 hover:bg-slate-50">
+                className={`px-4 py-2 rounded-xl text-sm font-semibold ${isDark ? 'border border-white/[0.06] text-slate-400 hover:bg-white/5' : 'border border-slate-200 text-slate-600 hover:bg-slate-50'}`}>
                 Cancelar
               </button>
               <button onClick={handleSolicitarNF}
@@ -649,10 +658,11 @@ export default function Solicitacoes() {
 }
 
 function Detail({ label, value }: { label: string; value: string }) {
+  const { isDark } = useTheme()
   return (
-    <div className="bg-slate-50 rounded-lg px-3 py-2">
-      <p className="text-[9px] text-slate-400 uppercase tracking-wider">{label}</p>
-      <p className="text-xs font-semibold text-slate-700 mt-0.5">{value}</p>
+    <div className={`rounded-lg px-3 py-2 ${isDark ? 'bg-white/5' : 'bg-slate-50'}`}>
+      <p className={`text-[9px] uppercase tracking-wider ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{label}</p>
+      <p className={`text-xs font-semibold mt-0.5 ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>{value}</p>
     </div>
   )
 }

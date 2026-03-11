@@ -1,25 +1,26 @@
 import { useState } from 'react'
 import { Plus, ClipboardCheck, CheckCircle, XCircle } from 'lucide-react'
 import { useChecklists, useCriarChecklist, useVeiculos } from '../../hooks/useFrotas'
+import { useTheme } from '../../contexts/ThemeContext'
 import type { FroChecklist, TipoChecklist } from '../../types/frotas'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 const TIPO_LABEL: Record<TipoChecklist, string> = {
-  pre_viagem: 'Pré-viagem', pos_viagem: 'Pós-viagem', pos_manutencao: 'Pós-manutenção',
+  pre_viagem: 'Pre-viagem', pos_viagem: 'Pos-viagem', pos_manutencao: 'Pos-manutencao',
 }
 
 const ITENS_CHECKLIST = [
-  { key: 'nivel_oleo_ok'       as keyof FroChecklist, label: 'Nível de óleo, água e fluido de freio' },
+  { key: 'nivel_oleo_ok'       as keyof FroChecklist, label: 'Nivel de oleo, agua e fluido de freio' },
   { key: 'calibragem_pneus_ok' as keyof FroChecklist, label: 'Calibragem dos pneus' },
-  { key: 'lanternas_ok'        as keyof FroChecklist, label: 'Funcionamento de lanternas e faróis' },
+  { key: 'lanternas_ok'        as keyof FroChecklist, label: 'Funcionamento de lanternas e farois' },
   { key: 'freios_ok'           as keyof FroChecklist, label: 'Freios e buzina' },
-  { key: 'documentacao_ok'     as keyof FroChecklist, label: 'Documentação do veículo (CRLV, seguro)' },
-  { key: 'nivel_agua_ok'       as keyof FroChecklist, label: 'Nível de água do radiador' },
-  { key: 'limpeza_ok'          as keyof FroChecklist, label: 'Limpeza e conservação interna/externa' },
+  { key: 'documentacao_ok'     as keyof FroChecklist, label: 'Documentacao do veiculo (CRLV, seguro)' },
+  { key: 'nivel_agua_ok'       as keyof FroChecklist, label: 'Nivel de agua do radiador' },
+  { key: 'limpeza_ok'          as keyof FroChecklist, label: 'Limpeza e conservacao interna/externa' },
 ]
 
 // ── Nova Checklist Modal ──────────────────────────────────────────────────────
-function NovaChecklistModal({ onClose }: { onClose: () => void }) {
+function NovaChecklistModal({ onClose, isLight }: { onClose: () => void; isLight: boolean }) {
   const criar = useCriarChecklist()
   const { data: veiculos = [] } = useVeiculos()
 
@@ -54,19 +55,21 @@ function NovaChecklistModal({ onClose }: { onClose: () => void }) {
     onClose()
   }
 
-  const inp = 'w-full px-3 py-2 rounded-xl bg-white/6 border border-white/10 text-sm text-white focus:outline-none focus:ring-2 focus:ring-rose-500/30'
-  const sel = inp + ' [&>option]:bg-slate-900'
+  const inp = `w-full px-3 py-2 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-rose-500/30 ${
+    isLight ? 'bg-slate-50 border border-slate-200 text-slate-800' : 'bg-white/6 border border-white/10 text-white'
+  }`
+  const sel = inp + (isLight ? '' : ' [&>option]:bg-slate-900')
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
       <form onSubmit={handleSubmit} className="glass-card rounded-2xl p-6 w-full max-w-lg space-y-4 max-h-[90vh] overflow-y-auto styled-scrollbar">
-        <h2 className="text-base font-bold text-white">Novo Checklist</h2>
+        <h2 className={`text-base font-bold ${isLight ? 'text-slate-800' : 'text-white'}`}>Novo Checklist</h2>
 
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <label className="text-[11px] text-slate-400">Veículo *</label>
+            <label className="text-[11px] text-slate-400">Veiculo *</label>
             <select className={sel} value={form.veiculo_id} onChange={e => setForm(f => ({ ...f, veiculo_id: e.target.value }))} required>
-              <option value="">Selecione…</option>
+              <option value="">Selecione...</option>
               {veiculos.filter(v => v.status !== 'baixado').map(v => (
                 <option key={v.id} value={v.id}>{v.placa} — {v.marca} {v.modelo}</option>
               ))}
@@ -81,13 +84,13 @@ function NovaChecklistModal({ onClose }: { onClose: () => void }) {
         </div>
 
         <div>
-          <label className="text-[11px] text-slate-400">Hodômetro atual (km)</label>
+          <label className="text-[11px] text-slate-400">Hodometro atual (km)</label>
           <input type="number" className={inp} value={form.hodometro} onChange={e => setForm(f => ({ ...f, hodometro: e.target.value }))} placeholder="Ex: 55432" />
         </div>
 
         {/* Itens */}
         <div className="space-y-2">
-          <label className="text-[11px] text-slate-400 uppercase tracking-wider">Itens de Verificação</label>
+          <label className="text-[11px] text-slate-400 uppercase tracking-wider">Itens de Verificacao</label>
           {ITENS_CHECKLIST.map(item => (
             <button
               key={item.key}
@@ -96,12 +99,14 @@ function NovaChecklistModal({ onClose }: { onClose: () => void }) {
               className={`w-full flex items-center gap-3 p-3 rounded-xl text-left text-sm transition-all border ${
                 form[item.key as keyof typeof form]
                   ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300'
-                  : 'bg-white/4 border-white/8 text-slate-400 hover:border-white/15'
+                  : isLight
+                    ? 'bg-slate-50 border-slate-200 text-slate-500 hover:border-slate-300'
+                    : 'bg-white/4 border-white/8 text-slate-400 hover:border-white/15'
               }`}
             >
               {form[item.key as keyof typeof form]
                 ? <CheckCircle size={15} className="text-emerald-400 shrink-0" />
-                : <div className="w-[15px] h-[15px] rounded-full border border-slate-600 shrink-0" />
+                : <div className={`w-[15px] h-[15px] rounded-full border shrink-0 ${isLight ? 'border-slate-300' : 'border-slate-600'}`} />
               }
               {item.label}
             </button>
@@ -113,18 +118,20 @@ function NovaChecklistModal({ onClose }: { onClose: () => void }) {
           allOk ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300' : 'bg-amber-500/10 border-amber-500/30 text-amber-300'
         }`}>
           {allOk ? <CheckCircle size={15} /> : <XCircle size={15} />}
-          {allOk ? 'Veículo liberado para uso' : `${ITENS_CHECKLIST.filter(i => !form[i.key as keyof typeof form]).length} item(s) pendente(s) — veículo NÃO liberado`}
+          {allOk ? 'Veiculo liberado para uso' : `${ITENS_CHECKLIST.filter(i => !form[i.key as keyof typeof form]).length} item(s) pendente(s) — veiculo NAO liberado`}
         </div>
 
         <div>
-          <label className="text-[11px] text-slate-400">Observações</label>
-          <textarea className={inp + ' resize-none'} rows={2} value={form.observacoes} onChange={e => setForm(f => ({ ...f, observacoes: e.target.value }))} placeholder="Anomalias, observações adicionais…" />
+          <label className="text-[11px] text-slate-400">Observacoes</label>
+          <textarea className={inp + ' resize-none'} rows={2} value={form.observacoes} onChange={e => setForm(f => ({ ...f, observacoes: e.target.value }))} placeholder="Anomalias, observacoes adicionais..." />
         </div>
 
         <div className="flex gap-2">
-          <button type="button" onClick={onClose} className="flex-1 py-2 rounded-xl border border-white/10 text-sm text-slate-400 hover:bg-white/5">Cancelar</button>
+          <button type="button" onClick={onClose} className={`flex-1 py-2 rounded-xl border text-sm ${
+            isLight ? 'border-slate-200 text-slate-500 hover:bg-slate-50' : 'border-white/10 text-slate-400 hover:bg-white/5'
+          }`}>Cancelar</button>
           <button type="submit" disabled={criar.isPending || !form.veiculo_id} className="flex-1 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-sm text-white font-semibold disabled:opacity-50">
-            {criar.isPending ? 'Registrando…' : 'Registrar Checklist'}
+            {criar.isPending ? 'Registrando...' : 'Registrar Checklist'}
           </button>
         </div>
       </form>
@@ -133,7 +140,7 @@ function NovaChecklistModal({ onClose }: { onClose: () => void }) {
 }
 
 // ── Checklist Row ─────────────────────────────────────────────────────────────
-function ChecklistRow({ ck }: { ck: FroChecklist }) {
+function ChecklistRow({ ck, isLight }: { ck: FroChecklist; isLight: boolean }) {
   const okCount = ITENS_CHECKLIST.filter(i => ck[i.key as keyof FroChecklist] === true).length
   const total   = ITENS_CHECKLIST.length
 
@@ -146,18 +153,18 @@ function ChecklistRow({ ck }: { ck: FroChecklist }) {
         }
       </div>
       <div className="flex-1 min-w-0">
-        <p className="text-sm font-semibold text-white">{ck.veiculo?.placa} — {ck.veiculo?.marca} {ck.veiculo?.modelo}</p>
+        <p className={`text-sm font-semibold ${isLight ? 'text-slate-800' : 'text-white'}`}>{ck.veiculo?.placa} — {ck.veiculo?.marca} {ck.veiculo?.modelo}</p>
         <p className="text-[11px] text-slate-500">{TIPO_LABEL[ck.tipo]} · {okCount}/{total} itens OK</p>
       </div>
       <div className="text-right">
         <p className="text-xs text-slate-400">{new Date(ck.data_checklist).toLocaleDateString('pt-BR')}</p>
         <p className={`text-[10px] font-bold ${ck.liberado ? 'text-emerald-400' : 'text-red-400'}`}>
-          {ck.liberado ? 'Liberado' : 'Não liberado'}
+          {ck.liberado ? 'Liberado' : 'Nao liberado'}
         </p>
       </div>
       {ck.observacoes && (
         <div className="hidden sm:block max-w-xs text-[11px] text-amber-400 truncate" title={ck.observacoes}>
-          ⚠ {ck.observacoes}
+          {ck.observacoes}
         </div>
       )}
     </div>
@@ -166,6 +173,7 @@ function ChecklistRow({ ck }: { ck: FroChecklist }) {
 
 // ── Main ──────────────────────────────────────────────────────────────────────
 export default function Checklists() {
+  const { isLightSidebar: isLight } = useTheme()
   const [modal, setModal]   = useState(false)
   const [dataFiltro, setDataFiltro] = useState(new Date().toISOString().split('T')[0])
   const [tipoFiltro, setTipoFiltro] = useState<TipoChecklist | ''>('')
@@ -182,11 +190,11 @@ export default function Checklists() {
     <div className="p-4 sm:p-6 space-y-4">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-bold text-white flex items-center gap-2">
+          <h1 className={`text-xl font-bold flex items-center gap-2 ${isLight ? 'text-slate-800' : 'text-white'}`}>
             <ClipboardCheck size={20} className="text-rose-400" /> Checklists
           </h1>
           <p className="text-sm text-slate-500">
-            {liberados} liberados · <span className="text-red-400">{naoLiberados} não liberados</span>
+            {liberados} liberados · <span className="text-red-400">{naoLiberados} nao liberados</span>
           </p>
         </div>
         <button onClick={() => setModal(true)} className="flex items-center gap-2 px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-sm text-white font-semibold">
@@ -202,7 +210,9 @@ export default function Checklists() {
             type="date"
             value={dataFiltro}
             onChange={e => setDataFiltro(e.target.value)}
-            className="px-3 py-2 rounded-xl bg-white/6 border border-white/10 text-sm text-white focus:outline-none focus:ring-2 focus:ring-rose-500/30"
+            className={`px-3 py-2 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-rose-500/30 ${
+              isLight ? 'bg-slate-50 border border-slate-200 text-slate-800' : 'bg-white/6 border border-white/10 text-white'
+            }`}
           />
         </div>
         <div>
@@ -210,7 +220,9 @@ export default function Checklists() {
           <select
             value={tipoFiltro}
             onChange={e => setTipoFiltro(e.target.value as TipoChecklist | '')}
-            className="px-3 py-2 rounded-xl bg-white/6 border border-white/10 text-sm text-white focus:outline-none focus:ring-2 focus:ring-rose-500/30 [&>option]:bg-slate-900"
+            className={`px-3 py-2 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-rose-500/30 ${
+              isLight ? 'bg-slate-50 border border-slate-200 text-slate-800' : 'bg-white/6 border border-white/10 text-white [&>option]:bg-slate-900'
+            }`}
           >
             <option value="">Todos</option>
             {Object.entries(TIPO_LABEL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
@@ -225,11 +237,11 @@ export default function Checklists() {
         <p className="text-sm text-slate-500 text-center py-12">Nenhum checklist encontrado para esta data</p>
       ) : (
         <div className="space-y-2">
-          {checklists.map(ck => <ChecklistRow key={ck.id} ck={ck} />)}
+          {checklists.map(ck => <ChecklistRow key={ck.id} ck={ck} isLight={isLight} />)}
         </div>
       )}
 
-      {modal && <NovaChecklistModal onClose={() => setModal(false)} />}
+      {modal && <NovaChecklistModal onClose={() => setModal(false)} isLight={isLight} />}
     </div>
   )
 }

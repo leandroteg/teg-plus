@@ -3,6 +3,7 @@ import {
   BarChart3, TrendingUp, Calendar, Download,
   PieChart, ArrowUpRight, ArrowDownRight, Minus,
 } from 'lucide-react'
+import { useTheme } from '../../contexts/ThemeContext'
 import { useContasPagar, useContasReceber } from '../../hooks/useFinanceiro'
 
 const fmt = (v: number) =>
@@ -23,6 +24,7 @@ const REPORTS: ReportDef[] = [
 ]
 
 export default function Relatorios() {
+  const { isDark } = useTheme()
   const [activeReport, setActiveReport] = useState<ReportType>('dre')
   const { data: cp = [] } = useContasPagar()
   const { data: cr = [] } = useContasReceber()
@@ -69,15 +71,14 @@ export default function Relatorios() {
       {/* ── Header ──────────────────────────────────────────── */}
       <div className="flex items-start justify-between">
         <div>
-          <h1 className="text-xl font-extrabold text-slate-800 flex items-center gap-2">
+          <h1 className={`text-xl font-extrabold flex items-center gap-2 ${isDark ? 'text-white' : 'text-slate-800'}`}>
             <BarChart3 size={20} className="text-emerald-600" />
             Relatórios Financeiros
           </h1>
-          <p className="text-xs text-slate-400 mt-0.5">DRE, Fluxo de Caixa, Centro de Custo e Aging</p>
+          <p className={`text-xs mt-0.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>DRE, Fluxo de Caixa, Centro de Custo e Aging</p>
         </div>
-        <button className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white border border-slate-200
-          text-[11px] font-semibold text-slate-600 hover:border-emerald-400 hover:text-emerald-600
-          transition-all shadow-sm">
+        <button className={`flex items-center gap-1.5 px-3 py-2 rounded-xl border text-[11px] font-semibold transition-all shadow-sm
+          ${isDark ? 'bg-[#1e293b] border-white/[0.06] text-slate-300 hover:border-emerald-400 hover:text-emerald-500' : 'bg-white border-slate-200 text-slate-600 hover:border-emerald-400 hover:text-emerald-600'}`}>
           <Download size={12} />
           Exportar
         </button>
@@ -92,10 +93,10 @@ export default function Relatorios() {
               className={`rounded-2xl p-3 text-left transition-all border
                 ${isActive
                   ? `${r.activeBg} ${r.activeBorder} shadow-sm`
-                  : 'bg-white border-slate-200 hover:border-slate-300'
+                  : isDark ? 'bg-[#1e293b] border-white/[0.06] hover:border-white/[0.12]' : 'bg-white border-slate-200 hover:border-slate-300'
                 }`}>
               <r.icon size={16} className={isActive ? r.activeIcon : 'text-slate-400'} />
-              <p className={`text-[11px] font-bold mt-1.5 ${isActive ? r.activeLabel : 'text-slate-700'}`}>
+              <p className={`text-[11px] font-bold mt-1.5 ${isActive ? r.activeLabel : isDark ? 'text-slate-300' : 'text-slate-700'}`}>
                 {r.label}
               </p>
               <p className="text-[9px] text-slate-400 mt-0.5">{r.desc}</p>
@@ -109,21 +110,21 @@ export default function Relatorios() {
         <div className="space-y-4">
           {/* Summary cards */}
           <div className="grid grid-cols-3 gap-3">
-            <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm">
+            <div className={`rounded-2xl p-4 border shadow-sm ${isDark ? 'bg-[#1e293b] border-white/[0.06]' : 'bg-white border-slate-200'}`}>
               <div className="flex items-center gap-1.5 mb-2">
                 <ArrowUpRight size={14} className="text-emerald-500" />
                 <p className="text-[10px] text-emerald-500 font-semibold uppercase tracking-widest">Receitas</p>
               </div>
               <p className="text-lg font-extrabold text-emerald-600">{fmt(totalReceitas)}</p>
             </div>
-            <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm">
+            <div className={`rounded-2xl p-4 border shadow-sm ${isDark ? 'bg-[#1e293b] border-white/[0.06]' : 'bg-white border-slate-200'}`}>
               <div className="flex items-center gap-1.5 mb-2">
                 <ArrowDownRight size={14} className="text-red-500" />
                 <p className="text-[10px] text-red-500 font-semibold uppercase tracking-widest">Despesas</p>
               </div>
               <p className="text-lg font-extrabold text-red-600">{fmt(totalDespesas)}</p>
             </div>
-            <div className={`bg-white rounded-2xl p-4 border shadow-sm
+            <div className={`rounded-2xl p-4 border shadow-sm ${isDark ? 'bg-[#1e293b] border-white/[0.06]' : 'bg-white'}
               ${resultado >= 0 ? 'border-emerald-200' : 'border-red-200'}`}>
               <div className="flex items-center gap-1.5 mb-2">
                 <Minus size={14} className={resultado >= 0 ? 'text-emerald-500' : 'text-red-500'} />
@@ -137,19 +138,19 @@ export default function Relatorios() {
           </div>
 
           {/* DRE table */}
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-            <div className="px-4 py-3 border-b border-slate-100 bg-slate-50">
-              <p className="text-xs font-bold text-slate-600">Demonstrativo de Resultado do Exercício</p>
+          <div className={`rounded-2xl border shadow-sm overflow-hidden ${isDark ? 'bg-[#1e293b] border-white/[0.06]' : 'bg-white border-slate-200'}`}>
+            <div className={`px-4 py-3 border-b ${isDark ? 'bg-white/[0.02] border-white/[0.06]' : 'bg-slate-50 border-slate-100'}`}>
+              <p className={`text-xs font-bold ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>Demonstrativo de Resultado do Exercício</p>
             </div>
-            <div className="divide-y divide-slate-100">
-              <DRERow label="(+) Receita Operacional" value={totalReceitas} bold isPositive />
-              <DRERow label="(-) Despesas Operacionais" value={totalDespesas} isPositive={false} />
-              <DRERow label="(-) Folha de Pagamento" value={0} isPositive={false} sub />
-              <DRERow label="(-) Fornecedores" value={totalDespesas} isPositive={false} sub />
-              <DRERow label="(-) Impostos" value={0} isPositive={false} sub />
-              <DRERow label="(=) Resultado Operacional" value={resultado} bold isPositive={resultado >= 0} highlight />
-              <DRERow label="(+/-) Resultado Financeiro" value={0} isPositive />
-              <DRERow label="(=) Resultado Líquido" value={resultado} bold isPositive={resultado >= 0} highlight />
+            <div className={`divide-y ${isDark ? 'divide-white/[0.04]' : 'divide-slate-100'}`}>
+              <DRERow isDark={isDark} label="(+) Receita Operacional" value={totalReceitas} bold isPositive />
+              <DRERow isDark={isDark} label="(-) Despesas Operacionais" value={totalDespesas} isPositive={false} />
+              <DRERow isDark={isDark} label="(-) Folha de Pagamento" value={0} isPositive={false} sub />
+              <DRERow isDark={isDark} label="(-) Fornecedores" value={totalDespesas} isPositive={false} sub />
+              <DRERow isDark={isDark} label="(-) Impostos" value={0} isPositive={false} sub />
+              <DRERow isDark={isDark} label="(=) Resultado Operacional" value={resultado} bold isPositive={resultado >= 0} highlight />
+              <DRERow isDark={isDark} label="(+/-) Resultado Financeiro" value={0} isPositive />
+              <DRERow isDark={isDark} label="(=) Resultado Líquido" value={resultado} bold isPositive={resultado >= 0} highlight />
             </div>
           </div>
         </div>
@@ -157,10 +158,10 @@ export default function Relatorios() {
 
       {activeReport === 'fluxo' && (
         <div className="space-y-4">
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5">
-            <p className="text-xs font-bold text-slate-600 mb-4">Fluxo de Caixa — Próximos 30 dias</p>
+          <div className={`rounded-2xl border shadow-sm p-5 ${isDark ? 'bg-[#1e293b] border-white/[0.06]' : 'bg-white border-slate-200'}`}>
+            <p className={`text-xs font-bold mb-4 ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>Fluxo de Caixa — Próximos 30 dias</p>
             <div className="space-y-3">
-              <FluxoBar label="Receitas Previstas"
+              <FluxoBar isDark={isDark} label="Receitas Previstas"
                 value={cr.filter(c => !['recebido', 'conciliado', 'cancelado'].includes(c.status))
                   .reduce((s, c) => s + c.valor_original, 0)}
                 textColor="text-emerald-600" barColor="bg-emerald-500"
@@ -171,7 +172,7 @@ export default function Relatorios() {
                     .reduce((s, c) => s + c.valor_original, 0)
                 ) || 1}
               />
-              <FluxoBar label="Pagamentos Previstos"
+              <FluxoBar isDark={isDark} label="Pagamentos Previstos"
                 value={cp.filter(c => !['pago', 'conciliado', 'cancelado'].includes(c.status))
                   .reduce((s, c) => s + c.valor_original, 0)}
                 textColor="text-red-600" barColor="bg-red-500"
@@ -186,11 +187,11 @@ export default function Relatorios() {
           </div>
 
           {/* Weekly breakdown */}
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-            <div className="px-4 py-3 border-b border-slate-100 bg-slate-50">
-              <p className="text-xs font-bold text-slate-600">Vencimentos — Próximas 4 Semanas</p>
+          <div className={`rounded-2xl border shadow-sm overflow-hidden ${isDark ? 'bg-[#1e293b] border-white/[0.06]' : 'bg-white border-slate-200'}`}>
+            <div className={`px-4 py-3 border-b ${isDark ? 'bg-white/[0.02] border-white/[0.06]' : 'bg-slate-50 border-slate-100'}`}>
+              <p className={`text-xs font-bold ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>Vencimentos — Próximas 4 Semanas</p>
             </div>
-            <div className="divide-y divide-slate-100">
+            <div className={`divide-y ${isDark ? 'divide-white/[0.04]' : 'divide-slate-100'}`}>
               {[
                 { label: 'Semana 1', days: 7 },
                 { label: 'Semana 2', days: 14 },
@@ -210,8 +211,8 @@ export default function Relatorios() {
                   .reduce((s, c) => s + c.valor_original, 0)
                 return (
                   <div key={w.label} className="flex items-center justify-between px-4 py-3">
-                    <p className="text-xs font-semibold text-slate-600">{w.label}</p>
-                    <p className="text-xs font-bold text-slate-800">{fmt(weekCP)}</p>
+                    <p className={`text-xs font-semibold ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>{w.label}</p>
+                    <p className={`text-xs font-bold ${isDark ? 'text-white' : 'text-slate-800'}`}>{fmt(weekCP)}</p>
                   </div>
                 )
               })}
@@ -222,23 +223,23 @@ export default function Relatorios() {
 
       {activeReport === 'cc' && (
         <div className="space-y-4">
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-            <div className="px-4 py-3 border-b border-slate-100 bg-slate-50">
-              <p className="text-xs font-bold text-slate-600">Gastos por Centro de Custo</p>
+          <div className={`rounded-2xl border shadow-sm overflow-hidden ${isDark ? 'bg-[#1e293b] border-white/[0.06]' : 'bg-white border-slate-200'}`}>
+            <div className={`px-4 py-3 border-b ${isDark ? 'bg-white/[0.02] border-white/[0.06]' : 'bg-slate-50 border-slate-100'}`}>
+              <p className={`text-xs font-bold ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>Gastos por Centro de Custo</p>
             </div>
             {ccData.length === 0 ? (
               <div className="p-8 text-center">
-                <p className="text-xs text-slate-400">Nenhum dado disponível</p>
+                <p className={`text-xs ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Nenhum dado disponível</p>
               </div>
             ) : (
               <div className="p-4 space-y-3">
                 {ccData.map(item => (
                   <div key={item.cc}>
                     <div className="flex items-center justify-between mb-1">
-                      <p className="text-xs font-bold text-slate-700">{item.cc}</p>
-                      <p className="text-xs font-bold text-slate-800">{fmt(item.total)}</p>
+                      <p className={`text-xs font-bold ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>{item.cc}</p>
+                      <p className={`text-xs font-bold ${isDark ? 'text-white' : 'text-slate-800'}`}>{fmt(item.total)}</p>
                     </div>
-                    <div className="h-2.5 bg-slate-100 rounded-full overflow-hidden">
+                    <div className={`h-2.5 rounded-full overflow-hidden ${isDark ? 'bg-white/[0.06]' : 'bg-slate-100'}`}>
                       <div className="h-full rounded-full flex">
                         <div
                           className="bg-emerald-500 rounded-l-full"
@@ -268,9 +269,9 @@ export default function Relatorios() {
 
       {activeReport === 'aging' && (
         <div className="space-y-4">
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-            <div className="px-4 py-3 border-b border-slate-100 bg-slate-50">
-              <p className="text-xs font-bold text-slate-600">Aging — Títulos por Faixa de Vencimento</p>
+          <div className={`rounded-2xl border shadow-sm overflow-hidden ${isDark ? 'bg-[#1e293b] border-white/[0.06]' : 'bg-white border-slate-200'}`}>
+            <div className={`px-4 py-3 border-b ${isDark ? 'bg-white/[0.02] border-white/[0.06]' : 'bg-slate-50 border-slate-100'}`}>
+              <p className={`text-xs font-bold ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>Aging — Títulos por Faixa de Vencimento</p>
             </div>
             <div className="p-4 space-y-3">
               {[
@@ -284,10 +285,10 @@ export default function Relatorios() {
                 return (
                   <div key={bucket.label}>
                     <div className="flex items-center justify-between mb-1">
-                      <p className="text-xs font-semibold text-slate-600">{bucket.label}</p>
-                      <p className="text-xs font-bold text-slate-800">{fmt(bucket.value)}</p>
+                      <p className={`text-xs font-semibold ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>{bucket.label}</p>
+                      <p className={`text-xs font-bold ${isDark ? 'text-white' : 'text-slate-800'}`}>{fmt(bucket.value)}</p>
                     </div>
-                    <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
+                    <div className={`h-2 rounded-full overflow-hidden ${isDark ? 'bg-white/[0.06]' : 'bg-slate-100'}`}>
                       <div
                         className={`h-full rounded-full ${bucket.color} transition-all`}
                         style={{ width: `${(bucket.value / maxAging) * 100}%` }}
@@ -306,14 +307,14 @@ export default function Relatorios() {
 
 // ── Sub-components ─────────────────────────────────────────────
 
-function DRERow({ label, value, bold, isPositive, sub, highlight }: {
-  label: string; value: number; bold?: boolean; isPositive: boolean; sub?: boolean; highlight?: boolean
+function DRERow({ label, value, bold, isPositive, sub, highlight, isDark }: {
+  label: string; value: number; bold?: boolean; isPositive: boolean; sub?: boolean; highlight?: boolean; isDark: boolean
 }) {
   return (
     <div className={`flex items-center justify-between px-4 py-2.5
-      ${highlight ? 'bg-slate-50' : ''}
+      ${highlight ? (isDark ? 'bg-white/[0.02]' : 'bg-slate-50') : ''}
       ${sub ? 'pl-8' : ''}`}>
-      <p className={`text-xs ${bold ? 'font-bold text-slate-800' : 'font-medium text-slate-500'}
+      <p className={`text-xs ${bold ? (isDark ? 'font-bold text-white' : 'font-bold text-slate-800') : (isDark ? 'font-medium text-slate-400' : 'font-medium text-slate-500')}
         ${sub ? 'text-[11px]' : ''}`}>
         {label}
       </p>
@@ -325,17 +326,17 @@ function DRERow({ label, value, bold, isPositive, sub, highlight }: {
   )
 }
 
-function FluxoBar({ label, value, textColor, barColor, max }: {
-  label: string; value: number; textColor: string; barColor: string; max: number
+function FluxoBar({ label, value, textColor, barColor, max, isDark }: {
+  label: string; value: number; textColor: string; barColor: string; max: number; isDark: boolean
 }) {
   const pct = max > 0 ? (value / max) * 100 : 0
   return (
     <div>
       <div className="flex items-center justify-between mb-1">
-        <p className="text-xs font-semibold text-slate-600">{label}</p>
+        <p className={`text-xs font-semibold ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>{label}</p>
         <p className={`text-xs font-bold ${textColor}`}>{fmt(value)}</p>
       </div>
-      <div className="h-3 bg-slate-100 rounded-full overflow-hidden">
+      <div className={`h-3 rounded-full overflow-hidden ${isDark ? 'bg-white/[0.06]' : 'bg-slate-100'}`}>
         <div
           className={`h-full rounded-full ${barColor} transition-all`}
           style={{ width: `${pct}%` }}
