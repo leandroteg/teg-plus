@@ -124,7 +124,7 @@ export default function ListaRequisicoes() {
   const obras = useLookupObras()
   const { data: requisicoes, isLoading } = useRequisicoes(statusFilter || undefined)
   const { data: aprovacoes } = useAprovacoesPendentes()
-  const { isAdmin, perfil } = useAuth()
+  const { isAdmin, atLeast, perfil } = useAuth()
   const decisaoMutation = useDecisaoRequisicao()
   const emitirPedidoMutation = useEmitirPedido()
   const cancelarMutation = useCancelarRequisicao()
@@ -393,7 +393,7 @@ export default function ListaRequisicoes() {
                 )}
 
                 {/* Botões Emitir Pedido / Cancelar — admin + cotacao_aprovada */}
-                {isAdmin && r.status === 'cotacao_aprovada' && (() => {
+                {atLeast('comprador') && r.status === 'cotacao_aprovada' && (() => {
                   const isEmitting = emitirPedidoMutation.isPending && emitirPedidoMutation.variables?.requisicaoId === r.id
                   const isCancelling = cancelarMutation.isPending && cancelarMutation.variables === r.id
                   return (
