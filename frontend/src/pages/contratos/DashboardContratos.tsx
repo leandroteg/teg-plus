@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import {
   FileText, TrendingUp, TrendingDown, AlertTriangle,
   Clock, CheckCircle2, RefreshCw, ArrowRight,
-  CalendarDays, FilePlus, DollarSign, ArrowDownCircle,
+  CalendarDays, DollarSign,
 } from 'lucide-react'
 import { useContratosDashboard } from '../../hooks/useContratos'
 import type { TipoContrato } from '../../types/contratos'
@@ -31,12 +31,6 @@ function StatusBadge({ status }: { status: string }) {
     </span>
   )
 }
-
-const ACTIONS = [
-  { icon: FileText,    label: 'Contratos',  to: '/contratos/lista',    color: 'text-indigo-600', bg: 'bg-indigo-50' },
-  { icon: FilePlus,    label: 'Modelos',     to: '/contratos/modelos',  color: 'text-violet-600', bg: 'bg-violet-50' },
-  { icon: CalendarDays, label: 'Parcelas',   to: '/contratos/previsao', color: 'text-blue-600',   bg: 'bg-blue-50'   },
-]
 
 export default function DashboardContratos() {
   const nav = useNavigate()
@@ -94,21 +88,6 @@ export default function DashboardContratos() {
           subtitulo={parcelas.pendentes > 0 ? fmt(parcelas.valor_pendente) : 'Nenhuma'} />
       </div>
 
-      {/* ── Quick Actions ─────────────────────────────────────── */}
-      <div className="grid grid-cols-3 gap-2">
-        {ACTIONS.map(({ icon: Icon, label, to, color, bg }) => (
-          <button key={to} onClick={() => nav(to)}
-            className="bg-white rounded-2xl p-3 border border-slate-200 shadow-sm
-              hover:shadow-md hover:-translate-y-0.5 transition-all text-center group">
-            <div className={`w-9 h-9 ${bg} rounded-xl flex items-center justify-center mx-auto mb-2
-              group-hover:scale-110 transition-transform`}>
-              <Icon size={16} className={color} />
-            </div>
-            <p className="text-[10px] font-bold text-slate-600">{label}</p>
-          </button>
-        ))}
-      </div>
-
       {/* ── Status das Parcelas ──────────────────────────────── */}
       <section>
         <h2 className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-2 flex items-center gap-1.5">
@@ -138,7 +117,7 @@ export default function DashboardContratos() {
           <h2 className="text-sm font-extrabold text-slate-800 flex items-center gap-1.5">
             <Clock size={14} className="text-amber-500" /> Próximas Parcelas
           </h2>
-          <button onClick={() => nav('/contratos/parcelas')}
+          <button onClick={() => nav('/contratos/previsao')}
             className="text-[10px] text-indigo-600 font-semibold flex items-center gap-0.5">
             Ver todas <ArrowRight size={10} />
           </button>
