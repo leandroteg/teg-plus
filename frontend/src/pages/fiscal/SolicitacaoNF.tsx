@@ -530,8 +530,8 @@ function EmissionForm({ sol, isDark, onSubmit, onCancel, isPending }: EmissionFo
                   items.length <= 1
                     ? 'opacity-20 cursor-not-allowed'
                     : isDark
-                      ? 'text-slate-500 hover:text-red-400 hover:bg-red-500/10'
-                      : 'text-slate-400 hover:text-red-500 hover:bg-red-50'
+                      ? 'text-red-400 hover:text-red-500 hover:bg-red-500/10'
+                      : 'text-red-400 hover:text-red-600 hover:bg-red-50'
                 }`}>
                 <Trash2 size={13} />
               </button>

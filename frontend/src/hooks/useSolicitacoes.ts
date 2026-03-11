@@ -3,6 +3,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../services/supabase'
+import { sanitizeAiText } from '../utils/sanitizeAiText'
 import type {
   Solicitacao,
   SolicitacaoHistorico,
@@ -777,12 +778,35 @@ export function useAnalisarMinuta() {
       if (!res.ok) throw new Error(`Erro na analise: ${res.status}`)
       const result = await res.json()
 
-      // 2. Save analysis result to Supabase
+      // 2. Sanitize AI text to fix encoding issues (unicode escapes, HTML entities)
       if (result.success && result.analise) {
+        const a = result.analise
+        if (typeof a.resumo === 'string') a.resumo = sanitizeAiText(a.resumo)
+        if (a.riscos) a.riscos = a.riscos.map((r: Record<string, unknown>) => ({
+          ...r,
+          descricao: typeof r.descricao === 'string' ? sanitizeAiText(r.descricao) : r.descricao,
+          mitigacao: typeof r.mitigacao === 'string' ? sanitizeAiText(r.mitigacao) : r.mitigacao,
+        }))
+        if (a.sugestoes) a.sugestoes = a.sugestoes.map((s: Record<string, unknown>) => ({
+          ...s,
+          descricao: typeof s.descricao === 'string' ? sanitizeAiText(s.descricao) : s.descricao,
+          justificativa: typeof s.justificativa === 'string' ? sanitizeAiText(s.justificativa) : s.justificativa,
+        }))
+        if (a.oportunidades) a.oportunidades = a.oportunidades.map((o: Record<string, unknown>) => ({
+          ...o,
+          descricao: typeof o.descricao === 'string' ? sanitizeAiText(o.descricao) : o.descricao,
+        }))
+        if (a.clausulas_analisadas) a.clausulas_analisadas = a.clausulas_analisadas.map((c: Record<string, unknown>) => ({
+          ...c,
+          texto_melhorado: typeof c.texto_melhorado === 'string' ? sanitizeAiText(c.texto_melhorado) : c.texto_melhorado,
+          justificativa: typeof c.justificativa === 'string' ? sanitizeAiText(c.justificativa) : c.justificativa,
+        }))
+
+        // 3. Save sanitized analysis result to Supabase
         await supabase
           .from('con_minutas')
           .update({
-            ai_analise: result.analise,
+            ai_analise: a,
             ai_analisado_em: new Date().toISOString(),
           })
           .eq('id', payload.minuta_id)

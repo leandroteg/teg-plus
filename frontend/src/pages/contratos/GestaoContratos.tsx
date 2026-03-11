@@ -1,15 +1,17 @@
-import { useState } from 'react'
+import { useState, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   Briefcase, Search, FileText, FileSignature, TrendingUp, CalendarClock,
   TrendingDown, Calendar, Building2, ChevronDown, ChevronUp,
   CalendarDays, CheckCircle2, XCircle, AlertTriangle, ArrowUpRight,
   ArrowDownRight, Filter, Clock, Banknote, CreditCard,
+  Pause, RotateCcw, Lock, AlertOctagon, Loader2, Play,
 } from 'lucide-react'
-import { useContratos, useAditivos, useAtualizarAditivo, useReajustes, useParcelas } from '../../hooks/useContratos'
+import { useContratos, useAditivos, useAtualizarAditivo, useAtualizarContrato, useReajustes, useParcelas } from '../../hooks/useContratos'
 import { useAuth } from '../../contexts/AuthContext'
 import type { Contrato } from '../../types/contratos'
 import type { StatusAditivo, TipoAditivo } from '../../types/contratos'
+import type { StatusContrato } from '../../types/contratos'
 
 // ── Formatters ──────────────────────────────────────────────────────────────
 const fmt = (v: number) =>
@@ -60,10 +62,50 @@ const TIPO_ADITIVO: Record<TipoAditivo, { label: string; bg: string; text: strin
   misto:  { label: 'Misto',  bg: 'bg-amber-50',  text: 'text-amber-700' },
 }
 
+// ── Action configs ──────────────────────────────────────────────────────────
+type ContratoAction = {
+  key: string
+  label: string
+  toStatus: StatusContrato
+  icon: typeof Play
+  bg: string
+  border: string
+  text: string
+  hoverBg: string
+  confirmBg: string
+  confirmHover: string
+  needsMotivo: boolean
+  minRole: 'comprador' | 'gerente'
+}
+
+const ACTIONS: Record<string, ContratoAction[]> = {
+  em_negociacao: [
+    { key: 'assinar', label: 'Assinar', toStatus: 'assinado', icon: FileSignature, bg: 'bg-emerald-50', border: 'border-emerald-200', text: 'text-emerald-600', hoverBg: 'hover:bg-emerald-100', confirmBg: 'bg-emerald-600', confirmHover: 'hover:bg-emerald-700', needsMotivo: false, minRole: 'comprador' },
+  ],
+  assinado: [
+    { key: 'liberar', label: 'Liberar Pagamentos', toStatus: 'vigente', icon: Banknote, bg: 'bg-emerald-50', border: 'border-emerald-200', text: 'text-emerald-600', hoverBg: 'hover:bg-emerald-100', confirmBg: 'bg-emerald-600', confirmHover: 'hover:bg-emerald-700', needsMotivo: false, minRole: 'comprador' },
+  ],
+  vigente: [
+    { key: 'suspender', label: 'Suspender', toStatus: 'suspenso', icon: Pause, bg: 'bg-amber-50', border: 'border-amber-200', text: 'text-amber-600', hoverBg: 'hover:bg-amber-100', confirmBg: 'bg-amber-500', confirmHover: 'hover:bg-amber-600', needsMotivo: true, minRole: 'comprador' },
+    { key: 'encerrar', label: 'Encerrar', toStatus: 'encerrado', icon: Lock, bg: 'bg-slate-50', border: 'border-slate-200', text: 'text-slate-600', hoverBg: 'hover:bg-slate-100', confirmBg: 'bg-slate-600', confirmHover: 'hover:bg-slate-700', needsMotivo: true, minRole: 'gerente' },
+    { key: 'rescindir', label: 'Rescindir', toStatus: 'rescindido', icon: AlertOctagon, bg: 'bg-red-50', border: 'border-red-200', text: 'text-red-600', hoverBg: 'hover:bg-red-100', confirmBg: 'bg-red-600', confirmHover: 'hover:bg-red-700', needsMotivo: true, minRole: 'gerente' },
+  ],
+  suspenso: [
+    { key: 'reativar', label: 'Reativar', toStatus: 'vigente', icon: RotateCcw, bg: 'bg-blue-50', border: 'border-blue-200', text: 'text-blue-600', hoverBg: 'hover:bg-blue-100', confirmBg: 'bg-blue-600', confirmHover: 'hover:bg-blue-700', needsMotivo: false, minRole: 'comprador' },
+    { key: 'encerrar', label: 'Encerrar', toStatus: 'encerrado', icon: Lock, bg: 'bg-slate-50', border: 'border-slate-200', text: 'text-slate-600', hoverBg: 'hover:bg-slate-100', confirmBg: 'bg-slate-600', confirmHover: 'hover:bg-slate-700', needsMotivo: true, minRole: 'gerente' },
+    { key: 'rescindir', label: 'Rescindir', toStatus: 'rescindido', icon: AlertOctagon, bg: 'bg-red-50', border: 'border-red-200', text: 'text-red-600', hoverBg: 'hover:bg-red-100', confirmBg: 'bg-red-600', confirmHover: 'hover:bg-red-700', needsMotivo: true, minRole: 'gerente' },
+  ],
+}
+
 // ── Contrato Card ───────────────────────────────────────────────────────────
-function ContratoCard({ contrato }: { contrato: Contrato }) {
+function ContratoCard({ contrato, onToast }: { contrato: Contrato; onToast: (type: 'success' | 'error', msg: string) => void }) {
   const nav = useNavigate()
+  const { atLeast } = useAuth()
+  const atualizarContrato = useAtualizarContrato()
   const [expanded, setExpanded] = useState(false)
+  const [confirmAction, setConfirmAction] = useState<ContratoAction | null>(null)
+  const [motivo, setMotivo] = useState('')
+
   const cfg = STATUS_CONTRATO[contrato.status]
   const isDespesa = contrato.tipo_contrato === 'despesa'
   const contraparte = isDespesa
@@ -73,10 +115,40 @@ function ContratoCard({ contrato }: { contrato: Contrato }) {
     (new Date(contrato.data_fim_previsto).getTime() - Date.now()) / (1000 * 60 * 60 * 24)
   )
 
+  const actions = (ACTIONS[contrato.status] ?? []).filter(a => atLeast(a.minRole))
+  const isFinal = contrato.status === 'encerrado' || contrato.status === 'rescindido'
+
+  const handleConfirm = () => {
+    if (!confirmAction) return
+    if (confirmAction.needsMotivo && !motivo.trim()) return
+
+    const today = new Date().toISOString().slice(0, 10)
+    const updates: Record<string, unknown> = {
+      id: contrato.id,
+      status: confirmAction.toStatus,
+    }
+    if (confirmAction.toStatus === 'encerrado' || confirmAction.toStatus === 'rescindido') {
+      updates.data_fim_real = today
+    }
+
+    atualizarContrato.mutate(updates as any, {
+      onSuccess: () => {
+        onToast('success', `Contrato ${confirmAction.label.toLowerCase()} com sucesso`)
+        setConfirmAction(null)
+        setMotivo('')
+      },
+      onError: () => {
+        onToast('error', `Erro ao ${confirmAction.label.toLowerCase()} contrato`)
+      },
+    })
+  }
+
+  const confirmBorder = confirmAction
+    ? confirmAction.border
+    : contrato.status === 'vigente' ? 'border-emerald-200' : 'border-slate-200'
+
   return (
-    <div className={`bg-white rounded-2xl border shadow-sm transition-all hover:shadow-md ${
-      contrato.status === 'vigente' ? 'border-emerald-200' : 'border-slate-200'
-    }`}>
+    <div className={`bg-white rounded-2xl border shadow-sm transition-all hover:shadow-md ${confirmBorder}`}>
       <div className="p-4">
         <div className="flex items-start gap-3">
           <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${
@@ -131,17 +203,85 @@ function ContratoCard({ contrato }: { contrato: Contrato }) {
             {expanded ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
           </button>
         </div>
-        <div className="flex gap-2 mt-3">
+
+        {/* Action buttons */}
+        <div className="flex flex-wrap gap-2 mt-3">
           <button
-            onClick={() => nav(`/contratos/parcelas?contrato=${contrato.id}`)}
-            className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl
+            onClick={() => nav(`/contratos/previsao?contrato=${contrato.id}`)}
+            className="flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl
               bg-indigo-50 border border-indigo-200 text-[11px] font-semibold text-indigo-600
               hover:bg-indigo-100 transition-all"
           >
             <CalendarDays size={11} />
-            Ver Parcelas
+            Ver detalhes
           </button>
+          {actions.map(action => {
+            const Icon = action.icon
+            return (
+              <button
+                key={action.key}
+                onClick={() => { setConfirmAction(action); setMotivo('') }}
+                disabled={atualizarContrato.isPending}
+                className={`flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl
+                  ${action.bg} border ${action.border} text-[11px] font-semibold ${action.text}
+                  ${action.hoverBg} transition-all disabled:opacity-50`}
+              >
+                <Icon size={11} />
+                {action.label}
+              </button>
+            )
+          })}
+          {isFinal && (
+            <span className="flex items-center gap-1.5 px-3 py-2 text-[11px] font-semibold text-slate-400 italic">
+              <Lock size={11} />
+              Contrato finalizado
+            </span>
+          )}
         </div>
+
+        {/* Confirmation panel */}
+        {confirmAction && (
+          <div className="mt-3 rounded-xl border border-slate-200 bg-slate-50 p-3 animate-[fadeIn_0.2s_ease]">
+            <div className="flex items-center gap-2 mb-2">
+              <confirmAction.icon size={14} className={confirmAction.text} />
+              <p className="text-xs font-bold text-slate-700">
+                Confirmar: {confirmAction.label}
+              </p>
+            </div>
+            {confirmAction.needsMotivo && (
+              <textarea
+                value={motivo}
+                onChange={e => setMotivo(e.target.value)}
+                placeholder="Motivo (obrigatorio)..."
+                rows={2}
+                className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-700
+                  placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 mb-2 resize-none"
+              />
+            )}
+            <div className="flex gap-2">
+              <button
+                onClick={handleConfirm}
+                disabled={atualizarContrato.isPending || (confirmAction.needsMotivo && !motivo.trim())}
+                className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-[11px] font-bold text-white
+                  ${confirmAction.confirmBg} ${confirmAction.confirmHover} shadow-sm
+                  transition-all disabled:opacity-50`}
+              >
+                {atualizarContrato.isPending
+                  ? <Loader2 size={12} className="animate-spin" />
+                  : <CheckCircle2 size={12} />}
+                Confirmar
+              </button>
+              <button
+                onClick={() => { setConfirmAction(null); setMotivo('') }}
+                disabled={atualizarContrato.isPending}
+                className="px-4 py-2 rounded-xl text-[11px] font-semibold text-slate-500
+                  border border-slate-200 hover:bg-slate-100 transition-all disabled:opacity-50"
+              >
+                Cancelar
+              </button>
+            </div>
+          </div>
+        )}
       </div>
       {expanded && (
         <div className="border-t border-slate-100 px-4 pb-4 pt-3">
@@ -175,6 +315,12 @@ function TabContratos() {
   const [statusFilter, setStatusFilter] = useState('')
   const [tipoFilter, setTipoFilter] = useState('')
   const [busca, setBusca] = useState('')
+  const [toast, setToast] = useState<{ type: 'success' | 'error'; msg: string } | null>(null)
+
+  const showToast = useCallback((type: 'success' | 'error', msg: string) => {
+    setToast({ type, msg })
+    setTimeout(() => setToast(null), 4000)
+  }, [])
 
   const { data: contratos = [], isLoading } = useContratos(
     (statusFilter || tipoFilter) ? {
@@ -202,6 +348,15 @@ function TabContratos() {
 
   return (
     <div className="space-y-4">
+      {toast && (
+        <div className={`fixed top-4 left-1/2 -translate-x-1/2 z-50 px-4 py-2.5 rounded-2xl shadow-lg text-sm font-bold flex items-center gap-2 animate-[slideDown_0.3s_ease] ${
+          toast.type === 'success' ? 'bg-emerald-500 text-white' : 'bg-red-500 text-white'
+        }`}>
+          {toast.type === 'success' ? <CheckCircle2 size={16} /> : <AlertTriangle size={16} />}
+          {toast.msg}
+        </div>
+      )}
+
       {/* Filters */}
       <div className="relative">
         <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
@@ -248,14 +403,14 @@ function TabContratos() {
             <FileText size={24} className="text-indigo-300" />
           </div>
           <p className="text-sm font-semibold text-slate-500">Nenhum contrato encontrado</p>
-          <button onClick={() => nav('/contratos/novo')}
+          <button onClick={() => nav('/contratos/solicitacoes')}
             className="mt-3 px-4 py-2 rounded-xl bg-indigo-600 text-white text-xs font-bold hover:bg-indigo-700 transition-all">
-            Criar Contrato
+            Nova Solicitação
           </button>
         </div>
       ) : (
         <div className="space-y-2">
-          {filtered.map(c => <ContratoCard key={c.id} contrato={c} />)}
+          {filtered.map(c => <ContratoCard key={c.id} contrato={c} onToast={showToast} />)}
         </div>
       )}
     </div>

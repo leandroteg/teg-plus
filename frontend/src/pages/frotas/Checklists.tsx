@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Plus, ClipboardCheck, CheckCircle, XCircle, AlertTriangle } from 'lucide-react'
+import { Plus, ClipboardCheck, CheckCircle, XCircle, AlertTriangle, X } from 'lucide-react'
 import { useChecklists, useCriarChecklist, useVeiculos } from '../../hooks/useFrotas'
 import { useTheme } from '../../contexts/ThemeContext'
 import { useAuth } from '../../contexts/AuthContext'
@@ -74,7 +74,12 @@ function NovaChecklistModal({ onClose, isLight }: { onClose: () => void; isLight
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
       <form onSubmit={handleSubmit} className={`rounded-2xl shadow-2xl p-6 w-full max-w-lg space-y-4 max-h-[90vh] overflow-y-auto styled-scrollbar ${isLight ? 'bg-white border border-slate-200' : 'bg-[#1e293b] border border-white/[0.06]'}`}>
-        <h2 className={`text-lg font-extrabold ${isLight ? 'text-slate-800' : 'text-white'}`}>Novo Checklist</h2>
+        <div className="flex items-center justify-between">
+          <h2 className={`text-lg font-extrabold ${isLight ? 'text-slate-800' : 'text-white'}`}>Novo Checklist</h2>
+          <button type="button" onClick={onClose} className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors ${isLight ? 'text-slate-400 hover:text-slate-600 hover:bg-slate-100' : 'text-slate-400 hover:text-white hover:bg-white/10'}`}>
+            <X size={18} />
+          </button>
+        </div>
 
         <div className="grid grid-cols-2 gap-3">
           <div>

@@ -134,6 +134,38 @@ export function useCriarRequisicao() {
         }
       }
 
+      // Issue #60: Cria registro em apr_aprovacoes para que a RC apareça na tela AprovAi
+      try {
+        // Busca aprovador da alçada correspondente
+        const { data: alcadaData } = await supabase
+          .from('apr_alcadas')
+          .select('id, prazo_horas, aprovador_padrao:sys_usuarios!aprovador_padrao_id(id, nome, email)')
+          .eq('nivel', alcadaNivel)
+          .eq('ativo', true)
+          .maybeSingle()
+
+        const aprovador = (alcadaData?.aprovador_padrao as { id: string; nome: string; email: string } | null)
+        const prazoHoras = (alcadaData?.prazo_horas as number) ?? 48
+        const dataLimite = new Date(Date.now() + prazoHoras * 3600_000).toISOString()
+
+        const { error: aprError } = await supabase
+          .from('apr_aprovacoes')
+          .insert({
+            modulo: 'cmp',
+            tipo_aprovacao: 'requisicao_compra',
+            entidade_id: req.id,
+            entidade_numero: numero,
+            aprovador_nome: aprovador?.nome ?? payload.solicitante_nome,
+            aprovador_email: aprovador?.email ?? 'pendente@teguniao.com.br',
+            nivel: alcadaNivel,
+            status: 'pendente',
+            data_limite: dataLimite,
+          })
+        if (aprError) console.warn('Aviso: apr_aprovacoes não inserido:', aprError.message)
+      } catch (e) {
+        console.warn('Aviso: erro ao criar aprovação pendente:', e)
+      }
+
       return req
     },
     onSuccess: () => {

@@ -623,3 +623,88 @@ export function useContratosResumo() {
     },
   })
 }
+
+// ── Modelos de Contrato ──────────────────────────────────────────────────────
+
+export interface ModeloContrato {
+  id: string
+  nome: string
+  tipo_contrato: 'receita' | 'despesa'
+  objeto: string | null
+  descricao: string | null
+  clausulas: string | null
+  recorrencia: string
+  indice_reajuste: string | null
+  itens_padrao: { descricao: string; unidade: string; quantidade: number; valor_unitario: number }[]
+  ativo: boolean
+  created_at: string
+  updated_at: string
+  created_by: string | null
+}
+
+export function useModelosContrato() {
+  return useQuery({
+    queryKey: ['con-modelos'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('con_modelos_contrato')
+        .select('*')
+        .order('created_at', { ascending: false })
+      if (error) throw error
+      return (data ?? []) as ModeloContrato[]
+    },
+  })
+}
+
+export function useCriarModelo() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (payload: Omit<ModeloContrato, 'id' | 'created_at' | 'updated_at' | 'created_by'>) => {
+      const { data, error } = await supabase
+        .from('con_modelos_contrato')
+        .insert(payload)
+        .select()
+        .single()
+      if (error) throw error
+      return data as ModeloContrato
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['con-modelos'] })
+    },
+  })
+}
+
+export function useAtualizarModelo() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ id, ...updates }: Partial<ModeloContrato> & { id: string }) => {
+      const { data, error } = await supabase
+        .from('con_modelos_contrato')
+        .update(updates)
+        .eq('id', id)
+        .select()
+        .single()
+      if (error) throw error
+      return data as ModeloContrato
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['con-modelos'] })
+    },
+  })
+}
+
+export function useExcluirModelo() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase
+        .from('con_modelos_contrato')
+        .delete()
+        .eq('id', id)
+      if (error) throw error
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['con-modelos'] })
+    },
+  })
+}

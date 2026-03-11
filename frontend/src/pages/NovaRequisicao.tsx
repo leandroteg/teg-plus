@@ -646,7 +646,7 @@ export default function NovaRequisicao() {
                           />
                           {previewItens.length > 1 && (
                             <button type="button" onClick={() => setPreviewItens(p => p.filter((_, i) => i !== idx))}
-                              className="text-slate-300 hover:text-red-500 transition flex-shrink-0">
+                              className="text-red-400 hover:text-red-600 transition flex-shrink-0">
                               <Trash2 size={12} />
                             </button>
                           )}
@@ -825,7 +825,7 @@ export default function NovaRequisicao() {
               <span className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">Item {idx + 1}</span>
               {itens.length > 1 && (
                 <button type="button" onClick={() => setItens(p => p.filter((_, i) => i !== idx))}>
-                  <Trash2 size={14} className="text-slate-300 hover:text-red-500 transition" />
+                  <Trash2 size={14} className="text-red-400 hover:text-red-600 transition" />
                 </button>
               )}
             </div>
