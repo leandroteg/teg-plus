@@ -15,7 +15,6 @@ export default function RHLayout() {
       moduleEmoji="👥"
       accent="violet"
       nav={NAV}
-      variant="compact"
       moduleSubtitle="Pessoas & Organização"
     />
   )

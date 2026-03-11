@@ -22,8 +22,6 @@ export default function ObrasLayout() {
       accent="orange"
       nav={NAV}
       moduleSubtitle="Gestão de Obras"
-      variant="compact"
-      bottomNavMaxItems={4}
     />
   )
 }

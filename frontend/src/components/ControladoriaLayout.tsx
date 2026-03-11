@@ -25,7 +25,6 @@ export default function ControladoriaLayout() {
       accent="emerald"
       nav={NAV}
       moduleSubtitle="Indicadores & Controle"
-      variant="compact"
     />
   )
 }
