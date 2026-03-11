@@ -2,12 +2,12 @@ import { useState, useCallback, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import {
   ChevronLeft, PlusCircle, Trash2, Send, CheckCircle, Info, AlertTriangle,
-  Paperclip, FileText, X, Loader2, Eye, Ban, CheckCircle2,
+  Paperclip, FileText, X, Loader2, Eye, Ban, CheckCircle2, PackagePlus,
 } from 'lucide-react'
 import { useCotacao, useFinalizarCotacao } from '../hooks/useCotacoes'
 import { useEmitirPedido, useCancelarRequisicao } from '../hooks/usePedidos'
 import { useAuth } from '../contexts/AuthContext'
-import type { Cotacao } from '../types'
+import type { Cotacao, ItemPreco } from '../types'
 import CotacaoComparativo from '../components/CotacaoComparativo'
 import FluxoTimeline from '../components/FluxoTimeline'
 import UploadCotacao from '../components/UploadCotacao'
@@ -29,13 +29,129 @@ interface FornecedorForm {
   condicao_pagamento: string
   observacao:         string
   arquivo_url:        string
+  itens_precos:       ItemPreco[]
 }
 
 const emptyFornecedor = (): FornecedorForm => ({
   fornecedor_nome: '', fornecedor_contato: '', fornecedor_cnpj: '',
   valor_total: 0, prazo_entrega_dias: 0, condicao_pagamento: '', observacao: '',
-  arquivo_url: '',
+  arquivo_url: '', itens_precos: [],
 })
+
+const calcTotalItems = (itens: ItemPreco[]) =>
+  Math.round(itens.reduce((s, i) => s + i.valor_total, 0) * 100) / 100
+
+// ── Tabela de itens e preços por fornecedor ──────────────────────────────────
+function ItemPricingTable({
+  items,
+  onChange,
+}: {
+  items: ItemPreco[]
+  onChange: (items: ItemPreco[]) => void
+}) {
+  const addItem = () =>
+    onChange([...items, { descricao: '', qtd: 1, valor_unitario: 0, valor_total: 0 }])
+
+  const removeItem = (i: number) => onChange(items.filter((_, idx) => idx !== i))
+
+  const updateItem = (i: number, field: keyof ItemPreco, raw: string) => {
+    const updated = items.map((item, idx) => {
+      if (idx !== i) return item
+      if (field === 'descricao') return { ...item, descricao: raw }
+      const val = parseFloat(raw) || 0
+      const next = { ...item, [field]: val }
+      if (field === 'qtd' || field === 'valor_unitario') {
+        const qtd = field === 'qtd' ? val : item.qtd
+        const vu  = field === 'valor_unitario' ? val : item.valor_unitario
+        next.valor_total = Math.round(qtd * vu * 100) / 100
+      }
+      return next
+    })
+    onChange(updated)
+  }
+
+  const total = calcTotalItems(items)
+  const fmtLocal = (v: number) => v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+
+  return (
+    <div className="space-y-1.5">
+      <div className="flex items-center justify-between">
+        <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wide flex items-center gap-1">
+          <PackagePlus size={11} /> Itens e Preços
+        </span>
+        {items.length > 0 && (
+          <span className="text-[10px] text-slate-400">{items.length} item{items.length !== 1 ? 's' : ''}</span>
+        )}
+      </div>
+
+      {items.length > 0 && (
+        <div className="bg-slate-50 rounded-xl overflow-hidden border border-slate-100">
+          {/* Header */}
+          <div className="grid grid-cols-[1fr_44px_80px_68px_24px] gap-1 px-2 py-1.5 text-[9px] font-bold text-slate-400 uppercase tracking-wide border-b border-slate-100">
+            <span>Descrição</span>
+            <span className="text-center">Qtd</span>
+            <span className="text-right">R$/un</span>
+            <span className="text-right">Total</span>
+            <span />
+          </div>
+
+          {items.map((item, i) => (
+            <div
+              key={i}
+              className="grid grid-cols-[1fr_44px_80px_68px_24px] gap-1 px-2 py-1.5 border-b border-slate-50 last:border-0 items-center"
+            >
+              <input
+                className="text-[11px] bg-white border border-slate-200 rounded px-1.5 py-1 outline-none focus:ring-1 focus:ring-teal-300 w-full"
+                placeholder="Descrição"
+                value={item.descricao}
+                onChange={e => updateItem(i, 'descricao', e.target.value)}
+              />
+              <input
+                type="number" min="0.001" step="any"
+                className="text-[11px] bg-white border border-slate-200 rounded px-1 py-1 text-center outline-none focus:ring-1 focus:ring-teal-300 w-full"
+                value={item.qtd || ''}
+                onChange={e => updateItem(i, 'qtd', e.target.value)}
+              />
+              <input
+                type="number" min="0" step="0.01"
+                className="text-[11px] bg-white border border-slate-200 rounded px-1 py-1 text-right outline-none focus:ring-1 focus:ring-teal-300 w-full"
+                value={item.valor_unitario || ''}
+                onChange={e => updateItem(i, 'valor_unitario', e.target.value)}
+              />
+              <span className="text-[11px] font-semibold text-slate-700 text-right pr-0.5">
+                {fmtLocal(item.valor_total)}
+              </span>
+              <button
+                type="button"
+                onClick={() => removeItem(i)}
+                className="flex items-center justify-center text-slate-300 hover:text-red-500 transition"
+              >
+                <X size={12} />
+              </button>
+            </div>
+          ))}
+
+          {/* Total row */}
+          <div className="flex justify-between items-center px-2 py-1.5 bg-teal-50 border-t border-teal-100">
+            <span className="text-[10px] font-bold text-teal-600 uppercase">Total calculado</span>
+            <span className="text-sm font-extrabold text-teal-600">
+              {total.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+            </span>
+          </div>
+        </div>
+      )}
+
+      <button
+        type="button"
+        onClick={addItem}
+        className="w-full flex items-center justify-center gap-1.5 py-1.5 text-[11px] font-semibold text-teal-600 border border-dashed border-teal-200 rounded-xl hover:bg-teal-50 transition"
+      >
+        <PlusCircle size={12} />
+        {items.length === 0 ? 'Precificar por item (opcional)' : 'Adicionar item'}
+      </button>
+    </div>
+  )
+}
 
 // Cotações mínimas pelo valor
 function getMinCot(valor: number) {
@@ -288,7 +404,15 @@ export default function CotacaoForm() {
   const updateFornecedor = (idx: number, field: keyof FornecedorForm, value: string | number) =>
     setFornecedores(prev => prev.map((f, i) => i === idx ? { ...f, [field]: value } : f))
 
-  // ── AI Upload: preenche fornecedores automaticamente ───────────────────────
+  const updateFornecedorItems = useCallback((idx: number, itens: ItemPreco[]) => {
+    setFornecedores(prev => prev.map((f, i) => {
+      if (i !== idx) return f
+      const total = calcTotalItems(itens)
+      return { ...f, itens_precos: itens, valor_total: total > 0 ? total : f.valor_total }
+    }))
+  }, [])
+
+  // ── AI Upload: preenche fornecedores automaticamente (incluindo itens) ───────
   const handleAiParsed = useCallback((parsed: {
     fornecedor_nome: string
     fornecedor_cnpj?: string
@@ -297,36 +421,39 @@ export default function CotacaoForm() {
     prazo_entrega_dias?: number
     condicao_pagamento?: string
     observacao?: string
+    itens?: { descricao: string; qtd: number; valor_unitario: number; valor_total: number }[]
   }[]) => {
     setFornecedores(prev => {
-      // Slots vazios disponíveis
-      const vazios = prev.filter(f => !f.fornecedor_nome.trim() && f.valor_total === 0)
+      const vazios      = prev.filter(f => !f.fornecedor_nome.trim() && f.valor_total === 0)
       const preenchidos = prev.filter(f => f.fornecedor_nome.trim() || f.valor_total > 0)
 
-      const novos: FornecedorForm[] = parsed.map(p => ({
-        fornecedor_nome: p.fornecedor_nome || '',
-        fornecedor_cnpj: p.fornecedor_cnpj ? maskCNPJ(p.fornecedor_cnpj) : '',
-        fornecedor_contato: p.fornecedor_contato || '',
-        valor_total: p.valor_total || 0,
-        prazo_entrega_dias: p.prazo_entrega_dias || 0,
-        condicao_pagamento: p.condicao_pagamento || '',
-        observacao: p.observacao || '',
-        arquivo_url: '',
-      }))
+      const novos: FornecedorForm[] = parsed.map(p => {
+        const itens: ItemPreco[] = (p.itens ?? []).map(it => ({
+          descricao:      it.descricao,
+          qtd:            it.qtd,
+          valor_unitario: it.valor_unitario,
+          valor_total:    Math.round(it.qtd * it.valor_unitario * 100) / 100,
+        }))
+        const totalItens = calcTotalItems(itens)
+        return {
+          fornecedor_nome:    p.fornecedor_nome || '',
+          fornecedor_cnpj:    p.fornecedor_cnpj ? maskCNPJ(p.fornecedor_cnpj) : '',
+          fornecedor_contato: p.fornecedor_contato || '',
+          valor_total:        itens.length > 0 ? totalItens : (p.valor_total || 0),
+          prazo_entrega_dias: p.prazo_entrega_dias || 0,
+          condicao_pagamento: p.condicao_pagamento || '',
+          observacao:         p.observacao || '',
+          arquivo_url:        '',
+          itens_precos:       itens,
+        }
+      })
 
-      // Preenche slots vazios primeiro, depois adiciona novos
       const result = [...preenchidos]
       let slotIdx = 0
       for (const novo of novos) {
-        if (slotIdx < vazios.length) {
-          result.push(novo) // Substitui slot vazio
-          slotIdx++
-        } else {
-          result.push(novo) // Adiciona novo
-        }
+        if (slotIdx < vazios.length) { result.push(novo); slotIdx++ }
+        else result.push(novo)
       }
-
-      // Garante mínimo de 2 slots
       while (result.length < 2) result.push(emptyFornecedor())
       return result
     })
@@ -412,14 +539,15 @@ export default function CotacaoForm() {
         cotacao_id: id,
         requisicao_id: cotacao.requisicao_id,
         fornecedores: validos.map(f => ({
-          fornecedor_nome: f.fornecedor_nome,
+          fornecedor_nome:    f.fornecedor_nome,
           fornecedor_contato: f.fornecedor_contato || undefined,
-          fornecedor_cnpj: f.fornecedor_cnpj || undefined,
-          valor_total: f.valor_total,
+          fornecedor_cnpj:    f.fornecedor_cnpj || undefined,
+          valor_total:        f.valor_total,
           prazo_entrega_dias: f.prazo_entrega_dias || undefined,
           condicao_pagamento: f.condicao_pagamento || undefined,
-          observacao: f.observacao || undefined,
-          arquivo_url: f.arquivo_url || undefined,
+          observacao:         f.observacao || undefined,
+          arquivo_url:        f.arquivo_url || undefined,
+          itens_precos:       f.itens_precos.length > 0 ? f.itens_precos : undefined,
         })),
         sem_cotacoes_minimas: semCotacoesMinimas,
         justificativa_sem_cotacoes: semCotacoesMinimas ? justificativa.trim() : undefined,
@@ -578,20 +706,32 @@ export default function CotacaoForm() {
               />
             </div>
 
+            {/* ── Itens e Preços ─────────────────────────────────────────────── */}
+            <ItemPricingTable
+              items={forn.itens_precos}
+              onChange={items => updateFornecedorItems(idx, items)}
+            />
+
             <div className="grid grid-cols-2 gap-2">
               <div>
-                <label className="text-[10px] text-slate-400 font-semibold">Valor Total *</label>
+                <label className="text-[10px] text-slate-400 font-semibold">
+                  {forn.itens_precos.length > 0 ? 'Valor Total (calculado)' : 'Valor Total *'}
+                </label>
                 <div className="relative">
                   <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-slate-400 font-semibold">R$</span>
                   <input
                     required={idx < minCot && !semCotacoesMinimas}
                     type="number" min="0.01" step="0.01"
+                    readOnly={forn.itens_precos.length > 0}
                     className={`w-full border rounded-xl pl-9 pr-3 py-2 text-sm font-semibold focus:ring-2 focus:ring-teal-300 outline-none transition-shadow ${
-                      triedSubmit && !forn.valor_total && idx < minCot && !semCotacoesMinimas
-                        ? 'border-red-300 bg-red-50/30' : 'border-slate-200'
+                      forn.itens_precos.length > 0
+                        ? 'bg-teal-50 border-teal-200 text-teal-700 cursor-default'
+                        : triedSubmit && !forn.valor_total && idx < minCot && !semCotacoesMinimas
+                          ? 'border-red-300 bg-red-50/30'
+                          : 'border-slate-200'
                     }`}
                     value={forn.valor_total || ''}
-                    onChange={e => updateFornecedor(idx, 'valor_total', parseFloat(e.target.value) || 0)}
+                    onChange={e => forn.itens_precos.length === 0 && updateFornecedor(idx, 'valor_total', parseFloat(e.target.value) || 0)}
                   />
                 </div>
               </div>
@@ -714,7 +854,7 @@ export default function CotacaoForm() {
             valor_total: f.valor_total,
             prazo_entrega_dias: f.prazo_entrega_dias || undefined,
             condicao_pagamento: f.condicao_pagamento || undefined,
-            itens_precos: [],
+            itens_precos: f.itens_precos,
             arquivo_url: f.arquivo_url || undefined,
             selecionado: f.valor_total === Math.min(...validos.map(x => x.valor_total)),
           }))}

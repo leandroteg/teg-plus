@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import type { AprovacaoPendente, AprovacaoHistorico, TipoAprovacao } from '../types'
+import type { AprovacaoPendente, AprovacaoHistorico, TipoAprovacao, CotacaoFornecedor, ItemSelecionado } from '../types'
 import { supabase } from '../services/supabase'
 import { api } from '../services/api'
 import { syncCPsParaAprovacao } from './useFinanceiro'
@@ -57,24 +57,28 @@ export function useAprovacoesPendentes(tipo?: TipoAprovacao) {
         valor: number
         prazo_dias: number
         total_cotados: number
+        cotacao_id?: string
+        fornecedores?: CotacaoFornecedor[]
       }>()
 
       if (cmpIds.length > 0) {
         const { data: cotData } = await supabase
           .from('cmp_cotacoes')
-          .select('requisicao_id, fornecedor_selecionado_nome, valor_selecionado, fornecedores:cmp_cotacao_fornecedores!cotacao_id(id, prazo_entrega_dias)')
+          .select('id, requisicao_id, fornecedor_selecionado_nome, valor_selecionado, fornecedores:cmp_cotacao_fornecedores!cotacao_id(*)')
           .in('requisicao_id', cmpIds)
           .eq('status', 'concluida')
 
         for (const c of cotData ?? []) {
           const cot = c as Record<string, unknown>
-          const fornecedores = (cot.fornecedores ?? []) as { id: string; prazo_entrega_dias?: number }[]
-          const selecionado = fornecedores.find(() => true)
+          const fornecedores = (cot.fornecedores ?? []) as CotacaoFornecedor[]
+          const selecionado = fornecedores.find(f => f.selecionado) ?? fornecedores[0]
           cotMap.set(cot.requisicao_id as string, {
             fornecedor_nome: (cot.fornecedor_selecionado_nome as string) ?? 'N/A',
             valor: (cot.valor_selecionado as number) ?? 0,
             prazo_dias: selecionado?.prazo_entrega_dias ?? 0,
             total_cotados: fornecedores.length,
+            cotacao_id: cot.id as string,
+            fornecedores,
           })
         }
       }
@@ -438,6 +442,10 @@ export interface DecisaoGenericaPayload {
   observacao?: string
   aprovadorNome: string
   aprovadorEmail: string
+  /** Para aprovação de cotação: itens selecionados por fornecedor (aprovação parcial) */
+  itens_selecionados?: ItemSelecionado[]
+  /** ID da cotação — necessário para salvar itens_selecionados */
+  cotacaoId?: string
 }
 
 export function useDecisaoGenerica() {
@@ -473,7 +481,36 @@ export function useDecisaoGenerica() {
 
       // 3. Atualizar entidade fonte conforme tipo de aprovacao
       try {
-        if (tipoAprovacao === 'minuta_contratual') {
+        if (tipoAprovacao === 'cotacao') {
+          // Atualiza RC com status de cotação aprovada/rejeitada
+          const novoStatus = decisao === 'aprovada' ? 'cotacao_aprovada' : 'cotacao_rejeitada'
+          await supabase
+            .from('cmp_requisicoes')
+            .update({ status: novoStatus })
+            .eq('id', entidadeId)
+
+          // Salva itens selecionados na cotação (aprovação parcial por item)
+          if (decisao === 'aprovada' && payload.itens_selecionados && payload.cotacaoId) {
+            await supabase
+              .from('cmp_cotacoes')
+              .update({ itens_selecionados: payload.itens_selecionados })
+              .eq('id', payload.cotacaoId)
+          } else if (decisao === 'aprovada' && payload.itens_selecionados && !payload.cotacaoId) {
+            // Fallback: busca cotação pelo requisicao_id
+            const { data: cotacoes } = await supabase
+              .from('cmp_cotacoes')
+              .select('id')
+              .eq('requisicao_id', entidadeId)
+              .eq('status', 'concluida')
+              .limit(1)
+            if (cotacoes?.[0]?.id) {
+              await supabase
+                .from('cmp_cotacoes')
+                .update({ itens_selecionados: payload.itens_selecionados })
+                .eq('id', cotacoes[0].id)
+            }
+          }
+        } else if (tipoAprovacao === 'minuta_contratual') {
           // Avanca etapa da solicitacao de contrato
           const nextEtapa = decisao === 'aprovada' ? 'enviar_assinatura' : 'preparar_minuta'
           await supabase
@@ -529,6 +566,11 @@ export function useDecisaoGenerica() {
       qc.invalidateQueries({ queryKey: ['con-solicitacoes-dashboard'] })
       qc.invalidateQueries({ queryKey: ['contas-pagar'] })
       qc.invalidateQueries({ queryKey: ['financeiro-dashboard'] })
+      qc.invalidateQueries({ queryKey: ['cotacoes'] })
+      qc.invalidateQueries({ queryKey: ['cotacao'] })
+      qc.invalidateQueries({ queryKey: ['cotacao-req'] })
+      qc.invalidateQueries({ queryKey: ['requisicoes'] })
+      qc.invalidateQueries({ queryKey: ['requisicao'] })
     },
   })
 }
