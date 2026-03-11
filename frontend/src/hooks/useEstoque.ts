@@ -138,8 +138,8 @@ export function useMovimentacoes(filtros?: {
         .from('est_movimentacoes')
         .select(`
           *,
-          item:est_itens(codigo, descricao, unidade),
-          base:est_bases(codigo, nome)
+          item:est_itens!est_movimentacoes_item_id_fkey(codigo, descricao, unidade),
+          base:est_bases!est_movimentacoes_base_id_fkey(codigo, nome)
         `)
         .order('criado_em', { ascending: false })
         .range(offset, offset + limit - 1)
