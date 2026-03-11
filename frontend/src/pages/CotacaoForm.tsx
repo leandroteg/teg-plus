@@ -291,7 +291,7 @@ export default function CotacaoForm() {
     setFornecedores(prev => prev.map((f, i) => i === idx ? { ...f, [field]: value } : f))
 
   // ── AI Upload: preenche fornecedores automaticamente ───────────────────────
-  const handleAiParsed = useCallback((parsed: {
+  const handleAiParsed = useCallback(async (parsed: {
     fornecedor_nome: string
     fornecedor_cnpj?: string
     fornecedor_contato?: string
@@ -299,7 +299,18 @@ export default function CotacaoForm() {
     prazo_entrega_dias?: number
     condicao_pagamento?: string
     observacao?: string
-  }[]) => {
+  }[], file: File) => {
+    // Upload do arquivo original para Supabase Storage
+    let uploadedPath = ''
+    if (id && file) {
+      try {
+        const safeName = 'cotacao_' + file.name.replace(/[^a-zA-Z0-9._-]/g, '_')
+        const path = `${id}/${Date.now()}_${safeName}`
+        const { error } = await supabase.storage.from('cotacoes-docs').upload(path, file)
+        if (!error) uploadedPath = path
+      } catch { /* upload falhou, segue sem anexo */ }
+    }
+
     setFornecedores(prev => {
       // Slots vazios disponíveis
       const vazios = prev.filter(f => !f.fornecedor_nome.trim() && f.valor_total === 0)
@@ -313,7 +324,7 @@ export default function CotacaoForm() {
         prazo_entrega_dias: p.prazo_entrega_dias || 0,
         condicao_pagamento: p.condicao_pagamento || '',
         observacao: p.observacao || '',
-        arquivo_url: '',
+        arquivo_url: uploadedPath,
       }))
 
       // Preenche slots vazios primeiro, depois adiciona novos
@@ -332,7 +343,7 @@ export default function CotacaoForm() {
       while (result.length < 2) result.push(emptyFornecedor())
       return result
     })
-  }, [])
+  }, [id])
 
   // ── Upload de arquivo por fornecedor ──────────────────────────────────────
   const [uploading, setUploading] = useState<Record<number, boolean>>({})
