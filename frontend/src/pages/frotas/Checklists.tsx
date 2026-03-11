@@ -1,7 +1,8 @@
 import { useState } from 'react'
-import { Plus, ClipboardCheck, CheckCircle, XCircle } from 'lucide-react'
+import { Plus, ClipboardCheck, CheckCircle, XCircle, AlertTriangle } from 'lucide-react'
 import { useChecklists, useCriarChecklist, useVeiculos } from '../../hooks/useFrotas'
 import { useTheme } from '../../contexts/ThemeContext'
+import { useAuth } from '../../contexts/AuthContext'
 import type { FroChecklist, TipoChecklist } from '../../types/frotas'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -23,6 +24,8 @@ const ITENS_CHECKLIST = [
 function NovaChecklistModal({ onClose, isLight }: { onClose: () => void; isLight: boolean }) {
   const criar = useCriarChecklist()
   const { data: veiculos = [] } = useVeiculos()
+  const { user } = useAuth()
+  const [erro, setErro] = useState('')
 
   const [form, setForm] = useState({
     veiculo_id: '', tipo: 'pre_viagem' as TipoChecklist, hodometro: '',
@@ -39,20 +42,27 @@ function NovaChecklistModal({ onClose, isLight }: { onClose: () => void; isLight
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    await criar.mutateAsync({
-      veiculo_id: form.veiculo_id,
-      tipo: form.tipo,
-      hodometro: form.hodometro ? +form.hodometro : undefined,
-      nivel_oleo_ok: form.nivel_oleo_ok,
-      nivel_agua_ok: form.nivel_agua_ok,
-      calibragem_pneus_ok: form.calibragem_pneus_ok,
-      lanternas_ok: form.lanternas_ok,
-      freios_ok: form.freios_ok,
-      documentacao_ok: form.documentacao_ok,
-      limpeza_ok: form.limpeza_ok,
-      observacoes: form.observacoes || undefined,
-    })
-    onClose()
+    setErro('')
+    try {
+      await criar.mutateAsync({
+        veiculo_id: form.veiculo_id,
+        motorista_id: user?.id,
+        tipo: form.tipo,
+        hodometro: form.hodometro ? +form.hodometro : undefined,
+        nivel_oleo_ok: form.nivel_oleo_ok,
+        nivel_agua_ok: form.nivel_agua_ok,
+        calibragem_pneus_ok: form.calibragem_pneus_ok,
+        lanternas_ok: form.lanternas_ok,
+        freios_ok: form.freios_ok,
+        documentacao_ok: form.documentacao_ok,
+        limpeza_ok: form.limpeza_ok,
+        observacoes: form.observacoes || undefined,
+      })
+      onClose()
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Erro ao registrar checklist'
+      setErro(msg.includes('row-level security') ? 'Voce nao tem permissao para registrar checklists. Contate o administrador.' : msg)
+    }
   }
 
   const inp = `w-full px-3 py-2 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-teal-400/40 ${
@@ -126,6 +136,13 @@ function NovaChecklistModal({ onClose, isLight }: { onClose: () => void; isLight
           <label className={lbl}>Observacoes</label>
           <textarea className={inp + ' resize-none'} rows={2} value={form.observacoes} onChange={e => setForm(f => ({ ...f, observacoes: e.target.value }))} placeholder="Anomalias, observacoes adicionais..." />
         </div>
+
+        {erro && (
+          <div className="flex items-center gap-2 p-3 rounded-2xl bg-red-500/10 border border-red-500/30">
+            <AlertTriangle size={16} className="text-red-400 shrink-0" />
+            <p className="text-sm text-red-400 font-medium">{erro}</p>
+          </div>
+        )}
 
         <div className="flex gap-2">
           <button type="button" onClick={onClose} className={`flex-1 py-2.5 rounded-xl border text-sm font-medium ${
