@@ -2,7 +2,7 @@
 title: "🛒 Compras Dashboard"
 type: painel-bi
 tags: [painel, bi, dashboard, compras]
-atualizado: 2026-03-04
+atualizado: 2026-03-11
 modulo: compras
 completude: 95
 ---
