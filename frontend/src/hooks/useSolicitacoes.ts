@@ -13,6 +13,9 @@ import type {
   EtapaSolicitacao,
   ConfigAnalise,
   MinutaAiAnalise,
+  Assinatura,
+  EnviarAssinaturaPayload,
+  EnviarAssinaturaResponse,
 } from '../types/contratos'
 
 // ── Lista de Solicitacoes ────────────────────────────────────────────────────
@@ -816,6 +819,65 @@ export function useAnalisarMinuta() {
     },
     onSuccess: (_d, vars) => {
       qc.invalidateQueries({ queryKey: ['con-minutas', vars.solicitacao_id] })
+    },
+  })
+}
+
+// ── Assinaturas (Certisign) ─────────────────────────────────────────
+
+export function useAssinaturas(solicitacaoId?: string) {
+  return useQuery<Assinatura[]>({
+    queryKey: ['con-assinaturas', solicitacaoId],
+    enabled: !!solicitacaoId,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('con_assinaturas')
+        .select('*')
+        .eq('solicitacao_id', solicitacaoId!)
+        .order('created_at', { ascending: false })
+      if (error) return []
+      return (data ?? []) as Assinatura[]
+    },
+  })
+}
+
+export function useAssinaturasAll() {
+  return useQuery<Assinatura[]>({
+    queryKey: ['con-assinaturas-all'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('con_assinaturas')
+        .select('*')
+        .order('created_at', { ascending: false })
+      if (error) return []
+      return (data ?? []) as Assinatura[]
+    },
+  })
+}
+
+export function useEnviarAssinatura() {
+  const qc = useQueryClient()
+  return useMutation<EnviarAssinaturaResponse, Error, EnviarAssinaturaPayload>({
+    mutationFn: async (payload) => {
+      const res = await fetch(`${N8N_BASE}/certisign-enviar`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...payload,
+          callback_url: `${N8N_BASE}/certisign-callback`,
+        }),
+      })
+      if (!res.ok) {
+        const body = await res.text().catch(() => '')
+        throw new Error(`Erro ao enviar para assinatura: ${res.status} ${body}`)
+      }
+      return res.json() as Promise<EnviarAssinaturaResponse>
+    },
+    onSuccess: (_d, vars) => {
+      qc.invalidateQueries({ queryKey: ['con-assinaturas', vars.solicitacao_id] })
+      qc.invalidateQueries({ queryKey: ['con-assinaturas-all'] })
+      qc.invalidateQueries({ queryKey: ['con-solicitacoes'] })
+      qc.invalidateQueries({ queryKey: ['con-solicitacao', vars.solicitacao_id] })
     },
   })
 }
