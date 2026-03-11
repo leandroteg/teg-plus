@@ -316,8 +316,8 @@ export default function RDO() {
                             <button
                               onClick={() => setDeleteConfirm(rdo.id)}
                               className={`p-1.5 rounded-lg transition-colors ${isLight
-                                ? 'hover:bg-red-50 text-slate-400 hover:text-red-600'
-                                : 'hover:bg-red-500/10 text-slate-500 hover:text-red-400'
+                                ? 'hover:bg-red-50 text-red-400 hover:text-red-600'
+                                : 'hover:bg-red-500/10 text-red-400 hover:text-red-500'
                               }`}
                               title="Excluir"
                             >

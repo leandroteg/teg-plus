@@ -251,8 +251,8 @@ function NFCard({
               onClick={() => setConfirmDelete(true)}
               className={`p-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition-all ${
                 isDark
-                  ? 'text-slate-500 hover:text-red-400 hover:bg-red-500/10'
-                  : 'text-slate-300 hover:text-red-500 hover:bg-red-50'
+                  ? 'text-red-400 hover:text-red-500 hover:bg-red-500/10'
+                  : 'text-red-400 hover:text-red-600 hover:bg-red-50'
               }`}
               title="Excluir NF"
             >

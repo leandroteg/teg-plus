@@ -213,7 +213,7 @@ function ContratoCard({ contrato, onToast }: { contrato: Contrato; onToast: (typ
               hover:bg-indigo-100 transition-all"
           >
             <CalendarDays size={11} />
-            Parcelas
+            Ver detalhes
           </button>
           {actions.map(action => {
             const Icon = action.icon
