@@ -107,8 +107,8 @@ export const CONTRATOS_CONFIG: ModuleMeta = {
   navItems: [
     { to: '/contratos',          icon: LayoutDashboard, label: 'Painel',    end: true  },
     { to: '/contratos/lista',    icon: FileText,        label: 'Contratos', end: false },
-    { to: '/contratos/novo',     icon: FilePlus,        label: 'Novo',      end: false },
-    { to: '/contratos/parcelas', icon: CalendarDays,    label: 'Parcelas',  end: false },
+    { to: '/contratos/modelos',  icon: FilePlus,        label: 'Modelos',   end: false },
+    { to: '/contratos/previsao', icon: CalendarDays,    label: 'Parcelas',  end: false },
   ],
 }
 
