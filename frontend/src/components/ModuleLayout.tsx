@@ -574,7 +574,7 @@ export default function ModuleLayout({
             </div>
             <div className={`pt-3 border-t ${ls ? 'border-slate-100' : 'border-white/5'}`}>
               <p className={`text-[10px] text-center ${ls ? 'text-slate-400' : 'text-slate-600'}`}>
-                TEG+ ERP · {headerModuleName}
+                TEG+ ERP 2.0 · {headerModuleName}
               </p>
             </div>
           </div>
@@ -668,18 +668,22 @@ export default function ModuleLayout({
       >
         {/* ── Top: brand + module badge ───────────────────────── */}
         <div className={`px-4 pt-5 pb-4 border-b ${ls ? 'border-slate-100' : 'border-white/[0.06]'}`}>
-          {/* Logo + wordmark */}
-          <div className="flex items-center gap-3 mb-4">
-            <LogoTeg size={36} animated={false} />
-            <div className="flex-1 min-w-0">
+          {/* Logo + wordmark + actions */}
+          <div className="flex items-center gap-2.5 mb-4">
+            <button onClick={() => navigate('/')} className="shrink-0" title="Ir para início">
+              <LogoTeg size={36} animated={false} />
+            </button>
+            <button onClick={() => navigate('/')} className="flex-1 min-w-0 text-left" title="Ir para início">
               <p className={`font-black text-lg tracking-tight leading-none ${ls ? 'text-slate-800' : 'text-white'}`}>TEG+</p>
-              <p className={`text-[10px] font-medium mt-0.5 ${ls ? 'text-slate-400' : 'text-slate-500'}`}>ERP Sistema</p>
-            </div>
-            <ApprovalBadge isDark={!ls} />
+              <p className={`text-[10px] font-medium mt-0.5 ${ls ? 'text-slate-400' : 'text-slate-500'}`}>ERP 2.0</p>
+            </button>
+            <div className="flex items-center gap-1 shrink-0">
+              <ApprovalBadge isDark={!ls} />
               <NotificationBell isDark={!ls} />
-            <div className="relative" data-avatar-menu>
-              {renderAvatarButton()}
-              {renderAvatarDropdown()}
+              <div className="relative" data-avatar-menu>
+                {renderAvatarButton()}
+                {renderAvatarDropdown()}
+              </div>
             </div>
           </div>
 
@@ -726,16 +730,16 @@ export default function ModuleLayout({
           style={{ boxShadow: ls ? '0 1px 3px rgba(0,0,0,0.05)' : '0 2px 20px rgba(0,0,0,0.4)' }}
         >
           {/* Logo */}
-          <button onClick={goBack} className="shrink-0" title="Trocar módulo">
+          <button onClick={() => navigate('/')} className="shrink-0" title="Ir para início">
             <LogoTeg size={28} animated={false} />
           </button>
 
           {/* Brand */}
           <div className="flex-1 min-w-0">
-            <div className="flex items-baseline gap-1.5">
+            <button onClick={() => navigate('/')} className="flex items-baseline gap-1.5">
               <h1 className={`text-sm font-black leading-none ${ls ? 'text-slate-800' : 'text-white'}`}>TEG+</h1>
               <span className={`text-[9px] font-semibold ${ls ? a.mobileHeaderLight : a.mobileHeaderDark}`}>{headerModuleName}</span>
-            </div>
+            </button>
           </div>
 
           {/* Notifications + Avatar */}

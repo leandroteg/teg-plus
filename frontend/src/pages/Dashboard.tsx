@@ -7,6 +7,7 @@ import {
 } from 'lucide-react'
 import { useDashboard } from '../hooks/useDashboard'
 import { useRequisicoes } from '../hooks/useRequisicoes'
+import { useLookupObras } from '../hooks/useLookups'
 import StatusBadge from '../components/StatusBadge'
 import FluxoTimeline from '../components/FluxoTimeline'
 import { isPlaceholder } from '../services/supabase'
@@ -72,8 +73,10 @@ function KpiCard({ titulo, valor, icon: Icon, cor, subtitulo }: {
 export default function Dashboard() {
   const nav = useNavigate()
   const [periodo, setPeriodo] = useState('trimestre')
+  const [obraFilter, setObraFilter] = useState('')
   const [pipelineFilter, setPipelineFilter] = useState<number | null>(null)
-  const { data, isLoading, isError, error, refetch } = useDashboard(periodo)
+  const obras = useLookupObras()
+  const { data, isLoading, isError, error, refetch } = useDashboard(periodo, obraFilter || undefined)
   const { data: todasReqs } = useRequisicoes()
 
   if (isPlaceholder) return <SetupRequired />
@@ -155,16 +158,30 @@ export default function Dashboard() {
         </div>
       </Link>
 
-      {/* ── Período ────────────────────────────────────────────────────── */}
-      <div className="flex gap-2">
-        {[['semana', 'Semana'], ['mes', 'Mês'], ['trimestre', 'Trimestre'], ['tudo', 'Tudo']].map(([val, lbl]) => (
-          <button key={val} onClick={() => setPeriodo(val)}
-            className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-all ${
-              periodo === val ? 'bg-slate-800 text-white shadow-sm' : 'bg-white text-slate-500 border border-slate-200'
-            }`}>
-            {lbl}
-          </button>
-        ))}
+      {/* ── Filtros compactos (Período + Obra) ────────────────────────── */}
+      <div className="flex items-center gap-2">
+        <div className="flex gap-1 flex-1">
+          {[['semana', 'Sem'], ['mes', 'Mês'], ['trimestre', 'Trim'], ['tudo', 'Tudo']].map(([val, lbl]) => (
+            <button key={val} onClick={() => setPeriodo(val)}
+              className={`px-2.5 py-1.5 rounded-full text-[11px] font-semibold transition-all ${
+                periodo === val ? 'bg-slate-800 text-white shadow-sm' : 'bg-white text-slate-500 border border-slate-200'
+              }`}>
+              {lbl}
+            </button>
+          ))}
+        </div>
+        <select
+          value={obraFilter}
+          onChange={e => setObraFilter(e.target.value)}
+          className={`text-[11px] font-semibold rounded-full px-2.5 py-1.5 border transition-all appearance-none cursor-pointer max-w-[140px] truncate ${
+            obraFilter ? 'bg-teal-50 border-teal-300 text-teal-700' : 'bg-white border-slate-200 text-slate-500'
+          }`}
+        >
+          <option value="">Todas obras</option>
+          {obras.map(o => (
+            <option key={o.id} value={o.id}>{o.codigo ? `${o.codigo} - ` : ''}{o.nome}</option>
+          ))}
+        </select>
       </div>
 
       {/* ── KPIs ───────────────────────────────────────────────────────── */}

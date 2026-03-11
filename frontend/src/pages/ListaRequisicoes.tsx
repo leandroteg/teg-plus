@@ -2,6 +2,7 @@ import { useState, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Search, SlidersHorizontal, CheckCircle, XCircle, MessageSquare, ChevronDown, ChevronUp, FileText, Ban } from 'lucide-react'
 import { useRequisicoes } from '../hooks/useRequisicoes'
+import { useLookupObras } from '../hooks/useLookups'
 import { useAprovacoesPendentes, useDecisaoRequisicao } from '../hooks/useAprovacoes'
 import { useEmitirPedido, useCancelarRequisicao } from '../hooks/usePedidos'
 import { useAuth } from '../contexts/AuthContext'
@@ -117,8 +118,10 @@ function StatusChip({ status, aprovacao, alcadaNivel, dataPrevista, esclarecimen
 export default function ListaRequisicoes() {
   const navigate = useNavigate()
   const [statusFilter, setStatusFilter] = useState('')
+  const [obraFilter, setObraFilter] = useState('')
   const [busca, setBusca] = useState('')
   const [showFilters, setShowFilters] = useState(false)
+  const obras = useLookupObras()
   const { data: requisicoes, isLoading } = useRequisicoes(statusFilter || undefined)
   const { data: aprovacoes } = useAprovacoesPendentes()
   const { isAdmin, perfil } = useAuth()
@@ -140,6 +143,7 @@ export default function ListaRequisicoes() {
   }, [aprovacoes])
 
   const filtradas = (requisicoes ?? []).filter(r => {
+    if (obraFilter && r.obra_id !== obraFilter) return false
     if (!busca) return true
     const termo = busca.toLowerCase()
     return (
@@ -213,15 +217,29 @@ export default function ListaRequisicoes() {
         </button>
       </div>
 
-      {/* Busca */}
-      <div className="relative">
-        <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
-        <input
-          className="w-full bg-white border border-slate-200 rounded-xl pl-9 pr-3 py-2.5 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-teal-400/30 focus:border-teal-400 transition"
-          placeholder="Buscar número, descrição, obra, comprador..."
-          value={busca}
-          onChange={e => setBusca(e.target.value)}
-        />
+      {/* Busca + Obra filter */}
+      <div className="flex gap-2">
+        <div className="relative flex-1">
+          <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+          <input
+            className="w-full bg-white border border-slate-200 rounded-xl pl-9 pr-3 py-2.5 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-teal-400/30 focus:border-teal-400 transition"
+            placeholder="Buscar número, descrição..."
+            value={busca}
+            onChange={e => setBusca(e.target.value)}
+          />
+        </div>
+        <select
+          value={obraFilter}
+          onChange={e => setObraFilter(e.target.value)}
+          className={`text-xs font-semibold rounded-xl px-2.5 py-2.5 border transition-all appearance-none cursor-pointer max-w-[130px] truncate ${
+            obraFilter ? 'bg-teal-50 border-teal-300 text-teal-700' : 'bg-white border-slate-200 text-slate-500'
+          }`}
+        >
+          <option value="">Obra</option>
+          {obras.map(o => (
+            <option key={o.id} value={o.id}>{o.codigo ? `${o.codigo} - ` : ''}{o.nome}</option>
+          ))}
+        </select>
       </div>
 
       {/* Filtros de pipeline */}
