@@ -41,10 +41,18 @@ export default function Assinaturas() {
     etapa_atual: 'enviar_assinatura',
   })
 
-  // Contratos assinados recentemente
-  const { data: contratos = [], isLoading: loadingCon } = useContratos({ status: 'assinado' })
+  // Contratos assinados — fetch both 'assinado' and 'vigente' status
+  // because contracts quickly transition assinado → vigente via "Liberar Pagamentos"
+  const { data: contratosAssinados = [], isLoading: loadingAss } = useContratos({ status: 'assinado' })
+  const { data: contratosVigentes = [], isLoading: loadingVig } = useContratos({ status: 'vigente' })
 
-  const isLoading = loadingSol || loadingCon
+  // Merge: all 'assinado' + 'vigente' that have data_assinatura set
+  const contratos = [
+    ...contratosAssinados,
+    ...contratosVigentes.filter(c => c.data_assinatura),
+  ]
+
+  const isLoading = loadingSol || loadingAss || loadingVig
 
   // Build unified list
   type Item = {

@@ -115,10 +115,12 @@ export const api = {
     // Tenta n8n primeiro (cache + monitoramento)
     if (BASE) {
       try {
-        return await request<CnpjResult>('/consulta-cnpj', {
+        const raw: Record<string, unknown> = await request('/consulta-cnpj', {
           method: 'POST',
           body: JSON.stringify({ valor: limpo }),
         })
+        // Normaliza resposta do n8n proxy (pode ter nomes de campo diferentes da CnpjResult)
+        return normalizeCnpjResponse(raw, limpo)
       } catch { /* fallback abaixo */ }
     }
     // Fallback: BrasilAPI direto
@@ -171,6 +173,50 @@ export const api = {
       uf: r.state ?? '',
     }
   },
+}
+
+// ── Normaliza resposta CNPJ (n8n proxy pode retornar campos com nomes diferentes) ──
+function normalizeCnpjResponse(r: Record<string, unknown>, cnpjDigits: string): CnpjResult {
+  // Handle potential wrapper: n8n may return { data: {...} } or nested structure
+  const d = (r.data && typeof r.data === 'object' ? r.data : r) as Record<string, unknown>
+
+  const razao = String(d.razao_social ?? d.razao ?? d.nome ?? d.name ?? d.company_name ?? '')
+  const fantasia = String(d.nome_fantasia ?? d.fantasia ?? d.trade_name ?? '')
+
+  // Detect error responses
+  if (d.error || d.erro) {
+    return {
+      cnpj: cnpjDigits,
+      razao_social: razao,
+      nome_fantasia: fantasia,
+      situacao: '',
+      endereco: { cep: '', logradouro: '', numero: '', complemento: '', bairro: '', cidade: '', uf: '' },
+      telefone: '',
+      email: '',
+      error: true,
+      message: String(d.message ?? d.mensagem ?? d.erro ?? 'CNPJ nao encontrado'),
+    }
+  }
+
+  const endereco = (d.endereco && typeof d.endereco === 'object' ? d.endereco : {}) as Record<string, unknown>
+
+  return {
+    cnpj: String(d.cnpj ?? cnpjDigits).replace(/\D/g, ''),
+    razao_social: razao,
+    nome_fantasia: fantasia,
+    situacao: String(d.situacao ?? d.descricao_situacao_cadastral ?? d.situacao_cadastral ?? ''),
+    endereco: {
+      cep: String(endereco.cep ?? d.cep ?? '').replace(/\D/g, ''),
+      logradouro: String(endereco.logradouro ?? d.logradouro ?? ''),
+      numero: String(endereco.numero ?? d.numero ?? ''),
+      complemento: String(endereco.complemento ?? d.complemento ?? ''),
+      bairro: String(endereco.bairro ?? d.bairro ?? ''),
+      cidade: String(endereco.cidade ?? d.municipio ?? d.cidade ?? ''),
+      uf: String(endereco.uf ?? d.uf ?? ''),
+    },
+    telefone: String(d.telefone ?? d.ddd_telefone_1 ?? '').replace(/\D/g, ''),
+    email: String(d.email ?? '').toLowerCase(),
+  }
 }
 
 // ── Types para consultas externas ────────────────────────────────────────

@@ -16,6 +16,7 @@ import {
 } from '../../hooks/useSolicitacoes'
 import type { ResumoAiGerado } from '../../hooks/useSolicitacoes'
 import type { ResumoExecutivo as TResumo, StatusResumo } from '../../types/contratos'
+import { sanitizeAiText } from '../../utils/sanitizeAiText'
 
 // ── Formatters ──────────────────────────────────────────────────────────────────
 
@@ -403,21 +404,21 @@ export default function ResumoExecutivoPage() {
         },
       })
 
-      // Pre-fill form with AI-generated data
+      // Pre-fill form with AI-generated data (sanitize special characters)
       const r = result.resumo
-      if (r.titulo) setTitulo(r.titulo)
-      if (r.objeto_resumo) setObjetoResumo(r.objeto_resumo)
+      if (r.titulo) setTitulo(sanitizeAiText(r.titulo))
+      if (r.objeto_resumo) setObjetoResumo(sanitizeAiText(r.objeto_resumo))
       if (r.valor_total != null) setValorTotal(String(r.valor_total))
       if (r.prazo_meses) setVigencia(`${r.prazo_meses} meses`)
-      if (r.recomendacao) setRecomendacao(r.recomendacao)
+      if (r.recomendacao) setRecomendacao(sanitizeAiText(r.recomendacao))
 
       // partes_envolvidas can be string or array
       if (r.partes_envolvidas) {
         if (typeof r.partes_envolvidas === 'string') {
-          setPartesEnvolvidas(r.partes_envolvidas)
+          setPartesEnvolvidas(sanitizeAiText(r.partes_envolvidas))
         } else if (Array.isArray(r.partes_envolvidas)) {
           setPartesEnvolvidas(
-            r.partes_envolvidas.map(p => `${p.papel}: ${p.nome}${p.cnpj ? ` (${p.cnpj})` : ''}`).join('\n')
+            r.partes_envolvidas.map(p => `${sanitizeAiText(p.papel)}: ${sanitizeAiText(p.nome)}${p.cnpj ? ` (${p.cnpj})` : ''}`).join('\n')
           )
         }
       }
@@ -427,8 +428,8 @@ export default function ResumoExecutivoPage() {
         setRiscos(
           r.riscos.map(rk => ({
             nivel: rk.nivel ?? rk.impacto?.toLowerCase() ?? 'medio',
-            descricao: rk.descricao,
-            mitigacao: rk.mitigacao ?? '',
+            descricao: sanitizeAiText(rk.descricao),
+            mitigacao: sanitizeAiText(rk.mitigacao) ?? '',
           }))
         )
       }
@@ -437,8 +438,8 @@ export default function ResumoExecutivoPage() {
       if (r.oportunidades && r.oportunidades.length > 0) {
         setOportunidades(
           r.oportunidades.map(op => ({
-            descricao: op.descricao,
-            impacto: op.impacto ?? op.beneficio ?? '',
+            descricao: sanitizeAiText(op.descricao),
+            impacto: sanitizeAiText(op.impacto) ?? sanitizeAiText(op.beneficio) ?? '',
           }))
         )
       }
