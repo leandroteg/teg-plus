@@ -798,6 +798,17 @@ export default function SolicitacaoDetalhe() {
         onConfirm={handleCancelar}
         isPending={cancelarSolicitacao.isPending}
       />
+
+      {/* ── Certisign Modal ──────────────────────────────────────────── */}
+      <CertisignModal
+        open={showCertisignModal}
+        onClose={() => setShowCertisignModal(false)}
+        onConfirm={() => {
+          handleAvancar('arquivar')
+          setShowCertisignModal(false)
+        }}
+        isPending={avancarEtapa.isPending}
+      />
     </div>
   )
 }
