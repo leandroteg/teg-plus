@@ -71,26 +71,27 @@ function NovaOSModal({ onClose, isLight }: { onClose: () => void; isLight: boole
     onClose()
   }
 
-  const inp = `w-full px-3 py-2 rounded-xl text-sm placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-rose-500/30 ${
-    isLight ? 'bg-slate-50 border border-slate-200 text-slate-800' : 'bg-white/6 border border-white/10 text-white'
+  const inp = `w-full px-3 py-2.5 rounded-xl text-sm placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-teal-400/40 transition-colors ${
+    isLight ? 'bg-white border border-slate-200 shadow-sm text-slate-800 hover:border-slate-300' : 'bg-white/6 border border-white/12 text-white hover:border-white/20'
   }`
   const sel = inp + (isLight ? '' : ' [&>option]:bg-slate-900')
+  const lbl = `block text-xs font-medium mb-1 ${isLight ? 'text-slate-600' : 'text-slate-300'}`
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
       <form onSubmit={handleSubmit} className="glass-card rounded-2xl p-6 w-full max-w-2xl space-y-4 max-h-[90vh] overflow-y-auto styled-scrollbar">
-        <h2 className={`text-base font-bold ${isLight ? 'text-slate-800' : 'text-white'}`}>Nova Ordem de Servico</h2>
+        <h2 className={`text-lg font-bold ${isLight ? 'text-slate-800' : 'text-white'}`}>Nova Ordem de Servico</h2>
 
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <label className="text-[11px] text-slate-400">Veiculo *</label>
+            <label className={lbl}>Veiculo *</label>
             <select className={sel} value={form.veiculo_id} onChange={e => setForm(f => ({ ...f, veiculo_id: e.target.value }))} required>
               <option value="">Selecione...</option>
               {veiculos.map(v => <option key={v.id} value={v.id}>{v.placa} — {v.marca} {v.modelo}</option>)}
             </select>
           </div>
           <div>
-            <label className="text-[11px] text-slate-400">Tipo</label>
+            <label className={lbl}>Tipo</label>
             <select className={sel} value={form.tipo} onChange={e => setForm(f => ({ ...f, tipo: e.target.value as TipoOS }))}>
               {Object.entries(TIPO_LABEL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
             </select>
@@ -99,32 +100,32 @@ function NovaOSModal({ onClose, isLight }: { onClose: () => void; isLight: boole
 
         <div className="grid grid-cols-3 gap-3">
           <div>
-            <label className="text-[11px] text-slate-400">Prioridade</label>
+            <label className={lbl}>Prioridade</label>
             <select className={sel} value={form.prioridade} onChange={e => setForm(f => ({ ...f, prioridade: e.target.value as PrioridadeOS }))}>
               {Object.entries(PRIORIDADE_CFG).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
             </select>
           </div>
           <div>
-            <label className="text-[11px] text-slate-400">Hodometro entrada</label>
+            <label className={lbl}>Hodometro entrada</label>
             <input type="number" className={inp} value={form.hodometro_entrada} onChange={e => setForm(f => ({ ...f, hodometro_entrada: e.target.value }))} placeholder="km" />
           </div>
           <div>
-            <label className="text-[11px] text-slate-400">Previsao de conclusao</label>
+            <label className={lbl}>Previsao de conclusao</label>
             <input type="date" className={inp} value={form.data_previsao} onChange={e => setForm(f => ({ ...f, data_previsao: e.target.value }))} />
           </div>
         </div>
 
         <div>
-          <label className="text-[11px] text-slate-400">Descricao do problema *</label>
+          <label className={lbl}>Descricao do problema *</label>
           <textarea className={inp + ' resize-none'} rows={2} required value={form.descricao_problema} onChange={e => setForm(f => ({ ...f, descricao_problema: e.target.value }))} placeholder="Descreva o problema identificado..." />
         </div>
 
         {/* Itens */}
         <div>
           <div className="flex items-center justify-between mb-2">
-            <label className="text-[11px] text-slate-400">Itens (pecas / mao de obra)</label>
-            <button type="button" onClick={addItem} className="text-[11px] text-rose-400 hover:text-rose-300 flex items-center gap-1">
-              <Plus size={12} /> Adicionar item
+            <label className={lbl}>Itens (pecas / mao de obra)</label>
+            <button type="button" onClick={addItem} className="text-xs font-medium text-teal-500 hover:text-teal-400 flex items-center gap-1 transition-colors">
+              <Plus size={14} /> Adicionar item
             </button>
           </div>
           {itens.map((item, idx) => (
@@ -145,10 +146,10 @@ function NovaOSModal({ onClose, isLight }: { onClose: () => void; isLight: boole
         </div>
 
         <div className="flex gap-2 pt-2">
-          <button type="button" onClick={onClose} className={`flex-1 py-2 rounded-xl border text-sm ${
-            isLight ? 'border-slate-200 text-slate-500 hover:bg-slate-50' : 'border-white/10 text-slate-400 hover:bg-white/5'
+          <button type="button" onClick={onClose} className={`flex-1 py-2.5 rounded-xl border text-sm font-medium transition-colors ${
+            isLight ? 'border-slate-200 text-slate-600 hover:bg-slate-50 hover:border-slate-300' : 'border-white/12 text-slate-300 hover:bg-white/5 hover:border-white/20'
           }`}>Cancelar</button>
-          <button type="submit" disabled={criar.isPending} className="flex-1 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-sm text-white font-semibold disabled:opacity-50">
+          <button type="submit" disabled={criar.isPending} className="flex-1 py-2.5 rounded-xl bg-gradient-to-r from-teal-500 to-teal-600 hover:from-teal-400 hover:to-teal-500 text-sm text-white font-semibold disabled:opacity-50 shadow-sm shadow-teal-500/20 transition-all">
             {criar.isPending ? 'Criando...' : 'Criar OS'}
           </button>
         </div>
@@ -179,8 +180,8 @@ function CotacoesPanel({ os, isLight }: { os: FroOrdemServico; isLight: boolean 
     setAddOpen(false)
   }
 
-  const inp = `w-full px-3 py-2 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-rose-500/30 ${
-    isLight ? 'bg-slate-50 border border-slate-200 text-slate-800' : 'bg-white/6 border border-white/10 text-white'
+  const inp = `w-full px-3 py-2 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-teal-400/40 ${
+    isLight ? 'bg-white border border-slate-200 shadow-sm text-slate-800' : 'bg-white/6 border border-white/12 text-white'
   }`
   const sel = inp + (isLight ? '' : ' [&>option]:bg-slate-900')
 
@@ -189,8 +190,8 @@ function CotacoesPanel({ os, isLight }: { os: FroOrdemServico; isLight: boolean 
       <div className="flex items-center justify-between">
         <p className="text-xs text-slate-400 font-semibold">Cotacoes ({cotacoes.length}/3 minimo)</p>
         {cotacoes.length < 3 && (
-          <button onClick={() => setAddOpen(o => !o)} className="text-[11px] text-rose-400 flex items-center gap-1">
-            <Plus size={11} /> Adicionar cotacao
+          <button onClick={() => setAddOpen(o => !o)} className="text-xs font-medium text-teal-500 hover:text-teal-400 flex items-center gap-1 transition-colors">
+            <Plus size={12} /> Adicionar cotacao
           </button>
         )}
       </div>
@@ -205,12 +206,12 @@ function CotacoesPanel({ os, isLight }: { os: FroOrdemServico; isLight: boolean 
           </select>
           <input type="number" className={inp} placeholder="Valor total R$" value={form.valor_total} onChange={e => setForm(f => ({ ...f, valor_total: e.target.value }))} required />
           <input type="number" className={inp} placeholder="Prazo (dias)" value={form.prazo_execucao_dias} onChange={e => setForm(f => ({ ...f, prazo_execucao_dias: e.target.value }))} />
-          <button type="submit" className="py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-xs text-white font-semibold">Adicionar</button>
+          <button type="submit" className="py-2 rounded-xl bg-teal-600 hover:bg-teal-500 text-xs text-white font-semibold shadow-sm">Adicionar</button>
         </form>
       )}
 
       {cotacoes.map(cot => (
-        <div key={cot.id} className={`flex items-center gap-3 p-2.5 rounded-xl border text-xs ${cot.selecionado ? 'border-rose-500/40 bg-rose-500/8' : isLight ? 'border-slate-200 bg-slate-50' : 'border-white/8 bg-white/3'}`}>
+        <div key={cot.id} className={`flex items-center gap-3 p-2.5 rounded-xl border text-xs ${cot.selecionado ? 'border-teal-500/40 bg-teal-500/8' : isLight ? 'border-slate-200 bg-slate-50' : 'border-white/8 bg-white/3'}`}>
           <div className="flex-1">
             <p className={`font-semibold ${isLight ? 'text-slate-800' : 'text-white'}`}>{cot.fornecedor?.razao_social}</p>
             {cot.prazo_execucao_dias && <p className="text-slate-500">{cot.prazo_execucao_dias} dias</p>}
@@ -219,12 +220,12 @@ function CotacoesPanel({ os, isLight }: { os: FroOrdemServico; isLight: boolean 
           {os.status === 'em_cotacao' && !cot.selecionado && cotacoes.length >= 1 && (
             <button
               onClick={() => selecionarCot.mutate({ cotacaoId: cot.id, osId: os.id, fornecedorId: cot.fornecedor_id, valor: cot.valor_total })}
-              className="flex items-center gap-1 px-2 py-1 rounded-lg bg-rose-600/80 hover:bg-rose-600 text-white"
+              className="flex items-center gap-1 px-2 py-1 rounded-lg bg-teal-600/80 hover:bg-teal-600 text-white"
             >
               <Check size={11} /> Selecionar
             </button>
           )}
-          {cot.selecionado && <span className="text-rose-400 font-bold text-[10px]">Selecionada</span>}
+          {cot.selecionado && <span className="text-teal-400 font-bold text-[10px]">Selecionada</span>}
         </div>
       ))}
     </div>
@@ -265,9 +266,10 @@ function OSCard({ os, isLight }: { os: FroOrdemServico; isLight: boolean }) {
     setConcluirModal(false)
   }
 
-  const modalInp = `w-full px-3 py-2 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-rose-500/30 resize-none ${
-    isLight ? 'bg-slate-50 border border-slate-200 text-slate-800' : 'bg-white/6 border border-white/10 text-white'
+  const modalInp = `w-full px-3 py-2.5 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-teal-400/40 resize-none ${
+    isLight ? 'bg-white border border-slate-200 shadow-sm text-slate-800' : 'bg-white/6 border border-white/12 text-white'
   }`
+  const lbl = `block text-xs font-medium mb-1 ${isLight ? 'text-slate-600' : 'text-slate-300'}`
 
   return (
     <div className={`glass-card rounded-2xl border ${os.prioridade === 'critica' ? 'border-red-500/30' : isLight ? 'border-slate-200' : 'border-white/6'}`}>
@@ -299,7 +301,7 @@ function OSCard({ os, isLight }: { os: FroOrdemServico; isLight: boolean }) {
 
           {/* Alcada info */}
           {os.valor_orcado && (
-            <p className="text-[11px] text-slate-400">
+            <p className={lbl}>
               Alcada de aprovacao: <span className={`font-semibold ${alcada.cor}`}>{alcada.nivel}</span>
             </p>
           )}
@@ -334,7 +336,7 @@ function OSCard({ os, isLight }: { os: FroOrdemServico; isLight: boolean }) {
           {os.status === 'aprovada' && (
             <button
               onClick={() => atualizarStatus.mutate({ id: os.id, status: 'em_execucao', extra: { data_entrada_oficina: new Date().toISOString() } })}
-              className="flex items-center gap-2 px-3 py-2 rounded-xl bg-rose-600/80 hover:bg-rose-600 text-xs text-white font-semibold"
+              className="flex items-center gap-2 px-3 py-2 rounded-xl bg-teal-600/80 hover:bg-teal-600 text-xs text-white font-semibold shadow-sm"
             >
               <Wrench size={13} /> Enviar para Execucao
             </button>
@@ -370,7 +372,7 @@ function OSCard({ os, isLight }: { os: FroOrdemServico; isLight: boolean }) {
               <p className="text-xs text-slate-400">Valor aprovado: <span className={`font-bold ${isLight ? 'text-slate-800' : 'text-white'}`}>{BRL(os.valor_orcado ?? 0)}</span></p>
             ) : (
               <div>
-                <label className="text-[11px] text-slate-400">Motivo da rejeicao *</label>
+                <label className={lbl}>Motivo da rejeicao *</label>
                 <textarea className={modalInp} rows={2} value={motivo} onChange={e => setMotivo(e.target.value)} required />
               </div>
             )}
@@ -396,11 +398,11 @@ function OSCard({ os, isLight }: { os: FroOrdemServico; isLight: boolean }) {
             <h3 className={`text-sm font-bold ${isLight ? 'text-slate-800' : 'text-white'}`}>Concluir OS {os.numero_os}</h3>
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="text-[11px] text-slate-400">Hodometro saida (km)</label>
+                <label className={lbl}>Hodometro saida (km)</label>
                 <input type="number" className={modalInp} value={hodSaida} onChange={e => setHodSaida(e.target.value)} />
               </div>
               <div>
-                <label className="text-[11px] text-slate-400">Valor final (R$)</label>
+                <label className={lbl}>Valor final (R$)</label>
                 <input type="number" className={modalInp} value={valorFinal} onChange={e => setValorFinal(e.target.value)} placeholder={String(os.valor_aprovado ?? '')} />
               </div>
             </div>
@@ -439,11 +441,11 @@ export default function Ordens() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className={`text-xl font-bold flex items-center gap-2 ${isLight ? 'text-slate-800' : 'text-white'}`}>
-            <Wrench size={20} className="text-rose-400" /> Ordens de Servico
+            <Wrench size={20} className="text-teal-500" /> Ordens de Servico
           </h1>
           <p className="text-sm text-slate-500">{os.length} OS na aba atual</p>
         </div>
-        <button onClick={() => setNovaOS(true)} className="flex items-center gap-2 px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-sm text-white font-semibold">
+        <button onClick={() => setNovaOS(true)} className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-teal-500 to-teal-600 hover:from-teal-400 hover:to-teal-500 text-sm text-white font-semibold shadow-sm shadow-teal-500/20 transition-all">
           <Plus size={15} /> Nova OS
         </button>
       </div>
@@ -458,7 +460,7 @@ export default function Ordens() {
             onClick={() => setTab(i)}
             className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
               tab === i
-                ? 'bg-rose-600 text-white'
+                ? 'bg-teal-600 text-white shadow-sm'
                 : isLight ? 'text-slate-500 hover:text-slate-800' : 'text-slate-400 hover:text-white'
             }`}
           >
