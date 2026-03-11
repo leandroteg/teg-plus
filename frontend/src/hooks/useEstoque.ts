@@ -5,6 +5,27 @@ import type {
   EstInventario, EstInventarioItem, EstoqueKPIs, NovaMovimentacaoPayload,
 } from '../types/estoque'
 
+// ── Catalog search (for RC item autocomplete) ────────────────────────────────
+export function useItemCatalogSearch(categorias: string[], search: string) {
+  return useQuery<EstItem[]>({
+    queryKey: ['est-itens-catalog', categorias, search],
+    enabled: search.length >= 2 && categorias.length > 0,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('est_itens')
+        .select('id, codigo, descricao, descricao_complementar, categoria, unidade, valor_medio')
+        .in('categoria', categorias)
+        .eq('ativo', true)
+        .ilike('descricao', `%${search}%`)
+        .order('descricao')
+        .limit(10)
+      if (error) return []
+      return (data ?? []) as EstItem[]
+    },
+    staleTime: 30_000,
+  })
+}
+
 // ── Bases ─────────────────────────────────────────────────────────────────────
 export function useBases() {
   return useQuery<EstBase[]>({

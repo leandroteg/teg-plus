@@ -11,6 +11,7 @@ import { useAiParse, readFileForAi, isBinaryFile, isImageFile } from '../hooks/u
 import { useCategorias } from '../hooks/useCategorias'
 import { useAuth } from '../contexts/AuthContext'
 import CategoryCard from '../components/CategoryCard'
+import ItemAutocomplete from '../components/ItemAutocomplete'
 import type { RequisicaoItem, Urgencia, AiParseResult, CategoriaMaterial } from '../types'
 
 // ── Obras fixas (alinhadas com seed do SQL) ────────────────────────────────
@@ -834,10 +835,21 @@ export default function NovaRequisicao() {
                 </button>
               )}
             </div>
-            <input required
-              className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-teal-300 outline-none"
-              placeholder="Descrição do item"
-              value={item.descricao} onChange={e => updateItem(idx, 'descricao', e.target.value)} />
+            <ItemAutocomplete
+              value={item.descricao}
+              onChange={v => updateItem(idx, 'descricao', v)}
+              onSelectCatalog={cat => {
+                setItens(prev => prev.map((it, i) => i === idx ? {
+                  ...it,
+                  descricao: cat.descricao,
+                  unidade: cat.unidade,
+                  valor_unitario_estimado: cat.valor_medio,
+                  est_item_id: cat.id,
+                  est_item_codigo: cat.codigo,
+                } : it))
+              }}
+              categoriaRC={categoria?.codigo ?? ''}
+            />
             <div className="grid grid-cols-3 gap-2">
               <div>
                 <label className="text-[10px] text-slate-400">Qtd</label>
@@ -849,7 +861,7 @@ export default function NovaRequisicao() {
                 <label className="text-[10px] text-slate-400">Unidade</label>
                 <select className="w-full border border-slate-200 rounded-xl px-2 py-1.5 text-sm bg-white focus:ring-2 focus:ring-teal-300 outline-none"
                   value={item.unidade} onChange={e => updateItem(idx, 'unidade', e.target.value)}>
-                  {['un', 'kg', 'm', 'm²', 'm³', 'L', 'pc', 'cx', 'hr', 'vb'].map(u => <option key={u} value={u}>{u}</option>)}
+                  {['un', 'par', 'jg', 'kg', 'ton', 'm', 'm²', 'm³', 'L', 'pc', 'cx', 'rl', 'hr', 'vb'].map(u => <option key={u} value={u}>{u}</option>)}
                 </select>
               </div>
               <div>

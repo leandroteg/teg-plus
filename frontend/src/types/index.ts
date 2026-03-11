@@ -74,6 +74,8 @@ export interface RequisicaoItem {
   quantidade: number
   unidade: string
   valor_unitario_estimado: number
+  est_item_id?: string
+  est_item_codigo?: string
 }
 
 export interface Requisicao {
