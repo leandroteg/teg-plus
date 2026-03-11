@@ -45,9 +45,9 @@ function OcorrenciaModal({ oc, onClose, isLight }: { oc: FroOcorrenciaTel; onClo
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-      <div className="glass-card rounded-2xl p-6 w-full max-w-md space-y-4">
+      <div className={`rounded-2xl shadow-2xl p-6 w-full max-w-md space-y-4 ${isLight ? 'bg-white border border-slate-200' : 'bg-[#1e293b] border border-white/[0.06]'}`}>
         <div className="flex items-start justify-between">
-          <h2 className={`text-base font-bold ${isLight ? 'text-slate-800' : 'text-white'}`}>Ocorrencia de Telemetria</h2>
+          <h2 className={`text-lg font-extrabold ${isLight ? 'text-slate-800' : 'text-white'}`}>Ocorrencia de Telemetria</h2>
           <button onClick={onClose} className={`${isLight ? 'text-slate-400 hover:text-slate-700' : 'text-slate-500 hover:text-white'}`}><XCircle size={18} /></button>
         </div>
 
@@ -95,7 +95,7 @@ function OcorrenciaModal({ oc, onClose, isLight }: { oc: FroOcorrenciaTel; onClo
 
         {/* Observacoes */}
         <div>
-          <label className={`block text-xs font-medium mb-1 ${isLight ? 'text-slate-600' : 'text-slate-300'}`}>Observacoes / Tratativa</label>
+          <label className={`block text-xs font-bold mb-1 ${isLight ? 'text-slate-600' : 'text-slate-300'}`}>Observacoes / Tratativa</label>
           <textarea
             className={`w-full px-3 py-2 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-teal-400/40 resize-none mt-1 ${
               isLight ? 'bg-white border border-slate-200 shadow-sm text-slate-800' : 'bg-white/6 border border-white/12 text-white'
@@ -134,8 +134,8 @@ function OcorrenciaRow({ oc, onSelect, isLight }: { oc: FroOcorrenciaTel; onSele
   const statusLabel = { registrada: 'Registrada', analisada: 'Analisada', comunicado_rh: 'Comunicado RH', encerrada: 'Encerrada' }[oc.status]
 
   return (
-    <button onClick={onSelect} className={`glass-card w-full rounded-xl px-4 py-3 flex items-center gap-4 text-left transition-colors ${
-      isLight ? 'hover:bg-slate-50' : 'hover:bg-white/5'
+    <button onClick={onSelect} className={`w-full rounded-xl shadow-sm px-4 py-3 flex items-center gap-4 text-left transition-colors ${
+      isLight ? 'bg-white border border-slate-200 hover:bg-slate-50' : 'bg-[#1e293b] border border-white/[0.06] hover:bg-white/5'
     }`}>
       <AlertTriangle size={15} className={oc.status === 'registrada' ? 'text-red-400' : oc.status === 'encerrada' ? 'text-slate-600' : 'text-amber-400'} />
       <div className="flex-1 min-w-0">
@@ -177,7 +177,7 @@ function NovaOcorrenciaModal({ onClose, isLight }: { onClose: () => void; isLigh
     onClose()
   }
 
-  const lbl = 'block text-xs font-medium mb-1 ' + (isLight ? 'text-slate-600' : 'text-slate-300')
+  const lbl = 'block text-xs font-bold mb-1 ' + (isLight ? 'text-slate-600' : 'text-slate-300')
   const inp = `w-full px-3 py-2 rounded-xl text-sm placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-teal-400/40 ${
     isLight ? 'bg-white border border-slate-200 shadow-sm text-slate-800' : 'bg-white/6 border border-white/12 text-white'
   }`
@@ -185,8 +185,8 @@ function NovaOcorrenciaModal({ onClose, isLight }: { onClose: () => void; isLigh
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-      <form onSubmit={handleSubmit} className="glass-card rounded-2xl p-6 w-full max-w-lg space-y-4">
-        <h2 className={`text-base font-bold ${isLight ? 'text-slate-800' : 'text-white'}`}>Registrar Ocorrencia</h2>
+      <form onSubmit={handleSubmit} className={`rounded-2xl shadow-2xl p-6 w-full max-w-lg space-y-4 ${isLight ? 'bg-white border border-slate-200' : 'bg-[#1e293b] border border-white/[0.06]'}`}>
+        <h2 className={`text-lg font-extrabold ${isLight ? 'text-slate-800' : 'text-white'}`}>Registrar Ocorrencia</h2>
 
         <div className="grid grid-cols-2 gap-3">
           <div>
@@ -305,7 +305,7 @@ export default function Telemetria() {
 
       {/* Lista */}
       {isLoading ? (
-        <div className="space-y-2">{Array.from({ length: 5 }).map((_, i) => <div key={i} className="glass-card rounded-xl h-16 animate-pulse" />)}</div>
+        <div className="space-y-2">{Array.from({ length: 5 }).map((_, i) => <div key={i} className={`rounded-xl h-16 animate-pulse ${isLight ? 'bg-white border border-slate-200 shadow-sm' : 'bg-[#1e293b] border border-white/[0.06]'}`} />)}</div>
       ) : ocorrencias.length === 0 ? (
         <div className="text-center py-12">
           <CheckCircle size={32} className="text-emerald-400 mx-auto mb-2 opacity-60" />

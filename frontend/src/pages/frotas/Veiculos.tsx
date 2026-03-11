@@ -60,7 +60,7 @@ function VeiculoModal({
     onClose()
   }
 
-  const lbl = 'block text-xs font-medium mb-1 ' + (isLight ? 'text-slate-600' : 'text-slate-300')
+  const lbl = 'block text-xs font-bold mb-1 ' + (isLight ? 'text-slate-600' : 'text-slate-300')
 
   const inp = `w-full px-3 py-2 rounded-xl text-sm placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-teal-400/40 ${
     isLight
@@ -73,9 +73,11 @@ function VeiculoModal({
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
       <form
         onSubmit={handleSubmit}
-        className="glass-card rounded-2xl p-6 w-full max-w-2xl space-y-4 max-h-[90vh] overflow-y-auto styled-scrollbar"
+        className={`rounded-2xl shadow-2xl p-6 w-full max-w-2xl space-y-4 max-h-[90vh] overflow-y-auto styled-scrollbar ${
+          isLight ? 'bg-white border border-slate-200' : 'bg-[#1e293b] border border-white/[0.06]'
+        }`}
       >
-        <h2 className={`text-base font-bold ${isLight ? 'text-slate-800' : 'text-white'}`}>{inicial?.id ? 'Editar' : 'Novo'} Veiculo</h2>
+        <h2 className={`text-lg font-extrabold ${isLight ? 'text-slate-800' : 'text-white'}`}>{inicial?.id ? 'Editar' : 'Novo'} Veiculo</h2>
 
         {/* Linha 1 */}
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
@@ -286,7 +288,7 @@ export default function Veiculos() {
       {isLoading ? (
         <div className="space-y-2">
           {Array.from({ length: 5 }).map((_, i) => (
-            <div key={i} className="glass-card rounded-xl h-16 animate-pulse" />
+            <div key={i} className={`rounded-xl h-16 animate-pulse ${isLight ? 'bg-white border border-slate-200 shadow-sm' : 'bg-[#1e293b] border border-white/[0.06]'}`} />
           ))}
         </div>
       ) : filtrados.length === 0 ? (
@@ -301,7 +303,9 @@ export default function Veiculos() {
             const warnPrev = v.km_proxima_preventiva && v.km_proxima_preventiva <= v.hodometro_atual + 500
 
             return (
-              <div key={v.id} className="glass-card rounded-xl px-4 py-3 flex items-center gap-4">
+              <div key={v.id} className={`rounded-xl shadow-sm px-4 py-3 flex items-center gap-4 ${
+                isLight ? 'bg-white border border-slate-200' : 'bg-[#1e293b] border border-white/[0.06]'
+              }`}>
 
                 {/* Placa */}
                 <div className="w-24 shrink-0">
