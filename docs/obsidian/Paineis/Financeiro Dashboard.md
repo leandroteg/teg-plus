@@ -2,9 +2,9 @@
 title: "💰 Financeiro Dashboard"
 type: painel-bi
 tags: [painel, bi, dashboard, financeiro]
-atualizado: 2026-03-04
+atualizado: 2026-03-11
 modulo: financeiro
-completude: 50
+completude: 80
 ---
 
 ```dataviewjs
@@ -72,9 +72,9 @@ const tDone=tarefas.where(t=>t.status==="concluido").length, tWip=tarefas.where(
 const pts=tarefas.array().reduce((s,t)=>s+(t.estimativa||0),0), ptsDone=tarefas.where(t=>t.status==="concluido").array().reduce((s,t)=>s+(t.estimativa||0),0);
 
 const submodulos = [
-  {nome:'Contas a Pagar (CP)',pct:80},{nome:'Contas a Receber (CR)',pct:60},{nome:'Aprovações Financeiras',pct:70},
-  {nome:'Conciliação CNAB',pct:40},{nome:'Relatórios Financeiros',pct:30},{nome:'Gestão Fornecedores',pct:50},
-  {nome:'Integração Omie ERP',pct:45},{nome:'DRE / Controladoria',pct:0},
+  {nome:'Contas a Pagar (CP)',pct:95},{nome:'Contas a Receber (CR)',pct:85},{nome:'Aprovações Financeiras',pct:90},
+  {nome:'Dashboard KPIs',pct:90},{nome:'Conciliação CNAB',pct:60},{nome:'Relatórios Financeiros',pct:50},
+  {nome:'Gestão Fornecedores',pct:80},{nome:'Integração Omie ERP',pct:70},{nome:'DRE / Controladoria',pct:40},
 ];
 const n8nSquads = [
   {nome:'Sync Contas a Pagar',st:'✅',wh:'omie-sync-cp'},{nome:'Sync Contas a Receber',st:'✅',wh:'omie-sync-cr'},
@@ -103,7 +103,7 @@ w.insertAdjacentHTML('afterbegin', `
     <div><div style="font-size:1.4em;font-weight:700;">Módulo Financeiro</div>
       <div style="font-size:.78em;color:var(--text-muted);">CP · CR · Aprovações · CNAB · Omie · Relatórios</div></div>
     <div style="margin-left:auto;text-align:right;">
-      <div style="font-size:2em;font-weight:700;color:${C.orange};">50%</div>
+      <div style="font-size:2em;font-weight:700;color:${C.green};">80%</div>
       <div style="font-size:.65em;color:var(--text-muted);text-transform:uppercase;letter-spacing:1.4px;">Completude</div></div>
   </div>
 

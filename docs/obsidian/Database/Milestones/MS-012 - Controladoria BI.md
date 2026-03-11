@@ -2,10 +2,11 @@
 tipo: milestone
 id: MS-012
 titulo: "Controladoria e BI — Visão Executiva"
-status: backlog
-fase: Q3-2026
-data_alvo: 2026-09-30
-progresso: 0
+status: em-andamento
+fase: Q1-2026
+data_alvo: 2026-06-30
+progresso: 75
+updated: 2026-03-11
 modulo: controladoria
 tags: [milestone, controladoria, bi, dre, orcado, realizado]
 ---
@@ -15,26 +16,34 @@ tags: [milestone, controladoria, bi, dre, orcado, realizado]
 ## Visão Geral
 Visão financeira consolidada para a diretoria: orçado vs realizado por obra, DRE consolidado, centro de custo, forecast de caixa, EBITDA e dashboard executivo.
 
-## Entregas Planejadas
+## Estado Atual (2026-03-11)
 
-### Relatórios por Obra
-- [ ] Orçado vs Realizado
-- [ ] Margem de contribuição
-- [ ] P&L por centro de custo
-- [ ] Custo de mão de obra (RH)
-- [ ] Custo de materiais (Compras + Estoque)
+### Frontend Implementado — 9 Páginas Operacionais
+- [x] **ControladoriaHome** — Dashboard consolidado com KPIs
+- [x] **Orcamentos** — Gestão de orçamentos por obra (CRUD completo)
+- [x] **DRE** — Demonstrativo de Resultado do Exercício
+- [x] **KPIs** — Painel de indicadores com múltiplos tipos
+- [x] **Cenarios** — Análise de cenários (what-if)
+- [x] **PlanoOrcamentario** — Plano orçamentário por período
+- [x] **ControleOrcamentario** — Controle orçado vs realizado
+- [x] **PainelIndicadores** — Painel de indicadores executivo
+- [x] **AlertasDesvio** — Alertas de desvio com severidade
 
-### Relatórios Consolidados
-- [ ] DRE consolidado (todas as obras)
+### API e Backend
+- [x] Integração real com Supabase (queries diretas)
+- [x] CRUD completo para orçamentos, KPIs, cenários, alertas
+- [x] Análise de custo por obra
+- [x] Layout Controladoria com sidebar
+
+### Pendências
+- [ ] DRE consolidado multi-obra
 - [ ] Fluxo de caixa previsto (30/60/90 dias)
-- [ ] EBITDA
-- [ ] Indicadores de rentabilidade
-
-### Dashboard Executivo
-- [ ] BI visual com gráficos
-- [ ] Drill-down por obra/período
+- [ ] EBITDA e margens consolidadas
+- [ ] Drill-down por obra/período avançado
 - [ ] Exportação para contabilidade
-- [ ] Alertas de desvio orçamentário
+- [ ] Integração profunda com Financeiro (dados CP/CR reais)
+- [ ] Integração RH (custo mão de obra)
+- [ ] Integração Contratos (medições previstas)
 
 ## Dependências
 - Financeiro (dados de CP, CR, DRE)
@@ -45,7 +54,7 @@ Visão financeira consolidada para a diretoria: orçado vs realizado por obra, D
 ## Tarefas
 | ID | Tarefa | Status |
 |----|--------|--------|
-| [[TASK-029 - Controladoria DRE\|TASK-029]] | DRE Consolidado e Orçado vs Realizado | ⬜ backlog |
+| [[TASK-029 - Controladoria DRE\|TASK-029]] | DRE Consolidado e Orçado vs Realizado | 🟡 parcial |
 
 ## Progresso
-`░░░░░░░░░░` 0%
+`███████░░░` 75%

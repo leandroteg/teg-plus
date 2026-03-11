@@ -5,8 +5,8 @@ titulo: "Módulo Contratos e Medições de Obra"
 status: em-andamento
 fase: Q1-2026
 data_alvo: 2026-06-30
-progresso: 80
-updated: 2026-03-10
+progresso: 85
+updated: 2026-03-11
 modulo: contratos
 tags: [milestone, contratos, medicoes, boletim, aditivos]
 ---
@@ -26,7 +26,13 @@ Gestão completa de contratos (cliente e fornecedor), boletins de medição, adi
 - [x] Executive summary + PDF attachment nos cards de aprovação
 - [x] Schema DB: con_contratos, con_contrato_itens, con_clientes, con_parcelas, con_parcela_anexos
 - [x] Cadastro de clientes
-- [x] Parcelas com controle de pagamento
+- [x] Parcelas com controle de pagamento e geração automática (recorrência)
+- [x] **15 páginas frontend** operacionais com Supabase
+- [x] Dashboard de contratos com KPIs
+- [x] Gestão de equipe PJ
+- [x] Aditivos (UI implementada)
+- [x] Reajustes (UI implementada)
+- [x] Medições (UI implementada, lógica de BM pendente)
 
 ### Pendente
 - [ ] Boletins de Medição (BM)
@@ -47,4 +53,4 @@ Gestão completa de contratos (cliente e fornecedor), boletins de medição, adi
 | [[TASK-025 - Contratos Gestao Medicoes\|TASK-025]] | Gestão de Contratos e Medições | 🟡 parcial (v2 pipeline done, medições pendente) |
 
 ## Progresso
-`████████░░` 80%
+`████████▒░` 85%

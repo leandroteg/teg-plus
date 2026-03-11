@@ -5,8 +5,8 @@ titulo: "Módulo Financeiro — Omie como Core"
 status: em-andamento
 fase: Q2-2026
 data_alvo: 2026-09-30
-progresso: 70
-updated: 2026-03-10
+progresso: 80
+updated: 2026-03-11
 modulo: financeiro
 tags: [milestone, financeiro, omie, nfe, dre, conciliacao, aprovacao]
 ---
@@ -87,12 +87,19 @@ Lançamento do módulo financeiro do TEG+ com o **Omie como módulo central**.
 | Gestão de Obras (previsto × realizado) | Importante | ⬜ backlog |
 | Contabilidade externa | Importante | ⬜ backlog |
 
-## Notas (2026-03-10)
+## Notas (2026-03-11)
 - CP approval flow wired into apr_aprovacoes via syncCPsParaAprovacao
 - AprovAi (Centro de Aprovacoes) implementado com 4 tipos: cotacao, autorizacao_pagamento, minuta_contratual, requisicao_compra
 - ApprovalBadge no header global para admin users
-- Telas CP, CR, Aprovacoes, Conciliacao, Relatorios, Fornecedores todas operacionais
+- **8 páginas operacionais** com API real (Supabase RPC `get_dashboard_financeiro`)
+- Dashboard Financeiro com KPIs e filtros
+- CP com status flow de 8 estágios (CRUD completo)
+- CR operacional com vencidos
+- Aprovações de pagamento com roteamento por alçada
+- Conciliação bancária (UI operacional, provider real pendente)
+- Relatórios básicos (DRE, Fluxo, CC, Aging) com UI pronta
+- Configurações com credenciais Omie
 - Pendente: integracao SEFAZ, remessa bancaria real, exceções de pagamento, RBAC completo
 
 ## Progresso
-`███████░░░` 70%
+`████████░░` 80%
