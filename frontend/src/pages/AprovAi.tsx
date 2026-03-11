@@ -435,13 +435,44 @@ function GenericPendingCard({ aprovacao, aprovadorNome, aprovadorEmail }: {
         {/* ── Resumo Executivo para Minuta Contratual ── */}
         {aprovacao.tipo_aprovacao === 'minuta_contratual' && aprovacao.minuta_resumo ? (
           <MinutaExecutiveSummary resumo={aprovacao.minuta_resumo} />
+        ) : aprovacao.tipo_aprovacao === 'autorizacao_pagamento' && aprovacao.requisicao ? (
+          <div className="space-y-2">
+            <div className="bg-slate-50 rounded-xl p-3 space-y-1.5">
+              {aprovacao.requisicao.solicitante_nome && (
+                <div className="flex justify-between text-xs">
+                  <span className="text-slate-500">Fornecedor</span>
+                  <span className="text-slate-800 font-semibold">{aprovacao.requisicao.solicitante_nome}</span>
+                </div>
+              )}
+              {aprovacao.requisicao.numero && aprovacao.requisicao.numero !== 'N/A' && (
+                <div className="flex justify-between text-xs">
+                  <span className="text-slate-500">Documento</span>
+                  <span className="text-slate-800 font-medium">{aprovacao.requisicao.numero}</span>
+                </div>
+              )}
+              {aprovacao.requisicao.obra_nome && (
+                <div className="flex justify-between text-xs">
+                  <span className="text-slate-500">Centro de Custo</span>
+                  <span className="text-slate-800 font-medium">{aprovacao.requisicao.obra_nome}</span>
+                </div>
+              )}
+            </div>
+            {aprovacao.requisicao.valor_estimado > 0 && (
+              <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 flex justify-between items-center">
+                <span className="text-xs text-amber-700 font-medium">Valor a Pagar</span>
+                <span className="text-lg font-extrabold text-amber-700">
+                  {fmt(aprovacao.requisicao.valor_estimado)}
+                </span>
+              </div>
+            )}
+          </div>
         ) : (
           <p className="text-sm text-slate-600">
             {aprovacao.requisicao?.descricao || `Aguardando aprovacao ${tipo.label.toLowerCase()}`}
           </p>
         )}
 
-        {aprovacao.requisicao?.valor_estimado > 0 && aprovacao.tipo_aprovacao !== 'minuta_contratual' && (
+        {aprovacao.requisicao?.valor_estimado > 0 && aprovacao.tipo_aprovacao !== 'minuta_contratual' && aprovacao.tipo_aprovacao !== 'autorizacao_pagamento' && (
           <div className="mt-3 bg-slate-50 rounded-xl p-3 flex justify-between items-center">
             <span className="text-xs text-slate-500">Valor</span>
             <span className={`text-lg font-extrabold ${tipo.textColor}`}>
@@ -450,46 +481,48 @@ function GenericPendingCard({ aprovacao, aprovadorNome, aprovadorEmail }: {
           </div>
         )}
 
-        {/* Expandir para observacao */}
-        <button type="button" onClick={() => setExpanded(!expanded)}
-          className="flex items-center gap-1 text-xs text-indigo-500 mt-3 mx-auto font-semibold">
-          {expanded ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
-          {expanded ? 'Menos detalhes' : 'Adicionar observacao'}
-        </button>
-
         {expanded && (
           <div className="mt-3">
-            <label className="text-xs text-slate-400">Observacao (opcional)</label>
+            <label className="text-xs text-slate-400">Observacao / Esclarecimento</label>
             <textarea
               rows={2}
               className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm mt-1 focus:ring-2 focus:ring-indigo-300 outline-none"
-              placeholder="Motivo da decisao..."
+              placeholder="Descreva o que precisa ser esclarecido ou justifique sua decisao..."
               value={observacao}
               onChange={e => setObservacao(e.target.value)}
             />
           </div>
         )}
       </div>
-      <div className="grid grid-cols-2 border-t border-slate-100">
+      <div className="grid grid-cols-3 border-t border-slate-100">
         <button
           type="button"
           disabled={mutation.isPending}
           onClick={() => handleDecision('rejeitada')}
-          className="flex items-center justify-center gap-2 py-3.5 text-xs font-bold text-red-500 hover:bg-red-50 active:bg-red-100 transition border-r border-slate-100 disabled:opacity-50"
+          className="flex items-center justify-center gap-1.5 py-3.5 text-xs font-bold text-red-500 hover:bg-red-50 active:bg-red-100 transition border-r border-slate-100 disabled:opacity-50"
         >
           {mutation.isPending && action === 'rejeitada'
-            ? <div className="w-5 h-5 border-2 border-red-400 border-t-transparent rounded-full animate-spin" />
-            : <XCircle size={18} />}
+            ? <div className="w-4 h-4 border-2 border-red-400 border-t-transparent rounded-full animate-spin" />
+            : <XCircle size={16} />}
           Rejeitar
         </button>
         <button
           type="button"
           disabled={mutation.isPending}
+          onClick={() => setExpanded(!expanded)}
+          className="flex items-center justify-center gap-1.5 py-3.5 text-xs font-bold text-indigo-500 hover:bg-indigo-50 active:bg-indigo-100 transition border-r border-slate-100 disabled:opacity-50"
+        >
+          <MessageSquare size={16} />
+          Esclarecer
+        </button>
+        <button
+          type="button"
+          disabled={mutation.isPending}
           onClick={() => handleDecision('aprovada')}
-          className="flex items-center justify-center gap-2 py-3.5 text-xs font-bold text-emerald-600 hover:bg-emerald-50 active:bg-emerald-100 transition disabled:opacity-50"
+          className="flex items-center justify-center gap-1.5 py-3.5 text-xs font-bold text-emerald-600 hover:bg-emerald-50 active:bg-emerald-100 transition disabled:opacity-50"
         >
           {mutation.isPending && action === 'aprovada'
-            ? <div className="w-5 h-5 border-2 border-emerald-400 border-t-transparent rounded-full animate-spin" />
+            ? <div className="w-4 h-4 border-2 border-emerald-400 border-t-transparent rounded-full animate-spin" />
             : <CheckCircle size={18} />}
           Aprovar
         </button>

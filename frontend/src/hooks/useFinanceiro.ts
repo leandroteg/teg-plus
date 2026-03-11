@@ -356,19 +356,13 @@ export function useDistinctCentroCusto() {
   return useQuery<string[]>({
     queryKey: ['distinct-centro-custo'],
     queryFn: async () => {
-      const { data: cp } = await supabase
-        .from('fin_contas_pagar')
-        .select('centro_custo')
-        .not('centro_custo', 'is', null)
-        .limit(500)
-      const { data: cr } = await supabase
-        .from('fin_contas_receber')
-        .select('centro_custo')
-        .not('centro_custo', 'is', null)
-        .limit(500)
-      const all = [...(cp ?? []), ...(cr ?? [])]
-      const unique = [...new Set(all.map(r => r.centro_custo).filter(Boolean))] as string[]
-      return unique.sort()
+      const { data, error } = await supabase
+        .from('fin_centros_custo')
+        .select('nome')
+        .eq('ativo', true)
+        .order('nome')
+      if (error) throw error
+      return (data ?? []).map(r => r.nome).filter(Boolean)
     },
     staleTime: 60_000,
   })
@@ -378,19 +372,13 @@ export function useDistinctClasseFinanceira() {
   return useQuery<string[]>({
     queryKey: ['distinct-classe-financeira'],
     queryFn: async () => {
-      const { data: cp } = await supabase
-        .from('fin_contas_pagar')
-        .select('classe_financeira')
-        .not('classe_financeira', 'is', null)
-        .limit(500)
-      const { data: cr } = await supabase
-        .from('fin_contas_receber')
-        .select('classe_financeira')
-        .not('classe_financeira', 'is', null)
-        .limit(500)
-      const all = [...(cp ?? []), ...(cr ?? [])]
-      const unique = [...new Set(all.map(r => r.classe_financeira).filter(Boolean))] as string[]
-      return unique.sort()
+      const { data, error } = await supabase
+        .from('fin_classes_financeiras')
+        .select('nome')
+        .eq('ativo', true)
+        .order('nome')
+      if (error) throw error
+      return (data ?? []).map(r => r.nome).filter(Boolean)
     },
     staleTime: 60_000,
   })

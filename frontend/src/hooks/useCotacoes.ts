@@ -243,7 +243,7 @@ export function useFinalizarCotacao() {
       try {
         await api.submeterCotacao({
           cotacao_id,
-          fornecedores: fornecedores.map(f => ({ ...f, itens_precos: [] })),
+          fornecedores: fornecedores.map(f => ({ ...f, itens_precos: [], arquivo_url: f.arquivo_url ?? null })),
         })
       } catch {
         // n8n indisponível, tudo já está salvo no Supabase

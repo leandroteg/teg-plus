@@ -94,6 +94,9 @@ export const api = {
       body: JSON.stringify(data),
     }),
 
+  enviarEmailPedido: (data: { pedido_id: string; email_destinatario: string; subject: string; body: string }) =>
+    request<{ ok: boolean }>('/compras/email-pedido', { method: 'POST', body: JSON.stringify(data) }),
+
   getDashboard: (params?: { periodo?: string; obra_id?: string }) => {
     const qs = params ? new URLSearchParams(params as Record<string, string>).toString() : ''
     return request<unknown>(`/painel/compras${qs ? `?${qs}` : ''}`)

@@ -6,6 +6,7 @@ import {
 } from 'lucide-react'
 import { useSearchParams } from 'react-router-dom'
 import { usePedidos, useAtualizarPedido, useLiberarPagamento } from '../hooks/usePedidos'
+import { api } from '../services/api'
 import { useAnexosPedido, useUploadAnexo, useCotacaoDocs, TIPO_LABEL } from '../hooks/useAnexos'
 import type { PedidoAnexo } from '../hooks/useAnexos'
 import FluxoTimeline from '../components/FluxoTimeline'
@@ -149,14 +150,30 @@ function compartilharWhatsApp(pedido: Pedido) {
   window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank')
 }
 
-function compartilharEmail(pedido: Pedido, email?: string) {
+async function compartilharEmail(pedido: Pedido, email?: string) {
   const subject = `Pedido de Compra #${pedido.numero_pedido} — TEG+`
   const body =
     `Prezado(a),\n\nSegue pedido de compra conforme detalhes abaixo:\n\n` +
     `Número: ${pedido.numero_pedido}\nFornecedor: ${pedido.fornecedor_nome}\n` +
     `Valor: ${pedido.valor_total?.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}\n` +
     `Previsão de Entrega: ${pedido.data_prevista_entrega ? new Date(pedido.data_prevista_entrega + 'T00:00:00').toLocaleDateString('pt-BR') : '—'}\n\n` +
+    `Para visualizar o pedido completo com anexos, acesse o sistema TEG+.\n\n` +
     `Atenciosamente,\nEquipe de Compras TEG+`
+
+  // Tenta enviar via n8n (com anexos)
+  try {
+    const res = await api.enviarEmailPedido({
+      pedido_id: pedido.id,
+      email_destinatario: email ?? '',
+      subject,
+      body,
+    })
+    if (res?.ok) return // sucesso via n8n
+  } catch {
+    // n8n indisponível — fallback mailto
+  }
+
+  // Fallback: abre mailto (sem anexos)
   window.open(`mailto:${email ?? ''}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`)
 }
 
