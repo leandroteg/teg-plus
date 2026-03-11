@@ -34,8 +34,8 @@ function StatusBadge({ status }: { status: string }) {
 
 const ACTIONS = [
   { icon: FileText,    label: 'Contratos',  to: '/contratos/lista',    color: 'text-indigo-600', bg: 'bg-indigo-50' },
-  { icon: FilePlus,    label: 'Novo',        to: '/contratos/novo',     color: 'text-violet-600', bg: 'bg-violet-50' },
-  { icon: CalendarDays, label: 'Parcelas',   to: '/contratos/parcelas', color: 'text-blue-600',   bg: 'bg-blue-50'   },
+  { icon: FilePlus,    label: 'Modelos',     to: '/contratos/modelos',  color: 'text-violet-600', bg: 'bg-violet-50' },
+  { icon: CalendarDays, label: 'Parcelas',   to: '/contratos/previsao', color: 'text-blue-600',   bg: 'bg-blue-50'   },
 ]
 
 export default function DashboardContratos() {
