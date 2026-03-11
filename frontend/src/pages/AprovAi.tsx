@@ -7,6 +7,7 @@ import {
   FileSearch, Banknote, FileSignature, ShoppingCart,
   History, ListChecks, Timer, TrendingUp, Filter,
   Calendar, FileText, Download, Eye, HelpCircle,
+  Package, SplitSquareHorizontal,
 } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../services/supabase'
@@ -19,7 +20,7 @@ import {
 } from '../hooks/useAprovacoes'
 import type { HistoricoFiltros } from '../hooks/useAprovacoes'
 import FluxoTimeline from '../components/FluxoTimeline'
-import type { AprovacaoPendente, AprovacaoHistorico, TipoAprovacao } from '../types'
+import type { AprovacaoPendente, AprovacaoHistorico, TipoAprovacao, CotacaoFornecedor, ItemSelecionado } from '../types'
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -387,7 +388,358 @@ function AprovacaoCard({ aprovacao, aprovadorNome, aprovadorEmail }: {
   )
 }
 
-// ── GenericPendingCard (cotacao, autorizacao_pagamento, minuta_contratual) ─────
+// ── CotacaoItemsCard — Aprovação parcial por item entre fornecedores ─────────
+
+const normalizeKey = (s: string) => s.toLowerCase().trim()
+
+function CotacaoItemsCard({ aprovacao, aprovadorNome, aprovadorEmail }: {
+  aprovacao: AprovacaoPendente
+  aprovadorNome: string
+  aprovadorEmail: string
+}) {
+  const mutation = useDecisaoGenerica()
+  const [action, setAction]           = useState<'aprovada' | 'rejeitada' | null>(null)
+  const [observacao, setObservacao]   = useState('')
+  const [showMatrix, setShowMatrix]   = useState(false)
+  const [expanded, setExpanded]       = useState(false)
+
+  // selecoes: itemKey -> fornecedor_id selecionado
+  const [selecoes, setSelecoes] = useState<Record<string, string>>({})
+
+  const cot        = aprovacao.cotacao_resumo
+  const fornecedores: CotacaoFornecedor[] = cot?.fornecedores ?? []
+  const temItens   = fornecedores.some(f => f.itens_precos?.length > 0)
+
+  // Monta lista unificada de itens
+  const allItemKeys = useMemo<string[]>(() => {
+    if (!temItens) return []
+    const keys = new Set<string>()
+    for (const f of fornecedores) {
+      for (const it of f.itens_precos ?? []) keys.add(normalizeKey(it.descricao))
+    }
+    return Array.from(keys)
+  }, [fornecedores, temItens])
+
+  // Inicializar seleção com menor preço por item
+  useEffect(() => {
+    if (!temItens) return
+    const init: Record<string, string> = {}
+    for (const key of allItemKeys) {
+      let bestId = ''
+      let bestVal = Infinity
+      for (const f of fornecedores) {
+        const item = f.itens_precos?.find(it => normalizeKey(it.descricao) === key)
+        if (item && item.valor_total < bestVal) { bestVal = item.valor_total; bestId = f.id }
+      }
+      if (bestId) init[key] = bestId
+    }
+    setSelecoes(init)
+  }, [allItemKeys, fornecedores, temItens])
+
+  // Calcula total selecionado
+  const totalSelecionado = useMemo(() => {
+    if (!temItens) return cot?.valor ?? 0
+    let total = 0
+    for (const [key, fornId] of Object.entries(selecoes)) {
+      const f = fornecedores.find(f => f.id === fornId)
+      const item = f?.itens_precos?.find(it => normalizeKey(it.descricao) === key)
+      if (item) total += item.valor_total
+    }
+    return Math.round(total * 100) / 100
+  }, [selecoes, fornecedores, temItens, cot])
+
+  // Monta itens_selecionados para salvar
+  const buildItensSelecionados = (): ItemSelecionado[] => {
+    const result: ItemSelecionado[] = []
+    for (const [key, fornId] of Object.entries(selecoes)) {
+      const f = fornecedores.find(f => f.id === fornId)
+      const item = f?.itens_precos?.find(it => normalizeKey(it.descricao) === key)
+      if (f && item) {
+        result.push({
+          descricao:      item.descricao,
+          qtd:            item.qtd,
+          fornecedor_id:  f.id,
+          fornecedor_nome: f.fornecedor_nome,
+          valor_unitario: item.valor_unitario,
+          valor_total:    item.valor_total,
+        })
+      }
+    }
+    return result
+  }
+
+  const handleDecision = async (decisao: 'aprovada' | 'rejeitada') => {
+    setAction(decisao)
+    try {
+      await mutation.mutateAsync({
+        aprovacaoId:     aprovacao.id,
+        entidadeId:      aprovacao.entidade_id,
+        entidadeNumero:  aprovacao.entidade_numero,
+        tipoAprovacao:   'cotacao',
+        modulo:          aprovacao.modulo,
+        nivel:           aprovacao.nivel,
+        decisao,
+        observacao:      observacao || undefined,
+        aprovadorNome,
+        aprovadorEmail,
+        itens_selecionados: decisao === 'aprovada' && temItens ? buildItensSelecionados() : undefined,
+        cotacaoId:       cot?.cotacao_id,
+      })
+    } catch { /* handled by mutation */ }
+  }
+
+  const tipo = tipoConfig.cotacao
+
+  if (mutation.isSuccess) {
+    const colors = action === 'aprovada'
+      ? { bg: 'bg-emerald-50 border-emerald-200', icon: 'text-emerald-500', text: 'text-emerald-700', msg: 'Aprovada' }
+      : { bg: 'bg-red-50 border-red-200', icon: 'text-red-500', text: 'text-red-700', msg: 'Rejeitada' }
+    return (
+      <div className={`rounded-2xl p-6 text-center border-2 ${colors.bg}`}>
+        {action === 'aprovada'
+          ? <CheckCircle size={44} className={`${colors.icon} mx-auto mb-3`} />
+          : <XCircle size={44} className={`${colors.icon} mx-auto mb-3`} />}
+        <p className={`font-bold text-base ${colors.text}`}>
+          {aprovacao.entidade_numero} — {colors.msg}
+        </p>
+        {action === 'aprovada' && temItens && (
+          <p className="text-xs text-slate-500 mt-1">
+            {Object.keys(selecoes).length} itens aprovados · Total {totalSelecionado.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+          </p>
+        )}
+      </div>
+    )
+  }
+
+  const req = aprovacao.requisicao
+
+  return (
+    <div className={`bg-white rounded-2xl shadow-md border ${tipo.borderColor} overflow-hidden`}>
+      {/* Header */}
+      <div className={`${tipo.headerBg} px-4 py-2.5 flex items-center justify-between`}>
+        <div className="flex items-center gap-2">
+          <FileSearch size={14} className="text-white/70" />
+          <span className="text-xs font-bold text-white">{tipo.label}</span>
+          {aprovacao.entidade_numero && (
+            <span className="text-white/60 text-[10px]">{aprovacao.entidade_numero}</span>
+          )}
+        </div>
+        {aprovacao.data_limite && (
+          <span className="text-[10px] text-white/70 font-semibold flex items-center gap-1">
+            <Clock size={10} /> {timeLeft(aprovacao.data_limite)}
+          </span>
+        )}
+      </div>
+
+      <div className="p-4 space-y-3">
+        {/* Descrição da RC */}
+        {req?.descricao && (
+          <p className="text-sm text-slate-700 font-medium">{req.descricao}</p>
+        )}
+
+        {/* Resumo de valor */}
+        {cot && (
+          <div className="bg-slate-50 rounded-xl p-3 space-y-1.5">
+            <div className="flex justify-between items-center">
+              <span className="text-xs text-slate-500">Fornecedor menor preço</span>
+              <span className="text-xs font-bold text-slate-700">{cot.fornecedor_nome}</span>
+            </div>
+            <div className="flex justify-between items-center">
+              <span className="text-xs text-slate-500">Valor menor cotação</span>
+              <span className="text-base font-extrabold text-blue-600">{fmt(cot.valor)}</span>
+            </div>
+            {temItens && (
+              <div className="flex justify-between items-center border-t border-slate-100 pt-1.5">
+                <span className="text-xs text-slate-500">Seleção atual (por item)</span>
+                <span className="text-base font-extrabold text-emerald-600">{fmt(totalSelecionado)}</span>
+              </div>
+            )}
+            <div className="text-[11px] text-slate-400">{cot.total_cotados} fornecedor{cot.total_cotados !== 1 ? 'es' : ''} cotado{cot.total_cotados !== 1 ? 's' : ''}</div>
+          </div>
+        )}
+
+        {/* ── Matriz por item (quando há itens) ───────────────────────────── */}
+        {temItens && (
+          <div>
+            <button
+              type="button"
+              onClick={() => setShowMatrix(!showMatrix)}
+              className="flex items-center gap-2 text-xs text-blue-600 font-bold hover:text-blue-800 transition"
+            >
+              <SplitSquareHorizontal size={14} />
+              {showMatrix ? 'Ocultar seleção por item' : `Selecionar fornecedor por item (${allItemKeys.length} itens)`}
+              {showMatrix ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
+            </button>
+
+            {showMatrix && (
+              <div className="mt-2 rounded-xl overflow-hidden border border-slate-200">
+                {/* Header da tabela */}
+                <div className={`grid gap-0 border-b border-slate-100`}
+                  style={{ gridTemplateColumns: `1fr repeat(${fornecedores.length}, minmax(80px, 1fr))` }}>
+                  <div className="px-2 py-1.5 text-[9px] font-bold text-slate-400 uppercase flex items-center gap-1">
+                    <Package size={9} /> Item
+                  </div>
+                  {fornecedores.map(f => (
+                    <div key={f.id} className="px-1 py-1.5 text-[9px] font-bold text-slate-500 text-center truncate">
+                      {f.fornecedor_nome}
+                    </div>
+                  ))}
+                </div>
+
+                {/* Linhas de itens */}
+                {allItemKeys.map(key => {
+                  const displayLabel = (() => {
+                    for (const f of fornecedores) {
+                      const it = f.itens_precos?.find(i => normalizeKey(i.descricao) === key)
+                      if (it) return it.descricao
+                    }
+                    return key
+                  })()
+
+                  // Preços de cada fornecedor para este item
+                  const precos = fornecedores.map(f =>
+                    f.itens_precos?.find(it => normalizeKey(it.descricao) === key) ?? null
+                  )
+                  const validos = precos.filter(Boolean).map(p => p!.valor_total)
+                  const minVal = validos.length > 0 ? Math.min(...validos) : null
+
+                  return (
+                    <div
+                      key={key}
+                      className="grid border-b border-slate-50 last:border-0"
+                      style={{ gridTemplateColumns: `1fr repeat(${fornecedores.length}, minmax(80px, 1fr))` }}
+                    >
+                      <div className="px-2 py-2 text-[11px] text-slate-700 font-medium self-center leading-tight">
+                        {displayLabel}
+                      </div>
+                      {fornecedores.map((f, fi) => {
+                        const preco = precos[fi]
+                        const isSelected = selecoes[key] === f.id
+                        const isBest = preco && minVal !== null && preco.valor_total === minVal
+
+                        return (
+                          <div key={f.id} className="px-1 py-2 flex flex-col items-center justify-center">
+                            {preco ? (
+                              <button
+                                type="button"
+                                onClick={() => setSelecoes(prev => ({ ...prev, [key]: f.id }))}
+                                className={`w-full rounded-lg px-1 py-1 text-center transition-all border-2 ${
+                                  isSelected
+                                    ? 'border-emerald-400 bg-emerald-50'
+                                    : isBest
+                                      ? 'border-amber-200 bg-amber-50 hover:border-amber-400'
+                                      : 'border-slate-100 bg-white hover:border-slate-300'
+                                }`}
+                              >
+                                <div className={`text-[11px] font-bold ${
+                                  isSelected ? 'text-emerald-700' : isBest ? 'text-teal-600' : 'text-slate-600'
+                                }`}>
+                                  {fmt(preco.valor_total)}
+                                </div>
+                                <div className="text-[9px] text-slate-400">
+                                  {preco.qtd}un × {fmt(preco.valor_unitario)}
+                                </div>
+                                {isSelected && (
+                                  <div className="text-[9px] font-bold text-emerald-600 mt-0.5">✓ selecionado</div>
+                                )}
+                                {!isSelected && isBest && (
+                                  <div className="text-[9px] font-bold text-amber-600 mt-0.5">menor preço</div>
+                                )}
+                              </button>
+                            ) : (
+                              <span className="text-slate-200 text-xs">—</span>
+                            )}
+                          </div>
+                        )
+                      })}
+                    </div>
+                  )
+                })}
+
+                {/* Total selecionado */}
+                <div
+                  className="grid bg-emerald-50 border-t border-emerald-100"
+                  style={{ gridTemplateColumns: `1fr repeat(${fornecedores.length}, minmax(80px, 1fr))` }}
+                >
+                  <div className="px-2 py-2 text-[10px] font-bold text-emerald-700 uppercase">
+                    Total selecionado
+                  </div>
+                  {fornecedores.map(f => {
+                    const subtotal = allItemKeys.reduce((sum, key) => {
+                      if (selecoes[key] !== f.id) return sum
+                      const item = f.itens_precos?.find(it => normalizeKey(it.descricao) === key)
+                      return sum + (item?.valor_total ?? 0)
+                    }, 0)
+                    const hasAny = allItemKeys.some(k => selecoes[k] === f.id)
+                    return (
+                      <div key={f.id} className="px-1 py-2 text-center">
+                        {hasAny ? (
+                          <span className="text-[11px] font-bold text-emerald-700">{fmt(subtotal)}</span>
+                        ) : (
+                          <span className="text-slate-200 text-xs">—</span>
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Observacao */}
+        <button type="button" onClick={() => setExpanded(!expanded)}
+          className="flex items-center gap-1 text-xs text-blue-500 font-semibold">
+          {expanded ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
+          {expanded ? 'Menos detalhes' : 'Adicionar observacao'}
+        </button>
+        {expanded && (
+          <textarea
+            rows={2}
+            className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-blue-300 outline-none resize-none"
+            placeholder="Motivo da decisao..."
+            value={observacao}
+            onChange={e => setObservacao(e.target.value)}
+          />
+        )}
+      </div>
+
+      {/* Botões */}
+      <div className="grid grid-cols-2 border-t border-slate-100">
+        <button
+          type="button"
+          disabled={mutation.isPending}
+          onClick={() => handleDecision('rejeitada')}
+          className="flex items-center justify-center gap-2 py-3.5 text-xs font-bold text-red-500 hover:bg-red-50 active:bg-red-100 transition border-r border-slate-100 disabled:opacity-50"
+        >
+          {mutation.isPending && action === 'rejeitada'
+            ? <div className="w-5 h-5 border-2 border-red-400 border-t-transparent rounded-full animate-spin" />
+            : <XCircle size={18} />}
+          Rejeitar
+        </button>
+        <button
+          type="button"
+          disabled={mutation.isPending}
+          onClick={() => handleDecision('aprovada')}
+          className="flex items-center justify-center gap-2 py-3.5 text-xs font-bold text-emerald-600 hover:bg-emerald-50 active:bg-emerald-100 transition disabled:opacity-50"
+        >
+          {mutation.isPending && action === 'aprovada'
+            ? <div className="w-5 h-5 border-2 border-emerald-400 border-t-transparent rounded-full animate-spin" />
+            : <CheckCircle size={18} />}
+          {temItens ? 'Aprovar Seleção' : 'Aprovar'}
+        </button>
+      </div>
+
+      {mutation.isError && (
+        <p className="text-red-500 text-xs text-center py-2 border-t border-red-100">
+          Erro ao processar: {mutation.error?.message || 'Tente novamente.'}
+        </p>
+      )}
+    </div>
+  )
+}
+
+// ── GenericPendingCard (autorizacao_pagamento, minuta_contratual) ──────────────
 
 function GenericPendingCard({ aprovacao, aprovadorNome, aprovadorEmail }: {
   aprovacao: AprovacaoPendente
@@ -828,6 +1180,13 @@ function AccordionSection({
           {aprovacoes.map(apr =>
             tipo === 'requisicao_compra' ? (
               <AprovacaoCard
+                key={apr.id}
+                aprovacao={apr}
+                aprovadorNome={aprovadorNome}
+                aprovadorEmail={aprovadorEmail}
+              />
+            ) : tipo === 'cotacao' ? (
+              <CotacaoItemsCard
                 key={apr.id}
                 aprovacao={apr}
                 aprovadorNome={aprovadorNome}
