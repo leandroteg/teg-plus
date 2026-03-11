@@ -216,12 +216,12 @@ export default function ListaContratos() {
           <p className="text-xs text-slate-400 mt-0.5">Gestão de contratos a pagar e a receber</p>
         </div>
         <button
-          onClick={() => nav('/contratos/novo')}
+          onClick={() => nav('/contratos/solicitacoes')}
           className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-indigo-600 text-white
             text-xs font-bold hover:bg-indigo-700 transition-all shadow-sm"
         >
           <Plus size={14} />
-          Novo Contrato
+          Nova Solicitação
         </button>
       </div>
 
@@ -294,10 +294,10 @@ export default function ListaContratos() {
           <p className="text-sm font-semibold text-slate-500">Nenhum contrato encontrado</p>
           <p className="text-xs text-slate-400 mt-1">Crie um novo contrato para começar</p>
           <button
-            onClick={() => nav('/contratos/novo')}
+            onClick={() => nav('/contratos/solicitacoes')}
             className="mt-4 px-4 py-2 rounded-xl bg-indigo-600 text-white text-xs font-bold hover:bg-indigo-700 transition-all"
           >
-            Criar Contrato
+            Nova Solicitação
           </button>
         </div>
       ) : (

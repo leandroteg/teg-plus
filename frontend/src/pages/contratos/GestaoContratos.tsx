@@ -403,9 +403,9 @@ function TabContratos() {
             <FileText size={24} className="text-indigo-300" />
           </div>
           <p className="text-sm font-semibold text-slate-500">Nenhum contrato encontrado</p>
-          <button onClick={() => nav('/contratos/novo')}
+          <button onClick={() => nav('/contratos/solicitacoes')}
             className="mt-3 px-4 py-2 rounded-xl bg-indigo-600 text-white text-xs font-bold hover:bg-indigo-700 transition-all">
-            Criar Contrato
+            Nova Solicitação
           </button>
         </div>
       ) : (
