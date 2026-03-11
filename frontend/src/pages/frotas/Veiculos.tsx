@@ -60,10 +60,12 @@ function VeiculoModal({
     onClose()
   }
 
-  const inp = `w-full px-3 py-2 rounded-xl text-sm placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-rose-500/30 ${
+  const lbl = 'block text-xs font-medium mb-1 ' + (isLight ? 'text-slate-600' : 'text-slate-300')
+
+  const inp = `w-full px-3 py-2 rounded-xl text-sm placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-teal-400/40 ${
     isLight
-      ? 'bg-slate-50 border border-slate-200 text-slate-800 focus:border-rose-400/50'
-      : 'bg-white/6 border border-white/10 text-white focus:border-rose-400/50'
+      ? 'bg-white border border-slate-200 shadow-sm text-slate-800 hover:border-slate-300'
+      : 'bg-white/6 border border-white/12 text-white hover:border-white/20'
   }`
   const sel = inp + (isLight ? '' : ' [&>option]:bg-slate-900')
 
@@ -78,15 +80,15 @@ function VeiculoModal({
         {/* Linha 1 */}
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
           <div>
-            <label className="text-[11px] text-slate-400">Placa *</label>
+            <label className={lbl}>Placa *</label>
             <input className={inp} value={form.placa} onChange={e => set('placa', e.target.value.toUpperCase())} required placeholder="ABC-1234" />
           </div>
           <div>
-            <label className="text-[11px] text-slate-400">Renavam</label>
+            <label className={lbl}>Renavam</label>
             <input className={inp} value={form.renavam ?? ''} onChange={e => set('renavam', e.target.value)} placeholder="00000000000" />
           </div>
           <div>
-            <label className="text-[11px] text-slate-400">Status</label>
+            <label className={lbl}>Status</label>
             <select className={sel} value={form.status} onChange={e => set('status', e.target.value)}>
               {Object.entries(STATUS_CFG).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
             </select>
@@ -96,11 +98,11 @@ function VeiculoModal({
         {/* Linha 2 */}
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <label className="text-[11px] text-slate-400">Marca *</label>
+            <label className={lbl}>Marca *</label>
             <input className={inp} value={form.marca} onChange={e => set('marca', e.target.value)} required placeholder="Toyota" />
           </div>
           <div>
-            <label className="text-[11px] text-slate-400">Modelo *</label>
+            <label className={lbl}>Modelo *</label>
             <input className={inp} value={form.modelo} onChange={e => set('modelo', e.target.value)} required placeholder="Hilux" />
           </div>
         </div>
@@ -108,15 +110,15 @@ function VeiculoModal({
         {/* Linha 3 */}
         <div className="grid grid-cols-3 gap-3">
           <div>
-            <label className="text-[11px] text-slate-400">Ano Fab.</label>
+            <label className={lbl}>Ano Fab.</label>
             <input type="number" className={inp} value={form.ano_fab ?? ''} onChange={e => set('ano_fab', +e.target.value)} placeholder="2022" />
           </div>
           <div>
-            <label className="text-[11px] text-slate-400">Ano Mod.</label>
+            <label className={lbl}>Ano Mod.</label>
             <input type="number" className={inp} value={form.ano_mod ?? ''} onChange={e => set('ano_mod', +e.target.value)} placeholder="2023" />
           </div>
           <div>
-            <label className="text-[11px] text-slate-400">Cor</label>
+            <label className={lbl}>Cor</label>
             <input className={inp} value={form.cor ?? ''} onChange={e => set('cor', e.target.value)} placeholder="Branca" />
           </div>
         </div>
@@ -124,19 +126,19 @@ function VeiculoModal({
         {/* Linha 4 */}
         <div className="grid grid-cols-3 gap-3">
           <div>
-            <label className="text-[11px] text-slate-400">Categoria</label>
+            <label className={lbl}>Categoria</label>
             <select className={sel} value={form.categoria} onChange={e => set('categoria', e.target.value as CategoriaVeiculo)}>
               {Object.entries(CATEGORIA_LABEL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
             </select>
           </div>
           <div>
-            <label className="text-[11px] text-slate-400">Combustivel</label>
+            <label className={lbl}>Combustivel</label>
             <select className={sel} value={form.combustivel} onChange={e => set('combustivel', e.target.value as CombustivelVeiculo)}>
               {Object.entries(COMBUSTIVEL_LABEL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
             </select>
           </div>
           <div>
-            <label className="text-[11px] text-slate-400">Propriedade</label>
+            <label className={lbl}>Propriedade</label>
             <select className={sel} value={form.propriedade} onChange={e => set('propriedade', e.target.value as PropriedadeVeiculo)}>
               <option value="propria">Propria</option>
               <option value="locada">Locada</option>
@@ -148,15 +150,15 @@ function VeiculoModal({
         {/* Hodometro */}
         <div className="grid grid-cols-3 gap-3">
           <div>
-            <label className="text-[11px] text-slate-400">Hodometro atual (km)</label>
+            <label className={lbl}>Hodometro atual (km)</label>
             <input type="number" className={inp} value={form.hodometro_atual} onChange={e => set('hodometro_atual', +e.target.value)} />
           </div>
           <div>
-            <label className="text-[11px] text-slate-400">Proxima prev. (km)</label>
+            <label className={lbl}>Proxima prev. (km)</label>
             <input type="number" className={inp} value={form.km_proxima_preventiva ?? ''} onChange={e => set('km_proxima_preventiva', +e.target.value)} placeholder="55000" />
           </div>
           <div>
-            <label className="text-[11px] text-slate-400">Proxima prev. (data)</label>
+            <label className={lbl}>Proxima prev. (data)</label>
             <input type="date" className={inp} value={form.data_proxima_preventiva ?? ''} onChange={e => set('data_proxima_preventiva', e.target.value)} />
           </div>
         </div>
@@ -164,31 +166,31 @@ function VeiculoModal({
         {/* Documentos */}
         <div className="grid grid-cols-3 gap-3">
           <div>
-            <label className="text-[11px] text-slate-400">Venc. CRLV</label>
+            <label className={lbl}>Venc. CRLV</label>
             <input type="date" className={inp} value={form.vencimento_crlv ?? ''} onChange={e => set('vencimento_crlv', e.target.value)} />
           </div>
           <div>
-            <label className="text-[11px] text-slate-400">Venc. Seguro</label>
+            <label className={lbl}>Venc. Seguro</label>
             <input type="date" className={inp} value={form.vencimento_seguro ?? ''} onChange={e => set('vencimento_seguro', e.target.value)} />
           </div>
           <div>
-            <label className="text-[11px] text-slate-400">Venc. Tacografo</label>
+            <label className={lbl}>Venc. Tacografo</label>
             <input type="date" className={inp} value={form.vencimento_tacografo ?? ''} onChange={e => set('vencimento_tacografo', e.target.value)} />
           </div>
         </div>
 
         <div>
-          <label className="text-[11px] text-slate-400">Observacoes</label>
+          <label className={lbl}>Observacoes</label>
           <textarea className={inp + ' resize-none'} rows={2} value={form.observacoes ?? ''} onChange={e => set('observacoes', e.target.value)} />
         </div>
 
         <div className="flex gap-2 pt-2">
-          <button type="button" onClick={onClose} className={`flex-1 py-2 rounded-xl border text-sm ${
-            isLight ? 'border-slate-200 text-slate-500 hover:bg-slate-50' : 'border-white/10 text-slate-400 hover:bg-white/5'
+          <button type="button" onClick={onClose} className={`flex-1 py-2.5 rounded-xl border text-sm font-medium transition-colors ${
+            isLight ? 'border-slate-200 text-slate-500 hover:bg-slate-50 hover:border-slate-300' : 'border-white/10 text-slate-400 hover:bg-white/5 hover:border-white/20'
           }`}>
             Cancelar
           </button>
-          <button type="submit" disabled={salvar.isPending} className="flex-1 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-sm text-white font-semibold disabled:opacity-50">
+          <button type="submit" disabled={salvar.isPending} className="flex-1 py-2.5 rounded-xl bg-gradient-to-r from-teal-500 to-teal-600 hover:from-teal-400 hover:to-teal-500 shadow-sm shadow-teal-500/20 text-sm text-white font-semibold disabled:opacity-50">
             {salvar.isPending ? 'Salvando...' : 'Salvar'}
           </button>
         </div>
@@ -225,13 +227,13 @@ export default function Veiculos() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className={`text-xl font-bold flex items-center gap-2 ${isLight ? 'text-slate-800' : 'text-white'}`}>
-            <Car size={20} className="text-rose-400" /> Veiculos
+            <Car size={20} className="text-teal-500" /> Veiculos
           </h1>
           <p className="text-sm text-slate-500">{veiculos.length} veiculo{veiculos.length !== 1 ? 's' : ''} cadastrado{veiculos.length !== 1 ? 's' : ''}</p>
         </div>
         <button
           onClick={() => setModal({})}
-          className="flex items-center gap-2 px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-sm text-white font-semibold transition-colors"
+          className="flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-teal-500 to-teal-600 hover:from-teal-400 hover:to-teal-500 shadow-sm shadow-teal-500/20 text-sm text-white font-semibold transition-colors"
         >
           <Plus size={15} /> Novo Veiculo
         </button>
@@ -242,10 +244,10 @@ export default function Veiculos() {
         <div className="relative max-w-xs flex-1 min-w-[200px]">
           <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
           <input
-            className={`w-full pl-9 pr-3 py-2 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-rose-500/30 ${
+            className={`w-full pl-9 pr-3 py-2 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-teal-400/40 ${
               isLight
-                ? 'bg-slate-50 border border-slate-200 text-slate-800 placeholder:text-slate-400'
-                : 'bg-white/6 border border-white/10 text-white placeholder:text-slate-600'
+                ? 'bg-white border border-slate-200 shadow-sm text-slate-800 hover:border-slate-300 placeholder:text-slate-400'
+                : 'bg-white/6 border border-white/12 text-white hover:border-white/20 placeholder:text-slate-600'
             }`}
             placeholder="Buscar placa, marca, modelo..."
             value={busca}
@@ -253,12 +255,12 @@ export default function Veiculos() {
           />
         </div>
         <div>
-          <label className="text-[10px] text-slate-500 block mb-1">Status</label>
+          <label className={`block text-xs font-medium mb-1 ${isLight ? 'text-slate-600' : 'text-slate-300'}`}>Status</label>
           <select
             value={statusFiltro}
             onChange={e => setStatusFiltro(e.target.value as StatusVeiculo | '')}
-            className={`px-3 py-2 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-rose-500/30 ${
-              isLight ? 'bg-slate-50 border border-slate-200 text-slate-800' : 'bg-white/6 border border-white/10 text-white [&>option]:bg-slate-900'
+            className={`px-3 py-2 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-teal-400/40 ${
+              isLight ? 'bg-white border border-slate-200 shadow-sm text-slate-800 hover:border-slate-300' : 'bg-white/6 border border-white/12 text-white hover:border-white/20 [&>option]:bg-slate-900'
             }`}
           >
             <option value="">Todos</option>
@@ -266,12 +268,12 @@ export default function Veiculos() {
           </select>
         </div>
         <div>
-          <label className="text-[10px] text-slate-500 block mb-1">Categoria</label>
+          <label className={`block text-xs font-medium mb-1 ${isLight ? 'text-slate-600' : 'text-slate-300'}`}>Categoria</label>
           <select
             value={catFiltro}
             onChange={e => setCatFiltro(e.target.value as CategoriaVeiculo | '')}
-            className={`px-3 py-2 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-rose-500/30 ${
-              isLight ? 'bg-slate-50 border border-slate-200 text-slate-800' : 'bg-white/6 border border-white/10 text-white [&>option]:bg-slate-900'
+            className={`px-3 py-2 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-teal-400/40 ${
+              isLight ? 'bg-white border border-slate-200 shadow-sm text-slate-800 hover:border-slate-300' : 'bg-white/6 border border-white/12 text-white hover:border-white/20 [&>option]:bg-slate-900'
             }`}
           >
             <option value="">Todas</option>
@@ -344,7 +346,7 @@ export default function Veiculos() {
                 {/* Edit */}
                 <button
                   onClick={() => setModal(v)}
-                  className="text-slate-500 hover:text-rose-400 transition-colors"
+                  className="text-slate-500 hover:text-teal-400 transition-colors"
                 >
                   <Edit2 size={14} />
                 </button>

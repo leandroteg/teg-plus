@@ -95,10 +95,10 @@ function OcorrenciaModal({ oc, onClose, isLight }: { oc: FroOcorrenciaTel; onClo
 
         {/* Observacoes */}
         <div>
-          <label className="text-[11px] text-slate-400">Observacoes / Tratativa</label>
+          <label className={`block text-xs font-medium mb-1 ${isLight ? 'text-slate-600' : 'text-slate-300'}`}>Observacoes / Tratativa</label>
           <textarea
-            className={`w-full px-3 py-2 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-rose-500/30 resize-none mt-1 ${
-              isLight ? 'bg-slate-50 border border-slate-200 text-slate-800' : 'bg-white/6 border border-white/10 text-white'
+            className={`w-full px-3 py-2 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-teal-400/40 resize-none mt-1 ${
+              isLight ? 'bg-white border border-slate-200 shadow-sm text-slate-800' : 'bg-white/6 border border-white/12 text-white'
             }`}
             rows={3}
             value={observacoes}
@@ -108,7 +108,7 @@ function OcorrenciaModal({ oc, onClose, isLight }: { oc: FroOcorrenciaTel; onClo
         </div>
 
         <div className="flex gap-2">
-          <button onClick={onClose} className={`flex-1 py-2 rounded-xl border text-sm ${
+          <button onClick={onClose} className={`flex-1 font-medium py-2.5 rounded-xl border text-sm ${
             isLight ? 'border-slate-200 text-slate-500 hover:bg-slate-50' : 'border-white/10 text-slate-400 hover:bg-white/5'
           }`}>Fechar</button>
           {oc.status !== 'encerrada' && (
@@ -177,8 +177,9 @@ function NovaOcorrenciaModal({ onClose, isLight }: { onClose: () => void; isLigh
     onClose()
   }
 
-  const inp = `w-full px-3 py-2 rounded-xl text-sm placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-rose-500/30 ${
-    isLight ? 'bg-slate-50 border border-slate-200 text-slate-800' : 'bg-white/6 border border-white/10 text-white'
+  const lbl = 'block text-xs font-medium mb-1 ' + (isLight ? 'text-slate-600' : 'text-slate-300')
+  const inp = `w-full px-3 py-2 rounded-xl text-sm placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-teal-400/40 ${
+    isLight ? 'bg-white border border-slate-200 shadow-sm text-slate-800' : 'bg-white/6 border border-white/12 text-white'
   }`
   const sel = inp + (isLight ? '' : ' [&>option]:bg-slate-900')
 
@@ -189,7 +190,7 @@ function NovaOcorrenciaModal({ onClose, isLight }: { onClose: () => void; isLigh
 
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <label className="text-[11px] text-slate-400">Veiculo *</label>
+            <label className={lbl}>Veiculo *</label>
             <select className={sel} value={form.veiculo_id} onChange={e => setForm(f => ({ ...f, veiculo_id: e.target.value }))} required>
               <option value="">Selecione...</option>
               {veiculos.filter(v => v.status !== 'baixado').map(v => (
@@ -198,7 +199,7 @@ function NovaOcorrenciaModal({ onClose, isLight }: { onClose: () => void; isLigh
             </select>
           </div>
           <div>
-            <label className="text-[11px] text-slate-400">Tipo *</label>
+            <label className={lbl}>Tipo *</label>
             <select className={sel} value={form.tipo_ocorrencia} onChange={e => setForm(f => ({ ...f, tipo_ocorrencia: e.target.value as TipoOcorrenciaTel }))}>
               {Object.entries(TIPO_CFG).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
             </select>
@@ -207,30 +208,30 @@ function NovaOcorrenciaModal({ onClose, isLight }: { onClose: () => void; isLigh
 
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <label className="text-[11px] text-slate-400">Data/hora *</label>
+            <label className={lbl}>Data/hora *</label>
             <input type="datetime-local" className={inp} value={form.data_ocorrencia} onChange={e => setForm(f => ({ ...f, data_ocorrencia: e.target.value }))} required />
           </div>
           <div>
-            <label className="text-[11px] text-slate-400">Velocidade (km/h)</label>
+            <label className={lbl}>Velocidade (km/h)</label>
             <input type="number" className={inp} value={form.velocidade} onChange={e => setForm(f => ({ ...f, velocidade: e.target.value }))} placeholder="Ex: 120" />
           </div>
         </div>
 
         <div>
-          <label className="text-[11px] text-slate-400">Endereco / Local</label>
+          <label className={lbl}>Endereco / Local</label>
           <input className={inp} value={form.endereco} onChange={e => setForm(f => ({ ...f, endereco: e.target.value }))} placeholder="Rodovia BR-040, km 512" />
         </div>
 
         <div>
-          <label className="text-[11px] text-slate-400">Observacoes</label>
+          <label className={lbl}>Observacoes</label>
           <textarea className={inp + ' resize-none'} rows={2} value={form.observacoes} onChange={e => setForm(f => ({ ...f, observacoes: e.target.value }))} placeholder="Detalhes adicionais..." />
         </div>
 
         <div className="flex gap-2">
-          <button type="button" onClick={onClose} className={`flex-1 py-2 rounded-xl border text-sm ${
+          <button type="button" onClick={onClose} className={`flex-1 font-medium py-2.5 rounded-xl border text-sm ${
             isLight ? 'border-slate-200 text-slate-500 hover:bg-slate-50' : 'border-white/10 text-slate-400 hover:bg-white/5'
           }`}>Cancelar</button>
-          <button type="submit" disabled={registrar.isPending} className="flex-1 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-sm text-white font-semibold disabled:opacity-50">
+          <button type="submit" disabled={registrar.isPending} className="flex-1 py-2 rounded-xl bg-gradient-to-r from-teal-500 to-teal-600 hover:from-teal-400 hover:to-teal-500 shadow-sm shadow-teal-500/20 text-sm text-white font-semibold disabled:opacity-50">
             {registrar.isPending ? 'Registrando...' : 'Registrar'}
           </button>
         </div>
@@ -261,11 +262,11 @@ export default function Telemetria() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className={`text-xl font-bold flex items-center gap-2 ${isLight ? 'text-slate-800' : 'text-white'}`}>
-            <Radio size={20} className="text-rose-400" /> Telemetria e Compliance
+            <Radio size={20} className="text-teal-500" /> Telemetria e Compliance
           </h1>
           <p className="text-sm text-slate-500">Ocorrencias registradas pelo sistema de rastreamento</p>
         </div>
-        <button onClick={() => setNovaModal(true)} className="flex items-center gap-2 px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-sm text-white font-semibold">
+        <button onClick={() => setNovaModal(true)} className="flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-teal-500 to-teal-600 hover:from-teal-400 hover:to-teal-500 shadow-sm shadow-teal-500/20 text-sm text-white font-semibold">
           <Plus size={15} /> Registrar Ocorrencia
         </button>
       </div>
@@ -280,7 +281,7 @@ export default function Telemetria() {
             onClick={() => setTabIdx(i)}
             className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
               tabIdx === i
-                ? 'bg-rose-600 text-white'
+                ? 'bg-teal-600 text-white'
                 : isLight
                   ? 'text-slate-500 hover:text-slate-800'
                   : 'text-slate-400 hover:text-white'
@@ -296,7 +297,7 @@ export default function Telemetria() {
         <span>Fluxo:</span>
         {['Registrada', 'Analisada', 'Comunicado RH', 'Encerrada'].map((s, i, arr) => (
           <span key={s} className="flex items-center gap-1">
-            <span className={`px-1.5 py-0.5 rounded ${i === tabIdx ? 'text-rose-300 bg-rose-500/15' : ''}`}>{s}</span>
+            <span className={`px-1.5 py-0.5 rounded ${i === tabIdx ? 'text-teal-300 bg-teal-500/15' : ''}`}>{s}</span>
             {i < arr.length - 1 && <span>→</span>}
           </span>
         ))}
