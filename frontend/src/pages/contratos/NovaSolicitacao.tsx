@@ -8,6 +8,7 @@ import {
 } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
 import { useObras } from '../../hooks/useFinanceiro'
+import { useLookupCentrosCusto, useLookupClassesFinanceiras } from '../../hooks/useLookups'
 import { useCriarSolicitacao } from '../../hooks/useSolicitacoes'
 import { api } from '../../services/api'
 import type {
@@ -140,6 +141,8 @@ export default function NovaSolicitacao() {
   const nav = useNavigate()
   const { perfil } = useAuth()
   const { data: obras = [] } = useObras()
+  const centrosCusto = useLookupCentrosCusto()
+  const classesFinanceiras = useLookupClassesFinanceiras()
   const criarSolicitacao = useCriarSolicitacao()
 
   const [step, setStep] = useState(1)
@@ -815,21 +818,29 @@ export default function NovaSolicitacao() {
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div>
               <label className={labelClass}>Centro de Custo</label>
-              <input
+              <select
                 value={centroCusto}
                 onChange={e => setCentroCusto(e.target.value)}
-                placeholder="Ex: ADM, OBRA-123"
                 className={inputClass}
-              />
+              >
+                <option value="">Selecione o centro de custo</option>
+                {centrosCusto.map(cc => (
+                  <option key={cc.id} value={cc.descricao}>{cc.codigo ? `${cc.codigo} - ` : ''}{cc.descricao}</option>
+                ))}
+              </select>
             </div>
             <div>
               <label className={labelClass}>Classe Financeira</label>
-              <input
+              <select
                 value={classeFinanceira}
                 onChange={e => setClasseFinanceira(e.target.value)}
-                placeholder="Ex: Servicos, Materiais"
                 className={inputClass}
-              />
+              >
+                <option value="">Selecione a classe financeira</option>
+                {classesFinanceiras.map(cf => (
+                  <option key={cf.id} value={cf.descricao}>{cf.codigo ? `${cf.codigo} - ` : ''}{cf.descricao}</option>
+                ))}
+              </select>
             </div>
             <div>
               <label className={labelClass}>Indice de Reajuste</label>
