@@ -57,13 +57,13 @@ function maskCNPJ(value: string): string {
 // ── Cotação Concluída (com botões Emitir Pedido / Cancelar) ─────────────────
 
 function CotacaoConcluida({ cotacao, nav }: { cotacao: Cotacao; nav: ReturnType<typeof useNavigate> }) {
-  const { isAdmin } = useAuth()
+  const { atLeast } = useAuth()
   const emitirMutation = useEmitirPedido()
   const cancelarMutation = useCancelarRequisicao()
   const [pedidoToast, setPedidoToast] = useState<{ type: 'success' | 'error'; msg: string } | null>(null)
 
   const req = cotacao.requisicao
-  const canEmitPedido = isAdmin && req?.status === 'cotacao_aprovada'
+  const canEmitPedido = atLeast('comprador') && req?.status === 'cotacao_aprovada'
 
   return (
     <div className="space-y-4">

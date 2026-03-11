@@ -36,7 +36,7 @@ export default function RequisicaoDetalhe() {
   const decisaoMutation = useDecisaoRequisicao()
   const emitirPedidoMutation = useEmitirPedido()
   const cancelarMutation = useCancelarRequisicao()
-  const { isAdmin, perfil } = useAuth()
+  const { isAdmin, atLeast, perfil } = useAuth()
 
   // Cotação vinculada à RC
   const showCotacao = req && ['em_cotacao', 'cotacao_enviada', 'cotacao_aprovada', 'cotacao_rejeitada', 'pedido_emitido'].includes(req.status)
@@ -320,7 +320,7 @@ export default function RequisicaoDetalhe() {
       )}
 
       {/* ── Emitir Pedido / Cancelar — cotação aprovada ───────────────────────── */}
-      {isAdmin && req.status === 'cotacao_aprovada' && (
+      {atLeast('comprador') && req.status === 'cotacao_aprovada' && (
         <div className="bg-white rounded-2xl border-2 border-teal-200 shadow-sm overflow-hidden">
           <div className="bg-teal-50 px-4 py-3 border-b border-teal-100">
             <p className="text-xs font-bold text-teal-700 uppercase tracking-wider flex items-center gap-2">

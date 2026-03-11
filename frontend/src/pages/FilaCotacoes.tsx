@@ -57,7 +57,7 @@ export default function FilaCotacoes() {
   const nav = useNavigate()
   const [statusFilter, setStatusFilter] = useState<StatusCotacao | ''>('')
   const { data: cotacoes, isLoading, error: cotError } = useCotacoes(undefined, statusFilter || undefined)
-  const { isAdmin, perfil } = useAuth()
+  const { isAdmin, atLeast, perfil } = useAuth()
   const decisaoMutation = useDecisaoRequisicao()
   const emitirPedidoMutation = useEmitirPedido()
   const cancelarMutation = useCancelarRequisicao()
@@ -321,8 +321,8 @@ export default function FilaCotacoes() {
                 )
               })()}
 
-              {/* Botões Emitir Pedido / Cancelar — admin + cotação aprovada */}
-              {isAdmin && concluida && cot.requisicao?.status === 'cotacao_aprovada' && cot.requisicao?.id && (() => {
+              {/* Botões Emitir Pedido / Cancelar — comprador+ cotação aprovada */}
+              {atLeast('comprador') && concluida && cot.requisicao?.status === 'cotacao_aprovada' && cot.requisicao?.id && (() => {
                 const req = cot.requisicao!
                 const isEmitting = emitirPedidoMutation.isPending && emitirPedidoMutation.variables?.requisicaoId === req.id
                 const isCancelling = cancelarMutation.isPending && cancelarMutation.variables === req.id
@@ -397,7 +397,7 @@ export default function FilaCotacoes() {
                     ? 'border-emerald-100 text-emerald-600 hover:bg-emerald-50'
                     : 'border-slate-100 text-teal-600 hover:bg-teal-50'
                 }`}>
-                {concluida ? 'Ver detalhes' : 'Abrir e Cotar'}
+                {concluida || !atLeast('comprador') ? 'Ver detalhes' : 'Abrir e Cotar'}
                 <ChevronRight size={15} />
               </button>
             </div>
