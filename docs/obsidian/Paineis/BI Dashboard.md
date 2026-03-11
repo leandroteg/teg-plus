@@ -2,7 +2,7 @@
 title: "📊 BI Dashboard"
 type: painel-bi
 tags: [painel, bi, dashboard, kpi]
-atualizado: 2026-03-02
+atualizado: 2026-03-11
 ---
 	
 ```dataviewjs

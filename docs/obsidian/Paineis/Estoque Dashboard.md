@@ -2,9 +2,9 @@
 title: "📦 Estoque Dashboard"
 type: painel-bi
 tags: [painel, bi, dashboard, estoque]
-atualizado: 2026-03-04
+atualizado: 2026-03-11
 modulo: estoque
-completude: 60
+completude: 85
 ---
 
 ```dataviewjs
@@ -25,9 +25,9 @@ const tDone=tarefas.where(t=>t.status==="concluido").length,tWip=tarefas.where(t
 const pts=tarefas.array().reduce((s,t)=>s+(t.estimativa||0),0),ptsDone=tarefas.where(t=>t.status==="concluido").array().reduce((s,t)=>s+(t.estimativa||0),0);
 
 const submodulos=[
-  {nome:'Almoxarifado por Obra',pct:100},{nome:'Catálogo de Materiais',pct:100},{nome:'Movimentações E/S',pct:90},
-  {nome:'Inventário / Contagem',pct:80},{nome:'Patrimonial / Ativo Fixo',pct:70},{nome:'Depreciação Automática',pct:60},
-  {nome:'Solicitações Inter-Bases',pct:0},{nome:'Transferências',pct:0},{nome:'Integração Compras→Estoque',pct:0},{nome:'Relatórios Gerenciais',pct:20},
+  {nome:'Almoxarifado por Obra',pct:100},{nome:'Catálogo de Materiais',pct:100},{nome:'Movimentações E/S',pct:100},
+  {nome:'Inventário / Contagem',pct:100},{nome:'Patrimonial / Ativo Fixo',pct:100},{nome:'Depreciação Automática',pct:90},
+  {nome:'Solicitações de Material',pct:80},{nome:'Alertas Estoque Mínimo',pct:90},{nome:'Transferências Inter-Bases',pct:0},{nome:'Integração Compras→Estoque',pct:0},{nome:'Relatórios Gerenciais',pct:30},
 ];
 const tabelas=['est_almoxarifados','est_categorias','est_itens','est_movimentacoes','est_inventarios','est_inventario_itens','est_lotes','pat_ativos','pat_categorias','pat_depreciacao','pat_movimentacoes','pat_manutencoes'];
 
@@ -46,7 +46,7 @@ w.insertAdjacentHTML('afterbegin', `
     <div><div style="font-size:1.4em;font-weight:700;">Módulo Estoque</div>
       <div style="font-size:.78em;color:var(--text-muted);">Almoxarifado · Movimentações · Inventário · Patrimonial · Depreciação</div></div>
     <div style="margin-left:auto;text-align:right;">
-      <div style="font-size:2em;font-weight:700;color:${C.orange};">60%</div>
+      <div style="font-size:2em;font-weight:700;color:${C.green};">85%</div>
       <div style="font-size:.65em;color:var(--text-muted);text-transform:uppercase;letter-spacing:1.4px;">Completude</div></div>
   </div>
 

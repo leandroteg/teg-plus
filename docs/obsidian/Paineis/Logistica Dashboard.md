@@ -2,7 +2,7 @@
 title: "🚚 Logística Dashboard"
 type: painel-bi
 tags: [painel, bi, dashboard, logistica]
-atualizado: 2026-03-04
+atualizado: 2026-03-11
 modulo: logistica
 completude: 85
 ---

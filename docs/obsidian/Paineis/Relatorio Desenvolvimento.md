@@ -2,7 +2,7 @@
 title: "📈 Relatorio de Desenvolvimento"
 type: painel
 tags: [painel, relatorio, desenvolvimento, weekly, report]
-atualizado: 2026-03-07
+atualizado: 2026-03-11
 ---
 
 # 📈 Relatorio de Desenvolvimento — TEG+ ERP
