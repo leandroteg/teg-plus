@@ -1084,7 +1084,7 @@ function PedidoCard({
               {confirmando
                 ? <div className="w-3.5 h-3.5 border-2 border-slate-400 border-t-transparent rounded-full animate-spin" />
                 : <CheckCircle size={14} />}
-              Confirmar Entrega (sem recebimento)
+              Confirmar Entrega Direta
             </button>
           )}
 

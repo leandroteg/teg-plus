@@ -14,6 +14,7 @@ import { StatusBadge } from './LogisticaHome'
 import { useTheme } from '../../contexts/ThemeContext'
 import type { CriarSolicitacaoPayload, TipoTransporte, StatusSolicitacao } from '../../types/logistica'
 import { useNavigate } from 'react-router-dom'
+import { useLookupObras, useLookupCentrosCusto } from '../../hooks/useLookups'
 
 const TIPO_LABEL: Record<TipoTransporte, string> = {
   viagem:                  'Viagem',
@@ -65,6 +66,8 @@ export default function Solicitacoes() {
   const [nfForm, setNfForm] = useState({ fornecedor_cnpj: '', fornecedor_nome: '', valor_total: 0, descricao: '' })
   const [itensForm, setItensForm] = useState<{ descricao: string; quantidade: number; unidade: string; peso_kg?: number; volume_m3?: number }[]>([])
   const navigate = useNavigate()
+  const obras = useLookupObras()
+  const centrosCusto = useLookupCentrosCusto()
 
   const { data: solicitacoes = [], isLoading } = useSolicitacoes(
     statusFiltro ? { status: statusFiltro as StatusSolicitacao } : undefined
@@ -400,13 +403,23 @@ export default function Solicitacoes() {
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className={`block text-xs font-bold mb-1 ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>Obra / Projeto</label>
-                  <input value={form.obra_nome ?? ''} onChange={e => set('obra_nome', e.target.value)}
-                    className="input-base" placeholder="SE Frutal..." />
+                  <select value={form.obra_nome ?? ''} onChange={e => set('obra_nome', e.target.value)}
+                    className="input-base">
+                    <option value="">Selecione...</option>
+                    {obras.map(o => (
+                      <option key={o.id} value={o.nome}>{o.codigo} - {o.nome}</option>
+                    ))}
+                  </select>
                 </div>
                 <div>
                   <label className={`block text-xs font-bold mb-1 ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>Centro de Custo</label>
-                  <input value={form.centro_custo ?? ''} onChange={e => set('centro_custo', e.target.value)}
-                    className="input-base" placeholder="CC-001" />
+                  <select value={form.centro_custo ?? ''} onChange={e => set('centro_custo', e.target.value)}
+                    className="input-base">
+                    <option value="">Selecione...</option>
+                    {centrosCusto.map(cc => (
+                      <option key={cc.id} value={cc.codigo}>{cc.codigo} - {cc.descricao}</option>
+                    ))}
+                  </select>
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-3">
