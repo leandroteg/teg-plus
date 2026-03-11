@@ -14,7 +14,7 @@ interface FornecedorParsed {
 }
 
 interface Props {
-  onParsed: (fornecedores: FornecedorParsed[]) => void
+  onParsed: (fornecedores: FornecedorParsed[], file: File) => void
   disabled?: boolean
 }
 
@@ -68,7 +68,7 @@ export default function UploadCotacao({ onParsed, disabled }: Props) {
 
       if (result.success && result.fornecedores?.length > 0) {
         setStatus('success')
-        onParsed(result.fornecedores)
+        onParsed(result.fornecedores, file)
       } else {
         setError(result.error || 'Não foi possível extrair dados do documento.')
         setStatus('error')
