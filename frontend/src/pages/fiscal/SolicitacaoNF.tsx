@@ -1,6 +1,6 @@
 import { useState, useMemo, useCallback } from 'react'
 import {
-  FileInput, Clock, CheckCircle2, XCircle, Search, Filter,
+  FileInput, FileOutput, Clock, CheckCircle2, XCircle, Search, Filter,
   ArrowRight, Edit3, Send, ThumbsUp, ThumbsDown, Building2,
   Calendar, Hash, AlertTriangle, Loader2, X, FileText,
   Truck, ShoppingCart, PenLine, Eye, ChevronDown, Key,
@@ -1200,14 +1200,18 @@ function SummaryPill({
 
 // ── Main Page ───────────────────────────────────────────────────────────────
 
-export default function SolicitacaoNF() {
+export default function SolicitacaoNF({ mode = 'solicitacao' }: { mode?: 'solicitacao' | 'emissao' } = {}) {
   const { isDark } = useTheme()
   const { role } = useAuth()
   const now = new Date()
   const isGestor = role === 'admin' || role === 'gerente'
 
+  const isEmissaoMode = mode === 'emissao'
+
   // ── Filters ─────────────────────────────────────────────────────────────
-  const [statusFilter, setStatusFilter] = useState<StatusSolicitacaoNF | ''>('')
+  const [statusFilter, setStatusFilter] = useState<StatusSolicitacaoNF | ''>(
+    isEmissaoMode ? 'pendente' : ''
+  )
   const [mes, setMes] = useState(now.getMonth() + 1)
   const [ano, setAno] = useState(now.getFullYear())
   const [busca, setBusca] = useState('')
@@ -1334,11 +1338,16 @@ export default function SolicitacaoNF() {
           <h1 className={`text-xl font-extrabold flex items-center gap-2 ${
             isDark ? 'text-slate-100' : 'text-slate-800'
           }`}>
-            <FileInput size={20} className={isDark ? 'text-amber-400' : 'text-amber-500'} />
-            Solicitacao de NF
+            {isEmissaoMode
+              ? <><FileOutput size={20} className={isDark ? 'text-amber-400' : 'text-amber-500'} /> Emissao de NF</>
+              : <><FileInput size={20} className={isDark ? 'text-amber-400' : 'text-amber-500'} /> Solicitacao de NF</>
+            }
           </h1>
           <p className={`text-xs mt-0.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
-            Processar solicitacoes recebidas de Logistica e Compras
+            {isEmissaoMode
+              ? 'Fila de emissao — NFs pendentes de Logistica e Compras'
+              : 'Processar solicitacoes recebidas de Logistica e Compras'
+            }
           </p>
         </div>
         <div className={`flex items-center gap-2 text-[11px] font-semibold px-3 py-1.5 rounded-xl border ${
