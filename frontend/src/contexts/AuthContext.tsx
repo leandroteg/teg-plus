@@ -61,14 +61,55 @@ export interface Perfil {
   updated_at: string
 }
 
-export const MODULOS_ERP = [
-  { key: 'compras',     label: 'Compras',     icon: '🛒' },
-  { key: 'financeiro',  label: 'Financeiro',  icon: '💰' },
-  { key: 'rh',          label: 'RH',          icon: '👥' },
-  { key: 'ssma',        label: 'SSMA',        icon: '⛑️' },
-  { key: 'estoque',     label: 'Estoque',     icon: '📦' },
-  { key: 'contratos',   label: 'Contratos',   icon: '📋' },
+export interface ModuloERP {
+  key: string
+  label: string
+  icon: string
+}
+
+export interface GrupoModulos {
+  label: string
+  modulos: ModuloERP[]
+}
+
+export const MODULOS_ERP_GROUPED: GrupoModulos[] = [
+  {
+    label: 'Projetos',
+    modulos: [
+      { key: 'egp',    label: 'EGP',    icon: '📊' },
+      { key: 'obras',  label: 'Obras',  icon: '🏗️' },
+      { key: 'ssma',   label: 'SSMA',   icon: '⛑️' },
+    ],
+  },
+  {
+    label: 'Suprimentos',
+    modulos: [
+      { key: 'compras',    label: 'Compras',    icon: '🛒' },
+      { key: 'logistica',  label: 'Logística',  icon: '🚚' },
+      { key: 'estoque',    label: 'Estoque',    icon: '📦' },
+      { key: 'frotas',     label: 'Frotas',     icon: '🚛' },
+    ],
+  },
+  {
+    label: 'Backoffice',
+    modulos: [
+      { key: 'financeiro',    label: 'Financeiro',    icon: '💰' },
+      { key: 'fiscal',        label: 'Fiscal',        icon: '🧾' },
+      { key: 'controladoria', label: 'Controladoria', icon: '📈' },
+      { key: 'contratos',     label: 'Contratos',     icon: '📋' },
+      { key: 'cadastros',     label: 'Cadastros',     icon: '⚙️' },
+    ],
+  },
+  {
+    label: 'RH',
+    modulos: [
+      { key: 'rh', label: 'RH', icon: '👥' },
+    ],
+  },
 ]
+
+// Flat array derivado (backward compat)
+export const MODULOS_ERP: ModuloERP[] = MODULOS_ERP_GROUPED.flatMap(g => g.modulos)
 
 // ── Context ────────────────────────────────────────────────────────────────────
 

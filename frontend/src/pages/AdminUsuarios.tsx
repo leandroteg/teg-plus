@@ -11,7 +11,7 @@ import { supabase } from '../services/supabase'
 import {
   useAuth,
   type Perfil, type Role,
-  ROLE_LABEL, ROLE_COLOR, ALCADA_LABEL, MODULOS_ERP,
+  ROLE_LABEL, ROLE_COLOR, ALCADA_LABEL, MODULOS_ERP, MODULOS_ERP_GROUPED,
 } from '../contexts/AuthContext'
 
 // ── Avatar inline ──────────────────────────────────────────────────────────────
@@ -41,6 +41,62 @@ function RoleBadge({ role }: { role: Role }) {
       <span className={`w-1.5 h-1.5 rounded-full ${c.dot}`} />
       {ROLE_LABEL[role]}
     </span>
+  )
+}
+
+// ── Módulo Checkbox Group ────────────────────────────────────────────────────
+function ModuloCheckboxGroup({
+  modulos,
+  onToggle,
+  onSetAll,
+}: {
+  modulos: Record<string, boolean>
+  onToggle: (key: string) => void
+  onSetAll: (keys: string[], val: boolean) => void
+}) {
+  const allKeys = MODULOS_ERP.map(m => m.key)
+  const selectedCount = allKeys.filter(k => modulos[k]).length
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-2">
+        <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+          Módulos ({selectedCount} de {allKeys.length})
+        </label>
+        <div className="flex gap-1.5">
+          <button type="button" onClick={() => onSetAll(allKeys, true)}
+            className="text-[10px] font-semibold text-primary hover:underline">Todos</button>
+          <span className="text-slate-300">·</span>
+          <button type="button" onClick={() => onSetAll(allKeys, false)}
+            className="text-[10px] font-semibold text-slate-400 hover:underline">Nenhum</button>
+        </div>
+      </div>
+      <div className="space-y-2.5">
+        {MODULOS_ERP_GROUPED.map(group => (
+          <div key={group.label}>
+            <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-1">{group.label}</p>
+            <div className="grid grid-cols-2 gap-1">
+              {group.modulos.map(({ key, label, icon }) => (
+                <label key={key}
+                  className={`flex items-center gap-1.5 px-2 py-1.5 rounded-lg cursor-pointer transition-all text-xs
+                    ${modulos[key]
+                      ? 'bg-primary/8 text-primary font-semibold'
+                      : 'text-slate-500 hover:bg-slate-50'}`}>
+                  <input
+                    type="checkbox"
+                    checked={!!modulos[key]}
+                    onChange={() => onToggle(key)}
+                    className="w-3.5 h-3.5 rounded border-slate-300 text-primary focus:ring-primary/30 cursor-pointer"
+                  />
+                  <span className="text-[11px]">{icon}</span>
+                  <span className="truncate">{label}</span>
+                </label>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
   )
 }
 
@@ -99,7 +155,7 @@ function useConvidarUsuario() {
 
       const { error: otpErr } = await supabase.auth.signInWithOtp({
         email,
-        options: { emailRedirectTo: window.location.origin },
+        options: { emailRedirectTo: `${window.location.origin}/bem-vindo` },
       })
       if (otpErr) throw otpErr
     },
@@ -173,9 +229,11 @@ function UserDetailPanel({
         </div>
 
         {/* Módulos atuais */}
-        {!editing && user.modulos && Object.values(user.modulos).some(Boolean) && (
+        {!editing && (
           <div>
-            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Módulos</p>
+            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">
+              Módulos ({MODULOS_ERP.filter(m => user.modulos?.[m.key]).length} de {MODULOS_ERP.length})
+            </p>
             <div className="flex gap-1 flex-wrap">
               {MODULOS_ERP.map(({ key, label, icon }) => (
                 <span key={key} className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md text-[10px] font-semibold ${
@@ -259,22 +317,15 @@ function UserDetailPanel({
           </div>
 
           {/* Módulos */}
-          <div>
-            <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-2">
-              Módulos Habilitados
-            </label>
-            <div className="grid grid-cols-2 gap-1.5">
-              {MODULOS_ERP.map(({ key, label, icon }) => (
-                <button key={key} onClick={() => toggleMod(key)}
-                  className={`flex items-center gap-2 px-3 py-2 rounded-xl border-2 text-xs font-semibold transition-all
-                    ${modulos[key] ? 'border-primary bg-primary/5 text-primary' : 'border-slate-100 text-slate-500 hover:border-slate-200'}`}>
-                  <span>{icon}</span>
-                  <span className="flex-1 text-left">{label}</span>
-                  {modulos[key] && <Check size={11} />}
-                </button>
-              ))}
-            </div>
-          </div>
+          <ModuloCheckboxGroup
+            modulos={modulos}
+            onToggle={toggleMod}
+            onSetAll={(keys, val) => setModulos(m => {
+              const next = { ...m }
+              keys.forEach(k => { next[k] = val })
+              return next
+            })}
+          />
 
           {/* Ativo/inativo */}
           <div className="flex items-center justify-between bg-white rounded-xl px-4 py-3">
@@ -415,20 +466,15 @@ function ConviteModal({ onClose }: { onClose: () => void }) {
             </div>
 
             {/* Módulos */}
-            <div>
-              <label className="block text-xs font-semibold text-slate-600 mb-1.5">Módulos habilitados</label>
-              <div className="grid grid-cols-2 gap-1.5">
-                {MODULOS_ERP.map(({ key, label, icon }) => (
-                  <button key={key} type="button" onClick={() => toggleMod(key)}
-                    className={`flex items-center gap-2 px-3 py-2 rounded-xl border-2 text-xs font-semibold transition-all
-                      ${form.modulos[key] ? 'border-primary bg-primary/5 text-primary' : 'border-slate-100 text-slate-500'}`}>
-                    <span>{icon}</span>
-                    <span className="flex-1 text-left">{label}</span>
-                    {form.modulos[key] && <Check size={11} />}
-                  </button>
-                ))}
-              </div>
-            </div>
+            <ModuloCheckboxGroup
+              modulos={form.modulos}
+              onToggle={toggleMod}
+              onSetAll={(keys, val) => setForm(f => {
+                const next = { ...f.modulos }
+                keys.forEach(k => { next[k] = val })
+                return { ...f, modulos: next }
+              })}
+            />
 
             {convidar.isError && (
               <div className="flex items-center gap-2 bg-red-50 text-red-600 rounded-xl px-3 py-2 text-xs">

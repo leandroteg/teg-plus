@@ -8,6 +8,7 @@ import Layout from './components/Layout'
 // Páginas públicas
 import Login from './pages/Login'
 import ResetPassword from './pages/ResetPassword'
+import BemVindo from './pages/BemVindo'
 
 // Páginas privadas
 import ModuloSelector from './pages/ModuloSelector'
@@ -160,6 +161,7 @@ export default function App() {
         {/* ── Públicas ──────────────────────────────────────── */}
         <Route path="/login"      element={<Login />} />
         <Route path="/nova-senha" element={<ResetPassword />} />
+        <Route path="/bem-vindo"  element={<BemVindo />} />
 
         {/* Aprovação por token: pública (aprovador externo) */}
         <Route path="/aprovacao/:token" element={<Aprovacao />} />

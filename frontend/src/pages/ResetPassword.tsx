@@ -1,28 +1,75 @@
-import { useState, useMemo } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Lock, Eye, EyeOff, ShieldCheck, AlertCircle, CheckCircle, ArrowRight } from 'lucide-react'
+import {
+  Lock, Eye, EyeOff, ShieldCheck, AlertCircle, CheckCircle,
+  ArrowRight, LogIn, Mail,
+} from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { useTheme } from '../contexts/ThemeContext'
 import LogoTeg from '../components/LogoTeg'
 import { PasswordStrengthBar } from '../components/SetPasswordModal'
 
+type PageState = 'loading' | 'form' | 'success' | 'expired'
+
 /**
- * Página dedicada para redefinição de senha.
- * Exibida quando o usuário clica no link de recovery do Supabase.
+ * Pagina dedicada para redefinicao de senha.
+ * Exibida quando o usuario clica no link de recovery do Supabase.
  * O AuthContext detecta o evento PASSWORD_RECOVERY e seta pendingPasswordReset=true,
- * que faz o PrivateRoute redirecionar para esta página.
+ * que faz o PrivateRoute redirecionar para esta pagina.
+ *
+ * Tambem acessivel diretamente pela URL /nova-senha quando o usuario
+ * clica no link do email de recovery.
  */
 export default function ResetPassword() {
-  const { updatePassword, clearPasswordReset } = useAuth()
+  const { updatePassword, clearPasswordReset, pendingPasswordReset, user } = useAuth()
   const { isDark } = useTheme()
   const navigate = useNavigate()
 
+  const [state, setState] = useState<PageState>('loading')
   const [password, setPassword] = useState('')
   const [confirm, setConfirm] = useState('')
   const [showPass, setShowPass] = useState(false)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [success, setSuccess] = useState(false)
+
+  // Detect if we have a valid recovery session
+  useEffect(() => {
+    // If already flagged by AuthContext, show form immediately
+    if (pendingPasswordReset) {
+      setState('form')
+      return
+    }
+
+    // Check URL hash for recovery tokens
+    const hash = window.location.hash
+    const hasRecoveryTokens = hash.includes('type=recovery') || hash.includes('access_token')
+
+    if (hasRecoveryTokens) {
+      // Wait for AuthContext to process the tokens
+      const timeout = setTimeout(() => {
+        // If after 5s we still don't have pendingPasswordReset or user, link is expired
+        setState(prev => prev === 'loading' ? 'expired' : prev)
+      }, 5000)
+
+      return () => clearTimeout(timeout)
+    }
+
+    // No tokens in URL and no pending reset → user navigated here directly
+    if (user) {
+      // User is logged in, show form (maybe they want to change password)
+      setState('form')
+    } else {
+      // No session, no tokens → expired/invalid link
+      setState('expired')
+    }
+  }, [pendingPasswordReset, user])
+
+  // React to pendingPasswordReset changing (from AuthContext processing tokens)
+  useEffect(() => {
+    if (pendingPasswordReset && state === 'loading') {
+      setState('form')
+    }
+  }, [pendingPasswordReset, state])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -33,7 +80,7 @@ export default function ResetPassword() {
       return
     }
     if (password !== confirm) {
-      setError('As senhas não coincidem')
+      setError('As senhas nao coincidem')
       return
     }
 
@@ -46,9 +93,13 @@ export default function ResetPassword() {
       return
     }
 
-    setSuccess(true)
+    setState('success')
     clearPasswordReset()
     setTimeout(() => navigate('/', { replace: true }), 2000)
+  }
+
+  const handleRequestNewLink = () => {
+    navigate('/login', { replace: true })
   }
 
   return (
@@ -65,13 +116,56 @@ export default function ResetPassword() {
           </div>
           <h1 className={`text-2xl font-black tracking-tight ${isDark ? 'text-white' : 'text-navy'}`}>TEG+</h1>
           <p className="text-xs text-slate-400 mt-0.5 font-medium tracking-wide uppercase">
-            Redefinição de Senha
+            Redefinicao de Senha
           </p>
         </div>
 
         {/* Card */}
         <div className={`rounded-2xl shadow-card overflow-hidden ${isDark ? 'bg-[#1e293b] border border-white/[0.06]' : 'bg-white'}`}>
-          {success ? (
+
+          {/* Loading */}
+          {state === 'loading' && (
+            <div className="p-10 text-center space-y-4">
+              <div className="w-10 h-10 border-[3px] border-primary border-t-transparent rounded-full animate-spin mx-auto" />
+              <p className={`text-sm font-medium ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
+                Verificando link de recuperacao...
+              </p>
+            </div>
+          )}
+
+          {/* Expired / Invalid link */}
+          {state === 'expired' && (
+            <div className="p-8 text-center space-y-4">
+              <div className="w-16 h-16 rounded-full bg-amber-100 flex items-center justify-center mx-auto">
+                <AlertCircle size={28} className="text-amber-600" />
+              </div>
+              <div>
+                <p className={`font-bold text-lg ${isDark ? 'text-white' : 'text-navy'}`}>Link expirado</p>
+                <p className="text-sm text-slate-500 mt-1">
+                  Este link de recuperacao nao e mais valido. Solicite um novo link na tela de login.
+                </p>
+              </div>
+              <div className="space-y-2">
+                <button
+                  onClick={handleRequestNewLink}
+                  className="w-full inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-primary text-white text-sm font-semibold
+                    hover:bg-indigo-500 active:scale-[0.98] transition-all"
+                >
+                  <Mail size={14} /> Solicitar novo link
+                </button>
+                <button
+                  onClick={() => navigate('/login', { replace: true })}
+                  className="w-full inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl border border-slate-200 text-sm font-semibold text-slate-600
+                    hover:bg-slate-50 transition-all"
+                >
+                  <LogIn size={14} /> Ir para login
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Success */}
+          {state === 'success' && (
             <div className="p-8 text-center space-y-4">
               <div className="w-16 h-16 rounded-full bg-green-100 flex items-center justify-center mx-auto">
                 <CheckCircle size={28} className="text-green-600" />
@@ -81,7 +175,10 @@ export default function ResetPassword() {
                 <p className="text-sm text-slate-500 mt-1">Redirecionando...</p>
               </div>
             </div>
-          ) : (
+          )}
+
+          {/* Form */}
+          {state === 'form' && (
             <form onSubmit={handleSubmit} className="p-5 space-y-4">
               <div className="flex items-center gap-3 mb-1">
                 <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
@@ -101,7 +198,7 @@ export default function ResetPassword() {
                     type={showPass ? 'text' : 'password'}
                     value={password}
                     onChange={e => { setPassword(e.target.value); setError(null) }}
-                    placeholder="Mínimo 6 caracteres"
+                    placeholder="Minimo 6 caracteres"
                     autoFocus
                     required
                     autoComplete="new-password"
@@ -135,6 +232,9 @@ export default function ResetPassword() {
                       bg-slate-50 focus:bg-white transition-all"
                   />
                 </div>
+                {confirm && password && confirm !== password && (
+                  <p className="text-[11px] text-red-500 mt-1 ml-1">As senhas nao coincidem</p>
+                )}
               </div>
 
               {error && (
