@@ -54,6 +54,7 @@ export interface ContaPagar {
   aprovado_por?: string
   aprovado_em?: string
   omie_cp_id?: number
+  lote_id?: string
   descricao?: string
   observacoes?: string
   created_at: string
@@ -126,4 +127,39 @@ export interface FinanceiroDashboardData {
   por_centro_custo: { centro_custo: string; total: number; valor: number; pago: number }[]
   vencimentos_proximos: ContaPagar[]
   recentes: ContaPagar[]
+}
+
+// ── Lotes de Pagamento ──────────────────────────────────────────────────────
+
+export type StatusLote =
+  | 'montando' | 'enviado_aprovacao' | 'parcialmente_aprovado'
+  | 'aprovado' | 'em_pagamento' | 'pago' | 'cancelado'
+
+export type DecisaoLoteItem = 'pendente' | 'aprovado' | 'rejeitado'
+
+export interface LotePagamento {
+  id: string
+  numero_lote: string
+  criado_por: string
+  criado_por_id?: string
+  valor_total: number
+  qtd_itens: number
+  status: StatusLote
+  observacao?: string
+  created_at: string
+  updated_at: string
+  itens?: LoteItem[]
+}
+
+export interface LoteItem {
+  id: string
+  lote_id: string
+  cp_id: string
+  valor: number
+  decisao: DecisaoLoteItem
+  decidido_por?: string
+  decidido_em?: string
+  observacao?: string
+  created_at: string
+  cp?: ContaPagar
 }

@@ -111,6 +111,9 @@ import ContasPagar from './pages/financeiro/ContasPagar'
 import ContasReceber from './pages/financeiro/ContasReceber'
 import AprovacoesPagamento from './pages/financeiro/AprovacoesPagamento'
 import Conciliacao from './pages/financeiro/Conciliacao'
+import LotesPagamento from './pages/financeiro/LotesPagamento'
+import LoteDetalhe from './pages/financeiro/LoteDetalhe'
+import PainelPagamentos from './pages/financeiro/PainelPagamentos'
 import Relatorios from './pages/financeiro/Relatorios'
 import Configuracoes from './pages/financeiro/Configuracoes'
 
@@ -184,6 +187,9 @@ export default function App() {
               <Route path="/financeiro/cp"           element={<ContasPagar />} />
               <Route path="/financeiro/cr"           element={<ContasReceber />} />
               <Route path="/financeiro/aprovacoes"   element={<AprovacoesPagamento />} />
+              <Route path="/financeiro/lotes"              element={<LotesPagamento />} />
+              <Route path="/financeiro/lotes/:loteId"      element={<LoteDetalhe />} />
+              <Route path="/financeiro/painel-pagamentos"  element={<PainelPagamentos />} />
               <Route path="/financeiro/conciliacao"  element={<Conciliacao />} />
               <Route path="/financeiro/relatorios"   element={<Relatorios />} />
               <Route path="/financeiro/configuracoes" element={<Navigate to="/admin/integracoes" replace />} />
