@@ -1,6 +1,8 @@
 import { useMutation } from '@tanstack/react-query'
 import type { AiParseResult } from '../types'
 import { api } from '../services/api'
+import { supabase } from '../services/supabase'
+import { getCategoriaEstoque } from '../components/ItemAutocomplete'
 
 // ── Tipos de arquivo aceitos ────────────────────────────────────────────────
 const BINARY_EXTS = /\.(pdf|xlsx|xls|jpg|jpeg|png|gif|webp|bmp|heic)$/i
@@ -131,15 +133,37 @@ function parseLocal(texto: string): AiParseResult {
 
   // Split por newline ou vírgula NÃO seguida de dígito (preserva decimais como "2,5 kg")
   const parts = texto.split(/\n+|,(?!\d)/).map(p => p.trim()).filter(p => p.length > 2)
-  const itens = parts.map(part => {
-    const qtyMatch = part.match(/(\d+[\.,]?\d*)\s*(un|kg|m2|m3|m|l|pc|cx|und|pcs)/i)
+  // Filtrar partes que são apenas stop-words / qualificadores (urgente, normal, etc.)
+  const stopWords = /^(urgente|critica|normal|para\s|na\s|no\s|da\s|do\s|de\s|e\s)/i
+  const itens = parts
+    .filter(p => !stopWords.test(p.trim()) || p.trim().length > 15)
+    .map(part => {
+    // Regex ampliado: reconhece "5 pares de", "10 unidades", "3 metros", etc.
+    const qtyMatch = part.match(/(\d+[\.,]?\d*)\s*(unidades?|und|un|pares?|par|jogos?|jg|metros?|m2|m3|m|kg|ton|litros?|l|pc|pcs|cx|caixas?|rl|rolos?|resmas?)/i)
     let quantidade = 1
     let unidade = 'un'
     if (qtyMatch) {
       quantidade = parseFloat(qtyMatch[1].replace(',', '.'))
-      unidade = qtyMatch[2].toLowerCase()
+      const raw = qtyMatch[2].toLowerCase()
+      // Normalize unit aliases
+      if (/^par/.test(raw)) unidade = 'par'
+      else if (/^jog/.test(raw)) unidade = 'jg'
+      else if (/^metro/.test(raw) || raw === 'm') unidade = 'm'
+      else if (/^litro/.test(raw) || raw === 'l') unidade = 'L'
+      else if (/^caixa/.test(raw) || raw === 'cx') unidade = 'cx'
+      else if (/^rolo/.test(raw) || raw === 'rl') unidade = 'rl'
+      else if (/^resma/.test(raw)) unidade = 'un'
+      else if (/^unid/.test(raw) || raw === 'un' || raw === 'und') unidade = 'un'
+      else unidade = raw
     }
-    let descricao = qtyMatch ? part.replace(qtyMatch[0], '').trim() : part
+    // Also try qty at the start without unit: "5 luvas isolantes..."
+    const qtyOnlyMatch = !qtyMatch ? part.match(/^(\d+)\s+(?!kv|mm|cm|\d)/i) : null
+    if (qtyOnlyMatch) {
+      quantidade = parseInt(qtyOnlyMatch[1])
+    }
+    let descricao = qtyMatch ? part.replace(qtyMatch[0], '').trim() : (qtyOnlyMatch ? part.replace(qtyOnlyMatch[0], '').trim() : part)
+    // Remove leading "de ", "para ", etc. after quantity removal
+    descricao = descricao.replace(/^(de|para|do|da|com|e)\s+/i, '').trim()
     descricao = descricao.replace(/^[\s,\-]+|[\s,\-]+$/g, '') || part
     return { descricao, quantidade, unidade, valor_unitario_estimado: 0 }
   }).filter(i => i.descricao.length > 1)
@@ -152,6 +176,66 @@ function parseLocal(texto: string): AiParseResult {
     comprador_sugerido,
     justificativa_sugerida: `Requisição de ${categoria_sugerida.replace(/_/g, ' ')}`,
     confianca: obra_sugerida ? 0.72 : 0.55,
+  }
+}
+
+// ── Normalize text for matching (remove accents, lowercase) ─────────────────
+function normalize(s: string): string {
+  return s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim()
+}
+
+// ── Match parsed items against est_itens catalog ────────────────────────────
+async function matchCatalogItems(result: AiParseResult): Promise<AiParseResult> {
+  const categoriasEstoque = getCategoriaEstoque(result.categoria_sugerida || '')
+  if (categoriasEstoque.length === 0) return result
+
+  // Fetch all active items for matching categories
+  const { data: catalog } = await supabase
+    .from('est_itens')
+    .select('id, codigo, descricao, unidade, valor_medio')
+    .in('categoria', categoriasEstoque)
+    .eq('ativo', true)
+
+  if (!catalog || catalog.length === 0) return result
+
+  let matchCount = 0
+  const matchedItens = result.itens.map(item => {
+    const normDesc = normalize(item.descricao)
+    // Try to find best match: catalog item whose normalized description contains the search term or vice versa
+    const match = catalog.find(c => {
+      const normCat = normalize(c.descricao)
+      return normCat.includes(normDesc) || normDesc.includes(normCat)
+    })
+    // Also try word-level matching (at least 2 significant words match)
+    const wordMatch = !match ? catalog.find(c => {
+      const normCat = normalize(c.descricao)
+      const words = normDesc.split(/\s+/).filter(w => w.length > 2)
+      const catWords = normCat.split(/\s+/).filter(w => w.length > 2)
+      const commonWords = words.filter(w => catWords.some(cw => cw.includes(w) || w.includes(cw)))
+      return commonWords.length >= 2
+    }) : null
+
+    const best = match || wordMatch
+    if (best) {
+      matchCount++
+      return {
+        ...item,
+        descricao: best.descricao,
+        unidade: (best.unidade || 'UN').toLowerCase(),
+        valor_unitario_estimado: best.valor_medio ?? item.valor_unitario_estimado,
+        est_item_id: best.id,
+        est_item_codigo: best.codigo,
+      }
+    }
+    return item
+  })
+
+  return {
+    ...result,
+    itens: matchedItens,
+    confianca: matchCount > 0
+      ? Math.min(0.95, result.confianca + (matchCount / result.itens.length) * 0.2)
+      : result.confianca,
   }
 }
 
@@ -170,7 +254,8 @@ export function useAiParse() {
       if (n8nUrl) {
         // Tenta o endpoint real de IA (suporta texto + arquivo/imagem)
         try {
-          return await api.parseRequisicaoAi(vars.texto, vars.solicitante_nome, vars.arquivo)
+          const result = await api.parseRequisicaoAi(vars.texto, vars.solicitante_nome, vars.arquivo)
+          return await matchCatalogItems(result)
         } catch {
           // Se tem arquivo binário e n8n falhou, não tem fallback local
           if (vars.arquivo) {
@@ -178,7 +263,8 @@ export function useAiParse() {
           }
           // Cai no parser local se n8n falhar (só texto)
           await new Promise(r => setTimeout(r, 800))
-          return parseLocal(vars.texto)
+          const local = parseLocal(vars.texto)
+          return await matchCatalogItems(local)
         }
       }
 
@@ -189,7 +275,8 @@ export function useAiParse() {
 
       // Usa parser local com delay simulado
       await new Promise(r => setTimeout(r, 1200))
-      return parseLocal(vars.texto)
+      const local = parseLocal(vars.texto)
+      return await matchCatalogItems(local)
     },
   })
 }
