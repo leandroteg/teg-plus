@@ -382,3 +382,29 @@ export interface IniciarTransportePayload {
   peso_total_kg?: number
   volumes_total?: number
 }
+
+// ── Pipeline Stages ──────────────────────────────────────────────────────────
+
+export type StatusSolicitacaoPipeline = 'solicitado' | 'validando' | 'planejado' | 'aguardando_aprovacao'
+export type StatusExpedicaoPipeline = 'aprovado' | 'romaneio_emitido' | 'nfe_emitida'
+export type StatusTransportePipeline = 'em_transito' | 'entregue' | 'confirmado' | 'concluido'
+
+export const SOLICITACAO_PIPELINE_STAGES: { status: StatusSolicitacaoPipeline; label: string; color: string }[] = [
+  { status: 'solicitado',            label: 'Pendentes',      color: 'slate' },
+  { status: 'validando',             label: 'Validando',      color: 'blue' },
+  { status: 'planejado',             label: 'Planejadas',     color: 'violet' },
+  { status: 'aguardando_aprovacao',  label: 'Em Aprovação',   color: 'amber' },
+]
+
+export const EXPEDICAO_PIPELINE_STAGES: { status: StatusExpedicaoPipeline; label: string; color: string }[] = [
+  { status: 'aprovado',          label: 'Pendentes',    color: 'slate' },
+  { status: 'romaneio_emitido',  label: 'Preparadas',   color: 'blue' },
+  { status: 'nfe_emitida',       label: 'NF Emitida',   color: 'violet' },
+]
+
+export const TRANSPORTE_PIPELINE_STAGES: { status: StatusTransportePipeline; label: string; color: string }[] = [
+  { status: 'em_transito',  label: 'Em Transporte',  color: 'amber' },
+  { status: 'entregue',     label: 'Entregues',      color: 'blue' },
+  { status: 'confirmado',   label: 'Confirmadas',    color: 'emerald' },
+  { status: 'concluido',    label: 'Concluídas',     color: 'green' },
+]

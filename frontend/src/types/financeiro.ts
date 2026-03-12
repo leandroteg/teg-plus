@@ -1,9 +1,20 @@
 // ── Financeiro Types ─────────────────────────────────────────────────────────
 
 export type StatusCP =
-  | 'previsto' | 'aprovado' | 'aguardando_docs'
-  | 'aguardando_aprovacao' | 'aprovado_pgto'
-  | 'em_remessa' | 'pago' | 'conciliado' | 'cancelado'
+  | 'previsto' | 'confirmado' | 'em_lote'
+  | 'aprovado_pgto' | 'em_pagamento'
+  | 'pago' | 'conciliado' | 'cancelado'
+
+// Pipeline stages in order (for Kanban columns)
+export const CP_PIPELINE_STAGES: { status: StatusCP; label: string; color: string; borderColor: string }[] = [
+  { status: 'previsto',       label: 'Previstos',           color: 'slate',   borderColor: 'border-t-slate-400' },
+  { status: 'confirmado',     label: 'Confirmados',         color: 'blue',    borderColor: 'border-t-blue-500' },
+  { status: 'em_lote',        label: 'Lote de Pagamento',   color: 'violet',  borderColor: 'border-t-violet-500' },
+  { status: 'aprovado_pgto',  label: 'Aprovados',           color: 'emerald', borderColor: 'border-t-emerald-500' },
+  { status: 'em_pagamento',   label: 'Painel de Pagamento', color: 'amber',   borderColor: 'border-t-amber-500' },
+  { status: 'pago',           label: 'Realizados',          color: 'teal',    borderColor: 'border-t-teal-500' },
+  { status: 'conciliado',     label: 'Conciliados',         color: 'green',   borderColor: 'border-t-green-500' },
+]
 
 export type StatusCR =
   | 'previsto' | 'faturado' | 'parcial'

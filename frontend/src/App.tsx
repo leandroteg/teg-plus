@@ -109,6 +109,7 @@ import MuralAdmin from './pages/rh/MuralAdmin'
 import FinanceiroLayout from './components/FinanceiroLayout'
 import DashboardFinanceiro from './pages/financeiro/DashboardFinanceiro'
 import ContasPagar from './pages/financeiro/ContasPagar'
+import CPPipeline from './pages/financeiro/CPPipeline'
 import ContasReceber from './pages/financeiro/ContasReceber'
 import AprovacoesPagamento from './pages/financeiro/AprovacoesPagamento'
 import Conciliacao from './pages/financeiro/Conciliacao'
@@ -139,9 +140,9 @@ import SolicitacoesEstoque from './pages/estoque/Solicitacoes'
 // Módulo Logística
 import LogisticaLayout from './components/LogisticaLayout'
 import LogisticaHome from './pages/logistica/LogisticaHome'
-import Solicitacoes from './pages/logistica/Solicitacoes'
-import Expedicao from './pages/logistica/Expedicao'
-import TransportesLog from './pages/logistica/Transportes'
+import SolicitacoesPipeline from './pages/logistica/SolicitacoesPipeline'
+import ExpedicaoPipeline from './pages/logistica/ExpedicaoPipeline'
+import TransportesPipeline from './pages/logistica/TransportesPipeline'
 import Recebimentos from './pages/logistica/Recebimentos'
 import TransportadorasLog from './pages/logistica/Transportadoras'
 
@@ -185,13 +186,14 @@ export default function App() {
           <Route element={<ModuleRoute moduleKey="financeiro" />}>
             <Route element={<FinanceiroLayout />}>
               <Route path="/financeiro"              element={<DashboardFinanceiro />} />
-              <Route path="/financeiro/cp"           element={<ContasPagar />} />
+              <Route path="/financeiro/contas-a-pagar" element={<CPPipeline />} />
+              <Route path="/financeiro/cp"           element={<Navigate to="/financeiro/contas-a-pagar" replace />} />
               <Route path="/financeiro/cr"           element={<ContasReceber />} />
-              <Route path="/financeiro/aprovacoes"   element={<AprovacoesPagamento />} />
-              <Route path="/financeiro/lotes"              element={<LotesPagamento />} />
+              <Route path="/financeiro/aprovacoes"   element={<Navigate to="/financeiro/contas-a-pagar" replace />} />
+              <Route path="/financeiro/lotes"              element={<Navigate to="/financeiro/contas-a-pagar" replace />} />
               <Route path="/financeiro/lotes/:loteId"      element={<LoteDetalhe />} />
-              <Route path="/financeiro/painel-pagamentos"  element={<PainelPagamentos />} />
-              <Route path="/financeiro/conciliacao"  element={<Conciliacao />} />
+              <Route path="/financeiro/painel-pagamentos"  element={<Navigate to="/financeiro/contas-a-pagar" replace />} />
+              <Route path="/financeiro/conciliacao"  element={<Navigate to="/financeiro/contas-a-pagar" replace />} />
               <Route path="/financeiro/relatorios"   element={<Relatorios />} />
               <Route path="/financeiro/configuracoes" element={<Navigate to="/admin/integracoes" replace />} />
             </Route>
@@ -222,9 +224,9 @@ export default function App() {
           <Route element={<ModuleRoute moduleKey="logistica" />}>
             <Route element={<LogisticaLayout />}>
               <Route path="/logistica"                   element={<LogisticaHome />} />
-              <Route path="/logistica/solicitacoes"      element={<Solicitacoes />} />
-              <Route path="/logistica/expedicao"         element={<Expedicao />} />
-              <Route path="/logistica/transportes"       element={<TransportesLog />} />
+              <Route path="/logistica/solicitacoes"      element={<SolicitacoesPipeline />} />
+              <Route path="/logistica/expedicao"         element={<ExpedicaoPipeline />} />
+              <Route path="/logistica/transportes"       element={<TransportesPipeline />} />
               <Route path="/logistica/recebimentos"      element={<Recebimentos />} />
               <Route path="/logistica/transportadoras"   element={<TransportadorasLog />} />
             </Route>

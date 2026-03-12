@@ -3,10 +3,11 @@ import { useNavigate } from 'react-router-dom'
 import {
   FileSignature, Search, Clock, CheckCircle2, XCircle,
   ExternalLink, Building2, Calendar, AlertTriangle, Send,
-  Eye, FileText,
+  Eye, FileText, Download, User,
 } from 'lucide-react'
-import { useSolicitacoes } from '../../hooks/useSolicitacoes'
+import { useSolicitacoes, useAssinaturasAll } from '../../hooks/useSolicitacoes'
 import { useContratos } from '../../hooks/useContratos'
+import type { Assinatura } from '../../types/contratos'
 
 const fmt = (v: number) =>
   v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
@@ -14,21 +15,25 @@ const fmt = (v: number) =>
 const fmtData = (d: string) =>
   new Date(d).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' })
 
-type StatusAssinatura = 'pendente' | 'enviado' | 'assinado' | 'recusado'
+type StatusAssinatura = 'pendente' | 'enviado' | 'parcialmente_assinado' | 'assinado' | 'recusado' | 'expirado'
 
 const STATUS_CFG: Record<StatusAssinatura, { label: string; dot: string; bg: string; text: string; icon: typeof Clock }> = {
-  pendente: { label: 'Pendente',     dot: 'bg-amber-400',   bg: 'bg-amber-50',   text: 'text-amber-700',   icon: Clock },
-  enviado:  { label: 'Enviado',      dot: 'bg-blue-400',    bg: 'bg-blue-50',     text: 'text-blue-700',    icon: Send },
-  assinado: { label: 'Assinado',     dot: 'bg-emerald-500', bg: 'bg-emerald-50',  text: 'text-emerald-700', icon: CheckCircle2 },
-  recusado: { label: 'Recusado',     dot: 'bg-red-400',     bg: 'bg-red-50',      text: 'text-red-600',     icon: XCircle },
+  pendente:              { label: 'Pendente',     dot: 'bg-amber-400',   bg: 'bg-amber-50',   text: 'text-amber-700',   icon: Clock },
+  enviado:               { label: 'Enviado',      dot: 'bg-blue-400',    bg: 'bg-blue-50',     text: 'text-blue-700',    icon: Send },
+  parcialmente_assinado: { label: 'Parcial',      dot: 'bg-cyan-400',    bg: 'bg-cyan-50',     text: 'text-cyan-700',    icon: Clock },
+  assinado:              { label: 'Assinado',     dot: 'bg-emerald-500', bg: 'bg-emerald-50',  text: 'text-emerald-700', icon: CheckCircle2 },
+  recusado:              { label: 'Recusado',     dot: 'bg-red-400',     bg: 'bg-red-50',      text: 'text-red-600',     icon: XCircle },
+  expirado:              { label: 'Expirado',     dot: 'bg-slate-400',   bg: 'bg-slate-50',    text: 'text-slate-600',   icon: AlertTriangle },
 }
 
 const FILTROS = [
   { label: 'Todos',     value: '' },
   { label: 'Pendentes', value: 'pendente' },
   { label: 'Enviados',  value: 'enviado' },
+  { label: 'Parciais',  value: 'parcialmente_assinado' },
   { label: 'Assinados', value: 'assinado' },
   { label: 'Recusados', value: 'recusado' },
+  { label: 'Expirados', value: 'expirado' },
 ]
 
 export default function Assinaturas() {
@@ -46,13 +51,16 @@ export default function Assinaturas() {
   const { data: contratosAssinados = [], isLoading: loadingAss } = useContratos({ status: 'assinado' })
   const { data: contratosVigentes = [], isLoading: loadingVig } = useContratos({ status: 'vigente' })
 
+  // Real assinaturas from con_assinaturas
+  const { data: assinaturas = [], isLoading: loadingAss2 } = useAssinaturasAll()
+
   // Merge: all 'assinado' + 'vigente' that have data_assinatura set
   const contratos = [
     ...contratosAssinados,
     ...contratosVigentes.filter(c => c.data_assinatura),
   ]
 
-  const isLoading = loadingSol || loadingAss || loadingVig
+  const isLoading = loadingSol || loadingAss || loadingVig || loadingAss2
 
   // Build unified list
   type Item = {
@@ -65,28 +73,46 @@ export default function Assinaturas() {
     status: StatusAssinatura
     data: string
     link?: string
+    assinatura: Assinatura | null
+  }
+
+  // Helper: find matching assinatura for a solicitacao
+  const findAssinatura = (solicitacaoId: string): Assinatura | null =>
+    assinaturas.find(a => a.solicitacao_id === solicitacaoId) ?? null
+
+  const resolveStatus = (ass: Assinatura | null, fallback: StatusAssinatura): StatusAssinatura => {
+    if (!ass) return fallback
+    const s = ass.status
+    if (s === 'cancelado') return 'recusado'
+    if (s in STATUS_CFG) return s as StatusAssinatura
+    return fallback
   }
 
   const items: Item[] = [
-    ...solicitacoes.map(s => ({
-      id: s.id,
-      tipo: 'solicitacao' as const,
-      numero: s.numero,
-      objeto: s.objeto,
-      contraparte: s.contraparte_nome,
-      valor: s.valor_estimado ?? undefined,
-      status: 'pendente' as StatusAssinatura,
-      data: s.updated_at,
-    })),
+    ...solicitacoes.map(s => {
+      const ass = findAssinatura(s.id)
+      return {
+        id: s.id,
+        tipo: 'solicitacao' as const,
+        numero: s.numero,
+        objeto: s.objeto,
+        contraparte: s.contraparte_nome,
+        valor: s.valor_estimado ?? undefined,
+        status: resolveStatus(ass, 'pendente'),
+        data: s.updated_at,
+        assinatura: ass,
+      }
+    }),
     ...contratos.map(c => ({
       id: c.id,
       tipo: 'contrato' as const,
       numero: c.numero,
       objeto: c.objeto,
-      contraparte: c.cliente?.nome ?? c.fornecedor?.razao_social ?? '—',
+      contraparte: c.cliente?.nome ?? c.fornecedor?.razao_social ?? '\u2014',
       valor: c.valor_total,
       status: 'assinado' as StatusAssinatura,
       data: c.data_assinatura ?? c.updated_at,
+      assinatura: null,
     })),
   ]
 
@@ -155,7 +181,7 @@ export default function Assinaturas() {
               placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/30"
           />
         </div>
-        <div className="flex gap-1">
+        <div className="flex gap-1 flex-wrap">
           {FILTROS.map(f => (
             <button
               key={f.value}
@@ -202,7 +228,7 @@ export default function Assinaturas() {
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between gap-2">
-                      <div className="flex items-center gap-2 min-w-0">
+                      <div className="flex items-center gap-2 min-w-0 flex-wrap">
                         <span className="text-[10px] font-mono font-bold text-indigo-600 bg-indigo-50 rounded-full px-2 py-0.5">
                           {item.numero}
                         </span>
@@ -232,8 +258,46 @@ export default function Assinaturas() {
                         </div>
                       )}
                     </div>
+
+                    {/* Signatarios badges */}
+                    {item.assinatura && item.assinatura.signatarios.length > 0 && (
+                      <div className="flex items-center gap-1.5 mt-2 flex-wrap">
+                        {item.assinatura.signatarios.map((sig, idx) => {
+                          const sigColor = sig.status === 'assinado'
+                            ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                            : sig.status === 'recusado'
+                            ? 'bg-red-50 text-red-600 border-red-200'
+                            : 'bg-slate-50 text-slate-600 border-slate-200'
+                          return (
+                            <span
+                              key={idx}
+                              className={`inline-flex items-center gap-1 text-[9px] font-semibold rounded-full px-2 py-0.5 border ${sigColor}`}
+                            >
+                              <User size={9} />
+                              {sig.nome.split(' ')[0]}
+                              {sig.status === 'assinado' && <CheckCircle2 size={9} className="text-emerald-500" />}
+                              {sig.status === 'recusado' && <XCircle size={9} className="text-red-400" />}
+                            </span>
+                          )
+                        })}
+                      </div>
+                    )}
                   </div>
-                  <Eye size={14} className="text-slate-300 mt-1 shrink-0" />
+                  <div className="flex items-center gap-1.5 mt-1 shrink-0">
+                    {item.assinatura?.documento_assinado_url && (
+                      <a
+                        href={item.assinatura.documento_assinado_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        onClick={e => e.stopPropagation()}
+                        className="text-teal-500 hover:text-teal-700 transition-colors"
+                        title="Baixar documento assinado"
+                      >
+                        <Download size={14} />
+                      </a>
+                    )}
+                    <Eye size={14} className="text-slate-300" />
+                  </div>
                 </div>
               </div>
             )

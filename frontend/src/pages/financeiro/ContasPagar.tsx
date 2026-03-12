@@ -291,23 +291,22 @@ const fmtData = (d: string) =>
   new Date(d + 'T00:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit' })
 
 const STATUS_CONFIG: Record<string, { label: string; dot: string; bg: string; text: string; icon: typeof Clock }> = {
-  previsto:              { label: 'Previsto',       dot: 'bg-slate-400',   bg: 'bg-slate-50',    text: 'text-slate-600',    icon: Calendar },
-  aprovado:              { label: 'Aprovado',       dot: 'bg-blue-400',    bg: 'bg-blue-50',     text: 'text-blue-700',     icon: CheckCircle2 },
-  aguardando_docs:       { label: 'Aguard. Docs',   dot: 'bg-amber-400',   bg: 'bg-amber-50',    text: 'text-amber-700',    icon: FileText },
-  aguardando_aprovacao:  { label: 'Aguard. Aprov.', dot: 'bg-orange-400',  bg: 'bg-orange-50',   text: 'text-orange-700',   icon: Clock },
-  aprovado_pgto:         { label: 'Pgto Aprovado',  dot: 'bg-indigo-400',  bg: 'bg-indigo-50',   text: 'text-indigo-700',   icon: CheckCircle2 },
-  em_remessa:            { label: 'Em Remessa',     dot: 'bg-cyan-400',    bg: 'bg-cyan-50',     text: 'text-cyan-700',     icon: Receipt },
-  pago:                  { label: 'Pago',           dot: 'bg-emerald-500', bg: 'bg-emerald-50',  text: 'text-emerald-700',  icon: CheckCircle2 },
-  conciliado:            { label: 'Conciliado',     dot: 'bg-green-500',   bg: 'bg-green-50',    text: 'text-green-700',    icon: CheckCircle2 },
-  cancelado:             { label: 'Cancelado',      dot: 'bg-gray-400',    bg: 'bg-gray-100',    text: 'text-gray-500',     icon: Clock },
+  previsto:       { label: 'Previsto',       dot: 'bg-slate-400',   bg: 'bg-slate-50',    text: 'text-slate-600',    icon: Calendar },
+  confirmado:     { label: 'Confirmado',     dot: 'bg-blue-500',    bg: 'bg-blue-50',     text: 'text-blue-700',     icon: CheckCircle2 },
+  em_lote:        { label: 'Em Lote',        dot: 'bg-violet-500',  bg: 'bg-violet-50',   text: 'text-violet-700',   icon: Receipt },
+  aprovado_pgto:  { label: 'Pgto Aprovado',  dot: 'bg-emerald-500', bg: 'bg-emerald-50',  text: 'text-emerald-700',  icon: CheckCircle2 },
+  em_pagamento:   { label: 'Em Pagamento',   dot: 'bg-amber-500',   bg: 'bg-amber-50',    text: 'text-amber-700',    icon: Clock },
+  pago:           { label: 'Pago',           dot: 'bg-teal-500',    bg: 'bg-teal-50',     text: 'text-teal-700',     icon: CheckCircle2 },
+  conciliado:     { label: 'Conciliado',     dot: 'bg-green-500',   bg: 'bg-green-50',    text: 'text-green-700',    icon: CheckCircle2 },
+  cancelado:      { label: 'Cancelado',      dot: 'bg-gray-400',    bg: 'bg-gray-100',    text: 'text-gray-500',     icon: Clock },
 }
 
 const FILTROS_STATUS: { label: string; value: string }[] = [
   { label: 'Todos',           value: '' },
-  { label: 'Em Aberto',       value: 'previsto' },
-  { label: 'Aguard. Aprov.',  value: 'aguardando_aprovacao' },
-  { label: 'Aprov. Pgto',     value: 'aprovado_pgto' },
-  { label: 'Em Remessa',      value: 'em_remessa' },
+  { label: 'Previstos',       value: 'previsto' },
+  { label: 'Confirmados',     value: 'confirmado' },
+  { label: 'Em Lote',         value: 'em_lote' },
+  { label: 'Aprovados',       value: 'aprovado_pgto' },
   { label: 'Pagos',           value: 'pago' },
   { label: 'Conciliados',     value: 'conciliado' },
 ]
@@ -389,7 +388,7 @@ function CPCard({ cp, onRegistrarPgto, onAprovarPgto, isDark }: {
   const vencido = !['pago', 'conciliado', 'cancelado'].includes(cp.status) &&
     new Date(cp.data_vencimento + 'T00:00:00') < new Date()
   const isPago = ['pago', 'conciliado'].includes(cp.status)
-  const canApprove = cp.status === 'aguardando_aprovacao'
+  const canApprove = cp.status === 'confirmado'
   const canPay = cp.status === 'aprovado_pgto'
   const cfg = STATUS_CONFIG[cp.status]
 

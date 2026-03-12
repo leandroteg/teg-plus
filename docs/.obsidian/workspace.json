@@ -171,8 +171,8 @@
             "state": {
               "type": "calendar",
               "state": {},
-              "icon": "lucide-ghost",
-              "title": "calendar"
+              "icon": "calendar-with-checkmark",
+              "title": "Calendar"
             }
           },
           {
@@ -181,8 +181,8 @@
             "state": {
               "type": "git-view",
               "state": {},
-              "icon": "lucide-ghost",
-              "title": "git-view"
+              "icon": "git-pull-request",
+              "title": "Source Control"
             }
           }
         ],
@@ -190,8 +190,7 @@
       }
     ],
     "direction": "horizontal",
-    "width": 300,
-    "collapsed": true
+    "width": 300
   },
   "left-ribbon": {
     "hiddenItems": {
@@ -202,19 +201,25 @@
       "templates:Inserir modelo": false,
       "command-palette:Abrir paleta de comandos": false,
       "bases:Criar nova base": false,
+      "obsidian-git:Open Git source control": false,
+      "templater-obsidian:Templater": false,
       "workspaces:Gerenciar leiautes da área de trabalho": false,
       "markdown-importer:Abrir importador Markdown": false,
       "audio-recorder:Começar/parar a gravação de áudio": false,
-      "publish:Publicar mudanças": false,
-      "obsidian-git:Open Git source control": false,
-      "templater-obsidian:Templater": false
+      "publish:Publicar mudanças": false
     }
   },
   "active": "a4bc148162b73016",
   "lastOpenFiles": [
-    "obsidian/Paineis/Compras Dashboard.md",
-    "obsidian/Paineis/BI Dashboard.md",
+    "plans/2026-03-11-certisign-implementation-plan.md",
+    "plans/2026-03-11-certisign-integration-design.md",
+    "obsidian/07 - Schema Database.md",
+    "obsidian/06 - Supabase.md",
+    "obsidian/00 - TEG+ INDEX.md",
     "obsidian/00 - Premissas do Projeto.md",
+    "obsidian/01 - Arquitetura Geral.md",
+    "obsidian/Paineis/Roadmap Board.md",
+    "obsidian/Paineis/BI Dashboard.md",
     "plans/2026-03-09-nf-romaneio-fiscal-redesign.md",
     "obsidian/Paineis/Dev Hub BI.md",
     "plans/2026-03-07-superteg-chat-redesign.md",
@@ -227,19 +232,13 @@
     "obsidian/Database/Issues/ISSUE-008 - Botao salvar requisicao travado.md",
     "obsidian/Database/Issues/ISSUE-007 - GH14 Melhoria layout chat AI.md",
     "obsidian/Database/Issues/ISSUE-006 - GH13 Filtro datas dashboard financeiro.md",
-    "obsidian/00 - TEG+ INDEX.md",
+    "obsidian/Paineis/Compras Dashboard.md",
     "obsidian/Paineis/Cadastros Dashboard.md",
     "obsidian/27 - Módulo Contratos Gestão.md",
     "obsidian/Paineis/Logistica Dashboard.md",
     "obsidian/26 - Upload Inteligente Cotacao.md",
     "obsidian/10 - n8n Workflows.md.tmp.28700.1772635214153",
-    "plans/2026-03-04-approval-flow-plan.md",
-    "plans/2026-03-04-approval-flow-design.md",
     "plans",
-    "obsidian/01 - Arquitetura Geral.md",
-    "obsidian/Paineis/Tasks Board.md",
-    "obsidian/Paineis/Roadmap Board.md",
-    "obsidian/Paineis/RH Dashboard.md",
     "obsidian/Paineis",
     "obsidian/Database/Tarefas",
     "obsidian/Database/Requisitos",
