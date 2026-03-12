@@ -85,15 +85,25 @@ export function useCriarLote() {
       observacao,
     }: {
       cpIds: string[]
-      cps: ContaPagar[]
+      cps?: ContaPagar[]
       criadoPor: string
       observacao?: string
     }) => {
+      // If cps not provided, fetch them
+      let cpList = cps ?? []
+      if (cpList.length === 0 && cpIds.length > 0) {
+        const { data } = await supabase
+          .from('fin_contas_pagar')
+          .select('id, valor_original')
+          .in('id', cpIds)
+        cpList = (data ?? []) as ContaPagar[]
+      }
+
       // 1. Generate lote number
       const { data: numData } = await supabase.rpc('generate_numero_lote')
       const numeroLote = (numData as string) || `LP-${Date.now()}`
 
-      const valorTotal = cps
+      const valorTotal = cpList
         .filter(c => cpIds.includes(c.id))
         .reduce((s, c) => s + (c.valor_original ?? 0), 0)
 
@@ -114,7 +124,7 @@ export function useCriarLote() {
 
       // 3. Insert itens
       const itens = cpIds.map(cpId => {
-        const cp = cps.find(c => c.id === cpId)
+        const cp = cpList.find(c => c.id === cpId)
         return {
           lote_id: lote.id,
           cp_id: cpId,
@@ -126,10 +136,10 @@ export function useCriarLote() {
         .insert(itens)
       if (iErr) throw iErr
 
-      // 4. Set lote_id on CPs
+      // 4. Set lote_id + status on CPs
       const { error: uErr } = await supabase
         .from('fin_contas_pagar')
-        .update({ lote_id: lote.id })
+        .update({ lote_id: lote.id, status: 'em_lote' })
         .in('id', cpIds)
       if (uErr) console.warn('Aviso: lote_id não atualizado nas CPs:', uErr.message)
 
@@ -161,19 +171,8 @@ export function useEnviarLoteAprovacao() {
         .eq('id', loteId)
       if (error) throw error
 
-      // 2. Update CPs status to aguardando_aprovacao
-      const { data: itens } = await supabase
-        .from('fin_lote_itens')
-        .select('cp_id')
-        .eq('lote_id', loteId)
-
-      if (itens && itens.length > 0) {
-        await supabase
-          .from('fin_contas_pagar')
-          .update({ status: 'aguardando_aprovacao' })
-          .in('id', itens.map(i => i.cp_id))
-          .in('status', ['previsto', 'aprovado'])
-      }
+      // 2. CPs already have status 'em_lote' from useCriarLote — no change needed
+      // (keeping lote_id reference intact)
 
       // 3. Create apr_aprovacoes record for the batch
       const nivel = lote.valor_total > 100000 ? 4 : lote.valor_total > 25000 ? 3 : lote.valor_total > 5000 ? 2 : 1

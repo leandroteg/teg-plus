@@ -67,7 +67,7 @@ export default function LotesPagamento() {
   // ── CPs disponíveis para montar lote ──
   const cpsDisponiveis = useMemo(() =>
     allCPs.filter(c =>
-      c.status === 'aguardando_aprovacao' && !c.lote_id
+      c.status === 'confirmado' && !c.lote_id
     ),
     [allCPs],
   )

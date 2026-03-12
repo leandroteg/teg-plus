@@ -109,6 +109,7 @@ import MuralAdmin from './pages/rh/MuralAdmin'
 import FinanceiroLayout from './components/FinanceiroLayout'
 import DashboardFinanceiro from './pages/financeiro/DashboardFinanceiro'
 import ContasPagar from './pages/financeiro/ContasPagar'
+import CPPipeline from './pages/financeiro/CPPipeline'
 import ContasReceber from './pages/financeiro/ContasReceber'
 import AprovacoesPagamento from './pages/financeiro/AprovacoesPagamento'
 import Conciliacao from './pages/financeiro/Conciliacao'
@@ -185,13 +186,14 @@ export default function App() {
           <Route element={<ModuleRoute moduleKey="financeiro" />}>
             <Route element={<FinanceiroLayout />}>
               <Route path="/financeiro"              element={<DashboardFinanceiro />} />
-              <Route path="/financeiro/cp"           element={<ContasPagar />} />
+              <Route path="/financeiro/contas-a-pagar" element={<CPPipeline />} />
+              <Route path="/financeiro/cp"           element={<Navigate to="/financeiro/contas-a-pagar" replace />} />
               <Route path="/financeiro/cr"           element={<ContasReceber />} />
-              <Route path="/financeiro/aprovacoes"   element={<AprovacoesPagamento />} />
-              <Route path="/financeiro/lotes"              element={<LotesPagamento />} />
+              <Route path="/financeiro/aprovacoes"   element={<Navigate to="/financeiro/contas-a-pagar" replace />} />
+              <Route path="/financeiro/lotes"              element={<Navigate to="/financeiro/contas-a-pagar" replace />} />
               <Route path="/financeiro/lotes/:loteId"      element={<LoteDetalhe />} />
-              <Route path="/financeiro/painel-pagamentos"  element={<PainelPagamentos />} />
-              <Route path="/financeiro/conciliacao"  element={<Conciliacao />} />
+              <Route path="/financeiro/painel-pagamentos"  element={<Navigate to="/financeiro/contas-a-pagar" replace />} />
+              <Route path="/financeiro/conciliacao"  element={<Navigate to="/financeiro/contas-a-pagar" replace />} />
               <Route path="/financeiro/relatorios"   element={<Relatorios />} />
               <Route path="/financeiro/configuracoes" element={<Navigate to="/admin/integracoes" replace />} />
             </Route>

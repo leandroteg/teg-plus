@@ -104,6 +104,24 @@ export function useFornecedorById(fornecedorId?: string | null) {
   })
 }
 
+// ── Confirmar CP: previsto → confirmado ─────────────────────────────────
+export function useConfirmarCP() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ cpIds }: { cpIds: string[] }) => {
+      const { error } = await supabase
+        .from('fin_contas_pagar')
+        .update({ status: 'confirmado' })
+        .in('id', cpIds)
+      if (error) throw error
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['contas-pagar'] })
+      qc.invalidateQueries({ queryKey: ['financeiro-dashboard'] })
+    },
+  })
+}
+
 // ── Aprovar Pagamento (AP): aguardando_aprovacao → aprovado_pgto ──────────
 // Autorização de Pagamento: o financeiro aprova a CP para pagamento efetivo.
 
@@ -205,7 +223,7 @@ export async function syncCPsParaAprovacao() {
   const { data: cps } = await supabase
     .from('fin_contas_pagar')
     .select('id, fornecedor_nome, valor_original, numero_documento')
-    .eq('status', 'aguardando_aprovacao')
+    .in('status', ['confirmado', 'em_lote'])
 
   if (!cps || cps.length === 0) return 0
 
