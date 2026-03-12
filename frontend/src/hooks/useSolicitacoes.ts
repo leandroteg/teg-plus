@@ -913,3 +913,80 @@ export function useEnviarAssinatura() {
     },
   })
 }
+
+// ── Confirmar assinatura (manual ou Certisign) + upload cópia assinada ──────
+
+export interface ConfirmarAssinaturaPayload {
+  solicitacao_id: string
+  arquivo?: File
+  observacao?: string
+}
+
+export function useConfirmarAssinatura() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (payload: ConfirmarAssinaturaPayload) => {
+      let documento_assinado_url: string | null = null
+
+      // 1) Upload da cópia assinada (se fornecida)
+      if (payload.arquivo) {
+        const ts = Date.now()
+        const safeName = payload.arquivo.name.replace(/[^a-zA-Z0-9._-]/g, '_')
+        const path = `assinados/${payload.solicitacao_id}/${ts}_${safeName}`
+
+        const { error: upErr } = await supabase.storage
+          .from('contratos-anexos')
+          .upload(path, payload.arquivo, { upsert: false, contentType: payload.arquivo.type })
+        if (upErr) throw new Error('Falha no upload do documento assinado: ' + upErr.message)
+
+        const { data: { publicUrl } } = supabase.storage
+          .from('contratos-anexos')
+          .getPublicUrl(path)
+        documento_assinado_url = publicUrl
+      }
+
+      // 2) Atualizar ou criar registro con_assinaturas com status 'assinado'
+      const { data: existing } = await supabase
+        .from('con_assinaturas')
+        .select('id')
+        .eq('solicitacao_id', payload.solicitacao_id)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single()
+
+      if (existing) {
+        const updatePayload: Record<string, unknown> = {
+          status: 'assinado',
+          concluido_em: new Date().toISOString(),
+        }
+        if (documento_assinado_url) updatePayload.documento_assinado_url = documento_assinado_url
+        const { error } = await supabase
+          .from('con_assinaturas')
+          .update(updatePayload)
+          .eq('id', existing.id)
+        if (error) throw new Error('Erro ao atualizar assinatura: ' + error.message)
+      } else {
+        const { error } = await supabase
+          .from('con_assinaturas')
+          .insert({
+            solicitacao_id: payload.solicitacao_id,
+            provedor: 'manual',
+            tipo_assinatura: 'eletronica',
+            status: 'assinado',
+            concluido_em: new Date().toISOString(),
+            documento_assinado_url,
+            signatarios: [],
+          })
+        if (error) throw new Error('Erro ao registrar assinatura: ' + error.message)
+      }
+
+      return { documento_assinado_url }
+    },
+    onSuccess: (_d, vars) => {
+      qc.invalidateQueries({ queryKey: ['con-assinaturas', vars.solicitacao_id] })
+      qc.invalidateQueries({ queryKey: ['con-assinaturas-all'] })
+      qc.invalidateQueries({ queryKey: ['con-solicitacoes'] })
+      qc.invalidateQueries({ queryKey: ['con-solicitacao', vars.solicitacao_id] })
+    },
+  })
+}
