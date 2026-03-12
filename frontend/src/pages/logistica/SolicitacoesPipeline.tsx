@@ -3,15 +3,17 @@ import {
   ClipboardList, Search, X, CheckCircle2, Clock, AlertTriangle,
   Calendar, ArrowUp, ArrowDown, LayoutList, LayoutGrid, Download,
   MapPin, Package2, Truck, FileText, Building2, Tag, Briefcase,
-  ShieldCheck,
+  ShieldCheck, Plus, Save, Loader2, Trash2,
 } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
 import {
   useSolicitacoes, useAtualizarStatusSolicitacao,
   useAprovarSolicitacao, usePlanejaarSolicitacao,
-  useEnviarParaAprovacao,
+  useEnviarParaAprovacao, useCriarSolicitacao,
+  useTransportadoras, useRotas,
 } from '../../hooks/useLogistica'
-import type { LogSolicitacao, StatusSolicitacaoPipeline } from '../../types/logistica'
+import { useLookupObras, useLookupCentrosCusto } from '../../hooks/useLookups'
+import type { LogSolicitacao, StatusSolicitacaoPipeline, CriarSolicitacaoPayload, TipoTransporte } from '../../types/logistica'
 import { SOLICITACAO_PIPELINE_STAGES } from '../../types/logistica'
 
 // ── Formatters ───────────────────────────────────────────────────────────────
@@ -280,6 +282,246 @@ function SolCard({ sol, onClick, isDark, isSelected, onSelect }: {
   )
 }
 
+// ── Nova Solicitação Modal ───────────────────────────────────────────────────
+
+const TIPO_LABELS: Record<TipoTransporte, string> = {
+  viagem:                  'Viagem',
+  mobilizacao:             'Mobilização',
+  transferencia_material:  'Transf. Material',
+  transferencia_maquina:   'Transf. Máquina',
+}
+
+const EMPTY_FORM: CriarSolicitacaoPayload = {
+  tipo: 'transferencia_material',
+  origem: '',
+  destino: '',
+  descricao: '',
+  urgente: false,
+}
+
+function NovaSolicitacaoModal({ isDark, onClose, onSuccess }: {
+  isDark: boolean; onClose: () => void; onSuccess: () => void
+}) {
+  const [form, setForm] = useState<CriarSolicitacaoPayload>({ ...EMPTY_FORM })
+  const [itensForm, setItensForm] = useState<{ descricao: string; quantidade: number; unidade: string; peso_kg?: number; volume_m3?: number }[]>([])
+  const criar = useCriarSolicitacao()
+  const obras = useLookupObras()
+  const centrosCusto = useLookupCentrosCusto()
+  const { data: rotas = [] } = useRotas()
+
+  const set = (k: keyof CriarSolicitacaoPayload, v: any) => setForm(p => ({ ...p, [k]: v }))
+
+  const canSubmit = form.origem.trim().length > 0 && form.destino.trim().length > 0
+
+  async function handleCriar() {
+    if (!canSubmit) return
+    await criar.mutateAsync({ ...form, itens: itensForm.length > 0 ? itensForm : undefined })
+    onSuccess()
+    onClose()
+  }
+
+  const inputCls = `w-full rounded-xl px-3 py-2.5 text-sm outline-none transition-colors ${
+    isDark
+      ? 'bg-white/[0.06] border border-white/[0.08] text-slate-200 placeholder:text-slate-500 focus:border-orange-500/50'
+      : 'bg-slate-50 border border-slate-200 text-slate-700 placeholder:text-slate-400 focus:border-orange-500'
+  }`
+  const labelCls = `block text-xs font-bold mb-1 ${isDark ? 'text-slate-300' : 'text-slate-600'}`
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm" onClick={onClose}>
+      <div className={`rounded-2xl shadow-2xl w-full max-w-xl max-h-[90vh] overflow-y-auto ${isDark ? 'bg-[#1e293b]' : 'bg-white'}`} onClick={e => e.stopPropagation()}>
+        {/* Header */}
+        <div className={`flex items-center justify-between px-6 py-4 sticky top-0 z-10 ${isDark ? 'border-b border-white/[0.06] bg-[#1e293b]' : 'border-b border-slate-100 bg-white'}`}>
+          <h2 className={`text-lg font-extrabold ${isDark ? 'text-white' : 'text-slate-800'}`}>Nova Solicitação</h2>
+          <button onClick={onClose}
+            className={`w-8 h-8 rounded-lg flex items-center justify-center ${isDark ? 'hover:bg-white/10 text-slate-400' : 'hover:bg-slate-100'}`}>
+            <X size={16} />
+          </button>
+        </div>
+
+        {/* Body */}
+        <div className="p-6 space-y-4">
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className={labelCls}>Tipo *</label>
+              <select value={form.tipo} onChange={e => set('tipo', e.target.value)} className={inputCls}>
+                {Object.entries(TIPO_LABELS).map(([k, v]) => (
+                  <option key={k} value={k}>{v}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className={labelCls}>Rota Padrão</label>
+              <select onChange={e => {
+                const r = rotas.find(r => r.id === e.target.value)
+                setForm(p => ({ ...p, origem: r?.origem ?? p.origem, destino: r?.destino ?? p.destino }))
+              }} className={inputCls}>
+                <option value="">Selecionar rota...</option>
+                {rotas.map(r => <option key={r.id} value={r.id}>{r.nome}</option>)}
+              </select>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className={labelCls}>Origem *</label>
+              <input value={form.origem} onChange={e => set('origem', e.target.value)}
+                className={inputCls} placeholder="Cidade / Depósito" />
+            </div>
+            <div>
+              <label className={labelCls}>Destino *</label>
+              <input value={form.destino} onChange={e => set('destino', e.target.value)}
+                className={inputCls} placeholder="Obra / Cidade" />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className={labelCls}>Obra / Projeto</label>
+              <select value={form.obra_nome ?? ''} onChange={e => set('obra_nome', e.target.value)} className={inputCls}>
+                <option value="">Selecione...</option>
+                {obras.map(o => (
+                  <option key={o.id} value={o.nome}>{o.codigo} - {o.nome}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className={labelCls}>Centro de Custo</label>
+              <select value={form.centro_custo ?? ''} onChange={e => set('centro_custo', e.target.value)} className={inputCls}>
+                <option value="">Selecione...</option>
+                {centrosCusto.map(cc => (
+                  <option key={cc.id} value={cc.codigo}>{cc.codigo} - {cc.descricao}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className={labelCls}>OC Vinculada</label>
+              <input value={form.oc_numero ?? ''} onChange={e => set('oc_numero', e.target.value)}
+                className={inputCls} placeholder="OC-2026-0001" />
+            </div>
+            <div>
+              <label className={labelCls}>Data Desejada</label>
+              <input type="date" value={form.data_desejada ?? ''} onChange={e => set('data_desejada', e.target.value)}
+                className={inputCls} />
+            </div>
+          </div>
+
+          <div>
+            <label className={labelCls}>Descrição da Carga</label>
+            <textarea value={form.descricao ?? ''} onChange={e => set('descricao', e.target.value)}
+              rows={2} className={`${inputCls} resize-none`} placeholder="Lista de materiais, equipamentos..." />
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className={labelCls}>Peso Total (kg)</label>
+              <input type="number" min={0} value={form.peso_total_kg ?? ''}
+                onChange={e => set('peso_total_kg', e.target.value ? Number(e.target.value) : undefined)}
+                className={inputCls} />
+            </div>
+            <div>
+              <label className={labelCls}>N° de Volumes</label>
+              <input type="number" min={0} value={form.volumes_total ?? ''}
+                onChange={e => set('volumes_total', e.target.value ? Number(e.target.value) : undefined)}
+                className={inputCls} />
+            </div>
+          </div>
+
+          {/* Itens da Carga */}
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <label className={`text-xs font-bold ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>Itens da Carga</label>
+              <button type="button"
+                onClick={() => setItensForm(p => [...p, { descricao: '', quantidade: 1, unidade: 'un' }])}
+                className="flex items-center gap-1 text-[10px] font-semibold text-orange-600 hover:text-orange-700">
+                <Plus size={10} /> Adicionar Item
+              </button>
+            </div>
+            {itensForm.length > 0 ? (
+              <div className="space-y-2">
+                {itensForm.map((item, idx) => (
+                  <div key={idx} className={`rounded-xl p-3 ${isDark ? 'bg-white/5 border border-white/[0.06]' : 'bg-slate-50 border border-slate-100'}`}>
+                    <div className="flex gap-2 mb-2">
+                      <input value={item.descricao}
+                        onChange={e => setItensForm(p => p.map((it, i) => i === idx ? { ...it, descricao: e.target.value } : it))}
+                        placeholder="Descrição do item *" className={`${inputCls} flex-1 text-xs`} />
+                      <button onClick={() => setItensForm(p => p.filter((_, i) => i !== idx))}
+                        className="text-red-400 hover:text-red-600 shrink-0 p-1">
+                        <Trash2 size={12} />
+                      </button>
+                    </div>
+                    <div className="grid grid-cols-4 gap-2">
+                      <input type="number" min={1} value={item.quantidade}
+                        onChange={e => setItensForm(p => p.map((it, i) => i === idx ? { ...it, quantidade: Number(e.target.value) } : it))}
+                        placeholder="Qtd" className={`${inputCls} text-xs`} />
+                      <select value={item.unidade}
+                        onChange={e => setItensForm(p => p.map((it, i) => i === idx ? { ...it, unidade: e.target.value } : it))}
+                        className={`${inputCls} text-xs`}>
+                        {['un','pç','kg','m','m²','m³','L','cx','rl','pct','bd','tb'].map(u => (
+                          <option key={u} value={u}>{u}</option>
+                        ))}
+                      </select>
+                      <input type="number" min={0} step={0.1} value={item.peso_kg ?? ''}
+                        onChange={e => setItensForm(p => p.map((it, i) => i === idx ? { ...it, peso_kg: e.target.value ? Number(e.target.value) : undefined } : it))}
+                        placeholder="Peso" className={`${inputCls} text-xs`} />
+                      <input type="number" min={0} step={0.01} value={item.volume_m3 ?? ''}
+                        onChange={e => setItensForm(p => p.map((it, i) => i === idx ? { ...it, volume_m3: e.target.value ? Number(e.target.value) : undefined } : it))}
+                        placeholder="Vol" className={`${inputCls} text-xs`} />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className={`rounded-xl px-4 py-3 text-center ${isDark ? 'bg-white/5 border border-white/[0.06]' : 'bg-slate-50 border border-slate-100'}`}>
+                <Package2 size={16} className={`mx-auto mb-1 ${isDark ? 'text-slate-600' : 'text-slate-300'}`} />
+                <p className={`text-[10px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Nenhum item adicionado (opcional)</p>
+              </div>
+            )}
+          </div>
+
+          <div className="flex gap-4">
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input type="checkbox" checked={form.urgente ?? false} onChange={e => set('urgente', e.target.checked)}
+                className="rounded border-slate-300 text-orange-600 focus:ring-orange-500" />
+              <span className={`text-xs font-semibold ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>Urgente</span>
+            </label>
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input type="checkbox" checked={form.carga_especial ?? false} onChange={e => set('carga_especial', e.target.checked)}
+                className="rounded border-slate-300 text-orange-600 focus:ring-orange-500" />
+              <span className={`text-xs font-semibold ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>Carga Especial</span>
+            </label>
+          </div>
+
+          {form.urgente && (
+            <div>
+              <label className={labelCls}>Justificativa da Urgência *</label>
+              <textarea value={form.justificativa_urgencia ?? ''} onChange={e => set('justificativa_urgencia', e.target.value)}
+                rows={2} className={`${inputCls} resize-none`} placeholder="Motivo da urgência..." />
+            </div>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className={`px-6 py-4 flex justify-end gap-2 ${isDark ? 'border-t border-white/[0.06]' : 'border-t border-slate-100'}`}>
+          <button onClick={onClose}
+            className={`px-4 py-2 rounded-xl text-sm font-semibold ${isDark ? 'border border-white/[0.06] text-slate-400 hover:bg-white/5' : 'border border-slate-200 text-slate-600 hover:bg-slate-50'}`}>
+            Cancelar
+          </button>
+          <button onClick={handleCriar} disabled={criar.isPending || !canSubmit}
+            className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-orange-600 hover:bg-orange-700
+              text-white text-sm font-semibold transition-colors disabled:opacity-60 shadow-sm">
+            {criar.isPending ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
+            Criar Solicitação
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ── Main Page ────────────────────────────────────────────────────────────────
 
 export default function SolicitacoesPipeline() {
@@ -292,6 +534,7 @@ export default function SolicitacoesPipeline() {
   const [sortField, setSortField] = useState<SortField>('data')
   const [sortDir, setSortDir] = useState<SortDir>('desc')
   const [viewMode, setViewMode] = useState<ViewMode>('cards')
+  const [showNovaSolicitacao, setShowNovaSolicitacao] = useState(false)
 
   const { data: solicitacoes = [], isLoading } = useSolicitacoes()
   const atualizarStatus = useAtualizarStatusSolicitacao()
@@ -431,6 +674,11 @@ export default function SolicitacoesPipeline() {
             {solicitacoes.filter(s => ['solicitado','planejado','aguardando_aprovacao'].includes(s.status)).length} solicitações no pipeline
           </p>
         </div>
+        <button onClick={() => setShowNovaSolicitacao(true)}
+          className="flex items-center gap-1.5 bg-orange-600 hover:bg-orange-700 text-white
+            text-sm font-semibold px-4 py-2 rounded-xl transition-colors shadow-sm">
+          <Plus size={15} /> Nova Solicitação
+        </button>
       </div>
 
       {/* Horizontal Tabs */}
@@ -575,6 +823,13 @@ export default function SolicitacoesPipeline() {
       </div>
 
       {detail && <DetailModal sol={detail} onClose={() => setDetail(null)} onAction={handleDetailAction} isDark={isDark} />}
+      {showNovaSolicitacao && (
+        <NovaSolicitacaoModal
+          isDark={isDark}
+          onClose={() => setShowNovaSolicitacao(false)}
+          onSuccess={() => showToast('success', 'Solicitação criada com sucesso!')}
+        />
+      )}
     </div>
   )
 }
