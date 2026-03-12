@@ -144,6 +144,11 @@ function DetailModal({ sol, onClose, onAction, isDark }: {
                 <ScrollText size={15} /> Emitir Romaneio
               </button>
             )}
+            {sol.status === 'romaneio_emitido' && sol.doc_fiscal_tipo !== 'nf' && (
+              <button onClick={() => onAction('solicitarNF', sol)} className="flex-1 py-3 rounded-xl bg-amber-600 text-white text-sm font-bold hover:bg-amber-700 transition-all flex items-center justify-center gap-2">
+                <FileText size={15} /> Solicitar NF
+              </button>
+            )}
             {(sol.status === 'romaneio_emitido' || sol.status === 'nfe_emitida') && (
               <button onClick={() => onAction('despachar', sol)} className="flex-1 py-3 rounded-xl bg-emerald-600 text-white text-sm font-bold hover:bg-emerald-700 transition-all flex items-center justify-center gap-2">
                 <Truck size={15} /> Despachar
@@ -276,9 +281,11 @@ export default function ExpedicaoPipeline() {
   const [sortField, setSortField] = useState<SortField>('data')
   const [sortDir, setSortDir] = useState<SortDir>('desc')
   const [viewMode, setViewMode] = useState<ViewMode>('list')
+  const [nfModal, setNfModal] = useState<LogSolicitacao | null>(null)
 
   const { data: solicitacoes = [], isLoading } = useSolicitacoes()
   const emitirRomaneio = useEmitirRomaneio()
+  const solicitarNF = useSolicitarNFFiscal()
 
   // Group by status
   const grouped = useMemo(() => {
@@ -336,9 +343,24 @@ export default function ExpedicaoPipeline() {
     if (activeTab === 'aprovado') handleEmitirRomaneio(ids)
   }
 
+  const handleSolicitarNF = async (sol: LogSolicitacao) => {
+    try {
+      await solicitarNF.mutateAsync({
+        solicitacao_id: sol.id,
+        fornecedor_nome: sol.origem,
+        valor_total: 0,
+        descricao: `NF ref. expedição #${sol.numero} — ${sol.origem} → ${sol.destino}`,
+      })
+      showToast('success', 'NF solicitada ao fiscal com sucesso')
+      setNfModal(null)
+      setDetail(null)
+    } catch { showToast('error', 'Erro ao solicitar NF') }
+  }
+
   const handleDetailAction = (action: string, sol: LogSolicitacao) => {
     setDetail(null)
     if (action === 'emitirRomaneio') handleEmitirRomaneio([sol.id])
+    if (action === 'solicitarNF') setNfModal(sol)
   }
 
   const handleExport = () => {
@@ -498,6 +520,39 @@ export default function ExpedicaoPipeline() {
       </div>
 
       {detail && <DetailModal sol={detail} onClose={() => setDetail(null)} onAction={handleDetailAction} isDark={isDark} />}
+
+      {/* Solicitar NF Modal */}
+      {nfModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4" onClick={() => setNfModal(null)}>
+          <div className={`rounded-2xl shadow-2xl w-full max-w-md ${isDark ? 'bg-[#1e293b]' : 'bg-white'}`} onClick={e => e.stopPropagation()}>
+            <div className={`flex items-center justify-between px-5 py-4 border-b ${isDark ? 'border-white/[0.06]' : 'border-slate-100'}`}>
+              <h3 className={`text-base font-bold ${isDark ? 'text-white' : 'text-slate-800'}`}>Solicitar NF ao Fiscal</h3>
+              <button onClick={() => setNfModal(null)} className="text-slate-400 hover:text-slate-600"><X size={18} /></button>
+            </div>
+            <div className="p-5 space-y-4">
+              <p className={`text-sm ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
+                Confirma a solicitação de Nota Fiscal para a expedição abaixo?
+              </p>
+              <div className={`rounded-xl p-4 space-y-2 text-xs ${isDark ? 'bg-white/[0.04]' : 'bg-slate-50'}`}>
+                <div><span className="text-slate-400">Expedição:</span> <span className="font-semibold">#{nfModal.numero}</span></div>
+                <div><span className="text-slate-400">Origem:</span> <span className="font-semibold">{nfModal.origem}</span></div>
+                <div><span className="text-slate-400">Destino:</span> <span className="font-semibold">{nfModal.destino}</span></div>
+                {nfModal.obra_nome && <div><span className="text-slate-400">Obra:</span> <span className="font-semibold">{nfModal.obra_nome}</span></div>}
+              </div>
+              <div className="flex gap-2">
+                <button onClick={() => setNfModal(null)} className={`flex-1 py-3 rounded-xl border text-sm font-semibold ${isDark ? 'border-white/[0.06] text-slate-300' : 'border-slate-200 text-slate-600'}`}>
+                  Cancelar
+                </button>
+                <button onClick={() => handleSolicitarNF(nfModal)} disabled={solicitarNF.isPending}
+                  className="flex-1 py-3 rounded-xl bg-amber-600 text-white text-sm font-bold hover:bg-amber-700 disabled:opacity-50 transition-all flex items-center justify-center gap-2">
+                  {solicitarNF.isPending ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> : <FileText size={15} />}
+                  Confirmar
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

@@ -1,12 +1,11 @@
 import {
-  ClipboardList, FileInput, FileOutput,
+  ClipboardList, Kanban,
 } from 'lucide-react'
 import ModuleLayout from './ModuleLayout'
 
 const NAV = [
-  { to: '/fiscal',             icon: ClipboardList, label: 'Histórico NF',     end: true  },
-  { to: '/fiscal/solicitacao', icon: FileInput,     label: 'Solicitação NF',   end: false },
-  { to: '/fiscal/emissao',     icon: FileOutput,    label: 'Emissão NF',       end: false },
+  { to: '/fiscal/pipeline',   icon: Kanban,        label: 'Emissão de Nota Fiscal', end: false },
+  { to: '/fiscal',            icon: ClipboardList, label: 'Histórico NF',           end: true  },
 ]
 
 export default function FiscalLayout() {

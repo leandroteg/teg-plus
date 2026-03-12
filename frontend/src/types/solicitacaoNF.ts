@@ -61,6 +61,8 @@ export interface SolicitacaoNF {
   obra_id?: string
   empresa_id?: string
 
+  emissao_tipo?: 'sistema' | 'externa'
+
   // Joined data (from select with joins)
   fornecedor?: { id: string; razao_social: string; cnpj?: string }
   obra?: { id: string; codigo: string; nome: string; municipio?: string; uf?: string }
@@ -124,4 +126,26 @@ export interface EmitirNFPayload {
   icms_base?: number
   icms_valor?: number
   info_complementar?: string
+}
+
+// ── Pipeline Stages ──────────────────────────────────────────────────────────
+
+export type StatusFiscalPipeline = 'pendente' | 'em_emissao' | 'aguardando_aprovacao' | 'emitida'
+
+export const FISCAL_PIPELINE_STAGES: { status: StatusFiscalPipeline; label: string; color: string }[] = [
+  { status: 'pendente',              label: 'Pendentes',          color: 'slate' },
+  { status: 'em_emissao',            label: 'Em Emissão',         color: 'blue' },
+  { status: 'aguardando_aprovacao',  label: 'Aguard. Aprovação',  color: 'amber' },
+  { status: 'emitida',               label: 'Emitidas',           color: 'green' },
+]
+
+// ── Anexar NF Externa Payload ────────────────────────────────────────────────
+
+export interface AnexarNFExternaPayload {
+  numero_nf: string
+  serie?: string
+  data_emissao: string
+  valor_total?: number
+  chave_acesso?: string
+  danfe_url?: string
 }

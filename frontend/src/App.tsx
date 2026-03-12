@@ -122,8 +122,7 @@ import Configuracoes from './pages/financeiro/Configuracoes'
 // Módulo Fiscal
 import FiscalLayout from './components/FiscalLayout'
 import NotasFiscais from './pages/financeiro/NotasFiscais'
-import SolicitacaoNF from './pages/fiscal/SolicitacaoNF'
-import EmissaoNF from './pages/fiscal/EmissaoNF'
+import FiscalPipeline from './pages/fiscal/FiscalPipeline'
 
 // SuperTEG AI Chat
 import SuperTEGChat from './components/SuperTEGChat'
@@ -203,8 +202,7 @@ export default function App() {
           <Route element={<ModuleRoute moduleKey="fiscal" />}>
             <Route element={<FiscalLayout />}>
               <Route path="/fiscal"              element={<NotasFiscais />} />
-              <Route path="/fiscal/solicitacao"  element={<SolicitacaoNF />} />
-              <Route path="/fiscal/emissao"      element={<EmissaoNF />} />
+              <Route path="/fiscal/pipeline"     element={<FiscalPipeline />} />
             </Route>
           </Route>
 
