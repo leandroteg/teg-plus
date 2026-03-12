@@ -283,22 +283,25 @@ export function useAnexarNFExterna() {
         // Parse failure is non-blocking — file is already uploaded
       }
 
-      // 4. Update solicitacao with parsed data
+      // 4. Update solicitacao with parsed data (only include parsed fields that have values)
       const agora = new Date().toISOString()
+      const updatePayload: Record<string, unknown> = {
+        danfe_url: publicUrl,
+        emissao_tipo: 'externa',
+        status: 'emitida',
+        emitido_por: perfil?.id ?? null,
+        emitido_em: agora,
+      }
+      // Only set parsed fields if n8n returned them (valor_total is NOT NULL in DB)
+      if (parsed.numero) updatePayload.numero_nf = parsed.numero
+      if (parsed.serie) updatePayload.serie = parsed.serie
+      if (parsed.data_emissao) updatePayload.data_emissao = parsed.data_emissao
+      if (parsed.valor_total) updatePayload.valor_total = parsed.valor_total
+      if (parsed.chave_acesso) updatePayload.chave_acesso = parsed.chave_acesso
+
       const { data, error } = await supabase
         .from('fis_solicitacoes_nf')
-        .update({
-          numero_nf: (parsed.numero as string) ?? null,
-          serie: (parsed.serie as string) ?? null,
-          data_emissao: (parsed.data_emissao as string) ?? null,
-          valor_total: (parsed.valor_total as number) ?? null,
-          chave_acesso: (parsed.chave_acesso as string) ?? null,
-          danfe_url: publicUrl,
-          emissao_tipo: 'externa',
-          status: 'emitida',
-          emitido_por: perfil?.id ?? null,
-          emitido_em: agora,
-        })
+        .update(updatePayload)
         .eq('id', id)
         .select()
         .single()
