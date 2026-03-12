@@ -140,9 +140,9 @@ import SolicitacoesEstoque from './pages/estoque/Solicitacoes'
 // Módulo Logística
 import LogisticaLayout from './components/LogisticaLayout'
 import LogisticaHome from './pages/logistica/LogisticaHome'
-import Solicitacoes from './pages/logistica/Solicitacoes'
-import Expedicao from './pages/logistica/Expedicao'
-import TransportesLog from './pages/logistica/Transportes'
+import SolicitacoesPipeline from './pages/logistica/SolicitacoesPipeline'
+import ExpedicaoPipeline from './pages/logistica/ExpedicaoPipeline'
+import TransportesPipeline from './pages/logistica/TransportesPipeline'
 import Recebimentos from './pages/logistica/Recebimentos'
 import TransportadorasLog from './pages/logistica/Transportadoras'
 
@@ -224,9 +224,9 @@ export default function App() {
           <Route element={<ModuleRoute moduleKey="logistica" />}>
             <Route element={<LogisticaLayout />}>
               <Route path="/logistica"                   element={<LogisticaHome />} />
-              <Route path="/logistica/solicitacoes"      element={<Solicitacoes />} />
-              <Route path="/logistica/expedicao"         element={<Expedicao />} />
-              <Route path="/logistica/transportes"       element={<TransportesLog />} />
+              <Route path="/logistica/solicitacoes"      element={<SolicitacoesPipeline />} />
+              <Route path="/logistica/expedicao"         element={<ExpedicaoPipeline />} />
+              <Route path="/logistica/transportes"       element={<TransportesPipeline />} />
               <Route path="/logistica/recebimentos"      element={<Recebimentos />} />
               <Route path="/logistica/transportadoras"   element={<TransportadorasLog />} />
             </Route>
