@@ -2,12 +2,13 @@ import { useState, useMemo } from 'react'
 import {
   Truck, Search, X, CheckCircle2, AlertTriangle,
   Calendar, ArrowUp, ArrowDown, LayoutList, LayoutGrid, Download,
-  MapPin, Clock, Building2, Package2,
+  MapPin, Clock, Building2, Package2, FileText, CalendarCheck,
 } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
 import {
-  useSolicitacoes, useTransportes, useConfirmarEntregaFisica,
-  useConfirmarRecebimento,
+  useSolicitacoes, useConfirmarEntregaFisica,
+  useConfirmarAgendamento, useIniciarTransporte,
+  useConcluirSolicitacao,
 } from '../../hooks/useLogistica'
 import type { LogSolicitacao, StatusTransportePipeline } from '../../types/logistica'
 import { TRANSPORTE_PIPELINE_STAGES } from '../../types/logistica'
@@ -16,9 +17,6 @@ import { TRANSPORTE_PIPELINE_STAGES } from '../../types/logistica'
 
 const fmtData = (d?: string) =>
   d ? new Date(d + (d.includes('T') ? '' : 'T00:00:00')).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit' }) : '—'
-
-const fmtDataFull = (d?: string) =>
-  d ? new Date(d + (d.includes('T') ? '' : 'T00:00:00')).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '—'
 
 const fmtDataHora = (d?: string) =>
   d ? new Date(d).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '—'
@@ -44,24 +42,27 @@ const TIPO_LABEL: Record<string, string> = {
 // ── Status accents ───────────────────────────────────────────────────────────
 
 const STATUS_ICONS: Record<string, typeof Truck> = {
-  em_transito: Truck,
-  entregue:    Package2,
-  confirmado:  CheckCircle2,
-  concluido:   CheckCircle2,
+  nfe_emitida:       FileText,
+  aguardando_coleta: CalendarCheck,
+  em_transito:       Truck,
+  entregue:          Package2,
+  concluido:         CheckCircle2,
 }
 
 const STATUS_ACCENT: Record<string, { bg: string; bgActive: string; text: string; textActive: string; dot: string; border: string }> = {
-  em_transito: { bg: 'hover:bg-amber-50',   bgActive: 'bg-amber-50',    text: 'text-amber-600',   textActive: 'text-amber-800',   dot: 'bg-amber-500',   border: 'border-amber-500' },
-  entregue:    { bg: 'hover:bg-blue-50',     bgActive: 'bg-blue-50',     text: 'text-blue-600',    textActive: 'text-blue-800',    dot: 'bg-blue-500',    border: 'border-blue-500' },
-  confirmado:  { bg: 'hover:bg-emerald-50',  bgActive: 'bg-emerald-50',  text: 'text-emerald-600', textActive: 'text-emerald-800', dot: 'bg-emerald-500', border: 'border-emerald-500' },
-  concluido:   { bg: 'hover:bg-green-50',    bgActive: 'bg-green-50',    text: 'text-green-600',   textActive: 'text-green-800',   dot: 'bg-green-500',   border: 'border-green-500' },
+  nfe_emitida:       { bg: 'hover:bg-slate-50',    bgActive: 'bg-slate-100',    text: 'text-slate-600',   textActive: 'text-slate-800',   dot: 'bg-slate-400',    border: 'border-slate-400' },
+  aguardando_coleta: { bg: 'hover:bg-blue-50',     bgActive: 'bg-blue-50',      text: 'text-blue-600',    textActive: 'text-blue-800',    dot: 'bg-blue-500',     border: 'border-blue-500' },
+  em_transito:       { bg: 'hover:bg-amber-50',    bgActive: 'bg-amber-50',     text: 'text-amber-600',   textActive: 'text-amber-800',   dot: 'bg-amber-500',    border: 'border-amber-500' },
+  entregue:          { bg: 'hover:bg-teal-50',     bgActive: 'bg-teal-50',      text: 'text-teal-600',    textActive: 'text-teal-800',    dot: 'bg-teal-500',     border: 'border-teal-500' },
+  concluido:         { bg: 'hover:bg-green-50',    bgActive: 'bg-green-50',     text: 'text-green-600',   textActive: 'text-green-800',   dot: 'bg-green-500',    border: 'border-green-500' },
 }
 
 const STATUS_ACCENT_DARK: Record<string, { bg: string; bgActive: string; text: string; textActive: string }> = {
-  em_transito: { bg: 'hover:bg-white/[0.03]', bgActive: 'bg-amber-500/10',   text: 'text-amber-400',   textActive: 'text-amber-300' },
-  entregue:    { bg: 'hover:bg-white/[0.03]', bgActive: 'bg-blue-500/10',    text: 'text-blue-400',    textActive: 'text-blue-300' },
-  confirmado:  { bg: 'hover:bg-white/[0.03]', bgActive: 'bg-emerald-500/10', text: 'text-emerald-400', textActive: 'text-emerald-300' },
-  concluido:   { bg: 'hover:bg-white/[0.03]', bgActive: 'bg-green-500/10',   text: 'text-green-400',   textActive: 'text-green-300' },
+  nfe_emitida:       { bg: 'hover:bg-white/[0.03]', bgActive: 'bg-slate-500/10',  text: 'text-slate-400',  textActive: 'text-slate-200' },
+  aguardando_coleta: { bg: 'hover:bg-white/[0.03]', bgActive: 'bg-blue-500/10',   text: 'text-blue-400',   textActive: 'text-blue-300' },
+  em_transito:       { bg: 'hover:bg-white/[0.03]', bgActive: 'bg-amber-500/10',  text: 'text-amber-400',  textActive: 'text-amber-300' },
+  entregue:          { bg: 'hover:bg-white/[0.03]', bgActive: 'bg-teal-500/10',   text: 'text-teal-400',   textActive: 'text-teal-300' },
+  concluido:         { bg: 'hover:bg-white/[0.03]', bgActive: 'bg-green-500/10',  text: 'text-green-400',  textActive: 'text-green-300' },
 }
 
 // ── Export CSV ────────────────────────────────────────────────────────────────
@@ -157,14 +158,19 @@ function DetailModal({ sol, onClose, onAction, isDark }: {
             <button onClick={onClose} className={`flex-1 py-3 rounded-xl border text-sm font-semibold transition-all ${isDark ? 'border-white/[0.06] text-slate-300' : 'border-slate-200 text-slate-600 hover:bg-slate-50'}`}>
               Fechar
             </button>
+            {sol.status === 'nfe_emitida' && (
+              <button onClick={() => onAction('confirmarAgendamento', sol)} className="flex-1 py-3 rounded-xl bg-blue-600 text-white text-sm font-bold hover:bg-blue-700 transition-all flex items-center justify-center gap-2">
+                <CalendarCheck size={15} /> Confirmar Agendamento
+              </button>
+            )}
             {sol.status === 'em_transito' && (
-              <button onClick={() => onAction('confirmarEntrega', sol)} className="flex-1 py-3 rounded-xl bg-blue-600 text-white text-sm font-bold hover:bg-blue-700 transition-all flex items-center justify-center gap-2">
+              <button onClick={() => onAction('confirmarEntrega', sol)} className="flex-1 py-3 rounded-xl bg-teal-600 text-white text-sm font-bold hover:bg-teal-700 transition-all flex items-center justify-center gap-2">
                 <Package2 size={15} /> Confirmar Entrega
               </button>
             )}
             {sol.status === 'entregue' && (
-              <button onClick={() => onAction('confirmarRecebimento', sol)} className="flex-1 py-3 rounded-xl bg-emerald-600 text-white text-sm font-bold hover:bg-emerald-700 transition-all flex items-center justify-center gap-2">
-                <CheckCircle2 size={15} /> Confirmar Recebimento
+              <button onClick={() => onAction('concluir', sol)} className="flex-1 py-3 rounded-xl bg-green-600 text-white text-sm font-bold hover:bg-green-700 transition-all flex items-center justify-center gap-2">
+                <CheckCircle2 size={15} /> Concluir
               </button>
             )}
           </div>
@@ -281,7 +287,7 @@ function TrCard({ sol, onClick, isDark, isSelected, onSelect }: {
 
 export default function TransportesPipeline() {
   const { isDark } = useTheme()
-  const [activeTab, setActiveTab] = useState<StatusTransportePipeline>('em_transito')
+  const [activeTab, setActiveTab] = useState<StatusTransportePipeline>('nfe_emitida')
   const [busca, setBusca] = useState('')
   const [detail, setDetail] = useState<LogSolicitacao | null>(null)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
@@ -292,6 +298,8 @@ export default function TransportesPipeline() {
 
   const { data: solicitacoes = [], isLoading } = useSolicitacoes()
   const confirmarEntrega = useConfirmarEntregaFisica()
+  const confirmarAgendamento = useConfirmarAgendamento()
+  const concluirSolicitacao = useConcluirSolicitacao()
 
   // Group by status
   const grouped = useMemo(() => {
@@ -335,6 +343,14 @@ export default function TransportesPipeline() {
   const switchTab = (status: StatusTransportePipeline) => { setActiveTab(status); setSelectedIds(new Set()); setBusca('') }
 
   // Actions
+  const handleConfirmarAgendamento = async (ids: string[]) => {
+    try {
+      for (const id of ids) await confirmarAgendamento.mutateAsync({ id })
+      showToast('success', `${ids.length} agendamento(s) confirmado(s)`)
+      setSelectedIds(new Set())
+    } catch { showToast('error', 'Erro ao confirmar agendamento') }
+  }
+
   const handleConfirmarEntrega = async (ids: string[]) => {
     try {
       for (const id of ids) {
@@ -346,15 +362,29 @@ export default function TransportesPipeline() {
     } catch { showToast('error', 'Erro ao confirmar entrega') }
   }
 
+  const handleConcluir = async (ids: string[]) => {
+    try {
+      for (const id of ids) await concluirSolicitacao.mutateAsync({ id })
+      showToast('success', `${ids.length} solicitação(ões) concluída(s)`)
+      setSelectedIds(new Set())
+    } catch { showToast('error', 'Erro ao concluir') }
+  }
+
   const handleBulkAction = () => {
     const ids = Array.from(selectedIds)
     if (ids.length === 0) return
-    if (activeTab === 'em_transito') handleConfirmarEntrega(ids)
+    switch (activeTab) {
+      case 'nfe_emitida': handleConfirmarAgendamento(ids); break
+      case 'em_transito': handleConfirmarEntrega(ids); break
+      case 'entregue': handleConcluir(ids); break
+    }
   }
 
   const handleDetailAction = (action: string, sol: LogSolicitacao) => {
     setDetail(null)
+    if (action === 'confirmarAgendamento') handleConfirmarAgendamento([sol.id])
     if (action === 'confirmarEntrega') handleConfirmarEntrega([sol.id])
+    if (action === 'concluir') handleConcluir([sol.id])
   }
 
   const handleExport = () => {
@@ -365,7 +395,9 @@ export default function TransportesPipeline() {
   }
 
   const BULK_ACTIONS: Partial<Record<StatusTransportePipeline, { label: string; icon: typeof CheckCircle2; className: string }>> = {
-    em_transito: { label: 'Confirmar Entrega', icon: Package2, className: 'bg-blue-600 hover:bg-blue-700 text-white' },
+    nfe_emitida: { label: 'Confirmar Agendamento', icon: CalendarCheck, className: 'bg-blue-600 hover:bg-blue-700 text-white' },
+    em_transito: { label: 'Confirmar Entrega',     icon: Package2,      className: 'bg-teal-600 hover:bg-teal-700 text-white' },
+    entregue:    { label: 'Concluir',               icon: CheckCircle2,  className: 'bg-green-600 hover:bg-green-700 text-white' },
   }
   const bulk = BULK_ACTIONS[activeTab]
   const selectedInTab = activeItems.filter(s => selectedIds.has(s.id))
@@ -387,7 +419,7 @@ export default function TransportesPipeline() {
             <Truck size={20} className="text-orange-600" /> Transportes
           </h1>
           <p className={`text-xs mt-0.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
-            {solicitacoes.filter(s => ['em_transito','entregue','confirmado','concluido'].includes(s.status)).length} no pipeline de transporte
+            {solicitacoes.filter(s => ['nfe_emitida','aguardando_coleta','em_transito','entregue','concluido'].includes(s.status)).length} no pipeline de transporte
           </p>
         </div>
       </div>

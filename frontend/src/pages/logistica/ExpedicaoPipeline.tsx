@@ -3,7 +3,7 @@ import {
   Package2, Search, X, CheckCircle2, AlertTriangle,
   Calendar, ArrowUp, ArrowDown, LayoutList, LayoutGrid, Download,
   MapPin, FileText, Building2, Briefcase, Truck, ScrollText,
-  ClipboardList, Eye,
+  ClipboardList,
 } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
 import {

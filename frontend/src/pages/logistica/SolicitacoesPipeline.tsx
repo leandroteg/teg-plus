@@ -3,12 +3,13 @@ import {
   ClipboardList, Search, X, CheckCircle2, Clock, AlertTriangle,
   Calendar, ArrowUp, ArrowDown, LayoutList, LayoutGrid, Download,
   MapPin, Package2, Truck, FileText, Building2, Tag, Briefcase,
-  ShieldCheck, Eye,
+  ShieldCheck,
 } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
 import {
   useSolicitacoes, useAtualizarStatusSolicitacao,
   useAprovarSolicitacao, usePlanejaarSolicitacao,
+  useEnviarParaAprovacao,
 } from '../../hooks/useLogistica'
 import type { LogSolicitacao, StatusSolicitacaoPipeline } from '../../types/logistica'
 import { SOLICITACAO_PIPELINE_STAGES } from '../../types/logistica'
@@ -48,21 +49,18 @@ const TIPO_LABEL: Record<string, string> = {
 
 const STATUS_ICONS: Record<string, typeof ClipboardList> = {
   solicitado:           ClipboardList,
-  validando:            Eye,
   planejado:            Calendar,
   aguardando_aprovacao: ShieldCheck,
 }
 
 const STATUS_ACCENT: Record<string, { bg: string; bgActive: string; text: string; textActive: string; dot: string; border: string }> = {
   solicitado:           { bg: 'hover:bg-slate-50',   bgActive: 'bg-slate-100',   text: 'text-slate-600',  textActive: 'text-slate-800',  dot: 'bg-slate-400',  border: 'border-slate-400' },
-  validando:            { bg: 'hover:bg-blue-50',    bgActive: 'bg-blue-50',     text: 'text-blue-600',   textActive: 'text-blue-800',   dot: 'bg-blue-500',   border: 'border-blue-500' },
   planejado:            { bg: 'hover:bg-violet-50',  bgActive: 'bg-violet-50',   text: 'text-violet-600', textActive: 'text-violet-800', dot: 'bg-violet-500', border: 'border-violet-500' },
   aguardando_aprovacao: { bg: 'hover:bg-amber-50',   bgActive: 'bg-amber-50',    text: 'text-amber-600',  textActive: 'text-amber-800',  dot: 'bg-amber-500',  border: 'border-amber-500' },
 }
 
 const STATUS_ACCENT_DARK: Record<string, { bg: string; bgActive: string; text: string; textActive: string }> = {
   solicitado:           { bg: 'hover:bg-white/[0.03]', bgActive: 'bg-slate-500/10',  text: 'text-slate-400',  textActive: 'text-slate-200' },
-  validando:            { bg: 'hover:bg-white/[0.03]', bgActive: 'bg-blue-500/10',   text: 'text-blue-400',   textActive: 'text-blue-300' },
   planejado:            { bg: 'hover:bg-white/[0.03]', bgActive: 'bg-violet-500/10', text: 'text-violet-400', textActive: 'text-violet-300' },
   aguardando_aprovacao: { bg: 'hover:bg-white/[0.03]', bgActive: 'bg-amber-500/10',  text: 'text-amber-400',  textActive: 'text-amber-300' },
 }
@@ -154,13 +152,13 @@ function DetailModal({ sol, onClose, onAction, isDark }: {
               Fechar
             </button>
             {sol.status === 'solicitado' && (
-              <button onClick={() => onAction('validar', sol)} className="flex-1 py-3 rounded-xl bg-blue-600 text-white text-sm font-bold hover:bg-blue-700 transition-all flex items-center justify-center gap-2">
-                <Eye size={15} /> Validar
-              </button>
-            )}
-            {sol.status === 'validando' && (
               <button onClick={() => onAction('planejar', sol)} className="flex-1 py-3 rounded-xl bg-violet-600 text-white text-sm font-bold hover:bg-violet-700 transition-all flex items-center justify-center gap-2">
                 <Calendar size={15} /> Planejar
+              </button>
+            )}
+            {sol.status === 'planejado' && (
+              <button onClick={() => onAction('enviarAprovacao', sol)} className="flex-1 py-3 rounded-xl bg-amber-600 text-white text-sm font-bold hover:bg-amber-700 transition-all flex items-center justify-center gap-2">
+                <ShieldCheck size={15} /> Enviar p/ Aprovação
               </button>
             )}
             {sol.status === 'aguardando_aprovacao' && (
@@ -298,6 +296,7 @@ export default function SolicitacoesPipeline() {
   const { data: solicitacoes = [], isLoading } = useSolicitacoes()
   const atualizarStatus = useAtualizarStatusSolicitacao()
   const aprovar = useAprovarSolicitacao()
+  const enviarParaAprovacao = useEnviarParaAprovacao()
 
   // Group by status
   const grouped = useMemo(() => {
@@ -354,12 +353,20 @@ export default function SolicitacoesPipeline() {
   const switchTab = (status: StatusSolicitacaoPipeline) => { setActiveTab(status); setSelectedIds(new Set()); setBusca('') }
 
   // Actions
-  const handleValidar = async (ids: string[]) => {
+  const handlePlanejar = async (ids: string[]) => {
     try {
-      for (const id of ids) await atualizarStatus.mutateAsync({ id, status: 'validando' })
-      showToast('success', `${ids.length} solicitação(ões) em validação`)
+      for (const id of ids) await atualizarStatus.mutateAsync({ id, status: 'planejado' })
+      showToast('success', `${ids.length} solicitação(ões) planejada(s)`)
       setSelectedIds(new Set())
-    } catch { showToast('error', 'Erro ao validar') }
+    } catch { showToast('error', 'Erro ao planejar') }
+  }
+
+  const handleEnviarAprovacao = async (ids: string[]) => {
+    try {
+      for (const id of ids) await enviarParaAprovacao.mutateAsync({ id })
+      showToast('success', `${ids.length} enviada(s) para aprovação`)
+      setSelectedIds(new Set())
+    } catch { showToast('error', 'Erro ao enviar para aprovação') }
   }
 
   const handleAprovar = async (ids: string[]) => {
@@ -374,7 +381,8 @@ export default function SolicitacoesPipeline() {
     const ids = Array.from(selectedIds)
     if (ids.length === 0) return
     switch (activeTab) {
-      case 'solicitado': handleValidar(ids); break
+      case 'solicitado': handlePlanejar(ids); break
+      case 'planejado': handleEnviarAprovacao(ids); break
       case 'aguardando_aprovacao': handleAprovar(ids); break
     }
   }
@@ -382,7 +390,8 @@ export default function SolicitacoesPipeline() {
   const handleDetailAction = (action: string, sol: LogSolicitacao) => {
     setDetail(null)
     switch (action) {
-      case 'validar': handleValidar([sol.id]); break
+      case 'planejar': handlePlanejar([sol.id]); break
+      case 'enviarAprovacao': handleEnviarAprovacao([sol.id]); break
       case 'aprovar': handleAprovar([sol.id]); break
     }
   }
@@ -395,8 +404,9 @@ export default function SolicitacoesPipeline() {
   }
 
   const BULK_ACTIONS: Partial<Record<StatusSolicitacaoPipeline, { label: string; icon: typeof CheckCircle2; className: string }>> = {
-    solicitado:           { label: 'Validar',  icon: Eye,          className: 'bg-blue-600 hover:bg-blue-700 text-white' },
-    aguardando_aprovacao: { label: 'Aprovar',  icon: CheckCircle2, className: 'bg-emerald-600 hover:bg-emerald-700 text-white' },
+    solicitado:           { label: 'Planejar',              icon: Calendar,     className: 'bg-violet-600 hover:bg-violet-700 text-white' },
+    planejado:            { label: 'Enviar p/ Aprovação',   icon: ShieldCheck,  className: 'bg-amber-600 hover:bg-amber-700 text-white' },
+    aguardando_aprovacao: { label: 'Aprovar',               icon: CheckCircle2, className: 'bg-emerald-600 hover:bg-emerald-700 text-white' },
   }
   const bulk = BULK_ACTIONS[activeTab]
   const selectedInTab = activeItems.filter(s => selectedIds.has(s.id))
@@ -418,7 +428,7 @@ export default function SolicitacoesPipeline() {
             <ClipboardList size={20} className="text-orange-600" /> Solicitações
           </h1>
           <p className={`text-xs mt-0.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
-            {solicitacoes.filter(s => ['solicitado','validando','planejado','aguardando_aprovacao'].includes(s.status)).length} solicitações no pipeline
+            {solicitacoes.filter(s => ['solicitado','planejado','aguardando_aprovacao'].includes(s.status)).length} solicitações no pipeline
           </p>
         </div>
       </div>
