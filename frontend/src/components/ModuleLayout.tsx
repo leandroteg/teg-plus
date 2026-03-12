@@ -320,9 +320,9 @@ export default function ModuleLayout({
     return visibleNav.map(({ to, icon: Icon, label, end, adminOnly, action, accent }) => {
       if (action) {
         return (
-          <button key={to} onClick={action} className={sidebarLinkClass({ isActive: false })}>
-            <Icon size={16} className={accent ? 'shrink-0 text-orange-500' : 'shrink-0'} />
-            <span>{label}</span>
+          <button key={to} onClick={action} className={`w-full text-left ${sidebarLinkClass({ isActive: false })}`}>
+            <Icon size={18} className={accent ? 'shrink-0 text-orange-500' : 'shrink-0'} />
+            <span className={accent ? 'text-orange-500 font-semibold' : undefined}>{label}</span>
           </button>
         )
       }
