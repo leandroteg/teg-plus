@@ -1,18 +1,24 @@
 import {
   LayoutDashboard, ClipboardList, Package2,
-  Truck, Building2,
+  Truck, Building2, Plus,
 } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
 import ModuleLayout from './ModuleLayout'
-
-const NAV = [
-  { to: '/logistica',                 icon: LayoutDashboard, label: 'Painel',          end: true  },
-  { to: '/logistica/solicitacoes',    icon: ClipboardList,   label: 'Solicitações',    end: false },
-  { to: '/logistica/expedicao',       icon: Package2,        label: 'Expedição',       end: false },
-  { to: '/logistica/transportes',     icon: Truck,           label: 'Transportes',     end: false },
-  { to: '/logistica/transportadoras', icon: Building2,       label: 'Transportadoras', end: false },
-]
+import type { NavItem } from './ModuleLayout'
 
 export default function LogisticaLayout() {
+  const navigate = useNavigate()
+
+  const NAV: NavItem[] = [
+    { to: '/logistica',                 icon: LayoutDashboard, label: 'Painel',             end: true  },
+    { to: '/logistica/solicitacoes',    icon: ClipboardList,   label: 'Solicitações',       end: false },
+    { to: '/logistica/nova-solicitacao', icon: Plus,           label: 'Nova Solicitação',   end: false,
+      action: () => navigate('/logistica/solicitacoes?nova=1'), accent: true },
+    { to: '/logistica/expedicao',       icon: Package2,        label: 'Expedição',          end: false },
+    { to: '/logistica/transportes',     icon: Truck,           label: 'Transportes',        end: false },
+    { to: '/logistica/transportadoras', icon: Building2,       label: 'Transportadoras',    end: false },
+  ]
+
   return (
     <ModuleLayout
       moduleKey="logistica"

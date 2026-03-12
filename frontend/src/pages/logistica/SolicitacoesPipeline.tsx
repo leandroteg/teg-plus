@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback } from 'react'
+import { useState, useMemo, useCallback, useEffect } from 'react'
 import {
   ClipboardList, Search, X, CheckCircle2, Clock, AlertTriangle,
   Calendar, ArrowUp, ArrowDown, LayoutList, LayoutGrid, Download,
@@ -535,6 +535,15 @@ export default function SolicitacoesPipeline() {
   const [sortDir, setSortDir] = useState<SortDir>('desc')
   const [viewMode, setViewMode] = useState<ViewMode>('cards')
   const [showNovaSolicitacao, setShowNovaSolicitacao] = useState(false)
+
+  // Abrir modal via ?nova=1 (clique no sidebar)
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    if (params.get('nova') === '1') {
+      setShowNovaSolicitacao(true)
+      window.history.replaceState({}, '', window.location.pathname)
+    }
+  }, [])
 
   const { data: solicitacoes = [], isLoading } = useSolicitacoes()
   const atualizarStatus = useAtualizarStatusSolicitacao()
