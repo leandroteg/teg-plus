@@ -259,7 +259,7 @@ function CertisignModal({ open, onClose, solicitacao, minutaUrl, onSuccess }: {
   onClose: () => void
   solicitacao: Solicitacao
   minutaUrl: string | null
-  onSuccess: () => void
+  onSuccess: () => void | Promise<void>
 }) {
   const [signatarios, setSignatarios] = useState<{ nome: string; email: string; cpf: string; papel: string }[]>([
     { nome: '', email: '', cpf: '', papel: 'Contratante' },
@@ -292,7 +292,8 @@ function CertisignModal({ open, onClose, solicitacao, minutaUrl, onSuccess }: {
         tipo_assinatura: tipoAssinatura,
         signatarios: signatarios.map(s => ({ nome: s.nome, email: s.email, cpf: s.cpf, papel: s.papel })),
       })
-      onSuccess()
+      // Avançar etapa ANTES de fechar o modal — await garante que erros sejam capturados
+      await onSuccess()
       onClose()
     } catch (e: unknown) {
       setErro(e instanceof Error ? e.message : 'Erro desconhecido ao enviar.')
