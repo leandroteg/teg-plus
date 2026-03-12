@@ -117,6 +117,7 @@ import LotesPagamento from './pages/financeiro/LotesPagamento'
 import LoteDetalhe from './pages/financeiro/LoteDetalhe'
 import PainelPagamentos from './pages/financeiro/PainelPagamentos'
 import Relatorios from './pages/financeiro/Relatorios'
+import Tesouraria from './pages/financeiro/Tesouraria'
 import Configuracoes from './pages/financeiro/Configuracoes'
 
 // Módulo Fiscal
@@ -192,6 +193,7 @@ export default function App() {
               <Route path="/financeiro/lotes/:loteId"      element={<LoteDetalhe />} />
               <Route path="/financeiro/painel-pagamentos"  element={<Navigate to="/financeiro/contas-a-pagar" replace />} />
               <Route path="/financeiro/conciliacao"  element={<Navigate to="/financeiro/contas-a-pagar" replace />} />
+              <Route path="/financeiro/tesouraria"    element={<Tesouraria />} />
               <Route path="/financeiro/relatorios"   element={<Relatorios />} />
               <Route path="/financeiro/configuracoes" element={<Navigate to="/admin/integracoes" replace />} />
             </Route>

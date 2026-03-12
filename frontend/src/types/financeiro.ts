@@ -194,3 +194,68 @@ export interface LoteItem {
   created_at: string
   cp?: ContaPagar
 }
+
+// ── Tesouraria ────────────────────────────────────────────
+export interface ContaBancaria {
+  id: string
+  nome: string
+  banco_codigo?: string
+  banco_nome?: string
+  agencia?: string
+  conta?: string
+  tipo: 'corrente' | 'poupanca' | 'investimento'
+  saldo_atual: number
+  saldo_atualizado_em?: string
+  cor: string
+  ativo: boolean
+}
+
+export interface MovimentacaoTesouraria {
+  id: string
+  conta_id: string
+  tipo: 'entrada' | 'saida' | 'transferencia'
+  valor: number
+  data_movimentacao: string
+  data_competencia?: string
+  descricao?: string
+  categoria: string
+  cp_id?: string
+  cr_id?: string
+  conciliado: boolean
+  conciliado_em?: string
+  origem: 'manual' | 'import_ofx' | 'import_csv' | 'auto_cp' | 'auto_cr'
+  conta_nome?: string
+  conta_cor?: string
+  criado_em?: string
+}
+
+export interface ExtratoImport {
+  id: string
+  conta_id: string
+  arquivo_url?: string
+  nome_arquivo?: string
+  formato: 'ofx' | 'csv'
+  periodo_inicio?: string
+  periodo_fim?: string
+  total_registros: number
+  importados: number
+  duplicados: number
+  status: 'processando' | 'concluido' | 'erro'
+}
+
+export interface TesourariaDashboardData {
+  saldo_total: number
+  entradas_periodo: number
+  saidas_periodo: number
+  contas: ContaBancaria[]
+  movimentacoes_recentes: MovimentacaoTesouraria[]
+  fluxo_diario: Array<{ data: string; entradas: number; saidas: number }>
+  previsao_cp: number
+  previsao_cr: number
+  aging_cp: { hoje: number; d7: number; d30: number; d60: number }
+  aging_cr: { hoje: number; d7: number; d30: number; d60: number }
+}
+
+export type CategoriaMovimentacao =
+  | 'pagamento_fornecedor' | 'recebimento_cliente' | 'transferencia'
+  | 'taxa_bancaria' | 'rendimento' | 'imposto' | 'folha' | 'outros'
