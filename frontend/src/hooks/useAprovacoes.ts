@@ -2,8 +2,6 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import type { AprovacaoPendente, AprovacaoHistorico, TipoAprovacao } from '../types'
 import { supabase } from '../services/supabase'
 import { api } from '../services/api'
-import { syncCPsParaAprovacao } from './useFinanceiro'
-
 // Tabelas: apr_aprovacoes (modulo Aprovacoes -- AprovAi)
 // NOTE: apr_aprovacoes.entidade_id NAO tem FK para cmp_requisicoes (design generico).
 // Por isso NAO usamos PostgREST join -- fazemos duas queries separadas.
@@ -16,8 +14,8 @@ export function useAprovacoesPendentes(tipo?: TipoAprovacao) {
   return useQuery<AprovacaoPendente[]>({
     queryKey: ['aprovacoes-pendentes', tipo],
     queryFn: async () => {
-      // 0. Sync: garante que CPs aguardando_aprovacao tenham apr_aprovacoes
-      try { await syncCPsParaAprovacao() } catch { /* non-critical */ }
+      // Aprovações de pagamento são criadas APENAS via Lotes (useEnviarLoteAprovacao)
+      // Não há mais sync automático de CPs individuais.
 
       // 1. Busca aprovacoes pendentes — filtra por tipo se fornecido
       let query = supabase
