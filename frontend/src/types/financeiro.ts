@@ -17,8 +17,19 @@ export const CP_PIPELINE_STAGES: { status: StatusCP; label: string; color: strin
 ]
 
 export type StatusCR =
-  | 'previsto' | 'faturado' | 'parcial'
-  | 'recebido' | 'conciliado' | 'vencido' | 'cancelado'
+  | 'previsto' | 'autorizado' | 'faturamento' | 'nf_emitida'
+  | 'aguardando' | 'recebido' | 'conciliado' | 'cancelado'
+
+// Pipeline stages in order (for CR Kanban columns)
+export const CR_PIPELINE_STAGES: { status: StatusCR; label: string; color: string; borderColor: string }[] = [
+  { status: 'previsto',     label: 'Previstos',     color: 'slate',   borderColor: 'border-t-slate-400' },
+  { status: 'autorizado',   label: 'Autorizados',   color: 'blue',    borderColor: 'border-t-blue-500' },
+  { status: 'faturamento',  label: 'Faturamento',   color: 'violet',  borderColor: 'border-t-violet-500' },
+  { status: 'nf_emitida',   label: 'NF Emitida',    color: 'amber',   borderColor: 'border-t-amber-500' },
+  { status: 'aguardando',   label: 'Aguardando',    color: 'orange',  borderColor: 'border-t-orange-500' },
+  { status: 'recebido',     label: 'Recebidos',     color: 'teal',    borderColor: 'border-t-teal-500' },
+  { status: 'conciliado',   label: 'Conciliados',   color: 'green',   borderColor: 'border-t-green-500' },
+]
 
 export type TipoDocumento =
   | 'ordem_compra' | 'contrato' | 'boleto' | 'fatura'
@@ -94,6 +105,8 @@ export interface ContaReceber {
   cliente_nome: string
   cliente_cnpj?: string
   numero_nf?: string
+  serie_nf?: string
+  chave_nfe?: string
   valor_original: number
   valor_recebido: number
   data_emissao: string
@@ -104,7 +117,14 @@ export interface ContaReceber {
   projeto_id?: string
   natureza?: string
   status: StatusCR
+  autorizado_por?: string
+  autorizado_em?: string
+  danfe_url?: string
+  xml_url?: string
+  email_compartilhado_em?: string
+  email_compartilhado_para?: string
   descricao?: string
+  observacoes?: string
   created_at: string
 }
 

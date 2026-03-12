@@ -287,6 +287,149 @@ export function useConciliarCRBatch() {
   })
 }
 
+// ── Autorizar CR: previsto → autorizado ──────────────────────────────────
+export function useAutorizarCR() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ crId, autorizadorNome }: { crId: string; autorizadorNome?: string }) => {
+      const { error } = await supabase
+        .from('fin_contas_receber')
+        .update({
+          status: 'autorizado',
+          autorizado_por: autorizadorNome ?? 'Financeiro',
+          autorizado_em: new Date().toISOString(),
+        })
+        .eq('id', crId)
+      if (error) throw error
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['contas-receber'] })
+      qc.invalidateQueries({ queryKey: ['financeiro-dashboard'] })
+    },
+  })
+}
+
+// ── Faturar CR: autorizado → nf_emitida (com upload DANFE/XML) ──────────
+export function useFaturarCR() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async ({
+      crId, numero_nf, serie_nf, chave_nfe, data_emissao,
+      danfeFile, xmlFile,
+    }: {
+      crId: string
+      numero_nf: string
+      serie_nf?: string
+      chave_nfe?: string
+      data_emissao?: string
+      danfeFile?: File
+      xmlFile?: File
+    }) => {
+      let danfe_url: string | undefined
+      let xml_url: string | undefined
+
+      if (danfeFile) {
+        const ext = danfeFile.name.split('.').pop() || 'pdf'
+        const path = `cr/${crId}/danfe-${Date.now()}.${ext}`
+        const { error: upErr } = await supabase.storage
+          .from('notas-fiscais').upload(path, danfeFile, { upsert: false, contentType: danfeFile.type })
+        if (upErr) throw new Error('Falha no upload DANFE: ' + upErr.message)
+        const { data: { publicUrl } } = supabase.storage.from('notas-fiscais').getPublicUrl(path)
+        danfe_url = publicUrl
+      }
+
+      if (xmlFile) {
+        const path = `cr/${crId}/xml-${Date.now()}.xml`
+        const { error: upErr } = await supabase.storage
+          .from('notas-fiscais').upload(path, xmlFile, { upsert: false, contentType: 'text/xml' })
+        if (upErr) throw new Error('Falha no upload XML: ' + upErr.message)
+        const { data: { publicUrl } } = supabase.storage.from('notas-fiscais').getPublicUrl(path)
+        xml_url = publicUrl
+      }
+
+      const updates: Record<string, unknown> = {
+        status: 'nf_emitida',
+        numero_nf,
+        data_emissao: data_emissao ?? new Date().toISOString().split('T')[0],
+      }
+      if (serie_nf) updates.serie_nf = serie_nf
+      if (chave_nfe) updates.chave_nfe = chave_nfe
+      if (danfe_url) updates.danfe_url = danfe_url
+      if (xml_url) updates.xml_url = xml_url
+
+      const { error } = await supabase
+        .from('fin_contas_receber').update(updates).eq('id', crId)
+      if (error) throw error
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['contas-receber'] })
+      qc.invalidateQueries({ queryKey: ['financeiro-dashboard'] })
+    },
+  })
+}
+
+// ── Avançar status CR (transições simples) ──────────────────────────────
+export function useAvancarStatusCR() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ crId, novoStatus }: { crId: string; novoStatus: string }) => {
+      const { error } = await supabase
+        .from('fin_contas_receber')
+        .update({ status: novoStatus, updated_at: new Date().toISOString() })
+        .eq('id', crId)
+      if (error) throw error
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['contas-receber'] })
+      qc.invalidateQueries({ queryKey: ['financeiro-dashboard'] })
+    },
+  })
+}
+
+// ── Registrar Recebimento CR: aguardando → recebido ─────────────────────
+export function useRegistrarRecebimentoCR() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ crId, valorRecebido, dataRecebimento }: {
+      crId: string; valorRecebido: number; dataRecebimento?: string
+    }) => {
+      const { error } = await supabase
+        .from('fin_contas_receber')
+        .update({
+          status: 'recebido',
+          valor_recebido: valorRecebido,
+          data_recebimento: dataRecebimento ?? new Date().toISOString().split('T')[0],
+        })
+        .eq('id', crId)
+      if (error) throw error
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['contas-receber'] })
+      qc.invalidateQueries({ queryKey: ['financeiro-dashboard'] })
+    },
+  })
+}
+
+// ── Compartilhar NF por Email (marca envio, não muda status) ────────────
+export function useCompartilharNFEmail() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ crId, email }: { crId: string; email: string }) => {
+      const { error } = await supabase
+        .from('fin_contas_receber')
+        .update({
+          email_compartilhado_em: new Date().toISOString(),
+          email_compartilhado_para: email,
+        })
+        .eq('id', crId)
+      if (error) throw error
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['contas-receber'] })
+    },
+  })
+}
+
 // ── Valores distintos para autocomplete ───────────────────────────────────
 export function useDistinctCentroCusto() {
   return useQuery<string[]>({
