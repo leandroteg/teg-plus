@@ -310,7 +310,7 @@ function CPRow({ cp, onClick, isDark, isSelected, onSelect }: {
   return (
     <div
       onClick={onClick}
-      className={`flex items-center gap-3 px-4 py-2.5 border-b cursor-pointer transition-all group ${
+      className={`flex items-center gap-2 px-3 py-1.5 border-b cursor-pointer transition-all ${
         isDark
           ? `border-white/[0.04] hover:bg-white/[0.03] ${isSelected ? 'bg-emerald-500/10' : ''}`
           : `border-slate-100 hover:bg-slate-50 ${isSelected ? 'bg-emerald-50' : ''}`
@@ -321,56 +321,48 @@ function CPRow({ cp, onClick, isDark, isSelected, onSelect }: {
         checked={isSelected}
         onChange={(e) => { e.stopPropagation(); onSelect(cp.id) }}
         onClick={e => e.stopPropagation()}
-        className="w-3.5 h-3.5 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 shrink-0"
+        className="w-3 h-3 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 shrink-0"
       />
 
-      <div className={`w-1 h-7 rounded-full shrink-0 ${
+      <div className={`w-0.5 h-4 rounded-full shrink-0 ${
         urgency === 'overdue' ? 'bg-red-500' : urgency === 'today' ? 'bg-amber-500' : urgency === 'week' ? 'bg-yellow-400' : 'bg-transparent'
       }`} />
 
-      <div className="flex-1 min-w-0">
-        <p className={`text-sm font-bold truncate ${isDark ? 'text-white' : 'text-slate-800'}`}>
-          {cp.fornecedor_nome}
-        </p>
-        <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 mt-0.5">
-          {cp.descricao && (
-            <span className={`text-[11px] truncate max-w-[200px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{cp.descricao}</span>
-          )}
-          {obraNome && (
-            <span className="text-[10px] text-slate-400 flex items-center gap-0.5">
-              <Building2 size={9} /> {obraNome}
-            </span>
-          )}
-          {pedidoNum && (
-            <span className="text-[10px] font-semibold text-teal-600 flex items-center gap-0.5">
-              <FileText size={9} /> {pedidoNum}
-            </span>
-          )}
-          {cp.centro_custo && (
-            <span className="text-[10px] text-slate-400 flex items-center gap-0.5">
-              <Briefcase size={9} /> {cp.centro_custo}
-            </span>
-          )}
-        </div>
-      </div>
+      <span className={`text-xs font-semibold truncate w-[180px] shrink-0 ${isDark ? 'text-white' : 'text-slate-800'}`}>
+        {cp.fornecedor_nome}
+      </span>
 
-      <div className="text-right shrink-0 w-20">
-        <p className={`text-[11px] font-medium flex items-center justify-end gap-0.5 ${
-          urgency === 'overdue' ? 'text-red-500 font-bold' : urgency === 'today' ? 'text-amber-600 font-bold' : isDark ? 'text-slate-400' : 'text-slate-500'
-        }`}>
-          <Calendar size={10} />
-          {fmtData(cp.data_vencimento)}
-        </p>
-        {urgency === 'overdue' && (
-          <span className="text-[9px] font-bold text-red-500">VENCIDO</span>
-        )}
-      </div>
+      <span className={`text-[11px] truncate w-[150px] shrink-0 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+        {cp.descricao || '—'}
+      </span>
 
-      <p className={`text-sm font-extrabold text-right shrink-0 w-28 ${
+      <span className={`text-[11px] truncate w-[100px] shrink-0 flex items-center gap-0.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+        {obraNome ? <><Building2 size={9} className="shrink-0" /> {obraNome}</> : '—'}
+      </span>
+
+      <span className={`text-[11px] truncate w-[70px] shrink-0 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+        {cp.centro_custo || '—'}
+      </span>
+
+      {pedidoNum ? (
+        <span className="text-[10px] font-semibold text-teal-600 truncate w-[90px] shrink-0 flex items-center gap-0.5">
+          <FileText size={9} className="shrink-0" /> {pedidoNum}
+        </span>
+      ) : (
+        <span className="w-[90px] shrink-0" />
+      )}
+
+      <span className={`text-[11px] text-right w-[62px] shrink-0 ${
+        urgency === 'overdue' ? 'text-red-500 font-bold' : urgency === 'today' ? 'text-amber-600 font-semibold' : isDark ? 'text-slate-500' : 'text-slate-400'
+      }`}>
+        {fmtData(cp.data_vencimento)}
+      </span>
+
+      <span className={`text-xs font-bold text-right w-[90px] shrink-0 ${
         urgency === 'overdue' ? 'text-red-600' : 'text-emerald-600'
       }`}>
         {fmt(cp.valor_original)}
-      </p>
+      </span>
     </div>
   )
 }
@@ -386,72 +378,74 @@ function CPCard({ cp, onClick, isDark, isSelected, onSelect }: {
 }) {
   const urgency = getUrgency(cp)
   const obraNome = cp.requisicao?.obra_nome
+  const pedidoNum = cp.pedido?.numero_pedido
 
   return (
     <div
       onClick={onClick}
-      className={`rounded-xl border p-4 cursor-pointer transition-all group ${
+      className={`rounded-2xl border p-4 cursor-pointer transition-all group ${
         isDark
-          ? `border-white/[0.06] hover:border-white/[0.12] ${isSelected ? 'bg-emerald-500/10 border-emerald-500/30' : 'bg-white/[0.02]'}`
-          : `border-slate-200 hover:border-slate-300 hover:shadow-sm ${isSelected ? 'bg-emerald-50 border-emerald-300' : 'bg-white'}`
+          ? `border-white/[0.06] hover:border-emerald-500/30 hover:shadow-lg hover:shadow-emerald-500/5 ${isSelected ? 'bg-emerald-500/10 border-emerald-500/30' : 'bg-white/[0.02]'}`
+          : `border-slate-200 hover:border-teal-300 hover:shadow-md ${isSelected ? 'bg-emerald-50 border-emerald-300' : 'bg-white'}`
       }`}
     >
-      <div className="flex items-start gap-3">
+      {/* Linha 1: checkbox + fornecedor + urgency + valor */}
+      <div className="flex items-center gap-3">
         <input
           type="checkbox"
           checked={isSelected}
           onChange={(e) => { e.stopPropagation(); onSelect(cp.id) }}
           onClick={e => e.stopPropagation()}
-          className="w-3.5 h-3.5 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 shrink-0 mt-0.5"
+          className="w-3.5 h-3.5 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 shrink-0"
         />
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center justify-between gap-2">
-            <p className={`text-sm font-bold truncate ${isDark ? 'text-white' : 'text-slate-800'}`}>
-              {cp.fornecedor_nome}
-            </p>
-            {urgency !== 'normal' && (
-              <div className={`w-2 h-2 rounded-full shrink-0 ${
-                urgency === 'overdue' ? 'bg-red-500' : urgency === 'today' ? 'bg-amber-500' : 'bg-yellow-400'
-              }`} />
-            )}
-          </div>
+        <div className={`w-1 h-6 rounded-full shrink-0 ${
+          urgency === 'overdue' ? 'bg-red-500' : urgency === 'today' ? 'bg-amber-500' : urgency === 'week' ? 'bg-yellow-400' : 'bg-transparent'
+        }`} />
+        <p className={`text-sm font-bold truncate flex-1 min-w-0 ${isDark ? 'text-white' : 'text-slate-800'}`}>
+          {cp.fornecedor_nome}
+        </p>
+        {urgency === 'overdue' && (
+          <span className="text-[10px] font-bold text-red-500 bg-red-50 dark:bg-red-500/10 px-2 py-0.5 rounded-full shrink-0">VENCIDO</span>
+        )}
+        <p className={`text-sm font-extrabold shrink-0 ${urgency === 'overdue' ? 'text-red-600' : 'text-emerald-600'}`}>
+          {fmt(cp.valor_original)}
+        </p>
+      </div>
 
-          {cp.descricao && (
-            <p className={`text-[11px] truncate mt-0.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{cp.descricao}</p>
+      {/* Linha 2: descrição */}
+      {cp.descricao && (
+        <p className={`text-xs truncate mt-1.5 ml-10 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{cp.descricao}</p>
+      )}
+
+      {/* Linha 3: tags + data */}
+      <div className="flex items-center justify-between mt-2 ml-10">
+        <div className="flex flex-wrap items-center gap-1.5 min-w-0">
+          {obraNome && (
+            <span className={`text-[10px] px-1.5 py-0.5 rounded-md flex items-center gap-0.5 shrink-0 ${isDark ? 'bg-white/[0.04] text-slate-400' : 'bg-slate-100 text-slate-500'}`}>
+              <Building2 size={9} /> {obraNome}
+            </span>
           )}
-
-          <div className="flex items-center justify-between mt-2.5">
-            <p className={`text-lg font-extrabold ${urgency === 'overdue' ? 'text-red-600' : 'text-emerald-600'}`}>
-              {fmt(cp.valor_original)}
-            </p>
-            <div className="text-right">
-              <p className={`text-[11px] flex items-center gap-0.5 ${
-                urgency === 'overdue' ? 'text-red-500 font-bold' : isDark ? 'text-slate-400' : 'text-slate-500'
-              }`}>
-                <Calendar size={10} /> {fmtData(cp.data_vencimento)}
-              </p>
-              {urgency === 'overdue' && <span className="text-[9px] font-bold text-red-500">VENCIDO</span>}
-            </div>
-          </div>
-
-          <div className="flex flex-wrap items-center gap-1.5 mt-2 pt-2 border-t border-slate-100 dark:border-white/[0.04]">
-            {obraNome && (
-              <span className={`text-[10px] px-1.5 py-0.5 rounded-md flex items-center gap-0.5 ${isDark ? 'bg-white/[0.04] text-slate-400' : 'bg-slate-100 text-slate-500'}`}>
-                <Building2 size={9} /> {obraNome}
-              </span>
-            )}
-            {cp.centro_custo && (
-              <span className={`text-[10px] px-1.5 py-0.5 rounded-md flex items-center gap-0.5 ${isDark ? 'bg-white/[0.04] text-slate-400' : 'bg-slate-100 text-slate-500'}`}>
-                <Briefcase size={9} /> {cp.centro_custo}
-              </span>
-            )}
-            {cp.pedido?.numero_pedido && (
-              <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-teal-50 text-teal-700 flex items-center gap-0.5 font-semibold">
-                <FileText size={9} /> {cp.pedido.numero_pedido}
-              </span>
-            )}
-          </div>
+          {cp.centro_custo && (
+            <span className={`text-[10px] px-1.5 py-0.5 rounded-md flex items-center gap-0.5 shrink-0 ${isDark ? 'bg-white/[0.04] text-slate-400' : 'bg-slate-100 text-slate-500'}`}>
+              <Briefcase size={9} /> {cp.centro_custo}
+            </span>
+          )}
+          {pedidoNum && (
+            <span className={`text-[10px] px-1.5 py-0.5 rounded-md flex items-center gap-0.5 font-semibold shrink-0 ${isDark ? 'bg-teal-500/10 text-teal-400' : 'bg-teal-50 text-teal-700'}`}>
+              <FileText size={9} /> {pedidoNum}
+            </span>
+          )}
+          {cp.numero_documento && (
+            <span className={`text-[10px] px-1.5 py-0.5 rounded-md flex items-center gap-0.5 shrink-0 ${isDark ? 'bg-white/[0.04] text-slate-500' : 'bg-slate-50 text-slate-400'}`}>
+              <Hash size={9} /> {cp.numero_documento}
+            </span>
+          )}
         </div>
+        <span className={`text-[11px] flex items-center gap-1 shrink-0 ml-3 ${
+          urgency === 'overdue' ? 'text-red-500 font-bold' : urgency === 'today' ? 'text-amber-600 font-semibold' : isDark ? 'text-slate-500' : 'text-slate-400'
+        }`}>
+          <Calendar size={10} /> {fmtData(cp.data_vencimento)}
+        </span>
       </div>
     </div>
   )
@@ -876,18 +870,34 @@ export default function CPPipeline() {
               </p>
             </div>
           ) : viewMode === 'list' ? (
-            activeCPs.map(cp => (
-              <CPRow
-                key={cp.id}
-                cp={cp}
-                onClick={() => setDetailCP(cp)}
-                isDark={isDark}
-                isSelected={selectedIds.has(cp.id)}
-                onSelect={toggleSelect}
-              />
-            ))
+            <>
+              {/* Table header */}
+              <div className={`flex items-center gap-2 px-3 py-1 border-b text-[10px] font-semibold uppercase tracking-wider ${
+                isDark ? 'border-white/[0.06] text-slate-600' : 'border-slate-100 text-slate-400'
+              }`}>
+                <span className="w-3 shrink-0" />
+                <span className="w-0.5 shrink-0" />
+                <span className="w-[180px] shrink-0">Fornecedor</span>
+                <span className="w-[150px] shrink-0">Descrição</span>
+                <span className="w-[100px] shrink-0">Obra</span>
+                <span className="w-[70px] shrink-0">CC</span>
+                <span className="w-[90px] shrink-0">Pedido</span>
+                <span className="w-[62px] shrink-0 text-right">Venc.</span>
+                <span className="w-[90px] shrink-0 text-right">Valor</span>
+              </div>
+              {activeCPs.map(cp => (
+                <CPRow
+                  key={cp.id}
+                  cp={cp}
+                  onClick={() => setDetailCP(cp)}
+                  isDark={isDark}
+                  isSelected={selectedIds.has(cp.id)}
+                  onSelect={toggleSelect}
+                />
+              ))}
+            </>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 p-4">
+            <div className="space-y-2 p-4">
               {activeCPs.map(cp => (
                 <CPCard
                   key={cp.id}
