@@ -50,7 +50,7 @@ export const FINANCEIRO_CONFIG: ModuleMeta = {
   navItems: [
     { to: '/financeiro',              icon: LayoutDashboard, label: 'Painel',          end: true  },
     { to: '/financeiro/cp',           icon: Receipt,         label: 'Contas a Pagar',  end: false },
-    { to: '/financeiro/cr',           icon: DollarSign,      label: 'A Receber',       end: false },
+    { to: '/financeiro/cr',           icon: DollarSign,      label: 'Contas a Receber', end: false },
     { to: '/financeiro/aprovacoes',   icon: FileCheck2,      label: 'Aprovações',      end: false },
     { to: '/financeiro/conciliacao',  icon: Landmark,        label: 'Conciliação',     end: false },
     { to: '/financeiro/relatorios',   icon: BarChart3,       label: 'Relatórios',      end: false },

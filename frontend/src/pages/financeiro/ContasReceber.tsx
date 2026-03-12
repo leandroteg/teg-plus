@@ -1,9 +1,11 @@
-import { useState, useRef } from 'react'
+import { useState, useMemo, useRef } from 'react'
 import {
-  DollarSign, Search, Calendar, AlertTriangle, TrendingUp,
-  RefreshCw, Zap, XCircle, CheckCircle2, Clock,
-  ChevronDown, ChevronUp, Upload, FileText, ExternalLink,
-  ShieldCheck, Receipt, Mail, ArrowRight, X,
+  TrendingUp, Search, Calendar, AlertTriangle, CheckCircle2, Clock,
+  FileText, ChevronDown, ChevronUp, X, ShieldCheck,
+  Building2, Tag, Briefcase, Hash, Layers,
+  ExternalLink, Download, ArrowUpDown, LayoutList,
+  LayoutGrid, ArrowDown, ArrowUp, Receipt, Mail,
+  ArrowRight, Upload, RefreshCw, XCircle, Zap,
 } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
 import {
@@ -12,7 +14,111 @@ import {
   useCompartilharNFEmail, useConciliarCRBatch,
 } from '../../hooks/useFinanceiro'
 import { useLastSync, useTriggerSync, useOmieConfig } from '../../hooks/useOmie'
-import type { ContaReceber } from '../../types/financeiro'
+import { supabase } from '../../services/supabase'
+import type { ContaReceber, StatusCR } from '../../types/financeiro'
+import { CR_PIPELINE_STAGES } from '../../types/financeiro'
+
+// ── Formatters ──────────────────────────────────────────────────────────────
+
+const fmt = (v: number) =>
+  v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 })
+
+const fmtFull = (v: number) =>
+  v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
+
+const fmtData = (d: string) =>
+  new Date(d + 'T00:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit' })
+
+const fmtDataFull = (d: string) =>
+  new Date(d + 'T00:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' })
+
+// ── Sort types ──────────────────────────────────────────────────────────────
+
+type SortField = 'vencimento' | 'valor' | 'cliente' | 'emissao'
+type SortDir = 'asc' | 'desc'
+type ViewMode = 'list' | 'cards'
+
+const SORT_OPTIONS: { field: SortField; label: string }[] = [
+  { field: 'vencimento', label: 'Vencimento' },
+  { field: 'valor',      label: 'Valor' },
+  { field: 'cliente',    label: 'Cliente' },
+  { field: 'emissao',    label: 'Emissao' },
+]
+
+// ── Urgency helper ──────────────────────────────────────────────────────────
+
+function getUrgency(cr: ContaReceber): 'overdue' | 'today' | 'week' | 'normal' {
+  if (['recebido', 'conciliado', 'cancelado'].includes(cr.status)) return 'normal'
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  const venc = new Date(cr.data_vencimento + 'T00:00:00')
+  const diffDays = Math.floor((venc.getTime() - today.getTime()) / 86_400_000)
+  if (diffDays < 0) return 'overdue'
+  if (diffDays === 0) return 'today'
+  if (diffDays <= 7) return 'week'
+  return 'normal'
+}
+
+// ── Status icon map ─────────────────────────────────────────────────────────
+
+const STATUS_ICONS: Record<string, typeof Receipt> = {
+  previsto:     Calendar,
+  autorizado:   ShieldCheck,
+  faturamento:  FileText,
+  nf_emitida:   Receipt,
+  aguardando:   Clock,
+  recebido:     CheckCircle2,
+  conciliado:   CheckCircle2,
+}
+
+const STATUS_ACCENT: Record<string, { bg: string; bgActive: string; text: string; textActive: string; dot: string; border: string }> = {
+  previsto:     { bg: 'hover:bg-slate-50',   bgActive: 'bg-slate-100',   text: 'text-slate-600',   textActive: 'text-slate-800',   dot: 'bg-slate-400',   border: 'border-slate-400' },
+  autorizado:   { bg: 'hover:bg-blue-50',    bgActive: 'bg-blue-50',     text: 'text-blue-600',    textActive: 'text-blue-800',    dot: 'bg-blue-500',    border: 'border-blue-500' },
+  faturamento:  { bg: 'hover:bg-violet-50',  bgActive: 'bg-violet-50',   text: 'text-violet-600',  textActive: 'text-violet-800',  dot: 'bg-violet-500',  border: 'border-violet-500' },
+  nf_emitida:   { bg: 'hover:bg-amber-50',   bgActive: 'bg-amber-50',    text: 'text-amber-600',   textActive: 'text-amber-800',   dot: 'bg-amber-500',   border: 'border-amber-500' },
+  aguardando:   { bg: 'hover:bg-orange-50',  bgActive: 'bg-orange-50',   text: 'text-orange-600',  textActive: 'text-orange-800',  dot: 'bg-orange-500',  border: 'border-orange-500' },
+  recebido:     { bg: 'hover:bg-teal-50',    bgActive: 'bg-teal-50',     text: 'text-teal-600',    textActive: 'text-teal-800',    dot: 'bg-teal-500',    border: 'border-teal-500' },
+  conciliado:   { bg: 'hover:bg-green-50',   bgActive: 'bg-green-50',    text: 'text-green-600',   textActive: 'text-green-800',   dot: 'bg-green-500',   border: 'border-green-500' },
+}
+
+const STATUS_ACCENT_DARK: Record<string, { bg: string; bgActive: string; text: string; textActive: string }> = {
+  previsto:     { bg: 'hover:bg-white/[0.03]', bgActive: 'bg-slate-500/10',   text: 'text-slate-400',   textActive: 'text-slate-200' },
+  autorizado:   { bg: 'hover:bg-white/[0.03]', bgActive: 'bg-blue-500/10',    text: 'text-blue-400',    textActive: 'text-blue-300' },
+  faturamento:  { bg: 'hover:bg-white/[0.03]', bgActive: 'bg-violet-500/10',  text: 'text-violet-400',  textActive: 'text-violet-300' },
+  nf_emitida:   { bg: 'hover:bg-white/[0.03]', bgActive: 'bg-amber-500/10',   text: 'text-amber-400',   textActive: 'text-amber-300' },
+  aguardando:   { bg: 'hover:bg-white/[0.03]', bgActive: 'bg-orange-500/10',  text: 'text-orange-400',  textActive: 'text-orange-300' },
+  recebido:     { bg: 'hover:bg-white/[0.03]', bgActive: 'bg-teal-500/10',    text: 'text-teal-400',    textActive: 'text-teal-300' },
+  conciliado:   { bg: 'hover:bg-white/[0.03]', bgActive: 'bg-green-500/10',   text: 'text-green-400',   textActive: 'text-green-300' },
+}
+
+// ── Export CSV ────────────────────────────────────────────────────────────────
+
+function exportCSV(crs: ContaReceber[], stageName: string) {
+  const headers = ['Cliente', 'CNPJ', 'Valor', 'Vencimento', 'Emissao', 'NF', 'Centro Custo', 'Classe Financeira', 'Natureza', 'Descricao', 'Status']
+  const rows = crs.map(cr => [
+    cr.cliente_nome,
+    cr.cliente_cnpj || '',
+    cr.valor_original.toFixed(2).replace('.', ','),
+    fmtDataFull(cr.data_vencimento),
+    fmtDataFull(cr.data_emissao),
+    cr.numero_nf || '',
+    cr.centro_custo || '',
+    cr.classe_financeira || '',
+    cr.natureza || '',
+    cr.descricao || '',
+    cr.status,
+  ])
+
+  const bom = '\uFEFF'
+  const csv = bom + [headers, ...rows].map(r => r.map(c => `"${String(c).replace(/"/g, '""')}"`).join(';')).join('\n')
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `contas-a-receber-${stageName.replace(/\s/g, '-').toLowerCase()}-${new Date().toISOString().split('T')[0]}.csv`
+  a.click()
+  URL.revokeObjectURL(url)
+}
 
 // ── SyncBar ───────────────────────────────────────────────────────────────────
 
@@ -50,7 +156,7 @@ function SyncBar({ isDark }: { isDark: boolean }) {
           {isPending ? 'Sincronizando com Omie...' : 'Omie'}
         </p>
         <p className="text-[10px] text-emerald-600/70 mt-0.5">
-          {isPending ? 'Aguarde a conclusão' : lastSyncText}
+          {isPending ? 'Aguarde a conclusao' : lastSyncText}
         </p>
       </div>
       <button
@@ -65,36 +171,6 @@ function SyncBar({ isDark }: { isDark: boolean }) {
     </div>
   )
 }
-
-// ── Formatters ────────────────────────────────────────────────────────────────
-
-const fmt = (v: number) =>
-  v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 })
-
-const fmtData = (d: string) =>
-  new Date(d + 'T00:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit' })
-
-const STATUS_CONFIG: Record<string, { label: string; dot: string; bg: string; text: string; icon: typeof Clock }> = {
-  previsto:     { label: 'Previsto',     dot: 'bg-slate-400',   bg: 'bg-slate-50',    text: 'text-slate-600',    icon: Calendar },
-  autorizado:   { label: 'Autorizado',   dot: 'bg-blue-500',    bg: 'bg-blue-50',     text: 'text-blue-700',     icon: ShieldCheck },
-  faturamento:  { label: 'Faturamento',  dot: 'bg-violet-500',  bg: 'bg-violet-50',   text: 'text-violet-700',   icon: FileText },
-  nf_emitida:   { label: 'NF Emitida',   dot: 'bg-amber-500',   bg: 'bg-amber-50',    text: 'text-amber-700',    icon: Receipt },
-  aguardando:   { label: 'Aguardando',   dot: 'bg-orange-500',  bg: 'bg-orange-50',   text: 'text-orange-700',   icon: Clock },
-  recebido:     { label: 'Recebido',     dot: 'bg-teal-500',    bg: 'bg-teal-50',     text: 'text-teal-700',     icon: CheckCircle2 },
-  conciliado:   { label: 'Conciliado',   dot: 'bg-green-500',   bg: 'bg-green-50',    text: 'text-green-700',    icon: CheckCircle2 },
-  cancelado:    { label: 'Cancelado',    dot: 'bg-gray-400',    bg: 'bg-gray-100',    text: 'text-gray-500',     icon: Clock },
-}
-
-const FILTROS: { label: string; value: string }[] = [
-  { label: 'Todos',        value: '' },
-  { label: 'Previstos',    value: 'previsto' },
-  { label: 'Autorizados',  value: 'autorizado' },
-  { label: 'Faturamento',  value: 'faturamento' },
-  { label: 'NF Emitida',   value: 'nf_emitida' },
-  { label: 'Aguardando',   value: 'aguardando' },
-  { label: 'Recebidos',    value: 'recebido' },
-  { label: 'Conciliados',  value: 'conciliado' },
-]
 
 // ── FaturamentoModal ──────────────────────────────────────────────────────────
 
@@ -129,13 +205,13 @@ function FaturamentoModal({ cr, onClose, isDark }: { cr: ContaReceber; onClose: 
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50" onClick={onClose}>
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-sm p-4" onClick={onClose}>
       <div onClick={e => e.stopPropagation()}
-        className={`w-full sm:max-w-lg sm:rounded-2xl rounded-t-2xl shadow-2xl p-6 max-h-[85vh] overflow-y-auto
+        className={`w-full sm:max-w-lg rounded-2xl shadow-2xl p-6 max-h-[85vh] overflow-y-auto
           ${isDark ? 'bg-[#1e293b]' : 'bg-white'}`}>
         <div className="flex items-center justify-between mb-4">
           <h3 className={`text-base font-extrabold ${isDark ? 'text-white' : 'text-slate-800'}`}>Faturamento</h3>
-          <button onClick={onClose} className="p-1 rounded-lg hover:bg-slate-100"><X size={16} className="text-slate-400" /></button>
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-600"><X size={18} /></button>
         </div>
 
         <p className={`text-xs mb-4 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
@@ -231,13 +307,13 @@ function RegistrarRecebimentoModal({ cr, onClose, isDark }: { cr: ContaReceber; 
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50" onClick={onClose}>
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-sm p-4" onClick={onClose}>
       <div onClick={e => e.stopPropagation()}
-        className={`w-full sm:max-w-md sm:rounded-2xl rounded-t-2xl shadow-2xl p-6
+        className={`w-full sm:max-w-md rounded-2xl shadow-2xl p-6
           ${isDark ? 'bg-[#1e293b]' : 'bg-white'}`}>
         <div className="flex items-center justify-between mb-4">
           <h3 className={`text-base font-extrabold ${isDark ? 'text-white' : 'text-slate-800'}`}>Registrar Recebimento</h3>
-          <button onClick={onClose} className="p-1 rounded-lg hover:bg-slate-100"><X size={16} className="text-slate-400" /></button>
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-600"><X size={18} /></button>
         </div>
 
         <p className={`text-xs mb-4 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
@@ -268,180 +344,77 @@ function RegistrarRecebimentoModal({ cr, onClose, isDark }: { cr: ContaReceber; 
   )
 }
 
-// ── CRCard ────────────────────────────────────────────────────────────────────
+// ── CRDetailModal ──────────────────────────────────────────────────────────
 
-function CRCard({ cr, isDark, onFaturar, onReceber, onEmail, onAutorizar, onAvancar, onConciliar }: {
+function CRDetailModal({ cr, onClose, onAction, isDark }: {
   cr: ContaReceber
+  onClose: () => void
+  onAction: (action: string, cr: ContaReceber) => void
   isDark: boolean
-  onAutorizar: (cr: ContaReceber) => void
-  onFaturar: (cr: ContaReceber) => void
-  onEmail: (cr: ContaReceber) => void
-  onAvancar: (cr: ContaReceber, status: string) => void
-  onReceber: (cr: ContaReceber) => void
-  onConciliar: (cr: ContaReceber) => void
 }) {
-  const [expanded, setExpanded] = useState(false)
-  const cfg = STATUS_CONFIG[cr.status]
-  const Icon = cfg?.icon ?? Clock
-
-  const isVencido = !['recebido', 'conciliado', 'cancelado'].includes(cr.status) &&
-    new Date(cr.data_vencimento) < new Date()
-
-  const borderColor = isVencido
-    ? 'border-red-300'
-    : cr.status === 'recebido' || cr.status === 'conciliado'
-      ? 'border-emerald-200'
-      : isDark ? 'border-white/[0.06]' : 'border-slate-200'
+  const urgency = getUrgency(cr)
+  const stage = CR_PIPELINE_STAGES.find(s => s.status === cr.status)
 
   return (
-    <div className={`rounded-2xl border shadow-sm transition-all hover:shadow-md
-      ${isDark ? 'bg-[#1e293b]' : 'bg-white'} ${borderColor}`}>
-
-      <div className="p-4">
-        <div className="flex items-start gap-3">
-          {/* Icon */}
-          <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0
-            ${isVencido
-              ? (isDark ? 'bg-red-500/10' : 'bg-red-50')
-              : cr.status === 'autorizado'
-                ? (isDark ? 'bg-blue-500/10' : 'bg-blue-50')
-                : (isDark ? 'bg-emerald-500/10' : 'bg-emerald-50')}`}>
-            {isVencido
-              ? <AlertTriangle size={16} className="text-red-500" />
-              : <Icon size={16} className={cfg?.text ?? 'text-slate-600'} />}
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-sm p-4" onClick={onClose}>
+      <div className={`rounded-2xl shadow-2xl w-full max-w-lg max-h-[85vh] overflow-y-auto ${isDark ? 'bg-[#1e293b]' : 'bg-white'}`} onClick={e => e.stopPropagation()}>
+        <div className={`flex items-center justify-between px-5 py-4 border-b sticky top-0 z-10 ${isDark ? 'border-white/[0.06] bg-[#1e293b]' : 'border-slate-100 bg-white'}`}>
+          <div className="flex items-center gap-2 min-w-0">
+            <TrendingUp size={18} className="text-emerald-600 shrink-0" />
+            <h3 className={`text-base font-bold truncate ${isDark ? 'text-white' : 'text-slate-800'}`}>{cr.cliente_nome}</h3>
           </div>
-
-          {/* Content */}
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center justify-between gap-2 mb-1">
-              <p className={`text-sm font-bold truncate ${isDark ? 'text-white' : 'text-slate-800'}`}>
-                {cr.cliente_nome}
-              </p>
-              <p className={`text-sm font-extrabold shrink-0 ${isVencido ? 'text-red-600' : 'text-emerald-600'}`}>
-                {fmt(cr.valor_original)}
-              </p>
-            </div>
-
-            {/* Badges */}
-            <div className="flex flex-wrap items-center gap-1.5 text-[10px]">
-              <span className={`inline-flex items-center gap-1 rounded-full font-semibold px-2 py-0.5 ${cfg?.bg} ${cfg?.text}`}>
-                <span className={`w-1.5 h-1.5 rounded-full ${cfg?.dot}`} />
-                {cfg?.label ?? cr.status}
-              </span>
-              {isVencido && cr.status !== 'cancelado' && (
-                <span className="inline-flex items-center gap-1 rounded-full font-semibold px-2 py-0.5 bg-red-50 text-red-600">
-                  <span className="w-1.5 h-1.5 rounded-full bg-red-500" />
-                  Vencido
-                </span>
-              )}
-              {cr.numero_nf && (
-                <span className="text-slate-400 font-mono">NF {cr.numero_nf}</span>
-              )}
-              {cr.natureza && <span className="text-slate-400">{cr.natureza}</span>}
-            </div>
-
-            {cr.descricao && (
-              <p className={`text-[11px] mt-1 line-clamp-1 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
-                {cr.descricao}
-              </p>
-            )}
-
-            {/* Metadata */}
-            <div className="flex flex-wrap items-center gap-3 mt-2 text-[10px] text-slate-400">
-              <span className="flex items-center gap-1">
-                <Calendar size={10} />
-                Venc. {fmtData(cr.data_vencimento)}
-              </span>
-              {cr.centro_custo && <span>CC: {cr.centro_custo}</span>}
-              {cr.classe_financeira && <span>Classe: {cr.classe_financeira}</span>}
-              {cr.data_recebimento && (
-                <span className="text-teal-600 font-medium">
-                  Recebido em {fmtData(cr.data_recebimento)}
-                </span>
-              )}
-              {cr.email_compartilhado_para && (
-                <span className="text-amber-600 font-medium flex items-center gap-1">
-                  <Mail size={9} /> Enviado para {cr.email_compartilhado_para}
-                </span>
-              )}
-            </div>
-          </div>
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-600 shrink-0"><X size={18} /></button>
         </div>
 
-        {/* Actions + Expand */}
-        <div className="flex items-center justify-between mt-3 pt-2 border-t border-slate-100">
-          <div className="flex gap-2">
-            {cr.status === 'previsto' && (
-              <button onClick={() => onAutorizar(cr)}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-600 text-white text-[10px] font-bold hover:bg-blue-700 transition-all">
-                <ShieldCheck size={12} /> Autorizar
-              </button>
-            )}
-            {cr.status === 'autorizado' && (
-              <button onClick={() => onFaturar(cr)}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-violet-600 text-white text-[10px] font-bold hover:bg-violet-700 transition-all">
-                <FileText size={12} /> Faturar
-              </button>
-            )}
-            {cr.status === 'nf_emitida' && (
-              <>
-                <button onClick={() => onEmail(cr)}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-500 text-white text-[10px] font-bold hover:bg-amber-600 transition-all">
-                  <Mail size={12} /> Compartilhar
-                </button>
-                <button onClick={() => onAvancar(cr, 'aguardando')}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-orange-500 text-white text-[10px] font-bold hover:bg-orange-600 transition-all">
-                  <ArrowRight size={12} /> Aguardar Pgto
-                </button>
-              </>
-            )}
-            {cr.status === 'aguardando' && (
-              <button onClick={() => onReceber(cr)}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-teal-600 text-white text-[10px] font-bold hover:bg-teal-700 transition-all">
-                <CheckCircle2 size={12} /> Registrar Recebimento
-              </button>
-            )}
-            {cr.status === 'recebido' && (
-              <button onClick={() => onConciliar(cr)}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-green-600 text-white text-[10px] font-bold hover:bg-green-700 transition-all">
-                <CheckCircle2 size={12} /> Conciliar
-              </button>
-            )}
+        <div className="p-5 space-y-4">
+          <div className="flex items-center justify-between">
+            <p className={`text-2xl font-extrabold ${urgency === 'overdue' ? 'text-red-600' : 'text-emerald-600'}`}>
+              {fmtFull(cr.valor_original)}
+            </p>
+            <span className={`inline-flex items-center gap-1.5 rounded-full font-semibold px-3 py-1 text-xs ${STATUS_ACCENT[cr.status]?.bgActive || 'bg-slate-100'} ${STATUS_ACCENT[cr.status]?.textActive || 'text-slate-700'}`}>
+              <span className={`w-2 h-2 rounded-full ${STATUS_ACCENT[cr.status]?.dot}`} />
+              {stage?.label ?? cr.status}
+            </span>
           </div>
 
-          <button onClick={() => setExpanded(!expanded)}
-            className={`flex items-center gap-1 text-[10px] font-semibold px-2 py-1 rounded-lg transition-all
-              ${isDark ? 'text-slate-400 hover:bg-white/5' : 'text-slate-400 hover:bg-slate-50'}`}>
-            {expanded ? <><ChevronUp size={12} /> Recolher</> : <><ChevronDown size={12} /> Detalhes</>}
-          </button>
-        </div>
-      </div>
+          {urgency === 'overdue' && (
+            <div className="flex items-center gap-2 bg-red-50 border border-red-200 rounded-xl px-3 py-2">
+              <AlertTriangle size={14} className="text-red-500 shrink-0" />
+              <p className="text-xs text-red-700 font-semibold">Vencido em {fmtData(cr.data_vencimento)}</p>
+            </div>
+          )}
 
-      {/* Expanded section */}
-      {expanded && (
-        <div className={`px-4 pb-4 pt-2 border-t space-y-3 ${isDark ? 'border-white/[0.06]' : 'border-slate-100'}`}>
-          <div className={`rounded-xl p-3 ${isDark ? 'bg-white/[0.03]' : 'bg-slate-50'}`}>
-            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">Detalhes</p>
-            <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-[11px]">
-              <div><span className="text-slate-400">Cliente:</span> <span className={`font-semibold ${isDark ? 'text-white' : 'text-slate-700'}`}>{cr.cliente_nome}</span></div>
-              {cr.cliente_cnpj && <div><span className="text-slate-400">CNPJ:</span> <span className="font-mono text-slate-600">{cr.cliente_cnpj}</span></div>}
-              {cr.numero_nf && <div><span className="text-slate-400">NF:</span> <span className="font-mono text-slate-600">{cr.numero_nf}</span></div>}
-              {cr.serie_nf && <div><span className="text-slate-400">Serie:</span> <span className="font-mono text-slate-600">{cr.serie_nf}</span></div>}
-              {cr.chave_nfe && <div className="col-span-2"><span className="text-slate-400">Chave NFe:</span> <span className="font-mono text-slate-600 text-[9px] break-all">{cr.chave_nfe}</span></div>}
-              <div><span className="text-slate-400">Emissao:</span> <span className="text-slate-600">{fmtData(cr.data_emissao)}</span></div>
-              <div><span className="text-slate-400">Vencimento:</span> <span className={`font-semibold ${isVencido ? 'text-red-600' : 'text-slate-600'}`}>{fmtData(cr.data_vencimento)}</span></div>
-              {cr.centro_custo && <div><span className="text-slate-400">Centro Custo:</span> <span className="text-slate-600">{cr.centro_custo}</span></div>}
-              {cr.classe_financeira && <div><span className="text-slate-400">Classe:</span> <span className="text-slate-600">{cr.classe_financeira}</span></div>}
+          <div className={`rounded-xl p-4 space-y-2 ${isDark ? 'bg-white/[0.04]' : 'bg-slate-50'}`}>
+            <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-xs">
+              <div><span className="text-slate-400">Vencimento:</span> <span className="font-semibold">{fmtData(cr.data_vencimento)}</span></div>
+              <div><span className="text-slate-400">Emissao:</span> <span className="font-semibold">{fmtData(cr.data_emissao)}</span></div>
+              {cr.cliente_cnpj && <div><span className="text-slate-400">CNPJ:</span> <span className="font-mono">{cr.cliente_cnpj}</span></div>}
+              {cr.numero_nf && <div><span className="text-slate-400">NF:</span> <span className="font-mono">{cr.numero_nf}</span></div>}
+              {cr.serie_nf && <div><span className="text-slate-400">Serie:</span> <span className="font-mono">{cr.serie_nf}</span></div>}
+              {cr.natureza && <div><span className="text-slate-400">Natureza:</span> <span>{cr.natureza}</span></div>}
+              {cr.centro_custo && <div><span className="text-slate-400">Centro Custo:</span> <span className="font-semibold">{cr.centro_custo}</span></div>}
+              {cr.classe_financeira && <div><span className="text-slate-400">Classe Fin:</span> <span className="text-violet-600 font-semibold">{cr.classe_financeira}</span></div>}
               {cr.autorizado_por && <div><span className="text-slate-400">Autorizado por:</span> <span className="text-blue-600 font-semibold">{cr.autorizado_por}</span></div>}
-              {cr.autorizado_em && <div><span className="text-slate-400">Em:</span> <span className="text-slate-600">{new Date(cr.autorizado_em).toLocaleDateString('pt-BR')}</span></div>}
+              {cr.autorizado_em && <div><span className="text-slate-400">Em:</span> <span>{new Date(cr.autorizado_em).toLocaleDateString('pt-BR')}</span></div>}
+              {cr.data_recebimento && <div><span className="text-slate-400">Recebido em:</span> <span className="text-emerald-600 font-semibold">{fmtData(cr.data_recebimento)}</span></div>}
+              {cr.valor_recebido > 0 && <div><span className="text-slate-400">Valor Recebido:</span> <span className="text-emerald-600 font-semibold">{fmtFull(cr.valor_recebido)}</span></div>}
+              {cr.email_compartilhado_para && <div className="col-span-2"><span className="text-slate-400">Email enviado:</span> <span className="text-amber-600 font-semibold">{cr.email_compartilhado_para}</span></div>}
             </div>
+            {cr.descricao && <p className="text-xs text-slate-500 mt-2 pt-2 border-t border-slate-200">{cr.descricao}</p>}
           </div>
+
+          {cr.chave_nfe && (
+            <div className={`rounded-xl p-3 ${isDark ? 'bg-white/[0.04]' : 'bg-slate-50'}`}>
+              <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-1">Chave NFe</p>
+              <p className="font-mono text-[10px] text-slate-600 break-all">{cr.chave_nfe}</p>
+            </div>
+          )}
 
           {/* DANFE / XML links */}
           {(cr.danfe_url || cr.xml_url) && (
-            <div className={`rounded-xl p-3 ${isDark ? 'bg-white/[0.03]' : 'bg-violet-50/60'}`}>
-              <p className="text-[10px] font-bold text-violet-500 uppercase tracking-wider mb-2 flex items-center gap-1">
-                <FileText size={10} /> Documentos Fiscais
+            <div className={`rounded-xl p-3 ${isDark ? 'bg-white/[0.04]' : 'bg-violet-50/60'}`}>
+              <p className="text-[9px] font-bold text-violet-500 uppercase tracking-wider mb-2 flex items-center gap-1">
+                <FileText size={9} /> Documentos Fiscais
               </p>
               <div className="flex gap-2">
                 {cr.danfe_url && (
@@ -460,65 +433,349 @@ function CRCard({ cr, isDark, onFaturar, onReceber, onEmail, onAutorizar, onAvan
             </div>
           )}
 
-          {cr.observacoes && (
-            <div className={`rounded-xl p-3 ${isDark ? 'bg-white/[0.03]' : 'bg-slate-50'}`}>
-              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Observacoes</p>
-              <p className={`text-[11px] ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>{cr.observacoes}</p>
+          {/* Pipeline progress */}
+          <div className={`rounded-xl p-3 ${isDark ? 'bg-white/[0.04]' : 'bg-slate-50'}`}>
+            <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-2">Progresso</p>
+            <div className="flex items-center gap-0.5">
+              {CR_PIPELINE_STAGES.map((s, i) => {
+                const currentIdx = CR_PIPELINE_STAGES.findIndex(st => st.status === cr.status)
+                const isPast = i <= currentIdx
+                const accent = STATUS_ACCENT[s.status]
+                return (
+                  <div key={s.status} className="flex-1">
+                    <div className={`h-1.5 rounded-full transition-all ${isPast ? accent?.dot || 'bg-slate-400' : isDark ? 'bg-white/[0.06]' : 'bg-slate-200'}`} />
+                  </div>
+                )
+              })}
             </div>
-          )}
+          </div>
+
+          <div className="flex gap-2 pt-1">
+            <button onClick={onClose} className={`flex-1 py-3 rounded-xl border text-sm font-semibold transition-all ${isDark ? 'border-white/[0.06] text-slate-300' : 'border-slate-200 text-slate-600 hover:bg-slate-50'}`}>
+              Fechar
+            </button>
+            {cr.status === 'previsto' && (
+              <button onClick={() => onAction('autorizar', cr)} className="flex-1 py-3 rounded-xl bg-blue-600 text-white text-sm font-bold hover:bg-blue-700 transition-all flex items-center justify-center gap-2">
+                <ShieldCheck size={15} /> Autorizar
+              </button>
+            )}
+            {cr.status === 'autorizado' && (
+              <button onClick={() => onAction('faturar', cr)} className="flex-1 py-3 rounded-xl bg-violet-600 text-white text-sm font-bold hover:bg-violet-700 transition-all flex items-center justify-center gap-2">
+                <FileText size={15} /> Faturar
+              </button>
+            )}
+            {cr.status === 'nf_emitida' && (
+              <button onClick={() => onAction('avancar', cr)} className="flex-1 py-3 rounded-xl bg-orange-500 text-white text-sm font-bold hover:bg-orange-600 transition-all flex items-center justify-center gap-2">
+                <ArrowRight size={15} /> Aguardar Pgto
+              </button>
+            )}
+            {cr.status === 'aguardando' && (
+              <button onClick={() => onAction('receber', cr)} className="flex-1 py-3 rounded-xl bg-teal-600 text-white text-sm font-bold hover:bg-teal-700 transition-all flex items-center justify-center gap-2">
+                <CheckCircle2 size={15} /> Reg. Recebimento
+              </button>
+            )}
+            {cr.status === 'recebido' && (
+              <button onClick={() => onAction('conciliar', cr)} className="flex-1 py-3 rounded-xl bg-green-600 text-white text-sm font-bold hover:bg-green-700 transition-all flex items-center justify-center gap-2">
+                <CheckCircle2 size={15} /> Conciliar
+              </button>
+            )}
+          </div>
         </div>
-      )}
+      </div>
     </div>
   )
 }
 
-// ── Main Page ─────────────────────────────────────────────────────────────────
+// ── CRRow (compact table row) ────────────────────────────────────────────────
+
+function CRRow({ cr, onClick, isDark, isSelected, onSelect }: {
+  cr: ContaReceber
+  onClick: () => void
+  isDark: boolean
+  isSelected: boolean
+  onSelect: (id: string) => void
+}) {
+  const urgency = getUrgency(cr)
+
+  return (
+    <div
+      onClick={onClick}
+      className={`flex items-center gap-2 px-3 py-1.5 border-b cursor-pointer transition-all ${
+        isDark
+          ? `border-white/[0.04] hover:bg-white/[0.03] ${isSelected ? 'bg-emerald-500/10' : ''}`
+          : `border-slate-100 hover:bg-slate-50 ${isSelected ? 'bg-emerald-50' : ''}`
+      }`}
+    >
+      <input
+        type="checkbox"
+        checked={isSelected}
+        onChange={(e) => { e.stopPropagation(); onSelect(cr.id) }}
+        onClick={e => e.stopPropagation()}
+        className="w-3 h-3 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 shrink-0"
+      />
+
+      <div className={`w-0.5 h-4 rounded-full shrink-0 ${
+        urgency === 'overdue' ? 'bg-red-500' : urgency === 'today' ? 'bg-amber-500' : urgency === 'week' ? 'bg-yellow-400' : 'bg-transparent'
+      }`} />
+
+      <span className={`text-xs font-semibold truncate w-[180px] shrink-0 ${isDark ? 'text-white' : 'text-slate-800'}`}>
+        {cr.cliente_nome}
+      </span>
+
+      <span className={`text-[11px] truncate w-[150px] shrink-0 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+        {cr.descricao || '—'}
+      </span>
+
+      <span className={`text-[11px] truncate w-[80px] shrink-0 font-mono ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+        {cr.numero_nf ? `NF ${cr.numero_nf}` : '—'}
+      </span>
+
+      <span className={`text-[11px] truncate w-[70px] shrink-0 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+        {cr.centro_custo || '—'}
+      </span>
+
+      <span className={`text-[11px] truncate w-[100px] shrink-0 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+        {cr.classe_financeira || '—'}
+      </span>
+
+      <span className={`text-[11px] text-right w-[62px] shrink-0 ${
+        urgency === 'overdue' ? 'text-red-500 font-bold' : urgency === 'today' ? 'text-amber-600 font-semibold' : isDark ? 'text-slate-500' : 'text-slate-400'
+      }`}>
+        {fmtData(cr.data_vencimento)}
+      </span>
+
+      <span className={`text-xs font-bold text-right w-[90px] shrink-0 ${
+        urgency === 'overdue' ? 'text-red-600' : 'text-emerald-600'
+      }`}>
+        {fmt(cr.valor_original)}
+      </span>
+    </div>
+  )
+}
+
+// ── CRCard (block/card view) ─────────────────────────────────────────────────
+
+function CRCard({ cr, onClick, isDark, isSelected, onSelect }: {
+  cr: ContaReceber
+  onClick: () => void
+  isDark: boolean
+  isSelected: boolean
+  onSelect: (id: string) => void
+}) {
+  const urgency = getUrgency(cr)
+
+  return (
+    <div
+      onClick={onClick}
+      className={`rounded-2xl border p-4 cursor-pointer transition-all group ${
+        isDark
+          ? `border-white/[0.06] hover:border-emerald-500/30 hover:shadow-lg hover:shadow-emerald-500/5 ${isSelected ? 'bg-emerald-500/10 border-emerald-500/30' : 'bg-white/[0.02]'}`
+          : `border-slate-200 hover:border-teal-300 hover:shadow-md ${isSelected ? 'bg-emerald-50 border-emerald-300' : 'bg-white'}`
+      }`}
+    >
+      {/* Linha 1: checkbox + cliente + urgency + valor */}
+      <div className="flex items-center gap-3">
+        <input
+          type="checkbox"
+          checked={isSelected}
+          onChange={(e) => { e.stopPropagation(); onSelect(cr.id) }}
+          onClick={e => e.stopPropagation()}
+          className="w-3.5 h-3.5 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 shrink-0"
+        />
+        <div className={`w-1 h-6 rounded-full shrink-0 ${
+          urgency === 'overdue' ? 'bg-red-500' : urgency === 'today' ? 'bg-amber-500' : urgency === 'week' ? 'bg-yellow-400' : 'bg-transparent'
+        }`} />
+        <p className={`text-sm font-bold truncate flex-1 min-w-0 ${isDark ? 'text-white' : 'text-slate-800'}`}>
+          {cr.cliente_nome}
+        </p>
+        {urgency === 'overdue' && (
+          <span className="text-[10px] font-bold text-red-500 bg-red-50 dark:bg-red-500/10 px-2 py-0.5 rounded-full shrink-0">VENCIDO</span>
+        )}
+        <p className={`text-sm font-extrabold shrink-0 ${urgency === 'overdue' ? 'text-red-600' : 'text-emerald-600'}`}>
+          {fmt(cr.valor_original)}
+        </p>
+      </div>
+
+      {/* Linha 2: descricao */}
+      {cr.descricao && (
+        <p className={`text-xs truncate mt-1.5 ml-10 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{cr.descricao}</p>
+      )}
+
+      {/* Linha 3: tags + data */}
+      <div className="flex items-center justify-between mt-2 ml-10">
+        <div className="flex flex-wrap items-center gap-1.5 min-w-0">
+          {cr.numero_nf && (
+            <span className={`text-[10px] px-1.5 py-0.5 rounded-md flex items-center gap-0.5 font-semibold shrink-0 ${isDark ? 'bg-violet-500/10 text-violet-400' : 'bg-violet-50 text-violet-700'}`}>
+              <FileText size={9} /> NF {cr.numero_nf}
+            </span>
+          )}
+          {cr.centro_custo && (
+            <span className={`text-[10px] px-1.5 py-0.5 rounded-md flex items-center gap-0.5 shrink-0 ${isDark ? 'bg-white/[0.04] text-slate-400' : 'bg-slate-100 text-slate-500'}`}>
+              <Briefcase size={9} /> {cr.centro_custo}
+            </span>
+          )}
+          {cr.classe_financeira && (
+            <span className={`text-[10px] px-1.5 py-0.5 rounded-md flex items-center gap-0.5 shrink-0 ${isDark ? 'bg-white/[0.04] text-slate-400' : 'bg-slate-100 text-slate-500'}`}>
+              <Tag size={9} /> {cr.classe_financeira}
+            </span>
+          )}
+          {cr.natureza && (
+            <span className={`text-[10px] px-1.5 py-0.5 rounded-md flex items-center gap-0.5 shrink-0 ${isDark ? 'bg-white/[0.04] text-slate-500' : 'bg-slate-50 text-slate-400'}`}>
+              {cr.natureza}
+            </span>
+          )}
+        </div>
+        <span className={`text-[11px] flex items-center gap-1 shrink-0 ml-3 ${
+          urgency === 'overdue' ? 'text-red-500 font-bold' : urgency === 'today' ? 'text-amber-600 font-semibold' : isDark ? 'text-slate-500' : 'text-slate-400'
+        }`}>
+          <Calendar size={10} /> {fmtData(cr.data_vencimento)}
+        </span>
+      </div>
+    </div>
+  )
+}
+
+// ── Main Page ───────────────────────────────────────────────────────────────
 
 export default function ContasReceber() {
   const { isDark } = useTheme()
-  const [statusFilter, setStatusFilter] = useState('')
+  const [activeTab, setActiveTab] = useState<StatusCR>('previsto')
   const [busca, setBusca] = useState('')
+  const [detailCR, setDetailCR] = useState<ContaReceber | null>(null)
   const [faturarModal, setFaturarModal] = useState<ContaReceber | null>(null)
   const [recebimentoModal, setRecebimentoModal] = useState<ContaReceber | null>(null)
-  const [toast, setToast] = useState<{ msg: string; ok: boolean } | null>(null)
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [toast, setToast] = useState<{ type: 'success' | 'error'; msg: string } | null>(null)
+  const [sortField, setSortField] = useState<SortField>('vencimento')
+  const [sortDir, setSortDir] = useState<SortDir>('asc')
+  const [viewMode, setViewMode] = useState<ViewMode>('list')
 
-  const { data: contas = [], isLoading, error: crError } = useContasReceber()
-  const autorizar = useAutorizarCR()
-  const avancar = useAvancarStatusCR()
-  const conciliar = useConciliarCRBatch()
-  const compartilhar = useCompartilharNFEmail()
+  // Data
+  const { data: contas = [], isLoading } = useContasReceber()
 
-  function showToast(msg: string, ok = true) {
-    setToast({ msg, ok })
-    setTimeout(() => setToast(null), 3000)
+  // Mutations
+  const autorizarMut = useAutorizarCR()
+  const avancarMut = useAvancarStatusCR()
+  const conciliarMut = useConciliarCRBatch()
+  const compartilharMut = useCompartilharNFEmail()
+
+  // Group all CRs by status
+  const grouped = useMemo(() => {
+    const map = new Map<StatusCR, ContaReceber[]>()
+    for (const s of CR_PIPELINE_STAGES) map.set(s.status, [])
+    for (const cr of contas) {
+      const arr = map.get(cr.status as StatusCR)
+      if (arr) arr.push(cr)
+    }
+    return map
+  }, [contas])
+
+  // Filter active tab by search, then sort
+  const activeCRs = useMemo(() => {
+    let crs = [...(grouped.get(activeTab) || [])]
+
+    // Search filter
+    if (busca) {
+      const q = busca.toLowerCase()
+      crs = crs.filter(cr =>
+        cr.cliente_nome.toLowerCase().includes(q)
+        || cr.descricao?.toLowerCase().includes(q)
+        || cr.numero_nf?.toLowerCase().includes(q)
+        || cr.centro_custo?.toLowerCase().includes(q)
+        || cr.classe_financeira?.toLowerCase().includes(q)
+        || cr.natureza?.toLowerCase().includes(q)
+        || cr.cliente_cnpj?.toLowerCase().includes(q)
+      )
+    }
+
+    // Sort
+    crs.sort((a, b) => {
+      let cmp = 0
+      switch (sortField) {
+        case 'vencimento': cmp = a.data_vencimento.localeCompare(b.data_vencimento); break
+        case 'emissao':    cmp = a.data_emissao.localeCompare(b.data_emissao); break
+        case 'valor':      cmp = a.valor_original - b.valor_original; break
+        case 'cliente':    cmp = a.cliente_nome.localeCompare(b.cliente_nome); break
+      }
+      return sortDir === 'asc' ? cmp : -cmp
+    })
+
+    return crs
+  }, [grouped, activeTab, busca, sortField, sortDir])
+
+  // Tab totals
+  const tabTotal = useMemo(() => activeCRs.reduce((s, cr) => s + cr.valor_original, 0), [activeCRs])
+
+  // Toast helper
+  const showToast = (type: 'success' | 'error', msg: string) => {
+    setToast({ type, msg })
+    setTimeout(() => setToast(null), 4000)
   }
 
-  async function handleAutorizar(cr: ContaReceber) {
+  // Toggle selection
+  const toggleSelect = (id: string) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id); else next.add(id)
+      return next
+    })
+  }
+
+  const selectAll = () => {
+    const allIds = activeCRs.map(cr => cr.id)
+    const allSelected = allIds.length > 0 && allIds.every(id => selectedIds.has(id))
+    if (allSelected) {
+      setSelectedIds(new Set())
+    } else {
+      setSelectedIds(new Set(allIds))
+    }
+  }
+
+  // Sort toggle
+  const toggleSort = (field: SortField) => {
+    if (sortField === field) {
+      setSortDir(d => d === 'asc' ? 'desc' : 'asc')
+    } else {
+      setSortField(field)
+      setSortDir('asc')
+    }
+  }
+
+  // ── Actions ─────────────────────────────────────────────────────────────
+
+  const handleAutorizar = async (ids: string[]) => {
     try {
-      await autorizar.mutateAsync({ crId: cr.id })
-      showToast(`${cr.cliente_nome} autorizado com sucesso`)
-    } catch { showToast('Erro ao autorizar', false) }
+      for (const id of ids) {
+        await autorizarMut.mutateAsync({ crId: id })
+      }
+      showToast('success', `${ids.length} titulo(s) autorizado(s)`)
+      setSelectedIds(new Set())
+    } catch { showToast('error', 'Erro ao autorizar') }
   }
 
-  async function handleAvancar(cr: ContaReceber, status: string) {
+  const handleAvancar = async (ids: string[], novoStatus: string) => {
     try {
-      await avancar.mutateAsync({ crId: cr.id, novoStatus: status })
-      showToast('Status atualizado')
-    } catch { showToast('Erro ao atualizar status', false) }
+      for (const id of ids) {
+        await avancarMut.mutateAsync({ crId: id, novoStatus })
+      }
+      showToast('success', `${ids.length} titulo(s) atualizado(s)`)
+      setSelectedIds(new Set())
+    } catch { showToast('error', 'Erro ao atualizar status') }
   }
 
-  async function handleConciliar(cr: ContaReceber) {
+  const handleConciliar = async (ids: string[]) => {
     try {
-      await conciliar.mutateAsync({ ids: [cr.id] })
-      showToast(`${cr.cliente_nome} conciliado`)
-    } catch { showToast('Erro ao conciliar', false) }
+      await conciliarMut.mutateAsync({ ids })
+      showToast('success', `${ids.length} titulo(s) conciliado(s)`)
+      setSelectedIds(new Set())
+    } catch { showToast('error', 'Erro ao conciliar') }
   }
 
-  async function handleEmail(cr: ContaReceber) {
+  const handleEmail = async (cr: ContaReceber) => {
     const email = prompt('Email do cliente:')
     if (!email) return
     try {
-      await compartilhar.mutateAsync({ crId: cr.id, email })
+      await compartilharMut.mutateAsync({ crId: cr.id, email })
       const subject = encodeURIComponent(`NF ${cr.numero_nf ?? ''} — ${cr.cliente_nome}`)
       const body = encodeURIComponent(
         `Segue a Nota Fiscal referente ao servico prestado.\n\n` +
@@ -529,161 +786,336 @@ export default function ContasReceber() {
         `\nAtenciosamente,\nTEG+ Financeiro`
       )
       window.open(`mailto:${email}?subject=${subject}&body=${body}`, '_blank')
-      showToast(`Email registrado para ${email}`)
-    } catch { showToast('Erro ao compartilhar', false) }
+      showToast('success', `Email registrado para ${email}`)
+    } catch { showToast('error', 'Erro ao compartilhar') }
   }
 
-  const filtered = contas
-    .filter(cr => !statusFilter || cr.status === statusFilter)
-    .filter(cr =>
-      !busca || cr.cliente_nome.toLowerCase().includes(busca.toLowerCase())
-        || cr.numero_nf?.toLowerCase().includes(busca.toLowerCase())
-        || cr.descricao?.toLowerCase().includes(busca.toLowerCase())
-    )
+  const handleBulkAction = () => {
+    const ids = Array.from(selectedIds)
+    if (ids.length === 0) return
+    switch (activeTab) {
+      case 'previsto': handleAutorizar(ids); break
+      case 'nf_emitida': handleAvancar(ids, 'aguardando'); break
+      case 'recebido': handleConciliar(ids); break
+    }
+  }
 
-  const totalAberto = filtered
-    .filter(cr => !['recebido', 'conciliado', 'cancelado'].includes(cr.status))
-    .reduce((s, cr) => s + cr.valor_original, 0)
-  const totalRecebido = filtered
-    .filter(cr => ['recebido', 'conciliado'].includes(cr.status))
-    .reduce((s, cr) => s + cr.valor_recebido, 0)
-  const totalVencido = filtered
-    .filter(cr =>
-      !['recebido', 'conciliado', 'cancelado'].includes(cr.status) &&
-      new Date(cr.data_vencimento) < new Date()
-    )
-    .reduce((s, cr) => s + cr.valor_original, 0)
+  const handleDetailAction = (action: string, cr: ContaReceber) => {
+    setDetailCR(null)
+    switch (action) {
+      case 'autorizar': handleAutorizar([cr.id]); break
+      case 'faturar': setFaturarModal(cr); break
+      case 'avancar': handleAvancar([cr.id], 'aguardando'); break
+      case 'receber': setRecebimentoModal(cr); break
+      case 'conciliar': handleConciliar([cr.id]); break
+    }
+  }
+
+  // Export
+  const handleExport = () => {
+    const stage = CR_PIPELINE_STAGES.find(s => s.status === activeTab)
+    const toExport = selectedIds.size > 0 ? activeCRs.filter(cr => selectedIds.has(cr.id)) : activeCRs
+    exportCSV(toExport, stage?.label || activeTab)
+    showToast('success', `${toExport.length} registro(s) exportado(s)`)
+  }
+
+  // Bulk action config per tab
+  const BULK_ACTIONS: Partial<Record<StatusCR, { label: string; icon: typeof CheckCircle2; className: string }>> = {
+    previsto:     { label: 'Autorizar',     icon: ShieldCheck,  className: 'bg-blue-600 hover:bg-blue-700 text-white' },
+    nf_emitida:   { label: 'Aguardar Pgto', icon: ArrowRight,   className: 'bg-orange-500 hover:bg-orange-600 text-white' },
+    recebido:     { label: 'Conciliar',     icon: CheckCircle2, className: 'bg-green-600 hover:bg-green-700 text-white' },
+  }
+  const bulk = BULK_ACTIONS[activeTab]
+  const selectedInTab = activeCRs.filter(cr => selectedIds.has(cr.id))
+
+  // Switch tab clears selection
+  const switchTab = (status: StatusCR) => {
+    setActiveTab(status)
+    setSelectedIds(new Set())
+    setBusca('')
+  }
+
+  // Summary stats
+  const overdueCt = activeCRs.filter(cr => getUrgency(cr) === 'overdue').length
+  const overdueTotal = activeCRs.filter(cr => getUrgency(cr) === 'overdue').reduce((s, c) => s + c.valor_original, 0)
 
   return (
-    <div className="space-y-5">
-
+    <div className="space-y-4">
       {/* Toast */}
       {toast && (
-        <div className={`fixed top-4 right-4 z-[100] px-4 py-2.5 rounded-xl shadow-lg text-sm font-semibold
-          ${toast.ok ? 'bg-emerald-600 text-white' : 'bg-red-600 text-white'}`}>
+        <div className={`fixed top-4 left-1/2 -translate-x-1/2 z-50 px-5 py-2.5 rounded-2xl shadow-lg text-sm font-bold flex items-center gap-2 animate-[slideDown_0.3s_ease] ${
+          toast.type === 'success' ? 'bg-emerald-500 text-white shadow-emerald-500/30' : 'bg-red-500 text-white shadow-red-500/30'
+        }`}>
+          {toast.type === 'success' ? <CheckCircle2 size={16} /> : <X size={16} />}
           {toast.msg}
         </div>
       )}
 
-      {/* Error */}
-      {crError && (
-        <div className="bg-red-50 border border-red-200 rounded-xl p-3 text-sm text-red-700">
-          Erro ao carregar contas a receber: {(crError as Error).message}
-        </div>
-      )}
-
       {/* Header */}
-      <div>
-        <h1 className={`text-xl font-extrabold flex items-center gap-2 ${isDark ? 'text-white' : 'text-slate-800'}`}>
-          <TrendingUp size={20} className="text-emerald-600" />
-          Contas a Receber
-        </h1>
-        <p className={`text-xs mt-0.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
-          Pipeline de faturamento e recebimentos
-        </p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className={`text-xl font-extrabold flex items-center gap-2 ${isDark ? 'text-white' : 'text-slate-800'}`}>
+            <TrendingUp size={20} className="text-emerald-600" />
+            Contas a Receber
+          </h1>
+          <p className={`text-xs mt-0.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+            {contas.length} titulos &middot; {fmt(contas.reduce((s, c) => s + c.valor_original, 0))}
+          </p>
+        </div>
       </div>
 
       {/* Omie Sync */}
       <SyncBar isDark={isDark} />
 
-      {/* KPIs */}
-      <div className="grid grid-cols-3 gap-3">
-        <div className={`rounded-2xl p-4 border shadow-sm ${isDark ? 'bg-[#1e293b] border-white/[0.06]' : 'bg-white border-slate-200'}`}>
-          <p className="text-[10px] text-slate-400 font-semibold uppercase tracking-widest">Total</p>
-          <p className={`text-lg font-extrabold mt-1 ${isDark ? 'text-white' : 'text-slate-800'}`}>{filtered.length}</p>
-          <p className="text-[10px] text-slate-400">titulos</p>
-        </div>
-        <div className={`rounded-2xl p-4 border shadow-sm ${isDark ? 'bg-[#1e293b] border-white/[0.06]' : 'bg-white border-slate-200'}`}>
-          <p className="text-[10px] text-blue-500 font-semibold uppercase tracking-widest">Em Aberto</p>
-          <p className="text-lg font-extrabold text-blue-600 mt-1">{fmt(totalAberto)}</p>
-        </div>
-        <div className={`rounded-2xl p-4 border shadow-sm ${isDark ? 'bg-[#1e293b] border-white/[0.06]' : 'bg-white border-slate-200'}`}>
-          <p className="text-[10px] text-emerald-500 font-semibold uppercase tracking-widest">Recebido</p>
-          <p className="text-lg font-extrabold text-emerald-600 mt-1">{fmt(totalRecebido)}</p>
-        </div>
-      </div>
+      {/* ── Horizontal Tabs ───────────────────────────────────────── */}
+      <div className={`flex items-center gap-1 overflow-x-auto hide-scrollbar pb-0.5`}>
+        {CR_PIPELINE_STAGES.map(stage => {
+          const count = grouped.get(stage.status)?.length || 0
+          const isActive = activeTab === stage.status
+          const Icon = STATUS_ICONS[stage.status] || Receipt
+          const accent = isDark ? STATUS_ACCENT_DARK[stage.status] : STATUS_ACCENT[stage.status]
 
-      {/* Vencido alert */}
-      {totalVencido > 0 && (
-        <div className={`border rounded-2xl p-4 flex items-center gap-3 ${isDark ? 'bg-red-500/10 border-red-500/20' : 'bg-red-50 border-red-200'}`}>
-          <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${isDark ? 'bg-red-500/20' : 'bg-red-100'}`}>
-            <AlertTriangle size={18} className="text-red-500" />
-          </div>
-          <div>
-            <p className="text-sm font-bold text-red-700">Titulos vencidos</p>
-            <p className="text-xs text-red-500">{fmt(totalVencido)} em atraso</p>
-          </div>
-        </div>
-      )}
-
-      {/* Filtros */}
-      <div className="flex flex-col sm:flex-row gap-3">
-        <div className="relative flex-1">
-          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-          <input type="text" value={busca} onChange={e => setBusca(e.target.value)}
-            placeholder="Buscar cliente, NF, descricao..."
-            className={`w-full pl-9 pr-4 py-2.5 rounded-xl border text-sm placeholder-slate-400 focus:outline-none
-              focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-400
-              ${isDark ? 'bg-[#1e293b] border-white/[0.06] text-slate-200' : 'border-slate-200 bg-white text-slate-700'}`} />
-        </div>
-        <div className="flex gap-1.5 overflow-x-auto hide-scrollbar">
-          {FILTROS.map(f => (
-            <button key={f.value} onClick={() => setStatusFilter(f.value)}
-              className={`px-3 py-2 rounded-xl text-[11px] font-semibold whitespace-nowrap transition-all
-                ${statusFilter === f.value
-                  ? 'bg-emerald-600 text-white shadow-sm'
-                  : isDark ? 'bg-[#1e293b] text-slate-400 border border-white/[0.06]' : 'bg-white text-slate-500 border border-slate-200'
+          return (
+            <button
+              key={stage.status}
+              onClick={() => switchTab(stage.status)}
+              className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs whitespace-nowrap transition-all shrink-0 ${
+                isActive
+                  ? `${accent?.bgActive} ${accent?.textActive} font-bold shadow-sm ${!isDark ? `ring-1 ${STATUS_ACCENT[stage.status]?.border?.replace('border-', 'ring-')}` : ''}`
+                  : `${accent?.bg} ${accent?.text} font-medium`
+              }`}
+            >
+              <Icon size={13} className="shrink-0" />
+              {stage.label}
+              {count > 0 && (
+                <span className={`text-[10px] font-bold rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1 ${
+                  isActive
+                    ? isDark ? 'bg-white/10 text-white' : `${STATUS_ACCENT[stage.status]?.dot} text-white`
+                    : isDark ? 'bg-white/[0.06] text-slate-500' : 'bg-slate-200/80 text-slate-500'
                 }`}>
-              {f.label}
+                  {count}
+                </span>
+              )}
             </button>
-          ))}
+          )
+        })}
+      </div>
+
+      {/* ── Content panel ───────────────────────────────────────────── */}
+      <div className={`rounded-2xl border overflow-hidden ${isDark ? 'bg-[#0f172a] border-white/[0.06]' : 'bg-white border-slate-200'}`}>
+
+        {/* Toolbar: Search + Sort + View Toggle + Export */}
+        <div className={`px-4 py-2.5 border-b flex flex-wrap items-center gap-2 ${isDark ? 'border-white/[0.06]' : 'border-slate-100'}`}>
+
+          {/* Search */}
+          <div className="relative flex-1 min-w-[180px] max-w-sm">
+            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+            <input
+              type="text" value={busca} onChange={e => setBusca(e.target.value)}
+              placeholder="Buscar cliente, NF, CNPJ, CC..."
+              className={`w-full pl-9 pr-4 py-2 rounded-xl border text-xs placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 ${
+                isDark ? 'bg-white/[0.04] border-white/[0.06] text-slate-200' : 'border-slate-200 bg-white text-slate-700'
+              }`}
+            />
+            {busca && (
+              <button onClick={() => setBusca('')} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
+                <X size={12} />
+              </button>
+            )}
+          </div>
+
+          {/* Sort buttons */}
+          <div className="flex items-center gap-0.5">
+            {SORT_OPTIONS.map(opt => {
+              const isActive = sortField === opt.field
+              return (
+                <button
+                  key={opt.field}
+                  onClick={() => toggleSort(opt.field)}
+                  className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-medium transition-all ${
+                    isActive
+                      ? isDark ? 'bg-white/[0.08] text-white' : 'bg-slate-100 text-slate-800'
+                      : isDark ? 'text-slate-500 hover:text-slate-300 hover:bg-white/[0.04]' : 'text-slate-400 hover:text-slate-600 hover:bg-slate-50'
+                  }`}
+                >
+                  {opt.label}
+                  {isActive && (sortDir === 'asc' ? <ArrowUp size={10} /> : <ArrowDown size={10} />)}
+                </button>
+              )
+            })}
+          </div>
+
+          {/* View toggle */}
+          <div className={`flex items-center rounded-lg border overflow-hidden ${isDark ? 'border-white/[0.06]' : 'border-slate-200'}`}>
+            <button
+              onClick={() => setViewMode('list')}
+              className={`p-1.5 transition-all ${
+                viewMode === 'list'
+                  ? isDark ? 'bg-white/[0.08] text-white' : 'bg-slate-100 text-slate-700'
+                  : isDark ? 'text-slate-500 hover:text-white' : 'text-slate-400 hover:text-slate-600'
+              }`}
+              title="Lista"
+            >
+              <LayoutList size={14} />
+            </button>
+            <button
+              onClick={() => setViewMode('cards')}
+              className={`p-1.5 transition-all ${
+                viewMode === 'cards'
+                  ? isDark ? 'bg-white/[0.08] text-white' : 'bg-slate-100 text-slate-700'
+                  : isDark ? 'text-slate-500 hover:text-white' : 'text-slate-400 hover:text-slate-600'
+              }`}
+              title="Cards"
+            >
+              <LayoutGrid size={14} />
+            </button>
+          </div>
+
+          {/* Export CSV */}
+          <button
+            onClick={handleExport}
+            disabled={activeCRs.length === 0}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-medium transition-all ${
+              isDark
+                ? 'text-slate-400 hover:text-white hover:bg-white/[0.04] disabled:opacity-30'
+                : 'text-slate-500 hover:text-slate-700 hover:bg-slate-50 disabled:opacity-30'
+            }`}
+            title="Exportar CSV"
+          >
+            <Download size={13} />
+            CSV
+          </button>
+
+          {/* Stats */}
+          <div className={`ml-auto flex items-center gap-3 text-[11px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+            <span>{activeCRs.length} {activeCRs.length === 1 ? 'titulo' : 'titulos'}</span>
+            <span className="font-bold text-emerald-600">{fmt(tabTotal)}</span>
+            {overdueCt > 0 && (
+              <span className="flex items-center gap-1 text-red-500 font-bold">
+                <AlertTriangle size={11} /> {overdueCt} vencido{overdueCt > 1 ? 's' : ''} ({fmt(overdueTotal)})
+              </span>
+            )}
+          </div>
+        </div>
+
+        {/* Select all + bulk action bar */}
+        {activeCRs.length > 0 && bulk && (
+          <div className={`px-4 py-2 border-b flex items-center gap-3 ${isDark ? 'border-white/[0.06] bg-white/[0.02]' : 'border-slate-100 bg-slate-50/50'}`}>
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={activeCRs.length > 0 && activeCRs.every(cr => selectedIds.has(cr.id))}
+                onChange={selectAll}
+                className="w-3.5 h-3.5 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
+              />
+              <span className={`text-[11px] font-medium ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+                Todos
+              </span>
+            </label>
+            {selectedInTab.length > 0 && (
+              <>
+                <button
+                  onClick={handleBulkAction}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-bold transition-all ${bulk.className}`}
+                >
+                  <bulk.icon size={12} />
+                  {bulk.label} ({selectedInTab.length})
+                </button>
+                <span className={`text-[10px] ml-auto ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+                  {fmt(selectedInTab.reduce((s, cr) => s + cr.valor_original, 0))} selecionado
+                </span>
+              </>
+            )}
+          </div>
+        )}
+
+        {/* CR list / cards */}
+        <div className="flex-1 overflow-y-auto">
+          {isLoading ? (
+            <div className="flex items-center justify-center py-20">
+              <div className="w-8 h-8 border-[3px] border-emerald-500 border-t-transparent rounded-full animate-spin" />
+            </div>
+          ) : activeCRs.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-20">
+              <div className={`w-14 h-14 rounded-2xl flex items-center justify-center mb-4 ${isDark ? 'bg-white/[0.04]' : 'bg-slate-100'}`}>
+                <TrendingUp size={24} className="text-slate-300" />
+              </div>
+              <p className={`text-sm font-semibold ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+                Nenhum titulo nesta etapa
+              </p>
+              <p className={`text-xs mt-1 ${isDark ? 'text-slate-600' : 'text-slate-400'}`}>
+                {busca ? 'Tente outra busca' : 'Os titulos aparecerão aqui quando avancarem'}
+              </p>
+            </div>
+          ) : viewMode === 'list' ? (
+            <>
+              {/* Table header */}
+              <div className={`flex items-center gap-2 px-3 py-1 border-b text-[10px] font-semibold uppercase tracking-wider ${
+                isDark ? 'border-white/[0.06] text-slate-600' : 'border-slate-100 text-slate-400'
+              }`}>
+                <span className="w-3 shrink-0" />
+                <span className="w-0.5 shrink-0" />
+                <span className="w-[180px] shrink-0">Cliente</span>
+                <span className="w-[150px] shrink-0">Descricao</span>
+                <span className="w-[80px] shrink-0">NF</span>
+                <span className="w-[70px] shrink-0">CC</span>
+                <span className="w-[100px] shrink-0">Classe</span>
+                <span className="w-[62px] shrink-0 text-right">Venc.</span>
+                <span className="w-[90px] shrink-0 text-right">Valor</span>
+              </div>
+              {activeCRs.map(cr => (
+                <CRRow
+                  key={cr.id}
+                  cr={cr}
+                  onClick={() => setDetailCR(cr)}
+                  isDark={isDark}
+                  isSelected={selectedIds.has(cr.id)}
+                  onSelect={toggleSelect}
+                />
+              ))}
+            </>
+          ) : (
+            <div className="space-y-2 p-4">
+              {activeCRs.map(cr => (
+                <CRCard
+                  key={cr.id}
+                  cr={cr}
+                  onClick={() => setDetailCR(cr)}
+                  isDark={isDark}
+                  isSelected={selectedIds.has(cr.id)}
+                  onSelect={toggleSelect}
+                />
+              ))}
+            </div>
+          )}
         </div>
       </div>
 
-      {/* Lista */}
-      {isLoading ? (
-        <div className="flex items-center justify-center py-16">
-          <div className="w-8 h-8 border-[3px] border-emerald-500 border-t-transparent rounded-full animate-spin" />
-        </div>
-      ) : filtered.length === 0 ? (
-        <div className="text-center py-16">
-          <div className={`w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4 ${isDark ? 'bg-emerald-500/10' : 'bg-emerald-50'}`}>
-            <DollarSign size={28} className="text-emerald-300" />
-          </div>
-          <p className={`text-sm font-semibold ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Nenhum titulo encontrado</p>
-          <p className={`text-xs mt-1 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>As contas a receber aparecerao aqui</p>
-        </div>
-      ) : (
-        <div className="space-y-2">
-          {filtered.map(cr => (
-            <CRCard
-              key={cr.id}
-              cr={cr}
-              isDark={isDark}
-              onAutorizar={handleAutorizar}
-              onFaturar={setFaturarModal}
-              onEmail={handleEmail}
-              onAvancar={handleAvancar}
-              onReceber={setRecebimentoModal}
-              onConciliar={handleConciliar}
-            />
-          ))}
-        </div>
+      {/* Detail Modal */}
+      {detailCR && (
+        <CRDetailModal
+          cr={detailCR}
+          onClose={() => setDetailCR(null)}
+          onAction={handleDetailAction}
+          isDark={isDark}
+        />
       )}
 
-      {/* Modals */}
+      {/* Faturamento Modal */}
       {faturarModal && (
         <FaturamentoModal
           cr={faturarModal}
           isDark={isDark}
-          onClose={() => { setFaturarModal(null); showToast('NF emitida com sucesso') }}
+          onClose={() => { setFaturarModal(null); showToast('success', 'NF emitida com sucesso') }}
         />
       )}
+
+      {/* Recebimento Modal */}
       {recebimentoModal && (
         <RegistrarRecebimentoModal
           cr={recebimentoModal}
           isDark={isDark}
-          onClose={() => { setRecebimentoModal(null); showToast('Recebimento registrado') }}
+          onClose={() => { setRecebimentoModal(null); showToast('success', 'Recebimento registrado') }}
         />
       )}
     </div>
