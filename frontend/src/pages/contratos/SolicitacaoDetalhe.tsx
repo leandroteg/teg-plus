@@ -5,14 +5,17 @@ import {
   XCircle, AlertTriangle, ChevronRight, Send,
   Archive, Unlock, Ban, Eye, Pencil, Building2, Calendar,
   DollarSign, User, Briefcase, Tag, ShieldCheck, Info, PenTool, X,
+  Plus, Trash2, Users,
 } from 'lucide-react'
 import {
   useSolicitacao,
   useSolicitacaoHistorico,
   useAvancarEtapa,
   useCancelarSolicitacao,
+  useEnviarAssinatura,
+  useMinutas,
 } from '../../hooks/useSolicitacoes'
-import type { EtapaSolicitacao, Solicitacao } from '../../types/contratos'
+import type { EtapaSolicitacao, Solicitacao, TipoAssinatura } from '../../types/contratos'
 
 // ── Formatters ──────────────────────────────────────────────────────────────────
 
@@ -251,18 +254,56 @@ function CancelModal({ open, onClose, onConfirm, isPending }: {
 
 // ── Certisign Modal ──────────────────────────────────────────────────────────────
 
-function CertisignModal({ open, onClose, onConfirm, isPending }: {
+function CertisignModal({ open, onClose, solicitacao, minutaUrl, onSuccess }: {
   open: boolean
   onClose: () => void
-  onConfirm: () => void
-  isPending: boolean
+  solicitacao: Solicitacao
+  minutaUrl: string | null
+  onSuccess: () => void
 }) {
+  const [signatarios, setSignatarios] = useState<{ nome: string; email: string; cpf: string; papel: string }[]>([
+    { nome: '', email: '', cpf: '', papel: 'Contratante' },
+    { nome: '', email: '', cpf: '', papel: 'Contratada' },
+  ])
+  const [tipoAssinatura, setTipoAssinatura] = useState<TipoAssinatura>('eletronica')
+  const [erro, setErro] = useState<string | null>(null)
+  const enviar = useEnviarAssinatura()
+
   if (!open) return null
+
+  const addSignatario = () =>
+    setSignatarios(prev => [...prev, { nome: '', email: '', cpf: '', papel: '' }])
+
+  const removeSignatario = (idx: number) =>
+    setSignatarios(prev => prev.filter((_, i) => i !== idx))
+
+  const updateSignatario = (idx: number, field: string, value: string) =>
+    setSignatarios(prev => prev.map((s, i) => i === idx ? { ...s, [field]: value } : s))
+
+  const handleSubmit = async () => {
+    setErro(null)
+    if (!minutaUrl) { setErro('Nenhuma minuta disponivel para envio.'); return }
+    const invalidos = signatarios.filter(s => !s.nome || !s.email || !s.cpf)
+    if (invalidos.length) { setErro('Preencha nome, e-mail e CPF de todos os signatarios.'); return }
+    try {
+      await enviar.mutateAsync({
+        solicitacao_id: solicitacao.id,
+        minuta_url: minutaUrl,
+        tipo_assinatura: tipoAssinatura,
+        signatarios: signatarios.map(s => ({ nome: s.nome, email: s.email, cpf: s.cpf, papel: s.papel })),
+      })
+      onSuccess()
+      onClose()
+    } catch (e: unknown) {
+      setErro(e instanceof Error ? e.message : 'Erro desconhecido ao enviar.')
+    }
+  }
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="fixed inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-md p-6 space-y-4 animate-in fade-in zoom-in-95 duration-200">
+      <div className="relative bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-2xl p-6 space-y-5 animate-in fade-in zoom-in-95 duration-200 max-h-[90vh] overflow-y-auto">
+        {/* Header */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-teal-500 to-teal-600 flex items-center justify-center shadow-sm">
@@ -270,7 +311,7 @@ function CertisignModal({ open, onClose, onConfirm, isPending }: {
             </div>
             <div>
               <h3 className="text-base font-extrabold text-slate-800">Enviar para Assinatura</h3>
-              <p className="text-xs text-slate-400">Integracao com Certisign</p>
+              <p className="text-xs text-slate-400">Integracao Certisign — {solicitacao.numero}</p>
             </div>
           </div>
           <button onClick={onClose} className="text-slate-400 hover:text-slate-600 transition-colors">
@@ -278,39 +319,112 @@ function CertisignModal({ open, onClose, onConfirm, isPending }: {
           </button>
         </div>
 
-        <div className="bg-amber-50 rounded-xl border border-amber-200 px-4 py-3">
-          <div className="flex items-start gap-2">
-            <AlertTriangle size={14} className="text-amber-500 mt-0.5 shrink-0" />
-            <div>
-              <p className="text-xs font-semibold text-amber-700">Integracao em Desenvolvimento</p>
-              <p className="text-[11px] text-amber-600 mt-1 leading-relaxed">
-                A integracao com a plataforma Certisign para assinatura digital esta em desenvolvimento.
-                Por enquanto, voce pode avancar a etapa manualmente e enviar o contrato para assinatura por outros meios.
-              </p>
+        {/* Erro */}
+        {erro && (
+          <div className="bg-red-50 rounded-xl border border-red-200 px-4 py-3 flex items-start gap-2">
+            <AlertTriangle size={14} className="text-red-500 mt-0.5 shrink-0" />
+            <p className="text-xs text-red-700 font-medium">{erro}</p>
+          </div>
+        )}
+
+        {/* Tipo assinatura */}
+        <div>
+          <label className="text-xs font-bold text-slate-600 mb-1.5 block">Tipo de Assinatura</label>
+          <select
+            value={tipoAssinatura}
+            onChange={e => setTipoAssinatura(e.target.value as TipoAssinatura)}
+            className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500/30"
+          >
+            <option value="eletronica">Eletronica</option>
+            <option value="digital_icp">Digital ICP-Brasil</option>
+          </select>
+        </div>
+
+        {/* Signatarios */}
+        <div>
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-2">
+              <Users size={14} className="text-teal-600" />
+              <span className="text-xs font-bold text-slate-600">Signatarios ({signatarios.length})</span>
             </div>
+            <button
+              type="button"
+              onClick={addSignatario}
+              className="flex items-center gap-1 text-[11px] font-bold text-teal-600 hover:text-teal-700 transition-colors"
+            >
+              <Plus size={12} /> Adicionar
+            </button>
+          </div>
+
+          <div className="space-y-3">
+            {signatarios.map((s, idx) => (
+              <div key={idx} className="bg-slate-50 rounded-xl border border-slate-200 p-3">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                    Signatario {idx + 1}
+                  </span>
+                  {signatarios.length > 1 && (
+                    <button
+                      type="button"
+                      onClick={() => removeSignatario(idx)}
+                      className="text-red-400 hover:text-red-600 transition-colors"
+                    >
+                      <Trash2 size={13} />
+                    </button>
+                  )}
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <input
+                    value={s.nome}
+                    onChange={e => updateSignatario(idx, 'nome', e.target.value)}
+                    placeholder="Nome completo"
+                    className="rounded-lg border border-slate-200 px-2.5 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-teal-500/30 bg-white"
+                  />
+                  <input
+                    value={s.email}
+                    onChange={e => updateSignatario(idx, 'email', e.target.value)}
+                    placeholder="E-mail"
+                    className="rounded-lg border border-slate-200 px-2.5 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-teal-500/30 bg-white"
+                  />
+                  <input
+                    value={s.cpf}
+                    onChange={e => updateSignatario(idx, 'cpf', e.target.value)}
+                    placeholder="CPF"
+                    className="rounded-lg border border-slate-200 px-2.5 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-teal-500/30 bg-white"
+                  />
+                  <input
+                    value={s.papel}
+                    onChange={e => updateSignatario(idx, 'papel', e.target.value)}
+                    placeholder="Papel (ex: Contratante)"
+                    className="rounded-lg border border-slate-200 px-2.5 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-teal-500/30 bg-white"
+                  />
+                </div>
+              </div>
+            ))}
           </div>
         </div>
 
-        <div className="flex gap-3">
+        {/* Actions */}
+        <div className="flex gap-3 pt-2">
           <button
             onClick={onClose}
             className="flex-1 py-2.5 rounded-xl border border-slate-200 text-sm font-semibold
               text-slate-600 hover:bg-slate-50 transition-all"
           >
-            Voltar
+            Cancelar
           </button>
           <button
-            onClick={onConfirm}
-            disabled={isPending}
+            onClick={handleSubmit}
+            disabled={enviar.isPending}
             className="flex-1 py-2.5 rounded-xl bg-gradient-to-r from-teal-500 to-teal-600
               text-white text-sm font-semibold shadow-sm
               hover:from-teal-600 hover:to-teal-700 transition-all disabled:opacity-50
               flex items-center justify-center gap-2"
           >
-            {isPending
+            {enviar.isPending
               ? <div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
               : <Send size={14} />}
-            Confirmar Envio
+            Enviar para Certisign
           </button>
         </div>
       </div>
@@ -481,6 +595,7 @@ export default function SolicitacaoDetalhe() {
   const { data: historico = [] } = useSolicitacaoHistorico(id)
   const avancarEtapa = useAvancarEtapa()
   const cancelarSolicitacao = useCancelarSolicitacao()
+  const { data: minutas } = useMinutas(id)
 
   const [showCancelModal, setShowCancelModal] = useState(false)
   const [showCertisignModal, setShowCertisignModal] = useState(false)
@@ -803,11 +918,9 @@ export default function SolicitacaoDetalhe() {
       <CertisignModal
         open={showCertisignModal}
         onClose={() => setShowCertisignModal(false)}
-        onConfirm={() => {
-          handleAvancar('arquivar')
-          setShowCertisignModal(false)
-        }}
-        isPending={avancarEtapa.isPending}
+        solicitacao={solicitacao}
+        minutaUrl={minutas?.find(m => m.arquivo_url)?.arquivo_url ?? null}
+        onSuccess={() => handleAvancar('arquivar')}
       />
     </div>
   )
