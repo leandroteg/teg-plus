@@ -148,7 +148,7 @@ const BRAND = {
 
 export default function ModuloSelector() {
   const { perfil, isAdmin, signOut } = useAuth()
-  const { isLightSidebar: isLight } = useTheme()
+  const { isLightSidebar: isLight, theme } = useTheme()
   const navigate = useNavigate()
   const [openPillar, setOpenPillar] = useState<Pillar | null>(null)
   const [overlayVisible, setOverlayVisible] = useState(false)
@@ -232,6 +232,18 @@ export default function ModuloSelector() {
 
   return (
     <div className={`min-h-screen relative overflow-x-hidden flex flex-col ${isLight ? 'bg-slate-50' : 'bg-[#060D1B]'}`}>
+
+      {/* ── Background image — transmission towers ─────────────── */}
+      <div
+        className="absolute inset-0 pointer-events-none bg-no-repeat bg-cover bg-center transition-opacity duration-500"
+        style={{
+          backgroundImage: 'url(/bg-teg-transmission.png)',
+          ...(isLight
+            ? { opacity: 0.05, filter: 'brightness(1.6) grayscale(0.3) contrast(0.85)', mixBlendMode: 'multiply' as const }
+            : { opacity: 0.12, filter: 'none', mixBlendMode: 'screen' as const }
+          ),
+        }}
+      />
 
       {/* ── Atmospheric glow layers (dark only) ────────────────── */}
       {!isLight && (
