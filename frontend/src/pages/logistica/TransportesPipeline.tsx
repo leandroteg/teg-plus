@@ -296,16 +296,20 @@ export default function TransportesPipeline() {
   const [sortDir, setSortDir] = useState<SortDir>('desc')
   const [viewMode, setViewMode] = useState<ViewMode>('list')
 
-  const { data: solicitacoes = [], isLoading } = useSolicitacoes()
+  const { data: solicitacoes = [], isLoading } = useSolicitacoes({
+    status: ['nfe_emitida', 'aguardando_coleta', 'em_transito', 'entregue', 'concluido'],
+  })
   const confirmarEntrega = useConfirmarEntregaFisica()
   const confirmarAgendamento = useConfirmarAgendamento()
   const concluirSolicitacao = useConcluirSolicitacao()
 
-  // Group by status
+  // Group by status — for "nfe_emitida" (Pendentes), only show items that actually have NF emitted
   const grouped = useMemo(() => {
     const map = new Map<StatusTransportePipeline, LogSolicitacao[]>()
     for (const s of TRANSPORTE_PIPELINE_STAGES) map.set(s.status, [])
     for (const sol of solicitacoes) {
+      // Skip nfe_emitida items that don't actually have a NF (still in Expedição)
+      if (sol.status === 'nfe_emitida' && sol.doc_fiscal_tipo !== 'nf' && !sol.nfe) continue
       const arr = map.get(sol.status as StatusTransportePipeline)
       if (arr) arr.push(sol)
     }
@@ -419,7 +423,7 @@ export default function TransportesPipeline() {
             <Truck size={20} className="text-orange-600" /> Transportes
           </h1>
           <p className={`text-xs mt-0.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
-            {solicitacoes.filter(s => ['nfe_emitida','aguardando_coleta','em_transito','entregue','concluido'].includes(s.status)).length} no pipeline de transporte
+            {Array.from(grouped.values()).reduce((sum, arr) => sum + arr.length, 0)} no pipeline de transporte
           </p>
         </div>
       </div>
