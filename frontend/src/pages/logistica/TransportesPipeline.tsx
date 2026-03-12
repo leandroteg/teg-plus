@@ -2,13 +2,12 @@ import { useState, useMemo } from 'react'
 import {
   Truck, Search, X, CheckCircle2, AlertTriangle,
   Calendar, ArrowUp, ArrowDown, LayoutList, LayoutGrid, Download,
-  MapPin, Clock, Building2, Package2, FileText, CalendarCheck,
+  MapPin, Clock, Building2, Package2, FileText, CalendarCheck, Star, Loader2,
 } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
 import {
   useSolicitacoes, useConfirmarEntregaFisica,
-  useConfirmarAgendamento, useIniciarTransporte,
-  useConcluirSolicitacao,
+  useConfirmarAgendamento, useConfirmarRecebimento,
 } from '../../hooks/useLogistica'
 import type { LogSolicitacao, StatusTransportePipeline } from '../../types/logistica'
 import { TRANSPORTE_PIPELINE_STAGES } from '../../types/logistica'
@@ -94,6 +93,136 @@ function isLate(sol: LogSolicitacao): boolean {
   return new Date(t.eta_atual) < new Date()
 }
 
+// ── Recebimento Modal ───────────────────────────────────────────────────────
+
+function RecebimentoModal({ sol, onClose, onConfirm, isPending, isDark }: {
+  sol: LogSolicitacao; onClose: () => void
+  onConfirm: (data: {
+    recebimento_id: string; solicitacao_id: string
+    checklist: { quantidades_conferidas: boolean; estado_verificado: boolean; seriais_conferidos: boolean; temperatura_verificada: boolean }
+    status: 'confirmado' | 'parcial' | 'recusado'
+    divergencias?: string; avaliacao_qualidade?: number
+  }) => void
+  isPending: boolean; isDark: boolean
+}) {
+  const [checklist, setChecklist] = useState({
+    quantidades_conferidas: false,
+    estado_verificado: false,
+    seriais_conferidos: false,
+    temperatura_verificada: false,
+  })
+  const [statusReceb, setStatusReceb] = useState<'confirmado' | 'parcial' | 'recusado'>('confirmado')
+  const [divergencias, setDivergencias] = useState('')
+  const [avaliacaoQualidade, setAvaliacaoQualidade] = useState(5)
+
+  const recebId = sol.recebimento?.id
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm" onClick={onClose}>
+      <div className={`rounded-2xl shadow-2xl w-full max-w-md max-h-[90vh] overflow-y-auto ${isDark ? 'bg-[#1e293b]' : 'bg-white'}`} onClick={e => e.stopPropagation()}>
+        <div className={`flex items-center justify-between px-6 py-4 sticky top-0 z-10 ${isDark ? 'border-b border-white/[0.06] bg-[#1e293b]' : 'border-b border-slate-100 bg-white'}`}>
+          <h2 className={`text-lg font-extrabold ${isDark ? 'text-white' : 'text-slate-800'}`}>Confirmar Recebimento</h2>
+          <button onClick={onClose} className={`w-8 h-8 rounded-lg flex items-center justify-center ${isDark ? 'hover:bg-white/10 text-slate-400' : 'hover:bg-slate-100'}`}>
+            <X size={16} />
+          </button>
+        </div>
+        <div className="p-6 space-y-4">
+          <div className={`rounded-xl px-3 py-2.5 ${isDark ? 'bg-white/5' : 'bg-slate-50'}`}>
+            <p className={`text-xs font-bold ${isDark ? 'text-white' : 'text-slate-700'}`}>#{sol.numero}</p>
+            <p className={`text-[10px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+              {sol.origem} → {sol.destino}{sol.obra_nome ? ` · ${sol.obra_nome}` : ''}
+            </p>
+          </div>
+
+          <div>
+            <p className={`text-xs font-bold mb-2 ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>Checklist de Recebimento</p>
+            <div className="space-y-2">
+              {([
+                ['quantidades_conferidas', 'Quantidades conferidas contra NF-e'],
+                ['estado_verificado',      'Estado dos itens verificado (avarias, violação)'],
+                ['seriais_conferidos',     'Itens de alta precisão conferidos individualmente'],
+                ['temperatura_verificada', 'Temperatura verificada (itens com controle especial)'],
+              ] as const).map(([k, l]) => (
+                <label key={k} className="flex items-center gap-2.5 cursor-pointer">
+                  <input type="checkbox"
+                    checked={checklist[k as keyof typeof checklist]}
+                    onChange={e => setChecklist(p => ({ ...p, [k]: e.target.checked }))}
+                    className="rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
+                  />
+                  <span className={`text-xs ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>{l}</span>
+                </label>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <label className={`block text-xs font-bold mb-1 ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>Resultado *</label>
+            <div className="flex gap-2">
+              {([
+                ['confirmado', 'Confirmado', 'bg-emerald-600'],
+                ['parcial',    'Parcial',    'bg-blue-600'],
+                ['recusado',   'Recusado',   'bg-red-600'],
+              ] as const).map(([v, l, c]) => (
+                <button key={v} onClick={() => setStatusReceb(v)}
+                  className={`flex-1 py-2 rounded-xl text-xs font-semibold transition-colors text-white ${statusReceb === v ? c : isDark ? 'bg-white/10 text-slate-400' : 'bg-slate-200 text-slate-600'}`}>
+                  {l}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {(statusReceb === 'parcial' || statusReceb === 'recusado') && (
+            <div>
+              <label className={`block text-xs font-bold mb-1 ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>Descrição das Divergências *</label>
+              <textarea value={divergencias} onChange={e => setDivergencias(e.target.value)}
+                rows={2} className={`w-full rounded-xl border text-xs px-3 py-2 resize-none focus:outline-none focus:ring-2 focus:ring-orange-500/30 ${isDark ? 'bg-white/[0.04] border-white/[0.06] text-slate-200' : 'border-slate-200 bg-white text-slate-700'}`} placeholder="Descreva as divergências encontradas..." />
+            </div>
+          )}
+
+          <div>
+            <label className={`block text-xs font-bold mb-1.5 ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>Avaliação de Qualidade</label>
+            <div className="flex gap-1.5">
+              {[1, 2, 3, 4, 5].map(n => (
+                <button key={n} onClick={() => setAvaliacaoQualidade(n)}
+                  className={`w-9 h-9 rounded-lg text-sm font-bold transition-all ${
+                    avaliacaoQualidade >= n
+                      ? 'bg-amber-400 text-white shadow-sm'
+                      : isDark ? 'bg-white/10 text-slate-500 hover:bg-amber-500/20' : 'bg-slate-100 text-slate-400 hover:bg-amber-100'
+                  }`}>
+                  <Star size={14} className="mx-auto" fill={avaliacaoQualidade >= n ? 'currentColor' : 'none'} />
+                </button>
+              ))}
+              <span className={`text-xs self-center ml-1 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{avaliacaoQualidade}/5</span>
+            </div>
+          </div>
+        </div>
+        <div className={`px-6 py-4 flex justify-end gap-2 ${isDark ? 'border-t border-white/[0.06]' : 'border-t border-slate-100'}`}>
+          <button onClick={onClose}
+            className={`px-4 py-2 rounded-xl text-sm font-semibold ${isDark ? 'border border-white/[0.06] text-slate-400 hover:bg-white/5' : 'border border-slate-200 text-slate-600 hover:bg-slate-50'}`}>
+            Cancelar
+          </button>
+          <button onClick={() => {
+            if (!recebId) return
+            onConfirm({
+              recebimento_id: recebId,
+              solicitacao_id: sol.id,
+              checklist,
+              status: statusReceb,
+              divergencias: divergencias || undefined,
+              avaliacao_qualidade: avaliacaoQualidade,
+            })
+          }} disabled={isPending || !recebId}
+            className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700
+              text-white text-sm font-semibold transition-colors disabled:opacity-60">
+            {isPending ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle2 size={14} />}
+            Confirmar Recebimento
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ── Detail Modal ─────────────────────────────────────────────────────────────
 
 function DetailModal({ sol, onClose, onAction, isDark }: {
@@ -141,6 +270,40 @@ function DetailModal({ sol, onClose, onAction, isDark }: {
             {sol.descricao && <p className="text-xs text-slate-500 mt-2 pt-2 border-t border-slate-200">{sol.descricao}</p>}
           </div>
 
+          {/* Recebimento info (for concluido) */}
+          {sol.status === 'concluido' && sol.recebimento && (
+            <div className={`rounded-xl p-4 space-y-2 ${isDark ? 'bg-emerald-500/5 border border-emerald-500/20' : 'bg-emerald-50 border border-emerald-200'}`}>
+              <p className="text-[9px] font-bold text-emerald-600 uppercase tracking-wider">Recebimento Confirmado</p>
+              <div className="grid grid-cols-2 gap-2 text-xs">
+                <div className="flex items-center gap-1">
+                  {sol.recebimento.quantidades_conferidas ? <CheckCircle2 size={11} className="text-emerald-500" /> : <X size={11} className="text-red-400" />}
+                  <span className={isDark ? 'text-slate-400' : 'text-slate-600'}>Quantidades</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  {sol.recebimento.estado_verificado ? <CheckCircle2 size={11} className="text-emerald-500" /> : <X size={11} className="text-red-400" />}
+                  <span className={isDark ? 'text-slate-400' : 'text-slate-600'}>Estado</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  {sol.recebimento.seriais_conferidos ? <CheckCircle2 size={11} className="text-emerald-500" /> : <X size={11} className="text-red-400" />}
+                  <span className={isDark ? 'text-slate-400' : 'text-slate-600'}>Seriais</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  {sol.recebimento.temperatura_verificada ? <CheckCircle2 size={11} className="text-emerald-500" /> : <X size={11} className="text-red-400" />}
+                  <span className={isDark ? 'text-slate-400' : 'text-slate-600'}>Temperatura</span>
+                </div>
+              </div>
+              {sol.recebimento.confirmado_em && (
+                <p className={`text-[10px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+                  Confirmado em {fmtDataHora(sol.recebimento.confirmado_em)}
+                  {sol.recebimento.assinatura_digital && ` · ${sol.recebimento.assinatura_digital}`}
+                </p>
+              )}
+              {sol.recebimento.divergencias && (
+                <p className="text-[10px] font-medium text-amber-600">Divergências: {sol.recebimento.divergencias}</p>
+              )}
+            </div>
+          )}
+
           {/* Progress */}
           <div className={`rounded-xl p-3 ${isDark ? 'bg-white/[0.04]' : 'bg-slate-50'}`}>
             <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-2">Progresso</p>
@@ -169,8 +332,8 @@ function DetailModal({ sol, onClose, onAction, isDark }: {
               </button>
             )}
             {sol.status === 'entregue' && (
-              <button onClick={() => onAction('concluir', sol)} className="flex-1 py-3 rounded-xl bg-green-600 text-white text-sm font-bold hover:bg-green-700 transition-all flex items-center justify-center gap-2">
-                <CheckCircle2 size={15} /> Concluir
+              <button onClick={() => onAction('confirmarRecebimento', sol)} className="flex-1 py-3 rounded-xl bg-emerald-600 text-white text-sm font-bold hover:bg-emerald-700 transition-all flex items-center justify-center gap-2">
+                <CheckCircle2 size={15} /> Confirmar Recebimento
               </button>
             )}
           </div>
@@ -290,6 +453,7 @@ export default function TransportesPipeline() {
   const [activeTab, setActiveTab] = useState<StatusTransportePipeline>('nfe_emitida')
   const [busca, setBusca] = useState('')
   const [detail, setDetail] = useState<LogSolicitacao | null>(null)
+  const [recebModal, setRecebModal] = useState<LogSolicitacao | null>(null)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [toast, setToast] = useState<{ type: 'success' | 'error'; msg: string } | null>(null)
   const [sortField, setSortField] = useState<SortField>('data')
@@ -301,7 +465,7 @@ export default function TransportesPipeline() {
   })
   const confirmarEntrega = useConfirmarEntregaFisica()
   const confirmarAgendamento = useConfirmarAgendamento()
-  const concluirSolicitacao = useConcluirSolicitacao()
+  const confirmarRecebimento = useConfirmarRecebimento()
 
   // Group by status — for "nfe_emitida" (Pendentes), only show items that actually have NF emitted
   const grouped = useMemo(() => {
@@ -309,7 +473,7 @@ export default function TransportesPipeline() {
     for (const s of TRANSPORTE_PIPELINE_STAGES) map.set(s.status, [])
     for (const sol of solicitacoes) {
       // Skip nfe_emitida items that don't actually have a NF (still in Expedição)
-      if (sol.status === 'nfe_emitida' && sol.doc_fiscal_tipo !== 'nf' && !sol.nfe) continue
+      if (sol.status === 'nfe_emitida' && sol.doc_fiscal_tipo !== 'nf') continue
       const arr = map.get(sol.status as StatusTransportePipeline)
       if (arr) arr.push(sol)
     }
@@ -366,12 +530,25 @@ export default function TransportesPipeline() {
     } catch { showToast('error', 'Erro ao confirmar entrega') }
   }
 
-  const handleConcluir = async (ids: string[]) => {
+  const handleConfirmarRecebimento = async (data: {
+    recebimento_id: string; solicitacao_id: string
+    checklist: { quantidades_conferidas: boolean; estado_verificado: boolean; seriais_conferidos: boolean; temperatura_verificada: boolean }
+    status: 'confirmado' | 'parcial' | 'recusado'
+    divergencias?: string; avaliacao_qualidade?: number
+  }) => {
     try {
-      for (const id of ids) await concluirSolicitacao.mutateAsync({ id })
-      showToast('success', `${ids.length} solicitação(ões) concluída(s)`)
+      await confirmarRecebimento.mutateAsync({
+        id: data.recebimento_id,
+        solicitacao_id: data.solicitacao_id,
+        checklist: data.checklist,
+        status: data.status,
+        divergencias: data.divergencias,
+        avaliacao_qualidade: data.avaliacao_qualidade,
+      })
+      showToast('success', 'Recebimento confirmado com sucesso')
+      setRecebModal(null)
       setSelectedIds(new Set())
-    } catch { showToast('error', 'Erro ao concluir') }
+    } catch { showToast('error', 'Erro ao confirmar recebimento') }
   }
 
   const handleBulkAction = () => {
@@ -380,7 +557,12 @@ export default function TransportesPipeline() {
     switch (activeTab) {
       case 'nfe_emitida': handleConfirmarAgendamento(ids); break
       case 'em_transito': handleConfirmarEntrega(ids); break
-      case 'entregue': handleConcluir(ids); break
+      // For 'entregue', bulk opens the modal for the first selected item
+      case 'entregue': {
+        const first = solicitacoes.find(s => ids.includes(s.id) && s.status === 'entregue')
+        if (first) setRecebModal(first)
+        break
+      }
     }
   }
 
@@ -388,7 +570,7 @@ export default function TransportesPipeline() {
     setDetail(null)
     if (action === 'confirmarAgendamento') handleConfirmarAgendamento([sol.id])
     if (action === 'confirmarEntrega') handleConfirmarEntrega([sol.id])
-    if (action === 'concluir') handleConcluir([sol.id])
+    if (action === 'confirmarRecebimento') setRecebModal(sol)
   }
 
   const handleExport = () => {
@@ -399,9 +581,9 @@ export default function TransportesPipeline() {
   }
 
   const BULK_ACTIONS: Partial<Record<StatusTransportePipeline, { label: string; icon: typeof CheckCircle2; className: string }>> = {
-    nfe_emitida: { label: 'Confirmar Agendamento', icon: CalendarCheck, className: 'bg-blue-600 hover:bg-blue-700 text-white' },
-    em_transito: { label: 'Confirmar Entrega',     icon: Package2,      className: 'bg-teal-600 hover:bg-teal-700 text-white' },
-    entregue:    { label: 'Concluir',               icon: CheckCircle2,  className: 'bg-green-600 hover:bg-green-700 text-white' },
+    nfe_emitida: { label: 'Confirmar Agendamento',  icon: CalendarCheck, className: 'bg-blue-600 hover:bg-blue-700 text-white' },
+    em_transito: { label: 'Confirmar Entrega',       icon: Package2,      className: 'bg-teal-600 hover:bg-teal-700 text-white' },
+    entregue:    { label: 'Confirmar Recebimento',    icon: CheckCircle2,  className: 'bg-emerald-600 hover:bg-emerald-700 text-white' },
   }
   const bulk = BULK_ACTIONS[activeTab]
   const selectedInTab = activeItems.filter(s => selectedIds.has(s.id))
@@ -556,6 +738,7 @@ export default function TransportesPipeline() {
       </div>
 
       {detail && <DetailModal sol={detail} onClose={() => setDetail(null)} onAction={handleDetailAction} isDark={isDark} />}
+      {recebModal && <RecebimentoModal sol={recebModal} onClose={() => setRecebModal(null)} onConfirm={handleConfirmarRecebimento} isPending={confirmarRecebimento.isPending} isDark={isDark} />}
     </div>
   )
 }

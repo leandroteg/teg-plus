@@ -1,6 +1,6 @@
 import {
   LayoutDashboard, ClipboardList, Package2,
-  Truck, CheckCircle2, Building2,
+  Truck, Building2,
 } from 'lucide-react'
 import ModuleLayout from './ModuleLayout'
 
@@ -9,7 +9,6 @@ const NAV = [
   { to: '/logistica/solicitacoes',    icon: ClipboardList,   label: 'Solicitações',    end: false },
   { to: '/logistica/expedicao',       icon: Package2,        label: 'Expedição',       end: false },
   { to: '/logistica/transportes',     icon: Truck,           label: 'Transportes',     end: false },
-  { to: '/logistica/recebimentos',    icon: CheckCircle2,    label: 'Recebimentos',    end: false },
   { to: '/logistica/transportadoras', icon: Building2,       label: 'Transportadoras', end: false },
 ]
 
