@@ -54,12 +54,16 @@ export interface Fornecedor {
   created_at: string
 }
 
+export type OrigemCP = 'compras' | 'logistica' | 'manual'
+
 export interface ContaPagar {
   id: string
   pedido_id?: string
   requisicao_id?: string
+  solicitacao_logistica_id?: string
   fornecedor_id?: string
   fornecedor_nome: string
+  origem?: OrigemCP
   valor_original: number
   valor_pago: number
   data_emissao: string
