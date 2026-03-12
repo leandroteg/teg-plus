@@ -18,10 +18,11 @@ import {
 import {
   useLotesPagamento,
   useCriarLote,
+  useEnviarLoteAprovacao,
   useRegistrarPagamentoBatch,
 } from '../../hooks/useLotesPagamento'
 import { supabase } from '../../services/supabase'
-import { useAnexosPedido, TIPO_LABEL } from '../../hooks/useAnexos'
+import { useAnexosPedido, useUploadAnexo, TIPO_LABEL } from '../../hooks/useAnexos'
 import type { PedidoAnexo } from '../../hooks/useAnexos'
 import type { ContaPagar, LotePagamento, StatusCP } from '../../types/financeiro'
 import { CP_PIPELINE_STAGES } from '../../types/financeiro'
@@ -139,7 +140,7 @@ function FornecedorBankInfo({ fornecedorId, isDark }: { fornecedorId: string; is
   return (
     <div className={`rounded-xl p-2.5 space-y-1 ${isDark ? 'bg-white/[0.04]' : 'bg-blue-50/60'}`}>
       <p className="text-[9px] font-bold text-blue-500 uppercase tracking-wider flex items-center gap-1">
-        <Banknote size={9} /> Dados Bancarios
+        <Banknote size={9} /> Dados Bancários
       </p>
       <div className="grid grid-cols-2 gap-x-3 gap-y-0.5 text-[10px]">
         {forn.banco_nome && <div><span className="text-slate-400">Banco:</span> <span className="font-semibold text-slate-700">{forn.banco_nome}</span></div>}
@@ -216,7 +217,7 @@ function CPDetailModal({ cp, onClose, onAction, isDark }: {
           <div className={`rounded-xl p-4 space-y-2 ${isDark ? 'bg-white/[0.04]' : 'bg-slate-50'}`}>
             <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-xs">
               <div><span className="text-slate-400">Vencimento:</span> <span className="font-semibold">{fmtData(cp.data_vencimento)}</span></div>
-              <div><span className="text-slate-400">Emissao:</span> <span className="font-semibold">{fmtData(cp.data_emissao)}</span></div>
+              <div><span className="text-slate-400">Emissão:</span> <span className="font-semibold">{fmtData(cp.data_emissao)}</span></div>
               {cp.numero_documento && <div><span className="text-slate-400">Documento:</span> <span className="font-mono">{cp.numero_documento}</span></div>}
               {cp.natureza && <div><span className="text-slate-400">Natureza:</span> <span>{cp.natureza}</span></div>}
               {cp.forma_pagamento && <div><span className="text-slate-400">Forma Pgto:</span> <span>{cp.forma_pagamento}</span></div>}
@@ -570,7 +571,7 @@ export default function CPPipeline() {
         .update({ status: 'confirmado' })
         .in('id', ids)
       if (error) throw error
-      showToast('success', `${ids.length} titulo(s) confirmado(s)`)
+      showToast('success', `${ids.length} título(s) confirmado(s)`)
       setSelectedIds(new Set())
     } catch { showToast('error', 'Erro ao confirmar') }
   }
@@ -598,7 +599,10 @@ export default function CPPipeline() {
     try {
       const { error } = await supabase
         .from('fin_contas_pagar')
-        .update({ status: 'pago', data_pagamento: new Date().toISOString().split('T')[0] })
+        .update({
+          status: 'pago',
+          data_pagamento: new Date().toISOString().split('T')[0],
+        })
         .in('id', ids)
       if (error) throw error
       showToast('success', `${ids.length} pagamento(s) confirmado(s)`)
@@ -609,7 +613,7 @@ export default function CPPipeline() {
   const handleConciliar = async (ids: string[]) => {
     try {
       await conciliarMut.mutateAsync({ ids })
-      showToast('success', `${ids.length} titulo(s) conciliado(s)`)
+      showToast('success', `${ids.length} título(s) conciliado(s)`)
       setSelectedIds(new Set())
     } catch { showToast('error', 'Erro ao conciliar') }
   }
@@ -686,7 +690,7 @@ export default function CPPipeline() {
             Contas a Pagar
           </h1>
           <p className={`text-xs mt-0.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
-            {contas.length} titulos &middot; {fmt(contas.reduce((s, c) => s + c.valor_original, 0))}
+            {contas.length} títulos &middot; {fmt(contas.reduce((s, c) => s + c.valor_original, 0))}
           </p>
         </div>
       </div>
@@ -812,7 +816,7 @@ export default function CPPipeline() {
 
           {/* Stats */}
           <div className={`ml-auto flex items-center gap-3 text-[11px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
-            <span>{activeCPs.length} {activeCPs.length === 1 ? 'titulo' : 'titulos'}</span>
+            <span>{activeCPs.length} {activeCPs.length === 1 ? 'título' : 'títulos'}</span>
             <span className="font-bold text-emerald-600">{fmt(tabTotal)}</span>
             {overdueCt > 0 && (
               <span className="flex items-center gap-1 text-red-500 font-bold">
@@ -865,14 +869,13 @@ export default function CPPipeline() {
                 <Receipt size={24} className="text-slate-300" />
               </div>
               <p className={`text-sm font-semibold ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
-                Nenhum titulo nesta etapa
+                Nenhum título nesta etapa
               </p>
               <p className={`text-xs mt-1 ${isDark ? 'text-slate-600' : 'text-slate-400'}`}>
-                {busca ? 'Tente outra busca' : 'Os titulos aparecerao aqui quando avancarem'}
+                {busca ? 'Tente outra busca' : 'Os títulos aparecerão aqui quando avançarem'}
               </p>
             </div>
           ) : viewMode === 'list' ? (
-            // ── List view ──
             activeCPs.map(cp => (
               <CPRow
                 key={cp.id}
@@ -884,7 +887,6 @@ export default function CPPipeline() {
               />
             ))
           ) : (
-            // ── Cards view ──
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 p-4">
               {activeCPs.map(cp => (
                 <CPCard
