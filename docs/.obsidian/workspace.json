@@ -13,12 +13,12 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "obsidian/07 - Schema Database.md",
+                "file": "obsidian/Paineis/BI Dashboard.md",
                 "mode": "source",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "07 - Schema Database"
+              "title": "BI Dashboard"
             }
           }
         ]
@@ -78,8 +78,7 @@
       }
     ],
     "direction": "horizontal",
-    "width": 300,
-    "collapsed": true
+    "width": 300
   },
   "right": {
     "id": "4c94cf6ee553823e",
@@ -191,8 +190,7 @@
       }
     ],
     "direction": "horizontal",
-    "width": 300,
-    "collapsed": true
+    "width": 300
   },
   "left-ribbon": {
     "hiddenItems": {
@@ -213,6 +211,9 @@
   },
   "active": "a4bc148162b73016",
   "lastOpenFiles": [
+    "plans/2026-03-11-certisign-implementation-plan.md",
+    "plans/2026-03-11-certisign-integration-design.md",
+    "obsidian/07 - Schema Database.md",
     "obsidian/06 - Supabase.md",
     "obsidian/00 - TEG+ INDEX.md",
     "obsidian/00 - Premissas do Projeto.md",
@@ -237,10 +238,7 @@
     "obsidian/Paineis/Logistica Dashboard.md",
     "obsidian/26 - Upload Inteligente Cotacao.md",
     "obsidian/10 - n8n Workflows.md.tmp.28700.1772635214153",
-    "plans/2026-03-04-approval-flow-plan.md",
-    "plans/2026-03-04-approval-flow-design.md",
     "plans",
-    "obsidian/Paineis/Tasks Board.md",
     "obsidian/Paineis",
     "obsidian/Database/Tarefas",
     "obsidian/Database/Requisitos",
