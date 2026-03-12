@@ -458,7 +458,7 @@ export default function TransportesPipeline() {
   const [toast, setToast] = useState<{ type: 'success' | 'error'; msg: string } | null>(null)
   const [sortField, setSortField] = useState<SortField>('data')
   const [sortDir, setSortDir] = useState<SortDir>('desc')
-  const [viewMode, setViewMode] = useState<ViewMode>('list')
+  const [viewMode, setViewMode] = useState<ViewMode>('cards')
 
   const { data: solicitacoes = [], isLoading } = useSolicitacoes({
     status: ['nfe_emitida', 'aguardando_coleta', 'em_transito', 'entregue', 'concluido'],

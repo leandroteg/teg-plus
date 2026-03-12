@@ -280,7 +280,7 @@ export default function ExpedicaoPipeline() {
   const [toast, setToast] = useState<{ type: 'success' | 'error'; msg: string } | null>(null)
   const [sortField, setSortField] = useState<SortField>('data')
   const [sortDir, setSortDir] = useState<SortDir>('desc')
-  const [viewMode, setViewMode] = useState<ViewMode>('list')
+  const [viewMode, setViewMode] = useState<ViewMode>('cards')
   const [nfModal, setNfModal] = useState<LogSolicitacao | null>(null)
 
   const { data: solicitacoes = [], isLoading } = useSolicitacoes()
