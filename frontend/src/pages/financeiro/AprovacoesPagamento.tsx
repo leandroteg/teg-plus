@@ -26,10 +26,10 @@ export default function AprovacoesPagamento() {
   const aprovarMutation = useAprovarPagamento()
 
   const pendentes = contas.filter(cp =>
-    cp.status === 'aguardando_aprovacao' || cp.status === 'aguardando_docs'
+    cp.status === 'confirmado' || cp.status === 'em_lote'
   )
   const aprovadas = contas.filter(cp =>
-    ['aprovado_pgto', 'em_remessa', 'pago', 'conciliado'].includes(cp.status)
+    ['aprovado_pgto', 'em_pagamento', 'pago', 'conciliado'].includes(cp.status)
   )
   const rejeitadas = contas.filter(cp => cp.status === 'cancelado')
 

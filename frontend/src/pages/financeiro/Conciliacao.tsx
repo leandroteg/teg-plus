@@ -47,11 +47,10 @@ interface UnifiedRow {
 
 const STATUS_CP: Record<string, { label: string; dot: string }> = {
   previsto:             { label: 'Previsto',       dot: 'bg-slate-400'   },
-  aprovado:             { label: 'Aprovado',       dot: 'bg-blue-400'   },
-  aguardando_docs:      { label: 'Aguard. Docs',  dot: 'bg-amber-400'  },
-  aguardando_aprovacao: { label: 'Aguard. Aprov.', dot: 'bg-orange-400' },
+  confirmado:           { label: 'Confirmado',     dot: 'bg-blue-400'   },
+  em_lote:              { label: 'Em Lote',        dot: 'bg-violet-400' },
   aprovado_pgto:        { label: 'Pgto Aprov.',    dot: 'bg-indigo-400' },
-  em_remessa:           { label: 'Em Remessa',     dot: 'bg-cyan-400'   },
+  em_pagamento:         { label: 'Em Pagamento',   dot: 'bg-amber-400'  },
   pago:                 { label: 'Pago',           dot: 'bg-emerald-500'},
   conciliado:           { label: 'Conciliado',     dot: 'bg-green-500'  },
   cancelado:            { label: 'Cancelado',      dot: 'bg-gray-400'   },
