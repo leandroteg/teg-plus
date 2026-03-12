@@ -239,8 +239,8 @@ export default function ModuloSelector() {
         style={{
           backgroundImage: 'url(/bg-teg-transmission.png)',
           ...(isLight
-            ? { opacity: 0.05, filter: 'brightness(1.6) grayscale(0.3) contrast(0.85)', mixBlendMode: 'multiply' as const }
-            : { opacity: 0.12, filter: 'none', mixBlendMode: 'screen' as const }
+            ? { opacity: 0.12, filter: 'brightness(1.4) grayscale(0.2) contrast(0.9)', mixBlendMode: 'multiply' as const }
+            : { opacity: 0.22, filter: 'none', mixBlendMode: 'screen' as const }
           ),
         }}
       />
