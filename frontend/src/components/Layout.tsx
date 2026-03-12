@@ -6,7 +6,7 @@ import ModuleLayout from './ModuleLayout'
 
 const NAV = [
   { to: '/compras',     icon: LayoutDashboard, label: 'Painel',      end: true  },
-  { to: '/nova',        icon: PlusCircle,      label: 'Nova RC',     end: false },
+  { to: '/nova',        icon: PlusCircle,      label: 'Nova Solicitação', end: false },
   { to: '/requisicoes', icon: List,            label: 'Requisições', end: false },
   { to: '/cotacoes',    icon: ShoppingCart,    label: 'Cotações',    end: false },
   { to: '/pedidos',     icon: Truck,           label: 'Pedidos',     end: false },
