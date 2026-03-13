@@ -81,20 +81,20 @@ const PIPELINE_STAGES: {
   },
 ]
 
-const STATUS_ACCENT: Record<PipelineTab, { bg: string; bgActive: string; text: string; textActive: string; dot: string; border: string }> = {
-  pendente:  { bg: 'hover:bg-cyan-50',    bgActive: 'bg-cyan-50',    text: 'text-cyan-600',    textActive: 'text-cyan-800',    dot: 'bg-cyan-400',    border: 'border-cyan-400' },
-  emitido:   { bg: 'hover:bg-blue-50',    bgActive: 'bg-blue-50',    text: 'text-blue-600',    textActive: 'text-blue-800',    dot: 'bg-blue-500',    border: 'border-blue-500' },
-  entregue:  { bg: 'hover:bg-emerald-50', bgActive: 'bg-emerald-50', text: 'text-emerald-600', textActive: 'text-emerald-800', dot: 'bg-emerald-500', border: 'border-emerald-500' },
-  liberado:  { bg: 'hover:bg-orange-50',  bgActive: 'bg-orange-50',  text: 'text-orange-600',  textActive: 'text-orange-800',  dot: 'bg-orange-400',  border: 'border-orange-400' },
-  encerrado: { bg: 'hover:bg-slate-50',   bgActive: 'bg-slate-100',  text: 'text-slate-500',   textActive: 'text-slate-700',   dot: 'bg-slate-400',   border: 'border-slate-400' },
+const STATUS_ACCENT: Record<PipelineTab, { bg: string; bgActive: string; text: string; textActive: string; badge: string; border: string }> = {
+  pendente:  { bg: 'hover:bg-cyan-50',    bgActive: 'bg-cyan-50',    text: 'text-cyan-600',    textActive: 'text-cyan-800',    badge: 'bg-cyan-100 text-cyan-700',       border: 'border-cyan-400' },
+  emitido:   { bg: 'hover:bg-blue-50',    bgActive: 'bg-blue-50',    text: 'text-blue-600',    textActive: 'text-blue-800',    badge: 'bg-blue-100 text-blue-700',       border: 'border-blue-500' },
+  entregue:  { bg: 'hover:bg-emerald-50', bgActive: 'bg-emerald-50', text: 'text-emerald-600', textActive: 'text-emerald-800', badge: 'bg-emerald-100 text-emerald-700', border: 'border-emerald-500' },
+  liberado:  { bg: 'hover:bg-orange-50',  bgActive: 'bg-orange-50',  text: 'text-orange-600',  textActive: 'text-orange-800',  badge: 'bg-orange-100 text-orange-700',   border: 'border-orange-400' },
+  encerrado: { bg: 'hover:bg-slate-50',   bgActive: 'bg-slate-100',  text: 'text-slate-500',   textActive: 'text-slate-700',   badge: 'bg-slate-200 text-slate-600',     border: 'border-slate-400' },
 }
 
-const STATUS_ACCENT_DARK: Record<PipelineTab, { bg: string; bgActive: string; text: string; textActive: string }> = {
-  pendente:  { bg: 'hover:bg-white/[0.03]', bgActive: 'bg-cyan-500/10',    text: 'text-cyan-400',    textActive: 'text-cyan-300' },
-  emitido:   { bg: 'hover:bg-white/[0.03]', bgActive: 'bg-blue-500/10',    text: 'text-blue-400',    textActive: 'text-blue-300' },
-  entregue:  { bg: 'hover:bg-white/[0.03]', bgActive: 'bg-emerald-500/10', text: 'text-emerald-400', textActive: 'text-emerald-300' },
-  liberado:  { bg: 'hover:bg-white/[0.03]', bgActive: 'bg-orange-500/10',  text: 'text-orange-400',  textActive: 'text-orange-300' },
-  encerrado: { bg: 'hover:bg-white/[0.03]', bgActive: 'bg-white/[0.06]',   text: 'text-slate-400',   textActive: 'text-slate-300' },
+const STATUS_ACCENT_DARK: Record<PipelineTab, { bg: string; bgActive: string; text: string; textActive: string; badge: string; border: string }> = {
+  pendente:  { bg: 'hover:bg-white/[0.03]', bgActive: 'bg-cyan-500/10',    text: 'text-cyan-400',    textActive: 'text-cyan-300',    badge: 'bg-cyan-500/20 text-cyan-300',       border: 'border-cyan-500/40' },
+  emitido:   { bg: 'hover:bg-white/[0.03]', bgActive: 'bg-blue-500/10',    text: 'text-blue-400',    textActive: 'text-blue-300',    badge: 'bg-blue-500/20 text-blue-300',       border: 'border-blue-500/40' },
+  entregue:  { bg: 'hover:bg-white/[0.03]', bgActive: 'bg-emerald-500/10', text: 'text-emerald-400', textActive: 'text-emerald-300', badge: 'bg-emerald-500/20 text-emerald-300', border: 'border-emerald-500/40' },
+  liberado:  { bg: 'hover:bg-white/[0.03]', bgActive: 'bg-orange-500/10',  text: 'text-orange-400',  textActive: 'text-orange-300',  badge: 'bg-orange-500/20 text-orange-300',   border: 'border-orange-500/40' },
+  encerrado: { bg: 'hover:bg-white/[0.03]', bgActive: 'bg-white/[0.06]',   text: 'text-slate-400',   textActive: 'text-slate-300',   badge: 'bg-white/[0.08] text-slate-300',     border: 'border-white/[0.08]' },
 }
 
 const statusConfig: Record<string, { bg: string; text: string; label: string; bgDark: string; textDark: string }> = {
@@ -1046,7 +1046,7 @@ export default function Pedidos() {
       </div>
 
       {/* Pipeline tabs */}
-      <div className={`flex gap-1 overflow-x-auto pb-1 -mx-1 px-1 border-b ${dark ? 'border-white/10' : 'border-slate-200'}`}>
+      <div className={`flex gap-1 p-1 rounded-2xl border overflow-x-auto hide-scrollbar ${dark ? 'bg-white/[0.02] border-white/[0.06]' : 'bg-slate-50 border-slate-200'}`}>
         {PIPELINE_STAGES.map(st => {
           const active = activeTab === st.key
           const acc = dark ? STATUS_ACCENT_DARK[st.key] : STATUS_ACCENT[st.key]
@@ -1055,22 +1055,25 @@ export default function Pedidos() {
             <button
               key={st.key}
               onClick={() => setActiveTab(st.key)}
-              className={`relative flex items-center gap-1.5 px-3 py-2.5 text-xs font-semibold whitespace-nowrap transition-all rounded-t-lg flex-shrink-0 ${
+              className={`min-w-fit md:flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold whitespace-nowrap transition-all border ${
                 active
-                  ? `${acc.bgActive} ${acc.textActive}`
-                  : `${acc.bg} ${acc.text}`
+                  ? `${acc.bgActive} ${acc.textActive} ${acc.border} shadow-sm`
+                  : dark
+                    ? `${acc.text} ${acc.bg} border-transparent`
+                    : `${acc.text} ${acc.bg} border-transparent hover:bg-white hover:shadow-sm`
               }`}
             >
-              <Icon size={14} />
+              <Icon size={15} className="shrink-0" />
               <span>{st.label}</span>
-              <span className={`ml-1 min-w-[18px] text-center px-1 py-0.5 rounded-full text-[10px] font-bold ${
+              <span className={`ml-1 min-w-[22px] px-1.5 py-0.5 rounded-full text-[10px] font-bold text-center ${
                 active
-                  ? dark ? 'bg-white/10 text-white' : `${STATUS_ACCENT[st.key].dot.replace('bg-', 'bg-')}/20 ${acc.textActive}`
-                  : dark ? 'bg-white/5 text-slate-500' : 'bg-slate-100 text-slate-400'
+                  ? acc.badge
+                  : dark
+                    ? 'bg-white/[0.06] text-slate-500'
+                    : 'bg-slate-100 text-slate-500'
               }`}>
                 {counts[st.key]}
               </span>
-              {active && <div className={`absolute bottom-0 left-2 right-2 h-[2px] rounded-full ${dark ? acc.bgActive.replace('bg-', 'bg-').replace('/10', '') : STATUS_ACCENT[st.key].dot}`} />}
             </button>
           )
         })}
