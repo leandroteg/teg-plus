@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import {
   AlertTriangle,
@@ -130,6 +130,15 @@ function ResumoView({ resumo }: { resumo: TResumo }) {
   )
 }
 
+function ContextCard({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-2xl bg-slate-50 px-4 py-3">
+      <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">{label}</p>
+      <p className="mt-1 whitespace-pre-wrap text-sm leading-relaxed text-slate-700">{value}</p>
+    </div>
+  )
+}
+
 export default function ResumoExecutivoPage() {
   const { id } = useParams<{ id: string }>()
   const nav = useNavigate()
@@ -152,6 +161,7 @@ export default function ResumoExecutivoPage() {
   const [recomendacao, setRecomendacao] = useState('')
   const [formError, setFormError] = useState('')
   const [isEditing, setIsEditing] = useState(false)
+  const autoDraftStartedRef = useRef(false)
 
   const isLoading = loadingSol || loadingResumo
 
@@ -179,7 +189,7 @@ export default function ResumoExecutivoPage() {
     }
 
     if (!resumo && solicitacao) {
-      setTitulo(`Resumo Executivo — ${solicitacao.objeto}`)
+      setTitulo(`Resumo Executivo - ${solicitacao.objeto}`)
       setPartesEnvolvidas(`TEG Engenharia e ${solicitacao.contraparte_nome}`)
       setObjetoResumo(solicitacao.objeto)
       setValorTotal(solicitacao.valor_estimado != null ? String(solicitacao.valor_estimado) : '')
@@ -200,7 +210,6 @@ export default function ResumoExecutivoPage() {
   const inputClass =
     'w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 ' +
     'placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-400'
-  const labelClass = 'mb-1 block text-xs font-semibold text-slate-600'
 
   const buildPayload = (status: 'rascunho' | 'enviado'): ResumoExecutivoPayloadDraft => ({
     solicitacao_id: id!,
@@ -228,9 +237,9 @@ export default function ResumoExecutivoPage() {
 
   const validate = () => {
     setFormError('')
-    if (!titulo.trim()) return setFormError('Informe o titulo'), false
-    if (!partesEnvolvidas.trim()) return setFormError('Informe as partes envolvidas'), false
-    if (!objetoResumo.trim()) return setFormError('Informe o objeto do resumo'), false
+    if (!titulo.trim()) return setFormError('Nao foi possivel montar o titulo do resumo'), false
+    if (!partesEnvolvidas.trim()) return setFormError('Nao foi possivel identificar as partes envolvidas'), false
+    if (!objetoResumo.trim()) return setFormError('Nao foi possivel identificar o objeto do contrato'), false
     if (!recomendacao.trim()) return setFormError('Informe o parecer executivo'), false
     return true
   }
@@ -252,7 +261,7 @@ export default function ResumoExecutivoPage() {
           objeto: solicitacao.objeto,
           valor_total: solicitacao.valor_estimado ?? undefined,
           prazo_meses: solicitacao.prazo_meses ?? undefined,
-          titulo: `Resumo Executivo — ${solicitacao.objeto}`,
+          titulo: `Resumo Executivo - ${solicitacao.objeto}`,
           cnpj_contratante: undefined,
           cnpj_contratada: solicitacao.contraparte_cnpj ?? undefined,
         },
@@ -260,7 +269,7 @@ export default function ResumoExecutivoPage() {
 
       const payload = mapResumoAiToPayload({
         solicitacaoId: solicitacao.id,
-        tituloPadrao: `Resumo Executivo — ${solicitacao.objeto}`,
+        tituloPadrao: `Resumo Executivo - ${solicitacao.objeto}`,
         resumo: result.resumo,
         status,
       })
@@ -270,7 +279,7 @@ export default function ResumoExecutivoPage() {
     } catch {
       const payload = buildResumoPayloadFromAnalise({
         solicitacaoId: solicitacao.id,
-        titulo: `Resumo Executivo — ${solicitacao.objeto}`,
+        titulo: `Resumo Executivo - ${solicitacao.objeto}`,
         partesEnvolvidas: `TEG Engenharia e ${solicitacao.contraparte_nome}`,
         objetoResumo: solicitacao.objeto,
         valorTotal: solicitacao.valor_estimado ?? undefined,
@@ -288,17 +297,41 @@ export default function ResumoExecutivoPage() {
     }
   }
 
+  const persistPayload = async (payload: ResumoExecutivoPayloadDraft) => {
+    if (isEditing && resumo) {
+      await atualizarResumo.mutateAsync({ id: resumo.id, ...payload })
+    } else {
+      await criarResumo.mutateAsync(payload)
+      setIsEditing(true)
+    }
+  }
+
+  useEffect(() => {
+    if (!solicitacao || isLoading || autoDraftStartedRef.current) return
+    if (resumo && resumo.status !== 'rascunho') return
+
+    const parecerAtual = (resumo?.recomendacao ?? recomendacao).trim()
+    if (resumo && parecerAtual) return
+
+    autoDraftStartedRef.current = true
+
+    void (async () => {
+      try {
+        const payload = await gerarPayloadAutomatico('rascunho')
+        if (!payload) return
+        await persistPayload(payload)
+      } catch (e: unknown) {
+        setFormError(e instanceof Error ? e.message : 'Erro ao gerar resumo automaticamente')
+        autoDraftStartedRef.current = false
+      }
+    })()
+  }, [isLoading, recomendacao, resumo, solicitacao])
+
   const handleSalvarRascunho = async () => {
     if (!validate()) return
-    const payload = buildPayload('rascunho')
 
     try {
-      if (isEditing && resumo) {
-        await atualizarResumo.mutateAsync({ id: resumo.id, ...payload })
-      } else {
-        await criarResumo.mutateAsync(payload)
-        setIsEditing(true)
-      }
+      await persistPayload(buildPayload('rascunho'))
     } catch (e: unknown) {
       setFormError(e instanceof Error ? e.message : 'Erro ao salvar')
     }
@@ -316,11 +349,7 @@ export default function ResumoExecutivoPage() {
       applyPayload(payload)
       if (!validate()) return
 
-      if (isEditing && resumo) {
-        await atualizarResumo.mutateAsync({ id: resumo.id, ...payload })
-      } else {
-        await criarResumo.mutateAsync(payload)
-      }
+      await persistPayload(payload)
 
       if (solicitacao) {
         await avancarEtapa.mutateAsync({
@@ -340,7 +369,8 @@ export default function ResumoExecutivoPage() {
   const handleGerarComIA = async () => {
     if (!solicitacao || gerarResumoAI.isPending) return
     try {
-      await gerarPayloadAutomatico('rascunho')
+      const payload = await gerarPayloadAutomatico('rascunho')
+      if (payload) await persistPayload(payload)
     } catch {
       setFormError('Erro ao gerar resumo com IA. Tente novamente.')
     }
@@ -365,10 +395,11 @@ export default function ResumoExecutivoPage() {
     )
   }
 
-  const showViewMode = resumo && resumo.status !== 'rascunho'
+  const showViewMode = !!(resumo && resumo.status !== 'rascunho')
   const isSaving = criarResumo.isPending || atualizarResumo.isPending
   const isSending = avancarEtapa.isPending
   const isGerandoIA = gerarResumoAI.isPending
+  const isAutoGenerating = !showViewMode && !recomendacao.trim() && isGerandoIA
 
   return (
     <div className="space-y-5">
@@ -390,7 +421,7 @@ export default function ResumoExecutivoPage() {
           <p className="mt-0.5 text-xs text-slate-400">
             {showViewMode
               ? 'Visualizacao do resumo executivo'
-              : 'Consolide a analise em um parecer unico para diretoria'}
+              : 'Parecer executivo em paragrafo unico para aprovacao da diretoria'}
           </p>
         </div>
       </div>
@@ -408,7 +439,7 @@ export default function ResumoExecutivoPage() {
                 <div>
                   <h3 className="text-sm font-extrabold text-slate-800">Gerar Parecer com IA</h3>
                   <p className="mt-0.5 text-[10px] text-slate-500">
-                    Monta automaticamente um resumo corrido com base na analise da minuta
+                    O rascunho e gerado automaticamente ao abrir a etapa. Use este botao apenas para regenerar.
                   </p>
                 </div>
               </div>
@@ -442,7 +473,7 @@ export default function ResumoExecutivoPage() {
             {gerarResumoAI.isError && (
               <div className="mt-3 flex items-center gap-2 rounded-lg bg-red-50 px-3 py-1.5 text-[10px] font-semibold text-red-700">
                 <AlertTriangle size={12} />
-                Nao foi possivel gerar com IA. O sistema usa fallback no envio.
+                Nao foi possivel gerar com IA. O sistema usa fallback automatico.
               </div>
             )}
           </div>
@@ -450,63 +481,17 @@ export default function ResumoExecutivoPage() {
           <div className="space-y-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
             <h2 className="flex items-center gap-2 text-sm font-extrabold text-slate-800">
               <FileText size={14} className="text-indigo-500" />
-              Dados do Resumo
+              Contexto do Contrato
             </h2>
 
-            <div>
-              <label className={labelClass}>Titulo *</label>
-              <input
-                value={titulo}
-                onChange={(e) => setTitulo(e.target.value)}
-                placeholder="Resumo Executivo — ..."
-                className={inputClass}
-              />
-            </div>
-
-            <div>
-              <label className={labelClass}>Partes Envolvidas *</label>
-              <textarea
-                value={partesEnvolvidas}
-                onChange={(e) => setPartesEnvolvidas(e.target.value)}
-                placeholder="Descreva as partes principais envolvidas"
-                rows={2}
-                className={`${inputClass} resize-none`}
-              />
-            </div>
-
-            <div>
-              <label className={labelClass}>Objeto do Contrato *</label>
-              <textarea
-                value={objetoResumo}
-                onChange={(e) => setObjetoResumo(e.target.value)}
-                placeholder="Descricao resumida do objeto contratual"
-                rows={2}
-                className={`${inputClass} resize-none`}
-              />
-            </div>
-
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <div>
-                <label className={labelClass}>Valor Total</label>
-                <input
-                  type="number"
-                  value={valorTotal}
-                  onChange={(e) => setValorTotal(e.target.value)}
-                  placeholder="0,00"
-                  className={inputClass}
-                  step="0.01"
-                  min="0"
-                />
+            <div className="grid gap-4 sm:grid-cols-2">
+              <ContextCard label="Titulo" value={titulo || 'Resumo Executivo'} />
+              <ContextCard label="Partes Envolvidas" value={partesEnvolvidas || 'Aguardando geracao automatica'} />
+              <div className="sm:col-span-2">
+                <ContextCard label="Objeto" value={objetoResumo || 'Aguardando geracao automatica'} />
               </div>
-              <div>
-                <label className={labelClass}>Vigencia</label>
-                <input
-                  value={vigencia}
-                  onChange={(e) => setVigencia(e.target.value)}
-                  placeholder="Ex: 12 meses, 01/01/2026 a 31/12/2026"
-                  className={inputClass}
-                />
-              </div>
+              <ContextCard label="Valor Total" value={valorTotal ? fmt(Number(valorTotal)) : 'Nao informado'} />
+              <ContextCard label="Vigencia" value={vigencia || 'Nao informada'} />
             </div>
           </div>
 
@@ -523,7 +508,7 @@ export default function ResumoExecutivoPage() {
               className={`${inputClass} resize-none`}
             />
             <p className="text-[11px] text-slate-400">
-              Riscos e oportunidades continuam salvos no registro para auditoria, mas a aprovacao usa um parecer textual unico.
+              A aprovacao usa apenas este parecer em paragrafo unico. Riscos e oportunidades ficam salvos apenas para auditoria e suporte interno.
             </p>
           </div>
 
@@ -543,7 +528,7 @@ export default function ResumoExecutivoPage() {
             </button>
             <button
               onClick={handleSalvarRascunho}
-              disabled={isSaving}
+              disabled={isSaving || isAutoGenerating}
               className="flex flex-1 items-center justify-center gap-2 rounded-xl border-2 border-indigo-200 bg-indigo-50 py-3.5 text-sm font-bold text-indigo-700 transition-all hover:bg-indigo-100 disabled:opacity-50"
             >
               {isSaving
@@ -553,10 +538,10 @@ export default function ResumoExecutivoPage() {
             </button>
             <button
               onClick={handleEnviarAprovacao}
-              disabled={isSaving || isSending || isGerandoIA}
+              disabled={isSaving || isSending || isAutoGenerating}
               className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-indigo-600 py-3.5 text-sm font-bold text-white shadow-sm transition-all hover:bg-indigo-700 disabled:opacity-50"
             >
-              {isSending || isGerandoIA
+              {isSending || isAutoGenerating
                 ? <div className="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white" />
                 : <Send size={14} />}
               Enviar para Aprovacao
