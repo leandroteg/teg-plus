@@ -121,16 +121,24 @@ const ORIGEM_CONFIG: Record<string, { label: string; icon: typeof Truck; color: 
 
 const TAB_ACCENT: Record<string, {
   bg: string; bgActive: string; text: string; textActive: string; dot: string; border: string
-  darkBg: string; darkBgActive: string; darkText: string; darkTextActive: string
+  badge: string
+  darkBg: string; darkBgActive: string; darkText: string; darkTextActive: string; darkBorder: string; darkBadge: string
 }> = {
-  slate:  { bg: 'hover:bg-slate-50',  bgActive: 'bg-slate-100',  text: 'text-slate-500', textActive: 'text-slate-800', dot: 'bg-slate-400', border: 'ring-slate-400',
-            darkBg: 'hover:bg-white/[0.03]', darkBgActive: 'bg-slate-500/10', darkText: 'text-slate-500', darkTextActive: 'text-slate-200' },
-  blue:   { bg: 'hover:bg-blue-50',   bgActive: 'bg-blue-50',    text: 'text-blue-500',  textActive: 'text-blue-800',  dot: 'bg-blue-500',  border: 'ring-blue-500',
-            darkBg: 'hover:bg-white/[0.03]', darkBgActive: 'bg-blue-500/10',  darkText: 'text-blue-400',  darkTextActive: 'text-blue-300' },
-  amber:  { bg: 'hover:bg-amber-50',  bgActive: 'bg-amber-50',   text: 'text-amber-500', textActive: 'text-amber-800', dot: 'bg-amber-500', border: 'ring-amber-500',
-            darkBg: 'hover:bg-white/[0.03]', darkBgActive: 'bg-amber-500/10', darkText: 'text-amber-400', darkTextActive: 'text-amber-300' },
-  green:  { bg: 'hover:bg-green-50',  bgActive: 'bg-green-50',   text: 'text-green-500', textActive: 'text-green-800', dot: 'bg-green-500', border: 'ring-green-500',
-            darkBg: 'hover:bg-white/[0.03]', darkBgActive: 'bg-green-500/10', darkText: 'text-green-400', darkTextActive: 'text-green-300' },
+  slate:  { bg: 'hover:bg-slate-50',  bgActive: 'bg-slate-100',  text: 'text-slate-500', textActive: 'text-slate-800', dot: 'bg-slate-400', border: 'border-slate-400', badge: 'bg-slate-200 text-slate-600',
+            darkBg: 'hover:bg-white/[0.03]', darkBgActive: 'bg-slate-500/10', darkText: 'text-slate-500', darkTextActive: 'text-slate-200', darkBorder: 'border-slate-400/40', darkBadge: 'bg-slate-500/15 text-slate-200' },
+  blue:   { bg: 'hover:bg-blue-50',   bgActive: 'bg-blue-50',    text: 'text-blue-500',  textActive: 'text-blue-800',  dot: 'bg-blue-500',  border: 'border-blue-500', badge: 'bg-blue-100 text-blue-700',
+            darkBg: 'hover:bg-white/[0.03]', darkBgActive: 'bg-blue-500/10',  darkText: 'text-blue-400',  darkTextActive: 'text-blue-300', darkBorder: 'border-blue-400/40', darkBadge: 'bg-blue-500/15 text-blue-200' },
+  amber:  { bg: 'hover:bg-amber-50',  bgActive: 'bg-amber-50',   text: 'text-amber-500', textActive: 'text-amber-800', dot: 'bg-amber-500', border: 'border-amber-500', badge: 'bg-amber-100 text-amber-700',
+            darkBg: 'hover:bg-white/[0.03]', darkBgActive: 'bg-amber-500/10', darkText: 'text-amber-400', darkTextActive: 'text-amber-300', darkBorder: 'border-amber-400/40', darkBadge: 'bg-amber-500/15 text-amber-200' },
+  green:  { bg: 'hover:bg-green-50',  bgActive: 'bg-green-50',   text: 'text-green-500', textActive: 'text-green-800', dot: 'bg-green-500', border: 'border-green-500', badge: 'bg-green-100 text-green-700',
+            darkBg: 'hover:bg-white/[0.03]', darkBgActive: 'bg-green-500/10', darkText: 'text-green-400', darkTextActive: 'text-green-300', darkBorder: 'border-green-400/40', darkBadge: 'bg-green-500/15 text-green-200' },
+}
+
+const FISCAL_STAGE_ICONS: Record<StatusFiscalPipeline, typeof Clock> = {
+  pendente: Clock,
+  em_emissao: Edit3,
+  aguardando_aprovacao: FileCheck,
+  emitida: FileOutput,
 }
 
 // ── StatusBadge ──────────────────────────────────────────────────────────────
@@ -1296,25 +1304,30 @@ export default function FiscalPipeline() {
       </div>
 
       {/* ── Horizontal Tabs ────────────────────────────────────────── */}
-      <div className="flex items-center gap-1 overflow-x-auto hide-scrollbar pb-0.5">
+      <div className={`overflow-x-auto hide-scrollbar rounded-2xl border p-1 ${
+        isDark ? 'border-white/[0.08] bg-white/[0.02]' : 'border-slate-200 bg-white'
+      }`}>
+        <div className="flex min-w-max items-stretch gap-1">
         {FISCAL_PIPELINE_STAGES.map(stage => {
           const count = grouped.get(stage.status)?.length || 0
           const isActive = activeTab === stage.status && !showRejected
-          const accent = isDark ? TAB_ACCENT[stage.color] : TAB_ACCENT[stage.color]
+          const accent = TAB_ACCENT[stage.color]
+          const Icon = FISCAL_STAGE_ICONS[stage.status] || Clock
 
           return (
             <button key={stage.status} onClick={() => switchTab(stage.status)}
-              className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs whitespace-nowrap transition-all shrink-0 ${
+              className={`flex min-h-[52px] items-center gap-2 rounded-xl px-4 py-3 text-xs whitespace-nowrap transition-all shrink-0 ${
                 isActive
-                  ? `${isDark ? accent?.darkBgActive : accent?.bgActive} ${isDark ? accent?.darkTextActive : accent?.textActive} font-bold shadow-sm ${!isDark ? `ring-1 ${accent?.border}` : ''}`
+                  ? `${isDark ? accent?.darkBgActive : accent?.bgActive} ${isDark ? accent?.darkTextActive : accent?.textActive} border font-bold shadow-sm ${isDark ? accent?.darkBorder : accent?.border}`
                   : `${isDark ? accent?.darkBg : accent?.bg} ${isDark ? accent?.darkText : accent?.text} font-medium`
               }`}>
+              <Icon size={13} className="shrink-0" />
               {stage.label}
               {count > 0 && (
-                <span className={`text-[10px] font-bold rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1 ${
+                <span className={`rounded-full min-w-[22px] h-[22px] px-1.5 flex items-center justify-center text-[10px] font-bold ${
                   isActive
-                    ? isDark ? 'bg-white/10 text-white' : `${accent?.dot} text-white`
-                    : isDark ? 'bg-white/[0.06] text-slate-500' : 'bg-slate-200/80 text-slate-500'
+                    ? isDark ? accent?.darkBadge : accent?.badge
+                    : isDark ? 'bg-white/[0.06] text-slate-500' : 'bg-slate-100 text-slate-500'
                 }`}>{count}</span>
               )}
             </button>
@@ -1324,20 +1337,21 @@ export default function FiscalPipeline() {
         {/* Rejeitadas toggle */}
         {rejectedCount > 0 && (
           <button onClick={() => { setShowRejected(!showRejected); setSelectedIds(new Set()) }}
-            className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs whitespace-nowrap transition-all shrink-0 ${
+            className={`flex min-h-[52px] items-center gap-2 rounded-xl px-4 py-3 text-xs whitespace-nowrap transition-all shrink-0 ${
               showRejected
-                ? isDark ? 'bg-red-500/10 text-red-400 font-bold' : 'bg-red-50 text-red-700 font-bold ring-1 ring-red-300'
-                : isDark ? 'text-red-400/60 hover:bg-white/[0.03]' : 'text-red-400 hover:bg-red-50'
+                ? isDark ? 'bg-red-500/10 text-red-400 border border-red-400/40 font-bold shadow-sm' : 'bg-red-50 text-red-700 border border-red-300 font-bold shadow-sm'
+                : isDark ? 'text-red-400/70 hover:bg-white/[0.03]' : 'text-red-500 hover:bg-red-50'
             }`}>
-            <XCircle size={12} />
+            <XCircle size={13} className="shrink-0" />
             Rejeitadas
-            <span className={`text-[10px] font-bold rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1 ${
+            <span className={`rounded-full min-w-[22px] h-[22px] px-1.5 flex items-center justify-center text-[10px] font-bold ${
               showRejected
-                ? 'bg-red-500 text-white'
-                : isDark ? 'bg-white/[0.06] text-slate-500' : 'bg-slate-200/80 text-slate-500'
+                ? isDark ? 'bg-red-500/20 text-red-100' : 'bg-red-100 text-red-700'
+                : isDark ? 'bg-white/[0.06] text-slate-500' : 'bg-slate-100 text-slate-500'
             }`}>{rejectedCount}</span>
           </button>
         )}
+        </div>
       </div>
 
       {/* ── Content Panel ──────────────────────────────────────────── */}
