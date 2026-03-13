@@ -338,9 +338,9 @@ function TabContratos() {
   )
 
   const FILTROS_STATUS = [
-    { label: 'Todos', value: '' }, { label: 'Vigentes', value: 'vigente' },
-    { label: 'Assinados', value: 'assinado' }, { label: 'Em Negociacao', value: 'em_negociacao' },
-    { label: 'Encerrados', value: 'encerrado' },
+    { label: 'Todos', value: '' }, { label: 'Ativo', value: 'vigente' },
+    { label: 'Assinado', value: 'assinado' }, { label: 'Suspenso', value: 'suspenso' },
+    { label: 'Concluído', value: 'encerrado' }, { label: 'Rescindido', value: 'rescindido' },
   ]
   const FILTROS_TIPO = [
     { label: 'Todos', value: '' }, { label: 'Receita', value: 'receita' }, { label: 'Despesa', value: 'despesa' },
