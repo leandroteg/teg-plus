@@ -1,29 +1,31 @@
 import { useState, useMemo } from 'react'
 import {
   Package2, Plus, Search, AlertTriangle, ArrowUpDown, LayoutList, LayoutGrid,
-  X, Save, Loader2, Download, Truck, PackageCheck, RefreshCw,
+  X, Save, Loader2, Download, Truck, PackageCheck, RefreshCw, ClipboardCheck,
 } from 'lucide-react'
 import {
   useEstoqueItens, useSalvarItem, useSaldos,
-  useAguardandoEntrada, useEmMovimentacao,
+  useAguardandoEntrada, useEmMovimentacao, useLiberadosRetirada,
 } from '../../hooks/useEstoque'
 import { useTheme } from '../../contexts/ThemeContext'
 import type {
-  EstItem, EstSaldo, EstoqueEntradaItem, EstoqueMovimentacaoItem,
+  EstItem, EstSaldo, EstSolicitacao, EstoqueEntradaItem, EstoqueMovimentacaoItem,
   EstoquePipelineTab, ESTOQUE_PIPELINE_STAGES,
 } from '../../types/estoque'
 import { ESTOQUE_PIPELINE_STAGES as STAGES } from '../../types/estoque'
 
 // ── Accent maps ──────────────────────────────────────────────────────────────
 const STATUS_ACCENT: Record<EstoquePipelineTab, { bg: string; text: string; border: string; badge: string; ring: string }> = {
-  aguardando_entrada: { bg: 'bg-slate-50',   text: 'text-slate-700',   border: 'border-slate-300', badge: 'bg-slate-100 text-slate-700',   ring: 'ring-slate-400'   },
+  aguardando_entrada: { bg: 'bg-slate-50',   text: 'text-slate-700',   border: 'border-slate-300',   badge: 'bg-slate-100 text-slate-700',     ring: 'ring-slate-400'   },
   em_estoque:         { bg: 'bg-emerald-50', text: 'text-emerald-700', border: 'border-emerald-400', badge: 'bg-emerald-100 text-emerald-700', ring: 'ring-emerald-400' },
-  em_movimentacao:    { bg: 'bg-amber-50',   text: 'text-amber-700',   border: 'border-amber-400', badge: 'bg-amber-100 text-amber-700',   ring: 'ring-amber-400'   },
+  liberado_retirada:  { bg: 'bg-blue-50',    text: 'text-blue-700',    border: 'border-blue-400',    badge: 'bg-blue-100 text-blue-700',       ring: 'ring-blue-400'    },
+  em_movimentacao:    { bg: 'bg-amber-50',   text: 'text-amber-700',   border: 'border-amber-400',   badge: 'bg-amber-100 text-amber-700',     ring: 'ring-amber-400'   },
 }
 const STATUS_ACCENT_DARK: Record<EstoquePipelineTab, { bg: string; text: string; border: string; badge: string; ring: string }> = {
-  aguardando_entrada: { bg: 'bg-slate-500/10',   text: 'text-slate-300',   border: 'border-slate-500', badge: 'bg-slate-500/20 text-slate-300',   ring: 'ring-slate-500'   },
+  aguardando_entrada: { bg: 'bg-slate-500/10',   text: 'text-slate-300',   border: 'border-slate-500',   badge: 'bg-slate-500/20 text-slate-300',     ring: 'ring-slate-500'   },
   em_estoque:         { bg: 'bg-emerald-500/10', text: 'text-emerald-400', border: 'border-emerald-500', badge: 'bg-emerald-500/20 text-emerald-400', ring: 'ring-emerald-500' },
-  em_movimentacao:    { bg: 'bg-amber-500/10',   text: 'text-amber-400',   border: 'border-amber-500', badge: 'bg-amber-500/20 text-amber-400',   ring: 'ring-amber-500'   },
+  liberado_retirada:  { bg: 'bg-blue-500/10',    text: 'text-blue-400',    border: 'border-blue-500',    badge: 'bg-blue-500/20 text-blue-400',       ring: 'ring-blue-500'    },
+  em_movimentacao:    { bg: 'bg-amber-500/10',   text: 'text-amber-400',   border: 'border-amber-500',   badge: 'bg-amber-500/20 text-amber-400',     ring: 'ring-amber-500'   },
 }
 
 const CURVA_COLOR: Record<string, { bg: string; text: string; darkBg: string; darkText: string }> = {
@@ -70,6 +72,7 @@ export default function Itens() {
   // Data
   const { data: saldos = [], isLoading: loadingSaldos } = useSaldos()
   const { data: entradas = [], isLoading: loadingEntradas } = useAguardandoEntrada()
+  const { data: liberados = [], isLoading: loadingLiberados } = useLiberadosRetirada()
   const { data: movs = [], isLoading: loadingMovs } = useEmMovimentacao()
   const salvar = useSalvarItem()
 
@@ -105,14 +108,26 @@ export default function Itens() {
     )
   }, [movs, busca])
 
+  const liberadosFiltrados = useMemo(() => {
+    if (!busca.trim()) return liberados
+    const t = busca.toLowerCase()
+    return liberados.filter(s =>
+      s.numero.toLowerCase().includes(t) ||
+      s.solicitante_nome.toLowerCase().includes(t) ||
+      s.obra_nome.toLowerCase().includes(t)
+    )
+  }, [liberados, busca])
+
   const counts: Record<EstoquePipelineTab, number> = {
     aguardando_entrada: entradasFiltradas.length,
     em_estoque: saldosFiltrados.length,
+    liberado_retirada: liberadosFiltrados.length,
     em_movimentacao: movsFiltradas.length,
   }
 
   const isLoading = activeTab === 'em_estoque' ? loadingSaldos
-    : activeTab === 'aguardando_entrada' ? loadingEntradas : loadingMovs
+    : activeTab === 'aguardando_entrada' ? loadingEntradas
+    : activeTab === 'liberado_retirada' ? loadingLiberados : loadingMovs
 
   // Form handlers
   function openNew() { setEditItem({ ...EMPTY_FORM }); setShowForm(true) }
@@ -132,6 +147,11 @@ export default function Itens() {
       csv = 'Codigo;Descricao;Quantidade;Tipo;Fornecedor;NF;Data\n'
       entradasFiltradas.forEach(e => {
         csv += `${e.codigo};${e.descricao};${e.quantidade};${TIPO_LABEL[e.tipo] ?? e.tipo};${e.fornecedor_nome ?? ''};${e.nf_numero ?? ''};${fmtDate(e.criado_em)}\n`
+      })
+    } else if (activeTab === 'liberado_retirada') {
+      csv = 'Numero;Solicitante;Obra;Urgencia;Status;Itens;Data\n'
+      liberadosFiltrados.forEach(s => {
+        csv += `${s.numero};${s.solicitante_nome};${s.obra_nome};${s.urgencia};${s.status};${s.itens?.length ?? 0};${fmtDate(s.criado_em)}\n`
       })
     } else {
       csv = 'Codigo;Descricao;Quantidade;Tipo;Base;Destino;Responsavel;Data\n'
@@ -189,6 +209,7 @@ export default function Itens() {
             >
               {stage.tab === 'aguardando_entrada' && <PackageCheck size={15} />}
               {stage.tab === 'em_estoque' && <Package2 size={15} />}
+              {stage.tab === 'liberado_retirada' && <ClipboardCheck size={15} />}
               {stage.tab === 'em_movimentacao' && <Truck size={15} />}
               {stage.label}
               <span className={`ml-1 text-[10px] font-bold px-1.5 py-0.5 rounded-full
@@ -271,6 +292,11 @@ export default function Itens() {
             viewMode === 'table'
               ? <EntradasTable data={entradasFiltradas} isLight={isLight} />
               : <EntradasCards data={entradasFiltradas} isLight={isLight} />
+          )}
+          {activeTab === 'liberado_retirada' && (
+            viewMode === 'table'
+              ? <LiberadosTable data={liberadosFiltrados} isLight={isLight} />
+              : <LiberadosCards data={liberadosFiltrados} isLight={isLight} />
           )}
           {activeTab === 'em_movimentacao' && (
             viewMode === 'table'
@@ -517,6 +543,132 @@ function EntradasCards({ data, isLight }: { data: EstoqueEntradaItem[]; isLight:
           </div>
         </div>
       ))}
+    </div>
+  )
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// Liberado para Retirada — Table & Cards
+// ═════════════════════════════════════════════════════════════════════════════
+
+const URGENCIA_BADGE: Record<string, { light: string; dark: string }> = {
+  normal:  { light: 'bg-slate-100 text-slate-600',  dark: 'bg-slate-500/20 text-slate-400'  },
+  urgente: { light: 'bg-amber-100 text-amber-700',  dark: 'bg-amber-500/20 text-amber-400'  },
+  critica: { light: 'bg-red-100 text-red-700',      dark: 'bg-red-500/20 text-red-400'      },
+}
+
+function LiberadosTable({ data, isLight }: { data: EstSolicitacao[]; isLight: boolean }) {
+  if (data.length === 0) return <EmptyState icon={ClipboardCheck} msg="Nenhuma solicitação liberada" isLight={isLight} />
+  const card = isLight ? 'bg-white border-slate-200 shadow-sm' : 'bg-white/[0.03] border-white/[0.06]'
+  const thCls = `text-left px-4 py-3 text-[10px] font-bold uppercase tracking-widest ${isLight ? 'text-slate-500' : 'text-slate-400'}`
+  return (
+    <div className={`rounded-2xl border overflow-hidden ${card}`}>
+      <table className="w-full text-sm">
+        <thead>
+          <tr className={`border-b ${isLight ? 'border-slate-100 bg-slate-50' : 'border-white/[0.04] bg-white/[0.02]'}`}>
+            <th className={thCls}>Número</th>
+            <th className={thCls}>Solicitante</th>
+            <th className={`${thCls} hidden md:table-cell`}>Obra</th>
+            <th className={`${thCls} hidden md:table-cell`}>Urgência</th>
+            <th className={`${thCls} hidden lg:table-cell`}>Status</th>
+            <th className={`${thCls} text-right`}>Itens</th>
+            <th className={`${thCls} text-right`}>Data</th>
+          </tr>
+        </thead>
+        <tbody className={`divide-y ${isLight ? 'divide-slate-50' : 'divide-white/[0.04]'}`}>
+          {data.map(s => {
+            const urg = URGENCIA_BADGE[s.urgencia] ?? URGENCIA_BADGE.normal
+            return (
+              <tr key={s.id} className={`transition-colors ${isLight ? 'hover:bg-slate-50' : 'hover:bg-white/[0.02]'}`}>
+                <td className={`px-4 py-3 font-mono text-xs font-semibold ${isLight ? 'text-blue-600' : 'text-blue-400'}`}>
+                  {s.numero}
+                </td>
+                <td className="px-4 py-3">
+                  <p className={`font-semibold ${isLight ? 'text-slate-800' : 'text-slate-200'}`}>{s.solicitante_nome}</p>
+                </td>
+                <td className={`px-4 py-3 hidden md:table-cell text-xs ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
+                  {s.obra_nome}
+                </td>
+                <td className="px-4 py-3 hidden md:table-cell">
+                  <span className={`inline-flex rounded-full text-[10px] font-bold px-2 py-0.5 capitalize
+                    ${isLight ? urg.light : urg.dark}`}>
+                    {s.urgencia}
+                  </span>
+                </td>
+                <td className="px-4 py-3 hidden lg:table-cell">
+                  <span className={`inline-flex rounded-full text-[10px] font-bold px-2 py-0.5
+                    ${isLight ? 'bg-blue-100 text-blue-700' : 'bg-blue-500/20 text-blue-400'}`}>
+                    {s.status === 'aprovada' ? 'Aprovada' : 'Em Separação'}
+                  </span>
+                </td>
+                <td className={`px-4 py-3 text-right font-semibold ${isLight ? 'text-slate-700' : 'text-slate-200'}`}>
+                  {s.itens?.length ?? 0}
+                </td>
+                <td className={`px-4 py-3 text-right text-xs ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
+                  {fmtDate(s.criado_em)}
+                </td>
+              </tr>
+            )
+          })}
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
+function LiberadosCards({ data, isLight }: { data: EstSolicitacao[]; isLight: boolean }) {
+  if (data.length === 0) return <EmptyState icon={ClipboardCheck} msg="Nenhuma solicitação liberada" isLight={isLight} />
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+      {data.map(s => {
+        const urg = URGENCIA_BADGE[s.urgencia] ?? URGENCIA_BADGE.normal
+        return (
+          <div key={s.id} className={`rounded-2xl border p-4 transition-all hover:shadow-md
+            ${isLight ? 'bg-white border-slate-200' : 'bg-white/[0.03] border-white/[0.06]'}`}>
+            <div className="flex items-start justify-between">
+              <div className="min-w-0">
+                <p className={`font-mono text-[10px] font-semibold ${isLight ? 'text-blue-600' : 'text-blue-400'}`}>{s.numero}</p>
+                <p className={`font-semibold text-sm mt-0.5 ${isLight ? 'text-slate-800' : 'text-slate-200'}`}>
+                  {s.solicitante_nome}
+                </p>
+              </div>
+              <span className={`rounded-full text-[10px] font-bold px-2 py-0.5 capitalize shrink-0
+                ${isLight ? urg.light : urg.dark}`}>
+                {s.urgencia}
+              </span>
+            </div>
+            <div className={`border-t my-3 ${isLight ? 'border-slate-100' : 'border-white/[0.06]'}`} />
+            <div className="flex items-center justify-between text-xs">
+              <span className={isLight ? 'text-slate-500' : 'text-slate-400'}>{s.obra_nome}</span>
+              <span className={`font-bold ${isLight ? 'text-slate-700' : 'text-slate-200'}`}>
+                {s.itens?.length ?? 0} itens
+              </span>
+            </div>
+            <div className="flex items-center justify-between text-xs mt-1">
+              <span className={`rounded-full font-bold px-2 py-0.5
+                ${isLight ? 'bg-blue-100 text-blue-700' : 'bg-blue-500/20 text-blue-400'}`}>
+                {s.status === 'aprovada' ? 'Aprovada' : 'Em Separação'}
+              </span>
+              <span className={isLight ? 'text-slate-400' : 'text-slate-500'}>{fmtDate(s.criado_em)}</span>
+            </div>
+            {s.itens && s.itens.length > 0 && (
+              <div className={`mt-3 pt-2 border-t space-y-1 ${isLight ? 'border-slate-100' : 'border-white/[0.06]'}`}>
+                {s.itens.slice(0, 3).map(it => (
+                  <div key={it.id} className={`flex items-center justify-between text-[11px] ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
+                    <span className="truncate max-w-[180px]">{it.item?.descricao ?? it.descricao_livre ?? '—'}</span>
+                    <span className="font-semibold">{it.quantidade} {it.item?.unidade ?? it.unidade ?? 'UN'}</span>
+                  </div>
+                ))}
+                {s.itens.length > 3 && (
+                  <p className={`text-[10px] ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>
+                    +{s.itens.length - 3} mais...
+                  </p>
+                )}
+              </div>
+            )}
+          </div>
+        )
+      })}
     </div>
   )
 }

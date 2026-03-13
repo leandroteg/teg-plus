@@ -484,6 +484,24 @@ export function useEmMovimentacao() {
   })
 }
 
+// ── Pipeline: Liberado para Retirada (solicitações aprovadas/em_separacao) ────
+export function useLiberadosRetirada() {
+  return useQuery<EstSolicitacao[]>({
+    queryKey: ['est-liberados-retirada'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('est_solicitacoes')
+        .select(`*, itens:est_solicitacao_itens(*, item:est_itens(codigo, descricao, unidade))`)
+        .in('status', ['aprovada', 'em_separacao'])
+        .order('criado_em', { ascending: false })
+        .limit(200)
+      if (error) return []
+      return (data ?? []) as EstSolicitacao[]
+    },
+    staleTime: 30_000,
+  })
+}
+
 // ── KPIs ──────────────────────────────────────────────────────────────────────
 export function useEstoqueKPIs() {
   return useQuery<EstoqueKPIs>({
