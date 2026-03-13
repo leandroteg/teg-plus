@@ -3,6 +3,7 @@ import {
   Landmark, Plus, Search, X, Save, Loader2,
   TrendingDown, AlertTriangle, CheckCircle2, Wrench,
   ArrowLeftRight, FileText, ChevronDown, ChevronRight, RefreshCw,
+  LayoutGrid, LayoutList,
 } from 'lucide-react'
 import {
   useImobilizados, useSalvarImobilizado, useBaixarImobilizado,
@@ -43,6 +44,8 @@ interface PatrimonialProps {
   hideHeader?: boolean
 }
 
+type ViewMode = 'cards' | 'list'
+
 export default function Patrimonial({
   forcedStatusFiltro,
   allowedStatuses,
@@ -57,6 +60,7 @@ export default function Patrimonial({
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const [showBaixaModal, setShowBaixaModal] = useState<string | null>(null)
   const [motivoBaixa, setMotivoBaixa] = useState('')
+  const [viewMode, setViewMode] = useState<ViewMode>('cards')
 
   const filtroAtivo = forcedStatusFiltro ?? statusFiltro
   const { data: imobs = [], isLoading } = useImobilizados(
@@ -191,6 +195,34 @@ export default function Patrimonial({
             ))}
           </select>
         )}
+        <div className={`flex items-center rounded-xl border overflow-hidden ${
+          isLight ? 'border-slate-200 bg-white' : 'border-white/[0.08] bg-white/[0.03]'
+        }`}>
+          <button
+            type="button"
+            onClick={() => setViewMode('list')}
+            className={`p-2 transition-all ${
+              viewMode === 'list'
+                ? isLight ? 'bg-slate-100 text-slate-700' : 'bg-white/[0.08] text-white'
+                : isLight ? 'text-slate-400 hover:text-slate-600 hover:bg-slate-50' : 'text-slate-500 hover:text-slate-300 hover:bg-white/[0.04]'
+            }`}
+            title="Visao tabela"
+          >
+            <LayoutList size={16} />
+          </button>
+          <button
+            type="button"
+            onClick={() => setViewMode('cards')}
+            className={`p-2 transition-all ${
+              viewMode === 'cards'
+                ? isLight ? 'bg-slate-100 text-slate-700' : 'bg-white/[0.08] text-white'
+                : isLight ? 'text-slate-400 hover:text-slate-600 hover:bg-slate-50' : 'text-slate-500 hover:text-slate-300 hover:bg-white/[0.04]'
+            }`}
+            title="Visao cards"
+          >
+            <LayoutGrid size={16} />
+          </button>
+        </div>
       </div>
 
       {/* -- Lista --------------------------------------------------- */}
@@ -203,62 +235,51 @@ export default function Patrimonial({
           <Landmark size={40} className={isLight ? 'text-slate-200' : 'text-slate-600'} />
           <p className={`font-semibold mt-3 ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>Nenhum imobilizado cadastrado</p>
         </div>
-      ) : (
+      ) : viewMode === 'cards' ? (
         <div className="space-y-2">
-          {filtrados.map(imob => {
-            const cfg = STATUS_CONFIG[imob.status]
-            const isExpanded = expandedId === imob.id
-            const pctDeprec = imob.percentual_depreciado ?? 0
-            return (
-              <div key={imob.id} className={`rounded-2xl border overflow-hidden ${card}`}>
-                <div
-                  className={`flex items-center gap-3 px-4 py-3 cursor-pointer transition-colors ${isLight ? 'hover:bg-slate-50' : 'hover:bg-white/[0.02]'}`}
-                  onClick={() => setExpandedId(isExpanded ? null : imob.id)}
-                >
-                  <div className="w-10 h-10 rounded-xl bg-cyan-50 flex items-center justify-center shrink-0">
-                    <Landmark size={16} className="text-cyan-600" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <p className={`text-sm font-extrabold font-mono ${isLight ? 'text-slate-800' : 'text-white'}`}>{imob.numero_patrimonio}</p>
-                      <span className={`inline-flex items-center gap-1 rounded-full text-[10px] font-semibold px-2 py-0.5 ${cfg.bg} ${cfg.text}`}>
-                        <span className={`w-1.5 h-1.5 rounded-full ${cfg.dot}`} />
-                        {cfg.label}
-                      </span>
-                    </div>
-                    <p className={`text-xs mt-0.5 truncate ${isLight ? 'text-slate-600' : 'text-slate-300'}`}>{imob.descricao}</p>
-                    <p className={`text-[10px] ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>
-                      {imob.categoria}
-                      {imob.responsavel_nome ? ` - ${imob.responsavel_nome}` : ''}
-                      {imob.base_nome ? ` - ${imob.base_nome}` : ''}
-                    </p>
-                  </div>
-                  <div className="text-right shrink-0 mr-2 hidden sm:block">
-                    <p className={`text-sm font-extrabold ${isLight ? 'text-slate-700' : 'text-slate-200'}`}>{fmt(imob.valor_atual ?? imob.valor_aquisicao)}</p>
-                    <div className="flex items-center gap-1 mt-1 justify-end">
-                      <div className={`w-16 h-1.5 rounded-full overflow-hidden ${isLight ? 'bg-slate-100' : 'bg-white/[0.08]'}`}>
-                        <div
-                          className={`h-full rounded-full transition-all ${pctDeprec >= 80 ? 'bg-red-500' : pctDeprec >= 50 ? 'bg-amber-500' : 'bg-blue-500'}`}
-                          style={{ width: `${pctDeprec}%` }}
-                        />
-                      </div>
-                      <span className={`text-[10px] ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>{pctDeprec}%</span>
-                    </div>
-                  </div>
-                  {isExpanded ? <ChevronDown size={16} className="text-slate-400 shrink-0" /> : <ChevronRight size={16} className="text-slate-400 shrink-0" />}
-                </div>
-
-                {isExpanded && (
-                  <ImobilizadoDetail
+          {filtrados.map(imob => (
+            <ImobilizadoCard
+              key={imob.id}
+              imob={imob}
+              expandedId={expandedId}
+              setExpandedId={setExpandedId}
+              onEdit={() => { setEditItem({ ...imob }); setShowForm(true) }}
+              onBaixa={() => setShowBaixaModal(imob.id)}
+              isLight={isLight}
+              card={card}
+            />
+          ))}
+        </div>
+      ) : (
+        <div className={`rounded-2xl border overflow-hidden ${card}`}>
+          <div className="overflow-x-auto">
+            <table className="min-w-full text-sm">
+              <thead className={isLight ? 'bg-slate-50' : 'bg-white/[0.03]'}>
+                <tr className={isLight ? 'text-slate-500' : 'text-slate-400'}>
+                  <th className="px-4 py-3 text-left text-[11px] font-bold uppercase tracking-wider">Patrimonio</th>
+                  <th className="px-4 py-3 text-left text-[11px] font-bold uppercase tracking-wider">Descricao</th>
+                  <th className="px-4 py-3 text-left text-[11px] font-bold uppercase tracking-wider">Status</th>
+                  <th className="px-4 py-3 text-left text-[11px] font-bold uppercase tracking-wider">Responsavel</th>
+                  <th className="px-4 py-3 text-right text-[11px] font-bold uppercase tracking-wider">Valor</th>
+                  <th className="px-4 py-3 text-right text-[11px] font-bold uppercase tracking-wider">Deprec.</th>
+                  <th className="px-4 py-3 text-right text-[11px] font-bold uppercase tracking-wider">Acoes</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filtrados.map(imob => (
+                  <ImobilizadoTableRow
+                    key={imob.id}
                     imob={imob}
+                    expandedId={expandedId}
+                    setExpandedId={setExpandedId}
                     onEdit={() => { setEditItem({ ...imob }); setShowForm(true) }}
                     onBaixa={() => setShowBaixaModal(imob.id)}
                     isLight={isLight}
                   />
-                )}
-              </div>
-            )
-          })}
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
 
@@ -317,6 +338,176 @@ export default function Patrimonial({
 }
 
 // -- Detalhe do Imobilizado --------------------------------------------------------
+function ImobilizadoCard({
+  imob,
+  expandedId,
+  setExpandedId,
+  onEdit,
+  onBaixa,
+  isLight,
+  card,
+}: {
+  imob: PatImobilizado
+  expandedId: string | null
+  setExpandedId: (id: string | null) => void
+  onEdit: () => void
+  onBaixa: () => void
+  isLight: boolean
+  card: string
+}) {
+  const cfg = STATUS_CONFIG[imob.status]
+  const isExpanded = expandedId === imob.id
+  const pctDeprec = imob.percentual_depreciado ?? 0
+
+  return (
+    <div className={`rounded-2xl border overflow-hidden ${card}`}>
+      <div
+        className={`flex items-center gap-3 px-4 py-3 cursor-pointer transition-colors ${isLight ? 'hover:bg-slate-50' : 'hover:bg-white/[0.02]'}`}
+        onClick={() => setExpandedId(isExpanded ? null : imob.id)}
+      >
+        <div className="w-10 h-10 rounded-xl bg-cyan-50 flex items-center justify-center shrink-0">
+          <Landmark size={16} className="text-cyan-600" />
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2">
+            <p className={`text-sm font-extrabold font-mono ${isLight ? 'text-slate-800' : 'text-white'}`}>{imob.numero_patrimonio}</p>
+            <span className={`inline-flex items-center gap-1 rounded-full text-[10px] font-semibold px-2 py-0.5 ${cfg.bg} ${cfg.text}`}>
+              <span className={`w-1.5 h-1.5 rounded-full ${cfg.dot}`} />
+              {cfg.label}
+            </span>
+          </div>
+          <p className={`text-xs mt-0.5 truncate ${isLight ? 'text-slate-600' : 'text-slate-300'}`}>{imob.descricao}</p>
+          <p className={`text-[10px] ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>
+            {imob.categoria}
+            {imob.responsavel_nome ? ` - ${imob.responsavel_nome}` : ''}
+            {imob.base_nome ? ` - ${imob.base_nome}` : ''}
+          </p>
+        </div>
+        <div className="text-right shrink-0 mr-2 hidden sm:block">
+          <p className={`text-sm font-extrabold ${isLight ? 'text-slate-700' : 'text-slate-200'}`}>{fmt(imob.valor_atual ?? imob.valor_aquisicao)}</p>
+          <div className="flex items-center gap-1 mt-1 justify-end">
+            <div className={`w-16 h-1.5 rounded-full overflow-hidden ${isLight ? 'bg-slate-100' : 'bg-white/[0.08]'}`}>
+              <div
+                className={`h-full rounded-full transition-all ${pctDeprec >= 80 ? 'bg-red-500' : pctDeprec >= 50 ? 'bg-amber-500' : 'bg-blue-500'}`}
+                style={{ width: `${pctDeprec}%` }}
+              />
+            </div>
+            <span className={`text-[10px] ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>{pctDeprec}%</span>
+          </div>
+        </div>
+        {isExpanded ? <ChevronDown size={16} className="text-slate-400 shrink-0" /> : <ChevronRight size={16} className="text-slate-400 shrink-0" />}
+      </div>
+
+      {isExpanded && (
+        <ImobilizadoDetail
+          imob={imob}
+          onEdit={onEdit}
+          onBaixa={onBaixa}
+          isLight={isLight}
+        />
+      )}
+    </div>
+  )
+}
+
+function ImobilizadoTableRow({
+  imob,
+  expandedId,
+  setExpandedId,
+  onEdit,
+  onBaixa,
+  isLight,
+}: {
+  imob: PatImobilizado
+  expandedId: string | null
+  setExpandedId: (id: string | null) => void
+  onEdit: () => void
+  onBaixa: () => void
+  isLight: boolean
+}) {
+  const cfg = STATUS_CONFIG[imob.status]
+  const pctDeprec = imob.percentual_depreciado ?? 0
+  const isExpanded = expandedId === imob.id
+  const cellBorder = isLight ? 'border-slate-100' : 'border-white/[0.04]'
+
+  return (
+    <>
+      <tr className={`border-t ${cellBorder} ${isLight ? 'hover:bg-slate-50/70' : 'hover:bg-white/[0.02]'}`}>
+        <td className="px-4 py-3">
+          <button
+            type="button"
+            onClick={() => setExpandedId(isExpanded ? null : imob.id)}
+            className="flex items-center gap-2 text-left"
+          >
+            <span className="w-8 h-8 rounded-lg bg-cyan-50 flex items-center justify-center shrink-0">
+              <Landmark size={14} className="text-cyan-600" />
+            </span>
+            <span className={`font-mono font-extrabold ${isLight ? 'text-slate-800' : 'text-white'}`}>{imob.numero_patrimonio}</span>
+          </button>
+        </td>
+        <td className={`px-4 py-3 ${isLight ? 'text-slate-600' : 'text-slate-300'}`}>
+          <div className="min-w-[220px]">
+            <p className="font-semibold">{imob.descricao}</p>
+            <p className={`text-[11px] ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>{imob.categoria || 'Sem categoria'}</p>
+          </div>
+        </td>
+        <td className="px-4 py-3">
+          <span className={`inline-flex items-center gap-1 rounded-full text-[10px] font-semibold px-2 py-0.5 ${cfg.bg} ${cfg.text}`}>
+            <span className={`w-1.5 h-1.5 rounded-full ${cfg.dot}`} />
+            {cfg.label}
+          </span>
+        </td>
+        <td className={`px-4 py-3 ${isLight ? 'text-slate-600' : 'text-slate-300'}`}>
+          <div className="min-w-[140px]">
+            <p>{imob.responsavel_nome || '--'}</p>
+            <p className={`text-[11px] ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>{imob.base_nome || 'Sem base'}</p>
+          </div>
+        </td>
+        <td className={`px-4 py-3 text-right font-extrabold ${isLight ? 'text-slate-700' : 'text-slate-200'}`}>
+          {fmt(imob.valor_atual ?? imob.valor_aquisicao)}
+        </td>
+        <td className="px-4 py-3">
+          <div className="flex items-center justify-end gap-2 min-w-[110px]">
+            <div className={`w-16 h-1.5 rounded-full overflow-hidden ${isLight ? 'bg-slate-100' : 'bg-white/[0.08]'}`}>
+              <div
+                className={`h-full rounded-full transition-all ${pctDeprec >= 80 ? 'bg-red-500' : pctDeprec >= 50 ? 'bg-amber-500' : 'bg-blue-500'}`}
+                style={{ width: `${pctDeprec}%` }}
+              />
+            </div>
+            <span className={`text-[11px] ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>{pctDeprec}%</span>
+          </div>
+        </td>
+        <td className="px-4 py-3">
+          <div className="flex items-center justify-end gap-2">
+            <button
+              type="button"
+              onClick={() => setExpandedId(isExpanded ? null : imob.id)}
+              className={`inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-semibold transition-colors ${
+                isLight ? 'bg-slate-100 text-slate-600 hover:bg-slate-200' : 'bg-white/[0.06] text-slate-300 hover:bg-white/[0.09]'
+              }`}
+            >
+              {isExpanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+              Detalhes
+            </button>
+          </div>
+        </td>
+      </tr>
+      {isExpanded && (
+        <tr className={`border-t ${cellBorder}`}>
+          <td colSpan={7} className="p-0">
+            <ImobilizadoDetail
+              imob={imob}
+              onEdit={onEdit}
+              onBaixa={onBaixa}
+              isLight={isLight}
+            />
+          </td>
+        </tr>
+      )}
+    </>
+  )
+}
+
 function ImobilizadoDetail({
   imob, onEdit, onBaixa, isLight
 }: { imob: PatImobilizado; onEdit: () => void; onBaixa: () => void; isLight: boolean }) {
