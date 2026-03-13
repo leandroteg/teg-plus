@@ -308,6 +308,55 @@ export interface PatrimonialKPIs {
 }
 
 // =============================================================================
+// Pipeline Estoque — Abas
+// =============================================================================
+
+export type EstoquePipelineTab = 'aguardando_entrada' | 'em_estoque' | 'em_movimentacao'
+
+export interface EstoquePipelineStage {
+  tab: EstoquePipelineTab
+  label: string
+  color: string
+}
+
+export const ESTOQUE_PIPELINE_STAGES: EstoquePipelineStage[] = [
+  { tab: 'aguardando_entrada', label: 'Aguardando Entrada', color: 'slate'   },
+  { tab: 'em_estoque',         label: 'Em Estoque',         color: 'emerald' },
+  { tab: 'em_movimentacao',    label: 'Em Movimentação',    color: 'amber'   },
+]
+
+// ── Aggregated item for pipeline views ──────────────────────────────────────
+export interface EstoqueEntradaItem {
+  id: string
+  item_id: string
+  codigo: string
+  descricao: string
+  unidade: string
+  quantidade: number
+  tipo: TipoMovimentacao
+  fornecedor_nome?: string
+  nf_numero?: string
+  base_nome?: string
+  obra_nome?: string
+  criado_em: string
+}
+
+export interface EstoqueMovimentacaoItem {
+  id: string
+  item_id: string
+  codigo: string
+  descricao: string
+  unidade: string
+  quantidade: number
+  tipo: TipoMovimentacao
+  base_nome?: string
+  base_destino_nome?: string
+  responsavel_nome?: string
+  obra_nome?: string
+  criado_em: string
+}
+
+// =============================================================================
 // Recebimento Types (Compras ↔ Estoque ↔ Patrimonial)
 // =============================================================================
 
