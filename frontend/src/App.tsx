@@ -144,7 +144,6 @@ import LogisticaHome from './pages/logistica/LogisticaHome'
 import SolicitacoesPipeline from './pages/logistica/SolicitacoesPipeline'
 import ExpedicaoPipeline from './pages/logistica/ExpedicaoPipeline'
 import TransportesPipeline from './pages/logistica/TransportesPipeline'
-import TransportadorasLog from './pages/logistica/Transportadoras'
 
 // Módulo Frotas
 import FrotasLayout from './components/FrotasLayout'
@@ -228,7 +227,6 @@ export default function App() {
               <Route path="/logistica/solicitacoes"      element={<SolicitacoesPipeline />} />
               <Route path="/logistica/expedicao"         element={<ExpedicaoPipeline />} />
               <Route path="/logistica/transportes"       element={<TransportesPipeline />} />
-              <Route path="/logistica/transportadoras"   element={<TransportadorasLog />} />
             </Route>
           </Route>
 

@@ -6,8 +6,9 @@ import {
 } from 'lucide-react'
 import {
   useSolicitacoes, useCriarSolicitacao, useAtualizarStatusSolicitacao,
-  useAprovarSolicitacao, usePlanejaarSolicitacao, useTransportadoras, useRotas,
+  useAprovarSolicitacao, usePlanejaarSolicitacao, useRotas,
 } from '../../hooks/useLogistica'
+import { useFornecedores } from '../../hooks/useFinanceiro'
 import { useCriarSolicitacao as useCriarSolicitacaoNF } from '../../hooks/useSolicitacoesNF'
 import { useConsultaCNPJ } from '../../hooks/useConsultas'
 import { StatusBadge } from './LogisticaHome'
@@ -72,7 +73,7 @@ export default function Solicitacoes() {
   const { data: solicitacoes = [], isLoading } = useSolicitacoes(
     statusFiltro ? { status: statusFiltro as StatusSolicitacao } : undefined
   )
-  const { data: transportadoras = [] } = useTransportadoras()
+  const { data: fornecedores = [] } = useFornecedores()
   const { data: rotas = [] } = useRotas()
   const criar = useCriarSolicitacao()
   const atualizarStatus = useAtualizarStatusSolicitacao()
@@ -565,12 +566,12 @@ export default function Solicitacoes() {
               </div>
               {planejForm.modal === 'transportadora' && (
                 <div>
-                  <label className={`block text-xs font-bold mb-1 ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>Transportadora</label>
+                  <label className={`block text-xs font-bold mb-1 ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>Fornecedor (Transportadora)</label>
                   <select value={planejForm.transportadora_id ?? ''} onChange={e => setPlanejForm((p: PlanejamentoForm) => ({ ...p, transportadora_id: e.target.value }))}
                     className="input-base">
                     <option value="">Selecione...</option>
-                    {transportadoras.filter(t => t.ativo).map(t => (
-                      <option key={t.id} value={t.id}>{t.nome_fantasia ?? t.razao_social}</option>
+                    {fornecedores.filter((f: any) => f.ativo !== false).map((f: any) => (
+                      <option key={f.id} value={f.id}>{f.nome_fantasia ?? f.razao_social}</option>
                     ))}
                   </select>
                 </div>

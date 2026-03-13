@@ -10,7 +10,7 @@ import {
   useSolicitacoes, useAtualizarStatusSolicitacao,
   useAprovarSolicitacao, usePlanejaarSolicitacao,
   useEnviarParaAprovacao, useCriarSolicitacao,
-  useTransportadoras, useRotas,
+  useRotas,
 } from '../../hooks/useLogistica'
 import { useLookupObras, useLookupCentrosCusto } from '../../hooks/useLookups'
 import type { LogSolicitacao, StatusSolicitacaoPipeline, CriarSolicitacaoPayload, TipoTransporte } from '../../types/logistica'
