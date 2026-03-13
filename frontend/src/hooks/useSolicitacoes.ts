@@ -478,6 +478,132 @@ export function useAtualizarResumo() {
 
 const N8N_BASE = import.meta.env.VITE_N8N_WEBHOOK_URL || 'https://teg-agents-n8n.nmmcas.easypanel.host/webhook'
 
+function parseAiObject(value: unknown): Record<string, unknown> | null {
+  if (!value) return null
+  if (typeof value === 'string') {
+    try {
+      const parsed = JSON.parse(value)
+      return parsed && typeof parsed === 'object' ? parsed as Record<string, unknown> : null
+    } catch {
+      return null
+    }
+  }
+  return typeof value === 'object' ? value as Record<string, unknown> : null
+}
+
+function normalizeMinutaAiAnalise(input: unknown): MinutaAiAnalise | null {
+  const raw = parseAiObject(input)
+  if (!raw) return null
+
+  const conformidadeRaw = parseAiObject(raw.conformidade)
+
+  const riscos = Array.isArray(raw.riscos) ? raw.riscos.map((item) => {
+    const risco = parseAiObject(item) ?? {}
+    return {
+      titulo: typeof risco.titulo === 'string' ? sanitizeAiText(risco.titulo) : 'Risco identificado',
+      severidade: (typeof risco.severidade === 'string' ? risco.severidade : 'medio') as 'baixo' | 'medio' | 'alto' | 'critico',
+      descricao: typeof risco.descricao === 'string' ? sanitizeAiText(risco.descricao) : '',
+      clausula_ref: typeof risco.clausula_ref === 'string' ? sanitizeAiText(risco.clausula_ref) : undefined,
+      sugestao_mitigacao: typeof risco.sugestao_mitigacao === 'string'
+        ? sanitizeAiText(risco.sugestao_mitigacao)
+        : typeof risco.mitigacao === 'string'
+          ? sanitizeAiText(risco.mitigacao)
+          : undefined,
+    }
+  }).filter((risco) => risco.descricao) : []
+
+  const sugestoes = Array.isArray(raw.sugestoes) ? raw.sugestoes.map((item) => {
+    const sugestao = parseAiObject(item) ?? {}
+    return {
+      titulo: typeof sugestao.titulo === 'string' ? sanitizeAiText(sugestao.titulo) : 'Sugestao',
+      prioridade: (typeof sugestao.prioridade === 'string' ? sugestao.prioridade : 'media') as 'baixa' | 'media' | 'alta',
+      categoria: typeof sugestao.categoria === 'string'
+        ? sugestao.categoria as 'importante' | 'recomendada' | 'opcional'
+        : undefined,
+      descricao: typeof sugestao.descricao === 'string' ? sanitizeAiText(sugestao.descricao) : '',
+      texto_sugerido: typeof sugestao.texto_sugerido === 'string' ? sanitizeAiText(sugestao.texto_sugerido) : undefined,
+      beneficio_teg: typeof sugestao.beneficio_teg === 'string'
+        ? sanitizeAiText(sugestao.beneficio_teg)
+        : typeof sugestao.justificativa === 'string'
+          ? sanitizeAiText(sugestao.justificativa)
+          : undefined,
+    }
+  }).filter((sugestao) => sugestao.descricao) : []
+
+  const oportunidades = Array.isArray(raw.oportunidades) ? raw.oportunidades.map((item) => {
+    const oportunidade = parseAiObject(item) ?? {}
+    return {
+      titulo: typeof oportunidade.titulo === 'string' ? sanitizeAiText(oportunidade.titulo) : 'Oportunidade',
+      descricao: typeof oportunidade.descricao === 'string' ? sanitizeAiText(oportunidade.descricao) : '',
+      impacto: typeof oportunidade.impacto === 'string'
+        ? oportunidade.impacto as 'alto' | 'medio' | 'baixo'
+        : undefined,
+      texto_sugerido: typeof oportunidade.texto_sugerido === 'string'
+        ? sanitizeAiText(oportunidade.texto_sugerido)
+        : undefined,
+    }
+  }).filter((oportunidade) => oportunidade.descricao) : []
+
+  const clausulas_analisadas = Array.isArray(raw.clausulas_analisadas) ? raw.clausulas_analisadas.map((item) => {
+    const clausula = parseAiObject(item) ?? {}
+    return {
+      nome: typeof clausula.nome === 'string' ? sanitizeAiText(clausula.nome) : 'Clausula',
+      status: (typeof clausula.status === 'string' ? clausula.status : 'atencao') as 'ok' | 'atencao' | 'risco' | 'ausente',
+      comentario: typeof clausula.comentario === 'string'
+        ? sanitizeAiText(clausula.comentario)
+        : typeof clausula.observacao === 'string'
+          ? sanitizeAiText(clausula.observacao)
+          : typeof clausula.justificativa === 'string'
+            ? sanitizeAiText(clausula.justificativa)
+            : '',
+    }
+  }).filter((clausula) => clausula.nome || clausula.comentario) : []
+
+  return {
+    score: typeof raw.score === 'number' ? raw.score : Number(raw.score) || 70,
+    resumo: typeof raw.resumo === 'string' ? sanitizeAiText(raw.resumo) : undefined,
+    papel_teg: typeof raw.papel_teg === 'string'
+      ? raw.papel_teg as 'contratante' | 'contratada' | 'indefinido'
+      : 'indefinido',
+    poder_barganha: (() => {
+      const barganha = parseAiObject(raw.poder_barganha)
+      if (!barganha) return undefined
+      return {
+        nivel: (typeof barganha.nivel === 'string' ? barganha.nivel : 'medio') as 'alto' | 'medio' | 'baixo',
+        justificativa: typeof barganha.justificativa === 'string' ? sanitizeAiText(barganha.justificativa) : undefined,
+      }
+    })(),
+    riscos,
+    sugestoes,
+    oportunidades,
+    clausulas_analisadas,
+    conformidade: conformidadeRaw ? {
+      clausulas_obrigatorias: Boolean(conformidadeRaw.clausulas_obrigatorias),
+      penalidades_adequadas: typeof conformidadeRaw.penalidades_adequadas === 'boolean'
+        ? conformidadeRaw.penalidades_adequadas
+        : Boolean(conformidadeRaw.penalidades),
+      prazos_razoaveis: typeof conformidadeRaw.prazos_razoaveis === 'boolean'
+        ? conformidadeRaw.prazos_razoaveis
+        : Boolean(conformidadeRaw.prazos),
+      garantias_previstas: typeof conformidadeRaw.garantias_previstas === 'boolean'
+        ? conformidadeRaw.garantias_previstas
+        : Boolean(conformidadeRaw.garantias),
+      seguro_previsto: typeof conformidadeRaw.seguro_previsto === 'boolean'
+        ? conformidadeRaw.seguro_previsto
+        : Boolean(conformidadeRaw.seguro),
+      ssma_previsto: typeof conformidadeRaw.ssma_previsto === 'boolean'
+        ? conformidadeRaw.ssma_previsto
+        : Boolean(conformidadeRaw.ssma),
+      anticorrupcao_previsto: typeof conformidadeRaw.anticorrupcao_previsto === 'boolean'
+        ? conformidadeRaw.anticorrupcao_previsto
+        : Boolean(conformidadeRaw.anticorrupcao),
+      reajuste_definido: typeof conformidadeRaw.reajuste_definido === 'boolean'
+        ? conformidadeRaw.reajuste_definido
+        : Boolean(conformidadeRaw.reajuste),
+    } : undefined,
+  }
+}
+
 export function useConfigAnalise() {
   return useQuery<ConfigAnalise[]>({
     queryKey: ['con-config-analise'],
@@ -781,38 +907,19 @@ export function useAnalisarMinuta() {
       if (!res.ok) throw new Error(`Erro na analise: ${res.status}`)
       const result = await res.json()
 
-      // 2. Sanitize AI text to fix encoding issues (unicode escapes, HTML entities)
-      if (result.success && result.analise) {
-        const a = result.analise
-        if (typeof a.resumo === 'string') a.resumo = sanitizeAiText(a.resumo)
-        if (a.riscos) a.riscos = a.riscos.map((r: Record<string, unknown>) => ({
-          ...r,
-          descricao: typeof r.descricao === 'string' ? sanitizeAiText(r.descricao) : r.descricao,
-          mitigacao: typeof r.mitigacao === 'string' ? sanitizeAiText(r.mitigacao) : r.mitigacao,
-        }))
-        if (a.sugestoes) a.sugestoes = a.sugestoes.map((s: Record<string, unknown>) => ({
-          ...s,
-          descricao: typeof s.descricao === 'string' ? sanitizeAiText(s.descricao) : s.descricao,
-          justificativa: typeof s.justificativa === 'string' ? sanitizeAiText(s.justificativa) : s.justificativa,
-        }))
-        if (a.oportunidades) a.oportunidades = a.oportunidades.map((o: Record<string, unknown>) => ({
-          ...o,
-          descricao: typeof o.descricao === 'string' ? sanitizeAiText(o.descricao) : o.descricao,
-        }))
-        if (a.clausulas_analisadas) a.clausulas_analisadas = a.clausulas_analisadas.map((c: Record<string, unknown>) => ({
-          ...c,
-          texto_melhorado: typeof c.texto_melhorado === 'string' ? sanitizeAiText(c.texto_melhorado) : c.texto_melhorado,
-          justificativa: typeof c.justificativa === 'string' ? sanitizeAiText(c.justificativa) : c.justificativa,
-        }))
+      const analise = normalizeMinutaAiAnalise(result?.analise ?? result)
 
-        // 3. Save sanitized analysis result to Supabase
+      // 2. Save normalized analysis result to Supabase
+      if (result.success && analise) {
         await supabase
           .from('con_minutas')
           .update({
-            ai_analise: a,
+            ai_analise: analise,
             ai_analisado_em: new Date().toISOString(),
           })
           .eq('id', payload.minuta_id)
+
+        result.analise = analise
       }
 
       return result

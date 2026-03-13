@@ -16,14 +16,22 @@ import {
   useAnalisarMinuta,
   useMelhorarMinuta,
   useGerarMinutaPDF,
+  useGerarResumoAI,
   useConfigAnalise,
+  useCriarResumo,
+  useResumoExecutivo,
   useAtualizarConfigAnalise,
+  useAtualizarResumo,
   useUploadMinutaFile,
 } from '../../hooks/useSolicitacoes'
 import type { MelhoriaMinuta, MinutaTextoGerado } from '../../hooks/useSolicitacoes'
 import type { Minuta, TipoMinuta, StatusMinuta, MinutaAiAnalise, ConfigAnalise } from '../../types/contratos'
 import { supabase } from '../../services/supabase'
 import { jsPDF } from 'jspdf'
+import {
+  buildResumoPayloadFromAnalise,
+  mapResumoAiToPayload,
+} from '../../utils/contratosResumoExecutivo'
 
 // ── Formatters ──────────────────────────────────────────────────────────────────
 
@@ -1382,14 +1390,18 @@ export default function PreparaMinuta() {
 
   const { data: solicitacao, isLoading: loadingSol } = useSolicitacao(id)
   const { data: minutas = [], isLoading: loadingMinutas } = useMinutas(id)
+  const { data: resumoExecutivo } = useResumoExecutivo(id)
   const { data: regras = [] } = useConfigAnalise()
   const criarMinuta = useCriarMinuta()
+  const criarResumo = useCriarResumo()
+  const atualizarResumo = useAtualizarResumo()
   const avancarEtapa = useAvancarEtapa()
   const analisarMinuta = useAnalisarMinuta()
   const atualizarConfig = useAtualizarConfigAnalise()
   const uploadFile = useUploadMinutaFile()
   const melhorarMinuta = useMelhorarMinuta()
   const gerarMinutaPDF = useGerarMinutaPDF()
+  const gerarResumoAI = useGerarResumoAI()
 
   // Form state
   const [titulo, setTitulo] = useState('')
@@ -1602,6 +1614,63 @@ export default function PreparaMinuta() {
 
   const handleAvancarResumo = async () => {
     if (!solicitacao) return
+
+    const minutaComAnalise = [...minutas]
+      .filter(m => m.ai_analise || analiseMap[m.id])
+      .sort((a, b) => b.versao - a.versao)[0]
+    const analise = minutaComAnalise ? (analiseMap[minutaComAnalise.id] ?? minutaComAnalise.ai_analise) : undefined
+
+    try {
+      let payload
+
+      try {
+        const result = await gerarResumoAI.mutateAsync({
+          solicitacao_id: solicitacao.id,
+          analise: analise ?? undefined,
+          dados_contrato: {
+            contratante: solicitacao.obra?.nome ?? 'TEG Engenharia',
+            contratada: solicitacao.contraparte_nome,
+            objeto: solicitacao.objeto,
+            valor_total: solicitacao.valor_estimado ?? undefined,
+            prazo_meses: solicitacao.prazo_meses ?? undefined,
+            titulo: `Resumo Executivo — ${solicitacao.objeto}`,
+            cnpj_contratante: undefined,
+            cnpj_contratada: solicitacao.contraparte_cnpj ?? undefined,
+          },
+        })
+
+        payload = mapResumoAiToPayload({
+          solicitacaoId: solicitacao.id,
+          tituloPadrao: `Resumo Executivo — ${solicitacao.objeto}`,
+          resumo: result.resumo,
+          status: 'rascunho',
+        })
+      } catch {
+        payload = buildResumoPayloadFromAnalise({
+          solicitacaoId: solicitacao.id,
+          titulo: `Resumo Executivo — ${solicitacao.objeto}`,
+          partesEnvolvidas: `TEG Engenharia e ${solicitacao.contraparte_nome}`,
+          objetoResumo: solicitacao.objeto,
+          valorTotal: solicitacao.valor_estimado ?? undefined,
+          vigencia: solicitacao.data_inicio_prevista && solicitacao.data_fim_prevista
+            ? `${fmtData(solicitacao.data_inicio_prevista)} a ${fmtData(solicitacao.data_fim_prevista)}`
+            : solicitacao.prazo_meses
+              ? `${solicitacao.prazo_meses} meses`
+              : undefined,
+          analise: analise ?? undefined,
+          status: 'rascunho',
+        })
+      }
+
+      if (resumoExecutivo) {
+        await atualizarResumo.mutateAsync({ id: resumoExecutivo.id, ...payload })
+      } else {
+        await criarResumo.mutateAsync(payload)
+      }
+    } catch (e) {
+      console.warn('Falha ao preparar resumo executivo automatico:', e)
+    }
+
     await avancarEtapa.mutateAsync({
       solicitacaoId: solicitacao.id,
       etapaDe: 'preparar_minuta',
