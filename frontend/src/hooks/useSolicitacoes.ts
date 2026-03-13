@@ -492,8 +492,24 @@ function parseAiObject(value: unknown): Record<string, unknown> | null {
 }
 
 function normalizeMinutaAiAnalise(input: unknown): MinutaAiAnalise | null {
-  const raw = parseAiObject(input)
+  let raw = parseAiObject(input)
   if (!raw) return null
+
+  const nestedResumo = typeof raw.resumo === 'string' ? parseAiObject(raw.resumo) : null
+  const shouldPromoteNestedResumo = !!nestedResumo && (
+    typeof nestedResumo.score !== 'undefined' ||
+    Array.isArray(nestedResumo.riscos) ||
+    Array.isArray(nestedResumo.sugestoes) ||
+    Array.isArray(nestedResumo.clausulas_analisadas)
+  )
+
+  if (shouldPromoteNestedResumo) {
+    raw = {
+      ...raw,
+      ...nestedResumo,
+      resumo: typeof nestedResumo.resumo === 'string' ? nestedResumo.resumo : raw.resumo,
+    }
+  }
 
   const conformidadeRaw = parseAiObject(raw.conformidade)
 
