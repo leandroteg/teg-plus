@@ -301,11 +301,13 @@ export default function FilaCotacoes() {
     const statusesFinalizados = ['pedido_emitido', 'em_entrega', 'entregue', 'comprada', 'cancelada', 'aguardando_pgto', 'pago']
 
     for (const cot of cotacoes) {
+      const reqStatus = cot.requisicao?.status
+
+      // "Em Aprovação" deve mostrar apenas o que ainda aguarda decisão financeira.
+      if (cot.status === 'concluida' && reqStatus && reqStatus !== 'cotacao_enviada') continue
+
       // Skip finalized
-      if (cot.status === 'concluida') {
-        const reqStatus = cot.requisicao?.status
-        if (reqStatus && statusesFinalizados.includes(reqStatus)) continue
-      }
+      if (cot.status === 'concluida' && reqStatus && statusesFinalizados.includes(reqStatus)) continue
 
       for (const stage of PIPELINE_STAGES) {
         if (stage.cotStatuses.includes(cot.status)) {

@@ -9,14 +9,20 @@ import {
 import { useSearchParams } from 'react-router-dom'
 import jsPDF from 'jspdf'
 import { useTheme } from '../contexts/ThemeContext'
-import { usePedidos, useAtualizarPedido, useLiberarPagamento } from '../hooks/usePedidos'
+import {
+  usePedidos,
+  useAtualizarPedido,
+  useLiberarPagamento,
+  useEmitirPedido,
+} from '../hooks/usePedidos'
+import { useCotacoes } from '../hooks/useCotacoes'
 import { api } from '../services/api'
 import { supabase } from '../services/supabase'
 import { useAnexosPedido, useUploadAnexo, useCotacaoDocs, TIPO_LABEL } from '../hooks/useAnexos'
 import type { PedidoAnexo } from '../hooks/useAnexos'
 import FluxoTimeline from '../components/FluxoTimeline'
 import RecebimentoModal from '../components/RecebimentoModal'
-import type { Pedido } from '../types'
+import type { Cotacao, Pedido } from '../types'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -24,6 +30,10 @@ type PipelineTab = 'pendente' | 'emitido' | 'entregue' | 'liberado' | 'encerrado
 type SortField = 'data' | 'valor' | 'fornecedor'
 type SortDir = 'asc' | 'desc'
 type ViewMode = 'list' | 'cards'
+type PedidoListItem = Pedido & {
+  pending_emissao?: boolean
+  source_cotacao?: Pick<Cotacao, 'id' | 'comprador_id'>
+}
 
 // ─── Formatters ──────────────────────────────────────────────────────────────
 
@@ -47,37 +57,37 @@ const PIPELINE_STAGES: {
   key: PipelineTab
   label: string
   icon: typeof Package
-  matchFn: (p: Pedido) => boolean
+  matchFn: (p: PedidoListItem) => boolean
 }[] = [
   {
     key: 'pendente',
     label: 'Pendente',
     icon: ClipboardList,
-    matchFn: p => p.status === 'emitido',
+    matchFn: p => isPendingEmission(p) || p.status === 'emitido',
   },
   {
     key: 'emitido',
     label: 'Emitido',
     icon: Truck,
-    matchFn: p => p.status === 'confirmado',
+    matchFn: p => !isPendingEmission(p) && p.status === 'confirmado',
   },
   {
     key: 'entregue',
     label: 'Entregue',
     icon: BoxIcon,
-    matchFn: p => (p.status === 'entregue' || p.status === 'parcialmente_recebido') && (p as any).status_pagamento !== 'liberado' && (p as any).status_pagamento !== 'pago',
+    matchFn: p => !isPendingEmission(p) && (p.status === 'entregue' || p.status === 'parcialmente_recebido') && (p as any).status_pagamento !== 'liberado' && (p as any).status_pagamento !== 'pago',
   },
   {
     key: 'liberado',
     label: 'Liberado p/ Pgto',
     icon: CreditCard,
-    matchFn: p => (p as any).status_pagamento === 'liberado' && (p as any).status_pagamento !== 'pago',
+    matchFn: p => !isPendingEmission(p) && (p as any).status_pagamento === 'liberado' && (p as any).status_pagamento !== 'pago',
   },
   {
     key: 'encerrado',
     label: 'Encerrado',
     icon: ArchiveIcon,
-    matchFn: p => (p as any).status_pagamento === 'pago',
+    matchFn: p => !isPendingEmission(p) && (p as any).status_pagamento === 'pago',
   },
 ]
 
@@ -104,6 +114,30 @@ const statusConfig: Record<string, { bg: string; text: string; label: string; bg
   parcialmente_recebido: { bg: 'bg-amber-100',   text: 'text-amber-700',   label: 'Parcial',    bgDark: 'bg-amber-900/40',   textDark: 'text-amber-300' },
   entregue:              { bg: 'bg-emerald-100', text: 'text-emerald-700', label: 'Entregue',   bgDark: 'bg-emerald-900/40', textDark: 'text-emerald-300' },
   cancelado:             { bg: 'bg-gray-100',    text: 'text-gray-500',    label: 'Cancelado',  bgDark: 'bg-gray-800',       textDark: 'text-gray-400' },
+}
+
+const pendingEmissionStatus = {
+  bg: 'bg-amber-100',
+  text: 'text-amber-700',
+  label: 'Aguardando Emissao',
+  bgDark: 'bg-amber-900/40',
+  textDark: 'text-amber-300',
+}
+
+function isPendingEmission(pedido: PedidoListItem) {
+  return pedido.pending_emissao === true
+}
+
+function getStatusMeta(pedido: PedidoListItem) {
+  return isPendingEmission(pedido)
+    ? pendingEmissionStatus
+    : (statusConfig[pedido.status] || statusConfig.emitido)
+}
+
+function getDisplayNumber(pedido: PedidoListItem) {
+  if (pedido.numero_pedido) return `#${pedido.numero_pedido}`
+  if (pedido.requisicao?.numero) return pedido.requisicao.numero
+  return `#${pedido.id.slice(0, 8).toUpperCase()}`
 }
 
 // ─── PDF / Share helpers ──────────────────────────────────────────────────────
@@ -643,9 +677,10 @@ function AnexosOrganizados({ pedidoId, cotacaoId }: { pedidoId: string; cotacaoI
 
 // ─── PedidoCard (compact pipeline card) ──────────────────────────────────────
 
-function PedCard({ pedido, dark, onClick }: { pedido: Pedido; dark: boolean; onClick: () => void }) {
+function PedCard({ pedido, dark, onClick }: { pedido: PedidoListItem; dark: boolean; onClick: () => void }) {
   const dias     = diasRestantes(pedido.data_prevista_entrega)
-  const st       = statusConfig[pedido.status] || statusConfig.emitido
+  const st       = getStatusMeta(pedido)
+  const pending  = isPendingEmission(pedido)
   const entregue = pedido.status === 'entregue'
   const parcial  = pedido.status === 'parcialmente_recebido'
   const atrasado = dias !== null && dias < 0 && !entregue && !parcial
@@ -668,9 +703,7 @@ function PedCard({ pedido, dark, onClick }: { pedido: Pedido; dark: boolean; onC
         {/* Header: number + status + value */}
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0">
-            {pedido.numero_pedido && (
-              <span className={`text-[10px] font-mono ${dark ? 'text-slate-500' : 'text-slate-400'}`}>#{pedido.numero_pedido}</span>
-            )}
+            <span className={`text-[10px] font-mono ${dark ? 'text-slate-500' : 'text-slate-400'}`}>{getDisplayNumber(pedido)}</span>
             <p className={`text-sm font-bold truncate ${dark ? 'text-white' : 'text-slate-800'}`}>{pedido.fornecedor_nome}</p>
           </div>
           <p className="text-base font-extrabold text-teal-500 flex-shrink-0">{fmt(pedido.valor_total)}</p>
@@ -688,6 +721,7 @@ function PedCard({ pedido, dark, onClick }: { pedido: Pedido; dark: boolean; onC
         {/* Status badges + dates */}
         <div className="flex flex-wrap items-center gap-1.5">
           <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${dark ? st.bgDark + ' ' + st.textDark : st.bg + ' ' + st.text}`}>{st.label}</span>
+          {pending && <span className="text-[10px] text-amber-600 font-bold">RC aprovada</span>}
           {isPago && <span className="flex items-center gap-0.5 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-700"><CheckCircle size={9} /> Pago</span>}
           {isLiberado && !isPago && <span className="flex items-center gap-0.5 px-2 py-0.5 rounded-full text-[10px] font-bold bg-orange-100 text-orange-700"><Clock size={9} /> Aguard. Pgto</span>}
           {atrasado && <span className="flex items-center gap-0.5 text-[10px] text-red-600 font-bold"><AlertTriangle size={10} /> {Math.abs(dias!)}d atr.</span>}
@@ -699,7 +733,7 @@ function PedCard({ pedido, dark, onClick }: { pedido: Pedido; dark: boolean; onC
           <span>Pedido: {fmtData(pedido.data_pedido)}</span>
           <span className={atrasado ? 'text-red-500 font-semibold' : ''}>
             Prev: {fmtDataISO(pedido.data_prevista_entrega)}
-            {dias !== null && !entregue && <span className="ml-0.5">({dias}d)</span>}
+            {dias !== null && !entregue && !pending && <span className="ml-0.5">({dias}d)</span>}
           </span>
           {pedido.data_entrega_real && <span className="text-emerald-500">Entreg: {fmtData(pedido.data_entrega_real)}</span>}
         </div>
@@ -718,22 +752,24 @@ function DetailModal({
   onLiberarPagamento,
   onReceber,
 }: {
-  pedido: Pedido
+  pedido: PedidoListItem
   dark: boolean
   onClose: () => void
-  onCompartilhar: (p: Pedido) => void
+  onCompartilhar: (p: PedidoListItem) => void
   onLiberarPagamento: (id: string) => void
   onReceber: (p: Pedido) => void
 }) {
   const mutation = useAtualizarPedido()
+  const emitirPedido = useEmitirPedido()
   const [confirmando, setConfirmando] = useState(false)
 
   const dias     = diasRestantes(pedido.data_prevista_entrega)
-  const st       = statusConfig[pedido.status] || statusConfig.emitido
+  const st       = getStatusMeta(pedido)
+  const pending  = isPendingEmission(pedido)
   const entregue = pedido.status === 'entregue'
   const parcial  = pedido.status === 'parcialmente_recebido'
   const atrasado = dias !== null && dias < 0 && !entregue && !parcial
-  const podeReceber = ['confirmado', 'em_entrega', 'parcialmente_recebido'].includes(pedido.status)
+  const podeReceber = !pending && ['confirmado', 'em_entrega', 'parcialmente_recebido'].includes(pedido.status)
   const qtdTotal     = pedido.qtd_itens_total ?? 0
   const qtdRecebidos = pedido.qtd_itens_recebidos ?? 0
   const statusPgto     = (pedido as any).status_pagamento as string | undefined
@@ -752,6 +788,18 @@ function DetailModal({
     }
   }
 
+  const handleEmitirPedido = async () => {
+    if (!pedido.requisicao_id || !pedido.source_cotacao?.id) return
+    await emitirPedido.mutateAsync({
+      requisicaoId: pedido.requisicao_id,
+      cotacaoId: pedido.source_cotacao.id,
+      fornecedorNome: pedido.fornecedor_nome,
+      valorTotal: pedido.valor_total ?? 0,
+      compradorId: pedido.source_cotacao.comprador_id ?? undefined,
+    })
+    onClose()
+  }
+
   const bg  = dark ? 'bg-[#0f172a]' : 'bg-white'
   const txt = dark ? 'text-white' : 'text-slate-800'
   const sub = dark ? 'text-slate-400' : 'text-slate-500'
@@ -763,13 +811,15 @@ function DetailModal({
         {/* Header */}
         <div className={`sticky top-0 z-10 ${bg} px-5 py-4 border-b ${brd} flex items-center justify-between`}>
           <div>
-            <p className={`text-xs ${sub}`}>Pedido de Compra</p>
-            <p className={`text-base font-bold ${txt}`}>#{pedido.numero_pedido ?? pedido.id.slice(0, 8).toUpperCase()}</p>
+            <p className={`text-xs ${sub}`}>{pending ? 'Pedido Pendente' : 'Pedido de Compra'}</p>
+            <p className={`text-base font-bold ${txt}`}>{getDisplayNumber(pedido)}</p>
           </div>
           <div className="flex items-center gap-2">
-            <button onClick={() => onCompartilhar(pedido)} className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-semibold text-teal-600 bg-teal-50 border border-teal-200 hover:bg-teal-100 transition-colors">
-              <Share2 size={12} /> Pedido
-            </button>
+            {!pending && (
+              <button onClick={() => onCompartilhar(pedido)} className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-semibold text-teal-600 bg-teal-50 border border-teal-200 hover:bg-teal-100 transition-colors">
+                <Share2 size={12} /> Pedido
+              </button>
+            )}
             <button onClick={onClose} className={`p-1.5 rounded-lg transition-colors ${dark ? 'text-slate-400 hover:text-white hover:bg-white/10' : 'text-slate-400 hover:text-slate-600 hover:bg-slate-100'}`}>
               <X size={18} />
             </button>
@@ -780,6 +830,7 @@ function DetailModal({
           {/* Status badges */}
           <div className="flex flex-wrap gap-1.5">
             <span className={`px-2.5 py-1 rounded-full text-xs font-semibold ${dark ? st.bgDark + ' ' + st.textDark : st.bg + ' ' + st.text}`}>{st.label}</span>
+            {pending && <span className="flex items-center gap-0.5 px-2.5 py-1 rounded-full text-xs font-bold bg-teal-50 text-teal-700 border border-teal-200"><FileText size={11} /> Cotacao aprovada</span>}
             {isPago && <span className="flex items-center gap-0.5 px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-100 text-emerald-700"><CheckCircle size={11} /> Pago {pagoEm && `· ${fmtData(pagoEm)}`}</span>}
             {isLiberado && !isPago && <span className="flex items-center gap-0.5 px-2.5 py-1 rounded-full text-xs font-bold bg-orange-100 text-orange-700"><Clock size={11} /> Aguard. Pgto</span>}
             {atrasado && <span className="flex items-center gap-0.5 px-2.5 py-1 rounded-full text-xs font-bold bg-red-100 text-red-700"><AlertTriangle size={11} /> {Math.abs(dias!)}d atrasado</span>}
@@ -809,13 +860,13 @@ function DetailModal({
             )}
             <div>
               <span className={sub}>Data Pedido</span>
-              <p className={`font-semibold ${txt}`}>{fmtData(pedido.data_pedido)}</p>
+              <p className={`font-semibold ${txt}`}>{pending ? 'Nao emitido' : fmtData(pedido.data_pedido)}</p>
             </div>
             <div>
-              <span className={sub}>Prev. Entrega</span>
+              <span className={sub}>{pending ? 'Status da RC' : 'Prev. Entrega'}</span>
               <p className={`font-semibold ${atrasado ? 'text-red-500' : txt}`}>
-                {fmtDataISO(pedido.data_prevista_entrega)}
-                {dias !== null && !entregue && <span className="text-[10px] ml-1">({dias}d)</span>}
+                {pending ? 'Cotacao aprovada' : fmtDataISO(pedido.data_prevista_entrega)}
+                {dias !== null && !entregue && !pending && <span className="text-[10px] ml-1">({dias}d)</span>}
               </p>
             </div>
             {pedido.data_entrega_real && (
@@ -866,7 +917,7 @@ function DetailModal({
           )}
 
           {/* Timeline */}
-          <FluxoTimeline status="pedido_emitido" compact />
+          {!pending && <FluxoTimeline status="pedido_emitido" compact />}
 
           {/* Requisição description */}
           {pedido.requisicao?.descricao && (
@@ -877,21 +928,31 @@ function DetailModal({
           )}
 
           {/* Documentos */}
-          <div>
-            <p className={`text-[11px] font-semibold uppercase tracking-wide mb-2 flex items-center gap-1 ${sub}`}>
-              <Paperclip size={11} /> Documentos
-            </p>
-            <AnexosOrganizados pedidoId={pedido.id} cotacaoId={pedido.cotacao_id} />
-          </div>
+          {!pending && (
+            <div>
+              <p className={`text-[11px] font-semibold uppercase tracking-wide mb-2 flex items-center gap-1 ${sub}`}>
+                <Paperclip size={11} /> Documentos
+              </p>
+              <AnexosOrganizados pedidoId={pedido.id} cotacaoId={pedido.cotacao_id} />
+            </div>
+          )}
 
           {/* Actions */}
           <div className="space-y-2 pt-1">
+            {pending && (
+              <button onClick={handleEmitirPedido} disabled={emitirPedido.isPending} className="w-full flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-bold bg-teal-50 text-teal-700 border border-teal-300 hover:bg-teal-500 hover:text-white transition-all disabled:opacity-50">
+                {emitirPedido.isPending
+                  ? <div className="w-4 h-4 border-2 border-teal-400 border-t-transparent rounded-full animate-spin" />
+                  : <FileText size={16} />}
+                {emitirPedido.isPending ? 'Emitindo...' : 'Emitir Pedido'}
+              </button>
+            )}
             {podeReceber && (
               <button onClick={() => onReceber(pedido)} className="w-full flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-bold bg-teal-50 text-teal-700 border border-teal-300 hover:bg-teal-500 hover:text-white transition-all">
                 <Package size={16} /> {parcial ? 'Receber Restante' : 'Receber'}
               </button>
             )}
-            {pedido.status === 'emitido' && (
+            {!pending && pedido.status === 'emitido' && (
               <button onClick={confirmarEntrega} disabled={confirmando || mutation.isPending} className={`w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-semibold border transition-all disabled:opacity-50 ${dark ? 'bg-white/5 text-slate-300 border-white/10 hover:bg-white/10' : 'bg-slate-50 text-slate-500 border-slate-200 hover:bg-slate-100'}`}>
                 {confirmando ? <div className="w-3.5 h-3.5 border-2 border-slate-400 border-t-transparent rounded-full animate-spin" /> : <CheckCircle size={14} />}
                 Confirmar Entrega Direta
@@ -920,14 +981,14 @@ function DetailModal({
 
 // ─── CSV export ──────────────────────────────────────────────────────────────
 
-function exportCSV(rows: Pedido[]) {
+function exportCSV(rows: PedidoListItem[]) {
   const header = 'Numero,Fornecedor,Valor,Status,Obra,Data Pedido,Prev Entrega,Entregue Em,NF'
   const lines = rows.map(p =>
     [
-      p.numero_pedido ?? '',
+      p.numero_pedido ?? p.requisicao?.numero ?? '',
       `"${p.fornecedor_nome}"`,
       p.valor_total ?? '',
-      p.status,
+      isPendingEmission(p) ? 'pendente_emissao' : p.status,
       `"${p.requisicao?.obra_nome ?? ''}"`,
       p.data_pedido ?? '',
       p.data_prevista_entrega ?? '',
@@ -956,8 +1017,8 @@ export default function Pedidos() {
   const [sortField, setSortField]                   = useState<SortField>('data')
   const [sortDir, setSortDir]                       = useState<SortDir>('desc')
   const [viewMode, setViewMode]                     = useState<ViewMode>('cards')
-  const [selectedPedido, setSelectedPedido]         = useState<Pedido | null>(null)
-  const [compartilharPedido, setCompartilhar]       = useState<Pedido | null>(null)
+  const [selectedPedido, setSelectedPedido]         = useState<PedidoListItem | null>(null)
+  const [compartilharPedido, setCompartilhar]       = useState<PedidoListItem | null>(null)
   const [showLiberarModal, setShowLiberarModal]     = useState<string | null>(null)
   const [receberPedido, setReceberPedido]           = useState<Pedido | null>(null)
 
@@ -969,25 +1030,59 @@ export default function Pedidos() {
     }
   }, [highlightPedidoId, setSearchParams])
 
-  const { data: pedidos, isLoading } = usePedidos()
+  const { data: pedidos, isLoading: isLoadingPedidos } = usePedidos()
+  const { data: cotacoes = [], isLoading: isLoadingCotacoes } = useCotacoes()
 
   // Exclude cancelado
   const allPedidos = useMemo(() => (pedidos ?? []).filter(p => p.status !== 'cancelado'), [pedidos])
+  const pedidosByReq = useMemo(() => new Set(allPedidos.map(p => p.requisicao_id).filter(Boolean)), [allPedidos])
+  const pendingApprovalPedidos = useMemo<PedidoListItem[]>(
+    () => cotacoes
+      .filter(c => c.status === 'concluida' && c.requisicao?.status === 'cotacao_aprovada')
+      .filter(c => !pedidosByReq.has(c.requisicao_id))
+      .map(c => ({
+        id: `cotacao-aprovada-${c.id}`,
+        requisicao_id: c.requisicao_id,
+        cotacao_id: c.id,
+        comprador_id: c.comprador_id,
+        fornecedor_nome: c.fornecedor_selecionado_nome ?? 'Fornecedor nao definido',
+        valor_total: c.valor_selecionado ?? c.requisicao?.valor_estimado,
+        status: 'emitido',
+        created_at: c.data_conclusao ?? c.created_at,
+        observacoes: c.observacao,
+        requisicao: c.requisicao
+          ? {
+              numero: c.requisicao.numero,
+              descricao: c.requisicao.descricao,
+              obra_nome: c.requisicao.obra_nome,
+              categoria: c.requisicao.categoria,
+            }
+          : undefined,
+        pending_emissao: true,
+        source_cotacao: { id: c.id, comprador_id: c.comprador_id },
+      })),
+    [cotacoes, pedidosByReq],
+  )
+  const allPedidoItems = useMemo<PedidoListItem[]>(
+    () => [...pendingApprovalPedidos, ...allPedidos],
+    [pendingApprovalPedidos, allPedidos],
+  )
+  const isLoading = isLoadingPedidos || isLoadingCotacoes
 
   // Count per tab
   const counts = useMemo(() => {
     const c: Record<PipelineTab, number> = { pendente: 0, emitido: 0, entregue: 0, liberado: 0, encerrado: 0 }
-    for (const p of allPedidos) {
+    for (const p of allPedidoItems) {
       for (const stage of PIPELINE_STAGES) {
         if (stage.matchFn(p)) { c[stage.key]++; break }
       }
     }
     return c
-  }, [allPedidos])
+  }, [allPedidoItems])
 
   // Filter by active tab
   const stage = PIPELINE_STAGES.find(s => s.key === activeTab)!
-  const tabFiltered = useMemo(() => allPedidos.filter(stage.matchFn), [allPedidos, stage])
+  const tabFiltered = useMemo(() => allPedidoItems.filter(stage.matchFn), [allPedidoItems, stage])
 
   // Search
   const searched = useMemo(() => {
@@ -1023,15 +1118,15 @@ export default function Pedidos() {
     else { setSortField(f); setSortDir('desc') }
   }
 
-  const liberarPedido = sorted.find(p => p.id === showLiberarModal) ?? allPedidos.find(p => p.id === showLiberarModal)
+  const liberarPedido = sorted.find(p => p.id === showLiberarModal && !isPendingEmission(p)) ?? allPedidos.find(p => p.id === showLiberarModal)
 
   // Auto-open detail if highlight param
   useEffect(() => {
-    if (highlightPedidoId && allPedidos.length > 0) {
-      const found = allPedidos.find(p => p.id === highlightPedidoId)
+    if (highlightPedidoId && allPedidoItems.length > 0) {
+      const found = allPedidoItems.find(p => p.id === highlightPedidoId)
       if (found) setSelectedPedido(found)
     }
-  }, [highlightPedidoId, allPedidos])
+  }, [highlightPedidoId, allPedidoItems])
 
   // ── Render ─────────────────────────────────────────────────────────────────
 
@@ -1169,9 +1264,10 @@ export default function Pedidos() {
             </thead>
             <tbody className={`divide-y ${dark ? 'divide-white/5' : 'divide-slate-100'}`}>
               {sorted.map(p => {
-                const st2 = statusConfig[p.status] || statusConfig.emitido
+                const st2 = getStatusMeta(p)
+                const pending = isPendingEmission(p)
                 const d = diasRestantes(p.data_prevista_entrega)
-                const atr = d !== null && d < 0 && p.status !== 'entregue' && p.status !== 'parcialmente_recebido'
+                const atr = !pending && d !== null && d < 0 && p.status !== 'entregue' && p.status !== 'parcialmente_recebido'
                 return (
                   <tr
                     key={p.id}
@@ -1179,7 +1275,7 @@ export default function Pedidos() {
                     className={`cursor-pointer transition-colors ${dark ? 'hover:bg-white/[0.03]' : 'hover:bg-slate-50'}`}
                   >
                     <td className={`px-3 py-2.5 font-mono ${dark ? 'text-slate-400' : 'text-slate-500'}`}>
-                      #{p.numero_pedido ?? p.id.slice(0, 6)}
+                      {getDisplayNumber(p)}
                     </td>
                     <td className={`px-3 py-2.5 font-semibold ${dark ? 'text-white' : 'text-slate-800'}`}>
                       {p.fornecedor_nome}
@@ -1196,11 +1292,11 @@ export default function Pedidos() {
                       </span>
                     </td>
                     <td className={`px-3 py-2.5 ${atr ? 'text-red-500 font-semibold' : dark ? 'text-slate-400' : 'text-slate-500'}`}>
-                      {fmtDataISO(p.data_prevista_entrega)}
-                      {d !== null && p.status !== 'entregue' && <span className="ml-1 text-[10px]">({d}d)</span>}
+                      {pending ? 'Cotacao aprovada' : fmtDataISO(p.data_prevista_entrega)}
+                      {d !== null && p.status !== 'entregue' && !pending && <span className="ml-1 text-[10px]">({d}d)</span>}
                     </td>
                     <td className={`px-3 py-2.5 ${dark ? 'text-slate-400' : 'text-slate-500'}`}>
-                      {fmtData(p.data_pedido)}
+                      {pending ? 'Nao emitido' : fmtData(p.data_pedido)}
                     </td>
                   </tr>
                 )
@@ -1211,7 +1307,7 @@ export default function Pedidos() {
       )}
 
       <p className={`text-center text-xs py-2 ${dark ? 'text-slate-600' : 'text-slate-300'}`}>
-        {sorted.length} pedido{sorted.length !== 1 ? 's' : ''}
+        {sorted.length} item{sorted.length !== 1 ? 's' : ''}
       </p>
 
       {/* Detail modal */}
