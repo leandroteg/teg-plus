@@ -540,7 +540,7 @@ export default function SolicitacoesPipeline() {
   // Abrir modal via ?nova=1 (clique no sidebar)
   const [searchParams, setSearchParams] = useSearchParams()
   useEffect(() => {
-    if (searchParams.get('nova') === '1') {
+    if (searchParams.get('nova')) {
       setShowNovaSolicitacao(true)
       setSearchParams({}, { replace: true })
     }

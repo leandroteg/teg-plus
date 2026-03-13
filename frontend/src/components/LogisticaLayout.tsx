@@ -12,7 +12,7 @@ export default function LogisticaLayout() {
   const NAV: NavItem[] = [
     { to: '/logistica',                 icon: LayoutDashboard, label: 'Painel',             end: true  },
     { to: '/logistica/nova-solicitacao', icon: Plus,           label: 'Nova Solicitação',   end: false,
-      action: () => navigate('/logistica/solicitacoes?nova=1'), accent: true },
+      action: () => navigate(`/logistica/solicitacoes?nova=${Date.now()}`), accent: true },
     { to: '/logistica/solicitacoes',    icon: ClipboardList,   label: 'Solicitações',       end: false },
     { to: '/logistica/expedicao',       icon: Package2,        label: 'Expedição',          end: false },
     { to: '/logistica/transportes',     icon: Truck,           label: 'Transportes',        end: false },

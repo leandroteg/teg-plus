@@ -1,4 +1,5 @@
 import { useState, useMemo, useCallback, useRef, useEffect } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import {
   FileText, Clock, CheckCircle2, XCircle, Search, Edit3, Send,
   ThumbsUp, ThumbsDown, Building2, Calendar, Hash, AlertTriangle,
@@ -1069,14 +1070,14 @@ export default function FiscalPipeline() {
   const [toast, setToast] = useState<{ type: 'success' | 'error'; msg: string } | null>(null)
   const [showCreate, setShowCreate] = useState(false)
 
-  // Detect ?nova=1 from sidebar
+  // Detect ?nova=... from sidebar
+  const [searchParams, setSearchParams] = useSearchParams()
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search)
-    if (params.get('nova') === '1') {
+    if (searchParams.get('nova')) {
       setShowCreate(true)
-      window.history.replaceState({}, '', window.location.pathname)
+      setSearchParams({}, { replace: true })
     }
-  }, [])
+  }, [searchParams, setSearchParams])
 
   // Data — no month filter for pipeline (show all)
   const filters: SolicitacaoNFFilters = useMemo(() => ({
