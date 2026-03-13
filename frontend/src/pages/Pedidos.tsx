@@ -63,13 +63,13 @@ const PIPELINE_STAGES: {
     key: 'pendente',
     label: 'Pendente',
     icon: ClipboardList,
-    matchFn: p => isPendingEmission(p) || p.status === 'emitido',
+    matchFn: p => isPendingEmission(p),
   },
   {
     key: 'emitido',
     label: 'Emitido',
     icon: Truck,
-    matchFn: p => !isPendingEmission(p) && p.status === 'confirmado',
+    matchFn: p => !isPendingEmission(p) && ['emitido', 'confirmado', 'em_entrega'].includes(p.status),
   },
   {
     key: 'entregue',
