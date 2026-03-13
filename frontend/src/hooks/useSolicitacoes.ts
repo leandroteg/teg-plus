@@ -620,6 +620,31 @@ function normalizeMinutaAiAnalise(input: unknown): MinutaAiAnalise | null {
   }
 }
 
+function hasMeaningfulMinutaAiAnalise(analise: MinutaAiAnalise | null | undefined) {
+  if (!analise) return false
+
+  return (
+    analise.riscos.length > 0 ||
+    analise.sugestoes.length > 0 ||
+    (analise.oportunidades?.length ?? 0) > 0 ||
+    (analise.clausulas_analisadas?.length ?? 0) > 0
+  )
+}
+
+function isFallbackMinutaAiAnalise(analise: MinutaAiAnalise | null | undefined) {
+  if (!analise) return true
+
+  const resumo = (analise.resumo ?? '').trim().toLowerCase()
+  const hasOnlyFallbackResumo = !resumo || resumo === 'análise processada.' || resumo === 'analise processada.'
+
+  return (
+    analise.score === 70 &&
+    analise.papel_teg === 'indefinido' &&
+    !hasMeaningfulMinutaAiAnalise(analise) &&
+    hasOnlyFallbackResumo
+  )
+}
+
 export function useConfigAnalise() {
   return useQuery<ConfigAnalise[]>({
     queryKey: ['con-config-analise'],
@@ -923,7 +948,20 @@ export function useAnalisarMinuta() {
       if (!res.ok) throw new Error(`Erro na analise: ${res.status}`)
       const result = await res.json()
 
-      const analise = normalizeMinutaAiAnalise(result?.analise ?? result)
+      let analise = normalizeMinutaAiAnalise(result?.analise ?? result)
+
+      if (isFallbackMinutaAiAnalise(analise)) {
+        const { data: minutaAtual } = await supabase
+          .from('con_minutas')
+          .select('ai_analise')
+          .eq('id', payload.minuta_id)
+          .maybeSingle()
+
+        const analiseAnterior = normalizeMinutaAiAnalise(minutaAtual?.ai_analise)
+        if (hasMeaningfulMinutaAiAnalise(analiseAnterior)) {
+          analise = analiseAnterior
+        }
+      }
 
       // 2. Save normalized analysis result to Supabase
       if (result.success && analise) {
