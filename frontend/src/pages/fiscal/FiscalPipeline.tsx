@@ -1282,7 +1282,7 @@ export default function FiscalPipeline() {
         <div>
           <h1 className={`text-xl font-extrabold flex items-center gap-2 ${isDark ? 'text-white' : 'text-slate-800'}`}>
             <FileOutput size={20} className="text-amber-500" />
-            Pipeline NF
+            Emissão de Nota Fiscal
           </h1>
           <p className={`text-xs mt-0.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
             {allSolicitacoes.length} solicitacoes &middot; Emissao via sistema ou NF emitida
