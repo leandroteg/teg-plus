@@ -122,6 +122,7 @@ import Configuracoes from './pages/financeiro/Configuracoes'
 
 // Módulo Fiscal
 import FiscalLayout from './components/FiscalLayout'
+import PainelFiscal from './pages/fiscal/PainelFiscal'
 import NotasFiscais from './pages/financeiro/NotasFiscais'
 import FiscalPipeline from './pages/fiscal/FiscalPipeline'
 
@@ -202,8 +203,9 @@ export default function App() {
           {/* Módulo Fiscal */}
           <Route element={<ModuleRoute moduleKey="fiscal" />}>
             <Route element={<FiscalLayout />}>
-              <Route path="/fiscal"              element={<NotasFiscais />} />
+              <Route path="/fiscal"              element={<PainelFiscal />} />
               <Route path="/fiscal/pipeline"     element={<FiscalPipeline />} />
+              <Route path="/fiscal/historico"    element={<NotasFiscais />} />
             </Route>
           </Route>
 

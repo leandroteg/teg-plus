@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback, useRef } from 'react'
+import { useState, useMemo, useCallback, useRef, useEffect } from 'react'
 import {
   FileText, Clock, CheckCircle2, XCircle, Search, Edit3, Send,
   ThumbsUp, ThumbsDown, Building2, Calendar, Hash, AlertTriangle,
@@ -16,10 +16,11 @@ import type {
 } from '../../types/solicitacaoNF'
 import { FISCAL_PIPELINE_STAGES } from '../../types/solicitacaoNF'
 import {
-  useSolicitacoesNF, useSolResumo, useIniciarEmissao,
+  useSolicitacoesNF, useSolResumo, useCriarSolicitacao, useIniciarEmissao,
   useEmitirNF, useAnexarNFExterna, useAprovarSolicitacao,
   useRejeitarSolicitacao, useUploadDANFE,
 } from '../../hooks/useSolicitacoesNF'
+import type { CriarSolicitacaoPayload } from '../../types/solicitacaoNF'
 import { useAuth } from '../../contexts/AuthContext'
 import { useTheme } from '../../contexts/ThemeContext'
 
@@ -1066,6 +1067,16 @@ export default function FiscalPipeline() {
   const [externaTarget, setExternaTarget] = useState<SolicitacaoNF | null>(null)
   const [rejectTarget, setRejectTarget] = useState<SolicitacaoNF | null>(null)
   const [toast, setToast] = useState<{ type: 'success' | 'error'; msg: string } | null>(null)
+  const [showCreate, setShowCreate] = useState(false)
+
+  // Detect ?nova=1 from sidebar
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    if (params.get('nova') === '1') {
+      setShowCreate(true)
+      window.history.replaceState({}, '', window.location.pathname)
+    }
+  }, [])
 
   // Data — no month filter for pipeline (show all)
   const filters: SolicitacaoNFFilters = useMemo(() => ({
@@ -1114,6 +1125,7 @@ export default function FiscalPipeline() {
   const anexarExterna = useAnexarNFExterna()
   const aprovarSol = useAprovarSolicitacao()
   const rejeitarSol = useRejeitarSolicitacao()
+  const criarSolicitacao = useCriarSolicitacao()
 
   const showToast = useCallback((type: 'success' | 'error', msg: string) => {
     setToast({ type, msg })
@@ -1276,6 +1288,10 @@ export default function FiscalPipeline() {
             {allSolicitacoes.length} solicitacoes &middot; Emissao via sistema ou NF emitida
           </p>
         </div>
+        <button onClick={() => setShowCreate(true)}
+          className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold bg-amber-600 text-white hover:bg-amber-700 transition-colors shadow-sm">
+          <Plus size={14} /> Nova Solicitação
+        </button>
       </div>
 
       {/* ── Horizontal Tabs ────────────────────────────────────────── */}
@@ -1492,6 +1508,150 @@ export default function FiscalPipeline() {
           onConfirm={handleRejectConfirm} onClose={() => setRejectTarget(null)}
           isPending={rejeitarSol.isPending} />
       )}
+
+      {showCreate && (
+        <NovaSolicitacaoNFModal isDark={isDark}
+          onClose={() => setShowCreate(false)}
+          onSubmit={(payload) => {
+            criarSolicitacao.mutate(payload, {
+              onSuccess: () => { showToast('success', 'Solicitação criada'); setShowCreate(false) },
+              onError: () => showToast('error', 'Erro ao criar solicitação'),
+            })
+          }}
+          isPending={criarSolicitacao.isPending} />
+      )}
+    </div>
+  )
+}
+
+// ── NovaSolicitacaoNFModal ────────────────────────────────────────────────────
+
+function NovaSolicitacaoNFModal({ isDark, onClose, onSubmit, isPending }: {
+  isDark: boolean; onClose: () => void;
+  onSubmit: (p: CriarSolicitacaoPayload) => void; isPending: boolean
+}) {
+  const [form, setForm] = useState({
+    fornecedor_cnpj: '', fornecedor_nome: '', valor_total: '',
+    cfop: '', natureza_operacao: '', descricao: '', observacoes: '',
+    origem: 'manual' as 'logistica' | 'compras' | 'manual',
+  })
+
+  const set = (k: string, v: string) => setForm(f => ({ ...f, [k]: v }))
+  const canSubmit = form.fornecedor_nome.trim() && form.valor_total
+
+  const submit = () => {
+    if (!canSubmit) return
+    onSubmit({
+      fornecedor_cnpj: form.fornecedor_cnpj,
+      fornecedor_nome: form.fornecedor_nome,
+      valor_total: parseFloat(form.valor_total) || 0,
+      cfop: form.cfop || undefined,
+      natureza_operacao: form.natureza_operacao || undefined,
+      descricao: form.descricao || undefined,
+      observacoes: form.observacoes || undefined,
+      origem: form.origem,
+    })
+  }
+
+  const card = isDark ? 'bg-[#1e293b] border-white/[0.06]' : 'bg-white border-slate-200'
+  const label = `text-[10px] font-bold uppercase tracking-widest mb-1 ${isDark ? 'text-slate-400' : 'text-slate-500'}`
+  const input = `w-full rounded-xl border px-3 py-2 text-sm outline-none transition-colors
+    ${isDark ? 'bg-slate-800 border-white/[0.08] text-white placeholder:text-slate-600 focus:border-amber-500/50' : 'bg-white border-slate-200 text-slate-800 placeholder:text-slate-300 focus:border-amber-400'}`
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
+      <div className={`relative w-full max-w-lg rounded-2xl border shadow-2xl ${card} max-h-[85vh] overflow-y-auto`}>
+        <div className={`sticky top-0 z-10 flex items-center justify-between px-5 py-4 border-b ${isDark ? 'border-white/[0.06] bg-[#1e293b]' : 'border-slate-100 bg-white'} rounded-t-2xl`}>
+          <h2 className={`text-base font-extrabold flex items-center gap-2 ${isDark ? 'text-white' : 'text-slate-800'}`}>
+            <Plus size={16} className="text-amber-500" /> Nova Solicitação NF
+          </h2>
+          <button onClick={onClose} className={`p-1.5 rounded-lg transition-colors ${isDark ? 'hover:bg-white/10' : 'hover:bg-slate-100'}`}>
+            <X size={16} className={isDark ? 'text-slate-400' : 'text-slate-500'} />
+          </button>
+        </div>
+
+        <div className="p-5 space-y-4">
+          {/* Origem */}
+          <div>
+            <p className={label}>Origem</p>
+            <div className="flex gap-2">
+              {(['manual', 'compras', 'logistica'] as const).map(o => (
+                <button key={o} onClick={() => set('origem', o)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
+                    form.origem === o
+                      ? 'bg-amber-600 text-white'
+                      : isDark ? 'bg-white/[0.06] text-slate-400 hover:bg-white/10' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
+                  }`}>
+                  {o === 'manual' ? 'Manual' : o === 'compras' ? 'Compras' : 'Logística'}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Fornecedor */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <p className={label}>Fornecedor *</p>
+              <input className={input} placeholder="Razão social" value={form.fornecedor_nome}
+                onChange={e => set('fornecedor_nome', e.target.value)} />
+            </div>
+            <div>
+              <p className={label}>CNPJ</p>
+              <input className={input} placeholder="00.000.000/0000-00" value={form.fornecedor_cnpj}
+                onChange={e => set('fornecedor_cnpj', e.target.value)} />
+            </div>
+          </div>
+
+          {/* Valor */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <p className={label}>Valor Total *</p>
+              <input className={input} type="number" step="0.01" placeholder="0,00" value={form.valor_total}
+                onChange={e => set('valor_total', e.target.value)} />
+            </div>
+            <div>
+              <p className={label}>CFOP</p>
+              <input className={input} placeholder="Ex: 5102" value={form.cfop}
+                onChange={e => set('cfop', e.target.value)} />
+            </div>
+          </div>
+
+          {/* Natureza */}
+          <div>
+            <p className={label}>Natureza da Operação</p>
+            <input className={input} placeholder="Ex: Venda de mercadoria" value={form.natureza_operacao}
+              onChange={e => set('natureza_operacao', e.target.value)} />
+          </div>
+
+          {/* Descrição */}
+          <div>
+            <p className={label}>Descrição</p>
+            <textarea className={`${input} resize-none`} rows={2} placeholder="Descrição da solicitação..."
+              value={form.descricao} onChange={e => set('descricao', e.target.value)} />
+          </div>
+
+          {/* Observações */}
+          <div>
+            <p className={label}>Observações</p>
+            <textarea className={`${input} resize-none`} rows={2} placeholder="Observações adicionais..."
+              value={form.observacoes} onChange={e => set('observacoes', e.target.value)} />
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div className={`sticky bottom-0 flex items-center justify-end gap-2 px-5 py-4 border-t ${isDark ? 'border-white/[0.06] bg-[#1e293b]' : 'border-slate-100 bg-white'} rounded-b-2xl`}>
+          <button onClick={onClose}
+            className={`px-4 py-2 rounded-xl text-xs font-bold transition-colors ${isDark ? 'text-slate-400 hover:bg-white/10' : 'text-slate-500 hover:bg-slate-100'}`}>
+            Cancelar
+          </button>
+          <button onClick={submit} disabled={!canSubmit || isPending}
+            className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold bg-amber-600 text-white hover:bg-amber-700 disabled:opacity-40 transition-colors shadow-sm">
+            {isPending ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle2 size={14} />}
+            Criar Solicitação
+          </button>
+        </div>
+      </div>
     </div>
   )
 }
