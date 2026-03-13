@@ -699,14 +699,14 @@ function PedCard({ pedido, dark, onClick }: { pedido: PedidoListItem; dark: bool
           : `bg-white ${atrasado ? 'border-red-200' : isPago ? 'border-emerald-300' : isLiberado ? 'border-orange-200' : entregue ? 'border-emerald-200' : 'border-slate-200'} shadow-sm`
       }`}
     >
-      <div className="p-4 space-y-2.5">
+      <div className="p-4 space-y-2">
         {/* Header: number + status + value */}
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0">
             <span className={`text-[10px] font-mono ${dark ? 'text-slate-500' : 'text-slate-400'}`}>{getDisplayNumber(pedido)}</span>
             <p className={`text-sm font-bold truncate ${dark ? 'text-white' : 'text-slate-800'}`}>{pedido.fornecedor_nome}</p>
           </div>
-          <p className="text-base font-extrabold text-teal-500 flex-shrink-0">{fmt(pedido.valor_total)}</p>
+          <p className="text-sm font-extrabold text-teal-500 flex-shrink-0">{fmt(pedido.valor_total)}</p>
         </div>
 
         {/* RC + Obra */}
@@ -729,7 +729,7 @@ function PedCard({ pedido, dark, onClick }: { pedido: PedidoListItem; dark: bool
         </div>
 
         {/* Dates row */}
-        <div className={`flex gap-4 text-[11px] ${dark ? 'text-slate-400' : 'text-slate-500'}`}>
+        <div className={`flex flex-wrap gap-x-4 gap-y-1 text-[11px] ${dark ? 'text-slate-400' : 'text-slate-500'}`}>
           <span>Pedido: {fmtData(pedido.data_pedido)}</span>
           <span className={atrasado ? 'text-red-500 font-semibold' : ''}>
             Prev: {fmtDataISO(pedido.data_prevista_entrega)}
@@ -1242,7 +1242,7 @@ export default function Pedidos() {
           </p>
         </div>
       ) : viewMode === 'cards' ? (
-        <div className="grid gap-3 sm:grid-cols-2">
+        <div className="space-y-2 p-4">
           {sorted.map(p => (
             <PedCard key={p.id} pedido={p} dark={dark} onClick={() => setSelectedPedido(p)} />
           ))}
