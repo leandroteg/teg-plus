@@ -236,7 +236,7 @@ export default function Patrimonial({
           <p className={`font-semibold mt-3 ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>Nenhum imobilizado cadastrado</p>
         </div>
       ) : viewMode === 'cards' ? (
-        <div className="space-y-2">
+        <div className="grid gap-4 md:grid-cols-2">
           {filtrados.map(imob => (
             <ImobilizadoCard
               key={imob.id}
@@ -256,13 +256,13 @@ export default function Patrimonial({
             <table className="min-w-full text-sm">
               <thead className={isLight ? 'bg-slate-50' : 'bg-white/[0.03]'}>
                 <tr className={isLight ? 'text-slate-500' : 'text-slate-400'}>
-                  <th className="px-4 py-3 text-left text-[11px] font-bold uppercase tracking-wider">Patrimonio</th>
-                  <th className="px-4 py-3 text-left text-[11px] font-bold uppercase tracking-wider">Descricao</th>
-                  <th className="px-4 py-3 text-left text-[11px] font-bold uppercase tracking-wider">Status</th>
-                  <th className="px-4 py-3 text-left text-[11px] font-bold uppercase tracking-wider">Responsavel</th>
-                  <th className="px-4 py-3 text-right text-[11px] font-bold uppercase tracking-wider">Valor</th>
-                  <th className="px-4 py-3 text-right text-[11px] font-bold uppercase tracking-wider">Deprec.</th>
-                  <th className="px-4 py-3 text-right text-[11px] font-bold uppercase tracking-wider">Acoes</th>
+                  <th className="px-4 py-2 text-left text-[11px] font-bold uppercase tracking-wider">Patrimonio</th>
+                  <th className="px-4 py-2 text-left text-[11px] font-bold uppercase tracking-wider">Descricao</th>
+                  <th className="px-4 py-2 text-left text-[11px] font-bold uppercase tracking-wider">Status</th>
+                  <th className="px-4 py-2 text-left text-[11px] font-bold uppercase tracking-wider">Responsavel</th>
+                  <th className="px-4 py-2 text-right text-[11px] font-bold uppercase tracking-wider">Valor</th>
+                  <th className="px-4 py-2 text-right text-[11px] font-bold uppercase tracking-wider">Deprec.</th>
+                  <th className="px-4 py-2 text-right text-[11px] font-bold uppercase tracking-wider">Acoes</th>
                 </tr>
               </thead>
               <tbody>
@@ -360,7 +360,7 @@ function ImobilizadoCard({
   const pctDeprec = imob.percentual_depreciado ?? 0
 
   return (
-    <div className={`rounded-2xl border overflow-hidden ${card}`}>
+    <div className={`rounded-2xl border overflow-hidden h-full ${card}`}>
       <div
         className={`flex items-center gap-3 px-4 py-3 cursor-pointer transition-colors ${isLight ? 'hover:bg-slate-50' : 'hover:bg-white/[0.02]'}`}
         onClick={() => setExpandedId(isExpanded ? null : imob.id)}
@@ -433,7 +433,7 @@ function ImobilizadoTableRow({
   return (
     <>
       <tr className={`border-t ${cellBorder} ${isLight ? 'hover:bg-slate-50/70' : 'hover:bg-white/[0.02]'}`}>
-        <td className="px-4 py-3">
+        <td className="px-4 py-2.5">
           <button
             type="button"
             onClick={() => setExpandedId(isExpanded ? null : imob.id)}
@@ -445,28 +445,28 @@ function ImobilizadoTableRow({
             <span className={`font-mono font-extrabold ${isLight ? 'text-slate-800' : 'text-white'}`}>{imob.numero_patrimonio}</span>
           </button>
         </td>
-        <td className={`px-4 py-3 ${isLight ? 'text-slate-600' : 'text-slate-300'}`}>
+        <td className={`px-4 py-2.5 ${isLight ? 'text-slate-600' : 'text-slate-300'}`}>
           <div className="min-w-[220px]">
             <p className="font-semibold">{imob.descricao}</p>
             <p className={`text-[11px] ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>{imob.categoria || 'Sem categoria'}</p>
           </div>
         </td>
-        <td className="px-4 py-3">
+        <td className="px-4 py-2.5">
           <span className={`inline-flex items-center gap-1 rounded-full text-[10px] font-semibold px-2 py-0.5 ${cfg.bg} ${cfg.text}`}>
             <span className={`w-1.5 h-1.5 rounded-full ${cfg.dot}`} />
             {cfg.label}
           </span>
         </td>
-        <td className={`px-4 py-3 ${isLight ? 'text-slate-600' : 'text-slate-300'}`}>
+        <td className={`px-4 py-2.5 ${isLight ? 'text-slate-600' : 'text-slate-300'}`}>
           <div className="min-w-[140px]">
             <p>{imob.responsavel_nome || '--'}</p>
             <p className={`text-[11px] ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>{imob.base_nome || 'Sem base'}</p>
           </div>
         </td>
-        <td className={`px-4 py-3 text-right font-extrabold ${isLight ? 'text-slate-700' : 'text-slate-200'}`}>
+        <td className={`px-4 py-2.5 text-right font-extrabold ${isLight ? 'text-slate-700' : 'text-slate-200'}`}>
           {fmt(imob.valor_atual ?? imob.valor_aquisicao)}
         </td>
-        <td className="px-4 py-3">
+        <td className="px-4 py-2.5">
           <div className="flex items-center justify-end gap-2 min-w-[110px]">
             <div className={`w-16 h-1.5 rounded-full overflow-hidden ${isLight ? 'bg-slate-100' : 'bg-white/[0.08]'}`}>
               <div
@@ -477,7 +477,7 @@ function ImobilizadoTableRow({
             <span className={`text-[11px] ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>{pctDeprec}%</span>
           </div>
         </td>
-        <td className="px-4 py-3">
+        <td className="px-4 py-2.5">
           <div className="flex items-center justify-end gap-2">
             <button
               type="button"
