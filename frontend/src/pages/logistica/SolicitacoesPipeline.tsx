@@ -12,6 +12,7 @@ import {
   useEnviarParaAprovacao, useCriarSolicitacao,
   useRotas,
 } from '../../hooks/useLogistica'
+import { useSearchParams } from 'react-router-dom'
 import { useLookupObras, useLookupCentrosCusto } from '../../hooks/useLookups'
 import type { LogSolicitacao, StatusSolicitacaoPipeline, CriarSolicitacaoPayload, TipoTransporte } from '../../types/logistica'
 import { SOLICITACAO_PIPELINE_STAGES } from '../../types/logistica'
@@ -537,13 +538,13 @@ export default function SolicitacoesPipeline() {
   const [showNovaSolicitacao, setShowNovaSolicitacao] = useState(false)
 
   // Abrir modal via ?nova=1 (clique no sidebar)
+  const [searchParams, setSearchParams] = useSearchParams()
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search)
-    if (params.get('nova') === '1') {
+    if (searchParams.get('nova') === '1') {
       setShowNovaSolicitacao(true)
-      window.history.replaceState({}, '', window.location.pathname)
+      setSearchParams({}, { replace: true })
     }
-  }, [])
+  }, [searchParams, setSearchParams])
 
   const { data: solicitacoes = [], isLoading } = useSolicitacoes()
   const atualizarStatus = useAtualizarStatusSolicitacao()
