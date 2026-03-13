@@ -20,15 +20,16 @@ type PipelineStage = {
   bg: string
   text: string
   border: string
+  badge: string
   etapas: EtapaSolicitacao[]  // which etapa_atual values map here
 }
 
 const STAGES: PipelineStage[] = [
-  { key: 'pendente',  label: 'Pendente',     icon: Clock,        dot: 'bg-amber-500',   bg: 'bg-amber-50',   text: 'text-amber-700',   border: 'border-l-amber-500',   etapas: ['enviar_assinatura'] },
-  { key: 'enviado',   label: 'Enviado',      icon: Send,         dot: 'bg-blue-500',    bg: 'bg-blue-50',    text: 'text-blue-700',    border: 'border-l-blue-500',    etapas: [] },
-  { key: 'assinado',  label: 'Assinado',     icon: CheckCircle2, dot: 'bg-emerald-500', bg: 'bg-emerald-50', text: 'text-emerald-700', border: 'border-l-emerald-500', etapas: [] },
-  { key: 'arquivado', label: 'Arquivado',    icon: Archive,      dot: 'bg-cyan-500',    bg: 'bg-cyan-50',    text: 'text-cyan-700',    border: 'border-l-cyan-500',    etapas: ['arquivar'] },
-  { key: 'liberado',  label: 'Liberado',     icon: Unlock,       dot: 'bg-green-500',   bg: 'bg-green-50',   text: 'text-green-700',   border: 'border-l-green-500',   etapas: ['liberar_execucao'] },
+  { key: 'pendente',  label: 'Pendente',     icon: Clock,        dot: 'bg-amber-500',   bg: 'bg-amber-50',   text: 'text-amber-700',   border: 'border-l-amber-500',   badge: 'bg-amber-100 text-amber-700', etapas: ['enviar_assinatura'] },
+  { key: 'enviado',   label: 'Enviado',      icon: Send,         dot: 'bg-blue-500',    bg: 'bg-blue-50',    text: 'text-blue-700',    border: 'border-l-blue-500',    badge: 'bg-blue-100 text-blue-700', etapas: [] },
+  { key: 'assinado',  label: 'Assinado',     icon: CheckCircle2, dot: 'bg-emerald-500', bg: 'bg-emerald-50', text: 'text-emerald-700', border: 'border-l-emerald-500', badge: 'bg-emerald-100 text-emerald-700', etapas: [] },
+  { key: 'arquivado', label: 'Arquivado',    icon: Archive,      dot: 'bg-cyan-500',    bg: 'bg-cyan-50',    text: 'text-cyan-700',    border: 'border-l-cyan-500',    badge: 'bg-cyan-100 text-cyan-700', etapas: ['arquivar'] },
+  { key: 'liberado',  label: 'Liberado',     icon: Unlock,       dot: 'bg-green-500',   bg: 'bg-green-50',   text: 'text-green-700',   border: 'border-l-green-500',   badge: 'bg-green-100 text-green-700', etapas: ['liberar_execucao'] },
 ]
 
 // ── Formatters ──────────────────────────────────────────────────────────────
@@ -188,7 +189,7 @@ export default function AssinaturaPipeline() {
       </div>
 
       {/* Stage tabs */}
-      <div className="flex items-center gap-1 overflow-x-auto hide-scrollbar pb-0.5">
+      <div className="flex gap-1 p-1 rounded-2xl border overflow-x-auto hide-scrollbar bg-slate-50 border-slate-200">
         {STAGES.map(s => {
           const Icon = s.icon
           const count = counts[s.key]
@@ -197,17 +198,17 @@ export default function AssinaturaPipeline() {
             <button
               key={s.key}
               onClick={() => setActiveStage(s.key)}
-              className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs whitespace-nowrap transition-all shrink-0 ${
+              className={`min-w-fit md:flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm whitespace-nowrap transition-all border ${
                 active
-                  ? `${s.bg} ${s.text} font-bold shadow-sm ring-1 ${s.border.replace('border-l-', 'ring-')}`
-                  : `bg-slate-50 text-slate-500 font-medium`
+                  ? `${s.bg} ${s.text} font-bold shadow-sm ${s.border.replace('border-l-', 'border-')}`
+                  : 'text-slate-500 font-medium border-transparent hover:bg-white hover:shadow-sm'
               }`}
             >
-              <Icon size={13} className="shrink-0" />
+              <Icon size={15} className="shrink-0" />
               {s.label}
               {count > 0 && (
-                <span className={`text-[10px] font-bold rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1 ${
-                  active ? `${s.dot} text-white` : 'bg-slate-200/80 text-slate-500'
+                <span className={`text-[10px] font-bold rounded-full min-w-[22px] px-1.5 py-0.5 flex items-center justify-center ${
+                  active ? s.badge : 'bg-slate-100 text-slate-500'
                 }`}>{count}</span>
               )}
             </button>

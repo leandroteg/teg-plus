@@ -145,7 +145,7 @@ export default function SolicitacoesLista() {
       </div>
 
       {/* Stage tabs */}
-      <div className="flex items-center gap-1 overflow-x-auto hide-scrollbar pb-0.5">
+      <div className="flex gap-1 p-1 rounded-2xl border overflow-x-auto hide-scrollbar bg-slate-50 border-slate-200">
         {STAGES.map(s => {
           const Icon = s.icon
           const count = getCount(s.key)
@@ -154,17 +154,17 @@ export default function SolicitacoesLista() {
             <button
               key={s.key}
               onClick={() => setActiveStage(s.key)}
-              className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs whitespace-nowrap transition-all shrink-0 ${
+              className={`min-w-fit md:flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm whitespace-nowrap transition-all border ${
                 active
-                  ? `${s.bg} ${s.text} font-bold shadow-sm ring-1 ${s.border.replace('border-l-', 'ring-')}`
-                  : `bg-slate-50 text-slate-500 font-medium`
+                  ? `${s.bg} ${s.text} font-bold shadow-sm ${s.border.replace('border-l-', 'border-')}`
+                  : 'text-slate-500 font-medium border-transparent hover:bg-white hover:shadow-sm'
               }`}
             >
-              <Icon size={13} className="shrink-0" />
+              <Icon size={15} className="shrink-0" />
               {s.label}
               {count > 0 && (
-                <span className={`text-[10px] font-bold rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1 ${
-                  active ? `${s.dot} text-white` : 'bg-slate-200/80 text-slate-500'
+                <span className={`text-[10px] font-bold rounded-full min-w-[22px] px-1.5 py-0.5 flex items-center justify-center ${
+                  active ? `${s.pill} ${s.pillText}` : 'bg-slate-100 text-slate-500'
                 }`}>{count}</span>
               )}
             </button>
