@@ -389,7 +389,7 @@ function TrCard({ sol, onClick, isDark, isSelected, onSelect }: {
   const t = sol.transporte
 
   return (
-    <div onClick={onClick} className={`rounded-2xl border p-4 cursor-pointer transition-all group min-h-[176px] h-full flex flex-col justify-between ${
+    <div onClick={onClick} className={`rounded-2xl border p-4 cursor-pointer transition-all group ${
       isDark
         ? `border-white/[0.06] hover:border-orange-500/30 hover:shadow-lg hover:shadow-orange-500/5 ${isSelected ? 'bg-orange-500/10 border-orange-500/30' : 'bg-white/[0.02]'}`
         : `border-slate-200 hover:border-orange-300 hover:shadow-md ${isSelected ? 'bg-orange-50 border-orange-300' : 'bg-white'}`
@@ -734,7 +734,7 @@ export default function TransportesPipeline() {
               {activeItems.map(sol => <TrRow key={sol.id} sol={sol} onClick={() => setDetail(sol)} isDark={isDark} isSelected={selectedIds.has(sol.id)} onSelect={toggleSelect} />)}
             </>
           ) : (
-            <div className="grid gap-4 p-4 md:grid-cols-2">
+            <div className="space-y-2 p-4">
               {activeItems.map(sol => <TrCard key={sol.id} sol={sol} onClick={() => setDetail(sol)} isDark={isDark} isSelected={selectedIds.has(sol.id)} onSelect={toggleSelect} />)}
             </div>
           )}
