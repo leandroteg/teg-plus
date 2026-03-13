@@ -1096,22 +1096,20 @@ export default function GestaoContratos() {
       </div>
 
       {/* Tabs */}
-      <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
+      <div className="flex items-center gap-1 overflow-x-auto hide-scrollbar pb-0.5">
         {TABS.map(t => {
           const Icon = t.icon
           const active = tab === t.key
           return (
             <button key={t.key} onClick={() => setTab(t.key)}
-              className={`relative bg-white rounded-2xl border-l-[3px] border border-slate-200
-                shadow-sm p-3 hover:shadow-md hover:-translate-y-0.5 transition-all text-left
-                ${t.border} ${active ? 'ring-2 ring-indigo-400 ring-offset-1' : ''}`}
+              className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs whitespace-nowrap transition-all shrink-0 ${
+                active
+                  ? `${t.bg} ${t.text} font-bold shadow-sm ring-1 ${t.border.replace('border-l-', 'ring-')}`
+                  : `bg-slate-50 text-slate-500 font-medium`
+              }`}
             >
-              <div className={`w-7 h-7 rounded-lg flex items-center justify-center mb-1.5 ${t.bg}`}>
-                <Icon size={13} className={t.text} />
-              </div>
-              <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider leading-tight">
-                {t.label}
-              </p>
+              <Icon size={13} className="shrink-0" />
+              {t.label}
             </button>
           )
         })}

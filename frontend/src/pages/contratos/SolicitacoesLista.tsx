@@ -145,7 +145,7 @@ export default function SolicitacoesLista() {
       </div>
 
       {/* Stage tabs */}
-      <div className="grid grid-cols-3 gap-3">
+      <div className="flex items-center gap-1 overflow-x-auto hide-scrollbar pb-0.5">
         {STAGES.map(s => {
           const Icon = s.icon
           const count = getCount(s.key)
@@ -154,19 +154,19 @@ export default function SolicitacoesLista() {
             <button
               key={s.key}
               onClick={() => setActiveStage(s.key)}
-              className={`relative bg-white rounded-2xl border-l-[3px] border border-slate-200
-                shadow-sm p-4 hover:shadow-md hover:-translate-y-0.5 transition-all text-left
-                ${s.border} ${active ? 'ring-2 ring-indigo-400 ring-offset-1' : ''}`}
+              className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs whitespace-nowrap transition-all shrink-0 ${
+                active
+                  ? `${s.bg} ${s.text} font-bold shadow-sm ring-1 ${s.border.replace('border-l-', 'ring-')}`
+                  : `bg-slate-50 text-slate-500 font-medium`
+              }`}
             >
-              <div className={`w-8 h-8 rounded-lg flex items-center justify-center mb-2 ${s.bg}`}>
-                <Icon size={14} className={s.text} />
-              </div>
-              <p className="text-2xl font-extrabold text-slate-800 leading-none">
-                {loadingDash ? '-' : count}
-              </p>
-              <p className="text-[10px] font-semibold text-slate-400 mt-1 uppercase tracking-wider">
-                {s.label}
-              </p>
+              <Icon size={13} className="shrink-0" />
+              {s.label}
+              {count > 0 && (
+                <span className={`text-[10px] font-bold rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1 ${
+                  active ? `${s.dot} text-white` : 'bg-slate-200/80 text-slate-500'
+                }`}>{count}</span>
+              )}
             </button>
           )
         })}
