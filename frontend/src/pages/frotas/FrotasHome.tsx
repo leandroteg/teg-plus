@@ -8,10 +8,10 @@ const BRL = (v: number) =>
   v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 })
 
 const PRIORIDADE_COLOR: Record<string, string> = {
-  critica: 'bg-red-500/15 text-red-300 border-red-500/30',
-  alta:    'bg-orange-500/15 text-orange-300 border-orange-500/30',
-  media:   'bg-amber-500/15 text-amber-300 border-amber-500/30',
-  baixa:   'bg-slate-500/10 text-slate-400 border-slate-500/20',
+  critica: 'bg-red-500/15 text-red-700 dark:text-red-300 border-red-500/30',
+  alta:    'bg-orange-500/15 text-orange-700 dark:text-orange-300 border-orange-500/30',
+  media:   'bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-500/30',
+  baixa:   'bg-slate-500/10 text-slate-600 dark:text-slate-400 border-slate-500/20',
 }
 
 const STATUS_VEICULO_DOT: Record<string, string> = {

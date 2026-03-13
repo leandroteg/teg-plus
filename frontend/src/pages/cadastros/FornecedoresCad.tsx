@@ -32,14 +32,14 @@ export default function FornecedoresCad() {
   const cnpjLookup = useConsultaCNPJ(useCallback((r) => {
     setEditItem(prev => prev ? {
       ...prev,
-      razao_social: prev.razao_social || r.razao_social,
-      nome_fantasia: prev.nome_fantasia || r.nome_fantasia,
-      telefone: prev.telefone || r.telefone,
-      email: prev.email || r.email,
-      cep: (prev as any).cep || r.endereco?.cep,
-      endereco: (prev as any).endereco || [r.endereco?.logradouro, r.endereco?.numero].filter(Boolean).join(', '),
-      cidade: (prev as any).cidade || r.endereco?.cidade,
-      uf: (prev as any).uf || r.endereco?.uf,
+      razao_social: r.razao_social || prev.razao_social,
+      nome_fantasia: r.nome_fantasia || prev.nome_fantasia,
+      telefone: r.telefone || prev.telefone,
+      email: r.email || prev.email,
+      cep: r.endereco?.cep || (prev as any).cep,
+      endereco: r.endereco?.logradouro ? [r.endereco.logradouro, r.endereco.numero].filter(Boolean).join(', ') : (prev as any).endereco,
+      cidade: r.endereco?.cidade || (prev as any).cidade,
+      uf: r.endereco?.uf || (prev as any).uf,
     } : prev)
   }, []))
 

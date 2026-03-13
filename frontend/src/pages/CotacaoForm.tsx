@@ -246,6 +246,7 @@ export default function CotacaoForm() {
   const handleCnpjLookup = useCallback(async (idx: number, rawCnpj: string) => {
     const digits = rawCnpj.replace(/\D/g, '')
     if (digits.length !== 14) return
+    const isCorrection = cnpjLastRef.current[idx] !== undefined && cnpjLastRef.current[idx] !== digits
     if (cnpjLastRef.current[idx] === digits) return
     cnpjLastRef.current[idx] = digits
 
@@ -258,15 +259,14 @@ export default function CotacaoForm() {
         setCnpjStatus(prev => ({ ...prev, [idx]: { ok: false, msg: result.message || 'CNPJ nao encontrado' } }))
       } else {
         setCnpjStatus(prev => ({ ...prev, [idx]: { ok: true, msg: result.situacao || 'Ativa' } }))
-        // Auto-fill name and contact if empty
-        // Prefer razao_social (always present) over nome_fantasia (often empty)
+        // Auto-fill name and contact — always overwrite on CNPJ correction
         const nomePreenchido = result.razao_social || result.nome_fantasia || ''
         setFornecedores(prev => prev.map((f, i) => {
           if (i !== idx) return f
           return {
             ...f,
-            fornecedor_nome: f.fornecedor_nome.trim() ? f.fornecedor_nome : nomePreenchido,
-            fornecedor_contato: f.fornecedor_contato.trim() ? f.fornecedor_contato : [result.telefone, result.email].filter(Boolean).join(' / '),
+            fornecedor_nome: (isCorrection || !f.fornecedor_nome.trim()) ? nomePreenchido : f.fornecedor_nome,
+            fornecedor_contato: (isCorrection || !f.fornecedor_contato.trim()) ? [result.telefone, result.email].filter(Boolean).join(' / ') : f.fornecedor_contato,
           }
         }))
       }
