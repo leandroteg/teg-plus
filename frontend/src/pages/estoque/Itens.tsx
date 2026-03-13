@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react'
 import {
-  Package2, Plus, Search, AlertTriangle, ArrowUpDown, LayoutList, LayoutGrid,
+  Package2, Plus, Search, AlertTriangle, LayoutList, LayoutGrid,
   X, Save, Loader2, Download, Truck, PackageCheck, RefreshCw, ClipboardCheck,
 } from 'lucide-react'
 import {
@@ -10,7 +10,7 @@ import {
 import { useTheme } from '../../contexts/ThemeContext'
 import type {
   EstItem, EstSaldo, EstSolicitacao, EstoqueEntradaItem, EstoqueMovimentacaoItem,
-  EstoquePipelineTab, ESTOQUE_PIPELINE_STAGES,
+  EstoquePipelineTab,
 } from '../../types/estoque'
 import { ESTOQUE_PIPELINE_STAGES as STAGES } from '../../types/estoque'
 
@@ -48,6 +48,8 @@ const EMPTY_FORM: Partial<EstItem> = {
   controla_lote: false, controla_serie: false, tem_validade: false, valor_medio: 0,
 }
 
+type ViewMode = 'list' | 'cards'
+
 function fmtDate(iso?: string) {
   if (!iso) return '—'
   return new Date(iso).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' })
@@ -61,9 +63,9 @@ function fmtCurrency(v: number) {
 // ═════════════════════════════════════════════════════════════════════════════
 
 export default function Itens() {
-  const { isLightSidebar: isLight } = useTheme()
+  const { isDark } = useTheme()
   const [activeTab, setActiveTab] = useState<EstoquePipelineTab>('em_estoque')
-  const [viewMode, setViewMode] = useState<'table' | 'cards'>('table')
+  const [viewMode, setViewMode] = useState<ViewMode>('list')
   const [busca, setBusca] = useState('')
   const [curvaFiltro, setCurvaFiltro] = useState('')
   const [showForm, setShowForm] = useState(false)
@@ -76,7 +78,7 @@ export default function Itens() {
   const { data: movs = [], isLoading: loadingMovs } = useEmMovimentacao()
   const salvar = useSalvarItem()
 
-  const accent = isLight ? STATUS_ACCENT : STATUS_ACCENT_DARK
+  const accent = isDark ? STATUS_ACCENT_DARK : STATUS_ACCENT
 
   // Filtered data per tab
   const saldosFiltrados = useMemo(() => {
@@ -166,18 +168,16 @@ export default function Itens() {
     URL.revokeObjectURL(url)
   }
 
-  const card = isLight ? 'bg-white border-slate-200 shadow-sm' : 'bg-white/[0.03] border-white/[0.06]'
-
   return (
     <div className="space-y-4">
 
       {/* ── Header ──────────────────────────────────────────────────── */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className={`text-xl font-extrabold ${isLight ? 'text-slate-800' : 'text-white'}`}>
+          <h1 className={`text-xl font-extrabold ${isDark ? 'text-white' : 'text-slate-800'}`}>
             Estoque
           </h1>
-          <p className={`text-xs mt-0.5 ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>
+          <p className={`text-xs mt-0.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
             Visão geral do estoque por item
           </p>
         </div>
@@ -191,7 +191,7 @@ export default function Itens() {
       </div>
 
       {/* ── Pipeline Tabs ──────────────────────────────────────────── */}
-      <div className={`flex gap-1 p-1 rounded-2xl border ${isLight ? 'bg-slate-50 border-slate-200' : 'bg-white/[0.02] border-white/[0.06]'}`}>
+      <div className={`flex gap-1 p-1 rounded-2xl border ${isDark ? 'bg-white/[0.02] border-white/[0.06]' : 'bg-slate-50 border-slate-200'}`}>
         {STAGES.map(stage => {
           const active = activeTab === stage.tab
           const a = accent[stage.tab]
@@ -202,9 +202,9 @@ export default function Itens() {
               className={`flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all
                 ${active
                   ? `${a.bg} ${a.text} ${a.border} border shadow-sm`
-                  : isLight
-                    ? 'text-slate-500 hover:bg-white hover:shadow-sm border border-transparent'
-                    : 'text-slate-400 hover:bg-white/[0.04] border border-transparent'
+                  : isDark
+                    ? 'text-slate-400 hover:bg-white/[0.04] border border-transparent'
+                    : 'text-slate-500 hover:bg-white hover:shadow-sm border border-transparent'
                 }`}
             >
               {stage.tab === 'aguardando_entrada' && <PackageCheck size={15} />}
@@ -213,7 +213,7 @@ export default function Itens() {
               {stage.tab === 'em_movimentacao' && <Truck size={15} />}
               {stage.label}
               <span className={`ml-1 text-[10px] font-bold px-1.5 py-0.5 rounded-full
-                ${active ? a.badge : isLight ? 'bg-slate-100 text-slate-500' : 'bg-white/[0.06] text-slate-500'}`}>
+                ${active ? a.badge : isDark ? 'bg-white/[0.06] text-slate-500' : 'bg-slate-100 text-slate-500'}`}>
                 {counts[stage.tab]}
               </span>
             </button>
@@ -221,90 +221,106 @@ export default function Itens() {
         })}
       </div>
 
-      {/* ── Toolbar ────────────────────────────────────────────────── */}
-      <div className="flex gap-2 flex-wrap items-center">
-        <div className="relative flex-1 min-w-[200px]">
-          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-          <input
-            value={busca}
-            onChange={e => setBusca(e.target.value)}
-            placeholder="Buscar por código ou descrição..."
-            className={`w-full pl-9 pr-4 py-2 rounded-xl border text-sm
-              focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400
-              ${isLight ? 'border-slate-200 bg-white text-slate-800' : 'border-white/[0.08] bg-white/[0.03] text-slate-200 placeholder:text-slate-500'}`}
-          />
-        </div>
+      {/* ── Content Card ─────────────────────────────────────────── */}
+      <div className={`rounded-2xl border overflow-hidden ${isDark ? 'bg-white/[0.02] border-white/[0.06]' : 'bg-white border-slate-200 shadow-sm'}`}>
 
-        {activeTab === 'em_estoque' && (
-          <div className="flex gap-1">
-            {(['', 'A', 'B', 'C'] as const).map(c => (
-              <button
-                key={c}
-                onClick={() => setCurvaFiltro(c)}
-                className={`px-3 py-2 rounded-xl text-xs font-semibold transition-all border ${
-                  curvaFiltro === c
-                    ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
-                    : isLight
-                      ? 'bg-white text-slate-500 border-slate-200'
-                      : 'bg-white/[0.03] text-slate-400 border-white/[0.08]'
-                }`}
-              >
-                {c === '' ? 'Todos' : `Curva ${c}`}
-              </button>
-            ))}
+        {/* ── Toolbar ─────────────────────────────────────────────── */}
+        <div className={`px-4 py-2.5 border-b flex flex-wrap items-center gap-2 ${isDark ? 'border-white/[0.06]' : 'border-slate-100'}`}>
+          <div className="relative">
+            <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
+            <input
+              value={busca}
+              onChange={e => setBusca(e.target.value)}
+              placeholder="Buscar..."
+              className={`pl-8 pr-3 py-1.5 rounded-lg border text-xs w-[200px]
+                focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400
+                ${isDark ? 'border-white/[0.08] bg-white/[0.03] text-slate-200 placeholder:text-slate-500' : 'border-slate-200 bg-white text-slate-800'}`}
+            />
           </div>
-        )}
 
-        <div className={`flex gap-0.5 p-0.5 rounded-lg border ${isLight ? 'border-slate-200 bg-slate-50' : 'border-white/[0.06] bg-white/[0.02]'}`}>
-          <button onClick={() => setViewMode('table')}
-            className={`p-1.5 rounded-md transition-all ${viewMode === 'table'
-              ? (isLight ? 'bg-white shadow-sm text-slate-700' : 'bg-white/[0.08] text-slate-200')
-              : (isLight ? 'text-slate-400' : 'text-slate-500')}`}>
-            <LayoutList size={14} />
-          </button>
-          <button onClick={() => setViewMode('cards')}
-            className={`p-1.5 rounded-md transition-all ${viewMode === 'cards'
-              ? (isLight ? 'bg-white shadow-sm text-slate-700' : 'bg-white/[0.08] text-slate-200')
-              : (isLight ? 'text-slate-400' : 'text-slate-500')}`}>
-            <LayoutGrid size={14} />
-          </button>
-        </div>
-
-        <button onClick={exportCSV}
-          className={`p-2 rounded-xl border transition-colors ${isLight ? 'border-slate-200 text-slate-500 hover:bg-slate-50' : 'border-white/[0.08] text-slate-400 hover:bg-white/[0.04]'}`}>
-          <Download size={14} />
-        </button>
-      </div>
-
-      {/* ── Content ────────────────────────────────────────────────── */}
-      {isLoading ? (
-        <div className="flex items-center justify-center py-16">
-          <div className="w-8 h-8 border-[3px] border-blue-500 border-t-transparent rounded-full animate-spin" />
-        </div>
-      ) : (
-        <>
           {activeTab === 'em_estoque' && (
-            viewMode === 'table'
-              ? <SaldosTable data={saldosFiltrados} isLight={isLight} onEdit={openEdit} />
-              : <SaldosCards data={saldosFiltrados} isLight={isLight} />
+            <div className="flex gap-1">
+              {(['', 'A', 'B', 'C'] as const).map(c => (
+                <button
+                  key={c}
+                  onClick={() => setCurvaFiltro(c)}
+                  className={`px-2 py-1 rounded-md text-[10px] font-bold transition-all border ${
+                    curvaFiltro === c
+                      ? 'bg-blue-600 text-white border-blue-600'
+                      : isDark
+                        ? 'bg-white/[0.03] text-slate-400 border-white/[0.08] hover:bg-white/[0.06]'
+                        : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-50'
+                  }`}
+                >
+                  {c === '' ? 'Todos' : c}
+                </button>
+              ))}
+            </div>
           )}
-          {activeTab === 'aguardando_entrada' && (
-            viewMode === 'table'
-              ? <EntradasTable data={entradasFiltradas} isLight={isLight} />
-              : <EntradasCards data={entradasFiltradas} isLight={isLight} />
-          )}
-          {activeTab === 'liberado_retirada' && (
-            viewMode === 'table'
-              ? <LiberadosTable data={liberadosFiltrados} isLight={isLight} />
-              : <LiberadosCards data={liberadosFiltrados} isLight={isLight} />
-          )}
-          {activeTab === 'em_movimentacao' && (
-            viewMode === 'table'
-              ? <MovsTable data={movsFiltradas} isLight={isLight} />
-              : <MovsCards data={movsFiltradas} isLight={isLight} />
-          )}
-        </>
-      )}
+
+          <div className={`flex items-center rounded-lg border overflow-hidden ${isDark ? 'border-white/[0.06]' : 'border-slate-200'}`}>
+            <button onClick={() => setViewMode('list')}
+              className={`p-1.5 transition-all ${viewMode === 'list'
+                ? (isDark ? 'bg-white/[0.08] text-white' : 'bg-slate-100 text-slate-700')
+                : (isDark ? 'text-slate-500 hover:text-white' : 'text-slate-400 hover:text-slate-600')}`}
+              title="Lista">
+              <LayoutList size={14} />
+            </button>
+            <button onClick={() => setViewMode('cards')}
+              className={`p-1.5 transition-all ${viewMode === 'cards'
+                ? (isDark ? 'bg-white/[0.08] text-white' : 'bg-slate-100 text-slate-700')
+                : (isDark ? 'text-slate-500 hover:text-white' : 'text-slate-400 hover:text-slate-600')}`}
+              title="Cards">
+              <LayoutGrid size={14} />
+            </button>
+          </div>
+
+          <button onClick={exportCSV}
+            className={`p-1.5 rounded-lg border transition-colors ${isDark ? 'border-white/[0.06] text-slate-400 hover:bg-white/[0.04]' : 'border-slate-200 text-slate-400 hover:bg-slate-50'}`}
+            title="Exportar CSV">
+            <Download size={14} />
+          </button>
+
+          <div className={`ml-auto flex items-center gap-3 text-[11px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+            <span>{counts[activeTab]} item(ns)</span>
+            {activeTab === 'em_estoque' && saldosFiltrados.filter(s => s.item && s.saldo <= (s.item.ponto_reposicao ?? s.item.estoque_minimo)).length > 0 && (
+              <span className="flex items-center gap-1 text-amber-500 font-bold">
+                <AlertTriangle size={11} /> {saldosFiltrados.filter(s => s.item && s.saldo <= (s.item.ponto_reposicao ?? s.item.estoque_minimo)).length} abaixo do mínimo
+              </span>
+            )}
+          </div>
+        </div>
+
+        {/* ── Content ─────────────────────────────────────────────── */}
+        {isLoading ? (
+          <div className="flex items-center justify-center py-16">
+            <div className="w-8 h-8 border-[3px] border-blue-500 border-t-transparent rounded-full animate-spin" />
+          </div>
+        ) : (
+          <>
+            {activeTab === 'em_estoque' && (
+              viewMode === 'list'
+                ? <SaldosList data={saldosFiltrados} isDark={isDark} onEdit={openEdit} />
+                : <SaldosCards data={saldosFiltrados} isDark={isDark} />
+            )}
+            {activeTab === 'aguardando_entrada' && (
+              viewMode === 'list'
+                ? <EntradasList data={entradasFiltradas} isDark={isDark} />
+                : <EntradasCards data={entradasFiltradas} isDark={isDark} />
+            )}
+            {activeTab === 'liberado_retirada' && (
+              viewMode === 'list'
+                ? <LiberadosList data={liberadosFiltrados} isDark={isDark} />
+                : <LiberadosCards data={liberadosFiltrados} isDark={isDark} />
+            )}
+            {activeTab === 'em_movimentacao' && (
+              viewMode === 'list'
+                ? <MovsList data={movsFiltradas} isDark={isDark} />
+                : <MovsCards data={movsFiltradas} isDark={isDark} />
+            )}
+          </>
+        )}
+      </div>
 
       {/* ── Item Form Modal ────────────────────────────────────────── */}
       {showForm && editItem && (
@@ -314,7 +330,7 @@ export default function Itens() {
           onSave={handleSave}
           onClose={closeForm}
           saving={salvar.isPending}
-          isLight={isLight}
+          isDark={isDark}
         />
       )}
     </div>
@@ -322,129 +338,122 @@ export default function Itens() {
 }
 
 // ═════════════════════════════════════════════════════════════════════════════
-// Em Estoque — Table & Cards
+// Em Estoque — List & Cards
 // ═════════════════════════════════════════════════════════════════════════════
 
-function SaldosTable({ data, isLight, onEdit }: { data: EstSaldo[]; isLight: boolean; onEdit: (item: EstItem) => void }) {
-  if (data.length === 0) return <EmptyState icon={Package2} msg="Nenhum item em estoque" isLight={isLight} />
-  const card = isLight ? 'bg-white border-slate-200 shadow-sm' : 'bg-white/[0.03] border-white/[0.06]'
-  const thCls = `text-left px-4 py-3 text-[10px] font-bold uppercase tracking-widest ${isLight ? 'text-slate-500' : 'text-slate-400'}`
+function SaldosList({ data, isDark, onEdit }: { data: EstSaldo[]; isDark: boolean; onEdit: (item: EstItem) => void }) {
+  if (data.length === 0) return <EmptyState icon={Package2} msg="Nenhum item em estoque" sub="Os itens aparecerão aqui quando houver saldo" isDark={isDark} />
   return (
-    <div className={`rounded-2xl border overflow-hidden ${card}`}>
-      <table className="w-full text-sm">
-        <thead>
-          <tr className={`border-b ${isLight ? 'border-slate-100 bg-slate-50' : 'border-white/[0.04] bg-white/[0.02]'}`}>
-            <th className={thCls}>Código</th>
-            <th className={thCls}>Descrição</th>
-            <th className={`${thCls} hidden md:table-cell`}>Base</th>
-            <th className={`${thCls} hidden md:table-cell`}>Curva</th>
-            <th className={`${thCls} text-right`}>Saldo</th>
-            <th className={`${thCls} text-right hidden lg:table-cell`}>Reservado</th>
-            <th className={`${thCls} text-right hidden lg:table-cell`}>Disponível</th>
-            <th className="px-4 py-3" />
-          </tr>
-        </thead>
-        <tbody className={`divide-y ${isLight ? 'divide-slate-50' : 'divide-white/[0.04]'}`}>
-          {data.map(s => {
-            const abaixo = s.item && s.saldo <= (s.item.ponto_reposicao ?? s.item.estoque_minimo)
-            const curva = CURVA_COLOR[s.item?.curva_abc ?? 'C']
-            const disponivel = s.saldo - (s.saldo_reservado ?? 0)
-            return (
-              <tr key={s.id} className={`transition-colors ${isLight ? 'hover:bg-slate-50' : 'hover:bg-white/[0.02]'}`}>
-                <td className={`px-4 py-3 font-mono text-xs ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>
-                  {s.item?.codigo ?? '—'}
-                </td>
-                <td className="px-4 py-3">
-                  <p className={`font-semibold truncate max-w-[220px] ${isLight ? 'text-slate-800' : 'text-slate-200'}`}>
-                    {s.item?.descricao ?? '—'}
-                  </p>
-                  {abaixo && (
-                    <span className="inline-flex items-center gap-1 text-[10px] text-amber-600 font-semibold mt-0.5">
-                      <AlertTriangle size={10} /> Abaixo do mínimo
-                    </span>
-                  )}
-                </td>
-                <td className={`px-4 py-3 hidden md:table-cell text-xs ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
-                  {s.base?.nome ?? '—'}
-                </td>
-                <td className="px-4 py-3 hidden md:table-cell">
-                  {s.item?.curva_abc && (
-                    <span className={`inline-flex rounded-full text-[10px] font-bold px-2 py-0.5
-                      ${isLight ? `${curva.bg} ${curva.text}` : `${curva.darkBg} ${curva.darkText}`}`}>
-                      {s.item.curva_abc}
-                    </span>
-                  )}
-                </td>
-                <td className={`px-4 py-3 text-right font-semibold ${isLight ? 'text-slate-700' : 'text-slate-200'}`}>
-                  {s.saldo} {s.item?.unidade}
-                </td>
-                <td className={`px-4 py-3 text-right hidden lg:table-cell text-xs ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
-                  {s.saldo_reservado ?? 0}
-                </td>
-                <td className={`px-4 py-3 text-right hidden lg:table-cell font-semibold ${
-                  disponivel <= 0 ? 'text-red-500' : isLight ? 'text-emerald-600' : 'text-emerald-400'
-                }`}>
-                  {disponivel} {s.item?.unidade}
-                </td>
-                <td className="px-4 py-3">
-                  <button
-                    onClick={() => s.item && onEdit(s.item as EstItem)}
-                    className="text-[10px] text-blue-600 font-semibold hover:underline"
-                  >
-                    Editar
-                  </button>
-                </td>
-              </tr>
-            )
-          })}
-        </tbody>
-      </table>
-    </div>
-  )
-}
-
-function SaldosCards({ data, isLight }: { data: EstSaldo[]; isLight: boolean }) {
-  if (data.length === 0) return <EmptyState icon={Package2} msg="Nenhum item em estoque" isLight={isLight} />
-  return (
-    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+    <>
+      {/* Header */}
+      <div className={`flex items-center gap-2 px-3 py-1 border-b text-[10px] font-semibold uppercase tracking-wider ${isDark ? 'border-white/[0.06] text-slate-600' : 'border-slate-100 text-slate-400'}`}>
+        <span className="w-[70px] shrink-0">Código</span>
+        <span className="flex-1 min-w-0">Descrição</span>
+        <span className="w-[100px] shrink-0">Base</span>
+        <span className="w-[50px] shrink-0 text-center">Curva</span>
+        <span className="w-[80px] shrink-0 text-right">Saldo</span>
+        <span className="w-[60px] shrink-0 text-right">Reserv.</span>
+        <span className="w-[80px] shrink-0 text-right">Disp.</span>
+        <span className="w-[40px] shrink-0" />
+      </div>
+      {/* Rows */}
       {data.map(s => {
         const abaixo = s.item && s.saldo <= (s.item.ponto_reposicao ?? s.item.estoque_minimo)
         const curva = CURVA_COLOR[s.item?.curva_abc ?? 'C']
         const disponivel = s.saldo - (s.saldo_reservado ?? 0)
         return (
-          <div key={s.id} className={`rounded-2xl border p-4 transition-all hover:shadow-md
-            ${isLight ? 'bg-white border-slate-200' : 'bg-white/[0.03] border-white/[0.06]'}`}>
+          <div key={s.id} className={`flex items-center gap-2 px-3 py-1.5 border-b cursor-pointer transition-all ${
+            isDark ? 'border-white/[0.04] hover:bg-white/[0.03]' : 'border-slate-100 hover:bg-slate-50'
+          }`}>
+            <span className={`text-[11px] font-mono font-bold w-[70px] shrink-0 ${isDark ? 'text-blue-400' : 'text-blue-700'}`}>
+              {s.item?.codigo ?? '—'}
+            </span>
+            <span className="flex-1 min-w-0 truncate">
+              <span className={`text-xs ${isDark ? 'text-white' : 'text-slate-800'}`}>{s.item?.descricao ?? '—'}</span>
+              {abaixo && <AlertTriangle size={10} className="inline ml-1 text-amber-500" />}
+            </span>
+            <span className={`text-[11px] truncate w-[100px] shrink-0 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+              {s.base?.nome ?? '—'}
+            </span>
+            <span className="w-[50px] shrink-0 text-center">
+              {s.item?.curva_abc && (
+                <span className={`inline-flex rounded-full text-[10px] font-bold px-1.5 py-0.5
+                  ${isDark ? `${curva.darkBg} ${curva.darkText}` : `${curva.bg} ${curva.text}`}`}>
+                  {s.item.curva_abc}
+                </span>
+              )}
+            </span>
+            <span className={`text-[11px] font-semibold text-right w-[80px] shrink-0 ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>
+              {s.saldo} {s.item?.unidade}
+            </span>
+            <span className={`text-[11px] text-right w-[60px] shrink-0 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+              {s.saldo_reservado ?? 0}
+            </span>
+            <span className={`text-[11px] font-semibold text-right w-[80px] shrink-0 ${
+              disponivel <= 0 ? 'text-red-500' : isDark ? 'text-emerald-400' : 'text-emerald-600'
+            }`}>
+              {disponivel} {s.item?.unidade}
+            </span>
+            <span className="w-[40px] shrink-0 text-right">
+              <button
+                onClick={(e) => { e.stopPropagation(); s.item && onEdit(s.item as EstItem) }}
+                className="text-[10px] text-blue-600 font-semibold hover:underline"
+              >
+                Editar
+              </button>
+            </span>
+          </div>
+        )
+      })}
+    </>
+  )
+}
+
+function SaldosCards({ data, isDark }: { data: EstSaldo[]; isDark: boolean }) {
+  if (data.length === 0) return <EmptyState icon={Package2} msg="Nenhum item em estoque" sub="Os itens aparecerão aqui quando houver saldo" isDark={isDark} />
+  return (
+    <div className="p-3 space-y-2">
+      {data.map(s => {
+        const abaixo = s.item && s.saldo <= (s.item.ponto_reposicao ?? s.item.estoque_minimo)
+        const curva = CURVA_COLOR[s.item?.curva_abc ?? 'C']
+        const disponivel = s.saldo - (s.saldo_reservado ?? 0)
+        return (
+          <div key={s.id} className={`rounded-2xl border p-4 cursor-pointer transition-all group ${
+            isDark
+              ? 'border-white/[0.06] hover:border-blue-500/30 hover:shadow-lg hover:shadow-blue-500/5 bg-white/[0.02]'
+              : 'border-slate-200 hover:border-blue-300 hover:shadow-md bg-white'
+          }`}>
             <div className="flex items-start justify-between">
               <div className="min-w-0">
-                <p className={`font-mono text-[10px] ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>{s.item?.codigo}</p>
-                <p className={`font-semibold text-sm truncate mt-0.5 ${isLight ? 'text-slate-800' : 'text-slate-200'}`}>
+                <p className={`font-mono text-[10px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{s.item?.codigo}</p>
+                <p className={`font-semibold text-sm truncate mt-0.5 ${isDark ? 'text-white' : 'text-slate-800'}`}>
                   {s.item?.descricao}
                 </p>
               </div>
               {s.item?.curva_abc && (
                 <span className={`rounded-full text-[10px] font-bold px-2 py-0.5 shrink-0
-                  ${isLight ? `${curva.bg} ${curva.text}` : `${curva.darkBg} ${curva.darkText}`}`}>
+                  ${isDark ? `${curva.darkBg} ${curva.darkText}` : `${curva.bg} ${curva.text}`}`}>
                   Curva {s.item.curva_abc}
                 </span>
               )}
             </div>
-            <div className={`border-t my-3 ${isLight ? 'border-slate-100' : 'border-white/[0.06]'}`} />
+            <div className={`border-t my-3 ${isDark ? 'border-white/[0.06]' : 'border-slate-100'}`} />
             <div className="flex items-center justify-between text-xs">
-              <span className={isLight ? 'text-slate-500' : 'text-slate-400'}>{s.base?.nome ?? '—'}</span>
-              <span className={`font-bold ${isLight ? 'text-slate-700' : 'text-slate-200'}`}>
+              <span className={isDark ? 'text-slate-400' : 'text-slate-500'}>{s.base?.nome ?? '—'}</span>
+              <span className={`font-bold ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>
                 {s.saldo} {s.item?.unidade}
               </span>
             </div>
             <div className="flex items-center justify-between text-xs mt-1">
-              <span className={isLight ? 'text-slate-400' : 'text-slate-500'}>
+              <span className={isDark ? 'text-slate-500' : 'text-slate-400'}>
                 Min: {s.item?.estoque_minimo} · Repos: {s.item?.ponto_reposicao}
               </span>
-              <span className={disponivel <= 0 ? 'text-red-500 font-bold' : isLight ? 'text-emerald-600' : 'text-emerald-400'}>
+              <span className={disponivel <= 0 ? 'text-red-500 font-bold' : isDark ? 'text-emerald-400' : 'text-emerald-600'}>
                 Disp: {disponivel}
               </span>
             </div>
             {abaixo && (
-              <div className="flex items-center gap-1 mt-2 text-[10px] text-amber-600 font-semibold">
+              <div className="flex items-center gap-1 mt-2 text-[10px] text-amber-500 font-semibold">
                 <AlertTriangle size={10} /> Abaixo do mínimo
               </div>
             )}
@@ -456,90 +465,89 @@ function SaldosCards({ data, isLight }: { data: EstSaldo[]; isLight: boolean }) 
 }
 
 // ═════════════════════════════════════════════════════════════════════════════
-// Aguardando Entrada — Table & Cards
+// Aguardando Entrada — List & Cards
 // ═════════════════════════════════════════════════════════════════════════════
 
-function EntradasTable({ data, isLight }: { data: EstoqueEntradaItem[]; isLight: boolean }) {
-  if (data.length === 0) return <EmptyState icon={PackageCheck} msg="Nenhuma entrada pendente" isLight={isLight} />
-  const card = isLight ? 'bg-white border-slate-200 shadow-sm' : 'bg-white/[0.03] border-white/[0.06]'
-  const thCls = `text-left px-4 py-3 text-[10px] font-bold uppercase tracking-widest ${isLight ? 'text-slate-500' : 'text-slate-400'}`
+function EntradasList({ data, isDark }: { data: EstoqueEntradaItem[]; isDark: boolean }) {
+  if (data.length === 0) return <EmptyState icon={PackageCheck} msg="Nenhuma entrada pendente" sub="As entradas aparecerão aqui quando registradas" isDark={isDark} />
   return (
-    <div className={`rounded-2xl border overflow-hidden ${card}`}>
-      <table className="w-full text-sm">
-        <thead>
-          <tr className={`border-b ${isLight ? 'border-slate-100 bg-slate-50' : 'border-white/[0.04] bg-white/[0.02]'}`}>
-            <th className={thCls}>Código</th>
-            <th className={thCls}>Descrição</th>
-            <th className={`${thCls} text-right`}>Quantidade</th>
-            <th className={`${thCls} hidden md:table-cell`}>Tipo</th>
-            <th className={`${thCls} hidden md:table-cell`}>Fornecedor / Origem</th>
-            <th className={`${thCls} hidden lg:table-cell`}>NF</th>
-            <th className={`${thCls} text-right`}>Data</th>
-          </tr>
-        </thead>
-        <tbody className={`divide-y ${isLight ? 'divide-slate-50' : 'divide-white/[0.04]'}`}>
-          {data.map(e => (
-            <tr key={e.id} className={`transition-colors ${isLight ? 'hover:bg-slate-50' : 'hover:bg-white/[0.02]'}`}>
-              <td className={`px-4 py-3 font-mono text-xs ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>{e.codigo}</td>
-              <td className="px-4 py-3">
-                <p className={`font-semibold truncate max-w-[200px] ${isLight ? 'text-slate-800' : 'text-slate-200'}`}>{e.descricao}</p>
-              </td>
-              <td className={`px-4 py-3 text-right font-semibold ${isLight ? 'text-slate-700' : 'text-slate-200'}`}>
-                {e.quantidade} {e.unidade}
-              </td>
-              <td className={`px-4 py-3 hidden md:table-cell text-xs ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
-                {TIPO_LABEL[e.tipo] ?? e.tipo}
-              </td>
-              <td className={`px-4 py-3 hidden md:table-cell text-xs ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
-                {e.fornecedor_nome || e.base_nome || '—'}
-              </td>
-              <td className={`px-4 py-3 hidden lg:table-cell text-xs ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
-                {e.nf_numero || '—'}
-              </td>
-              <td className={`px-4 py-3 text-right text-xs ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
-                {fmtDate(e.criado_em)}
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
+    <>
+      <div className={`flex items-center gap-2 px-3 py-1 border-b text-[10px] font-semibold uppercase tracking-wider ${isDark ? 'border-white/[0.06] text-slate-600' : 'border-slate-100 text-slate-400'}`}>
+        <span className="w-[70px] shrink-0">Código</span>
+        <span className="flex-1 min-w-0">Descrição</span>
+        <span className="w-[70px] shrink-0 text-right">Qtd</span>
+        <span className="w-[90px] shrink-0 text-center">Tipo</span>
+        <span className="w-[140px] shrink-0">Fornecedor / Origem</span>
+        <span className="w-[70px] shrink-0">NF</span>
+        <span className="w-[62px] shrink-0 text-right">Data</span>
+      </div>
+      {data.map(e => (
+        <div key={e.id} className={`flex items-center gap-2 px-3 py-1.5 border-b cursor-pointer transition-all ${
+          isDark ? 'border-white/[0.04] hover:bg-white/[0.03]' : 'border-slate-100 hover:bg-slate-50'
+        }`}>
+          <span className={`text-[11px] font-mono font-bold w-[70px] shrink-0 ${isDark ? 'text-blue-400' : 'text-blue-700'}`}>
+            {e.codigo}
+          </span>
+          <span className={`text-xs truncate flex-1 min-w-0 ${isDark ? 'text-white' : 'text-slate-800'}`}>
+            {e.descricao}
+          </span>
+          <span className={`text-[11px] font-semibold text-right w-[70px] shrink-0 ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>
+            {e.quantidade} {e.unidade}
+          </span>
+          <span className={`text-[10px] px-1.5 py-0.5 rounded-md w-[90px] shrink-0 text-center font-medium ${isDark ? 'bg-white/[0.04] text-slate-400' : 'bg-slate-100 text-slate-500'}`}>
+            {TIPO_LABEL[e.tipo] ?? e.tipo}
+          </span>
+          <span className={`text-[11px] truncate w-[140px] shrink-0 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+            {e.fornecedor_nome || e.base_nome || '—'}
+          </span>
+          <span className={`text-[11px] font-mono w-[70px] shrink-0 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+            {e.nf_numero || '—'}
+          </span>
+          <span className={`text-[11px] text-right w-[62px] shrink-0 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+            {fmtDate(e.criado_em)}
+          </span>
+        </div>
+      ))}
+    </>
   )
 }
 
-function EntradasCards({ data, isLight }: { data: EstoqueEntradaItem[]; isLight: boolean }) {
-  if (data.length === 0) return <EmptyState icon={PackageCheck} msg="Nenhuma entrada pendente" isLight={isLight} />
+function EntradasCards({ data, isDark }: { data: EstoqueEntradaItem[]; isDark: boolean }) {
+  if (data.length === 0) return <EmptyState icon={PackageCheck} msg="Nenhuma entrada pendente" sub="As entradas aparecerão aqui quando registradas" isDark={isDark} />
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+    <div className="p-3 space-y-2">
       {data.map(e => (
-        <div key={e.id} className={`rounded-2xl border p-4 transition-all hover:shadow-md
-          ${isLight ? 'bg-white border-slate-200' : 'bg-white/[0.03] border-white/[0.06]'}`}>
+        <div key={e.id} className={`rounded-2xl border p-4 cursor-pointer transition-all group ${
+          isDark
+            ? 'border-white/[0.06] hover:border-blue-500/30 hover:shadow-lg hover:shadow-blue-500/5 bg-white/[0.02]'
+            : 'border-slate-200 hover:border-blue-300 hover:shadow-md bg-white'
+        }`}>
           <div className="flex items-start justify-between">
             <div className="min-w-0">
-              <p className={`font-mono text-[10px] ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>{e.codigo}</p>
-              <p className={`font-semibold text-sm truncate mt-0.5 ${isLight ? 'text-slate-800' : 'text-slate-200'}`}>
+              <p className={`font-mono text-[10px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{e.codigo}</p>
+              <p className={`font-semibold text-sm truncate mt-0.5 ${isDark ? 'text-white' : 'text-slate-800'}`}>
                 {e.descricao}
               </p>
             </div>
             <span className={`rounded-full text-[10px] font-bold px-2 py-0.5 shrink-0
-              ${isLight ? 'bg-slate-100 text-slate-600' : 'bg-slate-500/20 text-slate-400'}`}>
+              ${isDark ? 'bg-slate-500/20 text-slate-400' : 'bg-slate-100 text-slate-600'}`}>
               {TIPO_LABEL[e.tipo] ?? e.tipo}
             </span>
           </div>
-          <div className={`border-t my-3 ${isLight ? 'border-slate-100' : 'border-white/[0.06]'}`} />
+          <div className={`border-t my-3 ${isDark ? 'border-white/[0.06]' : 'border-slate-100'}`} />
           <div className="flex items-center justify-between text-xs">
-            <span className={isLight ? 'text-slate-500' : 'text-slate-400'}>
+            <span className={isDark ? 'text-slate-400' : 'text-slate-500'}>
               Qtd: {e.quantidade} {e.unidade}
             </span>
             {e.nf_numero && (
-              <span className={`font-mono ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>NF {e.nf_numero}</span>
+              <span className={`font-mono ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>NF {e.nf_numero}</span>
             )}
           </div>
           <div className="flex items-center justify-between text-xs mt-1">
-            <span className={isLight ? 'text-slate-400' : 'text-slate-500'}>
+            <span className={isDark ? 'text-slate-500' : 'text-slate-400'}>
               {e.fornecedor_nome || e.base_nome || '—'}
             </span>
-            <span className={isLight ? 'text-slate-400' : 'text-slate-500'}>{fmtDate(e.criado_em)}</span>
+            <span className={isDark ? 'text-slate-500' : 'text-slate-400'}>{fmtDate(e.criado_em)}</span>
           </div>
         </div>
       ))}
@@ -548,7 +556,7 @@ function EntradasCards({ data, isLight }: { data: EstoqueEntradaItem[]; isLight:
 }
 
 // ═════════════════════════════════════════════════════════════════════════════
-// Liberado para Retirada — Table & Cards
+// Liberado para Retirada — List & Cards
 // ═════════════════════════════════════════════════════════════════════════════
 
 const URGENCIA_BADGE: Record<string, { light: string; dark: string }> = {
@@ -557,110 +565,107 @@ const URGENCIA_BADGE: Record<string, { light: string; dark: string }> = {
   critica: { light: 'bg-red-100 text-red-700',      dark: 'bg-red-500/20 text-red-400'      },
 }
 
-function LiberadosTable({ data, isLight }: { data: EstSolicitacao[]; isLight: boolean }) {
-  if (data.length === 0) return <EmptyState icon={ClipboardCheck} msg="Nenhuma solicitação liberada" isLight={isLight} />
-  const card = isLight ? 'bg-white border-slate-200 shadow-sm' : 'bg-white/[0.03] border-white/[0.06]'
-  const thCls = `text-left px-4 py-3 text-[10px] font-bold uppercase tracking-widest ${isLight ? 'text-slate-500' : 'text-slate-400'}`
+function LiberadosList({ data, isDark }: { data: EstSolicitacao[]; isDark: boolean }) {
+  if (data.length === 0) return <EmptyState icon={ClipboardCheck} msg="Nenhuma solicitação liberada" sub="As solicitações aprovadas aparecerão aqui" isDark={isDark} />
   return (
-    <div className={`rounded-2xl border overflow-hidden ${card}`}>
-      <table className="w-full text-sm">
-        <thead>
-          <tr className={`border-b ${isLight ? 'border-slate-100 bg-slate-50' : 'border-white/[0.04] bg-white/[0.02]'}`}>
-            <th className={thCls}>Número</th>
-            <th className={thCls}>Solicitante</th>
-            <th className={`${thCls} hidden md:table-cell`}>Obra</th>
-            <th className={`${thCls} hidden md:table-cell`}>Urgência</th>
-            <th className={`${thCls} hidden lg:table-cell`}>Status</th>
-            <th className={`${thCls} text-right`}>Itens</th>
-            <th className={`${thCls} text-right`}>Data</th>
-          </tr>
-        </thead>
-        <tbody className={`divide-y ${isLight ? 'divide-slate-50' : 'divide-white/[0.04]'}`}>
-          {data.map(s => {
-            const urg = URGENCIA_BADGE[s.urgencia] ?? URGENCIA_BADGE.normal
-            return (
-              <tr key={s.id} className={`transition-colors ${isLight ? 'hover:bg-slate-50' : 'hover:bg-white/[0.02]'}`}>
-                <td className={`px-4 py-3 font-mono text-xs font-semibold ${isLight ? 'text-blue-600' : 'text-blue-400'}`}>
-                  {s.numero}
-                </td>
-                <td className="px-4 py-3">
-                  <p className={`font-semibold ${isLight ? 'text-slate-800' : 'text-slate-200'}`}>{s.solicitante_nome}</p>
-                </td>
-                <td className={`px-4 py-3 hidden md:table-cell text-xs ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
-                  {s.obra_nome}
-                </td>
-                <td className="px-4 py-3 hidden md:table-cell">
-                  <span className={`inline-flex rounded-full text-[10px] font-bold px-2 py-0.5 capitalize
-                    ${isLight ? urg.light : urg.dark}`}>
-                    {s.urgencia}
-                  </span>
-                </td>
-                <td className="px-4 py-3 hidden lg:table-cell">
-                  <span className={`inline-flex rounded-full text-[10px] font-bold px-2 py-0.5
-                    ${isLight ? 'bg-blue-100 text-blue-700' : 'bg-blue-500/20 text-blue-400'}`}>
-                    {s.status === 'aprovada' ? 'Aprovada' : 'Em Separação'}
-                  </span>
-                </td>
-                <td className={`px-4 py-3 text-right font-semibold ${isLight ? 'text-slate-700' : 'text-slate-200'}`}>
-                  {s.itens?.length ?? 0}
-                </td>
-                <td className={`px-4 py-3 text-right text-xs ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
-                  {fmtDate(s.criado_em)}
-                </td>
-              </tr>
-            )
-          })}
-        </tbody>
-      </table>
-    </div>
-  )
-}
-
-function LiberadosCards({ data, isLight }: { data: EstSolicitacao[]; isLight: boolean }) {
-  if (data.length === 0) return <EmptyState icon={ClipboardCheck} msg="Nenhuma solicitação liberada" isLight={isLight} />
-  return (
-    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+    <>
+      <div className={`flex items-center gap-2 px-3 py-1 border-b text-[10px] font-semibold uppercase tracking-wider ${isDark ? 'border-white/[0.06] text-slate-600' : 'border-slate-100 text-slate-400'}`}>
+        <span className="w-[60px] shrink-0">Nº</span>
+        <span className="flex-1 min-w-0">Solicitante</span>
+        <span className="w-[120px] shrink-0">Obra</span>
+        <span className="w-[70px] shrink-0 text-center">Urgência</span>
+        <span className="w-[90px] shrink-0 text-center">Status</span>
+        <span className="w-[40px] shrink-0 text-right">Itens</span>
+        <span className="w-[62px] shrink-0 text-right">Data</span>
+      </div>
       {data.map(s => {
         const urg = URGENCIA_BADGE[s.urgencia] ?? URGENCIA_BADGE.normal
         return (
-          <div key={s.id} className={`rounded-2xl border p-4 transition-all hover:shadow-md
-            ${isLight ? 'bg-white border-slate-200' : 'bg-white/[0.03] border-white/[0.06]'}`}>
+          <div key={s.id} className={`flex items-center gap-2 px-3 py-1.5 border-b cursor-pointer transition-all ${
+            isDark ? 'border-white/[0.04] hover:bg-white/[0.03]' : 'border-slate-100 hover:bg-slate-50'
+          }`}>
+            <span className={`text-[11px] font-mono font-bold w-[60px] shrink-0 ${isDark ? 'text-blue-400' : 'text-blue-700'}`}>
+              {s.numero}
+            </span>
+            <span className={`text-xs truncate flex-1 min-w-0 ${isDark ? 'text-white' : 'text-slate-800'}`}>
+              {s.solicitante_nome}
+            </span>
+            <span className={`text-[11px] truncate w-[120px] shrink-0 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+              {s.obra_nome}
+            </span>
+            <span className="w-[70px] shrink-0 text-center">
+              <span className={`inline-flex rounded-full text-[10px] font-bold px-1.5 py-0.5 capitalize
+                ${isDark ? urg.dark : urg.light}`}>
+                {s.urgencia}
+              </span>
+            </span>
+            <span className="w-[90px] shrink-0 text-center">
+              <span className={`inline-flex rounded-full text-[10px] font-bold px-1.5 py-0.5
+                ${isDark ? 'bg-blue-500/20 text-blue-400' : 'bg-blue-100 text-blue-700'}`}>
+                {s.status === 'aprovada' ? 'Aprovada' : 'Em Separação'}
+              </span>
+            </span>
+            <span className={`text-[11px] font-semibold text-right w-[40px] shrink-0 ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>
+              {s.itens?.length ?? 0}
+            </span>
+            <span className={`text-[11px] text-right w-[62px] shrink-0 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+              {fmtDate(s.criado_em)}
+            </span>
+          </div>
+        )
+      })}
+    </>
+  )
+}
+
+function LiberadosCards({ data, isDark }: { data: EstSolicitacao[]; isDark: boolean }) {
+  if (data.length === 0) return <EmptyState icon={ClipboardCheck} msg="Nenhuma solicitação liberada" sub="As solicitações aprovadas aparecerão aqui" isDark={isDark} />
+  return (
+    <div className="p-3 space-y-2">
+      {data.map(s => {
+        const urg = URGENCIA_BADGE[s.urgencia] ?? URGENCIA_BADGE.normal
+        return (
+          <div key={s.id} className={`rounded-2xl border p-4 cursor-pointer transition-all group ${
+            isDark
+              ? 'border-white/[0.06] hover:border-blue-500/30 hover:shadow-lg hover:shadow-blue-500/5 bg-white/[0.02]'
+              : 'border-slate-200 hover:border-blue-300 hover:shadow-md bg-white'
+          }`}>
             <div className="flex items-start justify-between">
               <div className="min-w-0">
-                <p className={`font-mono text-[10px] font-semibold ${isLight ? 'text-blue-600' : 'text-blue-400'}`}>{s.numero}</p>
-                <p className={`font-semibold text-sm mt-0.5 ${isLight ? 'text-slate-800' : 'text-slate-200'}`}>
+                <p className={`font-mono text-[10px] font-semibold ${isDark ? 'text-blue-400' : 'text-blue-600'}`}>{s.numero}</p>
+                <p className={`font-semibold text-sm mt-0.5 ${isDark ? 'text-white' : 'text-slate-800'}`}>
                   {s.solicitante_nome}
                 </p>
               </div>
               <span className={`rounded-full text-[10px] font-bold px-2 py-0.5 capitalize shrink-0
-                ${isLight ? urg.light : urg.dark}`}>
+                ${isDark ? urg.dark : urg.light}`}>
                 {s.urgencia}
               </span>
             </div>
-            <div className={`border-t my-3 ${isLight ? 'border-slate-100' : 'border-white/[0.06]'}`} />
+            <div className={`border-t my-3 ${isDark ? 'border-white/[0.06]' : 'border-slate-100'}`} />
             <div className="flex items-center justify-between text-xs">
-              <span className={isLight ? 'text-slate-500' : 'text-slate-400'}>{s.obra_nome}</span>
-              <span className={`font-bold ${isLight ? 'text-slate-700' : 'text-slate-200'}`}>
+              <span className={isDark ? 'text-slate-400' : 'text-slate-500'}>{s.obra_nome}</span>
+              <span className={`font-bold ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>
                 {s.itens?.length ?? 0} itens
               </span>
             </div>
             <div className="flex items-center justify-between text-xs mt-1">
               <span className={`rounded-full font-bold px-2 py-0.5
-                ${isLight ? 'bg-blue-100 text-blue-700' : 'bg-blue-500/20 text-blue-400'}`}>
+                ${isDark ? 'bg-blue-500/20 text-blue-400' : 'bg-blue-100 text-blue-700'}`}>
                 {s.status === 'aprovada' ? 'Aprovada' : 'Em Separação'}
               </span>
-              <span className={isLight ? 'text-slate-400' : 'text-slate-500'}>{fmtDate(s.criado_em)}</span>
+              <span className={isDark ? 'text-slate-500' : 'text-slate-400'}>{fmtDate(s.criado_em)}</span>
             </div>
             {s.itens && s.itens.length > 0 && (
-              <div className={`mt-3 pt-2 border-t space-y-1 ${isLight ? 'border-slate-100' : 'border-white/[0.06]'}`}>
+              <div className={`mt-3 pt-2 border-t space-y-1 ${isDark ? 'border-white/[0.06]' : 'border-slate-100'}`}>
                 {s.itens.slice(0, 3).map(it => (
-                  <div key={it.id} className={`flex items-center justify-between text-[11px] ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
+                  <div key={it.id} className={`flex items-center justify-between text-[11px] ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
                     <span className="truncate max-w-[180px]">{it.item?.descricao ?? it.descricao_livre ?? '—'}</span>
                     <span className="font-semibold">{it.quantidade} {it.item?.unidade ?? it.unidade ?? 'UN'}</span>
                   </div>
                 ))}
                 {s.itens.length > 3 && (
-                  <p className={`text-[10px] ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>
+                  <p className={`text-[10px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
                     +{s.itens.length - 3} mais...
                   </p>
                 )}
@@ -674,91 +679,90 @@ function LiberadosCards({ data, isLight }: { data: EstSolicitacao[]; isLight: bo
 }
 
 // ═════════════════════════════════════════════════════════════════════════════
-// Em Movimentação — Table & Cards
+// Em Movimentação — List & Cards
 // ═════════════════════════════════════════════════════════════════════════════
 
-function MovsTable({ data, isLight }: { data: EstoqueMovimentacaoItem[]; isLight: boolean }) {
-  if (data.length === 0) return <EmptyState icon={Truck} msg="Nenhuma movimentação ativa" isLight={isLight} />
-  const card = isLight ? 'bg-white border-slate-200 shadow-sm' : 'bg-white/[0.03] border-white/[0.06]'
-  const thCls = `text-left px-4 py-3 text-[10px] font-bold uppercase tracking-widest ${isLight ? 'text-slate-500' : 'text-slate-400'}`
+function MovsList({ data, isDark }: { data: EstoqueMovimentacaoItem[]; isDark: boolean }) {
+  if (data.length === 0) return <EmptyState icon={Truck} msg="Nenhuma movimentação ativa" sub="As movimentações aparecerão aqui quando registradas" isDark={isDark} />
   return (
-    <div className={`rounded-2xl border overflow-hidden ${card}`}>
-      <table className="w-full text-sm">
-        <thead>
-          <tr className={`border-b ${isLight ? 'border-slate-100 bg-slate-50' : 'border-white/[0.04] bg-white/[0.02]'}`}>
-            <th className={thCls}>Código</th>
-            <th className={thCls}>Descrição</th>
-            <th className={`${thCls} text-right`}>Quantidade</th>
-            <th className={`${thCls} hidden md:table-cell`}>Tipo</th>
-            <th className={`${thCls} hidden md:table-cell`}>Origem → Destino</th>
-            <th className={`${thCls} hidden lg:table-cell`}>Responsável</th>
-            <th className={`${thCls} text-right`}>Data</th>
-          </tr>
-        </thead>
-        <tbody className={`divide-y ${isLight ? 'divide-slate-50' : 'divide-white/[0.04]'}`}>
-          {data.map(m => (
-            <tr key={m.id} className={`transition-colors ${isLight ? 'hover:bg-slate-50' : 'hover:bg-white/[0.02]'}`}>
-              <td className={`px-4 py-3 font-mono text-xs ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>{m.codigo}</td>
-              <td className="px-4 py-3">
-                <p className={`font-semibold truncate max-w-[200px] ${isLight ? 'text-slate-800' : 'text-slate-200'}`}>{m.descricao}</p>
-                {m.obra_nome && <p className={`text-[10px] ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>{m.obra_nome}</p>}
-              </td>
-              <td className={`px-4 py-3 text-right font-semibold ${isLight ? 'text-slate-700' : 'text-slate-200'}`}>
-                {m.quantidade} {m.unidade}
-              </td>
-              <td className={`px-4 py-3 hidden md:table-cell text-xs ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
-                {TIPO_LABEL[m.tipo] ?? m.tipo}
-              </td>
-              <td className={`px-4 py-3 hidden md:table-cell text-xs ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
-                {m.base_nome ?? '—'}{m.base_destino_nome ? ` → ${m.base_destino_nome}` : ''}
-              </td>
-              <td className={`px-4 py-3 hidden lg:table-cell text-xs ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
-                {m.responsavel_nome || '—'}
-              </td>
-              <td className={`px-4 py-3 text-right text-xs ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
-                {fmtDate(m.criado_em)}
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
+    <>
+      <div className={`flex items-center gap-2 px-3 py-1 border-b text-[10px] font-semibold uppercase tracking-wider ${isDark ? 'border-white/[0.06] text-slate-600' : 'border-slate-100 text-slate-400'}`}>
+        <span className="w-[70px] shrink-0">Código</span>
+        <span className="flex-1 min-w-0">Descrição</span>
+        <span className="w-[70px] shrink-0 text-right">Qtd</span>
+        <span className="w-[90px] shrink-0 text-center">Tipo</span>
+        <span className="w-[140px] shrink-0">Origem → Destino</span>
+        <span className="w-[100px] shrink-0">Responsável</span>
+        <span className="w-[62px] shrink-0 text-right">Data</span>
+      </div>
+      {data.map(m => (
+        <div key={m.id} className={`flex items-center gap-2 px-3 py-1.5 border-b cursor-pointer transition-all ${
+          isDark ? 'border-white/[0.04] hover:bg-white/[0.03]' : 'border-slate-100 hover:bg-slate-50'
+        }`}>
+          <span className={`text-[11px] font-mono font-bold w-[70px] shrink-0 ${isDark ? 'text-blue-400' : 'text-blue-700'}`}>
+            {m.codigo}
+          </span>
+          <span className="flex-1 min-w-0 truncate">
+            <span className={`text-xs ${isDark ? 'text-white' : 'text-slate-800'}`}>{m.descricao}</span>
+            {m.obra_nome && <span className={`text-[10px] ml-1 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{m.obra_nome}</span>}
+          </span>
+          <span className={`text-[11px] font-semibold text-right w-[70px] shrink-0 ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>
+            {m.quantidade} {m.unidade}
+          </span>
+          <span className={`text-[10px] px-1.5 py-0.5 rounded-md w-[90px] shrink-0 text-center font-medium ${isDark ? 'bg-white/[0.04] text-slate-400' : 'bg-slate-100 text-slate-500'}`}>
+            {TIPO_LABEL[m.tipo] ?? m.tipo}
+          </span>
+          <span className={`text-[11px] truncate w-[140px] shrink-0 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+            {m.base_nome ?? '—'}{m.base_destino_nome ? ` → ${m.base_destino_nome}` : ''}
+          </span>
+          <span className={`text-[11px] truncate w-[100px] shrink-0 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+            {m.responsavel_nome || '—'}
+          </span>
+          <span className={`text-[11px] text-right w-[62px] shrink-0 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+            {fmtDate(m.criado_em)}
+          </span>
+        </div>
+      ))}
+    </>
   )
 }
 
-function MovsCards({ data, isLight }: { data: EstoqueMovimentacaoItem[]; isLight: boolean }) {
-  if (data.length === 0) return <EmptyState icon={Truck} msg="Nenhuma movimentação ativa" isLight={isLight} />
+function MovsCards({ data, isDark }: { data: EstoqueMovimentacaoItem[]; isDark: boolean }) {
+  if (data.length === 0) return <EmptyState icon={Truck} msg="Nenhuma movimentação ativa" sub="As movimentações aparecerão aqui quando registradas" isDark={isDark} />
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+    <div className="p-3 space-y-2">
       {data.map(m => (
-        <div key={m.id} className={`rounded-2xl border p-4 transition-all hover:shadow-md
-          ${isLight ? 'bg-white border-slate-200' : 'bg-white/[0.03] border-white/[0.06]'}`}>
+        <div key={m.id} className={`rounded-2xl border p-4 cursor-pointer transition-all group ${
+          isDark
+            ? 'border-white/[0.06] hover:border-blue-500/30 hover:shadow-lg hover:shadow-blue-500/5 bg-white/[0.02]'
+            : 'border-slate-200 hover:border-blue-300 hover:shadow-md bg-white'
+        }`}>
           <div className="flex items-start justify-between">
             <div className="min-w-0">
-              <p className={`font-mono text-[10px] ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>{m.codigo}</p>
-              <p className={`font-semibold text-sm truncate mt-0.5 ${isLight ? 'text-slate-800' : 'text-slate-200'}`}>
+              <p className={`font-mono text-[10px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{m.codigo}</p>
+              <p className={`font-semibold text-sm truncate mt-0.5 ${isDark ? 'text-white' : 'text-slate-800'}`}>
                 {m.descricao}
               </p>
             </div>
             <span className={`rounded-full text-[10px] font-bold px-2 py-0.5 shrink-0
-              ${isLight ? 'bg-amber-100 text-amber-700' : 'bg-amber-500/20 text-amber-400'}`}>
+              ${isDark ? 'bg-amber-500/20 text-amber-400' : 'bg-amber-100 text-amber-700'}`}>
               {TIPO_LABEL[m.tipo] ?? m.tipo}
             </span>
           </div>
-          <div className={`border-t my-3 ${isLight ? 'border-slate-100' : 'border-white/[0.06]'}`} />
+          <div className={`border-t my-3 ${isDark ? 'border-white/[0.06]' : 'border-slate-100'}`} />
           <div className="flex items-center justify-between text-xs">
-            <span className={isLight ? 'text-slate-500' : 'text-slate-400'}>
+            <span className={isDark ? 'text-slate-400' : 'text-slate-500'}>
               Qtd: {m.quantidade} {m.unidade}
             </span>
-            <span className={isLight ? 'text-slate-500' : 'text-slate-400'}>
+            <span className={isDark ? 'text-slate-400' : 'text-slate-500'}>
               {m.base_nome ?? ''}{m.base_destino_nome ? ` → ${m.base_destino_nome}` : ''}
             </span>
           </div>
           <div className="flex items-center justify-between text-xs mt-1">
-            <span className={isLight ? 'text-slate-400' : 'text-slate-500'}>
+            <span className={isDark ? 'text-slate-500' : 'text-slate-400'}>
               {m.responsavel_nome || m.obra_nome || '—'}
             </span>
-            <span className={isLight ? 'text-slate-400' : 'text-slate-500'}>{fmtDate(m.criado_em)}</span>
+            <span className={isDark ? 'text-slate-500' : 'text-slate-400'}>{fmtDate(m.criado_em)}</span>
           </div>
         </div>
       ))}
@@ -766,12 +770,15 @@ function MovsCards({ data, isLight }: { data: EstoqueMovimentacaoItem[]; isLight
   )
 }
 
-// ── Empty state helper ───────────────────────────────────────────────────────
-function EmptyState({ icon: Icon, msg, isLight }: { icon: any; msg: string; isLight: boolean }) {
+// ── Empty state ─────────────────────────────────────────────────────────────
+function EmptyState({ icon: Icon, msg, sub, isDark }: { icon: any; msg: string; sub?: string; isDark: boolean }) {
   return (
-    <div className={`rounded-2xl border p-12 text-center ${isLight ? 'bg-white border-slate-200' : 'bg-white/[0.03] border-white/[0.06]'}`}>
-      <Icon size={40} className={`mx-auto ${isLight ? 'text-slate-200' : 'text-slate-600'}`} />
-      <p className={`font-semibold mt-3 ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>{msg}</p>
+    <div className="flex flex-col items-center justify-center py-20">
+      <div className={`w-14 h-14 rounded-2xl flex items-center justify-center mb-4 ${isDark ? 'bg-white/[0.04]' : 'bg-slate-100'}`}>
+        <Icon size={24} className="text-slate-300" />
+      </div>
+      <p className={`text-sm font-semibold ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{msg}</p>
+      {sub && <p className={`text-xs mt-1 ${isDark ? 'text-slate-600' : 'text-slate-400'}`}>{sub}</p>}
     </div>
   )
 }
@@ -781,32 +788,32 @@ function EmptyState({ icon: Icon, msg, isLight }: { icon: any; msg: string; isLi
 // ═════════════════════════════════════════════════════════════════════════════
 
 function ItemFormModal({
-  item, onChange, onSave, onClose, saving, isLight
+  item, onChange, onSave, onClose, saving, isDark
 }: {
   item: Partial<EstItem>
   onChange: (v: Partial<EstItem>) => void
   onSave: () => void
   onClose: () => void
   saving: boolean
-  isLight: boolean
+  isDark: boolean
 }) {
   const set = (k: keyof EstItem, v: any) => onChange({ ...item, [k]: v })
 
-  const modalBg = isLight ? 'bg-white' : 'bg-[#111827]'
-  const borderB = isLight ? 'border-slate-100' : 'border-white/[0.06]'
-  const labelCls = isLight ? 'text-slate-600' : 'text-slate-300'
-  const inputCls = isLight
-    ? 'input-base'
-    : 'input-base bg-white/[0.04] border-white/[0.08] text-slate-200 placeholder:text-slate-500'
+  const modalBg = isDark ? 'bg-[#111827]' : 'bg-white'
+  const borderB = isDark ? 'border-white/[0.06]' : 'border-slate-100'
+  const labelCls = isDark ? 'text-slate-300' : 'text-slate-600'
+  const inputCls = isDark
+    ? 'input-base bg-white/[0.04] border-white/[0.08] text-slate-200 placeholder:text-slate-500'
+    : 'input-base'
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
       <div className={`${modalBg} rounded-2xl shadow-2xl w-full max-w-xl max-h-[90vh] overflow-y-auto`}>
         <div className={`flex items-center justify-between px-6 py-4 border-b ${borderB}`}>
-          <h2 className={`text-lg font-extrabold ${isLight ? 'text-slate-800' : 'text-white'}`}>
+          <h2 className={`text-lg font-extrabold ${isDark ? 'text-white' : 'text-slate-800'}`}>
             {item.id ? 'Editar Item' : 'Novo Item'}
           </h2>
-          <button onClick={onClose} className={`w-8 h-8 rounded-lg flex items-center justify-center ${isLight ? 'hover:bg-slate-100 text-slate-500' : 'hover:bg-white/[0.06] text-slate-400'}`}>
+          <button onClick={onClose} className={`w-8 h-8 rounded-lg flex items-center justify-center ${isDark ? 'hover:bg-white/[0.06] text-slate-400' : 'hover:bg-slate-100 text-slate-500'}`}>
             <X size={16} />
           </button>
         </div>
@@ -898,21 +905,23 @@ function ItemFormModal({
                   onChange={e => set(key, e.target.checked)}
                   className="rounded border-slate-300 text-blue-600 focus:ring-blue-500"
                 />
-                <span className={`text-xs font-semibold ${labelCls}`}>{label}</span>
+                <span className={`text-xs ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>{label}</span>
               </label>
             ))}
           </div>
         </div>
 
-        <div className={`px-6 py-4 border-t flex justify-end gap-2 ${borderB}`}>
+        <div className={`flex items-center justify-end gap-3 px-6 py-4 border-t ${borderB}`}>
           <button onClick={onClose}
-            className={`px-4 py-2 rounded-xl border text-sm font-semibold transition-colors
-              ${isLight ? 'border-slate-200 text-slate-600 hover:bg-slate-50' : 'border-white/[0.08] text-slate-400 hover:bg-white/[0.04]'}`}>
+            className={`px-4 py-2 rounded-xl text-sm font-semibold transition-colors ${isDark ? 'text-slate-400 hover:bg-white/[0.04]' : 'text-slate-500 hover:bg-slate-100'}`}>
             Cancelar
           </button>
-          <button onClick={onSave} disabled={saving}
-            className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700
-              text-white text-sm font-semibold transition-colors disabled:opacity-60 shadow-sm">
+          <button
+            onClick={onSave}
+            disabled={saving || !item.codigo || !item.descricao}
+            className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-50
+              text-white text-sm font-semibold px-4 py-2 rounded-xl transition-colors shadow-sm"
+          >
             {saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
             Salvar
           </button>
