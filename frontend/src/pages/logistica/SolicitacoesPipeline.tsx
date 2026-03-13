@@ -10,10 +10,9 @@ import {
   useSolicitacoes, useAtualizarStatusSolicitacao,
   useAprovarSolicitacao, usePlanejaarSolicitacao,
   useEnviarParaAprovacao, useCriarSolicitacao,
-  useRotas,
 } from '../../hooks/useLogistica'
 import { useSearchParams } from 'react-router-dom'
-import { useLookupObras, useLookupCentrosCusto } from '../../hooks/useLookups'
+import { useLookupCentrosCusto } from '../../hooks/useLookups'
 import type { LogSolicitacao, StatusSolicitacaoPipeline, CriarSolicitacaoPayload, TipoTransporte } from '../../types/logistica'
 import { SOLICITACAO_PIPELINE_STAGES } from '../../types/logistica'
 
@@ -292,12 +291,16 @@ const TIPO_LABELS: Record<TipoTransporte, string> = {
   transferencia_maquina:   'Transf. Máquina',
 }
 
+const UF_LIST = [
+  'AC','AL','AM','AP','BA','CE','DF','ES','GO','MA','MG','MS','MT',
+  'PA','PB','PE','PI','PR','RJ','RN','RO','RR','RS','SC','SE','SP','TO',
+] as const
+
 const EMPTY_FORM: CriarSolicitacaoPayload = {
   tipo: 'transferencia_material',
   origem: '',
   destino: '',
   descricao: '',
-  urgente: false,
 }
 
 function NovaSolicitacaoModal({ isDark, onClose, onSuccess }: {
@@ -305,10 +308,10 @@ function NovaSolicitacaoModal({ isDark, onClose, onSuccess }: {
 }) {
   const [form, setForm] = useState<CriarSolicitacaoPayload>({ ...EMPTY_FORM })
   const [itensForm, setItensForm] = useState<{ descricao: string; quantidade: number; unidade: string; peso_kg?: number; volume_m3?: number }[]>([])
+  const [origemUF, setOrigemUF] = useState('')
+  const [destinoUF, setDestinoUF] = useState('')
   const criar = useCriarSolicitacao()
-  const obras = useLookupObras()
   const centrosCusto = useLookupCentrosCusto()
-  const { data: rotas = [] } = useRotas()
 
   const set = (k: keyof CriarSolicitacaoPayload, v: any) => setForm(p => ({ ...p, [k]: v }))
 
@@ -352,41 +355,6 @@ function NovaSolicitacaoModal({ isDark, onClose, onSuccess }: {
               </select>
             </div>
             <div>
-              <label className={labelCls}>Rota Padrão</label>
-              <select onChange={e => {
-                const r = rotas.find(r => r.id === e.target.value)
-                setForm(p => ({ ...p, origem: r?.origem ?? p.origem, destino: r?.destino ?? p.destino }))
-              }} className={inputCls}>
-                <option value="">Selecionar rota...</option>
-                {rotas.map(r => <option key={r.id} value={r.id}>{r.nome}</option>)}
-              </select>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className={labelCls}>Origem *</label>
-              <input value={form.origem} onChange={e => set('origem', e.target.value)}
-                className={inputCls} placeholder="Cidade / Depósito" />
-            </div>
-            <div>
-              <label className={labelCls}>Destino *</label>
-              <input value={form.destino} onChange={e => set('destino', e.target.value)}
-                className={inputCls} placeholder="Obra / Cidade" />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className={labelCls}>Obra / Projeto</label>
-              <select value={form.obra_nome ?? ''} onChange={e => set('obra_nome', e.target.value)} className={inputCls}>
-                <option value="">Selecione...</option>
-                {obras.map(o => (
-                  <option key={o.id} value={o.nome}>{o.codigo} - {o.nome}</option>
-                ))}
-              </select>
-            </div>
-            <div>
               <label className={labelCls}>Centro de Custo</label>
               <select value={form.centro_custo ?? ''} onChange={e => set('centro_custo', e.target.value)} className={inputCls}>
                 <option value="">Selecione...</option>
@@ -397,17 +365,36 @@ function NovaSolicitacaoModal({ isDark, onClose, onSuccess }: {
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className={labelCls}>OC Vinculada</label>
-              <input value={form.oc_numero ?? ''} onChange={e => set('oc_numero', e.target.value)}
-                className={inputCls} placeholder="OC-2026-0001" />
+          {/* Origem */}
+          <div>
+            <label className={labelCls}>Origem *</label>
+            <div className="grid grid-cols-[1fr_100px] gap-2">
+              <input value={form.origem} onChange={e => set('origem', e.target.value)}
+                className={inputCls} placeholder="Cidade" />
+              <select value={origemUF} onChange={e => setOrigemUF(e.target.value)} className={inputCls}>
+                <option value="">UF</option>
+                {UF_LIST.map(uf => <option key={uf} value={uf}>{uf}</option>)}
+              </select>
             </div>
-            <div>
-              <label className={labelCls}>Data Desejada</label>
-              <input type="date" value={form.data_desejada ?? ''} onChange={e => set('data_desejada', e.target.value)}
-                className={inputCls} />
+          </div>
+
+          {/* Destino */}
+          <div>
+            <label className={labelCls}>Destino *</label>
+            <div className="grid grid-cols-[1fr_100px] gap-2">
+              <input value={form.destino} onChange={e => set('destino', e.target.value)}
+                className={inputCls} placeholder="Cidade" />
+              <select value={destinoUF} onChange={e => setDestinoUF(e.target.value)} className={inputCls}>
+                <option value="">UF</option>
+                {UF_LIST.map(uf => <option key={uf} value={uf}>{uf}</option>)}
+              </select>
             </div>
+          </div>
+
+          <div>
+            <label className={labelCls}>Data Desejada</label>
+            <input type="date" value={form.data_desejada ?? ''} onChange={e => set('data_desejada', e.target.value)}
+              className={inputCls} />
           </div>
 
           <div>
@@ -483,26 +470,11 @@ function NovaSolicitacaoModal({ isDark, onClose, onSuccess }: {
             )}
           </div>
 
-          <div className="flex gap-4">
-            <label className="flex items-center gap-2 cursor-pointer">
-              <input type="checkbox" checked={form.urgente ?? false} onChange={e => set('urgente', e.target.checked)}
-                className="rounded border-slate-300 text-orange-600 focus:ring-orange-500" />
-              <span className={`text-xs font-semibold ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>Urgente</span>
-            </label>
-            <label className="flex items-center gap-2 cursor-pointer">
-              <input type="checkbox" checked={form.carga_especial ?? false} onChange={e => set('carga_especial', e.target.checked)}
-                className="rounded border-slate-300 text-orange-600 focus:ring-orange-500" />
-              <span className={`text-xs font-semibold ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>Carga Especial</span>
-            </label>
-          </div>
-
-          {form.urgente && (
-            <div>
-              <label className={labelCls}>Justificativa da Urgência *</label>
-              <textarea value={form.justificativa_urgencia ?? ''} onChange={e => set('justificativa_urgencia', e.target.value)}
-                rows={2} className={`${inputCls} resize-none`} placeholder="Motivo da urgência..." />
-            </div>
-          )}
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input type="checkbox" checked={form.carga_especial ?? false} onChange={e => set('carga_especial', e.target.checked)}
+              className="rounded border-slate-300 text-orange-600 focus:ring-orange-500" />
+            <span className={`text-xs font-semibold ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>Carga Especial</span>
+          </label>
         </div>
 
         {/* Footer */}
