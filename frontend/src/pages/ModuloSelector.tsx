@@ -72,7 +72,7 @@ const PILLARS: Pillar[] = [
       { key: 'compras', label: 'Compras', desc: 'Requisições, cotações e pedidos', Icon: ShoppingCart, active: true, route: '/compras' },
       { key: 'logistica', label: 'Logística', desc: 'Transportes e expedição', Icon: Truck, active: true, route: '/logistica' },
       { key: 'estoque', label: 'Estoque', desc: 'Almoxarifado e inventário', Icon: Package, active: true, route: '/estoque' },
-      { key: 'patrimonial', label: 'Patrimonial', desc: 'Ativos e depreciação', Icon: Building2, active: true, route: '/estoque/patrimonial' },
+      { key: 'patrimonial', label: 'Patrimonial', desc: 'Ativos e depreciação', Icon: Building2, active: true, route: '/patrimonial' },
       { key: 'frotas', label: 'Frotas', desc: 'Veículos, OS e telemetria', Icon: Car, active: true, route: '/frotas' },
     ],
   },
