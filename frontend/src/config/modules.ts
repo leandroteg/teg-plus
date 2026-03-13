@@ -68,7 +68,17 @@ export const ESTOQUE_CONFIG: ModuleMeta = {
     { to: '/estoque/itens',         icon: Package2,        label: 'Itens',           end: false },
     { to: '/estoque/movimentacoes', icon: ArrowLeftRight,  label: 'Movimentações',   end: false },
     { to: '/estoque/inventario',    icon: ClipboardList,   label: 'Inventário',      end: false },
-    { to: '/estoque/patrimonial',   icon: Landmark,        label: 'Patrimonial',     end: false },
+  ],
+}
+
+export const PATRIMONIAL_CONFIG: ModuleMeta = {
+  name: 'Patrimonial',
+  emoji: '🏛️',
+  color: 'amber',
+  navItems: [
+    { to: '/patrimonial',               icon: LayoutDashboard, label: 'Painel',          end: true  },
+    { to: '/patrimonial/movimentacoes', icon: ArrowLeftRight,  label: 'Movimentações',   end: false },
+    { to: '/patrimonial/patrimonio',    icon: Landmark,        label: 'Patrimônio',      end: false },
   ],
 }
 

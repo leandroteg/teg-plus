@@ -125,6 +125,10 @@ import FiscalLayout from './components/FiscalLayout'
 import PainelFiscal from './pages/fiscal/PainelFiscal'
 import NotasFiscais from './pages/financeiro/NotasFiscais'
 import FiscalPipeline from './pages/fiscal/FiscalPipeline'
+import PatrimonialLayout from './components/PatrimonialLayout'
+import PatrimonialHome from './pages/patrimonial/PatrimonialHome'
+import PatrimonialMovimentacoes from './pages/patrimonial/Movimentacoes'
+import Patrimonio from './pages/patrimonial/Patrimonio'
 
 // SuperTEG AI Chat
 import SuperTEGChat from './components/SuperTEGChat'
@@ -135,7 +139,6 @@ import EstoqueHome from './pages/estoque/EstoqueHome'
 import Itens from './pages/estoque/Itens'
 import Movimentacoes from './pages/estoque/Movimentacoes'
 import Inventario from './pages/estoque/Inventario'
-import Patrimonial from './pages/estoque/Patrimonial'
 import SolicitacoesEstoque from './pages/estoque/Solicitacoes'
 
 // Módulo Logística
@@ -215,8 +218,17 @@ export default function App() {
               <Route path="/estoque/itens"         element={<Itens />} />
               <Route path="/estoque/movimentacoes" element={<Movimentacoes />} />
               <Route path="/estoque/inventario"    element={<Inventario />} />
-              <Route path="/estoque/patrimonial"   element={<Patrimonial />} />
+              <Route path="/estoque/patrimonial"   element={<Navigate to="/patrimonial/patrimonio" replace />} />
               <Route path="/estoque/solicitacoes" element={<SolicitacoesEstoque />} />
+            </Route>
+          </Route>
+
+          {/* Módulo Patrimonial */}
+          <Route element={<ModuleRoute moduleKey="patrimonial" />}>
+            <Route element={<PatrimonialLayout />}>
+              <Route path="/patrimonial" element={<PatrimonialHome />} />
+              <Route path="/patrimonial/movimentacoes" element={<PatrimonialMovimentacoes />} />
+              <Route path="/patrimonial/patrimonio" element={<Patrimonio />} />
             </Route>
           </Route>
 

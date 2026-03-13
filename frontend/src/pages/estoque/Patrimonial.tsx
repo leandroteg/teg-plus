@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import {
   Landmark, Plus, Search, X, Save, Loader2,
   TrendingDown, AlertTriangle, CheckCircle2, Wrench,
@@ -36,7 +36,19 @@ const COMPETENCIA = (() => {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
 })()
 
-export default function Patrimonial() {
+interface PatrimonialProps {
+  forcedStatusFiltro?: string
+  allowedStatuses?: StatusImobilizado[]
+  showDepreciadosOnly?: boolean
+  hideHeader?: boolean
+}
+
+export default function Patrimonial({
+  forcedStatusFiltro,
+  allowedStatuses,
+  showDepreciadosOnly = false,
+  hideHeader = false,
+}: PatrimonialProps) {
   const { isLightSidebar: isLight } = useTheme()
   const [busca, setBusca] = useState('')
   const [statusFiltro, setStatusFiltro] = useState<string>('')
@@ -46,8 +58,9 @@ export default function Patrimonial() {
   const [showBaixaModal, setShowBaixaModal] = useState<string | null>(null)
   const [motivoBaixa, setMotivoBaixa] = useState('')
 
+  const filtroAtivo = forcedStatusFiltro ?? statusFiltro
   const { data: imobs = [], isLoading } = useImobilizados(
-    statusFiltro ? { status: statusFiltro } : undefined
+    filtroAtivo ? { status: filtroAtivo } : undefined
   )
   const { data: kpis } = usePatrimonialKPIs()
   const { data: bases = [] } = useBases()
@@ -55,13 +68,23 @@ export default function Patrimonial() {
   const baixar = useBaixarImobilizado()
   const calcDeprec = useCalcularDepreciacao()
 
-  const filtrados = busca.trim()
-    ? imobs.filter(i =>
-        i.descricao.toLowerCase().includes(busca.toLowerCase()) ||
-        i.numero_patrimonio.toLowerCase().includes(busca.toLowerCase()) ||
-        i.categoria?.toLowerCase().includes(busca.toLowerCase())
-      )
-    : imobs
+  const filtrados = useMemo(() => {
+    let base = allowedStatuses?.length
+      ? imobs.filter(i => allowedStatuses.includes(i.status))
+      : imobs
+
+    if (showDepreciadosOnly) {
+      base = base.filter(i => (i.percentual_depreciado ?? 0) >= 100)
+    }
+
+    return busca.trim()
+      ? base.filter(i =>
+          i.descricao.toLowerCase().includes(busca.toLowerCase()) ||
+          i.numero_patrimonio.toLowerCase().includes(busca.toLowerCase()) ||
+          i.categoria?.toLowerCase().includes(busca.toLowerCase())
+        )
+      : base
+  }, [allowedStatuses, busca, imobs, showDepreciadosOnly])
 
   async function handleSave() {
     if (!editItem) return
@@ -93,31 +116,33 @@ export default function Patrimonial() {
     <div className="space-y-4">
 
       {/* -- Header --------------------------------------------------- */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className={`text-xl font-extrabold ${isLight ? 'text-slate-800' : 'text-white'}`}>Patrimonial</h1>
-          <p className={`text-xs mt-0.5 ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>{filtrados.length} imobilizados</p>
+      {!hideHeader && (
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className={`text-xl font-extrabold ${isLight ? 'text-slate-800' : 'text-white'}`}>Patrimonial</h1>
+            <p className={`text-xs mt-0.5 ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>{filtrados.length} imobilizados</p>
+          </div>
+          <div className="flex gap-2">
+            <button
+              onClick={() => calcDeprec.mutate(COMPETENCIA)}
+              disabled={calcDeprec.isPending}
+              title={`Calcular depreciacao ${COMPETENCIA}`}
+              className={`flex items-center gap-1.5 border text-sm font-semibold px-3 py-2 rounded-xl transition-colors
+                ${isLight ? 'bg-white hover:bg-slate-50 border-slate-200 text-slate-600' : 'bg-white/[0.03] hover:bg-white/[0.05] border-white/[0.08] text-slate-300'}`}
+            >
+              {calcDeprec.isPending ? <Loader2 size={14} className="animate-spin" /> : <TrendingDown size={14} />}
+              Depreciar
+            </button>
+            <button
+              onClick={() => { setEditItem({ ...EMPTY_FORM }); setShowForm(true) }}
+              className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white
+                text-sm font-semibold px-4 py-2 rounded-xl transition-colors shadow-sm"
+            >
+              <Plus size={15} /> Novo
+            </button>
+          </div>
         </div>
-        <div className="flex gap-2">
-          <button
-            onClick={() => calcDeprec.mutate(COMPETENCIA)}
-            disabled={calcDeprec.isPending}
-            title={`Calcular depreciacao ${COMPETENCIA}`}
-            className={`flex items-center gap-1.5 border text-sm font-semibold px-3 py-2 rounded-xl transition-colors
-              ${isLight ? 'bg-white hover:bg-slate-50 border-slate-200 text-slate-600' : 'bg-white/[0.03] hover:bg-white/[0.05] border-white/[0.08] text-slate-300'}`}
-          >
-            {calcDeprec.isPending ? <Loader2 size={14} className="animate-spin" /> : <TrendingDown size={14} />}
-            Depreciar
-          </button>
-          <button
-            onClick={() => { setEditItem({ ...EMPTY_FORM }); setShowForm(true) }}
-            className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white
-              text-sm font-semibold px-4 py-2 rounded-xl transition-colors shadow-sm"
-          >
-            <Plus size={15} /> Novo
-          </button>
-        </div>
-      </div>
+      )}
 
       {/* -- KPI Summary -------------------------------------------- */}
       {kpis && (
@@ -152,18 +177,20 @@ export default function Patrimonial() {
               ${isLight ? 'border-slate-200 bg-white text-slate-800' : 'border-white/[0.08] bg-white/[0.03] text-slate-200 placeholder:text-slate-500'}`}
           />
         </div>
-        <select
-          value={statusFiltro}
-          onChange={e => setStatusFiltro(e.target.value)}
-          className={`px-3 py-2 rounded-xl border text-xs font-semibold
-            focus:outline-none focus:ring-2 focus:ring-blue-500/30
-            ${isLight ? 'border-slate-200 bg-white text-slate-600' : 'border-white/[0.08] bg-white/[0.03] text-slate-300'}`}
-        >
-          <option value="">Todos os status</option>
-          {Object.entries(STATUS_CONFIG).map(([k, v]) => (
-            <option key={k} value={k}>{v.label}</option>
-          ))}
-        </select>
+        {!forcedStatusFiltro && !showDepreciadosOnly && (
+          <select
+            value={statusFiltro}
+            onChange={e => setStatusFiltro(e.target.value)}
+            className={`px-3 py-2 rounded-xl border text-xs font-semibold
+              focus:outline-none focus:ring-2 focus:ring-blue-500/30
+              ${isLight ? 'border-slate-200 bg-white text-slate-600' : 'border-white/[0.08] bg-white/[0.03] text-slate-300'}`}
+          >
+            <option value="">Todos os status</option>
+            {Object.entries(STATUS_CONFIG).map(([k, v]) => (
+              <option key={k} value={k}>{v.label}</option>
+            ))}
+          </select>
+        )}
       </div>
 
       {/* -- Lista --------------------------------------------------- */}

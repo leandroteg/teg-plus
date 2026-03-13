@@ -87,6 +87,7 @@ export const MODULOS_ERP_GROUPED: GrupoModulos[] = [
       { key: 'compras',    label: 'Compras',    icon: '🛒' },
       { key: 'logistica',  label: 'Logística',  icon: '🚚' },
       { key: 'estoque',    label: 'Estoque',    icon: '📦' },
+      { key: 'patrimonial',label: 'Patrimonial',icon: '🏛️' },
       { key: 'frotas',     label: 'Frotas',     icon: '🚛' },
     ],
   },
@@ -368,7 +369,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     isAdmin:    role === 'admin',
     isGerente:  ROLE_NIVEL[role] >= ROLE_NIVEL['gerente'],
     canManage:  role === 'admin',
-    hasModule:  (mod) => perfil?.modulos?.[mod] === true,
+    hasModule:  (mod) => {
+      if (perfil?.modulos?.[mod] === true) return true
+      if (mod === 'patrimonial') return perfil?.modulos?.estoque === true
+      return false
+    },
     canApprove: (nivel) => (perfil?.alcada_nivel ?? 0) >= nivel,
     atLeast:    (r) => ROLE_NIVEL[role] >= ROLE_NIVEL[r],
   }
