@@ -111,7 +111,7 @@ function ReqCard({ r, apr, isDark, onClick }: {
   return (
     <div
       onClick={onClick}
-      className={`rounded-2xl border p-4 cursor-pointer transition-all active:scale-[0.99] space-y-3 ${
+      className={`rounded-2xl border p-4 cursor-pointer transition-all active:scale-[0.99] space-y-3 min-h-[176px] h-full flex flex-col justify-between ${
         isDark
           ? 'bg-white/[0.02] border-white/[0.06] hover:border-teal-500/40 hover:bg-white/[0.04]'
           : 'bg-white border-slate-200 hover:border-teal-300 hover:shadow-md shadow-sm'
@@ -532,7 +532,7 @@ export default function ListaRequisicoes() {
           <p className="text-sm font-medium">Nenhuma requisição nesta etapa</p>
         </div>
       ) : viewMode === 'cards' ? (
-        <div className="p-1 space-y-2">
+        <div className="grid gap-4 p-4 md:grid-cols-2">
           {activeItems.map(r => (
             <ReqCard key={r.id} r={r} apr={aprovacaoMap.get(r.id)} isDark={isDark}
               onClick={() => setDetail(r)} />
@@ -557,13 +557,13 @@ export default function ListaRequisicoes() {
               {activeItems.map(r => (
                 <tr key={r.id} onClick={() => setDetail(r)}
                   className={`cursor-pointer transition-all ${isDark ? 'hover:bg-white/[0.03] border-t border-white/[0.04]' : 'hover:bg-slate-50 border-t border-slate-100'}`}>
-                  <td className={`px-3 py-2.5 font-mono ${isDark ? 'text-teal-400' : 'text-teal-600'}`}>{r.numero}</td>
-                  <td className={`px-3 py-2.5 max-w-[200px] truncate ${isDark ? 'text-white' : 'text-slate-800'}`}>{r.descricao}</td>
-                  <td className={`px-3 py-2.5 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{r.obra_nome}</td>
-                  <td className={`px-3 py-2.5 text-right font-bold ${isDark ? 'text-teal-400' : 'text-teal-600'}`}>{fmt(r.valor_estimado)}</td>
-                  <td className={`px-3 py-2.5 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{r.solicitante_nome.split(' ')[0]}</td>
-                  <td className="px-3 py-2.5"><StatusBadge status={r.status as StatusRequisicao} size="sm" customLabel={getApprovalStatusLabel(r.status)} /></td>
-                  <td className={`px-3 py-2.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{fmtData(r.created_at)}</td>
+                  <td className={`px-3 py-2 font-mono ${isDark ? 'text-teal-400' : 'text-teal-600'}`}>{r.numero}</td>
+                  <td className={`px-3 py-2 max-w-[200px] truncate ${isDark ? 'text-white' : 'text-slate-800'}`}>{r.descricao}</td>
+                  <td className={`px-3 py-2 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{r.obra_nome}</td>
+                  <td className={`px-3 py-2 text-right font-bold ${isDark ? 'text-teal-400' : 'text-teal-600'}`}>{fmt(r.valor_estimado)}</td>
+                  <td className={`px-3 py-2 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{r.solicitante_nome.split(' ')[0]}</td>
+                  <td className="px-3 py-2"><StatusBadge status={r.status as StatusRequisicao} size="sm" customLabel={getApprovalStatusLabel(r.status)} /></td>
+                  <td className={`px-3 py-2 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{fmtData(r.created_at)}</td>
                 </tr>
               ))}
             </tbody>

@@ -412,13 +412,13 @@ function SaldosList({ data, isDark, onEdit }: { data: EstSaldo[]; isDark: boolea
 function SaldosCards({ data, isDark }: { data: EstSaldo[]; isDark: boolean }) {
   if (data.length === 0) return <EmptyState icon={Package2} msg="Nenhum item em estoque" sub="Os itens aparecerão aqui quando houver saldo" isDark={isDark} />
   return (
-    <div className="p-3 space-y-2">
+    <div className="grid gap-4 p-4 md:grid-cols-2">
       {data.map(s => {
         const abaixo = s.item && s.saldo <= (s.item.ponto_reposicao ?? s.item.estoque_minimo)
         const curva = CURVA_COLOR[s.item?.curva_abc ?? 'C']
         const disponivel = s.saldo - (s.saldo_reservado ?? 0)
         return (
-          <div key={s.id} className={`rounded-2xl border p-4 cursor-pointer transition-all group ${
+          <div key={s.id} className={`rounded-2xl border p-4 cursor-pointer transition-all group min-h-[176px] h-full flex flex-col ${
             isDark
               ? 'border-white/[0.06] hover:border-blue-500/30 hover:shadow-lg hover:shadow-blue-500/5 bg-white/[0.02]'
               : 'border-slate-200 hover:border-blue-300 hover:shadow-md bg-white'
@@ -515,9 +515,9 @@ function EntradasList({ data, isDark }: { data: EstoqueEntradaItem[]; isDark: bo
 function EntradasCards({ data, isDark }: { data: EstoqueEntradaItem[]; isDark: boolean }) {
   if (data.length === 0) return <EmptyState icon={PackageCheck} msg="Nenhuma entrada pendente" sub="As entradas aparecerão aqui quando registradas" isDark={isDark} />
   return (
-    <div className="p-3 space-y-2">
+    <div className="grid gap-4 p-4 md:grid-cols-2">
       {data.map(e => (
-        <div key={e.id} className={`rounded-2xl border p-4 cursor-pointer transition-all group ${
+        <div key={e.id} className={`rounded-2xl border p-4 cursor-pointer transition-all group min-h-[176px] h-full flex flex-col ${
           isDark
             ? 'border-white/[0.06] hover:border-blue-500/30 hover:shadow-lg hover:shadow-blue-500/5 bg-white/[0.02]'
             : 'border-slate-200 hover:border-blue-300 hover:shadow-md bg-white'
@@ -621,11 +621,11 @@ function LiberadosList({ data, isDark }: { data: EstSolicitacao[]; isDark: boole
 function LiberadosCards({ data, isDark }: { data: EstSolicitacao[]; isDark: boolean }) {
   if (data.length === 0) return <EmptyState icon={ClipboardCheck} msg="Nenhuma solicitação liberada" sub="As solicitações aprovadas aparecerão aqui" isDark={isDark} />
   return (
-    <div className="p-3 space-y-2">
+    <div className="grid gap-4 p-4 md:grid-cols-2">
       {data.map(s => {
         const urg = URGENCIA_BADGE[s.urgencia] ?? URGENCIA_BADGE.normal
         return (
-          <div key={s.id} className={`rounded-2xl border p-4 cursor-pointer transition-all group ${
+        <div key={s.id} className={`rounded-2xl border p-4 cursor-pointer transition-all group min-h-[176px] h-full flex flex-col ${
             isDark
               ? 'border-white/[0.06] hover:border-blue-500/30 hover:shadow-lg hover:shadow-blue-500/5 bg-white/[0.02]'
               : 'border-slate-200 hover:border-blue-300 hover:shadow-md bg-white'
@@ -730,9 +730,9 @@ function MovsList({ data, isDark }: { data: EstoqueMovimentacaoItem[]; isDark: b
 function MovsCards({ data, isDark }: { data: EstoqueMovimentacaoItem[]; isDark: boolean }) {
   if (data.length === 0) return <EmptyState icon={Truck} msg="Nenhuma movimentação ativa" sub="As movimentações aparecerão aqui quando registradas" isDark={isDark} />
   return (
-    <div className="p-3 space-y-2">
+    <div className="grid gap-4 p-4 md:grid-cols-2">
       {data.map(m => (
-        <div key={m.id} className={`rounded-2xl border p-4 cursor-pointer transition-all group ${
+        <div key={m.id} className={`rounded-2xl border p-4 cursor-pointer transition-all group min-h-[176px] h-full flex flex-col ${
           isDark
             ? 'border-white/[0.06] hover:border-blue-500/30 hover:shadow-lg hover:shadow-blue-500/5 bg-white/[0.02]'
             : 'border-slate-200 hover:border-blue-300 hover:shadow-md bg-white'

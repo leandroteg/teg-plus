@@ -98,7 +98,7 @@ function CotCard({ cot, isDark, onClick }: { cot: Cotacao; isDark: boolean; onCl
 
   return (
     <div onClick={onClick}
-      className={`rounded-2xl border p-4 cursor-pointer transition-all active:scale-[0.99] space-y-3 ${
+      className={`rounded-2xl border p-4 cursor-pointer transition-all active:scale-[0.99] space-y-3 min-h-[176px] h-full flex flex-col justify-between ${
         isDark
           ? 'bg-white/[0.02] border-white/[0.06] hover:border-teal-500/40 hover:bg-white/[0.04]'
           : concluida
@@ -442,7 +442,7 @@ export default function FilaCotacoes() {
           <p className="text-sm font-medium">Nenhuma cotação nesta etapa</p>
         </div>
       ) : viewMode === 'cards' ? (
-        <div className="p-1 space-y-2">
+        <div className="grid gap-4 p-4 md:grid-cols-2">
           {activeItems.map(cot => <CotCard key={cot.id} cot={cot} isDark={isDark} onClick={() => setDetail(cot)} />)}
         </div>
       ) : (
