@@ -6,7 +6,7 @@ import {
   Building2, User, XCircle, AlertTriangle,
 } from 'lucide-react'
 import { useSolicitacoes, useSolicitacoesDashboard, useAssinaturasAll } from '../../hooks/useSolicitacoes'
-import type { EtapaSolicitacao, Solicitacao, Assinatura } from '../../types/contratos'
+import type { EtapaSolicitacao, Solicitacao, Assinatura, Signatario } from '../../types/contratos'
 
 // ── Pipeline stages ─────────────────────────────────────────────────────────
 
@@ -39,6 +39,34 @@ const fmt = (v: number) =>
 
 const fmtData = (d: string) =>
   new Date(d).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit' })
+
+function normalizeSignatarios(value: Assinatura['signatarios'] | string | null | undefined): Signatario[] {
+  if (Array.isArray(value)) return value.filter(Boolean)
+
+  if (typeof value === 'string' && value.trim()) {
+    try {
+      const parsed = JSON.parse(value)
+      return Array.isArray(parsed) ? parsed.filter(Boolean) : []
+    } catch {
+      return []
+    }
+  }
+
+  return []
+}
+
+function getAssinaturaNormalizada(assinatura: Assinatura | null): Assinatura | null {
+  if (!assinatura) return null
+  return {
+    ...assinatura,
+    signatarios: normalizeSignatarios(assinatura.signatarios),
+  }
+}
+
+function getPrimeiroNome(nome?: string | null) {
+  if (!nome) return 'Assinante'
+  return nome.trim().split(/\s+/)[0] || 'Assinante'
+}
 
 // ── Sort ────────────────────────────────────────────────────────────────────
 
@@ -107,7 +135,11 @@ export default function AssinaturaPipeline() {
   // Build unified items list
   const allItems = useMemo(() => {
     const assMap = new Map<string, Assinatura>()
-    assinaturas.forEach(a => { if (a.solicitacao_id) assMap.set(a.solicitacao_id, a) })
+    assinaturas.forEach(a => {
+      if (a.solicitacao_id && !assMap.has(a.solicitacao_id)) {
+        assMap.set(a.solicitacao_id, getAssinaturaNormalizada(a)!)
+      }
+    })
 
     const toItem = (s: Solicitacao, stageKey: StageKey): DisplayItem => ({
       id: s.id,
@@ -314,7 +346,7 @@ export default function AssinaturaPipeline() {
                               'bg-slate-50 text-slate-600 border-slate-200'
                             }`}>
                               <User size={8} />
-                              {sig.nome.split(' ')[0]}
+                              {getPrimeiroNome(sig.nome)}
                               {sig.status === 'assinado' && <CheckCircle2 size={8} className="text-emerald-500" />}
                             </span>
                           ))}
@@ -374,7 +406,7 @@ export default function AssinaturaPipeline() {
                       'bg-slate-50 text-slate-600 border-slate-200'
                     }`}>
                       <User size={8} />
-                      {sig.nome.split(' ')[0]}
+                      {getPrimeiroNome(sig.nome)}
                       {sig.status === 'assinado' && <CheckCircle2 size={8} className="text-emerald-500" />}
                       {sig.status === 'recusado' && <XCircle size={8} className="text-red-400" />}
                     </span>
