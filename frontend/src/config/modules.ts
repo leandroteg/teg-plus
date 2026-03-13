@@ -2,7 +2,7 @@ import {
   LayoutDashboard, PlusCircle, List, ShoppingCart, Truck, User,
   Receipt, DollarSign, FileCheck2, Landmark, BarChart3, Users, Settings,
   Package2, ArrowLeftRight, ClipboardList,
-  CheckCircle2, Building2,
+  CheckCircle2,
   Car, Wrench, ClipboardCheck, Fuel, Radio,
   FileText, FilePlus, CalendarDays,
   ImagePlay,
@@ -82,7 +82,6 @@ export const LOGISTICA_CONFIG: ModuleMeta = {
     { to: '/logistica/expedicao',       icon: Package2,        label: 'Expedição',       end: false },
     { to: '/logistica/transportes',     icon: Truck,           label: 'Transportes',     end: false },
     { to: '/logistica/recebimentos',    icon: CheckCircle2,    label: 'Recebimentos',    end: false },
-    { to: '/logistica/transportadoras', icon: Building2,       label: 'Transportadoras', end: false },
   ],
 }
 

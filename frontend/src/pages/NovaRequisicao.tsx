@@ -378,28 +378,28 @@ export default function NovaRequisicao() {
 
         {/* Selected Category Details */}
         {categoria && (
-          <div className="border-t border-teal-100 bg-gradient-to-b from-teal-50/80 to-teal-50/30 px-4 py-3 space-y-2.5">
+          <div className="border-t border-teal-100 bg-teal-50 px-4 py-3 space-y-2.5">
             <p className="text-[10px] font-black text-teal-600 uppercase tracking-wider">Fluxo desta Categoria</p>
             <div className="grid grid-cols-2 gap-y-2 text-xs">
               <div>
                 <span className="text-teal-500">Comprador</span>
-                <p className="font-bold text-slate-800">{categoria.comprador_nome ?? '—'}</p>
+                <p className="font-bold text-slate-700">{categoria.comprador_nome ?? '—'}</p>
               </div>
               <div>
                 <span className="text-teal-500">Aprovação ≤R$2k</span>
-                <p className="font-bold text-slate-800">{categoria.alcada1_aprovador ?? 'Welton'}</p>
+                <p className="font-bold text-slate-700">{categoria.alcada1_aprovador ?? 'Welton'}</p>
               </div>
               <div>
                 <span className="text-teal-500">Aprovação &gt;R$2k</span>
-                <p className="font-bold text-slate-800">Laucídio</p>
+                <p className="font-bold text-slate-700">Laucídio</p>
               </div>
               <div>
                 <span className="text-teal-500">Cotações mínimas</span>
-                <p className="font-bold text-slate-800">≤R$500: 1 · ≤R$2k: 2 · &gt;R$2k: 3</p>
+                <p className="font-bold text-slate-700">≤R$500: 1 · ≤R$2k: 2 · &gt;R$2k: 3</p>
               </div>
             </div>
             {categoria.politica_resumo && (
-              <div className="bg-white/80 rounded-xl p-2.5 border border-teal-100">
+              <div className="bg-white rounded-xl p-2.5 border border-teal-100">
                 <p className="text-[11px] text-slate-600 leading-relaxed">
                   <span className="font-bold text-teal-700">Política: </span>{categoria.politica_resumo}
                 </p>

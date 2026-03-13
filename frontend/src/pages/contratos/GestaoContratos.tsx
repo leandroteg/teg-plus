@@ -29,13 +29,13 @@ const fmtPct = (v: number) =>
 // ── Tabs ────────────────────────────────────────────────────────────────────
 type Tab = 'contratos' | 'aditivos' | 'reajustes' | 'vencimentos' | 'recebiveis' | 'provisionado'
 
-const TABS: { key: Tab; label: string; icon: typeof FileText }[] = [
-  { key: 'contratos',    label: 'Contratos',    icon: FileText },
-  { key: 'recebiveis',   label: 'Recebiveis',   icon: Banknote },
-  { key: 'provisionado', label: 'Provisionado', icon: CreditCard },
-  { key: 'aditivos',     label: 'Aditivos',     icon: FileSignature },
-  { key: 'reajustes',    label: 'Reajustes',    icon: TrendingUp },
-  { key: 'vencimentos',  label: 'Vencimentos',  icon: CalendarClock },
+const TABS: { key: Tab; label: string; icon: typeof FileText; border: string; bg: string; text: string; dot: string }[] = [
+  { key: 'contratos',    label: 'Contratos',    icon: FileText,      border: 'border-l-indigo-500',  bg: 'bg-indigo-50',  text: 'text-indigo-700',  dot: 'bg-indigo-500' },
+  { key: 'recebiveis',   label: 'Recebíveis',   icon: Banknote,      border: 'border-l-emerald-500', bg: 'bg-emerald-50', text: 'text-emerald-700', dot: 'bg-emerald-500' },
+  { key: 'provisionado', label: 'Provisionado', icon: CreditCard,    border: 'border-l-amber-500',   bg: 'bg-amber-50',  text: 'text-amber-700',   dot: 'bg-amber-500' },
+  { key: 'aditivos',     label: 'Aditivos',     icon: FileSignature, border: 'border-l-violet-500',  bg: 'bg-violet-50', text: 'text-violet-700',  dot: 'bg-violet-500' },
+  { key: 'reajustes',    label: 'Reajustes',    icon: TrendingUp,    border: 'border-l-cyan-500',    bg: 'bg-cyan-50',   text: 'text-cyan-700',    dot: 'bg-cyan-500' },
+  { key: 'vencimentos',  label: 'Vencimentos',  icon: CalendarClock, border: 'border-l-red-500',     bg: 'bg-red-50',    text: 'text-red-700',     dot: 'bg-red-500' },
 ]
 
 // ── Status configs ──────────────────────────────────────────────────────────
@@ -338,9 +338,9 @@ function TabContratos() {
   )
 
   const FILTROS_STATUS = [
-    { label: 'Todos', value: '' }, { label: 'Vigentes', value: 'vigente' },
-    { label: 'Assinados', value: 'assinado' }, { label: 'Em Negociacao', value: 'em_negociacao' },
-    { label: 'Encerrados', value: 'encerrado' },
+    { label: 'Todos', value: '' }, { label: 'Ativo', value: 'vigente' },
+    { label: 'Assinado', value: 'assinado' }, { label: 'Suspenso', value: 'suspenso' },
+    { label: 'Concluído', value: 'encerrado' }, { label: 'Rescindido', value: 'rescindido' },
   ]
   const FILTROS_TIPO = [
     { label: 'Todos', value: '' }, { label: 'Receita', value: 'receita' }, { label: 'Despesa', value: 'despesa' },
@@ -1096,17 +1096,19 @@ export default function GestaoContratos() {
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-1 bg-slate-100 rounded-2xl p-1">
+      <div className="flex items-center gap-1 overflow-x-auto hide-scrollbar pb-0.5">
         {TABS.map(t => {
           const Icon = t.icon
           const active = tab === t.key
           return (
             <button key={t.key} onClick={() => setTab(t.key)}
-              className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-xs font-bold transition-all
-                ${active
-                  ? 'bg-white text-indigo-600 shadow-sm'
-                  : 'text-slate-500 hover:text-slate-700'}`}>
-              <Icon size={13} />
+              className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs whitespace-nowrap transition-all shrink-0 ${
+                active
+                  ? `${t.bg} ${t.text} font-bold shadow-sm ring-1 ${t.border.replace('border-l-', 'ring-')}`
+                  : `bg-slate-50 text-slate-500 font-medium`
+              }`}
+            >
+              <Icon size={13} className="shrink-0" />
               {t.label}
             </button>
           )

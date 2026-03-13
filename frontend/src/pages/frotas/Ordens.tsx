@@ -18,10 +18,10 @@ import type {
 const BRL = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
 
 const PRIORIDADE_CFG: Record<PrioridadeOS, { label: string; cls: string }> = {
-  critica: { label: 'CRITICA', cls: 'bg-red-500/15 text-red-300 border-red-500/30' },
-  alta:    { label: 'ALTA',    cls: 'bg-orange-500/15 text-orange-300 border-orange-500/30' },
-  media:   { label: 'MEDIA',   cls: 'bg-amber-500/15 text-amber-300 border-amber-500/30' },
-  baixa:   { label: 'BAIXA',   cls: 'bg-slate-500/10 text-slate-400 border-slate-500/20' },
+  critica: { label: 'CRITICA', cls: 'bg-red-500/15 text-red-700 dark:text-red-300 border-red-500/30' },
+  alta:    { label: 'ALTA',    cls: 'bg-orange-500/15 text-orange-700 dark:text-orange-300 border-orange-500/30' },
+  media:   { label: 'MEDIA',   cls: 'bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-500/30' },
+  baixa:   { label: 'BAIXA',   cls: 'bg-slate-500/10 text-slate-600 dark:text-slate-400 border-slate-500/20' },
 }
 
 const TIPO_LABEL: Record<TipoOS, string> = {

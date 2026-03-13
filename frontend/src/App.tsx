@@ -122,6 +122,7 @@ import Configuracoes from './pages/financeiro/Configuracoes'
 
 // Módulo Fiscal
 import FiscalLayout from './components/FiscalLayout'
+import PainelFiscal from './pages/fiscal/PainelFiscal'
 import NotasFiscais from './pages/financeiro/NotasFiscais'
 import FiscalPipeline from './pages/fiscal/FiscalPipeline'
 
@@ -143,7 +144,6 @@ import LogisticaHome from './pages/logistica/LogisticaHome'
 import SolicitacoesPipeline from './pages/logistica/SolicitacoesPipeline'
 import ExpedicaoPipeline from './pages/logistica/ExpedicaoPipeline'
 import TransportesPipeline from './pages/logistica/TransportesPipeline'
-import TransportadorasLog from './pages/logistica/Transportadoras'
 
 // Módulo Frotas
 import FrotasLayout from './components/FrotasLayout'
@@ -202,8 +202,9 @@ export default function App() {
           {/* Módulo Fiscal */}
           <Route element={<ModuleRoute moduleKey="fiscal" />}>
             <Route element={<FiscalLayout />}>
-              <Route path="/fiscal"              element={<NotasFiscais />} />
+              <Route path="/fiscal"              element={<PainelFiscal />} />
               <Route path="/fiscal/pipeline"     element={<FiscalPipeline />} />
+              <Route path="/fiscal/historico"    element={<NotasFiscais />} />
             </Route>
           </Route>
 
@@ -226,7 +227,6 @@ export default function App() {
               <Route path="/logistica/solicitacoes"      element={<SolicitacoesPipeline />} />
               <Route path="/logistica/expedicao"         element={<ExpedicaoPipeline />} />
               <Route path="/logistica/transportes"       element={<TransportesPipeline />} />
-              <Route path="/logistica/transportadoras"   element={<TransportadorasLog />} />
             </Route>
           </Route>
 

@@ -5,7 +5,7 @@ import {
   XCircle, AlertTriangle, ChevronRight, Send,
   Archive, Unlock, Ban, Eye, Pencil, Building2, Calendar,
   DollarSign, User, Briefcase, Tag, ShieldCheck, Info, PenTool, X,
-  Plus, Trash2, Users,
+  Plus, Trash2, Users, Upload, FileCheck2,
 } from 'lucide-react'
 import {
   useSolicitacao,
@@ -13,6 +13,7 @@ import {
   useAvancarEtapa,
   useCancelarSolicitacao,
   useEnviarAssinatura,
+  useConfirmarAssinatura,
   useMinutas,
 } from '../../hooks/useSolicitacoes'
 import type { EtapaSolicitacao, Solicitacao, TipoAssinatura } from '../../types/contratos'
@@ -259,7 +260,7 @@ function CertisignModal({ open, onClose, solicitacao, minutaUrl, onSuccess }: {
   onClose: () => void
   solicitacao: Solicitacao
   minutaUrl: string | null
-  onSuccess: () => void
+  onSuccess: () => void | Promise<void>
 }) {
   const [signatarios, setSignatarios] = useState<{ nome: string; email: string; cpf: string; papel: string }[]>([
     { nome: '', email: '', cpf: '', papel: 'Contratante' },
@@ -292,7 +293,8 @@ function CertisignModal({ open, onClose, solicitacao, minutaUrl, onSuccess }: {
         tipo_assinatura: tipoAssinatura,
         signatarios: signatarios.map(s => ({ nome: s.nome, email: s.email, cpf: s.cpf, papel: s.papel })),
       })
-      onSuccess()
+      // Avançar etapa ANTES de fechar o modal — await garante que erros sejam capturados
+      await onSuccess()
       onClose()
     } catch (e: unknown) {
       setErro(e instanceof Error ? e.message : 'Erro desconhecido ao enviar.')
@@ -432,14 +434,139 @@ function CertisignModal({ open, onClose, solicitacao, minutaUrl, onSuccess }: {
   )
 }
 
+// ── Confirmar Assinatura Modal (manual / externo) ───────────────────────────────
+
+function ConfirmarAssinaturaModal({ open, onClose, solicitacaoId, onSuccess }: {
+  open: boolean
+  onClose: () => void
+  solicitacaoId: string
+  onSuccess: () => void | Promise<void>
+}) {
+  const [arquivo, setArquivo] = useState<File | null>(null)
+  const [observacao, setObservacao] = useState('')
+  const [erro, setErro] = useState<string | null>(null)
+  const confirmar = useConfirmarAssinatura()
+
+  if (!open) return null
+
+  const handleSubmit = async () => {
+    setErro(null)
+    try {
+      await confirmar.mutateAsync({
+        solicitacao_id: solicitacaoId,
+        arquivo: arquivo ?? undefined,
+        observacao: observacao || undefined,
+      })
+      await onSuccess()
+      onClose()
+    } catch (e: unknown) {
+      setErro(e instanceof Error ? e.message : 'Erro desconhecido.')
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div className="fixed inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-lg p-6 space-y-5 animate-in fade-in zoom-in-95 duration-200">
+        {/* Header */}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500 to-emerald-600 flex items-center justify-center shadow-sm">
+              <FileCheck2 size={18} className="text-white" />
+            </div>
+            <div>
+              <h3 className="text-base font-extrabold text-slate-800">Confirmar Assinatura</h3>
+              <p className="text-xs text-slate-400">Assinatura realizada fora do sistema ou via Certisign</p>
+            </div>
+          </div>
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-600 transition-colors">
+            <X size={18} />
+          </button>
+        </div>
+
+        {erro && (
+          <div className="bg-red-50 rounded-xl border border-red-200 px-4 py-3 flex items-start gap-2">
+            <AlertTriangle size={14} className="text-red-500 mt-0.5 shrink-0" />
+            <p className="text-xs text-red-700 font-medium">{erro}</p>
+          </div>
+        )}
+
+        {/* Upload cópia assinada */}
+        <div>
+          <label className="text-xs font-bold text-slate-600 mb-1.5 block">
+            Cópia Assinada (PDF)
+          </label>
+          <div className="relative">
+            <input
+              type="file"
+              accept=".pdf,.doc,.docx,.png,.jpg,.jpeg"
+              onChange={e => setArquivo(e.target.files?.[0] ?? null)}
+              className="w-full text-sm file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0
+                file:text-xs file:font-bold file:bg-emerald-50 file:text-emerald-700
+                hover:file:bg-emerald-100 file:cursor-pointer file:transition-colors
+                border border-slate-200 rounded-xl px-3 py-2"
+            />
+          </div>
+          {arquivo && (
+            <p className="text-[10px] text-emerald-600 font-medium mt-1.5 flex items-center gap-1">
+              <FileCheck2 size={10} /> {arquivo.name} ({(arquivo.size / 1024).toFixed(0)} KB)
+            </p>
+          )}
+          <p className="text-[10px] text-slate-400 mt-1">
+            Opcional — anexe a cópia assinada do contrato (PDF, DOC ou imagem)
+          </p>
+        </div>
+
+        {/* Observação */}
+        <div>
+          <label className="text-xs font-bold text-slate-600 mb-1.5 block">Observação</label>
+          <textarea
+            value={observacao}
+            onChange={e => setObservacao(e.target.value)}
+            placeholder="Ex: Assinado presencialmente em reunião, assinado via DocuSign, etc."
+            rows={2}
+            className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm
+              focus:outline-none focus:ring-2 focus:ring-emerald-500/30 resize-none"
+          />
+        </div>
+
+        {/* Actions */}
+        <div className="flex gap-3 pt-2">
+          <button
+            onClick={onClose}
+            className="flex-1 py-2.5 rounded-xl border border-slate-200 text-sm font-semibold
+              text-slate-600 hover:bg-slate-50 transition-all"
+          >
+            Cancelar
+          </button>
+          <button
+            onClick={handleSubmit}
+            disabled={confirmar.isPending}
+            className="flex-1 py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-emerald-600
+              text-white text-sm font-semibold shadow-sm
+              hover:from-emerald-600 hover:to-emerald-700 transition-all disabled:opacity-50
+              flex items-center justify-center gap-2"
+          >
+            {confirmar.isPending
+              ? <div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+              : <CheckCircle2 size={14} />}
+            Confirmar Assinatura
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ── Etapa Actions ───────────────────────────────────────────────────────────────
 
-function EtapaActions({ etapa, solicitacaoId, onAvancar, onCancel, onEnviarAssinatura, isPending, nav }: {
+function EtapaActions({ etapa, solicitacaoId, onAvancar, onCancel, onEnviarAssinatura, onConfirmarAssinatura, isPending, nav }: {
   etapa: EtapaSolicitacao
   solicitacaoId: string
   onAvancar: (etapaPara: EtapaSolicitacao, obs?: string) => void
   onCancel: () => void
   onEnviarAssinatura: () => void
+  onConfirmarAssinatura: () => void
   isPending: boolean
   nav: ReturnType<typeof useNavigate>
 }) {
@@ -536,7 +663,14 @@ function EtapaActions({ etapa, solicitacaoId, onAvancar, onCancel, onEnviarAssin
             className={`${btnPrimary} bg-gradient-to-r from-teal-500 to-teal-600 text-white
               hover:from-teal-600 hover:to-teal-700 shadow-sm`}
           >
-            <PenTool size={13} /> Enviar para Assinatura
+            <PenTool size={13} /> Enviar via Certisign
+          </button>
+          <button
+            onClick={onConfirmarAssinatura}
+            className={`${btnPrimary} bg-gradient-to-r from-emerald-500 to-emerald-600 text-white
+              hover:from-emerald-600 hover:to-emerald-700 shadow-sm`}
+          >
+            <FileCheck2 size={13} /> Assinatura Confirmada
           </button>
           <button
             onClick={() => onAvancar('arquivar')}
@@ -599,6 +733,7 @@ export default function SolicitacaoDetalhe() {
 
   const [showCancelModal, setShowCancelModal] = useState(false)
   const [showCertisignModal, setShowCertisignModal] = useState(false)
+  const [showConfirmarAssinaturaModal, setShowConfirmarAssinaturaModal] = useState(false)
 
   // ── Loading ────────────────────────────────────────────────────────────
   if (isLoading) {
@@ -832,6 +967,7 @@ export default function SolicitacaoDetalhe() {
                   onAvancar={handleAvancar}
                   onCancel={() => setShowCancelModal(true)}
                   onEnviarAssinatura={() => setShowCertisignModal(true)}
+                  onConfirmarAssinatura={() => setShowConfirmarAssinaturaModal(true)}
                   isPending={avancarEtapa.isPending}
                   nav={nav}
                 />
@@ -920,6 +1056,14 @@ export default function SolicitacaoDetalhe() {
         onClose={() => setShowCertisignModal(false)}
         solicitacao={solicitacao}
         minutaUrl={minutas?.find(m => m.arquivo_url)?.arquivo_url ?? null}
+        onSuccess={() => handleAvancar('arquivar')}
+      />
+
+      {/* ── Confirmar Assinatura Modal ─────────────────────────────────── */}
+      <ConfirmarAssinaturaModal
+        open={showConfirmarAssinaturaModal}
+        onClose={() => setShowConfirmarAssinaturaModal(false)}
+        solicitacaoId={s.id}
         onSuccess={() => handleAvancar('arquivar')}
       />
     </div>

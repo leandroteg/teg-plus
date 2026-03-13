@@ -4,7 +4,7 @@ import {
   Receipt, Search, Calendar, AlertTriangle,
   CheckCircle2, Clock, FileText, RefreshCw, Zap, XCircle,
   ChevronDown, ChevronUp, Upload, Paperclip, ExternalLink, Banknote, X,
-  ShieldCheck, Building2, Tag, Briefcase, Hash,
+  ShieldCheck, Building2, Tag, Briefcase, Hash, Truck, Package,
 } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
 import { useContasPagar, useMarcarCPPago, useAprovarPagamento, useFornecedorById } from '../../hooks/useFinanceiro'
@@ -434,6 +434,17 @@ function CPCard({ cp, onRegistrarPgto, onAprovarPgto, isDark }: {
                 <span className={`w-1.5 h-1.5 rounded-full ${cfg?.dot}`} />
                 {cfg?.label ?? cp.status}
               </span>
+              {/* Origem badge */}
+              {cp.origem === 'logistica' && (
+                <span className="inline-flex items-center gap-0.5 bg-purple-50 text-purple-600 font-semibold rounded-full px-2 py-0.5">
+                  <Truck size={9} /> Logística
+                </span>
+              )}
+              {cp.origem === 'compras' && pedidoNum && (
+                <span className="inline-flex items-center gap-0.5 bg-sky-50 text-sky-600 font-semibold rounded-full px-2 py-0.5">
+                  <Package size={9} /> Compras
+                </span>
+              )}
               {pedidoNum && cp.pedido_id && (
                 <button
                   onClick={(e) => { e.stopPropagation(); nav(`/pedidos?pedido=${cp.pedido_id}`) }}
@@ -455,6 +466,18 @@ function CPCard({ cp, onRegistrarPgto, onAprovarPgto, isDark }: {
             {/* Descrição */}
             {cp.descricao && (
               <p className="text-[11px] text-slate-500 mt-1.5 line-clamp-1">{cp.descricao}</p>
+            )}
+
+            {/* Observações / Alerta de divergência */}
+            {cp.observacoes && (
+              <div className={`flex items-start gap-1.5 mt-1.5 px-2 py-1 rounded-lg text-[10px] ${
+                cp.observacoes.includes('Divergência')
+                  ? 'bg-amber-50 border border-amber-200 text-amber-700'
+                  : isDark ? 'bg-white/[0.04] text-slate-400' : 'bg-slate-50 text-slate-500'
+              }`}>
+                {cp.observacoes.includes('Divergência') && <AlertTriangle size={11} className="text-amber-500 shrink-0 mt-0.5" />}
+                <span className="font-medium">{cp.observacoes}</span>
+              </div>
             )}
 
             {/* Detalhes: obra, categoria, classe, CC */}
@@ -540,11 +563,25 @@ function CPCard({ cp, onRegistrarPgto, onAprovarPgto, isDark }: {
       {/* Expanded: Details + Attachments */}
       {expanded && (
         <div className={`border-t px-4 pb-4 pt-3 space-y-3 ${isDark ? 'border-white/[0.06]' : 'border-slate-100'}`}>
-          {/* Detalhes do pedido/requisição */}
-          {(pedidoNum || reqNum || obraNome || centroCusto || classeFinanceira) && (
+          {/* Detalhes do pedido/requisição ou logística */}
+          {(pedidoNum || reqNum || obraNome || centroCusto || classeFinanceira || cp.origem === 'logistica') && (
             <div className={`rounded-xl p-3 space-y-1.5 ${isDark ? 'bg-white/[0.04]' : 'bg-slate-50'}`}>
-              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Detalhes</p>
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
+                {cp.origem === 'logistica' ? <><Truck size={10} className="text-purple-500" /> Origem: Logística</> : 'Detalhes'}
+              </p>
               <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-[11px]">
+                {cp.origem === 'logistica' && cp.descricao && (
+                  <div className="col-span-2">
+                    <span className="text-slate-400">Descrição:</span>{' '}
+                    <span className="font-semibold text-slate-700">{cp.descricao}</span>
+                  </div>
+                )}
+                {cp.natureza && cp.origem === 'logistica' && (
+                  <div>
+                    <span className="text-slate-400">Natureza:</span>{' '}
+                    <span className="font-semibold text-purple-600">{cp.natureza}</span>
+                  </div>
+                )}
                 {pedidoNum && cp.pedido_id && (
                   <div>
                     <span className="text-slate-400">Pedido:</span>{' '}
@@ -577,7 +614,29 @@ function CPCard({ cp, onRegistrarPgto, onAprovarPgto, isDark }: {
                 {cp.numero_documento && (
                   <div><span className="text-slate-400">Doc:</span> <span className="font-mono text-slate-600">{cp.numero_documento}</span></div>
                 )}
+                {cp.data_emissao && (
+                  <div><span className="text-slate-400">Emissão:</span> <span className="font-medium text-slate-600">{fmtData(cp.data_emissao)}</span></div>
+                )}
               </div>
+            </div>
+          )}
+
+          {/* Observações expandidas */}
+          {cp.observacoes && (
+            <div className={`rounded-xl p-3 space-y-1 ${
+              cp.observacoes.includes('Divergência')
+                ? 'bg-amber-50 border border-amber-200'
+                : isDark ? 'bg-white/[0.04]' : 'bg-slate-50'
+            }`}>
+              <p className={`text-[10px] font-bold uppercase tracking-wider flex items-center gap-1.5 ${
+                cp.observacoes.includes('Divergência') ? 'text-amber-600' : 'text-slate-400'
+              }`}>
+                {cp.observacoes.includes('Divergência') && <AlertTriangle size={10} />}
+                Observações
+              </p>
+              <p className={`text-[11px] font-medium ${
+                cp.observacoes.includes('Divergência') ? 'text-amber-700' : isDark ? 'text-slate-300' : 'text-slate-600'
+              }`}>{cp.observacoes}</p>
             </div>
           )}
 
@@ -651,11 +710,15 @@ export default function ContasPagar() {
     })
   }
 
-  const filtered = contas.filter(cp =>
-    !busca || cp.fornecedor_nome.toLowerCase().includes(busca.toLowerCase())
-      || cp.descricao?.toLowerCase().includes(busca.toLowerCase())
-      || cp.numero_documento?.toLowerCase().includes(busca.toLowerCase())
-  )
+  const filtered = contas.filter(cp => {
+    if (!busca) return true
+    const b = busca.toLowerCase()
+    return cp.fornecedor_nome.toLowerCase().includes(b)
+      || cp.descricao?.toLowerCase().includes(b)
+      || cp.numero_documento?.toLowerCase().includes(b)
+      || cp.observacoes?.toLowerCase().includes(b)
+      || cp.origem?.toLowerCase().includes(b)
+  })
 
   const totalAberto = filtered
     .filter(cp => !['pago', 'conciliado', 'cancelado'].includes(cp.status))

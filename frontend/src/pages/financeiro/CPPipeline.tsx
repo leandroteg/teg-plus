@@ -2,7 +2,7 @@ import { useState, useMemo, useCallback } from 'react'
 import {
   Receipt, Search, Calendar, AlertTriangle, CheckCircle2, Clock,
   FileText, ChevronDown, ChevronUp, Banknote, X, ShieldCheck,
-  Building2, Tag, Briefcase, Hash, Layers,
+  Building2, Tag, Briefcase, Hash, Layers, Truck, Package,
   Paperclip, ExternalLink, Download, ArrowUpDown, LayoutList,
   LayoutGrid, Filter, SortAsc, SortDesc, ArrowDown, ArrowUp,
 } from 'lucide-react'
@@ -207,10 +207,32 @@ function CPDetailModal({ cp, onClose, onAction, isDark }: {
             </span>
           </div>
 
+          {/* Origem badge */}
+          {cp.origem === 'logistica' && (
+            <div className="flex items-center gap-2 bg-purple-50 border border-purple-200 rounded-xl px-3 py-2">
+              <Truck size={14} className="text-purple-500 shrink-0" />
+              <p className="text-xs text-purple-700 font-semibold">Origem: Logística</p>
+            </div>
+          )}
+          {cp.origem === 'compras' && (
+            <div className="flex items-center gap-2 bg-sky-50 border border-sky-200 rounded-xl px-3 py-2">
+              <Package size={14} className="text-sky-500 shrink-0" />
+              <p className="text-xs text-sky-700 font-semibold">Origem: Compras</p>
+            </div>
+          )}
+
           {urgency === 'overdue' && (
             <div className="flex items-center gap-2 bg-red-50 border border-red-200 rounded-xl px-3 py-2">
               <AlertTriangle size={14} className="text-red-500 shrink-0" />
               <p className="text-xs text-red-700 font-semibold">Vencido em {fmtData(cp.data_vencimento)}</p>
+            </div>
+          )}
+
+          {/* Alerta de divergência */}
+          {cp.observacoes && cp.observacoes.includes('Divergência') && (
+            <div className="flex items-center gap-2 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2">
+              <AlertTriangle size={14} className="text-amber-500 shrink-0" />
+              <p className="text-xs text-amber-700 font-semibold">{cp.observacoes}</p>
             </div>
           )}
 
@@ -235,6 +257,9 @@ function CPDetailModal({ cp, onClose, onAction, isDark }: {
               {cp.aprovado_por && <div><span className="text-slate-400">Aprovado por:</span> <span className="font-semibold">{cp.aprovado_por}</span></div>}
             </div>
             {cp.descricao && <p className="text-xs text-slate-500 mt-2 pt-2 border-t border-slate-200">{cp.descricao}</p>}
+            {cp.observacoes && !cp.observacoes.includes('Divergência') && (
+              <p className="text-xs text-slate-400 mt-1 italic">{cp.observacoes}</p>
+            )}
           </div>
 
           {cp.fornecedor_id && <FornecedorBankInfo fornecedorId={cp.fornecedor_id} isDark={isDark} />}
@@ -332,6 +357,17 @@ function CPRow({ cp, onClick, isDark, isSelected, onSelect }: {
         {cp.fornecedor_nome}
       </span>
 
+      {cp.origem === 'logistica' && (
+        <span className="inline-flex items-center gap-0.5 bg-purple-50 text-purple-600 text-[9px] font-semibold rounded-full px-1.5 py-0.5 shrink-0">
+          <Truck size={8} /> Log
+        </span>
+      )}
+      {cp.origem === 'compras' && pedidoNum && (
+        <span className="inline-flex items-center gap-0.5 bg-sky-50 text-sky-600 text-[9px] font-semibold rounded-full px-1.5 py-0.5 shrink-0">
+          <Package size={8} /> Cmp
+        </span>
+      )}
+
       <span className={`text-[11px] truncate w-[150px] shrink-0 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
         {cp.descricao || '—'}
       </span>
@@ -412,12 +448,38 @@ function CPCard({ cp, onClick, isDark, isSelected, onSelect }: {
         </p>
       </div>
 
-      {/* Linha 2: descrição */}
+      {/* Linha 2: origem badges */}
+      <div className="flex flex-wrap items-center gap-1.5 mt-1.5 ml-10">
+        {cp.origem === 'logistica' && (
+          <span className="inline-flex items-center gap-0.5 bg-purple-50 text-purple-600 text-[10px] font-semibold rounded-full px-2 py-0.5">
+            <Truck size={9} /> Logística
+          </span>
+        )}
+        {cp.origem === 'compras' && pedidoNum && (
+          <span className="inline-flex items-center gap-0.5 bg-sky-50 text-sky-600 text-[10px] font-semibold rounded-full px-2 py-0.5">
+            <Package size={9} /> Compras
+          </span>
+        )}
+      </div>
+
+      {/* Linha 3: descrição */}
       {cp.descricao && (
-        <p className={`text-xs truncate mt-1.5 ml-10 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{cp.descricao}</p>
+        <p className={`text-xs truncate mt-1 ml-10 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{cp.descricao}</p>
       )}
 
-      {/* Linha 3: tags + data */}
+      {/* Observações / Alerta de divergência */}
+      {cp.observacoes && (
+        <div className={`flex items-start gap-1.5 mt-1.5 ml-10 px-2 py-1 rounded-lg text-[10px] ${
+          cp.observacoes.includes('Divergência')
+            ? 'bg-amber-50 border border-amber-200 text-amber-700'
+            : isDark ? 'bg-white/[0.04] text-slate-400' : 'bg-slate-50 text-slate-500'
+        }`}>
+          {cp.observacoes.includes('Divergência') && <AlertTriangle size={11} className="text-amber-500 shrink-0 mt-0.5" />}
+          <span className="font-medium">{cp.observacoes}</span>
+        </div>
+      )}
+
+      {/* Linha 4: tags + data */}
       <div className="flex items-center justify-between mt-2 ml-10">
         <div className="flex flex-wrap items-center gap-1.5 min-w-0">
           {obraNome && (
@@ -500,6 +562,8 @@ export default function CPPipeline() {
         || cp.requisicao?.obra_nome?.toLowerCase().includes(q)
         || cp.pedido?.numero_pedido?.toLowerCase().includes(q)
         || cp.natureza?.toLowerCase().includes(q)
+        || cp.observacoes?.toLowerCase().includes(q)
+        || cp.origem?.toLowerCase().includes(q)
       )
     }
 

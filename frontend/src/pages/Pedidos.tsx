@@ -65,13 +65,13 @@ const PIPELINE_STAGES: {
     key: 'entregue',
     label: 'Entregue',
     icon: BoxIcon,
-    matchFn: p => p.status === 'entregue' || p.status === 'parcialmente_recebido',
+    matchFn: p => (p.status === 'entregue' || p.status === 'parcialmente_recebido') && (p as any).status_pagamento !== 'liberado' && (p as any).status_pagamento !== 'pago',
   },
   {
     key: 'liberado',
     label: 'Liberado p/ Pgto',
     icon: CreditCard,
-    matchFn: p => (p as any).status_pagamento === 'liberado',
+    matchFn: p => (p as any).status_pagamento === 'liberado' && (p as any).status_pagamento !== 'pago',
   },
   {
     key: 'encerrado',
