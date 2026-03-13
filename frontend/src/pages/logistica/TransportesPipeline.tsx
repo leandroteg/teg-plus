@@ -48,20 +48,20 @@ const STATUS_ICONS: Record<string, typeof Truck> = {
   concluido:         CheckCircle2,
 }
 
-const STATUS_ACCENT: Record<string, { bg: string; bgActive: string; text: string; textActive: string; dot: string; border: string }> = {
-  nfe_emitida:       { bg: 'hover:bg-slate-50',    bgActive: 'bg-slate-100',    text: 'text-slate-600',   textActive: 'text-slate-800',   dot: 'bg-slate-400',    border: 'border-slate-400' },
-  aguardando_coleta: { bg: 'hover:bg-blue-50',     bgActive: 'bg-blue-50',      text: 'text-blue-600',    textActive: 'text-blue-800',    dot: 'bg-blue-500',     border: 'border-blue-500' },
-  em_transito:       { bg: 'hover:bg-amber-50',    bgActive: 'bg-amber-50',     text: 'text-amber-600',   textActive: 'text-amber-800',   dot: 'bg-amber-500',    border: 'border-amber-500' },
-  entregue:          { bg: 'hover:bg-teal-50',     bgActive: 'bg-teal-50',      text: 'text-teal-600',    textActive: 'text-teal-800',    dot: 'bg-teal-500',     border: 'border-teal-500' },
-  concluido:         { bg: 'hover:bg-green-50',    bgActive: 'bg-green-50',     text: 'text-green-600',   textActive: 'text-green-800',   dot: 'bg-green-500',    border: 'border-green-500' },
+const STATUS_ACCENT: Record<string, { bg: string; bgActive: string; text: string; textActive: string; dot: string; border: string; badge: string }> = {
+  nfe_emitida:       { bg: 'hover:bg-slate-50',    bgActive: 'bg-slate-100',    text: 'text-slate-600',   textActive: 'text-slate-800',   dot: 'bg-slate-400',    border: 'border-slate-400',    badge: 'bg-slate-200 text-slate-700' },
+  aguardando_coleta: { bg: 'hover:bg-blue-50',     bgActive: 'bg-blue-50',      text: 'text-blue-600',    textActive: 'text-blue-800',    dot: 'bg-blue-500',     border: 'border-blue-500',     badge: 'bg-blue-100 text-blue-700' },
+  em_transito:       { bg: 'hover:bg-amber-50',    bgActive: 'bg-amber-50',     text: 'text-amber-600',   textActive: 'text-amber-800',   dot: 'bg-amber-500',    border: 'border-amber-500',    badge: 'bg-amber-100 text-amber-700' },
+  entregue:          { bg: 'hover:bg-teal-50',     bgActive: 'bg-teal-50',      text: 'text-teal-600',    textActive: 'text-teal-800',    dot: 'bg-teal-500',     border: 'border-teal-500',     badge: 'bg-teal-100 text-teal-700' },
+  concluido:         { bg: 'hover:bg-green-50',    bgActive: 'bg-green-50',     text: 'text-green-600',   textActive: 'text-green-800',   dot: 'bg-green-500',    border: 'border-green-500',    badge: 'bg-green-100 text-green-700' },
 }
 
-const STATUS_ACCENT_DARK: Record<string, { bg: string; bgActive: string; text: string; textActive: string }> = {
-  nfe_emitida:       { bg: 'hover:bg-white/[0.03]', bgActive: 'bg-slate-500/10',  text: 'text-slate-400',  textActive: 'text-slate-200' },
-  aguardando_coleta: { bg: 'hover:bg-white/[0.03]', bgActive: 'bg-blue-500/10',   text: 'text-blue-400',   textActive: 'text-blue-300' },
-  em_transito:       { bg: 'hover:bg-white/[0.03]', bgActive: 'bg-amber-500/10',  text: 'text-amber-400',  textActive: 'text-amber-300' },
-  entregue:          { bg: 'hover:bg-white/[0.03]', bgActive: 'bg-teal-500/10',   text: 'text-teal-400',   textActive: 'text-teal-300' },
-  concluido:         { bg: 'hover:bg-white/[0.03]', bgActive: 'bg-green-500/10',  text: 'text-green-400',  textActive: 'text-green-300' },
+const STATUS_ACCENT_DARK: Record<string, { bg: string; bgActive: string; text: string; textActive: string; badge: string; border: string }> = {
+  nfe_emitida:       { bg: 'hover:bg-white/[0.03]', bgActive: 'bg-slate-500/10',  text: 'text-slate-400',  textActive: 'text-slate-200',  badge: 'bg-slate-500/20 text-slate-300',  border: 'border-slate-500/40' },
+  aguardando_coleta: { bg: 'hover:bg-white/[0.03]', bgActive: 'bg-blue-500/10',   text: 'text-blue-400',   textActive: 'text-blue-300',   badge: 'bg-blue-500/20 text-blue-300',   border: 'border-blue-500/40' },
+  em_transito:       { bg: 'hover:bg-white/[0.03]', bgActive: 'bg-amber-500/10',  text: 'text-amber-400',  textActive: 'text-amber-300',  badge: 'bg-amber-500/20 text-amber-300',  border: 'border-amber-500/40' },
+  entregue:          { bg: 'hover:bg-white/[0.03]', bgActive: 'bg-teal-500/10',   text: 'text-teal-400',   textActive: 'text-teal-300',   badge: 'bg-teal-500/20 text-teal-300',   border: 'border-teal-500/40' },
+  concluido:         { bg: 'hover:bg-white/[0.03]', bgActive: 'bg-green-500/10',  text: 'text-green-400',  textActive: 'text-green-300',  badge: 'bg-green-500/20 text-green-300',  border: 'border-green-500/40' },
 }
 
 // ── Export CSV ────────────────────────────────────────────────────────────────
@@ -611,7 +611,7 @@ export default function TransportesPipeline() {
       </div>
 
       {/* Horizontal Tabs */}
-      <div className="flex items-center gap-1 overflow-x-auto hide-scrollbar pb-0.5">
+      <div className={`flex gap-1 p-1 rounded-2xl border overflow-x-auto hide-scrollbar ${isDark ? 'bg-white/[0.02] border-white/[0.06]' : 'bg-slate-50 border-slate-200'}`}>
         {TRANSPORTE_PIPELINE_STAGES.map(stage => {
           const count = grouped.get(stage.status)?.length || 0
           const isActive = activeTab === stage.status
@@ -619,16 +619,20 @@ export default function TransportesPipeline() {
           const accent = isDark ? STATUS_ACCENT_DARK[stage.status] : STATUS_ACCENT[stage.status]
           return (
             <button key={stage.status} onClick={() => switchTab(stage.status)}
-              className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs whitespace-nowrap transition-all shrink-0 ${
+              className={`min-w-fit md:flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm whitespace-nowrap transition-all border ${
                 isActive
-                  ? `${accent?.bgActive} ${accent?.textActive} font-bold shadow-sm ${!isDark ? `ring-1 ${STATUS_ACCENT[stage.status]?.border?.replace('border-', 'ring-')}` : ''}`
-                  : `${accent?.bg} ${accent?.text} font-medium`
+                  ? isDark
+                    ? `${accent?.bgActive} ${accent?.textActive} ${STATUS_ACCENT_DARK[stage.status]?.border} font-bold shadow-sm`
+                    : `${accent?.bgActive} ${accent?.textActive} ${STATUS_ACCENT[stage.status]?.border} font-bold shadow-sm`
+                  : isDark
+                    ? `${accent?.bg} ${accent?.text} font-medium border-transparent`
+                    : `${accent?.bg} ${accent?.text} font-medium border-transparent hover:bg-white hover:shadow-sm`
               }`}>
-              <Icon size={13} className="shrink-0" />
+              <Icon size={15} className="shrink-0" />
               {stage.label}
               {count > 0 && (
-                <span className={`text-[10px] font-bold rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1 ${
-                  isActive ? isDark ? 'bg-white/10 text-white' : `${STATUS_ACCENT[stage.status]?.dot} text-white` : isDark ? 'bg-white/[0.06] text-slate-500' : 'bg-slate-200/80 text-slate-500'
+                <span className={`text-[10px] font-bold rounded-full min-w-[22px] px-1.5 py-0.5 flex items-center justify-center ${
+                  isActive ? isDark ? `${STATUS_ACCENT_DARK[stage.status]?.badge}` : `${STATUS_ACCENT[stage.status]?.badge}` : isDark ? 'bg-white/[0.06] text-slate-500' : 'bg-slate-200/80 text-slate-500'
                 }`}>{count}</span>
               )}
             </button>

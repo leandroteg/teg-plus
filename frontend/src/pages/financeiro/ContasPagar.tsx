@@ -4,7 +4,7 @@ import {
   Receipt, Search, Calendar, AlertTriangle,
   CheckCircle2, Clock, FileText, RefreshCw, Zap, XCircle,
   ChevronDown, ChevronUp, Upload, Paperclip, ExternalLink, Banknote, X,
-  ShieldCheck, Building2, Tag, Briefcase, Hash, Truck, Package,
+  ShieldCheck, Building2, Tag, Briefcase, Hash, Truck, Package, Layers,
 } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
 import { useContasPagar, useMarcarCPPago, useAprovarPagamento, useFornecedorById } from '../../hooks/useFinanceiro'
@@ -310,6 +310,16 @@ const FILTROS_STATUS: { label: string; value: string }[] = [
   { label: 'Pagos',           value: 'pago' },
   { label: 'Conciliados',     value: 'conciliado' },
 ]
+
+const STATUS_FILTER_META: Record<string, { icon: typeof Receipt; badge: string; badgeDark: string; border: string; borderDark: string; bgActive: string; bgActiveDark: string; textActive: string; textActiveDark: string }> = {
+  '':             { icon: Layers,       badge: 'bg-slate-200 text-slate-600',       badgeDark: 'bg-white/[0.08] text-slate-300',       border: 'border-slate-300',   borderDark: 'border-white/[0.08]',   bgActive: 'bg-slate-100',   bgActiveDark: 'bg-white/[0.06]',   textActive: 'text-slate-700',   textActiveDark: 'text-slate-200' },
+  previsto:       { icon: Calendar,     badge: 'bg-slate-100 text-slate-700',       badgeDark: 'bg-slate-500/20 text-slate-300',       border: 'border-slate-300',   borderDark: 'border-slate-500/40',   bgActive: 'bg-slate-50',    bgActiveDark: 'bg-slate-500/10',   textActive: 'text-slate-700',   textActiveDark: 'text-slate-300' },
+  confirmado:     { icon: CheckCircle2, badge: 'bg-blue-100 text-blue-700',         badgeDark: 'bg-blue-500/20 text-blue-300',         border: 'border-blue-400',    borderDark: 'border-blue-500/40',    bgActive: 'bg-blue-50',     bgActiveDark: 'bg-blue-500/10',    textActive: 'text-blue-700',    textActiveDark: 'text-blue-300' },
+  em_lote:        { icon: Receipt,      badge: 'bg-violet-100 text-violet-700',     badgeDark: 'bg-violet-500/20 text-violet-300',     border: 'border-violet-400',  borderDark: 'border-violet-500/40',  bgActive: 'bg-violet-50',   bgActiveDark: 'bg-violet-500/10',  textActive: 'text-violet-700',  textActiveDark: 'text-violet-300' },
+  aprovado_pgto:  { icon: ShieldCheck,  badge: 'bg-emerald-100 text-emerald-700',   badgeDark: 'bg-emerald-500/20 text-emerald-300',   border: 'border-emerald-400', borderDark: 'border-emerald-500/40', bgActive: 'bg-emerald-50',  bgActiveDark: 'bg-emerald-500/10', textActive: 'text-emerald-700', textActiveDark: 'text-emerald-300' },
+  pago:           { icon: Banknote,     badge: 'bg-teal-100 text-teal-700',         badgeDark: 'bg-teal-500/20 text-teal-300',         border: 'border-teal-400',    borderDark: 'border-teal-500/40',    bgActive: 'bg-teal-50',     bgActiveDark: 'bg-teal-500/10',    textActive: 'text-teal-700',    textActiveDark: 'text-teal-300' },
+  conciliado:     { icon: CheckCircle2, badge: 'bg-green-100 text-green-700',       badgeDark: 'bg-green-500/20 text-green-300',       border: 'border-green-400',   borderDark: 'border-green-500/40',   bgActive: 'bg-green-50',    bgActiveDark: 'bg-green-500/10',   textActive: 'text-green-700',   textActiveDark: 'text-green-300' },
+}
 
 // ── Issue #36: Dados bancarios/PIX do fornecedor ──────────────────────────────
 
@@ -710,7 +720,7 @@ export default function ContasPagar() {
     })
   }
 
-  const filtered = contas.filter(cp => {
+  const searched = contas.filter(cp => {
     if (!busca) return true
     const b = busca.toLowerCase()
     return cp.fornecedor_nome.toLowerCase().includes(b)
@@ -719,6 +729,17 @@ export default function ContasPagar() {
       || cp.observacoes?.toLowerCase().includes(b)
       || cp.origem?.toLowerCase().includes(b)
   })
+
+  const counts = FILTROS_STATUS.reduce<Record<string, number>>((acc, filtro) => {
+    acc[filtro.value] = filtro.value
+      ? searched.filter(cp => cp.status === filtro.value).length
+      : searched.length
+    return acc
+  }, {})
+
+  const filtered = statusFilter
+    ? searched.filter(cp => cp.status === statusFilter)
+    : searched
 
   const totalAberto = filtered
     .filter(cp => !['pago', 'conciliado', 'cancelado'].includes(cp.status))
@@ -789,15 +810,30 @@ export default function ContasPagar() {
               focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-400
               ${isDark ? 'bg-[#1e293b] border-white/[0.06] text-slate-200' : 'border-slate-200 bg-white text-slate-700'}`} />
         </div>
-        <div className="flex gap-1.5 overflow-x-auto hide-scrollbar">
+        <div className={`flex gap-1 p-1 rounded-2xl border overflow-x-auto hide-scrollbar ${isDark ? 'bg-white/[0.02] border-white/[0.06]' : 'bg-slate-50 border-slate-200'}`}>
           {FILTROS_STATUS.map(f => (
             <button key={f.value} onClick={() => setStatusFilter(f.value)}
-              className={`px-3 py-2 rounded-xl text-[11px] font-semibold whitespace-nowrap transition-all
-                ${statusFilter === f.value
-                  ? 'bg-emerald-600 text-white shadow-sm'
-                  : isDark ? 'bg-[#1e293b] text-slate-400 border border-white/[0.06]' : 'bg-white text-slate-500 border border-slate-200'
-                }`}>
+              className={`min-w-fit flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold whitespace-nowrap transition-all border ${
+                statusFilter === f.value
+                  ? isDark
+                    ? `${STATUS_FILTER_META[f.value].bgActiveDark} ${STATUS_FILTER_META[f.value].textActiveDark} ${STATUS_FILTER_META[f.value].borderDark} shadow-sm`
+                    : `${STATUS_FILTER_META[f.value].bgActive} ${STATUS_FILTER_META[f.value].textActive} ${STATUS_FILTER_META[f.value].border} shadow-sm`
+                  : isDark
+                    ? 'text-slate-400 border-transparent hover:bg-white/[0.04]'
+                    : 'text-slate-500 border-transparent hover:bg-white hover:shadow-sm'
+              }`}>
+              {(() => {
+                const Icon = STATUS_FILTER_META[f.value].icon
+                return <Icon size={15} className="shrink-0" />
+              })()}
               {f.label}
+              <span className={`ml-1 min-w-[22px] px-1.5 py-0.5 rounded-full text-[10px] font-bold text-center ${
+                statusFilter === f.value
+                  ? isDark ? STATUS_FILTER_META[f.value].badgeDark : STATUS_FILTER_META[f.value].badge
+                  : isDark ? 'bg-white/[0.06] text-slate-500' : 'bg-slate-100 text-slate-500'
+              }`}>
+                {counts[f.value]}
+              </span>
             </button>
           ))}
         </div>
