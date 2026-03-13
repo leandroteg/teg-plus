@@ -12,15 +12,15 @@ import {
 import type { LogSolicitacao, StatusExpedicaoPipeline } from '../../types/logistica'
 import { EXPEDICAO_PIPELINE_STAGES } from '../../types/logistica'
 
-// ── Formatters ───────────────────────────────────────────────────────────────
+// â”€â”€ Formatters â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 const fmtData = (d?: string) =>
-  d ? new Date(d + (d.includes('T') ? '' : 'T00:00:00')).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit' }) : '—'
+  d ? new Date(d + (d.includes('T') ? '' : 'T00:00:00')).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit' }) : 'â€”'
 
 const fmtDataFull = (d?: string) =>
-  d ? new Date(d + (d.includes('T') ? '' : 'T00:00:00')).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '—'
+  d ? new Date(d + (d.includes('T') ? '' : 'T00:00:00')).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' }) : 'â€”'
 
-// ── Sort types ───────────────────────────────────────────────────────────────
+// â”€â”€ Sort types â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 type SortField = 'data' | 'origem' | 'destino' | 'tipo'
 type SortDir = 'asc' | 'desc'
@@ -34,11 +34,11 @@ const SORT_OPTIONS: { field: SortField; label: string }[] = [
 ]
 
 const TIPO_LABEL: Record<string, string> = {
-  viagem: 'Viagem', mobilizacao: 'Mobilização',
-  transferencia_material: 'Transf. Material', transferencia_maquina: 'Transf. Máquina',
+  viagem: 'Viagem', mobilizacao: 'MobilizaÃ§Ã£o',
+  transferencia_material: 'Transf. Material', transferencia_maquina: 'Transf. MÃ¡quina',
 }
 
-// ── Status accents ───────────────────────────────────────────────────────────
+// â”€â”€ Status accents â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 const STATUS_ICONS: Record<string, typeof Package2> = {
   aprovado:          ClipboardList,
@@ -58,10 +58,10 @@ const STATUS_ACCENT_DARK: Record<string, { bg: string; bgActive: string; text: s
   nfe_emitida:      { bg: 'hover:bg-white/[0.03]', bgActive: 'bg-violet-500/10', text: 'text-violet-400', textActive: 'text-violet-300', badge: 'bg-violet-500/20 text-violet-300', border: 'border-violet-500/40' },
 }
 
-// ── Export CSV ────────────────────────────────────────────────────────────────
+// â”€â”€ Export CSV â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function exportCSV(items: LogSolicitacao[], stageName: string) {
-  const headers = ['Número', 'Tipo', 'Origem', 'Destino', 'Obra', 'Doc Fiscal', 'Motorista', 'Placa', 'Status']
+  const headers = ['NÃºmero', 'Tipo', 'Origem', 'Destino', 'Obra', 'Doc Fiscal', 'Motorista', 'Placa', 'Status']
   const rows = items.map(s => [
     s.numero, TIPO_LABEL[s.tipo] || s.tipo, s.origem, s.destino,
     s.obra_nome || '', s.doc_fiscal_tipo || '', s.motorista_nome || '',
@@ -78,7 +78,7 @@ function exportCSV(items: LogSolicitacao[], stageName: string) {
   URL.revokeObjectURL(url)
 }
 
-// ── Detail Modal ─────────────────────────────────────────────────────────────
+// â”€â”€ Detail Modal â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function DetailModal({ sol, onClose, onAction, isDark }: {
   sol: LogSolicitacao; onClose: () => void
@@ -90,7 +90,7 @@ function DetailModal({ sol, onClose, onAction, isDark }: {
         <div className={`flex items-center justify-between px-5 py-4 border-b sticky top-0 z-10 ${isDark ? 'border-white/[0.06] bg-[#1e293b]' : 'border-slate-100 bg-white'}`}>
           <div className="flex items-center gap-2 min-w-0">
             <Package2 size={18} className="text-orange-600 shrink-0" />
-            <h3 className={`text-base font-bold truncate ${isDark ? 'text-white' : 'text-slate-800'}`}>Expedição #{sol.numero}</h3>
+            <h3 className={`text-base font-bold truncate ${isDark ? 'text-white' : 'text-slate-800'}`}>ExpediÃ§Ã£o #{sol.numero}</h3>
           </div>
           <button onClick={onClose} className="text-slate-400 hover:text-slate-600 shrink-0"><X size={18} /></button>
         </div>
@@ -161,7 +161,7 @@ function DetailModal({ sol, onClose, onAction, isDark }: {
   )
 }
 
-// ── Row (compact table) ──────────────────────────────────────────────────────
+// â”€â”€ Row (compact table) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function ExpRow({ sol, onClick, isDark, isSelected, onSelect }: {
   sol: LogSolicitacao; onClick: () => void; isDark: boolean; isSelected: boolean; onSelect: (id: string) => void
@@ -173,38 +173,38 @@ function ExpRow({ sol, onClick, isDark, isSelected, onSelect }: {
       <input type="checkbox" checked={isSelected} onChange={e => { e.stopPropagation(); onSelect(sol.id) }} onClick={e => e.stopPropagation()}
         className="w-3 h-3 rounded border-slate-300 text-orange-600 focus:ring-orange-500 shrink-0" />
 
-      <span className={`text-[11px] font-mono font-bold w-[60px] shrink-0 ${isDark ? 'text-orange-400' : 'text-orange-700'}`}>
+      <span className={`text-[11px] font-mono font-bold w-[86px] shrink-0 whitespace-nowrap ${isDark ? 'text-orange-400' : 'text-orange-700'}`}>
         {sol.numero}
       </span>
 
-      <span className={`text-xs truncate w-[130px] shrink-0 ${isDark ? 'text-white' : 'text-slate-800'}`}>{sol.origem}</span>
-      <span className={`text-[10px] ${isDark ? 'text-slate-600' : 'text-slate-300'} shrink-0`}>→</span>
-      <span className={`text-xs truncate w-[130px] shrink-0 ${isDark ? 'text-white' : 'text-slate-800'}`}>{sol.destino}</span>
+      <span className={`text-xs truncate w-[140px] shrink-0 ${isDark ? 'text-white' : 'text-slate-800'}`}>{sol.origem}</span>
+      <span className={`text-[10px] ${isDark ? 'text-slate-600' : 'text-slate-300'} shrink-0`}>â†’</span>
+      <span className={`text-xs truncate w-[140px] shrink-0 ${isDark ? 'text-white' : 'text-slate-800'}`}>{sol.destino}</span>
 
       <span className={`text-[11px] truncate w-[90px] shrink-0 flex items-center gap-0.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
-        {sol.obra_nome ? <><Building2 size={9} className="shrink-0" /> {sol.obra_nome}</> : '—'}
+        {sol.obra_nome ? <><Building2 size={9} className="shrink-0" /> {sol.obra_nome}</> : 'â€”'}
       </span>
 
-      <span className={`text-[10px] truncate w-[70px] shrink-0 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
-        {sol.motorista_nome || '—'}
+      <span className={`text-[10px] truncate w-[88px] shrink-0 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+        {sol.motorista_nome || 'â€”'}
       </span>
 
-      <span className={`text-[11px] font-mono truncate w-[70px] shrink-0 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
-        {sol.veiculo_placa || '—'}
+      <span className={`text-[11px] font-mono truncate w-[84px] shrink-0 whitespace-nowrap ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+        {sol.veiculo_placa || 'â€”'}
       </span>
 
-      <span className={`text-[10px] truncate w-[60px] shrink-0 capitalize text-center ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
-        {sol.doc_fiscal_tipo || '—'}
+      <span className={`text-[10px] truncate w-[72px] shrink-0 whitespace-nowrap capitalize text-center ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+        {sol.doc_fiscal_tipo || 'â€”'}
       </span>
 
-      <span className={`text-[11px] text-right w-[52px] shrink-0 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+      <span className={`text-[11px] text-right w-[64px] shrink-0 whitespace-nowrap ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
         {fmtData(sol.updated_at)}
       </span>
     </div>
   )
 }
 
-// ── Card (full-width, 1 per line) ────────────────────────────────────────────
+// â”€â”€ Card (full-width, 1 per line) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function ExpCard({ sol, onClick, isDark, isSelected, onSelect }: {
   sol: LogSolicitacao; onClick: () => void; isDark: boolean; isSelected: boolean; onSelect: (id: string) => void
@@ -224,7 +224,7 @@ function ExpCard({ sol, onClick, isDark, isSelected, onSelect }: {
         <div className="flex items-center gap-1.5 min-w-0 flex-1 text-sm">
           <MapPin size={12} className={`shrink-0 ${isDark ? 'text-slate-500' : 'text-slate-400'}`} />
           <span className={`font-semibold truncate ${isDark ? 'text-white' : 'text-slate-800'}`}>{sol.origem}</span>
-          <span className={`${isDark ? 'text-slate-600' : 'text-slate-300'} shrink-0`}>→</span>
+          <span className={`${isDark ? 'text-slate-600' : 'text-slate-300'} shrink-0`}>â†’</span>
           <span className={`font-semibold truncate ${isDark ? 'text-white' : 'text-slate-800'}`}>{sol.destino}</span>
         </div>
 
@@ -269,7 +269,7 @@ function ExpCard({ sol, onClick, isDark, isSelected, onSelect }: {
   )
 }
 
-// ── Main Page ────────────────────────────────────────────────────────────────
+// â”€â”€ Main Page â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export default function ExpedicaoPipeline() {
   const { isDark } = useTheme()
@@ -349,7 +349,7 @@ export default function ExpedicaoPipeline() {
         solicitacao_id: sol.id,
         fornecedor_nome: sol.origem,
         valor_total: 0,
-        descricao: `NF ref. expedição #${sol.numero} — ${sol.origem} → ${sol.destino}`,
+        descricao: `NF ref. expediÃ§Ã£o #${sol.numero} â€” ${sol.origem} â†’ ${sol.destino}`,
       })
       showToast('success', 'NF solicitada ao fiscal com sucesso')
       setNfModal(null)
@@ -389,10 +389,10 @@ export default function ExpedicaoPipeline() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className={`text-xl font-extrabold flex items-center gap-2 ${isDark ? 'text-white' : 'text-slate-800'}`}>
-            <Package2 size={20} className="text-orange-600" /> Expedição
+            <Package2 size={20} className="text-orange-600" /> ExpediÃ§Ã£o
           </h1>
           <p className={`text-xs mt-0.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
-            {solicitacoes.filter(s => ['aprovado','romaneio_emitido','nfe_emitida'].includes(s.status)).length} solicitações na expedição
+            {solicitacoes.filter(s => ['aprovado','romaneio_emitido','nfe_emitida'].includes(s.status)).length} solicitaÃ§Ãµes na expediÃ§Ã£o
           </p>
         </div>
       </div>
@@ -435,7 +435,7 @@ export default function ExpedicaoPipeline() {
           <div className="relative flex-1 min-w-[180px] max-w-sm">
             <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
             <input type="text" value={busca} onChange={e => setBusca(e.target.value)}
-              placeholder="Buscar número, origem, destino, motorista..."
+              placeholder="Buscar nÃºmero, origem, destino, motorista..."
               className={`w-full pl-9 pr-4 py-2 rounded-xl border text-xs placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-orange-500/30 ${
                 isDark ? 'bg-white/[0.04] border-white/[0.06] text-slate-200' : 'border-slate-200 bg-white text-slate-700'
               }`} />
@@ -497,21 +497,21 @@ export default function ExpedicaoPipeline() {
                 <Package2 size={24} className="text-slate-300" />
               </div>
               <p className={`text-sm font-semibold ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Nenhuma carga nesta etapa</p>
-              <p className={`text-xs mt-1 ${isDark ? 'text-slate-600' : 'text-slate-400'}`}>{busca ? 'Tente outra busca' : 'As cargas aparecerão aqui quando avançarem'}</p>
+              <p className={`text-xs mt-1 ${isDark ? 'text-slate-600' : 'text-slate-400'}`}>{busca ? 'Tente outra busca' : 'As cargas aparecerÃ£o aqui quando avanÃ§arem'}</p>
             </div>
           ) : viewMode === 'list' ? (
             <>
               <div className={`flex items-center gap-2 px-3 py-1 border-b text-[10px] font-semibold uppercase tracking-wider ${isDark ? 'border-white/[0.06] text-slate-600' : 'border-slate-100 text-slate-400'}`}>
                 <span className="w-3 shrink-0" />
-                <span className="w-[60px] shrink-0">Nº</span>
-                <span className="w-[130px] shrink-0">Origem</span>
+                <span className="w-[86px] shrink-0">NÂº</span>
+                <span className="w-[140px] shrink-0">Origem</span>
                 <span className="w-3 shrink-0" />
-                <span className="w-[130px] shrink-0">Destino</span>
+                <span className="w-[140px] shrink-0">Destino</span>
                 <span className="w-[90px] shrink-0">Obra</span>
-                <span className="w-[70px] shrink-0">Motorista</span>
-                <span className="w-[70px] shrink-0">Placa</span>
-                <span className="w-[60px] shrink-0 text-center">Doc</span>
-                <span className="w-[52px] shrink-0 text-right">Data</span>
+                <span className="w-[88px] shrink-0">Motorista</span>
+                <span className="w-[84px] shrink-0">Placa</span>
+                <span className="w-[72px] shrink-0 text-center">Doc</span>
+                <span className="w-[64px] shrink-0 text-right">Data</span>
               </div>
               {activeItems.map(sol => <ExpRow key={sol.id} sol={sol} onClick={() => setDetail(sol)} isDark={isDark} isSelected={selectedIds.has(sol.id)} onSelect={toggleSelect} />)}
             </>
@@ -535,10 +535,10 @@ export default function ExpedicaoPipeline() {
             </div>
             <div className="p-5 space-y-4">
               <p className={`text-sm ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
-                Confirma a solicitação de Nota Fiscal para a expedição abaixo?
+                Confirma a solicitaÃ§Ã£o de Nota Fiscal para a expediÃ§Ã£o abaixo?
               </p>
               <div className={`rounded-xl p-4 space-y-2 text-xs ${isDark ? 'bg-white/[0.04]' : 'bg-slate-50'}`}>
-                <div><span className="text-slate-400">Expedição:</span> <span className="font-semibold">#{nfModal.numero}</span></div>
+                <div><span className="text-slate-400">ExpediÃ§Ã£o:</span> <span className="font-semibold">#{nfModal.numero}</span></div>
                 <div><span className="text-slate-400">Origem:</span> <span className="font-semibold">{nfModal.origem}</span></div>
                 <div><span className="text-slate-400">Destino:</span> <span className="font-semibold">{nfModal.destino}</span></div>
                 {nfModal.obra_nome && <div><span className="text-slate-400">Obra:</span> <span className="font-semibold">{nfModal.obra_nome}</span></div>}
