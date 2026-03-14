@@ -60,6 +60,48 @@ const TESOURARIA_TABS: Array<{ key: TesourariaTab; label: string }> = [
   { key: 'conciliacao', label: 'Conciliacao' },
 ]
 
+const TAB_ICONS = {
+  painel: Landmark,
+  movimentacoes: FileText,
+  contas: Building2,
+  conciliacao: Check,
+} as const
+
+const TAB_ACCENT = {
+  painel: {
+    bg: 'hover:bg-teal-50',
+    bgActive: 'bg-teal-50',
+    text: 'text-teal-600',
+    textActive: 'text-teal-800',
+    border: 'border-teal-500',
+    badge: 'bg-teal-100 text-teal-700',
+  },
+  movimentacoes: {
+    bg: 'hover:bg-sky-50',
+    bgActive: 'bg-sky-50',
+    text: 'text-sky-600',
+    textActive: 'text-sky-800',
+    border: 'border-sky-500',
+    badge: 'bg-sky-100 text-sky-700',
+  },
+  contas: {
+    bg: 'hover:bg-emerald-50',
+    bgActive: 'bg-emerald-50',
+    text: 'text-emerald-600',
+    textActive: 'text-emerald-800',
+    border: 'border-emerald-500',
+    badge: 'bg-emerald-100 text-emerald-700',
+  },
+  conciliacao: {
+    bg: 'hover:bg-violet-50',
+    bgActive: 'bg-violet-50',
+    text: 'text-violet-600',
+    textActive: 'text-violet-800',
+    border: 'border-violet-500',
+    badge: 'bg-violet-100 text-violet-700',
+  },
+} as const
+
 const EMPTY_AGING = { hoje: 0, d7: 0, d30: 0, d60: 0 }
 
 const alertToneClasses: Record<string, string> = {
@@ -261,24 +303,81 @@ function TabsBar({ activeTab, onChange, isDark }: {
   isDark: boolean
 }) {
   return (
-    <div className={`flex flex-wrap gap-2 rounded-2xl p-2 ${
-      isDark ? 'border border-white/[0.08] bg-white/[0.04]' : 'border border-slate-100 bg-white shadow-sm'
+    <div className={`flex gap-1 overflow-x-auto hide-scrollbar rounded-2xl border p-1 pb-2 ${
+      isDark ? 'border-white/[0.06] bg-white/[0.02]' : 'border-slate-200 bg-slate-50'
     }`}>
-      {TESOURARIA_TABS.map((tab) => (
-        <button
-          key={tab.key}
-          onClick={() => onChange(tab.key)}
-          className={`rounded-xl px-4 py-2 text-sm font-bold transition-colors ${
-            activeTab === tab.key
-              ? 'bg-teal-600 text-white shadow-sm'
-              : isDark
-                ? 'text-slate-300 hover:bg-white/[0.06]'
-                : 'text-slate-600 hover:bg-slate-50'
-          }`}
-        >
-          {tab.label}
+      {TESOURARIA_TABS.map((tab) => {
+        const isActive = activeTab === tab.key
+        const Icon = TAB_ICONS[tab.key]
+        const accent = TAB_ACCENT[tab.key]
+        return (
+          <button
+            key={tab.key}
+            onClick={() => onChange(tab.key)}
+            className={`min-w-fit whitespace-nowrap rounded-xl border px-4 py-2.5 text-sm transition-all md:flex-1 ${
+              isActive
+                ? `${accent.bgActive} ${accent.textActive} ${accent.border} font-bold shadow-sm`
+                : `${accent.bg} ${accent.text} border-transparent font-medium hover:bg-white hover:shadow-sm`
+            } flex items-center justify-center gap-2`}
+          >
+            <Icon size={15} className="shrink-0" />
+            {tab.label}
+          </button>
+        )
+      })}
+    </div>
+  )
+}
+
+function TesourariaToolbar({ activeTab, periodo, setPeriodo, isDark, onNovaMovimentacao, onImportOFX, onNovaConta }: {
+  activeTab: TesourariaTab
+  periodo: string
+  setPeriodo: (p: string) => void
+  isDark: boolean
+  onNovaMovimentacao: () => void
+  onImportOFX: () => void
+  onNovaConta: () => void
+}) {
+  const shellCls = `rounded-2xl border px-4 py-2.5 flex flex-wrap items-center gap-2 ${
+    isDark ? 'border-white/[0.06] bg-[#0f172a]' : 'border-slate-200 bg-white'
+  }`
+  const pillCls = (active: boolean) => `rounded-full px-3 py-1.5 text-xs font-semibold transition-all ${
+    active
+      ? 'bg-teal-600 text-white shadow-sm'
+      : isDark
+        ? 'border border-white/[0.06] bg-[#1e293b] text-slate-400 hover:bg-white/[0.06]'
+        : 'border border-slate-200 bg-white text-slate-500 hover:bg-slate-50'
+  }`
+
+  if (activeTab === 'contas') {
+    return (
+      <div className={shellCls}>
+        <button onClick={onNovaConta} className="inline-flex items-center gap-1.5 rounded-xl bg-teal-600 px-4 py-2 text-xs font-bold text-white hover:bg-teal-700">
+          <Plus size={13} /> Nova Conta
         </button>
-      ))}
+        <button onClick={onImportOFX} className={`inline-flex items-center gap-1.5 rounded-xl px-4 py-2 text-xs font-bold ${isDark ? 'border border-white/[0.08] bg-white/[0.04] text-slate-300 hover:bg-white/[0.08]' : 'border border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100'}`}>
+          <Upload size={13} /> Importar OFX
+        </button>
+      </div>
+    )
+  }
+
+  return (
+    <div className={shellCls}>
+      {activeTab === 'movimentacoes' && (
+        <button onClick={onNovaMovimentacao} className="inline-flex items-center gap-1.5 rounded-xl bg-teal-600 px-4 py-2 text-xs font-bold text-white hover:bg-teal-700">
+          <Plus size={13} /> Nova Movimentacao
+        </button>
+      )}
+      {(activeTab === 'painel' || activeTab === 'movimentacoes' || activeTab === 'conciliacao') && (
+        <div className="flex flex-wrap items-center gap-1.5">
+          {PERIODOS.map(([val, lbl]) => (
+            <button key={val} onClick={() => setPeriodo(val)} className={pillCls(periodo === val)}>
+              {lbl}
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   )
 }
@@ -1593,12 +1692,16 @@ export default function Tesouraria() {
   if (isError) {
     return (
       <div className="space-y-5">
-        <TesourariaHeader
-          isDark={isDark}
+        <TesourariaHeader isDark={isDark} />
+        <TabsBar activeTab={activeTab} onChange={setActiveTab} isDark={isDark} />
+        <TesourariaToolbar
+          activeTab={activeTab}
           periodo={periodo}
           setPeriodo={setPeriodo}
+          isDark={isDark}
           onNovaMovimentacao={() => setShowNovaMovimentacao(true)}
           onImportOFX={() => setShowImportExtrato(true)}
+          onNovaConta={() => setShowNovaConta(true)}
         />
         <ErrorState isDark={isDark} onRetry={() => { void refetch() }} />
       </div>
@@ -1608,12 +1711,16 @@ export default function Tesouraria() {
   if (!hasData) {
     return (
       <div className="space-y-5">
-        <TesourariaHeader
-          isDark={isDark}
+        <TesourariaHeader isDark={isDark} />
+        <TabsBar activeTab={activeTab} onChange={setActiveTab} isDark={isDark} />
+        <TesourariaToolbar
+          activeTab={activeTab}
           periodo={periodo}
           setPeriodo={setPeriodo}
+          isDark={isDark}
           onNovaMovimentacao={() => setShowNovaMovimentacao(true)}
           onImportOFX={() => setShowImportExtrato(true)}
+          onNovaConta={() => setShowNovaConta(true)}
         />
         <EmptyState isDark={isDark} onAddConta={() => setShowNovaConta(true)} />
         {showNovaConta && <NovaContaModal isDark={isDark} onClose={() => setShowNovaConta(false)} />}
@@ -1626,53 +1733,55 @@ export default function Tesouraria() {
 
   return (
     <div className="space-y-5">
-      <TesourariaHeader
-        isDark={isDark}
+      <TesourariaHeader isDark={isDark} />
+      <TabsBar activeTab={activeTab} onChange={setActiveTab} isDark={isDark} />
+      <TesourariaToolbar
+        activeTab={activeTab}
         periodo={periodo}
         setPeriodo={setPeriodo}
+        isDark={isDark}
         onNovaMovimentacao={() => setShowNovaMovimentacao(true)}
         onImportOFX={() => setShowImportExtrato(true)}
+        onNovaConta={() => setShowNovaConta(true)}
       />
-      <TabsBar activeTab={activeTab} onChange={setActiveTab} isDark={isDark} />
-
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <KpiCard
-          titulo="Saldo Total"
-          valor={fmt(dashboard?.saldo_total ?? 0)}
-          icon={Wallet}
-          hexCor="#14B8A6"
-          isDark={isDark}
-        />
-        <KpiCard
-          titulo="Entradas no Periodo"
-          valor={fmt(dashboard?.entradas_periodo ?? 0)}
-          icon={TrendingUp}
-          hexCor="#10B981"
-          trend={{ value: comparativos.entradas_percentual, positive: comparativos.entradas_percentual >= 0 }}
-          subtitulo={`${fmt(dashboard?.entradas_periodo_anterior ?? 0)} periodo anterior`}
-          isDark={isDark}
-        />
-        <KpiCard
-          titulo="Saidas no Periodo"
-          valor={fmt(dashboard?.saidas_periodo ?? 0)}
-          icon={TrendingDown}
-          hexCor="#F43F5E"
-          trend={{ value: comparativos.saidas_percentual, positive: comparativos.saidas_percentual <= 0 }}
-          subtitulo={`${fmt(dashboard?.saidas_periodo_anterior ?? 0)} periodo anterior`}
-          isDark={isDark}
-        />
-        <KpiCard
-          titulo="Previsao 30d"
-          valor={fmt(indicadores.saldo_projetado_30d)}
-          icon={CircleDollarSign}
-          hexCor={indicadores.saldo_projetado_30d >= 0 ? '#8B5CF6' : '#EF4444'}
-          subtitulo={previsao30d >= 0 ? 'Superavit previsto' : 'Deficit previsto'}
-          isDark={isDark}
-        />
-      </div>
 
       {activeTab === 'painel' && (
         <>
+          <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+            <KpiCard
+              titulo="Saldo Total"
+              valor={fmt(dashboard?.saldo_total ?? 0)}
+              icon={Wallet}
+              hexCor="#14B8A6"
+              isDark={isDark}
+            />
+            <KpiCard
+              titulo="Entradas no Periodo"
+              valor={fmt(dashboard?.entradas_periodo ?? 0)}
+              icon={TrendingUp}
+              hexCor="#10B981"
+              trend={{ value: comparativos.entradas_percentual, positive: comparativos.entradas_percentual >= 0 }}
+              subtitulo={`${fmt(dashboard?.entradas_periodo_anterior ?? 0)} periodo anterior`}
+              isDark={isDark}
+            />
+            <KpiCard
+              titulo="Saidas no Periodo"
+              valor={fmt(dashboard?.saidas_periodo ?? 0)}
+              icon={TrendingDown}
+              hexCor="#F43F5E"
+              trend={{ value: comparativos.saidas_percentual, positive: comparativos.saidas_percentual <= 0 }}
+              subtitulo={`${fmt(dashboard?.saidas_periodo_anterior ?? 0)} periodo anterior`}
+              isDark={isDark}
+            />
+            <KpiCard
+              titulo="Previsao 30d"
+              valor={fmt(indicadores.saldo_projetado_30d)}
+              icon={CircleDollarSign}
+              hexCor={indicadores.saldo_projetado_30d >= 0 ? '#8B5CF6' : '#EF4444'}
+              subtitulo={previsao30d >= 0 ? 'Superavit previsto' : 'Deficit previsto'}
+              isDark={isDark}
+            />
+          </div>
           {dashboard && <IndicadoresPanel dashboard={dashboard} isDark={isDark} />}
 
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1fr_320px]">
@@ -1793,12 +1902,8 @@ export default function Tesouraria() {
   )
 }
 
-function TesourariaHeader({ isDark, periodo, setPeriodo, onNovaMovimentacao, onImportOFX }: {
+function TesourariaHeader({ isDark }: {
   isDark: boolean
-  periodo: string
-  setPeriodo: (p: string) => void
-  onNovaMovimentacao: () => void
-  onImportOFX: () => void
 }) {
   return (
     <div className="flex flex-wrap items-center justify-between gap-3">
@@ -1810,40 +1915,6 @@ function TesourariaHeader({ isDark, periodo, setPeriodo, onNovaMovimentacao, onI
         <p className={`mt-0.5 text-xs ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
           Cockpit financeiro com disponibilidade, projecao de caixa e operacao rapida.
         </p>
-      </div>
-
-      <div className="flex flex-wrap items-center gap-1.5">
-        <button
-          onClick={onNovaMovimentacao}
-          className="inline-flex items-center gap-1.5 rounded-full bg-teal-600 px-3 py-1.5 text-xs font-bold text-white transition-colors hover:bg-teal-700"
-        >
-          <Plus size={13} /> Nova Movimentacao
-        </button>
-        <button
-          onClick={onImportOFX}
-          className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-bold transition-colors ${
-            isDark
-              ? 'border border-white/[0.08] bg-white/[0.04] text-slate-300 hover:bg-white/[0.08]'
-              : 'border border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
-          }`}
-        >
-          <Upload size={13} /> Importar OFX
-        </button>
-        {PERIODOS.map(([val, lbl]) => (
-          <button
-            key={val}
-            onClick={() => setPeriodo(val)}
-            className={`rounded-full px-3 py-1.5 text-xs font-semibold transition-all ${
-              periodo === val
-                ? 'bg-teal-600 text-white shadow-sm'
-                : isDark
-                  ? 'bg-[#1e293b] text-slate-400 border border-white/[0.06] hover:bg-white/[0.06]'
-                  : 'bg-white text-slate-500 border border-slate-200 hover:bg-slate-50'
-            }`}
-          >
-            {lbl}
-          </button>
-        ))}
       </div>
     </div>
   )
