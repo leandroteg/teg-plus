@@ -72,7 +72,7 @@ type QuickFilterId = 'all' | 'overdue' | 'today' | 'week' | 'same_supplier' | 's
 
 const CP_PIPELINE_VIEW_STAGES: Array<{ status: PipelineStageId; label: string; color: string; borderColor: string }> = [
   ...CP_PIPELINE_STAGES.slice(0, 3),
-  { status: 'em_aprovacao', label: 'Em Aprova\u00E7\u00E3o', color: 'amber', borderColor: 'border-t-amber-500' },
+  { status: 'em_aprovacao', label: 'Em Aprovação', color: 'amber', borderColor: 'border-t-amber-500' },
   { status: 'aprovado_pgto', label: 'Painel de Pagamento', color: 'emerald', borderColor: 'border-t-emerald-500' },
   { status: 'em_pagamento', label: 'Em Processamento', color: 'sky', borderColor: 'border-t-sky-500' },
   ...CP_PIPELINE_STAGES.filter(stage => ['pago', 'conciliado'].includes(stage.status)),
@@ -82,7 +82,7 @@ const SORT_OPTIONS: { field: SortField; label: string }[] = [
   { field: 'vencimento', label: 'Vencimento' },
   { field: 'valor',      label: 'Valor' },
   { field: 'fornecedor', label: 'Fornecedor' },
-  { field: 'emissao',    label: 'Emiss\u00E3o' },
+  { field: 'emissao',    label: 'Emissão' },
 ]
 
 // Ã¢â€â‚¬Ã¢â€â‚¬ Urgency helper Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
@@ -516,7 +516,7 @@ function CPDetailModal({ cp, onClose, onAction, isDark }: {
             )}
             {cp.status === 'em_lote' && (
               <button onClick={() => onAction('sendLote', cp)} className="flex-1 py-3 rounded-xl bg-amber-500 text-white text-sm font-bold hover:bg-amber-600 transition-all flex items-center justify-center gap-2">
-                <Send size={15} /> Enviar p/ Aprova\u00E7\u00E3o
+                <Send size={15} /> Enviar p/ Aprovação
               </button>
             )}
             {cp.status === 'aprovado_pgto' && (
@@ -806,7 +806,7 @@ export default function CPPipeline() {
     if (!cp.lote_id) return null
     const lote = lotesById.get(cp.lote_id)
     if (!lote || lote.status !== 'enviado_aprovacao') return null
-    return lote.aprovador_nome ? `Aprovador: ${lote.aprovador_nome}` : 'Em aprova\u00E7\u00E3o'
+    return lote.aprovador_nome ? `Aprovador: ${lote.aprovador_nome}` : 'Em aprovação'
   }, [lotesById])
 
   // Group all CPs by pipeline stage
