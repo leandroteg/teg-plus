@@ -4,7 +4,7 @@ import {
   FileText, ChevronDown, ChevronUp, Banknote, X, ShieldCheck,
   Building2, Tag, Briefcase, Hash, Layers, Truck, Package,
   Paperclip, ExternalLink, Download, ArrowUpDown, LayoutList,
-  LayoutGrid, Filter, SortAsc, SortDesc, ArrowDown, ArrowUp, Send,
+  LayoutGrid, Filter, SortAsc, SortDesc, ArrowDown, ArrowUp, Send, MessageSquare, XCircle,
   ChevronLeft, ChevronRight,
 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
@@ -25,6 +25,8 @@ import {
   useSincronizarRemessasPagamento,
 } from '../../hooks/useLotesPagamento'
 import { supabase } from '../../services/supabase'
+import { useAuth } from '../../contexts/AuthContext'
+import { useDecisaoGenerica } from '../../hooks/useAprovacoes'
 import { useAnexosPedido, useUploadAnexo, TIPO_LABEL } from '../../hooks/useAnexos'
 import type { PedidoAnexo } from '../../hooks/useAnexos'
 import type { ContaPagar, LotePagamento, StatusCP } from '../../types/financeiro'
@@ -389,8 +391,80 @@ function CPDetailModal({ cp, onClose, onAction, isDark }: {
   isDark: boolean
 }) {
   const nav = useNavigate()
+  const { perfil, canApprove } = useAuth()
+  const decisaoGenericaMut = useDecisaoGenerica()
   const urgency = getUrgency(cp)
-  const stage = CP_PIPELINE_STAGES.find(s => s.status === cp.status)
+  const [approval, setApproval] = useState<null | {
+    id: string
+    entidade_id: string
+    entidade_numero?: string
+    modulo: string
+    nivel: number
+  }>(null)
+  const [approvalLoading, setApprovalLoading] = useState(false)
+  const [approvalExpanded, setApprovalExpanded] = useState(false)
+  const [approvalNote, setApprovalNote] = useState('')
+
+  useEffect(() => {
+    let active = true
+    if (!cp.lote_id || cp.status !== 'em_lote') {
+      setApproval(null)
+      return
+    }
+
+    setApprovalLoading(true)
+    supabase
+      .from('apr_aprovacoes')
+      .select('id, entidade_id, entidade_numero, modulo, nivel')
+      .eq('entidade_id', cp.lote_id)
+      .eq('tipo_aprovacao', 'autorizacao_pagamento')
+      .eq('status', 'pendente')
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (!active) return
+        setApproval(data ?? null)
+      })
+      .finally(() => {
+        if (active) setApprovalLoading(false)
+      })
+
+    return () => {
+      active = false
+    }
+  }, [cp.lote_id, cp.status])
+
+  const isApprovalStage = cp.status === 'em_lote' && !!approval
+  const canApproveCurrent = !!approval && canApprove(approval.nivel)
+  const stageStatus = isApprovalStage ? 'em_aprovacao' : cp.status
+  const stage = CP_PIPELINE_VIEW_STAGES.find(s => s.status === stageStatus)
+
+  const handleApprovalDecision = async (decisao: 'aprovada' | 'rejeitada' | 'esclarecimento') => {
+    if (!approval || !perfil) return
+    if (decisao === 'esclarecimento' && !approvalNote.trim()) {
+      setApprovalExpanded(true)
+      return
+    }
+
+    try {
+      await decisaoGenericaMut.mutateAsync({
+        aprovacaoId: approval.id,
+        entidadeId: approval.entidade_id,
+        entidadeNumero: approval.entidade_numero,
+        tipoAprovacao: 'autorizacao_pagamento',
+        modulo: approval.modulo,
+        nivel: approval.nivel,
+        decisao,
+        observacao: approvalNote.trim() || undefined,
+        aprovadorNome: perfil.nome,
+        aprovadorEmail: perfil.email || '',
+      })
+      onClose()
+    } catch {
+      // handled by mutation state
+    }
+  }
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-sm p-4" onClick={onClose}>
@@ -408,8 +482,8 @@ function CPDetailModal({ cp, onClose, onAction, isDark }: {
             <p className={`text-2xl font-extrabold ${urgency === 'overdue' ? 'text-red-600' : 'text-emerald-600'}`}>
               {fmtFull(cp.valor_original)}
             </p>
-            <span className={`inline-flex items-center gap-1.5 rounded-full font-semibold px-3 py-1 text-xs ${STATUS_ACCENT[cp.status]?.bgActive || 'bg-slate-100'} ${STATUS_ACCENT[cp.status]?.textActive || 'text-slate-700'}`}>
-              <span className={`w-2 h-2 rounded-full ${STATUS_ACCENT[cp.status]?.dot}`} />
+            <span className={`inline-flex items-center gap-1.5 rounded-full font-semibold px-3 py-1 text-xs ${STATUS_ACCENT[stageStatus]?.bgActive || 'bg-slate-100'} ${STATUS_ACCENT[stageStatus]?.textActive || 'text-slate-700'}`}>
+              <span className={`w-2 h-2 rounded-full ${STATUS_ACCENT[stageStatus]?.dot}`} />
               {stage?.label ?? cp.status}
             </span>
           </div>
@@ -488,7 +562,7 @@ function CPDetailModal({ cp, onClose, onAction, isDark }: {
             <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-2">Progresso</p>
             <div className="flex items-center gap-0.5">
               {CP_PIPELINE_STAGES.map((s, i) => {
-                const currentIdx = CP_PIPELINE_STAGES.findIndex(st => st.status === cp.status)
+                const currentIdx = CP_PIPELINE_STAGES.findIndex(st => st.status === (stageStatus === 'em_aprovacao' ? 'em_lote' : stageStatus))
                 const isPast = i <= currentIdx
                 const accent = STATUS_ACCENT[s.status]
                 return (
@@ -499,6 +573,85 @@ function CPDetailModal({ cp, onClose, onAction, isDark }: {
               })}
             </div>
           </div>
+
+          {isApprovalStage && (
+            <div className={`rounded-xl border ${isDark ? 'border-white/[0.08] bg-white/[0.03]' : 'border-amber-200 bg-amber-50/70'}`}>
+              <div className="px-4 py-3 border-b border-inherit">
+                <p className={`text-xs font-bold ${isDark ? 'text-amber-300' : 'text-amber-700'}`}>Aprovação de Pagamento</p>
+                <p className={`text-[11px] mt-1 ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
+                  {approvalLoading
+                    ? 'Carregando aprovação pendente...'
+                    : canApproveCurrent
+                      ? 'Você tem alçada para decidir esta aprovação.'
+                      : 'Aguardando aprovação'}
+                </p>
+              </div>
+
+              {canApproveCurrent ? (
+                <>
+                  <div className="p-4">
+                    <button
+                      type="button"
+                      onClick={() => setApprovalExpanded(v => !v)}
+                      className={`text-[11px] font-semibold ${isDark ? 'text-indigo-300' : 'text-indigo-600'}`}
+                    >
+                      {approvalExpanded ? 'Ocultar observação' : 'Adicionar observação'}
+                    </button>
+                    {approvalExpanded && (
+                      <textarea
+                        rows={3}
+                        className={`w-full mt-3 rounded-xl border px-3 py-2 text-sm outline-none ${isDark ? 'border-white/[0.08] bg-slate-950/40 text-white' : 'border-slate-200 bg-white text-slate-700'}`}
+                        placeholder="Descreva o esclarecimento ou justifique sua decisão..."
+                        value={approvalNote}
+                        onChange={e => setApprovalNote(e.target.value)}
+                      />
+                    )}
+                  </div>
+                  <div className={`grid grid-cols-3 border-t ${isDark ? 'border-white/[0.08]' : 'border-slate-200'}`}>
+                    <button
+                      type="button"
+                      disabled={decisaoGenericaMut.isPending}
+                      onClick={() => handleApprovalDecision('rejeitada')}
+                      className="flex items-center justify-center gap-1.5 py-3.5 text-xs font-bold text-red-500 hover:bg-red-50 transition disabled:opacity-50"
+                    >
+                      <XCircle size={16} />
+                      Rejeitar
+                    </button>
+                    <button
+                      type="button"
+                      disabled={decisaoGenericaMut.isPending}
+                      onClick={() => handleApprovalDecision('esclarecimento')}
+                      className="flex items-center justify-center gap-1.5 py-3.5 text-xs font-bold text-indigo-500 hover:bg-indigo-50 transition border-x border-inherit disabled:opacity-50"
+                    >
+                      <MessageSquare size={16} />
+                      Esclarecer
+                    </button>
+                    <button
+                      type="button"
+                      disabled={decisaoGenericaMut.isPending}
+                      onClick={() => handleApprovalDecision('aprovada')}
+                      className="flex items-center justify-center gap-1.5 py-3.5 text-xs font-bold text-emerald-600 hover:bg-emerald-50 transition disabled:opacity-50"
+                    >
+                      <CheckCircle2 size={16} />
+                      Aprovar
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <div className="px-4 py-3">
+                  <span className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold ${isDark ? 'bg-white/[0.06] text-slate-200' : 'bg-white text-amber-700 border border-amber-200'}`}>
+                    Aguardando aprovação
+                  </span>
+                </div>
+              )}
+
+              {decisaoGenericaMut.isError && (
+                <p className="px-4 py-2 text-xs text-red-500 border-t border-red-200">
+                  Erro ao processar aprovação. Tente novamente.
+                </p>
+              )}
+            </div>
+          )}
 
           <div className="flex gap-2 pt-1">
             <button onClick={onClose} className={`flex-1 py-3 rounded-xl border text-sm font-semibold transition-all ${isDark ? 'border-white/[0.06] text-slate-300' : 'border-slate-200 text-slate-600 hover:bg-slate-50'}`}>
@@ -514,7 +667,7 @@ function CPDetailModal({ cp, onClose, onAction, isDark }: {
                 <Layers size={15} /> Adicionar ao Lote
               </button>
             )}
-            {cp.status === 'em_lote' && (
+            {cp.status === 'em_lote' && !isApprovalStage && (
               <button onClick={() => onAction('sendLote', cp)} className="flex-1 py-3 rounded-xl bg-amber-500 text-white text-sm font-bold hover:bg-amber-600 transition-all flex items-center justify-center gap-2">
                 <Send size={15} /> Enviar p/ Aprovação
               </button>

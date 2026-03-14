@@ -432,7 +432,7 @@ export interface DecisaoGenericaPayload {
   tipoAprovacao: TipoAprovacao
   modulo: string
   nivel: number
-  decisao: 'aprovada' | 'rejeitada'
+  decisao: 'aprovada' | 'rejeitada' | 'esclarecimento'
   observacao?: string
   aprovadorNome: string
   aprovadorEmail: string
@@ -505,26 +505,64 @@ export function useDecisaoGenerica() {
             .maybeSingle()
 
           if (lote?.id) {
-            const decisaoItem = decisao === 'aprovada' ? 'aprovado' : 'rejeitado'
+            if (decisao === 'esclarecimento') {
+              await supabase
+                .from('fin_lote_itens')
+                .update({
+                  decisao: 'pendente',
+                  decidido_por: null,
+                  decidido_em: null,
+                  observacao: observacao || null,
+                })
+                .eq('lote_id', entidadeId)
 
-            await supabase
-              .from('fin_lote_itens')
-              .update({
-                decisao: decisaoItem,
-                decidido_por: aprovadorNome,
-                decidido_em: decisionAt,
-                observacao: observacao || null,
-              })
-              .eq('lote_id', entidadeId)
-              .eq('decisao', 'pendente')
+              await supabase
+                .from('fin_lotes_pagamento')
+                .update({
+                  status: 'montando',
+                  observacao: observacao || null,
+                  updated_at: decisionAt,
+                })
+                .eq('id', entidadeId)
 
-            await supabase.rpc('rpc_resolver_lote_status', { p_lote_id: entidadeId })
+              await supabase
+                .from('fin_contas_pagar')
+                .update({
+                  status: 'em_lote',
+                  updated_at: decisionAt,
+                })
+                .eq('lote_id', entidadeId)
+                .not('status', 'in', '(cancelado,pago,conciliado)')
+            } else {
+              const decisaoItem = decisao === 'aprovada' ? 'aprovado' : 'rejeitado'
+
+              await supabase
+                .from('fin_lote_itens')
+                .update({
+                  decisao: decisaoItem,
+                  decidido_por: aprovadorNome,
+                  decidido_em: decisionAt,
+                  observacao: observacao || null,
+                })
+                .eq('lote_id', entidadeId)
+                .eq('decisao', 'pendente')
+
+              await supabase.rpc('rpc_resolver_lote_status', { p_lote_id: entidadeId })
+            }
 
             if (decisao === 'aprovada') {
               await supabase
                 .from('fin_lotes_pagamento')
                 .update({
                   status: 'aprovado',
+                  updated_at: decisionAt,
+                })
+                .eq('id', entidadeId)
+            } else if (decisao === 'rejeitada') {
+              await supabase
+                .from('fin_lotes_pagamento')
+                .update({
+                  status: 'cancelado',
                   updated_at: decisionAt,
                 })
                 .eq('id', entidadeId)
@@ -538,10 +576,18 @@ export function useDecisaoGenerica() {
                 aprovado_em: decisionAt,
               })
               .eq('id', entidadeId)
-          } else {
+          } else if (decisao === 'rejeitada') {
             await supabase
               .from('fin_contas_pagar')
               .update({ status: 'cancelado' })
+              .eq('id', entidadeId)
+          } else {
+            await supabase
+              .from('fin_contas_pagar')
+              .update({
+                status: 'confirmado',
+                updated_at: decisionAt,
+              })
               .eq('id', entidadeId)
           }
         }
