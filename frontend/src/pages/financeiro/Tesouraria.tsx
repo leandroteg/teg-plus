@@ -152,25 +152,32 @@ function IndicadoresPanel({ dashboard, isDark }: {
   dashboard: TesourariaDashboardData
   isDark: boolean
 }) {
+  const indicadoresDashboard = dashboard.indicadores ?? {
+    saldo_disponivel: dashboard.saldo_total ?? 0,
+    saldo_projetado_30d: (dashboard.saldo_total ?? 0) + (dashboard.previsao_cr ?? 0) - (dashboard.previsao_cp ?? 0),
+    queima_media_diaria: 0,
+    cobertura_dias: null,
+  }
+
   const indicadores = [
     {
       label: 'Saldo disponivel',
-      value: fmt(dashboard.indicadores.saldo_disponivel),
+      value: fmt(indicadoresDashboard.saldo_disponivel),
       hint: 'Disponibilidade real consolidada',
     },
     {
       label: 'Saldo projetado 30d',
-      value: fmt(dashboard.indicadores.saldo_projetado_30d),
-      hint: dashboard.indicadores.saldo_projetado_30d >= 0 ? 'Janela confortavel' : 'Atencao ao caixa futuro',
+      value: fmt(indicadoresDashboard.saldo_projetado_30d),
+      hint: indicadoresDashboard.saldo_projetado_30d >= 0 ? 'Janela confortavel' : 'Atencao ao caixa futuro',
     },
     {
       label: 'Queima media diaria',
-      value: fmt(dashboard.indicadores.queima_media_diaria),
+      value: fmt(indicadoresDashboard.queima_media_diaria),
       hint: 'Baseada nas saidas do periodo',
     },
     {
       label: 'Cobertura de caixa',
-      value: dashboard.indicadores.cobertura_dias == null ? '--' : `${dashboard.indicadores.cobertura_dias.toFixed(1)} dias`,
+      value: indicadoresDashboard.cobertura_dias == null ? '--' : `${indicadoresDashboard.cobertura_dias.toFixed(1)} dias`,
       hint: 'Dias de cobertura no ritmo atual',
     },
   ]
