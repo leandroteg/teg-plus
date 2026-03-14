@@ -369,7 +369,7 @@ function StatusFilterRail({
   }
 
   return (
-    <div className="relative">
+    <div className="relative flex-1 min-w-0">
       {canScrollLeft && (
         <>
           <div className={`pointer-events-none absolute inset-y-1 left-1 z-10 w-10 rounded-l-2xl bg-gradient-to-r ${isDark ? 'from-[#0f172a]' : 'from-slate-50'} to-transparent`} />
@@ -957,7 +957,7 @@ export default function ContasPagar() {
 
       {/* ── Filtros ─────────────────────────────────────────── */}
       <div className="flex flex-col sm:flex-row gap-3">
-        <div className="relative flex-1">
+        <div className="relative flex-1 min-w-[220px]">
           <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
           <input type="text" value={busca} onChange={e => setBusca(e.target.value)}
             placeholder="Buscar fornecedor, documento..."
