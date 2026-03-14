@@ -500,7 +500,7 @@ function CPDetailModal({ cp, stageStatus, onClose, onAction, isDark }: {
   }, [approval?.id, approvalItems])
 
   const isApprovalStage = stageStatus === 'em_aprovacao'
-  const canApproveCurrent = !!approval && canApprove(approval.nivel)
+  const canApproveCurrent = !!approval && (perfil?.role === 'admin' || canApprove(approval.nivel))
   const stage = CP_PIPELINE_VIEW_STAGES.find(s => s.status === stageStatus)
   const isLoteApproval = !!approvalLoteId && approvalItems.length > 0
 
