@@ -165,10 +165,10 @@ function ContratoCard({ contrato, onToast }: { contrato: Contrato; onToast: (typ
           <div className="flex-1 min-w-0">
             <div className="flex items-center justify-between gap-2 mb-1">
               <div className="min-w-0">
-                <p className="text-[11px] font-semibold text-slate-500 truncate">
+                <p className="text-sm font-bold text-slate-800 truncate">{tituloContrato}</p>
+                <p className="text-[11px] font-semibold text-slate-500 truncate mt-0.5">
                   {linhaContexto || 'Contrato sem referencia'}
                 </p>
-                <p className="text-sm font-bold text-slate-800 truncate mt-0.5">{tituloContrato}</p>
               </div>
               <p className={`text-sm font-extrabold shrink-0 ${isDespesa ? 'text-amber-600' : 'text-emerald-600'}`}>
                 {fmt(contrato.valor_total + contrato.valor_aditivos)}

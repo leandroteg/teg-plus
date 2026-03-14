@@ -28,7 +28,7 @@ const fmt = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', curren
 const urgenciaConfig: Record<string, { bg: string; text: string; label: string }> = {
   normal:  { bg: 'bg-slate-100',  text: 'text-slate-600',  label: 'Normal'  },
   urgente: { bg: 'bg-amber-100',  text: 'text-amber-700',  label: 'Urgente' },
-  critica: { bg: 'bg-red-100',    text: 'text-red-700',    label: 'Cr\u00EDtica' },
+  critica: { bg: 'bg-red-100',    text: 'text-red-700',    label: 'Critica' },
 }
 
 const tipoConfig: Record<TipoAprovacao, {
@@ -43,7 +43,7 @@ const tipoConfig: Record<TipoAprovacao, {
   headerBg: string
 }> = {
   cotacao: {
-    label: 'Aprova\u00E7\u00E3o Compras',
+    label: 'Aprovacao Compras',
     icon: FileSearch,
     color: 'blue',
     bgLight: 'bg-blue-50',
@@ -54,7 +54,7 @@ const tipoConfig: Record<TipoAprovacao, {
     headerBg: 'bg-gradient-to-r from-blue-600 to-blue-500',
   },
   autorizacao_pagamento: {
-    label: 'Autoriza\u00E7\u00F5es de Pagamento',
+    label: 'Autorizacoes de Pagamento',
     icon: Banknote,
     color: 'amber',
     bgLight: 'bg-amber-50',
@@ -76,7 +76,7 @@ const tipoConfig: Record<TipoAprovacao, {
     headerBg: 'bg-gradient-to-r from-violet-600 to-violet-500',
   },
   requisicao_compra: {
-    label: 'Valida\u00E7\u00E3o T\u00E9c. Requisi\u00E7\u00E3o de Compra',
+    label: 'Validacao Tec. Requisicao de Compra',
     icon: ShoppingCart,
     color: 'teal',
     bgLight: 'bg-teal-50',
@@ -89,10 +89,10 @@ const tipoConfig: Record<TipoAprovacao, {
 }
 
 const tipoOrder: TipoAprovacao[] = [
-  'requisicao_compra',
   'cotacao',
-  'minuta_contratual',
   'autorizacao_pagamento',
+  'minuta_contratual',
+  'requisicao_compra',
 ]
 
 function timeLeft(dateStr?: string): string {
@@ -107,7 +107,7 @@ function timeLeft(dateStr?: string): string {
 function getAlcada(valor: number, nivel: number) {
   if (valor <= 2000) return { label: `Alcada 1`, sublabel: `Welton ou Claudinor <= R$2.000` }
   if (nivel <= 2)    return { label: 'Alcada 2', sublabel: 'Laucidio > R$2.000' }
-  return { label: 'Aprova\u00E7\u00E3o de Pagamento', sublabel: 'Laucidio -- etapa final' }
+  return { label: 'Aprovacao de Pagamento', sublabel: 'Laucidio -- etapa final' }
 }
 
 function formatDateShort(dateStr?: string): string {
@@ -398,28 +398,9 @@ function GenericPendingCard({ aprovacao, aprovadorNome, aprovadorEmail }: {
   const [expanded, setExpanded] = useState(false)
   const [observacao, setObservacao] = useState('')
   const [action, setAction] = useState<'aprovada' | 'rejeitada' | null>(null)
-  const loteItens = useMemo(
-    () => (
-      aprovacao.pagamento_detalhes?.is_lote
-        ? (aprovacao.pagamento_detalhes.itens ?? []).filter(item => item.decisao !== 'rejeitado')
-        : []
-    ),
-    [aprovacao.pagamento_detalhes]
-  )
-  const [selectedItemIds, setSelectedItemIds] = useState<string[]>(() => loteItens.map(item => item.id))
 
   const tipo = tipoConfig[aprovacao.tipo_aprovacao] || tipoConfig.requisicao_compra
   const IconComp = tipo.icon
-
-  useEffect(() => {
-    setSelectedItemIds(loteItens.map(item => item.id))
-  }, [aprovacao.id, loteItens])
-
-  const toggleLoteItem = (itemId: string) => {
-    setSelectedItemIds(prev =>
-      prev.includes(itemId) ? prev.filter(id => id !== itemId) : [...prev, itemId]
-    )
-  }
 
   const handleDecision = async (decisao: 'aprovada' | 'rejeitada') => {
     setAction(decisao)
@@ -435,7 +416,6 @@ function GenericPendingCard({ aprovacao, aprovadorNome, aprovadorEmail }: {
         observacao: observacao || undefined,
         aprovadorNome,
         aprovadorEmail,
-        selectedItemIds: decisao === 'aprovada' && loteItens.length > 0 ? selectedItemIds : undefined,
       })
     } catch { /* error handled by mutation state */ }
   }
@@ -485,13 +465,12 @@ function GenericPendingCard({ aprovacao, aprovadorNome, aprovadorEmail }: {
 
         {/* ── Resumo Executivo para Minuta Contratual ── */}
         {aprovacao.tipo_aprovacao === 'minuta_contratual' && aprovacao.minuta_resumo ? (
-          <MinutaExecutiveSummary resumo={aprovacao.minuta_resumo} />
-        ) : aprovacao.tipo_aprovacao === 'autorizacao_pagamento' && aprovacao.pagamento_detalhes ? (
-          <PagamentoDetalhesCard
-            detalhes={aprovacao.pagamento_detalhes}
-            selectedItemIds={selectedItemIds}
-            onToggleItem={toggleLoteItem}
+          <MinutaExecutiveSummary
+            resumo={aprovacao.minuta_resumo}
+            referencia={aprovacao.requisicao?.numero ?? aprovacao.entidade_numero}
           />
+        ) : aprovacao.tipo_aprovacao === 'autorizacao_pagamento' && aprovacao.pagamento_detalhes ? (
+          <PagamentoDetalhesCard detalhes={aprovacao.pagamento_detalhes} />
         ) : aprovacao.tipo_aprovacao === 'autorizacao_pagamento' && aprovacao.requisicao ? (
           <div className="space-y-2">
             <div className="bg-slate-50 rounded-xl p-3 space-y-1.5">
@@ -550,13 +529,6 @@ function GenericPendingCard({ aprovacao, aprovadorNome, aprovadorEmail }: {
             />
           </div>
         )}
-        {loteItens.length > 0 && (
-          <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] text-amber-800">
-            {selectedItemIds.length === loteItens.length
-              ? `Todos os ${loteItens.length} itens do lote serao aprovados.`
-              : `${selectedItemIds.length} de ${loteItens.length} itens serao aprovados. Os demais retornarao para Lote de Pagamento.`}
-          </div>
-        )}
       </div>
       <div className="grid grid-cols-3 border-t border-slate-100">
         <button
@@ -581,7 +553,7 @@ function GenericPendingCard({ aprovacao, aprovadorNome, aprovadorEmail }: {
         </button>
         <button
           type="button"
-          disabled={mutation.isPending || (loteItens.length > 0 && selectedItemIds.length === 0)}
+          disabled={mutation.isPending}
           onClick={() => handleDecision('aprovada')}
           className="flex items-center justify-center gap-1.5 py-3.5 text-xs font-bold text-emerald-600 hover:bg-emerald-50 active:bg-emerald-100 transition disabled:opacity-50"
         >
@@ -603,19 +575,12 @@ function GenericPendingCard({ aprovacao, aprovadorNome, aprovadorEmail }: {
 
 // ── Issue #35: Pagamento Detalhes Card ────────────────────────────────────────
 
-function PagamentoDetalhesCard({
-  detalhes,
-  selectedItemIds,
-  onToggleItem,
-}: {
+function PagamentoDetalhesCard({ detalhes }: {
   detalhes: NonNullable<AprovacaoPendente['pagamento_detalhes']>
-  selectedItemIds?: string[]
-  onToggleItem?: (itemId: string) => void
 }) {
   const [showEntender, setShowEntender] = useState(false)
   const fmtDate = (d: string) => d ? new Date(d + 'T00:00:00').toLocaleDateString('pt-BR') : '—'
-  const isVencida = !!detalhes.data_vencimento && new Date(detalhes.data_vencimento) < new Date()
-  const isLote = !!detalhes.is_lote
+  const isVencida = detalhes.data_vencimento && new Date(detalhes.data_vencimento) < new Date()
 
   return (
     <div className="space-y-2.5">
@@ -623,7 +588,7 @@ function PagamentoDetalhesCard({
       <div className={`rounded-xl p-3 flex justify-between items-center ${isVencida ? 'bg-red-50 border border-red-200' : 'bg-amber-50 border border-amber-200'}`}>
         <div>
           <span className={`text-xs font-medium ${isVencida ? 'text-red-700' : 'text-amber-700'}`}>
-            {isLote ? 'Valor Total do Lote' : 'Valor a Pagar'}
+            Valor a Pagar
           </span>
           {isVencida && (
             <span className="ml-2 text-[10px] font-bold text-red-600 bg-red-100 px-1.5 py-0.5 rounded-full">VENCIDA</span>
@@ -634,48 +599,6 @@ function PagamentoDetalhesCard({
         </span>
       </div>
 
-      {isLote && detalhes.itens && detalhes.itens.length > 0 && (
-        <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
-          <div className="grid grid-cols-[28px_minmax(0,1.7fr)_100px_90px_100px_90px] gap-x-3 px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-slate-400 bg-slate-50">
-            <span />
-            <span>Item</span>
-            <span>Documento</span>
-            <span>Venc.</span>
-            <span className="text-right">Valor</span>
-            <span>Decisão</span>
-          </div>
-          {detalhes.itens.map(item => (
-            <div key={item.id} className="grid grid-cols-[28px_minmax(0,1.7fr)_100px_90px_100px_90px] gap-x-3 px-3 py-2.5 text-xs border-t border-slate-100 items-center">
-              <label className="flex items-center justify-center">
-                <input
-                  type="checkbox"
-                  className="h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
-                  checked={selectedItemIds?.includes(item.id) ?? true}
-                  disabled={!onToggleItem || item.decisao === 'rejeitado'}
-                  onChange={() => onToggleItem?.(item.id)}
-                />
-              </label>
-              <div className="min-w-0">
-                <p className="truncate font-semibold text-slate-800">{item.fornecedor_nome || 'â€”'}</p>
-                <p className="truncate text-slate-500">{item.descricao || 'â€”'}</p>
-              </div>
-              <span className="truncate text-slate-600">{item.numero_documento || 'â€”'}</span>
-              <span className="text-slate-600">{fmtDate(item.data_vencimento)}</span>
-              <span className="text-right font-semibold text-emerald-700">{fmt(item.valor_original)}</span>
-              <span className={`inline-flex h-fit rounded-full px-2 py-0.5 text-[10px] font-semibold ${
-                item.decisao === 'aprovado'
-                  ? 'bg-emerald-50 text-emerald-700'
-                  : item.decisao === 'rejeitado'
-                    ? 'bg-rose-50 text-rose-700'
-                    : 'bg-slate-100 text-slate-600'
-              }`}>
-                {item.decisao === 'aprovado' ? 'Aprovado' : item.decisao === 'rejeitado' ? 'Excluído' : 'Pendente'}
-              </span>
-            </div>
-          ))}
-        </div>
-      )}
-
       {/* Info grid */}
       <div className="bg-slate-50 rounded-xl p-3 space-y-1.5">
         <div className="flex items-center gap-2 mb-1">
@@ -683,34 +606,6 @@ function PagamentoDetalhesCard({
           <span className="text-[11px] font-bold text-teal-600 uppercase tracking-wider">Detalhes do Pagamento</span>
         </div>
         <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-xs">
-          {isLote && (
-            <>
-              <div>
-                <span className="text-slate-400">Lote</span>
-                <p className="font-semibold text-slate-800">{detalhes.lote_numero || detalhes.numero_documento || 'â€”'}</p>
-              </div>
-              <div>
-                <span className="text-slate-400">Criado em</span>
-                <p className="font-medium text-slate-700">{detalhes.lote_data ? new Date(detalhes.lote_data).toLocaleDateString('pt-BR') : 'â€”'}</p>
-              </div>
-              <div>
-                <span className="text-slate-400">Qtd. itens</span>
-                <p className="font-medium text-slate-700">{detalhes.qtd_itens ?? detalhes.itens?.length ?? 0}</p>
-              </div>
-              <div>
-                <span className="text-slate-400">Fornecedores</span>
-                <p className="font-medium text-slate-700">{detalhes.resumo_fornecedores || 'â€”'}</p>
-              </div>
-              <div>
-                <span className="text-slate-400">Aprovados</span>
-                <p className="font-medium text-emerald-700">{detalhes.aprovados ?? 0}</p>
-              </div>
-              <div>
-                <span className="text-slate-400">Excluídos</span>
-                <p className="font-medium text-rose-700">{detalhes.excluidos ?? 0}</p>
-              </div>
-            </>
-          )}
           <div>
             <span className="text-slate-400">Fornecedor</span>
             <p className="font-semibold text-slate-800">{detalhes.fornecedor_nome || '—'}</p>
@@ -769,31 +664,16 @@ function PagamentoDetalhesCard({
       </button>
       {showEntender && (
         <div className="bg-indigo-50/60 border border-indigo-100 rounded-xl p-3 text-xs text-indigo-800 leading-relaxed">
-          {isLote ? (
-            <>
-              <p>
-                Esta e uma <strong>Autorizacao de Pagamento em lote</strong> para <strong>{detalhes.qtd_itens ?? detalhes.itens?.length ?? 0} itens</strong>,
-                totalizando <strong>{fmt(detalhes.valor_original)}</strong>.
-                {detalhes.resumo_fornecedores && <> Os principais fornecedores do lote sao <strong>{detalhes.resumo_fornecedores}</strong>.</>}
-              </p>
-              <p className="mt-1.5">
-                Ao aprovar, o financeiro podera seguir com o pagamento do lote. Ao rejeitar, o lote volta para revisao sem quebrar os status atuais.
-              </p>
-            </>
-          ) : (
-            <>
-              <p>
-                Esta e uma <strong>Autorizacao de Pagamento</strong> para o fornecedor <strong>{detalhes.fornecedor_nome}</strong> no
-                valor de <strong>{fmt(detalhes.valor_original)}</strong>
-                {detalhes.data_vencimento && <>, com vencimento em <strong>{fmtDate(detalhes.data_vencimento)}</strong></>}.
-                {detalhes.centro_custo && <> O gasto sera alocado no centro de custo <strong>{detalhes.centro_custo}</strong>.</>}
-                {isVencida && <> <span className="text-red-600 font-bold">Atencao: esta conta ja esta vencida.</span></>}
-              </p>
-              <p className="mt-1.5">
-                Ao aprovar, o financeiro podera efetuar o pagamento. Ao rejeitar, a CP voltara para revisao.
-              </p>
-            </>
-          )}
+          <p>
+            Esta e uma <strong>Autorizacao de Pagamento</strong> para o fornecedor <strong>{detalhes.fornecedor_nome}</strong> no
+            valor de <strong>{fmt(detalhes.valor_original)}</strong>
+            {detalhes.data_vencimento && <>, com vencimento em <strong>{fmtDate(detalhes.data_vencimento)}</strong></>}.
+            {detalhes.centro_custo && <> O gasto sera alocado no centro de custo <strong>{detalhes.centro_custo}</strong>.</>}
+            {isVencida && <> <span className="text-red-600 font-bold">Atencao: esta conta ja esta vencida.</span></>}
+          </p>
+          <p className="mt-1.5">
+            Ao aprovar, o financeiro podera efetuar o pagamento. Ao rejeitar, a CP voltara para revisao.
+          </p>
         </div>
       )}
     </div>
@@ -802,10 +682,13 @@ function PagamentoDetalhesCard({
 
 // ── Minuta Executive Summary (inline in GenericPendingCard) ───────────────────
 
-function MinutaExecutiveSummary({ resumo }: {
+function MinutaExecutiveSummary({ resumo, referencia }: {
   resumo: NonNullable<AprovacaoPendente['minuta_resumo']>
+  referencia?: string
 }) {
   const fmtDate = (d: string) => d ? new Date(d).toLocaleDateString('pt-BR') : '—'
+  const tituloResumo = resumo.objeto || resumo.minuta_titulo || 'Contrato sem titulo'
+  const linhaContexto = [resumo.contraparte, referencia].filter(Boolean).join(' • ')
 
   return (
     <div className="space-y-3">
@@ -815,19 +698,23 @@ function MinutaExecutiveSummary({ resumo }: {
           <FileSignature size={13} className="text-indigo-500" />
           <span className="text-[11px] font-bold text-indigo-600 uppercase tracking-wider">Resumo Executivo</span>
         </div>
+        <div className="rounded-xl border border-indigo-100 bg-white/80 px-3 py-2.5">
+          <p className="text-sm font-bold text-slate-800 leading-snug">{tituloResumo}</p>
+          <p className="text-[11px] font-semibold text-slate-500 mt-0.5">
+            {linhaContexto || 'Contrato sem referencia'}
+          </p>
+        </div>
         <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-xs">
-          <div>
-            <span className="text-slate-400">Contraparte</span>
-            <p className="font-semibold text-slate-800">{resumo.contraparte || '—'}</p>
-          </div>
           <div>
             <span className="text-slate-400">Valor Estimado</span>
             <p className="font-extrabold text-indigo-700">{resumo.valor_estimado > 0 ? fmt(resumo.valor_estimado) : '—'}</p>
           </div>
-          <div className="col-span-2">
-            <span className="text-slate-400">Objeto</span>
-            <p className="font-medium text-slate-700 leading-snug">{resumo.objeto || '—'}</p>
-          </div>
+          {resumo.contraparte && (
+            <div>
+              <span className="text-slate-400">Contraparte</span>
+              <p className="font-semibold text-slate-800">{resumo.contraparte}</p>
+            </div>
+          )}
           {resumo.tipo_contrato && (
             <div>
               <span className="text-slate-400">Tipo</span>
