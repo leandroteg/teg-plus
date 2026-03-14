@@ -37,6 +37,7 @@ const fmtDataFull = (d: string) =>
 type SortField = 'vencimento' | 'valor' | 'cliente' | 'emissao'
 type SortDir = 'asc' | 'desc'
 type ViewMode = 'list' | 'cards'
+const CR_TABLE_GRID = 'grid grid-cols-[20px_2px_minmax(0,1.8fr)_minmax(0,1.45fr)_90px_72px_minmax(0,1fr)_72px_96px] items-center gap-x-3'
 
 const SORT_OPTIONS: { field: SortField; label: string }[] = [
   { field: 'vencimento', label: 'Vencimento' },
@@ -500,7 +501,7 @@ function CRRow({ cr, onClick, isDark, isSelected, onSelect }: {
   return (
     <div
       onClick={onClick}
-      className={`flex items-center gap-2 px-3 py-1.5 border-b cursor-pointer transition-all ${
+      className={`${CR_TABLE_GRID} px-3 py-2 border-b cursor-pointer transition-all ${
         isDark
           ? `border-white/[0.04] hover:bg-white/[0.03] ${isSelected ? 'bg-emerald-500/10' : ''}`
           : `border-slate-100 hover:bg-slate-50 ${isSelected ? 'bg-emerald-50' : ''}`
@@ -518,33 +519,33 @@ function CRRow({ cr, onClick, isDark, isSelected, onSelect }: {
         urgency === 'overdue' ? 'bg-red-500' : urgency === 'today' ? 'bg-amber-500' : urgency === 'week' ? 'bg-yellow-400' : 'bg-transparent'
       }`} />
 
-      <span className={`text-xs font-semibold truncate w-[180px] shrink-0 ${isDark ? 'text-white' : 'text-slate-800'}`}>
+      <span className={`text-xs font-semibold truncate min-w-0 ${isDark ? 'text-white' : 'text-slate-800'}`}>
         {cr.cliente_nome}
       </span>
 
-      <span className={`text-[11px] truncate w-[150px] shrink-0 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+      <span className={`text-[11px] truncate min-w-0 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
         {cr.descricao || '—'}
       </span>
 
-      <span className={`text-[11px] truncate w-[80px] shrink-0 font-mono ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+      <span className={`text-[11px] truncate font-mono ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
         {cr.numero_nf ? `NF ${cr.numero_nf}` : '—'}
       </span>
 
-      <span className={`text-[11px] truncate w-[70px] shrink-0 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+      <span className={`text-[11px] truncate ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
         {cr.centro_custo || '—'}
       </span>
 
-      <span className={`text-[11px] truncate w-[100px] shrink-0 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+      <span className={`text-[11px] truncate min-w-0 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
         {cr.classe_financeira || '—'}
       </span>
 
-      <span className={`text-[11px] text-right w-[62px] shrink-0 ${
+      <span className={`text-[11px] text-right ${
         urgency === 'overdue' ? 'text-red-500 font-bold' : urgency === 'today' ? 'text-amber-600 font-semibold' : isDark ? 'text-slate-500' : 'text-slate-400'
       }`}>
         {fmtData(cr.data_vencimento)}
       </span>
 
-      <span className={`text-xs font-bold text-right w-[90px] shrink-0 ${
+      <span className={`text-xs font-bold text-right ${
         urgency === 'overdue' ? 'text-red-600' : 'text-emerald-600'
       }`}>
         {fmt(cr.valor_original)}
@@ -1054,18 +1055,18 @@ export default function ContasReceber() {
           ) : viewMode === 'list' ? (
             <>
               {/* Table header */}
-              <div className={`flex items-center gap-2 px-3 py-1 border-b text-[10px] font-semibold uppercase tracking-wider ${
+              <div className={`${CR_TABLE_GRID} px-3 py-2 border-b text-[10px] font-semibold uppercase tracking-wider ${
                 isDark ? 'border-white/[0.06] text-slate-600' : 'border-slate-100 text-slate-400'
               }`}>
-                <span className="w-3 shrink-0" />
-                <span className="w-0.5 shrink-0" />
-                <span className="w-[180px] shrink-0">Cliente</span>
-                <span className="w-[150px] shrink-0">Descricao</span>
-                <span className="w-[80px] shrink-0">NF</span>
-                <span className="w-[70px] shrink-0">CC</span>
-                <span className="w-[100px] shrink-0">Classe</span>
-                <span className="w-[62px] shrink-0 text-right">Venc.</span>
-                <span className="w-[90px] shrink-0 text-right">Valor</span>
+                <span />
+                <span />
+                <span>Cliente</span>
+                <span>Descricao</span>
+                <span>NF</span>
+                <span>CC</span>
+                <span>Classe</span>
+                <span className="text-right">Venc.</span>
+                <span className="text-right">Valor</span>
               </div>
               {activeCRs.map(cr => (
                 <CRRow

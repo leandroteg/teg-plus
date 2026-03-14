@@ -73,6 +73,7 @@ type PipelineStageId = StatusCP | 'em_aprovacao'
 type QuickFilterId = 'all' | 'overdue' | 'today' | 'week' | 'same_supplier' | 'same_work' | 'same_lote'
 type StatusHintTone = 'amber' | 'rose' | 'sky'
 type StatusHint = { text: string; tone: StatusHintTone }
+const CP_TABLE_GRID = 'grid grid-cols-[20px_2px_minmax(0,1.8fr)_minmax(0,1.45fr)_minmax(0,1fr)_70px_110px_72px_96px] items-center gap-x-3'
 
 const CP_PIPELINE_VIEW_STAGES: Array<{ status: PipelineStageId; label: string; color: string; borderColor: string }> = [
   ...CP_PIPELINE_STAGES.slice(0, 3),
@@ -721,7 +722,7 @@ function CPRow({ cp, onClick, isDark, isSelected, onSelect, approvalHint }: {
   return (
     <div
       onClick={onClick}
-      className={`flex items-center gap-2 px-3 py-1.5 border-b cursor-pointer transition-all ${
+      className={`${CP_TABLE_GRID} px-3 py-2 border-b cursor-pointer transition-all ${
         isDark
           ? `border-white/[0.04] hover:bg-white/[0.03] ${isSelected ? 'bg-emerald-500/10' : ''}`
           : `border-slate-100 hover:bg-slate-50 ${isSelected ? 'bg-emerald-50' : ''}`
@@ -739,22 +740,25 @@ function CPRow({ cp, onClick, isDark, isSelected, onSelect, approvalHint }: {
         urgency === 'overdue' ? 'bg-red-500' : urgency === 'today' ? 'bg-amber-500' : urgency === 'week' ? 'bg-yellow-400' : 'bg-transparent'
       }`} />
 
-      <span className={`text-xs font-semibold truncate w-[180px] shrink-0 ${isDark ? 'text-white' : 'text-slate-800'}`}>
-        {cp.fornecedor_nome}
-      </span>
+      <div className="min-w-0">
+        <div className="flex items-center gap-1.5 min-w-0">
+          <span className={`text-xs font-semibold truncate ${isDark ? 'text-white' : 'text-slate-800'}`}>
+            {cp.fornecedor_nome}
+          </span>
+          {cp.origem === 'logistica' && (
+            <span className="inline-flex items-center gap-0.5 bg-purple-50 text-purple-600 text-[9px] font-semibold rounded-full px-1.5 py-0.5 shrink-0">
+              <Truck size={8} /> Log
+            </span>
+          )}
+          {cp.origem === 'compras' && pedidoNum && (
+            <span className="inline-flex items-center gap-0.5 bg-sky-50 text-sky-600 text-[9px] font-semibold rounded-full px-1.5 py-0.5 shrink-0">
+              <Package size={8} /> Cmp
+            </span>
+          )}
+        </div>
+      </div>
 
-      {cp.origem === 'logistica' && (
-        <span className="inline-flex items-center gap-0.5 bg-purple-50 text-purple-600 text-[9px] font-semibold rounded-full px-1.5 py-0.5 shrink-0">
-          <Truck size={8} /> Log
-        </span>
-      )}
-      {cp.origem === 'compras' && pedidoNum && (
-        <span className="inline-flex items-center gap-0.5 bg-sky-50 text-sky-600 text-[9px] font-semibold rounded-full px-1.5 py-0.5 shrink-0">
-          <Package size={8} /> Cmp
-        </span>
-      )}
-
-      <div className="w-[150px] shrink-0">
+      <div className="min-w-0">
         <span className={`block truncate text-[11px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
           {cp.descricao || '\u2014'}
         </span>
@@ -771,29 +775,29 @@ function CPRow({ cp, onClick, isDark, isSelected, onSelect, approvalHint }: {
         )}
       </div>
 
-      <span className={`text-[11px] truncate w-[100px] shrink-0 flex items-center gap-0.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+      <span className={`text-[11px] truncate min-w-0 flex items-center gap-1 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
         {obraNome ? <><Building2 size={9} className="shrink-0" /> {obraNome}</> : '\u2014'}
       </span>
 
-      <span className={`text-[11px] truncate w-[70px] shrink-0 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+      <span className={`text-[11px] truncate ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
         {cp.centro_custo || '\u2014'}
       </span>
 
       {pedidoNum ? (
-        <span className="text-[10px] font-semibold text-teal-600 truncate w-[90px] shrink-0 flex items-center gap-0.5">
+        <span className="text-[10px] font-semibold text-teal-600 truncate flex items-center gap-0.5">
           <FileText size={9} className="shrink-0" /> {pedidoNum}
         </span>
       ) : (
-        <span className="w-[90px] shrink-0" />
+        <span className="truncate text-[10px] text-slate-300">\u2014</span>
       )}
 
-      <span className={`text-[11px] text-right w-[62px] shrink-0 ${
+      <span className={`text-[11px] text-right ${
         urgency === 'overdue' ? 'text-red-500 font-bold' : urgency === 'today' ? 'text-amber-600 font-semibold' : isDark ? 'text-slate-500' : 'text-slate-400'
       }`}>
         {fmtData(cp.data_vencimento)}
       </span>
 
-      <span className={`text-xs font-bold text-right w-[90px] shrink-0 ${
+      <span className={`text-xs font-bold text-right ${
         urgency === 'overdue' ? 'text-red-600' : 'text-emerald-600'
       }`}>
         {fmt(cp.valor_original)}
@@ -1527,18 +1531,18 @@ export default function CPPipeline() {
           ) : viewMode === 'list' ? (
             <>
               {/* Table header */}
-              <div className={`flex items-center gap-2 px-3 py-1 border-b text-[10px] font-semibold uppercase tracking-wider ${
+              <div className={`${CP_TABLE_GRID} px-3 py-2 border-b text-[10px] font-semibold uppercase tracking-wider ${
                 isDark ? 'border-white/[0.06] text-slate-600' : 'border-slate-100 text-slate-400'
               }`}>
-                <span className="w-3 shrink-0" />
-                <span className="w-0.5 shrink-0" />
-                <span className="w-[180px] shrink-0">Fornecedor</span>
-                <span className="w-[150px] shrink-0">Descri\u00E7\u00E3o</span>
-                <span className="w-[100px] shrink-0">Obra</span>
-                <span className="w-[70px] shrink-0">CC</span>
-                <span className="w-[90px] shrink-0">Pedido</span>
-                <span className="w-[62px] shrink-0 text-right">Venc.</span>
-                <span className="w-[90px] shrink-0 text-right">Valor</span>
+                <span />
+                <span />
+                <span>Fornecedor</span>
+                <span>Descri\u00E7\u00E3o</span>
+                <span>Obra</span>
+                <span>CC</span>
+                <span>Pedido</span>
+                <span className="text-right">Venc.</span>
+                <span className="text-right">Valor</span>
               </div>
               {activeCPs.map(cp => (
                 <CPRow
