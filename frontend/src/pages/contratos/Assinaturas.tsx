@@ -8,7 +8,7 @@ import {
 import { useSolicitacoes, useSolicitacoesDashboard, useAssinaturasAll } from '../../hooks/useSolicitacoes'
 import type { EtapaSolicitacao, Solicitacao, Assinatura, Signatario } from '../../types/contratos'
 
-// ── Pipeline stages ─────────────────────────────────────────────────────────
+// â”€â”€ Pipeline stages â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 type StageKey = 'pendente' | 'enviado' | 'assinado' | 'arquivado' | 'liberado'
 
@@ -32,7 +32,7 @@ const STAGES: PipelineStage[] = [
   { key: 'liberado',  label: 'Liberado',     icon: Unlock,       dot: 'bg-green-500',   bg: 'bg-green-50',   text: 'text-green-700',   border: 'border-l-green-500',   badge: 'bg-green-100 text-green-700', etapas: ['liberar_execucao'] },
 ]
 
-// ── Formatters ──────────────────────────────────────────────────────────────
+// â”€â”€ Formatters â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 const fmt = (v: number) =>
   v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 })
@@ -68,7 +68,7 @@ function getPrimeiroNome(nome?: string | null) {
   return nome.trim().split(/\s+/)[0] || 'Assinante'
 }
 
-// ── Sort ────────────────────────────────────────────────────────────────────
+// â”€â”€ Sort â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 type SortField = 'data' | 'contraparte' | 'valor'
 type SortDir = 'asc' | 'desc'
@@ -80,10 +80,10 @@ const SORT_OPTIONS: { field: SortField; label: string }[] = [
   { field: 'valor',       label: 'Valor' },
 ]
 
-// ── Export CSV ───────────────────────────────────────────────────────────────
+// â”€â”€ Export CSV â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function exportCSV(items: DisplayItem[], stageName: string) {
-  const headers = ['Número', 'Contraparte', 'Objeto', 'Status', 'Valor', 'Data']
+  const headers = ['NÃºmero', 'Contraparte', 'Objeto', 'Status', 'Valor', 'Data']
   const rows = items.map(s => [
     s.numero, s.contraparte, s.objeto, s.stageKey,
     s.valor ?? '', fmtData(s.data),
@@ -99,7 +99,7 @@ function exportCSV(items: DisplayItem[], stageName: string) {
   URL.revokeObjectURL(url)
 }
 
-// ── Unified item type ───────────────────────────────────────────────────────
+// â”€â”€ Unified item type â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 type DisplayItem = {
   id: string
@@ -113,7 +113,7 @@ type DisplayItem = {
   solicitacao: Solicitacao
 }
 
-// ── Main Component ──────────────────────────────────────────────────────────
+// â”€â”€ Main Component â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export default function AssinaturaPipeline() {
   const nav = useNavigate()
@@ -215,13 +215,13 @@ export default function AssinaturaPipeline() {
       <div>
         <h1 className="text-xl font-extrabold text-slate-800 flex items-center gap-2">
           <FileSignature size={20} className="text-indigo-500" />
-          Assinatura
+          Assinaturas
         </h1>
-        <p className="text-xs text-slate-400 mt-0.5">Pipeline de assinatura — do envio à liberação para execução</p>
+        <p className="text-xs text-slate-400 mt-0.5">{'Pipeline de assinatura - do envio \u00e0 libera\u00e7\u00e3o para execu\u00e7\u00e3o'}</p>
       </div>
 
       {/* Stage tabs */}
-      <div className="flex gap-1 p-1 rounded-2xl border overflow-x-auto hide-scrollbar bg-slate-50 border-slate-200">
+      <div className="flex gap-1 p-1 pb-2 rounded-2xl border overflow-x-auto hide-scrollbar bg-slate-50 border-slate-200">
         {STAGES.map(s => {
           const Icon = s.icon
           const count = counts[s.key]
@@ -255,7 +255,7 @@ export default function AssinaturaPipeline() {
           <input
             value={busca}
             onChange={e => setBusca(e.target.value)}
-            placeholder="Buscar número, objeto ou contraparte..."
+            placeholder="Buscar nÃºmero, objeto ou contraparte..."
             className="w-full pl-9 pr-4 py-2.5 rounded-xl border border-slate-200 bg-white text-sm text-slate-700 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-400"
           />
         </div>
@@ -305,7 +305,7 @@ export default function AssinaturaPipeline() {
           </div>
           <p className="text-sm font-semibold text-slate-500">Nenhum item nesta etapa</p>
           <p className="text-xs text-slate-400 mt-1">
-            {busca ? 'Tente ajustar a busca' : 'Contratos aparecerão aqui conforme avançam no fluxo de assinatura'}
+            {busca ? 'Tente ajustar a busca' : 'Contratos aparecerÃ£o aqui conforme avanÃ§am no fluxo de assinatura'}
           </p>
         </div>
       ) : viewMode === 'list' ? (
@@ -315,13 +315,13 @@ export default function AssinaturaPipeline() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-slate-100">
-                  <th className="text-left px-3 py-2 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Número</th>
+                  <th className="text-left px-3 py-2 text-[10px] font-bold text-slate-400 uppercase tracking-widest">NÃºmero</th>
                   <th className="text-left px-3 py-2 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Contraparte</th>
                   <th className="text-left px-3 py-2 text-[10px] font-bold text-slate-400 uppercase tracking-widest hidden lg:table-cell">Objeto</th>
-                  <th className="text-center px-3 py-2 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Signatários</th>
+                  <th className="text-center px-3 py-2 text-[10px] font-bold text-slate-400 uppercase tracking-widest">SignatÃ¡rios</th>
                   <th className="text-right px-3 py-2 text-[10px] font-bold text-slate-400 uppercase tracking-widest hidden sm:table-cell">Valor</th>
                   <th className="text-right px-3 py-2 text-[10px] font-bold text-slate-400 uppercase tracking-widest hidden md:table-cell">Data</th>
-                  <th className="text-center px-3 py-2 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Ação</th>
+                  <th className="text-center px-3 py-2 text-[10px] font-bold text-slate-400 uppercase tracking-widest">AÃ§Ã£o</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-50">
@@ -352,7 +352,7 @@ export default function AssinaturaPipeline() {
                           ))}
                         </div>
                       ) : (
-                        <span className="text-[10px] text-slate-300">—</span>
+                        <span className="text-[10px] text-slate-300">â€”</span>
                       )}
                     </td>
                     <td className="px-3 py-2 text-right hidden sm:table-cell">

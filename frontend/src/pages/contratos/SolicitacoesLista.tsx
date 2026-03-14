@@ -145,7 +145,7 @@ export default function SolicitacoesLista() {
       </div>
 
       {/* Stage tabs */}
-      <div className="flex gap-1 p-1 rounded-2xl border overflow-x-auto hide-scrollbar bg-slate-50 border-slate-200">
+      <div className="flex gap-1 p-1 pb-2 rounded-2xl border overflow-x-auto hide-scrollbar bg-slate-50 border-slate-200">
         {STAGES.map(s => {
           const Icon = s.icon
           const count = getCount(s.key)

@@ -424,6 +424,17 @@ export default function ListaRequisicoes() {
         </div>
       )}
 
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className={`text-xl font-extrabold flex items-center gap-2 ${isDark ? 'text-white' : 'text-slate-800'}`}>
+            <ClipboardList size={20} className="text-teal-600" /> {'Requisi\u00e7\u00f5es'}
+          </h1>
+          <p className={`text-xs mt-0.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+            {'Pipeline de requisi\u00e7\u00f5es em valida\u00e7\u00e3o t\u00e9cnica'}
+          </p>
+        </div>
+      </div>
+
       {/* Pipeline tabs */}
       <div className="flex gap-2 overflow-x-auto pb-1 hide-scrollbar">
         {PIPELINE_STAGES.map(stage => {
@@ -434,7 +445,7 @@ export default function ListaRequisicoes() {
 
           return (
             <button key={stage.status} onClick={() => setActiveTab(stage.status)}
-              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all flex-shrink-0 border ${
+              className={`min-w-fit md:flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all flex-shrink-0 border ${
                 isActive
                   ? isDark
                     ? `${accent.bgActive} ${accent.textActive} border-white/10 shadow-lg`

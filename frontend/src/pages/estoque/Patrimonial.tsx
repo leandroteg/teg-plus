@@ -16,9 +16,9 @@ import type { PatImobilizado, StatusImobilizado } from '../../types/estoque'
 
 const STATUS_CONFIG: Record<StatusImobilizado, { label: string; bg: string; text: string; dot: string }> = {
   ativo:            { label: 'Ativo',            bg: 'bg-emerald-50', text: 'text-emerald-700', dot: 'bg-emerald-500' },
-  em_manutencao:    { label: 'Em Manutencao',    bg: 'bg-amber-50',   text: 'text-amber-700',   dot: 'bg-amber-500'   },
+  em_manutencao:    { label: 'Em Manuten\u00e7\u00e3o',    bg: 'bg-amber-50',   text: 'text-amber-700',   dot: 'bg-amber-500'   },
   cedido:           { label: 'Cedido',           bg: 'bg-blue-50',    text: 'text-blue-700',    dot: 'bg-blue-500'    },
-  em_transferencia:  { label: 'Em Transferencia', bg: 'bg-indigo-50',  text: 'text-indigo-700',  dot: 'bg-indigo-500'  },
+  em_transferencia:  { label: 'Em Transfer\u00eancia', bg: 'bg-indigo-50',  text: 'text-indigo-700',  dot: 'bg-indigo-500'  },
   baixado:           { label: 'Baixado',          bg: 'bg-slate-100',  text: 'text-slate-500',   dot: 'bg-slate-400'   },
   pendente_registro: { label: 'Pendente',         bg: 'bg-violet-50',  text: 'text-violet-700',  dot: 'bg-violet-500'  },
 }
@@ -123,14 +123,14 @@ export default function Patrimonial({
       {!hideHeader && (
         <div className="flex items-center justify-between">
           <div>
-            <h1 className={`text-xl font-extrabold ${isLight ? 'text-slate-800' : 'text-white'}`}>Patrimonial</h1>
+            <h1 className={`text-xl font-extrabold ${isLight ? 'text-slate-800' : 'text-white'}`}>{'Patrim\u00f4nio'}</h1>
             <p className={`text-xs mt-0.5 ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>{filtrados.length} imobilizados</p>
           </div>
           <div className="flex gap-2">
             <button
               onClick={() => calcDeprec.mutate(COMPETENCIA)}
               disabled={calcDeprec.isPending}
-              title={`Calcular depreciacao ${COMPETENCIA}`}
+              title={`Calcular deprecia\u00e7\u00e3o ${COMPETENCIA}`}
               className={`flex items-center gap-1.5 border text-sm font-semibold px-3 py-2 rounded-xl transition-colors
                 ${isLight ? 'bg-white hover:bg-slate-50 border-slate-200 text-slate-600' : 'bg-white/[0.03] hover:bg-white/[0.05] border-white/[0.08] text-slate-300'}`}
             >
@@ -153,8 +153,8 @@ export default function Patrimonial({
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
           {[
             { color: 'bg-blue-500',   val: kpis.total_imobilizados, valCls: 'text-blue-600',   lbl: 'Total Ativos' },
-            { color: 'bg-indigo-500', val: fmt(kpis.valor_total_liquido), valCls: 'text-indigo-600', lbl: 'Valor Liquido' },
-            { color: 'bg-amber-500',  val: kpis.imobilizados_em_manutencao, valCls: 'text-amber-600', lbl: 'Em Manutencao' },
+            { color: 'bg-indigo-500', val: fmt(kpis.valor_total_liquido), valCls: 'text-indigo-600', lbl: 'Valor L\u00edquido' },
+            { color: 'bg-amber-500',  val: kpis.imobilizados_em_manutencao, valCls: 'text-amber-600', lbl: 'Em Manuten\u00e7\u00e3o' },
             { color: 'bg-red-500',    val: kpis.termos_pendentes, valCls: 'text-red-600',    lbl: 'Termos Pendentes' },
           ].map(({ color, val, valCls, lbl }) => (
             <div key={lbl} className={`rounded-2xl border overflow-hidden flex ${card}`}>
@@ -175,7 +175,7 @@ export default function Patrimonial({
           <input
             value={busca}
             onChange={e => setBusca(e.target.value)}
-            placeholder="Buscar por patrimonio, descricao ou categoria..."
+            placeholder={'Buscar por patrim\u00f4nio, descri\u00e7\u00e3o ou categoria...'}
             className={`w-full pl-9 pr-4 py-2 rounded-xl border text-sm
               focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400
               ${isLight ? 'border-slate-200 bg-white text-slate-800' : 'border-white/[0.08] bg-white/[0.03] text-slate-200 placeholder:text-slate-500'}`}
@@ -206,7 +206,7 @@ export default function Patrimonial({
                 ? isLight ? 'bg-slate-100 text-slate-700' : 'bg-white/[0.08] text-white'
                 : isLight ? 'text-slate-400 hover:text-slate-600 hover:bg-slate-50' : 'text-slate-500 hover:text-slate-300 hover:bg-white/[0.04]'
             }`}
-            title="Visao tabela"
+            title={'Vis\u00e3o tabela'}
           >
             <LayoutList size={16} />
           </button>
@@ -218,7 +218,7 @@ export default function Patrimonial({
                 ? isLight ? 'bg-slate-100 text-slate-700' : 'bg-white/[0.08] text-white'
                 : isLight ? 'text-slate-400 hover:text-slate-600 hover:bg-slate-50' : 'text-slate-500 hover:text-slate-300 hover:bg-white/[0.04]'
             }`}
-            title="Visao cards"
+            title={'Vis\u00e3o cards'}
           >
             <LayoutGrid size={16} />
           </button>
@@ -256,7 +256,7 @@ export default function Patrimonial({
             <table className="min-w-full text-sm">
               <thead className={isLight ? 'bg-slate-50' : 'bg-white/[0.03]'}>
                 <tr className={isLight ? 'text-slate-500' : 'text-slate-400'}>
-                  <th className="px-4 py-2 text-left text-[11px] font-bold uppercase tracking-wider">Patrimonio</th>
+                  <th className="px-4 py-2 text-left text-[11px] font-bold uppercase tracking-wider">{'Patrim\u00f4nio'}</th>
                   <th className="px-4 py-2 text-left text-[11px] font-bold uppercase tracking-wider">Descricao</th>
                   <th className="px-4 py-2 text-left text-[11px] font-bold uppercase tracking-wider">Status</th>
                   <th className="px-4 py-2 text-left text-[11px] font-bold uppercase tracking-wider">Responsavel</th>
@@ -540,8 +540,8 @@ function ImobilizadoDetail({
       {/* Informacoes adicionais */}
       <div className={`text-[10px] space-y-1 ${subtext}`}>
         {imob.marca && <p>Marca: <span className={`font-semibold ${isLight ? 'text-slate-600' : 'text-slate-300'}`}>{imob.marca}</span>{imob.modelo ? ` -- ${imob.modelo}` : ''}</p>}
-        {imob.numero_serie && <p>N. Serie: <span className={`font-semibold font-mono ${isLight ? 'text-slate-600' : 'text-slate-300'}`}>{imob.numero_serie}</span></p>}
-        {imob.taxa_depreciacao_anual && <p>Taxa depreciacao: <span className={`font-semibold ${isLight ? 'text-slate-600' : 'text-slate-300'}`}>{imob.taxa_depreciacao_anual}% a.a.</span> - Vida util: <span className={`font-semibold ${isLight ? 'text-slate-600' : 'text-slate-300'}`}>{imob.vida_util_meses} meses</span></p>}
+        {imob.numero_serie && <p>{'N. S\u00e9rie:'} <span className={`font-semibold font-mono ${isLight ? 'text-slate-600' : 'text-slate-300'}`}>{imob.numero_serie}</span></p>}
+        {imob.taxa_depreciacao_anual && <p>{'Taxa deprecia\u00e7\u00e3o:'} <span className={`font-semibold ${isLight ? 'text-slate-600' : 'text-slate-300'}`}>{imob.taxa_depreciacao_anual}% a.a.</span> {'- Vida \u00fatil:'} <span className={`font-semibold ${isLight ? 'text-slate-600' : 'text-slate-300'}`}>{imob.vida_util_meses} meses</span></p>}
         {imob.data_aquisicao && <p>Adquirido em: <span className={`font-semibold ${isLight ? 'text-slate-600' : 'text-slate-300'}`}>{new Date(imob.data_aquisicao + 'T00:00:00').toLocaleDateString('pt-BR')}</span></p>}
       </div>
 
@@ -644,7 +644,7 @@ function ImobilizadoFormModal({
         <div className="p-6 space-y-4">
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className={`block text-xs font-bold mb-1 ${labelCls}`}>N. Patrimonio *</label>
+              <label className={`block text-xs font-bold mb-1 ${labelCls}`}>{'N. Patrim\u00f4nio *'}</label>
               <input value={item.numero_patrimonio ?? ''} onChange={e => set('numero_patrimonio', e.target.value)}
                 className={inputCls} placeholder="PAT-0001" />
             </div>

@@ -191,7 +191,7 @@ export default function Itens() {
       </div>
 
       {/* ── Pipeline Tabs ──────────────────────────────────────────── */}
-      <div className={`flex gap-1 p-1 rounded-2xl border ${isDark ? 'bg-white/[0.02] border-white/[0.06]' : 'bg-slate-50 border-slate-200'}`}>
+      <div className={`flex gap-1 p-1 rounded-2xl border overflow-x-auto hide-scrollbar ${isDark ? 'bg-white/[0.02] border-white/[0.06]' : 'bg-slate-50 border-slate-200'}`}>
         {STAGES.map(stage => {
           const active = activeTab === stage.tab
           const a = accent[stage.tab]
@@ -199,7 +199,7 @@ export default function Itens() {
             <button
               key={stage.tab}
               onClick={() => setActiveTab(stage.tab)}
-              className={`flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all
+              className={`min-w-fit md:flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold whitespace-nowrap transition-all
                 ${active
                   ? `${a.bg} ${a.text} ${a.border} border shadow-sm`
                   : isDark

@@ -664,7 +664,7 @@ export default function SolicitacoesPipeline() {
       </div>
 
       {/* Horizontal Tabs */}
-      <div className={`flex gap-1 p-1 rounded-2xl border overflow-x-auto hide-scrollbar ${isDark ? 'bg-white/[0.02] border-white/[0.06]' : 'bg-slate-50 border-slate-200'}`}>
+      <div className={`flex gap-1 p-1 pb-2 rounded-2xl border overflow-x-auto hide-scrollbar ${isDark ? 'bg-white/[0.02] border-white/[0.06]' : 'bg-slate-50 border-slate-200'}`}>
         {SOLICITACAO_PIPELINE_STAGES.map(stage => {
           const count = grouped.get(stage.status)?.length || 0
           const isActive = activeTab === stage.status
