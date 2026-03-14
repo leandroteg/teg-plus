@@ -78,6 +78,12 @@ type NovaSolicitacaoExtraForm = {
   centro_custo: string
   classe_financeira: string
   valor: string
+  favorecido: string
+  banco_nome: string
+  agencia: string
+  conta: string
+  pix_tipo: string
+  pix_chave: string
 }
 
 const EMPTY_EXTRA_FORM: NovaSolicitacaoExtraForm = {
@@ -86,6 +92,12 @@ const EMPTY_EXTRA_FORM: NovaSolicitacaoExtraForm = {
   centro_custo: '',
   classe_financeira: '',
   valor: '',
+  favorecido: '',
+  banco_nome: '',
+  agencia: '',
+  conta: '',
+  pix_tipo: '',
+  pix_chave: '',
 }
 
 function summarizeNames(values: string[], fallback: string) {
@@ -472,6 +484,8 @@ function NovaSolicitacaoExtraordinariaModal({
   const classesFinanceiras = useLookupClassesFinanceiras()
   const criarSolicitacaoMut = useCriarSolicitacaoExtraordinariaCP()
   const [form, setForm] = useState<NovaSolicitacaoExtraForm>(EMPTY_EXTRA_FORM)
+  const [arquivos, setArquivos] = useState<File[]>([])
+  const [erro, setErro] = useState('')
 
   const canSubmit = form.descricao.trim().length > 0
     && form.justificativa.trim().length > 0
@@ -492,16 +506,30 @@ function NovaSolicitacaoExtraordinariaModal({
 
   async function handleCriar() {
     if (!canSubmit) return
-    await criarSolicitacaoMut.mutateAsync({
-      descricao: form.descricao,
-      justificativa: form.justificativa,
-      centro_custo: form.centro_custo,
-      classe_financeira: form.classe_financeira,
-      valor: Number(form.valor),
-      solicitanteNome: perfil?.nome,
-    })
-    onSuccess()
-    onClose()
+    setErro('')
+    try {
+      await criarSolicitacaoMut.mutateAsync({
+        descricao: form.descricao,
+        justificativa: form.justificativa,
+        centro_custo: form.centro_custo,
+        classe_financeira: form.classe_financeira,
+        valor: Number(form.valor),
+        solicitanteNome: perfil?.nome,
+        dadosBancarios: {
+          favorecido: form.favorecido || undefined,
+          banco_nome: form.banco_nome || undefined,
+          agencia: form.agencia || undefined,
+          conta: form.conta || undefined,
+          pix_tipo: form.pix_tipo || undefined,
+          pix_chave: form.pix_chave || undefined,
+        },
+        arquivos,
+      })
+      onSuccess()
+      onClose()
+    } catch (error) {
+      setErro(error instanceof Error ? error.message : 'Erro ao criar solicitação')
+    }
   }
 
   return (
@@ -558,6 +586,77 @@ function NovaSolicitacaoExtraordinariaModal({
             <label className={labelCls}>Valor *</label>
             <input type="number" min="0" step="0.01" value={form.valor} onChange={e => setField('valor', e.target.value)} className={inputCls} placeholder="0,00" />
           </div>
+
+          <div className={`rounded-xl border p-4 space-y-3 ${isDark ? 'border-white/[0.08] bg-white/[0.03]' : 'border-slate-200 bg-slate-50/70'}`}>
+            <div>
+              <p className={`text-xs font-bold ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>Dados bancários</p>
+              <p className={`text-[11px] mt-1 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Preencha quando o pagamento extraordinário exigir dados de depósito, transferência ou PIX.</p>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className={labelCls}>Favorecido</label>
+                <input value={form.favorecido} onChange={e => setField('favorecido', e.target.value)} className={inputCls} placeholder="Nome do favorecido" />
+              </div>
+              <div>
+                <label className={labelCls}>Banco</label>
+                <input value={form.banco_nome} onChange={e => setField('banco_nome', e.target.value)} className={inputCls} placeholder="Nome do banco" />
+              </div>
+              <div>
+                <label className={labelCls}>Agência</label>
+                <input value={form.agencia} onChange={e => setField('agencia', e.target.value)} className={inputCls} placeholder="0001" />
+              </div>
+              <div>
+                <label className={labelCls}>Conta</label>
+                <input value={form.conta} onChange={e => setField('conta', e.target.value)} className={inputCls} placeholder="12345-6" />
+              </div>
+              <div>
+                <label className={labelCls}>Tipo PIX</label>
+                <select value={form.pix_tipo} onChange={e => setField('pix_tipo', e.target.value)} className={inputCls}>
+                  <option value="">Selecione...</option>
+                  <option value="cpf">CPF</option>
+                  <option value="cnpj">CNPJ</option>
+                  <option value="email">E-mail</option>
+                  <option value="telefone">Telefone</option>
+                  <option value="aleatoria">Chave aleatória</option>
+                </select>
+              </div>
+              <div>
+                <label className={labelCls}>Chave PIX</label>
+                <input value={form.pix_chave} onChange={e => setField('pix_chave', e.target.value)} className={inputCls} placeholder="Informe a chave PIX" />
+              </div>
+            </div>
+          </div>
+
+          <div className={`rounded-xl border p-4 space-y-3 ${isDark ? 'border-white/[0.08] bg-white/[0.03]' : 'border-slate-200 bg-slate-50/70'}`}>
+            <div>
+              <p className={`text-xs font-bold ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>Anexos</p>
+              <p className={`text-[11px] mt-1 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Envie comprovantes, boletos, ordens de pagamento ou outros arquivos de suporte.</p>
+            </div>
+            <input
+              type="file"
+              multiple
+              onChange={e => setArquivos(Array.from(e.target.files ?? []))}
+              className={`block w-full text-xs ${isDark ? 'text-slate-300 file:bg-white/[0.08] file:text-slate-200' : 'text-slate-600 file:bg-white file:text-slate-700'} file:mr-3 file:rounded-xl file:border-0 file:px-3 file:py-2`}
+            />
+            {arquivos.length > 0 && (
+              <div className="space-y-1">
+                {arquivos.map(file => (
+                  <div key={`${file.name}-${file.size}`} className={`rounded-lg px-3 py-2 text-[11px] ${isDark ? 'bg-white/[0.04] text-slate-300' : 'bg-white text-slate-600 border border-slate-200'}`}>
+                    {file.name}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {!canSubmit && (
+            <p className={`text-[11px] ${isDark ? 'text-amber-300' : 'text-amber-700'}`}>
+              Preencha descrição, justificativa, centro de custo, classe financeira e valor para liberar a criação.
+            </p>
+          )}
+          {erro && (
+            <p className={`text-[11px] ${isDark ? 'text-rose-300' : 'text-rose-700'}`}>{erro}</p>
+          )}
         </div>
 
         <div className={`px-6 py-4 flex justify-end gap-2 ${isDark ? 'border-t border-white/[0.06]' : 'border-t border-slate-100'}`}>
@@ -586,6 +685,11 @@ function CPDetailModal({ cp, stageStatus, onClose, onAction, isDark }: {
   const decisaoGenericaMut = useDecisaoGenerica()
   const aprovarPagamentoMut = useAprovarPagamento()
   const urgency = getUrgency(cp)
+  const manualRequest = cp.remessa_payload && typeof cp.remessa_payload === 'object'
+    ? (cp.remessa_payload as Record<string, any>).manual_request as Record<string, any> | undefined
+    : undefined
+  const manualAttachments = Array.isArray(manualRequest?.anexos) ? manualRequest?.anexos as Array<{ nome: string; url: string }> : []
+  const bankInfo = manualRequest?.dados_bancarios as Record<string, string | undefined> | undefined
   const [approval, setApproval] = useState<null | {
     id: string
     entidade_id: string
@@ -789,10 +893,46 @@ function CPDetailModal({ cp, stageStatus, onClose, onAction, isDark }: {
 
           {cp.fornecedor_id && <FornecedorBankInfo fornecedorId={cp.fornecedor_id} isDark={isDark} />}
 
+          {bankInfo && Object.values(bankInfo).some(Boolean) && (
+            <div className={`rounded-xl p-3 space-y-2 ${isDark ? 'bg-white/[0.04]' : 'bg-emerald-50/70'}`}>
+              <p className="text-[10px] font-bold text-emerald-600 uppercase tracking-wider flex items-center gap-1">
+                <Banknote size={10} /> Dados bancários informados
+              </p>
+              <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-xs">
+                {bankInfo.favorecido && <div><span className="text-slate-400">Favorecido:</span> <span className="font-semibold">{bankInfo.favorecido}</span></div>}
+                {bankInfo.banco_nome && <div><span className="text-slate-400">Banco:</span> <span className="font-semibold">{bankInfo.banco_nome}</span></div>}
+                {bankInfo.agencia && <div><span className="text-slate-400">Agência:</span> <span className="font-semibold">{bankInfo.agencia}</span></div>}
+                {bankInfo.conta && <div><span className="text-slate-400">Conta:</span> <span className="font-semibold">{bankInfo.conta}</span></div>}
+                {bankInfo.pix_tipo && <div><span className="text-slate-400">Tipo PIX:</span> <span className="font-semibold capitalize">{bankInfo.pix_tipo}</span></div>}
+                {bankInfo.pix_chave && <div className="col-span-2"><span className="text-slate-400">Chave PIX:</span> <span className="font-semibold">{bankInfo.pix_chave}</span></div>}
+              </div>
+            </div>
+          )}
+
           {cp.pedido_id && (
             <div>
               <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2 flex items-center gap-1"><Paperclip size={10} /> Anexos</p>
               <AnexosList pedidoId={cp.pedido_id} />
+            </div>
+          )}
+          {!cp.pedido_id && manualAttachments.length > 0 && (
+            <div>
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2 flex items-center gap-1"><Paperclip size={10} /> Anexos</p>
+              <div className="space-y-1">
+                {manualAttachments.map(arquivo => (
+                  <a
+                    key={`${arquivo.nome}-${arquivo.url}`}
+                    href={arquivo.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-1.5 px-2 py-1 rounded-lg border border-slate-200 hover:border-slate-300 text-[10px] group"
+                  >
+                    <Paperclip size={9} className="text-slate-400 shrink-0" />
+                    <span className="truncate text-slate-600 font-medium">{arquivo.nome}</span>
+                    <ExternalLink size={8} className="text-slate-300 group-hover:text-slate-500 shrink-0 ml-auto" />
+                  </a>
+                ))}
+              </div>
             </div>
           )}
 

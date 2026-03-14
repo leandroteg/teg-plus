@@ -132,6 +132,8 @@ export function useCriarSolicitacaoExtraordinariaCP() {
       classe_financeira,
       valor,
       solicitanteNome,
+      dadosBancarios,
+      arquivos,
     }: {
       descricao: string
       justificativa: string
@@ -139,9 +141,33 @@ export function useCriarSolicitacaoExtraordinariaCP() {
       classe_financeira: string
       valor: number
       solicitanteNome?: string
+      dadosBancarios?: {
+        favorecido?: string
+        banco_nome?: string
+        agencia?: string
+        conta?: string
+        pix_tipo?: string
+        pix_chave?: string
+      }
+      arquivos?: File[]
     }) => {
       const hoje = new Date().toISOString().split('T')[0]
       const numeroDocumento = `EXT-${new Date().toISOString().replace(/[-:TZ.]/g, '').slice(0, 14)}`
+      const uploadedArquivos: Array<{ nome: string; url: string }> = []
+
+      for (const arquivo of arquivos ?? []) {
+        const ext = arquivo.name.split('.').pop()?.toLowerCase() || 'bin'
+        const path = `financeiro/extraordinarios/${numeroDocumento}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`
+        let bucket = 'notas-fiscais'
+        let uploadResult = await supabase.storage.from(bucket).upload(path, arquivo)
+        if (uploadResult.error) {
+          bucket = 'tesouraria-extratos'
+          uploadResult = await supabase.storage.from(bucket).upload(path, arquivo)
+        }
+        if (uploadResult.error) throw uploadResult.error
+        const { data: urlData } = supabase.storage.from(bucket).getPublicUrl(path)
+        uploadedArquivos.push({ nome: arquivo.name, url: urlData.publicUrl })
+      }
 
       const { data, error } = await supabase
         .from('fin_contas_pagar')
@@ -160,6 +186,15 @@ export function useCriarSolicitacaoExtraordinariaCP() {
           status: 'confirmado',
           descricao: descricao.trim(),
           observacoes: `Solicitação extraordinária urgente. Justificativa: ${justificativa.trim()}${solicitanteNome ? ` | Solicitante: ${solicitanteNome}` : ''}`,
+          remessa_payload: {
+            manual_request: {
+              urgente: true,
+              justificativa: justificativa.trim(),
+              solicitante_nome: solicitanteNome ?? null,
+              dados_bancarios: dadosBancarios ?? null,
+              anexos: uploadedArquivos,
+            },
+          },
         })
         .select('id')
         .single()
