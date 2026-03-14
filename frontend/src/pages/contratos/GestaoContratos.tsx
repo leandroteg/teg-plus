@@ -109,8 +109,11 @@ function ContratoCard({ contrato, onToast }: { contrato: Contrato; onToast: (typ
   const cfg = STATUS_CONTRATO[contrato.status]
   const isDespesa = contrato.tipo_contrato === 'despesa'
   const contraparte = isDespesa
-    ? contrato.fornecedor?.razao_social ?? contrato.fornecedor?.nome_fantasia
+    ? contrato.fornecedor?.razao_social
+      ?? contrato.fornecedor?.nome_fantasia
+      ?? contrato.solicitacao?.contraparte_nome
     : contrato.cliente?.nome
+      ?? contrato.solicitacao?.contraparte_nome
   const linhaContexto = [contraparte, contrato.numero, contrato.centro_custo]
     .filter(Boolean)
     .join(' • ')

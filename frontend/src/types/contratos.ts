@@ -44,6 +44,7 @@ export interface Contrato {
   // Partes
   cliente_id: string
   fornecedor_id?: string
+  solicitacao_id?: string
   obra_id?: string
   // Escopo
   objeto: string
@@ -91,6 +92,10 @@ export interface Contrato {
     id: string
     codigo: string
     nome: string
+  }
+  solicitacao?: {
+    id: string
+    contraparte_nome?: string
   }
   itens?: ContratoItem[]
 }

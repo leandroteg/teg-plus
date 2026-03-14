@@ -49,7 +49,8 @@ const SELECT_CONTRATO = `
   *,
   cliente:con_clientes!cliente_id(id, nome, cnpj, tipo),
   fornecedor:cmp_fornecedores!fornecedor_id(id, razao_social, nome_fantasia, cnpj),
-  obra:sys_obras!obra_id(id, codigo, nome)
+  obra:sys_obras!obra_id(id, codigo, nome),
+  solicitacao:con_solicitacoes!solicitacao_id(id, contraparte_nome)
 `
 
 export function useContratos(filters?: { status?: string; tipo_contrato?: string }) {
