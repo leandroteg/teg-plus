@@ -1,10 +1,11 @@
-import { useState, useMemo, useCallback } from 'react'
+import { useState, useMemo, useCallback, useEffect, useRef } from 'react'
 import {
   Receipt, Search, Calendar, AlertTriangle, CheckCircle2, Clock,
   FileText, ChevronDown, ChevronUp, Banknote, X, ShieldCheck,
   Building2, Tag, Briefcase, Hash, Layers, Truck, Package,
   Paperclip, ExternalLink, Download, ArrowUpDown, LayoutList,
   LayoutGrid, Filter, SortAsc, SortDesc, ArrowDown, ArrowUp, Send,
+  ChevronLeft, ChevronRight,
 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { useTheme } from '../../contexts/ThemeContext'
@@ -111,6 +112,178 @@ const STATUS_ACCENT_DARK: Record<string, { bg: string; bgActive: string; text: s
   em_pagamento:  { bg: 'hover:bg-white/[0.03]', bgActive: 'bg-sky-500/10',     text: 'text-sky-400',     textActive: 'text-sky-300',     border: 'border-sky-400/40',     badge: 'bg-sky-500/15 text-sky-200' },
   pago:          { bg: 'hover:bg-white/[0.03]', bgActive: 'bg-teal-500/10',    text: 'text-teal-400',    textActive: 'text-teal-300',    border: 'border-teal-400/40',    badge: 'bg-teal-500/15 text-teal-200' },
   conciliado:    { bg: 'hover:bg-white/[0.03]', bgActive: 'bg-green-500/10',   text: 'text-green-400',   textActive: 'text-green-300',   border: 'border-green-400/40',   badge: 'bg-green-500/15 text-green-200' },
+}
+
+function PipelineRail({
+  isDark,
+  activeTab,
+  switchTab,
+  grouped,
+}: {
+  isDark: boolean
+  activeTab: PipelineStageId
+  switchTab: (tab: PipelineStageId) => void
+  grouped: Map<PipelineStageId, ContaPagar[]>
+}) {
+  const railRef = useRef<HTMLDivElement | null>(null)
+  const dragRef = useRef<{ active: boolean; startX: number; startScrollLeft: number }>({
+    active: false,
+    startX: 0,
+    startScrollLeft: 0,
+  })
+  const [canScrollLeft, setCanScrollLeft] = useState(false)
+  const [canScrollRight, setCanScrollRight] = useState(false)
+
+  useEffect(() => {
+    const rail = railRef.current
+    if (!rail) return
+
+    const updateScrollState = () => {
+      const maxScroll = rail.scrollWidth - rail.clientWidth
+      setCanScrollLeft(rail.scrollLeft > 8)
+      setCanScrollRight(maxScroll - rail.scrollLeft > 8)
+    }
+
+    updateScrollState()
+    rail.addEventListener('scroll', updateScrollState, { passive: true })
+
+    const resizeObserver = new ResizeObserver(updateScrollState)
+    resizeObserver.observe(rail)
+    Array.from(rail.children).forEach(child => resizeObserver.observe(child))
+
+    return () => {
+      rail.removeEventListener('scroll', updateScrollState)
+      resizeObserver.disconnect()
+    }
+  }, [grouped, activeTab])
+
+  const scrollByOffset = (direction: 'left' | 'right') => {
+    const rail = railRef.current
+    if (!rail) return
+    const offset = Math.max(rail.clientWidth * 0.72, 220)
+    rail.scrollBy({ left: direction === 'left' ? -offset : offset, behavior: 'smooth' })
+  }
+
+  const handlePointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
+    const rail = railRef.current
+    if (!rail) return
+    dragRef.current = {
+      active: true,
+      startX: event.clientX,
+      startScrollLeft: rail.scrollLeft,
+    }
+    rail.setPointerCapture(event.pointerId)
+  }
+
+  const handlePointerMove = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (!dragRef.current.active) return
+    const rail = railRef.current
+    if (!rail) return
+    const delta = event.clientX - dragRef.current.startX
+    rail.scrollLeft = dragRef.current.startScrollLeft - delta
+  }
+
+  const handlePointerUp = (event: React.PointerEvent<HTMLDivElement>) => {
+    const rail = railRef.current
+    if (!rail) return
+    dragRef.current.active = false
+    if (rail.hasPointerCapture(event.pointerId)) {
+      rail.releasePointerCapture(event.pointerId)
+    }
+  }
+
+  const handleWheel = (event: React.WheelEvent<HTMLDivElement>) => {
+    const rail = railRef.current
+    if (!rail) return
+    if (Math.abs(event.deltaY) <= Math.abs(event.deltaX)) return
+    event.preventDefault()
+    rail.scrollLeft += event.deltaY
+  }
+
+  const arrowBaseClass = isDark
+    ? 'border-white/[0.08] bg-slate-950/80 text-slate-200 hover:bg-slate-900'
+    : 'border-slate-200 bg-white/95 text-slate-600 hover:bg-slate-50'
+
+  return (
+    <div className={`relative min-w-0 rounded-2xl border p-1 ${
+      isDark ? 'border-white/[0.08] bg-white/[0.02]' : 'border-slate-200 bg-white'
+    }`}>
+      {canScrollLeft && (
+        <>
+          <div className={`pointer-events-none absolute inset-y-1 left-1 z-10 w-16 rounded-l-[calc(1rem-2px)] ${
+            isDark ? 'bg-gradient-to-r from-[#0f172a] via-[#0f172a]/80 to-transparent' : 'bg-gradient-to-r from-white via-white/85 to-transparent'
+          }`} />
+          <button
+            type="button"
+            aria-label="Rolar abas para a esquerda"
+            onClick={() => scrollByOffset('left')}
+            className={`absolute left-3 top-1/2 z-20 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full border shadow-sm transition-all ${arrowBaseClass}`}
+          >
+            <ChevronLeft size={16} />
+          </button>
+        </>
+      )}
+
+      {canScrollRight && (
+        <>
+          <div className={`pointer-events-none absolute inset-y-1 right-1 z-10 w-16 rounded-r-[calc(1rem-2px)] ${
+            isDark ? 'bg-gradient-to-l from-[#0f172a] via-[#0f172a]/80 to-transparent' : 'bg-gradient-to-l from-white via-white/85 to-transparent'
+          }`} />
+          <button
+            type="button"
+            aria-label="Rolar abas para a direita"
+            onClick={() => scrollByOffset('right')}
+            className={`absolute right-3 top-1/2 z-20 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full border shadow-sm transition-all ${arrowBaseClass}`}
+          >
+            <ChevronRight size={16} />
+          </button>
+        </>
+      )}
+
+      <div
+        ref={railRef}
+        onPointerDown={handlePointerDown}
+        onPointerMove={handlePointerMove}
+        onPointerUp={handlePointerUp}
+        onPointerCancel={handlePointerUp}
+        onWheel={handleWheel}
+        className="min-w-0 overflow-x-auto hide-scrollbar cursor-grab active:cursor-grabbing"
+      >
+        <div className="flex min-w-max items-stretch gap-1 pr-10">
+          {CP_PIPELINE_VIEW_STAGES.map(stage => {
+            const count = grouped.get(stage.status)?.length || 0
+            const isActive = activeTab === stage.status
+            const Icon = STATUS_ICONS[stage.status] || Receipt
+            const accent = isDark ? STATUS_ACCENT_DARK[stage.status] : STATUS_ACCENT[stage.status]
+
+            return (
+              <button
+                key={stage.status}
+                onClick={() => switchTab(stage.status)}
+                className={`flex min-h-[52px] items-center gap-2 rounded-xl px-4 py-3 text-xs whitespace-nowrap transition-all shrink-0 ${
+                  isActive
+                    ? `${accent?.bgActive} ${accent?.textActive} border font-bold shadow-sm ${accent?.border}`
+                    : `${accent?.bg} ${accent?.text} font-medium`
+                }`}
+              >
+                <Icon size={13} className="shrink-0" />
+                {stage.label}
+                {count > 0 && (
+                  <span className={`rounded-full min-w-[22px] h-[22px] px-1.5 flex items-center justify-center text-[10px] font-bold ${
+                    isActive
+                      ? accent?.badge
+                      : isDark ? 'bg-white/[0.06] text-slate-500' : 'bg-slate-100 text-slate-500'
+                  }`}>
+                    {count}
+                  </span>
+                )}
+              </button>
+            )
+          })}
+        </div>
+      </div>
+    </div>
+  )
 }
 
 // Ã¢â€â‚¬Ã¢â€â‚¬ Export CSV Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
@@ -902,42 +1075,12 @@ export default function CPPipeline() {
       </div>
 
       {/* Ã¢â€â‚¬Ã¢â€â‚¬ Horizontal Tabs Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ */}
-      <div className={`overflow-x-auto hide-scrollbar rounded-2xl border p-1 ${
-        isDark ? 'border-white/[0.08] bg-white/[0.02]' : 'border-slate-200 bg-white'
-      }`}>
-        <div className="flex min-w-max items-stretch gap-1">
-        {CP_PIPELINE_VIEW_STAGES.map(stage => {
-          const count = grouped.get(stage.status)?.length || 0
-          const isActive = activeTab === stage.status
-          const Icon = STATUS_ICONS[stage.status] || Receipt
-          const accent = isDark ? STATUS_ACCENT_DARK[stage.status] : STATUS_ACCENT[stage.status]
-
-          return (
-            <button
-              key={stage.status}
-              onClick={() => switchTab(stage.status)}
-              className={`flex min-h-[52px] items-center gap-2 rounded-xl px-4 py-3 text-xs whitespace-nowrap transition-all shrink-0 ${
-                isActive
-                  ? `${accent?.bgActive} ${accent?.textActive} border font-bold shadow-sm ${accent?.border}`
-                  : `${accent?.bg} ${accent?.text} font-medium`
-              }`}
-            >
-              <Icon size={13} className="shrink-0" />
-              {stage.label}
-              {count > 0 && (
-                <span className={`rounded-full min-w-[22px] h-[22px] px-1.5 flex items-center justify-center text-[10px] font-bold ${
-                  isActive
-                    ? accent?.badge
-                    : isDark ? 'bg-white/[0.06] text-slate-500' : 'bg-slate-100 text-slate-500'
-                }`}>
-                  {count}
-                </span>
-              )}
-            </button>
-          )
-        })}
-        </div>
-      </div>
+      <PipelineRail
+        isDark={isDark}
+        activeTab={activeTab}
+        switchTab={switchTab}
+        grouped={grouped}
+      />
 
       {/* Ã¢â€â‚¬Ã¢â€â‚¬ Content panel Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ */}
       <div className={`rounded-2xl border overflow-hidden ${isDark ? 'bg-[#0f172a] border-white/[0.06]' : 'bg-white border-slate-200'}`}>
