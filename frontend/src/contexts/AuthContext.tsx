@@ -374,7 +374,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (mod === 'patrimonial') return perfil?.modulos?.estoque === true
       return false
     },
-    canApprove: (nivel) => (perfil?.alcada_nivel ?? 0) >= nivel,
+    canApprove: (nivel) => role === 'admin' || (perfil?.alcada_nivel ?? 0) >= nivel,
     atLeast:    (r) => ROLE_NIVEL[role] >= ROLE_NIVEL[r],
   }
 
