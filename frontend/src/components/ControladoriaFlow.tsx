@@ -1,10 +1,20 @@
 import type { ReactNode } from 'react'
+import type { LucideIcon } from 'lucide-react'
 import { useTheme } from '../contexts/ThemeContext'
 
 export interface FlowStep {
   key: string
   label: string
   description: string
+  icon: LucideIcon
+  accent: {
+    bg: string
+    bgActive: string
+    text: string
+    textActive: string
+    border: string
+    badge: string
+  }
 }
 
 interface ControladoriaFlowProps {
@@ -47,53 +57,41 @@ export default function ControladoriaFlow({
         </div>
       </div>
 
-      <section className={`rounded-[28px] border p-2 sm:p-3 ${
-        isLight ? 'bg-white border-slate-200 shadow-sm' : 'bg-white/[0.03] border-white/[0.06]'
+      <div className={`flex gap-1 p-1 pb-2 rounded-2xl border overflow-x-auto hide-scrollbar ${
+        isLight ? 'bg-slate-50 border-slate-200' : 'bg-white/[0.02] border-white/[0.06]'
       }`}>
-        <div className="flex flex-wrap gap-2">
-          {steps.map((step, index) => {
-            const isActive = step.key === activeStep
+        {steps.map((step, index) => {
+          const isActive = step.key === activeStep
+          const Icon = step.icon
+          const accent = step.accent
 
-            return (
-              <button
-                key={step.key}
-                onClick={() => onStepChange(step.key)}
-                className={`flex min-w-[180px] flex-1 items-center justify-between gap-3 rounded-[22px] border px-5 py-4 text-left transition-all ${
-                  isActive
-                    ? isLight
-                      ? 'border-slate-300 bg-slate-50 shadow-sm'
-                      : 'border-white/[0.14] bg-white/[0.06]'
-                    : isLight
-                      ? 'border-transparent bg-white text-slate-500 hover:bg-slate-50'
-                      : 'border-transparent bg-transparent text-slate-400 hover:bg-white/[0.03]'
-                }`}
-              >
-                <div className="min-w-0">
-                  <p className={`text-sm font-bold ${
-                    isActive
-                      ? isLight ? 'text-slate-800' : 'text-white'
-                      : isLight ? 'text-slate-500' : 'text-slate-300'
-                  }`}>
-                    {step.label}
-                  </p>
-                </div>
-
-                <div className={`flex h-8 min-w-8 items-center justify-center rounded-full px-2 text-xs font-bold ${
-                  isActive
-                    ? isLight
-                      ? 'bg-white text-slate-500 border border-slate-200'
-                      : 'bg-white/[0.08] text-slate-200 border border-white/[0.1]'
-                    : isLight
-                      ? 'bg-slate-100 text-slate-500'
-                      : 'bg-white/[0.06] text-slate-400'
-                }`}>
-                  {index + 1}
-                </div>
-              </button>
-            )
-          })}
-        </div>
-      </section>
+          return (
+            <button
+              key={step.key}
+              onClick={() => onStepChange(step.key)}
+              className={`min-w-fit md:flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm whitespace-nowrap transition-all border ${
+                isActive
+                  ? `${accent.bgActive} ${accent.textActive} ${accent.border} font-bold shadow-sm`
+                  : isLight
+                    ? `${accent.bg} ${accent.text} font-medium border-transparent hover:bg-white hover:shadow-sm`
+                    : `${accent.bg} ${accent.text} font-medium border-transparent`
+              }`}
+            >
+              <Icon size={15} className="shrink-0" />
+              {step.label}
+              <span className={`text-[10px] font-bold rounded-full min-w-[22px] px-1.5 py-0.5 flex items-center justify-center ${
+                isActive
+                  ? accent.badge
+                  : isLight
+                    ? 'bg-slate-200/80 text-slate-500'
+                    : 'bg-white/[0.06] text-slate-500'
+              }`}>
+                {index + 1}
+              </span>
+            </button>
+          )
+        })}
+      </div>
 
       <section>
         <div className="mb-3">
