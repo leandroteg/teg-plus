@@ -1,5 +1,4 @@
 import type { ReactNode } from 'react'
-import { CheckCircle2, ChevronRight } from 'lucide-react'
 import { useTheme } from '../contexts/ThemeContext'
 
 export interface FlowStep {
@@ -48,42 +47,48 @@ export default function ControladoriaFlow({
         </div>
       </div>
 
-      <section className={`rounded-3xl border p-4 sm:p-5 ${
+      <section className={`rounded-[28px] border p-2 sm:p-3 ${
         isLight ? 'bg-white border-slate-200 shadow-sm' : 'bg-white/[0.03] border-white/[0.06]'
       }`}>
         <div className="flex flex-wrap gap-2">
           {steps.map((step, index) => {
             const isActive = step.key === activeStep
+
             return (
               <button
                 key={step.key}
                 onClick={() => onStepChange(step.key)}
-                className={`group flex min-w-[180px] flex-1 items-start gap-3 rounded-2xl border px-4 py-3 text-left transition-all ${
+                className={`flex min-w-[180px] flex-1 items-center justify-between gap-3 rounded-[22px] border px-5 py-4 text-left transition-all ${
                   isActive
                     ? isLight
-                      ? 'border-emerald-200 bg-emerald-50 shadow-sm'
-                      : 'border-emerald-500/30 bg-emerald-500/10'
+                      ? 'border-slate-300 bg-slate-50 shadow-sm'
+                      : 'border-white/[0.14] bg-white/[0.06]'
                     : isLight
-                      ? 'border-slate-200 bg-slate-50 hover:border-slate-300 hover:bg-white'
-                      : 'border-white/[0.06] bg-white/[0.02] hover:border-white/[0.12] hover:bg-white/[0.04]'
+                      ? 'border-transparent bg-white text-slate-500 hover:bg-slate-50'
+                      : 'border-transparent bg-transparent text-slate-400 hover:bg-white/[0.03]'
                 }`}
               >
-                <div className={`mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold ${
+                <div className="min-w-0">
+                  <p className={`text-sm font-bold ${
+                    isActive
+                      ? isLight ? 'text-slate-800' : 'text-white'
+                      : isLight ? 'text-slate-500' : 'text-slate-300'
+                  }`}>
+                    {step.label}
+                  </p>
+                </div>
+
+                <div className={`flex h-8 min-w-8 items-center justify-center rounded-full px-2 text-xs font-bold ${
                   isActive
-                    ? 'bg-emerald-600 text-white'
-                    : isLight
+                    ? isLight
                       ? 'bg-white text-slate-500 border border-slate-200'
-                      : 'bg-white/[0.06] text-slate-300 border border-white/[0.08]'
+                      : 'bg-white/[0.08] text-slate-200 border border-white/[0.1]'
+                    : isLight
+                      ? 'bg-slate-100 text-slate-500'
+                      : 'bg-white/[0.06] text-slate-400'
                 }`}>
-                  {isActive ? <CheckCircle2 size={14} /> : index + 1}
+                  {index + 1}
                 </div>
-                <div className="min-w-0 flex-1">
-                  <p className={`text-sm font-bold ${isLight ? 'text-slate-700' : 'text-slate-100'}`}>{step.label}</p>
-                  <p className={`mt-1 text-[11px] leading-relaxed ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>{step.description}</p>
-                </div>
-                <ChevronRight className={`mt-1 shrink-0 transition-transform group-hover:translate-x-0.5 ${
-                  isActive ? 'text-emerald-500' : isLight ? 'text-slate-300' : 'text-slate-600'
-                }`} size={16} />
               </button>
             )
           })}
@@ -93,7 +98,7 @@ export default function ControladoriaFlow({
       <section>
         <div className="mb-3">
           <p className={`text-[10px] font-bold uppercase tracking-[0.24em] ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>
-            Etapa atual
+            Subaba atual
           </p>
           <h2 className={`mt-1 text-lg font-extrabold ${isLight ? 'text-slate-800' : 'text-white'}`}>{currentStep.label}</h2>
           <p className={`mt-1 text-xs ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>{currentStep.description}</p>
