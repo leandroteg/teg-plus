@@ -384,8 +384,9 @@ function AnexosList({ pedidoId }: { pedidoId: string }) {
 
 // Ã¢â€â‚¬Ã¢â€â‚¬ CPDetailModal Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 
-function CPDetailModal({ cp, onClose, onAction, isDark }: {
+function CPDetailModal({ cp, stageStatus, onClose, onAction, isDark }: {
   cp: ContaPagar
+  stageStatus: PipelineStageId
   onClose: () => void
   onAction: (action: string, cp: ContaPagar) => void
   isDark: boolean
@@ -407,7 +408,7 @@ function CPDetailModal({ cp, onClose, onAction, isDark }: {
 
   useEffect(() => {
     let active = true
-    if (!cp.lote_id || cp.status !== 'em_lote') {
+    if (!cp.lote_id || stageStatus !== 'em_aprovacao') {
       setApproval(null)
       return
     }
@@ -433,11 +434,10 @@ function CPDetailModal({ cp, onClose, onAction, isDark }: {
     return () => {
       active = false
     }
-  }, [cp.lote_id, cp.status])
+  }, [cp.lote_id, stageStatus])
 
-  const isApprovalStage = cp.status === 'em_lote' && !!approval
+  const isApprovalStage = stageStatus === 'em_aprovacao'
   const canApproveCurrent = !!approval && canApprove(approval.nivel)
-  const stageStatus = isApprovalStage ? 'em_aprovacao' : cp.status
   const stage = CP_PIPELINE_VIEW_STAGES.find(s => s.status === stageStatus)
 
   const handleApprovalDecision = async (decisao: 'aprovada' | 'rejeitada' | 'esclarecimento') => {
@@ -1545,6 +1545,7 @@ export default function CPPipeline() {
       {detailCP && (
         <CPDetailModal
           cp={detailCP}
+          stageStatus={resolvePipelineStage(detailCP)}
           onClose={() => setDetailCP(null)}
           onAction={handleDetailAction}
           isDark={isDark}
