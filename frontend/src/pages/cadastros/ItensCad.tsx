@@ -244,15 +244,8 @@ export default function ItensCad() {
                 required
               />
 
-              <div className="rounded-2xl border border-teal-100 bg-teal-50/70 p-4 space-y-4">
-                <div>
-                  <p className="text-[11px] font-black uppercase tracking-wider text-teal-700">Classificacao do Item</p>
-                  <p className="mt-1 text-xs text-teal-800">
-                    A classe financeira define a categoria automaticamente e o destino indica para onde o item vai apos o recebimento.
-                  </p>
-                </div>
-
-                <div className="grid grid-cols-2 gap-3">
+                <div className="rounded-2xl border border-slate-200 p-4 space-y-4">
+                  <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-bold text-slate-600 mb-1">Classe Financeira</label>
                   <select
@@ -297,9 +290,9 @@ export default function ItensCad() {
                             destino_operacional: option.value as EstItem['destino_operacional'],
                           })}
                           className={`rounded-xl border px-3 py-2 text-xs font-semibold transition-colors ${
-                            active
-                              ? 'border-teal-500 bg-teal-50 text-teal-700'
-                              : 'border-slate-200 bg-white text-slate-500 hover:border-slate-300'
+                              active
+                                ? 'border-teal-500 bg-white text-teal-700'
+                                : 'border-slate-200 bg-white text-slate-500 hover:border-slate-300'
                           }`}
                         >
                           {option.label}
