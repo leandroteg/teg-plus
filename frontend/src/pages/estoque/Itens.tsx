@@ -178,7 +178,7 @@ export default function Itens() {
             Estoque
           </h1>
           <p className={`text-xs mt-0.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
-            Visão geral do estoque por item
+            {'Vis\u00e3o geral do estoque por item'}
           </p>
         </div>
         <button
