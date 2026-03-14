@@ -233,7 +233,7 @@ function PipelineRail({
     : 'border-slate-200 bg-white/95 text-slate-600 hover:bg-slate-50'
 
   return (
-    <div className={`relative min-w-0 rounded-2xl border p-1 ${
+    <div className={`relative min-w-0 rounded-2xl border p-1.5 ${
       isDark ? 'border-white/[0.08] bg-white/[0.02]' : 'border-slate-200 bg-white'
     }`}>
       {canScrollLeft && (
@@ -277,7 +277,7 @@ function PipelineRail({
         onWheel={handleWheel}
         className="min-w-0 overflow-x-auto hide-scrollbar cursor-grab active:cursor-grabbing"
       >
-        <div className="flex min-w-max items-stretch gap-1 pr-10">
+        <div className="flex min-w-max items-stretch gap-1.5 pr-10 md:w-full">
           {CP_PIPELINE_VIEW_STAGES.map(stage => {
             const count = grouped.get(stage.status)?.length || 0
             const isActive = activeTab === stage.status
@@ -288,16 +288,16 @@ function PipelineRail({
               <button
                 key={stage.status}
                 onClick={() => switchTab(stage.status)}
-                className={`flex min-h-[52px] items-center gap-2 rounded-xl px-4 py-3 text-xs whitespace-nowrap transition-all shrink-0 ${
+                className={`flex min-h-[56px] min-w-fit items-center justify-center gap-2.5 rounded-xl px-4 py-2.5 text-sm whitespace-nowrap transition-all shrink-0 md:flex-1 ${
                   isActive
                     ? `${accent?.bgActive} ${accent?.textActive} border font-bold shadow-sm ${accent?.border}`
                     : `${accent?.bg} ${accent?.text} font-medium`
                 }`}
               >
-                <Icon size={13} className="shrink-0" />
+                <Icon size={15} className="shrink-0" />
                 {stage.label}
                 {count > 0 && (
-                  <span className={`rounded-full min-w-[22px] h-[22px] px-1.5 flex items-center justify-center text-[10px] font-bold ${
+                  <span className={`rounded-full min-w-[24px] h-[24px] px-1.5 flex items-center justify-center text-[10px] font-bold ${
                     isActive
                       ? accent?.badge
                       : isDark ? 'bg-white/[0.06] text-slate-500' : 'bg-slate-100 text-slate-500'
