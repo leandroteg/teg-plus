@@ -27,7 +27,7 @@ import type { PedidoAnexo } from '../../hooks/useAnexos'
 import type { ContaPagar, LotePagamento, StatusCP } from '../../types/financeiro'
 import { CP_PIPELINE_STAGES } from '../../types/financeiro'
 
-// ── Formatters ──────────────────────────────────────────────────────────────
+// Ã¢â€â‚¬Ã¢â€â‚¬ Formatters Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 
 const fmt = (v: number) =>
   v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 })
@@ -41,7 +41,7 @@ const fmtData = (d: string) =>
 const fmtDataFull = (d: string) =>
   new Date(d + 'T00:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' })
 
-// ── Sort types ──────────────────────────────────────────────────────────────
+// Ã¢â€â‚¬Ã¢â€â‚¬ Sort types Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 
 type SortField = 'vencimento' | 'valor' | 'fornecedor' | 'emissao'
 type SortDir = 'asc' | 'desc'
@@ -51,7 +51,7 @@ type QuickFilterId = 'all' | 'overdue' | 'today' | 'week' | 'same_supplier' | 's
 
 const CP_PIPELINE_VIEW_STAGES: Array<{ status: PipelineStageId; label: string; color: string; borderColor: string }> = [
   ...CP_PIPELINE_STAGES.slice(0, 3),
-  { status: 'em_aprovacao', label: 'Em Aprovação', color: 'amber', borderColor: 'border-t-amber-500' },
+  { status: 'em_aprovacao', label: 'Em Aprova\u00E7\u00E3o', color: 'amber', borderColor: 'border-t-amber-500' },
   { status: 'aprovado_pgto', label: 'Painel de Pagamento', color: 'emerald', borderColor: 'border-t-emerald-500' },
   { status: 'em_pagamento', label: 'Em Processamento', color: 'sky', borderColor: 'border-t-sky-500' },
   ...CP_PIPELINE_STAGES.filter(stage => ['pago', 'conciliado'].includes(stage.status)),
@@ -61,10 +61,10 @@ const SORT_OPTIONS: { field: SortField; label: string }[] = [
   { field: 'vencimento', label: 'Vencimento' },
   { field: 'valor',      label: 'Valor' },
   { field: 'fornecedor', label: 'Fornecedor' },
-  { field: 'emissao',    label: 'Emissão' },
+  { field: 'emissao',    label: 'Emiss\u00E3o' },
 ]
 
-// ── Urgency helper ──────────────────────────────────────────────────────────
+// Ã¢â€â‚¬Ã¢â€â‚¬ Urgency helper Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 
 function getUrgency(cp: ContaPagar): 'overdue' | 'today' | 'week' | 'normal' {
   if (['pago', 'conciliado', 'cancelado'].includes(cp.status)) return 'normal'
@@ -78,7 +78,7 @@ function getUrgency(cp: ContaPagar): 'overdue' | 'today' | 'week' | 'normal' {
   return 'normal'
 }
 
-// ── Status icon map ─────────────────────────────────────────────────────────
+// Ã¢â€â‚¬Ã¢â€â‚¬ Status icon map Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 
 const STATUS_ICONS: Record<string, typeof Receipt> = {
   previsto:      Calendar,
@@ -113,7 +113,7 @@ const STATUS_ACCENT_DARK: Record<string, { bg: string; bgActive: string; text: s
   conciliado:    { bg: 'hover:bg-white/[0.03]', bgActive: 'bg-green-500/10',   text: 'text-green-400',   textActive: 'text-green-300',   border: 'border-green-400/40',   badge: 'bg-green-500/15 text-green-200' },
 }
 
-// ── Export CSV ────────────────────────────────────────────────────────────────
+// Ã¢â€â‚¬Ã¢â€â‚¬ Export CSV Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 
 function exportCSV(cps: ContaPagar[], stageName: string) {
   const headers = ['Fornecedor', 'Valor', 'Vencimento', 'Emissao', 'Documento', 'Centro Custo', 'Classe Financeira', 'Obra', 'Pedido', 'Descricao', 'Status']
@@ -142,7 +142,7 @@ function exportCSV(cps: ContaPagar[], stageName: string) {
   URL.revokeObjectURL(url)
 }
 
-// ── FornecedorBankInfo ──────────────────────────────────────────────────────
+// Ã¢â€â‚¬Ã¢â€â‚¬ FornecedorBankInfo Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 
 function FornecedorBankInfo({ fornecedorId, isDark }: { fornecedorId: string; isDark: boolean }) {
   const { data: forn } = useFornecedorById(fornecedorId)
@@ -153,7 +153,7 @@ function FornecedorBankInfo({ fornecedorId, isDark }: { fornecedorId: string; is
   return (
     <div className={`rounded-xl p-2.5 space-y-1 ${isDark ? 'bg-white/[0.04]' : 'bg-blue-50/60'}`}>
       <p className="text-[9px] font-bold text-blue-500 uppercase tracking-wider flex items-center gap-1">
-        <Banknote size={9} /> Dados Bancários
+        <Banknote size={9} /> Dados Banc\u00E1rios
       </p>
       <div className="grid grid-cols-2 gap-x-3 gap-y-0.5 text-[10px]">
         {forn.banco_nome && <div><span className="text-slate-400">Banco:</span> <span className="font-semibold text-slate-700">{forn.banco_nome}</span></div>}
@@ -165,7 +165,7 @@ function FornecedorBankInfo({ fornecedorId, isDark }: { fornecedorId: string; is
   )
 }
 
-// ── AnexosList ──────────────────────────────────────────────────────────────
+// Ã¢â€â‚¬Ã¢â€â‚¬ AnexosList Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 
 function AnexosList({ pedidoId }: { pedidoId: string }) {
   const { data: anexos, isLoading } = useAnexosPedido(pedidoId)
@@ -186,7 +186,7 @@ function AnexosList({ pedidoId }: { pedidoId: string }) {
   )
 }
 
-// ── CPDetailModal ───────────────────────────────────────────────────────────
+// Ã¢â€â‚¬Ã¢â€â‚¬ CPDetailModal Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 
 function CPDetailModal({ cp, onClose, onAction, isDark }: {
   cp: ContaPagar
@@ -224,7 +224,7 @@ function CPDetailModal({ cp, onClose, onAction, isDark }: {
           {cp.origem === 'logistica' && (
             <div className="flex items-center gap-2 bg-purple-50 border border-purple-200 rounded-xl px-3 py-2">
               <Truck size={14} className="text-purple-500 shrink-0" />
-              <p className="text-xs text-purple-700 font-semibold">Origem: Logística</p>
+              <p className="text-xs text-purple-700 font-semibold">Origem: Log\u00EDstica</p>
             </div>
           )}
           {cp.origem === 'compras' && (
@@ -241,8 +241,8 @@ function CPDetailModal({ cp, onClose, onAction, isDark }: {
             </div>
           )}
 
-          {/* Alerta de divergência */}
-          {cp.observacoes && cp.observacoes.includes('Divergência') && (
+          {/* Alerta de diverg\u00EAncia */}
+          {cp.observacoes && cp.observacoes.includes('Diverg\u00EAncia') && (
             <div className="flex items-center gap-2 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2">
               <AlertTriangle size={14} className="text-amber-500 shrink-0" />
               <p className="text-xs text-amber-700 font-semibold">{cp.observacoes}</p>
@@ -252,7 +252,7 @@ function CPDetailModal({ cp, onClose, onAction, isDark }: {
           <div className={`rounded-xl p-4 space-y-2 ${isDark ? 'bg-white/[0.04]' : 'bg-slate-50'}`}>
             <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-xs">
               <div><span className="text-slate-400">Vencimento:</span> <span className="font-semibold">{fmtData(cp.data_vencimento)}</span></div>
-              <div><span className="text-slate-400">Emissão:</span> <span className="font-semibold">{fmtData(cp.data_emissao)}</span></div>
+              <div><span className="text-slate-400">Emiss\u00E3o:</span> <span className="font-semibold">{fmtData(cp.data_emissao)}</span></div>
               {cp.numero_documento && <div><span className="text-slate-400">Documento:</span> <span className="font-mono">{cp.numero_documento}</span></div>}
               {cp.natureza && <div><span className="text-slate-400">Natureza:</span> <span>{cp.natureza}</span></div>}
               {cp.forma_pagamento && <div><span className="text-slate-400">Forma Pgto:</span> <span>{cp.forma_pagamento}</span></div>}
@@ -270,7 +270,7 @@ function CPDetailModal({ cp, onClose, onAction, isDark }: {
               {cp.aprovado_por && <div><span className="text-slate-400">Aprovado por:</span> <span className="font-semibold">{cp.aprovado_por}</span></div>}
             </div>
             {cp.descricao && <p className="text-xs text-slate-500 mt-2 pt-2 border-t border-slate-200">{cp.descricao}</p>}
-            {cp.observacoes && !cp.observacoes.includes('Divergência') && (
+            {cp.observacoes && !cp.observacoes.includes('Diverg\u00EAncia') && (
               <p className="text-xs text-slate-400 mt-1 italic">{cp.observacoes}</p>
             )}
           </div>
@@ -317,7 +317,7 @@ function CPDetailModal({ cp, onClose, onAction, isDark }: {
             )}
             {cp.status === 'em_lote' && (
               <button onClick={() => onAction('sendLote', cp)} className="flex-1 py-3 rounded-xl bg-amber-500 text-white text-sm font-bold hover:bg-amber-600 transition-all flex items-center justify-center gap-2">
-                <Send size={15} /> Enviar p/ Aprovação
+                <Send size={15} /> Enviar p/ Aprova\u00E7\u00E3o
               </button>
             )}
             {cp.status === 'aprovado_pgto' && (
@@ -337,7 +337,7 @@ function CPDetailModal({ cp, onClose, onAction, isDark }: {
   )
 }
 
-// ── CPRow (compact table row) ────────────────────────────────────────────────
+// Ã¢â€â‚¬Ã¢â€â‚¬ CPRow (compact table row) Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 
 function CPRow({ cp, onClick, isDark, isSelected, onSelect, approvalHint }: {
   cp: ContaPagar
@@ -389,7 +389,7 @@ function CPRow({ cp, onClick, isDark, isSelected, onSelect, approvalHint }: {
 
       <div className="w-[150px] shrink-0">
         <span className={`block truncate text-[11px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
-          {cp.descricao || '—'}
+          {cp.descricao || '\u2014'}
         </span>
         {approvalHint && (
           <span className={`block truncate text-[10px] font-medium ${isDark ? 'text-amber-300' : 'text-amber-700'}`}>
@@ -399,11 +399,11 @@ function CPRow({ cp, onClick, isDark, isSelected, onSelect, approvalHint }: {
       </div>
 
       <span className={`text-[11px] truncate w-[100px] shrink-0 flex items-center gap-0.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
-        {obraNome ? <><Building2 size={9} className="shrink-0" /> {obraNome}</> : '—'}
+        {obraNome ? <><Building2 size={9} className="shrink-0" /> {obraNome}</> : '\u2014'}
       </span>
 
       <span className={`text-[11px] truncate w-[70px] shrink-0 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
-        {cp.centro_custo || '—'}
+        {cp.centro_custo || '\u2014'}
       </span>
 
       {pedidoNum ? (
@@ -429,7 +429,7 @@ function CPRow({ cp, onClick, isDark, isSelected, onSelect, approvalHint }: {
   )
 }
 
-// ── CPCard (block/card view) ─────────────────────────────────────────────────
+// Ã¢â€â‚¬Ã¢â€â‚¬ CPCard (block/card view) Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 
 function CPCard({ cp, onClick, isDark, isSelected, onSelect, approvalHint }: {
   cp: ContaPagar
@@ -479,7 +479,7 @@ function CPCard({ cp, onClick, isDark, isSelected, onSelect, approvalHint }: {
       <div className="flex flex-wrap items-center gap-1.5 mt-1.5 ml-10">
         {cp.origem === 'logistica' && (
           <span className="inline-flex items-center gap-0.5 bg-purple-50 text-purple-600 text-[10px] font-semibold rounded-full px-2 py-0.5">
-            <Truck size={9} /> Logística
+            <Truck size={9} /> Log\u00EDstica
           </span>
         )}
         {cp.origem === 'compras' && pedidoNum && (
@@ -489,7 +489,7 @@ function CPCard({ cp, onClick, isDark, isSelected, onSelect, approvalHint }: {
         )}
       </div>
 
-      {/* Linha 3: descrição */}
+      {/* Linha 3: descriÃƒÂ§ÃƒÂ£o */}
       {cp.descricao && (
         <p className={`text-xs truncate mt-1 ml-10 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{cp.descricao}</p>
       )}
@@ -501,14 +501,14 @@ function CPCard({ cp, onClick, isDark, isSelected, onSelect, approvalHint }: {
         </div>
       )}
 
-      {/* Observações / Alerta de divergência */}
+      {/* ObservaÃƒÂ§ÃƒÂµes / Alerta de divergÃƒÂªncia */}
       {cp.observacoes && (
         <div className={`flex items-start gap-1.5 mt-1.5 ml-10 px-2 py-1 rounded-lg text-[10px] ${
-          cp.observacoes.includes('Divergência')
+          cp.observacoes.includes('Diverg\u00EAncia')
             ? 'bg-amber-50 border border-amber-200 text-amber-700'
             : isDark ? 'bg-white/[0.04] text-slate-400' : 'bg-slate-50 text-slate-500'
         }`}>
-          {cp.observacoes.includes('Divergência') && <AlertTriangle size={11} className="text-amber-500 shrink-0 mt-0.5" />}
+          {cp.observacoes.includes('Diverg\u00EAncia') && <AlertTriangle size={11} className="text-amber-500 shrink-0 mt-0.5" />}
           <span className="font-medium">{cp.observacoes}</span>
         </div>
       )}
@@ -547,7 +547,7 @@ function CPCard({ cp, onClick, isDark, isSelected, onSelect, approvalHint }: {
   )
 }
 
-// ── Main Page ───────────────────────────────────────────────────────────────
+// Ã¢â€â‚¬Ã¢â€â‚¬ Main Page Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 
 export default function CPPipeline() {
   const { isDark } = useTheme()
@@ -593,7 +593,7 @@ export default function CPPipeline() {
     if (!cp.lote_id) return null
     const lote = lotesById.get(cp.lote_id)
     if (!lote || lote.status !== 'enviado_aprovacao') return null
-    return lote.aprovador_nome ? `Aprovador: ${lote.aprovador_nome}` : 'Em aprovação'
+    return lote.aprovador_nome ? `Aprovador: ${lote.aprovador_nome}` : 'Em aprova\u00E7\u00E3o'
   }, [lotesById])
 
   // Group all CPs by pipeline stage
@@ -711,7 +711,7 @@ export default function CPPipeline() {
     }
   }
 
-  // ── Actions ─────────────────────────────────────────────────────────────
+  // Ã¢â€â‚¬Ã¢â€â‚¬ Actions Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 
   const handleConfirmar = async (ids: string[]) => {
     try {
@@ -720,7 +720,7 @@ export default function CPPipeline() {
         .update({ status: 'confirmado' })
         .in('id', ids)
       if (error) throw error
-      showToast('success', `${ids.length} título(s) confirmado(s)`)
+      showToast('success', `${ids.length} t\u00EDtulo(s) confirmado(s)`)
       setSelectedIds(new Set())
     } catch { showToast('error', 'Erro ao confirmar') }
   }
@@ -789,7 +789,7 @@ export default function CPPipeline() {
   const handleConciliar = async (ids: string[]) => {
     try {
       await conciliarMut.mutateAsync({ ids })
-      showToast('success', `${ids.length} título(s) conciliado(s)`)
+      showToast('success', `${ids.length} t\u00EDtulo(s) conciliado(s)`)
       setSelectedIds(new Set())
     } catch { showToast('error', 'Erro ao conciliar') }
   }
@@ -896,12 +896,12 @@ export default function CPPipeline() {
             Contas a Pagar
           </h1>
           <p className={`text-xs mt-0.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
-            {contas.length} títulos &middot; {fmt(contas.reduce((s, c) => s + c.valor_original, 0))}
+            {contas.length} t\u00EDtulos &middot; {fmt(contas.reduce((s, c) => s + c.valor_original, 0))}
           </p>
         </div>
       </div>
 
-      {/* ── Horizontal Tabs ───────────────────────────────────────── */}
+      {/* Ã¢â€â‚¬Ã¢â€â‚¬ Horizontal Tabs Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ */}
       <div className={`overflow-x-auto hide-scrollbar rounded-2xl border p-1 ${
         isDark ? 'border-white/[0.08] bg-white/[0.02]' : 'border-slate-200 bg-white'
       }`}>
@@ -939,7 +939,7 @@ export default function CPPipeline() {
         </div>
       </div>
 
-      {/* ── Content panel ───────────────────────────────────────────── */}
+      {/* Ã¢â€â‚¬Ã¢â€â‚¬ Content panel Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ */}
       <div className={`rounded-2xl border overflow-hidden ${isDark ? 'bg-[#0f172a] border-white/[0.06]' : 'bg-white border-slate-200'}`}>
 
         {/* Toolbar: Search + Sort + View Toggle + Export */}
@@ -1026,7 +1026,7 @@ export default function CPPipeline() {
 
           {/* Stats */}
           <div className={`ml-auto flex items-center gap-3 text-[11px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
-            <span>{activeCPs.length} {activeCPs.length === 1 ? 'título' : 'títulos'}</span>
+            <span>{activeCPs.length} {activeCPs.length === 1 ? 't\u00EDtulo' : 't\u00EDtulos'}</span>
             <span className="font-bold text-emerald-600">{fmt(tabTotal)}</span>
             {overdueCt > 0 && (
               <span className="flex items-center gap-1 text-red-500 font-bold">
@@ -1091,7 +1091,7 @@ export default function CPPipeline() {
                     isDark ? 'text-slate-400 hover:text-white hover:bg-white/[0.04]' : 'text-slate-500 hover:text-slate-700 hover:bg-white'
                   }`}
                 >
-                  Limpar seleÃ§Ã£o
+                  Limpar sele\u00E7\u00E3o
                 </button>
                 <span className={`text-[10px] ml-auto ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
                   {fmt(selectedInTab.reduce((s, cp) => s + cp.valor_original, 0))} selecionado
@@ -1113,10 +1113,10 @@ export default function CPPipeline() {
                 <Receipt size={24} className="text-slate-300" />
               </div>
               <p className={`text-sm font-semibold ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
-                Nenhum título nesta etapa
+                Nenhum t\u00EDtulo nesta etapa
               </p>
               <p className={`text-xs mt-1 ${isDark ? 'text-slate-600' : 'text-slate-400'}`}>
-                {busca ? 'Tente outra busca' : 'Os títulos aparecerão aqui quando avançarem'}
+                {busca ? 'Tente outra busca' : 'Os t\u00EDtulos aparecer\u00E3o aqui quando avan\u00E7arem'}
               </p>
             </div>
           ) : viewMode === 'list' ? (
@@ -1128,7 +1128,7 @@ export default function CPPipeline() {
                 <span className="w-3 shrink-0" />
                 <span className="w-0.5 shrink-0" />
                 <span className="w-[180px] shrink-0">Fornecedor</span>
-                <span className="w-[150px] shrink-0">Descrição</span>
+                <span className="w-[150px] shrink-0">Descri\u00E7\u00E3o</span>
                 <span className="w-[100px] shrink-0">Obra</span>
                 <span className="w-[70px] shrink-0">CC</span>
                 <span className="w-[90px] shrink-0">Pedido</span>
