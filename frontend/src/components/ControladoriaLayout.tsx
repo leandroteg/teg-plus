@@ -1,19 +1,14 @@
 import {
-  LayoutDashboard, Calculator, TrendingUp, Activity,
-  Lightbulb, ClipboardList, Scale, BarChart3, AlertTriangle,
+  LayoutDashboard, BriefcaseBusiness, ReceiptText, FolderKanban, Lightbulb,
 } from 'lucide-react'
 import ModuleLayout from './ModuleLayout'
 
 const NAV = [
   { to: '/controladoria', icon: LayoutDashboard, label: 'Painel', end: true },
-  { to: '/controladoria/orcamentos', icon: Calculator, label: 'Orçamentos' },
-  { to: '/controladoria/plano-orcamentario', icon: ClipboardList, label: 'Plano Orçamentário' },
-  { to: '/controladoria/controle-orcamentario', icon: Scale, label: 'Controle Orçamentário' },
-  { to: '/controladoria/indicadores', icon: BarChart3, label: 'Indicadores' },
-  { to: '/controladoria/dre', icon: TrendingUp, label: 'DRE' },
-  { to: '/controladoria/kpis', icon: Activity, label: 'KPIs' },
+  { to: '/controladoria/controle-orcamentario', icon: BriefcaseBusiness, label: 'Controle Orçamentário' },
+  { to: '/controladoria/controle-custos', icon: ReceiptText, label: 'Controle de Custos' },
+  { to: '/controladoria/controle-projetos', icon: FolderKanban, label: 'Controle Projetos' },
   { to: '/controladoria/cenarios', icon: Lightbulb, label: 'Cenários' },
-  { to: '/controladoria/alertas',  icon: AlertTriangle, label: 'Alertas' },
 ]
 
 export default function ControladoriaLayout() {
@@ -24,7 +19,10 @@ export default function ControladoriaLayout() {
       moduleEmoji="📈"
       accent="emerald"
       nav={NAV}
-      moduleSubtitle="Indicadores & Controle"
+      mobileNav={NAV}
+      bottomNavMaxItems={5}
+      truncateBottomLabels
+      moduleSubtitle="Painel, orçamento e custos"
     />
   )
 }

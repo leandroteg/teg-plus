@@ -47,14 +47,10 @@ import ModelosContrato from './pages/contratos/ModelosContrato'
 // Módulo Controladoria
 import ControladoriaLayout from './components/ControladoriaLayout'
 import ControladoriaHome from './pages/controladoria/ControladoriaHome'
-import Orcamentos from './pages/controladoria/Orcamentos'
-import DRE from './pages/controladoria/DRE'
-import KPIs from './pages/controladoria/KPIs'
-import Cenarios from './pages/controladoria/Cenarios'
-import PlanoOrcamentario from './pages/controladoria/PlanoOrcamentario'
-import ControleOrcamentario from './pages/controladoria/ControleOrcamentario'
-import PainelIndicadores from './pages/controladoria/PainelIndicadores'
-import AlertasDesvio from './pages/controladoria/AlertasDesvio'
+import ControleOrcamentarioHub from './pages/controladoria/ControleOrcamentarioHub'
+import ControleCustosHub from './pages/controladoria/ControleCustosHub'
+import ControleProjetosHub from './pages/controladoria/ControleProjetosHub'
+import CenariosHub from './pages/controladoria/CenariosHub'
 
 // Módulo Obras
 import ObrasLayout from './components/ObrasLayout'
@@ -286,15 +282,17 @@ export default function App() {
           {/* Módulo Controladoria */}
           <Route element={<ModuleRoute moduleKey="controladoria" />}>
             <Route element={<ControladoriaLayout />}>
-              <Route path="/controladoria"              element={<ControladoriaHome />} />
-              <Route path="/controladoria/orcamentos"   element={<Orcamentos />} />
-              <Route path="/controladoria/dre"          element={<DRE />} />
-              <Route path="/controladoria/kpis"         element={<KPIs />} />
-              <Route path="/controladoria/cenarios"     element={<Cenarios />} />
-              <Route path="/controladoria/plano-orcamentario" element={<PlanoOrcamentario />} />
-              <Route path="/controladoria/controle-orcamentario" element={<ControleOrcamentario />} />
-              <Route path="/controladoria/indicadores" element={<PainelIndicadores />} />
-              <Route path="/controladoria/alertas"     element={<AlertasDesvio />} />
+              <Route path="/controladoria" element={<ControladoriaHome />} />
+              <Route path="/controladoria/controle-orcamentario" element={<ControleOrcamentarioHub />} />
+              <Route path="/controladoria/controle-custos" element={<ControleCustosHub />} />
+              <Route path="/controladoria/controle-projetos" element={<ControleProjetosHub />} />
+              <Route path="/controladoria/cenarios" element={<CenariosHub />} />
+              <Route path="/controladoria/orcamentos" element={<Navigate to="/controladoria/controle-orcamentario?etapa=budget-area" replace />} />
+              <Route path="/controladoria/plano-orcamentario" element={<Navigate to="/controladoria/controle-orcamentario?etapa=plano" replace />} />
+              <Route path="/controladoria/alertas" element={<Navigate to="/controladoria/controle-orcamentario?etapa=acoes" replace />} />
+              <Route path="/controladoria/kpis" element={<Navigate to="/controladoria/controle-custos?etapa=definicao-indicadores" replace />} />
+              <Route path="/controladoria/indicadores" element={<Navigate to="/controladoria/controle-custos?etapa=painel-indicadores" replace />} />
+              <Route path="/controladoria/dre" element={<Navigate to="/controladoria/controle-custos?etapa=evolucao-despesas" replace />} />
             </Route>
           </Route>
 
