@@ -7,23 +7,36 @@ import type {
 } from '../types/estoque'
 
 // ── Catalog search (for RC item autocomplete) ────────────────────────────────
-export function useItemCatalogSearch(categorias: string[], search: string) {
+export function useItemCatalogSearch(categoriaRC: string, categoriasEstoque: string[], search: string) {
   return useQuery<EstItem[]>({
-    queryKey: ['est-itens-catalog', categorias, search],
-    enabled: search.length >= 2 && categorias.length > 0,
+    queryKey: ['est-itens-catalog', categoriaRC, categoriasEstoque, search],
+    enabled: search.length >= 2 && !!categoriaRC,
     queryFn: async () => {
       // Case-insensitive search across descricao, descricao_complementar, and codigo (#49)
       const term = `%${search}%`
       const { data, error } = await supabase
         .from('est_itens')
-        .select('id, codigo, descricao, descricao_complementar, categoria, unidade, valor_medio')
-        .in('categoria', categorias)
+        .select(`
+          id, codigo, descricao, descricao_complementar, categoria, subcategoria, unidade, valor_medio,
+          classe_financeira_id, classe_financeira_codigo, classe_financeira_descricao,
+          categoria_financeira_codigo, categoria_financeira_descricao, destino_operacional
+        `)
         .eq('ativo', true)
         .or(`descricao.ilike.${term},descricao_complementar.ilike.${term},codigo.ilike.${term}`)
         .order('descricao')
-        .limit(15)
+        .limit(50)
       if (error) return []
-      return (data ?? []) as EstItem[]
+      const categoriaNormalizada = categoriaRC.trim().toUpperCase()
+      const categoriasLegadas = categoriasEstoque.map((item) => item.trim().toLowerCase())
+
+      return ((data ?? []) as EstItem[]).filter((item) => {
+        const grupoCompra = (item.subcategoria ?? '').trim().toUpperCase()
+        const categoriaLegada = (item.categoria ?? '').trim().toLowerCase()
+
+        if (grupoCompra && grupoCompra === categoriaNormalizada) return true
+        if (!grupoCompra && categoriasLegadas.length > 0) return categoriasLegadas.includes(categoriaLegada)
+        return false
+      })
     },
     staleTime: 30_000,
   })

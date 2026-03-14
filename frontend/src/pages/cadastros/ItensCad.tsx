@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Package2, Plus, Search, X, Save, Loader2, ChevronsUpDown } from 'lucide-react'
 import { useEstoqueItens, useSalvarItem } from '../../hooks/useEstoque'
 import { useCadClasses } from '../../hooks/useCadastros'
+import { useCategorias } from '../../hooks/useCategorias'
 import type { EstItem } from '../../types/estoque'
 import AutoCodeField from '../../components/AutoCodeField'
 import SmartTextField from '../../components/SmartTextField'
@@ -42,6 +43,7 @@ export default function ItensCad() {
     curvaFiltro ? { curva: curvaFiltro as 'A' | 'B' | 'C' } : undefined,
   )
   const { data: classes = [] } = useCadClasses({ tipo: 'despesa' })
+  const { data: gruposCompra = [] } = useCategorias()
   const salvar = useSalvarItem()
 
   const filtrados = busca.trim()
@@ -61,6 +63,11 @@ export default function ItensCad() {
   function formatClasseLabel(classe?: typeof classes[number]) {
     if (!classe) return ''
     return `${classe.codigo} - ${classe.descricao}`
+  }
+
+  function getGrupoCompraNome(codigo?: string) {
+    if (!codigo) return ''
+    return gruposCompra.find((grupo) => grupo.codigo === codigo)?.nome ?? codigo
   }
 
   function openNew() {
@@ -190,6 +197,9 @@ export default function ItensCad() {
                     <td className="px-4 py-3">
                       <p className="font-semibold text-slate-800 truncate max-w-[200px]">{item.descricao}</p>
                       <div className="flex flex-wrap items-center gap-2 mt-1">
+                        {item.subcategoria && (
+                          <span className="text-[10px] text-slate-500">{getGrupoCompraNome(item.subcategoria)}</span>
+                        )}
                         {item.categoria_financeira_descricao && (
                           <span className="text-[10px] text-slate-400">{item.categoria_financeira_descricao}</span>
                         )}
@@ -336,6 +346,25 @@ export default function ItensCad() {
                     readOnly
                   />
                 </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-600 mb-1">Grupo de Compra</label>
+                  <select
+                    value={editItem.subcategoria ?? ''}
+                    onChange={(event) => setEditItem({
+                      ...editItem,
+                      subcategoria: event.target.value || undefined,
+                    })}
+                    className="input-base"
+                  >
+                    <option value="">Selecionar grupo...</option>
+                    {gruposCompra.map((grupo) => (
+                      <option key={grupo.id} value={grupo.codigo}>
+                        {grupo.nome}
+                      </option>
+                    ))}
+                  </select>
                 </div>
 
                 <div>
