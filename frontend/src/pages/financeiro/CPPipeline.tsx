@@ -71,13 +71,15 @@ type SortDir = 'asc' | 'desc'
 type ViewMode = 'list' | 'cards'
 type PipelineStageId = StatusCP | 'em_aprovacao'
 type QuickFilterId = 'all' | 'overdue' | 'today' | 'week' | 'same_supplier' | 'same_work' | 'same_lote'
+type StatusHintTone = 'amber' | 'rose' | 'sky'
+type StatusHint = { text: string; tone: StatusHintTone }
 
 const CP_PIPELINE_VIEW_STAGES: Array<{ status: PipelineStageId; label: string; color: string; borderColor: string }> = [
   ...CP_PIPELINE_STAGES.slice(0, 3),
   { status: 'em_aprovacao', label: 'Em Aprovação', color: 'amber', borderColor: 'border-t-amber-500' },
   { status: 'aprovado_pgto', label: 'Painel de Pagamento', color: 'emerald', borderColor: 'border-t-emerald-500' },
   { status: 'em_pagamento', label: 'Em Processamento', color: 'sky', borderColor: 'border-t-sky-500' },
-  ...CP_PIPELINE_STAGES.filter(stage => ['pago', 'conciliado'].includes(stage.status)),
+  ...CP_PIPELINE_STAGES.filter(stage => ['pago', 'conciliado', 'cancelado'].includes(stage.status)),
 ]
 
 const SORT_OPTIONS: { field: SortField; label: string }[] = [
@@ -112,6 +114,7 @@ const STATUS_ICONS: Record<string, typeof Receipt> = {
   em_pagamento:  Clock,
   pago:          Banknote,
   conciliado:    CheckCircle2,
+  cancelado:     X,
 }
 
 const STATUS_ACCENT: Record<string, { bg: string; bgActive: string; text: string; textActive: string; dot: string; border: string; badge: string }> = {
@@ -123,6 +126,7 @@ const STATUS_ACCENT: Record<string, { bg: string; bgActive: string; text: string
   em_pagamento:  { bg: 'hover:bg-sky-50',     bgActive: 'bg-sky-50',      text: 'text-sky-600',     textActive: 'text-sky-800',     dot: 'bg-sky-500',     border: 'border-sky-500',     badge: 'bg-sky-100 text-sky-700' },
   pago:          { bg: 'hover:bg-teal-50',    bgActive: 'bg-teal-50',     text: 'text-teal-600',    textActive: 'text-teal-800',    dot: 'bg-teal-500',    border: 'border-teal-500',    badge: 'bg-teal-100 text-teal-700' },
   conciliado:    { bg: 'hover:bg-green-50',   bgActive: 'bg-green-50',    text: 'text-green-600',   textActive: 'text-green-800',   dot: 'bg-green-500',   border: 'border-green-500',   badge: 'bg-green-100 text-green-700' },
+  cancelado:     { bg: 'hover:bg-rose-50',    bgActive: 'bg-rose-50',     text: 'text-rose-600',    textActive: 'text-rose-800',    dot: 'bg-rose-500',    border: 'border-rose-500',    badge: 'bg-rose-100 text-rose-700' },
 }
 
 const STATUS_ACCENT_DARK: Record<string, { bg: string; bgActive: string; text: string; textActive: string; border: string; badge: string }> = {
@@ -134,6 +138,7 @@ const STATUS_ACCENT_DARK: Record<string, { bg: string; bgActive: string; text: s
   em_pagamento:  { bg: 'hover:bg-white/[0.03]', bgActive: 'bg-sky-500/10',     text: 'text-sky-400',     textActive: 'text-sky-300',     border: 'border-sky-400/40',     badge: 'bg-sky-500/15 text-sky-200' },
   pago:          { bg: 'hover:bg-white/[0.03]', bgActive: 'bg-teal-500/10',    text: 'text-teal-400',    textActive: 'text-teal-300',    border: 'border-teal-400/40',    badge: 'bg-teal-500/15 text-teal-200' },
   conciliado:    { bg: 'hover:bg-white/[0.03]', bgActive: 'bg-green-500/10',   text: 'text-green-400',   textActive: 'text-green-300',   border: 'border-green-400/40',   badge: 'bg-green-500/15 text-green-200' },
+  cancelado:     { bg: 'hover:bg-white/[0.03]', bgActive: 'bg-rose-500/10',    text: 'text-rose-400',    textActive: 'text-rose-300',    border: 'border-rose-400/40',    badge: 'bg-rose-500/15 text-rose-200' },
 }
 
 function PipelineRail({
@@ -707,7 +712,7 @@ function CPRow({ cp, onClick, isDark, isSelected, onSelect, approvalHint }: {
   isDark: boolean
   isSelected: boolean
   onSelect: (id: string) => void
-  approvalHint?: string | null
+  approvalHint?: StatusHint | null
 }) {
   const urgency = getUrgency(cp)
   const obraNome = cp.requisicao?.obra_nome
@@ -754,8 +759,14 @@ function CPRow({ cp, onClick, isDark, isSelected, onSelect, approvalHint }: {
           {cp.descricao || '\u2014'}
         </span>
         {approvalHint && (
-          <span className={`block truncate text-[10px] font-medium ${isDark ? 'text-amber-300' : 'text-amber-700'}`}>
-            {approvalHint}
+          <span className={`block truncate text-[10px] font-medium ${
+            approvalHint.tone === 'rose'
+              ? isDark ? 'text-rose-300' : 'text-rose-700'
+              : approvalHint.tone === 'sky'
+                ? isDark ? 'text-sky-300' : 'text-sky-700'
+                : isDark ? 'text-amber-300' : 'text-amber-700'
+          }`}>
+            {approvalHint.text}
           </span>
         )}
       </div>
@@ -799,7 +810,7 @@ function CPCard({ cp, onClick, isDark, isSelected, onSelect, approvalHint }: {
   isDark: boolean
   isSelected: boolean
   onSelect: (id: string) => void
-  approvalHint?: string | null
+  approvalHint?: StatusHint | null
 }) {
   const urgency = getUrgency(cp)
   const obraNome = cp.requisicao?.obra_nome
@@ -857,9 +868,13 @@ function CPCard({ cp, onClick, isDark, isSelected, onSelect, approvalHint }: {
       )}
       {approvalHint && (
         <div className={`mt-1 ml-10 inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold ${
-          isDark ? 'bg-amber-500/10 text-amber-300' : 'bg-amber-50 text-amber-700'
+          approvalHint.tone === 'rose'
+            ? isDark ? 'bg-rose-500/10 text-rose-300' : 'bg-rose-50 text-rose-700'
+            : approvalHint.tone === 'sky'
+              ? isDark ? 'bg-sky-500/10 text-sky-300' : 'bg-sky-50 text-sky-700'
+              : isDark ? 'bg-amber-500/10 text-amber-300' : 'bg-amber-50 text-amber-700'
         }`}>
-          {approvalHint}
+          {approvalHint.text}
         </div>
       )}
 
@@ -953,13 +968,27 @@ export default function CPPipeline() {
     return 'em_lote'
   }, [lotesById])
 
-  const getApprovalHint = useCallback((cp: ContaPagar) => {
+  const getApprovalHint = useCallback((cp: ContaPagar): StatusHint | null => {
     const remessaHint = getRemessaHint(cp)
-    if (remessaHint) return remessaHint
+    if (remessaHint) return { text: remessaHint, tone: 'sky' }
+    if (cp.status === 'cancelado') {
+      if (cp.lote_id) {
+        const lote = lotesById.get(cp.lote_id)
+        if (lote?.status === 'cancelado') {
+          if (lote.aprovador_nome) return { text: `Reprovado por: ${lote.aprovador_nome}`, tone: 'rose' }
+          if (lote.observacao) return { text: lote.observacao, tone: 'rose' }
+          return { text: 'Cancelado na aprovação', tone: 'rose' }
+        }
+      }
+      if (cp.observacoes) return { text: cp.observacoes, tone: 'rose' }
+      return { text: 'Cancelado', tone: 'rose' }
+    }
     if (!cp.lote_id) return null
     const lote = lotesById.get(cp.lote_id)
     if (!lote || lote.status !== 'enviado_aprovacao') return null
-    return lote.aprovador_nome ? `Aprovador: ${lote.aprovador_nome}` : 'Em aprovação'
+    return lote.aprovador_nome
+      ? { text: `Aprovador: ${lote.aprovador_nome}`, tone: 'amber' }
+      : { text: 'Em aprovação', tone: 'amber' }
   }, [lotesById])
 
   // Group all CPs by pipeline stage
