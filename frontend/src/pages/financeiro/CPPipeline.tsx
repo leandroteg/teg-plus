@@ -165,6 +165,7 @@ function PipelineRail({
   }
 
   const handlePointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
+    if ((event.target as HTMLElement).closest('button')) return
     const rail = railRef.current
     if (!rail) return
     dragRef.current = {
