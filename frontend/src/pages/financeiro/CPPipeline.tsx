@@ -486,6 +486,10 @@ function NovaSolicitacaoExtraordinariaModal({
   const [form, setForm] = useState<NovaSolicitacaoExtraForm>(EMPTY_EXTRA_FORM)
   const [arquivos, setArquivos] = useState<File[]>([])
   const [erro, setErro] = useState('')
+  const [ccBusca, setCcBusca] = useState('')
+  const [classeBusca, setClasseBusca] = useState('')
+  const [ccOpen, setCcOpen] = useState(false)
+  const [classeOpen, setClasseOpen] = useState(false)
 
   const canSubmit = form.descricao.trim().length > 0
     && form.justificativa.trim().length > 0
@@ -503,6 +507,14 @@ function NovaSolicitacaoExtraordinariaModal({
   const setField = (field: keyof NovaSolicitacaoExtraForm, value: string) => {
     setForm(prev => ({ ...prev, [field]: value }))
   }
+
+  const centrosFiltrados = centrosCusto
+    .filter(cc => `${cc.codigo} ${cc.descricao}`.toLowerCase().includes(ccBusca.toLowerCase()))
+    .slice(0, 8)
+
+  const classesFiltradas = classesFinanceiras
+    .filter(classe => `${classe.codigo} ${classe.descricao}`.toLowerCase().includes(classeBusca.toLowerCase()))
+    .slice(0, 8)
 
   async function handleCriar() {
     if (!canSubmit) return
@@ -562,37 +574,109 @@ function NovaSolicitacaoExtraordinariaModal({
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div>
+            <div className="relative">
               <label className={labelCls}>Centro de Custo *</label>
-              <input
-                list="financeiro-centros-custo-extra"
-                value={form.centro_custo}
-                onChange={e => setField('centro_custo', e.target.value)}
-                className={inputCls}
-                placeholder="Digite ou selecione..."
-              />
-              <datalist id="financeiro-centros-custo-extra">
-                {centrosCusto.map(cc => (
-                  <option key={cc.id} value={cc.codigo}>{cc.codigo} - {cc.descricao}</option>
-                ))}
-              </datalist>
-              <p className={`mt-1 text-[10px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Aceita seleção da lista ou preenchimento manual.</p>
+              <button
+                type="button"
+                onClick={() => {
+                  setCcOpen(prev => !prev)
+                  setClasseOpen(false)
+                }}
+                className={`${inputCls} flex items-center justify-between text-left ${ccOpen ? (isDark ? 'ring-1 ring-emerald-500/40' : 'ring-1 ring-emerald-500/30') : ''}`}
+              >
+                <span className={form.centro_custo ? '' : isDark ? 'text-slate-500' : 'text-slate-400'}>
+                  {form.centro_custo || 'Selecione...'}
+                </span>
+                <ChevronDown size={16} className={`transition-transform ${ccOpen ? 'rotate-180' : ''} ${isDark ? 'text-slate-400' : 'text-slate-500'}`} />
+              </button>
+              {ccOpen && (
+                <div className={`absolute z-30 mt-2 w-full rounded-2xl border shadow-xl overflow-hidden ${isDark ? 'border-white/[0.08] bg-slate-950' : 'border-slate-200 bg-white'}`}>
+                  <div className="p-2 border-b border-inherit">
+                    <input
+                      value={ccBusca}
+                      onChange={e => setCcBusca(e.target.value)}
+                      className={inputCls}
+                      placeholder="Buscar centro de custo..."
+                      autoFocus
+                    />
+                  </div>
+                  <div className="max-h-64 overflow-y-auto py-1">
+                    {centrosFiltrados.map(cc => {
+                      const label = `${cc.codigo} - ${cc.descricao}`
+                      return (
+                        <button
+                          key={cc.id}
+                          type="button"
+                          onClick={() => {
+                            setField('centro_custo', label)
+                            setCcBusca(label)
+                            setCcOpen(false)
+                          }}
+                          className={`w-full px-3 py-2 text-left text-sm transition-colors ${isDark ? 'text-slate-200 hover:bg-white/[0.06]' : 'text-slate-700 hover:bg-slate-50'}`}
+                        >
+                          <div className="font-medium">{cc.codigo}</div>
+                          <div className={`text-xs ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{cc.descricao}</div>
+                        </button>
+                      )
+                    })}
+                    {centrosFiltrados.length === 0 && (
+                      <div className={`px-3 py-3 text-sm ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Nenhum centro encontrado.</div>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
-            <div>
+            <div className="relative">
               <label className={labelCls}>Classe Financeira *</label>
-              <input
-                list="financeiro-classes-extra"
-                value={form.classe_financeira}
-                onChange={e => setField('classe_financeira', e.target.value)}
-                className={inputCls}
-                placeholder="Digite ou selecione..."
-              />
-              <datalist id="financeiro-classes-extra">
-                {classesFinanceiras.map(classe => (
-                  <option key={classe.id} value={classe.codigo}>{classe.codigo} - {classe.descricao}</option>
-                ))}
-              </datalist>
-              <p className={`mt-1 text-[10px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Aceita seleção da lista ou preenchimento manual.</p>
+              <button
+                type="button"
+                onClick={() => {
+                  setClasseOpen(prev => !prev)
+                  setCcOpen(false)
+                }}
+                className={`${inputCls} flex items-center justify-between text-left ${classeOpen ? (isDark ? 'ring-1 ring-emerald-500/40' : 'ring-1 ring-emerald-500/30') : ''}`}
+              >
+                <span className={form.classe_financeira ? '' : isDark ? 'text-slate-500' : 'text-slate-400'}>
+                  {form.classe_financeira || 'Selecione...'}
+                </span>
+                <ChevronDown size={16} className={`transition-transform ${classeOpen ? 'rotate-180' : ''} ${isDark ? 'text-slate-400' : 'text-slate-500'}`} />
+              </button>
+              {classeOpen && (
+                <div className={`absolute z-30 mt-2 w-full rounded-2xl border shadow-xl overflow-hidden ${isDark ? 'border-white/[0.08] bg-slate-950' : 'border-slate-200 bg-white'}`}>
+                  <div className="p-2 border-b border-inherit">
+                    <input
+                      value={classeBusca}
+                      onChange={e => setClasseBusca(e.target.value)}
+                      className={inputCls}
+                      placeholder="Buscar classe financeira..."
+                      autoFocus
+                    />
+                  </div>
+                  <div className="max-h-64 overflow-y-auto py-1">
+                    {classesFiltradas.map(classe => {
+                      const label = `${classe.codigo} - ${classe.descricao}`
+                      return (
+                        <button
+                          key={classe.id}
+                          type="button"
+                          onClick={() => {
+                            setField('classe_financeira', label)
+                            setClasseBusca(label)
+                            setClasseOpen(false)
+                          }}
+                          className={`w-full px-3 py-2 text-left text-sm transition-colors ${isDark ? 'text-slate-200 hover:bg-white/[0.06]' : 'text-slate-700 hover:bg-slate-50'}`}
+                        >
+                          <div className="font-medium">{classe.codigo}</div>
+                          <div className={`text-xs ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{classe.descricao}</div>
+                        </button>
+                      )
+                    })}
+                    {classesFiltradas.length === 0 && (
+                      <div className={`px-3 py-3 text-sm ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Nenhuma classe encontrada.</div>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 
