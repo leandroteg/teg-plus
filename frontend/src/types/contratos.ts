@@ -124,6 +124,12 @@ export interface Parcela {
   contrato?: Pick<Contrato, 'numero' | 'objeto' | 'tipo_contrato' | 'status'>
 }
 
+export interface ParcelaPlanejada {
+  numero: number
+  valor: number
+  data_vencimento: string
+}
+
 export interface ParcelaAnexo {
   id: string
   parcela_id: string

@@ -16,7 +16,9 @@ import type {
   Assinatura,
   EnviarAssinaturaPayload,
   EnviarAssinaturaResponse,
+  ParcelaPlanejada,
 } from '../types/contratos'
+import { normalizarParcelasPlanejadas, sugerirParcelasContrato } from '../utils/contratosParcelas'
 
 // ── Lista de Solicitacoes ────────────────────────────────────────────────────
 
@@ -179,6 +181,16 @@ export function useSolicitacaoHistorico(solicitacaoId: string | undefined) {
 
 // ── Avancar Etapa ───────────────────────────────────────────────────────────
 
+function readParcelasPlanejadas(dadosEtapa?: Record<string, unknown>, valorTotal?: number) {
+  const raw = dadosEtapa?.parcelas_planejadas
+  if (!Array.isArray(raw)) return []
+
+  return normalizarParcelasPlanejadas(
+    raw.map((item) => item as Partial<ParcelaPlanejada>),
+    valorTotal,
+  )
+}
+
 export function useAvancarEtapa() {
   const qc = useQueryClient()
   return useMutation({
@@ -187,6 +199,7 @@ export function useAvancarEtapa() {
       etapaDe: EtapaSolicitacao
       etapaPara: EtapaSolicitacao
       observacao?: string
+      dadosEtapa?: Record<string, unknown>
     }) => {
       // Update solicitacao etapa
       const { error: updateErr } = await supabase
@@ -209,6 +222,7 @@ export function useAvancarEtapa() {
           etapa_de: payload.etapaDe,
           etapa_para: payload.etapaPara,
           observacao: payload.observacao,
+          dados_etapa: payload.dadosEtapa ?? null,
         })
       if (histErr) throw histErr
 
@@ -222,32 +236,157 @@ export function useAvancarEtapa() {
             .single()
 
           if (sol) {
+            const { data: resumo } = await supabase
+              .from('con_resumos_executivos')
+              .select('id, valor_total, vigencia, recomendacao')
+              .eq('solicitacao_id', payload.solicitacaoId)
+              .order('created_at', { ascending: false })
+              .limit(1)
+              .maybeSingle()
+
             const today = new Date().toISOString().slice(0, 10)
-            const tipoMap: Record<string, 'receita' | 'despesa'> = {
-              servico: 'despesa', fornecimento: 'despesa', locacao: 'despesa',
-              consultoria: 'despesa', obra: 'despesa', receita: 'receita',
+            const tipoContrato = sol.tipo_contrato === 'receita' ? 'receita' : 'despesa'
+            const valorContrato = Number(resumo?.valor_total ?? sol.valor_estimado ?? 0)
+
+            const { data: contratoExistente } = await supabase
+              .from('con_contratos')
+              .select('id, numero, tipo_contrato, obra_id, centro_custo, classe_financeira, objeto, valor_total, data_inicio, data_fim_previsto')
+              .eq('solicitacao_id', payload.solicitacaoId)
+              .maybeSingle()
+
+            let contrato = contratoExistente
+
+            if (!contrato) {
+              const { data: contratoCriado, error: contratoErr } = await supabase
+                .from('con_contratos')
+                .insert({
+                  numero:             sol.numero,
+                  tipo_contrato:      tipoContrato,
+                  tipo_categoria:     sol.categoria_contrato ?? sol.tipo_contrato,
+                  fornecedor_id:      tipoContrato === 'despesa' ? (sol.contraparte_id ?? undefined) : undefined,
+                  obra_id:            sol.obra_id ?? undefined,
+                  objeto:             sol.objeto,
+                  descricao:          sol.descricao_escopo ?? undefined,
+                  valor_total:        valorContrato,
+                  data_assinatura:    today,
+                  data_inicio:        sol.data_inicio_prevista ?? today,
+                  data_fim_previsto:  sol.data_fim_prevista ?? today,
+                  centro_custo:       sol.centro_custo ?? undefined,
+                  classe_financeira:  sol.classe_financeira ?? undefined,
+                  indice_reajuste:    sol.indice_reajuste ?? undefined,
+                  status:             'vigente',
+                  solicitacao_id:     payload.solicitacaoId,
+                })
+                .select('id, numero, tipo_contrato, obra_id, centro_custo, classe_financeira, objeto, valor_total, data_inicio, data_fim_previsto')
+                .single()
+
+              if (contratoErr) throw contratoErr
+              contrato = contratoCriado
             }
 
-            await supabase
-              .from('con_contratos')
-              .insert({
-                numero:             sol.numero,
-                tipo_contrato:      tipoMap[sol.tipo_contrato] ?? 'despesa',
-                tipo_categoria:     sol.categoria_contrato ?? sol.tipo_contrato,
-                fornecedor_id:      sol.contraparte_id ?? undefined,
-                obra_id:            sol.obra_id ?? undefined,
-                objeto:             sol.objeto,
-                descricao:          sol.descricao_escopo ?? undefined,
-                valor_total:        sol.valor_estimado ?? 0,
-                data_assinatura:    today,
-                data_inicio:        sol.data_inicio_prevista ?? today,
-                data_fim_previsto:  sol.data_fim_prevista ?? today,
-                centro_custo:       sol.centro_custo ?? undefined,
-                classe_financeira:  sol.classe_financeira ?? undefined,
-                indice_reajuste:    sol.indice_reajuste ?? undefined,
-                status:             'vigente',
-                solicitacao_id:     payload.solicitacaoId,
-              })
+            const parcelasPlanejadas = readParcelasPlanejadas(payload.dadosEtapa, valorContrato)
+            const parcelasFallback = sugerirParcelasContrato({
+              solicitacao: {
+                forma_pagamento: sol.forma_pagamento,
+                valor_estimado: valorContrato,
+                data_inicio_prevista: sol.data_inicio_prevista,
+                data_fim_prevista: sol.data_fim_prevista,
+                prazo_meses: sol.prazo_meses,
+              },
+              resumo: resumo ?? null,
+            })
+
+            const parcelasResolvidas = parcelasPlanejadas.length > 0 ? parcelasPlanejadas : parcelasFallback
+
+            const { data: parcelasExistentes, error: parcelasExistentesErr } = await supabase
+              .from('con_parcelas')
+              .select('id, numero, valor, data_vencimento, fin_cp_id, fin_cr_id')
+              .eq('contrato_id', contrato.id)
+              .order('numero', { ascending: true })
+
+            if (parcelasExistentesErr) throw parcelasExistentesErr
+
+            let parcelasContrato = parcelasExistentes ?? []
+
+            if (parcelasContrato.length === 0) {
+              const { data: parcelasCriadas, error: parcelasErr } = await supabase
+                .from('con_parcelas')
+                .insert(parcelasResolvidas.map((parcela) => ({
+                  contrato_id: contrato.id,
+                  numero: parcela.numero,
+                  valor: parcela.valor,
+                  data_vencimento: parcela.data_vencimento,
+                  status: 'previsto',
+                  observacoes: `Gerada ao liberar execucao da solicitacao ${sol.numero}`,
+                })))
+                .select('id, numero, valor, data_vencimento, fin_cp_id, fin_cr_id')
+
+              if (parcelasErr) throw parcelasErr
+              parcelasContrato = (parcelasCriadas ?? []).sort((a, b) => a.numero - b.numero)
+            }
+
+            for (const parcela of parcelasContrato) {
+              if (tipoContrato === 'despesa' && !parcela.fin_cp_id) {
+                const { data: cp, error: cpErr } = await supabase
+                  .from('fin_contas_pagar')
+                  .insert({
+                    fornecedor_id: sol.contraparte_id ?? undefined,
+                    fornecedor_nome: sol.contraparte_nome,
+                    valor_original: parcela.valor,
+                    data_emissao: today,
+                    data_vencimento: parcela.data_vencimento,
+                    data_vencimento_orig: parcela.data_vencimento,
+                    centro_custo: sol.centro_custo ?? contrato.centro_custo ?? undefined,
+                    classe_financeira: sol.classe_financeira ?? contrato.classe_financeira ?? undefined,
+                    natureza: 'contrato',
+                    forma_pagamento: sol.forma_pagamento ?? undefined,
+                    numero_documento: `${sol.numero}-PARC-${String(parcela.numero).padStart(2, '0')}`,
+                    status: 'previsto',
+                    descricao: `${sol.objeto} - Parcela ${parcela.numero}/${parcelasContrato.length}`,
+                    observacoes: `Previsto gerado automaticamente ao liberar contrato ${sol.numero} para execucao`,
+                  })
+                  .select('id')
+                  .single()
+
+                if (cpErr) throw cpErr
+
+                const { error: updateParcelaErr } = await supabase
+                  .from('con_parcelas')
+                  .update({ fin_cp_id: cp.id })
+                  .eq('id', parcela.id)
+
+                if (updateParcelaErr) throw updateParcelaErr
+              }
+
+              if (tipoContrato === 'receita' && !parcela.fin_cr_id) {
+                const { data: cr, error: crErr } = await supabase
+                  .from('fin_contas_receber')
+                  .insert({
+                    cliente_nome: sol.contraparte_nome,
+                    cliente_cnpj: sol.contraparte_cnpj ?? undefined,
+                    valor_original: parcela.valor,
+                    data_emissao: today,
+                    data_vencimento: parcela.data_vencimento,
+                    centro_custo: sol.centro_custo ?? contrato.centro_custo ?? undefined,
+                    classe_financeira: sol.classe_financeira ?? contrato.classe_financeira ?? undefined,
+                    natureza: 'contrato',
+                    status: 'previsto',
+                    descricao: `${sol.objeto} - Parcela ${parcela.numero}/${parcelasContrato.length}`,
+                    observacoes: `Previsto gerado automaticamente ao liberar contrato ${sol.numero} para execucao`,
+                  })
+                  .select('id')
+                  .single()
+
+                if (crErr) throw crErr
+
+                const { error: updateParcelaErr } = await supabase
+                  .from('con_parcelas')
+                  .update({ fin_cr_id: cr.id })
+                  .eq('id', parcela.id)
+
+                if (updateParcelaErr) throw updateParcelaErr
+              }
+            }
           }
         } catch (e) {
           console.warn('Aviso: con_contratos nao criado ao liberar execucao:', e)
