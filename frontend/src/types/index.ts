@@ -142,6 +142,13 @@ export interface AprovacaoPendente extends Aprovacao {
     ai_score: number | null
   }
   pagamento_detalhes?: {
+    is_lote?: boolean
+    lote_numero?: string
+    lote_data?: string
+    qtd_itens?: number
+    aprovados?: number
+    excluidos?: number
+    resumo_fornecedores?: string
     fornecedor_nome: string
     valor_original: number
     valor_pago: number
@@ -154,6 +161,15 @@ export interface AprovacaoPendente extends Aprovacao {
     natureza: string
     forma_pagamento: string
     status_cp: string
+    itens?: {
+      id: string
+      fornecedor_nome: string
+      numero_documento: string
+      descricao: string
+      valor_original: number
+      data_vencimento: string
+      decisao?: string
+    }[]
   }
 }
 

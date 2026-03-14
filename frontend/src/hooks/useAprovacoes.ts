@@ -129,6 +129,8 @@ export function useAprovacoesPendentes(tipo?: TipoAprovacao) {
         .filter(Boolean)
 
       const finMap = new Map<string, Record<string, unknown>>()
+      const loteMap = new Map<string, Record<string, unknown>>()
+      const loteItensMap = new Map<string, Record<string, unknown>[]>()
       if (finIds.length > 0) {
         const { data: finData } = await supabase
           .from('fin_contas_pagar')
@@ -136,6 +138,49 @@ export function useAprovacoesPendentes(tipo?: TipoAprovacao) {
           .in('id', finIds)
         for (const f of finData ?? []) {
           finMap.set(f.id, f)
+        }
+
+        const loteIds = finIds.filter(id => !finMap.has(id))
+        if (loteIds.length > 0) {
+          const { data: loteData } = await supabase
+            .from('fin_lotes_pagamento')
+            .select('id, numero_lote, valor_total, qtd_itens, created_at, status')
+            .in('id', loteIds)
+          for (const lote of loteData ?? []) {
+            loteMap.set(lote.id, lote)
+          }
+
+          const { data: loteItens } = await supabase
+            .from('fin_lote_itens')
+            .select(`
+              id,
+              lote_id,
+              decisao,
+              cp:fin_contas_pagar!cp_id(
+                id,
+                fornecedor_nome,
+                valor_original,
+                valor_pago,
+                numero_documento,
+                descricao,
+                data_vencimento,
+                data_emissao,
+                centro_custo,
+                classe_financeira,
+                natureza,
+                forma_pagamento,
+                status
+              )
+            `)
+            .in('lote_id', loteIds)
+
+          for (const item of loteItens ?? []) {
+            const loteId = item.lote_id as string | undefined
+            if (!loteId) continue
+            const current = loteItensMap.get(loteId) ?? []
+            current.push(item as Record<string, unknown>)
+            loteItensMap.set(loteId, current)
+          }
         }
       }
 
@@ -213,20 +258,64 @@ export function useAprovacoesPendentes(tipo?: TipoAprovacao) {
             }
           } else if (a.tipo_aprovacao === 'autorizacao_pagamento') {
             const fin = finMap.get(a.entidade_id)
+            const lote = loteMap.get(a.entidade_id)
+            const loteItens = loteItensMap.get(a.entidade_id) ?? []
+            const loteCps = loteItens
+              .map(item => item.cp as Record<string, unknown> | null)
+              .filter((cp): cp is Record<string, unknown> => !!cp)
+            const fornecedores = Array.from(new Set(loteCps.map(cp => (cp.fornecedor_nome as string) || '').filter(Boolean)))
+            const fornecedorResumo = fornecedores.length === 0
+              ? ''
+              : fornecedores.length === 1
+                ? fornecedores[0]
+                : `${fornecedores[0]} + ${fornecedores.length - 1}`
             requisicao = {
               id: a.entidade_id,
-              numero: fin?.numero_documento ?? a.entidade_numero ?? 'N/A',
-              solicitante_nome: (fin?.fornecedor_nome as string) ?? '',
+              numero: (lote?.numero_lote as string) ?? (fin?.numero_documento as string) ?? a.entidade_numero ?? 'N/A',
+              solicitante_nome: (fin?.fornecedor_nome as string) ?? fornecedorResumo,
               obra_nome: (fin?.centro_custo as string) ?? '',
               descricao: `Autorizacao Pagamento — ${(fin?.fornecedor_nome as string) ?? ''} — ${(fin?.descricao as string) ?? ''}`,
-              valor_estimado: (fin?.valor_original as number) ?? 0,
+              valor_estimado: (lote?.valor_total as number) ?? (fin?.valor_original as number) ?? 0,
               urgencia: 'normal',
               status: 'em_aprovacao',
               alcada_nivel: a.nivel,
               created_at: a.created_at,
             }
-            // Issue #35: Attach enriched payment details for AprovAi card
-            if (fin) {
+            if (lote) {
+              ;(a as Record<string, unknown>)._pagamento_detalhes = {
+                is_lote: true,
+                lote_numero: (lote.numero_lote as string) ?? '',
+                lote_data: (lote.created_at as string) ?? '',
+                qtd_itens: (lote.qtd_itens as number) ?? loteItens.length,
+                aprovados: loteItens.filter(item => item.decisao === 'aprovado').length,
+                excluidos: loteItens.filter(item => item.decisao === 'rejeitado').length,
+                resumo_fornecedores: fornecedorResumo,
+                fornecedor_nome: fornecedorResumo || 'Lote de Pagamento',
+                valor_original: (lote.valor_total as number) ?? 0,
+                valor_pago: 0,
+                numero_documento: (lote.numero_lote as string) ?? '',
+                descricao: `Lote de pagamento com ${(lote.qtd_itens as number) ?? loteItens.length} itens`,
+                data_vencimento: '',
+                data_emissao: (lote.created_at as string) ?? '',
+                centro_custo: '',
+                classe_financeira: '',
+                natureza: '',
+                forma_pagamento: '',
+                status_cp: (lote.status as string) ?? '',
+                itens: loteItens.map(item => {
+                  const cp = item.cp as Record<string, unknown> | null
+                  return {
+                    id: (cp?.id as string) ?? (item.id as string),
+                    fornecedor_nome: (cp?.fornecedor_nome as string) ?? '',
+                    numero_documento: (cp?.numero_documento as string) ?? '',
+                    descricao: (cp?.descricao as string) ?? '',
+                    valor_original: (cp?.valor_original as number) ?? 0,
+                    data_vencimento: (cp?.data_vencimento as string) ?? '',
+                    decisao: (item.decisao as string) ?? 'pendente',
+                  }
+                }),
+              }
+            } else if (fin) {
               ;(a as Record<string, unknown>)._pagamento_detalhes = {
                 fornecedor_nome: (fin.fornecedor_nome as string) ?? '',
                 valor_original: (fin.valor_original as number) ?? 0,
@@ -264,6 +353,9 @@ export function useAprovacoesPendentes(tipo?: TipoAprovacao) {
 
           return {
             ...a,
+            entidade_numero: loteMap.has(a.entidade_id)
+              ? `${(loteMap.get(a.entidade_id)?.numero_lote as string) ?? a.entidade_numero ?? 'Lote'} • ${new Date((loteMap.get(a.entidade_id)?.created_at as string) ?? a.created_at).toLocaleDateString('pt-BR')} • ${((loteMap.get(a.entidade_id)?.valor_total as number) ?? 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}`
+              : a.entidade_numero,
             requisicao_id: a.entidade_id,
             tipo_aprovacao: a.tipo_aprovacao || 'requisicao_compra',
             modulo: a.modulo || 'cmp',

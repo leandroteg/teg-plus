@@ -577,7 +577,8 @@ function PagamentoDetalhesCard({ detalhes }: {
 }) {
   const [showEntender, setShowEntender] = useState(false)
   const fmtDate = (d: string) => d ? new Date(d + 'T00:00:00').toLocaleDateString('pt-BR') : '—'
-  const isVencida = detalhes.data_vencimento && new Date(detalhes.data_vencimento) < new Date()
+  const isVencida = !!detalhes.data_vencimento && new Date(detalhes.data_vencimento) < new Date()
+  const isLote = !!detalhes.is_lote
 
   return (
     <div className="space-y-2.5">
@@ -585,7 +586,7 @@ function PagamentoDetalhesCard({ detalhes }: {
       <div className={`rounded-xl p-3 flex justify-between items-center ${isVencida ? 'bg-red-50 border border-red-200' : 'bg-amber-50 border border-amber-200'}`}>
         <div>
           <span className={`text-xs font-medium ${isVencida ? 'text-red-700' : 'text-amber-700'}`}>
-            Valor a Pagar
+            {isLote ? 'Valor Total do Lote' : 'Valor a Pagar'}
           </span>
           {isVencida && (
             <span className="ml-2 text-[10px] font-bold text-red-600 bg-red-100 px-1.5 py-0.5 rounded-full">VENCIDA</span>
@@ -596,6 +597,38 @@ function PagamentoDetalhesCard({ detalhes }: {
         </span>
       </div>
 
+      {isLote && detalhes.itens && detalhes.itens.length > 0 && (
+        <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
+          <div className="grid grid-cols-[minmax(0,1.7fr)_100px_90px_100px_90px] gap-x-3 px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-slate-400 bg-slate-50">
+            <span>Item</span>
+            <span>Documento</span>
+            <span>Venc.</span>
+            <span className="text-right">Valor</span>
+            <span>Decisão</span>
+          </div>
+          {detalhes.itens.map(item => (
+            <div key={item.id} className="grid grid-cols-[minmax(0,1.7fr)_100px_90px_100px_90px] gap-x-3 px-3 py-2.5 text-xs border-t border-slate-100">
+              <div className="min-w-0">
+                <p className="truncate font-semibold text-slate-800">{item.fornecedor_nome || 'â€”'}</p>
+                <p className="truncate text-slate-500">{item.descricao || 'â€”'}</p>
+              </div>
+              <span className="truncate text-slate-600">{item.numero_documento || 'â€”'}</span>
+              <span className="text-slate-600">{fmtDate(item.data_vencimento)}</span>
+              <span className="text-right font-semibold text-emerald-700">{fmt(item.valor_original)}</span>
+              <span className={`inline-flex h-fit rounded-full px-2 py-0.5 text-[10px] font-semibold ${
+                item.decisao === 'aprovado'
+                  ? 'bg-emerald-50 text-emerald-700'
+                  : item.decisao === 'rejeitado'
+                    ? 'bg-rose-50 text-rose-700'
+                    : 'bg-slate-100 text-slate-600'
+              }`}>
+                {item.decisao === 'aprovado' ? 'Aprovado' : item.decisao === 'rejeitado' ? 'Excluído' : 'Pendente'}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+
       {/* Info grid */}
       <div className="bg-slate-50 rounded-xl p-3 space-y-1.5">
         <div className="flex items-center gap-2 mb-1">
@@ -603,6 +636,34 @@ function PagamentoDetalhesCard({ detalhes }: {
           <span className="text-[11px] font-bold text-teal-600 uppercase tracking-wider">Detalhes do Pagamento</span>
         </div>
         <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-xs">
+          {isLote && (
+            <>
+              <div>
+                <span className="text-slate-400">Lote</span>
+                <p className="font-semibold text-slate-800">{detalhes.lote_numero || detalhes.numero_documento || 'â€”'}</p>
+              </div>
+              <div>
+                <span className="text-slate-400">Criado em</span>
+                <p className="font-medium text-slate-700">{detalhes.lote_data ? new Date(detalhes.lote_data).toLocaleDateString('pt-BR') : 'â€”'}</p>
+              </div>
+              <div>
+                <span className="text-slate-400">Qtd. itens</span>
+                <p className="font-medium text-slate-700">{detalhes.qtd_itens ?? detalhes.itens?.length ?? 0}</p>
+              </div>
+              <div>
+                <span className="text-slate-400">Fornecedores</span>
+                <p className="font-medium text-slate-700">{detalhes.resumo_fornecedores || 'â€”'}</p>
+              </div>
+              <div>
+                <span className="text-slate-400">Aprovados</span>
+                <p className="font-medium text-emerald-700">{detalhes.aprovados ?? 0}</p>
+              </div>
+              <div>
+                <span className="text-slate-400">Excluídos</span>
+                <p className="font-medium text-rose-700">{detalhes.excluidos ?? 0}</p>
+              </div>
+            </>
+          )}
           <div>
             <span className="text-slate-400">Fornecedor</span>
             <p className="font-semibold text-slate-800">{detalhes.fornecedor_nome || '—'}</p>
@@ -661,16 +722,31 @@ function PagamentoDetalhesCard({ detalhes }: {
       </button>
       {showEntender && (
         <div className="bg-indigo-50/60 border border-indigo-100 rounded-xl p-3 text-xs text-indigo-800 leading-relaxed">
-          <p>
-            Esta e uma <strong>Autorizacao de Pagamento</strong> para o fornecedor <strong>{detalhes.fornecedor_nome}</strong> no
-            valor de <strong>{fmt(detalhes.valor_original)}</strong>
-            {detalhes.data_vencimento && <>, com vencimento em <strong>{fmtDate(detalhes.data_vencimento)}</strong></>}.
-            {detalhes.centro_custo && <> O gasto sera alocado no centro de custo <strong>{detalhes.centro_custo}</strong>.</>}
-            {isVencida && <> <span className="text-red-600 font-bold">Atencao: esta conta ja esta vencida.</span></>}
-          </p>
-          <p className="mt-1.5">
-            Ao aprovar, o financeiro podera efetuar o pagamento. Ao rejeitar, a CP voltara para revisao.
-          </p>
+          {isLote ? (
+            <>
+              <p>
+                Esta e uma <strong>Autorizacao de Pagamento em lote</strong> para <strong>{detalhes.qtd_itens ?? detalhes.itens?.length ?? 0} itens</strong>,
+                totalizando <strong>{fmt(detalhes.valor_original)}</strong>.
+                {detalhes.resumo_fornecedores && <> Os principais fornecedores do lote sao <strong>{detalhes.resumo_fornecedores}</strong>.</>}
+              </p>
+              <p className="mt-1.5">
+                Ao aprovar, o financeiro podera seguir com o pagamento do lote. Ao rejeitar, o lote volta para revisao sem quebrar os status atuais.
+              </p>
+            </>
+          ) : (
+            <>
+              <p>
+                Esta e uma <strong>Autorizacao de Pagamento</strong> para o fornecedor <strong>{detalhes.fornecedor_nome}</strong> no
+                valor de <strong>{fmt(detalhes.valor_original)}</strong>
+                {detalhes.data_vencimento && <>, com vencimento em <strong>{fmtDate(detalhes.data_vencimento)}</strong></>}.
+                {detalhes.centro_custo && <> O gasto sera alocado no centro de custo <strong>{detalhes.centro_custo}</strong>.</>}
+                {isVencida && <> <span className="text-red-600 font-bold">Atencao: esta conta ja esta vencida.</span></>}
+              </p>
+              <p className="mt-1.5">
+                Ao aprovar, o financeiro podera efetuar o pagamento. Ao rejeitar, a CP voltara para revisao.
+              </p>
+            </>
+          )}
         </div>
       )}
     </div>
