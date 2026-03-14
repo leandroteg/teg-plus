@@ -217,6 +217,7 @@ export interface ContaBancaria {
 export interface MovimentacaoTesouraria {
   id: string
   conta_id: string
+  conta_destino_id?: string
   tipo: 'entrada' | 'saida' | 'transferencia'
   valor: number
   data_movimentacao: string
@@ -230,6 +231,9 @@ export interface MovimentacaoTesouraria {
   origem: 'manual' | 'import_ofx' | 'import_csv' | 'auto_cp' | 'auto_cr'
   conta_nome?: string
   conta_cor?: string
+  conta_destino_nome?: string
+  conta_destino_cor?: string
+  created_at?: string
   criado_em?: string
 }
 
@@ -249,8 +253,12 @@ export interface ExtratoImport {
 
 export interface TesourariaDashboardData {
   saldo_total: number
+  saldo_inicial_periodo: number
+  saldo_final_periodo: number
   entradas_periodo: number
   saidas_periodo: number
+  entradas_periodo_anterior: number
+  saidas_periodo_anterior: number
   contas: ContaBancaria[]
   movimentacoes_recentes: MovimentacaoTesouraria[]
   fluxo_diario: Array<{ data: string; entradas: number; saidas: number }>
@@ -258,6 +266,22 @@ export interface TesourariaDashboardData {
   previsao_cr: number
   aging_cp: { hoje: number; d7: number; d30: number; d60: number }
   aging_cr: { hoje: number; d7: number; d30: number; d60: number }
+  comparativos: {
+    entradas_percentual: number
+    saidas_percentual: number
+  }
+  indicadores: {
+    saldo_disponivel: number
+    saldo_projetado_30d: number
+    queima_media_diaria: number
+    cobertura_dias: number | null
+  }
+  alertas: Array<{
+    id: string
+    tipo: 'critico' | 'alto' | 'medio' | 'baixo'
+    titulo: string
+    descricao: string
+  }>
 }
 
 export type CategoriaMovimentacao =

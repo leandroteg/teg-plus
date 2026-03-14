@@ -7,11 +7,21 @@ import type {
 
 // ── Dashboard RPC ─────────────────────────────────────────
 const EMPTY_DASHBOARD: TesourariaDashboardData = {
-  saldo_total: 0, entradas_periodo: 0, saidas_periodo: 0,
+  saldo_total: 0, saldo_inicial_periodo: 0, saldo_final_periodo: 0,
+  entradas_periodo: 0, saidas_periodo: 0,
+  entradas_periodo_anterior: 0, saidas_periodo_anterior: 0,
   contas: [], movimentacoes_recentes: [], fluxo_diario: [],
   previsao_cp: 0, previsao_cr: 0,
   aging_cp: { hoje: 0, d7: 0, d30: 0, d60: 0 },
   aging_cr: { hoje: 0, d7: 0, d30: 0, d60: 0 },
+  comparativos: { entradas_percentual: 0, saidas_percentual: 0 },
+  indicadores: {
+    saldo_disponivel: 0,
+    saldo_projetado_30d: 0,
+    queima_media_diaria: 0,
+    cobertura_dias: null,
+  },
+  alertas: [],
 }
 
 export function useTesourariaDashboard(periodo = '30d') {
@@ -21,8 +31,8 @@ export function useTesourariaDashboard(periodo = '30d') {
       const { data, error } = await supabase.rpc('get_tesouraria_dashboard', {
         p_periodo: periodo,
       })
-      if (error) return EMPTY_DASHBOARD
-      return data as TesourariaDashboardData
+      if (error) throw error
+      return (data as TesourariaDashboardData) ?? EMPTY_DASHBOARD
     },
     refetchInterval: 30_000,
   })
@@ -116,12 +126,18 @@ export function useCriarMovimentacao() {
   return useMutation({
     mutationFn: async (mov: {
       conta_id: string; tipo: 'entrada' | 'saida' | 'transferencia'
+      conta_destino_id?: string
       valor: number; data_movimentacao: string; descricao?: string
       categoria?: CategoriaMovimentacao
     }) => {
+      const payload = {
+        ...mov,
+        origem: 'manual' as const,
+        conta_destino_id: mov.tipo === 'transferencia' ? mov.conta_destino_id : null,
+      }
       const { data, error } = await supabase
         .from('fin_movimentacoes_tesouraria')
-        .insert({ ...mov, origem: 'manual' })
+        .insert(payload)
         .select()
         .single()
       if (error) throw error
@@ -142,12 +158,15 @@ export function useImportExtrato() {
     mutationFn: async ({ contaId, file }: { contaId: string; file: File }) => {
       const ext = file.name.split('.').pop()?.toLowerCase() || 'ofx'
       const path = `extratos/${contaId}/${Date.now()}.${ext}`
-      const { error: upErr } = await supabase.storage
-        .from('notas-fiscais')
-        .upload(path, file)
-      if (upErr) throw upErr
+      let bucket = 'tesouraria-extratos'
+      let uploadResult = await supabase.storage.from(bucket).upload(path, file)
+      if (uploadResult.error) {
+        bucket = 'notas-fiscais'
+        uploadResult = await supabase.storage.from(bucket).upload(path, file)
+      }
+      if (uploadResult.error) throw uploadResult.error
 
-      const { data: urlData } = supabase.storage.from('notas-fiscais').getPublicUrl(path)
+      const { data: urlData } = supabase.storage.from(bucket).getPublicUrl(path)
 
       const { data: importRec, error: insErr } = await supabase
         .from('fin_extratos_import')

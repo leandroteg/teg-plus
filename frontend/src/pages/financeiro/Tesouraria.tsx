@@ -11,7 +11,7 @@ import {
   ResponsiveContainer, Line, ComposedChart,
 } from 'recharts'
 import {
-  useTesourariaDashboard, useCriarContaBancaria, useCriarMovimentacao,
+  useTesourariaDashboard, useCriarContaBancaria, useCriarMovimentacao, useImportExtrato,
 } from '../../hooks/useTesouraria'
 import type { TesourariaDashboardData, CategoriaMovimentacao } from '../../types/financeiro'
 
@@ -48,6 +48,15 @@ const CORES_PRESET = [
   '#14B8A6', '#8B5CF6', '#F59E0B', '#EF4444', '#3B82F6',
   '#10B981', '#EC4899', '#6366F1', '#F97316', '#06B6D4',
 ]
+
+const EMPTY_AGING = { hoje: 0, d7: 0, d30: 0, d60: 0 }
+
+const alertToneClasses: Record<string, string> = {
+  critico: 'border-rose-200 bg-rose-50 text-rose-700',
+  alto: 'border-amber-200 bg-amber-50 text-amber-700',
+  medio: 'border-sky-200 bg-sky-50 text-sky-700',
+  baixo: 'border-emerald-200 bg-emerald-50 text-emerald-700',
+}
 
 // ── KpiCard ─────────────────────────────────────────────────────────────────
 
@@ -107,6 +116,121 @@ function KpiCard({ titulo, valor, icon: Icon, hexCor, subtitulo, trend, isDark }
               </span>
             )}
           </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function ErrorState({ isDark, onRetry }: { isDark: boolean; onRetry: () => void }) {
+  return (
+    <div className={`rounded-2xl border p-6 ${isDark ? 'border-white/[0.08] bg-white/[0.04]' : 'border-rose-200 bg-white'}`}>
+      <div className="flex items-start gap-3">
+        <div className={`rounded-xl p-2 ${isDark ? 'bg-rose-500/10' : 'bg-rose-50'}`}>
+          <AlertTriangle size={18} className="text-rose-500" />
+        </div>
+        <div className="flex-1">
+          <h2 className={`text-base font-extrabold ${isDark ? 'text-white' : 'text-slate-800'}`}>
+            Falha ao carregar a Tesouraria
+          </h2>
+          <p className={`mt-1 text-sm ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+            A tela nao recebeu os dados consolidados do banco. O modulo foi mantido isolado e nenhum fluxo de CP/CR foi alterado.
+          </p>
+        </div>
+        <button
+          onClick={onRetry}
+          className="rounded-xl bg-teal-600 px-4 py-2 text-xs font-bold text-white transition-colors hover:bg-teal-700"
+        >
+          Tentar novamente
+        </button>
+      </div>
+    </div>
+  )
+}
+
+function IndicadoresPanel({ dashboard, isDark }: {
+  dashboard: TesourariaDashboardData
+  isDark: boolean
+}) {
+  const indicadores = [
+    {
+      label: 'Saldo disponivel',
+      value: fmt(dashboard.indicadores.saldo_disponivel),
+      hint: 'Disponibilidade real consolidada',
+    },
+    {
+      label: 'Saldo projetado 30d',
+      value: fmt(dashboard.indicadores.saldo_projetado_30d),
+      hint: dashboard.indicadores.saldo_projetado_30d >= 0 ? 'Janela confortavel' : 'Atencao ao caixa futuro',
+    },
+    {
+      label: 'Queima media diaria',
+      value: fmt(dashboard.indicadores.queima_media_diaria),
+      hint: 'Baseada nas saidas do periodo',
+    },
+    {
+      label: 'Cobertura de caixa',
+      value: dashboard.indicadores.cobertura_dias == null ? '--' : `${dashboard.indicadores.cobertura_dias.toFixed(1)} dias`,
+      hint: 'Dias de cobertura no ritmo atual',
+    },
+  ]
+
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">
+      {indicadores.map((item) => (
+        <div
+          key={item.label}
+          className={`rounded-2xl p-4 ${isDark ? 'border border-white/[0.08] bg-white/[0.04]' : 'border border-slate-100 bg-white shadow-sm'}`}
+        >
+          <p className={`text-[10px] font-bold uppercase tracking-widest ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+            {item.label}
+          </p>
+          <p className={`mt-2 text-lg font-extrabold ${isDark ? 'text-white' : 'text-slate-800'}`}>
+            {item.value}
+          </p>
+          <p className={`mt-1 text-xs ${isDark ? 'text-slate-500' : 'text-slate-500'}`}>
+            {item.hint}
+          </p>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+function AlertasPanel({ alertas, isDark }: {
+  alertas: TesourariaDashboardData['alertas']
+  isDark: boolean
+}) {
+  return (
+    <div className={`rounded-2xl overflow-hidden ${isDark ? 'border border-white/[0.08] bg-white/[0.04]' : 'border border-slate-100 bg-white shadow-sm'}`}>
+      <div className={`flex items-center gap-2 px-4 py-3 ${isDark ? 'border-b border-white/[0.06]' : 'border-b border-slate-100'}`}>
+        <AlertTriangle size={14} className="text-amber-500" />
+        <h3 className={`text-sm font-extrabold ${isDark ? 'text-white' : 'text-slate-800'}`}>
+          Alertas e insights
+        </h3>
+      </div>
+      <div className="space-y-3 p-4">
+        {alertas.length === 0 ? (
+          <div className={`rounded-xl border border-dashed p-4 text-sm ${isDark ? 'border-white/[0.08] text-slate-400' : 'border-slate-200 text-slate-500'}`}>
+            Nenhum alerta critico no periodo. O caixa esta sob controle.
+          </div>
+        ) : (
+          alertas.map((alerta) => (
+            <div
+              key={alerta.id}
+              className={`rounded-xl border p-3 ${isDark ? 'border-white/[0.08] bg-white/[0.03] text-slate-200' : alertToneClasses[alerta.tipo] ?? 'border-slate-200 bg-slate-50 text-slate-700'}`}
+            >
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-sm font-bold">{alerta.titulo}</p>
+                <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-widest ${isDark ? 'bg-white/[0.06] text-slate-400' : 'bg-white/70 text-slate-600'}`}>
+                  {alerta.tipo}
+                </span>
+              </div>
+              <p className={`mt-1 text-xs ${isDark ? 'text-slate-400' : 'text-current'}`}>
+                {alerta.descricao}
+              </p>
+            </div>
+          ))
         )}
       </div>
     </div>
@@ -721,6 +845,99 @@ function NovaContaModal({ isDark, onClose }: { isDark: boolean; onClose: () => v
   )
 }
 
+function ImportExtratoModal({ isDark, contas, onClose }: {
+  isDark: boolean
+  contas: TesourariaDashboardData['contas']
+  onClose: () => void
+}) {
+  const importar = useImportExtrato()
+  const [contaId, setContaId] = useState(contas[0]?.id ?? '')
+  const [file, setFile] = useState<File | null>(null)
+
+  const canSubmit = Boolean(contaId && file)
+
+  const inputCls = `w-full rounded-xl px-3 py-2.5 text-sm outline-none transition-colors ${
+    isDark
+      ? 'bg-white/[0.06] border border-white/[0.08] text-slate-200 placeholder:text-slate-500 focus:border-teal-500/50'
+      : 'bg-slate-50 border border-slate-200 text-slate-700 placeholder:text-slate-400 focus:border-teal-500'
+  }`
+
+  const labelCls = `text-[10px] font-bold uppercase tracking-widest mb-1 block ${
+    isDark ? 'text-slate-400' : 'text-slate-500'
+  }`
+
+  const handleSubmit = () => {
+    if (!canSubmit || !file) return
+    importar.mutate({ contaId, file }, { onSuccess: () => onClose() })
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
+      <div className={`relative w-full max-w-md rounded-2xl overflow-hidden shadow-2xl ${
+        isDark ? 'border border-white/[0.08] bg-slate-900' : 'border border-slate-200 bg-white'
+      }`}>
+        <div className={`flex items-center justify-between px-5 py-4 ${
+          isDark ? 'border-b border-white/[0.06]' : 'border-b border-slate-100'
+        }`}>
+          <h2 className={`text-sm font-extrabold ${isDark ? 'text-white' : 'text-slate-800'}`}>
+            Importar extrato
+          </h2>
+          <button onClick={onClose} className={`rounded-lg p-1 transition-colors ${
+            isDark ? 'text-slate-400 hover:bg-white/[0.06]' : 'text-slate-500 hover:bg-slate-100'
+          }`}>
+            <X size={16} />
+          </button>
+        </div>
+
+        <div className="space-y-4 p-5">
+          <div>
+            <label className={labelCls}>Conta *</label>
+            <select className={inputCls} value={contaId} onChange={(e) => setContaId(e.target.value)}>
+              {contas.map((conta) => (
+                <option key={conta.id} value={conta.id}>{conta.nome}</option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className={labelCls}>Arquivo OFX ou CSV *</label>
+            <input
+              type="file"
+              accept=".ofx,.csv"
+              className={inputCls}
+              onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+            />
+            <p className={`mt-2 text-xs ${isDark ? 'text-slate-500' : 'text-slate-500'}`}>
+              O upload usa um bucket dedicado da Tesouraria e permanece isolado dos fluxos fiscais.
+            </p>
+          </div>
+        </div>
+
+        <div className={`flex justify-end gap-2 px-5 py-4 ${
+          isDark ? 'border-t border-white/[0.06]' : 'border-t border-slate-100'
+        }`}>
+          <button
+            onClick={onClose}
+            className={`rounded-xl px-4 py-2 text-xs font-bold transition-colors ${
+              isDark ? 'bg-white/[0.06] text-slate-300 hover:bg-white/[0.1]' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+            }`}
+          >
+            Cancelar
+          </button>
+          <button
+            onClick={handleSubmit}
+            disabled={!canSubmit || importar.isPending}
+            className="rounded-xl bg-teal-600 px-4 py-2 text-xs font-bold text-white transition-colors hover:bg-teal-700 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {importar.isPending ? 'Importando...' : 'Enviar extrato'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ── NovaMovimentacaoModal ───────────────────────────────────────────────────
 
 function NovaMovimentacaoModal({ isDark, contas, onClose }: {
@@ -731,6 +948,7 @@ function NovaMovimentacaoModal({ isDark, contas, onClose }: {
   const criar = useCriarMovimentacao()
   const [form, setForm] = useState({
     conta_id: contas[0]?.id ?? '',
+    conta_destino_id: '',
     tipo: 'entrada' as 'entrada' | 'saida' | 'transferencia',
     valor: '',
     data_movimentacao: new Date().toISOString().split('T')[0],
@@ -738,13 +956,18 @@ function NovaMovimentacaoModal({ isDark, contas, onClose }: {
     categoria: 'outros' as CategoriaMovimentacao,
   })
 
-  const canSubmit = form.conta_id && parseFloat(form.valor) > 0
+  const canSubmit = Boolean(
+    form.conta_id &&
+    parseFloat(form.valor) > 0 &&
+    (form.tipo !== 'transferencia' || (form.conta_destino_id && form.conta_destino_id !== form.conta_id))
+  )
 
   const handleSubmit = () => {
     if (!canSubmit) return
     criar.mutate(
       {
         conta_id: form.conta_id,
+        conta_destino_id: form.tipo === 'transferencia' ? form.conta_destino_id : undefined,
         tipo: form.tipo,
         valor: parseFloat(form.valor),
         data_movimentacao: form.data_movimentacao,
@@ -809,7 +1032,12 @@ function NovaMovimentacaoModal({ isDark, contas, onClose }: {
               <select
                 className={inputCls}
                 value={form.tipo}
-                onChange={e => setForm(f => ({ ...f, tipo: e.target.value as any }))}
+                onChange={e => setForm(f => ({
+                  ...f,
+                  tipo: e.target.value as any,
+                  conta_destino_id: e.target.value === 'transferencia' ? f.conta_destino_id : '',
+                  categoria: e.target.value === 'transferencia' ? 'transferencia' : f.categoria,
+                }))}
               >
                 <option value="entrada">Entrada</option>
                 <option value="saida">Saida</option>
@@ -829,6 +1057,24 @@ function NovaMovimentacaoModal({ isDark, contas, onClose }: {
               />
             </div>
           </div>
+
+          {form.tipo === 'transferencia' && (
+            <div>
+              <label className={labelCls}>Conta destino *</label>
+              <select
+                className={inputCls}
+                value={form.conta_destino_id}
+                onChange={e => setForm(f => ({ ...f, conta_destino_id: e.target.value }))}
+              >
+                <option value="">Selecione a conta de destino</option>
+                {contas
+                  .filter(c => c.id !== form.conta_id)
+                  .map(c => (
+                    <option key={c.id} value={c.id}>{c.nome}</option>
+                  ))}
+              </select>
+            </div>
+          )}
 
           <div className="grid grid-cols-2 gap-3">
             <div>
@@ -927,7 +1173,7 @@ function EmptyState({ isDark, onAddConta }: { isDark: boolean; onAddConta: () =>
 
 // ── Main Component ──────────────────────────────────────────────────────────
 
-export default function Tesouraria() {
+function TesourariaLegacy() {
   const { isDark } = useTheme()
   const [periodo, setPeriodo] = useState('30d')
   const [showNovaConta, setShowNovaConta] = useState(false)
@@ -1107,6 +1353,260 @@ function Header({ isDark, periodo, setPeriodo }: {
             key={val}
             onClick={() => setPeriodo(val)}
             className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-all ${
+              periodo === val
+                ? 'bg-teal-600 text-white shadow-sm'
+                : isDark
+                  ? 'bg-[#1e293b] text-slate-400 border border-white/[0.06] hover:bg-white/[0.06]'
+                  : 'bg-white text-slate-500 border border-slate-200 hover:bg-slate-50'
+            }`}
+          >
+            {lbl}
+          </button>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+export default function Tesouraria() {
+  const { isDark } = useTheme()
+  const [periodo, setPeriodo] = useState('30d')
+  const [showNovaConta, setShowNovaConta] = useState(false)
+  const [showNovaMovimentacao, setShowNovaMovimentacao] = useState(false)
+  const [showImportExtrato, setShowImportExtrato] = useState(false)
+
+  const { data: dashboard, isLoading, isError, refetch } = useTesourariaDashboard(periodo)
+
+  const contas = dashboard?.contas ?? []
+  const movimentacoes = dashboard?.movimentacoes_recentes ?? []
+  const agingCp = dashboard?.aging_cp ?? EMPTY_AGING
+  const agingCr = dashboard?.aging_cr ?? EMPTY_AGING
+  const alertas = dashboard?.alertas ?? []
+  const comparativos = dashboard?.comparativos ?? { entradas_percentual: 0, saidas_percentual: 0 }
+  const indicadores = dashboard?.indicadores ?? {
+    saldo_disponivel: 0,
+    saldo_projetado_30d: 0,
+    queima_media_diaria: 0,
+    cobertura_dias: null,
+  }
+
+  const chartData = useMemo(() => {
+    let saldo = dashboard?.saldo_inicial_periodo ?? 0
+    return (dashboard?.fluxo_diario ?? []).map((d) => {
+      saldo += d.entradas - d.saidas
+      return {
+        ...d,
+        saldo,
+        dataFmt: new Date(d.data + 'T00:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }),
+      }
+    })
+  }, [dashboard?.fluxo_diario, dashboard?.saldo_inicial_periodo])
+
+  const previsao30d = (dashboard?.previsao_cr ?? 0) - (dashboard?.previsao_cp ?? 0)
+  const hasData = contas.length > 0 || movimentacoes.length > 0
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <div className="h-8 w-8 animate-spin rounded-full border-[3px] border-teal-500 border-t-transparent" />
+      </div>
+    )
+  }
+
+  if (isError) {
+    return (
+      <div className="space-y-5">
+        <TesourariaHeader
+          isDark={isDark}
+          periodo={periodo}
+          setPeriodo={setPeriodo}
+          onNovaMovimentacao={() => setShowNovaMovimentacao(true)}
+          onImportOFX={() => setShowImportExtrato(true)}
+        />
+        <ErrorState isDark={isDark} onRetry={() => { void refetch() }} />
+      </div>
+    )
+  }
+
+  if (!hasData) {
+    return (
+      <div className="space-y-5">
+        <TesourariaHeader
+          isDark={isDark}
+          periodo={periodo}
+          setPeriodo={setPeriodo}
+          onNovaMovimentacao={() => setShowNovaMovimentacao(true)}
+          onImportOFX={() => setShowImportExtrato(true)}
+        />
+        <EmptyState isDark={isDark} onAddConta={() => setShowNovaConta(true)} />
+        {showNovaConta && <NovaContaModal isDark={isDark} onClose={() => setShowNovaConta(false)} />}
+        {showImportExtrato && (
+          <ImportExtratoModal isDark={isDark} contas={contas} onClose={() => setShowImportExtrato(false)} />
+        )}
+      </div>
+    )
+  }
+
+  return (
+    <div className="space-y-5">
+      <TesourariaHeader
+        isDark={isDark}
+        periodo={periodo}
+        setPeriodo={setPeriodo}
+        onNovaMovimentacao={() => setShowNovaMovimentacao(true)}
+        onImportOFX={() => setShowImportExtrato(true)}
+      />
+
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <KpiCard
+          titulo="Saldo Total"
+          valor={fmt(dashboard?.saldo_total ?? 0)}
+          icon={Wallet}
+          hexCor="#14B8A6"
+          isDark={isDark}
+        />
+        <KpiCard
+          titulo="Entradas no Periodo"
+          valor={fmt(dashboard?.entradas_periodo ?? 0)}
+          icon={TrendingUp}
+          hexCor="#10B981"
+          trend={{ value: comparativos.entradas_percentual, positive: comparativos.entradas_percentual >= 0 }}
+          subtitulo={`${fmt(dashboard?.entradas_periodo_anterior ?? 0)} periodo anterior`}
+          isDark={isDark}
+        />
+        <KpiCard
+          titulo="Saidas no Periodo"
+          valor={fmt(dashboard?.saidas_periodo ?? 0)}
+          icon={TrendingDown}
+          hexCor="#F43F5E"
+          trend={{ value: comparativos.saidas_percentual, positive: comparativos.saidas_percentual <= 0 }}
+          subtitulo={`${fmt(dashboard?.saidas_periodo_anterior ?? 0)} periodo anterior`}
+          isDark={isDark}
+        />
+        <KpiCard
+          titulo="Previsao 30d"
+          valor={fmt(indicadores.saldo_projetado_30d)}
+          icon={CircleDollarSign}
+          hexCor={indicadores.saldo_projetado_30d >= 0 ? '#8B5CF6' : '#EF4444'}
+          subtitulo={previsao30d >= 0 ? 'Superavit previsto' : 'Deficit previsto'}
+          isDark={isDark}
+        />
+      </div>
+
+      {dashboard && <IndicadoresPanel dashboard={dashboard} isDark={isDark} />}
+
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1fr_320px]">
+        <div className="space-y-4">
+          <div className={`rounded-2xl p-4 ${
+            isDark
+              ? 'backdrop-blur-xl bg-white/[0.04] border border-white/[0.08] shadow-xl'
+              : 'bg-white shadow-sm border border-slate-100'
+          }`}>
+            <div className="mb-4 flex items-center gap-2">
+              <Eye size={14} className="text-teal-500" />
+              <h3 className={`text-sm font-extrabold ${isDark ? 'text-white' : 'text-slate-800'}`}>
+                Fluxo de Caixa
+              </h3>
+              <div className="ml-auto flex items-center gap-3 text-[10px]">
+                <span className="flex items-center gap-1">
+                  <span className="h-1 w-2.5 rounded-full bg-teal-500" /> Entradas
+                </span>
+                <span className="flex items-center gap-1">
+                  <span className="h-1 w-2.5 rounded-full bg-rose-500" /> Saidas
+                </span>
+                <span className="flex items-center gap-1">
+                  <span className="h-0.5 w-2.5 rounded-full bg-slate-400" style={{ borderTop: '1px dashed' }} /> Saldo
+                </span>
+              </div>
+            </div>
+            <div className={`mb-3 flex flex-wrap items-center gap-3 text-xs ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+              <span>Saldo inicial: <strong className={isDark ? 'text-slate-200' : 'text-slate-700'}>{fmt(dashboard?.saldo_inicial_periodo ?? 0)}</strong></span>
+              <span>Saldo final: <strong className={isDark ? 'text-slate-200' : 'text-slate-700'}>{fmt(dashboard?.saldo_final_periodo ?? 0)}</strong></span>
+            </div>
+            <FluxoCaixaChart data={chartData} isDark={isDark} />
+          </div>
+
+          <MovimentacoesTable
+            movimentacoes={movimentacoes}
+            isDark={isDark}
+            onNovaMovimentacao={() => setShowNovaMovimentacao(true)}
+          />
+        </div>
+
+        <div className="space-y-4">
+          <AlertasPanel alertas={alertas} isDark={isDark} />
+          <ContasBancariasPanel
+            contas={contas}
+            isDark={isDark}
+            onNovaConta={() => setShowNovaConta(true)}
+            onImportOFX={() => setShowImportExtrato(true)}
+          />
+          <AgingPanel agingCp={agingCp} agingCr={agingCr} isDark={isDark} />
+        </div>
+      </div>
+
+      {showNovaConta && (
+        <NovaContaModal isDark={isDark} onClose={() => setShowNovaConta(false)} />
+      )}
+      {showNovaMovimentacao && (
+        <NovaMovimentacaoModal
+          isDark={isDark}
+          contas={contas}
+          onClose={() => setShowNovaMovimentacao(false)}
+        />
+      )}
+      {showImportExtrato && (
+        <ImportExtratoModal
+          isDark={isDark}
+          contas={contas}
+          onClose={() => setShowImportExtrato(false)}
+        />
+      )}
+    </div>
+  )
+}
+
+function TesourariaHeader({ isDark, periodo, setPeriodo, onNovaMovimentacao, onImportOFX }: {
+  isDark: boolean
+  periodo: string
+  setPeriodo: (p: string) => void
+  onNovaMovimentacao: () => void
+  onImportOFX: () => void
+}) {
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-3">
+      <div>
+        <h1 className={`flex items-center gap-2 text-xl font-extrabold ${isDark ? 'text-white' : 'text-slate-800'}`}>
+          <Landmark size={20} className="text-teal-500" />
+          Tesouraria
+        </h1>
+        <p className={`mt-0.5 text-xs ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+          Cockpit financeiro com disponibilidade, projecao de caixa e operacao rapida.
+        </p>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-1.5">
+        <button
+          onClick={onNovaMovimentacao}
+          className="inline-flex items-center gap-1.5 rounded-full bg-teal-600 px-3 py-1.5 text-xs font-bold text-white transition-colors hover:bg-teal-700"
+        >
+          <Plus size={13} /> Nova Movimentacao
+        </button>
+        <button
+          onClick={onImportOFX}
+          className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-bold transition-colors ${
+            isDark
+              ? 'border border-white/[0.08] bg-white/[0.04] text-slate-300 hover:bg-white/[0.08]'
+              : 'border border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+          }`}
+        >
+          <Upload size={13} /> Importar OFX
+        </button>
+        {PERIODOS.map(([val, lbl]) => (
+          <button
+            key={val}
+            onClick={() => setPeriodo(val)}
+            className={`rounded-full px-3 py-1.5 text-xs font-semibold transition-all ${
               periodo === val
                 ? 'bg-teal-600 text-white shadow-sm'
                 : isDark
