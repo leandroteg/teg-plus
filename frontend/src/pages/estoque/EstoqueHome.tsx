@@ -21,12 +21,6 @@ const EMPTY_KPIS: EstoqueKPIs = {
   solicitacoes_abertas: 0,
 }
 
-const ACTIONS = [
-  { icon: Package2,       label: 'Itens',          to: '/estoque/itens',         color: 'text-blue-600',   bg: 'bg-blue-50',   bgDark: 'bg-blue-500/15'   },
-  { icon: ArrowLeftRight, label: 'Movimenta\u00e7\u00f5es',   to: '/estoque/movimentacoes', color: 'text-indigo-600', bg: 'bg-indigo-50', bgDark: 'bg-indigo-500/15' },
-  { icon: ClipboardList,  label: 'Invent\u00e1rio',      to: '/estoque/inventario',    color: 'text-violet-600', bg: 'bg-violet-50', bgDark: 'bg-violet-500/15' },
-]
-
 export default function EstoqueHome() {
   const nav = useNavigate()
   const { isLightSidebar: isLight } = useTheme()
@@ -124,22 +118,6 @@ export default function EstoqueHome() {
           </p>
           <p className={`text-[10px] mt-1 ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>Sem movimentacao ha 90+ dias</p>
         </div>
-      </div>
-
-      {/* -- Quick Actions ------------------------------------------ */}
-      <div className="grid grid-cols-4 gap-2">
-        {ACTIONS.map(({ icon: Icon, label, to, color, bg, bgDark }) => (
-          <button key={to} onClick={() => nav(to)}
-            className={`rounded-2xl p-3 border shadow-sm
-              hover:shadow-md hover:-translate-y-0.5 transition-all text-center group
-              ${isLight ? 'bg-white border-slate-200' : 'bg-white/[0.03] border-white/[0.06]'}`}>
-            <div className={`w-9 h-9 rounded-xl flex items-center justify-center mx-auto mb-2
-              group-hover:scale-110 transition-transform ${isLight ? bg : bgDark}`}>
-              <Icon size={16} className={color} />
-            </div>
-            <p className={`text-[10px] font-bold ${isLight ? 'text-slate-600' : 'text-slate-300'}`}>{label}</p>
-          </button>
-        ))}
       </div>
 
       {/* -- Alertas: Itens Abaixo do Minimo ------------------------ */}

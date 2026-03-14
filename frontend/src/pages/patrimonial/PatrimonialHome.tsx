@@ -9,12 +9,6 @@ import { useTheme } from '../../contexts/ThemeContext'
 const fmt = (v: number) =>
   v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 })
 
-const ACTIONS = [
-  { label: 'Nova Movimenta\u00e7\u00e3o', to: '/patrimonial/movimentacoes?nova=1', icon: ArrowLeftRight, color: 'text-amber-700', bg: 'bg-amber-50', bgDark: 'bg-amber-500/15' },
-  { label: 'Movimenta\u00e7\u00f5es', to: '/patrimonial/movimentacoes', icon: FileText, color: 'text-orange-700', bg: 'bg-orange-50', bgDark: 'bg-orange-500/15' },
-  { label: 'Patrim\u00f4nio', to: '/patrimonial/patrimonio', icon: Landmark, color: 'text-yellow-700', bg: 'bg-yellow-50', bgDark: 'bg-yellow-500/15' },
-]
-
 export default function PatrimonialHome() {
   const nav = useNavigate()
   const { isLightSidebar: isLight } = useTheme()
@@ -51,23 +45,6 @@ export default function PatrimonialHome() {
         <KpiCard titulo={'Valor L\u00edquido'} valor={fmt(kpis?.valor_total_liquido ?? 0)} icon={CheckCircle2} cor="text-yellow-700" hexCor="#CA8A04" isLight={isLight} />
         <KpiCard titulo="Depreciados" valor={depreciados} icon={TrendingDown} cor="text-red-600" hexCor="#DC2626" isLight={isLight} />
         <KpiCard titulo={'Em Manuten\u00e7\u00e3o'} valor={kpis?.imobilizados_em_manutencao ?? 0} icon={Wrench} cor="text-orange-600" hexCor="#EA580C" isLight={isLight} />
-      </div>
-
-      <div className="grid grid-cols-3 gap-2">
-        {ACTIONS.map(({ label, to, icon: Icon, color, bg, bgDark }) => (
-          <button
-            key={to}
-            onClick={() => nav(to)}
-            className={`rounded-2xl p-3 border shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all text-center group ${
-              isLight ? 'bg-white border-slate-200' : 'bg-white/[0.03] border-white/[0.06]'
-            }`}
-          >
-            <div className={`w-9 h-9 rounded-xl flex items-center justify-center mx-auto mb-2 group-hover:scale-110 transition-transform ${isLight ? bg : bgDark}`}>
-              <Icon size={16} className={color} />
-            </div>
-            <p className={`text-[10px] font-bold ${isLight ? 'text-slate-600' : 'text-slate-300'}`}>{label}</p>
-          </button>
-        ))}
       </div>
 
       <div className="grid grid-cols-3 gap-3">
