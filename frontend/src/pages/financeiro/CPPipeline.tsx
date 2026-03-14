@@ -6,8 +6,9 @@ import {
   Paperclip, ExternalLink, Download, ArrowUpDown, LayoutList,
   LayoutGrid, Filter, SortAsc, SortDesc, ArrowDown, ArrowUp, Send, MessageSquare, XCircle,
   ChevronLeft, ChevronRight,
+  Plus, Save, Loader2,
 } from 'lucide-react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useTheme } from '../../contexts/ThemeContext'
 import {
   useContasPagar,
@@ -15,6 +16,7 @@ import {
   useMarcarCPPago,
   useConciliarCPBatch,
   useFornecedorById,
+  useCriarSolicitacaoExtraordinariaCP,
 } from '../../hooks/useFinanceiro'
 import {
   useLotesPagamento,
@@ -28,6 +30,7 @@ import {
 import { supabase } from '../../services/supabase'
 import { useAuth } from '../../contexts/AuthContext'
 import { useDecisaoGenerica } from '../../hooks/useAprovacoes'
+import { useLookupCentrosCusto, useLookupClassesFinanceiras } from '../../hooks/useLookups'
 import { useAnexosPedido, useUploadAnexo, TIPO_LABEL } from '../../hooks/useAnexos'
 import type { PedidoAnexo } from '../../hooks/useAnexos'
 import type { ContaPagar, LotePagamento, StatusCP } from '../../types/financeiro'
@@ -63,6 +66,26 @@ function getRemessaHint(cp: ContaPagar) {
   }
   if (cp.remessa_id) return `Remessa ${cp.remessa_id} em processamento`
   return 'Aguardando retorno da remessa'
+}
+
+function isUrgentExtraordinary(cp: ContaPagar) {
+  return cp.origem === 'manual' && cp.natureza === 'extraordinario'
+}
+
+type NovaSolicitacaoExtraForm = {
+  descricao: string
+  justificativa: string
+  centro_custo: string
+  classe_financeira: string
+  valor: string
+}
+
+const EMPTY_EXTRA_FORM: NovaSolicitacaoExtraForm = {
+  descricao: '',
+  justificativa: '',
+  centro_custo: '',
+  classe_financeira: '',
+  valor: '',
 }
 
 function summarizeNames(values: string[], fallback: string) {
@@ -435,6 +458,122 @@ function AnexosList({ pedidoId }: { pedidoId: string }) {
 
 // Ã¢â€â‚¬Ã¢â€â‚¬ CPDetailModal Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 
+function NovaSolicitacaoExtraordinariaModal({
+  isDark,
+  onClose,
+  onSuccess,
+}: {
+  isDark: boolean
+  onClose: () => void
+  onSuccess: () => void
+}) {
+  const { perfil } = useAuth()
+  const centrosCusto = useLookupCentrosCusto()
+  const classesFinanceiras = useLookupClassesFinanceiras()
+  const criarSolicitacaoMut = useCriarSolicitacaoExtraordinariaCP()
+  const [form, setForm] = useState<NovaSolicitacaoExtraForm>(EMPTY_EXTRA_FORM)
+
+  const canSubmit = form.descricao.trim().length > 0
+    && form.justificativa.trim().length > 0
+    && form.centro_custo.length > 0
+    && form.classe_financeira.length > 0
+    && Number(form.valor) > 0
+
+  const inputCls = `w-full rounded-xl px-3 py-2.5 text-sm outline-none transition-colors ${
+    isDark
+      ? 'bg-white/[0.06] border border-white/[0.08] text-slate-200 placeholder:text-slate-500 focus:border-emerald-500/50'
+      : 'bg-slate-50 border border-slate-200 text-slate-700 placeholder:text-slate-400 focus:border-emerald-500'
+  }`
+  const labelCls = `block text-xs font-bold mb-1 ${isDark ? 'text-slate-300' : 'text-slate-600'}`
+
+  const setField = (field: keyof NovaSolicitacaoExtraForm, value: string) => {
+    setForm(prev => ({ ...prev, [field]: value }))
+  }
+
+  async function handleCriar() {
+    if (!canSubmit) return
+    await criarSolicitacaoMut.mutateAsync({
+      descricao: form.descricao,
+      justificativa: form.justificativa,
+      centro_custo: form.centro_custo,
+      classe_financeira: form.classe_financeira,
+      valor: Number(form.valor),
+      solicitanteNome: perfil?.nome,
+    })
+    onSuccess()
+    onClose()
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm" onClick={onClose}>
+      <div className={`rounded-2xl shadow-2xl w-full max-w-xl max-h-[90vh] overflow-y-auto ${isDark ? 'bg-[#1e293b]' : 'bg-white'}`} onClick={e => e.stopPropagation()}>
+        <div className={`flex items-center justify-between px-6 py-4 sticky top-0 z-10 ${isDark ? 'border-b border-white/[0.06] bg-[#1e293b]' : 'border-b border-slate-100 bg-white'}`}>
+          <div>
+            <h2 className={`text-lg font-extrabold ${isDark ? 'text-white' : 'text-slate-800'}`}>Nova Solicitação</h2>
+            <p className={`text-xs mt-1 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Pagamento extraordinário com entrada direta em Confirmados</p>
+          </div>
+          <button onClick={onClose} className={`w-8 h-8 rounded-lg flex items-center justify-center ${isDark ? 'hover:bg-white/10 text-slate-400' : 'hover:bg-slate-100 text-slate-500'}`}>
+            <X size={16} />
+          </button>
+        </div>
+
+        <div className="p-6 space-y-4">
+          <div className={`rounded-xl border px-4 py-3 ${isDark ? 'border-rose-500/20 bg-rose-500/10' : 'border-rose-200 bg-rose-50'}`}>
+            <p className={`text-xs font-bold ${isDark ? 'text-rose-200' : 'text-rose-700'}`}>Urgente</p>
+            <p className={`text-[11px] mt-1 ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>A solicitação será criada como pagamento extraordinário manual e ficará visível com destaque urgente.</p>
+          </div>
+
+          <div>
+            <label className={labelCls}>Descrição *</label>
+            <textarea value={form.descricao} onChange={e => setField('descricao', e.target.value)} rows={3} className={`${inputCls} resize-none`} placeholder="Descreva o pagamento extraordinário" />
+          </div>
+
+          <div>
+            <label className={labelCls}>Justificativa *</label>
+            <textarea value={form.justificativa} onChange={e => setField('justificativa', e.target.value)} rows={4} className={`${inputCls} resize-none`} placeholder="Explique por que este pagamento foge ao fluxo natural" />
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label className={labelCls}>Centro de Custo *</label>
+              <select value={form.centro_custo} onChange={e => setField('centro_custo', e.target.value)} className={inputCls}>
+                <option value="">Selecione...</option>
+                {centrosCusto.map(cc => (
+                  <option key={cc.id} value={cc.codigo}>{cc.codigo} - {cc.descricao}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className={labelCls}>Classe Financeira *</label>
+              <select value={form.classe_financeira} onChange={e => setField('classe_financeira', e.target.value)} className={inputCls}>
+                <option value="">Selecione...</option>
+                {classesFinanceiras.map(classe => (
+                  <option key={classe.id} value={classe.codigo}>{classe.codigo} - {classe.descricao}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          <div>
+            <label className={labelCls}>Valor *</label>
+            <input type="number" min="0" step="0.01" value={form.valor} onChange={e => setField('valor', e.target.value)} className={inputCls} placeholder="0,00" />
+          </div>
+        </div>
+
+        <div className={`px-6 py-4 flex justify-end gap-2 ${isDark ? 'border-t border-white/[0.06]' : 'border-t border-slate-100'}`}>
+          <button onClick={onClose} className={`px-4 py-2 rounded-xl text-sm font-semibold ${isDark ? 'border border-white/[0.06] text-slate-400 hover:bg-white/5' : 'border border-slate-200 text-slate-600 hover:bg-slate-50'}`}>
+            Cancelar
+          </button>
+          <button onClick={handleCriar} disabled={criarSolicitacaoMut.isPending || !canSubmit} className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold transition-colors disabled:opacity-60 shadow-sm">
+            {criarSolicitacaoMut.isPending ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
+            Criar Solicitação
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function CPDetailModal({ cp, stageStatus, onClose, onAction, isDark }: {
   cp: ContaPagar
   stageStatus: PipelineStageId
@@ -587,6 +726,18 @@ function CPDetailModal({ cp, stageStatus, onClose, onAction, isDark }: {
             <div className="flex items-center gap-2 bg-sky-50 border border-sky-200 rounded-xl px-3 py-2">
               <Package size={14} className="text-sky-500 shrink-0" />
               <p className="text-xs text-sky-700 font-semibold">Origem: Compras</p>
+            </div>
+          )}
+          {cp.origem === 'manual' && (
+            <div className="flex items-center gap-2 bg-emerald-50 border border-emerald-200 rounded-xl px-3 py-2">
+              <Receipt size={14} className="text-emerald-500 shrink-0" />
+              <p className="text-xs text-emerald-700 font-semibold">Origem: Solicitação Financeira</p>
+            </div>
+          )}
+          {isUrgentExtraordinary(cp) && (
+            <div className="flex items-center gap-2 bg-rose-50 border border-rose-200 rounded-xl px-3 py-2">
+              <AlertTriangle size={14} className="text-rose-500 shrink-0" />
+              <p className="text-xs text-rose-700 font-semibold">Pagamento extraordinário urgente</p>
             </div>
           )}
 
@@ -843,6 +994,7 @@ function CPRow({ cp, onClick, isDark, isSelected, onSelect, approvalHint }: {
   approvalHint?: StatusHint | null
 }) {
   const urgency = getUrgency(cp)
+  const isUrgentRequest = isUrgentExtraordinary(cp)
   const obraNome = cp.requisicao?.obra_nome
   const pedidoNum = cp.pedido?.numero_pedido
 
@@ -877,11 +1029,16 @@ function CPRow({ cp, onClick, isDark, isSelected, onSelect, approvalHint }: {
               <Truck size={8} /> Log
             </span>
           )}
-          {cp.origem === 'compras' && pedidoNum && (
-            <span className="inline-flex items-center gap-0.5 bg-sky-50 text-sky-600 text-[9px] font-semibold rounded-full px-1.5 py-0.5 shrink-0">
-              <Package size={8} /> Cmp
-            </span>
-          )}
+      {cp.origem === 'compras' && pedidoNum && (
+        <span className="inline-flex items-center gap-0.5 bg-sky-50 text-sky-600 text-[9px] font-semibold rounded-full px-1.5 py-0.5 shrink-0">
+          <Package size={8} /> Cmp
+        </span>
+      )}
+      {isUrgentRequest && (
+        <span className="inline-flex items-center gap-0.5 bg-rose-50 text-rose-600 text-[9px] font-semibold rounded-full px-1.5 py-0.5 shrink-0">
+          <AlertTriangle size={8} /> Urg
+        </span>
+      )}
         </div>
       </div>
 
@@ -944,6 +1101,7 @@ function CPCard({ cp, onClick, isDark, isSelected, onSelect, approvalHint }: {
   approvalHint?: StatusHint | null
 }) {
   const urgency = getUrgency(cp)
+  const isUrgentRequest = isUrgentExtraordinary(cp)
   const obraNome = cp.requisicao?.obra_nome
   const pedidoNum = cp.pedido?.numero_pedido
 
@@ -974,6 +1132,9 @@ function CPCard({ cp, onClick, isDark, isSelected, onSelect, approvalHint }: {
         {urgency === 'overdue' && (
           <span className="text-[10px] font-bold text-red-500 bg-red-50 dark:bg-red-500/10 px-2 py-0.5 rounded-full shrink-0">VENCIDO</span>
         )}
+        {isUrgentRequest && (
+          <span className="text-[10px] font-bold text-rose-500 bg-rose-50 dark:bg-rose-500/10 px-2 py-0.5 rounded-full shrink-0">URGENTE</span>
+        )}
         <p className={`text-sm font-extrabold shrink-0 ${urgency === 'overdue' ? 'text-red-600' : 'text-emerald-600'}`}>
           {fmt(cp.valor_original)}
         </p>
@@ -989,6 +1150,11 @@ function CPCard({ cp, onClick, isDark, isSelected, onSelect, approvalHint }: {
         {cp.origem === 'compras' && pedidoNum && (
           <span className="inline-flex items-center gap-0.5 bg-sky-50 text-sky-600 text-[10px] font-semibold rounded-full px-2 py-0.5">
             <Package size={9} /> Compras
+          </span>
+        )}
+        {cp.origem === 'manual' && (
+          <span className="inline-flex items-center gap-0.5 bg-emerald-50 text-emerald-600 text-[10px] font-semibold rounded-full px-2 py-0.5">
+            <Receipt size={9} /> Financeiro
           </span>
         )}
       </div>
@@ -1279,6 +1445,7 @@ function LoteCard({
 
 export default function CPPipeline() {
   const { isDark } = useTheme()
+  const [searchParams, setSearchParams] = useSearchParams()
   const [activeTab, setActiveTab] = useState<PipelineStageId>('previsto')
   const [busca, setBusca] = useState('')
   const [detailCP, setDetailCP] = useState<ContaPagar | null>(null)
@@ -1288,7 +1455,15 @@ export default function CPPipeline() {
   const [sortDir, setSortDir] = useState<SortDir>('asc')
   const [viewMode, setViewMode] = useState<ViewMode>('list')
   const [quickFilter, setQuickFilter] = useState<QuickFilterId>('all')
+  const [showNovaSolicitacao, setShowNovaSolicitacao] = useState(false)
   const [expandedLoteIds, setExpandedLoteIds] = useState<Set<string>>(new Set())
+
+  useEffect(() => {
+    if (searchParams.get('nova')) {
+      setShowNovaSolicitacao(true)
+      setSearchParams({}, { replace: true })
+    }
+  }, [searchParams, setSearchParams])
 
   // Data
   const { data: contas = [], isLoading } = useContasPagar()
@@ -1821,6 +1996,14 @@ export default function CPPipeline() {
             {contas.length} t\u00EDtulos &middot; {fmt(contas.reduce((s, c) => s + c.valor_original, 0))}
           </p>
         </div>
+        <button
+          type="button"
+          onClick={() => setShowNovaSolicitacao(true)}
+          className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2 text-sm font-bold text-white shadow-sm transition-all hover:bg-emerald-700"
+        >
+          <Plus size={15} />
+          Nova Solicitação
+        </button>
       </div>
 
       {/* Ã¢â€â‚¬Ã¢â€â‚¬ Horizontal Tabs Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ */}
@@ -2118,6 +2301,17 @@ export default function CPPipeline() {
           )}
         </div>
       </div>
+
+      {showNovaSolicitacao && (
+        <NovaSolicitacaoExtraordinariaModal
+          isDark={isDark}
+          onClose={() => setShowNovaSolicitacao(false)}
+          onSuccess={() => {
+            setActiveTab('confirmado')
+            showToast('success', 'Solicitação extraordinária criada em Confirmados')
+          }}
+        />
+      )}
 
       {/* Detail Modal */}
       {detailCP && (

@@ -122,6 +122,57 @@ export function useConfirmarCP() {
   })
 }
 
+export function useCriarSolicitacaoExtraordinariaCP() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async ({
+      descricao,
+      justificativa,
+      centro_custo,
+      classe_financeira,
+      valor,
+      solicitanteNome,
+    }: {
+      descricao: string
+      justificativa: string
+      centro_custo: string
+      classe_financeira: string
+      valor: number
+      solicitanteNome?: string
+    }) => {
+      const hoje = new Date().toISOString().split('T')[0]
+      const numeroDocumento = `EXT-${new Date().toISOString().replace(/[-:TZ.]/g, '').slice(0, 14)}`
+
+      const { data, error } = await supabase
+        .from('fin_contas_pagar')
+        .insert({
+          fornecedor_nome: 'Pagamento Extraordinário',
+          origem: 'manual',
+          valor_original: valor,
+          valor_pago: 0,
+          data_emissao: hoje,
+          data_vencimento: hoje,
+          data_vencimento_orig: hoje,
+          centro_custo,
+          classe_financeira,
+          natureza: 'extraordinario',
+          numero_documento: numeroDocumento,
+          status: 'confirmado',
+          descricao: descricao.trim(),
+          observacoes: `Solicitação extraordinária urgente. Justificativa: ${justificativa.trim()}${solicitanteNome ? ` | Solicitante: ${solicitanteNome}` : ''}`,
+        })
+        .select('id')
+        .single()
+      if (error) throw error
+      return data
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['contas-pagar'] })
+      qc.invalidateQueries({ queryKey: ['financeiro-dashboard'] })
+    },
+  })
+}
+
 // ── Aprovar Pagamento (AP): aguardando_aprovacao → aprovado_pgto ──────────
 // Autorização de Pagamento: o financeiro aprova a CP para pagamento efetivo.
 
