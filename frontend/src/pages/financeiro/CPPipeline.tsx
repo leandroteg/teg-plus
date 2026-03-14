@@ -449,13 +449,77 @@ function FornecedorBankInfo({ fornecedorId, isDark }: { fornecedorId: string; is
 
 // Ã¢â€â‚¬Ã¢â€â‚¬ AnexosList Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 
-function AnexosList({ pedidoId }: { pedidoId: string }) {
+function AnexosList({
+  pedidoId,
+  isDark = false,
+  canUpload = false,
+}: {
+  pedidoId: string
+  isDark?: boolean
+  canUpload?: boolean
+}) {
   const { data: anexos, isLoading } = useAnexosPedido(pedidoId)
-  if (isLoading) return <div className="flex justify-center py-2"><div className="w-3 h-3 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin" /></div>
-  if (!anexos?.length) return <p className="text-[10px] text-slate-400 italic py-1">Sem anexos</p>
+  const anexosList = anexos ?? []
+  const uploadAnexoMut = useUploadAnexo()
+  const [tipo, setTipo] = useState<PedidoAnexo['tipo']>('outro')
+  const [erroUpload, setErroUpload] = useState('')
+
+  const handleUpload = async (files: FileList | null) => {
+    if (!files?.length) return
+    setErroUpload('')
+    try {
+      for (const file of Array.from(files)) {
+        await uploadAnexoMut.mutateAsync({
+          pedidoId,
+          file,
+          tipo,
+          origem: 'financeiro',
+        })
+      }
+    } catch (error) {
+      setErroUpload(error instanceof Error ? error.message : 'Erro ao enviar anexo')
+    }
+  }
+
   return (
     <div className="space-y-1">
-      {anexos.slice(0, 3).map((a: PedidoAnexo) => (
+      {canUpload && (
+        <div className={`rounded-xl border p-3 mb-2 ${isDark ? 'border-white/[0.08] bg-white/[0.03]' : 'border-slate-200 bg-slate-50/70'}`}>
+          <div className="flex flex-col sm:flex-row gap-2 sm:items-center">
+            <select
+              value={tipo}
+              onChange={e => setTipo(e.target.value as PedidoAnexo['tipo'])}
+              className={`rounded-lg border px-2.5 py-2 text-[11px] outline-none ${isDark ? 'border-white/[0.08] bg-white/[0.05] text-slate-200' : 'border-slate-200 bg-white text-slate-700'}`}
+            >
+              {Object.entries(TIPO_LABEL).map(([value, label]) => (
+                <option key={value} value={value}>{label}</option>
+              ))}
+            </select>
+            <label className={`inline-flex items-center justify-center gap-2 rounded-lg px-3 py-2 text-[11px] font-semibold cursor-pointer transition-colors ${
+              uploadAnexoMut.isPending
+                ? 'bg-emerald-300 text-white cursor-wait'
+                : 'bg-emerald-600 text-white hover:bg-emerald-700'
+            }`}>
+              <Paperclip size={12} />
+              {uploadAnexoMut.isPending ? 'Enviando...' : 'Adicionar anexo'}
+              <input
+                type="file"
+                multiple
+                className="hidden"
+                onChange={async e => {
+                  await handleUpload(e.target.files)
+                  e.target.value = ''
+                }}
+                disabled={uploadAnexoMut.isPending}
+              />
+            </label>
+          </div>
+          {erroUpload && <p className="mt-2 text-[10px] text-rose-500">{erroUpload}</p>}
+        </div>
+      )}
+      {isLoading && <div className="flex justify-center py-2"><div className="w-3 h-3 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin" /></div>}
+      {!isLoading && !anexosList.length && <p className="text-[10px] text-slate-400 italic py-1">Sem anexos</p>}
+      {anexosList.slice(0, 3).map((a: PedidoAnexo) => (
         <a key={a.id} href={a.url} target="_blank" rel="noopener noreferrer"
           className="flex items-center gap-1.5 px-2 py-1 rounded-lg border border-slate-200 hover:border-slate-300 text-[10px] group">
           <Paperclip size={9} className="text-slate-400 shrink-0" />
@@ -463,7 +527,7 @@ function AnexosList({ pedidoId }: { pedidoId: string }) {
           <ExternalLink size={8} className="text-slate-300 group-hover:text-slate-500 shrink-0 ml-auto" />
         </a>
       ))}
-      {anexos.length > 3 && <p className="text-[9px] text-slate-400">+{anexos.length - 3} mais</p>}
+      {anexosList.length > 3 && <p className="text-[9px] text-slate-400">+{anexosList.length - 3} mais</p>}
     </div>
   )
 }
@@ -862,6 +926,7 @@ function CPDetailModal({ cp, stageStatus, onClose, onAction, isDark }: {
   const canApproveCurrent = isApprovalStage && (perfil?.role === 'admin' || (!!approval && canApprove(approval.nivel)) || canDirectApproveCurrent)
   const stage = CP_PIPELINE_VIEW_STAGES.find(s => s.status === stageStatus)
   const isLoteApproval = !!approvalLoteId && approvalItems.length > 0
+  const canUploadPedidoAnexo = !!cp.pedido_id && (stageStatus === 'previsto' || stageStatus === 'confirmado')
 
   const toggleApprovalItem = (cpId: string) => {
     setSelectedApprovalItemIds(prev =>
@@ -1025,7 +1090,7 @@ function CPDetailModal({ cp, stageStatus, onClose, onAction, isDark }: {
           {cp.pedido_id && (
             <div>
               <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2 flex items-center gap-1"><Paperclip size={10} /> Anexos</p>
-              <AnexosList pedidoId={cp.pedido_id} />
+              <AnexosList pedidoId={cp.pedido_id} isDark={isDark} canUpload={canUploadPedidoAnexo} />
             </div>
           )}
           {!cp.pedido_id && manualAttachments.length > 0 && (
