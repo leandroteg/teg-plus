@@ -14,7 +14,7 @@ import type { EstInventario, TipoInventario } from '../../types/estoque'
 const STATUS_CONFIG = {
   aberto:       { label: 'Aberto',       bg: 'bg-blue-50',    text: 'text-blue-700',    dot: 'bg-blue-500'    },
   em_contagem:  { label: 'Em Contagem',  bg: 'bg-amber-50',   text: 'text-amber-700',   dot: 'bg-amber-500'   },
-  concluido:    { label: 'Concluido',    bg: 'bg-emerald-50', text: 'text-emerald-700', dot: 'bg-emerald-500' },
+  concluido:    { label: 'Conclu\u00eddo',    bg: 'bg-emerald-50', text: 'text-emerald-700', dot: 'bg-emerald-500' },
   cancelado:    { label: 'Cancelado',    bg: 'bg-slate-100',  text: 'text-slate-500',   dot: 'bg-slate-400'   },
 }
 
@@ -64,8 +64,8 @@ export default function Inventario() {
       {/* -- Header --------------------------------------------------- */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className={`text-xl font-extrabold ${isLight ? 'text-slate-800' : 'text-white'}`}>Inventarios</h1>
-          <p className={`text-xs mt-0.5 ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>{inventarios.length} inventarios</p>
+          <h1 className={`text-xl font-extrabold ${isLight ? 'text-slate-800' : 'text-white'}`}>{'Invent\u00e1rios'}</h1>
+          <p className={`text-xs mt-0.5 ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>{inventarios.length} {'invent\u00e1rios'}</p>
         </div>
         <button
           onClick={() => setShowForm(true)}

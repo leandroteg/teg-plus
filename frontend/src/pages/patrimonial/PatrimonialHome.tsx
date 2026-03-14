@@ -10,9 +10,9 @@ const fmt = (v: number) =>
   v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 })
 
 const ACTIONS = [
-  { label: 'Nova Movimentacao', to: '/patrimonial/movimentacoes?nova=1', icon: ArrowLeftRight, color: 'text-amber-700', bg: 'bg-amber-50', bgDark: 'bg-amber-500/15' },
-  { label: 'Movimentacoes', to: '/patrimonial/movimentacoes', icon: FileText, color: 'text-orange-700', bg: 'bg-orange-50', bgDark: 'bg-orange-500/15' },
-  { label: 'Patrimonio', to: '/patrimonial/patrimonio', icon: Landmark, color: 'text-yellow-700', bg: 'bg-yellow-50', bgDark: 'bg-yellow-500/15' },
+  { label: 'Nova Movimenta\u00e7\u00e3o', to: '/patrimonial/movimentacoes?nova=1', icon: ArrowLeftRight, color: 'text-amber-700', bg: 'bg-amber-50', bgDark: 'bg-amber-500/15' },
+  { label: 'Movimenta\u00e7\u00f5es', to: '/patrimonial/movimentacoes', icon: FileText, color: 'text-orange-700', bg: 'bg-orange-50', bgDark: 'bg-orange-500/15' },
+  { label: 'Patrim\u00f4nio', to: '/patrimonial/patrimonio', icon: Landmark, color: 'text-yellow-700', bg: 'bg-yellow-50', bgDark: 'bg-yellow-500/15' },
 ]
 
 export default function PatrimonialHome() {
@@ -36,21 +36,21 @@ export default function PatrimonialHome() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className={`text-xl font-extrabold ${isLight ? 'text-slate-800' : 'text-white'}`}>Painel Patrimonial</h1>
-          <p className={`text-xs mt-0.5 ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>Visao geral dos ativos, depreciacao e movimentacoes</p>
+          <p className={`text-xs mt-0.5 ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>{'Vis\u00e3o geral dos ativos, deprecia\u00e7\u00e3o e movimenta\u00e7\u00f5es'}</p>
         </div>
         <button
           onClick={() => nav('/patrimonial/movimentacoes?nova=1')}
           className="flex items-center gap-1.5 bg-amber-600 hover:bg-amber-700 text-white text-sm font-semibold px-4 py-2 rounded-xl transition-colors shadow-sm"
         >
-          <ArrowLeftRight size={15} /> Nova Movimentacao
+          <ArrowLeftRight size={15} /> {'Nova Movimenta\u00e7\u00e3o'}
         </button>
       </div>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         <KpiCard titulo="Ativos" valor={kpis?.total_imobilizados ?? 0} icon={Landmark} cor="text-amber-600" hexCor="#D97706" isLight={isLight} />
-        <KpiCard titulo="Valor Liquido" valor={fmt(kpis?.valor_total_liquido ?? 0)} icon={CheckCircle2} cor="text-yellow-700" hexCor="#CA8A04" isLight={isLight} />
+        <KpiCard titulo={'Valor L\u00edquido'} valor={fmt(kpis?.valor_total_liquido ?? 0)} icon={CheckCircle2} cor="text-yellow-700" hexCor="#CA8A04" isLight={isLight} />
         <KpiCard titulo="Depreciados" valor={depreciados} icon={TrendingDown} cor="text-red-600" hexCor="#DC2626" isLight={isLight} />
-        <KpiCard titulo="Em Manutencao" valor={kpis?.imobilizados_em_manutencao ?? 0} icon={Wrench} cor="text-orange-600" hexCor="#EA580C" isLight={isLight} />
+        <KpiCard titulo={'Em Manuten\u00e7\u00e3o'} valor={kpis?.imobilizados_em_manutencao ?? 0} icon={Wrench} cor="text-orange-600" hexCor="#EA580C" isLight={isLight} />
       </div>
 
       <div className="grid grid-cols-3 gap-2">
@@ -80,7 +80,7 @@ export default function PatrimonialHome() {
         <div className={`px-4 py-3 border-b flex items-center justify-between ${isLight ? 'border-slate-100' : 'border-white/[0.04]'}`}>
           <h2 className={`text-sm font-extrabold flex items-center gap-1.5 ${isLight ? 'text-slate-800' : 'text-white'}`}>
             <ArrowLeftRight size={14} className="text-amber-600" />
-            Movimentacoes Recentes
+            {'Movimenta\u00e7\u00f5es Recentes'}
           </h2>
           <button onClick={() => nav('/patrimonial/movimentacoes')} className="text-[10px] text-amber-600 font-semibold flex items-center gap-0.5">
             Ver todas <ArrowRight size={10} />
@@ -88,7 +88,7 @@ export default function PatrimonialHome() {
         </div>
         {recentes.length === 0 ? (
           <div className="px-4 py-10 text-center">
-            <p className={`${isLight ? 'text-slate-400' : 'text-slate-500'} text-sm`}>Nenhuma movimentacao registrada</p>
+            <p className={`${isLight ? 'text-slate-400' : 'text-slate-500'} text-sm`}>{'Nenhuma movimenta\u00e7\u00e3o registrada'}</p>
           </div>
         ) : (
           <div className={`divide-y ${isLight ? 'divide-slate-50' : 'divide-white/[0.04]'}`}>
@@ -96,7 +96,7 @@ export default function PatrimonialHome() {
               <div key={mov.id} className={`px-4 py-3 flex items-center justify-between gap-3 ${isLight ? 'hover:bg-slate-50' : 'hover:bg-white/[0.02]'}`}>
                 <div className="min-w-0">
                   <p className={`text-sm font-semibold truncate ${isLight ? 'text-slate-700' : 'text-slate-200'}`}>
-                    {mov.imobilizado?.numero_patrimonio ?? '--'} - {mov.imobilizado?.descricao ?? 'Sem descricao'}
+                    {mov.imobilizado?.numero_patrimonio ?? '--'} - {mov.imobilizado?.descricao ?? 'Sem descri\u00e7\u00e3o'}
                   </p>
                   <p className={`text-[10px] ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>
                     {mov.tipo} {mov.responsavel_destino ? `- ${mov.responsavel_destino}` : ''}

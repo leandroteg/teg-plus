@@ -12,11 +12,11 @@ import type { NovaMovimentacaoPayload, TipoMovimentacao } from '../../types/esto
 
 const TIPO_CONFIG: Record<TipoMovimentacao, { label: string; cor: string; bg: string; icon: typeof ArrowLeftRight }> = {
   entrada:           { label: 'Entrada',        cor: 'text-emerald-700', bg: 'bg-emerald-50', icon: ArrowDownCircle  },
-  devolucao:         { label: 'Devolucao',       cor: 'text-teal-700',    bg: 'bg-teal-50',   icon: ArrowDownCircle  },
+  devolucao:         { label: 'Devolu\u00e7\u00e3o',       cor: 'text-teal-700',    bg: 'bg-teal-50',   icon: ArrowDownCircle  },
   transferencia_in:  { label: 'Transf. Entrada', cor: 'text-blue-700',    bg: 'bg-blue-50',   icon: ArrowDownCircle  },
   ajuste_positivo:   { label: 'Ajuste +',        cor: 'text-indigo-700',  bg: 'bg-indigo-50', icon: RefreshCw        },
-  saida:             { label: 'Saida',           cor: 'text-red-700',     bg: 'bg-red-50',    icon: ArrowUpCircle    },
-  transferencia_out: { label: 'Transf. Saida',   cor: 'text-orange-700',  bg: 'bg-orange-50', icon: ArrowUpCircle    },
+  saida:             { label: 'Sa\u00edda',           cor: 'text-red-700',     bg: 'bg-red-50',    icon: ArrowUpCircle    },
+  transferencia_out: { label: 'Transf. Sa\u00edda',   cor: 'text-orange-700',  bg: 'bg-orange-50', icon: ArrowUpCircle    },
   ajuste_negativo:   { label: 'Ajuste -',        cor: 'text-amber-700',   bg: 'bg-amber-50',  icon: RefreshCw        },
   baixa:             { label: 'Baixa',           cor: 'text-slate-600',   bg: 'bg-slate-100', icon: AlertCircle      },
 }
@@ -75,7 +75,7 @@ export default function Movimentacoes() {
       {/* -- Header --------------------------------------------------- */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className={`text-xl font-extrabold ${isLight ? 'text-slate-800' : 'text-white'}`}>Movimentacoes</h1>
+          <h1 className={`text-xl font-extrabold ${isLight ? 'text-slate-800' : 'text-white'}`}>{'Movimenta\u00e7\u00f5es'}</h1>
           <p className={`text-xs mt-0.5 ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>{filtradas.length} registros</p>
         </div>
         <button

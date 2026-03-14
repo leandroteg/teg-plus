@@ -23,8 +23,8 @@ const EMPTY_KPIS: EstoqueKPIs = {
 
 const ACTIONS = [
   { icon: Package2,       label: 'Itens',          to: '/estoque/itens',         color: 'text-blue-600',   bg: 'bg-blue-50',   bgDark: 'bg-blue-500/15'   },
-  { icon: ArrowLeftRight, label: 'Movimentacoes',   to: '/estoque/movimentacoes', color: 'text-indigo-600', bg: 'bg-indigo-50', bgDark: 'bg-indigo-500/15' },
-  { icon: ClipboardList,  label: 'Inventario',      to: '/estoque/inventario',    color: 'text-violet-600', bg: 'bg-violet-50', bgDark: 'bg-violet-500/15' },
+  { icon: ArrowLeftRight, label: 'Movimenta\u00e7\u00f5es',   to: '/estoque/movimentacoes', color: 'text-indigo-600', bg: 'bg-indigo-50', bgDark: 'bg-indigo-500/15' },
+  { icon: ClipboardList,  label: 'Invent\u00e1rio',      to: '/estoque/inventario',    color: 'text-violet-600', bg: 'bg-violet-50', bgDark: 'bg-violet-500/15' },
 ]
 
 export default function EstoqueHome() {
@@ -51,8 +51,8 @@ export default function EstoqueHome() {
       {/* -- Header --------------------------------------------------- */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className={`text-xl font-extrabold ${isLight ? 'text-slate-800' : 'text-white'}`}>Painel -- Estoque</h1>
-          <p className={`text-xs mt-0.5 ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>Visao geral do almoxarifado</p>
+          <h1 className={`text-xl font-extrabold ${isLight ? 'text-slate-800' : 'text-white'}`}>Painel de Estoque</h1>
+          <p className={`text-xs mt-0.5 ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>{'Vis\u00e3o geral do almoxarifado'}</p>
         </div>
         <button onClick={() => refetch()}
           className={`flex items-center gap-1.5 text-xs transition-colors ${isLight ? 'text-slate-400 hover:text-blue-600' : 'text-slate-500 hover:text-blue-400'}`}>

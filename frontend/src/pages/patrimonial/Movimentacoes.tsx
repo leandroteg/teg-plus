@@ -15,12 +15,12 @@ import { useAuth } from '../../contexts/AuthContext'
 import type { PatMovimentacao } from '../../types/estoque'
 
 const TIPO_CONFIG: Record<PatMovimentacao['tipo'], { label: string; cor: string; bg: string }> = {
-  transferencia: { label: 'Transferencia', cor: 'text-blue-700', bg: 'bg-blue-50' },
-  manutencao: { label: 'Manutencao', cor: 'text-amber-700', bg: 'bg-amber-50' },
-  cessao: { label: 'Cessao', cor: 'text-violet-700', bg: 'bg-violet-50' },
+  transferencia: { label: 'Transfer\u00eancia', cor: 'text-blue-700', bg: 'bg-blue-50' },
+  manutencao: { label: 'Manuten\u00e7\u00e3o', cor: 'text-amber-700', bg: 'bg-amber-50' },
+  cessao: { label: 'Cess\u00e3o', cor: 'text-violet-700', bg: 'bg-violet-50' },
   retorno: { label: 'Retorno', cor: 'text-emerald-700', bg: 'bg-emerald-50' },
   baixa: { label: 'Baixa', cor: 'text-red-700', bg: 'bg-red-50' },
-  inventario: { label: 'Inventario', cor: 'text-slate-700', bg: 'bg-slate-100' },
+  inventario: { label: 'Invent\u00e1rio', cor: 'text-slate-700', bg: 'bg-slate-100' },
 }
 
 type FormState = {
@@ -120,11 +120,11 @@ export default function MovimentacoesPatrimonialPage() {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className={`text-xl font-extrabold ${isLight ? 'text-slate-800' : 'text-white'}`}>Movimentacoes Patrimoniais</h1>
+          <h1 className={`text-xl font-extrabold ${isLight ? 'text-slate-800' : 'text-white'}`}>{'Movimenta\u00e7\u00f5es Patrimoniais'}</h1>
           <p className={`text-xs mt-0.5 ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>{filtradas.length} registros</p>
         </div>
         <button onClick={openForm} className="flex items-center gap-1.5 bg-amber-600 hover:bg-amber-700 text-white text-sm font-semibold px-4 py-2 rounded-xl transition-colors shadow-sm">
-          <Plus size={15} /> Nova Movimentacao
+          <Plus size={15} /> {'Nova Movimenta\u00e7\u00e3o'}
         </button>
       </div>
 
@@ -134,7 +134,7 @@ export default function MovimentacoesPatrimonialPage() {
           <input
             value={busca}
             onChange={e => setBusca(e.target.value)}
-            placeholder="Buscar por patrimonio, descricao ou responsavel..."
+            placeholder={'Buscar por patrim\u00f4nio, descri\u00e7\u00e3o ou respons\u00e1vel...'}
             className={`w-full pl-9 pr-4 py-2 rounded-xl border text-sm focus:outline-none focus:ring-2 focus:ring-amber-500/30 focus:border-amber-400 ${isLight ? 'border-slate-200 bg-white text-slate-800' : 'border-white/[0.08] bg-white/[0.03] text-slate-200 placeholder:text-slate-500'}`}
           />
         </div>
@@ -157,7 +157,7 @@ export default function MovimentacoesPatrimonialPage() {
       ) : filtradas.length === 0 ? (
         <div className={`rounded-2xl border p-12 text-center ${card}`}>
           <ArrowLeftRight size={40} className={isLight ? 'text-slate-200' : 'text-slate-600'} />
-          <p className={`font-semibold mt-3 ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>Nenhuma movimentacao patrimonial encontrada</p>
+          <p className={`font-semibold mt-3 ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>{'Nenhuma movimenta\u00e7\u00e3o patrimonial encontrada'}</p>
         </div>
       ) : (
         <div className="space-y-2">
@@ -171,14 +171,14 @@ export default function MovimentacoesPatrimonialPage() {
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
                     <p className={`text-sm font-semibold truncate ${isLight ? 'text-slate-800' : 'text-slate-200'}`}>
-                      {mov.imobilizado?.numero_patrimonio ?? '--'} - {mov.imobilizado?.descricao ?? 'Sem descricao'}
+                      {mov.imobilizado?.numero_patrimonio ?? '--'} - {mov.imobilizado?.descricao ?? 'Sem descri\u00e7\u00e3o'}
                     </p>
                     <span className={`hidden sm:inline-flex items-center rounded-full text-[10px] font-semibold px-2 py-0.5 ${cfg.bg} ${cfg.cor}`}>
                       {cfg.label}
                     </span>
                   </div>
                   <p className={`text-[10px] mt-0.5 ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>
-                    {mov.responsavel_origem ? `Origem: ${mov.responsavel_origem}` : 'Sem responsavel origem'}
+                    {mov.responsavel_origem ? `Origem: ${mov.responsavel_origem}` : 'Sem respons\u00e1vel origem'}
                     {mov.responsavel_destino ? ` - Destino: ${mov.responsavel_destino}` : ''}
                   </p>
                 </div>
@@ -203,7 +203,7 @@ export default function MovimentacoesPatrimonialPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
           <div className={`rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto ${isLight ? 'bg-white' : 'bg-[#111827]'}`}>
             <div className={`flex items-center justify-between px-6 py-4 border-b ${isLight ? 'border-slate-100' : 'border-white/[0.06]'}`}>
-              <h2 className={`text-lg font-extrabold ${isLight ? 'text-slate-800' : 'text-white'}`}>Nova Movimentacao</h2>
+              <h2 className={`text-lg font-extrabold ${isLight ? 'text-slate-800' : 'text-white'}`}>{'Nova Movimenta\u00e7\u00e3o'}</h2>
               <button onClick={closeForm} className={`w-8 h-8 rounded-lg flex items-center justify-center ${isLight ? 'hover:bg-slate-100 text-slate-500' : 'hover:bg-white/[0.06] text-slate-400'}`}>
                 <X size={16} />
               </button>
@@ -211,7 +211,7 @@ export default function MovimentacoesPatrimonialPage() {
 
             <div className="p-6 space-y-4">
               <div>
-                <label className={`block text-xs font-bold mb-1 ${isLight ? 'text-slate-600' : 'text-slate-300'}`}>Patrimonio *</label>
+                <label className={`block text-xs font-bold mb-1 ${isLight ? 'text-slate-600' : 'text-slate-300'}`}>{'Patrim\u00f4nio *'}</label>
                 <select value={payload.imobilizado_id} onChange={e => setPayload(prev => ({ ...prev, imobilizado_id: e.target.value }))} className={inputCls}>
                   <option value="">Selecione...</option>
                   {imobilizados.filter(i => i.status !== 'baixado').map(i => (
