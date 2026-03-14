@@ -13,12 +13,12 @@ export default function PatrimonialLayout() {
     {
       to: '/patrimonial/movimentacoes?nova=1',
       icon: Plus,
-      label: 'Nova Movimentacao',
+      label: 'Nova Movimenta\u00e7\u00e3o',
       action: () => navigate('/patrimonial/movimentacoes?nova=1'),
       accent: true,
     },
-    { to: '/patrimonial/movimentacoes', icon: ArrowLeftRight, label: 'Movimentacoes' },
-    { to: '/patrimonial/patrimonio', icon: Landmark, label: 'Patrimonio' },
+    { to: '/patrimonial/movimentacoes', icon: ArrowLeftRight, label: 'Movimenta\u00e7\u00f5es' },
+    { to: '/patrimonial/patrimonio', icon: Landmark, label: 'Patrim\u00f4nio' },
   ]
 
   return (
@@ -28,7 +28,7 @@ export default function PatrimonialLayout() {
       moduleEmoji="🏛️"
       accent="amber"
       nav={NAV}
-      moduleSubtitle="Ativos e depreciacao"
+      moduleSubtitle={'Ativos e deprecia\u00e7\u00e3o'}
       mobileModuleName="Patrimonial"
       maxWidth="max-w-5xl"
       bottomNavCompact={false}
