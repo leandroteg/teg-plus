@@ -516,8 +516,18 @@ function NovaSolicitacaoExtraordinariaModal({
     .filter(classe => `${classe.codigo} ${classe.descricao}`.toLowerCase().includes(classeBusca.toLowerCase()))
     .slice(0, 8)
 
-  const centroSelecionado = centrosCusto.find(cc => cc.codigo === form.centro_custo)
-  const classeSelecionada = classesFinanceiras.find(classe => classe.codigo === form.classe_financeira)
+  const getLookupValue = (codigo?: string | null, descricao?: string | null) =>
+    codigo?.trim() || descricao?.trim() || ''
+
+  const getLookupLabel = (codigo?: string | null, descricao?: string | null) => {
+    const code = codigo?.trim() || ''
+    const desc = descricao?.trim() || ''
+    if (code && desc) return `${code} - ${desc}`
+    return code || desc
+  }
+
+  const centroSelecionado = centrosCusto.find(cc => getLookupValue(cc.codigo, cc.descricao) === form.centro_custo)
+  const classeSelecionada = classesFinanceiras.find(classe => getLookupValue(classe.codigo, classe.descricao) === form.classe_financeira)
 
   async function handleCriar() {
     if (!canSubmit) return
@@ -588,7 +598,7 @@ function NovaSolicitacaoExtraordinariaModal({
                 className={`${inputCls} flex items-center justify-between text-left ${ccOpen ? (isDark ? 'ring-1 ring-emerald-500/40' : 'ring-1 ring-emerald-500/30') : ''}`}
               >
                 <span className={form.centro_custo ? '' : isDark ? 'text-slate-500' : 'text-slate-400'}>
-                  {centroSelecionado ? `${centroSelecionado.codigo} - ${centroSelecionado.descricao}` : form.centro_custo || 'Selecione...'}
+                  {centroSelecionado ? getLookupLabel(centroSelecionado.codigo, centroSelecionado.descricao) : form.centro_custo || 'Selecione...'}
                 </span>
                 <ChevronDown size={16} className={`transition-transform ${ccOpen ? 'rotate-180' : ''} ${isDark ? 'text-slate-400' : 'text-slate-500'}`} />
               </button>
@@ -605,20 +615,21 @@ function NovaSolicitacaoExtraordinariaModal({
                   </div>
                   <div className="max-h-64 overflow-y-auto py-1">
                     {centrosFiltrados.map(cc => {
-                      const label = `${cc.codigo} - ${cc.descricao}`
+                      const value = getLookupValue(cc.codigo, cc.descricao)
+                      const label = getLookupLabel(cc.codigo, cc.descricao)
                       return (
                         <button
                           key={cc.id}
                           type="button"
                           onClick={() => {
-                            setField('centro_custo', cc.codigo)
+                            setField('centro_custo', value)
                             setCcBusca(label)
                             setCcOpen(false)
                           }}
                           className={`w-full px-3 py-2 text-left text-sm transition-colors ${isDark ? 'text-slate-200 hover:bg-white/[0.06]' : 'text-slate-700 hover:bg-slate-50'}`}
                         >
-                          <div className="font-medium">{cc.codigo}</div>
-                          <div className={`text-xs ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{cc.descricao}</div>
+                          <div className="font-medium">{cc.codigo || cc.descricao}</div>
+                          {!!cc.codigo && <div className={`text-xs ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{cc.descricao}</div>}
                         </button>
                       )
                     })}
@@ -640,7 +651,7 @@ function NovaSolicitacaoExtraordinariaModal({
                 className={`${inputCls} flex items-center justify-between text-left ${classeOpen ? (isDark ? 'ring-1 ring-emerald-500/40' : 'ring-1 ring-emerald-500/30') : ''}`}
               >
                 <span className={form.classe_financeira ? '' : isDark ? 'text-slate-500' : 'text-slate-400'}>
-                  {classeSelecionada ? `${classeSelecionada.codigo} - ${classeSelecionada.descricao}` : form.classe_financeira || 'Selecione...'}
+                  {classeSelecionada ? getLookupLabel(classeSelecionada.codigo, classeSelecionada.descricao) : form.classe_financeira || 'Selecione...'}
                 </span>
                 <ChevronDown size={16} className={`transition-transform ${classeOpen ? 'rotate-180' : ''} ${isDark ? 'text-slate-400' : 'text-slate-500'}`} />
               </button>
@@ -657,20 +668,21 @@ function NovaSolicitacaoExtraordinariaModal({
                   </div>
                   <div className="max-h-64 overflow-y-auto py-1">
                     {classesFiltradas.map(classe => {
-                      const label = `${classe.codigo} - ${classe.descricao}`
+                      const value = getLookupValue(classe.codigo, classe.descricao)
+                      const label = getLookupLabel(classe.codigo, classe.descricao)
                       return (
                         <button
                           key={classe.id}
                           type="button"
                           onClick={() => {
-                            setField('classe_financeira', classe.codigo)
+                            setField('classe_financeira', value)
                             setClasseBusca(label)
                             setClasseOpen(false)
                           }}
                           className={`w-full px-3 py-2 text-left text-sm transition-colors ${isDark ? 'text-slate-200 hover:bg-white/[0.06]' : 'text-slate-700 hover:bg-slate-50'}`}
                         >
-                          <div className="font-medium">{classe.codigo}</div>
-                          <div className={`text-xs ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{classe.descricao}</div>
+                          <div className="font-medium">{classe.codigo || classe.descricao}</div>
+                          {!!classe.codigo && <div className={`text-xs ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{classe.descricao}</div>}
                         </button>
                       )
                     })}
