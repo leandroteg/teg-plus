@@ -2,7 +2,7 @@ import { useState, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   Briefcase, Search, FileText, FileSignature, TrendingUp, CalendarClock,
-  TrendingDown, Calendar, Building2, ChevronDown, ChevronUp,
+  TrendingDown, Calendar, ChevronDown, ChevronUp,
   CalendarDays, CheckCircle2, XCircle, AlertTriangle, ArrowUpRight,
   ArrowDownRight, Filter, Clock, Banknote, CreditCard,
   Pause, RotateCcw, Lock, AlertOctagon, Loader2, Play,
@@ -111,6 +111,10 @@ function ContratoCard({ contrato, onToast }: { contrato: Contrato; onToast: (typ
   const contraparte = isDespesa
     ? contrato.fornecedor?.razao_social ?? contrato.fornecedor?.nome_fantasia
     : contrato.cliente?.nome
+  const linhaContexto = [contraparte, contrato.numero, contrato.centro_custo]
+    .filter(Boolean)
+    .join(' • ')
+  const tituloContrato = contrato.objeto?.trim() || 'Contrato sem titulo'
   const diasRestantes = Math.ceil(
     (new Date(contrato.data_fim_previsto).getTime() - Date.now()) / (1000 * 60 * 60 * 24)
   )
@@ -160,7 +164,12 @@ function ContratoCard({ contrato, onToast }: { contrato: Contrato; onToast: (typ
           </div>
           <div className="flex-1 min-w-0">
             <div className="flex items-center justify-between gap-2 mb-1">
-              <p className="text-sm font-bold text-slate-800 truncate">{contraparte ?? 'N/D'}</p>
+              <div className="min-w-0">
+                <p className="text-[11px] font-semibold text-slate-500 truncate">
+                  {linhaContexto || 'Contrato sem referencia'}
+                </p>
+                <p className="text-sm font-bold text-slate-800 truncate mt-0.5">{tituloContrato}</p>
+              </div>
               <p className={`text-sm font-extrabold shrink-0 ${isDespesa ? 'text-amber-600' : 'text-emerald-600'}`}>
                 {fmt(contrato.valor_total + contrato.valor_aditivos)}
               </p>
@@ -179,17 +188,14 @@ function ContratoCard({ contrato, onToast }: { contrato: Contrato; onToast: (typ
                 {isDespesa ? 'A Pagar' : 'A Receber'}
               </span>
             </div>
-            {contrato.objeto && (
-              <p className="text-[11px] text-slate-500 mt-1.5 line-clamp-1">{contrato.objeto}</p>
-            )}
             <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-2 text-[10px] text-slate-400">
               <span className="flex items-center gap-1">
                 <Calendar size={10} />
                 {fmtData(contrato.data_inicio)} — {fmtData(contrato.data_fim_previsto)}
               </span>
-              {contrato.obra?.nome && (
+              {contrato.centro_custo && (
                 <span className="flex items-center gap-1 text-slate-500">
-                  <Building2 size={9} /> {contrato.obra.nome}
+                  <Briefcase size={9} /> {contrato.centro_custo}
                 </span>
               )}
               {contrato.status === 'vigente' && diasRestantes > 0 && (
