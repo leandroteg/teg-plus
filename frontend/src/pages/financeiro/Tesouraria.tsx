@@ -55,9 +55,9 @@ type TesourariaTab = 'painel' | 'movimentacoes' | 'contas' | 'conciliacao'
 
 const TESOURARIA_TABS: Array<{ key: TesourariaTab; label: string }> = [
   { key: 'painel', label: 'Painel' },
-  { key: 'movimentacoes', label: 'Movimentacoes' },
+  { key: 'movimentacoes', label: 'Movimentações' },
   { key: 'contas', label: 'Contas e Saldos' },
-  { key: 'conciliacao', label: 'Conciliacao' },
+  { key: 'conciliacao', label: 'Conciliação' },
 ]
 
 const TAB_ICONS = {
