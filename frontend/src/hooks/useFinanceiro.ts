@@ -25,12 +25,6 @@ function getSupabaseErrorMessage(error: unknown, fallback: string) {
   return fallback
 }
 
-function isMissingColumnError(error: unknown, column: string) {
-  const message = getSupabaseErrorMessage(error, '')
-  return message.includes(`Could not find the '${column}' column`)
-    || message.includes(`column "${column}" does not exist`)
-}
-
 function appendExtraRequestDetailsToObservacoes(
   observacoesBase: string,
   dadosBancarios?: {
@@ -239,41 +233,19 @@ export function useCriarSolicitacaoExtraordinariaCP() {
       }
 
       if (dadosBancarios || uploadedArquivos.length > 0 || uploadFalhas.length > 0) {
-        const remessaPayload = {
-          manual_request: {
-            urgente: true,
-            justificativa: justificativa.trim(),
-            solicitante_nome: solicitanteNome ?? null,
-            dados_bancarios: dadosBancarios ?? null,
-            anexos: uploadedArquivos,
-            anexos_erro: uploadFalhas,
-          },
-        }
+        const observacoesComplementares = appendExtraRequestDetailsToObservacoes(
+          observacoesBase,
+          dadosBancarios,
+          uploadedArquivos,
+        )
 
         const { error: updateError } = await supabase
           .from('fin_contas_pagar')
-          .update({ remessa_payload: remessaPayload })
+          .update({ observacoes: observacoesComplementares })
           .eq('id', data.id)
 
         if (updateError) {
-          if (!isMissingColumnError(updateError, 'remessa_payload')) {
-            throw new Error(getSupabaseErrorMessage(updateError, 'Solicita\u00e7\u00e3o criada, mas n\u00e3o foi poss\u00edvel salvar os anexos'))
-          }
-
-          const observacoesFallback = appendExtraRequestDetailsToObservacoes(
-            observacoesBase,
-            dadosBancarios,
-            uploadedArquivos,
-          )
-
-          const { error: fallbackError } = await supabase
-            .from('fin_contas_pagar')
-            .update({ observacoes: observacoesFallback })
-            .eq('id', data.id)
-
-          if (fallbackError) {
-            throw new Error(getSupabaseErrorMessage(fallbackError, 'Solicita\u00e7\u00e3o criada, mas n\u00e3o foi poss\u00edvel salvar os detalhes complementares'))
-          }
+          throw new Error(getSupabaseErrorMessage(updateError, 'Solicita\u00e7\u00e3o criada, mas n\u00e3o foi poss\u00edvel salvar os detalhes complementares'))
         }
       }
 
