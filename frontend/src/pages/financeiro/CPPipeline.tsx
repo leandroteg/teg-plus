@@ -1148,7 +1148,7 @@ function LoteTableRow({
           <p className={`truncate text-[11px] ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{summary.progressLabel}</p>
         </button>
         <button type="button" onClick={onToggleExpand} className="min-w-0 text-left">
-          <p className={`truncate text-xs font-semibold ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>{summary.supplierLabel}</p>
+          <p className={`truncate text-xs font-semibold ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>{summary.totalItems > 1 ? `${summary.totalItems} titulos no lote` : summary.supplierLabel}</p>
           <p className={`truncate text-[11px] ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{summary.workLabel}</p>
           <div className={`mt-2 h-1.5 rounded-full overflow-hidden ${isDark ? 'bg-white/[0.06]' : 'bg-slate-200'}`}>
             <div className="h-full rounded-full bg-emerald-500 transition-all" style={{ width: `${summary.progress}%` }} />
@@ -1213,7 +1213,7 @@ function LoteCard({
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <p className={`text-[11px] font-semibold uppercase tracking-wider ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{summary.lote.numero_lote}</p>
-          <p className={`truncate text-base font-bold ${isDark ? 'text-white' : 'text-slate-800'}`}>{summary.supplierLabel}</p>
+          <p className={`truncate text-base font-bold ${isDark ? 'text-white' : 'text-slate-800'}`}>{summary.totalItems > 1 ? `${summary.totalItems} titulos no lote` : summary.supplierLabel}</p>
           <p className={`truncate text-sm ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{summary.workLabel}</p>
         </div>
         <div className="text-right shrink-0">
@@ -1434,7 +1434,11 @@ export default function CPPipeline() {
       const totalItems = lote?.qtd_itens ?? allItems.length
       const approvedItems = allItems.filter(cp => ['aprovado_pgto', 'em_pagamento', 'pago', 'conciliado'].includes(cp.status)).length
       const excludedItems = allItems.filter(cp => cp.status === 'cancelado').length
-      const supplierLabel = summarizeNames(allItems.map(cp => cp.fornecedor_nome), 'Lote sem fornecedor')
+      const uniqueSuppliers = Array.from(new Set(allItems.map(cp => cp.fornecedor_nome?.trim()).filter(Boolean))) as string[]
+      const uniqueWorks = Array.from(new Set(allItems.map(cp => (cp.requisicao?.obra_nome || cp.centro_custo || '').trim()).filter(Boolean))) as string[]
+      const supplierLabel = uniqueSuppliers.length <= 1
+        ? (uniqueSuppliers[0] || 'Lote sem fornecedor')
+        : `${uniqueSuppliers.length} fornecedores no lote`
       const workLabel = summarizeNames(allItems.map(cp => cp.requisicao?.obra_nome || cp.centro_custo || ''), 'Múltiplas obras e centros')
       const totalValue = lote?.valor_total ?? allItems.reduce((sum, cp) => sum + cp.valor_original, 0)
       const visibleValue = currentItems.reduce((sum, cp) => sum + cp.valor_original, 0)
@@ -1642,6 +1646,17 @@ export default function CPPipeline() {
   }
 
   const buildLoteActions = (summary: LoteStageSummary) => {
+    if (activeTab === 'em_aprovacao') {
+      return {
+        primary: {
+          label: 'Aprovar lote',
+          onClick: () => setDetailCP(summary.currentItems[0] ?? summary.allItems[0] ?? null),
+          tone: 'bg-emerald-600 hover:bg-emerald-700',
+          icon: CheckCircle2,
+        },
+      }
+    }
+
     switch (activeTab) {
       case 'em_lote':
         return {
