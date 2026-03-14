@@ -1144,6 +1144,10 @@ function LoteTableRow({
   onPrimaryAction?: { label: string; onClick: () => void; tone: string; icon: typeof Send }
   onSecondaryAction?: { label: string; onClick: () => void; tone: string; icon: typeof Banknote }
 }) {
+  const isMultiItemLote = summary.totalItems > 1
+  const resumoTitle = isMultiItemLote ? summary.headerLabel : summary.supplierLabel
+  const resumoSubtitle = isMultiItemLote ? summary.workLabel : summary.progressLabel
+
   return (
     <div className={`border-b ${isDark ? 'border-white/[0.04]' : 'border-slate-100'}`}>
       <div
@@ -1162,8 +1166,8 @@ function LoteTableRow({
           <p className={`truncate text-[11px] ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{summary.workLabel}</p>
         </button>
         <button type="button" onClick={onToggleExpand} className="min-w-0 text-left">
-          <p className={`truncate text-xs font-semibold ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>{summary.headerLabel}</p>
-          <p className={`truncate text-[11px] ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{summary.workLabel}</p>
+          <p className={`truncate text-xs font-semibold ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>{resumoTitle}</p>
+          <p className={`truncate text-[11px] ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{resumoSubtitle}</p>
           <div className={`mt-2 h-1.5 rounded-full overflow-hidden ${isDark ? 'bg-white/[0.06]' : 'bg-slate-200'}`}>
             <div className="h-full rounded-full bg-emerald-500 transition-all" style={{ width: `${summary.progress}%` }} />
           </div>
