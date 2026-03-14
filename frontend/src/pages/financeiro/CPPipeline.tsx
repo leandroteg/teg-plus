@@ -564,21 +564,35 @@ function NovaSolicitacaoExtraordinariaModal({
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className={labelCls}>Centro de Custo *</label>
-              <select value={form.centro_custo} onChange={e => setField('centro_custo', e.target.value)} className={inputCls}>
-                <option value="">Selecione...</option>
+              <input
+                list="financeiro-centros-custo-extra"
+                value={form.centro_custo}
+                onChange={e => setField('centro_custo', e.target.value)}
+                className={inputCls}
+                placeholder="Digite ou selecione..."
+              />
+              <datalist id="financeiro-centros-custo-extra">
                 {centrosCusto.map(cc => (
                   <option key={cc.id} value={cc.codigo}>{cc.codigo} - {cc.descricao}</option>
                 ))}
-              </select>
+              </datalist>
+              <p className={`mt-1 text-[10px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Aceita seleção da lista ou preenchimento manual.</p>
             </div>
             <div>
               <label className={labelCls}>Classe Financeira *</label>
-              <select value={form.classe_financeira} onChange={e => setField('classe_financeira', e.target.value)} className={inputCls}>
-                <option value="">Selecione...</option>
+              <input
+                list="financeiro-classes-extra"
+                value={form.classe_financeira}
+                onChange={e => setField('classe_financeira', e.target.value)}
+                className={inputCls}
+                placeholder="Digite ou selecione..."
+              />
+              <datalist id="financeiro-classes-extra">
                 {classesFinanceiras.map(classe => (
                   <option key={classe.id} value={classe.codigo}>{classe.codigo} - {classe.descricao}</option>
                 ))}
-              </select>
+              </datalist>
+              <p className={`mt-1 text-[10px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Aceita seleção da lista ou preenchimento manual.</p>
             </div>
           </div>
 
