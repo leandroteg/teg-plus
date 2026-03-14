@@ -21,6 +21,8 @@ import {
   useCriarLote,
   useEnviarLoteAprovacao,
   useRegistrarPagamentoBatch,
+  useEnviarRemessaPagamentoBatch,
+  useSincronizarRemessasPagamento,
 } from '../../hooks/useLotesPagamento'
 import { supabase } from '../../services/supabase'
 import { useAnexosPedido, useUploadAnexo, TIPO_LABEL } from '../../hooks/useAnexos'
@@ -41,6 +43,24 @@ const fmtData = (d: string) =>
 
 const fmtDataFull = (d: string) =>
   new Date(d + 'T00:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' })
+
+const fmtDateTime = (value?: string) =>
+  value ? new Date(value).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : ''
+
+function getRemessaHint(cp: ContaPagar) {
+  if (cp.status === 'aprovado_pgto' && cp.remessa_status === 'erro' && cp.remessa_erro) {
+    return `Falha na remessa: ${cp.remessa_erro}`
+  }
+  if (cp.status !== 'em_pagamento') return null
+  if (cp.remessa_status === 'erro') {
+    return cp.remessa_erro ? `Erro na remessa: ${cp.remessa_erro}` : 'Erro no retorno da remessa'
+  }
+  if (cp.remessa_id && cp.remessa_enviada_em) {
+    return `Remessa ${cp.remessa_id} enviada em ${fmtDateTime(cp.remessa_enviada_em)}`
+  }
+  if (cp.remessa_id) return `Remessa ${cp.remessa_id} em processamento`
+  return 'Aguardando retorno da remessa'
+}
 
 // Ã¢â€â‚¬Ã¢â€â‚¬ Sort types Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 
@@ -442,10 +462,15 @@ function CPDetailModal({ cp, onClose, onAction, isDark }: {
               {cp.requisicao?.numero && <div><span className="text-slate-400">RC:</span> <span className="font-semibold text-indigo-600">{cp.requisicao.numero}</span></div>}
               {cp.data_pagamento && <div><span className="text-slate-400">Pago em:</span> <span className="text-emerald-600 font-semibold">{fmtData(cp.data_pagamento)}</span></div>}
               {cp.aprovado_por && <div><span className="text-slate-400">Aprovado por:</span> <span className="font-semibold">{cp.aprovado_por}</span></div>}
+              {cp.remessa_id && <div><span className="text-slate-400">Remessa:</span> <span className="font-mono text-sky-600">{cp.remessa_id}</span></div>}
+              {cp.remessa_enviada_em && <div><span className="text-slate-400">Enviada em:</span> <span>{fmtDateTime(cp.remessa_enviada_em)}</span></div>}
             </div>
             {cp.descricao && <p className="text-xs text-slate-500 mt-2 pt-2 border-t border-slate-200">{cp.descricao}</p>}
             {cp.observacoes && !cp.observacoes.includes('Diverg\u00EAncia') && (
               <p className="text-xs text-slate-400 mt-1 italic">{cp.observacoes}</p>
+            )}
+            {cp.remessa_erro && (
+              <p className="text-xs text-red-500 mt-1">{cp.remessa_erro}</p>
             )}
           </div>
 
@@ -495,7 +520,17 @@ function CPDetailModal({ cp, onClose, onAction, isDark }: {
               </button>
             )}
             {cp.status === 'aprovado_pgto' && (
-              <button onClick={() => onAction('pagar', cp)} className="flex-1 py-3 rounded-xl bg-emerald-600 text-white text-sm font-bold hover:bg-emerald-700 transition-all flex items-center justify-center gap-2">
+              <>
+                <button onClick={() => onAction('enviarRemessa', cp)} className="flex-1 py-3 rounded-xl bg-sky-600 text-white text-sm font-bold hover:bg-sky-700 transition-all flex items-center justify-center gap-2">
+                  <Send size={15} /> Enviar Remessa
+                </button>
+                <button onClick={() => onAction('pagar', cp)} className="flex-1 py-3 rounded-xl bg-emerald-600 text-white text-sm font-bold hover:bg-emerald-700 transition-all flex items-center justify-center gap-2">
+                  <Banknote size={15} /> Registrar Pgto
+                </button>
+              </>
+            )}
+            {cp.status === 'em_pagamento' && (
+              <button onClick={() => onAction('pagar', cp)} className="flex-1 py-3 rounded-xl bg-teal-600 text-white text-sm font-bold hover:bg-teal-700 transition-all flex items-center justify-center gap-2">
                 <Banknote size={15} /> Registrar Pgto
               </button>
             )}
@@ -744,6 +779,8 @@ export default function CPPipeline() {
   const criarLoteMut = useCriarLote()
   const enviarLoteMut = useEnviarLoteAprovacao()
   const registrarBatchMut = useRegistrarPagamentoBatch()
+  const enviarRemessaMut = useEnviarRemessaPagamentoBatch()
+  const syncRemessasMut = useSincronizarRemessasPagamento()
 
   const contasById = useMemo(
     () => new Map(contas.map(cp => [cp.id, cp])),
@@ -764,6 +801,8 @@ export default function CPPipeline() {
   }, [lotesById])
 
   const getApprovalHint = useCallback((cp: ContaPagar) => {
+    const remessaHint = getRemessaHint(cp)
+    if (remessaHint) return remessaHint
     if (!cp.lote_id) return null
     const lote = lotesById.get(cp.lote_id)
     if (!lote || lote.status !== 'enviado_aprovacao') return null
@@ -918,6 +957,17 @@ export default function CPPipeline() {
     } catch { showToast('error', 'Erro ao registrar pagamento') }
   }
 
+  const handleEnviarRemessa = async (ids: string[]) => {
+    try {
+      const result = await enviarRemessaMut.mutateAsync({ cpIds: ids })
+      showToast('success', `Remessa ${result.remessaId} enviada para ${ids.length} pagamento(s)`)
+      setSelectedIds(new Set())
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Erro ao enviar remessa'
+      showToast('error', message)
+    }
+  }
+
   const handleEnviarLotesAprovacao = async (ids: string[]) => {
     const loteIds = Array.from(new Set(
       ids
@@ -947,15 +997,11 @@ export default function CPPipeline() {
 
   const handleConfirmarPagamento = async (ids: string[]) => {
     try {
-      const { error } = await supabase
-        .from('fin_contas_pagar')
-        .update({
-          status: 'pago',
-          data_pagamento: new Date().toISOString().split('T')[0],
-        })
-        .in('id', ids)
-      if (error) throw error
-      showToast('success', `${ids.length} pagamento(s) confirmado(s)`)
+      await registrarBatchMut.mutateAsync({
+        cpIds: ids,
+        dataPagamento: new Date().toISOString().split('T')[0],
+      })
+      showToast('success', `${ids.length} pagamento(s) registrados manualmente`)
       setSelectedIds(new Set())
     } catch { showToast('error', 'Erro ao confirmar pagamento') }
   }
@@ -975,7 +1021,7 @@ export default function CPPipeline() {
       case 'previsto': handleConfirmar(ids); break
       case 'confirmado': handleCriarLote(ids); break
       case 'em_lote': handleEnviarLotesAprovacao(ids); break
-      case 'aprovado_pgto': handlePagar(ids); break
+      case 'aprovado_pgto': handleEnviarRemessa(ids); break
       case 'em_pagamento': handleConfirmarPagamento(ids); break
       case 'pago': handleConciliar(ids); break
     }
@@ -987,6 +1033,7 @@ export default function CPPipeline() {
       case 'confirmar': handleConfirmar([cp.id]); break
       case 'addLote': handleCriarLote([cp.id]); break
       case 'sendLote': handleEnviarLotesAprovacao([cp.id]); break
+      case 'enviarRemessa': handleEnviarRemessa([cp.id]); break
       case 'pagar': handlePagar([cp.id]); break
       case 'conciliar': handleConciliar([cp.id]); break
     }
@@ -1005,8 +1052,8 @@ export default function CPPipeline() {
     previsto:      { label: 'Confirmar',     icon: CheckCircle2, className: 'bg-blue-600 hover:bg-blue-700 text-white' },
     confirmado:    { label: 'Criar Lote',    icon: Layers,       className: 'bg-violet-600 hover:bg-violet-700 text-white' },
     em_lote:       { label: 'Enviar p/ Aprov.', icon: Send,      className: 'bg-amber-500 hover:bg-amber-600 text-white' },
-    aprovado_pgto: { label: 'Reg. Pagamento', icon: Banknote,    className: 'bg-emerald-600 hover:bg-emerald-700 text-white' },
-    em_pagamento:  { label: 'Confirmar Pgto', icon: CheckCircle2, className: 'bg-teal-600 hover:bg-teal-700 text-white' },
+    aprovado_pgto: { label: 'Enviar Remessa', icon: Send,        className: 'bg-sky-600 hover:bg-sky-700 text-white' },
+    em_pagamento:  { label: 'Registrar Pgto', icon: Banknote,    className: 'bg-teal-600 hover:bg-teal-700 text-white' },
     pago:          { label: 'Conciliar',     icon: CheckCircle2, className: 'bg-green-600 hover:bg-green-700 text-white' },
   }
   const bulk = BULK_ACTIONS[activeTab]
@@ -1049,6 +1096,29 @@ export default function CPPipeline() {
       count: anchorCP?.lote_id ? stageCPs.filter(cp => cp.lote_id === anchorCP.lote_id).length : 0,
     },
   ]
+
+  useEffect(() => {
+    const pendentes = grouped.get('em_pagamento') || []
+    if (pendentes.length === 0) return
+
+    const runSync = () => {
+      if (syncRemessasMut.isPending) return
+      syncRemessasMut.mutate({ cps: pendentes }, {
+        onSuccess: result => {
+          if ((result?.confirmed ?? 0) > 0) {
+            showToast('success', `${result.confirmed} pagamento(s) confirmado(s) via remessa`)
+          }
+        },
+        onError: () => {
+          // Keep silent to avoid noisy polling when the external endpoint is offline.
+        },
+      })
+    }
+
+    runSync()
+    const timer = window.setInterval(runSync, 30000)
+    return () => window.clearInterval(timer)
+  }, [grouped, syncRemessasMut])
 
   return (
     <div className="space-y-4">
@@ -1229,6 +1299,15 @@ export default function CPPipeline() {
                   <bulk.icon size={12} />
                   {bulk.label} ({selectedInTab.length})
                 </button>
+                {activeTab === 'aprovado_pgto' && (
+                  <button
+                    onClick={() => handlePagar(Array.from(selectedIds))}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-bold transition-all bg-emerald-600 hover:bg-emerald-700 text-white"
+                  >
+                    <Banknote size={12} />
+                    Registrar Pgto ({selectedInTab.length})
+                  </button>
+                )}
                 <button
                   onClick={() => setSelectedIds(new Set())}
                   className={`px-3 py-1.5 rounded-lg text-[11px] font-medium transition-all ${

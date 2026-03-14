@@ -8,6 +8,108 @@ const SELECT_CP = `
   requisicao:cmp_requisicoes!requisicao_id(numero, descricao, obra_nome, categoria, centro_custo, classe_financeira, projeto_id)
 `
 
+type ConfigKey = 'n8n_webhook_url' | 'cp_remessa_webhook_url' | 'cp_remessa_status_webhook_url'
+
+type RemessaStatusResult = {
+  remessaId: string
+  status: string
+  dataPagamento?: string
+  payload?: Record<string, unknown>
+  message?: string
+}
+
+async function getFinanceiroConfig(keys: ConfigKey[]) {
+  const { data, error } = await supabase
+    .from('sys_config')
+    .select('chave, valor')
+    .in('chave', keys)
+
+  if (error) throw error
+
+  const cfg: Partial<Record<ConfigKey, string>> = {}
+  for (const row of data ?? []) {
+    cfg[row.chave as ConfigKey] = row.valor ?? ''
+  }
+  return cfg
+}
+
+function buildEndpointUrl(primary?: string, fallbackBase?: string, fallbackPath?: string) {
+  if (primary) return primary
+  if (!fallbackBase || !fallbackPath) return ''
+  return `${fallbackBase.replace(/\/$/, '')}${fallbackPath}`
+}
+
+function extractRemessaId(payload: unknown) {
+  if (!payload || typeof payload !== 'object') return null
+  const source = payload as Record<string, unknown>
+  const value = source.remessaId ?? source.remessa_id ?? source.id ?? source.codigo ?? null
+  return typeof value === 'string' && value.trim() ? value.trim() : null
+}
+
+function normalizeRemessaStatusResults(payload: unknown): RemessaStatusResult[] {
+  if (!payload || typeof payload !== 'object') return []
+
+  const source = payload as Record<string, unknown>
+  const rawList = Array.isArray(source.results)
+    ? source.results
+    : Array.isArray(source.remessas)
+      ? source.remessas
+      : Array.isArray(source.data)
+        ? source.data
+        : []
+
+  const results = rawList
+    .map(item => {
+      if (!item || typeof item !== 'object') return null
+      const record = item as Record<string, unknown>
+      const remessaId = extractRemessaId(record)
+      const status = String(record.status ?? record.situacao ?? record.resultado ?? '').trim().toLowerCase()
+      if (!remessaId || !status) return null
+      return {
+        remessaId,
+        status,
+        dataPagamento: typeof record.dataPagamento === 'string'
+          ? record.dataPagamento
+          : typeof record.data_pagamento === 'string'
+            ? record.data_pagamento
+            : undefined,
+        payload: record,
+        message: typeof record.message === 'string'
+          ? record.message
+          : typeof record.erro === 'string'
+            ? record.erro
+            : typeof record.error === 'string'
+              ? record.error
+              : undefined,
+      } satisfies RemessaStatusResult
+    })
+    .filter((item): item is RemessaStatusResult => !!item)
+
+  if (results.length > 0) return results
+
+  const remessaId = extractRemessaId(source)
+  const status = String(source.status ?? source.situacao ?? source.resultado ?? '').trim().toLowerCase()
+  if (!remessaId || !status) return []
+
+  return [{
+    remessaId,
+    status,
+    dataPagamento: typeof source.dataPagamento === 'string'
+      ? source.dataPagamento
+      : typeof source.data_pagamento === 'string'
+        ? source.data_pagamento
+        : undefined,
+    payload: source,
+    message: typeof source.message === 'string'
+      ? source.message
+      : typeof source.erro === 'string'
+        ? source.erro
+        : typeof source.error === 'string'
+          ? source.error
+          : undefined,
+  }]
+}
+
 // ── Query: Lista de lotes ────────────────────────────────────────────────────
 
 export function useLotesPagamento(statusFilter?: string) {
@@ -393,6 +495,138 @@ export function useRemoverItemLote() {
       qc.invalidateQueries({ queryKey: ['lote-detalhe'] })
       qc.invalidateQueries({ queryKey: ['lotes-pagamento'] })
       qc.invalidateQueries({ queryKey: ['contas-pagar'] })
+    },
+  })
+}
+
+export function useEnviarRemessaPagamentoBatch() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ cpIds }: { cpIds: string[] }) => {
+      if (cpIds.length === 0) return { remessaId: '', updated: 0 }
+
+      const cfg = await getFinanceiroConfig(['n8n_webhook_url', 'cp_remessa_webhook_url'])
+      const webhookUrl = buildEndpointUrl(
+        cfg.cp_remessa_webhook_url,
+        cfg.n8n_webhook_url,
+        '/financeiro/cp/remessa/enviar',
+      )
+
+      if (!webhookUrl) {
+        throw new Error('Configure o webhook de remessa em sys_config antes de enviar.')
+      }
+
+      const { data: cps, error: cpError } = await supabase
+        .from('fin_contas_pagar')
+        .select(SELECT_CP)
+        .in('id', cpIds)
+      if (cpError) throw cpError
+
+      const contas = (cps ?? []) as ContaPagar[]
+      const response = await fetch(webhookUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          source: 'teg-frontend',
+          cpIds,
+          contas,
+        }),
+      })
+
+      const payload = await response.json().catch(() => ({}))
+      if (!response.ok) {
+        const message = typeof payload?.message === 'string' ? payload.message : `HTTP ${response.status}`
+        throw new Error(message)
+      }
+      if (payload?.accepted === false || payload?.success === false) {
+        const message = typeof payload?.message === 'string' ? payload.message : 'Remessa recusada pelo endpoint'
+        throw new Error(message)
+      }
+
+      const remessaId = extractRemessaId(payload) ?? `REM-${Date.now()}`
+      const { data: updated, error } = await supabase.rpc('rpc_marcar_cp_remessa_batch', {
+        p_cp_ids: cpIds,
+        p_remessa_id: remessaId,
+        p_payload: payload ?? {},
+      })
+      if (error) throw error
+
+      return { remessaId, updated: Number(updated ?? 0) }
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['cps-para-pagamento'] })
+      qc.invalidateQueries({ queryKey: ['contas-pagar'] })
+      qc.invalidateQueries({ queryKey: ['financeiro-dashboard'] })
+      qc.invalidateQueries({ queryKey: ['lotes-pagamento'] })
+      qc.invalidateQueries({ queryKey: ['lote-detalhe'] })
+    },
+  })
+}
+
+export function useSincronizarRemessasPagamento() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ cps }: { cps?: ContaPagar[] } = {}) => {
+      const pendentes = (cps ?? []).filter(cp => cp.status === 'em_pagamento' && !!cp.remessa_id)
+      if (pendentes.length === 0) return { processed: 0, confirmed: 0, errors: 0 }
+
+      const cfg = await getFinanceiroConfig(['n8n_webhook_url', 'cp_remessa_status_webhook_url'])
+      const statusUrl = buildEndpointUrl(
+        cfg.cp_remessa_status_webhook_url,
+        cfg.n8n_webhook_url,
+        '/financeiro/cp/remessa/status',
+      )
+
+      if (!statusUrl) return { processed: 0, confirmed: 0, errors: 0 }
+
+      const response = await fetch(statusUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          source: 'teg-frontend',
+          remessaIds: pendentes.map(cp => cp.remessa_id),
+          cpIds: pendentes.map(cp => cp.id),
+        }),
+      })
+
+      const payload = await response.json().catch(() => ({}))
+      if (!response.ok) {
+        const message = typeof payload?.message === 'string' ? payload.message : `HTTP ${response.status}`
+        throw new Error(message)
+      }
+
+      const results = normalizeRemessaStatusResults(payload)
+      let processed = 0
+      let confirmed = 0
+      let errors = 0
+
+      for (const result of results) {
+        const { data, error } = await supabase.rpc('rpc_processar_retorno_cp_remessa', {
+          p_remessa_id: result.remessaId,
+          p_status: result.status,
+          p_payload: result.payload ?? {},
+          p_data_pagamento: result.dataPagamento ?? new Date().toISOString().slice(0, 10),
+          p_obs: result.message ?? null,
+        })
+        if (error) throw error
+
+        const affected = Number(data ?? 0)
+        processed += affected
+        if (affected > 0) {
+          if (['confirmada', 'confirmado', 'pago', 'sucesso', 'success'].includes(result.status)) confirmed += affected
+          if (['erro', 'error', 'falha', 'failed', 'rejeitada', 'rejeitado'].includes(result.status)) errors += affected
+        }
+      }
+
+      return { processed, confirmed, errors }
+    },
+    onSuccess: result => {
+      if ((result?.processed ?? 0) === 0) return
+      qc.invalidateQueries({ queryKey: ['cps-para-pagamento'] })
+      qc.invalidateQueries({ queryKey: ['contas-pagar'] })
+      qc.invalidateQueries({ queryKey: ['financeiro-dashboard'] })
+      qc.invalidateQueries({ queryKey: ['lotes-pagamento'] })
+      qc.invalidateQueries({ queryKey: ['lote-detalhe'] })
     },
   })
 }

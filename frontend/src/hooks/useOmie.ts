@@ -18,6 +18,8 @@ export interface OmieConfig {
   omie_app_secret: string
   n8n_webhook_url: string
   omie_enabled: string
+  cp_remessa_webhook_url: string
+  cp_remessa_status_webhook_url: string
 }
 
 // ── useLastSync ───────────────────────────────────────────────────────────────
@@ -61,6 +63,8 @@ export function useOmieConfig() {
         omie_app_secret: cfg['omie_app_secret'] ?? '',
         n8n_webhook_url: cfg['n8n_webhook_url'] ?? '',
         omie_enabled:    cfg['omie_enabled']    ?? 'false',
+        cp_remessa_webhook_url: cfg['cp_remessa_webhook_url'] ?? '',
+        cp_remessa_status_webhook_url: cfg['cp_remessa_status_webhook_url'] ?? '',
       }
     },
     staleTime: 60_000, // considera os dados frescos por 1 minuto

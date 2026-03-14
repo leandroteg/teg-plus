@@ -5,6 +5,14 @@ export type StatusCP =
   | 'aprovado_pgto' | 'em_pagamento'
   | 'pago' | 'conciliado' | 'cancelado'
 
+export type RemessaCPStatus =
+  | 'nao_enviada'
+  | 'enviada'
+  | 'processando'
+  | 'confirmada'
+  | 'confirmada_manual'
+  | 'erro'
+
 // Pipeline stages in order (for Kanban columns)
 export const CP_PIPELINE_STAGES: { status: StatusCP; label: string; color: string; borderColor: string }[] = [
   { status: 'previsto',       label: 'Previstos',           color: 'slate',   borderColor: 'border-t-slate-400' },
@@ -81,6 +89,14 @@ export interface ContaPagar {
   aprovado_em?: string
   omie_cp_id?: number
   lote_id?: string
+  remessa_status?: RemessaCPStatus
+  remessa_id?: string
+  remessa_enviada_em?: string
+  remessa_retorno_em?: string
+  remessa_sync_em?: string
+  remessa_payload?: Record<string, unknown> | null
+  remessa_retorno?: Record<string, unknown> | null
+  remessa_erro?: string
   descricao?: string
   observacoes?: string
   created_at: string
