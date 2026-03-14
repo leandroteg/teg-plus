@@ -21,7 +21,38 @@ export function useLotesPagamento(statusFilter?: string) {
       if (statusFilter) q = q.eq('status', statusFilter)
       const { data, error } = await q
       if (error) throw error
-      return (data ?? []) as LotePagamento[]
+
+      const lotes = (data ?? []) as LotePagamento[]
+      const loteIds = lotes.map(lote => lote.id)
+
+      if (loteIds.length === 0) return lotes
+
+      const { data: aprovacoes } = await supabase
+        .from('apr_aprovacoes')
+        .select('entidade_id, aprovador_nome, status, created_at')
+        .eq('modulo', 'fin')
+        .eq('tipo_aprovacao', 'autorizacao_pagamento')
+        .in('entidade_id', loteIds)
+        .order('created_at', { ascending: false })
+
+      const aprovacaoPorLote = new Map<string, { aprovador_nome?: string; status?: string }>()
+      for (const aprovacao of aprovacoes ?? []) {
+        const entidadeId = aprovacao.entidade_id as string | undefined
+        if (!entidadeId || aprovacaoPorLote.has(entidadeId)) continue
+        aprovacaoPorLote.set(entidadeId, {
+          aprovador_nome: aprovacao.aprovador_nome as string | undefined,
+          status: aprovacao.status as string | undefined,
+        })
+      }
+
+      return lotes.map(lote => {
+        const aprovacao = aprovacaoPorLote.get(lote.id)
+        return {
+          ...lote,
+          aprovador_nome: aprovacao?.aprovador_nome,
+          aprovacao_status: aprovacao?.status,
+        }
+      })
     },
     retry: false,
   })

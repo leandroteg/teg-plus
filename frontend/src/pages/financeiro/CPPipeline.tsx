@@ -46,6 +46,16 @@ const fmtDataFull = (d: string) =>
 type SortField = 'vencimento' | 'valor' | 'fornecedor' | 'emissao'
 type SortDir = 'asc' | 'desc'
 type ViewMode = 'list' | 'cards'
+type PipelineStageId = StatusCP | 'em_aprovacao'
+type QuickFilterId = 'all' | 'overdue' | 'today' | 'week' | 'same_supplier' | 'same_work' | 'same_lote'
+
+const CP_PIPELINE_VIEW_STAGES: Array<{ status: PipelineStageId; label: string; color: string; borderColor: string }> = [
+  ...CP_PIPELINE_STAGES.slice(0, 3),
+  { status: 'em_aprovacao', label: 'Em Aprovação', color: 'amber', borderColor: 'border-t-amber-500' },
+  { status: 'aprovado_pgto', label: 'Painel de Pagamento', color: 'emerald', borderColor: 'border-t-emerald-500' },
+  { status: 'em_pagamento', label: 'Em Processamento', color: 'sky', borderColor: 'border-t-sky-500' },
+  ...CP_PIPELINE_STAGES.filter(stage => ['pago', 'conciliado'].includes(stage.status)),
+]
 
 const SORT_OPTIONS: { field: SortField; label: string }[] = [
   { field: 'vencimento', label: 'Vencimento' },
@@ -74,6 +84,7 @@ const STATUS_ICONS: Record<string, typeof Receipt> = {
   previsto:      Calendar,
   confirmado:    CheckCircle2,
   em_lote:       Layers,
+  em_aprovacao:  Send,
   aprovado_pgto: ShieldCheck,
   em_pagamento:  Clock,
   pago:          Banknote,
@@ -84,8 +95,9 @@ const STATUS_ACCENT: Record<string, { bg: string; bgActive: string; text: string
   previsto:      { bg: 'hover:bg-slate-50',   bgActive: 'bg-slate-100',   text: 'text-slate-600',   textActive: 'text-slate-800',   dot: 'bg-slate-400',   border: 'border-slate-400',   badge: 'bg-slate-200 text-slate-600' },
   confirmado:    { bg: 'hover:bg-blue-50',    bgActive: 'bg-blue-50',     text: 'text-blue-600',    textActive: 'text-blue-800',    dot: 'bg-blue-500',    border: 'border-blue-500',    badge: 'bg-blue-100 text-blue-700' },
   em_lote:       { bg: 'hover:bg-violet-50',  bgActive: 'bg-violet-50',   text: 'text-violet-600',  textActive: 'text-violet-800',  dot: 'bg-violet-500',  border: 'border-violet-500',  badge: 'bg-violet-100 text-violet-700' },
+  em_aprovacao:  { bg: 'hover:bg-amber-50',   bgActive: 'bg-amber-50',    text: 'text-amber-600',   textActive: 'text-amber-800',   dot: 'bg-amber-500',   border: 'border-amber-500',   badge: 'bg-amber-100 text-amber-700' },
   aprovado_pgto: { bg: 'hover:bg-emerald-50', bgActive: 'bg-emerald-50',  text: 'text-emerald-600', textActive: 'text-emerald-800', dot: 'bg-emerald-500', border: 'border-emerald-500', badge: 'bg-emerald-100 text-emerald-700' },
-  em_pagamento:  { bg: 'hover:bg-amber-50',   bgActive: 'bg-amber-50',    text: 'text-amber-600',   textActive: 'text-amber-800',   dot: 'bg-amber-500',   border: 'border-amber-500',   badge: 'bg-amber-100 text-amber-700' },
+  em_pagamento:  { bg: 'hover:bg-sky-50',     bgActive: 'bg-sky-50',      text: 'text-sky-600',     textActive: 'text-sky-800',     dot: 'bg-sky-500',     border: 'border-sky-500',     badge: 'bg-sky-100 text-sky-700' },
   pago:          { bg: 'hover:bg-teal-50',    bgActive: 'bg-teal-50',     text: 'text-teal-600',    textActive: 'text-teal-800',    dot: 'bg-teal-500',    border: 'border-teal-500',    badge: 'bg-teal-100 text-teal-700' },
   conciliado:    { bg: 'hover:bg-green-50',   bgActive: 'bg-green-50',    text: 'text-green-600',   textActive: 'text-green-800',   dot: 'bg-green-500',   border: 'border-green-500',   badge: 'bg-green-100 text-green-700' },
 }
@@ -94,8 +106,9 @@ const STATUS_ACCENT_DARK: Record<string, { bg: string; bgActive: string; text: s
   previsto:      { bg: 'hover:bg-white/[0.03]', bgActive: 'bg-slate-500/10',   text: 'text-slate-400',   textActive: 'text-slate-200',   border: 'border-slate-400/40',   badge: 'bg-slate-500/15 text-slate-200' },
   confirmado:    { bg: 'hover:bg-white/[0.03]', bgActive: 'bg-blue-500/10',    text: 'text-blue-400',    textActive: 'text-blue-300',    border: 'border-blue-400/40',    badge: 'bg-blue-500/15 text-blue-200' },
   em_lote:       { bg: 'hover:bg-white/[0.03]', bgActive: 'bg-violet-500/10',  text: 'text-violet-400',  textActive: 'text-violet-300',  border: 'border-violet-400/40',  badge: 'bg-violet-500/15 text-violet-200' },
+  em_aprovacao:  { bg: 'hover:bg-white/[0.03]', bgActive: 'bg-amber-500/10',   text: 'text-amber-400',   textActive: 'text-amber-300',   border: 'border-amber-400/40',   badge: 'bg-amber-500/15 text-amber-200' },
   aprovado_pgto: { bg: 'hover:bg-white/[0.03]', bgActive: 'bg-emerald-500/10', text: 'text-emerald-400', textActive: 'text-emerald-300', border: 'border-emerald-400/40', badge: 'bg-emerald-500/15 text-emerald-200' },
-  em_pagamento:  { bg: 'hover:bg-white/[0.03]', bgActive: 'bg-amber-500/10',   text: 'text-amber-400',   textActive: 'text-amber-300',   border: 'border-amber-400/40',   badge: 'bg-amber-500/15 text-amber-200' },
+  em_pagamento:  { bg: 'hover:bg-white/[0.03]', bgActive: 'bg-sky-500/10',     text: 'text-sky-400',     textActive: 'text-sky-300',     border: 'border-sky-400/40',     badge: 'bg-sky-500/15 text-sky-200' },
   pago:          { bg: 'hover:bg-white/[0.03]', bgActive: 'bg-teal-500/10',    text: 'text-teal-400',    textActive: 'text-teal-300',    border: 'border-teal-400/40',    badge: 'bg-teal-500/15 text-teal-200' },
   conciliado:    { bg: 'hover:bg-white/[0.03]', bgActive: 'bg-green-500/10',   text: 'text-green-400',   textActive: 'text-green-300',   border: 'border-green-400/40',   badge: 'bg-green-500/15 text-green-200' },
 }
@@ -326,12 +339,13 @@ function CPDetailModal({ cp, onClose, onAction, isDark }: {
 
 // ── CPRow (compact table row) ────────────────────────────────────────────────
 
-function CPRow({ cp, onClick, isDark, isSelected, onSelect }: {
+function CPRow({ cp, onClick, isDark, isSelected, onSelect, approvalHint }: {
   cp: ContaPagar
   onClick: () => void
   isDark: boolean
   isSelected: boolean
   onSelect: (id: string) => void
+  approvalHint?: string | null
 }) {
   const urgency = getUrgency(cp)
   const obraNome = cp.requisicao?.obra_nome
@@ -373,9 +387,16 @@ function CPRow({ cp, onClick, isDark, isSelected, onSelect }: {
         </span>
       )}
 
-      <span className={`text-[11px] truncate w-[150px] shrink-0 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
-        {cp.descricao || '—'}
-      </span>
+      <div className="w-[150px] shrink-0">
+        <span className={`block truncate text-[11px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+          {cp.descricao || '—'}
+        </span>
+        {approvalHint && (
+          <span className={`block truncate text-[10px] font-medium ${isDark ? 'text-amber-300' : 'text-amber-700'}`}>
+            {approvalHint}
+          </span>
+        )}
+      </div>
 
       <span className={`text-[11px] truncate w-[100px] shrink-0 flex items-center gap-0.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
         {obraNome ? <><Building2 size={9} className="shrink-0" /> {obraNome}</> : '—'}
@@ -410,12 +431,13 @@ function CPRow({ cp, onClick, isDark, isSelected, onSelect }: {
 
 // ── CPCard (block/card view) ─────────────────────────────────────────────────
 
-function CPCard({ cp, onClick, isDark, isSelected, onSelect }: {
+function CPCard({ cp, onClick, isDark, isSelected, onSelect, approvalHint }: {
   cp: ContaPagar
   onClick: () => void
   isDark: boolean
   isSelected: boolean
   onSelect: (id: string) => void
+  approvalHint?: string | null
 }) {
   const urgency = getUrgency(cp)
   const obraNome = cp.requisicao?.obra_nome
@@ -471,6 +493,13 @@ function CPCard({ cp, onClick, isDark, isSelected, onSelect }: {
       {cp.descricao && (
         <p className={`text-xs truncate mt-1 ml-10 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{cp.descricao}</p>
       )}
+      {approvalHint && (
+        <div className={`mt-1 ml-10 inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold ${
+          isDark ? 'bg-amber-500/10 text-amber-300' : 'bg-amber-50 text-amber-700'
+        }`}>
+          {approvalHint}
+        </div>
+      )}
 
       {/* Observações / Alerta de divergência */}
       {cp.observacoes && (
@@ -522,7 +551,7 @@ function CPCard({ cp, onClick, isDark, isSelected, onSelect }: {
 
 export default function CPPipeline() {
   const { isDark } = useTheme()
-  const [activeTab, setActiveTab] = useState<StatusCP>('previsto')
+  const [activeTab, setActiveTab] = useState<PipelineStageId>('previsto')
   const [busca, setBusca] = useState('')
   const [detailCP, setDetailCP] = useState<ContaPagar | null>(null)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
@@ -530,6 +559,7 @@ export default function CPPipeline() {
   const [sortField, setSortField] = useState<SortField>('vencimento')
   const [sortDir, setSortDir] = useState<SortDir>('asc')
   const [viewMode, setViewMode] = useState<ViewMode>('list')
+  const [quickFilter, setQuickFilter] = useState<QuickFilterId>('all')
 
   // Data
   const { data: contas = [], isLoading } = useContasPagar()
@@ -551,19 +581,34 @@ export default function CPPipeline() {
     [lotes],
   )
 
-  // Group all CPs by status
+  const resolvePipelineStage = useCallback((cp: ContaPagar): PipelineStageId => {
+    if (cp.status !== 'em_lote') return cp.status
+
+    const lote = cp.lote_id ? lotesById.get(cp.lote_id) : undefined
+    if (lote?.status === 'enviado_aprovacao') return 'em_aprovacao'
+    return 'em_lote'
+  }, [lotesById])
+
+  const getApprovalHint = useCallback((cp: ContaPagar) => {
+    if (!cp.lote_id) return null
+    const lote = lotesById.get(cp.lote_id)
+    if (!lote || lote.status !== 'enviado_aprovacao') return null
+    return lote.aprovador_nome ? `Aprovador: ${lote.aprovador_nome}` : 'Em aprovação'
+  }, [lotesById])
+
+  // Group all CPs by pipeline stage
   const grouped = useMemo(() => {
-    const map = new Map<StatusCP, ContaPagar[]>()
-    for (const s of CP_PIPELINE_STAGES) map.set(s.status, [])
+    const map = new Map<PipelineStageId, ContaPagar[]>()
+    for (const stage of CP_PIPELINE_VIEW_STAGES) map.set(stage.status, [])
     for (const cp of contas) {
-      const arr = map.get(cp.status as StatusCP)
+      const arr = map.get(resolvePipelineStage(cp))
       if (arr) arr.push(cp)
     }
     return map
-  }, [contas])
+  }, [contas, resolvePipelineStage])
 
   // Filter active tab by search, then sort
-  const activeCPs = useMemo(() => {
+  const stageCPs = useMemo(() => {
     let cps = [...(grouped.get(activeTab) || [])]
 
     // Search filter
@@ -597,6 +642,36 @@ export default function CPPipeline() {
 
     return cps
   }, [grouped, activeTab, busca, sortField, sortDir])
+
+  const selectedInTab = useMemo(
+    () => stageCPs.filter(cp => selectedIds.has(cp.id)),
+    [stageCPs, selectedIds],
+  )
+
+  const anchorCP = selectedInTab[0] ?? null
+
+  const activeCPs = useMemo(() => {
+    switch (quickFilter) {
+      case 'overdue':
+        return stageCPs.filter(cp => getUrgency(cp) === 'overdue')
+      case 'today':
+        return stageCPs.filter(cp => getUrgency(cp) === 'today')
+      case 'week':
+        return stageCPs.filter(cp => ['today', 'week'].includes(getUrgency(cp)))
+      case 'same_supplier':
+        return anchorCP ? stageCPs.filter(cp => cp.fornecedor_nome === anchorCP.fornecedor_nome) : stageCPs
+      case 'same_work':
+        return anchorCP?.requisicao?.obra_nome
+          ? stageCPs.filter(cp => cp.requisicao?.obra_nome === anchorCP.requisicao?.obra_nome)
+          : stageCPs
+      case 'same_lote':
+        return anchorCP?.lote_id
+          ? stageCPs.filter(cp => cp.lote_id === anchorCP.lote_id)
+          : stageCPs
+      default:
+        return stageCPs
+    }
+  }, [anchorCP, quickFilter, stageCPs])
 
   // Tab totals
   const tabTotal = useMemo(() => activeCPs.reduce((s, cp) => s + cp.valor_original, 0), [activeCPs])
@@ -745,14 +820,14 @@ export default function CPPipeline() {
 
   // Export
   const handleExport = () => {
-    const stage = CP_PIPELINE_STAGES.find(s => s.status === activeTab)
+    const stage = CP_PIPELINE_VIEW_STAGES.find(s => s.status === activeTab)
     const toExport = selectedIds.size > 0 ? activeCPs.filter(cp => selectedIds.has(cp.id)) : activeCPs
     exportCSV(toExport, stage?.label || activeTab)
     showToast('success', `${toExport.length} registro(s) exportado(s)`)
   }
 
   // Bulk action config per tab
-  const BULK_ACTIONS: Partial<Record<StatusCP, { label: string; icon: typeof CheckCircle2; className: string }>> = {
+  const BULK_ACTIONS: Partial<Record<PipelineStageId, { label: string; icon: typeof CheckCircle2; className: string }>> = {
     previsto:      { label: 'Confirmar',     icon: CheckCircle2, className: 'bg-blue-600 hover:bg-blue-700 text-white' },
     confirmado:    { label: 'Criar Lote',    icon: Layers,       className: 'bg-violet-600 hover:bg-violet-700 text-white' },
     em_lote:       { label: 'Enviar p/ Aprov.', icon: Send,      className: 'bg-amber-500 hover:bg-amber-600 text-white' },
@@ -761,18 +836,45 @@ export default function CPPipeline() {
     pago:          { label: 'Conciliar',     icon: CheckCircle2, className: 'bg-green-600 hover:bg-green-700 text-white' },
   }
   const bulk = BULK_ACTIONS[activeTab]
-  const selectedInTab = activeCPs.filter(cp => selectedIds.has(cp.id))
 
   // Switch tab clears selection
-  const switchTab = (status: StatusCP) => {
+  const switchTab = (status: PipelineStageId) => {
     setActiveTab(status)
     setSelectedIds(new Set())
     setBusca('')
+    setQuickFilter('all')
   }
 
   // Summary stats
   const overdueCt = activeCPs.filter(cp => getUrgency(cp) === 'overdue').length
   const overdueTotal = activeCPs.filter(cp => getUrgency(cp) === 'overdue').reduce((s, c) => s + c.valor_original, 0)
+  const hasFilteredView = busca.length > 0 || quickFilter !== 'all'
+  const quickFilters = [
+    { id: 'all' as QuickFilterId, label: 'Tudo', enabled: true, count: stageCPs.length },
+    { id: 'overdue' as QuickFilterId, label: 'Vencidos', enabled: true, count: stageCPs.filter(cp => getUrgency(cp) === 'overdue').length },
+    { id: 'today' as QuickFilterId, label: 'Hoje', enabled: true, count: stageCPs.filter(cp => getUrgency(cp) === 'today').length },
+    { id: 'week' as QuickFilterId, label: '7 dias', enabled: true, count: stageCPs.filter(cp => ['today', 'week'].includes(getUrgency(cp))).length },
+    {
+      id: 'same_supplier' as QuickFilterId,
+      label: anchorCP ? `Fornecedor: ${anchorCP.fornecedor_nome}` : 'Mesmo fornecedor',
+      enabled: !!anchorCP,
+      count: anchorCP ? stageCPs.filter(cp => cp.fornecedor_nome === anchorCP.fornecedor_nome).length : 0,
+    },
+    {
+      id: 'same_work' as QuickFilterId,
+      label: anchorCP?.requisicao?.obra_nome ? `Obra: ${anchorCP.requisicao.obra_nome}` : 'Mesma obra',
+      enabled: !!anchorCP?.requisicao?.obra_nome,
+      count: anchorCP?.requisicao?.obra_nome
+        ? stageCPs.filter(cp => cp.requisicao?.obra_nome === anchorCP.requisicao?.obra_nome).length
+        : 0,
+    },
+    {
+      id: 'same_lote' as QuickFilterId,
+      label: anchorCP?.lote_id ? 'Mesmo lote' : 'Mesmo lote',
+      enabled: !!anchorCP?.lote_id,
+      count: anchorCP?.lote_id ? stageCPs.filter(cp => cp.lote_id === anchorCP.lote_id).length : 0,
+    },
+  ]
 
   return (
     <div className="space-y-4">
@@ -804,7 +906,7 @@ export default function CPPipeline() {
         isDark ? 'border-white/[0.08] bg-white/[0.02]' : 'border-slate-200 bg-white'
       }`}>
         <div className="flex min-w-max items-stretch gap-1">
-        {CP_PIPELINE_STAGES.map(stage => {
+        {CP_PIPELINE_VIEW_STAGES.map(stage => {
           const count = grouped.get(stage.status)?.length || 0
           const isActive = activeTab === stage.status
           const Icon = STATUS_ICONS[stage.status] || Receipt
@@ -936,7 +1038,33 @@ export default function CPPipeline() {
 
         {/* Select all + bulk action bar */}
         {activeCPs.length > 0 && bulk && (
-          <div className={`px-4 py-2 border-b flex items-center gap-3 ${isDark ? 'border-white/[0.06] bg-white/[0.02]' : 'border-slate-100 bg-slate-50/50'}`}>
+          <div className={`px-4 py-2 border-b flex flex-wrap items-center gap-3 ${isDark ? 'border-white/[0.06] bg-white/[0.02]' : 'border-slate-100 bg-slate-50/50'}`}>
+            <div className="flex flex-wrap items-center gap-2 mr-2">
+              <span className={`text-[10px] font-semibold uppercase tracking-wider ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+                Filtros
+              </span>
+              {quickFilters.map(filter => (
+                <button
+                  key={filter.id}
+                  onClick={() => filter.enabled && setQuickFilter(filter.id)}
+                  disabled={!filter.enabled}
+                  className={`rounded-full border px-2.5 py-1 text-[10px] transition-all ${
+                    quickFilter === filter.id
+                      ? isDark
+                        ? 'border-emerald-400/40 bg-emerald-500/10 text-emerald-300'
+                        : 'border-emerald-300 bg-emerald-50 text-emerald-700'
+                      : filter.enabled
+                        ? isDark
+                          ? 'border-white/[0.06] text-slate-300 hover:bg-white/[0.04]'
+                          : 'border-slate-200 text-slate-600 hover:bg-white'
+                        : 'cursor-not-allowed border-transparent text-slate-400 opacity-40'
+                  }`}
+                >
+                  {filter.label}
+                  {filter.count > 0 && <span className="ml-1 opacity-70">({filter.count})</span>}
+                </button>
+              ))}
+            </div>
             <label className="flex items-center gap-2 cursor-pointer">
               <input
                 type="checkbox"
@@ -945,7 +1073,7 @@ export default function CPPipeline() {
                 className="w-3.5 h-3.5 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
               />
               <span className={`text-[11px] font-medium ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
-                Todos
+                Selecionar filtrados
               </span>
             </label>
             {selectedInTab.length > 0 && (
@@ -956,6 +1084,14 @@ export default function CPPipeline() {
                 >
                   <bulk.icon size={12} />
                   {bulk.label} ({selectedInTab.length})
+                </button>
+                <button
+                  onClick={() => setSelectedIds(new Set())}
+                  className={`px-3 py-1.5 rounded-lg text-[11px] font-medium transition-all ${
+                    isDark ? 'text-slate-400 hover:text-white hover:bg-white/[0.04]' : 'text-slate-500 hover:text-slate-700 hover:bg-white'
+                  }`}
+                >
+                  Limpar seleÃ§Ã£o
                 </button>
                 <span className={`text-[10px] ml-auto ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
                   {fmt(selectedInTab.reduce((s, cp) => s + cp.valor_original, 0))} selecionado
@@ -1007,6 +1143,7 @@ export default function CPPipeline() {
                   isDark={isDark}
                   isSelected={selectedIds.has(cp.id)}
                   onSelect={toggleSelect}
+                  approvalHint={getApprovalHint(cp)}
                 />
               ))}
             </>
@@ -1020,6 +1157,7 @@ export default function CPPipeline() {
                   isDark={isDark}
                   isSelected={selectedIds.has(cp.id)}
                   onSelect={toggleSelect}
+                  approvalHint={getApprovalHint(cp)}
                 />
               ))}
             </div>

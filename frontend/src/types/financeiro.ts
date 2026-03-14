@@ -181,6 +181,8 @@ export interface LotePagamento {
   qtd_itens: number
   status: StatusLote
   observacao?: string
+  aprovador_nome?: string
+  aprovacao_status?: string
   created_at: string
   updated_at: string
   itens?: LoteItem[]
