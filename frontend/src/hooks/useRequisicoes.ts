@@ -6,6 +6,15 @@ import { api } from '../services/api'
 // Tabelas: cmp_requisicoes (módulo Compras)
 const TABLE = 'cmp_requisicoes'
 
+function sanitizeFileName(name: string) {
+  return name
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-zA-Z0-9._-]+/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '')
+}
+
 export function useRequisicoes(status?: string, search?: string) {
   return useQuery<Requisicao[]>({
     queryKey: ['requisicoes', status, search],
@@ -15,7 +24,8 @@ export function useRequisicoes(status?: string, search?: string) {
         .select(`
           id, numero, solicitante_nome, obra_nome, obra_id,
           descricao, justificativa, valor_estimado, urgencia, status,
-          alcada_nivel, categoria, comprador_id, texto_original, ai_confianca,
+          alcada_nivel, categoria, comprador_id, centro_custo, centro_custo_id,
+          classe_financeira, classe_financeira_id, texto_original, ai_confianca,
           esclarecimento_msg, esclarecimento_por, esclarecimento_em,
           created_at,
           comprador:cmp_compradores(nome, email)
@@ -47,9 +57,10 @@ export function useCriarRequisicao() {
   return useMutation({
     mutationFn: async (payload: NovaRequisicaoPayload) => {
       const n8nUrl = import.meta.env.VITE_N8N_WEBHOOK_URL || ''
+      const shouldUseN8n = Boolean(n8nUrl) && !payload.arquivo_referencia
 
       // Tenta via n8n se configurado
-      if (n8nUrl) {
+      if (shouldUseN8n) {
         try {
           return await api.criarRequisicao(payload)
         } catch {
@@ -69,6 +80,34 @@ export function useCriarRequisicao() {
       const numero = `RC-${yyyymm}-${seq}`
 
       const alcadaNivel = valorEstimado > 2000 ? 2 : 1
+      const classesSnapshot = Array.from(new Set(
+        payload.itens
+          .map(item => item.classe_financeira_codigo?.trim())
+          .filter((value): value is string => Boolean(value)),
+      ))
+
+      const classeFinanceiraCodigo = classesSnapshot.length === 1 ? classesSnapshot[0] : null
+      const classeFinanceiraId = classesSnapshot.length === 1
+        ? payload.itens.find(item => item.classe_financeira_codigo === classeFinanceiraCodigo)?.classe_financeira_id ?? null
+        : null
+
+      let centroCustoId: string | null = null
+      let centroCustoCodigo: string | null = null
+
+      if (payload.obra_id) {
+        try {
+          const { data: obra } = await supabase
+            .from('sys_obras')
+            .select('centro_custo_id, centro_custo:sys_centros_custo!centro_custo_id(codigo)')
+            .eq('id', payload.obra_id)
+            .maybeSingle()
+
+          centroCustoId = (obra as any)?.centro_custo_id ?? null
+          centroCustoCodigo = (obra as any)?.centro_custo?.codigo ?? null
+        } catch {
+          // fallback sem centro de custo automatico
+        }
+      }
 
       // Resolve comprador_id pelo nome da categoria quando não informado
       let compradorId = payload.comprador_id || null
@@ -105,6 +144,10 @@ export function useCriarRequisicao() {
           categoria:        payload.categoria  || null,
           comprador_id:     compradorId,
           alcada_nivel:     alcadaNivel,
+          centro_custo:     centroCustoCodigo,
+          centro_custo_id:  centroCustoId,
+          classe_financeira: classeFinanceiraCodigo,
+          classe_financeira_id: classeFinanceiraId,
           texto_original:   payload.texto_original || null,
           ai_confianca:     payload.ai_confianca  ?? null,
           valor_estimado:   valorEstimado,
@@ -114,6 +157,37 @@ export function useCriarRequisicao() {
         .single()
 
       if (reqError) throw new Error(reqError.message)
+
+      if (payload.arquivo_referencia) {
+        try {
+          const safeName = sanitizeFileName(payload.arquivo_referencia.name)
+          const path = `requisicoes/${req.id}/${Date.now()}-${safeName}`
+
+          const { error: uploadError } = await supabase.storage
+            .from('cotacoes-docs')
+            .upload(path, payload.arquivo_referencia, {
+              upsert: false,
+              contentType: payload.arquivo_referencia.type,
+            })
+
+          if (uploadError) throw uploadError
+
+          const { data: { publicUrl } } = supabase.storage
+            .from('cotacoes-docs')
+            .getPublicUrl(path)
+
+          const { error: updateArquivoError } = await supabase
+            .from('cmp_requisicoes')
+            .update({ arquivo_url: publicUrl })
+            .eq('id', req.id)
+
+          if (updateArquivoError) {
+            console.warn('Aviso: referencia de cotacao enviada, mas a URL nao foi vinculada na requisicao:', updateArquivoError.message)
+          }
+        } catch (arquivoError) {
+          console.warn('Aviso: falha ao subir referencia de cotacao:', arquivoError)
+        }
+      }
 
       // Insere itens (ignora erros não-críticos)
       if (payload.itens.length > 0) {
@@ -125,6 +199,14 @@ export function useCriarRequisicao() {
             quantidade:               item.quantidade,
             unidade:                  item.unidade || 'un',
             valor_unitario_estimado:  item.valor_unitario_estimado ?? 0,
+            est_item_id:              item.est_item_id || null,
+            est_item_codigo:          item.est_item_codigo || null,
+            classe_financeira_id:     item.classe_financeira_id || null,
+            classe_financeira_codigo: item.classe_financeira_codigo || null,
+            classe_financeira_descricao: item.classe_financeira_descricao || null,
+            categoria_financeira_codigo: item.categoria_financeira_codigo || null,
+            categoria_financeira_descricao: item.categoria_financeira_descricao || null,
+            destino_operacional:      item.destino_operacional || 'estoque',
           }))
         if (itens.length > 0) {
           const { error: itensError } = await supabase
@@ -204,10 +286,16 @@ export function useRequisicao(id?: string) {
         .select(`
           id, numero, solicitante_nome, obra_nome, obra_id,
           descricao, justificativa, valor_estimado, urgencia, status,
-          alcada_nivel, categoria, comprador_id, texto_original, ai_confianca,
+          alcada_nivel, categoria, comprador_id, centro_custo, centro_custo_id,
+          classe_financeira, classe_financeira_id, texto_original, ai_confianca,
           created_at, esclarecimento_msg, esclarecimento_por, esclarecimento_em,
           comprador:cmp_compradores(nome, email),
-          itens:cmp_requisicao_itens(id, descricao, quantidade, unidade, valor_unitario_estimado)
+          itens:cmp_requisicao_itens(
+            id, descricao, quantidade, unidade, valor_unitario_estimado,
+            est_item_id, est_item_codigo,
+            classe_financeira_id, classe_financeira_codigo, classe_financeira_descricao,
+            categoria_financeira_codigo, categoria_financeira_descricao, destino_operacional
+          )
         `)
         .eq('id', id)
         .single()

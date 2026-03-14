@@ -37,6 +37,8 @@ export interface Pedido {
   requisicao_id?: string
   cotacao_id?: string
   comprador_id?: string
+  classe_financeira_id?: string
+  centro_custo_id?: string
   numero_pedido?: string
   fornecedor_nome: string
   valor_total?: number
@@ -46,6 +48,10 @@ export interface Pedido {
   data_entrega_real?: string
   nf_numero?: string
   observacoes?: string
+  centro_custo?: string
+  classe_financeira?: string
+  condicao_pagamento?: string
+  parcelas_preview?: Array<{ numero: number; valor: number; data_vencimento: string; descricao?: string }>
   created_at: string
   // Recebimento tracking
   qtd_itens_total?: number
@@ -76,6 +82,12 @@ export interface RequisicaoItem {
   valor_unitario_estimado: number
   est_item_id?: string
   est_item_codigo?: string
+  classe_financeira_id?: string
+  classe_financeira_codigo?: string
+  classe_financeira_descricao?: string
+  categoria_financeira_codigo?: string
+  categoria_financeira_descricao?: string
+  destino_operacional?: 'estoque' | 'patrimonio' | 'nenhum'
 }
 
 export interface Requisicao {
@@ -92,8 +104,13 @@ export interface Requisicao {
   alcada_nivel: number
   categoria?: string
   comprador_nome?: string
+  centro_custo?: string
+  centro_custo_id?: string
+  classe_financeira?: string
+  classe_financeira_id?: string
   texto_original?: string
   ai_confianca?: number
+  arquivo_url?: string
   created_at: string
   esclarecimento_msg?: string
   esclarecimento_por?: string
@@ -262,6 +279,7 @@ export interface NovaRequisicaoPayload {
   texto_original?: string
   comprador_id?: string
   ai_confianca?: number
+  arquivo_referencia?: File
 }
 
 export interface NovaCotacaoPayload {

@@ -17,7 +17,13 @@ import type { RequisicaoItem, Urgencia, AiParseResult, CategoriaMaterial } from 
 
 
 const fmt = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
-const emptyItem = (): RequisicaoItem => ({ descricao: '', quantidade: 1, unidade: 'un', valor_unitario_estimado: 0 })
+const emptyItem = (): RequisicaoItem => ({
+  descricao: '',
+  quantidade: 1,
+  unidade: 'un',
+  valor_unitario_estimado: 0,
+  destino_operacional: 'estoque',
+})
 
 function minCotacoes(valor: number, regras?: { ate_500: number; '501_a_2k': number; acima_2k: number }) {
   if (!regras) return valor <= 500 ? 1 : valor <= 2000 ? 2 : 3
@@ -84,6 +90,19 @@ function parseCSVItems(text: string): RequisicaoItem[] {
   }).filter(i => i.descricao.length > 1)
 }
 
+function buildResumoRequisicao(itens: RequisicaoItem[], detalhes: string) {
+  if (detalhes.trim()) return detalhes.trim()
+
+  const descricoes = itens
+    .map((item) => item.descricao.trim())
+    .filter(Boolean)
+
+  if (descricoes.length === 0) return 'Solicitacao de compra'
+  if (descricoes.length === 1) return descricoes[0]
+  if (descricoes.length === 2) return `${descricoes[0]} e ${descricoes[1]}`
+  return `${descricoes[0]}, ${descricoes[1]} e mais ${descricoes.length - 2} item(ns)`
+}
+
 // ═══════════════════════════════════════════════════════════════════════════════
 
 export default function NovaRequisicao() {
@@ -95,12 +114,14 @@ export default function NovaRequisicao() {
   const { perfil } = useAuth()
 
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const referenciaInputRef = useRef<HTMLInputElement>(null)
 
   const [step, setStep]                 = useState(1)
   const [searchCat, setSearchCat]       = useState('')
   const [showAiHelper, setShowAiHelper] = useState(false)
   const [textoAi, setTextoAi]           = useState('')
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
+  const [referenciaFile, setReferenciaFile] = useState<File | null>(null)
   const [dragOver, setDragOver]         = useState(false)
 
   const [categoria, setCategoria]           = useState<CategoriaMaterial | null>(null)
@@ -286,16 +307,18 @@ export default function NovaRequisicao() {
     setItens(prev => prev.map((item, i) => i === idx ? { ...item, [field]: value } : item))
 
   const [submitting, setSubmitting] = useState(false)
+  const urgente = urgencia !== 'normal'
 
   const submit = async () => {
     setSubmitError(null)
     setSubmitting(true)
     try {
+      const descricaoFinal = buildResumoRequisicao(itens, descricao)
       await mutation.mutateAsync({
         solicitante_nome: solicitante,
         obra_nome:        obraNome,
         obra_id:          obraId || undefined,
-        descricao,
+        descricao:        descricaoFinal,
         justificativa,
         urgencia,
         categoria:        categoria?.codigo,
@@ -304,6 +327,7 @@ export default function NovaRequisicao() {
         texto_original:   textoAi || undefined,
         comprador_id:     compradorSugerido?.id,
         ai_confianca:     confianca,
+        arquivo_referencia: referenciaFile || undefined,
       })
       nav('/requisicoes')
     } catch (err) {
@@ -742,6 +766,265 @@ export default function NovaRequisicao() {
           confianca >= 0.8 ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-amber-50 text-amber-700 border-amber-200'
         }`}>
           <Sparkles size={13} />
+          IA preencheu com {Math.round(confianca * 100)}% de confianca - revise se necessario
+        </div>
+      )}
+
+      <div>
+        <label className="text-xs font-semibold text-slate-500 mb-1 block">Solicitante *</label>
+        <input required className={`w-full border rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-teal-300 outline-none ${
+          stepErrors.some(e => e.includes('solicitante')) ? 'border-red-300 bg-red-50/30' : 'border-slate-200'
+        }`}
+          placeholder="Seu nome completo" value={solicitante} onChange={e => setSolicitante(e.target.value)} />
+      </div>
+
+      <div>
+        <label className="text-xs font-semibold text-slate-500 mb-1 block">Obra *</label>
+        <select required className={`w-full border rounded-xl px-3 py-2.5 text-sm bg-white focus:ring-2 focus:ring-teal-300 outline-none ${
+          stepErrors.some(e => e.includes('obra')) ? 'border-red-300 bg-red-50/30' : 'border-slate-200'
+        }`}
+          value={obraId} onChange={e => setObraId(e.target.value)}>
+          <option value="">Selecione a obra</option>
+          {obras.map(o => <option key={o.id} value={o.id}>{o.codigo ? `${o.codigo} - ` : ''}{o.nome}</option>)}
+        </select>
+      </div>
+
+      <div>
+        <label className="text-xs font-semibold text-slate-500 mb-1 block">Justificativa</label>
+        <textarea rows={2}
+          className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-teal-300 outline-none"
+          placeholder="Por que é necessário ou urgente?"
+          value={justificativa} onChange={e => setJustificativa(e.target.value)} />
+      </div>
+
+      <div className="flex items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3">
+        <div>
+          <label className="text-xs font-semibold text-slate-500 block">Urgente</label>
+          <p className="text-[11px] text-slate-400 mt-0.5">Sinaliza prioridade para atendimento.</p>
+        </div>
+        <div className="inline-flex rounded-xl border border-slate-200 bg-slate-50 p-1">
+          {[
+            { label: 'Não', value: false },
+            { label: 'Sim', value: true },
+          ].map((option) => (
+            <button
+              key={option.label}
+              type="button"
+              onClick={() => setUrgencia(option.value ? 'urgente' : 'normal')}
+              className={`min-w-[72px] rounded-lg px-4 py-2 text-xs font-bold transition-all ${
+                urgente === option.value
+                  ? 'bg-white text-teal-700 shadow-sm ring-1 ring-teal-200'
+                  : 'text-slate-500 hover:text-slate-700'
+              }`}
+            >
+              {option.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div>
+        <label className="text-xs font-semibold text-slate-500 mb-1 block">Data de necessidade</label>
+        <input type="date"
+          min={new Date().toISOString().split('T')[0]}
+          className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-teal-300 outline-none"
+          value={dataNecessidade} onChange={e => setDataNecessidade(e.target.value)} />
+      </div>
+
+      <div>
+        <div className="flex justify-between items-center mb-2">
+          <label className="text-xs font-semibold text-slate-500">Itens *</label>
+          <button type="button" onClick={() => setItens(p => [...p, emptyItem()])}
+            className="text-teal-600 text-xs flex items-center gap-1 font-semibold">
+            <PlusCircle size={13} /> Adicionar
+          </button>
+        </div>
+
+        {itens.map((item, idx) => (
+          <div key={idx} className="bg-white border border-slate-200 rounded-2xl p-3 mb-2 space-y-2 shadow-sm">
+            <div className="flex justify-between items-center">
+              <span className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">Item {idx + 1}</span>
+              {itens.length > 1 && (
+                <button type="button" onClick={() => setItens(p => p.filter((_, i) => i !== idx))}>
+                  <Trash2 size={14} className="text-red-400 hover:text-red-600 transition" />
+                </button>
+              )}
+            </div>
+            <ItemAutocomplete
+              value={item.descricao}
+              onChange={v => updateItem(idx, 'descricao', v)}
+              onSelectCatalog={cat => {
+                setItens(prev => prev.map((it, i) => i === idx ? {
+                  ...it,
+                  descricao: cat.descricao,
+                  unidade: cat.unidade,
+                  valor_unitario_estimado: cat.valor_medio,
+                  est_item_id: cat.id,
+                  est_item_codigo: cat.codigo,
+                  classe_financeira_id: cat.classe_financeira_id,
+                  classe_financeira_codigo: cat.classe_financeira_codigo,
+                  classe_financeira_descricao: cat.classe_financeira_descricao,
+                  categoria_financeira_codigo: cat.categoria_financeira_codigo,
+                  categoria_financeira_descricao: cat.categoria_financeira_descricao,
+                  destino_operacional: cat.destino_operacional ?? 'estoque',
+                } : it))
+              }}
+              categoriaRC={categoria?.codigo ?? ''}
+            />
+            <div className="grid grid-cols-3 gap-2">
+              <div>
+                <label className="text-[10px] text-slate-400">Qtd</label>
+                <input required type="number" min="0.01" step="0.01"
+                  className="w-full border border-slate-200 rounded-xl px-2 py-1.5 text-sm focus:ring-2 focus:ring-teal-300 outline-none"
+                  value={item.quantidade || ''} onChange={e => updateItem(idx, 'quantidade', parseFloat(e.target.value) || 0)} />
+              </div>
+              <div>
+                <label className="text-[10px] text-slate-400">Unidade</label>
+                <select className="w-full border border-slate-200 rounded-xl px-2 py-1.5 text-sm bg-white focus:ring-2 focus:ring-teal-300 outline-none"
+                  value={item.unidade} onChange={e => updateItem(idx, 'unidade', e.target.value)}>
+                  {['un', 'par', 'jg', 'kg', 'ton', 'm', 'm²', 'm³', 'L', 'pc', 'cx', 'rl', 'hr', 'vb'].map(u => <option key={u} value={u}>{u}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="text-[10px] text-slate-400">Vlr. Unit.</label>
+                <input type="number" min="0" step="0.01"
+                  className="w-full border border-slate-200 rounded-xl px-2 py-1.5 text-sm focus:ring-2 focus:ring-teal-300 outline-none"
+                  value={item.valor_unitario_estimado || ''} onChange={e => updateItem(idx, 'valor_unitario_estimado', parseFloat(e.target.value) || 0)} />
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div>
+        <label className="text-xs font-semibold text-slate-500 mb-1.5 block">Referência de cotação</label>
+        <div
+          className={`rounded-2xl border-2 border-dashed p-4 transition-all cursor-pointer ${
+            referenciaFile
+              ? 'border-teal-300 bg-teal-50/40'
+              : 'border-slate-200 bg-slate-50/60 hover:border-teal-300 hover:bg-teal-50/20'
+          }`}
+          onClick={() => referenciaInputRef.current?.click()}
+        >
+          <input
+            ref={referenciaInputRef}
+            type="file"
+            className="hidden"
+            accept=".pdf,.xlsx,.xls,.csv,.doc,.docx,.jpg,.jpeg,.png,.webp"
+            onChange={(event) => {
+              if (event.target.files?.[0]) setReferenciaFile(event.target.files[0])
+            }}
+          />
+
+          {referenciaFile ? (
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white text-teal-600 shadow-sm">
+                  <FileUp size={18} />
+                </div>
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-semibold text-slate-700">{referenciaFile.name}</p>
+                  <p className="text-[11px] text-slate-400">{(referenciaFile.size / 1024).toFixed(1)} KB</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={(event) => {
+                  event.stopPropagation()
+                  setReferenciaFile(null)
+                  if (referenciaInputRef.current) referenciaInputRef.current.value = ''
+                }}
+                className="rounded-full bg-white p-2 text-slate-400 transition hover:text-red-500"
+              >
+                <X size={14} />
+              </button>
+            </div>
+          ) : (
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white text-slate-400 shadow-sm">
+                <Upload size={18} />
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-slate-700">Anexar referência de cotação</p>
+                <p className="text-[11px] text-slate-400">PDF, planilha, imagem ou documento de apoio.</p>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div>
+        <label className="text-xs font-semibold text-slate-500 mb-1 block">Detalhes adicionais</label>
+        <textarea rows={3}
+          className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-teal-300 outline-none"
+          placeholder="Informações complementares para a compra, entrega ou especificação."
+          value={descricao} onChange={e => setDescricao(e.target.value)} />
+      </div>
+
+      {total > 0 && (
+        <div className="bg-teal-50 border border-teal-200 rounded-2xl p-4 flex justify-between items-center">
+          <div>
+            <span className="text-xs text-teal-500 font-semibold">Total estimado</span>
+            <p className="text-lg font-black text-teal-700">{fmt(total)}</p>
+          </div>
+          <div className="text-right">
+            <span className="text-xs text-teal-500">Cotações mínimas</span>
+            <p className="text-2xl font-black text-teal-600">{minCot}</p>
+          </div>
+        </div>
+      )}
+
+      <div className="space-y-3">
+        {stepErrors.length > 0 && (
+          <div className="bg-red-50 border border-red-200 rounded-xl p-3 space-y-1">
+            {stepErrors.map(err => (
+              <p key={err} className="text-red-600 text-xs font-medium flex items-center gap-1.5">
+                <AlertCircle size={12} className="shrink-0" /> {err}
+              </p>
+            ))}
+          </div>
+        )}
+        <button
+          onClick={() => {
+            const errs: string[] = []
+            if (!solicitante.trim()) errs.push('Informe o nome do solicitante')
+            if (!obraNome) errs.push('Selecione a obra')
+            if (itens.every(i => !i.descricao.trim())) errs.push('Adicione ao menos um item com descricao')
+            if (dataNecessidade) {
+              const today = new Date().toISOString().split('T')[0]
+              if (dataNecessidade < today) errs.push('Data de necessidade nao pode ser no passado')
+            }
+            setStepErrors(errs)
+            if (errs.length === 0) setStep(3)
+          }}
+          className="w-full bg-teal-500 text-white rounded-2xl py-3.5 font-bold flex items-center justify-center gap-2 shadow-lg shadow-teal-500/25 active:scale-[0.98] transition-all"
+        >
+          Revisar e Confirmar <ChevronRight size={16} />
+        </button>
+      </div>
+    </div>
+  )
+
+  if (step === -2) return (
+    <div className="space-y-5">
+      <Stepper step={2} />
+      <button onClick={() => { setStep(1); setStepErrors([]) }} className="flex items-center gap-1 text-slate-500 text-sm -mt-2">
+        <ChevronLeft size={16} /> Voltar
+      </button>
+
+      {categoria && (
+        <div className="flex items-center gap-2 bg-teal-50 border border-teal-200 rounded-xl px-3 py-2">
+          <span className="text-xs font-bold text-teal-700">{categoria.nome}</span>
+          <span className="text-teal-400">·</span>
+          <span className="text-xs text-teal-600">Comprador: {categoria.comprador_nome}</span>
+        </div>
+      )}
+
+      {confianca > 0 && (
+        <div className={`flex items-center gap-2 px-3 py-2 rounded-xl text-xs border ${
+          confianca >= 0.8 ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-amber-50 text-amber-700 border-amber-200'
+        }`}>
+          <Sparkles size={13} />
           IA preencheu com {Math.round(confianca * 100)}% de confiança — revise se necessário
         </div>
       )}
@@ -767,11 +1050,11 @@ export default function NovaRequisicao() {
 
       <div>
         <label className="text-xs font-semibold text-slate-500 mb-1 block">Descrição *</label>
-        <textarea required rows={2}
+          <textarea rows={3}
           className={`w-full border rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-teal-300 outline-none ${
             stepErrors.some(e => e.includes('descricao')) ? 'border-red-300 bg-red-50/30' : 'border-slate-200'
           }`}
-          placeholder="Resumo do que precisa ser comprado"
+          placeholder="Informacoes complementares para a compra, entrega ou especificacao."
           value={descricao} onChange={e => setDescricao(e.target.value)} />
       </div>
 
@@ -840,6 +1123,12 @@ export default function NovaRequisicao() {
                   valor_unitario_estimado: cat.valor_medio,
                   est_item_id: cat.id,
                   est_item_codigo: cat.codigo,
+                  classe_financeira_id: cat.classe_financeira_id,
+                  classe_financeira_codigo: cat.classe_financeira_codigo,
+                  classe_financeira_descricao: cat.classe_financeira_descricao,
+                  categoria_financeira_codigo: cat.categoria_financeira_codigo,
+                  categoria_financeira_descricao: cat.categoria_financeira_descricao,
+                  destino_operacional: cat.destino_operacional ?? 'estoque',
                 } : it))
               }}
               categoriaRC={categoria?.codigo ?? ''}
