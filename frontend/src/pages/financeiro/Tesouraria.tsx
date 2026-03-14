@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { useTheme } from '../../contexts/ThemeContext'
 import {
   Landmark, TrendingUp, TrendingDown, ArrowUpRight, ArrowDownRight,
@@ -13,6 +14,7 @@ import {
 import {
   useTesourariaDashboard, useCriarContaBancaria, useCriarMovimentacao, useImportExtrato,
 } from '../../hooks/useTesouraria'
+import { useContasPagar, useContasReceber } from '../../hooks/useFinanceiro'
 import type { TesourariaDashboardData, CategoriaMovimentacao } from '../../types/financeiro'
 
 // ── Formatters ──────────────────────────────────────────────────────────────
@@ -47,6 +49,15 @@ const CATEGORIAS: { value: CategoriaMovimentacao; label: string }[] = [
 const CORES_PRESET = [
   '#14B8A6', '#8B5CF6', '#F59E0B', '#EF4444', '#3B82F6',
   '#10B981', '#EC4899', '#6366F1', '#F97316', '#06B6D4',
+]
+
+type TesourariaTab = 'painel' | 'movimentacoes' | 'contas' | 'conciliacao'
+
+const TESOURARIA_TABS: Array<{ key: TesourariaTab; label: string }> = [
+  { key: 'painel', label: 'Painel' },
+  { key: 'movimentacoes', label: 'Movimentacoes' },
+  { key: 'contas', label: 'Contas e Saldos' },
+  { key: 'conciliacao', label: 'Conciliacao' },
 ]
 
 const EMPTY_AGING = { hoje: 0, d7: 0, d30: 0, d60: 0 }
@@ -239,6 +250,158 @@ function AlertasPanel({ alertas, isDark }: {
             </div>
           ))
         )}
+      </div>
+    </div>
+  )
+}
+
+function TabsBar({ activeTab, onChange, isDark }: {
+  activeTab: TesourariaTab
+  onChange: (tab: TesourariaTab) => void
+  isDark: boolean
+}) {
+  return (
+    <div className={`flex flex-wrap gap-2 rounded-2xl p-2 ${
+      isDark ? 'border border-white/[0.08] bg-white/[0.04]' : 'border border-slate-100 bg-white shadow-sm'
+    }`}>
+      {TESOURARIA_TABS.map((tab) => (
+        <button
+          key={tab.key}
+          onClick={() => onChange(tab.key)}
+          className={`rounded-xl px-4 py-2 text-sm font-bold transition-colors ${
+            activeTab === tab.key
+              ? 'bg-teal-600 text-white shadow-sm'
+              : isDark
+                ? 'text-slate-300 hover:bg-white/[0.06]'
+                : 'text-slate-600 hover:bg-slate-50'
+          }`}
+        >
+          {tab.label}
+        </button>
+      ))}
+    </div>
+  )
+}
+
+function ConciliacaoPanel({ movimentacoes, isDark }: {
+  movimentacoes: TesourariaDashboardData['movimentacoes_recentes']
+  isDark: boolean
+}) {
+  const { data: contasPagar = [] } = useContasPagar()
+  const { data: contasReceber = [] } = useContasReceber()
+
+  const movimentacoesBanco = useMemo(
+    () => movimentacoes.filter((mov) => !mov.conciliado).slice(0, 20),
+    [movimentacoes],
+  )
+
+  const sistemaPendente = useMemo(() => {
+    const cp = contasPagar
+      .filter((item) => !['pago', 'conciliado', 'cancelado'].includes(item.status))
+      .slice(0, 10)
+      .map((item) => ({
+        id: item.id,
+        tipo: 'CP',
+        titulo: item.fornecedor_nome,
+        descricao: item.descricao || item.numero_documento || 'Conta a pagar do sistema',
+        valor: item.valor_original - (item.valor_pago || 0),
+        data: item.data_vencimento,
+        status: item.status,
+      }))
+
+    const cr = contasReceber
+      .filter((item) => !['recebido', 'conciliado', 'cancelado'].includes(item.status))
+      .slice(0, 10)
+      .map((item) => ({
+        id: item.id,
+        tipo: 'CR',
+        titulo: item.cliente_nome,
+        descricao: item.descricao || item.numero_nf || 'Conta a receber do sistema',
+        valor: item.valor_original - (item.valor_recebido || 0),
+        data: item.data_vencimento,
+        status: item.status,
+      }))
+
+    return [...cp, ...cr]
+      .sort((a, b) => a.data.localeCompare(b.data))
+      .slice(0, 20)
+  }, [contasPagar, contasReceber])
+
+  const cardCls = isDark
+    ? 'border border-white/[0.08] bg-white/[0.04]'
+    : 'border border-slate-100 bg-white shadow-sm'
+
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+        <div className={`rounded-2xl p-4 ${cardCls}`}>
+          <p className={`text-[10px] font-bold uppercase tracking-widest ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Pendencias do sistema</p>
+          <p className={`mt-2 text-2xl font-extrabold ${isDark ? 'text-white' : 'text-slate-800'}`}>{sistemaPendente.length}</p>
+        </div>
+        <div className={`rounded-2xl p-4 ${cardCls}`}>
+          <p className={`text-[10px] font-bold uppercase tracking-widest ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Movimentos bancarios pendentes</p>
+          <p className={`mt-2 text-2xl font-extrabold ${isDark ? 'text-white' : 'text-slate-800'}`}>{movimentacoesBanco.length}</p>
+        </div>
+        <div className={`rounded-2xl p-4 ${cardCls}`}>
+          <p className={`text-[10px] font-bold uppercase tracking-widest ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Visao operacional</p>
+          <p className={`mt-2 text-sm font-semibold ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
+            Sistema de um lado e banco do outro, para conciliacao tradicional.
+          </p>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+        <div className={`rounded-2xl overflow-hidden ${cardCls}`}>
+          <div className={`flex items-center gap-2 px-4 py-3 ${isDark ? 'border-b border-white/[0.06]' : 'border-b border-slate-100'}`}>
+            <FileText size={14} className="text-violet-500" />
+            <h3 className={`text-sm font-extrabold ${isDark ? 'text-white' : 'text-slate-800'}`}>Movimentacoes do sistema</h3>
+          </div>
+          <div className="divide-y divide-slate-100 p-2">
+            {sistemaPendente.length === 0 ? (
+              <p className={`px-2 py-6 text-center text-sm ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Nenhuma pendencia do sistema</p>
+            ) : sistemaPendente.map((item) => (
+              <div key={`${item.tipo}-${item.id}`} className="rounded-xl px-3 py-3">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <p className={`text-sm font-bold ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>{item.titulo}</p>
+                    <p className={`text-xs ${isDark ? 'text-slate-500' : 'text-slate-500'}`}>{item.descricao}</p>
+                  </div>
+                  <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${item.tipo === 'CP' ? 'bg-rose-100 text-rose-700' : 'bg-emerald-100 text-emerald-700'}`}>{item.tipo}</span>
+                </div>
+                <div className={`mt-2 flex items-center justify-between text-xs ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+                  <span>{new Date(item.data + 'T00:00:00').toLocaleDateString('pt-BR')}</span>
+                  <span className="font-bold">{fmtFull(item.valor)}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className={`rounded-2xl overflow-hidden ${cardCls}`}>
+          <div className={`flex items-center gap-2 px-4 py-3 ${isDark ? 'border-b border-white/[0.06]' : 'border-b border-slate-100'}`}>
+            <Landmark size={14} className="text-teal-500" />
+            <h3 className={`text-sm font-extrabold ${isDark ? 'text-white' : 'text-slate-800'}`}>Extrato bancario</h3>
+          </div>
+          <div className="divide-y divide-slate-100 p-2">
+            {movimentacoesBanco.length === 0 ? (
+              <p className={`px-2 py-6 text-center text-sm ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Nenhum movimento bancario pendente</p>
+            ) : movimentacoesBanco.map((mov) => (
+              <div key={mov.id} className="rounded-xl px-3 py-3">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <p className={`text-sm font-bold ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>{mov.descricao || mov.categoria || 'Movimentacao bancaria'}</p>
+                    <p className={`text-xs ${isDark ? 'text-slate-500' : 'text-slate-500'}`}>{mov.conta_nome || 'Conta bancaria'}</p>
+                  </div>
+                  <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${mov.tipo === 'entrada' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>{mov.tipo}</span>
+                </div>
+                <div className={`mt-2 flex items-center justify-between text-xs ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+                  <span>{new Date(mov.data_movimentacao + 'T00:00:00').toLocaleDateString('pt-BR')}</span>
+                  <span className="font-bold">{fmtFull(mov.valor)}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
     </div>
   )
@@ -1377,10 +1540,12 @@ function Header({ isDark, periodo, setPeriodo }: {
 
 export default function Tesouraria() {
   const { isDark } = useTheme()
+  const [searchParams, setSearchParams] = useSearchParams()
   const [periodo, setPeriodo] = useState('30d')
   const [showNovaConta, setShowNovaConta] = useState(false)
   const [showNovaMovimentacao, setShowNovaMovimentacao] = useState(false)
   const [showImportExtrato, setShowImportExtrato] = useState(false)
+  const activeTab = (searchParams.get('tab') as TesourariaTab | null) ?? 'painel'
 
   const { data: dashboard, isLoading, isError, refetch } = useTesourariaDashboard(periodo)
 
@@ -1411,6 +1576,11 @@ export default function Tesouraria() {
 
   const previsao30d = (dashboard?.previsao_cr ?? 0) - (dashboard?.previsao_cp ?? 0)
   const hasData = contas.length > 0 || movimentacoes.length > 0
+  const setActiveTab = (tab: TesourariaTab) => {
+    const next = new URLSearchParams(searchParams)
+    next.set('tab', tab)
+    setSearchParams(next, { replace: true })
+  }
 
   if (isLoading) {
     return (
@@ -1463,6 +1633,7 @@ export default function Tesouraria() {
         onNovaMovimentacao={() => setShowNovaMovimentacao(true)}
         onImportOFX={() => setShowImportExtrato(true)}
       />
+      <TabsBar activeTab={activeTab} onChange={setActiveTab} isDark={isDark} />
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <KpiCard
@@ -1500,57 +1671,106 @@ export default function Tesouraria() {
         />
       </div>
 
-      {dashboard && <IndicadoresPanel dashboard={dashboard} isDark={isDark} />}
+      {activeTab === 'painel' && (
+        <>
+          {dashboard && <IndicadoresPanel dashboard={dashboard} isDark={isDark} />}
 
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1fr_320px]">
-        <div className="space-y-4">
-          <div className={`rounded-2xl p-4 ${
-            isDark
-              ? 'backdrop-blur-xl bg-white/[0.04] border border-white/[0.08] shadow-xl'
-              : 'bg-white shadow-sm border border-slate-100'
-          }`}>
-            <div className="mb-4 flex items-center gap-2">
-              <Eye size={14} className="text-teal-500" />
-              <h3 className={`text-sm font-extrabold ${isDark ? 'text-white' : 'text-slate-800'}`}>
-                Fluxo de Caixa
-              </h3>
-              <div className="ml-auto flex items-center gap-3 text-[10px]">
-                <span className="flex items-center gap-1">
-                  <span className="h-1 w-2.5 rounded-full bg-teal-500" /> Entradas
-                </span>
-                <span className="flex items-center gap-1">
-                  <span className="h-1 w-2.5 rounded-full bg-rose-500" /> Saidas
-                </span>
-                <span className="flex items-center gap-1">
-                  <span className="h-0.5 w-2.5 rounded-full bg-slate-400" style={{ borderTop: '1px dashed' }} /> Saldo
-                </span>
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1fr_320px]">
+            <div className="space-y-4">
+              <div className={`rounded-2xl p-4 ${
+                isDark
+                  ? 'backdrop-blur-xl bg-white/[0.04] border border-white/[0.08] shadow-xl'
+                  : 'bg-white shadow-sm border border-slate-100'
+              }`}>
+                <div className="mb-4 flex items-center gap-2">
+                  <Eye size={14} className="text-teal-500" />
+                  <h3 className={`text-sm font-extrabold ${isDark ? 'text-white' : 'text-slate-800'}`}>
+                    Fluxo de Caixa
+                  </h3>
+                  <div className="ml-auto flex items-center gap-3 text-[10px]">
+                    <span className="flex items-center gap-1">
+                      <span className="h-1 w-2.5 rounded-full bg-teal-500" /> Entradas
+                    </span>
+                    <span className="flex items-center gap-1">
+                      <span className="h-1 w-2.5 rounded-full bg-rose-500" /> Saidas
+                    </span>
+                    <span className="flex items-center gap-1">
+                      <span className="h-0.5 w-2.5 rounded-full bg-slate-400" style={{ borderTop: '1px dashed' }} /> Saldo
+                    </span>
+                  </div>
+                </div>
+                <div className={`mb-3 flex flex-wrap items-center gap-3 text-xs ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+                  <span>Saldo inicial: <strong className={isDark ? 'text-slate-200' : 'text-slate-700'}>{fmt(dashboard?.saldo_inicial_periodo ?? 0)}</strong></span>
+                  <span>Saldo final: <strong className={isDark ? 'text-slate-200' : 'text-slate-700'}>{fmt(dashboard?.saldo_final_periodo ?? 0)}</strong></span>
+                </div>
+                <FluxoCaixaChart data={chartData} isDark={isDark} />
               </div>
+
+              <MovimentacoesTable
+                movimentacoes={movimentacoes}
+                isDark={isDark}
+                onNovaMovimentacao={() => setShowNovaMovimentacao(true)}
+              />
             </div>
-            <div className={`mb-3 flex flex-wrap items-center gap-3 text-xs ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
-              <span>Saldo inicial: <strong className={isDark ? 'text-slate-200' : 'text-slate-700'}>{fmt(dashboard?.saldo_inicial_periodo ?? 0)}</strong></span>
-              <span>Saldo final: <strong className={isDark ? 'text-slate-200' : 'text-slate-700'}>{fmt(dashboard?.saldo_final_periodo ?? 0)}</strong></span>
+
+            <div className="space-y-4">
+              <AlertasPanel alertas={alertas} isDark={isDark} />
+              <ContasBancariasPanel
+                contas={contas}
+                isDark={isDark}
+                onNovaConta={() => setShowNovaConta(true)}
+                onImportOFX={() => setShowImportExtrato(true)}
+              />
+              <AgingPanel agingCp={agingCp} agingCr={agingCr} isDark={isDark} />
             </div>
-            <FluxoCaixaChart data={chartData} isDark={isDark} />
           </div>
+        </>
+      )}
 
-          <MovimentacoesTable
-            movimentacoes={movimentacoes}
-            isDark={isDark}
-            onNovaMovimentacao={() => setShowNovaMovimentacao(true)}
-          />
-        </div>
+      {activeTab === 'movimentacoes' && (
+        <MovimentacoesTable
+          movimentacoes={movimentacoes}
+          isDark={isDark}
+          onNovaMovimentacao={() => setShowNovaMovimentacao(true)}
+        />
+      )}
 
-        <div className="space-y-4">
-          <AlertasPanel alertas={alertas} isDark={isDark} />
-          <ContasBancariasPanel
-            contas={contas}
-            isDark={isDark}
-            onNovaConta={() => setShowNovaConta(true)}
-            onImportOFX={() => setShowImportExtrato(true)}
-          />
+      {activeTab === 'contas' && (
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1fr_320px]">
+          <div className="space-y-4">
+            {dashboard && <IndicadoresPanel dashboard={dashboard} isDark={isDark} />}
+            <div className={`rounded-2xl p-4 ${
+              isDark
+                ? 'backdrop-blur-xl bg-white/[0.04] border border-white/[0.08] shadow-xl'
+                : 'bg-white shadow-sm border border-slate-100'
+            }`}>
+              <div className="mb-4 flex items-center justify-between gap-3">
+                <div>
+                  <h3 className={`text-sm font-extrabold ${isDark ? 'text-white' : 'text-slate-800'}`}>Contas e disponibilidade</h3>
+                  <p className={`mt-1 text-xs ${isDark ? 'text-slate-500' : 'text-slate-500'}`}>Gestao de contas, saldos e importacao de extrato no mesmo lugar.</p>
+                </div>
+                <button
+                  onClick={() => setShowImportExtrato(true)}
+                  className="inline-flex items-center gap-2 rounded-xl bg-teal-600 px-3 py-2 text-xs font-bold text-white hover:bg-teal-700"
+                >
+                  <Upload size={13} /> Importar extrato
+                </button>
+              </div>
+              <ContasBancariasPanel
+                contas={contas}
+                isDark={isDark}
+                onNovaConta={() => setShowNovaConta(true)}
+                onImportOFX={() => setShowImportExtrato(true)}
+              />
+            </div>
+          </div>
           <AgingPanel agingCp={agingCp} agingCr={agingCr} isDark={isDark} />
         </div>
-      </div>
+      )}
+
+      {activeTab === 'conciliacao' && (
+        <ConciliacaoPanel movimentacoes={movimentacoes} isDark={isDark} />
+      )}
 
       {showNovaConta && (
         <NovaContaModal isDark={isDark} onClose={() => setShowNovaConta(false)} />
