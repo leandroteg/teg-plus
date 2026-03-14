@@ -1,10 +1,10 @@
-import { useState, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   Receipt, Search, Calendar, AlertTriangle,
   CheckCircle2, Clock, FileText, RefreshCw, Zap, XCircle,
   ChevronDown, ChevronUp, Upload, Paperclip, ExternalLink, Banknote, X,
-  ShieldCheck, Building2, Tag, Briefcase, Hash, Truck, Package, Layers,
+  ShieldCheck, Building2, Tag, Briefcase, Hash, Truck, Package, Layers, ChevronLeft, ChevronRight,
 } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
 import { useContasPagar, useMarcarCPPago, useAprovarPagamento, useFornecedorById } from '../../hooks/useFinanceiro'
@@ -319,6 +319,161 @@ const STATUS_FILTER_META: Record<string, { icon: typeof Receipt; badge: string; 
   aprovado_pgto:  { icon: ShieldCheck,  badge: 'bg-emerald-100 text-emerald-700',   badgeDark: 'bg-emerald-500/20 text-emerald-300',   border: 'border-emerald-400', borderDark: 'border-emerald-500/40', bgActive: 'bg-emerald-50',  bgActiveDark: 'bg-emerald-500/10', textActive: 'text-emerald-700', textActiveDark: 'text-emerald-300' },
   pago:           { icon: Banknote,     badge: 'bg-teal-100 text-teal-700',         badgeDark: 'bg-teal-500/20 text-teal-300',         border: 'border-teal-400',    borderDark: 'border-teal-500/40',    bgActive: 'bg-teal-50',     bgActiveDark: 'bg-teal-500/10',    textActive: 'text-teal-700',    textActiveDark: 'text-teal-300' },
   conciliado:     { icon: CheckCircle2, badge: 'bg-green-100 text-green-700',       badgeDark: 'bg-green-500/20 text-green-300',       border: 'border-green-400',   borderDark: 'border-green-500/40',   bgActive: 'bg-green-50',    bgActiveDark: 'bg-green-500/10',   textActive: 'text-green-700',   textActiveDark: 'text-green-300' },
+}
+
+function StatusFilterRail({
+  isDark,
+  statusFilter,
+  setStatusFilter,
+  counts,
+}: {
+  isDark: boolean
+  statusFilter: string
+  setStatusFilter: (value: string) => void
+  counts: Record<string, number>
+}) {
+  const railRef = useRef<HTMLDivElement | null>(null)
+  const dragRef = useRef<{ active: boolean; startX: number; startScrollLeft: number; moved: boolean }>({
+    active: false,
+    startX: 0,
+    startScrollLeft: 0,
+    moved: false,
+  })
+  const [canScrollLeft, setCanScrollLeft] = useState(false)
+  const [canScrollRight, setCanScrollRight] = useState(false)
+
+  const updateScrollState = () => {
+    const el = railRef.current
+    if (!el) return
+    setCanScrollLeft(el.scrollLeft > 8)
+    setCanScrollRight(el.scrollLeft + el.clientWidth < el.scrollWidth - 8)
+  }
+
+  useEffect(() => {
+    updateScrollState()
+    const el = railRef.current
+    if (!el) return
+    el.addEventListener('scroll', updateScrollState, { passive: true })
+    const resizeObserver = new ResizeObserver(() => updateScrollState())
+    resizeObserver.observe(el)
+    return () => {
+      el.removeEventListener('scroll', updateScrollState)
+      resizeObserver.disconnect()
+    }
+  }, [])
+
+  const scrollByAmount = (direction: -1 | 1) => {
+    const el = railRef.current
+    if (!el) return
+    el.scrollBy({ left: direction * 240, behavior: 'smooth' })
+  }
+
+  return (
+    <div className="relative">
+      {canScrollLeft && (
+        <>
+          <div className={`pointer-events-none absolute inset-y-1 left-1 z-10 w-10 rounded-l-2xl bg-gradient-to-r ${isDark ? 'from-[#0f172a]' : 'from-slate-50'} to-transparent`} />
+          <button
+            type="button"
+            onClick={() => scrollByAmount(-1)}
+            className={`absolute left-2 top-1/2 z-20 -translate-y-1/2 h-8 w-8 rounded-full border backdrop-blur-sm transition-all ${
+              isDark
+                ? 'border-white/[0.10] bg-slate-900/85 text-slate-200 hover:bg-slate-800'
+                : 'border-slate-200 bg-white/95 text-slate-600 hover:bg-slate-50 shadow-sm'
+            }`}
+            aria-label="Rolar filtros para a esquerda"
+          >
+            <ChevronLeft size={14} className="mx-auto" />
+          </button>
+        </>
+      )}
+      {canScrollRight && (
+        <>
+          <div className={`pointer-events-none absolute inset-y-1 right-1 z-10 w-10 rounded-r-2xl bg-gradient-to-l ${isDark ? 'from-[#0f172a]' : 'from-slate-50'} to-transparent`} />
+          <button
+            type="button"
+            onClick={() => scrollByAmount(1)}
+            className={`absolute right-2 top-1/2 z-20 -translate-y-1/2 h-8 w-8 rounded-full border backdrop-blur-sm transition-all ${
+              isDark
+                ? 'border-white/[0.10] bg-slate-900/85 text-slate-200 hover:bg-slate-800'
+                : 'border-slate-200 bg-white/95 text-slate-600 hover:bg-slate-50 shadow-sm'
+            }`}
+            aria-label="Rolar filtros para a direita"
+          >
+            <ChevronRight size={14} className="mx-auto" />
+          </button>
+        </>
+      )}
+
+      <div
+        ref={railRef}
+        onMouseDown={e => {
+          dragRef.current = {
+            active: true,
+            startX: e.clientX,
+            startScrollLeft: railRef.current?.scrollLeft ?? 0,
+            moved: false,
+          }
+        }}
+        onMouseMove={e => {
+          if (!dragRef.current.active || !railRef.current) return
+          const delta = e.clientX - dragRef.current.startX
+          if (Math.abs(delta) > 4) dragRef.current.moved = true
+          railRef.current.scrollLeft = dragRef.current.startScrollLeft - delta
+        }}
+        onMouseUp={() => {
+          window.setTimeout(() => {
+            dragRef.current.active = false
+          }, 0)
+        }}
+        onMouseLeave={() => {
+          dragRef.current.active = false
+        }}
+        onClickCapture={e => {
+          if (dragRef.current.moved) {
+            e.preventDefault()
+            e.stopPropagation()
+            dragRef.current.moved = false
+          }
+        }}
+        onWheel={e => {
+          const el = railRef.current
+          if (!el) return
+          if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) {
+            e.preventDefault()
+            el.scrollLeft += e.deltaY
+          }
+        }}
+        className={`flex gap-1 p-1 rounded-2xl border overflow-x-auto hide-scrollbar pr-12 ${canScrollLeft ? 'pl-12' : ''} ${isDark ? 'bg-white/[0.02] border-white/[0.06]' : 'bg-slate-50 border-slate-200'} cursor-grab active:cursor-grabbing`}
+      >
+        {FILTROS_STATUS.map(f => (
+          <button key={f.value} onClick={() => setStatusFilter(f.value)}
+            className={`min-w-fit flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold whitespace-nowrap transition-all border ${
+              statusFilter === f.value
+                ? isDark
+                  ? `${STATUS_FILTER_META[f.value].bgActiveDark} ${STATUS_FILTER_META[f.value].textActiveDark} ${STATUS_FILTER_META[f.value].borderDark} shadow-sm`
+                  : `${STATUS_FILTER_META[f.value].bgActive} ${STATUS_FILTER_META[f.value].textActive} ${STATUS_FILTER_META[f.value].border} shadow-sm`
+                : isDark
+                  ? 'text-slate-400 border-transparent hover:bg-white/[0.04]'
+                  : 'text-slate-500 border-transparent hover:bg-white hover:shadow-sm'
+            }`}>
+            {(() => {
+              const Icon = STATUS_FILTER_META[f.value].icon
+              return <Icon size={15} className="shrink-0" />
+            })()}
+            {f.label}
+            <span className={`ml-1 min-w-[22px] px-1.5 py-0.5 rounded-full text-[10px] font-bold text-center ${
+              statusFilter === f.value
+                ? isDark ? STATUS_FILTER_META[f.value].badgeDark : STATUS_FILTER_META[f.value].badge
+                : isDark ? 'bg-white/[0.06] text-slate-500' : 'bg-slate-100 text-slate-500'
+            }`}>
+              {counts[f.value]}
+            </span>
+          </button>
+        ))}
+      </div>
+    </div>
+  )
 }
 
 // ── Issue #36: Dados bancarios/PIX do fornecedor ──────────────────────────────
@@ -810,33 +965,12 @@ export default function ContasPagar() {
               focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-400
               ${isDark ? 'bg-[#1e293b] border-white/[0.06] text-slate-200' : 'border-slate-200 bg-white text-slate-700'}`} />
         </div>
-        <div className={`flex gap-1 p-1 rounded-2xl border overflow-x-auto hide-scrollbar ${isDark ? 'bg-white/[0.02] border-white/[0.06]' : 'bg-slate-50 border-slate-200'}`}>
-          {FILTROS_STATUS.map(f => (
-            <button key={f.value} onClick={() => setStatusFilter(f.value)}
-              className={`min-w-fit flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold whitespace-nowrap transition-all border ${
-                statusFilter === f.value
-                  ? isDark
-                    ? `${STATUS_FILTER_META[f.value].bgActiveDark} ${STATUS_FILTER_META[f.value].textActiveDark} ${STATUS_FILTER_META[f.value].borderDark} shadow-sm`
-                    : `${STATUS_FILTER_META[f.value].bgActive} ${STATUS_FILTER_META[f.value].textActive} ${STATUS_FILTER_META[f.value].border} shadow-sm`
-                  : isDark
-                    ? 'text-slate-400 border-transparent hover:bg-white/[0.04]'
-                    : 'text-slate-500 border-transparent hover:bg-white hover:shadow-sm'
-              }`}>
-              {(() => {
-                const Icon = STATUS_FILTER_META[f.value].icon
-                return <Icon size={15} className="shrink-0" />
-              })()}
-              {f.label}
-              <span className={`ml-1 min-w-[22px] px-1.5 py-0.5 rounded-full text-[10px] font-bold text-center ${
-                statusFilter === f.value
-                  ? isDark ? STATUS_FILTER_META[f.value].badgeDark : STATUS_FILTER_META[f.value].badge
-                  : isDark ? 'bg-white/[0.06] text-slate-500' : 'bg-slate-100 text-slate-500'
-              }`}>
-                {counts[f.value]}
-              </span>
-            </button>
-          ))}
-        </div>
+        <StatusFilterRail
+          isDark={isDark}
+          statusFilter={statusFilter}
+          setStatusFilter={setStatusFilter}
+          counts={counts}
+        />
       </div>
 
       {/* ── Lista ───────────────────────────────────────────── */}
