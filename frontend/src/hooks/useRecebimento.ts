@@ -11,6 +11,9 @@ interface RequisicaoItemRow {
   quantidade: number
   unidade: string
   valor_unitario_estimado: number
+  est_item_id?: string
+  est_item_codigo?: string
+  destino_operacional?: 'estoque' | 'patrimonio' | 'nenhum'
 }
 
 export function useItensRequisicao(requisicaoId?: string) {
@@ -20,7 +23,10 @@ export function useItensRequisicao(requisicaoId?: string) {
       if (!requisicaoId) return []
       const { data, error } = await supabase
         .from('cmp_requisicao_itens')
-        .select('id, descricao, quantidade, unidade, valor_unitario_estimado')
+        .select(`
+          id, descricao, quantidade, unidade, valor_unitario_estimado,
+          est_item_id, est_item_codigo, destino_operacional
+        `)
         .eq('requisicao_id', requisicaoId)
         .order('created_at')
       if (error) throw error
@@ -100,13 +106,17 @@ export function useCriarRecebimento() {
         dataRecebimento, observacao, itens,
       } = payload
 
+      if (!perfil?.id) {
+        throw new Error('Perfil do usuario nao carregado para registrar o recebimento.')
+      }
+
       // 1. Create recebimento header
       const { data: rec, error: recErr } = await supabase
         .from('cmp_recebimentos')
         .insert({
           pedido_id: pedidoId,
           base_id: baseId || null,
-          recebido_por: perfil?.id ?? null,
+          recebido_por: perfil.id,
           nf_numero: nfNumero || null,
           nf_chave: nfChave || null,
           data_recebimento: dataRecebimento,

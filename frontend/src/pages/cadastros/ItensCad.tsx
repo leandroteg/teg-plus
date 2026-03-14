@@ -1,21 +1,33 @@
 import { useState } from 'react'
 import { Package2, Plus, Search, X, Save, Loader2 } from 'lucide-react'
 import { useEstoqueItens, useSalvarItem } from '../../hooks/useEstoque'
+import { useCadClasses } from '../../hooks/useCadastros'
 import type { EstItem } from '../../types/estoque'
 import AutoCodeField from '../../components/AutoCodeField'
 import SmartTextField from '../../components/SmartTextField'
 
 const UNIDADES = ['UN', 'M', 'M2', 'M3', 'KG', 'TON', 'L', 'CX', 'PCT', 'RL', 'PR', 'JG']
 const CURVA_COLOR = {
-  A: { bg: 'bg-red-100',   text: 'text-red-700',   label: 'Curva A' },
+  A: { bg: 'bg-red-100', text: 'text-red-700', label: 'Curva A' },
   B: { bg: 'bg-amber-100', text: 'text-amber-700', label: 'Curva B' },
   C: { bg: 'bg-slate-100', text: 'text-slate-600', label: 'Curva C' },
 }
 
 const EMPTY: Partial<EstItem> = {
-  codigo: '', descricao: '', categoria: '', unidade: 'UN', curva_abc: 'C',
-  estoque_minimo: 0, estoque_maximo: 0, ponto_reposicao: 0, lead_time_dias: 0,
-  controla_lote: false, controla_serie: false, tem_validade: false, valor_medio: 0,
+  codigo: '',
+  descricao: '',
+  categoria: '',
+  unidade: 'UN',
+  curva_abc: 'C',
+  estoque_minimo: 0,
+  estoque_maximo: 0,
+  ponto_reposicao: 0,
+  lead_time_dias: 0,
+  controla_lote: false,
+  controla_serie: false,
+  tem_validade: false,
+  valor_medio: 0,
+  destino_operacional: 'estoque',
 }
 
 export default function ItensCad() {
@@ -25,18 +37,61 @@ export default function ItensCad() {
   const [editItem, setEditItem] = useState<Partial<EstItem> | null>(null)
 
   const { data: itens = [], isLoading } = useEstoqueItens(
-    curvaFiltro ? { curva: curvaFiltro as 'A' | 'B' | 'C' } : undefined
+    curvaFiltro ? { curva: curvaFiltro as 'A' | 'B' | 'C' } : undefined,
   )
+  const { data: classes = [] } = useCadClasses({ tipo: 'despesa' })
   const salvar = useSalvarItem()
 
   const filtrados = busca.trim()
-    ? itens.filter(i => i.descricao.toLowerCase().includes(busca.toLowerCase()) || i.codigo.toLowerCase().includes(busca.toLowerCase()))
+    ? itens.filter((item) =>
+      item.descricao.toLowerCase().includes(busca.toLowerCase()) ||
+      item.codigo.toLowerCase().includes(busca.toLowerCase()))
     : itens
 
-  function openNew() { setEditItem({ ...EMPTY }); setShowForm(true) }
-  function openEdit(item: EstItem) { setEditItem({ ...item }); setShowForm(true) }
-  function closeForm() { setShowForm(false); setEditItem(null) }
-  async function handleSave() { if (!editItem) return; await salvar.mutateAsync(editItem); closeForm() }
+  function openNew() {
+    setEditItem({ ...EMPTY })
+    setShowForm(true)
+  }
+
+  function openEdit(item: EstItem) {
+    setEditItem({ ...item })
+    setShowForm(true)
+  }
+
+  function closeForm() {
+    setShowForm(false)
+    setEditItem(null)
+  }
+
+  function handleClasseChange(classeId: string) {
+    if (!editItem) return
+    const classe = classes.find((item) => item.id === classeId)
+    setEditItem({
+      ...editItem,
+      classe_financeira_id: classe?.id || undefined,
+      classe_financeira_codigo: classe?.codigo || '',
+      classe_financeira_descricao: classe?.descricao || '',
+      categoria_financeira_codigo: classe?.categoria?.codigo || '',
+      categoria_financeira_descricao: classe?.categoria?.descricao || '',
+      // Compatibilidade temporaria com o catalogo legado de estoque.
+      categoria: classe?.categoria?.descricao || editItem.categoria || '',
+    })
+  }
+
+  async function handleSave() {
+    if (!editItem) return
+    const payload = {
+      ...editItem,
+      categoria: editItem.categoria_financeira_descricao || editItem.categoria || 'GERAL',
+      estoque_minimo: editItem.destino_operacional === 'estoque' ? (editItem.estoque_minimo ?? 0) : 0,
+      estoque_maximo: editItem.destino_operacional === 'estoque' ? (editItem.estoque_maximo ?? 0) : 0,
+      ponto_reposicao: editItem.destino_operacional === 'estoque'
+        ? (editItem.ponto_reposicao ?? editItem.estoque_minimo ?? 0)
+        : 0,
+    }
+    await salvar.mutateAsync(payload)
+    closeForm()
+  }
 
   return (
     <div className="space-y-4">
@@ -45,9 +100,10 @@ export default function ItensCad() {
           <h1 className="text-xl font-extrabold text-slate-800">Catalogo de Itens</h1>
           <p className="text-xs text-slate-400 mt-0.5">{filtrados.length} itens</p>
         </div>
-        <button onClick={openNew}
-          className="flex items-center gap-1.5 bg-violet-600 hover:bg-violet-700 text-white
-            text-sm font-semibold px-4 py-2 rounded-xl transition-colors shadow-sm">
+        <button
+          onClick={openNew}
+          className="flex items-center gap-1.5 bg-violet-600 hover:bg-violet-700 text-white text-sm font-semibold px-4 py-2 rounded-xl transition-colors shadow-sm"
+        >
           <Plus size={15} /> Novo Item
         </button>
       </div>
@@ -55,17 +111,24 @@ export default function ItensCad() {
       <div className="flex gap-2 flex-wrap">
         <div className="relative flex-1 min-w-[200px]">
           <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-          <input value={busca} onChange={e => setBusca(e.target.value)}
+          <input
+            value={busca}
+            onChange={(event) => setBusca(event.target.value)}
             placeholder="Buscar por codigo ou descricao..."
-            className="w-full pl-9 pr-4 py-2 rounded-xl border border-slate-200 bg-white text-sm
-              focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400" />
+            className="w-full pl-9 pr-4 py-2 rounded-xl border border-slate-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400"
+          />
         </div>
-        {(['', 'A', 'B', 'C'] as const).map(c => (
-          <button key={c} onClick={() => setCurvaFiltro(c)}
+        {(['', 'A', 'B', 'C'] as const).map((curva) => (
+          <button
+            key={curva}
+            onClick={() => setCurvaFiltro(curva)}
             className={`px-3 py-2 rounded-xl text-xs font-semibold transition-all border ${
-              curvaFiltro === c ? 'bg-violet-600 text-white border-violet-600 shadow-sm' : 'bg-white text-slate-500 border-slate-200'
-            }`}>
-            {c === '' ? 'Todos' : `Curva ${c}`}
+              curvaFiltro === curva
+                ? 'bg-violet-600 text-white border-violet-600 shadow-sm'
+                : 'bg-white text-slate-500 border-slate-200'
+            }`}
+          >
+            {curva === '' ? 'Todos' : `Curva ${curva}`}
           </button>
         ))}
       </div>
@@ -92,17 +155,32 @@ export default function ItensCad() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-50">
-              {filtrados.map(item => {
+              {filtrados.map((item) => {
                 const curva = CURVA_COLOR[item.curva_abc] || CURVA_COLOR.C
                 return (
                   <tr key={item.id} className="hover:bg-slate-50 transition-colors">
                     <td className="px-4 py-3 font-mono text-xs text-slate-600">{item.codigo}</td>
                     <td className="px-4 py-3">
                       <p className="font-semibold text-slate-800 truncate max-w-[200px]">{item.descricao}</p>
-                      {item.categoria && <p className="text-[10px] text-slate-400">{item.categoria}</p>}
+                      <div className="flex flex-wrap items-center gap-2 mt-1">
+                        {item.categoria_financeira_descricao && (
+                          <span className="text-[10px] text-slate-400">{item.categoria_financeira_descricao}</span>
+                        )}
+                        {item.destino_operacional && (
+                          <span className="text-[10px] font-semibold text-teal-600 bg-teal-50 px-2 py-0.5 rounded-full">
+                            {item.destino_operacional === 'estoque'
+                              ? 'Gera estoque'
+                              : item.destino_operacional === 'patrimonio'
+                                ? 'Gera patrimonio'
+                                : 'Sem projecao'}
+                          </span>
+                        )}
+                      </div>
                     </td>
                     <td className="px-4 py-3 hidden md:table-cell">
-                      <span className={`inline-flex items-center rounded-full text-[10px] font-bold px-2 py-0.5 ${curva.bg} ${curva.text}`}>{curva.label}</span>
+                      <span className={`inline-flex items-center rounded-full text-[10px] font-bold px-2 py-0.5 ${curva.bg} ${curva.text}`}>
+                        {curva.label}
+                      </span>
                     </td>
                     <td className="px-4 py-3 text-right">
                       <span className="text-sm font-semibold text-slate-700">
@@ -110,7 +188,9 @@ export default function ItensCad() {
                       </span>
                     </td>
                     <td className="px-4 py-3">
-                      <button onClick={() => openEdit(item)} className="text-[10px] text-violet-600 font-semibold hover:underline">Editar</button>
+                      <button onClick={() => openEdit(item)} className="text-[10px] text-violet-600 font-semibold hover:underline">
+                        Editar
+                      </button>
                     </td>
                   </tr>
                 )
@@ -125,56 +205,202 @@ export default function ItensCad() {
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-xl max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
               <h2 className="text-lg font-extrabold text-slate-800">{editItem.id ? 'Editar Item' : 'Novo Item'}</h2>
-              <button onClick={closeForm} className="w-8 h-8 rounded-lg hover:bg-slate-100 flex items-center justify-center"><X size={16} /></button>
+              <button onClick={closeForm} className="w-8 h-8 rounded-lg hover:bg-slate-100 flex items-center justify-center">
+                <X size={16} />
+              </button>
             </div>
+
             <div className="p-6 space-y-4">
               <div className="grid grid-cols-2 gap-3">
-                <AutoCodeField prefix="ITM" table="est_itens" value={editItem.codigo ?? ''}
-                  onChange={v => setEditItem({ ...editItem, codigo: v })} disabled={!!editItem.id} />
+                <AutoCodeField
+                  prefix="ITM"
+                  table="est_itens"
+                  value={editItem.codigo ?? ''}
+                  onChange={(value) => setEditItem({ ...editItem, codigo: value })}
+                  disabled={!!editItem.id}
+                />
                 <div>
                   <label className="block text-xs font-bold text-slate-600 mb-1">Unidade *</label>
-                  <select value={editItem.unidade ?? 'UN'} onChange={e => setEditItem({ ...editItem, unidade: e.target.value as import('../../types/estoque').UnidadeEstoque })} className="input-base">
-                    {UNIDADES.map(u => <option key={u}>{u}</option>)}
+                  <select
+                    value={editItem.unidade ?? 'UN'}
+                    onChange={(event) => setEditItem({
+                      ...editItem,
+                      unidade: event.target.value as import('../../types/estoque').UnidadeEstoque,
+                    })}
+                    className="input-base"
+                  >
+                    {UNIDADES.map((unidade) => <option key={unidade}>{unidade}</option>)}
                   </select>
                 </div>
               </div>
-              <SmartTextField table="est_itens" column="descricao"
-                value={editItem.descricao ?? ''} onChange={v => setEditItem({ ...editItem, descricao: v })}
-                label="Descricao" placeholder="Nome completo do item" required />
-              <div className="grid grid-cols-2 gap-3">
+
+              <SmartTextField
+                table="est_itens"
+                column="descricao"
+                value={editItem.descricao ?? ''}
+                onChange={(value) => setEditItem({ ...editItem, descricao: value })}
+                label="Descricao"
+                placeholder="Nome completo do item"
+                required
+              />
+
+              <div className="rounded-2xl border border-teal-100 bg-teal-50/70 p-4 space-y-4">
                 <div>
-                  <label className="block text-xs font-bold text-slate-600 mb-1">Categoria</label>
-                  <input value={editItem.categoria ?? ''} onChange={e => setEditItem({ ...editItem, categoria: e.target.value })} className="input-base" placeholder="Eletrico, Civil..." />
+                  <p className="text-[11px] font-black uppercase tracking-wider text-teal-700">Classificacao do Item</p>
+                  <p className="mt-1 text-xs text-teal-800">
+                    A classe financeira define a categoria automaticamente e o destino indica para onde o item vai apos o recebimento.
+                  </p>
                 </div>
+
+                <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-bold text-slate-600 mb-1">Curva ABC</label>
-                  <select value={editItem.curva_abc ?? 'C'} onChange={e => setEditItem({ ...editItem, curva_abc: e.target.value as import('../../types/estoque').CurvaABC })} className="input-base">
-                    <option value="A">A — Alta rotatividade</option>
-                    <option value="B">B — Media rotatividade</option>
-                    <option value="C">C — Baixa rotatividade</option>
+                  <label className="block text-xs font-bold text-slate-600 mb-1">Classe Financeira</label>
+                  <select
+                    value={editItem.classe_financeira_id ?? ''}
+                    onChange={(event) => handleClasseChange(event.target.value)}
+                    className="input-base"
+                  >
+                    <option value="">Selecionar classe...</option>
+                    {classes.map((classe) => (
+                      <option key={classe.id} value={classe.id}>
+                        {classe.codigo} - {classe.descricao}
+                      </option>
+                    ))}
                   </select>
                 </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-600 mb-1">Categoria Financeira</label>
+                  <input
+                    value={editItem.categoria_financeira_descricao ?? ''}
+                    className="input-base bg-slate-50 text-slate-500"
+                    placeholder="Preenchida pela classe"
+                    readOnly
+                  />
+                </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-600 mb-1">Destino Operacional</label>
+                  <div className="grid grid-cols-3 gap-2">
+                    {[
+                      { value: 'estoque', label: 'Estoque' },
+                      { value: 'patrimonio', label: 'Patrimonio' },
+                      { value: 'nenhum', label: 'Nenhum' },
+                    ].map((option) => {
+                      const active = (editItem.destino_operacional ?? 'estoque') === option.value
+                      return (
+                        <button
+                          key={option.value}
+                          type="button"
+                          onClick={() => setEditItem({
+                            ...editItem,
+                            destino_operacional: option.value as EstItem['destino_operacional'],
+                          })}
+                          className={`rounded-xl border px-3 py-2 text-xs font-semibold transition-colors ${
+                            active
+                              ? 'border-teal-500 bg-teal-50 text-teal-700'
+                              : 'border-slate-200 bg-white text-slate-500 hover:border-slate-300'
+                          }`}
+                        >
+                          {option.label}
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
+
+                <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2">
+                  <p className="text-[11px] font-semibold text-slate-500">Resumo operacional</p>
+                  <p className="mt-1 text-xs text-slate-600">
+                    {editItem.destino_operacional === 'estoque'
+                      ? 'Recebimento gera pendencia no estoque.'
+                      : editItem.destino_operacional === 'patrimonio'
+                        ? 'Recebimento gera pendencia no patrimonial.'
+                        : 'Recebimento nao projeta em estoque nem patrimonio.'}
+                  </p>
+                </div>
               </div>
-              <div className="grid grid-cols-3 gap-3">
-                <div>
-                  <label className="block text-xs font-bold text-slate-600 mb-1">Est. Minimo</label>
-                  <input type="number" min={0} value={editItem.estoque_minimo ?? 0} onChange={e => setEditItem({ ...editItem, estoque_minimo: Number(e.target.value) })} className="input-base" />
+
+              {editItem.destino_operacional === 'estoque' && (
+                <div className="rounded-2xl border border-slate-200 p-4 space-y-4">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <p className="text-[11px] font-black uppercase tracking-wider text-slate-500">Parametros de Estoque</p>
+                      <p className="mt-1 text-xs text-slate-500">
+                        Mantidos por compatibilidade operacional para itens que geram estoque.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-bold text-slate-600 mb-1">Curva ABC</label>
+                      <select
+                        value={editItem.curva_abc ?? 'C'}
+                        onChange={(event) => setEditItem({
+                          ...editItem,
+                          curva_abc: event.target.value as import('../../types/estoque').CurvaABC,
+                        })}
+                        className="input-base"
+                      >
+                        <option value="A">A - Alta rotatividade</option>
+                        <option value="B">B - Media rotatividade</option>
+                        <option value="C">C - Baixa rotatividade</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-slate-600 mb-1">Valor Medio R$</label>
+                      <input
+                        type="number"
+                        min={0}
+                        step={0.01}
+                        value={editItem.valor_medio ?? 0}
+                        onChange={(event) => setEditItem({ ...editItem, valor_medio: Number(event.target.value) })}
+                        className="input-base"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-bold text-slate-600 mb-1">Est. Minimo</label>
+                      <input
+                        type="number"
+                        min={0}
+                        value={editItem.estoque_minimo ?? 0}
+                        onChange={(event) => setEditItem({ ...editItem, estoque_minimo: Number(event.target.value) })}
+                        className="input-base"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-slate-600 mb-1">Est. Maximo</label>
+                      <input
+                        type="number"
+                        min={0}
+                        value={editItem.estoque_maximo ?? 0}
+                        onChange={(event) => setEditItem({ ...editItem, estoque_maximo: Number(event.target.value) })}
+                        className="input-base"
+                      />
+                    </div>
+                  </div>
                 </div>
-                <div>
-                  <label className="block text-xs font-bold text-slate-600 mb-1">Est. Maximo</label>
-                  <input type="number" min={0} value={editItem.estoque_maximo ?? 0} onChange={e => setEditItem({ ...editItem, estoque_maximo: Number(e.target.value) })} className="input-base" />
-                </div>
-                <div>
-                  <label className="block text-xs font-bold text-slate-600 mb-1">Valor Medio R$</label>
-                  <input type="number" min={0} step={0.01} value={editItem.valor_medio ?? 0} onChange={e => setEditItem({ ...editItem, valor_medio: Number(e.target.value) })} className="input-base" />
-                </div>
-              </div>
+              )}
             </div>
+
             <div className="px-6 py-4 border-t border-slate-100 flex justify-end gap-2">
-              <button onClick={closeForm} className="px-4 py-2 rounded-xl border border-slate-200 text-sm font-semibold text-slate-600 hover:bg-slate-50">Cancelar</button>
-              <button onClick={handleSave} disabled={salvar.isPending}
-                className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-violet-600 hover:bg-violet-700 text-white text-sm font-semibold transition-colors disabled:opacity-60 shadow-sm">
-                {salvar.isPending ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />} Salvar
+              <button
+                onClick={closeForm}
+                className="px-4 py-2 rounded-xl border border-slate-200 text-sm font-semibold text-slate-600 hover:bg-slate-50"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleSave}
+                disabled={salvar.isPending}
+                className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-violet-600 hover:bg-violet-700 text-white text-sm font-semibold transition-colors disabled:opacity-60 shadow-sm"
+              >
+                {salvar.isPending ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
+                Salvar
               </button>
             </div>
           </div>
