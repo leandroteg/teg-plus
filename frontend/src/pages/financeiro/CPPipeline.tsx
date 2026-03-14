@@ -4,7 +4,7 @@ import {
   FileText, ChevronDown, ChevronUp, Banknote, X, ShieldCheck,
   Building2, Tag, Briefcase, Hash, Layers, Truck, Package,
   Paperclip, ExternalLink, Download, ArrowUpDown, LayoutList,
-  LayoutGrid, Filter, SortAsc, SortDesc, ArrowDown, ArrowUp,
+  LayoutGrid, Filter, SortAsc, SortDesc, ArrowDown, ArrowUp, Send,
 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { useTheme } from '../../contexts/ThemeContext'
@@ -302,6 +302,11 @@ function CPDetailModal({ cp, onClose, onAction, isDark }: {
                 <Layers size={15} /> Adicionar ao Lote
               </button>
             )}
+            {cp.status === 'em_lote' && (
+              <button onClick={() => onAction('sendLote', cp)} className="flex-1 py-3 rounded-xl bg-amber-500 text-white text-sm font-bold hover:bg-amber-600 transition-all flex items-center justify-center gap-2">
+                <Send size={15} /> Enviar p/ Aprovação
+              </button>
+            )}
             {cp.status === 'aprovado_pgto' && (
               <button onClick={() => onAction('pagar', cp)} className="flex-1 py-3 rounded-xl bg-emerald-600 text-white text-sm font-bold hover:bg-emerald-700 transition-all flex items-center justify-center gap-2">
                 <Banknote size={15} /> Registrar Pgto
@@ -533,7 +538,18 @@ export default function CPPipeline() {
   // Mutations
   const conciliarMut = useConciliarCPBatch()
   const criarLoteMut = useCriarLote()
+  const enviarLoteMut = useEnviarLoteAprovacao()
   const registrarBatchMut = useRegistrarPagamentoBatch()
+
+  const contasById = useMemo(
+    () => new Map(contas.map(cp => [cp.id, cp])),
+    [contas],
+  )
+
+  const lotesById = useMemo(
+    () => new Map(lotes.map(lote => [lote.id, lote])),
+    [lotes],
+  )
 
   // Group all CPs by status
   const grouped = useMemo(() => {
@@ -653,6 +669,33 @@ export default function CPPipeline() {
     } catch { showToast('error', 'Erro ao registrar pagamento') }
   }
 
+  const handleEnviarLotesAprovacao = async (ids: string[]) => {
+    const loteIds = Array.from(new Set(
+      ids
+        .map(id => contasById.get(id)?.lote_id)
+        .filter((loteId): loteId is string => !!loteId),
+    ))
+
+    const lotesMontando = loteIds
+      .map(loteId => lotesById.get(loteId))
+      .filter((lote): lote is LotePagamento => !!lote && lote.status === 'montando')
+
+    if (lotesMontando.length === 0) {
+      showToast('error', 'Nenhum lote montando encontrado na selecao')
+      return
+    }
+
+    try {
+      for (const lote of lotesMontando) {
+        await enviarLoteMut.mutateAsync({ loteId: lote.id, lote })
+      }
+      showToast('success', `${lotesMontando.length} lote(s) enviado(s) para aprovacao`)
+      setSelectedIds(new Set())
+    } catch {
+      showToast('error', 'Erro ao enviar lote para aprovacao')
+    }
+  }
+
   const handleConfirmarPagamento = async (ids: string[]) => {
     try {
       const { error } = await supabase
@@ -682,6 +725,7 @@ export default function CPPipeline() {
     switch (activeTab) {
       case 'previsto': handleConfirmar(ids); break
       case 'confirmado': handleCriarLote(ids); break
+      case 'em_lote': handleEnviarLotesAprovacao(ids); break
       case 'aprovado_pgto': handlePagar(ids); break
       case 'em_pagamento': handleConfirmarPagamento(ids); break
       case 'pago': handleConciliar(ids); break
@@ -693,6 +737,7 @@ export default function CPPipeline() {
     switch (action) {
       case 'confirmar': handleConfirmar([cp.id]); break
       case 'addLote': handleCriarLote([cp.id]); break
+      case 'sendLote': handleEnviarLotesAprovacao([cp.id]); break
       case 'pagar': handlePagar([cp.id]); break
       case 'conciliar': handleConciliar([cp.id]); break
     }
@@ -710,6 +755,7 @@ export default function CPPipeline() {
   const BULK_ACTIONS: Partial<Record<StatusCP, { label: string; icon: typeof CheckCircle2; className: string }>> = {
     previsto:      { label: 'Confirmar',     icon: CheckCircle2, className: 'bg-blue-600 hover:bg-blue-700 text-white' },
     confirmado:    { label: 'Criar Lote',    icon: Layers,       className: 'bg-violet-600 hover:bg-violet-700 text-white' },
+    em_lote:       { label: 'Enviar p/ Aprov.', icon: Send,      className: 'bg-amber-500 hover:bg-amber-600 text-white' },
     aprovado_pgto: { label: 'Reg. Pagamento', icon: Banknote,    className: 'bg-emerald-600 hover:bg-emerald-700 text-white' },
     em_pagamento:  { label: 'Confirmar Pgto', icon: CheckCircle2, className: 'bg-teal-600 hover:bg-teal-700 text-white' },
     pago:          { label: 'Conciliar',     icon: CheckCircle2, className: 'bg-green-600 hover:bg-green-700 text-white' },
