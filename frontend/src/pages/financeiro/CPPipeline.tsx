@@ -115,6 +115,8 @@ type LoteStageSummary = {
   visibleValue: number
   supplierLabel: string
   workLabel: string
+  headerLabel: string
+  metaLabel: string
   progress: number
   progressLabel: string
 }
@@ -1157,11 +1159,11 @@ function LoteTableRow({
         />
         <div className={`w-0.5 h-10 rounded-full ${isDark ? 'bg-emerald-400/60' : 'bg-emerald-500/70'}`} />
         <button type="button" onClick={onToggleExpand} className="min-w-0 text-left">
-          <p className={`truncate text-sm font-bold ${isDark ? 'text-white' : 'text-slate-800'}`}>{summary.lote.numero_lote}</p>
-          <p className={`truncate text-[11px] ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{summary.progressLabel}</p>
+          <p className={`truncate text-sm font-bold ${isDark ? 'text-white' : 'text-slate-800'}`}>{summary.headerLabel}</p>
+          <p className={`truncate text-[11px] ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{summary.metaLabel}</p>
         </button>
         <button type="button" onClick={onToggleExpand} className="min-w-0 text-left">
-          <p className={`truncate text-xs font-semibold ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>{summary.totalItems > 1 ? `${summary.totalItems} titulos no lote` : summary.supplierLabel}</p>
+          <p className={`truncate text-xs font-semibold ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>{summary.supplierLabel}</p>
           <p className={`truncate text-[11px] ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{summary.workLabel}</p>
           <div className={`mt-2 h-1.5 rounded-full overflow-hidden ${isDark ? 'bg-white/[0.06]' : 'bg-slate-200'}`}>
             <div className="h-full rounded-full bg-emerald-500 transition-all" style={{ width: `${summary.progress}%` }} />
@@ -1225,12 +1227,12 @@ function LoteCard({
     <div className={`rounded-2xl border p-4 ${isDark ? 'border-white/[0.06] bg-white/[0.02]' : 'border-slate-200 bg-white'}`}>
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className={`text-[11px] font-semibold uppercase tracking-wider ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{summary.lote.numero_lote}</p>
-          <p className={`truncate text-base font-bold ${isDark ? 'text-white' : 'text-slate-800'}`}>{summary.totalItems > 1 ? `${summary.totalItems} titulos no lote` : summary.supplierLabel}</p>
+          <p className={`text-[11px] font-semibold uppercase tracking-wider ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{summary.headerLabel}</p>
+          <p className={`truncate text-base font-bold ${isDark ? 'text-white' : 'text-slate-800'}`}>{summary.supplierLabel}</p>
           <p className={`truncate text-sm ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{summary.workLabel}</p>
         </div>
         <div className="text-right shrink-0">
-          <p className={`text-[11px] ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{summary.progressLabel}</p>
+          <p className={`text-[11px] ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{summary.metaLabel}</p>
           <p className="text-2xl font-extrabold text-emerald-600">{fmt(summary.visibleValue || summary.totalValue)}</p>
         </div>
       </div>
@@ -1455,6 +1457,10 @@ export default function CPPipeline() {
       const workLabel = summarizeNames(allItems.map(cp => cp.requisicao?.obra_nome || cp.centro_custo || ''), 'Múltiplas obras e centros')
       const totalValue = lote?.valor_total ?? allItems.reduce((sum, cp) => sum + cp.valor_original, 0)
       const visibleValue = currentItems.reduce((sum, cp) => sum + cp.valor_original, 0)
+      const loteDate = new Date((lote?.created_at ?? currentItems[0]?.created_at ?? new Date().toISOString())).toLocaleDateString('pt-BR')
+      const loteValue = totalValue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
+      const headerLabel = lote?.numero_lote ?? `Lote ${loteId.slice(0, 8)}`
+      const metaLabel = `${loteDate} • ${loteValue}`
       const { progress, progressLabel } = getLoteProgress(activeTab, lote?.status)
 
       return {
@@ -1478,6 +1484,8 @@ export default function CPPipeline() {
         visibleValue,
         supplierLabel,
         workLabel,
+        headerLabel,
+        metaLabel,
         progress,
         progressLabel,
       } satisfies LoteStageSummary
