@@ -192,9 +192,9 @@ export default function App() {
               <Route path="/financeiro/cp"           element={<Navigate to="/financeiro/contas-a-pagar" replace />} />
               <Route path="/financeiro/cr"           element={<ContasReceber />} />
               <Route path="/financeiro/aprovacoes"   element={<Navigate to="/financeiro/contas-a-pagar" replace />} />
-              <Route path="/financeiro/lotes"              element={<Navigate to="/financeiro/contas-a-pagar" replace />} />
+              <Route path="/financeiro/lotes"              element={<LotesPagamento />} />
               <Route path="/financeiro/lotes/:loteId"      element={<LoteDetalhe />} />
-              <Route path="/financeiro/painel-pagamentos"  element={<Navigate to="/financeiro/contas-a-pagar" replace />} />
+              <Route path="/financeiro/painel-pagamentos"  element={<PainelPagamentos />} />
               <Route path="/financeiro/conciliacao"  element={<Navigate to="/financeiro/contas-a-pagar" replace />} />
               <Route path="/financeiro/tesouraria"    element={<Tesouraria />} />
               <Route path="/financeiro/relatorios"   element={<Relatorios />} />
