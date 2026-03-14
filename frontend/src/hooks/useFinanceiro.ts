@@ -25,6 +25,39 @@ function getSupabaseErrorMessage(error: unknown, fallback: string) {
   return fallback
 }
 
+function isMissingColumnError(error: unknown, column: string) {
+  const message = getSupabaseErrorMessage(error, '')
+  return message.includes(`Could not find the '${column}' column`)
+    || message.includes(`column "${column}" does not exist`)
+}
+
+function appendExtraRequestDetailsToObservacoes(
+  observacoesBase: string,
+  dadosBancarios?: {
+    favorecido?: string
+    banco_nome?: string
+    agencia?: string
+    conta?: string
+    pix_tipo?: string
+    pix_chave?: string
+  },
+  anexos?: Array<{ nome: string; url: string }>,
+) {
+  const detalhes: string[] = [observacoesBase]
+  const banco = [
+    dadosBancarios?.favorecido && `Favorecido: ${dadosBancarios.favorecido}`,
+    dadosBancarios?.banco_nome && `Banco: ${dadosBancarios.banco_nome}`,
+    dadosBancarios?.agencia && `Agencia: ${dadosBancarios.agencia}`,
+    dadosBancarios?.conta && `Conta: ${dadosBancarios.conta}`,
+    dadosBancarios?.pix_tipo && `PIX Tipo: ${dadosBancarios.pix_tipo}`,
+    dadosBancarios?.pix_chave && `PIX Chave: ${dadosBancarios.pix_chave}`,
+  ].filter(Boolean)
+
+  if (banco.length > 0) detalhes.push(`Dados bancarios: ${banco.join(' | ')}`)
+  if ((anexos?.length ?? 0) > 0) detalhes.push(`Anexos: ${anexos!.map(a => `${a.nome} (${a.url})`).join(' | ')}`)
+  return detalhes.join('\n')
+}
+
 // â”€â”€ Dashboard â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 export function useFinanceiroDashboard(periodo = '30d') {
   return useQuery<FinanceiroDashboardData>({
@@ -169,6 +202,7 @@ export function useCriarSolicitacaoExtraordinariaCP() {
       const numeroDocumento = `EXT-${new Date().toISOString().replace(/[-:TZ.]/g, '').slice(0, 14)}`
       const uploadedArquivos: Array<{ nome: string; url: string }> = []
       const uploadFalhas: string[] = []
+      const observacoesBase = `Solicita\u00e7\u00e3o extraordin\u00e1ria urgente. Justificativa: ${justificativa.trim()}${solicitanteNome ? ` | Solicitante: ${solicitanteNome}` : ''}`
 
       const { data, error } = await supabase
         .from('fin_contas_pagar')
@@ -186,18 +220,9 @@ export function useCriarSolicitacaoExtraordinariaCP() {
           numero_documento: numeroDocumento,
           status: 'confirmado',
           descricao: descricao.trim(),
-          observacoes: `Solicita\u00e7\u00e3o extraordin\u00e1ria urgente. Justificativa: ${justificativa.trim()}${solicitanteNome ? ` | Solicitante: ${solicitanteNome}` : ''}`,
-          remessa_payload: {
-            manual_request: {
-              urgente: true,
-              justificativa: justificativa.trim(),
-              solicitante_nome: solicitanteNome ?? null,
-              dados_bancarios: dadosBancarios ?? null,
-              anexos: [],
-            },
-          },
+          observacoes: observacoesBase,
         })
-        .select('id, remessa_payload')
+        .select('id')
         .single()
       if (error) throw new Error(getSupabaseErrorMessage(error, 'Erro ao criar solicita\u00e7\u00e3o extraordin\u00e1ria'))
 
@@ -213,30 +238,42 @@ export function useCriarSolicitacaoExtraordinariaCP() {
         uploadedArquivos.push({ nome: arquivo.name, url: urlData.publicUrl })
       }
 
-      if (uploadedArquivos.length > 0 || uploadFalhas.length > 0) {
-        const remessaPayload = (data?.remessa_payload && typeof data.remessa_payload === 'object')
-          ? data.remessa_payload as Record<string, unknown>
-          : {}
-        const manualRequest = (remessaPayload.manual_request && typeof remessaPayload.manual_request === 'object')
-          ? remessaPayload.manual_request as Record<string, unknown>
-          : {}
+      if (dadosBancarios || uploadedArquivos.length > 0 || uploadFalhas.length > 0) {
+        const remessaPayload = {
+          manual_request: {
+            urgente: true,
+            justificativa: justificativa.trim(),
+            solicitante_nome: solicitanteNome ?? null,
+            dados_bancarios: dadosBancarios ?? null,
+            anexos: uploadedArquivos,
+            anexos_erro: uploadFalhas,
+          },
+        }
 
         const { error: updateError } = await supabase
           .from('fin_contas_pagar')
-          .update({
-            remessa_payload: {
-              ...remessaPayload,
-              manual_request: {
-                ...manualRequest,
-                anexos: uploadedArquivos,
-                anexos_erro: uploadFalhas,
-              },
-            },
-          })
+          .update({ remessa_payload: remessaPayload })
           .eq('id', data.id)
 
         if (updateError) {
-          throw new Error(getSupabaseErrorMessage(updateError, 'Solicita\u00e7\u00e3o criada, mas n\u00e3o foi poss\u00edvel salvar os anexos'))
+          if (!isMissingColumnError(updateError, 'remessa_payload')) {
+            throw new Error(getSupabaseErrorMessage(updateError, 'Solicita\u00e7\u00e3o criada, mas n\u00e3o foi poss\u00edvel salvar os anexos'))
+          }
+
+          const observacoesFallback = appendExtraRequestDetailsToObservacoes(
+            observacoesBase,
+            dadosBancarios,
+            uploadedArquivos,
+          )
+
+          const { error: fallbackError } = await supabase
+            .from('fin_contas_pagar')
+            .update({ observacoes: observacoesFallback })
+            .eq('id', data.id)
+
+          if (fallbackError) {
+            throw new Error(getSupabaseErrorMessage(fallbackError, 'Solicita\u00e7\u00e3o criada, mas n\u00e3o foi poss\u00edvel salvar os detalhes complementares'))
+          }
         }
       }
 
