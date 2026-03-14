@@ -31,7 +31,52 @@ export function useTesourariaDashboard(periodo = '30d') {
       const { data, error } = await supabase.rpc('get_tesouraria_dashboard', {
         p_periodo: periodo,
       })
-      if (error) throw error
+      if (error) {
+        const dias = periodo === '7d' ? 7 : periodo === '60d' ? 60 : periodo === '90d' ? 90 : 30
+        const dataInicio = new Date()
+        dataInicio.setDate(dataInicio.getDate() - dias)
+        const inicioIso = dataInicio.toISOString().split('T')[0]
+
+        const [contasRes, movRes] = await Promise.all([
+          supabase
+            .from('fin_contas_bancarias')
+            .select('*')
+            .eq('ativo', true)
+            .order('saldo_atual', { ascending: false }),
+          supabase
+            .from('fin_movimentacoes_tesouraria')
+            .select('*, conta:fin_contas_bancarias(nome, cor)')
+            .gte('data_movimentacao', inicioIso)
+            .order('data_movimentacao', { ascending: false })
+            .limit(50),
+        ])
+
+        if (contasRes.error || movRes.error) throw error
+
+        const movimentacoes = (movRes.data ?? []).map((m: any) => ({
+          ...m,
+          conta_nome: m.conta?.nome,
+          conta_cor: m.conta?.cor,
+        }))
+
+        const entradasPeriodo = movimentacoes
+          .filter((m: any) => m.tipo === 'entrada')
+          .reduce((sum: number, m: any) => sum + Number(m.valor || 0), 0)
+
+        const saidasPeriodo = movimentacoes
+          .filter((m: any) => m.tipo === 'saida')
+          .reduce((sum: number, m: any) => sum + Number(m.valor || 0), 0)
+
+        return {
+          ...EMPTY_DASHBOARD,
+          saldo_total: (contasRes.data ?? []).reduce((sum: number, conta: any) => sum + Number(conta.saldo_atual || 0), 0),
+          saldo_final_periodo: (contasRes.data ?? []).reduce((sum: number, conta: any) => sum + Number(conta.saldo_atual || 0), 0),
+          entradas_periodo: entradasPeriodo,
+          saidas_periodo: saidasPeriodo,
+          contas: contasRes.data ?? [],
+          movimentacoes_recentes: movimentacoes,
+        }
+      }
       return (data as TesourariaDashboardData) ?? EMPTY_DASHBOARD
     },
     refetchInterval: 30_000,
