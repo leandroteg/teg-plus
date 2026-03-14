@@ -398,9 +398,28 @@ function GenericPendingCard({ aprovacao, aprovadorNome, aprovadorEmail }: {
   const [expanded, setExpanded] = useState(false)
   const [observacao, setObservacao] = useState('')
   const [action, setAction] = useState<'aprovada' | 'rejeitada' | null>(null)
+  const loteItens = useMemo(
+    () => (
+      aprovacao.pagamento_detalhes?.is_lote
+        ? (aprovacao.pagamento_detalhes.itens ?? []).filter(item => item.decisao !== 'rejeitado')
+        : []
+    ),
+    [aprovacao.pagamento_detalhes]
+  )
+  const [selectedItemIds, setSelectedItemIds] = useState<string[]>(() => loteItens.map(item => item.id))
 
   const tipo = tipoConfig[aprovacao.tipo_aprovacao] || tipoConfig.requisicao_compra
   const IconComp = tipo.icon
+
+  useEffect(() => {
+    setSelectedItemIds(loteItens.map(item => item.id))
+  }, [aprovacao.id, loteItens])
+
+  const toggleLoteItem = (itemId: string) => {
+    setSelectedItemIds(prev =>
+      prev.includes(itemId) ? prev.filter(id => id !== itemId) : [...prev, itemId]
+    )
+  }
 
   const handleDecision = async (decisao: 'aprovada' | 'rejeitada') => {
     setAction(decisao)
@@ -416,6 +435,7 @@ function GenericPendingCard({ aprovacao, aprovadorNome, aprovadorEmail }: {
         observacao: observacao || undefined,
         aprovadorNome,
         aprovadorEmail,
+        selectedItemIds: decisao === 'aprovada' && loteItens.length > 0 ? selectedItemIds : undefined,
       })
     } catch { /* error handled by mutation state */ }
   }
@@ -467,7 +487,11 @@ function GenericPendingCard({ aprovacao, aprovadorNome, aprovadorEmail }: {
         {aprovacao.tipo_aprovacao === 'minuta_contratual' && aprovacao.minuta_resumo ? (
           <MinutaExecutiveSummary resumo={aprovacao.minuta_resumo} />
         ) : aprovacao.tipo_aprovacao === 'autorizacao_pagamento' && aprovacao.pagamento_detalhes ? (
-          <PagamentoDetalhesCard detalhes={aprovacao.pagamento_detalhes} />
+          <PagamentoDetalhesCard
+            detalhes={aprovacao.pagamento_detalhes}
+            selectedItemIds={selectedItemIds}
+            onToggleItem={toggleLoteItem}
+          />
         ) : aprovacao.tipo_aprovacao === 'autorizacao_pagamento' && aprovacao.requisicao ? (
           <div className="space-y-2">
             <div className="bg-slate-50 rounded-xl p-3 space-y-1.5">
@@ -526,6 +550,13 @@ function GenericPendingCard({ aprovacao, aprovadorNome, aprovadorEmail }: {
             />
           </div>
         )}
+        {loteItens.length > 0 && (
+          <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] text-amber-800">
+            {selectedItemIds.length === loteItens.length
+              ? `Todos os ${loteItens.length} itens do lote serao aprovados.`
+              : `${selectedItemIds.length} de ${loteItens.length} itens serao aprovados. Os demais retornarao para Lote de Pagamento.`}
+          </div>
+        )}
       </div>
       <div className="grid grid-cols-3 border-t border-slate-100">
         <button
@@ -550,7 +581,7 @@ function GenericPendingCard({ aprovacao, aprovadorNome, aprovadorEmail }: {
         </button>
         <button
           type="button"
-          disabled={mutation.isPending}
+          disabled={mutation.isPending || (loteItens.length > 0 && selectedItemIds.length === 0)}
           onClick={() => handleDecision('aprovada')}
           className="flex items-center justify-center gap-1.5 py-3.5 text-xs font-bold text-emerald-600 hover:bg-emerald-50 active:bg-emerald-100 transition disabled:opacity-50"
         >
@@ -572,8 +603,14 @@ function GenericPendingCard({ aprovacao, aprovadorNome, aprovadorEmail }: {
 
 // ── Issue #35: Pagamento Detalhes Card ────────────────────────────────────────
 
-function PagamentoDetalhesCard({ detalhes }: {
+function PagamentoDetalhesCard({
+  detalhes,
+  selectedItemIds,
+  onToggleItem,
+}: {
   detalhes: NonNullable<AprovacaoPendente['pagamento_detalhes']>
+  selectedItemIds?: string[]
+  onToggleItem?: (itemId: string) => void
 }) {
   const [showEntender, setShowEntender] = useState(false)
   const fmtDate = (d: string) => d ? new Date(d + 'T00:00:00').toLocaleDateString('pt-BR') : '—'
@@ -599,7 +636,8 @@ function PagamentoDetalhesCard({ detalhes }: {
 
       {isLote && detalhes.itens && detalhes.itens.length > 0 && (
         <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
-          <div className="grid grid-cols-[minmax(0,1.7fr)_100px_90px_100px_90px] gap-x-3 px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-slate-400 bg-slate-50">
+          <div className="grid grid-cols-[28px_minmax(0,1.7fr)_100px_90px_100px_90px] gap-x-3 px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-slate-400 bg-slate-50">
+            <span />
             <span>Item</span>
             <span>Documento</span>
             <span>Venc.</span>
@@ -607,7 +645,16 @@ function PagamentoDetalhesCard({ detalhes }: {
             <span>Decisão</span>
           </div>
           {detalhes.itens.map(item => (
-            <div key={item.id} className="grid grid-cols-[minmax(0,1.7fr)_100px_90px_100px_90px] gap-x-3 px-3 py-2.5 text-xs border-t border-slate-100">
+            <div key={item.id} className="grid grid-cols-[28px_minmax(0,1.7fr)_100px_90px_100px_90px] gap-x-3 px-3 py-2.5 text-xs border-t border-slate-100 items-center">
+              <label className="flex items-center justify-center">
+                <input
+                  type="checkbox"
+                  className="h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
+                  checked={selectedItemIds?.includes(item.id) ?? true}
+                  disabled={!onToggleItem || item.decisao === 'rejeitado'}
+                  onChange={() => onToggleItem?.(item.id)}
+                />
+              </label>
               <div className="min-w-0">
                 <p className="truncate font-semibold text-slate-800">{item.fornecedor_nome || 'â€”'}</p>
                 <p className="truncate text-slate-500">{item.descricao || 'â€”'}</p>

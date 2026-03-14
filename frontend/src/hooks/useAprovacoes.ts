@@ -528,6 +528,7 @@ export interface DecisaoGenericaPayload {
   observacao?: string
   aprovadorNome: string
   aprovadorEmail: string
+  selectedItemIds?: string[]
 }
 
 export function useDecisaoGenerica() {
@@ -535,7 +536,7 @@ export function useDecisaoGenerica() {
   return useMutation({
     mutationFn: async (payload: DecisaoGenericaPayload) => {
       const {
-        aprovacaoId, entidadeId, tipoAprovacao, decisao, observacao, aprovadorNome,
+        aprovacaoId, entidadeId, tipoAprovacao, decisao, observacao, aprovadorNome, selectedItemIds,
       } = payload
 
       // 1. Update the specific aprovacao record
@@ -626,31 +627,128 @@ export function useDecisaoGenerica() {
                 .eq('lote_id', entidadeId)
                 .not('status', 'in', '(cancelado,pago,conciliado)')
             } else {
-              const decisaoItem = decisao === 'aprovada' ? 'aprovado' : 'rejeitado'
-
-              await supabase
+              const { data: loteItens } = await supabase
                 .from('fin_lote_itens')
-                .update({
-                  decisao: decisaoItem,
-                  decidido_por: aprovadorNome,
-                  decidido_em: decisionAt,
-                  observacao: observacao || null,
-                })
+                .select('id, cp_id, valor, decisao')
                 .eq('lote_id', entidadeId)
-                .eq('decisao', 'pendente')
 
-              await supabase.rpc('rpc_resolver_lote_status', { p_lote_id: entidadeId })
+              const itensAtuais = loteItens ?? []
+              const pendingItems = itensAtuais.filter(item => item.decisao === 'pendente')
+              const selectedSet = new Set(selectedItemIds ?? pendingItems.map(item => item.cp_id))
+
+              if (decisao === 'aprovada' && pendingItems.length > 0) {
+                const aprovados = pendingItems.filter(item => selectedSet.has(item.cp_id))
+                const excluidos = pendingItems.filter(item => !selectedSet.has(item.cp_id))
+
+                if (aprovados.length === 0) {
+                  throw new Error('Selecione ao menos um item para aprovar o lote.')
+                }
+
+                await supabase
+                  .from('fin_lote_itens')
+                  .update({
+                    decisao: 'aprovado',
+                    decidido_por: aprovadorNome,
+                    decidido_em: decisionAt,
+                    observacao: observacao || null,
+                  })
+                  .in('id', aprovados.map(item => item.id))
+
+                await supabase
+                  .from('fin_contas_pagar')
+                  .update({
+                    status: 'aprovado_pgto',
+                    aprovado_por: aprovadorNome,
+                    aprovado_em: decisionAt,
+                    updated_at: decisionAt,
+                  })
+                  .in('id', aprovados.map(item => item.cp_id))
+
+                if (excluidos.length > 0) {
+                  const { data: numData } = await supabase.rpc('generate_numero_lote')
+                  const numeroLote = (numData as string) || `LP-${Date.now()}`
+                  const valorNovoLote = excluidos.reduce((sum, item) => sum + (item.valor ?? 0), 0)
+
+                  const { data: novoLote, error: novoLoteErr } = await supabase
+                    .from('fin_lotes_pagamento')
+                    .insert({
+                      numero_lote: numeroLote,
+                      criado_por: aprovadorNome,
+                      valor_total: valorNovoLote,
+                      qtd_itens: excluidos.length,
+                      status: 'montando',
+                      observacao: `Itens retornados da aprovação parcial do lote ${entidadeId}`,
+                    })
+                    .select()
+                    .single()
+
+                  if (novoLoteErr) throw novoLoteErr
+
+                  const novosItens = excluidos.map(item => ({
+                    lote_id: novoLote.id,
+                    cp_id: item.cp_id,
+                    valor: item.valor ?? 0,
+                    decisao: 'pendente',
+                  }))
+
+                  const { error: novosItensErr } = await supabase
+                    .from('fin_lote_itens')
+                    .insert(novosItens)
+                  if (novosItensErr) throw novosItensErr
+
+                  await supabase
+                    .from('fin_contas_pagar')
+                    .update({
+                      lote_id: novoLote.id,
+                      status: 'em_lote',
+                      updated_at: decisionAt,
+                    })
+                    .in('id', excluidos.map(item => item.cp_id))
+
+                  await supabase
+                    .from('fin_lote_itens')
+                    .delete()
+                    .in('id', excluidos.map(item => item.id))
+                }
+
+                const { data: approvedItens } = await supabase
+                  .from('fin_lote_itens')
+                  .select('valor')
+                  .eq('lote_id', entidadeId)
+
+                const valorAprovado = (approvedItens ?? []).reduce((sum, item) => sum + (item.valor as number ?? 0), 0)
+
+                await supabase
+                  .from('fin_lotes_pagamento')
+                  .update({
+                    status: 'aprovado',
+                    qtd_itens: approvedItens?.length ?? aprovados.length,
+                    valor_total: valorAprovado,
+                    observacao: excluidos.length > 0
+                      ? `Aprovação parcial por ${aprovadorNome}${observacao ? ` • ${observacao}` : ''}`
+                      : observacao || null,
+                    updated_at: decisionAt,
+                  })
+                  .eq('id', entidadeId)
+              } else {
+                const decisaoItem = decisao === 'aprovada' ? 'aprovado' : 'rejeitado'
+
+                await supabase
+                  .from('fin_lote_itens')
+                  .update({
+                    decisao: decisaoItem,
+                    decidido_por: aprovadorNome,
+                    decidido_em: decisionAt,
+                    observacao: observacao || null,
+                  })
+                  .eq('lote_id', entidadeId)
+                  .eq('decisao', 'pendente')
+
+                await supabase.rpc('rpc_resolver_lote_status', { p_lote_id: entidadeId })
+              }
             }
 
-            if (decisao === 'aprovada') {
-              await supabase
-                .from('fin_lotes_pagamento')
-                .update({
-                  status: 'aprovado',
-                  updated_at: decisionAt,
-                })
-                .eq('id', entidadeId)
-            } else if (decisao === 'rejeitada') {
+            if (decisao === 'rejeitada') {
               await supabase
                 .from('fin_lotes_pagamento')
                 .update({
