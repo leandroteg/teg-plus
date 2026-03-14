@@ -516,6 +516,9 @@ function NovaSolicitacaoExtraordinariaModal({
     .filter(classe => `${classe.codigo} ${classe.descricao}`.toLowerCase().includes(classeBusca.toLowerCase()))
     .slice(0, 8)
 
+  const centroSelecionado = centrosCusto.find(cc => cc.codigo === form.centro_custo)
+  const classeSelecionada = classesFinanceiras.find(classe => classe.codigo === form.classe_financeira)
+
   async function handleCriar() {
     if (!canSubmit) return
     setErro('')
@@ -585,7 +588,7 @@ function NovaSolicitacaoExtraordinariaModal({
                 className={`${inputCls} flex items-center justify-between text-left ${ccOpen ? (isDark ? 'ring-1 ring-emerald-500/40' : 'ring-1 ring-emerald-500/30') : ''}`}
               >
                 <span className={form.centro_custo ? '' : isDark ? 'text-slate-500' : 'text-slate-400'}>
-                  {form.centro_custo || 'Selecione...'}
+                  {centroSelecionado ? `${centroSelecionado.codigo} - ${centroSelecionado.descricao}` : form.centro_custo || 'Selecione...'}
                 </span>
                 <ChevronDown size={16} className={`transition-transform ${ccOpen ? 'rotate-180' : ''} ${isDark ? 'text-slate-400' : 'text-slate-500'}`} />
               </button>
@@ -608,7 +611,7 @@ function NovaSolicitacaoExtraordinariaModal({
                           key={cc.id}
                           type="button"
                           onClick={() => {
-                            setField('centro_custo', label)
+                            setField('centro_custo', cc.codigo)
                             setCcBusca(label)
                             setCcOpen(false)
                           }}
@@ -637,7 +640,7 @@ function NovaSolicitacaoExtraordinariaModal({
                 className={`${inputCls} flex items-center justify-between text-left ${classeOpen ? (isDark ? 'ring-1 ring-emerald-500/40' : 'ring-1 ring-emerald-500/30') : ''}`}
               >
                 <span className={form.classe_financeira ? '' : isDark ? 'text-slate-500' : 'text-slate-400'}>
-                  {form.classe_financeira || 'Selecione...'}
+                  {classeSelecionada ? `${classeSelecionada.codigo} - ${classeSelecionada.descricao}` : form.classe_financeira || 'Selecione...'}
                 </span>
                 <ChevronDown size={16} className={`transition-transform ${classeOpen ? 'rotate-180' : ''} ${isDark ? 'text-slate-400' : 'text-slate-500'}`} />
               </button>
@@ -660,7 +663,7 @@ function NovaSolicitacaoExtraordinariaModal({
                           key={classe.id}
                           type="button"
                           onClick={() => {
-                            setField('classe_financeira', label)
+                            setField('classe_financeira', classe.codigo)
                             setClasseBusca(label)
                             setClasseOpen(false)
                           }}
