@@ -89,10 +89,10 @@ const tipoConfig: Record<TipoAprovacao, {
 }
 
 const tipoOrder: TipoAprovacao[] = [
-  'cotacao',
-  'autorizacao_pagamento',
-  'minuta_contratual',
   'requisicao_compra',
+  'cotacao',
+  'minuta_contratual',
+  'autorizacao_pagamento',
 ]
 
 function timeLeft(dateStr?: string): string {
