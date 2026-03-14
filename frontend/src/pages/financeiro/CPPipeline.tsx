@@ -18,6 +18,7 @@ import {
 } from '../../hooks/useFinanceiro'
 import {
   useLotesPagamento,
+  useLoteById,
   useCriarLote,
   useEnviarLoteAprovacao,
   useRegistrarPagamentoBatch,
@@ -64,6 +65,31 @@ function getRemessaHint(cp: ContaPagar) {
   return 'Aguardando retorno da remessa'
 }
 
+function summarizeNames(values: string[], fallback: string) {
+  const unique = Array.from(new Set(values.map(v => v.trim()).filter(Boolean)))
+  if (unique.length === 0) return fallback
+  if (unique.length === 1) return unique[0]
+  if (unique.length === 2) return `${unique[0]} + ${unique[1]}`
+  return `${unique[0]} + ${unique.length - 1}`
+}
+
+function getLoteProgress(activeTab: PipelineStageId, loteStatus?: string) {
+  switch (activeTab) {
+    case 'em_lote':
+      return { progress: 28, progressLabel: 'Montagem do lote' }
+    case 'em_aprovacao':
+      return { progress: 52, progressLabel: 'Em aprovação' }
+    case 'aprovado_pgto':
+      return { progress: 74, progressLabel: 'Pronto para pagamento' }
+    case 'em_pagamento':
+      return { progress: 90, progressLabel: 'Remessa em processamento' }
+    default:
+      if (loteStatus === 'pago') return { progress: 100, progressLabel: 'Lote pago' }
+      if (loteStatus === 'cancelado') return { progress: 100, progressLabel: 'Lote cancelado' }
+      return { progress: 40, progressLabel: 'Em andamento' }
+  }
+}
+
 // Ã¢â€â‚¬Ã¢â€â‚¬ Sort types Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 
 type SortField = 'vencimento' | 'valor' | 'fornecedor' | 'emissao'
@@ -74,6 +100,24 @@ type QuickFilterId = 'all' | 'overdue' | 'today' | 'week' | 'same_supplier' | 's
 type StatusHintTone = 'amber' | 'rose' | 'sky'
 type StatusHint = { text: string; tone: StatusHintTone }
 const CP_TABLE_GRID = 'grid grid-cols-[20px_2px_minmax(0,1.8fr)_minmax(0,1.45fr)_minmax(0,1fr)_70px_110px_72px_96px] items-center gap-x-3'
+const LOTE_TABLE_GRID = 'grid grid-cols-[20px_2px_150px_minmax(0,1.8fr)_80px_100px_120px_190px] items-center gap-x-3'
+const LOTE_STAGE_TABS: PipelineStageId[] = ['em_lote', 'em_aprovacao', 'aprovado_pgto', 'em_pagamento']
+
+type LoteStageSummary = {
+  lote: LotePagamento
+  cpIds: string[]
+  currentItems: ContaPagar[]
+  allItems: ContaPagar[]
+  totalItems: number
+  approvedItems: number
+  excludedItems: number
+  totalValue: number
+  visibleValue: number
+  supplierLabel: string
+  workLabel: string
+  progress: number
+  progressLabel: string
+}
 
 const CP_PIPELINE_VIEW_STAGES: Array<{ status: PipelineStageId; label: string; color: string; borderColor: string }> = [
   ...CP_PIPELINE_STAGES.slice(0, 3),
@@ -928,6 +972,224 @@ function CPCard({ cp, onClick, isDark, isSelected, onSelect, approvalHint }: {
   )
 }
 
+function LoteItemsPanel({
+  loteId,
+  isDark,
+  onOpenCP,
+}: {
+  loteId: string
+  isDark: boolean
+  onOpenCP: (cp: ContaPagar) => void
+}) {
+  const { data, isLoading } = useLoteById(loteId)
+
+  if (isLoading) {
+    return (
+      <div className={`rounded-2xl border px-4 py-4 text-sm ${isDark ? 'border-white/[0.08] bg-white/[0.03] text-slate-400' : 'border-slate-200 bg-slate-50 text-slate-500'}`}>
+        Carregando itens do lote...
+      </div>
+    )
+  }
+
+  const itens = data?.itens ?? []
+  const approvedCount = itens.filter(item => item.decisao === 'aprovado').length
+  const rejectedCount = itens.filter(item => item.decisao === 'rejeitado').length
+
+  return (
+    <div className={`rounded-2xl border overflow-hidden ${isDark ? 'border-white/[0.08] bg-white/[0.03]' : 'border-slate-200 bg-slate-50/80'}`}>
+      <div className={`grid grid-cols-[minmax(0,1.8fr)_110px_90px_110px_120px] gap-x-3 px-4 py-2 text-[10px] font-semibold uppercase tracking-wider ${isDark ? 'text-slate-500 border-b border-white/[0.08]' : 'text-slate-400 border-b border-slate-200'}`}>
+        <span>Item</span>
+        <span>Documento</span>
+        <span>Venc.</span>
+        <span className="text-right">Valor</span>
+        <span>Decisão</span>
+      </div>
+      <div className="divide-y divide-inherit">
+        {itens.map(item => (
+          <button
+            key={item.id}
+            type="button"
+            onClick={() => item.cp && onOpenCP(item.cp)}
+            className={`grid w-full grid-cols-[minmax(0,1.8fr)_110px_90px_110px_120px] gap-x-3 px-4 py-2.5 text-left transition-all ${isDark ? 'hover:bg-white/[0.04]' : 'hover:bg-white'}`}
+          >
+            <div className="min-w-0">
+              <p className={`truncate text-xs font-semibold ${isDark ? 'text-white' : 'text-slate-800'}`}>{item.cp?.fornecedor_nome || 'Item sem fornecedor'}</p>
+              <p className={`truncate text-[11px] ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{item.cp?.descricao || '\u2014'}</p>
+            </div>
+            <span className={`truncate text-[11px] ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{item.cp?.numero_documento || '\u2014'}</span>
+            <span className={`text-[11px] ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{item.cp ? fmtData(item.cp.data_vencimento) : '\u2014'}</span>
+            <span className="text-right text-[11px] font-semibold text-emerald-600">{item.cp ? fmt(item.cp.valor_original) : '\u2014'}</span>
+            <span className={`inline-flex h-fit items-center rounded-full px-2 py-0.5 text-[10px] font-semibold ${
+              item.decisao === 'aprovado'
+                ? isDark ? 'bg-emerald-500/10 text-emerald-300' : 'bg-emerald-50 text-emerald-700'
+                : item.decisao === 'rejeitado'
+                  ? isDark ? 'bg-rose-500/10 text-rose-300' : 'bg-rose-50 text-rose-700'
+                  : isDark ? 'bg-white/[0.06] text-slate-300' : 'bg-white text-slate-600 border border-slate-200'
+            }`}>
+              {item.decisao === 'aprovado' ? 'Aprovado' : item.decisao === 'rejeitado' ? 'Rejeitado' : 'Pendente'}
+            </span>
+          </button>
+        ))}
+      </div>
+      <div className={`flex flex-wrap items-center gap-2 px-4 py-3 text-[11px] ${isDark ? 'border-t border-white/[0.08] text-slate-400' : 'border-t border-slate-200 text-slate-500'}`}>
+        <span>{itens.length} itens</span>
+        <span>{approvedCount} aprovados</span>
+        <span>{rejectedCount} excluídos</span>
+      </div>
+    </div>
+  )
+}
+
+function LoteTableRow({
+  summary,
+  isDark,
+  isSelected,
+  expanded,
+  onSelectMany,
+  onToggleExpand,
+  onOpenCP,
+  onPrimaryAction,
+  onSecondaryAction,
+}: {
+  summary: LoteStageSummary
+  isDark: boolean
+  isSelected: boolean
+  expanded: boolean
+  onSelectMany: (ids: string[]) => void
+  onToggleExpand: () => void
+  onOpenCP: (cp: ContaPagar) => void
+  onPrimaryAction?: { label: string; onClick: () => void; tone: string; icon: typeof Send }
+  onSecondaryAction?: { label: string; onClick: () => void; tone: string; icon: typeof Banknote }
+}) {
+  return (
+    <div className={`border-b ${isDark ? 'border-white/[0.04]' : 'border-slate-100'}`}>
+      <div
+        className={`${LOTE_TABLE_GRID} px-3 py-3 transition-all ${isDark ? `hover:bg-white/[0.03] ${isSelected ? 'bg-emerald-500/10' : ''}` : `hover:bg-slate-50 ${isSelected ? 'bg-emerald-50' : ''}`}`}
+      >
+        <input
+          type="checkbox"
+          checked={isSelected}
+          onChange={(e) => { e.stopPropagation(); onSelectMany(summary.cpIds) }}
+          onClick={e => e.stopPropagation()}
+          className="w-3 h-3 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
+        />
+        <div className={`w-0.5 h-10 rounded-full ${isDark ? 'bg-emerald-400/60' : 'bg-emerald-500/70'}`} />
+        <button type="button" onClick={onToggleExpand} className="min-w-0 text-left">
+          <p className={`truncate text-sm font-bold ${isDark ? 'text-white' : 'text-slate-800'}`}>{summary.lote.numero_lote}</p>
+          <p className={`truncate text-[11px] ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{summary.progressLabel}</p>
+        </button>
+        <button type="button" onClick={onToggleExpand} className="min-w-0 text-left">
+          <p className={`truncate text-xs font-semibold ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>{summary.supplierLabel}</p>
+          <p className={`truncate text-[11px] ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{summary.workLabel}</p>
+          <div className={`mt-2 h-1.5 rounded-full overflow-hidden ${isDark ? 'bg-white/[0.06]' : 'bg-slate-200'}`}>
+            <div className="h-full rounded-full bg-emerald-500 transition-all" style={{ width: `${summary.progress}%` }} />
+          </div>
+          <div className="mt-2 flex flex-wrap gap-1.5 text-[10px]">
+            <span className={`rounded-full px-2 py-0.5 ${isDark ? 'bg-white/[0.06] text-slate-200' : 'bg-white text-slate-600 border border-slate-200'}`}>{summary.totalItems} títulos</span>
+            <span className={`rounded-full px-2 py-0.5 ${isDark ? 'bg-emerald-500/10 text-emerald-300' : 'bg-emerald-50 text-emerald-700'}`}>{summary.approvedItems} aprovados</span>
+            {summary.excludedItems > 0 && (
+              <span className={`rounded-full px-2 py-0.5 ${isDark ? 'bg-rose-500/10 text-rose-300' : 'bg-rose-50 text-rose-700'}`}>{summary.excludedItems} excluídos</span>
+            )}
+          </div>
+        </button>
+        <span className={`text-sm font-bold ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>{summary.totalItems}</span>
+        <span className={`text-sm font-bold ${isDark ? 'text-emerald-300' : 'text-emerald-700'}`}>{summary.approvedItems}</span>
+        <span className="text-sm font-extrabold text-emerald-600">{fmt(summary.visibleValue || summary.totalValue)}</span>
+        <div className="flex items-center justify-end gap-2">
+          {onPrimaryAction && (
+            <button type="button" onClick={onPrimaryAction.onClick} className={`inline-flex items-center gap-1.5 rounded-xl px-3 py-2 text-[11px] font-bold text-white transition-all ${onPrimaryAction.tone}`}>
+              <onPrimaryAction.icon size={12} />
+              {onPrimaryAction.label}
+            </button>
+          )}
+          {onSecondaryAction && (
+            <button type="button" onClick={onSecondaryAction.onClick} className={`inline-flex items-center gap-1.5 rounded-xl px-3 py-2 text-[11px] font-bold text-white transition-all ${onSecondaryAction.tone}`}>
+              <onSecondaryAction.icon size={12} />
+              {onSecondaryAction.label}
+            </button>
+          )}
+          <button type="button" onClick={onToggleExpand} className={`inline-flex items-center gap-1 rounded-xl border px-3 py-2 text-[11px] font-semibold ${isDark ? 'border-white/[0.08] text-slate-200 hover:bg-white/[0.04]' : 'border-slate-200 text-slate-600 hover:bg-white'}`}>
+            {expanded ? 'Ocultar' : 'Itens'}
+          </button>
+        </div>
+      </div>
+      {expanded && (
+        <div className="px-3 pb-3">
+          <LoteItemsPanel loteId={summary.lote.id} isDark={isDark} onOpenCP={onOpenCP} />
+        </div>
+      )}
+    </div>
+  )
+}
+
+function LoteCard({
+  summary,
+  isDark,
+  expanded,
+  onToggleExpand,
+  onOpenCP,
+  onPrimaryAction,
+  onSecondaryAction,
+}: {
+  summary: LoteStageSummary
+  isDark: boolean
+  expanded: boolean
+  onToggleExpand: () => void
+  onOpenCP: (cp: ContaPagar) => void
+  onPrimaryAction?: { label: string; onClick: () => void; tone: string; icon: typeof Send }
+  onSecondaryAction?: { label: string; onClick: () => void; tone: string; icon: typeof Banknote }
+}) {
+  return (
+    <div className={`rounded-2xl border p-4 ${isDark ? 'border-white/[0.06] bg-white/[0.02]' : 'border-slate-200 bg-white'}`}>
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className={`text-[11px] font-semibold uppercase tracking-wider ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{summary.lote.numero_lote}</p>
+          <p className={`truncate text-base font-bold ${isDark ? 'text-white' : 'text-slate-800'}`}>{summary.supplierLabel}</p>
+          <p className={`truncate text-sm ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{summary.workLabel}</p>
+        </div>
+        <div className="text-right shrink-0">
+          <p className={`text-[11px] ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{summary.progressLabel}</p>
+          <p className="text-2xl font-extrabold text-emerald-600">{fmt(summary.visibleValue || summary.totalValue)}</p>
+        </div>
+      </div>
+      <div className="mt-4 flex flex-wrap gap-2 text-[11px]">
+        <span className={`rounded-full px-2.5 py-1 ${isDark ? 'bg-white/[0.06] text-slate-200' : 'bg-slate-50 text-slate-600 border border-slate-200'}`}>{summary.totalItems} títulos</span>
+        <span className={`rounded-full px-2.5 py-1 ${isDark ? 'bg-emerald-500/10 text-emerald-300' : 'bg-emerald-50 text-emerald-700'}`}>{summary.approvedItems} aprovados</span>
+        {summary.excludedItems > 0 && (
+          <span className={`rounded-full px-2.5 py-1 ${isDark ? 'bg-rose-500/10 text-rose-300' : 'bg-rose-50 text-rose-700'}`}>{summary.excludedItems} excluídos</span>
+        )}
+      </div>
+      <div className={`mt-4 h-2 rounded-full overflow-hidden ${isDark ? 'bg-white/[0.06]' : 'bg-slate-200'}`}>
+        <div className="h-full rounded-full bg-emerald-500 transition-all" style={{ width: `${summary.progress}%` }} />
+      </div>
+      <div className="mt-4 flex flex-wrap items-center justify-between gap-2">
+        <div className="flex flex-wrap gap-2">
+          {onPrimaryAction && (
+            <button type="button" onClick={onPrimaryAction.onClick} className={`inline-flex items-center gap-1.5 rounded-xl px-3 py-2 text-[11px] font-bold text-white transition-all ${onPrimaryAction.tone}`}>
+              <onPrimaryAction.icon size={12} />
+              {onPrimaryAction.label}
+            </button>
+          )}
+          {onSecondaryAction && (
+            <button type="button" onClick={onSecondaryAction.onClick} className={`inline-flex items-center gap-1.5 rounded-xl px-3 py-2 text-[11px] font-bold text-white transition-all ${onSecondaryAction.tone}`}>
+              <onSecondaryAction.icon size={12} />
+              {onSecondaryAction.label}
+            </button>
+          )}
+        </div>
+        <button type="button" onClick={onToggleExpand} className={`inline-flex items-center gap-1 rounded-xl border px-3 py-2 text-[11px] font-semibold ${isDark ? 'border-white/[0.08] text-slate-200 hover:bg-white/[0.04]' : 'border-slate-200 text-slate-600 hover:bg-slate-50'}`}>
+          {expanded ? 'Ocultar itens' : 'Ver itens'}
+        </button>
+      </div>
+      {expanded && (
+        <div className="mt-4">
+          <LoteItemsPanel loteId={summary.lote.id} isDark={isDark} onOpenCP={onOpenCP} />
+        </div>
+      )}
+    </div>
+  )
+}
+
 // Ã¢â€â‚¬Ã¢â€â‚¬ Main Page Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
 
 export default function CPPipeline() {
@@ -941,6 +1203,7 @@ export default function CPPipeline() {
   const [sortDir, setSortDir] = useState<SortDir>('asc')
   const [viewMode, setViewMode] = useState<ViewMode>('list')
   const [quickFilter, setQuickFilter] = useState<QuickFilterId>('all')
+  const [expandedLoteIds, setExpandedLoteIds] = useState<Set<string>>(new Set())
 
   // Data
   const { data: contas = [], isLoading } = useContasPagar()
@@ -963,6 +1226,17 @@ export default function CPPipeline() {
     () => new Map(lotes.map(lote => [lote.id, lote])),
     [lotes],
   )
+
+  const contasByLoteId = useMemo(() => {
+    const map = new Map<string, ContaPagar[]>()
+    for (const cp of contas) {
+      if (!cp.lote_id) continue
+      const list = map.get(cp.lote_id) ?? []
+      list.push(cp)
+      map.set(cp.lote_id, list)
+    }
+    return map
+  }, [contas])
 
   const resolvePipelineStage = useCallback((cp: ContaPagar): PipelineStageId => {
     if (cp.status !== 'em_lote') return cp.status
@@ -1072,6 +1346,58 @@ export default function CPPipeline() {
     }
   }, [anchorCP, quickFilter, stageCPs])
 
+  const isLoteStageTab = LOTE_STAGE_TABS.includes(activeTab)
+
+  const activeLotes = useMemo(() => {
+    if (!isLoteStageTab) return [] as LoteStageSummary[]
+
+    const byLote = new Map<string, ContaPagar[]>()
+    for (const cp of activeCPs) {
+      if (!cp.lote_id) continue
+      const list = byLote.get(cp.lote_id) ?? []
+      list.push(cp)
+      byLote.set(cp.lote_id, list)
+    }
+
+    return Array.from(byLote.entries()).map(([loteId, currentItems]) => {
+      const lote = lotesById.get(loteId)
+      const allItems = contasByLoteId.get(loteId) ?? currentItems
+      const totalItems = lote?.qtd_itens ?? allItems.length
+      const approvedItems = allItems.filter(cp => ['aprovado_pgto', 'em_pagamento', 'pago', 'conciliado'].includes(cp.status)).length
+      const excludedItems = allItems.filter(cp => cp.status === 'cancelado').length
+      const supplierLabel = summarizeNames(allItems.map(cp => cp.fornecedor_nome), 'Lote sem fornecedor')
+      const workLabel = summarizeNames(allItems.map(cp => cp.requisicao?.obra_nome || cp.centro_custo || ''), 'Múltiplas obras e centros')
+      const totalValue = lote?.valor_total ?? allItems.reduce((sum, cp) => sum + cp.valor_original, 0)
+      const visibleValue = currentItems.reduce((sum, cp) => sum + cp.valor_original, 0)
+      const { progress, progressLabel } = getLoteProgress(activeTab, lote?.status)
+
+      return {
+        lote: lote ?? {
+          id: loteId,
+          numero_lote: `Lote ${loteId.slice(0, 8)}`,
+          criado_por: 'Financeiro',
+          valor_total: totalValue,
+          qtd_itens: totalItems,
+          status: 'montando',
+          created_at: currentItems[0]?.created_at || new Date().toISOString(),
+          updated_at: currentItems[0]?.created_at || new Date().toISOString(),
+        },
+        cpIds: currentItems.map(cp => cp.id),
+        currentItems,
+        allItems,
+        totalItems,
+        approvedItems,
+        excludedItems,
+        totalValue,
+        visibleValue,
+        supplierLabel,
+        workLabel,
+        progress,
+        progressLabel,
+      } satisfies LoteStageSummary
+    })
+  }, [activeCPs, activeTab, contasByLoteId, isLoteStageTab, lotesById])
+
   // Tab totals
   const tabTotal = useMemo(() => activeCPs.reduce((s, cp) => s + cp.valor_original, 0), [activeCPs])
 
@@ -1086,6 +1412,27 @@ export default function CPPipeline() {
     setSelectedIds(prev => {
       const next = new Set(prev)
       if (next.has(id)) next.delete(id); else next.add(id)
+      return next
+    })
+  }
+
+  const toggleLoteSelection = (ids: string[]) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev)
+      const allSelected = ids.every(id => next.has(id))
+      for (const id of ids) {
+        if (allSelected) next.delete(id)
+        else next.add(id)
+      }
+      return next
+    })
+  }
+
+  const toggleExpandedLote = (loteId: string) => {
+    setExpandedLoteIds(prev => {
+      const next = new Set(prev)
+      if (next.has(loteId)) next.delete(loteId)
+      else next.add(loteId)
       return next
     })
   }
@@ -1225,6 +1572,46 @@ export default function CPPipeline() {
     }
   }
 
+  const buildLoteActions = (summary: LoteStageSummary) => {
+    switch (activeTab) {
+      case 'em_lote':
+        return {
+          primary: {
+            label: 'Enviar aprovação',
+            onClick: () => handleEnviarLotesAprovacao(summary.cpIds),
+            tone: 'bg-amber-500 hover:bg-amber-600',
+            icon: Send,
+          },
+        }
+      case 'aprovado_pgto':
+        return {
+          primary: {
+            label: 'Enviar remessa',
+            onClick: () => handleEnviarRemessa(summary.cpIds),
+            tone: 'bg-sky-600 hover:bg-sky-700',
+            icon: Send,
+          },
+          secondary: {
+            label: 'Registrar pgto',
+            onClick: () => handlePagar(summary.cpIds),
+            tone: 'bg-emerald-600 hover:bg-emerald-700',
+            icon: Banknote,
+          },
+        }
+      case 'em_pagamento':
+        return {
+          primary: {
+            label: 'Registrar pgto',
+            onClick: () => handleConfirmarPagamento(summary.cpIds),
+            tone: 'bg-teal-600 hover:bg-teal-700',
+            icon: Banknote,
+          },
+        }
+      default:
+        return {}
+    }
+  }
+
   // Export
   const handleExport = () => {
     const stage = CP_PIPELINE_VIEW_STAGES.find(s => s.status === activeTab)
@@ -1248,6 +1635,7 @@ export default function CPPipeline() {
   const switchTab = (status: PipelineStageId) => {
     setActiveTab(status)
     setSelectedIds(new Set())
+    setExpandedLoteIds(new Set())
     setBusca('')
     setQuickFilter('all')
   }
@@ -1426,7 +1814,11 @@ export default function CPPipeline() {
 
           {/* Stats */}
           <div className={`ml-auto flex items-center gap-3 text-[11px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
-            <span>{activeCPs.length} {activeCPs.length === 1 ? 't\u00EDtulo' : 't\u00EDtulos'}</span>
+            <span>
+              {isLoteStageTab
+                ? `${activeLotes.length} ${activeLotes.length === 1 ? 'lote' : 'lotes'}`
+                : `${activeCPs.length} ${activeCPs.length === 1 ? 't\u00EDtulo' : 't\u00EDtulos'}`}
+            </span>
             <span className="font-bold text-emerald-600">{fmt(tabTotal)}</span>
             {overdueCt > 0 && (
               <span className="flex items-center gap-1 text-red-500 font-bold">
@@ -1522,11 +1914,60 @@ export default function CPPipeline() {
                 <Receipt size={24} className="text-slate-300" />
               </div>
               <p className={`text-sm font-semibold ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
-                Nenhum t\u00EDtulo nesta etapa
+                {isLoteStageTab ? 'Nenhum lote nesta etapa' : 'Nenhum t\u00EDtulo nesta etapa'}
               </p>
               <p className={`text-xs mt-1 ${isDark ? 'text-slate-600' : 'text-slate-400'}`}>
-                {busca ? 'Tente outra busca' : 'Os t\u00EDtulos aparecer\u00E3o aqui quando avan\u00E7arem'}
+                {busca ? 'Tente outra busca' : isLoteStageTab ? 'Os lotes aparecer\u00E3o aqui quando avan\u00E7arem' : 'Os t\u00EDtulos aparecer\u00E3o aqui quando avan\u00E7arem'}
               </p>
+            </div>
+          ) : isLoteStageTab && viewMode === 'list' ? (
+            <>
+              <div className={`${LOTE_TABLE_GRID} px-3 py-2 border-b text-[10px] font-semibold uppercase tracking-wider ${isDark ? 'border-white/[0.06] text-slate-600' : 'border-slate-100 text-slate-400'}`}>
+                <span />
+                <span />
+                <span>Lote</span>
+                <span>Resumo</span>
+                <span>Qtd</span>
+                <span>Aprov.</span>
+                <span className="text-right">Valor</span>
+                <span className="text-right">Ações</span>
+              </div>
+              {activeLotes.map(summary => {
+                const actions = buildLoteActions(summary)
+                const selected = summary.cpIds.every(id => selectedIds.has(id))
+                return (
+                  <LoteTableRow
+                    key={summary.lote.id}
+                    summary={summary}
+                    isDark={isDark}
+                    isSelected={selected}
+                    expanded={expandedLoteIds.has(summary.lote.id)}
+                    onSelectMany={toggleLoteSelection}
+                    onToggleExpand={() => toggleExpandedLote(summary.lote.id)}
+                    onOpenCP={cp => setDetailCP(cp)}
+                    onPrimaryAction={actions.primary}
+                    onSecondaryAction={actions.secondary}
+                  />
+                )
+              })}
+            </>
+          ) : isLoteStageTab ? (
+            <div className="space-y-3 p-4">
+              {activeLotes.map(summary => {
+                const actions = buildLoteActions(summary)
+                return (
+                  <LoteCard
+                    key={summary.lote.id}
+                    summary={summary}
+                    isDark={isDark}
+                    expanded={expandedLoteIds.has(summary.lote.id)}
+                    onToggleExpand={() => toggleExpandedLote(summary.lote.id)}
+                    onOpenCP={cp => setDetailCP(cp)}
+                    onPrimaryAction={actions.primary}
+                    onSecondaryAction={actions.secondary}
+                  />
+                )
+              })}
             </div>
           ) : viewMode === 'list' ? (
             <>
