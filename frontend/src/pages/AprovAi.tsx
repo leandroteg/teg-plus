@@ -28,7 +28,7 @@ const fmt = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', curren
 const urgenciaConfig: Record<string, { bg: string; text: string; label: string }> = {
   normal:  { bg: 'bg-slate-100',  text: 'text-slate-600',  label: 'Normal'  },
   urgente: { bg: 'bg-amber-100',  text: 'text-amber-700',  label: 'Urgente' },
-  critica: { bg: 'bg-red-100',    text: 'text-red-700',    label: 'Critica' },
+  critica: { bg: 'bg-red-100',    text: 'text-red-700',    label: 'Cr\u00EDtica' },
 }
 
 const tipoConfig: Record<TipoAprovacao, {
@@ -43,7 +43,7 @@ const tipoConfig: Record<TipoAprovacao, {
   headerBg: string
 }> = {
   cotacao: {
-    label: 'Aprovacao Compras',
+    label: 'Aprova\u00E7\u00E3o Compras',
     icon: FileSearch,
     color: 'blue',
     bgLight: 'bg-blue-50',
@@ -54,7 +54,7 @@ const tipoConfig: Record<TipoAprovacao, {
     headerBg: 'bg-gradient-to-r from-blue-600 to-blue-500',
   },
   autorizacao_pagamento: {
-    label: 'Autorizacoes de Pagamento',
+    label: 'Autoriza\u00E7\u00F5es de Pagamento',
     icon: Banknote,
     color: 'amber',
     bgLight: 'bg-amber-50',
@@ -76,7 +76,7 @@ const tipoConfig: Record<TipoAprovacao, {
     headerBg: 'bg-gradient-to-r from-violet-600 to-violet-500',
   },
   requisicao_compra: {
-    label: 'Validacao Tec. Requisicao de Compra',
+    label: 'Valida\u00E7\u00E3o T\u00E9c. Requisi\u00E7\u00E3o de Compra',
     icon: ShoppingCart,
     color: 'teal',
     bgLight: 'bg-teal-50',
@@ -107,7 +107,7 @@ function timeLeft(dateStr?: string): string {
 function getAlcada(valor: number, nivel: number) {
   if (valor <= 2000) return { label: `Alcada 1`, sublabel: `Welton ou Claudinor <= R$2.000` }
   if (nivel <= 2)    return { label: 'Alcada 2', sublabel: 'Laucidio > R$2.000' }
-  return { label: 'Aprovacao de Pagamento', sublabel: 'Laucidio -- etapa final' }
+  return { label: 'Aprova\u00E7\u00E3o de Pagamento', sublabel: 'Laucidio -- etapa final' }
 }
 
 function formatDateShort(dateStr?: string): string {
