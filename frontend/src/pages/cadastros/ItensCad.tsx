@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Package2, Plus, Search, X, Save, Loader2 } from 'lucide-react'
+import { Package2, Plus, Search, X, Save, Loader2, ChevronsUpDown } from 'lucide-react'
 import { useEstoqueItens, useSalvarItem } from '../../hooks/useEstoque'
 import { useCadClasses } from '../../hooks/useCadastros'
 import type { EstItem } from '../../types/estoque'
@@ -35,6 +35,8 @@ export default function ItensCad() {
   const [curvaFiltro, setCurvaFiltro] = useState('')
   const [showForm, setShowForm] = useState(false)
   const [editItem, setEditItem] = useState<Partial<EstItem> | null>(null)
+  const [classeBusca, setClasseBusca] = useState('')
+  const [classeDropdownOpen, setClasseDropdownOpen] = useState(false)
 
   const { data: itens = [], isLoading } = useEstoqueItens(
     curvaFiltro ? { curva: curvaFiltro as 'A' | 'B' | 'C' } : undefined,
@@ -48,24 +50,49 @@ export default function ItensCad() {
       item.codigo.toLowerCase().includes(busca.toLowerCase()))
     : itens
 
+  const classesFiltradas = classes
+    .filter((classe) => {
+      const termo = classeBusca.trim().toLowerCase()
+      if (!termo) return true
+      return `${classe.codigo} ${classe.descricao}`.toLowerCase().includes(termo)
+    })
+    .slice(0, 12)
+
+  function formatClasseLabel(classe?: typeof classes[number]) {
+    if (!classe) return ''
+    return `${classe.codigo} - ${classe.descricao}`
+  }
+
   function openNew() {
     setEditItem({ ...EMPTY })
+    setClasseBusca('')
+    setClasseDropdownOpen(false)
     setShowForm(true)
   }
 
   function openEdit(item: EstItem) {
     setEditItem({ ...item })
+    setClasseBusca(
+      item.classe_financeira_codigo && item.classe_financeira_descricao
+        ? `${item.classe_financeira_codigo} - ${item.classe_financeira_descricao}`
+        : item.classe_financeira_descricao || item.classe_financeira_codigo || ''
+    )
+    setClasseDropdownOpen(false)
     setShowForm(true)
   }
 
   function closeForm() {
     setShowForm(false)
     setEditItem(null)
+    setClasseBusca('')
+    setClasseDropdownOpen(false)
   }
 
   function handleClasseChange(classeId: string) {
     if (!editItem) return
     const classe = classes.find((item) => item.id === classeId)
+    setClasseBusca(formatClasseLabel(classe))
+    setClasseDropdownOpen(false)
     setEditItem({
       ...editItem,
       classe_financeira_id: classe?.id || undefined,
@@ -246,21 +273,60 @@ export default function ItensCad() {
 
                 <div className="rounded-2xl border border-slate-200 p-4 space-y-4">
                   <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-bold text-slate-600 mb-1">Classe Financeira</label>
-                  <select
-                    value={editItem.classe_financeira_id ?? ''}
-                    onChange={(event) => handleClasseChange(event.target.value)}
-                    className="input-base"
-                  >
-                    <option value="">Selecionar classe...</option>
-                    {classes.map((classe) => (
-                      <option key={classe.id} value={classe.id}>
-                        {classe.codigo} - {classe.descricao}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+                  <div>
+                    <label className="block text-xs font-bold text-slate-600 mb-1">Classe Financeira</label>
+                    <div className="relative">
+                      <input
+                        value={classeBusca}
+                        onChange={(event) => {
+                          setClasseBusca(event.target.value)
+                          setClasseDropdownOpen(true)
+                        }}
+                        onFocus={() => setClasseDropdownOpen(true)}
+                        onBlur={() => {
+                          window.setTimeout(() => {
+                            setClasseDropdownOpen(false)
+                            if (!editItem.classe_financeira_id) {
+                              setClasseBusca('')
+                              return
+                            }
+                            const selecionada = classes.find((item) => item.id === editItem.classe_financeira_id)
+                            setClasseBusca(formatClasseLabel(selecionada))
+                          }, 120)
+                        }}
+                        placeholder="Digite codigo ou descricao..."
+                        className="input-base pr-10"
+                      />
+                      <ChevronsUpDown size={16} className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-slate-400" />
+
+                      {classeDropdownOpen && (
+                        <div className="absolute z-20 mt-2 max-h-64 w-full overflow-y-auto rounded-xl border border-slate-200 bg-white shadow-lg">
+                          {classesFiltradas.length > 0 ? (
+                            classesFiltradas.map((classe) => (
+                              <button
+                                key={classe.id}
+                                type="button"
+                                onMouseDown={(event) => {
+                                  event.preventDefault()
+                                  handleClasseChange(classe.id)
+                                }}
+                                className={`flex w-full items-start gap-2 px-3 py-2 text-left text-sm transition-colors hover:bg-slate-50 ${
+                                  editItem.classe_financeira_id === classe.id ? 'bg-slate-50' : ''
+                                }`}
+                              >
+                                <span className="font-semibold text-slate-700">{classe.codigo}</span>
+                                <span className="text-slate-500">{classe.descricao}</span>
+                              </button>
+                            ))
+                          ) : (
+                            <div className="px-3 py-2 text-sm text-slate-500">
+                              Nenhuma classe encontrada
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </div>
                 <div>
                   <label className="block text-xs font-bold text-slate-600 mb-1">Categoria Financeira</label>
                   <input
