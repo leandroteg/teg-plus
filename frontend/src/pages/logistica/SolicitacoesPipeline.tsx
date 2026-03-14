@@ -190,29 +190,29 @@ function SolRow({ sol, onClick, isDark, isSelected, onSelect }: {
       {sol.urgente && <AlertTriangle size={11} className="text-red-500 shrink-0" />}
       {!sol.urgente && <div className="w-[11px] shrink-0" />}
 
-      <span className={`text-[11px] font-mono font-bold w-[60px] shrink-0 ${isDark ? 'text-orange-400' : 'text-orange-700'}`}>
+      <span className={`text-[11px] font-mono font-bold w-[86px] shrink-0 whitespace-nowrap ${isDark ? 'text-orange-400' : 'text-orange-700'}`}>
         {sol.numero}
       </span>
 
-      <span className={`text-[10px] px-1.5 py-0.5 rounded-md w-[90px] shrink-0 text-center font-medium ${isDark ? 'bg-white/[0.04] text-slate-400' : 'bg-slate-100 text-slate-500'}`}>
+      <span className={`text-[10px] px-1.5 py-0.5 rounded-md w-[96px] shrink-0 text-center font-medium ${isDark ? 'bg-white/[0.04] text-slate-400' : 'bg-slate-100 text-slate-500'}`}>
         {TIPO_LABEL[sol.tipo] || sol.tipo}
       </span>
 
-      <span className={`text-xs truncate w-[140px] shrink-0 ${isDark ? 'text-white' : 'text-slate-800'}`}>
+      <span className={`text-xs truncate w-[150px] shrink-0 ${isDark ? 'text-white' : 'text-slate-800'}`}>
         {sol.origem}
       </span>
 
       <span className={`text-[10px] ${isDark ? 'text-slate-600' : 'text-slate-300'} shrink-0`}>→</span>
 
-      <span className={`text-xs truncate w-[140px] shrink-0 ${isDark ? 'text-white' : 'text-slate-800'}`}>
+      <span className={`text-xs truncate w-[150px] shrink-0 ${isDark ? 'text-white' : 'text-slate-800'}`}>
         {sol.destino}
       </span>
 
-      <span className={`text-[11px] truncate w-[100px] shrink-0 flex items-center gap-0.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+      <span className={`text-[11px] truncate w-[104px] shrink-0 flex items-center gap-0.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
         {sol.obra_nome ? <><Building2 size={9} className="shrink-0" /> {sol.obra_nome}</> : '—'}
       </span>
 
-      <span className={`text-[11px] text-right w-[62px] shrink-0 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+      <span className={`text-[11px] text-right w-[64px] shrink-0 whitespace-nowrap ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
         {fmtData(sol.data_desejada || sol.criado_em)}
       </span>
     </div>
@@ -786,13 +786,13 @@ export default function SolicitacoesPipeline() {
               <div className={`flex items-center gap-2 px-3 py-1 border-b text-[10px] font-semibold uppercase tracking-wider ${isDark ? 'border-white/[0.06] text-slate-600' : 'border-slate-100 text-slate-400'}`}>
                 <span className="w-3 shrink-0" />
                 <span className="w-[11px] shrink-0" />
-                <span className="w-[60px] shrink-0">Nº</span>
-                <span className="w-[90px] shrink-0 text-center">Tipo</span>
-                <span className="w-[140px] shrink-0">Origem</span>
+                <span className="w-[86px] shrink-0">Nº</span>
+                <span className="w-[96px] shrink-0 text-center">Tipo</span>
+                <span className="w-[150px] shrink-0">Origem</span>
                 <span className="w-3 shrink-0" />
-                <span className="w-[140px] shrink-0">Destino</span>
-                <span className="w-[100px] shrink-0">Obra</span>
-                <span className="w-[62px] shrink-0 text-right">Data</span>
+                <span className="w-[150px] shrink-0">Destino</span>
+                <span className="w-[104px] shrink-0">Obra</span>
+                <span className="w-[64px] shrink-0 text-right">Data</span>
               </div>
               {activeItems.map(sol => (
                 <SolRow key={sol.id} sol={sol} onClick={() => setDetail(sol)} isDark={isDark} isSelected={selectedIds.has(sol.id)} onSelect={toggleSelect} />

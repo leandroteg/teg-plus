@@ -98,7 +98,7 @@ function CotCard({ cot, isDark, onClick }: { cot: Cotacao; isDark: boolean; onCl
 
   return (
     <div onClick={onClick}
-      className={`rounded-2xl border p-4 cursor-pointer transition-all active:scale-[0.99] space-y-3 min-h-[176px] h-full flex flex-col justify-between ${
+      className={`rounded-2xl border p-4 cursor-pointer transition-all active:scale-[0.99] space-y-3 flex flex-col justify-between ${
         isDark
           ? 'bg-white/[0.02] border-white/[0.06] hover:border-teal-500/40 hover:bg-white/[0.04]'
           : concluida
@@ -442,7 +442,7 @@ export default function FilaCotacoes() {
           <p className="text-sm font-medium">Nenhuma cotação nesta etapa</p>
         </div>
       ) : viewMode === 'cards' ? (
-        <div className="grid gap-4 p-4 md:grid-cols-2">
+        <div className="space-y-2 p-4">
           {activeItems.map(cot => <CotCard key={cot.id} cot={cot} isDark={isDark} onClick={() => setDetail(cot)} />)}
         </div>
       ) : (
@@ -462,12 +462,12 @@ export default function FilaCotacoes() {
               {activeItems.map(cot => (
                 <tr key={cot.id} onClick={() => setDetail(cot)}
                   className={`cursor-pointer transition-all ${isDark ? 'hover:bg-white/[0.03] border-t border-white/[0.04]' : 'hover:bg-slate-50 border-t border-slate-100'}`}>
-                  <td className={`px-3 py-2.5 font-mono ${isDark ? 'text-teal-400' : 'text-teal-600'}`}>{cot.requisicao?.numero ?? '—'}</td>
-                  <td className={`px-3 py-2.5 max-w-[200px] truncate ${isDark ? 'text-white' : 'text-slate-800'}`}>{cot.requisicao?.descricao}</td>
-                  <td className={`px-3 py-2.5 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{cot.requisicao?.obra_nome}</td>
-                  <td className={`px-3 py-2.5 text-right font-bold ${isDark ? 'text-teal-400' : 'text-teal-600'}`}>{fmt(cot.valor_selecionado ?? 0)}</td>
-                  <td className={`px-3 py-2.5 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{cot.fornecedor_selecionado_nome ?? '—'}</td>
-                  <td className={`px-3 py-2.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{diasEmAberto(cot.created_at)}d</td>
+                  <td className={`px-3 py-2 font-mono ${isDark ? 'text-teal-400' : 'text-teal-600'}`}>{cot.requisicao?.numero ?? '—'}</td>
+                  <td className={`px-3 py-2 max-w-[200px] truncate ${isDark ? 'text-white' : 'text-slate-800'}`}>{cot.requisicao?.descricao}</td>
+                  <td className={`px-3 py-2 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{cot.requisicao?.obra_nome}</td>
+                  <td className={`px-3 py-2 text-right font-bold ${isDark ? 'text-teal-400' : 'text-teal-600'}`}>{fmt(cot.valor_selecionado ?? 0)}</td>
+                  <td className={`px-3 py-2 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{cot.fornecedor_selecionado_nome ?? '—'}</td>
+                  <td className={`px-3 py-2 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{diasEmAberto(cot.created_at)}d</td>
                 </tr>
               ))}
             </tbody>

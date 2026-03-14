@@ -315,28 +315,28 @@ export default function AssinaturaPipeline() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-slate-100">
-                  <th className="text-left px-4 py-3 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Número</th>
-                  <th className="text-left px-4 py-3 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Contraparte</th>
-                  <th className="text-left px-4 py-3 text-[10px] font-bold text-slate-400 uppercase tracking-widest hidden lg:table-cell">Objeto</th>
-                  <th className="text-center px-4 py-3 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Signatários</th>
-                  <th className="text-right px-4 py-3 text-[10px] font-bold text-slate-400 uppercase tracking-widest hidden sm:table-cell">Valor</th>
-                  <th className="text-right px-4 py-3 text-[10px] font-bold text-slate-400 uppercase tracking-widest hidden md:table-cell">Data</th>
-                  <th className="text-center px-4 py-3 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Ação</th>
+                  <th className="text-left px-3 py-2 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Número</th>
+                  <th className="text-left px-3 py-2 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Contraparte</th>
+                  <th className="text-left px-3 py-2 text-[10px] font-bold text-slate-400 uppercase tracking-widest hidden lg:table-cell">Objeto</th>
+                  <th className="text-center px-3 py-2 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Signatários</th>
+                  <th className="text-right px-3 py-2 text-[10px] font-bold text-slate-400 uppercase tracking-widest hidden sm:table-cell">Valor</th>
+                  <th className="text-right px-3 py-2 text-[10px] font-bold text-slate-400 uppercase tracking-widest hidden md:table-cell">Data</th>
+                  <th className="text-center px-3 py-2 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Ação</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-50">
                 {filtered.map(item => (
                   <tr key={item.id} onClick={() => nav(`/contratos/solicitacoes/${item.id}`)} className="hover:bg-slate-50/80 transition-colors cursor-pointer">
-                    <td className="px-4 py-3">
+                    <td className="px-3 py-2">
                       <span className="text-xs font-mono font-semibold text-indigo-600 bg-indigo-50 rounded-md px-2 py-0.5">{item.numero || '-'}</span>
                     </td>
-                    <td className="px-4 py-3">
+                    <td className="px-3 py-2">
                       <p className="text-sm font-semibold text-slate-700 truncate max-w-[180px]">{item.contraparte}</p>
                     </td>
-                    <td className="px-4 py-3 hidden lg:table-cell">
+                    <td className="px-3 py-2 hidden lg:table-cell">
                       <p className="text-xs text-slate-500 truncate max-w-[240px]">{item.objeto}</p>
                     </td>
-                    <td className="px-4 py-3 text-center">
+                    <td className="px-3 py-2 text-center">
                       {item.assinatura && item.assinatura.signatarios?.length > 0 ? (
                         <div className="flex items-center justify-center gap-1 flex-wrap">
                           {item.assinatura.signatarios.map((sig, idx) => (
@@ -355,13 +355,13 @@ export default function AssinaturaPipeline() {
                         <span className="text-[10px] text-slate-300">—</span>
                       )}
                     </td>
-                    <td className="px-4 py-3 text-right hidden sm:table-cell">
+                    <td className="px-3 py-2 text-right hidden sm:table-cell">
                       <span className="text-xs font-bold text-slate-700">{item.valor ? fmt(item.valor) : '-'}</span>
                     </td>
-                    <td className="px-4 py-3 text-right hidden md:table-cell">
+                    <td className="px-3 py-2 text-right hidden md:table-cell">
                       <span className="text-[11px] text-slate-400">{fmtData(item.data)}</span>
                     </td>
-                    <td className="px-4 py-3 text-center">
+                    <td className="px-3 py-2 text-center">
                       <button
                         onClick={e => { e.stopPropagation(); nav(`/contratos/solicitacoes/${item.id}`) }}
                         className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[10px] font-semibold text-indigo-600 bg-indigo-50 border border-indigo-100 hover:bg-indigo-100 transition-all"
@@ -377,7 +377,7 @@ export default function AssinaturaPipeline() {
         </div>
       ) : (
         /* Card view */
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+        <div className="space-y-2">
           {filtered.map(item => (
             <div
               key={item.id}

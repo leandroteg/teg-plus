@@ -111,7 +111,7 @@ function ReqCard({ r, apr, isDark, onClick }: {
   return (
     <div
       onClick={onClick}
-      className={`rounded-2xl border p-4 cursor-pointer transition-all active:scale-[0.99] space-y-3 min-h-[176px] h-full flex flex-col justify-between ${
+      className={`rounded-2xl border p-4 cursor-pointer transition-all active:scale-[0.99] space-y-3 flex flex-col justify-between ${
         isDark
           ? 'bg-white/[0.02] border-white/[0.06] hover:border-teal-500/40 hover:bg-white/[0.04]'
           : 'bg-white border-slate-200 hover:border-teal-300 hover:shadow-md shadow-sm'
@@ -532,7 +532,7 @@ export default function ListaRequisicoes() {
           <p className="text-sm font-medium">Nenhuma requisição nesta etapa</p>
         </div>
       ) : viewMode === 'cards' ? (
-        <div className="grid gap-4 p-4 md:grid-cols-2">
+        <div className="space-y-2 p-4">
           {activeItems.map(r => (
             <ReqCard key={r.id} r={r} apr={aprovacaoMap.get(r.id)} isDark={isDark}
               onClick={() => setDetail(r)} />

@@ -359,21 +359,21 @@ function TrRow({ sol, onClick, isDark, isSelected, onSelect }: {
 
       <div className={`w-0.5 h-4 rounded-full shrink-0 ${late ? 'bg-amber-500' : sol.urgente ? 'bg-red-500' : 'bg-transparent'}`} />
 
-      <span className={`text-[11px] font-mono font-bold w-[60px] shrink-0 ${isDark ? 'text-orange-400' : 'text-orange-700'}`}>{sol.numero}</span>
+      <span className={`text-[11px] font-mono font-bold w-[86px] shrink-0 whitespace-nowrap ${isDark ? 'text-orange-400' : 'text-orange-700'}`}>{sol.numero}</span>
 
-      <span className={`text-xs truncate w-[130px] shrink-0 ${isDark ? 'text-white' : 'text-slate-800'}`}>{sol.origem}</span>
+      <span className={`text-xs truncate w-[140px] shrink-0 ${isDark ? 'text-white' : 'text-slate-800'}`}>{sol.origem}</span>
       <span className={`text-[10px] ${isDark ? 'text-slate-600' : 'text-slate-300'} shrink-0`}>→</span>
-      <span className={`text-xs truncate w-[130px] shrink-0 ${isDark ? 'text-white' : 'text-slate-800'}`}>{sol.destino}</span>
+      <span className={`text-xs truncate w-[140px] shrink-0 ${isDark ? 'text-white' : 'text-slate-800'}`}>{sol.destino}</span>
 
       <span className={`text-[11px] truncate w-[90px] shrink-0 flex items-center gap-0.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
         {sol.obra_nome ? <><Building2 size={9} className="shrink-0" /> {sol.obra_nome}</> : '—'}
       </span>
 
-      <span className={`text-[10px] truncate w-[70px] shrink-0 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{sol.motorista_nome || '—'}</span>
+      <span className={`text-[10px] truncate w-[88px] shrink-0 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{sol.motorista_nome || '—'}</span>
 
-      <span className={`text-[11px] font-mono w-[65px] shrink-0 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{sol.veiculo_placa || '—'}</span>
+      <span className={`text-[11px] font-mono w-[84px] shrink-0 whitespace-nowrap ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{sol.veiculo_placa || '—'}</span>
 
-      <span className={`text-[11px] text-right w-[62px] shrink-0 ${late ? 'text-amber-600 font-bold' : isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+      <span className={`text-[11px] text-right w-[64px] shrink-0 whitespace-nowrap ${late ? 'text-amber-600 font-bold' : isDark ? 'text-slate-500' : 'text-slate-400'}`}>
         {fmtData(sol.transporte?.hora_saida || sol.updated_at)}
       </span>
     </div>
@@ -722,14 +722,14 @@ export default function TransportesPipeline() {
               <div className={`flex items-center gap-2 px-3 py-1 border-b text-[10px] font-semibold uppercase tracking-wider ${isDark ? 'border-white/[0.06] text-slate-600' : 'border-slate-100 text-slate-400'}`}>
                 <span className="w-3 shrink-0" />
                 <span className="w-0.5 shrink-0" />
-                <span className="w-[60px] shrink-0">Nº</span>
-                <span className="w-[130px] shrink-0">Origem</span>
+                <span className="w-[86px] shrink-0">Nº</span>
+                <span className="w-[140px] shrink-0">Origem</span>
                 <span className="w-3 shrink-0" />
-                <span className="w-[130px] shrink-0">Destino</span>
+                <span className="w-[140px] shrink-0">Destino</span>
                 <span className="w-[90px] shrink-0">Obra</span>
-                <span className="w-[70px] shrink-0">Motorista</span>
-                <span className="w-[65px] shrink-0">Placa</span>
-                <span className="w-[62px] shrink-0 text-right">Data</span>
+                <span className="w-[88px] shrink-0">Motorista</span>
+                <span className="w-[84px] shrink-0">Placa</span>
+                <span className="w-[64px] shrink-0 text-right">Data</span>
               </div>
               {activeItems.map(sol => <TrRow key={sol.id} sol={sol} onClick={() => setDetail(sol)} isDark={isDark} isSelected={selectedIds.has(sol.id)} onSelect={toggleSelect} />)}
             </>
