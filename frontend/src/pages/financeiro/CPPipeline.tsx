@@ -444,6 +444,7 @@ function CPDetailModal({ cp, stageStatus, onClose, onAction, isDark }: {
   const nav = useNavigate()
   const { perfil, canApprove } = useAuth()
   const decisaoGenericaMut = useDecisaoGenerica()
+  const aprovarPagamentoMut = useAprovarPagamento()
   const urgency = getUrgency(cp)
   const [approval, setApproval] = useState<null | {
     id: string
@@ -500,7 +501,8 @@ function CPDetailModal({ cp, stageStatus, onClose, onAction, isDark }: {
   }, [approval?.id, approvalItems])
 
   const isApprovalStage = stageStatus === 'em_aprovacao'
-  const canApproveCurrent = !!approval && (perfil?.role === 'admin' || canApprove(approval.nivel))
+  const canDirectApproveCurrent = isApprovalStage && perfil?.role === 'admin' && !approval
+  const canApproveCurrent = isApprovalStage && (perfil?.role === 'admin' || (!!approval && canApprove(approval.nivel)) || canDirectApproveCurrent)
   const stage = CP_PIPELINE_VIEW_STAGES.find(s => s.status === stageStatus)
   const isLoteApproval = !!approvalLoteId && approvalItems.length > 0
 
@@ -511,7 +513,8 @@ function CPDetailModal({ cp, stageStatus, onClose, onAction, isDark }: {
   }
 
   const handleApprovalDecision = async (decisao: 'aprovada' | 'rejeitada' | 'esclarecimento') => {
-    if (!approval || !perfil) return
+    if (!perfil) return
+    if (!approval && !canDirectApproveCurrent) return
     if (decisao === 'esclarecimento' && !approvalNote.trim()) {
       setApprovalExpanded(true)
       return
@@ -521,6 +524,16 @@ function CPDetailModal({ cp, stageStatus, onClose, onAction, isDark }: {
     }
 
     try {
+      if (!approval && canDirectApproveCurrent) {
+        if (decisao !== 'aprovada') return
+        await aprovarPagamentoMut.mutateAsync({
+          cpId: cp.id,
+          aprovadorNome: perfil.nome,
+        })
+        onClose()
+        return
+      }
+
       await decisaoGenericaMut.mutateAsync({
         aprovacaoId: approval.id,
         entidadeId: approval.entidade_id,
