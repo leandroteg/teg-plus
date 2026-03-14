@@ -51,7 +51,7 @@ export function useTesourariaDashboard(periodo = '30d') {
             .limit(50),
         ])
 
-        if (contasRes.error || movRes.error) throw error
+        if (contasRes.error || movRes.error) return EMPTY_DASHBOARD
 
         const movimentacoes = (movRes.data ?? []).map((m: any) => ({
           ...m,
