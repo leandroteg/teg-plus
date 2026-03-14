@@ -455,10 +455,17 @@ function CPDetailModal({ cp, stageStatus, onClose, onAction, isDark }: {
   const [approvalLoading, setApprovalLoading] = useState(false)
   const [approvalExpanded, setApprovalExpanded] = useState(false)
   const [approvalNote, setApprovalNote] = useState('')
+  const approvalLoteId = approval && cp.lote_id && approval.entidade_id === cp.lote_id ? approval.entidade_id : undefined
+  const { data: approvalLote } = useLoteById(approvalLoteId)
+  const approvalItems = useMemo(
+    () => (approvalLote?.itens ?? []).filter(item => item.decisao !== 'rejeitado'),
+    [approvalLote]
+  )
+  const [selectedApprovalItemIds, setSelectedApprovalItemIds] = useState<string[]>([])
 
   useEffect(() => {
     let active = true
-    if (!cp.lote_id || stageStatus !== 'em_aprovacao') {
+    if (stageStatus !== 'em_aprovacao') {
       setApproval(null)
       return
     }
@@ -467,15 +474,17 @@ function CPDetailModal({ cp, stageStatus, onClose, onAction, isDark }: {
     supabase
       .from('apr_aprovacoes')
       .select('id, entidade_id, entidade_numero, modulo, nivel')
-      .eq('entidade_id', cp.lote_id)
+      .in('entidade_id', cp.lote_id ? [cp.lote_id, cp.id] : [cp.id])
       .eq('tipo_aprovacao', 'autorizacao_pagamento')
       .eq('status', 'pendente')
       .order('created_at', { ascending: false })
-      .limit(1)
-      .maybeSingle()
+      .limit(5)
       .then(({ data }) => {
         if (!active) return
-        setApproval(data ?? null)
+        const pending = data ?? []
+        const loteApproval = cp.lote_id ? pending.find(item => item.entidade_id === cp.lote_id) : null
+        const unitApproval = pending.find(item => item.entidade_id === cp.id)
+        setApproval(loteApproval ?? unitApproval ?? null)
       })
       .finally(() => {
         if (active) setApprovalLoading(false)
@@ -484,16 +493,30 @@ function CPDetailModal({ cp, stageStatus, onClose, onAction, isDark }: {
     return () => {
       active = false
     }
-  }, [cp.lote_id, stageStatus])
+  }, [cp.id, cp.lote_id, stageStatus])
+
+  useEffect(() => {
+    setSelectedApprovalItemIds(approvalItems.map(item => item.cp_id))
+  }, [approval?.id, approvalItems])
 
   const isApprovalStage = stageStatus === 'em_aprovacao'
   const canApproveCurrent = !!approval && canApprove(approval.nivel)
   const stage = CP_PIPELINE_VIEW_STAGES.find(s => s.status === stageStatus)
+  const isLoteApproval = !!approvalLoteId && approvalItems.length > 0
+
+  const toggleApprovalItem = (cpId: string) => {
+    setSelectedApprovalItemIds(prev =>
+      prev.includes(cpId) ? prev.filter(id => id !== cpId) : [...prev, cpId]
+    )
+  }
 
   const handleApprovalDecision = async (decisao: 'aprovada' | 'rejeitada' | 'esclarecimento') => {
     if (!approval || !perfil) return
     if (decisao === 'esclarecimento' && !approvalNote.trim()) {
       setApprovalExpanded(true)
+      return
+    }
+    if (decisao === 'aprovada' && isLoteApproval && selectedApprovalItemIds.length === 0) {
       return
     }
 
@@ -509,6 +532,7 @@ function CPDetailModal({ cp, stageStatus, onClose, onAction, isDark }: {
         observacao: approvalNote.trim() || undefined,
         aprovadorNome: perfil.nome,
         aprovadorEmail: perfil.email || '',
+        selectedItemIds: decisao === 'aprovada' && isLoteApproval ? selectedApprovalItemIds : undefined,
       })
       onClose()
     } catch {
@@ -640,6 +664,51 @@ function CPDetailModal({ cp, stageStatus, onClose, onAction, isDark }: {
               {canApproveCurrent ? (
                 <>
                   <div className="p-4">
+                    {isLoteApproval && (
+                      <div className={`rounded-xl border mb-4 overflow-hidden ${isDark ? 'border-white/[0.08] bg-slate-950/30' : 'border-slate-200 bg-white'}`}>
+                        <div className={`grid grid-cols-[28px_minmax(0,1.8fr)_110px_90px_110px_100px] gap-x-3 px-3 py-2 text-[10px] font-semibold uppercase tracking-wider ${isDark ? 'text-slate-500 border-b border-white/[0.08]' : 'text-slate-400 border-b border-slate-200 bg-slate-50'}`}>
+                          <span />
+                          <span>Item</span>
+                          <span>Documento</span>
+                          <span>Venc.</span>
+                          <span className="text-right">Valor</span>
+                          <span>Decisao</span>
+                        </div>
+                        <div className="divide-y divide-inherit">
+                          {approvalItems.map(item => (
+                            <div key={item.id} className={`grid grid-cols-[28px_minmax(0,1.8fr)_110px_90px_110px_100px] gap-x-3 px-3 py-2.5 text-xs items-center ${isDark ? 'hover:bg-white/[0.03]' : 'hover:bg-slate-50/70'}`}>
+                              <label className="flex items-center justify-center">
+                                <input
+                                  type="checkbox"
+                                  className="h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
+                                  checked={selectedApprovalItemIds.includes(item.cp_id)}
+                                  onChange={() => toggleApprovalItem(item.cp_id)}
+                                />
+                              </label>
+                              <div className="min-w-0">
+                                <p className={`truncate font-semibold ${isDark ? 'text-white' : 'text-slate-800'}`}>{item.cp?.fornecedor_nome || 'Item sem fornecedor'}</p>
+                                <p className={`truncate text-[11px] ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{item.cp?.descricao || '—'}</p>
+                              </div>
+                              <span className={`truncate text-[11px] ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{item.cp?.numero_documento || '—'}</span>
+                              <span className={`text-[11px] ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{item.cp ? fmtData(item.cp.data_vencimento) : '—'}</span>
+                              <span className="text-right text-[11px] font-semibold text-emerald-600">{item.cp ? fmt(item.cp.valor_original) : '—'}</span>
+                              <span className={`inline-flex h-fit rounded-full px-2 py-0.5 text-[10px] font-semibold ${
+                                selectedApprovalItemIds.includes(item.cp_id)
+                                  ? isDark ? 'bg-emerald-500/10 text-emerald-300' : 'bg-emerald-50 text-emerald-700'
+                                  : isDark ? 'bg-amber-500/10 text-amber-300' : 'bg-amber-50 text-amber-700'
+                              }`}>
+                                {selectedApprovalItemIds.includes(item.cp_id) ? 'Aprovar' : 'Retornar'}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                        <div className={`px-3 py-2 text-[11px] ${isDark ? 'border-t border-white/[0.08] text-slate-300' : 'border-t border-slate-200 text-slate-600 bg-slate-50/70'}`}>
+                          {selectedApprovalItemIds.length === approvalItems.length
+                            ? `Todos os ${approvalItems.length} itens serao aprovados neste lote.`
+                            : `${selectedApprovalItemIds.length} de ${approvalItems.length} itens serao aprovados. Os demais retornarao para Lote de Pagamento.`}
+                        </div>
+                      </div>
+                    )}
                     <button
                       type="button"
                       onClick={() => setApprovalExpanded(v => !v)}
@@ -678,7 +747,7 @@ function CPDetailModal({ cp, stageStatus, onClose, onAction, isDark }: {
                     </button>
                     <button
                       type="button"
-                      disabled={decisaoGenericaMut.isPending}
+                      disabled={decisaoGenericaMut.isPending || (isLoteApproval && selectedApprovalItemIds.length === 0)}
                       onClick={() => handleApprovalDecision('aprovada')}
                       className="flex items-center justify-center gap-1.5 py-3.5 text-xs font-bold text-emerald-600 hover:bg-emerald-50 transition disabled:opacity-50"
                     >
