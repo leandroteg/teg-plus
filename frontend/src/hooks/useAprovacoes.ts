@@ -495,14 +495,47 @@ export function useDecisaoGenerica() {
                 : `Rejeitado por ${aprovadorNome}: ${observacao ?? ''}`,
             })
         } else if (tipoAprovacao === 'autorizacao_pagamento') {
-          // Atualiza status da CP
-          if (decisao === 'aprovada') {
+          const decisionAt = new Date().toISOString()
+
+          // Fluxo novo: a aprovacao de pagamento pode apontar para um lote.
+          const { data: lote } = await supabase
+            .from('fin_lotes_pagamento')
+            .select('id')
+            .eq('id', entidadeId)
+            .maybeSingle()
+
+          if (lote?.id) {
+            const decisaoItem = decisao === 'aprovada' ? 'aprovado' : 'rejeitado'
+
+            await supabase
+              .from('fin_lote_itens')
+              .update({
+                decisao: decisaoItem,
+                decidido_por: aprovadorNome,
+                decidido_em: decisionAt,
+                observacao: observacao || null,
+              })
+              .eq('lote_id', entidadeId)
+              .eq('decisao', 'pendente')
+
+            await supabase.rpc('rpc_resolver_lote_status', { p_lote_id: entidadeId })
+
+            if (decisao === 'aprovada') {
+              await supabase
+                .from('fin_lotes_pagamento')
+                .update({
+                  status: 'aprovado',
+                  updated_at: decisionAt,
+                })
+                .eq('id', entidadeId)
+            }
+          } else if (decisao === 'aprovada') {
             await supabase
               .from('fin_contas_pagar')
               .update({
                 status: 'aprovado_pgto',
                 aprovado_por: aprovadorNome,
-                aprovado_em: new Date().toISOString(),
+                aprovado_em: decisionAt,
               })
               .eq('id', entidadeId)
           } else {
@@ -527,6 +560,8 @@ export function useDecisaoGenerica() {
       qc.invalidateQueries({ queryKey: ['con-solicitacoes-dashboard'] })
       qc.invalidateQueries({ queryKey: ['contas-pagar'] })
       qc.invalidateQueries({ queryKey: ['financeiro-dashboard'] })
+      qc.invalidateQueries({ queryKey: ['lotes-pagamento'] })
+      qc.invalidateQueries({ queryKey: ['lote-detalhe'] })
     },
   })
 }
