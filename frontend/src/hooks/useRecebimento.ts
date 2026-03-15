@@ -194,6 +194,20 @@ export function useCriarRecebimento() {
 
       if (itensErr) throw itensErr
 
+      // 3. Update pedido status: parcial se nem tudo recebido, senão entregue
+      const totalEsperado = itens.reduce((s, i) => s + i.quantidade_esperada, 0)
+      const totalRecebido = itensToInsert.reduce((s, i) => s + i.quantidade_recebida, 0)
+      const novoStatus = totalRecebido < totalEsperado ? 'parcialmente_recebido' : 'entregue'
+
+      await supabase
+        .from('cmp_pedidos')
+        .update({
+          status: novoStatus,
+          data_entrega_real: dataRecebimento,
+          qtd_itens_recebidos: itensToInsert.length,
+        })
+        .eq('id', pedidoId)
+
       return rec
     },
     onSuccess: () => {

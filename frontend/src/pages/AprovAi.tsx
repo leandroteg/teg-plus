@@ -579,7 +579,11 @@ function PagamentoDetalhesCard({ detalhes }: {
   detalhes: NonNullable<AprovacaoPendente['pagamento_detalhes']>
 }) {
   const [showEntender, setShowEntender] = useState(false)
-  const fmtDate = (d: string) => d ? new Date(d + 'T00:00:00').toLocaleDateString('pt-BR') : '—'
+  const fmtDate = (d: string) => {
+    if (!d) return '—'
+    const dt = new Date(d.length === 10 ? d + 'T00:00:00' : d)
+    return isNaN(dt.getTime()) ? '—' : dt.toLocaleDateString('pt-BR')
+  }
   const isVencida = detalhes.data_vencimento && new Date(detalhes.data_vencimento) < new Date()
 
   return (

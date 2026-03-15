@@ -135,6 +135,78 @@ function parseBRL(formatted: string): number {
   return parseFloat(clean) || 0
 }
 
+// ── FilterSelect (combobox with type-to-filter) ─────────────────────────────
+
+function FilterSelect({ label, value, onChange, options, placeholder, labelClass, inputClass }: {
+  label: string
+  value: string
+  onChange: (v: string) => void
+  options: { id: string; label: string; value: string }[]
+  placeholder?: string
+  labelClass: string
+  inputClass: string
+}) {
+  const [query, setQuery] = useState('')
+  const [open, setOpen] = useState(false)
+  const ref = useRef<HTMLDivElement>(null)
+
+  // Close on outside click
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [])
+
+  const filtered = options.filter(o =>
+    o.label.toLowerCase().includes(query.toLowerCase())
+  )
+
+  const displayValue = value
+    ? options.find(o => o.value === value)?.label ?? value
+    : ''
+
+  return (
+    <div ref={ref} className="relative">
+      <label className={labelClass}>{label}</label>
+      <input
+        type="text"
+        value={open ? query : displayValue}
+        placeholder={placeholder}
+        className={inputClass}
+        onFocus={() => { setOpen(true); setQuery('') }}
+        onChange={e => { setQuery(e.target.value); setOpen(true) }}
+      />
+      {value && !open && (
+        <button
+          type="button"
+          onClick={() => { onChange(''); setQuery(''); setOpen(true) }}
+          className="absolute right-2 top-[calc(50%+10px)] -translate-y-1/2 text-slate-400 hover:text-slate-600 text-xs"
+        >✕</button>
+      )}
+      {open && (
+        <div className="absolute z-50 mt-1 w-full max-h-48 overflow-y-auto bg-white border border-slate-200 rounded-xl shadow-lg">
+          {filtered.length === 0 ? (
+            <p className="px-3 py-2 text-xs text-slate-400">Nenhum resultado</p>
+          ) : filtered.map(o => (
+            <button
+              key={o.id}
+              type="button"
+              onClick={() => { onChange(o.value); setQuery(''); setOpen(false) }}
+              className={`w-full text-left px-3 py-2 text-xs hover:bg-indigo-50 transition-colors ${
+                o.value === value ? 'bg-indigo-50 text-indigo-700 font-semibold' : 'text-slate-700'
+              }`}
+            >
+              {o.label}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ── Component ────────────────────────────────────────────────────────────────
 
 export default function NovaSolicitacao() {
@@ -816,32 +888,24 @@ export default function NovaSolicitacao() {
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <div>
-              <label className={labelClass}>Centro de Custo</label>
-              <select
-                value={centroCusto}
-                onChange={e => setCentroCusto(e.target.value)}
-                className={inputClass}
-              >
-                <option value="">Selecione o centro de custo</option>
-                {centrosCusto.map(cc => (
-                  <option key={cc.id} value={cc.descricao}>{cc.codigo ? `${cc.codigo} - ` : ''}{cc.descricao}</option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className={labelClass}>Classe Financeira</label>
-              <select
-                value={classeFinanceira}
-                onChange={e => setClasseFinanceira(e.target.value)}
-                className={inputClass}
-              >
-                <option value="">Selecione a classe financeira</option>
-                {classesFinanceiras.map(cf => (
-                  <option key={cf.id} value={cf.descricao}>{cf.codigo ? `${cf.codigo} - ` : ''}{cf.descricao}</option>
-                ))}
-              </select>
-            </div>
+            <FilterSelect
+              label="Centro de Custo"
+              value={centroCusto}
+              onChange={setCentroCusto}
+              options={centrosCusto.map(cc => ({ id: cc.id, label: `${cc.codigo ? `${cc.codigo} - ` : ''}${cc.descricao}`, value: cc.descricao }))}
+              placeholder="Digite para filtrar..."
+              labelClass={labelClass}
+              inputClass={inputClass}
+            />
+            <FilterSelect
+              label="Classe Financeira"
+              value={classeFinanceira}
+              onChange={setClasseFinanceira}
+              options={classesFinanceiras.map(cf => ({ id: cf.id, label: `${cf.codigo ? `${cf.codigo} - ` : ''}${cf.descricao}`, value: cf.descricao }))}
+              placeholder="Digite para filtrar..."
+              labelClass={labelClass}
+              inputClass={inputClass}
+            />
             <div>
               <label className={labelClass}>Indice de Reajuste</label>
               <select
