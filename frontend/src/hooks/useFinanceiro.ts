@@ -261,6 +261,65 @@ export function useCriarSolicitacaoExtraordinariaCP() {
 // â”€â”€ Aprovar Pagamento (AP): aguardando_aprovacao â†’ aprovado_pgto â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // AutorizaÃ§Ã£o de Pagamento: o financeiro aprova a CP para pagamento efetivo.
 
+export function useCriarPrevisaoPagamentoCP() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async ({
+      nome,
+      valor,
+      centro_custo,
+      classe_financeira,
+      recorrente,
+      periodicidade,
+      recorrenciaFim,
+      dataVencimento,
+      solicitanteNome,
+    }: {
+      nome: string
+      valor: number
+      centro_custo: string
+      classe_financeira: string
+      recorrente: boolean
+      periodicidade?: string
+      recorrenciaFim?: string
+      dataVencimento: string
+      solicitanteNome?: string
+    }) => {
+      const observacoes = [
+        'Previsão de pagamento registrada manualmente.',
+        solicitanteNome ? `Solicitante: ${solicitanteNome}` : null,
+        recorrente ? `Recorrência: ${periodicidade || 'mensal'} até ${recorrenciaFim || dataVencimento}` : null,
+      ].filter(Boolean).join(' | ')
+
+      const { data, error } = await supabase
+        .from('fin_contas_pagar')
+        .insert({
+          fornecedor_nome: nome.trim(),
+          origem: 'manual',
+          valor_original: valor,
+          valor_pago: 0,
+          data_emissao: new Date().toISOString().split('T')[0],
+          data_vencimento: dataVencimento,
+          data_vencimento_orig: dataVencimento,
+          centro_custo,
+          classe_financeira,
+          natureza: 'previsao_pagamento',
+          status: 'previsto',
+          descricao: nome.trim(),
+          observacoes,
+        })
+        .select('id')
+        .single()
+      if (error) throw new Error(getSupabaseErrorMessage(error, 'Erro ao criar previsão de pagamento'))
+      return data
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['contas-pagar'] })
+      qc.invalidateQueries({ queryKey: ['financeiro-dashboard'] })
+    },
+  })
+}
+
 export function useAprovarPagamento() {
   const qc = useQueryClient()
   return useMutation({
