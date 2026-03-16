@@ -25,6 +25,13 @@ type ModalRequisicao = {
   itens: RequisicaoItem[]
 }
 
+type ParcelaEditavel = {
+  numero: number
+  valor: number
+  data_vencimento: string
+  descricao?: string
+}
+
 interface EmitirPedidoModalProps {
   open: boolean
   onClose: () => void
@@ -162,6 +169,8 @@ export default function EmitirPedidoModal({
   const [condicaoPagamento, setCondicaoPagamento] = useState('')
   const [dataPrevistaEntrega, setDataPrevistaEntrega] = useState('')
   const [observacoes, setObservacoes] = useState('')
+  const [parcelasEditaveis, setParcelasEditaveis] = useState<ParcelaEditavel[]>([])
+  const [parcelasEditadasManualmente, setParcelasEditadasManualmente] = useState(false)
 
   useEffect(() => {
     if (!open || !requisicao) return
@@ -179,16 +188,72 @@ export default function EmitirPedidoModal({
     setCondicaoPagamento(cotacaoResolvida?.condicaoPagamento ?? '')
     setDataPrevistaEntrega('')
     setObservacoes('')
+    setParcelasEditadasManualmente(false)
   }, [open, requisicao, cotacaoResolvida?.condicaoPagamento, obras, classes, classeResumo.valor])
 
   const classeSelecionada = classes.find((item) => item.id === classeId)
   const centroSelecionado = centros.find((item) => item.id === centroId)
   const obraSelecionada = obras.find((item) => item.id === requisicao?.obra_id)
   const valorTotal = cotacaoResolvida?.valorTotal ?? 0
-  const parcelasPreview = useMemo(
+  const parcelasSugeridas = useMemo(
     () => gerarPreviaParcelas(valorTotal, condicaoPagamento, dataPrevistaEntrega || undefined),
     [valorTotal, condicaoPagamento, dataPrevistaEntrega],
   )
+
+  useEffect(() => {
+    if (!open) return
+    if (parcelasEditadasManualmente) return
+    setParcelasEditaveis(parcelasSugeridas)
+  }, [open, parcelasSugeridas, parcelasEditadasManualmente])
+
+  const totalParcelas = useMemo(
+    () => parcelasEditaveis.reduce((sum, parcela) => sum + (Number(parcela.valor) || 0), 0),
+    [parcelasEditaveis],
+  )
+
+  const diferencaParcelas = useMemo(
+    () => Math.round((totalParcelas - valorTotal) * 100) / 100,
+    [totalParcelas, valorTotal],
+  )
+
+  const parcelasValidas = parcelasEditaveis.length > 0 && parcelasEditaveis.every((parcela) =>
+    Number(parcela.valor) > 0 &&
+    Boolean(parcela.data_vencimento),
+  )
+
+  const updateParcela = (numero: number, changes: Partial<ParcelaEditavel>) => {
+    setParcelasEditadasManualmente(true)
+    setParcelasEditaveis((current) => current.map((parcela) =>
+      parcela.numero === numero
+        ? { ...parcela, ...changes }
+        : parcela,
+    ))
+  }
+
+  const addParcela = () => {
+    setParcelasEditadasManualmente(true)
+    setParcelasEditaveis((current) => [
+      ...current,
+      {
+        numero: current.length + 1,
+        valor: 0,
+        data_vencimento: dataPrevistaEntrega || '',
+        descricao: `${current.length + 1}a parcela`,
+      },
+    ])
+  }
+
+  const removeParcela = (numero: number) => {
+    setParcelasEditadasManualmente(true)
+    setParcelasEditaveis((current) => current
+      .filter((parcela) => parcela.numero !== numero)
+      .map((parcela, index) => ({ ...parcela, numero: index + 1 })))
+  }
+
+  const resetParcelas = () => {
+    setParcelasEditadasManualmente(false)
+    setParcelasEditaveis(parcelasSugeridas)
+  }
 
   if (!open) return null
 
@@ -379,23 +444,116 @@ export default function EmitirPedidoModal({
                   )}
                 </div>
                 <div className="p-4 space-y-2">
-                  {parcelasPreview.length === 0 ? (
+                  {parcelasEditaveis.length === 0 ? (
                     <p className="text-sm text-slate-400">Informe valor e condicao para gerar a previa.</p>
                   ) : (
-                    parcelasPreview.map((parcela) => (
-                      <div key={`${parcela.numero}-${parcela.data_vencimento}`} className="flex items-center justify-between rounded-xl border border-slate-200 px-3 py-2">
+                    <>
+                      <div className="flex items-center justify-between gap-3 rounded-xl border border-dashed border-slate-200 bg-slate-50 px-3 py-2">
                         <div>
-                          <p className="text-sm font-semibold text-slate-800">Parcela {parcela.numero}</p>
-                          <p className="text-[11px] text-slate-400">{parcela.descricao}</p>
-                        </div>
-                        <div className="text-right">
-                          <p className="text-sm font-bold text-slate-800">
-                            {parcela.valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                          <p className="text-sm font-semibold text-slate-700">Parcelas editaveis</p>
+                          <p className="text-[11px] text-slate-400">
+                            Revise valores, vencimentos e descricoes antes de emitir o pedido.
                           </p>
-                          <p className="text-[11px] text-slate-400">{parcela.data_vencimento}</p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          {parcelasEditadasManualmente && (
+                            <button
+                              type="button"
+                              onClick={resetParcelas}
+                              className="px-3 py-2 rounded-lg border border-slate-200 text-[11px] font-semibold text-slate-600 hover:bg-white"
+                            >
+                              Recalcular sugestao
+                            </button>
+                          )}
+                          <button
+                            type="button"
+                            onClick={addParcela}
+                            className="px-3 py-2 rounded-lg bg-teal-50 text-[11px] font-semibold text-teal-700 border border-teal-200 hover:bg-teal-100"
+                          >
+                            Nova parcela
+                          </button>
                         </div>
                       </div>
-                    ))
+
+                      {parcelasEditaveis.map((parcela) => (
+                        <div key={`parcela-${parcela.numero}`} className="rounded-xl border border-slate-200 p-3 space-y-3">
+                          <div className="flex items-center justify-between gap-3">
+                            <div>
+                              <p className="text-sm font-semibold text-slate-800">Parcela {parcela.numero}</p>
+                              <p className="text-[11px] text-slate-400">
+                                Ajuste manual quando a negociacao fugir da sugestao automatica.
+                              </p>
+                            </div>
+                            {parcelasEditaveis.length > 1 && (
+                              <button
+                                type="button"
+                                onClick={() => removeParcela(parcela.numero)}
+                                className="px-2.5 py-1.5 rounded-lg text-[11px] font-semibold text-red-600 border border-red-200 hover:bg-red-50"
+                              >
+                                Remover
+                              </button>
+                            )}
+                          </div>
+
+                          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                            <div>
+                              <label className="block text-[11px] font-semibold text-slate-500 mb-1">Descricao</label>
+                              <input
+                                value={parcela.descricao ?? ''}
+                                onChange={(event) => updateParcela(parcela.numero, { descricao: event.target.value })}
+                                className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-300"
+                                placeholder="Ex.: Entrada, 30 dias..."
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-[11px] font-semibold text-slate-500 mb-1">Valor</label>
+                              <input
+                                type="number"
+                                min="0"
+                                step="0.01"
+                                value={Number.isFinite(parcela.valor) ? parcela.valor : 0}
+                                onChange={(event) => updateParcela(parcela.numero, { valor: Number(event.target.value) })}
+                                className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-300"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-[11px] font-semibold text-slate-500 mb-1">Vencimento</label>
+                              <input
+                                type="date"
+                                value={parcela.data_vencimento}
+                                onChange={(event) => updateParcela(parcela.numero, { data_vencimento: event.target.value })}
+                                className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-300"
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+
+                      <div className={`rounded-xl border px-3 py-2 flex items-center justify-between gap-3 ${
+                        diferencaParcelas === 0
+                          ? 'border-emerald-200 bg-emerald-50'
+                          : 'border-amber-200 bg-amber-50'
+                      }`}>
+                        <div>
+                          <p className={`text-sm font-semibold ${diferencaParcelas === 0 ? 'text-emerald-700' : 'text-amber-700'}`}>
+                            Total das parcelas
+                          </p>
+                          <p className={`text-[11px] ${diferencaParcelas === 0 ? 'text-emerald-600' : 'text-amber-600'}`}>
+                            {diferencaParcelas === 0
+                              ? 'Fechado com o valor total do pedido.'
+                              : 'Ajuste os valores para fechar exatamente com o total do pedido.'}
+                          </p>
+                        </div>
+                        <div className="text-right">
+                          <p className={`text-sm font-bold ${diferencaParcelas === 0 ? 'text-emerald-700' : 'text-amber-700'}`}>
+                            {totalParcelas.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                          </p>
+                          <p className={`text-[11px] ${diferencaParcelas === 0 ? 'text-emerald-600' : 'text-amber-600'}`}>
+                            Pedido: {valorTotal.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                          </p>
+                        </div>
+                      </div>
+                    </>
                   )}
                 </div>
               </div>
@@ -423,9 +581,18 @@ export default function EmitirPedidoModal({
               condicaoPagamento: condicaoPagamento || cotacaoResolvida?.condicaoPagamento || undefined,
               observacoes,
               dataPrevistaEntrega,
-              parcelasPreview,
+              parcelasPreview: parcelasEditaveis,
             })}
-            disabled={isSubmitting || isLoading || !requisicao || !cotacaoResolvida?.id || !classeId || !centroId}
+            disabled={
+              isSubmitting ||
+              isLoading ||
+              !requisicao ||
+              !cotacaoResolvida?.id ||
+              !classeId ||
+              !centroId ||
+              !parcelasValidas ||
+              diferencaParcelas !== 0
+            }
             className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-teal-600 text-white text-sm font-bold hover:bg-teal-700 disabled:opacity-50"
           >
             {isSubmitting ? <Loader2 size={15} className="animate-spin" /> : <FileText size={15} />}
