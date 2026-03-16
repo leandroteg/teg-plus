@@ -83,7 +83,7 @@ const SORT_OPTIONS: { field: SortField; label: string }[] = [
 // â”€â”€ Export CSV â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function exportCSV(items: DisplayItem[], stageName: string) {
-  const headers = ['NÃºmero', 'Contraparte', 'Objeto', 'Status', 'Valor', 'Data']
+  const headers = ['Número', 'Contraparte', 'Objeto', 'Status', 'Valor', 'Data']
   const rows = items.map(s => [
     s.numero, s.contraparte, s.objeto, s.stageKey,
     s.valor ?? '', fmtData(s.data),
@@ -255,7 +255,7 @@ export default function AssinaturaPipeline() {
           <input
             value={busca}
             onChange={e => setBusca(e.target.value)}
-            placeholder="Buscar nÃºmero, objeto ou contraparte..."
+            placeholder="Buscar número, objeto ou contraparte..."
             className="w-full pl-9 pr-4 py-2.5 rounded-xl border border-slate-200 bg-white text-sm text-slate-700 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-400"
           />
         </div>
@@ -305,7 +305,7 @@ export default function AssinaturaPipeline() {
           </div>
           <p className="text-sm font-semibold text-slate-500">Nenhum item nesta etapa</p>
           <p className="text-xs text-slate-400 mt-1">
-            {busca ? 'Tente ajustar a busca' : 'Contratos aparecerÃ£o aqui conforme avanÃ§am no fluxo de assinatura'}
+            {busca ? 'Tente ajustar a busca' : 'Contratos aparecerão aqui conforme avançam no fluxo de assinatura'}
           </p>
         </div>
       ) : viewMode === 'list' ? (
@@ -315,13 +315,13 @@ export default function AssinaturaPipeline() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-slate-100">
-                  <th className="text-left px-3 py-2 text-[10px] font-bold text-slate-400 uppercase tracking-widest">NÃºmero</th>
+                  <th className="text-left px-3 py-2 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Número</th>
                   <th className="text-left px-3 py-2 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Contraparte</th>
                   <th className="text-left px-3 py-2 text-[10px] font-bold text-slate-400 uppercase tracking-widest hidden lg:table-cell">Objeto</th>
-                  <th className="text-center px-3 py-2 text-[10px] font-bold text-slate-400 uppercase tracking-widest">SignatÃ¡rios</th>
+                  <th className="text-center px-3 py-2 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Signatários</th>
                   <th className="text-right px-3 py-2 text-[10px] font-bold text-slate-400 uppercase tracking-widest hidden sm:table-cell">Valor</th>
                   <th className="text-right px-3 py-2 text-[10px] font-bold text-slate-400 uppercase tracking-widest hidden md:table-cell">Data</th>
-                  <th className="text-center px-3 py-2 text-[10px] font-bold text-slate-400 uppercase tracking-widest">AÃ§Ã£o</th>
+                  <th className="text-center px-3 py-2 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Ação</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-50">

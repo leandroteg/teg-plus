@@ -61,7 +61,7 @@ export function useFinanceiroDashboard(periodo = '30d') {
         p_periodo: periodo,
       })
       if (error) {
-        // Fallback: tabela pode nÃ£o existir ainda
+        // Fallback: tabela pode não existir ainda
         return { kpis: EMPTY_KPIS, por_status: [], por_centro_custo: [], vencimentos_proximos: [], recentes: [] }
       }
       return data as FinanceiroDashboardData
@@ -277,7 +277,7 @@ export function useCriarSolicitacaoExtraordinariaCP() {
 }
 
 // â”€â”€ Aprovar Pagamento (AP): aguardando_aprovacao â†’ aprovado_pgto â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-// AutorizaÃ§Ã£o de Pagamento: o financeiro aprova a CP para pagamento efetivo.
+// Autorização de Pagamento: o financeiro aprova a CP para pagamento efetivo.
 
 export function useCriarPrevisaoPagamentoCP() {
   const qc = useQueryClient()
@@ -376,8 +376,8 @@ export function useAprovarPagamento() {
 }
 
 // â”€â”€ Marcar CP como Pago â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-// Atualiza diretamente fin_contas_pagar quando nÃ£o hÃ¡ pedido vinculado,
-// ou quando o financeiro quer forÃ§ar status independente do fluxo de compras.
+// Atualiza diretamente fin_contas_pagar quando não há pedido vinculado,
+// ou quando o financeiro quer forçar status independente do fluxo de compras.
 
 export function useMarcarCPPago() {
   const qc = useQueryClient()
@@ -396,7 +396,7 @@ export function useMarcarCPPago() {
   })
 }
 
-// â”€â”€ ClassificaÃ§Ã£o em lote (CP) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// â”€â”€ Classificação em lote (CP) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 export function useClassificarCPBatch() {
   const qc = useQueryClient()
   return useMutation({
@@ -448,7 +448,7 @@ export function useConciliarCPBatch() {
   })
 }
 
-// â”€â”€ ClassificaÃ§Ã£o em lote (CR) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// â”€â”€ Classificação em lote (CR) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 export function useClassificarCRBatch() {
   const qc = useQueryClient()
   return useMutation({
@@ -581,7 +581,7 @@ export function useFaturarCR() {
   })
 }
 
-// â”€â”€ AvanÃ§ar status CR (transiÃ§Ãµes simples) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// â”€â”€ Avançar status CR (transições simples) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 export function useAvancarStatusCR() {
   const qc = useQueryClient()
   return useMutation({
@@ -623,7 +623,7 @@ export function useRegistrarRecebimentoCR() {
   })
 }
 
-// â”€â”€ Compartilhar NF por Email (marca envio, nÃ£o muda status) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// â”€â”€ Compartilhar NF por Email (marca envio, não muda status) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 export function useCompartilharNFEmail() {
   const qc = useQueryClient()
   return useMutation({
