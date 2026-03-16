@@ -294,7 +294,7 @@ const STATUS_CONFIG: Record<string, { label: string; dot: string; bg: string; te
   previsto:              { label: 'Previsto',       dot: 'bg-slate-400',   bg: 'bg-slate-50',    text: 'text-slate-600',    icon: Calendar },
   aprovado:              { label: 'Aprovado',       dot: 'bg-blue-400',    bg: 'bg-blue-50',     text: 'text-blue-700',     icon: CheckCircle2 },
   aguardando_docs:       { label: 'Aguard. Docs',   dot: 'bg-amber-400',   bg: 'bg-amber-50',    text: 'text-amber-700',    icon: FileText },
-  aguardando_aprovacao:  { label: 'Aguard. Aprov.', dot: 'bg-orange-400',  bg: 'bg-orange-50',   text: 'text-orange-700',   icon: Clock },
+  aguardando_aprovacao:  { label: 'Em Aprovação',   dot: 'bg-orange-400',  bg: 'bg-orange-50',   text: 'text-orange-700',   icon: Clock },
   aprovado_pgto:         { label: 'Pgto Aprovado',  dot: 'bg-indigo-400',  bg: 'bg-indigo-50',   text: 'text-indigo-700',   icon: CheckCircle2 },
   em_remessa:            { label: 'Em Remessa',     dot: 'bg-cyan-400',    bg: 'bg-cyan-50',     text: 'text-cyan-700',     icon: Receipt },
   pago:                  { label: 'Pago',           dot: 'bg-emerald-500', bg: 'bg-emerald-50',  text: 'text-emerald-700',  icon: CheckCircle2 },
@@ -305,7 +305,7 @@ const STATUS_CONFIG: Record<string, { label: string; dot: string; bg: string; te
 const FILTROS_STATUS: { label: string; value: string }[] = [
   { label: 'Todos',           value: '' },
   { label: 'Em Aberto',       value: 'previsto' },
-  { label: 'Aguard. Aprov.',  value: 'aguardando_aprovacao' },
+  { label: 'Em Aprovação',    value: 'aguardando_aprovacao' },
   { label: 'Aprov. Pgto',     value: 'aprovado_pgto' },
   { label: 'Em Remessa',      value: 'em_remessa' },
   { label: 'Pagos',           value: 'pago' },
