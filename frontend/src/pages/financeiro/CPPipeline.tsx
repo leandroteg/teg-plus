@@ -15,6 +15,7 @@ import {
   useAprovarPagamento,
   useMarcarCPPago,
   useConciliarCPBatch,
+  useCancelarCPBatch,
   useFornecedorById,
   useCriarSolicitacaoExtraordinariaCP,
   useCriarPrevisaoPagamentoCP,
@@ -1558,9 +1559,14 @@ function CPDetailModal({ cp, stageStatus, onClose, onAction, isDark }: {
               Fechar
             </button>
             {cp.status === 'previsto' && (
-              <button onClick={() => onAction('confirmar', cp)} className="flex-1 py-3 rounded-xl bg-blue-600 text-white text-sm font-bold hover:bg-blue-700 transition-all flex items-center justify-center gap-2">
-                <CheckCircle2 size={15} /> Confirmar
-              </button>
+              <>
+                <button onClick={() => onAction('excluir', cp)} className="flex-1 py-3 rounded-xl bg-rose-50 text-rose-700 border border-rose-200 text-sm font-bold hover:bg-rose-100 transition-all flex items-center justify-center gap-2">
+                  <XCircle size={15} /> Excluir
+                </button>
+                <button onClick={() => onAction('confirmar', cp)} className="flex-1 py-3 rounded-xl bg-blue-600 text-white text-sm font-bold hover:bg-blue-700 transition-all flex items-center justify-center gap-2">
+                  <CheckCircle2 size={15} /> Confirmar
+                </button>
+              </>
             )}
             {cp.status === 'confirmado' && (
               <button onClick={() => onAction('addLote', cp)} className="flex-1 py-3 rounded-xl bg-violet-600 text-white text-sm font-bold hover:bg-violet-700 transition-all flex items-center justify-center gap-2">
@@ -2101,6 +2107,7 @@ export default function CPPipeline() {
 
   // Mutations
   const conciliarMut = useConciliarCPBatch()
+  const cancelarCPMut = useCancelarCPBatch()
   const criarLoteMut = useCriarLote()
   const enviarLoteMut = useEnviarLoteAprovacao()
   const registrarBatchMut = useRegistrarPagamentoBatch()
@@ -2445,8 +2452,24 @@ export default function CPPipeline() {
     } catch { showToast('error', 'Erro ao conciliar') }
   }
 
+  const handleExcluirPrevistos = async (ids: string[]) => {
+    if (ids.length === 0) return
+    const confirmMessage = ids.length === 1
+      ? 'Excluir este item de Previstos? Ele sair\u00E1 da lista e ficar\u00E1 como cancelado no hist\u00F3rico.'
+      : `Excluir ${ids.length} itens de Previstos? Eles sair\u00E3o da lista e ficar\u00E3o como cancelados no hist\u00F3rico.`
+    if (!window.confirm(confirmMessage)) return
+
+    try {
+      await cancelarCPMut.mutateAsync({ cpIds: ids })
+      showToast('success', `${ids.length} item(ns) removido(s) de Previstos`)
+      setSelectedIds(new Set())
+    } catch {
+      showToast('error', 'Erro ao excluir itens de Previstos')
+    }
+  }
+
   const handleBulkAction = () => {
-    const ids = Array.from(selectedIds)
+    const ids = selectedInTab.map(cp => cp.id)
     if (ids.length === 0) return
     switch (activeTab) {
       case 'previsto': handleConfirmar(ids); break
@@ -2462,6 +2485,7 @@ export default function CPPipeline() {
     setDetailCP(null)
     switch (action) {
       case 'confirmar': handleConfirmar([cp.id]); break
+      case 'excluir': handleExcluirPrevistos([cp.id]); break
       case 'addLote': handleCriarLote([cp.id]); break
       case 'sendLote': handleEnviarLotesAprovacao([cp.id]); break
       case 'enviarRemessa': handleEnviarRemessa([cp.id]); break
@@ -2835,9 +2859,18 @@ export default function CPPipeline() {
                   <bulk.icon size={12} />
                   {bulk.label} ({selectedInTab.length})
                 </button>
+                {activeTab === 'previsto' && (
+                  <button
+                    onClick={() => handleExcluirPrevistos(selectedInTab.map(cp => cp.id))}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-bold transition-all bg-rose-600 hover:bg-rose-700 text-white"
+                  >
+                    <XCircle size={12} />
+                    Excluir ({selectedInTab.length})
+                  </button>
+                )}
                 {activeTab === 'aprovado_pgto' && (
                   <button
-                    onClick={() => handlePagar(Array.from(selectedIds))}
+                    onClick={() => handlePagar(selectedInTab.map(cp => cp.id))}
                     className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-bold transition-all bg-emerald-600 hover:bg-emerald-700 text-white"
                   >
                     <Banknote size={12} />

@@ -163,6 +163,24 @@ export function useConfirmarCP() {
   })
 }
 
+export function useCancelarCPBatch() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ cpIds }: { cpIds: string[] }) => {
+      const { error } = await supabase
+        .from('fin_contas_pagar')
+        .update({ status: 'cancelado' })
+        .in('id', cpIds)
+        .eq('status', 'previsto')
+      if (error) throw error
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['contas-pagar'] })
+      qc.invalidateQueries({ queryKey: ['financeiro-dashboard'] })
+    },
+  })
+}
+
 export function useCriarSolicitacaoExtraordinariaCP() {
   const qc = useQueryClient()
   return useMutation({
