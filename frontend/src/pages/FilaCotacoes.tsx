@@ -10,6 +10,7 @@ import { useCotacoes } from '../hooks/useCotacoes'
 import { useDecisaoRequisicao } from '../hooks/useAprovacoes'
 import { useEmitirPedido, useCancelarRequisicao } from '../hooks/usePedidos'
 import { useAuth } from '../contexts/AuthContext'
+import EmitirPedidoModal from '../components/EmitirPedidoModal'
 import type { StatusCotacao, Cotacao } from '../types'
 
 // ── Formatters ──────────────────────────────────────────────────────────────
@@ -285,6 +286,7 @@ export default function FilaCotacoes() {
   const [sortDir, setSortDir] = useState<SortDir>('desc')
   const [viewMode, setViewMode] = useState<ViewMode>('cards')
   const [detail, setDetail] = useState<Cotacao | null>(null)
+  const [emitirCotacao, setEmitirCotacao] = useState<Cotacao | null>(null)
 
   const { data: cotacoes = [], isLoading } = useCotacoes()
   const decisaoMutation = useDecisaoRequisicao()
@@ -496,19 +498,7 @@ export default function FilaCotacoes() {
             if (!req) return
             handleDecisao(req.id, req.numero, req.alcada_nivel, decisao, obs, req.categoria, req.status)
           }}
-          onEmitir={() => {
-            const req = detail.requisicao
-            if (!req) return
-            emitirPedidoMutation.mutate({
-              requisicaoId: req.id, cotacaoId: detail.id,
-              fornecedorNome: detail.fornecedor_selecionado_nome ?? 'N/A',
-              valorTotal: detail.valor_selecionado ?? req.valor_estimado,
-              compradorId: detail.comprador_id,
-            }, {
-              onSuccess: (pedido) => { setDetail(null); setToast({ type: 'success', msg: `${pedido.numero_pedido} emitido ✓` }); setTimeout(() => setToast(null), 4000) },
-              onError: (err: any) => { setToast({ type: 'error', msg: `Erro: ${err?.message || 'erro'}` }); setTimeout(() => setToast(null), 5000) },
-            })
-          }}
+          onEmitir={() => setEmitirCotacao(detail)}
           onCancelar={() => {
             const req = detail.requisicao
             if (!req) return
@@ -521,6 +511,38 @@ export default function FilaCotacoes() {
           isEmitting={emitirPedidoMutation.isPending}
           isCancelling={cancelarMutation.isPending}
           onOpenCotacao={() => { setDetail(null); nav(`/cotacoes/${detail.id}`) }}
+        />
+      )}
+
+      {emitirCotacao?.requisicao && (
+        <EmitirPedidoModal
+          open
+          onClose={() => setEmitirCotacao(null)}
+          requisicaoId={emitirCotacao.requisicao.id}
+          cotacao={{
+            id: emitirCotacao.id,
+            fornecedorNome: emitirCotacao.fornecedor_selecionado_nome ?? "N/A",
+            valorTotal: emitirCotacao.valor_selecionado ?? emitirCotacao.requisicao.valor_estimado,
+            compradorId: emitirCotacao.comprador_id,
+          }}
+          onConfirm={(payload) => {
+            emitirPedidoMutation.mutate({
+              requisicaoId: emitirCotacao.requisicao.id,
+              ...payload,
+            }, {
+              onSuccess: (pedido) => {
+                setEmitirCotacao(null)
+                setDetail(null)
+                setToast({ type: "success", msg: `${pedido.numero_pedido} emitido` })
+                setTimeout(() => setToast(null), 4000)
+              },
+              onError: (err: any) => {
+                setToast({ type: "error", msg: `Erro: ${err?.message || "erro"}` })
+                setTimeout(() => setToast(null), 5000)
+              },
+            })
+          }}
+          isSubmitting={emitirPedidoMutation.isPending}
         />
       )}
     </div>

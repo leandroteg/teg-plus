@@ -22,6 +22,7 @@ import { useAnexosPedido, useUploadAnexo, useCotacaoDocs, TIPO_LABEL } from '../
 import type { PedidoAnexo } from '../hooks/useAnexos'
 import FluxoTimeline from '../components/FluxoTimeline'
 import RecebimentoModal from '../components/RecebimentoModal'
+import EmitirPedidoModal from '../components/EmitirPedidoModal'
 import type { Cotacao, Pedido } from '../types'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -762,6 +763,7 @@ function DetailModal({
   const mutation = useAtualizarPedido()
   const emitirPedido = useEmitirPedido()
   const [confirmando, setConfirmando] = useState(false)
+  const [showEmitirModal, setShowEmitirModal] = useState(false)
 
   const dias     = diasRestantes(pedido.data_prevista_entrega)
   const st       = getStatusMeta(pedido)
@@ -786,18 +788,6 @@ function DetailModal({
     } finally {
       setConfirmando(false)
     }
-  }
-
-  const handleEmitirPedido = async () => {
-    if (!pedido.requisicao_id || !pedido.source_cotacao?.id) return
-    await emitirPedido.mutateAsync({
-      requisicaoId: pedido.requisicao_id,
-      cotacaoId: pedido.source_cotacao.id,
-      fornecedorNome: pedido.fornecedor_nome,
-      valorTotal: pedido.valor_total ?? 0,
-      compradorId: pedido.source_cotacao.comprador_id ?? undefined,
-    })
-    onClose()
   }
 
   const bg  = dark ? 'bg-[#0f172a]' : 'bg-white'
@@ -940,7 +930,7 @@ function DetailModal({
           {/* Actions */}
           <div className="space-y-2 pt-1">
             {pending && (
-              <button onClick={handleEmitirPedido} disabled={emitirPedido.isPending} className="w-full flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-bold bg-teal-50 text-teal-700 border border-teal-300 hover:bg-teal-500 hover:text-white transition-all disabled:opacity-50">
+              <button onClick={() => setShowEmitirModal(true)} disabled={emitirPedido.isPending} className="w-full flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-bold bg-teal-50 text-teal-700 border border-teal-300 hover:bg-teal-500 hover:text-white transition-all disabled:opacity-50">
                 {emitirPedido.isPending
                   ? <div className="w-4 h-4 border-2 border-teal-400 border-t-transparent rounded-full animate-spin" />
                   : <FileText size={16} />}
@@ -974,6 +964,32 @@ function DetailModal({
             )}
           </div>
         </div>
+
+        {pending && pedido.requisicao_id && (
+          <EmitirPedidoModal
+            open={showEmitirModal}
+            onClose={() => setShowEmitirModal(false)}
+            requisicaoId={pedido.requisicao_id}
+            cotacao={{
+              id: pedido.source_cotacao?.id,
+              fornecedorNome: pedido.fornecedor_nome,
+              valorTotal: pedido.valor_total ?? 0,
+              compradorId: pedido.source_cotacao?.comprador_id ?? undefined,
+            }}
+            onConfirm={(payload) => {
+              emitirPedido.mutate({
+                requisicaoId: pedido.requisicao_id!,
+                ...payload,
+              }, {
+                onSuccess: () => {
+                  setShowEmitirModal(false)
+                  onClose()
+                },
+              })
+            }}
+            isSubmitting={emitirPedido.isPending}
+          />
+        )}
       </div>
     </div>
   )

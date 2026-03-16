@@ -14,6 +14,7 @@ import { useEmitirPedido, useCancelarRequisicao } from '../hooks/usePedidos'
 import { useAuth } from '../contexts/AuthContext'
 import StatusBadge from '../components/StatusBadge'
 import FluxoTimeline from '../components/FluxoTimeline'
+import EmitirPedidoModal from '../components/EmitirPedidoModal'
 import type { StatusRequisicao, Aprovacao, Requisicao } from '../types'
 
 // ── Formatters ──────────────────────────────────────────────────────────────
@@ -329,6 +330,7 @@ export default function ListaRequisicoes() {
   const [sortDir, setSortDir] = useState<SortDir>('desc')
   const [viewMode, setViewMode] = useState<ViewMode>('cards')
   const [detail, setDetail] = useState<Requisicao | null>(null)
+  const [emitirRequisicao, setEmitirRequisicao] = useState<Requisicao | null>(null)
 
   const obras = useLookupObras()
   const { data: requisicoes = [], isLoading } = useRequisicoes()
@@ -592,14 +594,7 @@ export default function ListaRequisicoes() {
           canDecide={isAdmin && ['pendente', 'em_aprovacao', 'em_esclarecimento', 'cotacao_enviada'].includes(detail.status)}
           isProcessing={decisaoMutation.isPending}
           onDecisao={(decisao, obs) => handleDecisao(detail.id, detail.numero, detail.alcada_nivel, decisao, obs, detail.categoria, detail.status)}
-          onEmitir={() => {
-            emitirPedidoMutation.mutate({
-              requisicaoId: detail.id, cotacaoId: '', fornecedorNome: 'N/A', valorTotal: detail.valor_estimado,
-            }, {
-              onSuccess: (pedido) => { setDetail(null); setToast({ type: 'success', msg: `${pedido.numero_pedido} emitido ✓` }); setTimeout(() => setToast(null), 4000) },
-              onError: (err: any) => { setToast({ type: 'error', msg: `Erro: ${err?.message || 'erro'}` }); setTimeout(() => setToast(null), 5000) },
-            })
-          }}
+          onEmitir={() => setEmitirRequisicao(detail)}
           onCancelar={() => {
             if (!confirm('Cancelar esta requisição?')) return
             cancelarMutation.mutate(detail.id, {
@@ -609,6 +604,32 @@ export default function ListaRequisicoes() {
           }}
           isEmitting={emitirPedidoMutation.isPending}
           isCancelling={cancelarMutation.isPending}
+        />
+      )}
+
+      {emitirRequisicao && (
+        <EmitirPedidoModal
+          open
+          onClose={() => setEmitirRequisicao(null)}
+          requisicaoId={emitirRequisicao.id}
+          onConfirm={(payload) => {
+            emitirPedidoMutation.mutate({
+              requisicaoId: emitirRequisicao.id,
+              ...payload,
+            }, {
+              onSuccess: (pedido) => {
+                setEmitirRequisicao(null)
+                setDetail(null)
+                setToast({ type: "success", msg: `${pedido.numero_pedido} emitido` })
+                setTimeout(() => setToast(null), 4000)
+              },
+              onError: (err: any) => {
+                setToast({ type: "error", msg: `Erro: ${err?.message || "erro"}` })
+                setTimeout(() => setToast(null), 5000)
+              },
+            })
+          }}
+          isSubmitting={emitirPedidoMutation.isPending}
         />
       )}
     </div>

@@ -11,6 +11,7 @@ import type { Cotacao } from '../types'
 import CotacaoComparativo from '../components/CotacaoComparativo'
 import FluxoTimeline from '../components/FluxoTimeline'
 import UploadCotacao from '../components/UploadCotacao'
+import EmitirPedidoModal from '../components/EmitirPedidoModal'
 import { supabase } from '../services/supabase'
 import { api } from '../services/api'
 import type { CnpjResult } from '../services/api'
@@ -61,6 +62,7 @@ function CotacaoConcluida({ cotacao, nav }: { cotacao: Cotacao; nav: ReturnType<
   const emitirMutation = useEmitirPedido()
   const cancelarMutation = useCancelarRequisicao()
   const [pedidoToast, setPedidoToast] = useState<{ type: 'success' | 'error'; msg: string } | null>(null)
+  const [showEmitirModal, setShowEmitirModal] = useState(false)
 
   const req = cotacao.requisicao
   const canEmitPedido = atLeast('comprador') && req?.status === 'cotacao_aprovada'
@@ -158,23 +160,7 @@ function CotacaoConcluida({ cotacao, nav }: { cotacao: Cotacao; nav: ReturnType<
 
                 <button
                   disabled={emitirMutation.isPending || cancelarMutation.isPending}
-                  onClick={() => {
-                    emitirMutation.mutate({
-                      requisicaoId: req!.id,
-                      cotacaoId: cotacao.id,
-                      fornecedorNome: cotacao.fornecedor_selecionado_nome ?? 'N/A',
-                      valorTotal: cotacao.valor_selecionado ?? req!.valor_estimado,
-                      compradorId: cotacao.comprador_id,
-                    }, {
-                      onSuccess: (pedido) => {
-                        setPedidoToast({ type: 'success', msg: `Pedido ${pedido.numero_pedido} emitido ✓` })
-                      },
-                      onError: (err: any) => {
-                        setPedidoToast({ type: 'error', msg: `Erro ao emitir pedido: ${err?.message || 'erro desconhecido'}` })
-                        setTimeout(() => setPedidoToast(null), 5000)
-                      },
-                    })
-                  }}
+                  onClick={() => setShowEmitirModal(true)}
                   className="flex items-center justify-center gap-2 py-3.5 rounded-xl text-sm font-bold
                     text-white bg-teal-500 border-2 border-teal-500 hover:bg-teal-600 shadow-lg shadow-teal-500/20
                     active:scale-[0.98] transition-all disabled:opacity-50"
@@ -203,6 +189,37 @@ function CotacaoConcluida({ cotacao, nav }: { cotacao: Cotacao; nav: ReturnType<
             )}
           </div>
         </div>
+      )}
+
+
+      {req && showEmitirModal && (
+        <EmitirPedidoModal
+          open
+          onClose={() => setShowEmitirModal(false)}
+          requisicaoId={req.id}
+          cotacao={{
+            id: cotacao.id,
+            fornecedorNome: cotacao.fornecedor_selecionado_nome ?? "N/A",
+            valorTotal: cotacao.valor_selecionado ?? req.valor_estimado,
+            compradorId: cotacao.comprador_id,
+          }}
+          onConfirm={(payload) => {
+            emitirMutation.mutate({
+              requisicaoId: req.id,
+              ...payload,
+            }, {
+              onSuccess: (pedido) => {
+                setShowEmitirModal(false)
+                setPedidoToast({ type: "success", msg: `${pedido.numero_pedido} emitido` })
+              },
+              onError: (err: any) => {
+                setPedidoToast({ type: "error", msg: `Erro ao emitir pedido: ${err?.message || "erro desconhecido"}` })
+                setTimeout(() => setPedidoToast(null), 5000)
+              },
+            })
+          }}
+          isSubmitting={emitirMutation.isPending}
+        />
       )}
 
       {/* Status badges for non-admin or non-approved states */}

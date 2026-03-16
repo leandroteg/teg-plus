@@ -1,0 +1,438 @@
+import { useEffect, useMemo, useState } from 'react'
+import { useQuery } from '@tanstack/react-query'
+import { X, FileText, Loader2, AlertTriangle } from 'lucide-react'
+import { useCadCentrosCusto, useCadClasses, useCadObras } from '../hooks/useCadastros'
+import type { RequisicaoItem } from '../types'
+import { supabase } from '../services/supabase'
+import { gerarPreviaParcelas, resumirHomogeneidade } from '../utils/pagamentos'
+
+type ModalCotacao = {
+  id?: string
+  fornecedorNome?: string
+  valorTotal?: number
+  compradorId?: string
+  condicaoPagamento?: string
+}
+
+type ModalRequisicao = {
+  id: string
+  obra_id?: string | null
+  obra_nome: string
+  centro_custo?: string | null
+  centro_custo_id?: string | null
+  classe_financeira?: string | null
+  classe_financeira_id?: string | null
+  itens: RequisicaoItem[]
+}
+
+interface EmitirPedidoModalProps {
+  open: boolean
+  onClose: () => void
+  requisicaoId: string
+  cotacao?: ModalCotacao
+  onConfirm: (payload: {
+    cotacaoId: string
+    fornecedorNome: string
+    valorTotal: number
+    compradorId?: string
+    classeFinanceiraId?: string
+    classeFinanceira?: string
+    centroCustoId?: string
+    centroCusto?: string
+    condicaoPagamento?: string
+    observacoes?: string
+    dataPrevistaEntrega?: string
+    parcelasPreview: Array<{ numero: number; valor: number; data_vencimento: string; descricao?: string }>
+  }) => void
+  isSubmitting: boolean
+}
+
+export default function EmitirPedidoModal({
+  open,
+  onClose,
+  requisicaoId,
+  cotacao,
+  onConfirm,
+  isSubmitting,
+}: EmitirPedidoModalProps) {
+  const { data: classes = [] } = useCadClasses({ tipo: 'despesa' })
+  const { data: centros = [] } = useCadCentrosCusto()
+  const { data: obras = [] } = useCadObras()
+
+  const { data, isLoading, error } = useQuery({
+    queryKey: ['emitir-pedido-modal', requisicaoId, cotacao?.id ?? 'auto'],
+    enabled: open && !!requisicaoId,
+    queryFn: async () => {
+      const { data: requisicao, error: reqError } = await supabase
+        .from('cmp_requisicoes')
+        .select(`
+          id, obra_id, obra_nome,
+          centro_custo, centro_custo_id,
+          classe_financeira, classe_financeira_id,
+          itens:cmp_requisicao_itens(
+            id, descricao, quantidade, unidade,
+            valor_unitario_estimado,
+            classe_financeira_id, classe_financeira_codigo, classe_financeira_descricao
+          )
+        `)
+        .eq('id', requisicaoId)
+        .single()
+
+      if (reqError) throw reqError
+
+      let cotacaoResolvida = cotacao ?? {}
+
+      const hydrateCotacao = async (cotacaoId?: string) => {
+        if (!cotacaoId) return null
+        const { data: cotacaoData, error: cotError } = await supabase
+          .from('cmp_cotacoes')
+          .select('id, comprador_id, fornecedor_selecionado_id, fornecedor_selecionado_nome, valor_selecionado')
+          .eq('id', cotacaoId)
+          .maybeSingle()
+
+        if (cotError) throw cotError
+        if (!cotacaoData) return null
+
+        let condicaoPagamento = cotacao?.condicaoPagamento
+        if (!condicaoPagamento && cotacaoData.fornecedor_selecionado_id) {
+          const { data: fornecedor } = await supabase
+            .from('cmp_cotacao_fornecedores')
+            .select('condicao_pagamento')
+            .eq('id', cotacaoData.fornecedor_selecionado_id)
+            .maybeSingle()
+
+          condicaoPagamento = fornecedor?.condicao_pagamento ?? undefined
+        }
+
+        return {
+          id: cotacaoData.id,
+          fornecedorNome: cotacao?.fornecedorNome ?? cotacaoData.fornecedor_selecionado_nome ?? undefined,
+          valorTotal: cotacao?.valorTotal ?? cotacaoData.valor_selecionado ?? undefined,
+          compradorId: cotacao?.compradorId ?? cotacaoData.comprador_id ?? undefined,
+          condicaoPagamento,
+        } satisfies ModalCotacao
+      }
+
+      if (cotacao?.id) {
+        cotacaoResolvida = (await hydrateCotacao(cotacao.id)) ?? cotacaoResolvida
+      } else {
+        const { data: cotacaoData, error: cotError } = await supabase
+          .from('cmp_cotacoes')
+          .select('id')
+          .eq('requisicao_id', requisicaoId)
+          .eq('status', 'concluida')
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle()
+
+        if (cotError) throw cotError
+        cotacaoResolvida = (await hydrateCotacao(cotacaoData?.id)) ?? cotacaoResolvida
+      }
+
+      return {
+        requisicao: {
+          ...(requisicao as Omit<ModalRequisicao, 'itens'>),
+          itens: (((requisicao as any)?.itens ?? []) as RequisicaoItem[]),
+        } as ModalRequisicao,
+        cotacao: cotacaoResolvida,
+      }
+    },
+    staleTime: 30_000,
+  })
+
+  const requisicao = data?.requisicao
+  const cotacaoResolvida = data?.cotacao
+
+  const classeResumo = useMemo(
+    () => resumirHomogeneidade(requisicao?.itens.map((item) => item.classe_financeira_codigo) ?? []),
+    [requisicao],
+  )
+
+  const classesDosItens = useMemo(
+    () => Array.from(new Set(
+      (requisicao?.itens ?? [])
+        .map((item) => item.classe_financeira_codigo?.trim())
+        .filter((value): value is string => Boolean(value)),
+    )),
+    [requisicao],
+  )
+
+  const [classeId, setClasseId] = useState('')
+  const [centroId, setCentroId] = useState('')
+  const [condicaoPagamento, setCondicaoPagamento] = useState('')
+  const [dataPrevistaEntrega, setDataPrevistaEntrega] = useState('')
+  const [observacoes, setObservacoes] = useState('')
+
+  useEffect(() => {
+    if (!open || !requisicao) return
+
+    const obra = obras.find((item) => item.id === requisicao.obra_id)
+    const classeSelecionada = classes.find((item) =>
+      item.codigo === classeResumo.valor ||
+      item.id === requisicao.classe_financeira_id ||
+      item.codigo === requisicao.classe_financeira ||
+      requisicao.itens.some((reqItem) => reqItem.classe_financeira_id === item.id),
+    )
+
+    setClasseId(classeSelecionada?.id ?? '')
+    setCentroId(requisicao.centro_custo_id ?? (obra as any)?.centro_custo_id ?? '')
+    setCondicaoPagamento(cotacaoResolvida?.condicaoPagamento ?? '')
+    setDataPrevistaEntrega('')
+    setObservacoes('')
+  }, [open, requisicao, cotacaoResolvida?.condicaoPagamento, obras, classes, classeResumo.valor])
+
+  const classeSelecionada = classes.find((item) => item.id === classeId)
+  const centroSelecionado = centros.find((item) => item.id === centroId)
+  const obraSelecionada = obras.find((item) => item.id === requisicao?.obra_id)
+  const valorTotal = cotacaoResolvida?.valorTotal ?? 0
+  const parcelasPreview = useMemo(
+    () => gerarPreviaParcelas(valorTotal, condicaoPagamento, dataPrevistaEntrega || undefined),
+    [valorTotal, condicaoPagamento, dataPrevistaEntrega],
+  )
+
+  if (!open) return null
+
+  return (
+    <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+      <div className="w-full max-w-2xl bg-white rounded-3xl shadow-2xl overflow-hidden">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
+          <div>
+            <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-teal-600">Emissao do Pedido</p>
+            <h2 className="text-lg font-extrabold text-slate-800">{cotacaoResolvida?.fornecedorNome || 'Fechamento Financeiro'}</h2>
+          </div>
+          <button onClick={onClose} className="w-9 h-9 rounded-xl hover:bg-slate-100 flex items-center justify-center text-slate-500">
+            <X size={16} />
+          </button>
+        </div>
+
+        <div className="p-6 space-y-5 max-h-[80vh] overflow-y-auto">
+          {isLoading && (
+            <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-8 flex items-center justify-center gap-2 text-slate-500">
+              <Loader2 size={16} className="animate-spin" />
+              Carregando dados da requisicao e da cotacao aprovada...
+            </div>
+          )}
+
+          {!isLoading && error && (
+            <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-4 text-sm text-red-700">
+              Nao foi possivel carregar os dados da emissao: {error instanceof Error ? error.message : 'erro desconhecido'}.
+            </div>
+          )}
+
+          {!isLoading && !error && requisicao && (
+            <>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+                  <p className="text-[11px] font-semibold text-slate-500">Obra</p>
+                  <p className="mt-1 text-sm font-bold text-slate-800">{requisicao.obra_nome}</p>
+                </div>
+                <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+                  <p className="text-[11px] font-semibold text-slate-500">Fornecedor</p>
+                  <p className="mt-1 text-sm font-bold text-slate-800">{cotacaoResolvida?.fornecedorNome || '-'}</p>
+                </div>
+                <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+                  <p className="text-[11px] font-semibold text-slate-500">Valor</p>
+                  <p className="mt-1 text-sm font-extrabold text-emerald-600">
+                    {valorTotal.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                  </p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div className="rounded-2xl border border-teal-200 bg-teal-50 px-4 py-3">
+                  <p className="text-[11px] font-bold text-teal-700">Classe Financeira sugerida</p>
+                  <p className="mt-1 text-sm font-semibold text-slate-800">
+                    {classeResumo.homogeno && classeResumo.valor
+                      ? classeResumo.valor
+                      : requisicao.classe_financeira || 'Confirmacao manual necessaria'}
+                  </p>
+                  <p className="mt-1 text-[11px] text-slate-500">
+                    {classeResumo.homogeno && classeResumo.valor
+                      ? 'Puxada automaticamente dos itens da requisicao.'
+                      : `Itens com multiplas classes: ${classesDosItens.join(', ') || 'sem classe definida'}.`}
+                  </p>
+                </div>
+                <div className="rounded-2xl border border-cyan-200 bg-cyan-50 px-4 py-3">
+                  <p className="text-[11px] font-bold text-cyan-700">Centro de Custo sugerido</p>
+                  <p className="mt-1 text-sm font-semibold text-slate-800">
+                    {requisicao.centro_custo || (obraSelecionada as any)?.centro_custo?.codigo || 'Confirmacao manual necessaria'}
+                  </p>
+                  <p className="mt-1 text-[11px] text-slate-500">
+                    {requisicao.centro_custo
+                      ? 'Puxado da requisicao atual.'
+                      : (obraSelecionada as any)?.centro_custo_id
+                        ? 'Puxado automaticamente da obra vinculada.'
+                        : 'Selecione manualmente para emitir o pedido.'}
+                  </p>
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-slate-200 overflow-hidden">
+                <div className="px-4 py-3 bg-slate-50 border-b border-slate-200">
+                  <p className="text-xs font-bold text-slate-600">Conferencia dos itens</p>
+                </div>
+                <div className="divide-y divide-slate-200">
+                  {requisicao.itens.map((item, index) => (
+                    <div key={item.id || `${item.descricao}-${index}`} className="px-4 py-3 flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="text-sm font-semibold text-slate-800 truncate">{item.descricao}</p>
+                        <p className="text-[11px] text-slate-500">{item.quantidade} {item.unidade}</p>
+                      </div>
+                      <div className="shrink-0 text-right">
+                        <p className="text-[11px] font-semibold text-violet-700">
+                          {item.classe_financeira_codigo || 'Sem classe'}
+                        </p>
+                        <p className="text-[10px] text-slate-400 truncate max-w-[180px]">
+                          {item.classe_financeira_descricao || 'Classe financeira nao definida no item'}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-slate-600 mb-1.5">Classe Financeira Final</label>
+                  <select
+                    value={classeId}
+                    onChange={(event) => setClasseId(event.target.value)}
+                    className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-teal-300"
+                  >
+                    <option value="">Selecionar classe...</option>
+                    {classes.map((classe) => (
+                      <option key={classe.id} value={classe.id}>
+                        {classe.codigo} - {classe.descricao}
+                      </option>
+                    ))}
+                  </select>
+                  <p className="mt-1 text-[11px] text-slate-400">
+                    {classeResumo.homogeno && classeResumo.valor
+                      ? `Sugestao automatica aplicada: ${classeResumo.valor}`
+                      : 'Itens com classes diferentes exigem confirmacao manual.'}
+                  </p>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-600 mb-1.5">Centro de Custo Final</label>
+                  <select
+                    value={centroId}
+                    onChange={(event) => setCentroId(event.target.value)}
+                    className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-teal-300"
+                  >
+                    <option value="">Selecionar centro...</option>
+                    {centros.map((centro) => (
+                      <option key={centro.id} value={centro.id}>
+                        {centro.codigo} - {centro.descricao}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-slate-600 mb-1.5">Condicao de Pagamento</label>
+                  <input
+                    value={condicaoPagamento}
+                    onChange={(event) => setCondicaoPagamento(event.target.value)}
+                    className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-teal-300"
+                    placeholder="Ex.: 28 dias, 30/60, entrada + 28, 3x"
+                  />
+                  <p className="mt-1 text-[11px] text-slate-400">
+                    Puxada da cotacao aprovada quando houver. Revise abaixo as parcelas antes de emitir.
+                  </p>
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-600 mb-1.5">Data Prevista de Entrega</label>
+                  <input
+                    type="date"
+                    value={dataPrevistaEntrega}
+                    onChange={(event) => setDataPrevistaEntrega(event.target.value)}
+                    className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-teal-300"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-600 mb-1.5">Observacoes do Pedido</label>
+                <textarea
+                  value={observacoes}
+                  onChange={(event) => setObservacoes(event.target.value)}
+                  rows={3}
+                  className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-teal-300"
+                  placeholder="Complementos comerciais, observacoes de entrega ou financeiro..."
+                />
+              </div>
+
+              <div className="rounded-2xl border border-slate-200 overflow-hidden">
+                <div className="px-4 py-3 bg-slate-50 border-b border-slate-200 flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-xs font-bold text-slate-600">Confirmacao das parcelas</p>
+                    <p className="text-[11px] text-slate-400">Previa inteligente baseada na condicao de pagamento aprovada.</p>
+                  </div>
+                  {!cotacaoResolvida?.condicaoPagamento && (
+                    <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-amber-600">
+                      <AlertTriangle size={12} />
+                      Sem condicao puxada da cotacao
+                    </span>
+                  )}
+                </div>
+                <div className="p-4 space-y-2">
+                  {parcelasPreview.length === 0 ? (
+                    <p className="text-sm text-slate-400">Informe valor e condicao para gerar a previa.</p>
+                  ) : (
+                    parcelasPreview.map((parcela) => (
+                      <div key={`${parcela.numero}-${parcela.data_vencimento}`} className="flex items-center justify-between rounded-xl border border-slate-200 px-3 py-2">
+                        <div>
+                          <p className="text-sm font-semibold text-slate-800">Parcela {parcela.numero}</p>
+                          <p className="text-[11px] text-slate-400">{parcela.descricao}</p>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-sm font-bold text-slate-800">
+                            {parcela.valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                          </p>
+                          <p className="text-[11px] text-slate-400">{parcela.data_vencimento}</p>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+
+        <div className="px-6 py-4 border-t border-slate-100 flex items-center justify-between gap-3">
+          <button
+            onClick={onClose}
+            className="px-4 py-2.5 rounded-xl border border-slate-200 text-sm font-semibold text-slate-600 hover:bg-slate-50"
+          >
+            Cancelar
+          </button>
+          <button
+            onClick={() => onConfirm({
+              cotacaoId: cotacaoResolvida?.id || '',
+              fornecedorNome: cotacaoResolvida?.fornecedorNome || 'N/A',
+              valorTotal,
+              compradorId: cotacaoResolvida?.compradorId,
+              classeFinanceiraId: classeSelecionada?.id,
+              classeFinanceira: classeSelecionada?.codigo,
+              centroCustoId: centroSelecionado?.id,
+              centroCusto: centroSelecionado?.codigo,
+              condicaoPagamento: condicaoPagamento || cotacaoResolvida?.condicaoPagamento || undefined,
+              observacoes,
+              dataPrevistaEntrega,
+              parcelasPreview,
+            })}
+            disabled={isSubmitting || isLoading || !requisicao || !cotacaoResolvida?.id || !classeId || !centroId}
+            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-teal-600 text-white text-sm font-bold hover:bg-teal-700 disabled:opacity-50"
+          >
+            {isSubmitting ? <Loader2 size={15} className="animate-spin" /> : <FileText size={15} />}
+            Emitir Pedido
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
