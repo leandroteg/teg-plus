@@ -1001,23 +1001,35 @@ export default function NovaRequisicao() {
             ))}
           </div>
         )}
-        <button
-          onClick={() => {
-            const errs: string[] = []
-            if (!solicitante.trim()) errs.push('Informe o nome do solicitante')
-            if (!obraNome) errs.push('Selecione a obra')
-            if (itens.every(i => !i.descricao.trim())) errs.push('Adicione ao menos um item com descricao')
-            if (dataNecessidade) {
-              const today = new Date().toISOString().split('T')[0]
-              if (dataNecessidade < today) errs.push('Data de necessidade nao pode ser no passado')
-            }
-            setStepErrors(errs)
-            if (errs.length === 0) setStep(3)
-          }}
-          className="w-full bg-teal-500 text-white rounded-2xl py-3.5 font-bold flex items-center justify-center gap-2 shadow-lg shadow-teal-500/25 active:scale-[0.98] transition-all"
-        >
-          Revisar e Confirmar <ChevronRight size={16} />
-        </button>
+        <div className="flex gap-3">
+          <button
+            onClick={saveDraft}
+            disabled={savingDraft || submitting || (!solicitante.trim() && itens.every(i => !i.descricao.trim()))}
+            className="flex-1 bg-slate-100 text-slate-600 border border-slate-200 rounded-2xl py-3 font-bold text-sm flex items-center justify-center gap-2 disabled:opacity-50 hover:bg-slate-200 active:scale-[0.98] transition-all"
+          >
+            {savingDraft
+              ? <div className="w-4 h-4 border-2 border-slate-400 border-t-transparent rounded-full animate-spin" />
+              : <><Save size={15} /> Salvar Rascunho</>}
+          </button>
+
+          <button
+            onClick={() => {
+              const errs: string[] = []
+              if (!solicitante.trim()) errs.push('Informe o nome do solicitante')
+              if (!obraNome) errs.push('Selecione a obra')
+              if (itens.every(i => !i.descricao.trim())) errs.push('Adicione ao menos um item com descricao')
+              if (dataNecessidade) {
+                const today = new Date().toISOString().split('T')[0]
+                if (dataNecessidade < today) errs.push('Data de necessidade nao pode ser no passado')
+              }
+              setStepErrors(errs)
+              if (errs.length === 0) setStep(3)
+            }}
+            className="flex-[2] bg-teal-500 text-white rounded-2xl py-3 font-bold flex items-center justify-center gap-2 shadow-lg shadow-teal-500/25 active:scale-[0.98] transition-all"
+          >
+            Revisar e Confirmar <ChevronRight size={16} />
+          </button>
+        </div>
       </div>
     </div>
   )
@@ -1198,24 +1210,36 @@ export default function NovaRequisicao() {
             ))}
           </div>
         )}
-        <button
-          onClick={() => {
-            const errs: string[] = []
-            if (!solicitante.trim()) errs.push('Informe o nome do solicitante')
-            if (!obraNome) errs.push('Selecione a obra')
-            if (!descricao.trim()) errs.push('Informe a descricao do que precisa ser comprado')
-            if (itens.every(i => !i.descricao.trim())) errs.push('Adicione ao menos um item com descricao')
-            if (dataNecessidade) {
-              const today = new Date().toISOString().split('T')[0]
-              if (dataNecessidade < today) errs.push('Data de necessidade nao pode ser no passado')
-            }
-            setStepErrors(errs)
-            if (errs.length === 0) setStep(3)
-          }}
-          className="w-full bg-teal-500 text-white rounded-2xl py-3.5 font-bold flex items-center justify-center gap-2 shadow-lg shadow-teal-500/25 active:scale-[0.98] transition-all"
-        >
-          Revisar e Confirmar <ChevronRight size={16} />
-        </button>
+        <div className="flex gap-3">
+          <button
+            onClick={saveDraft}
+            disabled={savingDraft || submitting || (!solicitante.trim() && itens.every(i => !i.descricao.trim()))}
+            className="flex-1 bg-slate-100 text-slate-600 border border-slate-200 rounded-2xl py-3 font-bold text-sm flex items-center justify-center gap-2 disabled:opacity-50 hover:bg-slate-200 active:scale-[0.98] transition-all"
+          >
+            {savingDraft
+              ? <div className="w-4 h-4 border-2 border-slate-400 border-t-transparent rounded-full animate-spin" />
+              : <><Save size={15} /> Salvar Rascunho</>}
+          </button>
+
+          <button
+            onClick={() => {
+              const errs: string[] = []
+              if (!solicitante.trim()) errs.push('Informe o nome do solicitante')
+              if (!obraNome) errs.push('Selecione a obra')
+              if (!descricao.trim()) errs.push('Informe a descricao do que precisa ser comprado')
+              if (itens.every(i => !i.descricao.trim())) errs.push('Adicione ao menos um item com descricao')
+              if (dataNecessidade) {
+                const today = new Date().toISOString().split('T')[0]
+                if (dataNecessidade < today) errs.push('Data de necessidade nao pode ser no passado')
+              }
+              setStepErrors(errs)
+              if (errs.length === 0) setStep(3)
+            }}
+            className="flex-[2] bg-teal-500 text-white rounded-2xl py-3 font-bold flex items-center justify-center gap-2 shadow-lg shadow-teal-500/25 active:scale-[0.98] transition-all"
+          >
+            Revisar e Confirmar <ChevronRight size={16} />
+          </button>
+        </div>
       </div>
     </div>
   )
