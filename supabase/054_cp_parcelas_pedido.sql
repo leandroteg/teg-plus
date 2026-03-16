@@ -50,11 +50,18 @@ BEGIN
       COALESCE(NEW.data_pedido::date, CURRENT_DATE),
       COALESCE((parcela.item->>'data_vencimento')::date, NEW.data_prevista_entrega::date + 30, CURRENT_DATE + 30),
       COALESCE((parcela.item->>'data_vencimento')::date, NEW.data_prevista_entrega::date + 30, CURRENT_DATE + 30),
-      'previsto',
+      CASE
+        WHEN COALESCE(parcela.item->>'status_inicial', 'previsto') = 'confirmado' THEN 'confirmado'
+        ELSE 'previsto'
+      END,
       COALESCE(NEW.centro_custo, v_req.centro_custo),
       COALESCE(NEW.classe_financeira, v_req.classe_financeira),
       v_req.projeto_id,
       CASE
+        WHEN COALESCE(parcela.item->>'tipo', 'parcela') = 'adiantamento' THEN CONCAT(
+          COALESCE(v_req.descricao, 'Pedido de compra'),
+          ' - Adiantamento'
+        )
         WHEN v_total_parcelas = 1 THEN COALESCE(v_req.descricao, parcela.item->>'descricao', 'Pedido de compra')
         ELSE CONCAT(
           COALESCE(v_req.descricao, 'Pedido de compra'),

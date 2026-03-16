@@ -107,7 +107,14 @@ export interface EmitirPedidoPayload {
   classeFinanceira?: string
   centroCustoId?: string
   centroCusto?: string
-  parcelasPreview?: Array<{ numero: number; valor: number; data_vencimento: string; descricao?: string }>
+  parcelasPreview?: Array<{
+    numero: number
+    valor: number
+    data_vencimento: string
+    descricao?: string
+    tipo?: 'adiantamento' | 'parcela'
+    status_inicial?: 'confirmado' | 'previsto'
+  }>
 }
 
 type ParcelaPedido = {
@@ -115,6 +122,8 @@ type ParcelaPedido = {
   valor: number
   data_vencimento: string
   descricao?: string
+  tipo?: 'adiantamento' | 'parcela'
+  status_inicial?: 'confirmado' | 'previsto'
 }
 
 function extractHomogeneousClass(req: any) {
@@ -140,6 +149,7 @@ function extractHomogeneousClass(req: any) {
 
 function buildDescricaoParcela(descricaoBase: string | null | undefined, parcela: ParcelaPedido, totalParcelas: number) {
   const base = descricaoBase?.trim() || 'Pedido de compra'
+  if (parcela.tipo === 'adiantamento') return `${base} - Adiantamento`
   if (totalParcelas <= 1) return base
   return `${base} - ${parcela.descricao?.trim() || `Parcela ${parcela.numero}/${totalParcelas}`}`
 }
@@ -300,6 +310,8 @@ export function useEmitirPedido() {
         valor: Math.round(Number(parcela.valor || 0) * 100) / 100,
         data_vencimento: parcela.data_vencimento,
         descricao: parcela.descricao,
+        tipo: parcela.tipo || 'parcela',
+        status_inicial: parcela.status_inicial || 'previsto',
       }))
 
       const cpPayloads = parcelasSanitizadas.map((parcela) => ({
@@ -311,7 +323,7 @@ export function useEmitirPedido() {
         data_emissao: now.toISOString().split('T')[0],
         data_vencimento: parcela.data_vencimento,
         data_vencimento_orig: parcela.data_vencimento,
-        status: 'previsto',
+        status: parcela.status_inicial === 'confirmado' ? 'confirmado' : 'previsto',
         centro_custo: centroCusto || null,
         classe_financeira: classeFinanceira || null,
         projeto_id: requisicao.projeto_id || null,

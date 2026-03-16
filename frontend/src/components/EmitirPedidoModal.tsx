@@ -30,6 +30,8 @@ type ParcelaEditavel = {
   valor: number
   data_vencimento: string
   descricao?: string
+  tipo?: 'adiantamento' | 'parcela'
+  status_inicial?: 'confirmado' | 'previsto'
 }
 
 interface EmitirPedidoModalProps {
@@ -49,7 +51,14 @@ interface EmitirPedidoModalProps {
     condicaoPagamento?: string
     observacoes?: string
     dataPrevistaEntrega?: string
-    parcelasPreview: Array<{ numero: number; valor: number; data_vencimento: string; descricao?: string }>
+    parcelasPreview: Array<{
+      numero: number
+      valor: number
+      data_vencimento: string
+      descricao?: string
+      tipo?: 'adiantamento' | 'parcela'
+      status_inicial?: 'confirmado' | 'previsto'
+    }>
   }) => void
   isSubmitting: boolean
 }
@@ -169,6 +178,9 @@ export default function EmitirPedidoModal({
   const [condicaoPagamento, setCondicaoPagamento] = useState('')
   const [dataPrevistaEntrega, setDataPrevistaEntrega] = useState('')
   const [observacoes, setObservacoes] = useState('')
+  const [temAdiantamento, setTemAdiantamento] = useState(false)
+  const [adiantamentoValor, setAdiantamentoValor] = useState('')
+  const [adiantamentoData, setAdiantamentoData] = useState('')
   const [parcelasEditaveis, setParcelasEditaveis] = useState<ParcelaEditavel[]>([])
   const [parcelasEditadasManualmente, setParcelasEditadasManualmente] = useState(false)
 
@@ -188,6 +200,9 @@ export default function EmitirPedidoModal({
     setCondicaoPagamento(cotacaoResolvida?.condicaoPagamento ?? '')
     setDataPrevistaEntrega('')
     setObservacoes('')
+    setTemAdiantamento(false)
+    setAdiantamentoValor('')
+    setAdiantamentoData('')
     setParcelasEditadasManualmente(false)
   }, [open, requisicao, cotacaoResolvida?.condicaoPagamento, obras, classes, classeResumo.valor])
 
@@ -195,16 +210,45 @@ export default function EmitirPedidoModal({
   const centroSelecionado = centros.find((item) => item.id === centroId)
   const obraSelecionada = obras.find((item) => item.id === requisicao?.obra_id)
   const valorTotal = cotacaoResolvida?.valorTotal ?? 0
-  const parcelasSugeridas = useMemo(
-    () => gerarPreviaParcelas(valorTotal, condicaoPagamento, dataPrevistaEntrega || undefined),
-    [valorTotal, condicaoPagamento, dataPrevistaEntrega],
+  const valorAdiantamento = Math.round((Number(adiantamentoValor || 0) || 0) * 100) / 100
+  const adiantamentoInvalido = temAdiantamento && (valorAdiantamento <= 0 || valorAdiantamento > valorTotal || !adiantamentoData)
+  const saldoParcelado = Math.max(0, Math.round(((temAdiantamento ? valorTotal - valorAdiantamento : valorTotal)) * 100) / 100)
+  const parcelasSugeridasBase = useMemo(
+    () => gerarPreviaParcelas(saldoParcelado, condicaoPagamento, dataPrevistaEntrega || undefined),
+    [saldoParcelado, condicaoPagamento, dataPrevistaEntrega],
   )
+  const parcelasSugeridas = useMemo(() => {
+    const parcelasRegulares = parcelasSugeridasBase.map((parcela, index) => ({
+      ...parcela,
+      numero: temAdiantamento ? index + 2 : index + 1,
+      tipo: 'parcela' as const,
+      status_inicial: 'previsto' as const,
+    }))
+
+    if (!temAdiantamento) return parcelasRegulares
+
+    const adiantamento: ParcelaEditavel = {
+      numero: 1,
+      valor: valorAdiantamento,
+      data_vencimento: adiantamentoData,
+      descricao: 'Adiantamento',
+      tipo: 'adiantamento',
+      status_inicial: 'confirmado',
+    }
+
+    return [adiantamento, ...parcelasRegulares]
+  }, [parcelasSugeridasBase, temAdiantamento, valorAdiantamento, adiantamentoData])
 
   useEffect(() => {
     if (!open) return
     if (parcelasEditadasManualmente) return
     setParcelasEditaveis(parcelasSugeridas)
   }, [open, parcelasSugeridas, parcelasEditadasManualmente])
+
+  useEffect(() => {
+    if (!open) return
+    setParcelasEditadasManualmente(false)
+  }, [open, temAdiantamento, adiantamentoValor, adiantamentoData])
 
   const totalParcelas = useMemo(
     () => parcelasEditaveis.reduce((sum, parcela) => sum + (Number(parcela.valor) || 0), 0),
@@ -239,6 +283,8 @@ export default function EmitirPedidoModal({
         valor: 0,
         data_vencimento: dataPrevistaEntrega || '',
         descricao: `${current.length + 1}a parcela`,
+        tipo: 'parcela',
+        status_inicial: 'previsto',
       },
     ])
   }
@@ -247,7 +293,10 @@ export default function EmitirPedidoModal({
     setParcelasEditadasManualmente(true)
     setParcelasEditaveis((current) => current
       .filter((parcela) => parcela.numero !== numero)
-      .map((parcela, index) => ({ ...parcela, numero: index + 1 })))
+      .map((parcela, index) => ({
+        ...parcela,
+        numero: parcela.tipo === 'adiantamento' ? 1 : (temAdiantamento ? index + 1 : index + 1),
+      })))
   }
 
   const resetParcelas = () => {
@@ -419,6 +468,58 @@ export default function EmitirPedidoModal({
                 </div>
               </div>
 
+              <div className="rounded-2xl border border-amber-200 bg-amber-50/70 p-4 space-y-3">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-xs font-bold text-amber-700">Tem adiantamento?</p>
+                    <p className="text-[11px] text-slate-500">
+                      Se sim, essa parcela especial cai direto em Confirmados no Contas a Pagar.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setTemAdiantamento((prev) => !prev)}
+                    className={`relative inline-flex h-7 w-12 items-center rounded-full transition-colors ${temAdiantamento ? 'bg-amber-500' : 'bg-slate-200'}`}
+                  >
+                    <span className={`inline-block h-5 w-5 transform rounded-full bg-white transition-transform ${temAdiantamento ? 'translate-x-6' : 'translate-x-1'}`} />
+                  </button>
+                </div>
+
+                {temAdiantamento && (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs font-bold text-slate-600 mb-1.5">Valor do adiantamento</label>
+                      <input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={adiantamentoValor}
+                        onChange={(event) => setAdiantamentoValor(event.target.value)}
+                        className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-amber-300"
+                        placeholder="0,00"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-slate-600 mb-1.5">Data do adiantamento</label>
+                      <input
+                        type="date"
+                        value={adiantamentoData}
+                        onChange={(event) => setAdiantamentoData(event.target.value)}
+                        className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-amber-300"
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {temAdiantamento && (
+                  <p className={`text-[11px] ${adiantamentoInvalido ? 'text-rose-600' : 'text-slate-500'}`}>
+                    {adiantamentoInvalido
+                      ? 'Informe valor e data do adiantamento. O valor nao pode ser maior que o total do pedido.'
+                      : `Saldo restante para parcelamento normal: ${saldoParcelado.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}`}
+                  </p>
+                )}
+              </div>
+
               <div>
                 <label className="block text-xs font-bold text-slate-600 mb-1.5">Observacoes do Pedido</label>
                 <textarea
@@ -479,12 +580,23 @@ export default function EmitirPedidoModal({
                         <div key={`parcela-${parcela.numero}`} className="rounded-xl border border-slate-200 p-3 space-y-3">
                           <div className="flex items-center justify-between gap-3">
                             <div>
-                              <p className="text-sm font-semibold text-slate-800">Parcela {parcela.numero}</p>
+                              <div className="flex items-center gap-2">
+                                <p className="text-sm font-semibold text-slate-800">
+                                  {parcela.tipo === 'adiantamento' ? 'Adiantamento' : `Parcela ${parcela.numero}`}
+                                </p>
+                                {parcela.tipo === 'adiantamento' && (
+                                  <span className="inline-flex items-center rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-700 border border-emerald-200">
+                                    Vai para Confirmados
+                                  </span>
+                                )}
+                              </div>
                               <p className="text-[11px] text-slate-400">
-                                Ajuste manual quando a negociacao fugir da sugestao automatica.
+                                {parcela.tipo === 'adiantamento'
+                                  ? 'Parcela especial para pagamento antecipado do fornecedor.'
+                                  : 'Ajuste manual quando a negociacao fugir da sugestao automatica.'}
                               </p>
                             </div>
-                            {parcelasEditaveis.length > 1 && (
+                            {parcelasEditaveis.length > 1 && parcela.tipo !== 'adiantamento' && (
                               <button
                                 type="button"
                                 onClick={() => removeParcela(parcela.numero)}
@@ -499,8 +611,9 @@ export default function EmitirPedidoModal({
                             <div>
                               <label className="block text-[11px] font-semibold text-slate-500 mb-1">Descricao</label>
                               <input
-                                value={parcela.descricao ?? ''}
+                                value={parcela.tipo === 'adiantamento' ? 'Adiantamento' : parcela.descricao ?? ''}
                                 onChange={(event) => updateParcela(parcela.numero, { descricao: event.target.value })}
+                                readOnly={parcela.tipo === 'adiantamento'}
                                 className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-300"
                                 placeholder="Ex.: Entrada, 30 dias..."
                               />
@@ -581,7 +694,14 @@ export default function EmitirPedidoModal({
               condicaoPagamento: condicaoPagamento || cotacaoResolvida?.condicaoPagamento || undefined,
               observacoes,
               dataPrevistaEntrega,
-              parcelasPreview: parcelasEditaveis,
+              parcelasPreview: parcelasEditaveis.map((parcela) => ({
+                numero: parcela.numero,
+                valor: parcela.valor,
+                data_vencimento: parcela.data_vencimento,
+                descricao: parcela.tipo === 'adiantamento' ? 'Adiantamento' : parcela.descricao,
+                tipo: parcela.tipo,
+                status_inicial: parcela.status_inicial,
+              })),
             })}
             disabled={
               isSubmitting ||
@@ -590,6 +710,7 @@ export default function EmitirPedidoModal({
               !cotacaoResolvida?.id ||
               !classeId ||
               !centroId ||
+              adiantamentoInvalido ||
               !parcelasValidas ||
               diferencaParcelas !== 0
             }
