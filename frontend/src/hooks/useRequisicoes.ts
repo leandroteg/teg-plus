@@ -57,9 +57,9 @@ export function useCriarRequisicao() {
   return useMutation({
     mutationFn: async (payload: NovaRequisicaoPayload) => {
       const n8nUrl = import.meta.env.VITE_N8N_WEBHOOK_URL || ''
-      const shouldUseN8n = Boolean(n8nUrl) && !payload.arquivo_referencia
+      const shouldUseN8n = Boolean(n8nUrl) && !payload.arquivo_referencia && !payload.rascunho
 
-      // Tenta via n8n se configurado
+      // Tenta via n8n se configurado (skip for drafts)
       if (shouldUseN8n) {
         try {
           return await api.criarRequisicao(payload)
