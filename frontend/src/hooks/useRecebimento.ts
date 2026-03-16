@@ -21,16 +21,55 @@ export function useItensRequisicao(requisicaoId?: string) {
     queryKey: ['requisicao-itens', requisicaoId],
     queryFn: async () => {
       if (!requisicaoId) return []
+
+      // Fetch requisição items with catalog link fields
       const { data, error } = await supabase
         .from('cmp_requisicao_itens')
         .select(`
           id, descricao, quantidade, unidade, valor_unitario_estimado,
-          est_item_id, est_item_codigo, destino_operacional
+          est_item_id, est_item_codigo, destino_operacional,
+          item_estoque_id
         `)
         .eq('requisicao_id', requisicaoId)
         .order('created_at')
       if (error) throw error
-      return (data ?? []) as RequisicaoItemRow[]
+
+      // Normalize rows — use est_item_id or item_estoque_id
+      const rows = (data ?? []).map((row: any) => ({
+        id: row.id,
+        descricao: row.descricao,
+        quantidade: row.quantidade,
+        unidade: row.unidade,
+        valor_unitario_estimado: row.valor_unitario_estimado,
+        est_item_id: row.est_item_id ?? row.item_estoque_id ?? undefined,
+        est_item_codigo: row.est_item_codigo ?? undefined,
+        destino_operacional: row.destino_operacional ?? undefined,
+      } as RequisicaoItemRow))
+
+      // For items without a catalog link, try auto-match by exact description
+      const unlinked = rows.filter(r => !r.est_item_id)
+      if (unlinked.length > 0) {
+        const descs = unlinked.map(r => r.descricao)
+        const { data: matches } = await supabase
+          .from('est_itens')
+          .select('id, descricao, destino_operacional')
+          .in('descricao', descs)
+          .eq('ativo', true)
+        if (matches && matches.length > 0) {
+          const byDesc = new Map(matches.map((m: any) => [m.descricao, m]))
+          for (const row of rows) {
+            if (!row.est_item_id) {
+              const match = byDesc.get(row.descricao)
+              if (match) {
+                row.est_item_id = match.id
+                row.destino_operacional = match.destino_operacional
+              }
+            }
+          }
+        }
+      }
+
+      return rows
     },
     enabled: !!requisicaoId,
     staleTime: 60_000,
@@ -142,6 +181,7 @@ export function useCriarRecebimento() {
           numero_serie: i.numero_serie || null,
           data_validade: i.data_validade || null,
           tipo_destino: i.tipo_destino,
+          justificativa_destino: i.justificativa_destino || null,
         }))
 
       if (itensToInsert.length === 0) {

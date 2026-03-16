@@ -895,9 +895,11 @@ function ItemFormModal({
 
           <div className="flex gap-4">
             {([
-              ['controla_lote',   'Controla Lote'],
-              ['controla_serie',  'Controla N. Série'],
-              ['tem_validade',    'Controla Validade'],
+              ['controle_estoque',    'Controle Estoque'],
+              ['controle_patrimonio', 'Controle Patrimonial'],
+              ['controla_lote',       'Controla Lote'],
+              ['controla_serie',      'Controla N. Serie'],
+              ['tem_validade',        'Controla Validade'],
             ] as [keyof EstItem, string][]).map(([key, label]) => (
               <label key={key} className="flex items-center gap-2 cursor-pointer">
                 <input type="checkbox"

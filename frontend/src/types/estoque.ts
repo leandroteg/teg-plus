@@ -58,6 +58,14 @@ export interface EstItem {
   controla_lote: boolean
   controla_serie: boolean
   tem_validade: boolean
+  controle_estoque: boolean
+  controle_patrimonio: boolean
+  destino_operacional?: 'estoque' | 'patrimonio' | 'nenhum'
+  classe_financeira_id?: string
+  classe_financeira_codigo?: string
+  classe_financeira_descricao?: string
+  categoria_financeira_codigo?: string
+  categoria_financeira_descricao?: string
   valor_medio: number
   valor_ultima_entrada: number
   totvs_codigo?: string
@@ -391,6 +399,7 @@ export interface CmpRecebimentoItem {
   numero_serie?: string
   data_validade?: string
   tipo_destino: TipoDestino
+  justificativa_destino?: string
 }
 
 export interface RecebimentoItemForm {
@@ -404,4 +413,6 @@ export interface RecebimentoItemForm {
   numero_serie?: string
   data_validade?: string
   tipo_destino: TipoDestino
+  destino_padrao?: TipoDestino
+  justificativa_destino?: string
 }
