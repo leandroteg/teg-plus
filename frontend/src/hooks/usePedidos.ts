@@ -110,6 +110,13 @@ export interface EmitirPedidoPayload {
   parcelasPreview?: Array<{ numero: number; valor: number; data_vencimento: string; descricao?: string }>
 }
 
+type ParcelaPedido = {
+  numero: number
+  valor: number
+  data_vencimento: string
+  descricao?: string
+}
+
 function extractHomogeneousClass(req: any) {
   const values = Array.from(new Set(
     (req?.itens ?? [])
@@ -129,6 +136,12 @@ function extractHomogeneousClass(req: any) {
     classeFinanceira: values[0],
     classeFinanceiraId: item?.classe_financeira_id ?? req?.classe_financeira_id ?? null,
   }
+}
+
+function buildDescricaoParcela(descricaoBase: string | null | undefined, parcela: ParcelaPedido, totalParcelas: number) {
+  const base = descricaoBase?.trim() || 'Pedido de compra'
+  if (totalParcelas <= 1) return base
+  return `${base} - ${parcela.descricao?.trim() || `Parcela ${parcela.numero}/${totalParcelas}`}`
 }
 
 export function useEmitirPedido() {
@@ -180,6 +193,7 @@ export function useEmitirPedido() {
           id, descricao, obra_nome,
           classe_financeira, classe_financeira_id,
           centro_custo, centro_custo_id,
+          projeto_id,
           itens:cmp_requisicao_itens(classe_financeira_id, classe_financeira_codigo)
         `)
         .eq('id', requisicaoId)
@@ -260,6 +274,84 @@ export function useEmitirPedido() {
 
       if (reqError) {
         console.warn('Aviso: requisicao nao atualizada:', reqError.message)
+      }
+
+      const { data: existingCPs, error: existingCPsError } = await supabase
+        .from('fin_contas_pagar')
+        .select('id, status')
+        .eq('pedido_id', pedido.id)
+        .order('created_at', { ascending: true })
+
+      if (existingCPsError) {
+        throw new Error(`Erro ao localizar contas a pagar do pedido: ${existingCPsError.message}`)
+      }
+
+      const parcelasDoPedido = parcelasResolvidas.length > 0
+        ? parcelasResolvidas
+        : [{
+            numero: 1,
+            valor: valorTotal,
+            data_vencimento: dataPrevistaEntrega || now.toISOString().split('T')[0],
+            descricao: condicaoPagamento || undefined,
+          }]
+
+      const parcelasSanitizadas = parcelasDoPedido.map((parcela, index) => ({
+        numero: parcela.numero || index + 1,
+        valor: Math.round(Number(parcela.valor || 0) * 100) / 100,
+        data_vencimento: parcela.data_vencimento,
+        descricao: parcela.descricao,
+      }))
+
+      const cpPayloads = parcelasSanitizadas.map((parcela) => ({
+        pedido_id: pedido.id,
+        requisicao_id: requisicaoId,
+        fornecedor_nome: fornecedorNome,
+        valor_original: parcela.valor,
+        valor_pago: 0,
+        data_emissao: now.toISOString().split('T')[0],
+        data_vencimento: parcela.data_vencimento,
+        data_vencimento_orig: parcela.data_vencimento,
+        status: 'previsto',
+        centro_custo: centroCusto || null,
+        classe_financeira: classeFinanceira || null,
+        projeto_id: requisicao.projeto_id || null,
+        descricao: buildDescricaoParcela(requisicao.descricao, parcela, parcelasSanitizadas.length),
+        natureza: 'material',
+        observacoes: condicaoPagamento ? `Condição: ${condicaoPagamento}` : null,
+      }))
+
+      const existingIds = (existingCPs ?? []).map((cp: any) => cp.id)
+      const idsToUpdate = existingIds.slice(0, cpPayloads.length)
+      const payloadsToInsert = cpPayloads.slice(idsToUpdate.length)
+      const idsToDelete = existingIds.slice(cpPayloads.length)
+
+      for (let index = 0; index < idsToUpdate.length; index += 1) {
+        const { error: updateCPError } = await supabase
+          .from('fin_contas_pagar')
+          .update(cpPayloads[index])
+          .eq('id', idsToUpdate[index])
+        if (updateCPError) {
+          throw new Error(`Erro ao atualizar parcelas do contas a pagar: ${updateCPError.message}`)
+        }
+      }
+
+      if (payloadsToInsert.length > 0) {
+        const { error: insertCPError } = await supabase
+          .from('fin_contas_pagar')
+          .insert(payloadsToInsert)
+        if (insertCPError) {
+          throw new Error(`Erro ao criar parcelas do contas a pagar: ${insertCPError.message}`)
+        }
+      }
+
+      if (idsToDelete.length > 0) {
+        const { error: deleteCPError } = await supabase
+          .from('fin_contas_pagar')
+          .delete()
+          .in('id', idsToDelete)
+        if (deleteCPError) {
+          throw new Error(`Erro ao limpar parcelas antigas do contas a pagar: ${deleteCPError.message}`)
+        }
       }
 
       return pedido
