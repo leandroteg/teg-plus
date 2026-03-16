@@ -140,7 +140,7 @@ export function useCriarRequisicao() {
           descricao:        payload.descricao,
           justificativa:    payload.justificativa || null,
           urgencia:         payload.urgencia,
-          status:           'pendente',
+          status:           payload.rascunho ? 'rascunho' : 'em_aprovacao',
           categoria:        payload.categoria  || null,
           comprador_id:     compradorId,
           alcada_nivel:     alcadaNivel,
@@ -216,8 +216,8 @@ export function useCriarRequisicao() {
         }
       }
 
-      // Issue #60: Cria registro em apr_aprovacoes para que a RC apareça na tela AprovAi
-      try {
+      // Issue #60: Cria registro em apr_aprovacoes (skip for drafts)
+      if (!payload.rascunho) try {
         // Busca aprovador da alçada correspondente
         const { data: alcadaData } = await supabase
           .from('apr_alcadas')

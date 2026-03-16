@@ -4,7 +4,7 @@ import {
   Sparkles, Send, PlusCircle, Trash2, ChevronLeft, ChevronRight,
   AlertCircle, Check, Layers, FileText, Search, Upload, FileUp,
   ChevronDown, X, FileImage, Eye, Pencil, CheckCircle2, Loader2,
-  Package, MapPin, Zap,
+  Package, MapPin, Zap, Save,
 } from 'lucide-react'
 import { useCriarRequisicao } from '../hooks/useRequisicoes'
 import { useAiParse, readFileForAi, isBinaryFile, isImageFile } from '../hooks/useAiParse'
@@ -307,34 +307,51 @@ export default function NovaRequisicao() {
     setItens(prev => prev.map((item, i) => i === idx ? { ...item, [field]: value } : item))
 
   const [submitting, setSubmitting] = useState(false)
+  const [savingDraft, setSavingDraft] = useState(false)
   const urgente = urgencia !== 'normal'
+
+  const buildPayload = (rascunho = false) => ({
+    solicitante_nome: solicitante,
+    obra_nome:        obraNome,
+    obra_id:          obraId || undefined,
+    descricao:        buildResumoRequisicao(itens, descricao),
+    justificativa,
+    urgencia,
+    categoria:        categoria?.codigo,
+    itens,
+    data_necessidade: dataNecessidade || undefined,
+    texto_original:   textoAi || undefined,
+    comprador_id:     compradorSugerido?.id,
+    ai_confianca:     confianca,
+    arquivo_referencia: referenciaFile || undefined,
+    rascunho,
+  })
 
   const submit = async () => {
     setSubmitError(null)
     setSubmitting(true)
     try {
-      const descricaoFinal = buildResumoRequisicao(itens, descricao)
-      await mutation.mutateAsync({
-        solicitante_nome: solicitante,
-        obra_nome:        obraNome,
-        obra_id:          obraId || undefined,
-        descricao:        descricaoFinal,
-        justificativa,
-        urgencia,
-        categoria:        categoria?.codigo,
-        itens,
-        data_necessidade: dataNecessidade || undefined,
-        texto_original:   textoAi || undefined,
-        comprador_id:     compradorSugerido?.id,
-        ai_confianca:     confianca,
-        arquivo_referencia: referenciaFile || undefined,
-      })
+      await mutation.mutateAsync(buildPayload(false))
       nav('/requisicoes')
     } catch (err) {
       const msg = (err as Error)?.message || 'Erro ao enviar. Tente novamente.'
       setSubmitError(msg)
     } finally {
       setSubmitting(false)
+    }
+  }
+
+  const saveDraft = async () => {
+    setSubmitError(null)
+    setSavingDraft(true)
+    try {
+      await mutation.mutateAsync(buildPayload(true))
+      nav('/requisicoes')
+    } catch (err) {
+      const msg = (err as Error)?.message || 'Erro ao salvar rascunho. Tente novamente.'
+      setSubmitError(msg)
+    } finally {
+      setSavingDraft(false)
     }
   }
 
@@ -1297,12 +1314,21 @@ export default function NovaRequisicao() {
         </div>
       )}
 
-      <button onClick={submit} disabled={submitting}
-        className="w-full bg-teal-500 text-white rounded-2xl py-4 font-extrabold text-base flex items-center justify-center gap-2 disabled:opacity-50 shadow-xl shadow-teal-500/30 active:scale-[0.98] transition-all">
-        {submitting
-          ? <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-          : <><Send size={18} /> Enviar Requisição</>}
-      </button>
+      <div className="flex gap-3">
+        <button onClick={saveDraft} disabled={savingDraft || submitting}
+          className="flex-1 bg-slate-100 text-slate-600 border border-slate-200 rounded-2xl py-3.5 font-bold text-sm flex items-center justify-center gap-2 disabled:opacity-50 hover:bg-slate-200 active:scale-[0.98] transition-all">
+          {savingDraft
+            ? <div className="w-4 h-4 border-2 border-slate-400 border-t-transparent rounded-full animate-spin" />
+            : <><Save size={16} /> Salvar Rascunho</>}
+        </button>
+
+        <button onClick={submit} disabled={submitting || savingDraft}
+          className="flex-[2] bg-teal-500 text-white rounded-2xl py-3.5 font-extrabold text-base flex items-center justify-center gap-2 disabled:opacity-50 shadow-xl shadow-teal-500/30 active:scale-[0.98] transition-all">
+          {submitting
+            ? <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+            : <><Send size={18} /> Enviar Requisição</>}
+        </button>
+      </div>
 
       {submitError && (
         <p className="text-red-500 text-sm text-center bg-red-50 rounded-xl py-2">

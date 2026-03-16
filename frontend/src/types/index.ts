@@ -280,6 +280,7 @@ export interface NovaRequisicaoPayload {
   comprador_id?: string
   ai_confianca?: number
   arquivo_referencia?: File
+  rascunho?: boolean
 }
 
 export interface NovaCotacaoPayload {

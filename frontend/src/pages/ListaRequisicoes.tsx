@@ -35,8 +35,8 @@ type ViewMode = 'list' | 'cards'
 // ── Pipeline stages ─────────────────────────────────────────────────────────
 
 const PIPELINE_STAGES: { status: PipelineTab; label: string; icon: typeof ClipboardList; statuses: string[] }[] = [
-  { status: 'pendente',     label: 'Pendentes',              icon: ClipboardList, statuses: ['pendente'] },
-  { status: 'em_validacao', label: 'Em Validação Técnica',   icon: ShieldCheck,   statuses: ['em_aprovacao', 'em_esclarecimento'] },
+  { status: 'pendente',     label: 'Requisições Pendentes',   icon: ClipboardList, statuses: ['rascunho'] },
+  { status: 'em_validacao', label: 'Em Validação Técnica',   icon: ShieldCheck,   statuses: ['pendente', 'em_aprovacao', 'em_esclarecimento'] },
 ]
 
 const STATUS_ACCENT: Record<PipelineTab, { bg: string; bgActive: string; text: string; textActive: string; dot: string; border: string }> = {
