@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import {
   Settings, Key, Link, RefreshCw, CheckCircle2, XCircle,
   Eye, EyeOff, Save, Zap, AlertTriangle, Clock, Wifi,
-  Building2, DollarSign, ArrowDownUp,
+  Building2, DollarSign, ArrowDownUp, FlaskConical, ShieldCheck,
 } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
 import { useAuth } from '../../contexts/AuthContext'
@@ -484,55 +484,176 @@ export default function Configuracoes() {
               </button>
             </div>
 
-            {/* App Key */}
-            <div>
-              <label className={`block text-xs font-semibold mb-1.5 ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>
-                App Key (omie_app_key)
-              </label>
-              <div className="relative">
-                <input
-                  type={showKey ? 'text' : 'password'}
-                  value={form.omie_app_key}
-                  onChange={e => handleChange('omie_app_key', e.target.value)}
-                  disabled={!isAdmin}
-                  placeholder="Cole a App Key do Omie..."
-                  className={`w-full pr-10 px-3 py-2.5 rounded-xl border text-sm placeholder-slate-400
-                    focus:outline-none font-mono focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-400
-                    disabled:opacity-50 disabled:cursor-not-allowed
-                    ${isDark ? 'bg-white/[0.03] border-white/[0.06] text-slate-200' : 'border-slate-200 bg-white text-slate-700'}`}
-                />
+            {/* ── Seletor de Ambiente ──────────────────────────────── */}
+            <div className={`rounded-xl border p-3 ${isDark ? 'bg-white/[0.02] border-white/[0.06]' : 'bg-slate-50 border-slate-200'}`}>
+              <p className={`text-[11px] font-bold uppercase tracking-wide mb-2.5 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+                Ambiente Ativo
+              </p>
+              <div className="flex gap-2">
+                {/* Produção */}
                 <button
-                  type="button"
-                  onClick={() => setShowKey(v => !v)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors">
-                  {showKey ? <EyeOff size={14} /> : <Eye size={14} />}
+                  disabled={!isAdmin}
+                  onClick={() => handleChange('omie_sandbox_mode', 'false')}
+                  className={`flex-1 flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl text-sm font-bold transition-all border
+                    disabled:cursor-not-allowed ${
+                    form.omie_sandbox_mode !== 'true'
+                      ? 'bg-emerald-500 text-white border-emerald-500 shadow-sm shadow-emerald-200/60'
+                      : isDark
+                        ? 'bg-white/[0.02] border-white/[0.08] text-slate-500 hover:border-emerald-500/40 hover:text-emerald-400'
+                        : 'bg-white border-slate-200 text-slate-400 hover:border-emerald-300 hover:text-emerald-600'
+                  }`}
+                >
+                  <ShieldCheck size={15} className="shrink-0" />
+                  Produção
                 </button>
+                {/* Teste */}
+                <button
+                  disabled={!isAdmin}
+                  onClick={() => handleChange('omie_sandbox_mode', 'true')}
+                  className={`flex-1 flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl text-sm font-bold transition-all border
+                    disabled:cursor-not-allowed ${
+                    form.omie_sandbox_mode === 'true'
+                      ? 'bg-amber-500 text-white border-amber-500 shadow-sm shadow-amber-200/60'
+                      : isDark
+                        ? 'bg-white/[0.02] border-white/[0.08] text-slate-500 hover:border-amber-500/40 hover:text-amber-400'
+                        : 'bg-white border-slate-200 text-slate-400 hover:border-amber-300 hover:text-amber-600'
+                  }`}
+                >
+                  <FlaskConical size={15} className="shrink-0" />
+                  Teste
+                </button>
+              </div>
+              {form.omie_sandbox_mode === 'true' && (
+                <p className={`text-[11px] mt-2 flex items-center gap-1 ${isDark ? 'text-amber-400' : 'text-amber-600'}`}>
+                  <AlertTriangle size={11} className="shrink-0" />
+                  Modo Teste ativo — operações usam as credenciais de teste e não afetam a produção
+                </p>
+              )}
+            </div>
+
+            {/* ── Credenciais de Produção ──────────────────────────── */}
+            <div className={`rounded-xl border p-4 space-y-3 transition-all ${
+              form.omie_sandbox_mode !== 'true'
+                ? isDark ? 'bg-emerald-500/5 border-emerald-500/25' : 'bg-emerald-50/50 border-emerald-200'
+                : isDark ? 'bg-white/[0.01] border-white/[0.04] opacity-60' : 'bg-slate-50/50 border-slate-150 opacity-60'
+            }`}>
+              <div className="flex items-center gap-2">
+                <div className={`w-2 h-2 rounded-full shrink-0 ${form.omie_sandbox_mode !== 'true' ? 'bg-emerald-500' : 'bg-slate-300'}`} />
+                <p className={`text-xs font-bold ${form.omie_sandbox_mode !== 'true' ? isDark ? 'text-emerald-400' : 'text-emerald-700' : isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+                  Credenciais de Produção
+                </p>
+                {form.omie_sandbox_mode !== 'true' && (
+                  <span className="text-[9px] font-extrabold bg-emerald-500 text-white px-1.5 py-0.5 rounded-full tracking-wide">ATIVO</span>
+                )}
+              </div>
+              {/* App Key Produção */}
+              <div>
+                <label className={`block text-[11px] font-semibold mb-1 ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>
+                  App Key
+                </label>
+                <div className="relative">
+                  <input
+                    type={showKey ? 'text' : 'password'}
+                    value={form.omie_app_key}
+                    onChange={e => handleChange('omie_app_key', e.target.value)}
+                    disabled={!isAdmin}
+                    placeholder="App Key de produção..."
+                    className={`w-full pr-10 px-3 py-2 rounded-xl border text-sm placeholder-slate-400 font-mono
+                      focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-400
+                      disabled:opacity-50 disabled:cursor-not-allowed
+                      ${isDark ? 'bg-white/[0.03] border-white/[0.06] text-slate-200' : 'border-slate-200 bg-white text-slate-700'}`}
+                  />
+                  <button type="button" onClick={() => setShowKey(v => !v)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors">
+                    {showKey ? <EyeOff size={13} /> : <Eye size={13} />}
+                  </button>
+                </div>
+              </div>
+              {/* App Secret Produção */}
+              <div>
+                <label className={`block text-[11px] font-semibold mb-1 ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>
+                  App Secret
+                </label>
+                <div className="relative">
+                  <input
+                    type={showSecret ? 'text' : 'password'}
+                    value={form.omie_app_secret}
+                    onChange={e => handleChange('omie_app_secret', e.target.value)}
+                    disabled={!isAdmin}
+                    placeholder="App Secret de produção..."
+                    className={`w-full pr-10 px-3 py-2 rounded-xl border text-sm placeholder-slate-400 font-mono
+                      focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-400
+                      disabled:opacity-50 disabled:cursor-not-allowed
+                      ${isDark ? 'bg-white/[0.03] border-white/[0.06] text-slate-200' : 'border-slate-200 bg-white text-slate-700'}`}
+                  />
+                  <button type="button" onClick={() => setShowSecret(v => !v)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors">
+                    {showSecret ? <EyeOff size={13} /> : <Eye size={13} />}
+                  </button>
+                </div>
               </div>
             </div>
 
-            {/* App Secret */}
-            <div>
-              <label className={`block text-xs font-semibold mb-1.5 ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>
-                App Secret (omie_app_secret)
-              </label>
-              <div className="relative">
-                <input
-                  type={showSecret ? 'text' : 'password'}
-                  value={form.omie_app_secret}
-                  onChange={e => handleChange('omie_app_secret', e.target.value)}
-                  disabled={!isAdmin}
-                  placeholder="Cole o App Secret do Omie..."
-                  className={`w-full pr-10 px-3 py-2.5 rounded-xl border text-sm placeholder-slate-400
-                    focus:outline-none font-mono focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-400
-                    disabled:opacity-50 disabled:cursor-not-allowed
-                    ${isDark ? 'bg-white/[0.03] border-white/[0.06] text-slate-200' : 'border-slate-200 bg-white text-slate-700'}`}
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowSecret(v => !v)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors">
-                  {showSecret ? <EyeOff size={14} /> : <Eye size={14} />}
-                </button>
+            {/* ── Credenciais de Teste ─────────────────────────────── */}
+            <div className={`rounded-xl border p-4 space-y-3 transition-all ${
+              form.omie_sandbox_mode === 'true'
+                ? isDark ? 'bg-amber-500/5 border-amber-500/25' : 'bg-amber-50/50 border-amber-200'
+                : isDark ? 'bg-white/[0.01] border-white/[0.04] opacity-60' : 'bg-slate-50/50 border-slate-150 opacity-60'
+            }`}>
+              <div className="flex items-center gap-2">
+                <div className={`w-2 h-2 rounded-full shrink-0 ${form.omie_sandbox_mode === 'true' ? 'bg-amber-500' : 'bg-slate-300'}`} />
+                <p className={`text-xs font-bold ${form.omie_sandbox_mode === 'true' ? isDark ? 'text-amber-400' : 'text-amber-700' : isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+                  Credenciais de Teste
+                </p>
+                {form.omie_sandbox_mode === 'true' && (
+                  <span className="text-[9px] font-extrabold bg-amber-500 text-white px-1.5 py-0.5 rounded-full tracking-wide">ATIVO</span>
+                )}
+              </div>
+              {/* Sandbox App Key */}
+              <div>
+                <label className={`block text-[11px] font-semibold mb-1 ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>
+                  App Key
+                </label>
+                <div className="relative">
+                  <input
+                    type={showSandboxKey ? 'text' : 'password'}
+                    value={form.omie_sandbox_app_key}
+                    onChange={e => handleChange('omie_sandbox_app_key', e.target.value)}
+                    disabled={!isAdmin}
+                    placeholder="App Key da aplicação de teste..."
+                    className={`w-full pr-10 px-3 py-2 rounded-xl border text-sm placeholder-slate-400 font-mono
+                      focus:outline-none focus:ring-2 focus:ring-amber-400/30 focus:border-amber-400
+                      disabled:opacity-50 disabled:cursor-not-allowed
+                      ${isDark ? 'bg-white/[0.03] border-white/[0.06] text-slate-200' : 'border-slate-200 bg-white text-slate-700'}`}
+                  />
+                  <button type="button" onClick={() => setShowSandboxKey(v => !v)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors">
+                    {showSandboxKey ? <EyeOff size={13} /> : <Eye size={13} />}
+                  </button>
+                </div>
+              </div>
+              {/* Sandbox App Secret */}
+              <div>
+                <label className={`block text-[11px] font-semibold mb-1 ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>
+                  App Secret
+                </label>
+                <div className="relative">
+                  <input
+                    type={showSandboxSec ? 'text' : 'password'}
+                    value={form.omie_sandbox_app_secret}
+                    onChange={e => handleChange('omie_sandbox_app_secret', e.target.value)}
+                    disabled={!isAdmin}
+                    placeholder="App Secret da aplicação de teste..."
+                    className={`w-full pr-10 px-3 py-2 rounded-xl border text-sm placeholder-slate-400 font-mono
+                      focus:outline-none focus:ring-2 focus:ring-amber-400/30 focus:border-amber-400
+                      disabled:opacity-50 disabled:cursor-not-allowed
+                      ${isDark ? 'bg-white/[0.03] border-white/[0.06] text-slate-200' : 'border-slate-200 bg-white text-slate-700'}`}
+                  />
+                  <button type="button" onClick={() => setShowSandboxSec(v => !v)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors">
+                    {showSandboxSec ? <EyeOff size={13} /> : <Eye size={13} />}
+                  </button>
+                </div>
               </div>
             </div>
 
@@ -552,90 +673,6 @@ export default function Configuracoes() {
                   disabled:opacity-50 disabled:cursor-not-allowed
                   ${isDark ? 'bg-white/[0.03] border-white/[0.06] text-slate-200' : 'border-slate-200 bg-white text-slate-700'}`}
               />
-            </div>
-
-            {/* ── Sandbox / Homologação ─────────────────────────────── */}
-            <div className={`rounded-xl border p-4 space-y-3 ${
-              isDark ? 'bg-amber-500/5 border-amber-500/20' : 'bg-amber-50/60 border-amber-200'
-            }`}>
-              {/* Toggle sandbox */}
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className={`text-sm font-semibold flex items-center gap-1.5 ${isDark ? 'text-amber-300' : 'text-amber-800'}`}>
-                    <AlertTriangle size={13} />
-                    Modo Sandbox (Homologação)
-                  </p>
-                  <p className={`text-[11px] mt-0.5 ${isDark ? 'text-amber-500/80' : 'text-amber-600'}`}>
-                    Usa credenciais de uma aplicação de teste Omie separada — sem impacto em produção
-                  </p>
-                </div>
-                <button
-                  disabled={!isAdmin}
-                  onClick={() => handleChange('omie_sandbox_mode', form.omie_sandbox_mode === 'true' ? 'false' : 'true')}
-                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-200
-                    focus:outline-none focus:ring-2 focus:ring-amber-400/40 disabled:opacity-50 disabled:cursor-not-allowed
-                    ${form.omie_sandbox_mode === 'true' ? 'bg-amber-500' : 'bg-slate-300'}`}
-                >
-                  <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform duration-200
-                    ${form.omie_sandbox_mode === 'true' ? 'translate-x-6' : 'translate-x-1'}`}
-                  />
-                </button>
-              </div>
-
-              {form.omie_sandbox_mode === 'true' && (
-                <>
-                  {/* Sandbox App Key */}
-                  <div>
-                    <label className={`block text-xs font-semibold mb-1.5 ${isDark ? 'text-amber-400' : 'text-amber-700'}`}>
-                      Sandbox App Key
-                    </label>
-                    <div className="relative">
-                      <input
-                        type={showSandboxKey ? 'text' : 'password'}
-                        value={form.omie_sandbox_app_key}
-                        onChange={e => handleChange('omie_sandbox_app_key', e.target.value)}
-                        disabled={!isAdmin}
-                        placeholder="App Key da aplicação de teste..."
-                        className={`w-full pr-10 px-3 py-2.5 rounded-xl border text-sm placeholder-slate-400 font-mono
-                          focus:outline-none focus:ring-2 focus:ring-amber-400/30 focus:border-amber-400
-                          disabled:opacity-50 disabled:cursor-not-allowed
-                          ${isDark ? 'bg-white/[0.03] border-amber-500/20 text-slate-200' : 'border-amber-300 bg-white text-slate-700'}`}
-                      />
-                      <button type="button" onClick={() => setShowSandboxKey(v => !v)}
-                        className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors">
-                        {showSandboxKey ? <EyeOff size={14} /> : <Eye size={14} />}
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Sandbox App Secret */}
-                  <div>
-                    <label className={`block text-xs font-semibold mb-1.5 ${isDark ? 'text-amber-400' : 'text-amber-700'}`}>
-                      Sandbox App Secret
-                    </label>
-                    <div className="relative">
-                      <input
-                        type={showSandboxSec ? 'text' : 'password'}
-                        value={form.omie_sandbox_app_secret}
-                        onChange={e => handleChange('omie_sandbox_app_secret', e.target.value)}
-                        disabled={!isAdmin}
-                        placeholder="App Secret da aplicação de teste..."
-                        className={`w-full pr-10 px-3 py-2.5 rounded-xl border text-sm placeholder-slate-400 font-mono
-                          focus:outline-none focus:ring-2 focus:ring-amber-400/30 focus:border-amber-400
-                          disabled:opacity-50 disabled:cursor-not-allowed
-                          ${isDark ? 'bg-white/[0.03] border-amber-500/20 text-slate-200' : 'border-amber-300 bg-white text-slate-700'}`}
-                      />
-                      <button type="button" onClick={() => setShowSandboxSec(v => !v)}
-                        className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors">
-                        {showSandboxSec ? <EyeOff size={14} /> : <Eye size={14} />}
-                      </button>
-                    </div>
-                    <p className={`text-[10px] mt-1.5 ${isDark ? 'text-amber-500/70' : 'text-amber-500'}`}>
-                      Para criar uma aplicação de teste: <a href="https://app.omie.com.br" target="_blank" rel="noopener noreferrer" className="underline font-medium">app.omie.com.br</a> → Minhas Aplicações → + Nova Aplicação → Testar grátis (válido por 7 dias)
-                    </p>
-                  </div>
-                </>
-              )}
             </div>
 
             {/* Test result */}
