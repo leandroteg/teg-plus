@@ -129,6 +129,90 @@ export interface FinanceiroDashboardData {
   recentes: ContaPagar[]
 }
 
+// ── Cartões de Crédito ───────────────────────────────────────────────────────
+
+export type BandeiraCartao = 'visa' | 'mastercard' | 'elo' | 'amex' | 'hipercard' | 'outro'
+
+export type StatusApontamentoCartao = 'rascunho' | 'enviado' | 'conciliado' | 'rejeitado'
+
+export type StatusFaturaCartao = 'processando' | 'disponivel' | 'paga' | 'erro'
+
+export interface CartaoCredito {
+  id: string
+  nome: string
+  bandeira: BandeiraCartao
+  ultimos4?: string
+  limite?: number
+  ativo: boolean
+  observacoes?: string
+  created_at: string
+  updated_at: string
+}
+
+export interface PortadorCartao {
+  id: string
+  cartao_id: string
+  user_id: string
+  nome: string
+  ativo: boolean
+  created_at: string
+}
+
+export interface ApontamentoCartao {
+  id: string
+  cartao_id: string
+  portador_id?: string
+  user_id: string
+  data_lancamento: string
+  descricao: string
+  estabelecimento?: string
+  valor: number
+  centro_custo?: string
+  classe_financeira?: string
+  projeto_id?: string
+  comprovante_url?: string
+  comprovante_nome?: string
+  status: StatusApontamentoCartao
+  item_fatura_id?: string
+  observacoes?: string
+  created_at: string
+  updated_at: string
+  // Joins
+  cartao?: CartaoCredito
+}
+
+export interface FaturaCartao {
+  id: string
+  cartao_id: string
+  mes_referencia: string   // "2026-03"
+  data_vencimento?: string
+  valor_total?: number
+  arquivo_url?: string
+  arquivo_nome?: string
+  status: StatusFaturaCartao
+  processado_em?: string
+  erro_msg?: string
+  created_at: string
+  // Joins
+  cartao?: CartaoCredito
+  itens?: ItemFaturaCartao[]
+}
+
+export interface ItemFaturaCartao {
+  id: string
+  fatura_id: string
+  cartao_id: string
+  data_lancamento: string
+  descricao: string
+  valor: number
+  categoria_banco?: string
+  conciliado: boolean
+  apontamento_id?: string
+  created_at: string
+  // Joins
+  apontamento?: ApontamentoCartao
+}
+
 // ── Lotes de Pagamento ──────────────────────────────────────────────────────
 
 export type StatusLote =
