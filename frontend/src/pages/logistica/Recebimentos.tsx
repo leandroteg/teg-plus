@@ -13,6 +13,14 @@ const STATUS_RECEB = {
   recusado:   { label: 'Recusado',   bg: 'bg-red-50',     text: 'text-red-700',     dot: 'bg-red-500'     },
 }
 
+const RECEBIMENTO_FILTERS: Array<{ value: string; label: string; icon: typeof Clock; badge: string; border: string }> = [
+  { value: 'pendente',   label: 'Pendentes',   icon: Clock,         badge: 'bg-amber-100 text-amber-700',   border: 'border-amber-400' },
+  { value: 'confirmado', label: 'Confirmados', icon: CheckCircle2,  badge: 'bg-emerald-100 text-emerald-700', border: 'border-emerald-400' },
+  { value: 'parcial',    label: 'Parcial',     icon: AlertTriangle, badge: 'bg-blue-100 text-blue-700',    border: 'border-blue-400' },
+  { value: 'recusado',   label: 'Recusado',    icon: X,             badge: 'bg-red-100 text-red-700',      border: 'border-red-400' },
+  { value: '',           label: 'Todos',       icon: CheckCircle2,  badge: 'bg-slate-200 text-slate-700',   border: 'border-slate-300' },
+]
+
 const fmtDataHora = (d?: string) =>
   d ? new Date(d).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' }) : '—'
 
@@ -32,9 +40,20 @@ export default function Recebimentos() {
   const [avaliacaoQualidade, setAvaliacaoQualidade] = useState(5)
   const [avaliacao, setAvaliacao] = useState({ prazo: 5, qualidade: 5, comunicacao: 5, comentario: '' })
 
-  const { data: recebimentos = [], isLoading } = useRecebimentos(statusFiltro ? { status: statusFiltro } : undefined)
+  const { data: recebimentos = [], isLoading } = useRecebimentos()
   const confirmar = useConfirmarRecebimento()
   const avaliar = useAvaliarTransportadora()
+
+  const filteredRecebimentos = statusFiltro
+    ? recebimentos.filter(r => r.status === statusFiltro)
+    : recebimentos
+
+  const counts = RECEBIMENTO_FILTERS.reduce<Record<string, number>>((acc, filter) => {
+    acc[filter.value] = filter.value
+      ? recebimentos.filter(r => r.status === filter.value).length
+      : recebimentos.length
+    return acc
+  }, {})
 
   async function handleConfirmar() {
     if (!confirmModal) return
@@ -81,29 +100,47 @@ export default function Recebimentos() {
       </div>
 
       {/* Filtros */}
-      <div className="flex gap-2">
-        {[['pendente','Pendentes'],['confirmado','Confirmados'],['parcial','Parcial'],['recusado','Recusado'],['','Todos']].map(([v, l]) => (
-          <button key={v} onClick={() => setStatusFiltro(v)}
-            className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-all ${
-              statusFiltro === v ? 'bg-orange-600 text-white shadow-sm' : isDark ? 'bg-white/5 text-slate-400 border border-white/[0.06]' : 'bg-white text-slate-500 border border-slate-200'
-            }`}>
-            {l}
-          </button>
-        ))}
+      <div className={`flex gap-1 p-1 rounded-2xl border overflow-x-auto hide-scrollbar ${isDark ? 'bg-white/[0.02] border-white/[0.06]' : 'bg-slate-50 border-slate-200'}`}>
+        {RECEBIMENTO_FILTERS.map(filter => {
+          const Icon = filter.icon
+          const active = statusFiltro === filter.value
+          return (
+            <button key={filter.value} onClick={() => setStatusFiltro(filter.value)}
+              className={`min-w-fit md:flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold whitespace-nowrap transition-all border ${
+                active
+                  ? isDark
+                    ? 'bg-white/[0.06] text-white border-white/[0.08] shadow-sm'
+                    : `${STATUS_RECEB[filter.value as keyof typeof STATUS_RECEB]?.bg ?? 'bg-slate-100'} ${STATUS_RECEB[filter.value as keyof typeof STATUS_RECEB]?.text ?? 'text-slate-700'} ${filter.border} shadow-sm`
+                  : isDark
+                    ? 'text-slate-400 border-transparent hover:bg-white/[0.04]'
+                    : 'text-slate-500 border-transparent hover:bg-white hover:shadow-sm'
+              }`}>
+              <Icon size={15} className="shrink-0" />
+              {filter.label}
+              <span className={`ml-1 min-w-[22px] px-1.5 py-0.5 rounded-full text-[10px] font-bold text-center ${
+                active
+                  ? isDark ? 'bg-white/[0.08] text-slate-200' : filter.badge
+                  : isDark ? 'bg-white/[0.06] text-slate-500' : 'bg-slate-100 text-slate-500'
+              }`}>
+                {counts[filter.value]}
+              </span>
+            </button>
+          )
+        })}
       </div>
 
       {isLoading ? (
         <div className="flex items-center justify-center py-16">
           <div className="w-8 h-8 border-[3px] border-orange-500 border-t-transparent rounded-full animate-spin" />
         </div>
-      ) : recebimentos.length === 0 ? (
+      ) : filteredRecebimentos.length === 0 ? (
         <div className={`rounded-2xl p-12 text-center ${isDark ? 'bg-[#1e293b] border border-white/[0.06]' : 'bg-white border border-slate-200'}`}>
           <CheckCircle2 size={40} className={`mx-auto mb-3 ${isDark ? 'text-slate-600' : 'text-slate-200'}`} />
           <p className={`font-semibold ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Nenhum recebimento {statusFiltro === 'pendente' ? 'pendente' : 'encontrado'}</p>
         </div>
       ) : (
         <div className="space-y-2">
-          {recebimentos.map(r => {
+          {filteredRecebimentos.map(r => {
             const cfg = STATUS_RECEB[r.status]
             const s = r.solicitacao
             const entregadoHa = r.entregue_em
@@ -290,7 +327,7 @@ export default function Recebimentos() {
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
           <div className={`rounded-2xl shadow-2xl w-full max-w-sm ${isDark ? 'bg-[#1e293b]' : 'bg-white'}`}>
             <div className={`flex items-center justify-between px-6 py-4 ${isDark ? 'border-b border-white/[0.06]' : 'border-b border-slate-100'}`}>
-              <h2 className={`text-lg font-extrabold ${isDark ? 'text-white' : 'text-slate-800'}`}>Avaliar Transportadora</h2>
+              <h2 className={`text-lg font-extrabold ${isDark ? 'text-white' : 'text-slate-800'}`}>Avaliar Fornecedor</h2>
               <button onClick={() => setAvaliacaoModal(null)}
                 className={`w-8 h-8 rounded-lg flex items-center justify-center ${isDark ? 'hover:bg-white/10 text-slate-400' : 'hover:bg-slate-100'}`}>
                 <X size={16} />

@@ -1,10 +1,11 @@
 import { useState, useMemo } from 'react'
 import {
   X, Package, ChevronDown, ChevronUp, Check,
-  AlertTriangle, Warehouse, FileText, Hash,
+  AlertTriangle, Warehouse, FileText, Hash, Info,
+  ArchiveRestore, Gem, Ban,
 } from 'lucide-react'
 import type { Pedido } from '../types'
-import type { RecebimentoItemForm } from '../types/estoque'
+import type { RecebimentoItemForm, TipoDestino } from '../types/estoque'
 import {
   useItensRequisicao,
   useBases,
@@ -15,6 +16,21 @@ import {
 
 const fmt = (v?: number) =>
   v != null ? v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) : '—'
+
+/** Derive the default tipo_destino from destino_operacional */
+function derivarDestinoPadrao(
+  destino_operacional?: 'estoque' | 'patrimonio' | 'nenhum',
+): TipoDestino {
+  if (destino_operacional === 'patrimonio') return 'patrimonial'
+  if (destino_operacional === 'nenhum') return 'nenhum'
+  return 'consumo'
+}
+
+const DESTINO_OPTIONS: { value: TipoDestino; label: string; icon: typeof Package; color: string; activeColor: string }[] = [
+  { value: 'consumo',     label: 'Estoque',     icon: ArchiveRestore, color: 'teal',   activeColor: 'bg-teal-100 text-teal-700 border-teal-300 ring-1 ring-teal-200' },
+  { value: 'patrimonial', label: 'Patrimonio', icon: Gem,            color: 'violet', activeColor: 'bg-violet-100 text-violet-700 border-violet-300 ring-1 ring-violet-200' },
+  { value: 'nenhum',      label: 'Nenhum',      icon: Ban,            color: 'slate',  activeColor: 'bg-slate-100 text-slate-600 border-slate-300 ring-1 ring-slate-200' },
+]
 
 // ─── Component ───────────────────────────────────────────────────────────────
 
@@ -42,17 +58,22 @@ export default function RecebimentoModal({
   const [itens, setItens] = useState<RecebimentoItemForm[]>([])
   const [initialized, setInitialized]       = useState(false)
 
-  // Initialize items when RC items load
+  // Initialize items when RC items load — with smart pre-fill from catalog
   if (itensRC && !initialized) {
     setItens(
-      itensRC.map(item => ({
-        requisicao_item_id: item.id,
-        descricao: item.descricao,
-        quantidade_esperada: item.quantidade,
-        quantidade_recebida: item.quantidade, // pre-fill with full qty
-        valor_unitario: item.valor_unitario_estimado,
-        tipo_destino: 'consumo' as const,
-      }))
+      itensRC.map(item => {
+        const destino = derivarDestinoPadrao(item.destino_operacional)
+        return {
+          requisicao_item_id: item.id,
+          item_estoque_id: item.est_item_id,
+          descricao: item.descricao,
+          quantidade_esperada: item.quantidade,
+          quantidade_recebida: item.quantidade,
+          valor_unitario: item.valor_unitario_estimado,
+          tipo_destino: destino,
+          destino_padrao: item.est_item_id ? destino : undefined,
+        }
+      })
     )
     setInitialized(true)
   }
@@ -62,8 +83,16 @@ export default function RecebimentoModal({
     () => itens.reduce((sum, i) => sum + i.quantidade_recebida * i.valor_unitario, 0),
     [itens],
   )
-  const temPatrimonial = itens.some(i => i.tipo_destino === 'patrimonial')
+  const temPatrimonial = itens.some(i => i.tipo_destino === 'patrimonial' && i.quantidade_recebida > 0)
+  const temNenhum = itens.some(i => i.tipo_destino === 'nenhum' && i.quantidade_recebida > 0)
   const qtdComRecebimento = itens.filter(i => i.quantidade_recebida > 0).length
+
+  // Check if any item has an override without justification
+  const temOverrideSemJustificativa = itens.some(
+    i => i.destino_padrao && i.tipo_destino !== i.destino_padrao
+      && i.quantidade_recebida > 0
+      && !i.justificativa_destino?.trim()
+  )
 
   // Item updaters
   const updateItem = (idx: number, patch: Partial<RecebimentoItemForm>) => {
@@ -73,6 +102,10 @@ export default function RecebimentoModal({
   const handleSubmit = async () => {
     if (qtdComRecebimento === 0) {
       setErro('Informe a quantidade recebida em pelo menos 1 item.')
+      return
+    }
+    if (temOverrideSemJustificativa) {
+      setErro('Preencha a justificativa dos itens com destino alterado.')
       return
     }
     setErro('')
@@ -157,37 +190,6 @@ export default function RecebimentoModal({
                 </select>
               </div>
 
-              {/* ── NF fields ────────────────────────────────────── */}
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-semibold text-slate-600 mb-1.5">
-                    <FileText size={12} className="inline mr-1 -mt-0.5" />
-                    NF Fornecedor
-                  </label>
-                  <input
-                    type="text"
-                    value={nfNumero}
-                    onChange={e => setNfNumero(e.target.value)}
-                    placeholder="000.000"
-                    className="w-full text-sm border border-slate-200 rounded-xl px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-teal-400 focus:border-teal-400 placeholder:text-slate-300"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-semibold text-slate-600 mb-1.5">
-                    <Hash size={12} className="inline mr-1 -mt-0.5" />
-                    Chave NFe
-                  </label>
-                  <input
-                    type="text"
-                    value={nfChave}
-                    onChange={e => setNfChave(e.target.value)}
-                    placeholder="44 dígitos..."
-                    maxLength={44}
-                    className="w-full text-sm border border-slate-200 rounded-xl px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-teal-400 focus:border-teal-400 placeholder:text-slate-300"
-                  />
-                </div>
-              </div>
-
               {/* ── Items table ───────────────────────────────────── */}
               <div>
                 <p className="text-xs font-semibold text-slate-600 mb-2 flex items-center gap-1">
@@ -229,8 +231,19 @@ export default function RecebimentoModal({
                 <div className="flex items-start gap-2 bg-violet-50 border border-violet-200 rounded-xl px-3 py-2.5 text-xs text-violet-700">
                   <AlertTriangle size={14} className="flex-shrink-0 mt-0.5" />
                   <p>
-                    <span className="font-bold">Itens patrimoniais</span> serão registrados como pendentes
-                    no módulo Patrimonial para complementação de dados (vida útil, taxa, responsável).
+                    <span className="font-bold">Itens patrimoniais</span> serao registrados como pendentes
+                    no modulo Patrimonial para complementacao de dados (vida util, taxa, responsavel).
+                  </p>
+                </div>
+              )}
+
+              {/* ── Nenhum notice ──────────────────────────────────── */}
+              {temNenhum && (
+                <div className="flex items-start gap-2 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-xs text-slate-600">
+                  <Info size={14} className="flex-shrink-0 mt-0.5" />
+                  <p>
+                    Itens com destino <span className="font-bold">Nenhum</span> serao registrados
+                    apenas no recebimento, sem entrada no Estoque ou Patrimonial.
                   </p>
                 </div>
               )}
@@ -277,6 +290,12 @@ export default function RecebimentoModal({
 
 // ─── ItemRow ─────────────────────────────────────────────────────────────────
 
+function destinoLabel(d: TipoDestino) {
+  if (d === 'patrimonial') return 'Patrimonio'
+  if (d === 'nenhum') return 'Nenhum'
+  return 'Estoque'
+}
+
 function ItemRow({
   item,
   onChange,
@@ -288,59 +307,129 @@ function ItemRow({
   const parcial = item.quantidade_recebida < item.quantidade_esperada && item.quantidade_recebida > 0
   const zero = item.quantidade_recebida === 0
 
+  // Detect if user changed from the catalog default
+  const isOverride = item.destino_padrao != null && item.tipo_destino !== item.destino_padrao
+  const needsJustificativa = isOverride && item.quantidade_recebida > 0
+
+  const handleSetDestino = (novoDestino: TipoDestino) => {
+    const voltouAoPadrao = item.destino_padrao != null && novoDestino === item.destino_padrao
+    onChange({
+      tipo_destino: novoDestino,
+      ...(voltouAoPadrao ? { justificativa_destino: '' } : {}),
+    })
+  }
+
   return (
     <div className={`border rounded-xl overflow-hidden transition-colors ${
-      zero ? 'border-slate-100 bg-slate-50/50 opacity-60' : parcial ? 'border-amber-200 bg-amber-50/30' : 'border-slate-200'
+      zero ? 'border-slate-100 bg-slate-50/50 opacity-60'
+        : isOverride ? 'border-amber-300 bg-amber-50/40'
+        : parcial ? 'border-amber-200 bg-amber-50/30'
+        : 'border-slate-200'
     }`}>
       {/* Main row */}
-      <div className="px-3 py-2.5 flex items-center gap-2">
-        <div className="flex-1 min-w-0">
-          <p className="text-xs font-semibold text-slate-700 truncate">{item.descricao}</p>
-          <p className="text-[10px] text-slate-400 mt-0.5">
-            Esperado: {item.quantidade_esperada} · {fmt(item.valor_unitario)}/un
-          </p>
+      <div className="px-3 py-2.5 space-y-2">
+        <div className="flex items-center gap-2">
+          <div className="flex-1 min-w-0">
+            <p className="text-xs font-semibold text-slate-700 truncate">{item.descricao}</p>
+            <div className="flex items-center gap-1.5 mt-0.5">
+              <p className="text-[10px] text-slate-400">
+                Esperado: {item.quantidade_esperada} · {fmt(item.valor_unitario)}/un
+              </p>
+              {/* Badge showing catalog default */}
+              {item.destino_padrao && (
+                <span className={`inline-flex items-center gap-0.5 text-[9px] font-bold px-1.5 py-0.5 rounded-full ${
+                  item.destino_padrao === 'patrimonial'
+                    ? 'bg-violet-100 text-violet-600'
+                    : item.destino_padrao === 'nenhum'
+                    ? 'bg-slate-100 text-slate-500'
+                    : 'bg-teal-100 text-teal-600'
+                }`}>
+                  {item.destino_padrao === 'patrimonial' ? 'PAT' : item.destino_padrao === 'nenhum' ? '—' : 'EST'}
+                </span>
+              )}
+            </div>
+          </div>
+
+          {/* Quantity input */}
+          <div className="flex items-center gap-1.5 flex-shrink-0">
+            <input
+              type="number"
+              min={0}
+              max={item.quantidade_esperada}
+              step={1}
+              value={item.quantidade_recebida}
+              onChange={e => onChange({ quantidade_recebida: Math.max(0, Number(e.target.value)) })}
+              className="w-16 text-center text-sm font-bold border border-slate-200 rounded-lg py-1.5 focus:outline-none focus:ring-2 focus:ring-teal-400 focus:border-teal-400"
+            />
+          </div>
+
+          {/* Expand */}
+          <button
+            type="button"
+            onClick={() => setExpanded(!expanded)}
+            className="flex-shrink-0 p-1 rounded text-slate-300 hover:text-slate-500"
+          >
+            {expanded ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+          </button>
         </div>
 
-        {/* Quantity input */}
-        <div className="flex items-center gap-1.5 flex-shrink-0">
-          <input
-            type="number"
-            min={0}
-            max={item.quantidade_esperada}
-            step={1}
-            value={item.quantidade_recebida}
-            onChange={e => onChange({ quantidade_recebida: Math.max(0, Number(e.target.value)) })}
-            className="w-16 text-center text-sm font-bold border border-slate-200 rounded-lg py-1.5 focus:outline-none focus:ring-2 focus:ring-teal-400 focus:border-teal-400"
-          />
+        {/* Destino: elegant entry selector */}
+        <div className="bg-slate-50/80 border border-slate-200/80 rounded-xl px-3 py-2">
+          <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Entrada no sistema</p>
+          <div className="flex gap-1.5">
+            {DESTINO_OPTIONS.map(opt => {
+              const Icon = opt.icon
+              const isActive = item.tipo_destino === opt.value
+              return (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() => handleSetDestino(opt.value)}
+                  className={`flex-1 flex items-center justify-center gap-1.5 px-2 py-2 rounded-lg text-[11px] font-bold border-2 transition-all ${
+                    isActive
+                      ? opt.value === 'consumo'
+                        ? 'bg-teal-50 text-teal-700 border-teal-400 shadow-sm shadow-teal-100'
+                        : opt.value === 'patrimonial'
+                        ? 'bg-violet-50 text-violet-700 border-violet-400 shadow-sm shadow-violet-100'
+                        : 'bg-slate-100 text-slate-600 border-slate-400 shadow-sm'
+                      : 'bg-white text-slate-400 border-slate-200 hover:border-slate-300 hover:text-slate-500'
+                  }`}
+                >
+                  <Icon size={13} />
+                  {opt.label}
+                </button>
+              )
+            })}
+          </div>
         </div>
-
-        {/* Patrimonial toggle */}
-        <button
-          type="button"
-          onClick={() => onChange({
-            tipo_destino: item.tipo_destino === 'consumo' ? 'patrimonial' : 'consumo',
-          })}
-          title={item.tipo_destino === 'patrimonial' ? 'Patrimonial' : 'Consumo'}
-          className={`flex-shrink-0 w-7 h-7 rounded-lg flex items-center justify-center text-[10px] font-bold transition-all ${
-            item.tipo_destino === 'patrimonial'
-              ? 'bg-violet-100 text-violet-700 border border-violet-300'
-              : 'bg-slate-100 text-slate-400 border border-slate-200 hover:border-violet-200'
-          }`}
-        >
-          P
-        </button>
-
-        {/* Expand */}
-        <button
-          type="button"
-          onClick={() => setExpanded(!expanded)}
-          className="flex-shrink-0 p-1 rounded text-slate-300 hover:text-slate-500"
-        >
-          {expanded ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
-        </button>
       </div>
 
-      {/* Expanded: lote, série, validade */}
+      {/* Override warning + justificativa */}
+      {needsJustificativa && (
+        <div className="px-3 pb-2.5 pt-1 border-t border-amber-200/60">
+          <div className="flex items-start gap-1.5 mb-1.5">
+            <Info size={11} className="text-amber-500 flex-shrink-0 mt-0.5" />
+            <p className="text-[10px] text-amber-600 font-medium">
+              Destino alterado de <span className="font-bold">{destinoLabel(item.destino_padrao!)}</span> para{' '}
+              <span className="font-bold">{destinoLabel(item.tipo_destino)}</span>.
+              Justificativa obrigatoria:
+            </p>
+          </div>
+          <input
+            type="text"
+            value={item.justificativa_destino ?? ''}
+            onChange={e => onChange({ justificativa_destino: e.target.value })}
+            placeholder="Motivo da alteracao..."
+            className={`w-full text-xs border rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-1 transition-colors ${
+              !item.justificativa_destino?.trim()
+                ? 'border-amber-300 bg-amber-50 focus:ring-amber-400 placeholder:text-amber-300'
+                : 'border-slate-200 bg-white focus:ring-teal-300 placeholder:text-slate-300'
+            }`}
+          />
+        </div>
+      )}
+
+      {/* Expanded: lote, serie, validade */}
       {expanded && (
         <div className="px-3 pb-3 pt-1 border-t border-slate-100 grid grid-cols-3 gap-2">
           <div>
@@ -353,7 +442,7 @@ function ItemRow({
             />
           </div>
           <div>
-            <label className="block text-[10px] text-slate-400 mb-0.5">N. Série</label>
+            <label className="block text-[10px] text-slate-400 mb-0.5">N. Serie</label>
             <input
               type="text"
               value={item.numero_serie ?? ''}

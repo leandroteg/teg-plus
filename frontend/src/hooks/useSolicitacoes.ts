@@ -13,7 +13,12 @@ import type {
   EtapaSolicitacao,
   ConfigAnalise,
   MinutaAiAnalise,
+  Assinatura,
+  EnviarAssinaturaPayload,
+  EnviarAssinaturaResponse,
+  ParcelaPlanejada,
 } from '../types/contratos'
+import { normalizarParcelasPlanejadas, sugerirParcelasContrato } from '../utils/contratosParcelas'
 
 // ── Lista de Solicitacoes ────────────────────────────────────────────────────
 
@@ -176,6 +181,16 @@ export function useSolicitacaoHistorico(solicitacaoId: string | undefined) {
 
 // ── Avancar Etapa ───────────────────────────────────────────────────────────
 
+function readParcelasPlanejadas(dadosEtapa?: Record<string, unknown>, valorTotal?: number) {
+  const raw = dadosEtapa?.parcelas_planejadas
+  if (!Array.isArray(raw)) return []
+
+  return normalizarParcelasPlanejadas(
+    raw.map((item) => item as Partial<ParcelaPlanejada>),
+    valorTotal,
+  )
+}
+
 export function useAvancarEtapa() {
   const qc = useQueryClient()
   return useMutation({
@@ -184,6 +199,7 @@ export function useAvancarEtapa() {
       etapaDe: EtapaSolicitacao
       etapaPara: EtapaSolicitacao
       observacao?: string
+      dadosEtapa?: Record<string, unknown>
     }) => {
       // Update solicitacao etapa
       const { error: updateErr } = await supabase
@@ -206,6 +222,7 @@ export function useAvancarEtapa() {
           etapa_de: payload.etapaDe,
           etapa_para: payload.etapaPara,
           observacao: payload.observacao,
+          dados_etapa: payload.dadosEtapa ?? null,
         })
       if (histErr) throw histErr
 
@@ -219,32 +236,157 @@ export function useAvancarEtapa() {
             .single()
 
           if (sol) {
+            const { data: resumo } = await supabase
+              .from('con_resumos_executivos')
+              .select('id, valor_total, vigencia, recomendacao')
+              .eq('solicitacao_id', payload.solicitacaoId)
+              .order('created_at', { ascending: false })
+              .limit(1)
+              .maybeSingle()
+
             const today = new Date().toISOString().slice(0, 10)
-            const tipoMap: Record<string, 'receita' | 'despesa'> = {
-              servico: 'despesa', fornecimento: 'despesa', locacao: 'despesa',
-              consultoria: 'despesa', obra: 'despesa', receita: 'receita',
+            const tipoContrato = sol.tipo_contrato === 'receita' ? 'receita' : 'despesa'
+            const valorContrato = Number(resumo?.valor_total ?? sol.valor_estimado ?? 0)
+
+            const { data: contratoExistente } = await supabase
+              .from('con_contratos')
+              .select('id, numero, tipo_contrato, obra_id, centro_custo, classe_financeira, objeto, valor_total, data_inicio, data_fim_previsto')
+              .eq('solicitacao_id', payload.solicitacaoId)
+              .maybeSingle()
+
+            let contrato = contratoExistente
+
+            if (!contrato) {
+              const { data: contratoCriado, error: contratoErr } = await supabase
+                .from('con_contratos')
+                .insert({
+                  numero:             sol.numero,
+                  tipo_contrato:      tipoContrato,
+                  tipo_categoria:     sol.categoria_contrato ?? sol.tipo_contrato,
+                  fornecedor_id:      tipoContrato === 'despesa' ? (sol.contraparte_id ?? undefined) : undefined,
+                  obra_id:            sol.obra_id ?? undefined,
+                  objeto:             sol.objeto,
+                  descricao:          sol.descricao_escopo ?? undefined,
+                  valor_total:        valorContrato,
+                  data_assinatura:    today,
+                  data_inicio:        sol.data_inicio_prevista ?? today,
+                  data_fim_previsto:  sol.data_fim_prevista ?? today,
+                  centro_custo:       sol.centro_custo ?? undefined,
+                  classe_financeira:  sol.classe_financeira ?? undefined,
+                  indice_reajuste:    sol.indice_reajuste ?? undefined,
+                  status:             'vigente',
+                  solicitacao_id:     payload.solicitacaoId,
+                })
+                .select('id, numero, tipo_contrato, obra_id, centro_custo, classe_financeira, objeto, valor_total, data_inicio, data_fim_previsto')
+                .single()
+
+              if (contratoErr) throw contratoErr
+              contrato = contratoCriado
             }
 
-            await supabase
-              .from('con_contratos')
-              .insert({
-                numero:             sol.numero,
-                tipo_contrato:      tipoMap[sol.tipo_contrato] ?? 'despesa',
-                tipo_categoria:     sol.categoria_contrato ?? sol.tipo_contrato,
-                fornecedor_id:      sol.contraparte_id ?? undefined,
-                obra_id:            sol.obra_id ?? undefined,
-                objeto:             sol.objeto,
-                descricao:          sol.descricao_escopo ?? undefined,
-                valor_total:        sol.valor_estimado ?? 0,
-                data_assinatura:    today,
-                data_inicio:        sol.data_inicio_prevista ?? today,
-                data_fim_previsto:  sol.data_fim_prevista ?? today,
-                centro_custo:       sol.centro_custo ?? undefined,
-                classe_financeira:  sol.classe_financeira ?? undefined,
-                indice_reajuste:    sol.indice_reajuste ?? undefined,
-                status:             'vigente',
-                solicitacao_id:     payload.solicitacaoId,
-              })
+            const parcelasPlanejadas = readParcelasPlanejadas(payload.dadosEtapa, valorContrato)
+            const parcelasFallback = sugerirParcelasContrato({
+              solicitacao: {
+                forma_pagamento: sol.forma_pagamento,
+                valor_estimado: valorContrato,
+                data_inicio_prevista: sol.data_inicio_prevista,
+                data_fim_prevista: sol.data_fim_prevista,
+                prazo_meses: sol.prazo_meses,
+              },
+              resumo: resumo ?? null,
+            })
+
+            const parcelasResolvidas = parcelasPlanejadas.length > 0 ? parcelasPlanejadas : parcelasFallback
+
+            const { data: parcelasExistentes, error: parcelasExistentesErr } = await supabase
+              .from('con_parcelas')
+              .select('id, numero, valor, data_vencimento, fin_cp_id, fin_cr_id')
+              .eq('contrato_id', contrato.id)
+              .order('numero', { ascending: true })
+
+            if (parcelasExistentesErr) throw parcelasExistentesErr
+
+            let parcelasContrato = parcelasExistentes ?? []
+
+            if (parcelasContrato.length === 0) {
+              const { data: parcelasCriadas, error: parcelasErr } = await supabase
+                .from('con_parcelas')
+                .insert(parcelasResolvidas.map((parcela) => ({
+                  contrato_id: contrato.id,
+                  numero: parcela.numero,
+                  valor: parcela.valor,
+                  data_vencimento: parcela.data_vencimento,
+                  status: 'previsto',
+                  observacoes: `Gerada ao liberar execucao da solicitacao ${sol.numero}`,
+                })))
+                .select('id, numero, valor, data_vencimento, fin_cp_id, fin_cr_id')
+
+              if (parcelasErr) throw parcelasErr
+              parcelasContrato = (parcelasCriadas ?? []).sort((a, b) => a.numero - b.numero)
+            }
+
+            for (const parcela of parcelasContrato) {
+              if (tipoContrato === 'despesa' && !parcela.fin_cp_id) {
+                const { data: cp, error: cpErr } = await supabase
+                  .from('fin_contas_pagar')
+                  .insert({
+                    fornecedor_id: sol.contraparte_id ?? undefined,
+                    fornecedor_nome: sol.contraparte_nome,
+                    valor_original: parcela.valor,
+                    data_emissao: today,
+                    data_vencimento: parcela.data_vencimento,
+                    data_vencimento_orig: parcela.data_vencimento,
+                    centro_custo: sol.centro_custo ?? contrato.centro_custo ?? undefined,
+                    classe_financeira: sol.classe_financeira ?? contrato.classe_financeira ?? undefined,
+                    natureza: 'contrato',
+                    forma_pagamento: sol.forma_pagamento ?? undefined,
+                    numero_documento: `${sol.numero}-PARC-${String(parcela.numero).padStart(2, '0')}`,
+                    status: 'previsto',
+                    descricao: `${sol.objeto} - Parcela ${parcela.numero}/${parcelasContrato.length}`,
+                    observacoes: `Previsto gerado automaticamente ao liberar contrato ${sol.numero} para execucao`,
+                  })
+                  .select('id')
+                  .single()
+
+                if (cpErr) throw cpErr
+
+                const { error: updateParcelaErr } = await supabase
+                  .from('con_parcelas')
+                  .update({ fin_cp_id: cp.id })
+                  .eq('id', parcela.id)
+
+                if (updateParcelaErr) throw updateParcelaErr
+              }
+
+              if (tipoContrato === 'receita' && !parcela.fin_cr_id) {
+                const { data: cr, error: crErr } = await supabase
+                  .from('fin_contas_receber')
+                  .insert({
+                    cliente_nome: sol.contraparte_nome,
+                    cliente_cnpj: sol.contraparte_cnpj ?? undefined,
+                    valor_original: parcela.valor,
+                    data_emissao: today,
+                    data_vencimento: parcela.data_vencimento,
+                    centro_custo: sol.centro_custo ?? contrato.centro_custo ?? undefined,
+                    classe_financeira: sol.classe_financeira ?? contrato.classe_financeira ?? undefined,
+                    natureza: 'contrato',
+                    status: 'previsto',
+                    descricao: `${sol.objeto} - Parcela ${parcela.numero}/${parcelasContrato.length}`,
+                    observacoes: `Previsto gerado automaticamente ao liberar contrato ${sol.numero} para execucao`,
+                  })
+                  .select('id')
+                  .single()
+
+                if (crErr) throw crErr
+
+                const { error: updateParcelaErr } = await supabase
+                  .from('con_parcelas')
+                  .update({ fin_cr_id: cr.id })
+                  .eq('id', parcela.id)
+
+                if (updateParcelaErr) throw updateParcelaErr
+              }
+            }
           }
         } catch (e) {
           console.warn('Aviso: con_contratos nao criado ao liberar execucao:', e)
@@ -474,6 +616,173 @@ export function useAtualizarResumo() {
 // ── Config Analise IA ─────────────────────────────────────────────────────
 
 const N8N_BASE = import.meta.env.VITE_N8N_WEBHOOK_URL || 'https://teg-agents-n8n.nmmcas.easypanel.host/webhook'
+
+function parseAiObject(value: unknown): Record<string, unknown> | null {
+  if (!value) return null
+  if (typeof value === 'string') {
+    try {
+      const parsed = JSON.parse(value)
+      return parsed && typeof parsed === 'object' ? parsed as Record<string, unknown> : null
+    } catch {
+      return null
+    }
+  }
+  return typeof value === 'object' ? value as Record<string, unknown> : null
+}
+
+function normalizeMinutaAiAnalise(input: unknown): MinutaAiAnalise | null {
+  let raw = parseAiObject(input)
+  if (!raw) return null
+
+  const nestedResumo = typeof raw.resumo === 'string' ? parseAiObject(raw.resumo) : null
+  const shouldPromoteNestedResumo = !!nestedResumo && (
+    typeof nestedResumo.score !== 'undefined' ||
+    Array.isArray(nestedResumo.riscos) ||
+    Array.isArray(nestedResumo.sugestoes) ||
+    Array.isArray(nestedResumo.clausulas_analisadas)
+  )
+
+  if (shouldPromoteNestedResumo) {
+    raw = {
+      ...raw,
+      ...nestedResumo,
+      resumo: typeof nestedResumo.resumo === 'string' ? nestedResumo.resumo : raw.resumo,
+    }
+  }
+
+  const conformidadeRaw = parseAiObject(raw.conformidade)
+
+  const riscos = Array.isArray(raw.riscos) ? raw.riscos.map((item) => {
+    const risco = parseAiObject(item) ?? {}
+    return {
+      titulo: typeof risco.titulo === 'string' ? sanitizeAiText(risco.titulo) : 'Risco identificado',
+      severidade: (typeof risco.severidade === 'string' ? risco.severidade : 'medio') as 'baixo' | 'medio' | 'alto' | 'critico',
+      descricao: typeof risco.descricao === 'string' ? sanitizeAiText(risco.descricao) : '',
+      clausula_ref: typeof risco.clausula_ref === 'string' ? sanitizeAiText(risco.clausula_ref) : undefined,
+      sugestao_mitigacao: typeof risco.sugestao_mitigacao === 'string'
+        ? sanitizeAiText(risco.sugestao_mitigacao)
+        : typeof risco.mitigacao === 'string'
+          ? sanitizeAiText(risco.mitigacao)
+          : undefined,
+    }
+  }).filter((risco) => risco.descricao) : []
+
+  const sugestoes = Array.isArray(raw.sugestoes) ? raw.sugestoes.map((item) => {
+    const sugestao = parseAiObject(item) ?? {}
+    return {
+      titulo: typeof sugestao.titulo === 'string' ? sanitizeAiText(sugestao.titulo) : 'Sugestao',
+      prioridade: (typeof sugestao.prioridade === 'string' ? sugestao.prioridade : 'media') as 'baixa' | 'media' | 'alta',
+      categoria: typeof sugestao.categoria === 'string'
+        ? sugestao.categoria as 'importante' | 'recomendada' | 'opcional'
+        : undefined,
+      descricao: typeof sugestao.descricao === 'string' ? sanitizeAiText(sugestao.descricao) : '',
+      texto_sugerido: typeof sugestao.texto_sugerido === 'string' ? sanitizeAiText(sugestao.texto_sugerido) : undefined,
+      beneficio_teg: typeof sugestao.beneficio_teg === 'string'
+        ? sanitizeAiText(sugestao.beneficio_teg)
+        : typeof sugestao.justificativa === 'string'
+          ? sanitizeAiText(sugestao.justificativa)
+          : undefined,
+    }
+  }).filter((sugestao) => sugestao.descricao) : []
+
+  const oportunidades = Array.isArray(raw.oportunidades) ? raw.oportunidades.map((item) => {
+    const oportunidade = parseAiObject(item) ?? {}
+    return {
+      titulo: typeof oportunidade.titulo === 'string' ? sanitizeAiText(oportunidade.titulo) : 'Oportunidade',
+      descricao: typeof oportunidade.descricao === 'string' ? sanitizeAiText(oportunidade.descricao) : '',
+      impacto: typeof oportunidade.impacto === 'string'
+        ? oportunidade.impacto as 'alto' | 'medio' | 'baixo'
+        : undefined,
+      texto_sugerido: typeof oportunidade.texto_sugerido === 'string'
+        ? sanitizeAiText(oportunidade.texto_sugerido)
+        : undefined,
+    }
+  }).filter((oportunidade) => oportunidade.descricao) : []
+
+  const clausulas_analisadas = Array.isArray(raw.clausulas_analisadas) ? raw.clausulas_analisadas.map((item) => {
+    const clausula = parseAiObject(item) ?? {}
+    return {
+      nome: typeof clausula.nome === 'string' ? sanitizeAiText(clausula.nome) : 'Clausula',
+      status: (typeof clausula.status === 'string' ? clausula.status : 'atencao') as 'ok' | 'atencao' | 'risco' | 'ausente',
+      comentario: typeof clausula.comentario === 'string'
+        ? sanitizeAiText(clausula.comentario)
+        : typeof clausula.observacao === 'string'
+          ? sanitizeAiText(clausula.observacao)
+          : typeof clausula.justificativa === 'string'
+            ? sanitizeAiText(clausula.justificativa)
+            : '',
+    }
+  }).filter((clausula) => clausula.nome || clausula.comentario) : []
+
+  return {
+    score: typeof raw.score === 'number' ? raw.score : Number(raw.score) || 70,
+    resumo: typeof raw.resumo === 'string' ? sanitizeAiText(raw.resumo) : undefined,
+    papel_teg: typeof raw.papel_teg === 'string'
+      ? raw.papel_teg as 'contratante' | 'contratada' | 'indefinido'
+      : 'indefinido',
+    poder_barganha: (() => {
+      const barganha = parseAiObject(raw.poder_barganha)
+      if (!barganha) return undefined
+      return {
+        nivel: (typeof barganha.nivel === 'string' ? barganha.nivel : 'medio') as 'alto' | 'medio' | 'baixo',
+        justificativa: typeof barganha.justificativa === 'string' ? sanitizeAiText(barganha.justificativa) : undefined,
+      }
+    })(),
+    riscos,
+    sugestoes,
+    oportunidades,
+    clausulas_analisadas,
+    conformidade: conformidadeRaw ? {
+      clausulas_obrigatorias: Boolean(conformidadeRaw.clausulas_obrigatorias),
+      penalidades_adequadas: typeof conformidadeRaw.penalidades_adequadas === 'boolean'
+        ? conformidadeRaw.penalidades_adequadas
+        : Boolean(conformidadeRaw.penalidades),
+      prazos_razoaveis: typeof conformidadeRaw.prazos_razoaveis === 'boolean'
+        ? conformidadeRaw.prazos_razoaveis
+        : Boolean(conformidadeRaw.prazos),
+      garantias_previstas: typeof conformidadeRaw.garantias_previstas === 'boolean'
+        ? conformidadeRaw.garantias_previstas
+        : Boolean(conformidadeRaw.garantias),
+      seguro_previsto: typeof conformidadeRaw.seguro_previsto === 'boolean'
+        ? conformidadeRaw.seguro_previsto
+        : Boolean(conformidadeRaw.seguro),
+      ssma_previsto: typeof conformidadeRaw.ssma_previsto === 'boolean'
+        ? conformidadeRaw.ssma_previsto
+        : Boolean(conformidadeRaw.ssma),
+      anticorrupcao_previsto: typeof conformidadeRaw.anticorrupcao_previsto === 'boolean'
+        ? conformidadeRaw.anticorrupcao_previsto
+        : Boolean(conformidadeRaw.anticorrupcao),
+      reajuste_definido: typeof conformidadeRaw.reajuste_definido === 'boolean'
+        ? conformidadeRaw.reajuste_definido
+        : Boolean(conformidadeRaw.reajuste),
+    } : undefined,
+  }
+}
+
+function hasMeaningfulMinutaAiAnalise(analise: MinutaAiAnalise | null | undefined) {
+  if (!analise) return false
+
+  return (
+    analise.riscos.length > 0 ||
+    analise.sugestoes.length > 0 ||
+    (analise.oportunidades?.length ?? 0) > 0 ||
+    (analise.clausulas_analisadas?.length ?? 0) > 0
+  )
+}
+
+function isFallbackMinutaAiAnalise(analise: MinutaAiAnalise | null | undefined) {
+  if (!analise) return true
+
+  const resumo = (analise.resumo ?? '').trim().toLowerCase()
+  const hasOnlyFallbackResumo = !resumo || resumo === 'análise processada.' || resumo === 'analise processada.'
+
+  return (
+    analise.score === 70 &&
+    analise.papel_teg === 'indefinido' &&
+    !hasMeaningfulMinutaAiAnalise(analise) &&
+    hasOnlyFallbackResumo
+  )
+}
 
 export function useConfigAnalise() {
   return useQuery<ConfigAnalise[]>({
@@ -778,44 +1087,206 @@ export function useAnalisarMinuta() {
       if (!res.ok) throw new Error(`Erro na analise: ${res.status}`)
       const result = await res.json()
 
-      // 2. Sanitize AI text to fix encoding issues (unicode escapes, HTML entities)
-      if (result.success && result.analise) {
-        const a = result.analise
-        if (typeof a.resumo === 'string') a.resumo = sanitizeAiText(a.resumo)
-        if (a.riscos) a.riscos = a.riscos.map((r: Record<string, unknown>) => ({
-          ...r,
-          descricao: typeof r.descricao === 'string' ? sanitizeAiText(r.descricao) : r.descricao,
-          mitigacao: typeof r.mitigacao === 'string' ? sanitizeAiText(r.mitigacao) : r.mitigacao,
-        }))
-        if (a.sugestoes) a.sugestoes = a.sugestoes.map((s: Record<string, unknown>) => ({
-          ...s,
-          descricao: typeof s.descricao === 'string' ? sanitizeAiText(s.descricao) : s.descricao,
-          justificativa: typeof s.justificativa === 'string' ? sanitizeAiText(s.justificativa) : s.justificativa,
-        }))
-        if (a.oportunidades) a.oportunidades = a.oportunidades.map((o: Record<string, unknown>) => ({
-          ...o,
-          descricao: typeof o.descricao === 'string' ? sanitizeAiText(o.descricao) : o.descricao,
-        }))
-        if (a.clausulas_analisadas) a.clausulas_analisadas = a.clausulas_analisadas.map((c: Record<string, unknown>) => ({
-          ...c,
-          texto_melhorado: typeof c.texto_melhorado === 'string' ? sanitizeAiText(c.texto_melhorado) : c.texto_melhorado,
-          justificativa: typeof c.justificativa === 'string' ? sanitizeAiText(c.justificativa) : c.justificativa,
-        }))
+      let analise = normalizeMinutaAiAnalise(result?.analise ?? result)
 
-        // 3. Save sanitized analysis result to Supabase
+      if (isFallbackMinutaAiAnalise(analise)) {
+        const { data: minutaAtual } = await supabase
+          .from('con_minutas')
+          .select('ai_analise')
+          .eq('id', payload.minuta_id)
+          .maybeSingle()
+
+        const analiseAnterior = normalizeMinutaAiAnalise(minutaAtual?.ai_analise)
+        if (hasMeaningfulMinutaAiAnalise(analiseAnterior)) {
+          analise = analiseAnterior
+        }
+      }
+
+      // 2. Save normalized analysis result to Supabase
+      if (result.success && analise) {
         await supabase
           .from('con_minutas')
           .update({
-            ai_analise: a,
+            ai_analise: analise,
             ai_analisado_em: new Date().toISOString(),
           })
           .eq('id', payload.minuta_id)
+
+        result.analise = analise
       }
 
       return result
     },
     onSuccess: (_d, vars) => {
       qc.invalidateQueries({ queryKey: ['con-minutas', vars.solicitacao_id] })
+    },
+  })
+}
+
+// ── Assinaturas (Certisign) ─────────────────────────────────────────
+
+export function useAssinaturas(solicitacaoId?: string) {
+  return useQuery<Assinatura[]>({
+    queryKey: ['con-assinaturas', solicitacaoId],
+    enabled: !!solicitacaoId,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('con_assinaturas')
+        .select('*')
+        .eq('solicitacao_id', solicitacaoId!)
+        .order('created_at', { ascending: false })
+      if (error) return []
+      return (data ?? []) as Assinatura[]
+    },
+  })
+}
+
+export function useAssinaturasAll() {
+  return useQuery<Assinatura[]>({
+    queryKey: ['con-assinaturas-all'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('con_assinaturas')
+        .select('*')
+        .order('created_at', { ascending: false })
+      if (error) return []
+      return (data ?? []) as Assinatura[]
+    },
+  })
+}
+
+export function useEnviarAssinatura() {
+  const qc = useQueryClient()
+  return useMutation<EnviarAssinaturaResponse, Error, EnviarAssinaturaPayload>({
+    mutationFn: async (payload) => {
+      let envelope_id = ''
+      let n8nOk = false
+
+      // 1) Tentar enviar via n8n/Certisign (não-bloqueante se falhar)
+      try {
+        const res = await fetch(`${N8N_BASE}/certisign-enviar`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            ...payload,
+            callback_url: `${N8N_BASE}/certisign-callback`,
+          }),
+        })
+        if (res.ok) {
+          const data = await res.json()
+          envelope_id = data.envelope_id ?? ''
+          n8nOk = true
+        } else {
+          console.warn('[Certisign] Webhook retornou erro:', res.status)
+        }
+      } catch (err) {
+        console.warn('[Certisign] Webhook indisponivel, criando registro local:', err)
+      }
+
+      // 2) Criar registro con_assinaturas no Supabase (garante rastreabilidade)
+      const { data: assinatura, error: insErr } = await supabase
+        .from('con_assinaturas')
+        .insert({
+          solicitacao_id: payload.solicitacao_id,
+          tipo_assinatura: payload.tipo_assinatura,
+          status: n8nOk ? 'enviado' : 'pendente',
+          envelope_id: envelope_id || null,
+          signatarios: payload.signatarios,
+          enviado_em: new Date().toISOString(),
+        })
+        .select('id')
+        .single()
+
+      if (insErr) throw new Error(`Erro ao registrar assinatura: ${insErr.message}`)
+
+      return {
+        assinatura_id: assinatura?.id ?? '',
+        envelope_id,
+        status: 'enviado' as const,
+      }
+    },
+    onSuccess: (_d, vars) => {
+      qc.invalidateQueries({ queryKey: ['con-assinaturas', vars.solicitacao_id] })
+      qc.invalidateQueries({ queryKey: ['con-assinaturas-all'] })
+      qc.invalidateQueries({ queryKey: ['con-solicitacoes'] })
+      qc.invalidateQueries({ queryKey: ['con-solicitacao', vars.solicitacao_id] })
+    },
+  })
+}
+
+// ── Confirmar assinatura (manual ou Certisign) + upload cópia assinada ──────
+
+export interface ConfirmarAssinaturaPayload {
+  solicitacao_id: string
+  arquivo?: File
+  observacao?: string
+}
+
+export function useConfirmarAssinatura() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (payload: ConfirmarAssinaturaPayload) => {
+      let documento_assinado_url: string | null = null
+
+      // 1) Upload da cópia assinada (se fornecida)
+      if (payload.arquivo) {
+        const ts = Date.now()
+        const safeName = payload.arquivo.name.replace(/[^a-zA-Z0-9._-]/g, '_')
+        const path = `assinados/${payload.solicitacao_id}/${ts}_${safeName}`
+
+        const { error: upErr } = await supabase.storage
+          .from('contratos-anexos')
+          .upload(path, payload.arquivo, { upsert: false, contentType: payload.arquivo.type })
+        if (upErr) throw new Error('Falha no upload do documento assinado: ' + upErr.message)
+
+        const { data: { publicUrl } } = supabase.storage
+          .from('contratos-anexos')
+          .getPublicUrl(path)
+        documento_assinado_url = publicUrl
+      }
+
+      // 2) Atualizar ou criar registro con_assinaturas com status 'assinado'
+      const { data: existing } = await supabase
+        .from('con_assinaturas')
+        .select('id')
+        .eq('solicitacao_id', payload.solicitacao_id)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single()
+
+      if (existing) {
+        const updatePayload: Record<string, unknown> = {
+          status: 'assinado',
+          concluido_em: new Date().toISOString(),
+        }
+        if (documento_assinado_url) updatePayload.documento_assinado_url = documento_assinado_url
+        const { error } = await supabase
+          .from('con_assinaturas')
+          .update(updatePayload)
+          .eq('id', existing.id)
+        if (error) throw new Error('Erro ao atualizar assinatura: ' + error.message)
+      } else {
+        const { error } = await supabase
+          .from('con_assinaturas')
+          .insert({
+            solicitacao_id: payload.solicitacao_id,
+            provedor: 'manual',
+            tipo_assinatura: 'eletronica',
+            status: 'assinado',
+            concluido_em: new Date().toISOString(),
+            documento_assinado_url,
+            signatarios: [],
+          })
+        if (error) throw new Error('Erro ao registrar assinatura: ' + error.message)
+      }
+
+      return { documento_assinado_url }
+    },
+    onSuccess: (_d, vars) => {
+      qc.invalidateQueries({ queryKey: ['con-assinaturas', vars.solicitacao_id] })
+      qc.invalidateQueries({ queryKey: ['con-assinaturas-all'] })
+      qc.invalidateQueries({ queryKey: ['con-solicitacoes'] })
+      qc.invalidateQueries({ queryKey: ['con-solicitacao', vars.solicitacao_id] })
     },
   })
 }

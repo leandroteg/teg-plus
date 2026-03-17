@@ -12,9 +12,7 @@ import type {
 // ── Select com joins ────────────────────────────────────────────────────────
 const SELECT_SOL = `
   *,
-  fornecedor:cmp_fornecedores!fornecedor_id(id, razao_social, cnpj),
-  obra:sys_obras!obra_id(id, codigo, nome, municipio, uf),
-  empresa:sys_empresas!empresa_id(id, codigo, razao_social)
+  fornecedor:cmp_fornecedores!fornecedor_id(id, razao_social, cnpj)
 `
 
 // ── Listar Solicitações NF ──────────────────────────────────────────────────
@@ -148,6 +146,7 @@ export function useEmitirNF() {
           icms_base: payload.icms_base ?? null,
           icms_valor: payload.icms_valor ?? null,
           info_complementar: payload.info_complementar ?? null,
+          emissao_tipo: 'sistema',
           status: 'aguardando_aprovacao',
         })
         .eq('id', id)
@@ -240,6 +239,73 @@ export function useRejeitarSolicitacao() {
         .select()
         .single()
       if (error) throw new Error('Falha ao rejeitar: ' + error.message)
+      return data as SolicitacaoNF
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['solicitacoes-nf'] })
+    },
+  })
+}
+
+// ── Anexar NF Emitida (upload + n8n parse) ──────────────────────────────────
+const N8N_BASE = import.meta.env.VITE_N8N_WEBHOOK_URL || ''
+
+export function useAnexarNFExterna() {
+  const qc = useQueryClient()
+  const { perfil } = useAuth()
+
+  return useMutation({
+    mutationFn: async ({ id, file }: { id: string; file: File }) => {
+      // 1. Upload file to Supabase Storage
+      const ext = file.name.split('.').pop() || 'pdf'
+      const path = `externa/${Date.now()}-nf.${ext}`
+
+      const { error: uploadError } = await supabase.storage
+        .from('notas-fiscais')
+        .upload(path, file, { upsert: false, contentType: file.type })
+      if (uploadError) throw new Error('Falha no upload: ' + uploadError.message)
+
+      // 2. Get public URL
+      const { data: { publicUrl } } = supabase.storage
+        .from('notas-fiscais')
+        .getPublicUrl(path)
+
+      // 3. Parse NF via n8n (AI/OCR)
+      let parsed: Record<string, unknown> = {}
+      try {
+        const res = await fetch(`${N8N_BASE}/fiscal/nf/parse`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ arquivo: publicUrl, nome: file.name }),
+        })
+        if (res.ok) parsed = await res.json()
+      } catch {
+        // Parse failure is non-blocking — file is already uploaded
+      }
+
+      // 4. Update solicitacao with parsed data (only include parsed fields that have values)
+      const agora = new Date().toISOString()
+      const updatePayload: Record<string, unknown> = {
+        danfe_url: publicUrl,
+        emissao_tipo: 'externa',
+        status: 'emitida',
+        emitido_por: perfil?.id ?? null,
+        emitido_em: agora,
+      }
+      // Only set parsed fields if n8n returned them (valor_total is NOT NULL in DB)
+      if (parsed.numero) updatePayload.numero_nf = parsed.numero
+      if (parsed.serie) updatePayload.serie = parsed.serie
+      if (parsed.data_emissao) updatePayload.data_emissao = parsed.data_emissao
+      if (parsed.valor_total) updatePayload.valor_total = parsed.valor_total
+      if (parsed.chave_acesso) updatePayload.chave_acesso = parsed.chave_acesso
+
+      const { data, error } = await supabase
+        .from('fis_solicitacoes_nf')
+        .update(updatePayload)
+        .eq('id', id)
+        .select()
+        .single()
+      if (error) throw new Error('Falha ao anexar NF emitida: ' + error.message)
       return data as SolicitacaoNF
     },
     onSuccess: () => {

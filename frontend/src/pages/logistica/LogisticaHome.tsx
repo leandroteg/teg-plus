@@ -17,15 +17,14 @@ const EMPTY_KPIS: LogisticaKPIs = {
 
 const STATUS_LABEL: Record<string, { label: string; dot: string; bg: string; text: string }> = {
   solicitado:             { label: 'Solicitado',      dot: 'bg-slate-400',   bg: 'bg-slate-50',    text: 'text-slate-600'   },
-  validando:              { label: 'Validando',       dot: 'bg-sky-400',     bg: 'bg-sky-50',      text: 'text-sky-700'     },
   planejado:              { label: 'Planejado',       dot: 'bg-blue-400',    bg: 'bg-blue-50',     text: 'text-blue-700'    },
   aguardando_aprovacao:   { label: 'Aguard. Aprov.',  dot: 'bg-amber-400',   bg: 'bg-amber-50',    text: 'text-amber-700'   },
   aprovado:               { label: 'Aprovado',        dot: 'bg-indigo-400',  bg: 'bg-indigo-50',   text: 'text-indigo-700'  },
   romaneio_emitido:       { label: 'Romaneio',        dot: 'bg-teal-400',    bg: 'bg-teal-50',     text: 'text-teal-700'    },
   nfe_emitida:            { label: 'NF-e Emitida',    dot: 'bg-violet-400',  bg: 'bg-violet-50',   text: 'text-violet-700'  },
+  aguardando_coleta:      { label: 'Aguard. Coleta',  dot: 'bg-cyan-400',    bg: 'bg-cyan-50',     text: 'text-cyan-700'    },
   em_transito:            { label: 'Em Trânsito',     dot: 'bg-orange-400',  bg: 'bg-orange-50',   text: 'text-orange-700'  },
   entregue:               { label: 'Entregue',        dot: 'bg-teal-400',    bg: 'bg-teal-50',     text: 'text-teal-700'    },
-  confirmado:             { label: 'Confirmado',      dot: 'bg-emerald-500', bg: 'bg-emerald-50',  text: 'text-emerald-700' },
   concluido:              { label: 'Concluído',       dot: 'bg-green-500',   bg: 'bg-green-50',    text: 'text-green-700'   },
   recusado:               { label: 'Recusado',        dot: 'bg-red-400',     bg: 'bg-red-50',      text: 'text-red-700'     },
   cancelado:              { label: 'Cancelado',       dot: 'bg-gray-400',    bg: 'bg-gray-100',    text: 'text-gray-500'    },
@@ -62,7 +61,7 @@ export default function LogisticaHome() {
   const { data: kpis = EMPTY_KPIS, isLoading, refetch } = useLogisticaKPIs()
   const { data: urgentes = [] } = useSolicitacoes({
     urgente: true,
-    status: ['solicitado', 'validando', 'planejado', 'aguardando_aprovacao'],
+    status: ['solicitado', 'planejado', 'aguardando_aprovacao'],
   })
   const { data: emTransito = [] } = useSolicitacoes({ status: 'em_transito' })
 

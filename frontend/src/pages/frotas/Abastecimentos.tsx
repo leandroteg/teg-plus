@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Plus, Fuel, AlertTriangle, TrendingDown } from 'lucide-react'
+import { Plus, Fuel, AlertTriangle, TrendingDown, X } from 'lucide-react'
 import { useAbastecimentos, useRegistrarAbastecimento, useVeiculos } from '../../hooks/useFrotas'
 import { useTheme } from '../../contexts/ThemeContext'
 import type { CombustivelVeiculo, TipoPagamento } from '../../types/frotas'
@@ -58,7 +58,17 @@ function NovoAbastecimentoModal({ onClose, isLight }: { onClose: () => void; isL
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
       <form onSubmit={handleSubmit} className={`rounded-2xl shadow-2xl p-6 w-full max-w-lg space-y-4 ${isLight ? 'bg-white border border-slate-200' : 'bg-[#1e293b] border border-white/[0.06]'}`}>
-        <h2 className={`text-lg font-extrabold ${isLight ? 'text-slate-800' : 'text-white'}`}>Registrar Abastecimento</h2>
+        <div className="flex items-center justify-between">
+          <h2 className={`text-lg font-extrabold ${isLight ? 'text-slate-800' : 'text-white'}`}>Registrar Abastecimento</h2>
+          <button
+            type="button"
+            onClick={onClose}
+            className={`p-2 rounded-xl transition-colors ${isLight ? 'text-slate-400 hover:text-slate-600 hover:bg-slate-100' : 'text-slate-400 hover:text-white hover:bg-white/10'}`}
+            title="Fechar"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
 
         <div className="grid grid-cols-2 gap-3">
           <div>

@@ -11,7 +11,48 @@ const EMPTY_KPIS: FinanceiroKPIs = {
   aguardando_aprovacao: 0, total_cr: 0, valor_cr_aberto: 0,
 }
 
-// ── Dashboard ────────────────────────────────────────────────────────────────
+function getSupabaseErrorMessage(error: unknown, fallback: string) {
+  if (!error) return fallback
+  if (error instanceof Error) return error.message
+  if (typeof error === 'object' && error !== null) {
+    const message = 'message' in error ? (error as { message?: unknown }).message : null
+    if (typeof message === 'string' && message.trim()) return message
+    const hint = 'hint' in error ? (error as { hint?: unknown }).hint : null
+    if (typeof hint === 'string' && hint.trim()) return hint
+    const details = 'details' in error ? (error as { details?: unknown }).details : null
+    if (typeof details === 'string' && details.trim()) return details
+  }
+  return fallback
+}
+
+function appendExtraRequestDetailsToObservacoes(
+  observacoesBase: string,
+  dadosBancarios?: {
+    favorecido?: string
+    banco_nome?: string
+    agencia?: string
+    conta?: string
+    pix_tipo?: string
+    pix_chave?: string
+  },
+  anexos?: Array<{ nome: string; url: string }>,
+) {
+  const detalhes: string[] = [observacoesBase]
+  const banco = [
+    dadosBancarios?.favorecido && `Favorecido: ${dadosBancarios.favorecido}`,
+    dadosBancarios?.banco_nome && `Banco: ${dadosBancarios.banco_nome}`,
+    dadosBancarios?.agencia && `Agencia: ${dadosBancarios.agencia}`,
+    dadosBancarios?.conta && `Conta: ${dadosBancarios.conta}`,
+    dadosBancarios?.pix_tipo && `PIX Tipo: ${dadosBancarios.pix_tipo}`,
+    dadosBancarios?.pix_chave && `PIX Chave: ${dadosBancarios.pix_chave}`,
+  ].filter(Boolean)
+
+  if (banco.length > 0) detalhes.push(`Dados bancarios: ${banco.join(' | ')}`)
+  if ((anexos?.length ?? 0) > 0) detalhes.push(`Anexos: ${anexos!.map(a => `${a.nome} (${a.url})`).join(' | ')}`)
+  return detalhes.join('\n')
+}
+
+// â”€â”€ Dashboard â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 export function useFinanceiroDashboard(periodo = '30d') {
   return useQuery<FinanceiroDashboardData>({
     queryKey: ['financeiro-dashboard', periodo],
@@ -29,7 +70,7 @@ export function useFinanceiroDashboard(periodo = '30d') {
   })
 }
 
-// ── Contas a Pagar ───────────────────────────────────────────────────────────
+// â”€â”€ Contas a Pagar â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const SELECT_CP = `
   *,
   pedido:cmp_pedidos!pedido_id(numero_pedido, status, data_pedido, data_prevista_entrega, status_pagamento),
@@ -54,7 +95,7 @@ export function useContasPagar(filters?: { status?: string; centro_custo?: strin
   })
 }
 
-// ── Contas a Receber ─────────────────────────────────────────────────────────
+// â”€â”€ Contas a Receber â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 export function useContasReceber() {
   return useQuery<ContaReceber[]>({
     queryKey: ['contas-receber'],
@@ -70,7 +111,7 @@ export function useContasReceber() {
   })
 }
 
-// ── Fornecedores ─────────────────────────────────────────────────────────────
+// â”€â”€ Fornecedores â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 export function useFornecedores() {
   return useQuery<Fornecedor[]>({
     queryKey: ['fornecedores'],
@@ -85,7 +126,7 @@ export function useFornecedores() {
   })
 }
 
-// ── Fornecedor por ID (Issue #36: dados bancarios/PIX) ──────────────────────
+// â”€â”€ Fornecedor por ID (Issue #36: dados bancarios/PIX) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 export function useFornecedorById(fornecedorId?: string | null) {
   return useQuery<Fornecedor | null>({
     queryKey: ['fornecedor', fornecedorId],
@@ -104,8 +145,198 @@ export function useFornecedorById(fornecedorId?: string | null) {
   })
 }
 
-// ── Aprovar Pagamento (AP): aguardando_aprovacao → aprovado_pgto ──────────
+// â”€â”€ Confirmar CP: previsto â†’ confirmado â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+export function useConfirmarCP() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ cpIds }: { cpIds: string[] }) => {
+      const { error } = await supabase
+        .from('fin_contas_pagar')
+        .update({ status: 'confirmado' })
+        .in('id', cpIds)
+      if (error) throw error
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['contas-pagar'] })
+      qc.invalidateQueries({ queryKey: ['financeiro-dashboard'] })
+    },
+  })
+}
+
+export function useCancelarCPBatch() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ cpIds }: { cpIds: string[] }) => {
+      const { error } = await supabase
+        .from('fin_contas_pagar')
+        .update({ status: 'cancelado' })
+        .in('id', cpIds)
+        .eq('status', 'previsto')
+      if (error) throw error
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['contas-pagar'] })
+      qc.invalidateQueries({ queryKey: ['financeiro-dashboard'] })
+    },
+  })
+}
+
+export function useCriarSolicitacaoExtraordinariaCP() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async ({
+      descricao,
+      justificativa,
+      centro_custo,
+      classe_financeira,
+      valor,
+      solicitanteNome,
+      dadosBancarios,
+      arquivos,
+    }: {
+      descricao: string
+      justificativa: string
+      centro_custo: string
+      classe_financeira: string
+      valor: number
+      solicitanteNome?: string
+      dadosBancarios?: {
+        favorecido?: string
+        banco_nome?: string
+        agencia?: string
+        conta?: string
+        pix_tipo?: string
+        pix_chave?: string
+      }
+      arquivos?: File[]
+    }) => {
+      const hoje = new Date().toISOString().split('T')[0]
+      const numeroDocumento = `EXT-${new Date().toISOString().replace(/[-:TZ.]/g, '').slice(0, 14)}`
+      const uploadedArquivos: Array<{ nome: string; url: string }> = []
+      const uploadFalhas: string[] = []
+      const observacoesBase = `Solicita\u00e7\u00e3o extraordin\u00e1ria urgente. Justificativa: ${justificativa.trim()}${solicitanteNome ? ` | Solicitante: ${solicitanteNome}` : ''}`
+
+      const { data, error } = await supabase
+        .from('fin_contas_pagar')
+        .insert({
+          fornecedor_nome: 'Pagamento Extraordin\u00e1rio',
+          origem: 'manual',
+          valor_original: valor,
+          valor_pago: 0,
+          data_emissao: hoje,
+          data_vencimento: hoje,
+          data_vencimento_orig: hoje,
+          centro_custo,
+          classe_financeira,
+          natureza: 'extraordinario',
+          numero_documento: numeroDocumento,
+          status: 'confirmado',
+          descricao: descricao.trim(),
+          observacoes: observacoesBase,
+        })
+        .select('id')
+        .single()
+      if (error) throw new Error(getSupabaseErrorMessage(error, 'Erro ao criar solicita\u00e7\u00e3o extraordin\u00e1ria'))
+
+      for (const arquivo of arquivos ?? []) {
+        const ext = arquivo.name.split('.').pop()?.toLowerCase() || 'bin'
+        const path = `financeiro/extraordinarios/${numeroDocumento}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`
+        const uploadResult = await supabase.storage.from('tesouraria-extratos').upload(path, arquivo)
+        if (uploadResult.error) {
+          uploadFalhas.push(`${arquivo.name}: ${getSupabaseErrorMessage(uploadResult.error, 'falha no upload')}`)
+          continue
+        }
+        const { data: urlData } = supabase.storage.from('tesouraria-extratos').getPublicUrl(path)
+        uploadedArquivos.push({ nome: arquivo.name, url: urlData.publicUrl })
+      }
+
+      if (dadosBancarios || uploadedArquivos.length > 0 || uploadFalhas.length > 0) {
+        const observacoesComplementares = appendExtraRequestDetailsToObservacoes(
+          observacoesBase,
+          dadosBancarios,
+          uploadedArquivos,
+        )
+
+        const { error: updateError } = await supabase
+          .from('fin_contas_pagar')
+          .update({ observacoes: observacoesComplementares })
+          .eq('id', data.id)
+
+        if (updateError) {
+          throw new Error(getSupabaseErrorMessage(updateError, 'Solicita\u00e7\u00e3o criada, mas n\u00e3o foi poss\u00edvel salvar os detalhes complementares'))
+        }
+      }
+
+      return data
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['contas-pagar'] })
+      qc.invalidateQueries({ queryKey: ['financeiro-dashboard'] })
+    },
+  })
+}
+
+// â”€â”€ Aprovar Pagamento (AP): aguardando_aprovacao â†’ aprovado_pgto â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // Autorização de Pagamento: o financeiro aprova a CP para pagamento efetivo.
+
+export function useCriarPrevisaoPagamentoCP() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async ({
+      nome,
+      valor,
+      centro_custo,
+      classe_financeira,
+      recorrente,
+      periodicidade,
+      recorrenciaFim,
+      dataVencimento,
+      solicitanteNome,
+    }: {
+      nome: string
+      valor: number
+      centro_custo: string
+      classe_financeira: string
+      recorrente: boolean
+      periodicidade?: string
+      recorrenciaFim?: string
+      dataVencimento: string
+      solicitanteNome?: string
+    }) => {
+      const observacoes = [
+        'Previsão de pagamento registrada manualmente.',
+        solicitanteNome ? `Solicitante: ${solicitanteNome}` : null,
+        recorrente ? `Recorrência: ${periodicidade || 'mensal'} até ${recorrenciaFim || dataVencimento}` : null,
+      ].filter(Boolean).join(' | ')
+
+      const { data, error } = await supabase
+        .from('fin_contas_pagar')
+        .insert({
+          fornecedor_nome: nome.trim(),
+          origem: 'manual',
+          valor_original: valor,
+          valor_pago: 0,
+          data_emissao: new Date().toISOString().split('T')[0],
+          data_vencimento: dataVencimento,
+          data_vencimento_orig: dataVencimento,
+          centro_custo,
+          classe_financeira,
+          natureza: 'previsao_pagamento',
+          status: 'previsto',
+          descricao: nome.trim(),
+          observacoes,
+        })
+        .select('id')
+        .single()
+      if (error) throw new Error(getSupabaseErrorMessage(error, 'Erro ao criar previsão de pagamento'))
+      return data
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['contas-pagar'] })
+      qc.invalidateQueries({ queryKey: ['financeiro-dashboard'] })
+    },
+  })
+}
 
 export function useAprovarPagamento() {
   const qc = useQueryClient()
@@ -144,108 +375,7 @@ export function useAprovarPagamento() {
   })
 }
 
-// ── Solicitar Aprovação de Pagamento: cria registro em apr_aprovacoes ─────
-// Deve ser chamado quando uma CP entra em status aguardando_aprovacao.
-export function useSolicitarAprovacaoPagamento() {
-  const qc = useQueryClient()
-  return useMutation({
-    mutationFn: async ({ cpId }: { cpId: string }) => {
-      // Busca dados da CP
-      const { data: cp } = await supabase
-        .from('fin_contas_pagar')
-        .select('id, fornecedor_nome, valor_original, numero_documento, descricao, centro_custo')
-        .eq('id', cpId)
-        .single()
-
-      if (!cp) throw new Error('CP nao encontrada')
-
-      const valor = cp.valor_original ?? 0
-      const nivel = valor > 100000 ? 4 : valor > 25000 ? 3 : valor > 5000 ? 2 : 1
-      const aprovadorNome = valor > 25000 ? 'Laucidio' : 'Welton'
-
-      // Verifica se ja existe aprovacao pendente para esta CP
-      const { data: existing } = await supabase
-        .from('apr_aprovacoes')
-        .select('id')
-        .eq('entidade_id', cpId)
-        .eq('tipo_aprovacao', 'autorizacao_pagamento')
-        .eq('status', 'pendente')
-        .limit(1)
-
-      if (existing && existing.length > 0) return // Ja existe
-
-      const { error } = await supabase
-        .from('apr_aprovacoes')
-        .insert({
-          modulo: 'fin',
-          tipo_aprovacao: 'autorizacao_pagamento',
-          entidade_id: cpId,
-          entidade_numero: cp.numero_documento ?? '',
-          aprovador_nome: aprovadorNome,
-          aprovador_email: '',
-          nivel,
-          status: 'pendente',
-          observacao: `Autorizacao pagamento — ${cp.fornecedor_nome} — ${valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}`,
-          data_limite: new Date(Date.now() + 72 * 3600_000).toISOString(),
-        })
-
-      if (error) console.warn('Aviso: apr_aprovacoes nao criado para CP:', error.message)
-    },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['aprovacoes-pendentes'] })
-      qc.invalidateQueries({ queryKey: ['aprovacoes-kpis'] })
-    },
-  })
-}
-
-// ── Sync CPs pendentes → apr_aprovacoes (garante visibilidade no AprovAi) ──
-// Cria registros apr_aprovacoes para CPs aguardando_aprovacao que ainda nao tem.
-export async function syncCPsParaAprovacao() {
-  // 1. Busca CPs aguardando_aprovacao
-  const { data: cps } = await supabase
-    .from('fin_contas_pagar')
-    .select('id, fornecedor_nome, valor_original, numero_documento')
-    .eq('status', 'aguardando_aprovacao')
-
-  if (!cps || cps.length === 0) return 0
-
-  // 2. Busca quais ja tem apr_aprovacoes pendentes
-  const { data: existing } = await supabase
-    .from('apr_aprovacoes')
-    .select('entidade_id')
-    .eq('tipo_aprovacao', 'autorizacao_pagamento')
-    .eq('status', 'pendente')
-    .in('entidade_id', cps.map(c => c.id))
-
-  const existingIds = new Set((existing ?? []).map(e => e.entidade_id))
-  const missing = cps.filter(cp => !existingIds.has(cp.id))
-
-  if (missing.length === 0) return 0
-
-  // 3. Cria registros faltantes
-  const inserts = missing.map(cp => {
-    const valor = cp.valor_original ?? 0
-    const nivel = valor > 100000 ? 4 : valor > 25000 ? 3 : valor > 5000 ? 2 : 1
-    return {
-      modulo: 'fin',
-      tipo_aprovacao: 'autorizacao_pagamento',
-      entidade_id: cp.id,
-      entidade_numero: cp.numero_documento ?? '',
-      aprovador_nome: valor > 25000 ? 'Laucidio' : 'Welton',
-      aprovador_email: '',
-      nivel,
-      status: 'pendente',
-      observacao: `Autorizacao pagamento — ${cp.fornecedor_nome} — ${valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}`,
-      data_limite: new Date(Date.now() + 72 * 3600_000).toISOString(),
-    }
-  })
-
-  const { error } = await supabase.from('apr_aprovacoes').insert(inserts)
-  if (error) console.warn('Aviso: sync CPs → apr_aprovacoes falhou:', error.message)
-  return missing.length
-}
-
-// ── Marcar CP como Pago ────────────────────────────────────────────────────
+// â”€â”€ Marcar CP como Pago â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // Atualiza diretamente fin_contas_pagar quando não há pedido vinculado,
 // ou quando o financeiro quer forçar status independente do fluxo de compras.
 
@@ -266,7 +396,7 @@ export function useMarcarCPPago() {
   })
 }
 
-// ── Classificação em lote (CP) ────────────────────────────────────────────
+// â”€â”€ Classificação em lote (CP) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 export function useClassificarCPBatch() {
   const qc = useQueryClient()
   return useMutation({
@@ -300,7 +430,7 @@ export function useClassificarCPBatch() {
   })
 }
 
-// ── Conciliar em lote (CP) ────────────────────────────────────────────────
+// â”€â”€ Conciliar em lote (CP) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 export function useConciliarCPBatch() {
   const qc = useQueryClient()
   return useMutation({
@@ -318,7 +448,7 @@ export function useConciliarCPBatch() {
   })
 }
 
-// ── Classificação em lote (CR) ────────────────────────────────────────────
+// â”€â”€ Classificação em lote (CR) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 export function useClassificarCRBatch() {
   const qc = useQueryClient()
   return useMutation({
@@ -352,7 +482,7 @@ export function useClassificarCRBatch() {
   })
 }
 
-// ── Conciliar em lote (CR) ────────────────────────────────────────────────
+// â”€â”€ Conciliar em lote (CR) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 export function useConciliarCRBatch() {
   const qc = useQueryClient()
   return useMutation({
@@ -370,7 +500,150 @@ export function useConciliarCRBatch() {
   })
 }
 
-// ── Valores distintos para autocomplete ───────────────────────────────────
+// â”€â”€ Autorizar CR: previsto â†’ autorizado â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+export function useAutorizarCR() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ crId, autorizadorNome }: { crId: string; autorizadorNome?: string }) => {
+      const { error } = await supabase
+        .from('fin_contas_receber')
+        .update({
+          status: 'autorizado',
+          autorizado_por: autorizadorNome ?? 'Financeiro',
+          autorizado_em: new Date().toISOString(),
+        })
+        .eq('id', crId)
+      if (error) throw error
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['contas-receber'] })
+      qc.invalidateQueries({ queryKey: ['financeiro-dashboard'] })
+    },
+  })
+}
+
+// â”€â”€ Faturar CR: autorizado â†’ nf_emitida (com upload DANFE/XML) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+export function useFaturarCR() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async ({
+      crId, numero_nf, serie_nf, chave_nfe, data_emissao,
+      danfeFile, xmlFile,
+    }: {
+      crId: string
+      numero_nf: string
+      serie_nf?: string
+      chave_nfe?: string
+      data_emissao?: string
+      danfeFile?: File
+      xmlFile?: File
+    }) => {
+      let danfe_url: string | undefined
+      let xml_url: string | undefined
+
+      if (danfeFile) {
+        const ext = danfeFile.name.split('.').pop() || 'pdf'
+        const path = `cr/${crId}/danfe-${Date.now()}.${ext}`
+        const { error: upErr } = await supabase.storage
+          .from('notas-fiscais').upload(path, danfeFile, { upsert: false, contentType: danfeFile.type })
+        if (upErr) throw new Error('Falha no upload DANFE: ' + upErr.message)
+        const { data: { publicUrl } } = supabase.storage.from('notas-fiscais').getPublicUrl(path)
+        danfe_url = publicUrl
+      }
+
+      if (xmlFile) {
+        const path = `cr/${crId}/xml-${Date.now()}.xml`
+        const { error: upErr } = await supabase.storage
+          .from('notas-fiscais').upload(path, xmlFile, { upsert: false, contentType: 'text/xml' })
+        if (upErr) throw new Error('Falha no upload XML: ' + upErr.message)
+        const { data: { publicUrl } } = supabase.storage.from('notas-fiscais').getPublicUrl(path)
+        xml_url = publicUrl
+      }
+
+      const updates: Record<string, unknown> = {
+        status: 'nf_emitida',
+        numero_nf,
+        data_emissao: data_emissao ?? new Date().toISOString().split('T')[0],
+      }
+      if (serie_nf) updates.serie_nf = serie_nf
+      if (chave_nfe) updates.chave_nfe = chave_nfe
+      if (danfe_url) updates.danfe_url = danfe_url
+      if (xml_url) updates.xml_url = xml_url
+
+      const { error } = await supabase
+        .from('fin_contas_receber').update(updates).eq('id', crId)
+      if (error) throw error
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['contas-receber'] })
+      qc.invalidateQueries({ queryKey: ['financeiro-dashboard'] })
+    },
+  })
+}
+
+// â”€â”€ Avançar status CR (transições simples) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+export function useAvancarStatusCR() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ crId, novoStatus }: { crId: string; novoStatus: string }) => {
+      const { error } = await supabase
+        .from('fin_contas_receber')
+        .update({ status: novoStatus, updated_at: new Date().toISOString() })
+        .eq('id', crId)
+      if (error) throw error
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['contas-receber'] })
+      qc.invalidateQueries({ queryKey: ['financeiro-dashboard'] })
+    },
+  })
+}
+
+// â”€â”€ Registrar Recebimento CR: aguardando â†’ recebido â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+export function useRegistrarRecebimentoCR() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ crId, valorRecebido, dataRecebimento }: {
+      crId: string; valorRecebido: number; dataRecebimento?: string
+    }) => {
+      const { error } = await supabase
+        .from('fin_contas_receber')
+        .update({
+          status: 'recebido',
+          valor_recebido: valorRecebido,
+          data_recebimento: dataRecebimento ?? new Date().toISOString().split('T')[0],
+        })
+        .eq('id', crId)
+      if (error) throw error
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['contas-receber'] })
+      qc.invalidateQueries({ queryKey: ['financeiro-dashboard'] })
+    },
+  })
+}
+
+// â”€â”€ Compartilhar NF por Email (marca envio, não muda status) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+export function useCompartilharNFEmail() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ crId, email }: { crId: string; email: string }) => {
+      const { error } = await supabase
+        .from('fin_contas_receber')
+        .update({
+          email_compartilhado_em: new Date().toISOString(),
+          email_compartilhado_para: email,
+        })
+        .eq('id', crId)
+      if (error) throw error
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['contas-receber'] })
+    },
+  })
+}
+
+// â”€â”€ Valores distintos para autocomplete â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 export function useDistinctCentroCusto() {
   return useQuery<string[]>({
     queryKey: ['distinct-centro-custo'],

@@ -16,6 +16,8 @@ export interface NavItem {
   label: string
   end?: boolean
   adminOnly?: boolean
+  action?: () => void
+  accent?: boolean
 }
 
 export interface NavSection {
@@ -315,15 +317,25 @@ export default function ModuleLayout({
   // ── Render helpers ──────────────────────────────────────────────────────────
 
   function renderNavItems() {
-    return visibleNav.map(({ to, icon: Icon, label, end, adminOnly }) => (
-      <NavLink key={to} to={to} end={end} className={sidebarLinkClass}>
-        <Icon size={16} className="shrink-0" />
-        <span className={variant === 'compact' && adminOnly ? 'flex-1' : undefined}>{label}</span>
-        {variant === 'compact' && adminOnly && (
-          <Shield size={10} className={`shrink-0 ${ls ? a.shieldLight : a.shieldDark}`} />
-        )}
-      </NavLink>
-    ))
+    return visibleNav.map(({ to, icon: Icon, label, end, adminOnly, action, accent }) => {
+      if (action) {
+        return (
+          <button key={to} onClick={action} className={`w-full text-left ${sidebarLinkClass({ isActive: false })}`}>
+            <Icon size={18} className={accent ? 'shrink-0 text-orange-500' : 'shrink-0'} />
+            <span className={accent ? 'text-orange-500 font-semibold' : undefined}>{label}</span>
+          </button>
+        )
+      }
+      return (
+        <NavLink key={to} to={to} end={end} className={sidebarLinkClass}>
+          <Icon size={16} className="shrink-0" />
+          <span className={variant === 'compact' && adminOnly ? 'flex-1' : undefined}>{label}</span>
+          {variant === 'compact' && adminOnly && (
+            <Shield size={10} className={`shrink-0 ${ls ? a.shieldLight : a.shieldDark}`} />
+          )}
+        </NavLink>
+      )
+    })
   }
 
   function renderSectionedNav() {

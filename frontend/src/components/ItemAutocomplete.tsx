@@ -7,6 +7,24 @@ import type { EstItem } from '../types/estoque'
 
 // ── Map RC category (cmp_categorias.codigo) → est_itens.categoria ───────────
 const CATEGORY_MAP: Record<string, string[]> = {
+  ACO:             ['Almoxarifado Geral'],
+  CONCRETO:        ['Almoxarifado Geral'],
+  OUTROS_MAT_OBRA: ['Material Elétrico', 'Almoxarifado Geral'],
+  EQUIPAMENTOS:    ['Ferramental', 'Almoxarifado Geral'],
+  FERRAMENTAS:     ['Ferramental'],
+  EPI_EPC_UNIFORME:['EPI/EPC'],
+  ALIMENTACAO_CANTEIRO: [],
+  ITENS_ALOJAMENTO: [],
+  PRODUTOS_LIMPEZA: [],
+  LOCACAO_IMOVEIS: [],
+  SERV_OBRA_LOG:   [],
+  MAT_ESCRITORIO_CD: ['Material de Escritório'],
+  MANUT_FROTA:     ['Ferramental', 'Almoxarifado Geral'],
+  AQUISICAO_ATIVOS: [],
+  SERV_ADMIN:      ['Material de Escritório', 'Almoxarifado Geral'],
+  SOFTWARE_HARDWARE_TI: ['Material de Escritório'],
+  MAT_ESCRITORIO_SEDE: ['Material de Escritório'],
+  COMPRAS_EXTRA:   ['Material Elétrico', 'Almoxarifado Geral', 'EPI/EPC', 'Ferramental', 'Material de Escritório'],
   // Uppercase codes from cmp_categorias table
   MATERIAIS_OBRA:  ['Material Elétrico', 'Almoxarifado Geral'],
   EPI_EPC:         ['EPI/EPC'],
@@ -50,7 +68,20 @@ const UNIDADE_DB_TO_RC: Record<string, string> = {
 interface ItemAutocompleteProps {
   value: string
   onChange: (desc: string) => void
-  onSelectCatalog: (item: { id: string; codigo: string; descricao: string; unidade: string; valor_medio: number }) => void
+  onSelectCatalog: (item: {
+    id: string
+    codigo: string
+    descricao: string
+    unidade: string
+    valor_medio: number
+    classe_financeira_id?: string
+    classe_financeira_codigo?: string
+    classe_financeira_descricao?: string
+    categoria_financeira_codigo?: string
+    categoria_financeira_descricao?: string
+    destino_operacional?: 'estoque' | 'patrimonio' | 'nenhum'
+    grupo_compra_codigo?: string
+  }) => void
   categoriaRC: string
   placeholder?: string
   isDark?: boolean
@@ -69,9 +100,9 @@ export default function ItemAutocomplete({
   const wrapperRef = useRef<HTMLDivElement>(null)
 
   const categoriasEstoque = getCategoriaEstoque(categoriaRC)
-  const hasAutocomplete = categoriasEstoque.length > 0
+  const hasAutocomplete = Boolean(categoriaRC)
 
-  const { data: results = [], isLoading } = useItemCatalogSearch(categoriasEstoque, search)
+  const { data: results = [], isLoading } = useItemCatalogSearch(categoriaRC, categoriasEstoque, search)
   const { perfil } = useAuth()
 
   // Close on outside click
@@ -102,6 +133,13 @@ export default function ItemAutocomplete({
       descricao: item.descricao,
       unidade: UNIDADE_DB_TO_RC[dbUnit] || dbUnit.toLowerCase(),
       valor_medio: item.valor_medio ?? 0,
+      classe_financeira_id: item.classe_financeira_id,
+      classe_financeira_codigo: item.classe_financeira_codigo,
+      classe_financeira_descricao: item.classe_financeira_descricao,
+      categoria_financeira_codigo: item.categoria_financeira_codigo,
+      categoria_financeira_descricao: item.categoria_financeira_descricao,
+      destino_operacional: item.destino_operacional,
+      grupo_compra_codigo: item.subcategoria,
     })
     setShowDropdown(false)
     setShowCreateForm(false)
@@ -156,6 +194,7 @@ export default function ItemAutocomplete({
           codigo: code,
           descricao: descPadronizada,
           categoria,
+          subcategoria: categoriaRC || null,
           unidade: newUnidade,
           ativo: true,
           valor_medio: 0,
@@ -236,12 +275,22 @@ export default function ItemAutocomplete({
                       <span className={`text-[10px] font-mono ${mutedText} shrink-0`}>{item.codigo}</span>
                       <span className="truncate">{highlight(item.descricao)}</span>
                     </div>
-                    {item.descricao_complementar && (
-                      <div className={`text-[11px] ${mutedText} truncate`}>{item.descricao_complementar}</div>
-                    )}
+                    <div className={`text-[11px] ${mutedText} truncate flex items-center gap-2`}>
+                      {item.descricao_complementar && <span>{item.descricao_complementar}</span>}
+                      {item.categoria_financeira_descricao && <span>{item.categoria_financeira_descricao}</span>}
+                    </div>
                   </div>
                   <div className="text-right shrink-0">
                     <div className={`text-[10px] ${mutedText}`}>{item.unidade}</div>
+                    {item.destino_operacional && (
+                      <div className="text-[10px] text-slate-400">
+                        {item.destino_operacional === 'estoque'
+                          ? 'Estoque'
+                          : item.destino_operacional === 'patrimonio'
+                            ? 'Patrimonio'
+                            : 'Nenhum'}
+                      </div>
+                    )}
                     {(item.valor_medio ?? 0) > 0 && (
                       <div className="text-[11px] font-semibold text-teal-600">
                         R$ {(item.valor_medio ?? 0).toFixed(2)}

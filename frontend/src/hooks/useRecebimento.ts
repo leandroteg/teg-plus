@@ -11,6 +11,9 @@ interface RequisicaoItemRow {
   quantidade: number
   unidade: string
   valor_unitario_estimado: number
+  est_item_id?: string
+  est_item_codigo?: string
+  destino_operacional?: 'estoque' | 'patrimonio' | 'nenhum'
 }
 
 export function useItensRequisicao(requisicaoId?: string) {
@@ -18,13 +21,55 @@ export function useItensRequisicao(requisicaoId?: string) {
     queryKey: ['requisicao-itens', requisicaoId],
     queryFn: async () => {
       if (!requisicaoId) return []
+
+      // Fetch requisição items with catalog link fields
       const { data, error } = await supabase
         .from('cmp_requisicao_itens')
-        .select('id, descricao, quantidade, unidade, valor_unitario_estimado')
+        .select(`
+          id, descricao, quantidade, unidade, valor_unitario_estimado,
+          est_item_id, est_item_codigo, destino_operacional,
+          item_estoque_id
+        `)
         .eq('requisicao_id', requisicaoId)
         .order('created_at')
       if (error) throw error
-      return (data ?? []) as RequisicaoItemRow[]
+
+      // Normalize rows — use est_item_id or item_estoque_id
+      const rows = (data ?? []).map((row: any) => ({
+        id: row.id,
+        descricao: row.descricao,
+        quantidade: row.quantidade,
+        unidade: row.unidade,
+        valor_unitario_estimado: row.valor_unitario_estimado,
+        est_item_id: row.est_item_id ?? row.item_estoque_id ?? undefined,
+        est_item_codigo: row.est_item_codigo ?? undefined,
+        destino_operacional: row.destino_operacional ?? undefined,
+      } as RequisicaoItemRow))
+
+      // For items without a catalog link, try auto-match by exact description
+      const unlinked = rows.filter(r => !r.est_item_id)
+      if (unlinked.length > 0) {
+        const descs = unlinked.map(r => r.descricao)
+        const { data: matches } = await supabase
+          .from('est_itens')
+          .select('id, descricao, destino_operacional')
+          .in('descricao', descs)
+          .eq('ativo', true)
+        if (matches && matches.length > 0) {
+          const byDesc = new Map(matches.map((m: any) => [m.descricao, m]))
+          for (const row of rows) {
+            if (!row.est_item_id) {
+              const match = byDesc.get(row.descricao)
+              if (match) {
+                row.est_item_id = match.id
+                row.destino_operacional = match.destino_operacional
+              }
+            }
+          }
+        }
+      }
+
+      return rows
     },
     enabled: !!requisicaoId,
     staleTime: 60_000,
@@ -100,13 +145,17 @@ export function useCriarRecebimento() {
         dataRecebimento, observacao, itens,
       } = payload
 
+      if (!perfil?.id) {
+        throw new Error('Perfil do usuario nao carregado para registrar o recebimento.')
+      }
+
       // 1. Create recebimento header
       const { data: rec, error: recErr } = await supabase
         .from('cmp_recebimentos')
         .insert({
           pedido_id: pedidoId,
           base_id: baseId || null,
-          recebido_por: perfil?.id ?? null,
+          recebido_por: perfil.id,
           nf_numero: nfNumero || null,
           nf_chave: nfChave || null,
           data_recebimento: dataRecebimento,
@@ -132,6 +181,7 @@ export function useCriarRecebimento() {
           numero_serie: i.numero_serie || null,
           data_validade: i.data_validade || null,
           tipo_destino: i.tipo_destino,
+          justificativa_destino: i.justificativa_destino || null,
         }))
 
       if (itensToInsert.length === 0) {
@@ -143,6 +193,20 @@ export function useCriarRecebimento() {
         .insert(itensToInsert)
 
       if (itensErr) throw itensErr
+
+      // 3. Update pedido status: parcial se nem tudo recebido, senão entregue
+      const totalEsperado = itens.reduce((s, i) => s + i.quantidade_esperada, 0)
+      const totalRecebido = itensToInsert.reduce((s, i) => s + i.quantidade_recebida, 0)
+      const novoStatus = totalRecebido < totalEsperado ? 'parcialmente_recebido' : 'entregue'
+
+      await supabase
+        .from('cmp_pedidos')
+        .update({
+          status: novoStatus,
+          data_entrega_real: dataRecebimento,
+          qtd_itens_recebidos: itensToInsert.length,
+        })
+        .eq('id', pedidoId)
 
       return rec
     },

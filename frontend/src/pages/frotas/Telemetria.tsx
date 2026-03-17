@@ -1,18 +1,18 @@
 import { useState } from 'react'
-import { Plus, Radio, AlertTriangle, CheckCircle, MessageSquare, XCircle } from 'lucide-react'
+import { Plus, Radio, AlertTriangle, CheckCircle, MessageSquare, XCircle, X } from 'lucide-react'
 import { useOcorrenciasTel, useAtualizarOcorrencia, useRegistrarOcorrencia, useVeiculos } from '../../hooks/useFrotas'
 import { useTheme } from '../../contexts/ThemeContext'
 import type { FroOcorrenciaTel, StatusOcorrenciaTel, TipoOcorrenciaTel } from '../../types/frotas'
 
 // ── Maps ──────────────────────────────────────────────────────────────────────
 const TIPO_CFG: Record<TipoOcorrenciaTel, { label: string; cls: string }> = {
-  excesso_velocidade:  { label: 'Excesso de velocidade', cls: 'bg-red-500/15 text-red-300 border-red-500/30' },
-  frenagem_brusca:     { label: 'Frenagem brusca',       cls: 'bg-orange-500/15 text-orange-300 border-orange-500/30' },
-  aceleracao_brusca:   { label: 'Aceleração brusca',     cls: 'bg-amber-500/15 text-amber-300 border-amber-500/30' },
-  fora_horario:        { label: 'Fora do horário',       cls: 'bg-violet-500/15 text-violet-300 border-violet-500/30' },
-  fora_area:           { label: 'Fora da área',          cls: 'bg-rose-500/15 text-rose-300 border-rose-500/30' },
-  parada_nao_autorizada: { label: 'Parada não autorizada', cls: 'bg-sky-500/15 text-sky-300 border-sky-500/30' },
-  outro:               { label: 'Outro',                 cls: 'bg-slate-500/10 text-slate-400 border-slate-500/20' },
+  excesso_velocidade:  { label: 'Excesso de velocidade', cls: 'bg-red-500/15 text-red-700 dark:text-red-300 border-red-500/30' },
+  frenagem_brusca:     { label: 'Frenagem brusca',       cls: 'bg-orange-500/15 text-orange-700 dark:text-orange-300 border-orange-500/30' },
+  aceleracao_brusca:   { label: 'Aceleração brusca',     cls: 'bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-500/30' },
+  fora_horario:        { label: 'Fora do horário',       cls: 'bg-violet-500/15 text-violet-700 dark:text-violet-300 border-violet-500/30' },
+  fora_area:           { label: 'Fora da área',          cls: 'bg-rose-500/15 text-rose-700 dark:text-rose-300 border-rose-500/30' },
+  parada_nao_autorizada: { label: 'Parada não autorizada', cls: 'bg-sky-500/15 text-sky-700 dark:text-sky-300 border-sky-500/30' },
+  outro:               { label: 'Outro',                 cls: 'bg-slate-500/10 text-slate-600 dark:text-slate-400 border-slate-500/20' },
 }
 
 const STATUS_FLOW: Record<StatusOcorrenciaTel, { next: StatusOcorrenciaTel; label: string; cls: string; icon: React.ElementType }> = {
@@ -23,10 +23,10 @@ const STATUS_FLOW: Record<StatusOcorrenciaTel, { next: StatusOcorrenciaTel; labe
 }
 
 const STATUS_BADGE: Record<StatusOcorrenciaTel, string> = {
-  registrada:    'bg-red-500/15 text-red-300 border-red-500/30',
-  analisada:     'bg-sky-500/15 text-sky-300 border-sky-500/30',
-  comunicado_rh: 'bg-violet-500/15 text-violet-300 border-violet-500/30',
-  encerrada:     'bg-slate-500/10 text-slate-400 border-slate-500/20',
+  registrada:    'bg-red-500/15 text-red-700 dark:text-red-300 border-red-500/30',
+  analisada:     'bg-sky-500/15 text-sky-700 dark:text-sky-300 border-sky-500/30',
+  comunicado_rh: 'bg-violet-500/15 text-violet-700 dark:text-violet-300 border-violet-500/30',
+  encerrada:     'bg-slate-500/10 text-slate-600 dark:text-slate-400 border-slate-500/20',
 }
 
 // ── Detail Modal ──────────────────────────────────────────────────────────────
@@ -70,7 +70,7 @@ function OcorrenciaModal({ oc, onClose, isLight }: { oc: FroOcorrenciaTel; onClo
           {oc.velocidade && (
             <div className="flex justify-between">
               <span className="text-slate-400">Velocidade</span>
-              <span className="text-red-300 font-bold">{oc.velocidade} km/h</span>
+              <span className="text-red-600 dark:text-red-300 font-bold">{oc.velocidade} km/h</span>
             </div>
           )}
           {oc.endereco && (
@@ -143,7 +143,7 @@ function OcorrenciaRow({ oc, onSelect, isLight }: { oc: FroOcorrenciaTel; onSele
         <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded border ${tipoCfg.cls}`}>{tipoCfg.label}</span>
       </div>
       {oc.velocidade && (
-        <span className="hidden sm:block text-xs text-red-300 font-bold shrink-0">{oc.velocidade} km/h</span>
+        <span className="hidden sm:block text-xs text-red-600 dark:text-red-300 font-bold shrink-0">{oc.velocidade} km/h</span>
       )}
       <div className="text-right shrink-0">
         <span className={`text-[10px] font-bold px-2 py-0.5 rounded-lg border ${badgeCls}`}>{statusLabel}</span>
@@ -186,7 +186,17 @@ function NovaOcorrenciaModal({ onClose, isLight }: { onClose: () => void; isLigh
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
       <form onSubmit={handleSubmit} className={`rounded-2xl shadow-2xl p-6 w-full max-w-lg space-y-4 ${isLight ? 'bg-white border border-slate-200' : 'bg-[#1e293b] border border-white/[0.06]'}`}>
-        <h2 className={`text-lg font-extrabold ${isLight ? 'text-slate-800' : 'text-white'}`}>Registrar Ocorrencia</h2>
+        <div className="flex items-center justify-between">
+          <h2 className={`text-lg font-extrabold ${isLight ? 'text-slate-800' : 'text-white'}`}>Registrar Ocorrencia</h2>
+          <button
+            type="button"
+            onClick={onClose}
+            className={`p-2 rounded-xl transition-colors ${isLight ? 'text-slate-400 hover:text-slate-600 hover:bg-slate-100' : 'text-slate-400 hover:text-white hover:bg-white/10'}`}
+            title="Fechar"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
 
         <div className="grid grid-cols-2 gap-3">
           <div>
@@ -297,7 +307,7 @@ export default function Telemetria() {
         <span>Fluxo:</span>
         {['Registrada', 'Analisada', 'Comunicado RH', 'Encerrada'].map((s, i, arr) => (
           <span key={s} className="flex items-center gap-1">
-            <span className={`px-1.5 py-0.5 rounded ${i === tabIdx ? 'text-teal-300 bg-teal-500/15' : ''}`}>{s}</span>
+            <span className={`px-1.5 py-0.5 rounded ${i === tabIdx ? 'text-teal-700 dark:text-teal-300 bg-teal-500/15' : ''}`}>{s}</span>
             {i < arr.length - 1 && <span>→</span>}
           </span>
         ))}

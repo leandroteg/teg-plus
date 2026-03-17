@@ -73,6 +73,23 @@ function decodeHtmlEntities(text: string): string {
 }
 
 /**
+ * Attempt to repair common mojibake where UTF-8 bytes were read as Latin-1/Windows-1252.
+ * We only keep the repaired version if it clearly reduces corruption markers.
+ */
+function repairMojibake(text: string): string {
+  if (!/[ÃÂâ�]/.test(text)) return text
+  try {
+    const bytes = Uint8Array.from(Array.from(text).map((char) => char.charCodeAt(0) & 0xff))
+    const decoded = new TextDecoder('utf-8', { fatal: false }).decode(bytes)
+    const originalNoise = (text.match(/[ÃÂâ�]/g) ?? []).length
+    const decodedNoise = (decoded.match(/[ÃÂâ�]/g) ?? []).length
+    return decodedNoise < originalNoise ? decoded : text
+  } catch {
+    return text
+  }
+}
+
+/**
  * Strip wrapping quotes from double-stringified text.
  */
 function stripDoubleStringified(text: string): string {
@@ -98,6 +115,7 @@ export function sanitizeAiText(text: string | null | undefined): string {
   result = stripDoubleStringified(result)
   result = decodeUnicodeEscapes(result)
   result = decodeHtmlEntities(result)
+  result = repairMojibake(result)
   // Normalize escaped newlines/tabs that came as literal strings
   result = result.replace(/\\n/g, '\n').replace(/\\t/g, '\t')
   // Collapse excessive whitespace (more than 2 consecutive newlines)

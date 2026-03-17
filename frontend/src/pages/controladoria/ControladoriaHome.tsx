@@ -27,10 +27,10 @@ const SEVERIDADE_CFG: Record<string, { label: string; dot: string; text: string;
 
 // ── Quick Actions ─────────────────────────────────────────────────────────────
 const ACTIONS = [
-  { icon: BarChart3,   label: 'Orcamentos',  to: '/controladoria/orcamentos', color: 'text-blue-600',   bg: 'bg-blue-50'   },
-  { icon: PieChart,    label: 'DRE',          to: '/controladoria/dre',        color: 'text-violet-600', bg: 'bg-violet-50' },
-  { icon: TrendingUp,  label: 'KPIs',         to: '/controladoria/kpis',       color: 'text-emerald-600',bg: 'bg-emerald-50'},
-  { icon: AlertTriangle,label:'Alertas',       to: '/controladoria/alertas',    color: 'text-red-600',    bg: 'bg-red-50'    },
+  { icon: BarChart3, label: 'Controle Orçamentário', to: '/controladoria/controle-orcamentario', color: 'text-blue-600', bg: 'bg-blue-50' },
+  { icon: PieChart, label: 'Controle de Custos', to: '/controladoria/controle-custos', color: 'text-violet-600', bg: 'bg-violet-50' },
+  { icon: TrendingUp, label: 'Controle Projetos', to: '/controladoria/controle-projetos', color: 'text-emerald-600', bg: 'bg-emerald-50' },
+  { icon: AlertTriangle, label: 'Cenários', to: '/controladoria/cenarios', color: 'text-amber-600', bg: 'bg-amber-50' },
 ]
 
 // ── Component ─────────────────────────────────────────────────────────────────
@@ -51,6 +51,22 @@ export default function ControladoriaHome() {
   const orcamentosAprovados = orcamentos.filter(o => o.status === 'aprovado').length
 
   const alertasNaoLidos = alertas.filter(a => !a.lido).slice(0, 5)
+  const proximasAcoes = [
+    ...alertasNaoLidos.slice(0, 3).map(a => ({
+      id: `alerta-${a.id}`,
+      titulo: a.obra?.nome ?? 'Acao prioritaria',
+      descricao: a.mensagem,
+      contexto: `${pct(a.desvio_pct)} de desvio`,
+      to: '/controladoria/controle-orcamentario?etapa=acoes',
+    })),
+    ...orcamentos.filter(o => o.status !== 'aprovado').slice(0, 2).map(o => ({
+      id: `orc-${o.id}`,
+      titulo: o.obra?.nome ?? 'Budget por area',
+      descricao: `Revisar orcamento ${o.ano}`,
+      contexto: `Status ${o.status}`,
+      to: '/controladoria/controle-orcamentario?etapa=budget-area',
+    })),
+  ].slice(0, 5)
 
   if (loadingCustos) {
     return (
@@ -70,7 +86,7 @@ export default function ControladoriaHome() {
             Painel — Controladoria
           </h1>
           <p className={`text-xs mt-0.5 ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>
-            Visao geral de custos, margens e alertas
+            Visao geral do modulo e proximas acoes
           </p>
         </div>
         <button
@@ -122,7 +138,7 @@ export default function ControladoriaHome() {
       </div>
 
       {/* ── Quick Actions ─────────────────────────────────────── */}
-      <div className="grid grid-cols-4 gap-2">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2">
         {ACTIONS.map(({ icon: Icon, label, to, color, bg }) => (
           <button
             key={to}
@@ -137,13 +153,55 @@ export default function ControladoriaHome() {
               group-hover:scale-110 transition-transform`}>
               <Icon size={16} className={color} />
             </div>
-            <p className={`text-[10px] font-bold ${isLight ? 'text-slate-600' : 'text-slate-300'}`}>{label}</p>
+            <p className={`text-[10px] font-bold leading-tight ${isLight ? 'text-slate-600' : 'text-slate-300'}`}>{label}</p>
           </button>
         ))}
       </div>
 
       {/* ── Two columns: Alertas Recentes + Custo por Obra ──── */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+
+        <section className={`rounded-2xl border overflow-hidden ${
+          isLight ? 'bg-white border-slate-200 shadow-sm' : 'bg-white/[0.03] border-white/[0.06]'
+        }`}>
+          <div className={`px-4 py-3 border-b flex items-center justify-between ${
+            isLight ? 'border-slate-100' : 'border-white/[0.04]'
+          }`}>
+            <h2 className={`text-sm font-extrabold flex items-center gap-1.5 ${
+              isLight ? 'text-slate-800' : 'text-white'
+            }`}>
+              <FileCheck2 size={14} className="text-emerald-500" />
+              Proximas Acoes
+            </h2>
+            <button
+              onClick={() => nav('/controladoria/controle-orcamentario?etapa=acoes')}
+              className="text-[10px] text-teal-600 font-semibold flex items-center gap-0.5"
+            >
+              Abrir fluxo <ArrowRight size={10} />
+            </button>
+          </div>
+          <div className={`divide-y ${isLight ? 'divide-slate-50' : 'divide-white/[0.04]'}`}>
+            {proximasAcoes.length === 0 ? (
+              <p className={`text-center text-sm py-8 ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>
+                Nenhuma acao prioritaria aberta
+              </p>
+            ) : (
+              proximasAcoes.map(acao => (
+                <button
+                  key={acao.id}
+                  onClick={() => nav(acao.to)}
+                  className={`w-full px-4 py-3 text-left transition-colors ${
+                    isLight ? 'hover:bg-slate-50' : 'hover:bg-white/[0.02]'
+                  }`}
+                >
+                  <p className={`text-sm font-semibold truncate ${isLight ? 'text-slate-700' : 'text-white'}`}>{acao.titulo}</p>
+                  <p className={`mt-1 text-[11px] truncate ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>{acao.descricao}</p>
+                  <p className={`mt-2 text-[10px] font-medium ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>{acao.contexto}</p>
+                </button>
+              ))
+            )}
+          </div>
+        </section>
 
         {/* Alertas recentes */}
         <section className={`rounded-2xl border overflow-hidden ${

@@ -135,12 +135,14 @@ export default function DashboardContratos() {
                     ${vencido ? 'bg-red-50 text-red-600' : isDespesa ? 'bg-amber-50 text-amber-600' : 'bg-emerald-50 text-emerald-600'}`}>
                     {fmtData(p.data_vencimento).split('/')[0]}
                   </div>
-                  <div className="flex-1 min-w-0">
+                <div className="flex-1 min-w-0">
                     <p className="text-sm font-semibold text-slate-700 truncate">
-                      {p.contraparte}
+                      {p.contrato_objeto || 'Contrato sem titulo'}
                     </p>
-                    <div className="flex items-center gap-1.5 mt-0.5">
-                      <span className="text-[10px] text-slate-400">{p.contrato_numero}</span>
+                    <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+                      <span className="text-[10px] text-slate-400 truncate">
+                        {[p.contraparte, p.contrato_numero].filter(Boolean).join(' • ') || 'Contrato sem referencia'}
+                      </span>
                       <span className={`text-[9px] font-semibold px-1.5 py-0.5 rounded-full ${
                         isDespesa ? 'bg-red-50 text-red-600' : 'bg-emerald-50 text-emerald-600'
                       }`}>

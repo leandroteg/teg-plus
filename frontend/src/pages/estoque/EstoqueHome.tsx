@@ -2,7 +2,7 @@ import { useNavigate } from 'react-router-dom'
 import {
   Package2, AlertTriangle, TrendingDown, DollarSign,
   ClipboardList, ArrowRight, RefreshCw, BarChart3,
-  ArrowLeftRight, Landmark, CheckCircle2,
+  ArrowLeftRight, CheckCircle2,
 } from 'lucide-react'
 import { useEstoqueKPIs, useSaldosAbaixoMinimo } from '../../hooks/useEstoque'
 import { useTheme } from '../../contexts/ThemeContext'
@@ -20,13 +20,6 @@ const EMPTY_KPIS: EstoqueKPIs = {
   taxa_ruptura: 0,
   solicitacoes_abertas: 0,
 }
-
-const ACTIONS = [
-  { icon: Package2,       label: 'Itens',          to: '/estoque/itens',         color: 'text-blue-600',   bg: 'bg-blue-50',   bgDark: 'bg-blue-500/15'   },
-  { icon: ArrowLeftRight, label: 'Movimentacoes',   to: '/estoque/movimentacoes', color: 'text-indigo-600', bg: 'bg-indigo-50', bgDark: 'bg-indigo-500/15' },
-  { icon: ClipboardList,  label: 'Inventario',      to: '/estoque/inventario',    color: 'text-violet-600', bg: 'bg-violet-50', bgDark: 'bg-violet-500/15' },
-  { icon: Landmark,       label: 'Patrimonial',     to: '/estoque/patrimonial',   color: 'text-cyan-600',   bg: 'bg-cyan-50',   bgDark: 'bg-cyan-500/15'   },
-]
 
 export default function EstoqueHome() {
   const nav = useNavigate()
@@ -52,8 +45,8 @@ export default function EstoqueHome() {
       {/* -- Header --------------------------------------------------- */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className={`text-xl font-extrabold ${isLight ? 'text-slate-800' : 'text-white'}`}>Painel -- Estoque</h1>
-          <p className={`text-xs mt-0.5 ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>Visao geral do almoxarifado e patrimonio</p>
+          <h1 className={`text-xl font-extrabold ${isLight ? 'text-slate-800' : 'text-white'}`}>Painel de Estoque</h1>
+          <p className={`text-xs mt-0.5 ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>{'Vis\u00e3o geral do almoxarifado'}</p>
         </div>
         <button onClick={() => refetch()}
           className={`flex items-center gap-1.5 text-xs transition-colors ${isLight ? 'text-slate-400 hover:text-blue-600' : 'text-slate-500 hover:text-blue-400'}`}>
@@ -125,22 +118,6 @@ export default function EstoqueHome() {
           </p>
           <p className={`text-[10px] mt-1 ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>Sem movimentacao ha 90+ dias</p>
         </div>
-      </div>
-
-      {/* -- Quick Actions ------------------------------------------ */}
-      <div className="grid grid-cols-4 gap-2">
-        {ACTIONS.map(({ icon: Icon, label, to, color, bg, bgDark }) => (
-          <button key={to} onClick={() => nav(to)}
-            className={`rounded-2xl p-3 border shadow-sm
-              hover:shadow-md hover:-translate-y-0.5 transition-all text-center group
-              ${isLight ? 'bg-white border-slate-200' : 'bg-white/[0.03] border-white/[0.06]'}`}>
-            <div className={`w-9 h-9 rounded-xl flex items-center justify-center mx-auto mb-2
-              group-hover:scale-110 transition-transform ${isLight ? bg : bgDark}`}>
-              <Icon size={16} className={color} />
-            </div>
-            <p className={`text-[10px] font-bold ${isLight ? 'text-slate-600' : 'text-slate-300'}`}>{label}</p>
-          </button>
-        ))}
       </div>
 
       {/* -- Alertas: Itens Abaixo do Minimo ------------------------ */}

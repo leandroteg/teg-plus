@@ -15,6 +15,7 @@ import { supabase } from '../services/supabase'
 import StatusBadge from '../components/StatusBadge'
 import FluxoTimeline from '../components/FluxoTimeline'
 import CotacaoComparativo from '../components/CotacaoComparativo'
+import EmitirPedidoModal from '../components/EmitirPedidoModal'
 import type { StatusRequisicao } from '../types'
 
 const fmt = (v: number) =>
@@ -47,6 +48,7 @@ export default function RequisicaoDetalhe() {
   const [showItens, setShowItens] = useState(true)
   const [pendingAction, setPendingAction] = useState<'aprovada' | 'rejeitada' | 'esclarecimento' | null>(null)
   const [pedidoToast, setPedidoToast] = useState<{ type: 'success' | 'error'; msg: string } | null>(null)
+  const [showEmitirModal, setShowEmitirModal] = useState(false)
 
   // Decisão técnica (pendente/em_aprovacao/esclarecimento) OU financeira (cotacao_enviada)
   const canDecide = isAdmin && req && (
@@ -387,23 +389,7 @@ export default function RequisicaoDetalhe() {
 
                 <button
                   disabled={emitirPedidoMutation.isPending || cancelarMutation.isPending}
-                  onClick={() => {
-                    emitirPedidoMutation.mutate({
-                      requisicaoId: req.id,
-                      cotacaoId: cotacao?.id ?? '',
-                      fornecedorNome: cotacao?.fornecedor_selecionado_nome ?? 'N/A',
-                      valorTotal: cotacao?.valor_selecionado ?? req.valor_estimado,
-                      compradorId: cotacao?.comprador_id ?? undefined,
-                    }, {
-                      onSuccess: (pedido) => {
-                        setPedidoToast({ type: 'success', msg: `Pedido ${pedido.numero_pedido} emitido ✓` })
-                      },
-                      onError: (err: any) => {
-                        setPedidoToast({ type: 'error', msg: `Erro ao emitir pedido: ${err?.message || 'erro desconhecido'}` })
-                        setTimeout(() => setPedidoToast(null), 5000)
-                      },
-                    })
-                  }}
+                  onClick={() => setShowEmitirModal(true)}
                   className="flex items-center justify-center gap-2 py-3.5 rounded-xl text-sm font-bold
                     text-white bg-teal-500 border-2 border-teal-500 hover:bg-teal-600 shadow-lg shadow-teal-500/20
                     active:scale-[0.98] transition-all disabled:opacity-50"
@@ -436,6 +422,37 @@ export default function RequisicaoDetalhe() {
       )}
 
       {/* ── Decisão Admin ──────────────────────────────────────────────────────── */}
+
+      {req && showEmitirModal && (
+        <EmitirPedidoModal
+          open
+          onClose={() => setShowEmitirModal(false)}
+          requisicaoId={req.id}
+          cotacao={cotacao ? {
+            id: cotacao.id,
+            fornecedorNome: cotacao.fornecedor_selecionado_nome ?? "N/A",
+            valorTotal: cotacao.valor_selecionado ?? req.valor_estimado,
+            compradorId: cotacao.comprador_id ?? undefined,
+          } : undefined}
+          onConfirm={(payload) => {
+            emitirPedidoMutation.mutate({
+              requisicaoId: req.id,
+              ...payload,
+            }, {
+              onSuccess: (pedido) => {
+                setShowEmitirModal(false)
+                setPedidoToast({ type: "success", msg: `${pedido.numero_pedido} emitido` })
+              },
+              onError: (err: any) => {
+                setPedidoToast({ type: "error", msg: `Erro ao emitir pedido: ${err?.message || "erro desconhecido"}` })
+                setTimeout(() => setPedidoToast(null), 5000)
+              },
+            })
+          }}
+          isSubmitting={emitirPedidoMutation.isPending}
+        />
+      )}
+
       {canDecide && (
         <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 space-y-3">
           <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">

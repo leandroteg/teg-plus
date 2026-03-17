@@ -14,7 +14,7 @@ import type { EstSolicitacao, StatusSolicitacao } from '../../types/estoque'
 const STATUS_CONFIG: Record<StatusSolicitacao, { label: string; bg: string; text: string; dot: string }> = {
   aberta:       { label: 'Aberta',       bg: 'bg-blue-50',    text: 'text-blue-700',    dot: 'bg-blue-500'    },
   aprovada:     { label: 'Aprovada',     bg: 'bg-emerald-50', text: 'text-emerald-700', dot: 'bg-emerald-500' },
-  em_separacao: { label: 'Em Separacao', bg: 'bg-amber-50',   text: 'text-amber-700',   dot: 'bg-amber-500'   },
+  em_separacao: { label: 'Em Separa\u00e7\u00e3o', bg: 'bg-amber-50',   text: 'text-amber-700',   dot: 'bg-amber-500'   },
   atendida:     { label: 'Atendida',     bg: 'bg-green-50',   text: 'text-green-700',   dot: 'bg-green-500'   },
   parcial:      { label: 'Parcial',      bg: 'bg-indigo-50',  text: 'text-indigo-700',  dot: 'bg-indigo-500'  },
   cancelada:    { label: 'Cancelada',    bg: 'bg-slate-100',  text: 'text-slate-500',   dot: 'bg-slate-400'   },
@@ -23,7 +23,7 @@ const STATUS_CONFIG: Record<StatusSolicitacao, { label: string; bg: string; text
 const URGENCIA_CONFIG = {
   normal:  { label: 'Normal',  bg: 'bg-slate-100', text: 'text-slate-600' },
   urgente: { label: 'Urgente', bg: 'bg-amber-50',  text: 'text-amber-700' },
-  critica: { label: 'Critica', bg: 'bg-red-50',    text: 'text-red-700'   },
+  critica: { label: 'Cr\u00edtica', bg: 'bg-red-50',    text: 'text-red-700'   },
 }
 
 const STATUS_TRANSITIONS: Record<string, { next: StatusSolicitacao; label: string; icon: typeof CheckCircle2; color: string }[]> = {
@@ -32,7 +32,7 @@ const STATUS_TRANSITIONS: Record<string, { next: StatusSolicitacao; label: strin
     { next: 'cancelada',  label: 'Cancelar',     icon: Ban,          color: 'bg-red-600 hover:bg-red-700'         },
   ],
   aprovada:     [
-    { next: 'em_separacao', label: 'Iniciar Separacao', icon: PackageCheck, color: 'bg-amber-600 hover:bg-amber-700' },
+    { next: 'em_separacao', label: 'Iniciar Separa\u00e7\u00e3o', icon: PackageCheck, color: 'bg-amber-600 hover:bg-amber-700' },
     { next: 'cancelada',    label: 'Cancelar',          icon: Ban,          color: 'bg-red-600 hover:bg-red-700'     },
   ],
   em_separacao: [
@@ -71,8 +71,8 @@ export default function Solicitacoes() {
       {/* -- Header --------------------------------------------------- */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className={`text-xl font-extrabold ${isLight ? 'text-slate-800' : 'text-white'}`}>Solicitacoes de Material</h1>
-          <p className={`text-xs mt-0.5 ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>{solicitacoes.length} solicitacoes</p>
+          <h1 className={`text-xl font-extrabold ${isLight ? 'text-slate-800' : 'text-white'}`}>{'Solicita\u00e7\u00f5es de Material'}</h1>
+          <p className={`text-xs mt-0.5 ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>{solicitacoes.length} {'solicita\u00e7\u00f5es'}</p>
         </div>
         <button
           onClick={() => setShowForm(true)}

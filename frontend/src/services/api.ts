@@ -148,6 +148,30 @@ export const api = {
     }
   },
 
+  consultarPlaca: async (placa: string): Promise<PlacaResult> => {
+    const limpa = placa.replace(/[^A-Za-z0-9]/g, '').toUpperCase()
+    if (limpa.length !== 7) return { placa: limpa, error: true, message: 'Placa inválida' }
+    // Tenta n8n primeiro
+    if (BASE) {
+      try {
+        const raw = await request<Record<string, unknown>>('/consulta-placa', {
+          method: 'POST',
+          body: JSON.stringify({ valor: limpa }),
+        })
+        return normalizePlacaResponse(raw, limpa)
+      } catch { /* fallback */ }
+    }
+    // Fallback: API pública
+    try {
+      const res = await fetch(`https://brasilapi.com.br/api/fipe/preco/v1/${limpa}`)
+      if (!res.ok) return { placa: limpa, error: true, message: 'Placa não encontrada' }
+      const r = await res.json()
+      return normalizePlacaResponse(r, limpa)
+    } catch {
+      return { placa: limpa, error: true, message: 'Serviço indisponível' }
+    }
+  },
+
   consultarCEP: async (cep: string): Promise<CepResult> => {
     const limpo = cep.replace(/\D/g, '')
     // Tenta n8n primeiro
@@ -248,4 +272,51 @@ export interface CepResult {
   uf: string
   error?: boolean
   message?: string
+}
+
+export interface PlacaResult {
+  placa: string
+  marca?: string
+  modelo?: string
+  ano_fab?: number
+  ano_mod?: number
+  cor?: string
+  combustivel?: string
+  categoria?: string
+  error?: boolean
+  message?: string
+}
+
+function normalizePlacaResponse(r: unknown, placa: string): PlacaResult {
+  const d = (r && typeof r === 'object' ? r : {}) as Record<string, unknown>
+  const inner = (d.data && typeof d.data === 'object' ? d.data : d) as Record<string, unknown>
+
+  if (inner.error || inner.erro || !inner.marca) {
+    return { placa, error: true, message: String(inner.message ?? inner.mensagem ?? 'Placa não encontrada') }
+  }
+
+  const anoStr = String(inner.ano ?? inner.anoModelo ?? inner.ano_modelo ?? '')
+  const anoFab = Number(inner.ano_fab ?? inner.anoFabricacao ?? anoStr.split('/')[0]) || undefined
+  const anoMod = Number(inner.ano_mod ?? inner.anoModelo ?? anoStr.split('/')[1] ?? anoStr.split('/')[0]) || undefined
+
+  // Map combustivel
+  const combRaw = String(inner.combustivel ?? inner.combustivel_tipo ?? '').toLowerCase()
+  const combMap: Record<string, string> = { gasolina: 'gasolina', diesel: 'diesel', etanol: 'etanol', flex: 'flex', 'álcool': 'etanol', alcool: 'etanol', elétrico: 'eletrico', eletrico: 'eletrico', gnv: 'gnv' }
+  const combustivel = combMap[combRaw] || (combRaw.includes('flex') ? 'flex' : undefined)
+
+  // Map categoria
+  const tipoRaw = String(inner.tipo ?? inner.categoria ?? inner.especie ?? '').toLowerCase()
+  const catMap: Record<string, string> = { passeio: 'passeio', pickup: 'pickup', caminhonete: 'pickup', van: 'van', utilitário: 'vuc', utilitario: 'vuc', caminhão: 'truck', caminhao: 'truck', carreta: 'carreta', moto: 'moto', motocicleta: 'moto', ônibus: 'onibus', onibus: 'onibus' }
+  const categoria = catMap[tipoRaw] || undefined
+
+  return {
+    placa,
+    marca: String(inner.marca ?? inner.MARCA ?? ''),
+    modelo: String(inner.modelo ?? inner.MODELO ?? ''),
+    ano_fab: anoFab,
+    ano_mod: anoMod,
+    cor: inner.cor ? String(inner.cor) : undefined,
+    combustivel,
+    categoria,
+  }
 }

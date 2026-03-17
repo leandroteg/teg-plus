@@ -58,6 +58,14 @@ export interface EstItem {
   controla_lote: boolean
   controla_serie: boolean
   tem_validade: boolean
+  controle_estoque: boolean
+  controle_patrimonio: boolean
+  destino_operacional?: 'estoque' | 'patrimonio' | 'nenhum'
+  classe_financeira_id?: string
+  classe_financeira_codigo?: string
+  classe_financeira_descricao?: string
+  categoria_financeira_codigo?: string
+  categoria_financeira_descricao?: string
   valor_medio: number
   valor_ultima_entrada: number
   totvs_codigo?: string
@@ -308,10 +316,63 @@ export interface PatrimonialKPIs {
 }
 
 // =============================================================================
+// Pipeline Estoque — Abas
+// =============================================================================
+
+export type EstoquePipelineTab = 'aguardando_entrada' | 'em_estoque' | 'liberado_retirada' | 'em_movimentacao'
+
+export interface EstoquePipelineStage {
+  tab: EstoquePipelineTab
+  label: string
+  color: string
+}
+
+export const ESTOQUE_PIPELINE_STAGES: EstoquePipelineStage[] = [
+  { tab: 'aguardando_entrada', label: 'Aguardando Entrada',    color: 'slate'   },
+  { tab: 'em_estoque',         label: 'Em Estoque',            color: 'emerald' },
+  { tab: 'liberado_retirada',  label: 'Liberado p/ Retirada',  color: 'blue'    },
+  { tab: 'em_movimentacao',    label: 'Em Movimentação',       color: 'amber'   },
+]
+
+// ── Aggregated item for pipeline views ──────────────────────────────────────
+export interface EstoqueEntradaItem {
+  id: string
+  item_id: string
+  codigo: string
+  descricao: string
+  unidade: string
+  quantidade: number
+  tipo: TipoMovimentacao | 'recebimento'
+  tipo_destino?: TipoDestino
+  fornecedor_nome?: string
+  nf_numero?: string
+  base_nome?: string
+  obra_nome?: string
+  valor_unitario?: number
+  numero_pedido?: string
+  criado_em: string
+}
+
+export interface EstoqueMovimentacaoItem {
+  id: string
+  item_id: string
+  codigo: string
+  descricao: string
+  unidade: string
+  quantidade: number
+  tipo: TipoMovimentacao
+  base_nome?: string
+  base_destino_nome?: string
+  responsavel_nome?: string
+  obra_nome?: string
+  criado_em: string
+}
+
+// =============================================================================
 // Recebimento Types (Compras ↔ Estoque ↔ Patrimonial)
 // =============================================================================
 
-export type TipoDestino = 'consumo' | 'patrimonial'
+export type TipoDestino = 'consumo' | 'patrimonial' | 'nenhum'
 
 export interface CmpRecebimento {
   id: string
@@ -341,6 +402,7 @@ export interface CmpRecebimentoItem {
   numero_serie?: string
   data_validade?: string
   tipo_destino: TipoDestino
+  justificativa_destino?: string
 }
 
 export interface RecebimentoItemForm {
@@ -354,4 +416,6 @@ export interface RecebimentoItemForm {
   numero_serie?: string
   data_validade?: string
   tipo_destino: TipoDestino
+  destino_padrao?: TipoDestino
+  justificativa_destino?: string
 }

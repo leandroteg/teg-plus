@@ -2,8 +2,6 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import type { AprovacaoPendente, AprovacaoHistorico, TipoAprovacao, CotacaoFornecedor, ItemSelecionado } from '../types'
 import { supabase } from '../services/supabase'
 import { api } from '../services/api'
-import { syncCPsParaAprovacao } from './useFinanceiro'
-
 // Tabelas: apr_aprovacoes (modulo Aprovacoes -- AprovAi)
 // NOTE: apr_aprovacoes.entidade_id NAO tem FK para cmp_requisicoes (design generico).
 // Por isso NAO usamos PostgREST join -- fazemos duas queries separadas.
@@ -16,8 +14,8 @@ export function useAprovacoesPendentes(tipo?: TipoAprovacao) {
   return useQuery<AprovacaoPendente[]>({
     queryKey: ['aprovacoes-pendentes', tipo],
     queryFn: async () => {
-      // 0. Sync: garante que CPs aguardando_aprovacao tenham apr_aprovacoes
-      try { await syncCPsParaAprovacao() } catch { /* non-critical */ }
+      // Aprovações de pagamento são criadas APENAS via Lotes (useEnviarLoteAprovacao)
+      // Não há mais sync automático de CPs individuais.
 
       // 1. Busca aprovacoes pendentes — filtra por tipo se fornecido
       let query = supabase
@@ -135,6 +133,8 @@ export function useAprovacoesPendentes(tipo?: TipoAprovacao) {
         .filter(Boolean)
 
       const finMap = new Map<string, Record<string, unknown>>()
+      const loteMap = new Map<string, Record<string, unknown>>()
+      const loteItensMap = new Map<string, Record<string, unknown>[]>()
       if (finIds.length > 0) {
         const { data: finData } = await supabase
           .from('fin_contas_pagar')
@@ -142,6 +142,49 @@ export function useAprovacoesPendentes(tipo?: TipoAprovacao) {
           .in('id', finIds)
         for (const f of finData ?? []) {
           finMap.set(f.id, f)
+        }
+
+        const loteIds = finIds.filter(id => !finMap.has(id))
+        if (loteIds.length > 0) {
+          const { data: loteData } = await supabase
+            .from('fin_lotes_pagamento')
+            .select('id, numero_lote, valor_total, qtd_itens, created_at, status')
+            .in('id', loteIds)
+          for (const lote of loteData ?? []) {
+            loteMap.set(lote.id, lote)
+          }
+
+          const { data: loteItens } = await supabase
+            .from('fin_lote_itens')
+            .select(`
+              id,
+              lote_id,
+              decisao,
+              cp:fin_contas_pagar!cp_id(
+                id,
+                fornecedor_nome,
+                valor_original,
+                valor_pago,
+                numero_documento,
+                descricao,
+                data_vencimento,
+                data_emissao,
+                centro_custo,
+                classe_financeira,
+                natureza,
+                forma_pagamento,
+                status
+              )
+            `)
+            .in('lote_id', loteIds)
+
+          for (const item of loteItens ?? []) {
+            const loteId = item.lote_id as string | undefined
+            if (!loteId) continue
+            const current = loteItensMap.get(loteId) ?? []
+            current.push(item as Record<string, unknown>)
+            loteItensMap.set(loteId, current)
+          }
         }
       }
 
@@ -219,20 +262,64 @@ export function useAprovacoesPendentes(tipo?: TipoAprovacao) {
             }
           } else if (a.tipo_aprovacao === 'autorizacao_pagamento') {
             const fin = finMap.get(a.entidade_id)
+            const lote = loteMap.get(a.entidade_id)
+            const loteItens = loteItensMap.get(a.entidade_id) ?? []
+            const loteCps = loteItens
+              .map(item => item.cp as Record<string, unknown> | null)
+              .filter((cp): cp is Record<string, unknown> => !!cp)
+            const fornecedores = Array.from(new Set(loteCps.map(cp => (cp.fornecedor_nome as string) || '').filter(Boolean)))
+            const fornecedorResumo = fornecedores.length === 0
+              ? ''
+              : fornecedores.length === 1
+                ? fornecedores[0]
+                : `${fornecedores[0]} + ${fornecedores.length - 1}`
             requisicao = {
               id: a.entidade_id,
-              numero: fin?.numero_documento ?? a.entidade_numero ?? 'N/A',
-              solicitante_nome: (fin?.fornecedor_nome as string) ?? '',
+              numero: (lote?.numero_lote as string) ?? (fin?.numero_documento as string) ?? a.entidade_numero ?? 'N/A',
+              solicitante_nome: (fin?.fornecedor_nome as string) ?? fornecedorResumo,
               obra_nome: (fin?.centro_custo as string) ?? '',
               descricao: `Autorizacao Pagamento — ${(fin?.fornecedor_nome as string) ?? ''} — ${(fin?.descricao as string) ?? ''}`,
-              valor_estimado: (fin?.valor_original as number) ?? 0,
+              valor_estimado: (lote?.valor_total as number) ?? (fin?.valor_original as number) ?? 0,
               urgencia: 'normal',
               status: 'em_aprovacao',
               alcada_nivel: a.nivel,
               created_at: a.created_at,
             }
-            // Issue #35: Attach enriched payment details for AprovAi card
-            if (fin) {
+            if (lote) {
+              ;(a as Record<string, unknown>)._pagamento_detalhes = {
+                is_lote: true,
+                lote_numero: (lote.numero_lote as string) ?? '',
+                lote_data: (lote.created_at as string) ?? '',
+                qtd_itens: (lote.qtd_itens as number) ?? loteItens.length,
+                aprovados: loteItens.filter(item => item.decisao === 'aprovado').length,
+                excluidos: loteItens.filter(item => item.decisao === 'rejeitado').length,
+                resumo_fornecedores: fornecedorResumo,
+                fornecedor_nome: fornecedorResumo || 'Lote de Pagamento',
+                valor_original: (lote.valor_total as number) ?? 0,
+                valor_pago: 0,
+                numero_documento: (lote.numero_lote as string) ?? '',
+                descricao: `Lote de pagamento com ${(lote.qtd_itens as number) ?? loteItens.length} itens`,
+                data_vencimento: '',
+                data_emissao: (lote.created_at as string) ?? '',
+                centro_custo: '',
+                classe_financeira: '',
+                natureza: '',
+                forma_pagamento: '',
+                status_cp: (lote.status as string) ?? '',
+                itens: loteItens.map(item => {
+                  const cp = item.cp as Record<string, unknown> | null
+                  return {
+                    id: (cp?.id as string) ?? (item.id as string),
+                    fornecedor_nome: (cp?.fornecedor_nome as string) ?? '',
+                    numero_documento: (cp?.numero_documento as string) ?? '',
+                    descricao: (cp?.descricao as string) ?? '',
+                    valor_original: (cp?.valor_original as number) ?? 0,
+                    data_vencimento: (cp?.data_vencimento as string) ?? '',
+                    decisao: (item.decisao as string) ?? 'pendente',
+                  }
+                }),
+              }
+            } else if (fin) {
               ;(a as Record<string, unknown>)._pagamento_detalhes = {
                 fornecedor_nome: (fin.fornecedor_nome as string) ?? '',
                 valor_original: (fin.valor_original as number) ?? 0,
@@ -270,6 +357,9 @@ export function useAprovacoesPendentes(tipo?: TipoAprovacao) {
 
           return {
             ...a,
+            entidade_numero: loteMap.has(a.entidade_id)
+              ? `${(loteMap.get(a.entidade_id)?.numero_lote as string) ?? a.entidade_numero ?? 'Lote'} • ${new Date((loteMap.get(a.entidade_id)?.created_at as string) ?? a.created_at).toLocaleDateString('pt-BR')} • ${((loteMap.get(a.entidade_id)?.valor_total as number) ?? 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}`
+              : a.entidade_numero,
             requisicao_id: a.entidade_id,
             tipo_aprovacao: a.tipo_aprovacao || 'requisicao_compra',
             modulo: a.modulo || 'cmp',
@@ -438,10 +528,11 @@ export interface DecisaoGenericaPayload {
   tipoAprovacao: TipoAprovacao
   modulo: string
   nivel: number
-  decisao: 'aprovada' | 'rejeitada'
+  decisao: 'aprovada' | 'rejeitada' | 'esclarecimento'
   observacao?: string
   aprovadorNome: string
   aprovadorEmail: string
+  selectedItemIds?: string[]
   /** Para aprovação de cotação: itens selecionados por fornecedor (aprovação parcial) */
   itens_selecionados?: ItemSelecionado[]
   /** ID da cotação — necessário para salvar itens_selecionados */
@@ -453,7 +544,7 @@ export function useDecisaoGenerica() {
   return useMutation({
     mutationFn: async (payload: DecisaoGenericaPayload) => {
       const {
-        aprovacaoId, entidadeId, tipoAprovacao, decisao, observacao, aprovadorNome,
+        aprovacaoId, entidadeId, tipoAprovacao, decisao, observacao, aprovadorNome, selectedItemIds,
       } = payload
 
       // 1. Update the specific aprovacao record
@@ -534,20 +625,196 @@ export function useDecisaoGenerica() {
                 : `Rejeitado por ${aprovadorNome}: ${observacao ?? ''}`,
             })
         } else if (tipoAprovacao === 'autorizacao_pagamento') {
-          // Atualiza status da CP
-          if (decisao === 'aprovada') {
+          const decisionAt = new Date().toISOString()
+
+          // Fluxo novo: a aprovacao de pagamento pode apontar para um lote.
+          const { data: lote } = await supabase
+            .from('fin_lotes_pagamento')
+            .select('id')
+            .eq('id', entidadeId)
+            .maybeSingle()
+
+          if (lote?.id) {
+            if (decisao === 'esclarecimento') {
+              await supabase
+                .from('fin_lote_itens')
+                .update({
+                  decisao: 'pendente',
+                  decidido_por: null,
+                  decidido_em: null,
+                  observacao: observacao || null,
+                })
+                .eq('lote_id', entidadeId)
+
+              await supabase
+                .from('fin_lotes_pagamento')
+                .update({
+                  status: 'montando',
+                  observacao: observacao || null,
+                  updated_at: decisionAt,
+                })
+                .eq('id', entidadeId)
+
+              await supabase
+                .from('fin_contas_pagar')
+                .update({
+                  status: 'em_lote',
+                  updated_at: decisionAt,
+                })
+                .eq('lote_id', entidadeId)
+                .not('status', 'in', '(cancelado,pago,conciliado)')
+            } else {
+              const { data: loteItens } = await supabase
+                .from('fin_lote_itens')
+                .select('id, cp_id, valor, decisao')
+                .eq('lote_id', entidadeId)
+
+              const itensAtuais = loteItens ?? []
+              const pendingItems = itensAtuais.filter(item => item.decisao === 'pendente')
+              const selectedSet = new Set(selectedItemIds ?? pendingItems.map(item => item.cp_id))
+
+              if (decisao === 'aprovada' && pendingItems.length > 0) {
+                const aprovados = pendingItems.filter(item => selectedSet.has(item.cp_id))
+                const excluidos = pendingItems.filter(item => !selectedSet.has(item.cp_id))
+
+                if (aprovados.length === 0) {
+                  throw new Error('Selecione ao menos um item para aprovar o lote.')
+                }
+
+                await supabase
+                  .from('fin_lote_itens')
+                  .update({
+                    decisao: 'aprovado',
+                    decidido_por: aprovadorNome,
+                    decidido_em: decisionAt,
+                    observacao: observacao || null,
+                  })
+                  .in('id', aprovados.map(item => item.id))
+
+                await supabase
+                  .from('fin_contas_pagar')
+                  .update({
+                    status: 'aprovado_pgto',
+                    aprovado_por: aprovadorNome,
+                    aprovado_em: decisionAt,
+                    updated_at: decisionAt,
+                  })
+                  .in('id', aprovados.map(item => item.cp_id))
+
+                if (excluidos.length > 0) {
+                  const { data: numData } = await supabase.rpc('generate_numero_lote')
+                  const numeroLote = (numData as string) || `LP-${Date.now()}`
+                  const valorNovoLote = excluidos.reduce((sum, item) => sum + (item.valor ?? 0), 0)
+
+                  const { data: novoLote, error: novoLoteErr } = await supabase
+                    .from('fin_lotes_pagamento')
+                    .insert({
+                      numero_lote: numeroLote,
+                      criado_por: aprovadorNome,
+                      valor_total: valorNovoLote,
+                      qtd_itens: excluidos.length,
+                      status: 'montando',
+                      observacao: `Itens retornados da aprovação parcial do lote ${entidadeId}`,
+                    })
+                    .select()
+                    .single()
+
+                  if (novoLoteErr) throw novoLoteErr
+
+                  const novosItens = excluidos.map(item => ({
+                    lote_id: novoLote.id,
+                    cp_id: item.cp_id,
+                    valor: item.valor ?? 0,
+                    decisao: 'pendente',
+                  }))
+
+                  const { error: novosItensErr } = await supabase
+                    .from('fin_lote_itens')
+                    .insert(novosItens)
+                  if (novosItensErr) throw novosItensErr
+
+                  await supabase
+                    .from('fin_contas_pagar')
+                    .update({
+                      lote_id: novoLote.id,
+                      status: 'em_lote',
+                      updated_at: decisionAt,
+                    })
+                    .in('id', excluidos.map(item => item.cp_id))
+
+                  await supabase
+                    .from('fin_lote_itens')
+                    .delete()
+                    .in('id', excluidos.map(item => item.id))
+                }
+
+                const { data: approvedItens } = await supabase
+                  .from('fin_lote_itens')
+                  .select('valor')
+                  .eq('lote_id', entidadeId)
+
+                const valorAprovado = (approvedItens ?? []).reduce((sum, item) => sum + (item.valor as number ?? 0), 0)
+
+                await supabase
+                  .from('fin_lotes_pagamento')
+                  .update({
+                    status: 'aprovado',
+                    qtd_itens: approvedItens?.length ?? aprovados.length,
+                    valor_total: valorAprovado,
+                    observacao: excluidos.length > 0
+                      ? `Aprovação parcial por ${aprovadorNome}${observacao ? ` • ${observacao}` : ''}`
+                      : observacao || null,
+                    updated_at: decisionAt,
+                  })
+                  .eq('id', entidadeId)
+              } else {
+                const decisaoItem = decisao === 'aprovada' ? 'aprovado' : 'rejeitado'
+
+                await supabase
+                  .from('fin_lote_itens')
+                  .update({
+                    decisao: decisaoItem,
+                    decidido_por: aprovadorNome,
+                    decidido_em: decisionAt,
+                    observacao: observacao || null,
+                  })
+                  .eq('lote_id', entidadeId)
+                  .eq('decisao', 'pendente')
+
+                await supabase.rpc('rpc_resolver_lote_status', { p_lote_id: entidadeId })
+              }
+            }
+
+            if (decisao === 'rejeitada') {
+              await supabase
+                .from('fin_lotes_pagamento')
+                .update({
+                  status: 'cancelado',
+                  updated_at: decisionAt,
+                })
+                .eq('id', entidadeId)
+            }
+          } else if (decisao === 'aprovada') {
             await supabase
               .from('fin_contas_pagar')
               .update({
                 status: 'aprovado_pgto',
                 aprovado_por: aprovadorNome,
-                aprovado_em: new Date().toISOString(),
+                aprovado_em: decisionAt,
               })
+              .eq('id', entidadeId)
+          } else if (decisao === 'rejeitada') {
+            await supabase
+              .from('fin_contas_pagar')
+              .update({ status: 'cancelado' })
               .eq('id', entidadeId)
           } else {
             await supabase
               .from('fin_contas_pagar')
-              .update({ status: 'cancelado' })
+              .update({
+                status: 'confirmado',
+                updated_at: decisionAt,
+              })
               .eq('id', entidadeId)
           }
         }
@@ -571,6 +838,8 @@ export function useDecisaoGenerica() {
       qc.invalidateQueries({ queryKey: ['cotacao-req'] })
       qc.invalidateQueries({ queryKey: ['requisicoes'] })
       qc.invalidateQueries({ queryKey: ['requisicao'] })
+      qc.invalidateQueries({ queryKey: ['lotes-pagamento'] })
+      qc.invalidateQueries({ queryKey: ['lote-detalhe'] })
     },
   })
 }

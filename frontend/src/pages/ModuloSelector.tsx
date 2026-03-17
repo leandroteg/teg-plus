@@ -72,7 +72,7 @@ const PILLARS: Pillar[] = [
       { key: 'compras', label: 'Compras', desc: 'Requisições, cotações e pedidos', Icon: ShoppingCart, active: true, route: '/compras' },
       { key: 'logistica', label: 'Logística', desc: 'Transportes e expedição', Icon: Truck, active: true, route: '/logistica' },
       { key: 'estoque', label: 'Estoque', desc: 'Almoxarifado e inventário', Icon: Package, active: true, route: '/estoque' },
-      { key: 'patrimonial', label: 'Patrimonial', desc: 'Ativos e depreciação', Icon: Building2, active: true, route: '/estoque/patrimonial' },
+      { key: 'patrimonial', label: 'Patrimonial', desc: 'Ativos e depreciação', Icon: Building2, active: true, route: '/patrimonial' },
       { key: 'frotas', label: 'Frotas', desc: 'Veículos, OS e telemetria', Icon: Car, active: true, route: '/frotas' },
     ],
   },
@@ -149,7 +149,7 @@ const BRAND = {
 
 export default function ModuloSelector() {
   const { perfil, isAdmin, signOut } = useAuth()
-  const { isLightSidebar: isLight } = useTheme()
+  const { isLightSidebar: isLight, theme } = useTheme()
   const navigate = useNavigate()
   const [openPillar, setOpenPillar] = useState<Pillar | null>(null)
   const [overlayVisible, setOverlayVisible] = useState(false)
@@ -233,6 +233,18 @@ export default function ModuloSelector() {
 
   return (
     <div className={`min-h-screen relative overflow-x-hidden flex flex-col ${isLight ? 'bg-slate-50' : 'bg-[#060D1B]'}`}>
+
+      {/* ── Background image — transmission towers ─────────────── */}
+      <div
+        className="absolute inset-0 pointer-events-none bg-no-repeat bg-cover bg-center transition-opacity duration-500"
+        style={{
+          backgroundImage: 'url(/bg-teg-transmission.png)',
+          ...(isLight
+            ? { opacity: 0.12, filter: 'brightness(1.4) grayscale(0.2) contrast(0.9)', mixBlendMode: 'multiply' as const }
+            : { opacity: 0.22, filter: 'none', mixBlendMode: 'screen' as const }
+          ),
+        }}
+      />
 
       {/* ── Atmospheric glow layers (dark only) ────────────────── */}
       {!isLight && (

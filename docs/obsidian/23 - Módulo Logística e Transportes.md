@@ -5,7 +5,7 @@ modulo: logistica
 status: ativo
 tags: [logistica, transportes, nfe, rastreamento, expedicao, recebimento]
 criado: 2026-03-03
-atualizado: 2026-03-03
+atualizado: 2026-03-12
 ---
 
 # Módulo Logística e Transportes
@@ -143,6 +143,28 @@ A média é calculada automaticamente pelo trigger `fn_atualiza_avaliacao_transp
 
 ---
 
+## Transportadoras
+
+> O módulo separado de Transportadoras foi **removido**. O cadastro de transportadoras é gerido como fornecedores no módulo **Cadastros**, tabela `cmp_fornecedores`.
+> Filtrar por `tipo = 'transportadora'` para listar apenas transportadoras.
+
+---
+
+## Nova Solicitação — Formulário Simplificado
+
+O formulário de Nova Solicitação foi simplificado em 2026-03-12. Os campos a seguir foram **removidos** do form:
+
+| Campo removido | Motivo |
+|----------------|--------|
+| Rota Padrão | Não obrigatório no fluxo principal |
+| OC Vinculada | Vinculação opcional, pode ser feita depois |
+| Obra | Preenchida automaticamente via contexto do usuário |
+| Urgente | Simplificação UX — urgência tratada via prioridade de status |
+
+O formulário atual solicita apenas: tipo de transporte, modal, origem, destino, data desejada, descrição da carga e custo estimado.
+
+---
+
 ## Estrutura de Arquivos
 
 ```
@@ -152,10 +174,12 @@ frontend/src/
 ├── pages/logistica/
 │   ├── LogisticaHome.tsx            # Dashboard — KPIs + Em Trânsito + Urgentes
 │   ├── Solicitacoes.tsx             # CRUD + fluxo de aprovação + planejamento
+│   ├── SolicitacoesPipeline.tsx     # Pipeline Kanban de solicitações
 │   ├── Expedicao.tsx                # Checklist + NF-e + despacho
+│   ├── ExpedicaoPipeline.tsx        # Pipeline Kanban de expedição
 │   ├── Transportes.tsx              # Rastreamento + ocorrências
-│   ├── Recebimentos.tsx             # Confirmação + avaliação
-│   └── Transportadoras.tsx          # CRUD de transportadoras
+│   ├── TransportesPipeline.tsx      # Pipeline Kanban de transportes
+│   └── Recebimentos.tsx             # Confirmação + avaliação
 ├── hooks/
 │   └── useLogistica.ts             # Todos os hooks React Query
 └── types/
@@ -253,4 +277,4 @@ erDiagram
 
 ---
 
-*Documentação gerada em 2026-03-03.*
+*Documentação gerada em 2026-03-03. Atualizado em 2026-03-12: remoção do módulo Transportadoras (integrado ao Cadastros/Fornecedores) e simplificação do formulário Nova Solicitação.*

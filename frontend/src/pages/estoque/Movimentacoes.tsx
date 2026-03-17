@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import {
   ArrowLeftRight, Plus, Search, X, Save, Loader2,
   ArrowDownCircle, ArrowUpCircle, RefreshCw, AlertCircle,
@@ -12,11 +13,11 @@ import type { NovaMovimentacaoPayload, TipoMovimentacao } from '../../types/esto
 
 const TIPO_CONFIG: Record<TipoMovimentacao, { label: string; cor: string; bg: string; icon: typeof ArrowLeftRight }> = {
   entrada:           { label: 'Entrada',        cor: 'text-emerald-700', bg: 'bg-emerald-50', icon: ArrowDownCircle  },
-  devolucao:         { label: 'Devolucao',       cor: 'text-teal-700',    bg: 'bg-teal-50',   icon: ArrowDownCircle  },
+  devolucao:         { label: 'Devolu\u00e7\u00e3o',       cor: 'text-teal-700',    bg: 'bg-teal-50',   icon: ArrowDownCircle  },
   transferencia_in:  { label: 'Transf. Entrada', cor: 'text-blue-700',    bg: 'bg-blue-50',   icon: ArrowDownCircle  },
   ajuste_positivo:   { label: 'Ajuste +',        cor: 'text-indigo-700',  bg: 'bg-indigo-50', icon: RefreshCw        },
-  saida:             { label: 'Saida',           cor: 'text-red-700',     bg: 'bg-red-50',    icon: ArrowUpCircle    },
-  transferencia_out: { label: 'Transf. Saida',   cor: 'text-orange-700',  bg: 'bg-orange-50', icon: ArrowUpCircle    },
+  saida:             { label: 'Sa\u00edda',           cor: 'text-red-700',     bg: 'bg-red-50',    icon: ArrowUpCircle    },
+  transferencia_out: { label: 'Transf. Sa\u00edda',   cor: 'text-orange-700',  bg: 'bg-orange-50', icon: ArrowUpCircle    },
   ajuste_negativo:   { label: 'Ajuste -',        cor: 'text-amber-700',   bg: 'bg-amber-50',  icon: RefreshCw        },
   baixa:             { label: 'Baixa',           cor: 'text-slate-600',   bg: 'bg-slate-100', icon: AlertCircle      },
 }
@@ -29,11 +30,12 @@ const EMPTY_PAYLOAD: Partial<NovaMovimentacaoPayload> = {
 }
 
 export default function Movimentacoes() {
+  const [params, setParams] = useSearchParams()
   const { isLightSidebar: isLight } = useTheme()
   const [busca, setBusca] = useState('')
   const [tipoFiltro, setTipoFiltro] = useState<string>('')
   const [page, setPage] = useState(1)
-  const [showForm, setShowForm] = useState(false)
+  const [showForm, setShowForm] = useState(params.get('nova') === '1')
   const [payload, setPayload] = useState<Partial<NovaMovimentacaoPayload>>({ ...EMPTY_PAYLOAD })
 
   const { data: movs = [], isLoading } = useMovimentacoes({
@@ -55,8 +57,7 @@ export default function Movimentacoes() {
   async function handleSave() {
     if (!payload.item_id || !payload.base_id || !payload.tipo || !payload.quantidade) return
     await registrar.mutateAsync(payload as NovaMovimentacaoPayload)
-    setShowForm(false)
-    setPayload({ ...EMPTY_PAYLOAD })
+    closeForm()
   }
 
   const set = (k: keyof NovaMovimentacaoPayload, v: any) => setPayload(p => ({ ...p, [k]: v }))
@@ -69,17 +70,39 @@ export default function Movimentacoes() {
     ? 'input-base'
     : 'input-base bg-white/[0.04] border-white/[0.08] text-slate-200 placeholder:text-slate-500'
 
+  useEffect(() => {
+    setShowForm(params.get('nova') === '1')
+  }, [params])
+
+  function openForm() {
+    setParams(prev => {
+      const next = new URLSearchParams(prev)
+      next.set('nova', '1')
+      return next
+    })
+  }
+
+  function closeForm() {
+    setShowForm(false)
+    setPayload({ ...EMPTY_PAYLOAD })
+    setParams(prev => {
+      const next = new URLSearchParams(prev)
+      next.delete('nova')
+      return next
+    })
+  }
+
   return (
     <div className="space-y-4">
 
       {/* -- Header --------------------------------------------------- */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className={`text-xl font-extrabold ${isLight ? 'text-slate-800' : 'text-white'}`}>Movimentacoes</h1>
+          <h1 className={`text-xl font-extrabold ${isLight ? 'text-slate-800' : 'text-white'}`}>{'Movimenta\u00e7\u00f5es'}</h1>
           <p className={`text-xs mt-0.5 ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>{filtradas.length} registros</p>
         </div>
         <button
-          onClick={() => setShowForm(true)}
+          onClick={openForm}
           className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white
             text-sm font-semibold px-4 py-2 rounded-xl transition-colors shadow-sm"
         >
@@ -195,7 +218,7 @@ export default function Movimentacoes() {
           <div className={`rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto ${isLight ? 'bg-white' : 'bg-[#111827]'}`}>
             <div className={`flex items-center justify-between px-6 py-4 border-b ${isLight ? 'border-slate-100' : 'border-white/[0.06]'}`}>
               <h2 className={`text-lg font-extrabold ${isLight ? 'text-slate-800' : 'text-white'}`}>Nova Movimentacao</h2>
-              <button onClick={() => setShowForm(false)}
+              <button onClick={closeForm}
                 className={`w-8 h-8 rounded-lg flex items-center justify-center ${isLight ? 'hover:bg-slate-100 text-slate-500' : 'hover:bg-white/[0.06] text-slate-400'}`}>
                 <X size={16} />
               </button>

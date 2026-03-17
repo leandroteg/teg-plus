@@ -1,16 +1,17 @@
-import { useState } from 'react'
-import { Plus, Search, AlertTriangle, Car, Edit2 } from 'lucide-react'
+import { useState, useCallback, useRef } from 'react'
+import { Plus, Search, AlertTriangle, Car, Edit2, Loader2, Sparkles, X } from 'lucide-react'
 import { useVeiculos, useSalvarVeiculo } from '../../hooks/useFrotas'
 import { useTheme } from '../../contexts/ThemeContext'
+import { api } from '../../services/api'
 import type { FroVeiculo, StatusVeiculo, CategoriaVeiculo, CombustivelVeiculo, PropriedadeVeiculo } from '../../types/frotas'
 
 // ── Maps ──────────────────────────────────────────────────────────────────────
 const STATUS_CFG: Record<StatusVeiculo, { label: string; cls: string }> = {
-  disponivel:    { label: 'Disponivel',   cls: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30' },
-  em_uso:        { label: 'Em Uso',       cls: 'bg-sky-500/15 text-sky-300 border-sky-500/30' },
-  em_manutencao: { label: 'Manutencao',   cls: 'bg-amber-500/15 text-amber-300 border-amber-500/30' },
-  bloqueado:     { label: 'Bloqueado',    cls: 'bg-red-500/15 text-red-300 border-red-500/30' },
-  baixado:       { label: 'Baixado',      cls: 'bg-slate-500/10 text-slate-500 border-slate-500/20' },
+  disponivel:    { label: 'Disponivel',   cls: 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-500/30' },
+  em_uso:        { label: 'Em Uso',       cls: 'bg-sky-500/15 text-sky-700 dark:text-sky-300 border-sky-500/30' },
+  em_manutencao: { label: 'Manutencao',   cls: 'bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-500/30' },
+  bloqueado:     { label: 'Bloqueado',    cls: 'bg-red-500/15 text-red-700 dark:text-red-300 border-red-500/30' },
+  baixado:       { label: 'Baixado',      cls: 'bg-slate-500/10 text-slate-600 dark:text-slate-500 border-slate-500/20' },
 }
 
 const CATEGORIA_LABEL: Record<CategoriaVeiculo, string> = {
@@ -29,8 +30,8 @@ function docStatus(dateStr?: string) {
   const hoje = new Date()
   const d    = new Date(dateStr)
   const diff = Math.floor((d.getTime() - hoje.getTime()) / 86400000)
-  if (diff < 0)   return { cls: 'text-red-400',   icon: true, label: 'Vencido' }
-  if (diff <= 30) return { cls: 'text-amber-400',  icon: true, label: `${diff}d` }
+  if (diff < 0)   return { cls: 'text-red-600 dark:text-red-400',   icon: true, label: 'Vencido' }
+  if (diff <= 30) return { cls: 'text-amber-600 dark:text-amber-400',  icon: true, label: `${diff}d` }
   return null
 }
 
@@ -51,8 +52,41 @@ function VeiculoModal({
     hodometro_atual: 0,
     ...inicial,
   })
+  const [placaLoading, setPlacaLoading] = useState(false)
+  const [placaMsg, setPlacaMsg] = useState('')
+  const placaTimer = useRef<ReturnType<typeof setTimeout>>()
 
   const set = (k: keyof FroVeiculo, v: unknown) => setForm(f => ({ ...f, [k]: v }))
+
+  const handlePlacaChange = useCallback((raw: string) => {
+    const val = raw.toUpperCase()
+    set('placa', val)
+    setPlacaMsg('')
+    if (placaTimer.current) clearTimeout(placaTimer.current)
+    const limpa = val.replace(/[^A-Z0-9]/g, '')
+    if (limpa.length === 7 && !inicial?.id) {
+      placaTimer.current = setTimeout(async () => {
+        setPlacaLoading(true)
+        try {
+          const r = await api.consultarPlaca(limpa)
+          if (!r.error && r.marca) {
+            setForm(f => ({
+              ...f,
+              marca: r.marca || f.marca,
+              modelo: r.modelo || f.modelo,
+              ano_fab: r.ano_fab ?? f.ano_fab,
+              ano_mod: r.ano_mod ?? f.ano_mod,
+              cor: r.cor || f.cor,
+              combustivel: (r.combustivel as CombustivelVeiculo) || f.combustivel,
+              categoria: (r.categoria as CategoriaVeiculo) || f.categoria,
+            }))
+            setPlacaMsg('Dados preenchidos automaticamente')
+          }
+        } catch { /* silencioso */ }
+        setPlacaLoading(false)
+      }, 400)
+    }
+  }, [inicial?.id])
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -77,13 +111,23 @@ function VeiculoModal({
           isLight ? 'bg-white border border-slate-200' : 'bg-[#1e293b] border border-white/[0.06]'
         }`}
       >
-        <h2 className={`text-lg font-extrabold ${isLight ? 'text-slate-800' : 'text-white'}`}>{inicial?.id ? 'Editar' : 'Novo'} Veiculo</h2>
+        <div className="flex items-center justify-between">
+          <h2 className={`text-lg font-extrabold ${isLight ? 'text-slate-800' : 'text-white'}`}>{inicial?.id ? 'Editar' : 'Novo'} Veiculo</h2>
+          <button
+            type="button"
+            onClick={onClose}
+            className={`p-2 rounded-xl transition-colors ${isLight ? 'text-slate-400 hover:text-slate-600 hover:bg-slate-100' : 'text-slate-400 hover:text-white hover:bg-white/10'}`}
+            title="Fechar"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
 
         {/* Linha 1 */}
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
           <div>
-            <label className={lbl}>Placa *</label>
-            <input className={inp} value={form.placa} onChange={e => set('placa', e.target.value.toUpperCase())} required placeholder="ABC-1234" />
+            <label className={lbl}>Placa * {placaLoading && <Loader2 size={12} className="inline animate-spin text-teal-400 ml-1" />}{placaMsg && <span className="text-[10px] text-emerald-400 ml-1"><Sparkles size={10} className="inline -mt-0.5 mr-0.5" />{placaMsg}</span>}</label>
+            <input className={inp} value={form.placa} onChange={e => handlePlacaChange(e.target.value)} required placeholder="ABC-1234" />
           </div>
           <div>
             <label className={lbl}>Renavam</label>

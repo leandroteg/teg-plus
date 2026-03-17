@@ -3,26 +3,40 @@ import { supabase } from '../services/supabase'
 import type {
   EstBase, EstItem, EstSaldo, EstMovimentacao, EstSolicitacao,
   EstInventario, EstInventarioItem, EstoqueKPIs, NovaMovimentacaoPayload,
+  EstoqueEntradaItem, EstoqueMovimentacaoItem,
 } from '../types/estoque'
 
 // ── Catalog search (for RC item autocomplete) ────────────────────────────────
-export function useItemCatalogSearch(categorias: string[], search: string) {
+export function useItemCatalogSearch(categoriaRC: string, categoriasEstoque: string[], search: string) {
   return useQuery<EstItem[]>({
-    queryKey: ['est-itens-catalog', categorias, search],
-    enabled: search.length >= 2 && categorias.length > 0,
+    queryKey: ['est-itens-catalog', categoriaRC, categoriasEstoque, search],
+    enabled: search.length >= 2 && !!categoriaRC,
     queryFn: async () => {
       // Case-insensitive search across descricao, descricao_complementar, and codigo (#49)
       const term = `%${search}%`
       const { data, error } = await supabase
         .from('est_itens')
-        .select('id, codigo, descricao, descricao_complementar, categoria, unidade, valor_medio')
-        .in('categoria', categorias)
+        .select(`
+          id, codigo, descricao, descricao_complementar, categoria, subcategoria, unidade, valor_medio,
+          classe_financeira_id, classe_financeira_codigo, classe_financeira_descricao,
+          categoria_financeira_codigo, categoria_financeira_descricao, destino_operacional
+        `)
         .eq('ativo', true)
         .or(`descricao.ilike.${term},descricao_complementar.ilike.${term},codigo.ilike.${term}`)
         .order('descricao')
-        .limit(15)
+        .limit(50)
       if (error) return []
-      return (data ?? []) as EstItem[]
+      const categoriaNormalizada = categoriaRC.trim().toUpperCase()
+      const categoriasLegadas = categoriasEstoque.map((item) => item.trim().toLowerCase())
+
+      return ((data ?? []) as EstItem[]).filter((item) => {
+        const grupoCompra = (item.subcategoria ?? '').trim().toUpperCase()
+        const categoriaLegada = (item.categoria ?? '').trim().toLowerCase()
+
+        if (grupoCompra && grupoCompra === categoriaNormalizada) return true
+        if (!grupoCompra && categoriasLegadas.length > 0) return categoriasLegadas.includes(categoriaLegada)
+        return false
+      })
     },
     staleTime: 30_000,
   })
@@ -403,6 +417,128 @@ export function useConcluirInventario() {
       qc.invalidateQueries({ queryKey: ['est-inventario'] })
       qc.invalidateQueries({ queryKey: ['est-kpis'] })
     },
+  })
+}
+
+// ── Pipeline: Aguardando Entrada (recebimento items pending validation) ──────
+export function useAguardandoEntrada() {
+  return useQuery<EstoqueEntradaItem[]>({
+    queryKey: ['est-aguardando-entrada'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('cmp_recebimento_itens')
+        .select(`
+          id, descricao, quantidade_recebida, valor_unitario,
+          tipo_destino, item_estoque_id, created_at,
+          item:est_itens!cmp_recebimento_itens_item_estoque_id_fkey(codigo, descricao, unidade),
+          recebimento:cmp_recebimentos!cmp_recebimento_itens_recebimento_id_fkey(
+            nf_numero, data_recebimento,
+            base:est_bases(nome),
+            pedido:cmp_pedidos(numero_pedido, fornecedor_nome, requisicao:cmp_requisicoes(obra_nome))
+          )
+        `)
+        .eq('status', 'aguardando_entrada')
+        .order('created_at', { ascending: false })
+        .limit(200)
+      if (error) return []
+      return (data ?? []).map((m: any) => ({
+        id: m.id,
+        item_id: m.item_estoque_id ?? '',
+        codigo: m.item?.codigo ?? '',
+        descricao: m.item?.descricao ?? m.descricao ?? '',
+        unidade: m.item?.unidade ?? 'UN',
+        quantidade: m.quantidade_recebida,
+        tipo: 'recebimento' as const,
+        tipo_destino: m.tipo_destino,
+        fornecedor_nome: m.recebimento?.pedido?.fornecedor_nome,
+        nf_numero: m.recebimento?.nf_numero,
+        base_nome: m.recebimento?.base?.nome,
+        obra_nome: m.recebimento?.pedido?.requisicao?.obra_nome,
+        valor_unitario: m.valor_unitario,
+        numero_pedido: m.recebimento?.pedido?.numero_pedido,
+        criado_em: m.created_at,
+      })) as EstoqueEntradaItem[]
+    },
+    staleTime: 30_000,
+  })
+}
+
+// ── Confirm entry: move from aguardando_entrada → confirmado ─────────────────
+export function useConfirmarEntrada() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (itemIds: string[]) => {
+      const { error } = await supabase
+        .from('cmp_recebimento_itens')
+        .update({ status: 'confirmado' })
+        .in('id', itemIds)
+      if (error) throw error
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['est-aguardando-entrada'] })
+      qc.invalidateQueries({ queryKey: ['est-saldos'] })
+      qc.invalidateQueries({ queryKey: ['est-movimentacoes'] })
+      qc.invalidateQueries({ queryKey: ['pat-imobilizados'] })
+      qc.invalidateQueries({ queryKey: ['pedidos'] })
+      qc.invalidateQueries({ queryKey: ['recebimentos'] })
+    },
+  })
+}
+
+// ── Pipeline: Em Movimentação ────────────────────────────────────────────────
+export function useEmMovimentacao() {
+  return useQuery<EstoqueMovimentacaoItem[]>({
+    queryKey: ['est-em-movimentacao'],
+    queryFn: async () => {
+      const trinta_dias = new Date(Date.now() - 30 * 86400000).toISOString()
+      const { data, error } = await supabase
+        .from('est_movimentacoes')
+        .select(`
+          id, item_id, tipo, quantidade,
+          responsavel_nome, obra_nome, criado_em,
+          item:est_itens!est_movimentacoes_item_id_fkey(codigo, descricao, unidade),
+          base:est_bases!est_movimentacoes_base_id_fkey(nome),
+          base_destino:est_bases!est_movimentacoes_base_destino_id_fkey(nome)
+        `)
+        .in('tipo', ['saida', 'transferencia_out', 'ajuste_negativo', 'baixa'])
+        .gte('criado_em', trinta_dias)
+        .order('criado_em', { ascending: false })
+        .limit(200)
+      if (error) return []
+      return (data ?? []).map((m: any) => ({
+        id: m.id,
+        item_id: m.item_id,
+        codigo: m.item?.codigo ?? '',
+        descricao: m.item?.descricao ?? '',
+        unidade: m.item?.unidade ?? 'UN',
+        quantidade: m.quantidade,
+        tipo: m.tipo,
+        base_nome: m.base?.nome,
+        base_destino_nome: m.base_destino?.nome,
+        responsavel_nome: m.responsavel_nome,
+        obra_nome: m.obra_nome,
+        criado_em: m.criado_em,
+      })) as EstoqueMovimentacaoItem[]
+    },
+    staleTime: 30_000,
+  })
+}
+
+// ── Pipeline: Liberado para Retirada (solicitações aprovadas/em_separacao) ────
+export function useLiberadosRetirada() {
+  return useQuery<EstSolicitacao[]>({
+    queryKey: ['est-liberados-retirada'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('est_solicitacoes')
+        .select(`*, itens:est_solicitacao_itens(*, item:est_itens(codigo, descricao, unidade))`)
+        .in('status', ['aprovada', 'em_separacao'])
+        .order('criado_em', { ascending: false })
+        .limit(200)
+      if (error) return []
+      return (data ?? []) as EstSolicitacao[]
+    },
+    staleTime: 30_000,
   })
 }
 

@@ -4,7 +4,7 @@ type: frontend
 status: ativo
 tags: [frontend, rotas, react-router, páginas]
 criado: 2026-03-02
-atualizado: 2026-03-05
+atualizado: 2026-03-12
 relacionado: ["[[02 - Frontend Stack]]", "[[04 - Componentes]]", "[[09 - Auth Sistema]]"]
 ---
 
@@ -25,6 +25,11 @@ graph TD
     MOD --> FR["/frotas\nFrotasHome"]
     MOD --> RH["/rh\nRHHome"]
     MOD -.->|⚙️ via sidebar| CAD["/cadastros\nCadastrosHome"]
+    MOD --> FIS["/fiscal\nPainelFiscal"]
+    MOD --> CTRL["/controladoria\nControladoriaHome"]
+    MOD --> EGP["/egp\nEGPHome"]
+    MOD --> OBR["/obras\nObrasHome"]
+    MOD --> SSMA["/ssma\nSSMA stub"]
 
     RH --> MURAL["/rh/mural\nMuralAdmin 🔐"]
 
@@ -53,10 +58,39 @@ graph TD
     FR --> FR4["/frotas/abastecimentos"]
     FR --> FR5["/frotas/telemetria"]
 
-    MOD --> SSMA["/ssma 🔜"]
-    MOD --> CON["/contratos 🔜"]
+    FIS --> FIS1["/fiscal/pipeline"]
+    FIS --> FIS2["/fiscal/historico"]
+
+    CTRL --> CTRL1["/controladoria/orcamentos"]
+    CTRL --> CTRL2["/controladoria/dre"]
+    CTRL --> CTRL3["/controladoria/kpis"]
+    CTRL --> CTRL4["/controladoria/cenarios"]
+    CTRL --> CTRL5["/controladoria/plano-orcamentario"]
+    CTRL --> CTRL6["/controladoria/controle-orcamentario"]
+    CTRL --> CTRL7["/controladoria/indicadores"]
+    CTRL --> CTRL8["/controladoria/alertas"]
+
+    EGP --> EGP1["/egp/portfolio"]
+    EGP --> EGP2["/egp/tap"]
+    EGP --> EGP3["/egp/eap"]
+    EGP --> EGP4["/egp/cronograma"]
+    EGP --> EGP5["/egp/medicoes"]
+    EGP --> EGP6["/egp/histograma"]
+    EGP --> EGP7["/egp/custos"]
+    EGP --> EGP8["/egp/fluxo-os"]
+    EGP --> EGP9["/egp/reunioes"]
+    EGP --> EGP10["/egp/indicadores"]
+
+    OBR --> OBR1["/obras/apontamentos"]
+    OBR --> OBR2["/obras/rdo"]
+    OBR --> OBR3["/obras/adiantamentos"]
+    OBR --> OBR4["/obras/prestacao"]
+    OBR --> OBR5["/obras/equipe"]
+
+    MOD --> CON["/contratos"]
     ROOT --> APROV["/aprovacao/:token 🔓"]
     ROOT --> ADMIN["/admin/usuarios 🔐"]
+    ROOT --> ADMINDEV["/admin/desenvolvimento 🔐"]
 ```
 
 ---
@@ -121,7 +155,8 @@ graph TD
 | `/logistica/recebimentos` | `Recebimentos.tsx` | Recebimento de materiais |
 | `/logistica/expedicao` | `Expedicao.tsx` | Expedição e entregas |
 | `/logistica/solicitacoes` | `Solicitacoes.tsx` | Fila de solicitações |
-| `/logistica/transportadoras` | `Transportadoras.tsx` | Cadastro de transportadoras |
+
+> Transportadoras não são mais um módulo separado. O cadastro de transportadoras é gerido via `cmp_fornecedores` no módulo Cadastros.
 
 ### Módulo Frotas (com `FrotasLayout`)
 
@@ -169,17 +204,85 @@ graph TD
 
 > Acessível de qualquer módulo via ícone ⚙️ "Cadastros" na sidebar. Ver [[28 - Módulo Cadastros AI]].
 
-### Módulos Stub (em desenvolvimento)
+### Módulo Fiscal (com `FiscalLayout`)
 
-| Rota | Status |
-|------|--------|
-| `/ssma` | 🔜 Planejado |
+| Rota | Componente | Descrição |
+|------|-----------|-----------|
+| `/fiscal` | `PainelFiscal.tsx` | Dashboard — KPIs, NFs por origem, por obra, fila pendentes |
+| `/fiscal/pipeline` | `FiscalPipeline.tsx` | Pipeline Kanban de solicitações de NF (emissão) |
+| `/fiscal/historico` | `NotasFiscais.tsx` | Repositório / histórico de NFs emitidas |
+
+Ver [[29 - Módulo Fiscal]].
+
+### Módulo Controladoria (com `ControladoriaLayout`)
+
+| Rota | Componente | Descrição |
+|------|-----------|-----------|
+| `/controladoria` | `ControladoriaHome.tsx` | Dashboard — custos, margens, alertas ativos |
+| `/controladoria/orcamentos` | `Orcamentos.tsx` | Gestão de orçamentos por obra |
+| `/controladoria/dre` | `DRE.tsx` | DRE consolidado |
+| `/controladoria/kpis` | `KPIs.tsx` | Indicadores de desempenho |
+| `/controladoria/cenarios` | `Cenarios.tsx` | Simulação de cenários financeiros |
+| `/controladoria/plano-orcamentario` | `PlanoOrcamentario.tsx` | Plano orçamentário por obra |
+| `/controladoria/controle-orcamentario` | `ControleOrcamentario.tsx` | Orçado vs Realizado |
+| `/controladoria/indicadores` | `PainelIndicadores.tsx` | Painel de indicadores executivos |
+| `/controladoria/alertas` | `AlertasDesvio.tsx` | Alertas de desvio orçamentário |
+
+Ver [[30 - Módulo Controladoria]].
+
+### Módulo PMO/EGP (com `EGPLayout`)
+
+| Rota | Componente | Descrição |
+|------|-----------|-----------|
+| `/egp` | `EGPHome.tsx` (PMOHome) | Dashboard — portfólio de obras e KPIs |
+| `/egp/portfolio` | `Portfolio.tsx` | Lista de portfólios/obras |
+| `/egp/portfolio/novo` | `NovoPortfolio.tsx` | Criar novo portfólio |
+| `/egp/portfolio/:id` | `PortfolioDetalhe.tsx` | Detalhe de portfólio |
+| `/egp/tap` | `TapHub.tsx` | Seletor de TAP por portfólio |
+| `/egp/tap/:portfolioId` | `TapPage.tsx` | Termo de Abertura de Projeto |
+| `/egp/eap` | `EAPHub.tsx` | Seletor de EAP por portfólio |
+| `/egp/eap/:portfolioId` | `EAP.tsx` | Estrutura Analítica do Projeto |
+| `/egp/cronograma` | `CronogramaHub.tsx` | Seletor de cronograma por portfólio |
+| `/egp/cronograma/:portfolioId` | `Cronograma.tsx` | Cronograma Gantt |
+| `/egp/medicoes` | `MedicoesHub.tsx` | Seletor de medições por portfólio |
+| `/egp/medicoes/:portfolioId` | `Medicoes.tsx` | Boletins de Medição |
+| `/egp/histograma` | `HistogramaHub.tsx` | Seletor de histograma por portfólio |
+| `/egp/histograma/:portfolioId` | `Histograma.tsx` | Histograma de recursos |
+| `/egp/custos` | `CustosHub.tsx` | Seletor de custos por portfólio |
+| `/egp/custos/:portfolioId` | `ControleCustos.tsx` | Controle de custos |
+| `/egp/fluxo-os` | `FluxoOS.tsx` | Fluxo de Ordens de Serviço |
+| `/egp/reunioes` | `Reunioes.tsx` | Atas de reuniões |
+| `/egp/indicadores` | `StatusReportList.tsx` | Status Reports / indicadores |
+
+Ver [[31 - Módulo PMO-EGP]].
+
+### Módulo Obras (com `ObrasLayout`)
+
+| Rota | Componente | Descrição |
+|------|-----------|-----------|
+| `/obras` | `ObrasHome.tsx` | Dashboard — KPIs, apontamentos recentes, mobilizações |
+| `/obras/apontamentos` | `Apontamentos.tsx` | Apontamentos de campo (HH, equipes) |
+| `/obras/rdo` | `RDO.tsx` | Relatório Diário de Obra |
+| `/obras/adiantamentos` | `Adiantamentos.tsx` | Adiantamentos financeiros para obras |
+| `/obras/prestacao` | `PrestacaoContas.tsx` | Prestação de contas de adiantamentos |
+| `/obras/equipe` | `PlanejamentoEquipe.tsx` | Planejamento e gestão de equipe por obra |
+
+Ver [[32 - Módulo Obras]].
+
+### Módulo SSMA
+
+| Rota | Componente | Descrição |
+|------|-----------|-----------|
+| `/ssma` | `SSMA.tsx` | Tela informativa com roadmap do módulo (stub) |
+
+> SSMA está implementado como stub informativo. Funcionalidades completas planejadas para Q2-Q4 2026. Ver [[33 - Módulo SSMA]].
 
 ### Admin
 
 | Rota | Componente | Acesso |
 |------|-----------|--------|
 | `/admin/usuarios` | `AdminUsuarios.tsx` | Admin only |
+| `/admin/desenvolvimento` | `Desenvolvimento.tsx` | Admin only — Dev Hub |
 
 ---
 
@@ -213,7 +316,7 @@ O `ModuloSelector.tsx` renderiza o componente `BannerSlideshow` **entre** o hero
   ↓
 [BannerSlideshow]   ← banners do mural (auto-advance 5.5s, Ken Burns)
   ↓
-[Grade de Módulos: 2×4 grid responsivo]
+[Grade de Módulos: grid responsivo]
 ```
 
 Sem banners no banco, exibe 3 slides padrão. Gerenciado em `/rh/mural`. Ver [[25 - Mural de Recados]].
@@ -229,3 +332,8 @@ Sem banners no banco, exibe 3 slides padrão. Gerenciado em `/rh/mural`. Ver [[2
 - [[25 - Mural de Recados]] — Slideshow e gestão de banners
 - [[27 - Módulo Contratos Gestão]] — Rotas do módulo de contratos
 - [[28 - Módulo Cadastros AI]] — Rotas do módulo de cadastros AI
+- [[29 - Módulo Fiscal]] — Rotas do módulo fiscal
+- [[30 - Módulo Controladoria]] — Rotas do módulo de controladoria
+- [[31 - Módulo PMO-EGP]] — Rotas do módulo PMO/EGP
+- [[32 - Módulo Obras]] — Rotas do módulo de obras
+- [[33 - Módulo SSMA]] — Módulo SSMA (stub)

@@ -227,6 +227,7 @@ export function useFinalizarCotacao() {
           .from('apr_aprovacoes')
           .insert({
             modulo: 'cmp',
+            tipo_aprovacao: 'cotacao',
             entidade_id: requisicao_id,
             entidade_numero: rcData.numero,
             aprovador_nome: aprovadorNome,

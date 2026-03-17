@@ -1,18 +1,24 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import {
   ArrowLeft, FileText, ExternalLink, Clock, CheckCircle2,
   XCircle, AlertTriangle, ChevronRight, Send,
   Archive, Unlock, Ban, Eye, Pencil, Building2, Calendar,
   DollarSign, User, Briefcase, Tag, ShieldCheck, Info, PenTool, X,
+  Plus, Trash2, Users, Upload, FileCheck2,
 } from 'lucide-react'
 import {
   useSolicitacao,
   useSolicitacaoHistorico,
   useAvancarEtapa,
   useCancelarSolicitacao,
+  useEnviarAssinatura,
+  useConfirmarAssinatura,
+  useMinutas,
+  useResumoExecutivo,
 } from '../../hooks/useSolicitacoes'
-import type { EtapaSolicitacao, Solicitacao } from '../../types/contratos'
+import type { EtapaSolicitacao, ParcelaPlanejada, Solicitacao, TipoAssinatura } from '../../types/contratos'
+import { calcularDiferencaParcelas, normalizarParcelasPlanejadas, sugerirParcelasContrato } from '../../utils/contratosParcelas'
 
 // ── Formatters ──────────────────────────────────────────────────────────────────
 
@@ -251,18 +257,57 @@ function CancelModal({ open, onClose, onConfirm, isPending }: {
 
 // ── Certisign Modal ──────────────────────────────────────────────────────────────
 
-function CertisignModal({ open, onClose, onConfirm, isPending }: {
+function CertisignModal({ open, onClose, solicitacao, minutaUrl, onSuccess }: {
   open: boolean
   onClose: () => void
-  onConfirm: () => void
-  isPending: boolean
+  solicitacao: Solicitacao
+  minutaUrl: string | null
+  onSuccess: () => void | Promise<void>
 }) {
+  const [signatarios, setSignatarios] = useState<{ nome: string; email: string; cpf: string; papel: string }[]>([
+    { nome: '', email: '', cpf: '', papel: 'Contratante' },
+    { nome: '', email: '', cpf: '', papel: 'Contratada' },
+  ])
+  const [tipoAssinatura, setTipoAssinatura] = useState<TipoAssinatura>('eletronica')
+  const [erro, setErro] = useState<string | null>(null)
+  const enviar = useEnviarAssinatura()
+
   if (!open) return null
+
+  const addSignatario = () =>
+    setSignatarios(prev => [...prev, { nome: '', email: '', cpf: '', papel: '' }])
+
+  const removeSignatario = (idx: number) =>
+    setSignatarios(prev => prev.filter((_, i) => i !== idx))
+
+  const updateSignatario = (idx: number, field: string, value: string) =>
+    setSignatarios(prev => prev.map((s, i) => i === idx ? { ...s, [field]: value } : s))
+
+  const handleSubmit = async () => {
+    setErro(null)
+    if (!minutaUrl) { setErro('Nenhuma minuta disponivel para envio.'); return }
+    const invalidos = signatarios.filter(s => !s.nome || !s.email || !s.cpf)
+    if (invalidos.length) { setErro('Preencha nome, e-mail e CPF de todos os signatarios.'); return }
+    try {
+      await enviar.mutateAsync({
+        solicitacao_id: solicitacao.id,
+        minuta_url: minutaUrl,
+        tipo_assinatura: tipoAssinatura,
+        signatarios: signatarios.map(s => ({ nome: s.nome, email: s.email, cpf: s.cpf, papel: s.papel })),
+      })
+      // Avançar etapa ANTES de fechar o modal — await garante que erros sejam capturados
+      await onSuccess()
+      onClose()
+    } catch (e: unknown) {
+      setErro(e instanceof Error ? e.message : 'Erro desconhecido ao enviar.')
+    }
+  }
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="fixed inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-md p-6 space-y-4 animate-in fade-in zoom-in-95 duration-200">
+      <div className="relative bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-2xl p-6 space-y-5 animate-in fade-in zoom-in-95 duration-200 max-h-[90vh] overflow-y-auto">
+        {/* Header */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-teal-500 to-teal-600 flex items-center justify-center shadow-sm">
@@ -270,7 +315,7 @@ function CertisignModal({ open, onClose, onConfirm, isPending }: {
             </div>
             <div>
               <h3 className="text-base font-extrabold text-slate-800">Enviar para Assinatura</h3>
-              <p className="text-xs text-slate-400">Integracao com Certisign</p>
+              <p className="text-xs text-slate-400">Integracao Certisign — {solicitacao.numero}</p>
             </div>
           </div>
           <button onClick={onClose} className="text-slate-400 hover:text-slate-600 transition-colors">
@@ -278,39 +323,236 @@ function CertisignModal({ open, onClose, onConfirm, isPending }: {
           </button>
         </div>
 
-        <div className="bg-amber-50 rounded-xl border border-amber-200 px-4 py-3">
-          <div className="flex items-start gap-2">
-            <AlertTriangle size={14} className="text-amber-500 mt-0.5 shrink-0" />
-            <div>
-              <p className="text-xs font-semibold text-amber-700">Integracao em Desenvolvimento</p>
-              <p className="text-[11px] text-amber-600 mt-1 leading-relaxed">
-                A integracao com a plataforma Certisign para assinatura digital esta em desenvolvimento.
-                Por enquanto, voce pode avancar a etapa manualmente e enviar o contrato para assinatura por outros meios.
-              </p>
+        {/* Erro */}
+        {erro && (
+          <div className="bg-red-50 rounded-xl border border-red-200 px-4 py-3 flex items-start gap-2">
+            <AlertTriangle size={14} className="text-red-500 mt-0.5 shrink-0" />
+            <p className="text-xs text-red-700 font-medium">{erro}</p>
+          </div>
+        )}
+
+        {/* Tipo assinatura */}
+        <div>
+          <label className="text-xs font-bold text-slate-600 mb-1.5 block">Tipo de Assinatura</label>
+          <select
+            value={tipoAssinatura}
+            onChange={e => setTipoAssinatura(e.target.value as TipoAssinatura)}
+            className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500/30"
+          >
+            <option value="eletronica">Eletronica</option>
+            <option value="digital_icp">Digital ICP-Brasil</option>
+          </select>
+        </div>
+
+        {/* Signatarios */}
+        <div>
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-2">
+              <Users size={14} className="text-teal-600" />
+              <span className="text-xs font-bold text-slate-600">Signatarios ({signatarios.length})</span>
             </div>
+            <button
+              type="button"
+              onClick={addSignatario}
+              className="flex items-center gap-1 text-[11px] font-bold text-teal-600 hover:text-teal-700 transition-colors"
+            >
+              <Plus size={12} /> Adicionar
+            </button>
+          </div>
+
+          <div className="space-y-3">
+            {signatarios.map((s, idx) => (
+              <div key={idx} className="bg-slate-50 rounded-xl border border-slate-200 p-3">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                    Signatario {idx + 1}
+                  </span>
+                  {signatarios.length > 1 && (
+                    <button
+                      type="button"
+                      onClick={() => removeSignatario(idx)}
+                      className="text-red-400 hover:text-red-600 transition-colors"
+                    >
+                      <Trash2 size={13} />
+                    </button>
+                  )}
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <input
+                    value={s.nome}
+                    onChange={e => updateSignatario(idx, 'nome', e.target.value)}
+                    placeholder="Nome completo"
+                    className="rounded-lg border border-slate-200 px-2.5 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-teal-500/30 bg-white"
+                  />
+                  <input
+                    value={s.email}
+                    onChange={e => updateSignatario(idx, 'email', e.target.value)}
+                    placeholder="E-mail"
+                    className="rounded-lg border border-slate-200 px-2.5 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-teal-500/30 bg-white"
+                  />
+                  <input
+                    value={s.cpf}
+                    onChange={e => updateSignatario(idx, 'cpf', e.target.value)}
+                    placeholder="CPF"
+                    className="rounded-lg border border-slate-200 px-2.5 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-teal-500/30 bg-white"
+                  />
+                  <input
+                    value={s.papel}
+                    onChange={e => updateSignatario(idx, 'papel', e.target.value)}
+                    placeholder="Papel (ex: Contratante)"
+                    className="rounded-lg border border-slate-200 px-2.5 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-teal-500/30 bg-white"
+                  />
+                </div>
+              </div>
+            ))}
           </div>
         </div>
 
-        <div className="flex gap-3">
+        {/* Actions */}
+        <div className="flex gap-3 pt-2">
           <button
             onClick={onClose}
             className="flex-1 py-2.5 rounded-xl border border-slate-200 text-sm font-semibold
               text-slate-600 hover:bg-slate-50 transition-all"
           >
-            Voltar
+            Cancelar
           </button>
           <button
-            onClick={onConfirm}
-            disabled={isPending}
+            onClick={handleSubmit}
+            disabled={enviar.isPending}
             className="flex-1 py-2.5 rounded-xl bg-gradient-to-r from-teal-500 to-teal-600
               text-white text-sm font-semibold shadow-sm
               hover:from-teal-600 hover:to-teal-700 transition-all disabled:opacity-50
               flex items-center justify-center gap-2"
           >
-            {isPending
+            {enviar.isPending
               ? <div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
               : <Send size={14} />}
-            Confirmar Envio
+            Enviar para Certisign
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ── Confirmar Assinatura Modal (manual / externo) ───────────────────────────────
+
+function ConfirmarAssinaturaModal({ open, onClose, solicitacaoId, onSuccess }: {
+  open: boolean
+  onClose: () => void
+  solicitacaoId: string
+  onSuccess: () => void | Promise<void>
+}) {
+  const [arquivo, setArquivo] = useState<File | null>(null)
+  const [observacao, setObservacao] = useState('')
+  const [erro, setErro] = useState<string | null>(null)
+  const confirmar = useConfirmarAssinatura()
+
+  if (!open) return null
+
+  const handleSubmit = async () => {
+    setErro(null)
+    try {
+      await confirmar.mutateAsync({
+        solicitacao_id: solicitacaoId,
+        arquivo: arquivo ?? undefined,
+        observacao: observacao || undefined,
+      })
+      await onSuccess()
+      onClose()
+    } catch (e: unknown) {
+      setErro(e instanceof Error ? e.message : 'Erro desconhecido.')
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div className="fixed inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-lg p-6 space-y-5 animate-in fade-in zoom-in-95 duration-200">
+        {/* Header */}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500 to-emerald-600 flex items-center justify-center shadow-sm">
+              <FileCheck2 size={18} className="text-white" />
+            </div>
+            <div>
+              <h3 className="text-base font-extrabold text-slate-800">Confirmar Assinatura</h3>
+              <p className="text-xs text-slate-400">Assinatura realizada fora do sistema ou via Certisign</p>
+            </div>
+          </div>
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-600 transition-colors">
+            <X size={18} />
+          </button>
+        </div>
+
+        {erro && (
+          <div className="bg-red-50 rounded-xl border border-red-200 px-4 py-3 flex items-start gap-2">
+            <AlertTriangle size={14} className="text-red-500 mt-0.5 shrink-0" />
+            <p className="text-xs text-red-700 font-medium">{erro}</p>
+          </div>
+        )}
+
+        {/* Upload cópia assinada */}
+        <div>
+          <label className="text-xs font-bold text-slate-600 mb-1.5 block">
+            Cópia Assinada (PDF)
+          </label>
+          <div className="relative">
+            <input
+              type="file"
+              accept=".pdf,.doc,.docx,.png,.jpg,.jpeg"
+              onChange={e => setArquivo(e.target.files?.[0] ?? null)}
+              className="w-full text-sm file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0
+                file:text-xs file:font-bold file:bg-emerald-50 file:text-emerald-700
+                hover:file:bg-emerald-100 file:cursor-pointer file:transition-colors
+                border border-slate-200 rounded-xl px-3 py-2"
+            />
+          </div>
+          {arquivo && (
+            <p className="text-[10px] text-emerald-600 font-medium mt-1.5 flex items-center gap-1">
+              <FileCheck2 size={10} /> {arquivo.name} ({(arquivo.size / 1024).toFixed(0)} KB)
+            </p>
+          )}
+          <p className="text-[10px] text-slate-400 mt-1">
+            Opcional — anexe a cópia assinada do contrato (PDF, DOC ou imagem)
+          </p>
+        </div>
+
+        {/* Observação */}
+        <div>
+          <label className="text-xs font-bold text-slate-600 mb-1.5 block">Observação</label>
+          <textarea
+            value={observacao}
+            onChange={e => setObservacao(e.target.value)}
+            placeholder="Ex: Assinado presencialmente em reunião, assinado via DocuSign, etc."
+            rows={2}
+            className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm
+              focus:outline-none focus:ring-2 focus:ring-emerald-500/30 resize-none"
+          />
+        </div>
+
+        {/* Actions */}
+        <div className="flex gap-3 pt-2">
+          <button
+            onClick={onClose}
+            className="flex-1 py-2.5 rounded-xl border border-slate-200 text-sm font-semibold
+              text-slate-600 hover:bg-slate-50 transition-all"
+          >
+            Cancelar
+          </button>
+          <button
+            onClick={handleSubmit}
+            disabled={confirmar.isPending}
+            className="flex-1 py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-emerald-600
+              text-white text-sm font-semibold shadow-sm
+              hover:from-emerald-600 hover:to-emerald-700 transition-all disabled:opacity-50
+              flex items-center justify-center gap-2"
+          >
+            {confirmar.isPending
+              ? <div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+              : <CheckCircle2 size={14} />}
+            Confirmar Assinatura
           </button>
         </div>
       </div>
@@ -320,12 +562,136 @@ function CertisignModal({ open, onClose, onConfirm, isPending }: {
 
 // ── Etapa Actions ───────────────────────────────────────────────────────────────
 
-function EtapaActions({ etapa, solicitacaoId, onAvancar, onCancel, onEnviarAssinatura, isPending, nav }: {
+function PlanejamentoParcelasCard({
+  parcelas,
+  valorContrato,
+  destinoFinanceiro,
+  onChange,
+  onRegenerar,
+}: {
+  parcelas: ParcelaPlanejada[]
+  valorContrato: number
+  destinoFinanceiro: 'cp' | 'cr'
+  onChange: (parcelas: ParcelaPlanejada[]) => void
+  onRegenerar: () => void
+}) {
+  const diferenca = calcularDiferencaParcelas(parcelas, valorContrato)
+  const totalPlanejado = parcelas.reduce((acc, parcela) => acc + parcela.valor, 0)
+
+  const updateParcela = (index: number, patch: Partial<ParcelaPlanejada>) => {
+    onChange(parcelas.map((parcela, currentIndex) => (
+      currentIndex === index ? { ...parcela, ...patch } : parcela
+    )))
+  }
+
+  const addParcela = () => {
+    const ultima = parcelas[parcelas.length - 1]
+    onChange([
+      ...parcelas,
+      {
+        numero: parcelas.length + 1,
+        valor: 0,
+        data_vencimento: ultima?.data_vencimento ?? new Date().toISOString().slice(0, 10),
+      },
+    ])
+  }
+
+  const removeParcela = (index: number) => {
+    onChange(
+      parcelas
+        .filter((_, currentIndex) => currentIndex !== index)
+        .map((parcela, currentIndex) => ({ ...parcela, numero: currentIndex + 1 })),
+    )
+  }
+
+  return (
+    <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+      <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between gap-3">
+        <div>
+          <h2 className="text-sm font-extrabold text-slate-800">Planejamento de Parcelas</h2>
+          <p className="text-xs text-slate-400 mt-1">
+            As parcelas serao criadas como {destinoFinanceiro === 'cp' ? 'CP previstas' : 'CR previstas'} ao liberar a execucao.
+          </p>
+        </div>
+        <button
+          onClick={onRegenerar}
+          className="px-3 py-2 rounded-xl border border-slate-200 text-xs font-semibold text-slate-600 hover:bg-slate-50 transition-all"
+        >
+          Regenerar
+        </button>
+      </div>
+
+      <div className="px-5 py-4 space-y-4">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+            <p className="text-[10px] uppercase tracking-wider text-slate-400 font-semibold">Destino</p>
+            <p className="text-sm font-bold text-slate-700 mt-1">{destinoFinanceiro === 'cp' ? 'Financeiro > CP' : 'Financeiro > CR'}</p>
+          </div>
+          <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+            <p className="text-[10px] uppercase tracking-wider text-slate-400 font-semibold">Valor do Contrato</p>
+            <p className="text-sm font-bold text-slate-700 mt-1">{fmt(valorContrato || 0)}</p>
+          </div>
+          <div className={`rounded-xl border px-4 py-3 ${Math.abs(diferenca) <= 0.05 ? 'border-emerald-200 bg-emerald-50' : 'border-amber-200 bg-amber-50'}`}>
+            <p className="text-[10px] uppercase tracking-wider font-semibold text-slate-400">Planejado</p>
+            <p className={`text-sm font-bold mt-1 ${Math.abs(diferenca) <= 0.05 ? 'text-emerald-700' : 'text-amber-700'}`}>
+              {fmt(totalPlanejado)}
+            </p>
+            <p className="text-[11px] mt-1 text-slate-500">
+              {Math.abs(diferenca) <= 0.05 ? 'Total conciliado com o contrato' : `Diferenca de ${fmt(Math.abs(diferenca))}`}
+            </p>
+          </div>
+        </div>
+
+        <div className="space-y-2">
+          {parcelas.map((parcela, index) => (
+            <div key={`${parcela.numero}-${index}`} className="grid grid-cols-[72px_1fr_1fr_44px] gap-2 items-center">
+              <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-center">
+                <p className="text-[10px] uppercase tracking-wider text-slate-400 font-semibold">Parcela</p>
+                <p className="text-sm font-bold text-slate-700">{parcela.numero}</p>
+              </div>
+              <input
+                type="date"
+                value={parcela.data_vencimento}
+                onChange={(event) => updateParcela(index, { data_vencimento: event.target.value })}
+                className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-400"
+              />
+              <input
+                type="number"
+                min="0"
+                step="0.01"
+                value={Number.isFinite(parcela.valor) ? parcela.valor : 0}
+                onChange={(event) => updateParcela(index, { valor: Number(event.target.value) })}
+                className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-400"
+              />
+              <button
+                onClick={() => removeParcela(index)}
+                disabled={parcelas.length === 1}
+                className="w-11 h-11 rounded-xl border border-slate-200 text-slate-400 hover:text-red-500 hover:border-red-200 hover:bg-red-50 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                <Trash2 size={14} className="mx-auto" />
+              </button>
+            </div>
+          ))}
+        </div>
+
+        <button
+          onClick={addParcela}
+          className="w-full py-2.5 rounded-xl border border-dashed border-slate-300 text-xs font-semibold text-slate-600 hover:border-indigo-300 hover:bg-indigo-50 transition-all flex items-center justify-center gap-2"
+        >
+          <Plus size={12} /> Adicionar Parcela
+        </button>
+      </div>
+    </div>
+  )
+}
+
+function EtapaActions({ etapa, solicitacaoId, onAvancar, onCancel, onEnviarAssinatura, onConfirmarAssinatura, isPending, nav }: {
   etapa: EtapaSolicitacao
   solicitacaoId: string
   onAvancar: (etapaPara: EtapaSolicitacao, obs?: string) => void
   onCancel: () => void
   onEnviarAssinatura: () => void
+  onConfirmarAssinatura: () => void
   isPending: boolean
   nav: ReturnType<typeof useNavigate>
 }) {
@@ -422,7 +788,14 @@ function EtapaActions({ etapa, solicitacaoId, onAvancar, onCancel, onEnviarAssin
             className={`${btnPrimary} bg-gradient-to-r from-teal-500 to-teal-600 text-white
               hover:from-teal-600 hover:to-teal-700 shadow-sm`}
           >
-            <PenTool size={13} /> Enviar para Assinatura
+            <PenTool size={13} /> Enviar via Certisign
+          </button>
+          <button
+            onClick={onConfirmarAssinatura}
+            className={`${btnPrimary} bg-gradient-to-r from-emerald-500 to-emerald-600 text-white
+              hover:from-emerald-600 hover:to-emerald-700 shadow-sm`}
+          >
+            <FileCheck2 size={13} /> Assinatura Confirmada
           </button>
           <button
             onClick={() => onAvancar('arquivar')}
@@ -478,12 +851,18 @@ export default function SolicitacaoDetalhe() {
   const nav = useNavigate()
 
   const { data: solicitacao, isLoading } = useSolicitacao(id)
+  const { data: resumoExecutivo } = useResumoExecutivo(id)
   const { data: historico = [] } = useSolicitacaoHistorico(id)
   const avancarEtapa = useAvancarEtapa()
   const cancelarSolicitacao = useCancelarSolicitacao()
+  const { data: minutas } = useMinutas(id)
 
   const [showCancelModal, setShowCancelModal] = useState(false)
   const [showCertisignModal, setShowCertisignModal] = useState(false)
+  const [showConfirmarAssinaturaModal, setShowConfirmarAssinaturaModal] = useState(false)
+  const [parcelasPlanejadas, setParcelasPlanejadas] = useState<ParcelaPlanejada[]>([])
+  const [parcelasTouched, setParcelasTouched] = useState(false)
+  const [execucaoErro, setExecucaoErro] = useState('')
 
   // ── Loading ────────────────────────────────────────────────────────────
   if (isLoading) {
@@ -515,13 +894,44 @@ export default function SolicitacaoDetalhe() {
 
   const s = solicitacao as Solicitacao
   const etapa = s.etapa_atual
+  const valorContrato = Number(resumoExecutivo?.valor_total ?? s.valor_estimado ?? 0)
+  const destinoFinanceiro = s.tipo_contrato === 'receita' ? 'cr' : 'cp'
 
-  const handleAvancar = async (etapaPara: EtapaSolicitacao, observacao?: string) => {
+  useEffect(() => {
+    if (etapa !== 'liberar_execucao' || parcelasTouched) return
+
+    setParcelasPlanejadas(sugerirParcelasContrato({
+      solicitacao: {
+        forma_pagamento: s.forma_pagamento,
+        valor_estimado: valorContrato,
+        data_inicio_prevista: s.data_inicio_prevista,
+        data_fim_prevista: s.data_fim_prevista,
+        prazo_meses: s.prazo_meses,
+      },
+      resumo: resumoExecutivo ?? null,
+    }))
+  }, [
+    etapa,
+    parcelasTouched,
+    resumoExecutivo,
+    s.data_fim_prevista,
+    s.data_inicio_prevista,
+    s.forma_pagamento,
+    s.prazo_meses,
+    valorContrato,
+  ])
+
+  const handleAvancar = async (
+    etapaPara: EtapaSolicitacao,
+    observacao?: string,
+    dadosEtapa?: Record<string, unknown>,
+  ) => {
     await avancarEtapa.mutateAsync({
       solicitacaoId: s.id,
       etapaDe: etapa,
       etapaPara,
       observacao,
+      dadosEtapa,
     })
   }
 
@@ -540,6 +950,52 @@ export default function SolicitacaoDetalhe() {
   const historicoSorted = [...historico].sort(
     (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
   )
+
+  const handleRegenerarParcelas = () => {
+    setParcelasTouched(false)
+    setExecucaoErro('')
+    setParcelasPlanejadas(sugerirParcelasContrato({
+      solicitacao: {
+        forma_pagamento: s.forma_pagamento,
+        valor_estimado: valorContrato,
+        data_inicio_prevista: s.data_inicio_prevista,
+        data_fim_prevista: s.data_fim_prevista,
+        prazo_meses: s.prazo_meses,
+      },
+      resumo: resumoExecutivo ?? null,
+    }))
+  }
+
+  const handleChangeParcelas = (next: ParcelaPlanejada[]) => {
+    setParcelasTouched(true)
+    setExecucaoErro('')
+    setParcelasPlanejadas(normalizarParcelasPlanejadas(next))
+  }
+
+  const handleLiberarExecucao = async () => {
+    const parcelasNormalizadas = normalizarParcelasPlanejadas(parcelasPlanejadas, valorContrato)
+    const diferenca = calcularDiferencaParcelas(parcelasNormalizadas, valorContrato)
+
+    if (!parcelasNormalizadas.length) {
+      setExecucaoErro('Adicione pelo menos uma parcela antes de liberar a execucao.')
+      return
+    }
+
+    if (Math.abs(diferenca) > 0.05) {
+      setExecucaoErro('O total das parcelas precisa fechar com o valor do contrato antes de liberar a execucao.')
+      return
+    }
+
+    await handleAvancar(
+      'concluido',
+      `Contrato liberado para execucao com ${parcelasNormalizadas.length} parcelas previstas no financeiro`,
+      {
+        parcelas_planejadas: parcelasNormalizadas,
+        financeiro_destino: destinoFinanceiro,
+        resumo_executivo_id: resumoExecutivo?.id ?? null,
+      },
+    )
+  }
 
   return (
     <div className="space-y-5">
@@ -685,6 +1141,16 @@ export default function SolicitacaoDetalhe() {
               <p className="text-sm text-amber-800 leading-relaxed whitespace-pre-wrap">{s.observacoes}</p>
             </div>
           )}
+
+          {etapa === 'liberar_execucao' && (
+            <PlanejamentoParcelasCard
+              parcelas={parcelasPlanejadas}
+              valorContrato={valorContrato}
+              destinoFinanceiro={destinoFinanceiro}
+              onChange={handleChangeParcelas}
+              onRegenerar={handleRegenerarParcelas}
+            />
+          )}
         </div>
 
         {/* ── RIGHT (1/3) ────────────────────────────────────────────── */}
@@ -711,15 +1177,42 @@ export default function SolicitacaoDetalhe() {
                 </h2>
               </div>
               <div className="px-5 py-4 space-y-2.5">
-                <EtapaActions
-                  etapa={etapa}
-                  solicitacaoId={s.id}
-                  onAvancar={handleAvancar}
-                  onCancel={() => setShowCancelModal(true)}
-                  onEnviarAssinatura={() => setShowCertisignModal(true)}
-                  isPending={avancarEtapa.isPending}
-                  nav={nav}
-                />
+                {etapa === 'liberar_execucao' ? (
+                  <>
+                    <button
+                      onClick={handleLiberarExecucao}
+                      disabled={avancarEtapa.isPending}
+                      className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-bold bg-emerald-600 text-white hover:bg-emerald-700 shadow-sm transition-all disabled:opacity-50"
+                    >
+                      {avancarEtapa.isPending
+                        ? <div className="w-3.5 h-3.5 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+                        : <Unlock size={13} />}
+                      Liberar Execucao
+                    </button>
+                    {execucaoErro && (
+                      <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2">
+                        <p className="text-[11px] font-medium text-amber-700">{execucaoErro}</p>
+                      </div>
+                    )}
+                    <button
+                      onClick={() => setShowCancelModal(true)}
+                      className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-semibold border border-red-200 text-red-600 hover:bg-red-50 transition-all"
+                    >
+                      <Ban size={12} /> Cancelar Solicitacao
+                    </button>
+                  </>
+                ) : (
+                  <EtapaActions
+                    etapa={etapa}
+                    solicitacaoId={s.id}
+                    onAvancar={handleAvancar}
+                    onCancel={() => setShowCancelModal(true)}
+                    onEnviarAssinatura={() => setShowCertisignModal(true)}
+                    onConfirmarAssinatura={() => setShowConfirmarAssinaturaModal(true)}
+                    isPending={avancarEtapa.isPending}
+                    nav={nav}
+                  />
+                )}
               </div>
             </div>
           )}
@@ -803,11 +1296,17 @@ export default function SolicitacaoDetalhe() {
       <CertisignModal
         open={showCertisignModal}
         onClose={() => setShowCertisignModal(false)}
-        onConfirm={() => {
-          handleAvancar('arquivar')
-          setShowCertisignModal(false)
-        }}
-        isPending={avancarEtapa.isPending}
+        solicitacao={solicitacao}
+        minutaUrl={minutas?.find(m => m.arquivo_url)?.arquivo_url ?? null}
+        onSuccess={() => handleAvancar('arquivar')}
+      />
+
+      {/* ── Confirmar Assinatura Modal ─────────────────────────────────── */}
+      <ConfirmarAssinaturaModal
+        open={showConfirmarAssinaturaModal}
+        onClose={() => setShowConfirmarAssinaturaModal(false)}
+        solicitacaoId={s.id}
+        onSuccess={() => handleAvancar('arquivar')}
       />
     </div>
   )

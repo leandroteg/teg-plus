@@ -2,7 +2,7 @@ import {
   LayoutDashboard, PlusCircle, List, ShoppingCart, Truck, User,
   Receipt, DollarSign, FileCheck2, Landmark, BarChart3, Users, Settings,
   Package2, ArrowLeftRight, ClipboardList,
-  CheckCircle2, Building2,
+  CheckCircle2,
   Car, Wrench, ClipboardCheck, Fuel, Radio,
   FileText, FilePlus, CalendarDays,
   ImagePlay,
@@ -50,7 +50,7 @@ export const FINANCEIRO_CONFIG: ModuleMeta = {
   navItems: [
     { to: '/financeiro',              icon: LayoutDashboard, label: 'Painel',          end: true  },
     { to: '/financeiro/cp',           icon: Receipt,         label: 'Contas a Pagar',  end: false },
-    { to: '/financeiro/cr',           icon: DollarSign,      label: 'A Receber',       end: false },
+    { to: '/financeiro/cr',           icon: DollarSign,      label: 'Contas a Receber', end: false },
     { to: '/financeiro/aprovacoes',   icon: FileCheck2,      label: 'Aprovações',      end: false },
     { to: '/financeiro/conciliacao',  icon: Landmark,        label: 'Conciliação',     end: false },
     { to: '/financeiro/relatorios',   icon: BarChart3,       label: 'Relatórios',      end: false },
@@ -68,7 +68,17 @@ export const ESTOQUE_CONFIG: ModuleMeta = {
     { to: '/estoque/itens',         icon: Package2,        label: 'Itens',           end: false },
     { to: '/estoque/movimentacoes', icon: ArrowLeftRight,  label: 'Movimentações',   end: false },
     { to: '/estoque/inventario',    icon: ClipboardList,   label: 'Inventário',      end: false },
-    { to: '/estoque/patrimonial',   icon: Landmark,        label: 'Patrimonial',     end: false },
+  ],
+}
+
+export const PATRIMONIAL_CONFIG: ModuleMeta = {
+  name: 'Patrimonial',
+  emoji: '🏛️',
+  color: 'amber',
+  navItems: [
+    { to: '/patrimonial',               icon: LayoutDashboard, label: 'Painel',          end: true  },
+    { to: '/patrimonial/movimentacoes', icon: ArrowLeftRight,  label: 'Movimentações',   end: false },
+    { to: '/patrimonial/patrimonio',    icon: Landmark,        label: 'Patrimônio',      end: false },
   ],
 }
 
@@ -82,7 +92,6 @@ export const LOGISTICA_CONFIG: ModuleMeta = {
     { to: '/logistica/expedicao',       icon: Package2,        label: 'Expedição',       end: false },
     { to: '/logistica/transportes',     icon: Truck,           label: 'Transportes',     end: false },
     { to: '/logistica/recebimentos',    icon: CheckCircle2,    label: 'Recebimentos',    end: false },
-    { to: '/logistica/transportadoras', icon: Building2,       label: 'Transportadoras', end: false },
   ],
 }
 

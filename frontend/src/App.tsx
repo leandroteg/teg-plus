@@ -47,14 +47,10 @@ import ModelosContrato from './pages/contratos/ModelosContrato'
 // Módulo Controladoria
 import ControladoriaLayout from './components/ControladoriaLayout'
 import ControladoriaHome from './pages/controladoria/ControladoriaHome'
-import Orcamentos from './pages/controladoria/Orcamentos'
-import DRE from './pages/controladoria/DRE'
-import KPIs from './pages/controladoria/KPIs'
-import Cenarios from './pages/controladoria/Cenarios'
-import PlanoOrcamentario from './pages/controladoria/PlanoOrcamentario'
-import ControleOrcamentario from './pages/controladoria/ControleOrcamentario'
-import PainelIndicadores from './pages/controladoria/PainelIndicadores'
-import AlertasDesvio from './pages/controladoria/AlertasDesvio'
+import ControleOrcamentarioHub from './pages/controladoria/ControleOrcamentarioHub'
+import ControleCustosHub from './pages/controladoria/ControleCustosHub'
+import ControleProjetosHub from './pages/controladoria/ControleProjetosHub'
+import CenariosHub from './pages/controladoria/CenariosHub'
 
 // Módulo Apontamentos de Cartão (Backoffice)
 import ApontamentosCartao from './pages/apontamentos/ApontamentosCartao'
@@ -112,6 +108,7 @@ import MuralAdmin from './pages/rh/MuralAdmin'
 import FinanceiroLayout from './components/FinanceiroLayout'
 import DashboardFinanceiro from './pages/financeiro/DashboardFinanceiro'
 import ContasPagar from './pages/financeiro/ContasPagar'
+import CPPipeline from './pages/financeiro/CPPipeline'
 import ContasReceber from './pages/financeiro/ContasReceber'
 import AprovacoesPagamento from './pages/financeiro/AprovacoesPagamento'
 import Conciliacao from './pages/financeiro/Conciliacao'
@@ -120,13 +117,18 @@ import LotesPagamento from './pages/financeiro/LotesPagamento'
 import LoteDetalhe from './pages/financeiro/LoteDetalhe'
 import PainelPagamentos from './pages/financeiro/PainelPagamentos'
 import Relatorios from './pages/financeiro/Relatorios'
+import Tesouraria from './pages/financeiro/Tesouraria'
 import Configuracoes from './pages/financeiro/Configuracoes'
 
 // Módulo Fiscal
 import FiscalLayout from './components/FiscalLayout'
+import PainelFiscal from './pages/fiscal/PainelFiscal'
 import NotasFiscais from './pages/financeiro/NotasFiscais'
-import SolicitacaoNF from './pages/fiscal/SolicitacaoNF'
-import EmissaoNF from './pages/fiscal/EmissaoNF'
+import FiscalPipeline from './pages/fiscal/FiscalPipeline'
+import PatrimonialLayout from './components/PatrimonialLayout'
+import PatrimonialHome from './pages/patrimonial/PatrimonialHome'
+import PatrimonialMovimentacoes from './pages/patrimonial/Movimentacoes'
+import Patrimonio from './pages/patrimonial/Patrimonio'
 
 // SuperTEG AI Chat
 import SuperTEGChat from './components/SuperTEGChat'
@@ -137,17 +139,14 @@ import EstoqueHome from './pages/estoque/EstoqueHome'
 import Itens from './pages/estoque/Itens'
 import Movimentacoes from './pages/estoque/Movimentacoes'
 import Inventario from './pages/estoque/Inventario'
-import Patrimonial from './pages/estoque/Patrimonial'
 import SolicitacoesEstoque from './pages/estoque/Solicitacoes'
 
 // Módulo Logística
 import LogisticaLayout from './components/LogisticaLayout'
 import LogisticaHome from './pages/logistica/LogisticaHome'
-import Solicitacoes from './pages/logistica/Solicitacoes'
-import Expedicao from './pages/logistica/Expedicao'
-import TransportesLog from './pages/logistica/Transportes'
-import Recebimentos from './pages/logistica/Recebimentos'
-import TransportadorasLog from './pages/logistica/Transportadoras'
+import SolicitacoesPipeline from './pages/logistica/SolicitacoesPipeline'
+import ExpedicaoPipeline from './pages/logistica/ExpedicaoPipeline'
+import TransportesPipeline from './pages/logistica/TransportesPipeline'
 
 // Módulo Frotas
 import FrotasLayout from './components/FrotasLayout'
@@ -189,14 +188,16 @@ export default function App() {
           <Route element={<ModuleRoute moduleKey="financeiro" />}>
             <Route element={<FinanceiroLayout />}>
               <Route path="/financeiro"              element={<DashboardFinanceiro />} />
-              <Route path="/financeiro/cp"           element={<ContasPagar />} />
+              <Route path="/financeiro/contas-a-pagar" element={<CPPipeline />} />
+              <Route path="/financeiro/cp"           element={<Navigate to="/financeiro/contas-a-pagar" replace />} />
               <Route path="/financeiro/cr"           element={<ContasReceber />} />
-              <Route path="/financeiro/aprovacoes"   element={<AprovacoesPagamento />} />
+              <Route path="/financeiro/aprovacoes"   element={<Navigate to="/financeiro/contas-a-pagar" replace />} />
               <Route path="/financeiro/lotes"              element={<LotesPagamento />} />
               <Route path="/financeiro/lotes/:loteId"      element={<LoteDetalhe />} />
               <Route path="/financeiro/painel-pagamentos"  element={<PainelPagamentos />} />
-              <Route path="/financeiro/conciliacao"         element={<Conciliacao />} />
+              <Route path="/financeiro/conciliacao"         element={<Navigate to="/financeiro/contas-a-pagar" replace />} />
               <Route path="/financeiro/conciliacao-cartoes" element={<ConciliacaoCartoes />} />
+              <Route path="/financeiro/tesouraria"          element={<Tesouraria />} />
               <Route path="/financeiro/relatorios"   element={<Relatorios />} />
               <Route path="/financeiro/configuracoes" element={<Navigate to="/admin/integracoes" replace />} />
             </Route>
@@ -212,9 +213,9 @@ export default function App() {
           {/* Módulo Fiscal */}
           <Route element={<ModuleRoute moduleKey="fiscal" />}>
             <Route element={<FiscalLayout />}>
-              <Route path="/fiscal"              element={<NotasFiscais />} />
-              <Route path="/fiscal/solicitacao"  element={<SolicitacaoNF />} />
-              <Route path="/fiscal/emissao"      element={<EmissaoNF />} />
+              <Route path="/fiscal"              element={<PainelFiscal />} />
+              <Route path="/fiscal/pipeline"     element={<FiscalPipeline />} />
+              <Route path="/fiscal/historico"    element={<NotasFiscais />} />
             </Route>
           </Route>
 
@@ -225,8 +226,17 @@ export default function App() {
               <Route path="/estoque/itens"         element={<Itens />} />
               <Route path="/estoque/movimentacoes" element={<Movimentacoes />} />
               <Route path="/estoque/inventario"    element={<Inventario />} />
-              <Route path="/estoque/patrimonial"   element={<Patrimonial />} />
+              <Route path="/estoque/patrimonial"   element={<Navigate to="/patrimonial/patrimonio" replace />} />
               <Route path="/estoque/solicitacoes" element={<SolicitacoesEstoque />} />
+            </Route>
+          </Route>
+
+          {/* Módulo Patrimonial */}
+          <Route element={<ModuleRoute moduleKey="patrimonial" />}>
+            <Route element={<PatrimonialLayout />}>
+              <Route path="/patrimonial" element={<PatrimonialHome />} />
+              <Route path="/patrimonial/movimentacoes" element={<PatrimonialMovimentacoes />} />
+              <Route path="/patrimonial/patrimonio" element={<Patrimonio />} />
             </Route>
           </Route>
 
@@ -234,11 +244,9 @@ export default function App() {
           <Route element={<ModuleRoute moduleKey="logistica" />}>
             <Route element={<LogisticaLayout />}>
               <Route path="/logistica"                   element={<LogisticaHome />} />
-              <Route path="/logistica/solicitacoes"      element={<Solicitacoes />} />
-              <Route path="/logistica/expedicao"         element={<Expedicao />} />
-              <Route path="/logistica/transportes"       element={<TransportesLog />} />
-              <Route path="/logistica/recebimentos"      element={<Recebimentos />} />
-              <Route path="/logistica/transportadoras"   element={<TransportadorasLog />} />
+              <Route path="/logistica/solicitacoes"      element={<SolicitacoesPipeline />} />
+              <Route path="/logistica/expedicao"         element={<ExpedicaoPipeline />} />
+              <Route path="/logistica/transportes"       element={<TransportesPipeline />} />
             </Route>
           </Route>
 
@@ -286,15 +294,17 @@ export default function App() {
           {/* Módulo Controladoria */}
           <Route element={<ModuleRoute moduleKey="controladoria" />}>
             <Route element={<ControladoriaLayout />}>
-              <Route path="/controladoria"              element={<ControladoriaHome />} />
-              <Route path="/controladoria/orcamentos"   element={<Orcamentos />} />
-              <Route path="/controladoria/dre"          element={<DRE />} />
-              <Route path="/controladoria/kpis"         element={<KPIs />} />
-              <Route path="/controladoria/cenarios"     element={<Cenarios />} />
-              <Route path="/controladoria/plano-orcamentario" element={<PlanoOrcamentario />} />
-              <Route path="/controladoria/controle-orcamentario" element={<ControleOrcamentario />} />
-              <Route path="/controladoria/indicadores" element={<PainelIndicadores />} />
-              <Route path="/controladoria/alertas"     element={<AlertasDesvio />} />
+              <Route path="/controladoria" element={<ControladoriaHome />} />
+              <Route path="/controladoria/controle-orcamentario" element={<ControleOrcamentarioHub />} />
+              <Route path="/controladoria/controle-custos" element={<ControleCustosHub />} />
+              <Route path="/controladoria/controle-projetos" element={<ControleProjetosHub />} />
+              <Route path="/controladoria/cenarios" element={<CenariosHub />} />
+              <Route path="/controladoria/orcamentos" element={<Navigate to="/controladoria/controle-orcamentario?etapa=budget-area" replace />} />
+              <Route path="/controladoria/plano-orcamentario" element={<Navigate to="/controladoria/controle-orcamentario?etapa=plano" replace />} />
+              <Route path="/controladoria/alertas" element={<Navigate to="/controladoria/controle-orcamentario?etapa=acoes" replace />} />
+              <Route path="/controladoria/kpis" element={<Navigate to="/controladoria/controle-custos?etapa=definicao-indicadores" replace />} />
+              <Route path="/controladoria/indicadores" element={<Navigate to="/controladoria/controle-custos?etapa=painel-indicadores" replace />} />
+              <Route path="/controladoria/dre" element={<Navigate to="/controladoria/controle-custos?etapa=evolucao-despesas" replace />} />
             </Route>
           </Route>
 

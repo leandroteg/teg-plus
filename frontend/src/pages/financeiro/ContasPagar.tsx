@@ -1,10 +1,10 @@
-import { useState, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   Receipt, Search, Calendar, AlertTriangle,
   CheckCircle2, Clock, FileText, RefreshCw, Zap, XCircle,
   ChevronDown, ChevronUp, Upload, Paperclip, ExternalLink, Banknote, X,
-  ShieldCheck, Building2, Tag, Briefcase, Hash,
+  ShieldCheck, Building2, Tag, Briefcase, Hash, Truck, Package, Layers, ChevronLeft, ChevronRight,
 } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
 import { useContasPagar, useMarcarCPPago, useAprovarPagamento, useFornecedorById } from '../../hooks/useFinanceiro'
@@ -291,26 +291,190 @@ const fmtData = (d: string) =>
   new Date(d + 'T00:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit' })
 
 const STATUS_CONFIG: Record<string, { label: string; dot: string; bg: string; text: string; icon: typeof Clock }> = {
-  previsto:              { label: 'Previsto',       dot: 'bg-slate-400',   bg: 'bg-slate-50',    text: 'text-slate-600',    icon: Calendar },
-  aprovado:              { label: 'Aprovado',       dot: 'bg-blue-400',    bg: 'bg-blue-50',     text: 'text-blue-700',     icon: CheckCircle2 },
-  aguardando_docs:       { label: 'Aguard. Docs',   dot: 'bg-amber-400',   bg: 'bg-amber-50',    text: 'text-amber-700',    icon: FileText },
-  aguardando_aprovacao:  { label: 'Em Aprovação',   dot: 'bg-orange-400',  bg: 'bg-orange-50',   text: 'text-orange-700',   icon: Clock },
-  aprovado_pgto:         { label: 'Pgto Aprovado',  dot: 'bg-indigo-400',  bg: 'bg-indigo-50',   text: 'text-indigo-700',   icon: CheckCircle2 },
-  em_remessa:            { label: 'Em Remessa',     dot: 'bg-cyan-400',    bg: 'bg-cyan-50',     text: 'text-cyan-700',     icon: Receipt },
-  pago:                  { label: 'Pago',           dot: 'bg-emerald-500', bg: 'bg-emerald-50',  text: 'text-emerald-700',  icon: CheckCircle2 },
-  conciliado:            { label: 'Conciliado',     dot: 'bg-green-500',   bg: 'bg-green-50',    text: 'text-green-700',    icon: CheckCircle2 },
-  cancelado:             { label: 'Cancelado',      dot: 'bg-gray-400',    bg: 'bg-gray-100',    text: 'text-gray-500',     icon: Clock },
+  previsto:       { label: 'Previsto',       dot: 'bg-slate-400',   bg: 'bg-slate-50',    text: 'text-slate-600',    icon: Calendar },
+  confirmado:     { label: 'Confirmado',     dot: 'bg-blue-500',    bg: 'bg-blue-50',     text: 'text-blue-700',     icon: CheckCircle2 },
+  em_lote:        { label: 'Em Lote',        dot: 'bg-violet-500',  bg: 'bg-violet-50',   text: 'text-violet-700',   icon: Receipt },
+  aprovado_pgto:  { label: 'Pgto Aprovado',  dot: 'bg-emerald-500', bg: 'bg-emerald-50',  text: 'text-emerald-700',  icon: CheckCircle2 },
+  em_pagamento:   { label: 'Em Pagamento',   dot: 'bg-amber-500',   bg: 'bg-amber-50',    text: 'text-amber-700',    icon: Clock },
+  pago:           { label: 'Pago',           dot: 'bg-teal-500',    bg: 'bg-teal-50',     text: 'text-teal-700',     icon: CheckCircle2 },
+  conciliado:     { label: 'Conciliado',     dot: 'bg-green-500',   bg: 'bg-green-50',    text: 'text-green-700',    icon: CheckCircle2 },
+  cancelado:      { label: 'Cancelado',      dot: 'bg-gray-400',    bg: 'bg-gray-100',    text: 'text-gray-500',     icon: Clock },
 }
 
 const FILTROS_STATUS: { label: string; value: string }[] = [
   { label: 'Todos',           value: '' },
-  { label: 'Em Aberto',       value: 'previsto' },
-  { label: 'Em Aprovação',    value: 'aguardando_aprovacao' },
-  { label: 'Aprov. Pgto',     value: 'aprovado_pgto' },
-  { label: 'Em Remessa',      value: 'em_remessa' },
+  { label: 'Previstos',       value: 'previsto' },
+  { label: 'Confirmados',     value: 'confirmado' },
+  { label: 'Em Lote',         value: 'em_lote' },
+  { label: 'Aprovados',       value: 'aprovado_pgto' },
   { label: 'Pagos',           value: 'pago' },
   { label: 'Conciliados',     value: 'conciliado' },
 ]
+
+const STATUS_FILTER_META: Record<string, { icon: typeof Receipt; badge: string; badgeDark: string; border: string; borderDark: string; bgActive: string; bgActiveDark: string; textActive: string; textActiveDark: string }> = {
+  '':             { icon: Layers,       badge: 'bg-slate-200 text-slate-600',       badgeDark: 'bg-white/[0.08] text-slate-300',       border: 'border-slate-300',   borderDark: 'border-white/[0.08]',   bgActive: 'bg-slate-100',   bgActiveDark: 'bg-white/[0.06]',   textActive: 'text-slate-700',   textActiveDark: 'text-slate-200' },
+  previsto:       { icon: Calendar,     badge: 'bg-slate-100 text-slate-700',       badgeDark: 'bg-slate-500/20 text-slate-300',       border: 'border-slate-300',   borderDark: 'border-slate-500/40',   bgActive: 'bg-slate-50',    bgActiveDark: 'bg-slate-500/10',   textActive: 'text-slate-700',   textActiveDark: 'text-slate-300' },
+  confirmado:     { icon: CheckCircle2, badge: 'bg-blue-100 text-blue-700',         badgeDark: 'bg-blue-500/20 text-blue-300',         border: 'border-blue-400',    borderDark: 'border-blue-500/40',    bgActive: 'bg-blue-50',     bgActiveDark: 'bg-blue-500/10',    textActive: 'text-blue-700',    textActiveDark: 'text-blue-300' },
+  em_lote:        { icon: Receipt,      badge: 'bg-violet-100 text-violet-700',     badgeDark: 'bg-violet-500/20 text-violet-300',     border: 'border-violet-400',  borderDark: 'border-violet-500/40',  bgActive: 'bg-violet-50',   bgActiveDark: 'bg-violet-500/10',  textActive: 'text-violet-700',  textActiveDark: 'text-violet-300' },
+  aprovado_pgto:  { icon: ShieldCheck,  badge: 'bg-emerald-100 text-emerald-700',   badgeDark: 'bg-emerald-500/20 text-emerald-300',   border: 'border-emerald-400', borderDark: 'border-emerald-500/40', bgActive: 'bg-emerald-50',  bgActiveDark: 'bg-emerald-500/10', textActive: 'text-emerald-700', textActiveDark: 'text-emerald-300' },
+  pago:           { icon: Banknote,     badge: 'bg-teal-100 text-teal-700',         badgeDark: 'bg-teal-500/20 text-teal-300',         border: 'border-teal-400',    borderDark: 'border-teal-500/40',    bgActive: 'bg-teal-50',     bgActiveDark: 'bg-teal-500/10',    textActive: 'text-teal-700',    textActiveDark: 'text-teal-300' },
+  conciliado:     { icon: CheckCircle2, badge: 'bg-green-100 text-green-700',       badgeDark: 'bg-green-500/20 text-green-300',       border: 'border-green-400',   borderDark: 'border-green-500/40',   bgActive: 'bg-green-50',    bgActiveDark: 'bg-green-500/10',   textActive: 'text-green-700',   textActiveDark: 'text-green-300' },
+}
+
+function StatusFilterRail({
+  isDark,
+  statusFilter,
+  setStatusFilter,
+  counts,
+}: {
+  isDark: boolean
+  statusFilter: string
+  setStatusFilter: (value: string) => void
+  counts: Record<string, number>
+}) {
+  const railRef = useRef<HTMLDivElement | null>(null)
+  const dragRef = useRef<{ active: boolean; startX: number; startScrollLeft: number; moved: boolean }>({
+    active: false,
+    startX: 0,
+    startScrollLeft: 0,
+    moved: false,
+  })
+  const [canScrollLeft, setCanScrollLeft] = useState(false)
+  const [canScrollRight, setCanScrollRight] = useState(false)
+
+  const updateScrollState = () => {
+    const el = railRef.current
+    if (!el) return
+    setCanScrollLeft(el.scrollLeft > 8)
+    setCanScrollRight(el.scrollLeft + el.clientWidth < el.scrollWidth - 8)
+  }
+
+  useEffect(() => {
+    updateScrollState()
+    const el = railRef.current
+    if (!el) return
+    el.addEventListener('scroll', updateScrollState, { passive: true })
+    const resizeObserver = new ResizeObserver(() => updateScrollState())
+    resizeObserver.observe(el)
+    return () => {
+      el.removeEventListener('scroll', updateScrollState)
+      resizeObserver.disconnect()
+    }
+  }, [])
+
+  const scrollByAmount = (direction: -1 | 1) => {
+    const el = railRef.current
+    if (!el) return
+    el.scrollBy({ left: direction * 240, behavior: 'smooth' })
+  }
+
+  return (
+    <div className="relative flex-1 min-w-0">
+      {canScrollLeft && (
+        <>
+          <div className={`pointer-events-none absolute inset-y-1 left-1 z-10 w-10 rounded-l-2xl bg-gradient-to-r ${isDark ? 'from-[#0f172a]' : 'from-slate-50'} to-transparent`} />
+          <button
+            type="button"
+            onClick={() => scrollByAmount(-1)}
+            className={`absolute left-2 top-1/2 z-20 -translate-y-1/2 h-8 w-8 rounded-full border backdrop-blur-sm transition-all ${
+              isDark
+                ? 'border-white/[0.10] bg-slate-900/85 text-slate-200 hover:bg-slate-800'
+                : 'border-slate-200 bg-white/95 text-slate-600 hover:bg-slate-50 shadow-sm'
+            }`}
+            aria-label="Rolar filtros para a esquerda"
+          >
+            <ChevronLeft size={14} className="mx-auto" />
+          </button>
+        </>
+      )}
+      {canScrollRight && (
+        <>
+          <div className={`pointer-events-none absolute inset-y-1 right-1 z-10 w-10 rounded-r-2xl bg-gradient-to-l ${isDark ? 'from-[#0f172a]' : 'from-slate-50'} to-transparent`} />
+          <button
+            type="button"
+            onClick={() => scrollByAmount(1)}
+            className={`absolute right-2 top-1/2 z-20 -translate-y-1/2 h-8 w-8 rounded-full border backdrop-blur-sm transition-all ${
+              isDark
+                ? 'border-white/[0.10] bg-slate-900/85 text-slate-200 hover:bg-slate-800'
+                : 'border-slate-200 bg-white/95 text-slate-600 hover:bg-slate-50 shadow-sm'
+            }`}
+            aria-label="Rolar filtros para a direita"
+          >
+            <ChevronRight size={14} className="mx-auto" />
+          </button>
+        </>
+      )}
+
+      <div
+        ref={railRef}
+        onMouseDown={e => {
+          dragRef.current = {
+            active: true,
+            startX: e.clientX,
+            startScrollLeft: railRef.current?.scrollLeft ?? 0,
+            moved: false,
+          }
+        }}
+        onMouseMove={e => {
+          if (!dragRef.current.active || !railRef.current) return
+          const delta = e.clientX - dragRef.current.startX
+          if (Math.abs(delta) > 4) dragRef.current.moved = true
+          railRef.current.scrollLeft = dragRef.current.startScrollLeft - delta
+        }}
+        onMouseUp={() => {
+          window.setTimeout(() => {
+            dragRef.current.active = false
+          }, 0)
+        }}
+        onMouseLeave={() => {
+          dragRef.current.active = false
+        }}
+        onClickCapture={e => {
+          if (dragRef.current.moved) {
+            e.preventDefault()
+            e.stopPropagation()
+            dragRef.current.moved = false
+          }
+        }}
+        onWheel={e => {
+          const el = railRef.current
+          if (!el) return
+          if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) {
+            e.preventDefault()
+            el.scrollLeft += e.deltaY
+          }
+        }}
+        className={`flex gap-1 p-1 rounded-2xl border overflow-x-auto hide-scrollbar pr-12 ${canScrollLeft ? 'pl-12' : ''} ${isDark ? 'bg-white/[0.02] border-white/[0.06]' : 'bg-slate-50 border-slate-200'} cursor-grab active:cursor-grabbing`}
+      >
+        {FILTROS_STATUS.map(f => (
+          <button key={f.value} onClick={() => setStatusFilter(f.value)}
+            className={`min-w-fit flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold whitespace-nowrap transition-all border ${
+              statusFilter === f.value
+                ? isDark
+                  ? `${STATUS_FILTER_META[f.value].bgActiveDark} ${STATUS_FILTER_META[f.value].textActiveDark} ${STATUS_FILTER_META[f.value].borderDark} shadow-sm`
+                  : `${STATUS_FILTER_META[f.value].bgActive} ${STATUS_FILTER_META[f.value].textActive} ${STATUS_FILTER_META[f.value].border} shadow-sm`
+                : isDark
+                  ? 'text-slate-400 border-transparent hover:bg-white/[0.04]'
+                  : 'text-slate-500 border-transparent hover:bg-white hover:shadow-sm'
+            }`}>
+            {(() => {
+              const Icon = STATUS_FILTER_META[f.value].icon
+              return <Icon size={15} className="shrink-0" />
+            })()}
+            {f.label}
+            <span className={`ml-1 min-w-[22px] px-1.5 py-0.5 rounded-full text-[10px] font-bold text-center ${
+              statusFilter === f.value
+                ? isDark ? STATUS_FILTER_META[f.value].badgeDark : STATUS_FILTER_META[f.value].badge
+                : isDark ? 'bg-white/[0.06] text-slate-500' : 'bg-slate-100 text-slate-500'
+            }`}>
+              {counts[f.value]}
+            </span>
+          </button>
+        ))}
+      </div>
+    </div>
+  )
+}
 
 // ── Issue #36: Dados bancarios/PIX do fornecedor ──────────────────────────────
 
@@ -389,7 +553,7 @@ function CPCard({ cp, onRegistrarPgto, onAprovarPgto, isDark }: {
   const vencido = !['pago', 'conciliado', 'cancelado'].includes(cp.status) &&
     new Date(cp.data_vencimento + 'T00:00:00') < new Date()
   const isPago = ['pago', 'conciliado'].includes(cp.status)
-  const canApprove = cp.status === 'aguardando_aprovacao'
+  const canApprove = cp.status === 'confirmado'
   const canPay = cp.status === 'aprovado_pgto'
   const cfg = STATUS_CONFIG[cp.status]
 
@@ -435,6 +599,17 @@ function CPCard({ cp, onRegistrarPgto, onAprovarPgto, isDark }: {
                 <span className={`w-1.5 h-1.5 rounded-full ${cfg?.dot}`} />
                 {cfg?.label ?? cp.status}
               </span>
+              {/* Origem badge */}
+              {cp.origem === 'logistica' && (
+                <span className="inline-flex items-center gap-0.5 bg-purple-50 text-purple-600 font-semibold rounded-full px-2 py-0.5">
+                  <Truck size={9} /> Logística
+                </span>
+              )}
+              {cp.origem === 'compras' && pedidoNum && (
+                <span className="inline-flex items-center gap-0.5 bg-sky-50 text-sky-600 font-semibold rounded-full px-2 py-0.5">
+                  <Package size={9} /> Compras
+                </span>
+              )}
               {pedidoNum && cp.pedido_id && (
                 <button
                   onClick={(e) => { e.stopPropagation(); nav(`/pedidos?pedido=${cp.pedido_id}`) }}
@@ -456,6 +631,18 @@ function CPCard({ cp, onRegistrarPgto, onAprovarPgto, isDark }: {
             {/* Descrição */}
             {cp.descricao && (
               <p className="text-[11px] text-slate-500 mt-1.5 line-clamp-1">{cp.descricao}</p>
+            )}
+
+            {/* Observações / Alerta de divergência */}
+            {cp.observacoes && (
+              <div className={`flex items-start gap-1.5 mt-1.5 px-2 py-1 rounded-lg text-[10px] ${
+                cp.observacoes.includes('Divergência')
+                  ? 'bg-amber-50 border border-amber-200 text-amber-700'
+                  : isDark ? 'bg-white/[0.04] text-slate-400' : 'bg-slate-50 text-slate-500'
+              }`}>
+                {cp.observacoes.includes('Divergência') && <AlertTriangle size={11} className="text-amber-500 shrink-0 mt-0.5" />}
+                <span className="font-medium">{cp.observacoes}</span>
+              </div>
             )}
 
             {/* Detalhes: obra, categoria, classe, CC */}
@@ -541,11 +728,25 @@ function CPCard({ cp, onRegistrarPgto, onAprovarPgto, isDark }: {
       {/* Expanded: Details + Attachments */}
       {expanded && (
         <div className={`border-t px-4 pb-4 pt-3 space-y-3 ${isDark ? 'border-white/[0.06]' : 'border-slate-100'}`}>
-          {/* Detalhes do pedido/requisição */}
-          {(pedidoNum || reqNum || obraNome || centroCusto || classeFinanceira) && (
+          {/* Detalhes do pedido/requisição ou logística */}
+          {(pedidoNum || reqNum || obraNome || centroCusto || classeFinanceira || cp.origem === 'logistica') && (
             <div className={`rounded-xl p-3 space-y-1.5 ${isDark ? 'bg-white/[0.04]' : 'bg-slate-50'}`}>
-              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Detalhes</p>
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
+                {cp.origem === 'logistica' ? <><Truck size={10} className="text-purple-500" /> Origem: Logística</> : 'Detalhes'}
+              </p>
               <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-[11px]">
+                {cp.origem === 'logistica' && cp.descricao && (
+                  <div className="col-span-2">
+                    <span className="text-slate-400">Descrição:</span>{' '}
+                    <span className="font-semibold text-slate-700">{cp.descricao}</span>
+                  </div>
+                )}
+                {cp.natureza && cp.origem === 'logistica' && (
+                  <div>
+                    <span className="text-slate-400">Natureza:</span>{' '}
+                    <span className="font-semibold text-purple-600">{cp.natureza}</span>
+                  </div>
+                )}
                 {pedidoNum && cp.pedido_id && (
                   <div>
                     <span className="text-slate-400">Pedido:</span>{' '}
@@ -578,7 +779,29 @@ function CPCard({ cp, onRegistrarPgto, onAprovarPgto, isDark }: {
                 {cp.numero_documento && (
                   <div><span className="text-slate-400">Doc:</span> <span className="font-mono text-slate-600">{cp.numero_documento}</span></div>
                 )}
+                {cp.data_emissao && (
+                  <div><span className="text-slate-400">Emissão:</span> <span className="font-medium text-slate-600">{fmtData(cp.data_emissao)}</span></div>
+                )}
               </div>
+            </div>
+          )}
+
+          {/* Observações expandidas */}
+          {cp.observacoes && (
+            <div className={`rounded-xl p-3 space-y-1 ${
+              cp.observacoes.includes('Divergência')
+                ? 'bg-amber-50 border border-amber-200'
+                : isDark ? 'bg-white/[0.04]' : 'bg-slate-50'
+            }`}>
+              <p className={`text-[10px] font-bold uppercase tracking-wider flex items-center gap-1.5 ${
+                cp.observacoes.includes('Divergência') ? 'text-amber-600' : 'text-slate-400'
+              }`}>
+                {cp.observacoes.includes('Divergência') && <AlertTriangle size={10} />}
+                Observações
+              </p>
+              <p className={`text-[11px] font-medium ${
+                cp.observacoes.includes('Divergência') ? 'text-amber-700' : isDark ? 'text-slate-300' : 'text-slate-600'
+              }`}>{cp.observacoes}</p>
             </div>
           )}
 
@@ -652,11 +875,26 @@ export default function ContasPagar() {
     })
   }
 
-  const filtered = contas.filter(cp =>
-    !busca || cp.fornecedor_nome.toLowerCase().includes(busca.toLowerCase())
-      || cp.descricao?.toLowerCase().includes(busca.toLowerCase())
-      || cp.numero_documento?.toLowerCase().includes(busca.toLowerCase())
-  )
+  const searched = contas.filter(cp => {
+    if (!busca) return true
+    const b = busca.toLowerCase()
+    return cp.fornecedor_nome.toLowerCase().includes(b)
+      || cp.descricao?.toLowerCase().includes(b)
+      || cp.numero_documento?.toLowerCase().includes(b)
+      || cp.observacoes?.toLowerCase().includes(b)
+      || cp.origem?.toLowerCase().includes(b)
+  })
+
+  const counts = FILTROS_STATUS.reduce<Record<string, number>>((acc, filtro) => {
+    acc[filtro.value] = filtro.value
+      ? searched.filter(cp => cp.status === filtro.value).length
+      : searched.length
+    return acc
+  }, {})
+
+  const filtered = statusFilter
+    ? searched.filter(cp => cp.status === statusFilter)
+    : searched
 
   const totalAberto = filtered
     .filter(cp => !['pago', 'conciliado', 'cancelado'].includes(cp.status))
@@ -719,7 +957,7 @@ export default function ContasPagar() {
 
       {/* ── Filtros ─────────────────────────────────────────── */}
       <div className="flex flex-col sm:flex-row gap-3">
-        <div className="relative flex-1">
+        <div className="relative flex-1 min-w-[220px]">
           <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
           <input type="text" value={busca} onChange={e => setBusca(e.target.value)}
             placeholder="Buscar fornecedor, documento..."
@@ -727,18 +965,12 @@ export default function ContasPagar() {
               focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-400
               ${isDark ? 'bg-[#1e293b] border-white/[0.06] text-slate-200' : 'border-slate-200 bg-white text-slate-700'}`} />
         </div>
-        <div className="flex gap-1.5 overflow-x-auto hide-scrollbar">
-          {FILTROS_STATUS.map(f => (
-            <button key={f.value} onClick={() => setStatusFilter(f.value)}
-              className={`px-3 py-2 rounded-xl text-[11px] font-semibold whitespace-nowrap transition-all
-                ${statusFilter === f.value
-                  ? 'bg-emerald-600 text-white shadow-sm'
-                  : isDark ? 'bg-[#1e293b] text-slate-400 border border-white/[0.06]' : 'bg-white text-slate-500 border border-slate-200'
-                }`}>
-              {f.label}
-            </button>
-          ))}
-        </div>
+        <StatusFilterRail
+          isDark={isDark}
+          statusFilter={statusFilter}
+          setStatusFilter={setStatusFilter}
+          counts={counts}
+        />
       </div>
 
       {/* ── Lista ───────────────────────────────────────────── */}

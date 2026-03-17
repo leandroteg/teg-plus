@@ -44,6 +44,7 @@ export interface Contrato {
   // Partes
   cliente_id: string
   fornecedor_id?: string
+  solicitacao_id?: string
   obra_id?: string
   // Escopo
   objeto: string
@@ -92,6 +93,10 @@ export interface Contrato {
     codigo: string
     nome: string
   }
+  solicitacao?: {
+    id: string
+    contraparte_nome?: string
+  }
   itens?: ContratoItem[]
 }
 
@@ -122,6 +127,12 @@ export interface Parcela {
   updated_at: string
   // Joins
   contrato?: Pick<Contrato, 'numero' | 'objeto' | 'tipo_contrato' | 'status'>
+}
+
+export interface ParcelaPlanejada {
+  numero: number
+  valor: number
+  data_vencimento: string
 }
 
 export interface ParcelaAnexo {
@@ -508,4 +519,55 @@ export interface NovaSolicitacaoPayload {
   urgencia?: UrgenciaSolicitacao
   data_necessidade?: string
   observacoes?: string
+}
+
+// ── Certisign Assinaturas ───────────────────────────────────────────
+
+export type StatusAssinaturaType = 'pendente' | 'enviado' | 'parcialmente_assinado' | 'assinado' | 'recusado' | 'expirado' | 'cancelado'
+export type ProvedorAssinatura = 'certisign' | 'manual'
+export type TipoAssinatura = 'eletronica' | 'digital_icp'
+
+export interface Signatario {
+  nome: string
+  email: string
+  cpf: string
+  papel: string
+  ordem: number
+  status: 'pendente' | 'assinado' | 'recusado'
+  assinado_em: string | null
+  link_assinatura: string | null
+}
+
+export interface Assinatura {
+  id: string
+  contrato_id: string | null
+  solicitacao_id: string | null
+  minuta_id: string | null
+  provedor: ProvedorAssinatura
+  tipo_assinatura: TipoAssinatura
+  documento_externo_id: string | null
+  envelope_id: string | null
+  status: StatusAssinaturaType
+  signatarios: Signatario[]
+  enviado_em: string | null
+  concluido_em: string | null
+  expira_em: string | null
+  documento_assinado_url: string | null
+  certificado_url: string | null
+  webhook_log: unknown[]
+  created_at: string
+  updated_at: string
+}
+
+export interface EnviarAssinaturaPayload {
+  solicitacao_id: string
+  minuta_url: string
+  tipo_assinatura: TipoAssinatura
+  signatarios: Pick<Signatario, 'nome' | 'email' | 'cpf' | 'papel'>[]
+}
+
+export interface EnviarAssinaturaResponse {
+  assinatura_id: string
+  envelope_id: string
+  status: 'enviado'
 }

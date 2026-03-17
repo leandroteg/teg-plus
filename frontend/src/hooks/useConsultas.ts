@@ -20,8 +20,9 @@ export function useConsultaCNPJ(onResult?: (dados: CnpjResult) => void) {
   const consultar = useCallback(async (cnpj: string) => {
     const limpo = cnpj.replace(/\D/g, '')
 
-    // Só consulta com 14 dígitos e se mudou
-    if (limpo.length !== 14 || limpo === lastRef.current) return
+    // Só consulta com 14 dígitos; permite re-consulta após correção
+    if (limpo.length !== 14) return
+    if (limpo === lastRef.current) return
     lastRef.current = limpo
 
     setLoading(true)

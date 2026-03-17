@@ -5,7 +5,7 @@ modulo: frotas
 status: ativo
 tags: [frotas, manutencao, telemetria, checklist, abastecimento]
 criado: 2026-03-03
-atualizado: 2026-03-03
+atualizado: 2026-03-12
 ---
 
 # Módulo Manutenção e Uso de Frotas
@@ -235,4 +235,19 @@ frontend/src/
 
 ---
 
-*Documentação gerada em 2026-03-03.*
+---
+
+## Correções Recentes (2026-03-12)
+
+As seguintes issues de UX foram corrigidas no módulo Frotas:
+
+| Issue | Descrição | Status |
+|-------|-----------|--------|
+| #92 | Cores de texto em badges/status com baixo contraste | ✅ Resolvida |
+| #94 | Botão X (fechar) não funcionava nos modais de edição de veículos | ✅ Resolvida |
+| #102 | Botão X não funcionava nos modais da tela de Telemetria | ✅ Resolvida |
+| #103 | Botão X não funcionava nos modais da tela de Abastecimentos | ✅ Resolvida |
+
+---
+
+*Documentação gerada em 2026-03-03. Atualizado em 2026-03-12: registro de correções de UX (issues #92, #94, #102, #103).*

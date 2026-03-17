@@ -1,19 +1,40 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useMemo, useRef, useEffect } from 'react'
 import {
-  Package, Truck, CheckCircle, Clock, AlertTriangle, ChevronDown, ChevronUp,
+  Package, Truck, CheckCircle, Clock, AlertTriangle,
   FileText, Share2, Download, MessageCircle, Mail, Upload, X, Paperclip,
   Banknote, ExternalLink, Loader2,
+  Search, LayoutList, LayoutGrid, ArrowUp, ArrowDown,
+  ClipboardList, ShieldCheck, BoxIcon, CreditCard, ArchiveIcon,
 } from 'lucide-react'
 import { useSearchParams } from 'react-router-dom'
 import jsPDF from 'jspdf'
-import { usePedidos, useAtualizarPedido, useLiberarPagamento } from '../hooks/usePedidos'
+import { useTheme } from '../contexts/ThemeContext'
+import {
+  usePedidos,
+  useAtualizarPedido,
+  useLiberarPagamento,
+  useEmitirPedido,
+} from '../hooks/usePedidos'
+import { useCotacoes } from '../hooks/useCotacoes'
 import { api } from '../services/api'
 import { supabase } from '../services/supabase'
 import { useAnexosPedido, useUploadAnexo, useCotacaoDocs, TIPO_LABEL } from '../hooks/useAnexos'
 import type { PedidoAnexo } from '../hooks/useAnexos'
 import FluxoTimeline from '../components/FluxoTimeline'
 import RecebimentoModal from '../components/RecebimentoModal'
-import type { Pedido } from '../types'
+import EmitirPedidoModal from '../components/EmitirPedidoModal'
+import type { Cotacao, Pedido } from '../types'
+
+// ─── Types ────────────────────────────────────────────────────────────────────
+
+type PipelineTab = 'pendente' | 'emitido' | 'entregue' | 'liberado' | 'encerrado'
+type SortField = 'data' | 'valor' | 'fornecedor'
+type SortDir = 'asc' | 'desc'
+type ViewMode = 'list' | 'cards'
+type PedidoListItem = Pedido & {
+  pending_emissao?: boolean
+  source_cotacao?: Pick<Cotacao, 'id' | 'comprador_id'>
+}
 
 // ─── Formatters ──────────────────────────────────────────────────────────────
 
@@ -31,123 +52,259 @@ function diasRestantes(data?: string): number | null {
   return Math.round((new Date(data + 'T00:00:00').getTime() - Date.now()) / 86_400_000)
 }
 
-// ─── Status config ────────────────────────────────────────────────────────────
+// ─── Pipeline stages ──────────────────────────────────────────────────────────
 
-const STATUS_TABS = [
-  { value: '',                         label: 'Todos'              },
-  { value: 'emitido',                  label: 'Emitidos'           },
-  { value: 'confirmado',               label: 'Confirmados'        },
-  { value: 'em_entrega',               label: 'Em Entrega'         },
-  { value: 'parcialmente_recebido',    label: 'Parcial'            },
-  { value: 'entregue',                 label: 'Entregues'          },
-  { value: 'liberado_pagamento',       label: 'Aguard. Pagamento'  },
-  { value: 'pago',                     label: 'Pagos'              },
+const PIPELINE_STAGES: {
+  key: PipelineTab
+  label: string
+  icon: typeof Package
+  matchFn: (p: PedidoListItem) => boolean
+}[] = [
+  {
+    key: 'pendente',
+    label: 'Pendente',
+    icon: ClipboardList,
+    matchFn: p => isPendingEmission(p),
+  },
+  {
+    key: 'emitido',
+    label: 'Emitido',
+    icon: Truck,
+    matchFn: p => !isPendingEmission(p) && ['emitido', 'confirmado', 'em_entrega'].includes(p.status),
+  },
+  {
+    key: 'entregue',
+    label: 'Entregue',
+    icon: BoxIcon,
+    matchFn: p => !isPendingEmission(p) && (p.status === 'entregue' || p.status === 'parcialmente_recebido') && (p as any).status_pagamento !== 'liberado' && (p as any).status_pagamento !== 'pago',
+  },
+  {
+    key: 'liberado',
+    label: 'Liberado p/ Pgto',
+    icon: CreditCard,
+    matchFn: p => !isPendingEmission(p) && (p as any).status_pagamento === 'liberado' && (p as any).status_pagamento !== 'pago',
+  },
+  {
+    key: 'encerrado',
+    label: 'Encerrado',
+    icon: ArchiveIcon,
+    matchFn: p => !isPendingEmission(p) && (p as any).status_pagamento === 'pago',
+  },
 ]
 
-const statusConfig: Record<string, { bg: string; text: string; label: string }> = {
-  emitido:                 { bg: 'bg-cyan-100',    text: 'text-cyan-700',    label: 'Emitido'    },
-  confirmado:              { bg: 'bg-blue-100',    text: 'text-blue-700',    label: 'Confirmado' },
-  em_entrega:              { bg: 'bg-teal-100',    text: 'text-teal-700',    label: 'Em Entrega' },
-  parcialmente_recebido:   { bg: 'bg-amber-100',   text: 'text-amber-700',   label: 'Parcial'    },
-  entregue:                { bg: 'bg-emerald-100', text: 'text-emerald-700', label: 'Entregue'   },
-  cancelado:               { bg: 'bg-gray-100',    text: 'text-gray-500',    label: 'Cancelado'  },
+const STATUS_ACCENT: Record<PipelineTab, { bg: string; bgActive: string; text: string; textActive: string; badge: string; border: string }> = {
+  pendente:  { bg: 'hover:bg-cyan-50',    bgActive: 'bg-cyan-50',    text: 'text-cyan-600',    textActive: 'text-cyan-800',    badge: 'bg-cyan-100 text-cyan-700',       border: 'border-cyan-400' },
+  emitido:   { bg: 'hover:bg-blue-50',    bgActive: 'bg-blue-50',    text: 'text-blue-600',    textActive: 'text-blue-800',    badge: 'bg-blue-100 text-blue-700',       border: 'border-blue-500' },
+  entregue:  { bg: 'hover:bg-emerald-50', bgActive: 'bg-emerald-50', text: 'text-emerald-600', textActive: 'text-emerald-800', badge: 'bg-emerald-100 text-emerald-700', border: 'border-emerald-500' },
+  liberado:  { bg: 'hover:bg-orange-50',  bgActive: 'bg-orange-50',  text: 'text-orange-600',  textActive: 'text-orange-800',  badge: 'bg-orange-100 text-orange-700',   border: 'border-orange-400' },
+  encerrado: { bg: 'hover:bg-slate-50',   bgActive: 'bg-slate-100',  text: 'text-slate-500',   textActive: 'text-slate-700',   badge: 'bg-slate-200 text-slate-600',     border: 'border-slate-400' },
+}
+
+const STATUS_ACCENT_DARK: Record<PipelineTab, { bg: string; bgActive: string; text: string; textActive: string; badge: string; border: string }> = {
+  pendente:  { bg: 'hover:bg-white/[0.03]', bgActive: 'bg-cyan-500/10',    text: 'text-cyan-400',    textActive: 'text-cyan-300',    badge: 'bg-cyan-500/20 text-cyan-300',       border: 'border-cyan-500/40' },
+  emitido:   { bg: 'hover:bg-white/[0.03]', bgActive: 'bg-blue-500/10',    text: 'text-blue-400',    textActive: 'text-blue-300',    badge: 'bg-blue-500/20 text-blue-300',       border: 'border-blue-500/40' },
+  entregue:  { bg: 'hover:bg-white/[0.03]', bgActive: 'bg-emerald-500/10', text: 'text-emerald-400', textActive: 'text-emerald-300', badge: 'bg-emerald-500/20 text-emerald-300', border: 'border-emerald-500/40' },
+  liberado:  { bg: 'hover:bg-white/[0.03]', bgActive: 'bg-orange-500/10',  text: 'text-orange-400',  textActive: 'text-orange-300',  badge: 'bg-orange-500/20 text-orange-300',   border: 'border-orange-500/40' },
+  encerrado: { bg: 'hover:bg-white/[0.03]', bgActive: 'bg-white/[0.06]',   text: 'text-slate-400',   textActive: 'text-slate-300',   badge: 'bg-white/[0.08] text-slate-300',     border: 'border-white/[0.08]' },
+}
+
+const statusConfig: Record<string, { bg: string; text: string; label: string; bgDark: string; textDark: string }> = {
+  emitido:               { bg: 'bg-cyan-100',    text: 'text-cyan-700',    label: 'Emitido',    bgDark: 'bg-cyan-900/40',    textDark: 'text-cyan-300' },
+  confirmado:            { bg: 'bg-blue-100',    text: 'text-blue-700',    label: 'Confirmado', bgDark: 'bg-blue-900/40',    textDark: 'text-blue-300' },
+  em_entrega:            { bg: 'bg-teal-100',    text: 'text-teal-700',    label: 'Em Entrega', bgDark: 'bg-teal-900/40',    textDark: 'text-teal-300' },
+  parcialmente_recebido: { bg: 'bg-amber-100',   text: 'text-amber-700',   label: 'Parcial',    bgDark: 'bg-amber-900/40',   textDark: 'text-amber-300' },
+  entregue:              { bg: 'bg-emerald-100', text: 'text-emerald-700', label: 'Entregue',   bgDark: 'bg-emerald-900/40', textDark: 'text-emerald-300' },
+  cancelado:             { bg: 'bg-gray-100',    text: 'text-gray-500',    label: 'Cancelado',  bgDark: 'bg-gray-800',       textDark: 'text-gray-400' },
+}
+
+const pendingEmissionStatus = {
+  bg: 'bg-amber-100',
+  text: 'text-amber-700',
+  label: 'Aguardando Emissao',
+  bgDark: 'bg-amber-900/40',
+  textDark: 'text-amber-300',
+}
+
+function isPendingEmission(pedido: PedidoListItem) {
+  return pedido.pending_emissao === true
+}
+
+function getStatusMeta(pedido: PedidoListItem) {
+  return isPendingEmission(pedido)
+    ? pendingEmissionStatus
+    : (statusConfig[pedido.status] || statusConfig.emitido)
+}
+
+function getDisplayNumber(pedido: PedidoListItem) {
+  if (pedido.numero_pedido) return `#${pedido.numero_pedido}`
+  if (pedido.requisicao?.numero) return pedido.requisicao.numero
+  return `#${pedido.id.slice(0, 8).toUpperCase()}`
 }
 
 // ─── PDF / Share helpers ──────────────────────────────────────────────────────
 
-function gerarPdfHtml(pedido: Pedido): string {
+const EMPRESA = {
+  razao: 'TEG UNIAO - LOCACAO, SERVICOS & EMPREENDIMENTOS LTDA',
+  fantasia: 'Teg Uniao Energia',
+  cnpj: '19.887.731/0001-29',
+  logoUrl: '/logo-teg-plus.png',
+}
+
+const fmtBRL = (v?: number) => v != null ? v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) : '—'
+const fmtDate = (d?: string) => d ? new Date(d.includes('T') ? d : d + 'T00:00:00').toLocaleDateString('pt-BR') : '—'
+
+function buildPdfHtml(pedido: Pedido): string {
   const esc = (s: string) => s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c] ?? c))
-  return `
-    <!DOCTYPE html>
-    <html>
-    <head>
-      <meta charset="UTF-8">
-      <title>Pedido de Compra #${esc(pedido.numero_pedido ?? '')}</title>
-      <style>
-        body { font-family: Arial, sans-serif; padding: 40px; color: #1e293b; }
-        .header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 32px; border-bottom: 2px solid #0d9488; padding-bottom: 20px; }
-        .logo { font-size: 24px; font-weight: 900; color: #0d9488; }
-        .title { font-size: 18px; font-weight: 700; color: #334155; }
-        .field-row { display: flex; gap: 20px; margin-bottom: 16px; }
-        .field { flex: 1; }
-        .label { font-size: 10px; color: #94a3b8; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; }
-        .value { font-size: 14px; font-weight: 600; color: #1e293b; margin-top: 2px; }
-        .value.big { font-size: 20px; font-weight: 900; color: #0d9488; }
-        .section { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 16px; margin-bottom: 16px; }
-        .footer { margin-top: 40px; padding-top: 16px; border-top: 1px solid #e2e8f0; font-size: 11px; color: #94a3b8; text-align: center; }
-        @media print { button { display: none !important; } }
-      </style>
-    </head>
-    <body>
-      <div class="header">
-        <div>
-          <div class="logo">TEG+</div>
-          <div style="font-size:11px;color:#94a3b8;margin-top:4px">Sistema ERP</div>
-        </div>
-        <div style="text-align:right">
-          <div class="title">Pedido de Compra</div>
-          <div style="font-size:13px;font-weight:700;color:#0d9488">#${esc(pedido.numero_pedido ?? pedido.id.slice(0, 8).toUpperCase())}</div>
-          <div style="font-size:11px;color:#64748b;margin-top:4px">${new Date().toLocaleDateString('pt-BR')}</div>
-        </div>
-      </div>
+  const numero = esc(pedido.numero_pedido ?? pedido.id.slice(0, 8).toUpperCase())
+  const itens = pedido.requisicao?.itens ?? []
+  const parcelas = pedido.parcelas_preview ?? []
 
-      <div class="section">
-        <div class="field-row">
-          <div class="field">
-            <div class="label">Fornecedor</div>
-            <div class="value">${esc(pedido.fornecedor_nome)}</div>
-          </div>
-          <div class="field">
-            <div class="label">Valor Total</div>
-            <div class="value big">${pedido.valor_total?.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) ?? '—'}</div>
-          </div>
-        </div>
-        ${pedido.requisicao ? `
-        <div class="field-row">
-          <div class="field">
-            <div class="label">Requisição</div>
-            <div class="value">${esc(pedido.requisicao.numero)} — ${esc(pedido.requisicao.descricao)}</div>
-          </div>
-          <div class="field">
-            <div class="label">Obra / Projeto</div>
-            <div class="value">${esc(pedido.requisicao.obra_nome ?? '—')}</div>
-          </div>
-        </div>` : ''}
-        <div class="field-row">
-          <div class="field">
-            <div class="label">Data do Pedido</div>
-            <div class="value">${pedido.data_pedido ? new Date(pedido.data_pedido).toLocaleDateString('pt-BR') : '—'}</div>
-          </div>
-          <div class="field">
-            <div class="label">Previsão de Entrega</div>
-            <div class="value">${pedido.data_prevista_entrega ? new Date(pedido.data_prevista_entrega + 'T00:00:00').toLocaleDateString('pt-BR') : '—'}</div>
-          </div>
-          ${pedido.nf_numero ? `<div class="field"><div class="label">NF</div><div class="value">${esc(pedido.nf_numero)}</div></div>` : ''}
-        </div>
-        ${pedido.observacoes ? `<div class="field"><div class="label">Observações</div><div class="value">${esc(pedido.observacoes)}</div></div>` : ''}
-      </div>
+  const itensHtml = itens.length > 0 ? `
+    <div class="section">
+      <div class="section-title">Itens do Pedido</div>
+      <table>
+        <thead>
+          <tr><th style="width:5%">#</th><th style="width:50%">Descricao</th><th style="width:10%">Qtd</th><th style="width:10%">Un</th><th style="width:12%">Vl. Unit.</th><th style="width:13%">Subtotal</th></tr>
+        </thead>
+        <tbody>
+          ${itens.map((item, i) => `
+            <tr>
+              <td style="text-align:center">${i + 1}</td>
+              <td>${esc(item.descricao)}</td>
+              <td style="text-align:center">${item.quantidade}</td>
+              <td style="text-align:center">${esc(item.unidade)}</td>
+              <td style="text-align:right">${fmtBRL(item.valor_unitario_estimado)}</td>
+              <td style="text-align:right;font-weight:600">${fmtBRL(item.quantidade * item.valor_unitario_estimado)}</td>
+            </tr>
+          `).join('')}
+          <tr class="total-row">
+            <td colspan="5" style="text-align:right;font-weight:700">TOTAL</td>
+            <td style="text-align:right;font-weight:900;color:#0d9488">${fmtBRL(pedido.valor_total)}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  ` : ''
 
-      <div class="footer">
-        TEG+ ERP · Pedido de Compra · Emitido em ${new Date().toLocaleString('pt-BR')}<br>
-        Este documento é válido apenas com a assinatura do responsável pelo setor de compras.
+  const parcelasHtml = parcelas.length > 0 ? `
+    <div class="section">
+      <div class="section-title">Condicao de Pagamento${pedido.condicao_pagamento ? `: ${esc(pedido.condicao_pagamento)}` : ''}</div>
+      <table>
+        <thead>
+          <tr><th style="width:10%">Parcela</th><th style="width:45%">Descricao</th><th style="width:25%">Vencimento</th><th style="width:20%">Valor</th></tr>
+        </thead>
+        <tbody>
+          ${parcelas.map(p => `
+            <tr>
+              <td style="text-align:center">${p.numero}</td>
+              <td>${esc(p.descricao || `Parcela ${p.numero}/${parcelas.length}`)}</td>
+              <td style="text-align:center">${fmtDate(p.data_vencimento)}</td>
+              <td style="text-align:right;font-weight:600">${fmtBRL(p.valor)}</td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+    </div>
+  ` : ''
+
+  return `<!DOCTYPE html>
+<html><head><meta charset="UTF-8">
+<title>Pedido de Compra #${numero}</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: Arial, Helvetica, sans-serif; color: #1e293b; font-size: 12px; }
+  .page { max-width: 800px; margin: 0 auto; padding: 30px 40px; }
+  .header { display: flex; justify-content: space-between; align-items: flex-start; padding-bottom: 16px; border-bottom: 3px solid #0d9488; margin-bottom: 20px; }
+  .header-left { display: flex; align-items: center; gap: 12px; }
+  .header-left img { height: 50px; }
+  .company-name { font-size: 11px; font-weight: 700; color: #334155; }
+  .company-cnpj { font-size: 9px; color: #94a3b8; margin-top: 2px; }
+  .header-right { text-align: right; }
+  .doc-title { font-size: 18px; font-weight: 900; color: #0d9488; }
+  .doc-number { font-size: 13px; font-weight: 700; color: #334155; margin-top: 2px; }
+  .doc-date { font-size: 10px; color: #64748b; margin-top: 4px; }
+  .section { margin-bottom: 16px; }
+  .section-title { font-size: 11px; font-weight: 700; color: #0d9488; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 8px; border-bottom: 1px solid #e2e8f0; padding-bottom: 4px; }
+  .fields { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 20px; margin-bottom: 12px; }
+  .field .label { font-size: 9px; color: #94a3b8; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; }
+  .field .value { font-size: 13px; font-weight: 600; color: #1e293b; margin-top: 1px; }
+  .field .value.big { font-size: 18px; font-weight: 900; color: #0d9488; }
+  table { width: 100%; border-collapse: collapse; font-size: 11px; }
+  thead th { background: #f1f5f9; color: #475569; font-weight: 700; text-align: left; padding: 6px 8px; border-bottom: 2px solid #e2e8f0; font-size: 9px; text-transform: uppercase; }
+  tbody td { padding: 5px 8px; border-bottom: 1px solid #f1f5f9; }
+  .total-row td { border-top: 2px solid #e2e8f0; padding-top: 8px; }
+  .footer { margin-top: 30px; padding-top: 12px; border-top: 2px solid #e2e8f0; text-align: center; }
+  .footer p { font-size: 9px; color: #94a3b8; line-height: 1.5; }
+  .footer .disclaimer { font-size: 8px; color: #cbd5e1; margin-top: 4px; }
+  @media print { body { padding: 0; } .page { padding: 20px; } button { display: none !important; } }
+</style></head>
+<body><div class="page">
+  <div class="header">
+    <div class="header-left">
+      <img src="${EMPRESA.logoUrl}" alt="TEG+" />
+      <div>
+        <div class="company-name">${esc(EMPRESA.fantasia)}</div>
+        <div class="company-cnpj">CNPJ: ${EMPRESA.cnpj}</div>
       </div>
-    </body>
-    </html>
-  `
+    </div>
+    <div class="header-right">
+      <div class="doc-title">PEDIDO DE COMPRA</div>
+      <div class="doc-number">#${numero}</div>
+      <div class="doc-date">Emitido em ${new Date().toLocaleDateString('pt-BR')}</div>
+    </div>
+  </div>
+  <div class="section">
+    <div class="section-title">Dados do Pedido</div>
+    <div class="fields">
+      <div class="field"><div class="label">Fornecedor</div><div class="value">${esc(pedido.fornecedor_nome)}</div></div>
+      <div class="field"><div class="label">Valor Total</div><div class="value big">${fmtBRL(pedido.valor_total)}</div></div>
+      ${pedido.requisicao ? `
+      <div class="field"><div class="label">Requisicao</div><div class="value">${esc(pedido.requisicao.numero)} — ${esc(pedido.requisicao.descricao)}</div></div>
+      <div class="field"><div class="label">Obra / Projeto</div><div class="value">${esc(pedido.requisicao.obra_nome ?? '—')}</div></div>` : ''}
+      <div class="field"><div class="label">Data do Pedido</div><div class="value">${fmtDate(pedido.data_pedido)}</div></div>
+      <div class="field"><div class="label">Previsao de Entrega</div><div class="value">${fmtDate(pedido.data_prevista_entrega)}</div></div>
+      ${pedido.nf_numero ? `<div class="field"><div class="label">NF</div><div class="value">${esc(pedido.nf_numero)}</div></div>` : ''}
+      ${pedido.centro_custo ? `<div class="field"><div class="label">Centro de Custo</div><div class="value">${esc(pedido.centro_custo)}</div></div>` : ''}
+      ${pedido.classe_financeira ? `<div class="field"><div class="label">Classe Financeira</div><div class="value">${esc(pedido.classe_financeira)}</div></div>` : ''}
+    </div>
+    ${pedido.observacoes ? `<div class="field" style="margin-top:4px"><div class="label">Observacoes</div><div class="value" style="font-size:11px;font-weight:400">${esc(pedido.observacoes)}</div></div>` : ''}
+  </div>
+  ${itensHtml}
+  ${parcelasHtml}
+  <div class="footer">
+    <p>TEG+ ERP &middot; Pedido de Compra &middot; ${esc(EMPRESA.fantasia)} &middot; CNPJ ${EMPRESA.cnpj}</p>
+    <p class="disclaimer">Documento gerado automaticamente pelo sistema TEG+ ERP em ${new Date().toLocaleString('pt-BR')}.<br>
+    Valido apenas com a assinatura do responsavel pelo setor de compras.</p>
+  </div>
+</div></body></html>`
 }
 
 function gerarPdfPedido(pedido: Pedido) {
-  const html = gerarPdfHtml(pedido)
-  const printWin = window.open('', '_blank', 'width=900,height=700')
+  const html = buildPdfHtml(pedido)
+  const blob = new Blob([html], { type: 'text/html;charset=utf-8' })
+  const url = URL.createObjectURL(blob)
+  const printWin = window.open(url, '_blank', 'width=900,height=700')
   if (!printWin) return
-  printWin.document.open()
-  printWin.document.writeln(html)
-  printWin.document.close()
-  printWin.focus()
-  setTimeout(() => printWin.print(), 500)
+  printWin.addEventListener('load', () => {
+    printWin.focus()
+    setTimeout(() => { printWin.print(); URL.revokeObjectURL(url) }, 400)
+  })
 }
 
-function gerarPdfBlob(pedido: Pedido): Blob {
+async function loadLogoBase64(): Promise<string | null> {
+  try {
+    const resp = await fetch(EMPRESA.logoUrl)
+    const blob = await resp.blob()
+    return new Promise((resolve) => {
+      const reader = new FileReader()
+      reader.onloadend = () => resolve(reader.result as string)
+      reader.onerror = () => resolve(null)
+      reader.readAsDataURL(blob)
+    })
+  } catch { return null }
+}
+
+async function gerarPdfBlob(pedido: Pedido): Promise<Blob> {
   const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
   const W = 210
   const M = 15
@@ -159,66 +316,185 @@ function gerarPdfBlob(pedido: Pedido): Blob {
   const MID  = [100, 116, 139] as const
   const LIGHT = [226, 232, 240] as const
 
-  // Header bar
+  // ── Header bar ──────────────────────────────────────────────────────────────
   doc.setFillColor(...TEAL)
-  doc.rect(0, 0, W, 28, 'F')
-  doc.setFont('helvetica', 'bold')
-  doc.setFontSize(18)
-  doc.setTextColor(255, 255, 255)
-  doc.text('TEG+', M, 14)
-  doc.setFontSize(10)
-  doc.text('Pedido de Compra', M, 22)
+  doc.rect(0, 0, W, 30, 'F')
 
+  // Logo
+  const logo = await loadLogoBase64()
+  if (logo) {
+    try { doc.addImage(logo, 'PNG', M, 3, 18, 24) } catch { /* ignore */ }
+  }
+
+  // Company info
+  doc.setFont('helvetica', 'bold')
+  doc.setFontSize(11)
+  doc.setTextColor(255, 255, 255)
+  doc.text(EMPRESA.fantasia, M + 22, 13)
+  doc.setFont('helvetica', 'normal')
+  doc.setFontSize(8)
+  doc.text(`CNPJ: ${EMPRESA.cnpj}`, M + 22, 19)
+
+  // Document title
   const numero = pedido.numero_pedido ?? pedido.id.slice(0, 8).toUpperCase()
+  doc.setFont('helvetica', 'bold')
   doc.setFontSize(14)
-  doc.text(`#${numero}`, W - M, 14, { align: 'right' })
-  doc.setFontSize(9)
-  doc.text(new Date().toLocaleDateString('pt-BR'), W - M, 22, { align: 'right' })
+  doc.text('PEDIDO DE COMPRA', W - M, 13, { align: 'right' })
+  doc.setFontSize(10)
+  doc.text(`#${numero}`, W - M, 20, { align: 'right' })
+  doc.setFont('helvetica', 'normal')
+  doc.setFontSize(8)
+  doc.text(new Date().toLocaleDateString('pt-BR'), W - M, 26, { align: 'right' })
   y = 36
 
-  // Helper: label + value row
+  // ── Section: Dados do Pedido ────────────────────────────────────────────────
+  const sectionTitle = (title: string) => {
+    doc.setFont('helvetica', 'bold')
+    doc.setFontSize(10)
+    doc.setTextColor(...TEAL)
+    doc.text(title, M, y)
+    y += 1
+    doc.setDrawColor(...TEAL)
+    doc.setLineWidth(0.5)
+    doc.line(M, y, W - M, y)
+    y += 5
+  }
+
   const addField = (label: string, value: string, bold = false) => {
     doc.setFont('helvetica', 'normal')
-    doc.setFontSize(9)
+    doc.setFontSize(8)
     doc.setTextColor(...MID)
     doc.text(label, M, y)
     doc.setFont('helvetica', bold ? 'bold' : 'normal')
-    doc.setFontSize(11)
+    doc.setFontSize(10)
     doc.setTextColor(...DARK)
-    doc.text(value || '—', M + 45, y)
-    y += 7
+    const truncated = value?.length > 70 ? value.slice(0, 67) + '...' : (value || '—')
+    doc.text(truncated, M + 42, y)
+    y += 6.5
   }
 
+  sectionTitle('DADOS DO PEDIDO')
   addField('Fornecedor', pedido.fornecedor_nome, true)
-  addField('Valor Total', pedido.valor_total?.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) ?? '—', true)
+  addField('Valor Total', fmtBRL(pedido.valor_total), true)
   if (pedido.requisicao) {
     addField('Requisicao', `${pedido.requisicao.numero} — ${pedido.requisicao.descricao}`)
     if (pedido.requisicao.obra_nome) addField('Obra', pedido.requisicao.obra_nome)
   }
-  addField('Data Pedido', pedido.data_pedido ? new Date(pedido.data_pedido).toLocaleDateString('pt-BR') : '—')
-  addField('Prev. Entrega', pedido.data_prevista_entrega ? new Date(pedido.data_prevista_entrega + 'T00:00:00').toLocaleDateString('pt-BR') : '—')
+  addField('Data Pedido', fmtDate(pedido.data_pedido))
+  addField('Prev. Entrega', fmtDate(pedido.data_prevista_entrega))
   if (pedido.nf_numero) addField('NF', pedido.nf_numero)
+  if (pedido.centro_custo) addField('Centro Custo', pedido.centro_custo)
+  if (pedido.classe_financeira) addField('Classe Financ.', pedido.classe_financeira)
   if (pedido.observacoes) {
-    y += 3
     doc.setFont('helvetica', 'normal')
-    doc.setFontSize(9)
+    doc.setFontSize(8)
     doc.setTextColor(...MID)
     doc.text('Observacoes', M, y)
-    y += 5
+    y += 4
     doc.setTextColor(...DARK)
-    doc.setFontSize(10)
+    doc.setFontSize(9)
     const lines = doc.splitTextToSize(pedido.observacoes, CW)
-    doc.text(lines, M, y)
-    y += lines.length * 5
+    doc.text(lines.slice(0, 4), M, y)
+    y += Math.min(lines.length, 4) * 4
+  }
+  y += 4
+
+  // ── Section: Itens ──────────────────────────────────────────────────────────
+  const itens = pedido.requisicao?.itens ?? []
+  if (itens.length > 0) {
+    sectionTitle('ITENS DO PEDIDO')
+    const cols = [M, M + 8, M + 90, M + 105, M + 120, M + 145]
+    doc.setFillColor(241, 245, 249)
+    doc.rect(M, y - 3.5, CW, 5, 'F')
+    doc.setFont('helvetica', 'bold')
+    doc.setFontSize(7)
+    doc.setTextColor(71, 85, 105)
+    doc.text('#', cols[0], y)
+    doc.text('DESCRICAO', cols[1], y)
+    doc.text('QTD', cols[2], y)
+    doc.text('UN', cols[3], y)
+    doc.text('VL. UNIT.', cols[4], y)
+    doc.text('SUBTOTAL', cols[5], y)
+    y += 4
+
+    doc.setFont('helvetica', 'normal')
+    doc.setFontSize(8)
+    doc.setTextColor(...DARK)
+    itens.forEach((item, i) => {
+      if (y > 265) { doc.addPage(); y = M }
+      const subtotal = item.quantidade * item.valor_unitario_estimado
+      doc.text(String(i + 1), cols[0], y)
+      const desc = item.descricao.length > 45 ? item.descricao.slice(0, 42) + '...' : item.descricao
+      doc.text(desc, cols[1], y)
+      doc.text(String(item.quantidade), cols[2], y)
+      doc.text(item.unidade, cols[3], y)
+      doc.text(fmtBRL(item.valor_unitario_estimado), cols[4], y)
+      doc.setFont('helvetica', 'bold')
+      doc.text(fmtBRL(subtotal), cols[5], y)
+      doc.setFont('helvetica', 'normal')
+      y += 5
+      doc.setDrawColor(241, 245, 249)
+      doc.line(M, y - 2, W - M, y - 2)
+    })
+
+    doc.setDrawColor(...TEAL)
+    doc.setLineWidth(0.5)
+    doc.line(cols[4], y - 1, W - M, y - 1)
+    y += 2
+    doc.setFont('helvetica', 'bold')
+    doc.setFontSize(9)
+    doc.text('TOTAL', cols[4], y)
+    doc.setTextColor(...TEAL)
+    doc.text(fmtBRL(pedido.valor_total), cols[5], y)
+    y += 8
   }
 
-  // Footer
-  y = 282
+  // ── Section: Parcelas ───────────────────────────────────────────────────────
+  const parcelas = pedido.parcelas_preview ?? []
+  if (parcelas.length > 0) {
+    if (y > 240) { doc.addPage(); y = M }
+    sectionTitle(`CONDICAO DE PAGAMENTO${pedido.condicao_pagamento ? `: ${pedido.condicao_pagamento}` : ''}`)
+    const pCols = [M, M + 18, M + 90, M + 140]
+    doc.setFillColor(241, 245, 249)
+    doc.rect(M, y - 3.5, CW, 5, 'F')
+    doc.setFont('helvetica', 'bold')
+    doc.setFontSize(7)
+    doc.setTextColor(71, 85, 105)
+    doc.text('PARCELA', pCols[0], y)
+    doc.text('DESCRICAO', pCols[1], y)
+    doc.text('VENCIMENTO', pCols[2], y)
+    doc.text('VALOR', pCols[3], y)
+    y += 4
+
+    doc.setFont('helvetica', 'normal')
+    doc.setFontSize(8)
+    doc.setTextColor(...DARK)
+    parcelas.forEach(p => {
+      if (y > 270) { doc.addPage(); y = M }
+      doc.text(String(p.numero), pCols[0] + 6, y)
+      doc.text(p.descricao || `Parcela ${p.numero}/${parcelas.length}`, pCols[1], y)
+      doc.text(fmtDate(p.data_vencimento), pCols[2], y)
+      doc.setFont('helvetica', 'bold')
+      doc.text(fmtBRL(p.valor), pCols[3], y)
+      doc.setFont('helvetica', 'normal')
+      y += 5
+      doc.setDrawColor(241, 245, 249)
+      doc.line(M, y - 2, W - M, y - 2)
+    })
+    y += 4
+  }
+
+  // ── Footer ──────────────────────────────────────────────────────────────────
+  const footerY = Math.max(y + 10, 278)
+  if (footerY > 290) doc.addPage()
+  const fy = footerY > 290 ? 280 : footerY
   doc.setDrawColor(...LIGHT)
-  doc.line(M, y - 4, W - M, y - 4)
-  doc.setFontSize(8)
+  doc.line(M, fy - 4, W - M, fy - 4)
+  doc.setFontSize(7)
   doc.setTextColor(...MID)
-  doc.text(`TEG+ ERP · Pedido de Compra · Emitido em ${new Date().toLocaleString('pt-BR')}`, W / 2, y, { align: 'center' })
+  doc.text(`TEG+ ERP · ${EMPRESA.fantasia} · CNPJ ${EMPRESA.cnpj} · Emitido em ${new Date().toLocaleString('pt-BR')}`, W / 2, fy, { align: 'center' })
+  doc.setFontSize(6)
+  doc.text('Valido apenas com a assinatura do responsavel pelo setor de compras.', W / 2, fy + 4, { align: 'center' })
 
   return doc.output('blob')
 }
@@ -233,24 +509,20 @@ async function compartilharWhatsApp(pedido: Pedido): Promise<boolean> {
     `Previsão: ${pedido.data_prevista_entrega ? new Date(pedido.data_prevista_entrega + 'T00:00:00').toLocaleDateString('pt-BR') : '—'}\n` +
     `\n_Gerado pelo sistema TEG+ ERP_`
 
-  // Try Web Share API with PDF attachment (works on mobile browsers / WhatsApp)
   if (navigator.share && navigator.canShare) {
     try {
-      const blob = gerarPdfBlob(pedido)
+      const blob = await gerarPdfBlob(pedido)
       const file = new File([blob], `Pedido_${numero}.pdf`, { type: 'application/pdf' })
       const shareData = { text, files: [file] }
-
       if (navigator.canShare(shareData)) {
         await navigator.share(shareData)
         return true
       }
     } catch (err) {
-      // User cancelled or share failed — fall through to wa.me link
       if (err instanceof DOMException && err.name === 'AbortError') return false
     }
   }
 
-  // Fallback: text-only wa.me link (no attachment possible)
   window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank')
   return true
 }
@@ -265,7 +537,6 @@ async function compartilharEmail(pedido: Pedido, email?: string) {
     `Para visualizar o pedido completo com anexos, acesse o sistema TEG+.\n\n` +
     `Atenciosamente,\nEquipe de Compras TEG+`
 
-  // Busca anexos do pedido para enviar junto ao e-mail (#34)
   let anexosUrls: { url: string; nome: string; tipo: string }[] = []
   try {
     const { data: anexos } = await supabase
@@ -283,10 +554,8 @@ async function compartilharEmail(pedido: Pedido, email?: string) {
     // Se falhar ao buscar anexos, envia sem eles
   }
 
-  // Gera HTML do pedido para PDF inline
-  const pdfHtml = gerarPdfHtml(pedido)
+  const pdfHtml = buildPdfHtml(pedido)
 
-  // Tenta enviar via n8n (com anexos e PDF)
   try {
     const res = await api.enviarEmailPedido({
       pedido_id: pedido.id,
@@ -296,12 +565,11 @@ async function compartilharEmail(pedido: Pedido, email?: string) {
       anexos_urls: anexosUrls,
       pdf_html: pdfHtml,
     })
-    if (res?.ok) return // sucesso via n8n
+    if (res?.ok) return
   } catch {
     // n8n indisponivel -- fallback mailto
   }
 
-  // Fallback: abre mailto (sem anexos)
   window.open(`mailto:${email ?? ''}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`)
 }
 
@@ -318,86 +586,56 @@ function AnexoIcon({ mime }: { mime: string | null }) {
 
 // ─── CompartilharModal ────────────────────────────────────────────────────────
 
-function CompartilharModal({ pedido, onClose }: { pedido: Pedido; onClose: () => void }) {
+function CompartilharModal({ pedido, onClose, dark }: { pedido: Pedido; onClose: () => void; dark: boolean }) {
   const [sharing, setSharing] = useState(false)
 
   const handleWhatsApp = async () => {
     setSharing(true)
-    try {
-      await compartilharWhatsApp(pedido)
-    } finally {
-      setSharing(false)
-    }
+    try { await compartilharWhatsApp(pedido) } finally { setSharing(false) }
   }
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden animate-in slide-in-from-bottom-4 duration-200">
-        {/* Header */}
-        <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
+      <div className={`rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden animate-in slide-in-from-bottom-4 duration-200 ${dark ? 'bg-[#1e293b]' : 'bg-white'}`}>
+        <div className={`flex items-center justify-between px-5 py-4 border-b ${dark ? 'border-white/10' : 'border-slate-100'}`}>
           <div>
-            <p className="text-xs text-slate-400 font-medium">Pedido de Compra</p>
-            <p className="text-sm font-bold text-slate-800">
+            <p className={`text-xs font-medium ${dark ? 'text-slate-400' : 'text-slate-400'}`}>Pedido de Compra</p>
+            <p className={`text-sm font-bold ${dark ? 'text-white' : 'text-slate-800'}`}>
               #{pedido.numero_pedido ?? pedido.id.slice(0, 8).toUpperCase()}
             </p>
           </div>
-          <button
-            onClick={onClose}
-            className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors"
-          >
+          <button onClick={onClose} className={`p-1.5 rounded-lg transition-colors ${dark ? 'text-slate-400 hover:text-white hover:bg-white/10' : 'text-slate-400 hover:text-slate-600 hover:bg-slate-100'}`}>
             <X size={16} />
           </button>
         </div>
 
-        {/* Preview resumo */}
-        <div className="px-5 py-4 bg-slate-50 border-b border-slate-100 space-y-2">
+        <div className={`px-5 py-4 border-b space-y-2 ${dark ? 'bg-white/[0.02] border-white/10' : 'bg-slate-50 border-slate-100'}`}>
           <div className="flex justify-between text-xs">
             <span className="text-slate-400">Fornecedor</span>
-            <span className="font-semibold text-slate-700 truncate ml-4 text-right">{pedido.fornecedor_nome}</span>
+            <span className={`font-semibold truncate ml-4 text-right ${dark ? 'text-white' : 'text-slate-700'}`}>{pedido.fornecedor_nome}</span>
           </div>
           <div className="flex justify-between text-xs">
             <span className="text-slate-400">Valor Total</span>
-            <span className="font-bold text-teal-600">{fmt(pedido.valor_total)}</span>
+            <span className="font-bold text-teal-500">{fmt(pedido.valor_total)}</span>
           </div>
           {pedido.data_prevista_entrega && (
             <div className="flex justify-between text-xs">
               <span className="text-slate-400">Prev. Entrega</span>
-              <span className="font-semibold text-slate-700">{fmtDataISO(pedido.data_prevista_entrega)}</span>
-            </div>
-          )}
-          {pedido.requisicao?.obra_nome && (
-            <div className="flex justify-between text-xs">
-              <span className="text-slate-400">Obra</span>
-              <span className="font-semibold text-slate-700 truncate ml-4 text-right">{pedido.requisicao.obra_nome}</span>
+              <span className={`font-semibold ${dark ? 'text-white' : 'text-slate-700'}`}>{fmtDataISO(pedido.data_prevista_entrega)}</span>
             </div>
           )}
         </div>
 
-        {/* Action buttons */}
         <div className="p-5 space-y-2.5">
-          <button
-            onClick={() => gerarPdfPedido(pedido)}
-            className="w-full flex items-center gap-3 px-4 py-3 rounded-xl bg-teal-50 border border-teal-200 text-teal-700 text-sm font-semibold hover:bg-teal-100 transition-colors"
-          >
+          <button onClick={() => gerarPdfPedido(pedido)} className="w-full flex items-center gap-3 px-4 py-3 rounded-xl bg-teal-50 border border-teal-200 text-teal-700 text-sm font-semibold hover:bg-teal-100 transition-colors">
             <Download size={16} className="flex-shrink-0" />
             <span>Baixar / Imprimir PDF</span>
           </button>
-
-          <button
-            onClick={handleWhatsApp}
-            disabled={sharing}
-            className="w-full flex items-center gap-3 px-4 py-3 rounded-xl bg-green-50 border border-green-200 text-green-700 text-sm font-semibold hover:bg-green-100 transition-colors disabled:opacity-60"
-          >
-            {sharing
-              ? <Loader2 size={16} className="flex-shrink-0 animate-spin" />
-              : <MessageCircle size={16} className="flex-shrink-0" />}
+          <button onClick={handleWhatsApp} disabled={sharing} className="w-full flex items-center gap-3 px-4 py-3 rounded-xl bg-green-50 border border-green-200 text-green-700 text-sm font-semibold hover:bg-green-100 transition-colors disabled:opacity-60">
+            {sharing ? <Loader2 size={16} className="flex-shrink-0 animate-spin" /> : <MessageCircle size={16} className="flex-shrink-0" />}
             <span>{sharing ? 'Gerando PDF...' : 'Compartilhar no WhatsApp'}</span>
           </button>
-
-          <button
-            onClick={() => compartilharEmail(pedido)}
-            className="w-full flex items-center gap-3 px-4 py-3 rounded-xl bg-blue-50 border border-blue-200 text-blue-700 text-sm font-semibold hover:bg-blue-100 transition-colors"
-          >
+          <button onClick={() => compartilharEmail(pedido)} className="w-full flex items-center gap-3 px-4 py-3 rounded-xl bg-blue-50 border border-blue-200 text-blue-700 text-sm font-semibold hover:bg-blue-100 transition-colors">
             <Mail size={16} className="flex-shrink-0" />
             <span>Enviar por E-mail</span>
           </button>
@@ -416,13 +654,7 @@ const TIPO_OPTIONS: { value: PedidoAnexo['tipo']; label: string }[] = [
   { value: 'outro',               label: 'Outro'                 },
 ]
 
-function LiberarPagamentoModal({
-  pedido,
-  onClose,
-}: {
-  pedido: Pedido
-  onClose: () => void
-}) {
+function LiberarPagamentoModal({ pedido, onClose }: { pedido: Pedido; onClose: () => void }) {
   const uploadAnexo   = useUploadAnexo()
   const liberarPgto   = useLiberarPagamento()
   const fileRef       = useRef<HTMLInputElement>(null)
@@ -443,13 +675,7 @@ function LiberarPagamentoModal({
     setLoading(true)
     setErro('')
     try {
-      await uploadAnexo.mutateAsync({
-        pedidoId:   pedido.id,
-        file,
-        tipo,
-        observacao: obs || undefined,
-        origem:     'compras',
-      })
+      await uploadAnexo.mutateAsync({ pedidoId: pedido.id, file, tipo, observacao: obs || undefined, origem: 'compras' })
       await liberarPgto.mutateAsync(pedido.id)
       onClose()
     } catch (e: any) {
@@ -462,7 +688,6 @@ function LiberarPagamentoModal({
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden animate-in slide-in-from-bottom-4 duration-200">
-        {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
           <div className="flex items-center gap-2">
             <div className="w-8 h-8 rounded-xl bg-emerald-100 flex items-center justify-center flex-shrink-0">
@@ -470,42 +695,23 @@ function LiberarPagamentoModal({
             </div>
             <div>
               <p className="text-sm font-bold text-slate-800">Liberar para Pagamento</p>
-              <p className="text-[11px] text-slate-400">
-                #{pedido.numero_pedido ?? pedido.id.slice(0, 8).toUpperCase()}
-              </p>
+              <p className="text-[11px] text-slate-400">#{pedido.numero_pedido ?? pedido.id.slice(0, 8).toUpperCase()}</p>
             </div>
           </div>
-          <button
-            onClick={onClose}
-            className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors"
-          >
+          <button onClick={onClose} className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors">
             <X size={16} />
           </button>
         </div>
-
-        {/* Body */}
         <div className="p-5 space-y-4">
-          {/* File upload */}
           <div>
-            <label className="block text-xs font-semibold text-slate-600 mb-1.5">
-              Anexar Documento <span className="text-red-500">*</span>
-            </label>
-            <div
-              onClick={() => fileRef.current?.click()}
-              className={`flex items-center gap-3 border-2 border-dashed rounded-xl px-4 py-4 cursor-pointer transition-colors ${
-                file
-                  ? 'border-emerald-300 bg-emerald-50'
-                  : 'border-slate-200 bg-slate-50 hover:border-teal-300 hover:bg-teal-50'
-              }`}
-            >
+            <label className="block text-xs font-semibold text-slate-600 mb-1.5">Anexar Documento <span className="text-red-500">*</span></label>
+            <div onClick={() => fileRef.current?.click()} className={`flex items-center gap-3 border-2 border-dashed rounded-xl px-4 py-4 cursor-pointer transition-colors ${file ? 'border-emerald-300 bg-emerald-50' : 'border-slate-200 bg-slate-50 hover:border-teal-300 hover:bg-teal-50'}`}>
               <Upload size={18} className={file ? 'text-emerald-500' : 'text-slate-400'} />
               <div className="min-w-0">
                 {file ? (
                   <>
                     <p className="text-sm font-semibold text-emerald-700 truncate">{file.name}</p>
-                    <p className="text-[11px] text-emerald-500">
-                      {(file.size / 1024).toFixed(0)} KB
-                    </p>
+                    <p className="text-[11px] text-emerald-500">{(file.size / 1024).toFixed(0)} KB</p>
                   </>
                 ) : (
                   <>
@@ -515,68 +721,25 @@ function LiberarPagamentoModal({
                 )}
               </div>
             </div>
-            <input
-              ref={fileRef}
-              type="file"
-              accept=".pdf,.jpg,.jpeg,.png,.xls,.xlsx"
-              onChange={handleFile}
-              className="hidden"
-            />
+            <input ref={fileRef} type="file" accept=".pdf,.jpg,.jpeg,.png,.xls,.xlsx" onChange={handleFile} className="hidden" />
           </div>
-
-          {/* Tipo selector */}
           <div>
             <label className="block text-xs font-semibold text-slate-600 mb-1.5">Tipo do Documento</label>
             <div className="grid grid-cols-2 gap-2">
               {TIPO_OPTIONS.map(opt => (
-                <button
-                  key={opt.value}
-                  type="button"
-                  onClick={() => setTipo(opt.value)}
-                  className={`px-3 py-2 rounded-xl text-xs font-semibold border text-left transition-colors ${
-                    tipo === opt.value
-                      ? 'bg-teal-600 text-white border-teal-600'
-                      : 'bg-white text-slate-600 border-slate-200 hover:border-teal-300'
-                  }`}
-                >
+                <button key={opt.value} type="button" onClick={() => setTipo(opt.value)} className={`px-3 py-2 rounded-xl text-xs font-semibold border text-left transition-colors ${tipo === opt.value ? 'bg-teal-600 text-white border-teal-600' : 'bg-white text-slate-600 border-slate-200 hover:border-teal-300'}`}>
                   {opt.label}
                 </button>
               ))}
             </div>
           </div>
-
-          {/* Observação */}
           <div>
-            <label className="block text-xs font-semibold text-slate-600 mb-1.5">
-              Observação <span className="text-slate-400 font-normal">(opcional)</span>
-            </label>
-            <textarea
-              value={obs}
-              onChange={e => setObs(e.target.value)}
-              rows={2}
-              placeholder="Ex: NF entregue junto com o material..."
-              className="w-full text-sm border border-slate-200 rounded-xl px-3 py-2 resize-none focus:outline-none focus:ring-2 focus:ring-teal-400 placeholder:text-slate-300"
-            />
+            <label className="block text-xs font-semibold text-slate-600 mb-1.5">Observação <span className="text-slate-400 font-normal">(opcional)</span></label>
+            <textarea value={obs} onChange={e => setObs(e.target.value)} rows={2} placeholder="Ex: NF entregue junto com o material..." className="w-full text-sm border border-slate-200 rounded-xl px-3 py-2 resize-none focus:outline-none focus:ring-2 focus:ring-teal-400 placeholder:text-slate-300" />
           </div>
-
-          {/* Error */}
-          {erro && (
-            <p className="text-xs text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
-              {erro}
-            </p>
-          )}
-
-          {/* Submit */}
-          <button
-            onClick={handleSubmit}
-            disabled={loading}
-            className="w-full flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-bold bg-emerald-600 text-white hover:bg-emerald-700 transition-colors disabled:opacity-50"
-          >
-            {loading ? (
-              <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-            ) : (
-              <Banknote size={16} />
-            )}
+          {erro && <p className="text-xs text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{erro}</p>}
+          <button onClick={handleSubmit} disabled={loading} className="w-full flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-bold bg-emerald-600 text-white hover:bg-emerald-700 transition-colors disabled:opacity-50">
+            {loading ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> : <Banknote size={16} />}
             {loading ? 'Enviando...' : 'Liberar para Pagamento'}
           </button>
         </div>
@@ -585,7 +748,7 @@ function LiberarPagamentoModal({
   )
 }
 
-// ─── DocSection — seção agrupada de documentos ──────────────────────────────
+// ─── AnexosOrganizados — documentos agrupados por categoria ─────────────────
 
 const SECTION_COLORS: Record<string, { bg: string; border: string; text: string; badge: string }> = {
   violet:  { bg: 'bg-violet-50',  border: 'border-violet-200',  text: 'text-violet-700',  badge: 'bg-violet-100 text-violet-600' },
@@ -594,67 +757,36 @@ const SECTION_COLORS: Record<string, { bg: string; border: string; text: string;
   emerald: { bg: 'bg-emerald-50', border: 'border-emerald-200', text: 'text-emerald-700', badge: 'bg-emerald-100 text-emerald-600' },
 }
 
-function DocSection({
-  title, icon, color, count, children,
-}: {
-  title: string; icon: React.ReactNode; color: string; count: number; children: React.ReactNode
-}) {
+function DocSection({ title, icon, color, count, children }: { title: string; icon: React.ReactNode; color: string; count: number; children: React.ReactNode }) {
   const c = SECTION_COLORS[color] ?? SECTION_COLORS.cyan
   return (
     <div className={`rounded-xl border ${c.border} overflow-hidden`}>
       <div className={`${c.bg} px-3 py-2 flex items-center gap-2 border-b ${c.border}`}>
         {icon}
         <span className={`text-[11px] font-bold ${c.text}`}>{title}</span>
-        <span className={`ml-auto text-[10px] font-bold px-1.5 py-0.5 rounded-full ${c.badge}`}>
-          {count}
-        </span>
+        <span className={`ml-auto text-[10px] font-bold px-1.5 py-0.5 rounded-full ${c.badge}`}>{count}</span>
       </div>
       <div className="divide-y divide-slate-100 bg-white">{children}</div>
     </div>
   )
 }
 
-function DocItem({
-  name, url, mime, tipo, date, origem,
-}: {
-  name: string; url: string; mime?: string | null; tipo?: string; date?: string; origem?: string
-}) {
+function DocItem({ name, url, mime, tipo, date, origem }: { name: string; url: string; mime?: string | null; tipo?: string; date?: string; origem?: string }) {
   return (
-    <a
-      href={url}
-      target="_blank"
-      rel="noopener noreferrer"
-      className="flex items-center gap-2.5 px-3 py-2.5 hover:bg-slate-50 transition-colors group"
-    >
+    <a href={url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2.5 px-3 py-2.5 hover:bg-slate-50 transition-colors group">
       <AnexoIcon mime={mime ?? null} />
       <div className="min-w-0 flex-1">
         <p className="text-xs font-semibold text-slate-700 truncate">{name}</p>
         <div className="flex flex-wrap items-center gap-1.5 mt-0.5">
-          {tipo && (
-            <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-500">
-              {tipo}
-            </span>
-          )}
-          {origem && (
-            <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-semibold ${
-              origem === 'financeiro' ? 'bg-purple-100 text-purple-600' : 'bg-teal-100 text-teal-600'
-            }`}>
-              {origem === 'financeiro' ? 'Financeiro' : 'Compras'}
-            </span>
-          )}
-          {date && (
-            <span className="text-[10px] text-slate-400">
-              {new Date(date).toLocaleDateString('pt-BR')}
-            </span>
-          )}
+          {tipo && <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-500">{tipo}</span>}
+          {origem && <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-semibold ${origem === 'financeiro' ? 'bg-purple-100 text-purple-600' : 'bg-teal-100 text-teal-600'}`}>{origem === 'financeiro' ? 'Financeiro' : 'Compras'}</span>}
+          {date && <span className="text-[10px] text-slate-400">{new Date(date).toLocaleDateString('pt-BR')}</span>}
         </div>
       </div>
       <ExternalLink size={11} className="flex-shrink-0 text-slate-300 group-hover:text-slate-500 transition-colors" />
     </a>
   )
 }
-
-// ─── UploadAnexoInline — botão rápido para anexar docs ──────────────────────
 
 function UploadAnexoInline({ pedidoId }: { pedidoId: string }) {
   const uploadAnexo = useUploadAnexo()
@@ -681,56 +813,24 @@ function UploadAnexoInline({ pedidoId }: { pedidoId: string }) {
 
   return (
     <div className="flex items-center gap-2 pt-2">
-      <select
-        value={tipo}
-        onChange={e => setTipo(e.target.value as PedidoAnexo['tipo'])}
-        className="text-[11px] border border-slate-200 rounded-lg px-2 py-1.5 bg-white text-slate-600 focus:outline-none focus:ring-1 focus:ring-teal-300"
-      >
-        {TIPO_OPTIONS.map(o => (
-          <option key={o.value} value={o.value}>{o.label}</option>
-        ))}
+      <select value={tipo} onChange={e => setTipo(e.target.value as PedidoAnexo['tipo'])} className="text-[11px] border border-slate-200 rounded-lg px-2 py-1.5 bg-white text-slate-600 focus:outline-none focus:ring-1 focus:ring-teal-300">
+        {TIPO_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
       </select>
-      <button
-        onClick={() => fileRef.current?.click()}
-        disabled={loading}
-        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-semibold text-teal-600 bg-teal-50 border border-teal-200 hover:bg-teal-100 transition-colors disabled:opacity-50"
-      >
-        {loading ? (
-          <div className="w-3 h-3 border-2 border-teal-400 border-t-transparent rounded-full animate-spin" />
-        ) : success ? (
-          <CheckCircle size={12} className="text-emerald-500" />
-        ) : (
-          <Upload size={12} />
-        )}
+      <button onClick={() => fileRef.current?.click()} disabled={loading} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-semibold text-teal-600 bg-teal-50 border border-teal-200 hover:bg-teal-100 transition-colors disabled:opacity-50">
+        {loading ? <div className="w-3 h-3 border-2 border-teal-400 border-t-transparent rounded-full animate-spin" /> : success ? <CheckCircle size={12} className="text-emerald-500" /> : <Upload size={12} />}
         {loading ? 'Enviando...' : success ? 'Anexado!' : 'Anexar'}
       </button>
-      <input
-        ref={fileRef}
-        type="file"
-        accept=".pdf,.jpg,.jpeg,.png,.xls,.xlsx"
-        onChange={handleFile}
-        className="hidden"
-      />
+      <input ref={fileRef} type="file" accept=".pdf,.jpg,.jpeg,.png,.xls,.xlsx" onChange={handleFile} className="hidden" />
     </div>
   )
 }
 
-// ─── AnexosOrganizados — documentos agrupados por categoria ─────────────────
-
 function AnexosOrganizados({ pedidoId, cotacaoId }: { pedidoId: string; cotacaoId?: string }) {
   const { data: anexos, isLoading: loadingAnexos }  = useAnexosPedido(pedidoId)
   const { data: cotDocs, isLoading: loadingCot }     = useCotacaoDocs(cotacaoId)
-
   const isLoading = loadingAnexos || (cotacaoId ? loadingCot : false)
 
-  if (isLoading) {
-    return (
-      <div className="flex items-center gap-2 py-2 text-xs text-slate-400">
-        <div className="w-3.5 h-3.5 border-2 border-slate-300 border-t-transparent rounded-full animate-spin" />
-        Carregando documentos...
-      </div>
-    )
-  }
+  if (isLoading) return <div className="flex items-center gap-2 py-2 text-xs text-slate-400"><div className="w-3.5 h-3.5 border-2 border-slate-300 border-t-transparent rounded-full animate-spin" />Carregando documentos...</div>
 
   const cotacaoDocs   = cotDocs ?? []
   const nfDocs        = anexos?.filter(a => a.tipo === 'nota_fiscal') ?? []
@@ -738,132 +838,133 @@ function AnexosOrganizados({ pedidoId, cotacaoId }: { pedidoId: string; cotacaoI
   const pagamentoDocs = anexos?.filter(a => a.tipo === 'comprovante_pagamento') ?? []
   const totalDocs     = cotacaoDocs.length + nfDocs.length + pedidoAnexos.length + pagamentoDocs.length
 
-  if (totalDocs === 0) {
-    return (
-      <div>
-        <p className="text-xs text-slate-400 italic py-1">Nenhum documento encontrado.</p>
-        <UploadAnexoInline pedidoId={pedidoId} />
-      </div>
-    )
-  }
+  if (totalDocs === 0) return <div><p className="text-xs text-slate-400 italic py-1">Nenhum documento encontrado.</p><UploadAnexoInline pedidoId={pedidoId} /></div>
 
   return (
     <div className="space-y-3">
-      {/* Cotação Aprovada */}
       {cotacaoDocs.length > 0 && (
-        <DocSection
-          title="Cotação Aprovada"
-          icon={<FileText size={13} className="text-violet-500" />}
-          color="violet"
-          count={cotacaoDocs.length}
-        >
-          {cotacaoDocs.map((doc, i) => (
-            <DocItem key={i} name={doc.name} url={doc.url} mime={doc.mime} date={doc.created} />
-          ))}
+        <DocSection title="Cotação Aprovada" icon={<FileText size={13} className="text-violet-500" />} color="violet" count={cotacaoDocs.length}>
+          {cotacaoDocs.map((doc, i) => <DocItem key={i} name={doc.name} url={doc.url} mime={doc.mime} date={doc.created} />)}
         </DocSection>
       )}
-
-      {/* Nota Fiscal */}
       {nfDocs.length > 0 && (
-        <DocSection
-          title="Nota Fiscal"
-          icon={<FileText size={13} className="text-amber-500" />}
-          color="amber"
-          count={nfDocs.length}
-        >
-          {nfDocs.map(a => (
-            <DocItem
-              key={a.id}
-              name={a.nome_arquivo}
-              url={a.url}
-              mime={a.mime_type}
-              date={a.uploaded_at}
-              origem={a.origem}
-            />
-          ))}
+        <DocSection title="Nota Fiscal" icon={<FileText size={13} className="text-amber-500" />} color="amber" count={nfDocs.length}>
+          {nfDocs.map(a => <DocItem key={a.id} name={a.nome_arquivo} url={a.url} mime={a.mime_type} date={a.uploaded_at} origem={a.origem} />)}
         </DocSection>
       )}
-
-      {/* Pedido (comprovante entrega, medição, contrato, outro) */}
       {pedidoAnexos.length > 0 && (
-        <DocSection
-          title="Pedido"
-          icon={<Package size={13} className="text-cyan-500" />}
-          color="cyan"
-          count={pedidoAnexos.length}
-        >
-          {pedidoAnexos.map(a => (
-            <DocItem
-              key={a.id}
-              name={a.nome_arquivo}
-              url={a.url}
-              mime={a.mime_type}
-              tipo={TIPO_LABEL[a.tipo]}
-              date={a.uploaded_at}
-              origem={a.origem}
-            />
-          ))}
+        <DocSection title="Pedido" icon={<Package size={13} className="text-cyan-500" />} color="cyan" count={pedidoAnexos.length}>
+          {pedidoAnexos.map(a => <DocItem key={a.id} name={a.nome_arquivo} url={a.url} mime={a.mime_type} tipo={TIPO_LABEL[a.tipo]} date={a.uploaded_at} origem={a.origem} />)}
         </DocSection>
       )}
-
-      {/* Pagamento */}
       {pagamentoDocs.length > 0 && (
-        <DocSection
-          title="Pagamento"
-          icon={<Banknote size={13} className="text-emerald-500" />}
-          color="emerald"
-          count={pagamentoDocs.length}
-        >
-          {pagamentoDocs.map(a => (
-            <DocItem
-              key={a.id}
-              name={a.nome_arquivo}
-              url={a.url}
-              mime={a.mime_type}
-              date={a.uploaded_at}
-              origem={a.origem}
-            />
-          ))}
+        <DocSection title="Pagamento" icon={<Banknote size={13} className="text-emerald-500" />} color="emerald" count={pagamentoDocs.length}>
+          {pagamentoDocs.map(a => <DocItem key={a.id} name={a.nome_arquivo} url={a.url} mime={a.mime_type} date={a.uploaded_at} origem={a.origem} />)}
         </DocSection>
       )}
-
-      {/* Upload rápido */}
       <UploadAnexoInline pedidoId={pedidoId} />
     </div>
   )
 }
 
-// ─── PedidoCard ───────────────────────────────────────────────────────────────
+// ─── PedidoCard (compact pipeline card) ──────────────────────────────────────
 
-function PedidoCard({
-  pedido,
-  onCompartilhar,
-  onLiberarPagamento,
-  onReceber,
-  initialExpanded = false,
-}: {
-  pedido: Pedido
-  onCompartilhar: (p: Pedido) => void
-  onLiberarPagamento: (id: string) => void
-  onReceber: (p: Pedido) => void
-  initialExpanded?: boolean
-}) {
-  const mutation   = useAtualizarPedido()
-  const [expanded, setExpanded]     = useState(initialExpanded)
-  const [confirmando, setConfirmando] = useState(false)
-
+function PedCard({ pedido, dark, onClick }: { pedido: PedidoListItem; dark: boolean; onClick: () => void }) {
   const dias     = diasRestantes(pedido.data_prevista_entrega)
-  const st       = statusConfig[pedido.status] || statusConfig.emitido
+  const st       = getStatusMeta(pedido)
+  const pending  = isPendingEmission(pedido)
   const entregue = pedido.status === 'entregue'
   const parcial  = pedido.status === 'parcialmente_recebido'
   const atrasado = dias !== null && dias < 0 && !entregue && !parcial
-
-  // Recebimento: can receive if confirmado, em_entrega, or parcialmente_recebido
-  const podeReceber = ['confirmado', 'em_entrega', 'parcialmente_recebido'].includes(pedido.status)
+  const statusPgto = (pedido as any).status_pagamento as string | undefined
+  const isPago     = statusPgto === 'pago'
+  const isLiberado = statusPgto === 'liberado'
   const qtdTotal     = pedido.qtd_itens_total ?? 0
   const qtdRecebidos = pedido.qtd_itens_recebidos ?? 0
 
-  // Payment status helpers
+  return (
+    <div
+      onClick={onClick}
+      className={`rounded-2xl border cursor-pointer transition-all hover:shadow-md ${
+        dark
+          ? `bg-[#1e293b] border-white/10 hover:border-white/20`
+          : `bg-white ${atrasado ? 'border-red-200' : isPago ? 'border-emerald-300' : isLiberado ? 'border-orange-200' : entregue ? 'border-emerald-200' : 'border-slate-200'} shadow-sm`
+      }`}
+    >
+      <div className="p-4 space-y-2">
+        {/* Header: number + status + value */}
+        <div className="flex items-start justify-between gap-2">
+          <div className="min-w-0">
+            <span className={`text-[10px] font-mono ${dark ? 'text-slate-500' : 'text-slate-400'}`}>{getDisplayNumber(pedido)}</span>
+            <p className={`text-sm font-bold truncate ${dark ? 'text-white' : 'text-slate-800'}`}>{pedido.fornecedor_nome}</p>
+          </div>
+          <p className="text-sm font-extrabold text-teal-500 flex-shrink-0">{fmt(pedido.valor_total)}</p>
+        </div>
+
+        {/* RC + Obra */}
+        {pedido.requisicao && (
+          <p className={`text-xs truncate ${dark ? 'text-slate-400' : 'text-slate-500'}`}>
+            <span className={`font-mono ${dark ? 'text-slate-500' : 'text-slate-300'}`}>{pedido.requisicao.numero}</span>
+            {' · '}{pedido.requisicao.descricao}
+            {pedido.requisicao.obra_nome && <span className={dark ? 'text-slate-500' : 'text-slate-400'}> · {pedido.requisicao.obra_nome}</span>}
+          </p>
+        )}
+
+        {/* Status badges + dates */}
+        <div className="flex flex-wrap items-center gap-1.5">
+          <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${dark ? st.bgDark + ' ' + st.textDark : st.bg + ' ' + st.text}`}>{st.label}</span>
+          {pending && <span className="text-[10px] text-amber-600 font-bold">RC aprovada</span>}
+          {isPago && <span className="flex items-center gap-0.5 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-700"><CheckCircle size={9} /> Pago</span>}
+          {isLiberado && !isPago && <span className="flex items-center gap-0.5 px-2 py-0.5 rounded-full text-[10px] font-bold bg-orange-100 text-orange-700"><Clock size={9} /> Aguard. Pgto</span>}
+          {atrasado && <span className="flex items-center gap-0.5 text-[10px] text-red-600 font-bold"><AlertTriangle size={10} /> {Math.abs(dias!)}d atr.</span>}
+          {parcial && qtdTotal > 0 && <span className="text-[10px] text-amber-600 font-bold">{qtdRecebidos}/{qtdTotal} receb.</span>}
+        </div>
+
+        {/* Dates row */}
+        <div className={`flex flex-wrap gap-x-4 gap-y-1 text-[11px] ${dark ? 'text-slate-400' : 'text-slate-500'}`}>
+          <span>Pedido: {fmtData(pedido.data_pedido)}</span>
+          <span className={atrasado ? 'text-red-500 font-semibold' : ''}>
+            Prev: {fmtDataISO(pedido.data_prevista_entrega)}
+            {dias !== null && !entregue && !pending && <span className="ml-0.5">({dias}d)</span>}
+          </span>
+          {pedido.data_entrega_real && <span className="text-emerald-500">Entreg: {fmtData(pedido.data_entrega_real)}</span>}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ─── DetailModal ─────────────────────────────────────────────────────────────
+
+function DetailModal({
+  pedido,
+  dark,
+  onClose,
+  onCompartilhar,
+  onLiberarPagamento,
+  onReceber,
+}: {
+  pedido: PedidoListItem
+  dark: boolean
+  onClose: () => void
+  onCompartilhar: (p: PedidoListItem) => void
+  onLiberarPagamento: (id: string) => void
+  onReceber: (p: Pedido) => void
+}) {
+  const mutation = useAtualizarPedido()
+  const emitirPedido = useEmitirPedido()
+  const [confirmando, setConfirmando] = useState(false)
+  const [showEmitirModal, setShowEmitirModal] = useState(false)
+
+  const dias     = diasRestantes(pedido.data_prevista_entrega)
+  const st       = getStatusMeta(pedido)
+  const pending  = isPendingEmission(pedido)
+  const entregue = pedido.status === 'entregue'
+  const parcial  = pedido.status === 'parcialmente_recebido'
+  const atrasado = dias !== null && dias < 0 && !entregue && !parcial
+  const podeReceber = !pending && ['emitido', 'confirmado', 'em_entrega', 'parcialmente_recebido'].includes(pedido.status)
+  const qtdTotal     = pedido.qtd_itens_total ?? 0
+  const qtdRecebidos = pedido.qtd_itens_recebidos ?? 0
   const statusPgto     = (pedido as any).status_pagamento as string | undefined
   const liberadoEm     = (pedido as any).liberado_pagamento_em as string | undefined
   const pagoEm         = (pedido as any).pago_em as string | undefined
@@ -874,388 +975,573 @@ function PedidoCard({
   const confirmarEntrega = async () => {
     setConfirmando(true)
     try {
-      await mutation.mutateAsync({
-        id:                pedido.id,
-        status:            'entregue',
-        data_entrega_real: new Date().toISOString().split('T')[0],
-      })
+      await mutation.mutateAsync({ id: pedido.id, status: 'entregue', data_entrega_real: new Date().toISOString().split('T')[0] })
     } finally {
       setConfirmando(false)
     }
   }
 
-  // Border / header color
-  const borderClass = atrasado
-    ? 'border-red-200'
-    : isPago
-    ? 'border-emerald-300'
-    : isLiberado
-    ? 'border-orange-200'
-    : entregue
-    ? 'border-emerald-200'
-    : 'border-slate-200'
-
-  const headerClass = atrasado
-    ? 'bg-red-50 border-red-100'
-    : isPago
-    ? 'bg-emerald-50 border-emerald-100'
-    : isLiberado
-    ? 'bg-orange-50 border-orange-100'
-    : entregue
-    ? 'bg-emerald-50 border-emerald-100'
-    : 'bg-slate-50 border-slate-100'
+  const bg  = dark ? 'bg-[#0f172a]' : 'bg-white'
+  const txt = dark ? 'text-white' : 'text-slate-800'
+  const sub = dark ? 'text-slate-400' : 'text-slate-500'
+  const brd = dark ? 'border-white/10' : 'border-slate-200'
 
   return (
-    <div className={`bg-white rounded-2xl border shadow-sm overflow-hidden ${borderClass}`}>
-      {/* Header */}
-      <div className={`px-4 py-3 border-b flex items-center justify-between gap-2 ${headerClass}`}>
-        <div className="flex items-center gap-1.5 min-w-0 flex-wrap">
-          {pedido.numero_pedido && (
-            <span className="text-[10px] font-mono text-slate-400 flex-shrink-0">
-              #{pedido.numero_pedido}
-            </span>
-          )}
-          <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold flex-shrink-0 ${st.bg} ${st.text}`}>
-            {st.label}
-          </span>
-
-          {/* Payment status badges */}
-          {isPago && (
-            <span className="flex items-center gap-0.5 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-700 flex-shrink-0">
-              <CheckCircle size={9} /> Pago
-              {pagoEm && <span className="ml-0.5 font-normal">· {fmtData(pagoEm)}</span>}
-            </span>
-          )}
-          {isLiberado && !isPago && (
-            <span className="flex items-center gap-0.5 px-2 py-0.5 rounded-full text-[10px] font-bold bg-orange-100 text-orange-700 flex-shrink-0">
-              <Clock size={9} /> Aguardando Pagamento
-            </span>
-          )}
-
-          {atrasado && (
-            <span className="flex items-center gap-0.5 text-[10px] text-red-600 font-bold flex-shrink-0">
-              <AlertTriangle size={10} /> {Math.abs(dias!)}d atrasado
-            </span>
-          )}
-        </div>
-
-        <div className="flex items-center gap-1 flex-shrink-0">
-          {/* Compartilhar / Pedido button */}
-          <button
-            onClick={() => onCompartilhar(pedido)}
-            title="Ver / Compartilhar Pedido"
-            className="flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-semibold text-teal-600 bg-teal-50 border border-teal-200 hover:bg-teal-100 transition-colors"
-          >
-            <Share2 size={11} />
-            <span className="hidden sm:inline">Pedido</span>
-          </button>
-
-          <button
-            onClick={() => setExpanded(!expanded)}
-            className="p-1 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors"
-          >
-            {expanded ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
-          </button>
-        </div>
-      </div>
-
-      {/* Body */}
-      <div className="p-4 space-y-3">
-        {/* Fornecedor + valor */}
-        <div className="flex items-start justify-between gap-2">
-          <div className="min-w-0">
-            <p className="text-sm font-bold text-slate-800 truncate">{pedido.fornecedor_nome}</p>
-            {pedido.requisicao && (
-              <p className="text-xs text-slate-400 truncate mt-0.5">{pedido.requisicao.obra_nome}</p>
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-black/50 backdrop-blur-sm" onClick={onClose}>
+      <div onClick={e => e.stopPropagation()} className={`${bg} rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto`}>
+        {/* Header */}
+        <div className={`sticky top-0 z-10 ${bg} px-5 py-4 border-b ${brd} flex items-center justify-between`}>
+          <div>
+            <p className={`text-xs ${sub}`}>{pending ? 'Pedido Pendente' : 'Pedido de Compra'}</p>
+            <p className={`text-base font-bold ${txt}`}>{getDisplayNumber(pedido)}</p>
+          </div>
+          <div className="flex items-center gap-2">
+            {!pending && (
+              <button onClick={() => onCompartilhar(pedido)} className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-semibold text-teal-600 bg-teal-50 border border-teal-200 hover:bg-teal-100 transition-colors">
+                <Share2 size={12} /> Pedido
+              </button>
             )}
+            <button onClick={onClose} className={`p-1.5 rounded-lg transition-colors ${dark ? 'text-slate-400 hover:text-white hover:bg-white/10' : 'text-slate-400 hover:text-slate-600 hover:bg-slate-100'}`}>
+              <X size={18} />
+            </button>
           </div>
-          <p className="text-base font-extrabold text-teal-600 flex-shrink-0">{fmt(pedido.valor_total)}</p>
         </div>
 
-        {/* RC origem */}
-        {pedido.requisicao && (
-          <p className="text-xs text-slate-500 line-clamp-1">
-            <span className="font-mono text-slate-300">{pedido.requisicao.numero}</span>
-            {' · '}
-            {pedido.requisicao.descricao}
-          </p>
-        )}
-
-        {/* Timeline */}
-        <FluxoTimeline status="pedido_emitido" compact />
-
-        {/* Datas */}
-        <div className="grid grid-cols-2 gap-2 text-xs">
-          <div>
-            <span className="text-slate-400">Pedido em</span>
-            <p className="font-semibold text-slate-700">{fmtData(pedido.data_pedido)}</p>
+        <div className="p-5 space-y-5">
+          {/* Status badges */}
+          <div className="flex flex-wrap gap-1.5">
+            <span className={`px-2.5 py-1 rounded-full text-xs font-semibold ${dark ? st.bgDark + ' ' + st.textDark : st.bg + ' ' + st.text}`}>{st.label}</span>
+            {pending && <span className="flex items-center gap-0.5 px-2.5 py-1 rounded-full text-xs font-bold bg-teal-50 text-teal-700 border border-teal-200"><FileText size={11} /> Cotacao aprovada</span>}
+            {isPago && <span className="flex items-center gap-0.5 px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-100 text-emerald-700"><CheckCircle size={11} /> Pago {pagoEm && `· ${fmtData(pagoEm)}`}</span>}
+            {isLiberado && !isPago && <span className="flex items-center gap-0.5 px-2.5 py-1 rounded-full text-xs font-bold bg-orange-100 text-orange-700"><Clock size={11} /> Aguard. Pgto</span>}
+            {atrasado && <span className="flex items-center gap-0.5 px-2.5 py-1 rounded-full text-xs font-bold bg-red-100 text-red-700"><AlertTriangle size={11} /> {Math.abs(dias!)}d atrasado</span>}
           </div>
-          <div>
-            <span className="text-slate-400">Prev. entrega</span>
-            <p className={`font-semibold ${atrasado ? 'text-red-600' : 'text-slate-700'}`}>
-              {fmtDataISO(pedido.data_prevista_entrega)}
-              {dias !== null && !entregue && (
-                <span className={`ml-1 text-[10px] ${atrasado ? 'text-red-500' : dias <= 2 ? 'text-amber-500' : 'text-slate-400'}`}>
-                  {atrasado ? `(${Math.abs(dias)}d atr.)` : `(${dias}d)`}
-                </span>
-              )}
-            </p>
-          </div>
-          {pedido.data_entrega_real && (
-            <div>
-              <span className="text-slate-400">Entregue em</span>
-              <p className="font-semibold text-emerald-600">{fmtData(pedido.data_entrega_real)}</p>
-            </div>
-          )}
-          {pedido.nf_numero && (
-            <div>
-              <span className="text-slate-400">NF</span>
-              <p className="font-semibold text-slate-700 font-mono">{pedido.nf_numero}</p>
-            </div>
-          )}
-          {liberadoEm && (
-            <div>
-              <span className="text-slate-400">Liberado em</span>
-              <p className="font-semibold text-orange-600">{fmtData(liberadoEm)}</p>
-            </div>
-          )}
-          {pagoEm && (
-            <div>
-              <span className="text-slate-400">Pago em</span>
-              <p className="font-semibold text-emerald-600">{fmtData(pagoEm)}</p>
-            </div>
-          )}
-        </div>
 
-        {/* Expanded: observações + anexos */}
-        {expanded && (
-          <div className="space-y-3 pt-1">
-            {pedido.observacoes && (
-              <div className="bg-slate-50 rounded-xl p-3 border border-slate-200">
-                <p className="text-[11px] text-slate-400 font-semibold uppercase tracking-wide mb-1">Observações</p>
-                <p className="text-[11px] text-slate-500 leading-relaxed">{pedido.observacoes}</p>
+          {/* Info grid */}
+          <div className={`grid grid-cols-2 gap-3 text-xs border rounded-xl p-4 ${brd}`}>
+            <div>
+              <span className={sub}>Fornecedor</span>
+              <p className={`font-semibold ${txt}`}>{pedido.fornecedor_nome}</p>
+            </div>
+            <div>
+              <span className={sub}>Valor Total</span>
+              <p className="font-extrabold text-teal-500 text-sm">{fmt(pedido.valor_total)}</p>
+            </div>
+            {pedido.requisicao && (
+              <>
+                <div>
+                  <span className={sub}>Requisição</span>
+                  <p className={`font-semibold ${txt}`}>{pedido.requisicao.numero}</p>
+                </div>
+                <div>
+                  <span className={sub}>Obra</span>
+                  <p className={`font-semibold ${txt}`}>{pedido.requisicao.obra_nome ?? '—'}</p>
+                </div>
+              </>
+            )}
+            <div>
+              <span className={sub}>Data Pedido</span>
+              <p className={`font-semibold ${txt}`}>{pending ? 'Nao emitido' : fmtData(pedido.data_pedido)}</p>
+            </div>
+            <div>
+              <span className={sub}>{pending ? 'Status da RC' : 'Prev. Entrega'}</span>
+              <p className={`font-semibold ${atrasado ? 'text-red-500' : txt}`}>
+                {pending ? 'Cotacao aprovada' : fmtDataISO(pedido.data_prevista_entrega)}
+                {dias !== null && !entregue && !pending && <span className="text-[10px] ml-1">({dias}d)</span>}
+              </p>
+            </div>
+            {pedido.data_entrega_real && (
+              <div>
+                <span className={sub}>Entregue em</span>
+                <p className="font-semibold text-emerald-500">{fmtData(pedido.data_entrega_real)}</p>
               </div>
             )}
+            {pedido.nf_numero && (
+              <div>
+                <span className={sub}>NF</span>
+                <p className={`font-semibold font-mono ${txt}`}>{pedido.nf_numero}</p>
+              </div>
+            )}
+            {liberadoEm && (
+              <div>
+                <span className={sub}>Liberado em</span>
+                <p className="font-semibold text-orange-500">{fmtData(liberadoEm)}</p>
+              </div>
+            )}
+            {pagoEm && (
+              <div>
+                <span className={sub}>Pago em</span>
+                <p className="font-semibold text-emerald-500">{fmtData(pagoEm)}</p>
+              </div>
+            )}
+          </div>
 
-            {/* Documentos organizados por categoria */}
+          {/* Observacoes */}
+          {pedido.observacoes && (
+            <div className={`rounded-xl p-3 border ${dark ? 'bg-white/[0.02] border-white/10' : 'bg-slate-50 border-slate-200'}`}>
+              <p className={`text-[11px] font-semibold uppercase tracking-wide mb-1 ${sub}`}>Observações</p>
+              <p className={`text-xs leading-relaxed ${sub}`}>{pedido.observacoes}</p>
+            </div>
+          )}
+
+          {/* Recebimento progress */}
+          {parcial && qtdTotal > 0 && (
+            <div className="space-y-1">
+              <div className="flex items-center justify-between text-[11px]">
+                <span className="text-amber-600 font-bold">Recebido parcialmente</span>
+                <span className={`font-semibold ${sub}`}>{qtdRecebidos}/{qtdTotal} itens</span>
+              </div>
+              <div className={`w-full h-1.5 rounded-full overflow-hidden ${dark ? 'bg-white/10' : 'bg-slate-100'}`}>
+                <div className="h-full bg-amber-400 rounded-full transition-all" style={{ width: `${Math.min(100, (qtdRecebidos / qtdTotal) * 100)}%` }} />
+              </div>
+            </div>
+          )}
+
+          {/* Timeline */}
+          {!pending && <FluxoTimeline status="pedido_emitido" compact />}
+
+          {/* Requisição description */}
+          {pedido.requisicao?.descricao && (
+            <div className={`rounded-xl p-3 border ${dark ? 'bg-white/[0.02] border-white/10' : 'bg-slate-50 border-slate-200'}`}>
+              <p className={`text-[11px] font-semibold uppercase tracking-wide mb-1 ${sub}`}>Descrição da RC</p>
+              <p className={`text-xs leading-relaxed ${sub}`}>{pedido.requisicao.descricao}</p>
+            </div>
+          )}
+
+          {/* Documentos */}
+          {!pending && (
             <div>
-              <p className="text-[11px] text-slate-400 font-semibold uppercase tracking-wide mb-2 flex items-center gap-1">
+              <p className={`text-[11px] font-semibold uppercase tracking-wide mb-2 flex items-center gap-1 ${sub}`}>
                 <Paperclip size={11} /> Documentos
               </p>
               <AnexosOrganizados pedidoId={pedido.id} cotacaoId={pedido.cotacao_id} />
             </div>
+          )}
+
+          {/* Actions */}
+          <div className="space-y-2 pt-1">
+            {pending && (
+              <button onClick={() => setShowEmitirModal(true)} disabled={emitirPedido.isPending} className="w-full flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-bold bg-teal-50 text-teal-700 border border-teal-300 hover:bg-teal-500 hover:text-white transition-all disabled:opacity-50">
+                {emitirPedido.isPending
+                  ? <div className="w-4 h-4 border-2 border-teal-400 border-t-transparent rounded-full animate-spin" />
+                  : <FileText size={16} />}
+                {emitirPedido.isPending ? 'Emitindo...' : 'Emitir Pedido'}
+              </button>
+            )}
+            {podeReceber && (
+              <button onClick={() => onReceber(pedido)} className="w-full flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-bold bg-teal-600 text-white border border-teal-700 hover:bg-teal-700 transition-all shadow-sm">
+                <Package size={16} /> {parcial ? 'Receber Restante' : 'Confirmar Recebimento'}
+              </button>
+            )}
+            {!pending && pedido.status === 'emitido' && !podeReceber && (
+              <button onClick={confirmarEntrega} disabled={confirmando || mutation.isPending} className={`w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-semibold border transition-all disabled:opacity-50 ${dark ? 'bg-white/5 text-slate-300 border-white/10 hover:bg-white/10' : 'bg-slate-50 text-slate-500 border-slate-200 hover:bg-slate-100'}`}>
+                {confirmando ? <div className="w-3.5 h-3.5 border-2 border-slate-400 border-t-transparent rounded-full animate-spin" /> : <CheckCircle size={14} />}
+                Confirmar Entrega Direta
+              </button>
+            )}
+            {podeLiberar && (
+              <button onClick={() => onLiberarPagamento(pedido.id)} className="w-full flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-bold bg-emerald-50 text-emerald-700 border border-emerald-300 hover:bg-emerald-600 hover:text-white transition-all">
+                <Banknote size={16} /> Liberar para Pagamento
+              </button>
+            )}
+            {entregue && !podeLiberar && !isLiberado && !isPago && (
+              <div className="flex items-center gap-2 text-emerald-500 text-xs font-semibold"><CheckCircle size={14} /> Entrega confirmada {pedido.data_entrega_real ? `em ${fmtData(pedido.data_entrega_real)}` : ''}</div>
+            )}
+            {entregue && isLiberado && !isPago && (
+              <div className="flex items-center gap-2 text-orange-500 text-xs font-semibold"><Clock size={14} /> Aguardando pagamento · liberado em {fmtData(liberadoEm)}</div>
+            )}
+            {isPago && (
+              <div className="flex items-center gap-2 text-emerald-500 text-xs font-semibold"><CheckCircle size={14} /> Pagamento confirmado {pagoEm ? `em ${fmtData(pagoEm)}` : ''}</div>
+            )}
           </div>
-        )}
-
-        {/* Action buttons */}
-        <div className="space-y-2 pt-1">
-          {/* Receber pedido (new flow) */}
-          {podeReceber && (
-            <button
-              onClick={() => onReceber(pedido)}
-              className="w-full flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-bold bg-teal-50 text-teal-700 border border-teal-300 hover:bg-teal-500 hover:text-white transition-all"
-            >
-              <Package size={16} />
-              {parcial ? 'Receber Restante' : 'Receber'}
-            </button>
-          )}
-          {/* Recebimento progress */}
-          {parcial && qtdTotal > 0 && (
-            <div className="space-y-1">
-              <div className="flex items-center justify-between text-[10px]">
-                <span className="text-amber-600 font-bold">Recebido parcialmente</span>
-                <span className="text-slate-400 font-semibold">{qtdRecebidos}/{qtdTotal} itens</span>
-              </div>
-              <div className="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                <div
-                  className="h-full bg-amber-400 rounded-full transition-all"
-                  style={{ width: `${Math.min(100, (qtdRecebidos / qtdTotal) * 100)}%` }}
-                />
-              </div>
-            </div>
-          )}
-          {/* Confirmar entrega (legacy / direct) */}
-          {pedido.status === 'emitido' && (
-            <button
-              onClick={confirmarEntrega}
-              disabled={confirmando || mutation.isPending}
-              className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-semibold bg-slate-50 text-slate-500 border border-slate-200 hover:bg-slate-100 transition-all disabled:opacity-50"
-            >
-              {confirmando
-                ? <div className="w-3.5 h-3.5 border-2 border-slate-400 border-t-transparent rounded-full animate-spin" />
-                : <CheckCircle size={14} />}
-              Confirmar Entrega Direta
-            </button>
-          )}
-
-          {/* Liberar para pagamento */}
-          {podeLiberar && (
-            <button
-              onClick={() => onLiberarPagamento(pedido.id)}
-              className="w-full flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-bold bg-emerald-50 text-emerald-700 border border-emerald-300 hover:bg-emerald-600 hover:text-white transition-all"
-            >
-              <Banknote size={16} />
-              Liberar para Pagamento
-            </button>
-          )}
-
-          {/* Confirmed / paid status line */}
-          {entregue && !podeLiberar && !isLiberado && !isPago && (
-            <div className="flex items-center gap-2 text-emerald-600 text-xs font-semibold">
-              <CheckCircle size={14} />
-              Entrega confirmada {pedido.data_entrega_real ? `em ${fmtData(pedido.data_entrega_real)}` : ''}
-            </div>
-          )}
-          {entregue && isLiberado && !isPago && (
-            <div className="flex items-center gap-2 text-orange-500 text-xs font-semibold">
-              <Clock size={14} />
-              Aguardando pagamento · liberado em {fmtData(liberadoEm)}
-            </div>
-          )}
-          {isPago && (
-            <div className="flex items-center gap-2 text-emerald-600 text-xs font-semibold">
-              <CheckCircle size={14} />
-              Pagamento confirmado {pagoEm ? `em ${fmtData(pagoEm)}` : ''}
-            </div>
-          )}
         </div>
+
+        {pending && pedido.requisicao_id && (
+          <EmitirPedidoModal
+            open={showEmitirModal}
+            onClose={() => setShowEmitirModal(false)}
+            requisicaoId={pedido.requisicao_id}
+            cotacao={{
+              id: pedido.source_cotacao?.id,
+              fornecedorNome: pedido.fornecedor_nome,
+              valorTotal: pedido.valor_total ?? 0,
+              compradorId: pedido.source_cotacao?.comprador_id ?? undefined,
+            }}
+            onConfirm={(payload) => {
+              emitirPedido.mutate({
+                requisicaoId: pedido.requisicao_id!,
+                ...payload,
+              }, {
+                onSuccess: () => {
+                  setShowEmitirModal(false)
+                  onClose()
+                },
+              })
+            }}
+            isSubmitting={emitirPedido.isPending}
+          />
+        )}
       </div>
     </div>
   )
 }
 
-// ─── Pedidos page ─────────────────────────────────────────────────────────────
+// ─── CSV export ──────────────────────────────────────────────────────────────
+
+function exportCSV(rows: PedidoListItem[]) {
+  const header = 'Numero,Fornecedor,Valor,Status,Obra,Data Pedido,Prev Entrega,Entregue Em,NF'
+  const lines = rows.map(p =>
+    [
+      p.numero_pedido ?? p.requisicao?.numero ?? '',
+      `"${p.fornecedor_nome}"`,
+      p.valor_total ?? '',
+      isPendingEmission(p) ? 'pendente_emissao' : p.status,
+      `"${p.requisicao?.obra_nome ?? ''}"`,
+      p.data_pedido ?? '',
+      p.data_prevista_entrega ?? '',
+      p.data_entrega_real ?? '',
+      p.nf_numero ?? '',
+    ].join(',')
+  )
+  const blob = new Blob([header + '\n' + lines.join('\n')], { type: 'text/csv' })
+  const a = document.createElement('a')
+  a.href = URL.createObjectURL(blob)
+  a.download = `pedidos_${new Date().toISOString().slice(0, 10)}.csv`
+  a.click()
+}
+
+// ─── Main page ───────────────────────────────────────────────────────────────
 
 export default function Pedidos() {
+  const { theme } = useTheme()
+  const dark = theme === 'dark'
+
   const [searchParams, setSearchParams] = useSearchParams()
   const highlightPedidoId = searchParams.get('pedido')
 
-  const [statusFilter, setStatusFilter]         = useState('')
-  const [compartilharPedido, setCompartilhar]   = useState<Pedido | null>(null)
-  const [showLiberarModal, setShowLiberarModal] = useState<string | null>(null)
-  const [receberPedido, setReceberPedido]       = useState<Pedido | null>(null)
+  const [activeTab, setActiveTab]                   = useState<PipelineTab>('pendente')
+  const [search, setSearch]                         = useState('')
+  const [sortField, setSortField]                   = useState<SortField>('data')
+  const [sortDir, setSortDir]                       = useState<SortDir>('desc')
+  const [viewMode, setViewMode]                     = useState<ViewMode>('cards')
+  const [selectedPedido, setSelectedPedido]         = useState<PedidoListItem | null>(null)
+  const [compartilharPedido, setCompartilhar]       = useState<PedidoListItem | null>(null)
+  const [showLiberarModal, setShowLiberarModal]     = useState<string | null>(null)
+  const [receberPedido, setReceberPedido]           = useState<Pedido | null>(null)
 
-  // Limpar o query param após exibir para não manter na URL
+  // Clear highlight param after 2s
   useEffect(() => {
     if (highlightPedidoId) {
-      const timeout = setTimeout(() => {
-        setSearchParams({}, { replace: true })
-      }, 2000)
+      const timeout = setTimeout(() => setSearchParams({}, { replace: true }), 2000)
       return () => clearTimeout(timeout)
     }
   }, [highlightPedidoId, setSearchParams])
 
-  const { data: pedidos, isLoading } = usePedidos(
-    statusFilter === 'liberado_pagamento' || statusFilter === 'pago'
-      ? undefined
-      : statusFilter || undefined
+  const { data: pedidos, isLoading: isLoadingPedidos } = usePedidos()
+  const { data: cotacoes = [], isLoading: isLoadingCotacoes } = useCotacoes()
+
+  // Exclude cancelado
+  const allPedidos = useMemo(() => (pedidos ?? []).filter(p => p.status !== 'cancelado'), [pedidos])
+  const pedidosByReq = useMemo(() => new Set(allPedidos.map(p => p.requisicao_id).filter(Boolean)), [allPedidos])
+  const pendingApprovalPedidos = useMemo<PedidoListItem[]>(
+    () => cotacoes
+      .filter(c => c.status === 'concluida' && c.requisicao?.status === 'cotacao_aprovada')
+      .filter(c => !pedidosByReq.has(c.requisicao_id))
+      .map(c => ({
+        id: `cotacao-aprovada-${c.id}`,
+        requisicao_id: c.requisicao_id,
+        cotacao_id: c.id,
+        comprador_id: c.comprador_id,
+        fornecedor_nome: c.fornecedor_selecionado_nome ?? 'Fornecedor nao definido',
+        valor_total: c.valor_selecionado ?? c.requisicao?.valor_estimado,
+        status: 'emitido',
+        created_at: c.data_conclusao ?? c.created_at,
+        observacoes: c.observacao,
+        requisicao: c.requisicao
+          ? {
+              numero: c.requisicao.numero,
+              descricao: c.requisicao.descricao,
+              obra_nome: c.requisicao.obra_nome,
+              categoria: c.requisicao.categoria,
+            }
+          : undefined,
+        pending_emissao: true,
+        source_cotacao: { id: c.id, comprador_id: c.comprador_id },
+      })),
+    [cotacoes, pedidosByReq],
   )
+  const allPedidoItems = useMemo<PedidoListItem[]>(
+    () => [...pendingApprovalPedidos, ...allPedidos],
+    [pendingApprovalPedidos, allPedidos],
+  )
+  const isLoading = isLoadingPedidos || isLoadingCotacoes
 
-  // Client-side filter for payment status tabs
-  const filtered = (pedidos ?? []).filter(p => {
-    const pgto = (p as any).status_pagamento as string | undefined
-    if (statusFilter === 'liberado_pagamento') return pgto === 'liberado'
-    if (statusFilter === 'pago') return pgto === 'pago'
-    return true
-  })
+  // Count per tab
+  const counts = useMemo(() => {
+    const c: Record<PipelineTab, number> = { pendente: 0, emitido: 0, entregue: 0, liberado: 0, encerrado: 0 }
+    for (const p of allPedidoItems) {
+      for (const stage of PIPELINE_STAGES) {
+        if (stage.matchFn(p)) { c[stage.key]++; break }
+      }
+    }
+    return c
+  }, [allPedidoItems])
 
-  // Sort: atrasados first, then by data prevista
-  const sorted = filtered.slice().sort((a, b) => {
-    const diasA = diasRestantes(a.data_prevista_entrega) ?? 9999
-    const diasB = diasRestantes(b.data_prevista_entrega) ?? 9999
-    return diasA - diasB
-  })
+  // Filter by active tab
+  const stage = PIPELINE_STAGES.find(s => s.key === activeTab)!
+  const tabFiltered = useMemo(() => allPedidoItems.filter(stage.matchFn), [allPedidoItems, stage])
 
-  const atrasados = sorted.filter(p => {
-    const d = diasRestantes(p.data_prevista_entrega)
-    return d !== null && d < 0 && p.status !== 'entregue'
-  })
+  // Search
+  const searched = useMemo(() => {
+    if (!search.trim()) return tabFiltered
+    const q = search.toLowerCase()
+    return tabFiltered.filter(p =>
+      (p.numero_pedido ?? '').toLowerCase().includes(q) ||
+      p.fornecedor_nome.toLowerCase().includes(q) ||
+      (p.requisicao?.descricao ?? '').toLowerCase().includes(q) ||
+      (p.requisicao?.obra_nome ?? '').toLowerCase().includes(q) ||
+      (p.nf_numero ?? '').toLowerCase().includes(q)
+    )
+  }, [tabFiltered, search])
 
-  const liberarPedido = sorted.find(p => p.id === showLiberarModal)
+  // Sort
+  const sorted = useMemo(() => {
+    const arr = [...searched]
+    const dir = sortDir === 'asc' ? 1 : -1
+    arr.sort((a, b) => {
+      if (sortField === 'data') {
+        return dir * ((a.data_pedido ?? '').localeCompare(b.data_pedido ?? ''))
+      }
+      if (sortField === 'valor') {
+        return dir * ((a.valor_total ?? 0) - (b.valor_total ?? 0))
+      }
+      return dir * ((a.fornecedor_nome ?? '').localeCompare(b.fornecedor_nome ?? ''))
+    })
+    return arr
+  }, [searched, sortField, sortDir])
+
+  const toggleSort = (f: SortField) => {
+    if (sortField === f) setSortDir(d => d === 'asc' ? 'desc' : 'asc')
+    else { setSortField(f); setSortDir('desc') }
+  }
+
+  const liberarPedido = sorted.find(p => p.id === showLiberarModal && !isPendingEmission(p)) ?? allPedidos.find(p => p.id === showLiberarModal)
+
+  // Auto-open detail if highlight param
+  useEffect(() => {
+    if (highlightPedidoId && allPedidoItems.length > 0) {
+      const found = allPedidoItems.find(p => p.id === highlightPedidoId)
+      if (found) setSelectedPedido(found)
+    }
+  }, [highlightPedidoId, allPedidoItems])
+
+  // ── Render ─────────────────────────────────────────────────────────────────
 
   return (
     <div className="space-y-4">
-      {/* Page title */}
+      {/* Title */}
       <div className="flex items-center justify-between">
-        <h2 className="text-lg font-extrabold text-slate-800 tracking-tight flex items-center gap-2">
+        <h2 className={`text-lg font-extrabold tracking-tight flex items-center gap-2 ${dark ? 'text-white' : 'text-slate-800'}`}>
           <Truck size={18} className="text-teal-500" />
           Pedidos
         </h2>
-        {atrasados.length > 0 && (
-          <span className="flex items-center gap-1 text-xs font-bold text-red-600 bg-red-50 border border-red-200 rounded-full px-2.5 py-1">
-            <AlertTriangle size={11} /> {atrasados.length} atrasado{atrasados.length !== 1 ? 's' : ''}
-          </span>
-        )}
       </div>
 
-      {/* Status tabs */}
-      <div className="flex gap-1.5 overflow-x-auto pb-1 -mx-1 px-1">
-        {STATUS_TABS.map(tab => (
-          <button
-            key={tab.value}
-            onClick={() => setStatusFilter(tab.value)}
-            className={`px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-all flex-shrink-0 ${
-              statusFilter === tab.value
-                ? 'bg-slate-800 text-white shadow-sm'
-                : 'bg-white text-slate-500 border border-slate-200'
+      {/* Pipeline tabs */}
+      <div className={`flex gap-1 p-1 rounded-2xl border overflow-x-auto hide-scrollbar ${dark ? 'bg-white/[0.02] border-white/[0.06]' : 'bg-slate-50 border-slate-200'}`}>
+        {PIPELINE_STAGES.map(st => {
+          const active = activeTab === st.key
+          const acc = dark ? STATUS_ACCENT_DARK[st.key] : STATUS_ACCENT[st.key]
+          const Icon = st.icon
+          return (
+            <button
+              key={st.key}
+              onClick={() => setActiveTab(st.key)}
+              className={`min-w-fit md:flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold whitespace-nowrap transition-all border ${
+                active
+                  ? `${acc.bgActive} ${acc.textActive} ${acc.border} shadow-sm`
+                  : dark
+                    ? `${acc.text} ${acc.bg} border-transparent`
+                    : `${acc.text} ${acc.bg} border-transparent hover:bg-white hover:shadow-sm`
+              }`}
+            >
+              <Icon size={15} className="shrink-0" />
+              <span>{st.label}</span>
+              <span className={`ml-1 min-w-[22px] px-1.5 py-0.5 rounded-full text-[10px] font-bold text-center ${
+                active
+                  ? acc.badge
+                  : dark
+                    ? 'bg-white/[0.06] text-slate-500'
+                    : 'bg-slate-100 text-slate-500'
+              }`}>
+                {counts[st.key]}
+              </span>
+            </button>
+          )
+        })}
+      </div>
+
+      {/* Toolbar */}
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="relative flex-1 min-w-[180px]">
+          <Search size={14} className={`absolute left-3 top-1/2 -translate-y-1/2 ${dark ? 'text-slate-500' : 'text-slate-400'}`} />
+          <input
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            placeholder="Buscar pedido, fornecedor, NF..."
+            className={`w-full pl-9 pr-8 py-2 rounded-xl text-xs border focus:outline-none focus:ring-2 focus:ring-teal-400 ${
+              dark ? 'bg-white/5 border-white/10 text-white placeholder:text-slate-500' : 'bg-white border-slate-200 text-slate-700 placeholder:text-slate-400'
             }`}
-          >
-            {tab.label}
+          />
+          {search && (
+            <button onClick={() => setSearch('')} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
+              <X size={14} />
+            </button>
+          )}
+        </div>
+
+        {/* Sort buttons */}
+        {(['data', 'valor', 'fornecedor'] as SortField[]).map(f => {
+          const labels: Record<SortField, string> = { data: 'Data', valor: 'Valor', fornecedor: 'Fornecedor' }
+          const active = sortField === f
+          return (
+            <button
+              key={f}
+              onClick={() => toggleSort(f)}
+              className={`flex items-center gap-1 px-2.5 py-2 rounded-xl text-[11px] font-semibold border transition-all ${
+                active
+                  ? dark ? 'bg-white/10 border-white/20 text-white' : 'bg-teal-50 border-teal-200 text-teal-700'
+                  : dark ? 'bg-white/5 border-white/10 text-slate-400 hover:text-white' : 'bg-white border-slate-200 text-slate-500 hover:text-slate-700'
+              }`}
+            >
+              {labels[f]}
+              {active && (sortDir === 'asc' ? <ArrowUp size={11} /> : <ArrowDown size={11} />)}
+            </button>
+          )
+        })}
+
+        {/* View toggle */}
+        <div className={`flex rounded-xl border overflow-hidden ${dark ? 'border-white/10' : 'border-slate-200'}`}>
+          <button onClick={() => setViewMode('cards')} className={`p-2 ${viewMode === 'cards' ? (dark ? 'bg-white/10 text-white' : 'bg-teal-50 text-teal-600') : (dark ? 'text-slate-500 hover:text-white' : 'text-slate-400 hover:text-slate-600')}`}>
+            <LayoutGrid size={14} />
           </button>
-        ))}
+          <button onClick={() => setViewMode('list')} className={`p-2 ${viewMode === 'list' ? (dark ? 'bg-white/10 text-white' : 'bg-teal-50 text-teal-600') : (dark ? 'text-slate-500 hover:text-white' : 'text-slate-400 hover:text-slate-600')}`}>
+            <LayoutList size={14} />
+          </button>
+        </div>
+
+        {/* CSV export */}
+        <button onClick={() => exportCSV(sorted)} className={`p-2 rounded-xl border transition-colors ${dark ? 'border-white/10 text-slate-400 hover:text-white hover:bg-white/10' : 'border-slate-200 text-slate-400 hover:text-teal-600 hover:bg-teal-50'}`} title="Exportar CSV">
+          <Download size={14} />
+        </button>
       </div>
 
-      {/* List */}
+      {/* Content */}
       {isLoading ? (
         <div className="flex justify-center py-10">
           <div className="w-6 h-6 border-[3px] border-teal-500 border-t-transparent rounded-full animate-spin" />
         </div>
       ) : sorted.length === 0 ? (
-        <div className="text-center py-12 text-slate-400">
-          <Package size={32} className="mx-auto mb-2 opacity-30" />
-          <p className="text-sm">Nenhum pedido encontrado</p>
+        <div className="text-center py-12">
+          <Package size={32} className={`mx-auto mb-2 ${dark ? 'text-slate-600' : 'text-slate-300'}`} />
+          <p className={`text-sm ${dark ? 'text-slate-500' : 'text-slate-400'}`}>
+            {search ? 'Nenhum pedido encontrado para essa busca' : 'Nenhum pedido nesta etapa'}
+          </p>
+        </div>
+      ) : viewMode === 'cards' ? (
+        <div className="space-y-2 p-4">
+          {sorted.map(p => (
+            <PedCard key={p.id} pedido={p} dark={dark} onClick={() => setSelectedPedido(p)} />
+          ))}
         </div>
       ) : (
-        <div className="space-y-3">
-          {sorted.map(p => (
-            <PedidoCard
-              key={p.id}
-              pedido={p}
-              initialExpanded={p.id === highlightPedidoId}
-              onCompartilhar={setCompartilhar}
-              onLiberarPagamento={id => setShowLiberarModal(id)}
-              onReceber={setReceberPedido}
-            />
-          ))}
+        /* Table view */
+        <div className={`rounded-xl border overflow-x-auto ${dark ? 'border-white/10' : 'border-slate-200'}`}>
+          <table className="w-full text-xs">
+            <thead>
+              <tr className={dark ? 'bg-white/[0.03] text-slate-400' : 'bg-slate-50 text-slate-500'}>
+                <th className="text-left px-3 py-2.5 font-semibold">Número</th>
+                <th className="text-left px-3 py-2.5 font-semibold">Fornecedor</th>
+                <th className="text-left px-3 py-2.5 font-semibold">Obra</th>
+                <th className="text-right px-3 py-2.5 font-semibold">Valor</th>
+                <th className="text-left px-3 py-2.5 font-semibold">Status</th>
+                <th className="text-left px-3 py-2.5 font-semibold">Prev. Entrega</th>
+                <th className="text-left px-3 py-2.5 font-semibold">Data Pedido</th>
+              </tr>
+            </thead>
+            <tbody className={`divide-y ${dark ? 'divide-white/5' : 'divide-slate-100'}`}>
+              {sorted.map(p => {
+                const st2 = getStatusMeta(p)
+                const pending = isPendingEmission(p)
+                const d = diasRestantes(p.data_prevista_entrega)
+                const atr = !pending && d !== null && d < 0 && p.status !== 'entregue' && p.status !== 'parcialmente_recebido'
+                return (
+                  <tr
+                    key={p.id}
+                    onClick={() => setSelectedPedido(p)}
+                    className={`cursor-pointer transition-colors ${dark ? 'hover:bg-white/[0.03]' : 'hover:bg-slate-50'}`}
+                  >
+                    <td className={`px-3 py-2.5 font-mono ${dark ? 'text-slate-400' : 'text-slate-500'}`}>
+                      {getDisplayNumber(p)}
+                    </td>
+                    <td className={`px-3 py-2.5 font-semibold ${dark ? 'text-white' : 'text-slate-800'}`}>
+                      {p.fornecedor_nome}
+                    </td>
+                    <td className={`px-3 py-2.5 ${dark ? 'text-slate-400' : 'text-slate-500'}`}>
+                      {p.requisicao?.obra_nome ?? '—'}
+                    </td>
+                    <td className="px-3 py-2.5 text-right font-bold text-teal-500">
+                      {fmt(p.valor_total)}
+                    </td>
+                    <td className="px-3 py-2.5">
+                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${dark ? st2.bgDark + ' ' + st2.textDark : st2.bg + ' ' + st2.text}`}>
+                        {st2.label}
+                      </span>
+                    </td>
+                    <td className={`px-3 py-2.5 ${atr ? 'text-red-500 font-semibold' : dark ? 'text-slate-400' : 'text-slate-500'}`}>
+                      {pending ? 'Cotacao aprovada' : fmtDataISO(p.data_prevista_entrega)}
+                      {d !== null && p.status !== 'entregue' && !pending && <span className="ml-1 text-[10px]">({d}d)</span>}
+                    </td>
+                    <td className={`px-3 py-2.5 ${dark ? 'text-slate-400' : 'text-slate-500'}`}>
+                      {pending ? 'Nao emitido' : fmtData(p.data_pedido)}
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
         </div>
       )}
 
-      <p className="text-center text-xs text-slate-300 py-2">
-        {sorted.length} pedido{sorted.length !== 1 ? 's' : ''}
+      <p className={`text-center text-xs py-2 ${dark ? 'text-slate-600' : 'text-slate-300'}`}>
+        {sorted.length} item{sorted.length !== 1 ? 's' : ''}
       </p>
+
+      {/* Detail modal */}
+      {selectedPedido && (
+        <DetailModal
+          pedido={selectedPedido}
+          dark={dark}
+          onClose={() => setSelectedPedido(null)}
+          onCompartilhar={p => { setSelectedPedido(null); setCompartilhar(p) }}
+          onLiberarPagamento={id => { setSelectedPedido(null); setShowLiberarModal(id) }}
+          onReceber={p => { setSelectedPedido(null); setReceberPedido(p) }}
+        />
+      )}
 
       {/* Compartilhar modal */}
       {compartilharPedido && (
-        <CompartilharModal
-          pedido={compartilharPedido}
-          onClose={() => setCompartilhar(null)}
-        />
+        <CompartilharModal pedido={compartilharPedido} onClose={() => setCompartilhar(null)} dark={dark} />
       )}
 
       {/* Liberar pagamento modal */}
       {showLiberarModal && liberarPedido && (
-        <LiberarPagamentoModal
-          pedido={liberarPedido}
-          onClose={() => setShowLiberarModal(null)}
-        />
+        <LiberarPagamentoModal pedido={liberarPedido} onClose={() => setShowLiberarModal(null)} />
       )}
 
       {/* Recebimento modal */}
       {receberPedido && (
-        <RecebimentoModal
-          pedido={receberPedido}
-          onClose={() => setReceberPedido(null)}
-        />
+        <RecebimentoModal pedido={receberPedido} onClose={() => setReceberPedido(null)} />
       )}
     </div>
   )

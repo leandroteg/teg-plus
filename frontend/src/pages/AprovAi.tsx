@@ -817,7 +817,10 @@ function GenericPendingCard({ aprovacao, aprovadorNome, aprovadorEmail }: {
 
         {/* ── Resumo Executivo para Minuta Contratual ── */}
         {aprovacao.tipo_aprovacao === 'minuta_contratual' && aprovacao.minuta_resumo ? (
-          <MinutaExecutiveSummary resumo={aprovacao.minuta_resumo} />
+          <MinutaExecutiveSummary
+            resumo={aprovacao.minuta_resumo}
+            referencia={aprovacao.requisicao?.numero ?? aprovacao.entidade_numero}
+          />
         ) : aprovacao.tipo_aprovacao === 'autorizacao_pagamento' && aprovacao.pagamento_detalhes ? (
           <PagamentoDetalhesCard detalhes={aprovacao.pagamento_detalhes} />
         ) : aprovacao.tipo_aprovacao === 'autorizacao_pagamento' && aprovacao.requisicao ? (
@@ -928,7 +931,11 @@ function PagamentoDetalhesCard({ detalhes }: {
   detalhes: NonNullable<AprovacaoPendente['pagamento_detalhes']>
 }) {
   const [showEntender, setShowEntender] = useState(false)
-  const fmtDate = (d: string) => d ? new Date(d + 'T00:00:00').toLocaleDateString('pt-BR') : '—'
+  const fmtDate = (d: string) => {
+    if (!d) return '—'
+    const dt = new Date(d.length === 10 ? d + 'T00:00:00' : d)
+    return isNaN(dt.getTime()) ? '—' : dt.toLocaleDateString('pt-BR')
+  }
   const isVencida = detalhes.data_vencimento && new Date(detalhes.data_vencimento) < new Date()
 
   return (
@@ -1031,10 +1038,13 @@ function PagamentoDetalhesCard({ detalhes }: {
 
 // ── Minuta Executive Summary (inline in GenericPendingCard) ───────────────────
 
-function MinutaExecutiveSummary({ resumo }: {
+function MinutaExecutiveSummary({ resumo, referencia }: {
   resumo: NonNullable<AprovacaoPendente['minuta_resumo']>
+  referencia?: string
 }) {
   const fmtDate = (d: string) => d ? new Date(d).toLocaleDateString('pt-BR') : '—'
+  const tituloResumo = resumo.objeto || resumo.minuta_titulo || 'Contrato sem titulo'
+  const linhaContexto = [resumo.contraparte, referencia].filter(Boolean).join(' • ')
 
   return (
     <div className="space-y-3">
@@ -1044,19 +1054,23 @@ function MinutaExecutiveSummary({ resumo }: {
           <FileSignature size={13} className="text-indigo-500" />
           <span className="text-[11px] font-bold text-indigo-600 uppercase tracking-wider">Resumo Executivo</span>
         </div>
+        <div className="rounded-xl border border-indigo-100 bg-white/80 px-3 py-2.5">
+          <p className="text-sm font-bold text-slate-800 leading-snug">{tituloResumo}</p>
+          <p className="text-[11px] font-semibold text-slate-500 mt-0.5">
+            {linhaContexto || 'Contrato sem referencia'}
+          </p>
+        </div>
         <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-xs">
-          <div>
-            <span className="text-slate-400">Contraparte</span>
-            <p className="font-semibold text-slate-800">{resumo.contraparte || '—'}</p>
-          </div>
           <div>
             <span className="text-slate-400">Valor Estimado</span>
             <p className="font-extrabold text-indigo-700">{resumo.valor_estimado > 0 ? fmt(resumo.valor_estimado) : '—'}</p>
           </div>
-          <div className="col-span-2">
-            <span className="text-slate-400">Objeto</span>
-            <p className="font-medium text-slate-700 leading-snug">{resumo.objeto || '—'}</p>
-          </div>
+          {resumo.contraparte && (
+            <div>
+              <span className="text-slate-400">Contraparte</span>
+              <p className="font-semibold text-slate-800">{resumo.contraparte}</p>
+            </div>
+          )}
           {resumo.tipo_contrato && (
             <div>
               <span className="text-slate-400">Tipo</span>

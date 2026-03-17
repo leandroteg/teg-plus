@@ -6,15 +6,21 @@ import {
 } from 'lucide-react'
 import {
   useSolicitacoes, useCriarSolicitacao, useAtualizarStatusSolicitacao,
-  useAprovarSolicitacao, usePlanejaarSolicitacao, useTransportadoras, useRotas,
+  useAprovarSolicitacao, usePlanejaarSolicitacao,
 } from '../../hooks/useLogistica'
+import { useFornecedores } from '../../hooks/useFinanceiro'
 import { useCriarSolicitacao as useCriarSolicitacaoNF } from '../../hooks/useSolicitacoesNF'
 import { useConsultaCNPJ } from '../../hooks/useConsultas'
 import { StatusBadge } from './LogisticaHome'
 import { useTheme } from '../../contexts/ThemeContext'
 import type { CriarSolicitacaoPayload, TipoTransporte, StatusSolicitacao } from '../../types/logistica'
 import { useNavigate } from 'react-router-dom'
-import { useLookupObras, useLookupCentrosCusto } from '../../hooks/useLookups'
+import { useLookupCentrosCusto } from '../../hooks/useLookups'
+
+const UF_LIST = [
+  'AC','AL','AM','AP','BA','CE','DF','ES','GO','MA','MG','MS','MT',
+  'PA','PB','PE','PI','PR','RJ','RN','RO','RR','RS','SC','SE','SP','TO',
+]
 
 const TIPO_LABEL: Record<TipoTransporte, string> = {
   viagem:                  'Viagem',
@@ -28,7 +34,6 @@ const EMPTY_FORM: CriarSolicitacaoPayload = {
   origem: '',
   destino: '',
   descricao: '',
-  urgente: false,
 }
 
 const ALÇADAS = [
@@ -66,14 +71,12 @@ export default function Solicitacoes() {
   const [nfForm, setNfForm] = useState({ fornecedor_cnpj: '', fornecedor_nome: '', valor_total: 0, descricao: '' })
   const [itensForm, setItensForm] = useState<{ descricao: string; quantidade: number; unidade: string; peso_kg?: number; volume_m3?: number }[]>([])
   const navigate = useNavigate()
-  const obras = useLookupObras()
   const centrosCusto = useLookupCentrosCusto()
 
   const { data: solicitacoes = [], isLoading } = useSolicitacoes(
     statusFiltro ? { status: statusFiltro as StatusSolicitacao } : undefined
   )
-  const { data: transportadoras = [] } = useTransportadoras()
-  const { data: rotas = [] } = useRotas()
+  const { data: fornecedores = [] } = useFornecedores()
   const criar = useCriarSolicitacao()
   const atualizarStatus = useAtualizarStatusSolicitacao()
   const aprovar = useAprovarSolicitacao()
@@ -374,43 +377,32 @@ export default function Solicitacoes() {
                     ))}
                   </select>
                 </div>
-                <div>
-                  <label className={`block text-xs font-bold mb-1 ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>Rota Padrão</label>
-                  <select
-                    onChange={e => {
-                      const r = rotas.find(r => r.id === e.target.value)
-                      setForm(p => ({ ...p, origem: r?.origem ?? p.origem, destino: r?.destino ?? p.destino }))
-                    }}
-                    className="input-base"
-                  >
-                    <option value="">Selecionar rota...</option>
-                    {rotas.map(r => <option key={r.id} value={r.id}>{r.nome}</option>)}
-                  </select>
-                </div>
               </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className={`block text-xs font-bold mb-1 ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>Origem *</label>
+              <div>
+                <label className={`block text-xs font-bold mb-1 ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>Origem *</label>
+                <div className="grid grid-cols-3 gap-2">
                   <input value={form.origem} onChange={e => set('origem', e.target.value)}
-                    className="input-base" placeholder="Cidade / Depósito" />
+                    className="input-base col-span-2" placeholder="Cidade" />
+                  <select value={(form as any).origem_uf ?? ''} onChange={e => set('origem_uf' as any, e.target.value)}
+                    className="input-base">
+                    <option value="">UF</option>
+                    {UF_LIST.map(uf => <option key={uf} value={uf}>{uf}</option>)}
+                  </select>
                 </div>
-                <div>
-                  <label className={`block text-xs font-bold mb-1 ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>Destino *</label>
+              </div>
+              <div>
+                <label className={`block text-xs font-bold mb-1 ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>Destino *</label>
+                <div className="grid grid-cols-3 gap-2">
                   <input value={form.destino} onChange={e => set('destino', e.target.value)}
-                    className="input-base" placeholder="Obra / Cidade" />
+                    className="input-base col-span-2" placeholder="Cidade" />
+                  <select value={(form as any).destino_uf ?? ''} onChange={e => set('destino_uf' as any, e.target.value)}
+                    className="input-base">
+                    <option value="">UF</option>
+                    {UF_LIST.map(uf => <option key={uf} value={uf}>{uf}</option>)}
+                  </select>
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className={`block text-xs font-bold mb-1 ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>Obra / Projeto</label>
-                  <select value={form.obra_nome ?? ''} onChange={e => set('obra_nome', e.target.value)}
-                    className="input-base">
-                    <option value="">Selecione...</option>
-                    {obras.map(o => (
-                      <option key={o.id} value={o.nome}>{o.codigo} - {o.nome}</option>
-                    ))}
-                  </select>
-                </div>
                 <div>
                   <label className={`block text-xs font-bold mb-1 ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>Centro de Custo</label>
                   <select value={form.centro_custo ?? ''} onChange={e => set('centro_custo', e.target.value)}
@@ -420,13 +412,6 @@ export default function Solicitacoes() {
                       <option key={cc.id} value={cc.codigo}>{cc.codigo} - {cc.descricao}</option>
                     ))}
                   </select>
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className={`block text-xs font-bold mb-1 ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>OC Vinculada</label>
-                  <input value={form.oc_numero ?? ''} onChange={e => set('oc_numero', e.target.value)}
-                    className="input-base" placeholder="OC-2026-0001" />
                 </div>
                 <div>
                   <label className={`block text-xs font-bold mb-1 ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>Data Desejada</label>
@@ -507,23 +492,11 @@ export default function Solicitacoes() {
 
               <div className="flex gap-4">
                 <label className="flex items-center gap-2 cursor-pointer">
-                  <input type="checkbox" checked={form.urgente ?? false} onChange={e => set('urgente', e.target.checked)}
-                    className="rounded border-slate-300 text-orange-600 focus:ring-orange-500" />
-                  <span className={`text-xs font-semibold ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>Urgente</span>
-                </label>
-                <label className="flex items-center gap-2 cursor-pointer">
                   <input type="checkbox" checked={form.carga_especial ?? false} onChange={e => set('carga_especial', e.target.checked)}
                     className="rounded border-slate-300 text-orange-600 focus:ring-orange-500" />
                   <span className={`text-xs font-semibold ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>Carga Especial</span>
                 </label>
               </div>
-              {form.urgente && (
-                <div>
-                  <label className={`block text-xs font-bold mb-1 ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>Justificativa da Urgência *</label>
-                  <textarea value={form.justificativa_urgencia ?? ''} onChange={e => set('justificativa_urgencia', e.target.value)}
-                    rows={2} className="input-base resize-none" placeholder="Motivo da urgência..." />
-                </div>
-              )}
             </div>
             <div className={`px-6 py-4 flex justify-end gap-2 ${isDark ? 'border-t border-white/[0.06]' : 'border-t border-slate-100'}`}>
               <button onClick={() => setShowForm(false)}
@@ -565,12 +538,12 @@ export default function Solicitacoes() {
               </div>
               {planejForm.modal === 'transportadora' && (
                 <div>
-                  <label className={`block text-xs font-bold mb-1 ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>Transportadora</label>
+                  <label className={`block text-xs font-bold mb-1 ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>Fornecedor (Transportadora)</label>
                   <select value={planejForm.transportadora_id ?? ''} onChange={e => setPlanejForm((p: PlanejamentoForm) => ({ ...p, transportadora_id: e.target.value }))}
                     className="input-base">
                     <option value="">Selecione...</option>
-                    {transportadoras.filter(t => t.ativo).map(t => (
-                      <option key={t.id} value={t.id}>{t.nome_fantasia ?? t.razao_social}</option>
+                    {fornecedores.filter((f: any) => f.ativo !== false).map((f: any) => (
+                      <option key={f.id} value={f.id}>{f.nome_fantasia ?? f.razao_social}</option>
                     ))}
                   </select>
                 </div>

@@ -4,13 +4,13 @@ type: index
 status: ativo
 tags: [teg-plus, erp, moc, index]
 criado: 2026-03-02
-atualizado: 2026-03-10
+atualizado: 2026-03-12
 ---
 
 # TEG+ ERP — Mapa da Aplicação
 
 > Sistema ERP modular para gestão de obras de engenharia elétrica/transmissão.
-> **8 módulos operacionais** · 2 em planejamento · 14 milestones · 30 tarefas
+> **13 módulos operacionais** · 1 em planejamento (RH) · 14 milestones · 30 tarefas
 
 ---
 
@@ -36,6 +36,11 @@ atualizado: 2026-03-10
 | [[Paineis/Frotas Dashboard\|🚛 Frotas]] | 80% | ✅ Operacional |
 | [[Paineis/RH Dashboard\|👥 RH]] | 5% | 🔜 Q2 2026 |
 | [[Paineis/Cadastros Dashboard\|⚙️ Cadastros]] | 100% | ✅ Operacional |
+| Fiscal | 80% | ✅ Operacional |
+| Controladoria | 70% | ✅ Operacional |
+| PMO/EGP | 75% | ✅ Operacional |
+| Obras | 70% | ✅ Operacional |
+| SSMA | 10% | 🔜 Q2-Q3 2026 |
 
 > **Como usar:** edite os arquivos em `Database/Tarefas/`, `Database/Issues/`, `Database/Requisitos/` ou `Database/Milestones/` — os painéis atualizam automaticamente via Dataview.
 
@@ -73,6 +78,11 @@ atualizado: 2026-03-10
 | Upload Inteligente Cotação | [[26 - Upload Inteligente Cotacao]] |
 | Módulo Contratos | [[27 - Módulo Contratos Gestão]] |
 | Módulo Cadastros AI | [[28 - Módulo Cadastros AI]] |
+| Módulo Fiscal | [[29 - Módulo Fiscal]] |
+| Módulo Controladoria | [[30 - Módulo Controladoria]] |
+| Módulo PMO/EGP | [[31 - Módulo PMO-EGP]] |
+| Módulo Obras | [[32 - Módulo Obras]] |
+| Módulo SSMA | [[33 - Módulo SSMA]] |
 
 ---
 
@@ -107,9 +117,13 @@ graph LR
     M --> L[✅ Logística]
     M --> FR[✅ Frotas]
     M --> R[🔜 RH]
-    M --> S[🔜 SSMA]
+    M --> SS[✅ SSMA]
     M --> K[✅ Contratos]
     M --> CAD[✅ Cadastros]
+    M --> FIS[✅ Fiscal]
+    M --> CTRL[✅ Controladoria]
+    M --> PMO[✅ PMO/EGP]
+    M --> OBR[✅ Obras]
 
     CAD --> CAD1[Fornecedores 🤖]
     CAD --> CAD2[Itens]
@@ -136,15 +150,36 @@ graph LR
     FR --> FR2[Checklists]
     FR --> FR3[Telemetria]
 
+    FIS --> FIS1[Pipeline NF]
+    FIS --> FIS2[Histórico NF]
+
+    CTRL --> CTRL1[DRE]
+    CTRL --> CTRL2[KPIs]
+    CTRL --> CTRL3[Orçamentos]
+    CTRL --> CTRL4[Alertas]
+
+    PMO --> PMO1[Portfólio]
+    PMO --> PMO2[EAP/TAP]
+    PMO --> PMO3[Cronograma]
+    PMO --> PMO4[Medições]
+
+    OBR --> OBR1[Apontamentos]
+    OBR --> OBR2[RDO]
+    OBR --> OBR3[Adiantamentos]
+
     style C  fill:#10B981,color:#fff
     style F  fill:#10B981,color:#fff
     style E  fill:#3B82F6,color:#fff
     style L  fill:#EA580C,color:#fff
     style FR fill:#F43F5E,color:#fff
     style R  fill:#64748B,color:#fff
-    style S  fill:#64748B,color:#fff
+    style SS fill:#64748B,color:#fff
     style K  fill:#8B5CF6,color:#fff
     style CAD fill:#8B5CF6,color:#fff
+    style FIS fill:#F59E0B,color:#fff
+    style CTRL fill:#14B8A6,color:#fff
+    style PMO fill:#6366F1,color:#fff
+    style OBR fill:#059669,color:#fff
 ```
 
 ---
@@ -171,12 +206,15 @@ graph LR
 | AprovAi Multi-tipo | ✅ Entregue | 4 tipos: Compras, Pagamentos, Minutas Contratuais, Validacao Tec. Requisicao |
 | ApprovalBadge (Header) | ✅ Entregue | Badge com contador de pendencias no header global |
 | Cadastros AI (Master Data) | ✅ Entregue | 6 entidades, MagicModal AI/Manual, CNPJ/CPF lookup, em todos os modulos |
+| Fiscal — Emissão NF | ✅ Entregue | Pipeline Kanban + histórico NFs + Painel Fiscal |
+| Controladoria — BI | ✅ Entregue | DRE, orçamentos, KPIs, cenários, plano/controle orçamentário, alertas |
+| PMO/EGP | ✅ Entregue | Portfólio, TAP, EAP, cronograma, medições, histograma, custos, reuniões |
+| Obras | ✅ Entregue | Apontamentos, RDO, adiantamentos, prestação de contas, planejamento de equipe |
+| SSMA (stub) | ✅ Entregue | Tela de roadmap com funcionalidades planejadas Q2-Q4 2026 |
 | WhatsApp (Evolution API) | 🔜 Q1 2026 | Notificações automáticas |
 | RH Completo | 🔜 Q2 2026 | Colaboradores, ponto, folha, eSocial |
 | AI TEG+ (Claude API) | 🔜 Q2-Q3 2026 | Agente conversacional + RAG |
-| SSMA | 🔜 Q3 2026 | Segurança, NRs, DDS, EPI |
-| Contratos — Medicoes e Aditivos | 🔜 Q3 2026 | BM, aditivos, reajustes (extensao do modulo Contratos v2) |
-| Controladoria e BI | 🔜 Q3 2026 | DRE, orçado vs realizado, EBITDA |
+| SSMA — Módulo Completo | 🔜 Q2-Q4 2026 | Ocorrências, EPIs, checklists, treinamentos NR, auditorias |
 | Monday.com PMO | 🔜 Q4 2026 | Gestão de portfólio das 6 obras |
 
 ---
@@ -192,4 +230,4 @@ graph LR
 
 ---
 
-*Vault gerado em 2026-03-02 a partir do codigo-fonte. Ultima atualizacao: 2026-03-10.*
+*Vault gerado em 2026-03-02 a partir do codigo-fonte. Ultima atualizacao: 2026-03-12.*

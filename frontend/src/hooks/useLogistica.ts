@@ -145,14 +145,10 @@ export function usePlanejaarSolicitacao() {
       data_prevista_saida?: string
       custo_estimado?: number
     }) => {
-      // Decide se precisa de aprovação de custo (acima de R$ 500)
-      const precisaAprovacao = (custo_estimado ?? 0) > 500
-      const novoStatus = precisaAprovacao ? 'aguardando_aprovacao' : 'aprovado'
-
       const { data, error } = await supabase
         .from('log_solicitacoes')
         .update({
-          status: novoStatus,
+          status: 'planejado' as const,
           modal, transportadora_id, veiculo_placa, motorista_nome,
           motorista_telefone, data_prevista_saida, custo_estimado,
           updated_at: new Date().toISOString(),
@@ -184,6 +180,66 @@ export function useAprovarSolicitacao() {
           motivo_reprovacao: aprovado ? undefined : motivo,
           updated_at: new Date().toISOString(),
         })
+        .eq('id', id)
+        .select()
+        .single()
+      if (error) throw error
+      return data as LogSolicitacao
+    },
+    onSuccess: (data) => {
+      qc.invalidateQueries({ queryKey: ['log_solicitacoes'] })
+      qc.invalidateQueries({ queryKey: ['log_solicitacao', data.id] })
+    },
+  })
+}
+
+export function useEnviarParaAprovacao() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ id }: { id: string }) => {
+      const { data, error } = await supabase
+        .from('log_solicitacoes')
+        .update({ status: 'aguardando_aprovacao', updated_at: new Date().toISOString() })
+        .eq('id', id)
+        .select()
+        .single()
+      if (error) throw error
+      return data as LogSolicitacao
+    },
+    onSuccess: (data) => {
+      qc.invalidateQueries({ queryKey: ['log_solicitacoes'] })
+      qc.invalidateQueries({ queryKey: ['log_solicitacao', data.id] })
+    },
+  })
+}
+
+export function useConfirmarAgendamento() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ id }: { id: string }) => {
+      const { data, error } = await supabase
+        .from('log_solicitacoes')
+        .update({ status: 'aguardando_coleta', updated_at: new Date().toISOString() })
+        .eq('id', id)
+        .select()
+        .single()
+      if (error) throw error
+      return data as LogSolicitacao
+    },
+    onSuccess: (data) => {
+      qc.invalidateQueries({ queryKey: ['log_solicitacoes'] })
+      qc.invalidateQueries({ queryKey: ['log_solicitacao', data.id] })
+    },
+  })
+}
+
+export function useConcluirSolicitacao() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ id }: { id: string }) => {
+      const { data, error } = await supabase
+        .from('log_solicitacoes')
+        .update({ status: 'concluido', updated_at: new Date().toISOString() })
         .eq('id', id)
         .select()
         .single()
@@ -616,7 +672,7 @@ export function useConfirmarRecebimento() {
         await supabase
           .from('log_solicitacoes')
           .update({
-            status: status === 'confirmado' ? 'confirmado' : 'confirmado',
+            status: 'concluido' as const,
             updated_at: agora,
           })
           .eq('id', solicitacao_id)
@@ -730,7 +786,7 @@ export function useLogisticaKPIs() {
       const totalAbertas = await supabase
         .from('log_solicitacoes')
         .select('id', { count: 'exact', head: true })
-        .in('status', ['solicitado', 'validando', 'planejado', 'aguardando_aprovacao', 'aprovado', 'nfe_emitida', 'romaneio_emitido'])
+        .in('status', ['solicitado', 'planejado', 'aguardando_aprovacao', 'aprovado', 'nfe_emitida', 'romaneio_emitido', 'aguardando_coleta'])
 
       return {
         total_solicitacoes: solTotal.count ?? 0,

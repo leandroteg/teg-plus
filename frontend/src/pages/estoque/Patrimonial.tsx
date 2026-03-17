@@ -1,8 +1,9 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import {
   Landmark, Plus, Search, X, Save, Loader2,
   TrendingDown, AlertTriangle, CheckCircle2, Wrench,
   ArrowLeftRight, FileText, ChevronDown, ChevronRight, RefreshCw,
+  LayoutGrid, LayoutList,
 } from 'lucide-react'
 import {
   useImobilizados, useSalvarImobilizado, useBaixarImobilizado,
@@ -15,9 +16,9 @@ import type { PatImobilizado, StatusImobilizado } from '../../types/estoque'
 
 const STATUS_CONFIG: Record<StatusImobilizado, { label: string; bg: string; text: string; dot: string }> = {
   ativo:            { label: 'Ativo',            bg: 'bg-emerald-50', text: 'text-emerald-700', dot: 'bg-emerald-500' },
-  em_manutencao:    { label: 'Em Manutencao',    bg: 'bg-amber-50',   text: 'text-amber-700',   dot: 'bg-amber-500'   },
+  em_manutencao:    { label: 'Em Manuten\u00e7\u00e3o',    bg: 'bg-amber-50',   text: 'text-amber-700',   dot: 'bg-amber-500'   },
   cedido:           { label: 'Cedido',           bg: 'bg-blue-50',    text: 'text-blue-700',    dot: 'bg-blue-500'    },
-  em_transferencia:  { label: 'Em Transferencia', bg: 'bg-indigo-50',  text: 'text-indigo-700',  dot: 'bg-indigo-500'  },
+  em_transferencia:  { label: 'Em Transfer\u00eancia', bg: 'bg-indigo-50',  text: 'text-indigo-700',  dot: 'bg-indigo-500'  },
   baixado:           { label: 'Baixado',          bg: 'bg-slate-100',  text: 'text-slate-500',   dot: 'bg-slate-400'   },
   pendente_registro: { label: 'Pendente',         bg: 'bg-violet-50',  text: 'text-violet-700',  dot: 'bg-violet-500'  },
 }
@@ -36,7 +37,21 @@ const COMPETENCIA = (() => {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
 })()
 
-export default function Patrimonial() {
+interface PatrimonialProps {
+  forcedStatusFiltro?: string
+  allowedStatuses?: StatusImobilizado[]
+  showDepreciadosOnly?: boolean
+  hideHeader?: boolean
+}
+
+type ViewMode = 'cards' | 'list'
+
+export default function Patrimonial({
+  forcedStatusFiltro,
+  allowedStatuses,
+  showDepreciadosOnly = false,
+  hideHeader = false,
+}: PatrimonialProps) {
   const { isLightSidebar: isLight } = useTheme()
   const [busca, setBusca] = useState('')
   const [statusFiltro, setStatusFiltro] = useState<string>('')
@@ -45,9 +60,11 @@ export default function Patrimonial() {
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const [showBaixaModal, setShowBaixaModal] = useState<string | null>(null)
   const [motivoBaixa, setMotivoBaixa] = useState('')
+  const [viewMode, setViewMode] = useState<ViewMode>('cards')
 
+  const filtroAtivo = forcedStatusFiltro ?? statusFiltro
   const { data: imobs = [], isLoading } = useImobilizados(
-    statusFiltro ? { status: statusFiltro } : undefined
+    filtroAtivo ? { status: filtroAtivo } : undefined
   )
   const { data: kpis } = usePatrimonialKPIs()
   const { data: bases = [] } = useBases()
@@ -55,13 +72,23 @@ export default function Patrimonial() {
   const baixar = useBaixarImobilizado()
   const calcDeprec = useCalcularDepreciacao()
 
-  const filtrados = busca.trim()
-    ? imobs.filter(i =>
-        i.descricao.toLowerCase().includes(busca.toLowerCase()) ||
-        i.numero_patrimonio.toLowerCase().includes(busca.toLowerCase()) ||
-        i.categoria?.toLowerCase().includes(busca.toLowerCase())
-      )
-    : imobs
+  const filtrados = useMemo(() => {
+    let base = allowedStatuses?.length
+      ? imobs.filter(i => allowedStatuses.includes(i.status))
+      : imobs
+
+    if (showDepreciadosOnly) {
+      base = base.filter(i => (i.percentual_depreciado ?? 0) >= 100)
+    }
+
+    return busca.trim()
+      ? base.filter(i =>
+          i.descricao.toLowerCase().includes(busca.toLowerCase()) ||
+          i.numero_patrimonio.toLowerCase().includes(busca.toLowerCase()) ||
+          i.categoria?.toLowerCase().includes(busca.toLowerCase())
+        )
+      : base
+  }, [allowedStatuses, busca, imobs, showDepreciadosOnly])
 
   async function handleSave() {
     if (!editItem) return
@@ -93,39 +120,41 @@ export default function Patrimonial() {
     <div className="space-y-4">
 
       {/* -- Header --------------------------------------------------- */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className={`text-xl font-extrabold ${isLight ? 'text-slate-800' : 'text-white'}`}>Patrimonial</h1>
-          <p className={`text-xs mt-0.5 ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>{filtrados.length} imobilizados</p>
+      {!hideHeader && (
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className={`text-xl font-extrabold ${isLight ? 'text-slate-800' : 'text-white'}`}>{'Patrim\u00f4nio'}</h1>
+            <p className={`text-xs mt-0.5 ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>{filtrados.length} imobilizados</p>
+          </div>
+          <div className="flex gap-2">
+            <button
+              onClick={() => calcDeprec.mutate(COMPETENCIA)}
+              disabled={calcDeprec.isPending}
+              title={`Calcular deprecia\u00e7\u00e3o ${COMPETENCIA}`}
+              className={`flex items-center gap-1.5 border text-sm font-semibold px-3 py-2 rounded-xl transition-colors
+                ${isLight ? 'bg-white hover:bg-slate-50 border-slate-200 text-slate-600' : 'bg-white/[0.03] hover:bg-white/[0.05] border-white/[0.08] text-slate-300'}`}
+            >
+              {calcDeprec.isPending ? <Loader2 size={14} className="animate-spin" /> : <TrendingDown size={14} />}
+              Depreciar
+            </button>
+            <button
+              onClick={() => { setEditItem({ ...EMPTY_FORM }); setShowForm(true) }}
+              className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white
+                text-sm font-semibold px-4 py-2 rounded-xl transition-colors shadow-sm"
+            >
+              <Plus size={15} /> Novo
+            </button>
+          </div>
         </div>
-        <div className="flex gap-2">
-          <button
-            onClick={() => calcDeprec.mutate(COMPETENCIA)}
-            disabled={calcDeprec.isPending}
-            title={`Calcular depreciacao ${COMPETENCIA}`}
-            className={`flex items-center gap-1.5 border text-sm font-semibold px-3 py-2 rounded-xl transition-colors
-              ${isLight ? 'bg-white hover:bg-slate-50 border-slate-200 text-slate-600' : 'bg-white/[0.03] hover:bg-white/[0.05] border-white/[0.08] text-slate-300'}`}
-          >
-            {calcDeprec.isPending ? <Loader2 size={14} className="animate-spin" /> : <TrendingDown size={14} />}
-            Depreciar
-          </button>
-          <button
-            onClick={() => { setEditItem({ ...EMPTY_FORM }); setShowForm(true) }}
-            className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white
-              text-sm font-semibold px-4 py-2 rounded-xl transition-colors shadow-sm"
-          >
-            <Plus size={15} /> Novo
-          </button>
-        </div>
-      </div>
+      )}
 
       {/* -- KPI Summary -------------------------------------------- */}
       {kpis && (
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
           {[
             { color: 'bg-blue-500',   val: kpis.total_imobilizados, valCls: 'text-blue-600',   lbl: 'Total Ativos' },
-            { color: 'bg-indigo-500', val: fmt(kpis.valor_total_liquido), valCls: 'text-indigo-600', lbl: 'Valor Liquido' },
-            { color: 'bg-amber-500',  val: kpis.imobilizados_em_manutencao, valCls: 'text-amber-600', lbl: 'Em Manutencao' },
+            { color: 'bg-indigo-500', val: fmt(kpis.valor_total_liquido), valCls: 'text-indigo-600', lbl: 'Valor L\u00edquido' },
+            { color: 'bg-amber-500',  val: kpis.imobilizados_em_manutencao, valCls: 'text-amber-600', lbl: 'Em Manuten\u00e7\u00e3o' },
             { color: 'bg-red-500',    val: kpis.termos_pendentes, valCls: 'text-red-600',    lbl: 'Termos Pendentes' },
           ].map(({ color, val, valCls, lbl }) => (
             <div key={lbl} className={`rounded-2xl border overflow-hidden flex ${card}`}>
@@ -146,24 +175,54 @@ export default function Patrimonial() {
           <input
             value={busca}
             onChange={e => setBusca(e.target.value)}
-            placeholder="Buscar por patrimonio, descricao ou categoria..."
+            placeholder={'Buscar por patrim\u00f4nio, descri\u00e7\u00e3o ou categoria...'}
             className={`w-full pl-9 pr-4 py-2 rounded-xl border text-sm
               focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400
               ${isLight ? 'border-slate-200 bg-white text-slate-800' : 'border-white/[0.08] bg-white/[0.03] text-slate-200 placeholder:text-slate-500'}`}
           />
         </div>
-        <select
-          value={statusFiltro}
-          onChange={e => setStatusFiltro(e.target.value)}
-          className={`px-3 py-2 rounded-xl border text-xs font-semibold
-            focus:outline-none focus:ring-2 focus:ring-blue-500/30
-            ${isLight ? 'border-slate-200 bg-white text-slate-600' : 'border-white/[0.08] bg-white/[0.03] text-slate-300'}`}
-        >
-          <option value="">Todos os status</option>
-          {Object.entries(STATUS_CONFIG).map(([k, v]) => (
-            <option key={k} value={k}>{v.label}</option>
-          ))}
-        </select>
+        {!forcedStatusFiltro && !showDepreciadosOnly && (
+          <select
+            value={statusFiltro}
+            onChange={e => setStatusFiltro(e.target.value)}
+            className={`px-3 py-2 rounded-xl border text-xs font-semibold
+              focus:outline-none focus:ring-2 focus:ring-blue-500/30
+              ${isLight ? 'border-slate-200 bg-white text-slate-600' : 'border-white/[0.08] bg-white/[0.03] text-slate-300'}`}
+          >
+            <option value="">Todos os status</option>
+            {Object.entries(STATUS_CONFIG).map(([k, v]) => (
+              <option key={k} value={k}>{v.label}</option>
+            ))}
+          </select>
+        )}
+        <div className={`flex items-center rounded-xl border overflow-hidden ${
+          isLight ? 'border-slate-200 bg-white' : 'border-white/[0.08] bg-white/[0.03]'
+        }`}>
+          <button
+            type="button"
+            onClick={() => setViewMode('list')}
+            className={`p-2 transition-all ${
+              viewMode === 'list'
+                ? isLight ? 'bg-slate-100 text-slate-700' : 'bg-white/[0.08] text-white'
+                : isLight ? 'text-slate-400 hover:text-slate-600 hover:bg-slate-50' : 'text-slate-500 hover:text-slate-300 hover:bg-white/[0.04]'
+            }`}
+            title={'Vis\u00e3o tabela'}
+          >
+            <LayoutList size={16} />
+          </button>
+          <button
+            type="button"
+            onClick={() => setViewMode('cards')}
+            className={`p-2 transition-all ${
+              viewMode === 'cards'
+                ? isLight ? 'bg-slate-100 text-slate-700' : 'bg-white/[0.08] text-white'
+                : isLight ? 'text-slate-400 hover:text-slate-600 hover:bg-slate-50' : 'text-slate-500 hover:text-slate-300 hover:bg-white/[0.04]'
+            }`}
+            title={'Vis\u00e3o cards'}
+          >
+            <LayoutGrid size={16} />
+          </button>
+        </div>
       </div>
 
       {/* -- Lista --------------------------------------------------- */}
@@ -176,62 +235,51 @@ export default function Patrimonial() {
           <Landmark size={40} className={isLight ? 'text-slate-200' : 'text-slate-600'} />
           <p className={`font-semibold mt-3 ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>Nenhum imobilizado cadastrado</p>
         </div>
+      ) : viewMode === 'cards' ? (
+        <div className="space-y-2 p-4">
+          {filtrados.map(imob => (
+            <ImobilizadoCard
+              key={imob.id}
+              imob={imob}
+              expandedId={expandedId}
+              setExpandedId={setExpandedId}
+              onEdit={() => { setEditItem({ ...imob }); setShowForm(true) }}
+              onBaixa={() => setShowBaixaModal(imob.id)}
+              isLight={isLight}
+              card={card}
+            />
+          ))}
+        </div>
       ) : (
-        <div className="space-y-2">
-          {filtrados.map(imob => {
-            const cfg = STATUS_CONFIG[imob.status]
-            const isExpanded = expandedId === imob.id
-            const pctDeprec = imob.percentual_depreciado ?? 0
-            return (
-              <div key={imob.id} className={`rounded-2xl border overflow-hidden ${card}`}>
-                <div
-                  className={`flex items-center gap-3 px-4 py-3 cursor-pointer transition-colors ${isLight ? 'hover:bg-slate-50' : 'hover:bg-white/[0.02]'}`}
-                  onClick={() => setExpandedId(isExpanded ? null : imob.id)}
-                >
-                  <div className="w-10 h-10 rounded-xl bg-cyan-50 flex items-center justify-center shrink-0">
-                    <Landmark size={16} className="text-cyan-600" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <p className={`text-sm font-extrabold font-mono ${isLight ? 'text-slate-800' : 'text-white'}`}>{imob.numero_patrimonio}</p>
-                      <span className={`inline-flex items-center gap-1 rounded-full text-[10px] font-semibold px-2 py-0.5 ${cfg.bg} ${cfg.text}`}>
-                        <span className={`w-1.5 h-1.5 rounded-full ${cfg.dot}`} />
-                        {cfg.label}
-                      </span>
-                    </div>
-                    <p className={`text-xs mt-0.5 truncate ${isLight ? 'text-slate-600' : 'text-slate-300'}`}>{imob.descricao}</p>
-                    <p className={`text-[10px] ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>
-                      {imob.categoria}
-                      {imob.responsavel_nome ? ` - ${imob.responsavel_nome}` : ''}
-                      {imob.base_nome ? ` - ${imob.base_nome}` : ''}
-                    </p>
-                  </div>
-                  <div className="text-right shrink-0 mr-2 hidden sm:block">
-                    <p className={`text-sm font-extrabold ${isLight ? 'text-slate-700' : 'text-slate-200'}`}>{fmt(imob.valor_atual ?? imob.valor_aquisicao)}</p>
-                    <div className="flex items-center gap-1 mt-1 justify-end">
-                      <div className={`w-16 h-1.5 rounded-full overflow-hidden ${isLight ? 'bg-slate-100' : 'bg-white/[0.08]'}`}>
-                        <div
-                          className={`h-full rounded-full transition-all ${pctDeprec >= 80 ? 'bg-red-500' : pctDeprec >= 50 ? 'bg-amber-500' : 'bg-blue-500'}`}
-                          style={{ width: `${pctDeprec}%` }}
-                        />
-                      </div>
-                      <span className={`text-[10px] ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>{pctDeprec}%</span>
-                    </div>
-                  </div>
-                  {isExpanded ? <ChevronDown size={16} className="text-slate-400 shrink-0" /> : <ChevronRight size={16} className="text-slate-400 shrink-0" />}
-                </div>
-
-                {isExpanded && (
-                  <ImobilizadoDetail
+        <div className={`rounded-2xl border overflow-hidden ${card}`}>
+          <div className="overflow-x-auto">
+            <table className="min-w-full text-sm">
+              <thead className={isLight ? 'bg-slate-50' : 'bg-white/[0.03]'}>
+                <tr className={isLight ? 'text-slate-500' : 'text-slate-400'}>
+                  <th className="px-4 py-2 text-left text-[11px] font-bold uppercase tracking-wider">{'Patrim\u00f4nio'}</th>
+                  <th className="px-4 py-2 text-left text-[11px] font-bold uppercase tracking-wider">Descricao</th>
+                  <th className="px-4 py-2 text-left text-[11px] font-bold uppercase tracking-wider">Status</th>
+                  <th className="px-4 py-2 text-left text-[11px] font-bold uppercase tracking-wider">Responsavel</th>
+                  <th className="px-4 py-2 text-right text-[11px] font-bold uppercase tracking-wider">Valor</th>
+                  <th className="px-4 py-2 text-right text-[11px] font-bold uppercase tracking-wider">Deprec.</th>
+                  <th className="px-4 py-2 text-right text-[11px] font-bold uppercase tracking-wider">Acoes</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filtrados.map(imob => (
+                  <ImobilizadoTableRow
+                    key={imob.id}
                     imob={imob}
+                    expandedId={expandedId}
+                    setExpandedId={setExpandedId}
                     onEdit={() => { setEditItem({ ...imob }); setShowForm(true) }}
                     onBaixa={() => setShowBaixaModal(imob.id)}
                     isLight={isLight}
                   />
-                )}
-              </div>
-            )
-          })}
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
 
@@ -290,6 +338,176 @@ export default function Patrimonial() {
 }
 
 // -- Detalhe do Imobilizado --------------------------------------------------------
+function ImobilizadoCard({
+  imob,
+  expandedId,
+  setExpandedId,
+  onEdit,
+  onBaixa,
+  isLight,
+  card,
+}: {
+  imob: PatImobilizado
+  expandedId: string | null
+  setExpandedId: (id: string | null) => void
+  onEdit: () => void
+  onBaixa: () => void
+  isLight: boolean
+  card: string
+}) {
+  const cfg = STATUS_CONFIG[imob.status]
+  const isExpanded = expandedId === imob.id
+  const pctDeprec = imob.percentual_depreciado ?? 0
+
+  return (
+    <div className={`rounded-2xl border overflow-hidden h-full ${card}`}>
+      <div
+        className={`flex items-center gap-3 px-4 py-2.5 cursor-pointer transition-colors ${isLight ? 'hover:bg-slate-50' : 'hover:bg-white/[0.02]'}`}
+        onClick={() => setExpandedId(isExpanded ? null : imob.id)}
+      >
+        <div className="w-10 h-10 rounded-xl bg-cyan-50 flex items-center justify-center shrink-0">
+          <Landmark size={16} className="text-cyan-600" />
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2">
+            <p className={`text-sm font-extrabold font-mono ${isLight ? 'text-slate-800' : 'text-white'}`}>{imob.numero_patrimonio}</p>
+            <span className={`inline-flex items-center gap-1 rounded-full text-[10px] font-semibold px-2 py-0.5 ${cfg.bg} ${cfg.text}`}>
+              <span className={`w-1.5 h-1.5 rounded-full ${cfg.dot}`} />
+              {cfg.label}
+            </span>
+          </div>
+          <p className={`text-xs mt-0.5 truncate ${isLight ? 'text-slate-600' : 'text-slate-300'}`}>{imob.descricao}</p>
+          <p className={`text-[10px] ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>
+            {imob.categoria}
+            {imob.responsavel_nome ? ` - ${imob.responsavel_nome}` : ''}
+            {imob.base_nome ? ` - ${imob.base_nome}` : ''}
+          </p>
+        </div>
+        <div className="text-right shrink-0 mr-2 hidden sm:block">
+          <p className={`text-sm font-extrabold ${isLight ? 'text-slate-700' : 'text-slate-200'}`}>{fmt(imob.valor_atual ?? imob.valor_aquisicao)}</p>
+          <div className="flex items-center gap-1 mt-1 justify-end">
+            <div className={`w-16 h-1.5 rounded-full overflow-hidden ${isLight ? 'bg-slate-100' : 'bg-white/[0.08]'}`}>
+              <div
+                className={`h-full rounded-full transition-all ${pctDeprec >= 80 ? 'bg-red-500' : pctDeprec >= 50 ? 'bg-amber-500' : 'bg-blue-500'}`}
+                style={{ width: `${pctDeprec}%` }}
+              />
+            </div>
+            <span className={`text-[10px] ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>{pctDeprec}%</span>
+          </div>
+        </div>
+        {isExpanded ? <ChevronDown size={16} className="text-slate-400 shrink-0" /> : <ChevronRight size={16} className="text-slate-400 shrink-0" />}
+      </div>
+
+      {isExpanded && (
+        <ImobilizadoDetail
+          imob={imob}
+          onEdit={onEdit}
+          onBaixa={onBaixa}
+          isLight={isLight}
+        />
+      )}
+    </div>
+  )
+}
+
+function ImobilizadoTableRow({
+  imob,
+  expandedId,
+  setExpandedId,
+  onEdit,
+  onBaixa,
+  isLight,
+}: {
+  imob: PatImobilizado
+  expandedId: string | null
+  setExpandedId: (id: string | null) => void
+  onEdit: () => void
+  onBaixa: () => void
+  isLight: boolean
+}) {
+  const cfg = STATUS_CONFIG[imob.status]
+  const pctDeprec = imob.percentual_depreciado ?? 0
+  const isExpanded = expandedId === imob.id
+  const cellBorder = isLight ? 'border-slate-100' : 'border-white/[0.04]'
+
+  return (
+    <>
+      <tr className={`border-t ${cellBorder} ${isLight ? 'hover:bg-slate-50/70' : 'hover:bg-white/[0.02]'}`}>
+      <td className="px-4 py-2">
+          <button
+            type="button"
+            onClick={() => setExpandedId(isExpanded ? null : imob.id)}
+            className="flex items-center gap-2 text-left"
+          >
+            <span className="w-8 h-8 rounded-lg bg-cyan-50 flex items-center justify-center shrink-0">
+              <Landmark size={14} className="text-cyan-600" />
+            </span>
+            <span className={`font-mono font-extrabold ${isLight ? 'text-slate-800' : 'text-white'}`}>{imob.numero_patrimonio}</span>
+          </button>
+        </td>
+      <td className={`px-4 py-2 ${isLight ? 'text-slate-600' : 'text-slate-300'}`}>
+          <div className="min-w-[220px]">
+            <p className="font-semibold">{imob.descricao}</p>
+            <p className={`text-[11px] ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>{imob.categoria || 'Sem categoria'}</p>
+          </div>
+        </td>
+      <td className="px-4 py-2">
+          <span className={`inline-flex items-center gap-1 rounded-full text-[10px] font-semibold px-2 py-0.5 ${cfg.bg} ${cfg.text}`}>
+            <span className={`w-1.5 h-1.5 rounded-full ${cfg.dot}`} />
+            {cfg.label}
+          </span>
+        </td>
+      <td className={`px-4 py-2 ${isLight ? 'text-slate-600' : 'text-slate-300'}`}>
+          <div className="min-w-[140px]">
+            <p>{imob.responsavel_nome || '--'}</p>
+            <p className={`text-[11px] ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>{imob.base_nome || 'Sem base'}</p>
+          </div>
+        </td>
+      <td className={`px-4 py-2 text-right font-extrabold ${isLight ? 'text-slate-700' : 'text-slate-200'}`}>
+          {fmt(imob.valor_atual ?? imob.valor_aquisicao)}
+        </td>
+      <td className="px-4 py-2">
+          <div className="flex items-center justify-end gap-2 min-w-[110px]">
+            <div className={`w-16 h-1.5 rounded-full overflow-hidden ${isLight ? 'bg-slate-100' : 'bg-white/[0.08]'}`}>
+              <div
+                className={`h-full rounded-full transition-all ${pctDeprec >= 80 ? 'bg-red-500' : pctDeprec >= 50 ? 'bg-amber-500' : 'bg-blue-500'}`}
+                style={{ width: `${pctDeprec}%` }}
+              />
+            </div>
+            <span className={`text-[11px] ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>{pctDeprec}%</span>
+          </div>
+        </td>
+      <td className="px-4 py-2">
+          <div className="flex items-center justify-end gap-2">
+            <button
+              type="button"
+              onClick={() => setExpandedId(isExpanded ? null : imob.id)}
+              className={`inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-semibold transition-colors ${
+                isLight ? 'bg-slate-100 text-slate-600 hover:bg-slate-200' : 'bg-white/[0.06] text-slate-300 hover:bg-white/[0.09]'
+              }`}
+            >
+              {isExpanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+              Detalhes
+            </button>
+          </div>
+        </td>
+      </tr>
+      {isExpanded && (
+        <tr className={`border-t ${cellBorder}`}>
+          <td colSpan={7} className="p-0">
+            <ImobilizadoDetail
+              imob={imob}
+              onEdit={onEdit}
+              onBaixa={onBaixa}
+              isLight={isLight}
+            />
+          </td>
+        </tr>
+      )}
+    </>
+  )
+}
+
 function ImobilizadoDetail({
   imob, onEdit, onBaixa, isLight
 }: { imob: PatImobilizado; onEdit: () => void; onBaixa: () => void; isLight: boolean }) {
@@ -322,8 +540,8 @@ function ImobilizadoDetail({
       {/* Informacoes adicionais */}
       <div className={`text-[10px] space-y-1 ${subtext}`}>
         {imob.marca && <p>Marca: <span className={`font-semibold ${isLight ? 'text-slate-600' : 'text-slate-300'}`}>{imob.marca}</span>{imob.modelo ? ` -- ${imob.modelo}` : ''}</p>}
-        {imob.numero_serie && <p>N. Serie: <span className={`font-semibold font-mono ${isLight ? 'text-slate-600' : 'text-slate-300'}`}>{imob.numero_serie}</span></p>}
-        {imob.taxa_depreciacao_anual && <p>Taxa depreciacao: <span className={`font-semibold ${isLight ? 'text-slate-600' : 'text-slate-300'}`}>{imob.taxa_depreciacao_anual}% a.a.</span> - Vida util: <span className={`font-semibold ${isLight ? 'text-slate-600' : 'text-slate-300'}`}>{imob.vida_util_meses} meses</span></p>}
+        {imob.numero_serie && <p>{'N. S\u00e9rie:'} <span className={`font-semibold font-mono ${isLight ? 'text-slate-600' : 'text-slate-300'}`}>{imob.numero_serie}</span></p>}
+        {imob.taxa_depreciacao_anual && <p>{'Taxa deprecia\u00e7\u00e3o:'} <span className={`font-semibold ${isLight ? 'text-slate-600' : 'text-slate-300'}`}>{imob.taxa_depreciacao_anual}% a.a.</span> {'- Vida \u00fatil:'} <span className={`font-semibold ${isLight ? 'text-slate-600' : 'text-slate-300'}`}>{imob.vida_util_meses} meses</span></p>}
         {imob.data_aquisicao && <p>Adquirido em: <span className={`font-semibold ${isLight ? 'text-slate-600' : 'text-slate-300'}`}>{new Date(imob.data_aquisicao + 'T00:00:00').toLocaleDateString('pt-BR')}</span></p>}
       </div>
 
@@ -426,7 +644,7 @@ function ImobilizadoFormModal({
         <div className="p-6 space-y-4">
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className={`block text-xs font-bold mb-1 ${labelCls}`}>N. Patrimonio *</label>
+              <label className={`block text-xs font-bold mb-1 ${labelCls}`}>{'N. Patrim\u00f4nio *'}</label>
               <input value={item.numero_patrimonio ?? ''} onChange={e => set('numero_patrimonio', e.target.value)}
                 className={inputCls} placeholder="PAT-0001" />
             </div>

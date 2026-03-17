@@ -11,6 +11,7 @@ import type { Cotacao, ItemPreco } from '../types'
 import CotacaoComparativo from '../components/CotacaoComparativo'
 import FluxoTimeline from '../components/FluxoTimeline'
 import UploadCotacao from '../components/UploadCotacao'
+import EmitirPedidoModal from '../components/EmitirPedidoModal'
 import { supabase } from '../services/supabase'
 import { api } from '../services/api'
 import type { CnpjResult } from '../services/api'
@@ -177,6 +178,7 @@ function CotacaoConcluida({ cotacao, nav }: { cotacao: Cotacao; nav: ReturnType<
   const emitirMutation = useEmitirPedido()
   const cancelarMutation = useCancelarRequisicao()
   const [pedidoToast, setPedidoToast] = useState<{ type: 'success' | 'error'; msg: string } | null>(null)
+  const [showEmitirModal, setShowEmitirModal] = useState(false)
 
   const req = cotacao.requisicao
   const canEmitPedido = atLeast('comprador') && req?.status === 'cotacao_aprovada'
@@ -274,23 +276,7 @@ function CotacaoConcluida({ cotacao, nav }: { cotacao: Cotacao; nav: ReturnType<
 
                 <button
                   disabled={emitirMutation.isPending || cancelarMutation.isPending}
-                  onClick={() => {
-                    emitirMutation.mutate({
-                      requisicaoId: req!.id,
-                      cotacaoId: cotacao.id,
-                      fornecedorNome: cotacao.fornecedor_selecionado_nome ?? 'N/A',
-                      valorTotal: cotacao.valor_selecionado ?? req!.valor_estimado,
-                      compradorId: cotacao.comprador_id,
-                    }, {
-                      onSuccess: (pedido) => {
-                        setPedidoToast({ type: 'success', msg: `Pedido ${pedido.numero_pedido} emitido ✓` })
-                      },
-                      onError: (err: any) => {
-                        setPedidoToast({ type: 'error', msg: `Erro ao emitir pedido: ${err?.message || 'erro desconhecido'}` })
-                        setTimeout(() => setPedidoToast(null), 5000)
-                      },
-                    })
-                  }}
+                  onClick={() => setShowEmitirModal(true)}
                   className="flex items-center justify-center gap-2 py-3.5 rounded-xl text-sm font-bold
                     text-white bg-teal-500 border-2 border-teal-500 hover:bg-teal-600 shadow-lg shadow-teal-500/20
                     active:scale-[0.98] transition-all disabled:opacity-50"
@@ -319,6 +305,37 @@ function CotacaoConcluida({ cotacao, nav }: { cotacao: Cotacao; nav: ReturnType<
             )}
           </div>
         </div>
+      )}
+
+
+      {req && showEmitirModal && (
+        <EmitirPedidoModal
+          open
+          onClose={() => setShowEmitirModal(false)}
+          requisicaoId={req.id}
+          cotacao={{
+            id: cotacao.id,
+            fornecedorNome: cotacao.fornecedor_selecionado_nome ?? "N/A",
+            valorTotal: cotacao.valor_selecionado ?? req.valor_estimado,
+            compradorId: cotacao.comprador_id,
+          }}
+          onConfirm={(payload) => {
+            emitirMutation.mutate({
+              requisicaoId: req.id,
+              ...payload,
+            }, {
+              onSuccess: (pedido) => {
+                setShowEmitirModal(false)
+                setPedidoToast({ type: "success", msg: `${pedido.numero_pedido} emitido` })
+              },
+              onError: (err: any) => {
+                setPedidoToast({ type: "error", msg: `Erro ao emitir pedido: ${err?.message || "erro desconhecido"}` })
+                setTimeout(() => setPedidoToast(null), 5000)
+              },
+            })
+          }}
+          isSubmitting={emitirMutation.isPending}
+        />
       )}
 
       {/* Status badges for non-admin or non-approved states */}
@@ -362,6 +379,7 @@ export default function CotacaoForm() {
   const handleCnpjLookup = useCallback(async (idx: number, rawCnpj: string) => {
     const digits = rawCnpj.replace(/\D/g, '')
     if (digits.length !== 14) return
+    const isCorrection = cnpjLastRef.current[idx] !== undefined && cnpjLastRef.current[idx] !== digits
     if (cnpjLastRef.current[idx] === digits) return
     cnpjLastRef.current[idx] = digits
 
@@ -374,15 +392,14 @@ export default function CotacaoForm() {
         setCnpjStatus(prev => ({ ...prev, [idx]: { ok: false, msg: result.message || 'CNPJ nao encontrado' } }))
       } else {
         setCnpjStatus(prev => ({ ...prev, [idx]: { ok: true, msg: result.situacao || 'Ativa' } }))
-        // Auto-fill name and contact if empty
-        // Prefer razao_social (always present) over nome_fantasia (often empty)
+        // Auto-fill name and contact — always overwrite on CNPJ correction
         const nomePreenchido = result.razao_social || result.nome_fantasia || ''
         setFornecedores(prev => prev.map((f, i) => {
           if (i !== idx) return f
           return {
             ...f,
-            fornecedor_nome: f.fornecedor_nome.trim() ? f.fornecedor_nome : nomePreenchido,
-            fornecedor_contato: f.fornecedor_contato.trim() ? f.fornecedor_contato : [result.telefone, result.email].filter(Boolean).join(' / '),
+            fornecedor_nome: (isCorrection || !f.fornecedor_nome.trim()) ? nomePreenchido : f.fornecedor_nome,
+            fornecedor_contato: (isCorrection || !f.fornecedor_contato.trim()) ? [result.telefone, result.email].filter(Boolean).join(' / ') : f.fornecedor_contato,
           }
         }))
       }
@@ -415,7 +432,7 @@ export default function CotacaoForm() {
   }, [])
 
   // ── AI Upload: preenche fornecedores automaticamente (incluindo itens) ───────
-  const handleAiParsed = useCallback((parsed: {
+  const handleAiParsed = useCallback(async (parsed: {
     fornecedor_nome: string
     fornecedor_cnpj?: string
     fornecedor_contato?: string
@@ -424,7 +441,18 @@ export default function CotacaoForm() {
     condicao_pagamento?: string
     observacao?: string
     itens?: { descricao: string; qtd: number; valor_unitario: number; valor_total: number }[]
-  }[]) => {
+  }[], file: File) => {
+    // Upload do arquivo original para Supabase Storage
+    let uploadedPath = ''
+    if (id && file) {
+      try {
+        const safeName = 'cotacao_' + file.name.replace(/[^a-zA-Z0-9._-]/g, '_')
+        const path = `${id}/${Date.now()}_${safeName}`
+        const { error } = await supabase.storage.from('cotacoes-docs').upload(path, file)
+        if (!error) uploadedPath = path
+      } catch { /* upload falhou, segue sem anexo */ }
+    }
+
     setFornecedores(prev => {
       const vazios      = prev.filter(f => !f.fornecedor_nome.trim() && f.valor_total === 0)
       const preenchidos = prev.filter(f => f.fornecedor_nome.trim() || f.valor_total > 0)
@@ -445,7 +473,7 @@ export default function CotacaoForm() {
           prazo_entrega_dias: p.prazo_entrega_dias || 0,
           condicao_pagamento: p.condicao_pagamento || '',
           observacao:         p.observacao || '',
-          arquivo_url:        '',
+          arquivo_url:        uploadedPath,
           itens_precos:       itens,
         }
       })
@@ -459,7 +487,7 @@ export default function CotacaoForm() {
       while (result.length < 2) result.push(emptyFornecedor())
       return result
     })
-  }, [])
+  }, [id])
 
   // ── Upload de arquivo por fornecedor ──────────────────────────────────────
   const [uploading, setUploading] = useState<Record<number, boolean>>({})
