@@ -31,7 +31,6 @@ import {
 } from '../../hooks/useLotesPagamento'
 import { supabase } from '../../services/supabase'
 import { useAuth } from '../../contexts/AuthContext'
-import { useOmieCredentials, useOmieEnviarRemessa } from '../../hooks/useOmieApi'
 import { useDecisaoGenerica } from '../../hooks/useAprovacoes'
 import { useLookupCentrosCusto, useLookupClassesFinanceiras } from '../../hooks/useLookups'
 import { useAnexosPedido, useUploadAnexo, TIPO_LABEL } from '../../hooks/useAnexos'
@@ -2114,8 +2113,6 @@ export default function CPPipeline() {
   const registrarBatchMut = useRegistrarPagamentoBatch()
   const enviarRemessaMut = useEnviarRemessaPagamentoBatch()
   const syncRemessasMut = useSincronizarRemessasPagamento()
-  const { data: omieResult } = useOmieCredentials()
-  const omieEnviarRemessaMut = useOmieEnviarRemessa()
 
   const contasById = useMemo(
     () => new Map(contas.map(cp => [cp.id, cp])),
@@ -2400,32 +2397,8 @@ export default function CPPipeline() {
 
   const handleEnviarRemessa = async (ids: string[]) => {
     try {
-      // Se Omie estiver configurado, usa API direta (sem precisar de webhook n8n)
-      if (omieResult?.credentials) {
-        const cps = ids.map(id => contasById.get(id)).filter(Boolean) as ContaPagar[]
-        const result = await omieEnviarRemessaMut.mutateAsync({
-          credentials: omieResult.credentials,
-          cps: cps.map(cp => ({
-            id: cp.id,
-            fornecedor_id: cp.fornecedor_id ?? null,
-            fornecedor_nome: cp.fornecedor_nome ?? 'Fornecedor',
-            valor_original: cp.valor_original,
-            data_vencimento: cp.data_vencimento,
-            data_emissao: cp.data_emissao ?? new Date().toISOString().slice(0, 10),
-            numero_documento: cp.numero_documento ?? null,
-            descricao: cp.descricao ?? null,
-            omie_cp_id: cp.omie_cp_id ?? null,
-          })),
-        })
-        const ok = result.filter(r => r.status === 'incluido').length
-        const erros = result.filter(r => r.status === 'erro').length
-        showToast(erros === 0 ? 'success' : 'error', `Omie: ${ok} CP(s) enviada(s)${erros ? `, ${erros} com erro` : ''}`)
-        setSelectedIds(new Set())
-        return
-      }
-      // Fallback: fluxo webhook n8n
       const result = await enviarRemessaMut.mutateAsync({ cpIds: ids })
-      showToast('success', `Remessa ${result.remessaId} enviada para ${ids.length} pagamento(s)`)
+      showToast('success', `Remessa ${result.remessaId} enviada — ${result.incluidos ?? ids.length} CP(s) incluída(s) no Omie`)
       setSelectedIds(new Set())
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Erro ao enviar remessa'
