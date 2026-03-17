@@ -546,14 +546,12 @@ export function useEnviarRemessaPagamentoBatch() {
       }
 
       const remessaId = extractRemessaId(payload) ?? `REM-${Date.now()}`
-      const { data: updated, error } = await supabase.rpc('rpc_marcar_cp_remessa_batch', {
-        p_cp_ids: cpIds,
-        p_remessa_id: remessaId,
-        p_payload: payload ?? {},
-      })
-      if (error) throw error
 
-      return { remessaId, updated: Number(updated ?? 0) }
+      // Se o n8n/Omie já atualizou o Supabase diretamente (success: true com incluidos)
+      // não precisamos de RPC adicional — apenas invalidamos as queries
+      const incluidos = typeof payload?.incluidos === 'number' ? payload.incluidos : cpIds.length
+
+      return { remessaId, updated: incluidos, incluidos, erros: payload?.erros ?? 0 }
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['cps-para-pagamento'] })

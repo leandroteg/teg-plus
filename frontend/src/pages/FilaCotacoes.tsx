@@ -305,8 +305,8 @@ export default function FilaCotacoes() {
     for (const cot of cotacoes) {
       const reqStatus = cot.requisicao?.status
 
-      // "Em Aprovação" deve mostrar apenas o que ainda aguarda decisão financeira.
-      if (cot.status === 'concluida' && reqStatus && reqStatus !== 'cotacao_enviada') continue
+      // "Em Aprovação" mostra itens aguardando decisão financeira OU prontos para emitir pedido.
+      if (cot.status === 'concluida' && reqStatus && reqStatus !== 'cotacao_enviada' && reqStatus !== 'cotacao_aprovada') continue
 
       // Skip finalized
       if (cot.status === 'concluida' && reqStatus && statusesFinalizados.includes(reqStatus)) continue

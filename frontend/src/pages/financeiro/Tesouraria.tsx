@@ -5,7 +5,7 @@ import {
   Landmark, TrendingUp, TrendingDown, ArrowUpRight, ArrowDownRight,
   Plus, Upload, Wallet, Building2, CircleDollarSign, Search,
   Filter, X, Calendar, ChevronDown, Eye, FileText, Check,
-  AlertTriangle,
+  AlertTriangle, Zap, RefreshCw, ArrowDownUp, Link2,
 } from 'lucide-react'
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip,
@@ -16,6 +16,12 @@ import {
 } from '../../hooks/useTesouraria'
 import { useContasPagar, useContasReceber } from '../../hooks/useFinanceiro'
 import type { TesourariaDashboardData, CategoriaMovimentacao } from '../../types/financeiro'
+import {
+  useOmieCredentials,
+  useOmieContasCorrentes,
+  useOmieLancamentos,
+  useSincronizarSaldoContaOmie,
+} from '../../hooks/useOmieApi'
 
 // ── Formatters ──────────────────────────────────────────────────────────────
 
@@ -51,13 +57,14 @@ const CORES_PRESET = [
   '#10B981', '#EC4899', '#6366F1', '#F97316', '#06B6D4',
 ]
 
-type TesourariaTab = 'painel' | 'movimentacoes' | 'contas' | 'conciliacao'
+type TesourariaTab = 'painel' | 'movimentacoes' | 'contas' | 'conciliacao' | 'omie'
 
 const TESOURARIA_TABS: Array<{ key: TesourariaTab; label: string }> = [
   { key: 'painel', label: 'Painel' },
   { key: 'movimentacoes', label: 'Movimentações' },
   { key: 'contas', label: 'Contas e Saldos' },
   { key: 'conciliacao', label: 'Conciliação' },
+  { key: 'omie', label: 'Omie ERP' },
 ]
 
 const TAB_ICONS = {
@@ -65,6 +72,7 @@ const TAB_ICONS = {
   movimentacoes: FileText,
   contas: Building2,
   conciliacao: Check,
+  omie: Zap,
 } as const
 
 const TAB_ACCENT = {
@@ -99,6 +107,14 @@ const TAB_ACCENT = {
     textActive: 'text-violet-800',
     border: 'border-violet-500',
     badge: 'bg-violet-100 text-violet-700',
+  },
+  omie: {
+    bg: 'hover:bg-emerald-50',
+    bgActive: 'bg-emerald-50',
+    text: 'text-emerald-600',
+    textActive: 'text-emerald-800',
+    border: 'border-emerald-500',
+    badge: 'bg-emerald-100 text-emerald-700',
   },
 } as const
 
@@ -348,6 +364,8 @@ function TesourariaToolbar({ activeTab, periodo, setPeriodo, isDark, onNovaMovim
         ? 'border border-white/[0.06] bg-[#1e293b] text-slate-400 hover:bg-white/[0.06]'
         : 'border border-slate-200 bg-white text-slate-500 hover:bg-slate-50'
   }`
+
+  if (activeTab === 'omie') return null
 
   if (activeTab === 'contas') {
     return (
@@ -1637,6 +1655,213 @@ function Header({ isDark, periodo, setPeriodo }: {
   )
 }
 
+// ── OmiePanel ────────────────────────────────────────────────────────────────
+
+function OmiePanel({ isDark }: { isDark: boolean }) {
+  const { data: omieResult, isLoading: loadingCreds } = useOmieCredentials()
+  const credentials = omieResult?.credentials ?? null
+  const isSandbox   = omieResult?.isSandbox ?? false
+  const { data: contas = [], isLoading: loadingContas, refetch, isRefetching } = useOmieContasCorrentes(credentials)
+  const sincronizarSaldo = useSincronizarSaldoContaOmie()
+  const [selectedConta, setSelectedConta] = useState<number | null>(null)
+  const [sincStatus, setSincStatus] = useState<Record<number, string>>({})
+
+  // Data range for lançamentos: últimos 30 dias
+  const hoje = new Date()
+  const inicio = new Date(hoje)
+  inicio.setDate(inicio.getDate() - 30)
+  const fmtOmie = (d: Date) => `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}`
+
+  const { data: lancamentos = [], isLoading: loadingLanc } = useOmieLancamentos(
+    credentials,
+    selectedConta ? {
+      nCodCC: selectedConta,
+      dataInicio: fmtOmie(inicio),
+      dataFim: fmtOmie(hoje),
+    } : {},
+  )
+
+  const fmt = (v: number) =>
+    new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 }).format(v)
+
+  const card = `rounded-2xl border shadow-sm ${isDark ? 'bg-[#1e293b] border-white/[0.06]' : 'bg-white border-slate-200'}`
+
+  if (loadingCreds) {
+    return <div className="flex justify-center py-12"><div className="w-8 h-8 border-[3px] border-emerald-500 border-t-transparent rounded-full animate-spin" /></div>
+  }
+
+  if (!credentials) {
+    return (
+      <div className={`rounded-2xl border p-8 text-center ${isDark ? 'bg-[#1e293b] border-white/[0.06]' : 'bg-white border-slate-200'}`}>
+        <Zap size={32} className="mx-auto mb-3 text-slate-300" />
+        <p className={`text-sm font-semibold ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>Integração Omie não configurada</p>
+        <p className={`text-xs mt-1 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+          Acesse Financeiro → Configurações e informe APP_KEY e APP_SECRET do Omie.
+        </p>
+      </div>
+    )
+  }
+
+  return (
+    <div className="space-y-4">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className={`text-base font-extrabold flex items-center gap-2 ${isDark ? 'text-white' : 'text-slate-800'}`}>
+            <Zap size={16} className="text-emerald-500" />
+            Contas Correntes — Omie ERP
+            {isSandbox && (
+              <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 border border-amber-300">
+                SANDBOX
+              </span>
+            )}
+          </h2>
+          <p className={`text-xs mt-0.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+            {isSandbox
+              ? 'Dados de homologação — aplicação de teste Omie'
+              : 'Saldos e movimentações integradas diretamente do Omie'}
+          </p>
+        </div>
+        <button
+          onClick={() => refetch()}
+          disabled={loadingContas || isRefetching}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-emerald-600 text-white hover:bg-emerald-700 transition-all disabled:opacity-50"
+        >
+          <RefreshCw size={12} className={(loadingContas || isRefetching) ? 'animate-spin' : ''} />
+          Atualizar
+        </button>
+      </div>
+
+      {/* Contas Grid */}
+      {loadingContas ? (
+        <div className="flex justify-center py-8"><div className="w-7 h-7 border-[3px] border-emerald-500 border-t-transparent rounded-full animate-spin" /></div>
+      ) : contas.length === 0 ? (
+        <div className={`${card} p-8 text-center`}>
+          <Building2 size={28} className="mx-auto mb-3 text-slate-300" />
+          <p className={`text-sm ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Nenhuma conta corrente encontrada no Omie</p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+          {contas.map(conta => (
+            <div
+              key={conta.nCodCC}
+              onClick={() => setSelectedConta(prev => prev === conta.nCodCC ? null : conta.nCodCC)}
+              className={`${card} p-4 cursor-pointer transition-all hover:shadow-md ${
+                selectedConta === conta.nCodCC
+                  ? isDark ? 'ring-2 ring-emerald-500/40' : 'ring-2 ring-emerald-400'
+                  : ''
+              }`}
+            >
+              <div className="flex items-start justify-between gap-2 mb-3">
+                <div className="min-w-0 flex-1">
+                  <p className={`text-sm font-bold truncate ${isDark ? 'text-white' : 'text-slate-800'}`}>{conta.cDescricao}</p>
+                  <p className={`text-[10px] mt-0.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+                    {conta.cNomeBanco || `Banco ${conta.nCodBanco}`}
+                    {conta.cAgencia && ` · Ag. ${conta.cAgencia}`}
+                    {conta.cConta && ` · C. ${conta.cConta}`}
+                  </p>
+                </div>
+                <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full shrink-0 ${
+                  conta.cTipoConta === 'CC' ? 'bg-blue-50 text-blue-700' :
+                  conta.cTipoConta === 'CP' ? 'bg-purple-50 text-purple-700' :
+                  'bg-slate-100 text-slate-600'
+                }`}>
+                  {conta.cTipoConta === 'CC' ? 'Corrente' : conta.cTipoConta === 'CP' ? 'Poupança' : conta.cTipoConta}
+                </span>
+              </div>
+
+              <div className="flex items-end justify-between">
+                <div>
+                  <p className={`text-[10px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Saldo Omie</p>
+                  <p className={`text-lg font-extrabold ${conta.nSaldo >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>
+                    {fmt(conta.nSaldo)}
+                  </p>
+                </div>
+                <button
+                  onClick={async e => {
+                    e.stopPropagation()
+                    const contaId = prompt(`ID da conta interna TEG+ para vincular com "${conta.cDescricao}":`)
+                    if (!contaId) return
+                    try {
+                      await sincronizarSaldo.mutateAsync({ contaInternaId: contaId.trim(), nCodCC: conta.nCodCC, saldo: conta.nSaldo })
+                      setSincStatus(prev => ({ ...prev, [conta.nCodCC]: 'Sincronizado!' }))
+                      setTimeout(() => setSincStatus(prev => { const n = {...prev}; delete n[conta.nCodCC]; return n }), 3000)
+                    } catch {
+                      setSincStatus(prev => ({ ...prev, [conta.nCodCC]: 'Erro ao sincronizar' }))
+                    }
+                  }}
+                  className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100 transition-all"
+                >
+                  <ArrowDownUp size={10} />
+                  Sincronizar
+                </button>
+              </div>
+              {sincStatus[conta.nCodCC] && (
+                <p className="text-[10px] text-emerald-600 font-medium mt-1">{sincStatus[conta.nCodCC]}</p>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Lançamentos da conta selecionada */}
+      {selectedConta && (
+        <div className="space-y-2">
+          <div className="flex items-center gap-2">
+            <Link2 size={14} className="text-slate-400" />
+            <h3 className={`text-sm font-bold ${isDark ? 'text-white' : 'text-slate-800'}`}>
+              Lançamentos — {contas.find(c => c.nCodCC === selectedConta)?.cDescricao ?? 'Conta'} (últimos 30 dias)
+            </h3>
+          </div>
+
+          {loadingLanc ? (
+            <div className="flex justify-center py-6"><div className="w-6 h-6 border-[3px] border-emerald-500 border-t-transparent rounded-full animate-spin" /></div>
+          ) : lancamentos.length === 0 ? (
+            <div className={`${card} p-6 text-center`}>
+              <p className={`text-sm ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Sem lançamentos no período</p>
+            </div>
+          ) : (
+            <div className={`${card} overflow-hidden`}>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className={`border-b ${isDark ? 'border-white/[0.04]' : 'border-slate-100'}`}>
+                      <th className="text-left px-4 py-2 text-[10px] font-bold text-slate-400 uppercase">Data</th>
+                      <th className="text-left px-4 py-2 text-[10px] font-bold text-slate-400 uppercase">Descrição</th>
+                      <th className="text-left px-4 py-2 text-[10px] font-bold text-slate-400 uppercase hidden md:table-cell">Categoria</th>
+                      <th className="text-right px-4 py-2 text-[10px] font-bold text-slate-400 uppercase">Valor</th>
+                    </tr>
+                  </thead>
+                  <tbody className={`divide-y ${isDark ? 'divide-white/[0.03]' : 'divide-slate-50'}`}>
+                    {lancamentos.slice(0, 50).map(lanc => (
+                      <tr key={lanc.nCodLanc} className={`${isDark ? 'hover:bg-white/[0.02]' : 'hover:bg-slate-50/60'} transition-colors`}>
+                        <td className="px-4 py-2">
+                          <span className={`text-[11px] ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{lanc.dData}</span>
+                        </td>
+                        <td className="px-4 py-2">
+                          <p className={`text-xs truncate max-w-[200px] ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>{lanc.cDescricao}</p>
+                        </td>
+                        <td className="px-4 py-2 hidden md:table-cell">
+                          <span className={`text-[10px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{lanc.cCodCateg || '—'}</span>
+                        </td>
+                        <td className="px-4 py-2 text-right">
+                          <span className={`text-sm font-bold ${lanc.cTipoLanc === 'E' ? 'text-emerald-600' : 'text-red-500'}`}>
+                            {lanc.cTipoLanc === 'E' ? '+' : '-'}{fmt(Math.abs(lanc.nValor))}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
 export default function Tesouraria() {
   const { isDark } = useTheme()
   const [searchParams, setSearchParams] = useSearchParams()
@@ -1879,6 +2104,10 @@ export default function Tesouraria() {
 
       {activeTab === 'conciliacao' && (
         <ConciliacaoPanel movimentacoes={movimentacoes} isDark={isDark} />
+      )}
+
+      {activeTab === 'omie' && (
+        <OmiePanel isDark={isDark} />
       )}
 
       {showNovaConta && (
