@@ -56,6 +56,9 @@ import ControleOrcamentario from './pages/controladoria/ControleOrcamentario'
 import PainelIndicadores from './pages/controladoria/PainelIndicadores'
 import AlertasDesvio from './pages/controladoria/AlertasDesvio'
 
+// Módulo Apontamentos de Cartão (Backoffice)
+import ApontamentosCartao from './pages/apontamentos/ApontamentosCartao'
+
 // Módulo Obras
 import ObrasLayout from './components/ObrasLayout'
 import ObrasHome from './pages/obras/ObrasHome'
@@ -112,6 +115,7 @@ import ContasPagar from './pages/financeiro/ContasPagar'
 import ContasReceber from './pages/financeiro/ContasReceber'
 import AprovacoesPagamento from './pages/financeiro/AprovacoesPagamento'
 import Conciliacao from './pages/financeiro/Conciliacao'
+import ConciliacaoCartoes from './pages/financeiro/ConciliacaoCartoes'
 import LotesPagamento from './pages/financeiro/LotesPagamento'
 import LoteDetalhe from './pages/financeiro/LoteDetalhe'
 import PainelPagamentos from './pages/financeiro/PainelPagamentos'
@@ -191,9 +195,17 @@ export default function App() {
               <Route path="/financeiro/lotes"              element={<LotesPagamento />} />
               <Route path="/financeiro/lotes/:loteId"      element={<LoteDetalhe />} />
               <Route path="/financeiro/painel-pagamentos"  element={<PainelPagamentos />} />
-              <Route path="/financeiro/conciliacao"  element={<Conciliacao />} />
+              <Route path="/financeiro/conciliacao"         element={<Conciliacao />} />
+              <Route path="/financeiro/conciliacao-cartoes" element={<ConciliacaoCartoes />} />
               <Route path="/financeiro/relatorios"   element={<Relatorios />} />
               <Route path="/financeiro/configuracoes" element={<Navigate to="/admin/integracoes" replace />} />
+            </Route>
+          </Route>
+
+          {/* Módulo Apontamentos de Cartão */}
+          <Route element={<ModuleRoute moduleKey="financeiro" />}>
+            <Route element={<FinanceiroLayout />}>
+              <Route path="/apontamentos" element={<ApontamentosCartao />} />
             </Route>
           </Route>
 
