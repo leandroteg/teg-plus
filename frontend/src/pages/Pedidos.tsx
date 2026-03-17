@@ -962,7 +962,7 @@ function DetailModal({
   const entregue = pedido.status === 'entregue'
   const parcial  = pedido.status === 'parcialmente_recebido'
   const atrasado = dias !== null && dias < 0 && !entregue && !parcial
-  const podeReceber = !pending && ['confirmado', 'em_entrega', 'parcialmente_recebido'].includes(pedido.status)
+  const podeReceber = !pending && ['emitido', 'confirmado', 'em_entrega', 'parcialmente_recebido'].includes(pedido.status)
   const qtdTotal     = pedido.qtd_itens_total ?? 0
   const qtdRecebidos = pedido.qtd_itens_recebidos ?? 0
   const statusPgto     = (pedido as any).status_pagamento as string | undefined
