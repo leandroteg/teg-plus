@@ -190,37 +190,6 @@ export default function RecebimentoModal({
                 </select>
               </div>
 
-              {/* ── NF fields ────────────────────────────────────── */}
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-semibold text-slate-600 mb-1.5">
-                    <FileText size={12} className="inline mr-1 -mt-0.5" />
-                    NF Fornecedor
-                  </label>
-                  <input
-                    type="text"
-                    value={nfNumero}
-                    onChange={e => setNfNumero(e.target.value)}
-                    placeholder="000.000"
-                    className="w-full text-sm border border-slate-200 rounded-xl px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-teal-400 focus:border-teal-400 placeholder:text-slate-300"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-semibold text-slate-600 mb-1.5">
-                    <Hash size={12} className="inline mr-1 -mt-0.5" />
-                    Chave NFe
-                  </label>
-                  <input
-                    type="text"
-                    value={nfChave}
-                    onChange={e => setNfChave(e.target.value)}
-                    placeholder="44 digitos..."
-                    maxLength={44}
-                    className="w-full text-sm border border-slate-200 rounded-xl px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-teal-400 focus:border-teal-400 placeholder:text-slate-300"
-                  />
-                </div>
-              </div>
-
               {/* ── Items table ───────────────────────────────────── */}
               <div>
                 <p className="text-xs font-semibold text-slate-600 mb-2 flex items-center gap-1">
@@ -404,28 +373,34 @@ function ItemRow({
           </button>
         </div>
 
-        {/* Destino: 3 radio-style buttons */}
-        <div className="flex items-center gap-1">
-          <span className="text-[10px] font-semibold text-slate-400 mr-1 flex-shrink-0">Entrada:</span>
-          {DESTINO_OPTIONS.map(opt => {
-            const Icon = opt.icon
-            const isActive = item.tipo_destino === opt.value
-            return (
-              <button
-                key={opt.value}
-                type="button"
-                onClick={() => handleSetDestino(opt.value)}
-                className={`flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-bold border transition-all ${
-                  isActive
-                    ? opt.activeColor
-                    : 'bg-white text-slate-400 border-slate-200 hover:border-slate-300'
-                }`}
-              >
-                <Icon size={11} />
-                {opt.label}
-              </button>
-            )
-          })}
+        {/* Destino: elegant entry selector */}
+        <div className="bg-slate-50/80 border border-slate-200/80 rounded-xl px-3 py-2">
+          <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Entrada no sistema</p>
+          <div className="flex gap-1.5">
+            {DESTINO_OPTIONS.map(opt => {
+              const Icon = opt.icon
+              const isActive = item.tipo_destino === opt.value
+              return (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() => handleSetDestino(opt.value)}
+                  className={`flex-1 flex items-center justify-center gap-1.5 px-2 py-2 rounded-lg text-[11px] font-bold border-2 transition-all ${
+                    isActive
+                      ? opt.value === 'consumo'
+                        ? 'bg-teal-50 text-teal-700 border-teal-400 shadow-sm shadow-teal-100'
+                        : opt.value === 'patrimonial'
+                        ? 'bg-violet-50 text-violet-700 border-violet-400 shadow-sm shadow-violet-100'
+                        : 'bg-slate-100 text-slate-600 border-slate-400 shadow-sm'
+                      : 'bg-white text-slate-400 border-slate-200 hover:border-slate-300 hover:text-slate-500'
+                  }`}
+                >
+                  <Icon size={13} />
+                  {opt.label}
+                </button>
+              )
+            })}
+          </div>
         </div>
       </div>
 
