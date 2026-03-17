@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react'
 import {
   Settings, Key, Link, RefreshCw, CheckCircle2, XCircle,
-  Eye, EyeOff, Save, Zap, AlertTriangle, Clock,
+  Eye, EyeOff, Save, Zap, AlertTriangle, Clock, Wifi,
+  Building2, DollarSign, ArrowDownUp,
 } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
 import { useAuth } from '../../contexts/AuthContext'
@@ -14,6 +15,12 @@ import {
   type OmieConfig,
   type SyncLog as OmieSyncLog,
 } from '../../hooks/useOmie'
+import {
+  useOmieCredentials,
+  useOmieTestarConexao,
+  useOmieSyncContasPagar,
+  useOmieAtualizarRemessas,
+} from '../../hooks/useOmieApi'
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -163,6 +170,147 @@ function SyncSection({ webhookUrl, isDark }: { webhookUrl: string; isDark: boole
           <p className="text-[11px] text-amber-700">
             Configure a URL do webhook n8n para habilitar a sincronização.
           </p>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ── OmieApiDireta section ─────────────────────────────────────────────────────
+
+function OmieApiDiretaSection({ isDark }: { isDark: boolean }) {
+  const { data: credentials, isLoading } = useOmieCredentials()
+  const testar = useOmieTestarConexao()
+  const syncCP = useOmieSyncContasPagar()
+  const atualizarRemessas = useOmieAtualizarRemessas()
+
+  const [testResult, setTestResult] = useState<{ ok: boolean; msg: string } | null>(null)
+  const [syncResult, setSyncResult] = useState<string | null>(null)
+  const [remessaResult, setRemessaResult] = useState<string | null>(null)
+
+  async function handleTestar() {
+    if (!credentials) return
+    setTestResult(null)
+    try {
+      await testar.mutateAsync(credentials)
+      setTestResult({ ok: true, msg: 'API Omie respondeu com sucesso' })
+    } catch (err) {
+      setTestResult({ ok: false, msg: err instanceof Error ? err.message : 'Falha na conexão' })
+    }
+  }
+
+  async function handleSyncCP() {
+    if (!credentials) return
+    setSyncResult(null)
+    try {
+      const res = await syncCP.mutateAsync(credentials)
+      setSyncResult(`${res.novas} novas, ${res.atualizadas} atualizadas, ${res.erros} erros (total ${res.total})`)
+    } catch (err) {
+      setSyncResult(`Erro: ${err instanceof Error ? err.message : 'Desconhecido'}`)
+    }
+  }
+
+  async function handleAtualizarRemessas() {
+    if (!credentials) return
+    setRemessaResult(null)
+    try {
+      const res = await atualizarRemessas.mutateAsync({ credentials })
+      const confirmadas = res.filter(r => r.novoStatus === 'pago').length
+      setRemessaResult(`${res.length} remessa(s) verificada(s), ${confirmadas} confirmada(s) como pago`)
+    } catch (err) {
+      setRemessaResult(`Erro: ${err instanceof Error ? err.message : 'Desconhecido'}`)
+    }
+  }
+
+  const row = `flex items-center gap-3 py-3 border-b last:border-0 ${isDark ? 'border-white/[0.04]' : 'border-slate-100'}`
+  const btnPrimary = 'flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[11px] font-bold bg-emerald-600 text-white shadow-sm hover:bg-emerald-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed shrink-0'
+  const card = `rounded-2xl border shadow-sm overflow-hidden ${isDark ? 'bg-[#1e293b] border-white/[0.06]' : 'bg-white border-slate-200'}`
+
+  return (
+    <div className={card}>
+      <div className={`px-5 py-4 border-b flex items-center gap-2 ${isDark ? 'border-white/[0.06]' : 'border-slate-100'}`}>
+        <Wifi size={16} className="text-emerald-600" />
+        <h2 className={`text-sm font-extrabold ${isDark ? 'text-white' : 'text-slate-800'}`}>API Omie — Integração Direta</h2>
+        {credentials ? (
+          <span className="ml-auto inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+            Conectado
+          </span>
+        ) : !isLoading ? (
+          <span className="ml-auto inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-50 text-amber-700">
+            <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
+            Credenciais não configuradas
+          </span>
+        ) : null}
+      </div>
+
+      {!credentials && !isLoading ? (
+        <div className="px-5 py-4">
+          <p className={`text-xs ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+            Configure APP_KEY e APP_SECRET na seção acima e habilite a integração Omie.
+          </p>
+        </div>
+      ) : (
+        <div className="px-5">
+          {/* Testar conexão */}
+          <div className={row}>
+            <div className="flex-1">
+              <div className="flex items-center gap-2">
+                <Zap size={13} className="text-emerald-600" />
+                <p className={`text-sm font-semibold ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>Testar Conexão</p>
+              </div>
+              <p className={`text-xs mt-0.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Valida APP_KEY e APP_SECRET diretamente na API Omie</p>
+              {testResult && (
+                <p className={`text-xs mt-1 font-medium ${testResult.ok ? 'text-emerald-600' : 'text-red-600'}`}>
+                  {testResult.ok ? '✓' : '✗'} {testResult.msg}
+                </p>
+              )}
+            </div>
+            <button onClick={handleTestar} disabled={testar.isPending || !credentials} className={btnPrimary}>
+              {testar.isPending ? <RefreshCw size={11} className="animate-spin" /> : <Zap size={11} />}
+              {testar.isPending ? 'Testando...' : 'Testar'}
+            </button>
+          </div>
+
+          {/* Sync Contas a Pagar */}
+          <div className={row}>
+            <div className="flex-1">
+              <div className="flex items-center gap-2">
+                <DollarSign size={13} className="text-blue-500" />
+                <p className={`text-sm font-semibold ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>Importar CPs do Omie</p>
+              </div>
+              <p className={`text-xs mt-0.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Importa contas a pagar em aberto do Omie para o TEG+</p>
+              {syncResult && (
+                <p className={`text-xs mt-1 font-medium ${syncResult.startsWith('Erro') ? 'text-red-600' : 'text-emerald-600'}`}>
+                  {syncResult}
+                </p>
+              )}
+            </div>
+            <button onClick={handleSyncCP} disabled={syncCP.isPending || !credentials} className={btnPrimary}>
+              {syncCP.isPending ? <RefreshCw size={11} className="animate-spin" /> : <Building2 size={11} />}
+              {syncCP.isPending ? 'Importando...' : 'Importar'}
+            </button>
+          </div>
+
+          {/* Atualizar remessas */}
+          <div className={row}>
+            <div className="flex-1">
+              <div className="flex items-center gap-2">
+                <ArrowDownUp size={13} className="text-indigo-500" />
+                <p className={`text-sm font-semibold ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>Atualizar Status de Remessas</p>
+              </div>
+              <p className={`text-xs mt-0.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Consulta Omie e atualiza pagamentos enviados (enviada → pago/cancelado)</p>
+              {remessaResult && (
+                <p className={`text-xs mt-1 font-medium ${remessaResult.startsWith('Erro') ? 'text-red-600' : 'text-emerald-600'}`}>
+                  {remessaResult}
+                </p>
+              )}
+            </div>
+            <button onClick={handleAtualizarRemessas} disabled={atualizarRemessas.isPending || !credentials} className={btnPrimary}>
+              {atualizarRemessas.isPending ? <RefreshCw size={11} className="animate-spin" /> : <ArrowDownUp size={11} />}
+              {atualizarRemessas.isPending ? 'Atualizando...' : 'Atualizar'}
+            </button>
+          </div>
         </div>
       )}
     </div>
@@ -425,7 +573,10 @@ export default function Configuracoes() {
         )}
       </div>
 
-      {/* ── Section 2: Sincronização ────────────────────────── */}
+      {/* ── Section 2: API Direta Omie ──────────────────────── */}
+      <OmieApiDiretaSection isDark={isDark} />
+
+      {/* ── Section 3: Sincronização n8n ────────────────────── */}
       <SyncSection webhookUrl={form.n8n_webhook_url} isDark={isDark} />
 
       {/* ── Section 3: Webhooks n8n ─────────────────────────── */}

@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import {
   Layers, Search, CheckSquare, Square, Minus,
   Plus, Send, Package, CheckCircle2,
-  ChevronLeft, ChevronRight,
+  ChevronLeft, ChevronRight, RefreshCw, Zap, AlertCircle,
 } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
 import { useContasPagar } from '../../hooks/useFinanceiro'
@@ -12,6 +12,11 @@ import {
   useCriarLote,
   useEnviarLoteAprovacao,
 } from '../../hooks/useLotesPagamento'
+import {
+  useOmieCredentials,
+  useOmieEnviarRemessa,
+  useOmieAtualizarRemessas,
+} from '../../hooks/useOmieApi'
 import type { LotePagamento, StatusLote } from '../../types/financeiro'
 
 const CP_PAGE_SIZES = [100, 200, 500]
@@ -121,6 +126,47 @@ export default function LotesPagamento() {
   const { data: lotes = [], isLoading: loadingLotes } = useLotesPagamento()
   const criarLote = useCriarLote()
   const enviarAprovacao = useEnviarLoteAprovacao()
+
+  // Omie integration
+  const { data: omieCredentials } = useOmieCredentials()
+  const enviarRemessaOmie = useOmieEnviarRemessa()
+  const atualizarRemessas = useOmieAtualizarRemessas()
+  const [omieStatus, setOmieStatus] = useState<Record<string, { ok?: boolean; msg?: string; loading?: boolean }>>({})
+
+  async function handleEnviarOmie(lote: LotePagamento, e: React.MouseEvent) {
+    e.stopPropagation()
+    if (!omieCredentials) return
+    // Busca os CPs do lote para enviar
+    const cpsLote = cpsDisponiveis.filter(cp => cp.lote_id === lote.id)
+    if (cpsLote.length === 0) {
+      showToast('error', 'Nenhuma CP encontrada neste lote para enviar ao Omie')
+      return
+    }
+    setOmieStatus(prev => ({ ...prev, [lote.id]: { loading: true } }))
+    try {
+      const res = await enviarRemessaOmie.mutateAsync({ credentials: omieCredentials, cps: cpsLote })
+      const erros = res.filter(r => r.status === 'erro').length
+      const ok = res.filter(r => r.status === 'incluido').length
+      setOmieStatus(prev => ({ ...prev, [lote.id]: { ok: erros === 0, msg: `${ok} enviada(s)${erros ? `, ${erros} erro(s)` : ''}` } }))
+      showToast(erros === 0 ? 'success' : 'error', `Omie: ${ok} CP(s) incluída(s)${erros ? `, ${erros} com erro` : ''}`)
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Erro ao enviar ao Omie'
+      setOmieStatus(prev => ({ ...prev, [lote.id]: { ok: false, msg } }))
+      showToast('error', msg)
+    }
+  }
+
+  async function handleAtualizarOmie(e: React.MouseEvent) {
+    e.stopPropagation()
+    if (!omieCredentials) return
+    try {
+      const res = await atualizarRemessas.mutateAsync({ credentials: omieCredentials })
+      const confirmadas = res.filter(r => r.novoStatus === 'pago').length
+      showToast('success', `Atualizado: ${res.length} CP(s), ${confirmadas} pago(s)`)
+    } catch (err) {
+      showToast('error', err instanceof Error ? err.message : 'Erro ao atualizar remessas')
+    }
+  }
 
   const [tab, setTab] = useState<Tab>('montar')
   const [busca, setBusca] = useState('')
@@ -456,6 +502,26 @@ export default function LotesPagamento() {
 
       {tab === 'lotes' && (
         <>
+          {/* Omie integration bar */}
+          {omieCredentials && (
+            <div className={`flex items-center justify-between gap-3 rounded-xl border px-4 py-3 ${isDark ? 'bg-emerald-900/20 border-emerald-800/40' : 'bg-emerald-50 border-emerald-200'}`}>
+              <div className="flex items-center gap-2">
+                <Zap size={14} className="text-emerald-600 shrink-0" />
+                <p className={`text-xs font-semibold ${isDark ? 'text-emerald-300' : 'text-emerald-700'}`}>
+                  Integração Omie ativa — lotes aprovados podem ser enviados ao Omie para pagamento
+                </p>
+              </div>
+              <button
+                onClick={handleAtualizarOmie}
+                disabled={atualizarRemessas.isPending}
+                className="flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-bold text-white transition-colors hover:bg-emerald-700 disabled:opacity-50 shrink-0"
+              >
+                <RefreshCw size={12} className={atualizarRemessas.isPending ? 'animate-spin' : ''} />
+                {atualizarRemessas.isPending ? 'Atualizando...' : 'Atualizar Status Omie'}
+              </button>
+            </div>
+          )}
+
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="flex gap-1.5">
               {[
@@ -536,11 +602,37 @@ export default function LotesPagamento() {
                       {enviarAprovacao.isPending ? 'Enviando...' : 'Enviar para Aprovacao'}
                     </button>
                   )}
+
+                  {/* Omie remessa — disponível em lotes aprovados */}
+                  {omieCredentials && (lote.status === 'aprovado' || lote.status === 'parcialmente_aprovado') && (
+                    <button
+                      type="button"
+                      onClick={e => handleEnviarOmie(lote, e)}
+                      disabled={omieStatus[lote.id]?.loading || enviarRemessaOmie.isPending}
+                      className="flex items-center gap-2 rounded-lg bg-emerald-600 px-3 py-2 text-xs font-semibold text-white transition-colors hover:bg-emerald-700 disabled:opacity-50"
+                    >
+                      {omieStatus[lote.id]?.loading
+                        ? <RefreshCw size={13} className="animate-spin" />
+                        : <Zap size={13} />
+                      }
+                      {omieStatus[lote.id]?.loading ? 'Enviando Omie...' : 'Enviar para Omie'}
+                    </button>
+                  )}
                 </div>
 
                 {lote.observacao && (
                   <div className="mt-2 truncate text-[11px] text-slate-400">
                     {lote.observacao}
+                  </div>
+                )}
+                {omieStatus[lote.id]?.msg && (
+                  <div className={`mt-2 flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[11px] font-medium ${
+                    omieStatus[lote.id]?.ok
+                      ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-400'
+                      : 'bg-red-50 text-red-700 dark:bg-red-900/20 dark:text-red-400'
+                  }`}>
+                    {omieStatus[lote.id]?.ok ? <CheckCircle2 size={11} /> : <AlertCircle size={11} />}
+                    Omie: {omieStatus[lote.id]?.msg}
                   </div>
                 )}
               </div>
