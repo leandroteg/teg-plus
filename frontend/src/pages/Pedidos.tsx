@@ -143,99 +143,168 @@ function getDisplayNumber(pedido: PedidoListItem) {
 
 // ─── PDF / Share helpers ──────────────────────────────────────────────────────
 
-function gerarPdfHtml(pedido: Pedido): string {
+const EMPRESA = {
+  razao: 'TEG UNIAO - LOCACAO, SERVICOS & EMPREENDIMENTOS LTDA',
+  fantasia: 'Teg Uniao Energia',
+  cnpj: '19.887.731/0001-29',
+  logoUrl: '/logo-teg-plus.png',
+}
+
+const fmtBRL = (v?: number) => v != null ? v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) : '—'
+const fmtDate = (d?: string) => d ? new Date(d.includes('T') ? d : d + 'T00:00:00').toLocaleDateString('pt-BR') : '—'
+
+function buildPdfHtml(pedido: Pedido): string {
   const esc = (s: string) => s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c] ?? c))
-  return `
-    <!DOCTYPE html>
-    <html>
-    <head>
-      <meta charset="UTF-8">
-      <title>Pedido de Compra #${esc(pedido.numero_pedido ?? '')}</title>
-      <style>
-        body { font-family: Arial, sans-serif; padding: 40px; color: #1e293b; }
-        .header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 32px; border-bottom: 2px solid #0d9488; padding-bottom: 20px; }
-        .logo { font-size: 24px; font-weight: 900; color: #0d9488; }
-        .title { font-size: 18px; font-weight: 700; color: #334155; }
-        .field-row { display: flex; gap: 20px; margin-bottom: 16px; }
-        .field { flex: 1; }
-        .label { font-size: 10px; color: #94a3b8; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; }
-        .value { font-size: 14px; font-weight: 600; color: #1e293b; margin-top: 2px; }
-        .value.big { font-size: 20px; font-weight: 900; color: #0d9488; }
-        .section { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 16px; margin-bottom: 16px; }
-        .footer { margin-top: 40px; padding-top: 16px; border-top: 1px solid #e2e8f0; font-size: 11px; color: #94a3b8; text-align: center; }
-        @media print { button { display: none !important; } }
-      </style>
-    </head>
-    <body>
-      <div class="header">
-        <div>
-          <div class="logo">TEG+</div>
-          <div style="font-size:11px;color:#94a3b8;margin-top:4px">Sistema ERP</div>
-        </div>
-        <div style="text-align:right">
-          <div class="title">Pedido de Compra</div>
-          <div style="font-size:13px;font-weight:700;color:#0d9488">#${esc(pedido.numero_pedido ?? pedido.id.slice(0, 8).toUpperCase())}</div>
-          <div style="font-size:11px;color:#64748b;margin-top:4px">${new Date().toLocaleDateString('pt-BR')}</div>
-        </div>
-      </div>
+  const numero = esc(pedido.numero_pedido ?? pedido.id.slice(0, 8).toUpperCase())
+  const itens = pedido.requisicao?.itens ?? []
+  const parcelas = pedido.parcelas_preview ?? []
 
-      <div class="section">
-        <div class="field-row">
-          <div class="field">
-            <div class="label">Fornecedor</div>
-            <div class="value">${esc(pedido.fornecedor_nome)}</div>
-          </div>
-          <div class="field">
-            <div class="label">Valor Total</div>
-            <div class="value big">${pedido.valor_total?.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) ?? '—'}</div>
-          </div>
-        </div>
-        ${pedido.requisicao ? `
-        <div class="field-row">
-          <div class="field">
-            <div class="label">Requisição</div>
-            <div class="value">${esc(pedido.requisicao.numero)} — ${esc(pedido.requisicao.descricao)}</div>
-          </div>
-          <div class="field">
-            <div class="label">Obra / Projeto</div>
-            <div class="value">${esc(pedido.requisicao.obra_nome ?? '—')}</div>
-          </div>
-        </div>` : ''}
-        <div class="field-row">
-          <div class="field">
-            <div class="label">Data do Pedido</div>
-            <div class="value">${pedido.data_pedido ? new Date(pedido.data_pedido).toLocaleDateString('pt-BR') : '—'}</div>
-          </div>
-          <div class="field">
-            <div class="label">Previsão de Entrega</div>
-            <div class="value">${pedido.data_prevista_entrega ? new Date(pedido.data_prevista_entrega + 'T00:00:00').toLocaleDateString('pt-BR') : '—'}</div>
-          </div>
-          ${pedido.nf_numero ? `<div class="field"><div class="label">NF</div><div class="value">${esc(pedido.nf_numero)}</div></div>` : ''}
-        </div>
-        ${pedido.observacoes ? `<div class="field"><div class="label">Observações</div><div class="value">${esc(pedido.observacoes)}</div></div>` : ''}
-      </div>
+  const itensHtml = itens.length > 0 ? `
+    <div class="section">
+      <div class="section-title">Itens do Pedido</div>
+      <table>
+        <thead>
+          <tr><th style="width:5%">#</th><th style="width:50%">Descricao</th><th style="width:10%">Qtd</th><th style="width:10%">Un</th><th style="width:12%">Vl. Unit.</th><th style="width:13%">Subtotal</th></tr>
+        </thead>
+        <tbody>
+          ${itens.map((item, i) => `
+            <tr>
+              <td style="text-align:center">${i + 1}</td>
+              <td>${esc(item.descricao)}</td>
+              <td style="text-align:center">${item.quantidade}</td>
+              <td style="text-align:center">${esc(item.unidade)}</td>
+              <td style="text-align:right">${fmtBRL(item.valor_unitario_estimado)}</td>
+              <td style="text-align:right;font-weight:600">${fmtBRL(item.quantidade * item.valor_unitario_estimado)}</td>
+            </tr>
+          `).join('')}
+          <tr class="total-row">
+            <td colspan="5" style="text-align:right;font-weight:700">TOTAL</td>
+            <td style="text-align:right;font-weight:900;color:#0d9488">${fmtBRL(pedido.valor_total)}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  ` : ''
 
-      <div class="footer">
-        TEG+ ERP · Pedido de Compra · Emitido em ${new Date().toLocaleString('pt-BR')}<br>
-        Este documento é válido apenas com a assinatura do responsável pelo setor de compras.
+  const parcelasHtml = parcelas.length > 0 ? `
+    <div class="section">
+      <div class="section-title">Condicao de Pagamento${pedido.condicao_pagamento ? `: ${esc(pedido.condicao_pagamento)}` : ''}</div>
+      <table>
+        <thead>
+          <tr><th style="width:10%">Parcela</th><th style="width:45%">Descricao</th><th style="width:25%">Vencimento</th><th style="width:20%">Valor</th></tr>
+        </thead>
+        <tbody>
+          ${parcelas.map(p => `
+            <tr>
+              <td style="text-align:center">${p.numero}</td>
+              <td>${esc(p.descricao || `Parcela ${p.numero}/${parcelas.length}`)}</td>
+              <td style="text-align:center">${fmtDate(p.data_vencimento)}</td>
+              <td style="text-align:right;font-weight:600">${fmtBRL(p.valor)}</td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+    </div>
+  ` : ''
+
+  return `<!DOCTYPE html>
+<html><head><meta charset="UTF-8">
+<title>Pedido de Compra #${numero}</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: Arial, Helvetica, sans-serif; color: #1e293b; font-size: 12px; }
+  .page { max-width: 800px; margin: 0 auto; padding: 30px 40px; }
+  .header { display: flex; justify-content: space-between; align-items: flex-start; padding-bottom: 16px; border-bottom: 3px solid #0d9488; margin-bottom: 20px; }
+  .header-left { display: flex; align-items: center; gap: 12px; }
+  .header-left img { height: 50px; }
+  .company-name { font-size: 11px; font-weight: 700; color: #334155; }
+  .company-cnpj { font-size: 9px; color: #94a3b8; margin-top: 2px; }
+  .header-right { text-align: right; }
+  .doc-title { font-size: 18px; font-weight: 900; color: #0d9488; }
+  .doc-number { font-size: 13px; font-weight: 700; color: #334155; margin-top: 2px; }
+  .doc-date { font-size: 10px; color: #64748b; margin-top: 4px; }
+  .section { margin-bottom: 16px; }
+  .section-title { font-size: 11px; font-weight: 700; color: #0d9488; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 8px; border-bottom: 1px solid #e2e8f0; padding-bottom: 4px; }
+  .fields { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 20px; margin-bottom: 12px; }
+  .field .label { font-size: 9px; color: #94a3b8; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; }
+  .field .value { font-size: 13px; font-weight: 600; color: #1e293b; margin-top: 1px; }
+  .field .value.big { font-size: 18px; font-weight: 900; color: #0d9488; }
+  table { width: 100%; border-collapse: collapse; font-size: 11px; }
+  thead th { background: #f1f5f9; color: #475569; font-weight: 700; text-align: left; padding: 6px 8px; border-bottom: 2px solid #e2e8f0; font-size: 9px; text-transform: uppercase; }
+  tbody td { padding: 5px 8px; border-bottom: 1px solid #f1f5f9; }
+  .total-row td { border-top: 2px solid #e2e8f0; padding-top: 8px; }
+  .footer { margin-top: 30px; padding-top: 12px; border-top: 2px solid #e2e8f0; text-align: center; }
+  .footer p { font-size: 9px; color: #94a3b8; line-height: 1.5; }
+  .footer .disclaimer { font-size: 8px; color: #cbd5e1; margin-top: 4px; }
+  @media print { body { padding: 0; } .page { padding: 20px; } button { display: none !important; } }
+</style></head>
+<body><div class="page">
+  <div class="header">
+    <div class="header-left">
+      <img src="${EMPRESA.logoUrl}" alt="TEG+" />
+      <div>
+        <div class="company-name">${esc(EMPRESA.fantasia)}</div>
+        <div class="company-cnpj">CNPJ: ${EMPRESA.cnpj}</div>
       </div>
-    </body>
-    </html>
-  `
+    </div>
+    <div class="header-right">
+      <div class="doc-title">PEDIDO DE COMPRA</div>
+      <div class="doc-number">#${numero}</div>
+      <div class="doc-date">Emitido em ${new Date().toLocaleDateString('pt-BR')}</div>
+    </div>
+  </div>
+  <div class="section">
+    <div class="section-title">Dados do Pedido</div>
+    <div class="fields">
+      <div class="field"><div class="label">Fornecedor</div><div class="value">${esc(pedido.fornecedor_nome)}</div></div>
+      <div class="field"><div class="label">Valor Total</div><div class="value big">${fmtBRL(pedido.valor_total)}</div></div>
+      ${pedido.requisicao ? `
+      <div class="field"><div class="label">Requisicao</div><div class="value">${esc(pedido.requisicao.numero)} — ${esc(pedido.requisicao.descricao)}</div></div>
+      <div class="field"><div class="label">Obra / Projeto</div><div class="value">${esc(pedido.requisicao.obra_nome ?? '—')}</div></div>` : ''}
+      <div class="field"><div class="label">Data do Pedido</div><div class="value">${fmtDate(pedido.data_pedido)}</div></div>
+      <div class="field"><div class="label">Previsao de Entrega</div><div class="value">${fmtDate(pedido.data_prevista_entrega)}</div></div>
+      ${pedido.nf_numero ? `<div class="field"><div class="label">NF</div><div class="value">${esc(pedido.nf_numero)}</div></div>` : ''}
+      ${pedido.centro_custo ? `<div class="field"><div class="label">Centro de Custo</div><div class="value">${esc(pedido.centro_custo)}</div></div>` : ''}
+      ${pedido.classe_financeira ? `<div class="field"><div class="label">Classe Financeira</div><div class="value">${esc(pedido.classe_financeira)}</div></div>` : ''}
+    </div>
+    ${pedido.observacoes ? `<div class="field" style="margin-top:4px"><div class="label">Observacoes</div><div class="value" style="font-size:11px;font-weight:400">${esc(pedido.observacoes)}</div></div>` : ''}
+  </div>
+  ${itensHtml}
+  ${parcelasHtml}
+  <div class="footer">
+    <p>TEG+ ERP &middot; Pedido de Compra &middot; ${esc(EMPRESA.fantasia)} &middot; CNPJ ${EMPRESA.cnpj}</p>
+    <p class="disclaimer">Documento gerado automaticamente pelo sistema TEG+ ERP em ${new Date().toLocaleString('pt-BR')}.<br>
+    Valido apenas com a assinatura do responsavel pelo setor de compras.</p>
+  </div>
+</div></body></html>`
 }
 
 function gerarPdfPedido(pedido: Pedido) {
-  const html = gerarPdfHtml(pedido)
-  const printWin = window.open('', '_blank', 'width=900,height=700')
+  const html = buildPdfHtml(pedido)
+  const blob = new Blob([html], { type: 'text/html;charset=utf-8' })
+  const url = URL.createObjectURL(blob)
+  const printWin = window.open(url, '_blank', 'width=900,height=700')
   if (!printWin) return
-  printWin.document.open()
-  printWin.document.writeln(html)
-  printWin.document.close()
-  printWin.focus()
-  setTimeout(() => printWin.print(), 500)
+  printWin.addEventListener('load', () => {
+    printWin.focus()
+    setTimeout(() => { printWin.print(); URL.revokeObjectURL(url) }, 400)
+  })
 }
 
-function gerarPdfBlob(pedido: Pedido): Blob {
+async function loadLogoBase64(): Promise<string | null> {
+  try {
+    const resp = await fetch(EMPRESA.logoUrl)
+    const blob = await resp.blob()
+    return new Promise((resolve) => {
+      const reader = new FileReader()
+      reader.onloadend = () => resolve(reader.result as string)
+      reader.onerror = () => resolve(null)
+      reader.readAsDataURL(blob)
+    })
+  } catch { return null }
+}
+
+async function gerarPdfBlob(pedido: Pedido): Promise<Blob> {
   const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
   const W = 210
   const M = 15
@@ -247,63 +316,185 @@ function gerarPdfBlob(pedido: Pedido): Blob {
   const MID  = [100, 116, 139] as const
   const LIGHT = [226, 232, 240] as const
 
+  // ── Header bar ──────────────────────────────────────────────────────────────
   doc.setFillColor(...TEAL)
-  doc.rect(0, 0, W, 28, 'F')
-  doc.setFont('helvetica', 'bold')
-  doc.setFontSize(18)
-  doc.setTextColor(255, 255, 255)
-  doc.text('TEG+', M, 14)
-  doc.setFontSize(10)
-  doc.text('Pedido de Compra', M, 22)
+  doc.rect(0, 0, W, 30, 'F')
 
+  // Logo
+  const logo = await loadLogoBase64()
+  if (logo) {
+    try { doc.addImage(logo, 'PNG', M, 3, 18, 24) } catch { /* ignore */ }
+  }
+
+  // Company info
+  doc.setFont('helvetica', 'bold')
+  doc.setFontSize(11)
+  doc.setTextColor(255, 255, 255)
+  doc.text(EMPRESA.fantasia, M + 22, 13)
+  doc.setFont('helvetica', 'normal')
+  doc.setFontSize(8)
+  doc.text(`CNPJ: ${EMPRESA.cnpj}`, M + 22, 19)
+
+  // Document title
   const numero = pedido.numero_pedido ?? pedido.id.slice(0, 8).toUpperCase()
+  doc.setFont('helvetica', 'bold')
   doc.setFontSize(14)
-  doc.text(`#${numero}`, W - M, 14, { align: 'right' })
-  doc.setFontSize(9)
-  doc.text(new Date().toLocaleDateString('pt-BR'), W - M, 22, { align: 'right' })
+  doc.text('PEDIDO DE COMPRA', W - M, 13, { align: 'right' })
+  doc.setFontSize(10)
+  doc.text(`#${numero}`, W - M, 20, { align: 'right' })
+  doc.setFont('helvetica', 'normal')
+  doc.setFontSize(8)
+  doc.text(new Date().toLocaleDateString('pt-BR'), W - M, 26, { align: 'right' })
   y = 36
+
+  // ── Section: Dados do Pedido ────────────────────────────────────────────────
+  const sectionTitle = (title: string) => {
+    doc.setFont('helvetica', 'bold')
+    doc.setFontSize(10)
+    doc.setTextColor(...TEAL)
+    doc.text(title, M, y)
+    y += 1
+    doc.setDrawColor(...TEAL)
+    doc.setLineWidth(0.5)
+    doc.line(M, y, W - M, y)
+    y += 5
+  }
 
   const addField = (label: string, value: string, bold = false) => {
     doc.setFont('helvetica', 'normal')
-    doc.setFontSize(9)
+    doc.setFontSize(8)
     doc.setTextColor(...MID)
     doc.text(label, M, y)
     doc.setFont('helvetica', bold ? 'bold' : 'normal')
-    doc.setFontSize(11)
+    doc.setFontSize(10)
     doc.setTextColor(...DARK)
-    doc.text(value || '—', M + 45, y)
-    y += 7
+    const truncated = value?.length > 70 ? value.slice(0, 67) + '...' : (value || '—')
+    doc.text(truncated, M + 42, y)
+    y += 6.5
   }
 
+  sectionTitle('DADOS DO PEDIDO')
   addField('Fornecedor', pedido.fornecedor_nome, true)
-  addField('Valor Total', pedido.valor_total?.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) ?? '—', true)
+  addField('Valor Total', fmtBRL(pedido.valor_total), true)
   if (pedido.requisicao) {
     addField('Requisicao', `${pedido.requisicao.numero} — ${pedido.requisicao.descricao}`)
     if (pedido.requisicao.obra_nome) addField('Obra', pedido.requisicao.obra_nome)
   }
-  addField('Data Pedido', pedido.data_pedido ? new Date(pedido.data_pedido).toLocaleDateString('pt-BR') : '—')
-  addField('Prev. Entrega', pedido.data_prevista_entrega ? new Date(pedido.data_prevista_entrega + 'T00:00:00').toLocaleDateString('pt-BR') : '—')
+  addField('Data Pedido', fmtDate(pedido.data_pedido))
+  addField('Prev. Entrega', fmtDate(pedido.data_prevista_entrega))
   if (pedido.nf_numero) addField('NF', pedido.nf_numero)
+  if (pedido.centro_custo) addField('Centro Custo', pedido.centro_custo)
+  if (pedido.classe_financeira) addField('Classe Financ.', pedido.classe_financeira)
   if (pedido.observacoes) {
-    y += 3
     doc.setFont('helvetica', 'normal')
-    doc.setFontSize(9)
+    doc.setFontSize(8)
     doc.setTextColor(...MID)
     doc.text('Observacoes', M, y)
-    y += 5
+    y += 4
     doc.setTextColor(...DARK)
-    doc.setFontSize(10)
+    doc.setFontSize(9)
     const lines = doc.splitTextToSize(pedido.observacoes, CW)
-    doc.text(lines, M, y)
-    y += lines.length * 5
+    doc.text(lines.slice(0, 4), M, y)
+    y += Math.min(lines.length, 4) * 4
+  }
+  y += 4
+
+  // ── Section: Itens ──────────────────────────────────────────────────────────
+  const itens = pedido.requisicao?.itens ?? []
+  if (itens.length > 0) {
+    sectionTitle('ITENS DO PEDIDO')
+    const cols = [M, M + 8, M + 90, M + 105, M + 120, M + 145]
+    doc.setFillColor(241, 245, 249)
+    doc.rect(M, y - 3.5, CW, 5, 'F')
+    doc.setFont('helvetica', 'bold')
+    doc.setFontSize(7)
+    doc.setTextColor(71, 85, 105)
+    doc.text('#', cols[0], y)
+    doc.text('DESCRICAO', cols[1], y)
+    doc.text('QTD', cols[2], y)
+    doc.text('UN', cols[3], y)
+    doc.text('VL. UNIT.', cols[4], y)
+    doc.text('SUBTOTAL', cols[5], y)
+    y += 4
+
+    doc.setFont('helvetica', 'normal')
+    doc.setFontSize(8)
+    doc.setTextColor(...DARK)
+    itens.forEach((item, i) => {
+      if (y > 265) { doc.addPage(); y = M }
+      const subtotal = item.quantidade * item.valor_unitario_estimado
+      doc.text(String(i + 1), cols[0], y)
+      const desc = item.descricao.length > 45 ? item.descricao.slice(0, 42) + '...' : item.descricao
+      doc.text(desc, cols[1], y)
+      doc.text(String(item.quantidade), cols[2], y)
+      doc.text(item.unidade, cols[3], y)
+      doc.text(fmtBRL(item.valor_unitario_estimado), cols[4], y)
+      doc.setFont('helvetica', 'bold')
+      doc.text(fmtBRL(subtotal), cols[5], y)
+      doc.setFont('helvetica', 'normal')
+      y += 5
+      doc.setDrawColor(241, 245, 249)
+      doc.line(M, y - 2, W - M, y - 2)
+    })
+
+    doc.setDrawColor(...TEAL)
+    doc.setLineWidth(0.5)
+    doc.line(cols[4], y - 1, W - M, y - 1)
+    y += 2
+    doc.setFont('helvetica', 'bold')
+    doc.setFontSize(9)
+    doc.text('TOTAL', cols[4], y)
+    doc.setTextColor(...TEAL)
+    doc.text(fmtBRL(pedido.valor_total), cols[5], y)
+    y += 8
   }
 
-  y = 282
+  // ── Section: Parcelas ───────────────────────────────────────────────────────
+  const parcelas = pedido.parcelas_preview ?? []
+  if (parcelas.length > 0) {
+    if (y > 240) { doc.addPage(); y = M }
+    sectionTitle(`CONDICAO DE PAGAMENTO${pedido.condicao_pagamento ? `: ${pedido.condicao_pagamento}` : ''}`)
+    const pCols = [M, M + 18, M + 90, M + 140]
+    doc.setFillColor(241, 245, 249)
+    doc.rect(M, y - 3.5, CW, 5, 'F')
+    doc.setFont('helvetica', 'bold')
+    doc.setFontSize(7)
+    doc.setTextColor(71, 85, 105)
+    doc.text('PARCELA', pCols[0], y)
+    doc.text('DESCRICAO', pCols[1], y)
+    doc.text('VENCIMENTO', pCols[2], y)
+    doc.text('VALOR', pCols[3], y)
+    y += 4
+
+    doc.setFont('helvetica', 'normal')
+    doc.setFontSize(8)
+    doc.setTextColor(...DARK)
+    parcelas.forEach(p => {
+      if (y > 270) { doc.addPage(); y = M }
+      doc.text(String(p.numero), pCols[0] + 6, y)
+      doc.text(p.descricao || `Parcela ${p.numero}/${parcelas.length}`, pCols[1], y)
+      doc.text(fmtDate(p.data_vencimento), pCols[2], y)
+      doc.setFont('helvetica', 'bold')
+      doc.text(fmtBRL(p.valor), pCols[3], y)
+      doc.setFont('helvetica', 'normal')
+      y += 5
+      doc.setDrawColor(241, 245, 249)
+      doc.line(M, y - 2, W - M, y - 2)
+    })
+    y += 4
+  }
+
+  // ── Footer ──────────────────────────────────────────────────────────────────
+  const footerY = Math.max(y + 10, 278)
+  if (footerY > 290) doc.addPage()
+  const fy = footerY > 290 ? 280 : footerY
   doc.setDrawColor(...LIGHT)
-  doc.line(M, y - 4, W - M, y - 4)
-  doc.setFontSize(8)
+  doc.line(M, fy - 4, W - M, fy - 4)
+  doc.setFontSize(7)
   doc.setTextColor(...MID)
-  doc.text(`TEG+ ERP · Pedido de Compra · Emitido em ${new Date().toLocaleString('pt-BR')}`, W / 2, y, { align: 'center' })
+  doc.text(`TEG+ ERP · ${EMPRESA.fantasia} · CNPJ ${EMPRESA.cnpj} · Emitido em ${new Date().toLocaleString('pt-BR')}`, W / 2, fy, { align: 'center' })
+  doc.setFontSize(6)
+  doc.text('Valido apenas com a assinatura do responsavel pelo setor de compras.', W / 2, fy + 4, { align: 'center' })
 
   return doc.output('blob')
 }
@@ -320,7 +511,7 @@ async function compartilharWhatsApp(pedido: Pedido): Promise<boolean> {
 
   if (navigator.share && navigator.canShare) {
     try {
-      const blob = gerarPdfBlob(pedido)
+      const blob = await gerarPdfBlob(pedido)
       const file = new File([blob], `Pedido_${numero}.pdf`, { type: 'application/pdf' })
       const shareData = { text, files: [file] }
       if (navigator.canShare(shareData)) {
@@ -363,7 +554,7 @@ async function compartilharEmail(pedido: Pedido, email?: string) {
     // Se falhar ao buscar anexos, envia sem eles
   }
 
-  const pdfHtml = gerarPdfHtml(pedido)
+  const pdfHtml = buildPdfHtml(pedido)
 
   try {
     const res = await api.enviarEmailPedido({

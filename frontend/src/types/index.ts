@@ -62,7 +62,9 @@ export interface Pedido {
   liberado_pagamento_por?: string
   pago_em?: string
   // Joins
-  requisicao?: Pick<Requisicao, 'numero' | 'descricao' | 'obra_nome' | 'categoria'>
+  requisicao?: Pick<Requisicao, 'numero' | 'descricao' | 'obra_nome' | 'categoria'> & {
+    itens?: Pick<RequisicaoItem, 'descricao' | 'quantidade' | 'unidade' | 'valor_unitario_estimado'>[]
+  }
   comprador?: Pick<Comprador, 'nome'>
 }
 
