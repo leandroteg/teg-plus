@@ -1929,8 +1929,8 @@ function LoteTableRow({
   onSelectMany: (ids: string[]) => void
   onToggleExpand: () => void
   onOpenCP: (cp: ContaPagar) => void
-  onPrimaryAction?: { label: string; onClick: () => void; tone: string; icon: typeof Send }
-  onSecondaryAction?: { label: string; onClick: () => void; tone: string; icon: typeof Banknote }
+  onPrimaryAction?: { label: string; onClick: () => void; tone: string; icon: typeof Send; loading?: boolean; disabled?: boolean }
+  onSecondaryAction?: { label: string; onClick: () => void; tone: string; icon: typeof Banknote; loading?: boolean; disabled?: boolean }
 }) {
   const isMultiItemLote = summary.totalItems > 1
   const resumoTitle = isMultiItemLote ? summary.headerLabel : summary.supplierLabel
@@ -1972,15 +1972,17 @@ function LoteTableRow({
         <span className="text-sm font-extrabold text-emerald-600">{fmt(summary.visibleValue || summary.totalValue)}</span>
         <div className="flex items-center justify-end gap-2">
           {onPrimaryAction && (
-            <button type="button" onClick={onPrimaryAction.onClick} className={`inline-flex items-center gap-1.5 rounded-xl px-3 py-2 text-[11px] font-bold text-white transition-all ${onPrimaryAction.tone}`}>
-              <onPrimaryAction.icon size={12} />
-              {onPrimaryAction.label}
+            <button type="button" onClick={onPrimaryAction.onClick} disabled={onPrimaryAction.loading || onPrimaryAction.disabled}
+              className={`inline-flex items-center gap-1.5 rounded-xl px-3 py-2 text-[11px] font-bold text-white transition-all disabled:opacity-60 disabled:cursor-not-allowed ${onPrimaryAction.tone}`}>
+              {onPrimaryAction.loading ? <RefreshCw size={12} className="animate-spin" /> : <onPrimaryAction.icon size={12} />}
+              {onPrimaryAction.loading ? 'Enviando...' : onPrimaryAction.label}
             </button>
           )}
           {onSecondaryAction && (
-            <button type="button" onClick={onSecondaryAction.onClick} className={`inline-flex items-center gap-1.5 rounded-xl px-3 py-2 text-[11px] font-bold text-white transition-all ${onSecondaryAction.tone}`}>
-              <onSecondaryAction.icon size={12} />
-              {onSecondaryAction.label}
+            <button type="button" onClick={onSecondaryAction.onClick} disabled={onSecondaryAction.loading || onSecondaryAction.disabled}
+              className={`inline-flex items-center gap-1.5 rounded-xl px-3 py-2 text-[11px] font-bold text-white transition-all disabled:opacity-60 disabled:cursor-not-allowed ${onSecondaryAction.tone}`}>
+              {onSecondaryAction.loading ? <RefreshCw size={12} className="animate-spin" /> : <onSecondaryAction.icon size={12} />}
+              {onSecondaryAction.loading ? 'Processando...' : onSecondaryAction.label}
             </button>
           )}
           <button type="button" onClick={onToggleExpand} className={`inline-flex items-center gap-1 rounded-xl border px-3 py-2 text-[11px] font-semibold ${isDark ? 'border-white/[0.08] text-slate-200 hover:bg-white/[0.04]' : 'border-slate-200 text-slate-600 hover:bg-white'}`}>
@@ -2011,8 +2013,8 @@ function LoteCard({
   expanded: boolean
   onToggleExpand: () => void
   onOpenCP: (cp: ContaPagar) => void
-  onPrimaryAction?: { label: string; onClick: () => void; tone: string; icon: typeof Send }
-  onSecondaryAction?: { label: string; onClick: () => void; tone: string; icon: typeof Banknote }
+  onPrimaryAction?: { label: string; onClick: () => void; tone: string; icon: typeof Send; loading?: boolean; disabled?: boolean }
+  onSecondaryAction?: { label: string; onClick: () => void; tone: string; icon: typeof Banknote; loading?: boolean; disabled?: boolean }
 }) {
   return (
     <div className={`rounded-2xl border p-4 ${isDark ? 'border-white/[0.06] bg-white/[0.02]' : 'border-slate-200 bg-white'}`}>
@@ -2038,15 +2040,17 @@ function LoteCard({
       <div className="mt-4 flex flex-wrap items-center justify-between gap-2">
         <div className="flex flex-wrap gap-2">
           {onPrimaryAction && (
-            <button type="button" onClick={onPrimaryAction.onClick} className={`inline-flex items-center gap-1.5 rounded-xl px-3 py-2 text-[11px] font-bold text-white transition-all ${onPrimaryAction.tone}`}>
-              <onPrimaryAction.icon size={12} />
-              {onPrimaryAction.label}
+            <button type="button" onClick={onPrimaryAction.onClick} disabled={onPrimaryAction.loading || onPrimaryAction.disabled}
+              className={`inline-flex items-center gap-1.5 rounded-xl px-3 py-2 text-[11px] font-bold text-white transition-all disabled:opacity-60 disabled:cursor-not-allowed ${onPrimaryAction.tone}`}>
+              {onPrimaryAction.loading ? <RefreshCw size={12} className="animate-spin" /> : <onPrimaryAction.icon size={12} />}
+              {onPrimaryAction.loading ? 'Enviando...' : onPrimaryAction.label}
             </button>
           )}
           {onSecondaryAction && (
-            <button type="button" onClick={onSecondaryAction.onClick} className={`inline-flex items-center gap-1.5 rounded-xl px-3 py-2 text-[11px] font-bold text-white transition-all ${onSecondaryAction.tone}`}>
-              <onSecondaryAction.icon size={12} />
-              {onSecondaryAction.label}
+            <button type="button" onClick={onSecondaryAction.onClick} disabled={onSecondaryAction.loading || onSecondaryAction.disabled}
+              className={`inline-flex items-center gap-1.5 rounded-xl px-3 py-2 text-[11px] font-bold text-white transition-all disabled:opacity-60 disabled:cursor-not-allowed ${onSecondaryAction.tone}`}>
+              {onSecondaryAction.loading ? <RefreshCw size={12} className="animate-spin" /> : <onSecondaryAction.icon size={12} />}
+              {onSecondaryAction.loading ? 'Processando...' : onSecondaryAction.label}
             </button>
           )}
         </div>
@@ -2514,6 +2518,8 @@ export default function CPPipeline() {
             onClick: () => handleEnviarLotesAprovacao(summary.cpIds),
             tone: 'bg-amber-500 hover:bg-amber-600',
             icon: Send,
+            loading: enviarLoteMut.isPending,
+            disabled: enviarLoteMut.isPending,
           },
         }
       case 'aprovado_pgto':
@@ -2523,6 +2529,8 @@ export default function CPPipeline() {
             onClick: () => handleEnviarRemessa(summary.cpIds),
             tone: 'bg-sky-600 hover:bg-sky-700',
             icon: Send,
+            loading: enviarRemessaMut.isPending,
+            disabled: enviarRemessaMut.isPending,
           },
           secondary: {
             label: 'Registrar pgto',
