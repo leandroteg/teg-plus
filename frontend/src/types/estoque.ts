@@ -369,7 +369,7 @@ export interface EstoqueMovimentacaoItem {
 // Recebimento Types (Compras ↔ Estoque ↔ Patrimonial)
 // =============================================================================
 
-export type TipoDestino = 'consumo' | 'patrimonial'
+export type TipoDestino = 'consumo' | 'patrimonial' | 'nenhum'
 
 export interface CmpRecebimento {
   id: string

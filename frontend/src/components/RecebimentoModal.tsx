@@ -2,6 +2,7 @@ import { useState, useMemo } from 'react'
 import {
   X, Package, ChevronDown, ChevronUp, Check,
   AlertTriangle, Warehouse, FileText, Hash, Info,
+  ArchiveRestore, Gem, Ban,
 } from 'lucide-react'
 import type { Pedido } from '../types'
 import type { RecebimentoItemForm, TipoDestino } from '../types/estoque'
@@ -21,8 +22,15 @@ function derivarDestinoPadrao(
   destino_operacional?: 'estoque' | 'patrimonio' | 'nenhum',
 ): TipoDestino {
   if (destino_operacional === 'patrimonio') return 'patrimonial'
+  if (destino_operacional === 'nenhum') return 'nenhum'
   return 'consumo'
 }
+
+const DESTINO_OPTIONS: { value: TipoDestino; label: string; icon: typeof Package; color: string; activeColor: string }[] = [
+  { value: 'consumo',     label: 'Estoque',     icon: ArchiveRestore, color: 'teal',   activeColor: 'bg-teal-100 text-teal-700 border-teal-300 ring-1 ring-teal-200' },
+  { value: 'patrimonial', label: 'Patrimonio', icon: Gem,            color: 'violet', activeColor: 'bg-violet-100 text-violet-700 border-violet-300 ring-1 ring-violet-200' },
+  { value: 'nenhum',      label: 'Nenhum',      icon: Ban,            color: 'slate',  activeColor: 'bg-slate-100 text-slate-600 border-slate-300 ring-1 ring-slate-200' },
+]
 
 // ─── Component ───────────────────────────────────────────────────────────────
 
@@ -75,7 +83,8 @@ export default function RecebimentoModal({
     () => itens.reduce((sum, i) => sum + i.quantidade_recebida * i.valor_unitario, 0),
     [itens],
   )
-  const temPatrimonial = itens.some(i => i.tipo_destino === 'patrimonial')
+  const temPatrimonial = itens.some(i => i.tipo_destino === 'patrimonial' && i.quantidade_recebida > 0)
+  const temNenhum = itens.some(i => i.tipo_destino === 'nenhum' && i.quantidade_recebida > 0)
   const qtdComRecebimento = itens.filter(i => i.quantidade_recebida > 0).length
 
   // Check if any item has an override without justification
@@ -259,6 +268,17 @@ export default function RecebimentoModal({
                 </div>
               )}
 
+              {/* ── Nenhum notice ──────────────────────────────────── */}
+              {temNenhum && (
+                <div className="flex items-start gap-2 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 text-xs text-slate-600">
+                  <Info size={14} className="flex-shrink-0 mt-0.5" />
+                  <p>
+                    Itens com destino <span className="font-bold">Nenhum</span> serao registrados
+                    apenas no recebimento, sem entrada no Estoque ou Patrimonial.
+                  </p>
+                </div>
+              )}
+
               {/* ── Error ─────────────────────────────────────────── */}
               {erro && (
                 <p className="text-xs text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
@@ -301,6 +321,12 @@ export default function RecebimentoModal({
 
 // ─── ItemRow ─────────────────────────────────────────────────────────────────
 
+function destinoLabel(d: TipoDestino) {
+  if (d === 'patrimonial') return 'Patrimonio'
+  if (d === 'nenhum') return 'Nenhum'
+  return 'Estoque'
+}
+
 function ItemRow({
   item,
   onChange,
@@ -316,12 +342,10 @@ function ItemRow({
   const isOverride = item.destino_padrao != null && item.tipo_destino !== item.destino_padrao
   const needsJustificativa = isOverride && item.quantidade_recebida > 0
 
-  const handleToggleDestino = () => {
-    const novoDestino: TipoDestino = item.tipo_destino === 'consumo' ? 'patrimonial' : 'consumo'
+  const handleSetDestino = (novoDestino: TipoDestino) => {
     const voltouAoPadrao = item.destino_padrao != null && novoDestino === item.destino_padrao
     onChange({
       tipo_destino: novoDestino,
-      // Clear justificativa if returning to default
       ...(voltouAoPadrao ? { justificativa_destino: '' } : {}),
     })
   }
@@ -334,75 +358,75 @@ function ItemRow({
         : 'border-slate-200'
     }`}>
       {/* Main row */}
-      <div className="px-3 py-2.5 flex items-center gap-2">
-        <div className="flex-1 min-w-0">
-          <p className="text-xs font-semibold text-slate-700 truncate">{item.descricao}</p>
-          <div className="flex items-center gap-1.5 mt-0.5">
-            <p className="text-[10px] text-slate-400">
-              Esperado: {item.quantidade_esperada} · {fmt(item.valor_unitario)}/un
-            </p>
-            {/* Badge showing catalog default */}
-            {item.destino_padrao && (
-              <span className={`inline-flex items-center gap-0.5 text-[9px] font-bold px-1.5 py-0.5 rounded-full ${
-                item.destino_padrao === 'patrimonial'
-                  ? 'bg-violet-100 text-violet-600'
-                  : 'bg-teal-100 text-teal-600'
-              }`}>
-                {item.destino_padrao === 'patrimonial' ? 'PAT' : 'EST'}
-              </span>
-            )}
+      <div className="px-3 py-2.5 space-y-2">
+        <div className="flex items-center gap-2">
+          <div className="flex-1 min-w-0">
+            <p className="text-xs font-semibold text-slate-700 truncate">{item.descricao}</p>
+            <div className="flex items-center gap-1.5 mt-0.5">
+              <p className="text-[10px] text-slate-400">
+                Esperado: {item.quantidade_esperada} · {fmt(item.valor_unitario)}/un
+              </p>
+              {/* Badge showing catalog default */}
+              {item.destino_padrao && (
+                <span className={`inline-flex items-center gap-0.5 text-[9px] font-bold px-1.5 py-0.5 rounded-full ${
+                  item.destino_padrao === 'patrimonial'
+                    ? 'bg-violet-100 text-violet-600'
+                    : item.destino_padrao === 'nenhum'
+                    ? 'bg-slate-100 text-slate-500'
+                    : 'bg-teal-100 text-teal-600'
+                }`}>
+                  {item.destino_padrao === 'patrimonial' ? 'PAT' : item.destino_padrao === 'nenhum' ? '—' : 'EST'}
+                </span>
+              )}
+            </div>
           </div>
-        </div>
 
-        {/* Quantity input */}
-        <div className="flex items-center gap-1.5 flex-shrink-0">
-          <input
-            type="number"
-            min={0}
-            max={item.quantidade_esperada}
-            step={1}
-            value={item.quantidade_recebida}
-            onChange={e => onChange({ quantidade_recebida: Math.max(0, Number(e.target.value)) })}
-            className="w-16 text-center text-sm font-bold border border-slate-200 rounded-lg py-1.5 focus:outline-none focus:ring-2 focus:ring-teal-400 focus:border-teal-400"
-          />
-        </div>
+          {/* Quantity input */}
+          <div className="flex items-center gap-1.5 flex-shrink-0">
+            <input
+              type="number"
+              min={0}
+              max={item.quantidade_esperada}
+              step={1}
+              value={item.quantidade_recebida}
+              onChange={e => onChange({ quantidade_recebida: Math.max(0, Number(e.target.value)) })}
+              className="w-16 text-center text-sm font-bold border border-slate-200 rounded-lg py-1.5 focus:outline-none focus:ring-2 focus:ring-teal-400 focus:border-teal-400"
+            />
+          </div>
 
-        {/* Destino toggles: E (Estoque) and P (Patrimonial) */}
-        <div className="flex gap-1 flex-shrink-0">
+          {/* Expand */}
           <button
             type="button"
-            onClick={handleToggleDestino}
-            title={item.tipo_destino === 'consumo' ? 'Estoque (Consumo)' : 'Mudar para Estoque'}
-            className={`w-7 h-7 rounded-lg flex items-center justify-center text-[10px] font-bold transition-all ${
-              item.tipo_destino === 'consumo'
-                ? 'bg-teal-100 text-teal-700 border border-teal-300'
-                : 'bg-slate-100 text-slate-400 border border-slate-200 hover:border-teal-200'
-            }`}
+            onClick={() => setExpanded(!expanded)}
+            className="flex-shrink-0 p-1 rounded text-slate-300 hover:text-slate-500"
           >
-            E
-          </button>
-          <button
-            type="button"
-            onClick={handleToggleDestino}
-            title={item.tipo_destino === 'patrimonial' ? 'Patrimonial' : 'Mudar para Patrimonial'}
-            className={`w-7 h-7 rounded-lg flex items-center justify-center text-[10px] font-bold transition-all ${
-              item.tipo_destino === 'patrimonial'
-                ? 'bg-violet-100 text-violet-700 border border-violet-300'
-                : 'bg-slate-100 text-slate-400 border border-slate-200 hover:border-violet-200'
-            }`}
-          >
-            P
+            {expanded ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
           </button>
         </div>
 
-        {/* Expand */}
-        <button
-          type="button"
-          onClick={() => setExpanded(!expanded)}
-          className="flex-shrink-0 p-1 rounded text-slate-300 hover:text-slate-500"
-        >
-          {expanded ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
-        </button>
+        {/* Destino: 3 radio-style buttons */}
+        <div className="flex items-center gap-1">
+          <span className="text-[10px] font-semibold text-slate-400 mr-1 flex-shrink-0">Entrada:</span>
+          {DESTINO_OPTIONS.map(opt => {
+            const Icon = opt.icon
+            const isActive = item.tipo_destino === opt.value
+            return (
+              <button
+                key={opt.value}
+                type="button"
+                onClick={() => handleSetDestino(opt.value)}
+                className={`flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-bold border transition-all ${
+                  isActive
+                    ? opt.activeColor
+                    : 'bg-white text-slate-400 border-slate-200 hover:border-slate-300'
+                }`}
+              >
+                <Icon size={11} />
+                {opt.label}
+              </button>
+            )
+          })}
+        </div>
       </div>
 
       {/* Override warning + justificativa */}
@@ -411,8 +435,8 @@ function ItemRow({
           <div className="flex items-start gap-1.5 mb-1.5">
             <Info size={11} className="text-amber-500 flex-shrink-0 mt-0.5" />
             <p className="text-[10px] text-amber-600 font-medium">
-              Destino alterado de <span className="font-bold">{item.destino_padrao === 'patrimonial' ? 'Patrimonial' : 'Estoque'}</span> para{' '}
-              <span className="font-bold">{item.tipo_destino === 'patrimonial' ? 'Patrimonial' : 'Estoque'}</span>.
+              Destino alterado de <span className="font-bold">{destinoLabel(item.destino_padrao!)}</span> para{' '}
+              <span className="font-bold">{destinoLabel(item.tipo_destino)}</span>.
               Justificativa obrigatoria:
             </p>
           </div>
