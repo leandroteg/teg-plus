@@ -18,6 +18,13 @@ ALTER TABLE public.cmp_recebimento_itens
   ADD CONSTRAINT chk_recebimento_item_status
   CHECK (status IN ('aguardando_entrada', 'confirmado', 'rejeitado'));
 
+-- 3b. Fix tipo_destino constraint to include 'nenhum'
+ALTER TABLE public.cmp_recebimento_itens
+  DROP CONSTRAINT IF EXISTS cmp_recebimento_itens_tipo_destino_check;
+ALTER TABLE public.cmp_recebimento_itens
+  ADD CONSTRAINT cmp_recebimento_itens_tipo_destino_check
+  CHECK (tipo_destino IN ('consumo', 'patrimonial', 'nenhum'));
+
 -- 4. Index for pipeline query
 CREATE INDEX IF NOT EXISTS idx_receb_itens_status
   ON public.cmp_recebimento_itens (status)
