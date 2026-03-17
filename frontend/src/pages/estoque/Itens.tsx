@@ -2,10 +2,12 @@ import { useState, useMemo } from 'react'
 import {
   Package2, Plus, Search, AlertTriangle, LayoutList, LayoutGrid,
   X, Save, Loader2, Download, Truck, PackageCheck, RefreshCw, ClipboardCheck,
+  CheckCircle2, Warehouse, Building2, Ban,
 } from 'lucide-react'
 import {
   useEstoqueItens, useSalvarItem, useSaldos,
   useAguardandoEntrada, useEmMovimentacao, useLiberadosRetirada,
+  useConfirmarEntrada,
 } from '../../hooks/useEstoque'
 import { useTheme } from '../../contexts/ThemeContext'
 import type {
@@ -37,7 +39,13 @@ const CURVA_COLOR: Record<string, { bg: string; text: string; darkBg: string; da
 const TIPO_LABEL: Record<string, string> = {
   entrada: 'Entrada', saida: 'Saída', transferencia_out: 'Transf. Saída',
   transferencia_in: 'Transf. Entrada', ajuste_positivo: 'Ajuste +', ajuste_negativo: 'Ajuste −',
-  devolucao: 'Devolução', baixa: 'Baixa',
+  devolucao: 'Devolução', baixa: 'Baixa', recebimento: 'Recebimento',
+}
+
+const DESTINO_LABEL: Record<string, { label: string; icon: typeof Warehouse; color: string; darkColor: string }> = {
+  consumo:      { label: 'Estoque',     icon: Warehouse,  color: 'bg-teal-100 text-teal-700',   darkColor: 'bg-teal-500/20 text-teal-400' },
+  patrimonial:  { label: 'Patrimônio',  icon: Building2,  color: 'bg-violet-100 text-violet-700', darkColor: 'bg-violet-500/20 text-violet-400' },
+  nenhum:       { label: 'Nenhum',      icon: Ban,        color: 'bg-slate-100 text-slate-500',  darkColor: 'bg-slate-500/20 text-slate-400' },
 }
 
 const UNIDADES = ['UN', 'M', 'M2', 'M3', 'KG', 'TON', 'L', 'CX', 'PCT', 'RL', 'PR', 'JG']
@@ -77,6 +85,7 @@ export default function Itens() {
   const { data: liberados = [], isLoading: loadingLiberados } = useLiberadosRetirada()
   const { data: movs = [], isLoading: loadingMovs } = useEmMovimentacao()
   const salvar = useSalvarItem()
+  const confirmarEntrada = useConfirmarEntrada()
 
   const accent = isDark ? STATUS_ACCENT_DARK : STATUS_ACCENT
 
@@ -305,8 +314,8 @@ export default function Itens() {
             )}
             {activeTab === 'aguardando_entrada' && (
               viewMode === 'list'
-                ? <EntradasList data={entradasFiltradas} isDark={isDark} />
-                : <EntradasCards data={entradasFiltradas} isDark={isDark} />
+                ? <EntradasList data={entradasFiltradas} isDark={isDark} onConfirm={(ids) => confirmarEntrada.mutate(ids)} confirming={confirmarEntrada.isPending} />
+                : <EntradasCards data={entradasFiltradas} isDark={isDark} onConfirm={(ids) => confirmarEntrada.mutate(ids)} confirming={confirmarEntrada.isPending} />
             )}
             {activeTab === 'liberado_retirada' && (
               viewMode === 'list'
@@ -468,25 +477,37 @@ function SaldosCards({ data, isDark }: { data: EstSaldo[]; isDark: boolean }) {
 // Aguardando Entrada — List & Cards
 // ═════════════════════════════════════════════════════════════════════════════
 
-function EntradasList({ data, isDark }: { data: EstoqueEntradaItem[]; isDark: boolean }) {
-  if (data.length === 0) return <EmptyState icon={PackageCheck} msg="Nenhuma entrada pendente" sub="As entradas aparecerão aqui quando registradas" isDark={isDark} />
+function DestinoBadge({ tipo, isDark }: { tipo?: string; isDark: boolean }) {
+  const d = DESTINO_LABEL[tipo ?? 'nenhum'] ?? DESTINO_LABEL.nenhum
+  const Icon = d.icon
+  return (
+    <span className={`inline-flex items-center gap-1 text-[10px] font-bold px-1.5 py-0.5 rounded-md ${isDark ? d.darkColor : d.color}`}>
+      <Icon size={10} />
+      {d.label}
+    </span>
+  )
+}
+
+function EntradasList({ data, isDark, onConfirm, confirming }: { data: EstoqueEntradaItem[]; isDark: boolean; onConfirm: (ids: string[]) => void; confirming: boolean }) {
+  if (data.length === 0) return <EmptyState icon={PackageCheck} msg="Nenhuma entrada pendente" sub="Os itens aparecerão aqui após confirmar recebimento" isDark={isDark} />
   return (
     <>
       <div className={`flex items-center gap-2 px-3 py-1 border-b text-[10px] font-semibold uppercase tracking-wider ${isDark ? 'border-white/[0.06] text-slate-600' : 'border-slate-100 text-slate-400'}`}>
         <span className="w-[70px] shrink-0">Código</span>
         <span className="flex-1 min-w-0">Descrição</span>
         <span className="w-[70px] shrink-0 text-right">Qtd</span>
-        <span className="w-[90px] shrink-0 text-center">Tipo</span>
-        <span className="w-[140px] shrink-0">Fornecedor / Origem</span>
-        <span className="w-[70px] shrink-0">NF</span>
+        <span className="w-[90px] shrink-0 text-center">Destino</span>
+        <span className="w-[120px] shrink-0">Pedido</span>
+        <span className="w-[120px] shrink-0">Fornecedor</span>
         <span className="w-[62px] shrink-0 text-right">Data</span>
+        <span className="w-[80px] shrink-0 text-right">Ação</span>
       </div>
       {data.map(e => (
-        <div key={e.id} className={`flex items-center gap-2 px-3 py-1.5 border-b cursor-pointer transition-all ${
+        <div key={e.id} className={`flex items-center gap-2 px-3 py-1.5 border-b transition-all ${
           isDark ? 'border-white/[0.04] hover:bg-white/[0.03]' : 'border-slate-100 hover:bg-slate-50'
         }`}>
           <span className={`text-[11px] font-mono font-bold w-[70px] shrink-0 ${isDark ? 'text-blue-400' : 'text-blue-700'}`}>
-            {e.codigo}
+            {e.codigo || '—'}
           </span>
           <span className={`text-xs truncate flex-1 min-w-0 ${isDark ? 'text-white' : 'text-slate-800'}`}>
             {e.descricao}
@@ -494,63 +515,107 @@ function EntradasList({ data, isDark }: { data: EstoqueEntradaItem[]; isDark: bo
           <span className={`text-[11px] font-semibold text-right w-[70px] shrink-0 ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>
             {e.quantidade} {e.unidade}
           </span>
-          <span className={`text-[10px] px-1.5 py-0.5 rounded-md w-[90px] shrink-0 text-center font-medium ${isDark ? 'bg-white/[0.04] text-slate-400' : 'bg-slate-100 text-slate-500'}`}>
-            {TIPO_LABEL[e.tipo] ?? e.tipo}
+          <span className="w-[90px] shrink-0 text-center">
+            <DestinoBadge tipo={e.tipo_destino} isDark={isDark} />
           </span>
-          <span className={`text-[11px] truncate w-[140px] shrink-0 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
-            {e.fornecedor_nome || e.base_nome || '—'}
+          <span className={`text-[11px] font-mono w-[120px] shrink-0 truncate ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+            {e.numero_pedido || '—'}
           </span>
-          <span className={`text-[11px] font-mono w-[70px] shrink-0 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
-            {e.nf_numero || '—'}
+          <span className={`text-[11px] truncate w-[120px] shrink-0 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+            {e.fornecedor_nome || '—'}
           </span>
           <span className={`text-[11px] text-right w-[62px] shrink-0 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
             {fmtDate(e.criado_em)}
           </span>
+          <span className="w-[80px] shrink-0 text-right">
+            <button
+              onClick={() => onConfirm([e.id])}
+              disabled={confirming}
+              className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-1 rounded-lg bg-teal-600 text-white hover:bg-teal-700 disabled:opacity-50 transition-all"
+            >
+              <CheckCircle2 size={11} />
+              Confirmar
+            </button>
+          </span>
         </div>
       ))}
+      {data.length > 1 && (
+        <div className="flex justify-end px-3 py-2">
+          <button
+            onClick={() => onConfirm(data.map(e => e.id))}
+            disabled={confirming}
+            className="inline-flex items-center gap-1.5 text-xs font-bold px-4 py-2 rounded-xl bg-teal-600 text-white hover:bg-teal-700 disabled:opacity-50 transition-all shadow-sm"
+          >
+            <CheckCircle2 size={14} />
+            Confirmar Todos ({data.length})
+          </button>
+        </div>
+      )}
     </>
   )
 }
 
-function EntradasCards({ data, isDark }: { data: EstoqueEntradaItem[]; isDark: boolean }) {
-  if (data.length === 0) return <EmptyState icon={PackageCheck} msg="Nenhuma entrada pendente" sub="As entradas aparecerão aqui quando registradas" isDark={isDark} />
+function EntradasCards({ data, isDark, onConfirm, confirming }: { data: EstoqueEntradaItem[]; isDark: boolean; onConfirm: (ids: string[]) => void; confirming: boolean }) {
+  if (data.length === 0) return <EmptyState icon={PackageCheck} msg="Nenhuma entrada pendente" sub="Os itens aparecerão aqui após confirmar recebimento" isDark={isDark} />
   return (
     <div className="space-y-2 p-4">
-      {data.map(e => (
-        <div key={e.id} className={`rounded-2xl border p-4 cursor-pointer transition-all group flex flex-col ${
-          isDark
-            ? 'border-white/[0.06] hover:border-blue-500/30 hover:shadow-lg hover:shadow-blue-500/5 bg-white/[0.02]'
-            : 'border-slate-200 hover:border-blue-300 hover:shadow-md bg-white'
-        }`}>
-          <div className="flex items-start justify-between">
-            <div className="min-w-0">
-              <p className={`font-mono text-[10px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{e.codigo}</p>
-              <p className={`font-semibold text-sm truncate mt-0.5 ${isDark ? 'text-white' : 'text-slate-800'}`}>
-                {e.descricao}
-              </p>
+      {data.map(e => {
+        const dest = DESTINO_LABEL[e.tipo_destino ?? 'nenhum'] ?? DESTINO_LABEL.nenhum
+        return (
+          <div key={e.id} className={`rounded-2xl border p-4 transition-all group flex flex-col ${
+            isDark
+              ? 'border-white/[0.06] hover:border-teal-500/30 hover:shadow-lg hover:shadow-teal-500/5 bg-white/[0.02]'
+              : 'border-slate-200 hover:border-teal-300 hover:shadow-md bg-white'
+          }`}>
+            <div className="flex items-start justify-between">
+              <div className="min-w-0">
+                <p className={`font-mono text-[10px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+                  {e.codigo || '—'} {e.numero_pedido ? `· ${e.numero_pedido}` : ''}
+                </p>
+                <p className={`font-semibold text-sm truncate mt-0.5 ${isDark ? 'text-white' : 'text-slate-800'}`}>
+                  {e.descricao}
+                </p>
+              </div>
+              <DestinoBadge tipo={e.tipo_destino} isDark={isDark} />
             </div>
-            <span className={`rounded-full text-[10px] font-bold px-2 py-0.5 shrink-0
-              ${isDark ? 'bg-slate-500/20 text-slate-400' : 'bg-slate-100 text-slate-600'}`}>
-              {TIPO_LABEL[e.tipo] ?? e.tipo}
-            </span>
+            <div className={`border-t my-3 ${isDark ? 'border-white/[0.06]' : 'border-slate-100'}`} />
+            <div className="flex items-center justify-between text-xs">
+              <span className={isDark ? 'text-slate-400' : 'text-slate-500'}>
+                Qtd: {e.quantidade} {e.unidade}
+                {e.valor_unitario ? ` · ${fmtCurrency(e.valor_unitario)}/un` : ''}
+              </span>
+              <span className={isDark ? 'text-slate-500' : 'text-slate-400'}>
+                {e.fornecedor_nome || '—'}
+              </span>
+            </div>
+            <div className="flex items-center justify-between mt-3">
+              <span className={`text-[11px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+                {e.base_nome ? `Base: ${e.base_nome}` : ''} {fmtDate(e.criado_em)}
+              </span>
+              <button
+                onClick={() => onConfirm([e.id])}
+                disabled={confirming}
+                className="inline-flex items-center gap-1 text-[11px] font-bold px-3 py-1.5 rounded-lg bg-teal-600 text-white hover:bg-teal-700 disabled:opacity-50 transition-all"
+              >
+                <CheckCircle2 size={12} />
+                Confirmar Entrada
+              </button>
+            </div>
           </div>
-          <div className={`border-t my-3 ${isDark ? 'border-white/[0.06]' : 'border-slate-100'}`} />
-          <div className="flex items-center justify-between text-xs">
-            <span className={isDark ? 'text-slate-400' : 'text-slate-500'}>
-              Qtd: {e.quantidade} {e.unidade}
-            </span>
-            {e.nf_numero && (
-              <span className={`font-mono ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>NF {e.nf_numero}</span>
-            )}
-          </div>
-          <div className="flex items-center justify-between text-xs mt-1">
-            <span className={isDark ? 'text-slate-500' : 'text-slate-400'}>
-              {e.fornecedor_nome || e.base_nome || '—'}
-            </span>
-            <span className={isDark ? 'text-slate-500' : 'text-slate-400'}>{fmtDate(e.criado_em)}</span>
-          </div>
+        )
+      })}
+      {data.length > 1 && (
+        <div className="flex justify-center pt-2">
+          <button
+            onClick={() => onConfirm(data.map(e => e.id))}
+            disabled={confirming}
+            className="inline-flex items-center gap-1.5 text-xs font-bold px-5 py-2.5 rounded-xl bg-teal-600 text-white hover:bg-teal-700 disabled:opacity-50 transition-all shadow-sm"
+          >
+            <CheckCircle2 size={14} />
+            Confirmar Todos ({data.length})
+          </button>
         </div>
-      ))}
+      )}
     </div>
   )
 }

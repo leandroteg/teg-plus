@@ -342,11 +342,14 @@ export interface EstoqueEntradaItem {
   descricao: string
   unidade: string
   quantidade: number
-  tipo: TipoMovimentacao
+  tipo: TipoMovimentacao | 'recebimento'
+  tipo_destino?: TipoDestino
   fornecedor_nome?: string
   nf_numero?: string
   base_nome?: string
   obra_nome?: string
+  valor_unitario?: number
+  numero_pedido?: string
   criado_em: string
 }
 

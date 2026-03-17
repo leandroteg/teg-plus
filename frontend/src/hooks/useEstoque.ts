@@ -420,41 +420,68 @@ export function useConcluirInventario() {
   })
 }
 
-// ── Pipeline: Aguardando Entrada ──────────────────────────────────────────────
+// ── Pipeline: Aguardando Entrada (recebimento items pending validation) ──────
 export function useAguardandoEntrada() {
   return useQuery<EstoqueEntradaItem[]>({
     queryKey: ['est-aguardando-entrada'],
     queryFn: async () => {
-      const trinta_dias = new Date(Date.now() - 30 * 86400000).toISOString()
       const { data, error } = await supabase
-        .from('est_movimentacoes')
+        .from('cmp_recebimento_itens')
         .select(`
-          id, item_id, tipo, quantidade, valor_unitario,
-          fornecedor_nome, nf_numero, obra_nome, criado_em,
-          item:est_itens!est_movimentacoes_item_id_fkey(codigo, descricao, unidade),
-          base:est_bases!est_movimentacoes_base_id_fkey(nome)
+          id, descricao, quantidade_recebida, valor_unitario,
+          tipo_destino, item_estoque_id, created_at,
+          item:est_itens!cmp_recebimento_itens_item_estoque_id_fkey(codigo, descricao, unidade),
+          recebimento:cmp_recebimentos!cmp_recebimento_itens_recebimento_id_fkey(
+            nf_numero, data_recebimento,
+            base:est_bases(nome),
+            pedido:cmp_pedidos(numero_pedido, fornecedor_nome, requisicao:cmp_requisicoes(obra_nome))
+          )
         `)
-        .in('tipo', ['entrada', 'transferencia_in', 'devolucao'])
-        .gte('criado_em', trinta_dias)
-        .order('criado_em', { ascending: false })
+        .eq('status', 'aguardando_entrada')
+        .order('created_at', { ascending: false })
         .limit(200)
       if (error) return []
       return (data ?? []).map((m: any) => ({
         id: m.id,
-        item_id: m.item_id,
+        item_id: m.item_estoque_id ?? '',
         codigo: m.item?.codigo ?? '',
-        descricao: m.item?.descricao ?? '',
+        descricao: m.item?.descricao ?? m.descricao ?? '',
         unidade: m.item?.unidade ?? 'UN',
-        quantidade: m.quantidade,
-        tipo: m.tipo,
-        fornecedor_nome: m.fornecedor_nome,
-        nf_numero: m.nf_numero,
-        base_nome: m.base?.nome,
-        obra_nome: m.obra_nome,
-        criado_em: m.criado_em,
+        quantidade: m.quantidade_recebida,
+        tipo: 'recebimento' as const,
+        tipo_destino: m.tipo_destino,
+        fornecedor_nome: m.recebimento?.pedido?.fornecedor_nome,
+        nf_numero: m.recebimento?.nf_numero,
+        base_nome: m.recebimento?.base?.nome,
+        obra_nome: m.recebimento?.pedido?.requisicao?.obra_nome,
+        valor_unitario: m.valor_unitario,
+        numero_pedido: m.recebimento?.pedido?.numero_pedido,
+        criado_em: m.created_at,
       })) as EstoqueEntradaItem[]
     },
     staleTime: 30_000,
+  })
+}
+
+// ── Confirm entry: move from aguardando_entrada → confirmado ─────────────────
+export function useConfirmarEntrada() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (itemIds: string[]) => {
+      const { error } = await supabase
+        .from('cmp_recebimento_itens')
+        .update({ status: 'confirmado' })
+        .in('id', itemIds)
+      if (error) throw error
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['est-aguardando-entrada'] })
+      qc.invalidateQueries({ queryKey: ['est-saldos'] })
+      qc.invalidateQueries({ queryKey: ['est-movimentacoes'] })
+      qc.invalidateQueries({ queryKey: ['pat-imobilizados'] })
+      qc.invalidateQueries({ queryKey: ['pedidos'] })
+      qc.invalidateQueries({ queryKey: ['recebimentos'] })
+    },
   })
 }
 
