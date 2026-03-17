@@ -53,7 +53,7 @@ CREATE TABLE fin_apontamentos_cartao (
   valor               numeric(14,2) NOT NULL CHECK (valor > 0),
   centro_custo        text,
   classe_financeira   text,
-  projeto_id          uuid REFERENCES obras(id),
+  projeto_id          uuid REFERENCES sys_obras(id),
   comprovante_url     text,                          -- URL do arquivo no storage
   comprovante_nome    text,
   status              fin_status_apontamento_cartao NOT NULL DEFAULT 'rascunho',
