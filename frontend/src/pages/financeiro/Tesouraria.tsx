@@ -1658,7 +1658,9 @@ function Header({ isDark, periodo, setPeriodo }: {
 // ── OmiePanel ────────────────────────────────────────────────────────────────
 
 function OmiePanel({ isDark }: { isDark: boolean }) {
-  const { data: credentials, isLoading: loadingCreds } = useOmieCredentials()
+  const { data: omieResult, isLoading: loadingCreds } = useOmieCredentials()
+  const credentials = omieResult?.credentials ?? null
+  const isSandbox   = omieResult?.isSandbox ?? false
   const { data: contas = [], isLoading: loadingContas, refetch, isRefetching } = useOmieContasCorrentes(credentials)
   const sincronizarSaldo = useSincronizarSaldoContaOmie()
   const [selectedConta, setSelectedConta] = useState<number | null>(null)
@@ -1708,9 +1710,16 @@ function OmiePanel({ isDark }: { isDark: boolean }) {
           <h2 className={`text-base font-extrabold flex items-center gap-2 ${isDark ? 'text-white' : 'text-slate-800'}`}>
             <Zap size={16} className="text-emerald-500" />
             Contas Correntes — Omie ERP
+            {isSandbox && (
+              <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 border border-amber-300">
+                SANDBOX
+              </span>
+            )}
           </h2>
           <p className={`text-xs mt-0.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
-            Saldos e movimentações integradas diretamente do Omie
+            {isSandbox
+              ? 'Dados de homologação — aplicação de teste Omie'
+              : 'Saldos e movimentações integradas diretamente do Omie'}
           </p>
         </div>
         <button

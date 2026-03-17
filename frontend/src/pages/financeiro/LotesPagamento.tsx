@@ -128,7 +128,9 @@ export default function LotesPagamento() {
   const enviarAprovacao = useEnviarLoteAprovacao()
 
   // Omie integration
-  const { data: omieCredentials } = useOmieCredentials()
+  const { data: omieResult } = useOmieCredentials()
+  const omieCredentials = omieResult?.credentials ?? null
+  const omieIsSandbox   = omieResult?.isSandbox ?? false
   const enviarRemessaOmie = useOmieEnviarRemessa()
   const atualizarRemessas = useOmieAtualizarRemessas()
   const [omieStatus, setOmieStatus] = useState<Record<string, { ok?: boolean; msg?: string; loading?: boolean }>>({})
@@ -504,12 +506,23 @@ export default function LotesPagamento() {
         <>
           {/* Omie integration bar */}
           {omieCredentials && (
-            <div className={`flex items-center justify-between gap-3 rounded-xl border px-4 py-3 ${isDark ? 'bg-emerald-900/20 border-emerald-800/40' : 'bg-emerald-50 border-emerald-200'}`}>
+            <div className={`flex items-center justify-between gap-3 rounded-xl border px-4 py-3 ${
+              omieIsSandbox
+                ? isDark ? 'bg-amber-900/20 border-amber-800/40' : 'bg-amber-50 border-amber-200'
+                : isDark ? 'bg-emerald-900/20 border-emerald-800/40' : 'bg-emerald-50 border-emerald-200'
+            }`}>
               <div className="flex items-center gap-2">
-                <Zap size={14} className="text-emerald-600 shrink-0" />
-                <p className={`text-xs font-semibold ${isDark ? 'text-emerald-300' : 'text-emerald-700'}`}>
-                  Integração Omie ativa — lotes aprovados podem ser enviados ao Omie para pagamento
-                </p>
+                <Zap size={14} className={`shrink-0 ${omieIsSandbox ? 'text-amber-500' : 'text-emerald-600'}`} />
+                <div>
+                  <p className={`text-xs font-semibold ${omieIsSandbox ? isDark ? 'text-amber-300' : 'text-amber-700' : isDark ? 'text-emerald-300' : 'text-emerald-700'}`}>
+                    Integração Omie {omieIsSandbox ? '— MODO SANDBOX' : 'ativa'} — lotes aprovados podem ser enviados ao Omie para pagamento
+                  </p>
+                  {omieIsSandbox && (
+                    <p className={`text-[10px] mt-0.5 ${isDark ? 'text-amber-500/70' : 'text-amber-600'}`}>
+                      Usando credenciais de homologação. Nenhum pagamento real será realizado.
+                    </p>
+                  )}
+                </div>
               </div>
               <button
                 onClick={handleAtualizarOmie}

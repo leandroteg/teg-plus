@@ -179,7 +179,10 @@ function SyncSection({ webhookUrl, isDark }: { webhookUrl: string; isDark: boole
 // ── OmieApiDireta section ─────────────────────────────────────────────────────
 
 function OmieApiDiretaSection({ isDark }: { isDark: boolean }) {
-  const { data: credentials, isLoading } = useOmieCredentials()
+  const { data: result, isLoading } = useOmieCredentials()
+  const credentials = result?.credentials ?? null
+  const isSandbox   = result?.isSandbox ?? false
+
   const testar = useOmieTestarConexao()
   const syncCP = useOmieSyncContasPagar()
   const atualizarRemessas = useOmieAtualizarRemessas()
@@ -193,7 +196,7 @@ function OmieApiDiretaSection({ isDark }: { isDark: boolean }) {
     setTestResult(null)
     try {
       await testar.mutateAsync(credentials)
-      setTestResult({ ok: true, msg: 'API Omie respondeu com sucesso' })
+      setTestResult({ ok: true, msg: `API Omie respondeu com sucesso${isSandbox ? ' (Sandbox)' : ''}` })
     } catch (err) {
       setTestResult({ ok: false, msg: err instanceof Error ? err.message : 'Falha na conexão' })
     }
@@ -231,18 +234,42 @@ function OmieApiDiretaSection({ isDark }: { isDark: boolean }) {
       <div className={`px-5 py-4 border-b flex items-center gap-2 ${isDark ? 'border-white/[0.06]' : 'border-slate-100'}`}>
         <Wifi size={16} className="text-emerald-600" />
         <h2 className={`text-sm font-extrabold ${isDark ? 'text-white' : 'text-slate-800'}`}>API Omie — Integração Direta</h2>
-        {credentials ? (
-          <span className="ml-auto inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700">
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-            Conectado
-          </span>
-        ) : !isLoading ? (
-          <span className="ml-auto inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-50 text-amber-700">
-            <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
-            Credenciais não configuradas
-          </span>
-        ) : null}
+        <div className="ml-auto flex items-center gap-2">
+          {isSandbox && (
+            <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 border border-amber-300">
+              <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+              SANDBOX
+            </span>
+          )}
+          {credentials ? (
+            <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+              Conectado
+            </span>
+          ) : !isLoading ? (
+            <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-50 text-amber-700">
+              <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
+              Não configurado
+            </span>
+          ) : null}
+        </div>
       </div>
+
+      {/* Sandbox warning banner */}
+      {isSandbox && credentials && (
+        <div className="mx-5 mt-4 flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5">
+          <AlertTriangle size={13} className="text-amber-500 shrink-0 mt-0.5" />
+          <div>
+            <p className="text-xs font-bold text-amber-700">Modo Sandbox ativo</p>
+            <p className="text-[11px] text-amber-600 mt-0.5">
+              Usando credenciais de homologação Omie. Nenhuma operação afetará dados de produção.
+              Para criar uma aplicação de teste, acesse{' '}
+              <a href="https://app.omie.com.br" target="_blank" rel="noopener noreferrer" className="underline">app.omie.com.br</a>
+              {' '}→ Minhas Aplicações → + Nova Aplicação → Testar grátis.
+            </p>
+          </div>
+        </div>
+      )}
 
       {!credentials && !isLoading ? (
         <div className="px-5 py-4">
@@ -259,7 +286,9 @@ function OmieApiDiretaSection({ isDark }: { isDark: boolean }) {
                 <Zap size={13} className="text-emerald-600" />
                 <p className={`text-sm font-semibold ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>Testar Conexão</p>
               </div>
-              <p className={`text-xs mt-0.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Valida APP_KEY e APP_SECRET diretamente na API Omie</p>
+              <p className={`text-xs mt-0.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+                Valida {isSandbox ? 'credenciais sandbox' : 'APP_KEY e APP_SECRET'} diretamente na API Omie
+              </p>
               {testResult && (
                 <p className={`text-xs mt-1 font-medium ${testResult.ok ? 'text-emerald-600' : 'text-red-600'}`}>
                   {testResult.ok ? '✓' : '✗'} {testResult.msg}
@@ -331,10 +360,17 @@ export default function Configuracoes() {
     omie_app_secret: '',
     n8n_webhook_url: '',
     omie_enabled: 'false',
+    cp_remessa_webhook_url: '',
+    cp_remessa_status_webhook_url: '',
+    omie_sandbox_mode: 'false',
+    omie_sandbox_app_key: '',
+    omie_sandbox_app_secret: '',
   })
 
-  const [showKey, setShowKey]         = useState(false)
-  const [showSecret, setShowSecret]   = useState(false)
+  const [showKey, setShowKey]               = useState(false)
+  const [showSecret, setShowSecret]         = useState(false)
+  const [showSandboxKey, setShowSandboxKey] = useState(false)
+  const [showSandboxSec, setShowSandboxSec] = useState(false)
   const [testStatus, setTestStatus]   = useState<'idle' | 'testing' | 'ok' | 'error'>('idle')
   const [testMessage, setTestMessage] = useState('')
   const [saveSuccess, setSaveSuccess] = useState(false)
@@ -347,6 +383,11 @@ export default function Configuracoes() {
         omie_app_secret: config.omie_app_secret ?? '',
         n8n_webhook_url: config.n8n_webhook_url ?? '',
         omie_enabled:    config.omie_enabled    ?? 'false',
+        cp_remessa_webhook_url:        config.cp_remessa_webhook_url        ?? '',
+        cp_remessa_status_webhook_url: config.cp_remessa_status_webhook_url ?? '',
+        omie_sandbox_mode:       config.omie_sandbox_mode       ?? 'false',
+        omie_sandbox_app_key:    config.omie_sandbox_app_key    ?? '',
+        omie_sandbox_app_secret: config.omie_sandbox_app_secret ?? '',
       })
     }
   }, [config])
@@ -511,6 +552,90 @@ export default function Configuracoes() {
                   disabled:opacity-50 disabled:cursor-not-allowed
                   ${isDark ? 'bg-white/[0.03] border-white/[0.06] text-slate-200' : 'border-slate-200 bg-white text-slate-700'}`}
               />
+            </div>
+
+            {/* ── Sandbox / Homologação ─────────────────────────────── */}
+            <div className={`rounded-xl border p-4 space-y-3 ${
+              isDark ? 'bg-amber-500/5 border-amber-500/20' : 'bg-amber-50/60 border-amber-200'
+            }`}>
+              {/* Toggle sandbox */}
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className={`text-sm font-semibold flex items-center gap-1.5 ${isDark ? 'text-amber-300' : 'text-amber-800'}`}>
+                    <AlertTriangle size={13} />
+                    Modo Sandbox (Homologação)
+                  </p>
+                  <p className={`text-[11px] mt-0.5 ${isDark ? 'text-amber-500/80' : 'text-amber-600'}`}>
+                    Usa credenciais de uma aplicação de teste Omie separada — sem impacto em produção
+                  </p>
+                </div>
+                <button
+                  disabled={!isAdmin}
+                  onClick={() => handleChange('omie_sandbox_mode', form.omie_sandbox_mode === 'true' ? 'false' : 'true')}
+                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-200
+                    focus:outline-none focus:ring-2 focus:ring-amber-400/40 disabled:opacity-50 disabled:cursor-not-allowed
+                    ${form.omie_sandbox_mode === 'true' ? 'bg-amber-500' : 'bg-slate-300'}`}
+                >
+                  <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform duration-200
+                    ${form.omie_sandbox_mode === 'true' ? 'translate-x-6' : 'translate-x-1'}`}
+                  />
+                </button>
+              </div>
+
+              {form.omie_sandbox_mode === 'true' && (
+                <>
+                  {/* Sandbox App Key */}
+                  <div>
+                    <label className={`block text-xs font-semibold mb-1.5 ${isDark ? 'text-amber-400' : 'text-amber-700'}`}>
+                      Sandbox App Key
+                    </label>
+                    <div className="relative">
+                      <input
+                        type={showSandboxKey ? 'text' : 'password'}
+                        value={form.omie_sandbox_app_key}
+                        onChange={e => handleChange('omie_sandbox_app_key', e.target.value)}
+                        disabled={!isAdmin}
+                        placeholder="App Key da aplicação de teste..."
+                        className={`w-full pr-10 px-3 py-2.5 rounded-xl border text-sm placeholder-slate-400 font-mono
+                          focus:outline-none focus:ring-2 focus:ring-amber-400/30 focus:border-amber-400
+                          disabled:opacity-50 disabled:cursor-not-allowed
+                          ${isDark ? 'bg-white/[0.03] border-amber-500/20 text-slate-200' : 'border-amber-300 bg-white text-slate-700'}`}
+                      />
+                      <button type="button" onClick={() => setShowSandboxKey(v => !v)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors">
+                        {showSandboxKey ? <EyeOff size={14} /> : <Eye size={14} />}
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Sandbox App Secret */}
+                  <div>
+                    <label className={`block text-xs font-semibold mb-1.5 ${isDark ? 'text-amber-400' : 'text-amber-700'}`}>
+                      Sandbox App Secret
+                    </label>
+                    <div className="relative">
+                      <input
+                        type={showSandboxSec ? 'text' : 'password'}
+                        value={form.omie_sandbox_app_secret}
+                        onChange={e => handleChange('omie_sandbox_app_secret', e.target.value)}
+                        disabled={!isAdmin}
+                        placeholder="App Secret da aplicação de teste..."
+                        className={`w-full pr-10 px-3 py-2.5 rounded-xl border text-sm placeholder-slate-400 font-mono
+                          focus:outline-none focus:ring-2 focus:ring-amber-400/30 focus:border-amber-400
+                          disabled:opacity-50 disabled:cursor-not-allowed
+                          ${isDark ? 'bg-white/[0.03] border-amber-500/20 text-slate-200' : 'border-amber-300 bg-white text-slate-700'}`}
+                      />
+                      <button type="button" onClick={() => setShowSandboxSec(v => !v)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors">
+                        {showSandboxSec ? <EyeOff size={14} /> : <Eye size={14} />}
+                      </button>
+                    </div>
+                    <p className={`text-[10px] mt-1.5 ${isDark ? 'text-amber-500/70' : 'text-amber-500'}`}>
+                      Para criar uma aplicação de teste: <a href="https://app.omie.com.br" target="_blank" rel="noopener noreferrer" className="underline font-medium">app.omie.com.br</a> → Minhas Aplicações → + Nova Aplicação → Testar grátis (válido por 7 dias)
+                    </p>
+                  </div>
+                </>
+              )}
             </div>
 
             {/* Test result */}

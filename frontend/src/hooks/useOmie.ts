@@ -20,6 +20,10 @@ export interface OmieConfig {
   omie_enabled: string
   cp_remessa_webhook_url: string
   cp_remessa_status_webhook_url: string
+  // Sandbox / homologação
+  omie_sandbox_mode: string        // 'true' | 'false'
+  omie_sandbox_app_key: string
+  omie_sandbox_app_secret: string
 }
 
 // ── useLastSync ───────────────────────────────────────────────────────────────
@@ -65,6 +69,9 @@ export function useOmieConfig() {
         omie_enabled:    cfg['omie_enabled']    ?? 'false',
         cp_remessa_webhook_url: cfg['cp_remessa_webhook_url'] ?? '',
         cp_remessa_status_webhook_url: cfg['cp_remessa_status_webhook_url'] ?? '',
+        omie_sandbox_mode:       cfg['omie_sandbox_mode']       ?? 'false',
+        omie_sandbox_app_key:    cfg['omie_sandbox_app_key']    ?? '',
+        omie_sandbox_app_secret: cfg['omie_sandbox_app_secret'] ?? '',
       }
     },
     staleTime: 60_000, // considera os dados frescos por 1 minuto

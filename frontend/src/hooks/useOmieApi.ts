@@ -23,23 +23,46 @@ import {
 
 // ── Credenciais ───────────────────────────────────────────────────────────────
 
-/** Lê APP_KEY e APP_SECRET do sys_config e os retorna como OmieCredentials */
+export interface OmieCredentialsResult {
+  credentials: OmieCredentials
+  isSandbox: boolean
+}
+
+/**
+ * Lê APP_KEY e APP_SECRET do sys_config.
+ * Se omie_sandbox_mode='true' e credenciais sandbox existem, usa-as.
+ * Retorna { credentials, isSandbox } ou null se integração desabilitada.
+ */
 export function useOmieCredentials() {
-  return useQuery<OmieCredentials | null>({
+  return useQuery<OmieCredentialsResult | null>({
     queryKey: ['omie-credentials'],
     queryFn: async () => {
       const { data } = await supabase
         .from('sys_config')
         .select('chave, valor')
-        .in('chave', ['omie_app_key', 'omie_app_secret', 'omie_enabled'])
+        .in('chave', [
+          'omie_app_key', 'omie_app_secret', 'omie_enabled',
+          'omie_sandbox_mode', 'omie_sandbox_app_key', 'omie_sandbox_app_secret',
+        ])
       if (!data) return null
       const map: Record<string, string> = {}
       data.forEach(row => { map[row.chave] = row.valor ?? '' })
+
       if (map['omie_enabled'] !== 'true') return null
-      const appKey = map['omie_app_key'] ?? ''
+
+      const isSandbox = map['omie_sandbox_mode'] === 'true'
+      const sandboxKey    = map['omie_sandbox_app_key'] ?? ''
+      const sandboxSecret = map['omie_sandbox_app_secret'] ?? ''
+
+      if (isSandbox && sandboxKey && sandboxSecret) {
+        return { credentials: { appKey: sandboxKey, appSecret: sandboxSecret }, isSandbox: true }
+      }
+
+      const appKey    = map['omie_app_key'] ?? ''
       const appSecret = map['omie_app_secret'] ?? ''
       if (!appKey || !appSecret) return null
-      return { appKey, appSecret }
+
+      return { credentials: { appKey, appSecret }, isSandbox: false }
     },
     staleTime: 5 * 60_000,
     retry: false,
