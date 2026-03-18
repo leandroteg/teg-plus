@@ -984,14 +984,22 @@ function NovaContaModal({ isDark, onClose }: { isDark: boolean; onClose: () => v
     tipo: 'corrente' as 'corrente' | 'poupanca' | 'investimento',
     cor: CORES_PRESET[0],
   })
+  const [erroSalvar, setErroSalvar] = useState<string | null>(null)
 
   const canSubmit = form.nome.trim().length > 0
 
   const handleSubmit = () => {
     if (!canSubmit) return
+    setErroSalvar(null)
     criar.mutate(
       { nome: form.nome, banco_nome: form.banco_nome || undefined, agencia: form.agencia || undefined, conta: form.conta || undefined, tipo: form.tipo, cor: form.cor },
-      { onSuccess: () => onClose() },
+      {
+        onSuccess: () => onClose(),
+        onError: (err) => {
+          const msg = err instanceof Error ? err.message : 'Erro ao salvar conta bancária'
+          setErroSalvar(msg)
+        },
+      },
     )
   }
 
@@ -1103,6 +1111,14 @@ function NovaContaModal({ isDark, onClose }: { isDark: boolean; onClose: () => v
             </div>
           </div>
         </div>
+
+        {/* Error feedback (#91) */}
+        {erroSalvar && (
+          <div className="mx-5 mb-2 flex items-start gap-2 rounded-xl bg-red-50 border border-red-200 px-3 py-2.5">
+            <AlertTriangle size={13} className="mt-0.5 shrink-0 text-red-500" />
+            <p className="text-xs text-red-700">{erroSalvar}</p>
+          </div>
+        )}
 
         {/* Footer */}
         <div className={`px-5 py-4 flex justify-end gap-2 ${

@@ -2097,6 +2097,8 @@ export default function CPPipeline() {
   const [sortDir, setSortDir] = useState<SortDir>('asc')
   const [viewMode, setViewMode] = useState<ViewMode>('list')
   const [quickFilter, setQuickFilter] = useState<QuickFilterId>('all')
+  // Per-tab filter memory: preserves busca and quickFilter when switching tabs (#134)
+  const tabFiltersRef = useRef<Map<PipelineStageId, { busca: string; quickFilter: QuickFilterId }>>(new Map())
   const [showNovaSolicitacao, setShowNovaSolicitacao] = useState(false)
   const [showNovaMenu, setShowNovaMenu] = useState(false)
   const [novaSolicitacaoKind, setNovaSolicitacaoKind] = useState<NovaSolicitacaoKind | null>(null)
@@ -2630,11 +2632,15 @@ export default function CPPipeline() {
 
   // Switch tab clears selection
   const switchTab = (status: PipelineStageId) => {
+    // Save current tab's filter state before switching (#134)
+    tabFiltersRef.current.set(activeTab, { busca, quickFilter })
+    // Restore target tab's saved filter state, or reset to defaults
+    const saved = tabFiltersRef.current.get(status)
+    setBusca(saved?.busca ?? '')
+    setQuickFilter(saved?.quickFilter ?? 'all')
     setActiveTab(status)
     setSelectedIds(new Set())
     setExpandedLoteIds(new Set())
-    setBusca('')
-    setQuickFilter('all')
   }
 
   // Summary stats
