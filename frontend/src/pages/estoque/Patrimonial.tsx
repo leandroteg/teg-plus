@@ -697,7 +697,7 @@ function ImobilizadoFormModal({
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className={`block text-xs font-bold mb-1 ${labelCls}`}>Valor Aquisicao (R$) *</label>
-              <input type="number" min={0} step={0.01} value={item.valor_aquisicao ?? 0}
+              <input type="number" min={0} step={0.01} value={item.valor_aquisicao || ''}
                 onChange={e => set('valor_aquisicao', Number(e.target.value))}
                 className={inputCls} />
             </div>
@@ -724,7 +724,7 @@ function ImobilizadoFormModal({
             </div>
             <div>
               <label className={`block text-xs font-bold mb-1 ${labelCls}`}>Valor Residual (R$)</label>
-              <input type="number" min={0} step={0.01} value={item.valor_residual ?? 0}
+              <input type="number" min={0} step={0.01} value={item.valor_residual || ''}
                 onChange={e => set('valor_residual', Number(e.target.value))}
                 className={inputCls} />
             </div>

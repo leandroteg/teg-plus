@@ -252,9 +252,9 @@ export default function NovoContrato() {
                 <div className="grid grid-cols-3 gap-2">
                   <input value={it.unidade} onChange={e => updateItem(idx, 'unidade', e.target.value)}
                     placeholder="un" className={inputClass} />
-                  <input type="number" value={it.quantidade} onChange={e => updateItem(idx, 'quantidade', parseFloat(e.target.value) || 0)}
+                  <input type="number" value={it.quantidade || ''} onChange={e => updateItem(idx, 'quantidade', parseFloat(e.target.value) || 0)}
                     placeholder="Qtd" className={inputClass} min="0" step="0.01" />
-                  <input type="number" value={it.valor_unitario} onChange={e => updateItem(idx, 'valor_unitario', parseFloat(e.target.value) || 0)}
+                  <input type="number" value={it.valor_unitario || ''} onChange={e => updateItem(idx, 'valor_unitario', parseFloat(e.target.value) || 0)}
                     placeholder="Valor Un." className={inputClass} min="0" step="0.01" />
                 </div>
                 <p className="text-[10px] text-right text-slate-500 font-semibold">

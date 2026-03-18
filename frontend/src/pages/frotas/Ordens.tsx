@@ -139,8 +139,8 @@ function NovaOSModal({ onClose, isLight }: { onClose: () => void; isLight: boole
                 <option value="outros">Outros</option>
               </select>
               <input className={inp + ' col-span-5'} placeholder="Descricao" value={item.descricao} onChange={e => setItem(idx, 'descricao', e.target.value)} />
-              <input type="number" className={inp + ' col-span-2'} placeholder="Qtd" value={item.quantidade} onChange={e => setItem(idx, 'quantidade', +e.target.value)} min={0} step={0.1} />
-              <input type="number" className={inp + ' col-span-2'} placeholder="R$ unit." value={item.valor_unitario} onChange={e => setItem(idx, 'valor_unitario', +e.target.value)} min={0} step={0.01} />
+              <input type="number" className={inp + ' col-span-2'} placeholder="Qtd" value={item.quantidade || ''} onChange={e => setItem(idx, 'quantidade', +e.target.value)} min={0} step={0.1} />
+              <input type="number" className={inp + ' col-span-2'} placeholder="R$ unit." value={item.valor_unitario || ''} onChange={e => setItem(idx, 'valor_unitario', +e.target.value)} min={0} step={0.01} />
               <button type="button" onClick={() => removeItem(idx)} className="col-span-1 text-slate-600 hover:text-red-400 flex items-center justify-center">
                 <X size={14} />
               </button>

@@ -413,8 +413,12 @@ export default function CotacaoForm() {
   const handleCnpjChange = useCallback((idx: number, raw: string) => {
     const masked = maskCNPJ(raw)
     setFornecedores(prev => prev.map((f, i) => i === idx ? { ...f, fornecedor_cnpj: masked } : f))
-    // Auto-lookup when 14 digits reached
     const digits = raw.replace(/\D/g, '')
+    // Reset lastRef when editing (allows re-lookup after correction)
+    if (digits.length < 14) {
+      cnpjLastRef.current[idx] = ''
+    }
+    // Auto-lookup when 14 digits reached
     if (digits.length === 14) {
       handleCnpjLookup(idx, raw)
     }

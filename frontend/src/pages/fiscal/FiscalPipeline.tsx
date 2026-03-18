@@ -420,7 +420,7 @@ function SistemaEmissaoModal({ sol, isDark, onSubmit, onClose, isPending }: {
                   </div>
                   <div className="w-16">
                     <label className={labelCls}>Qtd</label>
-                    <input type="number" value={it.quantidade} min={0.01} step={0.01}
+                    <input type="number" value={it.quantidade || ''} min={0.01} step={0.01}
                       onChange={e => updateItem(i, 'quantidade', parseFloat(e.target.value) || 0)}
                       className={inputCls} />
                   </div>
@@ -432,7 +432,7 @@ function SistemaEmissaoModal({ sol, isDark, onSubmit, onClose, isPending }: {
                   </div>
                   <div className="w-24">
                     <label className={labelCls}>Vlr Unit</label>
-                    <input type="number" value={it.valor_unitario ?? ''} min={0} step={0.01}
+                    <input type="number" value={it.valor_unitario || ''} min={0} step={0.01}
                       onChange={e => updateItem(i, 'valor_unitario', parseFloat(e.target.value) || 0)}
                       className={inputCls} />
                   </div>
@@ -1589,6 +1589,11 @@ function NovaSolicitacaoNFModal({ isDark, onClose, onSubmit, isPending }: {
   const set = (k: string, v: string) => setForm(f => ({ ...f, [k]: v }))
   const canSubmit = form.fornecedor_nome.trim() && form.valor_total
 
+  // CNPJ auto-fill
+  const cnpjLookup = useConsultaCNPJ(useCallback((r: any) => {
+    setForm(f => ({ ...f, fornecedor_nome: f.fornecedor_nome || r.razao_social || r.nome_fantasia || '' }))
+  }, []))
+
   const submit = () => {
     if (!canSubmit) return
     onSubmit({
@@ -1646,10 +1651,23 @@ function NovaSolicitacaoNFModal({ isDark, onClose, onSubmit, isPending }: {
               <input className={input} placeholder="Razão social" value={form.fornecedor_nome}
                 onChange={e => set('fornecedor_nome', e.target.value)} />
             </div>
-            <div>
+            <div className="relative">
               <p className={label}>CNPJ</p>
               <input className={input} placeholder="00.000.000/0000-00" value={form.fornecedor_cnpj}
-                onChange={e => set('fornecedor_cnpj', e.target.value)} />
+                onChange={e => set('fornecedor_cnpj', e.target.value)}
+                onBlur={() => cnpjLookup.consultar(form.fornecedor_cnpj)} />
+              {cnpjLookup.loading && (
+                <div className="absolute right-2 top-7 flex items-center gap-1 text-amber-500">
+                  <Loader2 size={12} className="animate-spin" />
+                  <span className="text-[9px] font-semibold">Buscando...</span>
+                </div>
+              )}
+              {cnpjLookup.dados && !cnpjLookup.erro && (
+                <p className="text-[9px] text-emerald-600 mt-0.5 flex items-center gap-1">
+                  <CheckCircle2 size={9} /> {cnpjLookup.dados.situacao}
+                </p>
+              )}
+              {cnpjLookup.erro && <p className="text-[9px] text-red-500 mt-0.5">{cnpjLookup.erro}</p>}
             </div>
           </div>
 

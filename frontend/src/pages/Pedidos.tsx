@@ -70,7 +70,7 @@ const PIPELINE_STAGES: {
     key: 'emitido',
     label: 'Emitido',
     icon: Truck,
-    matchFn: p => !isPendingEmission(p) && ['emitido', 'confirmado', 'em_entrega'].includes(p.status),
+    matchFn: p => !isPendingEmission(p) && ['emitido', 'confirmado', 'em_entrega'].includes(p.status) && (p as any).status_pagamento !== 'liberado' && (p as any).status_pagamento !== 'pago',
   },
   {
     key: 'entregue',

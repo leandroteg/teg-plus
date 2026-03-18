@@ -952,7 +952,7 @@ function ItemFormModal({
             </div>
             <div>
               <label className={`block text-xs font-bold mb-1 ${labelCls}`}>Valor Médio (R$)</label>
-              <input type="number" min={0} step={0.01} value={item.valor_medio ?? 0}
+              <input type="number" min={0} step={0.01} value={item.valor_medio || ''}
                 onChange={e => set('valor_medio', Number(e.target.value))}
                 className={inputCls} />
             </div>

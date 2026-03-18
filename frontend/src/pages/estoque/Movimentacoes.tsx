@@ -279,7 +279,7 @@ export default function Movimentacoes() {
                 </div>
                 <div>
                   <label className={`block text-xs font-bold mb-1 ${isLight ? 'text-slate-600' : 'text-slate-300'}`}>Valor Unit. (R$)</label>
-                  <input type="number" min={0} step={0.01} value={payload.valor_unitario ?? 0}
+                  <input type="number" min={0} step={0.01} value={payload.valor_unitario || ''}
                     onChange={e => set('valor_unitario', Number(e.target.value))}
                     className={inputCls} />
                 </div>
