@@ -139,7 +139,7 @@ export function useEmitirNF() {
           destinatario_nome: payload.destinatario_nome ?? null,
           destinatario_uf: payload.destinatario_uf ?? null,
           items: payload.items ?? null,
-          valor_total: payload.valor_total ?? null,
+          ...(payload.valor_total != null ? { valor_total: payload.valor_total } : {}),
           valor_frete: payload.valor_frete ?? null,
           valor_seguro: payload.valor_seguro ?? null,
           valor_desconto_nf: payload.valor_desconto_nf ?? null,

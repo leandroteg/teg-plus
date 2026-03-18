@@ -1,9 +1,8 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import JSZip from 'jszip'
 import { supabase } from '../services/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import type { NotaFiscal, NotaFiscalFilters, NfParseResult } from '../types/fiscal'
-
-const BASE = import.meta.env.VITE_N8N_WEBHOOK_URL || ''
 
 // ── Select com joins ────────────────────────────────────────────────────────
 const SELECT_NF = `
@@ -153,10 +152,12 @@ export function useDeleteNF() {
 }
 
 // ── Parse NF via n8n (AI/OCR) ───────────────────────────────────────────────
+const N8N_BASE = import.meta.env.VITE_N8N_WEBHOOK_URL || ''
+
 export function useParseNF() {
   return useMutation({
     mutationFn: async ({ arquivo, nome }: { arquivo: string; nome: string }) => {
-      const res = await fetch(`${BASE}/fiscal/nf/parse`, {
+      const res = await fetch(`${N8N_BASE}/fiscal/nf/parse`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ arquivo, nome }),
@@ -167,17 +168,47 @@ export function useParseNF() {
   })
 }
 
-// ── Download lote (ZIP via n8n) ─────────────────────────────────────────────
+// ── Download lote (ZIP client-side via Supabase Storage) ────────────────────
 export function useDownloadZip() {
   return useMutation({
     mutationFn: async (nf_ids: string[]) => {
-      const res = await fetch(`${BASE}/fiscal/nf/download-lote`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ nf_ids }),
-      })
-      if (!res.ok) throw new Error(`Erro no download: ${res.status}`)
-      return res.blob()
+      // 1. Fetch pdf_path + numero for each NF id
+      const { data: notas, error } = await supabase
+        .from('fis_notas_fiscais')
+        .select('id, numero, serie, pdf_path, pdf_url')
+        .in('id', nf_ids)
+
+      if (error) throw new Error('Erro ao buscar notas: ' + error.message)
+      if (!notas || notas.length === 0) throw new Error('Nenhuma nota encontrada')
+
+      const zip = new JSZip()
+
+      // 2. Download each PDF from Storage (or via URL) and add to zip
+      await Promise.all(
+        notas.map(async (nf) => {
+          const label = [nf.numero, nf.serie].filter(Boolean).join('-') || nf.id
+          const filename = `NF-${label}.pdf`
+
+          if (nf.pdf_path) {
+            // Download directly from Supabase Storage bucket
+            const { data: fileData, error: dlError } = await supabase.storage
+              .from('notas-fiscais')
+              .download(nf.pdf_path)
+            if (dlError) throw new Error(`Erro ao baixar ${filename}: ${dlError.message}`)
+            zip.file(filename, fileData)
+          } else if (nf.pdf_url) {
+            // Fallback: fetch via public URL
+            const res = await fetch(nf.pdf_url)
+            if (!res.ok) throw new Error(`Erro ao baixar ${filename}: ${res.status}`)
+            const blob = await res.blob()
+            zip.file(filename, blob)
+          }
+          // If neither pdf_path nor pdf_url, skip silently
+        })
+      )
+
+      // 3. Generate zip blob
+      return zip.generateAsync({ type: 'blob', compression: 'DEFLATE', compressionOptions: { level: 6 } })
     },
   })
 }

@@ -259,7 +259,11 @@ function SistemaEmissaoModal({ sol, isDark, onSubmit, onClose, isPending }: {
   const [icmsValor, setIcmsValor] = useState(sol.icms_valor?.toString() || '')
   const [numero, setNumero] = useState(sol.numero_nf || '')
   const [serie, setSerie] = useState(sol.serie || '')
-  const [dataEmissao, setDataEmissao] = useState(sol.data_emissao || new Date().toISOString().split('T')[0])
+  const [dataEmissao, setDataEmissao] = useState(
+    sol.data_emissao
+      ? sol.data_emissao.split('T')[0]
+      : new Date().toISOString().split('T')[0]
+  )
   const [cfop, setCfop] = useState(sol.cfop || '')
   const [natOp, setNatOp] = useState(sol.natureza_operacao || '')
   const [chave, setChave] = useState(sol.chave_acesso || '')
