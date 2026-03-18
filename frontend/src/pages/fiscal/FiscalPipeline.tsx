@@ -269,10 +269,10 @@ function SistemaEmissaoModal({ sol, isDark, onSubmit, onClose, isPending }: {
 
   // CNPJ auto-fill
   const emitenteCnpjLookup = useConsultaCNPJ(useCallback((r: any) => {
-    setEmitenteNome(prev => prev || r.razao_social || '')
+    setEmitenteNome(r.razao_social || r.nome_fantasia || '')
   }, []))
   const destCnpjLookup = useConsultaCNPJ(useCallback((r: any) => {
-    setDestNome(prev => prev || r.razao_social || '')
+    setDestNome(r.razao_social || r.nome_fantasia || '')
   }, []))
 
   const obraUf = sol.obra?.uf
@@ -1591,7 +1591,7 @@ function NovaSolicitacaoNFModal({ isDark, onClose, onSubmit, isPending }: {
 
   // CNPJ auto-fill
   const cnpjLookup = useConsultaCNPJ(useCallback((r: any) => {
-    setForm(f => ({ ...f, fornecedor_nome: f.fornecedor_nome || r.razao_social || r.nome_fantasia || '' }))
+    setForm(f => ({ ...f, fornecedor_nome: r.razao_social || r.nome_fantasia || f.fornecedor_nome || '' }))
   }, []))
 
   const submit = () => {
