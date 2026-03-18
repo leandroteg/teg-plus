@@ -82,7 +82,7 @@ const PIPELINE_STAGES: {
     key: 'liberado',
     label: 'Liberado p/ Pgto',
     icon: CreditCard,
-    matchFn: p => !isPendingEmission(p) && (p as any).status_pagamento === 'liberado' && (p as any).status_pagamento !== 'pago',
+    matchFn: p => !isPendingEmission(p) && (p as any).status_pagamento === 'liberado',
   },
   {
     key: 'encerrado',
