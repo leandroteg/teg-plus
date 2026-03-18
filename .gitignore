@@ -38,3 +38,4 @@ npm-debug.log*
 # Temp workflow dumps (contain API tokens)
 wf_*.json
 fix_melhorar_n8n.py
+*.json

@@ -173,10 +173,64 @@ export function useAprovacoesPendentes(tipo?: TipoAprovacao) {
                 classe_financeira,
                 natureza,
                 forma_pagamento,
-                status
+                status,
+                requisicao_id,
+                pedido_id
               )
             `)
             .in('lote_id', loteIds)
+
+          // 5b. Buscar dados de requisição para cada CP
+          const cpIds = (loteItens ?? [])
+            .map(item => (item.cp as Record<string, unknown> | null)?.id as string)
+            .filter(Boolean)
+          const reqIds = (loteItens ?? [])
+            .map(item => (item.cp as Record<string, unknown> | null)?.requisicao_id as string)
+            .filter(Boolean)
+          const pedidoIds = (loteItens ?? [])
+            .map(item => (item.cp as Record<string, unknown> | null)?.pedido_id as string)
+            .filter(Boolean)
+
+          // Map: requisicao_id -> { numero, descricao, justificativa, solicitante_nome }
+          const rcMap = new Map<string, Record<string, unknown>>()
+          if (reqIds.length > 0) {
+            const { data: rcData } = await supabase
+              .from('cmp_requisicoes')
+              .select('id, numero, descricao, justificativa, solicitante_nome')
+              .in('id', [...new Set(reqIds)])
+            for (const rc of rcData ?? []) rcMap.set(rc.id, rc)
+          }
+
+          // Map: pedido_id -> anexos[]
+          const pedAnexosMap = new Map<string, Record<string, unknown>[]>()
+          if (pedidoIds.length > 0) {
+            const { data: anexosData } = await supabase
+              .from('cmp_pedidos_anexos')
+              .select('pedido_id, nome_arquivo, url, tipo, mime_type, uploaded_at, uploaded_by_nome')
+              .in('pedido_id', [...new Set(pedidoIds)])
+            for (const a of anexosData ?? []) {
+              const pid = a.pedido_id as string
+              const arr = pedAnexosMap.get(pid) ?? []
+              arr.push(a)
+              pedAnexosMap.set(pid, arr)
+            }
+          }
+
+          // Map: cp_id -> fin_documentos[]
+          const docMap = new Map<string, Record<string, unknown>[]>()
+          if (cpIds.length > 0) {
+            const { data: docsData } = await supabase
+              .from('fin_documentos')
+              .select('entity_id, nome_arquivo, arquivo_url, tipo, mime_type, uploaded_at')
+              .eq('entity_type', 'cp')
+              .in('entity_id', [...new Set(cpIds)])
+            for (const d of docsData ?? []) {
+              const eid = d.entity_id as string
+              const arr = docMap.get(eid) ?? []
+              arr.push(d)
+              docMap.set(eid, arr)
+            }
+          }
 
           for (const item of loteItens ?? []) {
             const loteId = item.lote_id as string | undefined
@@ -308,14 +362,40 @@ export function useAprovacoesPendentes(tipo?: TipoAprovacao) {
                 status_cp: (lote.status as string) ?? '',
                 itens: loteItens.map(item => {
                   const cp = item.cp as Record<string, unknown> | null
+                  const cpId = (cp?.id as string) ?? ''
+                  const rcId = (cp?.requisicao_id as string) ?? ''
+                  const pedId = (cp?.pedido_id as string) ?? ''
+                  const rc = rcId ? rcMap.get(rcId) : undefined
+                  // Merge anexos from pedido + fin_documentos
+                  const pedAnexos = pedId ? (pedAnexosMap.get(pedId) ?? []) : []
+                  const finDocs = cpId ? (docMap.get(cpId) ?? []) : []
+                  const anexos = [
+                    ...pedAnexos.map(a => ({
+                      nome: (a.nome_arquivo as string) ?? '',
+                      url: (a.url as string) ?? '',
+                      tipo: (a.tipo as string) ?? 'outro',
+                      mime_type: (a.mime_type as string) ?? '',
+                    })),
+                    ...finDocs.map(d => ({
+                      nome: (d.nome_arquivo as string) ?? '',
+                      url: (d.arquivo_url as string) ?? '',
+                      tipo: (d.tipo as string) ?? 'outro',
+                      mime_type: (d.mime_type as string) ?? '',
+                    })),
+                  ]
                   return {
-                    id: (cp?.id as string) ?? (item.id as string),
+                    id: cpId || (item.id as string),
                     fornecedor_nome: (cp?.fornecedor_nome as string) ?? '',
                     numero_documento: (cp?.numero_documento as string) ?? '',
                     descricao: (cp?.descricao as string) ?? '',
                     valor_original: (cp?.valor_original as number) ?? 0,
                     data_vencimento: (cp?.data_vencimento as string) ?? '',
                     decisao: (item.decisao as string) ?? 'pendente',
+                    requisicao_numero: (rc?.numero as string) ?? undefined,
+                    requisicao_descricao: (rc?.descricao as string) ?? undefined,
+                    requisicao_justificativa: (rc?.justificativa as string) ?? undefined,
+                    solicitante_nome: (rc?.solicitante_nome as string) ?? undefined,
+                    anexos: anexos.length > 0 ? anexos : undefined,
                   }
                 }),
               }
