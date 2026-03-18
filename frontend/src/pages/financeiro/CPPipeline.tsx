@@ -2759,7 +2759,7 @@ export default function CPPipeline() {
           Nova Solicitação
         </button>
         {showNovaMenu && (
-          <div ref={novaMenuRef} className={`absolute right-0 top-full z-40 mt-2 w-[320px] rounded-3xl border p-2 shadow-2xl ${isDark ? 'border-white/[0.08] bg-slate-900' : 'border-slate-200 bg-white'}`}>
+          <div ref={novaMenuRef} className={`absolute right-0 top-full z-[60] mt-2 w-[320px] rounded-3xl border p-2 shadow-2xl backdrop-blur-sm ${isDark ? 'border-white/[0.08] bg-slate-900/95' : 'border-slate-200 bg-white/95'}`}>
             <button
               type="button"
               onClick={() => {
