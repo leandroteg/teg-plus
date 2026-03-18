@@ -15,7 +15,6 @@ export default function FinanceiroLayout() {
     { to: '/financeiro/tesouraria',           icon: Landmark,        label: 'Tesouraria',       end: false },
     { to: '/financeiro/conciliacao-cartoes',  icon: CreditCard,      label: 'Conc. Cartões',    end: false },
     { to: '/financeiro/relatorios',           icon: BarChart3,       label: 'Relatórios',       end: false },
-    { to: '/apontamentos',                    icon: CreditCard,      label: 'Apontamentos',     end: true  },
   ]
 
   return (
