@@ -90,7 +90,7 @@ export default function Orcamentos() {
             className={`pl-8 pr-3 py-1.5 rounded-lg text-xs border ${
               isLight
                 ? 'bg-white border-slate-200 text-slate-700 placeholder:text-slate-400'
-                : 'bg-white/[0.04] border-white/[0.08] text-white placeholder:text-slate-500'
+                : 'bg-slate-800 border-slate-600 text-white placeholder:text-slate-400'
             }`}
           />
         </div>
@@ -101,7 +101,7 @@ export default function Orcamentos() {
           className={`px-3 py-1.5 rounded-lg text-xs border ${
             isLight
               ? 'bg-white border-slate-200 text-slate-700'
-              : 'bg-white/[0.04] border-white/[0.08] text-white'
+              : 'bg-slate-800 border-slate-600 text-white'
           }`}
         >
           <option value="">Todas as Obras</option>
@@ -116,7 +116,7 @@ export default function Orcamentos() {
           className={`px-3 py-1.5 rounded-lg text-xs border ${
             isLight
               ? 'bg-white border-slate-200 text-slate-700'
-              : 'bg-white/[0.04] border-white/[0.08] text-white'
+              : 'bg-slate-800 border-slate-600 text-white'
           }`}
         >
           <option value="">Todos os Status</option>

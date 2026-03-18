@@ -139,7 +139,7 @@ export default function Cronograma() {
             <select
               value={statusFilter}
               onChange={e => setStatusFilter(e.target.value)}
-              className={`bg-transparent text-sm outline-none ${isLight ? 'text-slate-700' : 'text-slate-200'}`}
+              className={`text-sm outline-none ${isLight ? 'bg-transparent text-slate-700' : 'bg-slate-800 text-white'}`}
             >
               {STATUS_OPTIONS.map(o => (
                 <option key={o.value} value={o.value}>{o.label}</option>

@@ -113,7 +113,7 @@ export default function Multas() {
           className={`px-3 py-1.5 rounded-lg text-xs border ${
             isLight
               ? 'bg-white border-slate-200 text-slate-700'
-              : 'bg-white/[0.04] border-white/[0.08] text-white'
+              : 'bg-slate-800 border-slate-600 text-white'
           }`}
         >
           <option value="">Todos os Portfolios</option>
@@ -128,7 +128,7 @@ export default function Multas() {
           className={`px-3 py-1.5 rounded-lg text-xs border ${
             isLight
               ? 'bg-white border-slate-200 text-slate-700'
-              : 'bg-white/[0.04] border-white/[0.08] text-white'
+              : 'bg-slate-800 border-slate-600 text-white'
           }`}
         >
           {STATUS_OPTIONS.map(o => (

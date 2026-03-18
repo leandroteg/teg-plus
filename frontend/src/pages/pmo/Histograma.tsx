@@ -72,7 +72,7 @@ export default function Histograma() {
           <select
             value={catFilter}
             onChange={e => setCatFilter(e.target.value)}
-            className={`bg-transparent text-sm outline-none ${isLight ? 'text-slate-700' : 'text-slate-200'}`}
+            className={`text-sm outline-none ${isLight ? 'bg-transparent text-slate-700' : 'bg-slate-800 text-white'}`}
           >
             {CAT_OPTIONS.map(o => (
               <option key={o.value} value={o.value}>{o.label}</option>

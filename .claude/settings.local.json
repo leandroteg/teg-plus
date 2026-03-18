@@ -22,8 +22,8 @@
       "Skill(commit-commands:commit-push-pr)",
       "Skill(commit-commands:commit-push-pr:*)",
       "mcp__402c23fe-4707-49e1-a558-76f47f37d917__get_logs",
-      "mcp__075f935a-0ea6-4165-a49b-a1222f26a21d__get_publishable_keys",
-      "mcp__075f935a-0ea6-4165-a49b-a1222f26a21d__execute_sql"
+      "Skill(commit-commands:commit)",
+      "Skill(commit-commands:commit:*)"
     ]
   }
 }

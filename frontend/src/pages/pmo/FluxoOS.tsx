@@ -92,7 +92,7 @@ export default function FluxoOS() {
           <select
             value={etapaFilter}
             onChange={e => setEtapaFilter(e.target.value)}
-            className={`bg-transparent text-sm outline-none ${isLight ? 'text-slate-700' : 'text-slate-200'}`}
+            className={`text-sm outline-none ${isLight ? 'bg-transparent text-slate-700' : 'bg-slate-800 text-white'}`}
           >
             {ETAPA_OPTIONS.map(o => (
               <option key={o.value} value={o.value}>{o.label}</option>
