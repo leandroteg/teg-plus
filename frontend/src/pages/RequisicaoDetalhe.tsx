@@ -196,10 +196,10 @@ export default function RequisicaoDetalhe() {
         </div>
       </div>
 
-      {/* Justificativa */}
+      {/* Descrição */}
       {req.justificativa && (
         <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4">
-          <p className="text-xs font-semibold text-slate-400 mb-1">Justificativa</p>
+          <p className="text-xs font-semibold text-slate-400 mb-1">Descrição</p>
           <p className="text-sm text-slate-700 whitespace-pre-wrap">{req.justificativa}</p>
         </div>
       )}

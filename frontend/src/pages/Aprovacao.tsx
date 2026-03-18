@@ -482,11 +482,11 @@ export default function Aprovacao() {
             </div>
           </div>
 
-          {/* Justificativa */}
+          {/* Descrição */}
           {req.justificativa && (
             <div>
               <p className="text-[10px] text-slate-400 uppercase tracking-wide font-medium mb-1.5">
-                Justificativa
+                Descrição
               </p>
               <div className="bg-amber-50 border border-amber-100 rounded-xl px-4 py-3 text-sm text-amber-800 leading-relaxed">
                 {req.justificativa}

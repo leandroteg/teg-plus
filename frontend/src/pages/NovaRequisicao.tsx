@@ -328,6 +328,10 @@ export default function NovaRequisicao() {
   })
 
   const submit = async () => {
+    if (!justificativa.trim()) {
+      setSubmitError('Preencha a Descrição da compra antes de enviar.')
+      return
+    }
     setSubmitError(null)
     setSubmitting(true)
     try {
@@ -807,10 +811,10 @@ export default function NovaRequisicao() {
       </div>
 
       <div>
-        <label className="text-xs font-semibold text-slate-500 mb-1 block">Justificativa</label>
-        <textarea rows={2}
+        <label className="text-xs font-semibold text-slate-500 mb-1 block">Descrição <span className="text-red-400">*</span></label>
+        <textarea rows={3} required
           className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-teal-300 outline-none"
-          placeholder="Por que é necessário ou urgente?"
+          placeholder="Descreva o que quer comprar e para que precisa dessa compra"
           value={justificativa} onChange={e => setJustificativa(e.target.value)} />
       </div>
 
@@ -1088,10 +1092,10 @@ export default function NovaRequisicao() {
       </div>
 
       <div>
-        <label className="text-xs font-semibold text-slate-500 mb-1 block">Justificativa</label>
-        <textarea rows={2}
+        <label className="text-xs font-semibold text-slate-500 mb-1 block">Descrição <span className="text-red-400">*</span></label>
+        <textarea rows={3} required
           className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-teal-300 outline-none"
-          placeholder="Por que é necessário? Impacto se não atendido?"
+          placeholder="Descreva o que quer comprar e para que precisa dessa compra"
           value={justificativa} onChange={e => setJustificativa(e.target.value)} />
       </div>
 
