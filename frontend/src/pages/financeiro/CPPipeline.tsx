@@ -2761,7 +2761,7 @@ export default function CPPipeline() {
         {showNovaMenu && (
           <>
             <div className="fixed inset-0 z-50" onClick={() => setShowNovaMenu(false)} />
-            <div ref={novaMenuRef} className={`absolute left-0 top-full z-50 mt-2 w-[340px] rounded-3xl border p-2.5 shadow-2xl backdrop-blur-sm ${isDark ? 'border-white/[0.08] bg-slate-900/95' : 'border-slate-200 bg-white/95'}`}>
+            <div ref={novaMenuRef} className={`absolute right-0 top-full z-50 mt-2 w-[340px] rounded-3xl border p-2.5 shadow-2xl backdrop-blur-sm ${isDark ? 'border-white/[0.08] bg-slate-900/95' : 'border-slate-200 bg-white/95'}`}>
               <button
                 type="button"
                 onClick={() => {
