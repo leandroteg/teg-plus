@@ -12,8 +12,9 @@ export function useItemCatalogSearch(categoriaRC: string, categoriasEstoque: str
     queryKey: ['est-itens-catalog', categoriaRC, categoriasEstoque, search],
     enabled: search.length >= 2 && !!categoriaRC,
     queryFn: async () => {
-      // Case-insensitive search across descricao, descricao_complementar, and codigo (#49)
-      const term = `%${search}%`
+      // Case-insensitive search across descricao, descricao_complementar, and codigo (#79)
+      const searchLower = search.trim().toLowerCase()
+      const term = `%${searchLower}%`
       const { data, error } = await supabase
         .from('est_itens')
         .select(`
@@ -22,20 +23,36 @@ export function useItemCatalogSearch(categoriaRC: string, categoriasEstoque: str
           categoria_financeira_codigo, categoria_financeira_descricao, destino_operacional
         `)
         .eq('ativo', true)
-        .or(`descricao.ilike.${term},descricao_complementar.ilike.${term},codigo.ilike.${term}`)
+        .or(`descricao.ilike.${term},codigo.ilike.${term}`)
         .order('descricao')
-        .limit(50)
+        .limit(100)
       if (error) return []
-      const categoriaNormalizada = categoriaRC.trim().toUpperCase()
-      const categoriasLegadas = categoriasEstoque.map((item) => item.trim().toLowerCase())
 
-      return ((data ?? []) as EstItem[]).filter((item) => {
+      // Apply client-side case-insensitive text filter (catches descricao_complementar too)
+      const matched = ((data ?? []) as EstItem[]).filter((item) => {
+        const desc = (item.descricao ?? '').toLowerCase()
+        const comp = (item.descricao_complementar ?? '').toLowerCase()
+        const cod  = (item.codigo ?? '').toLowerCase()
+        return desc.includes(searchLower) || comp.includes(searchLower) || cod.includes(searchLower)
+      })
+
+      const categoriaNormalizada = categoriaRC.trim().toUpperCase()
+      const categoriasLegadas = categoriasEstoque.map((c) => c.trim().toLowerCase())
+
+      // If no legacy category mapping exists for this RC category, return all text-matched items
+      if (categoriasLegadas.length === 0) {
+        return matched.filter((item) => {
+          const grupoCompra = (item.subcategoria ?? '').trim().toUpperCase()
+          return !grupoCompra || grupoCompra === categoriaNormalizada
+        })
+      }
+
+      return matched.filter((item) => {
         const grupoCompra = (item.subcategoria ?? '').trim().toUpperCase()
         const categoriaLegada = (item.categoria ?? '').trim().toLowerCase()
 
-        if (grupoCompra && grupoCompra === categoriaNormalizada) return true
-        if (!grupoCompra && categoriasLegadas.length > 0) return categoriasLegadas.includes(categoriaLegada)
-        return false
+        if (grupoCompra) return grupoCompra === categoriaNormalizada
+        return categoriasLegadas.includes(categoriaLegada)
       })
     },
     staleTime: 30_000,

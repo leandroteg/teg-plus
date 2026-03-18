@@ -73,14 +73,20 @@ export function usePreCadastros() {
     refetchInterval: 30_000,
   })
 
-  // Approve mutation — inserts into target table + updates status
+  // Approve mutation — inserts into target table + updates status (#24)
   const aprovar = useMutation({
-    mutationFn: async ({ id, dados }: { id: string; dados: Record<string, unknown> }) => {
-      // Find the pre-cadastro to get target table
-      const pre = pendentes.find(p => p.id === id)
-      if (!pre) throw new Error('Pre-cadastro nao encontrado')
+    mutationFn: async ({ id, dados, entidade, tabela_destino }: {
+      id: string
+      dados: Record<string, unknown>
+      entidade?: string
+      tabela_destino?: string
+    }) => {
+      // Prefer explicitly passed entidade/tabela_destino; fall back to pendentes lookup
+      const resolvedEntidade = entidade ?? pendentes.find(p => p.id === id)?.entidade
+      const resolvedTabela   = tabela_destino ?? pendentes.find(p => p.id === id)?.tabela_destino
+      if (!resolvedEntidade) throw new Error('Pre-cadastro nao encontrado — recarregue a pagina')
 
-      const targetTable = TABLE_MAP[pre.entidade] || pre.tabela_destino
+      const targetTable = TABLE_MAP[resolvedEntidade] || resolvedTabela || resolvedEntidade
 
       // Insert into the actual table
       const { error: insertError } = await supabase

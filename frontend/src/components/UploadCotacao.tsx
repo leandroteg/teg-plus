@@ -59,22 +59,43 @@ export default function UploadCotacao({ onParsed, disabled }: Props) {
         reader.readAsDataURL(file)
       })
 
-      // Enviar para n8n
-      const result = await api.parseCotacaoFile({
-        file_base64: base64,
-        file_name: file.name,
-        mime_type: file.type,
-      })
+      // Enviar para n8n (#29: melhor feedback de erro)
+      let result
+      try {
+        result = await api.parseCotacaoFile({
+          file_base64: base64,
+          file_name: file.name,
+          mime_type: file.type,
+        })
+      } catch (fetchErr) {
+        const msg = fetchErr instanceof Error ? fetchErr.message : ''
+        // Distingue erro de conectividade (n8n offline) de outros erros
+        if (
+          msg.includes('Failed to fetch') ||
+          msg.includes('NetworkError') ||
+          msg.includes('AbortError') ||
+          msg.includes('Tempo limite') ||
+          msg.includes('ECONNREFUSED')
+        ) {
+          setError('Serviço de IA indisponível no momento. Preencha os dados manualmente.')
+        } else if (msg.includes('Erro 5')) {
+          setError('Erro interno no serviço de IA (500). Tente novamente em instantes.')
+        } else {
+          setError(msg || 'Erro ao conectar com o serviço de IA. Preencha manualmente.')
+        }
+        setStatus('error')
+        return
+      }
 
       if (result.success && result.fornecedores?.length > 0) {
         setStatus('success')
         onParsed(result.fornecedores, file)
       } else {
-        setError(result.error || 'Não foi possível extrair dados do documento.')
+        setError(result.error || 'A IA não conseguiu extrair dados do documento. Tente uma imagem mais nítida ou preencha manualmente.')
         setStatus('error')
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Erro ao processar arquivo.')
+      setError(err instanceof Error ? err.message : 'Erro inesperado ao processar arquivo.')
       setStatus('error')
     }
   }, [onParsed])

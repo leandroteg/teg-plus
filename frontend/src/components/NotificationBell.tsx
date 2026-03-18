@@ -186,10 +186,36 @@ function ReviewPanel({
   const [showReject, setShowReject] = useState(false)
   const [busy, setBusy] = useState(false)
 
+  // Coerce string values back to their original types before inserting (#24)
+  function coerceDados(original: Record<string, unknown>, edited: Record<string, unknown>): Record<string, unknown> {
+    const result: Record<string, unknown> = {}
+    for (const [key, editedVal] of Object.entries(edited)) {
+      const originalVal = original[key]
+      const strVal = String(editedVal ?? '')
+      if (typeof originalVal === 'boolean') {
+        result[key] = strVal === 'true' || strVal === '1' || strVal === 'sim'
+      } else if (typeof originalVal === 'number') {
+        const n = Number(strVal)
+        result[key] = isNaN(n) ? originalVal : n
+      } else if (originalVal === null && strVal === '') {
+        result[key] = null
+      } else {
+        result[key] = editedVal
+      }
+    }
+    return result
+  }
+
   async function handleApprove() {
     setBusy(true)
     try {
-      await aprovar.mutateAsync({ id: pre.id, dados: editedDados })
+      const dadosCoercidos = coerceDados(pre.dados, editedDados)
+      await aprovar.mutateAsync({
+        id: pre.id,
+        dados: dadosCoercidos,
+        entidade: pre.entidade,
+        tabela_destino: pre.tabela_destino,
+      })
       onDone()
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Erro desconhecido'
