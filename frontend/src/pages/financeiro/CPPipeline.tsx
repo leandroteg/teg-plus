@@ -5,7 +5,7 @@ import {
   Building2, Tag, Briefcase, Hash, Layers, Truck, Package,
   Paperclip, ExternalLink, Download, ArrowUpDown, LayoutList,
   LayoutGrid, Filter, SortAsc, SortDesc, ArrowDown, ArrowUp, Send, MessageSquare, XCircle,
-  ChevronLeft, ChevronRight,
+  ChevronLeft, ChevronRight, ArrowRight,
   Plus, Save, Loader2, RefreshCw,
 } from 'lucide-react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
@@ -157,7 +157,7 @@ type SortField = 'vencimento' | 'valor' | 'fornecedor' | 'emissao'
 type SortDir = 'asc' | 'desc'
 type ViewMode = 'list' | 'cards'
 type PipelineStageId = StatusCP | 'em_aprovacao'
-type QuickFilterId = 'all' | 'overdue' | 'today' | 'week' | 'this_month' | 'next_month' | 'same_supplier' | 'same_work' | 'same_lote'
+type QuickFilterId = 'all' | 'overdue' | 'today' | 'week' | 'this_month' | 'next_month' | 'future' | 'custom' | 'same_supplier' | 'same_work' | 'same_lote'
 type StatusHintTone = 'amber' | 'rose' | 'sky'
 type StatusHint = { text: string; tone: StatusHintTone }
 const CP_TABLE_GRID = 'grid grid-cols-[20px_2px_minmax(0,1.8fr)_minmax(0,1.45fr)_minmax(0,1fr)_70px_110px_72px_96px] items-center gap-x-3'
@@ -2104,6 +2104,9 @@ export default function CPPipeline() {
   const [sortDir, setSortDir] = useState<SortDir>('asc')
   const [viewMode, setViewMode] = useState<ViewMode>('list')
   const [quickFilter, setQuickFilter] = useState<QuickFilterId>('all')
+  const [customDateFrom, setCustomDateFrom] = useState('')
+  const [customDateTo, setCustomDateTo] = useState('')
+  const [showCustomDate, setShowCustomDate] = useState(false)
   // Per-tab filter memory: preserves busca and quickFilter when switching tabs (#134)
   const tabFiltersRef = useRef<Map<PipelineStageId, { busca: string; quickFilter: QuickFilterId }>>(new Map())
   const [showNovaSolicitacao, setShowNovaSolicitacao] = useState(false)
@@ -2267,6 +2270,14 @@ export default function CPPipeline() {
         return stageCPs.filter(cp => cp.data_vencimento >= thisMonthStart && cp.data_vencimento <= thisMonthEnd)
       case 'next_month':
         return stageCPs.filter(cp => cp.data_vencimento >= nextMonthStart && cp.data_vencimento <= nextMonthEnd)
+      case 'future':
+        return stageCPs.filter(cp => cp.data_vencimento > nextMonthEnd)
+      case 'custom':
+        return stageCPs.filter(cp => {
+          if (customDateFrom && cp.data_vencimento < customDateFrom) return false
+          if (customDateTo && cp.data_vencimento > customDateTo) return false
+          return true
+        })
       case 'same_supplier':
         return anchorCP ? stageCPs.filter(cp => cp.fornecedor_nome === anchorCP.fornecedor_nome) : stageCPs
       case 'same_work':
@@ -2280,7 +2291,7 @@ export default function CPPipeline() {
       default:
         return stageCPs
     }
-  }, [anchorCP, quickFilter, stageCPs])
+  }, [anchorCP, quickFilter, stageCPs, customDateFrom, customDateTo])
 
   const isLoteStageTab = LOTE_STAGE_TABS.includes(activeTab)
 
@@ -2820,6 +2831,7 @@ export default function CPPipeline() {
               { id: 'week', label: '7 dias', count: stageCPs.filter(cp => ['today', 'week'].includes(getUrgency(cp))).length, value: stageCPs.filter(cp => ['today', 'week'].includes(getUrgency(cp))).reduce((s, c) => s + c.valor_original, 0), icon: Calendar, color: 'blue' },
               { id: 'this_month', label: mesAtualLabel, count: stageCPs.filter(cp => cp.data_vencimento >= mStart && cp.data_vencimento <= mEnd).length, value: stageCPs.filter(cp => cp.data_vencimento >= mStart && cp.data_vencimento <= mEnd).reduce((s, c) => s + c.valor_original, 0), icon: Calendar, color: 'violet' },
               { id: 'next_month', label: proxMesLabel, count: stageCPs.filter(cp => cp.data_vencimento >= nStart && cp.data_vencimento <= nEnd).length, value: stageCPs.filter(cp => cp.data_vencimento >= nStart && cp.data_vencimento <= nEnd).reduce((s, c) => s + c.valor_original, 0), icon: Calendar, color: 'indigo' },
+              { id: 'future', label: 'Futuros', count: stageCPs.filter(cp => cp.data_vencimento > nEnd).length, value: stageCPs.filter(cp => cp.data_vencimento > nEnd).reduce((s, c) => s + c.valor_original, 0), icon: ArrowRight, color: 'slate' },
             ]
 
             const colors: Record<string, { activeBg: string; activeBorder: string; activeText: string; countBg: string; idleBg: string; idleBorder: string; idleText: string }> = {
@@ -2829,6 +2841,7 @@ export default function CPPipeline() {
               blue: { activeBg: isDark ? 'bg-blue-500/15' : 'bg-blue-50', activeBorder: isDark ? 'border-blue-400/30 ring-1 ring-blue-400/20' : 'border-blue-200 ring-1 ring-blue-200/50', activeText: isDark ? 'text-blue-300' : 'text-blue-700', countBg: isDark ? 'bg-blue-500/20 text-blue-200' : 'bg-blue-100 text-blue-700', idleBg: isDark ? 'bg-white/[0.02]' : 'bg-white', idleBorder: isDark ? 'border-white/[0.06]' : 'border-slate-200', idleText: isDark ? 'text-slate-400' : 'text-slate-500' },
               violet: { activeBg: isDark ? 'bg-violet-500/15' : 'bg-violet-50', activeBorder: isDark ? 'border-violet-400/30 ring-1 ring-violet-400/20' : 'border-violet-200 ring-1 ring-violet-200/50', activeText: isDark ? 'text-violet-300' : 'text-violet-700', countBg: isDark ? 'bg-violet-500/20 text-violet-200' : 'bg-violet-100 text-violet-700', idleBg: isDark ? 'bg-white/[0.02]' : 'bg-white', idleBorder: isDark ? 'border-white/[0.06]' : 'border-slate-200', idleText: isDark ? 'text-slate-400' : 'text-slate-500' },
               indigo: { activeBg: isDark ? 'bg-indigo-500/15' : 'bg-indigo-50', activeBorder: isDark ? 'border-indigo-400/30 ring-1 ring-indigo-400/20' : 'border-indigo-200 ring-1 ring-indigo-200/50', activeText: isDark ? 'text-indigo-300' : 'text-indigo-700', countBg: isDark ? 'bg-indigo-500/20 text-indigo-200' : 'bg-indigo-100 text-indigo-700', idleBg: isDark ? 'bg-white/[0.02]' : 'bg-white', idleBorder: isDark ? 'border-white/[0.06]' : 'border-slate-200', idleText: isDark ? 'text-slate-400' : 'text-slate-500' },
+              slate: { activeBg: isDark ? 'bg-slate-500/15' : 'bg-slate-100', activeBorder: isDark ? 'border-slate-400/30 ring-1 ring-slate-400/20' : 'border-slate-300 ring-1 ring-slate-300/50', activeText: isDark ? 'text-slate-200' : 'text-slate-700', countBg: isDark ? 'bg-slate-500/20 text-slate-200' : 'bg-slate-200 text-slate-700', idleBg: isDark ? 'bg-white/[0.02]' : 'bg-white', idleBorder: isDark ? 'border-white/[0.06]' : 'border-slate-200', idleText: isDark ? 'text-slate-400' : 'text-slate-500' },
             }
 
             return stats.map(stat => {
@@ -2857,6 +2870,54 @@ export default function CPPipeline() {
               )
             })
           })()}
+
+          {/* Custom date range */}
+          <div className="relative">
+            <button
+              onClick={() => { setShowCustomDate(v => !v); if (quickFilter !== 'custom') { setQuickFilter('custom'); if (!customDateFrom && !customDateTo) setShowCustomDate(true) } }}
+              className={`group flex items-center gap-1.5 rounded-2xl border px-3 py-2 transition-all duration-200 hover:scale-[1.02] text-[11px] font-medium ${
+                quickFilter === 'custom'
+                  ? isDark ? 'border-teal-400/30 ring-1 ring-teal-400/20 bg-teal-500/15 text-teal-300' : 'border-teal-200 ring-1 ring-teal-200/50 bg-teal-50 text-teal-700'
+                  : isDark ? 'border-white/[0.06] bg-white/[0.02] text-slate-400 hover:shadow-sm' : 'border-slate-200 bg-white text-slate-500 hover:shadow-sm'
+              }`}
+            >
+              <Filter size={12} />
+              {quickFilter === 'custom' && customDateFrom ? (
+                <span className="tabular-nums">{customDateFrom.split('-').reverse().join('/')} — {customDateTo ? customDateTo.split('-').reverse().join('/') : '...'}</span>
+              ) : (
+                <span>Personalizado</span>
+              )}
+            </button>
+            {showCustomDate && (
+              <div className={`absolute left-0 top-full mt-2 z-40 rounded-2xl border p-4 shadow-xl space-y-3 min-w-[280px] ${isDark ? 'bg-slate-900 border-white/[0.08]' : 'bg-white border-slate-200'}`}>
+                <p className={`text-[10px] font-bold uppercase tracking-wider ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Período personalizado</p>
+                <div className="flex items-center gap-2">
+                  <div className="flex-1">
+                    <label className={`text-[10px] font-medium mb-1 block ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>De</label>
+                    <input type="date" value={customDateFrom} onChange={e => setCustomDateFrom(e.target.value)}
+                      className={`w-full px-2.5 py-1.5 rounded-xl border text-xs ${isDark ? 'bg-white/[0.04] border-white/[0.06] text-slate-200' : 'border-slate-200 bg-white text-slate-700'}`}
+                    />
+                  </div>
+                  <div className="flex-1">
+                    <label className={`text-[10px] font-medium mb-1 block ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Até</label>
+                    <input type="date" value={customDateTo} onChange={e => setCustomDateTo(e.target.value)}
+                      className={`w-full px-2.5 py-1.5 rounded-xl border text-xs ${isDark ? 'bg-white/[0.04] border-white/[0.06] text-slate-200' : 'border-slate-200 bg-white text-slate-700'}`}
+                    />
+                  </div>
+                </div>
+                <div className="flex items-center justify-between">
+                  <button onClick={() => { setCustomDateFrom(''); setCustomDateTo(''); setQuickFilter('all'); setShowCustomDate(false) }}
+                    className={`text-[11px] font-medium px-3 py-1.5 rounded-xl transition-all ${isDark ? 'text-slate-400 hover:bg-white/[0.04]' : 'text-slate-500 hover:bg-slate-50'}`}>
+                    Limpar
+                  </button>
+                  <button onClick={() => setShowCustomDate(false)}
+                    className="text-[11px] font-bold px-4 py-1.5 rounded-xl bg-teal-600 text-white hover:bg-teal-700 transition-all">
+                    Aplicar
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
 
           {/* Anchor-based contextual filters */}
           {anchorCP && (
