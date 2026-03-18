@@ -1590,15 +1590,23 @@ function CPDetailModal({ cp, stageStatus, onClose, onAction, isDark }: {
             )}
             {cp.status === 'em_pagamento' && (
               <>
-                <button
-                  onClick={() => window.open('https://app.omie.com.br', '_blank')}
-                  className="flex-1 py-3 rounded-xl bg-indigo-600 text-white text-sm font-bold hover:bg-indigo-700 transition-all flex items-center justify-center gap-2"
-                >
-                  <ExternalLink size={15} /> Pagar no Omie
-                </button>
-                <button onClick={() => onAction('sincronizar', cp)} className="flex-1 py-3 rounded-xl bg-sky-600 text-white text-sm font-bold hover:bg-sky-700 transition-all flex items-center justify-center gap-2">
-                  <RefreshCw size={15} /> Sincronizar
-                </button>
+                {cp.omie_cp_id ? (
+                  <>
+                    <button
+                      onClick={() => window.open('https://app.omie.com.br', '_blank')}
+                      className="flex-1 py-3 rounded-xl bg-indigo-600 text-white text-sm font-bold hover:bg-indigo-700 transition-all flex items-center justify-center gap-2"
+                    >
+                      <ExternalLink size={15} /> Pagar no Omie
+                    </button>
+                    <button onClick={() => onAction('sincronizar', cp)} className="flex-1 py-3 rounded-xl bg-sky-600 text-white text-sm font-bold hover:bg-sky-700 transition-all flex items-center justify-center gap-2">
+                      <RefreshCw size={15} /> Sincronizar
+                    </button>
+                  </>
+                ) : (
+                  <button onClick={() => onAction('pagar', cp)} className="flex-1 py-3 rounded-xl bg-teal-600 text-white text-sm font-bold hover:bg-teal-700 transition-all flex items-center justify-center gap-2">
+                    <Banknote size={15} /> Registrar Pgto
+                  </button>
+                )}
               </>
             )}
             {cp.status === 'pago' && (
@@ -2505,7 +2513,12 @@ export default function CPPipeline() {
       case 'confirmado': handleCriarLote(ids); break
       case 'em_lote': handleEnviarLotesAprovacao(ids); break
       case 'aprovado_pgto': handleEnviarRemessa(ids); break
-      case 'em_pagamento': window.open('https://app.omie.com.br', '_blank'); break
+      case 'em_pagamento': {
+        const hasOmie = ids.some(id => contasById.get(id)?.omie_cp_id)
+        if (hasOmie) window.open('https://app.omie.com.br', '_blank')
+        else handleConfirmarPagamento(ids)
+        break
+      }
       case 'pago': handleConciliar(ids); break
     }
   }
@@ -2565,21 +2578,32 @@ export default function CPPipeline() {
             icon: Banknote,
           },
         }
-      case 'em_pagamento':
-        return {
-          primary: {
-            label: 'Pagar no Omie',
-            onClick: () => window.open('https://app.omie.com.br', '_blank'),
-            tone: 'bg-indigo-600 hover:bg-indigo-700',
-            icon: ExternalLink,
-          },
-          secondary: {
-            label: 'Sincronizar',
-            onClick: () => handleSincronizarOmie(summary.cpIds),
-            tone: 'bg-sky-600 hover:bg-sky-700',
-            icon: RefreshCw,
-          },
-        }
+      case 'em_pagamento': {
+        const hasOmie = summary.cpIds.some(id => contasById.get(id)?.omie_cp_id)
+        return hasOmie
+          ? {
+              primary: {
+                label: 'Pagar no Omie',
+                onClick: () => window.open('https://app.omie.com.br', '_blank'),
+                tone: 'bg-indigo-600 hover:bg-indigo-700',
+                icon: ExternalLink,
+              },
+              secondary: {
+                label: 'Sincronizar',
+                onClick: () => handleSincronizarOmie(summary.cpIds),
+                tone: 'bg-sky-600 hover:bg-sky-700',
+                icon: RefreshCw,
+              },
+            }
+          : {
+              primary: {
+                label: 'Registrar Pgto',
+                onClick: () => handleConfirmarPagamento(summary.cpIds),
+                tone: 'bg-teal-600 hover:bg-teal-700',
+                icon: Banknote,
+              },
+            }
+      }
       default:
         return {}
     }
@@ -2599,7 +2623,7 @@ export default function CPPipeline() {
     confirmado:    { label: 'Criar Lote',    icon: Layers,       className: 'bg-violet-600 hover:bg-violet-700 text-white' },
     em_lote:       { label: 'Enviar p/ Aprov.', icon: Send,      className: 'bg-amber-500 hover:bg-amber-600 text-white' },
     aprovado_pgto: { label: 'Enviar Remessa', icon: Send,        className: 'bg-sky-600 hover:bg-sky-700 text-white' },
-    em_pagamento:  { label: 'Pagar no Omie',  icon: ExternalLink, className: 'bg-indigo-600 hover:bg-indigo-700 text-white' },
+    em_pagamento:  { label: 'Registrar Pgto', icon: Banknote,     className: 'bg-teal-600 hover:bg-teal-700 text-white' },
     pago:          { label: 'Conciliar',     icon: CheckCircle2, className: 'bg-green-600 hover:bg-green-700 text-white' },
   }
   const bulk = BULK_ACTIONS[activeTab]
