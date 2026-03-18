@@ -943,6 +943,7 @@ function DetailModal({
   onCompartilhar,
   onLiberarPagamento,
   onReceber,
+  onEmitted,
 }: {
   pedido: PedidoListItem
   dark: boolean
@@ -950,6 +951,7 @@ function DetailModal({
   onCompartilhar: (p: PedidoListItem) => void
   onLiberarPagamento: (id: string) => void
   onReceber: (p: Pedido) => void
+  onEmitted?: () => void
 }) {
   const mutation = useAtualizarPedido()
   const emitirPedido = useEmitirPedido()
@@ -1175,6 +1177,7 @@ function DetailModal({
                 onSuccess: () => {
                   setShowEmitirModal(false)
                   onClose()
+                  onEmitted?.()
                 },
               })
             }}
@@ -1228,6 +1231,8 @@ export default function Pedidos() {
   const [compartilharPedido, setCompartilhar]       = useState<PedidoListItem | null>(null)
   const [showLiberarModal, setShowLiberarModal]     = useState<string | null>(null)
   const [receberPedido, setReceberPedido]           = useState<Pedido | null>(null)
+  const [toast, setToast]                           = useState<{ type: 'success' | 'error'; msg: string } | null>(null)
+  const showToast = (type: 'success' | 'error', msg: string) => { setToast({ type, msg }); setTimeout(() => setToast(null), 4000) }
 
   // Clear highlight param after 2s
   useEffect(() => {
@@ -1339,6 +1344,13 @@ export default function Pedidos() {
 
   return (
     <div className="space-y-4">
+      {toast && (
+        <div className={`fixed top-4 left-1/2 -translate-x-1/2 z-50 px-5 py-2.5 rounded-2xl shadow-lg text-sm font-bold flex items-center gap-2 animate-[slideDown_0.3s_ease] ${
+          toast.type === 'success' ? 'bg-emerald-500 text-white shadow-emerald-500/30' : 'bg-red-500 text-white shadow-red-500/30'
+        }`}>
+          {toast.msg}
+        </div>
+      )}
       {/* Title */}
       <div className="flex items-center justify-between">
         <h2 className={`text-lg font-extrabold tracking-tight flex items-center gap-2 ${dark ? 'text-white' : 'text-slate-800'}`}>
@@ -1526,6 +1538,7 @@ export default function Pedidos() {
           onCompartilhar={p => { setSelectedPedido(null); setCompartilhar(p) }}
           onLiberarPagamento={id => { setSelectedPedido(null); setShowLiberarModal(id) }}
           onReceber={p => { setSelectedPedido(null); setReceberPedido(p) }}
+          onEmitted={() => { setActiveTab('emitido'); showToast('success', 'Pedido emitido com sucesso!') }}
         />
       )}
 

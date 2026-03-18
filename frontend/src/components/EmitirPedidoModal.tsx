@@ -685,7 +685,7 @@ export default function EmitirPedidoModal({
             onClick={() => onConfirm({
               cotacaoId: cotacaoResolvida?.id || '',
               fornecedorNome: cotacaoResolvida?.fornecedorNome || 'N/A',
-              valorTotal,
+              valorTotal: totalParcelas,
               compradorId: cotacaoResolvida?.compradorId,
               classeFinanceiraId: classeSelecionada?.id,
               classeFinanceira: classeSelecionada?.codigo,

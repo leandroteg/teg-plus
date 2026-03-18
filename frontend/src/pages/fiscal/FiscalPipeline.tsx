@@ -24,6 +24,7 @@ import {
 import type { CriarSolicitacaoPayload } from '../../types/solicitacaoNF'
 import { useAuth } from '../../contexts/AuthContext'
 import { useTheme } from '../../contexts/ThemeContext'
+import { useConsultaCNPJ } from '../../hooks/useConsultas'
 
 // ── Formatters ──────────────────────────────────────────────────────────────
 
@@ -266,6 +267,14 @@ function SistemaEmissaoModal({ sol, isDark, onSubmit, onClose, isPending }: {
   const [danfeUrl, setDanfeUrl] = useState(sol.danfe_url || '')
   const [formError, setFormError] = useState('')
 
+  // CNPJ auto-fill
+  const emitenteCnpjLookup = useConsultaCNPJ(useCallback((r: any) => {
+    setEmitenteNome(prev => prev || r.razao_social || '')
+  }, []))
+  const destCnpjLookup = useConsultaCNPJ(useCallback((r: any) => {
+    setDestNome(prev => prev || r.razao_social || '')
+  }, []))
+
   const obraUf = sol.obra?.uf
   const itemSubtotals = items.map(it => (it.valor_unitario ?? 0) * it.quantidade)
   const valorItens = itemSubtotals.reduce((s, v) => s + v, 0)
@@ -339,20 +348,46 @@ function SistemaEmissaoModal({ sol, isDark, onSubmit, onClose, isPending }: {
           {/* Section 1: Partes */}
           <FormSection title="Emitente / Destinatario" icon={Users} isDark={isDark} defaultOpen>
             <div className="grid grid-cols-2 gap-3 mt-2">
-              <div>
+              <div className="relative">
                 <label className={labelCls}>Emitente CNPJ</label>
                 <input type="text" value={emitenteCnpj} onChange={e => setEmitenteCnpj(e.target.value)}
+                  onBlur={() => emitenteCnpjLookup.consultar(emitenteCnpj)}
                   placeholder="00.000.000/0001-00" className={inputCls} />
+                {emitenteCnpjLookup.loading && (
+                  <div className="absolute right-2 top-7 flex items-center gap-1 text-amber-500">
+                    <Loader2 size={12} className="animate-spin" />
+                    <span className="text-[9px] font-semibold">Buscando...</span>
+                  </div>
+                )}
+                {emitenteCnpjLookup.dados && !emitenteCnpjLookup.erro && (
+                  <p className="text-[9px] text-emerald-600 mt-0.5 flex items-center gap-1">
+                    <CheckCircle2 size={9} /> {emitenteCnpjLookup.dados.situacao}
+                  </p>
+                )}
+                {emitenteCnpjLookup.erro && <p className="text-[9px] text-red-500 mt-0.5">{emitenteCnpjLookup.erro}</p>}
               </div>
               <div>
                 <label className={labelCls}>Emitente Nome</label>
                 <input type="text" value={emitenteNome} onChange={e => setEmitenteNome(e.target.value)}
                   placeholder="Razao Social" className={inputCls} />
               </div>
-              <div>
+              <div className="relative">
                 <label className={labelCls}>Destinatario CNPJ</label>
                 <input type="text" value={destCnpj} onChange={e => setDestCnpj(e.target.value)}
+                  onBlur={() => destCnpjLookup.consultar(destCnpj)}
                   placeholder="00.000.000/0001-00" className={inputCls} />
+                {destCnpjLookup.loading && (
+                  <div className="absolute right-2 top-7 flex items-center gap-1 text-amber-500">
+                    <Loader2 size={12} className="animate-spin" />
+                    <span className="text-[9px] font-semibold">Buscando...</span>
+                  </div>
+                )}
+                {destCnpjLookup.dados && !destCnpjLookup.erro && (
+                  <p className="text-[9px] text-emerald-600 mt-0.5 flex items-center gap-1">
+                    <CheckCircle2 size={9} /> {destCnpjLookup.dados.situacao}
+                  </p>
+                )}
+                {destCnpjLookup.erro && <p className="text-[9px] text-red-500 mt-0.5">{destCnpjLookup.erro}</p>}
               </div>
               <div>
                 <label className={labelCls}>Destinatario Nome</label>
