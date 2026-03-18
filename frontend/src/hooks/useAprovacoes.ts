@@ -136,6 +136,9 @@ export function useAprovacoesPendentes(tipo?: TipoAprovacao) {
       const finMap = new Map<string, Record<string, unknown>>()
       const loteMap = new Map<string, Record<string, unknown>>()
       const loteItensMap = new Map<string, Record<string, unknown>[]>()
+      const rcMap = new Map<string, Record<string, unknown>>()
+      const pedAnexosMap = new Map<string, Record<string, unknown>[]>()
+      const docMap = new Map<string, Record<string, unknown>[]>()
       if (finIds.length > 0) {
         const { data: finData } = await supabase
           .from('fin_contas_pagar')
@@ -191,10 +194,6 @@ export function useAprovacoesPendentes(tipo?: TipoAprovacao) {
           const pedidoIds = (loteItens ?? [])
             .map(item => (item.cp as Record<string, unknown> | null)?.pedido_id as string)
             .filter(Boolean)
-
-          const rcMap = new Map<string, Record<string, unknown>>()
-          const pedAnexosMap = new Map<string, Record<string, unknown>[]>()
-          const docMap = new Map<string, Record<string, unknown>[]>()
 
           try {
             if (reqIds.length > 0) {
