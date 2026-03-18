@@ -200,6 +200,15 @@ export interface AprovacaoPendente extends Aprovacao {
       decisao_obs?: string
       pedido_id?: string
       created_at?: string
+      timeline?: {
+        tipo: string
+        label: string
+        ator?: string
+        data: string
+        obs?: string
+        status?: string
+        nivel?: number
+      }[]
     }[]
   }
 }

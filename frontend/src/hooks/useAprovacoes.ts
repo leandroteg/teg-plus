@@ -139,6 +139,9 @@ export function useAprovacoesPendentes(tipo?: TipoAprovacao) {
       const rcMap = new Map<string, Record<string, unknown>>()
       const pedAnexosMap = new Map<string, Record<string, unknown>[]>()
       const docMap = new Map<string, Record<string, unknown>[]>()
+      const pedMap = new Map<string, Record<string, unknown>>()
+      const cotMap2 = new Map<string, Record<string, unknown>>()
+      const aprByEntity = new Map<string, Record<string, unknown>[]>()
       if (finIds.length > 0) {
         const { data: finData } = await supabase
           .from('fin_contas_pagar')
@@ -183,7 +186,8 @@ export function useAprovacoesPendentes(tipo?: TipoAprovacao) {
                 forma_pagamento,
                 status,
                 requisicao_id,
-                pedido_id
+                pedido_id,
+                created_at
               )
             `)
             .in('lote_id', loteIds)
@@ -203,7 +207,7 @@ export function useAprovacoesPendentes(tipo?: TipoAprovacao) {
             if (reqIds.length > 0) {
               const { data: rcData } = await supabase
                 .from('cmp_requisicoes')
-                .select('id, numero, descricao, justificativa, solicitante_nome')
+                .select('id, numero, descricao, justificativa, solicitante_nome, created_at')
                 .in('id', [...new Set(reqIds)])
               for (const rc of rcData ?? []) rcMap.set(rc.id, rc)
             }
@@ -239,6 +243,44 @@ export function useAprovacoesPendentes(tipo?: TipoAprovacao) {
               }
             }
           } catch { /* docs data is optional */ }
+
+          // Fetch timeline data
+          try {
+            if (pedidoIds.length > 0) {
+              const { data: pedData } = await supabase
+                .from('cmp_pedidos')
+                .select('id, numero_pedido, created_at, status, fornecedor_nome')
+                .in('id', [...new Set(pedidoIds)])
+              for (const p of pedData ?? []) pedMap.set(p.id, p)
+            }
+          } catch { /* optional */ }
+
+          try {
+            if (reqIds.length > 0) {
+              const { data: cotData } = await supabase
+                .from('cmp_cotacoes')
+                .select('id, requisicao_id, status, data_conclusao, fornecedor_selecionado_nome, valor_selecionado')
+                .in('requisicao_id', [...new Set(reqIds)])
+              for (const c of cotData ?? []) cotMap2.set(c.requisicao_id as string, c)
+            }
+          } catch { /* optional */ }
+
+          try {
+            const allEntityIds = [...new Set([...reqIds, ...loteIds])]
+            if (allEntityIds.length > 0) {
+              const { data: aprHistData } = await supabase
+                .from('apr_aprovacoes')
+                .select('entidade_id, tipo_aprovacao, aprovador_nome, status, data_decisao, observacao, nivel')
+                .in('entidade_id', allEntityIds)
+                .neq('status', 'pendente')
+              for (const a of aprHistData ?? []) {
+                const eid = a.entidade_id as string
+                const arr = aprByEntity.get(eid) ?? []
+                arr.push(a)
+                aprByEntity.set(eid, arr)
+              }
+            }
+          } catch { /* optional */ }
 
           for (const item of loteItens ?? []) {
             const loteId = item.lote_id as string | undefined
@@ -409,6 +451,41 @@ export function useAprovacoesPendentes(tipo?: TipoAprovacao) {
                     decisao_obs: (item.observacao as string) ?? undefined,
                     pedido_id: pedId || undefined,
                     created_at: (item.created_at as string) ?? undefined,
+                    timeline: (() => {
+                      const events: { tipo: string, label: string, ator?: string, data: string, obs?: string, status?: string, nivel?: number }[] = []
+
+                      // RC criada
+                      if (rc?.created_at) events.push({ tipo: 'rc_criada', label: `RC ${(rc.numero as string) ?? ''} criada`, ator: (rc.solicitante_nome as string) ?? undefined, data: (rc.created_at as string) })
+
+                      // Aprovações da RC
+                      const rcAprs = rcId ? (aprByEntity.get(rcId) ?? []).filter(a => (a.tipo_aprovacao as string) === 'requisicao_compra') : []
+                      for (const apr of rcAprs) events.push({ tipo: 'aprovacao', label: 'RC aprovada', ator: (apr.aprovador_nome as string) ?? undefined, data: (apr.data_decisao as string) ?? '', status: (apr.status as string), nivel: (apr.nivel as number) })
+
+                      // Cotação concluída
+                      const cot = rcId ? cotMap2.get(rcId) : undefined
+                      if (cot?.data_conclusao) events.push({ tipo: 'cotacao_aprovada', label: `Cotação concluída — ${(cot.fornecedor_selecionado_nome as string) ?? ''}`, data: (cot.data_conclusao as string) })
+
+                      // Aprovações da cotação
+                      const cotAprs = rcId ? (aprByEntity.get(rcId) ?? []).filter(a => (a.tipo_aprovacao as string) === 'cotacao') : []
+                      for (const apr of cotAprs) events.push({ tipo: 'aprovacao', label: 'Cotação aprovada', ator: (apr.aprovador_nome as string) ?? undefined, data: (apr.data_decisao as string) ?? '', status: (apr.status as string), nivel: (apr.nivel as number) })
+
+                      // Pedido emitido
+                      const ped = pedId ? pedMap.get(pedId) : undefined
+                      if (ped?.created_at) events.push({ tipo: 'pedido_emitido', label: `Pedido ${(ped.numero_pedido as string) ?? ''} emitido`, data: (ped.created_at as string) })
+
+                      // CP criada
+                      if (cp?.created_at) events.push({ tipo: 'cp_criada', label: 'CP criada', data: (cp.created_at as string) })
+
+                      // Incluído no lote
+                      if (item.created_at) events.push({ tipo: 'lote_incluido', label: 'Incluído no lote', data: (item.created_at as string) })
+
+                      // Decisão do item
+                      if (item.decidido_por) events.push({ tipo: 'aprovacao', label: (item.decisao as string) === 'aprovado' ? 'Item aprovado' : 'Item rejeitado', ator: (item.decidido_por as string), data: (item.decidido_em as string) ?? '', obs: (item.observacao as string) ?? undefined, status: (item.decisao as string) })
+
+                      // Sort chronologically (oldest first for timeline)
+                      events.sort((a, b) => new Date(a.data || 0).getTime() - new Date(b.data || 0).getTime())
+                      return events.length > 0 ? events : undefined
+                    })(),
                   }
                 }),
               }

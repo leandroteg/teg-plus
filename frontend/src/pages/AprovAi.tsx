@@ -8,6 +8,7 @@ import {
   History, ListChecks, Timer, TrendingUp, Filter,
   Calendar, FileText, Download, Eye, HelpCircle,
   Paperclip, Square, CheckSquare, Package, SplitSquareHorizontal,
+  DollarSign, Layers,
 } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../services/supabase'
@@ -117,6 +118,12 @@ function formatDateShort(dateStr?: string): string {
     day: '2-digit', month: '2-digit', year: '2-digit',
     hour: '2-digit', minute: '2-digit',
   })
+}
+
+const fmtDateTime = (d: string) => {
+  if (!d) return ''
+  const dt = new Date(d)
+  return isNaN(dt.getTime()) ? '' : dt.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })
 }
 
 // ── AprovacaoCard (requisicoes de compra — card completo) ──────────────────────
@@ -1199,42 +1206,49 @@ function PagamentoDetalhesCard({ detalhes, selectedItemIds, setSelectedItemIds }
                         {/* Section 1: Timeline de Aprovação */}
                         <div>
                           <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">Timeline</p>
-                          <div className="border-l-2 border-slate-200 pl-3 space-y-2">
-                            {item.decisao_por && (
-                              <div className="relative">
-                                <div className="absolute -left-[17px] top-0.5 w-2 h-2 rounded-full bg-slate-300" />
-                                <p className="text-[11px] text-slate-700 font-medium">
-                                  {item.decisao === 'aprovada' ? '✅' : item.decisao === 'rejeitada' ? '❌' : '⏳'}{' '}
-                                  {item.decisao_por}
-                                  {item.decisao_em && (
-                                    <span className="text-[10px] text-slate-400 ml-1">
-                                      {new Date(item.decisao_em).toLocaleDateString('pt-BR')}{' '}
-                                      {new Date(item.decisao_em).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
-                                    </span>
-                                  )}
-                                </p>
-                                {item.decisao_obs && (
-                                  <p className="text-[10px] text-slate-500 italic mt-0.5">{item.decisao_obs}</p>
-                                )}
-                              </div>
-                            )}
-                            {item.created_at && (
-                              <div className="relative">
-                                <div className="absolute -left-[17px] top-0.5 w-2 h-2 rounded-full bg-slate-300" />
-                                <p className="text-[10px] text-slate-500">
-                                  Incluído no lote · {new Date(item.created_at).toLocaleDateString('pt-BR')}
-                                </p>
-                              </div>
-                            )}
-                            {item.solicitante_nome && (
-                              <div className="relative">
-                                <div className="absolute -left-[17px] top-0.5 w-2 h-2 rounded-full bg-slate-300" />
-                                <p className="text-[10px] text-slate-500">
-                                  RC criada por {item.solicitante_nome}
-                                </p>
-                              </div>
-                            )}
-                          </div>
+                          {item.timeline && item.timeline.length > 0 ? (
+                            <div className="space-y-0">
+                              {item.timeline.map((evt: { tipo: string, label: string, ator?: string, data: string, obs?: string, status?: string, nivel?: number }, idx: number) => {
+                                const EventIcon = evt.tipo === 'rc_criada' ? FileText
+                                  : evt.tipo === 'cotacao_aprovada' ? ShoppingCart
+                                  : evt.tipo === 'pedido_emitido' ? Package
+                                  : evt.tipo === 'cp_criada' ? DollarSign
+                                  : evt.tipo === 'lote_incluido' ? Layers
+                                  : evt.tipo === 'aprovacao' && (evt.status === 'aprovada' || evt.status === 'aprovado') ? CheckCircle
+                                  : evt.tipo === 'aprovacao' && (evt.status === 'rejeitada' || evt.status === 'rejeitado') ? XCircle
+                                  : Clock
+                                const dotColorClass = evt.tipo === 'rc_criada' ? 'bg-slate-500'
+                                  : evt.tipo === 'cotacao_aprovada' ? 'bg-blue-500'
+                                  : evt.tipo === 'pedido_emitido' ? 'bg-teal-500'
+                                  : evt.tipo === 'cp_criada' ? 'bg-amber-500'
+                                  : evt.tipo === 'lote_incluido' ? 'bg-indigo-500'
+                                  : evt.tipo === 'aprovacao' && (evt.status === 'aprovada' || evt.status === 'aprovado') ? 'bg-emerald-500'
+                                  : evt.tipo === 'aprovacao' && (evt.status === 'rejeitada' || evt.status === 'rejeitado') ? 'bg-red-500'
+                                  : 'bg-slate-400'
+                                return (
+                                  <div key={idx} className="flex gap-2.5 relative">
+                                    {idx < item.timeline!.length - 1 && (
+                                      <div className="absolute left-[9px] top-5 bottom-0 w-px bg-slate-200" />
+                                    )}
+                                    <div className={`w-5 h-5 rounded-full flex items-center justify-center shrink-0 mt-0.5 ${dotColorClass}`}>
+                                      <EventIcon size={11} className="text-white" />
+                                    </div>
+                                    <div className="pb-3 min-w-0">
+                                      <p className="text-[11px] font-semibold text-slate-700">{evt.label}</p>
+                                      <p className="text-[10px] text-slate-400">
+                                        {evt.ator && <>{evt.ator} · </>}
+                                        {fmtDateTime(evt.data)}
+                                        {evt.nivel && <> · Nível {evt.nivel}</>}
+                                      </p>
+                                      {evt.obs && <p className="text-[10px] text-slate-500 italic mt-0.5">"{evt.obs}"</p>}
+                                    </div>
+                                  </div>
+                                )
+                              })}
+                            </div>
+                          ) : (
+                            <p className="text-[10px] text-slate-400 italic">Sem histórico disponível</p>
+                          )}
                         </div>
 
                         {/* Section 2: Documentos Anexados */}
