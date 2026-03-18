@@ -74,7 +74,7 @@ export function useFinanceiroDashboard(periodo = '30d') {
 const SELECT_CP = `
   *,
   pedido:cmp_pedidos!pedido_id(numero_pedido, status, data_pedido, data_prevista_entrega, status_pagamento),
-  requisicao:cmp_requisicoes!requisicao_id(numero, descricao, obra_nome, categoria, centro_custo, classe_financeira, projeto_id)
+  requisicao:cmp_requisicoes!requisicao_id(numero, descricao, justificativa, obra_nome, categoria, centro_custo, classe_financeira, projeto_id)
 `
 
 export function useContasPagar(filters?: { status?: string; centro_custo?: string }) {

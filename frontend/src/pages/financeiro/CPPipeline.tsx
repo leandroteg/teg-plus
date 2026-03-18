@@ -1366,6 +1366,13 @@ function CPDetailModal({ cp, stageStatus, onClose, onAction, isDark }: {
             {cp.remessa_erro && (
               <p className="text-xs text-red-500 mt-1">{cp.remessa_erro}</p>
             )}
+            {/* Descrição da requisição de compra */}
+            {cp.requisicao?.justificativa && (
+              <div className={`mt-3 pt-3 border-t rounded-xl px-3.5 py-2.5 ${isDark ? 'border-white/10 bg-teal-500/10' : 'border-slate-200 bg-teal-50'}`}>
+                <p className={`text-[10px] font-bold uppercase tracking-wider mb-1 ${isDark ? 'text-teal-400' : 'text-teal-600'}`}>Descrição da RC</p>
+                <p className={`text-xs leading-relaxed ${isDark ? 'text-teal-200' : 'text-teal-800'}`}>{cp.requisicao.justificativa}</p>
+              </div>
+            )}
           </div>
 
           {cp.fornecedor_id && <FornecedorBankInfo fornecedorId={cp.fornecedor_id} isDark={isDark} />}
