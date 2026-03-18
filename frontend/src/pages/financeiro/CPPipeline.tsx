@@ -157,7 +157,7 @@ type SortField = 'vencimento' | 'valor' | 'fornecedor' | 'emissao'
 type SortDir = 'asc' | 'desc'
 type ViewMode = 'list' | 'cards'
 type PipelineStageId = StatusCP | 'em_aprovacao'
-type QuickFilterId = 'all' | 'overdue' | 'today' | 'week' | 'same_supplier' | 'same_work' | 'same_lote'
+type QuickFilterId = 'all' | 'overdue' | 'today' | 'week' | 'this_month' | 'next_month' | 'same_supplier' | 'same_work' | 'same_lote'
 type StatusHintTone = 'amber' | 'rose' | 'sky'
 type StatusHint = { text: string; tone: StatusHintTone }
 const CP_TABLE_GRID = 'grid grid-cols-[20px_2px_minmax(0,1.8fr)_minmax(0,1.45fr)_minmax(0,1fr)_70px_110px_72px_96px] items-center gap-x-3'
@@ -2250,6 +2250,12 @@ export default function CPPipeline() {
   const anchorCP = selectedInTab[0] ?? null
 
   const activeCPs = useMemo(() => {
+    const now = new Date()
+    const thisMonthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().slice(0, 10)
+    const thisMonthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().slice(0, 10)
+    const nextMonthStart = new Date(now.getFullYear(), now.getMonth() + 1, 1).toISOString().slice(0, 10)
+    const nextMonthEnd = new Date(now.getFullYear(), now.getMonth() + 2, 0).toISOString().slice(0, 10)
+
     switch (quickFilter) {
       case 'overdue':
         return stageCPs.filter(cp => getUrgency(cp) === 'overdue')
@@ -2257,6 +2263,10 @@ export default function CPPipeline() {
         return stageCPs.filter(cp => getUrgency(cp) === 'today')
       case 'week':
         return stageCPs.filter(cp => ['today', 'week'].includes(getUrgency(cp)))
+      case 'this_month':
+        return stageCPs.filter(cp => cp.data_vencimento >= thisMonthStart && cp.data_vencimento <= thisMonthEnd)
+      case 'next_month':
+        return stageCPs.filter(cp => cp.data_vencimento >= nextMonthStart && cp.data_vencimento <= nextMonthEnd)
       case 'same_supplier':
         return anchorCP ? stageCPs.filter(cp => cp.fornecedor_nome === anchorCP.fornecedor_nome) : stageCPs
       case 'same_work':
@@ -2794,41 +2804,59 @@ export default function CPPipeline() {
           isDark ? 'border-white/[0.06] bg-gradient-to-r from-emerald-500/[0.03] to-transparent' : 'border-slate-100 bg-gradient-to-r from-emerald-50/50 to-transparent'
         }`}>
           {/* Stat pills — clickable quick filters */}
-          {[
-            { id: 'all' as QuickFilterId, label: 'Total', count: stageCPs.length, value: stageCPs.reduce((s, c) => s + c.valor_original, 0), icon: Receipt, color: 'emerald' },
-            { id: 'overdue' as QuickFilterId, label: 'Vencidos', count: stageCPs.filter(cp => getUrgency(cp) === 'overdue').length, value: stageCPs.filter(cp => getUrgency(cp) === 'overdue').reduce((s, c) => s + c.valor_original, 0), icon: AlertTriangle, color: 'red' },
-            { id: 'today' as QuickFilterId, label: 'Hoje', count: stageCPs.filter(cp => getUrgency(cp) === 'today').length, value: stageCPs.filter(cp => getUrgency(cp) === 'today').reduce((s, c) => s + c.valor_original, 0), icon: Clock, color: 'amber' },
-            { id: 'week' as QuickFilterId, label: '7 dias', count: stageCPs.filter(cp => ['today', 'week'].includes(getUrgency(cp))).length, value: stageCPs.filter(cp => ['today', 'week'].includes(getUrgency(cp))).reduce((s, c) => s + c.valor_original, 0), icon: Calendar, color: 'blue' },
-          ].map(stat => {
-            const active = quickFilter === stat.id
-            const StatIcon = stat.icon
+          {(() => {
+            const now = new Date()
+            const mStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().slice(0, 10)
+            const mEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().slice(0, 10)
+            const nStart = new Date(now.getFullYear(), now.getMonth() + 1, 1).toISOString().slice(0, 10)
+            const nEnd = new Date(now.getFullYear(), now.getMonth() + 2, 0).toISOString().slice(0, 10)
+            const mesAtualLabel = now.toLocaleDateString('pt-BR', { month: 'short' }).replace('.', '').toUpperCase()
+            const proxMesLabel = new Date(now.getFullYear(), now.getMonth() + 1, 1).toLocaleDateString('pt-BR', { month: 'short' }).replace('.', '').toUpperCase()
+
+            const stats: { id: QuickFilterId; label: string; count: number; value: number; icon: typeof Receipt; color: string }[] = [
+              { id: 'all', label: 'Total', count: stageCPs.length, value: stageCPs.reduce((s, c) => s + c.valor_original, 0), icon: Receipt, color: 'emerald' },
+              { id: 'overdue', label: 'Vencidos', count: stageCPs.filter(cp => getUrgency(cp) === 'overdue').length, value: stageCPs.filter(cp => getUrgency(cp) === 'overdue').reduce((s, c) => s + c.valor_original, 0), icon: AlertTriangle, color: 'red' },
+              { id: 'today', label: 'Hoje', count: stageCPs.filter(cp => getUrgency(cp) === 'today').length, value: stageCPs.filter(cp => getUrgency(cp) === 'today').reduce((s, c) => s + c.valor_original, 0), icon: Clock, color: 'amber' },
+              { id: 'week', label: '7 dias', count: stageCPs.filter(cp => ['today', 'week'].includes(getUrgency(cp))).length, value: stageCPs.filter(cp => ['today', 'week'].includes(getUrgency(cp))).reduce((s, c) => s + c.valor_original, 0), icon: Calendar, color: 'blue' },
+              { id: 'this_month', label: mesAtualLabel, count: stageCPs.filter(cp => cp.data_vencimento >= mStart && cp.data_vencimento <= mEnd).length, value: stageCPs.filter(cp => cp.data_vencimento >= mStart && cp.data_vencimento <= mEnd).reduce((s, c) => s + c.valor_original, 0), icon: Calendar, color: 'violet' },
+              { id: 'next_month', label: proxMesLabel, count: stageCPs.filter(cp => cp.data_vencimento >= nStart && cp.data_vencimento <= nEnd).length, value: stageCPs.filter(cp => cp.data_vencimento >= nStart && cp.data_vencimento <= nEnd).reduce((s, c) => s + c.valor_original, 0), icon: Calendar, color: 'indigo' },
+            ]
+
             const colors: Record<string, { activeBg: string; activeBorder: string; activeText: string; countBg: string; idleBg: string; idleBorder: string; idleText: string }> = {
               emerald: { activeBg: isDark ? 'bg-emerald-500/15' : 'bg-emerald-50', activeBorder: isDark ? 'border-emerald-400/30 ring-1 ring-emerald-400/20' : 'border-emerald-200 ring-1 ring-emerald-200/50', activeText: isDark ? 'text-emerald-300' : 'text-emerald-700', countBg: isDark ? 'bg-emerald-500/20 text-emerald-200' : 'bg-emerald-100 text-emerald-700', idleBg: isDark ? 'bg-white/[0.02]' : 'bg-white', idleBorder: isDark ? 'border-white/[0.06]' : 'border-slate-200', idleText: isDark ? 'text-slate-400' : 'text-slate-500' },
               red: { activeBg: isDark ? 'bg-red-500/15' : 'bg-red-50', activeBorder: isDark ? 'border-red-400/30 ring-1 ring-red-400/20' : 'border-red-200 ring-1 ring-red-200/50', activeText: isDark ? 'text-red-300' : 'text-red-700', countBg: isDark ? 'bg-red-500/20 text-red-200' : 'bg-red-100 text-red-700', idleBg: isDark ? 'bg-white/[0.02]' : 'bg-white', idleBorder: isDark ? 'border-white/[0.06]' : 'border-slate-200', idleText: isDark ? 'text-slate-400' : 'text-slate-500' },
               amber: { activeBg: isDark ? 'bg-amber-500/15' : 'bg-amber-50', activeBorder: isDark ? 'border-amber-400/30 ring-1 ring-amber-400/20' : 'border-amber-200 ring-1 ring-amber-200/50', activeText: isDark ? 'text-amber-300' : 'text-amber-700', countBg: isDark ? 'bg-amber-500/20 text-amber-200' : 'bg-amber-100 text-amber-700', idleBg: isDark ? 'bg-white/[0.02]' : 'bg-white', idleBorder: isDark ? 'border-white/[0.06]' : 'border-slate-200', idleText: isDark ? 'text-slate-400' : 'text-slate-500' },
               blue: { activeBg: isDark ? 'bg-blue-500/15' : 'bg-blue-50', activeBorder: isDark ? 'border-blue-400/30 ring-1 ring-blue-400/20' : 'border-blue-200 ring-1 ring-blue-200/50', activeText: isDark ? 'text-blue-300' : 'text-blue-700', countBg: isDark ? 'bg-blue-500/20 text-blue-200' : 'bg-blue-100 text-blue-700', idleBg: isDark ? 'bg-white/[0.02]' : 'bg-white', idleBorder: isDark ? 'border-white/[0.06]' : 'border-slate-200', idleText: isDark ? 'text-slate-400' : 'text-slate-500' },
+              violet: { activeBg: isDark ? 'bg-violet-500/15' : 'bg-violet-50', activeBorder: isDark ? 'border-violet-400/30 ring-1 ring-violet-400/20' : 'border-violet-200 ring-1 ring-violet-200/50', activeText: isDark ? 'text-violet-300' : 'text-violet-700', countBg: isDark ? 'bg-violet-500/20 text-violet-200' : 'bg-violet-100 text-violet-700', idleBg: isDark ? 'bg-white/[0.02]' : 'bg-white', idleBorder: isDark ? 'border-white/[0.06]' : 'border-slate-200', idleText: isDark ? 'text-slate-400' : 'text-slate-500' },
+              indigo: { activeBg: isDark ? 'bg-indigo-500/15' : 'bg-indigo-50', activeBorder: isDark ? 'border-indigo-400/30 ring-1 ring-indigo-400/20' : 'border-indigo-200 ring-1 ring-indigo-200/50', activeText: isDark ? 'text-indigo-300' : 'text-indigo-700', countBg: isDark ? 'bg-indigo-500/20 text-indigo-200' : 'bg-indigo-100 text-indigo-700', idleBg: isDark ? 'bg-white/[0.02]' : 'bg-white', idleBorder: isDark ? 'border-white/[0.06]' : 'border-slate-200', idleText: isDark ? 'text-slate-400' : 'text-slate-500' },
             }
-            const c = colors[stat.color]
-            if (stat.count === 0 && stat.id !== 'all') return null
-            return (
-              <button
-                key={stat.id}
-                onClick={() => setQuickFilter(active ? 'all' : stat.id)}
-                className={`group flex items-center gap-2.5 rounded-2xl border px-3.5 py-2 transition-all duration-200 hover:scale-[1.02] ${
-                  active ? `${c.activeBg} ${c.activeBorder} ${c.activeText}` : `${c.idleBg} ${c.idleBorder} ${c.idleText} hover:shadow-sm`
-                }`}
-              >
-                <StatIcon size={13} className={`shrink-0 ${active ? '' : 'opacity-50 group-hover:opacity-80'}`} />
-                <div className="text-left">
-                  <p className={`text-[10px] font-semibold uppercase tracking-wider leading-none ${active ? '' : 'opacity-70'}`}>{stat.label}</p>
-                  <p className={`text-sm font-extrabold tabular-nums leading-tight mt-0.5 ${active ? '' : isDark ? 'text-slate-200' : 'text-slate-700'}`}>{fmt(stat.value)}</p>
-                </div>
-                <span className={`ml-1 text-[10px] font-bold rounded-full px-1.5 py-0.5 min-w-[20px] text-center ${active ? c.countBg : isDark ? 'bg-white/[0.06] text-slate-400' : 'bg-slate-100 text-slate-500'}`}>
-                  {stat.count}
-                </span>
-              </button>
-            )
-          })}
+
+            return stats.map(stat => {
+              const active = quickFilter === stat.id
+              const StatIcon = stat.icon
+              const c = colors[stat.color]
+              const dimmed = stat.count === 0 && stat.id !== 'all'
+              return (
+                <button
+                  key={stat.id}
+                  onClick={() => !dimmed && setQuickFilter(active ? 'all' : stat.id)}
+                  className={`group flex items-center gap-2.5 rounded-2xl border px-3.5 py-2 transition-all duration-200 ${
+                    dimmed ? `opacity-40 cursor-default ${c.idleBg} ${c.idleBorder} ${c.idleText}` :
+                    active ? `${c.activeBg} ${c.activeBorder} ${c.activeText} hover:scale-[1.02]` : `${c.idleBg} ${c.idleBorder} ${c.idleText} hover:shadow-sm hover:scale-[1.02]`
+                  }`}
+                >
+                  <StatIcon size={13} className={`shrink-0 ${active ? '' : 'opacity-50 group-hover:opacity-80'}`} />
+                  <div className="text-left">
+                    <p className={`text-[10px] font-semibold uppercase tracking-wider leading-none ${active ? '' : 'opacity-70'}`}>{stat.label}</p>
+                    <p className={`text-sm font-extrabold tabular-nums leading-tight mt-0.5 ${active ? '' : isDark ? 'text-slate-200' : 'text-slate-700'}`}>{fmt(stat.value)}</p>
+                  </div>
+                  <span className={`ml-1 text-[10px] font-bold rounded-full px-1.5 py-0.5 min-w-[20px] text-center ${active ? c.countBg : isDark ? 'bg-white/[0.06] text-slate-400' : 'bg-slate-100 text-slate-500'}`}>
+                    {stat.count}
+                  </span>
+                </button>
+              )
+            })
+          })()}
 
           {/* Anchor-based contextual filters */}
           {anchorCP && (
