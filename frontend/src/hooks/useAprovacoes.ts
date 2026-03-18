@@ -270,7 +270,7 @@ export function useAprovacoesPendentes(tipo?: TipoAprovacao) {
             if (allEntityIds.length > 0) {
               const { data: aprHistData } = await supabase
                 .from('apr_aprovacoes')
-                .select('entidade_id, tipo_aprovacao, aprovador_nome, status, data_decisao, observacao, nivel')
+                .select('entidade_id, tipo_aprovacao, aprovador_nome, status, data_decisao, observacao, nivel, created_at')
                 .in('entidade_id', allEntityIds)
                 .neq('status', 'pendente')
               for (const a of aprHistData ?? []) {
@@ -457,17 +457,27 @@ export function useAprovacoesPendentes(tipo?: TipoAprovacao) {
                       // RC criada
                       if (rc?.created_at) events.push({ tipo: 'rc_criada', label: `RC ${(rc.numero as string) ?? ''} criada`, ator: (rc.solicitante_nome as string) ?? undefined, data: (rc.created_at as string) })
 
-                      // Aprovações da RC
-                      const rcAprs = rcId ? (aprByEntity.get(rcId) ?? []).filter(a => (a.tipo_aprovacao as string) === 'requisicao_compra') : []
-                      for (const apr of rcAprs) events.push({ tipo: 'aprovacao', label: 'RC aprovada', ator: (apr.aprovador_nome as string) ?? undefined, data: (apr.data_decisao as string) ?? '', status: (apr.status as string), nivel: (apr.nivel as number) })
+                      // Aprovações da RC (Validação Técnica) — filtrar inserts automáticos (diff < 1s)
+                      const rcAprs = rcId ? (aprByEntity.get(rcId) ?? []).filter(a => {
+                        if ((a.tipo_aprovacao as string) !== 'requisicao_compra') return false
+                        const created = new Date(a.created_at as string).getTime()
+                        const decided = new Date(a.data_decisao as string).getTime()
+                        return (decided - created) > 1000 // só registros com diff > 1s (decisão real)
+                      }) : []
+                      for (const apr of rcAprs) events.push({ tipo: 'aprovacao', label: 'Validação Técnica', ator: (apr.aprovador_nome as string) ?? undefined, data: (apr.data_decisao as string) ?? '', status: (apr.status as string), nivel: (apr.nivel as number) })
 
                       // Cotação concluída
                       const cot = rcId ? cotMap2.get(rcId) : undefined
                       if (cot?.data_conclusao) events.push({ tipo: 'cotacao_aprovada', label: `Cotação concluída — ${(cot.fornecedor_selecionado_nome as string) ?? ''}`, data: (cot.data_conclusao as string) })
 
-                      // Aprovações da cotação
-                      const cotAprs = rcId ? (aprByEntity.get(rcId) ?? []).filter(a => (a.tipo_aprovacao as string) === 'cotacao') : []
-                      for (const apr of cotAprs) events.push({ tipo: 'aprovacao', label: 'Cotação aprovada', ator: (apr.aprovador_nome as string) ?? undefined, data: (apr.data_decisao as string) ?? '', status: (apr.status as string), nivel: (apr.nivel as number) })
+                      // Aprovações da cotação (Aprovação de Compra) — filtrar inserts automáticos
+                      const cotAprs = rcId ? (aprByEntity.get(rcId) ?? []).filter(a => {
+                        if ((a.tipo_aprovacao as string) !== 'cotacao') return false
+                        const created = new Date(a.created_at as string).getTime()
+                        const decided = new Date(a.data_decisao as string).getTime()
+                        return (decided - created) > 1000
+                      }) : []
+                      for (const apr of cotAprs) events.push({ tipo: 'aprovacao', label: 'Aprovação de Compra', ator: (apr.aprovador_nome as string) ?? undefined, data: (apr.data_decisao as string) ?? '', status: (apr.status as string), nivel: (apr.nivel as number) })
 
                       // Pedido emitido
                       const ped = pedId ? pedMap.get(pedId) : undefined
