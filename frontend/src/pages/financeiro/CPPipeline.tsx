@@ -2861,33 +2861,38 @@ export default function CPPipeline() {
                 ? <span className="tabular-nums">{customDateFrom.split('-').reverse().slice(0,2).join('/')} — {customDateTo ? customDateTo.split('-').reverse().slice(0,2).join('/') : '...'}</span>
                 : 'Personalizado'}
             </button>
+            {/* Popover rendered as fixed overlay to escape overflow-hidden */}
             {showCustomDate && (
-              <div className={`absolute right-0 top-full mt-2 z-40 rounded-2xl border p-4 shadow-xl space-y-3 min-w-[280px] ${isDark ? 'bg-slate-900 border-white/[0.08]' : 'bg-white border-slate-200'}`}>
-                <p className={`text-[10px] font-bold uppercase tracking-wider ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Período personalizado</p>
-                <div className="flex items-center gap-2">
-                  <div className="flex-1">
-                    <label className={`text-[10px] font-medium mb-1 block ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>De</label>
-                    <input type="date" value={customDateFrom} onChange={e => setCustomDateFrom(e.target.value)}
-                      className={`w-full px-2.5 py-1.5 rounded-xl border text-xs ${isDark ? 'bg-white/[0.04] border-white/[0.06] text-slate-200' : 'border-slate-200 bg-white text-slate-700'}`} />
+              <>
+                <div className="fixed inset-0 z-50" onClick={() => setShowCustomDate(false)} />
+                <div className={`fixed z-50 rounded-2xl border p-4 shadow-2xl space-y-3 w-[300px] ${isDark ? 'bg-slate-900 border-white/[0.08]' : 'bg-white border-slate-200'}`}
+                  style={{ top: 'calc(50% - 100px)', left: 'calc(50% - 150px)' }}>
+                  <p className={`text-[10px] font-bold uppercase tracking-wider ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Período personalizado</p>
+                  <div className="flex items-center gap-2">
+                    <div className="flex-1">
+                      <label className={`text-[10px] font-medium mb-1 block ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>De</label>
+                      <input type="date" value={customDateFrom} onChange={e => setCustomDateFrom(e.target.value)}
+                        className={`w-full px-2.5 py-1.5 rounded-xl border text-xs ${isDark ? 'bg-slate-800 border-white/[0.1] text-slate-200' : 'border-slate-200 bg-white text-slate-700'}`} />
+                    </div>
+                    <div className="flex-1">
+                      <label className={`text-[10px] font-medium mb-1 block ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Até</label>
+                      <input type="date" value={customDateTo} onChange={e => setCustomDateTo(e.target.value)}
+                        className={`w-full px-2.5 py-1.5 rounded-xl border text-xs ${isDark ? 'bg-slate-800 border-white/[0.1] text-slate-200' : 'border-slate-200 bg-white text-slate-700'}`} />
+                    </div>
                   </div>
-                  <div className="flex-1">
-                    <label className={`text-[10px] font-medium mb-1 block ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Até</label>
-                    <input type="date" value={customDateTo} onChange={e => setCustomDateTo(e.target.value)}
-                      className={`w-full px-2.5 py-1.5 rounded-xl border text-xs ${isDark ? 'bg-white/[0.04] border-white/[0.06] text-slate-200' : 'border-slate-200 bg-white text-slate-700'}`} />
+                  <div className="flex items-center justify-between pt-1">
+                    <button onClick={() => { setCustomDateFrom(''); setCustomDateTo(''); setQuickFilter('all'); setShowCustomDate(false) }}
+                      className={`text-[11px] font-medium px-3 py-1.5 rounded-xl transition-all ${isDark ? 'text-slate-400 hover:bg-white/[0.04]' : 'text-slate-500 hover:bg-slate-50'}`}>
+                      Limpar
+                    </button>
+                    <button onClick={() => { setQuickFilter('custom'); setShowCustomDate(false) }}
+                      disabled={!customDateFrom && !customDateTo}
+                      className="text-[11px] font-bold px-4 py-1.5 rounded-xl bg-teal-600 text-white hover:bg-teal-700 transition-all shadow-sm disabled:opacity-40 disabled:cursor-not-allowed">
+                      Aplicar
+                    </button>
                   </div>
                 </div>
-                <div className="flex items-center justify-between">
-                  <button onClick={() => { setCustomDateFrom(''); setCustomDateTo(''); setQuickFilter('all'); setShowCustomDate(false) }}
-                    className={`text-[11px] font-medium px-3 py-1.5 rounded-xl transition-all ${isDark ? 'text-slate-400 hover:bg-white/[0.04]' : 'text-slate-500 hover:bg-slate-50'}`}>
-                    Limpar
-                  </button>
-                  <button onClick={() => { setQuickFilter('custom'); setShowCustomDate(false) }}
-                    disabled={!customDateFrom && !customDateTo}
-                    className="text-[11px] font-bold px-4 py-1.5 rounded-xl bg-teal-600 text-white hover:bg-teal-700 transition-all shadow-sm disabled:opacity-40 disabled:cursor-not-allowed">
-                    Aplicar
-                  </button>
-                </div>
-              </div>
+              </>
             )}
           </div>
 
