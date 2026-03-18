@@ -1,8 +1,8 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useRef, useCallback } from 'react'
 import {
   CreditCard, Link2, Unlink, Search, Upload,
   CheckCircle2, AlertCircle, ChevronDown, X,
-  RefreshCw, FileText, Clock, Check, Filter,
+  RefreshCw, FileText, Clock, Check, Filter, Loader2,
 } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
 import {
@@ -12,6 +12,7 @@ import {
   useItensFatura,
   useConciliarItem,
   useDesconciliarItem,
+  useUploadFatura,
 } from '../../hooks/useCartoes'
 import type {
   CartaoCredito, ApontamentoCartao, FaturaCartao, ItemFaturaCartao,
@@ -30,34 +31,183 @@ function diffPct(a: number, b: number) {
   return Math.abs((a - b) / b) * 100
 }
 
-// ── Fatura Upload Placeholder ─────────────────────────────────────────────────
+// ── Fatura Upload ─────────────────────────────────────────────────────────────
 
 function FaturaUploadCard({ cartaoId, isDark }: { cartaoId: string; isDark: boolean }) {
+  const [file, setFile]             = useState<File | null>(null)
+  const [drag, setDrag]             = useState(false)
+  const [dismissed, setDismissed]   = useState(false)
+  const fileRef                     = useRef<HTMLInputElement>(null)
+  const upload                      = useUploadFatura()
+
+  const defaultMonth = () => {
+    const d = new Date()
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+  }
+  const [mesReferencia, setMesReferencia] = useState(defaultMonth)
+
+  const handleDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault()
+    setDrag(false)
+    const f = e.dataTransfer.files[0]
+    if (f?.type === 'application/pdf') setFile(f)
+  }, [])
+
+  const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const f = e.target.files?.[0]
+    if (f?.type === 'application/pdf') setFile(f)
+    e.target.value = ''
+  }
+
+  async function handleUpload() {
+    if (!file) return
+    try {
+      await upload.mutateAsync({ cartaoId, mesReferencia, file })
+      setFile(null)
+    } catch {
+      // error displayed via upload.isError
+    }
+  }
+
+  if (dismissed) return null
+
+  const isPending = upload.isPending
+  const isSuccess = upload.isSuccess
+  const isError   = upload.isError
+
   return (
-    <div className={`rounded-2xl border-2 border-dashed p-5 flex flex-col items-center gap-3 text-center
-      ${isDark ? 'border-white/[0.08] text-slate-500' : 'border-slate-200 text-slate-400'}`}>
-      <div className={`w-12 h-12 rounded-xl flex items-center justify-center
-        ${isDark ? 'bg-white/[0.04]' : 'bg-slate-50'}`}>
-        <Upload size={22} className="text-emerald-500" />
+    <div className={`rounded-2xl border p-4 space-y-3
+      ${isDark ? 'border-white/[0.06] bg-white/[0.02]' : 'border-slate-200 bg-slate-50/60'}`}>
+
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <Upload size={14} className="text-emerald-500" />
+          <span className={`text-xs font-bold ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>
+            Upload de Fatura PDF
+          </span>
+        </div>
+        <button
+          onClick={() => setDismissed(true)}
+          className="text-slate-400 hover:text-slate-600 transition-colors"
+        >
+          <X size={13} />
+        </button>
       </div>
+
+      {/* Mês de referência */}
       <div>
-        <p className={`text-sm font-semibold ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
-          Upload de Fatura
-        </p>
-        <p className="text-xs mt-0.5">
-          Envie o PDF da fatura — o n8n extrairá os lançamentos automaticamente
-        </p>
+        <label className={`text-[10px] font-bold uppercase tracking-wider mb-1 block
+          ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+          Mês de Referência
+        </label>
+        <input
+          type="month"
+          value={mesReferencia}
+          onChange={e => setMesReferencia(e.target.value)}
+          className={`w-full px-3 py-2 rounded-xl border text-xs
+            focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-400
+            ${isDark
+              ? 'bg-white/[0.03] border-white/[0.06] text-slate-200'
+              : 'bg-white border-slate-200 text-slate-700'}`}
+        />
       </div>
-      <button
-        className="px-4 py-2 rounded-xl bg-emerald-600 text-white text-xs font-bold
-          hover:bg-emerald-700 transition-all shadow-sm shadow-emerald-500/20"
-        onClick={() => alert('Upload de fatura via n8n — configure o webhook no módulo de integrações')}
+
+      {/* Drop zone */}
+      <div
+        onDragOver={e => { e.preventDefault(); setDrag(true) }}
+        onDragLeave={() => setDrag(false)}
+        onDrop={handleDrop}
+        onClick={() => !file && fileRef.current?.click()}
+        className={`rounded-xl border-2 border-dashed p-4 flex flex-col items-center gap-2
+          text-center cursor-pointer transition-all select-none
+          ${drag
+            ? isDark ? 'border-emerald-500/50 bg-emerald-500/5' : 'border-emerald-400 bg-emerald-50'
+            : file
+              ? isDark ? 'border-emerald-500/30 bg-emerald-500/5' : 'border-emerald-300 bg-emerald-50'
+              : isDark ? 'border-white/[0.08] hover:border-white/20' : 'border-slate-200 hover:border-emerald-300'
+          }`}
       >
-        <Upload size={12} className="inline mr-1.5" />
-        Enviar Fatura PDF
-      </button>
-      <p className="text-[10px] text-slate-500">
-        Integração automática via n8n · Webhook configurável
+        <input
+          ref={fileRef}
+          type="file"
+          accept="application/pdf"
+          className="hidden"
+          onChange={handleFile}
+        />
+
+        {file ? (
+          <>
+            <div className={`w-9 h-9 rounded-xl flex items-center justify-center
+              ${isDark ? 'bg-emerald-500/10' : 'bg-emerald-100'}`}>
+              <FileText size={18} className="text-emerald-500" />
+            </div>
+            <p className={`text-xs font-semibold truncate max-w-full px-2
+              ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>
+              {file.name}
+            </p>
+            <p className="text-[10px] text-slate-400">
+              {(file.size / 1024).toFixed(0)} KB · Clique para trocar
+            </p>
+          </>
+        ) : (
+          <>
+            <div className={`w-9 h-9 rounded-xl flex items-center justify-center
+              ${isDark ? 'bg-white/[0.04]' : 'bg-white'}`}>
+              <Upload size={18} className="text-slate-400" />
+            </div>
+            <p className={`text-xs font-semibold ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+              Arraste o PDF aqui ou clique para selecionar
+            </p>
+            <p className="text-[10px] text-slate-400">Apenas arquivos .pdf</p>
+          </>
+        )}
+      </div>
+
+      {/* Feedback */}
+      {isSuccess && (
+        <div className="flex items-center gap-2 rounded-xl px-3 py-2 bg-emerald-500/10 text-emerald-600 text-xs font-semibold">
+          <CheckCircle2 size={13} />
+          Fatura enviada! Os lançamentos serão extraídos pelo n8n em instantes.
+        </div>
+      )}
+      {isError && (
+        <div className="flex items-center gap-2 rounded-xl px-3 py-2 bg-red-500/10 text-red-500 text-xs font-semibold">
+          <AlertCircle size={13} />
+          Erro ao enviar fatura. Verifique a conexão e tente novamente.
+        </div>
+      )}
+
+      {/* Actions */}
+      <div className="flex items-center gap-2">
+        <button
+          onClick={handleUpload}
+          disabled={!file || isPending}
+          className="flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-xl
+            bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed
+            text-white text-xs font-bold transition-all shadow-sm shadow-emerald-500/20"
+        >
+          {isPending ? (
+            <><Loader2 size={12} className="animate-spin" /> Processando…</>
+          ) : (
+            <><Upload size={12} /> Enviar e Processar</>
+          )}
+        </button>
+        {file && !isPending && (
+          <button
+            onClick={() => setFile(null)}
+            className={`px-3 py-2 rounded-xl border text-xs font-semibold transition-colors
+              ${isDark
+                ? 'border-white/[0.06] text-slate-400 hover:text-slate-200'
+                : 'border-slate-200 text-slate-500 hover:text-slate-700'}`}
+          >
+            Limpar
+          </button>
+        )}
+      </div>
+
+      <p className={`text-[10px] text-center ${isDark ? 'text-slate-600' : 'text-slate-400'}`}>
+        Integração automática via n8n · Os itens aparecerão na coluna de faturas após o processamento
       </p>
     </div>
   )

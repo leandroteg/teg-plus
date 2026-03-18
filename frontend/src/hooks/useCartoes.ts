@@ -282,6 +282,50 @@ export function useConciliarItem() {
   })
 }
 
+// ── Upload de fatura PDF ───────────────────────────────────────────────────────
+
+export function useUploadFatura() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async ({
+      cartaoId,
+      mesReferencia,
+      file,
+    }: {
+      cartaoId: string
+      mesReferencia: string
+      file: File
+    }) => {
+      // 1. Upload do PDF para o Supabase Storage
+      const path = `faturas/${cartaoId}/${mesReferencia}_${Date.now()}.pdf`
+      const { error: uploadError } = await supabase.storage
+        .from('faturas-cartao')
+        .upload(path, file, { contentType: 'application/pdf', upsert: true })
+      if (uploadError) throw uploadError
+
+      // 2. URL pública do arquivo
+      const { data: { publicUrl } } = supabase.storage
+        .from('faturas-cartao')
+        .getPublicUrl(path)
+
+      // 3. Aciona o n8n para extrair os lançamentos da fatura
+      const N8N_URL = import.meta.env.VITE_N8N_WEBHOOK_URL || 'https://teg-agents-n8n.nmmcas.easypanel.host/webhook'
+      const res = await fetch(`${N8N_URL}/processar-fatura`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ cartao_id: cartaoId, mes_referencia: mesReferencia, fatura_url: publicUrl }),
+        signal: AbortSignal.timeout(60_000),
+      })
+      if (!res.ok) throw new Error('Falha ao processar fatura no n8n')
+      return res.json()
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['faturas-cartao'] })
+      qc.invalidateQueries({ queryKey: ['itens-fatura'] })
+    },
+  })
+}
+
 export function useDesconciliarItem() {
   const qc = useQueryClient()
   return useMutation({
