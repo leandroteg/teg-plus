@@ -27,6 +27,8 @@ export function useSolicitacoes(filtros?: {
 }) {
   return useQuery({
     queryKey: QK.solicitacoes(filtros),
+    staleTime: 120_000,
+    refetchOnWindowFocus: false,
     queryFn: async () => {
       let q = supabase
         .from('log_solicitacoes')
@@ -61,6 +63,8 @@ export function useSolicitacao(id: string | undefined) {
   return useQuery({
     queryKey: QK.solicitacao(id!),
     enabled: !!id,
+    staleTime: 120_000,
+    refetchOnWindowFocus: false,
     queryFn: async () => {
       const { data, error } = await supabase
         .from('log_solicitacoes')
@@ -259,6 +263,8 @@ export function useChecklistExpedicao(solicitacaoId: string | undefined) {
   return useQuery({
     queryKey: ['log_checklist', solicitacaoId],
     enabled: !!solicitacaoId,
+    staleTime: 120_000,
+    refetchOnWindowFocus: false,
     queryFn: async () => {
       const { data, error } = await supabase
         .from('log_checklists_expedicao')
@@ -298,6 +304,8 @@ export function useNFe(solicitacaoId: string | undefined) {
   return useQuery({
     queryKey: ['log_nfe', solicitacaoId],
     enabled: !!solicitacaoId,
+    staleTime: 120_000,
+    refetchOnWindowFocus: false,
     queryFn: async () => {
       const { data, error } = await supabase
         .from('log_nfe')
@@ -466,6 +474,8 @@ export function useSolicitarNFFiscal() {
 export function useTransportes() {
   return useQuery({
     queryKey: QK.transportes(),
+    staleTime: 120_000,
+    refetchOnWindowFocus: false,
     queryFn: async () => {
       const { data, error } = await supabase
         .from('log_transportes')
@@ -601,6 +611,8 @@ export function useResolverOcorrencia() {
 export function useRecebimentos(filtros?: { status?: string }) {
   return useQuery({
     queryKey: QK.recebimentos(filtros),
+    staleTime: 120_000,
+    refetchOnWindowFocus: false,
     queryFn: async () => {
       let q = supabase
         .from('log_recebimentos')
@@ -766,6 +778,8 @@ export function useRotas() {
 export function useLogisticaKPIs() {
   return useQuery({
     queryKey: QK.kpis(),
+    staleTime: 120_000,
+    refetchOnWindowFocus: false,
     queryFn: async () => {
       const hoje = new Date().toISOString().slice(0, 10)
 
