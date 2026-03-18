@@ -2759,42 +2759,46 @@ export default function CPPipeline() {
           Nova Solicitação
         </button>
         {showNovaMenu && (
-          <div ref={novaMenuRef} className={`absolute left-0 top-full z-[60] mt-2 w-[320px] rounded-3xl border p-2 shadow-2xl backdrop-blur-sm ${isDark ? 'border-white/[0.08] bg-slate-900/95' : 'border-slate-200 bg-white/95'}`}>
-            <button
-              type="button"
-              onClick={() => {
-                setNovaSolicitacaoKind('extraordinario')
-                setShowNovaSolicitacao(true)
-                setShowNovaMenu(false)
-              }}
-              className={`flex w-full items-start gap-3 rounded-[20px] px-4 py-3 text-left transition-all ${isDark ? 'hover:bg-white/[0.05]' : 'hover:bg-slate-50'}`}
-            >
-              <span className={`mt-0.5 flex h-10 w-10 items-center justify-center rounded-2xl ${isDark ? 'bg-amber-500/15 text-amber-300' : 'bg-amber-50 text-amber-600'}`}>
-                <Receipt size={16} />
-              </span>
-              <span>
-                <span className={`block text-sm font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>Pagamento Extraordinário</span>
-                <span className={`mt-1 block text-xs ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Solicitação manual urgente com entrada direta em Confirmados.</span>
-              </span>
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setNovaSolicitacaoKind('previsao')
-                setShowNovaSolicitacao(true)
-                setShowNovaMenu(false)
-              }}
-              className={`flex w-full items-start gap-3 rounded-[20px] px-4 py-3 text-left transition-all ${isDark ? 'hover:bg-white/[0.05]' : 'hover:bg-slate-50'}`}
-            >
-              <span className={`mt-0.5 flex h-10 w-10 items-center justify-center rounded-2xl ${isDark ? 'bg-emerald-500/15 text-emerald-300' : 'bg-emerald-50 text-emerald-600'}`}>
-                <Calendar size={16} />
-              </span>
-              <span>
-                <span className={`block text-sm font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>Previsão de Pagamento</span>
-                <span className={`mt-1 block text-xs ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Planejamento de despesas futuras com recorrência opcional.</span>
-              </span>
-            </button>
-          </div>
+          <>
+            <div className="fixed inset-0 z-50" onClick={() => setShowNovaMenu(false)} />
+            <div ref={novaMenuRef} className={`fixed z-50 w-[340px] rounded-3xl border p-2.5 shadow-2xl backdrop-blur-sm ${isDark ? 'border-white/[0.08] bg-slate-900/95' : 'border-slate-200 bg-white/95'}`}
+              style={{ top: 'calc(50% - 90px)', left: 'calc(50% - 170px)' }}>
+              <button
+                type="button"
+                onClick={() => {
+                  setNovaSolicitacaoKind('extraordinario')
+                  setShowNovaSolicitacao(true)
+                  setShowNovaMenu(false)
+                }}
+                className={`flex w-full items-start gap-3 rounded-[20px] px-4 py-3.5 text-left transition-all ${isDark ? 'hover:bg-white/[0.05]' : 'hover:bg-slate-50'}`}
+              >
+                <span className={`mt-0.5 flex h-10 w-10 items-center justify-center rounded-2xl shrink-0 ${isDark ? 'bg-amber-500/15 text-amber-300' : 'bg-amber-50 text-amber-600'}`}>
+                  <Receipt size={16} />
+                </span>
+                <span>
+                  <span className={`block text-sm font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>Pagamento Extraordinário</span>
+                  <span className={`mt-1 block text-xs leading-relaxed ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Solicitação manual urgente com entrada direta em Confirmados.</span>
+                </span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setNovaSolicitacaoKind('previsao')
+                  setShowNovaSolicitacao(true)
+                  setShowNovaMenu(false)
+                }}
+                className={`flex w-full items-start gap-3 rounded-[20px] px-4 py-3.5 text-left transition-all ${isDark ? 'hover:bg-white/[0.05]' : 'hover:bg-slate-50'}`}
+              >
+                <span className={`mt-0.5 flex h-10 w-10 items-center justify-center rounded-2xl shrink-0 ${isDark ? 'bg-emerald-500/15 text-emerald-300' : 'bg-emerald-50 text-emerald-600'}`}>
+                  <Calendar size={16} />
+                </span>
+                <span>
+                  <span className={`block text-sm font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>Previsão de Pagamento</span>
+                  <span className={`mt-1 block text-xs leading-relaxed ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Planejamento de despesas futuras com recorrência opcional.</span>
+                </span>
+              </button>
+            </div>
+          </>
         )}
         </div>
       </div>
