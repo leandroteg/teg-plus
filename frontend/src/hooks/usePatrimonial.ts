@@ -67,6 +67,7 @@ export function useSalvarImobilizado() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['pat-imobilizados'] })
       qc.invalidateQueries({ queryKey: ['pat-imobilizado'] })
+      qc.invalidateQueries({ queryKey: ['pat-kpis'] })
     },
   })
 }

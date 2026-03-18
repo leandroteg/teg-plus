@@ -61,6 +61,8 @@ export default function Patrimonial({
   const [showBaixaModal, setShowBaixaModal] = useState<string | null>(null)
   const [motivoBaixa, setMotivoBaixa] = useState('')
   const [viewMode, setViewMode] = useState<ViewMode>('cards')
+  const [showDepreciarModal, setShowDepreciarModal] = useState(false)
+  const [depreciarCompetencia, setDepreciarCompetencia] = useState(COMPETENCIA)
 
   const filtroAtivo = forcedStatusFiltro ?? statusFiltro
   const { data: imobs = [], isLoading } = useImobilizados(
@@ -128,7 +130,7 @@ export default function Patrimonial({
           </div>
           <div className="flex gap-2">
             <button
-              onClick={() => calcDeprec.mutate(COMPETENCIA)}
+              onClick={() => { setDepreciarCompetencia(COMPETENCIA); setShowDepreciarModal(true) }}
               disabled={calcDeprec.isPending}
               title={`Calcular deprecia\u00e7\u00e3o ${COMPETENCIA}`}
               className={`flex items-center gap-1.5 border text-sm font-semibold px-3 py-2 rounded-xl transition-colors
@@ -294,6 +296,65 @@ export default function Patrimonial({
           saving={salvar.isPending}
           isLight={isLight}
         />
+      )}
+
+      {/* -- Modal Depreciar ---------------------------------------- */}
+      {showDepreciarModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+          <div className={`rounded-2xl shadow-2xl w-full max-w-sm ${isLight ? 'bg-white' : 'bg-[#111827]'}`}>
+            <div className={`flex items-center justify-between px-6 py-4 border-b ${isLight ? 'border-slate-100' : 'border-white/[0.06]'}`}>
+              <h2 className={`text-lg font-extrabold ${isLight ? 'text-slate-800' : 'text-white'}`}>{'Calcular Deprecia\u00e7\u00e3o'}</h2>
+              <button
+                onClick={() => setShowDepreciarModal(false)}
+                className={`w-8 h-8 rounded-lg flex items-center justify-center ${isLight ? 'hover:bg-slate-100 text-slate-500' : 'hover:bg-white/[0.06] text-slate-400'}`}
+              >
+                <X size={16} />
+              </button>
+            </div>
+            <div className="p-6 space-y-4">
+              <p className={`text-sm ${isLight ? 'text-slate-600' : 'text-slate-300'}`}>
+                {'Ser\u00e3o calculadas e registradas as deprecia\u00e7\u00f5es mensais de todos os imobilizados ativos, em manuten\u00e7\u00e3o e cedidos.'}
+              </p>
+              <div>
+                <label className={`block text-xs font-bold mb-1 ${labelCls}`}>{'Compet\u00eancia (AAAA-MM)'}</label>
+                <input
+                  type="month"
+                  value={depreciarCompetencia}
+                  onChange={e => setDepreciarCompetencia(e.target.value)}
+                  className={inputCls}
+                />
+              </div>
+              {kpis && (
+                <div className={`rounded-xl p-3 text-xs space-y-1 ${isLight ? 'bg-amber-50 border border-amber-100' : 'bg-amber-500/10 border border-amber-500/20'}`}>
+                  <p className={`font-bold ${isLight ? 'text-amber-700' : 'text-amber-400'}`}>{'Imobilizados elegíveis: '}<span className="font-extrabold">{kpis.total_imobilizados}</span></p>
+                  <p className={isLight ? 'text-amber-600' : 'text-amber-300'}>{'Deprecia\u00e7\u00e3o estimada: '}<span className="font-bold">{kpis.depreciacao_mensal.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span></p>
+                </div>
+              )}
+            </div>
+            <div className={`px-6 py-4 border-t flex justify-end gap-2 ${isLight ? 'border-slate-100' : 'border-white/[0.06]'}`}>
+              <button
+                onClick={() => setShowDepreciarModal(false)}
+                className={`px-4 py-2 rounded-xl border text-sm font-semibold transition-colors
+                  ${isLight ? 'border-slate-200 text-slate-600 hover:bg-slate-50' : 'border-white/[0.08] text-slate-400 hover:bg-white/[0.04]'}`}
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={() => {
+                  calcDeprec.mutate(depreciarCompetencia, {
+                    onSuccess: () => setShowDepreciarModal(false),
+                  })
+                }}
+                disabled={calcDeprec.isPending || !depreciarCompetencia}
+                className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-amber-600 hover:bg-amber-700
+                  text-white text-sm font-semibold transition-colors disabled:opacity-60"
+              >
+                {calcDeprec.isPending ? <Loader2 size={14} className="animate-spin" /> : <TrendingDown size={14} />}
+                {'Confirmar Deprecia\u00e7\u00e3o'}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* -- Modal Baixa -------------------------------------------- */}
