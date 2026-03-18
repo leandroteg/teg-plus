@@ -1,12 +1,13 @@
 import { useState, useMemo, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
-  CheckCircle, XCircle, ChevronDown, ChevronRight,
+  CheckCircle, XCircle, ChevronDown, ChevronRight, ChevronUp,
   Clock, Building, Sparkles, Shield, AlertTriangle,
   MessageSquare, ExternalLink, ArrowLeft,
   FileSearch, Banknote, FileSignature, ShoppingCart,
   History, ListChecks, Timer, TrendingUp, Filter,
   Calendar, FileText, Download, Eye, HelpCircle,
+  Paperclip, Square, CheckSquare, Package,
 } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../services/supabase'
@@ -394,10 +395,14 @@ function GenericPendingCard({ aprovacao, aprovadorNome, aprovadorEmail }: {
   aprovadorNome: string
   aprovadorEmail: string
 }) {
+  const { perfil } = useAuth()
   const mutation = useDecisaoGenerica()
   const [expanded, setExpanded] = useState(false)
   const [observacao, setObservacao] = useState('')
   const [action, setAction] = useState<'aprovada' | 'rejeitada' | null>(null)
+  const [selectedItemIds, setSelectedItemIds] = useState<Set<string>>(
+    new Set(aprovacao.pagamento_detalhes?.itens?.map(i => i.id) ?? [])
+  )
 
   const tipo = tipoConfig[aprovacao.tipo_aprovacao] || tipoConfig.requisicao_compra
   const IconComp = tipo.icon
@@ -417,6 +422,23 @@ function GenericPendingCard({ aprovacao, aprovadorNome, aprovadorEmail }: {
         aprovadorNome,
         aprovadorEmail,
       })
+
+      // After generic approval succeeds, apply per-item decisions for lotes
+      if (decisao === 'aprovada' && aprovacao.pagamento_detalhes?.is_lote && aprovacao.pagamento_detalhes.itens?.length) {
+        const allItems = aprovacao.pagamento_detalhes.itens
+        for (const item of allItems) {
+          const itemDecisao = selectedItemIds.has(item.id) ? 'aprovado' : 'rejeitado'
+          await supabase
+            .from('fin_lote_itens')
+            .update({
+              decisao: itemDecisao,
+              decidido_por: perfil?.nome ?? aprovadorNome ?? 'Aprovador',
+              decidido_em: new Date().toISOString(),
+            })
+            .eq('lote_id', aprovacao.entidade_id)
+            .eq('cp_id', item.id)
+        }
+      }
     } catch { /* error handled by mutation state */ }
   }
 
@@ -448,6 +470,11 @@ function GenericPendingCard({ aprovacao, aprovadorNome, aprovadorEmail }: {
           {aprovacao.entidade_numero && (
             <span className="text-white/60 text-[10px]">{aprovacao.entidade_numero}</span>
           )}
+          {aprovacao.pagamento_detalhes?.is_lote === true && (
+            <span className="text-[10px] font-bold bg-white/20 text-white px-1.5 py-0.5 rounded-full ml-1">
+              LOTE · {aprovacao.pagamento_detalhes.qtd_itens} itens
+            </span>
+          )}
         </div>
         {aprovacao.data_limite && (
           <span className="text-[10px] text-white/70 font-semibold flex items-center gap-1">
@@ -470,7 +497,11 @@ function GenericPendingCard({ aprovacao, aprovadorNome, aprovadorEmail }: {
             referencia={aprovacao.requisicao?.numero ?? aprovacao.entidade_numero}
           />
         ) : aprovacao.tipo_aprovacao === 'autorizacao_pagamento' && aprovacao.pagamento_detalhes ? (
-          <PagamentoDetalhesCard detalhes={aprovacao.pagamento_detalhes} />
+          <PagamentoDetalhesCard
+            detalhes={aprovacao.pagamento_detalhes}
+            selectedItemIds={selectedItemIds}
+            setSelectedItemIds={setSelectedItemIds}
+          />
         ) : aprovacao.tipo_aprovacao === 'autorizacao_pagamento' && aprovacao.requisicao ? (
           <div className="space-y-2">
             <div className="bg-slate-50 rounded-xl p-3 space-y-1.5">
@@ -575,10 +606,13 @@ function GenericPendingCard({ aprovacao, aprovadorNome, aprovadorEmail }: {
 
 // ── Issue #35: Pagamento Detalhes Card ────────────────────────────────────────
 
-function PagamentoDetalhesCard({ detalhes }: {
+function PagamentoDetalhesCard({ detalhes, selectedItemIds, setSelectedItemIds }: {
   detalhes: NonNullable<AprovacaoPendente['pagamento_detalhes']>
+  selectedItemIds?: Set<string>
+  setSelectedItemIds?: React.Dispatch<React.SetStateAction<Set<string>>>
 }) {
   const [showEntender, setShowEntender] = useState(false)
+  const [showItens, setShowItens] = useState(false)
   const fmtDate = (d: string) => {
     if (!d) return '—'
     const dt = new Date(d.length === 10 ? d + 'T00:00:00' : d)
@@ -586,6 +620,239 @@ function PagamentoDetalhesCard({ detalhes }: {
   }
   const isVencida = detalhes.data_vencimento && new Date(detalhes.data_vencimento) < new Date()
 
+  const anexoIcon = (tipo: string) => {
+    switch (tipo) {
+      case 'nota_fiscal': return '📄'
+      case 'contrato': return '📋'
+      case 'comprovante': return '🧾'
+      default: return '📎'
+    }
+  }
+
+  const toggleItem = (id: string) => {
+    if (!setSelectedItemIds) return
+    setSelectedItemIds(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  const selectAll = () => {
+    if (!setSelectedItemIds || !detalhes.itens) return
+    setSelectedItemIds(new Set(detalhes.itens.map(i => i.id)))
+  }
+
+  const deselectAll = () => {
+    if (!setSelectedItemIds) return
+    setSelectedItemIds(new Set())
+  }
+
+  // ── Lote layout ──
+  if (detalhes.is_lote && detalhes.itens?.length) {
+    const itens = detalhes.itens
+    const totalItens = itens.length
+    const aprovados = detalhes.aprovados ?? 0
+    const excluidos = detalhes.excluidos ?? 0
+    const pendentes = totalItens - aprovados - excluidos
+    const selectedCount = selectedItemIds?.size ?? totalItens
+
+    // Fornecedores summary: group by fornecedor_nome with summed values
+    const fornecedorMap = new Map<string, number>()
+    for (const item of itens) {
+      const nome = item.fornecedor_nome || 'Sem fornecedor'
+      fornecedorMap.set(nome, (fornecedorMap.get(nome) ?? 0) + item.valor_original)
+    }
+    const fornecedores = Array.from(fornecedorMap.entries()).sort((a, b) => b[1] - a[1])
+
+    return (
+      <div className="space-y-2.5">
+        {/* Header: lote badge + itens count */}
+        <div className="flex items-center gap-2">
+          {detalhes.lote_numero && (
+            <span className="text-[10px] font-bold bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full">
+              {detalhes.lote_numero}
+            </span>
+          )}
+          <span className="text-[10px] font-bold bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full">
+            LOTE · {totalItens} itens
+          </span>
+        </div>
+
+        {/* Valor total */}
+        <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 flex justify-between items-center">
+          <span className="text-xs font-medium text-amber-700">Valor Total do Lote</span>
+          <span className="text-lg font-extrabold text-amber-700">
+            {fmt(detalhes.valor_original)}
+          </span>
+        </div>
+
+        {/* Progress bar */}
+        {(aprovados > 0 || excluidos > 0) && (
+          <div className="bg-slate-50 rounded-xl p-3 space-y-1.5">
+            <div className="flex items-center gap-2 mb-1">
+              <Package size={13} className="text-slate-500" />
+              <span className="text-[11px] font-bold text-slate-600 uppercase tracking-wider">Progresso</span>
+            </div>
+            <div className="w-full h-2.5 rounded-full bg-slate-200 overflow-hidden flex">
+              {aprovados > 0 && (
+                <div className="bg-emerald-500 h-full" style={{ width: `${(aprovados / totalItens) * 100}%` }} />
+              )}
+              {excluidos > 0 && (
+                <div className="bg-red-400 h-full" style={{ width: `${(excluidos / totalItens) * 100}%` }} />
+              )}
+              {pendentes > 0 && (
+                <div className="bg-slate-300 h-full" style={{ width: `${(pendentes / totalItens) * 100}%` }} />
+              )}
+            </div>
+            <div className="flex gap-3 text-[10px] font-medium">
+              {aprovados > 0 && <span className="text-emerald-600">● {aprovados} aprovados</span>}
+              {excluidos > 0 && <span className="text-red-500">● {excluidos} excluidos</span>}
+              {pendentes > 0 && <span className="text-slate-500">● {pendentes} pendentes</span>}
+            </div>
+          </div>
+        )}
+
+        {/* Fornecedores summary */}
+        <div className="bg-slate-50 rounded-xl p-3 space-y-1">
+          <span className="text-[11px] font-bold text-slate-600 uppercase tracking-wider">Fornecedores</span>
+          {fornecedores.map(([nome, valor]) => (
+            <div key={nome} className="flex justify-between text-xs">
+              <span className="text-slate-600 truncate mr-2">{nome}</span>
+              <span className="text-slate-800 font-semibold whitespace-nowrap">{fmt(valor)}</span>
+            </div>
+          ))}
+        </div>
+
+        {/* Expandable items */}
+        <button
+          type="button"
+          onClick={() => setShowItens(!showItens)}
+          className="flex items-center gap-1.5 text-[11px] text-indigo-500 hover:text-indigo-700 font-semibold transition-colors"
+        >
+          {showItens ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+          {showItens ? 'Ocultar itens' : `Ver ${totalItens} itens`}
+        </button>
+
+        {showItens && (
+          <div className="space-y-2">
+            {/* Selection counter */}
+            <div className="flex items-center justify-between text-[11px]">
+              <span className="text-slate-500 font-medium">
+                {selectedCount} de {totalItens} selecionados
+              </span>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={selectAll}
+                  className="text-indigo-500 hover:text-indigo-700 font-semibold"
+                >
+                  Selecionar todos
+                </button>
+                <button
+                  type="button"
+                  onClick={deselectAll}
+                  className="text-slate-400 hover:text-slate-600 font-semibold"
+                >
+                  Limpar
+                </button>
+              </div>
+            </div>
+
+            {/* Item list */}
+            <div className="space-y-1.5 max-h-72 overflow-y-auto">
+              {itens.map(item => {
+                const checked = selectedItemIds?.has(item.id) ?? true
+                return (
+                  <div
+                    key={item.id}
+                    className={`rounded-xl border p-2.5 cursor-pointer transition-colors ${
+                      checked
+                        ? 'bg-white border-emerald-200 hover:bg-emerald-50/30'
+                        : 'bg-slate-50 border-slate-200 hover:bg-slate-100/50 opacity-60'
+                    }`}
+                    onClick={() => toggleItem(item.id)}
+                  >
+                    <div className="flex items-start gap-2">
+                      <div className="mt-0.5 flex-shrink-0">
+                        {checked
+                          ? <CheckSquare size={16} className="text-emerald-500" />
+                          : <Square size={16} className="text-slate-300" />}
+                      </div>
+                      <div className="flex-1 min-w-0 space-y-0.5">
+                        <div className="flex justify-between items-start gap-2">
+                          <span className="text-xs font-semibold text-slate-800 truncate">
+                            {item.fornecedor_nome || '—'}
+                          </span>
+                          <span className="text-xs font-bold text-amber-700 whitespace-nowrap">
+                            {fmt(item.valor_original)}
+                          </span>
+                        </div>
+                        {(item.requisicao_numero || item.solicitante_nome) && (
+                          <div className="flex gap-2 text-[10px] text-slate-400">
+                            {item.requisicao_numero && <span>Req: {item.requisicao_numero}</span>}
+                            {item.solicitante_nome && <span>• {item.solicitante_nome}</span>}
+                          </div>
+                        )}
+                        {(item.requisicao_descricao || item.requisicao_justificativa) && (
+                          <p className="text-[10px] text-slate-500 italic leading-snug line-clamp-2">
+                            {item.requisicao_descricao || item.requisicao_justificativa}
+                          </p>
+                        )}
+                        {item.anexos && item.anexos.length > 0 && (
+                          <div className="flex gap-1.5 mt-0.5">
+                            {item.anexos.map((anexo, idx) => (
+                              <a
+                                key={idx}
+                                href={anexo.url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                onClick={e => e.stopPropagation()}
+                                title={anexo.nome || anexo.tipo}
+                                className="text-sm hover:scale-110 transition-transform"
+                              >
+                                {anexoIcon(anexo.tipo)}
+                              </a>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* Entender esta autorizacao */}
+        <button
+          type="button"
+          onClick={() => setShowEntender(!showEntender)}
+          className="flex items-center gap-1.5 text-[11px] text-indigo-500 hover:text-indigo-700 font-semibold transition-colors"
+        >
+          <HelpCircle size={12} />
+          {showEntender ? 'Ocultar explicacao' : 'Entender esta autorizacao'}
+        </button>
+        {showEntender && (
+          <div className="bg-indigo-50/60 border border-indigo-100 rounded-xl p-3 text-xs text-indigo-800 leading-relaxed">
+            <p>
+              Este e um <strong>Lote de Pagamento</strong> com <strong>{totalItens} itens</strong> no
+              valor total de <strong>{fmt(detalhes.valor_original)}</strong>.
+              Voce pode aprovar todos os itens ou desmarcar itens individuais para aprova-los parcialmente.
+              Itens desmarcados serao rejeitados automaticamente.
+            </p>
+            <p className="mt-1.5">
+              Ao aprovar, somente os itens selecionados seguirao para pagamento. Ao rejeitar, todo o lote voltara para revisao.
+            </p>
+          </div>
+        )}
+      </div>
+    )
+  }
+
+  // ── Individual CP layout (original) ──
   return (
     <div className="space-y-2.5">
       {/* Valor destaque */}

@@ -188,6 +188,11 @@ export interface AprovacaoPendente extends Aprovacao {
       valor_original: number
       data_vencimento: string
       decisao?: string
+      requisicao_numero?: string
+      requisicao_descricao?: string
+      requisicao_justificativa?: string
+      solicitante_nome?: string
+      anexos?: { nome: string, url: string, tipo: string, mime_type?: string }[]
     }[]
   }
 }
