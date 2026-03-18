@@ -2810,99 +2810,70 @@ export default function CPPipeline() {
       {/* ══ Content panel ══ */}
       <div className={`rounded-2xl border overflow-hidden ${isDark ? 'bg-[#0f172a] border-white/[0.06]' : 'bg-white border-slate-200'}`}>
 
-        {/* ── Camada 1: Hero Stats Bar ── */}
-        <div className={`px-4 py-3 border-b flex flex-wrap items-center gap-2 ${
-          isDark ? 'border-white/[0.06] bg-gradient-to-r from-emerald-500/[0.03] to-transparent' : 'border-slate-100 bg-gradient-to-r from-emerald-50/50 to-transparent'
+        {/* ── Camada 1: Filter Chips (compact, single line) ── */}
+        <div className={`px-4 py-2.5 border-b flex items-center gap-1.5 overflow-x-auto hide-scrollbar ${
+          isDark ? 'border-white/[0.06]' : 'border-slate-100'
         }`}>
-          {/* Stat pills — clickable quick filters */}
+          <span className={`text-[10px] font-semibold uppercase tracking-wider shrink-0 mr-1 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Vencimento</span>
           {(() => {
             const now = new Date()
             const mStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().slice(0, 10)
             const mEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().slice(0, 10)
             const nStart = new Date(now.getFullYear(), now.getMonth() + 1, 1).toISOString().slice(0, 10)
             const nEnd = new Date(now.getFullYear(), now.getMonth() + 2, 0).toISOString().slice(0, 10)
-            const mesAtualLabel = now.toLocaleDateString('pt-BR', { month: 'short' }).replace('.', '').toUpperCase()
-            const proxMesLabel = new Date(now.getFullYear(), now.getMonth() + 1, 1).toLocaleDateString('pt-BR', { month: 'short' }).replace('.', '').toUpperCase()
-
-            const stats: { id: QuickFilterId; label: string; count: number; value: number; icon: typeof Receipt; color: string }[] = [
-              { id: 'all', label: 'Total', count: stageCPs.length, value: stageCPs.reduce((s, c) => s + c.valor_original, 0), icon: Receipt, color: 'emerald' },
-              { id: 'overdue', label: 'Vencidos', count: stageCPs.filter(cp => getUrgency(cp) === 'overdue').length, value: stageCPs.filter(cp => getUrgency(cp) === 'overdue').reduce((s, c) => s + c.valor_original, 0), icon: AlertTriangle, color: 'red' },
-              { id: 'today', label: 'Hoje', count: stageCPs.filter(cp => getUrgency(cp) === 'today').length, value: stageCPs.filter(cp => getUrgency(cp) === 'today').reduce((s, c) => s + c.valor_original, 0), icon: Clock, color: 'amber' },
-              { id: 'week', label: '7 dias', count: stageCPs.filter(cp => ['today', 'week'].includes(getUrgency(cp))).length, value: stageCPs.filter(cp => ['today', 'week'].includes(getUrgency(cp))).reduce((s, c) => s + c.valor_original, 0), icon: Calendar, color: 'blue' },
-              { id: 'this_month', label: mesAtualLabel, count: stageCPs.filter(cp => cp.data_vencimento >= mStart && cp.data_vencimento <= mEnd).length, value: stageCPs.filter(cp => cp.data_vencimento >= mStart && cp.data_vencimento <= mEnd).reduce((s, c) => s + c.valor_original, 0), icon: Calendar, color: 'violet' },
-              { id: 'next_month', label: proxMesLabel, count: stageCPs.filter(cp => cp.data_vencimento >= nStart && cp.data_vencimento <= nEnd).length, value: stageCPs.filter(cp => cp.data_vencimento >= nStart && cp.data_vencimento <= nEnd).reduce((s, c) => s + c.valor_original, 0), icon: Calendar, color: 'indigo' },
-              { id: 'future', label: 'Futuros', count: stageCPs.filter(cp => cp.data_vencimento > nEnd).length, value: stageCPs.filter(cp => cp.data_vencimento > nEnd).reduce((s, c) => s + c.valor_original, 0), icon: ArrowRight, color: 'slate' },
+            const mesLabel = now.toLocaleDateString('pt-BR', { month: 'short' }).replace('.', '')
+            const proxLabel = new Date(now.getFullYear(), now.getMonth() + 1, 1).toLocaleDateString('pt-BR', { month: 'short' }).replace('.', '')
+            const chips: { id: QuickFilterId; label: string; count: number; accent: string; activeAccent: string }[] = [
+              { id: 'all', label: 'Todos', count: stageCPs.length, accent: isDark ? 'text-emerald-400' : 'text-emerald-600', activeAccent: isDark ? 'bg-emerald-500/15 border-emerald-400/30 text-emerald-300' : 'bg-emerald-50 border-emerald-200 text-emerald-700' },
+              { id: 'overdue', label: 'Vencidos', count: stageCPs.filter(cp => getUrgency(cp) === 'overdue').length, accent: isDark ? 'text-red-400' : 'text-red-500', activeAccent: isDark ? 'bg-red-500/15 border-red-400/30 text-red-300' : 'bg-red-50 border-red-200 text-red-700' },
+              { id: 'today', label: 'Hoje', count: stageCPs.filter(cp => getUrgency(cp) === 'today').length, accent: isDark ? 'text-amber-400' : 'text-amber-500', activeAccent: isDark ? 'bg-amber-500/15 border-amber-400/30 text-amber-300' : 'bg-amber-50 border-amber-200 text-amber-700' },
+              { id: 'week', label: '7 dias', count: stageCPs.filter(cp => ['today', 'week'].includes(getUrgency(cp))).length, accent: isDark ? 'text-blue-400' : 'text-blue-500', activeAccent: isDark ? 'bg-blue-500/15 border-blue-400/30 text-blue-300' : 'bg-blue-50 border-blue-200 text-blue-700' },
+              { id: 'this_month', label: mesLabel, count: stageCPs.filter(cp => cp.data_vencimento >= mStart && cp.data_vencimento <= mEnd).length, accent: isDark ? 'text-violet-400' : 'text-violet-500', activeAccent: isDark ? 'bg-violet-500/15 border-violet-400/30 text-violet-300' : 'bg-violet-50 border-violet-200 text-violet-700' },
+              { id: 'next_month', label: proxLabel, count: stageCPs.filter(cp => cp.data_vencimento >= nStart && cp.data_vencimento <= nEnd).length, accent: isDark ? 'text-indigo-400' : 'text-indigo-500', activeAccent: isDark ? 'bg-indigo-500/15 border-indigo-400/30 text-indigo-300' : 'bg-indigo-50 border-indigo-200 text-indigo-700' },
+              { id: 'future', label: 'Futuros', count: stageCPs.filter(cp => cp.data_vencimento > nEnd).length, accent: isDark ? 'text-slate-300' : 'text-slate-500', activeAccent: isDark ? 'bg-slate-500/15 border-slate-400/30 text-slate-200' : 'bg-slate-100 border-slate-300 text-slate-700' },
             ]
-
-            const colors: Record<string, { activeBg: string; activeBorder: string; activeText: string; countBg: string; idleBg: string; idleBorder: string; idleText: string }> = {
-              emerald: { activeBg: isDark ? 'bg-emerald-500/15' : 'bg-emerald-50', activeBorder: isDark ? 'border-emerald-400/30 ring-1 ring-emerald-400/20' : 'border-emerald-200 ring-1 ring-emerald-200/50', activeText: isDark ? 'text-emerald-300' : 'text-emerald-700', countBg: isDark ? 'bg-emerald-500/20 text-emerald-200' : 'bg-emerald-100 text-emerald-700', idleBg: isDark ? 'bg-white/[0.02]' : 'bg-white', idleBorder: isDark ? 'border-white/[0.06]' : 'border-slate-200', idleText: isDark ? 'text-slate-400' : 'text-slate-500' },
-              red: { activeBg: isDark ? 'bg-red-500/15' : 'bg-red-50', activeBorder: isDark ? 'border-red-400/30 ring-1 ring-red-400/20' : 'border-red-200 ring-1 ring-red-200/50', activeText: isDark ? 'text-red-300' : 'text-red-700', countBg: isDark ? 'bg-red-500/20 text-red-200' : 'bg-red-100 text-red-700', idleBg: isDark ? 'bg-white/[0.02]' : 'bg-white', idleBorder: isDark ? 'border-white/[0.06]' : 'border-slate-200', idleText: isDark ? 'text-slate-400' : 'text-slate-500' },
-              amber: { activeBg: isDark ? 'bg-amber-500/15' : 'bg-amber-50', activeBorder: isDark ? 'border-amber-400/30 ring-1 ring-amber-400/20' : 'border-amber-200 ring-1 ring-amber-200/50', activeText: isDark ? 'text-amber-300' : 'text-amber-700', countBg: isDark ? 'bg-amber-500/20 text-amber-200' : 'bg-amber-100 text-amber-700', idleBg: isDark ? 'bg-white/[0.02]' : 'bg-white', idleBorder: isDark ? 'border-white/[0.06]' : 'border-slate-200', idleText: isDark ? 'text-slate-400' : 'text-slate-500' },
-              blue: { activeBg: isDark ? 'bg-blue-500/15' : 'bg-blue-50', activeBorder: isDark ? 'border-blue-400/30 ring-1 ring-blue-400/20' : 'border-blue-200 ring-1 ring-blue-200/50', activeText: isDark ? 'text-blue-300' : 'text-blue-700', countBg: isDark ? 'bg-blue-500/20 text-blue-200' : 'bg-blue-100 text-blue-700', idleBg: isDark ? 'bg-white/[0.02]' : 'bg-white', idleBorder: isDark ? 'border-white/[0.06]' : 'border-slate-200', idleText: isDark ? 'text-slate-400' : 'text-slate-500' },
-              violet: { activeBg: isDark ? 'bg-violet-500/15' : 'bg-violet-50', activeBorder: isDark ? 'border-violet-400/30 ring-1 ring-violet-400/20' : 'border-violet-200 ring-1 ring-violet-200/50', activeText: isDark ? 'text-violet-300' : 'text-violet-700', countBg: isDark ? 'bg-violet-500/20 text-violet-200' : 'bg-violet-100 text-violet-700', idleBg: isDark ? 'bg-white/[0.02]' : 'bg-white', idleBorder: isDark ? 'border-white/[0.06]' : 'border-slate-200', idleText: isDark ? 'text-slate-400' : 'text-slate-500' },
-              indigo: { activeBg: isDark ? 'bg-indigo-500/15' : 'bg-indigo-50', activeBorder: isDark ? 'border-indigo-400/30 ring-1 ring-indigo-400/20' : 'border-indigo-200 ring-1 ring-indigo-200/50', activeText: isDark ? 'text-indigo-300' : 'text-indigo-700', countBg: isDark ? 'bg-indigo-500/20 text-indigo-200' : 'bg-indigo-100 text-indigo-700', idleBg: isDark ? 'bg-white/[0.02]' : 'bg-white', idleBorder: isDark ? 'border-white/[0.06]' : 'border-slate-200', idleText: isDark ? 'text-slate-400' : 'text-slate-500' },
-              slate: { activeBg: isDark ? 'bg-slate-500/15' : 'bg-slate-100', activeBorder: isDark ? 'border-slate-400/30 ring-1 ring-slate-400/20' : 'border-slate-300 ring-1 ring-slate-300/50', activeText: isDark ? 'text-slate-200' : 'text-slate-700', countBg: isDark ? 'bg-slate-500/20 text-slate-200' : 'bg-slate-200 text-slate-700', idleBg: isDark ? 'bg-white/[0.02]' : 'bg-white', idleBorder: isDark ? 'border-white/[0.06]' : 'border-slate-200', idleText: isDark ? 'text-slate-400' : 'text-slate-500' },
-            }
-
-            return stats.map(stat => {
-              const active = quickFilter === stat.id
-              const StatIcon = stat.icon
-              const c = colors[stat.color]
-              const dimmed = stat.count === 0 && stat.id !== 'all'
+            return chips.map(chip => {
+              const active = quickFilter === chip.id
               return (
-                <button
-                  key={stat.id}
-                  onClick={() => !dimmed && setQuickFilter(active ? 'all' : stat.id)}
-                  className={`group flex items-center gap-2.5 rounded-2xl border px-3.5 py-2 transition-all duration-200 ${
-                    dimmed ? `opacity-40 cursor-default ${c.idleBg} ${c.idleBorder} ${c.idleText}` :
-                    active ? `${c.activeBg} ${c.activeBorder} ${c.activeText} hover:scale-[1.02]` : `${c.idleBg} ${c.idleBorder} ${c.idleText} hover:shadow-sm hover:scale-[1.02]`
+                <button key={chip.id} onClick={() => setQuickFilter(active ? 'all' : chip.id)}
+                  className={`shrink-0 flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-semibold transition-all ${
+                    active ? chip.activeAccent : isDark ? 'border-white/[0.06] text-slate-400 hover:bg-white/[0.04]' : 'border-slate-200 text-slate-500 hover:bg-slate-50'
                   }`}
                 >
-                  <StatIcon size={13} className={`shrink-0 ${active ? '' : 'opacity-50 group-hover:opacity-80'}`} />
-                  <div className="text-left">
-                    <p className={`text-[10px] font-semibold uppercase tracking-wider leading-none ${active ? '' : 'opacity-70'}`}>{stat.label}</p>
-                    <p className={`text-sm font-extrabold tabular-nums leading-tight mt-0.5 ${active ? '' : isDark ? 'text-slate-200' : 'text-slate-700'}`}>{fmt(stat.value)}</p>
-                  </div>
-                  <span className={`ml-1 text-[10px] font-bold rounded-full px-1.5 py-0.5 min-w-[20px] text-center ${active ? c.countBg : isDark ? 'bg-white/[0.06] text-slate-400' : 'bg-slate-100 text-slate-500'}`}>
-                    {stat.count}
-                  </span>
+                  {chip.label}
+                  <span className={`text-[10px] tabular-nums ${active ? 'opacity-80' : 'opacity-50'}`}>{chip.count}</span>
                 </button>
               )
             })
           })()}
 
           {/* Custom date range */}
-          <div className="relative">
-            <button
-              onClick={() => { setShowCustomDate(v => !v); if (quickFilter !== 'custom') { setQuickFilter('custom'); if (!customDateFrom && !customDateTo) setShowCustomDate(true) } }}
-              className={`group flex items-center gap-1.5 rounded-2xl border px-3 py-2 transition-all duration-200 hover:scale-[1.02] text-[11px] font-medium ${
+          <div className="relative shrink-0">
+            <button onClick={() => { if (quickFilter !== 'custom') { setQuickFilter('custom'); setShowCustomDate(true) } else setShowCustomDate(v => !v) }}
+              className={`flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-semibold transition-all ${
                 quickFilter === 'custom'
-                  ? isDark ? 'border-teal-400/30 ring-1 ring-teal-400/20 bg-teal-500/15 text-teal-300' : 'border-teal-200 ring-1 ring-teal-200/50 bg-teal-50 text-teal-700'
-                  : isDark ? 'border-white/[0.06] bg-white/[0.02] text-slate-400 hover:shadow-sm' : 'border-slate-200 bg-white text-slate-500 hover:shadow-sm'
+                  ? isDark ? 'bg-teal-500/15 border-teal-400/30 text-teal-300' : 'bg-teal-50 border-teal-200 text-teal-700'
+                  : isDark ? 'border-white/[0.06] text-slate-400 hover:bg-white/[0.04]' : 'border-slate-200 text-slate-500 hover:bg-slate-50'
               }`}
             >
-              <Filter size={12} />
-              {quickFilter === 'custom' && customDateFrom ? (
-                <span className="tabular-nums">{customDateFrom.split('-').reverse().join('/')} — {customDateTo ? customDateTo.split('-').reverse().join('/') : '...'}</span>
-              ) : (
-                <span>Personalizado</span>
-              )}
+              <Filter size={10} />
+              {quickFilter === 'custom' && customDateFrom
+                ? <span className="tabular-nums">{customDateFrom.split('-').reverse().slice(0,2).join('/')} — {customDateTo ? customDateTo.split('-').reverse().slice(0,2).join('/') : '...'}</span>
+                : 'Período'}
             </button>
             {showCustomDate && (
-              <div className={`absolute left-0 top-full mt-2 z-40 rounded-2xl border p-4 shadow-xl space-y-3 min-w-[280px] ${isDark ? 'bg-slate-900 border-white/[0.08]' : 'bg-white border-slate-200'}`}>
+              <div className={`absolute right-0 top-full mt-2 z-40 rounded-2xl border p-4 shadow-xl space-y-3 min-w-[280px] ${isDark ? 'bg-slate-900 border-white/[0.08]' : 'bg-white border-slate-200'}`}>
                 <p className={`text-[10px] font-bold uppercase tracking-wider ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Período personalizado</p>
                 <div className="flex items-center gap-2">
                   <div className="flex-1">
                     <label className={`text-[10px] font-medium mb-1 block ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>De</label>
                     <input type="date" value={customDateFrom} onChange={e => setCustomDateFrom(e.target.value)}
-                      className={`w-full px-2.5 py-1.5 rounded-xl border text-xs ${isDark ? 'bg-white/[0.04] border-white/[0.06] text-slate-200' : 'border-slate-200 bg-white text-slate-700'}`}
-                    />
+                      className={`w-full px-2.5 py-1.5 rounded-xl border text-xs ${isDark ? 'bg-white/[0.04] border-white/[0.06] text-slate-200' : 'border-slate-200 bg-white text-slate-700'}`} />
                   </div>
                   <div className="flex-1">
                     <label className={`text-[10px] font-medium mb-1 block ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Até</label>
                     <input type="date" value={customDateTo} onChange={e => setCustomDateTo(e.target.value)}
-                      className={`w-full px-2.5 py-1.5 rounded-xl border text-xs ${isDark ? 'bg-white/[0.04] border-white/[0.06] text-slate-200' : 'border-slate-200 bg-white text-slate-700'}`}
-                    />
+                      className={`w-full px-2.5 py-1.5 rounded-xl border text-xs ${isDark ? 'bg-white/[0.04] border-white/[0.06] text-slate-200' : 'border-slate-200 bg-white text-slate-700'}`} />
                   </div>
                 </div>
                 <div className="flex items-center justify-between">
@@ -2911,7 +2882,7 @@ export default function CPPipeline() {
                     Limpar
                   </button>
                   <button onClick={() => setShowCustomDate(false)}
-                    className="text-[11px] font-bold px-4 py-1.5 rounded-xl bg-teal-600 text-white hover:bg-teal-700 transition-all">
+                    className="text-[11px] font-bold px-4 py-1.5 rounded-xl bg-teal-600 text-white hover:bg-teal-700 transition-all shadow-sm">
                     Aplicar
                   </button>
                 </div>
@@ -2919,14 +2890,13 @@ export default function CPPipeline() {
             )}
           </div>
 
-          {/* Anchor-based contextual filters */}
+          {/* Divider + Anchor-based contextual filters */}
           {anchorCP && (
-            <div className={`flex items-center gap-1.5 ml-2 pl-2 border-l ${isDark ? 'border-white/[0.06]' : 'border-slate-200'}`}>
+            <>
+              <div className={`w-px h-5 shrink-0 ${isDark ? 'bg-white/[0.08]' : 'bg-slate-200'}`} />
               {quickFilters.filter(f => ['same_supplier', 'same_work', 'same_lote'].includes(f.id) && f.enabled).map(filter => (
-                <button
-                  key={filter.id}
-                  onClick={() => setQuickFilter(quickFilter === filter.id ? 'all' : filter.id)}
-                  className={`rounded-full border px-2.5 py-1 text-[10px] font-medium transition-all ${
+                <button key={filter.id} onClick={() => setQuickFilter(quickFilter === filter.id ? 'all' : filter.id)}
+                  className={`shrink-0 rounded-full border px-2.5 py-1 text-[10px] font-medium transition-all ${
                     quickFilter === filter.id
                       ? isDark ? 'border-violet-400/40 bg-violet-500/10 text-violet-300' : 'border-violet-300 bg-violet-50 text-violet-700'
                       : isDark ? 'border-white/[0.06] text-slate-400 hover:bg-white/[0.04]' : 'border-slate-200 text-slate-500 hover:bg-slate-50'
@@ -2935,8 +2905,21 @@ export default function CPPipeline() {
                   {filter.label} ({filter.count})
                 </button>
               ))}
-            </div>
+            </>
           )}
+
+          {/* Result summary (subtotal after filtering) */}
+          <div className={`ml-auto flex items-center gap-2 shrink-0 pl-3 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+            <span className="text-[11px] tabular-nums">
+              {isLoteStageTab ? `${activeLotes.length} lote${activeLotes.length !== 1 ? 's' : ''}` : `${activeCPs.length} t\u00EDtulo${activeCPs.length !== 1 ? 's' : ''}`}
+            </span>
+            <span className={`text-xs font-extrabold tabular-nums ${isDark ? 'text-emerald-400' : 'text-emerald-600'}`}>{fmt(tabTotal)}</span>
+            {overdueCt > 0 && (
+              <span className="flex items-center gap-1 text-[11px] text-red-500 font-bold tabular-nums">
+                <AlertTriangle size={10} /> {overdueCt}
+              </span>
+            )}
+          </div>
         </div>
 
         {/* ── Camada 2: Search + Sort + View + Export ── */}
