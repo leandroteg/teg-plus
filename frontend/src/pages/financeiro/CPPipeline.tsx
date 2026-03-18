@@ -2849,7 +2849,7 @@ export default function CPPipeline() {
 
           {/* Custom date range */}
           <div className="relative shrink-0">
-            <button onClick={() => { if (quickFilter !== 'custom') { setQuickFilter('custom'); setShowCustomDate(true) } else setShowCustomDate(v => !v) }}
+            <button onClick={() => setShowCustomDate(v => !v)}
               className={`flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-semibold transition-all ${
                 quickFilter === 'custom'
                   ? isDark ? 'bg-teal-500/15 border-teal-400/30 text-teal-300' : 'bg-teal-50 border-teal-200 text-teal-700'
@@ -2859,7 +2859,7 @@ export default function CPPipeline() {
               <Filter size={10} />
               {quickFilter === 'custom' && customDateFrom
                 ? <span className="tabular-nums">{customDateFrom.split('-').reverse().slice(0,2).join('/')} — {customDateTo ? customDateTo.split('-').reverse().slice(0,2).join('/') : '...'}</span>
-                : 'Período'}
+                : 'Personalizado'}
             </button>
             {showCustomDate && (
               <div className={`absolute right-0 top-full mt-2 z-40 rounded-2xl border p-4 shadow-xl space-y-3 min-w-[280px] ${isDark ? 'bg-slate-900 border-white/[0.08]' : 'bg-white border-slate-200'}`}>
@@ -2881,8 +2881,9 @@ export default function CPPipeline() {
                     className={`text-[11px] font-medium px-3 py-1.5 rounded-xl transition-all ${isDark ? 'text-slate-400 hover:bg-white/[0.04]' : 'text-slate-500 hover:bg-slate-50'}`}>
                     Limpar
                   </button>
-                  <button onClick={() => setShowCustomDate(false)}
-                    className="text-[11px] font-bold px-4 py-1.5 rounded-xl bg-teal-600 text-white hover:bg-teal-700 transition-all shadow-sm">
+                  <button onClick={() => { setQuickFilter('custom'); setShowCustomDate(false) }}
+                    disabled={!customDateFrom && !customDateTo}
+                    className="text-[11px] font-bold px-4 py-1.5 rounded-xl bg-teal-600 text-white hover:bg-teal-700 transition-all shadow-sm disabled:opacity-40 disabled:cursor-not-allowed">
                     Aplicar
                   </button>
                 </div>
