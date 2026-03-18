@@ -1105,8 +1105,14 @@ function DetailModal({
           {/* Requisição description */}
           {pedido.requisicao?.descricao && (
             <div className={`rounded-xl p-3 border ${dark ? 'bg-white/[0.02] border-white/10' : 'bg-slate-50 border-slate-200'}`}>
-              <p className={`text-[11px] font-semibold uppercase tracking-wide mb-1 ${sub}`}>Descrição da RC</p>
+              <p className={`text-[11px] font-semibold uppercase tracking-wide mb-1 ${sub}`}>Resumo da RC</p>
               <p className={`text-xs leading-relaxed ${sub}`}>{pedido.requisicao.descricao}</p>
+              {pedido.requisicao.justificativa && (
+                <div className={`mt-2 pt-2 border-t ${dark ? 'border-white/10' : 'border-slate-200'}`}>
+                  <p className={`text-[10px] font-bold uppercase tracking-wider mb-0.5 ${dark ? 'text-teal-400' : 'text-teal-600'}`}>Descrição</p>
+                  <p className={`text-xs leading-relaxed ${dark ? 'text-teal-200' : 'text-teal-800'}`}>{pedido.requisicao.justificativa}</p>
+                </div>
+              )}
             </div>
           )}
 

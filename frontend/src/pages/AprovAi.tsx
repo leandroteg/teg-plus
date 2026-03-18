@@ -239,6 +239,14 @@ function AprovacaoCard({ aprovacao, aprovadorNome, aprovadorEmail }: {
 
         <p className="text-sm text-slate-700 mb-2">{req.descricao}</p>
 
+        {/* Descrição da compra */}
+        {req.justificativa && (
+          <div className="rounded-xl px-3.5 py-2.5 mb-2 bg-teal-50 border border-teal-100">
+            <p className="text-[10px] font-bold uppercase tracking-wider mb-1 text-teal-600">Descrição</p>
+            <p className="text-xs leading-relaxed text-teal-800">{req.justificativa}</p>
+          </div>
+        )}
+
         <a
           href={`/requisicoes/${req.id}`}
           target="_blank"

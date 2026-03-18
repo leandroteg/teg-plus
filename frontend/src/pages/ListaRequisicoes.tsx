@@ -203,8 +203,16 @@ function DetailModal({ r, apr, onClose, isDark, canDecide, onDecisao, isProcessi
         </div>
 
         <div className="p-5 space-y-4">
-          {/* Descrição */}
+          {/* Resumo */}
           <p className={`text-sm font-semibold ${isDark ? 'text-white' : 'text-slate-800'}`}>{r.descricao}</p>
+
+          {/* Descrição da compra */}
+          {r.justificativa && (
+            <div className={`rounded-xl px-3.5 py-2.5 ${isDark ? 'bg-teal-500/10 border border-teal-500/20' : 'bg-teal-50 border border-teal-100'}`}>
+              <p className={`text-[10px] font-bold uppercase tracking-wider mb-1 ${isDark ? 'text-teal-400' : 'text-teal-600'}`}>Descrição</p>
+              <p className={`text-xs leading-relaxed ${isDark ? 'text-teal-200' : 'text-teal-800'}`}>{r.justificativa}</p>
+            </div>
+          )}
 
           {/* Timeline */}
           <FluxoTimeline status={r.status} compact />

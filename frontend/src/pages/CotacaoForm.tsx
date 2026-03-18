@@ -630,6 +630,12 @@ export default function CotacaoForm() {
               <span className="text-xs text-slate-400">{cotacao.requisicao.obra_nome}</span>
               <span className="text-sm font-extrabold text-teal-600">{fmt(valorRef)}</span>
             </div>
+            {cotacao.requisicao.justificativa && (
+              <div className="mt-2 pt-2 border-t border-slate-100 rounded-lg bg-teal-50/50 px-3 py-2">
+                <p className="text-[10px] font-bold uppercase tracking-wider mb-0.5 text-teal-600">Descrição</p>
+                <p className="text-xs leading-relaxed text-teal-800">{cotacao.requisicao.justificativa}</p>
+              </div>
+            )}
           </div>
           <FluxoTimeline status="em_cotacao" compact />
         </div>

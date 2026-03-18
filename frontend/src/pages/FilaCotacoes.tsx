@@ -196,6 +196,14 @@ function CotDetailModal({ cot, onClose, isDark, isAdmin, atLeastComprador, onDec
         <div className="p-5 space-y-4">
           <p className={`text-sm font-semibold ${isDark ? 'text-white' : 'text-slate-800'}`}>{cot.requisicao?.descricao}</p>
 
+          {/* Descrição da compra */}
+          {cot.requisicao?.justificativa && (
+            <div className={`rounded-xl px-3.5 py-2.5 ${isDark ? 'bg-teal-500/10 border border-teal-500/20' : 'bg-teal-50 border border-teal-100'}`}>
+              <p className={`text-[10px] font-bold uppercase tracking-wider mb-1 ${isDark ? 'text-teal-400' : 'text-teal-600'}`}>Descrição</p>
+              <p className={`text-xs leading-relaxed ${isDark ? 'text-teal-200' : 'text-teal-800'}`}>{cot.requisicao.justificativa}</p>
+            </div>
+          )}
+
           {/* Grid de dados */}
           <div className={`grid grid-cols-2 gap-3 text-xs ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
             <div><p className={`font-bold mb-0.5 ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>Obra</p><p>{cot.requisicao?.obra_nome}</p></div>
