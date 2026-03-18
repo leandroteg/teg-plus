@@ -6,7 +6,7 @@ import {
   Paperclip, ExternalLink, Download, ArrowUpDown, LayoutList,
   LayoutGrid, Filter, SortAsc, SortDesc, ArrowDown, ArrowUp, Send, MessageSquare, XCircle,
   ChevronLeft, ChevronRight,
-  Plus, Save, Loader2,
+  Plus, Save, Loader2, RefreshCw,
 } from 'lucide-react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useTheme } from '../../contexts/ThemeContext'
@@ -1589,9 +1589,17 @@ function CPDetailModal({ cp, stageStatus, onClose, onAction, isDark }: {
               </>
             )}
             {cp.status === 'em_pagamento' && (
-              <button onClick={() => onAction('pagar', cp)} className="flex-1 py-3 rounded-xl bg-teal-600 text-white text-sm font-bold hover:bg-teal-700 transition-all flex items-center justify-center gap-2">
-                <Banknote size={15} /> Registrar Pgto
-              </button>
+              <>
+                <button
+                  onClick={() => window.open('https://app.omie.com.br', '_blank')}
+                  className="flex-1 py-3 rounded-xl bg-indigo-600 text-white text-sm font-bold hover:bg-indigo-700 transition-all flex items-center justify-center gap-2"
+                >
+                  <ExternalLink size={15} /> Pagar no Omie
+                </button>
+                <button onClick={() => onAction('sincronizar', cp)} className="flex-1 py-3 rounded-xl bg-sky-600 text-white text-sm font-bold hover:bg-sky-700 transition-all flex items-center justify-center gap-2">
+                  <RefreshCw size={15} /> Sincronizar
+                </button>
+              </>
             )}
             {cp.status === 'pago' && (
               <button onClick={() => onAction('conciliar', cp)} className="flex-1 py-3 rounded-xl bg-green-600 text-white text-sm font-bold hover:bg-green-700 transition-all flex items-center justify-center gap-2">
@@ -2410,6 +2418,23 @@ export default function CPPipeline() {
     }
   }
 
+  const handleSincronizarOmie = async (ids: string[]) => {
+    try {
+      const cpsParaSync = ids.map(id => contasById.get(id)).filter((cp): cp is ContaPagar => !!cp)
+      const result = await syncRemessasMut.mutateAsync({ cps: cpsParaSync })
+      if (result.confirmed > 0) {
+        showToast('success', `${result.confirmed} pagamento(s) confirmado(s) pelo Omie`)
+      } else if (result.processed > 0) {
+        showToast('info', `${result.processed} CP(s) atualizadas`)
+      } else {
+        showToast('info', 'Nenhuma atualização de status no Omie')
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Erro ao sincronizar com Omie'
+      showToast('error', message)
+    }
+  }
+
   const handleEnviarLotesAprovacao = async (ids: string[]) => {
     const loteIds = Array.from(new Set(
       ids
@@ -2480,7 +2505,7 @@ export default function CPPipeline() {
       case 'confirmado': handleCriarLote(ids); break
       case 'em_lote': handleEnviarLotesAprovacao(ids); break
       case 'aprovado_pgto': handleEnviarRemessa(ids); break
-      case 'em_pagamento': handleConfirmarPagamento(ids); break
+      case 'em_pagamento': window.open('https://app.omie.com.br', '_blank'); break
       case 'pago': handleConciliar(ids); break
     }
   }
@@ -2494,6 +2519,7 @@ export default function CPPipeline() {
       case 'sendLote': handleEnviarLotesAprovacao([cp.id]); break
       case 'enviarRemessa': handleEnviarRemessa([cp.id]); break
       case 'pagar': handlePagar([cp.id]); break
+      case 'sincronizar': handleSincronizarOmie([cp.id]); break
       case 'conciliar': handleConciliar([cp.id]); break
     }
   }
@@ -2542,10 +2568,16 @@ export default function CPPipeline() {
       case 'em_pagamento':
         return {
           primary: {
-            label: 'Registrar pgto',
-            onClick: () => handleConfirmarPagamento(summary.cpIds),
-            tone: 'bg-teal-600 hover:bg-teal-700',
-            icon: Banknote,
+            label: 'Pagar no Omie',
+            onClick: () => window.open('https://app.omie.com.br', '_blank'),
+            tone: 'bg-indigo-600 hover:bg-indigo-700',
+            icon: ExternalLink,
+          },
+          secondary: {
+            label: 'Sincronizar',
+            onClick: () => handleSincronizarOmie(summary.cpIds),
+            tone: 'bg-sky-600 hover:bg-sky-700',
+            icon: RefreshCw,
           },
         }
       default:
@@ -2567,7 +2599,7 @@ export default function CPPipeline() {
     confirmado:    { label: 'Criar Lote',    icon: Layers,       className: 'bg-violet-600 hover:bg-violet-700 text-white' },
     em_lote:       { label: 'Enviar p/ Aprov.', icon: Send,      className: 'bg-amber-500 hover:bg-amber-600 text-white' },
     aprovado_pgto: { label: 'Enviar Remessa', icon: Send,        className: 'bg-sky-600 hover:bg-sky-700 text-white' },
-    em_pagamento:  { label: 'Registrar Pgto', icon: Banknote,    className: 'bg-teal-600 hover:bg-teal-700 text-white' },
+    em_pagamento:  { label: 'Pagar no Omie',  icon: ExternalLink, className: 'bg-indigo-600 hover:bg-indigo-700 text-white' },
     pago:          { label: 'Conciliar',     icon: CheckCircle2, className: 'bg-green-600 hover:bg-green-700 text-white' },
   }
   const bulk = BULK_ACTIONS[activeTab]
