@@ -180,7 +180,7 @@ export function useAprovacoesPendentes(tipo?: TipoAprovacao) {
             `)
             .in('lote_id', loteIds)
 
-          // 5b. Buscar dados de requisição para cada CP
+          // 5b. Buscar dados de requisição + anexos (não-crítico, falha silenciosa)
           const cpIds = (loteItens ?? [])
             .map(item => (item.cp as Record<string, unknown> | null)?.id as string)
             .filter(Boolean)
@@ -191,46 +191,50 @@ export function useAprovacoesPendentes(tipo?: TipoAprovacao) {
             .map(item => (item.cp as Record<string, unknown> | null)?.pedido_id as string)
             .filter(Boolean)
 
-          // Map: requisicao_id -> { numero, descricao, justificativa, solicitante_nome }
           const rcMap = new Map<string, Record<string, unknown>>()
-          if (reqIds.length > 0) {
-            const { data: rcData } = await supabase
-              .from('cmp_requisicoes')
-              .select('id, numero, descricao, justificativa, solicitante_nome')
-              .in('id', [...new Set(reqIds)])
-            for (const rc of rcData ?? []) rcMap.set(rc.id, rc)
-          }
-
-          // Map: pedido_id -> anexos[]
           const pedAnexosMap = new Map<string, Record<string, unknown>[]>()
-          if (pedidoIds.length > 0) {
-            const { data: anexosData } = await supabase
-              .from('cmp_pedidos_anexos')
-              .select('pedido_id, nome_arquivo, url, tipo, mime_type, uploaded_at, uploaded_by_nome')
-              .in('pedido_id', [...new Set(pedidoIds)])
-            for (const a of anexosData ?? []) {
-              const pid = a.pedido_id as string
-              const arr = pedAnexosMap.get(pid) ?? []
-              arr.push(a)
-              pedAnexosMap.set(pid, arr)
-            }
-          }
-
-          // Map: cp_id -> fin_documentos[]
           const docMap = new Map<string, Record<string, unknown>[]>()
-          if (cpIds.length > 0) {
-            const { data: docsData } = await supabase
-              .from('fin_documentos')
-              .select('entity_id, nome_arquivo, arquivo_url, tipo, mime_type, uploaded_at')
-              .eq('entity_type', 'cp')
-              .in('entity_id', [...new Set(cpIds)])
-            for (const d of docsData ?? []) {
-              const eid = d.entity_id as string
-              const arr = docMap.get(eid) ?? []
-              arr.push(d)
-              docMap.set(eid, arr)
+
+          try {
+            if (reqIds.length > 0) {
+              const { data: rcData } = await supabase
+                .from('cmp_requisicoes')
+                .select('id, numero, descricao, justificativa, solicitante_nome')
+                .in('id', [...new Set(reqIds)])
+              for (const rc of rcData ?? []) rcMap.set(rc.id, rc)
             }
-          }
+          } catch { /* requisição data is optional */ }
+
+          try {
+            if (pedidoIds.length > 0) {
+              const { data: anexosData } = await supabase
+                .from('cmp_pedidos_anexos')
+                .select('pedido_id, nome_arquivo, url, tipo, mime_type, uploaded_at, uploaded_by_nome')
+                .in('pedido_id', [...new Set(pedidoIds)])
+              for (const a of anexosData ?? []) {
+                const pid = a.pedido_id as string
+                const arr = pedAnexosMap.get(pid) ?? []
+                arr.push(a)
+                pedAnexosMap.set(pid, arr)
+              }
+            }
+          } catch { /* anexos data is optional */ }
+
+          try {
+            if (cpIds.length > 0) {
+              const { data: docsData } = await supabase
+                .from('fin_documentos')
+                .select('entity_id, nome_arquivo, arquivo_url, tipo, mime_type, uploaded_at')
+                .eq('entity_type', 'cp')
+                .in('entity_id', [...new Set(cpIds)])
+              for (const d of docsData ?? []) {
+                const eid = d.entity_id as string
+                const arr = docMap.get(eid) ?? []
+                arr.push(d)
+                docMap.set(eid, arr)
+              }
+            }
+          } catch { /* docs data is optional */ }
 
           for (const item of loteItens ?? []) {
             const loteId = item.lote_id as string | undefined
