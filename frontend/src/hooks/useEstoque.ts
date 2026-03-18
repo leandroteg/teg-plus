@@ -10,12 +10,11 @@ import type {
 export function useItemCatalogSearch(categoriaRC: string, categoriasEstoque: string[], search: string) {
   return useQuery<EstItem[]>({
     queryKey: ['est-itens-catalog', categoriaRC, categoriasEstoque, search],
-    enabled: search.length >= 2 && !!categoriaRC,
+    enabled: !!categoriaRC,
     queryFn: async () => {
-      // Case-insensitive search across descricao, descricao_complementar, and codigo (#79)
+      // Case-insensitive search across descricao, descricao_complementar, and codigo (#79, #138)
       const searchLower = search.trim().toLowerCase()
-      const term = `%${searchLower}%`
-      const { data, error } = await supabase
+      let query = supabase
         .from('est_itens')
         .select(`
           id, codigo, descricao, descricao_complementar, categoria, subcategoria, unidade, valor_medio,
@@ -23,13 +22,18 @@ export function useItemCatalogSearch(categoriaRC: string, categoriasEstoque: str
           categoria_financeira_codigo, categoria_financeira_descricao, destino_operacional
         `)
         .eq('ativo', true)
-        .or(`descricao.ilike.${term},codigo.ilike.${term}`)
         .order('descricao')
         .limit(100)
+      if (searchLower.length >= 1) {
+        const term = `%${searchLower}%`
+        query = query.or(`descricao.ilike.${term},codigo.ilike.${term}`)
+      }
+      const { data, error } = await query
       if (error) return []
 
       // Apply client-side case-insensitive text filter (catches descricao_complementar too)
       const matched = ((data ?? []) as EstItem[]).filter((item) => {
+        if (!searchLower) return true
         const desc = (item.descricao ?? '').toLowerCase()
         const comp = (item.descricao_complementar ?? '').toLowerCase()
         const cod  = (item.codigo ?? '').toLowerCase()

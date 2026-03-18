@@ -230,7 +230,7 @@ export default function ItemAutocomplete({
     )
   }
 
-  const showResults = showDropdown && hasAutocomplete && search.length >= 2
+  const showResults = showDropdown && hasAutocomplete
   const bg = isDark ? 'bg-slate-800 border-slate-600' : 'bg-white border-slate-200'
   const dropdownBg = isDark ? 'bg-slate-800 border-slate-600' : 'bg-white border-slate-200'
   const hoverBg = isDark ? 'hover:bg-slate-700' : 'hover:bg-teal-50'
@@ -246,7 +246,7 @@ export default function ItemAutocomplete({
         <input
           value={value}
           onChange={e => handleInputChange(e.target.value)}
-          onFocus={() => { if (value.length >= 2 && hasAutocomplete) setShowDropdown(true) }}
+          onFocus={() => { if (hasAutocomplete) setShowDropdown(true) }}
           placeholder={placeholder || (hasAutocomplete ? 'Buscar item do catálogo...' : 'Descrição do item')}
           className={`w-full border rounded-xl ${hasAutocomplete ? 'pl-9' : 'px-3'} pr-3 py-2 text-sm focus:ring-2 focus:ring-teal-300 outline-none ${bg} ${textColor}`}
           required
