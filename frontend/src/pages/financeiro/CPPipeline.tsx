@@ -2789,28 +2789,90 @@ export default function CPPipeline() {
       {/* ══ Content panel ══ */}
       <div className={`rounded-2xl border overflow-hidden ${isDark ? 'bg-[#0f172a] border-white/[0.06]' : 'bg-white border-slate-200'}`}>
 
-        {/* Toolbar: Search + Sort + View Toggle + Export */}
-        <div className={`px-4 py-2.5 border-b flex flex-wrap items-center gap-2 ${isDark ? 'border-white/[0.06]' : 'border-slate-100'}`}>
+        {/* ── Camada 1: Hero Stats Bar ── */}
+        <div className={`px-4 py-3 border-b flex flex-wrap items-center gap-2 ${
+          isDark ? 'border-white/[0.06] bg-gradient-to-r from-emerald-500/[0.03] to-transparent' : 'border-slate-100 bg-gradient-to-r from-emerald-50/50 to-transparent'
+        }`}>
+          {/* Stat pills — clickable quick filters */}
+          {[
+            { id: 'all' as QuickFilterId, label: 'Total', count: stageCPs.length, value: stageCPs.reduce((s, c) => s + c.valor_original, 0), icon: Receipt, color: 'emerald' },
+            { id: 'overdue' as QuickFilterId, label: 'Vencidos', count: stageCPs.filter(cp => getUrgency(cp) === 'overdue').length, value: stageCPs.filter(cp => getUrgency(cp) === 'overdue').reduce((s, c) => s + c.valor_original, 0), icon: AlertTriangle, color: 'red' },
+            { id: 'today' as QuickFilterId, label: 'Hoje', count: stageCPs.filter(cp => getUrgency(cp) === 'today').length, value: stageCPs.filter(cp => getUrgency(cp) === 'today').reduce((s, c) => s + c.valor_original, 0), icon: Clock, color: 'amber' },
+            { id: 'week' as QuickFilterId, label: '7 dias', count: stageCPs.filter(cp => ['today', 'week'].includes(getUrgency(cp))).length, value: stageCPs.filter(cp => ['today', 'week'].includes(getUrgency(cp))).reduce((s, c) => s + c.valor_original, 0), icon: Calendar, color: 'blue' },
+          ].map(stat => {
+            const active = quickFilter === stat.id
+            const StatIcon = stat.icon
+            const colors: Record<string, { activeBg: string; activeBorder: string; activeText: string; countBg: string; idleBg: string; idleBorder: string; idleText: string }> = {
+              emerald: { activeBg: isDark ? 'bg-emerald-500/15' : 'bg-emerald-50', activeBorder: isDark ? 'border-emerald-400/30 ring-1 ring-emerald-400/20' : 'border-emerald-200 ring-1 ring-emerald-200/50', activeText: isDark ? 'text-emerald-300' : 'text-emerald-700', countBg: isDark ? 'bg-emerald-500/20 text-emerald-200' : 'bg-emerald-100 text-emerald-700', idleBg: isDark ? 'bg-white/[0.02]' : 'bg-white', idleBorder: isDark ? 'border-white/[0.06]' : 'border-slate-200', idleText: isDark ? 'text-slate-400' : 'text-slate-500' },
+              red: { activeBg: isDark ? 'bg-red-500/15' : 'bg-red-50', activeBorder: isDark ? 'border-red-400/30 ring-1 ring-red-400/20' : 'border-red-200 ring-1 ring-red-200/50', activeText: isDark ? 'text-red-300' : 'text-red-700', countBg: isDark ? 'bg-red-500/20 text-red-200' : 'bg-red-100 text-red-700', idleBg: isDark ? 'bg-white/[0.02]' : 'bg-white', idleBorder: isDark ? 'border-white/[0.06]' : 'border-slate-200', idleText: isDark ? 'text-slate-400' : 'text-slate-500' },
+              amber: { activeBg: isDark ? 'bg-amber-500/15' : 'bg-amber-50', activeBorder: isDark ? 'border-amber-400/30 ring-1 ring-amber-400/20' : 'border-amber-200 ring-1 ring-amber-200/50', activeText: isDark ? 'text-amber-300' : 'text-amber-700', countBg: isDark ? 'bg-amber-500/20 text-amber-200' : 'bg-amber-100 text-amber-700', idleBg: isDark ? 'bg-white/[0.02]' : 'bg-white', idleBorder: isDark ? 'border-white/[0.06]' : 'border-slate-200', idleText: isDark ? 'text-slate-400' : 'text-slate-500' },
+              blue: { activeBg: isDark ? 'bg-blue-500/15' : 'bg-blue-50', activeBorder: isDark ? 'border-blue-400/30 ring-1 ring-blue-400/20' : 'border-blue-200 ring-1 ring-blue-200/50', activeText: isDark ? 'text-blue-300' : 'text-blue-700', countBg: isDark ? 'bg-blue-500/20 text-blue-200' : 'bg-blue-100 text-blue-700', idleBg: isDark ? 'bg-white/[0.02]' : 'bg-white', idleBorder: isDark ? 'border-white/[0.06]' : 'border-slate-200', idleText: isDark ? 'text-slate-400' : 'text-slate-500' },
+            }
+            const c = colors[stat.color]
+            if (stat.count === 0 && stat.id !== 'all') return null
+            return (
+              <button
+                key={stat.id}
+                onClick={() => setQuickFilter(active ? 'all' : stat.id)}
+                className={`group flex items-center gap-2.5 rounded-2xl border px-3.5 py-2 transition-all duration-200 hover:scale-[1.02] ${
+                  active ? `${c.activeBg} ${c.activeBorder} ${c.activeText}` : `${c.idleBg} ${c.idleBorder} ${c.idleText} hover:shadow-sm`
+                }`}
+              >
+                <StatIcon size={13} className={`shrink-0 ${active ? '' : 'opacity-50 group-hover:opacity-80'}`} />
+                <div className="text-left">
+                  <p className={`text-[10px] font-semibold uppercase tracking-wider leading-none ${active ? '' : 'opacity-70'}`}>{stat.label}</p>
+                  <p className={`text-sm font-extrabold tabular-nums leading-tight mt-0.5 ${active ? '' : isDark ? 'text-slate-200' : 'text-slate-700'}`}>{fmt(stat.value)}</p>
+                </div>
+                <span className={`ml-1 text-[10px] font-bold rounded-full px-1.5 py-0.5 min-w-[20px] text-center ${active ? c.countBg : isDark ? 'bg-white/[0.06] text-slate-400' : 'bg-slate-100 text-slate-500'}`}>
+                  {stat.count}
+                </span>
+              </button>
+            )
+          })}
 
+          {/* Anchor-based contextual filters */}
+          {anchorCP && (
+            <div className={`flex items-center gap-1.5 ml-2 pl-2 border-l ${isDark ? 'border-white/[0.06]' : 'border-slate-200'}`}>
+              {quickFilters.filter(f => ['same_supplier', 'same_work', 'same_lote'].includes(f.id) && f.enabled).map(filter => (
+                <button
+                  key={filter.id}
+                  onClick={() => setQuickFilter(quickFilter === filter.id ? 'all' : filter.id)}
+                  className={`rounded-full border px-2.5 py-1 text-[10px] font-medium transition-all ${
+                    quickFilter === filter.id
+                      ? isDark ? 'border-violet-400/40 bg-violet-500/10 text-violet-300' : 'border-violet-300 bg-violet-50 text-violet-700'
+                      : isDark ? 'border-white/[0.06] text-slate-400 hover:bg-white/[0.04]' : 'border-slate-200 text-slate-500 hover:bg-slate-50'
+                  }`}
+                >
+                  {filter.label} ({filter.count})
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* ── Camada 2: Search + Sort + View + Export ── */}
+        <div className={`px-4 py-2 border-b flex flex-wrap items-center gap-2 ${isDark ? 'border-white/[0.06]' : 'border-slate-100'}`}>
           {/* Search */}
-          <div className="relative flex-1 min-w-[180px] max-w-sm">
-            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+          <div className="relative flex-1 min-w-[200px] max-w-md">
+            <Search size={14} className={`absolute left-3 top-1/2 -translate-y-1/2 ${busca ? isDark ? 'text-emerald-400' : 'text-emerald-500' : 'text-slate-400'} transition-colors`} />
             <input
               type="text" value={busca} onChange={e => setBusca(e.target.value)}
               placeholder="Buscar fornecedor, documento, obra, CC..."
-              className={`w-full pl-9 pr-4 py-2 rounded-xl border text-xs placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 ${
-                isDark ? 'bg-white/[0.04] border-white/[0.06] text-slate-200' : 'border-slate-200 bg-white text-slate-700'
+              className={`w-full pl-9 pr-8 py-2 rounded-xl border text-xs placeholder-slate-400 transition-all focus:outline-none focus:ring-2 ${
+                isDark
+                  ? 'bg-white/[0.04] border-white/[0.06] text-slate-200 focus:ring-emerald-500/30 focus:border-emerald-500/30'
+                  : 'border-slate-200 bg-white text-slate-700 focus:ring-emerald-500/20 focus:border-emerald-300'
               }`}
             />
             {busca && (
-              <button onClick={() => setBusca('')} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
+              <button onClick={() => setBusca('')} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors">
                 <X size={12} />
               </button>
             )}
           </div>
 
-          {/* Sort buttons */}
-          <div className="flex items-center gap-0.5">
+          {/* Sort dropdown */}
+          <div className={`flex items-center gap-0.5 rounded-xl border px-1 py-0.5 ${isDark ? 'border-white/[0.06] bg-white/[0.02]' : 'border-slate-200 bg-slate-50/50'}`}>
             {SORT_OPTIONS.map(opt => {
               const isActive = sortField === opt.field
               return (
@@ -2819,8 +2881,8 @@ export default function CPPipeline() {
                   onClick={() => toggleSort(opt.field)}
                   className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-medium transition-all ${
                     isActive
-                      ? isDark ? 'bg-white/[0.08] text-white' : 'bg-slate-100 text-slate-800'
-                      : isDark ? 'text-slate-500 hover:text-slate-300 hover:bg-white/[0.04]' : 'text-slate-400 hover:text-slate-600 hover:bg-slate-50'
+                      ? isDark ? 'bg-white/[0.1] text-white shadow-sm' : 'bg-white text-slate-800 shadow-sm'
+                      : isDark ? 'text-slate-500 hover:text-slate-300' : 'text-slate-400 hover:text-slate-600'
                   }`}
                 >
                   {opt.label}
@@ -2831,7 +2893,7 @@ export default function CPPipeline() {
           </div>
 
           {/* View toggle */}
-          <div className={`flex items-center rounded-lg border overflow-hidden ${isDark ? 'border-white/[0.06]' : 'border-slate-200'}`}>
+          <div className={`flex items-center rounded-xl border overflow-hidden ${isDark ? 'border-white/[0.06]' : 'border-slate-200'}`}>
             <button
               onClick={() => setViewMode('list')}
               className={`p-1.5 transition-all ${
@@ -2860,7 +2922,7 @@ export default function CPPipeline() {
           <button
             onClick={handleExport}
             disabled={activeCPs.length === 0}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-medium transition-all ${
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[11px] font-medium transition-all ${
               isDark
                 ? 'text-slate-400 hover:text-white hover:bg-white/[0.04] disabled:opacity-30'
                 : 'text-slate-500 hover:text-slate-700 hover:bg-slate-50 disabled:opacity-30'
@@ -2871,52 +2933,9 @@ export default function CPPipeline() {
             CSV
           </button>
 
-          {/* Stats */}
-          <div className={`ml-auto flex items-center gap-3 text-[11px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
-            <span>
-              {isLoteStageTab
-                ? `${activeLotes.length} ${activeLotes.length === 1 ? 'lote' : 'lotes'}`
-                : `${activeCPs.length} ${activeCPs.length === 1 ? 't\u00EDtulo' : 't\u00EDtulos'}`}
-            </span>
-            <span className="font-bold text-emerald-600">{fmt(tabTotal)}</span>
-            {overdueCt > 0 && (
-              <span className="flex items-center gap-1 text-red-500 font-bold">
-                <AlertTriangle size={11} /> {overdueCt} vencido{overdueCt > 1 ? 's' : ''} ({fmt(overdueTotal)})
-              </span>
-            )}
-          </div>
-        </div>
-
-        {/* Select all + bulk action bar */}
-        {activeCPs.length > 0 && bulk && (
-          <div className={`px-4 py-2 border-b flex flex-wrap items-center gap-3 ${isDark ? 'border-white/[0.06] bg-white/[0.02]' : 'border-slate-100 bg-slate-50/50'}`}>
-            <div className="flex flex-wrap items-center gap-2 mr-2">
-              <span className={`text-[10px] font-semibold uppercase tracking-wider ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
-                Filtros
-              </span>
-              {quickFilters.map(filter => (
-                <button
-                  key={filter.id}
-                  onClick={() => filter.enabled && setQuickFilter(filter.id)}
-                  disabled={!filter.enabled}
-                  className={`rounded-full border px-2.5 py-1 text-[10px] transition-all ${
-                    quickFilter === filter.id
-                      ? isDark
-                        ? 'border-emerald-400/40 bg-emerald-500/10 text-emerald-300'
-                        : 'border-emerald-300 bg-emerald-50 text-emerald-700'
-                      : filter.enabled
-                        ? isDark
-                          ? 'border-white/[0.06] text-slate-300 hover:bg-white/[0.04]'
-                          : 'border-slate-200 text-slate-600 hover:bg-white'
-                        : 'cursor-not-allowed border-transparent text-slate-400 opacity-40'
-                  }`}
-                >
-                  {filter.label}
-                  {filter.count > 0 && <span className="ml-1 opacity-70">({filter.count})</span>}
-                </button>
-              ))}
-            </div>
-            <label className="flex items-center gap-2 cursor-pointer">
+          {/* Select + count */}
+          {bulk && activeCPs.length > 0 && (
+            <label className="flex items-center gap-2 ml-auto cursor-pointer">
               <input
                 type="checkbox"
                 checked={activeCPs.length > 0 && activeCPs.every(cp => selectedIds.has(cp.id))}
@@ -2924,49 +2943,60 @@ export default function CPPipeline() {
                 className="w-3.5 h-3.5 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
               />
               <span className={`text-[11px] font-medium ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
-                Selecionar filtrados
+                Selecionar {isLoteStageTab ? `${activeLotes.length} lotes` : `${activeCPs.length} t\u00EDtulos`}
               </span>
             </label>
-            {selectedInTab.length > 0 && (
-              <>
+          )}
+        </div>
+
+        {/* ── Camada 3: Bulk Actions Bar (s\u00F3 com sele\u00E7\u00E3o) ── */}
+        {selectedInTab.length > 0 && bulk && (
+          <div className={`px-4 py-2.5 border-b flex items-center gap-3 transition-all ${
+            isDark ? 'border-white/[0.06] bg-emerald-500/[0.05]' : 'border-emerald-100 bg-emerald-50/50'
+          }`}>
+            <div className={`flex items-center gap-2 text-xs font-bold ${isDark ? 'text-emerald-300' : 'text-emerald-700'}`}>
+              <CheckCircle2 size={14} />
+              <span className="tabular-nums">{selectedInTab.length}</span>
+              <span className="font-normal opacity-70">selecionado{selectedInTab.length > 1 ? 's' : ''}</span>
+              <span className={`px-2 py-0.5 rounded-lg text-[10px] font-extrabold tabular-nums ${isDark ? 'bg-emerald-500/20' : 'bg-emerald-100'}`}>
+                {fmt(selectedInTab.reduce((s, cp) => s + cp.valor_original, 0))}
+              </span>
+            </div>
+            <div className="flex items-center gap-2 ml-auto">
+              <button
+                onClick={handleBulkAction}
+                className={`flex items-center gap-1.5 px-4 py-1.5 rounded-xl text-[11px] font-bold transition-all shadow-sm hover:shadow ${bulk.className}`}
+              >
+                <bulk.icon size={12} />
+                {bulk.label}
+              </button>
+              {activeTab === 'previsto' && (
                 <button
-                  onClick={handleBulkAction}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-bold transition-all ${bulk.className}`}
+                  onClick={() => handleExcluirPrevistos(selectedInTab.map(cp => cp.id))}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[11px] font-bold transition-all bg-rose-600 hover:bg-rose-700 text-white shadow-sm"
                 >
-                  <bulk.icon size={12} />
-                  {bulk.label} ({selectedInTab.length})
+                  <XCircle size={12} />
+                  Excluir
                 </button>
-                {activeTab === 'previsto' && (
-                  <button
-                    onClick={() => handleExcluirPrevistos(selectedInTab.map(cp => cp.id))}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-bold transition-all bg-rose-600 hover:bg-rose-700 text-white"
-                  >
-                    <XCircle size={12} />
-                    Excluir ({selectedInTab.length})
-                  </button>
-                )}
-                {activeTab === 'aprovado_pgto' && (
-                  <button
-                    onClick={() => handlePagar(selectedInTab.map(cp => cp.id))}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-bold transition-all bg-emerald-600 hover:bg-emerald-700 text-white"
-                  >
-                    <Banknote size={12} />
-                    Registrar Pgto ({selectedInTab.length})
-                  </button>
-                )}
+              )}
+              {activeTab === 'aprovado_pgto' && (
                 <button
-                  onClick={() => setSelectedIds(new Set())}
-                  className={`px-3 py-1.5 rounded-lg text-[11px] font-medium transition-all ${
-                    isDark ? 'text-slate-400 hover:text-white hover:bg-white/[0.04]' : 'text-slate-500 hover:text-slate-700 hover:bg-white'
-                  }`}
+                  onClick={() => handlePagar(selectedInTab.map(cp => cp.id))}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[11px] font-bold transition-all bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm"
                 >
-                  Limpar sele\u00E7\u00E3o
+                  <Banknote size={12} />
+                  Registrar Pgto
                 </button>
-                <span className={`text-[10px] ml-auto ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
-                  {fmt(selectedInTab.reduce((s, cp) => s + cp.valor_original, 0))} selecionado
-                </span>
-              </>
-            )}
+              )}
+              <button
+                onClick={() => setSelectedIds(new Set())}
+                className={`px-3 py-1.5 rounded-xl text-[11px] font-medium transition-all ${
+                  isDark ? 'text-slate-400 hover:text-white hover:bg-white/[0.04]' : 'text-slate-500 hover:text-slate-700 hover:bg-white'
+                }`}
+              >
+                Limpar
+              </button>
+            </div>
           </div>
         )}
 
