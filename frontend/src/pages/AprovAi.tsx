@@ -965,6 +965,15 @@ function GenericPendingCard({ aprovacao, aprovadorNome, aprovadorEmail }: {
 
 // ── Issue #35: Pagamento Detalhes Card ────────────────────────────────────────
 
+const TIPO_LABEL: Record<string, string> = {
+  nota_fiscal: 'Nota Fiscal',
+  comprovante_entrega: 'Comprovante Entrega',
+  medicao: 'Medição',
+  comprovante_pagamento: 'Comprovante Pgto',
+  contrato: 'Contrato',
+  outro: 'Documento',
+}
+
 function PagamentoDetalhesCard({ detalhes, selectedItemIds, setSelectedItemIds }: {
   detalhes: NonNullable<AprovacaoPendente['pagamento_detalhes']>
   selectedItemIds?: Set<string>
@@ -972,6 +981,7 @@ function PagamentoDetalhesCard({ detalhes, selectedItemIds, setSelectedItemIds }
 }) {
   const [showEntender, setShowEntender] = useState(false)
   const [showItens, setShowItens] = useState(false)
+  const [expandedItemId, setExpandedItemId] = useState<string | null>(null)
   const fmtDate = (d: string) => {
     if (!d) return '—'
     const dt = new Date(d.length === 10 ? d + 'T00:00:00' : d)
@@ -1120,9 +1130,10 @@ function PagamentoDetalhesCard({ detalhes, selectedItemIds, setSelectedItemIds }
             </div>
 
             {/* Item list */}
-            <div className="space-y-1.5 max-h-72 overflow-y-auto">
+            <div className="space-y-1.5 max-h-[28rem] overflow-y-auto">
               {itens.map(item => {
                 const checked = selectedItemIds?.has(item.id) ?? true
+                const isExpanded = expandedItemId === item.id
                 return (
                   <div
                     key={item.id}
@@ -1131,10 +1142,13 @@ function PagamentoDetalhesCard({ detalhes, selectedItemIds, setSelectedItemIds }
                         ? 'bg-white border-emerald-200 hover:bg-emerald-50/30'
                         : 'bg-slate-50 border-slate-200 hover:bg-slate-100/50 opacity-60'
                     }`}
-                    onClick={() => toggleItem(item.id)}
+                    onClick={() => setExpandedItemId(prev => prev === item.id ? null : item.id)}
                   >
                     <div className="flex items-start gap-2">
-                      <div className="mt-0.5 flex-shrink-0">
+                      <div
+                        className="mt-0.5 flex-shrink-0"
+                        onClick={e => { e.stopPropagation(); toggleItem(item.id) }}
+                      >
                         {checked
                           ? <CheckSquare size={16} className="text-emerald-500" />
                           : <Square size={16} className="text-slate-300" />}
@@ -1159,7 +1173,7 @@ function PagamentoDetalhesCard({ detalhes, selectedItemIds, setSelectedItemIds }
                             {item.requisicao_descricao || item.requisicao_justificativa}
                           </p>
                         )}
-                        {item.anexos && item.anexos.length > 0 && (
+                        {item.anexos && item.anexos.length > 0 && !isExpanded && (
                           <div className="flex gap-1.5 mt-0.5">
                             {item.anexos.map((anexo, idx) => (
                               <a
@@ -1178,6 +1192,87 @@ function PagamentoDetalhesCard({ detalhes, selectedItemIds, setSelectedItemIds }
                         )}
                       </div>
                     </div>
+
+                    {/* Expanded detail panel */}
+                    {isExpanded && (
+                      <div className="bg-slate-50 rounded-lg p-3 mt-2 space-y-3" onClick={e => e.stopPropagation()}>
+                        {/* Section 1: Timeline de Aprovação */}
+                        <div>
+                          <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">Timeline</p>
+                          <div className="border-l-2 border-slate-200 pl-3 space-y-2">
+                            {item.decisao_por && (
+                              <div className="relative">
+                                <div className="absolute -left-[17px] top-0.5 w-2 h-2 rounded-full bg-slate-300" />
+                                <p className="text-[11px] text-slate-700 font-medium">
+                                  {item.decisao === 'aprovada' ? '✅' : item.decisao === 'rejeitada' ? '❌' : '⏳'}{' '}
+                                  {item.decisao_por}
+                                  {item.decisao_em && (
+                                    <span className="text-[10px] text-slate-400 ml-1">
+                                      {new Date(item.decisao_em).toLocaleDateString('pt-BR')}{' '}
+                                      {new Date(item.decisao_em).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                                    </span>
+                                  )}
+                                </p>
+                                {item.decisao_obs && (
+                                  <p className="text-[10px] text-slate-500 italic mt-0.5">{item.decisao_obs}</p>
+                                )}
+                              </div>
+                            )}
+                            {item.created_at && (
+                              <div className="relative">
+                                <div className="absolute -left-[17px] top-0.5 w-2 h-2 rounded-full bg-slate-300" />
+                                <p className="text-[10px] text-slate-500">
+                                  Incluído no lote · {new Date(item.created_at).toLocaleDateString('pt-BR')}
+                                </p>
+                              </div>
+                            )}
+                            {item.solicitante_nome && (
+                              <div className="relative">
+                                <div className="absolute -left-[17px] top-0.5 w-2 h-2 rounded-full bg-slate-300" />
+                                <p className="text-[10px] text-slate-500">
+                                  RC criada por {item.solicitante_nome}
+                                </p>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Section 2: Documentos Anexados */}
+                        <div>
+                          <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">Documentos</p>
+                          {item.anexos && item.anexos.length > 0 ? (
+                            <div className="space-y-1.5">
+                              {item.anexos.map((anexo, idx) => (
+                                <a
+                                  key={idx}
+                                  href={anexo.url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="flex items-center gap-2 px-3 py-2 rounded-lg border border-slate-200 bg-white hover:border-slate-300 hover:shadow-sm transition-all group"
+                                >
+                                  {anexo.mime_type?.includes('pdf') ? (
+                                    <FileText size={14} className="text-red-500 shrink-0" />
+                                  ) : (
+                                    <Paperclip size={14} className="text-slate-400 shrink-0" />
+                                  )}
+                                  <div className="flex-1 min-w-0">
+                                    <p className="text-[11px] font-semibold text-slate-700 truncate">{anexo.nome}</p>
+                                    <div className="flex items-center gap-1.5 mt-0.5">
+                                      <span className="text-[9px] font-semibold bg-slate-100 text-slate-500 rounded-full px-1.5 py-0.5">
+                                        {TIPO_LABEL[anexo.tipo] ?? anexo.tipo}
+                                      </span>
+                                    </div>
+                                  </div>
+                                  <ExternalLink size={10} className="text-slate-300 group-hover:text-slate-500 shrink-0" />
+                                </a>
+                              ))}
+                            </div>
+                          ) : (
+                            <p className="text-[10px] text-slate-400 italic">(sem documentos anexados)</p>
+                          )}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )
               })}

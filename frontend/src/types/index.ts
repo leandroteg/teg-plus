@@ -195,6 +195,11 @@ export interface AprovacaoPendente extends Aprovacao {
       requisicao_justificativa?: string
       solicitante_nome?: string
       anexos?: { nome: string, url: string, tipo: string, mime_type?: string }[]
+      decisao_por?: string
+      decisao_em?: string
+      decisao_obs?: string
+      pedido_id?: string
+      created_at?: string
     }[]
   }
 }

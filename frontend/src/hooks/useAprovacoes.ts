@@ -164,6 +164,10 @@ export function useAprovacoesPendentes(tipo?: TipoAprovacao) {
               id,
               lote_id,
               decisao,
+              decidido_por,
+              decidido_em,
+              observacao,
+              created_at,
               cp:fin_contas_pagar!cp_id(
                 id,
                 fornecedor_nome,
@@ -400,6 +404,11 @@ export function useAprovacoesPendentes(tipo?: TipoAprovacao) {
                     requisicao_justificativa: (rc?.justificativa as string) ?? undefined,
                     solicitante_nome: (rc?.solicitante_nome as string) ?? undefined,
                     anexos: anexos.length > 0 ? anexos : undefined,
+                    decisao_por: (item.decidido_por as string) ?? undefined,
+                    decisao_em: (item.decidido_em as string) ?? undefined,
+                    decisao_obs: (item.observacao as string) ?? undefined,
+                    pedido_id: pedId || undefined,
+                    created_at: (item.created_at as string) ?? undefined,
                   }
                 }),
               }
