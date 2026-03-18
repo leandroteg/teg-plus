@@ -5,7 +5,7 @@ import {
   Landmark, TrendingUp, TrendingDown, ArrowUpRight, ArrowDownRight,
   Plus, Upload, Wallet, Building2, CircleDollarSign, Search,
   Filter, X, Calendar, ChevronDown, Eye, FileText, Check,
-  AlertTriangle, Zap, RefreshCw, ArrowDownUp, Link2,
+  AlertTriangle, Zap, RefreshCw, ArrowDownUp, Link2, CreditCard,
 } from 'lucide-react'
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip,
@@ -22,6 +22,7 @@ import {
   useOmieLancamentos,
   useSincronizarSaldoContaOmie,
 } from '../../hooks/useOmieApi'
+import ConciliacaoCartoes from './ConciliacaoCartoes'
 
 // ── Formatters ──────────────────────────────────────────────────────────────
 
@@ -57,13 +58,14 @@ const CORES_PRESET = [
   '#10B981', '#EC4899', '#6366F1', '#F97316', '#06B6D4',
 ]
 
-type TesourariaTab = 'painel' | 'movimentacoes' | 'contas' | 'conciliacao' | 'omie'
+type TesourariaTab = 'painel' | 'movimentacoes' | 'contas' | 'conciliacao' | 'conc-cartoes' | 'omie'
 
 const TESOURARIA_TABS: Array<{ key: TesourariaTab; label: string }> = [
   { key: 'painel', label: 'Painel' },
   { key: 'movimentacoes', label: 'Movimentações' },
   { key: 'contas', label: 'Contas e Saldos' },
   { key: 'conciliacao', label: 'Conciliação' },
+  { key: 'conc-cartoes', label: 'Conc. Cartões' },
   { key: 'omie', label: 'Omie ERP' },
 ]
 
@@ -72,6 +74,7 @@ const TAB_ICONS = {
   movimentacoes: FileText,
   contas: Building2,
   conciliacao: Check,
+  'conc-cartoes': CreditCard,
   omie: Zap,
 } as const
 
@@ -107,6 +110,14 @@ const TAB_ACCENT = {
     textActive: 'text-violet-800',
     border: 'border-violet-500',
     badge: 'bg-violet-100 text-violet-700',
+  },
+  'conc-cartoes': {
+    bg: 'hover:bg-orange-50',
+    bgActive: 'bg-orange-50',
+    text: 'text-orange-600',
+    textActive: 'text-orange-800',
+    border: 'border-orange-500',
+    badge: 'bg-orange-100 text-orange-700',
   },
   omie: {
     bg: 'hover:bg-emerald-50',
@@ -365,7 +376,7 @@ function TesourariaToolbar({ activeTab, periodo, setPeriodo, isDark, onNovaMovim
         : 'border border-slate-200 bg-white text-slate-500 hover:bg-slate-50'
   }`
 
-  if (activeTab === 'omie') return null
+  if (activeTab === 'omie' || activeTab === 'conc-cartoes') return null
 
   if (activeTab === 'contas') {
     return (
@@ -2120,6 +2131,10 @@ export default function Tesouraria() {
 
       {activeTab === 'conciliacao' && (
         <ConciliacaoPanel movimentacoes={movimentacoes} isDark={isDark} />
+      )}
+
+      {activeTab === 'conc-cartoes' && (
+        <ConciliacaoCartoes />
       )}
 
       {activeTab === 'omie' && (
