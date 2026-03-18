@@ -2738,7 +2738,7 @@ export default function CPPipeline() {
       )}
 
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center gap-4">
         <div>
           <h1 className={`text-xl font-extrabold flex items-center gap-2 ${isDark ? 'text-white' : 'text-slate-800'}`}>
             <Receipt size={20} className="text-emerald-600" />
@@ -2759,7 +2759,7 @@ export default function CPPipeline() {
           Nova Solicitação
         </button>
         {showNovaMenu && (
-          <div ref={novaMenuRef} className={`absolute right-0 top-full z-[60] mt-2 w-[320px] rounded-3xl border p-2 shadow-2xl backdrop-blur-sm ${isDark ? 'border-white/[0.08] bg-slate-900/95' : 'border-slate-200 bg-white/95'}`}>
+          <div ref={novaMenuRef} className={`absolute left-0 top-full z-[60] mt-2 w-[320px] rounded-3xl border p-2 shadow-2xl backdrop-blur-sm ${isDark ? 'border-white/[0.08] bg-slate-900/95' : 'border-slate-200 bg-white/95'}`}>
             <button
               type="button"
               onClick={() => {
