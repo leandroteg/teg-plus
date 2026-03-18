@@ -2739,8 +2739,8 @@ export default function CPPipeline() {
 
       {/* Nova Solicitação modal */}
       {showNovaMenu && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/20 backdrop-blur-[2px]" onClick={() => setShowNovaMenu(false)}>
-          <div onClick={e => e.stopPropagation()} className={`w-[360px] rounded-3xl border p-3 shadow-2xl ${isDark ? 'border-white/[0.08] bg-slate-900' : 'border-slate-200 bg-white'}`}>
+        <div className="fixed inset-0 z-50 bg-black/10" onClick={() => setShowNovaMenu(false)}>
+          <div onClick={e => e.stopPropagation()} className={`absolute top-16 right-6 w-[360px] rounded-3xl border p-3 shadow-2xl ${isDark ? 'border-white/[0.08] bg-slate-900' : 'border-slate-200 bg-white'}`}>
             <p className={`text-[10px] font-bold uppercase tracking-wider px-4 pt-2 pb-1 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Nova solicitação</p>
             <button type="button"
               onClick={() => { setNovaSolicitacaoKind('extraordinario'); setShowNovaSolicitacao(true); setShowNovaMenu(false) }}
