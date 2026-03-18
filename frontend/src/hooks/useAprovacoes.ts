@@ -14,6 +14,7 @@ export function useAprovacoesPendentes(tipo?: TipoAprovacao) {
   return useQuery<AprovacaoPendente[]>({
     queryKey: ['aprovacoes-pendentes', tipo],
     queryFn: async () => {
+      try {
       // Aprovações de pagamento são criadas APENAS via Lotes (useEnviarLoteAprovacao)
       // Não há mais sync automático de CPs individuais.
 
@@ -454,6 +455,10 @@ export function useAprovacoesPendentes(tipo?: TipoAprovacao) {
           } as unknown as AprovacaoPendente
         })
         .filter((a): a is AprovacaoPendente => a !== null)
+      } catch (err) {
+        console.error('[AprovAI] useAprovacoesPendentes error:', err)
+        throw err
+      }
     },
     refetchInterval: 15_000,
     refetchOnMount: 'always',
