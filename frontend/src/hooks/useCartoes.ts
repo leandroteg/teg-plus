@@ -303,17 +303,18 @@ export function useUploadFatura() {
         .upload(path, file, { contentType: 'application/pdf', upsert: true })
       if (uploadError) throw uploadError
 
-      // 2. URL pública do arquivo
-      const { data: { publicUrl } } = supabase.storage
+      // 2. URL assinada (válida por 1h) — bucket privado, dados financeiros
+      const { data: signedData, error: signedError } = await supabase.storage
         .from('faturas-cartao')
-        .getPublicUrl(path)
+        .createSignedUrl(path, 3600)
+      if (signedError || !signedData) throw signedError ?? new Error('Falha ao gerar URL assinada')
 
       // 3. Aciona o n8n para extrair os lançamentos da fatura
       const N8N_URL = import.meta.env.VITE_N8N_WEBHOOK_URL || 'https://teg-agents-n8n.nmmcas.easypanel.host/webhook'
       const res = await fetch(`${N8N_URL}/processar-fatura`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ cartao_id: cartaoId, mes_referencia: mesReferencia, fatura_url: publicUrl }),
+        body: JSON.stringify({ cartao_id: cartaoId, mes_referencia: mesReferencia, fatura_url: signedData.signedUrl }),
         signal: AbortSignal.timeout(60_000),
       })
       if (!res.ok) throw new Error('Falha ao processar fatura no n8n')
