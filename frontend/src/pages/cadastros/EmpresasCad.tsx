@@ -204,6 +204,52 @@ export default function EmpresasCad() {
                 </div>
               </div>
 
+              {/* Endereço e contato */}
+              <div className="pt-2 border-t border-slate-100">
+                <p className="text-[10px] font-bold text-violet-500 uppercase tracking-wider mb-2">{`Endere\u00e7o e Contato`}</p>
+                <div className="space-y-3">
+                  <div>
+                    <label className="block text-xs font-bold text-slate-600 mb-1">{`Endere\u00e7o`}</label>
+                    <input value={(editItem as any).endereco ?? ''} onChange={e => set('endereco', e.target.value)}
+                      className="input-base" placeholder="Rua, número, bairro" />
+                  </div>
+                  <div className="grid grid-cols-3 gap-2">
+                    <div>
+                      <label className="block text-xs font-bold text-slate-600 mb-1">Cidade</label>
+                      <input value={(editItem as any).cidade ?? ''} onChange={e => set('cidade', e.target.value)}
+                        className="input-base" placeholder="Cidade" />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-slate-600 mb-1">UF</label>
+                      <input value={(editItem as any).uf ?? ''} onChange={e => set('uf', e.target.value)}
+                        className="input-base" placeholder="UF" maxLength={2} />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-slate-600 mb-1">CEP</label>
+                      <input value={(editItem as any).cep ?? ''} onChange={e => set('cep', e.target.value)}
+                        className="input-base" placeholder="00000-000" />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="block text-xs font-bold text-slate-600 mb-1">Telefone</label>
+                      <input value={(editItem as any).telefone ?? ''} onChange={e => set('telefone', e.target.value)}
+                        className="input-base" placeholder="(00) 0000-0000" />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-slate-600 mb-1">E-mail</label>
+                      <input value={(editItem as any).email ?? ''} onChange={e => set('email', e.target.value)}
+                        className="input-base" placeholder="contato@empresa.com" />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-slate-600 mb-1">{`Inscri\u00e7\u00e3o Estadual`}</label>
+                    <input value={(editItem as any).inscricao_estadual ?? ''} onChange={e => set('inscricao_estadual', e.target.value)}
+                      className="input-base" placeholder="00.000.000-0" />
+                  </div>
+                </div>
+              </div>
+
               <label className="flex items-center gap-2 cursor-pointer">
                 <input type="checkbox" checked={editItem.ativo ?? true}
                   onChange={e => set('ativo', e.target.checked)}
