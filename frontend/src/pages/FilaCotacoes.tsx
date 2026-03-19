@@ -472,8 +472,10 @@ export default function FilaCotacoes() {
             <thead>
               <tr className={isDark ? 'bg-white/[0.03] text-slate-400' : 'bg-slate-50 text-slate-500'}>
                 <th className="text-left px-3 py-2 font-semibold">RC</th>
-                <th className="text-left px-3 py-2 font-semibold">Descrição</th>
+                <th className="text-left px-3 py-2 font-semibold">{`Descri\u00e7\u00e3o`}</th>
                 <th className="text-left px-3 py-2 font-semibold">Obra</th>
+                <th className="text-left px-3 py-2 font-semibold">Necessidade</th>
+                <th className="text-center px-3 py-2 font-semibold">{`Urg\u00eancia`}</th>
                 <th className="text-right px-3 py-2 font-semibold">Valor</th>
                 <th className="text-left px-3 py-2 font-semibold">Fornecedor</th>
                 <th className="text-left px-3 py-2 font-semibold">Dias</th>
@@ -486,6 +488,10 @@ export default function FilaCotacoes() {
                   <td className={`px-3 py-2 font-mono ${isDark ? 'text-teal-400' : 'text-teal-600'}`}>{cot.requisicao?.numero ?? '—'}</td>
                   <td className={`px-3 py-2 max-w-[200px] truncate ${isDark ? 'text-white' : 'text-slate-800'}`}>{cot.requisicao?.descricao}</td>
                   <td className={`px-3 py-2 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{cot.requisicao?.obra_nome}</td>
+                  <td className={`px-3 py-2 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{cot.requisicao?.data_necessidade ? new Date(cot.requisicao.data_necessidade).toLocaleDateString('pt-BR') : '—'}</td>
+                  <td className="px-3 py-2 text-center">{cot.requisicao?.urgencia && cot.requisicao.urgencia !== 'normal' ? (
+                    <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${cot.requisicao.urgencia === 'critica' ? (isDark ? 'bg-red-500/20 text-red-400' : 'bg-red-100 text-red-700') : (isDark ? 'bg-amber-500/20 text-amber-400' : 'bg-amber-100 text-amber-700')}`}>{cot.requisicao.urgencia}</span>
+                  ) : <span className={isDark ? 'text-slate-600' : 'text-slate-300'}>—</span>}</td>
                   <td className={`px-3 py-2 text-right font-bold ${isDark ? 'text-teal-400' : 'text-teal-600'}`}>{fmt(cot.valor_selecionado ?? 0)}</td>
                   <td className={`px-3 py-2 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{cot.fornecedor_selecionado_nome ?? '—'}</td>
                   <td className={`px-3 py-2 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{diasEmAberto(cot.created_at)}d</td>

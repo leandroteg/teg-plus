@@ -5,7 +5,7 @@ import {
   Landmark, TrendingUp, TrendingDown, ArrowUpRight, ArrowDownRight,
   Plus, Upload, Wallet, Building2, CircleDollarSign, Search,
   Filter, X, Calendar, ChevronDown, Eye, FileText, Check,
-  AlertTriangle, Zap, RefreshCw, ArrowDownUp, Link2, CreditCard,
+  AlertTriangle, Zap, RefreshCw, ArrowDownUp, Link2, CreditCard, Download,
 } from 'lucide-react'
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip,
@@ -898,6 +898,35 @@ function MovimentacoesTable({ movimentacoes, isDark, onNovaMovimentacao }: {
             </button>
           )}
         </div>
+
+        <button
+          onClick={() => {
+            const headers = ['Data', 'Tipo', 'Conta', 'Categoria', `Descri\u00e7\u00e3o`, 'Valor']
+            const rows = filtered.map(m => [
+              m.data ? new Date(m.data).toLocaleDateString('pt-BR') : '',
+              m.tipo === 'entrada' ? 'Entrada' : `Sa\u00edda`,
+              m.conta_nome ?? '',
+              m.categoria ?? '',
+              (m.descricao ?? '').replace(/"/g, '""'),
+              (m.valor ?? 0).toFixed(2),
+            ])
+            const csv = [headers.join(';'), ...rows.map(r => r.map(c => `"${c}"`).join(';'))].join('\n')
+            const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8' })
+            const url = URL.createObjectURL(blob)
+            const a = document.createElement('a')
+            a.href = url; a.download = `movimentacoes_${new Date().toISOString().slice(0,10)}.csv`; a.click()
+            URL.revokeObjectURL(url)
+          }}
+          disabled={filtered.length === 0}
+          className={`flex items-center gap-1 text-[10px] font-bold px-3 py-1.5 rounded-lg transition-colors ${
+            isDark
+              ? 'text-slate-400 hover:text-white hover:bg-white/[0.06] disabled:opacity-30'
+              : 'text-slate-500 hover:text-slate-700 hover:bg-slate-100 disabled:opacity-30'
+          }`}
+          title="Exportar movimentações"
+        >
+          <Download size={12} /> CSV
+        </button>
 
         <button
           onClick={onNovaMovimentacao}

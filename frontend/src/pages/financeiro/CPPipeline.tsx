@@ -8,6 +8,7 @@ import {
   ChevronLeft, ChevronRight, ArrowRight,
   Plus, Save, Loader2, RefreshCw,
 } from 'lucide-react'
+import { useQueryClient } from '@tanstack/react-query'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useTheme } from '../../contexts/ThemeContext'
 import {
@@ -556,7 +557,7 @@ function PipelineRail({
 // ══ Export CSV ══════════════════════════════════════════════════
 
 function exportCSV(cps: ContaPagar[], stageName: string) {
-  const headers = ['Fornecedor', 'Valor', 'Vencimento', 'Emissao', 'Documento', 'Centro Custo', 'Classe Financeira', 'Obra', 'Pedido', 'Descricao', 'Status']
+  const headers = ['Fornecedor', 'Valor', 'Vencimento', `Emiss\u00e3o`, 'Documento', 'Centro Custo', 'Classe Financeira', 'Obra', 'Pedido', `Descri\u00e7\u00e3o`, 'Status']
   const rows = cps.map(cp => [
     cp.fornecedor_nome,
     cp.valor_original.toFixed(2).replace('.', ','),
@@ -1624,7 +1625,7 @@ function CPDetailModal({ cp, stageStatus, onClose, onAction, isDark }: {
                           <span>Documento</span>
                           <span>Venc.</span>
                           <span className="text-right">Valor</span>
-                          <span>Decisao</span>
+                          <span>{`Decis\u00e3o`}</span>
                         </div>
                         <div className="divide-y divide-inherit">
                           {approvalItems.map(item => (
@@ -2257,6 +2258,7 @@ function LoteCard({
 
 export default function CPPipeline() {
   const { isDark } = useTheme()
+  const qc = useQueryClient()
   const [searchParams, setSearchParams] = useSearchParams()
   const [activeTab, setActiveTab] = useState<PipelineStageId>('previsto')
   const [busca, setBusca] = useState('')
@@ -3248,6 +3250,19 @@ export default function CPPipeline() {
             CSV
           </button>
 
+          {/* Atualizar dados */}
+          <button
+            onClick={() => { qc.invalidateQueries({ queryKey: ['contas-pagar'] }); qc.invalidateQueries({ queryKey: ['financeiro-dashboard'] }); qc.invalidateQueries({ queryKey: ['lotes-pagamento'] }) }}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[11px] font-medium transition-all ${
+              isDark
+                ? 'text-slate-400 hover:text-white hover:bg-white/[0.04]'
+                : 'text-slate-500 hover:text-slate-700 hover:bg-slate-50'
+            }`}
+            title="Atualizar dados"
+          >
+            <RefreshCw size={13} />
+          </button>
+
           {/* Select + count */}
           {bulk && activeCPs.length > 0 && (
             <label className="flex items-center gap-2 ml-auto cursor-pointer">
@@ -3391,7 +3406,7 @@ export default function CPPipeline() {
                 <span />
                 <span />
                 <span>Fornecedor</span>
-                <span>Descri\u00E7\u00E3o</span>
+                <span>{`Descri\u00e7\u00e3o`}</span>
                 <span>Obra</span>
                 <span>CC</span>
                 <span>Pedido</span>
