@@ -586,21 +586,49 @@ function exportCSV(cps: ContaPagar[], stageName: string) {
 
 function FornecedorBankInfo({ fornecedorId, isDark }: { fornecedorId: string; isDark: boolean }) {
   const { data: forn } = useFornecedorById(fornecedorId)
+  const [copied, setCopied] = useState(false)
   if (!forn) return null
   const hasBankData = forn.banco_nome || forn.agencia || forn.conta || forn.pix_chave
   if (!hasBankData) return null
 
+  const PIX_TIPO_LABEL: Record<string, string> = { cpf: 'CPF', cnpj: 'CNPJ', email: 'E-mail', celular: 'Celular', aleatoria: 'Aleat\u00f3ria' }
+  const copyPix = () => {
+    if (!forn.pix_chave) return
+    navigator.clipboard.writeText(forn.pix_chave).then(() => { setCopied(true); setTimeout(() => setCopied(false), 2000) })
+  }
+
   return (
-    <div className={`rounded-xl p-2.5 space-y-1 ${isDark ? 'bg-white/[0.04]' : 'bg-blue-50/60'}`}>
-      <p className="text-[9px] font-bold text-blue-500 uppercase tracking-wider flex items-center gap-1">
-        <Banknote size={9} /> Dados Banc\u00E1rios
-      </p>
-      <div className="grid grid-cols-2 gap-x-3 gap-y-0.5 text-[10px]">
-        {forn.banco_nome && <div><span className="text-slate-400">Banco:</span> <span className="font-semibold text-slate-700">{forn.banco_nome}</span></div>}
-        {forn.agencia && <div><span className="text-slate-400">Ag:</span> <span className="font-mono text-slate-700">{forn.agencia}</span></div>}
-        {forn.conta && <div><span className="text-slate-400">CC:</span> <span className="font-mono text-slate-700">{forn.conta}</span></div>}
-        {forn.pix_chave && <div className="col-span-2"><span className="text-slate-400">PIX:</span> <span className="font-mono text-blue-700 font-semibold">{forn.pix_chave}</span></div>}
-      </div>
+    <div className="space-y-1.5">
+      {forn.pix_chave && (
+        <div className={`rounded-xl p-3 flex items-center justify-between ${isDark ? 'bg-emerald-500/10 border border-emerald-500/20' : 'bg-emerald-50 border border-emerald-200'}`}>
+          <div className="flex items-center gap-2 min-w-0">
+            <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${isDark ? 'bg-emerald-500/20' : 'bg-emerald-100'}`}>
+              <Banknote size={14} className={isDark ? 'text-emerald-400' : 'text-emerald-600'} />
+            </div>
+            <div className="min-w-0">
+              <p className={`text-[9px] font-bold uppercase tracking-wider ${isDark ? 'text-emerald-400' : 'text-emerald-600'}`}>
+                Pix {forn.pix_tipo ? `\u00b7 ${PIX_TIPO_LABEL[forn.pix_tipo] ?? forn.pix_tipo}` : ''}
+              </p>
+              <p className={`text-xs font-mono font-bold truncate ${isDark ? 'text-emerald-300' : 'text-emerald-800'}`}>{forn.pix_chave}</p>
+            </div>
+          </div>
+          <button onClick={copyPix} className={`shrink-0 ml-2 px-2.5 py-1 rounded-lg text-[10px] font-bold transition-all ${copied ? (isDark ? 'bg-emerald-500/30 text-emerald-300' : 'bg-emerald-200 text-emerald-800') : (isDark ? 'bg-white/[0.06] text-slate-300 hover:bg-white/[0.12]' : 'bg-white text-slate-600 hover:bg-emerald-100')}`}>
+            {copied ? 'Copiado!' : 'Copiar'}
+          </button>
+        </div>
+      )}
+      {(forn.banco_nome || forn.agencia || forn.conta) && (
+        <div className={`rounded-xl p-2.5 space-y-1 ${isDark ? 'bg-white/[0.04]' : 'bg-blue-50/60'}`}>
+          <p className="text-[9px] font-bold text-blue-500 uppercase tracking-wider flex items-center gap-1">
+            <Building2 size={9} /> Dados Banc\u00e1rios
+          </p>
+          <div className="grid grid-cols-3 gap-x-3 gap-y-0.5 text-[10px]">
+            {forn.banco_nome && <div><span className={isDark ? 'text-slate-500' : 'text-slate-400'}>Banco:</span> <span className={`font-semibold ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>{forn.banco_nome}</span></div>}
+            {forn.agencia && <div><span className={isDark ? 'text-slate-500' : 'text-slate-400'}>Ag:</span> <span className={`font-mono ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>{forn.agencia}</span></div>}
+            {forn.conta && <div><span className={isDark ? 'text-slate-500' : 'text-slate-400'}>CC:</span> <span className={`font-mono ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>{forn.conta}</span></div>}
+          </div>
+        </div>
+      )}
     </div>
   )
 }
@@ -2246,6 +2274,10 @@ export default function CPPipeline() {
   const tabFiltersRef = useRef<Map<PipelineStageId, { busca: string; quickFilter: QuickFilterId }>>(new Map())
   const [showNovaSolicitacao, setShowNovaSolicitacao] = useState(false)
   const [showNovaMenu, setShowNovaMenu] = useState(false)
+  const [pagModal, setPagModal] = useState<{ cpIds: string[]; pedidoId?: string } | null>(null)
+  const [pagData, setPagData] = useState(new Date().toISOString().split('T')[0])
+  const [pagFile, setPagFile] = useState<File | null>(null)
+  const [pagUploading, setPagUploading] = useState(false)
   const [novaSolicitacaoKind, setNovaSolicitacaoKind] = useState<NovaSolicitacaoKind | null>(null)
   const [expandedLoteIds, setExpandedLoteIds] = useState<Set<string>>(new Set())
   const novaMenuRef = useRef<HTMLDivElement | null>(null)
@@ -2278,6 +2310,7 @@ export default function CPPipeline() {
   const criarLoteMut = useCriarLote()
   const enviarLoteMut = useEnviarLoteAprovacao()
   const registrarBatchMut = useRegistrarPagamentoBatch()
+  const uploadComprovante = useUploadAnexo()
   const enviarRemessaMut = useEnviarRemessaPagamentoBatch()
   const syncRemessasMut = useSincronizarRemessasPagamento()
 
@@ -2569,19 +2602,11 @@ export default function CPPipeline() {
     } catch { showToast('error', 'Erro ao criar lote') }
   }
 
-  const handlePagar = async (ids: string[]) => {
-    try {
-      const count = await registrarBatchMut.mutateAsync({
-        cpIds: ids,
-        dataPagamento: new Date().toISOString().split('T')[0],
-      })
-      if (count === 0) {
-        showToast('error', 'Nenhum título elegível para pagamento (status deve ser aprovado ou em pagamento)')
-      } else {
-        showToast('success', `${count} pagamento(s) registrado(s)`)
-      }
-      setSelectedIds(new Set())
-    } catch { showToast('error', 'Erro ao registrar pagamento') }
+  const handlePagar = (ids: string[]) => {
+    const pedId = ids.length === 1 ? contasById.get(ids[0])?.pedido_id : undefined
+    setPagData(new Date().toISOString().split('T')[0])
+    setPagFile(null)
+    setPagModal({ cpIds: ids, pedidoId: pedId ?? undefined })
   }
 
   const handleEnviarRemessa = async (ids: string[]) => {
@@ -2639,19 +2664,44 @@ export default function CPPipeline() {
     }
   }
 
-  const handleConfirmarPagamento = async (ids: string[]) => {
+  const handleConfirmarPagamento = (ids: string[]) => {
+    const pedId = ids.length === 1 ? contasById.get(ids[0])?.pedido_id : undefined
+    setPagData(new Date().toISOString().split('T')[0])
+    setPagFile(null)
+    setPagModal({ cpIds: ids, pedidoId: pedId ?? undefined })
+  }
+
+  const executarPagamento = async () => {
+    if (!pagModal) return
+    setPagUploading(true)
     try {
+      // 1. Upload comprovante se fornecido
+      if (pagFile && pagModal.pedidoId) {
+        await uploadComprovante.mutateAsync({
+          pedidoId: pagModal.pedidoId,
+          file: pagFile,
+          tipo: 'comprovante_pagamento',
+          observacao: `Pagamento registrado em ${pagData}`,
+          origem: 'financeiro',
+        })
+      }
+      // 2. Registrar pagamento
       const count = await registrarBatchMut.mutateAsync({
-        cpIds: ids,
-        dataPagamento: new Date().toISOString().split('T')[0],
+        cpIds: pagModal.cpIds,
+        dataPagamento: pagData,
       })
+      setPagModal(null)
       if (count === 0) {
-        showToast('error', 'Nenhum título elegível para confirmação de pagamento')
+        showToast('error', 'Nenhum título elegível para pagamento')
       } else {
-        showToast('success', `${count} pagamento(s) registrados manualmente`)
+        showToast('success', `${count} pagamento(s) registrado(s)${pagFile ? ' com comprovante' : ''}`)
       }
       setSelectedIds(new Set())
-    } catch { showToast('error', 'Erro ao confirmar pagamento') }
+    } catch {
+      showToast('error', 'Erro ao registrar pagamento')
+    } finally {
+      setPagUploading(false)
+    }
   }
 
   const handleConciliar = async (ids: string[]) => {
@@ -2870,6 +2920,55 @@ export default function CPPipeline() {
 
   return (
     <div className="space-y-4">
+      {/* Modal Confirmar Pagamento */}
+      {pagModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-[2px]" onClick={() => !pagUploading && setPagModal(null)}>
+          <div onClick={e => e.stopPropagation()} className={`w-[400px] rounded-2xl border shadow-2xl ${isDark ? 'bg-slate-900 border-white/[0.08]' : 'bg-white border-slate-200'}`}>
+            <div className={`px-5 py-4 border-b ${isDark ? 'border-white/[0.06]' : 'border-slate-100'}`}>
+              <h3 className={`text-sm font-bold flex items-center gap-2 ${isDark ? 'text-white' : 'text-slate-800'}`}>
+                <Banknote size={16} className="text-emerald-500" /> Registrar Pagamento
+              </h3>
+              <p className={`text-[11px] mt-0.5 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+                {pagModal.cpIds.length} {pagModal.cpIds.length === 1 ? 'título' : 'títulos'}
+              </p>
+            </div>
+            <div className="px-5 py-4 space-y-3">
+              <div>
+                <label className={`text-[10px] font-bold uppercase tracking-wider ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Data do pagamento</label>
+                <input type="date" value={pagData} onChange={e => setPagData(e.target.value)}
+                  className={`w-full mt-1 px-3 py-2 rounded-xl text-sm border ${isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-50 border-slate-200 text-slate-800'}`} />
+              </div>
+              {pagModal.pedidoId && (
+                <div>
+                  <label className={`text-[10px] font-bold uppercase tracking-wider ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Comprovante (opcional)</label>
+                  <label className={`mt-1 flex items-center gap-2 px-3 py-2.5 rounded-xl border border-dashed cursor-pointer transition-all ${
+                    pagFile
+                      ? (isDark ? 'border-emerald-500/40 bg-emerald-500/10' : 'border-emerald-300 bg-emerald-50')
+                      : (isDark ? 'border-slate-700 hover:border-slate-500' : 'border-slate-300 hover:border-slate-400')
+                  }`}>
+                    <FileText size={16} className={pagFile ? 'text-emerald-500' : (isDark ? 'text-slate-500' : 'text-slate-400')} />
+                    <span className={`text-xs truncate ${pagFile ? (isDark ? 'text-emerald-400 font-semibold' : 'text-emerald-700 font-semibold') : (isDark ? 'text-slate-400' : 'text-slate-500')}`}>
+                      {pagFile ? pagFile.name : 'PDF, imagem ou documento'}
+                    </span>
+                    <input type="file" className="hidden" accept=".pdf,.png,.jpg,.jpeg,.webp" onChange={e => setPagFile(e.target.files?.[0] ?? null)} />
+                  </label>
+                </div>
+              )}
+            </div>
+            <div className={`px-5 py-3 border-t flex justify-end gap-2 ${isDark ? 'border-white/[0.06]' : 'border-slate-100'}`}>
+              <button onClick={() => setPagModal(null)} disabled={pagUploading}
+                className={`px-4 py-2 rounded-xl text-xs font-semibold ${isDark ? 'text-slate-300 hover:bg-white/[0.06]' : 'text-slate-600 hover:bg-slate-100'}`}>
+                Cancelar
+              </button>
+              <button onClick={executarPagamento} disabled={pagUploading || !pagData}
+                className="px-5 py-2 rounded-xl text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 flex items-center gap-1.5">
+                {pagUploading ? <><Loader2 size={13} className="animate-spin" /> Processando...</> : <><CheckCircle2 size={13} /> Confirmar</>}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Toast */}
       {toast && (
         <div className={`fixed top-4 left-1/2 -translate-x-1/2 z-50 px-5 py-2.5 rounded-2xl shadow-lg text-sm font-bold flex items-center gap-2 animate-[slideDown_0.3s_ease] ${
