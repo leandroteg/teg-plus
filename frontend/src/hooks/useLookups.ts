@@ -20,8 +20,7 @@ export function useLookups() {
     queryFn: async () => {
       const [obrasRes, ccRes, cfRes, catRes, empRes] = await Promise.all([
         supabase.from('sys_obras').select('id, nome, codigo, status').eq('status', 'ativa').order('nome'),
-        // fin_centros_custo has seeded data from CP/CR/contratos (nome column) — fix #78
-        supabase.from('fin_centros_custo').select('id, codigo, nome').eq('ativo', true).order('nome'),
+        supabase.from('sys_centros_custo').select('id, codigo, descricao').eq('ativo', true).order('descricao'),
         supabase.from('fin_classes_financeiras').select('id, codigo, descricao, tipo').order('descricao'),
         supabase.from('cmp_categorias').select('id, nome').eq('ativo', true).order('nome'),
         supabase.from('sys_empresas').select('id, razao_social, nome_fantasia, cnpj').order('razao_social'),
@@ -29,9 +28,7 @@ export function useLookups() {
 
       return {
         obras: (obrasRes.data ?? []) as Lookups['obras'],
-        centros_custo: ((ccRes.data ?? []) as Array<{ id: string; codigo: string; nome: string }>).map(r => ({
-          id: r.id, codigo: r.codigo, descricao: r.nome,
-        })),
+        centros_custo: (ccRes.data ?? []) as Lookups['centros_custo'],
         classes_financeiras: (cfRes.data ?? []) as Lookups['classes_financeiras'],
         categorias: (catRes.data ?? []) as Lookups['categorias'],
         empresas: ((empRes.data ?? []) as Array<{ id: string; razao_social: string; nome_fantasia: string; cnpj: string }>).map(e => ({
