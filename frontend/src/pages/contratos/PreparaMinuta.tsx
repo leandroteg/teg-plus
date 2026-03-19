@@ -1736,13 +1736,17 @@ export default function PreparaMinuta() {
           pdf.setDrawColor(c[0], c[1], c[2]); pdf.setLineWidth(0.3); pdf.line(mx, y, pw - mx, y); y += 3
         }
 
-        // HEADER — formal contract style (clean, no party details — preâmbulo handles qualification)
+        // HEADER — formal contract style
+        const CAT_LABEL: Record<string, string> = {
+          prestacao_servico: 'Prestacao de Servicos', fornecimento: 'Fornecimento',
+          locacao: 'Locacao', consultoria: 'Consultoria', obra_civil: 'Obra Civil',
+        }
+        const tipoLabel = CAT_LABEL[solicitacao.categoria_contrato ?? ''] ?? solicitacao.categoria_contrato ?? ''
+        const tituloContrato = tipoLabel ? `CONTRATO DE ${tipoLabel.toUpperCase()}` : 'MINUTA CONTRATUAL'
         pdf.setFont('helvetica', 'bold'); pdf.setFontSize(14); pdf.setTextColor(30, 41, 59)
-        pdf.text('MINUTA CONTRATUAL', pw / 2, 20, { align: 'center' })
+        pdf.text(tituloContrato, pw / 2, 20, { align: 'center' })
         pdf.setDrawColor(15, 118, 110); pdf.setLineWidth(0.8); pdf.line(mx, 24, pw - mx, 24)
-        pdf.setFont('helvetica', 'normal'); pdf.setFontSize(9); pdf.setTextColor(100, 116, 139)
-        pdf.text(minuta.titulo, pw / 2, 30, { align: 'center' })
-        y = 38
+        y = 30
 
         // PREAMBULO
         if (mtRaw.preambulo) { printText(mtRaw.preambulo, 9, { color: [30, 41, 59] }); y += gapLg }
