@@ -157,7 +157,7 @@ function AprovacaoCard({ aprovacao, aprovadorNome, aprovadorEmail }: {
   // Busca alerta de cotacoes obrigatorias faltantes (#38)
   useEffect(() => {
     if (!aprovacao.requisicao_id) return
-    supabase.rpc('get_alerta_cotacao', { p_requisicao_id: aprovacao.requisicao_id })
+    Promise.resolve(supabase.rpc('get_alerta_cotacao', { p_requisicao_id: aprovacao.requisicao_id }))
       .then(({ data }) => { if (data) setAlertaCotacao(data) })
       .catch(() => { /* non-critical */ })
   }, [aprovacao.requisicao_id])
@@ -1693,6 +1693,7 @@ function TabPendentes({
       autorizacao_pagamento: [],
       minuta_contratual: [],
       requisicao_compra: [],
+      aprovacao_transporte: [],
     }
     for (const apr of aprovacoes ?? []) {
       const tipo = apr.tipo_aprovacao || 'requisicao_compra'
