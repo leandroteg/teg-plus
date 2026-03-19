@@ -279,8 +279,13 @@ function buildPdfHtml(pedido: Pedido): string {
 </div></body></html>`
 }
 
-function gerarPdfPedido(pedido: Pedido) {
-  const html = buildPdfHtml(pedido)
+async function gerarPdfPedido(pedido: Pedido) {
+  // Pre-load logo as base64 so it works inside blob: URLs
+  const logoB64 = await loadLogoBase64()
+  let html = buildPdfHtml(pedido)
+  if (logoB64) {
+    html = html.replace(`src="${EMPRESA.logoUrl}"`, `src="${logoB64}"`)
+  }
   const blob = new Blob([html], { type: 'text/html;charset=utf-8' })
   const url = URL.createObjectURL(blob)
   const printWin = window.open(url, '_blank', 'width=900,height=700')
