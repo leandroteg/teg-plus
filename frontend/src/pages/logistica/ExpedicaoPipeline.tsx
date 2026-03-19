@@ -82,15 +82,13 @@ function exportCSV(items: LogSolicitacao[], stageName: string) {
 
 // ── Detail Modal ─────────────────────────────────────────────────────────────
 
-const ITEMS_CHECKLIST = [
-  ['itens_conferidos',       'Itens conferidos contra lista de materiais'],
-  ['volumes_identificados',  'Volumes identificados com etiquetas'],
-  ['embalagem_verificada',   'Condições de embalagem e proteção verificadas'],
-  ['documentacao_separada',  'Documentação separada (DANFE, romaneio)'],
-  ['motorista_habilitado',   'Motorista habilitado verificado'],
-  ['veiculo_vistoriado',     'Veículo vistoriado'],
-  ['contato_destinatario',   'Contato do destinatário confirmado'],
-] as const
+const ITEMS_CHECKLIST: readonly [string, string, boolean][] = [
+  // [key, label, fotoObrigatoria]
+  ['itens_conferidos',       'Itens conferidos contra lista de materiais', false],
+  ['volumes_identificados',  'Volumes identificados com etiquetas',        true],
+  ['embalagem_verificada',   'Condições de embalagem e proteção verificadas', true],
+  ['contato_destinatario',   'Contato do destinatário confirmado',         false],
+]
 
 function DetailModal({ sol, onClose, onAction, isDark }: {
   sol: LogSolicitacao; onClose: () => void
@@ -98,7 +96,12 @@ function DetailModal({ sol, onClose, onAction, isDark }: {
 }) {
   const { data: checklist } = useChecklistExpedicao(sol.id)
   const salvarChecklist = useSalvarChecklistExpedicao()
-  const todosMarcados = ITEMS_CHECKLIST.every(([k]) => checklist?.[k as keyof typeof checklist])
+  const todosMarcados = ITEMS_CHECKLIST.every(([k, , fotoObrig]) => {
+    const checked = checklist?.[k as keyof typeof checklist]
+    if (!checked) return false
+    if (fotoObrig && !(checklist?.fotos ?? []).some(f => f.key === k)) return false
+    return true
+  })
   const showChecklist = sol.status === 'aprovado'
 
   const [uploading, setUploading] = useState<string | null>(null)
@@ -207,10 +210,11 @@ function DetailModal({ sol, onClose, onAction, isDark }: {
 
               {/* Checklist items — cards grandes */}
               <div className="space-y-2">
-                {ITEMS_CHECKLIST.map(([key, label]) => {
+                {ITEMS_CHECKLIST.map(([key, label, fotoObrig]) => {
                   const checked = !!(checklist?.[key as keyof typeof checklist])
                   const itemFotos = (checklist?.fotos ?? []).filter(f => f.key === key)
                   const isUploading = uploading === key
+                  const fotoFaltando = fotoObrig && checked && itemFotos.length === 0
 
                   return (
                     <div key={key} className={`rounded-xl border-2 transition-all duration-200 ${
@@ -237,12 +241,14 @@ function DetailModal({ sol, onClose, onAction, isDark }: {
                         </span>
                       </button>
 
-                      {/* Photo strip + camera button */}
-                      <div className="px-4 pb-3 flex items-center gap-2 flex-wrap">
+                      {/* Photo strip + camera button — só nos itens com foto */}
+                      {fotoObrig && (
+                      <div className="px-4 pb-3 space-y-1.5">
+                        <div className="flex items-center gap-2 flex-wrap">
                         {itemFotos.map(foto => (
                           <div key={foto.url} className="relative group">
                             <a href={foto.url} target="_blank" rel="noreferrer">
-                              <img src={foto.url} alt="" className="w-12 h-12 sm:w-10 sm:h-10 rounded-lg object-cover border border-slate-200" />
+                              <img src={foto.url} alt="" className="w-14 h-14 sm:w-10 sm:h-10 rounded-lg object-cover border border-slate-200" />
                             </a>
                             <button onClick={() => removePhoto(foto.url)}
                               className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-red-500 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 sm:opacity-100 transition-opacity">
@@ -254,7 +260,7 @@ function DetailModal({ sol, onClose, onAction, isDark }: {
                           type="button"
                           onClick={() => fileRefs.current[key]?.click()}
                           disabled={isUploading}
-                          className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold transition-all active:scale-95 ${
+                          className={`flex items-center gap-1.5 px-3 py-2.5 rounded-lg text-xs font-semibold transition-all active:scale-95 ${
                             isDark
                               ? 'bg-white/[0.06] text-slate-300 hover:bg-white/[0.1]'
                               : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
@@ -271,7 +277,14 @@ function DetailModal({ sol, onClose, onAction, isDark }: {
                           ref={el => { fileRefs.current[key] = el }}
                           onChange={e => { const f = e.target.files?.[0]; if (f) handlePhoto(key, f); e.target.value = '' }}
                         />
+                        </div>
+                        {fotoFaltando && (
+                          <p className="text-xs text-red-500 font-medium flex items-center gap-1">
+                            <Camera size={12} /> Foto obrigatória
+                          </p>
+                        )}
                       </div>
+                      )}
                     </div>
                   )
                 })}
