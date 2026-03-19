@@ -181,6 +181,7 @@ export interface LogChecklistExpedicao {
   conferido_por?: string
   conferido_em?: string
   observacoes?: string
+  fotos?: { key: string; url: string; descricao?: string; created_at: string }[]
   criado_em: string
 }
 

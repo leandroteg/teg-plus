@@ -1,10 +1,11 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useRef } from 'react'
 import {
   Package2, Search, X, CheckCircle2, AlertTriangle,
   Calendar, ArrowUp, ArrowDown, LayoutList, LayoutGrid, Download,
   MapPin, FileText, Building2, Briefcase, Truck, ScrollText,
-  ClipboardList,
+  ClipboardList, Camera, Loader2, Trash2, Circle,
 } from 'lucide-react'
+import { supabase } from '../../services/supabase'
 import { useTheme } from '../../contexts/ThemeContext'
 import {
   useSolicitacoes, useEmitirRomaneio, useSolicitarNFFiscal, useIniciarTransporte,
@@ -100,6 +101,9 @@ function DetailModal({ sol, onClose, onAction, isDark }: {
   const todosMarcados = ITEMS_CHECKLIST.every(([k]) => checklist?.[k as keyof typeof checklist])
   const showChecklist = sol.status === 'aprovado'
 
+  const [uploading, setUploading] = useState<string | null>(null)
+  const fileRefs = useRef<Record<string, HTMLInputElement | null>>({})
+
   async function toggle(key: string, val: boolean) {
     await salvarChecklist.mutateAsync({
       solicitacao_id: sol.id,
@@ -107,6 +111,27 @@ function DetailModal({ sol, onClose, onAction, isDark }: {
       [key]: val,
     })
   }
+
+  async function handlePhoto(key: string, file: File) {
+    setUploading(key)
+    try {
+      const ext = file.name.split('.').pop() || 'jpg'
+      const path = `${sol.id}/${key}_${Date.now()}.${ext}`
+      const { error: uploadErr } = await supabase.storage.from('logistica-fotos').upload(path, file, { upsert: false })
+      if (uploadErr) throw uploadErr
+      const { data: urlData } = supabase.storage.from('logistica-fotos').getPublicUrl(path)
+      const fotos = [...(checklist?.fotos ?? []), { key, url: urlData.publicUrl, created_at: new Date().toISOString() }]
+      await salvarChecklist.mutateAsync({ solicitacao_id: sol.id, ...(checklist ?? {}), fotos })
+    } catch (e) { console.error('Upload error:', e) }
+    setUploading(null)
+  }
+
+  async function removePhoto(url: string) {
+    const fotos = (checklist?.fotos ?? []).filter(f => f.url !== url)
+    await salvarChecklist.mutateAsync({ solicitacao_id: sol.id, ...(checklist ?? {}), fotos })
+  }
+
+  const checkedCount = ITEMS_CHECKLIST.filter(([k]) => checklist?.[k as keyof typeof checklist]).length
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-sm p-4" onClick={onClose}>
@@ -159,34 +184,104 @@ function DetailModal({ sol, onClose, onAction, isDark }: {
             </div>
           </div>
 
-          {/* ── Checklist de Expedição ── */}
+          {/* ── Checklist de Expedição (mobile-first) ── */}
           {showChecklist && (
-            <div className={`rounded-xl p-3 space-y-2 ${isDark ? 'bg-white/[0.04]' : 'bg-slate-50'}`}>
-              <p className={`text-[9px] font-bold uppercase tracking-wider flex items-center gap-1.5 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
-                <ClipboardList size={11} />
-                Checklist de Expedição
-                <span className={`ml-auto text-[10px] font-bold px-1.5 py-0.5 rounded-full ${todosMarcados ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
-                  {ITEMS_CHECKLIST.filter(([k]) => checklist?.[k as keyof typeof checklist]).length}/{ITEMS_CHECKLIST.length}
-                </span>
-              </p>
-              <div className="space-y-1">
+            <div className="space-y-3">
+              {/* Header + progress */}
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <p className={`text-sm font-bold flex items-center gap-2 ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>
+                    <ClipboardList size={16} className="text-emerald-600" />
+                    Checklist de Expedição
+                  </p>
+                  <span className={`text-sm font-extrabold px-2.5 py-1 rounded-full ${todosMarcados ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
+                    {checkedCount}/{ITEMS_CHECKLIST.length}
+                  </span>
+                </div>
+                {/* Progress bar */}
+                <div className={`h-2 rounded-full overflow-hidden ${isDark ? 'bg-white/[0.06]' : 'bg-slate-200'}`}>
+                  <div className={`h-full rounded-full transition-all duration-500 ${todosMarcados ? 'bg-emerald-500' : 'bg-amber-500'}`}
+                    style={{ width: `${(checkedCount / ITEMS_CHECKLIST.length) * 100}%` }} />
+                </div>
+              </div>
+
+              {/* Checklist items — cards grandes */}
+              <div className="space-y-2">
                 {ITEMS_CHECKLIST.map(([key, label]) => {
                   const checked = !!(checklist?.[key as keyof typeof checklist])
+                  const itemFotos = (checklist?.fotos ?? []).filter(f => f.key === key)
+                  const isUploading = uploading === key
+
                   return (
-                    <label key={key} className="flex items-center gap-2 cursor-pointer group">
-                      <input type="checkbox" checked={checked} onChange={e => toggle(key, e.target.checked)}
-                        className="rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 transition-colors" />
-                      <span className={`text-xs transition-colors ${checked ? 'text-emerald-600 line-through opacity-60' : isDark ? 'text-slate-400' : 'text-slate-600'}`}>
-                        {label}
-                      </span>
-                    </label>
+                    <div key={key} className={`rounded-xl border-2 transition-all duration-200 ${
+                      checked
+                        ? isDark ? 'bg-emerald-500/10 border-emerald-500/40' : 'bg-emerald-50 border-emerald-300'
+                        : isDark ? 'bg-white/[0.02] border-white/[0.08]' : 'bg-white border-slate-200'
+                    }`}>
+                      {/* Main row — tap to toggle */}
+                      <button
+                        type="button"
+                        onClick={() => toggle(key, !checked)}
+                        className="w-full flex items-center gap-3 px-4 py-4 text-left active:scale-[0.98] transition-transform"
+                      >
+                        {checked
+                          ? <CheckCircle2 size={24} className="text-emerald-500 shrink-0" />
+                          : <Circle size={24} className={`shrink-0 ${isDark ? 'text-slate-600' : 'text-slate-300'}`} />
+                        }
+                        <span className={`text-sm sm:text-base font-medium flex-1 ${
+                          checked
+                            ? isDark ? 'text-emerald-400' : 'text-emerald-700'
+                            : isDark ? 'text-slate-300' : 'text-slate-700'
+                        }`}>
+                          {label}
+                        </span>
+                      </button>
+
+                      {/* Photo strip + camera button */}
+                      <div className="px-4 pb-3 flex items-center gap-2 flex-wrap">
+                        {itemFotos.map(foto => (
+                          <div key={foto.url} className="relative group">
+                            <a href={foto.url} target="_blank" rel="noreferrer">
+                              <img src={foto.url} alt="" className="w-12 h-12 sm:w-10 sm:h-10 rounded-lg object-cover border border-slate-200" />
+                            </a>
+                            <button onClick={() => removePhoto(foto.url)}
+                              className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-red-500 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 sm:opacity-100 transition-opacity">
+                              <Trash2 size={10} />
+                            </button>
+                          </div>
+                        ))}
+                        <button
+                          type="button"
+                          onClick={() => fileRefs.current[key]?.click()}
+                          disabled={isUploading}
+                          className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold transition-all active:scale-95 ${
+                            isDark
+                              ? 'bg-white/[0.06] text-slate-300 hover:bg-white/[0.1]'
+                              : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                          } disabled:opacity-50`}
+                        >
+                          {isUploading ? <Loader2 size={14} className="animate-spin" /> : <Camera size={14} />}
+                          {isUploading ? 'Enviando...' : 'Foto'}
+                        </button>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          capture="environment"
+                          className="hidden"
+                          ref={el => { fileRefs.current[key] = el }}
+                          onChange={e => { const f = e.target.files?.[0]; if (f) handlePhoto(key, f); e.target.value = '' }}
+                        />
+                      </div>
+                    </div>
                   )
                 })}
               </div>
+
               {!todosMarcados && (
-                <p className="text-[10px] text-amber-600 flex items-center gap-1">
-                  <AlertTriangle size={10} /> Complete o checklist para habilitar o despacho
-                </p>
+                <div className={`flex items-center gap-2 px-4 py-3 rounded-xl text-sm font-medium ${isDark ? 'bg-amber-500/10 text-amber-400' : 'bg-amber-50 text-amber-700'}`}>
+                  <AlertTriangle size={16} className="shrink-0" />
+                  Complete todos os itens para despachar
+                </div>
               )}
             </div>
           )}
