@@ -200,6 +200,18 @@ export const api = {
 }
 
 // ── Normaliza resposta CNPJ (n8n proxy pode retornar campos com nomes diferentes) ──
+function normalizeSocios(d: Record<string, unknown>): { nome: string; qualificacao: string }[] {
+  // BrasilAPI: qsa: [{ nome_socio, qualificacao_socio }]
+  // ReceitaWS: qsa: [{ nome, qual }]
+  // n8n proxy: socios or qsa
+  const raw = (d.qsa ?? d.socios ?? []) as Record<string, unknown>[]
+  if (!Array.isArray(raw)) return []
+  return raw.map(s => ({
+    nome: String(s.nome_socio ?? s.nome ?? ''),
+    qualificacao: String(s.qualificacao_socio ?? s.qual ?? s.qualificacao ?? 'Sócio Administrador'),
+  })).filter(s => s.nome)
+}
+
 function normalizeCnpjResponse(r: Record<string, unknown>, cnpjDigits: string): CnpjResult {
   // Handle potential wrapper: n8n may return { data: {...} } or nested structure
   const d = (r.data && typeof r.data === 'object' ? r.data : r) as Record<string, unknown>
@@ -240,6 +252,7 @@ function normalizeCnpjResponse(r: Record<string, unknown>, cnpjDigits: string): 
     },
     telefone: String(d.telefone ?? d.ddd_telefone_1 ?? '').replace(/\D/g, ''),
     email: String(d.email ?? '').toLowerCase(),
+    socios: normalizeSocios(d),
   }
 }
 
@@ -260,6 +273,7 @@ export interface CnpjResult {
   }
   telefone: string
   email: string
+  socios?: { nome: string; qualificacao: string }[]
   error?: boolean
   message?: string
 }

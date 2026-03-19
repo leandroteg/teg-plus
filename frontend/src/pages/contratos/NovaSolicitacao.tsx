@@ -308,13 +308,27 @@ export default function NovaSolicitacao() {
         if (!contraparteEmail.trim() && result.email) {
           setContraparteEmail(result.email)
         }
+        // Auto-fill endereço
+        if (!contraparteEndereco.trim() && result.endereco) {
+          const e = result.endereco
+          const parts = [e.logradouro, e.numero, e.complemento, e.bairro].filter(Boolean).join(', ')
+          const cidadeUf = [e.cidade, e.uf].filter(Boolean).join('/')
+          const cepStr = e.cep ? `CEP ${e.cep.replace(/^(\d{5})(\d{3})$/, '$1-$2')}` : ''
+          setContraparteEndereco([parts, cidadeUf, cepStr].filter(Boolean).join(' - '))
+        }
+        // Auto-fill representante legal (primeiro sócio)
+        if (!contraparteRepNome.trim() && result.socios?.length) {
+          const socio = result.socios[0]
+          setContraparteRepNome(socio.nome)
+          setContraparteRepCargo(socio.qualificacao || 'Sócio Administrador')
+        }
       }
     } catch {
       setCnpjStatus({ ok: false, msg: 'Erro na consulta CNPJ' })
     } finally {
       setCnpjLoading(false)
     }
-  }, [contraparteNome, contraparteTelefone, contraparteEmail])
+  }, [contraparteNome, contraparteTelefone, contraparteEmail, contraparteEndereco, contraparteRepNome])
 
   const handleCnpjChange = useCallback((raw: string) => {
     const masked = maskCNPJ(raw)
