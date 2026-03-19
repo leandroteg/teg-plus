@@ -214,15 +214,15 @@ function buildPdfHtml(pedido: Pedido): string {
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body { font-family: Arial, Helvetica, sans-serif; color: #1e293b; font-size: 12px; }
   .page { max-width: 800px; margin: 0 auto; padding: 30px 40px; }
-  .header { display: flex; justify-content: space-between; align-items: flex-start; padding-bottom: 16px; border-bottom: 3px solid #0d9488; margin-bottom: 20px; }
+  .header { display: flex; justify-content: space-between; align-items: center; padding: 16px 20px; background: #1e293b; border-radius: 12px; margin-bottom: 20px; }
   .header-left { display: flex; align-items: center; gap: 12px; }
   .header-left img { height: 50px; }
-  .company-name { font-size: 11px; font-weight: 700; color: #334155; }
+  .company-name { font-size: 11px; font-weight: 700; color: #e2e8f0; }
   .company-cnpj { font-size: 9px; color: #94a3b8; margin-top: 2px; }
   .header-right { text-align: right; }
-  .doc-title { font-size: 18px; font-weight: 900; color: #0d9488; }
-  .doc-number { font-size: 13px; font-weight: 700; color: #334155; margin-top: 2px; }
-  .doc-date { font-size: 10px; color: #64748b; margin-top: 4px; }
+  .doc-title { font-size: 18px; font-weight: 900; color: #2dd4bf; }
+  .doc-number { font-size: 13px; font-weight: 700; color: #e2e8f0; margin-top: 2px; }
+  .doc-date { font-size: 10px; color: #94a3b8; margin-top: 4px; }
   .section { margin-bottom: 16px; }
   .section-title { font-size: 11px; font-weight: 700; color: #0d9488; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 8px; border-bottom: 1px solid #e2e8f0; padding-bottom: 4px; }
   .fields { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 20px; margin-bottom: 12px; }
@@ -322,7 +322,7 @@ async function gerarPdfBlob(pedido: Pedido): Promise<Blob> {
   const LIGHT = [226, 232, 240] as const
 
   // ── Header bar ──────────────────────────────────────────────────────────────
-  doc.setFillColor(...TEAL)
+  doc.setFillColor(...DARK)
   doc.rect(0, 0, W, 30, 'F')
 
   // Logo
