@@ -525,6 +525,7 @@ export default function ExpedicaoPipeline() {
   const handleDetailAction = (action: string, sol: LogSolicitacao) => {
     setDetail(null)
     if (action === 'emitirRomaneio') handleEmitirRomaneio([sol.id])
+    if (action === 'despachar') handleEmitirRomaneio([sol.id])
     if (action === 'solicitarNF') setNfModal(sol)
   }
 
