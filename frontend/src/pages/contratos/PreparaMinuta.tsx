@@ -27,6 +27,7 @@ import {
 import type { MelhoriaMinuta, MinutaTextoGerado } from '../../hooks/useSolicitacoes'
 import type { Minuta, TipoMinuta, StatusMinuta, MinutaAiAnalise, ConfigAnalise } from '../../types/contratos'
 import { supabase } from '../../services/supabase'
+import { getEmpresa } from '../../services/empresa'
 import { jsPDF } from 'jspdf'
 import {
   buildResumoPayloadFromAnalise,
@@ -1687,7 +1688,8 @@ export default function PreparaMinuta() {
     setGerandoMinutaId(minuta.id)
     try {
       // ── Helper: build PDF from AI-generated structured text ──────────
-      const buildPdfFromAi = (mtRaw: MinutaTextoGerado) => {
+      const buildPdfFromAi = async (mtRaw: MinutaTextoGerado) => {
+        const empresa = await getEmpresa()
         // Normalize field names: n8n returns secoes/clausulas_finais/local_assinatura
         // but older code used clausulas/disposicoes_finais/local_data — accept both
         const clausulas = (mtRaw.secoes ?? mtRaw.clausulas ?? []).map((s, i) => ({
@@ -1779,7 +1781,7 @@ export default function PreparaMinuta() {
         pdf.setFont('helvetica', 'bold'); pdf.setFontSize(8); pdf.setTextColor(71, 85, 105)
         pdf.text('CONTRATANTE', mx + sigW / 2, y, { align: 'center' }); pdf.text('CONTRATADA', pw - mx - sigW / 2, y, { align: 'center' }); y += 4
         pdf.setFont('helvetica', 'normal'); pdf.setFontSize(7); pdf.setTextColor(148, 163, 184)
-        pdf.text('TEG Uniao Engenharia', mx + sigW / 2, y, { align: 'center' }); pdf.text(solicitacao.contraparte_nome, pw - mx - sigW / 2, y, { align: 'center' })
+        pdf.text(empresa.fantasia, mx + sigW / 2, y, { align: 'center' }); pdf.text(solicitacao.contraparte_nome, pw - mx - sigW / 2, y, { align: 'center' })
         // Testemunhas
         y += 20; ensureSpace(20); pdf.setDrawColor(148, 163, 184); pdf.setLineWidth(0.15)
         pdf.line(mx, y, mx + sigW, y); pdf.line(pw - mx - sigW, y, pw - mx, y); y += 4
@@ -1796,13 +1798,15 @@ export default function PreparaMinuta() {
       }
 
       // ── Helper: fallback PDF — formal contract from melhorias (when AI unavailable) ──
-      const buildPdfFallback = () => {
+      const buildPdfFallback = async () => {
+        const empresa = await getEmpresa()
         // Build a MinutaTextoGerado-like structure from the melhorias data
         const dataStr = new Date().toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' })
         const valorStr = solicitacao.valor_estimado ? fmt(solicitacao.valor_estimado) : 'conforme proposta'
         const cnpjContraparte = solicitacao.contraparte_cnpj || 'conforme cadastro'
+        const enderecoEmpresa = [empresa.endereco, empresa.cidade ? `${empresa.cidade}/${empresa.uf ?? ''}` : ''].filter(Boolean).join(', ')
 
-        const preambulo = `Pelo presente instrumento particular, de um lado, TEG UNIAO ENGENHARIA LTDA, pessoa juridica de direito privado, inscrita no CNPJ sob o no 10.482.352/0001-18, com sede na Rua Bernardo Guimaraes, 245, Sala 301, Funcionarios, Belo Horizonte/MG, CEP 30140-080, neste ato representada por seu Diretor, Leandro Mallet, doravante denominada CONTRATANTE; e, de outro lado, ${solicitacao.contraparte_nome}, inscrita no CNPJ sob o no ${cnpjContraparte}, doravante denominada CONTRATADA; tem entre si justo e contratado o presente instrumento, que se regera pelas clausulas e condicoes seguintes.`
+        const preambulo = `Pelo presente instrumento particular, de um lado, ${empresa.razao}, pessoa juridica de direito privado, inscrita no CNPJ sob o no ${empresa.cnpj}${enderecoEmpresa ? `, com sede em ${enderecoEmpresa}` : ''}, doravante denominada CONTRATANTE; e, de outro lado, ${solicitacao.contraparte_nome}, inscrita no CNPJ sob o no ${cnpjContraparte}, doravante denominada CONTRATADA; tem entre si justo e contratado o presente instrumento, que se regera pelas clausulas e condicoes seguintes.`
 
         // Build clausulas from melhorias
         const secoes: Array<{ titulo: string; conteudo: string }> = []
@@ -1833,14 +1837,17 @@ export default function PreparaMinuta() {
         }
 
         // Foro
-        const disposicoes = `As Partes elegem o foro da Comarca de Belo Horizonte, Estado de Minas Gerais, para dirimir quaisquer duvidas ou litigios decorrentes deste Contrato.`
-        const localAssinatura = `Belo Horizonte, ${dataStr}.\n\n_______________\nTEG UNIAO ENGENHARIA LTDA\nLeandro Mallet - Diretor\nCNPJ: 10.482.352/0001-18\n\n_______________\n${solicitacao.contraparte_nome}\nCNPJ: ${cnpjContraparte}\n\nTESTEMUNHAS:\n1. _______________\nNome:\nCPF:\n\n2. _______________\nNome:\nCPF:`
+        const cidadeForo = empresa.cidade ?? 'Campo Grande'
+        const ufForo = empresa.uf ?? 'MS'
+        const disposicoes = `As Partes elegem o foro da Comarca de ${cidadeForo}, Estado de ${ufForo === 'MS' ? 'Mato Grosso do Sul' : ufForo === 'MG' ? 'Minas Gerais' : ufForo}, para dirimir quaisquer duvidas ou litigios decorrentes deste Contrato.`
+        const localAssinatura = `${cidadeForo}, ${dataStr}.\n\n_______________\n${empresa.razao}\nCNPJ: ${empresa.cnpj}\n\n_______________\n${solicitacao.contraparte_nome}\nCNPJ: ${cnpjContraparte}\n\nTESTEMUNHAS:\n1. _______________\nNome:\nCPF:\n\n2. _______________\nNome:\nCPF:`
 
         // Reuse buildPdfFromAi with the constructed data
         return buildPdfFromAi({ preambulo, secoes, clausulas_finais: disposicoes, local_assinatura: localAssinatura })
       }
 
       // ── Step 1: Try n8n AI, fallback to local ───────────────────────
+      const empresaData = await getEmpresa()
       let pdf: jsPDF | null = null
       try {
         const aiResult = await gerarMinutaPDF.mutateAsync({
@@ -1863,15 +1870,22 @@ export default function PreparaMinuta() {
           centro_custo: solicitacao.centro_custo ?? undefined,
           justificativa: solicitacao.justificativa ?? undefined,
           melhorias: mel,
+          contratante_razao: empresaData.razao,
+          contratante_cnpj: empresaData.cnpj,
+          contratante_endereco: [empresaData.endereco, empresaData.cidade ? `${empresaData.cidade}/${empresaData.uf ?? ''}` : ''].filter(Boolean).join(' - '),
+          contratante_cidade: empresaData.cidade,
+          contratante_uf: empresaData.uf,
+          contratante_telefone: empresaData.telefone,
+          contratante_email: empresaData.email,
         })
         if (aiResult.success && aiResult.minuta_texto) {
-          pdf = buildPdfFromAi(aiResult.minuta_texto)
+          pdf = await buildPdfFromAi(aiResult.minuta_texto)
         }
       } catch (n8nErr) {
         console.warn('n8n AI generation failed, falling back to local PDF:', n8nErr)
       }
       if (!pdf) {
-        pdf = buildPdfFallback()
+        pdf = await buildPdfFallback()
       }
 
       // ── Step 2: Upload to Supabase Storage ──────────────────────────

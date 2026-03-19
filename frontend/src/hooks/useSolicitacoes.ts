@@ -966,6 +966,14 @@ export interface GerarMinutaPayload {
   centro_custo?: string
   justificativa?: string
   melhorias: MelhoriaMinuta
+  // Dados da empresa contratante (preenchidos automaticamente)
+  contratante_razao?: string
+  contratante_cnpj?: string
+  contratante_endereco?: string
+  contratante_cidade?: string
+  contratante_uf?: string
+  contratante_telefone?: string
+  contratante_email?: string
 }
 
 export function useGerarMinutaPDF() {
