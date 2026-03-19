@@ -192,14 +192,18 @@ export function useCriarRecebimento() {
         .from('cmp_recebimento_itens')
         .insert(itensToInsert)
 
-      if (itensErr) throw itensErr
+      if (itensErr) {
+        // Rollback: delete orphaned header
+        await supabase.from('cmp_recebimentos').delete().eq('id', rec.id)
+        throw new Error(itensErr.message || 'Erro ao inserir itens do recebimento')
+      }
 
       // 3. Update pedido status: parcial se nem tudo recebido, senão entregue
       const totalEsperado = itens.reduce((s, i) => s + i.quantidade_esperada, 0)
       const totalRecebido = itensToInsert.reduce((s, i) => s + i.quantidade_recebida, 0)
       const novoStatus = totalRecebido < totalEsperado ? 'parcialmente_recebido' : 'entregue'
 
-      await supabase
+      const { error: pedErr } = await supabase
         .from('cmp_pedidos')
         .update({
           status: novoStatus,
@@ -207,6 +211,8 @@ export function useCriarRecebimento() {
           qtd_itens_recebidos: itensToInsert.length,
         })
         .eq('id', pedidoId)
+
+      if (pedErr) throw new Error('Recebimento registrado, mas erro ao atualizar status do pedido: ' + pedErr.message)
 
       return rec
     },
