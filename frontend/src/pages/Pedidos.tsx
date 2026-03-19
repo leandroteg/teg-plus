@@ -159,13 +159,13 @@ let _empresaCache: EmpresaData | null = null
 async function getEmpresa(): Promise<EmpresaData> {
   if (_empresaCache) return _empresaCache
   try {
-    const { data } = await supabase.from('sys_empresas').select('razao_social, nome_fantasia, cnpjs, endereco, cidade, uf, cep, telefone, email').eq('codigo', 'EMP-001').single()
+    const { data } = await supabase.from('sys_empresas').select('razao_social, nome_fantasia, cnpjs, endereco, cidade, uf, cep, telefone, email, logo_url').eq('codigo', 'EMP-001').single()
     if (data) {
       _empresaCache = {
         razao: data.razao_social ?? EMPRESA_FALLBACK.razao,
         fantasia: data.nome_fantasia ?? EMPRESA_FALLBACK.fantasia,
         cnpj: (data.cnpjs as string[])?.[0] ?? EMPRESA_FALLBACK.cnpj,
-        logoUrl: EMPRESA_FALLBACK.logoUrl,
+        logoUrl: data.logo_url ?? EMPRESA_FALLBACK.logoUrl,
         endereco: data.endereco, cidade: data.cidade, uf: data.uf, cep: data.cep,
         telefone: data.telefone, email: data.email,
       }
@@ -308,7 +308,7 @@ function buildPdfHtml(pedido: Pedido, EMPRESA: EmpresaData = EMPRESA_FALLBACK): 
 
 async function gerarPdfPedido(pedido: Pedido) {
   const empresa = await getEmpresa()
-  const logoB64 = await loadLogoBase64()
+  const logoB64 = await loadLogoBase64(empresa.logoUrl)
   let html = buildPdfHtml(pedido, empresa)
   if (logoB64) {
     html = html.replace(`src="${empresa.logoUrl}"`, `src="${logoB64}"`)
@@ -323,9 +323,10 @@ async function gerarPdfPedido(pedido: Pedido) {
   })
 }
 
-async function loadLogoBase64(): Promise<string | null> {
+async function loadLogoBase64(url: string): Promise<string | null> {
   try {
-    const resp = await fetch(EMPRESA.logoUrl)
+    const resp = await fetch(url)
+    if (!resp.ok) return null
     const blob = await resp.blob()
     return new Promise((resolve) => {
       const reader = new FileReader()
@@ -354,7 +355,7 @@ async function gerarPdfBlob(pedido: Pedido): Promise<Blob> {
   doc.rect(0, 0, W, 34, 'F')
 
   // Logo
-  const logo = await loadLogoBase64()
+  const logo = await loadLogoBase64(EMPRESA.logoUrl)
   if (logo) {
     try { doc.addImage(logo, 'PNG', M, 3, 18, 28) } catch { /* ignore */ }
   }

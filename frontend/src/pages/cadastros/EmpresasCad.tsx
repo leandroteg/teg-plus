@@ -1,7 +1,8 @@
 import { useState, useCallback } from 'react'
-import { Building, Plus, Search, ChevronRight, X, Save, Loader2, CheckCircle2 } from 'lucide-react'
+import { Building, Plus, Search, ChevronRight, X, Save, Loader2, CheckCircle2, Upload, ImageIcon } from 'lucide-react'
 import { useCadEmpresas, useSalvarEmpresa } from '../../hooks/useCadastros'
 import { useConsultaCNPJ } from '../../hooks/useConsultas'
+import { supabase } from '../../services/supabase'
 import type { Empresa } from '../../types/cadastros'
 import AutoCodeField from '../../components/AutoCodeField'
 import SmartTextField from '../../components/SmartTextField'
@@ -154,6 +155,36 @@ export default function EmpresasCad() {
                 <label className="block text-xs font-bold text-slate-600 mb-1">Nome Fantasia</label>
                 <input value={editItem.nome_fantasia ?? ''} onChange={e => set('nome_fantasia', e.target.value)}
                   className="input-base" placeholder="Nome fantasia" />
+              </div>
+
+              {/* Logo upload */}
+              <div>
+                <label className="block text-xs font-bold text-slate-600 mb-1">Logo da Empresa</label>
+                <div className="flex items-center gap-3">
+                  {(editItem as any).logo_url ? (
+                    <img src={(editItem as any).logo_url} alt="Logo" className="h-12 rounded-lg bg-slate-100 object-contain p-1" />
+                  ) : (
+                    <div className="h-12 w-12 rounded-lg bg-slate-100 flex items-center justify-center">
+                      <ImageIcon size={18} className="text-slate-300" />
+                    </div>
+                  )}
+                  <label className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 text-xs font-semibold text-slate-600 hover:bg-slate-50 cursor-pointer transition-colors">
+                    <Upload size={12} /> {(editItem as any).logo_url ? 'Trocar' : 'Enviar logo'}
+                    <input type="file" className="hidden" accept="image/png,image/jpeg,image/webp" onChange={async e => {
+                      const file = e.target.files?.[0]
+                      if (!file) return
+                      const path = `${editItem.id ?? 'new'}/${Date.now()}.${file.name.split('.').pop()}`
+                      const { error: upErr } = await supabase.storage.from('empresa-logos').upload(path, file, { upsert: true })
+                      if (upErr) { alert('Erro no upload: ' + upErr.message); return }
+                      const { data: { publicUrl } } = supabase.storage.from('empresa-logos').getPublicUrl(path)
+                      set('logo_url' as any, publicUrl)
+                    }} />
+                  </label>
+                  {(editItem as any).logo_url && (
+                    <button type="button" onClick={() => set('logo_url' as any, null)}
+                      className="text-[10px] text-red-500 hover:text-red-700 font-semibold">Remover</button>
+                  )}
+                </div>
               </div>
 
               <div>
