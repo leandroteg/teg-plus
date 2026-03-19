@@ -143,11 +143,18 @@ function ReqCard({ r, apr, isDark, onClick }: {
       {/* Descrição */}
       <p className={`text-sm font-semibold line-clamp-2 leading-snug ${isDark ? 'text-white' : 'text-slate-800'}`}>{r.descricao}</p>
 
-      {/* Obra + Valor */}
+      {/* Obra + Necessidade + Valor */}
       <div className="flex items-center justify-between">
-        <span className={`text-xs truncate max-w-[55%] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
-          <Building2 size={10} className="inline mr-1" />{r.obra_nome}
-        </span>
+        <div className="flex items-center gap-2 min-w-0 max-w-[65%]">
+          <span className={`text-xs truncate ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+            <Building2 size={10} className="inline mr-1" />{r.obra_nome}
+          </span>
+          {r.data_necessidade && (
+            <span className={`text-[10px] flex-shrink-0 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+              <Calendar size={9} className="inline mr-0.5" />{new Date(r.data_necessidade).toLocaleDateString('pt-BR')}
+            </span>
+          )}
+        </div>
         <span className={`text-sm font-extrabold ${isDark ? 'text-teal-400' : 'text-teal-600'}`}>{fmt(r.valor_estimado)}</span>
       </div>
 
@@ -565,9 +572,11 @@ export default function ListaRequisicoes() {
           <table className="w-full text-xs">
             <thead>
               <tr className={isDark ? 'bg-white/[0.03] text-slate-400' : 'bg-slate-50 text-slate-500'}>
-                <th className="text-left px-3 py-2 font-semibold">Número</th>
-                <th className="text-left px-3 py-2 font-semibold">Descrição</th>
+                <th className="text-left px-3 py-2 font-semibold">{`N\u00famero`}</th>
+                <th className="text-left px-3 py-2 font-semibold">{`Descri\u00e7\u00e3o`}</th>
                 <th className="text-left px-3 py-2 font-semibold">Obra</th>
+                <th className="text-left px-3 py-2 font-semibold">Necessidade</th>
+                <th className="text-center px-3 py-2 font-semibold">{`Urg\u00eancia`}</th>
                 <th className="text-right px-3 py-2 font-semibold">Valor</th>
                 <th className="text-left px-3 py-2 font-semibold">Solicitante</th>
                 <th className="text-left px-3 py-2 font-semibold">Status</th>
@@ -581,6 +590,10 @@ export default function ListaRequisicoes() {
                   <td className={`px-3 py-2 font-mono ${isDark ? 'text-teal-400' : 'text-teal-600'}`}>{r.numero}</td>
                   <td className={`px-3 py-2 max-w-[200px] truncate ${isDark ? 'text-white' : 'text-slate-800'}`}>{r.descricao}</td>
                   <td className={`px-3 py-2 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{r.obra_nome}</td>
+                  <td className={`px-3 py-2 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{r.data_necessidade ? new Date(r.data_necessidade).toLocaleDateString('pt-BR') : '—'}</td>
+                  <td className="px-3 py-2 text-center">{r.urgencia && r.urgencia !== 'normal' ? (
+                    <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${r.urgencia === 'critica' ? (isDark ? 'bg-red-500/20 text-red-400' : 'bg-red-100 text-red-700') : (isDark ? 'bg-amber-500/20 text-amber-400' : 'bg-amber-100 text-amber-700')}`}>{r.urgencia}</span>
+                  ) : <span className={isDark ? 'text-slate-600' : 'text-slate-300'}>—</span>}</td>
                   <td className={`px-3 py-2 text-right font-bold ${isDark ? 'text-teal-400' : 'text-teal-600'}`}>{fmt(r.valor_estimado)}</td>
                   <td className={`px-3 py-2 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{r.solicitante_nome.split(' ')[0]}</td>
                   <td className="px-3 py-2"><StatusBadge status={r.status as StatusRequisicao} size="sm" customLabel={getApprovalStatusLabel(r.status)} /></td>
