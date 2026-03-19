@@ -161,36 +161,41 @@ export function useAprovacoesPendentes(tipo?: TipoAprovacao) {
             loteMap.set(lote.id, lote)
           }
 
-          const { data: loteItens } = await supabase
-            .from('fin_lote_itens')
-            .select(`
-              id,
-              lote_id,
-              decisao,
-              decidido_por,
-              decidido_em,
-              observacao,
-              created_at,
-              cp:fin_contas_pagar!cp_id(
+          let loteItens: Record<string, unknown>[] | null = null
+          try {
+            const { data, error } = await supabase
+              .from('fin_lote_itens')
+              .select(`
                 id,
-                fornecedor_nome,
-                valor_original,
-                valor_pago,
-                numero_documento,
-                descricao,
-                data_vencimento,
-                data_emissao,
-                centro_custo,
-                classe_financeira,
-                natureza,
-                forma_pagamento,
-                status,
-                requisicao_id,
-                pedido_id,
-                created_at
-              )
-            `)
-            .in('lote_id', loteIds)
+                lote_id,
+                decisao,
+                decidido_por,
+                decidido_em,
+                observacao,
+                created_at,
+                cp:fin_contas_pagar!cp_id(
+                  id,
+                  fornecedor_nome,
+                  valor_original,
+                  valor_pago,
+                  numero_documento,
+                  descricao,
+                  data_vencimento,
+                  data_emissao,
+                  centro_custo,
+                  classe_financeira,
+                  natureza,
+                  forma_pagamento,
+                  status,
+                  requisicao_id,
+                  pedido_id,
+                  created_at
+                )
+              `)
+              .in('lote_id', loteIds)
+            if (error) console.warn('[AprovAi] loteItens query error:', error.message)
+            loteItens = data as Record<string, unknown>[] | null
+          } catch (e) { console.warn('[AprovAi] loteItens exception:', e) }
 
           // 5b. Buscar dados de requisição + anexos (não-crítico, falha silenciosa)
           const cpIds = (loteItens ?? [])
@@ -299,13 +304,15 @@ export function useAprovacoesPendentes(tipo?: TipoAprovacao) {
         .filter(Boolean)
 
       const logMap = new Map<string, Record<string, unknown>>()
-      if (logIds.length > 0) {
-        const { data: logData } = await supabase
-          .from('log_solicitacoes')
-          .select('id, numero, tipo, origem, destino, data_desejada, modal, motorista_nome, veiculo_placa, obra_nome, centro_custo, descricao, peso_total_kg, volumes_total')
-          .in('id', logIds)
-        for (const s of logData ?? []) logMap.set((s as Record<string, unknown>).id as string, s as Record<string, unknown>)
-      }
+      try {
+        if (logIds.length > 0) {
+          const { data: logData } = await supabase
+            .from('log_solicitacoes')
+            .select('id, numero, tipo, origem, destino, data_desejada, modal, motorista_nome, veiculo_placa, obra_nome, centro_custo, descricao, peso_total_kg, volumes_total')
+            .in('id', logIds)
+          for (const s of logData ?? []) logMap.set((s as Record<string, unknown>).id as string, s as Record<string, unknown>)
+        }
+      } catch { /* transporte data is optional */ }
 
       // 6. Mescla aprovacoes com dados da requisicao/contrato/CP + cotacao
       return aprData
