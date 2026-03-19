@@ -11,8 +11,8 @@ export default function Layout() {
 
   const NAV: NavItem[] = [
     { to: '/compras',     icon: LayoutDashboard, label: 'Painel',            end: true  },
-    { to: '/compras/nova-solicitacao', icon: Plus, label: 'Nova Solicitação', end: false,
-      action: () => navigate('/nova'), accent: true },
+    { to: '/nova#action', icon: Plus, label: 'Nova Solicitação', end: false,
+      action: () => navigate(`/nova?t=${Date.now()}`), accent: true },
     { to: '/requisicoes', icon: List,            label: 'Requisições',       end: false },
     { to: '/cotacoes',    icon: ShoppingCart,    label: 'Cotações',          end: false },
     { to: '/pedidos',     icon: Truck,           label: 'Pedidos',           end: false },

@@ -2571,11 +2571,15 @@ export default function CPPipeline() {
 
   const handlePagar = async (ids: string[]) => {
     try {
-      await registrarBatchMut.mutateAsync({
+      const count = await registrarBatchMut.mutateAsync({
         cpIds: ids,
         dataPagamento: new Date().toISOString().split('T')[0],
       })
-      showToast('success', `${ids.length} pagamento(s) registrado(s)`)
+      if (count === 0) {
+        showToast('error', 'Nenhum título elegível para pagamento (status deve ser aprovado ou em pagamento)')
+      } else {
+        showToast('success', `${count} pagamento(s) registrado(s)`)
+      }
       setSelectedIds(new Set())
     } catch { showToast('error', 'Erro ao registrar pagamento') }
   }
@@ -2637,11 +2641,15 @@ export default function CPPipeline() {
 
   const handleConfirmarPagamento = async (ids: string[]) => {
     try {
-      await registrarBatchMut.mutateAsync({
+      const count = await registrarBatchMut.mutateAsync({
         cpIds: ids,
         dataPagamento: new Date().toISOString().split('T')[0],
       })
-      showToast('success', `${ids.length} pagamento(s) registrados manualmente`)
+      if (count === 0) {
+        showToast('error', 'Nenhum título elegível para confirmação de pagamento')
+      } else {
+        showToast('success', `${count} pagamento(s) registrados manualmente`)
+      }
       setSelectedIds(new Set())
     } catch { showToast('error', 'Erro ao confirmar pagamento') }
   }

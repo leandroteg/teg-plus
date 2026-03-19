@@ -20,7 +20,7 @@ const STATUS_CONFIG: Record<StatusImobilizado, { label: string; bg: string; text
   cedido:           { label: 'Cedido',           bg: 'bg-blue-50',    text: 'text-blue-700',    dot: 'bg-blue-500'    },
   em_transferencia:  { label: 'Em Transfer\u00eancia', bg: 'bg-indigo-50',  text: 'text-indigo-700',  dot: 'bg-indigo-500'  },
   baixado:           { label: 'Baixado',          bg: 'bg-slate-100',  text: 'text-slate-500',   dot: 'bg-slate-400'   },
-  pendente_registro: { label: 'Pendente',         bg: 'bg-violet-50',  text: 'text-violet-700',  dot: 'bg-violet-500'  },
+  pendente_registro: { label: 'Aguardando Entrada', bg: 'bg-violet-50',  text: 'text-violet-700',  dot: 'bg-violet-500'  },
 }
 
 const fmt = (v: number) =>
