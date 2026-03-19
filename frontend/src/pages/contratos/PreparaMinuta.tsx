@@ -1768,22 +1768,58 @@ export default function PreparaMinuta() {
           printText(disposicoes, 9, { color: [30, 41, 59] }); y += gapLg
         }
 
-        // SIGNATURE BLOCK
-        ensureSpace(50); hr(); y += gapMd
-        const localData = localAssinatura || `${solicitacao.obra?.nome ?? 'Local'}, ${dataStr}`
-        printText(localData, 9, { color: [100, 116, 139] }); y += 20
+        // SIGNATURE BLOCK — formal, no duplication with AI-generated local_assinatura
+        ensureSpace(80); hr(); y += gapMd
+
+        // Skip AI local_assinatura text if it contains signature lines (avoid duplication)
+        const hasAiSignatures = localAssinatura && (localAssinatura.includes('___') || localAssinatura.includes('CONTRATANTE'))
+        if (localAssinatura && !hasAiSignatures) {
+          printText(localAssinatura, 9, { color: [100, 116, 139] }); y += 8
+        }
+
+        // Render clean signature blocks
         const sigW = usable / 2 - 10
+        const cidadeSig = empresa.cidade ?? 'Campo Grande'
+        const dataStr2 = new Date().toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' })
+        printText(`${cidadeSig}, ${dataStr2}.`, 9, { color: [100, 116, 139] }); y += 15
+
+        // CONTRATANTE
         pdf.setDrawColor(100, 116, 139); pdf.setLineWidth(0.2)
-        pdf.line(mx, y, mx + sigW, y); pdf.line(pw - mx - sigW, y, pw - mx, y); y += 5
+        pdf.line(mx, y, mx + sigW, y); y += 4
         pdf.setFont('helvetica', 'bold'); pdf.setFontSize(8); pdf.setTextColor(71, 85, 105)
-        pdf.text('CONTRATANTE', mx + sigW / 2, y, { align: 'center' }); pdf.text('CONTRATADA', pw - mx - sigW / 2, y, { align: 'center' }); y += 4
-        pdf.setFont('helvetica', 'normal'); pdf.setFontSize(7); pdf.setTextColor(148, 163, 184)
-        pdf.text(empresa.fantasia, mx + sigW / 2, y, { align: 'center' }); pdf.text(solicitacao.contraparte_nome, pw - mx - sigW / 2, y, { align: 'center' })
-        // Testemunhas
-        y += 20; ensureSpace(20); pdf.setDrawColor(148, 163, 184); pdf.setLineWidth(0.15)
+        pdf.text('CONTRATANTE', mx, y); y += 4
+        pdf.setFont('helvetica', 'normal'); pdf.setFontSize(7); pdf.setTextColor(100, 116, 139)
+        pdf.text(empresa.razao, mx, y); y += 3.5
+        pdf.text(`CNPJ: ${empresa.cnpj}`, mx, y); y += 3.5
+        if (empresa.endereco) pdf.text([empresa.endereco, empresa.cidade ? `${empresa.cidade}/${empresa.uf ?? ''}` : ''].filter(Boolean).join(' - '), mx, y); y += 10
+
+        // CONTRATADA
+        ensureSpace(30)
+        pdf.setDrawColor(100, 116, 139); pdf.setLineWidth(0.2)
+        pdf.line(mx, y, mx + sigW, y); y += 4
+        pdf.setFont('helvetica', 'bold'); pdf.setFontSize(8); pdf.setTextColor(71, 85, 105)
+        pdf.text('CONTRATADA', mx, y); y += 4
+        pdf.setFont('helvetica', 'normal'); pdf.setFontSize(7); pdf.setTextColor(100, 116, 139)
+        pdf.text(solicitacao.contraparte_nome, mx, y); y += 3.5
+        if (solicitacao.contraparte_cnpj) { pdf.text(`CNPJ: ${solicitacao.contraparte_cnpj}`, mx, y); y += 3.5 }
+        if ((solicitacao as any).contraparte_endereco) { pdf.text((solicitacao as any).contraparte_endereco, mx, y); y += 3.5 }
+        if ((solicitacao as any).contraparte_representante_nome) {
+          const rep = (solicitacao as any)
+          const repLine = [rep.contraparte_representante_nome, rep.contraparte_representante_cargo].filter(Boolean).join(' - ')
+          pdf.text(repLine, mx, y); y += 3.5
+          if (rep.contraparte_representante_cpf) { pdf.text(`CPF: ${rep.contraparte_representante_cpf}`, mx, y); y += 3.5 }
+        }
+        y += 10
+
+        // TESTEMUNHAS
+        ensureSpace(25)
+        pdf.setFont('helvetica', 'bold'); pdf.setFontSize(8); pdf.setTextColor(71, 85, 105)
+        pdf.text('TESTEMUNHAS', mx, y); y += 6
+        pdf.setDrawColor(148, 163, 184); pdf.setLineWidth(0.15)
         pdf.line(mx, y, mx + sigW, y); pdf.line(pw - mx - sigW, y, pw - mx, y); y += 4
         pdf.setFont('helvetica', 'normal'); pdf.setFontSize(7); pdf.setTextColor(148, 163, 184)
-        pdf.text('Testemunha 1', mx + sigW / 2, y, { align: 'center' }); pdf.text('Testemunha 2', pw - mx - sigW / 2, y, { align: 'center' })
+        pdf.text('Nome:', mx, y); pdf.text('Nome:', pw - mx - sigW, y); y += 3.5
+        pdf.text('CPF:', mx, y); pdf.text('CPF:', pw - mx - sigW, y)
 
         // FOOTER
         const totalPages = pdf.getNumberOfPages()

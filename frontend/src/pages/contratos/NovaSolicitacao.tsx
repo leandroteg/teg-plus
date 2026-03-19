@@ -234,6 +234,10 @@ export default function NovaSolicitacao() {
   const [contraparteCnpj, setContraparteCnpj] = useState('')
   const [contraparteTelefone, setContraparteTelefone] = useState('')
   const [contraparteEmail, setContraparteEmail] = useState('')
+  const [contraparteEndereco, setContraparteEndereco] = useState('')
+  const [contraparteRepNome, setContraparteRepNome] = useState('')
+  const [contraparteRepCpf, setContraparteRepCpf] = useState('')
+  const [contraparteRepCargo, setContraparteRepCargo] = useState('')
   const [fornecedorCadastrado, setFornecedorCadastrado] = useState('')
   const [contratoVigente, setContratoVigente] = useState('')
   const [tipoContrato, setTipoContrato] = useState<TipoContratoV2>('despesa')
@@ -365,6 +369,10 @@ export default function NovaSolicitacao() {
     contraparte_cnpj: contraparteCnpj.replace(/\D/g, '') || undefined,
     contraparte_telefone: contraparteTelefone.trim() || undefined,
     contraparte_email: contraparteEmail.trim() || undefined,
+    contraparte_endereco: contraparteEndereco.trim() || undefined,
+    contraparte_representante_nome: contraparteRepNome.trim() || undefined,
+    contraparte_representante_cpf: contraparteRepCpf.trim() || undefined,
+    contraparte_representante_cargo: contraparteRepCargo.trim() || undefined,
     fornecedor_cadastrado: fornecedorCadastrado || undefined,
     contrato_vigente_fornecedor: contratoVigente || undefined,
     responsavel_aprovacao: responsavelAprovacao.trim() || undefined,
@@ -741,6 +749,30 @@ export default function NovaSolicitacao() {
                     <ShieldCheck size={9} /> Preenchido via CNPJ
                   </p>
                 )}
+              </div>
+            </div>
+
+            {/* Endereço + Representante legal */}
+            <div>
+              <label className={labelClass}>{`Endere\u00e7o da Contraparte`}</label>
+              <input value={contraparteEndereco} onChange={e => setContraparteEndereco(e.target.value)}
+                placeholder="Rua, n\u00famero, bairro, cidade/UF, CEP" className={inputClass} />
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div>
+                <label className={labelClass}>Representante Legal</label>
+                <input value={contraparteRepNome} onChange={e => setContraparteRepNome(e.target.value)}
+                  placeholder="Nome completo" className={inputClass} />
+              </div>
+              <div>
+                <label className={labelClass}>CPF do Representante</label>
+                <input value={contraparteRepCpf} onChange={e => setContraparteRepCpf(e.target.value)}
+                  placeholder="000.000.000-00" className={inputClass} />
+              </div>
+              <div>
+                <label className={labelClass}>Cargo</label>
+                <input value={contraparteRepCargo} onChange={e => setContraparteRepCargo(e.target.value)}
+                  placeholder="Ex: Diretor, S\u00f3cio" className={inputClass} />
               </div>
             </div>
 
