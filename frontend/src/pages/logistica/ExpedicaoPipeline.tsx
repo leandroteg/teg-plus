@@ -86,8 +86,8 @@ const ITEMS_CHECKLIST: readonly [string, string, boolean][] = [
   // [key, label, fotoObrigatoria]
   ['itens_conferidos',       'Itens conferidos contra lista de materiais', false],
   ['volumes_identificados',  'Volumes identificados com etiquetas',        true],
+  ['volumes_quantidade',     'Quantidade de volumes conferida',            false],
   ['embalagem_verificada',   'Condições de embalagem e proteção verificadas', true],
-  ['contato_destinatario',   'Contato do destinatário confirmado',         false],
 ]
 
 function DetailModal({ sol, onClose, onAction, isDark }: {
