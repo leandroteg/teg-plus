@@ -1,4 +1,5 @@
 import { useState, useMemo, useRef } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import {
   Package2, Search, X, CheckCircle2, AlertTriangle,
   Calendar, ArrowUp, ArrowDown, LayoutList, LayoutGrid, Download,
@@ -78,6 +79,23 @@ function exportCSV(items: LogSolicitacao[], stageName: string) {
   a.download = `expedicao-${stageName.replace(/\s/g, '-').toLowerCase()}-${new Date().toISOString().split('T')[0]}.csv`
   a.click()
   URL.revokeObjectURL(url)
+}
+
+// ── UF Detection ─────────────────────────────────────────────────────────────
+
+const CIDADES_MG = [
+  'araxa', 'araxá', 'frutal', 'ituiutaba', 'paracatu',
+  'perdizes', 'rio paranaiba', 'rio paranaíba', 'tres marias', 'três marias',
+]
+
+function detectUF(destino: string): 'MG' | 'outro' | 'indefinido' {
+  if (!destino) return 'indefinido'
+  const d = destino.toLowerCase().trim()
+  if (CIDADES_MG.some(c => d.includes(c))) return 'MG'
+  if (d.includes('se ') && !d.includes('campo grande')) return 'MG'
+  if (d.includes('campo grande') || d.includes('/ms') || d.includes(' ms')) return 'outro'
+  if (d.endsWith('/mg') || d.endsWith(' mg')) return 'MG'
+  return 'indefinido'
 }
 
 // ── Detail Modal ─────────────────────────────────────────────────────────────
@@ -309,14 +327,21 @@ function DetailModal({ sol, onClose, onAction, isDark }: {
                 <Truck size={15} /> Despachar
               </button>
             )}
-            {sol.status === 'romaneio_emitido' && (
-              <button onClick={() => onAction('solicitarNF', sol)} className="flex-1 py-3 rounded-xl bg-amber-600 text-white text-sm font-bold hover:bg-amber-700 transition-all flex items-center justify-center gap-2">
-                <FileText size={15} /> Solicitar NF
-              </button>
-            )}
+            {sol.status === 'romaneio_emitido' && (() => {
+              const uf = detectUF(sol.destino)
+              return uf === 'outro' || uf === 'indefinido' ? (
+                <button onClick={() => onAction('solicitarNF', sol)} className="flex-1 py-3 rounded-xl bg-amber-600 text-white text-sm font-bold hover:bg-amber-700 transition-all flex items-center justify-center gap-2">
+                  <FileText size={15} /> Solicitar NF
+                </button>
+              ) : (
+                <button onClick={() => onAction('concluir', sol)} className="flex-1 py-3 rounded-xl bg-emerald-600 text-white text-sm font-bold hover:bg-emerald-700 transition-all flex items-center justify-center gap-2">
+                  <CheckCircle2 size={15} /> Concluir Expedição
+                </button>
+              )
+            })()}
             {sol.status === 'nfe_emitida' && (
-              <button onClick={() => onAction('emitirRomaneio', sol)} className="flex-1 py-3 rounded-xl bg-blue-600 text-white text-sm font-bold hover:bg-blue-700 transition-all flex items-center justify-center gap-2">
-                <ScrollText size={15} /> Emitir Romaneio
+              <button onClick={() => onAction('concluir', sol)} className="flex-1 py-3 rounded-xl bg-emerald-600 text-white text-sm font-bold hover:bg-emerald-700 transition-all flex items-center justify-center gap-2">
+                <CheckCircle2 size={15} /> Concluir Expedição
               </button>
             )}
           </div>
@@ -449,6 +474,7 @@ export default function ExpedicaoPipeline() {
   const [nfModal, setNfModal] = useState<LogSolicitacao | null>(null)
 
   const { data: solicitacoes = [], isLoading } = useSolicitacoes()
+  const qc = useQueryClient()
   const emitirRomaneio = useEmitirRomaneio()
   const solicitarNF = useSolicitarNFFiscal()
 
@@ -522,11 +548,16 @@ export default function ExpedicaoPipeline() {
     } catch { showToast('error', 'Erro ao solicitar NF') }
   }
 
-  const handleDetailAction = (action: string, sol: LogSolicitacao) => {
+  const handleDetailAction = async (action: string, sol: LogSolicitacao) => {
     setDetail(null)
     if (action === 'emitirRomaneio') handleEmitirRomaneio([sol.id])
     if (action === 'despachar') handleEmitirRomaneio([sol.id])
     if (action === 'solicitarNF') setNfModal(sol)
+    if (action === 'concluir') {
+      await supabase.from('log_solicitacoes').update({ status: 'aguardando_coleta', updated_at: new Date().toISOString() }).eq('id', sol.id)
+      qc.invalidateQueries({ queryKey: ['log_solicitacoes'] })
+      showToast('success', `Expedição ${sol.numero} concluída — aguardando coleta`)
+    }
   }
 
   const handleExport = () => {
