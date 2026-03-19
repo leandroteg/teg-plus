@@ -196,19 +196,19 @@ function DetailModal({ sol, onClose, onAction, isDark }: {
               Fechar
             </button>
             {sol.status === 'aprovado' && (
-              <button onClick={() => onAction('emitirRomaneio', sol)} disabled={!todosMarcados}
-                className={`flex-1 py-3 rounded-xl text-sm font-bold transition-all flex items-center justify-center gap-2 ${todosMarcados ? 'bg-blue-600 text-white hover:bg-blue-700' : 'bg-slate-200 text-slate-400 cursor-not-allowed'}`}>
-                <ScrollText size={15} /> Emitir Romaneio
+              <button onClick={() => onAction('despachar', sol)} disabled={!todosMarcados}
+                className={`flex-1 py-3 rounded-xl text-sm font-bold transition-all flex items-center justify-center gap-2 ${todosMarcados ? 'bg-emerald-600 text-white hover:bg-emerald-700' : 'bg-slate-200 text-slate-400 cursor-not-allowed'}`}>
+                <Truck size={15} /> Despachar
               </button>
             )}
-            {sol.status === 'romaneio_emitido' && sol.doc_fiscal_tipo !== 'nf' && (
+            {sol.status === 'romaneio_emitido' && (
               <button onClick={() => onAction('solicitarNF', sol)} className="flex-1 py-3 rounded-xl bg-amber-600 text-white text-sm font-bold hover:bg-amber-700 transition-all flex items-center justify-center gap-2">
                 <FileText size={15} /> Solicitar NF
               </button>
             )}
-            {(sol.status === 'romaneio_emitido' || sol.status === 'nfe_emitida') && (
-              <button onClick={() => onAction('despachar', sol)} className="flex-1 py-3 rounded-xl bg-emerald-600 text-white text-sm font-bold hover:bg-emerald-700 transition-all flex items-center justify-center gap-2">
-                <Truck size={15} /> Despachar
+            {sol.status === 'nfe_emitida' && (
+              <button onClick={() => onAction('emitirRomaneio', sol)} className="flex-1 py-3 rounded-xl bg-blue-600 text-white text-sm font-bold hover:bg-blue-700 transition-all flex items-center justify-center gap-2">
+                <ScrollText size={15} /> Emitir Romaneio
               </button>
             )}
           </div>
