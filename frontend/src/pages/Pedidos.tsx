@@ -143,17 +143,42 @@ function getDisplayNumber(pedido: PedidoListItem) {
 
 // ─── PDF / Share helpers ──────────────────────────────────────────────────────
 
-const EMPRESA = {
+interface EmpresaData {
+  razao: string; fantasia: string; cnpj: string; logoUrl: string
+  endereco?: string; cidade?: string; uf?: string; cep?: string; telefone?: string; email?: string
+}
+
+const EMPRESA_FALLBACK: EmpresaData = {
   razao: 'TEG UNIAO - LOCACAO, SERVICOS & EMPREENDIMENTOS LTDA',
   fantasia: 'Teg Uniao Energia',
   cnpj: '19.887.731/0001-29',
   logoUrl: '/logo-teg-empresa.png',
 }
 
+let _empresaCache: EmpresaData | null = null
+async function getEmpresa(): Promise<EmpresaData> {
+  if (_empresaCache) return _empresaCache
+  try {
+    const { data } = await supabase.from('sys_empresas').select('razao_social, nome_fantasia, cnpjs, endereco, cidade, uf, cep, telefone, email').eq('codigo', 'EMP-001').single()
+    if (data) {
+      _empresaCache = {
+        razao: data.razao_social ?? EMPRESA_FALLBACK.razao,
+        fantasia: data.nome_fantasia ?? EMPRESA_FALLBACK.fantasia,
+        cnpj: (data.cnpjs as string[])?.[0] ?? EMPRESA_FALLBACK.cnpj,
+        logoUrl: EMPRESA_FALLBACK.logoUrl,
+        endereco: data.endereco, cidade: data.cidade, uf: data.uf, cep: data.cep,
+        telefone: data.telefone, email: data.email,
+      }
+      return _empresaCache
+    }
+  } catch { /* fallback */ }
+  return EMPRESA_FALLBACK
+}
+
 const fmtBRL = (v?: number) => v != null ? v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) : '—'
 const fmtDate = (d?: string) => d ? new Date(d.includes('T') ? d : d + 'T00:00:00').toLocaleDateString('pt-BR') : '—'
 
-function buildPdfHtml(pedido: Pedido): string {
+function buildPdfHtml(pedido: Pedido, EMPRESA: EmpresaData = EMPRESA_FALLBACK): string {
   const esc = (s: string) => s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c] ?? c))
   const numero = esc(pedido.numero_pedido ?? pedido.id.slice(0, 8).toUpperCase())
   const itens = pedido.requisicao?.itens ?? []
@@ -245,6 +270,8 @@ function buildPdfHtml(pedido: Pedido): string {
       <div>
         <div class="company-name">${esc(EMPRESA.fantasia)}</div>
         <div class="company-cnpj">CNPJ: ${EMPRESA.cnpj}</div>
+        ${EMPRESA.endereco ? `<div class="company-cnpj">${esc(EMPRESA.endereco)}${EMPRESA.cidade ? ` - ${esc(EMPRESA.cidade)}/${EMPRESA.uf ?? ''}` : ''}</div>` : ''}
+        ${EMPRESA.telefone ? `<div class="company-cnpj">${esc(EMPRESA.telefone)}${EMPRESA.email ? ` | ${esc(EMPRESA.email)}` : ''}</div>` : ''}
       </div>
     </div>
     <div class="header-right">
@@ -280,11 +307,11 @@ function buildPdfHtml(pedido: Pedido): string {
 }
 
 async function gerarPdfPedido(pedido: Pedido) {
-  // Pre-load logo as base64 so it works inside blob: URLs
+  const empresa = await getEmpresa()
   const logoB64 = await loadLogoBase64()
-  let html = buildPdfHtml(pedido)
+  let html = buildPdfHtml(pedido, empresa)
   if (logoB64) {
-    html = html.replace(`src="${EMPRESA.logoUrl}"`, `src="${logoB64}"`)
+    html = html.replace(`src="${empresa.logoUrl}"`, `src="${logoB64}"`)
   }
   const blob = new Blob([html], { type: 'text/html;charset=utf-8' })
   const url = URL.createObjectURL(blob)
@@ -310,6 +337,7 @@ async function loadLogoBase64(): Promise<string | null> {
 }
 
 async function gerarPdfBlob(pedido: Pedido): Promise<Blob> {
+  const EMPRESA = await getEmpresa()
   const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
   const W = 210
   const M = 15
@@ -323,22 +351,25 @@ async function gerarPdfBlob(pedido: Pedido): Promise<Blob> {
 
   // ── Header bar ──────────────────────────────────────────────────────────────
   doc.setFillColor(...DARK)
-  doc.rect(0, 0, W, 30, 'F')
+  doc.rect(0, 0, W, 34, 'F')
 
   // Logo
   const logo = await loadLogoBase64()
   if (logo) {
-    try { doc.addImage(logo, 'PNG', M, 3, 18, 24) } catch { /* ignore */ }
+    try { doc.addImage(logo, 'PNG', M, 3, 18, 28) } catch { /* ignore */ }
   }
 
   // Company info
   doc.setFont('helvetica', 'bold')
   doc.setFontSize(11)
   doc.setTextColor(255, 255, 255)
-  doc.text(EMPRESA.fantasia, M + 22, 13)
+  doc.text(EMPRESA.fantasia, M + 22, 11)
   doc.setFont('helvetica', 'normal')
-  doc.setFontSize(8)
-  doc.text(`CNPJ: ${EMPRESA.cnpj}`, M + 22, 19)
+  doc.setFontSize(7)
+  doc.setTextColor(180, 190, 200)
+  doc.text(`CNPJ: ${EMPRESA.cnpj}`, M + 22, 16)
+  if (EMPRESA.endereco) doc.text(`${EMPRESA.endereco}${EMPRESA.cidade ? ` - ${EMPRESA.cidade}/${EMPRESA.uf ?? ''}` : ''}`, M + 22, 21)
+  if (EMPRESA.telefone) doc.text(`${EMPRESA.telefone}${EMPRESA.email ? ` | ${EMPRESA.email}` : ''}`, M + 22, 26)
 
   // Document title
   const numero = pedido.numero_pedido ?? pedido.id.slice(0, 8).toUpperCase()
@@ -350,7 +381,7 @@ async function gerarPdfBlob(pedido: Pedido): Promise<Blob> {
   doc.setFont('helvetica', 'normal')
   doc.setFontSize(8)
   doc.text(new Date().toLocaleDateString('pt-BR'), W - M, 26, { align: 'right' })
-  y = 36
+  y = 40
 
   // ── Section: Dados do Pedido ────────────────────────────────────────────────
   const sectionTitle = (title: string) => {
