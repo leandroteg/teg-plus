@@ -3,7 +3,7 @@ import {
   ClipboardList, Search, X, CheckCircle2, Clock, AlertTriangle,
   Calendar, ArrowUp, ArrowDown, LayoutList, LayoutGrid, Download,
   MapPin, Package2, Truck, FileText, FileInput, Building2, Tag, Briefcase,
-  ShieldCheck, Plus, Save, Loader2, Trash2, ExternalLink,
+  ShieldCheck, Plus, Save, Loader2, Trash2, ExternalLink, XCircle, MessageSquare,
 } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
 import {
@@ -1021,42 +1021,84 @@ export default function SolicitacoesPipeline() {
 
       {/* ── Modal Aprovação ────────────────────────────────────── */}
       {aprovacaoModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm" onClick={() => setAprovacaoModal(null)}>
-          <div className={`rounded-2xl shadow-2xl w-full max-w-sm ${isDark ? 'bg-[#1e293b]' : 'bg-white'}`} onClick={e => e.stopPropagation()}>
-            <div className={`flex items-center justify-between px-6 py-4 ${isDark ? 'border-b border-white/[0.06]' : 'border-b border-slate-100'}`}>
-              <div>
-                <h2 className={`text-lg font-extrabold ${isDark ? 'text-white' : 'text-slate-800'}`}>Aprovação</h2>
-                <p className={`text-xs mt-0.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
-                  #{aprovacaoModal.numero} · {aprovacaoModal.origem} → {aprovacaoModal.destino}
-                </p>
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-sm p-4" onClick={() => setAprovacaoModal(null)}>
+          <div className={`rounded-2xl shadow-2xl w-full max-w-md max-h-[90vh] overflow-y-auto ${isDark ? 'bg-[#1e293b]' : 'bg-white'}`} onClick={e => e.stopPropagation()}>
+            {/* Header gradiente laranja */}
+            <div className="bg-gradient-to-r from-orange-600 to-amber-500 px-6 py-4 rounded-t-2xl">
+              <div className="flex items-center justify-between">
+                <div className="text-white">
+                  <p className="text-[10px] font-bold uppercase tracking-wider opacity-80">Aprovacao de Transporte</p>
+                  <h2 className="text-lg font-extrabold">#{aprovacaoModal.numero}</h2>
+                </div>
+                <button onClick={() => setAprovacaoModal(null)} className="w-8 h-8 rounded-lg flex items-center justify-center text-white/70 hover:text-white hover:bg-white/10">
+                  <X size={16} />
+                </button>
               </div>
-              <button onClick={() => setAprovacaoModal(null)}
-                className={`w-8 h-8 rounded-lg flex items-center justify-center ${isDark ? 'hover:bg-white/10 text-slate-400' : 'hover:bg-slate-100'}`}>
-                <X size={16} />
-              </button>
             </div>
-            <div className="p-6 space-y-4">
+
+            <div className="p-5 space-y-4">
+              {/* Card de rota */}
+              <div className="bg-orange-50 rounded-xl p-4 space-y-3">
+                <div className="flex items-center gap-2 text-base font-bold text-orange-800">
+                  <MapPin size={16} className="text-orange-500 shrink-0" />
+                  {aprovacaoModal.origem}
+                  <span className="text-orange-400 mx-1">→</span>
+                  {aprovacaoModal.destino}
+                </div>
+                <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
+                  {aprovacaoModal.data_desejada && (
+                    <div><span className="text-slate-500 text-xs">Data:</span> <span className="font-semibold text-slate-700">{new Date(aprovacaoModal.data_desejada).toLocaleDateString('pt-BR')}</span></div>
+                  )}
+                  {aprovacaoModal.modal && (
+                    <div><span className="text-slate-500 text-xs">Modal:</span> <span className="font-semibold text-slate-700 capitalize">{aprovacaoModal.modal.replace(/_/g, ' ')}</span></div>
+                  )}
+                  {aprovacaoModal.motorista_nome && (
+                    <div><span className="text-slate-500 text-xs">Motorista:</span> <span className="font-semibold text-slate-700">{aprovacaoModal.motorista_nome}</span></div>
+                  )}
+                  {aprovacaoModal.veiculo_placa && (
+                    <div><span className="text-slate-500 text-xs">Placa:</span> <span className="font-mono font-semibold text-slate-700">{aprovacaoModal.veiculo_placa}</span></div>
+                  )}
+                  {aprovacaoModal.obra_nome && (
+                    <div className="col-span-2"><span className="text-slate-500 text-xs">Obra:</span> <span className="font-semibold text-slate-700">{aprovacaoModal.obra_nome}</span></div>
+                  )}
+                </div>
+              </div>
+
+              {aprovacaoModal.descricao && (
+                <p className="text-sm text-slate-600 italic">{aprovacaoModal.descricao}</p>
+              )}
+
               {aprovacaoModal.custo_estimado != null && (
-                <div className={`rounded-xl px-3 py-2 ${isDark ? 'bg-emerald-500/10 border border-emerald-500/20' : 'bg-emerald-50 border border-emerald-200'}`}>
-                  <p className={`text-xs font-semibold ${isDark ? 'text-emerald-400' : 'text-emerald-700'}`}>
-                    Custo: R$ {aprovacaoModal.custo_estimado.toFixed(2)} · Alçada: {getAlcada(aprovacaoModal.custo_estimado).aprovador}
-                  </p>
+                <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3 flex justify-between items-center">
+                  <span className="text-xs text-emerald-700 font-medium">Custo Estimado</span>
+                  <span className="text-lg font-extrabold text-emerald-700">
+                    R$ {aprovacaoModal.custo_estimado.toFixed(2)}
+                  </span>
                 </div>
               )}
+
+              {/* Observação */}
               <div>
-                <label className={`block text-xs font-bold mb-1 ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>Motivo (se reprovar)</label>
+                <label className={`block text-xs font-bold mb-1.5 ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>Adicionar observacao</label>
                 <textarea value={motivoReprovacao} onChange={e => setMotivoReprovacao(e.target.value)}
-                  rows={2} className={`w-full rounded-xl px-3 py-2.5 text-sm outline-none resize-none ${isDark ? 'bg-white/[0.06] border border-white/[0.08] text-slate-200' : 'bg-slate-50 border border-slate-200 text-slate-700'}`} placeholder="Justificativa da reprovação..." />
+                  rows={2} className={`w-full rounded-xl px-3 py-2.5 text-sm outline-none resize-none ${isDark ? 'bg-white/[0.06] border border-white/[0.08] text-slate-200' : 'bg-slate-50 border border-slate-200 text-slate-700'}`}
+                  placeholder="Observacao ou motivo de rejeicao..." />
               </div>
             </div>
-            <div className={`px-6 py-4 flex gap-2 ${isDark ? 'border-t border-white/[0.06]' : 'border-t border-slate-100'}`}>
+
+            {/* Botões padrão AprovAi */}
+            <div className={`px-5 py-4 flex gap-2 ${isDark ? 'border-t border-white/[0.06]' : 'border-t border-slate-100'}`}>
               <button onClick={() => handleAprovarReprovar(false)} disabled={aprovar.isPending}
-                className="flex-1 py-2 rounded-xl bg-red-600 hover:bg-red-700 text-white text-sm font-semibold transition-colors disabled:opacity-60">
-                Reprovar
+                className="flex-1 py-3 rounded-xl border-2 border-red-200 text-red-600 text-sm font-bold hover:bg-red-50 transition-colors disabled:opacity-60 flex items-center justify-center gap-1.5">
+                <XCircle size={15} /> Rejeitar
+              </button>
+              <button onClick={() => setAprovacaoModal(null)}
+                className={`flex-1 py-3 rounded-xl border-2 text-sm font-bold transition-colors flex items-center justify-center gap-1.5 ${isDark ? 'border-white/[0.08] text-slate-300' : 'border-slate-200 text-slate-600 hover:bg-slate-50'}`}>
+                <MessageSquare size={15} /> Esclarecer
               </button>
               <button onClick={() => handleAprovarReprovar(true)} disabled={aprovar.isPending}
-                className="flex-1 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold transition-colors disabled:opacity-60">
-                Aprovar
+                className="flex-1 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold transition-colors disabled:opacity-60 flex items-center justify-center gap-1.5">
+                <CheckCircle2 size={15} /> Aprovar
               </button>
             </div>
           </div>
