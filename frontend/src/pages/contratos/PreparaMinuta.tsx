@@ -1723,39 +1723,54 @@ export default function PreparaMinuta() {
           pdf.setDrawColor(c[0], c[1], c[2]); pdf.setLineWidth(0.3); pdf.line(mx, y, pw - mx, y); y += 3
         }
 
-        // HEADER
-        pdf.setFillColor(15, 118, 110); pdf.rect(0, 0, pw, 40, 'F')
-        pdf.setFont('helvetica', 'bold'); pdf.setFontSize(9); pdf.setTextColor(200, 240, 230); pdf.text('TEG+', mx, 12)
-        pdf.setFontSize(18); pdf.setTextColor(255, 255, 255); pdf.text('MINUTA CONTRATUAL', pw / 2, 18, { align: 'center' })
-        pdf.setFontSize(10); pdf.setTextColor(200, 240, 230)
-        pdf.text(pdf.splitTextToSize(`${minuta.titulo} — Versao Melhorada via IA`, usable), pw / 2, 28, { align: 'center' })
-        y = 50
-
-        // INFO BOX
-        pdf.setFillColor(245, 248, 250); pdf.roundedRect(mx, y, usable, 32, 2, 2, 'F')
-        const bxY = y + 6
-        pdf.setFont('helvetica', 'bold'); pdf.setFontSize(8); pdf.setTextColor(100, 116, 139); pdf.text('OBJETO', mx + 4, bxY)
-        pdf.setFont('helvetica', 'normal'); pdf.setFontSize(9); pdf.setTextColor(30, 41, 59)
-        pdf.text(pdf.splitTextToSize(solicitacao.objeto, usable / 2 - 8).slice(0, 2), mx + 4, bxY + 5)
-        pdf.setFont('helvetica', 'bold'); pdf.setFontSize(8); pdf.setTextColor(100, 116, 139); pdf.text('CONTRAPARTE', usable / 2 + mx + 4, bxY)
-        pdf.setFont('helvetica', 'normal'); pdf.setFontSize(9); pdf.setTextColor(30, 41, 59); pdf.text(solicitacao.contraparte_nome, usable / 2 + mx + 4, bxY + 5)
-        if (solicitacao.valor_estimado) {
-          pdf.setFont('helvetica', 'bold'); pdf.setFontSize(8); pdf.setTextColor(100, 116, 139); pdf.text('VALOR', usable / 2 + mx + 4, bxY + 14)
-          pdf.setFont('helvetica', 'normal'); pdf.setFontSize(9); pdf.setTextColor(15, 118, 110); pdf.text(fmt(solicitacao.valor_estimado), usable / 2 + mx + 4, bxY + 19)
-        }
+        // HEADER — formal contract style
         const dataStr = new Date().toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' })
-        pdf.setFont('helvetica', 'bold'); pdf.setFontSize(8); pdf.setTextColor(100, 116, 139); pdf.text('DATA', mx + 4, bxY + 14)
-        pdf.setFont('helvetica', 'normal'); pdf.setFontSize(9); pdf.setTextColor(30, 41, 59); pdf.text(dataStr, mx + 4, bxY + 19)
-        y += 38
+        pdf.setFont('helvetica', 'bold'); pdf.setFontSize(14); pdf.setTextColor(30, 41, 59)
+        pdf.text('MINUTA CONTRATUAL', pw / 2, 20, { align: 'center' })
+        pdf.setDrawColor(15, 118, 110); pdf.setLineWidth(0.8); pdf.line(mx, 24, pw - mx, 24)
+        pdf.setFont('helvetica', 'normal'); pdf.setFontSize(9); pdf.setTextColor(100, 116, 139)
+        pdf.text(minuta.titulo, pw / 2, 30, { align: 'center' })
+        pdf.text(dataStr, pw / 2, 36, { align: 'center' })
+        y = 44
 
-        // Score badge
-        if (mel.score_estimado) {
-          ensureSpace(12)
-          const sc: [number,number,number] = mel.score_estimado >= 80 ? [16, 185, 129] : mel.score_estimado >= 60 ? [245, 158, 11] : [239, 68, 68]
-          pdf.setFillColor(sc[0], sc[1], sc[2]); pdf.roundedRect(mx, y, 50, 8, 2, 2, 'F')
-          pdf.setFont('helvetica', 'bold'); pdf.setFontSize(8); pdf.setTextColor(255, 255, 255)
-          pdf.text(`SCORE: ${mel.score_estimado}/100`, mx + 25, y + 5.5, { align: 'center' }); y += 12
+        // PARTES
+        pdf.setFont('helvetica', 'bold'); pdf.setFontSize(9); pdf.setTextColor(15, 118, 110)
+        pdf.text('PARTES', mx, y); y += 2
+        pdf.setDrawColor(15, 118, 110); pdf.setLineWidth(0.3); pdf.line(mx, y, pw - mx, y); y += 5
+
+        // Contratante
+        pdf.setFont('helvetica', 'bold'); pdf.setFontSize(8); pdf.setTextColor(100, 116, 139)
+        pdf.text('CONTRATANTE', mx, y); y += 4
+        pdf.setFont('helvetica', 'normal'); pdf.setFontSize(9); pdf.setTextColor(30, 41, 59)
+        pdf.text(empresa.razao, mx, y); y += 4
+        pdf.setFontSize(8); pdf.setTextColor(100, 116, 139)
+        pdf.text(`CNPJ: ${empresa.cnpj}`, mx, y)
+        if (empresa.endereco) {
+          const endFull = [empresa.endereco, empresa.cidade ? `${empresa.cidade}/${empresa.uf ?? ''}` : ''].filter(Boolean).join(' - ')
+          pdf.text(endFull, mx + 50, y)
         }
+        y += 6
+
+        // Contratada
+        pdf.setFont('helvetica', 'bold'); pdf.setFontSize(8); pdf.setTextColor(100, 116, 139)
+        pdf.text('CONTRATADA', mx, y); y += 4
+        pdf.setFont('helvetica', 'normal'); pdf.setFontSize(9); pdf.setTextColor(30, 41, 59)
+        pdf.text(solicitacao.contraparte_nome, mx, y); y += 4
+        pdf.setFontSize(8); pdf.setTextColor(100, 116, 139)
+        if (solicitacao.contraparte_cnpj) pdf.text(`CNPJ: ${solicitacao.contraparte_cnpj}`, mx, y)
+        y += 6
+
+        // Objeto + Valor
+        pdf.setFont('helvetica', 'bold'); pdf.setFontSize(8); pdf.setTextColor(100, 116, 139)
+        pdf.text('OBJETO', mx, y); y += 4
+        pdf.setFont('helvetica', 'normal'); pdf.setFontSize(9); pdf.setTextColor(30, 41, 59)
+        for (const line of pdf.splitTextToSize(solicitacao.objeto, usable)) { pdf.text(line, mx, y); y += 4 }
+        if (solicitacao.valor_estimado) {
+          pdf.setFont('helvetica', 'bold'); pdf.setFontSize(8); pdf.setTextColor(100, 116, 139)
+          pdf.text(`Valor: ${fmt(solicitacao.valor_estimado)}`, mx, y); y += 4
+        }
+        y += 4
+        pdf.setDrawColor(200, 200, 200); pdf.setLineWidth(0.3); pdf.line(mx, y, pw - mx, y); y += 6
 
         // PREAMBULO
         if (mtRaw.preambulo) { printText(mtRaw.preambulo, 9, { color: [30, 41, 59] }); y += gapLg }
