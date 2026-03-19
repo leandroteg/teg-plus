@@ -1617,10 +1617,10 @@ export default function PreparaMinuta() {
     if (!solicitacao) return
     const empresaResumo = await getEmpresa()
 
-    const minutaComAnalise = [...minutas]
-      .filter(m => m.ai_analise || analiseMap[m.id])
-      .sort((a, b) => b.versao - a.versao)[0]
-    const analise = minutaComAnalise ? (analiseMap[minutaComAnalise.id] ?? minutaComAnalise.ai_analise) : undefined
+    // Use the most recent minuta (final version) for the resumo
+    const minutaFinal = [...minutas].sort((a, b) => b.versao - a.versao)[0]
+    const analise = minutaFinal ? (analiseMap[minutaFinal.id] ?? minutaFinal.ai_analise) : undefined
+    const melhoriasFinal = minutaFinal ? (editedMelhoriasMap[minutaFinal.id] ?? melhoriasMap[minutaFinal.id]) : undefined
 
     try {
       let payload
@@ -1629,6 +1629,7 @@ export default function PreparaMinuta() {
         const result = await gerarResumoAI.mutateAsync({
           solicitacao_id: solicitacao.id,
           analise: analise ?? undefined,
+          melhorias: melhoriasFinal ?? undefined,
           dados_contrato: {
             contratante: solicitacao.obra?.nome ?? empresaResumo.fantasia,
             contratada: solicitacao.contraparte_nome,
@@ -1636,7 +1637,7 @@ export default function PreparaMinuta() {
             valor_total: solicitacao.valor_estimado ?? undefined,
             prazo_meses: solicitacao.prazo_meses ?? undefined,
             titulo: `Resumo Executivo — ${solicitacao.objeto}`,
-            cnpj_contratante: undefined,
+            cnpj_contratante: empresaResumo.cnpj,
             cnpj_contratada: solicitacao.contraparte_cnpj ?? undefined,
           },
         })

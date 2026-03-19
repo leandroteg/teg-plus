@@ -1037,6 +1037,7 @@ export function useGerarResumoAI() {
     {
       solicitacao_id: string
       analise?: MinutaAiAnalise
+      melhorias?: MelhoriaMinuta
       dados_contrato: {
         contratante?: string
         contratada?: string
