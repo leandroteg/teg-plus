@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import {
   ShoppingCart, Clock, CheckCircle, AlertTriangle, ChevronRight, Info,
   XCircle, MessageSquare, FileText, Ban, Search, X, ArrowUp, ArrowDown,
-  LayoutList, LayoutGrid, Download, Loader2, Building2,
+  LayoutList, LayoutGrid, Download, Loader2, Building2, Calendar,
 } from 'lucide-react'
 import { useTheme } from '../contexts/ThemeContext'
 import { useCotacoes } from '../hooks/useCotacoes'
@@ -135,11 +135,18 @@ function CotCard({ cot, isDark, onClick }: { cot: Cotacao; isDark: boolean; onCl
         {cot.requisicao?.descricao}
       </p>
 
-      {/* Obra + Valor */}
+      {/* Obra + Necessidade + Valor */}
       <div className="flex items-center justify-between">
-        <span className={`text-xs truncate max-w-[55%] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
-          <Building2 size={10} className="inline mr-1" />{cot.requisicao?.obra_nome}
-        </span>
+        <div className="flex items-center gap-2 min-w-0 max-w-[65%]">
+          <span className={`text-xs truncate ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+            <Building2 size={10} className="inline mr-1" />{cot.requisicao?.obra_nome}
+          </span>
+          {cot.requisicao?.data_necessidade && (
+            <span className={`text-[10px] flex-shrink-0 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+              <Calendar size={9} className="inline mr-0.5" />{new Date(cot.requisicao.data_necessidade).toLocaleDateString('pt-BR')}
+            </span>
+          )}
+        </div>
         <span className={`text-sm font-extrabold ${concluida ? isDark ? 'text-emerald-400' : 'text-emerald-600' : isDark ? 'text-teal-400' : 'text-teal-600'}`}>
           {fmt(valor)}
         </span>

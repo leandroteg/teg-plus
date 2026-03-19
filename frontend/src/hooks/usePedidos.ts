@@ -18,7 +18,7 @@ export function usePedidos(status?: string) {
           status_pagamento, liberado_pagamento_em, liberado_pagamento_por, pago_em,
           centro_custo, centro_custo_id, classe_financeira, classe_financeira_id,
           condicao_pagamento, parcelas_preview,
-          requisicao:cmp_requisicoes(numero, descricao, justificativa, obra_nome, categoria, itens:cmp_requisicao_itens(descricao, quantidade, unidade, valor_unitario_estimado)),
+          requisicao:cmp_requisicoes(numero, descricao, justificativa, obra_nome, categoria, urgencia, data_necessidade, itens:cmp_requisicao_itens(descricao, quantidade, unidade, valor_unitario_estimado)),
           comprador:cmp_compradores(nome)
         `)
         .order('data_prevista_entrega', { ascending: true })

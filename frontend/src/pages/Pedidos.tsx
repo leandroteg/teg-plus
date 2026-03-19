@@ -927,8 +927,30 @@ function PedCard({ pedido, dark, onClick }: { pedido: PedidoListItem; dark: bool
             Prev: {fmtDataISO(pedido.data_prevista_entrega)}
             {dias !== null && !entregue && !pending && <span className="ml-0.5">({dias}d)</span>}
           </span>
-          {pedido.data_entrega_real && <span className="text-emerald-500">Entreg: {fmtData(pedido.data_entrega_real)}</span>}
+          {!entregue && !parcial && pedido.requisicao?.data_necessidade && (
+            <span>Necess: {fmtDataISO(pedido.requisicao.data_necessidade)}</span>
+          )}
+          {pedido.data_entrega_real && (
+            <span className="text-emerald-500">
+              Recebido: {fmtData(pedido.data_entrega_real)}
+              {pedido.data_pedido && (() => {
+                const d0 = new Date(pedido.data_pedido)
+                const d1 = new Date(pedido.data_entrega_real!)
+                const delta = Math.round((d1.getTime() - d0.getTime()) / 86400000)
+                return <span className="ml-0.5 font-semibold">({delta}d)</span>
+              })()}
+            </span>
+          )}
         </div>
+
+        {/* Urgência flag (before delivery) */}
+        {!entregue && !parcial && pedido.requisicao?.urgencia && pedido.requisicao.urgencia !== 'normal' && (
+          <span className={`inline-flex items-center text-[10px] font-bold px-1.5 py-0.5 rounded ${
+            pedido.requisicao.urgencia === 'critica'
+              ? dark ? 'bg-red-500/20 text-red-400' : 'bg-red-100 text-red-700'
+              : dark ? 'bg-amber-500/20 text-amber-400' : 'bg-amber-100 text-amber-700'
+          }`}>{pedido.requisicao.urgencia === 'critica' ? '\u26a1 Cr\u00edtica' : '\u26a1 Urgente'}</span>
+        )}
       </div>
     </div>
   )
