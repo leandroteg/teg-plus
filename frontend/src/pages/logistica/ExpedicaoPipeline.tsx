@@ -8,6 +8,7 @@ import {
 import { useTheme } from '../../contexts/ThemeContext'
 import {
   useSolicitacoes, useEmitirRomaneio, useSolicitarNFFiscal, useIniciarTransporte,
+  useChecklistExpedicao, useSalvarChecklistExpedicao,
 } from '../../hooks/useLogistica'
 import type { LogSolicitacao, StatusExpedicaoPipeline } from '../../types/logistica'
 import { EXPEDICAO_PIPELINE_STAGES } from '../../types/logistica'
@@ -80,10 +81,33 @@ function exportCSV(items: LogSolicitacao[], stageName: string) {
 
 // ── Detail Modal ─────────────────────────────────────────────────────────────
 
+const ITEMS_CHECKLIST = [
+  ['itens_conferidos',       'Itens conferidos contra lista de materiais'],
+  ['volumes_identificados',  'Volumes identificados com etiquetas'],
+  ['embalagem_verificada',   'Condições de embalagem e proteção verificadas'],
+  ['documentacao_separada',  'Documentação separada (DANFE, romaneio)'],
+  ['motorista_habilitado',   'Motorista habilitado verificado'],
+  ['veiculo_vistoriado',     'Veículo vistoriado'],
+  ['contato_destinatario',   'Contato do destinatário confirmado'],
+] as const
+
 function DetailModal({ sol, onClose, onAction, isDark }: {
   sol: LogSolicitacao; onClose: () => void
   onAction: (action: string, sol: LogSolicitacao) => void; isDark: boolean
 }) {
+  const { data: checklist } = useChecklistExpedicao(sol.id)
+  const salvarChecklist = useSalvarChecklistExpedicao()
+  const todosMarcados = ITEMS_CHECKLIST.every(([k]) => checklist?.[k as keyof typeof checklist])
+  const showChecklist = ['romaneio_emitido', 'nfe_emitida'].includes(sol.status)
+
+  async function toggle(key: string, val: boolean) {
+    await salvarChecklist.mutateAsync({
+      solicitacao_id: sol.id,
+      ...(checklist ?? {}),
+      [key]: val,
+    })
+  }
+
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-sm p-4" onClick={onClose}>
       <div className={`rounded-2xl shadow-2xl w-full max-w-lg max-h-[85vh] overflow-y-auto ${isDark ? 'bg-[#1e293b]' : 'bg-white'}`} onClick={e => e.stopPropagation()}>
@@ -135,6 +159,38 @@ function DetailModal({ sol, onClose, onAction, isDark }: {
             </div>
           </div>
 
+          {/* ── Checklist de Expedição ── */}
+          {showChecklist && (
+            <div className={`rounded-xl p-3 space-y-2 ${isDark ? 'bg-white/[0.04]' : 'bg-slate-50'}`}>
+              <p className={`text-[9px] font-bold uppercase tracking-wider flex items-center gap-1.5 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+                <ClipboardList size={11} />
+                Checklist de Expedição
+                <span className={`ml-auto text-[10px] font-bold px-1.5 py-0.5 rounded-full ${todosMarcados ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
+                  {ITEMS_CHECKLIST.filter(([k]) => checklist?.[k as keyof typeof checklist]).length}/{ITEMS_CHECKLIST.length}
+                </span>
+              </p>
+              <div className="space-y-1">
+                {ITEMS_CHECKLIST.map(([key, label]) => {
+                  const checked = !!(checklist?.[key as keyof typeof checklist])
+                  return (
+                    <label key={key} className="flex items-center gap-2 cursor-pointer group">
+                      <input type="checkbox" checked={checked} onChange={e => toggle(key, e.target.checked)}
+                        className="rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 transition-colors" />
+                      <span className={`text-xs transition-colors ${checked ? 'text-emerald-600 line-through opacity-60' : isDark ? 'text-slate-400' : 'text-slate-600'}`}>
+                        {label}
+                      </span>
+                    </label>
+                  )
+                })}
+              </div>
+              {!todosMarcados && (
+                <p className="text-[10px] text-amber-600 flex items-center gap-1">
+                  <AlertTriangle size={10} /> Complete o checklist para habilitar o despacho
+                </p>
+              )}
+            </div>
+          )}
+
           <div className="flex gap-2 pt-1">
             <button onClick={onClose} className={`flex-1 py-3 rounded-xl border text-sm font-semibold transition-all ${isDark ? 'border-white/[0.06] text-slate-300' : 'border-slate-200 text-slate-600 hover:bg-slate-50'}`}>
               Fechar
@@ -150,7 +206,8 @@ function DetailModal({ sol, onClose, onAction, isDark }: {
               </button>
             )}
             {(sol.status === 'romaneio_emitido' || sol.status === 'nfe_emitida') && (
-              <button onClick={() => onAction('despachar', sol)} className="flex-1 py-3 rounded-xl bg-emerald-600 text-white text-sm font-bold hover:bg-emerald-700 transition-all flex items-center justify-center gap-2">
+              <button onClick={() => onAction('despachar', sol)} disabled={!todosMarcados}
+                className={`flex-1 py-3 rounded-xl text-sm font-bold transition-all flex items-center justify-center gap-2 ${todosMarcados ? 'bg-emerald-600 text-white hover:bg-emerald-700' : 'bg-slate-200 text-slate-400 cursor-not-allowed'}`}>
                 <Truck size={15} /> Despachar
               </button>
             )}
