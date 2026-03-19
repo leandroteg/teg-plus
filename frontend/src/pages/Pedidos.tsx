@@ -147,7 +147,7 @@ const EMPRESA = {
   razao: 'TEG UNIAO - LOCACAO, SERVICOS & EMPREENDIMENTOS LTDA',
   fantasia: 'Teg Uniao Energia',
   cnpj: '19.887.731/0001-29',
-  logoUrl: '/logo-teg-plus.png',
+  logoUrl: '/logo-teg-empresa.png',
 }
 
 const fmtBRL = (v?: number) => v != null ? v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) : '—'
