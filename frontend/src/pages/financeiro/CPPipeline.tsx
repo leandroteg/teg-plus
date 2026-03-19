@@ -85,26 +85,26 @@ function CPTimeline({ cp, isDark }: { cp: ContaPagar; isDark: boolean }) {
         const { data: rc } = await supabase.from('cmp_requisicoes').select('numero, solicitante_nome, created_at').eq('id', cp.requisicao_id).single()
         if (rc?.created_at) evts.push({ tipo: 'rc_criada', label: `RC ${rc.numero ?? ''} criada`, ator: rc.solicitante_nome, data: rc.created_at })
 
-        // Aprovações da RC (Validação Técnica)
-        const { data: rcAprs } = await supabase.from('apr_aprovacoes').select('aprovador_nome, data_decisao, nivel, created_at')
-          .eq('entidade_id', cp.requisicao_id).eq('tipo_aprovacao', 'requisicao_compra').neq('status', 'pendente')
-        for (const a of rcAprs ?? []) {
-          const diff = new Date(a.data_decisao).getTime() - new Date(a.created_at).getTime()
-          if (diff > 1000) evts.push({ tipo: 'aprovacao', label: 'Validação Técnica', ator: a.aprovador_nome, data: a.data_decisao, nivel: a.nivel })
-        }
+        // Aprovações da RC (Validação Técnica) — 1 por nível, a mais recente
+        const { data: rcAprs } = await supabase.from('apr_aprovacoes').select('aprovador_nome, data_decisao, nivel')
+          .eq('entidade_id', cp.requisicao_id).eq('tipo_aprovacao', 'requisicao_compra').eq('status', 'aprovada')
+          .order('data_decisao', { ascending: false })
+        const rcByNivel = new Map<number, typeof rcAprs extends (infer T)[] | null ? T : never>()
+        for (const a of rcAprs ?? []) { if (!rcByNivel.has(a.nivel)) rcByNivel.set(a.nivel, a) }
+        for (const a of rcByNivel.values()) evts.push({ tipo: 'aprovacao', label: 'Validação Técnica', ator: a.aprovador_nome, data: a.data_decisao, nivel: a.nivel })
 
         // Cotação
         const { data: cot } = await supabase.from('cmp_cotacoes').select('fornecedor_selecionado_nome, data_conclusao')
           .eq('requisicao_id', cp.requisicao_id).not('data_conclusao', 'is', null).order('data_conclusao', { ascending: false }).limit(1)
         if (cot?.[0]?.data_conclusao) evts.push({ tipo: 'cotacao_aprovada', label: `Cotação concluída — ${cot[0].fornecedor_selecionado_nome ?? ''}`, data: cot[0].data_conclusao })
 
-        // Aprovações da cotação (Aprovação de Compra)
-        const { data: cotAprs } = await supabase.from('apr_aprovacoes').select('aprovador_nome, data_decisao, nivel, created_at')
-          .eq('entidade_id', cp.requisicao_id).eq('tipo_aprovacao', 'cotacao').neq('status', 'pendente')
-        for (const a of cotAprs ?? []) {
-          const diff = new Date(a.data_decisao).getTime() - new Date(a.created_at).getTime()
-          if (diff > 1000) evts.push({ tipo: 'aprovacao', label: 'Aprovação de Compra', ator: a.aprovador_nome, data: a.data_decisao, nivel: a.nivel })
-        }
+        // Aprovações da cotação (Aprovação de Compra) — 1 por nível
+        const { data: cotAprs } = await supabase.from('apr_aprovacoes').select('aprovador_nome, data_decisao, nivel')
+          .eq('entidade_id', cp.requisicao_id).eq('tipo_aprovacao', 'cotacao').eq('status', 'aprovada')
+          .order('data_decisao', { ascending: false })
+        const cotByNivel = new Map<number, typeof cotAprs extends (infer T)[] | null ? T : never>()
+        for (const a of cotAprs ?? []) { if (!cotByNivel.has(a.nivel)) cotByNivel.set(a.nivel, a) }
+        for (const a of cotByNivel.values()) evts.push({ tipo: 'aprovacao', label: 'Aprovação de Compra', ator: a.aprovador_nome, data: a.data_decisao, nivel: a.nivel })
       }
 
       // Pedido
@@ -121,13 +121,13 @@ function CPTimeline({ cp, isDark }: { cp: ContaPagar; isDark: boolean }) {
         const { data: lote } = await supabase.from('fin_lotes_pagamento').select('numero, created_at').eq('id', cp.lote_id).single()
         if (lote?.created_at) evts.push({ tipo: 'lote', label: `Lote ${lote.numero ?? ''} montado`, data: lote.created_at })
 
-        // Autorizações de pagamento
-        const { data: pgtoAprs } = await supabase.from('apr_aprovacoes').select('aprovador_nome, data_decisao, nivel, created_at, status')
-          .eq('entidade_id', cp.lote_id).eq('tipo_aprovacao', 'autorizacao_pagamento').neq('status', 'pendente')
-        for (const a of pgtoAprs ?? []) {
-          const diff = new Date(a.data_decisao).getTime() - new Date(a.created_at).getTime()
-          if (diff > 1000) evts.push({ tipo: 'aprovacao', label: 'Autorização de Pagamento', ator: a.aprovador_nome, data: a.data_decisao, nivel: a.nivel })
-        }
+        // Autorizações de pagamento — 1 por nível
+        const { data: pgtoAprs } = await supabase.from('apr_aprovacoes').select('aprovador_nome, data_decisao, nivel')
+          .eq('entidade_id', cp.lote_id).eq('tipo_aprovacao', 'autorizacao_pagamento').eq('status', 'aprovada')
+          .order('data_decisao', { ascending: false })
+        const pgtoByNivel = new Map<number, typeof pgtoAprs extends (infer T)[] | null ? T : never>()
+        for (const a of pgtoAprs ?? []) { if (!pgtoByNivel.has(a.nivel)) pgtoByNivel.set(a.nivel, a) }
+        for (const a of pgtoByNivel.values()) evts.push({ tipo: 'aprovacao', label: 'Autorização de Pagamento', ator: a.aprovador_nome, data: a.data_decisao, nivel: a.nivel })
       }
 
       // Remessa

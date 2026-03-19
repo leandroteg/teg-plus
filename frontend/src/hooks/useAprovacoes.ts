@@ -457,27 +457,25 @@ export function useAprovacoesPendentes(tipo?: TipoAprovacao) {
                       // RC criada
                       if (rc?.created_at) events.push({ tipo: 'rc_criada', label: `RC ${(rc.numero as string) ?? ''} criada`, ator: (rc.solicitante_nome as string) ?? undefined, data: (rc.created_at as string) })
 
-                      // Aprovações da RC (Validação Técnica) — filtrar inserts automáticos (diff < 1s)
-                      const rcAprs = rcId ? (aprByEntity.get(rcId) ?? []).filter(a => {
-                        if ((a.tipo_aprovacao as string) !== 'requisicao_compra') return false
-                        const created = new Date(a.created_at as string).getTime()
-                        const decided = new Date(a.data_decisao as string).getTime()
-                        return (decided - created) > 1000 // só registros com diff > 1s (decisão real)
-                      }) : []
-                      for (const apr of rcAprs) events.push({ tipo: 'aprovacao', label: 'Validação Técnica', ator: (apr.aprovador_nome as string) ?? undefined, data: (apr.data_decisao as string) ?? '', status: (apr.status as string), nivel: (apr.nivel as number) })
+                      // Aprovações da RC (Validação Técnica) — 1 por nível, a mais recente
+                      const rcAprsAll = rcId ? (aprByEntity.get(rcId) ?? []).filter(a => (a.tipo_aprovacao as string) === 'requisicao_compra' && (a.status as string) === 'aprovada') : []
+                      const rcByNivel = new Map<number, typeof rcAprsAll[0]>()
+                      for (const a of rcAprsAll.sort((x, y) => new Date(y.data_decisao as string).getTime() - new Date(x.data_decisao as string).getTime())) {
+                        const n = a.nivel as number; if (!rcByNivel.has(n)) rcByNivel.set(n, a)
+                      }
+                      for (const apr of rcByNivel.values()) events.push({ tipo: 'aprovacao', label: 'Validação Técnica', ator: (apr.aprovador_nome as string) ?? undefined, data: (apr.data_decisao as string) ?? '', status: (apr.status as string), nivel: (apr.nivel as number) })
 
                       // Cotação concluída
                       const cot = rcId ? cotMap2.get(rcId) : undefined
                       if (cot?.data_conclusao) events.push({ tipo: 'cotacao_aprovada', label: `Cotação concluída — ${(cot.fornecedor_selecionado_nome as string) ?? ''}`, data: (cot.data_conclusao as string) })
 
-                      // Aprovações da cotação (Aprovação de Compra) — filtrar inserts automáticos
-                      const cotAprs = rcId ? (aprByEntity.get(rcId) ?? []).filter(a => {
-                        if ((a.tipo_aprovacao as string) !== 'cotacao') return false
-                        const created = new Date(a.created_at as string).getTime()
-                        const decided = new Date(a.data_decisao as string).getTime()
-                        return (decided - created) > 1000
-                      }) : []
-                      for (const apr of cotAprs) events.push({ tipo: 'aprovacao', label: 'Aprovação de Compra', ator: (apr.aprovador_nome as string) ?? undefined, data: (apr.data_decisao as string) ?? '', status: (apr.status as string), nivel: (apr.nivel as number) })
+                      // Aprovações da cotação (Aprovação de Compra) — 1 por nível
+                      const cotAprsAll = rcId ? (aprByEntity.get(rcId) ?? []).filter(a => (a.tipo_aprovacao as string) === 'cotacao' && (a.status as string) === 'aprovada') : []
+                      const cotByNivel = new Map<number, typeof cotAprsAll[0]>()
+                      for (const a of cotAprsAll.sort((x, y) => new Date(y.data_decisao as string).getTime() - new Date(x.data_decisao as string).getTime())) {
+                        const n = a.nivel as number; if (!cotByNivel.has(n)) cotByNivel.set(n, a)
+                      }
+                      for (const apr of cotByNivel.values()) events.push({ tipo: 'aprovacao', label: 'Aprovação de Compra', ator: (apr.aprovador_nome as string) ?? undefined, data: (apr.data_decisao as string) ?? '', status: (apr.status as string), nivel: (apr.nivel as number) })
 
                       // Pedido emitido
                       const ped = pedId ? pedMap.get(pedId) : undefined
