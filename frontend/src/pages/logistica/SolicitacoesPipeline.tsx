@@ -174,7 +174,18 @@ function DetailModal({ sol, onClose, onAction, isDark }: {
             </div>
           </div>
 
-          <div className="flex gap-2 pt-1">
+          <div className="space-y-2 pt-1">
+            {sol.status === 'planejado' && (
+              <div className="flex gap-2">
+                <button onClick={() => onAction('revisarPlanejamento', sol)} className={`flex-1 py-3 rounded-xl border text-sm font-bold transition-all flex items-center justify-center gap-2 ${isDark ? 'border-white/[0.08] text-slate-300 hover:bg-white/[0.04]' : 'border-slate-200 text-slate-600 hover:bg-slate-50'}`}>
+                  <Calendar size={15} /> Revisar Planejamento
+                </button>
+                <button onClick={() => onAction('enviarAprovacao', sol)} className="flex-1 py-3 rounded-xl bg-amber-600 text-white text-sm font-bold hover:bg-amber-700 transition-all flex items-center justify-center gap-2">
+                  <ShieldCheck size={15} /> Enviar p/ Aprovação
+                </button>
+              </div>
+            )}
+            <div className="flex gap-2">
             <button onClick={onClose} className={`flex-1 py-3 rounded-xl border text-sm font-semibold transition-all ${isDark ? 'border-white/[0.06] text-slate-300' : 'border-slate-200 text-slate-600 hover:bg-slate-50'}`}>
               Fechar
             </button>
@@ -182,16 +193,6 @@ function DetailModal({ sol, onClose, onAction, isDark }: {
               <button onClick={() => onAction('planejar', sol)} className="flex-1 py-3 rounded-xl bg-violet-600 text-white text-sm font-bold hover:bg-violet-700 transition-all flex items-center justify-center gap-2">
                 <Calendar size={15} /> Planejar
               </button>
-            )}
-            {sol.status === 'planejado' && (
-              <>
-                <button onClick={() => onAction('revisarPlanejamento', sol)} className={`flex-1 py-3 rounded-xl border text-sm font-bold transition-all flex items-center justify-center gap-2 ${isDark ? 'border-white/[0.08] text-slate-300 hover:bg-white/[0.04]' : 'border-slate-200 text-slate-600 hover:bg-slate-50'}`}>
-                  <Calendar size={15} /> Revisar Planejamento
-                </button>
-                <button onClick={() => onAction('enviarAprovacao', sol)} className="flex-1 py-3 rounded-xl bg-amber-600 text-white text-sm font-bold hover:bg-amber-700 transition-all flex items-center justify-center gap-2">
-                  <ShieldCheck size={15} /> Enviar p/ Aprovação
-                </button>
-              </>
             )}
             {sol.status === 'aguardando_aprovacao' && (
               <button onClick={() => onAction('aprovar', sol)} className="flex-1 py-3 rounded-xl bg-emerald-600 text-white text-sm font-bold hover:bg-emerald-700 transition-all flex items-center justify-center gap-2">
@@ -203,6 +204,7 @@ function DetailModal({ sol, onClose, onAction, isDark }: {
                 <FileInput size={15} /> Solicitar NF
               </button>
             )}
+            </div>
           </div>
         </div>
       </div>
