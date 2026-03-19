@@ -98,7 +98,7 @@ function DetailModal({ sol, onClose, onAction, isDark }: {
   const { data: checklist } = useChecklistExpedicao(sol.id)
   const salvarChecklist = useSalvarChecklistExpedicao()
   const todosMarcados = ITEMS_CHECKLIST.every(([k]) => checklist?.[k as keyof typeof checklist])
-  const showChecklist = ['romaneio_emitido', 'nfe_emitida'].includes(sol.status)
+  const showChecklist = sol.status === 'aprovado'
 
   async function toggle(key: string, val: boolean) {
     await salvarChecklist.mutateAsync({
@@ -196,7 +196,8 @@ function DetailModal({ sol, onClose, onAction, isDark }: {
               Fechar
             </button>
             {sol.status === 'aprovado' && (
-              <button onClick={() => onAction('emitirRomaneio', sol)} className="flex-1 py-3 rounded-xl bg-blue-600 text-white text-sm font-bold hover:bg-blue-700 transition-all flex items-center justify-center gap-2">
+              <button onClick={() => onAction('emitirRomaneio', sol)} disabled={!todosMarcados}
+                className={`flex-1 py-3 rounded-xl text-sm font-bold transition-all flex items-center justify-center gap-2 ${todosMarcados ? 'bg-blue-600 text-white hover:bg-blue-700' : 'bg-slate-200 text-slate-400 cursor-not-allowed'}`}>
                 <ScrollText size={15} /> Emitir Romaneio
               </button>
             )}
@@ -206,8 +207,7 @@ function DetailModal({ sol, onClose, onAction, isDark }: {
               </button>
             )}
             {(sol.status === 'romaneio_emitido' || sol.status === 'nfe_emitida') && (
-              <button onClick={() => onAction('despachar', sol)} disabled={!todosMarcados}
-                className={`flex-1 py-3 rounded-xl text-sm font-bold transition-all flex items-center justify-center gap-2 ${todosMarcados ? 'bg-emerald-600 text-white hover:bg-emerald-700' : 'bg-slate-200 text-slate-400 cursor-not-allowed'}`}>
+              <button onClick={() => onAction('despachar', sol)} className="flex-1 py-3 rounded-xl bg-emerald-600 text-white text-sm font-bold hover:bg-emerald-700 transition-all flex items-center justify-center gap-2">
                 <Truck size={15} /> Despachar
               </button>
             )}
