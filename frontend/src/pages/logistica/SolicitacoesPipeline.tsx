@@ -375,24 +375,14 @@ function NovaSolicitacaoModal({ isDark, onClose, onSuccess }: {
 
         {/* Body */}
         <div className="p-6 space-y-4">
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className={labelCls}>Tipo *</label>
-              <select value={form.tipo} onChange={e => set('tipo', e.target.value)} className={inputCls}>
-                {Object.entries(TIPO_LABELS).map(([k, v]) => (
-                  <option key={k} value={k}>{v}</option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className={labelCls}>Centro de Custo</label>
-              <select value={form.centro_custo ?? ''} onChange={e => set('centro_custo', e.target.value)} className={inputCls}>
-                <option value="">Selecione...</option>
-                {centrosCusto.map(cc => (
-                  <option key={cc.id} value={cc.codigo}>{cc.codigo} - {cc.descricao}</option>
-                ))}
-              </select>
-            </div>
+          <div>
+            <label className={labelCls}>Centro de Custo</label>
+            <select value={form.centro_custo ?? ''} onChange={e => set('centro_custo', e.target.value)} className={inputCls}>
+              <option value="">Selecione...</option>
+              {centrosCusto.map(cc => (
+                <option key={cc.id} value={cc.codigo}>{cc.codigo} - {cc.descricao}</option>
+              ))}
+            </select>
           </div>
 
           {/* Origem */}
