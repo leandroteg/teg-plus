@@ -175,24 +175,40 @@ export function useAprovarSolicitacao() {
   return useMutation({
     mutationFn: async ({ id, aprovado, motivo }: { id: string; aprovado: boolean; motivo?: string }) => {
       const { data: { user } } = await supabase.auth.getUser()
+      const now = new Date().toISOString()
       const { data, error } = await supabase
         .from('log_solicitacoes')
         .update({
           status: aprovado ? 'aprovado' : 'recusado',
           aprovado_por: aprovado ? user?.id : undefined,
-          aprovado_em: aprovado ? new Date().toISOString() : undefined,
+          aprovado_em: aprovado ? now : undefined,
           motivo_reprovacao: aprovado ? undefined : motivo,
-          updated_at: new Date().toISOString(),
+          updated_at: now,
         })
         .eq('id', id)
         .select()
         .single()
       if (error) throw error
+
+      // Atualizar registro centralizado de aprovação
+      const perfil = await supabase.from('sys_perfis').select('nome_completo').eq('auth_id', user?.id).single()
+      await supabase.from('apr_aprovacoes')
+        .update({
+          status: aprovado ? 'aprovada' : 'rejeitada',
+          data_decisao: now,
+          aprovador_nome: perfil.data?.nome_completo ?? 'Usuário',
+          observacao: motivo ?? null,
+        })
+        .eq('entidade_id', id)
+        .eq('tipo_aprovacao', 'aprovacao_transporte')
+        .eq('status', 'pendente')
+
       return data as LogSolicitacao
     },
     onSuccess: (data) => {
       qc.invalidateQueries({ queryKey: ['log_solicitacoes'] })
       qc.invalidateQueries({ queryKey: ['log_solicitacao', data.id] })
+      qc.invalidateQueries({ queryKey: ['aprovacoes-pendentes'] })
     },
   })
 }
@@ -208,11 +224,28 @@ export function useEnviarParaAprovacao() {
         .select()
         .single()
       if (error) throw error
-      return data as LogSolicitacao
+      const sol = data as LogSolicitacao
+
+      // Criar registro centralizado de aprovação
+      const { data: { user } } = await supabase.auth.getUser()
+      await supabase.from('apr_aprovacoes').insert({
+        modulo: 'log',
+        tipo_aprovacao: 'aprovacao_transporte',
+        entidade_id: sol.id,
+        entidade_numero: sol.numero,
+        status: 'pendente',
+        nivel: 1,
+        aprovador_nome: 'Laucídio',
+        solicitante_id: user?.id,
+        prazo_resposta: new Date(Date.now() + 48 * 3600 * 1000).toISOString(),
+      })
+
+      return sol
     },
     onSuccess: (data) => {
       qc.invalidateQueries({ queryKey: ['log_solicitacoes'] })
       qc.invalidateQueries({ queryKey: ['log_solicitacao', data.id] })
+      qc.invalidateQueries({ queryKey: ['aprovacoes-pendentes'] })
     },
   })
 }

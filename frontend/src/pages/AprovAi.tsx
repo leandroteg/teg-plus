@@ -4,7 +4,7 @@ import {
   CheckCircle, XCircle, ChevronDown, ChevronRight, ChevronUp,
   Clock, Building, Sparkles, Shield, AlertTriangle,
   MessageSquare, ExternalLink, ArrowLeft,
-  FileSearch, Banknote, FileSignature, ShoppingCart,
+  FileSearch, Banknote, FileSignature, ShoppingCart, Truck, MapPin,
   History, ListChecks, Timer, TrendingUp, Filter,
   Calendar, FileText, Download, Eye, HelpCircle,
   Paperclip, Square, CheckSquare, Package, SplitSquareHorizontal,
@@ -88,11 +88,23 @@ const tipoConfig: Record<TipoAprovacao, {
     badgeText: 'text-teal-700',
     headerBg: 'bg-gradient-to-r from-teal-600 to-teal-500',
   },
+  aprovacao_transporte: {
+    label: 'Aprovacao de Transporte',
+    icon: Truck,
+    color: 'orange',
+    bgLight: 'bg-orange-50',
+    textColor: 'text-orange-700',
+    borderColor: 'border-orange-200',
+    badgeBg: 'bg-orange-100',
+    badgeText: 'text-orange-700',
+    headerBg: 'bg-gradient-to-r from-orange-600 to-amber-500',
+  },
 }
 
 const tipoOrder: TipoAprovacao[] = [
   'cotacao',
   'autorizacao_pagamento',
+  'aprovacao_transporte',
   'minuta_contratual',
   'requisicao_compra',
 ]
@@ -897,6 +909,37 @@ function GenericPendingCard({ aprovacao, aprovadorNome, aprovadorEmail }: {
                   {fmt(aprovacao.requisicao.valor_estimado)}
                 </span>
               </div>
+            )}
+          </div>
+        ) : aprovacao.tipo_aprovacao === 'aprovacao_transporte' && aprovacao.transporte_detalhes ? (
+          <div className="space-y-2">
+            <div className="bg-orange-50 rounded-xl p-3 space-y-2">
+              <div className="flex items-center gap-2 text-sm font-bold text-orange-800">
+                <MapPin size={14} className="text-orange-500" />
+                {aprovacao.transporte_detalhes.origem}
+                <span className="text-orange-400 mx-1">→</span>
+                {aprovacao.transporte_detalhes.destino}
+              </div>
+              <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
+                {aprovacao.transporte_detalhes.data_desejada && (
+                  <div><span className="text-slate-500">Data:</span> <span className="font-semibold text-slate-700">{new Date(aprovacao.transporte_detalhes.data_desejada).toLocaleDateString('pt-BR')}</span></div>
+                )}
+                {aprovacao.transporte_detalhes.modal && (
+                  <div><span className="text-slate-500">Modal:</span> <span className="font-semibold text-slate-700 capitalize">{aprovacao.transporte_detalhes.modal.replace(/_/g, ' ')}</span></div>
+                )}
+                {aprovacao.transporte_detalhes.motorista_nome && (
+                  <div><span className="text-slate-500">Motorista:</span> <span className="font-semibold text-slate-700">{aprovacao.transporte_detalhes.motorista_nome}</span></div>
+                )}
+                {aprovacao.transporte_detalhes.veiculo_placa && (
+                  <div><span className="text-slate-500">Placa:</span> <span className="font-mono font-semibold text-slate-700">{aprovacao.transporte_detalhes.veiculo_placa}</span></div>
+                )}
+                {aprovacao.transporte_detalhes.obra_nome && (
+                  <div className="col-span-2"><span className="text-slate-500">Obra:</span> <span className="font-semibold text-slate-700">{aprovacao.transporte_detalhes.obra_nome}</span></div>
+                )}
+              </div>
+            </div>
+            {aprovacao.transporte_detalhes.descricao && (
+              <p className="text-xs text-slate-600 italic">{aprovacao.transporte_detalhes.descricao}</p>
             )}
           </div>
         ) : (

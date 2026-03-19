@@ -119,7 +119,7 @@ export interface Requisicao {
   esclarecimento_em?: string
 }
 
-export type TipoAprovacao = 'requisicao_compra' | 'cotacao' | 'autorizacao_pagamento' | 'minuta_contratual'
+export type TipoAprovacao = 'requisicao_compra' | 'cotacao' | 'autorizacao_pagamento' | 'minuta_contratual' | 'aprovacao_transporte'
 
 export interface Aprovacao {
   id: string
@@ -210,6 +210,16 @@ export interface AprovacaoPendente extends Aprovacao {
         nivel?: number
       }[]
     }[]
+  }
+  transporte_detalhes?: {
+    origem: string
+    destino: string
+    data_desejada?: string
+    modal?: string
+    motorista_nome?: string
+    veiculo_placa?: string
+    obra_nome?: string
+    descricao?: string
   }
 }
 

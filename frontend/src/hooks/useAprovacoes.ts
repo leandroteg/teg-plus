@@ -292,6 +292,21 @@ export function useAprovacoesPendentes(tipo?: TipoAprovacao) {
         }
       }
 
+      // 5b. Busca dados de transporte (aprovacao_transporte)
+      const logIds = aprData
+        .filter(a => a.tipo_aprovacao === 'aprovacao_transporte')
+        .map(a => a.entidade_id)
+        .filter(Boolean)
+
+      const logMap = new Map<string, Record<string, unknown>>()
+      if (logIds.length > 0) {
+        const { data: logData } = await supabase
+          .from('log_solicitacoes')
+          .select('id, numero, tipo, origem, destino, data_desejada, modal, motorista_nome, veiculo_placa, obra_nome, centro_custo, descricao, peso_total_kg, volumes_total')
+          .in('id', logIds)
+        for (const s of logData ?? []) logMap.set((s as Record<string, unknown>).id as string, s as Record<string, unknown>)
+      }
+
       // 6. Mescla aprovacoes com dados da requisicao/contrato/CP + cotacao
       return aprData
         .map(a => {
@@ -533,11 +548,26 @@ export function useAprovacoesPendentes(tipo?: TipoAprovacao) {
           const pagamentoDetalhes = (a as Record<string, unknown>)._pagamento_detalhes as AprovacaoPendente['pagamento_detalhes']
           delete (a as Record<string, unknown>)._pagamento_detalhes
 
+          // Transporte detalhes
+          const logSol = logMap.get(a.entidade_id)
+          const transporteDetalhes = logSol ? {
+            origem: logSol.origem as string,
+            destino: logSol.destino as string,
+            data_desejada: logSol.data_desejada as string | undefined,
+            modal: logSol.modal as string | undefined,
+            motorista_nome: logSol.motorista_nome as string | undefined,
+            veiculo_placa: logSol.veiculo_placa as string | undefined,
+            obra_nome: logSol.obra_nome as string | undefined,
+            descricao: logSol.descricao as string | undefined,
+          } : undefined
+
           return {
             ...a,
-            entidade_numero: loteMap.has(a.entidade_id)
-              ? `${(loteMap.get(a.entidade_id)?.numero_lote as string) ?? a.entidade_numero ?? 'Lote'} • ${new Date((loteMap.get(a.entidade_id)?.created_at as string) ?? a.created_at).toLocaleDateString('pt-BR')} • ${((loteMap.get(a.entidade_id)?.valor_total as number) ?? 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}`
-              : a.entidade_numero,
+            entidade_numero: logSol
+              ? `${(logSol.numero as string) ?? a.entidade_numero} • ${(logSol.origem as string)} → ${(logSol.destino as string)}`
+              : loteMap.has(a.entidade_id)
+                ? `${(loteMap.get(a.entidade_id)?.numero_lote as string) ?? a.entidade_numero ?? 'Lote'} • ${new Date((loteMap.get(a.entidade_id)?.created_at as string) ?? a.created_at).toLocaleDateString('pt-BR')} • ${((loteMap.get(a.entidade_id)?.valor_total as number) ?? 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}`
+                : a.entidade_numero,
             requisicao_id: a.entidade_id,
             tipo_aprovacao: a.tipo_aprovacao || 'requisicao_compra',
             modulo: a.modulo || 'cmp',
@@ -545,6 +575,7 @@ export function useAprovacoesPendentes(tipo?: TipoAprovacao) {
             cotacao_resumo: cotMap.get(a.entidade_id) ?? undefined,
             minuta_resumo: minutaResumo ?? undefined,
             pagamento_detalhes: pagamentoDetalhes ?? undefined,
+            transporte_detalhes: transporteDetalhes,
           } as unknown as AprovacaoPendente
         })
         .filter((a): a is AprovacaoPendente => a !== null)
