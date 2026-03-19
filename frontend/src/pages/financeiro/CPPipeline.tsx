@@ -116,10 +116,14 @@ function CPTimeline({ cp, isDark }: { cp: ContaPagar; isDark: boolean }) {
       // CP criada
       if (cp.created_at) evts.push({ tipo: 'cp_criada', label: 'CP criada', data: cp.created_at })
 
-      // Lote
+      // Lote + Incluído no lote
       if (cp.lote_id) {
         const { data: lote } = await supabase.from('fin_lotes_pagamento').select('numero, created_at').eq('id', cp.lote_id).single()
         if (lote?.created_at) evts.push({ tipo: 'lote', label: `Lote ${lote.numero ?? ''} montado`, data: lote.created_at })
+
+        // Incluído no lote (fin_lote_itens)
+        const { data: loteItem } = await supabase.from('fin_lote_itens').select('created_at').eq('lote_id', cp.lote_id).eq('cp_id', cp.id).limit(1).single()
+        if (loteItem?.created_at) evts.push({ tipo: 'lote', label: 'Incluído no lote', data: loteItem.created_at })
 
         // Autorizações de pagamento — 1 por nível
         const { data: pgtoAprs } = await supabase.from('apr_aprovacoes').select('aprovador_nome, data_decisao, nivel')
