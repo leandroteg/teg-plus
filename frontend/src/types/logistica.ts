@@ -174,6 +174,7 @@ export interface LogChecklistExpedicao {
   itens_conferidos: boolean
   volumes_identificados: boolean
   embalagem_verificada: boolean
+  volumes_quantidade: boolean
   documentacao_separada: boolean
   motorista_habilitado: boolean
   veiculo_vistoriado: boolean

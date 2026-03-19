@@ -85,8 +85,8 @@ function exportCSV(items: LogSolicitacao[], stageName: string) {
 const ITEMS_CHECKLIST: readonly [string, string, boolean][] = [
   // [key, label, fotoObrigatoria]
   ['itens_conferidos',       'Itens conferidos contra lista de materiais', false],
-  ['volumes_identificados',  'Volumes identificados com etiquetas',        true],
   ['volumes_quantidade',     'Quantidade de volumes conferida',            false],
+  ['volumes_identificados',  'Volumes identificados com etiquetas',        true],
   ['embalagem_verificada',   'Condições de embalagem e proteção verificadas', true],
 ]
 
