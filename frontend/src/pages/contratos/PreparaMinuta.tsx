@@ -1615,6 +1615,7 @@ export default function PreparaMinuta() {
 
   const handleAvancarResumo = async () => {
     if (!solicitacao) return
+    const empresaResumo = await getEmpresa()
 
     const minutaComAnalise = [...minutas]
       .filter(m => m.ai_analise || analiseMap[m.id])
@@ -1629,7 +1630,7 @@ export default function PreparaMinuta() {
           solicitacao_id: solicitacao.id,
           analise: analise ?? undefined,
           dados_contrato: {
-            contratante: solicitacao.obra?.nome ?? 'TEG Engenharia',
+            contratante: solicitacao.obra?.nome ?? empresaResumo.fantasia,
             contratada: solicitacao.contraparte_nome,
             objeto: solicitacao.objeto,
             valor_total: solicitacao.valor_estimado ?? undefined,
@@ -1650,7 +1651,7 @@ export default function PreparaMinuta() {
         payload = buildResumoPayloadFromAnalise({
           solicitacaoId: solicitacao.id,
           titulo: `Resumo Executivo — ${solicitacao.objeto}`,
-          partesEnvolvidas: `TEG Engenharia e ${solicitacao.contraparte_nome}`,
+          partesEnvolvidas: `${empresaResumo.fantasia} e ${solicitacao.contraparte_nome}`,
           objetoResumo: solicitacao.objeto,
           valorTotal: solicitacao.valor_estimado ?? undefined,
           vigencia: solicitacao.data_inicio_prevista && solicitacao.data_fim_prevista
@@ -1672,12 +1673,16 @@ export default function PreparaMinuta() {
       console.warn('Falha ao preparar resumo executivo automatico:', e)
     }
 
-    await avancarEtapa.mutateAsync({
-      solicitacaoId: solicitacao.id,
-      etapaDe: 'preparar_minuta',
-      etapaPara: 'resumo_executivo',
-      observacao: 'Minuta final registrada, avancando para resumo executivo',
-    })
+    try {
+      await avancarEtapa.mutateAsync({
+        solicitacaoId: solicitacao.id,
+        etapaDe: 'preparar_minuta',
+        etapaPara: 'resumo_executivo',
+        observacao: 'Minuta final registrada, avancando para resumo executivo',
+      })
+    } catch (e) {
+      console.error('Erro ao avancar etapa:', e)
+    }
     nav(`/contratos/solicitacoes/${id}`)
   }
 
