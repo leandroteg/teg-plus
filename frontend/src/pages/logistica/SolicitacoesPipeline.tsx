@@ -184,9 +184,14 @@ function DetailModal({ sol, onClose, onAction, isDark }: {
               </button>
             )}
             {sol.status === 'planejado' && (
-              <button onClick={() => onAction('enviarAprovacao', sol)} className="flex-1 py-3 rounded-xl bg-amber-600 text-white text-sm font-bold hover:bg-amber-700 transition-all flex items-center justify-center gap-2">
-                <ShieldCheck size={15} /> Enviar p/ Aprovação
-              </button>
+              <>
+                <button onClick={() => onAction('revisarPlanejamento', sol)} className={`flex-1 py-3 rounded-xl border text-sm font-bold transition-all flex items-center justify-center gap-2 ${isDark ? 'border-white/[0.08] text-slate-300 hover:bg-white/[0.04]' : 'border-slate-200 text-slate-600 hover:bg-slate-50'}`}>
+                  <Calendar size={15} /> Revisar Planejamento
+                </button>
+                <button onClick={() => onAction('enviarAprovacao', sol)} className="flex-1 py-3 rounded-xl bg-amber-600 text-white text-sm font-bold hover:bg-amber-700 transition-all flex items-center justify-center gap-2">
+                  <ShieldCheck size={15} /> Enviar p/ Aprovação
+                </button>
+              </>
             )}
             {sol.status === 'aguardando_aprovacao' && (
               <button onClick={() => onAction('aprovar', sol)} className="flex-1 py-3 rounded-xl bg-emerald-600 text-white text-sm font-bold hover:bg-emerald-700 transition-all flex items-center justify-center gap-2">
@@ -721,6 +726,7 @@ export default function SolicitacoesPipeline() {
     setDetail(null)
     switch (action) {
       case 'planejar': openPlanejamento(sol); break
+      case 'revisarPlanejamento': openPlanejamento(sol); break
       case 'enviarAprovacao': handleEnviarAprovacao([sol.id]); break
       case 'aprovar': openAprovacao(sol); break
       case 'solicitarNF': openNfModal(sol); break
