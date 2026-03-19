@@ -6,7 +6,7 @@ import {
   Sparkles, ShieldAlert, Lightbulb, CheckCircle2, XCircle,
   AlertTriangle, ChevronDown, ChevronUp, Settings2, ToggleLeft, ToggleRight,
   Loader2, Brain, Scale, FileSearch, FileUp, X, Wand2,
-  TrendingUp, ArrowRight, Shield, Edit3, FileDown, Target, Crown, Zap,
+  TrendingUp, ArrowRight, Shield, Edit3, FileDown, Target, Crown, Zap, RefreshCw,
 } from 'lucide-react'
 import {
   useSolicitacao,
@@ -988,16 +988,29 @@ function MelhoriasPanel({ melhorias, scoreOriginal, onGerarMinuta, gerandoMinuta
               <p className="text-sm font-bold text-emerald-800">Minuta Gerada com Sucesso</p>
               <p className="text-[10px] text-emerald-600">PDF disponivel para download e envio para aprovacao</p>
             </div>
-            <a
-              href={pdfUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-[10px] font-bold
-                bg-white text-emerald-700 border border-emerald-200 hover:bg-emerald-50 transition-all shadow-sm"
-            >
-              <ExternalLink size={11} />
-              Abrir PDF
-            </a>
+            <div className="flex items-center gap-2">
+              {onGerarMinuta && (
+                <button
+                  onClick={onGerarMinuta}
+                  disabled={gerandoMinuta}
+                  className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-[10px] font-bold
+                    bg-white text-slate-600 border border-slate-200 hover:bg-slate-50 transition-all shadow-sm disabled:opacity-50"
+                >
+                  <RefreshCw size={11} className={gerandoMinuta ? 'animate-spin' : ''} />
+                  Gerar novamente
+                </button>
+              )}
+              <a
+                href={pdfUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-[10px] font-bold
+                  bg-white text-emerald-700 border border-emerald-200 hover:bg-emerald-50 transition-all shadow-sm"
+              >
+                <ExternalLink size={11} />
+                Abrir PDF
+              </a>
+            </div>
           </div>
         </div>
       )}
