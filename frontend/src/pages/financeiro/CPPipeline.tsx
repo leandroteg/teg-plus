@@ -55,6 +55,134 @@ const fmtDataFull = (d: string) =>
 const fmtDateTime = (value?: string) =>
   value ? new Date(value).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : ''
 
+// ── Timeline do fluxo completo da CP ────────────────────────────────────────
+
+type TLEvent = { tipo: string; label: string; ator?: string; data: string; nivel?: number }
+
+const TL_ICONS: Record<string, { bg: string; icon: string }> = {
+  rc_criada:       { bg: 'bg-slate-500', icon: '📄' },
+  aprovacao:       { bg: 'bg-emerald-500', icon: '✅' },
+  cotacao_aprovada:{ bg: 'bg-sky-500', icon: '🛒' },
+  pedido_emitido:  { bg: 'bg-teal-500', icon: '📦' },
+  cp_criada:       { bg: 'bg-amber-500', icon: '💰' },
+  lote:            { bg: 'bg-indigo-500', icon: '📋' },
+  remessa:         { bg: 'bg-blue-500', icon: '🏦' },
+}
+
+function CPTimeline({ cp, isDark }: { cp: ContaPagar; isDark: boolean }) {
+  const [events, setEvents] = useState<TLEvent[]>([])
+  const [loading, setLoading] = useState(true)
+  const [expanded, setExpanded] = useState(false)
+
+  useEffect(() => {
+    let active = true
+    setLoading(true)
+    ;(async () => {
+      const evts: TLEvent[] = []
+
+      // RC
+      if (cp.requisicao_id) {
+        const { data: rc } = await supabase.from('cmp_requisicoes').select('numero, solicitante_nome, created_at').eq('id', cp.requisicao_id).single()
+        if (rc?.created_at) evts.push({ tipo: 'rc_criada', label: `RC ${rc.numero ?? ''} criada`, ator: rc.solicitante_nome, data: rc.created_at })
+
+        // Aprovações da RC (Validação Técnica)
+        const { data: rcAprs } = await supabase.from('apr_aprovacoes').select('aprovador_nome, data_decisao, nivel, created_at')
+          .eq('entidade_id', cp.requisicao_id).eq('tipo_aprovacao', 'requisicao_compra').neq('status', 'pendente')
+        for (const a of rcAprs ?? []) {
+          const diff = new Date(a.data_decisao).getTime() - new Date(a.created_at).getTime()
+          if (diff > 1000) evts.push({ tipo: 'aprovacao', label: 'Validação Técnica', ator: a.aprovador_nome, data: a.data_decisao, nivel: a.nivel })
+        }
+
+        // Cotação
+        const { data: cot } = await supabase.from('cmp_cotacoes').select('fornecedor_selecionado_nome, data_conclusao')
+          .eq('requisicao_id', cp.requisicao_id).not('data_conclusao', 'is', null).order('data_conclusao', { ascending: false }).limit(1)
+        if (cot?.[0]?.data_conclusao) evts.push({ tipo: 'cotacao_aprovada', label: `Cotação concluída — ${cot[0].fornecedor_selecionado_nome ?? ''}`, data: cot[0].data_conclusao })
+
+        // Aprovações da cotação (Aprovação de Compra)
+        const { data: cotAprs } = await supabase.from('apr_aprovacoes').select('aprovador_nome, data_decisao, nivel, created_at')
+          .eq('entidade_id', cp.requisicao_id).eq('tipo_aprovacao', 'cotacao').neq('status', 'pendente')
+        for (const a of cotAprs ?? []) {
+          const diff = new Date(a.data_decisao).getTime() - new Date(a.created_at).getTime()
+          if (diff > 1000) evts.push({ tipo: 'aprovacao', label: 'Aprovação de Compra', ator: a.aprovador_nome, data: a.data_decisao, nivel: a.nivel })
+        }
+      }
+
+      // Pedido
+      if (cp.pedido_id) {
+        const { data: ped } = await supabase.from('cmp_pedidos').select('numero_pedido, created_at').eq('id', cp.pedido_id).single()
+        if (ped?.created_at) evts.push({ tipo: 'pedido_emitido', label: `Pedido ${ped.numero_pedido ?? ''} emitido`, data: ped.created_at })
+      }
+
+      // CP criada
+      if (cp.created_at) evts.push({ tipo: 'cp_criada', label: 'CP criada', data: cp.created_at })
+
+      // Lote
+      if (cp.lote_id) {
+        const { data: lote } = await supabase.from('fin_lotes_pagamento').select('numero, created_at').eq('id', cp.lote_id).single()
+        if (lote?.created_at) evts.push({ tipo: 'lote', label: `Lote ${lote.numero ?? ''} montado`, data: lote.created_at })
+
+        // Autorizações de pagamento
+        const { data: pgtoAprs } = await supabase.from('apr_aprovacoes').select('aprovador_nome, data_decisao, nivel, created_at, status')
+          .eq('entidade_id', cp.lote_id).eq('tipo_aprovacao', 'autorizacao_pagamento').neq('status', 'pendente')
+        for (const a of pgtoAprs ?? []) {
+          const diff = new Date(a.data_decisao).getTime() - new Date(a.created_at).getTime()
+          if (diff > 1000) evts.push({ tipo: 'aprovacao', label: 'Autorização de Pagamento', ator: a.aprovador_nome, data: a.data_decisao, nivel: a.nivel })
+        }
+      }
+
+      // Remessa
+      if (cp.remessa_enviada_em) evts.push({ tipo: 'remessa', label: 'Remessa enviada', data: cp.remessa_enviada_em })
+
+      evts.sort((a, b) => new Date(a.data).getTime() - new Date(b.data).getTime())
+      if (active) { setEvents(evts); setLoading(false) }
+    })()
+    return () => { active = false }
+  }, [cp.id, cp.requisicao_id, cp.pedido_id, cp.lote_id])
+
+  if (loading) return <div className="text-center py-3"><div className="w-5 h-5 border-2 border-slate-300 border-t-transparent rounded-full animate-spin mx-auto" /></div>
+  if (events.length === 0) return null
+
+  const shown = expanded ? events : events.slice(0, 3)
+
+  return (
+    <div className={`rounded-xl p-3 ${isDark ? 'bg-white/[0.04]' : 'bg-slate-50'}`}>
+      <button onClick={() => setExpanded(v => !v)} className="flex items-center justify-between w-full mb-2">
+        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1">
+          <Clock size={10} /> Timeline ({events.length})
+        </p>
+        {events.length > 3 && (
+          <span className={`text-[10px] font-semibold ${isDark ? 'text-indigo-300' : 'text-indigo-600'}`}>
+            {expanded ? 'Ocultar' : `Ver todos (${events.length})`}
+          </span>
+        )}
+      </button>
+      <div className="space-y-0">
+        {shown.map((ev, i) => {
+          const tlStyle = TL_ICONS[ev.tipo] ?? { bg: 'bg-slate-400', icon: '•' }
+          const dt = new Date(ev.data)
+          const fmtDt = `${dt.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' })}, ${dt.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`
+          return (
+            <div key={`${ev.tipo}-${i}`} className="flex gap-3 items-start">
+              <div className="flex flex-col items-center">
+                <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[9px] ${tlStyle.bg} text-white shrink-0`}>
+                  {tlStyle.icon}
+                </div>
+                {i < shown.length - 1 && <div className={`w-px flex-1 min-h-[16px] ${isDark ? 'bg-white/10' : 'bg-slate-200'}`} />}
+              </div>
+              <div className="pb-2 min-w-0">
+                <p className={`text-[11px] font-semibold leading-tight ${isDark ? 'text-white' : 'text-slate-800'}`}>{ev.label}</p>
+                <p className={`text-[10px] ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+                  {ev.ator && <>{ev.ator} · </>}{fmtDt}{ev.nivel ? ` · Nível ${ev.nivel}` : ''}
+                </p>
+              </div>
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
 function getRemessaHint(cp: ContaPagar) {
   if (cp.status === 'aprovado_pgto' && cp.remessa_status === 'erro' && cp.remessa_erro) {
     return `Falha na remessa: ${cp.remessa_erro}`
@@ -1436,6 +1564,9 @@ function CPDetailModal({ cp, stageStatus, onClose, onAction, isDark }: {
               })}
             </div>
           </div>
+
+          {/* Timeline do fluxo */}
+          <CPTimeline cp={cp} isDark={isDark} />
 
           {isApprovalStage && (
             <div className={`rounded-xl border ${isDark ? 'border-white/[0.08] bg-white/[0.03]' : 'border-amber-200 bg-amber-50/70'}`}>
