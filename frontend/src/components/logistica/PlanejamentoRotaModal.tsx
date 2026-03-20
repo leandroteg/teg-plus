@@ -106,13 +106,12 @@ function MapFitter({ points }: { points: Array<{ lat: number; lng: number }> }) 
   return null
 }
 
-// ── Address Autocomplete Input ───────────────────────────────────────────────
+// ── Address Autocomplete Input (Endereço + CEP) ─────────────────────────────
 
 function EnderecoInput({
   value,
   onChange,
   onSelect,
-  placeholder,
   isDark,
   label,
   icon: Icon,
@@ -120,7 +119,6 @@ function EnderecoInput({
   value: string
   onChange: (v: string) => void
   onSelect: (s: EnderecoSugestao) => void
-  placeholder: string
   isDark: boolean
   label: string
   icon: typeof MapPin
@@ -128,8 +126,10 @@ function EnderecoInput({
   const [sugestoes, setSugestoes] = useState<EnderecoSugestao[]>([])
   const [loading, setLoading] = useState(false)
   const [open, setOpen] = useState(false)
-  const [cepMode, setCepMode] = useState(false)
+  const [mode, setMode] = useState<'endereco' | 'cep'>('endereco')
+  const [cepValue, setCepValue] = useState('')
   const timerRef = useRef<ReturnType<typeof setTimeout>>()
+  const abortRef = useRef<AbortController>()
   const containerRef = useRef<HTMLDivElement>(null)
 
   // Click outside close
@@ -141,116 +141,281 @@ function EnderecoInput({
     return () => document.removeEventListener('mousedown', handler)
   }, [])
 
-  const buscar = useCallback(async (query: string) => {
-    if (query.length < 3) { setSugestoes([]); return }
+  // ── Buscar endereço via Nominatim (gratuito, sem API key) ────────────────
+  const buscarEndereco = useCallback(async (query: string) => {
+    if (query.length < 3) { setSugestoes([]); setOpen(false); return }
+
+    // Cancel previous request
+    if (abortRef.current) abortRef.current.abort()
+    abortRef.current = new AbortController()
+
     setLoading(true)
     try {
-      const isCep = /^\d{5}-?\d{0,3}$/.test(query.replace(/\s/g, ''))
-      const endpoint = isCep ? '/logistica/consulta-cep' : '/logistica/autocomplete-endereco'
-      const body = isCep ? { cep: query.replace(/\D/g, '') } : { query, pais: 'BR' }
+      // Tenta n8n primeiro
+      try {
+        const res = await fetch(`${N8N_URL}/logistica/autocomplete-endereco`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ query, pais: 'BR' }),
+          signal: abortRef.current.signal,
+        })
+        if (res.ok) {
+          const json = await res.json()
+          const resultados = json.sugestoes || json.results || []
+          if (resultados.length > 0) {
+            setSugestoes(resultados)
+            setOpen(true)
+            return
+          }
+        }
+      } catch (e) {
+        if (e instanceof DOMException && e.name === 'AbortError') return
+      }
 
-      const res = await fetch(`${N8N_URL}${endpoint}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-        signal: AbortSignal.timeout(8000),
-      })
-
+      // Fallback: Nominatim OpenStreetMap (gratuito)
+      const encoded = encodeURIComponent(query)
+      const res = await fetch(
+        `https://nominatim.openstreetmap.org/search?q=${encoded}&format=json&addressdetails=1&limit=6&countrycodes=br`,
+        { signal: abortRef.current.signal, headers: { 'Accept-Language': 'pt-BR' } }
+      )
       if (res.ok) {
-        const json = await res.json()
-        const resultados = json.sugestoes || json.results || (json.cidade ? [json] : [])
+        const data = await res.json() as Array<{
+          display_name: string; lat: string; lon: string
+          address?: { road?: string; suburb?: string; city?: string; town?: string; state?: string; postcode?: string }
+        }>
+        const resultados: EnderecoSugestao[] = data.map(d => ({
+          descricao: d.display_name.replace(/, Brasil$/i, ''),
+          logradouro: d.address?.road,
+          bairro: d.address?.suburb,
+          cidade: d.address?.city || d.address?.town || '',
+          uf: d.address?.state || '',
+          cep: d.address?.postcode,
+          lat: parseFloat(d.lat),
+          lng: parseFloat(d.lon),
+        }))
         setSugestoes(resultados)
         setOpen(resultados.length > 0)
       }
-    } catch {
-      // Fallback: se CEP, buscar via BrasilAPI diretamente
-      const limpo = query.replace(/\D/g, '')
-      if (limpo.length === 8) {
-        try {
-          const res = await fetch(`https://brasilapi.com.br/api/cep/v2/${limpo}`)
-          if (res.ok) {
-            const d = await res.json()
-            const sug: EnderecoSugestao = {
-              descricao: `${d.street || ''}, ${d.neighborhood || ''}, ${d.city} - ${d.state}`,
-              logradouro: d.street,
-              bairro: d.neighborhood,
-              cidade: d.city,
-              uf: d.state,
-              cep: d.cep,
-              lat: d.location?.coordinates?.latitude,
-              lng: d.location?.coordinates?.longitude,
-            }
-            setSugestoes([sug])
-            setOpen(true)
-          }
-        } catch { /* silent */ }
-      }
+    } catch (e) {
+      if (e instanceof DOMException && e.name === 'AbortError') return
+      // silent
     } finally {
       setLoading(false)
     }
   }, [])
 
-  const handleChange = (v: string) => {
+  // ── Buscar por CEP ────────────────────────────────────────────────────────
+  const buscarCep = useCallback(async (cep: string) => {
+    const limpo = cep.replace(/\D/g, '')
+    if (limpo.length < 5) { setSugestoes([]); setOpen(false); return }
+
+    if (abortRef.current) abortRef.current.abort()
+    abortRef.current = new AbortController()
+
+    setLoading(true)
+    try {
+      // Tenta n8n primeiro
+      try {
+        const res = await fetch(`${N8N_URL}/logistica/consulta-cep`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ cep: limpo }),
+          signal: abortRef.current.signal,
+        })
+        if (res.ok) {
+          const json = await res.json()
+          if (json.cidade || json.city) {
+            const sug: EnderecoSugestao = {
+              descricao: json.descricao || `${json.logradouro || json.street || ''}, ${json.bairro || json.neighborhood || ''}, ${json.cidade || json.city} - ${json.uf || json.state}`,
+              logradouro: json.logradouro || json.street,
+              bairro: json.bairro || json.neighborhood,
+              cidade: json.cidade || json.city || '',
+              uf: json.uf || json.state || '',
+              cep: json.cep || limpo,
+              lat: json.lat || json.latitude,
+              lng: json.lng || json.longitude,
+            }
+            setSugestoes([sug])
+            setOpen(true)
+            return
+          }
+        }
+      } catch (e) {
+        if (e instanceof DOMException && e.name === 'AbortError') return
+      }
+
+      // Fallback: BrasilAPI direto
+      if (limpo.length === 8) {
+        const res = await fetch(`https://brasilapi.com.br/api/cep/v2/${limpo}`, { signal: abortRef.current.signal })
+        if (res.ok) {
+          const d = await res.json()
+          const desc = [d.street, d.neighborhood, d.city ? `${d.city} - ${d.state}` : ''].filter(Boolean).join(', ')
+          const sug: EnderecoSugestao = {
+            descricao: desc,
+            logradouro: d.street,
+            bairro: d.neighborhood,
+            cidade: d.city,
+            uf: d.state,
+            cep: d.cep,
+            lat: d.location?.coordinates?.latitude,
+            lng: d.location?.coordinates?.longitude,
+          }
+          setSugestoes([sug])
+          setOpen(true)
+
+          // Se não tem lat/lng, geocodificar via Nominatim
+          if (!sug.lat && desc) {
+            try {
+              const geoRes = await fetch(
+                `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(desc + ', Brasil')}&format=json&limit=1`,
+                { headers: { 'Accept-Language': 'pt-BR' } }
+              )
+              if (geoRes.ok) {
+                const [geo] = await geoRes.json()
+                if (geo) {
+                  sug.lat = parseFloat(geo.lat)
+                  sug.lng = parseFloat(geo.lon)
+                  setSugestoes([{ ...sug }])
+                }
+              }
+            } catch { /* silent */ }
+          }
+        }
+      }
+    } catch (e) {
+      if (e instanceof DOMException && e.name === 'AbortError') return
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  // Debounced handlers
+  const handleEnderecoChange = (v: string) => {
     onChange(v)
     if (timerRef.current) clearTimeout(timerRef.current)
-    timerRef.current = setTimeout(() => buscar(v), 400)
+    timerRef.current = setTimeout(() => buscarEndereco(v), 300)
   }
+
+  const handleCepChange = (v: string) => {
+    // Format CEP: 01234-567
+    const digits = v.replace(/\D/g, '').slice(0, 8)
+    const formatted = digits.length > 5 ? `${digits.slice(0, 5)}-${digits.slice(5)}` : digits
+    setCepValue(formatted)
+    if (timerRef.current) clearTimeout(timerRef.current)
+    timerRef.current = setTimeout(() => buscarCep(digits), 300)
+  }
+
+  const handleSelect = (s: EnderecoSugestao) => {
+    const desc = s.descricao || `${s.logradouro || ''}, ${s.bairro || ''}, ${s.cidade} - ${s.uf}`.replace(/^, /, '')
+    onSelect(s)
+    onChange(desc)
+    if (s.cep) setCepValue(s.cep.replace(/(\d{5})(\d{3})/, '$1-$2'))
+    setOpen(false)
+    setSugestoes([])
+  }
+
+  const inputClass = `w-full pl-3 pr-9 py-2 rounded-xl border text-sm transition-all focus:outline-none focus:ring-2 ${
+    isDark
+      ? 'bg-white/[0.06] border-white/[0.08] text-slate-200 focus:ring-orange-500/30 focus:border-orange-500/50 placeholder-slate-600'
+      : 'bg-slate-50 border-slate-200 text-slate-700 focus:ring-orange-500/20 focus:border-orange-400 placeholder-slate-400'
+  }`
+
+  const tabClass = (active: boolean) => `px-3 py-1 rounded-lg text-[11px] font-bold transition-all ${
+    active
+      ? 'bg-orange-500 text-white shadow-sm'
+      : isDark
+        ? 'text-slate-500 hover:text-slate-300 hover:bg-white/[0.05]'
+        : 'text-slate-400 hover:text-slate-600 hover:bg-slate-100'
+  }`
 
   return (
     <div ref={containerRef} className="relative">
-      <label className={`text-[10px] font-bold uppercase tracking-wider mb-1 flex items-center gap-1.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
-        <Icon size={11} /> {label}
-      </label>
-      <div className="relative">
-        <input
-          type="text"
-          value={value}
-          onChange={e => handleChange(e.target.value)}
-          onFocus={() => sugestoes.length > 0 && setOpen(true)}
-          placeholder={placeholder}
-          className={`w-full pl-3 pr-10 py-2.5 rounded-xl border text-sm transition-all focus:outline-none focus:ring-2 ${
-            isDark
-              ? 'bg-white/[0.06] border-white/[0.08] text-slate-200 focus:ring-orange-500/30 focus:border-orange-500/50 placeholder-slate-600'
-              : 'bg-slate-50 border-slate-200 text-slate-700 focus:ring-orange-500/20 focus:border-orange-400 placeholder-slate-400'
-          }`}
-        />
-        <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
-          {loading && <Loader2 size={14} className="animate-spin text-orange-500" />}
-          <button
-            onClick={() => setCepMode(!cepMode)}
-            title={cepMode ? 'Buscar por endereço' : 'Buscar por CEP'}
-            className={`p-1 rounded-md transition-all ${
-              cepMode
-                ? 'bg-orange-500/20 text-orange-500'
-                : isDark ? 'text-slate-600 hover:text-slate-400' : 'text-slate-400 hover:text-slate-600'
-            }`}
-          >
-            <Search size={12} />
+      <div className="flex items-center justify-between mb-1.5">
+        <label className={`text-[10px] font-bold uppercase tracking-wider flex items-center gap-1.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+          <Icon size={11} /> {label}
+        </label>
+        {/* Toggle: Endereço / CEP */}
+        <div className={`flex items-center gap-0.5 p-0.5 rounded-lg ${isDark ? 'bg-white/[0.04]' : 'bg-slate-100'}`}>
+          <button type="button" onClick={() => setMode('endereco')} className={tabClass(mode === 'endereco')}>
+            Endereço
+          </button>
+          <button type="button" onClick={() => setMode('cep')} className={tabClass(mode === 'cep')}>
+            CEP
           </button>
         </div>
       </div>
 
-      {/* Dropdown */}
-      {open && sugestoes.length > 0 && (
-        <div className={`absolute z-50 left-0 right-0 mt-1 rounded-xl shadow-xl border max-h-48 overflow-y-auto ${
-          isDark ? 'bg-[#1e293b] border-white/[0.1]' : 'bg-white border-slate-200'
+      {mode === 'endereco' ? (
+        <div className="relative">
+          <input
+            type="text"
+            value={value}
+            onChange={e => handleEnderecoChange(e.target.value)}
+            onFocus={() => sugestoes.length > 0 && setOpen(true)}
+            placeholder="Rua, Av, Cidade... (autocomplete)"
+            className={inputClass}
+          />
+          <div className="absolute right-2.5 top-1/2 -translate-y-1/2 flex items-center gap-1">
+            {loading ? (
+              <Loader2 size={14} className="animate-spin text-orange-500" />
+            ) : (
+              <Search size={13} className={isDark ? 'text-slate-600' : 'text-slate-400'} />
+            )}
+          </div>
+        </div>
+      ) : (
+        <div className="relative">
+          <input
+            type="text"
+            value={cepValue}
+            onChange={e => handleCepChange(e.target.value)}
+            onFocus={() => sugestoes.length > 0 && setOpen(true)}
+            placeholder="01234-567"
+            maxLength={9}
+            className={inputClass}
+          />
+          <div className="absolute right-2.5 top-1/2 -translate-y-1/2 flex items-center gap-1">
+            {loading ? (
+              <Loader2 size={14} className="animate-spin text-orange-500" />
+            ) : (
+              <Building2 size={13} className={isDark ? 'text-slate-600' : 'text-slate-400'} />
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Show resolved address below CEP input */}
+      {mode === 'cep' && value && (
+        <div className={`mt-1 text-[11px] px-2 py-1 rounded-lg truncate ${
+          isDark ? 'bg-white/[0.03] text-slate-400' : 'bg-slate-50 text-slate-500'
         }`}>
+          <MapPin size={10} className="inline mr-1 text-orange-400" />{value}
+        </div>
+      )}
+
+      {/* Dropdown sugestões */}
+      {open && sugestoes.length > 0 && (
+        <div className={`absolute z-50 left-0 right-0 mt-1 rounded-xl shadow-2xl border max-h-52 overflow-y-auto ${
+          isDark ? 'bg-[#1e293b] border-white/[0.1]' : 'bg-white border-slate-200'
+        }`} style={{ animation: 'fadeIn 0.15s ease-out' }}>
           {sugestoes.map((s, i) => (
             <button
               key={i}
-              onClick={() => {
-                onSelect(s)
-                onChange(s.descricao || `${s.cidade} - ${s.uf}`)
-                setOpen(false)
-              }}
-              className={`w-full text-left px-3 py-2.5 text-sm flex items-start gap-2 transition-all ${
-                isDark ? 'hover:bg-white/[0.06] text-slate-300' : 'hover:bg-orange-50 text-slate-700'
+              onClick={() => handleSelect(s)}
+              className={`w-full text-left px-3 py-2.5 text-sm flex items-start gap-2.5 transition-all ${
+                isDark ? 'hover:bg-orange-500/10 text-slate-300' : 'hover:bg-orange-50 text-slate-700'
               } ${i > 0 ? isDark ? 'border-t border-white/[0.04]' : 'border-t border-slate-100' : ''}`}
             >
-              <MapPin size={14} className="text-orange-500 mt-0.5 shrink-0" />
-              <div>
-                <div className="font-medium">{s.descricao || `${s.cidade} - ${s.uf}`}</div>
-                {s.cep && <div className={`text-[11px] mt-0.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>CEP: {s.cep}</div>}
+              <div className={`mt-0.5 p-1 rounded-md shrink-0 ${isDark ? 'bg-orange-500/20' : 'bg-orange-100'}`}>
+                <MapPin size={12} className="text-orange-500" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="font-medium truncate">{s.descricao || `${s.cidade} - ${s.uf}`}</div>
+                <div className={`text-[11px] mt-0.5 flex items-center gap-2 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+                  {s.cep && <span>CEP: {s.cep}</span>}
+                  {s.cidade && <span>{s.cidade}{s.uf ? ` - ${s.uf}` : ''}</span>}
+                  {s.lat != null && <span className="text-emerald-500">📍</span>}
+                </div>
               </div>
             </button>
           ))}
@@ -587,7 +752,6 @@ export default function PlanejamentoRotaModal({ isDark, solicitacoes, allSolicit
                     value={ponto.endereco_origem}
                     onChange={v => updatePonto(idx, 'endereco_origem', v)}
                     onSelect={s => handleSelectOrigem(idx, s)}
-                    placeholder="Endereço ou CEP de origem..."
                     isDark={isDark}
                     label="Origem"
                     icon={MapPin}
@@ -603,7 +767,6 @@ export default function PlanejamentoRotaModal({ isDark, solicitacoes, allSolicit
                     value={ponto.endereco_destino}
                     onChange={v => updatePonto(idx, 'endereco_destino', v)}
                     onSelect={s => handleSelectDestino(idx, s)}
-                    placeholder="Endereço ou CEP de destino..."
                     isDark={isDark}
                     label="Destino"
                     icon={Navigation}
@@ -869,6 +1032,10 @@ export default function PlanejamentoRotaModal({ isDark, solicitacoes, allSolicit
         @keyframes slideUp {
           from { opacity: 0; transform: translateY(30px) scale(0.97); }
           to   { opacity: 1; transform: translateY(0) scale(1); }
+        }
+        @keyframes fadeIn {
+          from { opacity: 0; transform: translateY(-4px); }
+          to   { opacity: 1; transform: translateY(0); }
         }
       `}</style>
     </div>
