@@ -1,7 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../services/supabase'
 import type {
-  LogSolicitacao, LogTransportadora, LogRota, LogNFe,
+  LogSolicitacao, LogViagem, LogTransportadora, LogRota, LogNFe,
   LogTransporte, LogOcorrencia, LogRecebimento, LogAvaliacao,
   LogChecklistExpedicao, LogisticaKPIs,
   CriarSolicitacaoPayload, EmitirNFePayload, IniciarTransportePayload,
@@ -34,6 +34,7 @@ export function useSolicitacoes(filtros?: {
           *,
           transportadora:log_transportadoras(id, nome_fantasia, razao_social, avaliacao_media),
           rota_planejada:log_rotas!rota_planejada_id(id, nome, distancia_km, tempo_estimado_h),
+          viagem:log_viagens!viagem_id(id, numero, status, qtd_paradas, distancia_total_km, tempo_estimado_h, custo_total, origem_principal, destino_final),
           nfe:log_nfe(id, numero, status, chave_acesso, valor_total),
           transporte:log_transportes(id, hora_saida, hora_chegada, eta_atual, placa, motorista_nome),
           recebimento:log_recebimentos(id, status, confirmado_em),
@@ -167,6 +168,195 @@ export function usePlanejaarSolicitacao() {
     onSuccess: (data) => {
       qc.invalidateQueries({ queryKey: ['log_solicitacoes'] })
       qc.invalidateQueries({ queryKey: ['log_solicitacao', data.id] })
+    },
+  })
+}
+
+// ── Viagem (consolida N solicitações numa trip) ──────────────────────────────
+
+export function useCriarViagem() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (payload: {
+      solicitacaoIds: string[]
+      modal?: string
+      motorista_nome?: string
+      motorista_telefone?: string
+      veiculo_placa?: string
+      data_prevista_saida?: string
+      custo_total?: number
+      distancia_total_km?: number
+      tempo_estimado_h?: number
+      origem_principal?: string
+      destino_final?: string
+      rota_polyline?: string
+    }) => {
+      const { data: { user } } = await supabase.auth.getUser()
+
+      // 1. Criar a viagem
+      const { data: viagem, error: vErr } = await supabase
+        .from('log_viagens')
+        .insert({
+          status: 'planejada',
+          modal: payload.modal,
+          veiculo_placa: payload.veiculo_placa,
+          motorista_nome: payload.motorista_nome,
+          motorista_telefone: payload.motorista_telefone,
+          origem_principal: payload.origem_principal,
+          destino_final: payload.destino_final,
+          distancia_total_km: payload.distancia_total_km,
+          tempo_estimado_h: payload.tempo_estimado_h,
+          qtd_paradas: payload.solicitacaoIds.length,
+          custo_total: payload.custo_total,
+          data_prevista_saida: payload.data_prevista_saida,
+          rota_polyline: payload.rota_polyline,
+          criado_por: user?.id,
+        })
+        .select()
+        .single()
+      if (vErr) throw vErr
+
+      // 2. Vincular solicitações à viagem + atualizar status → planejado
+      const custoRateado = payload.custo_total && payload.solicitacaoIds.length > 0
+        ? Math.round((payload.custo_total / payload.solicitacaoIds.length) * 100) / 100
+        : undefined
+
+      for (let i = 0; i < payload.solicitacaoIds.length; i++) {
+        const { error } = await supabase
+          .from('log_solicitacoes')
+          .update({
+            viagem_id: viagem.id,
+            ordem_na_viagem: i + 1,
+            custo_rateado: custoRateado,
+            status: 'planejado',
+            modal: payload.modal,
+            motorista_nome: payload.motorista_nome,
+            veiculo_placa: payload.veiculo_placa,
+            data_prevista_saida: payload.data_prevista_saida,
+            custo_estimado: custoRateado,
+            distancia_km: payload.distancia_total_km,
+            tempo_estimado_h: payload.tempo_estimado_h,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', payload.solicitacaoIds[i])
+        if (error) throw error
+      }
+
+      return viagem as LogViagem
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['log_solicitacoes'] })
+      qc.invalidateQueries({ queryKey: ['log_viagens'] })
+    },
+  })
+}
+
+export function useEnviarViagemAprovacao() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ viagemId }: { viagemId: string }) => {
+      // 1. Buscar viagem com solicitações vinculadas
+      const { data: viagem, error: vErr } = await supabase
+        .from('log_viagens')
+        .select('id, numero, qtd_paradas, custo_total, origem_principal, destino_final')
+        .eq('id', viagemId)
+        .single()
+      if (vErr) throw vErr
+
+      // 2. Atualizar status da viagem
+      const { error: updErr } = await supabase
+        .from('log_viagens')
+        .update({ status: 'aguardando_aprovacao', updated_at: new Date().toISOString() })
+        .eq('id', viagemId)
+      if (updErr) throw updErr
+
+      // 3. Atualizar todas as solicitações da viagem → aguardando_aprovacao
+      const { error: solErr } = await supabase
+        .from('log_solicitacoes')
+        .update({ status: 'aguardando_aprovacao', updated_at: new Date().toISOString() })
+        .eq('viagem_id', viagemId)
+      if (solErr) throw solErr
+
+      // 4. Criar UMA aprovação para a viagem inteira
+      const prazo = new Date()
+      prazo.setHours(prazo.getHours() + 48)
+
+      const { error: aprError } = await supabase.from('apr_aprovacoes').insert({
+        modulo: 'log',
+        tipo_aprovacao: 'aprovacao_transporte',
+        entidade_id: viagemId,
+        entidade_numero: viagem.numero,
+        status: 'pendente',
+        nivel: 1,
+        aprovador_nome: 'Gestor Logística',
+        aprovador_email: 'logistica@tegplus.com.br',
+        data_limite: prazo.toISOString(),
+      })
+      if (aprError) throw new Error(`Erro ao criar aprovação: ${aprError.message}`)
+
+      return viagem
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['log_solicitacoes'] })
+      qc.invalidateQueries({ queryKey: ['log_viagens'] })
+      qc.invalidateQueries({ queryKey: ['aprovacoes-pendentes'] })
+      qc.invalidateQueries({ queryKey: ['aprovacoes-kpis'] })
+    },
+  })
+}
+
+export function useAprovarViagem() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ viagemId, aprovado, motivo }: { viagemId: string; aprovado: boolean; motivo?: string }) => {
+      const { data: { user } } = await supabase.auth.getUser()
+      const novoStatus = aprovado ? 'aprovada' : 'cancelada'
+      const solStatus = aprovado ? 'aprovado' : 'recusado'
+
+      // 1. Atualizar viagem
+      const { error: vErr } = await supabase
+        .from('log_viagens')
+        .update({
+          status: novoStatus,
+          aprovado_por: user?.id,
+          aprovado_em: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', viagemId)
+      if (vErr) throw vErr
+
+      // 2. Atualizar todas as solicitações da viagem
+      const { error: solErr } = await supabase
+        .from('log_solicitacoes')
+        .update({
+          status: solStatus,
+          aprovado_por: user?.id,
+          aprovado_em: new Date().toISOString(),
+          ...(motivo ? { motivo_reprovacao: motivo } : {}),
+          updated_at: new Date().toISOString(),
+        })
+        .eq('viagem_id', viagemId)
+      if (solErr) throw solErr
+
+      // 3. Atualizar apr_aprovacoes
+      const { error: aprErr } = await supabase
+        .from('apr_aprovacoes')
+        .update({
+          status: aprovado ? 'aprovada' : 'rejeitada',
+          data_decisao: new Date().toISOString(),
+        })
+        .eq('entidade_id', viagemId)
+        .eq('tipo_aprovacao', 'aprovacao_transporte')
+        .eq('status', 'pendente')
+      if (aprErr) throw aprErr
+
+      return { viagemId, aprovado }
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['log_solicitacoes'] })
+      qc.invalidateQueries({ queryKey: ['log_viagens'] })
+      qc.invalidateQueries({ queryKey: ['aprovacoes-pendentes'] })
+      qc.invalidateQueries({ queryKey: ['aprovacoes-kpis'] })
     },
   })
 }

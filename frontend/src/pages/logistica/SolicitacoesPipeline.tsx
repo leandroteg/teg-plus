@@ -10,6 +10,7 @@ import {
   useSolicitacoes, useAtualizarStatusSolicitacao,
   useAprovarSolicitacao, usePlanejaarSolicitacao,
   useEnviarParaAprovacao, useCriarSolicitacao,
+  useCriarViagem, useEnviarViagemAprovacao, useAprovarViagem,
 } from '../../hooks/useLogistica'
 import { useSearchParams } from 'react-router-dom'
 import { useLookupCentrosCusto } from '../../hooks/useLookups'
@@ -789,6 +790,9 @@ export default function SolicitacoesPipeline() {
   const atualizarStatus = useAtualizarStatusSolicitacao()
   const aprovar = useAprovarSolicitacao()
   const enviarParaAprovacao = useEnviarParaAprovacao()
+  const criarViagem = useCriarViagem()
+  const enviarViagemAprovacao = useEnviarViagemAprovacao()
+  const aprovarViagem = useAprovarViagem()
 
   // Group by status
   const grouped = useMemo(() => {
@@ -859,24 +863,48 @@ export default function SolicitacoesPipeline() {
     duracao_total_horas: number
     modal?: string
     motorista_nome?: string
+    motorista_telefone?: string
     veiculo_placa?: string
     data_prevista_saida?: string
     custo_estimado?: number
+    origem_principal?: string
+    destino_final?: string
+    rota_polyline?: string
   }) => {
     try {
-      for (const id of data.solicitacaoIds) {
-        await planejar.mutateAsync({
-          id,
+      if (data.solicitacaoIds.length > 1) {
+        // Múltiplas solicitações → criar Viagem (trip) que consolida todas
+        await criarViagem.mutateAsync({
+          solicitacaoIds: data.solicitacaoIds,
           modal: data.modal,
           motorista_nome: data.motorista_nome,
+          motorista_telefone: data.motorista_telefone,
           veiculo_placa: data.veiculo_placa,
           data_prevista_saida: data.data_prevista_saida,
-          custo_estimado: data.custo_estimado,
-          distancia_km: data.distancia_total_km || undefined,
+          custo_total: data.custo_estimado,
+          distancia_total_km: data.distancia_total_km || undefined,
           tempo_estimado_h: data.duracao_total_horas || undefined,
+          origem_principal: data.origem_principal,
+          destino_final: data.destino_final,
+          rota_polyline: data.rota_polyline,
         })
+        showToast('success', `Viagem criada com ${data.solicitacaoIds.length} solicitações`)
+      } else {
+        // Solicitação individual → fluxo original (sem viagem)
+        for (const id of data.solicitacaoIds) {
+          await planejar.mutateAsync({
+            id,
+            modal: data.modal,
+            motorista_nome: data.motorista_nome,
+            veiculo_placa: data.veiculo_placa,
+            data_prevista_saida: data.data_prevista_saida,
+            custo_estimado: data.custo_estimado,
+            distancia_km: data.distancia_total_km || undefined,
+            tempo_estimado_h: data.duracao_total_horas || undefined,
+          })
+        }
+        showToast('success', `${data.solicitacaoIds.length} solicitação(ões) planejada(s)`)
       }
-      showToast('success', `${data.solicitacaoIds.length} solicitação(ões) planejada(s)`)
       setShowPlanejamento([])
       setSelectedIds(new Set())
     } catch {
@@ -886,15 +914,63 @@ export default function SolicitacoesPipeline() {
 
   const handleEnviarAprovacao = async (ids: string[]) => {
     try {
-      for (const id of ids) await enviarParaAprovacao.mutateAsync({ id })
-      showToast('success', `${ids.length} enviada(s) para aprovação`)
+      // Agrupar por viagem_id para enviar aprovação consolidada
+      const solsToSend = solicitacoes.filter(s => ids.includes(s.id))
+      const viagemIds = new Set<string>()
+      const soloIds: string[] = []
+
+      for (const s of solsToSend) {
+        if (s.viagem_id) {
+          viagemIds.add(s.viagem_id)
+        } else {
+          soloIds.push(s.id)
+        }
+      }
+
+      // Enviar aprovação por viagem (uma aprovação para todas as solicitações da viagem)
+      for (const viagemId of viagemIds) {
+        await enviarViagemAprovacao.mutateAsync({ viagemId })
+      }
+
+      // Enviar aprovação individual para solicitações sem viagem
+      for (const id of soloIds) {
+        await enviarParaAprovacao.mutateAsync({ id })
+      }
+
+      const totalViagens = viagemIds.size
+      const totalSolo = soloIds.length
+      const msg = totalViagens > 0
+        ? `${totalViagens} viagem(ns) e ${totalSolo} solicitação(ões) enviada(s) para aprovação`
+        : `${totalSolo} enviada(s) para aprovação`
+      showToast('success', msg)
       setSelectedIds(new Set())
     } catch { showToast('error', 'Erro ao enviar para aprovação') }
   }
 
   const handleAprovar = async (ids: string[]) => {
     try {
-      for (const id of ids) await aprovar.mutateAsync({ id, aprovado: true })
+      const solsToApprove = solicitacoes.filter(s => ids.includes(s.id))
+      const viagemIds = new Set<string>()
+      const soloIds: string[] = []
+
+      for (const s of solsToApprove) {
+        if (s.viagem_id) {
+          viagemIds.add(s.viagem_id)
+        } else {
+          soloIds.push(s.id)
+        }
+      }
+
+      // Aprovar viagens (aprova todas as solicitações vinculadas)
+      for (const viagemId of viagemIds) {
+        await aprovarViagem.mutateAsync({ viagemId, aprovado: true })
+      }
+
+      // Aprovar solicitações individuais
+      for (const id of soloIds) {
+        await aprovar.mutateAsync({ id, aprovado: true })
+      }
+
       showToast('success', `${ids.length} solicitação(ões) aprovada(s)`)
       setSelectedIds(new Set())
     } catch { showToast('error', 'Erro ao aprovar') }

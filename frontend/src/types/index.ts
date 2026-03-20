@@ -210,6 +210,13 @@ export interface AprovacaoPendente extends Aprovacao {
     urgente?: boolean
     peso_total_kg?: number
     volumes_total?: number
+    // Campos de viagem (consolidada)
+    is_viagem?: boolean
+    viagem_numero?: string
+    qtd_paradas?: number
+    distancia_total_km?: number
+    tempo_estimado_h?: number
+    solicitacoes?: Record<string, unknown>[]
   }
 }
 

@@ -12,6 +12,15 @@ export type ModalTransporte =
   | 'motoboy'
   | 'correios'
 
+export type StatusViagem =
+  | 'planejada'
+  | 'aguardando_aprovacao'
+  | 'aprovada'
+  | 'em_expedicao'
+  | 'em_transito'
+  | 'concluida'
+  | 'cancelada'
+
 export type StatusSolicitacao =
   | 'solicitado'
   | 'validando'
@@ -86,6 +95,45 @@ export interface LogRota {
   criado_em: string
 }
 
+// ── Viagem (consolida N solicitações) ─────────────────────────────────────────
+
+export interface LogViagem {
+  id: string
+  numero: string
+  status: StatusViagem
+
+  modal?: ModalTransporte
+  transportadora_id?: string
+  transportadora?: LogTransportadora
+  veiculo_placa?: string
+  motorista_nome?: string
+  motorista_telefone?: string
+
+  origem_principal?: string
+  destino_final?: string
+  distancia_total_km?: number
+  tempo_estimado_h?: number
+  qtd_paradas: number
+  rota_polyline?: string
+
+  custo_total?: number
+
+  data_prevista_saida?: string
+  data_real_saida?: string
+  data_conclusao?: string
+
+  aprovacao_id?: string
+  aprovado_por?: string
+  aprovado_em?: string
+
+  criado_por?: string
+  criado_em: string
+  updated_at: string
+
+  // Joined
+  solicitacoes?: LogSolicitacao[]
+}
+
 // ── Item da Solicitação ───────────────────────────────────────────────────────
 
 export interface LogItemSolicitacao {
@@ -147,6 +195,9 @@ export interface LogSolicitacao {
   distancia_km?: number
   tempo_estimado_h?: number
   rota_planejada_id?: string
+  viagem_id?: string
+  ordem_na_viagem?: number
+  custo_rateado?: number
 
   aprovado_por?: string
   aprovado_em?: string
@@ -161,6 +212,7 @@ export interface LogSolicitacao {
   danfe_url?: string
 
   // Joined
+  viagem?: LogViagem
   rota_planejada?: LogRota
   itens?: LogItemSolicitacao[]
   nfe?: LogNFe

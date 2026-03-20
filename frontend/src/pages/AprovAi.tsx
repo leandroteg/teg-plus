@@ -506,6 +506,15 @@ function GenericPendingCard({ aprovacao, aprovadorNome, aprovadorEmail }: {
         {/* ── Card Transporte ── */}
         {aprovacao.tipo_aprovacao === 'aprovacao_transporte' && aprovacao.transporte_detalhes ? (
           <div className="space-y-2">
+            {/* Badge viagem consolidada */}
+            {(aprovacao.transporte_detalhes as any).is_viagem && (
+              <div className="bg-orange-100 border border-orange-300 rounded-lg px-3 py-1.5 flex items-center gap-2">
+                <Truck size={14} className="text-orange-700" />
+                <span className="text-xs font-bold text-orange-800">
+                  Viagem {(aprovacao.transporte_detalhes as any).viagem_numero} — {(aprovacao.transporte_detalhes as any).qtd_paradas} paradas
+                </span>
+              </div>
+            )}
             {/* Rota */}
             <div className="bg-orange-50 border border-orange-200 rounded-xl p-3">
               <div className="flex items-center gap-2 mb-2">
@@ -517,25 +526,50 @@ function GenericPendingCard({ aprovacao, aprovadorNome, aprovadorEmail }: {
                 <span className="text-orange-400">→</span>
                 <span className="font-semibold text-slate-800">{aprovacao.transporte_detalhes.destino}</span>
               </div>
+              {/* Distância e tempo estimado */}
+              {((aprovacao.transporte_detalhes as any).distancia_total_km || (aprovacao.transporte_detalhes as any).tempo_estimado_h) && (
+                <div className="flex gap-3 mt-1.5">
+                  {(aprovacao.transporte_detalhes as any).distancia_total_km && (
+                    <span className="text-xs text-orange-600">{(aprovacao.transporte_detalhes as any).distancia_total_km.toFixed(0)} km</span>
+                  )}
+                  {(aprovacao.transporte_detalhes as any).tempo_estimado_h && (
+                    <span className="text-xs text-orange-600">{(aprovacao.transporte_detalhes as any).tempo_estimado_h.toFixed(1)}h estimadas</span>
+                  )}
+                </div>
+              )}
             </div>
+            {/* Solicitações da viagem */}
+            {(aprovacao.transporte_detalhes as any).is_viagem && (aprovacao.transporte_detalhes as any).solicitacoes?.length > 0 && (
+              <div className="bg-slate-50 border border-slate-200 rounded-xl p-3">
+                <div className="text-xs font-bold text-slate-600 mb-2">Solicitações na Viagem</div>
+                <div className="space-y-1.5">
+                  {((aprovacao.transporte_detalhes as any).solicitacoes as any[]).map((s: any, i: number) => (
+                    <div key={s.id || i} className="flex items-center justify-between text-xs bg-white rounded-lg px-2.5 py-1.5 border border-slate-100">
+                      <div className="flex items-center gap-2">
+                        <span className="font-mono font-bold text-orange-700">{s.numero}</span>
+                        <span className="text-slate-500">{s.origem} → {s.destino}</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {s.obra_nome && <span className="text-slate-400">{s.obra_nome}</span>}
+                        {s.urgente && <span className="text-red-500 font-bold">!</span>}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
             {/* Detalhes */}
             <div className="bg-slate-50 rounded-xl p-3 space-y-1.5">
               {aprovacao.transporte_detalhes.data_desejada && (
                 <div className="flex justify-between text-xs">
-                  <span className="text-slate-500">Data Desejada</span>
-                  <span className="text-slate-800 font-medium">{new Date(aprovacao.transporte_detalhes.data_desejada).toLocaleDateString('pt-BR')}</span>
-                </div>
-              )}
-              {aprovacao.transporte_detalhes.tipo && (
-                <div className="flex justify-between text-xs">
-                  <span className="text-slate-500">Tipo</span>
-                  <span className="text-slate-800 font-medium capitalize">{aprovacao.transporte_detalhes.tipo.replace(/_/g, ' ')}</span>
+                  <span className="text-slate-500">Data Saída</span>
+                  <span className="text-slate-800 font-medium">{new Date(aprovacao.transporte_detalhes.data_desejada).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' })}</span>
                 </div>
               )}
               {aprovacao.transporte_detalhes.modal && (
                 <div className="flex justify-between text-xs">
                   <span className="text-slate-500">Modal</span>
-                  <span className="text-slate-800 font-medium capitalize">{aprovacao.transporte_detalhes.modal}</span>
+                  <span className="text-slate-800 font-medium capitalize">{aprovacao.transporte_detalhes.modal.replace(/_/g, ' ')}</span>
                 </div>
               )}
               {aprovacao.transporte_detalhes.motorista_nome && (
@@ -550,25 +584,31 @@ function GenericPendingCard({ aprovacao, aprovadorNome, aprovadorEmail }: {
                   <span className="text-slate-800 font-medium">{aprovacao.transporte_detalhes.veiculo_placa}</span>
                 </div>
               )}
-              {aprovacao.transporte_detalhes.solicitante_nome && (
+              {!(aprovacao.transporte_detalhes as any).is_viagem && aprovacao.transporte_detalhes.solicitante_nome && (
                 <div className="flex justify-between text-xs">
                   <span className="text-slate-500">Solicitante</span>
                   <span className="text-slate-800 font-medium">{aprovacao.transporte_detalhes.solicitante_nome}</span>
                 </div>
               )}
-              {aprovacao.transporte_detalhes.obra_nome && (
+              {!(aprovacao.transporte_detalhes as any).is_viagem && aprovacao.transporte_detalhes.obra_nome && (
                 <div className="flex justify-between text-xs">
                   <span className="text-slate-500">Obra</span>
                   <span className="text-slate-800 font-medium">{aprovacao.transporte_detalhes.obra_nome}</span>
                 </div>
               )}
+              {!(aprovacao.transporte_detalhes as any).is_viagem && aprovacao.transporte_detalhes.tipo && (
+                <div className="flex justify-between text-xs">
+                  <span className="text-slate-500">Tipo</span>
+                  <span className="text-slate-800 font-medium capitalize">{aprovacao.transporte_detalhes.tipo.replace(/_/g, ' ')}</span>
+                </div>
+              )}
             </div>
-            {aprovacao.transporte_detalhes.descricao && (
+            {!(aprovacao.transporte_detalhes as any).is_viagem && aprovacao.transporte_detalhes.descricao && (
               <p className="text-xs text-slate-500 italic">{aprovacao.transporte_detalhes.descricao}</p>
             )}
             {aprovacao.transporte_detalhes.custo_estimado != null && aprovacao.transporte_detalhes.custo_estimado > 0 && (
               <div className="bg-orange-50 border border-orange-200 rounded-xl p-3 flex justify-between items-center">
-                <span className="text-xs text-orange-700 font-medium">Custo Estimado</span>
+                <span className="text-xs text-orange-700 font-medium">Custo {(aprovacao.transporte_detalhes as any).is_viagem ? 'Total' : 'Estimado'}</span>
                 <span className="text-lg font-extrabold text-orange-700">
                   {aprovacao.transporte_detalhes.custo_estimado.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
                 </span>
@@ -746,8 +786,8 @@ function PagamentoDetalhesCard({ detalhes, selectedItemIds, setSelectedItemIds }
     const itens = detalhes.itens
     const totalItens = itens.length
     const aprovados = detalhes.aprovados ?? 0
-    const excluídos = detalhes.excluídos ?? 0
-    const pendentes = totalItens - aprovados - excluídos
+    const excluidos = detalhes.excluidos ?? 0
+    const pendentes = totalItens - aprovados - excluidos
     const selectedCount = selectedItemIds?.size ?? totalItens
 
     // Fornecedores summary: group by fornecedor_nome with summed values
@@ -781,7 +821,7 @@ function PagamentoDetalhesCard({ detalhes, selectedItemIds, setSelectedItemIds }
         </div>
 
         {/* Progress bar */}
-        {(aprovados > 0 || excluídos > 0) && (
+        {(aprovados > 0 || excluidos > 0) && (
           <div className="bg-slate-50 rounded-xl p-3 space-y-1.5">
             <div className="flex items-center gap-2 mb-1">
               <Package size={13} className="text-slate-500" />
@@ -791,8 +831,8 @@ function PagamentoDetalhesCard({ detalhes, selectedItemIds, setSelectedItemIds }
               {aprovados > 0 && (
                 <div className="bg-emerald-500 h-full" style={{ width: `${(aprovados / totalItens) * 100}%` }} />
               )}
-              {excluídos > 0 && (
-                <div className="bg-red-400 h-full" style={{ width: `${(excluídos / totalItens) * 100}%` }} />
+              {excluidos > 0 && (
+                <div className="bg-red-400 h-full" style={{ width: `${(excluidos / totalItens) * 100}%` }} />
               )}
               {pendentes > 0 && (
                 <div className="bg-slate-300 h-full" style={{ width: `${(pendentes / totalItens) * 100}%` }} />
@@ -800,7 +840,7 @@ function PagamentoDetalhesCard({ detalhes, selectedItemIds, setSelectedItemIds }
             </div>
             <div className="flex gap-3 text-[10px] font-medium">
               {aprovados > 0 && <span className="text-emerald-600">● {aprovados} aprovados</span>}
-              {excluídos > 0 && <span className="text-red-500">● {excluídos} excluídos</span>}
+              {excluidos > 0 && <span className="text-red-500">● {excluidos} excluidos</span>}
               {pendentes > 0 && <span className="text-slate-500">● {pendentes} pendentes</span>}
             </div>
           </div>

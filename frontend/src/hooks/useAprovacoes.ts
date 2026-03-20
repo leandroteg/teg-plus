@@ -269,22 +269,57 @@ export function useAprovacoesPendentes(tipo?: TipoAprovacao) {
       }
 
       // 5b. Busca dados de transporte (aprovacao_transporte)
+      // entidade_id pode apontar para log_solicitacoes (individual) ou log_viagens (consolidada)
       const logIds = aprData
         .filter(a => a.tipo_aprovacao === 'aprovacao_transporte')
         .map(a => a.entidade_id)
         .filter(Boolean)
 
       const logMap = new Map<string, Record<string, unknown>>()
+      const viagemMap = new Map<string, Record<string, unknown>>()
+      const viagemSolsMap = new Map<string, Record<string, unknown>[]>()
+
       if (logIds.length > 0) {
         try {
+          // Tenta buscar como solicitações individuais
           const { data: logData } = await supabase
             .from('log_solicitacoes')
-            .select('id, numero, tipo, origem, destino, data_desejada, modal, motorista_nome, veiculo_placa, custo_estimado, descricao, solicitante_nome, obra_nome, urgente, peso_total_kg, volumes_total')
+            .select('id, numero, tipo, origem, destino, data_desejada, modal, motorista_nome, motorista_telefone, veiculo_placa, custo_estimado, descricao, solicitante_nome, obra_nome, urgente, peso_total_kg, volumes_total, distancia_km, tempo_estimado_h, viagem_id')
             .in('id', logIds)
           for (const l of logData ?? []) {
             logMap.set(l.id, l)
           }
-        } catch { /* transporte enrichment failed */ }
+        } catch { /* sol enrichment failed */ }
+
+        // IDs não encontrados em log_solicitacoes → podem ser viagens
+        const notFoundIds = logIds.filter(id => !logMap.has(id))
+        if (notFoundIds.length > 0) {
+          try {
+            const { data: viagemData } = await supabase
+              .from('log_viagens')
+              .select('id, numero, status, modal, veiculo_placa, motorista_nome, motorista_telefone, origem_principal, destino_final, distancia_total_km, tempo_estimado_h, qtd_paradas, custo_total, data_prevista_saida, criado_em')
+              .in('id', notFoundIds)
+            for (const v of viagemData ?? []) {
+              viagemMap.set(v.id, v)
+            }
+
+            // Buscar solicitações vinculadas a cada viagem
+            if (viagemData && viagemData.length > 0) {
+              const vIds = viagemData.map(v => v.id)
+              const { data: solsData } = await supabase
+                .from('log_solicitacoes')
+                .select('id, numero, tipo, origem, destino, obra_nome, solicitante_nome, descricao, urgente, peso_total_kg, volumes_total, data_desejada, viagem_id, ordem_na_viagem, custo_rateado')
+                .in('viagem_id', vIds)
+                .order('ordem_na_viagem', { ascending: true })
+              for (const s of solsData ?? []) {
+                const vId = s.viagem_id as string
+                const arr = viagemSolsMap.get(vId) || []
+                arr.push(s)
+                viagemSolsMap.set(vId, arr)
+              }
+            }
+          } catch { /* viagem enrichment failed */ }
+        }
       }
 
       // 6. Mescla aprovacoes com dados da requisicao/contrato/CP + cotacao
@@ -462,19 +497,59 @@ export function useAprovacoesPendentes(tipo?: TipoAprovacao) {
             }
           } else if (a.tipo_aprovacao === 'aprovacao_transporte') {
             const log = logMap.get(a.entidade_id)
-            requisicao = {
-              id: a.entidade_id,
-              numero: (log?.numero as string) ?? a.entidade_numero ?? 'N/A',
-              solicitante_nome: (log?.solicitante_nome as string) ?? '',
-              obra_nome: (log?.obra_nome as string) ?? '',
-              descricao: `Transporte: ${(log?.origem as string) ?? ''} → ${(log?.destino as string) ?? ''}`,
-              valor_estimado: (log?.custo_estimado as number) ?? 0,
-              urgencia: (log?.urgente as boolean) ? 'critica' : 'normal',
-              status: 'em_aprovacao',
-              alcada_nivel: a.nivel,
-              created_at: a.created_at,
-            }
-            if (log) {
+            const viagem = viagemMap.get(a.entidade_id)
+            const viagemSols = viagemSolsMap.get(a.entidade_id)
+
+            if (viagem) {
+              // Aprovação de viagem (consolidada — múltiplas solicitações)
+              const solNames = (viagemSols ?? []).map(s => `${(s.numero as string)}: ${(s.origem as string)} → ${(s.destino as string)}`).join(' | ')
+              requisicao = {
+                id: a.entidade_id,
+                numero: (viagem.numero as string) ?? a.entidade_numero ?? 'N/A',
+                solicitante_nome: '',
+                obra_nome: '',
+                descricao: `Viagem ${(viagem.numero as string)}: ${(viagem.origem_principal as string) ?? ''} → ${(viagem.destino_final as string) ?? ''} (${(viagem.qtd_paradas as number) ?? 0} paradas)`,
+                valor_estimado: (viagem.custo_total as number) ?? 0,
+                urgencia: (viagemSols ?? []).some(s => s.urgente) ? 'critica' : 'normal',
+                status: 'em_aprovacao',
+                alcada_nivel: a.nivel,
+                created_at: a.created_at,
+              }
+              ;(a as Record<string, unknown>)._transporte_detalhes = {
+                origem: (viagem.origem_principal as string) ?? '',
+                destino: (viagem.destino_final as string) ?? '',
+                tipo: 'viagem',
+                data_desejada: (viagem.data_prevista_saida as string) ?? undefined,
+                modal: (viagem.modal as string) ?? undefined,
+                motorista_nome: (viagem.motorista_nome as string) ?? undefined,
+                veiculo_placa: (viagem.veiculo_placa as string) ?? undefined,
+                custo_estimado: (viagem.custo_total as number) ?? undefined,
+                descricao: solNames || undefined,
+                urgente: (viagemSols ?? []).some(s => s.urgente),
+                peso_total_kg: undefined,
+                volumes_total: undefined,
+                // Campos extras de viagem
+                is_viagem: true,
+                viagem_numero: (viagem.numero as string) ?? '',
+                qtd_paradas: (viagem.qtd_paradas as number) ?? 0,
+                distancia_total_km: (viagem.distancia_total_km as number) ?? undefined,
+                tempo_estimado_h: (viagem.tempo_estimado_h as number) ?? undefined,
+                solicitacoes: viagemSols ?? [],
+              }
+            } else if (log) {
+              // Aprovação individual (solicitação solo, sem viagem)
+              requisicao = {
+                id: a.entidade_id,
+                numero: (log.numero as string) ?? a.entidade_numero ?? 'N/A',
+                solicitante_nome: (log.solicitante_nome as string) ?? '',
+                obra_nome: (log.obra_nome as string) ?? '',
+                descricao: `Transporte: ${(log.origem as string) ?? ''} → ${(log.destino as string) ?? ''}`,
+                valor_estimado: (log.custo_estimado as number) ?? 0,
+                urgencia: (log.urgente as boolean) ? 'critica' : 'normal',
+                status: 'em_aprovacao',
+                alcada_nivel: a.nivel,
+                created_at: a.created_at,
+              }
               ;(a as Record<string, unknown>)._transporte_detalhes = {
                 origem: (log.origem as string) ?? '',
                 destino: (log.destino as string) ?? '',
@@ -490,6 +565,20 @@ export function useAprovacoesPendentes(tipo?: TipoAprovacao) {
                 urgente: (log.urgente as boolean) ?? undefined,
                 peso_total_kg: (log.peso_total_kg as number) ?? undefined,
                 volumes_total: (log.volumes_total as number) ?? undefined,
+                is_viagem: false,
+              }
+            } else {
+              requisicao = {
+                id: a.entidade_id,
+                numero: a.entidade_numero ?? 'N/A',
+                solicitante_nome: '',
+                obra_nome: '',
+                descricao: `Transporte ${a.entidade_numero ?? ''}`,
+                valor_estimado: 0,
+                urgencia: 'normal',
+                status: 'em_aprovacao',
+                alcada_nivel: a.nivel,
+                created_at: a.created_at,
               }
             }
           } else {
@@ -941,33 +1030,54 @@ export function useDecisaoGenerica() {
           }
         } else if (tipoAprovacao === 'aprovacao_transporte') {
           const now = new Date().toISOString()
-          if (decisao === 'aprovada') {
-            await supabase
-              .from('log_solicitacoes')
-              .update({
-                status: 'aprovado',
-                aprovado_por: aprovadorNome,
-                aprovado_em: now,
-                updated_at: now,
-              })
-              .eq('id', entidadeId)
-          } else if (decisao === 'rejeitada') {
-            await supabase
-              .from('log_solicitacoes')
-              .update({
-                status: 'reprovado',
-                motivo_reprovacao: observacao || 'Reprovado',
-                updated_at: now,
-              })
-              .eq('id', entidadeId)
+
+          // Detectar se entidade_id é uma viagem ou solicitação individual
+          const { data: viagemCheck } = await supabase
+            .from('log_viagens')
+            .select('id')
+            .eq('id', entidadeId)
+            .maybeSingle()
+
+          if (viagemCheck) {
+            // Aprovação de viagem → atualizar viagem + todas as solicitações vinculadas
+            if (decisao === 'aprovada') {
+              await supabase.from('log_viagens').update({
+                status: 'aprovada', aprovado_por: aprovadorNome, aprovado_em: now, updated_at: now,
+              }).eq('id', entidadeId)
+              await supabase.from('log_solicitacoes').update({
+                status: 'aprovado', aprovado_por: aprovadorNome, aprovado_em: now, updated_at: now,
+              }).eq('viagem_id', entidadeId)
+            } else if (decisao === 'rejeitada') {
+              await supabase.from('log_viagens').update({
+                status: 'cancelada', updated_at: now,
+              }).eq('id', entidadeId)
+              await supabase.from('log_solicitacoes').update({
+                status: 'recusado', motivo_reprovacao: observacao || 'Reprovado', updated_at: now,
+              }).eq('viagem_id', entidadeId)
+            } else {
+              // Esclarecimento → volta viagem e solicitações para planejada/planejado
+              await supabase.from('log_viagens').update({
+                status: 'planejada', updated_at: now,
+              }).eq('id', entidadeId)
+              await supabase.from('log_solicitacoes').update({
+                status: 'planejado', updated_at: now,
+              }).eq('viagem_id', entidadeId)
+            }
           } else {
-            await supabase
-              .from('log_solicitacoes')
-              .update({
-                status: 'planejado',
-                updated_at: now,
-              })
-              .eq('id', entidadeId)
+            // Aprovação individual (solicitação solo)
+            if (decisao === 'aprovada') {
+              await supabase.from('log_solicitacoes').update({
+                status: 'aprovado', aprovado_por: aprovadorNome, aprovado_em: now, updated_at: now,
+              }).eq('id', entidadeId)
+            } else if (decisao === 'rejeitada') {
+              await supabase.from('log_solicitacoes').update({
+                status: 'recusado', motivo_reprovacao: observacao || 'Reprovado', updated_at: now,
+              }).eq('id', entidadeId)
+            } else {
+              await supabase.from('log_solicitacoes').update({
+                status: 'planejado', updated_at: now,
+              }).eq('id', entidadeId)
+            }
           }
         }
       } catch (e) {
@@ -988,6 +1098,7 @@ export function useDecisaoGenerica() {
       qc.invalidateQueries({ queryKey: ['lotes-pagamento'] })
       qc.invalidateQueries({ queryKey: ['lote-detalhe'] })
       qc.invalidateQueries({ queryKey: ['log_solicitacoes'] })
+      qc.invalidateQueries({ queryKey: ['log_viagens'] })
     },
   })
 }
