@@ -184,11 +184,27 @@ export function useAprovarSolicitacao() {
         .select()
         .single()
       if (error) throw error
+
+      // Atualizar apr_aprovacoes correspondente
+      const aprStatus = aprovado ? 'aprovada' : 'rejeitada'
+      await supabase
+        .from('apr_aprovacoes')
+        .update({
+          status: aprStatus,
+          data_decisao: new Date().toISOString(),
+          observacao: motivo || null,
+        })
+        .eq('entidade_id', id)
+        .eq('tipo_aprovacao', 'aprovacao_transporte')
+        .eq('status', 'pendente')
+
       return data as LogSolicitacao
     },
     onSuccess: (data) => {
       qc.invalidateQueries({ queryKey: ['log_solicitacoes'] })
       qc.invalidateQueries({ queryKey: ['log_solicitacao', data.id] })
+      qc.invalidateQueries({ queryKey: ['aprovacoes-pendentes'] })
+      qc.invalidateQueries({ queryKey: ['aprovacoes-kpis'] })
     },
   })
 }
@@ -204,11 +220,33 @@ export function useEnviarParaAprovacao() {
         .select()
         .single()
       if (error) throw error
-      return data as LogSolicitacao
+
+      const sol = data as LogSolicitacao
+
+      // Criar registro em apr_aprovacoes para aparecer no AprovAi
+      const prazo = new Date()
+      prazo.setHours(prazo.getHours() + 48)
+
+      const { error: aprError } = await supabase.from('apr_aprovacoes').insert({
+        modulo: 'log',
+        tipo_aprovacao: 'aprovacao_transporte',
+        entidade_id: sol.id,
+        entidade_numero: sol.numero,
+        status: 'pendente',
+        nivel: 1,
+        aprovador_nome: 'Gestor Logística',
+        aprovador_email: 'logistica@tegplus.com.br',
+        data_limite: prazo.toISOString(),
+      })
+      if (aprError) console.error('Erro ao criar aprovação transporte:', aprError)
+
+      return sol
     },
     onSuccess: (data) => {
       qc.invalidateQueries({ queryKey: ['log_solicitacoes'] })
       qc.invalidateQueries({ queryKey: ['log_solicitacao', data.id] })
+      qc.invalidateQueries({ queryKey: ['aprovacoes-pendentes'] })
+      qc.invalidateQueries({ queryKey: ['aprovacoes-kpis'] })
     },
   })
 }
