@@ -16,6 +16,7 @@ import {
   useConfirmarAssinatura,
   useMinutas,
   useResumoExecutivo,
+  useAssinaturas,
 } from '../../hooks/useSolicitacoes'
 import type { EtapaSolicitacao, ParcelaPlanejada, Solicitacao, TipoAssinatura } from '../../types/contratos'
 import { calcularDiferencaParcelas, normalizarParcelasPlanejadas, sugerirParcelasContrato } from '../../utils/contratosParcelas'
@@ -685,7 +686,7 @@ function PlanejamentoParcelasCard({
   )
 }
 
-function EtapaActions({ etapa, solicitacaoId, onAvancar, onCancel, onEnviarAssinatura, onConfirmarAssinatura, isPending, nav }: {
+function EtapaActions({ etapa, solicitacaoId, onAvancar, onCancel, onEnviarAssinatura, onConfirmarAssinatura, isPending, nav, jaEnviado }: {
   etapa: EtapaSolicitacao
   solicitacaoId: string
   onAvancar: (etapaPara: EtapaSolicitacao, obs?: string) => void
@@ -694,6 +695,7 @@ function EtapaActions({ etapa, solicitacaoId, onAvancar, onCancel, onEnviarAssin
   onConfirmarAssinatura: () => void
   isPending: boolean
   nav: ReturnType<typeof useNavigate>
+  jaEnviado?: boolean
 }) {
   const btnPrimary = `w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-bold
     transition-all disabled:opacity-50`
@@ -783,13 +785,20 @@ function EtapaActions({ etapa, solicitacaoId, onAvancar, onCancel, onEnviarAssin
     case 'enviar_assinatura':
       return (
         <>
-          <button
-            onClick={onEnviarAssinatura}
-            className={`${btnPrimary} bg-gradient-to-r from-teal-500 to-teal-600 text-white
-              hover:from-teal-600 hover:to-teal-700 shadow-sm`}
-          >
-            <PenTool size={13} /> Enviar via Certisign
-          </button>
+          {jaEnviado ? (
+            <div className="flex items-center gap-2 py-2.5 px-3 rounded-xl bg-teal-50 border border-teal-200 text-teal-700">
+              <CheckCircle2 size={14} />
+              <span className="text-xs font-semibold">Enviado para assinatura via Certisign</span>
+            </div>
+          ) : (
+            <button
+              onClick={onEnviarAssinatura}
+              className={`${btnPrimary} bg-gradient-to-r from-teal-500 to-teal-600 text-white
+                hover:from-teal-600 hover:to-teal-700 shadow-sm`}
+            >
+              <PenTool size={13} /> Enviar via Certisign
+            </button>
+          )}
           <button
             onClick={onConfirmarAssinatura}
             className={`${btnPrimary} bg-gradient-to-r from-emerald-500 to-emerald-600 text-white
@@ -856,6 +865,7 @@ export default function SolicitacaoDetalhe() {
   const avancarEtapa = useAvancarEtapa()
   const cancelarSolicitacao = useCancelarSolicitacao()
   const { data: minutas } = useMinutas(id)
+  const { data: assinaturas = [] } = useAssinaturas(id)
 
   const [showCancelModal, setShowCancelModal] = useState(false)
   const [showCertisignModal, setShowCertisignModal] = useState(false)
@@ -1174,7 +1184,7 @@ export default function SolicitacaoDetalhe() {
             <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
               <div className="px-5 py-4 border-b border-slate-100">
                 <h2 className="text-sm font-extrabold text-slate-800 flex items-center gap-2">
-                  <ChevronRight size={14} className="text-indigo-500" /> Acoes
+                  <ChevronRight size={14} className="text-indigo-500" /> Ações
                 </h2>
               </div>
               <div className="px-5 py-4 space-y-2.5">
@@ -1212,6 +1222,7 @@ export default function SolicitacaoDetalhe() {
                     onConfirmarAssinatura={() => setShowConfirmarAssinaturaModal(true)}
                     isPending={avancarEtapa.isPending}
                     nav={nav}
+                    jaEnviado={assinaturas.some(a => a.status === 'enviado' || a.status === 'assinado')}
                   />
                 )}
               </div>
