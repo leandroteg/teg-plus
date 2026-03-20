@@ -181,7 +181,7 @@ function FaturaUploadCard({ cartaoId, isDark }: { cartaoId: string; isDark: bool
       {isSuccess && (
         <div className="flex items-center gap-2 rounded-xl px-3 py-2 bg-emerald-500/10 text-emerald-600 text-xs font-semibold">
           <CheckCircle2 size={13} />
-          Fatura enviada! Os lançamentos serão extraídos pelo n8n em instantes.
+          Fatura enviada! Processando lançamentos em segundo plano…
         </div>
       )}
       {isError && (
@@ -444,9 +444,12 @@ export default function ConciliacaoCartoes() {
 
   const { data: cartoes = [] } = useCartoesCredito()
   const { data: faturas = [] } = useFaturasCartao(cartaoSelecionado || undefined)
+  const hasProcessing = faturas.some(f => f.status === 'processando')
+
   const { data: itens = [], isLoading: loadingItens }  = useItensFatura(
     faturaSelecionada || undefined,
-    faturaSelecionada ? undefined : (cartaoSelecionado || undefined)
+    faturaSelecionada ? undefined : (cartaoSelecionado || undefined),
+    hasProcessing
   )
   const { data: apontamentos = [], isLoading: loadingAp } = useApontamentosCartao({
     cartao_id: cartaoSelecionado || undefined,
@@ -597,6 +600,8 @@ export default function ConciliacaoCartoes() {
                 <option key={f.id} value={f.id}>
                   {f.mes_referencia} — {f.cartao?.nome ?? ''}
                   {f.valor_total ? ` · ${fmt(f.valor_total)}` : ''}
+                  {f.status === 'processando' ? ' · ⏳ Processando' : ''}
+                  {f.status === 'erro' ? ' · ❌ Erro' : ''}
                 </option>
               ))}
             </select>
@@ -724,10 +729,17 @@ export default function ConciliacaoCartoes() {
                 {filteredItens.length}
               </span>
             </h2>
-            <span className="text-[10px] text-slate-400 flex items-center gap-1">
-              <RefreshCw size={9} />
-              Extraído via n8n
-            </span>
+            {hasProcessing ? (
+              <span className="text-[10px] text-amber-500 flex items-center gap-1 font-semibold">
+                <Loader2 size={9} className="animate-spin" />
+                Processando fatura…
+              </span>
+            ) : (
+              <span className="text-[10px] text-slate-400 flex items-center gap-1">
+                <RefreshCw size={9} />
+                Extraído via n8n
+              </span>
+            )}
           </div>
 
           {/* Busca itens fatura */}
