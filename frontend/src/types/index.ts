@@ -202,14 +202,21 @@ export interface AprovacaoPendente extends Aprovacao {
     data_desejada?: string
     modal?: string
     motorista_nome?: string
+    motorista_telefone?: string
     veiculo_placa?: string
     custo_estimado?: number
     descricao?: string
     solicitante_nome?: string
     obra_nome?: string
+    centro_custo?: string
+    oc_numero?: string
     urgente?: boolean
+    justificativa_urgencia?: string
     peso_total_kg?: number
     volumes_total?: number
+    carga_especial?: boolean
+    observacoes_carga?: string
+    restricoes_seguranca?: string
     // Campos de viagem (consolidada)
     is_viagem?: boolean
     viagem_numero?: string

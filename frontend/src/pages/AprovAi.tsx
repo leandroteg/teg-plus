@@ -504,123 +504,261 @@ function GenericPendingCard({ aprovacao, aprovadorNome, aprovadorEmail }: {
         </p>
 
         {/* ── Card Transporte ── */}
-        {aprovacao.tipo_aprovacao === 'aprovacao_transporte' && aprovacao.transporte_detalhes ? (
+        {aprovacao.tipo_aprovacao === 'aprovacao_transporte' && aprovacao.transporte_detalhes ? (() => {
+          const td = aprovacao.transporte_detalhes as any
+          const isViagem = td.is_viagem
+          const sols = (td.solicitacoes ?? []) as any[]
+
+          return (
           <div className="space-y-2">
             {/* Badge viagem consolidada */}
-            {(aprovacao.transporte_detalhes as any).is_viagem && (
-              <div className="bg-orange-100 border border-orange-300 rounded-lg px-3 py-1.5 flex items-center gap-2">
-                <Truck size={14} className="text-orange-700" />
-                <span className="text-xs font-bold text-orange-800">
-                  Viagem {(aprovacao.transporte_detalhes as any).viagem_numero} — {(aprovacao.transporte_detalhes as any).qtd_paradas} paradas
-                </span>
+            {isViagem && (
+              <div className="bg-gradient-to-r from-orange-100 to-amber-100 border border-orange-300 rounded-lg px-3 py-2 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Truck size={15} className="text-orange-700" />
+                  <span className="text-xs font-bold text-orange-800">
+                    Viagem {td.viagem_numero}
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] bg-orange-200 text-orange-800 px-2 py-0.5 rounded-full font-bold">
+                    {td.qtd_paradas} {td.qtd_paradas === 1 ? 'parada' : 'paradas'}
+                  </span>
+                  {td.carga_especial && (
+                    <span className="text-[10px] bg-red-100 text-red-700 px-2 py-0.5 rounded-full font-bold">
+                      Carga Especial
+                    </span>
+                  )}
+                </div>
               </div>
             )}
-            {/* Rota */}
+
+            {/* Rota principal com km e tempo */}
             <div className="bg-orange-50 border border-orange-200 rounded-xl p-3">
               <div className="flex items-center gap-2 mb-2">
                 <MapPin size={14} className="text-orange-600" />
-                <span className="text-xs font-bold text-orange-700">Rota</span>
+                <span className="text-xs font-bold text-orange-700">{isViagem ? 'Rota da Viagem' : 'Rota'}</span>
               </div>
               <div className="flex items-center gap-2 text-sm">
-                <span className="font-semibold text-slate-800">{aprovacao.transporte_detalhes.origem}</span>
+                <span className="font-semibold text-slate-800">{td.origem}</span>
                 <span className="text-orange-400">→</span>
-                <span className="font-semibold text-slate-800">{aprovacao.transporte_detalhes.destino}</span>
+                <span className="font-semibold text-slate-800">{td.destino}</span>
               </div>
-              {/* Distância e tempo estimado */}
-              {((aprovacao.transporte_detalhes as any).distancia_total_km || (aprovacao.transporte_detalhes as any).tempo_estimado_h) && (
+              {(td.distancia_total_km || td.tempo_estimado_h) && (
                 <div className="flex gap-3 mt-1.5">
-                  {(aprovacao.transporte_detalhes as any).distancia_total_km && (
-                    <span className="text-xs text-orange-600">{(aprovacao.transporte_detalhes as any).distancia_total_km.toFixed(0)} km</span>
+                  {td.distancia_total_km != null && (
+                    <span className="text-xs text-orange-600 font-medium">{Number(td.distancia_total_km).toFixed(0)} km</span>
                   )}
-                  {(aprovacao.transporte_detalhes as any).tempo_estimado_h && (
-                    <span className="text-xs text-orange-600">{(aprovacao.transporte_detalhes as any).tempo_estimado_h.toFixed(1)}h estimadas</span>
+                  {td.tempo_estimado_h != null && (
+                    <span className="text-xs text-orange-600 font-medium">{Number(td.tempo_estimado_h).toFixed(1)}h estimadas</span>
                   )}
                 </div>
               )}
             </div>
-            {/* Solicitações da viagem */}
-            {(aprovacao.transporte_detalhes as any).is_viagem && (aprovacao.transporte_detalhes as any).solicitacoes?.length > 0 && (
-              <div className="bg-slate-50 border border-slate-200 rounded-xl p-3">
-                <div className="text-xs font-bold text-slate-600 mb-2">Solicitações na Viagem</div>
-                <div className="space-y-1.5">
-                  {((aprovacao.transporte_detalhes as any).solicitacoes as any[]).map((s: any, i: number) => (
-                    <div key={s.id || i} className="flex items-center justify-between text-xs bg-white rounded-lg px-2.5 py-1.5 border border-slate-100">
-                      <div className="flex items-center gap-2">
-                        <span className="font-mono font-bold text-orange-700">{s.numero}</span>
-                        <span className="text-slate-500">{s.origem} → {s.destino}</span>
+
+            {/* ── VIAGEM: Mapa de paradas com detalhes de cada solicitação ── */}
+            {isViagem && sols.length > 0 && (
+              <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
+                <div className="bg-slate-50 px-3 py-2 border-b border-slate-200 flex items-center justify-between">
+                  <span className="text-xs font-bold text-slate-600">Roteiro de Entregas</span>
+                  <div className="flex items-center gap-2 text-[10px] text-slate-400">
+                    {td.peso_total_kg > 0 && <span>{Number(td.peso_total_kg).toLocaleString('pt-BR')} kg total</span>}
+                    {td.volumes_total > 0 && <span>· {td.volumes_total} volumes</span>}
+                  </div>
+                </div>
+                <div className="divide-y divide-slate-100">
+                  {sols.map((s: any, i: number) => (
+                    <div key={s.id || i} className="px-3 py-2.5 hover:bg-slate-50/50">
+                      {/* Número da parada + rota */}
+                      <div className="flex items-start justify-between mb-1">
+                        <div className="flex items-center gap-2">
+                          <div className="w-5 h-5 rounded-full bg-orange-100 border border-orange-300 flex items-center justify-center text-[10px] font-bold text-orange-700">
+                            {s.ordem_na_viagem ?? i + 1}
+                          </div>
+                          <div>
+                            <span className="font-mono text-[11px] font-bold text-orange-700">{s.numero}</span>
+                            <div className="flex items-center gap-1 text-xs text-slate-600">
+                              <span>{s.origem}</span>
+                              <span className="text-orange-400">→</span>
+                              <span>{s.destino}</span>
+                            </div>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          {s.urgente && (
+                            <span className="text-[9px] bg-red-100 text-red-700 px-1.5 py-0.5 rounded font-bold">URGENTE</span>
+                          )}
+                          {s.carga_especial && (
+                            <span className="text-[9px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded font-bold">ESP.</span>
+                          )}
+                        </div>
                       </div>
-                      <div className="flex items-center gap-2">
-                        {s.obra_nome && <span className="text-slate-400">{s.obra_nome}</span>}
-                        {s.urgente && <span className="text-red-500 font-bold">!</span>}
+                      {/* Detalhes da solicitação */}
+                      <div className="ml-7 grid grid-cols-2 gap-x-4 gap-y-0.5 text-[11px]">
+                        {s.obra_nome && (
+                          <>
+                            <span className="text-slate-400">Obra</span>
+                            <span className="text-slate-700 font-medium">{s.obra_nome}</span>
+                          </>
+                        )}
+                        {s.solicitante_nome && (
+                          <>
+                            <span className="text-slate-400">Solicitante</span>
+                            <span className="text-slate-700 font-medium">{s.solicitante_nome}</span>
+                          </>
+                        )}
+                        {s.centro_custo && (
+                          <>
+                            <span className="text-slate-400">Centro Custo</span>
+                            <span className="text-slate-700 font-medium">{s.centro_custo}</span>
+                          </>
+                        )}
+                        {s.peso_total_kg > 0 && (
+                          <>
+                            <span className="text-slate-400">Peso</span>
+                            <span className="text-slate-700 font-medium">{Number(s.peso_total_kg).toLocaleString('pt-BR')} kg</span>
+                          </>
+                        )}
+                        {s.volumes_total > 0 && (
+                          <>
+                            <span className="text-slate-400">Volumes</span>
+                            <span className="text-slate-700 font-medium">{s.volumes_total}</span>
+                          </>
+                        )}
+                        {s.custo_rateado > 0 && (
+                          <>
+                            <span className="text-slate-400">Custo Rateado</span>
+                            <span className="text-slate-700 font-medium">{Number(s.custo_rateado).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
+                          </>
+                        )}
                       </div>
+                      {s.descricao && (
+                        <p className="ml-7 text-[10px] text-slate-400 italic mt-0.5 line-clamp-2">{s.descricao}</p>
+                      )}
                     </div>
                   ))}
                 </div>
               </div>
             )}
-            {/* Detalhes */}
-            <div className="bg-slate-50 rounded-xl p-3 space-y-1.5">
-              {aprovacao.transporte_detalhes.data_desejada && (
-                <div className="flex justify-between text-xs">
-                  <span className="text-slate-500">Data Saída</span>
-                  <span className="text-slate-800 font-medium">{new Date(aprovacao.transporte_detalhes.data_desejada).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' })}</span>
+
+            {/* ── SOLO: Detalhes completos da solicitação individual ── */}
+            {!isViagem && (
+              <div className="bg-slate-50 rounded-xl p-3 space-y-1.5">
+                {td.solicitante_nome && (
+                  <div className="flex justify-between text-xs">
+                    <span className="text-slate-500">Solicitante</span>
+                    <span className="text-slate-800 font-medium">{td.solicitante_nome}</span>
+                  </div>
+                )}
+                {td.obra_nome && (
+                  <div className="flex justify-between text-xs">
+                    <span className="text-slate-500">Obra</span>
+                    <span className="text-slate-800 font-medium">{td.obra_nome}</span>
+                  </div>
+                )}
+                {td.centro_custo && (
+                  <div className="flex justify-between text-xs">
+                    <span className="text-slate-500">Centro de Custo</span>
+                    <span className="text-slate-800 font-medium">{td.centro_custo}</span>
+                  </div>
+                )}
+                {td.oc_numero && (
+                  <div className="flex justify-between text-xs">
+                    <span className="text-slate-500">Ordem de Compra</span>
+                    <span className="text-slate-800 font-medium font-mono">{td.oc_numero}</span>
+                  </div>
+                )}
+                {td.tipo && (
+                  <div className="flex justify-between text-xs">
+                    <span className="text-slate-500">Tipo</span>
+                    <span className="text-slate-800 font-medium capitalize">{td.tipo.replace(/_/g, ' ')}</span>
+                  </div>
+                )}
+                {td.descricao && (
+                  <div className="pt-1 border-t border-slate-200 mt-1">
+                    <span className="text-[10px] text-slate-400 font-semibold uppercase">Carga</span>
+                    <p className="text-xs text-slate-700 mt-0.5">{td.descricao}</p>
+                  </div>
+                )}
+                <div className="flex gap-3 flex-wrap">
+                  {td.peso_total_kg > 0 && (
+                    <span className="text-[10px] bg-slate-200 text-slate-600 px-2 py-0.5 rounded-full font-medium">{Number(td.peso_total_kg).toLocaleString('pt-BR')} kg</span>
+                  )}
+                  {td.volumes_total > 0 && (
+                    <span className="text-[10px] bg-slate-200 text-slate-600 px-2 py-0.5 rounded-full font-medium">{td.volumes_total} volumes</span>
+                  )}
+                  {td.carga_especial && (
+                    <span className="text-[10px] bg-red-100 text-red-600 px-2 py-0.5 rounded-full font-bold">Carga Especial</span>
+                  )}
                 </div>
-              )}
-              {aprovacao.transporte_detalhes.modal && (
-                <div className="flex justify-between text-xs">
-                  <span className="text-slate-500">Modal</span>
-                  <span className="text-slate-800 font-medium capitalize">{aprovacao.transporte_detalhes.modal.replace(/_/g, ' ')}</span>
-                </div>
-              )}
-              {aprovacao.transporte_detalhes.motorista_nome && (
-                <div className="flex justify-between text-xs">
-                  <span className="text-slate-500">Motorista</span>
-                  <span className="text-slate-800 font-medium">{aprovacao.transporte_detalhes.motorista_nome}</span>
-                </div>
-              )}
-              {aprovacao.transporte_detalhes.veiculo_placa && (
-                <div className="flex justify-between text-xs">
-                  <span className="text-slate-500">Placa</span>
-                  <span className="text-slate-800 font-medium">{aprovacao.transporte_detalhes.veiculo_placa}</span>
-                </div>
-              )}
-              {!(aprovacao.transporte_detalhes as any).is_viagem && aprovacao.transporte_detalhes.solicitante_nome && (
-                <div className="flex justify-between text-xs">
-                  <span className="text-slate-500">Solicitante</span>
-                  <span className="text-slate-800 font-medium">{aprovacao.transporte_detalhes.solicitante_nome}</span>
-                </div>
-              )}
-              {!(aprovacao.transporte_detalhes as any).is_viagem && aprovacao.transporte_detalhes.obra_nome && (
-                <div className="flex justify-between text-xs">
-                  <span className="text-slate-500">Obra</span>
-                  <span className="text-slate-800 font-medium">{aprovacao.transporte_detalhes.obra_nome}</span>
-                </div>
-              )}
-              {!(aprovacao.transporte_detalhes as any).is_viagem && aprovacao.transporte_detalhes.tipo && (
-                <div className="flex justify-between text-xs">
-                  <span className="text-slate-500">Tipo</span>
-                  <span className="text-slate-800 font-medium capitalize">{aprovacao.transporte_detalhes.tipo.replace(/_/g, ' ')}</span>
-                </div>
-              )}
-            </div>
-            {!(aprovacao.transporte_detalhes as any).is_viagem && aprovacao.transporte_detalhes.descricao && (
-              <p className="text-xs text-slate-500 italic">{aprovacao.transporte_detalhes.descricao}</p>
+                {td.observacoes_carga && (
+                  <p className="text-[10px] text-amber-600 italic">{td.observacoes_carga}</p>
+                )}
+                {td.restricoes_seguranca && (
+                  <p className="text-[10px] text-red-500 italic">{td.restricoes_seguranca}</p>
+                )}
+              </div>
             )}
-            {aprovacao.transporte_detalhes.custo_estimado != null && aprovacao.transporte_detalhes.custo_estimado > 0 && (
+
+            {/* Planejamento logístico (comum a viagem e solo) */}
+            {(td.data_desejada || td.modal || td.motorista_nome || td.veiculo_placa) && (
+              <div className="bg-blue-50 border border-blue-200 rounded-xl p-3 space-y-1.5">
+                <div className="flex items-center gap-2 mb-1">
+                  <Truck size={13} className="text-blue-600" />
+                  <span className="text-[10px] font-bold text-blue-700 uppercase tracking-wider">Planejamento Logístico</span>
+                </div>
+                {td.data_desejada && (
+                  <div className="flex justify-between text-xs">
+                    <span className="text-blue-500">Data/Hora Saída</span>
+                    <span className="text-blue-800 font-medium">{new Date(td.data_desejada).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' })}</span>
+                  </div>
+                )}
+                {td.modal && (
+                  <div className="flex justify-between text-xs">
+                    <span className="text-blue-500">Modal</span>
+                    <span className="text-blue-800 font-medium capitalize">{td.modal.replace(/_/g, ' ')}</span>
+                  </div>
+                )}
+                {td.motorista_nome && (
+                  <div className="flex justify-between text-xs">
+                    <span className="text-blue-500">Motorista</span>
+                    <span className="text-blue-800 font-medium">{td.motorista_nome}{td.motorista_telefone ? ` · ${td.motorista_telefone}` : ''}</span>
+                  </div>
+                )}
+                {td.veiculo_placa && (
+                  <div className="flex justify-between text-xs">
+                    <span className="text-blue-500">Veículo</span>
+                    <span className="text-blue-800 font-bold font-mono">{td.veiculo_placa}</span>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Custo */}
+            {td.custo_estimado != null && td.custo_estimado > 0 && (
               <div className="bg-orange-50 border border-orange-200 rounded-xl p-3 flex justify-between items-center">
-                <span className="text-xs text-orange-700 font-medium">Custo {(aprovacao.transporte_detalhes as any).is_viagem ? 'Total' : 'Estimado'}</span>
+                <span className="text-xs text-orange-700 font-medium">Custo {isViagem ? 'Total da Viagem' : 'Estimado'}</span>
                 <span className="text-lg font-extrabold text-orange-700">
-                  {aprovacao.transporte_detalhes.custo_estimado.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                  {Number(td.custo_estimado).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
                 </span>
               </div>
             )}
-            {aprovacao.transporte_detalhes.urgente && (
-              <div className="flex items-center gap-1.5 text-xs text-red-600 font-bold">
-                <AlertTriangle size={12} /> URGENTE
+
+            {/* Urgente */}
+            {td.urgente && (
+              <div className="bg-red-50 border border-red-200 rounded-xl p-2.5 flex items-center gap-2">
+                <AlertTriangle size={13} className="text-red-600" />
+                <div>
+                  <span className="text-xs text-red-700 font-bold">URGENTE</span>
+                  {td.justificativa_urgencia && (
+                    <p className="text-[10px] text-red-500 mt-0.5">{td.justificativa_urgencia}</p>
+                  )}
+                </div>
               </div>
             )}
           </div>
-        ) : null}
+          )
+        })() : null}
 
         {/* ── Resumo Executivo para Minuta Contratual ── */}
         {aprovacao.tipo_aprovacao === 'minuta_contratual' && aprovacao.minuta_resumo ? (

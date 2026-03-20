@@ -284,7 +284,7 @@ export function useAprovacoesPendentes(tipo?: TipoAprovacao) {
           // Tenta buscar como solicitações individuais
           const { data: logData } = await supabase
             .from('log_solicitacoes')
-            .select('id, numero, tipo, origem, destino, data_desejada, modal, motorista_nome, motorista_telefone, veiculo_placa, custo_estimado, descricao, solicitante_nome, obra_nome, urgente, peso_total_kg, volumes_total, distancia_km, tempo_estimado_h, viagem_id')
+            .select('id, numero, tipo, origem, destino, data_desejada, data_prevista_saida, modal, motorista_nome, motorista_telefone, veiculo_placa, custo_estimado, descricao, solicitante_nome, obra_nome, centro_custo, oc_numero, urgente, justificativa_urgencia, peso_total_kg, volumes_total, carga_especial, observacoes_carga, distancia_km, tempo_estimado_h, viagem_id, restricoes_seguranca')
             .in('id', logIds)
           for (const l of logData ?? []) {
             logMap.set(l.id, l)
@@ -303,12 +303,12 @@ export function useAprovacoesPendentes(tipo?: TipoAprovacao) {
               viagemMap.set(v.id, v)
             }
 
-            // Buscar solicitações vinculadas a cada viagem
+            // Buscar solicitações vinculadas a cada viagem (com todos os detalhes relevantes)
             if (viagemData && viagemData.length > 0) {
               const vIds = viagemData.map(v => v.id)
               const { data: solsData } = await supabase
                 .from('log_solicitacoes')
-                .select('id, numero, tipo, origem, destino, obra_nome, solicitante_nome, descricao, urgente, peso_total_kg, volumes_total, data_desejada, viagem_id, ordem_na_viagem, custo_rateado')
+                .select('id, numero, tipo, origem, destino, obra_nome, centro_custo, solicitante_nome, descricao, urgente, peso_total_kg, volumes_total, data_desejada, viagem_id, ordem_na_viagem, custo_rateado, distancia_km, tempo_estimado_h, carga_especial, observacoes_carga, oc_numero')
                 .in('viagem_id', vIds)
                 .order('ordem_na_viagem', { ascending: true })
               for (const s of solsData ?? []) {
@@ -502,15 +502,20 @@ export function useAprovacoesPendentes(tipo?: TipoAprovacao) {
 
             if (viagem) {
               // Aprovação de viagem (consolidada — múltiplas solicitações)
-              const solNames = (viagemSols ?? []).map(s => `${(s.numero as string)}: ${(s.origem as string)} → ${(s.destino as string)}`).join(' | ')
+              const sols = viagemSols ?? []
+              const pesoTotal = sols.reduce((acc, s) => acc + ((s.peso_total_kg as number) || 0), 0)
+              const volumesTotal = sols.reduce((acc, s) => acc + ((s.volumes_total as number) || 0), 0)
+              const temCargaEspecial = sols.some(s => s.carga_especial)
+              const obrasUnicas = [...new Set(sols.map(s => s.obra_nome).filter(Boolean))]
+
               requisicao = {
                 id: a.entidade_id,
                 numero: (viagem.numero as string) ?? a.entidade_numero ?? 'N/A',
                 solicitante_nome: '',
-                obra_nome: '',
+                obra_nome: obrasUnicas.join(', '),
                 descricao: `Viagem ${(viagem.numero as string)}: ${(viagem.origem_principal as string) ?? ''} → ${(viagem.destino_final as string) ?? ''} (${(viagem.qtd_paradas as number) ?? 0} paradas)`,
                 valor_estimado: (viagem.custo_total as number) ?? 0,
-                urgencia: (viagemSols ?? []).some(s => s.urgente) ? 'critica' : 'normal',
+                urgencia: sols.some(s => s.urgente) ? 'critica' : 'normal',
                 status: 'em_aprovacao',
                 alcada_nivel: a.nivel,
                 created_at: a.created_at,
@@ -522,19 +527,20 @@ export function useAprovacoesPendentes(tipo?: TipoAprovacao) {
                 data_desejada: (viagem.data_prevista_saida as string) ?? undefined,
                 modal: (viagem.modal as string) ?? undefined,
                 motorista_nome: (viagem.motorista_nome as string) ?? undefined,
+                motorista_telefone: (viagem.motorista_telefone as string) ?? undefined,
                 veiculo_placa: (viagem.veiculo_placa as string) ?? undefined,
                 custo_estimado: (viagem.custo_total as number) ?? undefined,
-                descricao: solNames || undefined,
-                urgente: (viagemSols ?? []).some(s => s.urgente),
-                peso_total_kg: undefined,
-                volumes_total: undefined,
+                urgente: sols.some(s => s.urgente),
+                peso_total_kg: pesoTotal || undefined,
+                volumes_total: volumesTotal || undefined,
+                carga_especial: temCargaEspecial,
                 // Campos extras de viagem
                 is_viagem: true,
                 viagem_numero: (viagem.numero as string) ?? '',
                 qtd_paradas: (viagem.qtd_paradas as number) ?? 0,
                 distancia_total_km: (viagem.distancia_total_km as number) ?? undefined,
                 tempo_estimado_h: (viagem.tempo_estimado_h as number) ?? undefined,
-                solicitacoes: viagemSols ?? [],
+                solicitacoes: sols,
               }
             } else if (log) {
               // Aprovação individual (solicitação solo, sem viagem)
@@ -554,17 +560,26 @@ export function useAprovacoesPendentes(tipo?: TipoAprovacao) {
                 origem: (log.origem as string) ?? '',
                 destino: (log.destino as string) ?? '',
                 tipo: (log.tipo as string) ?? '',
-                data_desejada: (log.data_desejada as string) ?? undefined,
+                data_desejada: (log.data_prevista_saida as string) ?? (log.data_desejada as string) ?? undefined,
                 modal: (log.modal as string) ?? undefined,
                 motorista_nome: (log.motorista_nome as string) ?? undefined,
+                motorista_telefone: (log.motorista_telefone as string) ?? undefined,
                 veiculo_placa: (log.veiculo_placa as string) ?? undefined,
                 custo_estimado: (log.custo_estimado as number) ?? undefined,
                 descricao: (log.descricao as string) ?? undefined,
                 solicitante_nome: (log.solicitante_nome as string) ?? undefined,
                 obra_nome: (log.obra_nome as string) ?? undefined,
+                centro_custo: (log.centro_custo as string) ?? undefined,
+                oc_numero: (log.oc_numero as string) ?? undefined,
                 urgente: (log.urgente as boolean) ?? undefined,
+                justificativa_urgencia: (log.justificativa_urgencia as string) ?? undefined,
                 peso_total_kg: (log.peso_total_kg as number) ?? undefined,
                 volumes_total: (log.volumes_total as number) ?? undefined,
+                carga_especial: (log.carga_especial as boolean) ?? undefined,
+                observacoes_carga: (log.observacoes_carga as string) ?? undefined,
+                restricoes_seguranca: (log.restricoes_seguranca as string) ?? undefined,
+                distancia_total_km: (log.distancia_km as number) ?? undefined,
+                tempo_estimado_h: (log.tempo_estimado_h as number) ?? undefined,
                 is_viagem: false,
               }
             } else {
