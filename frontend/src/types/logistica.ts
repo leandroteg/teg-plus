@@ -159,6 +159,7 @@ export interface LogSolicitacao {
   danfe_url?: string
 
   // Joined
+  rota_planejada?: LogRota
   itens?: LogItemSolicitacao[]
   nfe?: LogNFe
   transporte?: LogTransporte

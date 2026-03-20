@@ -33,6 +33,7 @@ export function useSolicitacoes(filtros?: {
         .select(`
           *,
           transportadora:log_transportadoras(id, nome_fantasia, razao_social, avaliacao_media),
+          rota_planejada:log_rotas!rota_planejada_id(id, nome, distancia_km, tempo_estimado_h),
           nfe:log_nfe(id, numero, status, chave_acesso, valor_total),
           transporte:log_transportes(id, hora_saida, hora_chegada, eta_atual, placa, motorista_nome),
           recebimento:log_recebimentos(id, status, confirmado_em),

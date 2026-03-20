@@ -101,7 +101,7 @@ function DetailModal({ sol, onClose, onAction, isDark }: {
   const txtMain = isDark ? 'text-white' : 'text-slate-800'
   const fmtCurrency = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
 
-  const hasPlanning = !!(sol.modal || sol.motorista_nome || sol.veiculo_placa || sol.data_prevista_saida || sol.custo_estimado != null || sol.transportadora)
+  const hasPlanning = !!(sol.modal || sol.motorista_nome || sol.veiculo_placa || sol.data_prevista_saida || sol.custo_estimado != null || sol.transportadora || sol.rota_planejada)
   const hasLoad = !!(sol.descricao || sol.peso_total_kg || sol.volumes_total || sol.carga_especial || sol.observacoes_carga || (sol.itens && sol.itens.length > 0))
 
   return (
@@ -151,6 +151,27 @@ function DetailModal({ sol, onClose, onAction, isDark }: {
                 <p className={`text-[10px] ${txtMuted}`}>Destino</p>
               </div>
             </div>
+            {/* KM + Tempo Estimado */}
+            {(sol.rota_planejada?.distancia_km || sol.rota_planejada?.tempo_estimado_h) && (
+              <div className="flex items-center gap-3 mt-3 pt-3 border-t border-orange-200/60">
+                {sol.rota_planejada.distancia_km != null && (
+                  <div className={`flex-1 text-center rounded-lg py-1.5 ${isDark ? 'bg-orange-500/10' : 'bg-white/70'}`}>
+                    <p className={`text-base font-extrabold ${txtMain}`}>{sol.rota_planejada.distancia_km.toLocaleString('pt-BR')} km</p>
+                    <p className={`text-[10px] ${txtMuted}`}>Distância</p>
+                  </div>
+                )}
+                {sol.rota_planejada.tempo_estimado_h != null && (
+                  <div className={`flex-1 text-center rounded-lg py-1.5 ${isDark ? 'bg-orange-500/10' : 'bg-white/70'}`}>
+                    <p className={`text-base font-extrabold ${txtMain}`}>
+                      {sol.rota_planejada.tempo_estimado_h >= 1
+                        ? `${Math.floor(sol.rota_planejada.tempo_estimado_h)}h${sol.rota_planejada.tempo_estimado_h % 1 ? `${Math.round((sol.rota_planejada.tempo_estimado_h % 1) * 60)}min` : ''}`
+                        : `${Math.round(sol.rota_planejada.tempo_estimado_h * 60)}min`}
+                    </p>
+                    <p className={`text-[10px] ${txtMuted}`}>Tempo Estimado</p>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
           {/* ── Dados Gerais ── */}
@@ -257,7 +278,14 @@ function DetailModal({ sol, onClose, onAction, isDark }: {
                   <div><p className={txtMuted}>Placa</p><p className={`font-mono font-bold ${txtMain}`}>{sol.veiculo_placa}</p></div>
                 )}
                 {sol.data_prevista_saida && (
-                  <div><p className={txtMuted}>Saída Prevista</p><p className={`font-semibold ${txtMain}`}>{new Date(sol.data_prevista_saida).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' })}</p></div>
+                  <div className="col-span-2">
+                    <p className={txtMuted}>Data e Hora de Saída</p>
+                    <p className={`font-semibold ${txtMain}`}>
+                      {new Date(sol.data_prevista_saida).toLocaleDateString('pt-BR', { weekday: 'short', day: '2-digit', month: '2-digit', year: 'numeric' })}
+                      {' às '}
+                      {new Date(sol.data_prevista_saida).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                    </p>
+                  </div>
                 )}
                 {sol.custo_estimado != null && (
                   <div><p className={txtMuted}>Custo Estimado</p><p className="font-bold text-emerald-600">{fmtCurrency(sol.custo_estimado)}</p></div>
