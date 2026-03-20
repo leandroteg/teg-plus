@@ -151,14 +151,19 @@ function EnderecoInput({
 
     setLoading(true)
     try {
-      // Tenta n8n primeiro
+      // Tenta n8n primeiro (timeout curto de 3s para não bloquear fallback)
       try {
+        const n8nAbort = new AbortController()
+        const n8nTimer = setTimeout(() => n8nAbort.abort(), 3000)
+        // Also abort if parent aborts
+        abortRef.current.signal.addEventListener('abort', () => n8nAbort.abort())
         const res = await fetch(`${N8N_URL}/logistica/autocomplete-endereco`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ query, pais: 'BR' }),
-          signal: abortRef.current.signal,
+          signal: n8nAbort.signal,
         })
+        clearTimeout(n8nTimer)
         if (res.ok) {
           const json = await res.json()
           const resultados = json.sugestoes || json.results || []
@@ -169,7 +174,7 @@ function EnderecoInput({
           }
         }
       } catch (e) {
-        if (e instanceof DOMException && e.name === 'AbortError') return
+        if (abortRef.current?.signal.aborted) return
       }
 
       // Fallback: Nominatim OpenStreetMap (gratuito)
@@ -214,14 +219,18 @@ function EnderecoInput({
 
     setLoading(true)
     try {
-      // Tenta n8n primeiro
+      // Tenta n8n primeiro (timeout curto de 3s)
       try {
+        const n8nAbort = new AbortController()
+        const n8nTimer = setTimeout(() => n8nAbort.abort(), 3000)
+        abortRef.current.signal.addEventListener('abort', () => n8nAbort.abort())
         const res = await fetch(`${N8N_URL}/logistica/consulta-cep`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ cep: limpo }),
-          signal: abortRef.current.signal,
+          signal: n8nAbort.signal,
         })
+        clearTimeout(n8nTimer)
         if (res.ok) {
           const json = await res.json()
           if (json.cidade || json.city) {
@@ -241,7 +250,7 @@ function EnderecoInput({
           }
         }
       } catch (e) {
-        if (e instanceof DOMException && e.name === 'AbortError') return
+        if (abortRef.current?.signal.aborted) return
       }
 
       // Fallback: BrasilAPI direto
