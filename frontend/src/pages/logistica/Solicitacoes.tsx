@@ -223,7 +223,7 @@ export default function Solicitacoes() {
                       )}
                     </div>
                     <p className={`text-xs mt-0.5 ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>
-                      {TIPO_LABEL[s.tipo]} · {s.origem} → {s.destino}
+                      {s.origem} → {s.destino}
                     </p>
                     <p className={`text-[10px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
                       {s.obra_nome ?? '—'} · {s.centro_custo ?? '—'}
@@ -249,7 +249,6 @@ export default function Solicitacoes() {
                   <div className={`px-4 py-4 space-y-3 ${isDark ? 'border-t border-white/[0.06]' : 'border-t border-slate-100'}`}>
                     {/* Detalhes */}
                     <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-xs">
-                      <Detail label="Tipo" value={TIPO_LABEL[s.tipo]} />
                       <Detail label="Origem" value={s.origem} />
                       <Detail label="Destino" value={s.destino} />
                       {s.modal && <Detail label="Modal" value={s.modal.replace('_', ' ')} />}
@@ -367,16 +366,6 @@ export default function Solicitacoes() {
               </button>
             </div>
             <div className="p-6 space-y-4">
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className={`block text-xs font-bold mb-1 ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>Tipo *</label>
-                  <select value={form.tipo} onChange={e => set('tipo', e.target.value)} className="input-base">
-                    {Object.entries(TIPO_LABEL).map(([k, v]) => (
-                      <option key={k} value={k}>{v}</option>
-                    ))}
-                  </select>
-                </div>
-              </div>
               <div>
                 <label className={`block text-xs font-bold mb-1 ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>Origem *</label>
                 <div className="grid grid-cols-3 gap-2">

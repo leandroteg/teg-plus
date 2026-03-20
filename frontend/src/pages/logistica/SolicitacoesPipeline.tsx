@@ -40,7 +40,6 @@ const SORT_OPTIONS: { field: SortField; label: string }[] = [
   { field: 'data',    label: 'Data' },
   { field: 'origem',  label: 'Origem' },
   { field: 'destino', label: 'Destino' },
-  { field: 'tipo',    label: 'Tipo' },
 ]
 
 const TIPO_LABEL: Record<string, string> = {
@@ -102,9 +101,6 @@ function DetailModal({ sol, onClose, onAction, isDark }: {
           <div className="flex items-center gap-2 min-w-0">
             <ClipboardList size={18} className="text-orange-600 shrink-0" />
             <h3 className={`text-base font-bold truncate ${isDark ? 'text-white' : 'text-slate-800'}`}>#{sol.numero}</h3>
-            <span className={`text-[10px] px-2 py-0.5 rounded-full font-semibold ${isDark ? 'bg-orange-500/10 text-orange-400' : 'bg-orange-50 text-orange-700'}`}>
-              {TIPO_LABEL[sol.tipo] || sol.tipo}
-            </span>
           </div>
           <button onClick={onClose} className="text-slate-400 hover:text-slate-600 shrink-0"><X size={18} /></button>
         </div>
@@ -196,10 +192,6 @@ function SolRow({ sol, onClick, isDark, isSelected, onSelect }: {
         {sol.numero}
       </span>
 
-      <span className={`text-[10px] px-1.5 py-0.5 rounded-md w-[96px] shrink-0 text-center font-medium ${isDark ? 'bg-white/[0.04] text-slate-400' : 'bg-slate-100 text-slate-500'}`}>
-        {TIPO_LABEL[sol.tipo] || sol.tipo}
-      </span>
-
       <span className={`text-xs truncate w-[150px] shrink-0 ${isDark ? 'text-white' : 'text-slate-800'}`}>
         {sol.origem}
       </span>
@@ -239,10 +231,6 @@ function SolCard({ sol, onClick, isDark, isSelected, onSelect }: {
         {sol.urgente && <AlertTriangle size={13} className="text-red-500 shrink-0" />}
 
         <span className={`text-xs font-mono font-bold shrink-0 ${isDark ? 'text-orange-400' : 'text-orange-700'}`}>#{sol.numero}</span>
-
-        <span className={`text-[10px] px-1.5 py-0.5 rounded-md font-medium shrink-0 ${isDark ? 'bg-white/[0.04] text-slate-400' : 'bg-slate-100 text-slate-500'}`}>
-          {TIPO_LABEL[sol.tipo] || sol.tipo}
-        </span>
 
         <div className="flex items-center gap-1.5 min-w-0 flex-1 text-sm">
           <MapPin size={12} className={`shrink-0 ${isDark ? 'text-slate-500' : 'text-slate-400'}`} />
@@ -347,14 +335,6 @@ function NovaSolicitacaoModal({ isDark, onClose, onSuccess }: {
         {/* Body */}
         <div className="p-6 space-y-4">
           <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className={labelCls}>Tipo *</label>
-              <select value={form.tipo} onChange={e => set('tipo', e.target.value)} className={inputCls}>
-                {Object.entries(TIPO_LABELS).map(([k, v]) => (
-                  <option key={k} value={k}>{v}</option>
-                ))}
-              </select>
-            </div>
             <div>
               <label className={labelCls}>Centro de Custo</label>
               <select value={form.centro_custo ?? ''} onChange={e => set('centro_custo', e.target.value)} className={inputCls}>
