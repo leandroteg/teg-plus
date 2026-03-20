@@ -768,9 +768,9 @@ export default function NovaSolicitacao() {
 
             {/* Endereço + Representante legal */}
             <div>
-              <label className={labelClass}>{`Endere\u00e7o da Contraparte`}</label>
+              <label className={labelClass}>Endereço da Contraparte</label>
               <input value={contraparteEndereco} onChange={e => setContraparteEndereco(e.target.value)}
-                placeholder="Rua, n\u00famero, bairro, cidade/UF, CEP" className={inputClass} />
+                placeholder="Rua, número, bairro, cidade/UF, CEP" className={inputClass} />
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div>
@@ -786,7 +786,7 @@ export default function NovaSolicitacao() {
               <div>
                 <label className={labelClass}>Cargo</label>
                 <input value={contraparteRepCargo} onChange={e => setContraparteRepCargo(e.target.value)}
-                  placeholder="Ex: Diretor, S\u00f3cio" className={inputClass} />
+                  placeholder="Ex: Diretor, Sócio" className={inputClass} />
               </div>
             </div>
 

@@ -120,7 +120,18 @@ export const api = {
           body: JSON.stringify({ valor: limpo }),
         })
         // Normaliza resposta do n8n proxy (pode ter nomes de campo diferentes da CnpjResult)
-        return normalizeCnpjResponse(raw, limpo)
+        const result = normalizeCnpjResponse(raw, limpo)
+        // Se n8n não retornou sócios, tenta ReceitaWS como fallback para QSA
+        if (!result.error && (!result.socios || !result.socios.length)) {
+          try {
+            const rws = await fetch(`https://receitaws.com.br/v1/cnpj/${limpo}`)
+            if (rws.ok) {
+              const rwsData = await rws.json()
+              result.socios = normalizeSocios(rwsData as Record<string, unknown>)
+            }
+          } catch { /* ignora */ }
+        }
+        return result
       } catch { /* fallback abaixo */ }
     }
     // Fallback: BrasilAPI direto
@@ -129,6 +140,17 @@ export const api = {
       return { cnpj: limpo, razao_social: '', nome_fantasia: '', situacao: '', endereco: { cep: '', logradouro: '', numero: '', complemento: '', bairro: '', cidade: '', uf: '' }, telefone: '', email: '', error: true, message: `CNPJ não encontrado (${res.status})` }
     }
     const r = await res.json()
+    let socios = normalizeSocios(r as Record<string, unknown>)
+    // Se BrasilAPI não retornou sócios, tenta ReceitaWS como fallback
+    if (!socios.length) {
+      try {
+        const rws = await fetch(`https://receitaws.com.br/v1/cnpj/${limpo}`)
+        if (rws.ok) {
+          const rwsData = await rws.json()
+          socios = normalizeSocios(rwsData as Record<string, unknown>)
+        }
+      } catch { /* ignora erro do fallback */ }
+    }
     return {
       cnpj: String(r.cnpj ?? '').replace(/\D/g, ''),
       razao_social: r.razao_social ?? '',
@@ -145,6 +167,7 @@ export const api = {
       },
       telefone: String(r.ddd_telefone_1 ?? '').replace(/\D/g, ''),
       email: (r.email ?? '').toLowerCase(),
+      socios,
     }
   },
 
