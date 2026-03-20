@@ -141,7 +141,7 @@ export default function EquipePJ() {
             Equipe PJ
           </h1>
           <p className="text-xs text-slate-400 mt-0.5">
-            Prestadores de servico pessoa juridica vinculados a contratos
+            Prestadores de serviço pessoa jurídica vinculados a contratos
           </p>
         </div>
         <button
@@ -279,7 +279,7 @@ export default function EquipePJ() {
                       <span className={`text-[9px] font-semibold rounded-full px-2 py-0.5 ${
                         item.tipo === 'solicitacao' ? 'bg-violet-50 text-violet-600' : 'bg-slate-100 text-slate-500'
                       }`}>
-                        {item.tipo === 'solicitacao' ? 'Solicitacao' : 'Contrato'}
+                        {item.tipo === 'solicitacao' ? 'Solicitação' : 'Contrato'}
                       </span>
                     </div>
                   </div>

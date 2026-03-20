@@ -50,7 +50,7 @@ export default function ReajustesPage() {
           Reajustes
         </h1>
         <p className={`text-xs mt-0.5 ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>
-          Historico de reajustes contratuais por indice
+          Histórico de reajustes contratuais por índice
         </p>
       </div>
 
@@ -88,7 +88,7 @@ export default function ReajustesPage() {
             type="text"
             value={busca}
             onChange={e => setBusca(e.target.value)}
-            placeholder="Buscar indice, contrato, observacao..."
+            placeholder="Buscar índice, contrato, observação..."
             className={`w-full pl-9 pr-4 py-2.5 rounded-xl border text-sm placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-400
               ${isLight ? 'border-slate-200 bg-white text-slate-700' : 'border-white/[0.08] bg-white/[0.03] text-slate-200'}`}
           />
@@ -120,7 +120,7 @@ export default function ReajustesPage() {
             <TrendingUp size={28} className={isLight ? 'text-indigo-300' : 'text-indigo-400/50'} />
           </div>
           <p className={`text-sm font-semibold ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>Nenhum reajuste encontrado</p>
-          <p className={`text-xs mt-1 ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>Os reajustes aparecerao aqui quando forem aplicados</p>
+          <p className={`text-xs mt-1 ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>Os reajustes aparecerão aqui quando forem aplicados</p>
         </div>
       ) : (
         <div className={`${cardCls} overflow-hidden`}>

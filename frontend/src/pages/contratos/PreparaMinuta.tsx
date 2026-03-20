@@ -255,7 +255,7 @@ function AnalisePanel({ analise, onMelhorar, melhorando }: {
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 mb-1">
               <Brain size={14} className="text-white/80" />
-              <p className="text-sm font-extrabold text-white">Analise Juridica por IA</p>
+              <p className="text-sm font-extrabold text-white">Análise Jurídica por IA</p>
             </div>
 
             {/* TEG Role Badge */}
@@ -548,7 +548,7 @@ function RegrasConfig({ regras, onUpdate }: {
       >
         <div className="flex items-center gap-2">
           <Settings2 size={13} className="text-indigo-500" />
-          <span className="text-xs font-extrabold text-slate-800">Regras de Analise IA</span>
+          <span className="text-xs font-extrabold text-slate-800">Regras de Análise IA</span>
           <span className="text-[10px] text-slate-400 font-medium">
             ({regras.filter(r => r.ativo).length} ativas)
           </span>
@@ -986,7 +986,7 @@ function MelhoriasPanel({ melhorias, scoreOriginal, onGerarMinuta, gerandoMinuta
             </div>
             <div className="flex-1">
               <p className="text-sm font-bold text-emerald-800">Minuta Gerada com Sucesso</p>
-              <p className="text-[10px] text-emerald-600">PDF disponivel para download e envio para aprovacao</p>
+              <p className="text-[10px] text-emerald-600">PDF disponível para download e envio para aprovação</p>
             </div>
             <div className="flex items-center gap-2">
               {onGerarMinuta && (
@@ -1281,7 +1281,7 @@ function MinutaCard({ minuta, onAnalisar, onMelhorar, onGerarMinuta, analisando,
           {pdfUrl && (
             <div className="flex items-center gap-1.5 mt-1.5">
               <CheckCircle2 size={10} className="text-emerald-500" />
-              <span className="text-[10px] font-bold text-emerald-600">PDF gerado — pronto para aprovacao</span>
+              <span className="text-[10px] font-bold text-emerald-600">PDF gerado — pronto para aprovação</span>
             </div>
           )}
           <p className="text-[9px] text-teal-400 mt-1">Clique para expandir</p>
@@ -1348,7 +1348,7 @@ function MinutaCard({ minuta, onAnalisar, onMelhorar, onGerarMinuta, analisando,
             }`}
           >
             {showAnalise ? <ChevronUp size={10} /> : <ChevronDown size={10} />}
-            {showAnalise ? 'Ocultar Analise' : 'Ver Analise'}
+            {showAnalise ? 'Ocultar Análise' : 'Ver Análise'}
           </button>
         )}
 
@@ -1684,7 +1684,7 @@ export default function PreparaMinuta() {
         await criarResumo.mutateAsync(payload)
       }
     } catch (e) {
-      console.warn('Falha ao preparar resumo executivo automatico:', e)
+      console.warn('Falha ao preparar resumo executivo automático:', e)
     }
 
     try {
@@ -1692,7 +1692,7 @@ export default function PreparaMinuta() {
         solicitacaoId: solicitacao.id,
         etapaDe: 'preparar_minuta',
         etapaPara: 'resumo_executivo',
-        observacao: 'Minuta final registrada, avancando para resumo executivo',
+        observacao: 'Minuta final registrada, avançando para resumo executivo',
       })
     } catch (e) {
       console.error('Erro ao avancar etapa:', e)
@@ -1712,7 +1712,7 @@ export default function PreparaMinuta() {
         // Normalize field names: n8n returns secoes/clausulas_finais/local_assinatura
         // but older code used clausulas/disposicoes_finais/local_data — accept both
         const clausulas = (mtRaw.secoes ?? mtRaw.clausulas ?? []).map((s, i) => ({
-          numero: ('numero' in s && s.numero) ? s.numero : `CLAUSULA ${String(i + 1).padStart(2, '0')}`,
+          numero: ('numero' in s && s.numero) ? s.numero : `CLÁUSULA ${String(i + 1).padStart(2, '0')}`,
           titulo: s.titulo,
           conteudo: s.conteudo,
         }))
@@ -1738,8 +1738,8 @@ export default function PreparaMinuta() {
 
         // HEADER — formal contract style
         const CAT_LABEL: Record<string, string> = {
-          prestacao_servico: 'Prestacao de Servicos', fornecimento: 'Fornecimento',
-          locacao: 'Locacao', consultoria: 'Consultoria', obra_civil: 'Obra Civil',
+          prestacao_servico: 'Prestação de Serviços', fornecimento: 'Fornecimento',
+          locacao: 'Locação', consultoria: 'Consultoria', obra_civil: 'Obra Civil',
         }
         const tipoLabel = CAT_LABEL[solicitacao.categoria_contrato ?? ''] ?? solicitacao.categoria_contrato ?? ''
         const tituloContrato = tipoLabel ? `CONTRATO DE ${tipoLabel.toUpperCase()}` : 'MINUTA CONTRATUAL'
@@ -1839,33 +1839,33 @@ export default function PreparaMinuta() {
         const cnpjContraparte = solicitacao.contraparte_cnpj || 'conforme cadastro'
         const enderecoEmpresa = [empresa.endereco, empresa.cidade ? `${empresa.cidade}/${empresa.uf ?? ''}` : ''].filter(Boolean).join(', ')
 
-        const preambulo = `Pelo presente instrumento particular, de um lado, ${empresa.razao}, pessoa juridica de direito privado, inscrita no CNPJ sob o no ${empresa.cnpj}${enderecoEmpresa ? `, com sede em ${enderecoEmpresa}` : ''}, doravante denominada CONTRATANTE; e, de outro lado, ${solicitacao.contraparte_nome}, inscrita no CNPJ sob o no ${cnpjContraparte}, doravante denominada CONTRATADA; tem entre si justo e contratado o presente instrumento, que se regera pelas clausulas e condicoes seguintes.`
+        const preambulo = `Pelo presente instrumento particular, de um lado, ${empresa.razao}, pessoa jurídica de direito privado, inscrita no CNPJ sob o nº ${empresa.cnpj}${enderecoEmpresa ? `, com sede em ${enderecoEmpresa}` : ''}, doravante denominada CONTRATANTE; e, de outro lado, ${solicitacao.contraparte_nome}, inscrita no CNPJ sob o nº ${cnpjContraparte}, doravante denominada CONTRATADA; têm entre si justo e contratado o presente instrumento, que se regerá pelas cláusulas e condições seguintes.`
 
         // Build clausulas from melhorias
         const secoes: Array<{ titulo: string; conteudo: string }> = []
         let num = 1
 
         // Objeto
-        secoes.push({ titulo: `CLAUSULA ${num++} - DO OBJETO`, conteudo: `O presente Contrato tem por objeto ${solicitacao.objeto}.${solicitacao.descricao_escopo ? ' ' + solicitacao.descricao_escopo : ''}` })
+        secoes.push({ titulo: `CLÁUSULA ${num++} - DO OBJETO`, conteudo: `O presente Contrato tem por objeto ${solicitacao.objeto}.${solicitacao.descricao_escopo ? ' ' + solicitacao.descricao_escopo : ''}` })
 
         // Preco
-        secoes.push({ titulo: `CLAUSULA ${num++} - DO PRECO E CONDICOES DE PAGAMENTO`, conteudo: `Pela execucao dos servicos, a CONTRATANTE pagara a CONTRATADA o valor global de ${valorStr}.${solicitacao.forma_pagamento ? ' Forma de pagamento: ' + solicitacao.forma_pagamento + '.' : ' O pagamento sera efetuado mediante medicoes mensais, no prazo de 30 dias.'}` })
+        secoes.push({ titulo: `CLÁUSULA ${num++} - DO PREÇO E CONDIÇÕES DE PAGAMENTO`, conteudo: `Pela execução dos serviços, a CONTRATANTE pagará à CONTRATADA o valor global de ${valorStr}.${solicitacao.forma_pagamento ? ' Forma de pagamento: ' + solicitacao.forma_pagamento + '.' : ' O pagamento será efetuado mediante medições mensais, no prazo de 30 dias.'}` })
 
         // Prazo
         const prazoTxt = solicitacao.prazo_meses ? `${solicitacao.prazo_meses} meses` : 'conforme cronograma aprovado'
-        secoes.push({ titulo: `CLAUSULA ${num++} - DO PRAZO`, conteudo: `O prazo para execucao dos servicos e de ${prazoTxt}, contados a partir da assinatura deste instrumento ou emissao da Ordem de Servico.` })
+        secoes.push({ titulo: `CLÁUSULA ${num++} - DO PRAZO`, conteudo: `O prazo para execução dos serviços é de ${prazoTxt}, contados a partir da assinatura deste instrumento ou emissão da Ordem de Serviço.` })
 
         // Add all melhorias clausulas_melhoradas as formal contract clauses
         if (mel.clausulas_melhoradas?.length) {
           for (const c of mel.clausulas_melhoradas) {
-            secoes.push({ titulo: `CLAUSULA ${num++} - ${c.nome.toUpperCase()}`, conteudo: c.texto_melhorado })
+            secoes.push({ titulo: `CLÁUSULA ${num++} - ${c.nome.toUpperCase()}`, conteudo: c.texto_melhorado })
           }
         }
 
         // Add clausulas_novas
         if (mel.clausulas_novas?.length) {
           for (const c of mel.clausulas_novas) {
-            secoes.push({ titulo: `CLAUSULA ${num++} - ${c.nome.toUpperCase()}`, conteudo: c.texto })
+            secoes.push({ titulo: `CLÁUSULA ${num++} - ${c.nome.toUpperCase()}`, conteudo: c.texto })
           }
         }
 
@@ -1966,7 +1966,7 @@ export default function PreparaMinuta() {
         <div className="w-16 h-16 rounded-2xl bg-slate-100 flex items-center justify-center mx-auto mb-4">
           <FileText size={28} className="text-slate-300" />
         </div>
-        <p className="text-sm font-semibold text-slate-500">Solicitacao nao encontrada</p>
+        <p className="text-sm font-semibold text-slate-500">Solicitação não encontrada</p>
       </div>
     )
   }
@@ -1991,10 +1991,10 @@ export default function PreparaMinuta() {
             {s.numero}
           </p>
           <h1 className="text-xl font-extrabold text-slate-800 mt-1 leading-tight">
-            Preparacao de Minuta
+            Preparação de Minuta
           </h1>
           <p className="text-xs text-slate-400 mt-0.5">
-            Gerencie as versoes da minuta contratual
+            Gerencie as versões da minuta contratual
           </p>
         </div>
       </div>
@@ -2006,7 +2006,7 @@ export default function PreparaMinuta() {
         <div className="space-y-4">
           <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 space-y-3">
             <h3 className="text-xs font-extrabold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
-              <FileText size={11} className="text-indigo-500" /> Resumo da Solicitacao
+              <FileText size={11} className="text-indigo-500" /> Resumo da Solicitação
             </h3>
 
             <div className="space-y-2.5">
@@ -2037,7 +2037,7 @@ export default function PreparaMinuta() {
                 <div className="flex items-center gap-2">
                   <Calendar size={11} className="text-slate-400" />
                   <div>
-                    <p className="text-[10px] text-slate-400 font-semibold">Vigencia</p>
+                    <p className="text-[10px] text-slate-400 font-semibold">Vigência</p>
                     <p className="text-xs text-slate-700 font-medium">
                       {s.data_inicio_prevista ? fmtData(s.data_inicio_prevista) : '???'}
                       {' \u2014 '}
@@ -2061,14 +2061,14 @@ export default function PreparaMinuta() {
               {avancarEtapa.isPending
                 ? <div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
                 : <ChevronRight size={14} />}
-              Avancar para Resumo Executivo
+              Avançar para Resumo Executivo
             </button>
           )}
 
           {!hasFinalMinuta && minutas.length > 0 && (
             <div className="bg-amber-50 rounded-xl border border-amber-200 px-4 py-3">
               <p className="text-[10px] text-amber-700 font-semibold">
-                Adicione uma minuta com tipo "Final" para avancar para o Resumo Executivo.
+                Adicione uma minuta com tipo "Final" para avançar para o Resumo Executivo.
               </p>
             </div>
           )}
@@ -2084,7 +2084,7 @@ export default function PreparaMinuta() {
               Minutas
               {minutas.length > 0 && (
                 <span className="text-[10px] text-slate-400 font-medium ml-1">
-                  ({minutas.length} {minutas.length === 1 ? 'versao' : 'versoes'})
+                  ({minutas.length} {minutas.length === 1 ? 'versão' : 'versões'})
                 </span>
               )}
             </h2>
@@ -2094,7 +2094,7 @@ export default function PreparaMinuta() {
                 text-[11px] font-bold hover:bg-indigo-700 transition-all shadow-sm"
             >
               {showForm ? <Check size={12} /> : <Plus size={12} />}
-              {showForm ? 'Fechar Formulario' : 'Adicionar Minuta'}
+              {showForm ? 'Fechar Formulário' : 'Adicionar Minuta'}
             </button>
           </div>
 
@@ -2170,11 +2170,11 @@ export default function PreparaMinuta() {
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="sm:col-span-2">
-                  <label className={labelClass}>Titulo *</label>
+                  <label className={labelClass}>Título *</label>
                   <input
                     value={titulo}
                     onChange={e => setTitulo(e.target.value)}
-                    placeholder="Ex: Minuta de Contrato de Prestacao de Servico"
+                    placeholder="Ex: Minuta de Contrato de Prestação de Serviço"
                     className={inputClass}
                   />
                 </div>
@@ -2199,11 +2199,11 @@ export default function PreparaMinuta() {
                   />
                 </div>
                 <div className="sm:col-span-2">
-                  <label className={labelClass}>Descricao</label>
+                  <label className={labelClass}>Descrição</label>
                   <textarea
                     value={descricao}
                     onChange={e => setDescricao(e.target.value)}
-                    placeholder="Observacoes sobre esta versao da minuta..."
+                    placeholder="Observações sobre esta versão da minuta..."
                     rows={2}
                     className={`${inputClass} resize-none`}
                   />
@@ -2252,7 +2252,7 @@ export default function PreparaMinuta() {
               </div>
               <p className="text-sm font-semibold text-slate-500">Nenhuma minuta registrada</p>
               <p className="text-xs text-slate-400 mt-1">
-                Adicione a primeira versao da minuta contratual
+                Adicione a primeira versão da minuta contratual
               </p>
               {!showForm && (
                 <button
@@ -2289,7 +2289,7 @@ export default function PreparaMinuta() {
             </div>
           )}
 
-          {/* Regras de Analise IA */}
+          {/* Regras de Análise IA */}
           {regras.length > 0 && (
             <RegrasConfig regras={regras} onUpdate={handleUpdateConfig} />
           )}

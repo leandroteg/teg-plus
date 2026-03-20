@@ -15,7 +15,7 @@ const fmtData = (d: string) =>
 
 const STATUS_CFG: Record<StatusMedicao, { label: string; dot: string; bg: string; bgDark: string; text: string; textDark: string }> = {
   rascunho:     { label: 'Rascunho',      dot: 'bg-gray-400',    bg: 'bg-gray-100',    bgDark: 'bg-gray-500/15',    text: 'text-gray-600',    textDark: 'text-gray-400'    },
-  em_aprovacao: { label: 'Em Aprovacao',   dot: 'bg-amber-400',   bg: 'bg-amber-50',    bgDark: 'bg-amber-500/15',   text: 'text-amber-700',   textDark: 'text-amber-400'   },
+  em_aprovacao: { label: 'Em Aprovação',   dot: 'bg-amber-400',   bg: 'bg-amber-50',    bgDark: 'bg-amber-500/15',   text: 'text-amber-700',   textDark: 'text-amber-400'   },
   aprovado:     { label: 'Aprovado',       dot: 'bg-emerald-500', bg: 'bg-emerald-50',  bgDark: 'bg-emerald-500/15', text: 'text-emerald-700', textDark: 'text-emerald-400' },
   rejeitado:    { label: 'Rejeitado',      dot: 'bg-red-400',     bg: 'bg-red-50',      bgDark: 'bg-red-500/15',     text: 'text-red-600',     textDark: 'text-red-400'     },
   faturado:     { label: 'Faturado',       dot: 'bg-blue-400',    bg: 'bg-blue-50',     bgDark: 'bg-blue-500/15',    text: 'text-blue-700',    textDark: 'text-blue-400'    },
@@ -24,7 +24,7 @@ const STATUS_CFG: Record<StatusMedicao, { label: string; dot: string; bg: string
 const FILTROS_STATUS = [
   { label: 'Todos',          value: '' },
   { label: 'Rascunho',       value: 'rascunho' },
-  { label: 'Em Aprovacao',   value: 'em_aprovacao' },
+  { label: 'Em Aprovação',   value: 'em_aprovacao' },
   { label: 'Aprovados',      value: 'aprovado' },
   { label: 'Faturados',      value: 'faturado' },
 ]
@@ -79,11 +79,11 @@ export default function MedicoesPage() {
       },
       {
         onSuccess: () => {
-          setToast({ type: 'success', msg: `Medicao ${status === 'aprovado' ? 'aprovada' : status === 'rejeitado' ? 'rejeitada' : 'atualizada'} com sucesso` })
+          setToast({ type: 'success', msg: `Medição ${status === 'aprovado' ? 'aprovada' : status === 'rejeitado' ? 'rejeitada' : 'atualizada'} com sucesso` })
           setTimeout(() => setToast(null), 4000)
         },
         onError: () => {
-          setToast({ type: 'error', msg: 'Erro ao atualizar medicao' })
+          setToast({ type: 'error', msg: 'Erro ao atualizar medição' })
           setTimeout(() => setToast(null), 5000)
         },
       }
@@ -112,17 +112,17 @@ export default function MedicoesPage() {
       <div>
         <h1 className={`text-xl font-extrabold flex items-center gap-2 ${isLight ? 'text-slate-800' : 'text-white'}`}>
           <Receipt size={20} className="text-indigo-500" />
-          Medicoes
+          Medições
         </h1>
         <p className={`text-xs mt-0.5 ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>
-          Boletins de medicao de contratos
+          Boletins de medição de contratos
         </p>
       </div>
 
       {/* Summary Cards */}
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
         <div className={cardCls + ' p-4'}>
-          <p className={`text-[10px] font-semibold uppercase tracking-widest ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>Total Medicoes</p>
+          <p className={`text-[10px] font-semibold uppercase tracking-widest ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>Total Medições</p>
           <p className={`text-lg font-extrabold mt-1 ${isLight ? 'text-slate-800' : 'text-white'}`}>{filtered.length}</p>
         </div>
         <div className={cardCls + ' p-4'}>
@@ -192,8 +192,8 @@ export default function MedicoesPage() {
           <div className={`w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4 ${isLight ? 'bg-indigo-50' : 'bg-indigo-500/10'}`}>
             <Receipt size={28} className={isLight ? 'text-indigo-300' : 'text-indigo-400/50'} />
           </div>
-          <p className={`text-sm font-semibold ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>Nenhuma medicao encontrada</p>
-          <p className={`text-xs mt-1 ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>As medicoes aparecerao aqui quando forem criadas</p>
+          <p className={`text-sm font-semibold ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>Nenhuma medição encontrada</p>
+          <p className={`text-xs mt-1 ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>As medições aparecerão aqui quando forem criadas</p>
         </div>
       ) : (
         <div className={`${cardCls} overflow-hidden`}>
@@ -268,7 +268,7 @@ export default function MedicoesPage() {
                           <button
                             onClick={() => handleStatusChange(m.id, 'em_aprovacao')}
                             disabled={atualizarMedicao.isPending}
-                            title="Enviar para aprovacao"
+                            title="Enviar para aprovação"
                             className={`px-2 py-1 rounded-lg text-[10px] font-semibold transition-all disabled:opacity-50
                               ${isLight
                                 ? 'bg-amber-50 text-amber-600 hover:bg-amber-100'

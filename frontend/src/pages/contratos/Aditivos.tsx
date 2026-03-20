@@ -10,7 +10,7 @@ const fmt = (v: number) =>
 
 const STATUS_CFG: Record<StatusAditivo, { label: string; dot: string; bg: string; bgDark: string; text: string; textDark: string }> = {
   rascunho:     { label: 'Rascunho',      dot: 'bg-gray-400',    bg: 'bg-gray-100',    bgDark: 'bg-gray-500/15',    text: 'text-gray-600',    textDark: 'text-gray-400'    },
-  em_aprovacao: { label: 'Em Aprovacao',   dot: 'bg-amber-400',   bg: 'bg-amber-50',    bgDark: 'bg-amber-500/15',   text: 'text-amber-700',   textDark: 'text-amber-400'   },
+  em_aprovacao: { label: 'Em Aprovação',   dot: 'bg-amber-400',   bg: 'bg-amber-50',    bgDark: 'bg-amber-500/15',   text: 'text-amber-700',   textDark: 'text-amber-400'   },
   aprovado:     { label: 'Aprovado',       dot: 'bg-emerald-500', bg: 'bg-emerald-50',  bgDark: 'bg-emerald-500/15', text: 'text-emerald-700', textDark: 'text-emerald-400' },
   rejeitado:    { label: 'Rejeitado',      dot: 'bg-red-400',     bg: 'bg-red-50',      bgDark: 'bg-red-500/15',     text: 'text-red-600',     textDark: 'text-red-400'     },
 }
@@ -25,7 +25,7 @@ const TIPO_CFG: Record<TipoAditivo, { label: string; bg: string; bgDark: string;
 const FILTROS_STATUS = [
   { label: 'Todos',          value: '' },
   { label: 'Rascunho',       value: 'rascunho' },
-  { label: 'Em Aprovacao',   value: 'em_aprovacao' },
+  { label: 'Em Aprovação',   value: 'em_aprovacao' },
   { label: 'Aprovados',      value: 'aprovado' },
   { label: 'Rejeitados',     value: 'rejeitado' },
 ]
@@ -192,7 +192,7 @@ export default function AditivosPage() {
             <FileSignature size={28} className={isLight ? 'text-indigo-300' : 'text-indigo-400/50'} />
           </div>
           <p className={`text-sm font-semibold ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>Nenhum aditivo encontrado</p>
-          <p className={`text-xs mt-1 ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>Os aditivos aparecerao aqui quando forem registrados</p>
+          <p className={`text-xs mt-1 ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>Os aditivos aparecerão aqui quando forem registrados</p>
         </div>
       ) : (
         <div className={`${cardCls} overflow-hidden`}>
@@ -267,7 +267,7 @@ export default function AditivosPage() {
                           <button
                             onClick={() => handleStatusChange(a.id, 'em_aprovacao')}
                             disabled={atualizarAditivo.isPending}
-                            title="Enviar para aprovacao"
+                            title="Enviar para aprovação"
                             className={`px-2 py-1 rounded-lg text-[10px] font-semibold transition-all disabled:opacity-50
                               ${isLight
                                 ? 'bg-amber-50 text-amber-600 hover:bg-amber-100'

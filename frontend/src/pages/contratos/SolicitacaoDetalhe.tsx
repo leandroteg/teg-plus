@@ -39,24 +39,24 @@ const fmtDataHora = (d: string) =>
 // ── Constants ───────────────────────────────────────────────────────────────────
 
 const ETAPAS_FLOW: { key: EtapaSolicitacao; label: string; icon: typeof FileText }[] = [
-  { key: 'solicitacao',         label: 'Solicitacao',         icon: FileText },
+  { key: 'solicitacao',         label: 'Solicitação',         icon: FileText },
   { key: 'preparar_minuta',     label: 'Preparar Minuta',     icon: Pencil },
   { key: 'resumo_executivo',    label: 'Resumo Executivo',    icon: Eye },
-  { key: 'aprovacao_diretoria', label: 'Aprovacao Diretoria', icon: ShieldCheck },
+  { key: 'aprovacao_diretoria', label: 'Aprovação Diretoria', icon: ShieldCheck },
   { key: 'enviar_assinatura',   label: 'Enviar Assinatura',   icon: Send },
   { key: 'arquivar',            label: 'Arquivar',            icon: Archive },
-  { key: 'liberar_execucao',    label: 'Liberar Execucao',    icon: Unlock },
+  { key: 'liberar_execucao',    label: 'Liberar Execução',    icon: Unlock },
 ]
 
 const ETAPA_LABEL: Record<string, string> = {
-  solicitacao:         'Solicitacao',
+  solicitacao:         'Solicitação',
   preparar_minuta:     'Preparar Minuta',
   resumo_executivo:    'Resumo Executivo',
-  aprovacao_diretoria: 'Aprovacao Diretoria',
+  aprovacao_diretoria: 'Aprovação Diretoria',
   enviar_assinatura:   'Enviar Assinatura',
   arquivar:            'Arquivar',
-  liberar_execucao:    'Liberar Execucao',
-  concluido:           'Concluido',
+  liberar_execucao:    'Liberar Execução',
+  concluido:           'Concluído',
   cancelado:           'Cancelado',
 }
 
@@ -72,12 +72,12 @@ const TIPO_LABEL: Record<string, string> = {
 }
 
 const CATEGORIA_LABEL: Record<string, string> = {
-  prestacao_servico: 'Prestacao de Servico',
+  prestacao_servico: 'Prestação de Serviço',
   fornecimento:      'Fornecimento',
-  locacao:           'Locacao',
+  locacao:           'Locação',
   empreitada:        'Empreitada',
   consultoria:       'Consultoria',
-  pj_pessoa_fisica:  'PJ - Pessoa Fisica',
+  pj_pessoa_fisica:  'PJ - Pessoa Física',
   outro:             'Outro',
 }
 
@@ -185,7 +185,7 @@ function VerticalStepper({ etapaAtual }: { etapaAtual: EtapaSolicitacao }) {
           </div>
           <div className="pt-1.5">
             <p className={`text-xs font-bold ${isConcluido ? 'text-emerald-700' : 'text-red-600'}`}>
-              {isConcluido ? 'Concluido' : 'Cancelado'}
+              {isConcluido ? 'Concluído' : 'Cancelado'}
             </p>
           </div>
         </div>
@@ -212,8 +212,8 @@ function CancelModal({ open, onClose, onConfirm, isPending }: {
             <AlertTriangle size={18} className="text-red-500" />
           </div>
           <div>
-            <h3 className="text-base font-extrabold text-slate-800">Cancelar Solicitacao</h3>
-            <p className="text-xs text-slate-400">Esta acao nao pode ser desfeita.</p>
+            <h3 className="text-base font-extrabold text-slate-800">Cancelar Solicitação</h3>
+            <p className="text-xs text-slate-400">Esta ação não pode ser desfeita.</p>
           </div>
         </div>
         <div>
@@ -285,9 +285,9 @@ function CertisignModal({ open, onClose, solicitacao, minutaUrl, onSuccess }: {
 
   const handleSubmit = async () => {
     setErro(null)
-    if (!minutaUrl) { setErro('Nenhuma minuta disponivel para envio.'); return }
+    if (!minutaUrl) { setErro('Nenhuma minuta disponível para envio.'); return }
     const invalidos = signatarios.filter(s => !s.nome || !s.email || !s.cpf)
-    if (invalidos.length) { setErro('Preencha nome, e-mail e CPF de todos os signatarios.'); return }
+    if (invalidos.length) { setErro('Preencha nome, e-mail e CPF de todos os signatários.'); return }
     try {
       await enviar.mutateAsync({
         solicitacao_id: solicitacao.id,
@@ -708,7 +708,7 @@ function EtapaActions({ etapa, solicitacaoId, onAvancar, onCancel, onEnviarAssin
 
   const cancelBtn = (
     <button onClick={onCancel} className={`${btnSecondary} border-red-200 text-red-600 hover:bg-red-50`}>
-      <Ban size={12} /> Cancelar Solicitacao
+      <Ban size={12} /> Cancelar Solicitação
     </button>
   )
 
@@ -722,7 +722,7 @@ function EtapaActions({ etapa, solicitacaoId, onAvancar, onCancel, onEnviarAssin
             className={`${btnPrimary} bg-indigo-600 text-white hover:bg-indigo-700 shadow-sm`}
           >
             {isPending ? spinner : <Send size={13} />}
-            Enviar para Preparacao de Minuta
+            Enviar para Preparação de Minuta
           </button>
           {cancelBtn}
         </>
@@ -743,7 +743,7 @@ function EtapaActions({ etapa, solicitacaoId, onAvancar, onCancel, onEnviarAssin
             className={`${btnSecondary} border-slate-200 text-slate-600 hover:bg-slate-50`}
           >
             {isPending ? spinnerDark : <ArrowLeft size={12} />}
-            Voltar para Solicitacao
+            Voltar para Solicitação
           </button>
           {cancelBtn}
         </>
@@ -774,7 +774,7 @@ function EtapaActions({ etapa, solicitacaoId, onAvancar, onCancel, onEnviarAssin
       return (
         <>
           <button disabled className={`${btnPrimary} bg-amber-100 text-amber-700 cursor-not-allowed`}>
-            <Clock size={13} /> Aguardando Aprovacao...
+            <Clock size={13} /> Aguardando Aprovação...
           </button>
           {cancelBtn}
         </>
@@ -833,7 +833,7 @@ function EtapaActions({ etapa, solicitacaoId, onAvancar, onCancel, onEnviarAssin
             className={`${btnPrimary} bg-emerald-600 text-white hover:bg-emerald-700 shadow-sm`}
           >
             {isPending ? spinner : <Unlock size={13} />}
-            Liberar Execucao
+            Liberar Execução
           </button>
           {cancelBtn}
         </>
@@ -905,7 +905,7 @@ export default function SolicitacaoDetalhe() {
         <div className="w-16 h-16 rounded-2xl bg-slate-100 flex items-center justify-center mx-auto mb-4">
           <FileText size={28} className="text-slate-300" />
         </div>
-        <p className="text-sm font-semibold text-slate-500">Solicitacao nao encontrada</p>
+        <p className="text-sm font-semibold text-slate-500">Solicitação não encontrada</p>
         <button
           onClick={() => nav('/contratos/solicitacoes')}
           className="mt-4 px-4 py-2 rounded-xl bg-indigo-600 text-white text-xs font-bold
@@ -978,12 +978,12 @@ export default function SolicitacaoDetalhe() {
     const diferenca = calcularDiferencaParcelas(parcelasNormalizadas, valorContrato)
 
     if (!parcelasNormalizadas.length) {
-      setExecucaoErro('Adicione pelo menos uma parcela antes de liberar a execucao.')
+      setExecucaoErro('Adicione pelo menos uma parcela antes de liberar a execução.')
       return
     }
 
     if (Math.abs(diferenca) > 0.05) {
-      setExecucaoErro('O total das parcelas precisa fechar com o valor do contrato antes de liberar a execucao.')
+      setExecucaoErro('O total das parcelas precisa fechar com o valor do contrato antes de liberar a execução.')
       return
     }
 
@@ -1040,7 +1040,7 @@ export default function SolicitacaoDetalhe() {
               <div className="w-7 h-7 rounded-lg bg-indigo-50 flex items-center justify-center">
                 <Info size={13} className="text-indigo-600" />
               </div>
-              <h2 className="text-sm font-extrabold text-slate-800">Dados da Solicitacao</h2>
+              <h2 className="text-sm font-extrabold text-slate-800">Dados da Solicitação</h2>
             </div>
             <div className="px-5 py-3">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6">
@@ -1056,11 +1056,11 @@ export default function SolicitacaoDetalhe() {
                 <InfoItem label="Categoria" value={CATEGORIA_LABEL[s.categoria_contrato] ?? s.categoria_contrato} icon={Tag} />
                 <InfoItem label="Valor Estimado" value={s.valor_estimado ? fmt(s.valor_estimado) : undefined} icon={DollarSign} />
                 <InfoItem label="Forma de Pagamento" value={s.forma_pagamento} icon={DollarSign} />
-                <InfoItem label="Vigencia" value={vigencia} icon={Calendar} />
+                <InfoItem label="Vigência" value={vigencia} icon={Calendar} />
                 <InfoItem label="Prazo (meses)" value={s.prazo_meses ? `${s.prazo_meses} meses` : undefined} icon={Clock} />
                 <InfoItem label="Centro de Custo" value={s.centro_custo} icon={Briefcase} />
                 <InfoItem label="Classe Financeira" value={s.classe_financeira} icon={Tag} />
-                <InfoItem label="Indice Reajuste" value={s.indice_reajuste} icon={Tag} />
+                <InfoItem label="Índice Reajuste" value={s.indice_reajuste} icon={Tag} />
                 <InfoItem label="Data Necessidade" value={s.data_necessidade ? fmtData(s.data_necessidade) : undefined} icon={Calendar} />
                 <InfoItem label="Responsavel" value={s.responsavel_nome} icon={User} />
               </div>
@@ -1188,7 +1188,7 @@ export default function SolicitacaoDetalhe() {
                       {avancarEtapa.isPending
                         ? <div className="w-3.5 h-3.5 border-2 border-white/40 border-t-white rounded-full animate-spin" />
                         : <Unlock size={13} />}
-                      Liberar Execucao
+                      Liberar Execução
                     </button>
                     {execucaoErro && (
                       <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2">
@@ -1199,7 +1199,7 @@ export default function SolicitacaoDetalhe() {
                       onClick={() => setShowCancelModal(true)}
                       className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-semibold border border-red-200 text-red-600 hover:bg-red-50 transition-all"
                     >
-                      <Ban size={12} /> Cancelar Solicitacao
+                      <Ban size={12} /> Cancelar Solicitação
                     </button>
                   </>
                 ) : (
@@ -1222,7 +1222,7 @@ export default function SolicitacaoDetalhe() {
           {etapa === 'concluido' && (
             <div className="bg-emerald-50 rounded-2xl border border-emerald-200 px-5 py-5 text-center">
               <CheckCircle2 size={28} className="text-emerald-500 mx-auto mb-2" />
-              <p className="text-sm font-extrabold text-emerald-700">Solicitacao Concluida</p>
+              <p className="text-sm font-extrabold text-emerald-700">Solicitação Concluída</p>
               <p className="text-[10px] text-emerald-500 mt-1">Processo finalizado com sucesso</p>
             </div>
           )}
@@ -1231,7 +1231,7 @@ export default function SolicitacaoDetalhe() {
           {etapa === 'cancelado' && (
             <div className="bg-red-50 rounded-2xl border border-red-200 px-5 py-5 text-center">
               <XCircle size={28} className="text-red-500 mx-auto mb-2" />
-              <p className="text-sm font-extrabold text-red-700">Solicitacao Cancelada</p>
+              <p className="text-sm font-extrabold text-red-700">Solicitação Cancelada</p>
               {s.motivo_cancelamento && (
                 <p className="text-xs text-red-600 mt-2 leading-relaxed">{s.motivo_cancelamento}</p>
               )}
@@ -1242,12 +1242,12 @@ export default function SolicitacaoDetalhe() {
           <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
             <div className="px-5 py-4 border-b border-slate-100">
               <h2 className="text-sm font-extrabold text-slate-800 flex items-center gap-2">
-                <Clock size={14} className="text-slate-400" /> Historico
+                <Clock size={14} className="text-slate-400" /> Histórico
               </h2>
             </div>
             <div className="px-5 py-3">
               {historicoSorted.length === 0 ? (
-                <p className="text-xs text-slate-400 text-center py-4">Nenhuma transicao registrada</p>
+                <p className="text-xs text-slate-400 text-center py-4">Nenhuma transição registrada</p>
               ) : (
                 <div className="space-y-0">
                   {historicoSorted.map((h, idx) => (

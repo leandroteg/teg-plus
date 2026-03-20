@@ -92,7 +92,7 @@ function ResumoView({ resumo }: { resumo: TResumo }) {
             )}
             {resumo.vigencia && (
               <span className="rounded-full bg-slate-100 px-3 py-1 text-[11px] font-semibold text-slate-600">
-                Vigencia: {resumo.vigencia}
+                Vigência: {resumo.vigencia}
               </span>
             )}
           </div>
@@ -241,9 +241,9 @@ export default function ResumoExecutivoPage() {
 
   const validate = () => {
     setFormError('')
-    if (!titulo.trim()) return setFormError('Nao foi possivel montar o titulo do resumo'), false
-    if (!partesEnvolvidas.trim()) return setFormError('Nao foi possivel identificar as partes envolvidas'), false
-    if (!objetoResumo.trim()) return setFormError('Nao foi possivel identificar o objeto do contrato'), false
+    if (!titulo.trim()) return setFormError('Não foi possível montar o título do resumo'), false
+    if (!partesEnvolvidas.trim()) return setFormError('Não foi possível identificar as partes envolvidas'), false
+    if (!objetoResumo.trim()) return setFormError('Não foi possível identificar o objeto do contrato'), false
     if (!recomendacao.trim()) return setFormError('Informe o resumo executivo'), false
     return true
   }
@@ -360,7 +360,7 @@ export default function ResumoExecutivoPage() {
           solicitacaoId: solicitacao.id,
           etapaDe: 'resumo_executivo',
           etapaPara: 'aprovacao_diretoria',
-          observacao: 'Resumo executivo enviado para aprovacao da diretoria',
+          observacao: 'Resumo executivo enviado para aprovação da diretoria',
         })
       }
 
@@ -394,7 +394,7 @@ export default function ResumoExecutivoPage() {
         <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-slate-100">
           <FileText size={28} className="text-slate-300" />
         </div>
-        <p className="text-sm font-semibold text-slate-500">Solicitacao nao encontrada</p>
+        <p className="text-sm font-semibold text-slate-500">Solicitação não encontrada</p>
       </div>
     )
   }
@@ -424,7 +424,7 @@ export default function ResumoExecutivoPage() {
           </h1>
           <p className="mt-0.5 text-xs text-slate-400">
             {showViewMode
-              ? 'Visualizacao do resumo executivo'
+              ? 'Visualização do resumo executivo'
               : 'Resumo executivo para aprovação da diretoria'}
           </p>
         </div>
@@ -443,7 +443,7 @@ export default function ResumoExecutivoPage() {
                 <div>
                   <h3 className="text-sm font-extrabold text-slate-800">Gerar Resumo com IA</h3>
                   <p className="mt-0.5 text-[10px] text-slate-500">
-                    O rascunho e gerado automaticamente ao abrir a etapa. Use este botao apenas para regenerar.
+                    O rascunho é gerado automaticamente ao abrir a etapa. Use este botão apenas para regenerar.
                   </p>
                 </div>
               </div>
@@ -477,7 +477,7 @@ export default function ResumoExecutivoPage() {
             {gerarResumoAI.isError && (
               <div className="mt-3 flex items-center gap-2 rounded-lg bg-red-50 px-3 py-1.5 text-[10px] font-semibold text-red-700">
                 <AlertTriangle size={12} />
-                Nao foi possivel gerar com IA. O sistema usa fallback automatico.
+                Não foi possível gerar com IA. O sistema usa fallback automático.
               </div>
             )}
           </div>
@@ -489,13 +489,13 @@ export default function ResumoExecutivoPage() {
             </h2>
 
             <div className="grid gap-4 sm:grid-cols-2">
-              <ContextCard label="Titulo" value={titulo || 'Resumo Executivo'} />
-              <ContextCard label="Partes Envolvidas" value={partesEnvolvidas || 'Aguardando geracao automatica'} />
+              <ContextCard label="Título" value={titulo || 'Resumo Executivo'} />
+              <ContextCard label="Partes Envolvidas" value={partesEnvolvidas || 'Aguardando geração automática'} />
               <div className="sm:col-span-2">
-                <ContextCard label="Objeto" value={objetoResumo || 'Aguardando geracao automatica'} />
+                <ContextCard label="Objeto" value={objetoResumo || 'Aguardando geração automática'} />
               </div>
-              <ContextCard label="Valor Total" value={valorTotal ? fmt(Number(valorTotal)) : 'Nao informado'} />
-              <ContextCard label="Vigencia" value={vigencia || 'Nao informada'} />
+              <ContextCard label="Valor Total" value={valorTotal ? fmt(Number(valorTotal)) : 'Não informado'} />
+              <ContextCard label="Vigência" value={vigencia || 'Não informada'} />
             </div>
           </div>
 

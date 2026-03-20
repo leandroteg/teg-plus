@@ -50,7 +50,7 @@ const STATUS_CONTRATO: Record<string, { label: string; dot: string; bg: string; 
 
 const STATUS_ADITIVO: Record<StatusAditivo, { label: string; dot: string; bg: string; text: string }> = {
   rascunho:     { label: 'Rascunho',      dot: 'bg-gray-400',    bg: 'bg-gray-100',   text: 'text-gray-600' },
-  em_aprovacao: { label: 'Em Aprovacao',   dot: 'bg-amber-400',   bg: 'bg-amber-50',   text: 'text-amber-700' },
+  em_aprovacao: { label: 'Em Aprovação',   dot: 'bg-amber-400',   bg: 'bg-amber-50',   text: 'text-amber-700' },
   aprovado:     { label: 'Aprovado',       dot: 'bg-emerald-500', bg: 'bg-emerald-50', text: 'text-emerald-700' },
   rejeitado:    { label: 'Rejeitado',      dot: 'bg-red-400',     bg: 'bg-red-50',     text: 'text-red-600' },
 }
@@ -467,7 +467,7 @@ function TabAditivos() {
 
   const FILTROS = [
     { label: 'Todos', value: '' }, { label: 'Rascunho', value: 'rascunho' },
-    { label: 'Em Aprovacao', value: 'em_aprovacao' }, { label: 'Aprovados', value: 'aprovado' },
+    { label: 'Em Aprovação', value: 'em_aprovacao' }, { label: 'Aprovados', value: 'aprovado' },
     { label: 'Rejeitados', value: 'rejeitado' },
   ]
 
@@ -626,7 +626,7 @@ function TabReajustes() {
       <div className="relative">
         <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
         <input value={busca} onChange={e => setBusca(e.target.value)}
-          placeholder="Buscar indice, contrato..."
+          placeholder="Buscar índice, contrato..."
           className="w-full pl-9 pr-4 py-2.5 rounded-xl border border-slate-200 bg-white text-sm
             placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/30" />
       </div>
@@ -1075,7 +1075,7 @@ export default function GestaoContratos() {
       <div>
         <h1 className="text-xl font-extrabold text-slate-800 flex items-center gap-2">
           <Briefcase size={20} className="text-indigo-500" />
-          Gestao de Contratos
+          Gestão de Contratos
         </h1>
         <p className="text-xs text-slate-400 mt-0.5">
           Contratos ativos, aditivos, reajustes e vencimentos

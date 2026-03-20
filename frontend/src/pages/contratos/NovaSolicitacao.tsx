@@ -43,13 +43,13 @@ interface CnpjResult {
 const TIPO_SOLICITACAO_OPTIONS: { value: TipoSolicitacao; label: string; desc: string }[] = [
   { value: 'novo_contrato',     label: 'Novo Contrato',   desc: 'Contrato inicial, sem vínculo anterior' },
   { value: 'aditivo_contratual', label: 'Aditivo',         desc: 'Aditivo de prazo, valor ou escopo' },
-  { value: 'distrato_rescisao', label: 'Distrato/Rescisao', desc: 'Encerramento ou rescisao contratual' },
+  { value: 'distrato_rescisao', label: 'Distrato/Rescisão', desc: 'Encerramento ou rescisão contratual' },
 ]
 
 const TIPO_CONTRAPARTE_OPTIONS: { value: TipoContraparte; label: string; desc: string }[] = [
-  { value: 'fornecedor', label: 'Fornecedor', desc: 'Prestador de servico ou fornecedor de materiais' },
-  { value: 'cliente',    label: 'Cliente',     desc: 'Cliente contratante de servicos da TEG' },
-  { value: 'pj',         label: 'PJ',          desc: 'Pessoa juridica / prestador PJ' },
+  { value: 'fornecedor', label: 'Fornecedor', desc: 'Prestador de serviço ou fornecedor de materiais' },
+  { value: 'cliente',    label: 'Cliente',     desc: 'Cliente contratante de serviços da TEG' },
+  { value: 'pj',         label: 'PJ',          desc: 'Pessoa jurídica / prestador PJ' },
 ]
 
 const TIPO_CONTRATO_OPTIONS: { value: TipoContratoV2; label: string }[] = [
@@ -59,38 +59,38 @@ const TIPO_CONTRATO_OPTIONS: { value: TipoContratoV2; label: string }[] = [
 ]
 
 const CATEGORIA_OPTIONS: { value: CategoriaContrato; label: string }[] = [
-  { value: 'alimentacao_restaurante',  label: 'Alimentacao / Restaurante' },
-  { value: 'aquisicao_equipamentos',   label: 'Aquisicao de Equipamentos' },
-  { value: 'aquisicao_ferramental',    label: 'Aquisicao de Ferramental' },
-  { value: 'aquisicao_imovel',         label: 'Aquisicao de Imovel' },
-  { value: 'aquisicao_veiculos',       label: 'Aquisicao de Veiculos' },
+  { value: 'alimentacao_restaurante',  label: 'Alimentação / Restaurante' },
+  { value: 'aquisicao_equipamentos',   label: 'Aquisição de Equipamentos' },
+  { value: 'aquisicao_ferramental',    label: 'Aquisição de Ferramental' },
+  { value: 'aquisicao_imovel',         label: 'Aquisição de Imóvel' },
+  { value: 'aquisicao_veiculos',       label: 'Aquisição de Veículos' },
   { value: 'arrendamento_comodato',    label: 'Arrendamento / Comodato' },
   { value: 'contabilidade',            label: 'Contabilidade' },
   { value: 'frete_transportes',        label: 'Frete / Transportes' },
   { value: 'hospedagem',               label: 'Hospedagem' },
   { value: 'internet_telefonia',       label: 'Internet e Telefonia' },
-  { value: 'juridico_advocacia',       label: 'Juridico / Advocacia' },
-  { value: 'locacao_equipamentos',     label: 'Locacao de Equipamentos' },
-  { value: 'locacao_ferramental',      label: 'Locacao de Ferramental' },
-  { value: 'locacao_imovel_alojamento', label: 'Locacao de Imovel - Alojamento' },
-  { value: 'locacao_imovel_canteiro',  label: 'Locacao de Imovel - Canteiro de Obras' },
-  { value: 'locacao_imovel_deposito',  label: 'Locacao de Imovel - Deposito' },
-  { value: 'locacao_veiculos',         label: 'Locacao de Veiculos' },
-  { value: 'prestacao_servico',        label: 'Prestacao de Servicos - Terceiros' },
+  { value: 'juridico_advocacia',       label: 'Jurídico / Advocacia' },
+  { value: 'locacao_equipamentos',     label: 'Locação de Equipamentos' },
+  { value: 'locacao_ferramental',      label: 'Locação de Ferramental' },
+  { value: 'locacao_imovel_alojamento', label: 'Locação de Imóvel - Alojamento' },
+  { value: 'locacao_imovel_canteiro',  label: 'Locação de Imóvel - Canteiro de Obras' },
+  { value: 'locacao_imovel_deposito',  label: 'Locação de Imóvel - Depósito' },
+  { value: 'locacao_veiculos',         label: 'Locação de Veículos' },
+  { value: 'prestacao_servico',        label: 'Prestação de Serviços - Terceiros' },
   { value: 'seguros',                  label: 'Seguros' },
-  { value: 'servicos_medicos',         label: 'Servicos Medicos' },
+  { value: 'servicos_medicos',         label: 'Serviços Médicos' },
   { value: 'software_ti',             label: 'Software e TI' },
-  { value: 'subcontratacao',          label: 'Subcontratacao de Empresas' },
-  { value: 'vigilancia_monitoramento', label: 'Vigilancia e Monitoramento' },
+  { value: 'subcontratacao',          label: 'Subcontratação de Empresas' },
+  { value: 'vigilancia_monitoramento', label: 'Vigilância e Monitoramento' },
   { value: 'empreitada',              label: 'Empreitada' },
   { value: 'consultoria',             label: 'Consultoria' },
-  { value: 'pj_pessoa_fisica',        label: 'PJ Pessoa Fisica' },
+  { value: 'pj_pessoa_fisica',        label: 'PJ Pessoa Física' },
   { value: 'outro',                   label: 'Outro' },
 ]
 
 const URGENCIA_OPTIONS: { value: UrgenciaSolicitacao; label: string; color: string; prazo: string }[] = [
-  { value: 'critica', label: 'Urgente',     color: 'border-red-500 bg-red-50 text-red-700',       prazo: 'ate 7 dias' },
-  { value: 'alta',    label: 'Prioritario', color: 'border-orange-500 bg-orange-50 text-orange-700', prazo: 'ate 15 dias' },
+  { value: 'critica', label: 'Urgente',     color: 'border-red-500 bg-red-50 text-red-700',       prazo: 'até 7 dias' },
+  { value: 'alta',    label: 'Prioritário', color: 'border-orange-500 bg-orange-50 text-orange-700', prazo: 'até 15 dias' },
   { value: 'normal',  label: 'Normal',      color: 'border-slate-400 bg-slate-50 text-slate-700',   prazo: '30 dias' },
   { value: 'baixa',   label: 'Baixa',       color: 'border-green-500 bg-green-50 text-green-700',   prazo: 'sem prazo' },
 ]
@@ -107,14 +107,14 @@ const INDICE_REAJUSTE_OPTIONS = [
 
 const SIM_NAO_OPTIONS = [
   { value: 'sim', label: 'Sim' },
-  { value: 'nao', label: 'Nao' },
-  { value: 'nao_sei', label: 'Nao sei informar' },
+  { value: 'nao', label: 'Não' },
+  { value: 'nao_sei', label: 'Não sei informar' },
 ]
 
 const STEPS = [
-  { num: 1, label: 'Identificacao',            icon: User },
-  { num: 2, label: 'Dados da Solicitacao',     icon: FileText },
-  { num: 3, label: 'Vigencia e Classificacao', icon: Settings2 },
+  { num: 1, label: 'Identificação',            icon: User },
+  { num: 2, label: 'Dados da Solicitação',     icon: FileText },
+  { num: 3, label: 'Vigência e Classificação', icon: Settings2 },
 ]
 
 // ── BRL Format helpers ───────────────────────────────────────────────────────
@@ -217,13 +217,13 @@ export default function NovaSolicitacao() {
   const [erro, setErro] = useState('')
   const [touched, setTouched] = useState(false)
 
-  // Step 1 — Identificacao do Solicitante
+  // Step 1 — Identificação do Solicitante
   const [solicitanteNome, setSolicitanteNome] = useState(perfil?.nome ?? '')
   const [departamento, setDepartamento] = useState(perfil?.departamento ?? '')
   const [emailCorporativo] = useState(perfil?.email ?? '')
   // obraId removido
 
-  // Step 2 — Dados da Solicitacao
+  // Step 2 — Dados da Solicitação
   const [tipoSolicitacao, setTipoSolicitacao] = useState<TipoSolicitacao>('novo_contrato')
   const [tipoContraparte, setTipoContraparte] = useState<TipoContraparte>('fornecedor')
   const [contraparteNome, setContraparteNome] = useState('')
@@ -291,7 +291,7 @@ export default function NovaSolicitacao() {
     try {
       const result: CnpjResult = await api.consultarCNPJ(digits)
       if (result.error) {
-        setCnpjStatus({ ok: false, msg: result.message || 'CNPJ nao encontrado' })
+        setCnpjStatus({ ok: false, msg: result.message || 'CNPJ não encontrado' })
       } else {
         setCnpjStatus({ ok: true, msg: result.situacao || 'Ativa' })
         // Auto-fill fields (only if empty)
@@ -461,8 +461,8 @@ export default function NovaSolicitacao() {
           <ArrowLeft size={16} />
         </button>
         <div>
-          <h1 className="text-xl font-extrabold text-slate-800">Nova Solicitacao de Contrato</h1>
-          <p className="text-xs text-slate-400 mt-0.5">Preencha os dados para iniciar o fluxo de contratacao</p>
+          <h1 className="text-xl font-extrabold text-slate-800">Nova Solicitação de Contrato</h1>
+          <p className="text-xs text-slate-400 mt-0.5">Preencha os dados para iniciar o fluxo de contratação</p>
         </div>
       </div>
 
@@ -504,12 +504,12 @@ export default function NovaSolicitacao() {
         </div>
       </div>
 
-      {/* ── Step 1: Identificacao do Solicitante ───────────────── */}
+      {/* ── Step 1: Identificação do Solicitante ───────────────── */}
       {step === 1 && (
         <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 space-y-4">
           <h2 className="text-sm font-extrabold text-slate-800 flex items-center gap-2">
             <User size={14} className="text-indigo-600" />
-            Identificacao do Solicitante
+            Identificação do Solicitante
           </h2>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -567,17 +567,17 @@ export default function NovaSolicitacao() {
         </div>
       )}
 
-      {/* ── Step 2: Dados da Solicitacao ────────────────────────── */}
+      {/* ── Step 2: Dados da Solicitação ────────────────────────── */}
       {step === 2 && (
         <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 space-y-5">
           <h2 className="text-sm font-extrabold text-slate-800 flex items-center gap-2">
             <FileText size={14} className="text-indigo-600" />
-            Dados da Solicitacao
+            Dados da Solicitação
           </h2>
 
-          {/* Tipo de Solicitacao */}
+          {/* Tipo de Solicitação */}
           <div>
-            <label className={labelClass}>Tipo de Solicitacao *</label>
+            <label className={labelClass}>Tipo de Solicitação *</label>
             <div className="grid grid-cols-3 gap-2">
               {TIPO_SOLICITACAO_OPTIONS.map(opt => (
                 <button
@@ -809,7 +809,7 @@ export default function NovaSolicitacao() {
             <input
               value={objeto}
               onChange={e => setObjeto(e.target.value)}
-              placeholder="Descricao resumida do objeto do contrato"
+              placeholder="Descrição resumida do objeto do contrato"
               className={`${inputClass} ${errorBorder(objeto)}`}
             />
           </div>
@@ -830,7 +830,7 @@ export default function NovaSolicitacao() {
             <textarea
               value={descricaoEscopo}
               onChange={e => setDescricaoEscopo(e.target.value)}
-              placeholder="Detalhe o escopo dos servicos ou fornecimentos..."
+              placeholder="Detalhe o escopo dos serviços ou fornecimentos..."
               rows={2}
               className={`${inputClass} resize-none`}
             />
@@ -866,17 +866,17 @@ export default function NovaSolicitacao() {
         </div>
       )}
 
-      {/* ── Step 3: Vigencia e Classificacao ──────────────────── */}
+      {/* ── Step 3: Vigência e Classificação ──────────────────── */}
       {step === 3 && (
         <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 space-y-4">
           <h2 className="text-sm font-extrabold text-slate-800 flex items-center gap-2">
             <Settings2 size={14} className="text-indigo-600" />
-            Vigencia e Classificacao
+            Vigência e Classificação
           </h2>
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div>
-              <label className={labelClass}>Data Inicio</label>
+              <label className={labelClass}>Data Início</label>
               <div className="relative">
                 <Calendar size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                 <input
@@ -900,7 +900,7 @@ export default function NovaSolicitacao() {
               </div>
             </div>
             <div>
-              <label className={labelClass}>Prazo de Vigencia (meses)</label>
+              <label className={labelClass}>Prazo de Vigência (meses)</label>
               <input
                 type="number"
                 value={prazoMeses}
@@ -993,7 +993,7 @@ export default function NovaSolicitacao() {
                 ? <div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
                 : <Send size={14} />
               }
-              Enviar Solicitacao
+              Enviar Solicitação
             </button>
           </div>
         )}
