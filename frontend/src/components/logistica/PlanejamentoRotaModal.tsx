@@ -551,7 +551,24 @@ export default function PlanejamentoRotaModal({ isDark, solicitacoes, allSolicit
     })
   }
 
-  // Calcular rota via n8n
+  // Decode polyline6 (OSRM uses precision 5 by default)
+  function decodePolyline(encoded: string, precision = 5): Array<{ lat: number; lng: number }> {
+    const factor = 10 ** precision
+    const result: Array<{ lat: number; lng: number }> = []
+    let lat = 0, lng = 0, index = 0
+    while (index < encoded.length) {
+      let shift = 0, b: number, dlat = 0
+      do { b = encoded.charCodeAt(index++) - 63; dlat |= (b & 0x1f) << shift; shift += 5 } while (b >= 0x20)
+      lat += (dlat & 1) ? ~(dlat >> 1) : (dlat >> 1)
+      shift = 0; let dlng = 0
+      do { b = encoded.charCodeAt(index++) - 63; dlng |= (b & 0x1f) << shift; shift += 5 } while (b >= 0x20)
+      lng += (dlng & 1) ? ~(dlng >> 1) : (dlng >> 1)
+      result.push({ lat: lat / factor, lng: lng / factor })
+    }
+    return result
+  }
+
+  // Calcular rota via OSRM (gratuito, trajeto real de carro)
   const calcularRota = async () => {
     const waypoints = pontos.flatMap(p => {
       const pts: Array<{ lat: number; lng: number; label: string }> = []
@@ -564,37 +581,54 @@ export default function PlanejamentoRotaModal({ isDark, solicitacoes, allSolicit
 
     setCalculando(true)
     try {
-      const res = await fetch(`${N8N_URL}/logistica/calcular-rota`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ waypoints }),
-        signal: AbortSignal.timeout(15000),
-      })
+      // OSRM free API — trajeto real de carro com geometria
+      const coords = waypoints.map(w => `${w.lng},${w.lat}`).join(';')
+      const osrmUrl = `https://router.project-osrm.org/route/v1/driving/${coords}?overview=full&geometries=polyline&steps=false`
+      const res = await fetch(osrmUrl, { signal: AbortSignal.timeout(15000) })
 
       if (res.ok) {
         const json = await res.json()
-        setRota({
-          distancia_total_km: json.distancia_km || json.distancia_total_km || 0,
-          duracao_total_horas: json.duracao_horas || json.duracao_total_horas || 0,
-          pontos: json.pontos || json.geometry || [],
-        })
+        if (json.code === 'Ok' && json.routes?.length > 0) {
+          const route = json.routes[0]
+          const distKm = Math.round(route.distance / 1000)
+          const durHrs = Math.round(route.duration / 3600 * 10) / 10
 
-        // Atualizar distâncias individuais se fornecido
-        if (json.trechos && Array.isArray(json.trechos)) {
-          setPontos(prev => prev.map((p, i) => ({
-            ...p,
-            distancia_km: json.trechos[i]?.distancia_km,
-            duracao_horas: json.trechos[i]?.duracao_horas,
-          })))
+          // Decode polyline to get road geometry
+          const routePoints = decodePolyline(route.geometry)
+
+          setRota({
+            distancia_total_km: distKm,
+            duracao_total_horas: durHrs,
+            pontos: routePoints,
+          })
+
+          // Atualizar distâncias por trecho (leg) se houver múltiplos pontos
+          if (route.legs && route.legs.length > 0) {
+            setPontos(prev => prev.map((p, i) => {
+              const leg = route.legs[i]
+              if (!leg) return p
+              return {
+                ...p,
+                distancia_km: Math.round(leg.distance / 1000),
+                duracao_horas: Math.round(leg.duration / 3600 * 10) / 10,
+              }
+            }))
+          }
+          return
         }
       }
+      throw new Error('OSRM failed')
     } catch {
-      // Fallback: cálculo estimado por distância euclidiana (aprox)
+      // Fallback: haversine estimado
       let totalKm = 0
       const pts: Array<{ lat: number; lng: number }> = []
       pontos.forEach(p => {
         if (p.lat_origem && p.lng_origem && p.lat_destino && p.lng_destino) {
-          const d = haversine(p.lat_origem, p.lng_origem, p.lat_destino, p.lng_destino)
+          const R = 6371
+          const dLat = (p.lat_destino - p.lat_origem) * Math.PI / 180
+          const dLon = (p.lng_destino - p.lng_origem) * Math.PI / 180
+          const a = Math.sin(dLat / 2) ** 2 + Math.cos(p.lat_origem * Math.PI / 180) * Math.cos(p.lat_destino * Math.PI / 180) * Math.sin(dLon / 2) ** 2
+          const d = R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
           totalKm += d
           pts.push({ lat: p.lat_origem, lng: p.lng_origem })
           pts.push({ lat: p.lat_destino, lng: p.lng_destino })
@@ -602,23 +636,14 @@ export default function PlanejamentoRotaModal({ isDark, solicitacoes, allSolicit
       })
       if (totalKm > 0) {
         setRota({
-          distancia_total_km: Math.round(totalKm * 1.3), // 30% road factor
-          duracao_total_horas: Math.round((totalKm * 1.3) / 60 * 10) / 10, // ~60km/h avg
+          distancia_total_km: Math.round(totalKm * 1.3),
+          duracao_total_horas: Math.round((totalKm * 1.3) / 60 * 10) / 10,
           pontos: pts,
         })
       }
     } finally {
       setCalculando(false)
     }
-  }
-
-  // Haversine formula
-  function haversine(lat1: number, lon1: number, lat2: number, lon2: number) {
-    const R = 6371
-    const dLat = (lat2 - lat1) * Math.PI / 180
-    const dLon = (lon2 - lon1) * Math.PI / 180
-    const a = Math.sin(dLat / 2) ** 2 + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon / 2) ** 2
-    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
   }
 
   const handleSave = async () => {
@@ -651,20 +676,19 @@ export default function PlanejamentoRotaModal({ isDark, solicitacoes, allSolicit
         style={{ animation: 'slideUp 0.4s cubic-bezier(0.16,1,0.3,1)' }}
       >
         {/* ── Header ─────────────────────────────────────────────────────────── */}
-        <div className="relative overflow-hidden">
+        <div className="relative overflow-hidden rounded-t-3xl shrink-0">
           <div className="absolute inset-0 bg-gradient-to-r from-orange-600 via-amber-500 to-orange-600" />
-          <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAiIGhlaWdodD0iNDAiIHZpZXdCb3g9IjAgMCA0MCA0MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZGVmcz48cGF0dGVybiBpZD0iZyIgd2lkdGg9IjQwIiBoZWlnaHQ9IjQwIiBwYXR0ZXJuVW5pdHM9InVzZXJTcGFjZU9uVXNlIj48cGF0aCBkPSJNMCAwaDQwdjQwSDB6IiBmaWxsPSJub25lIi8+PHBhdGggZD0iTTAgMGg0MHY0MEgweiIgZmlsbD0icmdiYSgyNTUsMjU1LDI1NSwwLjAzKSIvPjwvcGF0dGVybj48L2RlZnM+PHJlY3Qgd2lkdGg9IjQwIiBoZWlnaHQ9IjQwIiBmaWxsPSJ1cmwoI2cpIi8+PC9zdmc+')] opacity-40" />
-          <div className="relative px-6 py-4 flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-white/20 backdrop-blur-sm flex items-center justify-center">
+          <div className="relative px-6 py-5 flex items-center justify-between">
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="w-10 h-10 rounded-xl bg-white/20 backdrop-blur-sm flex items-center justify-center shrink-0">
                 <Route size={20} className="text-white" />
               </div>
-              <div>
+              <div className="min-w-0">
                 <h2 className="text-lg font-extrabold text-white tracking-tight">Planejamento de Rota</h2>
-                <p className="text-xs text-white/70">{pontos.length} solicitação(ões) • Montagem de rota otimizada</p>
+                <p className="text-xs text-white/70 truncate">{pontos.length} solicitação(ões) • Montagem de rota otimizada</p>
               </div>
             </div>
-            <button onClick={onClose} className="p-2 rounded-xl bg-white/10 hover:bg-white/20 text-white transition-all">
+            <button onClick={onClose} className="p-2 rounded-xl bg-white/10 hover:bg-white/20 text-white transition-all shrink-0">
               <X size={18} />
             </button>
           </div>
