@@ -3,7 +3,7 @@ import {
   ClipboardList, Search, X, CheckCircle2, Clock, AlertTriangle,
   Calendar, ArrowUp, ArrowDown, LayoutList, LayoutGrid, Download,
   MapPin, Package2, Truck, FileText, Building2, Tag, Briefcase,
-  ShieldCheck, Plus, Save, Loader2, Trash2,
+  ShieldCheck, Plus, Save, Loader2, Trash2, Route,
 } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
 import {
@@ -15,6 +15,9 @@ import { useSearchParams } from 'react-router-dom'
 import { useLookupCentrosCusto } from '../../hooks/useLookups'
 import type { LogSolicitacao, StatusSolicitacaoPipeline, CriarSolicitacaoPayload, TipoTransporte } from '../../types/logistica'
 import { SOLICITACAO_PIPELINE_STAGES } from '../../types/logistica'
+import { lazy, Suspense } from 'react'
+
+const PlanejamentoRotaModal = lazy(() => import('../../components/logistica/PlanejamentoRotaModal'))
 
 // ── Formatters ───────────────────────────────────────────────────────────────
 
@@ -508,6 +511,7 @@ export default function SolicitacoesPipeline() {
   const [sortDir, setSortDir] = useState<SortDir>('desc')
   const [viewMode, setViewMode] = useState<ViewMode>('cards')
   const [showNovaSolicitacao, setShowNovaSolicitacao] = useState(false)
+  const [showPlanejamento, setShowPlanejamento] = useState<LogSolicitacao[]>([])
 
   // Abrir modal via ?nova=1 (clique no sidebar)
   const [searchParams, setSearchParams] = useSearchParams()
@@ -577,13 +581,42 @@ export default function SolicitacoesPipeline() {
   }
   const switchTab = (status: StatusSolicitacaoPipeline) => { setActiveTab(status); setSelectedIds(new Set()); setBusca('') }
 
+  const planejar = usePlanejaarSolicitacao()
+
   // Actions
-  const handlePlanejar = async (ids: string[]) => {
+  const handlePlanejar = (ids: string[]) => {
+    const sols = solicitacoes.filter(s => ids.includes(s.id))
+    if (sols.length > 0) setShowPlanejamento(sols)
+  }
+
+  const handleSavePlanejamento = async (data: {
+    solicitacaoIds: string[]
+    rota: unknown[]
+    distancia_total_km: number
+    duracao_total_horas: number
+    modal?: string
+    motorista_nome?: string
+    veiculo_placa?: string
+    data_prevista_saida?: string
+    custo_estimado?: number
+  }) => {
     try {
-      for (const id of ids) await atualizarStatus.mutateAsync({ id, status: 'planejado' })
-      showToast('success', `${ids.length} solicitação(ões) planejada(s)`)
+      for (const id of data.solicitacaoIds) {
+        await planejar.mutateAsync({
+          id,
+          modal: data.modal,
+          motorista_nome: data.motorista_nome,
+          veiculo_placa: data.veiculo_placa,
+          data_prevista_saida: data.data_prevista_saida,
+          custo_estimado: data.custo_estimado,
+        })
+      }
+      showToast('success', `${data.solicitacaoIds.length} solicitação(ões) planejada(s)`)
+      setShowPlanejamento([])
       setSelectedIds(new Set())
-    } catch { showToast('error', 'Erro ao planejar') }
+    } catch {
+      showToast('error', 'Erro ao salvar planejamento')
+    }
   }
 
   const handleEnviarAprovacao = async (ids: string[]) => {
@@ -815,6 +848,17 @@ export default function SolicitacoesPipeline() {
           onClose={() => setShowNovaSolicitacao(false)}
           onSuccess={() => showToast('success', 'Solicitação criada com sucesso!')}
         />
+      )}
+      {showPlanejamento.length > 0 && (
+        <Suspense fallback={<div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"><Loader2 size={32} className="text-orange-500 animate-spin" /></div>}>
+          <PlanejamentoRotaModal
+            isDark={isDark}
+            solicitacoes={showPlanejamento}
+            allSolicitacoes={solicitacoes}
+            onClose={() => setShowPlanejamento([])}
+            onSave={handleSavePlanejamento}
+          />
+        </Suspense>
       )}
     </div>
   )
