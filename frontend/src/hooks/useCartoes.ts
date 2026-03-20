@@ -254,14 +254,18 @@ export function useFaturasCartao(cartaoId?: string) {
       return (data ?? []) as FaturaCartao[]
     },
     retry: false,
+    refetchInterval: (query) => {
+      const faturas = query.state.data ?? []
+      return faturas.some(f => f.status === 'processando') ? 3000 : false
+    },
   })
 }
 
 // ── Itens da fatura ────────────────────────────────────────────────────────────
 
-const SELECT_ITEM = `*, apontamento:fin_apontamentos_cartao(id,descricao,valor,status,user_id)`
+const SELECT_ITEM = `*, apontamento:fin_apontamentos_cartao!apontamento_id(id,descricao,valor,status,user_id)`
 
-export function useItensFatura(faturaId?: string, cartaoId?: string) {
+export function useItensFatura(faturaId?: string, cartaoId?: string, isProcessing?: boolean) {
   return useQuery<ItemFaturaCartao[]>({
     queryKey: ['itens-fatura', faturaId, cartaoId],
     enabled: !!(faturaId || cartaoId),
@@ -277,6 +281,7 @@ export function useItensFatura(faturaId?: string, cartaoId?: string) {
       return (data ?? []) as ItemFaturaCartao[]
     },
     retry: false,
+    refetchInterval: isProcessing ? 3000 : false,
   })
 }
 
@@ -339,7 +344,21 @@ export function useUploadFatura() {
         .createSignedUrl(path, 3600)
       if (signedError || !signedData) throw signedError ?? new Error('Falha ao gerar URL assinada')
 
-      // 3. Aciona o n8n para extrair os lançamentos da fatura
+      // 3. Registra a fatura no Supabase com status 'processando' (n8n atualizará depois)
+      const { error: faturaError } = await supabase
+        .from('fin_faturas_cartao')
+        .upsert({
+          cartao_id: cartaoId,
+          mes_referencia: mesReferencia,
+          arquivo_url: signedData.signedUrl,
+          arquivo_nome: file.name,
+          status: 'processando',
+          erro_msg: null,
+          processado_em: null,
+        }, { onConflict: 'cartao_id,mes_referencia' })
+      if (faturaError) throw faturaError
+
+      // 4. Dispara o n8n de forma assíncrona — não aguarda resposta
       const payload = {
         cartao_id: cartaoId,
         mes_referencia: mesReferencia,
@@ -348,25 +367,14 @@ export function useUploadFatura() {
         mime_type: file.type || 'application/octet-stream',
         storage_path: path,
       }
-
-      let res = await fetch(`${N8N_WEBHOOK_BASE}/financeiro/cartoes/processar-fatura`, {
+      fetch(`${N8N_WEBHOOK_BASE}/financeiro/cartoes/processar-fatura`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
-        signal: AbortSignal.timeout(60_000),
+        signal: AbortSignal.timeout(300_000),
+      }).catch(() => {
+        // Falha silenciosa — fatura ficará como 'processando' ou 'erro' via n8n
       })
-
-      if (!res.ok && res.status === 404) {
-        res = await fetch(`${N8N_WEBHOOK_BASE}/processar-fatura`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload),
-          signal: AbortSignal.timeout(60_000),
-        })
-      }
-
-      if (!res.ok) throw new Error('Falha ao processar fatura no n8n')
-      return res.json()
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['faturas-cartao'] })
