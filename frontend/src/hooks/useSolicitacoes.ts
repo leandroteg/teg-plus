@@ -24,7 +24,7 @@ import { normalizarParcelasPlanejadas, sugerirParcelasContrato } from '../utils/
 
 const SELECT_SOLICITACAO = `
   *,
-  obra:sys_obras!obra_id(id, nome)
+  obra:sys_obras!left(id, nome)
 `
 
 export function useSolicitacoes(filtros?: {
