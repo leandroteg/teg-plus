@@ -1168,10 +1168,7 @@ export function useEnviarAssinatura() {
   const qc = useQueryClient()
   return useMutation<EnviarAssinaturaResponse, Error, EnviarAssinaturaPayload>({
     mutationFn: async (payload) => {
-      let envelope_id = ''
-      let n8nOk = false
-
-      // 1) Tentar enviar via n8n/Certisign (não-bloqueante se falhar)
+      // 1) Enviar via n8n/Certisign — o workflow já cria registro em con_assinaturas
       try {
         const res = await fetch(`${N8N_BASE}/certisign-enviar`, {
           method: 'POST',
@@ -1181,37 +1178,46 @@ export function useEnviarAssinatura() {
             callback_url: `${N8N_BASE}/certisign-callback`,
           }),
         })
-        if (res.ok) {
-          const data = await res.json()
-          envelope_id = data.envelope_id ?? ''
-          n8nOk = true
-        } else {
-          console.warn('[Certisign] Webhook retornou erro:', res.status)
+        const data = await res.json().catch(() => ({}))
+
+        if (res.ok && data.status === 'enviado') {
+          // n8n criou o registro — não duplicar
+          return {
+            assinatura_id: data.assinatura_id ?? '',
+            envelope_id: data.envelope_id ?? '',
+            status: 'enviado' as const,
+          }
         }
+
+        // n8n retornou erro — ele já criou registro com status 'erro'
+        throw new Error(data.message || 'Falha ao enviar para Certisign')
       } catch (err) {
-        console.warn('[Certisign] Webhook indisponivel, criando registro local:', err)
-      }
+        if (err instanceof TypeError) {
+          // Fetch falhou (n8n offline) — criar registro local como fallback
+          console.warn('[Certisign] Webhook indisponível, criando registro local:', err)
+          const { data: assinatura, error: insErr } = await supabase
+            .from('con_assinaturas')
+            .insert({
+              solicitacao_id: payload.solicitacao_id,
+              tipo_assinatura: payload.tipo_assinatura,
+              status: 'pendente',
+              envelope_id: null,
+              signatarios: payload.signatarios,
+              enviado_em: new Date().toISOString(),
+            })
+            .select('id')
+            .single()
 
-      // 2) Criar registro con_assinaturas no Supabase (garante rastreabilidade)
-      const { data: assinatura, error: insErr } = await supabase
-        .from('con_assinaturas')
-        .insert({
-          solicitacao_id: payload.solicitacao_id,
-          tipo_assinatura: payload.tipo_assinatura,
-          status: n8nOk ? 'enviado' : 'pendente',
-          envelope_id: envelope_id || null,
-          signatarios: payload.signatarios,
-          enviado_em: new Date().toISOString(),
-        })
-        .select('id')
-        .single()
+          if (insErr) throw new Error(`Erro ao registrar assinatura: ${insErr.message}`)
 
-      if (insErr) throw new Error(`Erro ao registrar assinatura: ${insErr.message}`)
-
-      return {
-        assinatura_id: assinatura?.id ?? '',
-        envelope_id,
-        status: 'enviado' as const,
+          return {
+            assinatura_id: assinatura?.id ?? '',
+            envelope_id: '',
+            status: 'enviado' as const,
+          }
+        }
+        // Erro do n8n — propagar para o usuário
+        throw err
       }
     },
     onSuccess: (_d, vars) => {
