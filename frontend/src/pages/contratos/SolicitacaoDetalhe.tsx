@@ -864,6 +864,31 @@ export default function SolicitacaoDetalhe() {
   const [parcelasTouched, setParcelasTouched] = useState(false)
   const [execucaoErro, setExecucaoErro] = useState('')
 
+  // Hook must be called unconditionally (before any early return)
+  const etapaAtual = solicitacao?.etapa_atual
+  const valorContrato_ = Number(resumoExecutivo?.valor_total ?? solicitacao?.valor_estimado ?? 0)
+  useEffect(() => {
+    if (!solicitacao) return
+    if (etapaAtual !== 'liberar_execucao' || parcelasTouched) return
+
+    setParcelasPlanejadas(sugerirParcelasContrato({
+      solicitacao: {
+        forma_pagamento: solicitacao.forma_pagamento,
+        valor_estimado: valorContrato_,
+        data_inicio_prevista: solicitacao.data_inicio_prevista,
+        data_fim_prevista: solicitacao.data_fim_prevista,
+        prazo_meses: solicitacao.prazo_meses,
+      },
+      resumo: resumoExecutivo ?? null,
+    }))
+  }, [
+    solicitacao,
+    etapaAtual,
+    parcelasTouched,
+    resumoExecutivo,
+    valorContrato_,
+  ])
+
   // ── Loading ────────────────────────────────────────────────────────────
   if (isLoading) {
     return (
@@ -896,30 +921,6 @@ export default function SolicitacaoDetalhe() {
   const etapa = s.etapa_atual
   const valorContrato = Number(resumoExecutivo?.valor_total ?? s.valor_estimado ?? 0)
   const destinoFinanceiro = s.tipo_contrato === 'receita' ? 'cr' : 'cp'
-
-  useEffect(() => {
-    if (etapa !== 'liberar_execucao' || parcelasTouched) return
-
-    setParcelasPlanejadas(sugerirParcelasContrato({
-      solicitacao: {
-        forma_pagamento: s.forma_pagamento,
-        valor_estimado: valorContrato,
-        data_inicio_prevista: s.data_inicio_prevista,
-        data_fim_prevista: s.data_fim_prevista,
-        prazo_meses: s.prazo_meses,
-      },
-      resumo: resumoExecutivo ?? null,
-    }))
-  }, [
-    etapa,
-    parcelasTouched,
-    resumoExecutivo,
-    s.data_fim_prevista,
-    s.data_inicio_prevista,
-    s.forma_pagamento,
-    s.prazo_meses,
-    valorContrato,
-  ])
 
   const handleAvancar = async (
     etapaPara: EtapaSolicitacao,
