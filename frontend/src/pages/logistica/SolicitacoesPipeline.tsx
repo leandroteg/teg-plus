@@ -94,48 +94,194 @@ function DetailModal({ sol, onClose, onAction, isDark }: {
   sol: LogSolicitacao; onClose: () => void
   onAction: (action: string, sol: LogSolicitacao) => void; isDark: boolean
 }) {
+  const bg = isDark ? 'bg-[#1e293b]' : 'bg-white'
+  const cardBg = isDark ? 'bg-white/[0.04]' : 'bg-slate-50'
+  const borderSub = isDark ? 'border-white/[0.06]' : 'border-slate-200'
+  const txtMuted = isDark ? 'text-slate-400' : 'text-slate-400'
+  const txtMain = isDark ? 'text-white' : 'text-slate-800'
+  const fmtCurrency = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
+
+  const hasPlanning = !!(sol.modal || sol.motorista_nome || sol.veiculo_placa || sol.data_prevista_saida || sol.custo_estimado != null || sol.transportadora)
+  const hasLoad = !!(sol.descricao || sol.peso_total_kg || sol.volumes_total || sol.carga_especial || sol.observacoes_carga || (sol.itens && sol.itens.length > 0))
+
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-sm p-4" onClick={onClose}>
-      <div className={`rounded-2xl shadow-2xl w-full max-w-lg max-h-[85vh] overflow-y-auto ${isDark ? 'bg-[#1e293b]' : 'bg-white'}`} onClick={e => e.stopPropagation()}>
-        <div className={`flex items-center justify-between px-5 py-4 border-b sticky top-0 z-10 ${isDark ? 'border-white/[0.06] bg-[#1e293b]' : 'border-slate-100 bg-white'}`}>
+      <div className={`rounded-2xl shadow-2xl w-full max-w-lg max-h-[85vh] overflow-y-auto ${bg}`} onClick={e => e.stopPropagation()}>
+        {/* Header */}
+        <div className={`flex items-center justify-between px-5 py-4 border-b sticky top-0 z-10 ${isDark ? 'border-white/[0.06] bg-[#1e293b]' : 'border-slate-100 bg-white'} rounded-t-2xl`}>
           <div className="flex items-center gap-2 min-w-0">
             <ClipboardList size={18} className="text-orange-600 shrink-0" />
-            <h3 className={`text-base font-bold truncate ${isDark ? 'text-white' : 'text-slate-800'}`}>#{sol.numero}</h3>
+            <h3 className={`text-base font-bold truncate ${txtMain}`}>#{sol.numero}</h3>
           </div>
           <button onClick={onClose} className="text-slate-400 hover:text-slate-600 shrink-0"><X size={18} /></button>
         </div>
 
         <div className="p-5 space-y-4">
+          {/* Status + Urgência */}
           <div className="flex items-center justify-between">
-            {sol.urgente && (
-              <span className="text-[10px] font-bold text-red-500 bg-red-50 dark:bg-red-500/10 px-2 py-0.5 rounded-full flex items-center gap-1">
-                <AlertTriangle size={10} /> URGENTE
-              </span>
-            )}
+            <div className="flex items-center gap-2">
+              {sol.urgente && (
+                <span className="text-[10px] font-bold text-red-500 bg-red-50 dark:bg-red-500/10 px-2 py-0.5 rounded-full flex items-center gap-1">
+                  <AlertTriangle size={10} /> URGENTE
+                </span>
+              )}
+              {sol.carga_especial && (
+                <span className="text-[10px] font-bold text-amber-600 bg-amber-50 dark:bg-amber-500/10 px-2 py-0.5 rounded-full">
+                  Carga Especial
+                </span>
+              )}
+            </div>
             <span className={`inline-flex items-center gap-1.5 rounded-full font-semibold px-3 py-1 text-xs ml-auto ${STATUS_ACCENT[sol.status]?.bgActive || 'bg-slate-100'} ${STATUS_ACCENT[sol.status]?.textActive || 'text-slate-700'}`}>
               <span className={`w-2 h-2 rounded-full ${STATUS_ACCENT[sol.status]?.dot || 'bg-slate-400'}`} />
               {SOLICITACAO_PIPELINE_STAGES.find(s => s.status === sol.status)?.label ?? sol.status}
             </span>
           </div>
 
-          <div className={`rounded-xl p-4 space-y-2 ${isDark ? 'bg-white/[0.04]' : 'bg-slate-50'}`}>
-            <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-xs">
-              <div><span className="text-slate-400">Origem:</span> <span className="font-semibold">{sol.origem}</span></div>
-              <div><span className="text-slate-400">Destino:</span> <span className="font-semibold">{sol.destino}</span></div>
-              {sol.obra_nome && <div><span className="text-slate-400">Obra:</span> <span className="font-semibold">{sol.obra_nome}</span></div>}
-              {sol.centro_custo && <div><span className="text-slate-400">Centro Custo:</span> <span className="font-semibold">{sol.centro_custo}</span></div>}
-              {sol.solicitante_nome && <div><span className="text-slate-400">Solicitante:</span> <span className="font-semibold">{sol.solicitante_nome}</span></div>}
-              {sol.data_desejada && <div><span className="text-slate-400">Data Desejada:</span> <span className="font-semibold">{fmtData(sol.data_desejada)}</span></div>}
-              {sol.modal && <div><span className="text-slate-400">Modal:</span> <span className="font-semibold capitalize">{sol.modal.replace(/_/g, ' ')}</span></div>}
-              {sol.motorista_nome && <div><span className="text-slate-400">Motorista:</span> <span className="font-semibold">{sol.motorista_nome}</span></div>}
-              {sol.veiculo_placa && <div><span className="text-slate-400">Placa:</span> <span className="font-mono font-semibold">{sol.veiculo_placa}</span></div>}
-              {sol.custo_estimado != null && <div><span className="text-slate-400">Custo Est.:</span> <span className="font-semibold text-emerald-600">R$ {sol.custo_estimado.toFixed(2)}</span></div>}
+          {/* ── Rota ── */}
+          <div className={`rounded-xl p-4 ${isDark ? 'bg-orange-500/10 border border-orange-500/20' : 'bg-orange-50 border border-orange-200'}`}>
+            <p className="text-[9px] font-bold text-orange-500 uppercase tracking-wider mb-2">Rota</p>
+            <div className="flex items-center gap-3 text-sm">
+              <div className="flex-1">
+                <p className={`font-bold ${txtMain}`}>{sol.origem}</p>
+                <p className={`text-[10px] ${txtMuted}`}>Origem</p>
+              </div>
+              <div className="text-orange-400 text-lg font-bold">→</div>
+              <div className="flex-1 text-right">
+                <p className={`font-bold ${txtMain}`}>{sol.destino}</p>
+                <p className={`text-[10px] ${txtMuted}`}>Destino</p>
+              </div>
             </div>
-            {sol.descricao && <p className="text-xs text-slate-500 mt-2 pt-2 border-t border-slate-200">{sol.descricao}</p>}
           </div>
 
+          {/* ── Dados Gerais ── */}
+          <div className={`rounded-xl p-4 ${cardBg}`}>
+            <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-2.5">Dados Gerais</p>
+            <div className="grid grid-cols-2 gap-x-4 gap-y-2.5 text-xs">
+              {sol.solicitante_nome && (
+                <div><p className={txtMuted}>Solicitante</p><p className={`font-semibold ${txtMain}`}>{sol.solicitante_nome}</p></div>
+              )}
+              {sol.obra_nome && (
+                <div><p className={txtMuted}>Obra</p><p className={`font-semibold ${txtMain}`}>{sol.obra_nome}</p></div>
+              )}
+              {sol.centro_custo && (
+                <div><p className={txtMuted}>Centro de Custo</p><p className={`font-semibold ${txtMain}`}>{sol.centro_custo}</p></div>
+              )}
+              {sol.data_desejada && (
+                <div><p className={txtMuted}>Data Desejada</p><p className={`font-semibold ${txtMain}`}>{fmtData(sol.data_desejada)}</p></div>
+              )}
+              {sol.oc_numero && (
+                <div><p className={txtMuted}>OC</p><p className={`font-semibold ${txtMain}`}>{sol.oc_numero}</p></div>
+              )}
+              {sol.tipo && (
+                <div><p className={txtMuted}>Tipo</p><p className={`font-semibold ${txtMain} capitalize`}>{sol.tipo.replace(/_/g, ' ')}</p></div>
+              )}
+            </div>
+            {sol.justificativa_urgencia && (
+              <div className="mt-2.5 pt-2.5 border-t border-dashed border-red-200">
+                <p className="text-[10px] font-bold text-red-500 uppercase mb-0.5">Justificativa Urgência</p>
+                <p className={`text-xs ${isDark ? 'text-red-300' : 'text-red-600'} italic`}>{sol.justificativa_urgencia}</p>
+              </div>
+            )}
+          </div>
+
+          {/* ── Carga & Itens ── */}
+          {hasLoad && (
+            <div className={`rounded-xl p-4 ${cardBg}`}>
+              <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-2.5">Carga</p>
+              {sol.descricao && (
+                <p className={`text-xs ${isDark ? 'text-slate-300' : 'text-slate-600'} mb-2.5`}>{sol.descricao}</p>
+              )}
+              <div className="grid grid-cols-3 gap-2 text-xs">
+                {sol.peso_total_kg != null && sol.peso_total_kg > 0 && (
+                  <div className={`rounded-lg p-2 text-center ${isDark ? 'bg-white/[0.04]' : 'bg-white'} border ${borderSub}`}>
+                    <p className={`text-lg font-extrabold ${txtMain}`}>{sol.peso_total_kg.toLocaleString('pt-BR')}</p>
+                    <p className={`text-[10px] ${txtMuted}`}>kg</p>
+                  </div>
+                )}
+                {sol.volumes_total != null && sol.volumes_total > 0 && (
+                  <div className={`rounded-lg p-2 text-center ${isDark ? 'bg-white/[0.04]' : 'bg-white'} border ${borderSub}`}>
+                    <p className={`text-lg font-extrabold ${txtMain}`}>{sol.volumes_total}</p>
+                    <p className={`text-[10px] ${txtMuted}`}>volumes</p>
+                  </div>
+                )}
+                {sol.itens && sol.itens.length > 0 && (
+                  <div className={`rounded-lg p-2 text-center ${isDark ? 'bg-white/[0.04]' : 'bg-white'} border ${borderSub}`}>
+                    <p className={`text-lg font-extrabold ${txtMain}`}>{sol.itens.length}</p>
+                    <p className={`text-[10px] ${txtMuted}`}>itens</p>
+                  </div>
+                )}
+              </div>
+              {sol.observacoes_carga && (
+                <p className={`text-[11px] ${txtMuted} italic mt-2`}>Obs.: {sol.observacoes_carga}</p>
+              )}
+              {/* Lista de itens */}
+              {sol.itens && sol.itens.length > 0 && (
+                <div className="mt-3 space-y-1">
+                  <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-1">Itens</p>
+                  {sol.itens.map(item => (
+                    <div key={item.id} className={`flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs ${isDark ? 'bg-white/[0.04]' : 'bg-white'} border ${borderSub}`}>
+                      <div className="flex-1 min-w-0">
+                        <span className={`font-medium ${txtMain}`}>{item.descricao}</span>
+                        {item.numero_serie && <span className={`ml-2 text-[10px] ${txtMuted}`}>S/N: {item.numero_serie}</span>}
+                      </div>
+                      <div className={`text-right shrink-0 ml-2 ${txtMuted}`}>
+                        <span className="font-semibold">{item.quantidade} {item.unidade}</span>
+                        {item.peso_kg != null && <span className="ml-1.5 text-[10px]">({item.peso_kg}kg)</span>}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ── Planejamento Logístico ── */}
+          {hasPlanning && (
+            <div className={`rounded-xl p-4 ${isDark ? 'bg-violet-500/10 border border-violet-500/20' : 'bg-violet-50 border border-violet-200'}`}>
+              <p className="text-[9px] font-bold text-violet-500 uppercase tracking-wider mb-2.5">Planejamento Logístico</p>
+              <div className="grid grid-cols-2 gap-x-4 gap-y-2.5 text-xs">
+                {sol.modal && (
+                  <div><p className={txtMuted}>Modal</p><p className={`font-semibold ${txtMain} capitalize`}>{sol.modal.replace(/_/g, ' ')}</p></div>
+                )}
+                {sol.transportadora && (
+                  <div><p className={txtMuted}>Transportadora</p><p className={`font-semibold ${txtMain}`}>{sol.transportadora.nome_fantasia || sol.transportadora.razao_social}</p></div>
+                )}
+                {sol.motorista_nome && (
+                  <div>
+                    <p className={txtMuted}>Motorista</p>
+                    <p className={`font-semibold ${txtMain}`}>{sol.motorista_nome}</p>
+                    {sol.motorista_telefone && <p className={`text-[10px] ${txtMuted}`}>{sol.motorista_telefone}</p>}
+                  </div>
+                )}
+                {sol.veiculo_placa && (
+                  <div><p className={txtMuted}>Placa</p><p className={`font-mono font-bold ${txtMain}`}>{sol.veiculo_placa}</p></div>
+                )}
+                {sol.data_prevista_saida && (
+                  <div><p className={txtMuted}>Saída Prevista</p><p className={`font-semibold ${txtMain}`}>{new Date(sol.data_prevista_saida).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' })}</p></div>
+                )}
+                {sol.custo_estimado != null && (
+                  <div><p className={txtMuted}>Custo Estimado</p><p className="font-bold text-emerald-600">{fmtCurrency(sol.custo_estimado)}</p></div>
+                )}
+              </div>
+              {sol.restricoes_seguranca && (
+                <div className="mt-2.5 pt-2.5 border-t border-dashed border-violet-200">
+                  <p className="text-[10px] font-bold text-violet-500 uppercase mb-0.5">Restrições de Segurança</p>
+                  <p className={`text-xs ${isDark ? 'text-violet-300' : 'text-violet-700'} italic`}>{sol.restricoes_seguranca}</p>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ── Observações ── */}
+          {sol.observacoes && (
+            <div className={`rounded-xl p-4 ${cardBg}`}>
+              <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Observações</p>
+              <p className={`text-xs ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>{sol.observacoes}</p>
+            </div>
+          )}
+
           {/* Progress */}
-          <div className={`rounded-xl p-3 ${isDark ? 'bg-white/[0.04]' : 'bg-slate-50'}`}>
+          <div className={`rounded-xl p-3 ${cardBg}`}>
             <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-2">Progresso</p>
             <div className="flex items-center gap-0.5">
               {SOLICITACAO_PIPELINE_STAGES.map((s, i) => {
@@ -147,6 +293,7 @@ function DetailModal({ sol, onClose, onAction, isDark }: {
             </div>
           </div>
 
+          {/* Botões */}
           <div className="flex gap-2 pt-1">
             <button onClick={onClose} className={`flex-1 py-3 rounded-xl border text-sm font-semibold transition-all ${isDark ? 'border-white/[0.06] text-slate-300' : 'border-slate-200 text-slate-600 hover:bg-slate-50'}`}>
               Fechar
