@@ -315,7 +315,7 @@ function CertisignModal({ open, onClose, solicitacao, minutaUrl, onSuccess }: {
             </div>
             <div>
               <h3 className="text-base font-extrabold text-slate-800">Enviar para Assinatura</h3>
-              <p className="text-xs text-slate-400">Integracao Certisign — {solicitacao.numero}</p>
+              <p className="text-xs text-slate-400">Integração Certisign — {solicitacao.numero}</p>
             </div>
           </div>
           <button onClick={onClose} className="text-slate-400 hover:text-slate-600 transition-colors">
@@ -1299,7 +1299,10 @@ export default function SolicitacaoDetalhe() {
         onClose={() => setShowCertisignModal(false)}
         solicitacao={solicitacao}
         minutaUrl={minutas?.find(m => m.arquivo_url)?.arquivo_url ?? null}
-        onSuccess={() => handleAvancar('arquivar')}
+        onSuccess={async () => {
+          // Não avança etapa — permanece em enviar_assinatura
+          // A etapa avança quando: callback Certisign confirma ou "Assinatura Confirmada" manual
+        }}
       />
 
       {/* ── Confirmar Assinatura Modal ─────────────────────────────────── */}
