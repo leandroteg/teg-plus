@@ -25,12 +25,11 @@ const UF_LIST = [
 const TIPO_LABEL: Record<TipoTransporte, string> = {
   viagem:                  'Viagem',
   mobilizacao:             'Mobilização',
-  transferencia_material:  'Transf. Material',
   transferencia_maquina:   'Transf. Máquina',
 }
 
 const EMPTY_FORM: CriarSolicitacaoPayload = {
-  tipo: 'transferencia_material',
+  tipo: 'viagem',
   origem: '',
   destino: '',
   descricao: '',

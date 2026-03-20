@@ -3,7 +3,6 @@
 export type TipoTransporte =
   | 'viagem'
   | 'mobilizacao'
-  | 'transferencia_material'
   | 'transferencia_maquina'
 
 export type ModalTransporte =

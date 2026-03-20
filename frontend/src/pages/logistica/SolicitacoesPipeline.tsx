@@ -46,7 +46,6 @@ const SORT_OPTIONS: { field: SortField; label: string }[] = [
 const TIPO_LABEL: Record<string, string> = {
   viagem:                 'Viagem',
   mobilizacao:            'Mobilização',
-  transferencia_material: 'Transf. Material',
   transferencia_maquina:  'Transf. Máquina',
 }
 
@@ -290,7 +289,6 @@ function SolCard({ sol, onClick, isDark, isSelected, onSelect }: {
 const TIPO_LABELS: Record<TipoTransporte, string> = {
   viagem:                  'Viagem',
   mobilizacao:             'Mobilização',
-  transferencia_material:  'Transf. Material',
   transferencia_maquina:   'Transf. Máquina',
 }
 
@@ -300,7 +298,7 @@ const UF_LIST = [
 ] as const
 
 const EMPTY_FORM: CriarSolicitacaoPayload = {
-  tipo: 'transferencia_material',
+  tipo: 'viagem',
   origem: '',
   destino: '',
   descricao: '',

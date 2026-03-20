@@ -38,7 +38,7 @@ const SORT_OPTIONS: { field: SortField; label: string }[] = [
 
 const TIPO_LABEL: Record<string, string> = {
   viagem: 'Viagem', mobilizacao: 'Mobiliza\u00e7\u00e3o',
-  transferencia_material: 'Transf. Material', transferencia_maquina: 'Transf. M\u00e1quina',
+  transferencia_maquina: 'Transf. M\u00e1quina',
 }
 
 // ── Status accents ───────────────────────────────────────────────────────────

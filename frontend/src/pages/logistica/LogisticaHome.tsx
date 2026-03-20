@@ -44,7 +44,6 @@ export function StatusBadge({ status }: { status: string }) {
 const TIPO_LABEL: Record<string, string> = {
   viagem: 'Viagem',
   mobilizacao: 'Mobilização',
-  transferencia_material: 'Transf. Material',
   transferencia_maquina: 'Transf. Máquina',
 }
 

@@ -91,7 +91,6 @@ const STATUS_LABEL: Record<string, { label: string; dot: string; bg: string; tex
 const TIPOS_TRANSPORTE: TipoTransporte[] = [
   'viagem',
   'mobilizacao',
-  'transferencia_material',
   'transferencia_maquina',
 ]
 
@@ -131,7 +130,7 @@ function makeSolicitacao(overrides: Partial<LogSolicitacao> = {}): LogSolicitaca
   return {
     id: 'sol-001',
     numero: 'LOG-202603-0001',
-    tipo: 'transferencia_material',
+    tipo: 'viagem',
     status: 'solicitado',
     origem: 'BH',
     destino: 'SE Frutal',
@@ -367,8 +366,8 @@ describe('TC-LOG-UNIT — Testes Unitários Logística', () => {
 
   // TC-LOG-UNIT-005 ────────────────────────────────────────────────────────
   describe('TC-LOG-UNIT-005: Tipos de transporte válidos', () => {
-    it('deve ter exatamente 4 tipos de transporte', () => {
-      expect(TIPOS_TRANSPORTE).toHaveLength(4)
+    it('deve ter exatamente 3 tipos de transporte', () => {
+      expect(TIPOS_TRANSPORTE).toHaveLength(3)
     })
 
     it('deve incluir "viagem"', () => {
@@ -377,10 +376,6 @@ describe('TC-LOG-UNIT — Testes Unitários Logística', () => {
 
     it('deve incluir "mobilizacao"', () => {
       expect(TIPOS_TRANSPORTE).toContain('mobilizacao')
-    })
-
-    it('deve incluir "transferencia_material"', () => {
-      expect(TIPOS_TRANSPORTE).toContain('transferencia_material')
     })
 
     it('deve incluir "transferencia_maquina"', () => {
@@ -452,7 +447,7 @@ describe('TC-LOG-INT — Testes de Integração Logística', () => {
   describe('TC-LOG-INT-001: Criar solicitação de transporte', () => {
     it('deve inserir na tabela log_solicitacoes via Supabase', async () => {
       const payload: CriarSolicitacaoPayload = {
-        tipo: 'transferencia_material',
+        tipo: 'viagem',
         origem: 'BH',
         destino: 'SE Frutal',
         descricao: '10 cabos XLPE',
@@ -1159,7 +1154,7 @@ describe('Validações extras de tipos Logística', () => {
 
     it('payload completo com itens', () => {
       const payload: CriarSolicitacaoPayload = {
-        tipo: 'transferencia_material',
+        tipo: 'viagem',
         origem: 'Depósito BH',
         destino: 'SE Paracatu',
         descricao: 'Materiais elétricos',
