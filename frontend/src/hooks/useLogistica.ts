@@ -238,7 +238,7 @@ export function useEnviarParaAprovacao() {
         aprovador_email: 'logistica@tegplus.com.br',
         data_limite: prazo.toISOString(),
       })
-      if (aprError) console.error('Erro ao criar aprovação transporte:', aprError)
+      if (aprError) throw new Error(`Erro ao criar aprovação: ${aprError.message}`)
 
       return sol
     },
