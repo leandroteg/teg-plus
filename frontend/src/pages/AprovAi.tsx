@@ -4,11 +4,11 @@ import {
   CheckCircle, XCircle, ChevronDown, ChevronRight, ChevronUp,
   Clock, Building, Sparkles, Shield, AlertTriangle,
   MessageSquare, ExternalLink, ArrowLeft,
-  FileSearch, Banknote, FileSignature, ShoppingCart, Truck, MapPin,
+  FileSearch, Banknote, FileSignature, ShoppingCart,
   History, ListChecks, Timer, TrendingUp, Filter,
   Calendar, FileText, Download, Eye, HelpCircle,
-  Paperclip, Square, CheckSquare, Package, SplitSquareHorizontal,
-  DollarSign, Layers,
+  Paperclip, Square, CheckSquare, Package,
+  Truck, MapPin,
 } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../services/supabase'
@@ -21,7 +21,7 @@ import {
 } from '../hooks/useAprovacoes'
 import type { HistoricoFiltros } from '../hooks/useAprovacoes'
 import FluxoTimeline from '../components/FluxoTimeline'
-import type { AprovacaoPendente, AprovacaoHistorico, TipoAprovacao, CotacaoFornecedor, ItemSelecionado } from '../types'
+import type { AprovacaoPendente, AprovacaoHistorico, TipoAprovacao } from '../types'
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -97,16 +97,16 @@ const tipoConfig: Record<TipoAprovacao, {
     borderColor: 'border-orange-200',
     badgeBg: 'bg-orange-100',
     badgeText: 'text-orange-700',
-    headerBg: 'bg-gradient-to-r from-orange-600 to-amber-500',
+    headerBg: 'bg-gradient-to-r from-orange-500 to-amber-600',
   },
 }
 
 const tipoOrder: TipoAprovacao[] = [
   'cotacao',
   'autorizacao_pagamento',
-  'aprovacao_transporte',
   'minuta_contratual',
   'requisicao_compra',
+  'aprovacao_transporte',
 ]
 
 function timeLeft(dateStr?: string): string {
@@ -132,12 +132,6 @@ function formatDateShort(dateStr?: string): string {
   })
 }
 
-const fmtDateTime = (d: string) => {
-  if (!d) return ''
-  const dt = new Date(d)
-  return isNaN(dt.getTime()) ? '' : dt.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })
-}
-
 // ── AprovacaoCard (requisicoes de compra — card completo) ──────────────────────
 
 function AprovacaoCard({ aprovacao, aprovadorNome, aprovadorEmail }: {
@@ -157,7 +151,7 @@ function AprovacaoCard({ aprovacao, aprovadorNome, aprovadorEmail }: {
   // Busca alerta de cotacoes obrigatorias faltantes (#38)
   useEffect(() => {
     if (!aprovacao.requisicao_id) return
-    Promise.resolve(supabase.rpc('get_alerta_cotacao', { p_requisicao_id: aprovacao.requisicao_id }))
+    supabase.rpc('get_alerta_cotacao', { p_requisicao_id: aprovacao.requisicao_id })
       .then(({ data }) => { if (data) setAlertaCotacao(data) })
       .catch(() => { /* non-critical */ })
   }, [aprovacao.requisicao_id])
@@ -257,14 +251,6 @@ function AprovacaoCard({ aprovacao, aprovadorNome, aprovadorEmail }: {
         </div>
 
         <p className="text-sm text-slate-700 mb-2">{req.descricao}</p>
-
-        {/* Descrição da compra */}
-        {req.justificativa && (
-          <div className="rounded-xl px-3.5 py-2.5 mb-2 bg-teal-50 border border-teal-100">
-            <p className="text-[10px] font-bold uppercase tracking-wider mb-1 text-teal-600">Descrição</p>
-            <p className="text-xs leading-relaxed text-teal-800">{req.justificativa}</p>
-          </div>
-        )}
 
         <a
           href={`/requisicoes/${req.id}`}
@@ -415,358 +401,7 @@ function AprovacaoCard({ aprovacao, aprovadorNome, aprovadorEmail }: {
   )
 }
 
-// ── CotacaoItemsCard — Aprovação parcial por item entre fornecedores ─────────
-
-const normalizeKey = (s: string) => s.toLowerCase().trim()
-
-function CotacaoItemsCard({ aprovacao, aprovadorNome, aprovadorEmail }: {
-  aprovacao: AprovacaoPendente
-  aprovadorNome: string
-  aprovadorEmail: string
-}) {
-  const mutation = useDecisaoGenerica()
-  const [action, setAction]           = useState<'aprovada' | 'rejeitada' | null>(null)
-  const [observacao, setObservacao]   = useState('')
-  const [showMatrix, setShowMatrix]   = useState(false)
-  const [expanded, setExpanded]       = useState(false)
-
-  // selecoes: itemKey -> fornecedor_id selecionado
-  const [selecoes, setSelecoes] = useState<Record<string, string>>({})
-
-  const cot        = aprovacao.cotacao_resumo
-  const fornecedores: CotacaoFornecedor[] = cot?.fornecedores ?? []
-  const temItens   = fornecedores.some(f => f.itens_precos?.length > 0)
-
-  // Monta lista unificada de itens
-  const allItemKeys = useMemo<string[]>(() => {
-    if (!temItens) return []
-    const keys = new Set<string>()
-    for (const f of fornecedores) {
-      for (const it of f.itens_precos ?? []) keys.add(normalizeKey(it.descricao))
-    }
-    return Array.from(keys)
-  }, [fornecedores, temItens])
-
-  // Inicializar seleção com menor preço por item
-  useEffect(() => {
-    if (!temItens) return
-    const init: Record<string, string> = {}
-    for (const key of allItemKeys) {
-      let bestId = ''
-      let bestVal = Infinity
-      for (const f of fornecedores) {
-        const item = f.itens_precos?.find(it => normalizeKey(it.descricao) === key)
-        if (item && item.valor_total < bestVal) { bestVal = item.valor_total; bestId = f.id }
-      }
-      if (bestId) init[key] = bestId
-    }
-    setSelecoes(init)
-  }, [allItemKeys, fornecedores, temItens])
-
-  // Calcula total selecionado
-  const totalSelecionado = useMemo(() => {
-    if (!temItens) return cot?.valor ?? 0
-    let total = 0
-    for (const [key, fornId] of Object.entries(selecoes)) {
-      const f = fornecedores.find(f => f.id === fornId)
-      const item = f?.itens_precos?.find(it => normalizeKey(it.descricao) === key)
-      if (item) total += item.valor_total
-    }
-    return Math.round(total * 100) / 100
-  }, [selecoes, fornecedores, temItens, cot])
-
-  // Monta itens_selecionados para salvar
-  const buildItensSelecionados = (): ItemSelecionado[] => {
-    const result: ItemSelecionado[] = []
-    for (const [key, fornId] of Object.entries(selecoes)) {
-      const f = fornecedores.find(f => f.id === fornId)
-      const item = f?.itens_precos?.find(it => normalizeKey(it.descricao) === key)
-      if (f && item) {
-        result.push({
-          descricao:      item.descricao,
-          qtd:            item.qtd,
-          fornecedor_id:  f.id,
-          fornecedor_nome: f.fornecedor_nome,
-          valor_unitario: item.valor_unitario,
-          valor_total:    item.valor_total,
-        })
-      }
-    }
-    return result
-  }
-
-  const handleDecision = async (decisao: 'aprovada' | 'rejeitada') => {
-    setAction(decisao)
-    try {
-      await mutation.mutateAsync({
-        aprovacaoId:     aprovacao.id,
-        entidadeId:      aprovacao.entidade_id,
-        entidadeNumero:  aprovacao.entidade_numero,
-        tipoAprovacao:   'cotacao',
-        modulo:          aprovacao.modulo,
-        nivel:           aprovacao.nivel,
-        decisao,
-        observacao:      observacao || undefined,
-        aprovadorNome,
-        aprovadorEmail,
-        itens_selecionados: decisao === 'aprovada' && temItens ? buildItensSelecionados() : undefined,
-        cotacaoId:       cot?.cotacao_id,
-      })
-    } catch { /* handled by mutation */ }
-  }
-
-  const tipo = tipoConfig.cotacao
-
-  if (mutation.isSuccess) {
-    const colors = action === 'aprovada'
-      ? { bg: 'bg-emerald-50 border-emerald-200', icon: 'text-emerald-500', text: 'text-emerald-700', msg: 'Aprovada' }
-      : { bg: 'bg-red-50 border-red-200', icon: 'text-red-500', text: 'text-red-700', msg: 'Rejeitada' }
-    return (
-      <div className={`rounded-2xl p-6 text-center border-2 ${colors.bg}`}>
-        {action === 'aprovada'
-          ? <CheckCircle size={44} className={`${colors.icon} mx-auto mb-3`} />
-          : <XCircle size={44} className={`${colors.icon} mx-auto mb-3`} />}
-        <p className={`font-bold text-base ${colors.text}`}>
-          {aprovacao.entidade_numero} — {colors.msg}
-        </p>
-        {action === 'aprovada' && temItens && (
-          <p className="text-xs text-slate-500 mt-1">
-            {Object.keys(selecoes).length} itens aprovados · Total {totalSelecionado.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-          </p>
-        )}
-      </div>
-    )
-  }
-
-  const req = aprovacao.requisicao
-
-  return (
-    <div className={`bg-white rounded-2xl shadow-md border ${tipo.borderColor} overflow-hidden`}>
-      {/* Header */}
-      <div className={`${tipo.headerBg} px-4 py-2.5 flex items-center justify-between`}>
-        <div className="flex items-center gap-2">
-          <FileSearch size={14} className="text-white/70" />
-          <span className="text-xs font-bold text-white">{tipo.label}</span>
-          {aprovacao.entidade_numero && (
-            <span className="text-white/60 text-[10px]">{aprovacao.entidade_numero}</span>
-          )}
-        </div>
-        {aprovacao.data_limite && (
-          <span className="text-[10px] text-white/70 font-semibold flex items-center gap-1">
-            <Clock size={10} /> {timeLeft(aprovacao.data_limite)}
-          </span>
-        )}
-      </div>
-
-      <div className="p-4 space-y-3">
-        {/* Descrição da RC */}
-        {req?.descricao && (
-          <p className="text-sm text-slate-700 font-medium">{req.descricao}</p>
-        )}
-
-        {/* Resumo de valor */}
-        {cot && (
-          <div className="bg-slate-50 rounded-xl p-3 space-y-1.5">
-            <div className="flex justify-between items-center">
-              <span className="text-xs text-slate-500">Fornecedor menor preço</span>
-              <span className="text-xs font-bold text-slate-700">{cot.fornecedor_nome}</span>
-            </div>
-            <div className="flex justify-between items-center">
-              <span className="text-xs text-slate-500">Valor menor cotação</span>
-              <span className="text-base font-extrabold text-blue-600">{fmt(cot.valor)}</span>
-            </div>
-            {temItens && (
-              <div className="flex justify-between items-center border-t border-slate-100 pt-1.5">
-                <span className="text-xs text-slate-500">Seleção atual (por item)</span>
-                <span className="text-base font-extrabold text-emerald-600">{fmt(totalSelecionado)}</span>
-              </div>
-            )}
-            <div className="text-[11px] text-slate-400">{cot.total_cotados} fornecedor{cot.total_cotados !== 1 ? 'es' : ''} cotado{cot.total_cotados !== 1 ? 's' : ''}</div>
-          </div>
-        )}
-
-        {/* ── Matriz por item (quando há itens) ───────────────────────────── */}
-        {temItens && (
-          <div>
-            <button
-              type="button"
-              onClick={() => setShowMatrix(!showMatrix)}
-              className="flex items-center gap-2 text-xs text-blue-600 font-bold hover:text-blue-800 transition"
-            >
-              <SplitSquareHorizontal size={14} />
-              {showMatrix ? 'Ocultar seleção por item' : `Selecionar fornecedor por item (${allItemKeys.length} itens)`}
-              {showMatrix ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
-            </button>
-
-            {showMatrix && (
-              <div className="mt-2 rounded-xl overflow-hidden border border-slate-200">
-                {/* Header da tabela */}
-                <div className={`grid gap-0 border-b border-slate-100`}
-                  style={{ gridTemplateColumns: `1fr repeat(${fornecedores.length}, minmax(80px, 1fr))` }}>
-                  <div className="px-2 py-1.5 text-[9px] font-bold text-slate-400 uppercase flex items-center gap-1">
-                    <Package size={9} /> Item
-                  </div>
-                  {fornecedores.map(f => (
-                    <div key={f.id} className="px-1 py-1.5 text-[9px] font-bold text-slate-500 text-center truncate">
-                      {f.fornecedor_nome}
-                    </div>
-                  ))}
-                </div>
-
-                {/* Linhas de itens */}
-                {allItemKeys.map(key => {
-                  const displayLabel = (() => {
-                    for (const f of fornecedores) {
-                      const it = f.itens_precos?.find(i => normalizeKey(i.descricao) === key)
-                      if (it) return it.descricao
-                    }
-                    return key
-                  })()
-
-                  // Preços de cada fornecedor para este item
-                  const precos = fornecedores.map(f =>
-                    f.itens_precos?.find(it => normalizeKey(it.descricao) === key) ?? null
-                  )
-                  const validos = precos.filter(Boolean).map(p => p!.valor_total)
-                  const minVal = validos.length > 0 ? Math.min(...validos) : null
-
-                  return (
-                    <div
-                      key={key}
-                      className="grid border-b border-slate-50 last:border-0"
-                      style={{ gridTemplateColumns: `1fr repeat(${fornecedores.length}, minmax(80px, 1fr))` }}
-                    >
-                      <div className="px-2 py-2 text-[11px] text-slate-700 font-medium self-center leading-tight">
-                        {displayLabel}
-                      </div>
-                      {fornecedores.map((f, fi) => {
-                        const preco = precos[fi]
-                        const isSelected = selecoes[key] === f.id
-                        const isBest = preco && minVal !== null && preco.valor_total === minVal
-
-                        return (
-                          <div key={f.id} className="px-1 py-2 flex flex-col items-center justify-center">
-                            {preco ? (
-                              <button
-                                type="button"
-                                onClick={() => setSelecoes(prev => ({ ...prev, [key]: f.id }))}
-                                className={`w-full rounded-lg px-1 py-1 text-center transition-all border-2 ${
-                                  isSelected
-                                    ? 'border-emerald-400 bg-emerald-50'
-                                    : isBest
-                                      ? 'border-amber-200 bg-amber-50 hover:border-amber-400'
-                                      : 'border-slate-100 bg-white hover:border-slate-300'
-                                }`}
-                              >
-                                <div className={`text-[11px] font-bold ${
-                                  isSelected ? 'text-emerald-700' : isBest ? 'text-teal-600' : 'text-slate-600'
-                                }`}>
-                                  {fmt(preco.valor_total)}
-                                </div>
-                                <div className="text-[9px] text-slate-400">
-                                  {preco.qtd}un × {fmt(preco.valor_unitario)}
-                                </div>
-                                {isSelected && (
-                                  <div className="text-[9px] font-bold text-emerald-600 mt-0.5">✓ selecionado</div>
-                                )}
-                                {!isSelected && isBest && (
-                                  <div className="text-[9px] font-bold text-amber-600 mt-0.5">menor preço</div>
-                                )}
-                              </button>
-                            ) : (
-                              <span className="text-slate-200 text-xs">—</span>
-                            )}
-                          </div>
-                        )
-                      })}
-                    </div>
-                  )
-                })}
-
-                {/* Total selecionado */}
-                <div
-                  className="grid bg-emerald-50 border-t border-emerald-100"
-                  style={{ gridTemplateColumns: `1fr repeat(${fornecedores.length}, minmax(80px, 1fr))` }}
-                >
-                  <div className="px-2 py-2 text-[10px] font-bold text-emerald-700 uppercase">
-                    Total selecionado
-                  </div>
-                  {fornecedores.map(f => {
-                    const subtotal = allItemKeys.reduce((sum, key) => {
-                      if (selecoes[key] !== f.id) return sum
-                      const item = f.itens_precos?.find(it => normalizeKey(it.descricao) === key)
-                      return sum + (item?.valor_total ?? 0)
-                    }, 0)
-                    const hasAny = allItemKeys.some(k => selecoes[k] === f.id)
-                    return (
-                      <div key={f.id} className="px-1 py-2 text-center">
-                        {hasAny ? (
-                          <span className="text-[11px] font-bold text-emerald-700">{fmt(subtotal)}</span>
-                        ) : (
-                          <span className="text-slate-200 text-xs">—</span>
-                        )}
-                      </div>
-                    )
-                  })}
-                </div>
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Observacao */}
-        <button type="button" onClick={() => setExpanded(!expanded)}
-          className="flex items-center gap-1 text-xs text-blue-500 font-semibold">
-          {expanded ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
-          {expanded ? 'Menos detalhes' : 'Adicionar observacao'}
-        </button>
-        {expanded && (
-          <textarea
-            rows={2}
-            className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-blue-300 outline-none resize-none"
-            placeholder="Motivo da decisao..."
-            value={observacao}
-            onChange={e => setObservacao(e.target.value)}
-          />
-        )}
-      </div>
-
-      {/* Botões */}
-      <div className="grid grid-cols-2 border-t border-slate-100">
-        <button
-          type="button"
-          disabled={mutation.isPending}
-          onClick={() => handleDecision('rejeitada')}
-          className="flex items-center justify-center gap-2 py-3.5 text-xs font-bold text-red-500 hover:bg-red-50 active:bg-red-100 transition border-r border-slate-100 disabled:opacity-50"
-        >
-          {mutation.isPending && action === 'rejeitada'
-            ? <div className="w-5 h-5 border-2 border-red-400 border-t-transparent rounded-full animate-spin" />
-            : <XCircle size={18} />}
-          Rejeitar
-        </button>
-        <button
-          type="button"
-          disabled={mutation.isPending}
-          onClick={() => handleDecision('aprovada')}
-          className="flex items-center justify-center gap-2 py-3.5 text-xs font-bold text-emerald-600 hover:bg-emerald-50 active:bg-emerald-100 transition disabled:opacity-50"
-        >
-          {mutation.isPending && action === 'aprovada'
-            ? <div className="w-5 h-5 border-2 border-emerald-400 border-t-transparent rounded-full animate-spin" />
-            : <CheckCircle size={18} />}
-          {temItens ? 'Aprovar Seleção' : 'Aprovar'}
-        </button>
-      </div>
-
-      {mutation.isError && (
-        <p className="text-red-500 text-xs text-center py-2 border-t border-red-100">
-          Erro ao processar: {mutation.error?.message || 'Tente novamente.'}
-        </p>
-      )}
-    </div>
-  )
-}
-
-// ── GenericPendingCard (autorizacao_pagamento, minuta_contratual) ──────────────
+// ── GenericPendingCard (cotacao, autorizacao_pagamento, minuta_contratual) ─────
 
 function GenericPendingCard({ aprovacao, aprovadorNome, aprovadorEmail }: {
   aprovacao: AprovacaoPendente
@@ -868,6 +503,85 @@ function GenericPendingCard({ aprovacao, aprovadorNome, aprovadorEmail }: {
           Nivel {aprovacao.nivel} | Aprovador: {aprovacao.aprovador_nome}
         </p>
 
+        {/* ── Card Transporte ── */}
+        {aprovacao.tipo_aprovacao === 'aprovacao_transporte' && aprovacao.transporte_detalhes ? (
+          <div className="space-y-2">
+            {/* Rota */}
+            <div className="bg-orange-50 border border-orange-200 rounded-xl p-3">
+              <div className="flex items-center gap-2 mb-2">
+                <MapPin size={14} className="text-orange-600" />
+                <span className="text-xs font-bold text-orange-700">Rota</span>
+              </div>
+              <div className="flex items-center gap-2 text-sm">
+                <span className="font-semibold text-slate-800">{aprovacao.transporte_detalhes.origem}</span>
+                <span className="text-orange-400">→</span>
+                <span className="font-semibold text-slate-800">{aprovacao.transporte_detalhes.destino}</span>
+              </div>
+            </div>
+            {/* Detalhes */}
+            <div className="bg-slate-50 rounded-xl p-3 space-y-1.5">
+              {aprovacao.transporte_detalhes.data_desejada && (
+                <div className="flex justify-between text-xs">
+                  <span className="text-slate-500">Data Desejada</span>
+                  <span className="text-slate-800 font-medium">{new Date(aprovacao.transporte_detalhes.data_desejada).toLocaleDateString('pt-BR')}</span>
+                </div>
+              )}
+              {aprovacao.transporte_detalhes.tipo && (
+                <div className="flex justify-between text-xs">
+                  <span className="text-slate-500">Tipo</span>
+                  <span className="text-slate-800 font-medium capitalize">{aprovacao.transporte_detalhes.tipo.replace(/_/g, ' ')}</span>
+                </div>
+              )}
+              {aprovacao.transporte_detalhes.modal && (
+                <div className="flex justify-between text-xs">
+                  <span className="text-slate-500">Modal</span>
+                  <span className="text-slate-800 font-medium capitalize">{aprovacao.transporte_detalhes.modal}</span>
+                </div>
+              )}
+              {aprovacao.transporte_detalhes.motorista_nome && (
+                <div className="flex justify-between text-xs">
+                  <span className="text-slate-500">Motorista</span>
+                  <span className="text-slate-800 font-medium">{aprovacao.transporte_detalhes.motorista_nome}</span>
+                </div>
+              )}
+              {aprovacao.transporte_detalhes.veiculo_placa && (
+                <div className="flex justify-between text-xs">
+                  <span className="text-slate-500">Placa</span>
+                  <span className="text-slate-800 font-medium">{aprovacao.transporte_detalhes.veiculo_placa}</span>
+                </div>
+              )}
+              {aprovacao.transporte_detalhes.solicitante_nome && (
+                <div className="flex justify-between text-xs">
+                  <span className="text-slate-500">Solicitante</span>
+                  <span className="text-slate-800 font-medium">{aprovacao.transporte_detalhes.solicitante_nome}</span>
+                </div>
+              )}
+              {aprovacao.transporte_detalhes.obra_nome && (
+                <div className="flex justify-between text-xs">
+                  <span className="text-slate-500">Obra</span>
+                  <span className="text-slate-800 font-medium">{aprovacao.transporte_detalhes.obra_nome}</span>
+                </div>
+              )}
+            </div>
+            {aprovacao.transporte_detalhes.descricao && (
+              <p className="text-xs text-slate-500 italic">{aprovacao.transporte_detalhes.descricao}</p>
+            )}
+            {aprovacao.transporte_detalhes.custo_estimado != null && aprovacao.transporte_detalhes.custo_estimado > 0 && (
+              <div className="bg-orange-50 border border-orange-200 rounded-xl p-3 flex justify-between items-center">
+                <span className="text-xs text-orange-700 font-medium">Custo Estimado</span>
+                <span className="text-lg font-extrabold text-orange-700">
+                  {aprovacao.transporte_detalhes.custo_estimado.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                </span>
+              </div>
+            )}
+            {aprovacao.transporte_detalhes.urgente && (
+              <div className="flex items-center gap-1.5 text-xs text-red-600 font-bold">
+                <AlertTriangle size={12} /> URGENTE
+              </div>
+            )}
+          </div>
+        ) : null}
+
         {/* ── Resumo Executivo para Minuta Contratual ── */}
         {aprovacao.tipo_aprovacao === 'minuta_contratual' && aprovacao.minuta_resumo ? (
           <MinutaExecutiveSummary
@@ -909,37 +623,6 @@ function GenericPendingCard({ aprovacao, aprovadorNome, aprovadorEmail }: {
                   {fmt(aprovacao.requisicao.valor_estimado)}
                 </span>
               </div>
-            )}
-          </div>
-        ) : aprovacao.tipo_aprovacao === 'aprovacao_transporte' && aprovacao.transporte_detalhes ? (
-          <div className="space-y-2">
-            <div className="bg-orange-50 rounded-xl p-3 space-y-2">
-              <div className="flex items-center gap-2 text-sm font-bold text-orange-800">
-                <MapPin size={14} className="text-orange-500" />
-                {aprovacao.transporte_detalhes.origem}
-                <span className="text-orange-400 mx-1">→</span>
-                {aprovacao.transporte_detalhes.destino}
-              </div>
-              <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
-                {aprovacao.transporte_detalhes.data_desejada && (
-                  <div><span className="text-slate-500">Data:</span> <span className="font-semibold text-slate-700">{new Date(aprovacao.transporte_detalhes.data_desejada).toLocaleDateString('pt-BR')}</span></div>
-                )}
-                {aprovacao.transporte_detalhes.modal && (
-                  <div><span className="text-slate-500">Modal:</span> <span className="font-semibold text-slate-700 capitalize">{aprovacao.transporte_detalhes.modal.replace(/_/g, ' ')}</span></div>
-                )}
-                {aprovacao.transporte_detalhes.motorista_nome && (
-                  <div><span className="text-slate-500">Motorista:</span> <span className="font-semibold text-slate-700">{aprovacao.transporte_detalhes.motorista_nome}</span></div>
-                )}
-                {aprovacao.transporte_detalhes.veiculo_placa && (
-                  <div><span className="text-slate-500">Placa:</span> <span className="font-mono font-semibold text-slate-700">{aprovacao.transporte_detalhes.veiculo_placa}</span></div>
-                )}
-                {aprovacao.transporte_detalhes.obra_nome && (
-                  <div className="col-span-2"><span className="text-slate-500">Obra:</span> <span className="font-semibold text-slate-700">{aprovacao.transporte_detalhes.obra_nome}</span></div>
-                )}
-              </div>
-            </div>
-            {aprovacao.transporte_detalhes.descricao && (
-              <p className="text-xs text-slate-600 italic">{aprovacao.transporte_detalhes.descricao}</p>
             )}
           </div>
         ) : (
@@ -1015,15 +698,6 @@ function GenericPendingCard({ aprovacao, aprovadorNome, aprovadorEmail }: {
 
 // ── Issue #35: Pagamento Detalhes Card ────────────────────────────────────────
 
-const TIPO_LABEL: Record<string, string> = {
-  nota_fiscal: 'Nota Fiscal',
-  comprovante_entrega: 'Comprovante Entrega',
-  medicao: 'Medição',
-  comprovante_pagamento: 'Comprovante Pgto',
-  contrato: 'Contrato',
-  outro: 'Documento',
-}
-
 function PagamentoDetalhesCard({ detalhes, selectedItemIds, setSelectedItemIds }: {
   detalhes: NonNullable<AprovacaoPendente['pagamento_detalhes']>
   selectedItemIds?: Set<string>
@@ -1031,7 +705,6 @@ function PagamentoDetalhesCard({ detalhes, selectedItemIds, setSelectedItemIds }
 }) {
   const [showEntender, setShowEntender] = useState(false)
   const [showItens, setShowItens] = useState(false)
-  const [expandedItemId, setExpandedItemId] = useState<string | null>(null)
   const fmtDate = (d: string) => {
     if (!d) return '—'
     const dt = new Date(d.length === 10 ? d + 'T00:00:00' : d)
@@ -1180,10 +853,9 @@ function PagamentoDetalhesCard({ detalhes, selectedItemIds, setSelectedItemIds }
             </div>
 
             {/* Item list */}
-            <div className="space-y-1.5 max-h-[28rem] overflow-y-auto">
+            <div className="space-y-1.5 max-h-72 overflow-y-auto">
               {itens.map(item => {
                 const checked = selectedItemIds?.has(item.id) ?? true
-                const isExpanded = expandedItemId === item.id
                 return (
                   <div
                     key={item.id}
@@ -1192,13 +864,10 @@ function PagamentoDetalhesCard({ detalhes, selectedItemIds, setSelectedItemIds }
                         ? 'bg-white border-emerald-200 hover:bg-emerald-50/30'
                         : 'bg-slate-50 border-slate-200 hover:bg-slate-100/50 opacity-60'
                     }`}
-                    onClick={() => setExpandedItemId(prev => prev === item.id ? null : item.id)}
+                    onClick={() => toggleItem(item.id)}
                   >
                     <div className="flex items-start gap-2">
-                      <div
-                        className="mt-0.5 flex-shrink-0"
-                        onClick={e => { e.stopPropagation(); toggleItem(item.id) }}
-                      >
+                      <div className="mt-0.5 flex-shrink-0">
                         {checked
                           ? <CheckSquare size={16} className="text-emerald-500" />
                           : <Square size={16} className="text-slate-300" />}
@@ -1223,7 +892,7 @@ function PagamentoDetalhesCard({ detalhes, selectedItemIds, setSelectedItemIds }
                             {item.requisicao_descricao || item.requisicao_justificativa}
                           </p>
                         )}
-                        {item.anexos && item.anexos.length > 0 && !isExpanded && (
+                        {item.anexos && item.anexos.length > 0 && (
                           <div className="flex gap-1.5 mt-0.5">
                             {item.anexos.map((anexo, idx) => (
                               <a
@@ -1242,94 +911,6 @@ function PagamentoDetalhesCard({ detalhes, selectedItemIds, setSelectedItemIds }
                         )}
                       </div>
                     </div>
-
-                    {/* Expanded detail panel */}
-                    {isExpanded && (
-                      <div className="bg-slate-50 rounded-lg p-3 mt-2 space-y-3" onClick={e => e.stopPropagation()}>
-                        {/* Section 1: Timeline de Aprovação */}
-                        <div>
-                          <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">Timeline</p>
-                          {item.timeline && item.timeline.length > 0 ? (
-                            <div className="space-y-0">
-                              {item.timeline.map((evt: { tipo: string, label: string, ator?: string, data: string, obs?: string, status?: string, nivel?: number }, idx: number) => {
-                                const EventIcon = evt.tipo === 'rc_criada' ? FileText
-                                  : evt.tipo === 'cotacao_aprovada' ? ShoppingCart
-                                  : evt.tipo === 'pedido_emitido' ? Package
-                                  : evt.tipo === 'cp_criada' ? DollarSign
-                                  : evt.tipo === 'lote_incluido' ? Layers
-                                  : evt.tipo === 'aprovacao' && (evt.status === 'aprovada' || evt.status === 'aprovado') ? CheckCircle
-                                  : evt.tipo === 'aprovacao' && (evt.status === 'rejeitada' || evt.status === 'rejeitado') ? XCircle
-                                  : Clock
-                                const dotColorClass = evt.tipo === 'rc_criada' ? 'bg-slate-500'
-                                  : evt.tipo === 'cotacao_aprovada' ? 'bg-blue-500'
-                                  : evt.tipo === 'pedido_emitido' ? 'bg-teal-500'
-                                  : evt.tipo === 'cp_criada' ? 'bg-amber-500'
-                                  : evt.tipo === 'lote_incluido' ? 'bg-indigo-500'
-                                  : evt.tipo === 'aprovacao' && (evt.status === 'aprovada' || evt.status === 'aprovado') ? 'bg-emerald-500'
-                                  : evt.tipo === 'aprovacao' && (evt.status === 'rejeitada' || evt.status === 'rejeitado') ? 'bg-red-500'
-                                  : 'bg-slate-400'
-                                return (
-                                  <div key={idx} className="flex gap-2.5 relative">
-                                    {idx < item.timeline!.length - 1 && (
-                                      <div className="absolute left-[9px] top-5 bottom-0 w-px bg-slate-200" />
-                                    )}
-                                    <div className={`w-5 h-5 rounded-full flex items-center justify-center shrink-0 mt-0.5 ${dotColorClass}`}>
-                                      <EventIcon size={11} className="text-white" />
-                                    </div>
-                                    <div className="pb-3 min-w-0">
-                                      <p className="text-[11px] font-semibold text-slate-700">{evt.label}</p>
-                                      <p className="text-[10px] text-slate-400">
-                                        {evt.ator && <>{evt.ator} · </>}
-                                        {fmtDateTime(evt.data)}
-                                        {evt.nivel && <> · Nível {evt.nivel}</>}
-                                      </p>
-                                      {evt.obs && <p className="text-[10px] text-slate-500 italic mt-0.5">"{evt.obs}"</p>}
-                                    </div>
-                                  </div>
-                                )
-                              })}
-                            </div>
-                          ) : (
-                            <p className="text-[10px] text-slate-400 italic">Sem histórico disponível</p>
-                          )}
-                        </div>
-
-                        {/* Section 2: Documentos Anexados */}
-                        <div>
-                          <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">Documentos</p>
-                          {item.anexos && item.anexos.length > 0 ? (
-                            <div className="space-y-1.5">
-                              {item.anexos.map((anexo, idx) => (
-                                <a
-                                  key={idx}
-                                  href={anexo.url}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="flex items-center gap-2 px-3 py-2 rounded-lg border border-slate-200 bg-white hover:border-slate-300 hover:shadow-sm transition-all group"
-                                >
-                                  {anexo.mime_type?.includes('pdf') ? (
-                                    <FileText size={14} className="text-red-500 shrink-0" />
-                                  ) : (
-                                    <Paperclip size={14} className="text-slate-400 shrink-0" />
-                                  )}
-                                  <div className="flex-1 min-w-0">
-                                    <p className="text-[11px] font-semibold text-slate-700 truncate">{anexo.nome}</p>
-                                    <div className="flex items-center gap-1.5 mt-0.5">
-                                      <span className="text-[9px] font-semibold bg-slate-100 text-slate-500 rounded-full px-1.5 py-0.5">
-                                        {TIPO_LABEL[anexo.tipo] ?? anexo.tipo}
-                                      </span>
-                                    </div>
-                                  </div>
-                                  <ExternalLink size={10} className="text-slate-300 group-hover:text-slate-500 shrink-0" />
-                                </a>
-                              ))}
-                            </div>
-                          ) : (
-                            <p className="text-[10px] text-slate-400 italic">(sem documentos anexados)</p>
-                          )}
-                        </div>
-                      </div>
-                    )}
                   </div>
                 )
               })}
@@ -1620,13 +1201,6 @@ function AccordionSection({
           {aprovacoes.map(apr =>
             tipo === 'requisicao_compra' ? (
               <AprovacaoCard
-                key={apr.id}
-                aprovacao={apr}
-                aprovadorNome={aprovadorNome}
-                aprovadorEmail={aprovadorEmail}
-              />
-            ) : tipo === 'cotacao' ? (
-              <CotacaoItemsCard
                 key={apr.id}
                 aprovacao={apr}
                 aprovadorNome={aprovadorNome}

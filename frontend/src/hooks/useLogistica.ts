@@ -27,8 +27,6 @@ export function useSolicitacoes(filtros?: {
 }) {
   return useQuery({
     queryKey: QK.solicitacoes(filtros),
-    staleTime: 120_000,
-    refetchOnWindowFocus: false,
     queryFn: async () => {
       let q = supabase
         .from('log_solicitacoes')
@@ -63,8 +61,6 @@ export function useSolicitacao(id: string | undefined) {
   return useQuery({
     queryKey: QK.solicitacao(id!),
     enabled: !!id,
-    staleTime: 120_000,
-    refetchOnWindowFocus: false,
     queryFn: async () => {
       const { data, error } = await supabase
         .from('log_solicitacoes')
@@ -175,29 +171,28 @@ export function useAprovarSolicitacao() {
   return useMutation({
     mutationFn: async ({ id, aprovado, motivo }: { id: string; aprovado: boolean; motivo?: string }) => {
       const { data: { user } } = await supabase.auth.getUser()
-      const now = new Date().toISOString()
       const { data, error } = await supabase
         .from('log_solicitacoes')
         .update({
           status: aprovado ? 'aprovado' : 'recusado',
           aprovado_por: aprovado ? user?.id : undefined,
-          aprovado_em: aprovado ? now : undefined,
+          aprovado_em: aprovado ? new Date().toISOString() : undefined,
           motivo_reprovacao: aprovado ? undefined : motivo,
-          updated_at: now,
+          updated_at: new Date().toISOString(),
         })
         .eq('id', id)
         .select()
         .single()
       if (error) throw error
 
-      // Atualizar registro centralizado de aprovação
-      const perfil = await supabase.from('sys_perfis').select('nome_completo').eq('auth_id', user?.id).single()
-      await supabase.from('apr_aprovacoes')
+      // Atualizar apr_aprovacoes correspondente
+      const aprStatus = aprovado ? 'aprovada' : 'rejeitada'
+      await supabase
+        .from('apr_aprovacoes')
         .update({
-          status: aprovado ? 'aprovada' : 'rejeitada',
-          data_decisao: now,
-          aprovador_nome: perfil.data?.nome_completo ?? 'Usuário',
-          observacao: motivo ?? null,
+          status: aprStatus,
+          data_decisao: new Date().toISOString(),
+          observacao: motivo || null,
         })
         .eq('entidade_id', id)
         .eq('tipo_aprovacao', 'aprovacao_transporte')
@@ -209,6 +204,7 @@ export function useAprovarSolicitacao() {
       qc.invalidateQueries({ queryKey: ['log_solicitacoes'] })
       qc.invalidateQueries({ queryKey: ['log_solicitacao', data.id] })
       qc.invalidateQueries({ queryKey: ['aprovacoes-pendentes'] })
+      qc.invalidateQueries({ queryKey: ['aprovacoes-kpis'] })
     },
   })
 }
@@ -224,21 +220,25 @@ export function useEnviarParaAprovacao() {
         .select()
         .single()
       if (error) throw error
+
       const sol = data as LogSolicitacao
 
-      // Criar registro centralizado de aprovação
-      const { data: { user } } = await supabase.auth.getUser()
-      await supabase.from('apr_aprovacoes').insert({
+      // Criar registro em apr_aprovacoes para aparecer no AprovAi
+      const prazo = new Date()
+      prazo.setHours(prazo.getHours() + 48)
+
+      const { error: aprError } = await supabase.from('apr_aprovacoes').insert({
         modulo: 'log',
         tipo_aprovacao: 'aprovacao_transporte',
         entidade_id: sol.id,
         entidade_numero: sol.numero,
         status: 'pendente',
         nivel: 1,
-        aprovador_nome: 'Laucídio',
-        solicitante_id: user?.id,
-        prazo_resposta: new Date(Date.now() + 48 * 3600 * 1000).toISOString(),
+        aprovador_nome: 'Gestor Logística',
+        aprovador_email: 'logistica@tegplus.com.br',
+        data_limite: prazo.toISOString(),
       })
+      if (aprError) console.error('Erro ao criar aprovação transporte:', aprError)
 
       return sol
     },
@@ -246,6 +246,7 @@ export function useEnviarParaAprovacao() {
       qc.invalidateQueries({ queryKey: ['log_solicitacoes'] })
       qc.invalidateQueries({ queryKey: ['log_solicitacao', data.id] })
       qc.invalidateQueries({ queryKey: ['aprovacoes-pendentes'] })
+      qc.invalidateQueries({ queryKey: ['aprovacoes-kpis'] })
     },
   })
 }
@@ -296,8 +297,6 @@ export function useChecklistExpedicao(solicitacaoId: string | undefined) {
   return useQuery({
     queryKey: ['log_checklist', solicitacaoId],
     enabled: !!solicitacaoId,
-    staleTime: 120_000,
-    refetchOnWindowFocus: false,
     queryFn: async () => {
       const { data, error } = await supabase
         .from('log_checklists_expedicao')
@@ -337,8 +336,6 @@ export function useNFe(solicitacaoId: string | undefined) {
   return useQuery({
     queryKey: ['log_nfe', solicitacaoId],
     enabled: !!solicitacaoId,
-    staleTime: 120_000,
-    refetchOnWindowFocus: false,
     queryFn: async () => {
       const { data, error } = await supabase
         .from('log_nfe')
@@ -507,8 +504,6 @@ export function useSolicitarNFFiscal() {
 export function useTransportes() {
   return useQuery({
     queryKey: QK.transportes(),
-    staleTime: 120_000,
-    refetchOnWindowFocus: false,
     queryFn: async () => {
       const { data, error } = await supabase
         .from('log_transportes')
@@ -644,8 +639,6 @@ export function useResolverOcorrencia() {
 export function useRecebimentos(filtros?: { status?: string }) {
   return useQuery({
     queryKey: QK.recebimentos(filtros),
-    staleTime: 120_000,
-    refetchOnWindowFocus: false,
     queryFn: async () => {
       let q = supabase
         .from('log_recebimentos')
@@ -811,8 +804,6 @@ export function useRotas() {
 export function useLogisticaKPIs() {
   return useQuery({
     queryKey: QK.kpis(),
-    staleTime: 120_000,
-    refetchOnWindowFocus: false,
     queryFn: async () => {
       const hoje = new Date().toISOString().slice(0, 10)
 

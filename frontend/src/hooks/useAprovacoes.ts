@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import type { AprovacaoPendente, AprovacaoHistorico, TipoAprovacao, CotacaoFornecedor, ItemSelecionado } from '../types'
+import type { AprovacaoPendente, AprovacaoHistorico, TipoAprovacao } from '../types'
 import { supabase } from '../services/supabase'
 import { api } from '../services/api'
 // Tabelas: apr_aprovacoes (modulo Aprovacoes -- AprovAi)
@@ -14,7 +14,6 @@ export function useAprovacoesPendentes(tipo?: TipoAprovacao) {
   return useQuery<AprovacaoPendente[]>({
     queryKey: ['aprovacoes-pendentes', tipo],
     queryFn: async () => {
-      try {
       // Aprovações de pagamento são criadas APENAS via Lotes (useEnviarLoteAprovacao)
       // Não há mais sync automático de CPs individuais.
 
@@ -56,28 +55,24 @@ export function useAprovacoesPendentes(tipo?: TipoAprovacao) {
         valor: number
         prazo_dias: number
         total_cotados: number
-        cotacao_id?: string
-        fornecedores?: CotacaoFornecedor[]
       }>()
 
       if (cmpIds.length > 0) {
         const { data: cotData } = await supabase
           .from('cmp_cotacoes')
-          .select('id, requisicao_id, fornecedor_selecionado_nome, valor_selecionado, fornecedores:cmp_cotacao_fornecedores!cotacao_id(*)')
+          .select('requisicao_id, fornecedor_selecionado_nome, valor_selecionado, fornecedores:cmp_cotacao_fornecedores!cotacao_id(id, prazo_entrega_dias)')
           .in('requisicao_id', cmpIds)
           .eq('status', 'concluida')
 
         for (const c of cotData ?? []) {
           const cot = c as Record<string, unknown>
-          const fornecedores = (cot.fornecedores ?? []) as CotacaoFornecedor[]
-          const selecionado = fornecedores.find(f => f.selecionado) ?? fornecedores[0]
+          const fornecedores = (cot.fornecedores ?? []) as { id: string; prazo_entrega_dias?: number }[]
+          const selecionado = fornecedores.find(() => true)
           cotMap.set(cot.requisicao_id as string, {
             fornecedor_nome: (cot.fornecedor_selecionado_nome as string) ?? 'N/A',
             valor: (cot.valor_selecionado as number) ?? 0,
             prazo_dias: selecionado?.prazo_entrega_dias ?? 0,
             total_cotados: fornecedores.length,
-            cotacao_id: cot.id as string,
-            fornecedores,
           })
         }
       }
@@ -136,12 +131,6 @@ export function useAprovacoesPendentes(tipo?: TipoAprovacao) {
       const finMap = new Map<string, Record<string, unknown>>()
       const loteMap = new Map<string, Record<string, unknown>>()
       const loteItensMap = new Map<string, Record<string, unknown>[]>()
-      const rcMap = new Map<string, Record<string, unknown>>()
-      const pedAnexosMap = new Map<string, Record<string, unknown>[]>()
-      const docMap = new Map<string, Record<string, unknown>[]>()
-      const pedMap = new Map<string, Record<string, unknown>>()
-      const cotMap2 = new Map<string, Record<string, unknown>>()
-      const aprByEntity = new Map<string, Record<string, unknown>[]>()
       if (finIds.length > 0) {
         const { data: finData } = await supabase
           .from('fin_contas_pagar')
@@ -161,43 +150,33 @@ export function useAprovacoesPendentes(tipo?: TipoAprovacao) {
             loteMap.set(lote.id, lote)
           }
 
-          let loteItens: Record<string, unknown>[] | null = null
-          try {
-            const { data, error } = await supabase
-              .from('fin_lote_itens')
-              .select(`
+          const { data: loteItens } = await supabase
+            .from('fin_lote_itens')
+            .select(`
+              id,
+              lote_id,
+              decisao,
+              cp:fin_contas_pagar!cp_id(
                 id,
-                lote_id,
-                decisao,
-                decidido_por,
-                decidido_em,
-                observacao,
-                created_at,
-                cp:fin_contas_pagar!cp_id(
-                  id,
-                  fornecedor_nome,
-                  valor_original,
-                  valor_pago,
-                  numero_documento,
-                  descricao,
-                  data_vencimento,
-                  data_emissao,
-                  centro_custo,
-                  classe_financeira,
-                  natureza,
-                  forma_pagamento,
-                  status,
-                  requisicao_id,
-                  pedido_id,
-                  created_at
-                )
-              `)
-              .in('lote_id', loteIds)
-            if (error) console.warn('[AprovAi] loteItens query error:', error.message)
-            loteItens = data as Record<string, unknown>[] | null
-          } catch (e) { console.warn('[AprovAi] loteItens exception:', e) }
+                fornecedor_nome,
+                valor_original,
+                valor_pago,
+                numero_documento,
+                descricao,
+                data_vencimento,
+                data_emissao,
+                centro_custo,
+                classe_financeira,
+                natureza,
+                forma_pagamento,
+                status,
+                requisicao_id,
+                pedido_id
+              )
+            `)
+            .in('lote_id', loteIds)
 
-          // 5b. Buscar dados de requisição + anexos (não-crítico, falha silenciosa)
+          // 5b. Buscar dados de requisição para cada CP
           const cpIds = (loteItens ?? [])
             .map(item => (item.cp as Record<string, unknown> | null)?.id as string)
             .filter(Boolean)
@@ -208,84 +187,46 @@ export function useAprovacoesPendentes(tipo?: TipoAprovacao) {
             .map(item => (item.cp as Record<string, unknown> | null)?.pedido_id as string)
             .filter(Boolean)
 
-          try {
-            if (reqIds.length > 0) {
-              const { data: rcData } = await supabase
-                .from('cmp_requisicoes')
-                .select('id, numero, descricao, justificativa, solicitante_nome, created_at')
-                .in('id', [...new Set(reqIds)])
-              for (const rc of rcData ?? []) rcMap.set(rc.id, rc)
-            }
-          } catch { /* requisição data is optional */ }
+          // Map: requisicao_id -> { numero, descricao, justificativa, solicitante_nome }
+          const rcMap = new Map<string, Record<string, unknown>>()
+          if (reqIds.length > 0) {
+            const { data: rcData } = await supabase
+              .from('cmp_requisicoes')
+              .select('id, numero, descricao, justificativa, solicitante_nome')
+              .in('id', [...new Set(reqIds)])
+            for (const rc of rcData ?? []) rcMap.set(rc.id, rc)
+          }
 
-          try {
-            if (pedidoIds.length > 0) {
-              const { data: anexosData } = await supabase
-                .from('cmp_pedidos_anexos')
-                .select('pedido_id, nome_arquivo, url, tipo, mime_type, uploaded_at, uploaded_by_nome')
-                .in('pedido_id', [...new Set(pedidoIds)])
-              for (const a of anexosData ?? []) {
-                const pid = a.pedido_id as string
-                const arr = pedAnexosMap.get(pid) ?? []
-                arr.push(a)
-                pedAnexosMap.set(pid, arr)
-              }
+          // Map: pedido_id -> anexos[]
+          const pedAnexosMap = new Map<string, Record<string, unknown>[]>()
+          if (pedidoIds.length > 0) {
+            const { data: anexosData } = await supabase
+              .from('cmp_pedidos_anexos')
+              .select('pedido_id, nome_arquivo, url, tipo, mime_type, uploaded_at, uploaded_by_nome')
+              .in('pedido_id', [...new Set(pedidoIds)])
+            for (const a of anexosData ?? []) {
+              const pid = a.pedido_id as string
+              const arr = pedAnexosMap.get(pid) ?? []
+              arr.push(a)
+              pedAnexosMap.set(pid, arr)
             }
-          } catch { /* anexos data is optional */ }
+          }
 
-          try {
-            if (cpIds.length > 0) {
-              const { data: docsData } = await supabase
-                .from('fin_documentos')
-                .select('entity_id, nome_arquivo, arquivo_url, tipo, mime_type, uploaded_at')
-                .eq('entity_type', 'cp')
-                .in('entity_id', [...new Set(cpIds)])
-              for (const d of docsData ?? []) {
-                const eid = d.entity_id as string
-                const arr = docMap.get(eid) ?? []
-                arr.push(d)
-                docMap.set(eid, arr)
-              }
+          // Map: cp_id -> fin_documentos[]
+          const docMap = new Map<string, Record<string, unknown>[]>()
+          if (cpIds.length > 0) {
+            const { data: docsData } = await supabase
+              .from('fin_documentos')
+              .select('entity_id, nome_arquivo, arquivo_url, tipo, mime_type, uploaded_at')
+              .eq('entity_type', 'cp')
+              .in('entity_id', [...new Set(cpIds)])
+            for (const d of docsData ?? []) {
+              const eid = d.entity_id as string
+              const arr = docMap.get(eid) ?? []
+              arr.push(d)
+              docMap.set(eid, arr)
             }
-          } catch { /* docs data is optional */ }
-
-          // Fetch timeline data
-          try {
-            if (pedidoIds.length > 0) {
-              const { data: pedData } = await supabase
-                .from('cmp_pedidos')
-                .select('id, numero_pedido, created_at, status, fornecedor_nome')
-                .in('id', [...new Set(pedidoIds)])
-              for (const p of pedData ?? []) pedMap.set(p.id, p)
-            }
-          } catch { /* optional */ }
-
-          try {
-            if (reqIds.length > 0) {
-              const { data: cotData } = await supabase
-                .from('cmp_cotacoes')
-                .select('id, requisicao_id, status, data_conclusao, fornecedor_selecionado_nome, valor_selecionado')
-                .in('requisicao_id', [...new Set(reqIds)])
-              for (const c of cotData ?? []) cotMap2.set(c.requisicao_id as string, c)
-            }
-          } catch { /* optional */ }
-
-          try {
-            const allEntityIds = [...new Set([...reqIds, ...loteIds])]
-            if (allEntityIds.length > 0) {
-              const { data: aprHistData } = await supabase
-                .from('apr_aprovacoes')
-                .select('entidade_id, tipo_aprovacao, aprovador_nome, status, data_decisao, observacao, nivel, created_at')
-                .in('entidade_id', allEntityIds)
-                .neq('status', 'pendente')
-              for (const a of aprHistData ?? []) {
-                const eid = a.entidade_id as string
-                const arr = aprByEntity.get(eid) ?? []
-                arr.push(a)
-                aprByEntity.set(eid, arr)
-              }
-            }
-          } catch { /* optional */ }
+          }
 
           for (const item of loteItens ?? []) {
             const loteId = item.lote_id as string | undefined
@@ -304,15 +245,15 @@ export function useAprovacoesPendentes(tipo?: TipoAprovacao) {
         .filter(Boolean)
 
       const logMap = new Map<string, Record<string, unknown>>()
-      try {
-        if (logIds.length > 0) {
-          const { data: logData } = await supabase
-            .from('log_solicitacoes')
-            .select('id, numero, tipo, origem, destino, data_desejada, modal, motorista_nome, veiculo_placa, obra_nome, centro_custo, descricao, peso_total_kg, volumes_total')
-            .in('id', logIds)
-          for (const s of logData ?? []) logMap.set((s as Record<string, unknown>).id as string, s as Record<string, unknown>)
+      if (logIds.length > 0) {
+        const { data: logData } = await supabase
+          .from('log_solicitacoes')
+          .select('id, numero, tipo, origem, destino, data_desejada, modal, motorista_nome, veiculo_placa, custo_estimado, descricao, solicitante_nome, obra_nome, urgente, peso_total_kg, volumes_total')
+          .in('id', logIds)
+        for (const l of logData ?? []) {
+          logMap.set(l.id, l)
         }
-      } catch { /* transporte data is optional */ }
+      }
 
       // 6. Mescla aprovacoes com dados da requisicao/contrato/CP + cotacao
       return aprData
@@ -468,54 +409,6 @@ export function useAprovacoesPendentes(tipo?: TipoAprovacao) {
                     requisicao_justificativa: (rc?.justificativa as string) ?? undefined,
                     solicitante_nome: (rc?.solicitante_nome as string) ?? undefined,
                     anexos: anexos.length > 0 ? anexos : undefined,
-                    decisao_por: (item.decidido_por as string) ?? undefined,
-                    decisao_em: (item.decidido_em as string) ?? undefined,
-                    decisao_obs: (item.observacao as string) ?? undefined,
-                    pedido_id: pedId || undefined,
-                    created_at: (item.created_at as string) ?? undefined,
-                    timeline: (() => {
-                      const events: { tipo: string, label: string, ator?: string, data: string, obs?: string, status?: string, nivel?: number }[] = []
-
-                      // RC criada
-                      if (rc?.created_at) events.push({ tipo: 'rc_criada', label: `RC ${(rc.numero as string) ?? ''} criada`, ator: (rc.solicitante_nome as string) ?? undefined, data: (rc.created_at as string) })
-
-                      // Aprovações da RC (Validação Técnica) — 1 por nível, a mais recente
-                      const rcAprsAll = rcId ? (aprByEntity.get(rcId) ?? []).filter(a => (a.tipo_aprovacao as string) === 'requisicao_compra' && (a.status as string) === 'aprovada') : []
-                      const rcByNivel = new Map<number, typeof rcAprsAll[0]>()
-                      for (const a of rcAprsAll.sort((x, y) => new Date(y.data_decisao as string).getTime() - new Date(x.data_decisao as string).getTime())) {
-                        const n = a.nivel as number; if (!rcByNivel.has(n)) rcByNivel.set(n, a)
-                      }
-                      for (const apr of rcByNivel.values()) events.push({ tipo: 'aprovacao', label: 'Validação Técnica', ator: (apr.aprovador_nome as string) ?? undefined, data: (apr.data_decisao as string) ?? '', status: (apr.status as string), nivel: (apr.nivel as number) })
-
-                      // Cotação concluída
-                      const cot = rcId ? cotMap2.get(rcId) : undefined
-                      if (cot?.data_conclusao) events.push({ tipo: 'cotacao_aprovada', label: `Cotação concluída — ${(cot.fornecedor_selecionado_nome as string) ?? ''}`, data: (cot.data_conclusao as string) })
-
-                      // Aprovações da cotação (Aprovação de Compra) — 1 por nível
-                      const cotAprsAll = rcId ? (aprByEntity.get(rcId) ?? []).filter(a => (a.tipo_aprovacao as string) === 'cotacao' && (a.status as string) === 'aprovada') : []
-                      const cotByNivel = new Map<number, typeof cotAprsAll[0]>()
-                      for (const a of cotAprsAll.sort((x, y) => new Date(y.data_decisao as string).getTime() - new Date(x.data_decisao as string).getTime())) {
-                        const n = a.nivel as number; if (!cotByNivel.has(n)) cotByNivel.set(n, a)
-                      }
-                      for (const apr of cotByNivel.values()) events.push({ tipo: 'aprovacao', label: 'Aprovação de Compra', ator: (apr.aprovador_nome as string) ?? undefined, data: (apr.data_decisao as string) ?? '', status: (apr.status as string), nivel: (apr.nivel as number) })
-
-                      // Pedido emitido
-                      const ped = pedId ? pedMap.get(pedId) : undefined
-                      if (ped?.created_at) events.push({ tipo: 'pedido_emitido', label: `Pedido ${(ped.numero_pedido as string) ?? ''} emitido`, data: (ped.created_at as string) })
-
-                      // CP criada
-                      if (cp?.created_at) events.push({ tipo: 'cp_criada', label: 'CP criada', data: (cp.created_at as string) })
-
-                      // Incluído no lote
-                      if (item.created_at) events.push({ tipo: 'lote_incluido', label: 'Incluído no lote', data: (item.created_at as string) })
-
-                      // Decisão do item
-                      if (item.decidido_por) events.push({ tipo: 'aprovacao', label: (item.decisao as string) === 'aprovado' ? 'Item aprovado' : 'Item rejeitado', ator: (item.decidido_por as string), data: (item.decidido_em as string) ?? '', obs: (item.observacao as string) ?? undefined, status: (item.decisao as string) })
-
-                      // Sort chronologically (oldest first for timeline)
-                      events.sort((a, b) => new Date(a.data || 0).getTime() - new Date(b.data || 0).getTime())
-                      return events.length > 0 ? events : undefined
-                    })(),
                   }
                 }),
               }
@@ -533,6 +426,38 @@ export function useAprovacoesPendentes(tipo?: TipoAprovacao) {
                 natureza: (fin.natureza as string) ?? '',
                 forma_pagamento: (fin.forma_pagamento as string) ?? '',
                 status_cp: (fin.status as string) ?? '',
+              }
+            }
+          } else if (a.tipo_aprovacao === 'aprovacao_transporte') {
+            const log = logMap.get(a.entidade_id)
+            requisicao = {
+              id: a.entidade_id,
+              numero: (log?.numero as string) ?? a.entidade_numero ?? 'N/A',
+              solicitante_nome: (log?.solicitante_nome as string) ?? '',
+              obra_nome: (log?.obra_nome as string) ?? '',
+              descricao: `Transporte: ${(log?.origem as string) ?? ''} → ${(log?.destino as string) ?? ''}`,
+              valor_estimado: (log?.custo_estimado as number) ?? 0,
+              urgencia: (log?.urgente as boolean) ? 'critica' : 'normal',
+              status: 'em_aprovacao',
+              alcada_nivel: a.nivel,
+              created_at: a.created_at,
+            }
+            if (log) {
+              ;(a as Record<string, unknown>)._transporte_detalhes = {
+                origem: (log.origem as string) ?? '',
+                destino: (log.destino as string) ?? '',
+                tipo: (log.tipo as string) ?? '',
+                data_desejada: (log.data_desejada as string) ?? undefined,
+                modal: (log.modal as string) ?? undefined,
+                motorista_nome: (log.motorista_nome as string) ?? undefined,
+                veiculo_placa: (log.veiculo_placa as string) ?? undefined,
+                custo_estimado: (log.custo_estimado as number) ?? undefined,
+                descricao: (log.descricao as string) ?? undefined,
+                solicitante_nome: (log.solicitante_nome as string) ?? undefined,
+                obra_nome: (log.obra_nome as string) ?? undefined,
+                urgente: (log.urgente as boolean) ?? undefined,
+                peso_total_kg: (log.peso_total_kg as number) ?? undefined,
+                volumes_total: (log.volumes_total as number) ?? undefined,
               }
             }
           } else {
@@ -554,27 +479,14 @@ export function useAprovacoesPendentes(tipo?: TipoAprovacao) {
           delete (a as Record<string, unknown>)._minuta_resumo
           const pagamentoDetalhes = (a as Record<string, unknown>)._pagamento_detalhes as AprovacaoPendente['pagamento_detalhes']
           delete (a as Record<string, unknown>)._pagamento_detalhes
-
-          // Transporte detalhes
-          const logSol = logMap.get(a.entidade_id)
-          const transporteDetalhes = logSol ? {
-            origem: logSol.origem as string,
-            destino: logSol.destino as string,
-            data_desejada: logSol.data_desejada as string | undefined,
-            modal: logSol.modal as string | undefined,
-            motorista_nome: logSol.motorista_nome as string | undefined,
-            veiculo_placa: logSol.veiculo_placa as string | undefined,
-            obra_nome: logSol.obra_nome as string | undefined,
-            descricao: logSol.descricao as string | undefined,
-          } : undefined
+          const transporteDetalhes = (a as Record<string, unknown>)._transporte_detalhes as AprovacaoPendente['transporte_detalhes']
+          delete (a as Record<string, unknown>)._transporte_detalhes
 
           return {
             ...a,
-            entidade_numero: logSol
-              ? `${(logSol.numero as string) ?? a.entidade_numero} • ${(logSol.origem as string)} → ${(logSol.destino as string)}`
-              : loteMap.has(a.entidade_id)
-                ? `${(loteMap.get(a.entidade_id)?.numero_lote as string) ?? a.entidade_numero ?? 'Lote'} • ${new Date((loteMap.get(a.entidade_id)?.created_at as string) ?? a.created_at).toLocaleDateString('pt-BR')} • ${((loteMap.get(a.entidade_id)?.valor_total as number) ?? 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}`
-                : a.entidade_numero,
+            entidade_numero: loteMap.has(a.entidade_id)
+              ? `${(loteMap.get(a.entidade_id)?.numero_lote as string) ?? a.entidade_numero ?? 'Lote'} • ${new Date((loteMap.get(a.entidade_id)?.created_at as string) ?? a.created_at).toLocaleDateString('pt-BR')} • ${((loteMap.get(a.entidade_id)?.valor_total as number) ?? 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}`
+              : a.entidade_numero,
             requisicao_id: a.entidade_id,
             tipo_aprovacao: a.tipo_aprovacao || 'requisicao_compra',
             modulo: a.modulo || 'cmp',
@@ -582,14 +494,10 @@ export function useAprovacoesPendentes(tipo?: TipoAprovacao) {
             cotacao_resumo: cotMap.get(a.entidade_id) ?? undefined,
             minuta_resumo: minutaResumo ?? undefined,
             pagamento_detalhes: pagamentoDetalhes ?? undefined,
-            transporte_detalhes: transporteDetalhes,
+            transporte_detalhes: transporteDetalhes ?? undefined,
           } as unknown as AprovacaoPendente
         })
         .filter((a): a is AprovacaoPendente => a !== null)
-      } catch (err) {
-        console.error('[AprovAI] useAprovacoesPendentes error:', err)
-        throw err
-      }
     },
     refetchInterval: 15_000,
     refetchOnMount: 'always',
@@ -753,10 +661,6 @@ export interface DecisaoGenericaPayload {
   aprovadorNome: string
   aprovadorEmail: string
   selectedItemIds?: string[]
-  /** Para aprovação de cotação: itens selecionados por fornecedor (aprovação parcial) */
-  itens_selecionados?: ItemSelecionado[]
-  /** ID da cotação — necessário para salvar itens_selecionados */
-  cotacaoId?: string
 }
 
 export function useDecisaoGenerica() {
@@ -792,36 +696,7 @@ export function useDecisaoGenerica() {
 
       // 3. Atualizar entidade fonte conforme tipo de aprovacao
       try {
-        if (tipoAprovacao === 'cotacao') {
-          // Atualiza RC com status de cotação aprovada/rejeitada
-          const novoStatus = decisao === 'aprovada' ? 'cotacao_aprovada' : 'cotacao_rejeitada'
-          await supabase
-            .from('cmp_requisicoes')
-            .update({ status: novoStatus })
-            .eq('id', entidadeId)
-
-          // Salva itens selecionados na cotação (aprovação parcial por item)
-          if (decisao === 'aprovada' && payload.itens_selecionados && payload.cotacaoId) {
-            await supabase
-              .from('cmp_cotacoes')
-              .update({ itens_selecionados: payload.itens_selecionados })
-              .eq('id', payload.cotacaoId)
-          } else if (decisao === 'aprovada' && payload.itens_selecionados && !payload.cotacaoId) {
-            // Fallback: busca cotação pelo requisicao_id
-            const { data: cotacoes } = await supabase
-              .from('cmp_cotacoes')
-              .select('id')
-              .eq('requisicao_id', entidadeId)
-              .eq('status', 'concluida')
-              .limit(1)
-            if (cotacoes?.[0]?.id) {
-              await supabase
-                .from('cmp_cotacoes')
-                .update({ itens_selecionados: payload.itens_selecionados })
-                .eq('id', cotacoes[0].id)
-            }
-          }
-        } else if (tipoAprovacao === 'minuta_contratual') {
+        if (tipoAprovacao === 'minuta_contratual') {
           // Avanca etapa da solicitacao de contrato
           const nextEtapa = decisao === 'aprovada' ? 'enviar_assinatura' : 'preparar_minuta'
           await supabase
@@ -1037,6 +912,36 @@ export function useDecisaoGenerica() {
               })
               .eq('id', entidadeId)
           }
+        } else if (tipoAprovacao === 'aprovacao_transporte') {
+          const now = new Date().toISOString()
+          if (decisao === 'aprovada') {
+            await supabase
+              .from('log_solicitacoes')
+              .update({
+                status: 'aprovado',
+                aprovado_por: aprovadorNome,
+                aprovado_em: now,
+                updated_at: now,
+              })
+              .eq('id', entidadeId)
+          } else if (decisao === 'rejeitada') {
+            await supabase
+              .from('log_solicitacoes')
+              .update({
+                status: 'reprovado',
+                motivo_reprovacao: observacao || 'Reprovado',
+                updated_at: now,
+              })
+              .eq('id', entidadeId)
+          } else {
+            await supabase
+              .from('log_solicitacoes')
+              .update({
+                status: 'planejado',
+                updated_at: now,
+              })
+              .eq('id', entidadeId)
+          }
         }
       } catch (e) {
         console.warn('Aviso: entidade fonte nao atualizada:', e)
@@ -1053,13 +958,9 @@ export function useDecisaoGenerica() {
       qc.invalidateQueries({ queryKey: ['con-solicitacoes-dashboard'] })
       qc.invalidateQueries({ queryKey: ['contas-pagar'] })
       qc.invalidateQueries({ queryKey: ['financeiro-dashboard'] })
-      qc.invalidateQueries({ queryKey: ['cotacoes'] })
-      qc.invalidateQueries({ queryKey: ['cotacao'] })
-      qc.invalidateQueries({ queryKey: ['cotacao-req'] })
-      qc.invalidateQueries({ queryKey: ['requisicoes'] })
-      qc.invalidateQueries({ queryKey: ['requisicao'] })
       qc.invalidateQueries({ queryKey: ['lotes-pagamento'] })
       qc.invalidateQueries({ queryKey: ['lote-detalhe'] })
+      qc.invalidateQueries({ queryKey: ['log_solicitacoes'] })
     },
   })
 }

@@ -146,8 +146,6 @@ export interface AprovacaoPendente extends Aprovacao {
     valor: number
     prazo_dias: number
     total_cotados: number
-    cotacao_id?: string
-    fornecedores?: CotacaoFornecedor[]
   }
   minuta_resumo?: {
     objeto: string
@@ -195,31 +193,23 @@ export interface AprovacaoPendente extends Aprovacao {
       requisicao_justificativa?: string
       solicitante_nome?: string
       anexos?: { nome: string, url: string, tipo: string, mime_type?: string }[]
-      decisao_por?: string
-      decisao_em?: string
-      decisao_obs?: string
-      pedido_id?: string
-      created_at?: string
-      timeline?: {
-        tipo: string
-        label: string
-        ator?: string
-        data: string
-        obs?: string
-        status?: string
-        nivel?: number
-      }[]
     }[]
   }
   transporte_detalhes?: {
     origem: string
     destino: string
+    tipo: string
     data_desejada?: string
     modal?: string
     motorista_nome?: string
     veiculo_placa?: string
-    obra_nome?: string
+    custo_estimado?: number
     descricao?: string
+    solicitante_nome?: string
+    obra_nome?: string
+    urgente?: boolean
+    peso_total_kg?: number
+    volumes_total?: number
   }
 }
 
@@ -238,22 +228,6 @@ export interface AprovacaoHistorico {
   created_at: string
 }
 
-export interface ItemPreco {
-  descricao: string
-  qtd: number
-  valor_unitario: number
-  valor_total: number
-}
-
-export interface ItemSelecionado {
-  descricao: string
-  qtd: number
-  fornecedor_id: string
-  fornecedor_nome: string
-  valor_unitario: number
-  valor_total: number
-}
-
 export interface CotacaoFornecedor {
   id: string
   cotacao_id: string
@@ -263,7 +237,7 @@ export interface CotacaoFornecedor {
   valor_total: number
   prazo_entrega_dias?: number
   condicao_pagamento?: string
-  itens_precos: ItemPreco[]
+  itens_precos: { descricao: string; qtd: number; valor_unitario: number; valor_total: number }[]
   observacao?: string
   arquivo_url?: string
   selecionado: boolean
@@ -283,7 +257,6 @@ export interface Cotacao {
   data_conclusao?: string
   sem_cotacoes_minimas?: boolean
   justificativa_sem_cotacoes?: string
-  itens_selecionados?: ItemSelecionado[]
   created_at: string
   requisicao?: Requisicao
   fornecedores?: CotacaoFornecedor[]
@@ -342,7 +315,7 @@ export interface NovaCotacaoPayload {
     valor_total: number
     prazo_entrega_dias?: number
     condicao_pagamento?: string
-    itens_precos: ItemPreco[]
+    itens_precos: { descricao: string; qtd: number; valor_unitario: number; valor_total: number }[]
     observacao?: string
   }[]
 }

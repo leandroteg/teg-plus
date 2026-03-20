@@ -2,8 +2,8 @@ import { useState, useMemo, useCallback, useEffect } from 'react'
 import {
   ClipboardList, Search, X, CheckCircle2, Clock, AlertTriangle,
   Calendar, ArrowUp, ArrowDown, LayoutList, LayoutGrid, Download,
-  MapPin, Package2, Truck, FileText, FileInput, Building2, Tag, Briefcase,
-  ShieldCheck, Plus, Save, Loader2, Trash2, ExternalLink, XCircle, MessageSquare,
+  MapPin, Package2, Truck, FileText, Building2, Tag, Briefcase,
+  ShieldCheck, Plus, Save, Loader2, Trash2, Route,
 } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
 import {
@@ -11,35 +11,13 @@ import {
   useAprovarSolicitacao, usePlanejaarSolicitacao,
   useEnviarParaAprovacao, useCriarSolicitacao,
 } from '../../hooks/useLogistica'
-import { useFornecedores } from '../../hooks/useFinanceiro'
-import { useCriarSolicitacao as useCriarSolicitacaoNF } from '../../hooks/useSolicitacoesNF'
-import { useConsultaCNPJ } from '../../hooks/useConsultas'
-import { useSearchParams, useNavigate } from 'react-router-dom'
+import { useSearchParams } from 'react-router-dom'
 import { useLookupCentrosCusto } from '../../hooks/useLookups'
 import type { LogSolicitacao, StatusSolicitacaoPipeline, CriarSolicitacaoPayload, TipoTransporte } from '../../types/logistica'
 import { SOLICITACAO_PIPELINE_STAGES } from '../../types/logistica'
+import { lazy, Suspense } from 'react'
 
-// ── Alçadas & Planejamento ────────────────────────────────────────────────────
-
-const ALCADAS = [
-  { limite: 500,    label: 'Até R$ 500',         aprovador: 'Coordenador' },
-  { limite: 2000,   label: 'R$ 501 a R$ 2.000',  aprovador: 'Gerente' },
-  { limite: Infinity, label: 'Acima de R$ 2.000', aprovador: 'Diretoria' },
-]
-
-interface PlanejamentoForm {
-  modal?: string
-  transportadora_id?: string
-  veiculo_placa?: string
-  motorista_nome?: string
-  data_prevista_saida?: string
-  custo_estimado?: number
-}
-
-function getAlcada(valor?: number) {
-  if (!valor) return ALCADAS[0]
-  return ALCADAS.find(a => valor <= a.limite) ?? ALCADAS[2]
-}
+const PlanejamentoRotaModal = lazy(() => import('../../components/logistica/PlanejamentoRotaModal'))
 
 // ── Formatters ───────────────────────────────────────────────────────────────
 
@@ -174,18 +152,7 @@ function DetailModal({ sol, onClose, onAction, isDark }: {
             </div>
           </div>
 
-          <div className="space-y-2 pt-1">
-            {sol.status === 'planejado' && (
-              <div className="flex gap-2">
-                <button onClick={() => onAction('revisarPlanejamento', sol)} className={`flex-1 py-3 rounded-xl border text-sm font-bold transition-all flex items-center justify-center gap-2 ${isDark ? 'border-white/[0.08] text-slate-300 hover:bg-white/[0.04]' : 'border-slate-200 text-slate-600 hover:bg-slate-50'}`}>
-                  <Calendar size={15} /> Revisar Planejamento
-                </button>
-                <button onClick={() => onAction('enviarAprovacao', sol)} className="flex-1 py-3 rounded-xl bg-amber-600 text-white text-sm font-bold hover:bg-amber-700 transition-all flex items-center justify-center gap-2">
-                  <ShieldCheck size={15} /> Enviar p/ Aprovação
-                </button>
-              </div>
-            )}
-            <div className="flex gap-2">
+          <div className="flex gap-2 pt-1">
             <button onClick={onClose} className={`flex-1 py-3 rounded-xl border text-sm font-semibold transition-all ${isDark ? 'border-white/[0.06] text-slate-300' : 'border-slate-200 text-slate-600 hover:bg-slate-50'}`}>
               Fechar
             </button>
@@ -194,17 +161,16 @@ function DetailModal({ sol, onClose, onAction, isDark }: {
                 <Calendar size={15} /> Planejar
               </button>
             )}
+            {sol.status === 'planejado' && (
+              <button onClick={() => onAction('enviarAprovacao', sol)} className="flex-1 py-3 rounded-xl bg-amber-600 text-white text-sm font-bold hover:bg-amber-700 transition-all flex items-center justify-center gap-2">
+                <ShieldCheck size={15} /> Enviar p/ Aprovação
+              </button>
+            )}
             {sol.status === 'aguardando_aprovacao' && (
               <button onClick={() => onAction('aprovar', sol)} className="flex-1 py-3 rounded-xl bg-emerald-600 text-white text-sm font-bold hover:bg-emerald-700 transition-all flex items-center justify-center gap-2">
                 <CheckCircle2 size={15} /> Aprovar
               </button>
             )}
-            {sol.status === 'aprovado' && (
-              <button onClick={() => onAction('solicitarNF', sol)} className="flex-1 py-3 rounded-xl bg-amber-600 text-white text-sm font-bold hover:bg-amber-700 transition-all flex items-center justify-center gap-2">
-                <FileInput size={15} /> Solicitar NF
-              </button>
-            )}
-            </div>
           </div>
         </div>
       </div>
@@ -382,14 +348,24 @@ function NovaSolicitacaoModal({ isDark, onClose, onSuccess }: {
 
         {/* Body */}
         <div className="p-6 space-y-4">
-          <div>
-            <label className={labelCls}>Centro de Custo</label>
-            <select value={form.centro_custo ?? ''} onChange={e => set('centro_custo', e.target.value)} className={inputCls}>
-              <option value="">Selecione...</option>
-              {centrosCusto.map(cc => (
-                <option key={cc.id} value={cc.codigo}>{cc.codigo} - {cc.descricao}</option>
-              ))}
-            </select>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className={labelCls}>Tipo *</label>
+              <select value={form.tipo} onChange={e => set('tipo', e.target.value)} className={inputCls}>
+                {Object.entries(TIPO_LABELS).map(([k, v]) => (
+                  <option key={k} value={k}>{v}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className={labelCls}>Centro de Custo</label>
+              <select value={form.centro_custo ?? ''} onChange={e => set('centro_custo', e.target.value)} className={inputCls}>
+                <option value="">Selecione...</option>
+                {centrosCusto.map(cc => (
+                  <option key={cc.id} value={cc.codigo}>{cc.codigo} - {cc.descricao}</option>
+                ))}
+              </select>
+            </div>
           </div>
 
           {/* Origem */}
@@ -535,12 +511,7 @@ export default function SolicitacoesPipeline() {
   const [sortDir, setSortDir] = useState<SortDir>('desc')
   const [viewMode, setViewMode] = useState<ViewMode>('cards')
   const [showNovaSolicitacao, setShowNovaSolicitacao] = useState(false)
-  const [planejamentoModal, setPlanejamentoModal] = useState<LogSolicitacao | null>(null)
-  const [planejForm, setPlanejForm] = useState<PlanejamentoForm>({})
-  const [aprovacaoModal, setAprovacaoModal] = useState<LogSolicitacao | null>(null)
-  const [motivoReprovacao, setMotivoReprovacao] = useState('')
-  const [nfModal, setNfModal] = useState<{ sol: LogSolicitacao; form: { fornecedor_cnpj: string; fornecedor_nome: string; valor_total: number; descricao: string } } | null>(null)
-  const navigate = useNavigate()
+  const [showPlanejamento, setShowPlanejamento] = useState<LogSolicitacao[]>([])
 
   // Abrir modal via ?nova=1 (clique no sidebar)
   const [searchParams, setSearchParams] = useSearchParams()
@@ -552,15 +523,9 @@ export default function SolicitacoesPipeline() {
   }, [searchParams, setSearchParams])
 
   const { data: solicitacoes = [], isLoading } = useSolicitacoes()
-  const { data: fornecedores = [] } = useFornecedores()
   const atualizarStatus = useAtualizarStatusSolicitacao()
   const aprovar = useAprovarSolicitacao()
-  const planejar = usePlanejaarSolicitacao()
   const enviarParaAprovacao = useEnviarParaAprovacao()
-  const criarNF = useCriarSolicitacaoNF()
-  const cnpjLookup = useConsultaCNPJ(useCallback((r: any) => {
-    setNfModal(prev => prev ? { ...prev, form: { ...prev.form, fornecedor_nome: prev.form.fornecedor_nome || r.razao_social } } : prev)
-  }, []))
 
   // Group by status
   const grouped = useMemo(() => {
@@ -616,20 +581,42 @@ export default function SolicitacoesPipeline() {
   }
   const switchTab = (status: StatusSolicitacaoPipeline) => { setActiveTab(status); setSelectedIds(new Set()); setBusca('') }
 
-  // Actions — open modals instead of acting directly
-  const openPlanejamento = (sol: LogSolicitacao) => {
-    setPlanejamentoModal(sol)
-    setPlanejForm({ custo_estimado: sol.custo_estimado })
+  const planejar = usePlanejaarSolicitacao()
+
+  // Actions
+  const handlePlanejar = (ids: string[]) => {
+    const sols = solicitacoes.filter(s => ids.includes(s.id))
+    if (sols.length > 0) setShowPlanejamento(sols)
   }
 
-  const handleSalvarPlanejamento = async () => {
-    if (!planejamentoModal) return
+  const handleSavePlanejamento = async (data: {
+    solicitacaoIds: string[]
+    rota: unknown[]
+    distancia_total_km: number
+    duracao_total_horas: number
+    modal?: string
+    motorista_nome?: string
+    veiculo_placa?: string
+    data_prevista_saida?: string
+    custo_estimado?: number
+  }) => {
     try {
-      await planejar.mutateAsync({ id: planejamentoModal.id, ...planejForm })
-      showToast('success', 'Planejamento salvo!')
-      setPlanejamentoModal(null)
-      setPlanejForm({})
-    } catch { showToast('error', 'Erro ao salvar planejamento') }
+      for (const id of data.solicitacaoIds) {
+        await planejar.mutateAsync({
+          id,
+          modal: data.modal,
+          motorista_nome: data.motorista_nome,
+          veiculo_placa: data.veiculo_placa,
+          data_prevista_saida: data.data_prevista_saida,
+          custo_estimado: data.custo_estimado,
+        })
+      }
+      showToast('success', `${data.solicitacaoIds.length} solicitação(ões) planejada(s)`)
+      setShowPlanejamento([])
+      setSelectedIds(new Set())
+    } catch {
+      showToast('error', 'Erro ao salvar planejamento')
+    }
   }
 
   const handleEnviarAprovacao = async (ids: string[]) => {
@@ -640,98 +627,30 @@ export default function SolicitacoesPipeline() {
     } catch { showToast('error', 'Erro ao enviar para aprovação') }
   }
 
-  const openAprovacao = (sol: LogSolicitacao) => {
-    setAprovacaoModal(sol)
-    setMotivoReprovacao('')
-  }
-
-  const handleAprovarReprovar = async (aprovado: boolean) => {
-    if (!aprovacaoModal) return
+  const handleAprovar = async (ids: string[]) => {
     try {
-      await aprovar.mutateAsync({ id: aprovacaoModal.id, aprovado, motivo: motivoReprovacao })
-      showToast('success', aprovado ? 'Solicitação aprovada!' : 'Solicitação reprovada')
-      setAprovacaoModal(null)
-      setMotivoReprovacao('')
-    } catch { showToast('error', 'Erro na aprovação') }
-  }
-
-  const openNfModal = (sol: LogSolicitacao) => {
-    const transp = (sol as any).transportadora
-    setNfModal({
-      sol,
-      form: {
-        fornecedor_cnpj: transp?.cnpj ?? '',
-        fornecedor_nome: transp?.nome_fantasia ?? transp?.razao_social ?? '',
-        valor_total: sol.custo_estimado ?? 0,
-        descricao: `Transporte ${sol.numero} — ${sol.origem} → ${sol.destino}`,
-      },
-    })
-  }
-
-  const handleSolicitarNF = async () => {
-    if (!nfModal) return
-    try {
-      await criarNF.mutateAsync({
-        fornecedor_cnpj: nfModal.form.fornecedor_cnpj,
-        fornecedor_nome: nfModal.form.fornecedor_nome,
-        valor_total: nfModal.form.valor_total,
-        descricao: nfModal.form.descricao,
-        origem: 'logistica',
-        solicitacao_log_id: nfModal.sol.id,
-      })
-      await atualizarStatus.mutateAsync({ id: nfModal.sol.id, status: 'nfe_emitida' })
-      showToast('success', 'NF solicitada ao módulo Fiscal!')
-      setNfModal(null)
-    } catch { showToast('error', 'Erro ao solicitar NF') }
+      for (const id of ids) await aprovar.mutateAsync({ id, aprovado: true })
+      showToast('success', `${ids.length} solicitação(ões) aprovada(s)`)
+      setSelectedIds(new Set())
+    } catch { showToast('error', 'Erro ao aprovar') }
   }
 
   const handleBulkAction = () => {
     const ids = Array.from(selectedIds)
     if (ids.length === 0) return
     switch (activeTab) {
-      case 'solicitado': {
-        // For single item, open modal; for bulk, advance directly
-        if (ids.length === 1) {
-          const sol = activeItems.find(s => s.id === ids[0])
-          if (sol) openPlanejamento(sol)
-        } else {
-          (async () => {
-            try {
-              for (const id of ids) await atualizarStatus.mutateAsync({ id, status: 'planejado' })
-              showToast('success', `${ids.length} solicitação(ões) planejada(s)`)
-              setSelectedIds(new Set())
-            } catch { showToast('error', 'Erro ao planejar') }
-          })()
-        }
-        break
-      }
+      case 'solicitado': handlePlanejar(ids); break
       case 'planejado': handleEnviarAprovacao(ids); break
-      case 'aguardando_aprovacao': {
-        if (ids.length === 1) {
-          const sol = activeItems.find(s => s.id === ids[0])
-          if (sol) openAprovacao(sol)
-        } else {
-          (async () => {
-            try {
-              for (const id of ids) await aprovar.mutateAsync({ id, aprovado: true })
-              showToast('success', `${ids.length} solicitação(ões) aprovada(s)`)
-              setSelectedIds(new Set())
-            } catch { showToast('error', 'Erro ao aprovar') }
-          })()
-        }
-        break
-      }
+      case 'aguardando_aprovacao': handleAprovar(ids); break
     }
   }
 
   const handleDetailAction = (action: string, sol: LogSolicitacao) => {
     setDetail(null)
     switch (action) {
-      case 'planejar': openPlanejamento(sol); break
-      case 'revisarPlanejamento': openPlanejamento(sol); break
+      case 'planejar': handlePlanejar([sol.id]); break
       case 'enviarAprovacao': handleEnviarAprovacao([sol.id]); break
-      case 'aprovar': openAprovacao(sol); break
-      case 'solicitarNF': openNfModal(sol); break
+      case 'aprovar': handleAprovar([sol.id]); break
     }
   }
 
@@ -930,263 +849,16 @@ export default function SolicitacoesPipeline() {
           onSuccess={() => showToast('success', 'Solicitação criada com sucesso!')}
         />
       )}
-
-      {/* ── Modal Planejamento ─────────────────────────────────── */}
-      {planejamentoModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm" onClick={() => setPlanejamentoModal(null)}>
-          <div className={`rounded-2xl shadow-2xl w-full max-w-md ${isDark ? 'bg-[#1e293b]' : 'bg-white'}`} onClick={e => e.stopPropagation()}>
-            <div className={`flex items-center justify-between px-6 py-4 ${isDark ? 'border-b border-white/[0.06]' : 'border-b border-slate-100'}`}>
-              <div>
-                <h2 className={`text-lg font-extrabold ${isDark ? 'text-white' : 'text-slate-800'}`}>Planejar Transporte</h2>
-                <p className={`text-xs mt-0.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>#{planejamentoModal.numero} · {planejamentoModal.origem} → {planejamentoModal.destino}</p>
-              </div>
-              <button onClick={() => setPlanejamentoModal(null)}
-                className={`w-8 h-8 rounded-lg flex items-center justify-center ${isDark ? 'hover:bg-white/10 text-slate-400' : 'hover:bg-slate-100'}`}>
-                <X size={16} />
-              </button>
-            </div>
-            <div className="p-6 space-y-4">
-              <div>
-                <label className={`block text-xs font-bold mb-1 ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>Modal</label>
-                <select value={planejForm.modal ?? ''} onChange={e => setPlanejForm(p => ({ ...p, modal: e.target.value }))}
-                  className={`w-full rounded-xl px-3 py-2.5 text-sm outline-none transition-colors ${isDark ? 'bg-white/[0.06] border border-white/[0.08] text-slate-200' : 'bg-slate-50 border border-slate-200 text-slate-700'}`}>
-                  <option value="">Selecione...</option>
-                  {[['frota_propria','Frota Própria'],['frota_locada','Frota Locada'],['transportadora','Transportadora'],['motoboy','Motoboy'],['correios','Correios']].map(([k,v]) => (
-                    <option key={k} value={k}>{v}</option>
-                  ))}
-                </select>
-              </div>
-              {planejForm.modal === 'transportadora' && (
-                <div>
-                  <label className={`block text-xs font-bold mb-1 ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>Fornecedor (Transportadora)</label>
-                  <select value={planejForm.transportadora_id ?? ''} onChange={e => setPlanejForm(p => ({ ...p, transportadora_id: e.target.value }))}
-                    className={`w-full rounded-xl px-3 py-2.5 text-sm outline-none transition-colors ${isDark ? 'bg-white/[0.06] border border-white/[0.08] text-slate-200' : 'bg-slate-50 border border-slate-200 text-slate-700'}`}>
-                    <option value="">Selecione...</option>
-                    {fornecedores.filter((f: any) => f.ativo !== false).map((f: any) => (
-                      <option key={f.id} value={f.id}>{f.nome_fantasia ?? f.razao_social}</option>
-                    ))}
-                  </select>
-                </div>
-              )}
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className={`block text-xs font-bold mb-1 ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>Placa do Veículo</label>
-                  <input value={planejForm.veiculo_placa ?? ''} onChange={e => setPlanejForm(p => ({ ...p, veiculo_placa: e.target.value }))}
-                    className={`w-full rounded-xl px-3 py-2.5 text-sm outline-none ${isDark ? 'bg-white/[0.06] border border-white/[0.08] text-slate-200' : 'bg-slate-50 border border-slate-200 text-slate-700'}`} placeholder="ABC-1234" />
-                </div>
-                <div>
-                  <label className={`block text-xs font-bold mb-1 ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>Motorista</label>
-                  <input value={planejForm.motorista_nome ?? ''} onChange={e => setPlanejForm(p => ({ ...p, motorista_nome: e.target.value }))}
-                    className={`w-full rounded-xl px-3 py-2.5 text-sm outline-none ${isDark ? 'bg-white/[0.06] border border-white/[0.08] text-slate-200' : 'bg-slate-50 border border-slate-200 text-slate-700'}`} placeholder="Nome do motorista" />
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className={`block text-xs font-bold mb-1 ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>Data Prevista</label>
-                  <input type="datetime-local" value={planejForm.data_prevista_saida ?? ''}
-                    onChange={e => setPlanejForm(p => ({ ...p, data_prevista_saida: e.target.value }))}
-                    className={`w-full rounded-xl px-3 py-2.5 text-sm outline-none ${isDark ? 'bg-white/[0.06] border border-white/[0.08] text-slate-200' : 'bg-slate-50 border border-slate-200 text-slate-700'}`} />
-                </div>
-                <div>
-                  <label className={`block text-xs font-bold mb-1 ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>Custo Estimado (R$)</label>
-                  <input type="number" min={0} step={0.01} value={planejForm.custo_estimado ?? ''}
-                    onChange={e => setPlanejForm(p => ({ ...p, custo_estimado: Number(e.target.value) }))}
-                    className={`w-full rounded-xl px-3 py-2.5 text-sm outline-none ${isDark ? 'bg-white/[0.06] border border-white/[0.08] text-slate-200' : 'bg-slate-50 border border-slate-200 text-slate-700'}`} />
-                </div>
-              </div>
-              {(planejForm.custo_estimado ?? 0) > 0 && (
-                <div className={`rounded-xl px-3 py-2 ${isDark ? 'bg-amber-500/10 border border-amber-500/20' : 'bg-amber-50 border border-amber-200'}`}>
-                  <p className={`text-xs font-semibold ${isDark ? 'text-amber-400' : 'text-amber-700'}`}>
-                    Alçada: {getAlcada(planejForm.custo_estimado).aprovador}
-                    {(planejForm.custo_estimado ?? 0) > 500 && ' — Requer aprovação formal'}
-                  </p>
-                </div>
-              )}
-            </div>
-            <div className={`px-6 py-4 flex justify-end gap-2 ${isDark ? 'border-t border-white/[0.06]' : 'border-t border-slate-100'}`}>
-              <button onClick={() => setPlanejamentoModal(null)}
-                className={`px-4 py-2 rounded-xl text-sm font-semibold ${isDark ? 'border border-white/[0.06] text-slate-400 hover:bg-white/5' : 'border border-slate-200 text-slate-600 hover:bg-slate-50'}`}>
-                Cancelar
-              </button>
-              <button onClick={handleSalvarPlanejamento} disabled={planejar.isPending}
-                className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-violet-600 hover:bg-violet-700
-                  text-white text-sm font-semibold transition-colors disabled:opacity-60">
-                {planejar.isPending ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
-                Salvar Planejamento
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ── Modal Aprovação ────────────────────────────────────── */}
-      {aprovacaoModal && (
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-sm p-4" onClick={() => setAprovacaoModal(null)}>
-          <div className={`rounded-2xl shadow-2xl w-full max-w-md max-h-[90vh] overflow-y-auto ${isDark ? 'bg-[#1e293b]' : 'bg-white'}`} onClick={e => e.stopPropagation()}>
-            {/* Header gradiente laranja */}
-            <div className="bg-gradient-to-r from-orange-600 to-amber-500 px-6 py-4 rounded-t-2xl">
-              <div className="flex items-center justify-between">
-                <div className="text-white">
-                  <p className="text-[10px] font-bold uppercase tracking-wider opacity-80">Aprovacao de Transporte</p>
-                  <h2 className="text-lg font-extrabold">#{aprovacaoModal.numero}</h2>
-                </div>
-                <button onClick={() => setAprovacaoModal(null)} className="w-8 h-8 rounded-lg flex items-center justify-center text-white/70 hover:text-white hover:bg-white/10">
-                  <X size={16} />
-                </button>
-              </div>
-            </div>
-
-            <div className="p-5 space-y-4">
-              {/* Card de rota */}
-              <div className="bg-orange-50 rounded-xl p-4 space-y-3">
-                <div className="flex items-center gap-2 text-base font-bold text-orange-800">
-                  <MapPin size={16} className="text-orange-500 shrink-0" />
-                  {aprovacaoModal.origem}
-                  <span className="text-orange-400 mx-1">→</span>
-                  {aprovacaoModal.destino}
-                </div>
-                <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
-                  {aprovacaoModal.data_desejada && (
-                    <div><span className="text-slate-500 text-xs">Data:</span> <span className="font-semibold text-slate-700">{new Date(aprovacaoModal.data_desejada).toLocaleDateString('pt-BR')}</span></div>
-                  )}
-                  {aprovacaoModal.modal && (
-                    <div><span className="text-slate-500 text-xs">Modal:</span> <span className="font-semibold text-slate-700 capitalize">{aprovacaoModal.modal.replace(/_/g, ' ')}</span></div>
-                  )}
-                  {aprovacaoModal.motorista_nome && (
-                    <div><span className="text-slate-500 text-xs">Motorista:</span> <span className="font-semibold text-slate-700">{aprovacaoModal.motorista_nome}</span></div>
-                  )}
-                  {aprovacaoModal.veiculo_placa && (
-                    <div><span className="text-slate-500 text-xs">Placa:</span> <span className="font-mono font-semibold text-slate-700">{aprovacaoModal.veiculo_placa}</span></div>
-                  )}
-                  {aprovacaoModal.obra_nome && (
-                    <div className="col-span-2"><span className="text-slate-500 text-xs">Obra:</span> <span className="font-semibold text-slate-700">{aprovacaoModal.obra_nome}</span></div>
-                  )}
-                </div>
-              </div>
-
-              {aprovacaoModal.descricao && (
-                <p className="text-sm text-slate-600 italic">{aprovacaoModal.descricao}</p>
-              )}
-
-              {aprovacaoModal.custo_estimado != null && (
-                <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3 flex justify-between items-center">
-                  <span className="text-xs text-emerald-700 font-medium">Custo Estimado</span>
-                  <span className="text-lg font-extrabold text-emerald-700">
-                    R$ {aprovacaoModal.custo_estimado.toFixed(2)}
-                  </span>
-                </div>
-              )}
-
-              {/* Observação */}
-              <div>
-                <label className={`block text-xs font-bold mb-1.5 ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>Adicionar observacao</label>
-                <textarea value={motivoReprovacao} onChange={e => setMotivoReprovacao(e.target.value)}
-                  rows={2} className={`w-full rounded-xl px-3 py-2.5 text-sm outline-none resize-none ${isDark ? 'bg-white/[0.06] border border-white/[0.08] text-slate-200' : 'bg-slate-50 border border-slate-200 text-slate-700'}`}
-                  placeholder="Observacao ou motivo de rejeicao..." />
-              </div>
-            </div>
-
-            {/* Botões padrão AprovAi */}
-            <div className={`px-5 py-4 flex gap-2 ${isDark ? 'border-t border-white/[0.06]' : 'border-t border-slate-100'}`}>
-              <button onClick={() => handleAprovarReprovar(false)} disabled={aprovar.isPending}
-                className="flex-1 py-3 rounded-xl border-2 border-red-200 text-red-600 text-sm font-bold hover:bg-red-50 transition-colors disabled:opacity-60 flex items-center justify-center gap-1.5">
-                <XCircle size={15} /> Rejeitar
-              </button>
-              <button onClick={() => setAprovacaoModal(null)}
-                className={`flex-1 py-3 rounded-xl border-2 text-sm font-bold transition-colors flex items-center justify-center gap-1.5 ${isDark ? 'border-white/[0.08] text-slate-300' : 'border-slate-200 text-slate-600 hover:bg-slate-50'}`}>
-                <MessageSquare size={15} /> Esclarecer
-              </button>
-              <button onClick={() => handleAprovarReprovar(true)} disabled={aprovar.isPending}
-                className="flex-1 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold transition-colors disabled:opacity-60 flex items-center justify-center gap-1.5">
-                <CheckCircle2 size={15} /> Aprovar
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ── Modal Solicitar NF ──────────────────────────────── */}
-      {nfModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm" onClick={() => setNfModal(null)}>
-          <div className={`rounded-2xl shadow-2xl w-full max-w-md ${isDark ? 'bg-[#1e293b]' : 'bg-white'}`} onClick={e => e.stopPropagation()}>
-            <div className={`flex items-center justify-between px-6 py-4 ${isDark ? 'border-b border-white/[0.06]' : 'border-b border-slate-100'}`}>
-              <div>
-                <h2 className={`text-lg font-extrabold ${isDark ? 'text-white' : 'text-slate-800'}`}>Solicitar Nota Fiscal</h2>
-                <p className={`text-xs mt-0.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Transporte {nfModal.sol.numero}</p>
-              </div>
-              <button onClick={() => setNfModal(null)}
-                className={`w-8 h-8 rounded-lg flex items-center justify-center ${isDark ? 'hover:bg-white/10 text-slate-400' : 'hover:bg-slate-100'}`}>
-                <X size={16} />
-              </button>
-            </div>
-            <div className="p-6 space-y-4">
-              <div className={`rounded-xl px-3 py-2.5 ${isDark ? 'bg-amber-500/10 border border-amber-500/20' : 'bg-amber-50 border border-amber-200'}`}>
-                <p className={`text-xs font-semibold flex items-center gap-1.5 ${isDark ? 'text-amber-400' : 'text-amber-700'}`}>
-                  <FileInput size={13} />
-                  Será enviada ao módulo Fiscal como &quot;Pendente&quot;
-                </p>
-              </div>
-              <div className="relative">
-                <label className={`block text-xs font-bold mb-1 ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>CNPJ do Fornecedor *</label>
-                <input value={nfModal.form.fornecedor_cnpj}
-                  onChange={e => setNfModal(prev => prev ? { ...prev, form: { ...prev.form, fornecedor_cnpj: e.target.value } } : prev)}
-                  onBlur={() => cnpjLookup.consultar(nfModal.form.fornecedor_cnpj)}
-                  className={`w-full rounded-xl px-3 py-2.5 text-sm outline-none ${isDark ? 'bg-white/[0.06] border border-white/[0.08] text-slate-200' : 'bg-slate-50 border border-slate-200 text-slate-700'}`} placeholder="00.000.000/0000-00" />
-                {cnpjLookup.loading && (
-                  <div className="absolute right-2 top-7 flex items-center gap-1 text-amber-500">
-                    <Loader2 size={12} className="animate-spin" />
-                    <span className="text-[9px] font-semibold">Buscando...</span>
-                  </div>
-                )}
-                {cnpjLookup.dados && !cnpjLookup.erro && (
-                  <p className="text-[9px] text-emerald-600 mt-0.5 flex items-center gap-1">
-                    <CheckCircle2 size={9} /> {cnpjLookup.dados.situacao}
-                  </p>
-                )}
-                {cnpjLookup.erro && <p className="text-[9px] text-red-500 mt-0.5">{cnpjLookup.erro}</p>}
-              </div>
-              <div>
-                <label className={`block text-xs font-bold mb-1 ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>Nome / Razão Social *</label>
-                <input value={nfModal.form.fornecedor_nome}
-                  onChange={e => setNfModal(prev => prev ? { ...prev, form: { ...prev.form, fornecedor_nome: e.target.value } } : prev)}
-                  className={`w-full rounded-xl px-3 py-2.5 text-sm outline-none ${isDark ? 'bg-white/[0.06] border border-white/[0.08] text-slate-200' : 'bg-slate-50 border border-slate-200 text-slate-700'}`} placeholder="Nome do fornecedor" />
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className={`block text-xs font-bold mb-1 ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>Valor Total (R$) *</label>
-                  <input type="number" min={0} step={0.01}
-                    value={nfModal.form.valor_total}
-                    onChange={e => setNfModal(prev => prev ? { ...prev, form: { ...prev.form, valor_total: Number(e.target.value) } } : prev)}
-                    className={`w-full rounded-xl px-3 py-2.5 text-sm outline-none ${isDark ? 'bg-white/[0.06] border border-white/[0.08] text-slate-200' : 'bg-slate-50 border border-slate-200 text-slate-700'}`} />
-                </div>
-                <div className="flex items-end pb-0.5">
-                  <p className={`text-[10px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
-                    Pré-preenchido com custo estimado do transporte
-                  </p>
-                </div>
-              </div>
-              <div>
-                <label className={`block text-xs font-bold mb-1 ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>Descrição</label>
-                <textarea value={nfModal.form.descricao}
-                  onChange={e => setNfModal(prev => prev ? { ...prev, form: { ...prev.form, descricao: e.target.value } } : prev)}
-                  rows={2} className={`w-full rounded-xl px-3 py-2.5 text-sm outline-none resize-none ${isDark ? 'bg-white/[0.06] border border-white/[0.08] text-slate-200' : 'bg-slate-50 border border-slate-200 text-slate-700'}`} />
-              </div>
-            </div>
-            <div className={`px-6 py-4 flex justify-end gap-2 ${isDark ? 'border-t border-white/[0.06]' : 'border-t border-slate-100'}`}>
-              <button onClick={() => setNfModal(null)}
-                className={`px-4 py-2 rounded-xl text-sm font-semibold ${isDark ? 'border border-white/[0.06] text-slate-400 hover:bg-white/5' : 'border border-slate-200 text-slate-600 hover:bg-slate-50'}`}>
-                Cancelar
-              </button>
-              <button onClick={handleSolicitarNF}
-                disabled={criarNF.isPending || atualizarStatus.isPending || !nfModal.form.fornecedor_nome || !nfModal.form.fornecedor_cnpj}
-                className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-amber-600 hover:bg-amber-700
-                  text-white text-sm font-semibold transition-colors disabled:opacity-60 shadow-sm">
-                {(criarNF.isPending || atualizarStatus.isPending) ? <Loader2 size={14} className="animate-spin" /> : <FileInput size={14} />}
-                Enviar ao Fiscal
-              </button>
-            </div>
-          </div>
-        </div>
+      {showPlanejamento.length > 0 && (
+        <Suspense fallback={<div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"><Loader2 size={32} className="text-orange-500 animate-spin" /></div>}>
+          <PlanejamentoRotaModal
+            isDark={isDark}
+            solicitacoes={showPlanejamento}
+            allSolicitacoes={solicitacoes}
+            onClose={() => setShowPlanejamento([])}
+            onSave={handleSavePlanejamento}
+          />
+        </Suspense>
       )}
     </div>
   )
