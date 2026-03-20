@@ -49,31 +49,27 @@ export function buildResumoNarrativo(input: {
   oportunidades?: ResumoOportunidade[]
   recomendacao?: string
   parecerJuridico?: string
-  scoreAnalise?: number
 }) {
   const segmentos = [
-    input.objetoResumo ? `Trata-se de ${sanitizeAiText(input.objetoResumo).trim()}` : '',
+    input.objetoResumo ? `Contratação de ${sanitizeAiText(input.objetoResumo).trim()}` : '',
     input.partesEnvolvidas ? `envolvendo ${sanitizeAiText(input.partesEnvolvidas).trim()}` : '',
   ].filter(Boolean)
 
-  const abertura = segmentos.length > 0 ? asSentence(segmentos.join(' ')) : ''
+  const abertura = segmentos.length > 0 ? asSentence(segmentos.join(', ')) : ''
   const valor = typeof input.valorTotal === 'number'
-    ? `Valor estimado de R$ ${input.valorTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}.`
+    ? `Valor: R$ ${input.valorTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}.`
     : ''
-  const vigencia = input.vigencia ? asSentence(`Vigencia prevista ${sanitizeAiText(input.vigencia).trim()}`) : ''
-  const score = typeof input.scoreAnalise === 'number'
-    ? `Score de analise juridica: ${input.scoreAnalise}/100.`
-    : ''
+  const vigencia = input.vigencia ? asSentence(`Prazo: ${sanitizeAiText(input.vigencia).trim()}`) : ''
 
-  const riscos = input.riscos && input.riscos.length > 0
-    ? asSentence(`Principais riscos: ${input.riscos.slice(0, 3).map((risco) => sanitizeAiText(risco.descricao)).join('; ')}`)
+  const pontosAtencao = input.riscos && input.riscos.length > 0
+    ? asSentence(`Pontos de atenção: ${input.riscos.slice(0, 3).map((risco) => sanitizeAiText(risco.descricao)).join('; ')}`)
     : ''
   const oportunidades = input.oportunidades && input.oportunidades.length > 0
-    ? asSentence(`Oportunidades identificadas: ${input.oportunidades.slice(0, 2).map((op) => sanitizeAiText(op.descricao)).join('; ')}`)
+    ? asSentence(`Oportunidades: ${input.oportunidades.slice(0, 2).map((op) => sanitizeAiText(op.descricao)).join('; ')}`)
     : ''
   const fechamento = asSentence(input.recomendacao || input.parecerJuridico)
 
-  return [abertura, valor, vigencia, score, riscos, oportunidades, fechamento]
+  return [abertura, valor, vigencia, pontosAtencao, oportunidades, fechamento]
     .filter(Boolean)
     .join(' ')
     .trim()
@@ -119,7 +115,6 @@ export function mapResumoAiToPayload(input: {
       oportunidades,
       recomendacao: input.resumo.recomendacao,
       parecerJuridico: input.resumo.parecer_juridico,
-      scoreAnalise: input.resumo.score_analise,
     }),
     status: input.status,
   }
@@ -163,7 +158,6 @@ export function buildResumoPayloadFromAnalise(input: {
       riscos,
       oportunidades,
       recomendacao: input.analise?.resumo,
-      scoreAnalise: input.analise?.score,
     }),
     status: input.status,
   }

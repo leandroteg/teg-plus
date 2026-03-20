@@ -118,7 +118,7 @@ function ResumoView({ resumo }: { resumo: TResumo }) {
 
           <div className="rounded-2xl border border-indigo-100 bg-indigo-50/60 px-5 py-4">
             <p className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-indigo-600">
-              Parecer Executivo
+              Resumo Executivo
             </p>
             <p className="whitespace-pre-wrap text-sm leading-7 text-slate-700">
               {parecer}
@@ -244,7 +244,7 @@ export default function ResumoExecutivoPage() {
     if (!titulo.trim()) return setFormError('Nao foi possivel montar o titulo do resumo'), false
     if (!partesEnvolvidas.trim()) return setFormError('Nao foi possivel identificar as partes envolvidas'), false
     if (!objetoResumo.trim()) return setFormError('Nao foi possivel identificar o objeto do contrato'), false
-    if (!recomendacao.trim()) return setFormError('Informe o parecer executivo'), false
+    if (!recomendacao.trim()) return setFormError('Informe o resumo executivo'), false
     return true
   }
 
@@ -425,7 +425,7 @@ export default function ResumoExecutivoPage() {
           <p className="mt-0.5 text-xs text-slate-400">
             {showViewMode
               ? 'Visualizacao do resumo executivo'
-              : 'Parecer executivo em paragrafo unico para aprovacao da diretoria'}
+              : 'Resumo executivo para aprovação da diretoria'}
           </p>
         </div>
       </div>
@@ -441,7 +441,7 @@ export default function ResumoExecutivoPage() {
                   <Brain size={18} className="text-white" />
                 </div>
                 <div>
-                  <h3 className="text-sm font-extrabold text-slate-800">Gerar Parecer com IA</h3>
+                  <h3 className="text-sm font-extrabold text-slate-800">Gerar Resumo com IA</h3>
                   <p className="mt-0.5 text-[10px] text-slate-500">
                     O rascunho e gerado automaticamente ao abrir a etapa. Use este botao apenas para regenerar.
                   </p>
@@ -470,7 +470,7 @@ export default function ResumoExecutivoPage() {
             {gerarResumoAI.isSuccess && (
               <div className="mt-3 flex items-center gap-2 rounded-lg bg-emerald-50 px-3 py-1.5 text-[10px] font-semibold text-emerald-700">
                 <CheckCircle2 size={12} />
-                Parecer gerado com sucesso. Revise o texto abaixo antes de enviar.
+                Resumo gerado com sucesso. Revise o texto abaixo antes de enviar.
               </div>
             )}
 
@@ -502,17 +502,17 @@ export default function ResumoExecutivoPage() {
           <div className="space-y-3 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
             <h2 className="flex items-center gap-2 text-sm font-extrabold text-slate-800">
               <CheckCircle2 size={14} className="text-emerald-500" />
-              Parecer Executivo
+              Resumo Executivo
             </h2>
             <textarea
               value={recomendacao}
               onChange={(e) => setRecomendacao(e.target.value)}
-              placeholder="Escreva um unico paragrafo com contexto, riscos principais, oportunidades e recomendacao final"
+              placeholder="Resumo do contrato: partes, objeto, valor, prazo, pontos de atenção e recomendação"
               rows={8}
               className={`${inputClass} resize-none`}
             />
             <p className="text-[11px] text-slate-400">
-              A aprovacao usa apenas este parecer em paragrafo unico. Riscos e oportunidades ficam salvos apenas para auditoria e suporte interno.
+              Este resumo será enviado para aprovação da diretoria. Riscos e oportunidades ficam salvos para auditoria.
             </p>
           </div>
 
