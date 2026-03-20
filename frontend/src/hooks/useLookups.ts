@@ -20,7 +20,7 @@ export function useLookups() {
     queryFn: async () => {
       const [obrasRes, ccRes, cfRes, catRes, empRes] = await Promise.all([
         supabase.from('sys_obras').select('id, nome, codigo, status').eq('status', 'ativa').order('nome'),
-        supabase.from('sys_centros_custo').select('id, codigo, descricao').eq('ativo', true).order('descricao'),
+        supabase.from('sys_centros_custo').select('id, codigo, descricao').eq('ativo', true).order('codigo'),
         supabase.from('fin_classes_financeiras').select('id, codigo, descricao, tipo').order('descricao'),
         supabase.from('cmp_categorias').select('id, nome').eq('ativo', true).order('nome'),
         supabase.from('sys_empresas').select('id, razao_social, nome_fantasia, cnpj').order('razao_social'),

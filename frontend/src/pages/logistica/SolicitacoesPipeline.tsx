@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback, useEffect } from 'react'
+import { useState, useMemo, useCallback, useEffect, useRef } from 'react'
 import {
   ClipboardList, Search, X, CheckCircle2, Clock, AlertTriangle,
   Calendar, ArrowUp, ArrowDown, LayoutList, LayoutGrid, Download,
@@ -272,6 +272,117 @@ function SolCard({ sol, onClick, isDark, isSelected, onSelect }: {
   )
 }
 
+// ── Centro de Custo Autocomplete ─────────────────────────────────────────────
+
+function CentroCustoAutocomplete({ centrosCusto, value, onChange, isDark, inputCls }: {
+  centrosCusto: Array<{ id: string; codigo: string; descricao: string }>
+  value: string
+  onChange: (v: string) => void
+  isDark: boolean
+  inputCls: string
+}) {
+  const [query, setQuery] = useState('')
+  const [open, setOpen] = useState(false)
+  const containerRef = useRef<HTMLDivElement>(null)
+
+  // Click outside close
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) setOpen(false)
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [])
+
+  // Sort numerically by codigo
+  const sorted = useMemo(() =>
+    [...centrosCusto].sort((a, b) => {
+      const numA = parseInt(a.codigo.replace(/\D/g, '')) || 0
+      const numB = parseInt(b.codigo.replace(/\D/g, '')) || 0
+      return numA - numB
+    }),
+    [centrosCusto]
+  )
+
+  // Filter by query
+  const filtered = useMemo(() => {
+    if (!query) return sorted
+    const q = query.toLowerCase()
+    return sorted.filter(cc =>
+      cc.codigo.toLowerCase().includes(q) || cc.descricao.toLowerCase().includes(q)
+    )
+  }, [sorted, query])
+
+  // Display text for selected value
+  const selectedLabel = useMemo(() => {
+    if (!value) return ''
+    const found = centrosCusto.find(cc => cc.codigo === value)
+    return found ? `${found.codigo} - ${found.descricao}` : value
+  }, [value, centrosCusto])
+
+  const handleFocus = () => {
+    setQuery('')
+    setOpen(true)
+  }
+
+  const handleSelect = (cc: { codigo: string; descricao: string }) => {
+    onChange(cc.codigo)
+    setQuery('')
+    setOpen(false)
+  }
+
+  return (
+    <div ref={containerRef} className="relative">
+      <input
+        type="text"
+        value={open ? query : selectedLabel}
+        onChange={e => { setQuery(e.target.value); setOpen(true) }}
+        onFocus={handleFocus}
+        placeholder="Buscar centro de custo..."
+        className={inputCls}
+      />
+      {value && !open && (
+        <button
+          type="button"
+          onClick={() => { onChange(''); setQuery(''); }}
+          className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+        >
+          <X size={14} />
+        </button>
+      )}
+      {open && filtered.length > 0 && (
+        <div className={`absolute z-50 left-0 right-0 mt-1 rounded-xl shadow-xl border max-h-52 overflow-y-auto ${
+          isDark ? 'bg-[#1e293b] border-white/10' : 'bg-white border-slate-200'
+        }`}>
+          {filtered.map(cc => (
+            <button
+              key={cc.id}
+              type="button"
+              onClick={() => handleSelect(cc)}
+              className={`w-full text-left px-3 py-2 text-sm transition-colors ${
+                cc.codigo === value
+                  ? isDark ? 'bg-orange-500/20 text-orange-300' : 'bg-orange-50 text-orange-700'
+                  : isDark ? 'text-slate-300 hover:bg-white/[0.06]' : 'text-slate-700 hover:bg-slate-50'
+              }`}
+            >
+              <span className="font-medium">{cc.codigo}</span>
+              <span className={isDark ? 'text-slate-500' : 'text-slate-400'}> - </span>
+              <span>{cc.descricao}</span>
+            </button>
+          ))}
+        </div>
+      )}
+      {open && filtered.length === 0 && query && (
+        <div className={`absolute z-50 left-0 right-0 mt-1 rounded-xl shadow-xl border px-3 py-3 text-sm ${
+          isDark ? 'bg-[#1e293b] border-white/10 text-slate-500' : 'bg-white border-slate-200 text-slate-400'
+        }`}>
+          Nenhum centro de custo encontrado
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ── Nova Solicitação Modal ───────────────────────────────────────────────────
 
 const TIPO_LABELS: Record<TipoTransporte, string> = {
@@ -334,16 +445,15 @@ function NovaSolicitacaoModal({ isDark, onClose, onSuccess }: {
 
         {/* Body */}
         <div className="p-6 space-y-4">
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className={labelCls}>Centro de Custo</label>
-              <select value={form.centro_custo ?? ''} onChange={e => set('centro_custo', e.target.value)} className={inputCls}>
-                <option value="">Selecione...</option>
-                {centrosCusto.map(cc => (
-                  <option key={cc.id} value={cc.codigo}>{cc.codigo} - {cc.descricao}</option>
-                ))}
-              </select>
-            </div>
+          <div>
+            <label className={labelCls}>Centro de Custo</label>
+            <CentroCustoAutocomplete
+              centrosCusto={centrosCusto}
+              value={form.centro_custo ?? ''}
+              onChange={v => set('centro_custo', v)}
+              isDark={isDark}
+              inputCls={inputCls}
+            />
           </div>
 
           {/* Origem */}
