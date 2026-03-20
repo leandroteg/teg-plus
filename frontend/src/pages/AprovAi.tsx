@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useCallback } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   CheckCircle, XCircle, ChevronDown, ChevronRight, ChevronUp,
@@ -8,8 +8,7 @@ import {
   History, ListChecks, Timer, TrendingUp, Filter,
   Calendar, FileText, Download, Eye, HelpCircle,
   Paperclip, Square, CheckSquare, Package,
-  Truck, MapPin, Smartphone, Wallet,
-  Info, X, Tag, Briefcase, Hash, List,
+  Truck, MapPin,
 } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../services/supabase'
@@ -20,10 +19,7 @@ import {
   useHistoricoAprovacoes,
   useAprovacaoKPIs,
 } from '../hooks/useAprovacoes'
-import { useEditorLock } from '../hooks/useEditorLock'
 import type { HistoricoFiltros } from '../hooks/useAprovacoes'
-import { useRequisicao } from '../hooks/useRequisicoes'
-import { useCotacaoByRequisicao } from '../hooks/useCotacoes'
 import FluxoTimeline from '../components/FluxoTimeline'
 import type { AprovacaoPendente, AprovacaoHistorico, TipoAprovacao } from '../types'
 
@@ -34,7 +30,7 @@ const fmt = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', curren
 const urgenciaConfig: Record<string, { bg: string; text: string; label: string }> = {
   normal:  { bg: 'bg-slate-100',  text: 'text-slate-600',  label: 'Normal'  },
   urgente: { bg: 'bg-amber-100',  text: 'text-amber-700',  label: 'Urgente' },
-  critica: { bg: 'bg-red-100',    text: 'text-red-700',    label: 'Crítica' },
+  critica: { bg: 'bg-red-100',    text: 'text-red-700',    label: 'Critica' },
 }
 
 const tipoConfig: Record<TipoAprovacao, {
@@ -49,7 +45,7 @@ const tipoConfig: Record<TipoAprovacao, {
   headerBg: string
 }> = {
   cotacao: {
-    label: 'Aprovação Compras',
+    label: 'Aprovacao Compras',
     icon: FileSearch,
     color: 'blue',
     bgLight: 'bg-blue-50',
@@ -60,7 +56,7 @@ const tipoConfig: Record<TipoAprovacao, {
     headerBg: 'bg-gradient-to-r from-blue-600 to-blue-500',
   },
   autorizacao_pagamento: {
-    label: 'Autorizações de Pagamento',
+    label: 'Autorizacoes de Pagamento',
     icon: Banknote,
     color: 'amber',
     bgLight: 'bg-amber-50',
@@ -82,7 +78,7 @@ const tipoConfig: Record<TipoAprovacao, {
     headerBg: 'bg-gradient-to-r from-violet-600 to-violet-500',
   },
   requisicao_compra: {
-    label: 'Validação Téc. Requisição de Compra',
+    label: 'Validacao Tec. Requisicao de Compra',
     icon: ShoppingCart,
     color: 'teal',
     bgLight: 'bg-teal-50',
@@ -93,7 +89,7 @@ const tipoConfig: Record<TipoAprovacao, {
     headerBg: 'bg-gradient-to-r from-teal-600 to-teal-500',
   },
   aprovacao_transporte: {
-    label: 'Aprovação de Transporte',
+    label: 'Aprovacao de Transporte',
     icon: Truck,
     color: 'orange',
     bgLight: 'bg-orange-50',
@@ -103,17 +99,6 @@ const tipoConfig: Record<TipoAprovacao, {
     badgeText: 'text-orange-700',
     headerBg: 'bg-gradient-to-r from-orange-500 to-amber-600',
   },
-  solicitacao_adiantamento: {
-    label: 'Solicitação de Adiantamento',
-    icon: Wallet,
-    color: 'emerald',
-    bgLight: 'bg-emerald-50',
-    textColor: 'text-emerald-700',
-    borderColor: 'border-emerald-200',
-    badgeBg: 'bg-emerald-100',
-    badgeText: 'text-emerald-700',
-    headerBg: 'bg-gradient-to-r from-emerald-600 to-teal-500',
-  },
 }
 
 const tipoOrder: TipoAprovacao[] = [
@@ -122,7 +107,6 @@ const tipoOrder: TipoAprovacao[] = [
   'minuta_contratual',
   'requisicao_compra',
   'aprovacao_transporte',
-  'solicitacao_adiantamento',
 ]
 
 function timeLeft(dateStr?: string): string {
@@ -135,9 +119,9 @@ function timeLeft(dateStr?: string): string {
 }
 
 function getAlcada(valor: number, nivel: number) {
-  if (valor <= 2000) return { label: `Alçada 1`, sublabel: `Welton ou Claudinor <= R$2.000` }
-  if (nivel <= 2)    return { label: 'Alçada 2', sublabel: 'Laucídio > R$2.000' }
-  return { label: 'Aprovação de Pagamento', sublabel: 'Laucídio — etapa final' }
+  if (valor <= 2000) return { label: `Alcada 1`, sublabel: `Welton ou Claudinor <= R$2.000` }
+  if (nivel <= 2)    return { label: 'Alcada 2', sublabel: 'Laucidio > R$2.000' }
+  return { label: 'Aprovacao de Pagamento', sublabel: 'Laucidio -- etapa final' }
 }
 
 function formatDateShort(dateStr?: string): string {
@@ -157,27 +141,14 @@ function AprovacaoCard({ aprovacao, aprovadorNome, aprovadorEmail }: {
 }) {
   const mutation = useDecisaoRequisicao()
   const [expanded, setExpanded] = useState(false)
-  const [showDetalhes, setShowDetalhes] = useState(false)
   const [observacao, setObservacao] = useState('')
   const [action, setAction] = useState<'aprovada' | 'rejeitada' | 'esclarecimento' | null>(null)
-  const [alertaCotacao, setAlertaCotacao] = useState<{
-    sem_cotacoes_minimas: boolean
-    justificativa?: string
-    cotacoes_count?: number
-    cotacoes_minimo?: number
-    cotacoes_insuficientes?: boolean
-  } | null>(null)
+  const [alertaCotacao, setAlertaCotacao] = useState<{ sem_cotacoes_minimas: boolean; justificativa?: string } | null>(null)
 
   const req  = aprovacao.requisicao
   const cot  = aprovacao.cotacao_resumo
-  const { data: reqDetalhe, isLoading: loadingDetalhe } = useRequisicao(showDetalhes ? req?.id : undefined)
-  const { isLocked, blockedByName } = useEditorLock({
-    resourceType: 'cmp_requisicao',
-    resourceId: aprovacao.requisicao_id,
-    enabled: Boolean(aprovacao.requisicao_id),
-  })
 
-  // Busca alerta de cotações obrigatórias faltantes (#38)
+  // Busca alerta de cotacoes obrigatorias faltantes (#38)
   useEffect(() => {
     if (!aprovacao.requisicao_id) return
     supabase.rpc('get_alerta_cotacao', { p_requisicao_id: aprovacao.requisicao_id })
@@ -191,7 +162,6 @@ function AprovacaoCard({ aprovacao, aprovadorNome, aprovadorEmail }: {
   const alc  = getAlcada(req.valor_estimado, aprovacao.nivel)
 
   const handleDecision = async (decisao: 'aprovada' | 'rejeitada') => {
-    if (isLocked) return
     setAction(decisao)
     try {
       await mutation.mutateAsync({
@@ -209,7 +179,6 @@ function AprovacaoCard({ aprovacao, aprovadorNome, aprovadorEmail }: {
   }
 
   const handleEsclarecimento = async () => {
-    if (isLocked) return
     if (!observacao.trim()) {
       setExpanded(true)
       setAction('esclarecimento')
@@ -231,7 +200,7 @@ function AprovacaoCard({ aprovacao, aprovadorNome, aprovadorEmail }: {
     } catch { /* error handled by mutation state */ }
   }
 
-  // Resultado pós-decisão
+  // Resultado pos-decisao
   if (mutation.isSuccess) {
     const colors = action === 'aprovada'
       ? { bg: 'bg-emerald-50 border-emerald-200', icon: 'text-emerald-500', text: 'text-emerald-700', msg: 'Aprovada' }
@@ -247,7 +216,7 @@ function AprovacaoCard({ aprovacao, aprovadorNome, aprovadorEmail }: {
         <p className={`font-bold text-base ${colors.text}`}>
           {req.numero} -- {colors.msg}
         </p>
-        <p className="text-xs text-slate-500 mt-1">Aprovador notificado automáticamente</p>
+        <p className="text-xs text-slate-500 mt-1">Aprovador notificado automaticamente</p>
       </div>
     )
   }
@@ -255,7 +224,7 @@ function AprovacaoCard({ aprovacao, aprovadorNome, aprovadorEmail }: {
   // Card principal
   return (
     <div className="bg-white rounded-2xl shadow-md border border-slate-100 overflow-hidden">
-      {/* Badge de nível / tipo */}
+      {/* Badge de nivel / tipo */}
       <div className="bg-indigo-600 px-4 py-2.5 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Shield size={14} className="text-indigo-200" />
@@ -318,7 +287,7 @@ function AprovacaoCard({ aprovacao, aprovadorNome, aprovadorEmail }: {
           {cot && (
             <div className="border-t border-slate-200 pt-2 space-y-1.5">
               <div className="flex justify-between items-center">
-                <span className="text-xs text-slate-500">Menor cotação</span>
+                <span className="text-xs text-slate-500">Menor cotacao</span>
                 <span className="text-lg font-extrabold text-emerald-600">{fmt(cot.valor)}</span>
               </div>
               <div className="flex justify-between text-[11px] text-slate-400">
@@ -337,34 +306,13 @@ function AprovacaoCard({ aprovacao, aprovadorNome, aprovadorEmail }: {
 
           {!cot && req.valor_estimado > 2000 && (
             <div className="flex items-center gap-1.5 text-[11px] text-amber-600">
-              <AlertTriangle size={11} /> Valor acima de R$2.000 — alçada Laucídio
+              <AlertTriangle size={11} /> Valor acima de R$2.000 -- alcada Laucidio
             </div>
           )}
         </div>
 
-        {/* Alerta: cotações insuficientes conforme política (#164) */}
-        {alertaCotacao?.cotacoes_insuficientes && (
-          <div className="mt-3 bg-amber-50 border border-amber-300 rounded-xl p-3 flex gap-2.5">
-            <AlertTriangle size={16} className="text-amber-600 shrink-0 mt-0.5" />
-            <div>
-              <p className="text-xs font-bold text-amber-800">
-                Numero de cotacoes inferior ao exigido pela politica ({alertaCotacao.cotacoes_count ?? 0} de {alertaCotacao.cotacoes_minimo ?? '?'} minimo)
-              </p>
-              <p className="text-[11px] text-amber-700 mt-0.5 leading-relaxed">
-                A quantidade de fornecedores/propostas esta abaixo do minimo exigido pela politica de compras. Avalie com cautela.
-              </p>
-              {alertaCotacao.justificativa && (
-                <div className="mt-1.5 bg-white border border-amber-200 rounded-lg px-2.5 py-1.5">
-                  <p className="text-[10px] font-semibold text-amber-600 uppercase tracking-wide mb-0.5">Justificativa:</p>
-                  <p className="text-[11px] text-amber-800 italic">{alertaCotacao.justificativa}</p>
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* Alerta: cotações obrigatórias faltantes — flag manual (#38) */}
-        {alertaCotacao?.sem_cotacoes_minimas && !alertaCotacao?.cotacoes_insuficientes && (
+        {/* Alerta: cotacoes obrigatorias faltantes (#38) */}
+        {alertaCotacao?.sem_cotacoes_minimas && (
           <div className="mt-3 bg-amber-50 border border-amber-300 rounded-xl p-3 flex gap-2.5">
             <AlertTriangle size={16} className="text-amber-600 shrink-0 mt-0.5" />
             <div>
@@ -384,28 +332,22 @@ function AprovacaoCard({ aprovacao, aprovadorNome, aprovadorEmail }: {
           </div>
         )}
 
-        {/* Expandir para observação */}
+        {/* Expandir para observacao */}
         <button type="button" onClick={() => setExpanded(!expanded)}
           className="flex items-center gap-1 text-xs text-indigo-500 mt-3 mx-auto font-semibold">
           {expanded ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
-          {expanded ? 'Menos detalhes' : 'Adicionar observação'}
+          {expanded ? 'Menos detalhes' : 'Adicionar observacao'}
         </button>
 
         {expanded && (
           <div className="mt-3">
-            {isLocked && (
-              <div className="mb-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] font-semibold text-amber-700">
-                {blockedByName ?? 'Outro usuário'} está editando esta requisição.
-              </div>
-            )}
             <label className="text-xs text-slate-400">
-              {action === 'esclarecimento' ? 'Descreva o esclarecimento necessário (obrigatório)' : 'Observação (opcional)'}
+              {action === 'esclarecimento' ? 'Descreva o esclarecimento necessario (obrigatorio)' : 'Observacao (opcional)'}
             </label>
             <textarea
               rows={2}
-              disabled={isLocked}
               className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm mt-1 focus:ring-2 focus:ring-indigo-300 outline-none"
-              placeholder={action === 'esclarecimento' ? 'O que precisa ser esclarecido...' : 'Motivo da decisão...'}
+              placeholder={action === 'esclarecimento' ? 'O que precisa ser esclarecido...' : 'Motivo da decisao...'}
               value={observacao}
               onChange={e => setObservacao(e.target.value)}
             />
@@ -413,47 +355,39 @@ function AprovacaoCard({ aprovacao, aprovadorNome, aprovadorEmail }: {
         )}
       </div>
 
-      {/* Botoes de acao -- 4 colunas */}
-      <div className="grid grid-cols-4 border-t border-slate-100">
+      {/* Botoes de acao -- 3 colunas */}
+      <div className="grid grid-cols-3 border-t border-slate-100">
         <button
           type="button"
-          disabled={mutation.isPending || isLocked}
+          disabled={mutation.isPending}
           onClick={() => handleDecision('rejeitada')}
           className="flex flex-col items-center justify-center gap-1 py-4 text-xs font-bold text-red-500 hover:bg-red-50 active:bg-red-100 transition border-r border-slate-100 disabled:opacity-50"
         >
           {mutation.isPending && action === 'rejeitada'
             ? <div className="w-5 h-5 border-2 border-red-400 border-t-transparent rounded-full animate-spin" />
-            : <XCircle size={18} />}
+            : <XCircle size={20} />}
           <span>Rejeitar</span>
         </button>
         <button
           type="button"
-          disabled={mutation.isPending || isLocked}
+          disabled={mutation.isPending}
           onClick={handleEsclarecimento}
           className="flex flex-col items-center justify-center gap-1 py-4 text-xs font-bold text-amber-600 hover:bg-amber-50 active:bg-amber-100 transition border-r border-slate-100 disabled:opacity-50"
         >
           {mutation.isPending && action === 'esclarecimento'
             ? <div className="w-5 h-5 border-2 border-amber-400 border-t-transparent rounded-full animate-spin" />
-            : <MessageSquare size={18} />}
+            : <MessageSquare size={20} />}
           <span>Esclarecer</span>
         </button>
         <button
           type="button"
-          onClick={() => setShowDetalhes(true)}
-          className="flex flex-col items-center justify-center gap-1 py-4 text-xs font-bold text-indigo-500 hover:bg-indigo-50 active:bg-indigo-100 transition border-r border-slate-100"
-        >
-          <Info size={18} />
-          <span>Detalhes</span>
-        </button>
-        <button
-          type="button"
-          disabled={mutation.isPending || isLocked}
+          disabled={mutation.isPending}
           onClick={() => handleDecision('aprovada')}
           className="flex flex-col items-center justify-center gap-1 py-4 text-xs font-bold text-emerald-600 hover:bg-emerald-50 active:bg-emerald-100 transition disabled:opacity-50"
         >
           {mutation.isPending && action === 'aprovada'
             ? <div className="w-5 h-5 border-2 border-emerald-400 border-t-transparent rounded-full animate-spin" />
-            : <CheckCircle size={18} />}
+            : <CheckCircle size={20} />}
           <span>Aprovar</span>
         </button>
       </div>
@@ -462,193 +396,6 @@ function AprovacaoCard({ aprovacao, aprovadorNome, aprovadorEmail }: {
         <p className="text-red-500 text-xs text-center py-2 border-t border-red-100">
           Erro ao processar: {mutation.error?.message || 'Tente novamente.'}
         </p>
-      )}
-
-      {/* ── Modal Detalhes ── */}
-      {showDetalhes && (
-        <div className="fixed inset-0 z-50 flex items-end" onClick={() => setShowDetalhes(false)}>
-          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
-          <div
-            className="relative w-full bg-white rounded-t-3xl shadow-2xl max-h-[85vh] flex flex-col"
-            onClick={e => e.stopPropagation()}
-          >
-            {/* Handle */}
-            <div className="flex justify-center pt-3 pb-1">
-              <div className="w-10 h-1 rounded-full bg-slate-200" />
-            </div>
-
-            {/* Header */}
-            <div className="flex items-center justify-between px-5 py-3 border-b border-slate-100">
-              <div>
-                <p className="text-sm font-extrabold text-slate-800">{req.numero}</p>
-                <p className="text-[11px] text-slate-400 mt-0.5">{req.solicitante_nome}</p>
-              </div>
-              <button
-                onClick={() => setShowDetalhes(false)}
-                className="p-2 rounded-xl hover:bg-slate-100 text-slate-400 transition"
-              >
-                <X size={18} />
-              </button>
-            </div>
-
-            {/* Body */}
-            <div className="overflow-y-auto flex-1 px-5 py-4 space-y-4">
-
-              {/* Descrição */}
-              <div className="bg-slate-50 rounded-2xl p-3.5">
-                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Descrição</p>
-                <p className="text-sm text-slate-700">{req.descricao}</p>
-                {req.justificativa && (
-                  <p className="text-[11px] text-slate-500 mt-1.5 italic">{req.justificativa}</p>
-                )}
-              </div>
-
-              {/* Detalhes principais */}
-              <div className="bg-slate-50 rounded-2xl p-3.5">
-                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">
-                  <List size={10} /> Detalhes
-                </p>
-                <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-[11px]">
-                  <div>
-                    <span className="text-slate-400">Obra:</span>{' '}
-                    <span className="font-semibold text-slate-700">{req.obra_nome}</span>
-                  </div>
-                  {req.categoria && (
-                    <div>
-                      <span className="text-slate-400">Categoria:</span>{' '}
-                      <span className="font-medium text-slate-600">{req.categoria.replace(/_/g, ' ')}</span>
-                    </div>
-                  )}
-                  {req.centro_custo && (
-                    <div>
-                      <span className="text-slate-400">Centro de Custo:</span>{' '}
-                      <span className="font-semibold text-slate-700">{req.centro_custo}</span>
-                    </div>
-                  )}
-                  {req.classe_financeira && (
-                    <div>
-                      <span className="text-slate-400">Classe Fin.:</span>{' '}
-                      <span className="font-semibold text-violet-600">{req.classe_financeira}</span>
-                    </div>
-                  )}
-                  <div>
-                    <span className="text-slate-400">Solicitante:</span>{' '}
-                    <span className="font-semibold text-slate-700">{req.solicitante_nome}</span>
-                  </div>
-                  {req.created_at && (
-                    <div>
-                      <span className="text-slate-400">Data:</span>{' '}
-                      <span className="font-medium text-slate-600">
-                        {new Date(req.created_at).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit' })}
-                      </span>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Cotação */}
-              {cot && (
-                <div className="bg-emerald-50 rounded-2xl p-3.5">
-                  <p className="text-[10px] font-bold text-emerald-600 uppercase tracking-wider mb-2 flex items-center gap-1.5">
-                    <Sparkles size={10} /> Melhor Cotação
-                  </p>
-                  <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-[11px]">
-                    <div className="col-span-2">
-                      <span className="text-slate-400">Fornecedor:</span>{' '}
-                      <span className="font-semibold text-slate-700">{cot.fornecedor_nome}</span>
-                    </div>
-                    <div>
-                      <span className="text-slate-400">Valor:</span>{' '}
-                      <span className="font-extrabold text-emerald-600">{fmt(cot.valor)}</span>
-                    </div>
-                    <div>
-                      <span className="text-slate-400">Prazo:</span>{' '}
-                      <span className="font-medium text-slate-600">{cot.prazo_dias}d</span>
-                    </div>
-                    <div>
-                      <span className="text-slate-400">Cotações:</span>{' '}
-                      <span className="font-medium text-slate-600">{cot.total_cotados} fornecedor{cot.total_cotados !== 1 ? 'es' : ''}</span>
-                    </div>
-                    {cot.valor < req.valor_estimado && (
-                      <div className="col-span-2 flex items-center gap-1 text-emerald-600 font-semibold">
-                        <Sparkles size={11} />
-                        Economia de {fmt(req.valor_estimado - cot.valor)} ({Math.round((1 - cot.valor / req.valor_estimado) * 100)}%)
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {/* Valor estimado (sem cotação) */}
-              {!cot && (
-                <div className="bg-indigo-50 rounded-2xl p-3.5 flex justify-between items-center">
-                  <span className="text-xs text-indigo-500 font-semibold">Valor Estimado</span>
-                  <span className="text-lg font-extrabold text-indigo-600">{fmt(req.valor_estimado)}</span>
-                </div>
-              )}
-
-              {/* Itens da requisição */}
-              {loadingDetalhe ? (
-                <div className="flex justify-center py-4">
-                  <div className="w-5 h-5 border-2 border-indigo-400 border-t-transparent rounded-full animate-spin" />
-                </div>
-              ) : reqDetalhe?.itens && reqDetalhe.itens.length > 0 && (
-                <div className="bg-slate-50 rounded-2xl p-3.5">
-                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">
-                    <Package size={10} /> Itens ({reqDetalhe.itens.length})
-                  </p>
-                  <div className="space-y-2">
-                    {reqDetalhe.itens.map((item, i) => (
-                      <div key={item.id ?? i} className="bg-white rounded-xl px-3 py-2.5 border border-slate-100">
-                        <p className="text-[11px] font-semibold text-slate-700">{item.descricao}</p>
-                        <div className="flex items-center gap-3 mt-1 text-[10px] text-slate-400">
-                          <span>{item.quantidade} {item.unidade}</span>
-                          {item.valor_unitario_estimado > 0 && (
-                            <>
-                              <span>×</span>
-                              <span>{fmt(item.valor_unitario_estimado)}</span>
-                              <span className="ml-auto font-semibold text-slate-600">
-                                {fmt(item.quantidade * item.valor_unitario_estimado)}
-                              </span>
-                            </>
-                          )}
-                        </div>
-                        {item.classe_financeira_descricao && (
-                          <p className="text-[10px] text-violet-500 mt-0.5">{item.classe_financeira_descricao}</p>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Esclarecimento pendente */}
-              {req.esclarecimento_msg && (
-                <div className="bg-amber-50 border border-amber-200 rounded-2xl p-3.5">
-                  <p className="text-[10px] font-bold text-amber-600 uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
-                    <MessageSquare size={10} /> Esclarecimento solicitado
-                  </p>
-                  <p className="text-[11px] text-amber-800">{req.esclarecimento_msg}</p>
-                  {req.esclarecimento_por && (
-                    <p className="text-[10px] text-amber-500 mt-1">Por: {req.esclarecimento_por}</p>
-                  )}
-                </div>
-              )}
-
-              {/* Link para página completa */}
-              <a
-                href={`/requisicoes/${req.id}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center justify-center gap-2 w-full py-3 rounded-2xl border border-indigo-200 text-indigo-600 text-sm font-semibold hover:bg-indigo-50 transition"
-              >
-                <ExternalLink size={14} /> Abrir página completa
-              </a>
-
-              <div className="h-4" />
-            </div>
-          </div>
-        </div>
       )}
     </div>
   )
@@ -670,27 +417,12 @@ function GenericPendingCard({ aprovacao, aprovadorNome, aprovadorEmail }: {
     new Set(aprovacao.pagamento_detalhes?.itens?.map(i => i.id) ?? [])
   )
 
-  const [showDetalhes, setShowDetalhes] = useState(false)
-  const req = aprovacao.requisicao
-  const cot = aprovacao.cotacao_resumo
-  const isDetalheCotacao = showDetalhes && aprovacao.tipo_aprovacao === 'cotacao'
-  const { data: reqDetalhe, isLoading: loadingDetalhe } = useRequisicao(isDetalheCotacao ? req?.id : undefined)
-  const { data: cotacaoDetalhe } = useCotacaoByRequisicao(isDetalheCotacao ? req?.id : undefined)
-
   const tipo = tipoConfig[aprovacao.tipo_aprovacao] || tipoConfig.requisicao_compra
   const IconComp = tipo.icon
 
   const handleDecision = async (decisao: 'aprovada' | 'rejeitada') => {
     setAction(decisao)
     try {
-      // Build selectedItemIds array for lote approval so useDecisaoGenerica
-      // respects per-item decisions (Bug #181: rejected items were being approved)
-      const selectedItemIdsArray = decisao === 'aprovada'
-        && aprovacao.pagamento_detalhes?.is_lote
-        && aprovacao.pagamento_detalhes.itens?.length
-        ? Array.from(selectedItemIds)
-        : undefined
-
       await mutation.mutateAsync({
         aprovacaoId: aprovacao.id,
         entidadeId: aprovacao.entidade_id,
@@ -702,12 +434,28 @@ function GenericPendingCard({ aprovacao, aprovadorNome, aprovadorEmail }: {
         observacao: observacao || undefined,
         aprovadorNome,
         aprovadorEmail,
-        selectedItemIds: selectedItemIdsArray,
       })
+
+      // After generic approval succeeds, apply per-item decisions for lotes
+      if (decisao === 'aprovada' && aprovacao.pagamento_detalhes?.is_lote && aprovacao.pagamento_detalhes.itens?.length) {
+        const allItems = aprovacao.pagamento_detalhes.itens
+        for (const item of allItems) {
+          const itemDecisao = selectedItemIds.has(item.id) ? 'aprovado' : 'rejeitado'
+          await supabase
+            .from('fin_lote_itens')
+            .update({
+              decisao: itemDecisao,
+              decidido_por: perfil?.nome ?? aprovadorNome ?? 'Aprovador',
+              decidido_em: new Date().toISOString(),
+            })
+            .eq('lote_id', aprovacao.entidade_id)
+            .eq('cp_id', item.id)
+        }
+      }
     } catch { /* error handled by mutation state */ }
   }
 
-  // Resultado pós-decisão
+  // Resultado pos-decisao
   if (mutation.isSuccess) {
     const colors = action === 'aprovada'
       ? { bg: 'bg-emerald-50 border-emerald-200', icon: 'text-emerald-500', text: 'text-emerald-700', msg: 'Aprovada' }
@@ -721,7 +469,7 @@ function GenericPendingCard({ aprovacao, aprovadorNome, aprovadorEmail }: {
         <p className={`font-bold text-base ${colors.text}`}>
           {aprovacao.entidade_numero || tipo.label} — {colors.msg}
         </p>
-        <p className="text-xs text-slate-500 mt-1">Decisão registrada com sucesso</p>
+        <p className="text-xs text-slate-500 mt-1">Decisao registrada com sucesso</p>
       </div>
     )
   }
@@ -752,265 +500,87 @@ function GenericPendingCard({ aprovacao, aprovadorNome, aprovadorEmail }: {
           {aprovacao.entidade_numero || `#${aprovacao.entidade_id.slice(0, 8)}`}
         </p>
         <p className="text-xs text-slate-500 mb-2">
-          Nível {aprovacao.nivel} | Aprovador: {aprovacao.aprovador_nome}
+          Nivel {aprovacao.nivel} | Aprovador: {aprovacao.aprovador_nome}
         </p>
 
         {/* ── Card Transporte ── */}
-        {aprovacao.tipo_aprovacao === 'aprovacao_transporte' && aprovacao.transporte_detalhes ? (() => {
-          const td = aprovacao.transporte_detalhes as any
-          const isViagem = td.is_viagem
-          const sols = (td.solicitacoes ?? []) as any[]
-
-          return (
+        {aprovacao.tipo_aprovacao === 'aprovacao_transporte' && aprovacao.transporte_detalhes ? (
           <div className="space-y-2">
-            {/* Badge viagem consolidada */}
-            {isViagem && (
-              <div className="bg-gradient-to-r from-orange-100 to-amber-100 border border-orange-300 rounded-lg px-3 py-2 flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Truck size={15} className="text-orange-700" />
-                  <span className="text-xs font-bold text-orange-800">
-                    Viagem {td.viagem_numero}
-                  </span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="text-[10px] bg-orange-200 text-orange-800 px-2 py-0.5 rounded-full font-bold">
-                    {td.qtd_paradas} {td.qtd_paradas === 1 ? 'parada' : 'paradas'}
-                  </span>
-                  {td.carga_especial && (
-                    <span className="text-[10px] bg-red-100 text-red-700 px-2 py-0.5 rounded-full font-bold">
-                      Carga Especial
-                    </span>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {/* Rota principal com km e tempo */}
+            {/* Rota */}
             <div className="bg-orange-50 border border-orange-200 rounded-xl p-3">
               <div className="flex items-center gap-2 mb-2">
                 <MapPin size={14} className="text-orange-600" />
-                <span className="text-xs font-bold text-orange-700">{isViagem ? 'Rota da Viagem' : 'Rota'}</span>
+                <span className="text-xs font-bold text-orange-700">Rota</span>
               </div>
               <div className="flex items-center gap-2 text-sm">
-                <span className="font-semibold text-slate-800">{td.origem}</span>
+                <span className="font-semibold text-slate-800">{aprovacao.transporte_detalhes.origem}</span>
                 <span className="text-orange-400">→</span>
-                <span className="font-semibold text-slate-800">{td.destino}</span>
+                <span className="font-semibold text-slate-800">{aprovacao.transporte_detalhes.destino}</span>
               </div>
-              {(td.distancia_total_km || td.tempo_estimado_h) && (
-                <div className="flex gap-3 mt-1.5">
-                  {td.distancia_total_km != null && (
-                    <span className="text-xs text-orange-600 font-medium">{Number(td.distancia_total_km).toFixed(0)} km</span>
-                  )}
-                  {td.tempo_estimado_h != null && (
-                    <span className="text-xs text-orange-600 font-medium">{Number(td.tempo_estimado_h).toFixed(1)}h estimadas</span>
-                  )}
+            </div>
+            {/* Detalhes */}
+            <div className="bg-slate-50 rounded-xl p-3 space-y-1.5">
+              {aprovacao.transporte_detalhes.data_desejada && (
+                <div className="flex justify-between text-xs">
+                  <span className="text-slate-500">Data Desejada</span>
+                  <span className="text-slate-800 font-medium">{new Date(aprovacao.transporte_detalhes.data_desejada).toLocaleDateString('pt-BR')}</span>
+                </div>
+              )}
+              {aprovacao.transporte_detalhes.tipo && (
+                <div className="flex justify-between text-xs">
+                  <span className="text-slate-500">Tipo</span>
+                  <span className="text-slate-800 font-medium capitalize">{aprovacao.transporte_detalhes.tipo.replace(/_/g, ' ')}</span>
+                </div>
+              )}
+              {aprovacao.transporte_detalhes.modal && (
+                <div className="flex justify-between text-xs">
+                  <span className="text-slate-500">Modal</span>
+                  <span className="text-slate-800 font-medium capitalize">{aprovacao.transporte_detalhes.modal}</span>
+                </div>
+              )}
+              {aprovacao.transporte_detalhes.motorista_nome && (
+                <div className="flex justify-between text-xs">
+                  <span className="text-slate-500">Motorista</span>
+                  <span className="text-slate-800 font-medium">{aprovacao.transporte_detalhes.motorista_nome}</span>
+                </div>
+              )}
+              {aprovacao.transporte_detalhes.veiculo_placa && (
+                <div className="flex justify-between text-xs">
+                  <span className="text-slate-500">Placa</span>
+                  <span className="text-slate-800 font-medium">{aprovacao.transporte_detalhes.veiculo_placa}</span>
+                </div>
+              )}
+              {aprovacao.transporte_detalhes.solicitante_nome && (
+                <div className="flex justify-between text-xs">
+                  <span className="text-slate-500">Solicitante</span>
+                  <span className="text-slate-800 font-medium">{aprovacao.transporte_detalhes.solicitante_nome}</span>
+                </div>
+              )}
+              {aprovacao.transporte_detalhes.obra_nome && (
+                <div className="flex justify-between text-xs">
+                  <span className="text-slate-500">Obra</span>
+                  <span className="text-slate-800 font-medium">{aprovacao.transporte_detalhes.obra_nome}</span>
                 </div>
               )}
             </div>
-
-            {/* ── VIAGEM: Mapa de paradas com detalhes de cada solicitação ── */}
-            {isViagem && sols.length > 0 && (
-              <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
-                <div className="bg-slate-50 px-3 py-2 border-b border-slate-200 flex items-center justify-between">
-                  <span className="text-xs font-bold text-slate-600">Roteiro de Entregas</span>
-                  <div className="flex items-center gap-2 text-[10px] text-slate-400">
-                    {td.peso_total_kg > 0 && <span>{Number(td.peso_total_kg).toLocaleString('pt-BR')} kg total</span>}
-                    {td.volumes_total > 0 && <span>· {td.volumes_total} volumes</span>}
-                  </div>
-                </div>
-                <div className="divide-y divide-slate-100">
-                  {sols.map((s: any, i: number) => (
-                    <div key={s.id || i} className="px-3 py-2.5 hover:bg-slate-50/50">
-                      {/* Número da parada + rota */}
-                      <div className="flex items-start justify-between mb-1">
-                        <div className="flex items-center gap-2">
-                          <div className="w-5 h-5 rounded-full bg-orange-100 border border-orange-300 flex items-center justify-center text-[10px] font-bold text-orange-700">
-                            {s.ordem_na_viagem ?? i + 1}
-                          </div>
-                          <div>
-                            <span className="font-mono text-[11px] font-bold text-orange-700">{s.numero}</span>
-                            <div className="flex items-center gap-1 text-xs text-slate-600">
-                              <span>{s.origem}</span>
-                              <span className="text-orange-400">→</span>
-                              <span>{s.destino}</span>
-                            </div>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-1.5">
-                          {s.urgente && (
-                            <span className="text-[9px] bg-red-100 text-red-700 px-1.5 py-0.5 rounded font-bold">URGENTE</span>
-                          )}
-                          {s.carga_especial && (
-                            <span className="text-[9px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded font-bold">ESP.</span>
-                          )}
-                        </div>
-                      </div>
-                      {/* Detalhes da solicitação */}
-                      <div className="ml-7 grid grid-cols-2 gap-x-4 gap-y-0.5 text-[11px]">
-                        {s.obra_nome && (
-                          <>
-                            <span className="text-slate-400">Obra</span>
-                            <span className="text-slate-700 font-medium">{s.obra_nome}</span>
-                          </>
-                        )}
-                        {s.solicitante_nome && (
-                          <>
-                            <span className="text-slate-400">Solicitante</span>
-                            <span className="text-slate-700 font-medium">{s.solicitante_nome}</span>
-                          </>
-                        )}
-                        {s.centro_custo && (
-                          <>
-                            <span className="text-slate-400">Centro Custo</span>
-                            <span className="text-slate-700 font-medium">{s.centro_custo}</span>
-                          </>
-                        )}
-                        {s.peso_total_kg > 0 && (
-                          <>
-                            <span className="text-slate-400">Peso</span>
-                            <span className="text-slate-700 font-medium">{Number(s.peso_total_kg).toLocaleString('pt-BR')} kg</span>
-                          </>
-                        )}
-                        {s.volumes_total > 0 && (
-                          <>
-                            <span className="text-slate-400">Volumes</span>
-                            <span className="text-slate-700 font-medium">{s.volumes_total}</span>
-                          </>
-                        )}
-                        {s.custo_rateado > 0 && (
-                          <>
-                            <span className="text-slate-400">Custo Rateado</span>
-                            <span className="text-slate-700 font-medium">{Number(s.custo_rateado).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>
-                          </>
-                        )}
-                      </div>
-                      {s.descricao && (
-                        <p className="ml-7 text-[10px] text-slate-400 italic mt-0.5 line-clamp-2">{s.descricao}</p>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </div>
+            {aprovacao.transporte_detalhes.descricao && (
+              <p className="text-xs text-slate-500 italic">{aprovacao.transporte_detalhes.descricao}</p>
             )}
-
-            {/* ── SOLO: Detalhes completos da solicitação individual ── */}
-            {!isViagem && (
-              <div className="bg-slate-50 rounded-xl p-3 space-y-1.5">
-                {td.solicitante_nome && (
-                  <div className="flex justify-between text-xs">
-                    <span className="text-slate-500">Solicitante</span>
-                    <span className="text-slate-800 font-medium">{td.solicitante_nome}</span>
-                  </div>
-                )}
-                {td.obra_nome && (
-                  <div className="flex justify-between text-xs">
-                    <span className="text-slate-500">Obra</span>
-                    <span className="text-slate-800 font-medium">{td.obra_nome}</span>
-                  </div>
-                )}
-                {td.centro_custo && (
-                  <div className="flex justify-between text-xs">
-                    <span className="text-slate-500">Centro de Custo</span>
-                    <span className="text-slate-800 font-medium">{td.centro_custo}</span>
-                  </div>
-                )}
-                {td.oc_numero && (
-                  <div className="flex justify-between text-xs">
-                    <span className="text-slate-500">Ordem de Compra</span>
-                    <span className="text-slate-800 font-medium font-mono">{td.oc_numero}</span>
-                  </div>
-                )}
-                {td.tipo && (
-                  <div className="flex justify-between text-xs">
-                    <span className="text-slate-500">Tipo</span>
-                    <span className="text-slate-800 font-medium capitalize">{td.tipo.replace(/_/g, ' ')}</span>
-                  </div>
-                )}
-                {td.descricao && (
-                  <div className="pt-1 border-t border-slate-200 mt-1">
-                    <span className="text-[10px] text-slate-400 font-semibold uppercase">Carga</span>
-                    <p className="text-xs text-slate-700 mt-0.5">{td.descricao}</p>
-                  </div>
-                )}
-                <div className="flex gap-3 flex-wrap">
-                  {td.peso_total_kg > 0 && (
-                    <span className="text-[10px] bg-slate-200 text-slate-600 px-2 py-0.5 rounded-full font-medium">{Number(td.peso_total_kg).toLocaleString('pt-BR')} kg</span>
-                  )}
-                  {td.volumes_total > 0 && (
-                    <span className="text-[10px] bg-slate-200 text-slate-600 px-2 py-0.5 rounded-full font-medium">{td.volumes_total} volumes</span>
-                  )}
-                  {td.carga_especial && (
-                    <span className="text-[10px] bg-red-100 text-red-600 px-2 py-0.5 rounded-full font-bold">Carga Especial</span>
-                  )}
-                </div>
-                {td.observacoes_carga && (
-                  <p className="text-[10px] text-amber-600 italic">{td.observacoes_carga}</p>
-                )}
-                {td.restricoes_seguranca && (
-                  <p className="text-[10px] text-red-500 italic">{td.restricoes_seguranca}</p>
-                )}
-              </div>
-            )}
-
-            {/* Planejamento logístico (comum a viagem e solo) */}
-            {(td.data_desejada || td.modal || td.motorista_nome || td.veiculo_placa) && (
-              <div className="bg-blue-50 border border-blue-200 rounded-xl p-3 space-y-1.5">
-                <div className="flex items-center gap-2 mb-1">
-                  <Truck size={13} className="text-blue-600" />
-                  <span className="text-[10px] font-bold text-blue-700 uppercase tracking-wider">Planejamento Logístico</span>
-                </div>
-                {td.data_desejada && (
-                  <div className="flex justify-between text-xs">
-                    <span className="text-blue-500">Data/Hora Saída</span>
-                    <span className="text-blue-800 font-medium">{new Date(td.data_desejada).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' })}</span>
-                  </div>
-                )}
-                {td.modal && (
-                  <div className="flex justify-between text-xs">
-                    <span className="text-blue-500">Modal</span>
-                    <span className="text-blue-800 font-medium capitalize">{td.modal.replace(/_/g, ' ')}</span>
-                  </div>
-                )}
-                {td.motorista_nome && (
-                  <div className="flex justify-between text-xs">
-                    <span className="text-blue-500">Motorista</span>
-                    <span className="text-blue-800 font-medium">{td.motorista_nome}{td.motorista_telefone ? ` · ${td.motorista_telefone}` : ''}</span>
-                  </div>
-                )}
-                {td.veiculo_placa && (
-                  <div className="flex justify-between text-xs">
-                    <span className="text-blue-500">Veículo</span>
-                    <span className="text-blue-800 font-bold font-mono">{td.veiculo_placa}</span>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* Custo */}
-            {td.custo_estimado != null && td.custo_estimado > 0 && (
+            {aprovacao.transporte_detalhes.custo_estimado != null && aprovacao.transporte_detalhes.custo_estimado > 0 && (
               <div className="bg-orange-50 border border-orange-200 rounded-xl p-3 flex justify-between items-center">
-                <span className="text-xs text-orange-700 font-medium">Custo {isViagem ? 'Total da Viagem' : 'Estimado'}</span>
+                <span className="text-xs text-orange-700 font-medium">Custo Estimado</span>
                 <span className="text-lg font-extrabold text-orange-700">
-                  {Number(td.custo_estimado).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                  {aprovacao.transporte_detalhes.custo_estimado.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
                 </span>
               </div>
             )}
-
-            {/* Urgente */}
-            {td.urgente && (
-              <div className="bg-red-50 border border-red-200 rounded-xl p-2.5 flex items-center gap-2">
-                <AlertTriangle size={13} className="text-red-600" />
-                <div>
-                  <span className="text-xs text-red-700 font-bold">URGENTE</span>
-                  {td.justificativa_urgencia && (
-                    <p className="text-[10px] text-red-500 mt-0.5">{td.justificativa_urgencia}</p>
-                  )}
-                </div>
+            {aprovacao.transporte_detalhes.urgente && (
+              <div className="flex items-center gap-1.5 text-xs text-red-600 font-bold">
+                <AlertTriangle size={12} /> URGENTE
               </div>
             )}
           </div>
-          )
-        })() : null}
+        ) : null}
 
         {/* ── Resumo Executivo para Minuta Contratual ── */}
         {aprovacao.tipo_aprovacao === 'minuta_contratual' && aprovacao.minuta_resumo ? (
@@ -1057,7 +627,7 @@ function GenericPendingCard({ aprovacao, aprovadorNome, aprovadorEmail }: {
           </div>
         ) : (
           <p className="text-sm text-slate-600">
-            {aprovacao.requisicao?.descricao || `Aguardando aprovação ${tipo.label.toLowerCase()}`}
+            {aprovacao.requisicao?.descricao || `Aguardando aprovacao ${tipo.label.toLowerCase()}`}
           </p>
         )}
 
@@ -1072,18 +642,18 @@ function GenericPendingCard({ aprovacao, aprovadorNome, aprovadorEmail }: {
 
         {expanded && (
           <div className="mt-3">
-            <label className="text-xs text-slate-400">Observação / Esclarecimento</label>
+            <label className="text-xs text-slate-400">Observacao / Esclarecimento</label>
             <textarea
               rows={2}
               className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm mt-1 focus:ring-2 focus:ring-indigo-300 outline-none"
-              placeholder="Descreva o que precisa ser esclarecido ou justifique sua decisão..."
+              placeholder="Descreva o que precisa ser esclarecido ou justifique sua decisao..."
               value={observacao}
               onChange={e => setObservacao(e.target.value)}
             />
           </div>
         )}
       </div>
-      <div className={`grid ${aprovacao.tipo_aprovacao === 'cotacao' ? 'grid-cols-4' : 'grid-cols-3'} border-t border-slate-100`}>
+      <div className="grid grid-cols-3 border-t border-slate-100">
         <button
           type="button"
           disabled={mutation.isPending}
@@ -1104,16 +674,6 @@ function GenericPendingCard({ aprovacao, aprovadorNome, aprovadorEmail }: {
           <MessageSquare size={16} />
           Esclarecer
         </button>
-        {aprovacao.tipo_aprovacao === 'cotacao' && (
-          <button
-            type="button"
-            onClick={() => setShowDetalhes(true)}
-            className="flex items-center justify-center gap-1.5 py-3.5 text-xs font-bold text-blue-500 hover:bg-blue-50 active:bg-blue-100 transition border-r border-slate-100"
-          >
-            <Info size={16} />
-            Detalhes
-          </button>
-        )}
         <button
           type="button"
           disabled={mutation.isPending}
@@ -1131,254 +691,6 @@ function GenericPendingCard({ aprovacao, aprovadorNome, aprovadorEmail }: {
         <p className="text-red-500 text-xs text-center py-2 border-t border-red-100">
           Erro ao processar: {mutation.error?.message || 'Tente novamente.'}
         </p>
-      )}
-
-      {/* ── Modal Detalhes (cotacao) ── */}
-      {showDetalhes && aprovacao.tipo_aprovacao === 'cotacao' && (
-        <div className="fixed inset-0 z-50 flex items-end" onClick={() => setShowDetalhes(false)}>
-          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
-          <div
-            className="relative w-full bg-white rounded-t-3xl shadow-2xl max-h-[85vh] flex flex-col"
-            onClick={e => e.stopPropagation()}
-          >
-            {/* Handle */}
-            <div className="flex justify-center pt-3 pb-1">
-              <div className="w-10 h-1 rounded-full bg-slate-200" />
-            </div>
-
-            {/* Header */}
-            <div className="flex items-center justify-between px-5 py-3 border-b border-slate-100">
-              <div>
-                <p className="text-sm font-extrabold text-slate-800">{aprovacao.entidade_numero || req?.numero}</p>
-                <p className="text-[11px] text-slate-400 mt-0.5">{req?.solicitante_nome}</p>
-              </div>
-              <button
-                onClick={() => setShowDetalhes(false)}
-                className="p-2 rounded-xl hover:bg-slate-100 text-slate-400 transition"
-              >
-                <X size={18} />
-              </button>
-            </div>
-
-            {/* Body */}
-            <div className="overflow-y-auto flex-1 px-5 py-4 space-y-4">
-
-              {/* Descrição */}
-              {req?.descricao && (
-                <div className="bg-slate-50 rounded-2xl p-3.5">
-                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Descrição</p>
-                  <p className="text-sm text-slate-700">{req.descricao}</p>
-                  {req.justificativa && (
-                    <p className="text-[11px] text-slate-500 mt-1.5 italic">{req.justificativa}</p>
-                  )}
-                </div>
-              )}
-
-              {/* Detalhes principais */}
-              {req && (
-                <div className="bg-slate-50 rounded-2xl p-3.5">
-                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">
-                    <List size={10} /> Detalhes
-                  </p>
-                  <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-[11px]">
-                    <div>
-                      <span className="text-slate-400">Obra:</span>{' '}
-                      <span className="font-semibold text-slate-700">{req.obra_nome}</span>
-                    </div>
-                    {req.categoria && (
-                      <div>
-                        <span className="text-slate-400">Categoria:</span>{' '}
-                        <span className="font-medium text-slate-600">{req.categoria.replace(/_/g, ' ')}</span>
-                      </div>
-                    )}
-                    {req.centro_custo && (
-                      <div>
-                        <span className="text-slate-400">Centro de Custo:</span>{' '}
-                        <span className="font-semibold text-slate-700">{req.centro_custo}</span>
-                      </div>
-                    )}
-                    {req.classe_financeira && (
-                      <div>
-                        <span className="text-slate-400">Classe Fin.:</span>{' '}
-                        <span className="font-semibold text-violet-600">{req.classe_financeira}</span>
-                      </div>
-                    )}
-                    <div>
-                      <span className="text-slate-400">Solicitante:</span>{' '}
-                      <span className="font-semibold text-slate-700">{req.solicitante_nome}</span>
-                    </div>
-                    {req.created_at && (
-                      <div>
-                        <span className="text-slate-400">Data:</span>{' '}
-                        <span className="font-medium text-slate-600">
-                          {new Date(req.created_at).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit' })}
-                        </span>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {/* Cotação */}
-              {cot ? (
-                <div className="bg-emerald-50 rounded-2xl p-3.5">
-                  <p className="text-[10px] font-bold text-emerald-600 uppercase tracking-wider mb-2 flex items-center gap-1.5">
-                    <Sparkles size={10} /> Melhor Cotação
-                  </p>
-                  <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-[11px]">
-                    <div className="col-span-2">
-                      <span className="text-slate-400">Fornecedor:</span>{' '}
-                      <span className="font-semibold text-slate-700">{cot.fornecedor_nome}</span>
-                    </div>
-                    <div>
-                      <span className="text-slate-400">Valor:</span>{' '}
-                      <span className="font-extrabold text-emerald-600">{fmt(cot.valor)}</span>
-                    </div>
-                    <div>
-                      <span className="text-slate-400">Prazo:</span>{' '}
-                      <span className="font-medium text-slate-600">{cot.prazo_dias}d</span>
-                    </div>
-                    <div>
-                      <span className="text-slate-400">Cotações:</span>{' '}
-                      <span className="font-medium text-slate-600">{cot.total_cotados} fornecedor{cot.total_cotados !== 1 ? 'es' : ''}</span>
-                    </div>
-                    {req && cot.valor < req.valor_estimado && (
-                      <div className="col-span-2 flex items-center gap-1 text-emerald-600 font-semibold">
-                        <Sparkles size={11} />
-                        Economia de {fmt(req.valor_estimado - cot.valor)} ({Math.round((1 - cot.valor / req.valor_estimado) * 100)}%)
-                      </div>
-                    )}
-                  </div>
-                </div>
-              ) : req && req.valor_estimado > 0 && (
-                <div className="bg-blue-50 rounded-2xl p-3.5 flex justify-between items-center">
-                  <span className="text-xs text-blue-500 font-semibold">Valor Estimado</span>
-                  <span className="text-lg font-extrabold text-blue-600">{fmt(req.valor_estimado)}</span>
-                </div>
-              )}
-
-              {/* Timeline de cotações */}
-              {cotacaoDetalhe && (
-                <div className="bg-slate-50 rounded-2xl p-3.5">
-                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">
-                    <List size={10} /> Linha do Tempo da Cotação
-                  </p>
-                  <div className="space-y-1.5 text-[11px] mb-3">
-                    {cotacaoDetalhe.comprador_nome && (
-                      <div>
-                        <span className="text-slate-400">Comprador:</span>{' '}
-                        <span className="font-semibold text-slate-700">{cotacaoDetalhe.comprador_nome}</span>
-                      </div>
-                    )}
-                    {cotacaoDetalhe.data_conclusao && (
-                      <div>
-                        <span className="text-slate-400">Data da cotação:</span>{' '}
-                        <span className="font-medium text-slate-600">
-                          {new Date(cotacaoDetalhe.data_conclusao).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit' })}
-                        </span>
-                      </div>
-                    )}
-                    {!cotacaoDetalhe.data_conclusao && cotacaoDetalhe.created_at && (
-                      <div>
-                        <span className="text-slate-400">Iniciada em:</span>{' '}
-                        <span className="font-medium text-slate-600">
-                          {new Date(cotacaoDetalhe.created_at).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit' })}
-                        </span>
-                      </div>
-                    )}
-                  </div>
-                  {cotacaoDetalhe.fornecedores && cotacaoDetalhe.fornecedores.length > 0 && (
-                    <>
-                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">
-                        Todas as cotações ({cotacaoDetalhe.fornecedores.length})
-                      </p>
-                      <div className="space-y-1.5">
-                        {[...cotacaoDetalhe.fornecedores]
-                          .sort((a, b) => a.valor_total - b.valor_total)
-                          .map((f, i) => (
-                          <div key={f.id ?? i} className={`flex items-center gap-2 px-3 py-2 rounded-xl ${f.selecionado ? 'bg-emerald-100 border border-emerald-200' : 'bg-white border border-slate-100'}`}>
-                            {f.selecionado && <Sparkles size={11} className="text-emerald-600 shrink-0" />}
-                            <div className="flex-1 min-w-0">
-                              <p className={`text-[11px] font-semibold truncate ${f.selecionado ? 'text-emerald-700' : 'text-slate-700'}`}>{f.fornecedor_nome}</p>
-                              {f.prazo_entrega_dias != null && (
-                                <p className="text-[10px] text-slate-400">Prazo: {f.prazo_entrega_dias}d</p>
-                              )}
-                            </div>
-                            <span className={`text-[11px] font-extrabold shrink-0 ${f.selecionado ? 'text-emerald-600' : 'text-slate-600'}`}>
-                              {fmt(f.valor_total)}
-                            </span>
-                          </div>
-                        ))}
-                      </div>
-                    </>
-                  )}
-                </div>
-              )}
-
-              {/* Itens da requisição */}
-              {loadingDetalhe ? (
-                <div className="flex justify-center py-4">
-                  <div className="w-5 h-5 border-2 border-blue-400 border-t-transparent rounded-full animate-spin" />
-                </div>
-              ) : reqDetalhe?.itens && reqDetalhe.itens.length > 0 && (
-                <div className="bg-slate-50 rounded-2xl p-3.5">
-                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">
-                    <Package size={10} /> Itens ({reqDetalhe.itens.length})
-                  </p>
-                  <div className="space-y-2">
-                    {reqDetalhe.itens.map((item, i) => (
-                      <div key={item.id ?? i} className="bg-white rounded-xl px-3 py-2.5 border border-slate-100">
-                        <p className="text-[11px] font-semibold text-slate-700">{item.descricao}</p>
-                        <div className="flex items-center gap-3 mt-1 text-[10px] text-slate-400">
-                          <span>{item.quantidade} {item.unidade}</span>
-                          {item.valor_unitario_estimado > 0 && (
-                            <>
-                              <span>×</span>
-                              <span>{fmt(item.valor_unitario_estimado)}</span>
-                              <span className="ml-auto font-semibold text-slate-600">
-                                {fmt(item.quantidade * item.valor_unitario_estimado)}
-                              </span>
-                            </>
-                          )}
-                        </div>
-                        {item.classe_financeira_descricao && (
-                          <p className="text-[10px] text-violet-500 mt-0.5">{item.classe_financeira_descricao}</p>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Esclarecimento pendente */}
-              {req?.esclarecimento_msg && (
-                <div className="bg-amber-50 border border-amber-200 rounded-2xl p-3.5">
-                  <p className="text-[10px] font-bold text-amber-600 uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
-                    <MessageSquare size={10} /> Esclarecimento solicitado
-                  </p>
-                  <p className="text-[11px] text-amber-800">{req.esclarecimento_msg}</p>
-                  {req.esclarecimento_por && (
-                    <p className="text-[10px] text-amber-500 mt-1">Por: {req.esclarecimento_por}</p>
-                  )}
-                </div>
-              )}
-
-              {/* Link para página completa */}
-              {req?.id && (
-                <a
-                  href={`/requisicoes/${req.id}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center justify-center gap-2 w-full py-3 rounded-2xl border border-blue-200 text-blue-600 text-sm font-semibold hover:bg-blue-50 transition"
-                >
-                  <ExternalLink size={14} /> Abrir página completa
-                </a>
-              )}
-
-              <div className="h-4" />
-            </div>
-          </div>
-        </div>
       )}
     </div>
   )
@@ -1606,25 +918,25 @@ function PagamentoDetalhesCard({ detalhes, selectedItemIds, setSelectedItemIds }
           </div>
         )}
 
-        {/* Entender esta autorização */}
+        {/* Entender esta autorizacao */}
         <button
           type="button"
           onClick={() => setShowEntender(!showEntender)}
           className="flex items-center gap-1.5 text-[11px] text-indigo-500 hover:text-indigo-700 font-semibold transition-colors"
         >
           <HelpCircle size={12} />
-          {showEntender ? 'Ocultar explicação' : 'Entender esta autorização'}
+          {showEntender ? 'Ocultar explicacao' : 'Entender esta autorizacao'}
         </button>
         {showEntender && (
           <div className="bg-indigo-50/60 border border-indigo-100 rounded-xl p-3 text-xs text-indigo-800 leading-relaxed">
             <p>
-              Este é um <strong>Lote de Pagamento</strong> com <strong>{totalItens} itens</strong> no
+              Este e um <strong>Lote de Pagamento</strong> com <strong>{totalItens} itens</strong> no
               valor total de <strong>{fmt(detalhes.valor_original)}</strong>.
-              Você pode aprovar todos os itens ou desmarcar itens individuais para aprová-los parcialmente.
-              Itens desmarcados serão rejeitados automaticamente.
+              Voce pode aprovar todos os itens ou desmarcar itens individuais para aprova-los parcialmente.
+              Itens desmarcados serao rejeitados automaticamente.
             </p>
             <p className="mt-1.5">
-              Ao aprovar, somente os itens selecionados seguirão para pagamento. Ao rejeitar, todo o lote voltará para revisão.
+              Ao aprovar, somente os itens selecionados seguirao para pagamento. Ao rejeitar, todo o lote voltara para revisao.
             </p>
           </div>
         )}
@@ -1666,7 +978,7 @@ function PagamentoDetalhesCard({ detalhes, selectedItemIds, setSelectedItemIds }
             <p className="font-medium text-slate-700">{detalhes.numero_documento || '—'}</p>
           </div>
           <div className="col-span-2">
-            <span className="text-slate-400">Descrição</span>
+            <span className="text-slate-400">Descricao</span>
             <p className="font-medium text-slate-700 leading-snug">{detalhes.descricao || '—'}</p>
           </div>
           <div>
@@ -1674,7 +986,7 @@ function PagamentoDetalhesCard({ detalhes, selectedItemIds, setSelectedItemIds }
             <p className={`font-medium ${isVencida ? 'text-red-600' : 'text-slate-700'}`}>{fmtDate(detalhes.data_vencimento)}</p>
           </div>
           <div>
-            <span className="text-slate-400">Emissão</span>
+            <span className="text-slate-400">Emissao</span>
             <p className="font-medium text-slate-700">{fmtDate(detalhes.data_emissao)}</p>
           </div>
           {detalhes.centro_custo && (
@@ -1704,26 +1016,26 @@ function PagamentoDetalhesCard({ detalhes, selectedItemIds, setSelectedItemIds }
         </div>
       </div>
 
-      {/* Entender esta autorização */}
+      {/* Entender esta autorizacao */}
       <button
         type="button"
         onClick={() => setShowEntender(!showEntender)}
         className="flex items-center gap-1.5 text-[11px] text-indigo-500 hover:text-indigo-700 font-semibold transition-colors"
       >
         <HelpCircle size={12} />
-        {showEntender ? 'Ocultar explicação' : 'Entender esta autorização'}
+        {showEntender ? 'Ocultar explicacao' : 'Entender esta autorizacao'}
       </button>
       {showEntender && (
         <div className="bg-indigo-50/60 border border-indigo-100 rounded-xl p-3 text-xs text-indigo-800 leading-relaxed">
           <p>
-            Esta é uma <strong>Autorização de Pagamento</strong> para o fornecedor <strong>{detalhes.fornecedor_nome}</strong> no
+            Esta e uma <strong>Autorizacao de Pagamento</strong> para o fornecedor <strong>{detalhes.fornecedor_nome}</strong> no
             valor de <strong>{fmt(detalhes.valor_original)}</strong>
             {detalhes.data_vencimento && <>, com vencimento em <strong>{fmtDate(detalhes.data_vencimento)}</strong></>}.
-            {detalhes.centro_custo && <> O gasto será alocado no centro de custo <strong>{detalhes.centro_custo}</strong>.</>}
-            {isVencida && <> <span className="text-red-600 font-bold">Atenção: esta conta já está vencida.</span></>}
+            {detalhes.centro_custo && <> O gasto sera alocado no centro de custo <strong>{detalhes.centro_custo}</strong>.</>}
+            {isVencida && <> <span className="text-red-600 font-bold">Atencao: esta conta ja esta vencida.</span></>}
           </p>
           <p className="mt-1.5">
-            Ao aprovar, o financeiro poderá efetuar o pagamento. Ao rejeitar, a CP voltará para revisão.
+            Ao aprovar, o financeiro podera efetuar o pagamento. Ao rejeitar, a CP voltara para revisao.
           </p>
         </div>
       )}
@@ -1738,7 +1050,7 @@ function MinutaExecutiveSummary({ resumo, referencia }: {
   referencia?: string
 }) {
   const fmtDate = (d: string) => d ? new Date(d).toLocaleDateString('pt-BR') : '—'
-  const tituloResumo = resumo.objeto || resumo.minuta_titulo || 'Contrato sem título'
+  const tituloResumo = resumo.objeto || resumo.minuta_titulo || 'Contrato sem titulo'
   const linhaContexto = [resumo.contraparte, referencia].filter(Boolean).join(' • ')
 
   return (
@@ -1752,7 +1064,7 @@ function MinutaExecutiveSummary({ resumo, referencia }: {
         <div className="rounded-xl border border-indigo-100 bg-white/80 px-3 py-2.5">
           <p className="text-sm font-bold text-slate-800 leading-snug">{tituloResumo}</p>
           <p className="text-[11px] font-semibold text-slate-500 mt-0.5">
-            {linhaContexto || 'Contrato sem referência'}
+            {linhaContexto || 'Contrato sem referencia'}
           </p>
         </div>
         <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-xs">
@@ -1774,7 +1086,7 @@ function MinutaExecutiveSummary({ resumo, referencia }: {
           )}
           {(resumo.vigencia_inicio || resumo.vigencia_fim) && (
             <div>
-              <span className="text-slate-400">Vigência</span>
+              <span className="text-slate-400">Vigencia</span>
               <p className="font-medium text-slate-700">{fmtDate(resumo.vigencia_inicio)} — {fmtDate(resumo.vigencia_fim)}</p>
             </div>
           )}
@@ -1786,7 +1098,7 @@ function MinutaExecutiveSummary({ resumo, referencia }: {
         <div className="bg-violet-50/60 rounded-xl p-3">
           <div className="flex items-center gap-2 mb-2">
             <Sparkles size={13} className="text-violet-500" />
-            <span className="text-[11px] font-bold text-violet-600 uppercase tracking-wider">Resumo do Contrato</span>
+            <span className="text-[11px] font-bold text-violet-600 uppercase tracking-wider">Parecer / Resumo Executivo</span>
             {typeof resumo.ai_score === 'number' && (
               <span className={`ml-auto text-[11px] font-extrabold px-2 py-0.5 rounded-full ${
                 resumo.ai_score >= 80 ? 'bg-emerald-100 text-emerald-700' :
@@ -1904,7 +1216,7 @@ function AccordionSection({
       {open && count === 0 && (
         <div className="px-4 pb-4">
           <p className="text-center text-white/30 text-xs py-4">
-            Nenhuma aprovação pendente
+            Nenhuma aprovacao pendente
           </p>
         </div>
       )}
@@ -1956,7 +1268,6 @@ function TabPendentes({
       minuta_contratual: [],
       requisicao_compra: [],
       aprovacao_transporte: [],
-      solicitacao_adiantamento: [],
     }
     for (const apr of aprovacoes ?? []) {
       const tipo = apr.tipo_aprovacao || 'requisicao_compra'
@@ -1977,7 +1288,7 @@ function TabPendentes({
           <KpiCard icon={ListChecks} label="Pendentes" value={kpis.totalPendentes} color="text-indigo-300" />
           <KpiCard icon={CheckCircle} label="Aprovadas Hoje" value={kpis.aprovadasHoje} color="text-emerald-400" />
           <KpiCard icon={XCircle} label="Rejeitadas Hoje" value={kpis.rejeitadasHoje} color="text-red-400" />
-          <KpiCard icon={Timer} label="Tempo Médio" value={kpis.tempoMedioHoras > 0 ? `${kpis.tempoMedioHoras}h` : '--'} color="text-amber-400" />
+          <KpiCard icon={Timer} label="Tempo Medio" value={kpis.tempoMedioHoras > 0 ? `${kpis.tempoMedioHoras}h` : '--'} color="text-amber-400" />
         </div>
       )}
 
@@ -1993,7 +1304,7 @@ function TabPendentes({
         <div className="text-center py-14">
           <AlertTriangle size={44} className="text-amber-300 mx-auto mb-3" />
           <p className="text-white text-base font-bold">Erro ao carregar</p>
-          <p className="text-indigo-300 text-sm mt-1 mb-4">Não foi possível buscar as aprovações</p>
+          <p className="text-indigo-300 text-sm mt-1 mb-4">Nao foi possivel buscar as aprovacoes</p>
           <button
             onClick={() => refetch()}
             className="bg-white/20 text-white text-sm font-bold px-5 py-2.5 rounded-xl hover:bg-white/30 transition"
@@ -2008,7 +1319,7 @@ function TabPendentes({
         <div className="text-center py-14">
           <CheckCircle size={52} className="text-indigo-300 mx-auto mb-3 opacity-80" />
           <p className="text-white text-base font-bold">Tudo em dia!</p>
-          <p className="text-indigo-300 text-sm mt-1">Nenhuma aprovação pendente</p>
+          <p className="text-indigo-300 text-sm mt-1">Nenhuma aprovacao pendente</p>
         </div>
       )}
 
@@ -2076,7 +1387,7 @@ function HistoricoCard({ item }: { item: AprovacaoHistorico }) {
         {item.entidade_numero || `#${item.entidade_id.slice(0, 8)}`}
       </p>
       <p className="text-xs text-slate-500 mb-1">
-        Nível {item.nivel} | {item.aprovador_nome}
+        Nivel {item.nivel} | {item.aprovador_nome}
       </p>
       {item.observacao && (
         <p className="text-xs text-slate-500 bg-slate-50 rounded-lg p-2 mt-2 italic">
@@ -2150,7 +1461,7 @@ function TabHistorico() {
           {/* Periodo */}
           <div>
             <label className="text-[10px] text-indigo-300 font-semibold uppercase tracking-wider mb-1.5 block">
-              Período
+              Periodo
             </label>
             <div className="flex gap-1.5">
               {periodoOptions.map(opt => (
@@ -2173,7 +1484,7 @@ function TabHistorico() {
           {/* Decisao */}
           <div>
             <label className="text-[10px] text-indigo-300 font-semibold uppercase tracking-wider mb-1.5 block">
-              Decisão
+              Decisao
             </label>
             <div className="flex gap-1.5">
               {decisaoOptions.map(opt => (
@@ -2206,7 +1517,7 @@ function TabHistorico() {
       {!isLoading && isError && (
         <div className="text-center py-10">
           <AlertTriangle size={36} className="text-amber-300 mx-auto mb-3" />
-          <p className="text-white text-sm font-bold">Erro ao carregar histórico</p>
+          <p className="text-white text-sm font-bold">Erro ao carregar historico</p>
         </div>
       )}
 
@@ -2238,46 +1549,11 @@ function TabHistorico() {
 
 type Tab = 'pendentes' | 'historico'
 
-// ── AprovAi PWA Install ──────────────────────────────────────────────────────
-
-function useAprovAiInstall() {
-  const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null)
-  const [isStandalone, setIsStandalone] = useState(false)
-
-  useEffect(() => {
-    setIsStandalone(
-      window.matchMedia('(display-mode: standalone)').matches ||
-      (navigator as unknown as { standalone?: boolean }).standalone === true
-    )
-
-    const handler = (e: Event) => {
-      e.preventDefault()
-      setDeferredPrompt(e as BeforeInstallPromptEvent)
-    }
-    window.addEventListener('beforeinstallprompt', handler)
-
-    return () => {
-      window.removeEventListener('beforeinstallprompt', handler)
-    }
-  }, [])
-
-  const install = useCallback(async () => {
-    if (!deferredPrompt) return
-    await (deferredPrompt as BeforeInstallPromptEvent & { prompt: () => Promise<void> }).prompt()
-    setDeferredPrompt(null)
-  }, [deferredPrompt])
-
-  return { canInstall: !!deferredPrompt, install, isStandalone }
-}
-
-type BeforeInstallPromptEvent = Event & { prompt: () => Promise<void> }
-
 export default function AprovAi() {
   const navigate = useNavigate()
   const { perfil } = useAuth()
   const [activeTab, setActiveTab] = useState<Tab>('pendentes')
   const { data: aprovacoes, isLoading, isError, refetch } = useAprovacoesPendentes()
-  const { canInstall, install, isStandalone } = useAprovAiInstall()
 
   const aprovadorNome = perfil?.nome ?? 'Aprovador'
   const aprovadorEmail = perfil?.email ?? ''
@@ -2290,27 +1566,13 @@ export default function AprovAi() {
 
       {/* Header */}
       <header className="px-4 pt-6 pb-5">
-        <div className="flex items-center justify-between mb-4">
-          <button
-            onClick={() => isStandalone ? navigate('/') : navigate(-1)}
-            className="flex items-center gap-1.5 text-indigo-300 hover:text-white transition-colors"
-          >
-            <ArrowLeft size={18} />
-            <span className="text-xs font-semibold">Voltar</span>
-          </button>
-          {!isStandalone && <div />}
-          {canInstall && (
-            <button
-              onClick={install}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl
-                bg-white/10 backdrop-blur-sm border border-white/20
-                text-white/80 hover:text-white hover:bg-white/20 transition-all text-[11px] font-semibold"
-            >
-              <Smartphone size={13} />
-              Instalar App
-            </button>
-          )}
-        </div>
+        <button
+          onClick={() => navigate(-1)}
+          className="flex items-center gap-1.5 text-indigo-300 hover:text-white transition-colors mb-4"
+        >
+          <ArrowLeft size={18} />
+          <span className="text-xs font-semibold">Voltar</span>
+        </button>
 
         <div className="text-center">
           <div className="flex items-center justify-center gap-2 mb-1">
@@ -2319,7 +1581,7 @@ export default function AprovAi() {
               Aprov<span className="text-indigo-200">Ai</span>
             </h1>
           </div>
-          <p className="text-indigo-300 text-xs font-medium">Aprovações inteligentes com 1 toque</p>
+          <p className="text-indigo-300 text-xs font-medium">Aprovacoes inteligentes com 1 toque</p>
           {activeTab === 'pendentes' && totalPendentes > 0 && (
             <div className="mt-3 inline-flex items-center gap-2 bg-white/15 backdrop-blur-sm rounded-full px-4 py-1.5">
               <span className="text-white text-lg font-extrabold">{totalPendentes}</span>
@@ -2359,7 +1621,7 @@ export default function AprovAi() {
             }`}
           >
             <History size={14} />
-            Histórico
+            Historico
           </button>
         </div>
       </div>

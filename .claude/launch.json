@@ -4,9 +4,9 @@
     {
       "name": "teg-frontend",
       "runtimeExecutable": "node",
-      "runtimeArgs": ["node_modules/vite/bin/vite.js", "--port", "5174"],
-      "cwd": "frontend",
-      "port": 5174
+      "runtimeArgs": ["C:/Program Files/nodejs/node_modules/npm/bin/npm-cli.js", "run", "dev"],
+      "cwd": "C:/teg-plus/.claude/worktrees/musing-perlman/frontend",
+      "port": 5173
     }
   ]
 }
