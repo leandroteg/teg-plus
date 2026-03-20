@@ -238,6 +238,23 @@ export function useAprovacoesPendentes(tipo?: TipoAprovacao) {
         }
       }
 
+      // 5b. Busca dados de transporte (aprovacao_transporte)
+      const logIds = aprData
+        .filter(a => a.tipo_aprovacao === 'aprovacao_transporte')
+        .map(a => a.entidade_id)
+        .filter(Boolean)
+
+      const logMap = new Map<string, Record<string, unknown>>()
+      if (logIds.length > 0) {
+        const { data: logData } = await supabase
+          .from('log_solicitacoes')
+          .select('id, numero, tipo, origem, destino, data_desejada, modal, motorista_nome, veiculo_placa, custo_estimado, descricao, solicitante_nome, obra_nome, urgente, peso_total_kg, volumes_total')
+          .in('id', logIds)
+        for (const l of logData ?? []) {
+          logMap.set(l.id, l)
+        }
+      }
+
       // 6. Mescla aprovacoes com dados da requisicao/contrato/CP + cotacao
       return aprData
         .map(a => {
@@ -411,6 +428,38 @@ export function useAprovacoesPendentes(tipo?: TipoAprovacao) {
                 status_cp: (fin.status as string) ?? '',
               }
             }
+          } else if (a.tipo_aprovacao === 'aprovacao_transporte') {
+            const log = logMap.get(a.entidade_id)
+            requisicao = {
+              id: a.entidade_id,
+              numero: (log?.numero as string) ?? a.entidade_numero ?? 'N/A',
+              solicitante_nome: (log?.solicitante_nome as string) ?? '',
+              obra_nome: (log?.obra_nome as string) ?? '',
+              descricao: `Transporte: ${(log?.origem as string) ?? ''} → ${(log?.destino as string) ?? ''}`,
+              valor_estimado: (log?.custo_estimado as number) ?? 0,
+              urgencia: (log?.urgente as boolean) ? 'critica' : 'normal',
+              status: 'em_aprovacao',
+              alcada_nivel: a.nivel,
+              created_at: a.created_at,
+            }
+            if (log) {
+              ;(a as Record<string, unknown>)._transporte_detalhes = {
+                origem: (log.origem as string) ?? '',
+                destino: (log.destino as string) ?? '',
+                tipo: (log.tipo as string) ?? '',
+                data_desejada: (log.data_desejada as string) ?? undefined,
+                modal: (log.modal as string) ?? undefined,
+                motorista_nome: (log.motorista_nome as string) ?? undefined,
+                veiculo_placa: (log.veiculo_placa as string) ?? undefined,
+                custo_estimado: (log.custo_estimado as number) ?? undefined,
+                descricao: (log.descricao as string) ?? undefined,
+                solicitante_nome: (log.solicitante_nome as string) ?? undefined,
+                obra_nome: (log.obra_nome as string) ?? undefined,
+                urgente: (log.urgente as boolean) ?? undefined,
+                peso_total_kg: (log.peso_total_kg as number) ?? undefined,
+                volumes_total: (log.volumes_total as number) ?? undefined,
+              }
+            }
           } else {
             requisicao = {
               id: a.entidade_id,
@@ -430,6 +479,8 @@ export function useAprovacoesPendentes(tipo?: TipoAprovacao) {
           delete (a as Record<string, unknown>)._minuta_resumo
           const pagamentoDetalhes = (a as Record<string, unknown>)._pagamento_detalhes as AprovacaoPendente['pagamento_detalhes']
           delete (a as Record<string, unknown>)._pagamento_detalhes
+          const transporteDetalhes = (a as Record<string, unknown>)._transporte_detalhes as AprovacaoPendente['transporte_detalhes']
+          delete (a as Record<string, unknown>)._transporte_detalhes
 
           return {
             ...a,
@@ -443,6 +494,7 @@ export function useAprovacoesPendentes(tipo?: TipoAprovacao) {
             cotacao_resumo: cotMap.get(a.entidade_id) ?? undefined,
             minuta_resumo: minutaResumo ?? undefined,
             pagamento_detalhes: pagamentoDetalhes ?? undefined,
+            transporte_detalhes: transporteDetalhes ?? undefined,
           } as unknown as AprovacaoPendente
         })
         .filter((a): a is AprovacaoPendente => a !== null)
@@ -860,6 +912,36 @@ export function useDecisaoGenerica() {
               })
               .eq('id', entidadeId)
           }
+        } else if (tipoAprovacao === 'aprovacao_transporte') {
+          const now = new Date().toISOString()
+          if (decisao === 'aprovada') {
+            await supabase
+              .from('log_solicitacoes')
+              .update({
+                status: 'aprovado',
+                aprovado_por: aprovadorNome,
+                aprovado_em: now,
+                updated_at: now,
+              })
+              .eq('id', entidadeId)
+          } else if (decisao === 'rejeitada') {
+            await supabase
+              .from('log_solicitacoes')
+              .update({
+                status: 'reprovado',
+                motivo_reprovacao: observacao || 'Reprovado',
+                updated_at: now,
+              })
+              .eq('id', entidadeId)
+          } else {
+            await supabase
+              .from('log_solicitacoes')
+              .update({
+                status: 'planejado',
+                updated_at: now,
+              })
+              .eq('id', entidadeId)
+          }
         }
       } catch (e) {
         console.warn('Aviso: entidade fonte nao atualizada:', e)
@@ -878,6 +960,7 @@ export function useDecisaoGenerica() {
       qc.invalidateQueries({ queryKey: ['financeiro-dashboard'] })
       qc.invalidateQueries({ queryKey: ['lotes-pagamento'] })
       qc.invalidateQueries({ queryKey: ['lote-detalhe'] })
+      qc.invalidateQueries({ queryKey: ['log_solicitacoes'] })
     },
   })
 }

@@ -8,6 +8,7 @@ import {
   History, ListChecks, Timer, TrendingUp, Filter,
   Calendar, FileText, Download, Eye, HelpCircle,
   Paperclip, Square, CheckSquare, Package,
+  Truck, MapPin,
 } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../services/supabase'
@@ -87,6 +88,17 @@ const tipoConfig: Record<TipoAprovacao, {
     badgeText: 'text-teal-700',
     headerBg: 'bg-gradient-to-r from-teal-600 to-teal-500',
   },
+  aprovacao_transporte: {
+    label: 'Aprovacao de Transporte',
+    icon: Truck,
+    color: 'orange',
+    bgLight: 'bg-orange-50',
+    textColor: 'text-orange-700',
+    borderColor: 'border-orange-200',
+    badgeBg: 'bg-orange-100',
+    badgeText: 'text-orange-700',
+    headerBg: 'bg-gradient-to-r from-orange-500 to-amber-600',
+  },
 }
 
 const tipoOrder: TipoAprovacao[] = [
@@ -94,6 +106,7 @@ const tipoOrder: TipoAprovacao[] = [
   'autorizacao_pagamento',
   'minuta_contratual',
   'requisicao_compra',
+  'aprovacao_transporte',
 ]
 
 function timeLeft(dateStr?: string): string {
@@ -489,6 +502,85 @@ function GenericPendingCard({ aprovacao, aprovadorNome, aprovadorEmail }: {
         <p className="text-xs text-slate-500 mb-2">
           Nivel {aprovacao.nivel} | Aprovador: {aprovacao.aprovador_nome}
         </p>
+
+        {/* ── Card Transporte ── */}
+        {aprovacao.tipo_aprovacao === 'aprovacao_transporte' && aprovacao.transporte_detalhes ? (
+          <div className="space-y-2">
+            {/* Rota */}
+            <div className="bg-orange-50 border border-orange-200 rounded-xl p-3">
+              <div className="flex items-center gap-2 mb-2">
+                <MapPin size={14} className="text-orange-600" />
+                <span className="text-xs font-bold text-orange-700">Rota</span>
+              </div>
+              <div className="flex items-center gap-2 text-sm">
+                <span className="font-semibold text-slate-800">{aprovacao.transporte_detalhes.origem}</span>
+                <span className="text-orange-400">→</span>
+                <span className="font-semibold text-slate-800">{aprovacao.transporte_detalhes.destino}</span>
+              </div>
+            </div>
+            {/* Detalhes */}
+            <div className="bg-slate-50 rounded-xl p-3 space-y-1.5">
+              {aprovacao.transporte_detalhes.data_desejada && (
+                <div className="flex justify-between text-xs">
+                  <span className="text-slate-500">Data Desejada</span>
+                  <span className="text-slate-800 font-medium">{new Date(aprovacao.transporte_detalhes.data_desejada).toLocaleDateString('pt-BR')}</span>
+                </div>
+              )}
+              {aprovacao.transporte_detalhes.tipo && (
+                <div className="flex justify-between text-xs">
+                  <span className="text-slate-500">Tipo</span>
+                  <span className="text-slate-800 font-medium capitalize">{aprovacao.transporte_detalhes.tipo.replace(/_/g, ' ')}</span>
+                </div>
+              )}
+              {aprovacao.transporte_detalhes.modal && (
+                <div className="flex justify-between text-xs">
+                  <span className="text-slate-500">Modal</span>
+                  <span className="text-slate-800 font-medium capitalize">{aprovacao.transporte_detalhes.modal}</span>
+                </div>
+              )}
+              {aprovacao.transporte_detalhes.motorista_nome && (
+                <div className="flex justify-between text-xs">
+                  <span className="text-slate-500">Motorista</span>
+                  <span className="text-slate-800 font-medium">{aprovacao.transporte_detalhes.motorista_nome}</span>
+                </div>
+              )}
+              {aprovacao.transporte_detalhes.veiculo_placa && (
+                <div className="flex justify-between text-xs">
+                  <span className="text-slate-500">Placa</span>
+                  <span className="text-slate-800 font-medium">{aprovacao.transporte_detalhes.veiculo_placa}</span>
+                </div>
+              )}
+              {aprovacao.transporte_detalhes.solicitante_nome && (
+                <div className="flex justify-between text-xs">
+                  <span className="text-slate-500">Solicitante</span>
+                  <span className="text-slate-800 font-medium">{aprovacao.transporte_detalhes.solicitante_nome}</span>
+                </div>
+              )}
+              {aprovacao.transporte_detalhes.obra_nome && (
+                <div className="flex justify-between text-xs">
+                  <span className="text-slate-500">Obra</span>
+                  <span className="text-slate-800 font-medium">{aprovacao.transporte_detalhes.obra_nome}</span>
+                </div>
+              )}
+            </div>
+            {aprovacao.transporte_detalhes.descricao && (
+              <p className="text-xs text-slate-500 italic">{aprovacao.transporte_detalhes.descricao}</p>
+            )}
+            {aprovacao.transporte_detalhes.custo_estimado != null && aprovacao.transporte_detalhes.custo_estimado > 0 && (
+              <div className="bg-orange-50 border border-orange-200 rounded-xl p-3 flex justify-between items-center">
+                <span className="text-xs text-orange-700 font-medium">Custo Estimado</span>
+                <span className="text-lg font-extrabold text-orange-700">
+                  {aprovacao.transporte_detalhes.custo_estimado.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                </span>
+              </div>
+            )}
+            {aprovacao.transporte_detalhes.urgente && (
+              <div className="flex items-center gap-1.5 text-xs text-red-600 font-bold">
+                <AlertTriangle size={12} /> URGENTE
+              </div>
+            )}
+          </div>
+        ) : null}
 
         {/* ── Resumo Executivo para Minuta Contratual ── */}
         {aprovacao.tipo_aprovacao === 'minuta_contratual' && aprovacao.minuta_resumo ? (
@@ -1175,6 +1267,7 @@ function TabPendentes({
       autorizacao_pagamento: [],
       minuta_contratual: [],
       requisicao_compra: [],
+      aprovacao_transporte: [],
     }
     for (const apr of aprovacoes ?? []) {
       const tipo = apr.tipo_aprovacao || 'requisicao_compra'
