@@ -152,20 +152,20 @@ function DetailModal({ sol, onClose, onAction, isDark }: {
               </div>
             </div>
             {/* KM + Tempo Estimado */}
-            {(sol.rota_planejada?.distancia_km || sol.rota_planejada?.tempo_estimado_h) && (
+            {(sol.distancia_km || sol.tempo_estimado_h) && (
               <div className="flex items-center gap-3 mt-3 pt-3 border-t border-orange-200/60">
-                {sol.rota_planejada.distancia_km != null && (
+                {sol.distancia_km != null && sol.distancia_km > 0 && (
                   <div className={`flex-1 text-center rounded-lg py-1.5 ${isDark ? 'bg-orange-500/10' : 'bg-white/70'}`}>
-                    <p className={`text-base font-extrabold ${txtMain}`}>{sol.rota_planejada.distancia_km.toLocaleString('pt-BR')} km</p>
+                    <p className={`text-base font-extrabold ${txtMain}`}>{Number(sol.distancia_km).toLocaleString('pt-BR', { maximumFractionDigits: 1 })} km</p>
                     <p className={`text-[10px] ${txtMuted}`}>Distância</p>
                   </div>
                 )}
-                {sol.rota_planejada.tempo_estimado_h != null && (
+                {sol.tempo_estimado_h != null && sol.tempo_estimado_h > 0 && (
                   <div className={`flex-1 text-center rounded-lg py-1.5 ${isDark ? 'bg-orange-500/10' : 'bg-white/70'}`}>
                     <p className={`text-base font-extrabold ${txtMain}`}>
-                      {sol.rota_planejada.tempo_estimado_h >= 1
-                        ? `${Math.floor(sol.rota_planejada.tempo_estimado_h)}h${sol.rota_planejada.tempo_estimado_h % 1 ? `${Math.round((sol.rota_planejada.tempo_estimado_h % 1) * 60)}min` : ''}`
-                        : `${Math.round(sol.rota_planejada.tempo_estimado_h * 60)}min`}
+                      {Number(sol.tempo_estimado_h) >= 1
+                        ? `${Math.floor(Number(sol.tempo_estimado_h))}h${Number(sol.tempo_estimado_h) % 1 ? `${Math.round((Number(sol.tempo_estimado_h) % 1) * 60)}min` : ''}`
+                        : `${Math.round(Number(sol.tempo_estimado_h) * 60)}min`}
                     </p>
                     <p className={`text-[10px] ${txtMuted}`}>Tempo Estimado</p>
                   </div>
@@ -872,6 +872,8 @@ export default function SolicitacoesPipeline() {
           veiculo_placa: data.veiculo_placa,
           data_prevista_saida: data.data_prevista_saida,
           custo_estimado: data.custo_estimado,
+          distancia_km: data.distancia_total_km || undefined,
+          tempo_estimado_h: data.duracao_total_horas || undefined,
         })
       }
       showToast('success', `${data.solicitacaoIds.length} solicitação(ões) planejada(s)`)

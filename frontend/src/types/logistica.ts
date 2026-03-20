@@ -144,6 +144,8 @@ export interface LogSolicitacao {
   motorista_telefone?: string
   data_prevista_saida?: string
   custo_estimado?: number
+  distancia_km?: number
+  tempo_estimado_h?: number
   rota_planejada_id?: string
 
   aprovado_por?: string

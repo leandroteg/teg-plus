@@ -136,6 +136,7 @@ export function usePlanejaarSolicitacao() {
     mutationFn: async ({
       id, modal, transportadora_id, veiculo_placa, motorista_nome,
       motorista_telefone, data_prevista_saida, custo_estimado,
+      distancia_km, tempo_estimado_h,
     }: {
       id: string
       modal?: string
@@ -145,6 +146,8 @@ export function usePlanejaarSolicitacao() {
       motorista_telefone?: string
       data_prevista_saida?: string
       custo_estimado?: number
+      distancia_km?: number
+      tempo_estimado_h?: number
     }) => {
       const { data, error } = await supabase
         .from('log_solicitacoes')
@@ -152,6 +155,7 @@ export function usePlanejaarSolicitacao() {
           status: 'planejado' as const,
           modal, transportadora_id, veiculo_placa, motorista_nome,
           motorista_telefone, data_prevista_saida, custo_estimado,
+          distancia_km, tempo_estimado_h,
           updated_at: new Date().toISOString(),
         })
         .eq('id', id)
