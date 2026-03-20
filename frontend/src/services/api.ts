@@ -119,18 +119,8 @@ export const api = {
           method: 'POST',
           body: JSON.stringify({ valor: limpo }),
         })
-        // Normaliza resposta do n8n proxy (pode ter nomes de campo diferentes da CnpjResult)
+        // Normaliza resposta do n8n proxy
         const result = normalizeCnpjResponse(raw, limpo)
-        // Se n8n não retornou sócios, tenta ReceitaWS como fallback para QSA
-        if (!result.error && (!result.socios || !result.socios.length)) {
-          try {
-            const rws = await fetch(`https://receitaws.com.br/v1/cnpj/${limpo}`)
-            if (rws.ok) {
-              const rwsData = await rws.json()
-              result.socios = normalizeSocios(rwsData as Record<string, unknown>)
-            }
-          } catch { /* ignora */ }
-        }
         return result
       } catch { /* fallback abaixo */ }
     }
@@ -276,6 +266,10 @@ function normalizeCnpjResponse(r: Record<string, unknown>, cnpjDigits: string): 
     telefone: String(d.telefone ?? d.ddd_telefone_1 ?? '').replace(/\D/g, ''),
     email: String(d.email ?? '').toLowerCase(),
     socios: normalizeSocios(d),
+    representante_nome: String(d.representante_nome ?? ''),
+    representante_cpf: String(d.representante_cpf ?? ''),
+    representante_cargo: String(d.representante_cargo ?? ''),
+    endereco_completo: String(d.endereco_completo ?? ''),
   }
 }
 
@@ -297,6 +291,10 @@ export interface CnpjResult {
   telefone: string
   email: string
   socios?: { nome: string; qualificacao: string }[]
+  representante_nome?: string
+  representante_cpf?: string
+  representante_cargo?: string
+  endereco_completo?: string
   error?: boolean
   message?: string
 }
