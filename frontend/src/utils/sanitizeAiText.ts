@@ -116,6 +116,8 @@ export function sanitizeAiText(text: string | null | undefined): string {
   result = decodeUnicodeEscapes(result)
   result = decodeHtmlEntities(result)
   result = repairMojibake(result)
+  // Remove Unicode Replacement Characters (U+FFFD) — sign of broken encoding from n8n
+  result = result.replace(/\uFFFD+/g, '')
   // Normalize escaped newlines/tabs that came as literal strings
   result = result.replace(/\\n/g, '\n').replace(/\\t/g, '\t')
   // Collapse excessive whitespace (more than 2 consecutive newlines)

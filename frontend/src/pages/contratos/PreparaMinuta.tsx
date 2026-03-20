@@ -1094,7 +1094,7 @@ function MelhoriasPanel({ melhorias, scoreOriginal, onGerarMinuta, gerandoMinuta
               {enviandoAprovacao ? (
                 <><Loader2 size={14} className="animate-spin" /> Enviando...</>
               ) : (
-                <><ChevronRight size={14} /> Enviar para Aprovacao</>
+                <><ChevronRight size={14} /> Enviar para Aprovação</>
               )}
             </button>
           )}

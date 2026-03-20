@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import {
   AlertTriangle,
@@ -28,6 +28,7 @@ import {
   mapResumoAiToPayload,
   type ResumoExecutivoPayloadDraft,
 } from '../../utils/contratosResumoExecutivo'
+import { sanitizeAiText } from '../../utils/sanitizeAiText'
 
 const fmt = (v: number) =>
   v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
@@ -57,14 +58,17 @@ function StatusBadge({ status }: { status: string }) {
 }
 
 function ResumoView({ resumo }: { resumo: TResumo }) {
-  const parecer = resumo.recomendacao || buildResumoNarrativo({
-    partesEnvolvidas: resumo.partes_envolvidas,
-    objetoResumo: resumo.objeto_resumo,
-    valorTotal: resumo.valor_total,
-    vigencia: resumo.vigencia,
-    riscos: resumo.riscos,
-    oportunidades: resumo.oportunidades,
-  })
+  const parecer = useMemo(() => {
+    const raw = resumo.recomendacao || buildResumoNarrativo({
+      partesEnvolvidas: resumo.partes_envolvidas,
+      objetoResumo: resumo.objeto_resumo,
+      valorTotal: resumo.valor_total,
+      vigencia: resumo.vigencia,
+      riscos: resumo.riscos,
+      oportunidades: resumo.oportunidades,
+    })
+    return sanitizeAiText(raw)
+  }, [resumo])
 
   return (
     <div className="space-y-4">
@@ -74,7 +78,7 @@ function ResumoView({ resumo }: { resumo: TResumo }) {
             <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-indigo-50">
               <Eye size={13} className="text-indigo-600" />
             </div>
-            <h2 className="text-sm font-extrabold text-slate-800">{resumo.titulo}</h2>
+            <h2 className="text-sm font-extrabold text-slate-800">{sanitizeAiText(resumo.titulo)}</h2>
           </div>
           <StatusBadge status={resumo.status} />
         </div>
@@ -544,7 +548,7 @@ export default function ResumoExecutivoPage() {
               {isSending || isAutoGenerating
                 ? <div className="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white" />
                 : <Send size={14} />}
-              Enviar para Aprovacao
+              Enviar para Aprovação
             </button>
           </div>
         </div>
