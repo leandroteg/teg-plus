@@ -30,7 +30,7 @@ const fmt = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', curren
 const urgenciaConfig: Record<string, { bg: string; text: string; label: string }> = {
   normal:  { bg: 'bg-slate-100',  text: 'text-slate-600',  label: 'Normal'  },
   urgente: { bg: 'bg-amber-100',  text: 'text-amber-700',  label: 'Urgente' },
-  critica: { bg: 'bg-red-100',    text: 'text-red-700',    label: 'Critica' },
+  critica: { bg: 'bg-red-100',    text: 'text-red-700',    label: 'Crítica' },
 }
 
 const tipoConfig: Record<TipoAprovacao, {
@@ -45,7 +45,7 @@ const tipoConfig: Record<TipoAprovacao, {
   headerBg: string
 }> = {
   cotacao: {
-    label: 'Aprovacao Compras',
+    label: 'Aprovação Compras',
     icon: FileSearch,
     color: 'blue',
     bgLight: 'bg-blue-50',
@@ -56,7 +56,7 @@ const tipoConfig: Record<TipoAprovacao, {
     headerBg: 'bg-gradient-to-r from-blue-600 to-blue-500',
   },
   autorizacao_pagamento: {
-    label: 'Autorizacoes de Pagamento',
+    label: 'Autorizações de Pagamento',
     icon: Banknote,
     color: 'amber',
     bgLight: 'bg-amber-50',
@@ -78,7 +78,7 @@ const tipoConfig: Record<TipoAprovacao, {
     headerBg: 'bg-gradient-to-r from-violet-600 to-violet-500',
   },
   requisicao_compra: {
-    label: 'Validacao Tec. Requisicao de Compra',
+    label: 'Validação Téc. Requisição de Compra',
     icon: ShoppingCart,
     color: 'teal',
     bgLight: 'bg-teal-50',
@@ -89,7 +89,7 @@ const tipoConfig: Record<TipoAprovacao, {
     headerBg: 'bg-gradient-to-r from-teal-600 to-teal-500',
   },
   aprovacao_transporte: {
-    label: 'Aprovacao de Transporte',
+    label: 'Aprovação de Transporte',
     icon: Truck,
     color: 'orange',
     bgLight: 'bg-orange-50',
@@ -119,9 +119,9 @@ function timeLeft(dateStr?: string): string {
 }
 
 function getAlcada(valor: number, nivel: number) {
-  if (valor <= 2000) return { label: `Alcada 1`, sublabel: `Welton ou Claudinor <= R$2.000` }
-  if (nivel <= 2)    return { label: 'Alcada 2', sublabel: 'Laucidio > R$2.000' }
-  return { label: 'Aprovacao de Pagamento', sublabel: 'Laucidio -- etapa final' }
+  if (valor <= 2000) return { label: `Alçada 1`, sublabel: `Welton ou Claudinor <= R$2.000` }
+  if (nivel <= 2)    return { label: 'Alçada 2', sublabel: 'Laucídio > R$2.000' }
+  return { label: 'Aprovação de Pagamento', sublabel: 'Laucídio — etapa final' }
 }
 
 function formatDateShort(dateStr?: string): string {
@@ -148,7 +148,7 @@ function AprovacaoCard({ aprovacao, aprovadorNome, aprovadorEmail }: {
   const req  = aprovacao.requisicao
   const cot  = aprovacao.cotacao_resumo
 
-  // Busca alerta de cotacoes obrigatorias faltantes (#38)
+  // Busca alerta de cotações obrigatórias faltantes (#38)
   useEffect(() => {
     if (!aprovacao.requisicao_id) return
     supabase.rpc('get_alerta_cotacao', { p_requisicao_id: aprovacao.requisicao_id })
@@ -200,7 +200,7 @@ function AprovacaoCard({ aprovacao, aprovadorNome, aprovadorEmail }: {
     } catch { /* error handled by mutation state */ }
   }
 
-  // Resultado pos-decisao
+  // Resultado pós-decisão
   if (mutation.isSuccess) {
     const colors = action === 'aprovada'
       ? { bg: 'bg-emerald-50 border-emerald-200', icon: 'text-emerald-500', text: 'text-emerald-700', msg: 'Aprovada' }
@@ -216,7 +216,7 @@ function AprovacaoCard({ aprovacao, aprovadorNome, aprovadorEmail }: {
         <p className={`font-bold text-base ${colors.text}`}>
           {req.numero} -- {colors.msg}
         </p>
-        <p className="text-xs text-slate-500 mt-1">Aprovador notificado automaticamente</p>
+        <p className="text-xs text-slate-500 mt-1">Aprovador notificado automáticamente</p>
       </div>
     )
   }
@@ -224,7 +224,7 @@ function AprovacaoCard({ aprovacao, aprovadorNome, aprovadorEmail }: {
   // Card principal
   return (
     <div className="bg-white rounded-2xl shadow-md border border-slate-100 overflow-hidden">
-      {/* Badge de nivel / tipo */}
+      {/* Badge de nível / tipo */}
       <div className="bg-indigo-600 px-4 py-2.5 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Shield size={14} className="text-indigo-200" />
@@ -287,7 +287,7 @@ function AprovacaoCard({ aprovacao, aprovadorNome, aprovadorEmail }: {
           {cot && (
             <div className="border-t border-slate-200 pt-2 space-y-1.5">
               <div className="flex justify-between items-center">
-                <span className="text-xs text-slate-500">Menor cotacao</span>
+                <span className="text-xs text-slate-500">Menor cotação</span>
                 <span className="text-lg font-extrabold text-emerald-600">{fmt(cot.valor)}</span>
               </div>
               <div className="flex justify-between text-[11px] text-slate-400">
@@ -306,21 +306,21 @@ function AprovacaoCard({ aprovacao, aprovadorNome, aprovadorEmail }: {
 
           {!cot && req.valor_estimado > 2000 && (
             <div className="flex items-center gap-1.5 text-[11px] text-amber-600">
-              <AlertTriangle size={11} /> Valor acima de R$2.000 -- alcada Laucidio
+              <AlertTriangle size={11} /> Valor acima de R$2.000 — alçada Laucídio
             </div>
           )}
         </div>
 
-        {/* Alerta: cotacoes obrigatorias faltantes (#38) */}
+        {/* Alerta: cotações obrigatórias faltantes (#38) */}
         {alertaCotacao?.sem_cotacoes_minimas && (
           <div className="mt-3 bg-amber-50 border border-amber-300 rounded-xl p-3 flex gap-2.5">
             <AlertTriangle size={16} className="text-amber-600 shrink-0 mt-0.5" />
             <div>
               <p className="text-xs font-bold text-amber-800">
-                Cotacao sem numero minimo de fornecedores
+                Cotação sem número mínimo de fornecedores
               </p>
               <p className="text-[11px] text-amber-700 mt-0.5 leading-relaxed">
-                O comprador enviou esta cotacao sem atingir o minimo exigido. Avalie com cautela.
+                O comprador enviou esta cotação sem atingir o mínimo exigido. Avalie com cautela.
               </p>
               {alertaCotacao.justificativa && (
                 <div className="mt-1.5 bg-white border border-amber-200 rounded-lg px-2.5 py-1.5">
@@ -332,22 +332,22 @@ function AprovacaoCard({ aprovacao, aprovadorNome, aprovadorEmail }: {
           </div>
         )}
 
-        {/* Expandir para observacao */}
+        {/* Expandir para observação */}
         <button type="button" onClick={() => setExpanded(!expanded)}
           className="flex items-center gap-1 text-xs text-indigo-500 mt-3 mx-auto font-semibold">
           {expanded ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
-          {expanded ? 'Menos detalhes' : 'Adicionar observacao'}
+          {expanded ? 'Menos detalhes' : 'Adicionar observação'}
         </button>
 
         {expanded && (
           <div className="mt-3">
             <label className="text-xs text-slate-400">
-              {action === 'esclarecimento' ? 'Descreva o esclarecimento necessario (obrigatorio)' : 'Observacao (opcional)'}
+              {action === 'esclarecimento' ? 'Descreva o esclarecimento necessário (obrigatório)' : 'Observação (opcional)'}
             </label>
             <textarea
               rows={2}
               className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm mt-1 focus:ring-2 focus:ring-indigo-300 outline-none"
-              placeholder={action === 'esclarecimento' ? 'O que precisa ser esclarecido...' : 'Motivo da decisao...'}
+              placeholder={action === 'esclarecimento' ? 'O que precisa ser esclarecido...' : 'Motivo da decisão...'}
               value={observacao}
               onChange={e => setObservacao(e.target.value)}
             />
@@ -455,7 +455,7 @@ function GenericPendingCard({ aprovacao, aprovadorNome, aprovadorEmail }: {
     } catch { /* error handled by mutation state */ }
   }
 
-  // Resultado pos-decisao
+  // Resultado pós-decisão
   if (mutation.isSuccess) {
     const colors = action === 'aprovada'
       ? { bg: 'bg-emerald-50 border-emerald-200', icon: 'text-emerald-500', text: 'text-emerald-700', msg: 'Aprovada' }
@@ -469,7 +469,7 @@ function GenericPendingCard({ aprovacao, aprovadorNome, aprovadorEmail }: {
         <p className={`font-bold text-base ${colors.text}`}>
           {aprovacao.entidade_numero || tipo.label} — {colors.msg}
         </p>
-        <p className="text-xs text-slate-500 mt-1">Decisao registrada com sucesso</p>
+        <p className="text-xs text-slate-500 mt-1">Decisão registrada com sucesso</p>
       </div>
     )
   }
@@ -500,7 +500,7 @@ function GenericPendingCard({ aprovacao, aprovadorNome, aprovadorEmail }: {
           {aprovacao.entidade_numero || `#${aprovacao.entidade_id.slice(0, 8)}`}
         </p>
         <p className="text-xs text-slate-500 mb-2">
-          Nivel {aprovacao.nivel} | Aprovador: {aprovacao.aprovador_nome}
+          Nível {aprovacao.nivel} | Aprovador: {aprovacao.aprovador_nome}
         </p>
 
         {/* ── Card Transporte ── */}
@@ -627,7 +627,7 @@ function GenericPendingCard({ aprovacao, aprovadorNome, aprovadorEmail }: {
           </div>
         ) : (
           <p className="text-sm text-slate-600">
-            {aprovacao.requisicao?.descricao || `Aguardando aprovacao ${tipo.label.toLowerCase()}`}
+            {aprovacao.requisicao?.descricao || `Aguardando aprovação ${tipo.label.toLowerCase()}`}
           </p>
         )}
 
@@ -642,11 +642,11 @@ function GenericPendingCard({ aprovacao, aprovadorNome, aprovadorEmail }: {
 
         {expanded && (
           <div className="mt-3">
-            <label className="text-xs text-slate-400">Observacao / Esclarecimento</label>
+            <label className="text-xs text-slate-400">Observação / Esclarecimento</label>
             <textarea
               rows={2}
               className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm mt-1 focus:ring-2 focus:ring-indigo-300 outline-none"
-              placeholder="Descreva o que precisa ser esclarecido ou justifique sua decisao..."
+              placeholder="Descreva o que precisa ser esclarecido ou justifique sua decisão..."
               value={observacao}
               onChange={e => setObservacao(e.target.value)}
             />
@@ -746,8 +746,8 @@ function PagamentoDetalhesCard({ detalhes, selectedItemIds, setSelectedItemIds }
     const itens = detalhes.itens
     const totalItens = itens.length
     const aprovados = detalhes.aprovados ?? 0
-    const excluidos = detalhes.excluidos ?? 0
-    const pendentes = totalItens - aprovados - excluidos
+    const excluídos = detalhes.excluídos ?? 0
+    const pendentes = totalItens - aprovados - excluídos
     const selectedCount = selectedItemIds?.size ?? totalItens
 
     // Fornecedores summary: group by fornecedor_nome with summed values
@@ -781,7 +781,7 @@ function PagamentoDetalhesCard({ detalhes, selectedItemIds, setSelectedItemIds }
         </div>
 
         {/* Progress bar */}
-        {(aprovados > 0 || excluidos > 0) && (
+        {(aprovados > 0 || excluídos > 0) && (
           <div className="bg-slate-50 rounded-xl p-3 space-y-1.5">
             <div className="flex items-center gap-2 mb-1">
               <Package size={13} className="text-slate-500" />
@@ -791,8 +791,8 @@ function PagamentoDetalhesCard({ detalhes, selectedItemIds, setSelectedItemIds }
               {aprovados > 0 && (
                 <div className="bg-emerald-500 h-full" style={{ width: `${(aprovados / totalItens) * 100}%` }} />
               )}
-              {excluidos > 0 && (
-                <div className="bg-red-400 h-full" style={{ width: `${(excluidos / totalItens) * 100}%` }} />
+              {excluídos > 0 && (
+                <div className="bg-red-400 h-full" style={{ width: `${(excluídos / totalItens) * 100}%` }} />
               )}
               {pendentes > 0 && (
                 <div className="bg-slate-300 h-full" style={{ width: `${(pendentes / totalItens) * 100}%` }} />
@@ -800,7 +800,7 @@ function PagamentoDetalhesCard({ detalhes, selectedItemIds, setSelectedItemIds }
             </div>
             <div className="flex gap-3 text-[10px] font-medium">
               {aprovados > 0 && <span className="text-emerald-600">● {aprovados} aprovados</span>}
-              {excluidos > 0 && <span className="text-red-500">● {excluidos} excluidos</span>}
+              {excluídos > 0 && <span className="text-red-500">● {excluídos} excluídos</span>}
               {pendentes > 0 && <span className="text-slate-500">● {pendentes} pendentes</span>}
             </div>
           </div>
@@ -918,25 +918,25 @@ function PagamentoDetalhesCard({ detalhes, selectedItemIds, setSelectedItemIds }
           </div>
         )}
 
-        {/* Entender esta autorizacao */}
+        {/* Entender esta autorização */}
         <button
           type="button"
           onClick={() => setShowEntender(!showEntender)}
           className="flex items-center gap-1.5 text-[11px] text-indigo-500 hover:text-indigo-700 font-semibold transition-colors"
         >
           <HelpCircle size={12} />
-          {showEntender ? 'Ocultar explicacao' : 'Entender esta autorizacao'}
+          {showEntender ? 'Ocultar explicação' : 'Entender esta autorização'}
         </button>
         {showEntender && (
           <div className="bg-indigo-50/60 border border-indigo-100 rounded-xl p-3 text-xs text-indigo-800 leading-relaxed">
             <p>
-              Este e um <strong>Lote de Pagamento</strong> com <strong>{totalItens} itens</strong> no
+              Este é um <strong>Lote de Pagamento</strong> com <strong>{totalItens} itens</strong> no
               valor total de <strong>{fmt(detalhes.valor_original)}</strong>.
-              Voce pode aprovar todos os itens ou desmarcar itens individuais para aprova-los parcialmente.
-              Itens desmarcados serao rejeitados automaticamente.
+              Você pode aprovar todos os itens ou desmarcar itens individuais para aprová-los parcialmente.
+              Itens desmarcados serão rejeitados automaticamente.
             </p>
             <p className="mt-1.5">
-              Ao aprovar, somente os itens selecionados seguirao para pagamento. Ao rejeitar, todo o lote voltara para revisao.
+              Ao aprovar, somente os itens selecionados seguirão para pagamento. Ao rejeitar, todo o lote voltará para revisão.
             </p>
           </div>
         )}
@@ -978,7 +978,7 @@ function PagamentoDetalhesCard({ detalhes, selectedItemIds, setSelectedItemIds }
             <p className="font-medium text-slate-700">{detalhes.numero_documento || '—'}</p>
           </div>
           <div className="col-span-2">
-            <span className="text-slate-400">Descricao</span>
+            <span className="text-slate-400">Descrição</span>
             <p className="font-medium text-slate-700 leading-snug">{detalhes.descricao || '—'}</p>
           </div>
           <div>
@@ -986,7 +986,7 @@ function PagamentoDetalhesCard({ detalhes, selectedItemIds, setSelectedItemIds }
             <p className={`font-medium ${isVencida ? 'text-red-600' : 'text-slate-700'}`}>{fmtDate(detalhes.data_vencimento)}</p>
           </div>
           <div>
-            <span className="text-slate-400">Emissao</span>
+            <span className="text-slate-400">Emissão</span>
             <p className="font-medium text-slate-700">{fmtDate(detalhes.data_emissao)}</p>
           </div>
           {detalhes.centro_custo && (
@@ -1016,26 +1016,26 @@ function PagamentoDetalhesCard({ detalhes, selectedItemIds, setSelectedItemIds }
         </div>
       </div>
 
-      {/* Entender esta autorizacao */}
+      {/* Entender esta autorização */}
       <button
         type="button"
         onClick={() => setShowEntender(!showEntender)}
         className="flex items-center gap-1.5 text-[11px] text-indigo-500 hover:text-indigo-700 font-semibold transition-colors"
       >
         <HelpCircle size={12} />
-        {showEntender ? 'Ocultar explicacao' : 'Entender esta autorizacao'}
+        {showEntender ? 'Ocultar explicação' : 'Entender esta autorização'}
       </button>
       {showEntender && (
         <div className="bg-indigo-50/60 border border-indigo-100 rounded-xl p-3 text-xs text-indigo-800 leading-relaxed">
           <p>
-            Esta e uma <strong>Autorizacao de Pagamento</strong> para o fornecedor <strong>{detalhes.fornecedor_nome}</strong> no
+            Esta é uma <strong>Autorização de Pagamento</strong> para o fornecedor <strong>{detalhes.fornecedor_nome}</strong> no
             valor de <strong>{fmt(detalhes.valor_original)}</strong>
             {detalhes.data_vencimento && <>, com vencimento em <strong>{fmtDate(detalhes.data_vencimento)}</strong></>}.
-            {detalhes.centro_custo && <> O gasto sera alocado no centro de custo <strong>{detalhes.centro_custo}</strong>.</>}
-            {isVencida && <> <span className="text-red-600 font-bold">Atencao: esta conta ja esta vencida.</span></>}
+            {detalhes.centro_custo && <> O gasto será alocado no centro de custo <strong>{detalhes.centro_custo}</strong>.</>}
+            {isVencida && <> <span className="text-red-600 font-bold">Atenção: esta conta já está vencida.</span></>}
           </p>
           <p className="mt-1.5">
-            Ao aprovar, o financeiro podera efetuar o pagamento. Ao rejeitar, a CP voltara para revisao.
+            Ao aprovar, o financeiro poderá efetuar o pagamento. Ao rejeitar, a CP voltará para revisão.
           </p>
         </div>
       )}
@@ -1050,7 +1050,7 @@ function MinutaExecutiveSummary({ resumo, referencia }: {
   referencia?: string
 }) {
   const fmtDate = (d: string) => d ? new Date(d).toLocaleDateString('pt-BR') : '—'
-  const tituloResumo = resumo.objeto || resumo.minuta_titulo || 'Contrato sem titulo'
+  const tituloResumo = resumo.objeto || resumo.minuta_titulo || 'Contrato sem título'
   const linhaContexto = [resumo.contraparte, referencia].filter(Boolean).join(' • ')
 
   return (
@@ -1064,7 +1064,7 @@ function MinutaExecutiveSummary({ resumo, referencia }: {
         <div className="rounded-xl border border-indigo-100 bg-white/80 px-3 py-2.5">
           <p className="text-sm font-bold text-slate-800 leading-snug">{tituloResumo}</p>
           <p className="text-[11px] font-semibold text-slate-500 mt-0.5">
-            {linhaContexto || 'Contrato sem referencia'}
+            {linhaContexto || 'Contrato sem referência'}
           </p>
         </div>
         <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-xs">
@@ -1086,7 +1086,7 @@ function MinutaExecutiveSummary({ resumo, referencia }: {
           )}
           {(resumo.vigencia_inicio || resumo.vigencia_fim) && (
             <div>
-              <span className="text-slate-400">Vigencia</span>
+              <span className="text-slate-400">Vigência</span>
               <p className="font-medium text-slate-700">{fmtDate(resumo.vigencia_inicio)} — {fmtDate(resumo.vigencia_fim)}</p>
             </div>
           )}
@@ -1216,7 +1216,7 @@ function AccordionSection({
       {open && count === 0 && (
         <div className="px-4 pb-4">
           <p className="text-center text-white/30 text-xs py-4">
-            Nenhuma aprovacao pendente
+            Nenhuma aprovação pendente
           </p>
         </div>
       )}
@@ -1288,7 +1288,7 @@ function TabPendentes({
           <KpiCard icon={ListChecks} label="Pendentes" value={kpis.totalPendentes} color="text-indigo-300" />
           <KpiCard icon={CheckCircle} label="Aprovadas Hoje" value={kpis.aprovadasHoje} color="text-emerald-400" />
           <KpiCard icon={XCircle} label="Rejeitadas Hoje" value={kpis.rejeitadasHoje} color="text-red-400" />
-          <KpiCard icon={Timer} label="Tempo Medio" value={kpis.tempoMedioHoras > 0 ? `${kpis.tempoMedioHoras}h` : '--'} color="text-amber-400" />
+          <KpiCard icon={Timer} label="Tempo Médio" value={kpis.tempoMedioHoras > 0 ? `${kpis.tempoMedioHoras}h` : '--'} color="text-amber-400" />
         </div>
       )}
 
@@ -1304,7 +1304,7 @@ function TabPendentes({
         <div className="text-center py-14">
           <AlertTriangle size={44} className="text-amber-300 mx-auto mb-3" />
           <p className="text-white text-base font-bold">Erro ao carregar</p>
-          <p className="text-indigo-300 text-sm mt-1 mb-4">Nao foi possivel buscar as aprovacoes</p>
+          <p className="text-indigo-300 text-sm mt-1 mb-4">Não foi possível buscar as aprovações</p>
           <button
             onClick={() => refetch()}
             className="bg-white/20 text-white text-sm font-bold px-5 py-2.5 rounded-xl hover:bg-white/30 transition"
@@ -1319,7 +1319,7 @@ function TabPendentes({
         <div className="text-center py-14">
           <CheckCircle size={52} className="text-indigo-300 mx-auto mb-3 opacity-80" />
           <p className="text-white text-base font-bold">Tudo em dia!</p>
-          <p className="text-indigo-300 text-sm mt-1">Nenhuma aprovacao pendente</p>
+          <p className="text-indigo-300 text-sm mt-1">Nenhuma aprovação pendente</p>
         </div>
       )}
 
@@ -1387,7 +1387,7 @@ function HistoricoCard({ item }: { item: AprovacaoHistorico }) {
         {item.entidade_numero || `#${item.entidade_id.slice(0, 8)}`}
       </p>
       <p className="text-xs text-slate-500 mb-1">
-        Nivel {item.nivel} | {item.aprovador_nome}
+        Nível {item.nivel} | {item.aprovador_nome}
       </p>
       {item.observacao && (
         <p className="text-xs text-slate-500 bg-slate-50 rounded-lg p-2 mt-2 italic">
@@ -1461,7 +1461,7 @@ function TabHistorico() {
           {/* Periodo */}
           <div>
             <label className="text-[10px] text-indigo-300 font-semibold uppercase tracking-wider mb-1.5 block">
-              Periodo
+              Período
             </label>
             <div className="flex gap-1.5">
               {periodoOptions.map(opt => (
@@ -1484,7 +1484,7 @@ function TabHistorico() {
           {/* Decisao */}
           <div>
             <label className="text-[10px] text-indigo-300 font-semibold uppercase tracking-wider mb-1.5 block">
-              Decisao
+              Decisão
             </label>
             <div className="flex gap-1.5">
               {decisaoOptions.map(opt => (
@@ -1517,7 +1517,7 @@ function TabHistorico() {
       {!isLoading && isError && (
         <div className="text-center py-10">
           <AlertTriangle size={36} className="text-amber-300 mx-auto mb-3" />
-          <p className="text-white text-sm font-bold">Erro ao carregar historico</p>
+          <p className="text-white text-sm font-bold">Erro ao carregar histórico</p>
         </div>
       )}
 
@@ -1581,7 +1581,7 @@ export default function AprovAi() {
               Aprov<span className="text-indigo-200">Ai</span>
             </h1>
           </div>
-          <p className="text-indigo-300 text-xs font-medium">Aprovacoes inteligentes com 1 toque</p>
+          <p className="text-indigo-300 text-xs font-medium">Aprovações inteligentes com 1 toque</p>
           {activeTab === 'pendentes' && totalPendentes > 0 && (
             <div className="mt-3 inline-flex items-center gap-2 bg-white/15 backdrop-blur-sm rounded-full px-4 py-1.5">
               <span className="text-white text-lg font-extrabold">{totalPendentes}</span>
@@ -1621,7 +1621,7 @@ export default function AprovAi() {
             }`}
           >
             <History size={14} />
-            Historico
+            Histórico
           </button>
         </div>
       </div>
