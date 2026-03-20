@@ -7,7 +7,6 @@ import {
   Loader2, Search as SearchIcon, ShieldCheck,
 } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
-import { useObras } from '../../hooks/useFinanceiro'
 import { useLookupCentrosCusto, useLookupClassesFinanceiras } from '../../hooks/useLookups'
 import { useCriarSolicitacao } from '../../hooks/useSolicitacoes'
 import { api } from '../../services/api'
@@ -104,10 +103,7 @@ const INDICE_REAJUSTE_OPTIONS = [
   { value: 'Outro', label: 'Outro' },
 ]
 
-const SETOR_OPTIONS = [
-  'Engenharia', 'Suprimentos', 'Diretoria', 'Tecnologia da Informacao',
-  'Recursos Humanos', 'Administrativo', 'Financeiro', 'Outro',
-]
+// Centro de custos carregado via useLookupCentrosCusto()
 
 const SIM_NAO_OPTIONS = [
   { value: 'sim', label: 'Sim' },
@@ -212,7 +208,7 @@ function FilterSelect({ label, value, onChange, options, placeholder, labelClass
 export default function NovaSolicitacao() {
   const nav = useNavigate()
   const { perfil } = useAuth()
-  const { data: obras = [] } = useObras()
+  // obras removido — usar centro de custos
   const centrosCusto = useLookupCentrosCusto()
   const classesFinanceiras = useLookupClassesFinanceiras()
   const criarSolicitacao = useCriarSolicitacao()
@@ -225,7 +221,7 @@ export default function NovaSolicitacao() {
   const [solicitanteNome, setSolicitanteNome] = useState(perfil?.nome ?? '')
   const [departamento, setDepartamento] = useState(perfil?.departamento ?? '')
   const [emailCorporativo] = useState(perfil?.email ?? '')
-  const [obraId, setObraId] = useState('')
+  // obraId removido
 
   // Step 2 — Dados da Solicitacao
   const [tipoSolicitacao, setTipoSolicitacao] = useState<TipoSolicitacao>('novo_contrato')
@@ -376,7 +372,6 @@ export default function NovaSolicitacao() {
     solicitante_id: perfil?.id,
     solicitante_nome: solicitanteNome.trim(),
     departamento: departamento.trim() || undefined,
-    obra_id: obraId || undefined,
     tipo_solicitacao: tipoSolicitacao,
     tipo_contraparte: tipoContraparte,
     contraparte_nome: contraparteNome.trim(),
@@ -533,15 +528,15 @@ export default function NovaSolicitacao() {
               )}
             </div>
             <div>
-              <label className={labelClass}>Setor / Departamento</label>
+              <label className={labelClass}>Centro de Custos</label>
               <select
                 value={departamento}
                 onChange={e => setDepartamento(e.target.value)}
                 className={inputClass}
               >
-                <option value="">Selecione o setor</option>
-                {SETOR_OPTIONS.map(s => (
-                  <option key={s} value={s}>{s}</option>
+                <option value="">Selecione o centro de custos</option>
+                {centrosCusto.map(cc => (
+                  <option key={cc.id} value={cc.descricao}>{cc.codigo} — {cc.descricao}</option>
                 ))}
               </select>
               {perfil?.departamento && (
@@ -567,22 +562,7 @@ export default function NovaSolicitacao() {
                 <ShieldCheck size={9} /> Vinculado ao seu perfil
               </p>
             </div>
-            <div>
-              <label className={labelClass}>Obra</label>
-              <div className="relative">
-                <Building2 size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                <select
-                  value={obraId}
-                  onChange={e => setObraId(e.target.value)}
-                  className={`${inputClass} pl-9`}
-                >
-                  <option value="">Selecione a obra (opcional)</option>
-                  {obras.map(o => (
-                    <option key={o.id} value={o.id}>{o.nome}</option>
-                  ))}
-                </select>
-              </div>
-            </div>
+            <div></div>
           </div>
         </div>
       )}
