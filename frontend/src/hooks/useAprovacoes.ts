@@ -42,11 +42,13 @@ export function useAprovacoesPendentes(tipo?: TipoAprovacao) {
       let reqMap = new Map<string, Record<string, unknown>>()
 
       if (cmpIds.length > 0) {
-        const { data: reqData } = await supabase
-          .from(TABLE_REQ)
-          .select('id, numero, solicitante_nome, obra_nome, descricao, valor_estimado, urgencia, status, alcada_nivel, categoria, created_at')
-          .in('id', cmpIds)
-        reqMap = new Map((reqData ?? []).map(r => [r.id, r]))
+        try {
+          const { data: reqData } = await supabase
+            .from(TABLE_REQ)
+            .select('id, numero, solicitante_nome, obra_nome, descricao, valor_estimado, urgencia, status, alcada_nivel, categoria, created_at')
+            .in('id', cmpIds)
+          reqMap = new Map((reqData ?? []).map(r => [r.id, r]))
+        } catch { /* requisicoes enrichment failed — continue without */ }
       }
 
       // 3. Busca dados de cotacao para cotacao_resumo (fornecedor vencedor, valor, total cotados)
@@ -58,23 +60,25 @@ export function useAprovacoesPendentes(tipo?: TipoAprovacao) {
       }>()
 
       if (cmpIds.length > 0) {
-        const { data: cotData } = await supabase
-          .from('cmp_cotacoes')
-          .select('requisicao_id, fornecedor_selecionado_nome, valor_selecionado, fornecedores:cmp_cotacao_fornecedores!cotacao_id(id, prazo_entrega_dias)')
-          .in('requisicao_id', cmpIds)
-          .eq('status', 'concluida')
+        try {
+          const { data: cotData } = await supabase
+            .from('cmp_cotacoes')
+            .select('requisicao_id, fornecedor_selecionado_nome, valor_selecionado, fornecedores:cmp_cotacao_fornecedores!cotacao_id(id, prazo_entrega_dias)')
+            .in('requisicao_id', cmpIds)
+            .eq('status', 'concluida')
 
-        for (const c of cotData ?? []) {
-          const cot = c as Record<string, unknown>
-          const fornecedores = (cot.fornecedores ?? []) as { id: string; prazo_entrega_dias?: number }[]
-          const selecionado = fornecedores.find(() => true)
-          cotMap.set(cot.requisicao_id as string, {
-            fornecedor_nome: (cot.fornecedor_selecionado_nome as string) ?? 'N/A',
-            valor: (cot.valor_selecionado as number) ?? 0,
-            prazo_dias: selecionado?.prazo_entrega_dias ?? 0,
-            total_cotados: fornecedores.length,
-          })
-        }
+          for (const c of cotData ?? []) {
+            const cot = c as Record<string, unknown>
+            const fornecedores = (cot.fornecedores ?? []) as { id: string; prazo_entrega_dias?: number }[]
+            const selecionado = fornecedores.find(() => true)
+            cotMap.set(cot.requisicao_id as string, {
+              fornecedor_nome: (cot.fornecedor_selecionado_nome as string) ?? 'N/A',
+              valor: (cot.valor_selecionado as number) ?? 0,
+              prazo_dias: selecionado?.prazo_entrega_dias ?? 0,
+              total_cotados: fornecedores.length,
+            })
+          }
+        } catch { /* cotacoes enrichment failed — continue without */ }
       }
 
       // 4. Busca dados de contratos (minuta_contratual)
@@ -87,39 +91,45 @@ export function useAprovacoesPendentes(tipo?: TipoAprovacao) {
       const minutaMap = new Map<string, Record<string, unknown>>()
       const resumoMap = new Map<string, Record<string, unknown>>()
       if (conIds.length > 0) {
-        const { data: conData } = await supabase
-          .from('con_solicitacoes')
-          .select('id, numero, objeto, contraparte_nome, valor_estimado, tipo_contrato, etapa_atual')
-          .in('id', conIds)
-        for (const c of conData ?? []) {
-          conMap.set(c.id, c)
-        }
-
-        // Busca minuta mais recente de cada solicitacao (com PDF)
-        const { data: minutaData } = await supabase
-          .from('con_minutas')
-          .select('id, solicitacao_id, titulo, arquivo_url, arquivo_nome, status')
-          .in('solicitacao_id', conIds)
-          .order('created_at', { ascending: false })
-        for (const m of minutaData ?? []) {
-          // Guarda apenas a mais recente por solicitacao
-          if (!minutaMap.has(m.solicitacao_id)) {
-            minutaMap.set(m.solicitacao_id, m)
+        try {
+          const { data: conData } = await supabase
+            .from('con_solicitacoes')
+            .select('id, numero, objeto, contraparte_nome, valor_estimado, tipo_contrato, etapa_atual')
+            .in('id', conIds)
+          for (const c of conData ?? []) {
+            conMap.set(c.id, c)
           }
-        }
+        } catch { /* contratos enrichment failed */ }
 
-        // Busca resumo executivo mais recente de cada solicitacao
-        // Issue #44: aprovacao deve exibir o resumo executivo, nao a analise antiga da minuta
-        const { data: resumoData } = await supabase
-          .from('con_resumos_executivos')
-          .select('id, solicitacao_id, titulo, objeto_resumo, partes_envolvidas, valor_total, vigencia, riscos, oportunidades, recomendacao, status')
-          .in('solicitacao_id', conIds)
-          .order('created_at', { ascending: false })
-        for (const r of resumoData ?? []) {
-          if (!resumoMap.has(r.solicitacao_id as string)) {
-            resumoMap.set(r.solicitacao_id as string, r)
+        try {
+          // Busca minuta mais recente de cada solicitacao (com PDF)
+          const { data: minutaData } = await supabase
+            .from('con_minutas')
+            .select('id, solicitacao_id, titulo, arquivo_url, arquivo_nome, status')
+            .in('solicitacao_id', conIds)
+            .order('created_at', { ascending: false })
+          for (const m of minutaData ?? []) {
+            // Guarda apenas a mais recente por solicitacao
+            if (!minutaMap.has(m.solicitacao_id)) {
+              minutaMap.set(m.solicitacao_id, m)
+            }
           }
-        }
+        } catch { /* minutas enrichment failed */ }
+
+        try {
+          // Busca resumo executivo mais recente de cada solicitacao
+          // Issue #44: aprovacao deve exibir o resumo executivo, nao a analise antiga da minuta
+          const { data: resumoData } = await supabase
+            .from('con_resumos_executivos')
+            .select('id, solicitacao_id, titulo, objeto_resumo, partes_envolvidas, valor_total, vigencia, riscos, oportunidades, recomendacao, status')
+            .in('solicitacao_id', conIds)
+            .order('created_at', { ascending: false })
+          for (const r of resumoData ?? []) {
+            if (!resumoMap.has(r.solicitacao_id as string)) {
+              resumoMap.set(r.solicitacao_id as string, r)
+            }
+          }
+        } catch { /* resumos enrichment failed */ }
       }
 
       // 5. Busca dados de financeiro (autorizacao_pagamento)
@@ -131,108 +141,128 @@ export function useAprovacoesPendentes(tipo?: TipoAprovacao) {
       const finMap = new Map<string, Record<string, unknown>>()
       const loteMap = new Map<string, Record<string, unknown>>()
       const loteItensMap = new Map<string, Record<string, unknown>[]>()
+      const rcMap = new Map<string, Record<string, unknown>>()
+      const pedAnexosMap = new Map<string, Record<string, unknown>[]>()
+      const docMap = new Map<string, Record<string, unknown>[]>()
       if (finIds.length > 0) {
-        const { data: finData } = await supabase
-          .from('fin_contas_pagar')
-          .select('id, fornecedor_nome, valor_original, valor_pago, numero_documento, descricao, data_vencimento, data_emissao, centro_custo, classe_financeira, natureza, forma_pagamento, status')
-          .in('id', finIds)
-        for (const f of finData ?? []) {
-          finMap.set(f.id, f)
-        }
+        try {
+          const { data: finData } = await supabase
+            .from('fin_contas_pagar')
+            .select('id, fornecedor_nome, valor_original, valor_pago, numero_documento, descricao, data_vencimento, data_emissao, centro_custo, classe_financeira, natureza, forma_pagamento, status')
+            .in('id', finIds)
+          for (const f of finData ?? []) {
+            finMap.set(f.id, f)
+          }
+        } catch { /* fin_contas_pagar enrichment failed */ }
 
         const loteIds = finIds.filter(id => !finMap.has(id))
         if (loteIds.length > 0) {
-          const { data: loteData } = await supabase
-            .from('fin_lotes_pagamento')
-            .select('id, numero_lote, valor_total, qtd_itens, created_at, status')
-            .in('id', loteIds)
-          for (const lote of loteData ?? []) {
-            loteMap.set(lote.id, lote)
-          }
+          try {
+            const { data: loteData } = await supabase
+              .from('fin_lotes_pagamento')
+              .select('id, numero_lote, valor_total, qtd_itens, created_at, status')
+              .in('id', loteIds)
+            for (const lote of loteData ?? []) {
+              loteMap.set(lote.id, lote)
+            }
+          } catch { /* lotes enrichment failed */ }
 
-          const { data: loteItens } = await supabase
-            .from('fin_lote_itens')
-            .select(`
-              id,
-              lote_id,
-              decisao,
-              cp:fin_contas_pagar!cp_id(
-                id,
-                fornecedor_nome,
-                valor_original,
-                valor_pago,
-                numero_documento,
-                descricao,
-                data_vencimento,
-                data_emissao,
-                centro_custo,
-                classe_financeira,
-                natureza,
-                forma_pagamento,
-                status,
-                requisicao_id,
-                pedido_id
-              )
-            `)
-            .in('lote_id', loteIds)
-
-          // 5b. Buscar dados de requisição para cada CP
-          const cpIds = (loteItens ?? [])
-            .map(item => (item.cp as Record<string, unknown> | null)?.id as string)
-            .filter(Boolean)
-          const reqIds = (loteItens ?? [])
-            .map(item => (item.cp as Record<string, unknown> | null)?.requisicao_id as string)
-            .filter(Boolean)
-          const pedidoIds = (loteItens ?? [])
-            .map(item => (item.cp as Record<string, unknown> | null)?.pedido_id as string)
-            .filter(Boolean)
-
-          // Map: requisicao_id -> { numero, descricao, justificativa, solicitante_nome }
+          let loteItens: Record<string, unknown>[] = []
           const rcMap = new Map<string, Record<string, unknown>>()
-          if (reqIds.length > 0) {
-            const { data: rcData } = await supabase
-              .from('cmp_requisicoes')
-              .select('id, numero, descricao, justificativa, solicitante_nome')
-              .in('id', [...new Set(reqIds)])
-            for (const rc of rcData ?? []) rcMap.set(rc.id, rc)
-          }
-
-          // Map: pedido_id -> anexos[]
           const pedAnexosMap = new Map<string, Record<string, unknown>[]>()
-          if (pedidoIds.length > 0) {
-            const { data: anexosData } = await supabase
-              .from('cmp_pedidos_anexos')
-              .select('pedido_id, nome_arquivo, url, tipo, mime_type, uploaded_at, uploaded_by_nome')
-              .in('pedido_id', [...new Set(pedidoIds)])
-            for (const a of anexosData ?? []) {
-              const pid = a.pedido_id as string
-              const arr = pedAnexosMap.get(pid) ?? []
-              arr.push(a)
-              pedAnexosMap.set(pid, arr)
-            }
-          }
-
-          // Map: cp_id -> fin_documentos[]
           const docMap = new Map<string, Record<string, unknown>[]>()
-          if (cpIds.length > 0) {
-            const { data: docsData } = await supabase
-              .from('fin_documentos')
-              .select('entity_id, nome_arquivo, arquivo_url, tipo, mime_type, uploaded_at')
-              .eq('entity_type', 'cp')
-              .in('entity_id', [...new Set(cpIds)])
-            for (const d of docsData ?? []) {
-              const eid = d.entity_id as string
-              const arr = docMap.get(eid) ?? []
-              arr.push(d)
-              docMap.set(eid, arr)
+
+          try {
+            const { data: loteItensData } = await supabase
+              .from('fin_lote_itens')
+              .select(`
+                id,
+                lote_id,
+                decisao,
+                cp:fin_contas_pagar!cp_id(
+                  id,
+                  fornecedor_nome,
+                  valor_original,
+                  valor_pago,
+                  numero_documento,
+                  descricao,
+                  data_vencimento,
+                  data_emissao,
+                  centro_custo,
+                  classe_financeira,
+                  natureza,
+                  forma_pagamento,
+                  status,
+                  requisicao_id,
+                  pedido_id
+                )
+              `)
+              .in('lote_id', loteIds)
+            loteItens = (loteItensData ?? []) as Record<string, unknown>[]
+          } catch { /* fin_lote_itens enrichment failed */ }
+
+          if (loteItens.length > 0) {
+            // 5b. Buscar dados de requisição para cada CP
+            const cpIds = loteItens
+              .map(item => (item.cp as Record<string, unknown> | null)?.id as string)
+              .filter(Boolean)
+            const reqIds = loteItens
+              .map(item => (item.cp as Record<string, unknown> | null)?.requisicao_id as string)
+              .filter(Boolean)
+            const pedidoIds = loteItens
+              .map(item => (item.cp as Record<string, unknown> | null)?.pedido_id as string)
+              .filter(Boolean)
+
+            // Map: requisicao_id -> { numero, descricao, justificativa, solicitante_nome }
+            if (reqIds.length > 0) {
+              try {
+                const { data: rcData } = await supabase
+                  .from('cmp_requisicoes')
+                  .select('id, numero, descricao, justificativa, solicitante_nome')
+                  .in('id', [...new Set(reqIds)])
+                for (const rc of rcData ?? []) rcMap.set(rc.id, rc)
+              } catch { /* requisicoes for lote enrichment failed */ }
+            }
+
+            // Map: pedido_id -> anexos[]
+            if (pedidoIds.length > 0) {
+              try {
+                const { data: anexosData } = await supabase
+                  .from('cmp_pedidos_anexos')
+                  .select('pedido_id, nome_arquivo, url, tipo, mime_type, uploaded_at, uploaded_by_nome')
+                  .in('pedido_id', [...new Set(pedidoIds)])
+                for (const a of anexosData ?? []) {
+                  const pid = a.pedido_id as string
+                  const arr = pedAnexosMap.get(pid) ?? []
+                  arr.push(a)
+                  pedAnexosMap.set(pid, arr)
+                }
+              } catch { /* pedidos anexos enrichment failed */ }
+            }
+
+            // Map: cp_id -> fin_documentos[]
+            if (cpIds.length > 0) {
+              try {
+                const { data: docsData } = await supabase
+                  .from('fin_documentos')
+                  .select('entity_id, nome_arquivo, arquivo_url, tipo, mime_type, uploaded_at')
+                  .eq('entity_type', 'cp')
+                  .in('entity_id', [...new Set(cpIds)])
+                for (const d of docsData ?? []) {
+                  const eid = d.entity_id as string
+                  const arr = docMap.get(eid) ?? []
+                  arr.push(d)
+                  docMap.set(eid, arr)
+                }
+              } catch { /* fin_documentos enrichment failed */ }
             }
           }
 
-          for (const item of loteItens ?? []) {
+          for (const item of loteItens) {
             const loteId = item.lote_id as string | undefined
             if (!loteId) continue
             const current = loteItensMap.get(loteId) ?? []
-            current.push(item as Record<string, unknown>)
+            current.push(item)
             loteItensMap.set(loteId, current)
           }
         }
@@ -246,13 +276,15 @@ export function useAprovacoesPendentes(tipo?: TipoAprovacao) {
 
       const logMap = new Map<string, Record<string, unknown>>()
       if (logIds.length > 0) {
-        const { data: logData } = await supabase
-          .from('log_solicitacoes')
-          .select('id, numero, tipo, origem, destino, data_desejada, modal, motorista_nome, veiculo_placa, custo_estimado, descricao, solicitante_nome, obra_nome, urgente, peso_total_kg, volumes_total')
-          .in('id', logIds)
-        for (const l of logData ?? []) {
-          logMap.set(l.id, l)
-        }
+        try {
+          const { data: logData } = await supabase
+            .from('log_solicitacoes')
+            .select('id, numero, tipo, origem, destino, data_desejada, modal, motorista_nome, veiculo_placa, custo_estimado, descricao, solicitante_nome, obra_nome, urgente, peso_total_kg, volumes_total')
+            .in('id', logIds)
+          for (const l of logData ?? []) {
+            logMap.set(l.id, l)
+          }
+        } catch { /* transporte enrichment failed */ }
       }
 
       // 6. Mescla aprovacoes com dados da requisicao/contrato/CP + cotacao
@@ -578,25 +610,20 @@ export function useAprovacaoKPIs() {
       today.setHours(0, 0, 0, 0)
       const todayISO = today.toISOString()
 
-      // Pendentes
-      const { count: totalPendentes } = await supabase
-        .from(TABLE_APR)
-        .select('id', { count: 'exact', head: true })
-        .eq('status', 'pendente')
-
-      // Aprovadas hoje
-      const { count: aprovadasHoje } = await supabase
-        .from(TABLE_APR)
-        .select('id', { count: 'exact', head: true })
-        .eq('status', 'aprovada')
-        .gte('data_decisao', todayISO)
-
-      // Rejeitadas hoje
-      const { count: rejeitadasHoje } = await supabase
-        .from(TABLE_APR)
-        .select('id', { count: 'exact', head: true })
-        .eq('status', 'rejeitada')
-        .gte('data_decisao', todayISO)
+      // Pendentes (try-catch para 503 intermitentes)
+      let totalPendentes = 0
+      let aprovadasHoje = 0
+      let rejeitadasHoje = 0
+      try {
+        const [pend, aprov, rej] = await Promise.all([
+          supabase.from(TABLE_APR).select('id', { count: 'exact', head: true }).eq('status', 'pendente'),
+          supabase.from(TABLE_APR).select('id', { count: 'exact', head: true }).eq('status', 'aprovada').gte('data_decisao', todayISO),
+          supabase.from(TABLE_APR).select('id', { count: 'exact', head: true }).eq('status', 'rejeitada').gte('data_decisao', todayISO),
+        ])
+        totalPendentes = pend.count ?? 0
+        aprovadasHoje = aprov.count ?? 0
+        rejeitadasHoje = rej.count ?? 0
+      } catch { /* silent — KPIs are non-critical */ }
 
       // Tempo medio: ultimas 50 aprovacoes com data_decisao
       const { data: recentes } = await supabase
