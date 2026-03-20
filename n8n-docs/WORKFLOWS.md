@@ -273,6 +273,92 @@ e registram cada execucao no `fin_sync_log`.
 | `RECEBIDO` | `recebido` |
 | `CANCELADO` | `cancelado` |
 
+---
+
+### 10. TEG+ | Financeiro - Processar Fatura Cartao
+- **Arquivo:** `workflow-cartoes-processar-fatura.json`
+- **Webhook:** POST `/financeiro/cartoes/processar-fatura`
+- **Nodes:** 11
+- **Fluxo:** Webhook -> Validar payload -> Upsert fatura (`processando`) -> Normalizar itens -> Limpar itens antigos -> Inserir itens -> Atualizar fatura (`disponivel`) -> Responder
+
+**Objetivo:**
+- Permitir que Tesouraria, em `Conc. Cartoes`, envie manualmente uma fatura em PDF ou imagem.
+- Registrar a fatura em `fin_faturas_cartao`.
+- Popular `fin_itens_fatura_cartao` para que as compras aparecam imediatamente na tela de conciliacao.
+
+**Payload esperado do frontend:**
+```json
+{
+  "cartao_id": "uuid-do-cartao",
+  "mes_referencia": "2026-03",
+  "fatura_url": "https://...signed-url...",
+  "arquivo_nome": "fatura-marco.pdf",
+  "mime_type": "application/pdf",
+  "storage_path": "faturas/<cartao>/<arquivo>.pdf"
+}
+```
+
+**Payload alternativo para testes manuais ou OCR externo:**
+```json
+{
+  "cartao_id": "uuid-do-cartao",
+  "mes_referencia": "2026-03",
+  "fatura_url": "https://...signed-url...",
+  "texto_extraido": "01/03 UBER 34,90\n03/03 POSTO SHELL 280,00",
+  "arquivo_nome": "fatura-marco.pdf",
+  "mime_type": "application/pdf"
+}
+```
+
+**Payload alternativo com itens estruturados:**
+```json
+{
+  "cartao_id": "uuid-do-cartao",
+  "mes_referencia": "2026-03",
+  "fatura_url": "https://...signed-url...",
+  "itens": [
+    {
+      "data_lancamento": "2026-03-01",
+      "descricao": "UBER",
+      "valor": 34.9,
+      "categoria_banco": "mobilidade"
+    },
+    {
+      "data_lancamento": "2026-03-03",
+      "descricao": "POSTO SHELL",
+      "valor": 280,
+      "categoria_banco": "combustivel"
+    }
+  ]
+}
+```
+
+**Resposta de sucesso:**
+```json
+{
+  "success": true,
+  "fatura_id": "uuid",
+  "total_itens": 12,
+  "valor_total": 4832.17,
+  "status": "disponivel",
+  "parser_origem": "payload_manual"
+}
+```
+
+**Comportamento operacional:**
+- Faz `upsert` por `cartao_id + mes_referencia`, evitando duplicidade de fatura.
+- Remove os itens antigos da fatura antes de reinserir, permitindo reprocessamento.
+- Marca a fatura como `erro` quando nenhum item e identificado ou o payload vier invalido.
+- O frontend consulta `fin_faturas_cartao` e `fin_itens_fatura_cartao`, entao os lancamentos passam a ficar visiveis na conciliacao sem ajuste adicional na tela.
+
+**Variaveis obrigatorias no n8n:**
+- `$vars.supabase_url`
+- `$vars.supabase_service_role_key`
+
+**Observacao importante:**
+- Este workflow ja fecha o ciclo de persistencia no Supabase.
+- Se a operacao usar PDFs escaneados ou imagens sem `texto_extraido`, conecte antes do node `Normalizar Itens` o OCR/IA de sua preferencia e mantenha o mesmo contrato de saida (`texto_extraido` ou `itens`).
+
 **Upsert key:** `omie_cr_id`
 
 ---

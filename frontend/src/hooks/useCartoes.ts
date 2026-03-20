@@ -6,6 +6,34 @@ import type {
   StatusApontamentoCartao,
 } from '../types/financeiro'
 
+const N8N_WEBHOOK_BASE = import.meta.env.VITE_N8N_WEBHOOK_URL || 'https://teg-agents-n8n.nmmcas.easypanel.host/webhook'
+
+function sanitizeFileName(name: string) {
+  return name
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-zA-Z0-9._-]+/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '')
+    .toLowerCase()
+}
+
+function getFileExtension(file: File) {
+  const fromName = file.name.split('.').pop()?.trim().toLowerCase()
+  if (fromName) return fromName
+
+  const mimeMap: Record<string, string> = {
+    'application/pdf': 'pdf',
+    'image/jpeg': 'jpg',
+    'image/png': 'png',
+    'image/webp': 'webp',
+    'image/heic': 'heic',
+    'image/heif': 'heif',
+  }
+
+  return mimeMap[file.type] ?? 'bin'
+}
+
 // ── Cartões ───────────────────────────────────────────────────────────────────
 
 export function useCartoesCredito() {
@@ -297,10 +325,12 @@ export function useUploadFatura() {
       file: File
     }) => {
       // 1. Upload do PDF para o Supabase Storage
-      const path = `faturas/${cartaoId}/${mesReferencia}_${Date.now()}.pdf`
+      const ext = getFileExtension(file)
+      const baseName = sanitizeFileName(file.name.replace(/\.[^.]+$/, '') || `fatura-${mesReferencia}`)
+      const path = `faturas/${cartaoId}/${mesReferencia}_${Date.now()}_${baseName}.${ext}`
       const { error: uploadError } = await supabase.storage
         .from('faturas-cartao')
-        .upload(path, file, { contentType: 'application/pdf', upsert: true })
+        .upload(path, file, { contentType: file.type || 'application/octet-stream', upsert: true })
       if (uploadError) throw uploadError
 
       // 2. URL assinada (válida por 1h) — bucket privado, dados financeiros
@@ -310,13 +340,31 @@ export function useUploadFatura() {
       if (signedError || !signedData) throw signedError ?? new Error('Falha ao gerar URL assinada')
 
       // 3. Aciona o n8n para extrair os lançamentos da fatura
-      const N8N_URL = import.meta.env.VITE_N8N_WEBHOOK_URL || 'https://teg-agents-n8n.nmmcas.easypanel.host/webhook'
-      const res = await fetch(`${N8N_URL}/processar-fatura`, {
+      const payload = {
+        cartao_id: cartaoId,
+        mes_referencia: mesReferencia,
+        fatura_url: signedData.signedUrl,
+        arquivo_nome: file.name,
+        mime_type: file.type || 'application/octet-stream',
+        storage_path: path,
+      }
+
+      let res = await fetch(`${N8N_WEBHOOK_BASE}/financeiro/cartoes/processar-fatura`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ cartao_id: cartaoId, mes_referencia: mesReferencia, fatura_url: signedData.signedUrl }),
+        body: JSON.stringify(payload),
         signal: AbortSignal.timeout(60_000),
       })
+
+      if (!res.ok && res.status === 404) {
+        res = await fetch(`${N8N_WEBHOOK_BASE}/processar-fatura`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+          signal: AbortSignal.timeout(60_000),
+        })
+      }
+
       if (!res.ok) throw new Error('Falha ao processar fatura no n8n')
       return res.json()
     },

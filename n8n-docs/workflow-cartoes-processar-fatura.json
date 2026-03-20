@@ -1,0 +1,406 @@
+{
+  "name": "TEG+ | Financeiro - Processar Fatura Cartao",
+  "nodes": [
+    {
+      "parameters": {
+        "path": "financeiro/cartoes/processar-fatura",
+        "httpMethod": "POST",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "webhook-processar-fatura",
+      "name": "Webhook Processar Fatura",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        260,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "language": "javaScript",
+        "jsCode": "const raw = $input.first().json;\nconst body = raw.body || raw;\n\nconst cartaoId = String(body.cartao_id || '').trim();\nconst mesReferencia = String(body.mes_referencia || '').trim();\nconst faturaUrl = String(body.fatura_url || '').trim();\nconst arquivoNome = String(body.arquivo_nome || body.file_name || `fatura-${mesReferencia || 'sem-mes'}.pdf`).trim();\nconst mimeType = String(body.mime_type || 'application/pdf').trim();\nconst storagePath = String(body.storage_path || '').trim();\nconst textoExtraido = String(body.texto_extraido || '').trim();\nconst itensEntrada = Array.isArray(body.itens) ? body.itens : [];\n\nif (!cartaoId) {\n  throw new Error('cartao_id obrigatorio');\n}\nif (!mesReferencia || !/^\\d{4}-\\d{2}$/.test(mesReferencia)) {\n  throw new Error('mes_referencia deve estar no formato YYYY-MM');\n}\nif (!faturaUrl) {\n  throw new Error('fatura_url obrigatoria');\n}\n\nreturn [{\n  json: {\n    cartao_id: cartaoId,\n    mes_referencia: mesReferencia,\n    fatura_url: faturaUrl,\n    arquivo_nome: arquivoNome,\n    mime_type: mimeType,\n    storage_path: storagePath,\n    texto_extraido: textoExtraido,\n    itens_entrada: itensEntrada,\n    processado_em: new Date().toISOString()\n  }\n}];"
+      },
+      "id": "preparar-entrada",
+      "name": "Preparar Entrada",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        480,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $vars.supabase_url + '/rest/v1/fin_faturas_cartao?on_conflict=cartao_id,mes_referencia' }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "={{ $vars.supabase_service_role_key }}"
+            },
+            {
+              "name": "Authorization",
+              "value": "={{ 'Bearer ' + $vars.supabase_service_role_key }}"
+            },
+            {
+              "name": "Prefer",
+              "value": "resolution=merge-duplicates,return=representation"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ [{ cartao_id: $json.cartao_id, mes_referencia: $json.mes_referencia, arquivo_url: $json.fatura_url, arquivo_nome: $json.arquivo_nome, status: 'processando', erro_msg: null, processado_em: null }] }}",
+        "options": {}
+      },
+      "id": "upsert-fatura-processando",
+      "name": "Upsert Fatura Processando",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        720,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "language": "javaScript",
+        "jsCode": "const input = $input.first().json;\nconst body = $items('Preparar Entrada', 0, 0)[0].json;\nconst registro = Array.isArray(input) ? input[0] : input;\nconst faturaId = registro?.id;\n\nif (!faturaId) {\n  throw new Error('Nao foi possivel obter o id da fatura apos o upsert');\n}\n\nconst itensEntrada = Array.isArray(body.itens_entrada) ? body.itens_entrada : [];\nif (itensEntrada.length > 0) {\n  const normalizados = itensEntrada\n    .map((item) => ({\n      data_lancamento: String(item.data_lancamento || '').trim(),\n      descricao: String(item.descricao || '').trim(),\n      valor: Number(item.valor || 0),\n      categoria_banco: item.categoria_banco ? String(item.categoria_banco).trim() : null\n    }))\n    .filter((item) => item.data_lancamento && item.descricao && Number.isFinite(item.valor) && item.valor > 0);\n\n  return [{\n    json: {\n      ...body,\n      fatura_id: faturaId,\n      itens_extraidos: normalizados,\n      parser_origem: 'payload_manual'\n    }\n  }];\n}\n\nconst texto = String(body.texto_extraido || '').trim();\nif (!texto) {\n  throw new Error('Configure um node OCR/IA antes deste passo ou envie texto_extraido/itens no payload.');\n}\n\nconst linhas = texto\n  .split(/\\r?\\n/)\n  .map((linha) => linha.replace(/\\s+/g, ' ').trim())\n  .filter(Boolean);\n\nconst itens = [];\nfor (const linha of linhas) {\n  const m = linha.match(/(\\d{2}\\/\\d{2}(?:\\/\\d{2,4})?)\\s+(.+?)\\s+(-?\\d+[\\.,]\\d{2})$/);\n  if (!m) continue;\n  let [_, dataBr, descricao, valorBr] = m;\n  const partes = dataBr.split('/');\n  const ano = partes.length === 3 ? partes[2] : body.mes_referencia.slice(0, 4);\n  const ano4 = ano.length === 2 ? `20${ano}` : ano;\n  const dataIso = `${ano4}-${partes[1]}-${partes[0]}`;\n  const valor = Number(valorBr.replace(/\\./g, '').replace(',', '.'));\n  if (!Number.isFinite(valor) || valor <= 0) continue;\n  itens.push({\n    data_lancamento: dataIso,\n    descricao: descricao.trim(),\n    valor,\n    categoria_banco: null\n  });\n}\n\nif (itens.length === 0) {\n  throw new Error('Nenhum item foi identificado na fatura. Revise o OCR/IA ou envie itens estruturados.');\n}\n\nreturn [{\n  json: {\n    ...body,\n    fatura_id: faturaId,\n    itens_extraidos: itens,\n    parser_origem: 'texto_extraido'\n  }\n}];"
+      },
+      "id": "normalizar-itens",
+      "name": "Normalizar Itens",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        980,
+        300
+      ],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "method": "DELETE",
+        "url": "={{ $vars.supabase_url + \"/rest/v1/fin_itens_fatura_cartao?fatura_id=eq.\" + $json.fatura_id }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "={{ $vars.supabase_service_role_key }}"
+            },
+            {
+              "name": "Authorization",
+              "value": "={{ 'Bearer ' + $vars.supabase_service_role_key }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "limpar-itens-anteriores",
+      "name": "Limpar Itens Anteriores",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1200,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $vars.supabase_url + '/rest/v1/fin_itens_fatura_cartao' }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "={{ $vars.supabase_service_role_key }}"
+            },
+            {
+              "name": "Authorization",
+              "value": "={{ 'Bearer ' + $vars.supabase_service_role_key }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json.itens_extraidos.map(item => ({ fatura_id: $json.fatura_id, cartao_id: $json.cartao_id, data_lancamento: item.data_lancamento, descricao: item.descricao, valor: item.valor, categoria_banco: item.categoria_banco })) }}",
+        "options": {}
+      },
+      "id": "inserir-itens-fatura",
+      "name": "Inserir Itens Fatura",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1420,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "language": "javaScript",
+        "jsCode": "const itens = $input.first().json;\nconst itensInseridos = Array.isArray(itens) ? itens : [itens];\nconst soma = itensInseridos.reduce((acc, item) => acc + Number(item.valor || 0), 0);\nconst base = $items('Normalizar Itens', 0, 0)[0].json;\n\nreturn [{\n  json: {\n    fatura_id: base.fatura_id,\n    cartao_id: base.cartao_id,\n    mes_referencia: base.mes_referencia,\n    arquivo_nome: base.arquivo_nome,\n    processado_em: base.processado_em,\n    total_itens: itensInseridos.length,\n    valor_total: Number(soma.toFixed(2)),\n    parser_origem: base.parser_origem\n  }\n}];"
+      },
+      "id": "montar-resumo-fatura",
+      "name": "Montar Resumo Fatura",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1640,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "={{ $vars.supabase_url + \"/rest/v1/fin_faturas_cartao?id=eq.\" + $json.fatura_id }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "={{ $vars.supabase_service_role_key }}"
+            },
+            {
+              "name": "Authorization",
+              "value": "={{ 'Bearer ' + $vars.supabase_service_role_key }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { status: 'disponivel', valor_total: $json.valor_total, processado_em: $json.processado_em, erro_msg: null } }}",
+        "options": {}
+      },
+      "id": "finalizar-fatura",
+      "name": "Finalizar Fatura",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1860,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\"success\":true,\"fatura_id\":\"{{$json.fatura_id}}\",\"total_itens\":{{$json.total_itens}},\"valor_total\":{{$json.valor_total}},\"status\":\"disponivel\",\"parser_origem\":\"{{$json.parser_origem}}\"}",
+        "options": {}
+      },
+      "id": "responder-sucesso",
+      "name": "Responder Sucesso",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        2080,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "language": "javaScript",
+        "jsCode": "const erro = $input.first().json;\nconst base = $items('Preparar Entrada', 0, 0)[0].json;\nconst mensagem = String(erro.message || erro.error?.message || 'Falha ao processar fatura');\n\nreturn [{\n  json: {\n    cartao_id: base.cartao_id,\n    mes_referencia: base.mes_referencia,\n    erro_msg: mensagem,\n    processado_em: new Date().toISOString()\n  }\n}];"
+      },
+      "id": "tratar-erro",
+      "name": "Tratar Erro",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1200,
+        520
+      ]
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "={{ $vars.supabase_url + '/rest/v1/fin_faturas_cartao?cartao_id=eq.' + $json.cartao_id + '&mes_referencia=eq.' + $json.mes_referencia }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "={{ $vars.supabase_service_role_key }}"
+            },
+            {
+              "name": "Authorization",
+              "value": "={{ 'Bearer ' + $vars.supabase_service_role_key }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { status: 'erro', erro_msg: $json.erro_msg, processado_em: $json.processado_em } }}",
+        "options": {}
+      },
+      "id": "marcar-fatura-erro",
+      "name": "Marcar Fatura Erro",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1420,
+        520
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\"success\":false,\"status\":\"erro\",\"message\":\"{{$json.erro_msg}}\"}",
+        "options": {
+          "responseCode": 422
+        }
+      },
+      "id": "responder-erro",
+      "name": "Responder Erro",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        1640,
+        520
+      ]
+    }
+  ],
+  "connections": {
+    "Webhook Processar Fatura": {
+      "main": [
+        [
+          {
+            "node": "Preparar Entrada",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Preparar Entrada": {
+      "main": [
+        [
+          {
+            "node": "Upsert Fatura Processando",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upsert Fatura Processando": {
+      "main": [
+        [
+          {
+            "node": "Normalizar Itens",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalizar Itens": {
+      "main": [
+        [
+          {
+            "node": "Limpar Itens Anteriores",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ],
+      "error": [
+        [
+          {
+            "node": "Tratar Erro",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Limpar Itens Anteriores": {
+      "main": [
+        [
+          {
+            "node": "Inserir Itens Fatura",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Inserir Itens Fatura": {
+      "main": [
+        [
+          {
+            "node": "Montar Resumo Fatura",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Montar Resumo Fatura": {
+      "main": [
+        [
+          {
+            "node": "Finalizar Fatura",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Finalizar Fatura": {
+      "main": [
+        [
+          {
+            "node": "Responder Sucesso",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Tratar Erro": {
+      "main": [
+        [
+          {
+            "node": "Marcar Fatura Erro",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Marcar Fatura Erro": {
+      "main": [
+        [
+          {
+            "node": "Responder Erro",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

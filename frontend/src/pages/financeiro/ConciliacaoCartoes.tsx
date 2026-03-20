@@ -31,6 +31,19 @@ function diffPct(a: number, b: number) {
   return Math.abs((a - b) / b) * 100
 }
 
+const ACCEPTED_FATURA_MIME_TYPES = [
+  'application/pdf',
+  'image/jpeg',
+  'image/png',
+  'image/webp',
+  'image/heic',
+  'image/heif',
+]
+
+function isAcceptedFaturaFile(file?: File | null) {
+  return !!file && ACCEPTED_FATURA_MIME_TYPES.includes(file.type)
+}
+
 // ── Fatura Upload ─────────────────────────────────────────────────────────────
 
 function FaturaUploadCard({ cartaoId, isDark }: { cartaoId: string; isDark: boolean }) {
@@ -50,12 +63,12 @@ function FaturaUploadCard({ cartaoId, isDark }: { cartaoId: string; isDark: bool
     e.preventDefault()
     setDrag(false)
     const f = e.dataTransfer.files[0]
-    if (f?.type === 'application/pdf') setFile(f)
+    if (isAcceptedFaturaFile(f)) setFile(f)
   }, [])
 
   const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0]
-    if (f?.type === 'application/pdf') setFile(f)
+    if (isAcceptedFaturaFile(f)) setFile(f)
     e.target.value = ''
   }
 
@@ -84,7 +97,7 @@ function FaturaUploadCard({ cartaoId, isDark }: { cartaoId: string; isDark: bool
         <div className="flex items-center gap-2">
           <Upload size={14} className="text-emerald-500" />
           <span className={`text-xs font-bold ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>
-            Upload de Fatura PDF
+            Upload de Fatura
           </span>
         </div>
         <button
@@ -131,7 +144,7 @@ function FaturaUploadCard({ cartaoId, isDark }: { cartaoId: string; isDark: bool
         <input
           ref={fileRef}
           type="file"
-          accept="application/pdf"
+          accept=".pdf,image/jpeg,image/png,image/webp,image/heic,image/heif"
           className="hidden"
           onChange={handleFile}
         />
@@ -157,9 +170,9 @@ function FaturaUploadCard({ cartaoId, isDark }: { cartaoId: string; isDark: bool
               <Upload size={18} className="text-slate-400" />
             </div>
             <p className={`text-xs font-semibold ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
-              Arraste o PDF aqui ou clique para selecionar
+              Arraste o arquivo aqui ou clique para selecionar
             </p>
-            <p className="text-[10px] text-slate-400">Apenas arquivos .pdf</p>
+            <p className="text-[10px] text-slate-400">PDF, JPG, PNG, WebP, HEIC</p>
           </>
         )}
       </div>
