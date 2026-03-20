@@ -67,9 +67,13 @@ interface Props {
     duracao_total_horas: number
     modal?: string
     motorista_nome?: string
+    motorista_telefone?: string
     veiculo_placa?: string
     data_prevista_saida?: string
     custo_estimado?: number
+    origem_principal?: string
+    destino_final?: string
+    rota_polyline?: string
   }) => Promise<void>
 }
 
@@ -876,6 +880,10 @@ export default function PlanejamentoRotaModal({ isDark, solicitacoes, allSolicit
   const handleSave = async () => {
     setSalvando(true)
     try {
+      // Determinar origem e destino da viagem a partir dos pontos da rota
+      const primeiraOrigem = pontos[0]?.endereco_origem || pontos[0]?.solicitacao?.origem || ''
+      const ultimoDestino = pontos[pontos.length - 1]?.endereco_destino || pontos[pontos.length - 1]?.solicitacao?.destino || ''
+
       await onSave({
         solicitacaoIds: pontos.map(p => p.id),
         rota: pontos,
@@ -886,6 +894,8 @@ export default function PlanejamentoRotaModal({ isDark, solicitacoes, allSolicit
         veiculo_placa: placa || undefined,
         data_prevista_saida: dataPartida || undefined,
         custo_estimado: custo !== '' ? custo : undefined,
+        origem_principal: primeiraOrigem || undefined,
+        destino_final: ultimoDestino || undefined,
       })
     } finally {
       setSalvando(false)
