@@ -312,11 +312,11 @@ export default function NovaSolicitacao() {
           const cepStr = e.cep ? `CEP ${e.cep.replace(/^(\d{5})(\d{3})$/, '$1-$2')}` : ''
           setContraparteEndereco([parts, cidadeUf, cepStr].filter(Boolean).join(' - '))
         }
-        // Auto-fill representante legal (primeiro sócio)
-        if (!contraparteRepNome.trim() && result.socios?.length) {
-          const socio = result.socios[0]
-          setContraparteRepNome(socio.nome)
-          setContraparteRepCargo(socio.qualificacao || 'Sócio Administrador')
+        // Auto-fill representante legal
+        if (!contraparteRepNome.trim() && result.representante_nome) {
+          setContraparteRepNome(result.representante_nome)
+          if (result.representante_cpf) setContraparteRepCpf(result.representante_cpf)
+          setContraparteRepCargo(result.representante_cargo || 'Socio Administrador')
         }
       }
     } catch {
