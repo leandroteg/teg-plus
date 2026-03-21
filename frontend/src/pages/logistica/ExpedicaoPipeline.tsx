@@ -4,7 +4,7 @@ import {
   Package2, Search, X, CheckCircle2, AlertTriangle,
   Calendar, ArrowUp, ArrowDown, LayoutList, LayoutGrid, Download,
   MapPin, FileText, Building2, Briefcase, Truck, ScrollText,
-  ClipboardList, Camera, Loader2, Trash2, Circle,
+  ClipboardList, Camera, Loader2, Trash2, Circle, Route,
 } from 'lucide-react'
 import { supabase } from '../../services/supabase'
 import { useTheme } from '../../contexts/ThemeContext'
@@ -459,6 +459,108 @@ function ExpCard({ sol, onClick, isDark, isSelected, onSelect }: {
   )
 }
 
+// ── Viagem Group Card (Expedição) ─────────────────────────────────────────────
+
+function ViagemGroupCard({ viagem, solicitacoes, onClick, isDark, selectedIds, onSelect }: {
+  viagem: LogSolicitacao['viagem']; solicitacoes: LogSolicitacao[]
+  onClick: (sol: LogSolicitacao) => void; isDark: boolean
+  selectedIds: Set<string>; onSelect: (id: string) => void
+}) {
+  const v = viagem
+  const allSelected = solicitacoes.every(s => selectedIds.has(s.id))
+  const someSelected = solicitacoes.some(s => selectedIds.has(s.id))
+
+  const toggleAll = (e: React.MouseEvent) => {
+    e.stopPropagation()
+    for (const s of solicitacoes) onSelect(s.id)
+  }
+
+  return (
+    <div className={`rounded-2xl border overflow-hidden transition-all ${
+      isDark
+        ? `border-white/[0.06] ${someSelected ? 'bg-orange-500/5 border-orange-500/20' : 'bg-white/[0.02]'}`
+        : `border-slate-200 ${someSelected ? 'bg-orange-50/50 border-orange-200' : 'bg-white'}`
+    }`}>
+      {/* Viagem header */}
+      <div className={`px-4 py-3 flex items-center gap-3 ${isDark ? 'bg-indigo-500/5 border-b border-white/[0.06]' : 'bg-indigo-50/40 border-b border-slate-100'}`}>
+        <input type="checkbox" checked={allSelected} onChange={() => {}} onClick={toggleAll}
+          className="w-3.5 h-3.5 rounded border-slate-300 text-orange-600 focus:ring-orange-500 shrink-0" />
+        <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${isDark ? 'bg-orange-500/10' : 'bg-orange-100'}`}>
+          <Route size={14} className={isDark ? 'text-orange-400' : 'text-orange-600'} />
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className={`text-xs font-mono font-extrabold ${isDark ? 'text-orange-400' : 'text-orange-700'}`}>
+              {v?.numero ?? 'Viagem'}
+            </span>
+            <span className={`text-sm font-semibold ${isDark ? 'text-white' : 'text-slate-800'}`}>
+              {v?.origem_principal ? v.origem_principal.split(',')[0] : solicitacoes[0]?.origem} → {v?.destino_final ? v.destino_final.split(',')[0] : solicitacoes[solicitacoes.length - 1]?.destino}
+            </span>
+          </div>
+          <div className="flex items-center gap-3 mt-0.5 flex-wrap">
+            {v?.motorista_nome && (
+              <span className={`text-[10px] flex items-center gap-0.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+                <Truck size={9} /> {v.motorista_nome}
+              </span>
+            )}
+            {v?.veiculo_placa && (
+              <span className={`text-[10px] font-mono ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{v.veiculo_placa}</span>
+            )}
+            {v?.distancia_total_km != null && (
+              <span className={`text-[10px] ${isDark ? 'text-orange-400/70' : 'text-orange-600'}`}>{Number(v.distancia_total_km).toFixed(0)} km</span>
+            )}
+            {v?.tempo_estimado_h != null && (
+              <span className={`text-[10px] ${isDark ? 'text-orange-400/70' : 'text-orange-600'}`}>{Number(v.tempo_estimado_h).toFixed(1)}h</span>
+            )}
+          </div>
+        </div>
+        <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full shrink-0 ${isDark ? 'bg-orange-500/15 text-orange-400' : 'bg-orange-100 text-orange-700'}`}>
+          {solicitacoes.length} parada{solicitacoes.length > 1 ? 's' : ''}
+        </span>
+      </div>
+
+      {/* Sub-items */}
+      <div className={isDark ? 'divide-y divide-white/[0.04]' : 'divide-y divide-slate-100'}>
+        {solicitacoes.map((sol, i) => (
+          <div key={sol.id} onClick={() => onClick(sol)}
+            className={`flex items-center gap-3 px-4 py-2.5 cursor-pointer transition-all ${
+              isDark ? 'hover:bg-white/[0.03]' : 'hover:bg-slate-50/60'
+            }`}>
+            <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0 ${
+              isDark ? 'bg-orange-500/10 text-orange-400 border border-orange-500/20' : 'bg-orange-100 text-orange-700 border border-orange-200'
+            }`}>{sol.ordem_na_viagem ?? i + 1}</div>
+
+            <span className={`text-[11px] font-mono font-bold shrink-0 ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>{sol.numero}</span>
+
+            <div className="flex items-center gap-1 min-w-0 flex-1 text-xs">
+              <span className={isDark ? 'text-white' : 'text-slate-800'}>{sol.origem}</span>
+              <span className={isDark ? 'text-slate-600' : 'text-slate-300'}>→</span>
+              <span className={isDark ? 'text-white' : 'text-slate-800'}>{sol.destino}</span>
+            </div>
+
+            <div className="flex items-center gap-1.5 shrink-0">
+              {sol.urgente && <span className="text-[9px] bg-red-100 text-red-700 font-bold px-1.5 py-0.5 rounded-full">!</span>}
+              {sol.obra_nome && (
+                <span className={`text-[10px] px-1.5 py-0.5 rounded-md flex items-center gap-0.5 ${isDark ? 'bg-white/[0.04] text-slate-500' : 'bg-slate-100 text-slate-500'}`}>
+                  <Building2 size={8} /> {sol.obra_nome}
+                </span>
+              )}
+              {sol.doc_fiscal_tipo && sol.doc_fiscal_tipo !== 'nenhum' && (
+                <span className={`text-[10px] px-1.5 py-0.5 rounded-md font-semibold capitalize ${
+                  sol.doc_fiscal_tipo === 'nf' ? isDark ? 'bg-violet-500/10 text-violet-400' : 'bg-violet-50 text-violet-700'
+                  : isDark ? 'bg-blue-500/10 text-blue-400' : 'bg-blue-50 text-blue-700'
+                }`}>
+                  {sol.doc_fiscal_tipo === 'nf' ? 'NF-e' : 'Rom.'}
+                </span>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 // ── Main Page ────────────────────────────────────────────────────────────────
 
 export default function ExpedicaoPipeline() {
@@ -512,6 +614,39 @@ export default function ExpedicaoPipeline() {
     })
     return items
   }, [grouped, activeTab, busca, sortField, sortDir])
+
+  // ── Group activeItems by viagem_id ──
+  type DisplayItem =
+    | { kind: 'solo'; sol: LogSolicitacao }
+    | { kind: 'viagem'; viagemId: string; viagem: LogSolicitacao['viagem']; solicitacoes: LogSolicitacao[] }
+
+  const displayItems = useMemo((): DisplayItem[] => {
+    const viagemGroups = new Map<string, LogSolicitacao[]>()
+    const result: DisplayItem[] = []
+    const viagemInserted = new Set<string>()
+
+    for (const sol of activeItems) {
+      if (sol.viagem_id) {
+        const arr = viagemGroups.get(sol.viagem_id) || []
+        arr.push(sol)
+        viagemGroups.set(sol.viagem_id, arr)
+      }
+    }
+
+    for (const sol of activeItems) {
+      if (sol.viagem_id) {
+        if (!viagemInserted.has(sol.viagem_id)) {
+          viagemInserted.add(sol.viagem_id)
+          const sols = viagemGroups.get(sol.viagem_id)!
+          sols.sort((a, b) => (a.ordem_na_viagem ?? 0) - (b.ordem_na_viagem ?? 0))
+          result.push({ kind: 'viagem', viagemId: sol.viagem_id, viagem: sol.viagem, solicitacoes: sols })
+        }
+      } else {
+        result.push({ kind: 'solo', sol })
+      }
+    }
+    return result
+  }, [activeItems])
 
   const showToast = (type: 'success' | 'error', msg: string) => { setToast({ type, msg }); setTimeout(() => setToast(null), 4000) }
   const toggleSelect = (id: string) => { setSelectedIds(prev => { const next = new Set(prev); if (next.has(id)) next.delete(id); else next.add(id); return next }) }
@@ -662,7 +797,7 @@ export default function ExpedicaoPipeline() {
             }`} title="Exportar CSV"><Download size={13} /> CSV</button>
 
           <div className={`ml-auto flex items-center gap-3 text-[11px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
-            <span>{activeItems.length} item(ns)</span>
+            <span>{displayItems.length} item(ns)</span>
           </div>
         </div>
 
@@ -714,7 +849,19 @@ export default function ExpedicaoPipeline() {
             </>
           ) : (
             <div className="space-y-2 p-4">
-              {activeItems.map(sol => <ExpCard key={sol.id} sol={sol} onClick={() => setDetail(sol)} isDark={isDark} isSelected={selectedIds.has(sol.id)} onSelect={toggleSelect} />)}
+              {displayItems.map(item => item.kind === 'viagem' ? (
+                <ViagemGroupCard
+                  key={`vg-${item.viagemId}`}
+                  viagem={item.viagem}
+                  solicitacoes={item.solicitacoes}
+                  onClick={sol => setDetail(sol)}
+                  isDark={isDark}
+                  selectedIds={selectedIds}
+                  onSelect={toggleSelect}
+                />
+              ) : (
+                <ExpCard key={item.sol.id} sol={item.sol} onClick={() => setDetail(item.sol)} isDark={isDark} isSelected={selectedIds.has(item.sol.id)} onSelect={toggleSelect} />
+              ))}
             </div>
           )}
         </div>
