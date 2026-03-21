@@ -448,6 +448,167 @@ function SolCard({ sol, onClick, isDark, isSelected, onSelect }: {
   )
 }
 
+// ── Viagem grouped card ─────────────────────────────────────────────────────
+
+type DisplayItem =
+  | { kind: 'solo'; sol: LogSolicitacao }
+  | { kind: 'viagem'; viagemId: string; viagem: LogSolicitacao['viagem']; solicitacoes: LogSolicitacao[] }
+
+function ViagemCard({ item, onClick, isDark, selectedIds, onToggleViagem }: {
+  item: Extract<DisplayItem, { kind: 'viagem' }>
+  onClick: (sol: LogSolicitacao) => void
+  isDark: boolean
+  selectedIds: Set<string>
+  onToggleViagem: (ids: string[]) => void
+}) {
+  const v = item.viagem
+  const sols = item.solicitacoes
+  const allIds = sols.map(s => s.id)
+  const allSelected = allIds.length > 0 && allIds.every(id => selectedIds.has(id))
+  const hasUrgent = sols.some(s => s.urgente)
+  const origemPrincipal = v?.origem_principal || sols[0]?.origem || '—'
+  const destinoFinal = v?.destino_final || sols[sols.length - 1]?.destino || '—'
+
+  return (
+    <div className={`rounded-2xl border overflow-hidden transition-all ${
+      isDark
+        ? `border-white/[0.06] ${allSelected ? 'bg-orange-500/10 border-orange-500/30' : 'bg-white/[0.02]'}`
+        : `border-orange-200 ${allSelected ? 'bg-orange-50 border-orange-300' : 'bg-white'}`
+    }`}>
+      {/* Header da viagem */}
+      <div className={`px-4 py-2.5 flex items-center gap-3 ${isDark ? 'bg-orange-500/10' : 'bg-gradient-to-r from-orange-50 to-amber-50'}`}>
+        <input type="checkbox" checked={allSelected}
+          onChange={e => { e.stopPropagation(); onToggleViagem(allIds) }}
+          className="w-3.5 h-3.5 rounded border-slate-300 text-orange-600 focus:ring-orange-500 shrink-0" />
+        <Route size={14} className="text-orange-600 shrink-0" />
+        <span className={`text-xs font-mono font-extrabold ${isDark ? 'text-orange-400' : 'text-orange-700'}`}>
+          {v?.numero || 'Viagem'}
+        </span>
+        <div className="flex items-center gap-1.5 text-sm flex-1 min-w-0">
+          <span className={`font-semibold truncate ${isDark ? 'text-white' : 'text-slate-800'}`}>{origemPrincipal}</span>
+          <span className={`${isDark ? 'text-slate-600' : 'text-orange-400'} shrink-0`}>→</span>
+          <span className={`font-semibold truncate ${isDark ? 'text-white' : 'text-slate-800'}`}>{destinoFinal}</span>
+        </div>
+        <div className="flex items-center gap-2 shrink-0">
+          {v?.distancia_total_km && (
+            <span className={`text-[10px] font-medium ${isDark ? 'text-orange-400/80' : 'text-orange-600'}`}>
+              {Number(v.distancia_total_km).toFixed(0)} km
+            </span>
+          )}
+          {v?.tempo_estimado_h && (
+            <span className={`text-[10px] font-medium ${isDark ? 'text-orange-400/80' : 'text-orange-600'}`}>
+              {Number(v.tempo_estimado_h).toFixed(1)}h
+            </span>
+          )}
+          <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold ${isDark ? 'bg-orange-500/20 text-orange-300' : 'bg-orange-100 text-orange-700'}`}>
+            {sols.length} {sols.length === 1 ? 'parada' : 'paradas'}
+          </span>
+          {hasUrgent && <span className="text-[10px] font-bold text-red-500 bg-red-50 dark:bg-red-500/10 px-2 py-0.5 rounded-full">URGENTE</span>}
+        </div>
+      </div>
+
+      {/* Planejamento resumido */}
+      {(v?.motorista_nome || v?.veiculo_placa || v?.modal) && (
+        <div className={`px-4 py-1.5 flex items-center gap-4 text-[10px] border-b ${isDark ? 'border-white/[0.04] text-slate-500' : 'border-orange-100 text-slate-400'}`}>
+          {v?.modal && <span className="capitalize">{(v.modal as string).replace(/_/g, ' ')}</span>}
+          {v?.motorista_nome && <span>🚛 {v.motorista_nome as string}</span>}
+          {v?.veiculo_placa && <span className="font-mono font-bold">{v.veiculo_placa as string}</span>}
+        </div>
+      )}
+
+      {/* Solicitações filhas */}
+      <div className={`divide-y ${isDark ? 'divide-white/[0.04]' : 'divide-slate-100'}`}>
+        {sols.map((sol, i) => (
+          <div key={sol.id} onClick={() => onClick(sol)}
+            className={`flex items-center gap-3 px-4 py-2 cursor-pointer transition-all ${
+              isDark ? 'hover:bg-white/[0.03]' : 'hover:bg-slate-50'
+            }`}>
+            <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0 ${
+              isDark ? 'bg-orange-500/20 text-orange-400' : 'bg-orange-100 text-orange-700'
+            }`}>{sol.ordem_na_viagem ?? i + 1}</div>
+            <span className={`text-[11px] font-mono font-bold shrink-0 ${isDark ? 'text-orange-400/70' : 'text-orange-600/70'}`}>{sol.numero}</span>
+            <div className="flex items-center gap-1 text-xs flex-1 min-w-0">
+              <span className={`truncate ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>{sol.origem}</span>
+              <span className={`${isDark ? 'text-slate-600' : 'text-slate-300'} shrink-0`}>→</span>
+              <span className={`truncate ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>{sol.destino}</span>
+            </div>
+            <div className="flex items-center gap-1.5 shrink-0">
+              {sol.obra_nome && (
+                <span className={`text-[10px] px-1.5 py-0.5 rounded-md ${isDark ? 'bg-white/[0.04] text-slate-500' : 'bg-slate-100 text-slate-500'}`}>
+                  <Building2 size={8} className="inline mr-0.5" />{sol.obra_nome}
+                </span>
+              )}
+              {sol.urgente && <AlertTriangle size={10} className="text-red-500" />}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function ViagemRow({ item, onClick, isDark, selectedIds, onToggleViagem }: {
+  item: Extract<DisplayItem, { kind: 'viagem' }>
+  onClick: (sol: LogSolicitacao) => void
+  isDark: boolean
+  selectedIds: Set<string>
+  onToggleViagem: (ids: string[]) => void
+}) {
+  const v = item.viagem
+  const sols = item.solicitacoes
+  const allIds = sols.map(s => s.id)
+  const allSelected = allIds.length > 0 && allIds.every(id => selectedIds.has(id))
+  const hasUrgent = sols.some(s => s.urgente)
+  const origemPrincipal = v?.origem_principal || sols[0]?.origem || '—'
+  const destinoFinal = v?.destino_final || sols[sols.length - 1]?.destino || '—'
+
+  return (
+    <div className={`border-b ${isDark ? 'border-white/[0.04]' : 'border-slate-100'}`}>
+      {/* Header row */}
+      <div className={`flex items-center gap-2 px-3 py-1.5 transition-all ${
+        isDark ? `hover:bg-white/[0.03] ${allSelected ? 'bg-orange-500/10' : ''}` : `hover:bg-orange-50/50 ${allSelected ? 'bg-orange-50' : ''}`
+      }`}>
+        <input type="checkbox" checked={allSelected}
+          onChange={e => { e.stopPropagation(); onToggleViagem(allIds) }}
+          className="w-3 h-3 rounded border-slate-300 text-orange-600 focus:ring-orange-500 shrink-0" />
+        {hasUrgent ? <AlertTriangle size={11} className="text-red-500 shrink-0" /> : <Route size={11} className="text-orange-500 shrink-0" />}
+        <span className={`text-[11px] font-mono font-bold w-[86px] shrink-0 whitespace-nowrap ${isDark ? 'text-orange-400' : 'text-orange-700'}`}>
+          {v?.numero || 'Viagem'}
+        </span>
+        <span className={`text-xs truncate w-[150px] shrink-0 ${isDark ? 'text-white' : 'text-slate-800'}`}>{origemPrincipal}</span>
+        <span className={`text-[10px] ${isDark ? 'text-slate-600' : 'text-slate-300'} shrink-0`}>→</span>
+        <span className={`text-xs truncate w-[150px] shrink-0 ${isDark ? 'text-white' : 'text-slate-800'}`}>{destinoFinal}</span>
+        <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold shrink-0 ${isDark ? 'bg-orange-500/20 text-orange-300' : 'bg-orange-100 text-orange-700'}`}>
+          {sols.length} paradas
+        </span>
+        <span className={`text-[11px] text-right w-[64px] shrink-0 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+          {v?.data_prevista_saida ? fmtData(v.data_prevista_saida as string) : '—'}
+        </span>
+      </div>
+      {/* Nested rows */}
+      {sols.map((sol, i) => (
+        <div key={sol.id} onClick={() => onClick(sol)}
+          className={`flex items-center gap-2 px-3 py-1 cursor-pointer transition-all ${
+            isDark ? 'hover:bg-white/[0.02] bg-white/[0.01]' : 'hover:bg-slate-50 bg-slate-50/30'
+          }`}>
+          <span className="w-3 shrink-0" />
+          <div className={`w-4 h-4 rounded-full flex items-center justify-center text-[8px] font-bold shrink-0 ${
+            isDark ? 'bg-orange-500/15 text-orange-400' : 'bg-orange-100 text-orange-600'
+          }`}>{sol.ordem_na_viagem ?? i + 1}</div>
+          <span className={`text-[10px] font-mono w-[82px] shrink-0 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{sol.numero}</span>
+          <span className={`text-[11px] truncate w-[146px] shrink-0 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{sol.origem}</span>
+          <span className={`text-[9px] ${isDark ? 'text-slate-700' : 'text-slate-300'} shrink-0`}>→</span>
+          <span className={`text-[11px] truncate w-[146px] shrink-0 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{sol.destino}</span>
+          <span className={`text-[10px] truncate w-[104px] shrink-0 ${isDark ? 'text-slate-600' : 'text-slate-400'}`}>
+            {sol.obra_nome || ''}
+          </span>
+          {sol.urgente && <AlertTriangle size={9} className="text-red-500 shrink-0" />}
+        </div>
+      ))}
+    </div>
+  )
+}
+
 // ── Centro de Custo Autocomplete ─────────────────────────────────────────────
 
 function CentroCustoAutocomplete({ centrosCusto, value, onChange, isDark, inputCls }: {
@@ -830,6 +991,46 @@ export default function SolicitacoesPipeline() {
     return items
   }, [grouped, activeTab, busca, sortField, sortDir])
 
+  // Agrupar solicitações com viagem_id num único DisplayItem de viagem
+  const displayItems = useMemo((): DisplayItem[] => {
+    const viagemGroups = new Map<string, LogSolicitacao[]>()
+    const solos: LogSolicitacao[] = []
+
+    for (const sol of activeItems) {
+      if (sol.viagem_id) {
+        const arr = viagemGroups.get(sol.viagem_id) || []
+        arr.push(sol)
+        viagemGroups.set(sol.viagem_id, arr)
+      } else {
+        solos.push(sol)
+      }
+    }
+
+    const result: DisplayItem[] = []
+    const viagemInserted = new Set<string>()
+
+    // Manter a ordem original: ao encontrar a primeira sol de uma viagem, inserir o grupo
+    for (const sol of activeItems) {
+      if (sol.viagem_id) {
+        if (!viagemInserted.has(sol.viagem_id)) {
+          viagemInserted.add(sol.viagem_id)
+          const sols = viagemGroups.get(sol.viagem_id)!
+          sols.sort((a, b) => (a.ordem_na_viagem ?? 0) - (b.ordem_na_viagem ?? 0))
+          result.push({
+            kind: 'viagem',
+            viagemId: sol.viagem_id,
+            viagem: sol.viagem,
+            solicitacoes: sols,
+          })
+        }
+      } else {
+        result.push({ kind: 'solo', sol })
+      }
+    }
+
+    return result
+  }, [activeItems])
+
   const showToast = (type: 'success' | 'error', msg: string) => {
     setToast({ type, msg }); setTimeout(() => setToast(null), 4000)
   }
@@ -841,6 +1042,14 @@ export default function SolicitacoesPipeline() {
     const ids = activeItems.map(s => s.id)
     const all = ids.length > 0 && ids.every(id => selectedIds.has(id))
     setSelectedIds(all ? new Set() : new Set(ids))
+  }
+  const toggleViagem = (ids: string[]) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev)
+      const allIn = ids.every(id => next.has(id))
+      if (allIn) { ids.forEach(id => next.delete(id)) } else { ids.forEach(id => next.add(id)) }
+      return next
+    })
   }
   const toggleSort = (field: SortField) => {
     if (sortField === field) setSortDir(d => d === 'asc' ? 'desc' : 'asc')
@@ -1114,7 +1323,7 @@ export default function SolicitacoesPipeline() {
           </button>
 
           <div className={`ml-auto flex items-center gap-3 text-[11px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
-            <span>{activeItems.length} solicitação(ões)</span>
+            <span>{displayItems.length} {displayItems.length === 1 ? 'item' : 'itens'}</span>
             {urgentCt > 0 && (
               <span className="flex items-center gap-1 text-red-500 font-bold">
                 <AlertTriangle size={11} /> {urgentCt} urgente{urgentCt > 1 ? 's' : ''}
@@ -1161,22 +1370,29 @@ export default function SolicitacoesPipeline() {
                 <span className="w-3 shrink-0" />
                 <span className="w-[11px] shrink-0" />
                 <span className="w-[86px] shrink-0">Nº</span>
-                <span className="w-[96px] shrink-0 text-center">Tipo</span>
                 <span className="w-[150px] shrink-0">Origem</span>
                 <span className="w-3 shrink-0" />
                 <span className="w-[150px] shrink-0">Destino</span>
                 <span className="w-[104px] shrink-0">Obra</span>
                 <span className="w-[64px] shrink-0 text-right">Data</span>
               </div>
-              {activeItems.map(sol => (
-                <SolRow key={sol.id} sol={sol} onClick={() => setDetail(sol)} isDark={isDark} isSelected={selectedIds.has(sol.id)} onSelect={toggleSelect} />
-              ))}
+              {displayItems.map(item =>
+                item.kind === 'viagem' ? (
+                  <ViagemRow key={`vg-${item.viagemId}`} item={item} onClick={sol => setDetail(sol)} isDark={isDark} selectedIds={selectedIds} onToggleViagem={toggleViagem} />
+                ) : (
+                  <SolRow key={item.sol.id} sol={item.sol} onClick={() => setDetail(item.sol)} isDark={isDark} isSelected={selectedIds.has(item.sol.id)} onSelect={toggleSelect} />
+                )
+              )}
             </>
           ) : (
             <div className="space-y-2 p-4">
-              {activeItems.map(sol => (
-                <SolCard key={sol.id} sol={sol} onClick={() => setDetail(sol)} isDark={isDark} isSelected={selectedIds.has(sol.id)} onSelect={toggleSelect} />
-              ))}
+              {displayItems.map(item =>
+                item.kind === 'viagem' ? (
+                  <ViagemCard key={`vg-${item.viagemId}`} item={item} onClick={sol => setDetail(sol)} isDark={isDark} selectedIds={selectedIds} onToggleViagem={toggleViagem} />
+                ) : (
+                  <SolCard key={item.sol.id} sol={item.sol} onClick={() => setDetail(item.sol)} isDark={isDark} isSelected={selectedIds.has(item.sol.id)} onSelect={toggleSelect} />
+                )
+              )}
             </div>
           )}
         </div>
