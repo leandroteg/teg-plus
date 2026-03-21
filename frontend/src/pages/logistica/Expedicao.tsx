@@ -39,6 +39,34 @@ function getDocLabel(uf: 'MG' | 'outro' | 'indefinido'): string {
   }
 }
 
+// ── Romaneio download (standalone, used by getDocStatus and ExpedicaoDetail) ──
+
+function downloadRomaneio(s: LogSolicitacao) {
+  const url = gerarRomaneioPDF({
+    numero: s.numero,
+    origem: s.origem,
+    destino: s.destino,
+    obra_nome: s.obra_nome,
+    solicitante: s.solicitante_nome,
+    motorista_nome: s.motorista_nome,
+    veiculo_placa: s.veiculo_placa,
+    peso_total_kg: s.peso_total_kg,
+    volumes_total: s.volumes_total,
+    observacoes: s.observacoes_carga,
+    itens: (s.itens ?? []).map(i => ({
+      descricao: i.descricao,
+      quantidade: i.quantidade,
+      unidade: i.unidade,
+      peso_kg: i.peso_kg,
+    })),
+  })
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `romaneio-${s.numero}.pdf`
+  a.click()
+  URL.revokeObjectURL(url)
+}
+
 // ── Main Component ────────────────────────────────────────────────────────────
 
 export default function Expedicao() {
@@ -112,32 +140,6 @@ export default function Expedicao() {
     })
 
     setRomaneioModal(null)
-  }
-
-  function downloadRomaneio(s: LogSolicitacao) {
-    const url = gerarRomaneioPDF({
-      numero: s.numero,
-      origem: s.origem,
-      destino: s.destino,
-      obra_nome: s.obra_nome,
-      solicitante: s.solicitante_nome,
-      motorista_nome: s.motorista_nome,
-      veiculo_placa: s.veiculo_placa,
-      peso_total_kg: s.peso_total_kg,
-      volumes_total: s.volumes_total,
-      observacoes: s.observacoes_carga,
-      itens: (s.itens ?? []).map(i => ({
-        descricao: i.descricao,
-        quantidade: i.quantidade,
-        unidade: i.unidade,
-        peso_kg: i.peso_kg,
-      })),
-    })
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `romaneio-${s.numero}.pdf`
-    a.click()
-    URL.revokeObjectURL(url)
   }
 
   // ── Solicitar NF handler ──
