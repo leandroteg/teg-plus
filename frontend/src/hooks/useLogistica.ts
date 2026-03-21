@@ -34,7 +34,7 @@ export function useSolicitacoes(filtros?: {
           *,
           transportadora:log_transportadoras(id, nome_fantasia, razao_social, avaliacao_media),
           rota_planejada:log_rotas!rota_planejada_id(id, nome, distancia_km, tempo_estimado_h),
-          viagem:log_viagens!viagem_id(id, numero, status, qtd_paradas, distancia_total_km, tempo_estimado_h, custo_total, origem_principal, destino_final),
+          viagem:log_viagens!viagem_id(id, numero, status, modal, veiculo_placa, motorista_nome, motorista_telefone, qtd_paradas, distancia_total_km, tempo_estimado_h, custo_total, origem_principal, destino_final, data_prevista_saida),
           nfe:log_nfe(id, numero, status, chave_acesso, valor_total),
           transporte:log_transportes(id, hora_saida, hora_chegada, eta_atual, placa, motorista_nome),
           recebimento:log_recebimentos(id, status, confirmado_em),
