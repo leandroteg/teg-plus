@@ -10,7 +10,7 @@ import {
   useSolicitacoes, useAtualizarStatusSolicitacao,
   useAprovarSolicitacao, usePlanejaarSolicitacao,
   useEnviarParaAprovacao, useCriarSolicitacao,
-  useCriarViagem, useEnviarViagemAprovacao, useAprovarViagem,
+  useCriarViagem, useAtualizarViagem, useEnviarViagemAprovacao, useAprovarViagem,
 } from '../../hooks/useLogistica'
 import { useSearchParams } from 'react-router-dom'
 import { useLookupCentrosCusto } from '../../hooks/useLookups'
@@ -454,12 +454,13 @@ type DisplayItem =
   | { kind: 'solo'; sol: LogSolicitacao }
   | { kind: 'viagem'; viagemId: string; viagem: LogSolicitacao['viagem']; solicitacoes: LogSolicitacao[] }
 
-function ViagemCard({ item, onClick, isDark, selectedIds, onToggleViagem }: {
+function ViagemCard({ item, onClick, isDark, selectedIds, onToggleViagem, onEditViagem }: {
   item: Extract<DisplayItem, { kind: 'viagem' }>
   onClick: (sol: LogSolicitacao) => void
   isDark: boolean
   selectedIds: Set<string>
   onToggleViagem: (ids: string[]) => void
+  onEditViagem?: (item: Extract<DisplayItem, { kind: 'viagem' }>) => void
 }) {
   const v = item.viagem
   const sols = item.solicitacoes
@@ -504,6 +505,14 @@ function ViagemCard({ item, onClick, isDark, selectedIds, onToggleViagem }: {
             {sols.length} {sols.length === 1 ? 'parada' : 'paradas'}
           </span>
           {hasUrgent && <span className="text-[10px] font-bold text-red-500 bg-red-50 dark:bg-red-500/10 px-2 py-0.5 rounded-full">URGENTE</span>}
+          {onEditViagem && (
+            <button onClick={e => { e.stopPropagation(); onEditViagem(item) }}
+              className={`text-[10px] px-2 py-0.5 rounded-lg font-semibold transition-all flex items-center gap-1 ${
+                isDark ? 'bg-white/[0.06] text-slate-400 hover:bg-white/[0.12] hover:text-white' : 'bg-slate-100 text-slate-500 hover:bg-violet-100 hover:text-violet-700'
+              }`}>
+              <FileText size={10} /> Editar
+            </button>
+          )}
         </div>
       </div>
 
@@ -937,6 +946,7 @@ export default function SolicitacoesPipeline() {
   const [viewMode, setViewMode] = useState<ViewMode>('cards')
   const [showNovaSolicitacao, setShowNovaSolicitacao] = useState(false)
   const [showPlanejamento, setShowPlanejamento] = useState<LogSolicitacao[]>([])
+  const [editandoViagemId, setEditandoViagemId] = useState<string | null>(null) // null = criando nova, string = editando existente
 
   // Abrir modal via ?nova=1 (clique no sidebar)
   const [searchParams, setSearchParams] = useSearchParams()
@@ -952,6 +962,7 @@ export default function SolicitacoesPipeline() {
   const aprovar = useAprovarSolicitacao()
   const enviarParaAprovacao = useEnviarParaAprovacao()
   const criarViagem = useCriarViagem()
+  const atualizarViagem = useAtualizarViagem()
   const enviarViagemAprovacao = useEnviarViagemAprovacao()
   const aprovarViagem = useAprovarViagem()
 
@@ -1062,7 +1073,15 @@ export default function SolicitacoesPipeline() {
   // Actions
   const handlePlanejar = (ids: string[]) => {
     const sols = solicitacoes.filter(s => ids.includes(s.id))
-    if (sols.length > 0) setShowPlanejamento(sols)
+    if (sols.length > 0) {
+      setEditandoViagemId(null)
+      setShowPlanejamento(sols)
+    }
+  }
+
+  const handleEditViagem = (item: Extract<DisplayItem, { kind: 'viagem' }>) => {
+    setEditandoViagemId(item.viagemId)
+    setShowPlanejamento(item.solicitacoes)
   }
 
   const handleSavePlanejamento = async (data: {
@@ -1081,22 +1100,28 @@ export default function SolicitacoesPipeline() {
     rota_polyline?: string
   }) => {
     try {
-      if (data.solicitacaoIds.length > 1) {
+      const viagemPayload = {
+        solicitacaoIds: data.solicitacaoIds,
+        modal: data.modal,
+        motorista_nome: data.motorista_nome,
+        motorista_telefone: data.motorista_telefone,
+        veiculo_placa: data.veiculo_placa,
+        data_prevista_saida: data.data_prevista_saida,
+        custo_total: data.custo_estimado,
+        distancia_total_km: data.distancia_total_km || undefined,
+        tempo_estimado_h: data.duracao_total_horas || undefined,
+        origem_principal: data.origem_principal,
+        destino_final: data.destino_final,
+        rota_polyline: data.rota_polyline,
+      }
+
+      if (editandoViagemId) {
+        // Editando viagem existente
+        await atualizarViagem.mutateAsync({ viagemId: editandoViagemId, ...viagemPayload })
+        showToast('success', 'Viagem atualizada com sucesso')
+      } else if (data.solicitacaoIds.length > 1) {
         // Múltiplas solicitações → criar Viagem (trip) que consolida todas
-        await criarViagem.mutateAsync({
-          solicitacaoIds: data.solicitacaoIds,
-          modal: data.modal,
-          motorista_nome: data.motorista_nome,
-          motorista_telefone: data.motorista_telefone,
-          veiculo_placa: data.veiculo_placa,
-          data_prevista_saida: data.data_prevista_saida,
-          custo_total: data.custo_estimado,
-          distancia_total_km: data.distancia_total_km || undefined,
-          tempo_estimado_h: data.duracao_total_horas || undefined,
-          origem_principal: data.origem_principal,
-          destino_final: data.destino_final,
-          rota_polyline: data.rota_polyline,
-        })
+        await criarViagem.mutateAsync(viagemPayload)
         showToast('success', `Viagem criada com ${data.solicitacaoIds.length} solicitações`)
       } else {
         // Solicitação individual → fluxo original (sem viagem)
@@ -1115,6 +1140,7 @@ export default function SolicitacoesPipeline() {
         showToast('success', `${data.solicitacaoIds.length} solicitação(ões) planejada(s)`)
       }
       setShowPlanejamento([])
+      setEditandoViagemId(null)
       setSelectedIds(new Set())
     } catch {
       showToast('error', 'Erro ao salvar planejamento')
@@ -1388,7 +1414,8 @@ export default function SolicitacoesPipeline() {
             <div className="space-y-2 p-4">
               {displayItems.map(item =>
                 item.kind === 'viagem' ? (
-                  <ViagemCard key={`vg-${item.viagemId}`} item={item} onClick={sol => setDetail(sol)} isDark={isDark} selectedIds={selectedIds} onToggleViagem={toggleViagem} />
+                  <ViagemCard key={`vg-${item.viagemId}`} item={item} onClick={sol => setDetail(sol)} isDark={isDark} selectedIds={selectedIds} onToggleViagem={toggleViagem}
+                    onEditViagem={activeTab !== 'aguardando_aprovacao' ? handleEditViagem : undefined} />
                 ) : (
                   <SolCard key={item.sol.id} sol={item.sol} onClick={() => setDetail(item.sol)} isDark={isDark} isSelected={selectedIds.has(item.sol.id)} onSelect={toggleSelect} />
                 )
@@ -1412,8 +1439,15 @@ export default function SolicitacoesPipeline() {
             isDark={isDark}
             solicitacoes={showPlanejamento}
             allSolicitacoes={solicitacoes}
-            onClose={() => setShowPlanejamento([])}
+            onClose={() => { setShowPlanejamento([]); setEditandoViagemId(null) }}
             onSave={handleSavePlanejamento}
+            initialData={editandoViagemId ? {
+              modal: showPlanejamento[0]?.modal || undefined,
+              motorista_nome: showPlanejamento[0]?.motorista_nome || undefined,
+              veiculo_placa: showPlanejamento[0]?.veiculo_placa || undefined,
+              data_prevista_saida: showPlanejamento[0]?.data_prevista_saida || undefined,
+              custo_estimado: showPlanejamento[0]?.custo_estimado || undefined,
+            } : undefined}
           />
         </Suspense>
       )}

@@ -75,6 +75,14 @@ interface Props {
     destino_final?: string
     rota_polyline?: string
   }) => Promise<void>
+  /** Dados iniciais para pré-preencher quando editando planejamento existente */
+  initialData?: {
+    modal?: string
+    motorista_nome?: string
+    veiculo_placa?: string
+    data_prevista_saida?: string
+    custo_estimado?: number
+  }
 }
 
 // ── Custom marker icons ──────────────────────────────────────────────────────
@@ -667,7 +675,7 @@ function DadosTransporte({ isDark, modal, setModal, motorista, setMotorista, pla
 
 // ── Modal principal ──────────────────────────────────────────────────────────
 
-export default function PlanejamentoRotaModal({ isDark, solicitacoes, allSolicitacoes, onClose, onSave }: Props) {
+export default function PlanejamentoRotaModal({ isDark, solicitacoes, allSolicitacoes, onClose, onSave, initialData }: Props) {
   // Estado: Pontos de rota (cada solicitação = 1 ponto com origem+destino)
   const [pontos, setPontos] = useState<PontoRota[]>(() =>
     solicitacoes.map(sol => ({
@@ -682,12 +690,12 @@ export default function PlanejamentoRotaModal({ isDark, solicitacoes, allSolicit
   const [rota, setRota] = useState<RotaCalculada | null>(null)
   const [calculando, setCalculando] = useState(false)
 
-  // Planning fields
-  const [modal, setModal] = useState('')
-  const [motorista, setMotorista] = useState('')
-  const [placa, setPlaca] = useState('')
-  const [dataPartida, setDataPartida] = useState('')
-  const [custo, setCusto] = useState<number | ''>('')
+  // Planning fields — pré-preencher com initialData quando editando
+  const [modal, setModal] = useState(initialData?.modal || '')
+  const [motorista, setMotorista] = useState(initialData?.motorista_nome || '')
+  const [placa, setPlaca] = useState(initialData?.veiculo_placa || '')
+  const [dataPartida, setDataPartida] = useState(initialData?.data_prevista_saida || '')
+  const [custo, setCusto] = useState<number | ''>(initialData?.custo_estimado ?? '')
   const [salvando, setSalvando] = useState(false)
 
   // Adicionar mais solicitações

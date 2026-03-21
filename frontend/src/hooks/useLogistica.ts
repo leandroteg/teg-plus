@@ -251,6 +251,86 @@ export function useCriarViagem() {
   })
 }
 
+export function useAtualizarViagem() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (payload: {
+      viagemId: string
+      solicitacaoIds: string[]
+      modal?: string
+      motorista_nome?: string
+      motorista_telefone?: string
+      veiculo_placa?: string
+      data_prevista_saida?: string
+      custo_total?: number
+      distancia_total_km?: number
+      tempo_estimado_h?: number
+      origem_principal?: string
+      destino_final?: string
+      rota_polyline?: string
+    }) => {
+      // 1. Atualizar a viagem
+      const { error: vErr } = await supabase
+        .from('log_viagens')
+        .update({
+          modal: payload.modal,
+          veiculo_placa: payload.veiculo_placa,
+          motorista_nome: payload.motorista_nome,
+          motorista_telefone: payload.motorista_telefone,
+          origem_principal: payload.origem_principal,
+          destino_final: payload.destino_final,
+          distancia_total_km: payload.distancia_total_km,
+          tempo_estimado_h: payload.tempo_estimado_h,
+          qtd_paradas: payload.solicitacaoIds.length,
+          custo_total: payload.custo_total,
+          data_prevista_saida: payload.data_prevista_saida,
+          rota_polyline: payload.rota_polyline,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', payload.viagemId)
+      if (vErr) throw vErr
+
+      // 2. Desvincular solicitações que não estão mais na lista
+      const { error: clearErr } = await supabase
+        .from('log_solicitacoes')
+        .update({ viagem_id: null, ordem_na_viagem: null, custo_rateado: null, status: 'solicitado', updated_at: new Date().toISOString() })
+        .eq('viagem_id', payload.viagemId)
+        .not('id', 'in', `(${payload.solicitacaoIds.join(',')})`)
+      if (clearErr) throw clearErr
+
+      // 3. Vincular/atualizar solicitações na viagem
+      const custoRateado = payload.custo_total && payload.solicitacaoIds.length > 0
+        ? Math.round((payload.custo_total / payload.solicitacaoIds.length) * 100) / 100
+        : undefined
+
+      for (let i = 0; i < payload.solicitacaoIds.length; i++) {
+        const { error } = await supabase
+          .from('log_solicitacoes')
+          .update({
+            viagem_id: payload.viagemId,
+            ordem_na_viagem: i + 1,
+            custo_rateado: custoRateado,
+            status: 'planejado',
+            modal: payload.modal,
+            motorista_nome: payload.motorista_nome,
+            veiculo_placa: payload.veiculo_placa,
+            data_prevista_saida: payload.data_prevista_saida,
+            custo_estimado: custoRateado,
+            distancia_km: payload.distancia_total_km,
+            tempo_estimado_h: payload.tempo_estimado_h,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', payload.solicitacaoIds[i])
+        if (error) throw error
+      }
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['log_solicitacoes'] })
+      qc.invalidateQueries({ queryKey: ['log_viagens'] })
+    },
+  })
+}
+
 export function useEnviarViagemAprovacao() {
   const qc = useQueryClient()
   return useMutation({
