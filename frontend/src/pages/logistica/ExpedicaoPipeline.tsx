@@ -108,9 +108,10 @@ const ITEMS_CHECKLIST: readonly [string, string, boolean][] = [
   ['embalagem_verificada',   'Condições de embalagem e proteção verificadas', true],
 ]
 
-function DetailModal({ sol, onClose, onAction, isDark }: {
+function DetailModal({ sol, onClose, onAction, isDark, allSolicitacoes }: {
   sol: LogSolicitacao; onClose: () => void
   onAction: (action: string, sol: LogSolicitacao) => void; isDark: boolean
+  allSolicitacoes: LogSolicitacao[]
 }) {
   const { data: checklist } = useChecklistExpedicao(sol.id)
   const salvarChecklist = useSalvarChecklistExpedicao()
@@ -153,6 +154,18 @@ function DetailModal({ sol, onClose, onAction, isDark }: {
   }
 
   const checkedCount = ITEMS_CHECKLIST.filter(([k]) => checklist?.[k as keyof typeof checklist]).length
+
+  // ── Bloqueio viagem: só pode concluir expedição quando TODAS as irmãs estiverem prontas ──
+  const irmasViagem = sol.viagem_id
+    ? allSolicitacoes.filter(s => s.viagem_id === sol.viagem_id && s.id !== sol.id)
+    : []
+  const irmasDocPronto = irmasViagem.every(s =>
+    s.status === 'romaneio_emitido' || s.status === 'nfe_emitida'
+  )
+  const viagemBloqueada = sol.viagem_id != null && !irmasDocPronto
+  const irmasPendentes = irmasViagem.filter(s =>
+    s.status !== 'romaneio_emitido' && s.status !== 'nfe_emitida'
+  )
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-sm p-4" onClick={onClose}>
@@ -334,17 +347,39 @@ function DetailModal({ sol, onClose, onAction, isDark }: {
                   <FileText size={15} /> Solicitar NF
                 </button>
               ) : (
-                <button onClick={() => onAction('concluir', sol)} className="flex-1 py-3 rounded-xl bg-emerald-600 text-white text-sm font-bold hover:bg-emerald-700 transition-all flex items-center justify-center gap-2">
+                <button onClick={() => !viagemBloqueada && onAction('concluir', sol)} disabled={viagemBloqueada}
+                  className={`flex-1 py-3 rounded-xl text-sm font-bold transition-all flex items-center justify-center gap-2 ${
+                    viagemBloqueada ? 'bg-slate-200 text-slate-400 cursor-not-allowed' : 'bg-emerald-600 text-white hover:bg-emerald-700'
+                  }`}>
                   <CheckCircle2 size={15} /> Concluir Expedição
                 </button>
               )
             })()}
             {sol.status === 'nfe_emitida' && (
-              <button onClick={() => onAction('concluir', sol)} className="flex-1 py-3 rounded-xl bg-emerald-600 text-white text-sm font-bold hover:bg-emerald-700 transition-all flex items-center justify-center gap-2">
+              <button onClick={() => !viagemBloqueada && onAction('concluir', sol)} disabled={viagemBloqueada}
+                className={`flex-1 py-3 rounded-xl text-sm font-bold transition-all flex items-center justify-center gap-2 ${
+                  viagemBloqueada ? 'bg-slate-200 text-slate-400 cursor-not-allowed' : 'bg-emerald-600 text-white hover:bg-emerald-700'
+                }`}>
                 <CheckCircle2 size={15} /> Concluir Expedição
               </button>
             )}
           </div>
+
+          {/* Aviso de bloqueio por viagem */}
+          {viagemBloqueada && (sol.status === 'romaneio_emitido' || sol.status === 'nfe_emitida') && (
+            <div className={`flex items-start gap-2 px-4 py-3 rounded-xl text-xs font-medium ${isDark ? 'bg-amber-500/10 text-amber-400' : 'bg-amber-50 text-amber-700'}`}>
+              <AlertTriangle size={14} className="shrink-0 mt-0.5" />
+              <div>
+                <p className="font-bold">Viagem incompleta</p>
+                <p className="mt-0.5">
+                  {irmasPendentes.length === 1
+                    ? `A solicitação ${irmasPendentes[0].numero} ainda não tem documento fiscal emitido.`
+                    : `${irmasPendentes.length} solicitações da viagem ainda não têm documento fiscal: ${irmasPendentes.map(s => s.numero).join(', ')}.`}
+                  {' '}Todas as paradas precisam estar prontas para concluir a expedição da viagem.
+                </p>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>
@@ -867,7 +902,7 @@ export default function ExpedicaoPipeline() {
         </div>
       </div>
 
-      {detail && <DetailModal sol={detail} onClose={() => setDetail(null)} onAction={handleDetailAction} isDark={isDark} />}
+      {detail && <DetailModal sol={detail} onClose={() => setDetail(null)} onAction={handleDetailAction} isDark={isDark} allSolicitacoes={solicitacoes} />}
 
       {/* Solicitar NF Modal */}
       {nfModal && (
