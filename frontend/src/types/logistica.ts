@@ -302,6 +302,7 @@ export interface LogTransporte {
   eta_atual?: string
   hora_chegada?: string
 
+  viagem_id?: string
   despachado_por?: string
   criado_em: string
   updated_at: string
@@ -309,6 +310,7 @@ export interface LogTransporte {
   // Joined
   solicitacao?: LogSolicitacao
   ocorrencias?: LogOcorrencia[]
+  viagem?: LogViagem
 }
 
 // ── Ocorrência ────────────────────────────────────────────────────────────────
@@ -431,6 +433,7 @@ export interface EmitirNFePayload {
 
 export interface IniciarTransportePayload {
   solicitacao_id: string
+  viagem_id?: string
   placa: string
   motorista_nome: string
   motorista_telefone?: string

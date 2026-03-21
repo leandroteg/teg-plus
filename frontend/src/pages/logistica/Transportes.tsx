@@ -1,7 +1,7 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import {
   Truck, AlertTriangle, CheckCircle2, X, Save, Loader2,
-  MapPin, Clock, ChevronDown,
+  MapPin, Clock, ChevronDown, Route,
 } from 'lucide-react'
 import {
   useTransportes, useRegistrarOcorrencia, useResolverOcorrencia,
@@ -9,7 +9,11 @@ import {
 } from '../../hooks/useLogistica'
 import { useTheme } from '../../contexts/ThemeContext'
 import { StatusBadge } from './LogisticaHome'
-import type { TipoOcorrencia } from '../../types/logistica'
+import type { TipoOcorrencia, LogTransporte } from '../../types/logistica'
+
+type DisplayItem =
+  | { kind: 'solo'; transport: LogTransporte }
+  | { kind: 'viagem'; viagemId: string; viagem: LogTransporte['viagem']; transportes: LogTransporte[] }
 
 const OCORRENCIA_LABEL: Record<TipoOcorrencia, { label: string; cor: string }> = {
   avaria_veiculo:          { label: 'Avaria do Veículo',        cor: 'text-amber-700'  },
@@ -35,12 +39,40 @@ export default function Transportes() {
   const [ocForm, setOcForm] = useState<{ tipo: TipoOcorrencia; descricao: string; localizacao?: string }>({
     tipo: 'atraso', descricao: '',
   })
-  const [entregaModal, setEntregaModal] = useState<{ transporte_id: string; solicitacao_id: string; numero: string } | null>(null)
+  const [entregaModal, setEntregaModal] = useState<{ transporte_id: string; solicitacao_id: string; numero: string; viagem_id?: string } | null>(null)
 
   const { data: transportes = [], isLoading } = useTransportes()
   const registrarOcorrencia = useRegistrarOcorrencia()
   const resolverOcorrencia = useResolverOcorrencia()
   const confirmarEntrega = useConfirmarEntregaFisica()
+
+  const displayItems = useMemo<DisplayItem[]>(() => {
+    const viagemMap = new Map<string, LogTransporte[]>()
+    const solos: LogTransporte[] = []
+
+    for (const t of transportes) {
+      if (t.viagem_id) {
+        const list = viagemMap.get(t.viagem_id) ?? []
+        list.push(t)
+        viagemMap.set(t.viagem_id, list)
+      } else {
+        solos.push(t)
+      }
+    }
+
+    const items: DisplayItem[] = []
+
+    for (const [viagemId, list] of viagemMap) {
+      list.sort((a, b) => (a.solicitacao?.ordem_na_viagem ?? 0) - (b.solicitacao?.ordem_na_viagem ?? 0))
+      items.push({ kind: 'viagem', viagemId, viagem: list[0].viagem, transportes: list })
+    }
+
+    for (const t of solos) {
+      items.push({ kind: 'solo', transport: t })
+    }
+
+    return items
+  }, [transportes])
 
   async function handleRegistrarOcorrencia() {
     if (!ocorrenciaModal || !ocForm.descricao) return
@@ -54,7 +86,11 @@ export default function Transportes() {
 
   async function handleConfirmarEntrega() {
     if (!entregaModal) return
-    await confirmarEntrega.mutateAsync(entregaModal)
+    await confirmarEntrega.mutateAsync({
+      transporte_id: entregaModal.transporte_id,
+      solicitacao_id: entregaModal.solicitacao_id,
+      viagem_id: entregaModal.viagem_id,
+    })
     setEntregaModal(null)
   }
 
@@ -80,7 +116,23 @@ export default function Transportes() {
         </div>
       ) : (
         <div className="space-y-3">
-          {transportes.map(t => {
+          {displayItems.map(item => {
+            if (item.kind === 'viagem') {
+              return (
+                <ViagemTransportCard
+                  key={`vg-${item.viagemId}`}
+                  item={item}
+                  isDark={isDark}
+                  expandedId={expandedId}
+                  setExpandedId={setExpandedId}
+                  setOcorrenciaModal={setOcorrenciaModal}
+                  setEntregaModal={setEntregaModal}
+                  resolverOcorrencia={resolverOcorrencia}
+                />
+              )
+            }
+
+            const t = item.transport
             const s = t.solicitacao
             const isExp = expandedId === t.id
             const ocorrencias = t.ocorrencias ?? []
@@ -105,7 +157,7 @@ export default function Transportes() {
                       {s?.urgente && <span className="text-[9px] bg-red-100 text-red-700 font-bold px-1.5 py-0.5 rounded-full">URGENTE</span>}
                       {ocAberta.length > 0 && (
                         <span className="text-[9px] bg-red-100 text-red-700 font-bold px-1.5 py-0.5 rounded-full">
-                          {ocAberta.length} ocorrência(s)
+                          {ocAberta.length} ocorrencia(s)
                         </span>
                       )}
                       {atrasado && !ocAberta.length && (
@@ -133,7 +185,7 @@ export default function Transportes() {
                   <div className={`px-4 py-4 space-y-4 ${isDark ? 'border-t border-white/[0.06]' : 'border-t border-slate-100'}`}>
                     {/* Info do transporte */}
                     <div className="grid grid-cols-3 gap-3">
-                      <Detail label="Saída" value={fmtDataHora(t.hora_saida)} />
+                      <Detail label="Saida" value={fmtDataHora(t.hora_saida)} />
                       <Detail label="ETA Original" value={fmtDataHora(t.eta_original)} />
                       <Detail label="ETA Atual" value={fmtDataHora(t.eta_atual)} />
                     </div>
@@ -149,10 +201,10 @@ export default function Transportes() {
                       </div>
                     )}
 
-                    {/* Ocorrências */}
+                    {/* Ocorrencias */}
                     {ocorrencias.length > 0 && (
                       <div>
-                        <p className="text-xs font-bold text-slate-600 mb-2">Ocorrências</p>
+                        <p className="text-xs font-bold text-slate-600 mb-2">Ocorrencias</p>
                         <div className="space-y-2">
                           {ocorrencias.map(oc => (
                             <div key={oc.id} className={`rounded-xl px-3 py-2 border ${oc.resolvido ? 'bg-slate-50 border-slate-200' : 'bg-red-50 border-red-200'}`}>
@@ -183,14 +235,14 @@ export default function Transportes() {
                       </div>
                     )}
 
-                    {/* Ações */}
+                    {/* Acoes */}
                     <div className="flex gap-2">
                       <button
                         onClick={() => setOcorrenciaModal({ transporte_id: t.id, solicitacao_id: t.solicitacao_id })}
                         className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-50 hover:bg-amber-100
                           text-amber-700 text-xs font-semibold transition-colors border border-amber-200"
                       >
-                        <AlertTriangle size={12} /> Registrar Ocorrência
+                        <AlertTriangle size={12} /> Registrar Ocorrencia
                       </button>
                       <button
                         onClick={() => setEntregaModal({ transporte_id: t.id, solicitacao_id: t.solicitacao_id, numero: s?.numero ?? '' })}
@@ -283,6 +335,212 @@ export default function Transportes() {
               </button>
             </div>
           </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function ViagemTransportCard({
+  item,
+  isDark,
+  expandedId,
+  setExpandedId,
+  setOcorrenciaModal,
+  setEntregaModal,
+  resolverOcorrencia,
+}: {
+  item: Extract<DisplayItem, { kind: 'viagem' }>
+  isDark: boolean
+  expandedId: string | null
+  setExpandedId: (id: string | null) => void
+  setOcorrenciaModal: (v: { transporte_id: string; solicitacao_id: string } | null) => void
+  setEntregaModal: (v: { transporte_id: string; solicitacao_id: string; numero: string; viagem_id?: string } | null) => void
+  resolverOcorrencia: ReturnType<typeof useResolverOcorrencia>
+}) {
+  const { viagem, transportes, viagemId } = item
+  const isExp = expandedId === `vg-${viagemId}`
+  const delivered = transportes.filter(t => !!t.hora_chegada).length
+  const total = transportes.length
+  const allOcAbertas = transportes.flatMap(t => (t.ocorrencias ?? []).filter(o => !o.resolvido))
+
+  return (
+    <div className={`rounded-2xl border shadow-sm overflow-hidden ${isDark
+      ? `bg-[#1e293b] ${allOcAbertas.length > 0 ? 'border-red-500/30' : 'border-white/[0.06]'}`
+      : `bg-white ${allOcAbertas.length > 0 ? 'border-red-200' : 'border-slate-200'}`
+    }`}>
+      {/* Header */}
+      <div
+        className={`flex items-center gap-3 px-4 py-3 cursor-pointer ${isDark ? 'hover:bg-white/[0.03]' : 'hover:bg-slate-50'}`}
+        onClick={() => setExpandedId(isExp ? null : `vg-${viagemId}`)}
+      >
+        <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 bg-blue-50">
+          <Route size={16} className="text-blue-500" />
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2">
+            <p className={`text-sm font-extrabold font-mono ${isDark ? 'text-white' : 'text-slate-800'}`}>
+              {viagem?.numero ?? `VG-${viagemId.slice(0, 4).toUpperCase()}`}
+            </p>
+            <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full ${
+              delivered === total
+                ? 'bg-emerald-100 text-emerald-700'
+                : 'bg-blue-100 text-blue-700'
+            }`}>
+              {delivered}/{total} entregues
+            </span>
+            {allOcAbertas.length > 0 && (
+              <span className="text-[9px] bg-red-100 text-red-700 font-bold px-1.5 py-0.5 rounded-full">
+                {allOcAbertas.length} ocorrencia(s)
+              </span>
+            )}
+          </div>
+          <p className={`text-[10px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+            {viagem?.origem_principal ?? transportes[0]?.solicitacao?.origem} → {viagem?.destino_final ?? transportes[transportes.length - 1]?.solicitacao?.destino}
+          </p>
+        </div>
+        <div className="text-right shrink-0 mr-2 hidden sm:block">
+          <p className={`text-xs font-semibold ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>{viagem?.motorista_nome ?? transportes[0]?.motorista_nome ?? '—'}</p>
+          <p className={`text-[10px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{viagem?.veiculo_placa ?? transportes[0]?.placa ?? '—'}</p>
+        </div>
+        <ChevronDown size={16} className={`text-slate-400 shrink-0 transition-transform ${isExp ? 'rotate-180' : ''}`} />
+      </div>
+
+      {/* Progress bar */}
+      <div className={`px-4 pb-2 ${!isExp ? '' : 'hidden'}`}>
+        <div className="flex gap-1">
+          {transportes.map((t, i) => (
+            <div
+              key={t.id}
+              className={`h-1.5 rounded-full flex-1 ${
+                t.hora_chegada
+                  ? 'bg-emerald-400'
+                  : isDark ? 'bg-white/10' : 'bg-slate-200'
+              }`}
+              title={`Parada ${i + 1}: ${t.solicitacao?.numero ?? ''} - ${t.hora_chegada ? 'Entregue' : 'Em transito'}`}
+            />
+          ))}
+        </div>
+      </div>
+
+      {/* Expanded sub-items */}
+      {isExp && (
+        <div className={`px-4 py-3 space-y-2 ${isDark ? 'border-t border-white/[0.06]' : 'border-t border-slate-100'}`}>
+          {/* Progress bar inside expanded */}
+          <div className="flex gap-1 mb-3">
+            {transportes.map((t, i) => (
+              <div
+                key={t.id}
+                className={`h-2 rounded-full flex-1 ${
+                  t.hora_chegada
+                    ? 'bg-emerald-400'
+                    : isDark ? 'bg-white/10' : 'bg-slate-200'
+                }`}
+                title={`Parada ${i + 1}: ${t.solicitacao?.numero ?? ''}`}
+              />
+            ))}
+          </div>
+
+          {transportes.map((t, idx) => {
+            const s = t.solicitacao
+            const ocorrencias = t.ocorrencias ?? []
+            const ocAberta = ocorrencias.filter(o => !o.resolvido)
+            const isDelivered = !!t.hora_chegada
+            const atrasado = !isDelivered && t.eta_atual && new Date(t.eta_atual) < new Date()
+
+            return (
+              <div
+                key={t.id}
+                className={`rounded-xl border px-3 py-2.5 ${isDark
+                  ? `${isDelivered ? 'bg-emerald-500/5 border-emerald-500/20' : ocAberta.length > 0 ? 'bg-red-500/5 border-red-500/20' : 'bg-white/[0.02] border-white/[0.06]'}`
+                  : `${isDelivered ? 'bg-emerald-50 border-emerald-200' : ocAberta.length > 0 ? 'bg-red-50 border-red-200' : 'bg-slate-50 border-slate-200'}`
+                }`}
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2 min-w-0 flex-1">
+                    <span className={`text-[10px] font-bold shrink-0 w-5 h-5 rounded-md flex items-center justify-center ${
+                      isDelivered
+                        ? 'bg-emerald-100 text-emerald-700'
+                        : isDark ? 'bg-white/10 text-slate-400' : 'bg-slate-200 text-slate-600'
+                    }`}>
+                      {s?.ordem_na_viagem ?? idx + 1}
+                    </span>
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-1.5">
+                        <p className={`text-xs font-bold font-mono ${isDark ? 'text-white' : 'text-slate-800'}`}>{s?.numero}</p>
+                        {isDelivered ? (
+                          <span className="text-[9px] bg-emerald-100 text-emerald-700 font-bold px-1.5 py-0.5 rounded-full flex items-center gap-0.5">
+                            <CheckCircle2 size={8} /> Entregue {fmtHora(t.hora_chegada)}
+                          </span>
+                        ) : (
+                          <span className="text-[9px] bg-amber-100 text-amber-700 font-bold px-1.5 py-0.5 rounded-full">
+                            Em transito
+                          </span>
+                        )}
+                        {atrasado && (
+                          <span className="text-[9px] bg-red-100 text-red-700 font-bold px-1.5 py-0.5 rounded-full">ATRASADO</span>
+                        )}
+                      </div>
+                      <p className={`text-[10px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+                        {s?.origem} → {s?.destino}
+                        {s?.obra_nome ? ` · ${s.obra_nome}` : ''}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    {t.eta_atual && !isDelivered && (
+                      <p className={`text-[10px] font-semibold ${atrasado ? 'text-red-500' : isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+                        ETA: {fmtDataHora(t.eta_atual)}
+                      </p>
+                    )}
+                  </div>
+                </div>
+
+                {/* Occurrence badges */}
+                {ocAberta.length > 0 && (
+                  <div className="mt-1.5 flex flex-wrap gap-1">
+                    {ocAberta.map(oc => (
+                      <span key={oc.id} className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-red-100 ${OCORRENCIA_LABEL[oc.tipo]?.cor ?? 'text-red-700'}`}>
+                        {OCORRENCIA_LABEL[oc.tipo]?.label ?? oc.tipo}
+                        <button
+                          onClick={() => resolverOcorrencia.mutate({ id: oc.id, resolucao: 'Resolvido pelo operador' })}
+                          className="ml-1 opacity-70 hover:opacity-100"
+                          title="Resolver"
+                        >
+                          ×
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                )}
+
+                {/* Actions for in-transit stops */}
+                {!isDelivered && (
+                  <div className="flex gap-1.5 mt-2">
+                    <button
+                      onClick={() => setOcorrenciaModal({ transporte_id: t.id, solicitacao_id: t.solicitacao_id })}
+                      className="flex items-center gap-1 px-2 py-1 rounded-md bg-amber-50 hover:bg-amber-100
+                        text-amber-700 text-[10px] font-semibold transition-colors border border-amber-200"
+                    >
+                      <AlertTriangle size={10} /> Ocorrencia
+                    </button>
+                    <button
+                      onClick={() => setEntregaModal({
+                        transporte_id: t.id,
+                        solicitacao_id: t.solicitacao_id,
+                        numero: s?.numero ?? '',
+                        viagem_id: t.viagem_id,
+                      })}
+                      className="flex items-center gap-1 px-2 py-1 rounded-md bg-emerald-600 hover:bg-emerald-700
+                        text-white text-[10px] font-semibold transition-colors"
+                    >
+                      <CheckCircle2 size={10} /> Confirmar Entrega
+                    </button>
+                  </div>
+                )}
+              </div>
+            )
+          })}
         </div>
       )}
     </div>

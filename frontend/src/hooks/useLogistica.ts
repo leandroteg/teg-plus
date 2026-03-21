@@ -786,9 +786,11 @@ export function useTransportes() {
           *,
           solicitacao:log_solicitacoes(
             id, numero, tipo, origem, destino, obra_nome, centro_custo, urgente,
-            solicitante_nome, transportadora:log_transportadoras(nome_fantasia)
+            solicitante_nome, viagem_id, ordem_na_viagem,
+            transportadora:log_transportadoras(nome_fantasia)
           ),
-          ocorrencias:log_ocorrencias(*)
+          ocorrencias:log_ocorrencias(*),
+          viagem:log_viagens!viagem_id(id, numero, status, origem_principal, destino_final, qtd_paradas, distancia_total_km, tempo_estimado_h, motorista_nome, veiculo_placa, modal)
         `)
         .is('hora_chegada', null)
         .order('criado_em', { ascending: false })
@@ -836,26 +838,117 @@ export function useIniciarTransporte() {
   })
 }
 
+export function useDespacharViagem() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (payload: {
+      viagemId: string
+      placa: string
+      motorista_nome: string
+      motorista_telefone?: string
+      eta_original: string
+      codigo_rastreio?: string
+    }) => {
+      const { data: { user } } = await supabase.auth.getUser()
+      const agora = new Date().toISOString()
+
+      // 1. Buscar solicitações da viagem
+      const { data: sols, error: solErr } = await supabase
+        .from('log_solicitacoes')
+        .select('id, peso_total_kg, volumes_total')
+        .eq('viagem_id', payload.viagemId)
+        .order('ordem_na_viagem', { ascending: true })
+      if (solErr) throw solErr
+      if (!sols || sols.length === 0) throw new Error('Nenhuma solicitação encontrada na viagem')
+
+      // 2. Criar 1 transporte por solicitação
+      for (const sol of sols) {
+        const { error } = await supabase
+          .from('log_transportes')
+          .insert({
+            solicitacao_id: sol.id,
+            viagem_id: payload.viagemId,
+            placa: payload.placa,
+            motorista_nome: payload.motorista_nome,
+            motorista_telefone: payload.motorista_telefone,
+            eta_original: payload.eta_original,
+            codigo_rastreio: payload.codigo_rastreio,
+            hora_saida: agora,
+            despachado_por: user?.id,
+            peso_total_kg: sol.peso_total_kg,
+            volumes_total: sol.volumes_total,
+          })
+        if (error) throw error
+
+        // Criar recebimento pendente
+        await supabase
+          .from('log_recebimentos')
+          .insert({ solicitacao_id: sol.id, status: 'pendente' })
+      }
+
+      // 3. Atualizar solicitações → em_transito
+      await supabase
+        .from('log_solicitacoes')
+        .update({ status: 'em_transito', updated_at: agora })
+        .eq('viagem_id', payload.viagemId)
+
+      // 4. Atualizar viagem → em_transito
+      await supabase
+        .from('log_viagens')
+        .update({ status: 'em_transito', data_real_saida: agora, updated_at: agora })
+        .eq('id', payload.viagemId)
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['log_transportes'] })
+      qc.invalidateQueries({ queryKey: ['log_solicitacoes'] })
+      qc.invalidateQueries({ queryKey: ['log_recebimentos'] })
+      qc.invalidateQueries({ queryKey: ['log_viagens'] })
+    },
+  })
+}
+
 export function useConfirmarEntregaFisica() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: async ({ transporte_id, solicitacao_id }: { transporte_id: string; solicitacao_id: string }) => {
+    mutationFn: async ({ transporte_id, solicitacao_id, viagem_id }: {
+      transporte_id: string; solicitacao_id: string; viagem_id?: string
+    }) => {
       const agora = new Date().toISOString()
 
+      // 1. Marcar transporte como chegou
       await supabase
         .from('log_transportes')
         .update({ hora_chegada: agora, updated_at: agora })
         .eq('id', transporte_id)
 
+      // 2. Marcar solicitação como entregue
       await supabase
         .from('log_solicitacoes')
         .update({ status: 'entregue', updated_at: agora })
         .eq('id', solicitacao_id)
 
+      // 3. Marcar recebimento
       await supabase
         .from('log_recebimentos')
         .update({ entregue_em: agora, updated_at: agora })
         .eq('solicitacao_id', solicitacao_id)
+
+      // 4. Se faz parte de viagem, verificar se TODAS as paradas foram entregues
+      if (viagem_id) {
+        const { data: pendentes } = await supabase
+          .from('log_transportes')
+          .select('id')
+          .eq('viagem_id', viagem_id)
+          .is('hora_chegada', null)
+
+        if (!pendentes || pendentes.length === 0) {
+          // Todas entregues → viagem concluída
+          await supabase
+            .from('log_viagens')
+            .update({ status: 'concluida', data_conclusao: agora, updated_at: agora })
+            .eq('id', viagem_id)
+        }
+      }
 
       return { ok: true }
     },
@@ -863,6 +956,7 @@ export function useConfirmarEntregaFisica() {
       qc.invalidateQueries({ queryKey: ['log_transportes'] })
       qc.invalidateQueries({ queryKey: ['log_solicitacoes'] })
       qc.invalidateQueries({ queryKey: ['log_recebimentos'] })
+      qc.invalidateQueries({ queryKey: ['log_viagens'] })
     },
   })
 }

@@ -2,11 +2,12 @@ import { useState, useMemo } from 'react'
 import {
   Package2, FileText, Truck, CheckCircle2, X, Loader2,
   AlertTriangle, ChevronDown, Download, ClipboardList,
-  ExternalLink, MapPin, Clock, ScrollText, XCircle,
+  ExternalLink, MapPin, Clock, ScrollText, XCircle, Route,
 } from 'lucide-react'
 import {
   useSolicitacoes, useChecklistExpedicao, useSalvarChecklistExpedicao,
   useNFe, useCancelarNFe, useIniciarTransporte, useEmitirRomaneio, useSolicitarNFFiscal,
+  useDespacharViagem,
 } from '../../hooks/useLogistica'
 import { gerarRomaneioPDF } from '../../utils/romaneio-pdf'
 import { StatusBadge } from './LogisticaHome'
@@ -69,6 +70,13 @@ export default function Expedicao() {
   const solicitarNF = useSolicitarNFFiscal()
   const cancelarNFe = useCancelarNFe()
   const iniciarTransporte = useIniciarTransporte()
+  const despacharViagem = useDespacharViagem()
+
+  // Viagem despacho modal
+  const [despachoViagemModal, setDespachoViagemModal] = useState<{ viagemId: string; solicitacoes: LogSolicitacao[] } | null>(null)
+  const [despachoViagemForm, setDespachoViagemForm] = useState<{
+    placa: string; motorista_nome: string; motorista_telefone: string; eta_original: string; codigo_rastreio: string
+  }>({ placa: '', motorista_nome: '', motorista_telefone: '', eta_original: '', codigo_rastreio: '' })
 
   // ── Romaneio handler ──
 
@@ -206,6 +214,76 @@ export default function Expedicao() {
     return { aprovado, romaneio, nfe, nfPendente, total: solicitacoes.length }
   }, [solicitacoes])
 
+  // ── Group by viagem_id ──
+  type DisplayItem =
+    | { kind: 'solo'; sol: LogSolicitacao }
+    | { kind: 'viagem'; viagemId: string; viagem: LogSolicitacao['viagem']; solicitacoes: LogSolicitacao[] }
+
+  const displayItems = useMemo((): DisplayItem[] => {
+    const viagemGroups = new Map<string, LogSolicitacao[]>()
+    const solos: LogSolicitacao[] = []
+
+    for (const sol of solicitacoes) {
+      if (sol.viagem_id) {
+        const arr = viagemGroups.get(sol.viagem_id) || []
+        arr.push(sol)
+        viagemGroups.set(sol.viagem_id, arr)
+      } else {
+        solos.push(sol)
+      }
+    }
+
+    const result: DisplayItem[] = []
+    const viagemInserted = new Set<string>()
+
+    for (const sol of solicitacoes) {
+      if (sol.viagem_id) {
+        if (!viagemInserted.has(sol.viagem_id)) {
+          viagemInserted.add(sol.viagem_id)
+          const sols = viagemGroups.get(sol.viagem_id)!
+          sols.sort((a, b) => (a.ordem_na_viagem ?? 0) - (b.ordem_na_viagem ?? 0))
+          result.push({
+            kind: 'viagem',
+            viagemId: sol.viagem_id,
+            viagem: sol.viagem,
+            solicitacoes: sols,
+          })
+        }
+      } else {
+        result.push({ kind: 'solo', sol })
+      }
+    }
+
+    return result
+  }, [solicitacoes])
+
+  // ── Despachar viagem handler ──
+  function openDespachoViagem(viagemId: string, sols: LogSolicitacao[]) {
+    const v = sols[0]?.viagem
+    setDespachoViagemModal({ viagemId, solicitacoes: sols })
+    setDespachoViagemForm({
+      placa: v?.veiculo_placa ?? sols[0]?.veiculo_placa ?? '',
+      motorista_nome: v?.motorista_nome ?? sols[0]?.motorista_nome ?? '',
+      motorista_telefone: v?.motorista_telefone ?? sols[0]?.motorista_telefone ?? '',
+      eta_original: '',
+      codigo_rastreio: '',
+    })
+  }
+
+  async function handleDespacharViagem() {
+    if (!despachoViagemModal || !despachoViagemForm.placa || !despachoViagemForm.motorista_nome || !despachoViagemForm.eta_original) return
+    await despacharViagem.mutateAsync({
+      viagemId: despachoViagemModal.viagemId,
+      placa: despachoViagemForm.placa,
+      motorista_nome: despachoViagemForm.motorista_nome,
+      motorista_telefone: despachoViagemForm.motorista_telefone || undefined,
+      eta_original: despachoViagemForm.eta_original,
+      codigo_rastreio: despachoViagemForm.codigo_rastreio || undefined,
+    })
+    setDespachoViagemModal(null)
+    setDespachoViagemForm({ placa: '', motorista_nome: '', motorista_telefone: '', eta_original: '', codigo_rastreio: '' })
+  }
+
   return (
     <div className="space-y-4">
 
@@ -265,59 +343,84 @@ export default function Expedicao() {
         </div>
       ) : (
         <div className="space-y-3">
-          {solicitacoes.map(s => {
-            const isExp = expandedId === s.id
-            const docStatus = getDocStatus(s)
-            return (
-              <div key={s.id} className={`rounded-2xl shadow-sm overflow-hidden transition-shadow hover:shadow-md ${isDark ? 'bg-[#1e293b] border border-white/[0.06]' : 'bg-white border border-slate-200'}`}>
-                {/* ── Row header ── */}
-                <div
-                  className={`flex items-center gap-3 px-4 py-3 cursor-pointer transition-colors ${isDark ? 'hover:bg-white/[0.03]' : 'hover:bg-slate-50/60'}`}
-                  onClick={() => setExpandedId(isExp ? null : s.id)}
-                >
-                  <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 transition-colors ${docStatus.iconBg}`}>
-                    {docStatus.icon}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <p className={`text-sm font-extrabold font-mono ${isDark ? 'text-white' : 'text-slate-800'}`}>{s.numero}</p>
-                      <StatusBadge status={s.status} />
-                      {s.urgente && <span className="text-[9px] bg-red-100 text-red-700 font-bold px-1.5 py-0.5 rounded-full uppercase tracking-wider">Urgente</span>}
-                      {docStatus.badge}
+          {displayItems.map(item => item.kind === 'viagem' ? (
+            <ViagemExpCard
+              key={`vg-${item.viagemId}`}
+              item={item}
+              expandedId={expandedId}
+              setExpandedId={setExpandedId}
+              onEmitirRomaneio={s => setRomaneioModal(s)}
+              onSolicitarNF={s => openNfModal(s)}
+              onCancelarNFe={(nfeId, solId) => cancelarNFe.mutate({ id: nfeId, motivo: 'Cancelamento pela expedição', solicitacao_id: solId })}
+              cancelandoNFe={cancelarNFe.isPending}
+              onDespacharSolo={s => {
+                setDespachoModal(s.id)
+                setDespachoForm({
+                  solicitacao_id: s.id,
+                  placa: s.veiculo_placa ?? '',
+                  motorista_nome: s.motorista_nome ?? '',
+                  motorista_telefone: s.motorista_telefone ?? '',
+                })
+              }}
+              onDespacharViagem={() => openDespachoViagem(item.viagemId, item.solicitacoes)}
+              isDark={isDark}
+            />
+          ) : (
+            (() => {
+              const s = item.sol
+              const isExp = expandedId === s.id
+              const docStatus = getDocStatus(s)
+              return (
+                <div key={s.id} className={`rounded-2xl shadow-sm overflow-hidden transition-shadow hover:shadow-md ${isDark ? 'bg-[#1e293b] border border-white/[0.06]' : 'bg-white border border-slate-200'}`}>
+                  {/* ── Row header ── */}
+                  <div
+                    className={`flex items-center gap-3 px-4 py-3 cursor-pointer transition-colors ${isDark ? 'hover:bg-white/[0.03]' : 'hover:bg-slate-50/60'}`}
+                    onClick={() => setExpandedId(isExp ? null : s.id)}
+                  >
+                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 transition-colors ${docStatus.iconBg}`}>
+                      {docStatus.icon}
                     </div>
-                    <div className="flex items-center gap-1 mt-0.5">
-                      <MapPin size={10} className={isDark ? 'text-slate-600' : 'text-slate-300'} />
-                      <p className={`text-[10px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{s.origem} → {s.destino}{s.obra_nome ? ` · ${s.obra_nome}` : ''}</p>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <p className={`text-sm font-extrabold font-mono ${isDark ? 'text-white' : 'text-slate-800'}`}>{s.numero}</p>
+                        <StatusBadge status={s.status} />
+                        {s.urgente && <span className="text-[9px] bg-red-100 text-red-700 font-bold px-1.5 py-0.5 rounded-full uppercase tracking-wider">Urgente</span>}
+                        {docStatus.badge}
+                      </div>
+                      <div className="flex items-center gap-1 mt-0.5">
+                        <MapPin size={10} className={isDark ? 'text-slate-600' : 'text-slate-300'} />
+                        <p className={`text-[10px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{s.origem} → {s.destino}{s.obra_nome ? ` · ${s.obra_nome}` : ''}</p>
+                      </div>
                     </div>
+                    <div className="text-right shrink-0 mr-2">
+                      {docStatus.rightInfo}
+                    </div>
+                    <ChevronDown size={16} className={`text-slate-400 shrink-0 transition-transform duration-200 ${isExp ? 'rotate-180' : ''}`} />
                   </div>
-                  <div className="text-right shrink-0 mr-2">
-                    {docStatus.rightInfo}
-                  </div>
-                  <ChevronDown size={16} className={`text-slate-400 shrink-0 transition-transform duration-200 ${isExp ? 'rotate-180' : ''}`} />
-                </div>
 
-                {/* ── Expanded detail ── */}
-                {isExp && (
-                  <ExpedicaoDetail
-                    solicitacao={s}
-                    onEmitirRomaneio={() => setRomaneioModal(s)}
-                    onSolicitarNF={() => openNfModal(s)}
-                    onCancelarNFe={nfeId => cancelarNFe.mutate({ id: nfeId, motivo: 'Cancelamento pela expedição', solicitacao_id: s.id })}
-                    cancelandoNFe={cancelarNFe.isPending}
-                    onDespachar={() => {
-                      setDespachoModal(s.id)
-                      setDespachoForm({
-                        solicitacao_id: s.id,
-                        placa: s.veiculo_placa ?? '',
-                        motorista_nome: s.motorista_nome ?? '',
-                        motorista_telefone: s.motorista_telefone ?? '',
-                      })
-                    }}
-                  />
-                )}
-              </div>
-            )
-          })}
+                  {/* ── Expanded detail ── */}
+                  {isExp && (
+                    <ExpedicaoDetail
+                      solicitacao={s}
+                      onEmitirRomaneio={() => setRomaneioModal(s)}
+                      onSolicitarNF={() => openNfModal(s)}
+                      onCancelarNFe={nfeId => cancelarNFe.mutate({ id: nfeId, motivo: 'Cancelamento pela expedição', solicitacao_id: s.id })}
+                      cancelandoNFe={cancelarNFe.isPending}
+                      onDespachar={() => {
+                        setDespachoModal(s.id)
+                        setDespachoForm({
+                          solicitacao_id: s.id,
+                          placa: s.veiculo_placa ?? '',
+                          motorista_nome: s.motorista_nome ?? '',
+                          motorista_telefone: s.motorista_telefone ?? '',
+                        })
+                      }}
+                    />
+                  )}
+                </div>
+              )
+            })()
+          ))}
         </div>
       )}
 
@@ -635,6 +738,86 @@ export default function Expedicao() {
           </div>
         </div>
       )}
+
+      {/* ═══════════════════════════════════════════════════════════════════════ */}
+      {/*  MODAL: Despacho Viagem                                              */}
+      {/* ═══════════════════════════════════════════════════════════════════════ */}
+      {despachoViagemModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className={`rounded-2xl shadow-2xl w-full max-w-md ${isDark ? 'bg-[#1e293b]' : 'bg-white'}`}>
+            <div className={`flex items-center justify-between px-6 py-4 ${isDark ? 'border-b border-white/[0.06]' : 'border-b border-slate-100'}`}>
+              <div className="flex items-center gap-2">
+                <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${isDark ? 'bg-orange-500/10' : 'bg-orange-50'}`}>
+                  <Route size={16} className="text-orange-600" />
+                </div>
+                <div>
+                  <h2 className={`text-lg font-extrabold ${isDark ? 'text-white' : 'text-slate-800'}`}>Despachar Viagem</h2>
+                  <p className={`text-[10px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{despachoViagemModal.solicitacoes.length} solicitações nesta viagem</p>
+                </div>
+              </div>
+              <button onClick={() => setDespachoViagemModal(null)}
+                className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors ${isDark ? 'hover:bg-white/10 text-slate-400' : 'hover:bg-slate-100'}`}>
+                <X size={16} />
+              </button>
+            </div>
+            <div className="p-6 space-y-4">
+              {/* Solicitações included */}
+              <div className={`rounded-xl px-3 py-2.5 ${isDark ? 'bg-orange-500/10 border border-orange-500/20' : 'bg-orange-50 border border-orange-200'}`}>
+                <p className={`text-[10px] font-bold mb-1 ${isDark ? 'text-orange-400' : 'text-orange-700'}`}>Solicitações incluídas:</p>
+                {despachoViagemModal.solicitacoes.map(s => (
+                  <p key={s.id} className={`text-[10px] ${isDark ? 'text-orange-300' : 'text-orange-600'}`}>
+                    {s.numero} — {s.origem} → {s.destino}
+                  </p>
+                ))}
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className={`block text-xs font-bold mb-1 ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>Placa *</label>
+                  <input value={despachoViagemForm.placa} onChange={e => setDespachoViagemForm(p => ({ ...p, placa: e.target.value }))}
+                    className="input-base" placeholder="ABC-1234" />
+                </div>
+                <div>
+                  <label className={`block text-xs font-bold mb-1 ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>Motorista *</label>
+                  <input value={despachoViagemForm.motorista_nome} onChange={e => setDespachoViagemForm(p => ({ ...p, motorista_nome: e.target.value }))}
+                    className="input-base" placeholder="Nome do motorista" />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className={`block text-xs font-bold mb-1 ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>Tel. Motorista</label>
+                  <input value={despachoViagemForm.motorista_telefone} onChange={e => setDespachoViagemForm(p => ({ ...p, motorista_telefone: e.target.value }))}
+                    className="input-base" placeholder="(34) 99999-0000" />
+                </div>
+                <div>
+                  <label className={`block text-xs font-bold mb-1 ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>ETA Previsto *</label>
+                  <input type="datetime-local" value={despachoViagemForm.eta_original}
+                    onChange={e => setDespachoViagemForm(p => ({ ...p, eta_original: e.target.value }))}
+                    className="input-base" />
+                </div>
+              </div>
+              <div>
+                <label className={`block text-xs font-bold mb-1 ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>Código Rastreio</label>
+                <input value={despachoViagemForm.codigo_rastreio} onChange={e => setDespachoViagemForm(p => ({ ...p, codigo_rastreio: e.target.value }))}
+                  className="input-base" placeholder="Código da transportadora..." />
+              </div>
+            </div>
+            <div className={`px-6 py-4 flex justify-end gap-2 ${isDark ? 'border-t border-white/[0.06]' : 'border-t border-slate-100'}`}>
+              <button onClick={() => setDespachoViagemModal(null)}
+                className={`px-4 py-2 rounded-xl text-sm font-semibold transition-colors ${isDark ? 'border border-white/[0.06] text-slate-400 hover:bg-white/5' : 'border border-slate-200 text-slate-600 hover:bg-slate-50'}`}>
+                Cancelar
+              </button>
+              <button onClick={handleDespacharViagem}
+                disabled={despacharViagem.isPending || !despachoViagemForm.placa || !despachoViagemForm.motorista_nome || !despachoViagemForm.eta_original}
+                className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-orange-600 hover:bg-orange-700
+                  text-white text-sm font-semibold transition-all disabled:opacity-60 active:scale-[0.98]">
+                {despacharViagem.isPending ? <Loader2 size={14} className="animate-spin" /> : <Route size={14} />}
+                Despachar Viagem
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
@@ -726,6 +909,134 @@ function InfoField({ label, value }: { label: string; value?: string | null }) {
     <div>
       <p className={`text-[10px] font-bold uppercase tracking-wider ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{label}</p>
       <p className={`text-xs font-medium mt-0.5 ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>{value || 'N/A'}</p>
+    </div>
+  )
+}
+
+// ── Viagem grouped card for Expedição ────────────────────────────────────────
+
+function ViagemExpCard({ item, expandedId, setExpandedId, onEmitirRomaneio, onSolicitarNF, onCancelarNFe, cancelandoNFe, onDespacharSolo, onDespacharViagem, isDark }: {
+  item: { kind: 'viagem'; viagemId: string; viagem: LogSolicitacao['viagem']; solicitacoes: LogSolicitacao[] }
+  expandedId: string | null
+  setExpandedId: (id: string | null) => void
+  onEmitirRomaneio: (s: LogSolicitacao) => void
+  onSolicitarNF: (s: LogSolicitacao) => void
+  onCancelarNFe: (nfeId: string, solId: string) => void
+  cancelandoNFe: boolean
+  onDespacharSolo: (s: LogSolicitacao) => void
+  onDespacharViagem: () => void
+  isDark: boolean
+}) {
+  const v = item.viagem
+  const sols = item.solicitacoes
+
+  // Check if all solicitações have doc fiscal ready
+  const allDocReady = sols.every(s =>
+    s.status === 'romaneio_emitido' || s.status === 'nfe_emitida' ||
+    s.nfe?.status === 'autorizada'
+  )
+
+  return (
+    <div className={`rounded-2xl shadow-sm overflow-hidden transition-shadow hover:shadow-md ${isDark ? 'bg-[#1e293b] border border-white/[0.06]' : 'bg-white border border-slate-200'}`}>
+      {/* ── Viagem header ── */}
+      <div className={`px-4 py-3 ${isDark ? 'bg-indigo-500/5 border-b border-white/[0.06]' : 'bg-indigo-50/40 border-b border-slate-100'}`}>
+        <div className="flex items-center gap-3">
+          <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${isDark ? 'bg-indigo-500/10' : 'bg-indigo-100'}`}>
+            <Route size={16} className={isDark ? 'text-indigo-400' : 'text-indigo-600'} />
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
+              <p className={`text-sm font-extrabold font-mono ${isDark ? 'text-white' : 'text-slate-800'}`}>
+                {v?.numero ?? 'Viagem'}
+              </p>
+              <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full ${isDark ? 'bg-indigo-500/15 text-indigo-400 border border-indigo-500/20' : 'bg-indigo-100 text-indigo-700'}`}>
+                {sols.length} solicitações
+              </span>
+              {v?.qtd_paradas != null && v.qtd_paradas > 0 && (
+                <span className={`text-[9px] font-semibold px-1.5 py-0.5 rounded-full ${isDark ? 'bg-slate-700 text-slate-400' : 'bg-slate-100 text-slate-500'}`}>
+                  {v.qtd_paradas} parada{v.qtd_paradas > 1 ? 's' : ''}
+                </span>
+              )}
+            </div>
+            <div className="flex items-center gap-3 mt-0.5 flex-wrap">
+              <div className="flex items-center gap-1">
+                <MapPin size={10} className={isDark ? 'text-slate-600' : 'text-slate-300'} />
+                <p className={`text-[10px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+                  {v?.origem_principal ?? sols[0]?.origem} → {v?.destino_final ?? sols[sols.length - 1]?.destino}
+                </p>
+              </div>
+              {v?.motorista_nome && (
+                <p className={`text-[10px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+                  <Truck size={10} className="inline mr-0.5" />{v.motorista_nome}
+                </p>
+              )}
+              {v?.veiculo_placa && (
+                <p className={`text-[10px] font-mono ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+                  {v.veiculo_placa}
+                </p>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* ── Sub-items ── */}
+      <div className={isDark ? 'divide-y divide-white/[0.04]' : 'divide-y divide-slate-100'}>
+        {sols.map(s => {
+          const isExp = expandedId === s.id
+          const docStatus = getDocStatus(s)
+          return (
+            <div key={s.id}>
+              <div
+                className={`flex items-center gap-3 px-4 py-2.5 cursor-pointer transition-colors ${isDark ? 'hover:bg-white/[0.03]' : 'hover:bg-slate-50/60'}`}
+                onClick={() => setExpandedId(isExp ? null : s.id)}
+              >
+                <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${docStatus.iconBg}`}>
+                  {docStatus.icon}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <p className={`text-xs font-bold font-mono ${isDark ? 'text-white' : 'text-slate-800'}`}>{s.numero}</p>
+                    <StatusBadge status={s.status} />
+                    {s.urgente && <span className="text-[9px] bg-red-100 text-red-700 font-bold px-1.5 py-0.5 rounded-full uppercase tracking-wider">Urgente</span>}
+                    {docStatus.badge}
+                  </div>
+                  <div className="flex items-center gap-1 mt-0.5">
+                    <MapPin size={9} className={isDark ? 'text-slate-600' : 'text-slate-300'} />
+                    <p className={`text-[10px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{s.origem} → {s.destino}{s.obra_nome ? ` · ${s.obra_nome}` : ''}</p>
+                  </div>
+                </div>
+                <div className="text-right shrink-0 mr-2">
+                  {docStatus.rightInfo}
+                </div>
+                <ChevronDown size={14} className={`text-slate-400 shrink-0 transition-transform duration-200 ${isExp ? 'rotate-180' : ''}`} />
+              </div>
+
+              {isExp && (
+                <ExpedicaoDetail
+                  solicitacao={s}
+                  onEmitirRomaneio={() => onEmitirRomaneio(s)}
+                  onSolicitarNF={() => onSolicitarNF(s)}
+                  onCancelarNFe={nfeId => onCancelarNFe(nfeId, s.id)}
+                  cancelandoNFe={cancelandoNFe}
+                  onDespachar={() => onDespacharSolo(s)}
+                />
+              )}
+            </div>
+          )
+        })}
+      </div>
+
+      {/* ── Group action: Despachar Viagem ── */}
+      {allDocReady && (
+        <div className={`px-4 py-3 flex items-center justify-end gap-2 ${isDark ? 'border-t border-white/[0.06] bg-white/[0.02]' : 'border-t border-slate-100 bg-slate-50/40'}`}>
+          <button onClick={onDespacharViagem}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-orange-600 hover:bg-orange-700
+              text-white text-xs font-semibold transition-all active:scale-[0.97]">
+            <Route size={12} /> Despachar Viagem ({sols.length} solicitações)
+          </button>
+        </div>
+      )}
     </div>
   )
 }
