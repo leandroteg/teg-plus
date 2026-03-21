@@ -349,6 +349,172 @@ function DetailModal({ sol, onClose, onAction, isDark }: {
   )
 }
 
+// ── Viagem Detail Modal ──────────────────────────────────────────────────────
+
+function ViagemDetailModal({ item, onClose, onAction, onEdit, isDark }: {
+  item: Extract<DisplayItem, { kind: 'viagem' }>
+  onClose: () => void
+  onAction: (action: string, sols: LogSolicitacao[]) => void
+  onEdit: () => void
+  isDark: boolean
+}) {
+  const v = item.viagem
+  const sols = item.solicitacoes
+  const bg = isDark ? 'bg-[#1e293b]' : 'bg-white'
+  const cardBg = isDark ? 'bg-white/[0.04]' : 'bg-slate-50'
+  const borderSub = isDark ? 'border-white/[0.06]' : 'border-slate-200'
+  const txtMuted = isDark ? 'text-slate-400' : 'text-slate-400'
+  const txtMain = isDark ? 'text-white' : 'text-slate-800'
+  const fmtCurrency = (val: number) => val.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
+  const hasUrgent = sols.some(s => s.urgente)
+  const status = sols[0]?.status || 'planejado'
+  const origemPrincipal = v?.origem_principal || sols[0]?.origem || '—'
+  const destinoFinal = v?.destino_final || sols[sols.length - 1]?.destino || '—'
+  const pesoTotal = sols.reduce((acc, s) => acc + (s.peso_total_kg || 0), 0)
+  const volumesTotal = sols.reduce((acc, s) => acc + (s.volumes_total || 0), 0)
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-sm p-4" onClick={onClose}>
+      <div className={`rounded-2xl shadow-2xl w-full max-w-lg max-h-[85vh] overflow-y-auto ${bg}`} onClick={e => e.stopPropagation()}>
+        {/* Header */}
+        <div className={`flex items-center justify-between px-5 py-4 border-b sticky top-0 z-10 ${isDark ? 'border-white/[0.06] bg-[#1e293b]' : 'border-slate-100 bg-white'} rounded-t-2xl`}>
+          <div className="flex items-center gap-2 min-w-0">
+            <Route size={18} className="text-orange-600 shrink-0" />
+            <h3 className={`text-base font-bold truncate ${txtMain}`}>{v?.numero || 'Viagem'}</h3>
+            <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${isDark ? 'bg-orange-500/20 text-orange-300' : 'bg-orange-100 text-orange-700'}`}>
+              {sols.length} {sols.length === 1 ? 'parada' : 'paradas'}
+            </span>
+            {hasUrgent && <span className="text-[10px] font-bold text-red-500 bg-red-50 px-2 py-0.5 rounded-full">URGENTE</span>}
+          </div>
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-600 shrink-0"><X size={18} /></button>
+        </div>
+
+        <div className="p-5 space-y-4">
+          {/* Rota principal */}
+          <div className={`${cardBg} rounded-xl p-3.5`}>
+            <div className="flex items-center gap-2 mb-2">
+              <MapPin size={14} className="text-orange-600" />
+              <span className={`text-xs font-bold ${isDark ? 'text-orange-400' : 'text-orange-700'}`}>Rota da Viagem</span>
+            </div>
+            <div className="flex items-center gap-2 text-sm">
+              <span className={`font-semibold ${txtMain}`}>{origemPrincipal}</span>
+              <span className="text-orange-400">→</span>
+              <span className={`font-semibold ${txtMain}`}>{destinoFinal}</span>
+            </div>
+            {(v?.distancia_total_km || v?.tempo_estimado_h) && (
+              <div className="flex gap-3 mt-1.5">
+                {v?.distancia_total_km != null && <span className="text-xs text-orange-600 font-medium">{Number(v.distancia_total_km).toFixed(0)} km</span>}
+                {v?.tempo_estimado_h != null && <span className="text-xs text-orange-600 font-medium">{Number(v.tempo_estimado_h).toFixed(1)}h estimadas</span>}
+              </div>
+            )}
+          </div>
+
+          {/* Roteiro de entregas */}
+          <div className={`border ${borderSub} rounded-xl overflow-hidden`}>
+            <div className={`${cardBg} px-3.5 py-2 border-b ${borderSub} flex items-center justify-between`}>
+              <span className={`text-xs font-bold ${txtMuted}`}>Roteiro de Entregas</span>
+              <div className={`flex gap-2 text-[10px] ${txtMuted}`}>
+                {pesoTotal > 0 && <span>{pesoTotal.toLocaleString('pt-BR')} kg</span>}
+                {volumesTotal > 0 && <span>· {volumesTotal} vol.</span>}
+              </div>
+            </div>
+            <div className={`divide-y ${isDark ? 'divide-white/[0.04]' : 'divide-slate-100'}`}>
+              {sols.map((s, i) => (
+                <div key={s.id} className="px-3.5 py-2.5">
+                  <div className="flex items-center justify-between mb-1">
+                    <div className="flex items-center gap-2">
+                      <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold ${isDark ? 'bg-orange-500/20 text-orange-400' : 'bg-orange-100 text-orange-700'}`}>
+                        {s.ordem_na_viagem ?? i + 1}
+                      </div>
+                      <span className={`text-[11px] font-mono font-bold ${isDark ? 'text-orange-400/80' : 'text-orange-600'}`}>{s.numero}</span>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      {s.urgente && <span className="text-[9px] bg-red-100 text-red-700 px-1.5 py-0.5 rounded font-bold">URGENTE</span>}
+                    </div>
+                  </div>
+                  <div className={`flex items-center gap-1 text-xs ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
+                    <span>{s.origem}</span> <span className="text-orange-400">→</span> <span>{s.destino}</span>
+                  </div>
+                  <div className={`flex flex-wrap gap-x-3 gap-y-0.5 mt-1 text-[10px] ${txtMuted}`}>
+                    {s.obra_nome && <span>🏗️ {s.obra_nome}</span>}
+                    {s.solicitante_nome && <span>👤 {s.solicitante_nome}</span>}
+                    {s.centro_custo && <span>💼 {s.centro_custo}</span>}
+                    {s.peso_total_kg != null && s.peso_total_kg > 0 && <span>{s.peso_total_kg.toLocaleString('pt-BR')} kg</span>}
+                    {s.volumes_total != null && s.volumes_total > 0 && <span>{s.volumes_total} vol.</span>}
+                  </div>
+                  {s.descricao && <p className={`text-[10px] ${txtMuted} italic mt-0.5 line-clamp-1`}>{s.descricao}</p>}
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Planejamento logístico */}
+          {(sols[0]?.modal || sols[0]?.motorista_nome || sols[0]?.veiculo_placa || sols[0]?.data_prevista_saida) && (
+            <div className={`${isDark ? 'bg-blue-500/10' : 'bg-blue-50'} border ${isDark ? 'border-blue-500/20' : 'border-blue-200'} rounded-xl p-3.5 space-y-1.5`}>
+              <div className="flex items-center gap-2 mb-1">
+                <Truck size={13} className={`${isDark ? 'text-blue-400' : 'text-blue-600'}`} />
+                <span className={`text-[10px] font-bold uppercase tracking-wider ${isDark ? 'text-blue-400' : 'text-blue-700'}`}>Planejamento Logístico</span>
+              </div>
+              {sols[0]?.data_prevista_saida && (
+                <div className="flex justify-between text-xs">
+                  <span className={`${isDark ? 'text-blue-400/70' : 'text-blue-500'}`}>Data/Hora Saída</span>
+                  <span className={`font-medium ${isDark ? 'text-blue-300' : 'text-blue-800'}`}>{new Date(sols[0].data_prevista_saida).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' })}</span>
+                </div>
+              )}
+              {sols[0]?.modal && (
+                <div className="flex justify-between text-xs">
+                  <span className={`${isDark ? 'text-blue-400/70' : 'text-blue-500'}`}>Modal</span>
+                  <span className={`font-medium capitalize ${isDark ? 'text-blue-300' : 'text-blue-800'}`}>{sols[0].modal.replace(/_/g, ' ')}</span>
+                </div>
+              )}
+              {sols[0]?.motorista_nome && (
+                <div className="flex justify-between text-xs">
+                  <span className={`${isDark ? 'text-blue-400/70' : 'text-blue-500'}`}>Motorista</span>
+                  <span className={`font-medium ${isDark ? 'text-blue-300' : 'text-blue-800'}`}>{sols[0].motorista_nome}</span>
+                </div>
+              )}
+              {sols[0]?.veiculo_placa && (
+                <div className="flex justify-between text-xs">
+                  <span className={`${isDark ? 'text-blue-400/70' : 'text-blue-500'}`}>Veículo</span>
+                  <span className={`font-mono font-bold ${isDark ? 'text-blue-300' : 'text-blue-800'}`}>{sols[0].veiculo_placa}</span>
+                </div>
+              )}
+              {v?.custo_total != null && Number(v.custo_total) > 0 && (
+                <div className="flex justify-between text-xs pt-1 border-t border-blue-200/30">
+                  <span className={`${isDark ? 'text-blue-400/70' : 'text-blue-500'}`}>Custo Total</span>
+                  <span className={`font-bold ${isDark ? 'text-blue-300' : 'text-blue-800'}`}>{fmtCurrency(Number(v.custo_total))}</span>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Botões de ação */}
+          <div className="flex gap-2 pt-1">
+            <button onClick={onClose} className={`flex-1 py-3 rounded-xl border text-sm font-semibold transition-all ${isDark ? 'border-white/[0.06] text-slate-300' : 'border-slate-200 text-slate-600 hover:bg-slate-50'}`}>
+              Fechar
+            </button>
+            {status === 'planejado' && (
+              <>
+                <button onClick={() => { onClose(); onEdit() }} className={`py-3 px-4 rounded-xl border text-sm font-semibold transition-all flex items-center gap-1.5 ${isDark ? 'border-white/[0.06] text-violet-400 hover:bg-violet-500/10' : 'border-violet-200 text-violet-600 hover:bg-violet-50'}`}>
+                  <FileText size={14} /> Editar
+                </button>
+                <button onClick={() => onAction('enviarAprovacao', sols)} className="flex-1 py-3 rounded-xl bg-amber-600 text-white text-sm font-bold hover:bg-amber-700 transition-all flex items-center justify-center gap-2">
+                  <ShieldCheck size={15} /> Enviar p/ Aprovação
+                </button>
+              </>
+            )}
+            {status === 'aguardando_aprovacao' && (
+              <button onClick={() => onAction('aprovar', sols)} className="flex-1 py-3 rounded-xl bg-emerald-600 text-white text-sm font-bold hover:bg-emerald-700 transition-all flex items-center justify-center gap-2">
+                <CheckCircle2 size={15} /> Aprovar
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ── Row (compact table row) ──────────────────────────────────────────────────
 
 function SolRow({ sol, onClick, isDark, isSelected, onSelect }: {
@@ -454,9 +620,10 @@ type DisplayItem =
   | { kind: 'solo'; sol: LogSolicitacao }
   | { kind: 'viagem'; viagemId: string; viagem: LogSolicitacao['viagem']; solicitacoes: LogSolicitacao[] }
 
-function ViagemCard({ item, onClick, isDark, selectedIds, onToggleViagem, onEditViagem }: {
+function ViagemCard({ item, onClick, onOpenDetail, isDark, selectedIds, onToggleViagem, onEditViagem }: {
   item: Extract<DisplayItem, { kind: 'viagem' }>
   onClick: (sol: LogSolicitacao) => void
+  onOpenDetail: (item: Extract<DisplayItem, { kind: 'viagem' }>) => void
   isDark: boolean
   selectedIds: Set<string>
   onToggleViagem: (ids: string[]) => void
@@ -476,8 +643,9 @@ function ViagemCard({ item, onClick, isDark, selectedIds, onToggleViagem, onEdit
         ? `border-white/[0.06] ${allSelected ? 'bg-orange-500/10 border-orange-500/30' : 'bg-white/[0.02]'}`
         : `border-orange-200 ${allSelected ? 'bg-orange-50 border-orange-300' : 'bg-white'}`
     }`}>
-      {/* Header da viagem */}
-      <div className={`px-4 py-2.5 flex items-center gap-3 ${isDark ? 'bg-orange-500/10' : 'bg-gradient-to-r from-orange-50 to-amber-50'}`}>
+      {/* Header da viagem — clicável para abrir detalhes */}
+      <div className={`px-4 py-2.5 flex items-center gap-3 cursor-pointer ${isDark ? 'bg-orange-500/10 hover:bg-orange-500/15' : 'bg-gradient-to-r from-orange-50 to-amber-50 hover:from-orange-100 hover:to-amber-100'} transition-all`}
+        onClick={() => onOpenDetail(item)}>
         <input type="checkbox" checked={allSelected}
           onChange={e => { e.stopPropagation(); onToggleViagem(allIds) }}
           className="w-3.5 h-3.5 rounded border-slate-300 text-orange-600 focus:ring-orange-500 shrink-0" />
@@ -947,6 +1115,7 @@ export default function SolicitacoesPipeline() {
   const [showNovaSolicitacao, setShowNovaSolicitacao] = useState(false)
   const [showPlanejamento, setShowPlanejamento] = useState<LogSolicitacao[]>([])
   const [editandoViagemId, setEditandoViagemId] = useState<string | null>(null) // null = criando nova, string = editando existente
+  const [viagemDetail, setViagemDetail] = useState<Extract<DisplayItem, { kind: 'viagem' }> | null>(null)
 
   // Abrir modal via ?nova=1 (clique no sidebar)
   const [searchParams, setSearchParams] = useSearchParams()
@@ -1221,6 +1390,15 @@ export default function SolicitacoesPipeline() {
     }
   }
 
+  const handleViagemDetailAction = (action: string, sols: LogSolicitacao[]) => {
+    setViagemDetail(null)
+    const ids = sols.map(s => s.id)
+    switch (action) {
+      case 'enviarAprovacao': handleEnviarAprovacao(ids); break
+      case 'aprovar': handleAprovar(ids); break
+    }
+  }
+
   const handleDetailAction = (action: string, sol: LogSolicitacao) => {
     setDetail(null)
     switch (action) {
@@ -1414,7 +1592,7 @@ export default function SolicitacoesPipeline() {
             <div className="space-y-2 p-4">
               {displayItems.map(item =>
                 item.kind === 'viagem' ? (
-                  <ViagemCard key={`vg-${item.viagemId}`} item={item} onClick={sol => setDetail(sol)} isDark={isDark} selectedIds={selectedIds} onToggleViagem={toggleViagem}
+                  <ViagemCard key={`vg-${item.viagemId}`} item={item} onClick={sol => setDetail(sol)} onOpenDetail={setViagemDetail} isDark={isDark} selectedIds={selectedIds} onToggleViagem={toggleViagem}
                     onEditViagem={activeTab !== 'aguardando_aprovacao' ? handleEditViagem : undefined} />
                 ) : (
                   <SolCard key={item.sol.id} sol={item.sol} onClick={() => setDetail(item.sol)} isDark={isDark} isSelected={selectedIds.has(item.sol.id)} onSelect={toggleSelect} />
@@ -1426,6 +1604,7 @@ export default function SolicitacoesPipeline() {
       </div>
 
       {detail && <DetailModal sol={detail} onClose={() => setDetail(null)} onAction={handleDetailAction} isDark={isDark} />}
+      {viagemDetail && <ViagemDetailModal item={viagemDetail} onClose={() => setViagemDetail(null)} onAction={handleViagemDetailAction} onEdit={() => handleEditViagem(viagemDetail)} isDark={isDark} />}
       {showNovaSolicitacao && (
         <NovaSolicitacaoModal
           isDark={isDark}
