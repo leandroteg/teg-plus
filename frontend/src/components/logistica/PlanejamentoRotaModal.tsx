@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react'
 import {
   X, MapPin, Navigation, Clock, Ruler, Truck, Save, Loader2,
-  Search, Package2, Route, Plus, Trash2, GripVertical, ArrowRight,
+  Search, Package2, Route, Plus, Trash2, GripVertical, ArrowRight, ArrowUp, ArrowDown,
   Building2, ChevronDown, Zap, AlertTriangle, Calendar,
 } from 'lucide-react'
 import type { LogSolicitacao } from '../../types/logistica'
@@ -750,6 +750,17 @@ export default function PlanejamentoRotaModal({ isDark, solicitacoes, allSolicit
     })
   }
 
+  const movePonto = (from: number, to: number) => {
+    if (to < 0 || to >= pontos.length) return
+    setPontos(prev => {
+      const next = [...prev]
+      const [moved] = next.splice(from, 1)
+      next.splice(to, 0, moved)
+      return next
+    })
+    setRota(null) // Invalidar rota calculada ao reordenar
+  }
+
   const addSolicitacao = (sol: LogSolicitacao) => {
     setPontos(prev => [...prev, {
       id: sol.id,
@@ -1018,10 +1029,22 @@ export default function PlanejamentoRotaModal({ isDark, solicitacoes, allSolicit
                       )}
                     </div>
                     {pontos.length > 1 && (
-                      <button onClick={() => removePonto(idx)}
-                        className={`p-1 rounded-lg transition-all ${isDark ? 'text-slate-600 hover:text-red-400 hover:bg-red-500/10' : 'text-slate-400 hover:text-red-500 hover:bg-red-50'}`}>
-                        <Trash2 size={12} />
-                      </button>
+                      <div className="flex items-center gap-0.5">
+                        <button onClick={() => movePonto(idx, idx - 1)} disabled={idx === 0}
+                          className={`p-1 rounded-lg transition-all disabled:opacity-20 ${isDark ? 'text-slate-500 hover:text-white hover:bg-white/[0.08]' : 'text-slate-400 hover:text-slate-700 hover:bg-slate-100'}`}
+                          title="Mover para cima">
+                          <ArrowUp size={12} />
+                        </button>
+                        <button onClick={() => movePonto(idx, idx + 1)} disabled={idx === pontos.length - 1}
+                          className={`p-1 rounded-lg transition-all disabled:opacity-20 ${isDark ? 'text-slate-500 hover:text-white hover:bg-white/[0.08]' : 'text-slate-400 hover:text-slate-700 hover:bg-slate-100'}`}
+                          title="Mover para baixo">
+                          <ArrowDown size={12} />
+                        </button>
+                        <button onClick={() => removePonto(idx)}
+                          className={`p-1 rounded-lg transition-all ${isDark ? 'text-slate-600 hover:text-red-400 hover:bg-red-500/10' : 'text-slate-400 hover:text-red-500 hover:bg-red-50'}`}>
+                          <Trash2 size={12} />
+                        </button>
+                      </div>
                     )}
                   </div>
 
