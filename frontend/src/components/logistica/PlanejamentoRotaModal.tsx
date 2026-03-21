@@ -378,13 +378,16 @@ function EnderecoInput({
             placeholder="Rua, Av, Cidade... (autocomplete)"
             className={inputClass}
           />
-          <div className="absolute right-2.5 top-1/2 -translate-y-1/2 flex items-center gap-1">
+          <button type="button"
+            onClick={() => { if (value.length >= 3) buscarEndereco(value) }}
+            disabled={loading || value.length < 3}
+            className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded-lg transition-all disabled:opacity-30 hover:bg-orange-100 dark:hover:bg-orange-500/20">
             {loading ? (
               <Loader2 size={14} className="animate-spin text-orange-500" />
             ) : (
-              <Search size={13} className={isDark ? 'text-slate-600' : 'text-slate-400'} />
+              <Search size={13} className={`${isDark ? 'text-slate-500 hover:text-orange-400' : 'text-slate-400 hover:text-orange-600'} transition-colors`} />
             )}
-          </div>
+          </button>
         </div>
       ) : (
         <div className="relative">
