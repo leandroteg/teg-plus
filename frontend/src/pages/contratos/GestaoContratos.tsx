@@ -11,8 +11,8 @@ import { useContratos, useAditivos, useAtualizarAditivo, useAtualizarContrato, u
 import { useAuth } from '../../contexts/AuthContext'
 import type { Contrato } from '../../types/contratos'
 import type { StatusAditivo, TipoAditivo } from '../../types/contratos'
-import type { StatusContrato } from '../../types/contratos'
-import { GRUPO_CONTRATO_OPTIONS } from '../../constants/contratos'
+import type { StatusContrato, GrupoContrato } from '../../types/contratos'
+import { GRUPO_CONTRATO_OPTIONS, GRUPO_CONTRATO_LABEL } from '../../constants/contratos'
 
 // ── Formatters ──────────────────────────────────────────────────────────────
 const fmt = (v: number) =>
@@ -1071,10 +1071,12 @@ function TabProvisionado() {
 
 // ── Main ────────────────────────────────────────────────────────────────────
 export default function GestaoContratos() {
+  const nav = useNavigate()
   const [tab, setTab] = useState<Tab>('contratos')
   const { data: contratos = [] } = useContratos()
   const { data: aditivos = [] } = useAditivos()
   const { data: reajustes = [] } = useReajustes()
+  const { data: parcelas = [] } = useParcelas()
 
   const vigentes = contratos.filter(c => c.status === 'vigente').length
   const totalReceita = contratos
@@ -1118,6 +1120,147 @@ export default function GestaoContratos() {
           <p className="text-[10px] text-indigo-500">{reajustes.length} reajustes</p>
         </div>
       </div>
+
+      {/* ── Acompanhamento ─────────────────────────────────────────── */}
+      {tab === 'contratos' && (
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        {/* Status Distribution */}
+        <div className="bg-white rounded-2xl p-5 border border-slate-100 shadow-sm">
+          <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-4">Distribuicao por Status</h3>
+          {(() => {
+            const statusCounts = Object.entries(STATUS_CONTRATO).map(([key, cfg]) => ({
+              key, ...cfg, count: contratos.filter(c => c.status === key).length
+            })).filter(s => s.count > 0)
+            const total = contratos.length || 1
+            return (
+              <div>
+                <div className="flex h-4 rounded-full overflow-hidden mb-3">
+                  {statusCounts.map(s => (
+                    <div key={s.key} className={`${s.dot} transition-all`} style={{ width: `${(s.count / total) * 100}%` }}
+                      title={`${s.label}: ${s.count}`} />
+                  ))}
+                </div>
+                <div className="flex flex-wrap gap-3">
+                  {statusCounts.map(s => (
+                    <div key={s.key} className="flex items-center gap-1.5 text-xs text-slate-600">
+                      <span className={`w-2.5 h-2.5 rounded-full ${s.dot}`} />
+                      {s.label} <span className="font-bold">{s.count}</span>
+                      <span className="text-slate-400">({Math.round((s.count / total) * 100)}%)</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )
+          })()}
+        </div>
+
+        {/* Proximos Vencimentos */}
+        <div className="bg-white rounded-2xl p-5 border border-slate-100 shadow-sm">
+          <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-4">Proximos Vencimentos</h3>
+          {(() => {
+            const hoje = new Date()
+            const proximos = contratos
+              .filter(c => c.status === 'vigente' && c.data_fim_previsto)
+              .map(c => {
+                const fim = new Date(c.data_fim_previsto + 'T00:00:00')
+                const dias = Math.ceil((fim.getTime() - hoje.getTime()) / (1000 * 60 * 60 * 24))
+                return { ...c, diasRestantes: dias }
+              })
+              .sort((a, b) => a.diasRestantes - b.diasRestantes)
+              .slice(0, 5)
+            if (!proximos.length) return <p className="text-sm text-slate-400">Nenhum contrato vigente com data de vencimento</p>
+            return (
+              <div className="space-y-2">
+                {proximos.map(c => (
+                  <div key={c.id} className="flex items-center justify-between py-2 px-3 rounded-xl bg-slate-50 hover:bg-slate-100 transition-colors cursor-pointer"
+                    onClick={() => nav(`/contratos/previsao?contrato=${c.id}`)}>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-medium text-slate-800 truncate">{c.objeto}</p>
+                      <p className="text-xs text-slate-500">{c.numero}</p>
+                    </div>
+                    <span className={`ml-3 px-2.5 py-1 rounded-lg text-xs font-bold whitespace-nowrap ${
+                      c.diasRestantes < 0 ? 'bg-red-100 text-red-700' :
+                      c.diasRestantes < 30 ? 'bg-red-100 text-red-700' :
+                      c.diasRestantes < 90 ? 'bg-amber-100 text-amber-700' :
+                      'bg-emerald-100 text-emerald-700'
+                    }`}>
+                      {c.diasRestantes < 0 ? `${Math.abs(c.diasRestantes)}d vencido` : `${c.diasRestantes}d`}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )
+          })()}
+        </div>
+
+        {/* Alertas Ativos — full width */}
+        <div className="lg:col-span-2">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            {(() => {
+              const hoje = new Date()
+              const suspensos = contratos.filter(c => c.status === 'suspenso').length
+              const vencendo30d = contratos.filter(c => {
+                if (c.status !== 'vigente' || !c.data_fim_previsto) return false
+                const dias = Math.ceil((new Date(c.data_fim_previsto + 'T00:00:00').getTime() - hoje.getTime()) / (1000*60*60*24))
+                return dias >= 0 && dias <= 30
+              }).length
+              const aditivosPendentes = (aditivos || []).filter((a: any) => a.status === 'em_aprovacao').length
+              const parcelasAtrasadas = (parcelas || []).filter((p: any) => {
+                if (p.status === 'pago' || p.status === 'cancelado') return false
+                return new Date(p.data_vencimento + 'T00:00:00') < hoje
+              }).length
+
+              const alerts = [
+                { label: 'Suspensos', count: suspensos, Icon: AlertTriangle, bg: 'bg-orange-50', border: 'border-orange-200', text: 'text-orange-700' },
+                { label: 'Vencendo em 30d', count: vencendo30d, Icon: Clock, bg: 'bg-red-50', border: 'border-red-200', text: 'text-red-700' },
+                { label: 'Aditivos Pendentes', count: aditivosPendentes, Icon: FileSignature, bg: 'bg-amber-50', border: 'border-amber-200', text: 'text-amber-700' },
+                { label: 'Parcelas Atrasadas', count: parcelasAtrasadas, Icon: Banknote, bg: 'bg-red-50', border: 'border-red-200', text: 'text-red-700' },
+              ]
+              return alerts.map(a => (
+                <div key={a.label} className={`${a.bg} border ${a.border} rounded-2xl p-4 text-center`}>
+                  <div className="flex justify-center mb-1">
+                    <a.Icon size={20} className={a.text} />
+                  </div>
+                  <p className={`text-2xl font-black ${a.text}`}>{a.count}</p>
+                  <p className={`text-xs font-medium ${a.text} opacity-80`}>{a.label}</p>
+                </div>
+              ))
+            })()}
+          </div>
+        </div>
+
+        {/* Distribuicao por Grupo — full width */}
+        <div className="lg:col-span-2 bg-white rounded-2xl p-5 border border-slate-100 shadow-sm">
+          <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-4">Por Tipo de Contrato</h3>
+          {(() => {
+            const grupos = contratos.reduce((acc: Record<string, number>, c) => {
+              const g = c.grupo_contrato || 'outro'
+              acc[g] = (acc[g] || 0) + 1
+              return acc
+            }, {})
+            const sorted = Object.entries(grupos).sort((a, b) => b[1] - a[1])
+            const maxCount = Math.max(...sorted.map(([, v]) => v), 1)
+            if (!sorted.length) return <p className="text-sm text-slate-400">Nenhum contrato cadastrado</p>
+            return (
+              <div className="space-y-2">
+                {sorted.map(([grupo, count]) => (
+                  <div key={grupo} className="flex items-center gap-3">
+                    <span className="text-xs text-slate-600 w-48 truncate text-right">
+                      {GRUPO_CONTRATO_LABEL[grupo as GrupoContrato] ?? grupo}
+                    </span>
+                    <div className="flex-1 h-5 bg-slate-100 rounded-full overflow-hidden">
+                      <div className="h-full bg-gradient-to-r from-indigo-400 to-violet-500 rounded-full transition-all"
+                        style={{ width: `${(count / maxCount) * 100}%` }} />
+                    </div>
+                    <span className="text-xs font-bold text-slate-700 w-8 text-right">{count}</span>
+                  </div>
+                ))}
+              </div>
+            )
+          })()}
+        </div>
+      </div>
+      )}
 
       {/* Tabs */}
       <div className="flex items-center gap-1 overflow-x-auto hide-scrollbar pb-0.5">
