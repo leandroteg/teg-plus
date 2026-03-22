@@ -2,17 +2,59 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import type { AprovacaoPendente, AprovacaoHistorico, TipoAprovacao } from '../types'
 import { supabase } from '../services/supabase'
 import { api } from '../services/api'
+import { useAuth } from '../contexts/AuthContext'
+import type { Perfil } from '../contexts/AuthContext'
 // Tabelas: apr_aprovacoes (modulo Aprovacoes -- AprovAi)
 // NOTE: apr_aprovacoes.entidade_id NAO tem FK para cmp_requisicoes (design generico).
 // Por isso NAO usamos PostgREST join -- fazemos duas queries separadas.
 const TABLE_APR = 'apr_aprovacoes'
 const TABLE_REQ = 'cmp_requisicoes'
 
+// Mapeamento modulo apr → chave modulos do perfil
+const MODULO_MAP: Record<string, string> = {
+  cmp: 'compras',
+  fin: 'financeiro',
+  con: 'contratos',
+  log: 'logistica',
+  est: 'estoque',
+  fro: 'frotas',
+  fis: 'fiscal',
+}
+
+// Filtra aprovações baseado no perfil do usuário
+function filtrarPorPermissao(items: AprovacaoPendente[], perfil: Perfil | null): AprovacaoPendente[] {
+  if (!perfil) return []
+  // Administrador vê tudo
+  if (perfil.role === 'administrador') return items
+  // Visitante não vê nada
+  if (perfil.role === 'visitante') return []
+
+  const modulosUsuario = perfil.modulos ?? {}
+  const email = perfil.email?.toLowerCase() ?? ''
+
+  return items.filter(a => {
+    const apr = a as unknown as Record<string, unknown>
+    const modulo = (apr.modulo as string) ?? ''
+    const aprovadorEmail = ((apr.aprovador_email as string) ?? '').toLowerCase()
+
+    // Requisitante: só vê aprovações endereçadas a ele
+    if (perfil.role === 'requisitante') {
+      return aprovadorEmail === email
+    }
+
+    // Gestor/Diretor: vê aprovações dos módulos que tem acesso
+    const moduloKey = MODULO_MAP[modulo] ?? modulo
+    if (!moduloKey) return true // sem módulo definido → mostra
+    return modulosUsuario[moduloKey] === true
+  })
+}
+
 // ── Aprovacoes Pendentes (multi-tipo) ──────────────────────────────────────────
 
 export function useAprovacoesPendentes(tipo?: TipoAprovacao) {
+  const { perfil } = useAuth()
   return useQuery<AprovacaoPendente[]>({
-    queryKey: ['aprovacoes-pendentes', tipo],
+    queryKey: ['aprovacoes-pendentes', tipo, perfil?.role, perfil?.email],
     queryFn: async () => {
       // Aprovações de pagamento são criadas APENAS via Lotes (useEnviarLoteAprovacao)
       // Não há mais sync automático de CPs individuais.
@@ -323,7 +365,7 @@ export function useAprovacoesPendentes(tipo?: TipoAprovacao) {
       }
 
       // 6. Mescla aprovacoes com dados da requisicao/contrato/CP + cotacao
-      return aprData
+      const result = aprData
         .map(a => {
           let requisicao: Record<string, unknown>
           const req = reqMap.get(a.entidade_id)
@@ -634,6 +676,9 @@ export function useAprovacoesPendentes(tipo?: TipoAprovacao) {
           } as unknown as AprovacaoPendente
         })
         .filter((a): a is AprovacaoPendente => a !== null)
+
+      // Filtra por permissão do usuário logado
+      return filtrarPorPermissao(result, perfil)
     },
     refetchInterval: 15_000,
     refetchOnMount: 'always',
