@@ -11,9 +11,10 @@ import { useLookupCentrosCusto, useLookupClassesFinanceiras } from '../../hooks/
 import { useCriarSolicitacao } from '../../hooks/useSolicitacoes'
 import { api } from '../../services/api'
 import type {
-  TipoContraparte, TipoContratoV2, CategoriaContrato,
+  TipoContraparte, TipoContratoV2, CategoriaContrato, GrupoContrato,
   UrgenciaSolicitacao, NovaSolicitacaoPayload, TipoSolicitacao,
 } from '../../types/contratos'
+import { GRUPO_CONTRATO_OPTIONS } from '../../constants/contratos'
 
 // ── CNPJ helpers ──────────────────────────────────────────────────────────────
 
@@ -58,35 +59,7 @@ const TIPO_CONTRATO_OPTIONS: { value: TipoContratoV2; label: string }[] = [
   { value: 'pj',      label: 'PJ (Prestador)' },
 ]
 
-const CATEGORIA_OPTIONS: { value: CategoriaContrato; label: string }[] = [
-  { value: 'alimentacao_restaurante',  label: 'Alimentação / Restaurante' },
-  { value: 'aquisicao_equipamentos',   label: 'Aquisição de Equipamentos' },
-  { value: 'aquisicao_ferramental',    label: 'Aquisição de Ferramental' },
-  { value: 'aquisicao_imovel',         label: 'Aquisição de Imóvel' },
-  { value: 'aquisicao_veiculos',       label: 'Aquisição de Veículos' },
-  { value: 'arrendamento_comodato',    label: 'Arrendamento / Comodato' },
-  { value: 'contabilidade',            label: 'Contabilidade' },
-  { value: 'frete_transportes',        label: 'Frete / Transportes' },
-  { value: 'hospedagem',               label: 'Hospedagem' },
-  { value: 'internet_telefonia',       label: 'Internet e Telefonia' },
-  { value: 'juridico_advocacia',       label: 'Jurídico / Advocacia' },
-  { value: 'locacao_equipamentos',     label: 'Locação de Equipamentos' },
-  { value: 'locacao_ferramental',      label: 'Locação de Ferramental' },
-  { value: 'locacao_imovel_alojamento', label: 'Locação de Imóvel - Alojamento' },
-  { value: 'locacao_imovel_canteiro',  label: 'Locação de Imóvel - Canteiro de Obras' },
-  { value: 'locacao_imovel_deposito',  label: 'Locação de Imóvel - Depósito' },
-  { value: 'locacao_veiculos',         label: 'Locação de Veículos' },
-  { value: 'prestacao_servico',        label: 'Prestação de Serviços - Terceiros' },
-  { value: 'seguros',                  label: 'Seguros' },
-  { value: 'servicos_medicos',         label: 'Serviços Médicos' },
-  { value: 'software_ti',             label: 'Software e TI' },
-  { value: 'subcontratacao',          label: 'Subcontratação de Empresas' },
-  { value: 'vigilancia_monitoramento', label: 'Vigilância e Monitoramento' },
-  { value: 'empreitada',              label: 'Empreitada' },
-  { value: 'consultoria',             label: 'Consultoria' },
-  { value: 'pj_pessoa_fisica',        label: 'PJ Pessoa Física' },
-  { value: 'outro',                   label: 'Outro' },
-]
+// CATEGORIA_OPTIONS removido — usar GRUPO_CONTRATO_OPTIONS de constants/contratos
 
 const URGENCIA_OPTIONS: { value: UrgenciaSolicitacao; label: string; color: string; prazo: string }[] = [
   { value: 'critica', label: 'Urgente',     color: 'border-red-500 bg-red-50 text-red-700',       prazo: 'até 7 dias' },
@@ -237,7 +210,8 @@ export default function NovaSolicitacao() {
   const [fornecedorCadastrado, setFornecedorCadastrado] = useState('')
   const [contratoVigente, setContratoVigente] = useState('')
   const [tipoContrato, setTipoContrato] = useState<TipoContratoV2>('despesa')
-  const [categoriaContrato, setCategoriaContrato] = useState<CategoriaContrato>('prestacao_servico')
+  const [grupoContrato, setGrupoContrato] = useState<GrupoContrato>('prestacao_servicos')
+  const [subtipoContrato, setSubtipoContrato] = useState<string>('')
   const [objeto, setObjeto] = useState('')
   const [justificativa, setJustificativa] = useState('')
   const [valorEstimadoDisplay, setValorEstimadoDisplay] = useState('')
@@ -386,7 +360,9 @@ export default function NovaSolicitacao() {
     contrato_vigente_fornecedor: contratoVigente || undefined,
     responsavel_aprovacao: responsavelAprovacao.trim() || undefined,
     tipo_contrato: tipoContrato,
-    categoria_contrato: categoriaContrato,
+    grupo_contrato: grupoContrato,
+    subtipo_contrato: subtipoContrato || null,
+    categoria_contrato: grupoContrato as unknown as CategoriaContrato, // backward compat
     objeto: objeto.trim(),
     descricao_escopo: descricaoEscopo.trim() || undefined,
     justificativa: justificativa.trim() || undefined,
@@ -611,17 +587,39 @@ export default function NovaSolicitacao() {
               </select>
             </div>
             <div>
-              <label className={labelClass}>Categoria *</label>
+              <label className={labelClass}>Grupo de Contrato *</label>
               <select
-                value={categoriaContrato}
-                onChange={e => setCategoriaContrato(e.target.value as CategoriaContrato)}
+                value={grupoContrato}
+                onChange={e => {
+                  setGrupoContrato(e.target.value as GrupoContrato)
+                  setSubtipoContrato('')
+                }}
                 className={inputClass}
               >
-                {CATEGORIA_OPTIONS.map(o => (
+                {GRUPO_CONTRATO_OPTIONS.map(o => (
                   <option key={o.value} value={o.value}>{o.label}</option>
                 ))}
               </select>
             </div>
+            {(() => {
+              const grupo = GRUPO_CONTRATO_OPTIONS.find(o => o.value === grupoContrato)
+              if (!grupo?.subtipos?.length) return null
+              return (
+                <div>
+                  <label className={labelClass}>Subtipo</label>
+                  <select
+                    value={subtipoContrato}
+                    onChange={e => setSubtipoContrato(e.target.value)}
+                    className={inputClass}
+                  >
+                    <option value="">Selecione o subtipo</option>
+                    {grupo.subtipos.map(s => (
+                      <option key={s.value} value={s.value}>{s.label}</option>
+                    ))}
+                  </select>
+                </div>
+              )
+            })()}
           </div>
 
           {/* Tipo Contraparte */}

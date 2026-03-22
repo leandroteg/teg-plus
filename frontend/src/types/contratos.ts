@@ -514,6 +514,8 @@ export interface NovaSolicitacaoPayload {
   responsavel_aprovacao?: string
   tipo_contrato: TipoContratoV2
   categoria_contrato: CategoriaContrato
+  grupo_contrato?: GrupoContrato
+  subtipo_contrato?: string | null
   objeto: string
   descricao_escopo?: string
   justificativa?: string
