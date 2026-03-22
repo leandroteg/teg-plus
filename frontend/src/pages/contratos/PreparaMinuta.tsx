@@ -7,6 +7,7 @@ import {
   AlertTriangle, ChevronDown, ChevronUp, Settings2, ToggleLeft, ToggleRight,
   Loader2, Brain, Scale, FileSearch, FileUp, X, Wand2,
   TrendingUp, ArrowRight, Shield, Edit3, FileDown, Target, Crown, Zap, RefreshCw,
+  FileStack,
 } from 'lucide-react'
 import {
   useSolicitacao,
@@ -25,7 +26,9 @@ import {
   useUploadMinutaFile,
 } from '../../hooks/useSolicitacoes'
 import type { MelhoriaMinuta, MinutaTextoGerado } from '../../hooks/useSolicitacoes'
-import type { Minuta, TipoMinuta, StatusMinuta, MinutaAiAnalise, ConfigAnalise } from '../../types/contratos'
+import type { Minuta, TipoMinuta, StatusMinuta, MinutaAiAnalise, ConfigAnalise, GrupoContrato } from '../../types/contratos'
+import { useModelosContrato } from '../../hooks/useContratos'
+import { GRUPO_CONTRATO_LABEL } from '../../constants/contratos'
 import { supabase } from '../../services/supabase'
 import { getEmpresa } from '../../services/empresa'
 import { jsPDF } from 'jspdf'
@@ -1417,6 +1420,11 @@ export default function PreparaMinuta() {
   const gerarMinutaPDF = useGerarMinutaPDF()
   const gerarResumoAI = useGerarResumoAI()
 
+  const { data: todosModelos } = useModelosContrato()
+  const modelosDisponiveis = todosModelos?.filter(
+    m => m.ativo && m.grupo_contrato === solicitacao?.grupo_contrato
+  ) ?? []
+
   // Form state
   const [titulo, setTitulo] = useState('')
   const [tipo, setTipo] = useState<TipoMinuta>('rascunho')
@@ -2076,6 +2084,52 @@ export default function PreparaMinuta() {
 
         {/* Main content: Minutas list + Upload */}
         <div className="lg:col-span-2 space-y-4">
+
+          {/* Biblioteca de Modelos */}
+          {modelosDisponiveis.length > 0 && !minutas?.length && (
+            <div className="bg-gradient-to-br from-violet-50 to-indigo-50 rounded-2xl p-5 border border-violet-100">
+              <h3 className="text-sm font-bold text-violet-900 mb-3 flex items-center gap-2">
+                <FileStack size={16} className="text-violet-600" />
+                Biblioteca de Modelos — {GRUPO_CONTRATO_LABEL[solicitacao?.grupo_contrato as GrupoContrato] ?? ''}
+              </h3>
+              <div className="space-y-2">
+                {modelosDisponiveis.map(modelo => (
+                  <div key={modelo.id} className="flex items-center justify-between bg-white rounded-xl px-4 py-3 border border-violet-100 hover:border-violet-300 transition-colors">
+                    <div>
+                      <p className="text-sm font-semibold text-slate-800">{modelo.nome}</p>
+                      <p className="text-xs text-slate-500">
+                        v{modelo.versao} · {modelo.objeto ? modelo.objeto.substring(0, 60) + (modelo.objeto.length > 60 ? '...' : '') : 'Sem objeto'}
+                      </p>
+                    </div>
+                    {modelo.arquivo_url ? (
+                      <button
+                        onClick={async () => {
+                          try {
+                            const resp = await fetch(modelo.arquivo_url!)
+                            const blob = await resp.blob()
+                            const fileName = `modelo_${modelo.nome.replace(/\s+/g, '_')}.pdf`
+                            const file = new File([blob], fileName, { type: blob.type })
+                            await uploadFile.mutateAsync({
+                              solicitacao_id: solicitacao!.id,
+                              file,
+                              tipo: 'modelo' as any,
+                            })
+                          } catch (err) {
+                            console.error('Erro ao usar modelo:', err)
+                          }
+                        }}
+                        className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-violet-600 text-white hover:bg-violet-700 transition-colors"
+                      >
+                        Usar como base
+                      </button>
+                    ) : (
+                      <span className="text-xs text-slate-400">Sem arquivo</span>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Add button */}
           <div className="flex items-center justify-between">
