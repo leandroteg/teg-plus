@@ -5,6 +5,7 @@ import {
   ArrowUp, ArrowDown, ClipboardList, FileEdit, ShieldCheck,
   Building2, Calendar, Tag,
 } from 'lucide-react'
+import { GRUPO_CONTRATO_OPTIONS } from '../../constants/contratos'
 import { useSolicitacoes, useSolicitacoesDashboard } from '../../hooks/useSolicitacoes'
 import type { EtapaSolicitacao, Solicitacao } from '../../types/contratos'
 
@@ -83,6 +84,7 @@ export default function SolicitacoesLista() {
   const [sortField, setSortField] = useState<SortField>('data')
   const [sortDir, setSortDir] = useState<SortDir>('desc')
   const [viewMode, setViewMode] = useState<ViewMode>('cards')
+  const [filtroGrupo, setFiltroGrupo] = useState<string>('')
 
   const { data: dashboard = {}, isLoading: loadingDash } = useSolicitacoesDashboard()
 
@@ -107,6 +109,9 @@ export default function SolicitacoesLista() {
         s.contraparte_nome?.toLowerCase().includes(q)
       )
     }
+    if (filtroGrupo) {
+      items = items.filter(s => (s as any).grupo_contrato === filtroGrupo)
+    }
     items.sort((a, b) => {
       let cmp = 0
       if (sortField === 'data') cmp = new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
@@ -115,7 +120,7 @@ export default function SolicitacoesLista() {
       return sortDir === 'asc' ? cmp : -cmp
     })
     return items
-  }, [rawItems, busca, sortField, sortDir])
+  }, [rawItems, busca, filtroGrupo, sortField, sortDir])
 
   const stage = STAGES.find(s => s.key === activeStage)!
 
@@ -183,6 +188,16 @@ export default function SolicitacoesLista() {
             className="w-full pl-9 pr-4 py-2.5 rounded-xl border border-slate-200 bg-white text-sm text-slate-700 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-400"
           />
         </div>
+        <select
+          value={filtroGrupo}
+          onChange={e => setFiltroGrupo(e.target.value)}
+          className="px-3 py-2 rounded-xl border border-slate-200 bg-white text-sm text-slate-600 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 min-w-[180px]"
+        >
+          <option value="">Todos os Grupos</option>
+          {GRUPO_CONTRATO_OPTIONS.map(o => (
+            <option key={o.value} value={o.value}>{o.label}</option>
+          ))}
+        </select>
         <div className="flex items-center gap-2">
           {SORT_OPTIONS.map(opt => (
             <button
