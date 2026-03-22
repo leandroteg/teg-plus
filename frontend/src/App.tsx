@@ -41,7 +41,6 @@ import PreparaMinuta from './pages/contratos/PreparaMinuta'
 import ResumoExecutivoPage from './pages/contratos/ResumoExecutivo'
 import Assinaturas from './pages/contratos/Assinaturas'
 import GestaoContratos from './pages/contratos/GestaoContratos'
-import EquipePJ from './pages/contratos/EquipePJ'
 import ModelosContrato from './pages/contratos/ModelosContrato'
 
 // Módulo Controladoria
@@ -288,7 +287,6 @@ export default function App() {
               <Route path="/contratos/solicitacoes/:id/resumo" element={<ResumoExecutivoPage />} />
               <Route path="/contratos/assinaturas"  element={<Assinaturas />} />
               <Route path="/contratos/gestao"       element={<GestaoContratos />} />
-              <Route path="/contratos/equipe-pj"    element={<EquipePJ />} />
               <Route path="/contratos/modelos"      element={<ModelosContrato />} />
             </Route>
           </Route>

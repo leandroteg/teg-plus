@@ -1,6 +1,6 @@
 import {
   LayoutDashboard, ClipboardList,
-  FileSignature, Briefcase, Users, FileStack,
+  FileSignature, Briefcase, FileStack,
 } from 'lucide-react'
 import ModuleLayout from './ModuleLayout'
 
@@ -9,7 +9,6 @@ const NAV = [
   { to: '/contratos/solicitacoes', icon: ClipboardList,    label: 'Solicitações'    },
   { to: '/contratos/assinaturas',  icon: FileSignature,    label: 'Assinaturas'     },
   { to: '/contratos/gestao',       icon: Briefcase,        label: 'Gestão'          },
-  { to: '/contratos/equipe-pj',    icon: Users,            label: 'Equipe PJ'       },
   { to: '/contratos/modelos',      icon: FileStack,        label: 'Modelos'         },
 ]
 
