@@ -18,6 +18,8 @@ import {
   useResumoExecutivo,
   useAssinaturas,
 } from '../../hooks/useSolicitacoes'
+import { GRUPO_CONTRATO_LABEL } from '../../constants/contratos'
+import type { GrupoContrato } from '../../types/contratos'
 import type { EtapaSolicitacao, ParcelaPlanejada, Solicitacao, TipoAssinatura } from '../../types/contratos'
 import { calcularDiferencaParcelas, normalizarParcelasPlanejadas, sugerirParcelasContrato } from '../../utils/contratosParcelas'
 
@@ -72,15 +74,7 @@ const TIPO_LABEL: Record<string, string> = {
   receita: 'Receita', despesa: 'Despesa', pj: 'PJ',
 }
 
-const CATEGORIA_LABEL: Record<string, string> = {
-  prestacao_servico: 'Prestação de Serviço',
-  fornecimento:      'Fornecimento',
-  locacao:           'Locação',
-  empreitada:        'Empreitada',
-  consultoria:       'Consultoria',
-  pj_pessoa_fisica:  'PJ - Pessoa Física',
-  outro:             'Outro',
-}
+// CATEGORIA_LABEL removido — usar GRUPO_CONTRATO_LABEL de constants/contratos
 
 // ── Sub-components ──────────────────────────────────────────────────────────────
 
@@ -1063,7 +1057,10 @@ export default function SolicitacaoDetalhe() {
                   icon={Building2}
                 />
                 <InfoItem label="Tipo de Contrato" value={TIPO_LABEL[s.tipo_contrato] ?? s.tipo_contrato} icon={Tag} />
-                <InfoItem label="Categoria" value={CATEGORIA_LABEL[s.categoria_contrato] ?? s.categoria_contrato} icon={Tag} />
+                <InfoItem label="Categoria" value={(() => {
+                  const grupoLabel = GRUPO_CONTRATO_LABEL[s.grupo_contrato as GrupoContrato] ?? s.grupo_contrato ?? s.categoria_contrato
+                  return s.subtipo_contrato ? `${grupoLabel} — ${s.subtipo_contrato}` : grupoLabel
+                })()} icon={Tag} />
                 <InfoItem label="Valor Estimado" value={s.valor_estimado ? fmt(s.valor_estimado) : undefined} icon={DollarSign} />
                 <InfoItem label="Forma de Pagamento" value={s.forma_pagamento} icon={DollarSign} />
                 <InfoItem label="Vigência" value={vigencia} icon={Calendar} />

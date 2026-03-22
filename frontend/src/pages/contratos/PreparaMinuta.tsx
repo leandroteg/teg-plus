@@ -1745,11 +1745,7 @@ export default function PreparaMinuta() {
         }
 
         // HEADER — formal contract style
-        const CAT_LABEL: Record<string, string> = {
-          prestacao_servico: 'Prestação de Serviços', fornecimento: 'Fornecimento',
-          locacao: 'Locação', consultoria: 'Consultoria', obra_civil: 'Obra Civil',
-        }
-        const tipoLabel = CAT_LABEL[solicitacao.categoria_contrato ?? ''] ?? solicitacao.categoria_contrato ?? ''
+        const tipoLabel = GRUPO_CONTRATO_LABEL[solicitacao.grupo_contrato as GrupoContrato] ?? solicitacao.categoria_contrato ?? ''
         const tituloContrato = tipoLabel ? `CONTRATO DE ${tipoLabel.toUpperCase()}` : 'MINUTA CONTRATUAL'
         pdf.setFont('helvetica', 'bold'); pdf.setFontSize(14); pdf.setTextColor(30, 41, 59)
         pdf.text(tituloContrato, pw / 2, 20, { align: 'center' })
@@ -1907,6 +1903,7 @@ export default function PreparaMinuta() {
           indice_reajuste: solicitacao.indice_reajuste ?? undefined,
           tipo_contrato: solicitacao.tipo_contrato ?? undefined,
           categoria_contrato: solicitacao.categoria_contrato ?? undefined,
+          grupo_contrato: solicitacao.grupo_contrato ?? undefined,
           obra_nome: solicitacao.obra?.nome ?? undefined,
           centro_custo: solicitacao.centro_custo ?? undefined,
           justificativa: solicitacao.justificativa ?? undefined,

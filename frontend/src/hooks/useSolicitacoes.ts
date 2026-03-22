@@ -262,7 +262,7 @@ export function useAvancarEtapa() {
                 .insert({
                   numero:             sol.numero,
                   tipo_contrato:      tipoContrato,
-                  tipo_categoria:     sol.categoria_contrato ?? sol.tipo_contrato,
+                  tipo_categoria:     sol.grupo_contrato ?? sol.categoria_contrato ?? sol.tipo_contrato,
                   fornecedor_id:      tipoContrato === 'despesa' ? (sol.contraparte_id ?? undefined) : undefined,
                   obra_id:            sol.obra_id ?? undefined,
                   objeto:             sol.objeto,
@@ -962,6 +962,7 @@ export interface GerarMinutaPayload {
   indice_reajuste?: string
   tipo_contrato?: string
   categoria_contrato?: string
+  grupo_contrato?: string
   obra_nome?: string
   centro_custo?: string
   justificativa?: string
