@@ -8,30 +8,28 @@ import { supabase } from '../services/supabase'
 // ── Tipos ──────────────────────────────────────────────────────────────────────
 
 export type Role =
-  | 'admin' | 'gerente' | 'aprovador'
-  | 'comprador' | 'requisitante' | 'visitante'
+  | 'administrador' | 'diretor' | 'gestor'
+  | 'requisitante' | 'visitante'
 
 export const ROLE_LABEL: Record<Role, string> = {
-  admin:        'Administrador',
-  gerente:      'Gerente',
-  aprovador:    'Aprovador',
-  comprador:    'Comprador',
-  requisitante: 'Requisitante',
-  visitante:    'Visitante',
+  administrador: 'Administrador',
+  diretor:       'Diretor',
+  gestor:        'Gestor',
+  requisitante:  'Requisitante',
+  visitante:     'Visitante',
 }
 
 export const ROLE_COLOR: Record<Role, { bg: string; text: string; dot: string }> = {
-  admin:        { bg: 'bg-violet-100', text: 'text-violet-700', dot: 'bg-violet-500' },
-  gerente:      { bg: 'bg-indigo-100', text: 'text-indigo-700', dot: 'bg-indigo-500' },
-  aprovador:    { bg: 'bg-amber-100',  text: 'text-amber-700',  dot: 'bg-amber-500'  },
-  comprador:    { bg: 'bg-green-100',  text: 'text-green-700',  dot: 'bg-green-500'  },
-  requisitante: { bg: 'bg-sky-100',    text: 'text-sky-700',    dot: 'bg-sky-500'    },
-  visitante:    { bg: 'bg-slate-100',  text: 'text-slate-600',  dot: 'bg-slate-400'  },
+  administrador: { bg: 'bg-violet-100', text: 'text-violet-700', dot: 'bg-violet-500' },
+  diretor:       { bg: 'bg-indigo-100', text: 'text-indigo-700', dot: 'bg-indigo-500' },
+  gestor:        { bg: 'bg-amber-100',  text: 'text-amber-700',  dot: 'bg-amber-500'  },
+  requisitante:  { bg: 'bg-sky-100',    text: 'text-sky-700',    dot: 'bg-sky-500'    },
+  visitante:     { bg: 'bg-slate-100',  text: 'text-slate-600',  dot: 'bg-slate-400'  },
 }
 
 export const ROLE_NIVEL: Record<Role, number> = {
-  admin: 5, gerente: 4, aprovador: 3,
-  comprador: 2, requisitante: 1, visitante: 0,
+  administrador: 5, diretor: 4, gestor: 3,
+  requisitante: 2, visitante: 1,
 }
 
 export const ALCADA_LABEL: Record<number, string> = {
@@ -53,6 +51,7 @@ export interface Perfil {
   role: Role
   alcada_nivel: number
   modulos: Record<string, boolean>
+  permissoes_especiais: Record<string, Record<string, unknown>>
   preferencias: Record<string, unknown>
   ativo: boolean
   senha_definida: boolean
@@ -142,6 +141,7 @@ interface AuthContextType {
   hasModule: (mod: string) => boolean
   canApprove: (nivel: number) => boolean
   atLeast: (role: Role) => boolean
+  permissoesEspeciais: (modulo: string) => Record<string, unknown>
 }
 
 const AuthContext = createContext<AuthContextType | null>(null)
@@ -366,16 +366,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     clearPasswordReset,
     role,
     roleLabel:  ROLE_LABEL[role],
-    isAdmin:    role === 'admin',
-    isGerente:  ROLE_NIVEL[role] >= ROLE_NIVEL['gerente'],
-    canManage:  role === 'admin',
+    isAdmin:    role === 'administrador',
+    isGerente:  ROLE_NIVEL[role] >= ROLE_NIVEL['diretor'],
+    canManage:  role === 'administrador',
     hasModule:  (mod) => {
       if (perfil?.modulos?.[mod] === true) return true
       if (mod === 'patrimonial') return perfil?.modulos?.estoque === true
       return false
     },
-    canApprove: (nivel) => role === 'admin' || (perfil?.alcada_nivel ?? 0) >= nivel,
+    canApprove: (nivel) => role === 'administrador' || (perfil?.alcada_nivel ?? 0) >= nivel,
     atLeast:    (r) => ROLE_NIVEL[role] >= ROLE_NIVEL[r],
+    permissoesEspeciais: (modulo: string) => perfil?.permissoes_especiais?.[modulo] ?? {},
   }
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
