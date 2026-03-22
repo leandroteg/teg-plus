@@ -13,6 +13,16 @@ import {
   type Perfil, type Role,
   ROLE_LABEL, ROLE_COLOR, ALCADA_LABEL, MODULOS_ERP, MODULOS_ERP_GROUPED,
 } from '../contexts/AuthContext'
+import { GRUPO_CONTRATO_OPTIONS } from '../constants/contratos'
+
+// ── Roles config (novo sistema 5 perfis) ─────────────────────────────────────
+const ROLES: { value: Role; label: string; color: string }[] = [
+  { value: 'administrador', label: 'Administrador', color: 'bg-red-100 text-red-700 border-red-200' },
+  { value: 'diretor',       label: 'Diretor',       color: 'bg-violet-100 text-violet-700 border-violet-200' },
+  { value: 'gestor',        label: 'Gestor',        color: 'bg-blue-100 text-blue-700 border-blue-200' },
+  { value: 'requisitante',  label: 'Requisitante',  color: 'bg-emerald-100 text-emerald-700 border-emerald-200' },
+  { value: 'visitante',     label: 'Visitante',     color: 'bg-slate-100 text-slate-600 border-slate-200' },
+]
 
 // ── Avatar inline ──────────────────────────────────────────────────────────────
 const AVATAR_COLORS = [
@@ -172,13 +182,14 @@ function UserDetailPanel({
   const [alcada,  setAlcada]  = useState(user.alcada_nivel)
   const [ativo,   setAtivo]   = useState(user.ativo)
   const [modulos, setModulos] = useState<Record<string, boolean>>(user.modulos ?? {})
+  const [permEspeciais, setPermEspeciais] = useState<Record<string, any>>(user.permissoes_especiais ?? {})
   const [success, setSuccess] = useState(false)
 
   const toggleMod = (key: string) =>
     setModulos(m => ({ ...m, [key]: !m[key] }))
 
   const handleSave = async () => {
-    await update.mutateAsync({ id: user.id, role, alcada_nivel: alcada, ativo, modulos })
+    await update.mutateAsync({ id: user.id, role, alcada_nivel: alcada, ativo, modulos, permissoes_especiais: permEspeciais })
     setSuccess(true)
     setTimeout(() => { setSuccess(false); setEditing(false) }, 1200)
   }
@@ -188,6 +199,7 @@ function UserDetailPanel({
     setAlcada(user.alcada_nivel)
     setAtivo(user.ativo)
     setModulos(user.modulos ?? {})
+    setPermEspeciais(user.permissoes_especiais ?? {})
     setEditing(false)
   }
 
@@ -283,18 +295,17 @@ function UserDetailPanel({
             <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-2">
               Perfil de Acesso
             </label>
-            <div className="grid grid-cols-3 gap-1.5">
-              {(Object.keys(ROLE_LABEL) as Role[]).map(r => {
-                const c = ROLE_COLOR[r]
-                return (
-                  <button key={r} onClick={() => setRole(r)}
-                    className={`flex items-center gap-1.5 px-2.5 py-2 rounded-xl border-2 text-left transition-all text-xs font-semibold
-                      ${role === r ? `${c.bg} ${c.text} border-current` : 'border-slate-100 text-slate-600 hover:border-slate-200'}`}>
-                    <span className={`w-1.5 h-1.5 rounded-full ${c.dot}`} />
-                    {ROLE_LABEL[r]}
-                  </button>
-                )
-              })}
+            <div className="flex flex-wrap gap-2">
+              {ROLES.map(r => (
+                <button key={r.value}
+                  onClick={() => setRole(r.value)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all ${
+                    role === r.value ? r.color + ' ring-2 ring-offset-1 ring-current' : 'bg-white text-slate-400 border-slate-200 hover:border-slate-300'
+                  }`}
+                >
+                  {r.label}
+                </button>
+              ))}
             </div>
           </div>
 
@@ -326,6 +337,36 @@ function UserDetailPanel({
               return next
             })}
           />
+
+          {/* ── Permissões Especiais ─────────────────────────────────── */}
+          {modulos?.contratos && role !== 'administrador' && (
+            <div className="space-y-2">
+              <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Permissões Contratos</label>
+              <div className="grid grid-cols-2 gap-2">
+                {GRUPO_CONTRATO_OPTIONS.map(g => (
+                  <label key={g.value} className="flex items-center gap-2 text-xs text-slate-600 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={permEspeciais?.contratos?.grupos_permitidos?.includes(g.value) ?? false}
+                      onChange={e => {
+                        const current = permEspeciais?.contratos?.grupos_permitidos ?? []
+                        const updated = e.target.checked
+                          ? [...current, g.value]
+                          : current.filter((v: string) => v !== g.value)
+                        setPermEspeciais({
+                          ...permEspeciais,
+                          contratos: { ...permEspeciais?.contratos, grupos_permitidos: updated }
+                        })
+                      }}
+                      className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                    />
+                    {g.label}
+                  </label>
+                ))}
+              </div>
+              <p className="text-[10px] text-slate-400">Se nenhum grupo selecionado, acessa todos</p>
+            </div>
+          )}
 
           {/* Ativo/inativo */}
           <div className="flex items-center justify-between bg-white rounded-xl px-4 py-3">
@@ -564,7 +605,7 @@ export default function AdminUsuarios() {
 
         {/* Stats de roles */}
         <div className="grid grid-cols-3 gap-2">
-          {(['admin', 'comprador', 'requisitante'] as Role[]).map(r => {
+          {(['administrador', 'gestor', 'requisitante'] as Role[]).map(r => {
             const c = ROLE_COLOR[r]
             return (
               <div key={r} className={`rounded-xl p-3 ${c.bg}`}>
