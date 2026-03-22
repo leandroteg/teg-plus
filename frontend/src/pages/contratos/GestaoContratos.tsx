@@ -6,6 +6,7 @@ import {
   CalendarDays, CheckCircle2, XCircle, AlertTriangle, ArrowUpRight,
   ArrowDownRight, Filter, Clock, Banknote, CreditCard,
   Pause, RotateCcw, Lock, AlertOctagon, Loader2, Play,
+  LayoutList, LayoutGrid, Eye,
 } from 'lucide-react'
 import { useContratos, useAditivos, useAtualizarAditivo, useAtualizarContrato, useReajustes, useParcelas } from '../../hooks/useContratos'
 import { useAuth } from '../../contexts/AuthContext'
@@ -322,6 +323,7 @@ function ContratoCard({ contrato, onToast }: { contrato: Contrato; onToast: (typ
 // ── Tab: Contratos ──────────────────────────────────────────────────────────
 function TabContratos() {
   const nav = useNavigate()
+  const [viewMode, setViewMode] = useState<'cards' | 'table'>('table')
   const [statusFilter, setStatusFilter] = useState('')
   const [tipoFilter, setTipoFilter] = useState('')
   const [filtroGrupo, setFiltroGrupo] = useState<string>('')
@@ -407,6 +409,17 @@ function TabContratos() {
             <option key={o.value} value={o.value}>{o.label}</option>
           ))}
         </select>
+
+        <div className="flex border rounded-lg border-slate-200">
+          <button onClick={() => setViewMode('table')}
+            className={`p-1.5 transition-all ${viewMode === 'table' ? 'bg-slate-100 text-slate-800' : 'text-slate-400 hover:bg-slate-50'}`}>
+            <LayoutList size={14} />
+          </button>
+          <button onClick={() => setViewMode('cards')}
+            className={`p-1.5 transition-all ${viewMode === 'cards' ? 'bg-slate-100 text-slate-800' : 'text-slate-400 hover:bg-slate-50'}`}>
+            <LayoutGrid size={14} />
+          </button>
+        </div>
       </div>
 
       {/* List */}
@@ -425,9 +438,80 @@ function TabContratos() {
             Nova Solicitação
           </button>
         </div>
-      ) : (
+      ) : viewMode === 'cards' ? (
         <div className="space-y-2">
           {filtered.map(c => <ContratoCard key={c.id} contrato={c} onToast={showToast} />)}
+        </div>
+      ) : (
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-slate-100">
+                  <th className="text-left px-3 py-2.5 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Número</th>
+                  <th className="text-left px-3 py-2.5 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Objeto</th>
+                  <th className="text-left px-3 py-2.5 text-[10px] font-bold text-slate-400 uppercase tracking-widest hidden lg:table-cell">Contraparte</th>
+                  <th className="text-left px-3 py-2.5 text-[10px] font-bold text-slate-400 uppercase tracking-widest hidden md:table-cell">Grupo</th>
+                  <th className="text-center px-3 py-2.5 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Tipo</th>
+                  <th className="text-right px-3 py-2.5 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Valor</th>
+                  <th className="text-center px-3 py-2.5 text-[10px] font-bold text-slate-400 uppercase tracking-widest hidden sm:table-cell">Status</th>
+                  <th className="text-right px-3 py-2.5 text-[10px] font-bold text-slate-400 uppercase tracking-widest hidden md:table-cell">Vencimento</th>
+                  <th className="text-center px-3 py-2.5 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Ação</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-50">
+                {filtered.map(c => {
+                  const sc = STATUS_CONTRATO[c.status] ?? STATUS_CONTRATO.em_negociacao
+                  const isReceita = c.tipo_contrato === 'receita'
+                  const grupoLabel = GRUPO_CONTRATO_LABEL?.[c.grupo_contrato as any] ?? c.grupo_contrato ?? '—'
+                  const contraparte = c.fornecedor?.razao_social || c.fornecedor?.nome_fantasia || c.cliente?.nome || '—'
+                  return (
+                    <tr key={c.id} onClick={() => nav(`/contratos/previsao?contrato=${c.id}`)} className="hover:bg-slate-50/80 transition-colors cursor-pointer">
+                      <td className="px-3 py-2.5">
+                        <span className="text-xs font-mono font-semibold text-indigo-600 bg-indigo-50 rounded-md px-2 py-0.5">{c.numero}</span>
+                      </td>
+                      <td className="px-3 py-2.5">
+                        <p className="text-sm font-semibold text-slate-700 truncate max-w-[220px]">{c.objeto}</p>
+                        {c.obra?.nome && <p className="text-[10px] text-slate-400 truncate">{c.obra.nome}</p>}
+                      </td>
+                      <td className="px-3 py-2.5 hidden lg:table-cell">
+                        <p className="text-xs text-slate-600 truncate max-w-[160px]">{contraparte}</p>
+                      </td>
+                      <td className="px-3 py-2.5 hidden md:table-cell">
+                        <span className="text-[10px] px-2 py-0.5 rounded-full bg-teal-50 text-teal-700">{grupoLabel}</span>
+                      </td>
+                      <td className="px-3 py-2.5 text-center">
+                        <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${isReceita ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'}`}>
+                          {isReceita ? 'Receita' : 'Despesa'}
+                        </span>
+                      </td>
+                      <td className={`px-3 py-2.5 text-right text-xs font-bold ${isReceita ? 'text-emerald-600' : 'text-amber-600'}`}>
+                        {fmt(c.valor_total + (c.valor_aditivos || 0))}
+                      </td>
+                      <td className="px-3 py-2.5 text-center hidden sm:table-cell">
+                        <span className={`inline-flex items-center gap-1 rounded-full text-[10px] font-semibold px-2 py-0.5 ${sc.bg} ${sc.text}`}>
+                          <span className={`w-1.5 h-1.5 rounded-full ${sc.dot}`} />
+                          {sc.label}
+                        </span>
+                      </td>
+                      <td className="px-3 py-2.5 text-right hidden md:table-cell">
+                        <span className="text-[11px] text-slate-400">{c.data_fim_previsto ? fmtData(c.data_fim_previsto) : '—'}</span>
+                      </td>
+                      <td className="px-3 py-2.5 text-center">
+                        <button onClick={e => { e.stopPropagation() }}
+                          className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[10px] font-semibold text-indigo-600 bg-indigo-50 border border-indigo-100 hover:bg-indigo-100 transition-all">
+                          <Eye size={11} /> Ver
+                        </button>
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+          {filtered.length === 0 && (
+            <div className="py-10 text-center text-sm text-slate-400">Nenhum contrato encontrado</div>
+          )}
         </div>
       )}
     </div>
