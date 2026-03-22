@@ -27,9 +27,11 @@ export const ROLE_COLOR: Record<Role, { bg: string; text: string; dot: string }>
   visitante:     { bg: 'bg-slate-100',  text: 'text-slate-600',  dot: 'bg-slate-400'  },
 }
 
-export const ROLE_NIVEL: Record<Role, number> = {
+export const ROLE_NIVEL: Record<string, number> = {
   administrador: 5, diretor: 4, gestor: 3,
   requisitante: 2, visitante: 1,
+  // backward compat — RLS e código legado usam nomes antigos
+  admin: 5, gerente: 4, aprovador: 3, comprador: 3,
 }
 
 export const ALCADA_LABEL: Record<number, string> = {
@@ -140,7 +142,7 @@ interface AuthContextType {
   canManage: boolean
   hasModule: (mod: string) => boolean
   canApprove: (nivel: number) => boolean
-  atLeast: (role: Role) => boolean
+  atLeast: (role: Role | string) => boolean
   permissoesEspeciais: (modulo: string) => Record<string, unknown>
 }
 
@@ -375,7 +377,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return false
     },
     canApprove: (nivel) => role === 'administrador' || (perfil?.alcada_nivel ?? 0) >= nivel,
-    atLeast:    (r) => ROLE_NIVEL[role] >= ROLE_NIVEL[r],
+    atLeast:    (r) => (ROLE_NIVEL[role] ?? 0) >= (ROLE_NIVEL[r] ?? 0),
     permissoesEspeciais: (modulo: string) => perfil?.permissoes_especiais?.[modulo] ?? {},
   }
 
