@@ -1,44 +1,47 @@
+import { useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
-  ClipboardList, Truck, CheckCircle2, AlertTriangle,
-  Package2, FileText, Building2, RefreshCw, ArrowRight,
+  ClipboardList,
+  Truck,
+  AlertTriangle,
+  FileText,
+  RefreshCw,
+  ArrowRight,
   Clock,
+  Route,
+  CalendarClock,
 } from 'lucide-react'
-import { useLogisticaKPIs, useSolicitacoes } from '../../hooks/useLogistica'
+import { useLogisticaKPIs, useSolicitacoes, useTransportes } from '../../hooks/useLogistica'
 import { useTheme } from '../../contexts/ThemeContext'
 import type { LogisticaKPIs } from '../../types/logistica'
 
 const EMPTY_KPIS: LogisticaKPIs = {
-  total_solicitacoes: 0, abertas: 0, em_transito: 0,
-  entregues_hoje: 0, confirmadas_hoje: 0, urgentes_pendentes: 0,
-  nfe_emitidas_mes: 0, custo_total_mes: 0,
-  taxa_entrega_prazo: 0, taxa_avarias: 0, tempo_medio_confirmacao_h: 0,
+  total_solicitacoes: 0,
+  abertas: 0,
+  em_transito: 0,
+  entregues_hoje: 0,
+  confirmadas_hoje: 0,
+  urgentes_pendentes: 0,
+  nfe_emitidas_mes: 0,
+  custo_total_mes: 0,
+  taxa_entrega_prazo: 0,
+  taxa_avarias: 0,
+  tempo_medio_confirmacao_h: 0,
 }
 
 const STATUS_LABEL: Record<string, { label: string; dot: string; bg: string; text: string }> = {
-  solicitado:             { label: 'Solicitado',      dot: 'bg-slate-400',   bg: 'bg-slate-50',    text: 'text-slate-600'   },
-  planejado:              { label: 'Planejado',       dot: 'bg-blue-400',    bg: 'bg-blue-50',     text: 'text-blue-700'    },
-  aguardando_aprovacao:   { label: 'Aguard. Aprov.',  dot: 'bg-amber-400',   bg: 'bg-amber-50',    text: 'text-amber-700'   },
-  aprovado:               { label: 'Aprovado',        dot: 'bg-indigo-400',  bg: 'bg-indigo-50',   text: 'text-indigo-700'  },
-  romaneio_emitido:       { label: 'Romaneio',        dot: 'bg-teal-400',    bg: 'bg-teal-50',     text: 'text-teal-700'    },
-  nfe_emitida:            { label: 'NF-e Emitida',    dot: 'bg-violet-400',  bg: 'bg-violet-50',   text: 'text-violet-700'  },
-  aguardando_coleta:      { label: 'Aguard. Coleta',  dot: 'bg-cyan-400',    bg: 'bg-cyan-50',     text: 'text-cyan-700'    },
-  em_transito:            { label: 'Em Trânsito',     dot: 'bg-orange-400',  bg: 'bg-orange-50',   text: 'text-orange-700'  },
-  entregue:               { label: 'Entregue',        dot: 'bg-teal-400',    bg: 'bg-teal-50',     text: 'text-teal-700'    },
-  concluido:              { label: 'Concluído',       dot: 'bg-green-500',   bg: 'bg-green-50',    text: 'text-green-700'   },
-  recusado:               { label: 'Recusado',        dot: 'bg-red-400',     bg: 'bg-red-50',      text: 'text-red-700'     },
-  cancelado:              { label: 'Cancelado',       dot: 'bg-gray-400',    bg: 'bg-gray-100',    text: 'text-gray-500'    },
-}
-
-export function StatusBadge({ status }: { status: string }) {
-  const { isDark } = useTheme()
-  const c = STATUS_LABEL[status] ?? { label: status, dot: 'bg-gray-400', bg: 'bg-gray-100', text: 'text-gray-600' }
-  return (
-    <span className={`inline-flex items-center gap-1 rounded-full text-[10px] font-semibold px-2 py-0.5 ${isDark ? 'bg-white/10' : c.bg} ${isDark ? 'text-slate-200' : c.text}`}>
-      <span className={`w-1.5 h-1.5 rounded-full ${c.dot}`} />
-      {c.label}
-    </span>
-  )
+  solicitado: { label: 'Solicitado', dot: 'bg-slate-400', bg: 'bg-slate-50', text: 'text-slate-600' },
+  planejado: { label: 'Planejado', dot: 'bg-blue-400', bg: 'bg-blue-50', text: 'text-blue-700' },
+  aguardando_aprovacao: { label: 'Aguard. Aprov.', dot: 'bg-amber-400', bg: 'bg-amber-50', text: 'text-amber-700' },
+  aprovado: { label: 'Aprovado', dot: 'bg-indigo-400', bg: 'bg-indigo-50', text: 'text-indigo-700' },
+  romaneio_emitido: { label: 'Romaneio', dot: 'bg-teal-400', bg: 'bg-teal-50', text: 'text-teal-700' },
+  nfe_emitida: { label: 'NF-e Emitida', dot: 'bg-violet-400', bg: 'bg-violet-50', text: 'text-violet-700' },
+  aguardando_coleta: { label: 'Aguard. Coleta', dot: 'bg-cyan-400', bg: 'bg-cyan-50', text: 'text-cyan-700' },
+  em_transito: { label: 'Em Trânsito', dot: 'bg-orange-400', bg: 'bg-orange-50', text: 'text-orange-700' },
+  entregue: { label: 'Entregue', dot: 'bg-teal-400', bg: 'bg-teal-50', text: 'text-teal-700' },
+  concluido: { label: 'Concluído', dot: 'bg-green-500', bg: 'bg-green-50', text: 'text-green-700' },
+  recusado: { label: 'Recusado', dot: 'bg-red-400', bg: 'bg-red-50', text: 'text-red-700' },
+  cancelado: { label: 'Cancelado', dot: 'bg-gray-400', bg: 'bg-gray-100', text: 'text-gray-500' },
 }
 
 const TIPO_LABEL: Record<string, string> = {
@@ -47,12 +50,47 @@ const TIPO_LABEL: Record<string, string> = {
   transferencia_maquina: 'Transf. Máquina',
 }
 
-const ACTIONS = [
-  { icon: ClipboardList, label: 'Solicitações',    to: '/logistica/solicitacoes',    color: 'text-orange-600',  bg: 'bg-orange-50'  },
-  { icon: Package2,      label: 'Expedição',       to: '/logistica/expedicao',       color: 'text-amber-600',   bg: 'bg-amber-50'   },
-  { icon: Truck,         label: 'Transportes',     to: '/logistica/transportes',     color: 'text-blue-600',    bg: 'bg-blue-50'    },
-  { icon: CheckCircle2,  label: 'Recebimentos',    to: '/logistica/recebimentos',    color: 'text-emerald-600', bg: 'bg-emerald-50' },
-]
+const OPERATIONAL_STATUSES = ['planejado', 'aprovado', 'nfe_emitida', 'aguardando_coleta', 'em_transito'] as const
+
+function parseDate(value?: string) {
+  if (!value) return 0
+  const iso = value.includes('T') ? value : `${value}T00:00:00`
+  const time = new Date(iso).getTime()
+  return Number.isNaN(time) ? 0 : time
+}
+
+function fmtDate(value?: string, withTime = false) {
+  if (!value) return 'Sem agenda'
+  const iso = value.includes('T') ? value : `${value}T00:00:00`
+  const date = new Date(iso)
+  if (Number.isNaN(date.getTime())) return 'Sem agenda'
+  return withTime
+    ? date.toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })
+    : date.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })
+}
+
+function fmtKm(value: number) {
+  return value.toLocaleString('pt-BR', { maximumFractionDigits: value >= 100 ? 0 : 1 })
+}
+
+export function StatusBadge({ status }: { status: string }) {
+  const { isDark } = useTheme()
+  const c = STATUS_LABEL[status] ?? {
+    label: status,
+    dot: 'bg-gray-400',
+    bg: 'bg-gray-100',
+    text: 'text-gray-600',
+  }
+
+  return (
+    <span
+      className={`inline-flex items-center gap-1 rounded-full text-[10px] font-semibold px-2 py-0.5 ${isDark ? 'bg-white/10 text-slate-200' : `${c.bg} ${c.text}`}`}
+    >
+      <span className={`w-1.5 h-1.5 rounded-full ${c.dot}`} />
+      {c.label}
+    </span>
+  )
+}
 
 export default function LogisticaHome() {
   const nav = useNavigate()
@@ -62,7 +100,72 @@ export default function LogisticaHome() {
     urgente: true,
     status: ['solicitado', 'planejado', 'aguardando_aprovacao'],
   })
-  const { data: emTransito = [] } = useSolicitacoes({ status: 'em_transito' })
+  const { data: operacionais = [] } = useSolicitacoes({ status: [...OPERATIONAL_STATUSES] })
+  const { data: aguardandoColeta = [] } = useSolicitacoes({ status: ['nfe_emitida', 'aguardando_coleta'] })
+  const { data: transportesAtivos = [] } = useTransportes()
+
+  const operationalView = useMemo(() => {
+    const routeMap = new Map<string, { label: string; km: number; solicitacoes: number }>()
+    const countedTrips = new Set<string>()
+    let kmProgramados = 0
+
+    for (const sol of operacionais) {
+      const tripKey = sol.viagem_id ? `viagem:${sol.viagem_id}` : null
+      const routeKey =
+        tripKey ?? (sol.rota_planejada?.id ? `rota:${sol.rota_planejada.id}` : `trecho:${sol.origem}:${sol.destino}`)
+      const routeLabel = tripKey
+        ? `${sol.viagem?.numero ?? 'Viagem'} · ${sol.viagem?.origem_principal ?? sol.origem} → ${sol.viagem?.destino_final ?? sol.destino}`
+        : sol.rota_planejada?.nome ?? `${sol.origem} → ${sol.destino}`
+      const routeKm = sol.viagem?.distancia_total_km ?? sol.rota_planejada?.distancia_km ?? sol.distancia_km ?? 0
+
+      if (tripKey) {
+        if (!countedTrips.has(tripKey)) {
+          kmProgramados += routeKm
+          countedTrips.add(tripKey)
+        }
+      } else {
+        kmProgramados += routeKm
+      }
+
+      const current = routeMap.get(routeKey) ?? { label: routeLabel, km: routeKm, solicitacoes: 0 }
+      current.solicitacoes += 1
+      current.km = current.km || routeKm
+      routeMap.set(routeKey, current)
+    }
+
+    const proximasColetas = [...aguardandoColeta]
+      .sort((a, b) => parseDate(a.data_prevista_saida ?? a.data_desejada) - parseDate(b.data_prevista_saida ?? b.data_desejada))
+      .slice(0, 4)
+
+    const now = Date.now()
+    const coletasAtrasadas = aguardandoColeta.filter(sol => {
+      const agenda = parseDate(sol.data_prevista_saida ?? sol.data_desejada)
+      return agenda > 0 && agenda < now
+    }).length
+
+    const viagensEmExecucao = new Set(
+      transportesAtivos.map(t => t.viagem_id).filter((value): value is string => Boolean(value))
+    ).size
+
+    const ocorrenciasAbertas = transportesAtivos.reduce(
+      (total, transporte) => total + (transporte.ocorrencias?.filter(oc => !oc.resolvido).length ?? 0),
+      0
+    )
+
+    const topRotas = [...routeMap.values()]
+      .sort((a, b) => (b.km - a.km) || (b.solicitacoes - a.solicitacoes))
+      .slice(0, 4)
+
+    return {
+      kmProgramados,
+      rotasAtivas: routeMap.size,
+      proximasColetas,
+      coletasAtrasadas,
+      viagensEmExecucao,
+      ocorrenciasAbertas,
+      topRotas,
+    }
+  }, [aguardandoColeta, operacionais, transportesAtivos])
 
   if (isLoading) {
     return (
@@ -74,35 +177,35 @@ export default function LogisticaHome() {
 
   return (
     <div className="space-y-5">
-
-      {/* ── Header ────────────────────────────────────────────── */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className={`text-xl font-extrabold ${isDark ? 'text-white' : 'text-navy'}`}>Painel — Logística</h1>
-          <p className={`text-xs mt-0.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Transportes, NF-e e rastreamento de entregas</p>
+          <p className={`text-xs mt-0.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+            Transportes, NF-e e rastreamento de entregas
+          </p>
         </div>
-        <button onClick={() => refetch()}
-          className={`flex items-center gap-1.5 text-xs transition-colors ${isDark ? 'text-slate-500 hover:text-orange-400' : 'text-slate-400 hover:text-orange-600'}`}>
+        <button
+          onClick={() => refetch()}
+          className={`flex items-center gap-1.5 text-xs transition-colors ${isDark ? 'text-slate-500 hover:text-orange-400' : 'text-slate-400 hover:text-orange-600'}`}
+        >
           <RefreshCw size={12} /> Atualizar
         </button>
       </div>
 
-      {/* ── KPIs ──────────────────────────────────────────────── */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <KpiCard titulo="Abertas" valor={kpis.abertas}
-          icon={ClipboardList} cor="text-orange-600" hexCor="#EA580C" />
-        <KpiCard titulo="Em Trânsito" valor={kpis.em_transito}
-          icon={Truck} cor="text-blue-600" hexCor="#2563EB" />
-        <KpiCard titulo="Urgentes Pendentes" valor={kpis.urgentes_pendentes}
+        <KpiCard titulo="Abertas" valor={kpis.abertas} icon={ClipboardList} cor="text-orange-600" hexCor="#EA580C" />
+        <KpiCard titulo="Em Trânsito" valor={kpis.em_transito} icon={Truck} cor="text-blue-600" hexCor="#2563EB" />
+        <KpiCard
+          titulo="Urgentes Pendentes"
+          valor={kpis.urgentes_pendentes}
           icon={AlertTriangle}
           cor={kpis.urgentes_pendentes > 0 ? 'text-red-600' : 'text-slate-400'}
           hexCor={kpis.urgentes_pendentes > 0 ? '#DC2626' : '#94A3B8'}
-          subtitulo={kpis.urgentes_pendentes > 0 ? 'Atenção!' : 'Nenhuma'} />
-        <KpiCard titulo="NF-e no Mês" valor={kpis.nfe_emitidas_mes}
-          icon={FileText} cor="text-violet-600" hexCor="#7C3AED" />
+          subtitulo={kpis.urgentes_pendentes > 0 ? 'Atenção!' : 'Nenhuma'}
+        />
+        <KpiCard titulo="NF-e no Mês" valor={kpis.nfe_emitidas_mes} icon={FileText} cor="text-violet-600" hexCor="#7C3AED" />
       </div>
 
-      {/* ── Entregas do dia ───────────────────────────────────── */}
       <div className="grid grid-cols-2 gap-3">
         <div className={`rounded-2xl shadow-sm p-4 ${isDark ? 'bg-[#1e293b] border border-white/[0.06]' : 'bg-white border border-slate-200'}`}>
           <div className="flex items-center gap-2 mb-3">
@@ -124,89 +227,207 @@ export default function LogisticaHome() {
         </div>
       </div>
 
-      {/* ── Quick Actions ─────────────────────────────────────── */}
-      <div className="grid grid-cols-4 gap-2">
-        {ACTIONS.map(({ icon: Icon, label, to, color, bg }) => (
-          <button key={to} onClick={() => nav(to)}
-            className={`rounded-2xl p-3 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all text-center group ${isDark ? 'bg-[#1e293b] border border-white/[0.06]' : 'bg-white border border-slate-200'}`}>
-            <div className={`w-9 h-9 ${isDark ? 'bg-white/10' : bg} rounded-xl flex items-center justify-center mx-auto mb-2
-              group-hover:scale-110 transition-transform`}>
-              <Icon size={16} className={color} />
-            </div>
-            <p className={`text-[10px] font-bold ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>{label}</p>
-          </button>
-        ))}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
+        <KpiCard
+          titulo="Km em Rotas"
+          valor={fmtKm(operationalView.kmProgramados)}
+          icon={Route}
+          cor="text-sky-600"
+          hexCor="#0284C7"
+          subtitulo={`${operationalView.rotasAtivas} rota(s)/viagem(ns) planejada(s)`}
+        />
+        <KpiCard
+          titulo="Próx. Coletas"
+          valor={operationalView.proximasColetas.length}
+          icon={CalendarClock}
+          cor={operationalView.coletasAtrasadas > 0 ? 'text-amber-600' : 'text-cyan-600'}
+          hexCor={operationalView.coletasAtrasadas > 0 ? '#D97706' : '#0891B2'}
+          subtitulo={operationalView.coletasAtrasadas > 0 ? `${operationalView.coletasAtrasadas} em atraso` : 'Fila sob controle'}
+        />
+        <KpiCard
+          titulo="Transportes em Execução"
+          valor={transportesAtivos.length}
+          icon={Truck}
+          cor={operationalView.ocorrenciasAbertas > 0 ? 'text-orange-600' : 'text-emerald-600'}
+          hexCor={operationalView.ocorrenciasAbertas > 0 ? '#EA580C' : '#059669'}
+          subtitulo={
+            operationalView.ocorrenciasAbertas > 0
+              ? `${operationalView.ocorrenciasAbertas} ocorrência(s) aberta(s)`
+              : `${operationalView.viagensEmExecucao} viagem(ns) em campo`
+          }
+        />
       </div>
 
-      {/* ── Em Trânsito ───────────────────────────────────────── */}
-      {emTransito.length > 0 && (
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-3">
         <section className={`rounded-2xl shadow-sm overflow-hidden ${isDark ? 'bg-[#1e293b] border border-white/[0.06]' : 'bg-white border border-slate-200'}`}>
           <div className={`px-4 py-3 flex items-center justify-between ${isDark ? 'border-b border-white/[0.06]' : 'border-b border-slate-100'}`}>
             <h2 className={`text-sm font-extrabold flex items-center gap-1.5 ${isDark ? 'text-white' : 'text-slate-800'}`}>
-              <Truck size={14} className="text-orange-500" /> Em Trânsito Agora
+              <CalendarClock size={14} className="text-cyan-500" /> Próximas Coletas
             </h2>
-            <button onClick={() => nav('/logistica/transportes')}
-              className="text-[10px] text-orange-600 font-semibold flex items-center gap-0.5">
-              Ver todos <ArrowRight size={10} />
+            <button onClick={() => nav('/logistica/transportes')} className="text-[10px] text-cyan-600 font-semibold flex items-center gap-0.5">
+              Abrir fila <ArrowRight size={10} />
             </button>
           </div>
-          <div className={`divide-y ${isDark ? 'divide-white/[0.04]' : 'divide-slate-50'}`}>
-            {emTransito.slice(0, 5).map(s => (
-              <div key={s.id} className={`flex items-center gap-3 px-4 py-3 transition-colors ${isDark ? 'hover:bg-white/[0.03]' : 'hover:bg-slate-50'}`}>
-                <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${isDark ? 'bg-orange-500/10' : 'bg-orange-50'}`}>
-                  <Truck size={14} className="text-orange-500" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-1.5">
-                    <p className={`text-xs font-extrabold font-mono ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>{s.numero}</p>
-                    {s.urgente && <span className="text-[9px] bg-red-100 text-red-700 font-bold px-1.5 py-0.5 rounded-full">URGENTE</span>}
+          {operationalView.proximasColetas.length === 0 ? (
+            <EmptyPanel
+              isDark={isDark}
+              title="Nenhuma coleta pendente"
+              description="Assim que a expedição liberar uma carga, ela aparece aqui com a agenda prevista."
+            />
+          ) : (
+            <div className={`divide-y ${isDark ? 'divide-white/[0.04]' : 'divide-slate-50'}`}>
+              {operationalView.proximasColetas.map(sol => (
+                <div key={sol.id} className={`flex items-center gap-3 px-4 py-3 transition-colors ${isDark ? 'hover:bg-white/[0.03]' : 'hover:bg-slate-50'}`}>
+                  <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${isDark ? 'bg-cyan-500/10' : 'bg-cyan-50'}`}>
+                    <CalendarClock size={15} className="text-cyan-500" />
                   </div>
-                  <p className={`text-[10px] truncate ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
-                    {s.origem} → {s.destino}
-                    {s.obra_nome ? ` · ${s.obra_nome}` : ''}
-                  </p>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <p className={`text-xs font-extrabold font-mono ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>{sol.numero}</p>
+                      <StatusBadge status={sol.status} />
+                    </div>
+                    <p className={`text-[10px] truncate ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+                      {sol.origem} → {sol.destino}
+                      {sol.rota_planejada?.distancia_km ? ` · ${fmtKm(sol.rota_planejada.distancia_km)} km` : sol.distancia_km ? ` · ${fmtKm(sol.distancia_km)} km` : ''}
+                    </p>
+                  </div>
+                  <div className="text-right shrink-0">
+                    <p className={`text-xs font-semibold ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
+                      {fmtDate(sol.data_prevista_saida ?? sol.data_desejada, Boolean(sol.data_prevista_saida))}
+                    </p>
+                    <p className={`text-[10px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+                      {sol.transportadora?.nome_fantasia ?? sol.motorista_nome ?? 'Aguardando definição'}
+                    </p>
+                  </div>
                 </div>
-                <div className="text-right shrink-0">
-                  <p className={`text-xs font-semibold ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
-                    {s.transporte?.motorista_nome ?? s.motorista_nome ?? '—'}
-                  </p>
-                  <p className={`text-[10px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{s.transporte?.placa ?? s.veiculo_placa ?? '—'}</p>
-                </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </section>
-      )}
 
-      {/* ── Urgentes Pendentes ────────────────────────────────── */}
+        <section className={`rounded-2xl shadow-sm overflow-hidden ${isDark ? 'bg-[#1e293b] border border-white/[0.06]' : 'bg-white border border-slate-200'}`}>
+          <div className={`px-4 py-3 flex items-center justify-between ${isDark ? 'border-b border-white/[0.06]' : 'border-b border-slate-100'}`}>
+            <h2 className={`text-sm font-extrabold flex items-center gap-1.5 ${isDark ? 'text-white' : 'text-slate-800'}`}>
+              <Route size={14} className="text-sky-500" /> Rotas com Maior Carga
+            </h2>
+            <span className={`text-[10px] font-semibold ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+              {fmtKm(operationalView.kmProgramados)} km planejados
+            </span>
+          </div>
+          {operationalView.topRotas.length === 0 ? (
+            <EmptyPanel
+              isDark={isDark}
+              title="Sem rotas planejadas"
+              description="Planejamentos aprovados e coletas liberadas passam a aparecer aqui com o km total estimado."
+            />
+          ) : (
+            <div className={`divide-y ${isDark ? 'divide-white/[0.04]' : 'divide-slate-50'}`}>
+              {operationalView.topRotas.map(rota => (
+                <div key={rota.label} className={`px-4 py-3 transition-colors ${isDark ? 'hover:bg-white/[0.03]' : 'hover:bg-slate-50'}`}>
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className={`text-xs font-bold truncate ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>{rota.label}</p>
+                      <p className={`text-[10px] mt-0.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+                        {rota.solicitacoes} solicitação(ões) em rota
+                      </p>
+                    </div>
+                    <div className="text-right shrink-0">
+                      <p className="text-sm font-extrabold text-sky-600">{fmtKm(rota.km)} km</p>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
+      </div>
+
+      <section className={`rounded-2xl shadow-sm overflow-hidden ${isDark ? 'bg-[#1e293b] border border-white/[0.06]' : 'bg-white border border-slate-200'}`}>
+        <div className={`px-4 py-3 flex items-center justify-between ${isDark ? 'border-b border-white/[0.06]' : 'border-b border-slate-100'}`}>
+          <h2 className={`text-sm font-extrabold flex items-center gap-1.5 ${isDark ? 'text-white' : 'text-slate-800'}`}>
+            <Truck size={14} className="text-orange-500" /> Transportes em Execução
+          </h2>
+          <button onClick={() => nav('/logistica/transportes')} className="text-[10px] text-orange-600 font-semibold flex items-center gap-0.5">
+            Ver todos <ArrowRight size={10} />
+          </button>
+        </div>
+        {transportesAtivos.length === 0 ? (
+          <EmptyPanel
+            isDark={isDark}
+            title="Nenhum transporte em campo"
+            description="Quando a carga sair para coleta ou entrega, o operador acompanha a execução por aqui."
+          />
+        ) : (
+          <div className={`divide-y ${isDark ? 'divide-white/[0.04]' : 'divide-slate-50'}`}>
+            {transportesAtivos.slice(0, 5).map(transporte => {
+              const sol = transporte.solicitacao
+              const atraso = transporte.eta_atual ? new Date(transporte.eta_atual) < new Date() : false
+              const ocorrenciasAbertas = transporte.ocorrencias?.filter(oc => !oc.resolvido).length ?? 0
+
+              return (
+                <div key={transporte.id} className={`flex items-center gap-3 px-4 py-3 transition-colors ${isDark ? 'hover:bg-white/[0.03]' : 'hover:bg-slate-50'}`}>
+                  <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${ocorrenciasAbertas > 0 ? 'bg-red-50' : isDark ? 'bg-orange-500/10' : 'bg-orange-50'}`}>
+                    {ocorrenciasAbertas > 0 ? (
+                      <AlertTriangle size={14} className="text-red-500" />
+                    ) : (
+                      <Truck size={14} className="text-orange-500" />
+                    )}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-1.5">
+                      <p className={`text-xs font-extrabold font-mono ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>{sol?.numero ?? transporte.id.slice(0, 8)}</p>
+                      {sol?.urgente && <span className="text-[9px] bg-red-100 text-red-700 font-bold px-1.5 py-0.5 rounded-full">URGENTE</span>}
+                      {atraso && <span className="text-[9px] bg-amber-100 text-amber-700 font-bold px-1.5 py-0.5 rounded-full">ATRASADO</span>}
+                      {ocorrenciasAbertas > 0 && <span className="text-[9px] bg-red-100 text-red-700 font-bold px-1.5 py-0.5 rounded-full">{ocorrenciasAbertas} ocorr.</span>}
+                    </div>
+                    <p className={`text-[10px] truncate ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+                      {sol?.origem ?? transporte.viagem?.origem_principal ?? 'Origem'} → {sol?.destino ?? transporte.viagem?.destino_final ?? 'Destino'}
+                      {transporte.viagem?.numero ? ` · ${transporte.viagem.numero}` : ''}
+                    </p>
+                  </div>
+                  <div className="text-right shrink-0">
+                    <p className={`text-xs font-semibold ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
+                      {transporte.motorista_nome ?? transporte.viagem?.motorista_nome ?? '—'}
+                    </p>
+                    <p className={`text-[10px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{transporte.placa ?? transporte.viagem?.veiculo_placa ?? '—'}</p>
+                    <p className={`text-[10px] ${atraso ? 'text-amber-600' : isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+                      ETA {fmtDate(transporte.eta_atual, true)}
+                    </p>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        )}
+      </section>
+
       {urgentes.length > 0 && (
         <section className={`rounded-2xl shadow-sm overflow-hidden ${isDark ? 'bg-[#1e293b] border border-red-500/30' : 'bg-white border border-red-200'}`}>
           <div className={`px-4 py-3 flex items-center justify-between ${isDark ? 'border-b border-red-500/20' : 'border-b border-red-100'}`}>
             <h2 className={`text-sm font-extrabold flex items-center gap-1.5 ${isDark ? 'text-red-400' : 'text-red-800'}`}>
               <AlertTriangle size={14} className="text-red-500" /> Solicitações Urgentes
             </h2>
-            <button onClick={() => nav('/logistica/solicitacoes')}
-              className="text-[10px] text-red-600 font-semibold flex items-center gap-0.5">
+            <button onClick={() => nav('/logistica/solicitacoes')} className="text-[10px] text-red-600 font-semibold flex items-center gap-0.5">
               Ver todas <ArrowRight size={10} />
             </button>
           </div>
           <div className={`divide-y ${isDark ? 'divide-white/[0.04]' : 'divide-red-50'}`}>
-            {urgentes.slice(0, 4).map(s => (
-              <div key={s.id} className={`flex items-center gap-3 px-4 py-3 transition-colors ${isDark ? 'hover:bg-white/[0.03]' : 'hover:bg-red-50/50'}`}>
+            {urgentes.slice(0, 4).map(sol => (
+              <div key={sol.id} className={`flex items-center gap-3 px-4 py-3 transition-colors ${isDark ? 'hover:bg-white/[0.03]' : 'hover:bg-red-50/50'}`}>
                 <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${isDark ? 'bg-red-500/10' : 'bg-red-50'}`}>
                   <AlertTriangle size={14} className="text-red-500" />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className={`text-xs font-extrabold font-mono ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>{s.numero}</p>
+                  <p className={`text-xs font-extrabold font-mono ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>{sol.numero}</p>
                   <p className={`text-[10px] truncate ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
-                    {TIPO_LABEL[s.tipo] ?? s.tipo} · {s.origem} → {s.destino}
+                    {TIPO_LABEL[sol.tipo] ?? sol.tipo} · {sol.origem} → {sol.destino}
                   </p>
                 </div>
                 <div className="text-right shrink-0">
-                  <StatusBadge status={s.status} />
-                  {s.data_desejada && (
+                  <StatusBadge status={sol.status} />
+                  {sol.data_desejada && (
                     <p className={`text-[9px] mt-0.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
-                      Prazo: {new Date(s.data_desejada + 'T00:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}
+                      Prazo: {fmtDate(sol.data_desejada)}
                     </p>
                   )}
                 </div>
@@ -219,23 +440,51 @@ export default function LogisticaHome() {
   )
 }
 
-function KpiCard({ titulo, valor, icon: Icon, cor, hexCor, subtitulo }: {
-  titulo: string; valor: number | string; icon: typeof ClipboardList;
-  cor: string; hexCor: string; subtitulo?: string
+function KpiCard({
+  titulo,
+  valor,
+  icon: Icon,
+  cor,
+  hexCor,
+  subtitulo,
+}: {
+  titulo: string
+  valor: number | string
+  icon: typeof ClipboardList
+  cor: string
+  hexCor: string
+  subtitulo?: string
 }) {
   const { isDark } = useTheme()
+
   return (
     <div className={`rounded-2xl shadow-sm overflow-hidden flex ${isDark ? 'bg-[#1e293b] border border-white/[0.06]' : 'bg-white border border-slate-200'}`}>
       <div className="w-[3px] shrink-0" style={{ backgroundColor: hexCor }} />
       <div className="p-4 flex-1 min-w-0">
-        <div className="w-8 h-8 rounded-xl flex items-center justify-center mb-2"
-          style={{ backgroundColor: hexCor + '18' }}>
+        <div className="w-8 h-8 rounded-xl flex items-center justify-center mb-2" style={{ backgroundColor: `${hexCor}18` }}>
           <Icon size={14} className={cor} />
         </div>
         <p className={`text-xl font-extrabold ${cor} leading-none`}>{valor}</p>
         <p className={`text-[10px] font-semibold mt-1 uppercase tracking-widest ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{titulo}</p>
         {subtitulo && <p className={`text-[10px] mt-0.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{subtitulo}</p>}
       </div>
+    </div>
+  )
+}
+
+function EmptyPanel({
+  isDark,
+  title,
+  description,
+}: {
+  isDark: boolean
+  title: string
+  description: string
+}) {
+  return (
+    <div className={`px-4 py-6 text-center ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+      <p className={`text-xs font-bold ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>{title}</p>
+      <p className="text-[10px] mt-1">{description}</p>
     </div>
   )
 }
