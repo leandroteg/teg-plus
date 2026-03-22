@@ -1,13 +1,16 @@
 import { useState } from 'react'
 import {
   FileStack, Plus, Trash2, CheckCircle2, AlertTriangle, X,
-  TrendingUp, TrendingDown, Loader2, Edit3, ChevronDown, ChevronUp,
+  TrendingUp, TrendingDown, Loader2, Edit3, ChevronDown, ChevronUp, Filter,
 } from 'lucide-react'
 import {
   useModelosContrato, useCriarModelo, useAtualizarModelo, useExcluirModelo,
   type ModeloContrato,
 } from '../../hooks/useContratos'
 import { useAuth } from '../../contexts/AuthContext'
+import { GRUPO_CONTRATO_OPTIONS, GRUPO_CONTRATO_LABEL } from '../../constants/contratos'
+import type { GrupoContrato } from '../../types/contratos'
+import { supabase } from '../../services/supabase'
 
 const RECORRENCIAS = [
   { value: 'mensal',        label: 'Mensal' },
@@ -40,6 +43,7 @@ function ModeloForm({
 }) {
   const [nome, setNome] = useState(initial?.nome ?? '')
   const [tipo, setTipo] = useState<'receita' | 'despesa'>(initial?.tipo_contrato ?? 'despesa')
+  const [grupoContrato, setGrupoContrato] = useState<GrupoContrato>(initial?.grupo_contrato as GrupoContrato ?? 'outro')
   const [objeto, setObjeto] = useState(initial?.objeto ?? '')
   const [descricao, setDescricao] = useState(initial?.descricao ?? '')
   const [clausulas, setClausulas] = useState(initial?.clausulas ?? '')
@@ -48,6 +52,7 @@ function ModeloForm({
   const [itens, setItens] = useState<ItemForm[]>(
     (initial?.itens_padrao as ItemForm[] | undefined) ?? []
   )
+  const [arquivo, setArquivo] = useState<File | null>(null)
   const [erro, setErro] = useState('')
 
   const addItem = () => setItens(prev => [...prev, { descricao: '', unidade: 'un', quantidade: 1, valor_unitario: 0 }])
@@ -55,20 +60,36 @@ function ModeloForm({
   const updateItem = (idx: number, field: keyof ItemForm, val: string | number) =>
     setItens(prev => prev.map((it, i) => i === idx ? { ...it, [field]: val } : it))
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     setErro('')
     if (!nome.trim()) return setErro('Informe o nome do modelo')
     if (!objeto.trim()) return setErro('Informe o objeto do modelo')
 
+    let arquivoUrl = initial?.arquivo_url ?? null
+
+    if (arquivo) {
+      const path = `modelos/${initial?.id ?? crypto.randomUUID()}/${arquivo.name}`
+      const { error: upErr } = await supabase.storage
+        .from('contratos-anexos')
+        .upload(path, arquivo, { upsert: true })
+      if (upErr) return setErro('Erro ao enviar arquivo: ' + upErr.message)
+      const { data: { publicUrl } } = supabase.storage
+        .from('contratos-anexos')
+        .getPublicUrl(path)
+      arquivoUrl = publicUrl
+    }
+
     onSave({
       nome: nome.trim(),
       tipo_contrato: tipo,
+      grupo_contrato: grupoContrato,
       objeto: objeto.trim(),
       descricao: descricao.trim() || null,
       clausulas: clausulas.trim() || null,
       recorrencia,
       indice_reajuste: indiceReajuste.trim() || null,
       itens_padrao: itens.length > 0 ? itens : [],
+      arquivo_url: arquivoUrl,
       ativo: true,
     })
   }
@@ -98,6 +119,38 @@ function ModeloForm({
             }`}>
             A Receber (Receita)
           </button>
+        </div>
+      </div>
+
+      {/* Grupo de Contrato e Template */}
+      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 space-y-4">
+        <h2 className="text-sm font-extrabold text-slate-800">Classificação</h2>
+        <div>
+          <label className={labelClass}>Grupo de Contrato *</label>
+          <select
+            value={grupoContrato}
+            onChange={e => setGrupoContrato(e.target.value as GrupoContrato)}
+            className={inputClass}
+          >
+            {GRUPO_CONTRATO_OPTIONS.map(o => (
+              <option key={o.value} value={o.value}>{o.label}</option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label className={labelClass}>Arquivo Template (PDF/DOCX)</label>
+          <input
+            type="file"
+            accept=".pdf,.docx,.doc"
+            onChange={e => setArquivo(e.target.files?.[0] ?? null)}
+            className="w-full text-sm text-slate-600 file:mr-3 file:py-2 file:px-4 file:rounded-xl file:border-0 file:bg-violet-50 file:text-violet-700 file:font-medium file:cursor-pointer hover:file:bg-violet-100"
+          />
+          {initial?.arquivo_url && !arquivo && (
+            <a href={initial.arquivo_url} target="_blank" rel="noopener noreferrer"
+               className="text-xs text-violet-600 hover:underline mt-1 inline-flex items-center gap-1">
+              <FileStack size={12} /> Ver template atual
+            </a>
+          )}
         </div>
       </div>
 
@@ -250,6 +303,9 @@ function ModeloCard({
               }`}>
                 {isDespesa ? 'Despesa' : 'Receita'}
               </span>
+              <span className="inline-flex items-center text-[10px] font-semibold rounded-full px-2 py-0.5 bg-teal-50 text-teal-700">
+                {GRUPO_CONTRATO_LABEL[modelo.grupo_contrato as GrupoContrato] ?? modelo.grupo_contrato ?? 'Outro'}
+              </span>
               <span className="inline-flex items-center text-[10px] font-semibold rounded-full px-2 py-0.5 bg-violet-50 text-violet-700">
                 {RECORRENCIAS.find(r => r.value === modelo.recorrencia)?.label ?? modelo.recorrencia}
               </span>
@@ -282,6 +338,15 @@ function ModeloCard({
                 <p className="text-xs text-slate-600 mt-0.5 whitespace-pre-wrap font-mono leading-relaxed max-h-40 overflow-y-auto">
                   {modelo.clausulas}
                 </p>
+              </div>
+            )}
+            {modelo.arquivo_url && (
+              <div>
+                <p className="text-[10px] font-bold text-slate-400 uppercase">Template</p>
+                <a href={modelo.arquivo_url} target="_blank" rel="noopener noreferrer"
+                   className="text-xs text-violet-600 hover:underline mt-0.5 inline-flex items-center gap-1">
+                  <FileStack size={12} /> Ver arquivo do template
+                </a>
               </div>
             )}
             {(modelo.itens_padrao as ItemForm[])?.length > 0 && (
@@ -337,6 +402,11 @@ export default function ModelosContrato() {
   const [mode, setMode] = useState<'list' | 'create' | 'edit'>('list')
   const [editingModelo, setEditingModelo] = useState<ModeloContrato | null>(null)
   const [toast, setToast] = useState<{ type: 'success' | 'error'; msg: string } | null>(null)
+  const [filtroGrupo, setFiltroGrupo] = useState<string>('')
+
+  const modelosFiltrados = filtroGrupo
+    ? modelos.filter(m => m.grupo_contrato === filtroGrupo)
+    : modelos
 
   const showToast = (type: 'success' | 'error', msg: string) => {
     setToast({ type, msg })
@@ -445,22 +515,52 @@ export default function ModelosContrato() {
         </div>
       )}
 
+      {/* Filtro por Grupo */}
+      {modelos.length > 0 && (
+        <div className="flex items-center gap-2">
+          <Filter size={14} className="text-slate-400" />
+          <select
+            value={filtroGrupo}
+            onChange={e => setFiltroGrupo(e.target.value)}
+            className="px-3 py-2 rounded-xl border border-slate-200 bg-white text-xs text-slate-700 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400"
+          >
+            <option value="">Todos os grupos</option>
+            {GRUPO_CONTRATO_OPTIONS.map(o => (
+              <option key={o.value} value={o.value}>{o.label}</option>
+            ))}
+          </select>
+          {filtroGrupo && (
+            <button onClick={() => setFiltroGrupo('')}
+              className="text-[10px] font-semibold text-violet-600 hover:text-violet-800">
+              Limpar
+            </button>
+          )}
+          <span className="text-[10px] text-slate-400 ml-auto">
+            {modelosFiltrados.length} de {modelos.length} modelo{modelos.length !== 1 ? 's' : ''}
+          </span>
+        </div>
+      )}
+
       {/* Content */}
       {isLoading ? (
         <div className="flex items-center justify-center py-20">
           <Loader2 size={24} className="animate-spin text-violet-400" />
         </div>
-      ) : modelos.length === 0 ? (
+      ) : modelosFiltrados.length === 0 ? (
         <div className="text-center py-20">
           <div className="w-16 h-16 mx-auto rounded-2xl bg-violet-50 flex items-center justify-center mb-4">
             <FileStack size={24} className="text-violet-300" />
           </div>
-          <p className="text-sm font-bold text-slate-600">Nenhum modelo cadastrado</p>
-          <p className="text-xs text-slate-400 mt-1">Crie modelos para agilizar a criação de contratos</p>
+          <p className="text-sm font-bold text-slate-600">
+            {filtroGrupo ? 'Nenhum modelo neste grupo' : 'Nenhum modelo cadastrado'}
+          </p>
+          <p className="text-xs text-slate-400 mt-1">
+            {filtroGrupo ? 'Tente outro filtro ou crie um novo modelo' : 'Crie modelos para agilizar a criação de contratos'}
+          </p>
         </div>
       ) : (
         <div className="grid gap-3">
-          {modelos.map(m => (
+          {modelosFiltrados.map(m => (
             <ModeloCard
               key={m.id}
               modelo={m}
