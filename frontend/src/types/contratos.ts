@@ -67,6 +67,8 @@ export interface Contrato {
   // Classificação
   centro_custo?: string
   classe_financeira?: string
+  grupo_contrato?: string
+  tipo_categoria?: string
   // Reajuste
   indice_reajuste?: string
   // Garantia
