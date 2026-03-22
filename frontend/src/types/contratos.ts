@@ -315,6 +315,13 @@ export type CategoriaContrato =
   | 'vigilancia_monitoramento'
   | 'fornecimento' | 'locacao' | 'empreitada'
   | 'consultoria' | 'pj_pessoa_fisica' | 'outro'
+
+export type GrupoContrato =
+  | 'locacao_imovel' | 'locacao_veiculos' | 'locacao_equipamentos'
+  | 'equipe_pj' | 'prestacao_servicos' | 'servico_recorrente'
+  | 'aquisicao' | 'subcontratacao_empreitada' | 'consultoria_juridico'
+  | 'apoio_operacional' | 'seguros' | 'outro'
+
 export type UrgenciaSolicitacao = 'baixa' | 'normal' | 'alta' | 'critica'
 
 export type TipoMinuta = 'modelo' | 'rascunho' | 'revisado' | 'final' | 'assinado'
@@ -404,6 +411,8 @@ export interface Solicitacao {
   responsavel_aprovacao?: string
   tipo_contrato: TipoContratoV2
   categoria_contrato: CategoriaContrato
+  grupo_contrato?: GrupoContrato
+  subtipo_contrato?: string
   objeto: string
   descricao_escopo?: string
   justificativa?: string

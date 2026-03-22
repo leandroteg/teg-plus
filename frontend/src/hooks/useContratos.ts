@@ -6,6 +6,7 @@ import type {
   NovoContratoPayload, NovaParcelaPayload,
   ContratoMedicao, ContratoMedicaoItem, ContratoAditivo,
   ContratoReajuste, ContratoCronograma,
+  GrupoContrato,
 } from '../types/contratos'
 
 // ── Dashboard ────────────────────────────────────────────────────────────────
@@ -637,6 +638,9 @@ export interface ModeloContrato {
   recorrencia: string
   indice_reajuste: string | null
   itens_padrao: { descricao: string; unidade: string; quantidade: number; valor_unitario: number }[]
+  grupo_contrato: GrupoContrato | null
+  arquivo_url: string | null
+  versao: number
   ativo: boolean
   created_at: string
   updated_at: string
