@@ -231,7 +231,7 @@ export default function LogisticaHome() {
                   Nucleo Operacional
                 </p>
                 <h2 className={`mt-1.5 text-[1.9rem] md:text-[2.45rem] leading-none font-black tracking-tight ${isDark ? 'text-white' : 'text-slate-900'}`}>
-                  {fmtKm(operationalView.kmProgramados)} km em malha ativa
+                  {fmtKm(operationalView.kmProgramados)} km em viagem
                 </h2>
                 <p className={`mt-2 text-[13px] ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
                   {operationalView.rotasAtivas} rota(s)/viagem(ns) planejada(s), {transportesAtivos.length} transporte(s) acompanhados e {fmtCurrency(kpis.custo_total_mes)} em custo logistico no mes.
