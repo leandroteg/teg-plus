@@ -43,6 +43,7 @@ interface RequisicaoCompleta {
   obra_nome: string
   descricao: string
   justificativa?: string
+  justificativa_urgencia?: string
   valor_estimado: number
   urgencia: Urgencia
   status: string
@@ -210,7 +211,13 @@ export default function Aprovacao() {
   const [decisao, setDecisao]         = useState<DecisaoTipo | null>(null)
   const [observacao, setObservacao]   = useState('')
   const [mostrarItens, setMostrarItens] = useState(false)
-  const [alertaCotacao, setAlertaCotacao] = useState<{ sem_cotacoes_minimas: boolean; justificativa?: string } | null>(null)
+  const [alertaCotacao, setAlertaCotacao] = useState<{
+    sem_cotacoes_minimas: boolean
+    justificativa?: string
+    cotacoes_count?: number
+    cotacoes_minimo?: number
+    cotacoes_insuficientes?: boolean
+  } | null>(null)
 
   // ── Carrega dados ao montar ───────────────────────────────────────────────
 
@@ -493,6 +500,28 @@ export default function Aprovacao() {
               </div>
             </div>
           )}
+
+          {/* Justificativa de urgência */}
+          {req.justificativa_urgencia && (
+            <div>
+              <p className="text-[10px] text-slate-400 uppercase tracking-wide font-medium mb-1.5">
+                Justificativa de Urgência
+              </p>
+              <div className={`rounded-xl px-4 py-3 text-sm leading-relaxed border ${
+                req.urgencia === 'critica'
+                  ? 'bg-red-50 border-red-100 text-red-800'
+                  : 'bg-amber-50 border-amber-100 text-amber-800'
+              }`}>
+                <div className="flex items-center gap-1.5 mb-1">
+                  <Zap className={`w-3.5 h-3.5 ${req.urgencia === 'critica' ? 'text-red-500' : 'text-amber-500'}`} />
+                  <span className={`text-[10px] font-bold uppercase ${req.urgencia === 'critica' ? 'text-red-600' : 'text-amber-600'}`}>
+                    {req.urgencia === 'critica' ? 'Crítica' : 'Urgente'}
+                  </span>
+                </div>
+                {req.justificativa_urgencia}
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Card de itens (colapsável) */}
@@ -607,18 +636,42 @@ export default function Aprovacao() {
           )}
         </div>
 
-        {/* Alerta de cotação sem mínimo de fornecedores */}
-        {alertaCotacao?.sem_cotacoes_minimas && (
+        {/* Alerta: cotações insuficientes conforme política (#164) */}
+        {alertaCotacao?.cotacoes_insuficientes && (
           <div className="bg-amber-50 border-2 border-amber-400 rounded-2xl p-4 flex gap-3">
             <div className="w-10 h-10 bg-amber-100 rounded-xl flex items-center justify-center shrink-0">
               <AlertTriangle size={20} className="text-amber-600" />
             </div>
             <div>
               <p className="text-sm font-extrabold text-amber-800">
-                ⚠️ Atenção: Cotação enviada sem número mínimo de fornecedores
+                Numero de cotacoes inferior ao exigido pela politica ({alertaCotacao.cotacoes_count ?? 0} de {alertaCotacao.cotacoes_minimo ?? '?'} minimo)
               </p>
               <p className="text-xs text-amber-700 mt-1 leading-relaxed">
-                O comprador enviou esta cotação sem atingir o número mínimo de fornecedores exigido para esta categoria.
+                A quantidade de fornecedores/propostas nesta cotacao esta abaixo do minimo
+                exigido pela politica de compras para este valor. Avalie com cautela antes de aprovar.
+              </p>
+              {alertaCotacao.justificativa && (
+                <div className="mt-2 bg-white border border-amber-200 rounded-xl px-3 py-2">
+                  <p className="text-[10px] font-semibold text-amber-600 uppercase tracking-wide mb-0.5">Justificativa do comprador:</p>
+                  <p className="text-xs text-amber-800 italic">"{alertaCotacao.justificativa}"</p>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Alerta de cotação sem mínimo de fornecedores (flag manual do comprador) */}
+        {alertaCotacao?.sem_cotacoes_minimas && !alertaCotacao?.cotacoes_insuficientes && (
+          <div className="bg-amber-50 border-2 border-amber-400 rounded-2xl p-4 flex gap-3">
+            <div className="w-10 h-10 bg-amber-100 rounded-xl flex items-center justify-center shrink-0">
+              <AlertTriangle size={20} className="text-amber-600" />
+            </div>
+            <div>
+              <p className="text-sm font-extrabold text-amber-800">
+                Atencao: Cotacao enviada sem numero minimo de fornecedores
+              </p>
+              <p className="text-xs text-amber-700 mt-1 leading-relaxed">
+                O comprador enviou esta cotacao sem atingir o numero minimo de fornecedores exigido para esta categoria.
                 Avalie com cautela antes de aprovar.
               </p>
               {alertaCotacao.justificativa && (

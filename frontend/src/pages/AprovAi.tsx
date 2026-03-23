@@ -143,7 +143,13 @@ function AprovacaoCard({ aprovacao, aprovadorNome, aprovadorEmail }: {
   const [expanded, setExpanded] = useState(false)
   const [observacao, setObservacao] = useState('')
   const [action, setAction] = useState<'aprovada' | 'rejeitada' | 'esclarecimento' | null>(null)
-  const [alertaCotacao, setAlertaCotacao] = useState<{ sem_cotacoes_minimas: boolean; justificativa?: string } | null>(null)
+  const [alertaCotacao, setAlertaCotacao] = useState<{
+    sem_cotacoes_minimas: boolean
+    justificativa?: string
+    cotacoes_count?: number
+    cotacoes_minimo?: number
+    cotacoes_insuficientes?: boolean
+  } | null>(null)
 
   const req  = aprovacao.requisicao
   const cot  = aprovacao.cotacao_resumo
@@ -311,16 +317,37 @@ function AprovacaoCard({ aprovacao, aprovadorNome, aprovadorEmail }: {
           )}
         </div>
 
-        {/* Alerta: cotações obrigatórias faltantes (#38) */}
-        {alertaCotacao?.sem_cotacoes_minimas && (
+        {/* Alerta: cotações insuficientes conforme política (#164) */}
+        {alertaCotacao?.cotacoes_insuficientes && (
           <div className="mt-3 bg-amber-50 border border-amber-300 rounded-xl p-3 flex gap-2.5">
             <AlertTriangle size={16} className="text-amber-600 shrink-0 mt-0.5" />
             <div>
               <p className="text-xs font-bold text-amber-800">
-                Cotação sem número mínimo de fornecedores
+                Numero de cotacoes inferior ao exigido pela politica ({alertaCotacao.cotacoes_count ?? 0} de {alertaCotacao.cotacoes_minimo ?? '?'} minimo)
               </p>
               <p className="text-[11px] text-amber-700 mt-0.5 leading-relaxed">
-                O comprador enviou esta cotação sem atingir o mínimo exigido. Avalie com cautela.
+                A quantidade de fornecedores/propostas esta abaixo do minimo exigido pela politica de compras. Avalie com cautela.
+              </p>
+              {alertaCotacao.justificativa && (
+                <div className="mt-1.5 bg-white border border-amber-200 rounded-lg px-2.5 py-1.5">
+                  <p className="text-[10px] font-semibold text-amber-600 uppercase tracking-wide mb-0.5">Justificativa:</p>
+                  <p className="text-[11px] text-amber-800 italic">{alertaCotacao.justificativa}</p>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Alerta: cotações obrigatórias faltantes — flag manual (#38) */}
+        {alertaCotacao?.sem_cotacoes_minimas && !alertaCotacao?.cotacoes_insuficientes && (
+          <div className="mt-3 bg-amber-50 border border-amber-300 rounded-xl p-3 flex gap-2.5">
+            <AlertTriangle size={16} className="text-amber-600 shrink-0 mt-0.5" />
+            <div>
+              <p className="text-xs font-bold text-amber-800">
+                Cotacao sem numero minimo de fornecedores
+              </p>
+              <p className="text-[11px] text-amber-700 mt-0.5 leading-relaxed">
+                O comprador enviou esta cotacao sem atingir o minimo exigido. Avalie com cautela.
               </p>
               {alertaCotacao.justificativa && (
                 <div className="mt-1.5 bg-white border border-amber-200 rounded-lg px-2.5 py-1.5">
