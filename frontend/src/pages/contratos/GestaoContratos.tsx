@@ -449,13 +449,12 @@ function TabContratos() {
               <thead>
                 <tr className="border-b border-slate-100">
                   <th className="text-left px-3 py-2.5 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Número</th>
-                  <th className="text-left px-3 py-2.5 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Objeto</th>
-                  <th className="text-left px-3 py-2.5 text-[10px] font-bold text-slate-400 uppercase tracking-widest hidden lg:table-cell">Contraparte</th>
-                  <th className="text-left px-3 py-2.5 text-[10px] font-bold text-slate-400 uppercase tracking-widest hidden md:table-cell">Grupo</th>
-                  <th className="text-center px-3 py-2.5 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Tipo</th>
+                  <th className="text-left px-3 py-2.5 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Contraparte</th>
+                  <th className="text-left px-3 py-2.5 text-[10px] font-bold text-slate-400 uppercase tracking-widest hidden sm:table-cell">Grupo</th>
+                  <th className="text-center px-3 py-2.5 text-[10px] font-bold text-slate-400 uppercase tracking-widest hidden md:table-cell">Tipo</th>
                   <th className="text-right px-3 py-2.5 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Valor</th>
                   <th className="text-center px-3 py-2.5 text-[10px] font-bold text-slate-400 uppercase tracking-widest hidden sm:table-cell">Status</th>
-                  <th className="text-right px-3 py-2.5 text-[10px] font-bold text-slate-400 uppercase tracking-widest hidden md:table-cell">Vencimento</th>
+                  <th className="text-right px-3 py-2.5 text-[10px] font-bold text-slate-400 uppercase tracking-widest hidden lg:table-cell">Vencimento</th>
                   <th className="text-center px-3 py-2.5 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Ação</th>
                 </tr>
               </thead>
@@ -471,16 +470,13 @@ function TabContratos() {
                         <span className="text-[10px] font-mono font-semibold text-indigo-600 bg-indigo-50 rounded-md px-1.5 py-0.5 whitespace-nowrap">{c.numero}</span>
                       </td>
                       <td className="px-3 py-2.5">
-                        <p className="text-sm font-semibold text-slate-700 truncate max-w-[220px]">{c.objeto}</p>
+                        <p className="text-xs font-semibold text-slate-700 truncate max-w-[200px]">{contraparte}</p>
                         {c.obra?.nome && <p className="text-[10px] text-slate-400 truncate">{c.obra.nome}</p>}
                       </td>
-                      <td className="px-3 py-2.5 hidden lg:table-cell">
-                        <p className="text-xs text-slate-600 truncate max-w-[160px]">{contraparte}</p>
+                      <td className="px-3 py-2.5 hidden sm:table-cell">
+                        <span className="text-[10px] px-2 py-0.5 rounded-full bg-teal-50 text-teal-700 whitespace-nowrap">{grupoLabel}</span>
                       </td>
-                      <td className="px-3 py-2.5 hidden md:table-cell">
-                        <span className="text-[10px] px-2 py-0.5 rounded-full bg-teal-50 text-teal-700">{grupoLabel}</span>
-                      </td>
-                      <td className="px-3 py-2.5 text-center">
+                      <td className="px-3 py-2.5 text-center hidden md:table-cell">
                         <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${isReceita ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'}`}>
                           {isReceita ? 'Receita' : 'Despesa'}
                         </span>
@@ -494,7 +490,7 @@ function TabContratos() {
                           {sc.label}
                         </span>
                       </td>
-                      <td className="px-3 py-2.5 text-right hidden md:table-cell">
+                      <td className="px-3 py-2.5 text-right hidden lg:table-cell">
                         <span className="text-[11px] text-slate-400">{c.data_fim_previsto ? fmtData(c.data_fim_previsto) : '—'}</span>
                       </td>
                       <td className="px-3 py-2.5 text-center">
