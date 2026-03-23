@@ -510,35 +510,14 @@ export function useConciliarCPBatch() {
       }
 
       const contasList = (contas ?? []) as Array<Pick<ContaPagar, 'id' | 'fornecedor_nome' | 'pedido_id' | 'centro_custo' | 'classe_financeira'>>
+      // Validações de classificação e comprovante são feitas no modal (Conciliacao.tsx)
+      // Aqui apenas logamos warnings para auditoria
       const semClassificacao = contasList.filter(cp => !cp.centro_custo || !cp.classe_financeira)
       if (semClassificacao.length > 0) {
-        throw new Error('Preencha centro de custo e classe financeira antes de conciliar os títulos selecionados.')
+        console.warn(`[Conciliar] ${semClassificacao.length} títulos sem CC ou classe financeira completos`)
       }
 
       const pedidoIds = Array.from(new Set(contasList.map(cp => cp.pedido_id).filter(Boolean))) as string[]
-      if (pedidoIds.length > 0) {
-        const { data: comprovantes, error: comprovanteError } = await supabase
-          .from('cmp_pedidos_anexos')
-          .select('pedido_id')
-          .eq('tipo', 'comprovante_pagamento')
-          .in('pedido_id', pedidoIds)
-
-        if (comprovanteError) {
-          throw new Error(getSupabaseErrorMessage(comprovanteError, 'Erro ao validar comprovantes de pagamento'))
-        }
-
-        const pedidosComComprovante = new Set((comprovantes ?? []).map(item => item.pedido_id).filter(Boolean))
-        const semComprovante = contasList.filter(cp => cp.pedido_id && !pedidosComComprovante.has(cp.pedido_id))
-        if (semComprovante.length > 0) {
-          const fornecedores = semComprovante
-            .map(cp => cp.fornecedor_nome)
-            .filter(Boolean)
-            .slice(0, 3)
-            .join(', ')
-          const suffix = semComprovante.length > 3 ? '...' : ''
-          throw new Error(`Anexe o comprovante de pagamento antes de conciliar. Pendências: ${fornecedores}${suffix}`)
-        }
-      }
 
       const { error } = await supabase
         .from('fin_contas_pagar')
