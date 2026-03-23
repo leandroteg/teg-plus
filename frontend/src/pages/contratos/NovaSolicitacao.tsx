@@ -8,6 +8,8 @@ import {
 } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
 import { useLookupCentrosCusto, useLookupClassesFinanceiras } from '../../hooks/useLookups'
+import SearchableSelect from '../../components/SearchableSelect'
+import type { SelectOption } from '../../components/SearchableSelect'
 import { useCriarSolicitacao } from '../../hooks/useSolicitacoes'
 import { api } from '../../services/api'
 import type {
@@ -184,6 +186,8 @@ export default function NovaSolicitacao() {
   // obras removido — usar centro de custos
   const centrosCusto = useLookupCentrosCusto()
   const classesFinanceiras = useLookupClassesFinanceiras()
+  const centrosCustoOptions: SelectOption[] = centrosCusto.map(c => ({ value: c.descricao, label: c.descricao, code: c.codigo }))
+  const classesOptions: SelectOption[] = classesFinanceiras.map(c => ({ value: c.descricao, label: c.descricao, code: c.codigo }))
   const criarSolicitacao = useCriarSolicitacao()
 
   const [step, setStep] = useState(1)
@@ -911,6 +915,36 @@ export default function NovaSolicitacao() {
             </div>
           </div>
 
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div>
+              <label className={labelClass}>Centro de Custo</label>
+              <SearchableSelect
+                options={centrosCustoOptions}
+                value={centroCusto}
+                onChange={setCentroCusto}
+                placeholder="Selecione o centro de custo"
+              />
+            </div>
+            <div>
+              <label className={labelClass}>Classe Financeira</label>
+              <SearchableSelect
+                options={classesOptions}
+                value={classeFinanceira}
+                onChange={setClasseFinanceira}
+                placeholder="Selecione a classe financeira"
+              />
+            </div>
+            <div>
+              <label className={labelClass}>Índice de Reajuste</label>
+              <input
+                value={indiceReajuste}
+                onChange={e => setIndiceReajuste(e.target.value)}
+                placeholder="IPCA, IGP-M, INPC"
+                className={inputClass}
+              />
+            </div>
+          </div>
 
           <div>
             <label className={labelClass}>Informacoes Complementares</label>

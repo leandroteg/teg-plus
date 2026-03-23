@@ -5,6 +5,9 @@ import {
 } from 'lucide-react'
 import { useCriarContrato, useClientes } from '../../hooks/useContratos'
 import { useFornecedores } from '../../hooks/useFinanceiro'
+import { useLookupCentrosCusto, useLookupClassesFinanceiras } from '../../hooks/useLookups'
+import SearchableSelect from '../../components/SearchableSelect'
+import type { SelectOption } from '../../components/SearchableSelect'
 import type { NovoContratoPayload, RecorrenciaContrato, TipoContrato, StatusContrato } from '../../types/contratos'
 
 const RECORRENCIAS: { value: RecorrenciaContrato; label: string }[] = [
@@ -34,6 +37,11 @@ export default function NovoContrato() {
   const criarContrato = useCriarContrato()
   const { data: clientes = [] } = useClientes()
   const { data: fornecedores = [] } = useFornecedores()
+  const centrosCusto = useLookupCentrosCusto()
+  const classesFinanceiras = useLookupClassesFinanceiras()
+
+  const centrosCustoOptions: SelectOption[] = centrosCusto.map(c => ({ value: c.descricao, label: c.descricao, code: c.codigo }))
+  const classesOptions: SelectOption[] = classesFinanceiras.map(c => ({ value: c.descricao, label: c.descricao, code: c.codigo }))
 
   const [tipo, setTipo] = useState<TipoContrato>('despesa')
   const [numero, setNumero] = useState('')
@@ -309,13 +317,21 @@ export default function NovoContrato() {
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <div>
             <label className={labelClass}>Centro de Custo</label>
-            <input value={centroCusto} onChange={e => setCentroCusto(e.target.value)}
-              placeholder="Ex: ADM, OBRA-123" className={inputClass} />
+            <SearchableSelect
+              options={centrosCustoOptions}
+              value={centroCusto}
+              onChange={setCentroCusto}
+              placeholder="Selecione o centro de custo"
+            />
           </div>
           <div>
             <label className={labelClass}>Classe Financeira</label>
-            <input value={classeFinanceira} onChange={e => setClasseFinanceira(e.target.value)}
-              placeholder="Ex: Serviços, Materiais" className={inputClass} />
+            <SearchableSelect
+              options={classesOptions}
+              value={classeFinanceira}
+              onChange={setClasseFinanceira}
+              placeholder="Selecione a classe financeira"
+            />
           </div>
           <div>
             <label className={labelClass}>Índice de Reajuste</label>
