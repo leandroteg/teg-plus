@@ -77,6 +77,14 @@ export default function FornecedorCadastroModal({
     }))
   }, []))
 
+  useEffect(() => {
+    if (!open) return
+    const cnpj = normalizeDigits(initialData.cnpj)
+    if (cnpj.length === 14) {
+      void cnpjLookup.consultar(cnpj)
+    }
+  }, [open, initialData.cnpj, cnpjLookup])
+
   const bg = dark ? 'bg-[#0f172a]' : 'bg-white'
   const border = dark ? 'border-white/10' : 'border-slate-200'
   const text = dark ? 'text-white' : 'text-slate-800'

@@ -32,15 +32,19 @@ import {
   useSincronizarRemessasPagamento,
 } from '../../hooks/useLotesPagamento'
 import { supabase } from '../../services/supabase'
+import { useConsultaCNPJ } from '../../hooks/useConsultas'
+import { useCadFornecedores } from '../../hooks/useCadastros'
+import { formatCNPJ, normalizeDigits } from '../../hooks/useFornecedorVinculo'
 import { useLookupCentrosCusto, useLookupClassesFinanceiras } from '../../hooks/useLookups'
 import SearchableSelect from '../../components/SearchableSelect'
 import type { SelectOption } from '../../components/SearchableSelect'
+import FornecedorCadastroModal, { type FornecedorFormData } from '../../components/FornecedorCadastroModal'
 import { useAuth } from '../../contexts/AuthContext'
 import { useDecisaoGenerica } from '../../hooks/useAprovacoes'
 import { useLookupCentrosCusto, useLookupClassesFinanceiras } from '../../hooks/useLookups'
 import { useAnexosPedido, useUploadAnexo, TIPO_LABEL } from '../../hooks/useAnexos'
 import type { PedidoAnexo } from '../../hooks/useAnexos'
-import type { ContaPagar, LotePagamento, StatusCP } from '../../types/financeiro'
+import type { ContaPagar, Fornecedor, LotePagamento, StatusCP } from '../../types/financeiro'
 import { CP_PIPELINE_STAGES } from '../../types/financeiro'
 
 // ══ Formatters ══════════════════════════════════════════════════
@@ -217,6 +221,8 @@ type NovaSolicitacaoExtraForm = {
   centro_custo: string
   classe_financeira: string
   valor: string
+  fornecedor_id: string
+  fornecedor_cnpj: string
   favorecido: string
   banco_nome: string
   agencia: string
@@ -244,6 +250,8 @@ const EMPTY_EXTRA_FORM: NovaSolicitacaoExtraForm = {
   centro_custo: '',
   classe_financeira: '',
   valor: '',
+  fornecedor_id: '',
+  fornecedor_cnpj: '',
   favorecido: '',
   banco_nome: '',
   agencia: '',
@@ -745,6 +753,7 @@ function NovaSolicitacaoExtraordinariaModal({
   const { perfil } = useAuth()
   const centrosCusto = useLookupCentrosCusto()
   const classesFinanceiras = useLookupClassesFinanceiras()
+  const { data: fornecedores = [] } = useCadFornecedores({ ativo: true })
   const criarSolicitacaoMut = useCriarSolicitacaoExtraordinariaCP()
   const [form, setForm] = useState<NovaSolicitacaoExtraForm>(EMPTY_EXTRA_FORM)
   const [arquivos, setArquivos] = useState<File[]>([])
@@ -753,12 +762,15 @@ function NovaSolicitacaoExtraordinariaModal({
   const [classeBusca, setClasseBusca] = useState('')
   const [ccOpen, setCcOpen] = useState(false)
   const [classeOpen, setClasseOpen] = useState(false)
+  const [fornecedorSelecionado, setFornecedorSelecionado] = useState<Fornecedor | null>(null)
+  const [showFornecedorCadastro, setShowFornecedorCadastro] = useState(false)
 
   const canSubmit = form.descricao.trim().length > 0
     && form.justificativa.trim().length > 0
     && form.centro_custo.length > 0
     && form.classe_financeira.length > 0
     && Number(form.valor) > 0
+    && form.fornecedor_id.length > 0
 
   const inputCls = `w-full rounded-xl px-3 py-2.5 text-sm outline-none transition-colors ${
     isDark
@@ -770,6 +782,85 @@ function NovaSolicitacaoExtraordinariaModal({
   const setField = (field: keyof NovaSolicitacaoExtraForm, value: string) => {
     setForm(prev => ({ ...prev, [field]: value }))
   }
+
+  const fornecedorPorCnpj = useMemo(() => {
+    const map = new Map<string, Fornecedor>()
+    for (const fornecedor of fornecedores) {
+      const digits = normalizeDigits(fornecedor.cnpj)
+      if (digits) map.set(digits, fornecedor)
+    }
+    return map
+  }, [fornecedores])
+
+  const preencherFornecedor = useCallback((fornecedor: Fornecedor) => {
+    setFornecedorSelecionado(fornecedor)
+    setForm(prev => ({
+      ...prev,
+      fornecedor_id: fornecedor.id,
+      fornecedor_cnpj: formatCNPJ(fornecedor.cnpj),
+      favorecido: fornecedor.nome_fantasia?.trim() || fornecedor.razao_social?.trim() || prev.favorecido,
+      banco_nome: fornecedor.banco_nome ?? '',
+      agencia: fornecedor.agencia ?? '',
+      conta: fornecedor.conta ?? '',
+      pix_tipo: fornecedor.pix_tipo ?? '',
+      pix_chave: fornecedor.pix_chave ?? '',
+    }))
+  }, [])
+
+  const cnpjLookup = useConsultaCNPJ(useCallback((result) => {
+    setForm(prev => ({
+      ...prev,
+      favorecido: result.nome_fantasia || result.razao_social || prev.favorecido,
+    }))
+  }, []))
+
+  const cnpjDigits = useMemo(() => normalizeDigits(form.fornecedor_cnpj), [form.fornecedor_cnpj])
+
+  const handleFornecedorLookup = useCallback(async (cnpjValue: string) => {
+    const digits = normalizeDigits(cnpjValue)
+    if (digits.length !== 14) {
+      setFornecedorSelecionado(null)
+      setForm(prev => ({ ...prev, fornecedor_id: '' }))
+      return
+    }
+
+    const fornecedorExistente = fornecedorPorCnpj.get(digits)
+    if (fornecedorExistente) {
+      preencherFornecedor(fornecedorExistente)
+      return
+    }
+
+    setFornecedorSelecionado(null)
+    setForm(prev => ({
+      ...prev,
+      fornecedor_id: '',
+      banco_nome: '',
+      agencia: '',
+      conta: '',
+      pix_tipo: '',
+      pix_chave: '',
+    }))
+    await cnpjLookup.consultar(digits)
+  }, [cnpjLookup, fornecedorPorCnpj, preencherFornecedor])
+
+  const fornecedorCadastroInitialData = useMemo<FornecedorFormData>(() => ({
+    cnpj: formatCNPJ(form.fornecedor_cnpj),
+    razao_social: cnpjLookup.dados?.razao_social || form.favorecido || '',
+    nome_fantasia: cnpjLookup.dados?.nome_fantasia || '',
+    telefone: cnpjLookup.dados?.telefone || '',
+    email: cnpjLookup.dados?.email || '',
+    endereco: cnpjLookup.dados?.endereco?.logradouro
+      ? [cnpjLookup.dados.endereco.logradouro, cnpjLookup.dados.endereco.numero].filter(Boolean).join(', ')
+      : '',
+    cidade: cnpjLookup.dados?.endereco?.cidade || '',
+    uf: cnpjLookup.dados?.endereco?.uf || '',
+    cep: cnpjLookup.dados?.endereco?.cep || '',
+    banco_nome: form.banco_nome,
+    agencia: form.agencia,
+    conta: form.conta,
+    pix_chave: form.pix_chave,
+    pix_tipo: form.pix_tipo,
+  }), [cnpjLookup.dados, form.agencia, form.banco_nome, form.conta, form.favorecido, form.fornecedor_cnpj, form.pix_chave, form.pix_tipo])
 
   const centrosFiltrados = centrosCusto
     .filter(cc => `${cc.codigo} ${cc.descricao}`.toLowerCase().includes(ccBusca.toLowerCase()))
@@ -803,6 +894,9 @@ function NovaSolicitacaoExtraordinariaModal({
         classe_financeira: form.classe_financeira,
         valor: Number(form.valor),
         solicitanteNome: perfil?.nome,
+        fornecedorId: form.fornecedor_id || undefined,
+        fornecedorNome: form.favorecido || undefined,
+        fornecedorCnpj: formatCNPJ(form.fornecedor_cnpj) || undefined,
         dadosBancarios: {
           favorecido: form.favorecido || undefined,
           banco_nome: form.banco_nome || undefined,
@@ -966,13 +1060,79 @@ function NovaSolicitacaoExtraordinariaModal({
           <div className={`rounded-xl border p-4 space-y-3 ${isDark ? 'border-white/[0.08] bg-white/[0.03]' : 'border-slate-200 bg-slate-50/70'}`}>
             <div>
               <p className={`text-xs font-bold ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>Dados bancários</p>
-              <p className={`text-[11px] mt-1 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Preencha quando o pagamento extraordinário exigir dados de depósito, transferência ou PIX.</p>
+              <p className={`text-[11px] mt-1 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Selecione o favorecido pelo CNPJ para reaproveitar o cadastro de fornecedores e os dados de pagamento existentes.</p>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
-                <label className={labelCls}>Favorecido</label>
+                <label className={labelCls}>CNPJ do Favorecido *</label>
+                <input
+                  value={form.fornecedor_cnpj}
+                  onChange={e => {
+                    const value = e.target.value
+                    setForm(prev => ({
+                      ...prev,
+                      fornecedor_cnpj: value,
+                      fornecedor_id: '',
+                    }))
+                    if (normalizeDigits(value).length < 14) {
+                      setFornecedorSelecionado(null)
+                    }
+                    if (normalizeDigits(value).length === 14) {
+                      void handleFornecedorLookup(value)
+                    }
+                  }}
+                  onBlur={() => void handleFornecedorLookup(form.fornecedor_cnpj)}
+                  className={inputCls}
+                  placeholder="00.000.000/0000-00"
+                />
+                {cnpjLookup.loading && <p className={`mt-1 text-[11px] ${isDark ? 'text-emerald-300' : 'text-emerald-600'}`}>Consultando CNPJ...</p>}
+                {cnpjLookup.erro && cnpjDigits.length === 14 && !fornecedorSelecionado && (
+                  <p className="mt-1 text-[11px] text-red-500">{cnpjLookup.erro}</p>
+                )}
+              </div>
+              <div>
+                <label className={labelCls}>Nome do Favorecido *</label>
                 <input value={form.favorecido} onChange={e => setField('favorecido', e.target.value)} className={inputCls} placeholder="Nome do favorecido" />
               </div>
+            </div>
+            <div className={`rounded-xl border px-3 py-3 ${isDark ? 'border-white/[0.08] bg-white/[0.03]' : 'border-slate-200 bg-white'}`}>
+              {fornecedorSelecionado ? (
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <p className={`text-xs font-bold ${isDark ? 'text-emerald-300' : 'text-emerald-700'}`}>Fornecedor encontrado no cadastro</p>
+                    <p className={`text-[11px] mt-1 ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
+                      {fornecedorSelecionado.razao_social}
+                      {fornecedorSelecionado.cnpj ? ` • ${formatCNPJ(fornecedorSelecionado.cnpj)}` : ''}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setShowFornecedorCadastro(true)}
+                    className={`px-3 py-2 rounded-xl text-xs font-semibold transition-colors ${isDark ? 'bg-white/10 text-slate-200 hover:bg-white/15' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'}`}
+                  >
+                    Editar fornecedor
+                  </button>
+                </div>
+              ) : (
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <p className={`text-xs font-bold ${isDark ? 'text-amber-300' : 'text-amber-700'}`}>Fornecedor ainda não cadastrado</p>
+                    <p className={`text-[11px] mt-1 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+                      Cadastre o fornecedor para vincular este pagamento extraordinário ao cadastro oficial.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setShowFornecedorCadastro(true)}
+                    disabled={cnpjDigits.length !== 14}
+                    className="px-3 py-2 rounded-xl text-xs font-semibold bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Cadastrar fornecedor
+                  </button>
+                </div>
+              )}
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <label className={labelCls}>Banco</label>
                 <input value={form.banco_nome} onChange={e => setField('banco_nome', e.target.value)} className={inputCls} placeholder="Nome do banco" />
@@ -1027,7 +1187,7 @@ function NovaSolicitacaoExtraordinariaModal({
 
           {!canSubmit && (
             <p className={`text-[11px] ${isDark ? 'text-amber-300' : 'text-amber-700'}`}>
-              Preencha descrição, justificativa, centro de custo, classe financeira e valor para liberar a criação.
+              Preencha descrição, justificativa, centro de custo, classe financeira, valor e selecione/cadastre o fornecedor para liberar a criação.
             </p>
           )}
           {erro && (
@@ -1045,6 +1205,18 @@ function NovaSolicitacaoExtraordinariaModal({
           </button>
         </div>
       </div>
+      <FornecedorCadastroModal
+        open={showFornecedorCadastro}
+        dark={isDark}
+        title="Cadastrar fornecedor para pagamento"
+        description="Use o CNPJ para buscar os dados principais e salvar o fornecedor já vinculado à solicitação extraordinária."
+        initialData={fornecedorCadastroInitialData}
+        onClose={() => setShowFornecedorCadastro(false)}
+        onSaved={(fornecedor) => {
+          setShowFornecedorCadastro(false)
+          preencherFornecedor(fornecedor)
+        }}
+      />
     </div>
   )
 }
