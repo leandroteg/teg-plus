@@ -160,10 +160,6 @@ function RegistrarPgtoModal({ cp, onClose, isDark }: RegistrarPgtoModalProps & {
 
   const handleConfirm = async () => {
     setErro('')
-    if (cp.pedido_id && !arquivo && !jaTemComprovante) {
-      setErro('Anexe o comprovante de pagamento antes de confirmar.')
-      return
-    }
     setLoading(true)
     try {
       // 1. Atualizar classificação (CC, classe financeira) se alterados
@@ -180,13 +176,18 @@ function RegistrarPgtoModal({ cp, onClose, isDark }: RegistrarPgtoModalProps & {
 
       // 2. Upload comprovante if a file was selected
       if (arquivo && cp.pedido_id) {
-        await uploadAnexo.mutateAsync({
-          pedidoId: cp.pedido_id,
-          file: arquivo,
-          tipo: 'comprovante_pagamento',
-          observacao: observacao || undefined,
-          origem: 'financeiro',
-        })
+        try {
+          await uploadAnexo.mutateAsync({
+            pedidoId: cp.pedido_id,
+            file: arquivo,
+            tipo: 'comprovante_pagamento',
+            observacao: observacao || undefined,
+            origem: 'financeiro',
+          })
+        } catch (uploadErr) {
+          console.warn('Falha no upload do comprovante:', uploadErr)
+          // Continua com o registro — comprovante pode ser anexado depois
+        }
       }
 
       // 3. Register payment
@@ -235,8 +236,8 @@ function RegistrarPgtoModal({ cp, onClose, isDark }: RegistrarPgtoModalProps & {
             <div>
               <p className="text-xs font-semibold text-slate-600 mb-2">
                 Comprovante de Pagamento{' '}
-                <span className={`font-normal ${jaTemComprovante ? 'text-emerald-600' : 'text-red-500'}`}>
-                  {jaTemComprovante ? '(já anexado no pedido)' : '(obrigatório)'}
+                <span className={`font-normal ${jaTemComprovante ? 'text-emerald-600' : 'text-slate-400'}`}>
+                  {jaTemComprovante ? '(já anexado no pedido)' : '(opcional)'}
                 </span>
               </p>
               <input
