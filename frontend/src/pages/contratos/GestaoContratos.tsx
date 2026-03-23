@@ -468,7 +468,7 @@ function TabContratos() {
                   return (
                     <tr key={c.id} onClick={() => nav(`/contratos/previsao?contrato=${c.id}`)} className="hover:bg-slate-50/80 transition-colors cursor-pointer">
                       <td className="px-3 py-2.5">
-                        <span className="text-xs font-mono font-semibold text-indigo-600 bg-indigo-50 rounded-md px-2 py-0.5">{c.numero}</span>
+                        <span className="text-[10px] font-mono font-semibold text-indigo-600 bg-indigo-50 rounded-md px-1.5 py-0.5 whitespace-nowrap">{c.numero}</span>
                       </td>
                       <td className="px-3 py-2.5">
                         <p className="text-sm font-semibold text-slate-700 truncate max-w-[220px]">{c.objeto}</p>
