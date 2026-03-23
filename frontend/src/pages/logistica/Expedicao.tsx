@@ -10,34 +10,10 @@ import {
   useDespacharViagem,
 } from '../../hooks/useLogistica'
 import { buildRomaneioDataFromSolicitacao, gerarRomaneioPDF } from '../../utils/romaneio-pdf'
+import { getDocumentoFiscalContext, getDocumentoFiscalLabel } from '../../utils/logisticaFiscal'
 import { StatusBadge } from './LogisticaHome'
 import { useTheme } from '../../contexts/ThemeContext'
 import type { IniciarTransportePayload, LogSolicitacao } from '../../types/logistica'
-
-// ── UF Detection ──────────────────────────────────────────────────────────────
-
-const CIDADES_MG = [
-  'araxa', 'araxá', 'frutal', 'ituiutaba', 'paracatu',
-  'perdizes', 'rio paranaiba', 'rio paranaíba', 'tres marias', 'três marias',
-]
-
-function detectUF(destino: string): 'MG' | 'outro' | 'indefinido' {
-  if (!destino) return 'indefinido'
-  const d = destino.toLowerCase().trim()
-  if (CIDADES_MG.some(c => d.includes(c))) return 'MG'
-  if (d.includes('se ') && !d.includes('campo grande')) return 'MG'
-  if (d.includes('campo grande') || d.includes('/ms') || d.includes(' ms')) return 'outro'
-  if (d.endsWith('/mg') || d.endsWith(' mg')) return 'MG'
-  return 'indefinido'
-}
-
-function getDocLabel(uf: 'MG' | 'outro' | 'indefinido'): string {
-  switch (uf) {
-    case 'MG': return 'Transporte dentro de MG — Romaneio disponível'
-    case 'outro': return 'Transporte interestadual — NF obrigatória'
-    case 'indefinido': return 'Destino não identificado — escolha o documento fiscal'
-  }
-}
 
 // ── Romaneio download (standalone, used by getDocStatus and ExpedicaoDetail) ──
 
@@ -157,16 +133,16 @@ export default function Expedicao() {
   // ── Open NF modal with smart defaults ──
 
   function openNfModal(s: LogSolicitacao) {
-    const uf = detectUF(s.destino)
+    const fiscalCtx = getDocumentoFiscalContext(s)
     setNfModal(s)
     setNfForm({
       emitente_cnpj: '',
       emitente_nome: '',
       destinatario_cnpj: '',
       destinatario_nome: s.obra_nome ?? '',
-      destinatario_uf: uf === 'MG' ? 'MG' : uf === 'outro' ? '' : '',
+      destinatario_uf: fiscalCtx.destinoUf || '',
       valor_total: 0,
-      cfop: uf === 'MG' ? '5.949' : uf === 'outro' ? '6.949' : '',
+      cfop: fiscalCtx.regra === 'romaneio' ? '5.949' : fiscalCtx.regra === 'nf' ? '6.949' : '',
       natureza_operacao: 'Remessa de Materiais',
       descricao: '',
     })
@@ -533,7 +509,7 @@ export default function Expedicao() {
                   <span className={`font-bold ${isDark ? 'text-violet-400' : 'text-violet-800'}`}>{nfModal.destino}</span>
                 </div>
                 <p className={`text-[11px] mt-1 ml-5 ${isDark ? 'text-violet-400' : 'text-violet-600'}`}>
-                  {detectUF(nfModal.destino) === 'outro' ? 'Transporte interestadual — NF obrigatória' : 'NF solicitada manualmente'}
+                  {getDocumentoFiscalContext(nfModal).regra === 'nf' ? 'Transporte interestadual — NF obrigatória' : 'NF solicitada manualmente'}
                 </p>
               </div>
 
@@ -1033,7 +1009,7 @@ function ExpedicaoDetail({
   const temRomaneio = solicitacao.status === 'romaneio_emitido'
   const nfSolicitada = solicitacao.doc_fiscal_tipo === 'nf' && solicitacao.status === 'aprovado'
   const temDocFiscal = temNfe || temRomaneio || solicitacao.status === 'nfe_emitida'
-  const uf = detectUF(solicitacao.destino)
+  const fiscalCtx = getDocumentoFiscalContext(solicitacao)
 
   const ITEMS_CHECKLIST = [
     ['itens_conferidos',       'Itens conferidos contra lista de materiais'],
@@ -1147,7 +1123,10 @@ function ExpedicaoDetail({
             <AlertTriangle size={14} className="text-amber-600" />
             <p className="text-xs font-semibold text-amber-700">Documento fiscal obrigatório para despacho</p>
           </div>
-          <p className="text-[10px] text-amber-600 ml-5">{getDocLabel(uf)}</p>
+          <p className="text-[10px] text-amber-600 ml-5">{getDocumentoFiscalLabel(fiscalCtx.regra)}</p>
+          {(fiscalCtx.origemUf || fiscalCtx.destinoUf) && (
+            <p className="text-[10px] text-amber-700 ml-5 mt-1 font-medium">UFs da rota: {fiscalCtx.origemUf || '—'} → {fiscalCtx.destinoUf || '—'}</p>
+          )}
         </div>
       )}
 
@@ -1157,7 +1136,7 @@ function ExpedicaoDetail({
         {!temDocFiscal && !nfSolicitada && (
           <>
             {/* MG → show Romaneio primary, NF secondary */}
-            {uf === 'MG' && (
+            {fiscalCtx.regra === 'romaneio' && (
               <>
                 <button onClick={onEmitirRomaneio}
                   className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-teal-600 hover:bg-teal-700
@@ -1172,7 +1151,7 @@ function ExpedicaoDetail({
               </>
             )}
             {/* Inter-state → show NF primary, Romaneio secondary */}
-            {uf === 'outro' && (
+            {fiscalCtx.regra === 'nf' && (
               <>
                 <button onClick={onSolicitarNF}
                   className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-violet-600 hover:bg-violet-700
@@ -1187,7 +1166,7 @@ function ExpedicaoDetail({
               </>
             )}
             {/* Indefinido → show both equal weight */}
-            {uf === 'indefinido' && (
+            {fiscalCtx.regra === 'indefinido' && (
               <>
                 <button onClick={onEmitirRomaneio}
                   className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-teal-600 hover:bg-teal-700

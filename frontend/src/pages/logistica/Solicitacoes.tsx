@@ -16,6 +16,7 @@ import { useTheme } from '../../contexts/ThemeContext'
 import type { CriarSolicitacaoPayload, TipoTransporte, StatusSolicitacao } from '../../types/logistica'
 import { useNavigate } from 'react-router-dom'
 import { useLookupCentrosCusto } from '../../hooks/useLookups'
+import { mergeCidadeUf } from '../../utils/logisticaFiscal'
 
 const UF_LIST = [
   'AC','AL','AM','AP','BA','CE','DF','ES','GO','MA','MG','MS','MT',
@@ -100,7 +101,13 @@ export default function Solicitacoes() {
   const set = (k: keyof CriarSolicitacaoPayload, v: any) => setForm(p => ({ ...p, [k]: v }))
 
   async function handleCriar() {
-    await criar.mutateAsync({ ...form, itens: itensForm.length > 0 ? itensForm : undefined })
+    const { origem_uf: _origemUf, destino_uf: _destinoUf, ...baseForm } = form
+    await criar.mutateAsync({
+      ...baseForm,
+      origem: mergeCidadeUf(form.origem, form.origem_uf),
+      destino: mergeCidadeUf(form.destino, form.destino_uf),
+      itens: itensForm.length > 0 ? itensForm : undefined,
+    })
     setShowForm(false)
     setForm({ ...EMPTY_FORM })
     setItensForm([])

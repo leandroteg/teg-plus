@@ -182,7 +182,9 @@ export interface LogSolicitacao {
   oc_numero?: string
 
   origem: string
+  origem_uf?: string
   destino: string
+  destino_uf?: string
   rota_id?: string
   rota?: LogRota
 
@@ -418,7 +420,9 @@ export interface LogisticaKPIs {
 export interface CriarSolicitacaoPayload {
   tipo: TipoTransporte
   origem: string
+  origem_uf?: string
   destino: string
+  destino_uf?: string
   descricao?: string
   obra_nome?: string
   centro_custo?: string

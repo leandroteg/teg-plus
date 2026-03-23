@@ -17,6 +17,7 @@ import { useLookupCentrosCusto } from '../../hooks/useLookups'
 import type { LogSolicitacao, StatusSolicitacaoPipeline, CriarSolicitacaoPayload, TipoTransporte } from '../../types/logistica'
 import { SOLICITACAO_PIPELINE_STAGES } from '../../types/logistica'
 import { lazy, Suspense } from 'react'
+import { getDocumentoFiscalContext, mergeCidadeUf } from '../../utils/logisticaFiscal'
 
 const PlanejamentoRotaModal = lazy(() => import('../../components/logistica/PlanejamentoRotaModal'))
 
@@ -101,6 +102,7 @@ function DetailModal({ sol, onClose, onAction, isDark }: {
   const txtMuted = isDark ? 'text-slate-400' : 'text-slate-400'
   const txtMain = isDark ? 'text-white' : 'text-slate-800'
   const fmtCurrency = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
+  const fiscalCtx = getDocumentoFiscalContext(sol)
 
   const hasPlanning = !!(sol.modal || sol.motorista_nome || sol.veiculo_placa || sol.data_prevista_saida || sol.custo_estimado != null || sol.transportadora || sol.rota_planejada)
   const hasLoad = !!(sol.descricao || sol.peso_total_kg || sol.volumes_total || sol.carga_especial || sol.observacoes_carga || (sol.itens && sol.itens.length > 0))
@@ -143,15 +145,21 @@ function DetailModal({ sol, onClose, onAction, isDark }: {
             <p className="text-[9px] font-bold text-orange-500 uppercase tracking-wider mb-2">Rota</p>
             <div className="flex items-center gap-3 text-sm">
               <div className="flex-1">
-                <p className={`font-bold ${txtMain}`}>{sol.origem}</p>
+                <p className={`font-bold ${txtMain}`}>{fiscalCtx.origemLabel}</p>
                 <p className={`text-[10px] ${txtMuted}`}>Origem</p>
               </div>
               <div className="text-orange-400 text-lg font-bold">→</div>
               <div className="flex-1 text-right">
-                <p className={`font-bold ${txtMain}`}>{sol.destino}</p>
+                <p className={`font-bold ${txtMain}`}>{fiscalCtx.destinoLabel}</p>
                 <p className={`text-[10px] ${txtMuted}`}>Destino</p>
               </div>
             </div>
+            {(fiscalCtx.origemUf || fiscalCtx.destinoUf) && (
+              <div className="flex items-center justify-between gap-2 mt-3 pt-3 border-t border-orange-200/60 text-[10px]">
+                <span className={txtMuted}>UFs da rota</span>
+                <span className={`font-semibold ${txtMain}`}>{fiscalCtx.origemUf || '—'} → {fiscalCtx.destinoUf || '—'}</span>
+              </div>
+            )}
             {/* KM + Tempo Estimado */}
             {(sol.distancia_km || sol.tempo_estimado_h) && (
               <div className="flex items-center gap-3 mt-3 pt-3 border-t border-orange-200/60">
@@ -933,7 +941,13 @@ function NovaSolicitacaoModal({ isDark, onClose, onSuccess }: {
 
   async function handleCriar() {
     if (!canSubmit) return
-    await criar.mutateAsync({ ...form, itens: itensForm.length > 0 ? itensForm : undefined })
+    const { origem_uf: _origemUf, destino_uf: _destinoUf, ...baseForm } = form
+    await criar.mutateAsync({
+      ...baseForm,
+      origem: mergeCidadeUf(form.origem, origemUF),
+      destino: mergeCidadeUf(form.destino, destinoUF),
+      itens: itensForm.length > 0 ? itensForm : undefined,
+    })
     onSuccess()
     onClose()
   }
