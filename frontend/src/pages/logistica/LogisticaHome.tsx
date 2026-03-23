@@ -32,22 +32,22 @@ const EMPTY_KPIS: LogisticaKPIs = {
 const STATUS_LABEL: Record<string, { label: string; dot: string; bg: string; text: string }> = {
   solicitado: { label: 'Solicitado', dot: 'bg-slate-400', bg: 'bg-slate-50', text: 'text-slate-600' },
   planejado: { label: 'Planejado', dot: 'bg-blue-400', bg: 'bg-blue-50', text: 'text-blue-700' },
-  aguardando_aprovacao: { label: 'Aguard. Aprov.', dot: 'bg-amber-400', bg: 'bg-amber-50', text: 'text-amber-700' },
+  aguardando_aprovacao: { label: 'Aguard. aprov.', dot: 'bg-amber-400', bg: 'bg-amber-50', text: 'text-amber-700' },
   aprovado: { label: 'Aprovado', dot: 'bg-indigo-400', bg: 'bg-indigo-50', text: 'text-indigo-700' },
   romaneio_emitido: { label: 'Romaneio', dot: 'bg-teal-400', bg: 'bg-teal-50', text: 'text-teal-700' },
-  nfe_emitida: { label: 'NF-e Emitida', dot: 'bg-violet-400', bg: 'bg-violet-50', text: 'text-violet-700' },
-  aguardando_coleta: { label: 'Aguard. Coleta', dot: 'bg-cyan-400', bg: 'bg-cyan-50', text: 'text-cyan-700' },
-  em_transito: { label: 'Em Trânsito', dot: 'bg-orange-400', bg: 'bg-orange-50', text: 'text-orange-700' },
+  nfe_emitida: { label: 'NF-e emitida', dot: 'bg-violet-400', bg: 'bg-violet-50', text: 'text-violet-700' },
+  aguardando_coleta: { label: 'Aguard. coleta', dot: 'bg-cyan-400', bg: 'bg-cyan-50', text: 'text-cyan-700' },
+  em_transito: { label: 'Em transito', dot: 'bg-orange-400', bg: 'bg-orange-50', text: 'text-orange-700' },
   entregue: { label: 'Entregue', dot: 'bg-teal-400', bg: 'bg-teal-50', text: 'text-teal-700' },
-  concluido: { label: 'Concluído', dot: 'bg-green-500', bg: 'bg-green-50', text: 'text-green-700' },
+  concluido: { label: 'Concluido', dot: 'bg-green-500', bg: 'bg-green-50', text: 'text-green-700' },
   recusado: { label: 'Recusado', dot: 'bg-red-400', bg: 'bg-red-50', text: 'text-red-700' },
   cancelado: { label: 'Cancelado', dot: 'bg-gray-400', bg: 'bg-gray-100', text: 'text-gray-500' },
 }
 
 const TIPO_LABEL: Record<string, string> = {
   viagem: 'Viagem',
-  mobilizacao: 'Mobilização',
-  transferencia_maquina: 'Transf. Máquina',
+  mobilizacao: 'Mobilizacao',
+  transferencia_maquina: 'Transf. maquina',
 }
 
 const OPERATIONAL_STATUSES = ['planejado', 'aprovado', 'nfe_emitida', 'aguardando_coleta', 'em_transito'] as const
@@ -71,6 +71,67 @@ function fmtDate(value?: string, withTime = false) {
 
 function fmtKm(value: number) {
   return value.toLocaleString('pt-BR', { maximumFractionDigits: value >= 100 ? 0 : 1 })
+}
+
+function fmtCurrency(value: number) {
+  return value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 })
+}
+
+function toneClasses(tone: 'sky' | 'emerald' | 'cyan' | 'amber' | 'teal' | 'orange' | 'blue' | 'violet' | 'red' | 'slate') {
+  const map = {
+    sky: {
+      text: 'text-sky-600',
+      soft: 'bg-sky-50 text-sky-700 border-sky-100',
+      icon: 'bg-sky-50 text-sky-500',
+    },
+    emerald: {
+      text: 'text-emerald-600',
+      soft: 'bg-emerald-50 text-emerald-700 border-emerald-100',
+      icon: 'bg-emerald-50 text-emerald-500',
+    },
+    cyan: {
+      text: 'text-cyan-600',
+      soft: 'bg-cyan-50 text-cyan-700 border-cyan-100',
+      icon: 'bg-cyan-50 text-cyan-500',
+    },
+    amber: {
+      text: 'text-amber-600',
+      soft: 'bg-amber-50 text-amber-700 border-amber-100',
+      icon: 'bg-amber-50 text-amber-500',
+    },
+    teal: {
+      text: 'text-teal-600',
+      soft: 'bg-teal-50 text-teal-700 border-teal-100',
+      icon: 'bg-teal-50 text-teal-500',
+    },
+    orange: {
+      text: 'text-orange-600',
+      soft: 'bg-orange-50 text-orange-700 border-orange-100',
+      icon: 'bg-orange-50 text-orange-500',
+    },
+    blue: {
+      text: 'text-blue-600',
+      soft: 'bg-blue-50 text-blue-700 border-blue-100',
+      icon: 'bg-blue-50 text-blue-500',
+    },
+    violet: {
+      text: 'text-violet-600',
+      soft: 'bg-violet-50 text-violet-700 border-violet-100',
+      icon: 'bg-violet-50 text-violet-500',
+    },
+    red: {
+      text: 'text-red-600',
+      soft: 'bg-red-50 text-red-700 border-red-100',
+      icon: 'bg-red-50 text-red-500',
+    },
+    slate: {
+      text: 'text-slate-500',
+      soft: 'bg-slate-50 text-slate-600 border-slate-100',
+      icon: 'bg-slate-50 text-slate-400',
+    },
+  } as const
+
+  return map[tone]
 }
 
 export function StatusBadge({ status }: { status: string }) {
@@ -114,8 +175,8 @@ export default function LogisticaHome() {
       const routeKey =
         tripKey ?? (sol.rota_planejada?.id ? `rota:${sol.rota_planejada.id}` : `trecho:${sol.origem}:${sol.destino}`)
       const routeLabel = tripKey
-        ? `${sol.viagem?.numero ?? 'Viagem'} · ${sol.viagem?.origem_principal ?? sol.origem} → ${sol.viagem?.destino_final ?? sol.destino}`
-        : sol.rota_planejada?.nome ?? `${sol.origem} → ${sol.destino}`
+        ? `${sol.viagem?.numero ?? 'Viagem'} · ${sol.viagem?.origem_principal ?? sol.origem} -> ${sol.viagem?.destino_final ?? sol.destino}`
+        : sol.rota_planejada?.nome ?? `${sol.origem} -> ${sol.destino}`
       const routeKm = sol.viagem?.distancia_total_km ?? sol.rota_planejada?.distancia_km ?? sol.distancia_km ?? 0
 
       if (tripKey) {
@@ -175,11 +236,13 @@ export default function LogisticaHome() {
     )
   }
 
+  const aguardandoConfirmacao = Math.max(0, kpis.entregues_hoje - kpis.confirmadas_hoje)
+
   return (
     <div className="space-y-5">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className={`text-xl font-extrabold ${isDark ? 'text-white' : 'text-navy'}`}>Painel — Logística</h1>
+          <h1 className={`text-xl font-extrabold ${isDark ? 'text-white' : 'text-navy'}`}>Painel - Logistica</h1>
           <p className={`text-xs mt-0.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
             Transportes, NF-e e rastreamento de entregas
           </p>
@@ -192,77 +255,117 @@ export default function LogisticaHome() {
         </button>
       </div>
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <KpiCard titulo="Abertas" valor={kpis.abertas} icon={ClipboardList} cor="text-orange-600" hexCor="#EA580C" />
-        <KpiCard titulo="Em Trânsito" valor={kpis.em_transito} icon={Truck} cor="text-blue-600" hexCor="#2563EB" />
-        <KpiCard
-          titulo="Urgentes Pendentes"
-          valor={kpis.urgentes_pendentes}
-          icon={AlertTriangle}
-          cor={kpis.urgentes_pendentes > 0 ? 'text-red-600' : 'text-slate-400'}
-          hexCor={kpis.urgentes_pendentes > 0 ? '#DC2626' : '#94A3B8'}
-          subtitulo={kpis.urgentes_pendentes > 0 ? 'Atenção!' : 'Nenhuma'}
-        />
-        <KpiCard titulo="NF-e no Mês" valor={kpis.nfe_emitidas_mes} icon={FileText} cor="text-violet-600" hexCor="#7C3AED" />
+      <div className="grid grid-cols-1 xl:grid-cols-[1.45fr_0.95fr] gap-3">
+        <section className={`rounded-3xl shadow-sm overflow-hidden ${isDark ? 'bg-[#1e293b] border border-white/[0.06]' : 'bg-white border border-slate-200'}`}>
+          <div className="p-5 md:p-6 space-y-5">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className={`text-[11px] font-bold uppercase tracking-[0.24em] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+                  Nucleo Operacional
+                </p>
+                <h2 className={`mt-2 text-2xl md:text-3xl font-black tracking-tight ${isDark ? 'text-white' : 'text-slate-900'}`}>
+                  {fmtKm(operationalView.kmProgramados)} km em malha ativa
+                </h2>
+                <p className={`mt-2 text-sm ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+                  {operationalView.rotasAtivas} rota(s)/viagem(ns) planejada(s), {transportesAtivos.length} transporte(s) acompanhados e {fmtCurrency(kpis.custo_total_mes)} em custo logístico no mes.
+                </p>
+              </div>
+              <div className={`hidden md:flex w-14 h-14 rounded-2xl items-center justify-center ${isDark ? 'bg-sky-500/10' : 'bg-sky-50'}`}>
+                <Route size={26} className="text-sky-500" />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+              <SpotlightMetric label="Rotas Planejadas" value={operationalView.rotasAtivas} tone="sky" note={`${operationalView.viagensEmExecucao} viagem(ns) em campo`} />
+              <SpotlightMetric
+                label="Transportes em Execucao"
+                value={transportesAtivos.length}
+                tone={operationalView.ocorrenciasAbertas > 0 ? 'amber' : 'emerald'}
+                note={operationalView.ocorrenciasAbertas > 0 ? `${operationalView.ocorrenciasAbertas} ocorrencia(s) aberta(s)` : 'Operacao fluindo'}
+              />
+              <SpotlightMetric
+                label="Proximas Coletas"
+                value={operationalView.proximasColetas.length}
+                tone={operationalView.coletasAtrasadas > 0 ? 'amber' : 'cyan'}
+                note={operationalView.coletasAtrasadas > 0 ? `${operationalView.coletasAtrasadas} em atraso` : 'Fila sob controle'}
+              />
+              <SpotlightMetric
+                label="Entregues Hoje"
+                value={kpis.entregues_hoje}
+                tone={aguardandoConfirmacao > 0 ? 'teal' : 'slate'}
+                note={`${kpis.confirmadas_hoje} confirmadas`}
+              />
+            </div>
+          </div>
+        </section>
+
+        <section className={`rounded-3xl shadow-sm overflow-hidden ${isDark ? 'bg-[#1e293b] border border-white/[0.06]' : 'bg-white border border-slate-200'}`}>
+          <div className="p-5 md:p-6 space-y-4">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className={`text-[11px] font-bold uppercase tracking-[0.24em] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+                  Janela Critica
+                </p>
+                <h2 className={`mt-2 text-lg font-black ${isDark ? 'text-white' : 'text-slate-900'}`}>
+                  O que exige acao primeiro
+                </h2>
+              </div>
+              <div className={`w-11 h-11 rounded-2xl flex items-center justify-center ${kpis.urgentes_pendentes > 0 ? 'bg-red-50' : isDark ? 'bg-white/5' : 'bg-slate-50'}`}>
+                <AlertTriangle size={18} className={kpis.urgentes_pendentes > 0 ? 'text-red-500' : 'text-slate-400'} />
+              </div>
+            </div>
+
+            <div className={`rounded-2xl p-4 ${kpis.urgentes_pendentes > 0 ? 'bg-red-50 border border-red-100' : isDark ? 'bg-white/[0.03] border border-white/[0.06]' : 'bg-slate-50 border border-slate-100'}`}>
+              <div className="flex items-end justify-between gap-3">
+                <div>
+                  <p className={`text-[11px] font-bold uppercase tracking-widest ${kpis.urgentes_pendentes > 0 ? 'text-red-600' : isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+                    Urgentes Pendentes
+                  </p>
+                  <p className={`mt-2 text-3xl font-black ${kpis.urgentes_pendentes > 0 ? 'text-red-600' : isDark ? 'text-white' : 'text-slate-800'}`}>
+                    {kpis.urgentes_pendentes}
+                  </p>
+                </div>
+                <div className="text-right">
+                  <p className={`text-xs font-semibold ${aguardandoConfirmacao > 0 ? 'text-amber-600' : isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+                    {aguardandoConfirmacao} aguardando confirmacao
+                  </p>
+                  <p className={`text-[10px] mt-1 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+                    SLA de confirmacao: ate 4h apos a entrega
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <MiniInfoCard label="NF-e no mes" value={kpis.nfe_emitidas_mes} note="documentos emitidos" icon={FileText} iconTone="text-violet-600" isDark={isDark} />
+              <MiniInfoCard label="Solicitacoes abertas" value={kpis.abertas} note="na fila operacional" icon={ClipboardList} iconTone="text-orange-600" isDark={isDark} />
+            </div>
+          </div>
+        </section>
       </div>
 
-      <div className="grid grid-cols-2 gap-3">
-        <div className={`rounded-2xl shadow-sm p-4 ${isDark ? 'bg-[#1e293b] border border-white/[0.06]' : 'bg-white border border-slate-200'}`}>
-          <div className="flex items-center gap-2 mb-3">
-            <Truck size={14} className="text-teal-500" />
-            <p className={`text-xs font-bold uppercase tracking-widest ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Entregues Hoje</p>
-          </div>
-          <p className="text-3xl font-extrabold text-teal-600">{kpis.entregues_hoje}</p>
-          <p className={`text-[10px] mt-1 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{kpis.confirmadas_hoje} confirmadas</p>
-        </div>
-        <div className={`rounded-2xl shadow-sm p-4 ${isDark ? 'bg-[#1e293b] border border-white/[0.06]' : 'bg-white border border-slate-200'}`}>
-          <div className="flex items-center gap-2 mb-3">
-            <Clock size={14} className="text-amber-500" />
-            <p className={`text-xs font-bold uppercase tracking-widest ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Aguard. Confirmação</p>
-          </div>
-          <p className={`text-3xl font-extrabold ${kpis.entregues_hoje - kpis.confirmadas_hoje > 0 ? 'text-amber-600' : isDark ? 'text-slate-500' : 'text-slate-400'}`}>
-            {Math.max(0, kpis.entregues_hoje - kpis.confirmadas_hoje)}
+      <section className={`rounded-2xl shadow-sm overflow-hidden ${isDark ? 'bg-[#1e293b] border border-white/[0.06]' : 'bg-white border border-slate-200'}`}>
+        <div className={`px-4 py-3 flex items-center justify-between ${isDark ? 'border-b border-white/[0.06]' : 'border-b border-slate-100'}`}>
+          <h2 className={`text-sm font-extrabold flex items-center gap-1.5 ${isDark ? 'text-white' : 'text-slate-800'}`}>
+            <Clock size={14} className="text-slate-500" /> Pulso por Status
+          </h2>
+          <p className={`text-[10px] font-semibold ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+            Resumo enxuto da fila
           </p>
-          <p className={`text-[10px] mt-1 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>SLA: até 4h após entrega</p>
         </div>
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
-        <KpiCard
-          titulo="Km em Rotas"
-          valor={fmtKm(operationalView.kmProgramados)}
-          icon={Route}
-          cor="text-sky-600"
-          hexCor="#0284C7"
-          subtitulo={`${operationalView.rotasAtivas} rota(s)/viagem(ns) planejada(s)`}
-        />
-        <KpiCard
-          titulo="Próx. Coletas"
-          valor={operationalView.proximasColetas.length}
-          icon={CalendarClock}
-          cor={operationalView.coletasAtrasadas > 0 ? 'text-amber-600' : 'text-cyan-600'}
-          hexCor={operationalView.coletasAtrasadas > 0 ? '#D97706' : '#0891B2'}
-          subtitulo={operationalView.coletasAtrasadas > 0 ? `${operationalView.coletasAtrasadas} em atraso` : 'Fila sob controle'}
-        />
-        <KpiCard
-          titulo="Transportes em Execução"
-          valor={transportesAtivos.length}
-          icon={Truck}
-          cor={operationalView.ocorrenciasAbertas > 0 ? 'text-orange-600' : 'text-emerald-600'}
-          hexCor={operationalView.ocorrenciasAbertas > 0 ? '#EA580C' : '#059669'}
-          subtitulo={
-            operationalView.ocorrenciasAbertas > 0
-              ? `${operationalView.ocorrenciasAbertas} ocorrência(s) aberta(s)`
-              : `${operationalView.viagensEmExecucao} viagem(ns) em campo`
-          }
-        />
-      </div>
+        <div className="p-4 grid grid-cols-2 lg:grid-cols-4 gap-3">
+          <CompactStatusCard label="Abertas" value={kpis.abertas} icon={ClipboardList} tone="orange" isDark={isDark} />
+          <CompactStatusCard label="Em transito" value={kpis.em_transito} icon={Truck} tone="blue" isDark={isDark} />
+          <CompactStatusCard label="Urgentes" value={kpis.urgentes_pendentes} icon={AlertTriangle} tone={kpis.urgentes_pendentes > 0 ? 'red' : 'slate'} isDark={isDark} />
+          <CompactStatusCard label="NF-e emitidas" value={kpis.nfe_emitidas_mes} icon={FileText} tone="violet" isDark={isDark} />
+        </div>
+      </section>
 
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-3">
         <section className={`rounded-2xl shadow-sm overflow-hidden ${isDark ? 'bg-[#1e293b] border border-white/[0.06]' : 'bg-white border border-slate-200'}`}>
           <div className={`px-4 py-3 flex items-center justify-between ${isDark ? 'border-b border-white/[0.06]' : 'border-b border-slate-100'}`}>
             <h2 className={`text-sm font-extrabold flex items-center gap-1.5 ${isDark ? 'text-white' : 'text-slate-800'}`}>
-              <CalendarClock size={14} className="text-cyan-500" /> Próximas Coletas
+              <CalendarClock size={14} className="text-cyan-500" /> Proximas Coletas
             </h2>
             <button onClick={() => nav('/logistica/transportes')} className="text-[10px] text-cyan-600 font-semibold flex items-center gap-0.5">
               Abrir fila <ArrowRight size={10} />
@@ -272,7 +375,7 @@ export default function LogisticaHome() {
             <EmptyPanel
               isDark={isDark}
               title="Nenhuma coleta pendente"
-              description="Assim que a expedição liberar uma carga, ela aparece aqui com a agenda prevista."
+              description="Assim que a expedicao liberar uma carga, ela aparece aqui com a agenda prevista."
             />
           ) : (
             <div className={`divide-y ${isDark ? 'divide-white/[0.04]' : 'divide-slate-50'}`}>
@@ -287,7 +390,7 @@ export default function LogisticaHome() {
                       <StatusBadge status={sol.status} />
                     </div>
                     <p className={`text-[10px] truncate ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
-                      {sol.origem} → {sol.destino}
+                      {sol.origem} {'->'} {sol.destino}
                       {sol.rota_planejada?.distancia_km ? ` · ${fmtKm(sol.rota_planejada.distancia_km)} km` : sol.distancia_km ? ` · ${fmtKm(sol.distancia_km)} km` : ''}
                     </p>
                   </div>
@@ -296,7 +399,7 @@ export default function LogisticaHome() {
                       {fmtDate(sol.data_prevista_saida ?? sol.data_desejada, Boolean(sol.data_prevista_saida))}
                     </p>
                     <p className={`text-[10px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
-                      {sol.transportadora?.nome_fantasia ?? sol.motorista_nome ?? 'Aguardando definição'}
+                      {sol.transportadora?.nome_fantasia ?? sol.motorista_nome ?? 'Aguardando definicao'}
                     </p>
                   </div>
                 </div>
@@ -328,7 +431,7 @@ export default function LogisticaHome() {
                     <div className="min-w-0">
                       <p className={`text-xs font-bold truncate ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>{rota.label}</p>
                       <p className={`text-[10px] mt-0.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
-                        {rota.solicitacoes} solicitação(ões) em rota
+                        {rota.solicitacoes} solicitacao(oes) em rota
                       </p>
                     </div>
                     <div className="text-right shrink-0">
@@ -345,7 +448,7 @@ export default function LogisticaHome() {
       <section className={`rounded-2xl shadow-sm overflow-hidden ${isDark ? 'bg-[#1e293b] border border-white/[0.06]' : 'bg-white border border-slate-200'}`}>
         <div className={`px-4 py-3 flex items-center justify-between ${isDark ? 'border-b border-white/[0.06]' : 'border-b border-slate-100'}`}>
           <h2 className={`text-sm font-extrabold flex items-center gap-1.5 ${isDark ? 'text-white' : 'text-slate-800'}`}>
-            <Truck size={14} className="text-orange-500" /> Transportes em Execução
+            <Truck size={14} className="text-orange-500" /> Transportes em Execucao
           </h2>
           <button onClick={() => nav('/logistica/transportes')} className="text-[10px] text-orange-600 font-semibold flex items-center gap-0.5">
             Ver todos <ArrowRight size={10} />
@@ -355,7 +458,7 @@ export default function LogisticaHome() {
           <EmptyPanel
             isDark={isDark}
             title="Nenhum transporte em campo"
-            description="Quando a carga sair para coleta ou entrega, o operador acompanha a execução por aqui."
+            description="Quando a carga sair para coleta ou entrega, o operador acompanha a execucao por aqui."
           />
         ) : (
           <div className={`divide-y ${isDark ? 'divide-white/[0.04]' : 'divide-slate-50'}`}>
@@ -381,15 +484,15 @@ export default function LogisticaHome() {
                       {ocorrenciasAbertas > 0 && <span className="text-[9px] bg-red-100 text-red-700 font-bold px-1.5 py-0.5 rounded-full">{ocorrenciasAbertas} ocorr.</span>}
                     </div>
                     <p className={`text-[10px] truncate ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
-                      {sol?.origem ?? transporte.viagem?.origem_principal ?? 'Origem'} → {sol?.destino ?? transporte.viagem?.destino_final ?? 'Destino'}
+                      {sol?.origem ?? transporte.viagem?.origem_principal ?? 'Origem'} {'->'} {sol?.destino ?? transporte.viagem?.destino_final ?? 'Destino'}
                       {transporte.viagem?.numero ? ` · ${transporte.viagem.numero}` : ''}
                     </p>
                   </div>
                   <div className="text-right shrink-0">
                     <p className={`text-xs font-semibold ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
-                      {transporte.motorista_nome ?? transporte.viagem?.motorista_nome ?? '—'}
+                      {transporte.motorista_nome ?? transporte.viagem?.motorista_nome ?? '-'}
                     </p>
-                    <p className={`text-[10px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{transporte.placa ?? transporte.viagem?.veiculo_placa ?? '—'}</p>
+                    <p className={`text-[10px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{transporte.placa ?? transporte.viagem?.veiculo_placa ?? '-'}</p>
                     <p className={`text-[10px] ${atraso ? 'text-amber-600' : isDark ? 'text-slate-500' : 'text-slate-400'}`}>
                       ETA {fmtDate(transporte.eta_atual, true)}
                     </p>
@@ -405,7 +508,7 @@ export default function LogisticaHome() {
         <section className={`rounded-2xl shadow-sm overflow-hidden ${isDark ? 'bg-[#1e293b] border border-red-500/30' : 'bg-white border border-red-200'}`}>
           <div className={`px-4 py-3 flex items-center justify-between ${isDark ? 'border-b border-red-500/20' : 'border-b border-red-100'}`}>
             <h2 className={`text-sm font-extrabold flex items-center gap-1.5 ${isDark ? 'text-red-400' : 'text-red-800'}`}>
-              <AlertTriangle size={14} className="text-red-500" /> Solicitações Urgentes
+              <AlertTriangle size={14} className="text-red-500" /> Solicitacoes Urgentes
             </h2>
             <button onClick={() => nav('/logistica/solicitacoes')} className="text-[10px] text-red-600 font-semibold flex items-center gap-0.5">
               Ver todas <ArrowRight size={10} />
@@ -420,7 +523,7 @@ export default function LogisticaHome() {
                 <div className="flex-1 min-w-0">
                   <p className={`text-xs font-extrabold font-mono ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>{sol.numero}</p>
                   <p className={`text-[10px] truncate ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
-                    {TIPO_LABEL[sol.tipo] ?? sol.tipo} · {sol.origem} → {sol.destino}
+                      {TIPO_LABEL[sol.tipo] ?? sol.tipo} · {sol.origem} {'->'} {sol.destino}
                   </p>
                 </div>
                 <div className="text-right shrink-0">
@@ -440,33 +543,83 @@ export default function LogisticaHome() {
   )
 }
 
-function KpiCard({
-  titulo,
-  valor,
-  icon: Icon,
-  cor,
-  hexCor,
-  subtitulo,
+function SpotlightMetric({
+  label,
+  value,
+  note,
+  tone,
 }: {
-  titulo: string
-  valor: number | string
-  icon: typeof ClipboardList
-  cor: string
-  hexCor: string
-  subtitulo?: string
+  label: string
+  value: number | string
+  note: string
+  tone: 'sky' | 'emerald' | 'cyan' | 'amber' | 'teal' | 'slate'
 }) {
   const { isDark } = useTheme()
+  const palette = toneClasses(tone)
 
   return (
-    <div className={`rounded-2xl shadow-sm overflow-hidden flex ${isDark ? 'bg-[#1e293b] border border-white/[0.06]' : 'bg-white border border-slate-200'}`}>
-      <div className="w-[3px] shrink-0" style={{ backgroundColor: hexCor }} />
-      <div className="p-4 flex-1 min-w-0">
-        <div className="w-8 h-8 rounded-xl flex items-center justify-center mb-2" style={{ backgroundColor: `${hexCor}18` }}>
-          <Icon size={14} className={cor} />
+    <div className={`rounded-2xl border px-4 py-3 ${isDark ? 'border-white/[0.06] bg-white/[0.03]' : `${palette.soft} border`}`}>
+      <p className={`text-[10px] font-bold uppercase tracking-widest ${isDark ? 'text-slate-500' : 'text-slate-500'}`}>{label}</p>
+      <p className={`mt-2 text-2xl font-black ${palette.text}`}>{value}</p>
+      <p className={`text-[10px] mt-1 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{note}</p>
+    </div>
+  )
+}
+
+function CompactStatusCard({
+  label,
+  value,
+  icon: Icon,
+  tone,
+  isDark,
+}: {
+  label: string
+  value: number
+  icon: typeof ClipboardList
+  tone: 'orange' | 'blue' | 'red' | 'violet' | 'slate'
+  isDark: boolean
+}) {
+  const palette = toneClasses(tone)
+
+  return (
+    <div className={`rounded-2xl border px-3 py-3 flex items-center gap-3 ${isDark ? 'border-white/[0.06] bg-white/[0.03]' : 'border-slate-100 bg-slate-50/80'}`}>
+      <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${isDark ? 'bg-white/5 text-slate-300' : palette.icon}`}>
+        <Icon size={15} />
+      </div>
+      <div className="min-w-0">
+        <p className={`text-lg font-black leading-none ${palette.text}`}>{value}</p>
+        <p className={`text-[10px] mt-1 font-semibold uppercase tracking-widest ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{label}</p>
+      </div>
+    </div>
+  )
+}
+
+function MiniInfoCard({
+  label,
+  value,
+  note,
+  icon: Icon,
+  iconTone,
+  isDark,
+}: {
+  label: string
+  value: number
+  note: string
+  icon: typeof ClipboardList
+  iconTone: string
+  isDark: boolean
+}) {
+  return (
+    <div className={`rounded-2xl border px-4 py-3 ${isDark ? 'border-white/[0.06] bg-white/[0.03]' : 'border-slate-100 bg-slate-50/80'}`}>
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className={`text-[10px] font-bold uppercase tracking-widest ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{label}</p>
+          <p className={`mt-2 text-2xl font-black ${isDark ? 'text-white' : 'text-slate-900'}`}>{value}</p>
+          <p className={`text-[10px] mt-1 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{note}</p>
         </div>
-        <p className={`text-xl font-extrabold ${cor} leading-none`}>{valor}</p>
-        <p className={`text-[10px] font-semibold mt-1 uppercase tracking-widest ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{titulo}</p>
-        {subtitulo && <p className={`text-[10px] mt-0.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{subtitulo}</p>}
+        <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${isDark ? 'bg-white/5' : 'bg-white'}`}>
+          <Icon size={15} className={iconTone} />
+        </div>
       </div>
     </div>
   )
