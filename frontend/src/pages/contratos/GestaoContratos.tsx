@@ -481,8 +481,11 @@ function TabContratos() {
                           {isReceita ? 'Receita' : 'Despesa'}
                         </span>
                       </td>
-                      <td className={`px-3 py-2.5 text-right text-xs font-bold ${isReceita ? 'text-emerald-600' : 'text-amber-600'}`}>
-                        {fmt(c.valor_total + (c.valor_aditivos || 0))}
+                      <td className={`px-3 py-2.5 text-right ${isReceita ? 'text-emerald-600' : 'text-amber-600'}`}>
+                        <span className="text-xs font-bold">{fmt(c.valor_total + (c.valor_aditivos || 0))}</span>
+                        {(c as any).valor_mensal && (
+                          <p className="text-[9px] text-indigo-500 font-semibold">{fmt((c as any).valor_mensal)}/mês</p>
+                        )}
                       </td>
                       <td className="px-3 py-2.5 text-center hidden sm:table-cell">
                         <span className={`inline-flex items-center gap-1 rounded-full text-[10px] font-semibold px-2 py-0.5 ${sc.bg} ${sc.text}`}>

@@ -302,6 +302,8 @@ export function useAvancarEtapa() {
                   objeto:             sol.objeto,
                   descricao:          sol.descricao_escopo ?? undefined,
                   valor_total:        valorContrato,
+                  valor_mensal:       sol.valor_mensal ?? undefined,
+                  recorrente:         sol.recorrente ?? false,
                   data_assinatura:    today,
                   data_inicio:        sol.data_inicio_prevista ?? today,
                   data_fim_previsto:  sol.data_fim_prevista ?? today,

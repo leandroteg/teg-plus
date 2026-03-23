@@ -47,6 +47,88 @@ type PedidoListItem = Pedido & {
   source_cotacao?: Pick<Cotacao, 'id' | 'comprador_id'>
 }
 
+function SolicitarContratoForm({ valorMensal, pedido, onSuccess }: {
+  valorMensal: number
+  pedido: PedidoListItem
+  onSuccess: () => void
+}) {
+  const [prazoMeses, setPrazoMeses] = useState(12)
+  const [enviando, setEnviando] = useState(false)
+  const valorTotal = valorMensal * prazoMeses
+
+  const handleSolicitar = async () => {
+    if (prazoMeses < 1) return
+    setEnviando(true)
+    try {
+      const num = `SOL-CON-${new Date().getFullYear()}-${String(Math.floor(Math.random() * 9000) + 1000)}`
+      const { error: solErr } = await supabase.from('con_solicitacoes').insert({
+        numero: num,
+        objeto: pedido.requisicao?.descricao || 'Contrato recorrente',
+        solicitante_nome: (pedido.requisicao as any)?.solicitante_nome || 'Solicitante',
+        tipo_contraparte: 'fornecedor',
+        contraparte_nome: pedido.fornecedor_nome || 'A definir',
+        tipo_contrato: 'despesa',
+        categoria_contrato: 'prestacao_servico',
+        grupo_contrato: 'prestacao_servicos',
+        obra_id: (pedido.requisicao as any)?.obra_id || null,
+        valor_estimado: valorTotal,
+        valor_mensal: valorMensal,
+        prazo_meses: prazoMeses,
+        recorrente: true,
+        etapa_atual: 'solicitacao',
+        status: 'em_andamento',
+        requisicao_origem_id: pedido.requisicao_id,
+      })
+      if (solErr) throw solErr
+      await supabase.from('cmp_requisicoes').update({ status: 'aguardando_contrato' }).eq('id', pedido.requisicao_id)
+      onSuccess()
+    } catch (err: any) {
+      alert(`Erro: ${err?.message || 'falha ao criar solicitação'}`)
+      setEnviando(false)
+    }
+  }
+
+  const fmt = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
+
+  return (
+    <div className="space-y-3">
+      <div className="bg-indigo-50/60 border border-indigo-200 rounded-xl p-3 space-y-2.5">
+        <p className="text-[10px] font-bold text-indigo-600 uppercase tracking-wider">Contrato Recorrente</p>
+        <div className="grid grid-cols-2 gap-2">
+          <div>
+            <label className="text-[10px] text-indigo-500 font-semibold">Valor Mensal</label>
+            <p className="text-sm font-extrabold text-indigo-700">{fmt(valorMensal)}</p>
+          </div>
+          <div>
+            <label className="text-[10px] text-indigo-500 font-semibold block mb-1">Prazo (meses)</label>
+            <input
+              type="number" min={1} max={120}
+              value={prazoMeses}
+              onChange={e => setPrazoMeses(Math.max(1, parseInt(e.target.value) || 1))}
+              className="w-full border border-indigo-300 rounded-lg px-2.5 py-1.5 text-sm font-bold text-indigo-800 bg-white focus:ring-2 focus:ring-indigo-300 outline-none"
+            />
+          </div>
+        </div>
+        <div className="flex items-center justify-between pt-1 border-t border-indigo-200">
+          <span className="text-[10px] text-indigo-500 font-semibold">Valor Total do Contrato</span>
+          <span className="text-sm font-extrabold text-indigo-800">{fmt(valorTotal)}</span>
+        </div>
+        <p className="text-[10px] text-indigo-400">{fmt(valorMensal)}/mês × {prazoMeses} meses</p>
+      </div>
+      <button
+        onClick={handleSolicitar}
+        disabled={enviando || prazoMeses < 1}
+        className="w-full flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-bold border transition-all bg-indigo-600 text-white border-indigo-700 hover:bg-indigo-700 disabled:opacity-50"
+      >
+        {enviando
+          ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+          : <FileText size={16} />}
+        {enviando ? 'Criando...' : 'Solicitar Contrato'}
+      </button>
+    </div>
+  )
+}
+
 function FornecedorSelectorModal({
   open,
   dark,
@@ -1514,37 +1596,11 @@ function DetailModal({
             {pending && (
               <>
                 {(pedido.requisicao as any)?.compra_recorrente ? (
-                  <button
-                    onClick={async () => {
-                      try {
-                        const num = `SOL-CON-${new Date().getFullYear()}-${String(Math.floor(Math.random() * 9000) + 1000)}`
-                        const { error: solErr } = await supabase.from('con_solicitacoes').insert({
-                          numero: num,
-                          objeto: pedido.requisicao?.descricao || 'Contrato recorrente',
-                          solicitante_nome: (pedido.requisicao as any)?.solicitante_nome || 'Solicitante',
-                          tipo_contraparte: 'fornecedor',
-                          contraparte_nome: pedido.fornecedor_nome || 'A definir',
-                          tipo_contrato: 'despesa',
-                          categoria_contrato: 'prestacao_servico',
-                          grupo_contrato: 'prestacao_servicos',
-                          obra_id: (pedido.requisicao as any)?.obra_id || null,
-                          valor_estimado: pedido.valor_total || 0,
-                          etapa_atual: 'solicitacao',
-                          status: 'em_andamento',
-                          requisicao_origem_id: pedido.requisicao_id,
-                        })
-                        if (solErr) throw solErr
-                        await supabase.from('cmp_requisicoes').update({ status: 'aguardando_contrato' }).eq('id', pedido.requisicao_id)
-                        onClose()
-                        window.location.href = '/contratos/solicitacoes'
-                      } catch (err: any) {
-                        alert(`Erro: ${err?.message || 'falha ao criar solicitação'}`)
-                      }
-                    }}
-                    className="w-full flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-bold border transition-all bg-indigo-50 text-indigo-700 border-indigo-300 hover:bg-indigo-600 hover:text-white"
-                  >
-                    <FileText size={16} /> Solicitar Contrato
-                  </button>
+                  <SolicitarContratoForm
+                    valorMensal={pedido.valor_total || 0}
+                    pedido={pedido}
+                    onSuccess={() => { onClose(); window.location.href = '/contratos/solicitacoes' }}
+                  />
                 ) : (
                   <button
                     onClick={() => {

@@ -1093,7 +1093,10 @@ export default function SolicitacaoDetalhe() {
                   const grupoLabel = GRUPO_CONTRATO_LABEL[s.grupo_contrato as GrupoContrato] ?? s.grupo_contrato ?? s.categoria_contrato
                   return s.subtipo_contrato ? `${grupoLabel} — ${s.subtipo_contrato}` : grupoLabel
                 })()} icon={Tag} />
-                <InfoItem label="Valor Estimado" value={s.valor_estimado ? fmt(s.valor_estimado) : undefined} icon={DollarSign} />
+                <InfoItem label={(s as any).recorrente ? 'Valor Total (contrato)' : 'Valor Estimado'} value={s.valor_estimado ? fmt(s.valor_estimado) : undefined} icon={DollarSign} />
+                {(s as any).valor_mensal && (
+                  <InfoItem label="Valor Mensal" value={`${fmt((s as any).valor_mensal)}${s.prazo_meses ? ` × ${s.prazo_meses} meses` : ''}`} icon={DollarSign} />
+                )}
                 <InfoItem label="Forma de Pagamento" value={s.forma_pagamento} icon={DollarSign} />
                 <InfoItem label="Vigência" value={vigencia} icon={Calendar} />
                 <InfoItem label="Prazo (meses)" value={s.prazo_meses ? `${s.prazo_meses} meses` : undefined} icon={Clock} />
