@@ -222,27 +222,27 @@ export default function LogisticaHome() {
         </button>
       </div>
 
-      <div className="grid grid-cols-1 xl:grid-cols-[1.45fr_0.95fr] gap-3">
+      <div className="grid grid-cols-1 xl:grid-cols-[1.52fr_0.88fr] gap-3">
         <section className={`rounded-3xl shadow-sm overflow-hidden ${isDark ? 'bg-[#1e293b] border border-white/[0.06]' : 'bg-white border border-slate-200'}`}>
-          <div className="p-5 md:p-6 space-y-5">
+          <div className="p-4 md:p-5 space-y-4">
             <div className="flex items-start justify-between gap-4">
               <div>
                 <p className={`text-[11px] font-bold uppercase tracking-[0.24em] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
                   Nucleo Operacional
                 </p>
-                <h2 className={`mt-2 text-2xl md:text-3xl font-black tracking-tight ${isDark ? 'text-white' : 'text-slate-900'}`}>
+                <h2 className={`mt-1.5 text-[1.9rem] md:text-[2.45rem] leading-none font-black tracking-tight ${isDark ? 'text-white' : 'text-slate-900'}`}>
                   {fmtKm(operationalView.kmProgramados)} km em malha ativa
                 </h2>
-                <p className={`mt-2 text-sm ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+                <p className={`mt-2 text-[13px] ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
                   {operationalView.rotasAtivas} rota(s)/viagem(ns) planejada(s), {transportesAtivos.length} transporte(s) acompanhados e {fmtCurrency(kpis.custo_total_mes)} em custo logistico no mes.
                 </p>
               </div>
-              <div className={`hidden md:flex w-14 h-14 rounded-2xl items-center justify-center ${isDark ? 'bg-sky-500/10' : 'bg-sky-50'}`}>
-                <Route size={26} className="text-sky-500" />
+              <div className={`hidden md:flex w-12 h-12 rounded-2xl items-center justify-center ${isDark ? 'bg-sky-500/10' : 'bg-sky-50'}`}>
+                <Route size={22} className="text-sky-500" />
               </div>
             </div>
 
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5">
               <SpotlightMetric label="Rotas Planejadas" value={operationalView.rotasAtivas} tone="sky" note={`${operationalView.viagensEmExecucao} viagem(ns) em campo`} />
               <SpotlightMetric
                 label="Transportes em Execucao"
@@ -267,28 +267,28 @@ export default function LogisticaHome() {
         </section>
 
         <section className={`rounded-3xl shadow-sm overflow-hidden ${isDark ? 'bg-[#1e293b] border border-white/[0.06]' : 'bg-white border border-slate-200'}`}>
-          <div className="p-5 md:p-6 space-y-4">
+          <div className="p-4 md:p-5 space-y-3">
             <div className="flex items-start justify-between gap-3">
               <div>
                 <p className={`text-[11px] font-bold uppercase tracking-[0.24em] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
                   Janela Critica
                 </p>
-                <h2 className={`mt-2 text-lg font-black ${isDark ? 'text-white' : 'text-slate-900'}`}>
+                <h2 className={`mt-1.5 text-base md:text-[17px] font-black ${isDark ? 'text-white' : 'text-slate-900'}`}>
                   O que exige acao primeiro
                 </h2>
               </div>
-              <div className={`w-11 h-11 rounded-2xl flex items-center justify-center ${kpis.urgentes_pendentes > 0 ? 'bg-red-50' : isDark ? 'bg-white/5' : 'bg-slate-50'}`}>
-                <AlertTriangle size={18} className={kpis.urgentes_pendentes > 0 ? 'text-red-500' : 'text-slate-400'} />
+              <div className={`w-10 h-10 rounded-2xl flex items-center justify-center ${kpis.urgentes_pendentes > 0 ? 'bg-red-50' : isDark ? 'bg-white/5' : 'bg-slate-50'}`}>
+                <AlertTriangle size={16} className={kpis.urgentes_pendentes > 0 ? 'text-red-500' : 'text-slate-400'} />
               </div>
             </div>
 
-            <div className={`rounded-2xl p-4 ${kpis.urgentes_pendentes > 0 ? 'bg-red-50 border border-red-100' : isDark ? 'bg-white/[0.03] border border-white/[0.06]' : 'bg-slate-50 border border-slate-100'}`}>
+            <div className={`rounded-2xl p-3 ${kpis.urgentes_pendentes > 0 ? 'bg-red-50 border border-red-100' : isDark ? 'bg-white/[0.03] border border-white/[0.06]' : 'bg-slate-50 border border-slate-100'}`}>
               <div className="flex items-end justify-between gap-3">
                 <div>
                   <p className={`text-[11px] font-bold uppercase tracking-widest ${kpis.urgentes_pendentes > 0 ? 'text-red-600' : isDark ? 'text-slate-400' : 'text-slate-500'}`}>
                     Urgentes Pendentes
                   </p>
-                  <p className={`mt-2 text-3xl font-black ${kpis.urgentes_pendentes > 0 ? 'text-red-600' : isDark ? 'text-white' : 'text-slate-800'}`}>
+                  <p className={`mt-1.5 text-[2rem] leading-none font-black ${kpis.urgentes_pendentes > 0 ? 'text-red-600' : isDark ? 'text-white' : 'text-slate-800'}`}>
                     {kpis.urgentes_pendentes}
                   </p>
                 </div>
@@ -296,14 +296,14 @@ export default function LogisticaHome() {
                   <p className={`text-xs font-semibold ${aguardandoConfirmacao > 0 ? 'text-amber-600' : isDark ? 'text-slate-400' : 'text-slate-500'}`}>
                     {aguardandoConfirmacao} aguardando confirmacao
                   </p>
-                  <p className={`text-[10px] mt-1 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+                  <p className={`text-[10px] mt-0.5 leading-snug ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
                     SLA de confirmacao: ate 4h apos a entrega
                   </p>
                 </div>
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-2 gap-2.5">
               <MiniInfoCard label="NF-e no mes" value={kpis.nfe_emitidas_mes} note="documentos emitidos" icon={FileText} iconTone="text-violet-600" isDark={isDark} />
               <MiniInfoCard label="Solicitacoes abertas" value={kpis.abertas} note="na fila operacional" icon={ClipboardList} iconTone="text-orange-600" isDark={isDark} />
             </div>
@@ -540,10 +540,10 @@ function SpotlightMetric({
   const palette = toneClasses(tone)
 
   return (
-    <div className={`rounded-2xl border px-4 py-3 ${isDark ? 'border-white/[0.06] bg-white/[0.03]' : `${palette.soft} border`}`}>
+    <div className={`rounded-2xl border px-3.5 py-2.5 ${isDark ? 'border-white/[0.06] bg-white/[0.03]' : `${palette.soft} border`}`}>
       <p className={`text-[10px] font-bold uppercase tracking-widest ${isDark ? 'text-slate-500' : 'text-slate-500'}`}>{label}</p>
-      <p className={`mt-2 text-2xl font-black ${palette.text}`}>{value}</p>
-      <p className={`text-[10px] mt-1 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{note}</p>
+      <p className={`mt-1.5 text-[1.85rem] leading-none font-black ${palette.text}`}>{value}</p>
+      <p className={`text-[10px] mt-1 leading-snug ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{note}</p>
     </div>
   )
 }
@@ -652,15 +652,15 @@ function MiniInfoCard({
   isDark: boolean
 }) {
   return (
-    <div className={`rounded-2xl border px-4 py-3 ${isDark ? 'border-white/[0.06] bg-white/[0.03]' : 'border-slate-100 bg-slate-50/80'}`}>
+    <div className={`rounded-2xl border px-3.5 py-3 ${isDark ? 'border-white/[0.06] bg-white/[0.03]' : 'border-slate-100 bg-slate-50/80'}`}>
       <div className="flex items-start justify-between gap-3">
         <div>
           <p className={`text-[10px] font-bold uppercase tracking-widest ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{label}</p>
-          <p className={`mt-2 text-2xl font-black ${isDark ? 'text-white' : 'text-slate-900'}`}>{value}</p>
-          <p className={`text-[10px] mt-1 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{note}</p>
+          <p className={`mt-1.5 text-[1.85rem] leading-none font-black ${isDark ? 'text-white' : 'text-slate-900'}`}>{value}</p>
+          <p className={`text-[10px] mt-1 leading-snug ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{note}</p>
         </div>
-        <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${isDark ? 'bg-white/5' : 'bg-white'}`}>
-          <Icon size={15} className={iconTone} />
+        <div className={`w-8 h-8 rounded-xl flex items-center justify-center ${isDark ? 'bg-white/5' : 'bg-white'}`}>
+          <Icon size={14} className={iconTone} />
         </div>
       </div>
     </div>
