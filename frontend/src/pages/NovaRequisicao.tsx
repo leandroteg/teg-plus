@@ -801,7 +801,15 @@ export default function NovaRequisicao() {
         ))}
       </div>
 
-      <div className="hidden">
+      <div>
+        <label className="text-xs font-semibold text-slate-500 mb-1 block">Detalhes adicionais</label>
+        <textarea rows={3}
+          className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-teal-300 outline-none"
+          placeholder="Informações complementares para a compra, entrega ou especificação."
+          value={descricao} onChange={e => setDescricao(e.target.value)} />
+      </div>
+
+      <div>
         <label className="text-xs font-semibold text-slate-500 mb-1.5 block">Referência de cotação</label>
         <div
           className={`rounded-2xl border-2 border-dashed p-4 transition-all cursor-pointer ${
@@ -878,14 +886,6 @@ export default function NovaRequisicao() {
             </div>
           )}
         </div>
-      </div>
-
-      <div>
-        <label className="text-xs font-semibold text-slate-500 mb-1 block">Detalhes adicionais</label>
-        <textarea rows={3}
-          className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-teal-300 outline-none"
-          placeholder="Informações complementares para a compra, entrega ou especificação."
-          value={descricao} onChange={e => setDescricao(e.target.value)} />
       </div>
 
       {total > 0 && (
