@@ -463,7 +463,7 @@ function TabContratos() {
                   const sc = STATUS_CONTRATO[c.status] ?? STATUS_CONTRATO.em_negociacao
                   const isReceita = c.tipo_contrato === 'receita'
                   const grupoLabel = GRUPO_CONTRATO_LABEL?.[c.grupo_contrato as any] ?? c.grupo_contrato ?? '—'
-                  const contraparte = c.fornecedor?.razao_social || c.fornecedor?.nome_fantasia || c.cliente?.nome || '—'
+                  const contraparte = c.fornecedor?.razao_social || c.fornecedor?.nome_fantasia || c.cliente?.nome || (c as any).solicitacao?.contraparte_nome || '—'
                   return (
                     <tr key={c.id} onClick={() => nav(`/contratos/previsao?contrato=${c.id}`)} className="hover:bg-slate-50/80 transition-colors cursor-pointer">
                       <td className="px-3 py-2.5">
@@ -795,8 +795,8 @@ function TabVencimentos() {
     const fim = new Date(c.data_fim_previsto).getTime()
     const dias = Math.ceil((fim - hoje) / (1000 * 60 * 60 * 24))
     const contraparte = c.tipo_contrato === 'despesa'
-      ? c.fornecedor?.razao_social ?? c.fornecedor?.nome_fantasia ?? '—'
-      : c.cliente?.nome ?? '—'
+      ? c.fornecedor?.razao_social ?? c.fornecedor?.nome_fantasia ?? (c as any).solicitacao?.contraparte_nome ?? '—'
+      : c.cliente?.nome ?? (c as any).solicitacao?.contraparte_nome ?? '—'
     return { ...c, dias, contraparte }
   }).sort((a, b) => a.dias - b.dias)
 
