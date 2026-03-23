@@ -1340,9 +1340,9 @@ function CPDetailModal({ cp, stageStatus, onClose, onAction, isDark }: {
   const { data: obrasList = [] } = useObras()
   const centrosCusto = useLookupCentrosCusto()
   const classesFinanceiras = useLookupClassesFinanceiras()
-  const ccOptions: SelectOption[] = (centrosCusto.data ?? []).map((c: any) => ({ value: c.descricao ?? c, label: c.descricao ?? c }))
-  const classeOptions: SelectOption[] = (classesFinanceiras.data ?? []).map((c: any) => ({ value: c.descricao ?? c, label: c.descricao ?? c, code: c.codigo }))
-  const obraOptions: SelectOption[] = obrasList.map(o => ({ value: o.id, label: o.nome, code: o.codigo }))
+  const ccOptions: SelectOption[] = centrosCusto.map(c => ({ value: c.descricao, label: c.descricao, code: c.codigo }))
+  const classeOptions: SelectOption[] = classesFinanceiras.map(c => ({ value: c.descricao, label: c.descricao, code: c.codigo }))
+  const obraOptions: SelectOption[] = obrasList.map(o => ({ value: o.id, label: o.nome, code: (o as any).codigo }))
   const urgency = getUrgency(cp)
   const manualRequest = cp.remessa_payload && typeof cp.remessa_payload === 'object'
     ? (cp.remessa_payload as Record<string, any>).manual_request as Record<string, any> | undefined
