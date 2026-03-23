@@ -3093,7 +3093,7 @@ export default function CPPipeline() {
           {showNovaMenu && (
             <div
               onClick={e => e.stopPropagation()}
-              className={`absolute right-0 top-full mt-3 w-[360px] max-w-[calc(100vw-2rem)] rounded-3xl border p-3 shadow-2xl ${isDark ? 'border-white/[0.08] bg-slate-900' : 'border-slate-200 bg-white'}`}
+              className={`absolute left-0 top-full mt-3 w-[360px] max-w-[calc(100vw-2rem)] rounded-3xl border p-3 shadow-2xl ${isDark ? 'border-white/[0.08] bg-slate-900' : 'border-slate-200 bg-white'}`}
             >
             <p className={`text-[10px] font-bold uppercase tracking-wider px-4 pt-2 pb-1 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Nova solicitação</p>
             <button type="button"
