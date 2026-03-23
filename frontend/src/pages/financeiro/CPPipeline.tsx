@@ -1068,7 +1068,7 @@ function NovaSolicitacaoExtraordinariaModal({
                 <input
                   value={form.fornecedor_cnpj}
                   onChange={e => {
-                    const value = e.target.value
+                    const value = formatCNPJ(e.target.value)
                     setForm(prev => ({
                       ...prev,
                       fornecedor_cnpj: value,
