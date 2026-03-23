@@ -315,10 +315,22 @@ type QuickFilterId = 'all' | 'overdue' | 'today' | 'week' | 'this_month' | 'next
 type StatusHintTone = 'amber' | 'rose' | 'sky'
 type StatusHint = { text: string; tone: StatusHintTone }
 const CP_TABLE_GRID = 'grid grid-cols-[20px_2px_minmax(0,1.8fr)_minmax(0,1.45fr)_minmax(0,1fr)_70px_110px_72px_96px] items-center gap-x-3'
-const LOTE_TABLE_GRID = 'grid grid-cols-[20px_2px_150px_minmax(0,1.8fr)_80px_100px_120px_200px] items-center gap-x-3'
+const LOTE_TABLE_GRID = 'grid grid-cols-[20px_2px_150px_minmax(0,1.8fr)_80px_100px_136px_220px] items-center gap-x-4'
 const LOTE_STAGE_TABS: PipelineStageId[] = ['em_lote', 'em_aprovacao', 'aprovado_pgto', 'em_pagamento']
 const LOTE_ACTION_BUTTON_CLASS = 'inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-xl px-2.5 py-1.5 text-[10px] font-bold leading-none text-white transition-all disabled:opacity-60 disabled:cursor-not-allowed'
 const LOTE_TOGGLE_BUTTON_CLASS = 'inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-xl border px-2.5 py-1.5 text-[10px] font-semibold'
+
+type LoteActionConfig = {
+  label: string
+  compactLabel?: string
+  title?: string
+  onClick: () => void
+  tone: string
+  icon: typeof Send
+  loading?: boolean
+  disabled?: boolean
+  iconOnly?: boolean
+}
 
 type LoteStageSummary = {
   lote: LotePagamento
@@ -2386,8 +2398,8 @@ function LoteTableRow({
   onSelectMany: (ids: string[]) => void
   onToggleExpand: () => void
   onOpenCP: (cp: ContaPagar) => void
-  onPrimaryAction?: { label: string; onClick: () => void; tone: string; icon: typeof Send; loading?: boolean; disabled?: boolean }
-  onSecondaryAction?: { label: string; onClick: () => void; tone: string; icon: typeof Banknote; loading?: boolean; disabled?: boolean }
+  onPrimaryAction?: LoteActionConfig
+  onSecondaryAction?: LoteActionConfig
 }) {
   const isMultiItemLote = summary.totalItems > 1
   const resumoTitle = isMultiItemLote ? summary.headerLabel : summary.supplierLabel
@@ -2426,20 +2438,20 @@ function LoteTableRow({
         </button>
         <span className={`text-sm font-bold ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>{summary.totalItems}</span>
         <span className={`text-sm font-bold ${isDark ? 'text-emerald-300' : 'text-emerald-700'}`}>{summary.approvedItems}</span>
-        <span className="text-sm font-extrabold text-emerald-600">{fmt(summary.visibleValue || summary.totalValue)}</span>
-        <div className="flex items-center justify-end gap-1.5 whitespace-nowrap">
+        <span className="pr-4 text-sm font-extrabold text-emerald-600">{fmt(summary.visibleValue || summary.totalValue)}</span>
+        <div className="flex items-center justify-end gap-1.5 whitespace-nowrap pl-5">
           {onPrimaryAction && (
-            <button type="button" onClick={onPrimaryAction.onClick} disabled={onPrimaryAction.loading || onPrimaryAction.disabled}
-              className={`${LOTE_ACTION_BUTTON_CLASS} ${onPrimaryAction.tone}`}>
+            <button type="button" onClick={onPrimaryAction.onClick} disabled={onPrimaryAction.loading || onPrimaryAction.disabled} title={onPrimaryAction.title ?? onPrimaryAction.label}
+              className={`${LOTE_ACTION_BUTTON_CLASS} ${onPrimaryAction.iconOnly ? 'min-w-[30px] justify-center px-2' : ''} ${onPrimaryAction.tone}`}>
               {onPrimaryAction.loading ? <RefreshCw size={12} className="animate-spin" /> : <onPrimaryAction.icon size={12} />}
-              {onPrimaryAction.loading ? 'Enviando...' : onPrimaryAction.label}
+              {!onPrimaryAction.iconOnly && (onPrimaryAction.loading ? 'Enviando...' : (onPrimaryAction.compactLabel ?? onPrimaryAction.label))}
             </button>
           )}
           {onSecondaryAction && (
-            <button type="button" onClick={onSecondaryAction.onClick} disabled={onSecondaryAction.loading || onSecondaryAction.disabled}
-              className={`${LOTE_ACTION_BUTTON_CLASS} ${onSecondaryAction.tone}`}>
+            <button type="button" onClick={onSecondaryAction.onClick} disabled={onSecondaryAction.loading || onSecondaryAction.disabled} title={onSecondaryAction.title ?? onSecondaryAction.label}
+              className={`${LOTE_ACTION_BUTTON_CLASS} ${onSecondaryAction.iconOnly ? 'min-w-[30px] justify-center px-2' : ''} ${onSecondaryAction.tone}`}>
               {onSecondaryAction.loading ? <RefreshCw size={12} className="animate-spin" /> : <onSecondaryAction.icon size={12} />}
-              {onSecondaryAction.loading ? 'Processando...' : onSecondaryAction.label}
+              {!onSecondaryAction.iconOnly && (onSecondaryAction.loading ? 'Processando...' : (onSecondaryAction.compactLabel ?? onSecondaryAction.label))}
             </button>
           )}
           <button type="button" onClick={onToggleExpand} className={`${LOTE_TOGGLE_BUTTON_CLASS} ${isDark ? 'border-white/[0.08] text-slate-200 hover:bg-white/[0.04]' : 'border-slate-200 text-slate-600 hover:bg-white'}`}>
@@ -2470,8 +2482,8 @@ function LoteCard({
   expanded: boolean
   onToggleExpand: () => void
   onOpenCP: (cp: ContaPagar) => void
-  onPrimaryAction?: { label: string; onClick: () => void; tone: string; icon: typeof Send; loading?: boolean; disabled?: boolean }
-  onSecondaryAction?: { label: string; onClick: () => void; tone: string; icon: typeof Banknote; loading?: boolean; disabled?: boolean }
+  onPrimaryAction?: LoteActionConfig
+  onSecondaryAction?: LoteActionConfig
 }) {
   return (
     <div className={`rounded-2xl border p-4 ${isDark ? 'border-white/[0.06] bg-white/[0.02]' : 'border-slate-200 bg-white'}`}>
@@ -2497,17 +2509,17 @@ function LoteCard({
       <div className="mt-4 flex flex-wrap items-center justify-between gap-2">
         <div className="flex flex-wrap gap-2">
           {onPrimaryAction && (
-            <button type="button" onClick={onPrimaryAction.onClick} disabled={onPrimaryAction.loading || onPrimaryAction.disabled}
-              className={`${LOTE_ACTION_BUTTON_CLASS} ${onPrimaryAction.tone}`}>
+            <button type="button" onClick={onPrimaryAction.onClick} disabled={onPrimaryAction.loading || onPrimaryAction.disabled} title={onPrimaryAction.title ?? onPrimaryAction.label}
+              className={`${LOTE_ACTION_BUTTON_CLASS} ${onPrimaryAction.iconOnly ? 'min-w-[30px] justify-center px-2' : ''} ${onPrimaryAction.tone}`}>
               {onPrimaryAction.loading ? <RefreshCw size={12} className="animate-spin" /> : <onPrimaryAction.icon size={12} />}
-              {onPrimaryAction.loading ? 'Enviando...' : onPrimaryAction.label}
+              {!onPrimaryAction.iconOnly && (onPrimaryAction.loading ? 'Enviando...' : (onPrimaryAction.compactLabel ?? onPrimaryAction.label))}
             </button>
           )}
           {onSecondaryAction && (
-            <button type="button" onClick={onSecondaryAction.onClick} disabled={onSecondaryAction.loading || onSecondaryAction.disabled}
-              className={`${LOTE_ACTION_BUTTON_CLASS} ${onSecondaryAction.tone}`}>
+            <button type="button" onClick={onSecondaryAction.onClick} disabled={onSecondaryAction.loading || onSecondaryAction.disabled} title={onSecondaryAction.title ?? onSecondaryAction.label}
+              className={`${LOTE_ACTION_BUTTON_CLASS} ${onSecondaryAction.iconOnly ? 'min-w-[30px] justify-center px-2' : ''} ${onSecondaryAction.tone}`}>
               {onSecondaryAction.loading ? <RefreshCw size={12} className="animate-spin" /> : <onSecondaryAction.icon size={12} />}
-              {onSecondaryAction.loading ? 'Processando...' : onSecondaryAction.label}
+              {!onSecondaryAction.iconOnly && (onSecondaryAction.loading ? 'Processando...' : (onSecondaryAction.compactLabel ?? onSecondaryAction.label))}
             </button>
           )}
         </div>
@@ -3060,6 +3072,7 @@ export default function CPPipeline() {
         return {
           primary: {
             label: 'Enviar aprovação',
+            compactLabel: 'Aprovação',
             onClick: () => handleEnviarLotesAprovacao(summary.cpIds),
             tone: 'bg-amber-500 hover:bg-amber-600',
             icon: Send,
@@ -3071,6 +3084,7 @@ export default function CPPipeline() {
         return {
           primary: {
             label: 'Enviar remessa',
+            compactLabel: 'Remessa',
             onClick: () => handleEnviarRemessa(summary.cpIds),
             tone: 'bg-sky-600 hover:bg-sky-700',
             icon: Send,
@@ -3079,6 +3093,8 @@ export default function CPPipeline() {
           },
           secondary: {
             label: 'Registrar pgto',
+            compactLabel: 'Pgto',
+            title: 'Registrar pagamento',
             onClick: () => handlePagar(summary.cpIds),
             tone: 'bg-emerald-600 hover:bg-emerald-700',
             icon: Banknote,
@@ -3090,20 +3106,27 @@ export default function CPPipeline() {
           ? {
               primary: {
                 label: 'Pagar no Omie',
+                compactLabel: 'Omie',
                 onClick: () => window.open('https://app.omie.com.br', '_blank'),
                 tone: 'bg-indigo-600 hover:bg-indigo-700',
                 icon: ExternalLink,
               },
               secondary: {
                 label: 'Sincronizar',
+                title: 'Sincronizar com Omie',
                 onClick: () => handleSincronizarOmie(summary.cpIds),
                 tone: 'bg-sky-600 hover:bg-sky-700',
                 icon: RefreshCw,
+                loading: syncRemessasMut.isPending,
+                disabled: syncRemessasMut.isPending,
+                iconOnly: true,
               },
             }
           : {
               primary: {
                 label: 'Registrar Pgto',
+                compactLabel: 'Pgto',
+                title: 'Registrar pagamento',
                 onClick: () => handleConfirmarPagamento(summary.cpIds),
                 tone: 'bg-teal-600 hover:bg-teal-700',
                 icon: Banknote,
