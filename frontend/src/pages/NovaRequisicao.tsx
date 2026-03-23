@@ -35,7 +35,7 @@ function minCotacoes(valor: number, regras?: { ate_500: number; '501_a_2k': numb
 function Stepper({ step }: { step: number }) {
   const steps = ['Categoria', 'Detalhes', 'Confirmar']
   return (
-    <div className="mx-auto mb-6 w-full max-w-2xl px-4">
+    <div className="mb-6 w-full">
       <div className="flex items-center gap-0">
       {steps.map((label, i) => {
         const idx = i + 1
