@@ -13,7 +13,7 @@ import {
 } from 'lucide-react'
 import { useLogisticaKPIs, useSolicitacoes, useTransportes } from '../../hooks/useLogistica'
 import { useTheme } from '../../contexts/ThemeContext'
-import type { LogisticaKPIs } from '../../types/logistica'
+import type { LogisticaKPIs, LogSolicitacao } from '../../types/logistica'
 
 const EMPTY_KPIS: LogisticaKPIs = {
   total_solicitacoes: 0,
@@ -121,7 +121,7 @@ export default function LogisticaHome() {
   const { data: transportesAtivos = [] } = useTransportes()
 
   const operationalView = useMemo(() => {
-    const routeMap = new Map<string, { label: string; km: number; solicitacoes: number }>()
+    const routeMap = new Map<string, { label: string; km: number; solicitacoes: number; sample: LogSolicitacao; viagemId?: string }>()
     const countedTrips = new Set<string>()
     let kmProgramados = 0
 
@@ -143,9 +143,11 @@ export default function LogisticaHome() {
         kmProgramados += routeKm
       }
 
-      const current = routeMap.get(routeKey) ?? { label: routeLabel, km: routeKm, solicitacoes: 0 }
+      const current = routeMap.get(routeKey) ?? { label: routeLabel, km: routeKm, solicitacoes: 0, sample: sol, viagemId: sol.viagem_id }
       current.solicitacoes += 1
       current.km = current.km || routeKm
+      current.sample = current.sample ?? sol
+      current.viagemId = current.viagemId ?? sol.viagem_id
       routeMap.set(routeKey, current)
     }
 
@@ -204,6 +206,27 @@ export default function LogisticaHome() {
     },
     { key: 'nfe', label: 'NF-e emitidas', value: kpis.nfe_emitidas_mes, barClass: 'bg-violet-500', tone: 'violet' as const },
   ].filter(segment => segment.value > 0)
+
+  const buildSolicitacaoDeepLink = (sol: LogSolicitacao, preferViagem = false) => {
+    const params = new URLSearchParams()
+
+    if (sol.status === 'solicitado' || sol.status === 'planejado' || sol.status === 'aguardando_aprovacao') {
+      params.set('tab', sol.status)
+      if (preferViagem && sol.viagem_id) params.set('viagem', sol.viagem_id)
+      else params.set('item', sol.id)
+      return `/logistica/solicitacoes?${params.toString()}`
+    }
+
+    if (sol.status === 'aprovado' || sol.status === 'romaneio_emitido' || (sol.status === 'nfe_emitida' && sol.doc_fiscal_tipo !== 'nf')) {
+      params.set('tab', sol.status === 'nfe_emitida' ? 'nfe_emitida' : sol.status)
+      params.set('item', sol.id)
+      return `/logistica/expedicao?${params.toString()}`
+    }
+
+    params.set('tab', sol.status === 'nfe_emitida' ? 'nfe_emitida' : sol.status)
+    params.set('item', sol.id)
+    return `/logistica/transportes?${params.toString()}`
+  }
 
   return (
     <div className="space-y-5">
@@ -354,7 +377,12 @@ export default function LogisticaHome() {
                 const ocorrenciasAbertas = transporte.ocorrencias?.filter(oc => !oc.resolvido).length ?? 0
 
                 return (
-                  <div key={transporte.id} className={`flex items-center gap-3 px-4 py-3 transition-colors ${isDark ? 'hover:bg-white/[0.03]' : 'hover:bg-slate-50'}`}>
+                  <button
+                    key={transporte.id}
+                    type="button"
+                    onClick={() => sol && nav(buildSolicitacaoDeepLink(sol))}
+                    className={`w-full text-left flex items-center gap-3 px-4 py-3 transition-colors ${isDark ? 'hover:bg-white/[0.03]' : 'hover:bg-slate-50'}`}
+                  >
                     <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${ocorrenciasAbertas > 0 ? 'bg-red-50' : isDark ? 'bg-orange-500/10' : 'bg-orange-50'}`}>
                       {ocorrenciasAbertas > 0 ? (
                         <AlertTriangle size={14} className="text-red-500" />
@@ -383,7 +411,7 @@ export default function LogisticaHome() {
                         ETA {fmtDate(transporte.eta_atual, true)}
                       </p>
                     </div>
-                  </div>
+                  </button>
                 )
               })}
             </div>
@@ -408,7 +436,12 @@ export default function LogisticaHome() {
           ) : (
             <div className={`divide-y ${isDark ? 'divide-white/[0.04]' : 'divide-red-50'}`}>
               {urgentes.slice(0, 4).map(sol => (
-                <div key={sol.id} className={`flex items-center gap-3 px-4 py-3 transition-colors ${isDark ? 'hover:bg-white/[0.03]' : 'hover:bg-red-50/50'}`}>
+                <button
+                  key={sol.id}
+                  type="button"
+                  onClick={() => nav(buildSolicitacaoDeepLink(sol, Boolean(sol.viagem_id)))}
+                  className={`w-full text-left flex items-center gap-3 px-4 py-3 transition-colors ${isDark ? 'hover:bg-white/[0.03]' : 'hover:bg-red-50/50'}`}
+                >
                   <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${isDark ? 'bg-red-500/10' : 'bg-red-50'}`}>
                     <AlertTriangle size={14} className="text-red-500" />
                   </div>
@@ -426,7 +459,7 @@ export default function LogisticaHome() {
                       </p>
                     )}
                   </div>
-                </div>
+                </button>
               ))}
             </div>
           )}
@@ -452,7 +485,12 @@ export default function LogisticaHome() {
           ) : (
             <div className={`divide-y ${isDark ? 'divide-white/[0.04]' : 'divide-slate-50'}`}>
               {operationalView.proximasColetas.map(sol => (
-                <div key={sol.id} className={`flex items-center gap-3 px-4 py-3 transition-colors ${isDark ? 'hover:bg-white/[0.03]' : 'hover:bg-slate-50'}`}>
+                <button
+                  key={sol.id}
+                  type="button"
+                  onClick={() => nav(buildSolicitacaoDeepLink(sol))}
+                  className={`w-full text-left flex items-center gap-3 px-4 py-3 transition-colors ${isDark ? 'hover:bg-white/[0.03]' : 'hover:bg-slate-50'}`}
+                >
                   <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${isDark ? 'bg-cyan-500/10' : 'bg-cyan-50'}`}>
                     <CalendarClock size={15} className="text-cyan-500" />
                   </div>
@@ -478,7 +516,7 @@ export default function LogisticaHome() {
                       {sol.transportadora?.nome_fantasia ?? sol.motorista_nome ?? 'Aguardando definicao'}
                     </p>
                   </div>
-                </div>
+                </button>
               ))}
             </div>
           )}
@@ -502,7 +540,12 @@ export default function LogisticaHome() {
           ) : (
             <div className={`divide-y ${isDark ? 'divide-white/[0.04]' : 'divide-slate-50'}`}>
               {operationalView.topRotas.map(rota => (
-                <div key={rota.label} className={`px-4 py-3 transition-colors ${isDark ? 'hover:bg-white/[0.03]' : 'hover:bg-slate-50'}`}>
+                <button
+                  key={rota.label}
+                  type="button"
+                  onClick={() => nav(buildSolicitacaoDeepLink(rota.sample, Boolean(rota.viagemId)))}
+                  className={`w-full text-left px-4 py-3 transition-colors ${isDark ? 'hover:bg-white/[0.03]' : 'hover:bg-slate-50'}`}
+                >
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
                       <p className={`text-xs font-bold truncate ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>{rota.label}</p>
@@ -514,7 +557,7 @@ export default function LogisticaHome() {
                       <p className="text-sm font-extrabold text-sky-600">{fmtKm(rota.km)} km</p>
                     </div>
                   </div>
-                </div>
+                </button>
               ))}
             </div>
           )}

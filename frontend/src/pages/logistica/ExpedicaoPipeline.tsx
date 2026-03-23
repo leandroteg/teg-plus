@@ -1,4 +1,5 @@
-import { useState, useMemo, useRef } from 'react'
+import { useState, useMemo, useRef, useEffect } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
 import {
   Package2, Search, X, CheckCircle2, AlertTriangle,
@@ -600,6 +601,7 @@ function ViagemGroupCard({ viagem, solicitacoes, onClick, isDark, selectedIds, o
 
 export default function ExpedicaoPipeline() {
   const { isDark } = useTheme()
+  const [searchParams, setSearchParams] = useSearchParams()
   const [activeTab, setActiveTab] = useState<StatusExpedicaoPipeline>('aprovado')
   const [busca, setBusca] = useState('')
   const [detail, setDetail] = useState<LogSolicitacao | null>(null)
@@ -614,6 +616,24 @@ export default function ExpedicaoPipeline() {
   const qc = useQueryClient()
   const emitirRomaneio = useEmitirRomaneio()
   const solicitarNF = useSolicitarNFFiscal()
+  const requestedItemId = searchParams.get('item')
+
+  useEffect(() => {
+    const requestedTab = searchParams.get('tab')
+    if (!requestedTab) return
+    const isValid = EXPEDICAO_PIPELINE_STAGES.some(stage => stage.status === requestedTab)
+    if (isValid) {
+      setActiveTab(requestedTab as StatusExpedicaoPipeline)
+    }
+  }, [searchParams])
+
+  useEffect(() => {
+    if (!requestedItemId) return
+    const item = solicitacoes.find(sol => sol.id === requestedItemId)
+    if (item) {
+      setDetail(item)
+    }
+  }, [requestedItemId, solicitacoes])
 
   // Group by status
   const grouped = useMemo(() => {
@@ -684,10 +704,23 @@ export default function ExpedicaoPipeline() {
   }, [activeItems])
 
   const showToast = (type: 'success' | 'error', msg: string) => { setToast({ type, msg }); setTimeout(() => setToast(null), 4000) }
+  const closeDetail = () => {
+    setDetail(null)
+    const next = new URLSearchParams(searchParams)
+    next.delete('item')
+    setSearchParams(next, { replace: true })
+  }
   const toggleSelect = (id: string) => { setSelectedIds(prev => { const next = new Set(prev); if (next.has(id)) next.delete(id); else next.add(id); return next }) }
   const selectAll = () => { const ids = activeItems.map(s => s.id); setSelectedIds(ids.every(id => selectedIds.has(id)) ? new Set() : new Set(ids)) }
   const toggleSort = (field: SortField) => { if (sortField === field) setSortDir(d => d === 'asc' ? 'desc' : 'asc'); else { setSortField(field); setSortDir('asc') } }
-  const switchTab = (status: StatusExpedicaoPipeline) => { setActiveTab(status); setSelectedIds(new Set()); setBusca('') }
+  const switchTab = (status: StatusExpedicaoPipeline) => {
+    setActiveTab(status)
+    setSelectedIds(new Set())
+    setBusca('')
+    const next = new URLSearchParams(searchParams)
+    next.set('tab', status)
+    setSearchParams(next, { replace: true })
+  }
 
   // Actions
   const handleEmitirRomaneio = async (ids: string[]) => {
@@ -714,12 +747,12 @@ export default function ExpedicaoPipeline() {
       })
       showToast('success', 'NF solicitada ao fiscal com sucesso')
       setNfModal(null)
-      setDetail(null)
+      closeDetail()
     } catch { showToast('error', 'Erro ao solicitar NF') }
   }
 
   const handleDetailAction = async (action: string, sol: LogSolicitacao) => {
-    setDetail(null)
+    closeDetail()
     if (action === 'emitirRomaneio') handleEmitirRomaneio([sol.id])
     if (action === 'despachar') handleEmitirRomaneio([sol.id])
     if (action === 'solicitarNF') setNfModal(sol)
@@ -902,7 +935,7 @@ export default function ExpedicaoPipeline() {
         </div>
       </div>
 
-      {detail && <DetailModal sol={detail} onClose={() => setDetail(null)} onAction={handleDetailAction} isDark={isDark} allSolicitacoes={solicitacoes} />}
+      {detail && <DetailModal sol={detail} onClose={closeDetail} onAction={handleDetailAction} isDark={isDark} allSolicitacoes={solicitacoes} />}
 
       {/* Solicitar NF Modal */}
       {nfModal && (

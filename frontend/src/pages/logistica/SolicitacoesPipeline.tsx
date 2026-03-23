@@ -1133,6 +1133,8 @@ export default function SolicitacoesPipeline() {
   }, [searchParams, setSearchParams])
 
   const urgentOnly = searchParams.get('urgent') === '1'
+  const requestedItemId = searchParams.get('item')
+  const requestedViagemId = searchParams.get('viagem')
 
   const { data: solicitacoes = [], isLoading } = useSolicitacoes()
   const atualizarStatus = useAtualizarStatusSolicitacao()
@@ -1222,8 +1224,41 @@ export default function SolicitacoesPipeline() {
     return result
   }, [activeItems])
 
+  useEffect(() => {
+    if (requestedViagemId) {
+      const viagem = displayItems.find(
+        (item): item is Extract<DisplayItem, { kind: 'viagem' }> => item.kind === 'viagem' && item.viagemId === requestedViagemId
+      )
+      if (viagem) {
+        setViagemDetail(viagem)
+        setDetail(null)
+      }
+      return
+    }
+
+    if (requestedItemId) {
+      const item = solicitacoes.find(sol => sol.id === requestedItemId)
+      if (item) {
+        setDetail(item)
+        setViagemDetail(null)
+      }
+    }
+  }, [requestedItemId, requestedViagemId, displayItems, solicitacoes])
+
   const showToast = (type: 'success' | 'error', msg: string) => {
     setToast({ type, msg }); setTimeout(() => setToast(null), 4000)
+  }
+  const closeDetail = () => {
+    setDetail(null)
+    const next = new URLSearchParams(searchParams)
+    next.delete('item')
+    setSearchParams(next, { replace: true })
+  }
+  const closeViagemDetail = () => {
+    setViagemDetail(null)
+    const next = new URLSearchParams(searchParams)
+    next.delete('viagem')
+    setSearchParams(next, { replace: true })
   }
 
   const toggleSelect = (id: string) => {
@@ -1409,7 +1444,7 @@ export default function SolicitacoesPipeline() {
   }
 
   const handleViagemDetailAction = (action: string, sols: LogSolicitacao[]) => {
-    setViagemDetail(null)
+    closeViagemDetail()
     const ids = sols.map(s => s.id)
     switch (action) {
       case 'enviarAprovacao': handleEnviarAprovacao(ids); break
@@ -1418,7 +1453,7 @@ export default function SolicitacoesPipeline() {
   }
 
   const handleDetailAction = (action: string, sol: LogSolicitacao) => {
-    setDetail(null)
+    closeDetail()
     switch (action) {
       case 'planejar': handlePlanejar([sol.id]); break
       case 'enviarAprovacao': handleEnviarAprovacao([sol.id]); break
@@ -1621,8 +1656,8 @@ export default function SolicitacoesPipeline() {
         </div>
       </div>
 
-      {detail && <DetailModal sol={detail} onClose={() => setDetail(null)} onAction={handleDetailAction} isDark={isDark} />}
-      {viagemDetail && <ViagemDetailModal item={viagemDetail} onClose={() => setViagemDetail(null)} onAction={handleViagemDetailAction} onEdit={() => handleEditViagem(viagemDetail)} isDark={isDark} />}
+      {detail && <DetailModal sol={detail} onClose={closeDetail} onAction={handleDetailAction} isDark={isDark} />}
+      {viagemDetail && <ViagemDetailModal item={viagemDetail} onClose={closeViagemDetail} onAction={handleViagemDetailAction} onEdit={() => handleEditViagem(viagemDetail)} isDark={isDark} />}
       {showNovaSolicitacao && (
         <NovaSolicitacaoModal
           isDark={isDark}
