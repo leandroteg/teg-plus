@@ -249,7 +249,7 @@ export interface AiParseVars {
 export function useAiParse() {
   return useMutation({
     mutationFn: async (vars: AiParseVars): Promise<AiParseResult> => {
-      const n8nUrl = import.meta.env.VITE_N8N_WEBHOOK_URL || ''
+      const n8nUrl = import.meta.env.VITE_N8N_WEBHOOK_URL || 'https://teg-agents-n8n.nmmcas.easypanel.host/webhook'
 
       if (n8nUrl) {
         // Tenta o endpoint real de IA (suporta texto + arquivo/imagem)

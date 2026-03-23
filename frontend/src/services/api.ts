@@ -21,10 +21,10 @@ function releaseSlot() {
   if (next) { activeRequests++; next() }
 }
 
-async function fetchWithRetry(url: string, init?: RequestInit, retries = 2): Promise<Response> {
+async function fetchWithRetry(url: string, init?: RequestInit, retries = 2, timeoutMs = 30_000): Promise<Response> {
   for (let attempt = 0; ; attempt++) {
     const controller = new AbortController()
-    const timeoutId = setTimeout(() => controller.abort(), 15_000) // 15s per-request timeout
+    const timeoutId = setTimeout(() => controller.abort(), timeoutMs)
     try {
       return await fetch(url, { ...init, signal: controller.signal })
     } catch (err) {
@@ -40,13 +40,13 @@ async function fetchWithRetry(url: string, init?: RequestInit, retries = 2): Pro
   }
 }
 
-async function request<T>(path: string, options?: RequestInit): Promise<T> {
+async function request<T>(path: string, options?: RequestInit, timeoutMs = 30_000): Promise<T> {
   await acquireSlot()
   try {
     const res = await fetchWithRetry(`${BASE}${path}`, {
       headers: { 'Content-Type': 'application/json' },
       ...options,
-    })
+    }, 2, timeoutMs)
     if (!res.ok) throw new Error(`Erro ${res.status}: ${res.statusText}`)
     return res.json() as Promise<T>
   } finally {
@@ -77,7 +77,7 @@ export const api = {
     request<AiParseResult>('/compras/requisicao-ai', {
       method: 'POST',
       body: JSON.stringify({ texto, solicitante_nome, arquivo }),
-    }),
+    }, arquivo ? 60_000 : 30_000),
 
   processarAprovacao: (token: string, decisao: 'aprovada' | 'rejeitada', observacao?: string) =>
     request<unknown>('/compras/aprovacao', {
@@ -92,7 +92,7 @@ export const api = {
     request<ParseCotacaoResult>('/compras/parse-cotacao', {
       method: 'POST',
       body: JSON.stringify(data),
-    }),
+    }, 60_000),
 
   enviarEmailPedido: (data: {
     pedido_id: string;

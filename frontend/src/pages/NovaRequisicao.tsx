@@ -339,8 +339,9 @@ export default function NovaRequisicao() {
       } else {
         setRefParseMsg({ type: 'error', text: 'Não foi possível extrair itens do arquivo. Tente usar o Assistente IA no passo anterior.' })
       }
-    } catch {
-      setRefParseMsg({ type: 'error', text: 'Erro ao processar o arquivo. Tente novamente.' })
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Erro ao processar o arquivo. Tente novamente.'
+      setRefParseMsg({ type: 'error', text: msg })
     }
     setRefParsing(false)
   }
