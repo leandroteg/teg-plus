@@ -49,6 +49,7 @@ interface RequisicaoCompleta {
   status: string
   alcada_nivel: number
   categoria?: string
+  compra_recorrente?: boolean
   created_at: string
   cmp_requisicao_itens?: RequisicaoItem[]
 }
@@ -459,9 +460,16 @@ export default function Aprovacao() {
               </div>
               <div className="min-w-0">
                 <p className="text-[10px] text-slate-400 uppercase tracking-wide font-medium">
-                  {totalItens > 0 ? 'Total dos Itens' : 'Valor Estimado'}
+                  {req.compra_recorrente
+                    ? (totalItens > 0 ? 'Valor Mensal (Itens)' : 'Valor Mensal')
+                    : (totalItens > 0 ? 'Total dos Itens' : 'Valor Estimado')}
                 </p>
-                <p className="text-sm font-extrabold text-slate-800">{formatMoeda(valorExibir)}</p>
+                <div className="flex items-center gap-2">
+                  <p className="text-sm font-extrabold text-slate-800">{formatMoeda(valorExibir)}</p>
+                  {req.compra_recorrente && (
+                    <span className="text-[9px] font-bold bg-indigo-100 text-indigo-700 px-1.5 py-0.5 rounded">RECORRENTE</span>
+                  )}
+                </div>
               </div>
             </div>
 
@@ -733,7 +741,7 @@ export default function Aprovacao() {
 
             <p className="text-sm text-slate-500 leading-relaxed">
               {decisao === 'aprovada'
-                ? `Você está aprovando a RC ${req.numero ?? aprov.entidade_numero} no valor de ${formatMoeda(valorExibir)}. Deseja adicionar alguma observação?`
+                ? `Você está aprovando a RC ${req.numero ?? aprov.entidade_numero} no ${req.compra_recorrente ? 'valor mensal' : 'valor'} de ${formatMoeda(valorExibir)}${req.compra_recorrente ? ' (recorrente)' : ''}. Deseja adicionar alguma observação?`
                 : `Você está rejeitando a RC ${req.numero ?? aprov.entidade_numero}. Por favor, informe o motivo da rejeição (obrigatório).`
               }
             </p>
