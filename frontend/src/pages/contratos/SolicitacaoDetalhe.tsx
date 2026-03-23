@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
+import { useAuth } from '../../contexts/AuthContext'
+import { supabase } from '../../services/supabase'
 import {
   ArrowLeft, FileText, ExternalLink, Clock, CheckCircle2,
   XCircle, AlertTriangle, ChevronRight, Send,
@@ -766,15 +768,45 @@ function EtapaActions({ etapa, solicitacaoId, onAvancar, onCancel, onEnviarAssin
         </>
       )
 
-    case 'aprovacao_diretoria':
+    case 'aprovacao_diretoria': {
+      const { role } = useAuth()
+      const canApproveHere = role === 'administrador' || role === 'diretor'
+      const [approving, setApproving] = useState(false)
       return (
         <>
-          <button disabled className={`${btnPrimary} bg-amber-100 text-amber-700 cursor-not-allowed`}>
-            <Clock size={13} /> Aguardando Aprovação...
-          </button>
+          {canApproveHere ? (
+            <button
+              disabled={approving || isPending}
+              onClick={async () => {
+                setApproving(true)
+                try {
+                  // Aprovar em apr_aprovacoes
+                  await supabase
+                    .from('apr_aprovacoes')
+                    .update({ status: 'aprovada', updated_at: new Date().toISOString() })
+                    .eq('entidade_id', solicitacaoId)
+                    .eq('modulo', 'con')
+                    .eq('status', 'pendente')
+                  // Avançar etapa
+                  onAvancar('enviar_assinatura', 'Aprovado pela diretoria')
+                } catch {
+                  setApproving(false)
+                }
+              }}
+              className={`${btnPrimary} bg-gradient-to-r from-emerald-500 to-emerald-600 text-white hover:from-emerald-600 hover:to-emerald-700 shadow-sm`}
+            >
+              {approving ? <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" /> : <CheckCircle2 size={13} />}
+              Aprovar Solicitação
+            </button>
+          ) : (
+            <button disabled className={`${btnPrimary} bg-amber-100 text-amber-700 cursor-not-allowed`}>
+              <Clock size={13} /> Aguardando Aprovação...
+            </button>
+          )}
           {cancelBtn}
         </>
       )
+    }
 
     case 'enviar_assinatura':
       return (
