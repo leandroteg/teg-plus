@@ -84,6 +84,16 @@ function exportCSV(items: LogSolicitacao[], stageName: string) {
   URL.revokeObjectURL(url)
 }
 
+function hasDocumentoFiscalPronto(sol: LogSolicitacao) {
+  if (hasRomaneioDocumento(sol)) return true
+  if (sol.status === 'nfe_emitida') return true
+  if (sol.nfe?.status === 'autorizada') return true
+
+  return ['aguardando_coleta', 'em_transito', 'entregue', 'concluido'].includes(sol.status)
+    && !!sol.doc_fiscal_tipo
+    && sol.doc_fiscal_tipo !== 'nenhum'
+}
+
 // ── Detail Modal ─────────────────────────────────────────────────────────────
 
 const ITEMS_CHECKLIST: readonly [string, string, boolean][] = [
@@ -146,13 +156,9 @@ function DetailModal({ sol, onClose, onAction, isDark, allSolicitacoes }: {
   const irmasViagem = sol.viagem_id
     ? allSolicitacoes.filter(s => s.viagem_id === sol.viagem_id && s.id !== sol.id)
     : []
-  const irmasDocPronto = irmasViagem.every(s =>
-    s.status === 'romaneio_emitido' || s.status === 'nfe_emitida'
-  )
+  const irmasDocPronto = irmasViagem.every(hasDocumentoFiscalPronto)
   const viagemBloqueada = sol.viagem_id != null && !irmasDocPronto
-  const irmasPendentes = irmasViagem.filter(s =>
-    s.status !== 'romaneio_emitido' && s.status !== 'nfe_emitida'
-  )
+  const irmasPendentes = irmasViagem.filter(s => !hasDocumentoFiscalPronto(s))
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-sm p-4" onClick={onClose}>
