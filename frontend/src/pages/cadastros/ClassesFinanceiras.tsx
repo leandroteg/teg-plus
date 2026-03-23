@@ -4,6 +4,8 @@ import { useCadClasses, useSalvarClasse, useCadCategorias } from '../../hooks/us
 import type { ClasseFinanceira } from '../../types/cadastros'
 import AutoCodeField from '../../components/AutoCodeField'
 import SmartTextField from '../../components/SmartTextField'
+import SearchableSelect from '../../components/SearchableSelect'
+import type { SelectOption } from '../../components/SearchableSelect'
 
 const EMPTY: Partial<ClasseFinanceira> = { codigo: '', descricao: '', tipo: 'ambos', categoria_id: undefined, ativo: true }
 const TIPO_LABEL: Record<string, { label: string; bg: string; text: string }> = {
@@ -146,14 +148,13 @@ export default function ClassesFinanceiras() {
               <SmartTextField table="fin_classes_financeiras" column="descricao"
                 value={editItem.descricao ?? ''} onChange={v => setEditItem({ ...editItem, descricao: v })}
                 label="Descricao" placeholder="Nome da classe financeira" required />
-              <div>
-                <label className="block text-xs font-bold text-slate-600 mb-1">Categoria</label>
-                <select value={editItem.categoria_id ?? ''} onChange={e => setEditItem({ ...editItem, categoria_id: e.target.value || undefined })}
-                  className="input-base">
-                  <option value="">Selecione uma categoria</option>
-                  {categorias.map(cat => <option key={cat.id} value={cat.id}>{cat.codigo} — {cat.descricao}</option>)}
-                </select>
-              </div>
+              <SearchableSelect
+                options={(categorias ?? []).map(cat => ({ value: cat.id, label: cat.descricao, code: cat.codigo }))}
+                value={editItem.categoria_id ?? ''}
+                onChange={v => setEditItem({ ...editItem, categoria_id: v || undefined })}
+                placeholder="Buscar categoria..."
+                label="Categoria"
+              />
               <label className="flex items-center gap-2 cursor-pointer">
                 <input type="checkbox" checked={editItem.ativo ?? true}
                   onChange={e => setEditItem({ ...editItem, ativo: e.target.checked })}

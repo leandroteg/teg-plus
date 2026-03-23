@@ -15,6 +15,9 @@ import {
   useExcluirApontamentoCartao,
 } from '../../hooks/useCartoes'
 import type { ApontamentoCartao, StatusApontamentoCartao, BandeiraCartao } from '../../types/financeiro'
+import { useCadClasses, useCadCentrosCusto } from '../../hooks/useCadastros'
+import SearchableSelect from '../../components/SearchableSelect'
+import type { SelectOption } from '../../components/SearchableSelect'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -82,8 +85,13 @@ function ApontamentoModal({
   onSaved: (msg: string) => void
 }) {
   const { data: cartoes = [] } = useCartoesCredito()
+  const { data: classes = [] } = useCadClasses()
+  const { data: centrosCusto = [] } = useCadCentrosCusto()
   const criar = useCriarApontamentoCartao()
   const atualizar = useAtualizarApontamentoCartao()
+
+  const classeOptions: SelectOption[] = (classes ?? []).map(c => ({ value: c.descricao, label: c.descricao, code: c.codigo }))
+  const centroOptions: SelectOption[] = (centrosCusto ?? []).map(c => ({ value: c.descricao, label: c.descricao, code: c.codigo }))
 
   const [form, setForm] = useState(() =>
     editing
@@ -231,27 +239,21 @@ function ApontamentoModal({
 
           <div className="grid grid-cols-2 gap-3">
             {/* Centro de custo */}
-            <div>
-              <label className={lbl}>Centro de Custo</label>
-              <input
-                type="text"
-                placeholder="Ex: Obra Frutal"
-                value={form.centro_custo}
-                onChange={e => setForm(f => ({ ...f, centro_custo: e.target.value }))}
-                className={inp}
-              />
-            </div>
+            <SearchableSelect
+              options={centroOptions}
+              value={form.centro_custo}
+              onChange={v => setForm(f => ({ ...f, centro_custo: v }))}
+              placeholder="Buscar centro de custo..."
+              label="Centro de Custo"
+            />
             {/* Classe financeira */}
-            <div>
-              <label className={lbl}>Classe Financeira</label>
-              <input
-                type="text"
-                placeholder="Ex: Alimentação, Material"
-                value={form.classe_financeira}
-                onChange={e => setForm(f => ({ ...f, classe_financeira: e.target.value }))}
-                className={inp}
-              />
-            </div>
+            <SearchableSelect
+              options={classeOptions}
+              value={form.classe_financeira}
+              onChange={v => setForm(f => ({ ...f, classe_financeira: v }))}
+              placeholder="Buscar classe financeira..."
+              label="Classe Financeira"
+            />
           </div>
 
           {/* Observações */}

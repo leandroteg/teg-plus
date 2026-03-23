@@ -2,6 +2,8 @@ import { useEffect, useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { X, FileText, Loader2, AlertTriangle } from 'lucide-react'
 import { useCadCentrosCusto, useCadClasses, useCadObras } from '../hooks/useCadastros'
+import SearchableSelect from './SearchableSelect'
+import type { SelectOption } from './SearchableSelect'
 import type { RequisicaoItem } from '../types'
 import { supabase } from '../services/supabase'
 import { gerarPreviaParcelas, resumirHomogeneidade } from '../utils/pagamentos'
@@ -408,18 +410,12 @@ export default function EmitirPedidoModal({
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-bold text-slate-600 mb-1.5">Classe Financeira Final</label>
-                  <select
+                  <SearchableSelect
+                    options={(classes ?? []).map(c => ({ value: c.id, label: c.descricao, code: c.codigo }))}
                     value={classeId}
-                    onChange={(event) => setClasseId(event.target.value)}
-                    className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-teal-300"
-                  >
-                    <option value="">Selecionar classe...</option>
-                    {classes.map((classe) => (
-                      <option key={classe.id} value={classe.id}>
-                        {classe.codigo} - {classe.descricao}
-                      </option>
-                    ))}
-                  </select>
+                    onChange={setClasseId}
+                    placeholder="Buscar classe financeira..."
+                  />
                   <p className="mt-1 text-[11px] text-slate-400">
                     {classeResumo.homogeno && classeResumo.valor
                       ? `Sugestao automatica aplicada: ${classeResumo.valor}`
@@ -429,18 +425,12 @@ export default function EmitirPedidoModal({
 
                 <div>
                   <label className="block text-xs font-bold text-slate-600 mb-1.5">Centro de Custo Final</label>
-                  <select
+                  <SearchableSelect
+                    options={(centros ?? []).map(c => ({ value: c.id, label: c.descricao, code: c.codigo }))}
                     value={centroId}
-                    onChange={(event) => setCentroId(event.target.value)}
-                    className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-teal-300"
-                  >
-                    <option value="">Selecionar centro...</option>
-                    {centros.map((centro) => (
-                      <option key={centro.id} value={centro.id}>
-                        {centro.codigo} - {centro.descricao}
-                      </option>
-                    ))}
-                  </select>
+                    onChange={setCentroId}
+                    placeholder="Buscar centro de custo..."
+                  />
                 </div>
               </div>
 
