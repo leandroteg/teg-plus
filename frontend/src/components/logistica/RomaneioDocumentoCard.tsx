@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import {
-  ExternalLink, FileText, Loader2, Mail, MessageCircle, ScrollText, Share2, X,
+  Download, ExternalLink, FileText, Loader2, Mail, MessageCircle, ScrollText, Share2, X,
 } from 'lucide-react'
 import type { LogSolicitacao } from '../../types/logistica'
 import { gerarRomaneioPDF, gerarRomaneioPdfBlob, getRomaneioFileName } from '../../utils/romaneio-pdf'
