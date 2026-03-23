@@ -560,6 +560,7 @@ export default function TransportesPipeline() {
   const confirmarEntrega = useConfirmarEntregaFisica()
   const confirmarAgendamento = useConfirmarAgendamento()
   const confirmarRecebimento = useConfirmarRecebimento()
+  const requestedItemId = searchParams.get('item')
 
   useEffect(() => {
     const requestedTab = searchParams.get('tab')
@@ -569,6 +570,14 @@ export default function TransportesPipeline() {
       setActiveTab(requestedTab as StatusTransportePipeline)
     }
   }, [searchParams])
+
+  useEffect(() => {
+    if (!requestedItemId) return
+    const item = solicitacoes.find(sol => sol.id === requestedItemId)
+    if (item) {
+      setDetail(item)
+    }
+  }, [requestedItemId, solicitacoes])
 
   // Group by status — for "nfe_emitida" (Pendentes), only show items that actually have NF emitted
   const grouped = useMemo(() => {
@@ -641,6 +650,12 @@ export default function TransportesPipeline() {
   }, [activeItems])
 
   const showToast = (type: 'success' | 'error', msg: string) => { setToast({ type, msg }); setTimeout(() => setToast(null), 4000) }
+  const closeDetail = () => {
+    setDetail(null)
+    const next = new URLSearchParams(searchParams)
+    next.delete('item')
+    setSearchParams(next, { replace: true })
+  }
   const toggleSelect = (id: string) => { setSelectedIds(prev => { const next = new Set(prev); if (next.has(id)) next.delete(id); else next.add(id); return next }) }
   const selectAll = () => { const ids = activeItems.map(s => s.id); setSelectedIds(ids.every(id => selectedIds.has(id)) ? new Set() : new Set(ids)) }
   const toggleSort = (field: SortField) => { if (sortField === field) setSortDir(d => d === 'asc' ? 'desc' : 'asc'); else { setSortField(field); setSortDir('asc') } }
@@ -710,7 +725,7 @@ export default function TransportesPipeline() {
   }
 
   const handleDetailAction = (action: string, sol: LogSolicitacao) => {
-    setDetail(null)
+    closeDetail()
     if (action === 'confirmarAgendamento') handleConfirmarAgendamento([sol.id])
     if (action === 'confirmarEntrega') handleConfirmarEntrega([sol.id])
     if (action === 'confirmarRecebimento') setRecebModal(sol)
@@ -896,7 +911,7 @@ export default function TransportesPipeline() {
         </div>
       </div>
 
-      {detail && <DetailModal sol={detail} onClose={() => setDetail(null)} onAction={handleDetailAction} isDark={isDark} />}
+      {detail && <DetailModal sol={detail} onClose={closeDetail} onAction={handleDetailAction} isDark={isDark} />}
       {recebModal && <RecebimentoModal sol={recebModal} onClose={() => setRecebModal(null)} onConfirm={handleConfirmarRecebimento} isPending={confirmarRecebimento.isPending} isDark={isDark} />}
     </div>
   )
