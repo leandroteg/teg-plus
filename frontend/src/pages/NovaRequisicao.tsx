@@ -810,14 +810,14 @@ export default function NovaRequisicao() {
   // ETAPA 2 — Detalhes
   // ═══════════════════════════════════════
   if (step === 2) return (
-    <div className="space-y-5">
+    <div className="space-y-5 flex flex-col">
       <Stepper step={2} />
       <button onClick={() => { setStep(1); setStepErrors([]) }} className="flex items-center gap-1 text-slate-500 text-sm -mt-2">
         <ChevronLeft size={16} /> Voltar
       </button>
 
       {categoria && (
-        <div className="flex items-center gap-2 bg-teal-50 border border-teal-200 rounded-xl px-3 py-2">
+        <div className="order-1 flex items-center gap-2 bg-teal-50 border border-teal-200 rounded-xl px-3 py-2">
           <span className="text-xs font-bold text-teal-700">{categoria.nome}</span>
           <span className="text-teal-400">·</span>
           <span className="text-xs text-teal-600">Comprador: {categoria.comprador_nome}</span>
@@ -825,7 +825,7 @@ export default function NovaRequisicao() {
       )}
 
       {confianca > 0 && (
-        <div className={`flex items-center gap-2 px-3 py-2 rounded-xl text-xs border ${
+        <div className={`order-2 flex items-center gap-2 px-3 py-2 rounded-xl text-xs border ${
           confianca >= 0.8 ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-amber-50 text-amber-700 border-amber-200'
         }`}>
           <Sparkles size={13} />
@@ -833,7 +833,7 @@ export default function NovaRequisicao() {
         </div>
       )}
 
-      <div>
+      <div className="order-3">
         <label className="text-xs font-semibold text-slate-500 mb-1 block">Solicitante *</label>
         <input required className={`w-full border rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-teal-300 outline-none ${
           stepErrors.some(e => e.includes('solicitante')) ? 'border-red-300 bg-red-50/30' : 'border-slate-200'
@@ -841,18 +841,28 @@ export default function NovaRequisicao() {
           placeholder="Seu nome completo" value={solicitante} onChange={e => setSolicitante(e.target.value)} />
       </div>
 
-      <div>
-        <label className="text-xs font-semibold text-slate-500 mb-1 block">Obra *</label>
-        <select required className={`w-full border rounded-xl px-3 py-2.5 text-sm bg-white focus:ring-2 focus:ring-teal-300 outline-none ${
-          stepErrors.some(e => e.includes('obra')) ? 'border-red-300 bg-red-50/30' : 'border-slate-200'
-        }`}
-          value={obraId} onChange={e => setObraId(e.target.value)}>
-          <option value="">Selecione a obra</option>
-          {obras.map(o => <option key={o.id} value={o.id}>{o.codigo ? `${o.codigo} - ` : ''}{o.nome}</option>)}
-        </select>
+      <div className="order-4 grid grid-cols-1 md:grid-cols-3 gap-3">
+        <div className="md:col-span-2">
+          <label className="text-xs font-semibold text-slate-500 mb-1 block">Obra *</label>
+          <select required className={`w-full border rounded-xl px-3 py-2.5 text-sm bg-white focus:ring-2 focus:ring-teal-300 outline-none ${
+            stepErrors.some(e => e.includes('obra')) ? 'border-red-300 bg-red-50/30' : 'border-slate-200'
+          }`}
+            value={obraId} onChange={e => setObraId(e.target.value)}>
+            <option value="">Selecione a obra</option>
+            {obras.map(o => <option key={o.id} value={o.id}>{o.codigo ? `${o.codigo} - ` : ''}{o.nome}</option>)}
+          </select>
+        </div>
+
+        <div>
+          <label className="text-xs font-semibold text-slate-500 mb-1 block">Data de necessidade</label>
+          <input type="date"
+            min={new Date().toISOString().split('T')[0]}
+            className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-teal-300 outline-none"
+            value={dataNecessidade} onChange={e => setDataNecessidade(e.target.value)} />
+        </div>
       </div>
 
-      <div>
+      <div className="order-5">
         <label className="text-xs font-semibold text-slate-500 mb-1 block">Descrição <span className="text-red-400">*</span></label>
         <textarea rows={3} required
           className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-teal-300 outline-none"
@@ -860,12 +870,13 @@ export default function NovaRequisicao() {
           value={justificativa} onChange={e => setJustificativa(e.target.value)} />
       </div>
 
-      <div className="flex items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3">
-        <div>
-          <label className="text-xs font-semibold text-slate-500 block">Urgente</label>
-          <p className="text-[11px] text-slate-400 mt-0.5">Sinaliza prioridade para atendimento.</p>
-        </div>
-        <div className="inline-flex rounded-xl border border-slate-200 bg-slate-50 p-1">
+      <div className="order-7 grid grid-cols-1 lg:grid-cols-2 gap-3">
+        <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3 flex items-center justify-between gap-3">
+          <div>
+            <label className="text-xs font-semibold text-slate-500 block">Urgente</label>
+            <p className="text-[11px] text-slate-400 mt-0.5">Sinaliza prioridade para atendimento.</p>
+          </div>
+          <div className="inline-flex rounded-xl border border-slate-200 bg-slate-50 p-1">
           {[
             { label: 'Não', value: false },
             { label: 'Sim', value: true },
@@ -883,23 +894,15 @@ export default function NovaRequisicao() {
               {option.label}
             </button>
           ))}
+          </div>
         </div>
-      </div>
 
-      <div>
-        <label className="text-xs font-semibold text-slate-500 mb-1 block">Data de necessidade</label>
-        <input type="date"
-          min={new Date().toISOString().split('T')[0]}
-          className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-teal-300 outline-none"
-          value={dataNecessidade} onChange={e => setDataNecessidade(e.target.value)} />
-      </div>
-
-      <div className={`rounded-2xl border p-4 space-y-4 ${
+        <div className={`rounded-2xl border px-4 py-3 space-y-3 ${
         compraRecorrente ? 'border-indigo-200 bg-indigo-50/60' : 'border-slate-200 bg-white'
       }`}>
         <div className="flex items-start justify-between gap-3">
           <div>
-            <label className="text-sm font-bold text-slate-800 block">Compra recorrente</label>
+            <label className="text-xs font-semibold text-slate-500 block">Compra recorrente</label>
             <p className="text-xs text-slate-500 mt-1">
               Esta solicitacao segue para Contratos e volta para Pedidos depois da formalizacao contratual.
             </p>
@@ -951,9 +954,10 @@ export default function NovaRequisicao() {
             </div>
           </div>
         )}
+        </div>
       </div>
 
-      <div>
+      <div className="order-8">
         <div className="flex justify-between items-center mb-2">
           <label className="text-xs font-semibold text-slate-500">Itens *</label>
           <button type="button" onClick={() => setItens(p => [...p, emptyItem()])}
@@ -1018,7 +1022,7 @@ export default function NovaRequisicao() {
         ))}
       </div>
 
-      <div>
+      <div className="order-6">
         <label className="text-xs font-semibold text-slate-500 mb-1.5 block">Referência de cotação</label>
         <div
           className={`rounded-2xl border-2 border-dashed p-4 transition-all cursor-pointer ${
@@ -1097,7 +1101,7 @@ export default function NovaRequisicao() {
         </div>
       </div>
 
-      <div>
+      <div className="order-9">
         <label className="text-xs font-semibold text-slate-500 mb-1 block">Detalhes adicionais</label>
         <textarea rows={3}
           className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-teal-300 outline-none"
@@ -1106,7 +1110,7 @@ export default function NovaRequisicao() {
       </div>
 
       {total > 0 && (
-        <div className="bg-teal-50 border border-teal-200 rounded-2xl p-4 flex justify-between items-center">
+        <div className="order-10 bg-teal-50 border border-teal-200 rounded-2xl p-4 flex justify-between items-center">
           <div>
             <span className="text-xs text-teal-500 font-semibold">Total estimado</span>
             <p className="text-lg font-black text-teal-700">{fmt(total)}</p>
@@ -1120,7 +1124,7 @@ export default function NovaRequisicao() {
         </div>
       )}
 
-      <div className="space-y-3">
+      <div className="order-11 space-y-3">
         {stepErrors.length > 0 && (
           <div className="bg-red-50 border border-red-200 rounded-xl p-3 space-y-1">
             {stepErrors.map(err => (
