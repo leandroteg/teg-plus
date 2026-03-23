@@ -264,6 +264,26 @@ function DetailModal({ r, apr, onClose, isDark, canDecide, onDecisao, isProcessi
             )}
           </div>
 
+          {/* Justificativa de urgência */}
+          {r.urgencia !== 'normal' && r.justificativa_urgencia && (
+            <div className={`rounded-xl px-3.5 py-2.5 ${
+              r.urgencia === 'critica'
+                ? isDark ? 'bg-red-500/10 border border-red-500/20' : 'bg-red-50 border border-red-100'
+                : isDark ? 'bg-amber-500/10 border border-amber-500/20' : 'bg-amber-50 border border-amber-100'
+            }`}>
+              <p className={`text-[10px] font-bold uppercase tracking-wider mb-1 ${
+                r.urgencia === 'critica'
+                  ? isDark ? 'text-red-400' : 'text-red-600'
+                  : isDark ? 'text-amber-400' : 'text-amber-600'
+              }`}>Justificativa de Urgência</p>
+              <p className={`text-xs leading-relaxed ${
+                r.urgencia === 'critica'
+                  ? isDark ? 'text-red-200' : 'text-red-800'
+                  : isDark ? 'text-amber-200' : 'text-amber-800'
+              }`}>{r.justificativa_urgencia}</p>
+            </div>
+          )}
+
           {r.esclarecimento_msg && (
             <div className={`rounded-xl px-3 py-2.5 ${isDark ? 'bg-amber-500/10 border border-amber-500/20' : 'bg-amber-50 border border-amber-200'}`}>
               <p className={`text-xs font-bold mb-1 ${isDark ? 'text-amber-400' : 'text-amber-700'}`}>Esclarecimento</p>

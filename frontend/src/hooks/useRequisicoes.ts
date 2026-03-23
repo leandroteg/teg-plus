@@ -23,7 +23,7 @@ export function useRequisicoes(status?: string, search?: string) {
         .from(TABLE)
         .select(`
           id, numero, solicitante_nome, obra_nome, obra_id,
-          descricao, justificativa, valor_estimado, urgencia, status,
+          descricao, justificativa, valor_estimado, urgencia, justificativa_urgencia, status,
           alcada_nivel, categoria, comprador_id, centro_custo, centro_custo_id,
           classe_financeira, classe_financeira_id, texto_original, ai_confianca,
           esclarecimento_msg, esclarecimento_por, esclarecimento_em,
@@ -140,6 +140,7 @@ export function useCriarRequisicao() {
           descricao:        payload.descricao,
           justificativa:    payload.justificativa || null,
           urgencia:         payload.urgencia,
+          justificativa_urgencia: payload.justificativa_urgencia || null,
           status:           payload.rascunho ? 'rascunho' : 'em_aprovacao',
           categoria:        payload.categoria  || null,
           comprador_id:     compradorId,

@@ -115,6 +115,7 @@ export interface Requisicao {
   ai_confianca?: number
   arquivo_url?: string
   created_at: string
+  justificativa_urgencia?: string
   esclarecimento_msg?: string
   esclarecimento_por?: string
   esclarecimento_em?: string
@@ -312,6 +313,7 @@ export interface NovaRequisicaoPayload {
   justificativa?: string
   categoria?: string
   urgencia: Urgencia
+  justificativa_urgencia?: string
   data_necessidade?: string
   itens: RequisicaoItem[]
   texto_original?: string

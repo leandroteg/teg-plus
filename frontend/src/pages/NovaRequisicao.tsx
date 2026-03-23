@@ -133,6 +133,7 @@ export default function NovaRequisicao() {
   const [descricao, setDescricao]           = useState('')
   const [justificativa, setJustificativa]   = useState('')
   const [urgencia, setUrgencia]             = useState<Urgencia>('normal')
+  const [justificativaUrgencia, setJustificativaUrgencia] = useState('')
   const [dataNecessidade, setDataNecessidade] = useState('')
   const [compraRecorrente, setCompraRecorrente] = useState(false)
   const [valorMensal, setValorMensal] = useState('')
@@ -359,6 +360,7 @@ export default function NovaRequisicao() {
     descricao:        buildResumoRequisicao(itens, descricao),
     justificativa,
     urgencia,
+    justificativa_urgencia: urgencia !== 'normal' ? justificativaUrgencia : undefined,
     categoria:        categoria?.codigo,
     itens,
     data_necessidade: dataNecessidade || undefined,
@@ -374,6 +376,10 @@ export default function NovaRequisicao() {
   const submit = async () => {
     if (!justificativa.trim()) {
       setSubmitError('Preencha a Descrição da compra antes de enviar.')
+      return
+    }
+    if (urgencia !== 'normal' && !justificativaUrgencia.trim()) {
+      setSubmitError('Preencha a justificativa de urgência antes de enviar.')
       return
     }
     setSubmitError(null)
@@ -1008,6 +1014,27 @@ export default function NovaRequisicao() {
             </button>
           ))}
         </div>
+
+        {/* Justificativa de urgência (aparece quando urgência != normal) */}
+        {urgencia !== 'normal' && (
+          <div className="mt-3">
+            <label className={`text-xs font-semibold mb-1 block ${urgencia === 'critica' ? 'text-red-600' : 'text-amber-600'}`}>
+              Justificativa de urgência <span className="text-red-400">*</span>
+            </label>
+            <textarea
+              rows={2}
+              required
+              className={`w-full border rounded-xl px-3 py-2.5 text-sm outline-none transition-all ${
+                urgencia === 'critica'
+                  ? 'border-red-300 bg-red-50/50 focus:ring-2 focus:ring-red-300 placeholder:text-red-300'
+                  : 'border-amber-300 bg-amber-50/50 focus:ring-2 focus:ring-amber-300 placeholder:text-amber-300'
+              }`}
+              placeholder="Explique o motivo da urgência desta requisição..."
+              value={justificativaUrgencia}
+              onChange={e => setJustificativaUrgencia(e.target.value)}
+            />
+          </div>
+        )}
       </div>
 
       <div>
@@ -1178,6 +1205,11 @@ export default function NovaRequisicao() {
               <p className={`font-bold ${urgencia === 'critica' ? 'text-red-600' : urgencia === 'urgente' ? 'text-amber-600' : 'text-emerald-600'}`}>
                 {urgencia.charAt(0).toUpperCase() + urgencia.slice(1)}
               </p>
+              {urgencia !== 'normal' && justificativaUrgencia && (
+                <p className={`text-xs mt-0.5 italic ${urgencia === 'critica' ? 'text-red-500' : 'text-amber-500'}`}>
+                  {justificativaUrgencia}
+                </p>
+              )}
             </div>
             <div>
               <span className="text-[11px] text-slate-400">Valor estimado</span>
