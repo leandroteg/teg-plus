@@ -1335,7 +1335,7 @@ function CPDetailModal({ cp, stageStatus, onClose, onAction, isDark }: {
   const aprovarPagamentoMut = useAprovarPagamento()
   const [editCC, setEditCC] = useState(cp.centro_custo ?? '')
   const [editClasse, setEditClasse] = useState(cp.classe_financeira ?? '')
-  const [editObra, setEditObra] = useState((cp as any).obra_id ?? '')
+  const [editObra, setEditObra] = useState((cp as any).projeto_id ?? '')
   const [savingClass, setSavingClass] = useState(false)
   const { data: obrasList = [] } = useObras()
   const centrosCusto = useLookupCentrosCusto()
@@ -1852,7 +1852,7 @@ function CPDetailModal({ cp, stageStatus, onClose, onAction, isDark }: {
                   const updates: Record<string, string | null> = {}
                   if (editCC !== (cp.centro_custo ?? '')) updates.centro_custo = editCC || null
                   if (editClasse !== (cp.classe_financeira ?? '')) updates.classe_financeira = editClasse || null
-                  if (editObra && editObra !== ((cp as any).obra_id ?? '')) updates.obra_id = editObra || null
+                  if (editObra && editObra !== ((cp as any).projeto_id ?? '')) updates.projeto_id = editObra || null
                   if (Object.keys(updates).length > 0) {
                     setSavingClass(true)
                     const { error } = await supabase.from('fin_contas_pagar').update(updates).eq('id', cp.id)
