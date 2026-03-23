@@ -1,7 +1,7 @@
 import { useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import {
-  FileText, Clock, CheckCircle, DollarSign, Sparkles,
+  FileText, Clock, CheckCircle, DollarSign,
   RefreshCw, Settings, TrendingUp, AlertTriangle,
   ShoppingCart, Package, ChevronRight,
 } from 'lucide-react'
@@ -136,27 +136,6 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-5">
-
-      {/* ── AprovAi Banner ─────────────────────────────────────────────── */}
-      <Link to="/aprovaai"
-        className="block rounded-2xl p-4 active:scale-[0.98] transition-all"
-        style={{ background: 'linear-gradient(135deg, #6366F1 0%, #8B5CF6 100%)', boxShadow: '0 8px 24px rgba(99,102,241,0.25)' }}>
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="bg-white/20 rounded-xl p-2.5">
-              <Sparkles size={18} className="text-white" />
-            </div>
-            <div>
-              <h3 className="text-white font-bold text-sm leading-none">AprovAi</h3>
-              <p className="text-indigo-200 text-xs mt-0.5">Aprovações pendentes com 1 toque</p>
-            </div>
-          </div>
-          <div className="bg-white/20 backdrop-blur-sm rounded-xl px-3 py-1.5 flex items-center gap-1.5">
-            <span className="text-white text-xl font-extrabold">{kpis.aguardando_aprovacao}</span>
-            <span className="text-indigo-200 text-xs">pendente{kpis.aguardando_aprovacao !== 1 ? 's' : ''}</span>
-          </div>
-        </div>
-      </Link>
 
       {/* ── Filtros compactos (Período + Obra) ────────────────────────── */}
       <div className="flex items-center gap-2">
