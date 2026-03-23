@@ -221,6 +221,7 @@ type NovaSolicitacaoExtraForm = {
   centro_custo: string
   classe_financeira: string
   valor: string
+  data_necessidade: string
   fornecedor_id: string
   fornecedor_cnpj: string
   favorecido: string
@@ -250,6 +251,7 @@ const EMPTY_EXTRA_FORM: NovaSolicitacaoExtraForm = {
   centro_custo: '',
   classe_financeira: '',
   valor: '',
+  data_necessidade: new Date().toISOString().split('T')[0],
   fornecedor_id: '',
   fornecedor_cnpj: '',
   favorecido: '',
@@ -277,6 +279,13 @@ function summarizeNames(values: string[], fallback: string) {
   if (unique.length === 1) return unique[0]
   if (unique.length === 2) return `${unique[0]} + ${unique[1]}`
   return `${unique[0]} + ${unique.length - 1}`
+}
+
+function formatFormaPagamentoLabel(value?: string | null) {
+  if (!value) return ''
+  return value
+    .replace(/_/g, ' ')
+    .replace(/\b\w/g, char => char.toUpperCase())
 }
 
 function getLoteProgress(activeTab: PipelineStageId, loteStatus?: string) {
@@ -770,6 +779,7 @@ function NovaSolicitacaoExtraordinariaModal({
     && form.centro_custo.length > 0
     && form.classe_financeira.length > 0
     && Number(form.valor) > 0
+    && form.data_necessidade.length > 0
     && form.fornecedor_id.length > 0
 
   const inputCls = `w-full rounded-xl px-3 py-2.5 text-sm outline-none transition-colors ${
@@ -893,6 +903,7 @@ function NovaSolicitacaoExtraordinariaModal({
         centro_custo: form.centro_custo,
         classe_financeira: form.classe_financeira,
         valor: Number(form.valor),
+        dataNecessidade: form.data_necessidade,
         solicitanteNome: perfil?.nome,
         fornecedorId: form.fornecedor_id || undefined,
         fornecedorNome: form.favorecido || undefined,
@@ -1052,9 +1063,15 @@ function NovaSolicitacaoExtraordinariaModal({
             </div>
           </div>
 
-          <div>
-            <label className={labelCls}>Valor *</label>
-            <input type="number" min="0" step="0.01" value={form.valor} onChange={e => setField('valor', e.target.value)} className={inputCls} placeholder="0,00" />
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label className={labelCls}>Valor *</label>
+              <input type="number" min="0" step="0.01" value={form.valor} onChange={e => setField('valor', e.target.value)} className={inputCls} placeholder="0,00" />
+            </div>
+            <div>
+              <label className={labelCls}>Data da necessidade *</label>
+              <input type="date" value={form.data_necessidade} onChange={e => setField('data_necessidade', e.target.value)} className={inputCls} />
+            </div>
           </div>
 
           <div className={`rounded-xl border p-4 space-y-3 ${isDark ? 'border-white/[0.08] bg-white/[0.03]' : 'border-slate-200 bg-slate-50/70'}`}>
@@ -1187,7 +1204,7 @@ function NovaSolicitacaoExtraordinariaModal({
 
           {!canSubmit && (
             <p className={`text-[11px] ${isDark ? 'text-amber-300' : 'text-amber-700'}`}>
-              Preencha descrição, justificativa, centro de custo, classe financeira, valor e selecione/cadastre o fornecedor para liberar a criação.
+              Preencha descrição, justificativa, centro de custo, classe financeira, valor, data da necessidade e selecione/cadastre o fornecedor para liberar a criação.
             </p>
           )}
           {erro && (
@@ -2582,6 +2599,26 @@ export default function CPPipeline() {
     [contas],
   )
 
+  const pagCpSelecionadas = useMemo(
+    () => pagModal?.cpIds
+      .map(id => contasById.get(id))
+      .filter((cp): cp is ContaPagar => !!cp) ?? [],
+    [contasById, pagModal],
+  )
+
+  const pagFormaPagamentoLabel = useMemo(() => {
+    const formas = Array.from(new Set(
+      pagCpSelecionadas
+        .map(cp => cp.forma_pagamento?.trim().toLowerCase())
+        .filter((forma): forma is string => !!forma),
+    ))
+
+    if (formas.length === 0) return ''
+    if (formas.length === 1) return formatFormaPagamentoLabel(formas[0])
+    if (formas.includes('boleto')) return 'Múltiplas (inclui Boleto)'
+    return 'Múltiplas'
+  }, [pagCpSelecionadas])
+
   const lotesById = useMemo(
     () => new Map(lotes.map(lote => [lote.id, lote])),
     [lotes],
@@ -3203,6 +3240,14 @@ export default function CPPipeline() {
                 <input type="date" value={pagData} onChange={e => setPagData(e.target.value)}
                   className={`w-full mt-1 px-3 py-2 rounded-xl text-sm border ${isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-50 border-slate-200 text-slate-800'}`} />
               </div>
+              {pagFormaPagamentoLabel && (
+                <div>
+                  <label className={`text-[10px] font-bold uppercase tracking-wider ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Forma de pagamento</label>
+                  <div className={`mt-1 rounded-xl border px-3 py-2 text-sm font-semibold ${isDark ? 'border-emerald-500/20 bg-emerald-500/10 text-emerald-300' : 'border-emerald-200 bg-emerald-50 text-emerald-700'}`}>
+                    {pagFormaPagamentoLabel}
+                  </div>
+                </div>
+              )}
               {pagModal.pedidoId && (
                 <div>
                   <label className={`text-[10px] font-bold uppercase tracking-wider ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Comprovante (opcional)</label>
