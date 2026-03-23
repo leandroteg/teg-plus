@@ -155,7 +155,12 @@ function ReqCard({ r, apr, isDark, onClick }: {
             </span>
           )}
         </div>
-        <span className={`text-sm font-extrabold ${isDark ? 'text-teal-400' : 'text-teal-600'}`}>{fmt(r.valor_estimado)}</span>
+        <div className="flex items-center gap-1.5">
+          {(r as any).compra_recorrente && (
+            <span className="text-[8px] font-bold bg-indigo-100 text-indigo-700 px-1.5 py-0.5 rounded">MENSAL</span>
+          )}
+          <span className={`text-sm font-extrabold ${isDark ? 'text-teal-400' : 'text-teal-600'}`}>{fmt(r.valor_estimado)}</span>
+        </div>
       </div>
 
       {/* Comprador + data + chip */}
@@ -231,8 +236,13 @@ function DetailModal({ r, apr, onClose, isDark, canDecide, onDecisao, isProcessi
               <p>{r.obra_nome}</p>
             </div>
             <div>
-              <p className={`font-bold mb-0.5 ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>Valor Estimado</p>
-              <p className={`font-extrabold ${isDark ? 'text-teal-400' : 'text-teal-600'}`}>{fmt(r.valor_estimado)}</p>
+              <p className={`font-bold mb-0.5 ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>{(r as any).compra_recorrente ? 'Valor Mensal' : 'Valor Estimado'}</p>
+              <div className="flex items-center gap-1.5">
+                <p className={`font-extrabold ${isDark ? 'text-teal-400' : 'text-teal-600'}`}>{fmt(r.valor_estimado)}</p>
+                {(r as any).compra_recorrente && (
+                  <span className="text-[8px] font-bold bg-indigo-100 text-indigo-700 px-1.5 py-0.5 rounded">RECORRENTE</span>
+                )}
+              </div>
             </div>
             <div>
               <p className={`font-bold mb-0.5 ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>Solicitante</p>
@@ -614,7 +624,10 @@ export default function ListaRequisicoes() {
                   <td className="px-3 py-2 text-center">{r.urgencia && r.urgencia !== 'normal' ? (
                     <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${r.urgencia === 'critica' ? (isDark ? 'bg-red-500/20 text-red-400' : 'bg-red-100 text-red-700') : (isDark ? 'bg-amber-500/20 text-amber-400' : 'bg-amber-100 text-amber-700')}`}>{r.urgencia}</span>
                   ) : <span className={isDark ? 'text-slate-600' : 'text-slate-300'}>—</span>}</td>
-                  <td className={`px-3 py-2 text-right font-bold ${isDark ? 'text-teal-400' : 'text-teal-600'}`}>{fmt(r.valor_estimado)}</td>
+                  <td className={`px-3 py-2 text-right font-bold ${isDark ? 'text-teal-400' : 'text-teal-600'}`}>
+                    {fmt(r.valor_estimado)}
+                    {(r as any).compra_recorrente && <span className="text-[8px] font-bold text-indigo-500 ml-1">/mês</span>}
+                  </td>
                   <td className={`px-3 py-2 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{r.solicitante_nome.split(' ')[0]}</td>
                   <td className="px-3 py-2"><StatusBadge status={r.status as StatusRequisicao} size="sm" customLabel={getApprovalStatusLabel(r.status)} /></td>
                   <td className={`px-3 py-2 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{fmtData(r.created_at)}</td>

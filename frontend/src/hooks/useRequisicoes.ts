@@ -27,6 +27,7 @@ export function useRequisicoes(status?: string, search?: string) {
           alcada_nivel, categoria, comprador_id, centro_custo, centro_custo_id,
           classe_financeira, classe_financeira_id, texto_original, ai_confianca,
           esclarecimento_msg, esclarecimento_por, esclarecimento_em,
+          compra_recorrente,
           created_at,
           comprador:cmp_compradores(nome, email)
         `)
