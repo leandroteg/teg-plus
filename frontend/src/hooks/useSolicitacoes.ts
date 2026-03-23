@@ -422,6 +422,14 @@ export function useAvancarEtapa() {
               }
             }
           }
+          // ── Atualizar requisição de origem (compra recorrente) ──
+          if (sol?.requisicao_origem_id) {
+            await supabase
+              .from('cmp_requisicoes')
+              .update({ status: 'pedido_emitido' })
+              .eq('id', sol.requisicao_origem_id)
+              .eq('status', 'aguardando_contrato')
+          }
         } catch (e) {
           console.warn('Aviso: con_contratos nao criado ao liberar execucao:', e)
         }
