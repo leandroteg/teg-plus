@@ -13,6 +13,7 @@ import { useAnexosPedido, useUploadAnexo, TIPO_LABEL } from '../../hooks/useAnex
 import { useRegistrarPagamento } from '../../hooks/usePedidos'
 import type { PedidoAnexo } from '../../hooks/useAnexos'
 import type { ContaPagar } from '../../types/financeiro'
+import { supabase } from '../../services/supabase'
 
 // ── SyncBar ───────────────────────────────────────────────────────────────────
 
@@ -147,6 +148,9 @@ function RegistrarPgtoModal({ cp, onClose, isDark }: RegistrarPgtoModalProps & {
   const [observacao, setObservacao] = useState('')
   const [erro, setErro] = useState('')
   const [loading, setLoading] = useState(false)
+  const [editCC, setEditCC] = useState(cp.centro_custo ?? '')
+  const [editClasse, setEditClasse] = useState(cp.classe_financeira ?? '')
+  const [editObra, setEditObra] = useState(cp.obra_id ?? '')
 
   const { data: anexosPedido = [] } = useAnexosPedido(cp.pedido_id)
   const uploadAnexo = useUploadAnexo()
@@ -162,7 +166,19 @@ function RegistrarPgtoModal({ cp, onClose, isDark }: RegistrarPgtoModalProps & {
     }
     setLoading(true)
     try {
-      // 1. Upload comprovante if a file was selected
+      // 1. Atualizar classificação (CC, classe financeira) se alterados
+      const classUpdates: Record<string, string | null> = {}
+      if (editCC !== (cp.centro_custo ?? '')) classUpdates.centro_custo = editCC || null
+      if (editClasse !== (cp.classe_financeira ?? '')) classUpdates.classe_financeira = editClasse || null
+      if (Object.keys(classUpdates).length > 0) {
+        const { error: classErr } = await supabase
+          .from('fin_contas_pagar')
+          .update(classUpdates)
+          .eq('id', cp.id)
+        if (classErr) throw new Error('Erro ao atualizar classificação: ' + classErr.message)
+      }
+
+      // 2. Upload comprovante if a file was selected
       if (arquivo && cp.pedido_id) {
         await uploadAnexo.mutateAsync({
           pedidoId: cp.pedido_id,
@@ -173,7 +189,7 @@ function RegistrarPgtoModal({ cp, onClose, isDark }: RegistrarPgtoModalProps & {
         })
       }
 
-      // 2. Register payment
+      // 3. Register payment
       if (cp.pedido_id) {
         // Via cmp_pedidos trigger chain
         await registrarPag.mutateAsync(cp.pedido_id)
@@ -259,6 +275,27 @@ function RegistrarPgtoModal({ cp, onClose, isDark }: RegistrarPgtoModalProps & {
               />
             </div>
           )}
+
+          {/* Classificação: CC, Classe Financeira, Obra */}
+          <div className="space-y-3">
+            <p className={`text-[10px] font-bold uppercase tracking-wider ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+              Classificação (opcional)
+            </p>
+            <div className="grid grid-cols-1 gap-2">
+              <div>
+                <label className={`text-xs font-semibold mb-1 block ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>Centro de Custo</label>
+                <input value={editCC} onChange={e => setEditCC(e.target.value)}
+                  placeholder={cp.centro_custo || 'Ex: ADM, Obra Frutal'}
+                  className={`w-full px-3 py-2 rounded-xl border text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-400 ${isDark ? 'bg-[#1e293b] border-white/[0.06] text-slate-200' : 'border-slate-200 text-slate-700'}`} />
+              </div>
+              <div>
+                <label className={`text-xs font-semibold mb-1 block ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>Classe Financeira</label>
+                <input value={editClasse} onChange={e => setEditClasse(e.target.value)}
+                  placeholder={cp.classe_financeira || 'Ex: Material, Serviço'}
+                  className={`w-full px-3 py-2 rounded-xl border text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-400 ${isDark ? 'bg-[#1e293b] border-white/[0.06] text-slate-200' : 'border-slate-200 text-slate-700'}`} />
+              </div>
+            </div>
+          </div>
 
           {erro && (
             <div className="flex items-start gap-2 bg-red-50 border border-red-200 rounded-xl px-3 py-2">
