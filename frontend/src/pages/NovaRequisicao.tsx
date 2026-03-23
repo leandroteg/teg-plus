@@ -345,14 +345,14 @@ export default function NovaRequisicao() {
         const sanitized = sanitizeItems(allItens.length > 0 ? allItens : [])
 
         if (sanitized.length > 0 && sanitized.some(i => i.descricao.trim())) {
-          setPreviewItens(sanitized)
-          setShowPreview(true)
-          setAiPreview({
-            itens: sanitized,
-            confianca: 0.85,
-            obra_sugerida: result.fornecedores[0]?.fornecedor_nome,
-          })
-          setRefParseMsg({ type: 'success', text: `${sanitized.length} itens extraídos de ${result.fornecedores.length} fornecedor(es)` })
+          // Aplicar itens diretamente no formulário
+          setItens(sanitized)
+          // Preencher fornecedor se disponível
+          const forn = result.fornecedores[0]
+          if (forn?.fornecedor_nome && !descricao.trim()) {
+            setDescricao(`Cotação ref: ${forn.fornecedor_nome}${forn.fornecedor_cnpj ? ` (${forn.fornecedor_cnpj})` : ''}`)
+          }
+          setRefParseMsg({ type: 'success', text: `${sanitized.length} itens preenchidos de ${result.fornecedores.length} fornecedor(es)` })
         } else {
           setRefParseMsg({ type: 'error', text: 'IA não conseguiu extrair itens. Tente imagem mais nítida ou preencha manualmente.' })
         }
