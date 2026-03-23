@@ -141,6 +141,7 @@ export function useCriarRequisicao() {
           justificativa:    payload.justificativa || null,
           urgencia:         payload.urgencia,
           justificativa_urgencia: payload.justificativa_urgencia || null,
+          compra_recorrente: payload.compra_recorrente || false,
           status:           payload.rascunho ? 'rascunho' : 'em_aprovacao',
           categoria:        payload.categoria  || null,
           comprador_id:     compradorId,

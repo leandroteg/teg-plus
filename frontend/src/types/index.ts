@@ -321,6 +321,8 @@ export interface NovaRequisicaoPayload {
   ai_confianca?: number
   arquivo_referencia?: File
   rascunho?: boolean
+  compra_recorrente?: boolean
+  valor_mensal?: number
 }
 
 export interface NovaCotacaoPayload {

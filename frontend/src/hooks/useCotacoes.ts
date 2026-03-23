@@ -13,7 +13,8 @@ const SELECT_COTACAO = `
   observacao, data_limite, data_conclusao, created_at,
   requisicao:cmp_requisicoes(
     id, numero, solicitante_nome, obra_nome, descricao, justificativa,
-    valor_estimado, urgencia, status, alcada_nivel, categoria, created_at
+    valor_estimado, urgencia, status, alcada_nivel, categoria, created_at,
+    compra_recorrente
   ),
   comprador:cmp_compradores(nome, email)
 `

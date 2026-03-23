@@ -624,7 +624,12 @@ export default function CotacaoForm() {
       {cotacao?.requisicao && (
         <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm space-y-3">
           <div>
-            <p className="text-xs text-slate-400 font-mono">{cotacao.requisicao.numero}</p>
+            <div className="flex items-center gap-2">
+              <p className="text-xs text-slate-400 font-mono">{cotacao.requisicao.numero}</p>
+              {(cotacao.requisicao as any)?.compra_recorrente && (
+                <span className="text-[10px] font-bold bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-lg">Recorrente</span>
+              )}
+            </div>
             <p className="text-sm font-bold text-slate-800 mt-0.5">{cotacao.requisicao.descricao}</p>
             <div className="flex justify-between mt-1">
               <span className="text-xs text-slate-400">{cotacao.requisicao.obra_nome}</span>
@@ -757,7 +762,9 @@ export default function CotacaoForm() {
             <div className="grid grid-cols-2 gap-2">
               <div>
                 <label className="text-[10px] text-slate-400 font-semibold">
-                  {forn.itens_precos.length > 0 ? 'Valor Total (calculado)' : 'Valor Total *'}
+                  {forn.itens_precos.length > 0
+                    ? (cotacao?.requisicao as any)?.compra_recorrente ? 'Valor Mensal (calculado)' : 'Valor Total (calculado)'
+                    : (cotacao?.requisicao as any)?.compra_recorrente ? 'Valor Mensal *' : 'Valor Total *'}
                 </label>
                 <div className="relative">
                   <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-slate-400 font-semibold">R$</span>
