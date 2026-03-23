@@ -256,6 +256,9 @@ export function useCriarSolicitacaoExtraordinariaCP() {
       classe_financeira,
       valor,
       solicitanteNome,
+      fornecedorId,
+      fornecedorNome,
+      fornecedorCnpj,
       dadosBancarios,
       arquivos,
     }: {
@@ -265,6 +268,9 @@ export function useCriarSolicitacaoExtraordinariaCP() {
       classe_financeira: string
       valor: number
       solicitanteNome?: string
+      fornecedorId?: string
+      fornecedorNome?: string
+      fornecedorCnpj?: string
       dadosBancarios?: {
         favorecido?: string
         banco_nome?: string
@@ -279,12 +285,13 @@ export function useCriarSolicitacaoExtraordinariaCP() {
       const numeroDocumento = `EXT-${new Date().toISOString().replace(/[-:TZ.]/g, '').slice(0, 14)}`
       const uploadedArquivos: Array<{ nome: string; url: string }> = []
       const uploadFalhas: string[] = []
-      const observacoesBase = `Solicita\u00e7\u00e3o extraordin\u00e1ria urgente. Justificativa: ${justificativa.trim()}${solicitanteNome ? ` | Solicitante: ${solicitanteNome}` : ''}`
+      const observacoesBase = `Solicita\u00e7\u00e3o extraordin\u00e1ria urgente. Justificativa: ${justificativa.trim()}${solicitanteNome ? ` | Solicitante: ${solicitanteNome}` : ''}${fornecedorNome ? ` | Fornecedor: ${fornecedorNome}` : ''}${fornecedorCnpj ? ` | CNPJ: ${fornecedorCnpj}` : ''}`
 
       const { data, error } = await supabase
         .from('fin_contas_pagar')
         .insert({
-          fornecedor_nome: 'Pagamento Extraordin\u00e1rio',
+          fornecedor_id: fornecedorId || null,
+          fornecedor_nome: fornecedorNome?.trim() || 'Pagamento Extraordin\u00e1rio',
           origem: 'manual',
           valor_original: valor,
           valor_pago: 0,
