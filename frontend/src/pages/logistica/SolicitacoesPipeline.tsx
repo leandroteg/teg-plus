@@ -1104,6 +1104,7 @@ function NovaSolicitacaoModal({ isDark, onClose, onSuccess }: {
 
 export default function SolicitacoesPipeline() {
   const { isDark } = useTheme()
+  const [searchParams, setSearchParams] = useSearchParams()
   const [activeTab, setActiveTab] = useState<StatusSolicitacaoPipeline>('solicitado')
   const [busca, setBusca] = useState('')
   const [detail, setDetail] = useState<LogSolicitacao | null>(null)
@@ -1117,14 +1118,21 @@ export default function SolicitacoesPipeline() {
   const [editandoViagemId, setEditandoViagemId] = useState<string | null>(null) // null = criando nova, string = editando existente
   const [viagemDetail, setViagemDetail] = useState<Extract<DisplayItem, { kind: 'viagem' }> | null>(null)
 
-  // Abrir modal via ?nova=1 (clique no sidebar)
-  const [searchParams, setSearchParams] = useSearchParams()
   useEffect(() => {
+    const requestedTab = searchParams.get('tab')
+    if (requestedTab && SOLICITACAO_PIPELINE_STAGES.some(stage => stage.status === requestedTab)) {
+      setActiveTab(requestedTab as StatusSolicitacaoPipeline)
+    }
+
     if (searchParams.get('nova')) {
       setShowNovaSolicitacao(true)
-      setSearchParams({}, { replace: true })
+      const next = new URLSearchParams(searchParams)
+      next.delete('nova')
+      setSearchParams(next, { replace: true })
     }
   }, [searchParams, setSearchParams])
+
+  const urgentOnly = searchParams.get('urgent') === '1'
 
   const { data: solicitacoes = [], isLoading } = useSolicitacoes()
   const atualizarStatus = useAtualizarStatusSolicitacao()
@@ -1149,6 +1157,9 @@ export default function SolicitacoesPipeline() {
   // Filter + sort active tab
   const activeItems = useMemo(() => {
     let items = [...(grouped.get(activeTab) || [])]
+    if (urgentOnly) {
+      items = items.filter(s => s.urgente)
+    }
     if (busca) {
       const q = busca.toLowerCase()
       items = items.filter(s =>
@@ -1169,7 +1180,7 @@ export default function SolicitacoesPipeline() {
       return sortDir === 'asc' ? cmp : -cmp
     })
     return items
-  }, [grouped, activeTab, busca, sortField, sortDir])
+  }, [grouped, activeTab, urgentOnly, busca, sortField, sortDir])
 
   // Agrupar solicitações com viagem_id num único DisplayItem de viagem
   const displayItems = useMemo((): DisplayItem[] => {
@@ -1235,7 +1246,14 @@ export default function SolicitacoesPipeline() {
     if (sortField === field) setSortDir(d => d === 'asc' ? 'desc' : 'asc')
     else { setSortField(field); setSortDir('asc') }
   }
-  const switchTab = (status: StatusSolicitacaoPipeline) => { setActiveTab(status); setSelectedIds(new Set()); setBusca('') }
+  const switchTab = (status: StatusSolicitacaoPipeline) => {
+    setActiveTab(status)
+    setSelectedIds(new Set())
+    setBusca('')
+    const next = new URLSearchParams(searchParams)
+    next.set('tab', status)
+    setSearchParams(next, { replace: true })
+  }
 
   const planejar = usePlanejaarSolicitacao()
 

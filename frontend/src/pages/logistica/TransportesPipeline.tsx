@@ -1,4 +1,5 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import {
   Truck, Search, X, CheckCircle2, AlertTriangle,
   Calendar, ArrowUp, ArrowDown, LayoutList, LayoutGrid, Download,
@@ -542,6 +543,7 @@ function ViagemTrGroupCard({ viagem, solicitacoes, onClick, isDark, selectedIds,
 
 export default function TransportesPipeline() {
   const { isDark } = useTheme()
+  const [searchParams, setSearchParams] = useSearchParams()
   const [activeTab, setActiveTab] = useState<StatusTransportePipeline>('nfe_emitida')
   const [busca, setBusca] = useState('')
   const [detail, setDetail] = useState<LogSolicitacao | null>(null)
@@ -558,6 +560,15 @@ export default function TransportesPipeline() {
   const confirmarEntrega = useConfirmarEntregaFisica()
   const confirmarAgendamento = useConfirmarAgendamento()
   const confirmarRecebimento = useConfirmarRecebimento()
+
+  useEffect(() => {
+    const requestedTab = searchParams.get('tab')
+    if (!requestedTab) return
+    const isValid = TRANSPORTE_PIPELINE_STAGES.some(stage => stage.status === requestedTab)
+    if (isValid) {
+      setActiveTab(requestedTab as StatusTransportePipeline)
+    }
+  }, [searchParams])
 
   // Group by status — for "nfe_emitida" (Pendentes), only show items that actually have NF emitted
   const grouped = useMemo(() => {
@@ -633,7 +644,14 @@ export default function TransportesPipeline() {
   const toggleSelect = (id: string) => { setSelectedIds(prev => { const next = new Set(prev); if (next.has(id)) next.delete(id); else next.add(id); return next }) }
   const selectAll = () => { const ids = activeItems.map(s => s.id); setSelectedIds(ids.every(id => selectedIds.has(id)) ? new Set() : new Set(ids)) }
   const toggleSort = (field: SortField) => { if (sortField === field) setSortDir(d => d === 'asc' ? 'desc' : 'asc'); else { setSortField(field); setSortDir('asc') } }
-  const switchTab = (status: StatusTransportePipeline) => { setActiveTab(status); setSelectedIds(new Set()); setBusca('') }
+  const switchTab = (status: StatusTransportePipeline) => {
+    setActiveTab(status)
+    setSelectedIds(new Set())
+    setBusca('')
+    const next = new URLSearchParams(searchParams)
+    next.set('tab', status)
+    setSearchParams(next, { replace: true })
+  }
 
   // Actions
   const handleConfirmarAgendamento = async (ids: string[]) => {

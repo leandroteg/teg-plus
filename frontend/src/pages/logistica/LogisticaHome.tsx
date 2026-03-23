@@ -327,7 +327,6 @@ export default function LogisticaHome() {
             emptyLabel="Sem status relevantes no momento"
             segments={statusSegments}
           />
-          <InlineStatusLegend isDark={isDark} segments={statusSegments} />
         </div>
       </section>
 
@@ -337,7 +336,7 @@ export default function LogisticaHome() {
             <h2 className={`text-sm font-extrabold flex items-center gap-1.5 ${isDark ? 'text-white' : 'text-slate-800'}`}>
               <Truck size={14} className="text-orange-500" /> Transportes em Execucao
             </h2>
-            <button onClick={() => nav('/logistica/transportes')} className="text-[10px] text-orange-600 font-semibold flex items-center gap-0.5">
+            <button onClick={() => nav('/logistica/transportes?tab=em_transito')} className="text-[10px] text-orange-600 font-semibold flex items-center gap-0.5">
               Ver todos <ArrowRight size={10} />
             </button>
           </div>
@@ -396,7 +395,7 @@ export default function LogisticaHome() {
             <h2 className={`text-sm font-extrabold flex items-center gap-1.5 ${isDark ? 'text-red-400' : 'text-red-800'}`}>
               <AlertTriangle size={14} className="text-red-500" /> Solicitacoes Urgentes
             </h2>
-            <button onClick={() => nav('/logistica/solicitacoes')} className="text-[10px] text-red-600 font-semibold flex items-center gap-0.5">
+            <button onClick={() => nav('/logistica/solicitacoes?tab=solicitado&urgent=1')} className="text-[10px] text-red-600 font-semibold flex items-center gap-0.5">
               Ver todas <ArrowRight size={10} />
             </button>
           </div>
@@ -440,7 +439,7 @@ export default function LogisticaHome() {
             <h2 className={`text-sm font-extrabold flex items-center gap-1.5 ${isDark ? 'text-white' : 'text-slate-800'}`}>
               <CalendarClock size={14} className="text-cyan-500" /> Proximas Coletas
             </h2>
-            <button onClick={() => nav('/logistica/transportes')} className="text-[10px] text-cyan-600 font-semibold flex items-center gap-0.5">
+            <button onClick={() => nav('/logistica/transportes?tab=aguardando_coleta')} className="text-[10px] text-cyan-600 font-semibold flex items-center gap-0.5">
               Abrir fila <ArrowRight size={10} />
             </button>
           </div>
@@ -595,43 +594,6 @@ function HorizontalStatusBar({
           })}
         </div>
       )}
-    </div>
-  )
-}
-
-function InlineStatusLegend({
-  segments,
-  isDark,
-}: {
-  segments: Array<{
-    key: string
-    label: string
-    value: number
-    barClass: string
-    tone: 'orange' | 'blue' | 'red' | 'violet' | 'slate'
-  }>
-  isDark: boolean
-}) {
-  if (segments.length === 0) {
-    return null
-  }
-
-  return (
-    <div className="flex flex-wrap gap-2">
-      {segments.map(segment => {
-        const palette = toneClasses(segment.tone)
-
-        return (
-          <div
-            key={segment.key}
-            className={`inline-flex items-center gap-2 rounded-full px-2.5 py-1 text-[10px] font-semibold ${isDark ? 'bg-white/[0.04] text-slate-300' : palette.soft}`}
-          >
-            <span className={`w-2 h-2 rounded-full ${segment.barClass}`} />
-            {segment.label}
-            <span className={`${isDark ? 'text-white' : palette.text}`}>{segment.value}</span>
-          </div>
-        )
-      })}
     </div>
   )
 }
