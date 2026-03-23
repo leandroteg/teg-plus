@@ -16,6 +16,7 @@ import {
 import type { LogSolicitacao, StatusExpedicaoPipeline } from '../../types/logistica'
 import { EXPEDICAO_PIPELINE_STAGES } from '../../types/logistica'
 import { hasRomaneioDocumento, RomaneioDocumentoCard } from '../../components/logistica/RomaneioDocumentoCard'
+import { getDocumentoFiscalContext, getDocumentoFiscalLabel } from '../../utils/logisticaFiscal'
 
 // ── Formatters ───────────────────────────────────────────────────────────────
 
@@ -83,23 +84,6 @@ function exportCSV(items: LogSolicitacao[], stageName: string) {
   URL.revokeObjectURL(url)
 }
 
-// ── UF Detection ─────────────────────────────────────────────────────────────
-
-const CIDADES_MG = [
-  'araxa', 'araxá', 'frutal', 'ituiutaba', 'paracatu',
-  'perdizes', 'rio paranaiba', 'rio paranaíba', 'tres marias', 'três marias',
-]
-
-function detectUF(destino: string): 'MG' | 'outro' | 'indefinido' {
-  if (!destino) return 'indefinido'
-  const d = destino.toLowerCase().trim()
-  if (CIDADES_MG.some(c => d.includes(c))) return 'MG'
-  if (d.includes('se ') && !d.includes('campo grande')) return 'MG'
-  if (d.includes('campo grande') || d.includes('/ms') || d.includes(' ms')) return 'outro'
-  if (d.endsWith('/mg') || d.endsWith(' mg')) return 'MG'
-  return 'indefinido'
-}
-
 // ── Detail Modal ─────────────────────────────────────────────────────────────
 
 const ITEMS_CHECKLIST: readonly [string, string, boolean][] = [
@@ -115,6 +99,7 @@ function DetailModal({ sol, onClose, onAction, isDark, allSolicitacoes }: {
   onAction: (action: string, sol: LogSolicitacao) => void; isDark: boolean
   allSolicitacoes: LogSolicitacao[]
 }) {
+  const fiscalCtx = getDocumentoFiscalContext(sol)
   const { data: checklist } = useChecklistExpedicao(sol.id)
   const salvarChecklist = useSalvarChecklistExpedicao()
   const todosMarcados = ITEMS_CHECKLIST.every(([k, , fotoObrig]) => {
@@ -193,14 +178,16 @@ function DetailModal({ sol, onClose, onAction, isDark, allSolicitacoes }: {
 
           <div className={`rounded-xl p-4 space-y-2 ${isDark ? 'bg-white/[0.04]' : 'bg-slate-50'}`}>
             <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-xs">
-              <div><span className="text-slate-400">Origem:</span> <span className="font-semibold">{sol.origem}</span></div>
-              <div><span className="text-slate-400">Destino:</span> <span className="font-semibold">{sol.destino}</span></div>
+              <div><span className="text-slate-400">Origem:</span> <span className="font-semibold">{fiscalCtx.origemLabel}</span></div>
+              <div><span className="text-slate-400">Destino:</span> <span className="font-semibold">{fiscalCtx.destinoLabel}</span></div>
+              {(fiscalCtx.origemUf || fiscalCtx.destinoUf) && <div><span className="text-slate-400">UFs:</span> <span className="font-semibold">{fiscalCtx.origemUf || '—'} → {fiscalCtx.destinoUf || '—'}</span></div>}
               {sol.obra_nome && <div><span className="text-slate-400">Obra:</span> <span className="font-semibold">{sol.obra_nome}</span></div>}
               {sol.centro_custo && <div><span className="text-slate-400">Centro Custo:</span> <span className="font-semibold">{sol.centro_custo}</span></div>}
               {sol.motorista_nome && <div><span className="text-slate-400">Motorista:</span> <span className="font-semibold">{sol.motorista_nome}</span></div>}
               {sol.veiculo_placa && <div><span className="text-slate-400">Placa:</span> <span className="font-mono font-semibold">{sol.veiculo_placa}</span></div>}
               {sol.modal && <div><span className="text-slate-400">Modal:</span> <span className="font-semibold capitalize">{sol.modal.replace(/_/g, ' ')}</span></div>}
               {sol.doc_fiscal_tipo && <div><span className="text-slate-400">Doc. Fiscal:</span> <span className="font-semibold capitalize">{sol.doc_fiscal_tipo}</span></div>}
+              <div className="col-span-2"><span className="text-slate-400">Regra Fiscal:</span> <span className="font-semibold">{getDocumentoFiscalLabel(fiscalCtx.regra)}</span></div>
               {sol.peso_total_kg != null && <div><span className="text-slate-400">Peso:</span> <span className="font-semibold">{sol.peso_total_kg} kg</span></div>}
               {sol.volumes_total != null && <div><span className="text-slate-400">Volumes:</span> <span className="font-semibold">{sol.volumes_total}</span></div>}
             </div>
@@ -347,8 +334,7 @@ function DetailModal({ sol, onClose, onAction, isDark, allSolicitacoes }: {
               </button>
             )}
             {sol.status === 'romaneio_emitido' && (() => {
-              const uf = detectUF(sol.destino)
-              return uf === 'outro' || uf === 'indefinido' ? (
+              return fiscalCtx.regra === 'nf' || fiscalCtx.regra === 'indefinido' ? (
                 <button onClick={() => onAction('solicitarNF', sol)} className="flex-1 py-3 rounded-xl bg-amber-600 text-white text-sm font-bold hover:bg-amber-700 transition-all flex items-center justify-center gap-2">
                   <FileText size={15} /> Solicitar NF
                 </button>
@@ -743,12 +729,14 @@ export default function ExpedicaoPipeline() {
   }
 
   const handleSolicitarNF = async (sol: LogSolicitacao) => {
+    const fiscalCtx = getDocumentoFiscalContext(sol)
     try {
       await solicitarNF.mutateAsync({
         solicitacao_id: sol.id,
         fornecedor_nome: sol.origem,
         valor_total: 0,
         descricao: `NF ref. expedi\u00e7\u00e3o #${sol.numero} - ${sol.origem} -> ${sol.destino}`,
+        destinatario_uf: fiscalCtx.destinoUf || undefined,
       })
       showToast('success', 'NF solicitada ao fiscal com sucesso')
       setNfModal(null)
@@ -956,8 +944,9 @@ export default function ExpedicaoPipeline() {
               </p>
               <div className={`rounded-xl p-4 space-y-2 text-xs ${isDark ? 'bg-white/[0.04]' : 'bg-slate-50'}`}>
               <div><span className="text-slate-400">{'Expedi\u00e7\u00e3o:'}</span> <span className="font-semibold">#{nfModal.numero}</span></div>
-                <div><span className="text-slate-400">Origem:</span> <span className="font-semibold">{nfModal.origem}</span></div>
-                <div><span className="text-slate-400">Destino:</span> <span className="font-semibold">{nfModal.destino}</span></div>
+                <div><span className="text-slate-400">Origem:</span> <span className="font-semibold">{getDocumentoFiscalContext(nfModal).origemLabel}</span></div>
+                <div><span className="text-slate-400">Destino:</span> <span className="font-semibold">{getDocumentoFiscalContext(nfModal).destinoLabel}</span></div>
+                <div><span className="text-slate-400">Regra Fiscal:</span> <span className="font-semibold">{getDocumentoFiscalLabel(getDocumentoFiscalContext(nfModal).regra)}</span></div>
                 {nfModal.obra_nome && <div><span className="text-slate-400">Obra:</span> <span className="font-semibold">{nfModal.obra_nome}</span></div>}
               </div>
               <div className="flex gap-2">

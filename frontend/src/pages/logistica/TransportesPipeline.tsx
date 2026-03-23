@@ -14,6 +14,7 @@ import type { LogSolicitacao, StatusTransportePipeline } from '../../types/logis
 import { TRANSPORTE_PIPELINE_STAGES } from '../../types/logistica'
 import { applyEtasToEtapas, buildViagemEtapas, getViagemResumo } from '../../utils/logisticaViagem'
 import { hasRomaneioDocumento, openGeneratedPdf, RomaneioDocumentoCard } from '../../components/logistica/RomaneioDocumentoCard'
+import { getDocumentoFiscalContext, getDocumentoFiscalLabel } from '../../utils/logisticaFiscal'
 const fmtDistancia = (v?: number) =>
   typeof v === 'number' && Number.isFinite(v) && v > 0
     ? `${v.toLocaleString('pt-BR', { maximumFractionDigits: v < 10 ? 1 : 0 })} km`
@@ -247,6 +248,7 @@ function DetailModal({ sol, viagemSolicitacoes, onClose, onAction, isDark }: {
 }) {
   const t = sol.transporte
   const late = isLate(sol)
+  const fiscalCtx = getDocumentoFiscalContext(sol)
   const isViagemView = !!sol.viagem_id && !!viagemSolicitacoes && viagemSolicitacoes.length > 1
   const viagem = viagemSolicitacoes?.[0]?.viagem ?? sol.viagem
   const departureBase = viagem?.data_real_saida || t?.hora_saida || viagem?.data_prevista_saida || sol.data_prevista_saida
@@ -286,8 +288,9 @@ function DetailModal({ sol, viagemSolicitacoes, onClose, onAction, isDark }: {
 
           <div className={`rounded-xl p-4 space-y-2 ${isDark ? 'bg-white/[0.04]' : 'bg-slate-50'}`}>
             <div className={`grid gap-x-4 gap-y-2 text-xs ${isViagemView ? 'grid-cols-2 md:grid-cols-3' : 'grid-cols-2'}`}>
-              <div><span className="text-slate-400">Origem:</span> <span className="font-semibold">{sol.origem}</span></div>
-              <div><span className="text-slate-400">Destino:</span> <span className="font-semibold">{sol.destino}</span></div>
+              <div><span className="text-slate-400">Origem:</span> <span className="font-semibold">{fiscalCtx.origemLabel}</span></div>
+              <div><span className="text-slate-400">Destino:</span> <span className="font-semibold">{fiscalCtx.destinoLabel}</span></div>
+              {(fiscalCtx.origemUf || fiscalCtx.destinoUf) && <div><span className="text-slate-400">UFs:</span> <span className="font-semibold">{fiscalCtx.origemUf || '—'} → {fiscalCtx.destinoUf || '—'}</span></div>}
               {sol.obra_nome && <div><span className="text-slate-400">Obra:</span> <span className="font-semibold">{sol.obra_nome}</span></div>}
               {(viagem?.motorista_nome || sol.motorista_nome) && <div><span className="text-slate-400">Motorista:</span> <span className="font-semibold">{viagem?.motorista_nome || sol.motorista_nome}</span></div>}
               {(viagem?.veiculo_placa || sol.veiculo_placa) && <div><span className="text-slate-400">Placa:</span> <span className="font-mono font-semibold">{viagem?.veiculo_placa || sol.veiculo_placa}</span></div>}
@@ -296,6 +299,7 @@ function DetailModal({ sol, viagemSolicitacoes, onClose, onAction, isDark }: {
               {t?.eta_atual && <div><span className="text-slate-400">ETA:</span> <span className={`font-semibold ${late ? 'text-amber-600' : ''}`}>{fmtDataHora(t.eta_atual)}</span></div>}
               {t?.hora_chegada && <div><span className="text-slate-400">Chegada:</span> <span className="font-semibold text-emerald-600">{fmtDataHora(t.hora_chegada)}</span></div>}
               {t?.codigo_rastreio && <div className="col-span-2"><span className="text-slate-400">Rastreio:</span> <span className="font-mono font-semibold">{t.codigo_rastreio}</span></div>}
+              <div className="col-span-2"><span className="text-slate-400">Regra Fiscal:</span> <span className="font-semibold">{getDocumentoFiscalLabel(fiscalCtx.regra)}</span></div>
             </div>
             {sol.descricao && <p className="text-xs text-slate-500 mt-2 pt-2 border-t border-slate-200">{sol.descricao}</p>}
           </div>
