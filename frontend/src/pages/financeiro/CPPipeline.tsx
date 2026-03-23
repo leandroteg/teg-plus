@@ -20,6 +20,7 @@ import {
   useFornecedorByReference,
   useCriarSolicitacaoExtraordinariaCP,
   useCriarPrevisaoPagamentoCP,
+  useObras,
 } from '../../hooks/useFinanceiro'
 import {
   useLotesPagamento,
@@ -1331,7 +1332,9 @@ function CPDetailModal({ cp, stageStatus, onClose, onAction, isDark }: {
   const aprovarPagamentoMut = useAprovarPagamento()
   const [editCC, setEditCC] = useState(cp.centro_custo ?? '')
   const [editClasse, setEditClasse] = useState(cp.classe_financeira ?? '')
+  const [editObra, setEditObra] = useState((cp as any).obra_id ?? '')
   const [savingClass, setSavingClass] = useState(false)
+  const { data: obrasList = [] } = useObras()
   const urgency = getUrgency(cp)
   const manualRequest = cp.remessa_payload && typeof cp.remessa_payload === 'object'
     ? (cp.remessa_payload as Record<string, any>).manual_request as Record<string, any> | undefined
@@ -1752,7 +1755,7 @@ function CPDetailModal({ cp, stageStatus, onClose, onAction, isDark }: {
               <p className={`text-[10px] font-bold uppercase tracking-wider ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
                 Classificação (ajuste antes de conciliar)
               </p>
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-3 gap-2">
                 <div>
                   <label className={`text-[10px] font-semibold mb-0.5 block ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Centro de Custo</label>
                   <input value={editCC} onChange={e => setEditCC(e.target.value)}
@@ -1764,6 +1767,14 @@ function CPDetailModal({ cp, stageStatus, onClose, onAction, isDark }: {
                   <input value={editClasse} onChange={e => setEditClasse(e.target.value)}
                     placeholder={cp.classe_financeira || 'Ex: Material'}
                     className={`w-full px-2.5 py-1.5 rounded-lg border text-xs focus:outline-none focus:ring-2 focus:ring-green-500/30 focus:border-green-400 ${isDark ? 'bg-[#1e293b] border-white/[0.06] text-slate-200' : 'border-slate-200 text-slate-700 bg-white'}`} />
+                </div>
+                <div>
+                  <label className={`text-[10px] font-semibold mb-0.5 block ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Obra</label>
+                  <select value={editObra} onChange={e => setEditObra(e.target.value)}
+                    className={`w-full px-2.5 py-1.5 rounded-lg border text-xs focus:outline-none focus:ring-2 focus:ring-green-500/30 focus:border-green-400 ${isDark ? 'bg-[#1e293b] border-white/[0.06] text-slate-200' : 'border-slate-200 text-slate-700 bg-white'}`}>
+                    <option value="">Selecione</option>
+                    {obrasList.map(o => <option key={o.id} value={o.id}>{o.nome}</option>)}
+                  </select>
                 </div>
               </div>
             </div>
@@ -1832,6 +1843,7 @@ function CPDetailModal({ cp, stageStatus, onClose, onAction, isDark }: {
                   const updates: Record<string, string | null> = {}
                   if (editCC !== (cp.centro_custo ?? '')) updates.centro_custo = editCC || null
                   if (editClasse !== (cp.classe_financeira ?? '')) updates.classe_financeira = editClasse || null
+                  if (editObra && editObra !== ((cp as any).obra_id ?? '')) updates.obra_id = editObra || null
                   if (Object.keys(updates).length > 0) {
                     setSavingClass(true)
                     const { error } = await supabase.from('fin_contas_pagar').update(updates).eq('id', cp.id)
