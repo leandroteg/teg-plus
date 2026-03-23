@@ -17,8 +17,14 @@
     <script type="module" src="/src/main.tsx"></script>
     <script>
       if ('serviceWorker' in navigator) {
-        window.addEventListener('load', () => {
-          navigator.serviceWorker.register('/sw.js')
+        window.addEventListener('load', async () => {
+          const registrations = await navigator.serviceWorker.getRegistrations()
+          await Promise.all(registrations.map(registration => registration.unregister()))
+
+          if ('caches' in window) {
+            const cacheKeys = await caches.keys()
+            await Promise.all(cacheKeys.filter(key => key.startsWith('teg-')).map(key => caches.delete(key)))
+          }
         })
       }
     </script>
