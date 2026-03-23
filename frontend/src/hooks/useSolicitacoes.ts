@@ -831,7 +831,7 @@ export function useUploadMinutaFile() {
 
       const { error: uploadError } = await supabase.storage
         .from('contratos-anexos')
-        .upload(path, file, { upsert: false, contentType: file.type })
+        .upload(path, file, { upsert: true, contentType: file.type || 'application/pdf' })
       if (uploadError) throw new Error('Falha no upload: ' + uploadError.message)
 
       const { data: { publicUrl } } = supabase.storage

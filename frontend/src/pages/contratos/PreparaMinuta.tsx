@@ -2112,8 +2112,11 @@ export default function PreparaMinuta() {
                             const resp = await fetch(modelo.arquivo_url!)
                             if (!resp.ok) throw new Error(`Erro ao baixar modelo: ${resp.status}`)
                             const blob = await resp.blob()
-                            const fileName = `modelo_${modelo.nome.replace(/\s+/g, '_')}.pdf`
-                            const file = new File([blob], fileName, { type: blob.type || 'application/pdf' })
+                            const ext = modelo.arquivo_url!.split('.').pop()?.toLowerCase() || 'pdf'
+                            const mimeType = ext === 'docx' ? 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+                              : ext === 'doc' ? 'application/msword' : 'application/pdf'
+                            const fileName = `modelo_${modelo.nome.replace(/\s+/g, '_')}.${ext}`
+                            const file = new File([blob], fileName, { type: mimeType })
                             const uploaded = await uploadFile.mutateAsync({
                               solicitacaoId: solicitacao!.id,
                               file,
@@ -2121,6 +2124,8 @@ export default function PreparaMinuta() {
                             await supabase.from('con_minutas').insert({
                               solicitacao_id: solicitacao!.id,
                               versao: (minutas?.length ?? 0) + 1,
+                              tipo: 'modelo',
+                              titulo: modelo.nome,
                               arquivo_url: uploaded.arquivo_url,
                               arquivo_nome: fileName,
                               status: 'em_revisao',
