@@ -132,6 +132,8 @@ export default function NovaRequisicao() {
   const [justificativa, setJustificativa]   = useState('')
   const [urgencia, setUrgencia]             = useState<Urgencia>('normal')
   const [dataNecessidade, setDataNecessidade] = useState('')
+  const [compraRecorrente, setCompraRecorrente] = useState(false)
+  const [valorMensal, setValorMensal] = useState('')
   const [itens, setItens]                   = useState<RequisicaoItem[]>([emptyItem()])
   const [compradorSugerido, setCompradorSugerido] = useState<{ id: string; nome: string } | null>(null)
   const [confianca, setConfianca]           = useState(0)
@@ -143,6 +145,8 @@ export default function NovaRequisicao() {
   const [aiPreview, setAiPreview]           = useState<AiParseResult | null>(null)
   const [previewItens, setPreviewItens]     = useState<RequisicaoItem[]>([])
   const [showPreview, setShowPreview]       = useState(false)
+  const [refParsing, setRefParsing]         = useState(false)
+  const [refParseMsg, setRefParseMsg]       = useState<{ type: 'success' | 'error'; text: string } | null>(null)
 
   const total  = itens.reduce((s, i) => s + i.quantidade * i.valor_unitario_estimado, 0)
   const minCot = categoria ? minCotacoes(total, categoria.cotacoes_regras) : 1
@@ -306,6 +310,41 @@ export default function NovaRequisicao() {
   const updateItem = (idx: number, field: keyof RequisicaoItem, value: string | number) =>
     setItens(prev => prev.map((item, i) => i === idx ? { ...item, [field]: value } : item))
 
+  // ── Extrair dados do arquivo de referência (cotação) via IA ─────────────
+  const handleExtrairReferencia = async () => {
+    if (!referenciaFile || refParsing) return
+    setRefParsing(true)
+    setRefParseMsg(null)
+    try {
+      const fileData = await readFileForAi(referenciaFile)
+      const payload: { texto: string; solicitante_nome?: string; arquivo?: { base64: string; nome: string; mime: string } } = {
+        texto: `Extrair itens, quantidades, unidades e valores desta cotação/proposta comercial: ${referenciaFile.name}`,
+        solicitante_nome: perfil?.nome || solicitante,
+      }
+      if (fileData.arquivo) {
+        payload.arquivo = fileData.arquivo
+      } else if (fileData.texto) {
+        payload.texto += `\n\nConteúdo do arquivo:\n${fileData.texto}`
+      }
+
+      const result: AiParseResult = await aiParse.mutateAsync(payload)
+      const sanitized = sanitizeItems(result.itens)
+
+      if (sanitized.length > 0 && sanitized.some(i => i.descricao.trim())) {
+        // Mostra preview antes de aplicar
+        setAiPreview(result)
+        setPreviewItens(sanitized)
+        setShowPreview(true)
+        setRefParseMsg({ type: 'success', text: `${sanitized.length} itens extraídos do arquivo` })
+      } else {
+        setRefParseMsg({ type: 'error', text: 'Não foi possível extrair itens do arquivo. Tente usar o Assistente IA no passo anterior.' })
+      }
+    } catch {
+      setRefParseMsg({ type: 'error', text: 'Erro ao processar o arquivo. Tente novamente.' })
+    }
+    setRefParsing(false)
+  }
+
   const [submitting, setSubmitting] = useState(false)
   const [savingDraft, setSavingDraft] = useState(false)
   const urgente = urgencia !== 'normal'
@@ -324,6 +363,8 @@ export default function NovaRequisicao() {
     comprador_id:     compradorSugerido?.id,
     ai_confianca:     confianca,
     arquivo_referencia: referenciaFile || undefined,
+    compra_recorrente: compraRecorrente,
+    valor_mensal: compraRecorrente ? (parseFloat(valorMensal) || 0) : undefined,
     rascunho,
   })
 
@@ -852,6 +893,65 @@ export default function NovaRequisicao() {
           value={dataNecessidade} onChange={e => setDataNecessidade(e.target.value)} />
       </div>
 
+      <div className={`rounded-2xl border p-4 space-y-4 ${
+        compraRecorrente ? 'border-indigo-200 bg-indigo-50/60' : 'border-slate-200 bg-white'
+      }`}>
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <label className="text-sm font-bold text-slate-800 block">Compra recorrente</label>
+            <p className="text-xs text-slate-500 mt-1">
+              Esta solicitacao segue para Contratos e volta para Pedidos depois da formalizacao contratual.
+            </p>
+          </div>
+          <div className="inline-flex rounded-xl border border-slate-200 bg-slate-50 p-1">
+            {[
+              { label: 'Nao', value: false },
+              { label: 'Sim', value: true },
+            ].map((option) => (
+              <button
+                key={option.label}
+                type="button"
+                onClick={() => {
+                  setCompraRecorrente(option.value)
+                  if (!option.value) setValorMensal('')
+                }}
+                className={`min-w-[72px] rounded-lg px-4 py-2 text-xs font-bold transition-all ${
+                  compraRecorrente === option.value
+                    ? 'bg-white text-indigo-700 shadow-sm ring-1 ring-indigo-200'
+                    : 'text-slate-500 hover:text-slate-700'
+                }`}
+              >
+                {option.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {compraRecorrente && (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label className="text-xs font-semibold text-slate-500 mb-1 block">Valor mensal *</label>
+              <input
+                type="number"
+                min="0"
+                step="0.01"
+                className={`w-full border rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-indigo-300 outline-none ${
+                  stepErrors.some(e => e.includes('valor mensal')) ? 'border-red-300 bg-red-50/30' : 'border-slate-200'
+                }`}
+                placeholder="0,00"
+                value={valorMensal}
+                onChange={e => setValorMensal(e.target.value)}
+              />
+            </div>
+            <div className="rounded-xl border border-indigo-100 bg-white px-3 py-2.5">
+              <span className="text-[11px] font-semibold uppercase tracking-wide text-indigo-500">Fluxo</span>
+              <p className="mt-1 text-sm font-bold text-slate-800">Contratos &gt; Elaboracao</p>
+              <p className="mt-1 text-[11px] text-slate-500">Os itens desta RC serao levados como escopo da solicitacao contratual.</p>
+            </div>
+          </div>
+        )}
+      </div>
+
       <div>
         <div className="flex justify-between items-center mb-2">
           <label className="text-xs font-semibold text-slate-500">Itens *</label>
@@ -938,27 +1038,49 @@ export default function NovaRequisicao() {
           />
 
           {referenciaFile ? (
-            <div className="flex items-center justify-between gap-3">
-              <div className="flex items-center gap-3 min-w-0">
-                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white text-teal-600 shadow-sm">
-                  <FileUp size={18} />
+            <div className="space-y-2">
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white text-teal-600 shadow-sm">
+                    <FileUp size={18} />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-semibold text-slate-700">{referenciaFile.name}</p>
+                    <p className="text-[11px] text-slate-400">{(referenciaFile.size / 1024).toFixed(1)} KB</p>
+                  </div>
                 </div>
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-semibold text-slate-700">{referenciaFile.name}</p>
-                  <p className="text-[11px] text-slate-400">{(referenciaFile.size / 1024).toFixed(1)} KB</p>
-                </div>
+                <button
+                  type="button"
+                  onClick={(event) => {
+                    event.stopPropagation()
+                    setReferenciaFile(null)
+                    setRefParseMsg(null)
+                    if (referenciaInputRef.current) referenciaInputRef.current.value = ''
+                  }}
+                  className="rounded-full bg-white p-2 text-slate-400 transition hover:text-red-500"
+                >
+                  <X size={14} />
+                </button>
               </div>
+              {/* Botão para extrair dados com IA */}
               <button
                 type="button"
-                onClick={(event) => {
-                  event.stopPropagation()
-                  setReferenciaFile(null)
-                  if (referenciaInputRef.current) referenciaInputRef.current.value = ''
-                }}
-                className="rounded-full bg-white p-2 text-slate-400 transition hover:text-red-500"
+                disabled={refParsing}
+                onClick={(e) => { e.stopPropagation(); handleExtrairReferencia() }}
+                className="w-full flex items-center justify-center gap-2 py-2 px-3 rounded-xl text-xs font-bold transition-all bg-gradient-to-r from-violet-500 to-purple-600 text-white hover:from-violet-600 hover:to-purple-700 shadow-sm disabled:opacity-60"
               >
-                <X size={14} />
+                {refParsing ? (
+                  <><Loader2 size={14} className="animate-spin" /> Extraindo dados...</>
+                ) : (
+                  <><Sparkles size={14} /> Extrair itens e valores com IA</>
+                )}
               </button>
+              {refParseMsg && (
+                <p className={`text-[11px] font-medium flex items-center gap-1 ${refParseMsg.type === 'success' ? 'text-emerald-600' : 'text-red-500'}`}>
+                  {refParseMsg.type === 'success' ? <Check size={12} /> : <AlertCircle size={12} />}
+                  {refParseMsg.text}
+                </p>
+              )}
             </div>
           ) : (
             <div className="flex items-center gap-3">
@@ -990,7 +1112,9 @@ export default function NovaRequisicao() {
           </div>
           <div className="text-right">
             <span className="text-xs text-teal-500">Cotações mínimas</span>
-            <p className="text-2xl font-black text-teal-600">{minCot}</p>
+            <p className="text-2xl font-black text-teal-600">
+              {compraRecorrente ? fmt(parseFloat(valorMensal) || 0) : minCot}
+            </p>
           </div>
         </div>
       )}
@@ -1022,6 +1146,7 @@ export default function NovaRequisicao() {
               if (!solicitante.trim()) errs.push('Informe o nome do solicitante')
               if (!obraNome) errs.push('Selecione a obra')
               if (itens.every(i => !i.descricao.trim())) errs.push('Adicione ao menos um item com descricao')
+              if (compraRecorrente && (parseFloat(valorMensal) || 0) <= 0) errs.push('Informe o valor mensal da compra recorrente')
               if (dataNecessidade) {
                 const today = new Date().toISOString().split('T')[0]
                 if (dataNecessidade < today) errs.push('Data de necessidade nao pode ser no passado')
@@ -1273,6 +1398,7 @@ export default function NovaRequisicao() {
               ['Obra', obraNome],
               ['Categoria', categoria?.nome ?? '—'],
               ['Comprador', categoria?.comprador_nome ?? '—'],
+              ['Fluxo', compraRecorrente ? 'Contratos' : 'Pedidos'],
             ].map(([label, value]) => (
               <div key={label}>
                 <span className="text-[11px] text-slate-400">{label}</span>
@@ -1289,6 +1415,12 @@ export default function NovaRequisicao() {
               <span className="text-[11px] text-slate-400">Valor estimado</span>
               <p className="font-extrabold text-teal-700 text-base">{fmt(total)}</p>
             </div>
+            {compraRecorrente && (
+              <div>
+                <span className="text-[11px] text-slate-400">Valor mensal</span>
+                <p className="font-extrabold text-indigo-700 text-base">{fmt(parseFloat(valorMensal) || 0)}</p>
+              </div>
+            )}
           </div>
           {descricao && (
             <div className="pt-2 border-t border-slate-100">
@@ -1331,6 +1463,14 @@ export default function NovaRequisicao() {
               <span key={i} className={`px-2 py-1 rounded-lg font-semibold ${s.color}`}>{s.label}</span>
             ))}
           </div>
+          {compraRecorrente && (
+            <div className="mt-3 flex items-start gap-2 bg-fuchsia-50 border border-fuchsia-200 rounded-xl p-2.5">
+              <AlertCircle size={13} className="text-fuchsia-500 mt-0.5 flex-shrink-0" />
+              <p className="text-[11px] text-fuchsia-700">
+                Depois da aprovacao financeira, a RC segue para <strong>Contratos &gt; Elaboracao</strong> e o pedido volta com o contrato vinculado.
+              </p>
+            </div>
+          )}
           {total > 500 && (
             <div className="mt-3 flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-xl p-2.5">
               <AlertCircle size={13} className="text-amber-500 mt-0.5 flex-shrink-0" />
