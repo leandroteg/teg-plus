@@ -367,7 +367,7 @@ export default function NovaRequisicao() {
     ai_confianca:     confianca,
     arquivo_referencia: referenciaFile || undefined,
     compra_recorrente: compraRecorrente,
-    valor_mensal: compraRecorrente ? (parseFloat(valorMensal) || 0) : undefined,
+    valor_mensal: undefined, // preenchido na etapa de cotação
     rascunho,
   })
 
@@ -711,26 +711,10 @@ export default function NovaRequisicao() {
         </div>
 
         {compraRecorrente && (
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div>
-              <label className="text-xs font-semibold text-slate-500 mb-1 block">Valor mensal *</label>
-              <input
-                type="number"
-                min="0"
-                step="0.01"
-                className={`w-full border rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-indigo-300 outline-none ${
-                  stepErrors.some(e => e.includes('valor mensal')) ? 'border-red-300 bg-red-50/30' : 'border-slate-200'
-                }`}
-                placeholder="0,00"
-                value={valorMensal}
-                onChange={e => setValorMensal(e.target.value)}
-              />
-            </div>
-            <div className="rounded-xl border border-indigo-100 bg-white px-3 py-2.5">
-              <span className="text-[11px] font-semibold uppercase tracking-wide text-indigo-500">Fluxo</span>
-              <p className="mt-1 text-sm font-bold text-slate-800">Contratos &gt; Elaboracao</p>
-              <p className="mt-1 text-[11px] text-slate-500">Os itens desta RC serao levados como escopo da solicitacao contratual.</p>
-            </div>
+          <div className="rounded-xl border border-indigo-100 bg-white px-3 py-2.5">
+            <span className="text-[11px] font-semibold uppercase tracking-wide text-indigo-500">Fluxo</span>
+            <p className="mt-1 text-sm font-bold text-slate-800">Contratos &gt; Elaboracao</p>
+            <p className="mt-1 text-[11px] text-slate-500">Os itens desta RC serao levados como escopo da solicitacao contratual.</p>
           </div>
         )}
         </div>
@@ -897,7 +881,7 @@ export default function NovaRequisicao() {
           <div className="text-right">
             <span className="text-xs text-teal-500">Cotações mínimas</span>
             <p className="text-2xl font-black text-teal-600">
-              {compraRecorrente ? fmt(parseFloat(valorMensal) || 0) : minCot}
+              {minCot}
             </p>
           </div>
         </div>
@@ -930,7 +914,7 @@ export default function NovaRequisicao() {
               if (!solicitante.trim()) errs.push('Informe o nome do solicitante')
               if (!obraNome) errs.push('Selecione a obra')
               if (itens.every(i => !i.descricao.trim())) errs.push('Adicione ao menos um item com descricao')
-              if (compraRecorrente && (parseFloat(valorMensal) || 0) <= 0) errs.push('Informe o valor mensal da compra recorrente')
+              // valor mensal agora é preenchido na etapa de cotação, não na requisição
               if (dataNecessidade) {
                 const today = new Date().toISOString().split('T')[0]
                 if (dataNecessidade < today) errs.push('Data de necessidade nao pode ser no passado')
@@ -1201,8 +1185,8 @@ export default function NovaRequisicao() {
             </div>
             {compraRecorrente && (
               <div>
-                <span className="text-[11px] text-slate-400">Valor mensal</span>
-                <p className="font-extrabold text-indigo-700 text-base">{fmt(parseFloat(valorMensal) || 0)}</p>
+                <span className="text-[11px] text-slate-400">Tipo</span>
+                <p className="font-extrabold text-indigo-700 text-base">Recorrente</p>
               </div>
             )}
           </div>
