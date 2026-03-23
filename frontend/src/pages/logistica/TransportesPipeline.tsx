@@ -13,6 +13,7 @@ import {
 import type { LogSolicitacao, StatusTransportePipeline } from '../../types/logistica'
 import { TRANSPORTE_PIPELINE_STAGES } from '../../types/logistica'
 import { applyEtasToEtapas, buildViagemEtapas, getViagemResumo } from '../../utils/logisticaViagem'
+import { hasRomaneioDocumento, openGeneratedPdf, RomaneioDocumentoCard } from '../../components/logistica/RomaneioDocumentoCard'
 const fmtDistancia = (v?: number) =>
   typeof v === 'number' && Number.isFinite(v) && v > 0
     ? `${v.toLocaleString('pt-BR', { maximumFractionDigits: v < 10 ? 1 : 0 })} km`
@@ -299,6 +300,10 @@ function DetailModal({ sol, viagemSolicitacoes, onClose, onAction, isDark }: {
             {sol.descricao && <p className="text-xs text-slate-500 mt-2 pt-2 border-t border-slate-200">{sol.descricao}</p>}
           </div>
 
+          {hasRomaneioDocumento(sol) && (
+            <RomaneioDocumentoCard sol={sol} dark={isDark} />
+          )}
+
           {isViagemView && viagemResumo && viagemSolicitacoes && (
             <div className="space-y-3">
               <div className={`rounded-xl p-4 ${isDark ? 'bg-white/[0.04]' : 'bg-slate-50'}`}>
@@ -366,6 +371,16 @@ function DetailModal({ sol, viagemSolicitacoes, onClose, onAction, isDark }: {
                             <div className="flex items-center gap-2 flex-wrap">
                               <span className={`text-xs font-mono font-bold ${isDark ? 'text-orange-300' : 'text-orange-700'}`}>{etapaSol?.numero ?? `Etapa ${etapa.ordem}`}</span>
                               <span className={`text-xs ${isDark ? 'text-white' : 'text-slate-800'}`}>{etapa.origem} → {etapa.destino}</span>
+                              {etapaSol && hasRomaneioDocumento(etapaSol) && (
+                                <button
+                                  type="button"
+                                  onClick={() => openGeneratedPdf(etapaSol)}
+                                  className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold transition-colors ${isDark ? 'bg-blue-500/10 text-blue-300 hover:bg-blue-500/20' : 'bg-blue-50 text-blue-700 hover:bg-blue-100'}`}
+                                >
+                                  <FileText size={11} />
+                                  Romaneio
+                                </button>
+                              )}
                             </div>
 
                             <div className="grid grid-cols-2 gap-2 mt-2 md:grid-cols-4">

@@ -15,6 +15,7 @@ import {
 } from '../../hooks/useLogistica'
 import type { LogSolicitacao, StatusExpedicaoPipeline } from '../../types/logistica'
 import { EXPEDICAO_PIPELINE_STAGES } from '../../types/logistica'
+import { hasRomaneioDocumento, RomaneioDocumentoCard } from '../../components/logistica/RomaneioDocumentoCard'
 
 // ── Formatters ───────────────────────────────────────────────────────────────
 
@@ -205,6 +206,10 @@ function DetailModal({ sol, onClose, onAction, isDark, allSolicitacoes }: {
             </div>
             {sol.descricao && <p className="text-xs text-slate-500 mt-2 pt-2 border-t border-slate-200">{sol.descricao}</p>}
           </div>
+
+          {hasRomaneioDocumento(sol) && (
+            <RomaneioDocumentoCard sol={sol} dark={isDark} />
+          )}
 
           {/* Progress */}
           <div className={`rounded-xl p-3 ${isDark ? 'bg-white/[0.04]' : 'bg-slate-50'}`}>

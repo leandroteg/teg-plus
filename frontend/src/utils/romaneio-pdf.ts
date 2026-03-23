@@ -1,4 +1,5 @@
 import jsPDF from 'jspdf'
+import type { LogSolicitacao } from '../types/logistica'
 
 export interface RomaneioData {
   numero: string
@@ -19,7 +20,7 @@ export interface RomaneioData {
   observacoes?: string
 }
 
-export function gerarRomaneioPDF(data: RomaneioData): string {
+function buildRomaneioDoc(data: RomaneioData) {
   const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
   const W = 210
   const M = 15 // margin
@@ -178,5 +179,49 @@ export function gerarRomaneioPDF(data: RomaneioData): string {
   doc.setTextColor(180, 180, 180)
   doc.text(`TEG+ ERP \u2014 Romaneio gerado em ${dataStr}`, W / 2, 290, { align: 'center' })
 
-  return doc.output('bloburl').toString()
+  return doc
+}
+
+export function buildRomaneioDataFromSolicitacao(sol: LogSolicitacao): RomaneioData {
+  const itens = sol.itens?.length
+    ? sol.itens.map(item => ({
+        descricao: item.descricao,
+        quantidade: item.quantidade,
+        unidade: item.unidade,
+        peso_kg: item.peso_kg,
+      }))
+    : [{
+        descricao: sol.descricao || 'Carga diversa',
+        quantidade: 1,
+        unidade: 'un',
+      }]
+
+  return {
+    numero: sol.numero,
+    origem: sol.origem,
+    destino: sol.destino,
+    obra_nome: sol.obra_nome,
+    solicitante: sol.solicitante_nome,
+    motorista_nome: sol.viagem?.motorista_nome || sol.motorista_nome,
+    veiculo_placa: sol.viagem?.veiculo_placa || sol.veiculo_placa,
+    itens,
+    peso_total_kg: sol.peso_total_kg,
+    volumes_total: sol.volumes_total,
+    observacoes: sol.observacoes_carga || sol.observacoes,
+  }
+}
+
+export function getRomaneioFileName(input: Pick<RomaneioData, 'numero'> | Pick<LogSolicitacao, 'numero'>) {
+  return `romaneio-${input.numero}.pdf`
+}
+
+export function gerarRomaneioPdfBlob(data: RomaneioData | LogSolicitacao): Blob {
+  const payload = 'status' in data ? buildRomaneioDataFromSolicitacao(data) : data
+  const doc = buildRomaneioDoc(payload)
+  return doc.output('blob')
+}
+
+export function gerarRomaneioPDF(data: RomaneioData | LogSolicitacao): string {
+  const blob = gerarRomaneioPdfBlob(data)
+  return URL.createObjectURL(blob)
 }
