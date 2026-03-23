@@ -1,4 +1,5 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import {
   CreditCard, Plus, Search, Calendar, Filter,
   Upload, Trash2, Send, X, Check, Eye, Receipt,
@@ -320,6 +321,7 @@ function ApontamentoModal({
 export default function ApontamentosCartao() {
   const { isDark } = useTheme()
   const { perfil } = useAuth()
+  const [searchParams] = useSearchParams()
 
   const [filtroCartao, setFiltroCartao] = useState('')
   const [filtroStatus, setFiltroStatus] = useState<StatusApontamentoCartao | ''>('')
@@ -328,6 +330,11 @@ export default function ApontamentosCartao() {
   const [dataFim, setDataFim] = useState('')
   const [showModal, setShowModal] = useState(false)
   const [editing, setEditing] = useState<ApontamentoCartao | null>(null)
+
+  // Abre modal automaticamente quando ?nova= está presente na URL
+  useEffect(() => {
+    if (searchParams.has('nova')) setShowModal(true)
+  }, [searchParams])
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null)
   const [toast, setToast] = useState<{ type: 'success' | 'error'; msg: string } | null>(null)
 

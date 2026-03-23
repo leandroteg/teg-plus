@@ -372,6 +372,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     hasModule:  (mod) => {
       if (perfil?.modulos?.[mod] === true) return true
       if (mod === 'patrimonial') return perfil?.modulos?.estoque === true
+      if (mod === 'apontamentos') return perfil?.modulos?.financeiro === true
       return false
     },
     canApprove: (nivel) => role === 'admin' || (perfil?.alcada_nivel ?? 0) >= nivel,

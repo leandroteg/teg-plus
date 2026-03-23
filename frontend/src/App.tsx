@@ -52,7 +52,9 @@ import ControleCustosHub from './pages/controladoria/ControleCustosHub'
 import ControleProjetosHub from './pages/controladoria/ControleProjetosHub'
 import CenariosHub from './pages/controladoria/CenariosHub'
 
-// Módulo Apontamentos de Cartão (Backoffice)
+// Módulo Apontamentos de Cartão
+import ApontamentosLayout from './components/ApontamentosLayout'
+import ApontamentosHome from './pages/apontamentos/ApontamentosHome'
 import ApontamentosCartao from './pages/apontamentos/ApontamentosCartao'
 
 // Módulo Obras
@@ -197,7 +199,7 @@ export default function App() {
               <Route path="/financeiro/lotes/:loteId"      element={<LoteDetalhe />} />
               <Route path="/financeiro/painel-pagamentos"  element={<PainelPagamentos />} />
               <Route path="/financeiro/conciliacao"         element={<Navigate to="/financeiro/contas-a-pagar" replace />} />
-              <Route path="/financeiro/conciliacao-cartoes" element={<ConciliacaoCartoes />} />
+              <Route path="/financeiro/conciliacao-cartoes" element={<Navigate to="/apontamentos/conciliacao" replace />} />
               <Route path="/financeiro/tesouraria"          element={<Tesouraria />} />
               <Route path="/financeiro/relatorios"   element={<Relatorios />} />
               <Route path="/financeiro/configuracoes" element={<Navigate to="/admin/integracoes" replace />} />
@@ -205,9 +207,11 @@ export default function App() {
           </Route>
 
           {/* Módulo Apontamentos de Cartão */}
-          <Route element={<ModuleRoute moduleKey="financeiro" />}>
-            <Route element={<FinanceiroLayout />}>
-              <Route path="/apontamentos" element={<ApontamentosCartao />} />
+          <Route element={<ModuleRoute moduleKey="apontamentos" />}>
+            <Route element={<ApontamentosLayout />}>
+              <Route path="/apontamentos"              element={<ApontamentosHome />} />
+              <Route path="/apontamentos/realizados"   element={<ApontamentosCartao />} />
+              <Route path="/apontamentos/conciliacao"  element={<ConciliacaoCartoes />} />
             </Route>
           </Route>
 

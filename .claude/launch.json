@@ -4,7 +4,7 @@
     {
       "name": "teg-frontend",
       "runtimeExecutable": "node",
-      "runtimeArgs": ["C:/Users/owner/Documents/nodejs/node_modules/npm/bin/npm-cli.js", "run", "dev"],
+      "runtimeArgs": ["C:/Program Files/nodejs/node_modules/npm/bin/npm-cli.js", "run", "dev"],
       "cwd": "frontend",
       "port": 5173
     }
