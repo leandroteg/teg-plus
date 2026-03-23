@@ -386,6 +386,31 @@ function CotacaoConcluida({ cotacao, nav }: { cotacao: Cotacao; nav: ReturnType<
           open
           onClose={() => setShowEmitirModal(false)}
           requisicaoId={req.id}
+          compraRecorrente={(req as any).compra_recorrente === true}
+          onSolicitarContrato={async () => {
+            try {
+              const num = `SOL-CON-${new Date().getFullYear()}-${String(Math.floor(Math.random() * 9000) + 1000)}`
+              const { error: solErr } = await supabase.from('con_solicitacoes').insert({
+                numero: num,
+                titulo: req.descricao || `Contrato ref. ${req.numero}`,
+                grupo_contrato: 'prestacao_servicos',
+                tipo: 'despesa',
+                obra_id: req.obra_id || null,
+                valor_estimado: cotacao.valor_selecionado || req.valor_estimado || 0,
+                solicitante_id: perfil?.id || null,
+                etapa_atual: 'solicitacao',
+                status: 'em_andamento',
+                requisicao_origem_id: req.id,
+              })
+              if (solErr) throw solErr
+              await supabase.from('cmp_requisicoes').update({ status: 'aguardando_contrato' }).eq('id', req.id)
+              setShowEmitirModal(false)
+              setPedidoToast({ type: 'success', msg: `Solicitação de contrato ${num} criada` })
+              setTimeout(() => nav('/contratos/solicitacoes'), 1500)
+            } catch (err: any) {
+              setPedidoToast({ type: 'error', msg: `Erro: ${err?.message || 'falha ao criar solicitação'}` })
+            }
+          }}
           cotacao={{
             id: cotacao.id,
             fornecedorNome: cotacao.fornecedor_selecionado_nome ?? "N/A",

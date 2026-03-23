@@ -41,6 +41,8 @@ interface EmitirPedidoModalProps {
   onClose: () => void
   requisicaoId: string
   cotacao?: ModalCotacao
+  compraRecorrente?: boolean
+  onSolicitarContrato?: () => void
   onConfirm: (payload: {
     cotacaoId: string
     fornecedorNome: string
@@ -70,6 +72,8 @@ export default function EmitirPedidoModal({
   onClose,
   requisicaoId,
   cotacao,
+  compraRecorrente,
+  onSolicitarContrato,
   onConfirm,
   isSubmitting,
 }: EmitirPedidoModalProps) {
@@ -704,10 +708,13 @@ export default function EmitirPedidoModal({
               !parcelasValidas ||
               diferencaParcelas !== 0
             }
-            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-teal-600 text-white text-sm font-bold hover:bg-teal-700 disabled:opacity-50"
+            className={`inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-white text-sm font-bold disabled:opacity-50 ${
+              compraRecorrente ? 'bg-indigo-600 hover:bg-indigo-700' : 'bg-teal-600 hover:bg-teal-700'
+            }`}
+            onClick={compraRecorrente && onSolicitarContrato ? (e) => { e.preventDefault(); onSolicitarContrato() } : undefined}
           >
             {isSubmitting ? <Loader2 size={15} className="animate-spin" /> : <FileText size={15} />}
-            Emitir Pedido
+            {compraRecorrente ? 'Solicitar Contrato' : 'Emitir Pedido'}
           </button>
         </div>
       </div>
