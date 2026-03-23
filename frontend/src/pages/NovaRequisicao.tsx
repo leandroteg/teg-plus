@@ -810,14 +810,14 @@ export default function NovaRequisicao() {
   // ETAPA 2 — Detalhes
   // ═══════════════════════════════════════
   if (step === 2) return (
-    <div className="space-y-5 flex flex-col">
+    <div className="space-y-5">
       <Stepper step={2} />
       <button onClick={() => { setStep(1); setStepErrors([]) }} className="flex items-center gap-1 text-slate-500 text-sm -mt-2">
         <ChevronLeft size={16} /> Voltar
       </button>
 
       {categoria && (
-        <div className="order-1 flex items-center gap-2 bg-teal-50 border border-teal-200 rounded-xl px-3 py-2">
+        <div className="flex items-center gap-2 bg-teal-50 border border-teal-200 rounded-xl px-3 py-2">
           <span className="text-xs font-bold text-teal-700">{categoria.nome}</span>
           <span className="text-teal-400">·</span>
           <span className="text-xs text-teal-600">Comprador: {categoria.comprador_nome}</span>
@@ -825,7 +825,7 @@ export default function NovaRequisicao() {
       )}
 
       {confianca > 0 && (
-        <div className={`order-2 flex items-center gap-2 px-3 py-2 rounded-xl text-xs border ${
+        <div className={`flex items-center gap-2 px-3 py-2 rounded-xl text-xs border ${
           confianca >= 0.8 ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-amber-50 text-amber-700 border-amber-200'
         }`}>
           <Sparkles size={13} />
@@ -833,7 +833,7 @@ export default function NovaRequisicao() {
         </div>
       )}
 
-      <div className="order-3">
+      <div>
         <label className="text-xs font-semibold text-slate-500 mb-1 block">Solicitante *</label>
         <input required className={`w-full border rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-teal-300 outline-none ${
           stepErrors.some(e => e.includes('solicitante')) ? 'border-red-300 bg-red-50/30' : 'border-slate-200'
@@ -841,7 +841,7 @@ export default function NovaRequisicao() {
           placeholder="Seu nome completo" value={solicitante} onChange={e => setSolicitante(e.target.value)} />
       </div>
 
-      <div className="order-4 grid grid-cols-1 md:grid-cols-3 gap-3">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
         <div className="md:col-span-2">
           <label className="text-xs font-semibold text-slate-500 mb-1 block">Obra *</label>
           <select required className={`w-full border rounded-xl px-3 py-2.5 text-sm bg-white focus:ring-2 focus:ring-teal-300 outline-none ${
@@ -862,7 +862,7 @@ export default function NovaRequisicao() {
         </div>
       </div>
 
-      <div className="order-5">
+      <div>
         <label className="text-xs font-semibold text-slate-500 mb-1 block">Descrição <span className="text-red-400">*</span></label>
         <textarea rows={3} required
           className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-teal-300 outline-none"
@@ -870,7 +870,86 @@ export default function NovaRequisicao() {
           value={justificativa} onChange={e => setJustificativa(e.target.value)} />
       </div>
 
-      <div className="order-7 grid grid-cols-1 lg:grid-cols-2 gap-3">
+      <div>
+        <label className="text-xs font-semibold text-slate-500 mb-1.5 block">ReferÃªncia de cotaÃ§Ã£o</label>
+        <div
+          className={`rounded-2xl border-2 border-dashed p-4 transition-all cursor-pointer ${
+            referenciaFile
+              ? 'border-teal-300 bg-teal-50/40'
+              : 'border-slate-200 bg-slate-50/60 hover:border-teal-300 hover:bg-teal-50/20'
+          }`}
+          onClick={() => referenciaInputRef.current?.click()}
+        >
+          <input
+            ref={referenciaInputRef}
+            type="file"
+            className="hidden"
+            accept=".pdf,.xlsx,.xls,.csv,.doc,.docx,.jpg,.jpeg,.png,.webp"
+            onChange={(event) => {
+              if (event.target.files?.[0]) setReferenciaFile(event.target.files[0])
+            }}
+          />
+
+          {referenciaFile ? (
+            <div className="space-y-2">
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white text-teal-600 shadow-sm">
+                    <FileUp size={18} />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-semibold text-slate-700">{referenciaFile.name}</p>
+                    <p className="text-[11px] text-slate-400">{(referenciaFile.size / 1024).toFixed(1)} KB</p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={(event) => {
+                    event.stopPropagation()
+                    setReferenciaFile(null)
+                    setRefParseMsg(null)
+                    if (referenciaInputRef.current) referenciaInputRef.current.value = ''
+                  }}
+                  className="rounded-full bg-white p-2 text-slate-400 transition hover:text-red-500"
+                >
+                  <X size={14} />
+                </button>
+              </div>
+              {/* BotÃ£o para extrair dados com IA */}
+              <button
+                type="button"
+                disabled={refParsing}
+                onClick={(e) => { e.stopPropagation(); handleExtrairReferencia() }}
+                className="w-full flex items-center justify-center gap-2 py-2 px-3 rounded-xl text-xs font-bold transition-all bg-gradient-to-r from-violet-500 to-purple-600 text-white hover:from-violet-600 hover:to-purple-700 shadow-sm disabled:opacity-60"
+              >
+                {refParsing ? (
+                  <><Loader2 size={14} className="animate-spin" /> Extraindo dados...</>
+                ) : (
+                  <><Sparkles size={14} /> Extrair itens e valores com IA</>
+                )}
+              </button>
+              {refParseMsg && (
+                <p className={`text-[11px] font-medium flex items-center gap-1 ${refParseMsg.type === 'success' ? 'text-emerald-600' : 'text-red-500'}`}>
+                  {refParseMsg.type === 'success' ? <Check size={12} /> : <AlertCircle size={12} />}
+                  {refParseMsg.text}
+                </p>
+              )}
+            </div>
+          ) : (
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white text-slate-400 shadow-sm">
+                <Upload size={18} />
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-slate-700">Anexar referÃªncia de cotaÃ§Ã£o</p>
+                <p className="text-[11px] text-slate-400">PDF, planilha, imagem ou documento de apoio.</p>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
         <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3 flex items-center justify-between gap-3">
           <div>
             <label className="text-xs font-semibold text-slate-500 block">Urgente</label>
@@ -957,7 +1036,7 @@ export default function NovaRequisicao() {
         </div>
       </div>
 
-      <div className="order-8">
+      <div>
         <div className="flex justify-between items-center mb-2">
           <label className="text-xs font-semibold text-slate-500">Itens *</label>
           <button type="button" onClick={() => setItens(p => [...p, emptyItem()])}
@@ -1022,7 +1101,7 @@ export default function NovaRequisicao() {
         ))}
       </div>
 
-      <div className="order-6">
+      <div className="hidden">
         <label className="text-xs font-semibold text-slate-500 mb-1.5 block">Referência de cotação</label>
         <div
           className={`rounded-2xl border-2 border-dashed p-4 transition-all cursor-pointer ${
@@ -1101,7 +1180,7 @@ export default function NovaRequisicao() {
         </div>
       </div>
 
-      <div className="order-9">
+      <div>
         <label className="text-xs font-semibold text-slate-500 mb-1 block">Detalhes adicionais</label>
         <textarea rows={3}
           className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-teal-300 outline-none"
@@ -1110,7 +1189,7 @@ export default function NovaRequisicao() {
       </div>
 
       {total > 0 && (
-        <div className="order-10 bg-teal-50 border border-teal-200 rounded-2xl p-4 flex justify-between items-center">
+        <div className="bg-teal-50 border border-teal-200 rounded-2xl p-4 flex justify-between items-center">
           <div>
             <span className="text-xs text-teal-500 font-semibold">Total estimado</span>
             <p className="text-lg font-black text-teal-700">{fmt(total)}</p>
@@ -1124,7 +1203,7 @@ export default function NovaRequisicao() {
         </div>
       )}
 
-      <div className="order-11 space-y-3">
+      <div className="space-y-3">
         {stepErrors.length > 0 && (
           <div className="bg-red-50 border border-red-200 rounded-xl p-3 space-y-1">
             {stepErrors.map(err => (
