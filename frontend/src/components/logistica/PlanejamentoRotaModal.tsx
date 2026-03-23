@@ -12,6 +12,7 @@ import type { FroVeiculo } from '../../types/frotas'
 import { MapContainer, TileLayer, Marker, Popup, Polyline, useMap } from 'react-leaflet'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
+import { serializeViagemRotaPayload } from '../../utils/logisticaViagem'
 
 // Fix leaflet default icon issue
 delete (L.Icon.Default.prototype as Record<string, unknown>)._getIconUrl
@@ -53,6 +54,7 @@ interface RotaCalculada {
   distancia_total_km: number
   duracao_total_horas: number
   pontos: Array<{ lat: number; lng: number }>
+  polyline?: string
 }
 
 interface Props {
@@ -853,6 +855,7 @@ export default function PlanejamentoRotaModal({ isDark, solicitacoes, allSolicit
             distancia_total_km: distKm,
             duracao_total_horas: durHrs,
             pontos: routePoints,
+            polyline: route.geometry,
           })
 
           // Atualizar distâncias por trecho (leg) se houver múltiplos pontos
@@ -918,6 +921,20 @@ export default function PlanejamentoRotaModal({ isDark, solicitacoes, allSolicit
         custo_estimado: custo !== '' ? custo : undefined,
         origem_principal: primeiraOrigem || undefined,
         destino_final: ultimoDestino || undefined,
+        rota_polyline: serializeViagemRotaPayload({
+          version: 1,
+          polyline: rota?.polyline,
+          distancia_total_km: rota?.distancia_total_km || 0,
+          duracao_total_horas: rota?.duracao_total_horas || 0,
+          etapas: pontos.map((ponto, index) => ({
+            solicitacao_id: ponto.id,
+            ordem: index + 1,
+            origem: ponto.endereco_origem || ponto.solicitacao?.origem || '',
+            destino: ponto.endereco_destino || ponto.solicitacao?.destino || '',
+            distancia_km: ponto.distancia_km,
+            duracao_horas: ponto.duracao_horas,
+          })),
+        }),
       })
     } finally {
       setSalvando(false)

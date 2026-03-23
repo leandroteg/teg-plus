@@ -12,6 +12,17 @@ import {
 } from '../../hooks/useLogistica'
 import type { LogSolicitacao, StatusTransportePipeline } from '../../types/logistica'
 import { TRANSPORTE_PIPELINE_STAGES } from '../../types/logistica'
+import { applyEtasToEtapas, buildViagemEtapas, getViagemResumo } from '../../utils/logisticaViagem'
+const fmtDistancia = (v?: number) =>
+  typeof v === 'number' && Number.isFinite(v) && v > 0
+    ? `${v.toLocaleString('pt-BR', { maximumFractionDigits: v < 10 ? 1 : 0 })} km`
+    : '—'
+
+const fmtDuracao = (v?: number) => {
+  if (typeof v !== 'number' || !Number.isFinite(v) || v <= 0) return '—'
+  if (v < 1) return `${Math.round(v * 60)} min`
+  return `${v.toLocaleString('pt-BR', { minimumFractionDigits: v < 10 ? 1 : 0, maximumFractionDigits: 1 })} h`
+}
 
 // ── Formatters ───────────────────────────────────────────────────────────────
 
@@ -226,20 +237,36 @@ function RecebimentoModal({ sol, onClose, onConfirm, isPending, isDark }: {
 
 // ── Detail Modal ─────────────────────────────────────────────────────────────
 
-function DetailModal({ sol, onClose, onAction, isDark }: {
-  sol: LogSolicitacao; onClose: () => void
-  onAction: (action: string, sol: LogSolicitacao) => void; isDark: boolean
+function DetailModal({ sol, viagemSolicitacoes, onClose, onAction, isDark }: {
+  sol: LogSolicitacao
+  viagemSolicitacoes?: LogSolicitacao[]
+  onClose: () => void
+  onAction: (action: string, sol: LogSolicitacao) => void
+  isDark: boolean
 }) {
   const t = sol.transporte
   const late = isLate(sol)
+  const isViagemView = !!sol.viagem_id && !!viagemSolicitacoes && viagemSolicitacoes.length > 1
+  const viagem = viagemSolicitacoes?.[0]?.viagem ?? sol.viagem
+  const departureBase = viagem?.data_real_saida || t?.hora_saida || viagem?.data_prevista_saida || sol.data_prevista_saida
+  const viagemEtapas = useMemo(
+    () => isViagemView && viagemSolicitacoes ? applyEtasToEtapas(buildViagemEtapas(viagem, viagemSolicitacoes), departureBase) : [],
+    [departureBase, isViagemView, viagem, viagemSolicitacoes]
+  )
+  const viagemResumo = useMemo(
+    () => isViagemView ? getViagemResumo(viagem, viagemEtapas) : null,
+    [isViagemView, viagem, viagemEtapas]
+  )
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-sm p-4" onClick={onClose}>
-      <div className={`rounded-2xl shadow-2xl w-full max-w-lg max-h-[85vh] overflow-y-auto ${isDark ? 'bg-[#1e293b]' : 'bg-white'}`} onClick={e => e.stopPropagation()}>
+      <div className={`rounded-2xl shadow-2xl w-full ${isViagemView ? 'max-w-3xl' : 'max-w-lg'} max-h-[88vh] overflow-y-auto ${isDark ? 'bg-[#1e293b]' : 'bg-white'}`} onClick={e => e.stopPropagation()}>
         <div className={`flex items-center justify-between px-5 py-4 border-b sticky top-0 z-10 ${isDark ? 'border-white/[0.06] bg-[#1e293b]' : 'border-slate-100 bg-white'}`}>
           <div className="flex items-center gap-2 min-w-0">
             <Truck size={18} className="text-orange-600 shrink-0" />
-            <h3 className={`text-base font-bold truncate ${isDark ? 'text-white' : 'text-slate-800'}`}>Transporte #{sol.numero}</h3>
+            <h3 className={`text-base font-bold truncate ${isDark ? 'text-white' : 'text-slate-800'}`}>
+              {isViagemView ? `Viagem ${viagem?.numero ?? sol.viagem_id}` : `Transporte #${sol.numero}`}
+            </h3>
           </div>
           <button onClick={onClose} className="text-slate-400 hover:text-slate-600 shrink-0"><X size={18} /></button>
         </div>
@@ -257,12 +284,13 @@ function DetailModal({ sol, onClose, onAction, isDark }: {
           </div>
 
           <div className={`rounded-xl p-4 space-y-2 ${isDark ? 'bg-white/[0.04]' : 'bg-slate-50'}`}>
-            <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-xs">
+            <div className={`grid gap-x-4 gap-y-2 text-xs ${isViagemView ? 'grid-cols-2 md:grid-cols-3' : 'grid-cols-2'}`}>
               <div><span className="text-slate-400">Origem:</span> <span className="font-semibold">{sol.origem}</span></div>
               <div><span className="text-slate-400">Destino:</span> <span className="font-semibold">{sol.destino}</span></div>
               {sol.obra_nome && <div><span className="text-slate-400">Obra:</span> <span className="font-semibold">{sol.obra_nome}</span></div>}
-              {sol.motorista_nome && <div><span className="text-slate-400">Motorista:</span> <span className="font-semibold">{sol.motorista_nome}</span></div>}
-              {sol.veiculo_placa && <div><span className="text-slate-400">Placa:</span> <span className="font-mono font-semibold">{sol.veiculo_placa}</span></div>}
+              {(viagem?.motorista_nome || sol.motorista_nome) && <div><span className="text-slate-400">Motorista:</span> <span className="font-semibold">{viagem?.motorista_nome || sol.motorista_nome}</span></div>}
+              {(viagem?.veiculo_placa || sol.veiculo_placa) && <div><span className="text-slate-400">Placa:</span> <span className="font-mono font-semibold">{viagem?.veiculo_placa || sol.veiculo_placa}</span></div>}
+              {(viagem?.motorista_telefone || sol.motorista_telefone) && <div><span className="text-slate-400">Contato:</span> <span className="font-semibold">{viagem?.motorista_telefone || sol.motorista_telefone}</span></div>}
               {t?.hora_saida && <div><span className="text-slate-400">Saída:</span> <span className="font-semibold">{fmtDataHora(t.hora_saida)}</span></div>}
               {t?.eta_atual && <div><span className="text-slate-400">ETA:</span> <span className={`font-semibold ${late ? 'text-amber-600' : ''}`}>{fmtDataHora(t.eta_atual)}</span></div>}
               {t?.hora_chegada && <div><span className="text-slate-400">Chegada:</span> <span className="font-semibold text-emerald-600">{fmtDataHora(t.hora_chegada)}</span></div>}
@@ -270,6 +298,107 @@ function DetailModal({ sol, onClose, onAction, isDark }: {
             </div>
             {sol.descricao && <p className="text-xs text-slate-500 mt-2 pt-2 border-t border-slate-200">{sol.descricao}</p>}
           </div>
+
+          {isViagemView && viagemResumo && viagemSolicitacoes && (
+            <div className="space-y-3">
+              <div className={`rounded-xl p-4 ${isDark ? 'bg-white/[0.04]' : 'bg-slate-50'}`}>
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className={`text-[10px] font-bold uppercase tracking-[0.24em] ${isDark ? 'text-orange-400' : 'text-orange-600'}`}>
+                      Visao da Viagem
+                    </p>
+                    <h4 className={`text-base font-bold mt-1 ${isDark ? 'text-white' : 'text-slate-800'}`}>
+                      {(viagem?.origem_principal || viagemSolicitacoes[0]?.origem)} → {(viagem?.destino_final || viagemSolicitacoes[viagemSolicitacoes.length - 1]?.destino)}
+                    </h4>
+                  </div>
+                  <span className={`text-[10px] font-bold px-2 py-1 rounded-full shrink-0 ${isDark ? 'bg-orange-500/10 text-orange-300' : 'bg-orange-100 text-orange-700'}`}>
+                    {viagemSolicitacoes.length} etapa{viagemSolicitacoes.length > 1 ? 's' : ''}
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3 mt-4 md:grid-cols-4">
+                  <div>
+                    <p className="text-[10px] text-slate-400 uppercase tracking-wider">Rota</p>
+                    <p className={`text-sm font-semibold mt-1 ${isDark ? 'text-white' : 'text-slate-800'}`}>{viagemSolicitacoes.length} despacho(s)</p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] text-slate-400 uppercase tracking-wider">Distancia</p>
+                    <p className={`text-sm font-semibold mt-1 ${isDark ? 'text-white' : 'text-slate-800'}`}>{fmtDistancia(viagemResumo.distancia_total_km)}</p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] text-slate-400 uppercase tracking-wider">Tempo</p>
+                    <p className={`text-sm font-semibold mt-1 ${isDark ? 'text-white' : 'text-slate-800'}`}>{fmtDuracao(viagemResumo.duracao_total_horas)}</p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] text-slate-400 uppercase tracking-wider">Partida Base</p>
+                    <p className={`text-sm font-semibold mt-1 ${isDark ? 'text-white' : 'text-slate-800'}`}>{fmtDataHora(departureBase)}</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className={`rounded-xl border overflow-hidden ${isDark ? 'border-white/[0.06]' : 'border-slate-200'}`}>
+                <div className={`px-4 py-3 border-b ${isDark ? 'border-white/[0.06] bg-white/[0.03]' : 'border-slate-100 bg-slate-50/70'}`}>
+                  <p className={`text-[10px] font-bold uppercase tracking-[0.24em] ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+                    Etapas e Despachos
+                  </p>
+                </div>
+
+                <div className={isDark ? 'divide-y divide-white/[0.06]' : 'divide-y divide-slate-100'}>
+                  {viagemEtapas.map((etapa) => {
+                    const etapaSol = etapa.solicitacao
+                    const etapaLate = etapaSol ? isLate(etapaSol) : false
+                    const entregue = !!etapaSol?.transporte?.hora_chegada
+
+                    return (
+                      <div key={etapaSol?.id ?? `${etapa.ordem}-${etapa.destino}`} className="px-4 py-3">
+                        <div className="flex items-start gap-3">
+                          <div className={`w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-bold shrink-0 ${
+                            entregue
+                              ? 'bg-emerald-100 text-emerald-700'
+                              : etapaLate
+                                ? 'bg-amber-100 text-amber-700'
+                                : isDark ? 'bg-orange-500/10 text-orange-300' : 'bg-orange-100 text-orange-700'
+                          }`}>
+                            {entregue ? <CheckCircle2 size={12} /> : etapa.ordem}
+                          </div>
+
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className={`text-xs font-mono font-bold ${isDark ? 'text-orange-300' : 'text-orange-700'}`}>{etapaSol?.numero ?? `Etapa ${etapa.ordem}`}</span>
+                              <span className={`text-xs ${isDark ? 'text-white' : 'text-slate-800'}`}>{etapa.origem} → {etapa.destino}</span>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-2 mt-2 md:grid-cols-4">
+                              <div>
+                                <p className="text-[10px] text-slate-400 uppercase tracking-wider">ETA</p>
+                                <p className={`text-xs font-semibold mt-1 ${etapaLate ? 'text-amber-600' : isDark ? 'text-white' : 'text-slate-800'}`}>
+                                  {fmtDataHora(etapaSol?.transporte?.eta_atual || etapaSol?.transporte?.eta_original || etapa.eta_previsto)}
+                                </p>
+                              </div>
+                              <div>
+                                <p className="text-[10px] text-slate-400 uppercase tracking-wider">Trecho</p>
+                                <p className={`text-xs font-semibold mt-1 ${isDark ? 'text-white' : 'text-slate-800'}`}>{fmtDistancia(etapa.distancia_km)}</p>
+                              </div>
+                              <div>
+                                <p className="text-[10px] text-slate-400 uppercase tracking-wider">Tempo</p>
+                                <p className={`text-xs font-semibold mt-1 ${isDark ? 'text-white' : 'text-slate-800'}`}>{fmtDuracao(etapa.duracao_horas)}</p>
+                              </div>
+                              <div>
+                                <p className="text-[10px] text-slate-400 uppercase tracking-wider">Despacho</p>
+                                <p className={`text-xs font-semibold mt-1 ${isDark ? 'text-white' : 'text-slate-800'}`}>
+                                  {entregue ? 'Entregue' : etapaSol?.status === 'em_transito' ? 'Em transporte' : etapaSol?.status === 'aguardando_coleta' ? 'Aguard. coleta' : 'Planejado'}
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Recebimento info (for concluido) */}
           {sol.status === 'concluido' && sol.recebimento && (
@@ -573,6 +702,15 @@ function DespachoViagemModal({
   onSubmit: () => void
   isPending: boolean
 }) {
+  const viagem = solicitacoes[0]?.viagem
+  const departureBase = viagem?.data_prevista_saida || form.eta_original || new Date().toISOString()
+  const etapas = useMemo(
+    () => applyEtasToEtapas(buildViagemEtapas(viagem, solicitacoes), departureBase),
+    [departureBase, solicitacoes, viagem]
+  )
+  const resumo = useMemo(() => getViagemResumo(viagem, etapas), [etapas, viagem])
+  const finalEta = etapas[etapas.length - 1]?.eta_previsto || form.eta_original
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-in fade-in duration-200">
       <div className={`rounded-2xl shadow-2xl w-full max-w-md ${isDark ? 'bg-[#1e293b]' : 'bg-white'}`}>
@@ -583,7 +721,7 @@ function DespachoViagemModal({
             </div>
             <div>
               <h2 className={`text-lg font-extrabold ${isDark ? 'text-white' : 'text-slate-800'}`}>Despachar Viagem</h2>
-              <p className={`text-[10px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{solicitacoes.length} solicitacao(oes) nesta viagem</p>
+              <p className={`text-[10px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{solicitacoes.length} despacho(s) nesta viagem</p>
             </div>
           </div>
           <button
@@ -602,6 +740,29 @@ function DespachoViagemModal({
                 {s.numero} - {s.origem} {'->'} {s.destino}
               </p>
             ))}
+          </div>
+
+          <div className={`rounded-xl p-4 ${isDark ? 'bg-white/[0.04]' : 'bg-slate-50'}`}>
+            <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+              <div>
+                <p className="text-[10px] text-slate-400 uppercase tracking-wider">Rota</p>
+                <p className={`text-sm font-semibold mt-1 ${isDark ? 'text-white' : 'text-slate-800'}`}>
+                  {(viagem?.origem_principal || solicitacoes[0]?.origem)} → {(viagem?.destino_final || solicitacoes[solicitacoes.length - 1]?.destino)}
+                </p>
+              </div>
+              <div>
+                <p className="text-[10px] text-slate-400 uppercase tracking-wider">Distancia</p>
+                <p className={`text-sm font-semibold mt-1 ${isDark ? 'text-white' : 'text-slate-800'}`}>{fmtDistancia(resumo.distancia_total_km)}</p>
+              </div>
+              <div>
+                <p className="text-[10px] text-slate-400 uppercase tracking-wider">Tempo</p>
+                <p className={`text-sm font-semibold mt-1 ${isDark ? 'text-white' : 'text-slate-800'}`}>{fmtDuracao(resumo.duracao_total_horas)}</p>
+              </div>
+              <div>
+                <p className="text-[10px] text-slate-400 uppercase tracking-wider">ETA Final</p>
+                <p className={`text-sm font-semibold mt-1 ${isDark ? 'text-white' : 'text-slate-800'}`}>{fmtDataHora(finalEta)}</p>
+              </div>
+            </div>
           </div>
 
           <div className="grid grid-cols-2 gap-3">
@@ -642,15 +803,40 @@ function DespachoViagemModal({
               />
             </div>
             <div>
-              <label className={`block text-xs font-bold mb-1 ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>ETA Previsto *</label>
-              <input
-                type="datetime-local"
-                value={form.eta_original}
-                onChange={e => setForm(prev => ({ ...prev, eta_original: e.target.value }))}
-                className={`w-full px-3 py-2 rounded-xl border text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/30 ${
-                  isDark ? 'bg-white/[0.04] border-white/[0.06] text-slate-200' : 'bg-white border-slate-200 text-slate-700'
-                }`}
-              />
+              <label className={`block text-xs font-bold mb-1 ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>ETA Final Automatico</label>
+              <div className={`w-full px-3 py-2 rounded-xl border text-sm ${
+                isDark ? 'bg-white/[0.04] border-white/[0.06] text-slate-200' : 'bg-white border-slate-200 text-slate-700'
+              }`}>
+                {fmtDataHora(finalEta)}
+              </div>
+            </div>
+          </div>
+
+          <div className={`rounded-xl border overflow-hidden ${isDark ? 'border-white/[0.06]' : 'border-slate-200'}`}>
+            <div className={`px-4 py-3 border-b ${isDark ? 'border-white/[0.06] bg-white/[0.03]' : 'border-slate-100 bg-slate-50/70'}`}>
+              <p className={`text-[10px] font-bold uppercase tracking-[0.24em] ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+                ETA por Etapa
+              </p>
+            </div>
+            <div className={isDark ? 'divide-y divide-white/[0.06]' : 'divide-y divide-slate-100'}>
+              {etapas.map((etapa) => (
+                <div key={etapa.solicitacao?.id ?? `${etapa.ordem}-${etapa.destino}`} className="px-4 py-3">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className={`text-xs font-semibold ${isDark ? 'text-white' : 'text-slate-800'}`}>
+                        {(etapa.solicitacao?.numero || `Etapa ${etapa.ordem}`)} · {etapa.origem} → {etapa.destino}
+                      </p>
+                      <p className={`text-[10px] mt-1 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+                        {fmtDistancia(etapa.distancia_km)} · {fmtDuracao(etapa.duracao_horas)}
+                      </p>
+                    </div>
+                    <div className="text-right shrink-0">
+                      <p className={`text-[10px] uppercase tracking-wider ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>ETA</p>
+                      <p className={`text-xs font-semibold mt-1 ${isDark ? 'text-white' : 'text-slate-800'}`}>{fmtDataHora(etapa.eta_previsto)}</p>
+                    </div>
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
 
@@ -676,7 +862,7 @@ function DespachoViagemModal({
           </button>
           <button
             onClick={onSubmit}
-            disabled={isPending || !form.placa || !form.motorista_nome || !form.eta_original}
+            disabled={isPending || !form.placa || !form.motorista_nome}
             className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-orange-600 hover:bg-orange-700 text-white text-sm font-semibold transition-all disabled:opacity-60 active:scale-[0.98]"
           >
             {isPending ? <Loader2 size={14} className="animate-spin" /> : <Route size={14} />}
@@ -719,6 +905,7 @@ export default function TransportesPipeline() {
   const confirmarRecebimento = useConfirmarRecebimento()
   const despacharViagem = useDespacharViagem()
   const requestedItemId = searchParams.get('item')
+  const requestedViagemId = searchParams.get('viagem')
 
   useEffect(() => {
     const requestedTab = searchParams.get('tab')
@@ -736,6 +923,14 @@ export default function TransportesPipeline() {
       setDetail(item)
     }
   }, [requestedItemId, solicitacoes])
+
+  useEffect(() => {
+    if (!requestedViagemId) return
+    const item = solicitacoes.find(sol => sol.viagem_id === requestedViagemId)
+    if (item) {
+      setDetail(item)
+    }
+  }, [requestedViagemId, solicitacoes])
 
   // Group by status — for "nfe_emitida" (Pendentes), only show items that actually have NF emitted
   const grouped = useMemo(() => {
@@ -812,6 +1007,7 @@ export default function TransportesPipeline() {
     setDetail(null)
     const next = new URLSearchParams(searchParams)
     next.delete('item')
+    next.delete('viagem')
     setSearchParams(next, { replace: true })
   }
   const toggleSelect = (id: string) => { setSelectedIds(prev => { const next = new Set(prev); if (next.has(id)) next.delete(id); else next.add(id); return next }) }
@@ -869,18 +1065,19 @@ export default function TransportesPipeline() {
 
   const openDespachoViagem = (viagemId: string, sols: LogSolicitacao[]) => {
     const v = sols[0]?.viagem
+    const etapas = applyEtasToEtapas(buildViagemEtapas(v, sols), v?.data_prevista_saida || new Date().toISOString())
     setDespachoViagemModal({ viagemId, solicitacoes: sols })
     setDespachoViagemForm({
       placa: v?.veiculo_placa ?? sols[0]?.veiculo_placa ?? '',
       motorista_nome: v?.motorista_nome ?? sols[0]?.motorista_nome ?? '',
       motorista_telefone: v?.motorista_telefone ?? sols[0]?.motorista_telefone ?? '',
-      eta_original: '',
+      eta_original: etapas[etapas.length - 1]?.eta_previsto?.slice(0, 16) ?? '',
       codigo_rastreio: '',
     })
   }
 
   const handleDespacharViagem = async () => {
-    if (!despachoViagemModal || !despachoViagemForm.placa || !despachoViagemForm.motorista_nome || !despachoViagemForm.eta_original) {
+    if (!despachoViagemModal || !despachoViagemForm.placa || !despachoViagemForm.motorista_nome) {
       return
     }
 
@@ -890,7 +1087,6 @@ export default function TransportesPipeline() {
         placa: despachoViagemForm.placa,
         motorista_nome: despachoViagemForm.motorista_nome,
         motorista_telefone: despachoViagemForm.motorista_telefone || undefined,
-        eta_original: despachoViagemForm.eta_original,
         codigo_rastreio: despachoViagemForm.codigo_rastreio || undefined,
       })
       showToast('success', 'Viagem despachada para transporte')
@@ -947,6 +1143,12 @@ export default function TransportesPipeline() {
   const bulk = BULK_ACTIONS[activeTab]
   const selectedInTab = activeItems.filter(s => selectedIds.has(s.id))
   const lateCt = activeItems.filter(s => isLate(s)).length
+  const detailViagemSolicitacoes = useMemo(() => {
+    if (!detail?.viagem_id) return undefined
+    return solicitacoes
+      .filter(item => item.viagem_id === detail.viagem_id)
+      .sort((a, b) => (a.ordem_na_viagem ?? 0) - (b.ordem_na_viagem ?? 0))
+  }, [detail, solicitacoes])
 
   return (
     <div className="space-y-4">
@@ -1112,7 +1314,7 @@ export default function TransportesPipeline() {
         </div>
       </div>
 
-      {detail && <DetailModal sol={detail} onClose={closeDetail} onAction={handleDetailAction} isDark={isDark} />}
+      {detail && <DetailModal sol={detail} viagemSolicitacoes={detailViagemSolicitacoes} onClose={closeDetail} onAction={handleDetailAction} isDark={isDark} />}
       {despachoViagemModal && (
         <DespachoViagemModal
           isDark={isDark}

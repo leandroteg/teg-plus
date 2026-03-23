@@ -95,6 +95,23 @@ export interface LogRota {
   criado_em: string
 }
 
+export interface LogViagemRotaEtapa {
+  solicitacao_id?: string
+  ordem: number
+  origem: string
+  destino: string
+  distancia_km?: number
+  duracao_horas?: number
+}
+
+export interface LogViagemRotaPayload {
+  version: 1
+  polyline?: string
+  distancia_total_km?: number
+  duracao_total_horas?: number
+  etapas: LogViagemRotaEtapa[]
+}
+
 // ── Viagem (consolida N solicitações) ─────────────────────────────────────────
 
 export interface LogViagem {
