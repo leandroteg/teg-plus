@@ -156,8 +156,11 @@ export default function Solicitacoes() {
       origem: 'logistica',
       solicitacao_log_id: nfModal.solId,
     })
-    // Avançar status para nfe_emitida
-    await atualizarStatus.mutateAsync({ id: nfModal.solId, status: 'nfe_emitida' })
+    await atualizarStatus.mutateAsync({
+      id: nfModal.solId,
+      status: 'aprovado',
+      extra: { doc_fiscal_tipo: 'nf' },
+    })
     setNfModal(null)
   }
 
@@ -191,7 +194,7 @@ export default function Solicitacoes() {
           {[
             ['solicitado','Solicitado'],['validando','Validando'],['planejado','Planejado'],
             ['aguardando_aprovacao','Aguard. Aprovação'],['aprovado','Aprovado'],
-            ['nfe_emitida','NF-e Emitida'],['em_transito','Em Trânsito'],
+            ['nfe_emitida','NF-e Emitida'],['transporte_pendente','Transp. Pendente'],['em_transito','Em Trânsito'],
             ['entregue','Entregue'],['confirmado','Confirmado'],['concluido','Concluído'],
             ['recusado','Recusado'],['cancelado','Cancelado'],
           ].map(([v, l]) => <option key={v} value={v}>{l}</option>)}
@@ -343,6 +346,13 @@ export default function Solicitacoes() {
                             <ExternalLink size={12} /> Ver no Fiscal
                           </button>
                         </>
+                      )}
+                      {s.status === 'transporte_pendente' && (
+                        <button onClick={() => navigate('/logistica/transportes?tab=transporte_pendente')}
+                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-700 hover:bg-slate-800
+                            text-white text-xs font-semibold transition-colors shadow-sm">
+                          <Package2 size={12} /> Ir para Transportes
+                        </button>
                       )}
                       {(s.status === 'solicitado' || s.status === 'validando' || s.status === 'planejado') && (
                         <ActionBtn

@@ -87,9 +87,10 @@ function exportCSV(items: LogSolicitacao[], stageName: string) {
 function hasDocumentoFiscalPronto(sol: LogSolicitacao) {
   if (hasRomaneioDocumento(sol)) return true
   if (sol.status === 'nfe_emitida') return true
+  if (sol.status === 'transporte_pendente') return true
   if (sol.nfe?.status === 'autorizada') return true
 
-  return ['aguardando_coleta', 'em_transito', 'entregue', 'concluido'].includes(sol.status)
+  return ['transporte_pendente', 'aguardando_coleta', 'em_transito', 'entregue', 'concluido'].includes(sol.status)
     && !!sol.doc_fiscal_tipo
     && sol.doc_fiscal_tipo !== 'nenhum'
 }
@@ -756,9 +757,23 @@ export default function ExpedicaoPipeline() {
     if (action === 'despachar') handleEmitirRomaneio([sol.id])
     if (action === 'solicitarNF') setNfModal(sol)
     if (action === 'concluir') {
-      await supabase.from('log_solicitacoes').update({ status: 'aguardando_coleta', updated_at: new Date().toISOString() }).eq('id', sol.id)
+      const updatedAt = new Date().toISOString()
+      const nextStatus = await supabase
+        .from('log_solicitacoes')
+        .update({ status: 'transporte_pendente', updated_at: updatedAt })
+        .eq('id', sol.id)
+
+      if (nextStatus.error) {
+        const fallback = await supabase
+          .from('log_solicitacoes')
+          .update({ status: 'aguardando_coleta', updated_at: updatedAt })
+          .eq('id', sol.id)
+
+        if (fallback.error) throw nextStatus.error
+      }
+
       qc.invalidateQueries({ queryKey: ['log_solicitacoes'] })
-      showToast('success', `Expedição ${sol.numero} concluída — aguardando coleta`)
+      showToast('success', `Expedição ${sol.numero} concluída — pronta para transporte`)
     }
   }
 

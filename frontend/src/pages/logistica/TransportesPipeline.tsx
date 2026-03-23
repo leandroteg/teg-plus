@@ -55,6 +55,7 @@ const TIPO_LABEL: Record<string, string> = {
 // ── Status accents ───────────────────────────────────────────────────────────
 
 const STATUS_ICONS: Record<string, typeof Truck> = {
+  transporte_pendente: CalendarCheck,
   nfe_emitida:       FileText,
   aguardando_coleta: CalendarCheck,
   em_transito:       Truck,
@@ -63,6 +64,7 @@ const STATUS_ICONS: Record<string, typeof Truck> = {
 }
 
 const STATUS_ACCENT: Record<string, { bg: string; bgActive: string; text: string; textActive: string; dot: string; border: string; badge: string }> = {
+  transporte_pendente: { bg: 'hover:bg-slate-50',    bgActive: 'bg-slate-100',    text: 'text-slate-600',   textActive: 'text-slate-800',   dot: 'bg-slate-400',    border: 'border-slate-400',    badge: 'bg-slate-200 text-slate-700' },
   nfe_emitida:       { bg: 'hover:bg-slate-50',    bgActive: 'bg-slate-100',    text: 'text-slate-600',   textActive: 'text-slate-800',   dot: 'bg-slate-400',    border: 'border-slate-400',    badge: 'bg-slate-200 text-slate-700' },
   aguardando_coleta: { bg: 'hover:bg-blue-50',     bgActive: 'bg-blue-50',      text: 'text-blue-600',    textActive: 'text-blue-800',    dot: 'bg-blue-500',     border: 'border-blue-500',     badge: 'bg-blue-100 text-blue-700' },
   em_transito:       { bg: 'hover:bg-amber-50',    bgActive: 'bg-amber-50',     text: 'text-amber-600',   textActive: 'text-amber-800',   dot: 'bg-amber-500',    border: 'border-amber-500',    badge: 'bg-amber-100 text-amber-700' },
@@ -71,6 +73,7 @@ const STATUS_ACCENT: Record<string, { bg: string; bgActive: string; text: string
 }
 
 const STATUS_ACCENT_DARK: Record<string, { bg: string; bgActive: string; text: string; textActive: string; badge: string; border: string }> = {
+  transporte_pendente: { bg: 'hover:bg-white/[0.03]', bgActive: 'bg-slate-500/10',  text: 'text-slate-400',  textActive: 'text-slate-200',  badge: 'bg-slate-500/20 text-slate-300',  border: 'border-slate-500/40' },
   nfe_emitida:       { bg: 'hover:bg-white/[0.03]', bgActive: 'bg-slate-500/10',  text: 'text-slate-400',  textActive: 'text-slate-200',  badge: 'bg-slate-500/20 text-slate-300',  border: 'border-slate-500/40' },
   aguardando_coleta: { bg: 'hover:bg-white/[0.03]', bgActive: 'bg-blue-500/10',   text: 'text-blue-400',   textActive: 'text-blue-300',   badge: 'bg-blue-500/20 text-blue-300',   border: 'border-blue-500/40' },
   em_transito:       { bg: 'hover:bg-white/[0.03]', bgActive: 'bg-amber-500/10',  text: 'text-amber-400',  textActive: 'text-amber-300',  badge: 'bg-amber-500/20 text-amber-300',  border: 'border-amber-500/40' },
@@ -96,6 +99,16 @@ function exportCSV(items: LogSolicitacao[], stageName: string) {
   a.download = `transportes-${stageName.replace(/\s/g, '-').toLowerCase()}-${new Date().toISOString().split('T')[0]}.csv`
   a.click()
   URL.revokeObjectURL(url)
+}
+
+function resolveTransporteStage(sol: LogSolicitacao): StatusTransportePipeline | null {
+  if (sol.status === 'transporte_pendente' || sol.status === 'nfe_emitida' || sol.status === 'romaneio_emitido') {
+    return 'transporte_pendente'
+  }
+  if (sol.status === 'aguardando_coleta' || sol.status === 'em_transito' || sol.status === 'entregue' || sol.status === 'concluido') {
+    return sol.status
+  }
+  return null
 }
 
 
@@ -250,6 +263,7 @@ function DetailModal({ sol, viagemSolicitacoes, onClose, onAction, isDark }: {
   const t = sol.transporte
   const late = isLate(sol)
   const fiscalCtx = getDocumentoFiscalContext(sol)
+  const transportStage = resolveTransporteStage(sol) ?? 'transporte_pendente'
   const isViagemView = !!sol.viagem_id && !!viagemSolicitacoes && viagemSolicitacoes.length > 1
   const viagem = viagemSolicitacoes?.[0]?.viagem ?? sol.viagem
   const departureBase = viagem?.data_real_saida || t?.hora_saida || viagem?.data_prevista_saida || sol.data_prevista_saida
@@ -281,9 +295,9 @@ function DetailModal({ sol, viagemSolicitacoes, onClose, onAction, isDark }: {
               {sol.urgente && <span className="text-[10px] font-bold text-red-500 bg-red-50 dark:bg-red-500/10 px-2 py-0.5 rounded-full flex items-center gap-1"><AlertTriangle size={10} /> URGENTE</span>}
               {late && <span className="text-[10px] font-bold text-amber-600 bg-amber-50 dark:bg-amber-500/10 px-2 py-0.5 rounded-full flex items-center gap-1"><Clock size={10} /> ATRASADO</span>}
             </div>
-            <span className={`inline-flex items-center gap-1.5 rounded-full font-semibold px-3 py-1 text-xs ${STATUS_ACCENT[sol.status]?.bgActive || 'bg-slate-100'} ${STATUS_ACCENT[sol.status]?.textActive || 'text-slate-700'}`}>
-              <span className={`w-2 h-2 rounded-full ${STATUS_ACCENT[sol.status]?.dot || 'bg-slate-400'}`} />
-              {TRANSPORTE_PIPELINE_STAGES.find(s => s.status === sol.status)?.label ?? sol.status}
+            <span className={`inline-flex items-center gap-1.5 rounded-full font-semibold px-3 py-1 text-xs ${STATUS_ACCENT[transportStage]?.bgActive || 'bg-slate-100'} ${STATUS_ACCENT[transportStage]?.textActive || 'text-slate-700'}`}>
+              <span className={`w-2 h-2 rounded-full ${STATUS_ACCENT[transportStage]?.dot || 'bg-slate-400'}`} />
+              {TRANSPORTE_PIPELINE_STAGES.find(s => s.status === transportStage)?.label ?? transportStage}
             </span>
           </div>
 
@@ -406,7 +420,7 @@ function DetailModal({ sol, viagemSolicitacoes, onClose, onAction, isDark }: {
                               <div>
                                 <p className="text-[10px] text-slate-400 uppercase tracking-wider">Despacho</p>
                                 <p className={`text-xs font-semibold mt-1 ${isDark ? 'text-white' : 'text-slate-800'}`}>
-                                  {entregue ? 'Entregue' : etapaSol?.status === 'em_transito' ? 'Em transporte' : etapaSol?.status === 'aguardando_coleta' ? 'Aguard. coleta' : 'Planejado'}
+                                  {entregue ? 'Entregue' : etapaSol?.status === 'em_transito' ? 'Em transporte' : etapaSol?.status === 'aguardando_coleta' ? 'Aguard. coleta' : etapaSol?.status === 'transporte_pendente' || etapaSol?.status === 'nfe_emitida' || etapaSol?.status === 'romaneio_emitido' ? 'Transp. pendente' : 'Planejado'}
                                 </p>
                               </div>
                             </div>
@@ -459,7 +473,7 @@ function DetailModal({ sol, viagemSolicitacoes, onClose, onAction, isDark }: {
             <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-2">Progresso</p>
             <div className="flex items-center gap-0.5">
               {TRANSPORTE_PIPELINE_STAGES.map((s, i) => {
-                const currentIdx = TRANSPORTE_PIPELINE_STAGES.findIndex(st => st.status === sol.status)
+                const currentIdx = TRANSPORTE_PIPELINE_STAGES.findIndex(st => st.status === transportStage)
                 const isPast = i <= currentIdx
                 const accent = STATUS_ACCENT[s.status]
                 return <div key={s.status} className="flex-1"><div className={`h-1.5 rounded-full transition-all ${isPast ? accent?.dot || 'bg-slate-400' : isDark ? 'bg-white/[0.06]' : 'bg-slate-200'}`} /></div>
@@ -471,7 +485,7 @@ function DetailModal({ sol, viagemSolicitacoes, onClose, onAction, isDark }: {
             <button onClick={onClose} className={`flex-1 py-3 rounded-xl border text-sm font-semibold transition-all ${isDark ? 'border-white/[0.06] text-slate-300' : 'border-slate-200 text-slate-600 hover:bg-slate-50'}`}>
               Fechar
             </button>
-            {sol.status === 'nfe_emitida' && (
+            {transportStage === 'transporte_pendente' && (
               <button onClick={() => onAction('confirmarAgendamento', sol)} className="flex-1 py-3 rounded-xl bg-blue-600 text-white text-sm font-bold hover:bg-blue-700 transition-all flex items-center justify-center gap-2">
                 <CalendarCheck size={15} /> Confirmar Agendamento
               </button>
@@ -899,7 +913,7 @@ function DespachoViagemModal({
 export default function TransportesPipeline() {
   const { isDark } = useTheme()
   const [searchParams, setSearchParams] = useSearchParams()
-  const [activeTab, setActiveTab] = useState<StatusTransportePipeline>('nfe_emitida')
+  const [activeTab, setActiveTab] = useState<StatusTransportePipeline>('transporte_pendente')
   const [busca, setBusca] = useState('')
   const [detail, setDetail] = useState<LogSolicitacao | null>(null)
   const [recebModal, setRecebModal] = useState<LogSolicitacao | null>(null)
@@ -918,7 +932,7 @@ export default function TransportesPipeline() {
   })
 
   const { data: solicitacoes = [], isLoading } = useSolicitacoes({
-    status: ['nfe_emitida', 'aguardando_coleta', 'em_transito', 'entregue', 'concluido'],
+    status: ['nfe_emitida', 'romaneio_emitido', 'transporte_pendente', 'aguardando_coleta', 'em_transito', 'entregue', 'concluido'],
   })
   const confirmarEntrega = useConfirmarEntregaFisica()
   const confirmarAgendamento = useConfirmarAgendamento()
@@ -930,9 +944,13 @@ export default function TransportesPipeline() {
   useEffect(() => {
     const requestedTab = searchParams.get('tab')
     if (!requestedTab) return
-    const isValid = TRANSPORTE_PIPELINE_STAGES.some(stage => stage.status === requestedTab)
+    const normalizedTab =
+      requestedTab === 'nfe_emitida' || requestedTab === 'romaneio_emitido'
+        ? 'transporte_pendente'
+        : requestedTab
+    const isValid = TRANSPORTE_PIPELINE_STAGES.some(stage => stage.status === normalizedTab)
     if (isValid) {
-      setActiveTab(requestedTab as StatusTransportePipeline)
+      setActiveTab(normalizedTab as StatusTransportePipeline)
     }
   }, [searchParams])
 
@@ -952,13 +970,14 @@ export default function TransportesPipeline() {
     }
   }, [requestedViagemId, solicitacoes])
 
-  // Group by status — compatível com registros legados em nfe_emitida e novos em transporte_pendente
+  // Group by status — compatível com registros legados em nfe_emitida/romaneio_emitido
   const grouped = useMemo(() => {
     const map = new Map<StatusTransportePipeline, LogSolicitacao[]>()
     for (const s of TRANSPORTE_PIPELINE_STAGES) map.set(s.status, [])
     for (const sol of solicitacoes) {
-      if (sol.status === 'nfe_emitida' && sol.doc_fiscal_tipo !== 'nf') continue
-      const arr = map.get(sol.status as StatusTransportePipeline)
+      const stage = resolveTransporteStage(sol)
+      if (!stage) continue
+      const arr = map.get(stage)
       if (arr) arr.push(sol)
     }
     return map
@@ -1121,7 +1140,7 @@ export default function TransportesPipeline() {
     const ids = Array.from(selectedIds)
     if (ids.length === 0) return
     switch (activeTab) {
-      case 'nfe_emitida': handleConfirmarAgendamento(ids); break
+      case 'transporte_pendente': handleConfirmarAgendamento(ids); break
       case 'em_transito': handleConfirmarEntrega(ids); break
       // For 'entregue', bulk opens the modal for the first selected item
       case 'entregue': {
@@ -1155,7 +1174,7 @@ export default function TransportesPipeline() {
   }
 
   const BULK_ACTIONS: Partial<Record<StatusTransportePipeline, { label: string; icon: typeof CheckCircle2; className: string }>> = {
-    nfe_emitida: { label: 'Confirmar Agendamento',  icon: CalendarCheck, className: 'bg-blue-600 hover:bg-blue-700 text-white' },
+    transporte_pendente: { label: 'Confirmar Agendamento',  icon: CalendarCheck, className: 'bg-blue-600 hover:bg-blue-700 text-white' },
     em_transito: { label: 'Confirmar Entrega',       icon: Package2,      className: 'bg-teal-600 hover:bg-teal-700 text-white' },
     entregue:    { label: 'Confirmar Recebimento',    icon: CheckCircle2,  className: 'bg-emerald-600 hover:bg-emerald-700 text-white' },
   }

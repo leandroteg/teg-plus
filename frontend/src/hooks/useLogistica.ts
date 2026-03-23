@@ -651,11 +651,20 @@ export function useEmitirNFe() {
         .single()
       if (error) throw error
 
-      // Atualiza status da solicitação
-      await supabase
+      const updateBase = { updated_at: new Date().toISOString() }
+      const nextStatus = await supabase
         .from('log_solicitacoes')
-        .update({ status: 'nfe_emitida', updated_at: new Date().toISOString() })
+        .update({ status: 'transporte_pendente', ...updateBase })
         .eq('id', payload.solicitacao_id)
+
+      if (nextStatus.error) {
+        const fallback = await supabase
+          .from('log_solicitacoes')
+          .update({ status: 'nfe_emitida', ...updateBase })
+          .eq('id', payload.solicitacao_id)
+
+        if (fallback.error) throw nextStatus.error
+      }
 
       return data as LogNFe
     },
@@ -699,19 +708,36 @@ export function useEmitirRomaneio() {
       solicitacao_id: string
       romaneio_url: string
     }) => {
+      const baseUpdate = {
+        romaneio_url: payload.romaneio_url,
+        doc_fiscal_tipo: 'romaneio' as const,
+        updated_at: new Date().toISOString(),
+      }
+
       const { data, error } = await supabase
         .from('log_solicitacoes')
         .update({
-          status: 'romaneio_emitido',
-          romaneio_url: payload.romaneio_url,
-          doc_fiscal_tipo: 'romaneio',
-          updated_at: new Date().toISOString(),
+          status: 'transporte_pendente',
+          ...baseUpdate,
         })
         .eq('id', payload.solicitacao_id)
         .select()
         .single()
-      if (error) throw error
-      return data as LogSolicitacao
+
+      if (!error) return data as LogSolicitacao
+
+      const fallback = await supabase
+        .from('log_solicitacoes')
+        .update({
+          status: 'romaneio_emitido',
+          ...baseUpdate,
+        })
+        .eq('id', payload.solicitacao_id)
+        .select()
+        .single()
+
+      if (fallback.error) throw error
+      return fallback.data as LogSolicitacao
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['log_solicitacoes'] })
@@ -1216,7 +1242,7 @@ export function useLogisticaKPIs() {
       const totalAbertas = await supabase
         .from('log_solicitacoes')
         .select('id', { count: 'exact', head: true })
-        .in('status', ['solicitado', 'planejado', 'aguardando_aprovacao', 'aprovado', 'nfe_emitida', 'romaneio_emitido', 'aguardando_coleta'])
+        .in('status', ['solicitado', 'planejado', 'aguardando_aprovacao', 'aprovado', 'nfe_emitida', 'romaneio_emitido', 'transporte_pendente', 'aguardando_coleta'])
 
       return {
         total_solicitacoes: solTotal.count ?? 0,
