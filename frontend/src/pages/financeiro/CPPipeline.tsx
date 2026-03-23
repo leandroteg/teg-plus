@@ -6,7 +6,7 @@ import {
   Paperclip, ExternalLink, Download, ArrowUpDown, LayoutList,
   LayoutGrid, Filter, SortAsc, SortDesc, ArrowDown, ArrowUp, Send, MessageSquare, XCircle,
   ChevronLeft, ChevronRight, ArrowRight,
-  Plus, Save, Loader2, RefreshCw,
+  Save, Loader2, RefreshCw,
 } from 'lucide-react'
 import { useQueryClient } from '@tanstack/react-query'
 import { useNavigate, useSearchParams } from 'react-router-dom'
@@ -315,8 +315,10 @@ type QuickFilterId = 'all' | 'overdue' | 'today' | 'week' | 'this_month' | 'next
 type StatusHintTone = 'amber' | 'rose' | 'sky'
 type StatusHint = { text: string; tone: StatusHintTone }
 const CP_TABLE_GRID = 'grid grid-cols-[20px_2px_minmax(0,1.8fr)_minmax(0,1.45fr)_minmax(0,1fr)_70px_110px_72px_96px] items-center gap-x-3'
-const LOTE_TABLE_GRID = 'grid grid-cols-[20px_2px_150px_minmax(0,1.8fr)_80px_100px_120px_190px] items-center gap-x-3'
+const LOTE_TABLE_GRID = 'grid grid-cols-[20px_2px_150px_minmax(0,1.8fr)_80px_100px_120px_200px] items-center gap-x-3'
 const LOTE_STAGE_TABS: PipelineStageId[] = ['em_lote', 'em_aprovacao', 'aprovado_pgto', 'em_pagamento']
+const LOTE_ACTION_BUTTON_CLASS = 'inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-xl px-2.5 py-1.5 text-[10px] font-bold leading-none text-white transition-all disabled:opacity-60 disabled:cursor-not-allowed'
+const LOTE_TOGGLE_BUTTON_CLASS = 'inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-xl border px-2.5 py-1.5 text-[10px] font-semibold'
 
 type LoteStageSummary = {
   lote: LotePagamento
@@ -2425,22 +2427,22 @@ function LoteTableRow({
         <span className={`text-sm font-bold ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>{summary.totalItems}</span>
         <span className={`text-sm font-bold ${isDark ? 'text-emerald-300' : 'text-emerald-700'}`}>{summary.approvedItems}</span>
         <span className="text-sm font-extrabold text-emerald-600">{fmt(summary.visibleValue || summary.totalValue)}</span>
-        <div className="flex items-center justify-end gap-2">
+        <div className="flex items-center justify-end gap-1.5 whitespace-nowrap">
           {onPrimaryAction && (
             <button type="button" onClick={onPrimaryAction.onClick} disabled={onPrimaryAction.loading || onPrimaryAction.disabled}
-              className={`inline-flex items-center gap-1.5 rounded-xl px-3 py-2 text-[11px] font-bold text-white transition-all disabled:opacity-60 disabled:cursor-not-allowed ${onPrimaryAction.tone}`}>
+              className={`${LOTE_ACTION_BUTTON_CLASS} ${onPrimaryAction.tone}`}>
               {onPrimaryAction.loading ? <RefreshCw size={12} className="animate-spin" /> : <onPrimaryAction.icon size={12} />}
               {onPrimaryAction.loading ? 'Enviando...' : onPrimaryAction.label}
             </button>
           )}
           {onSecondaryAction && (
             <button type="button" onClick={onSecondaryAction.onClick} disabled={onSecondaryAction.loading || onSecondaryAction.disabled}
-              className={`inline-flex items-center gap-1.5 rounded-xl px-3 py-2 text-[11px] font-bold text-white transition-all disabled:opacity-60 disabled:cursor-not-allowed ${onSecondaryAction.tone}`}>
+              className={`${LOTE_ACTION_BUTTON_CLASS} ${onSecondaryAction.tone}`}>
               {onSecondaryAction.loading ? <RefreshCw size={12} className="animate-spin" /> : <onSecondaryAction.icon size={12} />}
               {onSecondaryAction.loading ? 'Processando...' : onSecondaryAction.label}
             </button>
           )}
-          <button type="button" onClick={onToggleExpand} className={`inline-flex items-center gap-1 rounded-xl border px-3 py-2 text-[11px] font-semibold ${isDark ? 'border-white/[0.08] text-slate-200 hover:bg-white/[0.04]' : 'border-slate-200 text-slate-600 hover:bg-white'}`}>
+          <button type="button" onClick={onToggleExpand} className={`${LOTE_TOGGLE_BUTTON_CLASS} ${isDark ? 'border-white/[0.08] text-slate-200 hover:bg-white/[0.04]' : 'border-slate-200 text-slate-600 hover:bg-white'}`}>
             {expanded ? 'Ocultar' : 'Itens'}
           </button>
         </div>
@@ -2496,20 +2498,20 @@ function LoteCard({
         <div className="flex flex-wrap gap-2">
           {onPrimaryAction && (
             <button type="button" onClick={onPrimaryAction.onClick} disabled={onPrimaryAction.loading || onPrimaryAction.disabled}
-              className={`inline-flex items-center gap-1.5 rounded-xl px-3 py-2 text-[11px] font-bold text-white transition-all disabled:opacity-60 disabled:cursor-not-allowed ${onPrimaryAction.tone}`}>
+              className={`${LOTE_ACTION_BUTTON_CLASS} ${onPrimaryAction.tone}`}>
               {onPrimaryAction.loading ? <RefreshCw size={12} className="animate-spin" /> : <onPrimaryAction.icon size={12} />}
               {onPrimaryAction.loading ? 'Enviando...' : onPrimaryAction.label}
             </button>
           )}
           {onSecondaryAction && (
             <button type="button" onClick={onSecondaryAction.onClick} disabled={onSecondaryAction.loading || onSecondaryAction.disabled}
-              className={`inline-flex items-center gap-1.5 rounded-xl px-3 py-2 text-[11px] font-bold text-white transition-all disabled:opacity-60 disabled:cursor-not-allowed ${onSecondaryAction.tone}`}>
+              className={`${LOTE_ACTION_BUTTON_CLASS} ${onSecondaryAction.tone}`}>
               {onSecondaryAction.loading ? <RefreshCw size={12} className="animate-spin" /> : <onSecondaryAction.icon size={12} />}
               {onSecondaryAction.loading ? 'Processando...' : onSecondaryAction.label}
             </button>
           )}
         </div>
-        <button type="button" onClick={onToggleExpand} className={`inline-flex items-center gap-1 rounded-xl border px-3 py-2 text-[11px] font-semibold ${isDark ? 'border-white/[0.08] text-slate-200 hover:bg-white/[0.04]' : 'border-slate-200 text-slate-600 hover:bg-slate-50'}`}>
+        <button type="button" onClick={onToggleExpand} className={`${LOTE_TOGGLE_BUTTON_CLASS} ${isDark ? 'border-white/[0.08] text-slate-200 hover:bg-white/[0.04]' : 'border-slate-200 text-slate-600 hover:bg-slate-50'}`}>
           {expanded ? 'Ocultar itens' : 'Ver itens'}
         </button>
       </div>
@@ -2543,40 +2545,21 @@ export default function CPPipeline() {
   // Per-tab filter memory: preserves busca and quickFilter when switching tabs (#134)
   const tabFiltersRef = useRef<Map<PipelineStageId, { busca: string; quickFilter: QuickFilterId }>>(new Map())
   const [showNovaSolicitacao, setShowNovaSolicitacao] = useState(false)
-  const [showNovaMenu, setShowNovaMenu] = useState(false)
   const [pagModal, setPagModal] = useState<{ cpIds: string[]; pedidoId?: string } | null>(null)
   const [pagData, setPagData] = useState(new Date().toISOString().split('T')[0])
   const [pagFile, setPagFile] = useState<File | null>(null)
   const [pagUploading, setPagUploading] = useState(false)
   const [novaSolicitacaoKind, setNovaSolicitacaoKind] = useState<NovaSolicitacaoKind | null>(null)
   const [expandedLoteIds, setExpandedLoteIds] = useState<Set<string>>(new Set())
-  const novaMenuRef = useRef<HTMLDivElement | null>(null)
 
   useEffect(() => {
     const novaIntent = searchParams.get('nova')
     if (novaIntent === 'extraordinario' || novaIntent === 'previsao') {
       setNovaSolicitacaoKind(novaIntent)
       setShowNovaSolicitacao(true)
-      setShowNovaMenu(false)
-      setSearchParams({}, { replace: true })
-      return
-    }
-    if (novaIntent) {
-      setShowNovaMenu(true)
       setSearchParams({}, { replace: true })
     }
   }, [searchParams, setSearchParams])
-
-  useEffect(() => {
-    if (!showNovaMenu) return
-    const handleClickOutside = (event: MouseEvent) => {
-      if (!novaMenuRef.current?.contains(event.target as Node)) {
-        setShowNovaMenu(false)
-      }
-    }
-    document.addEventListener('mousedown', handleClickOutside)
-    return () => document.removeEventListener('mousedown', handleClickOutside)
-  }, [showNovaMenu])
 
   // Data
   const { data: contas = [], isLoading } = useContasPagar()
@@ -3287,13 +3270,8 @@ export default function CPPipeline() {
         </div>
       )}
 
-      {/* Nova Solicitação modal */}
-      {showNovaMenu && (
-        <div className="fixed inset-0 z-40 bg-black/10" onClick={() => setShowNovaMenu(false)} />
-      )}
-
       {/* Header */}
-      <div className="flex items-center gap-4">
+      <div className="flex items-center">
         <div>
           <h1 className={`text-xl font-extrabold flex items-center gap-2 ${isDark ? 'text-white' : 'text-slate-800'}`}>
             <Receipt size={20} className="text-emerald-600" />
@@ -3302,49 +3280,6 @@ export default function CPPipeline() {
           <p className={`text-xs mt-0.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
             {contas.length} t\u00EDtulos &middot; {fmt(contas.reduce((s, c) => s + c.valor_original, 0))}
           </p>
-        </div>
-        <div ref={novaMenuRef} className="relative z-50">
-          <button
-            type="button"
-            onClick={() => setShowNovaMenu(prev => !prev)}
-            className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2 text-sm font-bold text-white shadow-sm transition-all hover:bg-emerald-700"
-          >
-            <Plus size={15} />
-            <ChevronDown size={15} className={`transition-transform ${showNovaMenu ? 'rotate-180' : ''}`} />
-            Nova Solicitação
-          </button>
-          {showNovaMenu && (
-            <div
-              onClick={e => e.stopPropagation()}
-              className={`absolute left-0 top-full mt-3 w-[360px] max-w-[calc(100vw-2rem)] rounded-3xl border p-3 shadow-2xl ${isDark ? 'border-white/[0.08] bg-slate-900' : 'border-slate-200 bg-white'}`}
-            >
-            <p className={`text-[10px] font-bold uppercase tracking-wider px-4 pt-2 pb-1 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Nova solicitação</p>
-            <button type="button"
-              onClick={() => { setNovaSolicitacaoKind('extraordinario'); setShowNovaSolicitacao(true); setShowNovaMenu(false) }}
-              className={`flex w-full items-start gap-3 rounded-2xl px-4 py-3.5 text-left transition-all ${isDark ? 'hover:bg-white/[0.05]' : 'hover:bg-slate-50'}`}
-            >
-              <span className={`mt-0.5 flex h-10 w-10 items-center justify-center rounded-2xl shrink-0 ${isDark ? 'bg-amber-500/15 text-amber-300' : 'bg-amber-50 text-amber-600'}`}>
-                <Receipt size={16} />
-              </span>
-              <span>
-                <span className={`block text-sm font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>Pagamento Extraordinário</span>
-                <span className={`mt-1 block text-xs leading-relaxed ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Solicitação manual urgente com entrada direta em Confirmados.</span>
-              </span>
-            </button>
-            <button type="button"
-              onClick={() => { setNovaSolicitacaoKind('previsao'); setShowNovaSolicitacao(true); setShowNovaMenu(false) }}
-              className={`flex w-full items-start gap-3 rounded-2xl px-4 py-3.5 text-left transition-all ${isDark ? 'hover:bg-white/[0.05]' : 'hover:bg-slate-50'}`}
-            >
-              <span className={`mt-0.5 flex h-10 w-10 items-center justify-center rounded-2xl shrink-0 ${isDark ? 'bg-emerald-500/15 text-emerald-300' : 'bg-emerald-50 text-emerald-600'}`}>
-                <Calendar size={16} />
-              </span>
-              <span>
-                <span className={`block text-sm font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>Previsão de Pagamento</span>
-                <span className={`mt-1 block text-xs leading-relaxed ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Planejamento de despesas futuras com recorrência opcional.</span>
-              </span>
-            </button>
-            </div>
-          )}
         </div>
       </div>
 
