@@ -1143,11 +1143,6 @@ function ExpedicaoDetail({
                     text-white text-xs font-semibold transition-all active:scale-[0.97]">
                   <ScrollText size={12} /> Emitir Romaneio
                 </button>
-                <button onClick={onSolicitarNF}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-violet-200 bg-violet-50 hover:bg-violet-100
-                    text-violet-700 text-xs font-semibold transition-all active:scale-[0.97]">
-                  <FileText size={12} /> Solicitar NF
-                </button>
               </>
             )}
             {/* Inter-state → show NF primary, Romaneio secondary */}
