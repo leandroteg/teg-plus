@@ -340,20 +340,28 @@ function DetailModal({ sol, onClose, onAction, isDark, allSolicitacoes }: {
                 <Truck size={15} /> Despachar
               </button>
             )}
-            {sol.status === 'romaneio_emitido' && (() => {
-              return fiscalCtx.regra === 'nf' || fiscalCtx.regra === 'indefinido' ? (
-                <button onClick={() => onAction('solicitarNF', sol)} className="flex-1 py-3 rounded-xl bg-amber-600 text-white text-sm font-bold hover:bg-amber-700 transition-all flex items-center justify-center gap-2">
-                  <FileText size={15} /> Solicitar NF
-                </button>
-              ) : (
-                <button onClick={() => !viagemBloqueada && onAction('concluir', sol)} disabled={viagemBloqueada}
-                  className={`flex-1 py-3 rounded-xl text-sm font-bold transition-all flex items-center justify-center gap-2 ${
-                    viagemBloqueada ? 'bg-slate-200 text-slate-400 cursor-not-allowed' : 'bg-emerald-600 text-white hover:bg-emerald-700'
-                  }`}>
-                  <CheckCircle2 size={15} /> Concluir Expedição
-                </button>
-              )
-            })()}
+            {sol.status === 'romaneio_emitido' && (
+              <>
+                {(fiscalCtx.regra === 'romaneio' || fiscalCtx.regra === 'indefinido') && (
+                  <button onClick={() => onAction('emitirRomaneio', sol)} className="flex-1 py-3 rounded-xl bg-blue-600 text-white text-sm font-bold hover:bg-blue-700 transition-all flex items-center justify-center gap-2">
+                    <ScrollText size={15} /> Emitir Romaneio
+                  </button>
+                )}
+                {(fiscalCtx.regra === 'nf' || fiscalCtx.regra === 'indefinido') && (
+                  <button onClick={() => onAction('solicitarNF', sol)} className="flex-1 py-3 rounded-xl bg-amber-600 text-white text-sm font-bold hover:bg-amber-700 transition-all flex items-center justify-center gap-2">
+                    <FileText size={15} /> Solicitar NF
+                  </button>
+                )}
+                {hasRomaneioDocumento(sol) && (
+                  <button onClick={() => !viagemBloqueada && onAction('concluir', sol)} disabled={viagemBloqueada}
+                    className={`flex-1 py-3 rounded-xl text-sm font-bold transition-all flex items-center justify-center gap-2 ${
+                      viagemBloqueada ? 'bg-slate-200 text-slate-400 cursor-not-allowed' : 'bg-emerald-600 text-white hover:bg-emerald-700'
+                    }`}>
+                    <CheckCircle2 size={15} /> Concluir Expedição
+                  </button>
+                )}
+              </>
+            )}
             {sol.status === 'nfe_emitida' && (
               <button onClick={() => !viagemBloqueada && onAction('concluir', sol)} disabled={viagemBloqueada}
                 className={`flex-1 py-3 rounded-xl text-sm font-bold transition-all flex items-center justify-center gap-2 ${
@@ -638,7 +646,6 @@ export default function ExpedicaoPipeline() {
     const map = new Map<StatusExpedicaoPipeline, LogSolicitacao[]>()
     for (const s of EXPEDICAO_PIPELINE_STAGES) map.set(s.status, [])
     for (const sol of solicitacoes) {
-      if (sol.status !== 'aprovado') continue
       const arr = map.get(sol.status as StatusExpedicaoPipeline)
       if (arr) arr.push(sol)
     }
@@ -730,10 +737,26 @@ export default function ExpedicaoPipeline() {
     } catch { showToast('error', 'Erro ao emitir romaneio') }
   }
 
+  const handleDespachar = async (ids: string[]) => {
+    try {
+      const updatedAt = new Date().toISOString()
+      for (const id of ids) {
+        const { error } = await supabase
+          .from('log_solicitacoes')
+          .update({ status: 'romaneio_emitido', updated_at: updatedAt })
+          .eq('id', id)
+        if (error) throw error
+      }
+      qc.invalidateQueries({ queryKey: ['log_solicitacoes'] })
+      showToast('success', `${ids.length} carga(s) despachada(s) para preparação documental`)
+      setSelectedIds(new Set())
+    } catch { showToast('error', 'Erro ao despachar cargas') }
+  }
+
   const handleBulkAction = () => {
     const ids = Array.from(selectedIds)
     if (ids.length === 0) return
-    if (activeTab === 'aprovado') handleEmitirRomaneio(ids)
+    if (activeTab === 'aprovado') handleDespachar(ids)
   }
 
   const handleSolicitarNF = async (sol: LogSolicitacao) => {
@@ -755,7 +778,7 @@ export default function ExpedicaoPipeline() {
   const handleDetailAction = async (action: string, sol: LogSolicitacao) => {
     closeDetail()
     if (action === 'emitirRomaneio') handleEmitirRomaneio([sol.id])
-    if (action === 'despachar') handleEmitirRomaneio([sol.id])
+    if (action === 'despachar') handleDespachar([sol.id])
     if (action === 'solicitarNF') setNfModal(sol)
     if (action === 'concluir') {
       const updatedAt = new Date().toISOString()
@@ -786,7 +809,7 @@ export default function ExpedicaoPipeline() {
   }
 
   const BULK_ACTIONS: Partial<Record<StatusExpedicaoPipeline, { label: string; icon: typeof CheckCircle2; className: string }>> = {
-    aprovado: { label: 'Emitir Romaneio', icon: ScrollText, className: 'bg-blue-600 hover:bg-blue-700 text-white' },
+    aprovado: { label: 'Despachar', icon: Truck, className: 'bg-emerald-600 hover:bg-emerald-700 text-white' },
   }
   const bulk = BULK_ACTIONS[activeTab]
   const selectedInTab = activeItems.filter(s => selectedIds.has(s.id))
@@ -807,7 +830,7 @@ export default function ExpedicaoPipeline() {
             <Package2 size={20} className="text-orange-600" /> {'Expedi\u00e7\u00e3o'}
           </h1>
           <p className={`text-xs mt-0.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
-            {`${Array.from(grouped.values()).reduce((sum, items) => sum + items.length, 0)} solicita\u00e7\u00f5es na expedi\u00e7\u00e3o`}
+            {`${solicitacoes.filter(s => ['aprovado','romaneio_emitido','nfe_emitida'].includes(s.status)).length} solicita\u00e7\u00f5es na expedi\u00e7\u00e3o`}
           </p>
         </div>
       </div>
