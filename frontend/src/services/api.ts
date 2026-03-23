@@ -61,12 +61,27 @@ export interface ParseCotacaoResult {
     fornecedor_nome: string
     fornecedor_cnpj?: string
     fornecedor_contato?: string
+    matched_supplier_id?: string
+    supplier_match_status?: 'matched' | 'suggested' | 'new'
+    supplier_confidence?: number
     valor_total: number
     prazo_entrega_dias?: number
     condicao_pagamento?: string
-    itens?: { descricao: string; qtd: number; valor_unitario: number; valor_total: number }[]
+    itens?: {
+      descricao: string
+      qtd: number
+      valor_unitario: number
+      valor_total: number
+      matched_item_id?: string
+      matched_item_codigo?: string
+      match_status?: 'auto_match' | 'review' | 'unmatched'
+      confidence?: number
+      linha_original?: string
+    }[]
     observacao?: string
   }[]
+  warnings?: string[]
+  parser_confidence?: number
 }
 
 export const api = {
@@ -88,7 +103,13 @@ export const api = {
   submeterCotacao: (data: NovaCotacaoPayload) =>
     request<unknown>('/compras/cotacao', { method: 'POST', body: JSON.stringify(data) }),
 
-  parseCotacaoFile: (data: { file_base64: string; file_name: string; mime_type: string }) =>
+  parseCotacaoFile: (data: {
+    file_base64: string
+    file_name: string
+    mime_type: string
+    cotacao_id?: string
+    requisicao_id?: string
+  }) =>
     request<ParseCotacaoResult>('/compras/parse-cotacao', {
       method: 'POST',
       body: JSON.stringify(data),

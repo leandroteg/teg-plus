@@ -6,7 +6,7 @@ import {
   Paperclip, ExternalLink, Download, ArrowUpDown, LayoutList,
   LayoutGrid, Filter, SortAsc, SortDesc, ArrowDown, ArrowUp, Send, MessageSquare, XCircle,
   ChevronLeft, ChevronRight, ArrowRight,
-  Save, Loader2, RefreshCw,
+  Plus, Save, Loader2, RefreshCw,
 } from 'lucide-react'
 import { useQueryClient } from '@tanstack/react-query'
 import { useNavigate, useSearchParams } from 'react-router-dom'
@@ -221,7 +221,6 @@ type NovaSolicitacaoExtraForm = {
   centro_custo: string
   classe_financeira: string
   valor: string
-  data_necessidade: string
   fornecedor_id: string
   fornecedor_cnpj: string
   favorecido: string
@@ -251,7 +250,6 @@ const EMPTY_EXTRA_FORM: NovaSolicitacaoExtraForm = {
   centro_custo: '',
   classe_financeira: '',
   valor: '',
-  data_necessidade: new Date().toISOString().split('T')[0],
   fornecedor_id: '',
   fornecedor_cnpj: '',
   favorecido: '',
@@ -281,13 +279,6 @@ function summarizeNames(values: string[], fallback: string) {
   return `${unique[0]} + ${unique.length - 1}`
 }
 
-function formatFormaPagamentoLabel(value?: string | null) {
-  if (!value) return ''
-  return value
-    .replace(/_/g, ' ')
-    .replace(/\b\w/g, char => char.toUpperCase())
-}
-
 function getLoteProgress(activeTab: PipelineStageId, loteStatus?: string) {
   switch (activeTab) {
     case 'em_lote':
@@ -315,22 +306,8 @@ type QuickFilterId = 'all' | 'overdue' | 'today' | 'week' | 'this_month' | 'next
 type StatusHintTone = 'amber' | 'rose' | 'sky'
 type StatusHint = { text: string; tone: StatusHintTone }
 const CP_TABLE_GRID = 'grid grid-cols-[20px_2px_minmax(0,1.8fr)_minmax(0,1.45fr)_minmax(0,1fr)_70px_110px_72px_96px] items-center gap-x-3'
-const LOTE_TABLE_GRID = 'grid grid-cols-[20px_2px_150px_minmax(0,1.8fr)_80px_100px_136px_220px] items-center gap-x-4'
+const LOTE_TABLE_GRID = 'grid grid-cols-[20px_2px_150px_minmax(0,1.8fr)_80px_100px_120px_190px] items-center gap-x-3'
 const LOTE_STAGE_TABS: PipelineStageId[] = ['em_lote', 'em_aprovacao', 'aprovado_pgto', 'em_pagamento']
-const LOTE_ACTION_BUTTON_CLASS = 'inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-xl px-2.5 py-1.5 text-[10px] font-bold leading-none text-white transition-all disabled:opacity-60 disabled:cursor-not-allowed'
-const LOTE_TOGGLE_BUTTON_CLASS = 'inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-xl border px-2.5 py-1.5 text-[10px] font-semibold'
-
-type LoteActionConfig = {
-  label: string
-  compactLabel?: string
-  title?: string
-  onClick: () => void
-  tone: string
-  icon: typeof Send
-  loading?: boolean
-  disabled?: boolean
-  iconOnly?: boolean
-}
 
 type LoteStageSummary = {
   lote: LotePagamento
@@ -356,7 +333,6 @@ const CP_PIPELINE_VIEW_STAGES: Array<{ status: PipelineStageId; label: string; c
   { status: 'em_pagamento', label: 'Em Processamento', color: 'sky', borderColor: 'border-t-sky-500' },
   ...CP_PIPELINE_STAGES.filter(stage => ['pago', 'conciliado', 'cancelado'].includes(stage.status)),
 ]
-const CP_PROGRESS_STAGES = CP_PIPELINE_STAGES.filter(stage => stage.status !== 'cancelado')
 
 const SORT_OPTIONS: { field: SortField; label: string }[] = [
   { field: 'vencimento', label: 'Vencimento' },
@@ -794,7 +770,6 @@ function NovaSolicitacaoExtraordinariaModal({
     && form.centro_custo.length > 0
     && form.classe_financeira.length > 0
     && Number(form.valor) > 0
-    && form.data_necessidade.length > 0
     && form.fornecedor_id.length > 0
 
   const inputCls = `w-full rounded-xl px-3 py-2.5 text-sm outline-none transition-colors ${
@@ -917,7 +892,6 @@ function NovaSolicitacaoExtraordinariaModal({
         centro_custo: form.centro_custo,
         classe_financeira: form.classe_financeira,
         valor: Number(form.valor),
-        dataNecessidade: form.data_necessidade,
         solicitanteNome: perfil?.nome,
         fornecedorId: form.fornecedor_id || undefined,
         fornecedorNome: form.favorecido || undefined,
@@ -1077,15 +1051,9 @@ function NovaSolicitacaoExtraordinariaModal({
             </div>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div>
-              <label className={labelCls}>Valor *</label>
-              <input type="number" min="0" step="0.01" value={form.valor} onChange={e => setField('valor', e.target.value)} className={inputCls} placeholder="0,00" />
-            </div>
-            <div>
-              <label className={labelCls}>Data da necessidade *</label>
-              <input type="date" value={form.data_necessidade} onChange={e => setField('data_necessidade', e.target.value)} className={inputCls} />
-            </div>
+          <div>
+            <label className={labelCls}>Valor *</label>
+            <input type="number" min="0" step="0.01" value={form.valor} onChange={e => setField('valor', e.target.value)} className={inputCls} placeholder="0,00" />
           </div>
 
           <div className={`rounded-xl border p-4 space-y-3 ${isDark ? 'border-white/[0.08] bg-white/[0.03]' : 'border-slate-200 bg-slate-50/70'}`}>
@@ -1218,7 +1186,7 @@ function NovaSolicitacaoExtraordinariaModal({
 
           {!canSubmit && (
             <p className={`text-[11px] ${isDark ? 'text-amber-300' : 'text-amber-700'}`}>
-              Preencha descrição, justificativa, centro de custo, classe financeira, valor, data da necessidade e selecione/cadastre o fornecedor para liberar a criação.
+              Preencha descrição, justificativa, centro de custo, classe financeira, valor e selecione/cadastre o fornecedor para liberar a criação.
             </p>
           )}
           {erro && (
@@ -1609,14 +1577,6 @@ function CPDetailModal({ cp, stageStatus, onClose, onAction, isDark }: {
   const canDirectApproveCurrent = isApprovalStage && perfil?.role === 'admin' && !approval
   const canApproveCurrent = isApprovalStage && (perfil?.role === 'admin' || (!!approval && canApprove(approval.nivel)) || canDirectApproveCurrent)
   const stage = CP_PIPELINE_VIEW_STAGES.find(s => s.status === stageStatus)
-  const progressStageStatus = stageStatus === 'em_aprovacao'
-    ? 'em_lote'
-    : stageStatus === 'cancelado'
-      ? null
-      : stageStatus
-  const currentProgressIdx = progressStageStatus
-    ? CP_PROGRESS_STAGES.findIndex(st => st.status === progressStageStatus)
-    : -1
   const isLoteApproval = !!approvalLoteId && approvalItems.length > 0
   const canUploadPedidoAnexo = !!cp.pedido_id && (
     stageStatus === 'previsto'
@@ -1827,8 +1787,9 @@ function CPDetailModal({ cp, stageStatus, onClose, onAction, isDark }: {
           <div className={`rounded-xl p-3 ${isDark ? 'bg-white/[0.04]' : 'bg-slate-50'}`}>
             <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-2">Progresso</p>
             <div className="flex items-center gap-0.5">
-              {CP_PROGRESS_STAGES.map((s, i) => {
-                const isPast = i <= currentProgressIdx
+              {CP_PIPELINE_STAGES.map((s, i) => {
+                const currentIdx = CP_PIPELINE_STAGES.findIndex(st => st.status === (stageStatus === 'em_aprovacao' ? 'em_lote' : stageStatus))
+                const isPast = i <= currentIdx
                 const accent = STATUS_ACCENT[s.status]
                 return (
                   <div key={s.status} className="flex-1">
@@ -2406,8 +2367,8 @@ function LoteTableRow({
   onSelectMany: (ids: string[]) => void
   onToggleExpand: () => void
   onOpenCP: (cp: ContaPagar) => void
-  onPrimaryAction?: LoteActionConfig
-  onSecondaryAction?: LoteActionConfig
+  onPrimaryAction?: { label: string; onClick: () => void; tone: string; icon: typeof Send; loading?: boolean; disabled?: boolean }
+  onSecondaryAction?: { label: string; onClick: () => void; tone: string; icon: typeof Banknote; loading?: boolean; disabled?: boolean }
 }) {
   const isMultiItemLote = summary.totalItems > 1
   const resumoTitle = isMultiItemLote ? summary.headerLabel : summary.supplierLabel
@@ -2446,23 +2407,23 @@ function LoteTableRow({
         </button>
         <span className={`text-sm font-bold ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>{summary.totalItems}</span>
         <span className={`text-sm font-bold ${isDark ? 'text-emerald-300' : 'text-emerald-700'}`}>{summary.approvedItems}</span>
-        <span className="pr-4 text-sm font-extrabold text-emerald-600">{fmt(summary.visibleValue || summary.totalValue)}</span>
-        <div className="flex items-center justify-end gap-1.5 whitespace-nowrap pl-5">
+        <span className="text-sm font-extrabold text-emerald-600">{fmt(summary.visibleValue || summary.totalValue)}</span>
+        <div className="flex items-center justify-end gap-2">
           {onPrimaryAction && (
-            <button type="button" onClick={onPrimaryAction.onClick} disabled={onPrimaryAction.loading || onPrimaryAction.disabled} title={onPrimaryAction.title ?? onPrimaryAction.label}
-              className={`${LOTE_ACTION_BUTTON_CLASS} ${onPrimaryAction.iconOnly ? 'min-w-[30px] justify-center px-2' : ''} ${onPrimaryAction.tone}`}>
+            <button type="button" onClick={onPrimaryAction.onClick} disabled={onPrimaryAction.loading || onPrimaryAction.disabled}
+              className={`inline-flex items-center gap-1.5 rounded-xl px-3 py-2 text-[11px] font-bold text-white transition-all disabled:opacity-60 disabled:cursor-not-allowed ${onPrimaryAction.tone}`}>
               {onPrimaryAction.loading ? <RefreshCw size={12} className="animate-spin" /> : <onPrimaryAction.icon size={12} />}
-              {!onPrimaryAction.iconOnly && (onPrimaryAction.loading ? 'Enviando...' : (onPrimaryAction.compactLabel ?? onPrimaryAction.label))}
+              {onPrimaryAction.loading ? 'Enviando...' : onPrimaryAction.label}
             </button>
           )}
           {onSecondaryAction && (
-            <button type="button" onClick={onSecondaryAction.onClick} disabled={onSecondaryAction.loading || onSecondaryAction.disabled} title={onSecondaryAction.title ?? onSecondaryAction.label}
-              className={`${LOTE_ACTION_BUTTON_CLASS} ${onSecondaryAction.iconOnly ? 'min-w-[30px] justify-center px-2' : ''} ${onSecondaryAction.tone}`}>
+            <button type="button" onClick={onSecondaryAction.onClick} disabled={onSecondaryAction.loading || onSecondaryAction.disabled}
+              className={`inline-flex items-center gap-1.5 rounded-xl px-3 py-2 text-[11px] font-bold text-white transition-all disabled:opacity-60 disabled:cursor-not-allowed ${onSecondaryAction.tone}`}>
               {onSecondaryAction.loading ? <RefreshCw size={12} className="animate-spin" /> : <onSecondaryAction.icon size={12} />}
-              {!onSecondaryAction.iconOnly && (onSecondaryAction.loading ? 'Processando...' : (onSecondaryAction.compactLabel ?? onSecondaryAction.label))}
+              {onSecondaryAction.loading ? 'Processando...' : onSecondaryAction.label}
             </button>
           )}
-          <button type="button" onClick={onToggleExpand} className={`${LOTE_TOGGLE_BUTTON_CLASS} ${isDark ? 'border-white/[0.08] text-slate-200 hover:bg-white/[0.04]' : 'border-slate-200 text-slate-600 hover:bg-white'}`}>
+          <button type="button" onClick={onToggleExpand} className={`inline-flex items-center gap-1 rounded-xl border px-3 py-2 text-[11px] font-semibold ${isDark ? 'border-white/[0.08] text-slate-200 hover:bg-white/[0.04]' : 'border-slate-200 text-slate-600 hover:bg-white'}`}>
             {expanded ? 'Ocultar' : 'Itens'}
           </button>
         </div>
@@ -2490,8 +2451,8 @@ function LoteCard({
   expanded: boolean
   onToggleExpand: () => void
   onOpenCP: (cp: ContaPagar) => void
-  onPrimaryAction?: LoteActionConfig
-  onSecondaryAction?: LoteActionConfig
+  onPrimaryAction?: { label: string; onClick: () => void; tone: string; icon: typeof Send; loading?: boolean; disabled?: boolean }
+  onSecondaryAction?: { label: string; onClick: () => void; tone: string; icon: typeof Banknote; loading?: boolean; disabled?: boolean }
 }) {
   return (
     <div className={`rounded-2xl border p-4 ${isDark ? 'border-white/[0.06] bg-white/[0.02]' : 'border-slate-200 bg-white'}`}>
@@ -2517,21 +2478,21 @@ function LoteCard({
       <div className="mt-4 flex flex-wrap items-center justify-between gap-2">
         <div className="flex flex-wrap gap-2">
           {onPrimaryAction && (
-            <button type="button" onClick={onPrimaryAction.onClick} disabled={onPrimaryAction.loading || onPrimaryAction.disabled} title={onPrimaryAction.title ?? onPrimaryAction.label}
-              className={`${LOTE_ACTION_BUTTON_CLASS} ${onPrimaryAction.iconOnly ? 'min-w-[30px] justify-center px-2' : ''} ${onPrimaryAction.tone}`}>
+            <button type="button" onClick={onPrimaryAction.onClick} disabled={onPrimaryAction.loading || onPrimaryAction.disabled}
+              className={`inline-flex items-center gap-1.5 rounded-xl px-3 py-2 text-[11px] font-bold text-white transition-all disabled:opacity-60 disabled:cursor-not-allowed ${onPrimaryAction.tone}`}>
               {onPrimaryAction.loading ? <RefreshCw size={12} className="animate-spin" /> : <onPrimaryAction.icon size={12} />}
-              {!onPrimaryAction.iconOnly && (onPrimaryAction.loading ? 'Enviando...' : (onPrimaryAction.compactLabel ?? onPrimaryAction.label))}
+              {onPrimaryAction.loading ? 'Enviando...' : onPrimaryAction.label}
             </button>
           )}
           {onSecondaryAction && (
-            <button type="button" onClick={onSecondaryAction.onClick} disabled={onSecondaryAction.loading || onSecondaryAction.disabled} title={onSecondaryAction.title ?? onSecondaryAction.label}
-              className={`${LOTE_ACTION_BUTTON_CLASS} ${onSecondaryAction.iconOnly ? 'min-w-[30px] justify-center px-2' : ''} ${onSecondaryAction.tone}`}>
+            <button type="button" onClick={onSecondaryAction.onClick} disabled={onSecondaryAction.loading || onSecondaryAction.disabled}
+              className={`inline-flex items-center gap-1.5 rounded-xl px-3 py-2 text-[11px] font-bold text-white transition-all disabled:opacity-60 disabled:cursor-not-allowed ${onSecondaryAction.tone}`}>
               {onSecondaryAction.loading ? <RefreshCw size={12} className="animate-spin" /> : <onSecondaryAction.icon size={12} />}
-              {!onSecondaryAction.iconOnly && (onSecondaryAction.loading ? 'Processando...' : (onSecondaryAction.compactLabel ?? onSecondaryAction.label))}
+              {onSecondaryAction.loading ? 'Processando...' : onSecondaryAction.label}
             </button>
           )}
         </div>
-        <button type="button" onClick={onToggleExpand} className={`${LOTE_TOGGLE_BUTTON_CLASS} ${isDark ? 'border-white/[0.08] text-slate-200 hover:bg-white/[0.04]' : 'border-slate-200 text-slate-600 hover:bg-slate-50'}`}>
+        <button type="button" onClick={onToggleExpand} className={`inline-flex items-center gap-1 rounded-xl border px-3 py-2 text-[11px] font-semibold ${isDark ? 'border-white/[0.08] text-slate-200 hover:bg-white/[0.04]' : 'border-slate-200 text-slate-600 hover:bg-slate-50'}`}>
           {expanded ? 'Ocultar itens' : 'Ver itens'}
         </button>
       </div>
@@ -2565,21 +2526,40 @@ export default function CPPipeline() {
   // Per-tab filter memory: preserves busca and quickFilter when switching tabs (#134)
   const tabFiltersRef = useRef<Map<PipelineStageId, { busca: string; quickFilter: QuickFilterId }>>(new Map())
   const [showNovaSolicitacao, setShowNovaSolicitacao] = useState(false)
+  const [showNovaMenu, setShowNovaMenu] = useState(false)
   const [pagModal, setPagModal] = useState<{ cpIds: string[]; pedidoId?: string } | null>(null)
   const [pagData, setPagData] = useState(new Date().toISOString().split('T')[0])
   const [pagFile, setPagFile] = useState<File | null>(null)
   const [pagUploading, setPagUploading] = useState(false)
   const [novaSolicitacaoKind, setNovaSolicitacaoKind] = useState<NovaSolicitacaoKind | null>(null)
   const [expandedLoteIds, setExpandedLoteIds] = useState<Set<string>>(new Set())
+  const novaMenuRef = useRef<HTMLDivElement | null>(null)
 
   useEffect(() => {
     const novaIntent = searchParams.get('nova')
     if (novaIntent === 'extraordinario' || novaIntent === 'previsao') {
       setNovaSolicitacaoKind(novaIntent)
       setShowNovaSolicitacao(true)
+      setShowNovaMenu(false)
+      setSearchParams({}, { replace: true })
+      return
+    }
+    if (novaIntent) {
+      setShowNovaMenu(true)
       setSearchParams({}, { replace: true })
     }
   }, [searchParams, setSearchParams])
+
+  useEffect(() => {
+    if (!showNovaMenu) return
+    const handleClickOutside = (event: MouseEvent) => {
+      if (!novaMenuRef.current?.contains(event.target as Node)) {
+        setShowNovaMenu(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [showNovaMenu])
 
   // Data
   const { data: contas = [], isLoading } = useContasPagar()
@@ -2599,26 +2579,6 @@ export default function CPPipeline() {
     () => new Map(contas.map(cp => [cp.id, cp])),
     [contas],
   )
-
-  const pagCpSelecionadas = useMemo(
-    () => pagModal?.cpIds
-      .map(id => contasById.get(id))
-      .filter((cp): cp is ContaPagar => !!cp) ?? [],
-    [contasById, pagModal],
-  )
-
-  const pagFormaPagamentoLabel = useMemo(() => {
-    const formas = Array.from(new Set(
-      pagCpSelecionadas
-        .map(cp => cp.forma_pagamento?.trim().toLowerCase())
-        .filter((forma): forma is string => !!forma),
-    ))
-
-    if (formas.length === 0) return ''
-    if (formas.length === 1) return formatFormaPagamentoLabel(formas[0])
-    if (formas.includes('boleto')) return 'Múltiplas (inclui Boleto)'
-    return 'Múltiplas'
-  }, [pagCpSelecionadas])
 
   const lotesById = useMemo(
     () => new Map(lotes.map(lote => [lote.id, lote])),
@@ -3080,7 +3040,6 @@ export default function CPPipeline() {
         return {
           primary: {
             label: 'Enviar aprovação',
-            compactLabel: 'Aprovação',
             onClick: () => handleEnviarLotesAprovacao(summary.cpIds),
             tone: 'bg-amber-500 hover:bg-amber-600',
             icon: Send,
@@ -3092,7 +3051,6 @@ export default function CPPipeline() {
         return {
           primary: {
             label: 'Enviar remessa',
-            compactLabel: 'Remessa',
             onClick: () => handleEnviarRemessa(summary.cpIds),
             tone: 'bg-sky-600 hover:bg-sky-700',
             icon: Send,
@@ -3101,8 +3059,6 @@ export default function CPPipeline() {
           },
           secondary: {
             label: 'Registrar pgto',
-            compactLabel: 'Pgto',
-            title: 'Registrar pagamento',
             onClick: () => handlePagar(summary.cpIds),
             tone: 'bg-emerald-600 hover:bg-emerald-700',
             icon: Banknote,
@@ -3114,27 +3070,20 @@ export default function CPPipeline() {
           ? {
               primary: {
                 label: 'Pagar no Omie',
-                compactLabel: 'Omie',
                 onClick: () => window.open('https://app.omie.com.br', '_blank'),
                 tone: 'bg-indigo-600 hover:bg-indigo-700',
                 icon: ExternalLink,
               },
               secondary: {
                 label: 'Sincronizar',
-                title: 'Sincronizar com Omie',
                 onClick: () => handleSincronizarOmie(summary.cpIds),
                 tone: 'bg-sky-600 hover:bg-sky-700',
                 icon: RefreshCw,
-                loading: syncRemessasMut.isPending,
-                disabled: syncRemessasMut.isPending,
-                iconOnly: true,
               },
             }
           : {
               primary: {
                 label: 'Registrar Pgto',
-                compactLabel: 'Pgto',
-                title: 'Registrar pagamento',
                 onClick: () => handleConfirmarPagamento(summary.cpIds),
                 tone: 'bg-teal-600 hover:bg-teal-700',
                 icon: Banknote,
@@ -3252,14 +3201,6 @@ export default function CPPipeline() {
                 <input type="date" value={pagData} onChange={e => setPagData(e.target.value)}
                   className={`w-full mt-1 px-3 py-2 rounded-xl text-sm border ${isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-50 border-slate-200 text-slate-800'}`} />
               </div>
-              {pagFormaPagamentoLabel && (
-                <div>
-                  <label className={`text-[10px] font-bold uppercase tracking-wider ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Forma de pagamento</label>
-                  <div className={`mt-1 rounded-xl border px-3 py-2 text-sm font-semibold ${isDark ? 'border-emerald-500/20 bg-emerald-500/10 text-emerald-300' : 'border-emerald-200 bg-emerald-50 text-emerald-700'}`}>
-                    {pagFormaPagamentoLabel}
-                  </div>
-                </div>
-              )}
               {pagModal.pedidoId && (
                 <div>
                   <label className={`text-[10px] font-bold uppercase tracking-wider ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Comprovante (opcional)</label>
@@ -3301,8 +3242,13 @@ export default function CPPipeline() {
         </div>
       )}
 
+      {/* Nova Solicitação modal */}
+      {showNovaMenu && (
+        <div className="fixed inset-0 z-40 bg-black/10" onClick={() => setShowNovaMenu(false)} />
+      )}
+
       {/* Header */}
-      <div className="flex items-center">
+      <div className="flex items-center gap-4">
         <div>
           <h1 className={`text-xl font-extrabold flex items-center gap-2 ${isDark ? 'text-white' : 'text-slate-800'}`}>
             <Receipt size={20} className="text-emerald-600" />
@@ -3311,6 +3257,49 @@ export default function CPPipeline() {
           <p className={`text-xs mt-0.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
             {contas.length} t\u00EDtulos &middot; {fmt(contas.reduce((s, c) => s + c.valor_original, 0))}
           </p>
+        </div>
+        <div ref={novaMenuRef} className="relative z-50">
+          <button
+            type="button"
+            onClick={() => setShowNovaMenu(prev => !prev)}
+            className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2 text-sm font-bold text-white shadow-sm transition-all hover:bg-emerald-700"
+          >
+            <Plus size={15} />
+            <ChevronDown size={15} className={`transition-transform ${showNovaMenu ? 'rotate-180' : ''}`} />
+            Nova Solicitação
+          </button>
+          {showNovaMenu && (
+            <div
+              onClick={e => e.stopPropagation()}
+              className={`absolute left-0 top-full mt-3 w-[360px] max-w-[calc(100vw-2rem)] rounded-3xl border p-3 shadow-2xl ${isDark ? 'border-white/[0.08] bg-slate-900' : 'border-slate-200 bg-white'}`}
+            >
+            <p className={`text-[10px] font-bold uppercase tracking-wider px-4 pt-2 pb-1 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Nova solicitação</p>
+            <button type="button"
+              onClick={() => { setNovaSolicitacaoKind('extraordinario'); setShowNovaSolicitacao(true); setShowNovaMenu(false) }}
+              className={`flex w-full items-start gap-3 rounded-2xl px-4 py-3.5 text-left transition-all ${isDark ? 'hover:bg-white/[0.05]' : 'hover:bg-slate-50'}`}
+            >
+              <span className={`mt-0.5 flex h-10 w-10 items-center justify-center rounded-2xl shrink-0 ${isDark ? 'bg-amber-500/15 text-amber-300' : 'bg-amber-50 text-amber-600'}`}>
+                <Receipt size={16} />
+              </span>
+              <span>
+                <span className={`block text-sm font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>Pagamento Extraordinário</span>
+                <span className={`mt-1 block text-xs leading-relaxed ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Solicitação manual urgente com entrada direta em Confirmados.</span>
+              </span>
+            </button>
+            <button type="button"
+              onClick={() => { setNovaSolicitacaoKind('previsao'); setShowNovaSolicitacao(true); setShowNovaMenu(false) }}
+              className={`flex w-full items-start gap-3 rounded-2xl px-4 py-3.5 text-left transition-all ${isDark ? 'hover:bg-white/[0.05]' : 'hover:bg-slate-50'}`}
+            >
+              <span className={`mt-0.5 flex h-10 w-10 items-center justify-center rounded-2xl shrink-0 ${isDark ? 'bg-emerald-500/15 text-emerald-300' : 'bg-emerald-50 text-emerald-600'}`}>
+                <Calendar size={16} />
+              </span>
+              <span>
+                <span className={`block text-sm font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>Previsão de Pagamento</span>
+                <span className={`mt-1 block text-xs leading-relaxed ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Planejamento de despesas futuras com recorrência opcional.</span>
+              </span>
+            </button>
+            </div>
+          )}
         </div>
       </div>
 
@@ -3633,8 +3622,8 @@ export default function CPPipeline() {
                 <span>Resumo</span>
                 <span>Qtd</span>
                 <span>Aprov.</span>
-                <span className="text-left">Valor</span>
-                <span className="flex justify-center pl-5 pr-4">Ações</span>
+                <span className="text-right">Valor</span>
+                <span className="text-right">Ações</span>
               </div>
               {activeLotes.map(summary => {
                 const actions = buildLoteActions(summary)

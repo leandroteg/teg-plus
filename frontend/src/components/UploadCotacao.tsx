@@ -16,6 +16,8 @@ interface FornecedorParsed {
 interface Props {
   onParsed: (fornecedores: FornecedorParsed[], file: File) => void
   disabled?: boolean
+  cotacaoId?: string
+  requisicaoId?: string
 }
 
 const ACCEPTED = ['image/jpeg', 'image/png', 'image/webp', 'application/pdf']
@@ -23,7 +25,7 @@ const MAX_SIZE = 10 * 1024 * 1024 // 10 MB
 
 type Status = 'idle' | 'processing' | 'success' | 'error'
 
-export default function UploadCotacao({ onParsed, disabled }: Props) {
+export default function UploadCotacao({ onParsed, disabled, cotacaoId, requisicaoId }: Props) {
   const [status, setStatus] = useState<Status>('idle')
   const [error, setError] = useState('')
   const [fileName, setFileName] = useState('')
@@ -66,6 +68,8 @@ export default function UploadCotacao({ onParsed, disabled }: Props) {
           file_base64: base64,
           file_name: file.name,
           mime_type: file.type,
+          cotacao_id: cotacaoId,
+          requisicao_id: requisicaoId,
         })
       } catch (fetchErr) {
         const msg = fetchErr instanceof Error ? fetchErr.message : ''

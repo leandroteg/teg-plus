@@ -659,6 +659,8 @@ export default function CotacaoForm() {
       <UploadCotacao
         onParsed={handleAiParsed}
         disabled={cotacao?.status === 'concluida'}
+        cotacaoId={id}
+        requisicaoId={cotacao?.requisicao_id}
       />
 
       {/* Progresso de fornecedores */}
