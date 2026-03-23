@@ -127,14 +127,14 @@ export default function SearchableSelect({
               value={search}
               onChange={e => setSearch(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder={selected ? selected.label : placeholder}
+              placeholder={selected ? selected.label : value || placeholder}
               className="flex-1 bg-transparent outline-none text-sm text-slate-700 placeholder-slate-400"
               autoFocus
             />
           </div>
         ) : (
-          <span className={`flex-1 truncate ${selected ? 'text-slate-700' : 'text-slate-400'}`}>
-            {selected ? (selected.code ? `${selected.code} — ${selected.label}` : selected.label) : placeholder}
+          <span className={`flex-1 truncate ${selected || value ? 'text-slate-700' : 'text-slate-400'}`}>
+            {selected ? (selected.code ? `${selected.code} — ${selected.label}` : selected.label) : value || placeholder}
           </span>
         )}
         {value && !open ? (
