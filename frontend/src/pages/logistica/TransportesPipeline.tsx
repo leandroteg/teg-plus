@@ -932,7 +932,7 @@ export default function TransportesPipeline() {
   })
 
   const { data: solicitacoes = [], isLoading } = useSolicitacoes({
-    status: ['nfe_emitida', 'romaneio_emitido', 'transporte_pendente', 'aguardando_coleta', 'em_transito', 'entregue', 'concluido'],
+    status: ['nfe_emitida', 'romaneio_emitido', 'aguardando_coleta', 'em_transito', 'entregue', 'concluido'],
   })
   const confirmarEntrega = useConfirmarEntregaFisica()
   const confirmarAgendamento = useConfirmarAgendamento()

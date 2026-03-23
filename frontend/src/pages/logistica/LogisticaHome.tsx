@@ -51,7 +51,7 @@ const TIPO_LABEL: Record<string, string> = {
   transferencia_maquina: 'Transf. maquina',
 }
 
-const OPERATIONAL_STATUSES = ['planejado', 'aprovado', 'nfe_emitida', 'romaneio_emitido', 'transporte_pendente', 'aguardando_coleta', 'em_transito'] as const
+const OPERATIONAL_STATUSES = ['planejado', 'aprovado', 'nfe_emitida', 'romaneio_emitido', 'aguardando_coleta', 'em_transito'] as const
 
 function parseDate(value?: string) {
   if (!value) return 0
@@ -118,7 +118,7 @@ export default function LogisticaHome() {
     status: ['solicitado', 'planejado', 'aguardando_aprovacao'],
   })
   const { data: operacionais = [] } = useSolicitacoes({ status: [...OPERATIONAL_STATUSES] })
-  const { data: aguardandoColeta = [] } = useSolicitacoes({ status: ['nfe_emitida', 'romaneio_emitido', 'transporte_pendente', 'aguardando_coleta'] })
+  const { data: aguardandoColeta = [] } = useSolicitacoes({ status: ['nfe_emitida', 'romaneio_emitido', 'aguardando_coleta'] })
   const { data: transportesAtivos = [] } = useTransportes()
 
   const operationalView = useMemo(() => {

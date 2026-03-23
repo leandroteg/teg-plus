@@ -194,7 +194,7 @@ export default function Solicitacoes() {
           {[
             ['solicitado','Solicitado'],['validando','Validando'],['planejado','Planejado'],
             ['aguardando_aprovacao','Aguard. Aprovação'],['aprovado','Aprovado'],
-            ['nfe_emitida','NF-e Emitida'],['transporte_pendente','Transp. Pendente'],['em_transito','Em Trânsito'],
+            ['nfe_emitida','NF-e Emitida'],['em_transito','Em Trânsito'],
             ['entregue','Entregue'],['confirmado','Confirmado'],['concluido','Concluído'],
             ['recusado','Recusado'],['cancelado','Cancelado'],
           ].map(([v, l]) => <option key={v} value={v}>{l}</option>)}
