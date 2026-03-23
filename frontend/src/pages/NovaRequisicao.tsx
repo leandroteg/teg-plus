@@ -8,7 +8,6 @@ import {
 } from 'lucide-react'
 import { useCriarRequisicao } from '../hooks/useRequisicoes'
 import { useAiParse, readFileForAi, isBinaryFile, isImageFile } from '../hooks/useAiParse'
-import { api } from '../services/api'
 import { useCategorias } from '../hooks/useCategorias'
 import { useLookupObras } from '../hooks/useLookups'
 import { useAuth } from '../contexts/AuthContext'
@@ -317,55 +316,32 @@ export default function NovaRequisicao() {
     setRefParsing(true)
     setRefParseMsg(null)
     try {
-      // Converter arquivo para base64
-      const base64 = await new Promise<string>((resolve, reject) => {
-        const reader = new FileReader()
-        reader.onload = () => resolve((reader.result as string).split(',')[1])
-        reader.onerror = reject
-        reader.readAsDataURL(referenciaFile)
-      })
+      const fileData = await readFileForAi(referenciaFile)
+      const payload: { texto: string; solicitante_nome?: string; arquivo?: { base64: string; nome: string; mime: string } } = {
+        texto: `Extrair itens, quantidades, unidades e valores desta cotação/proposta comercial: ${referenciaFile.name}`,
+        solicitante_nome: perfil?.nome || solicitante,
+      }
+      if (fileData.arquivo) {
+        payload.arquivo = fileData.arquivo
+      } else if (fileData.texto) {
+        payload.texto += `\n\nConteúdo do arquivo:\n${fileData.texto}`
+      }
 
-      // Usar endpoint parse-cotacao (mais robusto para cotações/propostas)
-      const result = await api.parseCotacaoFile({
-        file_base64: base64,
-        file_name: referenciaFile.name,
-        mime_type: referenciaFile.type,
-      })
+      const result: AiParseResult = await aiParse.mutateAsync(payload)
+      const sanitized = sanitizeItems(result.itens)
 
-      if (result.success && result.fornecedores?.length > 0) {
-        // Converter fornecedores parsed para itens da requisição
-        const allItens = result.fornecedores.flatMap((f: { itens?: { descricao: string; qtd: number; valor_unitario: number }[] }) =>
-          (f.itens || []).map(i => ({
-            descricao: i.descricao,
-            quantidade: i.qtd || 1,
-            unidade: 'un' as const,
-            valor_unitario_estimado: i.valor_unitario || 0,
-          }))
-        )
-        const sanitized = sanitizeItems(allItens.length > 0 ? allItens : [])
-
-        if (sanitized.length > 0 && sanitized.some(i => i.descricao.trim())) {
-          // Aplicar itens diretamente no formulário
-          setItens(sanitized)
-          // Preencher fornecedor se disponível
-          const forn = result.fornecedores[0]
-          if (forn?.fornecedor_nome && !descricao.trim()) {
-            setDescricao(`Cotação ref: ${forn.fornecedor_nome}${forn.fornecedor_cnpj ? ` (${forn.fornecedor_cnpj})` : ''}`)
-          }
-          setRefParseMsg({ type: 'success', text: `${sanitized.length} itens preenchidos de ${result.fornecedores.length} fornecedor(es)` })
-        } else {
-          setRefParseMsg({ type: 'error', text: 'IA não conseguiu extrair itens. Tente imagem mais nítida ou preencha manualmente.' })
-        }
+      if (sanitized.length > 0 && sanitized.some(i => i.descricao.trim())) {
+        // Mostra preview antes de aplicar
+        setAiPreview(result)
+        setPreviewItens(sanitized)
+        setShowPreview(true)
+        setRefParseMsg({ type: 'success', text: `${sanitized.length} itens extraídos do arquivo` })
       } else {
-        setRefParseMsg({ type: 'error', text: result.error || 'Não foi possível extrair dados do documento.' })
+        setRefParseMsg({ type: 'error', text: 'Não foi possível extrair itens do arquivo. Tente usar o Assistente IA no passo anterior.' })
       }
     } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Erro ao processar o arquivo.'
-      if (msg.includes('Failed to fetch') || msg.includes('NetworkError')) {
-        setRefParseMsg({ type: 'error', text: 'Serviço de IA indisponível. Preencha os itens manualmente.' })
-      } else {
-        setRefParseMsg({ type: 'error', text: msg })
-      }
+      const msg = err instanceof Error ? err.message : 'Erro ao processar o arquivo. Tente novamente.'
+      setRefParseMsg({ type: 'error', text: msg })
     }
     setRefParsing(false)
   }
@@ -520,6 +496,308 @@ export default function NovaRequisicao() {
         )}
       </div>
 
+      {/* ── AI Helper (Optional, Collapsible) ─────────────────────────────── */}
+      <div className={`rounded-2xl border overflow-hidden transition-all duration-300 ${
+        showAiHelper
+          ? 'border-violet-200 bg-violet-50/20 shadow-sm shadow-violet-100'
+          : 'border-slate-200 bg-white hover:border-violet-200'
+      }`}>
+        <button
+          type="button"
+          onClick={() => setShowAiHelper(!showAiHelper)}
+          className="w-full flex items-center justify-between px-4 py-3 text-left group"
+        >
+          <div className="flex items-center gap-3">
+            <div className={`w-8 h-8 rounded-xl flex items-center justify-center transition-all duration-300 ${
+              showAiHelper
+                ? 'bg-gradient-to-br from-violet-500 to-indigo-500 shadow-md shadow-violet-200'
+                : 'bg-violet-100 group-hover:bg-violet-200'
+            }`}>
+              <Sparkles size={15} className={showAiHelper ? 'text-white' : 'text-violet-500'} />
+            </div>
+            <div>
+              <p className={`text-sm font-bold transition-colors ${
+                showAiHelper ? 'text-violet-700' : 'text-slate-700 group-hover:text-violet-600'
+              }`}>
+                Assistente IA
+              </p>
+              <p className="text-[11px] text-slate-400">
+                Extraia itens de textos ou arquivos automaticamente
+              </p>
+            </div>
+          </div>
+          <div className={`w-6 h-6 rounded-full flex items-center justify-center transition-all duration-300 ${
+            showAiHelper ? 'bg-violet-200 rotate-180' : 'bg-slate-100 group-hover:bg-violet-100'
+          }`}>
+            <ChevronDown size={14} className={showAiHelper ? 'text-violet-600' : 'text-slate-400'} />
+          </div>
+        </button>
+
+        {showAiHelper && (
+          <div className="px-4 pb-4 space-y-3 border-t border-violet-100/60">
+            {/* Text Input */}
+            <div className="pt-3">
+              <label className="text-xs font-semibold text-slate-500 mb-1 block">
+                Descreva sua necessidade
+              </label>
+              <textarea rows={3}
+                className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-violet-300 outline-none resize-none bg-white"
+                placeholder="Ex: 500m de cabo XLPE 15kV e 200 conectores terminais para a SE Frutal, urgente..."
+                value={textoAi} onChange={e => setTextoAi(e.target.value)} />
+            </div>
+
+            {/* File Upload Area */}
+            <div>
+              <label className="text-xs font-semibold text-slate-500 mb-1.5 block">
+                Ou envie um arquivo com a lista de itens
+              </label>
+              <div
+                className={`relative border-2 border-dashed rounded-xl p-5 text-center transition-all cursor-pointer ${
+                  dragOver
+                    ? 'border-violet-400 bg-violet-50 scale-[1.01]'
+                    : selectedFile
+                      ? 'border-violet-300 bg-violet-50/50'
+                      : 'border-slate-200 hover:border-violet-300 hover:bg-violet-50/30'
+                }`}
+                onDragOver={e => { e.preventDefault(); setDragOver(true) }}
+                onDragLeave={() => setDragOver(false)}
+                onDrop={e => {
+                  e.preventDefault()
+                  setDragOver(false)
+                  if (e.dataTransfer.files[0]) setSelectedFile(e.dataTransfer.files[0])
+                }}
+                onClick={() => fileInputRef.current?.click()}
+              >
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  className="hidden"
+                  accept=".pdf,.xlsx,.xls,.csv,.txt,.jpg,.jpeg,.png,.gif,.webp,.heic,.bmp"
+                  onChange={e => {
+                    if (e.target.files?.[0]) setSelectedFile(e.target.files[0])
+                  }}
+                />
+
+                {selectedFile ? (
+                  <div className="flex items-center justify-center gap-3">
+                    <div className={`w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 ${
+                      isImageFile(selectedFile.name) ? 'bg-pink-100' : 'bg-violet-100'
+                    }`}>
+                      {isImageFile(selectedFile.name)
+                        ? <FileImage size={18} className="text-pink-500" />
+                        : <FileUp size={18} className="text-violet-500" />
+                      }
+                    </div>
+                    <div className="text-left min-w-0">
+                      <p className="text-sm font-semibold text-violet-700 truncate">{selectedFile.name}</p>
+                      <p className="text-[10px] text-violet-400">
+                        {(selectedFile.size / 1024).toFixed(1)} KB
+                      </p>
+                    </div>
+                    <button type="button" onClick={e => {
+                      e.stopPropagation()
+                      setSelectedFile(null)
+                      if (fileInputRef.current) fileInputRef.current.value = ''
+                    }}
+                      className="ml-1 w-7 h-7 rounded-full bg-violet-100 hover:bg-red-100 flex items-center justify-center transition-colors flex-shrink-0">
+                      <X size={13} className="text-violet-500 hover:text-red-500" />
+                    </button>
+                  </div>
+                ) : (
+                  <>
+                    <div className="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center mx-auto mb-2">
+                      <Upload size={20} className="text-slate-400" />
+                    </div>
+                    <p className="text-xs text-slate-500">
+                      Arraste um arquivo ou <span className="text-violet-600 font-bold">clique para enviar</span>
+                    </p>
+                    <p className="text-[10px] text-slate-400 mt-1">
+                      Imagem · PDF · Excel · CSV · TXT
+                    </p>
+                  </>
+                )}
+              </div>
+            </div>
+
+            {/* AI Progress Steps Indicator */}
+            {aiProgress !== 'idle' && aiProgress !== 'error' && (
+              <div className="bg-gradient-to-r from-violet-50 to-indigo-50 border border-violet-200 rounded-xl p-3 space-y-2">
+                <div className="flex items-center gap-3">
+                  {[
+                    { key: 'reading', label: 'Lendo arquivo', icon: FileUp },
+                    { key: 'parsing', label: 'Processando IA', icon: Sparkles },
+                    { key: 'done',    label: 'Concluido',      icon: CheckCircle2 },
+                  ].map((s, i) => {
+                    const isActive = s.key === aiProgress
+                    const isDone = (aiProgress === 'parsing' && s.key === 'reading')
+                      || (aiProgress === 'done' && (s.key === 'reading' || s.key === 'parsing'))
+                    const Icon = s.icon
+                    return (
+                      <div key={s.key} className="flex items-center gap-1.5 flex-1 min-w-0">
+                        <div className={`w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 transition-all duration-300 ${
+                          isDone ? 'bg-violet-500' : isActive ? 'bg-violet-400 ring-2 ring-violet-200' : 'bg-slate-200'
+                        }`}>
+                          {isDone ? <Check size={10} strokeWidth={3} className="text-white" />
+                            : isActive ? <Loader2 size={10} className="text-white animate-spin" />
+                            : <Icon size={10} className="text-slate-400" />}
+                        </div>
+                        <span className={`text-[10px] font-semibold truncate ${
+                          isDone ? 'text-violet-600' : isActive ? 'text-violet-700' : 'text-slate-400'
+                        }`}>{s.label}</span>
+                        {i < 2 && <div className={`flex-shrink-0 w-4 h-px ${isDone ? 'bg-violet-400' : 'bg-slate-200'}`} />}
+                      </div>
+                    )
+                  })}
+                </div>
+                {aiProgress === 'parsing' && (
+                  <div className="h-1 bg-violet-100 rounded-full overflow-hidden">
+                    <div className="h-full bg-gradient-to-r from-violet-400 to-indigo-500 rounded-full animate-pulse" style={{ width: '70%' }} />
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Process Button */}
+            <button onClick={handleAiParse}
+              disabled={(!textoAi.trim() && !selectedFile) || aiParse.isPending || aiProgress !== 'idle'}
+              className="w-full bg-gradient-to-r from-violet-600 to-indigo-600 text-white rounded-xl py-3 font-bold text-sm flex items-center justify-center gap-2 disabled:opacity-40 shadow-lg shadow-violet-500/20 active:scale-[0.98] transition-all">
+              {aiParse.isPending || (aiProgress !== 'idle' && aiProgress !== 'error')
+                ? <><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> Processando...</>
+                : <><Sparkles size={15} /> Processar com IA</>}
+            </button>
+
+            {/* Error feedback */}
+            {(aiParse.isError || aiProgress === 'error') && (
+              <div className="bg-red-50 border border-red-200 rounded-xl p-3">
+                <p className="text-red-600 text-xs text-center font-medium">
+                  {(aiParse.error as Error)?.message || 'Erro ao processar. Tente novamente.'}
+                </p>
+              </div>
+            )}
+
+            {/* ── AI Preview Modal (Issue #17) ──────────────────────────────── */}
+            {showPreview && aiPreview && (
+              <div className="bg-white border-2 border-violet-300 rounded-2xl shadow-xl overflow-hidden animate-in fade-in slide-in-from-bottom-2 duration-300">
+                {/* Preview header */}
+                <div className="bg-gradient-to-r from-violet-500 to-indigo-500 px-4 py-3 flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Eye size={15} className="text-white" />
+                    <p className="text-sm font-bold text-white">Resultado da IA</p>
+                    <span className="text-[10px] bg-white/20 text-white px-2 py-0.5 rounded-full font-semibold">
+                      {Math.round((aiPreview.confianca ?? 0.5) * 100)}% confianca
+                    </span>
+                  </div>
+                  <button type="button" onClick={dismissPreview} className="text-white/80 hover:text-white">
+                    <X size={16} />
+                  </button>
+                </div>
+
+                {/* Preview summary */}
+                <div className="p-4 space-y-3">
+                  {/* Metadata chips */}
+                  <div className="flex flex-wrap gap-1.5">
+                    {aiPreview.obra_sugerida && (
+                      <span className="flex items-center gap-1 text-[10px] font-semibold bg-teal-50 text-teal-700 px-2 py-1 rounded-lg border border-teal-200">
+                        <MapPin size={10} /> {aiPreview.obra_sugerida}
+                      </span>
+                    )}
+                    {aiPreview.urgencia_sugerida && aiPreview.urgencia_sugerida !== 'normal' && (
+                      <span className={`flex items-center gap-1 text-[10px] font-semibold px-2 py-1 rounded-lg border ${
+                        aiPreview.urgencia_sugerida === 'critica'
+                          ? 'bg-red-50 text-red-700 border-red-200'
+                          : 'bg-amber-50 text-amber-700 border-amber-200'
+                      }`}>
+                        <Zap size={10} /> {aiPreview.urgencia_sugerida === 'critica' ? 'Critica' : 'Urgente'}
+                      </span>
+                    )}
+                    {aiPreview.categoria_sugerida && (
+                      <span className="flex items-center gap-1 text-[10px] font-semibold bg-violet-50 text-violet-700 px-2 py-1 rounded-lg border border-violet-200">
+                        <Layers size={10} /> {aiPreview.categoria_sugerida.replace(/_/g, ' ')}
+                      </span>
+                    )}
+                    <span className="flex items-center gap-1 text-[10px] font-semibold bg-slate-50 text-slate-700 px-2 py-1 rounded-lg border border-slate-200">
+                      <Package size={10} /> {previewItens.filter(i => i.descricao.trim()).length} iten{previewItens.filter(i => i.descricao.trim()).length !== 1 ? 's' : ''}
+                    </span>
+                  </div>
+
+                  {/* Editable items list */}
+                  <div className="space-y-1.5 max-h-[240px] overflow-y-auto pr-1" style={{ scrollbarWidth: 'thin' }}>
+                    {previewItens.map((item, idx) => (
+                      <div key={idx} className="bg-slate-50 border border-slate-200 rounded-xl p-2.5 space-y-1.5">
+                        <div className="flex items-center gap-2">
+                          <span className="text-[9px] font-bold text-slate-400 flex-shrink-0">#{idx + 1}</span>
+                          <input
+                            className="flex-1 bg-white border border-slate-200 rounded-lg px-2 py-1 text-xs font-semibold text-slate-800 focus:ring-1 focus:ring-violet-300 outline-none"
+                            value={item.descricao}
+                            onChange={e => updatePreviewItem(idx, 'descricao', e.target.value)}
+                          />
+                          {previewItens.length > 1 && (
+                            <button type="button" onClick={() => setPreviewItens(p => p.filter((_, i) => i !== idx))}
+                              className="text-red-400 hover:text-red-600 transition flex-shrink-0">
+                              <Trash2 size={12} />
+                            </button>
+                          )}
+                        </div>
+                        <div className="grid grid-cols-3 gap-1.5">
+                          <input type="number" min="0.01" step="0.01"
+                            className="bg-white border border-slate-200 rounded-lg px-2 py-1 text-[11px] focus:ring-1 focus:ring-violet-300 outline-none"
+                            placeholder="Qtd"
+                            value={item.quantidade || ''}
+                            onChange={e => updatePreviewItem(idx, 'quantidade', parseFloat(e.target.value) || 0)} />
+                          <select className="bg-white border border-slate-200 rounded-lg px-1.5 py-1 text-[11px] focus:ring-1 focus:ring-violet-300 outline-none"
+                            value={item.unidade}
+                            onChange={e => updatePreviewItem(idx, 'unidade', e.target.value)}>
+                            {['un', 'kg', 'm', 'm2', 'm3', 'L', 'pc', 'cx', 'hr', 'vb'].map(u => <option key={u} value={u}>{u}</option>)}
+                          </select>
+                          <input type="number" min="0" step="0.01"
+                            className="bg-white border border-slate-200 rounded-lg px-2 py-1 text-[11px] focus:ring-1 focus:ring-violet-300 outline-none"
+                            placeholder="R$ unit."
+                            value={item.valor_unitario_estimado || ''}
+                            onChange={e => updatePreviewItem(idx, 'valor_unitario_estimado', parseFloat(e.target.value) || 0)} />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Preview total */}
+                  {previewItens.some(i => i.valor_unitario_estimado > 0) && (
+                    <div className="flex justify-between items-center text-xs bg-teal-50 border border-teal-200 rounded-lg px-3 py-2">
+                      <span className="text-teal-600 font-semibold">Total estimado</span>
+                      <span className="font-extrabold text-teal-700">
+                        {fmt(previewItens.reduce((s, i) => s + i.quantidade * i.valor_unitario_estimado, 0))}
+                      </span>
+                    </div>
+                  )}
+
+                  {/* Action buttons */}
+                  <div className="grid grid-cols-2 gap-2 pt-1">
+                    <button type="button" onClick={dismissPreview}
+                      className="px-4 py-2.5 rounded-xl text-sm font-bold border-2 border-slate-200 text-slate-600 hover:bg-slate-50 active:scale-[0.98] transition-all">
+                      Descartar
+                    </button>
+                    <button type="button" onClick={confirmPreview}
+                      className="px-4 py-2.5 rounded-xl text-sm font-bold bg-gradient-to-r from-violet-600 to-indigo-600 text-white shadow-lg shadow-violet-500/20 active:scale-[0.98] transition-all flex items-center justify-center gap-1.5">
+                      <Check size={14} strokeWidth={3} /> Aplicar
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Skip AI link */}
+            <button type="button" onClick={() => {
+              if (textoAi.trim()) setDescricao(textoAi)
+              // Issue #18: Auto-fill solicitante when skipping AI too
+              if (perfil?.nome && !solicitante.trim()) setSolicitante(perfil.nome)
+              setStep(2)
+            }}
+              className="w-full text-xs text-slate-400 text-center py-0.5 hover:text-slate-600 transition">
+              Pular IA e preencher manualmente →
+            </button>
+          </div>
+        )}
+      </div>
+
       {/* ── Next Step Button ──────────────────────────────────────────────── */}
       <button onClick={() => setStep(2)} disabled={!categoria}
         className="w-full bg-teal-500 text-white rounded-2xl py-3.5 font-bold flex items-center justify-center gap-2 disabled:opacity-40 shadow-lg shadow-teal-500/25 active:scale-[0.98] transition-all">
@@ -563,15 +841,25 @@ export default function NovaRequisicao() {
           placeholder="Seu nome completo" value={solicitante} onChange={e => setSolicitante(e.target.value)} />
       </div>
 
-      <div>
-        <label className="text-xs font-semibold text-slate-500 mb-1 block">Obra *</label>
-        <select required className={`w-full border rounded-xl px-3 py-2.5 text-sm bg-white focus:ring-2 focus:ring-teal-300 outline-none ${
-          stepErrors.some(e => e.includes('obra')) ? 'border-red-300 bg-red-50/30' : 'border-slate-200'
-        }`}
-          value={obraId} onChange={e => setObraId(e.target.value)}>
-          <option value="">Selecione a obra</option>
-          {obras.map(o => <option key={o.id} value={o.id}>{o.codigo ? `${o.codigo} - ` : ''}{o.nome}</option>)}
-        </select>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+        <div className="md:col-span-2">
+          <label className="text-xs font-semibold text-slate-500 mb-1 block">Obra *</label>
+          <select required className={`w-full border rounded-xl px-3 py-2.5 text-sm bg-white focus:ring-2 focus:ring-teal-300 outline-none ${
+            stepErrors.some(e => e.includes('obra')) ? 'border-red-300 bg-red-50/30' : 'border-slate-200'
+          }`}
+            value={obraId} onChange={e => setObraId(e.target.value)}>
+            <option value="">Selecione a obra</option>
+            {obras.map(o => <option key={o.id} value={o.id}>{o.codigo ? `${o.codigo} - ` : ''}{o.nome}</option>)}
+          </select>
+        </div>
+
+        <div>
+          <label className="text-xs font-semibold text-slate-500 mb-1 block">Data de necessidade</label>
+          <input type="date"
+            min={new Date().toISOString().split('T')[0]}
+            className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-teal-300 outline-none"
+            value={dataNecessidade} onChange={e => setDataNecessidade(e.target.value)} />
+        </div>
       </div>
 
       <div>
@@ -582,12 +870,92 @@ export default function NovaRequisicao() {
           value={justificativa} onChange={e => setJustificativa(e.target.value)} />
       </div>
 
-      <div className="flex items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3">
-        <div>
-          <label className="text-xs font-semibold text-slate-500 block">Urgente</label>
-          <p className="text-[11px] text-slate-400 mt-0.5">Sinaliza prioridade para atendimento.</p>
+      <div>
+        <label className="text-xs font-semibold text-slate-500 mb-1.5 block">ReferÃªncia de cotaÃ§Ã£o</label>
+        <div
+          className={`rounded-2xl border-2 border-dashed p-4 transition-all cursor-pointer ${
+            referenciaFile
+              ? 'border-teal-300 bg-teal-50/40'
+              : 'border-slate-200 bg-slate-50/60 hover:border-teal-300 hover:bg-teal-50/20'
+          }`}
+          onClick={() => referenciaInputRef.current?.click()}
+        >
+          <input
+            ref={referenciaInputRef}
+            type="file"
+            className="hidden"
+            accept=".pdf,.xlsx,.xls,.csv,.doc,.docx,.jpg,.jpeg,.png,.webp"
+            onChange={(event) => {
+              if (event.target.files?.[0]) setReferenciaFile(event.target.files[0])
+            }}
+          />
+
+          {referenciaFile ? (
+            <div className="space-y-2">
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white text-teal-600 shadow-sm">
+                    <FileUp size={18} />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-semibold text-slate-700">{referenciaFile.name}</p>
+                    <p className="text-[11px] text-slate-400">{(referenciaFile.size / 1024).toFixed(1)} KB</p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={(event) => {
+                    event.stopPropagation()
+                    setReferenciaFile(null)
+                    setRefParseMsg(null)
+                    if (referenciaInputRef.current) referenciaInputRef.current.value = ''
+                  }}
+                  className="rounded-full bg-white p-2 text-slate-400 transition hover:text-red-500"
+                >
+                  <X size={14} />
+                </button>
+              </div>
+              {/* BotÃ£o para extrair dados com IA */}
+              <button
+                type="button"
+                disabled={refParsing}
+                onClick={(e) => { e.stopPropagation(); handleExtrairReferencia() }}
+                className="w-full flex items-center justify-center gap-2 py-2 px-3 rounded-xl text-xs font-bold transition-all bg-gradient-to-r from-violet-500 to-purple-600 text-white hover:from-violet-600 hover:to-purple-700 shadow-sm disabled:opacity-60"
+              >
+                {refParsing ? (
+                  <><Loader2 size={14} className="animate-spin" /> Extraindo dados...</>
+                ) : (
+                  <><Sparkles size={14} /> Extrair itens e valores com IA</>
+                )}
+              </button>
+              {refParseMsg && (
+                <p className={`text-[11px] font-medium flex items-center gap-1 ${refParseMsg.type === 'success' ? 'text-emerald-600' : 'text-red-500'}`}>
+                  {refParseMsg.type === 'success' ? <Check size={12} /> : <AlertCircle size={12} />}
+                  {refParseMsg.text}
+                </p>
+              )}
+            </div>
+          ) : (
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white text-slate-400 shadow-sm">
+                <Upload size={18} />
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-slate-700">Anexar referÃªncia de cotaÃ§Ã£o</p>
+                <p className="text-[11px] text-slate-400">PDF, planilha, imagem ou documento de apoio.</p>
+              </div>
+            </div>
+          )}
         </div>
-        <div className="inline-flex rounded-xl border border-slate-200 bg-slate-50 p-1">
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+        <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3 flex items-center justify-between gap-3">
+          <div>
+            <label className="text-xs font-semibold text-slate-500 block">Urgente</label>
+            <p className="text-[11px] text-slate-400 mt-0.5">Sinaliza prioridade para atendimento.</p>
+          </div>
+          <div className="inline-flex rounded-xl border border-slate-200 bg-slate-50 p-1">
           {[
             { label: 'Não', value: false },
             { label: 'Sim', value: true },
@@ -605,23 +973,15 @@ export default function NovaRequisicao() {
               {option.label}
             </button>
           ))}
+          </div>
         </div>
-      </div>
 
-      <div>
-        <label className="text-xs font-semibold text-slate-500 mb-1 block">Data de necessidade</label>
-        <input type="date"
-          min={new Date().toISOString().split('T')[0]}
-          className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-teal-300 outline-none"
-          value={dataNecessidade} onChange={e => setDataNecessidade(e.target.value)} />
-      </div>
-
-      <div className={`rounded-2xl border p-4 space-y-4 ${
+        <div className={`rounded-2xl border px-4 py-3 space-y-3 ${
         compraRecorrente ? 'border-indigo-200 bg-indigo-50/60' : 'border-slate-200 bg-white'
       }`}>
         <div className="flex items-start justify-between gap-3">
           <div>
-            <label className="text-sm font-bold text-slate-800 block">Compra recorrente</label>
+            <label className="text-xs font-semibold text-slate-500 block">Compra recorrente</label>
             <p className="text-xs text-slate-500 mt-1">
               Esta solicitacao segue para Contratos e volta para Pedidos depois da formalizacao contratual.
             </p>
@@ -673,6 +1033,7 @@ export default function NovaRequisicao() {
             </div>
           </div>
         )}
+        </div>
       </div>
 
       <div>
@@ -740,7 +1101,7 @@ export default function NovaRequisicao() {
         ))}
       </div>
 
-      <div>
+      <div className="hidden">
         <label className="text-xs font-semibold text-slate-500 mb-1.5 block">Referência de cotação</label>
         <div
           className={`rounded-2xl border-2 border-dashed p-4 transition-all cursor-pointer ${
