@@ -638,6 +638,7 @@ export default function ExpedicaoPipeline() {
     const map = new Map<StatusExpedicaoPipeline, LogSolicitacao[]>()
     for (const s of EXPEDICAO_PIPELINE_STAGES) map.set(s.status, [])
     for (const sol of solicitacoes) {
+      if (sol.status !== 'aprovado') continue
       const arr = map.get(sol.status as StatusExpedicaoPipeline)
       if (arr) arr.push(sol)
     }
@@ -806,7 +807,7 @@ export default function ExpedicaoPipeline() {
             <Package2 size={20} className="text-orange-600" /> {'Expedi\u00e7\u00e3o'}
           </h1>
           <p className={`text-xs mt-0.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
-            {`${solicitacoes.filter(s => ['aprovado','romaneio_emitido','nfe_emitida'].includes(s.status)).length} solicita\u00e7\u00f5es na expedi\u00e7\u00e3o`}
+            {`${Array.from(grouped.values()).reduce((sum, items) => sum + items.length, 0)} solicita\u00e7\u00f5es na expedi\u00e7\u00e3o`}
           </p>
         </div>
       </div>
