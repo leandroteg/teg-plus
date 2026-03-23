@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react'
+import { useState, useMemo, useEffect, type Dispatch, type SetStateAction } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import {
   Truck, Search, X, CheckCircle2, AlertTriangle,
@@ -8,7 +8,7 @@ import {
 import { useTheme } from '../../contexts/ThemeContext'
 import {
   useSolicitacoes, useConfirmarEntregaFisica,
-  useConfirmarAgendamento, useConfirmarRecebimento,
+  useConfirmarAgendamento, useConfirmarRecebimento, useDespacharViagem,
 } from '../../hooks/useLogistica'
 import type { LogSolicitacao, StatusTransportePipeline } from '../../types/logistica'
 import { TRANSPORTE_PIPELINE_STAGES } from '../../types/logistica'
@@ -327,6 +327,11 @@ function DetailModal({ sol, onClose, onAction, isDark }: {
                 <CalendarCheck size={15} /> Confirmar Agendamento
               </button>
             )}
+            {sol.status === 'aguardando_coleta' && sol.viagem_id && (
+              <button onClick={() => onAction('despacharViagem', sol)} className="flex-1 py-3 rounded-xl bg-orange-600 text-white text-sm font-bold hover:bg-orange-700 transition-all flex items-center justify-center gap-2">
+                <Route size={15} /> Despachar Viagem
+              </button>
+            )}
             {sol.status === 'em_transito' && (
               <button onClick={() => onAction('confirmarEntrega', sol)} className="flex-1 py-3 rounded-xl bg-teal-600 text-white text-sm font-bold hover:bg-teal-700 transition-all flex items-center justify-center gap-2">
                 <Package2 size={15} /> Confirmar Entrega
@@ -539,6 +544,150 @@ function ViagemTrGroupCard({ viagem, solicitacoes, onClick, isDark, selectedIds,
   )
 }
 
+function DespachoViagemModal({
+  isDark,
+  solicitacoes,
+  form,
+  setForm,
+  onClose,
+  onSubmit,
+  isPending,
+}: {
+  isDark: boolean
+  solicitacoes: LogSolicitacao[]
+  form: {
+    placa: string
+    motorista_nome: string
+    motorista_telefone: string
+    eta_original: string
+    codigo_rastreio: string
+  }
+  setForm: Dispatch<SetStateAction<{
+    placa: string
+    motorista_nome: string
+    motorista_telefone: string
+    eta_original: string
+    codigo_rastreio: string
+  }>>
+  onClose: () => void
+  onSubmit: () => void
+  isPending: boolean
+}) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-in fade-in duration-200">
+      <div className={`rounded-2xl shadow-2xl w-full max-w-md ${isDark ? 'bg-[#1e293b]' : 'bg-white'}`}>
+        <div className={`flex items-center justify-between px-6 py-4 ${isDark ? 'border-b border-white/[0.06]' : 'border-b border-slate-100'}`}>
+          <div className="flex items-center gap-2">
+            <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${isDark ? 'bg-orange-500/10' : 'bg-orange-50'}`}>
+              <Route size={16} className="text-orange-600" />
+            </div>
+            <div>
+              <h2 className={`text-lg font-extrabold ${isDark ? 'text-white' : 'text-slate-800'}`}>Despachar Viagem</h2>
+              <p className={`text-[10px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{solicitacoes.length} solicitacao(oes) nesta viagem</p>
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors ${isDark ? 'hover:bg-white/10 text-slate-400' : 'hover:bg-slate-100'}`}
+          >
+            <X size={16} />
+          </button>
+        </div>
+
+        <div className="p-6 space-y-4">
+          <div className={`rounded-xl px-3 py-2.5 ${isDark ? 'bg-orange-500/10 border border-orange-500/20' : 'bg-orange-50 border border-orange-200'}`}>
+            <p className={`text-[10px] font-bold mb-1 ${isDark ? 'text-orange-400' : 'text-orange-700'}`}>Solicitacoes incluidas:</p>
+            {solicitacoes.map(s => (
+              <p key={s.id} className={`text-[10px] ${isDark ? 'text-orange-300' : 'text-orange-600'}`}>
+                {s.numero} - {s.origem} {'->'} {s.destino}
+              </p>
+            ))}
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className={`block text-xs font-bold mb-1 ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>Placa *</label>
+              <input
+                value={form.placa}
+                onChange={e => setForm(prev => ({ ...prev, placa: e.target.value }))}
+                className={`w-full px-3 py-2 rounded-xl border text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/30 ${
+                  isDark ? 'bg-white/[0.04] border-white/[0.06] text-slate-200' : 'bg-white border-slate-200 text-slate-700'
+                }`}
+                placeholder="ABC-1234"
+              />
+            </div>
+            <div>
+              <label className={`block text-xs font-bold mb-1 ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>Motorista *</label>
+              <input
+                value={form.motorista_nome}
+                onChange={e => setForm(prev => ({ ...prev, motorista_nome: e.target.value }))}
+                className={`w-full px-3 py-2 rounded-xl border text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/30 ${
+                  isDark ? 'bg-white/[0.04] border-white/[0.06] text-slate-200' : 'bg-white border-slate-200 text-slate-700'
+                }`}
+                placeholder="Nome do motorista"
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className={`block text-xs font-bold mb-1 ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>Tel. Motorista</label>
+              <input
+                value={form.motorista_telefone}
+                onChange={e => setForm(prev => ({ ...prev, motorista_telefone: e.target.value }))}
+                className={`w-full px-3 py-2 rounded-xl border text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/30 ${
+                  isDark ? 'bg-white/[0.04] border-white/[0.06] text-slate-200' : 'bg-white border-slate-200 text-slate-700'
+                }`}
+                placeholder="(34) 99999-0000"
+              />
+            </div>
+            <div>
+              <label className={`block text-xs font-bold mb-1 ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>ETA Previsto *</label>
+              <input
+                type="datetime-local"
+                value={form.eta_original}
+                onChange={e => setForm(prev => ({ ...prev, eta_original: e.target.value }))}
+                className={`w-full px-3 py-2 rounded-xl border text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/30 ${
+                  isDark ? 'bg-white/[0.04] border-white/[0.06] text-slate-200' : 'bg-white border-slate-200 text-slate-700'
+                }`}
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className={`block text-xs font-bold mb-1 ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>Codigo Rastreio</label>
+            <input
+              value={form.codigo_rastreio}
+              onChange={e => setForm(prev => ({ ...prev, codigo_rastreio: e.target.value }))}
+              className={`w-full px-3 py-2 rounded-xl border text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/30 ${
+                isDark ? 'bg-white/[0.04] border-white/[0.06] text-slate-200' : 'bg-white border-slate-200 text-slate-700'
+              }`}
+              placeholder="Codigo da transportadora..."
+            />
+          </div>
+        </div>
+
+        <div className={`px-6 py-4 flex justify-end gap-2 ${isDark ? 'border-t border-white/[0.06]' : 'border-t border-slate-100'}`}>
+          <button
+            onClick={onClose}
+            className={`px-4 py-2 rounded-xl text-sm font-semibold transition-colors ${isDark ? 'border border-white/[0.06] text-slate-400 hover:bg-white/5' : 'border border-slate-200 text-slate-600 hover:bg-slate-50'}`}
+          >
+            Cancelar
+          </button>
+          <button
+            onClick={onSubmit}
+            disabled={isPending || !form.placa || !form.motorista_nome || !form.eta_original}
+            className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-orange-600 hover:bg-orange-700 text-white text-sm font-semibold transition-all disabled:opacity-60 active:scale-[0.98]"
+          >
+            {isPending ? <Loader2 size={14} className="animate-spin" /> : <Route size={14} />}
+            Despachar Viagem
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ── Main Page ────────────────────────────────────────────────────────────────
 
 export default function TransportesPipeline() {
@@ -553,6 +702,14 @@ export default function TransportesPipeline() {
   const [sortField, setSortField] = useState<SortField>('data')
   const [sortDir, setSortDir] = useState<SortDir>('desc')
   const [viewMode, setViewMode] = useState<ViewMode>('cards')
+  const [despachoViagemModal, setDespachoViagemModal] = useState<{ viagemId: string; solicitacoes: LogSolicitacao[] } | null>(null)
+  const [despachoViagemForm, setDespachoViagemForm] = useState({
+    placa: '',
+    motorista_nome: '',
+    motorista_telefone: '',
+    eta_original: '',
+    codigo_rastreio: '',
+  })
 
   const { data: solicitacoes = [], isLoading } = useSolicitacoes({
     status: ['nfe_emitida', 'aguardando_coleta', 'em_transito', 'entregue', 'concluido'],
@@ -560,6 +717,7 @@ export default function TransportesPipeline() {
   const confirmarEntrega = useConfirmarEntregaFisica()
   const confirmarAgendamento = useConfirmarAgendamento()
   const confirmarRecebimento = useConfirmarRecebimento()
+  const despacharViagem = useDespacharViagem()
   const requestedItemId = searchParams.get('item')
 
   useEffect(() => {
@@ -709,6 +867,41 @@ export default function TransportesPipeline() {
     } catch { showToast('error', 'Erro ao confirmar recebimento') }
   }
 
+  const openDespachoViagem = (viagemId: string, sols: LogSolicitacao[]) => {
+    const v = sols[0]?.viagem
+    setDespachoViagemModal({ viagemId, solicitacoes: sols })
+    setDespachoViagemForm({
+      placa: v?.veiculo_placa ?? sols[0]?.veiculo_placa ?? '',
+      motorista_nome: v?.motorista_nome ?? sols[0]?.motorista_nome ?? '',
+      motorista_telefone: v?.motorista_telefone ?? sols[0]?.motorista_telefone ?? '',
+      eta_original: '',
+      codigo_rastreio: '',
+    })
+  }
+
+  const handleDespacharViagem = async () => {
+    if (!despachoViagemModal || !despachoViagemForm.placa || !despachoViagemForm.motorista_nome || !despachoViagemForm.eta_original) {
+      return
+    }
+
+    try {
+      await despacharViagem.mutateAsync({
+        viagemId: despachoViagemModal.viagemId,
+        placa: despachoViagemForm.placa,
+        motorista_nome: despachoViagemForm.motorista_nome,
+        motorista_telefone: despachoViagemForm.motorista_telefone || undefined,
+        eta_original: despachoViagemForm.eta_original,
+        codigo_rastreio: despachoViagemForm.codigo_rastreio || undefined,
+      })
+      showToast('success', 'Viagem despachada para transporte')
+      setDespachoViagemModal(null)
+      setDespachoViagemForm({ placa: '', motorista_nome: '', motorista_telefone: '', eta_original: '', codigo_rastreio: '' })
+      setSelectedIds(new Set())
+    } catch {
+      showToast('error', 'Erro ao despachar viagem')
+    }
+  }
+
   const handleBulkAction = () => {
     const ids = Array.from(selectedIds)
     if (ids.length === 0) return
@@ -727,6 +920,14 @@ export default function TransportesPipeline() {
   const handleDetailAction = (action: string, sol: LogSolicitacao) => {
     closeDetail()
     if (action === 'confirmarAgendamento') handleConfirmarAgendamento([sol.id])
+    if (action === 'despacharViagem' && sol.viagem_id) {
+      const solsDaViagem = solicitacoes
+        .filter(item => item.viagem_id === sol.viagem_id && item.status === 'aguardando_coleta')
+        .sort((a, b) => (a.ordem_na_viagem ?? 0) - (b.ordem_na_viagem ?? 0))
+      if (solsDaViagem.length > 0) {
+        openDespachoViagem(sol.viagem_id, solsDaViagem)
+      }
+    }
     if (action === 'confirmarEntrega') handleConfirmarEntrega([sol.id])
     if (action === 'confirmarRecebimento') setRecebModal(sol)
   }
@@ -912,6 +1113,17 @@ export default function TransportesPipeline() {
       </div>
 
       {detail && <DetailModal sol={detail} onClose={closeDetail} onAction={handleDetailAction} isDark={isDark} />}
+      {despachoViagemModal && (
+        <DespachoViagemModal
+          isDark={isDark}
+          solicitacoes={despachoViagemModal.solicitacoes}
+          form={despachoViagemForm}
+          setForm={setDespachoViagemForm}
+          onClose={() => setDespachoViagemModal(null)}
+          onSubmit={handleDespacharViagem}
+          isPending={despacharViagem.isPending}
+        />
+      )}
       {recebModal && <RecebimentoModal sol={recebModal} onClose={() => setRecebModal(null)} onConfirm={handleConfirmarRecebimento} isPending={confirmarRecebimento.isPending} isDark={isDark} />}
     </div>
   )
