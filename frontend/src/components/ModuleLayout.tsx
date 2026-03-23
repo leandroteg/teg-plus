@@ -264,7 +264,7 @@ export default function ModuleLayout({
   const navigate = useNavigate()
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [avatarOpen, setAvatarOpen] = useState(false)
-  const [openNavMenu, setOpenNavMenu] = useState<string | null>(null)
+  const [openNavMenu, setOpenNavMenu] = useState<{ id: string; top: number; left: number } | null>(null)
 
   // Close avatar dropdown on click outside or Escape
   useEffect(() => {
@@ -296,6 +296,19 @@ export default function ModuleLayout({
     return () => {
       document.removeEventListener('mousedown', onClickOutside)
       document.removeEventListener('keydown', onEscape)
+    }
+  }, [openNavMenu])
+
+  useEffect(() => {
+    if (!openNavMenu) return
+    function closeNavMenu() {
+      setOpenNavMenu(null)
+    }
+    window.addEventListener('resize', closeNavMenu)
+    window.addEventListener('scroll', closeNavMenu, true)
+    return () => {
+      window.removeEventListener('resize', closeNavMenu)
+      window.removeEventListener('scroll', closeNavMenu, true)
     }
   }, [openNavMenu])
 
@@ -359,19 +372,34 @@ export default function ModuleLayout({
   function renderNavItems() {
     return visibleNav.map(({ to, icon: Icon, label, end, adminOnly, action, actionMenu, accent }) => {
       if (actionMenu) {
-        const isOpen = openNavMenu === to
+        const isOpen = openNavMenu?.id === to
         return (
-          <div key={to} className="relative" data-nav-action-menu>
+          <div key={to}>
             <button
               type="button"
-              onClick={() => setOpenNavMenu(prev => prev === to ? null : to)}
+              onClick={event => {
+                if (openNavMenu?.id === to) {
+                  setOpenNavMenu(null)
+                  return
+                }
+                const rect = event.currentTarget.getBoundingClientRect()
+                setOpenNavMenu({
+                  id: to,
+                  top: Math.min(rect.top, window.innerHeight - 260),
+                  left: rect.right + 12,
+                })
+              }}
               className={`w-full text-left ${sidebarLinkClass({ isActive: false })}`}
             >
               <Icon size={18} className={accent ? 'shrink-0 text-orange-500' : 'shrink-0'} />
               <span className={accent ? 'text-orange-500 font-semibold' : undefined}>{label}</span>
             </button>
             {isOpen && (
-              <div className={`absolute left-full top-0 z-50 ml-3 w-[340px] rounded-3xl border p-3 shadow-2xl ${ls ? 'border-slate-200 bg-white' : 'border-white/[0.08] bg-slate-900'}`}>
+              <div
+                data-nav-action-menu
+                className={`fixed z-[70] w-[340px] rounded-3xl border p-3 shadow-2xl ${ls ? 'border-slate-200 bg-white' : 'border-white/[0.08] bg-slate-900'}`}
+                style={{ top: openNavMenu.top, left: openNavMenu.left }}
+              >
                 {actionMenu.title && (
                   <p className={`px-4 pt-2 pb-1 text-[10px] font-bold uppercase tracking-wider ${ls ? 'text-slate-400' : 'text-slate-500'}`}>
                     {actionMenu.title}
