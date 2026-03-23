@@ -272,7 +272,7 @@ export default function Expedicao() {
       <div className={`rounded-2xl px-4 py-3 flex items-start gap-2.5 ${isDark ? 'bg-amber-500/10 border border-amber-500/20' : 'bg-amber-50 border border-amber-200'}`}>
         <AlertTriangle size={16} className={`shrink-0 mt-0.5 ${isDark ? 'text-amber-400' : 'text-amber-600'}`} />
         <p className={`text-xs font-medium ${isDark ? 'text-amber-400' : 'text-amber-700'}`}>
-          <strong>Regra obrigatória:</strong> Nenhuma carga pode ser despachada sem documento fiscal (Romaneio para MG ou NF-e interestadual).
+          <strong>Regra obrigatória:</strong> Nenhuma carga pode ser despachada sem documento fiscal (Romaneio intrastadual ou NF-e interestadual).
           O sistema bloqueia o despacho até o documento ser emitido.
         </p>
       </div>
@@ -384,7 +384,7 @@ export default function Expedicao() {
                 </div>
                 <div>
                   <h2 className={`text-lg font-extrabold ${isDark ? 'text-white' : 'text-slate-800'}`}>Emitir Romaneio</h2>
-                  <p className={`text-[10px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Documento de carga MG → MG</p>
+                  <p className={`text-[10px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Documento operacional intrastadual</p>
                 </div>
               </div>
               <button onClick={() => setRomaneioModal(null)}

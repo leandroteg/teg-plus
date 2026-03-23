@@ -2,18 +2,51 @@ import type { LogSolicitacao } from '../types/logistica'
 
 export type DocumentoFiscalRegra = 'romaneio' | 'nf' | 'indefinido'
 
-const CIDADES_MG = [
-  'araxa', 'araxá', 'frutal', 'ituiutaba', 'paracatu',
-  'perdizes', 'rio paranaiba', 'rio paranaíba', 'tres marias', 'três marias',
-]
+const CIDADES_POR_UF: Record<string, string[]> = {
+  MG: [
+    'araxa',
+    'frutal',
+    'ituiutaba',
+    'paracatu',
+    'perdizes',
+    'rio paranaiba',
+    'tres marias',
+  ],
+  MS: [
+    'campo grande',
+    'corumba',
+    'paraiso das aguas',
+    'paraíso das águas',
+    'tres lagoas',
+    'três lagoas',
+    'dourados',
+    'sidrolandia',
+    'sidrolândia',
+    'chapadao do sul',
+    'chapadão do sul',
+    'cassilandia',
+    'cassilândia',
+    'sonora',
+    'coxim',
+    'rio verde de mato grosso',
+  ],
+}
+
+function normalizeText(value?: string | null) {
+  return String(value ?? '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toUpperCase()
+    .trim()
+}
 
 function normalizeUf(value?: string | null) {
-  const clean = String(value ?? '').trim().toUpperCase()
+  const clean = normalizeText(value)
   return clean.length === 2 ? clean : ''
 }
 
 function parseUfFromTrecho(value?: string | null) {
-  const text = String(value ?? '').trim().toUpperCase()
+  const text = normalizeText(value)
   if (!text) return ''
   const slashMatch = text.match(/(?:\/|-|\s)(AC|AL|AM|AP|BA|CE|DF|ES|GO|MA|MG|MS|MT|PA|PB|PE|PI|PR|RJ|RN|RO|RR|RS|SC|SE|SP|TO)\s*$/)
   if (slashMatch) return slashMatch[1]
@@ -21,10 +54,15 @@ function parseUfFromTrecho(value?: string | null) {
 }
 
 function inferUfFromCity(value?: string | null) {
-  const text = String(value ?? '').trim().toLowerCase()
+  const text = normalizeText(value).toLowerCase()
   if (!text) return ''
-  if (CIDADES_MG.some(city => text.includes(city))) return 'MG'
-  if (text.includes('campo grande')) return 'MS'
+
+  for (const [uf, cidades] of Object.entries(CIDADES_POR_UF)) {
+    if (cidades.some(city => text.includes(city.normalize('NFD').replace(/[\u0300-\u036f]/g, '')))) {
+      return uf
+    }
+  }
+
   return ''
 }
 
@@ -50,10 +88,8 @@ export function getDocumentoFiscalContext(sol: Pick<LogSolicitacao, 'origem' | '
   const destinoUf = getDestinoUf(sol)
 
   let regra: DocumentoFiscalRegra = 'indefinido'
-  if (origemUf === 'MG' && destinoUf === 'MG') regra = 'romaneio'
+  if (origemUf && destinoUf && origemUf === destinoUf) regra = 'romaneio'
   else if (origemUf && destinoUf && origemUf !== destinoUf) regra = 'nf'
-  else if (!origemUf && destinoUf === 'MG' && inferUfFromCity(sol.origem) === 'MG') regra = 'romaneio'
-  else if (!origemUf && destinoUf && destinoUf !== 'MG') regra = 'nf'
 
   return {
     origemUf,
@@ -67,7 +103,7 @@ export function getDocumentoFiscalContext(sol: Pick<LogSolicitacao, 'origem' | '
 export function getDocumentoFiscalLabel(regra: DocumentoFiscalRegra) {
   switch (regra) {
     case 'romaneio':
-      return 'MG → MG - Romaneio operacional'
+      return 'Mesmo estado - Romaneio operacional'
     case 'nf':
       return 'Interestadual - NF obrigatória'
     default:
