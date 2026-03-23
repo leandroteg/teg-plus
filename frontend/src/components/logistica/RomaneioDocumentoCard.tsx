@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import {
-  Download, ExternalLink, FileText, Loader2, Mail, MessageCircle, ScrollText, Share2, X,
+  ExternalLink, FileText, Loader2, Mail, MessageCircle, ScrollText, Share2, X,
 } from 'lucide-react'
 import type { LogSolicitacao } from '../../types/logistica'
 import { gerarRomaneioPDF, gerarRomaneioPdfBlob, getRomaneioFileName } from '../../utils/romaneio-pdf'
@@ -161,23 +161,6 @@ export function RomaneioDocumentoCard({ sol, dark }: { sol: LogSolicitacao; dark
           >
             <Share2 size={14} />
             Compartilhar
-          </button>
-        </div>
-
-        <div className="flex gap-2 mt-4">
-          <button
-            onClick={() => openGeneratedPdf(sol)}
-            className={`flex-1 flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl text-sm font-semibold transition-colors ${dark ? 'bg-white/[0.05] text-slate-200 hover:bg-white/[0.08]' : 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-50'}`}
-          >
-            <ExternalLink size={15} />
-            Abrir PDF
-          </button>
-          <button
-            onClick={() => downloadGeneratedPdf(sol)}
-            className={`flex-1 flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl text-sm font-semibold transition-colors ${dark ? 'bg-white/[0.05] text-slate-200 hover:bg-white/[0.08]' : 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-50'}`}
-          >
-            <Download size={15} />
-            Baixar
           </button>
         </div>
       </div>
