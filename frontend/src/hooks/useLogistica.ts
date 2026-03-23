@@ -7,6 +7,7 @@ import type {
   CriarSolicitacaoPayload, EmitirNFePayload, IniciarTransportePayload,
   StatusSolicitacao, TipoTransporte,
 } from '../types/logistica'
+import { applyEtasToEtapas, buildViagemEtapas } from '../utils/logisticaViagem'
 
 const QK = {
   solicitacoes:    (f?: any) => ['log_solicitacoes', f],
@@ -34,7 +35,7 @@ export function useSolicitacoes(filtros?: {
           *,
           transportadora:log_transportadoras(id, nome_fantasia, razao_social, avaliacao_media),
           rota_planejada:log_rotas!rota_planejada_id(id, nome, distancia_km, tempo_estimado_h),
-          viagem:log_viagens!viagem_id(id, numero, status, modal, veiculo_placa, motorista_nome, motorista_telefone, qtd_paradas, distancia_total_km, tempo_estimado_h, custo_total, origem_principal, destino_final, data_prevista_saida),
+          viagem:log_viagens!viagem_id(id, numero, status, modal, veiculo_placa, motorista_nome, motorista_telefone, qtd_paradas, distancia_total_km, tempo_estimado_h, custo_total, origem_principal, destino_final, data_prevista_saida, data_real_saida, data_conclusao, rota_polyline),
           nfe:log_nfe(id, numero, status, chave_acesso, valor_total),
           transporte:log_transportes(id, hora_saida, hora_chegada, eta_atual, placa, motorista_nome),
           recebimento:log_recebimentos(id, status, confirmado_em),
@@ -790,7 +791,7 @@ export function useTransportes() {
             transportadora:log_transportadoras(nome_fantasia)
           ),
           ocorrencias:log_ocorrencias(*),
-          viagem:log_viagens!viagem_id(id, numero, status, origem_principal, destino_final, qtd_paradas, distancia_total_km, tempo_estimado_h, motorista_nome, veiculo_placa, modal)
+          viagem:log_viagens!viagem_id(id, numero, status, origem_principal, destino_final, qtd_paradas, distancia_total_km, tempo_estimado_h, motorista_nome, motorista_telefone, veiculo_placa, modal, data_prevista_saida, data_real_saida, rota_polyline)
         `)
         .is('hora_chegada', null)
         .order('criado_em', { ascending: false })
@@ -846,20 +847,34 @@ export function useDespacharViagem() {
       placa: string
       motorista_nome: string
       motorista_telefone?: string
-      eta_original: string
       codigo_rastreio?: string
     }) => {
       const { data: { user } } = await supabase.auth.getUser()
       const agora = new Date().toISOString()
 
+      const { data: viagem, error: viagemErr } = await supabase
+        .from('log_viagens')
+        .select('id, rota_polyline, distancia_total_km, tempo_estimado_h, data_prevista_saida, data_real_saida')
+        .eq('id', payload.viagemId)
+        .single()
+      if (viagemErr) throw viagemErr
+
       // 1. Buscar solicitações da viagem
       const { data: sols, error: solErr } = await supabase
         .from('log_solicitacoes')
-        .select('id, peso_total_kg, volumes_total')
+        .select('id, origem, destino, ordem_na_viagem, peso_total_kg, volumes_total, status')
         .eq('viagem_id', payload.viagemId)
         .order('ordem_na_viagem', { ascending: true })
       if (solErr) throw solErr
       if (!sols || sols.length === 0) throw new Error('Nenhuma solicitação encontrada na viagem')
+
+      const etapas = applyEtasToEtapas(buildViagemEtapas(viagem as LogViagem, sols as LogSolicitacao[]), agora)
+      const etaPorSolicitacao = new Map(
+        etapas
+          .filter(etapa => etapa.solicitacao?.id && etapa.eta_previsto)
+          .map(etapa => [etapa.solicitacao!.id, etapa.eta_previsto!])
+      )
+      const etaFinal = etapas[etapas.length - 1]?.eta_previsto
 
       // 2. Criar 1 transporte por solicitação
       for (const sol of sols) {
@@ -871,7 +886,8 @@ export function useDespacharViagem() {
             placa: payload.placa,
             motorista_nome: payload.motorista_nome,
             motorista_telefone: payload.motorista_telefone,
-            eta_original: payload.eta_original,
+            eta_original: etaPorSolicitacao.get(sol.id) ?? etaFinal ?? agora,
+            eta_atual: etaPorSolicitacao.get(sol.id) ?? etaFinal ?? agora,
             codigo_rastreio: payload.codigo_rastreio,
             hora_saida: agora,
             despachado_por: user?.id,
@@ -895,7 +911,14 @@ export function useDespacharViagem() {
       // 4. Atualizar viagem → em_transito
       await supabase
         .from('log_viagens')
-        .update({ status: 'em_transito', data_real_saida: agora, updated_at: agora })
+        .update({
+          status: 'em_transito',
+          data_real_saida: agora,
+          veiculo_placa: payload.placa,
+          motorista_nome: payload.motorista_nome,
+          motorista_telefone: payload.motorista_telefone,
+          updated_at: agora,
+        })
         .eq('id', payload.viagemId)
     },
     onSuccess: () => {
