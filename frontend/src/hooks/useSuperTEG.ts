@@ -1,5 +1,6 @@
 import { useState, useCallback, useRef, useEffect } from 'react'
 import { useAuth } from '../contexts/AuthContext'
+import { supabase } from '../services/supabase'
 
 const WEBHOOK_URL = 'https://teg-agents-n8n.nmmcas.easypanel.host/webhook/superteg/chat'
 
@@ -209,6 +210,86 @@ export function useSuperTEG() {
     [perfil]
   )
 
+  const sendMessageWithFile = useCallback(
+    async (text: string, file: File) => {
+      if (busyRef.current) return
+      busyRef.current = true
+      setIsLoading(true)
+
+      const userMsg: ChatMessage = {
+        id: `u_${Date.now()}`,
+        role: 'user',
+        content: `${text}\n📎 ${file.name} (${(file.size / 1024).toFixed(0)} KB)`,
+        timestamp: new Date().toISOString(),
+      }
+      setMessages(prev => [...prev, userMsg])
+
+      try {
+        // 1. Upload to Supabase Storage
+        const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_')
+        const path = `superteg-uploads/${Date.now()}_${safeName}`
+        const { error: upErr } = await supabase.storage
+          .from('cotacoes-docs')
+          .upload(path, file, { upsert: true, contentType: file.type || 'application/pdf' })
+        if (upErr) throw new Error('Falha no upload: ' + upErr.message)
+
+        const { data: { publicUrl } } = supabase.storage.from('cotacoes-docs').getPublicUrl(path)
+
+        // 2. Convert to base64 for n8n
+        const base64 = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader()
+          reader.onload = () => resolve((reader.result as string).split(',')[1])
+          reader.onerror = reject
+          reader.readAsDataURL(file)
+        })
+
+        // 3. Send to SuperTEG with file info
+        const res = await fetch(WEBHOOK_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            message: text,
+            session_id: sessionRef.current,
+            perfil_id: perfil?.id || null,
+            file: {
+              url: publicUrl,
+              name: file.name,
+              mime_type: file.type,
+              size: file.size,
+              base64,
+            },
+          }),
+        })
+
+        const raw = await res.json()
+        const data = Array.isArray(raw) ? raw[0] : raw
+        const { content, actions } = parseResponse(data)
+
+        setMessages(prev => [...prev, {
+          id: `a_${Date.now()}`,
+          role: 'assistant',
+          content,
+          actions: actions.length > 0 ? actions : undefined,
+          timestamp: data?.timestamp || new Date().toISOString(),
+        }])
+
+        const navActions = actions.filter(a => a.type === 'navigate')
+        if (navActions.length === 1) setPendingAction(navActions[0])
+      } catch (err) {
+        setMessages(prev => [...prev, {
+          id: `e_${Date.now()}`,
+          role: 'assistant',
+          content: `Erro ao processar arquivo: ${err instanceof Error ? err.message : 'erro desconhecido'}`,
+          timestamp: new Date().toISOString(),
+        }])
+      } finally {
+        busyRef.current = false
+        setIsLoading(false)
+      }
+    },
+    [perfil]
+  )
+
   const clearMessages = useCallback(() => {
     setMessages([])
     sessionStorage.removeItem('superteg-history')
@@ -222,5 +303,5 @@ export function useSuperTEG() {
     return action
   }, [pendingAction])
 
-  return { messages, isLoading, sendMessage, sendAudio, clearMessages, pendingAction, consumePendingAction }
+  return { messages, isLoading, sendMessage, sendMessageWithFile, sendAudio, clearMessages, pendingAction, consumePendingAction }
 }
