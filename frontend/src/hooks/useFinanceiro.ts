@@ -36,6 +36,8 @@ function appendExtraRequestDetailsToObservacoes(
     pix_chave?: string
   },
   anexos?: Array<{ nome: string; url: string }>,
+  dataNecessidade?: string,
+  formaPagamento?: string,
 ) {
   const detalhes: string[] = [observacoesBase]
   const banco = [
@@ -47,9 +49,31 @@ function appendExtraRequestDetailsToObservacoes(
     dadosBancarios?.pix_chave && `PIX Chave: ${dadosBancarios.pix_chave}`,
   ].filter(Boolean)
 
+  if (dataNecessidade) detalhes.push(`Data da necessidade: ${dataNecessidade}`)
+  if (formaPagamento) detalhes.push(`Forma de pagamento: ${formaPagamento}`)
   if (banco.length > 0) detalhes.push(`Dados bancarios: ${banco.join(' | ')}`)
   if ((anexos?.length ?? 0) > 0) detalhes.push(`Anexos: ${anexos!.map(a => `${a.nome} (${a.url})`).join(' | ')}`)
   return detalhes.join('\n')
+}
+
+function detectaFormaPagamentoPorArquivo(arquivos?: File[]) {
+  const arquivosList = arquivos ?? []
+  const temBoleto = arquivosList.some(arquivo => {
+    const nome = arquivo.name
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase()
+
+    return nome.includes('boleto')
+      || nome.includes('linha digitavel')
+      || nome.includes('linha_digitavel')
+      || nome.includes('linha-digitavel')
+      || nome.includes('codigo barras')
+      || nome.includes('codigo_barras')
+      || nome.includes('codigo-de-barras')
+  })
+
+  return temBoleto ? 'boleto' : undefined
 }
 
 // â”€â”€ Dashboard â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
@@ -255,6 +279,7 @@ export function useCriarSolicitacaoExtraordinariaCP() {
       centro_custo,
       classe_financeira,
       valor,
+      dataNecessidade,
       solicitanteNome,
       fornecedorId,
       fornecedorNome,
@@ -267,6 +292,7 @@ export function useCriarSolicitacaoExtraordinariaCP() {
       centro_custo: string
       classe_financeira: string
       valor: number
+      dataNecessidade: string
       solicitanteNome?: string
       fornecedorId?: string
       fornecedorNome?: string
@@ -285,7 +311,8 @@ export function useCriarSolicitacaoExtraordinariaCP() {
       const numeroDocumento = `EXT-${new Date().toISOString().replace(/[-:TZ.]/g, '').slice(0, 14)}`
       const uploadedArquivos: Array<{ nome: string; url: string }> = []
       const uploadFalhas: string[] = []
-      const observacoesBase = `Solicita\u00e7\u00e3o extraordin\u00e1ria urgente. Justificativa: ${justificativa.trim()}${solicitanteNome ? ` | Solicitante: ${solicitanteNome}` : ''}${fornecedorNome ? ` | Fornecedor: ${fornecedorNome}` : ''}${fornecedorCnpj ? ` | CNPJ: ${fornecedorCnpj}` : ''}`
+      const formaPagamento = detectaFormaPagamentoPorArquivo(arquivos)
+      const observacoesBase = `Solicita\u00e7\u00e3o extraordin\u00e1ria urgente. Justificativa: ${justificativa.trim()}${solicitanteNome ? ` | Solicitante: ${solicitanteNome}` : ''}${fornecedorNome ? ` | Fornecedor: ${fornecedorNome}` : ''}${fornecedorCnpj ? ` | CNPJ: ${fornecedorCnpj}` : ''}${dataNecessidade ? ` | Necessidade: ${dataNecessidade}` : ''}`
 
       const { data, error } = await supabase
         .from('fin_contas_pagar')
@@ -296,11 +323,12 @@ export function useCriarSolicitacaoExtraordinariaCP() {
           valor_original: valor,
           valor_pago: 0,
           data_emissao: hoje,
-          data_vencimento: hoje,
-          data_vencimento_orig: hoje,
+          data_vencimento: dataNecessidade,
+          data_vencimento_orig: dataNecessidade,
           centro_custo,
           classe_financeira,
           natureza: 'extraordinario',
+          forma_pagamento: formaPagamento ?? null,
           numero_documento: numeroDocumento,
           status: 'confirmado',
           descricao: descricao.trim(),
@@ -327,6 +355,8 @@ export function useCriarSolicitacaoExtraordinariaCP() {
           observacoesBase,
           dadosBancarios,
           uploadedArquivos,
+          dataNecessidade,
+          formaPagamento,
         )
 
         const { error: updateError } = await supabase
