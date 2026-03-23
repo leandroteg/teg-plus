@@ -356,6 +356,7 @@ const CP_PIPELINE_VIEW_STAGES: Array<{ status: PipelineStageId; label: string; c
   { status: 'em_pagamento', label: 'Em Processamento', color: 'sky', borderColor: 'border-t-sky-500' },
   ...CP_PIPELINE_STAGES.filter(stage => ['pago', 'conciliado', 'cancelado'].includes(stage.status)),
 ]
+const CP_PROGRESS_STAGES = CP_PIPELINE_STAGES.filter(stage => stage.status !== 'cancelado')
 
 const SORT_OPTIONS: { field: SortField; label: string }[] = [
   { field: 'vencimento', label: 'Vencimento' },
@@ -1608,6 +1609,14 @@ function CPDetailModal({ cp, stageStatus, onClose, onAction, isDark }: {
   const canDirectApproveCurrent = isApprovalStage && perfil?.role === 'admin' && !approval
   const canApproveCurrent = isApprovalStage && (perfil?.role === 'admin' || (!!approval && canApprove(approval.nivel)) || canDirectApproveCurrent)
   const stage = CP_PIPELINE_VIEW_STAGES.find(s => s.status === stageStatus)
+  const progressStageStatus = stageStatus === 'em_aprovacao'
+    ? 'em_lote'
+    : stageStatus === 'cancelado'
+      ? null
+      : stageStatus
+  const currentProgressIdx = progressStageStatus
+    ? CP_PROGRESS_STAGES.findIndex(st => st.status === progressStageStatus)
+    : -1
   const isLoteApproval = !!approvalLoteId && approvalItems.length > 0
   const canUploadPedidoAnexo = !!cp.pedido_id && (
     stageStatus === 'previsto'
@@ -1818,9 +1827,8 @@ function CPDetailModal({ cp, stageStatus, onClose, onAction, isDark }: {
           <div className={`rounded-xl p-3 ${isDark ? 'bg-white/[0.04]' : 'bg-slate-50'}`}>
             <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-2">Progresso</p>
             <div className="flex items-center gap-0.5">
-              {CP_PIPELINE_STAGES.map((s, i) => {
-                const currentIdx = CP_PIPELINE_STAGES.findIndex(st => st.status === (stageStatus === 'em_aprovacao' ? 'em_lote' : stageStatus))
-                const isPast = i <= currentIdx
+              {CP_PROGRESS_STAGES.map((s, i) => {
+                const isPast = i <= currentProgressIdx
                 const accent = STATUS_ACCENT[s.status]
                 return (
                   <div key={s.status} className="flex-1">
