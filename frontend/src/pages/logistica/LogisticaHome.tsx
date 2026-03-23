@@ -77,58 +77,20 @@ function fmtCurrency(value: number) {
   return value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 })
 }
 
-function toneClasses(tone: 'sky' | 'emerald' | 'cyan' | 'amber' | 'teal' | 'orange' | 'blue' | 'violet' | 'red' | 'slate') {
+function toneClasses(
+  tone: 'sky' | 'emerald' | 'cyan' | 'amber' | 'teal' | 'orange' | 'blue' | 'violet' | 'red' | 'slate'
+) {
   const map = {
-    sky: {
-      text: 'text-sky-600',
-      soft: 'bg-sky-50 text-sky-700 border-sky-100',
-      icon: 'bg-sky-50 text-sky-500',
-    },
-    emerald: {
-      text: 'text-emerald-600',
-      soft: 'bg-emerald-50 text-emerald-700 border-emerald-100',
-      icon: 'bg-emerald-50 text-emerald-500',
-    },
-    cyan: {
-      text: 'text-cyan-600',
-      soft: 'bg-cyan-50 text-cyan-700 border-cyan-100',
-      icon: 'bg-cyan-50 text-cyan-500',
-    },
-    amber: {
-      text: 'text-amber-600',
-      soft: 'bg-amber-50 text-amber-700 border-amber-100',
-      icon: 'bg-amber-50 text-amber-500',
-    },
-    teal: {
-      text: 'text-teal-600',
-      soft: 'bg-teal-50 text-teal-700 border-teal-100',
-      icon: 'bg-teal-50 text-teal-500',
-    },
-    orange: {
-      text: 'text-orange-600',
-      soft: 'bg-orange-50 text-orange-700 border-orange-100',
-      icon: 'bg-orange-50 text-orange-500',
-    },
-    blue: {
-      text: 'text-blue-600',
-      soft: 'bg-blue-50 text-blue-700 border-blue-100',
-      icon: 'bg-blue-50 text-blue-500',
-    },
-    violet: {
-      text: 'text-violet-600',
-      soft: 'bg-violet-50 text-violet-700 border-violet-100',
-      icon: 'bg-violet-50 text-violet-500',
-    },
-    red: {
-      text: 'text-red-600',
-      soft: 'bg-red-50 text-red-700 border-red-100',
-      icon: 'bg-red-50 text-red-500',
-    },
-    slate: {
-      text: 'text-slate-500',
-      soft: 'bg-slate-50 text-slate-600 border-slate-100',
-      icon: 'bg-slate-50 text-slate-400',
-    },
+    sky: { text: 'text-sky-600', soft: 'bg-sky-50 text-sky-700 border-sky-100', icon: 'bg-sky-50 text-sky-500' },
+    emerald: { text: 'text-emerald-600', soft: 'bg-emerald-50 text-emerald-700 border-emerald-100', icon: 'bg-emerald-50 text-emerald-500' },
+    cyan: { text: 'text-cyan-600', soft: 'bg-cyan-50 text-cyan-700 border-cyan-100', icon: 'bg-cyan-50 text-cyan-500' },
+    amber: { text: 'text-amber-600', soft: 'bg-amber-50 text-amber-700 border-amber-100', icon: 'bg-amber-50 text-amber-500' },
+    teal: { text: 'text-teal-600', soft: 'bg-teal-50 text-teal-700 border-teal-100', icon: 'bg-teal-50 text-teal-500' },
+    orange: { text: 'text-orange-600', soft: 'bg-orange-50 text-orange-700 border-orange-100', icon: 'bg-orange-50 text-orange-500' },
+    blue: { text: 'text-blue-600', soft: 'bg-blue-50 text-blue-700 border-blue-100', icon: 'bg-blue-50 text-blue-500' },
+    violet: { text: 'text-violet-600', soft: 'bg-violet-50 text-violet-700 border-violet-100', icon: 'bg-violet-50 text-violet-500' },
+    red: { text: 'text-red-600', soft: 'bg-red-50 text-red-700 border-red-100', icon: 'bg-red-50 text-red-500' },
+    slate: { text: 'text-slate-500', soft: 'bg-slate-50 text-slate-600 border-slate-100', icon: 'bg-slate-50 text-slate-400' },
   } as const
 
   return map[tone]
@@ -136,17 +98,10 @@ function toneClasses(tone: 'sky' | 'emerald' | 'cyan' | 'amber' | 'teal' | 'oran
 
 export function StatusBadge({ status }: { status: string }) {
   const { isDark } = useTheme()
-  const c = STATUS_LABEL[status] ?? {
-    label: status,
-    dot: 'bg-gray-400',
-    bg: 'bg-gray-100',
-    text: 'text-gray-600',
-  }
+  const c = STATUS_LABEL[status] ?? { label: status, dot: 'bg-gray-400', bg: 'bg-gray-100', text: 'text-gray-600' }
 
   return (
-    <span
-      className={`inline-flex items-center gap-1 rounded-full text-[10px] font-semibold px-2 py-0.5 ${isDark ? 'bg-white/10 text-slate-200' : `${c.bg} ${c.text}`}`}
-    >
+    <span className={`inline-flex items-center gap-1 rounded-full text-[10px] font-semibold px-2 py-0.5 ${isDark ? 'bg-white/10 text-slate-200' : `${c.bg} ${c.text}`}`}>
       <span className={`w-1.5 h-1.5 rounded-full ${c.dot}`} />
       {c.label}
     </span>
@@ -214,7 +169,7 @@ export default function LogisticaHome() {
     )
 
     const topRotas = [...routeMap.values()]
-      .sort((a, b) => (b.km - a.km) || (b.solicitacoes - a.solicitacoes))
+      .sort((a, b) => b.km - a.km || b.solicitacoes - a.solicitacoes)
       .slice(0, 4)
 
     return {
@@ -237,6 +192,18 @@ export default function LogisticaHome() {
   }
 
   const aguardandoConfirmacao = Math.max(0, kpis.entregues_hoje - kpis.confirmadas_hoje)
+  const statusSegments = [
+    { key: 'abertas', label: 'Abertas', value: kpis.abertas, barClass: 'bg-orange-500', tone: 'orange' as const },
+    { key: 'em_transito', label: 'Em transito', value: kpis.em_transito, barClass: 'bg-blue-500', tone: 'blue' as const },
+    {
+      key: 'urgentes',
+      label: 'Urgentes',
+      value: kpis.urgentes_pendentes,
+      barClass: kpis.urgentes_pendentes > 0 ? 'bg-red-500' : 'bg-slate-400',
+      tone: (kpis.urgentes_pendentes > 0 ? 'red' : 'slate') as const,
+    },
+    { key: 'nfe', label: 'NF-e emitidas', value: kpis.nfe_emitidas_mes, barClass: 'bg-violet-500', tone: 'violet' as const },
+  ].filter(segment => segment.value > 0)
 
   return (
     <div className="space-y-5">
@@ -267,7 +234,7 @@ export default function LogisticaHome() {
                   {fmtKm(operationalView.kmProgramados)} km em malha ativa
                 </h2>
                 <p className={`mt-2 text-sm ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
-                  {operationalView.rotasAtivas} rota(s)/viagem(ns) planejada(s), {transportesAtivos.length} transporte(s) acompanhados e {fmtCurrency(kpis.custo_total_mes)} em custo logístico no mes.
+                  {operationalView.rotasAtivas} rota(s)/viagem(ns) planejada(s), {transportesAtivos.length} transporte(s) acompanhados e {fmtCurrency(kpis.custo_total_mes)} em custo logistico no mes.
                 </p>
               </div>
               <div className={`hidden md:flex w-14 h-14 rounded-2xl items-center justify-center ${isDark ? 'bg-sky-500/10' : 'bg-sky-50'}`}>
@@ -353,13 +320,119 @@ export default function LogisticaHome() {
             Resumo enxuto da fila
           </p>
         </div>
-        <div className="p-4 grid grid-cols-2 lg:grid-cols-4 gap-3">
-          <CompactStatusCard label="Abertas" value={kpis.abertas} icon={ClipboardList} tone="orange" isDark={isDark} />
-          <CompactStatusCard label="Em transito" value={kpis.em_transito} icon={Truck} tone="blue" isDark={isDark} />
-          <CompactStatusCard label="Urgentes" value={kpis.urgentes_pendentes} icon={AlertTriangle} tone={kpis.urgentes_pendentes > 0 ? 'red' : 'slate'} isDark={isDark} />
-          <CompactStatusCard label="NF-e emitidas" value={kpis.nfe_emitidas_mes} icon={FileText} tone="violet" isDark={isDark} />
+        <div className="p-4 space-y-3">
+          <HorizontalStatusBar
+            isDark={isDark}
+            title="Distribuicao atual da fila"
+            emptyLabel="Sem status relevantes no momento"
+            segments={statusSegments}
+          />
+          <InlineStatusLegend isDark={isDark} segments={statusSegments} />
         </div>
       </section>
+
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-3">
+        <section className={`rounded-2xl shadow-sm overflow-hidden ${isDark ? 'bg-[#1e293b] border border-white/[0.06]' : 'bg-white border border-slate-200'}`}>
+          <div className={`px-4 py-3 flex items-center justify-between ${isDark ? 'border-b border-white/[0.06]' : 'border-b border-slate-100'}`}>
+            <h2 className={`text-sm font-extrabold flex items-center gap-1.5 ${isDark ? 'text-white' : 'text-slate-800'}`}>
+              <Truck size={14} className="text-orange-500" /> Transportes em Execucao
+            </h2>
+            <button onClick={() => nav('/logistica/transportes')} className="text-[10px] text-orange-600 font-semibold flex items-center gap-0.5">
+              Ver todos <ArrowRight size={10} />
+            </button>
+          </div>
+          {transportesAtivos.length === 0 ? (
+            <EmptyPanel
+              isDark={isDark}
+              title="Nenhum transporte em campo"
+              description="Quando a carga sair para coleta ou entrega, o operador acompanha a execucao por aqui."
+            />
+          ) : (
+            <div className={`divide-y ${isDark ? 'divide-white/[0.04]' : 'divide-slate-50'}`}>
+              {transportesAtivos.slice(0, 4).map(transporte => {
+                const sol = transporte.solicitacao
+                const atraso = transporte.eta_atual ? new Date(transporte.eta_atual) < new Date() : false
+                const ocorrenciasAbertas = transporte.ocorrencias?.filter(oc => !oc.resolvido).length ?? 0
+
+                return (
+                  <div key={transporte.id} className={`flex items-center gap-3 px-4 py-3 transition-colors ${isDark ? 'hover:bg-white/[0.03]' : 'hover:bg-slate-50'}`}>
+                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${ocorrenciasAbertas > 0 ? 'bg-red-50' : isDark ? 'bg-orange-500/10' : 'bg-orange-50'}`}>
+                      {ocorrenciasAbertas > 0 ? (
+                        <AlertTriangle size={14} className="text-red-500" />
+                      ) : (
+                        <Truck size={14} className="text-orange-500" />
+                      )}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-1.5">
+                        <p className={`text-xs font-extrabold font-mono ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>{sol?.numero ?? transporte.id.slice(0, 8)}</p>
+                        {sol?.urgente && <span className="text-[9px] bg-red-100 text-red-700 font-bold px-1.5 py-0.5 rounded-full">URGENTE</span>}
+                        {atraso && <span className="text-[9px] bg-amber-100 text-amber-700 font-bold px-1.5 py-0.5 rounded-full">ATRASADO</span>}
+                        {ocorrenciasAbertas > 0 && <span className="text-[9px] bg-red-100 text-red-700 font-bold px-1.5 py-0.5 rounded-full">{ocorrenciasAbertas} ocorr.</span>}
+                      </div>
+                      <p className={`text-[10px] truncate ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+                        {sol?.origem ?? transporte.viagem?.origem_principal ?? 'Origem'} {'->'} {sol?.destino ?? transporte.viagem?.destino_final ?? 'Destino'}
+                        {transporte.viagem?.numero ? ` · ${transporte.viagem.numero}` : ''}
+                      </p>
+                    </div>
+                    <div className="text-right shrink-0">
+                      <p className={`text-xs font-semibold ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
+                        {transporte.motorista_nome ?? transporte.viagem?.motorista_nome ?? '-'}
+                      </p>
+                      <p className={`text-[10px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{transporte.placa ?? transporte.viagem?.veiculo_placa ?? '-'}</p>
+                      <p className={`text-[10px] ${atraso ? 'text-amber-600' : isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+                        ETA {fmtDate(transporte.eta_atual, true)}
+                      </p>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </section>
+
+        <section className={`rounded-2xl shadow-sm overflow-hidden ${isDark ? 'bg-[#1e293b] border border-red-500/30' : 'bg-white border border-red-200'}`}>
+          <div className={`px-4 py-3 flex items-center justify-between ${isDark ? 'border-b border-red-500/20' : 'border-b border-red-100'}`}>
+            <h2 className={`text-sm font-extrabold flex items-center gap-1.5 ${isDark ? 'text-red-400' : 'text-red-800'}`}>
+              <AlertTriangle size={14} className="text-red-500" /> Solicitacoes Urgentes
+            </h2>
+            <button onClick={() => nav('/logistica/solicitacoes')} className="text-[10px] text-red-600 font-semibold flex items-center gap-0.5">
+              Ver todas <ArrowRight size={10} />
+            </button>
+          </div>
+          {urgentes.length === 0 ? (
+            <EmptyPanel
+              isDark={isDark}
+              title="Nenhuma solicitacao urgente"
+              description="As excecoes operacionais aparecem aqui para o operador priorizar a resposta."
+            />
+          ) : (
+            <div className={`divide-y ${isDark ? 'divide-white/[0.04]' : 'divide-red-50'}`}>
+              {urgentes.slice(0, 4).map(sol => (
+                <div key={sol.id} className={`flex items-center gap-3 px-4 py-3 transition-colors ${isDark ? 'hover:bg-white/[0.03]' : 'hover:bg-red-50/50'}`}>
+                  <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${isDark ? 'bg-red-500/10' : 'bg-red-50'}`}>
+                    <AlertTriangle size={14} className="text-red-500" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className={`text-xs font-extrabold font-mono ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>{sol.numero}</p>
+                    <p className={`text-[10px] truncate ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+                      {TIPO_LABEL[sol.tipo] ?? sol.tipo} · {sol.origem} {'->'} {sol.destino}
+                    </p>
+                  </div>
+                  <div className="text-right shrink-0">
+                    <StatusBadge status={sol.status} />
+                    {sol.data_desejada && (
+                      <p className={`text-[9px] mt-0.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+                        Prazo: {fmtDate(sol.data_desejada)}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
+      </div>
 
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-3">
         <section className={`rounded-2xl shadow-sm overflow-hidden ${isDark ? 'bg-[#1e293b] border border-white/[0.06]' : 'bg-white border border-slate-200'}`}>
@@ -391,7 +464,11 @@ export default function LogisticaHome() {
                     </div>
                     <p className={`text-[10px] truncate ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
                       {sol.origem} {'->'} {sol.destino}
-                      {sol.rota_planejada?.distancia_km ? ` · ${fmtKm(sol.rota_planejada.distancia_km)} km` : sol.distancia_km ? ` · ${fmtKm(sol.distancia_km)} km` : ''}
+                      {sol.rota_planejada?.distancia_km
+                        ? ` · ${fmtKm(sol.rota_planejada.distancia_km)} km`
+                        : sol.distancia_km
+                          ? ` · ${fmtKm(sol.distancia_km)} km`
+                          : ''}
                     </p>
                   </div>
                   <div className="text-right shrink-0">
@@ -444,101 +521,6 @@ export default function LogisticaHome() {
           )}
         </section>
       </div>
-
-      <section className={`rounded-2xl shadow-sm overflow-hidden ${isDark ? 'bg-[#1e293b] border border-white/[0.06]' : 'bg-white border border-slate-200'}`}>
-        <div className={`px-4 py-3 flex items-center justify-between ${isDark ? 'border-b border-white/[0.06]' : 'border-b border-slate-100'}`}>
-          <h2 className={`text-sm font-extrabold flex items-center gap-1.5 ${isDark ? 'text-white' : 'text-slate-800'}`}>
-            <Truck size={14} className="text-orange-500" /> Transportes em Execucao
-          </h2>
-          <button onClick={() => nav('/logistica/transportes')} className="text-[10px] text-orange-600 font-semibold flex items-center gap-0.5">
-            Ver todos <ArrowRight size={10} />
-          </button>
-        </div>
-        {transportesAtivos.length === 0 ? (
-          <EmptyPanel
-            isDark={isDark}
-            title="Nenhum transporte em campo"
-            description="Quando a carga sair para coleta ou entrega, o operador acompanha a execucao por aqui."
-          />
-        ) : (
-          <div className={`divide-y ${isDark ? 'divide-white/[0.04]' : 'divide-slate-50'}`}>
-            {transportesAtivos.slice(0, 5).map(transporte => {
-              const sol = transporte.solicitacao
-              const atraso = transporte.eta_atual ? new Date(transporte.eta_atual) < new Date() : false
-              const ocorrenciasAbertas = transporte.ocorrencias?.filter(oc => !oc.resolvido).length ?? 0
-
-              return (
-                <div key={transporte.id} className={`flex items-center gap-3 px-4 py-3 transition-colors ${isDark ? 'hover:bg-white/[0.03]' : 'hover:bg-slate-50'}`}>
-                  <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${ocorrenciasAbertas > 0 ? 'bg-red-50' : isDark ? 'bg-orange-500/10' : 'bg-orange-50'}`}>
-                    {ocorrenciasAbertas > 0 ? (
-                      <AlertTriangle size={14} className="text-red-500" />
-                    ) : (
-                      <Truck size={14} className="text-orange-500" />
-                    )}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-1.5">
-                      <p className={`text-xs font-extrabold font-mono ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>{sol?.numero ?? transporte.id.slice(0, 8)}</p>
-                      {sol?.urgente && <span className="text-[9px] bg-red-100 text-red-700 font-bold px-1.5 py-0.5 rounded-full">URGENTE</span>}
-                      {atraso && <span className="text-[9px] bg-amber-100 text-amber-700 font-bold px-1.5 py-0.5 rounded-full">ATRASADO</span>}
-                      {ocorrenciasAbertas > 0 && <span className="text-[9px] bg-red-100 text-red-700 font-bold px-1.5 py-0.5 rounded-full">{ocorrenciasAbertas} ocorr.</span>}
-                    </div>
-                    <p className={`text-[10px] truncate ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
-                      {sol?.origem ?? transporte.viagem?.origem_principal ?? 'Origem'} {'->'} {sol?.destino ?? transporte.viagem?.destino_final ?? 'Destino'}
-                      {transporte.viagem?.numero ? ` · ${transporte.viagem.numero}` : ''}
-                    </p>
-                  </div>
-                  <div className="text-right shrink-0">
-                    <p className={`text-xs font-semibold ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
-                      {transporte.motorista_nome ?? transporte.viagem?.motorista_nome ?? '-'}
-                    </p>
-                    <p className={`text-[10px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{transporte.placa ?? transporte.viagem?.veiculo_placa ?? '-'}</p>
-                    <p className={`text-[10px] ${atraso ? 'text-amber-600' : isDark ? 'text-slate-500' : 'text-slate-400'}`}>
-                      ETA {fmtDate(transporte.eta_atual, true)}
-                    </p>
-                  </div>
-                </div>
-              )
-            })}
-          </div>
-        )}
-      </section>
-
-      {urgentes.length > 0 && (
-        <section className={`rounded-2xl shadow-sm overflow-hidden ${isDark ? 'bg-[#1e293b] border border-red-500/30' : 'bg-white border border-red-200'}`}>
-          <div className={`px-4 py-3 flex items-center justify-between ${isDark ? 'border-b border-red-500/20' : 'border-b border-red-100'}`}>
-            <h2 className={`text-sm font-extrabold flex items-center gap-1.5 ${isDark ? 'text-red-400' : 'text-red-800'}`}>
-              <AlertTriangle size={14} className="text-red-500" /> Solicitacoes Urgentes
-            </h2>
-            <button onClick={() => nav('/logistica/solicitacoes')} className="text-[10px] text-red-600 font-semibold flex items-center gap-0.5">
-              Ver todas <ArrowRight size={10} />
-            </button>
-          </div>
-          <div className={`divide-y ${isDark ? 'divide-white/[0.04]' : 'divide-red-50'}`}>
-            {urgentes.slice(0, 4).map(sol => (
-              <div key={sol.id} className={`flex items-center gap-3 px-4 py-3 transition-colors ${isDark ? 'hover:bg-white/[0.03]' : 'hover:bg-red-50/50'}`}>
-                <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${isDark ? 'bg-red-500/10' : 'bg-red-50'}`}>
-                  <AlertTriangle size={14} className="text-red-500" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className={`text-xs font-extrabold font-mono ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>{sol.numero}</p>
-                  <p className={`text-[10px] truncate ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
-                      {TIPO_LABEL[sol.tipo] ?? sol.tipo} · {sol.origem} {'->'} {sol.destino}
-                  </p>
-                </div>
-                <div className="text-right shrink-0">
-                  <StatusBadge status={sol.status} />
-                  {sol.data_desejada && (
-                    <p className={`text-[9px] mt-0.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
-                      Prazo: {fmtDate(sol.data_desejada)}
-                    </p>
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
-        </section>
-      )}
     </div>
   )
 }
@@ -566,30 +548,90 @@ function SpotlightMetric({
   )
 }
 
-function CompactStatusCard({
-  label,
-  value,
-  icon: Icon,
-  tone,
+function HorizontalStatusBar({
+  title,
+  segments,
+  emptyLabel,
   isDark,
 }: {
-  label: string
-  value: number
-  icon: typeof ClipboardList
-  tone: 'orange' | 'blue' | 'red' | 'violet' | 'slate'
+  title: string
+  segments: Array<{ key: string; label: string; value: number; barClass: string }>
+  emptyLabel: string
   isDark: boolean
 }) {
-  const palette = toneClasses(tone)
+  const total = segments.reduce((sum, segment) => sum + segment.value, 0)
 
   return (
-    <div className={`rounded-2xl border px-3 py-3 flex items-center gap-3 ${isDark ? 'border-white/[0.06] bg-white/[0.03]' : 'border-slate-100 bg-slate-50/80'}`}>
-      <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${isDark ? 'bg-white/5 text-slate-300' : palette.icon}`}>
-        <Icon size={15} />
+    <div>
+      <div className="flex items-center justify-between gap-3 mb-2">
+        <p className={`text-[10px] font-bold uppercase tracking-widest ${isDark ? 'text-slate-500' : 'text-slate-500'}`}>{title}</p>
+        <p className={`text-[10px] font-semibold ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{total} item(ns)</p>
       </div>
-      <div className="min-w-0">
-        <p className={`text-lg font-black leading-none ${palette.text}`}>{value}</p>
-        <p className={`text-[10px] mt-1 font-semibold uppercase tracking-widest ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{label}</p>
-      </div>
+      {segments.length === 0 ? (
+        <div className={`h-10 rounded-xl flex items-center justify-center text-[10px] font-semibold ${isDark ? 'bg-white/[0.04] text-slate-500' : 'bg-slate-50 text-slate-400'}`}>
+          {emptyLabel}
+        </div>
+      ) : (
+        <div className={`flex h-10 rounded-xl overflow-hidden ${isDark ? 'bg-white/[0.04]' : 'bg-slate-100'}`}>
+          {segments.map(segment => {
+            const pct = (segment.value / total) * 100
+            const showLabel = pct >= 14
+            const showValue = pct >= 22
+
+            return (
+              <div
+                key={segment.key}
+                className={`${segment.barClass} relative flex items-center justify-center transition-all`}
+                style={{ width: `${Math.max(pct, 4)}%` }}
+                title={`${segment.label}: ${segment.value}`}
+              >
+                {showLabel && (
+                  <span className="text-[10px] font-bold text-white drop-shadow-sm truncate px-2">
+                    {segment.label} {showValue ? segment.value : ''}
+                  </span>
+                )}
+              </div>
+            )
+          })}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function InlineStatusLegend({
+  segments,
+  isDark,
+}: {
+  segments: Array<{
+    key: string
+    label: string
+    value: number
+    barClass: string
+    tone: 'orange' | 'blue' | 'red' | 'violet' | 'slate'
+  }>
+  isDark: boolean
+}) {
+  if (segments.length === 0) {
+    return null
+  }
+
+  return (
+    <div className="flex flex-wrap gap-2">
+      {segments.map(segment => {
+        const palette = toneClasses(segment.tone)
+
+        return (
+          <div
+            key={segment.key}
+            className={`inline-flex items-center gap-2 rounded-full px-2.5 py-1 text-[10px] font-semibold ${isDark ? 'bg-white/[0.04] text-slate-300' : palette.soft}`}
+          >
+            <span className={`w-2 h-2 rounded-full ${segment.barClass}`} />
+            {segment.label}
+            <span className={`${isDark ? 'text-white' : palette.text}`}>{segment.value}</span>
+          </div>
+        )
+      })}
     </div>
   )
 }
