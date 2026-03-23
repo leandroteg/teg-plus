@@ -35,34 +35,34 @@ function minCotacoes(valor: number, regras?: { ate_500: number; '501_a_2k': numb
 function Stepper({ step }: { step: number }) {
   const steps = ['Categoria', 'Detalhes', 'Confirmar']
   return (
-    <div className="mb-6 w-full">
-      <div className="flex w-full items-center gap-0">
-      {steps.map((label, i) => {
-        const idx = i + 1
-        const done = idx < step
-        const active = idx === step
-        return (
-          <div key={label} className="flex items-center flex-1 min-w-0">
-            <div className="flex flex-col items-center">
-              <div className={`
-                w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-extrabold flex-shrink-0 transition-all
-                ${done   ? 'bg-teal-500 text-white' : ''}
-                ${active ? 'bg-teal-400 text-white ring-4 ring-teal-400/20' : ''}
-                ${!done && !active ? 'bg-slate-100 text-slate-400' : ''}
-              `}>
-                {done ? <Check size={13} strokeWidth={3} /> : idx}
+    <div className="mb-6 flex justify-center">
+      <div className="flex w-full max-w-4xl items-center gap-0 px-2">
+        {steps.map((label, i) => {
+          const idx = i + 1
+          const done = idx < step
+          const active = idx === step
+          return (
+            <div key={label} className="flex min-w-0 flex-1 items-center">
+              <div className="flex flex-col items-center">
+                <div className={`
+                  w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-extrabold flex-shrink-0 transition-all
+                  ${done   ? 'bg-teal-500 text-white' : ''}
+                  ${active ? 'bg-teal-400 text-white ring-4 ring-teal-400/20' : ''}
+                  ${!done && !active ? 'bg-slate-100 text-slate-400' : ''}
+                `}>
+                  {done ? <Check size={13} strokeWidth={3} /> : idx}
+                </div>
+                <span className={`text-[10px] font-semibold mt-1 whitespace-nowrap
+                  ${active ? 'text-teal-600' : done ? 'text-teal-500' : 'text-slate-400'}`}>
+                  {label}
+                </span>
               </div>
-              <span className={`text-[10px] font-semibold mt-1 whitespace-nowrap
-                ${active ? 'text-teal-600' : done ? 'text-teal-500' : 'text-slate-400'}`}>
-                {label}
-              </span>
+              {i < steps.length - 1 && (
+                <div className={`flex-1 h-px mx-1 mt-[-12px] ${done ? 'bg-teal-400' : 'bg-slate-200'}`} />
+              )}
             </div>
-            {i < steps.length - 1 && (
-              <div className={`flex-1 h-px mx-1 mt-[-12px] ${done ? 'bg-teal-400' : 'bg-slate-200'}`} />
-            )}
-          </div>
-        )
-      })}
+          )
+        })}
       </div>
     </div>
   )
