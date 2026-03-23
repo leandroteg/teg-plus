@@ -1505,9 +1505,8 @@ function DetailModal({
                         const num = `SOL-CON-${new Date().getFullYear()}-${String(Math.floor(Math.random() * 9000) + 1000)}`
                         const { error: solErr } = await supabase.from('con_solicitacoes').insert({
                           numero: num,
-                          titulo: pedido.requisicao?.descricao || `Contrato ref. ${pedido.requisicao?.numero}`,
                           grupo_contrato: 'prestacao_servicos',
-                          tipo: 'despesa',
+                          tipo_contrato: 'despesa',
                           obra_id: (pedido.requisicao as any)?.obra_id || null,
                           valor_estimado: pedido.valor_total || 0,
                           etapa_atual: 'solicitacao',

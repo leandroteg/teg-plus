@@ -205,7 +205,6 @@ function CotacaoConcluida({ cotacao, nav }: { cotacao: Cotacao; nav: ReturnType<
         .from('con_solicitacoes')
         .insert({
           numero,
-          titulo: req.descricao,
           objeto: req.descricao,
           categoria_contrato: 'prestacao_servico',
           grupo_contrato: 'prestacao_servicos',
@@ -392,9 +391,8 @@ function CotacaoConcluida({ cotacao, nav }: { cotacao: Cotacao; nav: ReturnType<
               const num = `SOL-CON-${new Date().getFullYear()}-${String(Math.floor(Math.random() * 9000) + 1000)}`
               const { error: solErr } = await supabase.from('con_solicitacoes').insert({
                 numero: num,
-                titulo: req.descricao || `Contrato ref. ${req.numero}`,
                 grupo_contrato: 'prestacao_servicos',
-                tipo: 'despesa',
+                tipo_contrato: 'despesa',
                 obra_id: req.obra_id || null,
                 valor_estimado: cotacao.valor_selecionado || req.valor_estimado || 0,
                 solicitante_id: perfil?.id || null,
