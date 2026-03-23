@@ -8,6 +8,7 @@ import {
 } from 'lucide-react'
 import { useCriarRequisicao } from '../hooks/useRequisicoes'
 import { useAiParse, readFileForAi, isBinaryFile, isImageFile } from '../hooks/useAiParse'
+import { api } from '../services/api'
 import { useCategorias } from '../hooks/useCategorias'
 import { useLookupObras } from '../hooks/useLookups'
 import { useAuth } from '../contexts/AuthContext'
@@ -316,32 +317,55 @@ export default function NovaRequisicao() {
     setRefParsing(true)
     setRefParseMsg(null)
     try {
-      const fileData = await readFileForAi(referenciaFile)
-      const payload: { texto: string; solicitante_nome?: string; arquivo?: { base64: string; nome: string; mime: string } } = {
-        texto: `Extrair itens, quantidades, unidades e valores desta cotação/proposta comercial: ${referenciaFile.name}`,
-        solicitante_nome: perfil?.nome || solicitante,
-      }
-      if (fileData.arquivo) {
-        payload.arquivo = fileData.arquivo
-      } else if (fileData.texto) {
-        payload.texto += `\n\nConteúdo do arquivo:\n${fileData.texto}`
-      }
+      // Converter arquivo para base64
+      const base64 = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader()
+        reader.onload = () => resolve((reader.result as string).split(',')[1])
+        reader.onerror = reject
+        reader.readAsDataURL(referenciaFile)
+      })
 
-      const result: AiParseResult = await aiParse.mutateAsync(payload)
-      const sanitized = sanitizeItems(result.itens)
+      // Usar endpoint parse-cotacao (mais robusto para cotações/propostas)
+      const result = await api.parseCotacaoFile({
+        file_base64: base64,
+        file_name: referenciaFile.name,
+        mime_type: referenciaFile.type,
+      })
 
-      if (sanitized.length > 0 && sanitized.some(i => i.descricao.trim())) {
-        // Mostra preview antes de aplicar
-        setAiPreview(result)
-        setPreviewItens(sanitized)
-        setShowPreview(true)
-        setRefParseMsg({ type: 'success', text: `${sanitized.length} itens extraídos do arquivo` })
+      if (result.success && result.fornecedores?.length > 0) {
+        // Converter fornecedores parsed para itens da requisição
+        const allItens = result.fornecedores.flatMap((f: { itens?: { descricao: string; qtd: number; valor_unitario: number }[] }) =>
+          (f.itens || []).map(i => ({
+            descricao: i.descricao,
+            quantidade: i.qtd || 1,
+            unidade: 'un' as const,
+            valor_unitario_estimado: i.valor_unitario || 0,
+          }))
+        )
+        const sanitized = sanitizeItems(allItens.length > 0 ? allItens : [])
+
+        if (sanitized.length > 0 && sanitized.some(i => i.descricao.trim())) {
+          setPreviewItens(sanitized)
+          setShowPreview(true)
+          setAiPreview({
+            itens: sanitized,
+            confianca: 0.85,
+            obra_sugerida: result.fornecedores[0]?.fornecedor_nome,
+          })
+          setRefParseMsg({ type: 'success', text: `${sanitized.length} itens extraídos de ${result.fornecedores.length} fornecedor(es)` })
+        } else {
+          setRefParseMsg({ type: 'error', text: 'IA não conseguiu extrair itens. Tente imagem mais nítida ou preencha manualmente.' })
+        }
       } else {
-        setRefParseMsg({ type: 'error', text: 'Não foi possível extrair itens do arquivo. Tente usar o Assistente IA no passo anterior.' })
+        setRefParseMsg({ type: 'error', text: result.error || 'Não foi possível extrair dados do documento.' })
       }
     } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Erro ao processar o arquivo. Tente novamente.'
-      setRefParseMsg({ type: 'error', text: msg })
+      const msg = err instanceof Error ? err.message : 'Erro ao processar o arquivo.'
+      if (msg.includes('Failed to fetch') || msg.includes('NetworkError')) {
+        setRefParseMsg({ type: 'error', text: 'Serviço de IA indisponível. Preencha os itens manualmente.' })
+      } else {
+        setRefParseMsg({ type: 'error', text: msg })
+      }
     }
     setRefParsing(false)
   }
