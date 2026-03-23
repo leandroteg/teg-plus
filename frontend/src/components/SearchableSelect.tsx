@@ -34,16 +34,21 @@ export default function SearchableSelect({
   const inputRef = useRef<HTMLInputElement>(null)
   const listRef = useRef<HTMLDivElement>(null)
 
-  const selected = options.find(o => o.value === value)
+  // Se o valor atual não está nas opções, adicionar como opção temporária
+  const allOptions = value && !options.some(o => o.value === value)
+    ? [{ value, label: value, description: 'Valor atual' }, ...options]
+    : options
+
+  const selected = allOptions.find(o => o.value === value)
 
   const filtered = search.trim()
-    ? options.filter(o => {
+    ? allOptions.filter(o => {
         const q = search.toLowerCase()
         return o.label.toLowerCase().includes(q)
           || (o.code?.toLowerCase().includes(q) ?? false)
           || (o.description?.toLowerCase().includes(q) ?? false)
       })
-    : options
+    : allOptions
 
   // Close on outside click
   useEffect(() => {
