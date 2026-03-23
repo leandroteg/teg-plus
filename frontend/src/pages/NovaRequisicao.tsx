@@ -716,13 +716,6 @@ export default function NovaRequisicao() {
           </div>
         </div>
 
-        {compraRecorrente && (
-          <div className="rounded-xl border border-indigo-100 bg-white px-3 py-2.5">
-            <span className="text-[11px] font-semibold uppercase tracking-wide text-indigo-500">Fluxo</span>
-            <p className="mt-1 text-sm font-bold text-slate-800">Contratos &gt; Elaboracao</p>
-            <p className="mt-1 text-[11px] text-slate-500">Os itens desta RC serao levados como escopo da solicitacao contratual.</p>
-          </div>
-        )}
         </div>
       </div>
 
