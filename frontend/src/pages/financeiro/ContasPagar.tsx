@@ -7,7 +7,7 @@ import {
   ShieldCheck, Building2, Tag, Briefcase, Hash, Truck, Package, Layers, ChevronLeft, ChevronRight,
 } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
-import { useContasPagar, useMarcarCPPago, useAprovarPagamento, useFornecedorById } from '../../hooks/useFinanceiro'
+import { useContasPagar, useMarcarCPPago, useAprovarPagamento, useFornecedorByReference } from '../../hooks/useFinanceiro'
 import { useLastSync, useTriggerSync, useOmieConfig } from '../../hooks/useOmie'
 import { useAnexosPedido, useUploadAnexo, TIPO_LABEL } from '../../hooks/useAnexos'
 import { useRegistrarPagamento } from '../../hooks/usePedidos'
@@ -148,12 +148,18 @@ function RegistrarPgtoModal({ cp, onClose, isDark }: RegistrarPgtoModalProps & {
   const [erro, setErro] = useState('')
   const [loading, setLoading] = useState(false)
 
+  const { data: anexosPedido = [] } = useAnexosPedido(cp.pedido_id)
   const uploadAnexo = useUploadAnexo()
   const registrarPag = useRegistrarPagamento()  // for cmp_pedidos (triggers fin_contas_pagar)
   const marcarCPPago = useMarcarCPPago()         // direct update of fin_contas_pagar
+  const jaTemComprovante = anexosPedido.some(a => a.tipo === 'comprovante_pagamento')
 
   const handleConfirm = async () => {
     setErro('')
+    if (cp.pedido_id && !arquivo && !jaTemComprovante) {
+      setErro('Anexe o comprovante de pagamento antes de confirmar.')
+      return
+    }
     setLoading(true)
     try {
       // 1. Upload comprovante if a file was selected
@@ -212,7 +218,10 @@ function RegistrarPgtoModal({ cp, onClose, isDark }: RegistrarPgtoModalProps & {
           {cp.pedido_id && (
             <div>
               <p className="text-xs font-semibold text-slate-600 mb-2">
-                Comprovante de Pagamento <span className="text-slate-400 font-normal">(opcional)</span>
+                Comprovante de Pagamento{' '}
+                <span className={`font-normal ${jaTemComprovante ? 'text-emerald-600' : 'text-red-500'}`}>
+                  {jaTemComprovante ? '(já anexado no pedido)' : '(obrigatório)'}
+                </span>
               </p>
               <input
                 ref={fileRef}
@@ -233,7 +242,9 @@ function RegistrarPgtoModal({ cp, onClose, isDark }: RegistrarPgtoModalProps & {
                 <span className={`text-xs font-semibold ${arquivo ? 'text-emerald-700' : 'text-slate-500'}`}>
                   {arquivo
                     ? `${arquivo.name} (${(arquivo.size / 1024).toFixed(0)} KB)`
-                    : 'Clique para anexar comprovante'}
+                    : jaTemComprovante
+                      ? 'Clique para substituir ou complementar o comprovante'
+                      : 'Clique para anexar comprovante'}
                 </span>
               </button>
 
@@ -478,8 +489,16 @@ function StatusFilterRail({
 
 // ── Issue #36: Dados bancarios/PIX do fornecedor ──────────────────────────────
 
-function FornecedorPagamentoInfo({ fornecedorId, isDark }: { fornecedorId: string; isDark: boolean }) {
-  const { data: forn, isLoading } = useFornecedorById(fornecedorId)
+function FornecedorPagamentoInfo({
+  fornecedorId,
+  fornecedorNome,
+  isDark,
+}: {
+  fornecedorId?: string
+  fornecedorNome?: string
+  isDark: boolean
+}) {
+  const { data: forn, isLoading } = useFornecedorByReference({ fornecedorId, fornecedorNome })
 
   if (isLoading) {
     return (
@@ -806,8 +825,12 @@ function CPCard({ cp, onRegistrarPgto, onAprovarPgto, isDark }: {
           )}
 
           {/* Issue #36: Dados bancarios/PIX do fornecedor */}
-          {cp.fornecedor_id && (
-            <FornecedorPagamentoInfo fornecedorId={cp.fornecedor_id} isDark={isDark} />
+          {(cp.fornecedor_id || cp.fornecedor_nome) && (
+            <FornecedorPagamentoInfo
+              fornecedorId={cp.fornecedor_id}
+              fornecedorNome={cp.fornecedor_nome}
+              isDark={isDark}
+            />
           )}
 
           {/* Anexos */}

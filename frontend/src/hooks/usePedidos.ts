@@ -11,7 +11,7 @@ export function usePedidos(status?: string) {
       let query = supabase
         .from('cmp_pedidos')
         .select(`
-          id, requisicao_id, cotacao_id, comprador_id,
+          id, requisicao_id, cotacao_id, comprador_id, fornecedor_id,
           numero_pedido, fornecedor_nome, valor_total, status,
           data_pedido, data_prevista_entrega, data_entrega_real,
           nf_numero, observacoes, created_at,
@@ -90,13 +90,19 @@ export function useRegistrarPagamento() {
         .eq('id', pedidoId)
       if (error) throw error
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['pedidos'] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['pedidos'] })
+      qc.invalidateQueries({ queryKey: ['contas-pagar'] })
+      qc.invalidateQueries({ queryKey: ['financeiro-dashboard'] })
+      qc.invalidateQueries({ queryKey: ['requisicoes'] })
+    },
   })
 }
 
 export interface EmitirPedidoPayload {
   requisicaoId: string
   cotacaoId: string
+  fornecedorId?: string
   fornecedorNome: string
   valorTotal: number
   compradorId?: string
@@ -162,6 +168,7 @@ export function useEmitirPedido() {
       let {
         requisicaoId,
         cotacaoId,
+        fornecedorId,
         fornecedorNome,
         valorTotal,
         compradorId,
@@ -250,6 +257,7 @@ export function useEmitirPedido() {
           requisicao_id: requisicaoId,
           cotacao_id: cotacaoId,
           comprador_id: compradorId || null,
+          fornecedor_id: fornecedorId || null,
           numero_pedido: numeroPedido,
           fornecedor_nome: fornecedorNome,
           valor_total: valorTotal,
@@ -317,6 +325,7 @@ export function useEmitirPedido() {
       const cpPayloads = parcelasSanitizadas.map((parcela) => ({
         pedido_id: pedido.id,
         requisicao_id: requisicaoId,
+        fornecedor_id: fornecedorId || null,
         fornecedor_nome: fornecedorNome,
         valor_original: parcela.valor,
         valor_pago: 0,

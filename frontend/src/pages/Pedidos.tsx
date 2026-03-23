@@ -5,6 +5,7 @@ import {
   Banknote, ExternalLink, Loader2,
   Search, LayoutList, LayoutGrid, ArrowUp, ArrowDown,
   ClipboardList, ShieldCheck, BoxIcon, CreditCard, ArchiveIcon,
+  Building2, Link2, RefreshCw, UserPlus,
 } from 'lucide-react'
 import { useSearchParams } from 'react-router-dom'
 import jsPDF from 'jspdf'
@@ -15,7 +16,15 @@ import {
   useLiberarPagamento,
   useEmitirPedido,
 } from '../hooks/usePedidos'
+import { useCadFornecedores } from '../hooks/useCadastros'
 import { useCotacoes } from '../hooks/useCotacoes'
+import {
+  buildFornecedorPrefillFromCotacao,
+  formatCNPJ,
+  getFornecedorPaymentMissingFields,
+  hasFornecedorPaymentData,
+  useFornecedorCotacaoResolver,
+} from '../hooks/useFornecedorVinculo'
 import { api } from '../services/api'
 import { supabase } from '../services/supabase'
 import { useAnexosPedido, useUploadAnexo, useCotacaoDocs, TIPO_LABEL } from '../hooks/useAnexos'
@@ -23,7 +32,9 @@ import type { PedidoAnexo } from '../hooks/useAnexos'
 import FluxoTimeline from '../components/FluxoTimeline'
 import RecebimentoModal from '../components/RecebimentoModal'
 import EmitirPedidoModal from '../components/EmitirPedidoModal'
+import FornecedorCadastroModal from '../components/FornecedorCadastroModal'
 import type { Cotacao, Pedido } from '../types'
+import type { Fornecedor } from '../types/financeiro'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -34,6 +45,114 @@ type ViewMode = 'list' | 'cards'
 type PedidoListItem = Pedido & {
   pending_emissao?: boolean
   source_cotacao?: Pick<Cotacao, 'id' | 'comprador_id'>
+}
+
+function FornecedorSelectorModal({
+  open,
+  dark,
+  fornecedores,
+  selectedId,
+  onClose,
+  onSelect,
+}: {
+  open: boolean
+  dark: boolean
+  fornecedores: Fornecedor[]
+  selectedId?: string | null
+  onClose: () => void
+  onSelect: (fornecedor: Fornecedor) => void
+}) {
+  const [busca, setBusca] = useState('')
+
+  useEffect(() => {
+    if (!open) setBusca('')
+  }, [open])
+
+  const filtrados = useMemo(() => {
+    const termo = busca.trim().toLowerCase()
+    if (!termo) return fornecedores
+    const termoCnpj = termo.replace(/\D/g, '')
+    return fornecedores.filter((fornecedor) => {
+      const cnpj = fornecedor.cnpj?.replace(/\D/g, '') ?? ''
+      return fornecedor.razao_social.toLowerCase().includes(termo)
+        || fornecedor.nome_fantasia?.toLowerCase().includes(termo)
+        || (termoCnpj.length > 0 && cnpj.includes(termoCnpj))
+    })
+  }, [fornecedores, busca])
+
+  if (!open) return null
+
+  const bg = dark ? 'bg-[#0f172a]' : 'bg-white'
+  const border = dark ? 'border-white/10' : 'border-slate-200'
+  const text = dark ? 'text-white' : 'text-slate-800'
+  const subtext = dark ? 'text-slate-400' : 'text-slate-500'
+
+  return (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm" onClick={onClose}>
+      <div onClick={(event) => event.stopPropagation()} className={`${bg} w-full max-w-2xl max-h-[85vh] overflow-y-auto rounded-2xl shadow-2xl border ${border}`}>
+        <div className={`sticky top-0 z-10 ${bg} px-6 py-4 border-b ${border} flex items-center justify-between gap-3`}>
+          <div>
+            <p className={`text-base font-bold ${text}`}>Selecionar outro fornecedor</p>
+            <p className={`text-xs mt-0.5 ${subtext}`}>Escolha o cadastro mestre que deve ficar vinculado ao pedido.</p>
+          </div>
+          <button onClick={onClose} className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors ${dark ? 'hover:bg-white/10 text-slate-400' : 'hover:bg-slate-100 text-slate-400'}`}>
+            <X size={16} />
+          </button>
+        </div>
+
+        <div className="p-6 space-y-4">
+          <div className="relative">
+            <Search size={14} className={`absolute left-3 top-1/2 -translate-y-1/2 ${dark ? 'text-slate-500' : 'text-slate-400'}`} />
+            <input
+              value={busca}
+              onChange={(event) => setBusca(event.target.value)}
+              placeholder="Buscar por razão social ou CNPJ"
+              className={`w-full pl-9 pr-4 py-2.5 rounded-xl border text-sm ${dark ? 'bg-white/5 border-white/10 text-white placeholder:text-slate-500' : 'bg-white border-slate-200 text-slate-700 placeholder:text-slate-400'}`}
+            />
+          </div>
+
+          <div className="space-y-2 max-h-[50vh] overflow-y-auto pr-1">
+            {filtrados.map((fornecedor) => {
+              const selected = selectedId === fornecedor.id
+              const paymentReady = hasFornecedorPaymentData(fornecedor)
+              return (
+                <button
+                  key={fornecedor.id}
+                  type="button"
+                  onClick={() => onSelect(fornecedor)}
+                  className={`w-full text-left rounded-2xl border p-4 transition-all ${
+                    selected
+                      ? 'border-teal-400 bg-teal-50'
+                      : dark
+                        ? 'border-white/10 bg-white/[0.03] hover:bg-white/[0.06]'
+                        : 'border-slate-200 bg-white hover:border-teal-200 hover:bg-teal-50/60'
+                  }`}
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className={`text-sm font-bold truncate ${dark && !selected ? 'text-white' : 'text-slate-800'}`}>{fornecedor.razao_social}</p>
+                      <p className={`text-[11px] mt-0.5 ${dark && !selected ? 'text-slate-400' : 'text-slate-500'}`}>
+                        {formatCNPJ(fornecedor.cnpj) || 'CNPJ não informado'}
+                      </p>
+                    </div>
+                    <span className={`px-2.5 py-1 rounded-full text-[10px] font-semibold ${paymentReady ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
+                      {paymentReady ? 'Pagamento OK' : 'Dados pendentes'}
+                    </span>
+                  </div>
+                </button>
+              )
+            })}
+
+            {filtrados.length === 0 && (
+              <div className={`rounded-2xl border p-6 text-center ${dark ? 'border-white/10 bg-white/[0.03] text-slate-400' : 'border-slate-200 bg-slate-50 text-slate-500'}`}>
+                Nenhum fornecedor encontrado com esse filtro.
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  )
 }
 
 // ─── Formatters ──────────────────────────────────────────────────────────────
@@ -985,8 +1104,13 @@ function DetailModal({
 }) {
   const mutation = useAtualizarPedido()
   const emitirPedido = useEmitirPedido()
+  const { data: fornecedoresAtivos = [] } = useCadFornecedores({ ativo: true })
   const [confirmando, setConfirmando] = useState(false)
   const [showEmitirModal, setShowEmitirModal] = useState(false)
+  const [showFornecedorCadastroModal, setShowFornecedorCadastroModal] = useState(false)
+  const [showFornecedorAtualizarModal, setShowFornecedorAtualizarModal] = useState(false)
+  const [showFornecedorSelectorModal, setShowFornecedorSelectorModal] = useState(false)
+  const [fornecedorVinculado, setFornecedorVinculado] = useState<Fornecedor | null>(null)
 
   const dias     = diasRestantes(pedido.data_prevista_entrega)
   const st       = getStatusMeta(pedido)
@@ -1003,6 +1127,31 @@ function DetailModal({
   const isLiberado     = statusPgto === 'liberado'
   const isPago         = statusPgto === 'pago'
   const podeLiberar    = entregue && !statusPgto
+  const { data: fornecedorResolvido, isLoading: isLoadingFornecedorResolvido, refetch: refetchFornecedorResolvido } = useFornecedorCotacaoResolver(
+    pending ? pedido.source_cotacao?.id : undefined,
+  )
+
+  useEffect(() => {
+    if (!pending) {
+      setFornecedorVinculado(null)
+      return
+    }
+
+    setFornecedorVinculado(null)
+  }, [pending, pedido.id])
+
+  const fornecedorDetectado = fornecedorResolvido?.fornecedorCorrespondente ?? null
+  const fornecedorAtivo = fornecedorVinculado
+  const fornecedorAtivoComplete = hasFornecedorPaymentData(fornecedorAtivo)
+  const camposPagamentoPendentes = getFornecedorPaymentMissingFields(fornecedorAtivo)
+  const podeEmitirPedidoPendente = !pending || Boolean(fornecedorAtivo && fornecedorAtivoComplete)
+  const motivoBloqueioEmissao = !pending
+    ? null
+    : !fornecedorAtivo
+      ? 'Vincule ou cadastre o fornecedor mestre antes de emitir o pedido.'
+      : !fornecedorAtivoComplete
+        ? `Atualize os dados de pagamento do fornecedor: ${camposPagamentoPendentes.join(', ')}.`
+        : null
 
   const confirmarEntrega = async () => {
     setConfirmando(true)
@@ -1017,6 +1166,15 @@ function DetailModal({
   const txt = dark ? 'text-white' : 'text-slate-800'
   const sub = dark ? 'text-slate-400' : 'text-slate-500'
   const brd = dark ? 'border-white/10' : 'border-slate-200'
+  const prefillCadastro = buildFornecedorPrefillFromCotacao(fornecedorResolvido)
+
+  const handleFornecedorVinculado = async (fornecedor: Fornecedor) => {
+    setFornecedorVinculado(fornecedor)
+    setShowFornecedorCadastroModal(false)
+    setShowFornecedorAtualizarModal(false)
+    setShowFornecedorSelectorModal(false)
+    await refetchFornecedorResolvido()
+  }
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-black/50 backdrop-blur-sm" onClick={onClose}>
@@ -1133,6 +1291,173 @@ function DetailModal({
           {!pending && <FluxoTimeline status="pedido_emitido" compact />}
 
           {/* Requisição description */}
+          {pending && (
+            <div className={`rounded-2xl border p-4 space-y-4 ${dark ? 'border-white/10 bg-white/[0.03]' : 'border-slate-200 bg-slate-50/80'}`}>
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className={`text-sm font-bold ${txt}`}>Cadastro do fornecedor</p>
+                  <p className={`text-xs mt-1 ${sub}`}>A emissão fica bloqueada até existir um fornecedor mestre vinculado com dados completos de pagamento.</p>
+                </div>
+                <span className={`px-2.5 py-1 rounded-full text-[11px] font-semibold ${fornecedorAtivo && fornecedorAtivoComplete ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
+                  {fornecedorAtivo && fornecedorAtivoComplete ? 'Pronto para emitir' : 'Ação necessária'}
+                </span>
+              </div>
+
+              <div className={`grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs border rounded-xl p-4 ${brd}`}>
+                <div>
+                  <span className={sub}>Fornecedor da cotação</span>
+                  <p className={`font-semibold ${txt}`}>{fornecedorResolvido?.nomeCotacao ?? pedido.fornecedor_nome}</p>
+                </div>
+                <div>
+                  <span className={sub}>CNPJ da cotação</span>
+                  <p className={`font-semibold ${txt}`}>{formatCNPJ(fornecedorResolvido?.cnpjCotacao) || 'Não informado'}</p>
+                </div>
+              </div>
+
+              {isLoadingFornecedorResolvido ? (
+                <div className={`rounded-xl border p-4 flex items-center gap-3 text-sm ${dark ? 'border-white/10 bg-white/[0.02] text-slate-300' : 'border-slate-200 bg-white text-slate-600'}`}>
+                  <Loader2 size={16} className="animate-spin text-teal-500" />
+                  Verificando cadastro mestre do fornecedor...
+                </div>
+              ) : fornecedorDetectado ? (
+                <div className={`rounded-xl border p-4 space-y-3 ${dark ? 'border-white/10 bg-white/[0.02]' : 'border-slate-200 bg-white'}`}>
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className={`text-xs font-bold uppercase tracking-wide ${sub}`}>Fornecedor já cadastrado</p>
+                      <p className={`text-sm font-bold ${txt}`}>{fornecedorDetectado.razao_social}</p>
+                    </div>
+                    <span className={`px-2.5 py-1 rounded-full text-[10px] font-semibold ${hasFornecedorPaymentData(fornecedorDetectado) ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
+                      {hasFornecedorPaymentData(fornecedorDetectado) ? 'Dados OK' : 'Atualizar dados'}
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                    <div>
+                      <span className={sub}>Nome</span>
+                      <p className={`font-semibold ${txt}`}>{fornecedorDetectado.razao_social}</p>
+                    </div>
+                    <div>
+                      <span className={sub}>CNPJ</span>
+                      <p className={`font-semibold ${txt}`}>{formatCNPJ(fornecedorDetectado.cnpj) || 'Não informado'}</p>
+                    </div>
+                  </div>
+
+                  {!hasFornecedorPaymentData(fornecedorDetectado) && (
+                    <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] text-amber-700">
+                      Dados de pagamento pendentes: {fornecedorResolvido?.camposPagamentoFaltantes.join(', ')}.
+                    </div>
+                  )}
+
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setFornecedorVinculado(fornecedorDetectado)}
+                      className={`inline-flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold transition-colors ${
+                        fornecedorAtivo?.id === fornecedorDetectado.id
+                          ? 'bg-emerald-100 text-emerald-700 border border-emerald-200'
+                          : 'bg-teal-50 text-teal-700 border border-teal-200 hover:bg-teal-100'
+                      }`}
+                    >
+                      <Link2 size={14} />
+                      {fornecedorAtivo?.id === fornecedorDetectado.id ? 'Fornecedor vinculado' : 'Vincular'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setShowFornecedorSelectorModal(true)}
+                      className="inline-flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold border border-slate-200 text-slate-600 hover:bg-slate-50 transition-colors"
+                    >
+                      <Search size={14} />
+                      Selecionar outro
+                    </button>
+                    {!hasFornecedorPaymentData(fornecedorDetectado) && (
+                      <button
+                        type="button"
+                        onClick={() => setShowFornecedorAtualizarModal(true)}
+                        className="inline-flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold border border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100 transition-colors"
+                      >
+                        <RefreshCw size={14} />
+                        Atualizar dados
+                      </button>
+                    )}
+                  </div>
+                </div>
+              ) : (
+                <div className={`rounded-xl border p-4 space-y-3 ${dark ? 'border-white/10 bg-white/[0.02]' : 'border-slate-200 bg-white'}`}>
+                  <div className="flex items-start gap-3">
+                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${dark ? 'bg-amber-500/10' : 'bg-amber-50'}`}>
+                      <Building2 size={18} className={dark ? 'text-amber-300' : 'text-amber-600'} />
+                    </div>
+                    <div>
+                      <p className={`text-sm font-bold ${txt}`}>Fornecedor ainda não cadastrado</p>
+                      <p className={`text-xs mt-1 ${sub}`}>Nenhum cadastro mestre foi localizado para este CNPJ. O pedido fica bloqueado até concluir o cadastro.</p>
+                    </div>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setShowFornecedorCadastroModal(true)}
+                      className="inline-flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold bg-teal-50 text-teal-700 border border-teal-200 hover:bg-teal-100 transition-colors"
+                    >
+                      <UserPlus size={14} />
+                      Cadastrar fornecedor
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setShowFornecedorSelectorModal(true)}
+                      className="inline-flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold border border-slate-200 text-slate-600 hover:bg-slate-50 transition-colors"
+                    >
+                      <Search size={14} />
+                      Selecionar outro
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {fornecedorAtivo && (
+                <div className={`rounded-xl border p-4 space-y-3 ${fornecedorAtivoComplete ? 'border-emerald-200 bg-emerald-50/80' : 'border-amber-200 bg-amber-50/80'}`}>
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="text-xs font-bold uppercase tracking-wide text-slate-500">Cadastro vinculado ao pedido</p>
+                      <p className="text-sm font-bold text-slate-800">{fornecedorAtivo.razao_social}</p>
+                    </div>
+                    <span className={`px-2.5 py-1 rounded-full text-[10px] font-semibold ${fornecedorAtivoComplete ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
+                      {fornecedorAtivoComplete ? 'Completo' : 'Pendente'}
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                    <div>
+                      <span className="text-slate-500">CNPJ</span>
+                      <p className="font-semibold text-slate-800">{formatCNPJ(fornecedorAtivo.cnpj) || 'Não informado'}</p>
+                    </div>
+                    <div>
+                      <span className="text-slate-500">Forma disponível</span>
+                      <p className="font-semibold text-slate-800">
+                        {fornecedorAtivo.pix_chave?.trim()
+                          ? `PIX${fornecedorAtivo.pix_tipo ? ` • ${fornecedorAtivo.pix_tipo}` : ''}`
+                          : fornecedorAtivo.banco_nome?.trim()
+                            ? `${fornecedorAtivo.banco_nome} • Ag ${fornecedorAtivo.agencia ?? '—'}`
+                            : 'Dados pendentes'}
+                      </p>
+                    </div>
+                  </div>
+                  {!fornecedorAtivoComplete && (
+                    <div className="flex flex-wrap items-center gap-2">
+                      <p className="text-[11px] text-amber-700">Pendências: {camposPagamentoPendentes.join(', ')}.</p>
+                      <button
+                        type="button"
+                        onClick={() => setShowFornecedorAtualizarModal(true)}
+                        className="inline-flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold border border-amber-200 bg-white text-amber-700 hover:bg-amber-50 transition-colors"
+                      >
+                        <RefreshCw size={14} />
+                        Atualizar dados
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
           {pedido.requisicao?.descricao && (
             <div className={`rounded-xl p-3 border ${dark ? 'bg-white/[0.02] border-white/10' : 'bg-slate-50 border-slate-200'}`}>
               <p className={`text-[11px] font-semibold uppercase tracking-wide mb-1 ${sub}`}>Resumo da RC</p>
@@ -1159,12 +1484,32 @@ function DetailModal({
           {/* Actions */}
           <div className="space-y-2 pt-1">
             {pending && (
-              <button onClick={() => setShowEmitirModal(true)} disabled={emitirPedido.isPending} className="w-full flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-bold bg-teal-50 text-teal-700 border border-teal-300 hover:bg-teal-500 hover:text-white transition-all disabled:opacity-50">
-                {emitirPedido.isPending
-                  ? <div className="w-4 h-4 border-2 border-teal-400 border-t-transparent rounded-full animate-spin" />
-                  : <FileText size={16} />}
-                {emitirPedido.isPending ? 'Emitindo...' : 'Emitir Pedido'}
-              </button>
+              <>
+                <button
+                  onClick={() => {
+                    if (!podeEmitirPedidoPendente) return
+                    setShowEmitirModal(true)
+                  }}
+                  disabled={emitirPedido.isPending || !podeEmitirPedidoPendente}
+                  className={`w-full flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-bold border transition-all disabled:cursor-not-allowed ${
+                    podeEmitirPedidoPendente
+                      ? 'bg-teal-50 text-teal-700 border-teal-300 hover:bg-teal-500 hover:text-white'
+                      : dark
+                        ? 'bg-white/[0.04] text-slate-500 border-white/10'
+                        : 'bg-slate-100 text-slate-400 border-slate-200'
+                  }`}
+                >
+                  {emitirPedido.isPending
+                    ? <div className="w-4 h-4 border-2 border-teal-400 border-t-transparent rounded-full animate-spin" />
+                    : <FileText size={16} />}
+                  {emitirPedido.isPending ? 'Emitindo...' : 'Emitir Pedido'}
+                </button>
+                {motivoBloqueioEmissao && (
+                  <div className={`rounded-xl border px-3 py-2 text-[11px] ${dark ? 'border-white/10 bg-white/[0.03] text-slate-400' : 'border-slate-200 bg-slate-50 text-slate-500'}`}>
+                    {motivoBloqueioEmissao}
+                  </div>
+                )}
+              </>
             )}
             {podeReceber && (
               <button onClick={() => onReceber(pedido)} className="w-full flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-bold bg-teal-600 text-white border border-teal-700 hover:bg-teal-700 transition-all shadow-sm">
@@ -1201,14 +1546,17 @@ function DetailModal({
             requisicaoId={pedido.requisicao_id}
             cotacao={{
               id: pedido.source_cotacao?.id,
-              fornecedorNome: pedido.fornecedor_nome,
+              fornecedorNome: fornecedorAtivo?.razao_social || pedido.fornecedor_nome,
               valorTotal: pedido.valor_total ?? 0,
               compradorId: pedido.source_cotacao?.comprador_id ?? undefined,
+              condicaoPagamento: fornecedorResolvido?.condicaoPagamento,
             }}
             onConfirm={(payload) => {
               emitirPedido.mutate({
-                requisicaoId: pedido.requisicao_id!,
                 ...payload,
+                requisicaoId: pedido.requisicao_id!,
+                fornecedorId: fornecedorAtivo?.id,
+                fornecedorNome: fornecedorAtivo?.razao_social || payload.fornecedorNome,
               }, {
                 onSuccess: () => {
                   setShowEmitirModal(false)
@@ -1220,6 +1568,37 @@ function DetailModal({
             isSubmitting={emitirPedido.isPending}
           />
         )}
+
+        <FornecedorCadastroModal
+          open={showFornecedorCadastroModal}
+          dark={dark}
+          title="Cadastrar fornecedor"
+          description="O cadastro já abre pré-preenchido com os dados do processo de compras."
+          initialData={prefillCadastro}
+          requirePaymentData
+          onClose={() => setShowFornecedorCadastroModal(false)}
+          onSaved={handleFornecedorVinculado}
+        />
+
+        <FornecedorCadastroModal
+          open={showFornecedorAtualizarModal}
+          dark={dark}
+          title="Atualizar dados do fornecedor"
+          description="Complete os dados de pagamento para liberar a emissão do pedido."
+          initialData={fornecedorAtivo ?? fornecedorDetectado ?? prefillCadastro}
+          requirePaymentData
+          onClose={() => setShowFornecedorAtualizarModal(false)}
+          onSaved={handleFornecedorVinculado}
+        />
+
+        <FornecedorSelectorModal
+          open={showFornecedorSelectorModal}
+          dark={dark}
+          fornecedores={fornecedoresAtivos}
+          selectedId={fornecedorAtivo?.id}
+          onClose={() => setShowFornecedorSelectorModal(false)}
+          onSelect={handleFornecedorVinculado}
+        />
       </div>
     </div>
   )
