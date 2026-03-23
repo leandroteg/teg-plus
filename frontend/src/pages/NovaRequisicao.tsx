@@ -36,13 +36,13 @@ function Stepper({ step }: { step: number }) {
   const steps = ['Categoria', 'Detalhes', 'Confirmar']
   return (
     <div className="mb-6 flex justify-center">
-      <div className="flex w-full max-w-4xl items-center gap-0 px-2">
+      <div className="flex w-full max-w-3xl items-start justify-center px-4 sm:px-6">
         {steps.map((label, i) => {
           const idx = i + 1
           const done = idx < step
           const active = idx === step
           return (
-            <div key={label} className="flex min-w-0 flex-1 items-center">
+            <div key={label} className="flex min-w-0 items-center">
               <div className="flex flex-col items-center">
                 <div className={`
                   w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-extrabold flex-shrink-0 transition-all
@@ -58,7 +58,7 @@ function Stepper({ step }: { step: number }) {
                 </span>
               </div>
               {i < steps.length - 1 && (
-                <div className={`flex-1 h-px mx-1 mt-[-12px] ${done ? 'bg-teal-400' : 'bg-slate-200'}`} />
+                <div className={`h-px w-24 sm:w-40 md:w-52 mx-3 sm:mx-5 mt-[-12px] ${done ? 'bg-teal-400' : 'bg-slate-200'}`} />
               )}
             </div>
           )
