@@ -246,31 +246,107 @@ export interface AiParseVars {
   arquivo?: { base64: string; nome: string; mime: string }
 }
 
+// ── Parse arquivo binário via Gemini (direto) ────────────────────────────────
+async function parseArquivoComGemini(arquivo: { base64: string; nome: string; mime: string }, textoExtra?: string): Promise<AiParseResult> {
+  const N8N_URL = import.meta.env.VITE_N8N_WEBHOOK_URL || 'https://teg-agents-n8n.nmmcas.easypanel.host/webhook'
+
+  // Chamar endpoint n8n que faz o parse com Gemini
+  const controller = new AbortController()
+  const timeout = setTimeout(() => controller.abort(), 90_000) // 90s para IA processar PDF
+
+  try {
+    const resp = await fetch(`${N8N_URL}/compras/parse-documento-ai`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        base64: arquivo.base64,
+        nome: arquivo.nome,
+        mime_type: arquivo.mime,
+        texto_extra: textoExtra || '',
+      }),
+      signal: controller.signal,
+    })
+
+    if (!resp.ok) {
+      const errText = await resp.text().catch(() => '')
+      throw new Error(`Erro ${resp.status} do servidor de IA: ${errText.substring(0, 200)}`)
+    }
+
+    const data = await resp.json()
+
+    // Converter formato do OCR/Gemini para AiParseResult
+    if (data.itens && Array.isArray(data.itens)) {
+      return {
+        itens: data.itens.map((item: Record<string, unknown>) => ({
+          descricao: String(item.descricao || item.description || ''),
+          quantidade: Number(item.quantidade || item.qtd || item.qty || 1),
+          unidade: String(item.unidade || item.unit || 'un'),
+          valor_unitario_estimado: Number(item.valor_unitario_estimado || item.valor_unit || item.unit_price || 0),
+        })).filter((i: { descricao: string }) => i.descricao.trim().length > 1),
+        obra_sugerida: String(data.obra_sugerida || ''),
+        urgencia_sugerida: (data.urgencia_sugerida as 'normal' | 'urgente' | 'critica') || 'normal',
+        categoria_sugerida: String(data.categoria_sugerida || 'consumo'),
+        comprador_sugerido: data.comprador_sugerido || undefined,
+        justificativa_sugerida: String(data.justificativa_sugerida || `Itens extraídos de ${arquivo.nome}`),
+        confianca: Number(data.confianca || 0.85),
+      }
+    }
+
+    // Fallback: se retornou no formato OCR antigo (llm_dados.itens)
+    const llm = data.llm_dados || data
+    if (llm.itens && Array.isArray(llm.itens)) {
+      return {
+        itens: llm.itens.map((item: Record<string, unknown>) => ({
+          descricao: String(item.descricao || ''),
+          quantidade: Number(item.qtd || item.quantidade || 1),
+          unidade: 'un',
+          valor_unitario_estimado: Number(item.valor_unit || item.valor_unitario || 0),
+        })).filter((i: { descricao: string }) => i.descricao.trim().length > 1),
+        obra_sugerida: '',
+        urgencia_sugerida: 'normal',
+        categoria_sugerida: 'consumo',
+        justificativa_sugerida: `Documento: ${llm.tipo_doc || arquivo.nome}${llm.fornecedor_nome ? ` — Fornecedor: ${llm.fornecedor_nome}` : ''}`,
+        confianca: 0.85,
+      }
+    }
+
+    throw new Error('O servidor de IA não retornou dados estruturados.')
+  } finally {
+    clearTimeout(timeout)
+  }
+}
+
 export function useAiParse() {
   return useMutation({
     mutationFn: async (vars: AiParseVars): Promise<AiParseResult> => {
+      // Se tem arquivo binário (PDF, imagem), usar Gemini via n8n
+      if (vars.arquivo) {
+        try {
+          const result = await parseArquivoComGemini(vars.arquivo, vars.texto)
+          return await matchCatalogItems(result)
+        } catch (err) {
+          // Se endpoint dedicado falhou, tenta o endpoint genérico
+          try {
+            const result = await api.parseRequisicaoAi(vars.texto, vars.solicitante_nome, vars.arquivo)
+            return await matchCatalogItems(result)
+          } catch {
+            throw err // Re-throw o erro original do Gemini
+          }
+        }
+      }
+
       const n8nUrl = import.meta.env.VITE_N8N_WEBHOOK_URL || 'https://teg-agents-n8n.nmmcas.easypanel.host/webhook'
 
       if (n8nUrl) {
-        // Tenta o endpoint real de IA (suporta texto + arquivo/imagem)
         try {
-          const result = await api.parseRequisicaoAi(vars.texto, vars.solicitante_nome, vars.arquivo)
+          const result = await api.parseRequisicaoAi(vars.texto, vars.solicitante_nome)
           return await matchCatalogItems(result)
         } catch {
-          // Se tem arquivo binário e n8n falhou, não tem fallback local
-          if (vars.arquivo) {
-            throw new Error('Processamento de imagens/PDF requer o serviço de IA (n8n). Tente com texto ou CSV.')
-          }
           // Cai no parser local se n8n falhar (só texto)
           await new Promise(r => setTimeout(r, 800))
           const local = parseLocal(vars.texto)
           return await matchCatalogItems(local)
         }
-      }
-
-      // Sem n8n configurado
-      if (vars.arquivo) {
-        throw new Error('Processamento de imagens/PDF requer o serviço de IA (n8n). Use texto ou CSV por enquanto.')
       }
 
       // Usa parser local com delay simulado
