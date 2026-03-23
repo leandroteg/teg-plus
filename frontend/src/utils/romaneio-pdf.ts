@@ -22,14 +22,32 @@ export interface RomaneioData {
   observacoes?: string
 }
 
-async function loadLogoBase64(url: string): Promise<string | null> {
+interface LoadedLogoAsset {
+  dataUrl: string
+  format: 'PNG' | 'JPEG'
+  width: number
+  height: number
+}
+
+async function loadLogoAsset(url: string): Promise<LoadedLogoAsset | null> {
   try {
     const resp = await fetch(url)
     if (!resp.ok) return null
     const blob = await resp.blob()
     return new Promise((resolve) => {
       const reader = new FileReader()
-      reader.onloadend = () => resolve(reader.result as string)
+      reader.onloadend = () => {
+        const dataUrl = reader.result as string
+        const img = new Image()
+        img.onload = () => resolve({
+          dataUrl,
+          format: blob.type === 'image/jpeg' || blob.type === 'image/jpg' ? 'JPEG' : 'PNG',
+          width: img.naturalWidth || img.width || 1,
+          height: img.naturalHeight || img.height || 1,
+        })
+        img.onerror = () => resolve(null)
+        img.src = dataUrl
+      }
       reader.onerror = () => resolve(null)
       reader.readAsDataURL(blob)
     })
@@ -38,7 +56,7 @@ async function loadLogoBase64(url: string): Promise<string | null> {
   }
 }
 
-function buildRomaneioDoc(data: RomaneioData, empresa: EmpresaData, logoBase64?: string | null) {
+function buildRomaneioDoc(data: RomaneioData, empresa: EmpresaData, logoAsset?: LoadedLogoAsset | null) {
   const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
   const W = 210
   const M = 15
@@ -53,9 +71,22 @@ function buildRomaneioDoc(data: RomaneioData, empresa: EmpresaData, logoBase64?:
   doc.setFillColor(...DARK)
   doc.rect(0, 0, W, 34, 'F')
 
-  if (logoBase64) {
+  if (logoAsset) {
     try {
-      doc.addImage(logoBase64, 'PNG', M, 3, 18, 28)
+      const maxWidth = 24
+      const maxHeight = 24
+      const ratio = logoAsset.width / Math.max(logoAsset.height, 1)
+      let renderWidth = maxWidth
+      let renderHeight = renderWidth / Math.max(ratio, 0.01)
+
+      if (renderHeight > maxHeight) {
+        renderHeight = maxHeight
+        renderWidth = renderHeight * Math.max(ratio, 0.01)
+      }
+
+      const logoX = M
+      const logoY = 5 + (maxHeight - renderHeight) / 2
+      doc.addImage(logoAsset.dataUrl, logoAsset.format, logoX, logoY, renderWidth, renderHeight)
     } catch {
       // Keep rendering even if the logo fails.
     }
@@ -255,8 +286,8 @@ export function getRomaneioFileName(input: Pick<RomaneioData, 'numero'> | Pick<L
 export async function gerarRomaneioPdfBlob(data: RomaneioData | LogSolicitacao): Promise<Blob> {
   const payload = 'status' in data ? buildRomaneioDataFromSolicitacao(data) : data
   const empresa = await getEmpresa().catch(() => EMPRESA_FALLBACK)
-  const logoBase64 = await loadLogoBase64(empresa.logoUrl)
-  const doc = buildRomaneioDoc(payload, empresa, logoBase64)
+  const logoAsset = await loadLogoAsset(empresa.logoUrl)
+  const doc = buildRomaneioDoc(payload, empresa, logoAsset)
   return doc.output('blob')
 }
 
