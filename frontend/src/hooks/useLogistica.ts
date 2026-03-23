@@ -657,14 +657,7 @@ export function useEmitirNFe() {
         .update({ status: 'transporte_pendente', ...updateBase })
         .eq('id', payload.solicitacao_id)
 
-      if (nextStatus.error) {
-        const fallback = await supabase
-          .from('log_solicitacoes')
-          .update({ status: 'nfe_emitida', ...updateBase })
-          .eq('id', payload.solicitacao_id)
-
-        if (fallback.error) throw nextStatus.error
-      }
+      if (nextStatus.error) throw nextStatus.error
 
       return data as LogNFe
     },
@@ -724,20 +717,8 @@ export function useEmitirRomaneio() {
         .select()
         .single()
 
-      if (!error) return data as LogSolicitacao
-
-      const fallback = await supabase
-        .from('log_solicitacoes')
-        .update({
-          status: 'romaneio_emitido',
-          ...baseUpdate,
-        })
-        .eq('id', payload.solicitacao_id)
-        .select()
-        .single()
-
-      if (fallback.error) throw error
-      return fallback.data as LogSolicitacao
+      if (error) throw error
+      return data as LogSolicitacao
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['log_solicitacoes'] })
@@ -1242,7 +1223,7 @@ export function useLogisticaKPIs() {
       const totalAbertas = await supabase
         .from('log_solicitacoes')
         .select('id', { count: 'exact', head: true })
-        .in('status', ['solicitado', 'planejado', 'aguardando_aprovacao', 'aprovado', 'nfe_emitida', 'romaneio_emitido', 'aguardando_coleta'])
+        .in('status', ['solicitado', 'planejado', 'aguardando_aprovacao', 'aprovado', 'transporte_pendente', 'aguardando_coleta'])
 
       return {
         total_solicitacoes: solTotal.count ?? 0,

@@ -787,14 +787,7 @@ export default function ExpedicaoPipeline() {
         .update({ status: 'transporte_pendente', updated_at: updatedAt })
         .eq('id', sol.id)
 
-      if (nextStatus.error) {
-        const fallback = await supabase
-          .from('log_solicitacoes')
-          .update({ status: 'aguardando_coleta', updated_at: updatedAt })
-          .eq('id', sol.id)
-
-        if (fallback.error) throw nextStatus.error
-      }
+      if (nextStatus.error) throw nextStatus.error
 
       qc.invalidateQueries({ queryKey: ['log_solicitacoes'] })
       showToast('success', `Expedição ${sol.numero} concluída — pronta para transporte`)

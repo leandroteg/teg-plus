@@ -102,7 +102,7 @@ function exportCSV(items: LogSolicitacao[], stageName: string) {
 }
 
 function resolveTransporteStage(sol: LogSolicitacao): StatusTransportePipeline | null {
-  if (sol.status === 'transporte_pendente' || sol.status === 'nfe_emitida' || sol.status === 'romaneio_emitido') {
+  if (sol.status === 'transporte_pendente') {
     return 'transporte_pendente'
   }
   if (sol.status === 'aguardando_coleta' || sol.status === 'em_transito' || sol.status === 'entregue' || sol.status === 'concluido') {
@@ -932,7 +932,7 @@ export default function TransportesPipeline() {
   })
 
   const { data: solicitacoes = [], isLoading } = useSolicitacoes({
-    status: ['nfe_emitida', 'romaneio_emitido', 'aguardando_coleta', 'em_transito', 'entregue', 'concluido'],
+    status: ['transporte_pendente', 'aguardando_coleta', 'em_transito', 'entregue', 'concluido'],
   })
   const confirmarEntrega = useConfirmarEntregaFisica()
   const confirmarAgendamento = useConfirmarAgendamento()
@@ -944,10 +944,7 @@ export default function TransportesPipeline() {
   useEffect(() => {
     const requestedTab = searchParams.get('tab')
     if (!requestedTab) return
-    const normalizedTab =
-      requestedTab === 'nfe_emitida' || requestedTab === 'romaneio_emitido'
-        ? 'transporte_pendente'
-        : requestedTab
+    const normalizedTab = requestedTab
     const isValid = TRANSPORTE_PIPELINE_STAGES.some(stage => stage.status === normalizedTab)
     if (isValid) {
       setActiveTab(normalizedTab as StatusTransportePipeline)
