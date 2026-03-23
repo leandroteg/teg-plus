@@ -1,9 +1,9 @@
-import { useState, useMemo, useCallback } from 'react'
+import { useState, useMemo, useCallback, useRef } from 'react'
 import {
   Landmark, CheckCircle2, Search, Calendar, Filter,
   Tag, Briefcase, FolderOpen, ChevronDown, X,
   CheckSquare, Square, Minus, ArrowUpDown, AlertTriangle,
-  Layers, XCircle,
+  Layers, XCircle, Upload,
 } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
 import {
@@ -13,6 +13,8 @@ import {
   useDistinctCentroCusto, useDistinctClasseFinanceira,
   useObras,
 } from '../../hooks/useFinanceiro'
+import { useUploadAnexo } from '../../hooks/useAnexos'
+import { supabase } from '../../services/supabase'
 import type { ContaPagar, ContaReceber } from '../../types/financeiro'
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -27,6 +29,7 @@ const fmtData = (d: string) =>
   new Date(d + 'T00:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit' })
 
 type Tab = 'cp' | 'cr'
+type ClassModalMode = 'classificar' | 'conciliar'
 
 interface UnifiedRow {
   id: string
@@ -129,6 +132,7 @@ function AutocompleteField({
 
 export default function Conciliacao() {
   const { isDark } = useTheme()
+  const fileRef = useRef<HTMLInputElement>(null)
   const [tab, setTab] = useState<Tab>('cp')
   const [busca, setBusca] = useState('')
   const [dataInicio, setDataInicio] = useState('')
@@ -139,7 +143,12 @@ export default function Conciliacao() {
   const [filtroClasse, setFiltroClasse] = useState('')
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [showClassModal, setShowClassModal] = useState(false)
+  const [classModalMode, setClassModalMode] = useState<ClassModalMode>('classificar')
   const [toast, setToast] = useState<{ type: 'success' | 'error'; msg: string } | null>(null)
+  const [conciliarIds, setConciliarIds] = useState<string[]>([])
+  const [missingComprovantePedidoIds, setMissingComprovantePedidoIds] = useState<string[]>([])
+  const [arquivoComprovante, setArquivoComprovante] = useState<File | null>(null)
+  const [observacaoComprovante, setObservacaoComprovante] = useState('')
 
   // Batch classification form state
   const [batchCC, setBatchCC] = useState('')
@@ -158,6 +167,7 @@ export default function Conciliacao() {
   const conciliarCP = useConciliarCPBatch()
   const classificarCR = useClassificarCRBatch()
   const conciliarCR = useConciliarCRBatch()
+  const uploadAnexo = useUploadAnexo()
 
   const isLoading = tab === 'cp' ? loadingCP : loadingCR
 
@@ -261,9 +271,38 @@ export default function Conciliacao() {
     setTimeout(() => setToast(null), 4000)
   }
 
+  const resetModalState = useCallback(() => {
+    setBatchCC('')
+    setBatchClasse('')
+    setBatchProjeto('')
+    setConciliarIds([])
+    setMissingComprovantePedidoIds([])
+    setArquivoComprovante(null)
+    setObservacaoComprovante('')
+  }, [])
+
+  const closeClassModal = useCallback(() => {
+    setShowClassModal(false)
+    resetModalState()
+  }, [resetModalState])
+
+  const modalIds = useMemo(
+    () => classModalMode === 'conciliar'
+      ? conciliarIds
+      : [...selected].filter(id => filtered.some(r => r.id === id)),
+    [classModalMode, conciliarIds, selected, filtered],
+  )
+
+  const modalRows = useMemo(
+    () => modalIds
+      .map(id => rows.find(row => row.id === id))
+      .filter((row): row is UnifiedRow => Boolean(row)),
+    [modalIds, rows],
+  )
+
   // Batch classify
   const handleClassificar = async () => {
-    const ids = [...selected].filter(id => filtered.some(r => r.id === id))
+    const ids = modalIds
     if (ids.length === 0) return
 
     const payload = {
@@ -280,13 +319,10 @@ export default function Conciliacao() {
         await classificarCR.mutateAsync(payload)
       }
       showToast('success', `${ids.length} ${ids.length === 1 ? 'título classificado' : 'títulos classificados'}`)
-      setShowClassModal(false)
-      setBatchCC('')
-      setBatchClasse('')
-      setBatchProjeto('')
+      closeClassModal()
       setSelected(new Set())
-    } catch {
-      showToast('error', 'Erro ao classificar títulos')
+    } catch (error) {
+      showToast('error', error instanceof Error ? error.message : 'Erro ao classificar títulos')
     }
   }
 
@@ -304,16 +340,88 @@ export default function Conciliacao() {
       return
     }
 
-    try {
-      if (tab === 'cp') {
-        await conciliarCP.mutateAsync({ ids: validIds })
-      } else {
-        await conciliarCR.mutateAsync({ ids: validIds })
+    if (tab === 'cp') {
+      try {
+        const cpRows = validIds
+          .map(id => filtered.find(r => r.id === id))
+          .filter((row): row is UnifiedRow => Boolean(row))
+
+        const pedidoIds = Array.from(new Set(
+          cpRows
+            .map(row => (row.raw as ContaPagar).pedido_id)
+            .filter(Boolean),
+        )) as string[]
+
+        let pedidosSemComprovante: string[] = []
+        if (pedidoIds.length > 0) {
+          const { data: anexos, error } = await supabase
+            .from('cmp_pedidos_anexos')
+            .select('pedido_id')
+            .eq('tipo', 'comprovante_pagamento')
+            .in('pedido_id', pedidoIds)
+
+          if (error) throw error
+
+          const pedidosComComprovante = new Set((anexos ?? []).map(anexo => anexo.pedido_id).filter(Boolean))
+          pedidosSemComprovante = pedidoIds.filter(pedidoId => !pedidosComComprovante.has(pedidoId))
+        }
+
+        setClassModalMode('conciliar')
+        setConciliarIds(validIds)
+        setMissingComprovantePedidoIds(pedidosSemComprovante)
+        setArquivoComprovante(null)
+        setObservacaoComprovante('')
+        setShowClassModal(true)
+      } catch (error) {
+        showToast('error', error instanceof Error ? error.message : 'Erro ao validar comprovantes')
       }
+      return
+    }
+
+    try {
+      await conciliarCR.mutateAsync({ ids: validIds })
       showToast('success', `${validIds.length} ${validIds.length === 1 ? 'título conciliado' : 'títulos conciliados'}`)
       setSelected(new Set())
-    } catch {
-      showToast('error', 'Erro ao conciliar títulos')
+    } catch (error) {
+      showToast('error', error instanceof Error ? error.message : 'Erro ao conciliar títulos')
+    }
+  }
+
+  const handleConfirmarConciliacao = async () => {
+    if (modalIds.length === 0) return
+    if (missingComprovantePedidoIds.length > 0 && !arquivoComprovante) {
+      showToast('error', 'Anexe o comprovante de pagamento para continuar.')
+      return
+    }
+
+    try {
+      if (arquivoComprovante) {
+        for (const pedidoId of missingComprovantePedidoIds) {
+          await uploadAnexo.mutateAsync({
+            pedidoId,
+            file: arquivoComprovante,
+            tipo: 'comprovante_pagamento',
+            observacao: observacaoComprovante || undefined,
+            origem: 'financeiro',
+          })
+        }
+      }
+
+      if (batchCC || batchClasse || batchProjeto) {
+        await classificarCP.mutateAsync({
+          ids: modalIds,
+          centro_custo: batchCC || undefined,
+          classe_financeira: batchClasse || undefined,
+          projeto_id: batchProjeto || undefined,
+        })
+      }
+
+      await conciliarCP.mutateAsync({ ids: modalIds })
+      showToast('success', `${modalIds.length} ${modalIds.length === 1 ? 'título conciliado' : 'títulos conciliados'}`)
+      closeClassModal()
+      setSelected(new Set())
+    } catch (error) {
+      showToast('error', error instanceof Error ? error.message : 'Erro ao conciliar títulos')
     }
   }
 
@@ -324,6 +432,11 @@ export default function Conciliacao() {
   const valorSelected = filtered
     .filter(r => selected.has(r.id))
     .reduce((s, r) => s + r.valor, 0)
+  const modalSelectedValue = modalRows.reduce((sum, row) => sum + row.valor, 0)
+  const modalSelectedCount = modalRows.length
+  const modalMissingCCCount = modalRows.filter(row => !row.centroCusto).length
+  const modalMissingClasseCount = modalRows.filter(row => !row.classeFinanceira).length
+  const requiresComprovanteUpload = classModalMode === 'conciliar' && missingComprovantePedidoIds.length > 0
 
   const statusMap = tab === 'cp' ? STATUS_CP : STATUS_CR
 
@@ -731,9 +844,8 @@ export default function Conciliacao() {
               </button>
               <button
                 onClick={() => {
-                  setBatchCC('')
-                  setBatchClasse('')
-                  setBatchProjeto('')
+                  resetModalState()
+                  setClassModalMode('classificar')
                   setShowClassModal(true)
                 }}
                 disabled={isBusy}
@@ -772,21 +884,44 @@ export default function Conciliacao() {
               <div className="flex items-center gap-2">
                 <Tag size={18} className="text-violet-600" />
                 <div>
-                  <h3 className={`text-base font-bold ${isDark ? 'text-white' : 'text-slate-800'}`}>Classificar em Lote</h3>
+                  <h3 className={`text-base font-bold ${isDark ? 'text-white' : 'text-slate-800'}`}>
+                    {classModalMode === 'conciliar' ? 'Preparar Conciliação' : 'Classificar em Lote'}
+                  </h3>
                   <p className="text-[10px] text-slate-400">
-                    {selectedCount} {selectedCount === 1 ? 'título' : 'títulos'} — {fmtFull(valorSelected)}
+                    {modalSelectedCount} {modalSelectedCount === 1 ? 'título' : 'títulos'} — {fmtFull(modalSelectedValue)}
                   </p>
                 </div>
               </div>
-              <button onClick={() => setShowClassModal(false)} className="text-slate-400 hover:text-slate-600">
+              <button onClick={closeClassModal} className="text-slate-400 hover:text-slate-600">
                 <X size={18} />
               </button>
             </div>
 
             <div className="p-5 space-y-4">
               <p className={`text-xs ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
-                Preencha os campos que deseja aplicar. Campos vazios não serão alterados.
+                {classModalMode === 'conciliar'
+                  ? 'Revise os classificadores antes da conciliação. Campos vazios mantêm o valor atual dos títulos selecionados.'
+                  : 'Preencha os campos que deseja aplicar. Campos vazios não serão alterados.'}
               </p>
+
+              {classModalMode === 'conciliar' && (
+                <div className={`rounded-xl border px-3 py-2.5 text-xs space-y-1.5 ${
+                  isDark ? 'border-white/[0.08] bg-white/[0.03] text-slate-300' : 'border-amber-200 bg-amber-50 text-amber-800'
+                }`}>
+                  <p className="font-semibold">
+                    Pendências: {modalMissingCCCount} sem centro de custo, {modalMissingClasseCount} sem classe financeira.
+                  </p>
+                  {requiresComprovanteUpload ? (
+                    <p>
+                      {missingComprovantePedidoIds.length === 1
+                        ? 'Falta comprovante em 1 pedido vinculado. Anexe o arquivo para concluir a conciliação.'
+                        : `Faltam comprovantes em ${missingComprovantePedidoIds.length} pedidos vinculados. O mesmo arquivo será anexado a todos eles.`}
+                    </p>
+                  ) : (
+                    <p>Os pedidos vinculados aos títulos selecionados já possuem comprovante de pagamento.</p>
+                  )}
+                </div>
+              )}
 
               <AutocompleteField
                 isDark={isDark}
@@ -829,27 +964,78 @@ export default function Conciliacao() {
                 </div>
               </div>
 
+              {classModalMode === 'conciliar' && requiresComprovanteUpload && (
+                <div className="space-y-2">
+                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                    Comprovante de Pagamento
+                  </p>
+                  <input
+                    ref={fileRef}
+                    type="file"
+                    accept=".pdf,.jpg,.jpeg,.png,.webp"
+                    className="hidden"
+                    onChange={event => setArquivoComprovante(event.target.files?.[0] ?? null)}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => fileRef.current?.click()}
+                    className={`w-full flex flex-col items-center gap-2 py-4 rounded-xl border-2 border-dashed transition-all ${
+                      arquivoComprovante
+                        ? 'border-emerald-400 bg-emerald-50'
+                        : 'border-slate-300 hover:border-emerald-400 hover:bg-emerald-50/50'
+                    }`}
+                  >
+                    <Upload size={20} className={arquivoComprovante ? 'text-emerald-500' : 'text-slate-400'} />
+                    <span className={`text-xs font-semibold ${arquivoComprovante ? 'text-emerald-700' : 'text-slate-500'}`}>
+                      {arquivoComprovante
+                        ? `${arquivoComprovante.name} (${(arquivoComprovante.size / 1024).toFixed(0)} KB)`
+                        : 'Clique para anexar o comprovante'}
+                    </span>
+                  </button>
+                  <textarea
+                    value={observacaoComprovante}
+                    onChange={event => setObservacaoComprovante(event.target.value)}
+                    placeholder="Observação sobre o pagamento (opcional)"
+                    rows={2}
+                    className={`w-full px-3 py-2 rounded-xl border text-xs resize-none focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-400 ${
+                      isDark ? 'bg-[#1e293b] border-white/[0.06] text-slate-200 placeholder-slate-500' : 'border-slate-200 text-slate-700 placeholder-slate-400'
+                    }`}
+                  />
+                </div>
+              )}
+
               {/* Actions */}
               <div className="flex gap-2 pt-2">
                 <button
-                  onClick={() => setShowClassModal(false)}
+                  onClick={closeClassModal}
                   className={`flex-1 py-3 rounded-xl border text-sm font-semibold transition-all
                     ${isDark ? 'border-white/[0.06] text-slate-400 hover:bg-white/[0.03]' : 'border-slate-200 text-slate-600 hover:bg-slate-50'}`}
                 >
                   Cancelar
                 </button>
                 <button
-                  onClick={handleClassificar}
-                  disabled={isBusy || (!batchCC && !batchClasse && !batchProjeto)}
-                  className="flex-1 py-3 rounded-xl bg-violet-600 text-white text-sm font-bold
-                    hover:bg-violet-700 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+                  onClick={classModalMode === 'conciliar' ? handleConfirmarConciliacao : handleClassificar}
+                  disabled={
+                    isBusy
+                    || uploadAnexo.isPending
+                    || (
+                      classModalMode === 'classificar'
+                        ? (!batchCC && !batchClasse && !batchProjeto)
+                        : (requiresComprovanteUpload && !arquivoComprovante)
+                    )
+                  }
+                  className={`flex-1 py-3 rounded-xl text-white text-sm font-bold transition-all disabled:opacity-50 flex items-center justify-center gap-2 ${
+                    classModalMode === 'conciliar' ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-violet-600 hover:bg-violet-700'
+                  }`}
                 >
-                  {isBusy ? (
+                  {isBusy || uploadAnexo.isPending ? (
                     <div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
                   ) : (
                     <CheckCircle2 size={15} />
                   )}
-                  Aplicar a {selectedCount} {selectedCount === 1 ? 'título' : 'títulos'}
+                  {classModalMode === 'conciliar'
+                    ? `Conciliar ${modalSelectedCount} ${modalSelectedCount === 1 ? 'título' : 'títulos'}`
+                    : `Aplicar a ${modalSelectedCount} ${modalSelectedCount === 1 ? 'título' : 'títulos'}`}
                 </button>
               </div>
             </div>

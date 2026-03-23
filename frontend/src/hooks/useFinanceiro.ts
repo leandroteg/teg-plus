@@ -145,6 +145,71 @@ export function useFornecedorById(fornecedorId?: string | null) {
   })
 }
 
+async function findFornecedorByName(fornecedorNome?: string | null) {
+  const nome = fornecedorNome?.trim()
+  if (!nome) return null
+
+  const exactColumns: Array<'razao_social' | 'nome_fantasia'> = ['razao_social', 'nome_fantasia']
+  for (const column of exactColumns) {
+    const { data, error } = await supabase
+      .from('cmp_fornecedores')
+      .select('*')
+      .eq(column, nome)
+      .limit(1)
+
+    if (!error && data?.length) return data[0] as Fornecedor
+  }
+
+  for (const column of exactColumns) {
+    const { data, error } = await supabase
+      .from('cmp_fornecedores')
+      .select('*')
+      .ilike(column, nome)
+      .limit(1)
+
+    if (!error && data?.length) return data[0] as Fornecedor
+  }
+
+  for (const column of exactColumns) {
+    const { data, error } = await supabase
+      .from('cmp_fornecedores')
+      .select('*')
+      .ilike(column, `%${nome}%`)
+      .limit(1)
+
+    if (!error && data?.length) return data[0] as Fornecedor
+  }
+
+  return null
+}
+
+export function useFornecedorByReference({
+  fornecedorId,
+  fornecedorNome,
+}: {
+  fornecedorId?: string | null
+  fornecedorNome?: string | null
+}) {
+  return useQuery<Fornecedor | null>({
+    queryKey: ['fornecedor-ref', fornecedorId ?? null, fornecedorNome ?? null],
+    queryFn: async () => {
+      if (fornecedorId) {
+        const { data, error } = await supabase
+          .from('cmp_fornecedores')
+          .select('*')
+          .eq('id', fornecedorId)
+          .single()
+
+        if (!error && data) return data as Fornecedor
+      }
+
+      return findFornecedorByName(fornecedorNome)
+    },
+    enabled: !!fornecedorId || !!fornecedorNome?.trim(),
+    staleTime: 300_000,
+  })
+}
+
 // â”€â”€ Confirmar CP: previsto â†’ confirmado â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 export function useConfirmarCP() {
   const qc = useQueryClient()
@@ -435,15 +500,72 @@ export function useConciliarCPBatch() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async ({ ids }: { ids: string[] }) => {
+      const { data: contas, error: loadError } = await supabase
+        .from('fin_contas_pagar')
+        .select('id, fornecedor_nome, pedido_id, centro_custo, classe_financeira')
+        .in('id', ids)
+
+      if (loadError) {
+        throw new Error(getSupabaseErrorMessage(loadError, 'Erro ao validar contas antes da conciliação'))
+      }
+
+      const contasList = (contas ?? []) as Array<Pick<ContaPagar, 'id' | 'fornecedor_nome' | 'pedido_id' | 'centro_custo' | 'classe_financeira'>>
+      const semClassificacao = contasList.filter(cp => !cp.centro_custo || !cp.classe_financeira)
+      if (semClassificacao.length > 0) {
+        throw new Error('Preencha centro de custo e classe financeira antes de conciliar os títulos selecionados.')
+      }
+
+      const pedidoIds = Array.from(new Set(contasList.map(cp => cp.pedido_id).filter(Boolean))) as string[]
+      if (pedidoIds.length > 0) {
+        const { data: comprovantes, error: comprovanteError } = await supabase
+          .from('cmp_pedidos_anexos')
+          .select('pedido_id')
+          .eq('tipo', 'comprovante_pagamento')
+          .in('pedido_id', pedidoIds)
+
+        if (comprovanteError) {
+          throw new Error(getSupabaseErrorMessage(comprovanteError, 'Erro ao validar comprovantes de pagamento'))
+        }
+
+        const pedidosComComprovante = new Set((comprovantes ?? []).map(item => item.pedido_id).filter(Boolean))
+        const semComprovante = contasList.filter(cp => cp.pedido_id && !pedidosComComprovante.has(cp.pedido_id))
+        if (semComprovante.length > 0) {
+          const fornecedores = semComprovante
+            .map(cp => cp.fornecedor_nome)
+            .filter(Boolean)
+            .slice(0, 3)
+            .join(', ')
+          const suffix = semComprovante.length > 3 ? '...' : ''
+          throw new Error(`Anexe o comprovante de pagamento antes de conciliar. Pendências: ${fornecedores}${suffix}`)
+        }
+      }
+
       const { error } = await supabase
         .from('fin_contas_pagar')
         .update({ status: 'conciliado' })
         .in('id', ids)
-      if (error) throw error
+      if (error) throw new Error(getSupabaseErrorMessage(error, 'Erro ao conciliar contas a pagar'))
+
+      if (pedidoIds.length > 0) {
+        const agora = new Date().toISOString()
+        const { error: pedidoError } = await supabase
+          .from('cmp_pedidos')
+          .update({
+            status_pagamento: 'pago',
+            pago_em: agora,
+          })
+          .in('id', pedidoIds)
+
+        if (pedidoError) {
+          throw new Error(getSupabaseErrorMessage(pedidoError, 'As contas foram conciliadas, mas não foi possível encerrar o pedido em Compras'))
+        }
+      }
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['contas-pagar'] })
       qc.invalidateQueries({ queryKey: ['financeiro-dashboard'] })
+      qc.invalidateQueries({ queryKey: ['pedidos'] })
+      qc.invalidateQueries({ queryKey: ['requisicoes'] })
     },
   })
 }

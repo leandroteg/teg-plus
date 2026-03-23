@@ -17,7 +17,7 @@ import {
   useMarcarCPPago,
   useConciliarCPBatch,
   useCancelarCPBatch,
-  useFornecedorById,
+  useFornecedorByReference,
   useCriarSolicitacaoExtraordinariaCP,
   useCriarPrevisaoPagamentoCP,
 } from '../../hooks/useFinanceiro'
@@ -585,8 +585,16 @@ function exportCSV(cps: ContaPagar[], stageName: string) {
 
 // ══ FornecedorBankInfo ══════════════════════════════════════════
 
-function FornecedorBankInfo({ fornecedorId, isDark }: { fornecedorId: string; isDark: boolean }) {
-  const { data: forn } = useFornecedorById(fornecedorId)
+function FornecedorBankInfo({
+  fornecedorId,
+  fornecedorNome,
+  isDark,
+}: {
+  fornecedorId?: string
+  fornecedorNome?: string
+  isDark: boolean
+}) {
+  const { data: forn } = useFornecedorByReference({ fornecedorId, fornecedorNome })
   const [copied, setCopied] = useState(false)
   if (!forn) return null
   const hasBankData = forn.banco_nome || forn.agencia || forn.conta || forn.pix_chave
@@ -1386,7 +1394,11 @@ function CPDetailModal({ cp, stageStatus, onClose, onAction, isDark }: {
   const canApproveCurrent = isApprovalStage && (perfil?.role === 'admin' || (!!approval && canApprove(approval.nivel)) || canDirectApproveCurrent)
   const stage = CP_PIPELINE_VIEW_STAGES.find(s => s.status === stageStatus)
   const isLoteApproval = !!approvalLoteId && approvalItems.length > 0
-  const canUploadPedidoAnexo = !!cp.pedido_id && (stageStatus === 'previsto' || stageStatus === 'confirmado')
+  const canUploadPedidoAnexo = !!cp.pedido_id && (
+    stageStatus === 'previsto'
+    || stageStatus === 'confirmado'
+    || stageStatus === 'pago'
+  )
 
   const toggleApprovalItem = (cpId: string) => {
     setSelectedApprovalItemIds(prev =>
@@ -1536,7 +1548,13 @@ function CPDetailModal({ cp, stageStatus, onClose, onAction, isDark }: {
             )}
           </div>
 
-          {cp.fornecedor_id && <FornecedorBankInfo fornecedorId={cp.fornecedor_id} isDark={isDark} />}
+          {(cp.fornecedor_id || cp.fornecedor_nome) && (
+            <FornecedorBankInfo
+              fornecedorId={cp.fornecedor_id}
+              fornecedorNome={cp.fornecedor_nome}
+              isDark={isDark}
+            />
+          )}
 
           {bankInfo && Object.values(bankInfo).some(Boolean) && (
             <div className={`rounded-xl p-3 space-y-2 ${isDark ? 'bg-white/[0.04]' : 'bg-emerald-50/70'}`}>
@@ -2711,7 +2729,9 @@ export default function CPPipeline() {
       await conciliarMut.mutateAsync({ ids })
       showToast('success', `${ids.length} t\u00EDtulo(s) conciliado(s)`)
       setSelectedIds(new Set())
-    } catch { showToast('error', 'Erro ao conciliar') }
+    } catch (error) {
+      showToast('error', error instanceof Error ? error.message : 'Erro ao conciliar')
+    }
   }
 
   const handleExcluirPrevistos = async (ids: string[]) => {

@@ -56,11 +56,22 @@ export function useSalvarFornecedor() {
     mutationFn: async (payload: Partial<Fornecedor> & { id?: string }) => {
       const { id, ...rest } = payload
       if (id) {
-        const { error } = await supabase.from('cmp_fornecedores').update(rest).eq('id', id)
+        const { data, error } = await supabase
+          .from('cmp_fornecedores')
+          .update(rest)
+          .eq('id', id)
+          .select('*')
+          .single()
         if (error) throw error
+        return data as Fornecedor
       } else {
-        const { error } = await supabase.from('cmp_fornecedores').insert(rest)
+        const { data, error } = await supabase
+          .from('cmp_fornecedores')
+          .insert(rest)
+          .select('*')
+          .single()
         if (error) throw error
+        return data as Fornecedor
       }
     },
     onSuccess: () => {

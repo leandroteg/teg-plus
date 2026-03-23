@@ -37,6 +37,7 @@ export interface Pedido {
   requisicao_id?: string
   cotacao_id?: string
   comprador_id?: string
+  fornecedor_id?: string
   classe_financeira_id?: string
   centro_custo_id?: string
   numero_pedido?: string
