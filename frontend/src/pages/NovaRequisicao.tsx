@@ -36,7 +36,7 @@ function Stepper({ step }: { step: number }) {
   const steps = ['Categoria', 'Detalhes', 'Confirmar']
   return (
     <div className="mb-6 w-full">
-      <div className="flex items-center gap-0">
+      <div className="flex w-full items-center gap-0">
       {steps.map((label, i) => {
         const idx = i + 1
         const done = idx < step
