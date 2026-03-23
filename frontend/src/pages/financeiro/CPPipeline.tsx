@@ -2363,8 +2363,7 @@ export default function CPPipeline() {
   const [pagUploading, setPagUploading] = useState(false)
   const [novaSolicitacaoKind, setNovaSolicitacaoKind] = useState<NovaSolicitacaoKind | null>(null)
   const [expandedLoteIds, setExpandedLoteIds] = useState<Set<string>>(new Set())
-  const novaButtonRef = useRef<HTMLButtonElement | null>(null)
-  const [novaMenuPosition, setNovaMenuPosition] = useState({ top: 80, left: 16, width: 360 })
+  const novaMenuRef = useRef<HTMLDivElement | null>(null)
 
   useEffect(() => {
     if (searchParams.get('nova')) {
@@ -2375,34 +2374,13 @@ export default function CPPipeline() {
 
   useEffect(() => {
     if (!showNovaMenu) return
-    const updateNovaMenuPosition = () => {
-      const trigger = novaButtonRef.current
-      if (!trigger) return
-
-      const rect = trigger.getBoundingClientRect()
-      const viewportWidth = window.innerWidth
-      const viewportHeight = window.innerHeight
-      const width = Math.min(360, viewportWidth - 32)
-      const estimatedHeight = 220
-      const top = rect.bottom + estimatedHeight + 12 <= viewportHeight - 16
-        ? rect.bottom + 12
-        : Math.max(16, rect.top - estimatedHeight - 12)
-      const left = Math.min(
-        Math.max(16, rect.right - width),
-        Math.max(16, viewportWidth - width - 16),
-      )
-
-      setNovaMenuPosition({ top, left, width })
+    const handleClickOutside = (event: MouseEvent) => {
+      if (!novaMenuRef.current?.contains(event.target as Node)) {
+        setShowNovaMenu(false)
+      }
     }
-
-    updateNovaMenuPosition()
-    window.addEventListener('resize', updateNovaMenuPosition)
-    window.addEventListener('scroll', updateNovaMenuPosition, true)
-
-    return () => {
-      window.removeEventListener('resize', updateNovaMenuPosition)
-      window.removeEventListener('scroll', updateNovaMenuPosition, true)
-    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [showNovaMenu])
 
   // Data
@@ -3088,12 +3066,35 @@ export default function CPPipeline() {
 
       {/* Nova Solicitação modal */}
       {showNovaMenu && (
-        <div className="fixed inset-0 z-50 bg-black/10" onClick={() => setShowNovaMenu(false)}>
-          <div
-            onClick={e => e.stopPropagation()}
-            className={`fixed rounded-3xl border p-3 shadow-2xl ${isDark ? 'border-white/[0.08] bg-slate-900' : 'border-slate-200 bg-white'}`}
-            style={novaMenuPosition}
+        <div className="fixed inset-0 z-40 bg-black/10" onClick={() => setShowNovaMenu(false)} />
+      )}
+
+      {/* Header */}
+      <div className="flex items-center gap-4">
+        <div>
+          <h1 className={`text-xl font-extrabold flex items-center gap-2 ${isDark ? 'text-white' : 'text-slate-800'}`}>
+            <Receipt size={20} className="text-emerald-600" />
+            Contas a Pagar
+          </h1>
+          <p className={`text-xs mt-0.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+            {contas.length} t\u00EDtulos &middot; {fmt(contas.reduce((s, c) => s + c.valor_original, 0))}
+          </p>
+        </div>
+        <div ref={novaMenuRef} className="relative z-50">
+          <button
+            type="button"
+            onClick={() => setShowNovaMenu(prev => !prev)}
+            className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2 text-sm font-bold text-white shadow-sm transition-all hover:bg-emerald-700"
           >
+            <Plus size={15} />
+            <ChevronDown size={15} className={`transition-transform ${showNovaMenu ? 'rotate-180' : ''}`} />
+            Nova Solicitação
+          </button>
+          {showNovaMenu && (
+            <div
+              onClick={e => e.stopPropagation()}
+              className={`absolute right-0 top-full mt-3 w-[360px] max-w-[calc(100vw-2rem)] rounded-3xl border p-3 shadow-2xl ${isDark ? 'border-white/[0.08] bg-slate-900' : 'border-slate-200 bg-white'}`}
+            >
             <p className={`text-[10px] font-bold uppercase tracking-wider px-4 pt-2 pb-1 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Nova solicitação</p>
             <button type="button"
               onClick={() => { setNovaSolicitacaoKind('extraordinario'); setShowNovaSolicitacao(true); setShowNovaMenu(false) }}
@@ -3119,32 +3120,8 @@ export default function CPPipeline() {
                 <span className={`mt-1 block text-xs leading-relaxed ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Planejamento de despesas futuras com recorrência opcional.</span>
               </span>
             </button>
-          </div>
-        </div>
-      )}
-
-      {/* Header */}
-      <div className="flex items-center gap-4">
-        <div>
-          <h1 className={`text-xl font-extrabold flex items-center gap-2 ${isDark ? 'text-white' : 'text-slate-800'}`}>
-            <Receipt size={20} className="text-emerald-600" />
-            Contas a Pagar
-          </h1>
-          <p className={`text-xs mt-0.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
-            {contas.length} t\u00EDtulos &middot; {fmt(contas.reduce((s, c) => s + c.valor_original, 0))}
-          </p>
-        </div>
-        <div className="relative">
-        <button
-          ref={novaButtonRef}
-          type="button"
-          onClick={() => setShowNovaMenu(prev => !prev)}
-          className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2 text-sm font-bold text-white shadow-sm transition-all hover:bg-emerald-700"
-        >
-          <Plus size={15} />
-          <ChevronDown size={15} className={`transition-transform ${showNovaMenu ? 'rotate-180' : ''}`} />
-          Nova Solicitação
-        </button>
+            </div>
+          )}
         </div>
       </div>
 
