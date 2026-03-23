@@ -1329,6 +1329,9 @@ function CPDetailModal({ cp, stageStatus, onClose, onAction, isDark }: {
   const { perfil, canApprove } = useAuth()
   const decisaoGenericaMut = useDecisaoGenerica()
   const aprovarPagamentoMut = useAprovarPagamento()
+  const [editCC, setEditCC] = useState(cp.centro_custo ?? '')
+  const [editClasse, setEditClasse] = useState(cp.classe_financeira ?? '')
+  const [savingClass, setSavingClass] = useState(false)
   const urgency = getUrgency(cp)
   const manualRequest = cp.remessa_payload && typeof cp.remessa_payload === 'object'
     ? (cp.remessa_payload as Record<string, any>).manual_request as Record<string, any> | undefined
@@ -1743,6 +1746,29 @@ function CPDetailModal({ cp, stageStatus, onClose, onAction, isDark }: {
             </div>
           )}
 
+          {/* Classificação editável — visível para status pago (antes de conciliar) */}
+          {cp.status === 'pago' && (
+            <div className={`rounded-xl border p-3 space-y-2 ${isDark ? 'border-white/[0.08] bg-white/[0.03]' : 'border-slate-200 bg-slate-50'}`}>
+              <p className={`text-[10px] font-bold uppercase tracking-wider ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+                Classificação (ajuste antes de conciliar)
+              </p>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className={`text-[10px] font-semibold mb-0.5 block ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Centro de Custo</label>
+                  <input value={editCC} onChange={e => setEditCC(e.target.value)}
+                    placeholder={cp.centro_custo || 'Ex: ADM'}
+                    className={`w-full px-2.5 py-1.5 rounded-lg border text-xs focus:outline-none focus:ring-2 focus:ring-green-500/30 focus:border-green-400 ${isDark ? 'bg-[#1e293b] border-white/[0.06] text-slate-200' : 'border-slate-200 text-slate-700 bg-white'}`} />
+                </div>
+                <div>
+                  <label className={`text-[10px] font-semibold mb-0.5 block ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Classe Financeira</label>
+                  <input value={editClasse} onChange={e => setEditClasse(e.target.value)}
+                    placeholder={cp.classe_financeira || 'Ex: Material'}
+                    className={`w-full px-2.5 py-1.5 rounded-lg border text-xs focus:outline-none focus:ring-2 focus:ring-green-500/30 focus:border-green-400 ${isDark ? 'bg-[#1e293b] border-white/[0.06] text-slate-200' : 'border-slate-200 text-slate-700 bg-white'}`} />
+                </div>
+              </div>
+            </div>
+          )}
+
           <div className="flex gap-2 pt-1">
             <button onClick={onClose} className={`flex-1 py-3 rounded-xl border text-sm font-semibold transition-all ${isDark ? 'border-white/[0.06] text-slate-300' : 'border-slate-200 text-slate-600 hover:bg-slate-50'}`}>
               Fechar
@@ -1799,7 +1825,23 @@ function CPDetailModal({ cp, stageStatus, onClose, onAction, isDark }: {
               </>
             )}
             {cp.status === 'pago' && (
-              <button onClick={() => onAction('conciliar', cp)} className="flex-1 py-3 rounded-xl bg-green-600 text-white text-sm font-bold hover:bg-green-700 transition-all flex items-center justify-center gap-2">
+              <button
+                disabled={savingClass}
+                onClick={async () => {
+                  // Salvar CC/classe se alterados antes de conciliar
+                  const updates: Record<string, string | null> = {}
+                  if (editCC !== (cp.centro_custo ?? '')) updates.centro_custo = editCC || null
+                  if (editClasse !== (cp.classe_financeira ?? '')) updates.classe_financeira = editClasse || null
+                  if (Object.keys(updates).length > 0) {
+                    setSavingClass(true)
+                    const { error } = await supabase.from('fin_contas_pagar').update(updates).eq('id', cp.id)
+                    setSavingClass(false)
+                    if (error) { console.error('Erro ao salvar classificação:', error); return }
+                  }
+                  onAction('conciliar', cp)
+                }}
+                className="flex-1 py-3 rounded-xl bg-green-600 text-white text-sm font-bold hover:bg-green-700 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+              >
                 <CheckCircle2 size={15} /> Conciliar
               </button>
             )}
