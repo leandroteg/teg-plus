@@ -260,7 +260,16 @@ function isAguardandoContrato(pedido: PedidoListItem) {
   return (pedido as any).aguardando_contrato === true
 }
 
+const contratoAtivoStatus = {
+  bg: 'bg-violet-100',
+  text: 'text-violet-700',
+  label: 'Contrato Ativo',
+  bgDark: 'bg-violet-900/40',
+  textDark: 'text-violet-300',
+}
+
 function getStatusMeta(pedido: PedidoListItem) {
+  if ((pedido as any).contrato_ativo) return contratoAtivoStatus
   if (isAguardandoContrato(pedido)) return aguardandoContratoStatus
   return isPendingEmission(pedido)
     ? pendingEmissionStatus
@@ -1058,6 +1067,12 @@ function PedCard({ pedido, dark, onClick }: { pedido: PedidoListItem; dark: bool
           {isLiberado && !isPago && <span className="flex items-center gap-0.5 px-2 py-0.5 rounded-full text-[10px] font-bold bg-orange-100 text-orange-700"><Clock size={9} /> Aguard. Pgto</span>}
           {atrasado && <span className="flex items-center gap-0.5 text-[10px] text-red-600 font-bold"><AlertTriangle size={10} /> {Math.abs(dias!)}d atr.</span>}
           {parcial && qtdTotal > 0 && <span className="text-[10px] text-amber-600 font-bold">{qtdRecebidos}/{qtdTotal} receb.</span>}
+          {(pedido as any).contrato_ativo && (
+            <a href={`/contratos/gestao`} onClick={e => e.stopPropagation()}
+              className="flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-violet-50 text-violet-700 border border-violet-200 hover:bg-violet-100 transition-colors">
+              <ExternalLink size={9} /> Ver Contrato
+            </a>
+          )}
         </div>
 
         {/* Dates row */}
@@ -1767,7 +1782,35 @@ export default function Pedidos() {
         source_cotacao: { id: c.id, comprador_id: c.comprador_id },
       }))
 
-    return [...pendingEmission, ...aguardandoContrato]
+    // Recorrentes com contrato formalizado → aba Encerrado com link
+    const contratoFormalizado = cotacoes
+      .filter(c => c.status === 'concluida' && c.requisicao?.status === 'pedido_emitido' && (c.requisicao as any)?.compra_recorrente)
+      .filter(c => !pedidosByReq.has(c.requisicao_id))
+      .map(c => ({
+        id: `contrato-${c.id}`,
+        requisicao_id: c.requisicao_id,
+        cotacao_id: c.id,
+        comprador_id: c.comprador_id,
+        fornecedor_nome: c.fornecedor_selecionado_nome ?? '',
+        valor_total: c.valor_selecionado ?? c.requisicao?.valor_estimado,
+        status: 'entregue' as const,
+        status_pagamento: 'pago' as const,
+        created_at: c.data_conclusao ?? c.created_at,
+        observacoes: 'Contrato formalizado',
+        requisicao: c.requisicao
+          ? {
+              numero: c.requisicao.numero,
+              descricao: c.requisicao.descricao,
+              obra_nome: c.requisicao.obra_nome,
+              categoria: c.requisicao.categoria,
+              compra_recorrente: true,
+            }
+          : undefined,
+        pending_emissao: false,
+        contrato_ativo: true,
+      }))
+
+    return [...pendingEmission, ...aguardandoContrato, ...contratoFormalizado]
   }, [cotacoes, pedidosByReq])
   const allPedidoItems = useMemo<PedidoListItem[]>(
     () => [...pendingApprovalPedidos, ...allPedidos],
