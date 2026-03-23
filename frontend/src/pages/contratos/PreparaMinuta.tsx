@@ -2102,17 +2102,22 @@ export default function PreparaMinuta() {
                     </div>
                     {modelo.arquivo_url ? (
                       <button
-                        onClick={async () => {
+                        disabled={uploadFile.isPending}
+                        onClick={async (e) => {
+                          e.stopPropagation()
+                          const btn = e.currentTarget
+                          btn.textContent = 'Carregando...'
+                          btn.disabled = true
                           try {
                             const resp = await fetch(modelo.arquivo_url!)
+                            if (!resp.ok) throw new Error(`Erro ao baixar modelo: ${resp.status}`)
                             const blob = await resp.blob()
                             const fileName = `modelo_${modelo.nome.replace(/\s+/g, '_')}.pdf`
-                            const file = new File([blob], fileName, { type: blob.type })
+                            const file = new File([blob], fileName, { type: blob.type || 'application/pdf' })
                             const uploaded = await uploadFile.mutateAsync({
                               solicitacaoId: solicitacao!.id,
                               file,
                             })
-                            // Criar registro de minuta com o arquivo do modelo
                             await supabase.from('con_minutas').insert({
                               solicitacao_id: solicitacao!.id,
                               versao: (minutas?.length ?? 0) + 1,
@@ -2121,8 +2126,18 @@ export default function PreparaMinuta() {
                               status: 'em_revisao',
                             })
                             qc.invalidateQueries({ queryKey: ['con-minutas'] })
-                          } catch (err) {
+                            btn.textContent = '✓ Carregado!'
+                            btn.className = 'px-3 py-1.5 text-xs font-semibold rounded-lg bg-emerald-600 text-white'
+                          } catch (err: any) {
                             console.error('Erro ao usar modelo:', err)
+                            btn.textContent = 'Erro!'
+                            btn.className = 'px-3 py-1.5 text-xs font-semibold rounded-lg bg-red-600 text-white'
+                            alert(`Erro ao carregar modelo: ${err?.message || 'erro desconhecido'}`)
+                            setTimeout(() => {
+                              btn.textContent = 'Usar como base'
+                              btn.className = 'px-3 py-1.5 text-xs font-semibold rounded-lg bg-violet-600 text-white hover:bg-violet-700 transition-colors'
+                              btn.disabled = false
+                            }, 2000)
                           }
                         }}
                         className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-violet-600 text-white hover:bg-violet-700 transition-colors"
