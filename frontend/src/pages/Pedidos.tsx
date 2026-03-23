@@ -1506,16 +1506,18 @@ function DetailModal({
                   disabled={emitirPedido.isPending || !podeEmitirPedidoPendente}
                   className={`w-full flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-bold border transition-all disabled:cursor-not-allowed ${
                     podeEmitirPedidoPendente
-                      ? 'bg-teal-50 text-teal-700 border-teal-300 hover:bg-teal-500 hover:text-white'
+                      ? (pedido.requisicao as any)?.compra_recorrente
+                        ? 'bg-indigo-50 text-indigo-700 border-indigo-300 hover:bg-indigo-600 hover:text-white'
+                        : 'bg-teal-50 text-teal-700 border-teal-300 hover:bg-teal-500 hover:text-white'
                       : dark
                         ? 'bg-white/[0.04] text-slate-500 border-white/10'
                         : 'bg-slate-100 text-slate-400 border-slate-200'
                   }`}
                 >
                   {emitirPedido.isPending
-                    ? <div className="w-4 h-4 border-2 border-teal-400 border-t-transparent rounded-full animate-spin" />
+                    ? <div className={`w-4 h-4 border-2 ${(pedido.requisicao as any)?.compra_recorrente ? 'border-indigo-400' : 'border-teal-400'} border-t-transparent rounded-full animate-spin`} />
                     : <FileText size={16} />}
-                  {emitirPedido.isPending ? 'Emitindo...' : 'Emitir Pedido'}
+                  {emitirPedido.isPending ? 'Processando...' : (pedido.requisicao as any)?.compra_recorrente ? 'Solicitar Contrato' : 'Emitir Pedido'}
                 </button>
                 {motivoBloqueioEmissao && (
                   <div className={`rounded-xl border px-3 py-2 text-[11px] ${dark ? 'border-white/10 bg-white/[0.03] text-slate-400' : 'border-slate-200 bg-slate-50 text-slate-500'}`}>
