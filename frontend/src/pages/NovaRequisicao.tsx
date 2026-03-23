@@ -680,6 +680,28 @@ export default function NovaRequisicao() {
             </button>
           ))}
           </div>
+          {/* Justificativa de urgência */}
+          {urgencia !== 'normal' && (
+            <div className="mt-2">
+              <label className={`text-[11px] font-semibold block mb-1 ${
+                urgencia === 'critica' ? 'text-red-600' : 'text-amber-600'
+              }`}>
+                Justificativa de urgência *
+              </label>
+              <textarea
+                rows={2}
+                required
+                className={`w-full border rounded-xl px-3 py-2 text-sm outline-none transition-all ${
+                  urgencia === 'critica'
+                    ? 'border-red-300 bg-red-50/50 focus:ring-2 focus:ring-red-300 placeholder:text-red-300'
+                    : 'border-amber-300 bg-amber-50/50 focus:ring-2 focus:ring-amber-300 placeholder:text-amber-300'
+                }`}
+                placeholder="Explique o motivo da urgência desta requisição..."
+                value={justificativaUrgencia}
+                onChange={e => setJustificativaUrgencia(e.target.value)}
+              />
+            </div>
+          )}
         </div>
 
         <div className={`rounded-2xl border px-4 py-3 space-y-3 ${
