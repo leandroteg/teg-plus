@@ -2125,7 +2125,7 @@ export default function PreparaMinuta() {
                               arquivo_nome: fileName,
                               status: 'em_revisao',
                             })
-                            qc.invalidateQueries({ queryKey: ['con-minutas'] })
+                            qc.invalidateQueries({ queryKey: ['con-minutas', solicitacao!.id] })
                             btn.textContent = '✓ Carregado!'
                             btn.className = 'px-3 py-1.5 text-xs font-semibold rounded-lg bg-emerald-600 text-white'
                           } catch (err: any) {
