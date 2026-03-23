@@ -9,7 +9,7 @@ import {
   useNFe, useCancelarNFe, useIniciarTransporte, useEmitirRomaneio, useSolicitarNFFiscal,
   useDespacharViagem,
 } from '../../hooks/useLogistica'
-import { gerarRomaneioPDF } from '../../utils/romaneio-pdf'
+import { buildRomaneioDataFromSolicitacao, gerarRomaneioPDF } from '../../utils/romaneio-pdf'
 import { StatusBadge } from './LogisticaHome'
 import { useTheme } from '../../contexts/ThemeContext'
 import type { IniciarTransportePayload, LogSolicitacao } from '../../types/logistica'
@@ -42,29 +42,14 @@ function getDocLabel(uf: 'MG' | 'outro' | 'indefinido'): string {
 // ── Romaneio download (standalone, used by getDocStatus and ExpedicaoDetail) ──
 
 function downloadRomaneio(s: LogSolicitacao) {
-  const url = gerarRomaneioPDF({
-    numero: s.numero,
-    origem: s.origem,
-    destino: s.destino,
-    obra_nome: s.obra_nome,
-    solicitante: s.solicitante_nome,
-    motorista_nome: s.motorista_nome,
-    veiculo_placa: s.veiculo_placa,
-    peso_total_kg: s.peso_total_kg,
-    volumes_total: s.volumes_total,
-    observacoes: s.observacoes_carga,
-    itens: (s.itens ?? []).map(i => ({
-      descricao: i.descricao,
-      quantidade: i.quantidade,
-      unidade: i.unidade,
-      peso_kg: i.peso_kg,
-    })),
-  })
-  const a = document.createElement('a')
-  a.href = url
-  a.download = `romaneio-${s.numero}.pdf`
-  a.click()
-  URL.revokeObjectURL(url)
+  void (async () => {
+    const url = await gerarRomaneioPDF(buildRomaneioDataFromSolicitacao(s))
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `romaneio-${s.numero}.pdf`
+    a.click()
+    window.setTimeout(() => URL.revokeObjectURL(url), 60_000)
+  })()
 }
 
 // ── Main Component ────────────────────────────────────────────────────────────
@@ -112,31 +97,15 @@ export default function Expedicao() {
     if (!romaneioModal) return
     const s = romaneioModal
 
-    const url = gerarRomaneioPDF({
-      numero: s.numero,
-      origem: s.origem,
-      destino: s.destino,
-      obra_nome: s.obra_nome,
-      solicitante: s.solicitante_nome,
-      motorista_nome: s.motorista_nome,
-      veiculo_placa: s.veiculo_placa,
-      peso_total_kg: s.peso_total_kg,
-      volumes_total: s.volumes_total,
-      observacoes: s.observacoes_carga,
-      itens: (s.itens ?? []).map(i => ({
-        descricao: i.descricao,
-        quantidade: i.quantidade,
-        unidade: i.unidade,
-        peso_kg: i.peso_kg,
-      })),
-    })
+    const url = await gerarRomaneioPDF(buildRomaneioDataFromSolicitacao(s))
 
     // Open PDF in new tab for the user
     window.open(url, '_blank')
+    window.setTimeout(() => URL.revokeObjectURL(url), 60_000)
 
     await emitirRomaneio.mutateAsync({
       solicitacao_id: s.id,
-      romaneio_url: url,
+      romaneio_url: '',
     })
 
     setRomaneioModal(null)
