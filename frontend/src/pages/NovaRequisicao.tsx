@@ -833,7 +833,7 @@ export default function NovaRequisicao() {
         </div>
       )}
 
-      <div>
+      <div className="-order-4">
         <label className="text-xs font-semibold text-slate-500 mb-1 block">Solicitante *</label>
         <input required className={`w-full border rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-teal-300 outline-none ${
           stepErrors.some(e => e.includes('solicitante')) ? 'border-red-300 bg-red-50/30' : 'border-slate-200'
@@ -841,7 +841,7 @@ export default function NovaRequisicao() {
           placeholder="Seu nome completo" value={solicitante} onChange={e => setSolicitante(e.target.value)} />
       </div>
 
-      <div className="order-6 grid grid-cols-1 md:grid-cols-3 gap-3">
+      <div className="-order-1 grid grid-cols-1 md:grid-cols-3 gap-3">
         <div className="md:col-span-2">
           <label className="text-xs font-semibold text-slate-500 mb-1 block">Obra *</label>
           <select required className={`w-full border rounded-xl px-3 py-2.5 text-sm bg-white focus:ring-2 focus:ring-teal-300 outline-none ${
@@ -862,7 +862,7 @@ export default function NovaRequisicao() {
         </div>
       </div>
 
-      <div className="order-4">
+      <div className="-order-3">
         <label className="text-xs font-semibold text-slate-500 mb-1 block">Descri&ccedil;&atilde;o <span className="text-red-400">*</span></label>
         <textarea rows={3} required
           className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-teal-300 outline-none"
@@ -870,7 +870,7 @@ export default function NovaRequisicao() {
           value={justificativa} onChange={e => setJustificativa(e.target.value)} />
       </div>
 
-      <div className="order-5">
+      <div className="-order-2">
         <label className="text-xs font-semibold text-slate-500 mb-1.5 block">Refer&ecirc;ncia de cota&ccedil;&atilde;o</label>
         <div
           className={`rounded-2xl border-2 border-dashed p-4 transition-all cursor-pointer ${
