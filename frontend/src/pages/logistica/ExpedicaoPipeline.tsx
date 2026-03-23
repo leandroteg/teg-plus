@@ -756,9 +756,9 @@ export default function ExpedicaoPipeline() {
     if (action === 'despachar') handleEmitirRomaneio([sol.id])
     if (action === 'solicitarNF') setNfModal(sol)
     if (action === 'concluir') {
-      await supabase.from('log_solicitacoes').update({ status: 'aguardando_coleta', updated_at: new Date().toISOString() }).eq('id', sol.id)
+      await supabase.from('log_solicitacoes').update({ status: 'transporte_pendente', updated_at: new Date().toISOString() }).eq('id', sol.id)
       qc.invalidateQueries({ queryKey: ['log_solicitacoes'] })
-      showToast('success', `Expedição ${sol.numero} concluída — aguardando coleta`)
+      showToast('success', `Expedição ${sol.numero} concluída — transporte pendente`)
     }
   }
 

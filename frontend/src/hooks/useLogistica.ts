@@ -1216,7 +1216,7 @@ export function useLogisticaKPIs() {
       const totalAbertas = await supabase
         .from('log_solicitacoes')
         .select('id', { count: 'exact', head: true })
-        .in('status', ['solicitado', 'planejado', 'aguardando_aprovacao', 'aprovado', 'nfe_emitida', 'romaneio_emitido', 'aguardando_coleta'])
+        .in('status', ['solicitado', 'planejado', 'aguardando_aprovacao', 'aprovado', 'nfe_emitida', 'romaneio_emitido', 'transporte_pendente', 'aguardando_coleta'])
 
       return {
         total_solicitacoes: solTotal.count ?? 0,
