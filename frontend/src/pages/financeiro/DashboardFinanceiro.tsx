@@ -114,26 +114,53 @@ export default function DashboardFinanceiro() {
           subtitulo={kpis.cp_vencidas > 0 ? 'Atenção!' : 'Nenhuma'} isDark={isDark} />
       </div>
 
-      {/* ── Status Pipeline ───────────────────────────────────── */}
-      {porStatus.length > 0 && (
-        <section>
-          <h2 className={`text-xs font-bold uppercase tracking-widest mb-2 flex items-center gap-1.5 ${isDark ? 'text-slate-500' : 'text-slate-500'}`}>
-            <TrendingUp size={12} /> Por Status
-          </h2>
-          <div className="grid grid-cols-3 lg:grid-cols-5 gap-2">
-            {porStatus.map(s => {
-              const cfg = STATUS_LABEL[s.status]
-              return (
-                <div key={s.status} className={`rounded-xl p-3 shadow-sm ${isDark ? 'bg-[#1e293b] border border-white/[0.06]' : 'bg-white border border-slate-200'}`}>
-                  <StatusBadge status={s.status} isDark={isDark} />
-                  <p className={`text-lg font-extrabold mt-2 ${isDark ? 'text-white' : 'text-slate-800'}`}>{s.total}</p>
-                  <p className={`text-[10px] mt-0.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{fmt(s.valor)}</p>
-                </div>
-              )
-            })}
-          </div>
-        </section>
-      )}
+      {/* ── Status Pipeline (barra elegante) ─────────────────── */}
+      {porStatus.length > 0 && (() => {
+        const PIPELINE_ORDER = ['previsto','confirmado','em_lote','aprovado_pgto','em_pagamento','pago','conciliado','cancelado']
+        const ordered = PIPELINE_ORDER
+          .map(key => porStatus.find(s => s.status === key))
+          .filter((s): s is typeof porStatus[number] => !!s && s.total > 0)
+        const totalGeral = ordered.reduce((sum, s) => sum + s.total, 0) || 1
+        const BAR_COLORS: Record<string, string> = {
+          previsto: 'bg-slate-400', confirmado: 'bg-blue-400', em_lote: 'bg-violet-500',
+          aprovado_pgto: 'bg-indigo-500', em_pagamento: 'bg-amber-400',
+          pago: 'bg-emerald-500', conciliado: 'bg-green-500', cancelado: 'bg-gray-400',
+        }
+        return (
+          <section className={`rounded-2xl p-5 shadow-sm ${isDark ? 'bg-[#1e293b] border border-white/[0.06]' : 'bg-white border border-slate-100'}`}>
+            <h2 className={`text-xs font-bold uppercase tracking-widest mb-4 flex items-center gap-1.5 ${isDark ? 'text-slate-500' : 'text-slate-500'}`}>
+              <TrendingUp size={12} /> Pipeline Financeiro
+            </h2>
+            {/* Barra */}
+            <div className="flex h-5 rounded-full overflow-hidden mb-4">
+              {ordered.map(s => (
+                <div key={s.status} className={`${BAR_COLORS[s.status] ?? 'bg-gray-300'} transition-all relative group cursor-default`}
+                  style={{ width: `${Math.max((s.total / totalGeral) * 100, 3)}%` }}
+                  title={`${STATUS_LABEL[s.status]?.label}: ${s.total} — ${fmt(s.valor)}`}
+                />
+              ))}
+            </div>
+            {/* Legenda */}
+            <div className="flex flex-wrap gap-x-5 gap-y-2">
+              {ordered.map(s => {
+                const cfg = STATUS_LABEL[s.status]
+                return (
+                  <div key={s.status} className="flex items-center gap-2">
+                    <span className={`w-3 h-3 rounded-full ${BAR_COLORS[s.status] ?? 'bg-gray-300'}`} />
+                    <div>
+                      <span className={`text-xs font-semibold ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
+                        {cfg?.label ?? s.status}
+                      </span>
+                      <span className={`text-xs ml-1.5 font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>{s.total}</span>
+                      <span className={`text-[10px] ml-1 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{fmt(s.valor)}</span>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </section>
+        )
+      })()}
 
       {/* ── Two columns: Próximos Vencimentos + Por Centro de Custo ── */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
