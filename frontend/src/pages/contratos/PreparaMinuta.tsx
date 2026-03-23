@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import { useParams, useNavigate } from 'react-router-dom'
 import {
   ArrowLeft, FileText, Plus, Upload, ExternalLink, Check,
@@ -1414,6 +1415,7 @@ export default function PreparaMinuta() {
   const atualizarResumo = useAtualizarResumo()
   const avancarEtapa = useAvancarEtapa()
   const analisarMinuta = useAnalisarMinuta()
+  const qc = useQueryClient()
   const atualizarConfig = useAtualizarConfigAnalise()
   const uploadFile = useUploadMinutaFile()
   const melhorarMinuta = useMelhorarMinuta()
@@ -2106,11 +2108,19 @@ export default function PreparaMinuta() {
                             const blob = await resp.blob()
                             const fileName = `modelo_${modelo.nome.replace(/\s+/g, '_')}.pdf`
                             const file = new File([blob], fileName, { type: blob.type })
-                            await uploadFile.mutateAsync({
-                              solicitacao_id: solicitacao!.id,
+                            const uploaded = await uploadFile.mutateAsync({
+                              solicitacaoId: solicitacao!.id,
                               file,
-                              tipo: 'modelo' as any,
                             })
+                            // Criar registro de minuta com o arquivo do modelo
+                            await supabase.from('con_minutas').insert({
+                              solicitacao_id: solicitacao!.id,
+                              versao: (minutas?.length ?? 0) + 1,
+                              arquivo_url: uploaded.arquivo_url,
+                              arquivo_nome: fileName,
+                              status: 'em_revisao',
+                            })
+                            qc.invalidateQueries({ queryKey: ['con-minutas'] })
                           } catch (err) {
                             console.error('Erro ao usar modelo:', err)
                           }
