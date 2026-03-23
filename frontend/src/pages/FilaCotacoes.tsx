@@ -147,9 +147,14 @@ function CotCard({ cot, isDark, onClick }: { cot: Cotacao; isDark: boolean; onCl
             </span>
           )}
         </div>
-        <span className={`text-sm font-extrabold ${concluida ? isDark ? 'text-emerald-400' : 'text-emerald-600' : isDark ? 'text-teal-400' : 'text-teal-600'}`}>
-          {fmt(valor)}
-        </span>
+        <div className="flex items-center gap-1.5">
+          {(cot.requisicao as any)?.compra_recorrente && (
+            <span className="text-[8px] font-bold bg-indigo-100 text-indigo-700 px-1.5 py-0.5 rounded">MENSAL</span>
+          )}
+          <span className={`text-sm font-extrabold ${concluida ? isDark ? 'text-emerald-400' : 'text-emerald-600' : isDark ? 'text-teal-400' : 'text-teal-600'}`}>
+            {fmt(valor)}
+          </span>
+        </div>
       </div>
 
       {/* Fornecedor selecionado */}
@@ -214,7 +219,7 @@ function CotDetailModal({ cot, onClose, isDark, isAdmin, atLeastComprador, onDec
           {/* Grid de dados */}
           <div className={`grid grid-cols-2 gap-3 text-xs ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
             <div><p className={`font-bold mb-0.5 ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>Obra</p><p>{cot.requisicao?.obra_nome}</p></div>
-            <div><p className={`font-bold mb-0.5 ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>Valor</p><p className={`font-extrabold ${isDark ? 'text-teal-400' : 'text-teal-600'}`}>{fmt(valor)}</p></div>
+            <div><p className={`font-bold mb-0.5 ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>{(cot.requisicao as any)?.compra_recorrente ? 'Valor Mensal' : 'Valor'}</p><div className="flex items-center gap-1.5"><p className={`font-extrabold ${isDark ? 'text-teal-400' : 'text-teal-600'}`}>{fmt(valor)}</p>{(cot.requisicao as any)?.compra_recorrente && <span className="text-[8px] font-bold bg-indigo-100 text-indigo-700 px-1.5 py-0.5 rounded">RECORRENTE</span>}</div></div>
             <div><p className={`font-bold mb-0.5 ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>Dias em aberto</p><p className={dias > 5 ? 'text-red-500 font-bold' : ''}>{dias}d</p></div>
             {cot.fornecedor_selecionado_nome && (
               <div><p className={`font-bold mb-0.5 ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>Fornecedor</p><p className={isDark ? 'text-emerald-400' : 'text-emerald-600'}>{cot.fornecedor_selecionado_nome}</p></div>
