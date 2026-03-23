@@ -334,11 +334,10 @@ export default function NovaRequisicao() {
       const sanitized = sanitizeItems(result.itens)
 
       if (sanitized.length > 0 && sanitized.some(i => i.descricao.trim())) {
-        // Mostra preview antes de aplicar
-        setAiPreview(result)
-        setPreviewItens(sanitized)
-        setShowPreview(true)
-        setRefParseMsg({ type: 'success', text: `${sanitized.length} itens extraídos do arquivo` })
+        // Aplicar diretamente os itens extraídos ao formulário
+        // matchCatalogItems já foi chamado dentro de useAiParse — itens com match terão est_item_id
+        applyAiResult(result, sanitized, `Itens extraídos de ${referenciaFile.name}`)
+        setRefParseMsg({ type: 'success', text: `${sanitized.length} itens extraídos e preenchidos` })
       } else {
         setRefParseMsg({ type: 'error', text: 'Não foi possível extrair itens do arquivo. Tente usar o Assistente IA no passo anterior.' })
       }
