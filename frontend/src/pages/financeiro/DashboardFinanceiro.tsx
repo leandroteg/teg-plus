@@ -131,29 +131,25 @@ export default function DashboardFinanceiro() {
             <h2 className={`text-xs font-bold uppercase tracking-widest mb-4 flex items-center gap-1.5 ${isDark ? 'text-slate-500' : 'text-slate-500'}`}>
               <TrendingUp size={12} /> Pipeline Financeiro
             </h2>
-            {/* Barra */}
-            <div className="flex h-5 rounded-full overflow-hidden mb-4">
-              {ordered.map(s => (
-                <div key={s.status} className={`${BAR_COLORS[s.status] ?? 'bg-gray-300'} transition-all relative group cursor-default`}
-                  style={{ width: `${Math.max((s.total / totalGeral) * 100, 3)}%` }}
-                  title={`${STATUS_LABEL[s.status]?.label}: ${s.total} — ${fmt(s.valor)}`}
-                />
-              ))}
-            </div>
-            {/* Legenda */}
-            <div className="flex flex-wrap gap-x-5 gap-y-2">
+            {/* Barra com labels inline */}
+            <div className="flex h-9 rounded-xl overflow-hidden">
               {ordered.map(s => {
+                const pct = (s.total / totalGeral) * 100
                 const cfg = STATUS_LABEL[s.status]
+                const label = cfg?.label ?? s.status
+                const showLabel = pct >= 12
+                const showValue = pct >= 20
                 return (
-                  <div key={s.status} className="flex items-center gap-2">
-                    <span className={`w-3 h-3 rounded-full ${BAR_COLORS[s.status] ?? 'bg-gray-300'}`} />
-                    <div>
-                      <span className={`text-xs font-semibold ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
-                        {cfg?.label ?? s.status}
+                  <div key={s.status}
+                    className={`${BAR_COLORS[s.status] ?? 'bg-gray-300'} transition-all relative flex items-center justify-center cursor-default`}
+                    style={{ width: `${Math.max(pct, 2.5)}%` }}
+                    title={`${label}: ${s.total} — ${fmt(s.valor)}`}
+                  >
+                    {showLabel && (
+                      <span className="text-[10px] font-bold text-white drop-shadow-sm truncate px-1">
+                        {label} {s.total}{showValue ? ` · ${fmt(s.valor)}` : ''}
                       </span>
-                      <span className={`text-xs ml-1.5 font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>{s.total}</span>
-                      <span className={`text-[10px] ml-1 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{fmt(s.valor)}</span>
-                    </div>
+                    )}
                   </div>
                 )
               })}
