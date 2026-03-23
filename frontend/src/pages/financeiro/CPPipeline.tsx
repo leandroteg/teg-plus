@@ -2366,7 +2366,15 @@ export default function CPPipeline() {
   const novaMenuRef = useRef<HTMLDivElement | null>(null)
 
   useEffect(() => {
-    if (searchParams.get('nova')) {
+    const novaIntent = searchParams.get('nova')
+    if (novaIntent === 'extraordinario' || novaIntent === 'previsao') {
+      setNovaSolicitacaoKind(novaIntent)
+      setShowNovaSolicitacao(true)
+      setShowNovaMenu(false)
+      setSearchParams({}, { replace: true })
+      return
+    }
+    if (novaIntent) {
       setShowNovaMenu(true)
       setSearchParams({}, { replace: true })
     }
