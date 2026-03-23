@@ -874,7 +874,6 @@ function NovaSolicitacaoExtraordinariaModal({
 
   const centrosFiltrados = centrosCusto
     .filter(cc => `${cc.codigo} ${cc.descricao}`.toLowerCase().includes(ccBusca.toLowerCase()))
-    .slice(0, 8)
 
   const classesFiltradas = classesFinanceiras
     .filter(classe => `${classe.codigo} ${classe.descricao}`.toLowerCase().includes(classeBusca.toLowerCase()))
@@ -996,8 +995,8 @@ function NovaSolicitacaoExtraordinariaModal({
                           }}
                           className={`w-full px-3 py-2 text-left text-sm transition-colors ${isDark ? 'text-slate-200 hover:bg-white/[0.06]' : 'text-slate-700 hover:bg-slate-50'}`}
                         >
-                          <div className="font-medium">{cc.codigo || cc.descricao}</div>
-                          {!!cc.codigo && <div className={`text-xs ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{cc.descricao}</div>}
+                          <div className="font-medium">{cc.descricao || cc.codigo}</div>
+                          {!!cc.codigo && <div className={`text-xs ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{cc.codigo}</div>}
                         </button>
                       )
                     })}
@@ -1271,7 +1270,6 @@ function NovaPrevisaoPagamentoModal({
 
   const centrosFiltrados = centrosCusto
     .filter(cc => `${cc.codigo} ${cc.descricao}`.toLowerCase().includes(ccBusca.toLowerCase()))
-    .slice(0, 8)
 
   const classesFiltradas = classesFinanceiras
     .filter(classe => `${classe.codigo} ${classe.descricao}`.toLowerCase().includes(classeBusca.toLowerCase()))
@@ -1394,8 +1392,8 @@ function NovaPrevisaoPagamentoModal({
                           }}
                           className={`w-full px-3 py-2 text-left text-sm transition-colors ${isDark ? 'text-slate-200 hover:bg-white/[0.06]' : 'text-slate-700 hover:bg-slate-50'}`}
                         >
-                          <div className="font-medium">{cc.codigo || cc.descricao}</div>
-                          {!!cc.codigo && <div className={`text-xs ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{cc.descricao}</div>}
+                          <div className="font-medium">{cc.descricao || cc.codigo}</div>
+                          {!!cc.codigo && <div className={`text-xs ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{cc.codigo}</div>}
                         </button>
                       )
                     })}
