@@ -1767,35 +1767,7 @@ export default function Pedidos() {
         source_cotacao: { id: c.id, comprador_id: c.comprador_id },
       }))
 
-    // Recorrentes com contrato concluído (já liberado)
-    const contratoConcluido = cotacoes
-      .filter(c => c.status === 'concluida' && c.requisicao?.status === 'pedido_emitido' && (c.requisicao as any)?.compra_recorrente)
-      .filter(c => !pedidosByReq.has(c.requisicao_id))
-      .map(c => ({
-        id: `contrato-concluido-${c.id}`,
-        requisicao_id: c.requisicao_id,
-        cotacao_id: c.id,
-        comprador_id: c.comprador_id,
-        fornecedor_nome: c.fornecedor_selecionado_nome ?? '',
-        valor_total: c.valor_selecionado ?? c.requisicao?.valor_estimado,
-        status: 'entregue' as const,
-        status_pagamento: 'pago' as const,
-        created_at: c.data_conclusao ?? c.created_at,
-        observacoes: 'Contrato formalizado',
-        requisicao: c.requisicao
-          ? {
-              numero: c.requisicao.numero,
-              descricao: c.requisicao.descricao,
-              obra_nome: c.requisicao.obra_nome,
-              categoria: c.requisicao.categoria,
-              compra_recorrente: true,
-            }
-          : undefined,
-        pending_emissao: false,
-        contrato_ativo: true,
-      }))
-
-    return [...pendingEmission, ...aguardandoContrato, ...contratoConcluido]
+    return [...pendingEmission, ...aguardandoContrato]
   }, [cotacoes, pedidosByReq])
   const allPedidoItems = useMemo<PedidoListItem[]>(
     () => [...pendingApprovalPedidos, ...allPedidos],
