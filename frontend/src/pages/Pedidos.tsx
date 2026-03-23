@@ -1697,7 +1697,9 @@ export default function Pedidos() {
               numero: c.requisicao.numero,
               descricao: c.requisicao.descricao,
               obra_nome: c.requisicao.obra_nome,
+              obra_id: (c.requisicao as any).obra_id,
               categoria: c.requisicao.categoria,
+              compra_recorrente: (c.requisicao as any).compra_recorrente,
             }
           : undefined,
         pending_emissao: true,
@@ -1723,7 +1725,9 @@ export default function Pedidos() {
               numero: c.requisicao.numero,
               descricao: c.requisicao.descricao,
               obra_nome: c.requisicao.obra_nome,
+              obra_id: (c.requisicao as any).obra_id,
               categoria: c.requisicao.categoria,
+              compra_recorrente: (c.requisicao as any).compra_recorrente,
             }
           : undefined,
         pending_emissao: true,
