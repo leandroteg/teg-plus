@@ -810,7 +810,7 @@ export default function NovaRequisicao() {
   // ETAPA 2 — Detalhes
   // ═══════════════════════════════════════
   if (step === 2) return (
-    <div className="space-y-5">
+    <div className="space-y-5 flex flex-col">
       <Stepper step={2} />
       <button onClick={() => { setStep(1); setStepErrors([]) }} className="flex items-center gap-1 text-slate-500 text-sm -mt-2">
         <ChevronLeft size={16} /> Voltar
@@ -841,7 +841,7 @@ export default function NovaRequisicao() {
           placeholder="Seu nome completo" value={solicitante} onChange={e => setSolicitante(e.target.value)} />
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+      <div className="order-6 grid grid-cols-1 md:grid-cols-3 gap-3">
         <div className="md:col-span-2">
           <label className="text-xs font-semibold text-slate-500 mb-1 block">Obra *</label>
           <select required className={`w-full border rounded-xl px-3 py-2.5 text-sm bg-white focus:ring-2 focus:ring-teal-300 outline-none ${
@@ -862,16 +862,16 @@ export default function NovaRequisicao() {
         </div>
       </div>
 
-      <div>
-        <label className="text-xs font-semibold text-slate-500 mb-1 block">Descrição <span className="text-red-400">*</span></label>
+      <div className="order-4">
+        <label className="text-xs font-semibold text-slate-500 mb-1 block">Descri&ccedil;&atilde;o <span className="text-red-400">*</span></label>
         <textarea rows={3} required
           className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-teal-300 outline-none"
           placeholder="Descreva o que quer comprar e para que precisa dessa compra"
           value={justificativa} onChange={e => setJustificativa(e.target.value)} />
       </div>
 
-      <div>
-        <label className="text-xs font-semibold text-slate-500 mb-1.5 block">ReferÃªncia de cotaÃ§Ã£o</label>
+      <div className="order-5">
+        <label className="text-xs font-semibold text-slate-500 mb-1.5 block">Refer&ecirc;ncia de cota&ccedil;&atilde;o</label>
         <div
           className={`rounded-2xl border-2 border-dashed p-4 transition-all cursor-pointer ${
             referenciaFile
@@ -941,7 +941,7 @@ export default function NovaRequisicao() {
                 <Upload size={18} />
               </div>
               <div>
-                <p className="text-sm font-semibold text-slate-700">Anexar referÃªncia de cotaÃ§Ã£o</p>
+                <p className="text-sm font-semibold text-slate-700">Anexar refer&ecirc;ncia de cota&ccedil;&atilde;o</p>
                 <p className="text-[11px] text-slate-400">PDF, planilha, imagem ou documento de apoio.</p>
               </div>
             </div>
