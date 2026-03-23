@@ -395,33 +395,48 @@ export default function Conciliacao() {
     }
 
     try {
-      if (arquivoComprovante) {
-        for (const pedidoId of missingComprovantePedidoIds) {
-          await uploadAnexo.mutateAsync({
-            pedidoId,
-            file: arquivoComprovante,
-            tipo: 'comprovante_pagamento',
-            observacao: observacaoComprovante || undefined,
-            origem: 'financeiro',
-          })
+      // 1. Upload comprovante(s)
+      if (arquivoComprovante && missingComprovantePedidoIds.length > 0) {
+        for (let i = 0; i < missingComprovantePedidoIds.length; i++) {
+          try {
+            await uploadAnexo.mutateAsync({
+              pedidoId: missingComprovantePedidoIds[i],
+              file: arquivoComprovante,
+              tipo: 'comprovante_pagamento',
+              observacao: observacaoComprovante || undefined,
+              origem: 'financeiro',
+            })
+          } catch (uploadErr) {
+            showToast('error', `Erro ao anexar comprovante ao pedido ${i + 1}: ${uploadErr instanceof Error ? uploadErr.message : 'Falha no upload'}`)
+            return
+          }
         }
       }
 
+      // 2. Classificar se necessário
       if (batchCC || batchClasse || batchProjeto) {
-        await classificarCP.mutateAsync({
-          ids: modalIds,
-          centro_custo: batchCC || undefined,
-          classe_financeira: batchClasse || undefined,
-          projeto_id: batchProjeto || undefined,
-        })
+        try {
+          await classificarCP.mutateAsync({
+            ids: modalIds,
+            centro_custo: batchCC || undefined,
+            classe_financeira: batchClasse || undefined,
+            projeto_id: batchProjeto || undefined,
+          })
+        } catch (classErr) {
+          showToast('error', `Erro ao classificar: ${classErr instanceof Error ? classErr.message : 'Falha na classificação'}`)
+          return
+        }
       }
 
+      // 3. Conciliar
       await conciliarCP.mutateAsync({ ids: modalIds })
-      showToast('success', `${modalIds.length} ${modalIds.length === 1 ? 'título conciliado' : 'títulos conciliados'}`)
+
+      // 4. Fechar modal e exibir sucesso
       closeClassModal()
       setSelected(new Set())
+      showToast('success', `${modalIds.length} ${modalIds.length === 1 ? 'título conciliado' : 'títulos conciliados'}`)
     } catch (error) {
-      showToast('error', error instanceof Error ? error.message : 'Erro ao conciliar títulos')
+      showToast('error', `Erro ao conciliar: ${error instanceof Error ? error.message : 'Falha na conciliação'}`)
     }
   }
 
