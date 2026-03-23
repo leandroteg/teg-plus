@@ -226,6 +226,40 @@ export function useAvancarEtapa() {
         })
       if (histErr) throw histErr
 
+      // ── Criar aprovação ao avançar para aprovacao_diretoria ──
+      if (payload.etapaPara === 'aprovacao_diretoria') {
+        try {
+          const { data: sol } = await supabase
+            .from('con_solicitacoes')
+            .select('numero, objeto, valor_estimado, contraparte_nome')
+            .eq('id', payload.solicitacaoId)
+            .single()
+
+          // Verificar se já existe aprovação pendente
+          const { data: existing } = await supabase
+            .from('apr_aprovacoes')
+            .select('id')
+            .eq('entidade_id', payload.solicitacaoId)
+            .eq('modulo', 'con')
+            .eq('status', 'pendente')
+            .limit(1)
+
+          if (!existing?.length) {
+            await supabase.from('apr_aprovacoes').insert({
+              modulo: 'con',
+              tipo_aprovacao: 'minuta_contratual',
+              entidade_id: payload.solicitacaoId,
+              entidade_numero: sol?.numero ?? '',
+              nivel: 2,
+              status: 'pendente',
+            })
+          }
+        } catch (aprErr) {
+          console.error('Erro ao criar aprovação:', aprErr)
+          // Não bloqueia o avanço de etapa
+        }
+      }
+
       // ── Criar contrato em con_contratos ao liberar execucao ──
       if (payload.etapaPara === 'concluido') {
         try {
