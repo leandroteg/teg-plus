@@ -3625,8 +3625,8 @@ export default function CPPipeline() {
                 <span>Resumo</span>
                 <span>Qtd</span>
                 <span>Aprov.</span>
-                <span className="text-right">Valor</span>
-                <span className="text-right">Ações</span>
+                <span className="pr-4 text-right">Valor</span>
+                <span className="pl-5 text-right">Ações</span>
               </div>
               {activeLotes.map(summary => {
                 const actions = buildLoteActions(summary)
