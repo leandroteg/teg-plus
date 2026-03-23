@@ -18,18 +18,22 @@ function buildRomaneioShareText(sol: LogSolicitacao) {
 }
 
 export function openGeneratedPdf(sol: LogSolicitacao) {
-  const url = gerarRomaneioPDF(sol)
-  window.open(url, '_blank', 'noopener,noreferrer')
-  window.setTimeout(() => URL.revokeObjectURL(url), 60_000)
+  void (async () => {
+    const url = await gerarRomaneioPDF(sol)
+    window.open(url, '_blank', 'noopener,noreferrer')
+    window.setTimeout(() => URL.revokeObjectURL(url), 60_000)
+  })()
 }
 
 export function downloadGeneratedPdf(sol: LogSolicitacao) {
-  const url = gerarRomaneioPDF(sol)
-  const a = document.createElement('a')
-  a.href = url
-  a.download = getRomaneioFileName(sol)
-  a.click()
-  window.setTimeout(() => URL.revokeObjectURL(url), 60_000)
+  void (async () => {
+    const url = await gerarRomaneioPDF(sol)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = getRomaneioFileName(sol)
+    a.click()
+    window.setTimeout(() => URL.revokeObjectURL(url), 60_000)
+  })()
 }
 
 async function compartilharWhatsApp(sol: LogSolicitacao): Promise<boolean> {
@@ -37,7 +41,7 @@ async function compartilharWhatsApp(sol: LogSolicitacao): Promise<boolean> {
 
   if (navigator.share && navigator.canShare) {
     try {
-      const blob = gerarRomaneioPdfBlob(sol)
+      const blob = await gerarRomaneioPdfBlob(sol)
       const file = new File([blob], getRomaneioFileName(sol), { type: 'application/pdf' })
       const shareData = { text, files: [file] }
       if (navigator.canShare(shareData)) {
