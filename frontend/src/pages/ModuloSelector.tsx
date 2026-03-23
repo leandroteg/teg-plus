@@ -95,7 +95,7 @@ const PILLARS: Pillar[] = [
   },
   {
     key: 'hr',
-    label: 'HR',
+    label: 'RH',
     tagline: 'Pessoas e departamento pessoal',
     Icon: Users,
     grad: 'from-violet-500/20 to-purple-600/20',
