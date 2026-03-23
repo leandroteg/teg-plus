@@ -10,6 +10,14 @@ import ApprovalBadge from './ApprovalBadge'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
+export interface NavActionMenuItem {
+  icon: LucideIcon
+  label: string
+  description?: string
+  tone?: 'amber' | 'emerald'
+  action: () => void
+}
+
 export interface NavItem {
   to: string
   icon: LucideIcon
@@ -17,6 +25,10 @@ export interface NavItem {
   end?: boolean
   adminOnly?: boolean
   action?: () => void
+  actionMenu?: {
+    title?: string
+    items: NavActionMenuItem[]
+  }
   accent?: boolean
 }
 
@@ -252,6 +264,7 @@ export default function ModuleLayout({
   const navigate = useNavigate()
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [avatarOpen, setAvatarOpen] = useState(false)
+  const [openNavMenu, setOpenNavMenu] = useState<{ id: string; top: number; left: number } | null>(null)
 
   // Close avatar dropdown on click outside or Escape
   useEffect(() => {
@@ -269,6 +282,35 @@ export default function ModuleLayout({
       document.removeEventListener('keydown', onEscape)
     }
   }, [avatarOpen])
+
+  useEffect(() => {
+    if (!openNavMenu) return
+    function onClickOutside(e: MouseEvent) {
+      if (!(e.target as HTMLElement).closest('[data-nav-action-menu]')) setOpenNavMenu(null)
+    }
+    function onEscape(e: KeyboardEvent) {
+      if (e.key === 'Escape') setOpenNavMenu(null)
+    }
+    document.addEventListener('mousedown', onClickOutside)
+    document.addEventListener('keydown', onEscape)
+    return () => {
+      document.removeEventListener('mousedown', onClickOutside)
+      document.removeEventListener('keydown', onEscape)
+    }
+  }, [openNavMenu])
+
+  useEffect(() => {
+    if (!openNavMenu) return
+    function closeNavMenu() {
+      setOpenNavMenu(null)
+    }
+    window.addEventListener('resize', closeNavMenu)
+    window.addEventListener('scroll', closeNavMenu, true)
+    return () => {
+      window.removeEventListener('resize', closeNavMenu)
+      window.removeEventListener('scroll', closeNavMenu, true)
+    }
+  }, [openNavMenu])
 
   const ls = isLightSidebar
   const a = ACCENT_CLASSES[config.accent] ?? ACCENT_CLASSES.teal
@@ -314,10 +356,86 @@ export default function ModuleLayout({
     return `${base} ${ls ? 'text-slate-400 hover:text-slate-600' : 'text-slate-500 hover:text-slate-300'}`
   }
 
+  function navActionMenuToneClasses(tone: NavActionMenuItem['tone']) {
+    if (tone === 'amber') {
+      return ls
+        ? 'bg-amber-50 text-amber-600'
+        : 'bg-amber-500/15 text-amber-300'
+    }
+    return ls
+      ? 'bg-emerald-50 text-emerald-600'
+      : 'bg-emerald-500/15 text-emerald-300'
+  }
+
   // ── Render helpers ──────────────────────────────────────────────────────────
 
   function renderNavItems() {
-    return visibleNav.map(({ to, icon: Icon, label, end, adminOnly, action, accent }) => {
+    return visibleNav.map(({ to, icon: Icon, label, end, adminOnly, action, actionMenu, accent }) => {
+      if (actionMenu) {
+        const isOpen = openNavMenu?.id === to
+        return (
+          <div key={to}>
+            <button
+              type="button"
+              onClick={event => {
+                if (openNavMenu?.id === to) {
+                  setOpenNavMenu(null)
+                  return
+                }
+                const rect = event.currentTarget.getBoundingClientRect()
+                setOpenNavMenu({
+                  id: to,
+                  top: Math.min(rect.top, window.innerHeight - 260),
+                  left: rect.right + 12,
+                })
+              }}
+              className={`w-full text-left ${sidebarLinkClass({ isActive: false })}`}
+            >
+              <Icon size={18} className={accent ? 'shrink-0 text-orange-500' : 'shrink-0'} />
+              <span className={accent ? 'text-orange-500 font-semibold' : undefined}>{label}</span>
+            </button>
+            {isOpen && (
+              <div
+                data-nav-action-menu
+                className={`fixed z-[70] w-[340px] rounded-3xl border p-3 shadow-2xl ${ls ? 'border-slate-200 bg-white' : 'border-white/[0.08] bg-slate-900'}`}
+                style={{ top: openNavMenu.top, left: openNavMenu.left }}
+              >
+                {actionMenu.title && (
+                  <p className={`px-4 pt-2 pb-1 text-[10px] font-bold uppercase tracking-wider ${ls ? 'text-slate-400' : 'text-slate-500'}`}>
+                    {actionMenu.title}
+                  </p>
+                )}
+                {actionMenu.items.map(item => {
+                  const ItemIcon = item.icon
+                  return (
+                    <button
+                      key={item.label}
+                      type="button"
+                      onClick={() => {
+                        setOpenNavMenu(null)
+                        item.action()
+                      }}
+                      className={`flex w-full items-start gap-3 rounded-2xl px-4 py-3.5 text-left transition-all ${ls ? 'hover:bg-slate-50' : 'hover:bg-white/[0.05]'}`}
+                    >
+                      <span className={`mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl ${navActionMenuToneClasses(item.tone)}`}>
+                        <ItemIcon size={16} />
+                      </span>
+                      <span>
+                        <span className={`block text-sm font-bold ${ls ? 'text-slate-900' : 'text-white'}`}>{item.label}</span>
+                        {item.description && (
+                          <span className={`mt-1 block text-xs leading-relaxed ${ls ? 'text-slate-500' : 'text-slate-400'}`}>
+                            {item.description}
+                          </span>
+                        )}
+                      </span>
+                    </button>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+        )
+      }
       if (action) {
         return (
           <button key={to} onClick={action} className={`w-full text-left ${sidebarLinkClass({ isActive: false })}`}>
