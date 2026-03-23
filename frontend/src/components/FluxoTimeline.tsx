@@ -36,7 +36,7 @@ const ETAPAS: Etapa[] = [
   {
     label:      'Pedido',
     shortLabel: 'Ped',
-    statuses:   ['pedido_emitido'],
+    statuses:   ['pedido_emitido', 'aguardando_contrato'],
   },
   {
     label:      'Entrega',

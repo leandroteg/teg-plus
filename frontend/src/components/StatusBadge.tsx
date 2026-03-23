@@ -16,8 +16,9 @@ const config: Record<string, { dot: string; bg: string; text: string; label: str
   // ── Etapa 4: Aprovação Técnica/Financeira ─────────────────────────────────
   cotacao_aprovada:  { dot: 'bg-teal-500',    bg: 'bg-teal-50',     text: 'text-teal-700',    label: 'Cotação Aprovada'  },
   cotacao_rejeitada: { dot: 'bg-red-400',     bg: 'bg-red-50',      text: 'text-red-600',     label: 'Cotação Reprovada' },
-  // ── Etapa 5: Pedido ────────────────────────────────────────────────────────
-  pedido_emitido:    { dot: 'bg-cyan-500',    bg: 'bg-cyan-50',     text: 'text-cyan-700',    label: 'Pedido Emitido'    },
+  // ── Etapa 5: Pedido / Contrato ──────────────────────────────────────────────
+  pedido_emitido:       { dot: 'bg-cyan-500',    bg: 'bg-cyan-50',     text: 'text-cyan-700',    label: 'Pedido Emitido'    },
+  aguardando_contrato:  { dot: 'bg-indigo-500',  bg: 'bg-indigo-50',   text: 'text-indigo-700',  label: 'Aguard. Contrato'  },
   // ── Etapa 6: Entrega ───────────────────────────────────────────────────────
   em_entrega:        { dot: 'bg-orange-400',  bg: 'bg-orange-50',   text: 'text-orange-700',  label: 'Em Entrega'        },
   entregue:          { dot: 'bg-green-400',   bg: 'bg-green-50',    text: 'text-green-700',   label: 'Entregue'          },

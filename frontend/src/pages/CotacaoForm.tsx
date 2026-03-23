@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import {
   ChevronLeft, PlusCircle, Trash2, Send, CheckCircle, Info, AlertTriangle,
   Paperclip, FileText, X, Loader2, Eye, Ban, CheckCircle2, PackagePlus,
+  ScrollText,
 } from 'lucide-react'
 import { useCotacao, useFinalizarCotacao } from '../hooks/useCotacoes'
 import { useEmitirPedido, useCancelarRequisicao } from '../hooks/usePedidos'
@@ -174,14 +175,71 @@ function maskCNPJ(value: string): string {
 // ── Cotação Concluída (com botões Emitir Pedido / Cancelar) ─────────────────
 
 function CotacaoConcluida({ cotacao, nav }: { cotacao: Cotacao; nav: ReturnType<typeof useNavigate> }) {
-  const { atLeast } = useAuth()
+  const { atLeast, perfil } = useAuth()
   const emitirMutation = useEmitirPedido()
   const cancelarMutation = useCancelarRequisicao()
   const [pedidoToast, setPedidoToast] = useState<{ type: 'success' | 'error'; msg: string } | null>(null)
   const [showEmitirModal, setShowEmitirModal] = useState(false)
+  const [solicitandoContrato, setSolicitandoContrato] = useState(false)
 
   const req = cotacao.requisicao
   const canEmitPedido = atLeast('comprador') && req?.status === 'cotacao_aprovada'
+  const isRecorrente = (req as any)?.compra_recorrente === true
+
+  // ── Solicitar Contrato (compra recorrente) ───────────────────────────────
+  const handleSolicitarContrato = async () => {
+    if (!req || !perfil) return
+    setSolicitandoContrato(true)
+    try {
+      // Generate numero: SOL-CON-YYYY-NNN
+      const year = new Date().getFullYear()
+      const prefix = `SOL-CON-${year}-`
+      const { count } = await supabase
+        .from('con_solicitacoes')
+        .select('id', { count: 'exact', head: true })
+        .like('numero', `${prefix}%`)
+      const seq = String((count ?? 0) + 1).padStart(3, '0')
+      const numero = `${prefix}${seq}`
+
+      const { error: insertErr } = await supabase
+        .from('con_solicitacoes')
+        .insert({
+          numero,
+          titulo: req.descricao,
+          objeto: req.descricao,
+          categoria_contrato: 'prestacao_servico',
+          grupo_contrato: 'prestacao_servicos',
+          tipo_contrato: 'despesa',
+          tipo_contraparte: 'fornecedor',
+          contraparte_nome: cotacao.fornecedor_selecionado_nome ?? 'A definir',
+          obra_id: (req as any).obra_id ?? null,
+          valor_estimado: cotacao.valor_selecionado ?? req.valor_estimado ?? 0,
+          solicitante_id: perfil.id,
+          solicitante_nome: perfil.nome,
+          etapa_atual: 'solicitacao',
+          status: 'em_andamento',
+          requisicao_origem_id: req.id,
+          urgencia: 'normal',
+          documentos_ref: [],
+        })
+      if (insertErr) throw insertErr
+
+      // Update requisição status
+      const { error: updErr } = await supabase
+        .from('cmp_requisicoes')
+        .update({ status: 'aguardando_contrato' })
+        .eq('id', req.id)
+      if (updErr) throw updErr
+
+      setPedidoToast({ type: 'success', msg: 'Solicitação de contrato criada com sucesso' })
+      setTimeout(() => nav('/contratos/solicitacoes'), 2000)
+    } catch (err: any) {
+      setPedidoToast({ type: 'error', msg: `Erro ao solicitar contrato: ${err?.message || 'erro desconhecido'}` })
+      setTimeout(() => setPedidoToast(null), 5000)
+    } finally {
+      setSolicitandoContrato(false)
+    }
+  }
 
   return (
     <div className="space-y-4">
@@ -208,13 +266,13 @@ function CotacaoConcluida({ cotacao, nav }: { cotacao: Cotacao; nav: ReturnType<
       {/* Comparativo */}
       {cotacao.fornecedores && <CotacaoComparativo fornecedores={cotacao.fornecedores} readOnly />}
 
-      {/* ── Emitir Pedido / Cancelar ────────────────────────────────────── */}
+      {/* ── Emitir Pedido / Solicitar Contrato / Cancelar ────────────── */}
       {canEmitPedido && (
-        <div className="bg-white rounded-2xl border-2 border-teal-200 shadow-sm overflow-hidden">
-          <div className="bg-teal-50 px-4 py-3 border-b border-teal-100">
-            <p className="text-xs font-bold text-teal-700 uppercase tracking-wider flex items-center gap-2">
-              <FileText size={14} />
-              Próximo Passo — Emissão de Pedido
+        <div className={`bg-white rounded-2xl border-2 ${isRecorrente ? 'border-indigo-200' : 'border-teal-200'} shadow-sm overflow-hidden`}>
+          <div className={`${isRecorrente ? 'bg-indigo-50' : 'bg-teal-50'} px-4 py-3 border-b ${isRecorrente ? 'border-indigo-100' : 'border-teal-100'}`}>
+            <p className={`text-xs font-bold ${isRecorrente ? 'text-indigo-700' : 'text-teal-700'} uppercase tracking-wider flex items-center gap-2`}>
+              {isRecorrente ? <ScrollText size={14} /> : <FileText size={14} />}
+              {isRecorrente ? 'Próximo Passo — Solicitação de Contrato' : 'Próximo Passo — Emissão de Pedido'}
             </p>
           </div>
 
@@ -250,7 +308,7 @@ function CotacaoConcluida({ cotacao, nav }: { cotacao: Cotacao; nav: ReturnType<
             {!emitirMutation.isSuccess && !cancelarMutation.isSuccess && (
               <div className="grid grid-cols-2 gap-3">
                 <button
-                  disabled={cancelarMutation.isPending || emitirMutation.isPending}
+                  disabled={cancelarMutation.isPending || emitirMutation.isPending || solicitandoContrato}
                   onClick={() => {
                     if (!confirm('Cancelar esta requisição? Esta ação não pode ser desfeita.')) return
                     cancelarMutation.mutate(req!.id, {
@@ -274,18 +332,33 @@ function CotacaoConcluida({ cotacao, nav }: { cotacao: Cotacao; nav: ReturnType<
                   Cancelar RC
                 </button>
 
-                <button
-                  disabled={emitirMutation.isPending || cancelarMutation.isPending}
-                  onClick={() => setShowEmitirModal(true)}
-                  className="flex items-center justify-center gap-2 py-3.5 rounded-xl text-sm font-bold
-                    text-white bg-teal-500 border-2 border-teal-500 hover:bg-teal-600 shadow-lg shadow-teal-500/20
-                    active:scale-[0.98] transition-all disabled:opacity-50"
-                >
-                  {emitirMutation.isPending
-                    ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                    : <FileText size={16} />}
-                  Emitir Pedido
-                </button>
+                {isRecorrente ? (
+                  <button
+                    disabled={solicitandoContrato || cancelarMutation.isPending}
+                    onClick={handleSolicitarContrato}
+                    className="flex items-center justify-center gap-2 py-3.5 rounded-xl text-sm font-bold
+                      text-white bg-indigo-500 border-2 border-indigo-500 hover:bg-indigo-600 shadow-lg shadow-indigo-500/20
+                      active:scale-[0.98] transition-all disabled:opacity-50"
+                  >
+                    {solicitandoContrato
+                      ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      : <ScrollText size={16} />}
+                    Solicitar Contrato
+                  </button>
+                ) : (
+                  <button
+                    disabled={emitirMutation.isPending || cancelarMutation.isPending}
+                    onClick={() => setShowEmitirModal(true)}
+                    className="flex items-center justify-center gap-2 py-3.5 rounded-xl text-sm font-bold
+                      text-white bg-teal-500 border-2 border-teal-500 hover:bg-teal-600 shadow-lg shadow-teal-500/20
+                      active:scale-[0.98] transition-all disabled:opacity-50"
+                  >
+                    {emitirMutation.isPending
+                      ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      : <FileText size={16} />}
+                    Emitir Pedido
+                  </button>
+                )}
               </div>
             )}
 

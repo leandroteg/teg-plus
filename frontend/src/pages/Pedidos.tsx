@@ -244,11 +244,24 @@ const pendingEmissionStatus = {
   textDark: 'text-amber-300',
 }
 
+const aguardandoContratoStatus = {
+  bg: 'bg-indigo-100',
+  text: 'text-indigo-700',
+  label: 'Aguard. Contrato',
+  bgDark: 'bg-indigo-900/40',
+  textDark: 'text-indigo-300',
+}
+
 function isPendingEmission(pedido: PedidoListItem) {
   return pedido.pending_emissao === true
 }
 
+function isAguardandoContrato(pedido: PedidoListItem) {
+  return (pedido as any).aguardando_contrato === true
+}
+
 function getStatusMeta(pedido: PedidoListItem) {
+  if (isAguardandoContrato(pedido)) return aguardandoContratoStatus
   return isPendingEmission(pedido)
     ? pendingEmissionStatus
     : (statusConfig[pedido.status] || statusConfig.emitido)
@@ -1663,8 +1676,8 @@ export default function Pedidos() {
   // Exclude cancelado
   const allPedidos = useMemo(() => (pedidos ?? []).filter(p => p.status !== 'cancelado'), [pedidos])
   const pedidosByReq = useMemo(() => new Set(allPedidos.map(p => p.requisicao_id).filter(Boolean)), [allPedidos])
-  const pendingApprovalPedidos = useMemo<PedidoListItem[]>(
-    () => cotacoes
+  const pendingApprovalPedidos = useMemo<PedidoListItem[]>(() => {
+    const pendingEmission = cotacoes
       .filter(c => c.status === 'concluida' && c.requisicao?.status === 'cotacao_aprovada')
       .filter(c => !pedidosByReq.has(c.requisicao_id))
       .map(c => ({
@@ -1674,7 +1687,7 @@ export default function Pedidos() {
         comprador_id: c.comprador_id,
         fornecedor_nome: c.fornecedor_selecionado_nome ?? 'Fornecedor nao definido',
         valor_total: c.valor_selecionado ?? c.requisicao?.valor_estimado,
-        status: 'emitido',
+        status: 'emitido' as const,
         created_at: c.data_conclusao ?? c.created_at,
         observacoes: c.observacao,
         requisicao: c.requisicao
@@ -1687,9 +1700,37 @@ export default function Pedidos() {
           : undefined,
         pending_emissao: true,
         source_cotacao: { id: c.id, comprador_id: c.comprador_id },
-      })),
-    [cotacoes, pedidosByReq],
-  )
+      }))
+
+    // Requisições aguardando contrato (compra recorrente)
+    const aguardandoContrato = cotacoes
+      .filter(c => c.status === 'concluida' && c.requisicao?.status === 'aguardando_contrato')
+      .filter(c => !pedidosByReq.has(c.requisicao_id))
+      .map(c => ({
+        id: `aguardando-contrato-${c.id}`,
+        requisicao_id: c.requisicao_id,
+        cotacao_id: c.id,
+        comprador_id: c.comprador_id,
+        fornecedor_nome: c.fornecedor_selecionado_nome ?? 'Fornecedor nao definido',
+        valor_total: c.valor_selecionado ?? c.requisicao?.valor_estimado,
+        status: 'emitido' as const,
+        created_at: c.data_conclusao ?? c.created_at,
+        observacoes: c.observacao,
+        requisicao: c.requisicao
+          ? {
+              numero: c.requisicao.numero,
+              descricao: c.requisicao.descricao,
+              obra_nome: c.requisicao.obra_nome,
+              categoria: c.requisicao.categoria,
+            }
+          : undefined,
+        pending_emissao: true,
+        aguardando_contrato: true,
+        source_cotacao: { id: c.id, comprador_id: c.comprador_id },
+      }))
+
+    return [...pendingEmission, ...aguardandoContrato]
+  }, [cotacoes, pedidosByReq])
   const allPedidoItems = useMemo<PedidoListItem[]>(
     () => [...pendingApprovalPedidos, ...allPedidos],
     [pendingApprovalPedidos, allPedidos],
