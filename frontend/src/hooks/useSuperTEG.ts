@@ -235,37 +235,52 @@ export function useSuperTEG() {
 
         const { data: { publicUrl } } = supabase.storage.from('cotacoes-docs').getPublicUrl(path)
 
-        // 2. Send as multipart/form-data (binary) to n8n
-        const formData = new FormData()
-        formData.append('message', text)
-        formData.append('session_id', sessionRef.current)
-        formData.append('perfil_id', perfil?.id || '')
-        formData.append('file_url', publicUrl)
-        formData.append('file_name', file.name)
-        formData.append('file_mime', file.type || 'application/pdf')
-        formData.append('file_size', String(file.size))
-        formData.append('file', file, file.name)
-
-        const res = await fetch(WEBHOOK_URL, {
-          method: 'POST',
-          body: formData,
-          // No Content-Type header — browser sets multipart boundary automatically
+        // 2. Extract data from PDF via parse-cotacao (IA)
+        const N8N_BASE = 'https://teg-agents-n8n.nmmcas.easypanel.host/webhook'
+        const reader = new FileReader()
+        const base64 = await new Promise<string>((resolve, reject) => {
+          reader.onload = () => resolve((reader.result as string).split(',')[1])
+          reader.onerror = reject
+          reader.readAsDataURL(file)
         })
 
-        const raw = await res.json()
-        const data = Array.isArray(raw) ? raw[0] : raw
-        const { content, actions } = parseResponse(data)
+        let extractedData: Record<string, unknown> = {}
+        try {
+          const parseRes = await fetch(`${N8N_BASE}/compras/parse-cotacao`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ file_base64: base64, file_name: file.name, mime_type: file.type || 'application/pdf' }),
+          })
+          const parseData = await parseRes.json()
+          if (parseData?.success && parseData?.fornecedores?.length > 0) {
+            extractedData = parseData
+          }
+        } catch { /* parse falhou — ainda navega com arquivo */ }
+
+        // 3. Save prefill data in sessionStorage and navigate to NovaRequisicao
+        const prefill = {
+          descricao: text || file.name.replace(/\.[^.]+$/, '').replace(/[_-]/g, ' '),
+          cotacao_referencia_url: publicUrl,
+          cotacao_referencia_nome: file.name,
+          mensagem_usuario: text,
+          ...(extractedData as Record<string, unknown>),
+        }
+        sessionStorage.setItem('superteg-prefill-rc', JSON.stringify(prefill))
+
+        const totalItens = (extractedData as any)?.fornecedores?.[0]?.itens?.length || 0
+        const totalFornecedores = (extractedData as any)?.fornecedores?.length || 0
 
         setMessages(prev => [...prev, {
           id: `a_${Date.now()}`,
           role: 'assistant',
-          content,
-          actions: actions.length > 0 ? actions : undefined,
-          timestamp: data?.timestamp || new Date().toISOString(),
+          content: totalItens > 0
+            ? `Extraido ${totalItens} iten(s) de ${totalFornecedores} fornecedor(es) do arquivo. Abrindo formulario pre-preenchido...`
+            : `Arquivo recebido. Abrindo formulario de requisicao com o arquivo anexado...`,
+          actions: [{ type: 'navigate' as const, path: '/nova', label: 'Nova Requisicao' }],
+          timestamp: new Date().toISOString(),
         }])
 
-        const navActions = actions.filter(a => a.type === 'navigate')
-        if (navActions.length === 1) setPendingAction(navActions[0])
+        setPendingAction({ type: 'navigate', path: '/nova', label: 'Nova Requisicao' })
       } catch (err) {
         setMessages(prev => [...prev, {
           id: `e_${Date.now()}`,

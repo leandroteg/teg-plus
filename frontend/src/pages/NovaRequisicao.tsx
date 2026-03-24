@@ -154,6 +154,38 @@ export default function NovaRequisicao() {
   const total  = itens.reduce((s, i) => s + i.quantidade * i.valor_unitario_estimado, 0)
   const minCot = categoria ? minCotacoes(total, categoria.cotacoes_regras) : 1
 
+  // ── Prefill from SuperTEG (sessionStorage) ──────────────────────────────
+  useEffect(() => {
+    try {
+      const raw = sessionStorage.getItem('superteg-prefill-rc')
+      if (!raw) return
+      sessionStorage.removeItem('superteg-prefill-rc')
+      const pf = JSON.parse(raw)
+
+      if (pf.descricao) setDescricao(pf.descricao)
+      if (pf.mensagem_usuario) setJustificativa(pf.mensagem_usuario)
+      if (pf.cotacao_referencia_url) {
+        setRefParseMsg({ type: 'success', text: `Arquivo ${pf.cotacao_referencia_nome || 'PDF'} carregado via SuperTEG` })
+      }
+
+      // Apply extracted items from parse-cotacao
+      const fornecedores = pf.fornecedores as Array<{ nome_fornecedor?: string; itens?: RequisicaoItem[] }> | undefined
+      if (fornecedores?.length && fornecedores[0]?.itens?.length) {
+        const rawItens = fornecedores[0].itens.map((it: any) => ({
+          descricao: String(it.descricao ?? it.nome ?? '').trim(),
+          quantidade: parseFloat(String(it.quantidade ?? it.qtd ?? 1)) || 1,
+          unidade: String(it.unidade ?? 'un').toLowerCase(),
+          valor_unitario_estimado: parseFloat(String(it.valor_unitario ?? it.valor_unitario_estimado ?? 0)) || 0,
+        })).filter((it: RequisicaoItem) => it.descricao.length > 0)
+        if (rawItens.length > 0) setItens(rawItens)
+
+        // Set step to 1 (detalhes) since items are already filled
+        setStep(1)
+      }
+    } catch { /* ignore parse errors */ }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   const filteredCats = categorias.filter(cat =>
     !searchCat.trim() ||
     cat.nome.toLowerCase().includes(searchCat.toLowerCase()) ||
