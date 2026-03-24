@@ -162,25 +162,46 @@ export default function NovaRequisicao() {
       sessionStorage.removeItem('superteg-prefill-rc')
       const pf = JSON.parse(raw)
 
-      if (pf.descricao) setDescricao(pf.descricao)
-      if (pf.mensagem_usuario) setJustificativa(pf.mensagem_usuario)
       if (pf.cotacao_referencia_url) {
         setRefParseMsg({ type: 'success', text: `Arquivo ${pf.cotacao_referencia_nome || 'PDF'} carregado via SuperTEG` })
       }
+
+      // Clean item names: remove leading verbs/articles ("Fornecimento de" → keep noun)
+      const cleanName = (s: string) =>
+        s.replace(/^(fornecimento|contrata[cç][aã]o|presta[cç][aã]o|aquisi[cç][aã]o|servi[cç]os?)\s+d[eao]s?\s+/i, '')
+         .replace(/^(o|a|os|as|um|uma|uns|umas|de|do|da|dos|das)\s+/i, '')
+         .trim()
 
       // Apply extracted items from parse-cotacao
       const fornecedores = pf.fornecedores as Array<{ nome_fornecedor?: string; itens?: RequisicaoItem[] }> | undefined
       if (fornecedores?.length && fornecedores[0]?.itens?.length) {
         const rawItens = fornecedores[0].itens.map((it: any) => ({
-          descricao: String(it.descricao ?? it.nome ?? '').trim(),
+          descricao: cleanName(String(it.descricao ?? it.nome ?? '').trim()),
           quantidade: parseFloat(String(it.quantidade ?? it.qtd ?? 1)) || 1,
           unidade: String(it.unidade ?? 'un').toLowerCase(),
           valor_unitario_estimado: parseFloat(String(it.valor_unitario ?? it.valor_unitario_estimado ?? 0)) || 0,
         })).filter((it: RequisicaoItem) => it.descricao.length > 0)
         if (rawItens.length > 0) setItens(rawItens)
 
+        // Build smart description from item names
+        const nomes = rawItens.map((it: RequisicaoItem) => it.descricao)
+        const desc = nomes.length <= 3
+          ? nomes.join(', ')
+          : `${nomes.slice(0, 2).join(', ')} e mais ${nomes.length - 2} item(ns)`
+        const fornNome = fornecedores[0].nome_fornecedor
+        setDescricao(fornNome ? `${desc} — ${fornNome}` : desc)
+
+        // User message goes to justificativa only if it's not just the filename
+        if (pf.mensagem_usuario && !pf.mensagem_usuario.includes(pf.cotacao_referencia_nome || '___')) {
+          setJustificativa(pf.mensagem_usuario)
+        }
+
         // Skip to step 2 (Detalhes) since items are already filled
         setStep(2)
+      } else {
+        // No items extracted — just fill description
+        if (pf.descricao) setDescricao(pf.descricao)
+        if (pf.mensagem_usuario) setJustificativa(pf.mensagem_usuario)
       }
     } catch { /* ignore parse errors */ }
   // eslint-disable-next-line react-hooks/exhaustive-deps
