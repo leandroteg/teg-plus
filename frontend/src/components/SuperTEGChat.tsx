@@ -55,16 +55,16 @@ export default function SuperTEGChat() {
     const label = pendingAction.label || 'pagina'
     setToast(`Abrindo ${label}...`)
 
+    // Navigate faster (500ms) — enough for user to see the toast
     const timer = setTimeout(() => {
       const action = consumePendingAction()
       if (action?.path) {
-        navigate(action.path)
-        // Minimize chat instead of closing
         setIsOpen(false)
+        // Small delay to let chat close animation finish
+        setTimeout(() => navigate(action.path!), 100)
       }
-      // Clear toast after navigation
-      setTimeout(() => setToast(null), 1500)
-    }, 1800)
+      setTimeout(() => setToast(null), 1000)
+    }, 500)
 
     return () => clearTimeout(timer)
   }, [pendingAction, consumePendingAction, navigate])
