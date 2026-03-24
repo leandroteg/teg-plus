@@ -235,30 +235,21 @@ export function useSuperTEG() {
 
         const { data: { publicUrl } } = supabase.storage.from('cotacoes-docs').getPublicUrl(path)
 
-        // 2. Convert to base64 for n8n
-        const base64 = await new Promise<string>((resolve, reject) => {
-          const reader = new FileReader()
-          reader.onload = () => resolve((reader.result as string).split(',')[1])
-          reader.onerror = reject
-          reader.readAsDataURL(file)
-        })
+        // 2. Send as multipart/form-data (binary) to n8n
+        const formData = new FormData()
+        formData.append('message', text)
+        formData.append('session_id', sessionRef.current)
+        formData.append('perfil_id', perfil?.id || '')
+        formData.append('file_url', publicUrl)
+        formData.append('file_name', file.name)
+        formData.append('file_mime', file.type || 'application/pdf')
+        formData.append('file_size', String(file.size))
+        formData.append('file', file, file.name)
 
-        // 3. Send to SuperTEG with file info
         const res = await fetch(WEBHOOK_URL, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            message: text,
-            session_id: sessionRef.current,
-            perfil_id: perfil?.id || null,
-            file: {
-              url: publicUrl,
-              name: file.name,
-              mime_type: file.type,
-              size: file.size,
-              base64,
-            },
-          }),
+          body: formData,
+          // No Content-Type header — browser sets multipart boundary automatically
         })
 
         const raw = await res.json()
