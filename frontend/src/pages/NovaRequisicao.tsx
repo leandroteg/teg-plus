@@ -179,8 +179,8 @@ export default function NovaRequisicao() {
         })).filter((it: RequisicaoItem) => it.descricao.length > 0)
         if (rawItens.length > 0) setItens(rawItens)
 
-        // Set step to 1 (detalhes) since items are already filled
-        setStep(1)
+        // Skip to step 2 (Detalhes) since items are already filled
+        setStep(2)
       }
     } catch { /* ignore parse errors */ }
   // eslint-disable-next-line react-hooks/exhaustive-deps
