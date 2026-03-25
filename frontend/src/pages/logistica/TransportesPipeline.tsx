@@ -325,34 +325,67 @@ function DetailModal({ sol, viagemSolicitacoes, onClose, onAction, isDark }: {
             <RomaneioDocumentoCard sol={sol} dark={isDark} />
           )}
 
-          {/* Solo: mostrar seção de rota com dados da solicitação */}
+          {/* Solo: layout idêntico ao VG — Visão da Viagem + Etapas */}
           {!hasViagem && (
-            <div className={`rounded-xl p-4 ${isDark ? 'bg-white/[0.04]' : 'bg-slate-50'}`}>
-              <p className={`text-[10px] font-bold uppercase tracking-[0.24em] mb-2 ${isDark ? 'text-orange-400' : 'text-orange-600'}`}>Rota</p>
-              <h4 className={`text-base font-bold ${isDark ? 'text-white' : 'text-slate-800'}`}>
-                {fiscalCtx.origemLabel} → {fiscalCtx.destinoLabel}
-              </h4>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-3">
-                <div className={`rounded-lg p-2.5 text-center ${isDark ? 'bg-white/[0.04]' : 'bg-white'}`}>
-                  <p className="text-lg font-extrabold text-slate-700">{sol.distancia_km ? `${sol.distancia_km} km` : '—'}</p>
-                  <p className="text-[10px] text-orange-500 font-semibold">Distância</p>
-                </div>
-                <div className={`rounded-lg p-2.5 text-center ${isDark ? 'bg-white/[0.04]' : 'bg-white'}`}>
-                  <p className="text-lg font-extrabold text-slate-700">{sol.tempo_estimado_h ? `${sol.tempo_estimado_h}h` : '—'}</p>
-                  <p className="text-[10px] text-orange-500 font-semibold">Tempo Estimado</p>
-                </div>
-                {sol.peso_total_kg && (
-                  <div className={`rounded-lg p-2.5 text-center ${isDark ? 'bg-white/[0.04]' : 'bg-white'}`}>
-                    <p className="text-lg font-extrabold text-slate-700">{sol.peso_total_kg} kg</p>
-                    <p className="text-[10px] text-orange-500 font-semibold">Peso</p>
+            <div className="space-y-3">
+              <div className={`rounded-xl p-4 ${isDark ? 'bg-white/[0.04]' : 'bg-slate-50'}`}>
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className={`text-[10px] font-bold uppercase tracking-[0.24em] ${isDark ? 'text-orange-400' : 'text-orange-600'}`}>Visao da Viagem</p>
+                    <h4 className={`text-base font-bold mt-1 ${isDark ? 'text-white' : 'text-slate-800'}`}>
+                      {fiscalCtx.origemLabel} → {fiscalCtx.destinoLabel}
+                    </h4>
                   </div>
-                )}
-                {sol.volumes_total && (
+                  <span className={`text-[10px] font-bold px-2 py-1 rounded-full shrink-0 ${isDark ? 'bg-orange-500/10 text-orange-300' : 'bg-orange-100 text-orange-700'}`}>1 etapa</span>
+                </div>
+                <div className="grid grid-cols-2 gap-3 mt-4 md:grid-cols-4">
                   <div className={`rounded-lg p-2.5 text-center ${isDark ? 'bg-white/[0.04]' : 'bg-white'}`}>
-                    <p className="text-lg font-extrabold text-slate-700">{sol.volumes_total}</p>
-                    <p className="text-[10px] text-orange-500 font-semibold">Volumes</p>
+                    <p className={`text-[10px] font-semibold uppercase ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Rota</p>
+                    <p className={`text-sm font-extrabold mt-0.5 ${isDark ? 'text-white' : 'text-slate-800'}`}>1 despacho(s)</p>
                   </div>
-                )}
+                  <div className={`rounded-lg p-2.5 text-center ${isDark ? 'bg-white/[0.04]' : 'bg-white'}`}>
+                    <p className={`text-[10px] font-semibold uppercase ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Distancia</p>
+                    <p className={`text-sm font-extrabold mt-0.5 ${isDark ? 'text-white' : 'text-slate-800'}`}>{sol.distancia_km ? `${sol.distancia_km} km` : '—'}</p>
+                  </div>
+                  <div className={`rounded-lg p-2.5 text-center ${isDark ? 'bg-white/[0.04]' : 'bg-white'}`}>
+                    <p className={`text-[10px] font-semibold uppercase ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Tempo</p>
+                    <p className={`text-sm font-extrabold mt-0.5 ${isDark ? 'text-white' : 'text-slate-800'}`}>{sol.tempo_estimado_h ? `${sol.tempo_estimado_h} h` : '—'}</p>
+                  </div>
+                  <div className={`rounded-lg p-2.5 text-center ${isDark ? 'bg-white/[0.04]' : 'bg-white'}`}>
+                    <p className={`text-[10px] font-semibold uppercase ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Partida Base</p>
+                    <p className={`text-sm font-extrabold mt-0.5 ${isDark ? 'text-white' : 'text-slate-800'}`}>{sol.data_prevista_saida ? fmtDataHora(sol.data_prevista_saida) : '—'}</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Etapas e Despachos — 1 item */}
+              <div className={`rounded-xl overflow-hidden border ${isDark ? 'border-white/[0.06]' : 'border-slate-200'}`}>
+                <div className={`px-4 py-2.5 ${isDark ? 'bg-white/[0.03]' : 'bg-slate-50'}`}>
+                  <p className={`text-[10px] font-bold uppercase tracking-[0.24em] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Etapas e Despachos</p>
+                </div>
+                <div className="px-4 py-3">
+                  <div className="flex items-start gap-3">
+                    <div className={`w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-bold shrink-0 ${isDark ? 'bg-orange-500/10 text-orange-300' : 'bg-orange-100 text-orange-700'}`}>1</div>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className={`text-xs font-mono font-bold ${isDark ? 'text-orange-300' : 'text-orange-700'}`}>{sol.numero}</span>
+                        <span className={`text-xs ${isDark ? 'text-white' : 'text-slate-800'}`}>{fiscalCtx.origemLabel} → {fiscalCtx.destinoLabel}</span>
+                        {hasRomaneioDocumento(sol) && (
+                          <button type="button" onClick={() => openGeneratedPdf(sol)}
+                            className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold transition-colors ${isDark ? 'bg-blue-500/10 text-blue-300 hover:bg-blue-500/20' : 'bg-blue-50 text-blue-700 hover:bg-blue-100'}`}>
+                            <FileText size={11} /> Romaneio
+                          </button>
+                        )}
+                      </div>
+                      <div className="grid grid-cols-2 gap-2 mt-2 md:grid-cols-4">
+                        <div><p className={`text-[9px] uppercase font-semibold ${isDark ? 'text-slate-600' : 'text-slate-400'}`}>ETA</p><p className={`text-xs font-bold ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>{sol.data_prevista_saida ? fmtDataHora(sol.data_prevista_saida) : '—'}</p></div>
+                        <div><p className={`text-[9px] uppercase font-semibold ${isDark ? 'text-slate-600' : 'text-slate-400'}`}>Trecho</p><p className={`text-xs font-bold ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>{sol.distancia_km ? `${sol.distancia_km} km` : '—'}</p></div>
+                        <div><p className={`text-[9px] uppercase font-semibold ${isDark ? 'text-slate-600' : 'text-slate-400'}`}>Tempo</p><p className={`text-xs font-bold ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>{sol.tempo_estimado_h ? `${Math.round(sol.tempo_estimado_h * 60)} min` : '—'}</p></div>
+                        <div><p className={`text-[9px] uppercase font-semibold ${isDark ? 'text-slate-600' : 'text-slate-400'}`}>Despacho</p><p className={`text-xs font-bold ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>Aguard. coleta</p></div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
           )}
