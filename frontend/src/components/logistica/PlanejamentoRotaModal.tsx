@@ -854,12 +854,22 @@ export default function PlanejamentoRotaModal({ isDark, solicitacoes, allSolicit
   const [rota, setRota] = useState<RotaCalculada | null>(null)
   const [calculando, setCalculando] = useState(false)
 
-  // Planning fields — pré-preencher com initialData quando editando
-  const [modal, setModal] = useState(initialData?.modal || '')
-  const [motorista, setMotorista] = useState(initialData?.motorista_nome || '')
-  const [placa, setPlaca] = useState(initialData?.veiculo_placa || '')
-  const [dataPartida, setDataPartida] = useState(initialData?.data_prevista_saida || '')
-  const [custo, setCusto] = useState<number | ''>(initialData?.custo_estimado ?? '')
+  // Planning fields — pré-preencher com initialData ou dados da primeira solicitação
+  const _init = initialData || (solicitacoes[0]?.modal ? {
+    modal: solicitacoes[0].modal,
+    motorista_nome: solicitacoes[0].motorista_nome,
+    veiculo_placa: solicitacoes[0].veiculo_placa,
+    data_prevista_saida: solicitacoes[0].data_prevista_saida,
+    custo_estimado: solicitacoes[0].custo_estimado,
+  } : undefined)
+  const [modal, setModal] = useState(_init?.modal || '')
+  const [motorista, setMotorista] = useState(_init?.motorista_nome || '')
+  const [placa, setPlaca] = useState(_init?.veiculo_placa || '')
+  const [dataPartida, setDataPartida] = useState(() => {
+    const d = _init?.data_prevista_saida || ''
+    return d ? d.slice(0, 16) : ''
+  })
+  const [custo, setCusto] = useState<number | ''>(_init?.custo_estimado ?? '')
   const [salvando, setSalvando] = useState(false)
 
   // Adicionar mais solicitações
