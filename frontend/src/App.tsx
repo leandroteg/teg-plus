@@ -99,6 +99,7 @@ import ColaboradoresCad from './pages/cadastros/ColaboradoresCad'
 import EmpresasCad from './pages/cadastros/EmpresasCad'
 import GruposFinanceiros from './pages/cadastros/GruposFinanceiros'
 import CategoriasFinanceiras from './pages/cadastros/CategoriasFinanceiras'
+import BasesCad from './pages/cadastros/Bases'
 
 // Módulo RH
 import RHLayout from './components/RHLayout'
@@ -362,6 +363,7 @@ export default function App() {
               <Route path="/cadastros/empresas"       element={<EmpresasCad />} />
               <Route path="/cadastros/grupos"          element={<GruposFinanceiros />} />
               <Route path="/cadastros/categorias"      element={<CategoriasFinanceiras />} />
+              <Route path="/cadastros/bases"           element={<BasesCad />} />
             </Route>
           </Route>
 

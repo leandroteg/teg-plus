@@ -563,6 +563,37 @@ export function useLiberadosRetirada() {
   })
 }
 
+// ── Conta Corrente do Item ────────────────────────────────────────────────────
+export function useContaCorrenteItem(itemId: string | undefined) {
+  return useQuery<{ saldos: EstSaldo[]; movimentacoes: EstMovimentacao[] }>({
+    queryKey: ['est-conta-corrente', itemId],
+    enabled: !!itemId,
+    queryFn: async () => {
+      const [saldosRes, movsRes] = await Promise.all([
+        supabase
+          .from('est_saldos')
+          .select('*, base:est_bases(codigo, nome)')
+          .eq('item_id', itemId!)
+          .order('base_id'),
+        supabase
+          .from('est_movimentacoes')
+          .select(`
+            *,
+            item:est_itens!est_movimentacoes_item_id_fkey(codigo, descricao, unidade),
+            base:est_bases!est_movimentacoes_base_id_fkey(codigo, nome)
+          `)
+          .eq('item_id', itemId!)
+          .order('criado_em', { ascending: true })
+          .limit(500),
+      ])
+      return {
+        saldos: (saldosRes.data ?? []) as EstSaldo[],
+        movimentacoes: (movsRes.data ?? []) as EstMovimentacao[],
+      }
+    },
+  })
+}
+
 // ── KPIs ──────────────────────────────────────────────────────────────────────
 export function useEstoqueKPIs() {
   return useQuery<EstoqueKPIs>({

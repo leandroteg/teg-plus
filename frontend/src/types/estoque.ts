@@ -25,6 +25,12 @@ export interface EstBase {
   codigo: string
   nome: string
   endereco?: string
+  cidade?: string
+  uf?: string
+  cep?: string
+  cnpj?: string
+  telefone?: string
+  email?: string
   responsavel?: string
   ativa: boolean
   criado_em: string
