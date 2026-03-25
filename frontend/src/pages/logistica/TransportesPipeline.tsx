@@ -264,16 +264,17 @@ function DetailModal({ sol, viagemSolicitacoes, onClose, onAction, isDark }: {
   const late = isLate(sol)
   const fiscalCtx = getDocumentoFiscalContext(sol)
   const transportStage = resolveTransporteStage(sol) ?? 'transporte_pendente'
-  const isViagemView = !!sol.viagem_id && !!viagemSolicitacoes && viagemSolicitacoes.length >= 1
+  const hasViagem = !!sol.viagem_id && !!viagemSolicitacoes && viagemSolicitacoes.length >= 1
+  const isViagemView = true // Sempre usar layout completo
   const viagem = viagemSolicitacoes?.[0]?.viagem ?? sol.viagem
   const departureBase = viagem?.data_real_saida || t?.hora_saida || viagem?.data_prevista_saida || sol.data_prevista_saida
   const viagemEtapas = useMemo(
-    () => isViagemView && viagemSolicitacoes ? applyEtasToEtapas(buildViagemEtapas(viagem, viagemSolicitacoes), departureBase) : [],
-    [departureBase, isViagemView, viagem, viagemSolicitacoes]
+    () => hasViagem && viagemSolicitacoes ? applyEtasToEtapas(buildViagemEtapas(viagem, viagemSolicitacoes), departureBase) : [],
+    [departureBase, hasViagem, viagem, viagemSolicitacoes]
   )
   const viagemResumo = useMemo(
-    () => isViagemView ? getViagemResumo(viagem, viagemEtapas) : null,
-    [isViagemView, viagem, viagemEtapas]
+    () => hasViagem ? getViagemResumo(viagem, viagemEtapas) : null,
+    [hasViagem, viagem, viagemEtapas]
   )
 
   return (
@@ -283,7 +284,7 @@ function DetailModal({ sol, viagemSolicitacoes, onClose, onAction, isDark }: {
           <div className="flex items-center gap-2 min-w-0">
             <Truck size={18} className="text-orange-600 shrink-0" />
             <h3 className={`text-base font-bold truncate ${isDark ? 'text-white' : 'text-slate-800'}`}>
-              {isViagemView ? `Viagem ${viagem?.numero ?? sol.viagem_id}` : `Transporte #${sol.numero}`}
+              {hasViagem ? `Viagem ${viagem?.numero ?? sol.viagem_id}` : `Transporte #${sol.numero}`}
             </h3>
           </div>
           <button onClick={onClose} className="text-slate-400 hover:text-slate-600 shrink-0"><X size={18} /></button>
