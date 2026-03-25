@@ -796,6 +796,8 @@ function DespachoViagemModal({
     motorista_telefone: string
     eta_original: string
     codigo_rastreio: string
+    cnh_url: string
+    cnh_nome: string
   }
   setForm: Dispatch<SetStateAction<{
     placa: string
@@ -803,6 +805,8 @@ function DespachoViagemModal({
     motorista_telefone: string
     eta_original: string
     codigo_rastreio: string
+    cnh_url: string
+    cnh_nome: string
   }>>
   onClose: () => void
   onSubmit: () => void
@@ -918,6 +922,37 @@ function DespachoViagemModal({
             </div>
           </div>
 
+          {/* CNH do motorista */}
+          <div>
+            <label className={`block text-xs font-bold mb-1 ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>CNH do Motorista</label>
+            {form.cnh_url ? (
+              <div className={`flex items-center gap-2 px-3 py-2 rounded-xl border ${isDark ? 'bg-emerald-500/10 border-emerald-500/20' : 'bg-emerald-50 border-emerald-200'}`}>
+                <CheckCircle2 size={14} className="text-emerald-600 shrink-0" />
+                <span className={`text-xs font-medium flex-1 truncate ${isDark ? 'text-emerald-300' : 'text-emerald-700'}`}>{form.cnh_nome || 'CNH anexada'}</span>
+                <button onClick={() => setForm(prev => ({ ...prev, cnh_url: '', cnh_nome: '' }))} className="text-slate-400 hover:text-red-500 shrink-0"><X size={14} /></button>
+              </div>
+            ) : (
+              <label className={`flex items-center gap-2 px-3 py-2 rounded-xl border cursor-pointer transition-all hover:border-orange-300 ${
+                isDark ? 'bg-white/[0.04] border-white/[0.06] text-slate-400' : 'bg-white border-slate-200 text-slate-500'
+              }`}>
+                <FileText size={14} />
+                <span className="text-xs">Anexar CNH (PDF, foto)</span>
+                <input type="file" className="hidden" accept=".pdf,.jpg,.jpeg,.png,.webp"
+                  onChange={async (e) => {
+                    const file = e.target.files?.[0]
+                    if (!file) return
+                    const path = `cnh/${Date.now()}_${file.name.replace(/[^a-zA-Z0-9._-]/g, '_')}`
+                    const { error } = await supabase.storage.from('cotacoes-docs').upload(path, file, { upsert: true })
+                    if (error) return
+                    const { data: { publicUrl } } = supabase.storage.from('cotacoes-docs').getPublicUrl(path)
+                    setForm(prev => ({ ...prev, cnh_url: publicUrl, cnh_nome: file.name }))
+                    e.target.value = ''
+                  }}
+                />
+              </label>
+            )}
+          </div>
+
           <div className={`rounded-xl border overflow-hidden ${isDark ? 'border-white/[0.06]' : 'border-slate-200'}`}>
             <div className={`px-4 py-3 border-b ${isDark ? 'border-white/[0.06] bg-white/[0.03]' : 'border-slate-100 bg-slate-50/70'}`}>
               <p className={`text-[10px] font-bold uppercase tracking-[0.24em] ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
@@ -1001,6 +1036,8 @@ export default function TransportesPipeline() {
     motorista_telefone: '',
     eta_original: '',
     codigo_rastreio: '',
+    cnh_url: '',
+    cnh_nome: '',
   })
 
   const { data: solicitacoes = [], isLoading } = useSolicitacoes({
@@ -1220,7 +1257,7 @@ export default function TransportesPipeline() {
       })
       showToast('success', 'Viagem despachada para transporte')
       setDespachoViagemModal(null)
-      setDespachoViagemForm({ placa: '', motorista_nome: '', motorista_telefone: '', eta_original: '', codigo_rastreio: '' })
+      setDespachoViagemForm({ placa: '', motorista_nome: '', motorista_telefone: '', eta_original: '', codigo_rastreio: '', cnh_url: '', cnh_nome: '' })
       setSelectedIds(new Set())
     } catch {
       showToast('error', 'Erro ao despachar viagem')
