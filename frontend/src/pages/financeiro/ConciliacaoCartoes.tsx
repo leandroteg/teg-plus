@@ -2,7 +2,7 @@ import { useState, useMemo, useRef, useCallback } from 'react'
 import {
   CreditCard, Link2, Unlink, Search, Upload,
   CheckCircle2, AlertCircle, ChevronDown, X,
-  RefreshCw, FileText, Clock, Check, Filter, Loader2,
+  RefreshCw, FileText, Clock, Filter, Loader2,
 } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
 import {
@@ -25,11 +25,6 @@ const fmt = (v: number) =>
 
 const fmtDate = (d: string) =>
   new Date(d + 'T00:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit' })
-
-function diffPct(a: number, b: number) {
-  if (!b) return null
-  return Math.abs((a - b) / b) * 100
-}
 
 const ACCEPTED_FATURA_MIME_TYPES = [
   'application/pdf',
@@ -226,52 +221,65 @@ function FaturaUploadCard({ cartaoId, isDark }: { cartaoId: string; isDark: bool
   )
 }
 
+// ── Checkbox circle ───────────────────────────────────────────────────────────
+
+function SelectCircle({ selected, isDark }: { selected: boolean; isDark: boolean }) {
+  if (selected) {
+    return (
+      <div className="w-5 h-5 rounded-full bg-emerald-500 flex items-center justify-center shrink-0 shadow-sm shadow-emerald-500/40">
+        <svg width="10" height="8" viewBox="0 0 10 8" fill="none">
+          <path d="M1 4L3.5 6.5L9 1" stroke="white" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+        </svg>
+      </div>
+    )
+  }
+  return (
+    <div className={`w-5 h-5 rounded-full border-2 shrink-0 transition-colors
+      ${isDark ? 'border-white/20 hover:border-emerald-500/60' : 'border-slate-300 hover:border-emerald-400'}`}
+    />
+  )
+}
+
 // ── Item Fatura Card ──────────────────────────────────────────────────────────
 
 function ItemFaturaRow({
   item,
   isDark,
-  candidatos,
-  onConciliar,
-  isBusy,
+  isSelected,
+  onToggle,
 }: {
   item: ItemFaturaCartao
   isDark: boolean
-  candidatos: ApontamentoCartao[]
-  onConciliar: (itemId: string, apontamentoId: string) => void
-  isBusy: boolean
+  isSelected: boolean
+  onToggle: (id: string) => void
 }) {
-  const [open, setOpen] = useState(false)
-
-  // Auto-match: mesma data ± 2 dias E valor próximo (≤ 5%)
-  const suggestions = useMemo(() => {
-    const d = new Date(item.data_lancamento)
-    return candidatos.filter(a => {
-      const da = new Date(a.data_lancamento)
-      const diff = Math.abs(d.getTime() - da.getTime()) / 86400000
-      const pct = diffPct(a.valor, item.valor)
-      return diff <= 2 && (pct === null || pct <= 5)
-    })
-  }, [candidatos, item])
-
   const isConc = item.conciliado
 
   return (
-    <div className={`rounded-xl border px-3 py-2.5 transition-all
-      ${isConc
-        ? isDark ? 'bg-emerald-500/5 border-emerald-500/20' : 'bg-emerald-50 border-emerald-200'
-        : isDark ? 'bg-[#1e293b] border-white/[0.06]' : 'bg-white border-slate-200'
-      }`}>
+    <div
+      onClick={() => !isConc && onToggle(item.id)}
+      className={`rounded-xl border px-3 py-2.5 transition-all
+        ${isConc
+          ? isDark ? 'bg-emerald-500/5 border-emerald-500/20' : 'bg-emerald-50 border-emerald-200'
+          : isSelected
+            ? isDark ? 'bg-emerald-500/10 border-emerald-500/40 cursor-pointer' : 'bg-emerald-50 border-emerald-400 cursor-pointer'
+            : isDark ? 'bg-[#1e293b] border-white/[0.06] cursor-pointer hover:border-white/20' : 'bg-white border-slate-200 cursor-pointer hover:border-slate-300'
+        }`}>
       <div className="flex items-center gap-2">
-        {/* Status */}
-        <div className={`w-2 h-2 rounded-full shrink-0 ${isConc ? 'bg-emerald-500' : 'bg-slate-400'}`} />
+
+        {/* Checkbox or status dot */}
+        {isConc ? (
+          <div className="w-2 h-2 rounded-full shrink-0 bg-emerald-500" />
+        ) : (
+          <SelectCircle selected={isSelected} isDark={isDark} />
+        )}
 
         {/* Info */}
         <div className="flex-1 min-w-0">
           <p className={`text-xs font-bold truncate ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>
             {item.descricao}
           </p>
-          <div className="flex items-center gap-2 mt-0.5">
+          <div className="flex items-center gap-2 mt-0.5 flex-wrap">
             <span className="text-[10px] text-slate-400">{fmtDate(item.data_lancamento)}</span>
             {item.categoria_banco && (
               <span className="text-[10px] text-slate-400">· {item.categoria_banco}</span>
@@ -288,68 +296,7 @@ function ItemFaturaRow({
         <p className={`text-sm font-extrabold shrink-0 ${isDark ? 'text-white' : 'text-slate-800'}`}>
           {fmt(item.valor)}
         </p>
-
-        {/* Link button */}
-        {!isConc && (
-          <button
-            onClick={() => setOpen(v => !v)}
-            className={`shrink-0 w-7 h-7 rounded-lg flex items-center justify-center transition-colors
-              ${isDark ? 'text-emerald-400 hover:bg-emerald-500/10' : 'text-emerald-600 hover:bg-emerald-50'}`}
-            title="Vincular apontamento"
-          >
-            <Link2 size={13} />
-          </button>
-        )}
       </div>
-
-      {/* Dropdown de candidatos */}
-      {open && !isConc && (
-        <div className={`mt-2 rounded-xl border p-2 space-y-1
-          ${isDark ? 'bg-white/[0.03] border-white/[0.06]' : 'bg-slate-50 border-slate-200'}`}>
-          <p className="text-[10px] text-slate-400 font-semibold px-1 mb-1.5">
-            {suggestions.length > 0
-              ? `${suggestions.length} apontamento(s) compatível(is)`
-              : 'Nenhum apontamento compatível automático — selecione manualmente:'
-            }
-          </p>
-          {(suggestions.length > 0 ? suggestions : candidatos).slice(0, 8).map(a => {
-            const pct = diffPct(a.valor, item.valor)
-            return (
-              <button
-                key={a.id}
-                disabled={isBusy}
-                onClick={() => { onConciliar(item.id, a.id); setOpen(false) }}
-                className={`w-full text-left rounded-lg px-2.5 py-1.5 flex items-center gap-2
-                  transition-colors text-xs group
-                  ${isDark
-                    ? 'hover:bg-emerald-500/10 text-slate-300'
-                    : 'hover:bg-emerald-50 text-slate-700'
-                  }`}
-              >
-                <div className="flex-1 min-w-0">
-                  <p className="font-semibold truncate">{a.descricao}</p>
-                  <p className="text-[10px] text-slate-400">{fmtDate(a.data_lancamento)} · {a.estabelecimento ?? '—'}</p>
-                </div>
-                <div className="shrink-0 text-right">
-                  <p className={`font-bold ${pct !== null && pct > 5 ? 'text-amber-500' : 'text-emerald-600'}`}>
-                    {fmt(a.valor)}
-                  </p>
-                  {pct !== null && pct > 0.5 && (
-                    <p className="text-[9px] text-amber-500">{pct.toFixed(1)}% diff</p>
-                  )}
-                </div>
-                <Check size={12} className="shrink-0 text-emerald-600 opacity-0 group-hover:opacity-100 transition-opacity" />
-              </button>
-            )
-          })}
-          <button
-            onClick={() => setOpen(false)}
-            className="w-full text-center text-[10px] text-slate-400 hover:text-slate-600 py-1"
-          >
-            Cancelar
-          </button>
-        </div>
-      )}
     </div>
   )
 }
@@ -361,25 +308,37 @@ function ApontamentoRow({
   isDark,
   onDesconciliar,
   isBusy,
+  isSelected,
+  onToggle,
 }: {
   a: ApontamentoCartao
   isDark: boolean
   onDesconciliar: (itemId: string, apontamentoId: string) => void
   isBusy: boolean
+  isSelected: boolean
+  onToggle: (id: string) => void
 }) {
   const isConc = a.status === 'conciliado'
   const isEnv  = a.status === 'enviado'
 
   return (
-    <div className={`rounded-xl border px-3 py-2.5 transition-all
-      ${isConc
-        ? isDark ? 'bg-emerald-500/5 border-emerald-500/20' : 'bg-emerald-50 border-emerald-200'
-        : isDark ? 'bg-[#1e293b] border-white/[0.06]' : 'bg-white border-slate-200'
-      }`}>
+    <div
+      onClick={() => !isConc && onToggle(a.id)}
+      className={`rounded-xl border px-3 py-2.5 transition-all
+        ${isConc
+          ? isDark ? 'bg-emerald-500/5 border-emerald-500/20' : 'bg-emerald-50 border-emerald-200'
+          : isSelected
+            ? isDark ? 'bg-blue-500/10 border-blue-500/40 cursor-pointer' : 'bg-blue-50 border-blue-400 cursor-pointer'
+            : isDark ? 'bg-[#1e293b] border-white/[0.06] cursor-pointer hover:border-white/20' : 'bg-white border-slate-200 cursor-pointer hover:border-slate-300'
+        }`}>
       <div className="flex items-center gap-2">
-        <div className={`w-2 h-2 rounded-full shrink-0 ${
-          isConc ? 'bg-emerald-500' : isEnv ? 'bg-blue-500' : 'bg-slate-400'
-        }`} />
+
+        {/* Checkbox or status dot */}
+        {isConc ? (
+          <div className="w-2 h-2 rounded-full shrink-0 bg-emerald-500" />
+        ) : (
+          <SelectCircle selected={isSelected} isDark={isDark} />
+        )}
 
         <div className="flex-1 min-w-0">
           <p className={`text-xs font-bold truncate ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>
@@ -402,6 +361,7 @@ function ApontamentoRow({
             )}
             {a.comprovante_url && (
               <a href={a.comprovante_url} target="_blank" rel="noreferrer"
+                onClick={e => e.stopPropagation()}
                 className="text-[10px] text-blue-500 flex items-center gap-0.5 hover:underline">
                 <FileText size={9} /> Comprovante
               </a>
@@ -415,7 +375,7 @@ function ApontamentoRow({
 
         {isConc && a.item_fatura_id && (
           <button
-            onClick={() => onDesconciliar(a.item_fatura_id!, a.id)}
+            onClick={e => { e.stopPropagation(); onDesconciliar(a.item_fatura_id!, a.id) }}
             disabled={isBusy}
             title="Desvincular"
             className={`shrink-0 w-7 h-7 rounded-lg flex items-center justify-center transition-colors
@@ -424,6 +384,88 @@ function ApontamentoRow({
             <Unlink size={12} />
           </button>
         )}
+      </div>
+    </div>
+  )
+}
+
+// ── Confirmation Bar ──────────────────────────────────────────────────────────
+
+function ConfirmBar({
+  item,
+  apontamento,
+  isBusy,
+  isDark,
+  onConfirm,
+  onCancel,
+}: {
+  item: ItemFaturaCartao
+  apontamento: ApontamentoCartao
+  isBusy: boolean
+  isDark: boolean
+  onConfirm: () => void
+  onCancel: () => void
+}) {
+  const diff = Math.abs(item.valor - apontamento.valor)
+  const pct  = item.valor > 0 ? (diff / item.valor) * 100 : 0
+
+  return (
+    <div className={`fixed bottom-0 left-0 right-0 z-40 border-t px-4 py-3 flex items-center gap-3
+      shadow-2xl animate-[slideUp_0.25s_ease]
+      ${isDark
+        ? 'bg-[#0f172a] border-white/[0.08]'
+        : 'bg-white border-slate-200'}`}>
+
+      {/* Pair summary */}
+      <div className="flex-1 min-w-0 flex items-center gap-2 overflow-hidden">
+        {/* Fatura item */}
+        <div className={`flex-1 min-w-0 rounded-xl px-3 py-2
+          ${isDark ? 'bg-purple-500/10 border border-purple-500/20' : 'bg-purple-50 border border-purple-200'}`}>
+          <p className="text-[10px] font-bold text-purple-500 uppercase tracking-wider mb-0.5">Fatura</p>
+          <p className={`text-xs font-bold truncate ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>{item.descricao}</p>
+          <p className="text-[10px] text-slate-400">{fmtDate(item.data_lancamento)} · {fmt(item.valor)}</p>
+        </div>
+
+        {/* Arrow */}
+        <Link2 size={16} className="shrink-0 text-emerald-500" />
+
+        {/* Apontamento */}
+        <div className={`flex-1 min-w-0 rounded-xl px-3 py-2
+          ${isDark ? 'bg-blue-500/10 border border-blue-500/20' : 'bg-blue-50 border border-blue-200'}`}>
+          <p className="text-[10px] font-bold text-blue-500 uppercase tracking-wider mb-0.5">Apontamento</p>
+          <p className={`text-xs font-bold truncate ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>{apontamento.descricao}</p>
+          <p className="text-[10px] text-slate-400">{fmtDate(apontamento.data_lancamento)} · {fmt(apontamento.valor)}</p>
+        </div>
+      </div>
+
+      {/* Diff warning */}
+      {pct > 1 && (
+        <div className="shrink-0 text-center">
+          <p className="text-[10px] text-amber-500 font-bold">{pct.toFixed(1)}% diff</p>
+          <p className="text-[10px] text-slate-400">{fmt(diff)}</p>
+        </div>
+      )}
+
+      {/* Actions */}
+      <div className="flex items-center gap-2 shrink-0">
+        <button
+          onClick={onCancel}
+          className={`px-4 py-2 rounded-xl border text-xs font-semibold transition-colors
+            ${isDark
+              ? 'border-white/[0.08] text-slate-400 hover:text-slate-200'
+              : 'border-slate-200 text-slate-500 hover:text-slate-700'}`}
+        >
+          Cancelar
+        </button>
+        <button
+          onClick={onConfirm}
+          disabled={isBusy}
+          className="px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50
+            text-white text-xs font-bold transition-all flex items-center gap-2 shadow-sm shadow-emerald-500/20"
+        >
+          {isBusy ? <Loader2 size={12} className="animate-spin" /> : <Link2 size={12} />}
+          Confirmar Conciliação
+        </button>
       </div>
     </div>
   )
@@ -439,6 +481,10 @@ export default function ConciliacaoCartoes() {
   const [buscaApontamento, setBuscaApontamento] = useState('')
   const [buscaFatura, setBuscaFatura]   = useState('')
   const [showSoConc, setShowSoConc]    = useState(false)
+
+  // Checkbox selections
+  const [selectedItemId, setSelectedItemId] = useState<string | null>(null)
+  const [selectedApId, setSelectedApId]     = useState<string | null>(null)
 
   const [toast, setToast] = useState<{ type: 'success' | 'error'; msg: string } | null>(null)
 
@@ -464,9 +510,20 @@ export default function ConciliacaoCartoes() {
     setTimeout(() => setToast(null), 3500)
   }
 
-  async function handleConciliar(itemId: string, apontamentoId: string) {
+  function toggleItem(id: string) {
+    setSelectedItemId(prev => prev === id ? null : id)
+  }
+
+  function toggleAp(id: string) {
+    setSelectedApId(prev => prev === id ? null : id)
+  }
+
+  async function handleConfirmConciliar() {
+    if (!selectedItemId || !selectedApId) return
     try {
-      await conciliar.mutateAsync({ itemId, apontamentoId })
+      await conciliar.mutateAsync({ itemId: selectedItemId, apontamentoId: selectedApId })
+      setSelectedItemId(null)
+      setSelectedApId(null)
       showToast('success', 'Lançamento conciliado com sucesso')
     } catch {
       showToast('error', 'Erro ao conciliar lançamento')
@@ -481,12 +538,6 @@ export default function ConciliacaoCartoes() {
       showToast('error', 'Erro ao desvincular')
     }
   }
-
-  // Candidatos para vincular (apenas enviados/não conciliados)
-  const candidatosVinculo = useMemo(() =>
-    apontamentos.filter(a => a.status === 'enviado'),
-    [apontamentos]
-  )
 
   // Filtragem local
   const filteredItens = useMemo(() => {
@@ -513,6 +564,11 @@ export default function ConciliacaoCartoes() {
     return r
   }, [apontamentos, showSoConc, buscaApontamento])
 
+  // Lookup for confirmation bar
+  const selectedItem = selectedItemId ? itens.find(i => i.id === selectedItemId) : null
+  const selectedAp   = selectedApId   ? apontamentos.find(a => a.id === selectedApId) : null
+  const showBar      = !!(selectedItem && selectedAp)
+
   // Métricas
   const totalItens = itens.length
   const concItens  = itens.filter(i => i.conciliado).length
@@ -526,7 +582,7 @@ export default function ConciliacaoCartoes() {
     `rounded-2xl border shadow-sm ${extra} ${isDark ? 'bg-[#1e293b] border-white/[0.06]' : 'bg-white border-slate-200'}`
 
   return (
-    <div className="space-y-4 pb-20">
+    <div className={`space-y-4 ${showBar ? 'pb-28' : 'pb-6'}`}>
 
       {/* Toast */}
       {toast && (
@@ -548,7 +604,7 @@ export default function ConciliacaoCartoes() {
           Conciliação de Cartões de Crédito
         </h1>
         <p className={`text-xs mt-0.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
-          Vincule os apontamentos dos portadores com os lançamentos extraídos das faturas
+          Selecione um item da fatura e um apontamento para confirmá-los como o mesmo lançamento
         </p>
       </div>
 
@@ -660,6 +716,18 @@ export default function ConciliacaoCartoes() {
         </div>
       </div>
 
+      {/* ── Hint ────────────────────────────────────────────────── */}
+      {!showBar && (selectedItemId || selectedApId) && (
+        <div className={`rounded-xl border px-4 py-2.5 flex items-center gap-2 text-xs font-semibold
+          ${isDark ? 'border-blue-500/20 bg-blue-500/5 text-blue-300' : 'border-blue-200 bg-blue-50 text-blue-700'}`}>
+          <Link2 size={13} />
+          {selectedItemId && !selectedApId
+            ? 'Agora selecione um apontamento na coluna da esquerda para conciliar'
+            : 'Agora selecione um item da fatura na coluna da direita para conciliar'
+          }
+        </div>
+      )}
+
       {/* ── Split View ──────────────────────────────────────────── */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
 
@@ -712,6 +780,8 @@ export default function ConciliacaoCartoes() {
                   isDark={isDark}
                   onDesconciliar={handleDesconciliar}
                   isBusy={isBusy}
+                  isSelected={selectedApId === a.id}
+                  onToggle={toggleAp}
                 />
               ))}
             </div>
@@ -785,9 +855,8 @@ export default function ConciliacaoCartoes() {
                     key={item.id}
                     item={item}
                     isDark={isDark}
-                    candidatos={candidatosVinculo}
-                    onConciliar={handleConciliar}
-                    isBusy={isBusy}
+                    isSelected={selectedItemId === item.id}
+                    onToggle={toggleItem}
                   />
                 ))}
               </div>
@@ -799,6 +868,18 @@ export default function ConciliacaoCartoes() {
           )}
         </div>
       </div>
+
+      {/* ── Confirmation Bar ────────────────────────────────────── */}
+      {showBar && selectedItem && selectedAp && (
+        <ConfirmBar
+          item={selectedItem}
+          apontamento={selectedAp}
+          isBusy={isBusy}
+          isDark={isDark}
+          onConfirm={handleConfirmConciliar}
+          onCancel={() => { setSelectedItemId(null); setSelectedApId(null) }}
+        />
+      )}
     </div>
   )
 }

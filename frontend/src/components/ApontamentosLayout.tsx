@@ -1,6 +1,6 @@
 import { useNavigate } from 'react-router-dom'
 import {
-  LayoutDashboard, Plus, ClipboardList, FileText,
+  LayoutDashboard, Plus, ClipboardList,
 } from 'lucide-react'
 import ModuleLayout from './ModuleLayout'
 import type { NavItem } from './ModuleLayout'
@@ -12,7 +12,6 @@ export default function ApontamentosLayout() {
     { to: '/apontamentos',            icon: LayoutDashboard, label: 'Painel',                  end: true },
     { to: '/apontamentos/realizados', icon: Plus,            label: 'Novo Apontamento',         end: false, action: () => navigate(`/apontamentos/realizados?nova=${Date.now()}`), accent: true },
     { to: '/apontamentos/realizados', icon: ClipboardList,   label: 'Apontamentos Realizados',  end: false },
-    { to: '/apontamentos/conciliacao', icon: FileText,       label: 'Conciliação de Faturas',   end: false },
   ]
 
   return (

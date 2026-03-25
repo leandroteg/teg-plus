@@ -198,7 +198,7 @@ export default function App() {
               <Route path="/financeiro/lotes/:loteId"      element={<LoteDetalhe />} />
               <Route path="/financeiro/painel-pagamentos"  element={<PainelPagamentos />} />
               <Route path="/financeiro/conciliacao"         element={<Navigate to="/financeiro/contas-a-pagar" replace />} />
-              <Route path="/financeiro/conciliacao-cartoes" element={<Navigate to="/apontamentos/conciliacao" replace />} />
+              <Route path="/financeiro/conciliacao-cartoes" element={<ConciliacaoCartoes />} />
               <Route path="/financeiro/tesouraria"          element={<Tesouraria />} />
               <Route path="/financeiro/relatorios"   element={<Relatorios />} />
               <Route path="/financeiro/configuracoes" element={<Navigate to="/admin/integracoes" replace />} />
@@ -210,7 +210,7 @@ export default function App() {
             <Route element={<ApontamentosLayout />}>
               <Route path="/apontamentos"              element={<ApontamentosHome />} />
               <Route path="/apontamentos/realizados"   element={<ApontamentosCartao />} />
-              <Route path="/apontamentos/conciliacao"  element={<ConciliacaoCartoes />} />
+              <Route path="/apontamentos/conciliacao"  element={<Navigate to="/financeiro/conciliacao-cartoes" replace />} />
             </Route>
           </Route>
 
