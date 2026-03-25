@@ -232,7 +232,7 @@ function RecebimentoModal({ sol, onClose, onConfirm, isPending, isDark }: {
               <span className={`text-xs self-center ml-1 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{avaliacaoQualidade}/5</span>
             </div>
           </div>
-        </div>
+
           {/* Destino da carga */}
           <div>
             <label className={`block text-xs font-bold mb-1.5 ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>Destino da Carga</label>
