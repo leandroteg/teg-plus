@@ -1,6 +1,6 @@
 import { useNavigate } from 'react-router-dom'
 import {
-  CreditCard, Plus, ClipboardList, FileText,
+  CreditCard, Plus, ClipboardList,
   Clock, CheckCircle2, Check, TrendingUp,
 } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
@@ -128,20 +128,6 @@ export default function ApontamentosHome() {
           </div>
         </button>
 
-        <button
-          onClick={() => navigate('/apontamentos/conciliacao')}
-          className={`flex items-center gap-3 p-4 rounded-xl border transition-colors text-left ${
-            dark
-              ? 'border-slate-700 hover:border-slate-500 hover:bg-slate-700/50 text-slate-300'
-              : 'border-slate-200 hover:border-slate-300 hover:bg-slate-50 text-slate-700'
-          }`}
-        >
-          <FileText className="w-5 h-5 shrink-0" />
-          <div>
-            <p className="font-semibold text-sm">Conciliação de Faturas</p>
-            <p className={`text-xs ${dark ? 'text-slate-400' : 'text-slate-500'}`}>Upload e conciliação de fatura</p>
-          </div>
-        </button>
       </div>
 
       {/* Recentes */}
