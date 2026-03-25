@@ -1123,8 +1123,25 @@ export default function TransportesPipeline() {
     }
 
     try {
+      let viagemId = despachoViagemModal.viagemId
+
+      // Item solo: criar viagem primeiro
+      if (viagemId.startsWith('__solo__')) {
+        const solId = viagemId.replace('__solo__', '')
+        const sol = despachoViagemModal.solicitacoes[0]
+        const viagem = await criarViagem.mutateAsync({
+          solicitacaoIds: [solId],
+          origem_principal: sol?.origem ?? '',
+          destino_final: sol?.destino ?? '',
+          veiculo_placa: despachoViagemForm.placa,
+          motorista_nome: despachoViagemForm.motorista_nome,
+          motorista_telefone: despachoViagemForm.motorista_telefone || undefined,
+        })
+        viagemId = viagem.id
+      }
+
       await despacharViagem.mutateAsync({
-        viagemId: despachoViagemModal.viagemId,
+        viagemId,
         placa: despachoViagemForm.placa,
         motorista_nome: despachoViagemForm.motorista_nome,
         motorista_telefone: despachoViagemForm.motorista_telefone || undefined,
@@ -1155,7 +1172,7 @@ export default function TransportesPipeline() {
   }
 
   const handleDetailAction = (action: string, sol: LogSolicitacao) => {
-    if (action !== 'despacharSolo') closeDetail()
+    closeDetail()
     if (action === 'confirmarAgendamento') handleConfirmarAgendamento([sol.id])
     if (action === 'despacharViagem' && sol.viagem_id) {
       const solsDaViagem = solicitacoes
@@ -1166,23 +1183,9 @@ export default function TransportesPipeline() {
       }
     }
     if (action === 'despacharSolo' && !sol.viagem_id) {
-      // Criar viagem automática com 1 item, invalidar queries, e reabrir o modal completo
-      criarViagem.mutateAsync({
-        solicitacaoIds: [sol.id],
-        origem_principal: sol.origem ?? '',
-        destino_final: sol.destino ?? '',
-      }).then(viagem => {
-        if (viagem?.id) {
-          showToast('success', 'Viagem criada. Abrindo despacho...')
-          // Esperar invalidação das queries para pegar o sol atualizado com viagem_id
-          setTimeout(() => {
-            const updated = solicitacoes.find(s => s.id === sol.id)
-            setDetail(updated ? { ...updated, viagem_id: viagem.id } : { ...sol, viagem_id: viagem.id })
-          }, 500)
-        }
-      }).catch(() => {
-        showToast('error', 'Erro ao criar viagem para despacho')
-      })
+      // Abrir modal de despacho direto — cria viagem no submit
+      closeDetail()
+      openDespachoViagem(`__solo__${sol.id}`, [sol])
     }
     if (action === 'confirmarEntrega') handleConfirmarEntrega([sol.id])
     if (action === 'confirmarRecebimento') setRecebModal(sol)
@@ -1205,12 +1208,9 @@ export default function TransportesPipeline() {
   const lateCt = activeItems.filter(s => isLate(s)).length
   const detailViagemSolicitacoes = useMemo(() => {
     if (!detail?.viagem_id) return undefined
-    const fromQuery = solicitacoes.filter(item => item.viagem_id === detail.viagem_id)
-    // Se a query ainda não atualizou, incluir o próprio detail
-    if (fromQuery.length === 0 && detail.viagem_id) {
-      return [detail]
-    }
-    return fromQuery.sort((a, b) => (a.ordem_na_viagem ?? 0) - (b.ordem_na_viagem ?? 0))
+    return solicitacoes
+      .filter(item => item.viagem_id === detail.viagem_id)
+      .sort((a, b) => (a.ordem_na_viagem ?? 0) - (b.ordem_na_viagem ?? 0))
   }, [detail, solicitacoes])
 
   return (
