@@ -1155,7 +1155,7 @@ export default function TransportesPipeline() {
   }
 
   const handleDetailAction = (action: string, sol: LogSolicitacao) => {
-    closeDetail()
+    if (action !== 'despacharSolo') closeDetail()
     if (action === 'confirmarAgendamento') handleConfirmarAgendamento([sol.id])
     if (action === 'despacharViagem' && sol.viagem_id) {
       const solsDaViagem = solicitacoes
@@ -1166,14 +1166,19 @@ export default function TransportesPipeline() {
       }
     }
     if (action === 'despacharSolo' && !sol.viagem_id) {
-      // Criar viagem automática com 1 item e abrir modal de despacho
+      // Criar viagem automática com 1 item, invalidar queries, e reabrir o modal completo
       criarViagem.mutateAsync({
         solicitacaoIds: [sol.id],
         origem_principal: sol.origem ?? '',
         destino_final: sol.destino ?? '',
       }).then(viagem => {
         if (viagem?.id) {
-          openDespachoViagem(viagem.id, [{ ...sol, viagem_id: viagem.id }])
+          showToast('success', 'Viagem criada. Abrindo despacho...')
+          // Esperar invalidação das queries para pegar o sol atualizado com viagem_id
+          setTimeout(() => {
+            const updated = solicitacoes.find(s => s.id === sol.id)
+            setDetail(updated ? { ...updated, viagem_id: viagem.id } : { ...sol, viagem_id: viagem.id })
+          }, 500)
         }
       }).catch(() => {
         showToast('error', 'Erro ao criar viagem para despacho')
@@ -1200,9 +1205,12 @@ export default function TransportesPipeline() {
   const lateCt = activeItems.filter(s => isLate(s)).length
   const detailViagemSolicitacoes = useMemo(() => {
     if (!detail?.viagem_id) return undefined
-    return solicitacoes
-      .filter(item => item.viagem_id === detail.viagem_id)
-      .sort((a, b) => (a.ordem_na_viagem ?? 0) - (b.ordem_na_viagem ?? 0))
+    const fromQuery = solicitacoes.filter(item => item.viagem_id === detail.viagem_id)
+    // Se a query ainda não atualizou, incluir o próprio detail
+    if (fromQuery.length === 0 && detail.viagem_id) {
+      return [detail]
+    }
+    return fromQuery.sort((a, b) => (a.ordem_na_viagem ?? 0) - (b.ordem_na_viagem ?? 0))
   }, [detail, solicitacoes])
 
   return (
