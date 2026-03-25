@@ -1221,27 +1221,31 @@ export default function TransportesPipeline() {
       }
     }
     if (action === 'despacharSolo' && !sol.viagem_id) {
-      // Criar viagem e despachar direto sem modal intermediário
+      // Criar viagem silenciosamente e abrir modal de despacho padrão (igual VG)
       try {
-        const viagem = await criarViagem.mutateAsync({
-          solicitacaoIds: [sol.id],
-          origem_principal: sol.origem ?? '',
-          destino_final: sol.destino ?? '',
-          motorista_nome: sol.motorista_nome ?? undefined,
-          veiculo_placa: sol.veiculo_placa ?? undefined,
-          motorista_telefone: sol.motorista_telefone ?? undefined,
-        })
-        if (viagem?.id) {
-          await despacharViagem.mutateAsync({
-            viagemId: viagem.id,
-            placa: sol.veiculo_placa ?? '',
-            motorista_nome: sol.motorista_nome ?? '',
+        const { data: viagem } = await supabase
+          .from('log_viagens')
+          .insert({
+            status: 'planejada',
+            origem_principal: sol.origem ?? '',
+            destino_final: sol.destino ?? '',
+            motorista_nome: sol.motorista_nome ?? undefined,
+            veiculo_placa: sol.veiculo_placa ?? undefined,
             motorista_telefone: sol.motorista_telefone ?? undefined,
+            qtd_paradas: 1,
           })
-          showToast('success', 'Transporte despachado com sucesso')
+          .select()
+          .single()
+        if (viagem?.id) {
+          await supabase
+            .from('log_solicitacoes')
+            .update({ viagem_id: viagem.id, ordem_na_viagem: 1 })
+            .eq('id', sol.id)
+          // Abrir modal de despacho padrão (mesmo da viagem)
+          openDespachoViagem(viagem.id, [{ ...sol, viagem_id: viagem.id }])
         }
       } catch {
-        showToast('error', 'Erro ao despachar transporte')
+        showToast('error', 'Erro ao preparar despacho')
       }
     }
     if (action === 'confirmarEntrega') handleConfirmarEntrega([sol.id])
