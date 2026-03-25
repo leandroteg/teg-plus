@@ -1230,9 +1230,10 @@ export default function TransportesPipeline() {
   const lateCt = activeItems.filter(s => isLate(s)).length
   const detailViagemSolicitacoes = useMemo(() => {
     if (!detail?.viagem_id) return undefined
-    return solicitacoes
-      .filter(item => item.viagem_id === detail.viagem_id)
-      .sort((a, b) => (a.ordem_na_viagem ?? 0) - (b.ordem_na_viagem ?? 0))
+    const fromQuery = solicitacoes.filter(item => item.viagem_id === detail.viagem_id)
+    // Fallback: query cache pode não ter atualizado ainda (viagem recém-criada)
+    if (fromQuery.length === 0) return [detail]
+    return fromQuery.sort((a, b) => (a.ordem_na_viagem ?? 0) - (b.ordem_na_viagem ?? 0))
   }, [detail, solicitacoes])
 
   return (
