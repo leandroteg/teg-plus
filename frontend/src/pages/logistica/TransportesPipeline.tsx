@@ -6,6 +6,7 @@ import {
   MapPin, Clock, Building2, Package2, FileText, CalendarCheck, Star, Loader2, Route,
 } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
+import { supabase } from '../../services/supabase'
 import {
   useSolicitacoes, useConfirmarEntregaFisica,
   useConfirmarAgendamento, useConfirmarRecebimento, useDespacharViagem, useCriarViagem,
@@ -1044,20 +1045,31 @@ export default function TransportesPipeline() {
     return result
   }, [activeItems])
 
-  // Para itens solo em aguardando_coleta, criar viagem antes de abrir o modal
+  // Para itens solo em aguardando_coleta, criar viagem silenciosamente (sem mudar status)
   const openDetail = async (sol: LogSolicitacao) => {
     if (!sol.viagem_id && sol.status === 'aguardando_coleta') {
       try {
-        const viagem = await criarViagem.mutateAsync({
-          solicitacaoIds: [sol.id],
-          origem_principal: sol.origem ?? '',
-          destino_final: sol.destino ?? '',
-          motorista_nome: sol.motorista_nome ?? undefined,
-          veiculo_placa: sol.veiculo_placa ?? undefined,
-          motorista_telefone: sol.motorista_telefone ?? undefined,
-        })
+        // Criar viagem sem mudar status da solicitação
+        const { data: viagem } = await supabase
+          .from('log_viagens')
+          .insert({
+            status: 'planejada',
+            origem_principal: sol.origem ?? '',
+            destino_final: sol.destino ?? '',
+            motorista_nome: sol.motorista_nome ?? undefined,
+            veiculo_placa: sol.veiculo_placa ?? undefined,
+            motorista_telefone: sol.motorista_telefone ?? undefined,
+            qtd_paradas: 1,
+          })
+          .select()
+          .single()
         if (viagem?.id) {
-          setDetail({ ...sol, viagem_id: viagem.id, viagem })
+          // Vincular sem mudar status
+          await supabase
+            .from('log_solicitacoes')
+            .update({ viagem_id: viagem.id, ordem_na_viagem: 1 })
+            .eq('id', sol.id)
+          setDetail({ ...sol, viagem_id: viagem.id, viagem } as LogSolicitacao)
           return
         }
       } catch { /* fallback para modal simples */ }
