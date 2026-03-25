@@ -3,10 +3,11 @@ import { useSearchParams } from 'react-router-dom'
 import {
   Truck, Search, X, CheckCircle2, AlertTriangle,
   Calendar, ArrowUp, ArrowDown, LayoutList, LayoutGrid, Download,
-  MapPin, Clock, Building2, Package2, FileText, CalendarCheck, Star, Loader2, Route,
+  MapPin, Clock, Building2, Package2, FileText, CalendarCheck, Star, Loader2, Route, Camera,
 } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
 import { supabase } from '../../services/supabase'
+import { useBases } from '../../hooks/useRecebimento'
 import {
   useSolicitacoes, useConfirmarEntregaFisica,
   useConfirmarAgendamento, useConfirmarRecebimento, useDespacharViagem, useCriarViagem,
@@ -131,6 +132,8 @@ function RecebimentoModal({ sol, onClose, onConfirm, isPending, isDark }: {
     checklist: { quantidades_conferidas: boolean; estado_verificado: boolean; seriais_conferidos: boolean; temperatura_verificada: boolean }
     status: 'confirmado' | 'parcial' | 'recusado'
     divergencias?: string; avaliacao_qualidade?: number
+    destino?: 'consumo' | 'patrimonial' | 'nenhum'; base_id?: string
+    fotos_urls?: string[]
   }) => void
   isPending: boolean; isDark: boolean
 }) {
@@ -143,6 +146,11 @@ function RecebimentoModal({ sol, onClose, onConfirm, isPending, isDark }: {
   const [statusReceb, setStatusReceb] = useState<'confirmado' | 'parcial' | 'recusado'>('confirmado')
   const [divergencias, setDivergencias] = useState('')
   const [avaliacaoQualidade, setAvaliacaoQualidade] = useState(5)
+  const [destino, setDestino] = useState<'consumo' | 'patrimonial' | 'nenhum'>('nenhum')
+  const [baseId, setBaseId] = useState('')
+  const [fotos, setFotos] = useState<{ file: File; preview: string }[]>([])
+  const [uploadingFotos, setUploadingFotos] = useState(false)
+  const { data: bases } = useBases()
 
   const recebId = sol.recebimento?.id
 
@@ -225,13 +233,88 @@ function RecebimentoModal({ sol, onClose, onConfirm, isPending, isDark }: {
             </div>
           </div>
         </div>
-        <div className={`px-6 py-4 flex justify-end gap-2 ${isDark ? 'border-t border-white/[0.06]' : 'border-t border-slate-100'}`}>
+          {/* Destino da carga */}
+          <div>
+            <label className={`block text-xs font-bold mb-1.5 ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>Destino da Carga</label>
+            <div className="grid grid-cols-3 gap-2">
+              {([
+                ['consumo', 'Estoque', 'bg-teal-600'],
+                ['patrimonial', 'Patrimônio', 'bg-violet-600'],
+                ['nenhum', 'Nenhum', 'bg-slate-500'],
+              ] as const).map(([v, l, c]) => (
+                <button key={v} onClick={() => setDestino(v)}
+                  className={`py-2 rounded-xl text-xs font-semibold transition-colors text-white ${destino === v ? c : isDark ? 'bg-white/10 text-slate-400' : 'bg-slate-200 text-slate-600'}`}>
+                  {l}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Base/Almoxarifado — só quando destino = consumo */}
+          {destino === 'consumo' && (
+            <div>
+              <label className={`block text-xs font-bold mb-1 ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>Base / Almoxarifado *</label>
+              <select value={baseId} onChange={e => setBaseId(e.target.value)}
+                className={`w-full px-3 py-2 rounded-xl border text-sm focus:outline-none focus:ring-2 focus:ring-teal-500/30 ${isDark ? 'bg-white/[0.04] border-white/[0.06] text-slate-200' : 'bg-white border-slate-200 text-slate-700'}`}>
+                <option value="">Selecione...</option>
+                {(bases ?? []).map((b: any) => (
+                  <option key={b.id} value={b.id}>{b.nome}</option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          {/* Fotos do recebimento */}
+          <div>
+            <label className={`block text-xs font-bold mb-1.5 ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>Fotos do Recebimento</label>
+            {fotos.length > 0 && (
+              <div className="flex gap-2 flex-wrap mb-2">
+                {fotos.map((f, i) => (
+                  <div key={i} className="relative w-16 h-16 rounded-lg overflow-hidden border border-slate-200">
+                    <img src={f.preview} alt="" className="w-full h-full object-cover" />
+                    <button onClick={() => { URL.revokeObjectURL(f.preview); setFotos(p => p.filter((_, j) => j !== i)) }}
+                      className="absolute top-0 right-0 w-5 h-5 bg-red-500 text-white rounded-bl-lg flex items-center justify-center">
+                      <X size={10} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+            <label className={`flex items-center gap-2 px-3 py-2 rounded-xl border cursor-pointer transition-all hover:border-orange-300 ${isDark ? 'bg-white/[0.04] border-white/[0.06] text-slate-400' : 'bg-white border-slate-200 text-slate-500'}`}>
+              <Camera size={14} />
+              <span className="text-xs">Adicionar foto</span>
+              <input type="file" className="hidden" accept="image/*,.pdf" multiple
+                onChange={e => {
+                  const files = Array.from(e.target.files ?? [])
+                  setFotos(p => [...p, ...files.map(f => ({ file: f, preview: URL.createObjectURL(f) }))])
+                  e.target.value = ''
+                }}
+              />
+            </label>
+          </div>
+        </div>
+
+        <div className={`px-6 py-4 flex justify-end gap-2 sticky bottom-0 ${isDark ? 'border-t border-white/[0.06] bg-[#1e293b]' : 'border-t border-slate-100 bg-white'}`}>
           <button onClick={onClose}
             className={`px-4 py-2 rounded-xl text-sm font-semibold ${isDark ? 'border border-white/[0.06] text-slate-400 hover:bg-white/5' : 'border border-slate-200 text-slate-600 hover:bg-slate-50'}`}>
             Cancelar
           </button>
-          <button onClick={() => {
+          <button onClick={async () => {
             if (!recebId) return
+            // Upload fotos
+            let fotosUrls: string[] = []
+            if (fotos.length > 0) {
+              setUploadingFotos(true)
+              for (const f of fotos) {
+                const path = `logistica-recebimento/${sol.id}/${Date.now()}_${f.file.name.replace(/[^a-zA-Z0-9._-]/g, '_')}`
+                const { error } = await supabase.storage.from('cotacoes-docs').upload(path, f.file, { upsert: true })
+                if (!error) {
+                  const { data: { publicUrl } } = supabase.storage.from('cotacoes-docs').getPublicUrl(path)
+                  fotosUrls.push(publicUrl)
+                }
+              }
+              setUploadingFotos(false)
+            }
             onConfirm({
               recebimento_id: recebId,
               solicitacao_id: sol.id,
@@ -239,11 +322,14 @@ function RecebimentoModal({ sol, onClose, onConfirm, isPending, isDark }: {
               status: statusReceb,
               divergencias: divergencias || undefined,
               avaliacao_qualidade: avaliacaoQualidade,
+              destino,
+              base_id: destino === 'consumo' ? baseId || undefined : undefined,
+              fotos_urls: fotosUrls.length > 0 ? fotosUrls : undefined,
             })
-          }} disabled={isPending || !recebId}
+          }} disabled={isPending || uploadingFotos || !recebId || (destino === 'consumo' && !baseId)}
             className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700
               text-white text-sm font-semibold transition-colors disabled:opacity-60">
-            {isPending ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle2 size={14} />}
+            {(isPending || uploadingFotos) ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle2 size={14} />}
             Confirmar Recebimento
           </button>
         </div>
@@ -1196,6 +1282,8 @@ export default function TransportesPipeline() {
     checklist: { quantidades_conferidas: boolean; estado_verificado: boolean; seriais_conferidos: boolean; temperatura_verificada: boolean }
     status: 'confirmado' | 'parcial' | 'recusado'
     divergencias?: string; avaliacao_qualidade?: number
+    destino?: 'consumo' | 'patrimonial' | 'nenhum'; base_id?: string
+    fotos_urls?: string[]
   }) => {
     try {
       await confirmarRecebimento.mutateAsync({
@@ -1205,8 +1293,14 @@ export default function TransportesPipeline() {
         status: data.status,
         divergencias: data.divergencias,
         avaliacao_qualidade: data.avaliacao_qualidade,
+        destino: data.destino,
+        base_id: data.base_id,
+        fotos_urls: data.fotos_urls,
       })
-      showToast('success', 'Recebimento confirmado com sucesso')
+      const msgs: string[] = ['Recebimento confirmado']
+      if (data.destino === 'consumo') msgs.push('Entrada em estoque registrada')
+      if (data.destino === 'patrimonial') msgs.push('Patrimônio registrado')
+      showToast('success', msgs.join(' · '))
       setRecebModal(null)
       setSelectedIds(new Set())
     } catch { showToast('error', 'Erro ao confirmar recebimento') }

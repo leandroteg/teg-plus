@@ -1070,6 +1070,9 @@ export function useConfirmarRecebimento() {
       divergencias,
       avaliacao_qualidade,
       observacoes,
+      destino,
+      base_id,
+      fotos_urls,
     }: {
       id: string
       solicitacao_id: string
@@ -1083,6 +1086,9 @@ export function useConfirmarRecebimento() {
       divergencias?: string
       avaliacao_qualidade?: number
       observacoes?: string
+      destino?: 'consumo' | 'patrimonial' | 'nenhum'
+      base_id?: string
+      fotos_urls?: string[]
     }) => {
       const { data: { user } } = await supabase.auth.getUser()
       const agora = new Date().toISOString()
@@ -1098,12 +1104,47 @@ export function useConfirmarRecebimento() {
           confirmado_por: user?.id,
           confirmado_em: agora,
           assinatura_digital: `CONF-${Date.now().toString(36).toUpperCase()}`,
+          destino: destino || 'nenhum',
+          base_id: base_id || null,
+          fotos_recebimento: fotos_urls && fotos_urls.length > 0 ? fotos_urls : [],
           updated_at: agora,
         })
         .eq('id', id)
         .select()
         .single()
       if (error) throw error
+
+      // Buscar dados da solicitação para criar registros
+      const { data: sol } = await supabase
+        .from('log_solicitacoes')
+        .select('numero, descricao, obra_nome, centro_custo, peso_total_kg, volumes_total')
+        .eq('id', solicitacao_id)
+        .single()
+
+      if ((status === 'confirmado' || status === 'parcial') && destino === 'consumo' && base_id) {
+        // Criar entrada no estoque
+        await supabase.from('est_movimentacoes').insert({
+          tipo: 'entrada',
+          base_id,
+          quantidade: sol?.volumes_total || 1,
+          descricao: `Recebimento logístico ${sol?.numero || ''} — ${sol?.descricao || ''}`,
+          obra_nome: sol?.obra_nome || null,
+          centro_custo: sol?.centro_custo || null,
+          responsavel_id: user?.id,
+        })
+      }
+
+      if ((status === 'confirmado' || status === 'parcial') && destino === 'patrimonial') {
+        // Criar registro patrimonial pendente
+        await supabase.from('pat_imobilizados').insert({
+          numero_patrimonio: `PAT-LOG-${Date.now().toString(36).toUpperCase()}`,
+          descricao: `${sol?.descricao || sol?.numero || 'Item logístico'}`,
+          categoria: 'GERAL',
+          status: 'pendente_registro',
+          responsavel_id: user?.id,
+          data_aquisicao: agora,
+        })
+      }
 
       if (status === 'confirmado' || status === 'parcial') {
         await supabase
@@ -1120,6 +1161,9 @@ export function useConfirmarRecebimento() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['log_recebimentos'] })
       qc.invalidateQueries({ queryKey: ['log_solicitacoes'] })
+      qc.invalidateQueries({ queryKey: ['est-movimentacoes'] })
+      qc.invalidateQueries({ queryKey: ['est-saldos'] })
+      qc.invalidateQueries({ queryKey: ['pat-imobilizados'] })
     },
   })
 }
