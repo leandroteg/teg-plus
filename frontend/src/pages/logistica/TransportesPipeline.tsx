@@ -264,7 +264,7 @@ function DetailModal({ sol, viagemSolicitacoes, onClose, onAction, isDark }: {
   const late = isLate(sol)
   const fiscalCtx = getDocumentoFiscalContext(sol)
   const transportStage = resolveTransporteStage(sol) ?? 'transporte_pendente'
-  const isViagemView = !!sol.viagem_id && !!viagemSolicitacoes && viagemSolicitacoes.length > 1
+  const isViagemView = !!sol.viagem_id && !!viagemSolicitacoes && viagemSolicitacoes.length >= 1
   const viagem = viagemSolicitacoes?.[0]?.viagem ?? sol.viagem
   const departureBase = viagem?.data_real_saida || t?.hora_saida || viagem?.data_prevista_saida || sol.data_prevista_saida
   const viagemEtapas = useMemo(
