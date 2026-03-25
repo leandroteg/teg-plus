@@ -850,26 +850,31 @@ export default function PlanejamentoRotaModal({ isDark, solicitacoes, allSolicit
     }))
   )
 
-  // Rota calculada
-  const [rota, setRota] = useState<RotaCalculada | null>(null)
+  // Rota calculada — pré-popular com dados existentes da solicitação/viagem
+  const [rota, setRota] = useState<RotaCalculada | null>(() => {
+    const s = solicitacoes[0]
+    if (s?.distancia_km || s?.tempo_estimado_h) {
+      return {
+        distancia_km: s.distancia_km ?? 0,
+        tempo_estimado_h: s.tempo_estimado_h ?? 0,
+        polyline: (s as any).rota_polyline || '',
+        trechos: [],
+      }
+    }
+    return null
+  })
   const [calculando, setCalculando] = useState(false)
 
   // Planning fields — pré-preencher com initialData ou dados da primeira solicitação
-  const _init = initialData || (solicitacoes[0]?.modal ? {
-    modal: solicitacoes[0].modal,
-    motorista_nome: solicitacoes[0].motorista_nome,
-    veiculo_placa: solicitacoes[0].veiculo_placa,
-    data_prevista_saida: solicitacoes[0].data_prevista_saida,
-    custo_estimado: solicitacoes[0].custo_estimado,
-  } : undefined)
-  const [modal, setModal] = useState(_init?.modal || '')
-  const [motorista, setMotorista] = useState(_init?.motorista_nome || '')
-  const [placa, setPlaca] = useState(_init?.veiculo_placa || '')
+  const s0 = solicitacoes[0]
+  const [modal, setModal] = useState(initialData?.modal || s0?.modal || '')
+  const [motorista, setMotorista] = useState(initialData?.motorista_nome || s0?.motorista_nome || '')
+  const [placa, setPlaca] = useState(initialData?.veiculo_placa || s0?.veiculo_placa || '')
   const [dataPartida, setDataPartida] = useState(() => {
-    const d = _init?.data_prevista_saida || ''
+    const d = initialData?.data_prevista_saida || s0?.data_prevista_saida || ''
     return d ? d.slice(0, 16) : ''
   })
-  const [custo, setCusto] = useState<number | ''>(_init?.custo_estimado ?? '')
+  const [custo, setCusto] = useState<number | ''>(initialData?.custo_estimado ?? s0?.custo_estimado ?? '')
   const [salvando, setSalvando] = useState(false)
 
   // Adicionar mais solicitações
