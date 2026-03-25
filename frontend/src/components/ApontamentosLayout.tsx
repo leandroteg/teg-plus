@@ -10,7 +10,7 @@ export default function ApontamentosLayout() {
 
   const NAV: NavItem[] = [
     { to: '/apontamentos',            icon: LayoutDashboard, label: 'Painel',                  end: true },
-    { to: '/apontamentos/realizados', icon: Plus,            label: 'Novo Apontamento',         end: false, action: () => navigate(`/apontamentos/realizados?nova=${Date.now()}`), accent: true },
+    { to: '/apontamentos/novo',       icon: Plus,            label: 'Novo Apontamento',         end: false, action: () => navigate(`/apontamentos/realizados?nova=${Date.now()}`), accent: true },
     { to: '/apontamentos/realizados', icon: ClipboardList,   label: 'Apontamentos Realizados',  end: false },
   ]
 
