@@ -353,9 +353,17 @@ function DetailModal({ sol, onClose, onAction, onEdit, isDark }: {
               </>
             )}
             {sol.status === 'aguardando_aprovacao' && (
-              <button onClick={() => onAction('aprovar', sol)} className="flex-1 py-3 rounded-xl bg-emerald-600 text-white text-sm font-bold hover:bg-emerald-700 transition-all flex items-center justify-center gap-2">
-                <CheckCircle2 size={15} /> Aprovar
-              </button>
+              <>
+                <button onClick={() => onAction('devolver', sol)} className={`py-3 px-4 rounded-xl border text-sm font-semibold transition-all flex items-center gap-1.5 ${isDark ? 'border-white/[0.06] text-amber-400' : 'border-amber-200 text-amber-600 hover:bg-amber-50'}`}>
+                  Devolver
+                </button>
+                <button onClick={() => onAction('recusar', sol)} className={`py-3 px-4 rounded-xl border text-sm font-semibold transition-all flex items-center gap-1.5 ${isDark ? 'border-white/[0.06] text-red-400' : 'border-red-200 text-red-600 hover:bg-red-50'}`}>
+                  Recusar
+                </button>
+                <button onClick={() => onAction('aprovar', sol)} className="flex-1 py-3 rounded-xl bg-emerald-600 text-white text-sm font-bold hover:bg-emerald-700 transition-all flex items-center justify-center gap-2">
+                  <CheckCircle2 size={15} /> Aprovar
+                </button>
+              </>
             )}
           </div>
         </div>
@@ -519,9 +527,17 @@ function ViagemDetailModal({ item, onClose, onAction, onEdit, isDark }: {
               </>
             )}
             {status === 'aguardando_aprovacao' && (
-              <button onClick={() => onAction('aprovar', sols)} className="flex-1 py-3 rounded-xl bg-emerald-600 text-white text-sm font-bold hover:bg-emerald-700 transition-all flex items-center justify-center gap-2">
-                <CheckCircle2 size={15} /> Aprovar
-              </button>
+              <>
+                <button onClick={() => onAction('devolver', sols)} className={`py-3 px-4 rounded-xl border text-sm font-semibold transition-all flex items-center gap-1.5 ${isDark ? 'border-white/[0.06] text-amber-400' : 'border-amber-200 text-amber-600 hover:bg-amber-50'}`}>
+                  Devolver
+                </button>
+                <button onClick={() => onAction('recusar', sols)} className={`py-3 px-4 rounded-xl border text-sm font-semibold transition-all flex items-center gap-1.5 ${isDark ? 'border-white/[0.06] text-red-400' : 'border-red-200 text-red-600 hover:bg-red-50'}`}>
+                  Recusar
+                </button>
+                <button onClick={() => onAction('aprovar', sols)} className="flex-1 py-3 rounded-xl bg-emerald-600 text-white text-sm font-bold hover:bg-emerald-700 transition-all flex items-center justify-center gap-2">
+                  <CheckCircle2 size={15} /> Aprovar
+                </button>
+              </>
             )}
           </div>
         </div>
