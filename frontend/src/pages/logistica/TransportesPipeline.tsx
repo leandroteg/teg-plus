@@ -1209,7 +1209,7 @@ export default function TransportesPipeline() {
     }
   }
 
-  const handleDetailAction = (action: string, sol: LogSolicitacao) => {
+  const handleDetailAction = async (action: string, sol: LogSolicitacao) => {
     closeDetail()
     if (action === 'confirmarAgendamento') handleConfirmarAgendamento([sol.id])
     if (action === 'despacharViagem' && sol.viagem_id) {
@@ -1221,9 +1221,28 @@ export default function TransportesPipeline() {
       }
     }
     if (action === 'despacharSolo' && !sol.viagem_id) {
-      // Abrir modal de despacho direto — cria viagem no submit
-      closeDetail()
-      openDespachoViagem(`__solo__${sol.id}`, [sol])
+      // Criar viagem e despachar direto sem modal intermediário
+      try {
+        const viagem = await criarViagem.mutateAsync({
+          solicitacaoIds: [sol.id],
+          origem_principal: sol.origem ?? '',
+          destino_final: sol.destino ?? '',
+          motorista_nome: sol.motorista_nome ?? undefined,
+          veiculo_placa: sol.veiculo_placa ?? undefined,
+          motorista_telefone: sol.motorista_telefone ?? undefined,
+        })
+        if (viagem?.id) {
+          await despacharViagem.mutateAsync({
+            viagemId: viagem.id,
+            placa: sol.veiculo_placa ?? '',
+            motorista_nome: sol.motorista_nome ?? '',
+            motorista_telefone: sol.motorista_telefone ?? undefined,
+          })
+          showToast('success', 'Transporte despachado com sucesso')
+        }
+      } catch {
+        showToast('error', 'Erro ao despachar transporte')
+      }
     }
     if (action === 'confirmarEntrega') handleConfirmarEntrega([sol.id])
     if (action === 'confirmarRecebimento') setRecebModal(sol)
