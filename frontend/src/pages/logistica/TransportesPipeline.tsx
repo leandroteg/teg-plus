@@ -325,6 +325,38 @@ function DetailModal({ sol, viagemSolicitacoes, onClose, onAction, isDark }: {
             <RomaneioDocumentoCard sol={sol} dark={isDark} />
           )}
 
+          {/* Solo: mostrar seção de rota com dados da solicitação */}
+          {!hasViagem && (
+            <div className={`rounded-xl p-4 ${isDark ? 'bg-white/[0.04]' : 'bg-slate-50'}`}>
+              <p className={`text-[10px] font-bold uppercase tracking-[0.24em] mb-2 ${isDark ? 'text-orange-400' : 'text-orange-600'}`}>Rota</p>
+              <h4 className={`text-base font-bold ${isDark ? 'text-white' : 'text-slate-800'}`}>
+                {fiscalCtx.origemLabel} → {fiscalCtx.destinoLabel}
+              </h4>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-3">
+                <div className={`rounded-lg p-2.5 text-center ${isDark ? 'bg-white/[0.04]' : 'bg-white'}`}>
+                  <p className="text-lg font-extrabold text-slate-700">{sol.distancia_km ? `${sol.distancia_km} km` : '—'}</p>
+                  <p className="text-[10px] text-orange-500 font-semibold">Distância</p>
+                </div>
+                <div className={`rounded-lg p-2.5 text-center ${isDark ? 'bg-white/[0.04]' : 'bg-white'}`}>
+                  <p className="text-lg font-extrabold text-slate-700">{sol.tempo_estimado_h ? `${sol.tempo_estimado_h}h` : '—'}</p>
+                  <p className="text-[10px] text-orange-500 font-semibold">Tempo Estimado</p>
+                </div>
+                {sol.peso_total_kg && (
+                  <div className={`rounded-lg p-2.5 text-center ${isDark ? 'bg-white/[0.04]' : 'bg-white'}`}>
+                    <p className="text-lg font-extrabold text-slate-700">{sol.peso_total_kg} kg</p>
+                    <p className="text-[10px] text-orange-500 font-semibold">Peso</p>
+                  </div>
+                )}
+                {sol.volumes_total && (
+                  <div className={`rounded-lg p-2.5 text-center ${isDark ? 'bg-white/[0.04]' : 'bg-white'}`}>
+                    <p className="text-lg font-extrabold text-slate-700">{sol.volumes_total}</p>
+                    <p className="text-[10px] text-orange-500 font-semibold">Volumes</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
           {isViagemView && viagemResumo && viagemSolicitacoes && (
             <div className="space-y-3">
               <div className={`rounded-xl p-4 ${isDark ? 'bg-white/[0.04]' : 'bg-slate-50'}`}>
