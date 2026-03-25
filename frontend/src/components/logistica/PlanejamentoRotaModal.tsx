@@ -855,10 +855,10 @@ export default function PlanejamentoRotaModal({ isDark, solicitacoes, allSolicit
     const s = solicitacoes[0]
     if (s?.distancia_km || s?.tempo_estimado_h) {
       return {
-        distancia_km: s.distancia_km ?? 0,
-        tempo_estimado_h: s.tempo_estimado_h ?? 0,
-        polyline: (s as any).rota_polyline || '',
-        trechos: [],
+        distancia_total_km: s.distancia_km ?? 0,
+        duracao_total_horas: s.tempo_estimado_h ?? 0,
+        polyline: (s as any).rota_polyline || undefined,
+        pontos: [],
       }
     }
     return null
