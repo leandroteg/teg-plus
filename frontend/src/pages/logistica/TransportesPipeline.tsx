@@ -8,7 +8,7 @@ import {
 import { useTheme } from '../../contexts/ThemeContext'
 import {
   useSolicitacoes, useConfirmarEntregaFisica,
-  useConfirmarAgendamento, useConfirmarRecebimento, useDespacharViagem,
+  useConfirmarAgendamento, useConfirmarRecebimento, useDespacharViagem, useCriarViagem,
 } from '../../hooks/useLogistica'
 import type { LogSolicitacao, StatusTransportePipeline } from '../../types/logistica'
 import { TRANSPORTE_PIPELINE_STAGES } from '../../types/logistica'
@@ -495,6 +495,11 @@ function DetailModal({ sol, viagemSolicitacoes, onClose, onAction, isDark }: {
                 <Route size={15} /> Despachar Viagem
               </button>
             )}
+            {sol.status === 'aguardando_coleta' && !sol.viagem_id && (
+              <button onClick={() => onAction('despacharSolo', sol)} className="flex-1 py-3 rounded-xl bg-orange-600 text-white text-sm font-bold hover:bg-orange-700 transition-all flex items-center justify-center gap-2">
+                <Route size={15} /> Despachar
+              </button>
+            )}
             {sol.status === 'em_transito' && (
               <button onClick={() => onAction('confirmarEntrega', sol)} className="flex-1 py-3 rounded-xl bg-teal-600 text-white text-sm font-bold hover:bg-teal-700 transition-all flex items-center justify-center gap-2">
                 <Package2 size={15} /> Confirmar Entrega
@@ -938,6 +943,7 @@ export default function TransportesPipeline() {
   const confirmarAgendamento = useConfirmarAgendamento()
   const confirmarRecebimento = useConfirmarRecebimento()
   const despacharViagem = useDespacharViagem()
+  const criarViagem = useCriarViagem()
   const requestedItemId = searchParams.get('item')
   const requestedViagemId = searchParams.get('viagem')
 
@@ -1158,6 +1164,20 @@ export default function TransportesPipeline() {
       if (solsDaViagem.length > 0) {
         openDespachoViagem(sol.viagem_id, solsDaViagem)
       }
+    }
+    if (action === 'despacharSolo' && !sol.viagem_id) {
+      // Criar viagem automática com 1 item e abrir modal de despacho
+      criarViagem.mutateAsync({
+        solicitacaoIds: [sol.id],
+        origem_principal: sol.origem ?? '',
+        destino_final: sol.destino ?? '',
+      }).then(viagem => {
+        if (viagem?.id) {
+          openDespachoViagem(viagem.id, [{ ...sol, viagem_id: viagem.id }])
+        }
+      }).catch(() => {
+        showToast('error', 'Erro ao criar viagem para despacho')
+      })
     }
     if (action === 'confirmarEntrega') handleConfirmarEntrega([sol.id])
     if (action === 'confirmarRecebimento') setRecebModal(sol)
