@@ -1694,7 +1694,7 @@ export default function SolicitacoesPipeline() {
             allSolicitacoes={solicitacoes}
             onClose={() => { setShowPlanejamento([]); setEditandoViagemId(null) }}
             onSave={handleSavePlanejamento}
-            initialData={editandoViagemId ? {
+            initialData={(editandoViagemId || showPlanejamento[0]?.status === 'planejado') ? {
               modal: showPlanejamento[0]?.modal || undefined,
               motorista_nome: showPlanejamento[0]?.motorista_nome || undefined,
               veiculo_placa: showPlanejamento[0]?.veiculo_placa || undefined,
