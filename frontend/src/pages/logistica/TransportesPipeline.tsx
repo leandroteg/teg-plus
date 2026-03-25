@@ -1044,6 +1044,27 @@ export default function TransportesPipeline() {
     return result
   }, [activeItems])
 
+  // Para itens solo em aguardando_coleta, criar viagem antes de abrir o modal
+  const openDetail = async (sol: LogSolicitacao) => {
+    if (!sol.viagem_id && sol.status === 'aguardando_coleta') {
+      try {
+        const viagem = await criarViagem.mutateAsync({
+          solicitacaoIds: [sol.id],
+          origem_principal: sol.origem ?? '',
+          destino_final: sol.destino ?? '',
+          motorista_nome: sol.motorista_nome ?? undefined,
+          veiculo_placa: sol.veiculo_placa ?? undefined,
+          motorista_telefone: sol.motorista_telefone ?? undefined,
+        })
+        if (viagem?.id) {
+          setDetail({ ...sol, viagem_id: viagem.id, viagem })
+          return
+        }
+      } catch { /* fallback para modal simples */ }
+    }
+    setDetail(sol)
+  }
+
   const showToast = (type: 'success' | 'error', msg: string) => { setToast({ type, msg }); setTimeout(() => setToast(null), 4000) }
   const closeDetail = () => {
     setDetail(null)
@@ -1356,7 +1377,7 @@ export default function TransportesPipeline() {
                 <span className="w-[84px] shrink-0">Placa</span>
                 <span className="w-[64px] shrink-0 text-right">Data</span>
               </div>
-              {activeItems.map(sol => <TrRow key={sol.id} sol={sol} onClick={() => setDetail(sol)} isDark={isDark} isSelected={selectedIds.has(sol.id)} onSelect={toggleSelect} />)}
+              {activeItems.map(sol => <TrRow key={sol.id} sol={sol} onClick={() => openDetail(sol)} isDark={isDark} isSelected={selectedIds.has(sol.id)} onSelect={toggleSelect} />)}
             </>
           ) : (
             <div className="space-y-2 p-4">
@@ -1365,13 +1386,13 @@ export default function TransportesPipeline() {
                   key={`vg-${item.viagemId}`}
                   viagem={item.viagem}
                   solicitacoes={item.solicitacoes}
-                  onClick={sol => setDetail(sol)}
+                  onClick={sol => openDetail(sol)}
                   isDark={isDark}
                   selectedIds={selectedIds}
                   onSelect={toggleSelect}
                 />
               ) : (
-                <TrCard key={item.sol.id} sol={item.sol} onClick={() => setDetail(item.sol)} isDark={isDark} isSelected={selectedIds.has(item.sol.id)} onSelect={toggleSelect} />
+                <TrCard key={item.sol.id} sol={item.sol} onClick={() => openDetail(item.sol)} isDark={isDark} isSelected={selectedIds.has(item.sol.id)} onSelect={toggleSelect} />
               ))}
             </div>
           )}
