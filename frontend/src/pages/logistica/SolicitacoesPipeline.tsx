@@ -92,9 +92,9 @@ function exportCSV(items: LogSolicitacao[], stageName: string) {
 
 // ── Detail Modal ─────────────────────────────────────────────────────────────
 
-function DetailModal({ sol, onClose, onAction, isDark }: {
+function DetailModal({ sol, onClose, onAction, onEdit, isDark }: {
   sol: LogSolicitacao; onClose: () => void
-  onAction: (action: string, sol: LogSolicitacao) => void; isDark: boolean
+  onAction: (action: string, sol: LogSolicitacao) => void; onEdit?: () => void; isDark: boolean
 }) {
   const bg = isDark ? 'bg-[#1e293b]' : 'bg-white'
   const cardBg = isDark ? 'bg-white/[0.04]' : 'bg-slate-50'
@@ -341,9 +341,16 @@ function DetailModal({ sol, onClose, onAction, isDark }: {
               </button>
             )}
             {sol.status === 'planejado' && (
-              <button onClick={() => onAction('enviarAprovacao', sol)} className="flex-1 py-3 rounded-xl bg-amber-600 text-white text-sm font-bold hover:bg-amber-700 transition-all flex items-center justify-center gap-2">
-                <ShieldCheck size={15} /> Enviar p/ Aprovação
-              </button>
+              <>
+                {onEdit && (
+                  <button onClick={() => { onClose(); onEdit() }} className={`py-3 px-4 rounded-xl border text-sm font-semibold transition-all flex items-center gap-1.5 ${isDark ? 'border-white/[0.06] text-violet-400 hover:bg-violet-500/10' : 'border-violet-200 text-violet-600 hover:bg-violet-50'}`}>
+                    <FileText size={14} /> Editar
+                  </button>
+                )}
+                <button onClick={() => onAction('enviarAprovacao', sol)} className="flex-1 py-3 rounded-xl bg-amber-600 text-white text-sm font-bold hover:bg-amber-700 transition-all flex items-center justify-center gap-2">
+                  <ShieldCheck size={15} /> Enviar p/ Aprovação
+                </button>
+              </>
             )}
             {sol.status === 'aguardando_aprovacao' && (
               <button onClick={() => onAction('aprovar', sol)} className="flex-1 py-3 rounded-xl bg-emerald-600 text-white text-sm font-bold hover:bg-emerald-700 transition-all flex items-center justify-center gap-2">
@@ -1670,7 +1677,7 @@ export default function SolicitacoesPipeline() {
         </div>
       </div>
 
-      {detail && <DetailModal sol={detail} onClose={closeDetail} onAction={handleDetailAction} isDark={isDark} />}
+      {detail && <DetailModal sol={detail} onClose={closeDetail} onAction={handleDetailAction} onEdit={detail.status === 'planejado' ? () => { closeDetail(); setEditandoViagemId(null); setShowPlanejamento([detail]) } : undefined} isDark={isDark} />}
       {viagemDetail && <ViagemDetailModal item={viagemDetail} onClose={closeViagemDetail} onAction={handleViagemDetailAction} onEdit={() => handleEditViagem(viagemDetail)} isDark={isDark} />}
       {showNovaSolicitacao && (
         <NovaSolicitacaoModal
