@@ -741,9 +741,18 @@ export default function ExpedicaoPipeline() {
     try {
       const updatedAt = new Date().toISOString()
       for (const id of ids) {
+        // Buscar solicitação para determinar regra fiscal
+        const sol = solicitacoes.find(s => s.id === id)
+        const fiscalCtx = sol ? getDocumentoFiscalContext(sol) : null
+        const isRomaneio = fiscalCtx?.regra === 'romaneio' || fiscalCtx?.regra === 'indefinido'
+
         const { error } = await supabase
           .from('log_solicitacoes')
-          .update({ status: 'romaneio_emitido', updated_at: updatedAt })
+          .update({
+            status: 'romaneio_emitido',
+            doc_fiscal_tipo: isRomaneio ? 'romaneio' : (sol as any)?.doc_fiscal_tipo || 'nenhum',
+            updated_at: updatedAt,
+          })
           .eq('id', id)
         if (error) throw error
       }
@@ -782,9 +791,15 @@ export default function ExpedicaoPipeline() {
     if (action === 'solicitarNF') setNfModal(sol)
     if (action === 'concluir') {
       const updatedAt = new Date().toISOString()
+      const fiscalCtx = getDocumentoFiscalContext(sol)
+      const isRomaneio = fiscalCtx.regra === 'romaneio' || fiscalCtx.regra === 'indefinido'
       const nextStatus = await supabase
         .from('log_solicitacoes')
-        .update({ status: 'transporte_pendente', updated_at: updatedAt })
+        .update({
+          status: 'transporte_pendente',
+          doc_fiscal_tipo: isRomaneio ? 'romaneio' : sol.doc_fiscal_tipo || 'nenhum',
+          updated_at: updatedAt,
+        })
         .eq('id', sol.id)
 
       if (nextStatus.error) throw nextStatus.error
