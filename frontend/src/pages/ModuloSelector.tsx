@@ -7,7 +7,7 @@ import {
   // Sub-module icons
   Settings, HardHat, ShieldCheck, ShoppingCart, Truck,
   Package, Building2, Car, Banknote, BarChart3, FileText,
-  UserCog, Server, Bot, Target, Store, Receipt, CreditCard,
+  UserCog, UserSearch, Server, Bot, Target, Store, Receipt, CreditCard, Heart, Calculator,
   type LucideIcon,
 } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
@@ -103,7 +103,11 @@ const PILLARS: Pillar[] = [
     glow: 'rgba(139,92,246,0.16)',
     accent: '#A78BFA',
     subs: [
-      { key: 'rh', label: 'Gestão de Pessoas', desc: 'Headcount, R&S, Performance, Cultura, DP', Icon: UserCog, active: true, route: '/rh' },
+      { key: 'headcount', label: 'Headcount', desc: 'Admissão, colaboradores, movimentações e desligamento', Icon: Users, active: true, route: '/rh/headcount' },
+      { key: 'rs', label: 'R&S', desc: 'Recrutamento e seleção de talentos', Icon: UserSearch, active: false, route: '' },
+      { key: 'performance', label: 'Performance', desc: 'Avaliações, metas e feedbacks', Icon: Target, active: false, route: '' },
+      { key: 'cultura', label: 'Cultura', desc: 'Engajamento, clima e mural de recados', Icon: Heart, active: false, route: '' },
+      { key: 'dp', label: 'DP', desc: 'Folha, ponto e benefícios', Icon: Calculator, active: false, route: '' },
     ],
   },
   {

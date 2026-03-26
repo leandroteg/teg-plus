@@ -403,7 +403,8 @@ export default function App() {
           <Route element={<Layout />}>
             <Route path="/admin/usuarios" element={<AdminUsuarios />} />
             <Route path="/admin/integracoes" element={<Configuracoes />} />
-            <Route path="/admin/mural" element={<MuralAdmin />} />
+            <Route path="/admin/mural"  element={<MuralAdmin />} />
+            <Route path="/rh/cultura/mural" element={<MuralAdmin />} />
             <Route path="/admin/desenvolvimento" element={<Desenvolvimento />} />
           </Route>
         </Route>
