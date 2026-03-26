@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from 'react'
+import { useState, useCallback, useRef, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import {
   ChevronLeft, PlusCircle, Trash2, Send, CheckCircle, Info, AlertTriangle,
@@ -51,6 +51,10 @@ function ItemPricingTable({
   items: ItemPreco[]
   onChange: (items: ItemPreco[]) => void
 }) {
+  const [itemResults, setItemResults] = useState<Record<number, any[]>>({})
+  const [itemOpen, setItemOpen] = useState<Record<number, boolean>>({})
+  const itemTimerRef = useRef<Record<number, ReturnType<typeof setTimeout>>>({})
+
   const addItem = () =>
     onChange([...items, { descricao: '', qtd: 1, valor_unitario: 0, valor_total: 0 }])
 
@@ -71,6 +75,47 @@ function ItemPricingTable({
     })
     onChange(updated)
   }
+
+  const searchItem = useCallback((i: number, query: string) => {
+    updateItem(i, 'descricao', query)
+    if (itemTimerRef.current[i]) clearTimeout(itemTimerRef.current[i])
+    if (query.trim().length < 2) {
+      setItemResults(prev => ({ ...prev, [i]: [] }))
+      setItemOpen(prev => ({ ...prev, [i]: false }))
+      return
+    }
+    itemTimerRef.current[i] = setTimeout(async () => {
+      const { data } = await supabase
+        .from('est_itens')
+        .select('id, codigo, descricao, unidade, valor_medio')
+        .ilike('descricao', `%${query}%`)
+        .eq('ativo', true)
+        .order('descricao')
+        .limit(8)
+      setItemResults(prev => ({ ...prev, [i]: data || [] }))
+      setItemOpen(prev => ({ ...prev, [i]: (data?.length ?? 0) > 0 }))
+    }, 300)
+  }, [])
+
+  const selectItem = useCallback((i: number, est: any) => {
+    onChange(items.map((item, idx) => {
+      if (idx !== i) return item
+      const vu = est.valor_medio || 0
+      return {
+        ...item,
+        descricao: est.descricao,
+        valor_unitario: vu,
+        valor_total: Math.round(item.qtd * vu * 100) / 100,
+      }
+    }))
+    setItemOpen(prev => ({ ...prev, [i]: false }))
+  }, [items, onChange])
+
+  // Close dropdowns when items array shrinks
+  useEffect(() => {
+    setItemResults({})
+    setItemOpen({})
+  }, [items.length])
 
   const total = calcTotalItems(items)
   const fmtLocal = (v: number) => v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
@@ -102,12 +147,35 @@ function ItemPricingTable({
               key={i}
               className="grid grid-cols-[1fr_44px_80px_68px_24px] gap-1 px-2 py-1.5 border-b border-slate-50 last:border-0 items-center"
             >
-              <input
-                className="text-[11px] bg-white border border-slate-200 rounded px-1.5 py-1 outline-none focus:ring-1 focus:ring-teal-300 w-full"
-                placeholder="Descrição"
-                value={item.descricao}
-                onChange={e => updateItem(i, 'descricao', e.target.value)}
-              />
+              <div className="relative">
+                <input
+                  className="text-[11px] bg-white border border-slate-200 rounded px-1.5 py-1 outline-none focus:ring-1 focus:ring-teal-300 w-full"
+                  placeholder="Descrição"
+                  autoComplete="off"
+                  value={item.descricao}
+                  onChange={e => searchItem(i, e.target.value)}
+                  onFocus={() => {
+                    if (item.descricao.trim().length >= 2 && (itemResults[i]?.length ?? 0) > 0)
+                      setItemOpen(prev => ({ ...prev, [i]: true }))
+                  }}
+                  onBlur={() => setTimeout(() => setItemOpen(prev => ({ ...prev, [i]: false })), 150)}
+                />
+                {itemOpen[i] && (itemResults[i]?.length ?? 0) > 0 && (
+                  <div className="absolute z-50 left-0 w-64 mt-0.5 bg-white border border-slate-200 rounded-xl shadow-lg overflow-hidden max-h-48 overflow-y-auto">
+                    {itemResults[i].map((est: any) => (
+                      <button
+                        key={est.id}
+                        type="button"
+                        className="w-full text-left px-2.5 py-2 hover:bg-teal-50 transition-colors border-b border-slate-100 last:border-0"
+                        onMouseDown={() => selectItem(i, est)}
+                      >
+                        <p className="text-[11px] font-semibold text-slate-800 truncate">{est.descricao}</p>
+                        <p className="text-[10px] text-slate-400">{est.codigo} · {est.unidade}{est.valor_medio ? ` · ${est.valor_medio.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}` : ''}</p>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
               <input
                 type="number" min="0.001" step="any"
                 className="text-[11px] bg-white border border-slate-200 rounded px-1 py-1 text-center outline-none focus:ring-1 focus:ring-teal-300 w-full"
