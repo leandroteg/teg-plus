@@ -676,27 +676,34 @@ export default function EmitirPedidoModal({
             Cancelar
           </button>
           <button
-            onClick={() => onConfirm({
-              cotacaoId: cotacaoResolvida?.id || '',
-              fornecedorNome: cotacaoResolvida?.fornecedorNome || 'N/A',
-              valorTotal: totalParcelas,
-              compradorId: cotacaoResolvida?.compradorId,
-              classeFinanceiraId: classeSelecionada?.id,
-              classeFinanceira: classeSelecionada?.codigo,
-              centroCustoId: centroSelecionado?.id,
-              centroCusto: centroSelecionado?.codigo,
-              condicaoPagamento: condicaoPagamento || cotacaoResolvida?.condicaoPagamento || undefined,
-              observacoes,
-              dataPrevistaEntrega,
-              parcelasPreview: parcelasEditaveis.map((parcela) => ({
-                numero: parcela.numero,
-                valor: parcela.valor,
-                data_vencimento: parcela.data_vencimento,
-                descricao: parcela.tipo === 'adiantamento' ? 'Adiantamento' : parcela.descricao,
-                tipo: parcela.tipo,
-                status_inicial: parcela.status_inicial,
-              })),
-            })}
+            onClick={(e) => {
+              if (compraRecorrente && onSolicitarContrato) {
+                e.preventDefault()
+                onSolicitarContrato()
+              } else {
+                onConfirm({
+                  cotacaoId: cotacaoResolvida?.id || '',
+                  fornecedorNome: cotacaoResolvida?.fornecedorNome || 'N/A',
+                  valorTotal: totalParcelas,
+                  compradorId: cotacaoResolvida?.compradorId,
+                  classeFinanceiraId: classeSelecionada?.id,
+                  classeFinanceira: classeSelecionada?.codigo,
+                  centroCustoId: centroSelecionado?.id,
+                  centroCusto: centroSelecionado?.codigo,
+                  condicaoPagamento: condicaoPagamento || cotacaoResolvida?.condicaoPagamento || undefined,
+                  observacoes,
+                  dataPrevistaEntrega,
+                  parcelasPreview: parcelasEditaveis.map((parcela) => ({
+                    numero: parcela.numero,
+                    valor: parcela.valor,
+                    data_vencimento: parcela.data_vencimento,
+                    descricao: parcela.tipo === 'adiantamento' ? 'Adiantamento' : parcela.descricao,
+                    tipo: parcela.tipo,
+                    status_inicial: parcela.status_inicial,
+                  })),
+                })
+              }
+            }}
             disabled={
               isSubmitting ||
               isLoading ||
@@ -711,7 +718,6 @@ export default function EmitirPedidoModal({
             className={`inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-white text-sm font-bold disabled:opacity-50 ${
               compraRecorrente ? 'bg-indigo-600 hover:bg-indigo-700' : 'bg-teal-600 hover:bg-teal-700'
             }`}
-            onClick={compraRecorrente && onSolicitarContrato ? (e) => { e.preventDefault(); onSolicitarContrato() } : undefined}
           >
             {isSubmitting ? <Loader2 size={15} className="animate-spin" /> : <FileText size={15} />}
             {compraRecorrente ? 'Solicitar Contrato' : 'Emitir Pedido'}
