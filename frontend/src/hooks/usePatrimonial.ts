@@ -256,6 +256,72 @@ export function useCalcularDepreciacao() {
   })
 }
 
+// ── Transferências ───────────────────────────────────────────────────────────
+export function useTransferencias(imobilizadoId?: string) {
+  return useQuery<any[]>({
+    queryKey: ['pat-transferencias', imobilizadoId],
+    enabled: !!imobilizadoId,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('pat_transferencias')
+        .select('*')
+        .eq('imobilizado_id', imobilizadoId!)
+        .order('data_transferencia', { ascending: false })
+      if (error) return []
+      return data ?? []
+    },
+  })
+}
+
+export function useTransferirAtivo() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (payload: {
+      imobilizado_id: string
+      base_origem_id?: string | null
+      base_origem_nome?: string | null
+      base_destino_id: string
+      base_destino_nome: string
+      responsavel_id?: string | null
+      responsavel_nome?: string | null
+      motivo?: string
+      observacoes?: string
+    }) => {
+      // 1. Update the imobilizado's base
+      const { error: updErr } = await supabase
+        .from('pat_imobilizados')
+        .update({
+          base_id: payload.base_destino_id,
+          base_nome: payload.base_destino_nome,
+        })
+        .eq('id', payload.imobilizado_id)
+      if (updErr) throw updErr
+
+      // 2. Insert transfer record
+      const { error: insErr } = await supabase
+        .from('pat_transferencias')
+        .insert({
+          imobilizado_id: payload.imobilizado_id,
+          base_origem_id: payload.base_origem_id ?? null,
+          base_origem_nome: payload.base_origem_nome ?? null,
+          base_destino_id: payload.base_destino_id,
+          base_destino_nome: payload.base_destino_nome,
+          responsavel_id: payload.responsavel_id ?? null,
+          responsavel_nome: payload.responsavel_nome ?? null,
+          motivo: payload.motivo ?? null,
+          observacoes: payload.observacoes ?? null,
+        })
+      if (insErr) throw insErr
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['pat-imobilizados'] })
+      qc.invalidateQueries({ queryKey: ['pat-imobilizado'] })
+      qc.invalidateQueries({ queryKey: ['pat-transferencias'] })
+      qc.invalidateQueries({ queryKey: ['pat-kpis'] })
+    },
+  })
+}
+
 // ── KPIs ──────────────────────────────────────────────────────────────────────
 export function usePatrimonialKPIs() {
   return useQuery<PatrimonialKPIs>({

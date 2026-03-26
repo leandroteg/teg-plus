@@ -1,7 +1,8 @@
 import { useMemo, useState } from 'react'
-import { Archive, ArrowDownUp, Landmark, PackageCheck, TrendingDown } from 'lucide-react'
+import { Archive, ArrowDownUp, Landmark, PackageCheck, TrendingDown, MapPin } from 'lucide-react'
 import PatrimonialLegacy from '../estoque/Patrimonial'
 import { useImobilizados } from '../../hooks/usePatrimonial'
+import { useBases } from '../../hooks/useEstoque'
 import { useTheme } from '../../contexts/ThemeContext'
 
 const TABS = [
@@ -14,7 +15,11 @@ const TABS = [
 export default function PatrimonioPage() {
   const { isLightSidebar: isLight } = useTheme()
   const [tab, setTab] = useState(TABS[1].key)
-  const { data: imobilizados = [] } = useImobilizados()
+  const [filtroBase, setFiltroBase] = useState('')
+  const { data: bases = [] } = useBases()
+  const { data: imobilizados = [] } = useImobilizados(
+    filtroBase ? { base_id: filtroBase } : undefined
+  )
 
   const counts = useMemo(() => {
     return Object.fromEntries(TABS.map(t => [
@@ -28,6 +33,27 @@ export default function PatrimonioPage() {
       <div>
         <h1 className={`text-xl font-extrabold ${isLight ? 'text-slate-800' : 'text-white'}`}>{'Patrim\u00f4nio'}</h1>
         <p className={`text-xs mt-0.5 ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>{'Gest\u00e3o completa dos imobilizados por etapa do ciclo de vida'}</p>
+      </div>
+
+      {/* Filtro por Base */}
+      <div className="flex items-center gap-3">
+        <div className="flex items-center gap-1.5">
+          <MapPin size={13} className={isLight ? 'text-slate-400' : 'text-slate-500'} />
+          <select
+            value={filtroBase}
+            onChange={e => setFiltroBase(e.target.value)}
+            className={`px-3 py-2 rounded-xl border text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500/30 ${
+              isLight
+                ? 'border-slate-200 bg-white text-slate-600'
+                : 'border-white/[0.08] bg-white/[0.03] text-slate-300'
+            }`}
+          >
+            <option value="">Todas as Bases</option>
+            {bases.map(b => (
+              <option key={b.id} value={b.id}>{b.nome}</option>
+            ))}
+          </select>
+        </div>
       </div>
 
       <div className={`overflow-x-auto hide-scrollbar rounded-2xl border p-1 ${
