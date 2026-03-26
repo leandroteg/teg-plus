@@ -1137,14 +1137,15 @@ export function useConfirmarRecebimento() {
 
       if ((status === 'confirmado' || status === 'parcial') && destino === 'patrimonial') {
         // Criar registro patrimonial pendente
-        await supabase.from('pat_imobilizados').insert({
+        const { error: patErr } = await supabase.from('pat_imobilizados').insert({
           numero_patrimonio: `PAT-LOG-${Date.now().toString(36).toUpperCase()}`,
           descricao: `${sol?.descricao || sol?.numero || 'Item logístico'}`,
           categoria: 'GERAL',
           status: 'pendente_registro',
           responsavel_id: user?.id,
-          data_aquisicao: agora,
+          data_aquisicao: agora.split('T')[0],
         })
+        if (patErr) console.error('[Logística→Patrimonial] Erro ao criar imobilizado:', patErr)
       }
 
       if (status === 'confirmado' || status === 'parcial') {
