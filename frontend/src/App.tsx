@@ -103,7 +103,11 @@ import BasesCad from './pages/cadastros/Bases'
 
 // Módulo RH
 import RHLayout from './components/RHLayout'
-import RHHome from './pages/rh/RHHome'
+import RHPainel from './pages/rh/RHPainel'
+import RHAdmissao from './pages/rh/RHAdmissao'
+import RHColaboradores from './pages/rh/RHColaboradores'
+import RHMovimentacoes from './pages/rh/RHMovimentacoes'
+import RHDesligamento from './pages/rh/RHDesligamento'
 import MuralAdmin from './pages/rh/MuralAdmin'
 
 // Módulo Financeiro
@@ -271,8 +275,12 @@ export default function App() {
           {/* Módulo RH */}
           <Route element={<ModuleRoute moduleKey="rh" />}>
             <Route element={<RHLayout />}>
-              <Route path="/rh"        element={<RHHome />} />
-              <Route path="/rh/mural"  element={<MuralAdmin />} />
+              <Route path="/rh"                element={<RHPainel />} />
+              <Route path="/rh/admissao"       element={<RHAdmissao />} />
+              <Route path="/rh/colaboradores"  element={<RHColaboradores />} />
+              <Route path="/rh/movimentacoes"  element={<RHMovimentacoes />} />
+              <Route path="/rh/desligamento"   element={<RHDesligamento />} />
+              <Route path="/rh/mural"          element={<MuralAdmin />} />
             </Route>
           </Route>
 
