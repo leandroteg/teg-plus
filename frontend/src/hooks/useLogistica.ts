@@ -1122,16 +1122,17 @@ export function useConfirmarRecebimento() {
         .single()
 
       if ((status === 'confirmado' || status === 'parcial') && destino === 'consumo' && base_id) {
-        // Criar entrada no estoque
-        await supabase.from('est_movimentacoes').insert({
+        // Criar entrada direta no estoque
+        const { error: estErr } = await supabase.from('est_movimentacoes').insert({
           tipo: 'entrada',
           base_id,
           quantidade: sol?.volumes_total || 1,
-          descricao: `Recebimento logístico ${sol?.numero || ''} — ${sol?.descricao || ''}`,
+          observacao: `Recebimento logístico ${sol?.numero || ''} — ${sol?.descricao || ''}`,
           obra_nome: sol?.obra_nome || null,
           centro_custo: sol?.centro_custo || null,
           responsavel_id: user?.id,
         })
+        if (estErr) console.error('[Logística→Estoque] Erro ao criar movimentação:', estErr)
       }
 
       if ((status === 'confirmado' || status === 'parcial') && destino === 'patrimonial') {
