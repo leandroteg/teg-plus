@@ -110,6 +110,8 @@ import RHAdmissao from './pages/rh/RHAdmissao'
 import RHColaboradores from './pages/rh/RHColaboradores'
 import RHMovimentacoes from './pages/rh/RHMovimentacoes'
 import RHDesligamento from './pages/rh/RHDesligamento'
+import CulturaLayout from './components/CulturaLayout'
+import CulturaHome from './pages/rh/CulturaHome'
 import MuralAdmin from './pages/rh/MuralAdmin'
 
 // Módulo Financeiro
@@ -288,6 +290,11 @@ export default function App() {
               <Route path="/rh/headcount/movimentacoes"  element={<RHMovimentacoes />} />
               <Route path="/rh/headcount/desligamento"   element={<RHDesligamento />} />
             </Route>
+            {/* Sub-módulo Cultura */}
+            <Route element={<CulturaLayout />}>
+              <Route path="/rh/cultura"       element={<CulturaHome />} />
+              <Route path="/rh/cultura/mural" element={<MuralAdmin />} />
+            </Route>
           </Route>
 
           {/* Módulo Contratos */}
@@ -403,8 +410,7 @@ export default function App() {
           <Route element={<Layout />}>
             <Route path="/admin/usuarios" element={<AdminUsuarios />} />
             <Route path="/admin/integracoes" element={<Configuracoes />} />
-            <Route path="/admin/mural"  element={<MuralAdmin />} />
-            <Route path="/rh/cultura/mural" element={<MuralAdmin />} />
+            <Route path="/admin/mural" element={<MuralAdmin />} />
             <Route path="/admin/desenvolvimento" element={<Desenvolvimento />} />
           </Route>
         </Route>

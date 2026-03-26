@@ -60,7 +60,7 @@ const SUB_MODULES: SubModule[] = [
     desc: 'Engajamento, clima organizacional, endomarketing e mural de recados',
     icon: Heart,
     route: '/rh/cultura',
-    active: false,
+    active: true,
     color: 'text-pink-500',
     bgLight: 'bg-pink-50 border-pink-200',
     bgDark: 'bg-pink-500/10 border-pink-500/25',
