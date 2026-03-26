@@ -103,6 +103,8 @@ import BasesCad from './pages/cadastros/Bases'
 
 // Módulo RH
 import RHLayout from './components/RHLayout'
+import RHHome from './pages/rh/RHHome'
+import HeadcountLayout from './components/HeadcountLayout'
 import RHPainel from './pages/rh/RHPainel'
 import RHAdmissao from './pages/rh/RHAdmissao'
 import RHColaboradores from './pages/rh/RHColaboradores'
@@ -274,13 +276,17 @@ export default function App() {
 
           {/* Módulo RH */}
           <Route element={<ModuleRoute moduleKey="rh" />}>
+            {/* Hub de sub-módulos */}
             <Route element={<RHLayout />}>
-              <Route path="/rh"                element={<RHPainel />} />
-              <Route path="/rh/admissao"       element={<RHAdmissao />} />
-              <Route path="/rh/colaboradores"  element={<RHColaboradores />} />
-              <Route path="/rh/movimentacoes"  element={<RHMovimentacoes />} />
-              <Route path="/rh/desligamento"   element={<RHDesligamento />} />
-              <Route path="/rh/mural"          element={<MuralAdmin />} />
+              <Route path="/rh" element={<RHHome />} />
+            </Route>
+            {/* Sub-módulo Headcount */}
+            <Route element={<HeadcountLayout />}>
+              <Route path="/rh/headcount"                element={<RHPainel />} />
+              <Route path="/rh/headcount/admissao"       element={<RHAdmissao />} />
+              <Route path="/rh/headcount/colaboradores"  element={<RHColaboradores />} />
+              <Route path="/rh/headcount/movimentacoes"  element={<RHMovimentacoes />} />
+              <Route path="/rh/headcount/desligamento"   element={<RHDesligamento />} />
             </Route>
           </Route>
 
@@ -397,6 +403,7 @@ export default function App() {
           <Route element={<Layout />}>
             <Route path="/admin/usuarios" element={<AdminUsuarios />} />
             <Route path="/admin/integracoes" element={<Configuracoes />} />
+            <Route path="/admin/mural" element={<MuralAdmin />} />
             <Route path="/admin/desenvolvimento" element={<Desenvolvimento />} />
           </Route>
         </Route>

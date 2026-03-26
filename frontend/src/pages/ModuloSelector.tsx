@@ -103,8 +103,7 @@ const PILLARS: Pillar[] = [
     glow: 'rgba(139,92,246,0.16)',
     accent: '#A78BFA',
     subs: [
-      { key: 'rh', label: 'Recursos Humanos', desc: 'Colaboradores, férias e mural', Icon: UserCog, active: true, route: '/rh', adminOnly: true },
-      { key: 'dp', label: 'Depto. Pessoal', desc: 'Folha, ponto e benefícios', Icon: Users, active: false, route: '' },
+      { key: 'rh', label: 'Gestão de Pessoas', desc: 'Headcount, R&S, Performance, Cultura, DP', Icon: UserCog, active: true, route: '/rh' },
     ],
   },
   {
