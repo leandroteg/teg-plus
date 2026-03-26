@@ -3,7 +3,7 @@ import {
   Landmark, Plus, Search, X, Save, Loader2,
   TrendingDown, AlertTriangle, CheckCircle2, Wrench, Truck,
   ArrowLeftRight, FileText, ChevronDown, ChevronRight, RefreshCw,
-  LayoutGrid, LayoutList,
+  LayoutGrid, LayoutList, MapPin,
 } from 'lucide-react'
 import {
   useImobilizados, useSalvarImobilizado, useBaixarImobilizado,
@@ -65,11 +65,13 @@ export default function Patrimonial({
   const [showDepreciarModal, setShowDepreciarModal] = useState(false)
   const [depreciarCompetencia, setDepreciarCompetencia] = useState(COMPETENCIA)
   const [transferirAtivo, setTransferirAtivo] = useState<PatImobilizado | null>(null)
+  const [filtroBase, setFiltroBase] = useState<string>('')
 
   const filtroAtivo = forcedStatusFiltro ?? statusFiltro
-  const { data: imobs = [], isLoading } = useImobilizados(
-    filtroAtivo ? { status: filtroAtivo } : undefined
-  )
+  const { data: imobs = [], isLoading } = useImobilizados({
+    ...(filtroAtivo ? { status: filtroAtivo } : {}),
+    ...(filtroBase ? { base_id: filtroBase } : {}),
+  })
   const { data: kpis } = usePatrimonialKPIs()
   const { data: bases = [] } = useBases()
   const salvar = useSalvarImobilizado()
@@ -158,7 +160,7 @@ export default function Patrimonial({
           {[
             { color: 'bg-blue-500',   val: kpis.total_imobilizados, valCls: 'text-blue-600',   lbl: 'Total Ativos' },
             { color: 'bg-indigo-500', val: fmt(kpis.valor_total_liquido), valCls: 'text-indigo-600', lbl: 'Valor L\u00edquido' },
-            { color: 'bg-amber-500',  val: kpis.imobilizados_em_manutencao, valCls: 'text-amber-600', lbl: 'Em Manuten\u00e7\u00e3o' },
+            { color: 'bg-amber-500',  val: fmt(kpis.depreciacao_acumulada ?? 0), valCls: 'text-amber-600', lbl: 'Deprecia\u00e7\u00e3o Acum.' },
             { color: 'bg-red-500',    val: kpis.termos_pendentes, valCls: 'text-red-600',    lbl: 'Termos Pendentes' },
           ].map(({ color, val, valCls, lbl }) => (
             <div key={lbl} className={`rounded-2xl border overflow-hidden flex ${card}`}>
@@ -185,6 +187,21 @@ export default function Patrimonial({
               ${isLight ? 'border-slate-200 bg-white text-slate-800' : 'border-white/[0.08] bg-white/[0.03] text-slate-200 placeholder:text-slate-500'}`}
           />
         </div>
+        <select
+          value={filtroBase}
+          onChange={e => setFiltroBase(e.target.value)}
+          className={`px-3 py-2 rounded-xl border text-xs font-semibold
+            focus:outline-none focus:ring-2 focus:ring-violet-500/30
+            ${filtroBase
+              ? isLight ? 'border-violet-300 bg-violet-50 text-violet-700' : 'border-violet-400/40 bg-violet-500/10 text-violet-300'
+              : isLight ? 'border-slate-200 bg-white text-slate-600' : 'border-white/[0.08] bg-white/[0.03] text-slate-300'
+            }`}
+        >
+          <option value="">Todas as Bases</option>
+          {bases.filter(b => b.ativa).map(b => (
+            <option key={b.id} value={b.id}>{b.codigo ? `${b.codigo} — ${b.nome}` : b.nome}</option>
+          ))}
+        </select>
         {!forcedStatusFiltro && !showDepreciadosOnly && (
           <select
             value={statusFiltro}
@@ -454,11 +471,15 @@ function ImobilizadoCard({
             </span>
           </div>
           <p className={`text-xs mt-0.5 truncate ${isLight ? 'text-slate-600' : 'text-slate-300'}`}>{imob.descricao}</p>
-          <p className={`text-[10px] ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>
-            {imob.categoria}
-            {imob.responsavel_nome ? ` - ${imob.responsavel_nome}` : ''}
-            {imob.base_nome ? ` - ${imob.base_nome}` : ''}
-          </p>
+          <div className={`flex items-center gap-2 text-[10px] ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>
+            <span>{imob.categoria}</span>
+            {imob.responsavel_nome && <span>· {imob.responsavel_nome}</span>}
+            {imob.base_nome && (
+              <span className="inline-flex items-center gap-0.5 text-violet-500 font-semibold">
+                <MapPin size={9} /> {imob.base_nome}
+              </span>
+            )}
+          </div>
         </div>
         <div className="text-right shrink-0 mr-2 hidden sm:block">
           <p className={`text-sm font-extrabold ${isLight ? 'text-slate-700' : 'text-slate-200'}`}>{fmt(imob.valor_atual ?? imob.valor_aquisicao)}</p>
@@ -540,7 +561,10 @@ function ImobilizadoTableRow({
       <td className={`px-4 py-2 ${isLight ? 'text-slate-600' : 'text-slate-300'}`}>
           <div className="min-w-[140px]">
             <p>{imob.responsavel_nome || '--'}</p>
-            <p className={`text-[11px] ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>{imob.base_nome || 'Sem base'}</p>
+            <p className={`text-[11px] flex items-center gap-0.5 ${imob.base_nome ? 'text-violet-500 font-semibold' : isLight ? 'text-slate-400' : 'text-slate-500'}`}>
+              {imob.base_nome && <MapPin size={9} />}
+              {imob.base_nome || 'Sem base'}
+            </p>
           </div>
         </td>
       <td className={`px-4 py-2 text-right font-extrabold ${isLight ? 'text-slate-700' : 'text-slate-200'}`}>
