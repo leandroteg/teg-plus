@@ -472,6 +472,11 @@ export default function CotacaoForm() {
   const [cnpjStatus, setCnpjStatus] = useState<Record<number, { ok: boolean; msg: string }>>({})
   const cnpjLastRef = useRef<Record<number, string>>({})
 
+  // ── Fornecedor autocomplete state ─────────────────────────────────────────
+  const [fornResults, setFornResults] = useState<Record<number, any[]>>({})
+  const [fornOpen, setFornOpen] = useState<Record<number, boolean>>({})
+  const searchTimerRef = useRef<Record<number, ReturnType<typeof setTimeout>>>({})
+
   const handleCnpjLookup = useCallback(async (idx: number, rawCnpj: string) => {
     const digits = rawCnpj.replace(/\D/g, '')
     if (digits.length !== 14) return
@@ -522,6 +527,37 @@ export default function CotacaoForm() {
 
   const updateFornecedor = (idx: number, field: keyof FornecedorForm, value: string | number) =>
     setFornecedores(prev => prev.map((f, i) => i === idx ? { ...f, [field]: value } : f))
+
+  const searchFornecedor = useCallback((idx: number, query: string) => {
+    setFornecedores(prev => prev.map((f, i) => i === idx ? { ...f, fornecedor_nome: query } : f))
+    if (searchTimerRef.current[idx]) clearTimeout(searchTimerRef.current[idx])
+    if (query.trim().length < 2) {
+      setFornResults(prev => ({ ...prev, [idx]: [] }))
+      setFornOpen(prev => ({ ...prev, [idx]: false }))
+      return
+    }
+    searchTimerRef.current[idx] = setTimeout(async () => {
+      const { data } = await supabase
+        .from('cmp_fornecedores')
+        .select('id, nome_fantasia, razao_social, cnpj, telefone, email, contato_nome, cidade, uf')
+        .or(`nome_fantasia.ilike.%${query}%,razao_social.ilike.%${query}%`)
+        .eq('ativo', true)
+        .limit(8)
+      setFornResults(prev => ({ ...prev, [idx]: data || [] }))
+      setFornOpen(prev => ({ ...prev, [idx]: (data?.length ?? 0) > 0 }))
+    }, 300)
+  }, [])
+
+  const selectFornecedor = useCallback((idx: number, f: any) => {
+    const contato = [f.telefone, f.email].filter(Boolean).join(' / ')
+    setFornecedores(prev => prev.map((item, i) => i !== idx ? item : {
+      ...item,
+      fornecedor_nome: f.nome_fantasia || f.razao_social || '',
+      fornecedor_cnpj: f.cnpj || '',
+      fornecedor_contato: contato || f.contato_nome || '',
+    }))
+    setFornOpen(prev => ({ ...prev, [idx]: false }))
+  }, [])
 
   const updateFornecedorItems = useCallback((idx: number, itens: ItemPreco[]) => {
     setFornecedores(prev => prev.map((f, i) => {
@@ -805,16 +841,42 @@ export default function CotacaoForm() {
           </div>
 
           <div className="px-4 pb-4 space-y-3">
-            <input
-              required={idx < minCot && !semCotacoesMinimas}
-              className={`w-full border rounded-xl px-3 py-2.5 text-sm font-semibold focus:ring-2 focus:ring-teal-300 focus:border-teal-400 outline-none transition-shadow ${
-                triedSubmit && !forn.fornecedor_nome.trim() && idx < minCot && !semCotacoesMinimas
-                  ? 'border-red-300 bg-red-50/30' : 'border-slate-200'
-              }`}
-              placeholder="Nome do fornecedor *"
-              value={forn.fornecedor_nome}
-              onChange={e => updateFornecedor(idx, 'fornecedor_nome', e.target.value)}
-            />
+            <div className="relative">
+              <input
+                required={idx < minCot && !semCotacoesMinimas}
+                autoComplete="off"
+                className={`w-full border rounded-xl px-3 py-2.5 text-sm font-semibold focus:ring-2 focus:ring-teal-300 focus:border-teal-400 outline-none transition-shadow ${
+                  triedSubmit && !forn.fornecedor_nome.trim() && idx < minCot && !semCotacoesMinimas
+                    ? 'border-red-300 bg-red-50/30' : 'border-slate-200'
+                }`}
+                placeholder="Nome do fornecedor *"
+                value={forn.fornecedor_nome}
+                onChange={e => searchFornecedor(idx, e.target.value)}
+                onFocus={() => {
+                  if (forn.fornecedor_nome.trim().length >= 2 && (fornResults[idx]?.length ?? 0) > 0)
+                    setFornOpen(prev => ({ ...prev, [idx]: true }))
+                }}
+                onBlur={() => setTimeout(() => setFornOpen(prev => ({ ...prev, [idx]: false })), 150)}
+              />
+              {fornOpen[idx] && (fornResults[idx]?.length ?? 0) > 0 && (
+                <div className="absolute z-50 w-full mt-1 bg-white border border-slate-200 rounded-xl shadow-lg overflow-hidden max-h-56 overflow-y-auto">
+                  {fornResults[idx].map((f: any) => (
+                    <button
+                      key={f.id}
+                      type="button"
+                      className="w-full text-left px-3 py-2.5 hover:bg-teal-50 transition-colors border-b border-slate-100 last:border-0"
+                      onMouseDown={() => selectFornecedor(idx, f)}
+                    >
+                      <p className="text-sm font-semibold text-slate-800 truncate">{f.nome_fantasia || f.razao_social}</p>
+                      {f.nome_fantasia && f.razao_social && f.nome_fantasia !== f.razao_social && (
+                        <p className="text-[11px] text-slate-400 truncate">{f.razao_social}</p>
+                      )}
+                      <p className="text-[10px] text-slate-400">{[f.cidade, f.uf].filter(Boolean).join(' – ')}{f.cnpj ? ` · ${f.cnpj}` : ''}</p>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
 
             <div className="grid grid-cols-2 gap-2">
               <div className="relative">
