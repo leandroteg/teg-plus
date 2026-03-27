@@ -450,6 +450,14 @@ function GenericPendingCard({ aprovacao, aprovadorNome, aprovadorEmail }: {
   const handleDecision = async (decisao: 'aprovada' | 'rejeitada') => {
     setAction(decisao)
     try {
+      // Build selectedItemIds array for lote approval so useDecisaoGenerica
+      // respects per-item decisions (Bug #181: rejected items were being approved)
+      const selectedItemIdsArray = decisao === 'aprovada'
+        && aprovacao.pagamento_detalhes?.is_lote
+        && aprovacao.pagamento_detalhes.itens?.length
+        ? Array.from(selectedItemIds)
+        : undefined
+
       await mutation.mutateAsync({
         aprovacaoId: aprovacao.id,
         entidadeId: aprovacao.entidade_id,
@@ -461,24 +469,8 @@ function GenericPendingCard({ aprovacao, aprovadorNome, aprovadorEmail }: {
         observacao: observacao || undefined,
         aprovadorNome,
         aprovadorEmail,
+        selectedItemIds: selectedItemIdsArray,
       })
-
-      // After generic approval succeeds, apply per-item decisions for lotes
-      if (decisao === 'aprovada' && aprovacao.pagamento_detalhes?.is_lote && aprovacao.pagamento_detalhes.itens?.length) {
-        const allItems = aprovacao.pagamento_detalhes.itens
-        for (const item of allItems) {
-          const itemDecisao = selectedItemIds.has(item.id) ? 'aprovado' : 'rejeitado'
-          await supabase
-            .from('fin_lote_itens')
-            .update({
-              decisao: itemDecisao,
-              decidido_por: perfil?.nome ?? aprovadorNome ?? 'Aprovador',
-              decidido_em: new Date().toISOString(),
-            })
-            .eq('lote_id', aprovacao.entidade_id)
-            .eq('cp_id', item.id)
-        }
-      }
     } catch { /* error handled by mutation state */ }
   }
 

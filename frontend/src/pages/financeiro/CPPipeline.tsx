@@ -2909,7 +2909,7 @@ export default function CPPipeline() {
       .filter((lote): lote is LotePagamento => !!lote && lote.status === 'montando')
 
     if (lotesMontando.length === 0) {
-      showToast('error', 'Nenhum lote montando encontrado na selecao')
+      showToast('error', 'Nenhum lote montando encontrado na seleção')
       return
     }
 
@@ -2917,10 +2917,10 @@ export default function CPPipeline() {
       for (const lote of lotesMontando) {
         await enviarLoteMut.mutateAsync({ loteId: lote.id, lote })
       }
-      showToast('success', `${lotesMontando.length} lote(s) enviado(s) para aprovacao`)
+      showToast('success', `${lotesMontando.length} lote(s) enviado(s) para aprovação`)
       setSelectedIds(new Set())
     } catch {
-      showToast('error', 'Erro ao enviar lote para aprovacao')
+      showToast('error', 'Erro ao enviar lote para aprovação')
     }
   }
 
@@ -3004,7 +3004,11 @@ export default function CPPipeline() {
         else handleConfirmarPagamento(ids)
         break
       }
-      case 'pago': handleConciliar(ids); break
+      case 'pago':
+        if (window.confirm(`Conciliar ${ids.length} título(s) selecionado(s)?`)) {
+          handleConciliar(ids)
+        }
+        break
     }
   }
 
