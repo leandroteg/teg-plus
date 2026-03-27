@@ -77,11 +77,13 @@ function CardBadge({ bandeira, ultimos4, nome }: { bandeira: BandeiraCartao; ult
 function ApontamentoModal({
   isDark,
   editing,
+  nextIndex,
   onClose,
   onSaved,
 }: {
   isDark: boolean
   editing: ApontamentoCartao | null
+  nextIndex: number
   onClose: () => void
   onSaved: (msg: string) => void
 }) {
@@ -162,6 +164,11 @@ function ApontamentoModal({
               <h3 className={`text-base font-bold ${isDark ? 'text-white' : 'text-slate-800'}`}>
                 {editing ? 'Editar Apontamento' : 'Novo Apontamento'}
               </h3>
+              {!editing && (
+                <p className="text-[10px] text-emerald-500 font-semibold mt-0.5">
+                  Lancamento #{nextIndex}
+                </p>
+              )}
               <p className="text-[10px] text-slate-400">Registre o gasto no cartão corporativo</p>
             </div>
           </div>
@@ -367,6 +374,7 @@ export default function ApontamentosCartao() {
   const countRascunho = apontamentos.filter(a => a.status === 'rascunho').length
   const countEnviado  = apontamentos.filter(a => a.status === 'enviado').length
   const countConc     = apontamentos.filter(a => a.status === 'conciliado').length
+  const nextApontamentoIndex = apontamentos.length + 1
 
   function showToast(type: 'success' | 'error', msg: string) {
     setToast({ type, msg })
@@ -541,7 +549,7 @@ export default function ApontamentosCartao() {
         </div>
       ) : (
         <div className="space-y-2">
-          {filtered.map(a => {
+          {filtered.map((a, index) => {
             const cfg = STATUS_CONFIG[a.status]
             const StatusIcon = cfg.icon
             const isEditable = a.status === 'rascunho'
@@ -552,6 +560,12 @@ export default function ApontamentosCartao() {
                 className={`rounded-xl border px-4 py-3 flex items-center gap-3 transition-all
                   ${isDark ? 'bg-[#1e293b] border-white/[0.06] hover:border-white/[0.12]' : 'bg-white border-slate-200 hover:border-slate-300 hover:shadow-sm'}`}
               >
+                <div className={`w-8 shrink-0 text-sm font-extrabold text-right ${
+                  isDark ? 'text-slate-400' : 'text-slate-500'
+                }`}>
+                  {index + 1}
+                </div>
+
                 {/* Status dot */}
                 <div className={`w-2 h-2 rounded-full shrink-0 ${
                   a.status === 'conciliado' ? 'bg-emerald-500' :
@@ -677,6 +691,7 @@ export default function ApontamentosCartao() {
         <ApontamentoModal
           isDark={isDark}
           editing={editing}
+          nextIndex={nextApontamentoIndex}
           onClose={() => { setShowModal(false); setEditing(null) }}
           onSaved={msg => showToast('success', msg)}
         />
