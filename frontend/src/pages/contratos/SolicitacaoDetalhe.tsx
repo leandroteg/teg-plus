@@ -1010,7 +1010,10 @@ export default function SolicitacaoDetalhe() {
   }
 
   const handleLiberarExecucao = async () => {
-    const parcelasNormalizadas = normalizarParcelasPlanejadas(parcelasPlanejadas, valorContrato)
+    const parcelasNormalizadas = normalizarParcelasPlanejadas(
+      parcelasPlanejadas.filter(p => p.data_vencimento && p.valor > 0),
+      valorContrato
+    )
     const diferenca = calcularDiferencaParcelas(parcelasNormalizadas, valorContrato)
 
     if (!parcelasNormalizadas.length) {
