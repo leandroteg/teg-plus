@@ -218,7 +218,7 @@ function ContratoCard({ contrato, onToast }: { contrato: Contrato; onToast: (typ
         {/* Action buttons */}
         <div className="flex flex-wrap gap-2 mt-3">
           <button
-            onClick={() => nav(`/contratos/previsao?contrato=${contrato.id}`)}
+            onClick={() => nav(`/contratos/detalhe/${contrato.id}`)}
             className="flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl
               bg-indigo-50 border border-indigo-200 text-[11px] font-semibold text-indigo-600
               hover:bg-indigo-100 transition-all"
@@ -465,7 +465,7 @@ function TabContratos() {
                   const grupoLabel = GRUPO_CONTRATO_LABEL?.[c.grupo_contrato as any] ?? c.grupo_contrato ?? '—'
                   const contraparte = c.fornecedor?.razao_social || c.fornecedor?.nome_fantasia || c.cliente?.nome || (c as any).solicitacao?.contraparte_nome || '—'
                   return (
-                    <tr key={c.id} onClick={() => nav(`/contratos/previsao?contrato=${c.id}`)} className="hover:bg-slate-50/80 transition-colors cursor-pointer">
+                    <tr key={c.id} onClick={() => nav(`/contratos/detalhe/${c.id}`)} className="hover:bg-slate-50/80 transition-colors cursor-pointer">
                       <td className="px-3 py-2.5">
                         <span className="text-[10px] font-mono font-semibold text-indigo-600 bg-indigo-50 rounded-md px-1.5 py-0.5 whitespace-nowrap">{c.numero}</span>
                       </td>
@@ -497,7 +497,7 @@ function TabContratos() {
                         <span className="text-[11px] text-slate-400">{c.data_fim_previsto ? fmtData(c.data_fim_previsto) : '—'}</span>
                       </td>
                       <td className="px-3 py-2.5 text-center">
-                        <button onClick={e => { e.stopPropagation(); nav(`/contratos/previsao?contrato=${c.id}`) }}
+                        <button onClick={e => { e.stopPropagation(); nav(`/contratos/detalhe/${c.id}`) }}
                           className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[10px] font-semibold text-indigo-600 bg-indigo-50 border border-indigo-100 hover:bg-indigo-100 transition-all">
                           <Eye size={11} /> Ver
                         </button>
