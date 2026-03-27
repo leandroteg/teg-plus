@@ -1,7 +1,7 @@
 import { useNavigate } from 'react-router-dom'
 import {
   CreditCard, Plus, ClipboardList,
-  Clock, CheckCircle2, Check, TrendingUp,
+  CheckCircle2, Check, TrendingUp,
 } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
 import { useApontamentosCartao } from '../../hooks/useCartoes'
@@ -14,7 +14,6 @@ export default function ApontamentosHome() {
   const navigate = useNavigate()
 
   const { data: todos       = [] } = useApontamentosCartao()
-  const { data: rascunhos   = [] } = useApontamentosCartao({ status: 'rascunho' })
   const { data: enviados    = [] } = useApontamentosCartao({ status: 'enviado' })
   const { data: conciliados = [] } = useApontamentosCartao({ status: 'conciliado' })
 
@@ -28,13 +27,6 @@ export default function ApontamentosHome() {
       icon: TrendingUp,
       color: dark ? 'text-violet-400' : 'text-violet-600',
       bg:    dark ? 'bg-violet-500/10' : 'bg-violet-50',
-    },
-    {
-      label: 'Rascunhos',
-      value: rascunhos.length,
-      icon: Clock,
-      color: dark ? 'text-slate-400' : 'text-slate-600',
-      bg:    dark ? 'bg-slate-500/10' : 'bg-slate-50',
     },
     {
       label: 'Enviados',
@@ -74,7 +66,7 @@ export default function ApontamentosHome() {
       </div>
 
       {/* KPIs */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {kpis.map(k => (
           <div
             key={k.label}
