@@ -8,6 +8,7 @@ import {
   useAprovarAdiantamento,
 } from '../../hooks/useObras'
 import { useLookupObras } from '../../hooks/useLookups'
+import NumericInput from '../../components/NumericInput'
 import { supabase } from '../../services/supabase'
 import type { StatusAdiantamento } from '../../types/obras'
 
@@ -325,7 +326,7 @@ export default function Adiantamentos() {
               </div>
               <div>
                 <label className={labelClass}>Valor Solicitado (R$) *</label>
-                <input type="number" value={form.valor_solicitado} onChange={e => setForm(f => ({ ...f, valor_solicitado: Number(e.target.value) }))} className={inputClass} min={0} step="0.01" />
+                <NumericInput value={form.valor_solicitado} onChange={v => setForm(f => ({ ...f, valor_solicitado: v }))} className={inputClass} min={0} step={0.01} />
               </div>
               <div>
                 <label className={labelClass}>Finalidade *</label>
@@ -380,7 +381,7 @@ export default function Adiantamentos() {
             </div>
             <div>
               <label className={labelClass}>Valor Aprovado (R$) *</label>
-              <input type="number" value={approveVal} onChange={e => setApproveVal(Number(e.target.value))} className={inputClass} min={0} step="0.01" />
+              <NumericInput value={approveVal} onChange={setApproveVal} className={inputClass} min={0} step={0.01} />
             </div>
             <div className="flex justify-end gap-3 mt-6">
               <button onClick={() => setShowApproveModal(null)} className={`px-4 py-2 rounded-xl text-sm font-semibold transition-colors ${isLight

@@ -10,6 +10,7 @@ import {
 } from '../../hooks/useEstoque'
 import { useTheme } from '../../contexts/ThemeContext'
 import type { NovaMovimentacaoPayload, TipoMovimentacao } from '../../types/estoque'
+import NumericInput from '../../components/NumericInput'
 
 const TIPO_CONFIG: Record<TipoMovimentacao, { label: string; cor: string; bg: string; icon: typeof ArrowLeftRight }> = {
   entrada:           { label: 'Entrada',        cor: 'text-emerald-700', bg: 'bg-emerald-50', icon: ArrowDownCircle  },
@@ -273,14 +274,14 @@ export default function Movimentacoes() {
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className={`block text-xs font-bold mb-1 ${isLight ? 'text-slate-600' : 'text-slate-300'}`}>Quantidade *</label>
-                  <input type="number" min={0.001} step={0.001} value={payload.quantidade ?? 1}
-                    onChange={e => set('quantidade', Number(e.target.value))}
+                  <NumericInput min={0.001} step={0.001} value={payload.quantidade ?? 1}
+                    onChange={v => set('quantidade', v)}
                     className={inputCls} />
                 </div>
                 <div>
                   <label className={`block text-xs font-bold mb-1 ${isLight ? 'text-slate-600' : 'text-slate-300'}`}>Valor Unit. (R$)</label>
-                  <input type="number" min={0} step={0.01} value={payload.valor_unitario || ''}
-                    onChange={e => set('valor_unitario', Number(e.target.value))}
+                  <NumericInput min={0} step={0.01} value={payload.valor_unitario ?? 0}
+                    onChange={v => set('valor_unitario', v)}
                     className={inputCls} />
                 </div>
               </div>

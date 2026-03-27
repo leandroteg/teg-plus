@@ -16,6 +16,7 @@ import EmitirPedidoModal from '../components/EmitirPedidoModal'
 import { supabase } from '../services/supabase'
 import { api } from '../services/api'
 import type { CnpjResult } from '../services/api'
+import NumericInput from '../components/NumericInput'
 
 const fmt = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
 
@@ -994,9 +995,9 @@ export default function CotacaoForm() {
                 </label>
                 <div className="relative">
                   <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-slate-400 font-semibold">R$</span>
-                  <input
+                  <NumericInput
                     required={idx < minCot && !semCotacoesMinimas}
-                    type="number" min="0.01" step="0.01"
+                    min={0.01} step={0.01}
                     readOnly={forn.itens_precos.length > 0}
                     className={`w-full border rounded-xl pl-9 pr-3 py-2 text-sm font-semibold focus:ring-2 focus:ring-teal-300 outline-none transition-shadow ${
                       forn.itens_precos.length > 0
@@ -1005,18 +1006,18 @@ export default function CotacaoForm() {
                           ? 'border-red-300 bg-red-50/30'
                           : 'border-slate-200'
                     }`}
-                    value={forn.valor_total || ''}
-                    onChange={e => forn.itens_precos.length === 0 && updateFornecedor(idx, 'valor_total', parseFloat(e.target.value) || 0)}
+                    value={forn.valor_total}
+                    onChange={v => forn.itens_precos.length === 0 && updateFornecedor(idx, 'valor_total', v)}
                   />
                 </div>
               </div>
               <div>
                 <label className="text-[10px] text-slate-400 font-semibold">Prazo (dias)</label>
-                <input
-                  type="number" min="1"
+                <NumericInput
+                  min={1}
                   className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-teal-300 outline-none transition-shadow"
-                  value={forn.prazo_entrega_dias || ''}
-                  onChange={e => updateFornecedor(idx, 'prazo_entrega_dias', parseInt(e.target.value) || 0)}
+                  value={forn.prazo_entrega_dias}
+                  onChange={v => updateFornecedor(idx, 'prazo_entrega_dias', v)}
                 />
               </div>
             </div>

@@ -24,6 +24,7 @@ import { GRUPO_CONTRATO_LABEL } from '../../constants/contratos'
 import type { GrupoContrato } from '../../types/contratos'
 import type { EtapaSolicitacao, ParcelaPlanejada, Solicitacao, TipoAssinatura } from '../../types/contratos'
 import { calcularDiferencaParcelas, normalizarParcelasPlanejadas, sugerirParcelasContrato } from '../../utils/contratosParcelas'
+import NumericInput from '../../components/NumericInput'
 
 // ── Formatters ──────────────────────────────────────────────────────────────────
 
@@ -652,12 +653,11 @@ function PlanejamentoParcelasCard({
                 onChange={(event) => updateParcela(index, { data_vencimento: event.target.value })}
                 className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-400"
               />
-              <input
-                type="number"
-                min="0"
-                step="0.01"
+              <NumericInput
+                min={0}
+                step={0.01}
                 value={Number.isFinite(parcela.valor) ? parcela.valor : 0}
-                onChange={(event) => updateParcela(index, { valor: Number(event.target.value) })}
+                onChange={v => updateParcela(index, { valor: v })}
                 className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-400"
               />
               <button

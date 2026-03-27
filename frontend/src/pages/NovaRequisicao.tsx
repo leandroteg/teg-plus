@@ -12,6 +12,7 @@ import { useCategorias } from '../hooks/useCategorias'
 import { useLookupObras } from '../hooks/useLookups'
 import { useAuth } from '../contexts/AuthContext'
 import CategoryCard from '../components/CategoryCard'
+import NumericInput from '../components/NumericInput'
 import ItemAutocomplete from '../components/ItemAutocomplete'
 import type { RequisicaoItem, Urgencia, AiParseResult, CategoriaMaterial } from '../types'
 
@@ -839,9 +840,9 @@ export default function NovaRequisicao() {
             <div className="grid grid-cols-3 gap-2">
               <div>
                 <label className="text-[10px] text-slate-400">Qtd</label>
-                <input required type="number" min="0.01" step="0.01"
+                <NumericInput required min={0.01} step={0.01}
                   className="w-full border border-slate-200 rounded-xl px-2 py-1.5 text-sm focus:ring-2 focus:ring-teal-300 outline-none"
-                  value={item.quantidade || ''} onChange={e => updateItem(idx, 'quantidade', parseFloat(e.target.value) || 0)} />
+                  value={item.quantidade} onChange={v => updateItem(idx, 'quantidade', v)} />
               </div>
               <div>
                 <label className="text-[10px] text-slate-400">Unidade</label>
@@ -852,9 +853,9 @@ export default function NovaRequisicao() {
               </div>
               <div>
                 <label className="text-[10px] text-slate-400">Vlr. Unit.</label>
-                <input type="number" min="0" step="0.01"
+                <NumericInput min={0} step={0.01}
                   className="w-full border border-slate-200 rounded-xl px-2 py-1.5 text-sm focus:ring-2 focus:ring-teal-300 outline-none"
-                  value={item.valor_unitario_estimado || ''} onChange={e => updateItem(idx, 'valor_unitario_estimado', parseFloat(e.target.value) || 0)} />
+                  value={item.valor_unitario_estimado} onChange={v => updateItem(idx, 'valor_unitario_estimado', v)} />
               </div>
             </div>
           </div>
@@ -1080,9 +1081,9 @@ export default function NovaRequisicao() {
             <div className="grid grid-cols-3 gap-2">
               <div>
                 <label className="text-[10px] text-slate-400">Qtd</label>
-                <input required type="number" min="0.01" step="0.01"
+                <NumericInput required min={0.01} step={0.01}
                   className="w-full border border-slate-200 rounded-xl px-2 py-1.5 text-sm focus:ring-2 focus:ring-teal-300 outline-none"
-                  value={item.quantidade || ''} onChange={e => updateItem(idx, 'quantidade', parseFloat(e.target.value) || 0)} />
+                  value={item.quantidade} onChange={v => updateItem(idx, 'quantidade', v)} />
               </div>
               <div>
                 <label className="text-[10px] text-slate-400">Unidade</label>
@@ -1093,9 +1094,9 @@ export default function NovaRequisicao() {
               </div>
               <div>
                 <label className="text-[10px] text-slate-400">Vlr. Unit.</label>
-                <input type="number" min="0" step="0.01"
+                <NumericInput min={0} step={0.01}
                   className="w-full border border-slate-200 rounded-xl px-2 py-1.5 text-sm focus:ring-2 focus:ring-teal-300 outline-none"
-                  value={item.valor_unitario_estimado || ''} onChange={e => updateItem(idx, 'valor_unitario_estimado', parseFloat(e.target.value) || 0)} />
+                  value={item.valor_unitario_estimado} onChange={v => updateItem(idx, 'valor_unitario_estimado', v)} />
               </div>
             </div>
           </div>
