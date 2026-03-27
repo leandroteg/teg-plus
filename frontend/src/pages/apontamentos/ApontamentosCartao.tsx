@@ -385,7 +385,6 @@ export default function ApontamentosCartao() {
 
   // KPIs
   const totalValor = apontamentos.reduce((s, a) => s + a.valor, 0)
-  const countRascunho = apontamentos.filter(a => a.status === 'rascunho').length
   const countEnviado  = apontamentos.filter(a => a.status === 'enviado').length
   const countConc     = apontamentos.filter(a => a.status === 'conciliado').length
   const nextApontamentoIndex = Object.keys(numberingById).length + 1
@@ -455,16 +454,10 @@ export default function ApontamentosCartao() {
       </div>
 
       {/* ── KPIs ────────────────────────────────────────────────── */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         <div className={card('p-3.5')}>
           <p className="text-[10px] text-slate-400 font-semibold uppercase tracking-widest mb-1">Total Período</p>
           <p className={`text-base font-extrabold ${isDark ? 'text-white' : 'text-slate-800'}`}>{fmt(totalValor)}</p>
-        </div>
-        <div className={card('p-3.5')}>
-          <p className="text-[10px] text-amber-500 font-semibold uppercase tracking-widest mb-1 flex items-center gap-1">
-            <Clock size={9} /> Rascunho
-          </p>
-          <p className="text-base font-extrabold text-amber-600">{countRascunho}</p>
         </div>
         <div className={card('p-3.5')}>
           <p className="text-[10px] text-blue-500 font-semibold uppercase tracking-widest mb-1 flex items-center gap-1">
