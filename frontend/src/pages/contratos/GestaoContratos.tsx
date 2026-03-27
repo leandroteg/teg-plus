@@ -499,7 +499,7 @@ function TabContratos() {
                       <td className="px-3 py-2.5 text-center">
                         <button onClick={e => { e.stopPropagation(); nav(`/contratos/detalhe/${c.id}`) }}
                           className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[10px] font-semibold text-indigo-600 bg-indigo-50 border border-indigo-100 hover:bg-indigo-100 transition-all">
-                          <Eye size={11} /> Ver
+                          <Eye size={11} /> Detalhes
                         </button>
                       </td>
                     </tr>
