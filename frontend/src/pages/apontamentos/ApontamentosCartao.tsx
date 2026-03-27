@@ -369,12 +369,26 @@ export default function ApontamentosCartao() {
     )
   }, [apontamentos, busca])
 
+  const numberingById = useMemo(() => {
+    const ordered = [...apontamentos].sort((a, b) => {
+      const byDate = a.data_lancamento.localeCompare(b.data_lancamento)
+      if (byDate !== 0) return byDate
+
+      const byCreatedAt = a.created_at.localeCompare(b.created_at)
+      if (byCreatedAt !== 0) return byCreatedAt
+
+      return a.id.localeCompare(b.id)
+    })
+
+    return Object.fromEntries(ordered.map((item, index) => [item.id, index + 1]))
+  }, [apontamentos])
+
   // KPIs
   const totalValor = apontamentos.reduce((s, a) => s + a.valor, 0)
   const countRascunho = apontamentos.filter(a => a.status === 'rascunho').length
   const countEnviado  = apontamentos.filter(a => a.status === 'enviado').length
   const countConc     = apontamentos.filter(a => a.status === 'conciliado').length
-  const nextApontamentoIndex = apontamentos.length + 1
+  const nextApontamentoIndex = Object.keys(numberingById).length + 1
 
   function showToast(type: 'success' | 'error', msg: string) {
     setToast({ type, msg })
@@ -549,10 +563,11 @@ export default function ApontamentosCartao() {
         </div>
       ) : (
         <div className="space-y-2">
-          {filtered.map((a, index) => {
+          {filtered.map(a => {
             const cfg = STATUS_CONFIG[a.status]
             const StatusIcon = cfg.icon
             const isEditable = a.status === 'rascunho'
+            const displayIndex = numberingById[a.id] ?? 0
 
             return (
               <div
@@ -563,7 +578,7 @@ export default function ApontamentosCartao() {
                 <div className={`w-8 shrink-0 text-sm font-extrabold text-right ${
                   isDark ? 'text-slate-400' : 'text-slate-500'
                 }`}>
-                  {index + 1}
+                  {displayIndex}
                 </div>
 
                 {/* Status dot */}
