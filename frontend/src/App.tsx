@@ -114,6 +114,7 @@ import RHDesligamento from './pages/rh/RHDesligamento'
 import CulturaLayout from './components/CulturaLayout'
 import CulturaHome from './pages/rh/CulturaHome'
 import MuralAdmin from './pages/rh/MuralAdmin'
+import Endomarketing from './pages/rh/Endomarketing'
 
 // Módulo Financeiro
 import FinanceiroLayout from './components/FinanceiroLayout'
@@ -293,8 +294,9 @@ export default function App() {
             </Route>
             {/* Sub-módulo Cultura */}
             <Route element={<CulturaLayout />}>
-              <Route path="/rh/cultura"       element={<CulturaHome />} />
-              <Route path="/rh/cultura/mural" element={<MuralAdmin />} />
+              <Route path="/rh/cultura"                element={<CulturaHome />} />
+              <Route path="/rh/cultura/mural"            element={<MuralAdmin />} />
+              <Route path="/rh/cultura/endomarketing"    element={<Endomarketing />} />
             </Route>
           </Route>
 
