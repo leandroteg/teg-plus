@@ -156,7 +156,9 @@ export default function ApontamentosHome() {
                   : ap.status === 'conciliado' ? (dark ? 'bg-emerald-500/20 text-emerald-300' : 'bg-emerald-100 text-emerald-700')
                   :                              (dark ? 'bg-red-500/20 text-red-300'     : 'bg-red-100 text-red-700')
                   }`}>
-                    {ap.status.charAt(0).toUpperCase() + ap.status.slice(1)}
+                    {ap.status === 'rascunho'
+                      ? 'Pendente'
+                      : ap.status.charAt(0).toUpperCase() + ap.status.slice(1)}
                   </span>
                 </div>
               </div>

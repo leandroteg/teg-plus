@@ -44,7 +44,7 @@ const STATUS_CONFIG: Record<StatusApontamentoCartao, {
   light: string
   dark: string
 }> = {
-  rascunho:   { label: 'Rascunho',   icon: Clock,         light: 'bg-slate-100 text-slate-600',       dark: 'bg-slate-500/15 text-slate-400' },
+  rascunho:   { label: 'Pendente',   icon: Clock,         light: 'bg-slate-100 text-slate-600',       dark: 'bg-slate-500/15 text-slate-400' },
   enviado:    { label: 'Enviado',    icon: CheckCircle2,  light: 'bg-blue-100 text-blue-700',         dark: 'bg-blue-500/15 text-blue-300' },
   conciliado: { label: 'Conciliado', icon: Check,         light: 'bg-emerald-100 text-emerald-700',   dark: 'bg-emerald-500/15 text-emerald-300' },
   rejeitado:  { label: 'Rejeitado',  icon: XCircle,       light: 'bg-red-100 text-red-700',           dark: 'bg-red-500/15 text-red-300' },
@@ -512,7 +512,7 @@ export default function ApontamentosCartao() {
               ${isDark ? 'bg-white/[0.03] border-white/[0.06] text-slate-300' : 'border-slate-200 bg-slate-50 text-slate-600'}`}
           >
             <option value="">Todos os status</option>
-            <option value="rascunho">Rascunho</option>
+            <option value="rascunho">Pendente</option>
             <option value="enviado">Enviado</option>
             <option value="conciliado">Conciliado</option>
             <option value="rejeitado">Rejeitado</option>
