@@ -1,3 +1,4 @@
+import { useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   CreditCard, Plus, ClipboardList,
@@ -44,6 +45,17 @@ export default function ApontamentosHome() {
       bg:    dark ? 'bg-emerald-500/10' : 'bg-emerald-50',
     },
   ]
+
+  const numberingById = useMemo(() => {
+    const ordered = [...todos].sort((a, b) => {
+      const byDate = a.data_lancamento.localeCompare(b.data_lancamento)
+      if (byDate !== 0) return byDate
+      const byCreatedAt = (a.created_at ?? '').localeCompare(b.created_at ?? '')
+      if (byCreatedAt !== 0) return byCreatedAt
+      return a.id.localeCompare(b.id)
+    })
+    return Object.fromEntries(ordered.map((item, index) => [item.id, index + 1]))
+  }, [todos])
 
   const recentes = todos.slice(0, 6)
 
@@ -136,8 +148,11 @@ export default function ApontamentosHome() {
           </div>
           <div className="divide-y divide-slate-100 dark:divide-slate-700">
             {recentes.map(ap => (
-              <div key={ap.id} className="px-4 py-3 flex items-center justify-between">
-                <div className="min-w-0">
+              <div key={ap.id} className="px-4 py-3 flex items-center gap-3 justify-between">
+                <span className={`w-8 shrink-0 text-sm font-extrabold text-right ${dark ? 'text-slate-400' : 'text-slate-500'}`}>
+                  {numberingById[ap.id] ?? ''}
+                </span>
+                <div className="min-w-0 flex-1">
                   <p className={`text-sm font-medium truncate ${dark ? 'text-slate-200' : 'text-slate-700'}`}>
                     {ap.descricao}
                   </p>
