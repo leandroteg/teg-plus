@@ -10,6 +10,11 @@ import { useApontamentosCartao } from '../../hooks/useCartoes'
 const fmt = (v: number) =>
   v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
 
+const formatControlNumber = (value?: number) => {
+  if (!value || value <= 0) return 'Pendente'
+  return `CTL-${String(value).padStart(4, '0')}`
+}
+
 export default function ApontamentosHome() {
   const { dark } = useTheme()
   const navigate = useNavigate()
@@ -46,7 +51,7 @@ export default function ApontamentosHome() {
     },
   ]
 
-  const numberingById = useMemo(() => {
+  const fallbackNumberingById = useMemo(() => {
     const ordered = [...todos].sort((a, b) => {
       const byDate = a.data_lancamento.localeCompare(b.data_lancamento)
       if (byDate !== 0) return byDate
@@ -149,9 +154,20 @@ export default function ApontamentosHome() {
           <div className="divide-y divide-slate-100 dark:divide-slate-700">
             {recentes.map(ap => (
               <div key={ap.id} className="px-4 py-3 flex items-center gap-3 justify-between">
-                <span className={`w-8 shrink-0 text-sm font-extrabold text-right ${dark ? 'text-slate-400' : 'text-slate-500'}`}>
-                  {numberingById[ap.id] ?? ''}
-                </span>
+                <div className={`min-w-[108px] rounded-xl border px-3 py-2 shrink-0 ${
+                  dark ? 'border-violet-500/20 bg-violet-500/10' : 'border-violet-200 bg-violet-50'
+                }`}>
+                  <p className={`text-[9px] font-bold uppercase tracking-[0.24em] ${
+                    dark ? 'text-violet-300/80' : 'text-violet-700/70'
+                  }`}>
+                    Controle
+                  </p>
+                  <p className={`text-sm font-black tracking-[0.18em] ${
+                    dark ? 'text-violet-100' : 'text-violet-800'
+                  }`}>
+                    {formatControlNumber(ap.numero ?? fallbackNumberingById[ap.id])}
+                  </p>
+                </div>
                 <div className="min-w-0 flex-1">
                   <p className={`text-sm font-medium truncate ${dark ? 'text-slate-200' : 'text-slate-700'}`}>
                     {ap.descricao}

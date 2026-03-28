@@ -212,6 +212,7 @@ export interface PortadorCartao {
 
 export interface ApontamentoCartao {
   id: string
+  numero?: number
   cartao_id: string
   portador_id?: string
   user_id: string
