@@ -30,7 +30,7 @@ const fmtDate = (d: string) =>
 
 const formatControlNumber = (value?: number) => {
   if (!value || value <= 0) return 'Pendente'
-  return String(value).padStart(4, '0')
+  return String(value)
 }
 
 const BANDEIRA_LABEL: Record<BandeiraCartao, string> = {
@@ -578,7 +578,7 @@ export default function ApontamentosCartao() {
                     ? 'border-emerald-500/20 bg-emerald-500/10'
                     : 'border-emerald-200 bg-emerald-50'
                 }`}>
-                  <p className={`text-sm font-black tracking-[0.18em] ${
+                  <p className={`text-sm font-black tracking-[0.18em] text-center ${
                     isDark ? 'text-emerald-100' : 'text-emerald-800'
                   }`}>
                     {formatControlNumber(displayNumber)}

@@ -12,7 +12,7 @@ const fmt = (v: number) =>
 
 const formatControlNumber = (value?: number) => {
   if (!value || value <= 0) return 'Pendente'
-  return String(value).padStart(4, '0')
+  return String(value)
 }
 
 export default function ApontamentosHome() {
@@ -157,7 +157,7 @@ export default function ApontamentosHome() {
                 <div className={`min-w-[108px] rounded-xl border px-3 py-2 shrink-0 ${
                   dark ? 'border-violet-500/20 bg-violet-500/10' : 'border-violet-200 bg-violet-50'
                 }`}>
-                  <p className={`text-sm font-black tracking-[0.18em] ${
+                  <p className={`text-sm font-black tracking-[0.18em] text-center ${
                     dark ? 'text-violet-100' : 'text-violet-800'
                   }`}>
                     {formatControlNumber(ap.numero ?? fallbackNumberingById[ap.id])}
