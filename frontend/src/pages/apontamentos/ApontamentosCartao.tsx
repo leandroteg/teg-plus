@@ -578,11 +578,6 @@ export default function ApontamentosCartao() {
                     ? 'border-emerald-500/20 bg-emerald-500/10'
                     : 'border-emerald-200 bg-emerald-50'
                 }`}>
-                  <p className={`text-[9px] font-bold uppercase tracking-[0.24em] ${
-                    isDark ? 'text-emerald-300/80' : 'text-emerald-700/70'
-                  }`}>
-                    N. Controle
-                  </p>
                   <p className={`text-sm font-black tracking-[0.18em] ${
                     isDark ? 'text-emerald-100' : 'text-emerald-800'
                   }`}>
