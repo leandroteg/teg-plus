@@ -12,7 +12,7 @@ const fmt = (v: number) =>
 
 const formatControlNumber = (value?: number) => {
   if (!value || value <= 0) return 'Pendente'
-  return `CTL-${String(value).padStart(4, '0')}`
+  return String(value).padStart(4, '0')
 }
 
 export default function ApontamentosHome() {

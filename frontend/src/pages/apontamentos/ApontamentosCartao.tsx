@@ -30,7 +30,7 @@ const fmtDate = (d: string) =>
 
 const formatControlNumber = (value?: number) => {
   if (!value || value <= 0) return 'Pendente'
-  return `CTL-${String(value).padStart(4, '0')}`
+  return String(value).padStart(4, '0')
 }
 
 const BANDEIRA_LABEL: Record<BandeiraCartao, string> = {
