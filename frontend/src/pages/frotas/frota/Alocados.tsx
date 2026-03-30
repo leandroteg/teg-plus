@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { MapPin, Wrench, CornerDownLeft, X, Car, Cog, CalendarDays, Building2 } from 'lucide-react'
+import { MapPin, Wrench, CornerDownLeft, X, Car, Cog, CalendarDays, Building2, LayoutGrid, LayoutList, User } from 'lucide-react'
 import { useTheme } from '../../../contexts/ThemeContext'
 import { useAlocacoes, useEncerrarAlocacao, useOrdensServico } from '../../../hooks/useFrotas'
 import type { FroAlocacao } from '../../../types/frotas'
@@ -192,11 +192,114 @@ function fmtDate(dateStr?: string): string {
   return new Date(dateStr).toLocaleDateString('pt-BR')
 }
 
+// ── AlocacaoCard ──────────────────────────────────────────────────────────────
+
+interface AlocacaoCardProps {
+  a: FroAlocacao
+  osCount: number
+  isLight: boolean
+  onRetorno: (a: FroAlocacao) => void
+}
+
+function AlocacaoCard({ a, osCount, isLight, onRetorno }: AlocacaoCardProps) {
+  const identificador = a.veiculo?.placa ?? '—'
+  const isMaquina = a.horimetro_saida !== undefined && a.horimetro_saida !== null
+  const retAtrasado = a.data_retorno_prev && new Date(a.data_retorno_prev) < new Date()
+
+  return (
+    <div className={`rounded-2xl border transition-all duration-200 hover:shadow-lg ${
+      isLight
+        ? 'bg-white border-slate-200 hover:border-rose-300 hover:shadow-rose-500/10'
+        : 'bg-slate-800/50 border-white/[0.06] hover:border-rose-500/40 hover:shadow-rose-500/5'
+    }`}>
+      <div className="p-4">
+        {/* Header */}
+        <div className="flex items-start justify-between gap-2 mb-3">
+          <div className="flex items-center gap-2 min-w-0">
+            <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 ${
+              isMaquina
+                ? (isLight ? 'bg-violet-50 text-violet-600' : 'bg-violet-500/10 text-violet-400')
+                : (isLight ? 'bg-sky-50 text-sky-600'       : 'bg-sky-500/10 text-sky-400')
+            }`}>
+              {isMaquina ? <Cog size={15} /> : <Car size={15} />}
+            </div>
+            <div className="min-w-0">
+              <p className={`text-sm font-extrabold tracking-wide truncate ${isLight ? 'text-slate-800' : 'text-white'}`}>
+                {identificador}
+              </p>
+              <p className={`text-xs truncate ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>
+                {a.veiculo?.marca} {a.veiculo?.modelo}
+              </p>
+            </div>
+          </div>
+          {osCount > 0 && <OSBadge count={osCount} isLight={isLight} />}
+        </div>
+
+        {/* Details */}
+        <div className="space-y-1.5 mb-4">
+          <div className={`flex items-center gap-2 text-xs rounded-xl px-3 py-2 ${
+            isLight ? 'bg-slate-50' : 'bg-slate-700/30'
+          }`}>
+            <Building2 size={12} className="shrink-0 text-rose-500" />
+            <span className={`font-medium truncate ${isLight ? 'text-slate-700' : 'text-slate-200'}`}>
+              {a.obra?.nome ?? a.centro_custo_id ?? 'Sem destino'}
+            </span>
+          </div>
+
+          <div className="grid grid-cols-2 gap-1.5">
+            <div className={`flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-xl ${
+              isLight ? 'bg-slate-50 text-slate-500' : 'bg-slate-700/20 text-slate-400'
+            }`}>
+              <CalendarDays size={11} className="shrink-0" />
+              <span>Saída: {a.data_saida ? new Date(a.data_saida).toLocaleDateString('pt-BR') : '—'}</span>
+            </div>
+            <div className={`flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-xl ${
+              retAtrasado
+                ? (isLight ? 'bg-red-50 text-red-600' : 'bg-red-500/10 text-red-400')
+                : (isLight ? 'bg-slate-50 text-slate-500' : 'bg-slate-700/20 text-slate-400')
+            }`}>
+              <CalendarDays size={11} className="shrink-0" />
+              <span>
+                Ret: {a.data_retorno_prev ? new Date(a.data_retorno_prev).toLocaleDateString('pt-BR') : '—'}
+                {retAtrasado ? ' ⚠' : ''}
+              </span>
+            </div>
+          </div>
+
+          {a.responsavel_nome && (
+            <div className={`flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-xl ${
+              isLight ? 'bg-slate-50 text-slate-500' : 'bg-slate-700/20 text-slate-400'
+            }`}>
+              <User size={11} className="shrink-0" />
+              <span className="truncate">{a.responsavel_nome}</span>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Action */}
+      <div className={`px-4 pb-4`}>
+        <button
+          onClick={() => onRetorno(a)}
+          className={`w-full flex items-center justify-center gap-1.5 text-xs font-semibold py-2 rounded-xl transition-all ${
+            isLight
+              ? 'bg-slate-100 text-slate-600 hover:bg-rose-50 hover:text-rose-600'
+              : 'bg-slate-700/60 text-slate-300 hover:bg-rose-500/10 hover:text-rose-400'
+          }`}
+        >
+          <CornerDownLeft size={12} /> Registrar Retorno
+        </button>
+      </div>
+    </div>
+  )
+}
+
 // ── Alocados ──────────────────────────────────────────────────────────────────
 
 export default function Alocados() {
   const { isLightSidebar: isLight } = useTheme()
   const [retornoAloc, setRetornoAloc] = useState<FroAlocacao | null>(null)
+  const [viewMode, setViewMode] = useState<'table' | 'cards'>('table')
 
   const { data: alocacoes = [], isLoading } = useAlocacoes({ status: 'ativa' })
   const { data: ordens    = [] } = useOrdensServico({
@@ -229,21 +332,53 @@ export default function Alocados() {
   return (
     <div className="p-4 md:p-6 space-y-5">
       {/* Header */}
-      <div>
-        <h2 className={`text-lg font-bold flex items-center gap-2 ${isLight ? 'text-slate-800' : 'text-white'}`}>
-          <MapPin size={18} className="text-rose-500" />
-          Alocados
-          {alocacoes.length > 0 && (
-            <span className={`ml-1 text-xs font-semibold px-2 py-0.5 rounded-full ${
-              isLight ? 'bg-rose-100 text-rose-700' : 'bg-rose-500/15 text-rose-400'
-            }`}>
-              {alocacoes.length} em uso
-            </span>
-          )}
-        </h2>
-        <p className={`text-xs mt-0.5 ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
-          Ativos com alocação ativa em obras ou centros de custo
-        </p>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div>
+          <h2 className={`text-lg font-bold flex items-center gap-2 ${isLight ? 'text-slate-800' : 'text-white'}`}>
+            <MapPin size={18} className="text-rose-500" />
+            Alocados
+            {alocacoes.length > 0 && (
+              <span className={`ml-1 text-xs font-semibold px-2 py-0.5 rounded-full ${
+                isLight ? 'bg-rose-100 text-rose-700' : 'bg-rose-500/15 text-rose-400'
+              }`}>
+                {alocacoes.length} em uso
+              </span>
+            )}
+          </h2>
+          <p className={`text-xs mt-0.5 ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
+            Ativos com alocação ativa em obras ou centros de custo
+          </p>
+        </div>
+
+        {/* View toggle */}
+        {alocacoes.length > 0 && (
+          <div className={`flex items-center self-start sm:self-auto rounded-xl border overflow-hidden ${
+            isLight ? 'border-slate-200 bg-slate-50' : 'border-white/[0.06] bg-slate-800/40'
+          }`}>
+            <button
+              onClick={() => setViewMode('table')}
+              title="Visualização em tabela"
+              className={`flex items-center justify-center w-8 h-8 transition-colors ${
+                viewMode === 'table'
+                  ? (isLight ? 'bg-white text-slate-800 shadow-sm' : 'bg-slate-700 text-white')
+                  : (isLight ? 'text-slate-400 hover:text-slate-600' : 'text-slate-500 hover:text-slate-300')
+              }`}
+            >
+              <LayoutList size={14} />
+            </button>
+            <button
+              onClick={() => setViewMode('cards')}
+              title="Visualização em cards"
+              className={`flex items-center justify-center w-8 h-8 transition-colors ${
+                viewMode === 'cards'
+                  ? (isLight ? 'bg-white text-slate-800 shadow-sm' : 'bg-slate-700 text-white')
+                  : (isLight ? 'text-slate-400 hover:text-slate-600' : 'text-slate-500 hover:text-slate-300')
+              }`}
+            >
+              <LayoutGrid size={14} />
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Loading */}
@@ -272,13 +407,12 @@ export default function Alocados() {
         </div>
       )}
 
-      {/* Table — hidden on very small, list on sm, table on md+ */}
-      {!isLoading && alocacoes.length > 0 && (
-        <>
-          {/* Desktop table */}
-          <div className={`hidden md:block rounded-2xl border overflow-hidden ${
-            isLight ? 'bg-white border-slate-200' : 'bg-slate-800/40 border-white/[0.06]'
-          }`}>
+      {/* Table view */}
+      {!isLoading && alocacoes.length > 0 && viewMode === 'table' && (
+        <div className={`rounded-2xl border overflow-hidden ${
+          isLight ? 'bg-white border-slate-200' : 'bg-slate-800/40 border-white/[0.06]'
+        }`}>
+          <div className="overflow-x-auto">
             <table className="w-full">
               <thead className={isLight ? 'bg-slate-50 border-b border-slate-100' : 'bg-slate-800/60 border-b border-white/[0.04]'}>
                 <tr>
@@ -293,14 +427,13 @@ export default function Alocados() {
               </thead>
               <tbody>
                 {alocacoes.map((a, idx) => {
-                  const isMaquina = false // tipo_ativo not in Pick — infer from horimetro_saida
                   const identificador = a.veiculo?.placa ?? '—'
                   const osCount = osCountMap[a.veiculo_id] ?? 0
                   const retAtrasado = a.data_retorno_prev && new Date(a.data_retorno_prev) < new Date()
 
                   const trCls = `border-t transition-colors ${
                     isLight
-                      ? `border-slate-100 hover:bg-slate-50 ${idx % 2 === 0 ? '' : 'bg-slate-50/50'}`
+                      ? `border-slate-100 hover:bg-rose-50/20 ${idx % 2 === 0 ? '' : 'bg-slate-50/40'}`
                       : `border-white/[0.04] hover:bg-white/[0.02] ${idx % 2 === 0 ? '' : 'bg-white/[0.01]'}`
                   }`
 
@@ -396,72 +529,22 @@ export default function Alocados() {
               </tbody>
             </table>
           </div>
+        </div>
+      )}
 
-          {/* Mobile cards */}
-          <div className="md:hidden space-y-2">
-            {alocacoes.map(a => {
-              const identificador = a.veiculo?.placa ?? '—'
-              const osCount = osCountMap[a.veiculo_id] ?? 0
-              const retAtrasado = a.data_retorno_prev && new Date(a.data_retorno_prev) < new Date()
-
-              return (
-                <div key={a.id} className={`p-4 rounded-2xl border ${
-                  isLight ? 'bg-white border-slate-200' : 'bg-slate-800/50 border-white/[0.06]'
-                }`}>
-                  <div className="flex items-start justify-between gap-2 mb-3">
-                    <div>
-                      <p className={`text-sm font-bold ${isLight ? 'text-slate-800' : 'text-white'}`}>
-                        {identificador}
-                      </p>
-                      <p className={`text-xs ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
-                        {a.veiculo?.marca} {a.veiculo?.modelo}
-                      </p>
-                    </div>
-                    <OSBadge count={osCount} isLight={isLight} />
-                  </div>
-
-                  <div className="space-y-1.5 mb-3">
-                    <div className="flex items-center gap-1.5 text-xs">
-                      <Building2 size={11} className={isLight ? 'text-slate-400' : 'text-slate-500'} />
-                      <span className={isLight ? 'text-slate-600' : 'text-slate-300'}>
-                        {a.obra?.nome ?? a.centro_custo_id ?? '—'}
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-1.5 text-xs">
-                      <CalendarDays size={11} className={isLight ? 'text-slate-400' : 'text-slate-500'} />
-                      <span className={isLight ? 'text-slate-600' : 'text-slate-300'}>
-                        Saída: {fmtDate(a.data_saida)}
-                      </span>
-                      <span className={`font-medium ${
-                        retAtrasado
-                          ? (isLight ? 'text-red-600' : 'text-red-400')
-                          : (isLight ? 'text-slate-500' : 'text-slate-400')
-                      }`}>
-                        · Ret. prev: {fmtDate(a.data_retorno_prev)}{retAtrasado ? ' ⚠' : ''}
-                      </span>
-                    </div>
-                    {a.responsavel_nome && (
-                      <p className={`text-xs ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
-                        Resp: {a.responsavel_nome}
-                      </p>
-                    )}
-                  </div>
-
-                  <button
-                    onClick={() => setRetornoAloc(a)}
-                    className={`w-full flex items-center justify-center gap-1.5 text-xs font-semibold py-2 rounded-xl transition-all ${
-                      isLight
-                        ? 'bg-slate-100 text-slate-600 hover:bg-rose-50 hover:text-rose-600'
-                        : 'bg-slate-700/60 text-slate-300 hover:bg-rose-500/10 hover:text-rose-400'
-                    }`}
-                  >
-                    <CornerDownLeft size={12} /> Registrar Retorno
-                  </button>
-                </div>
-              )
-            })}
-          </div>
-        </>
+      {/* Cards view */}
+      {!isLoading && alocacoes.length > 0 && viewMode === 'cards' && (
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+          {alocacoes.map(a => (
+            <AlocacaoCard
+              key={a.id}
+              a={a}
+              osCount={osCountMap[a.veiculo_id] ?? 0}
+              isLight={isLight}
+              onRetorno={setRetornoAloc}
+            />
+          ))}
+        </div>
       )}
 
       {/* Retorno Modal */}

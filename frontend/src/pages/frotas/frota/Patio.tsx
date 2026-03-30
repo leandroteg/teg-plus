@@ -2,6 +2,7 @@ import { useState, useMemo } from 'react'
 import {
   Search, Plus, Car, Cog, Gauge, Timer, AlertTriangle,
   FileText, ShieldAlert, Wrench, ClipboardList, MapPin, Warehouse,
+  LayoutGrid, LayoutList,
 } from 'lucide-react'
 import { useTheme } from '../../../contexts/ThemeContext'
 import { useVeiculos, useOrdensServico } from '../../../hooks/useFrotas'
@@ -228,11 +229,167 @@ function VeiculoCard({ v, osCount, isLight, onAlocar, onOS, onChecklist }: Veicu
   )
 }
 
+// ── VeiculoRow (table row) ────────────────────────────────────────────────────
+
+interface VeiculoRowProps {
+  v: FroVeiculo
+  osCount: number
+  isLight: boolean
+  idx: number
+  onAlocar: (id: string) => void
+  onOS: (id: string) => void
+  onChecklist: (id: string) => void
+}
+
+function VeiculoRow({ v, osCount, isLight, idx, onAlocar, onOS, onChecklist }: VeiculoRowProps) {
+  const isMaquina = v.tipo_ativo === 'maquina'
+  const prop = PROP_MAP[v.propriedade]
+  const prevColor = preventivaColor(v.km_proxima_preventiva, v.hodometro_atual, v.data_proxima_preventiva, isLight)
+  const prevStyle = PREV_STYLES[prevColor]
+  const diasCrlv   = diasAte(v.vencimento_crlv)
+  const diasSeguro = diasAte(v.vencimento_seguro)
+  const crlvColor   = docAlertColor(diasCrlv, isLight)
+  const seguroColor = docAlertColor(diasSeguro, isLight)
+  const identificador = isMaquina && v.numero_serie ? v.numero_serie : v.placa
+
+  const trCls = `border-t transition-colors ${
+    isLight
+      ? `border-slate-100 hover:bg-rose-50/30 ${idx % 2 === 0 ? '' : 'bg-slate-50/40'}`
+      : `border-white/[0.04] hover:bg-white/[0.02] ${idx % 2 === 0 ? '' : 'bg-white/[0.01]'}`
+  }`
+
+  return (
+    <tr className={trCls}>
+      {/* Ativo */}
+      <td className="px-4 py-3">
+        <div className="flex items-center gap-2.5">
+          <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${
+            isMaquina
+              ? (isLight ? 'bg-violet-50 text-violet-600' : 'bg-violet-500/10 text-violet-400')
+              : (isLight ? 'bg-sky-50 text-sky-600'       : 'bg-sky-500/10 text-sky-400')
+          }`}>
+            {isMaquina ? <Cog size={13} /> : <Car size={13} />}
+          </div>
+          <div>
+            <p className={`text-xs font-bold ${isLight ? 'text-slate-800' : 'text-white'}`}>
+              {identificador}
+            </p>
+            <p className={`text-[10px] ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>
+              {isMaquina ? 'Máquina' : 'Veículo'}
+            </p>
+          </div>
+        </div>
+      </td>
+
+      {/* Marca/Modelo */}
+      <td className="px-4 py-3">
+        <p className={`text-xs font-medium ${isLight ? 'text-slate-700' : 'text-slate-200'}`}>
+          {v.marca} {v.modelo}
+        </p>
+        {v.ano_mod && (
+          <p className={`text-[10px] ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>{v.ano_mod}</p>
+        )}
+      </td>
+
+      {/* Propriedade */}
+      <td className="px-4 py-3">
+        <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${isLight ? prop.light : prop.dark}`}>
+          {prop.label}
+        </span>
+      </td>
+
+      {/* KM / Hs */}
+      <td className="px-4 py-3">
+        <span className={`inline-flex items-center gap-1 text-xs ${isLight ? 'text-slate-600' : 'text-slate-300'}`}>
+          {isMaquina
+            ? <><Timer size={11} /> {v.horimetro_atual !== undefined ? fmtNum(v.horimetro_atual) + ' h' : '—'}</>
+            : <><Gauge size={11} /> {fmtNum(v.hodometro_atual)} km</>
+          }
+        </span>
+      </td>
+
+      {/* Próxima Preventiva */}
+      <td className="px-4 py-3">
+        <span className={`inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full border ${isLight ? prevStyle.light : prevStyle.dark}`}>
+          <Wrench size={9} />
+          {isMaquina && v.km_proxima_preventiva
+            ? `${fmtNum(v.km_proxima_preventiva)} h`
+            : v.km_proxima_preventiva
+            ? `${fmtNum(v.km_proxima_preventiva)} km`
+            : v.data_proxima_preventiva
+            ? new Date(v.data_proxima_preventiva).toLocaleDateString('pt-BR')
+            : 'OK'}
+        </span>
+      </td>
+
+      {/* Documentos */}
+      <td className="px-4 py-3">
+        <div className="flex flex-col gap-0.5">
+          {crlvColor ? (
+            <span className={`inline-flex items-center gap-1 text-[10px] font-semibold ${crlvColor}`}>
+              <FileText size={9} />
+              CRLV {diasCrlv !== null && diasCrlv <= 0 ? 'VENCIDO' : `${diasCrlv}d`}
+            </span>
+          ) : null}
+          {seguroColor ? (
+            <span className={`inline-flex items-center gap-1 text-[10px] font-semibold ${seguroColor}`}>
+              <ShieldAlert size={9} />
+              Seguro {diasSeguro !== null && diasSeguro <= 0 ? 'VENCIDO' : `${diasSeguro}d`}
+            </span>
+          ) : null}
+          {!crlvColor && !seguroColor && (
+            <span className={`text-[10px] ${isLight ? 'text-slate-300' : 'text-slate-600'}`}>OK</span>
+          )}
+        </div>
+      </td>
+
+      {/* OS */}
+      <td className="px-4 py-3">
+        <OSBadge count={osCount} isLight={isLight} />
+        {osCount === 0 && <span className={`text-[10px] ${isLight ? 'text-slate-300' : 'text-slate-600'}`}>—</span>}
+      </td>
+
+      {/* Ações */}
+      <td className="px-4 py-3 text-right">
+        <div className="flex items-center justify-end gap-1">
+          <button
+            onClick={() => onAlocar(v.id)}
+            className={`inline-flex items-center gap-1 text-[10px] font-bold px-2.5 py-1.5 rounded-lg transition-all ${
+              isLight
+                ? 'bg-rose-500 text-white hover:bg-rose-600 shadow-sm shadow-rose-500/30'
+                : 'bg-rose-500/90 text-white hover:bg-rose-500'
+            }`}
+          >
+            <MapPin size={10} /> Alocar
+          </button>
+          <button
+            onClick={() => onOS(v.id)}
+            className={`inline-flex items-center gap-1 text-[10px] font-semibold px-2.5 py-1.5 rounded-lg transition-all ${
+              isLight ? 'bg-slate-100 text-slate-600 hover:bg-slate-200' : 'bg-slate-700/60 text-slate-300 hover:bg-slate-700'
+            }`}
+          >
+            <Wrench size={10} /> OS
+          </button>
+          <button
+            onClick={() => onChecklist(v.id)}
+            className={`inline-flex items-center gap-1 text-[10px] font-semibold px-2.5 py-1.5 rounded-lg transition-all ${
+              isLight ? 'bg-slate-100 text-slate-600 hover:bg-slate-200' : 'bg-slate-700/60 text-slate-300 hover:bg-slate-700'
+            }`}
+          >
+            <ClipboardList size={10} />
+          </button>
+        </div>
+      </td>
+    </tr>
+  )
+}
+
 // ── Patio ─────────────────────────────────────────────────────────────────────
 
 export default function Patio() {
   const { isLightSidebar: isLight } = useTheme()
   const [search, setSearch] = useState('')
+  const [viewMode, setViewMode] = useState<'cards' | 'table'>('cards')
 
   const { data: veiculos = [], isLoading } = useVeiculos({ status: 'disponivel' })
   const { data: ordens  = [] } = useOrdensServico({
@@ -297,6 +454,35 @@ export default function Patio() {
               }`}
             />
           </div>
+
+          {/* View toggle */}
+          <div className={`flex items-center rounded-xl border overflow-hidden ${
+            isLight ? 'border-slate-200 bg-slate-50' : 'border-white/[0.06] bg-slate-800/40'
+          }`}>
+            <button
+              onClick={() => setViewMode('table')}
+              title="Visualização em tabela"
+              className={`flex items-center justify-center w-8 h-8 transition-colors ${
+                viewMode === 'table'
+                  ? (isLight ? 'bg-white text-slate-800 shadow-sm' : 'bg-slate-700 text-white')
+                  : (isLight ? 'text-slate-400 hover:text-slate-600' : 'text-slate-500 hover:text-slate-300')
+              }`}
+            >
+              <LayoutList size={14} />
+            </button>
+            <button
+              onClick={() => setViewMode('cards')}
+              title="Visualização em cards"
+              className={`flex items-center justify-center w-8 h-8 transition-colors ${
+                viewMode === 'cards'
+                  ? (isLight ? 'bg-white text-slate-800 shadow-sm' : 'bg-slate-700 text-white')
+                  : (isLight ? 'text-slate-400 hover:text-slate-600' : 'text-slate-500 hover:text-slate-300')
+              }`}
+            >
+              <LayoutGrid size={14} />
+            </button>
+          </div>
+
           <button className={`flex items-center gap-1.5 text-xs font-semibold px-3 py-2 rounded-xl transition-all ${
             isLight
               ? 'bg-rose-500 text-white hover:bg-rose-600 shadow-sm shadow-rose-500/30'
@@ -331,8 +517,8 @@ export default function Patio() {
         </div>
       )}
 
-      {/* Grid */}
-      {!isLoading && filtered.length > 0 && (
+      {/* Cards view */}
+      {!isLoading && filtered.length > 0 && viewMode === 'cards' && (
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {filtered.map(v => (
             <VeiculoCard
@@ -345,6 +531,43 @@ export default function Patio() {
               onChecklist={handleChecklist}
             />
           ))}
+        </div>
+      )}
+
+      {/* Table view */}
+      {!isLoading && filtered.length > 0 && viewMode === 'table' && (
+        <div className={`rounded-2xl border overflow-hidden ${
+          isLight ? 'bg-white border-slate-200' : 'bg-slate-800/40 border-white/[0.06]'
+        }`}>
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead className={isLight ? 'bg-slate-50 border-b border-slate-100' : 'bg-slate-800/60 border-b border-white/[0.04]'}>
+                <tr>
+                  {(['Ativo', 'Marca / Modelo', 'Propriedade', 'KM / Hs', 'Próx. Preventiva', 'Documentos', 'OS', ''] as const).map(h => (
+                    <th key={h} className={`text-left text-[10px] font-bold uppercase tracking-wider px-4 py-3 ${
+                      isLight ? 'text-slate-500' : 'text-slate-400'
+                    } ${h === '' ? 'text-right' : ''}`}>
+                      {h}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {filtered.map((v, idx) => (
+                  <VeiculoRow
+                    key={v.id}
+                    v={v}
+                    osCount={osCountMap[v.id] ?? 0}
+                    isLight={isLight}
+                    idx={idx}
+                    onAlocar={handleAlocar}
+                    onOS={handleOS}
+                    onChecklist={handleChecklist}
+                  />
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
     </div>
