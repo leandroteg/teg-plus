@@ -285,6 +285,24 @@ Prefixo `fro_`
 
 ---
 
+## 9b. Integrações Externas — Arquitetura de Adaptador
+
+### Abastecimento — Cartão Frota (Veloe / Ticket / outros)
+- Tabela `fro_integracao_cartao`: `provider` (veloe | ticket | sem_parar | manual), `api_key_enc`, `last_sync_at`
+- n8n workflow `POST /frotas/sync-cartao`: busca extrato da API do provider → normaliza → insere em `fro_abastecimentos` com campo `origem = 'cartao_veloe'`
+- UI: botão "Importar Extrato" + badge "Última sync HH:mm" na aba Abastecimentos
+- Registros manuais continuam funcionando em paralelo
+- Troca de provider: só muda config na tabela + ajusta n8n, zero mudança no frontend
+
+### Telemetria — GPS/Rastreador (Cobli / Omnilink / outros)
+- Tabela `fro_integracao_telemetria`: `provider` (cobli | omnilink | rastreio | samsara), `device_id` por veículo, `webhook_secret`
+- Cobli e maioria dos providers enviam webhooks de eventos → n8n recebe em `POST /frotas/telemetria-webhook` → normaliza → insere em `fro_telemetria_ocorrencias`
+- Dados capturados: posição lat/lng, velocidade, ignição on/off, odômetro, eventos de comportamento (excesso velocidade, frenagem brusca, etc.), histórico de rotas
+- **Compartilhamento com Logística:** view `fro_posicao_atual` (posição mais recente por veículo) consumida pelo módulo Transportes para acompanhamento de rota em tempo real — sem duplicar dados, sem acoplamento direto
+- Troca de provider: só muda webhook_secret + ajusta parser no n8n
+
+---
+
 ## 10. Fases de Implementação
 
 ### Fase 1 — Core (prioridade alta)
