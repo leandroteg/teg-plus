@@ -226,6 +226,11 @@ export default function ModuloSelector() {
     if (route) navigate(route)
   }
 
+  function handleAvatarNavigate(route: string) {
+    setAvatarOpen(false)
+    requestAnimationFrame(() => navigate(route))
+  }
+
   async function handleLogout() {
     await signOut()
     navigate('/login', { replace: true })
@@ -263,50 +268,55 @@ export default function ModuloSelector() {
         </div>
 
         <div className="py-1">
-          <a
-            href="/perfil"
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); handleAvatarNavigate('/perfil') }}
             className={`w-full flex items-center gap-3 px-4 py-2.5 text-[13px] font-medium transition-colors
               ${isLight ? 'text-slate-600 hover:bg-slate-50 hover:text-slate-900' : 'text-slate-300 hover:bg-white/[0.04] hover:text-white'}`}
           >
             <User size={15} className="shrink-0 opacity-50" />
             Meu Perfil
-          </a>
+          </button>
 
           {isAdmin && (
             <>
               <div className={`h-px mx-3 my-1 ${isLight ? 'bg-slate-100' : 'bg-white/[0.06]'}`} />
-              <a
-                href="/admin/usuarios"
+              <button
+                type="button"
+                onClick={(e) => { e.stopPropagation(); handleAvatarNavigate('/admin/usuarios') }}
                 className={`w-full flex items-center gap-3 px-4 py-2.5 text-[13px] font-medium transition-colors
                   ${isLight ? 'text-slate-600 hover:bg-slate-50 hover:text-slate-900' : 'text-slate-300 hover:bg-white/[0.04] hover:text-white'}`}
               >
                 <ShieldCheck size={15} className="shrink-0 opacity-50" />
                 {'Usu\u00e1rios'}
-              </a>
-              <a
-                href="/cadastros"
+              </button>
+              <button
+                type="button"
+                onClick={(e) => { e.stopPropagation(); handleAvatarNavigate('/cadastros') }}
                 className={`w-full flex items-center gap-3 px-4 py-2.5 text-[13px] font-medium transition-colors
                   ${isLight ? 'text-slate-600 hover:bg-slate-50 hover:text-slate-900' : 'text-slate-300 hover:bg-white/[0.04] hover:text-white'}`}
               >
                 <Settings size={15} className="shrink-0 opacity-50" />
                 Cadastros
-              </a>
-              <a
-                href="/admin/integracoes"
+              </button>
+              <button
+                type="button"
+                onClick={(e) => { e.stopPropagation(); handleAvatarNavigate('/admin/integracoes') }}
                 className={`w-full flex items-center gap-3 px-4 py-2.5 text-[13px] font-medium transition-colors
                   ${isLight ? 'text-slate-600 hover:bg-slate-50 hover:text-slate-900' : 'text-slate-300 hover:bg-white/[0.04] hover:text-white'}`}
               >
                 <Link2 size={15} className="shrink-0 opacity-50" />
                 {'Integra\u00e7\u00f5es'}
-              </a>
-              <a
-                href="/admin/desenvolvimento"
+              </button>
+              <button
+                type="button"
+                onClick={(e) => { e.stopPropagation(); handleAvatarNavigate('/admin/desenvolvimento') }}
                 className={`w-full flex items-center gap-3 px-4 py-2.5 text-[13px] font-medium transition-colors
                   ${isLight ? 'text-slate-600 hover:bg-slate-50 hover:text-slate-900' : 'text-slate-300 hover:bg-white/[0.04] hover:text-white'}`}
               >
                 <Code2 size={15} className="shrink-0 opacity-50" />
                 Desenvolvimento
-              </a>
+              </button>
             </>
           )}
         </div>
