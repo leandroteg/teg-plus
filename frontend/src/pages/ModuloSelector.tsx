@@ -234,17 +234,8 @@ export default function ModuloSelector() {
     }
     if (avatarNavigatingRef.current) return
     avatarNavigatingRef.current = true
-    const currentPath = window.location.pathname
     setAvatarOpen(false)
-    navigate(route)
-
-    window.setTimeout(() => {
-      // Fallback hard navigation when SPA navigation is blocked/intercepted
-      if (window.location.pathname === currentPath) {
-        window.location.assign(route)
-      }
-      avatarNavigatingRef.current = false
-    }, 120)
+    window.location.assign(route)
   }
 
   async function handleLogout() {
@@ -286,7 +277,7 @@ export default function ModuloSelector() {
         <div className="py-1">
           <button
             type="button"
-            onClick={(e) => handleAvatarNavigate('/perfil', e)}
+            onMouseDown={(e) => handleAvatarNavigate('/perfil', e)}
             className={`w-full flex items-center gap-3 px-4 py-2.5 text-[13px] font-medium transition-colors
               ${isLight ? 'text-slate-600 hover:bg-slate-50 hover:text-slate-900' : 'text-slate-300 hover:bg-white/[0.04] hover:text-white'}`}
           >
@@ -299,7 +290,7 @@ export default function ModuloSelector() {
               <div className={`h-px mx-3 my-1 ${isLight ? 'bg-slate-100' : 'bg-white/[0.06]'}`} />
               <button
                 type="button"
-                onClick={(e) => handleAvatarNavigate('/admin/usuarios', e)}
+                onMouseDown={(e) => handleAvatarNavigate('/admin/usuarios', e)}
                 className={`w-full flex items-center gap-3 px-4 py-2.5 text-[13px] font-medium transition-colors
                   ${isLight ? 'text-slate-600 hover:bg-slate-50 hover:text-slate-900' : 'text-slate-300 hover:bg-white/[0.04] hover:text-white'}`}
               >
@@ -308,7 +299,7 @@ export default function ModuloSelector() {
               </button>
               <button
                 type="button"
-                onClick={(e) => handleAvatarNavigate('/cadastros', e)}
+                onMouseDown={(e) => handleAvatarNavigate('/cadastros', e)}
                 className={`w-full flex items-center gap-3 px-4 py-2.5 text-[13px] font-medium transition-colors
                   ${isLight ? 'text-slate-600 hover:bg-slate-50 hover:text-slate-900' : 'text-slate-300 hover:bg-white/[0.04] hover:text-white'}`}
               >
@@ -317,7 +308,7 @@ export default function ModuloSelector() {
               </button>
               <button
                 type="button"
-                onClick={(e) => handleAvatarNavigate('/admin/integracoes', e)}
+                onMouseDown={(e) => handleAvatarNavigate('/admin/integracoes', e)}
                 className={`w-full flex items-center gap-3 px-4 py-2.5 text-[13px] font-medium transition-colors
                   ${isLight ? 'text-slate-600 hover:bg-slate-50 hover:text-slate-900' : 'text-slate-300 hover:bg-white/[0.04] hover:text-white'}`}
               >
@@ -326,7 +317,7 @@ export default function ModuloSelector() {
               </button>
               <button
                 type="button"
-                onClick={(e) => handleAvatarNavigate('/admin/desenvolvimento', e)}
+                onMouseDown={(e) => handleAvatarNavigate('/admin/desenvolvimento', e)}
                 className={`w-full flex items-center gap-3 px-4 py-2.5 text-[13px] font-medium transition-colors
                   ${isLight ? 'text-slate-600 hover:bg-slate-50 hover:text-slate-900' : 'text-slate-300 hover:bg-white/[0.04] hover:text-white'}`}
               >

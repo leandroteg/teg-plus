@@ -16,17 +16,31 @@
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
     <script>
-      if ('serviceWorker' in navigator) {
-        window.addEventListener('load', async () => {
+      (async function forceClientCacheCleanup() {
+        if (!('serviceWorker' in navigator)) return
+        const CLEANUP_FLAG = 'teg_sw_cleanup_v2'
+        if (sessionStorage.getItem(CLEANUP_FLAG) === '1') return
+
+        try {
+          let hadClientCache = false
           const registrations = await navigator.serviceWorker.getRegistrations()
-          await Promise.all(registrations.map(registration => registration.unregister()))
+          if (registrations.length > 0) {
+            hadClientCache = true
+            await Promise.all(registrations.map((registration) => registration.unregister()))
+          }
 
           if ('caches' in window) {
             const cacheKeys = await caches.keys()
-            await Promise.all(cacheKeys.filter(key => key.startsWith('teg-')).map(key => caches.delete(key)))
+            if (cacheKeys.length > 0) hadClientCache = true
+            await Promise.all(cacheKeys.map((key) => caches.delete(key)))
           }
-        })
-      }
+
+          sessionStorage.setItem(CLEANUP_FLAG, '1')
+          if (hadClientCache) window.location.reload()
+        } catch (_) {
+          sessionStorage.setItem(CLEANUP_FLAG, '1')
+        }
+      })()
     </script>
   </body>
 </html>
