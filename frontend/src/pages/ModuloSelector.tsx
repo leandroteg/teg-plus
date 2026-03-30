@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import {
   LogOut, X, Lock, Megaphone, User, Link2, Code2,
   // Category icons
@@ -7,7 +7,7 @@ import {
   // Sub-module icons
   Settings, HardHat, ShieldCheck, ShoppingCart, Truck,
   Package, Building2, Car, Banknote, BarChart3, FileText,
-  UserCog, UserSearch, Server, Bot, Target, Store, Receipt, CreditCard, Heart, Calculator,
+  UserCog, UserSearch, Server, Bot, Target, Store, Receipt, CreditCard, Heart, Calculator, Laptop, Moon, Sun,
   type LucideIcon,
 } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
@@ -226,20 +226,15 @@ export default function ModuloSelector() {
     if (route) navigate(route)
   }
 
-  function handleAvatarNavigate(route: string) {
-    setAvatarOpen(false)
-    requestAnimationFrame(() => navigate(route))
-  }
-
   async function handleLogout() {
     await signOut()
     navigate('/login', { replace: true })
   }
 
   const THEME_OPTS = [
-    { value: 'original' as const, icon: '🖥️', label: 'Auto' },
-    { value: 'dark' as const, icon: '🌙', label: 'Dark' },
-    { value: 'light' as const, icon: '☀️', label: 'Light' },
+    { value: 'original' as const, Icon: Laptop, label: 'Auto' },
+    { value: 'dark' as const, Icon: Moon, label: 'Dark' },
+    { value: 'light' as const, Icon: Sun, label: 'Light' },
   ]
 
   function renderAvatarDropdown() {
@@ -268,55 +263,55 @@ export default function ModuloSelector() {
         </div>
 
         <div className="py-1">
-          <button
-            type="button"
-            onClick={(e) => { e.stopPropagation(); handleAvatarNavigate('/perfil') }}
+          <Link
+            to="/perfil"
+            onClick={() => setAvatarOpen(false)}
             className={`w-full flex items-center gap-3 px-4 py-2.5 text-[13px] font-medium transition-colors
               ${isLight ? 'text-slate-600 hover:bg-slate-50 hover:text-slate-900' : 'text-slate-300 hover:bg-white/[0.04] hover:text-white'}`}
           >
             <User size={15} className="shrink-0 opacity-50" />
             Meu Perfil
-          </button>
+          </Link>
 
           {isAdmin && (
             <>
               <div className={`h-px mx-3 my-1 ${isLight ? 'bg-slate-100' : 'bg-white/[0.06]'}`} />
-              <button
-                type="button"
-                onClick={(e) => { e.stopPropagation(); handleAvatarNavigate('/admin/usuarios') }}
+              <Link
+                to="/admin/usuarios"
+                onClick={() => setAvatarOpen(false)}
                 className={`w-full flex items-center gap-3 px-4 py-2.5 text-[13px] font-medium transition-colors
                   ${isLight ? 'text-slate-600 hover:bg-slate-50 hover:text-slate-900' : 'text-slate-300 hover:bg-white/[0.04] hover:text-white'}`}
               >
                 <ShieldCheck size={15} className="shrink-0 opacity-50" />
-                Usuários
-              </button>
-              <button
-                type="button"
-                onClick={(e) => { e.stopPropagation(); handleAvatarNavigate('/cadastros') }}
+                {'Usu\u00e1rios'}
+              </Link>
+              <Link
+                to="/cadastros"
+                onClick={() => setAvatarOpen(false)}
                 className={`w-full flex items-center gap-3 px-4 py-2.5 text-[13px] font-medium transition-colors
                   ${isLight ? 'text-slate-600 hover:bg-slate-50 hover:text-slate-900' : 'text-slate-300 hover:bg-white/[0.04] hover:text-white'}`}
               >
                 <Settings size={15} className="shrink-0 opacity-50" />
                 Cadastros
-              </button>
-              <button
-                type="button"
-                onClick={(e) => { e.stopPropagation(); handleAvatarNavigate('/admin/integracoes') }}
+              </Link>
+              <Link
+                to="/admin/integracoes"
+                onClick={() => setAvatarOpen(false)}
                 className={`w-full flex items-center gap-3 px-4 py-2.5 text-[13px] font-medium transition-colors
                   ${isLight ? 'text-slate-600 hover:bg-slate-50 hover:text-slate-900' : 'text-slate-300 hover:bg-white/[0.04] hover:text-white'}`}
               >
                 <Link2 size={15} className="shrink-0 opacity-50" />
-                Integrações
-              </button>
-              <button
-                type="button"
-                onClick={(e) => { e.stopPropagation(); handleAvatarNavigate('/admin/desenvolvimento') }}
+                {'Integra\u00e7\u00f5es'}
+              </Link>
+              <Link
+                to="/admin/desenvolvimento"
+                onClick={() => setAvatarOpen(false)}
                 className={`w-full flex items-center gap-3 px-4 py-2.5 text-[13px] font-medium transition-colors
                   ${isLight ? 'text-slate-600 hover:bg-slate-50 hover:text-slate-900' : 'text-slate-300 hover:bg-white/[0.04] hover:text-white'}`}
               >
                 <Code2 size={15} className="shrink-0 opacity-50" />
                 Desenvolvimento
-              </button>
+              </Link>
             </>
           )}
         </div>
@@ -325,7 +320,7 @@ export default function ModuloSelector() {
           <div className={`flex items-center gap-0.5 p-0.5 rounded-lg border w-full ${
             isLight ? 'bg-slate-100/80 border-slate-200' : 'bg-white/5 border-white/[0.06]'
           }`}>
-            {THEME_OPTS.map(({ value, icon, label }) => (
+            {THEME_OPTS.map(({ value, Icon, label }) => (
               <button
                 type="button"
                 key={value}
@@ -337,7 +332,7 @@ export default function ModuloSelector() {
                     : isLight ? 'text-slate-400 hover:text-slate-600' : 'text-slate-500 hover:text-slate-300',
                 ].join(' ')}
               >
-                <span className="text-[11px]">{icon}</span>
+                <Icon size={11} className="shrink-0" />
                 {label}
               </button>
             ))}
@@ -429,7 +424,7 @@ export default function ModuloSelector() {
         <div className="flex items-center gap-2.5">
           <div className={`w-1.5 h-1.5 rounded-full animate-pulse ${isLight ? 'bg-teal-500' : 'bg-teal-400'}`} />
           <span className={`text-[11px] font-semibold uppercase tracking-widest ${isLight ? 'text-teal-600' : 'text-teal-400/70'}`}>TEG+ ERP</span>
-          <span className={isLight ? 'text-slate-300' : 'text-slate-700'}>·</span>
+          <span className={isLight ? 'text-slate-300' : 'text-slate-700'}>&middot;</span>
           <span className={`text-[11px] font-medium ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>v2.0</span>
         </div>
 
@@ -469,7 +464,7 @@ export default function ModuloSelector() {
                 isLight ? 'ring-slate-200/60 hover:ring-slate-300' : 'ring-white/10 hover:ring-white/25',
                 avatarOpen ? (isLight ? 'ring-slate-400 scale-105' : 'ring-white/40 scale-105') : '',
               ].join(' ')}
-              title={`${nome} · ${ROLE_LABEL[role]}`}
+              title={`${nome} - ${ROLE_LABEL[role]}`}
             >
               {initials}
             </button>
