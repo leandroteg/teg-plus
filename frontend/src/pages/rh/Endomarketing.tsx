@@ -303,12 +303,23 @@ function TabGerarComunicado({ identidade }: { identidade: IdentidadeVisual }) {
 
   async function captureCanvas(): Promise<HTMLCanvasElement | null> {
     if (!templateRef.current) return null
+    // Target the actual content div (has explicit w/h), not the wrapper
+    const target = (templateRef.current.firstElementChild as HTMLElement) ?? templateRef.current
+    const fmt = FORMATOS.find(f => f.value === formato)!
+    // Wait for Google Fonts to finish loading before capture
+    await document.fonts.ready
     const html2canvas = (await import('html2canvas')).default
-    return html2canvas(templateRef.current, {
-      scale: 1,
+    return html2canvas(target, {
+      scale: 2,
       useCORS: true,
       allowTaint: true,
       backgroundColor: identidade.cor_fundo,
+      width: fmt.w,
+      height: fmt.h,
+      windowWidth: fmt.w,
+      windowHeight: fmt.h,
+      logging: false,
+      ignoreElements: (el) => el.hasAttribute('data-html2canvas-ignore'),
     })
   }
 
