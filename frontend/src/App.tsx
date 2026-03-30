@@ -164,11 +164,9 @@ import Recebimentos from './pages/logistica/Recebimentos'
 // Módulo Frotas
 import FrotasLayout from './components/FrotasLayout'
 import FrotasHome from './pages/frotas/FrotasHome'
-import Veiculos from './pages/frotas/Veiculos'
-import Ordens from './pages/frotas/Ordens'
-import Checklists from './pages/frotas/Checklists'
-import Abastecimentos from './pages/frotas/Abastecimentos'
-import Telemetria from './pages/frotas/Telemetria'
+import FrotaHub      from './pages/frotas/frota/FrotaHub'
+import ManutencaoHub from './pages/frotas/manutencao/ManutencaoHub'
+import OperacaoHub   from './pages/frotas/operacao/OperacaoHub'
 
 // Admin
 import AdminUsuarios from './pages/AdminUsuarios'
@@ -269,12 +267,10 @@ export default function App() {
           {/* Módulo Frotas */}
           <Route element={<ModuleRoute moduleKey="frotas" />}>
             <Route element={<FrotasLayout />}>
-              <Route path="/frotas"                      element={<FrotasHome />} />
-              <Route path="/frotas/veiculos"             element={<Veiculos />} />
-              <Route path="/frotas/ordens"               element={<Ordens />} />
-              <Route path="/frotas/checklists"           element={<Checklists />} />
-              <Route path="/frotas/abastecimentos"       element={<Abastecimentos />} />
-              <Route path="/frotas/telemetria"           element={<Telemetria />} />
+              <Route path="/frotas"            element={<FrotasHome />} />
+              <Route path="/frotas/frota"      element={<FrotaHub />} />
+              <Route path="/frotas/manutencao" element={<ManutencaoHub />} />
+              <Route path="/frotas/operacao"   element={<OperacaoHub />} />
             </Route>
           </Route>
 
