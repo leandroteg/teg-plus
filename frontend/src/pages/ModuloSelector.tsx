@@ -243,7 +243,7 @@ export default function ModuloSelector() {
     return (
       <div
         className={[
-          'absolute right-0 top-full mt-2 z-[120] w-60 rounded-2xl border overflow-hidden shadow-xl transition-all',
+          'absolute right-0 top-full mt-2 z-[120] w-60 rounded-2xl border overflow-hidden shadow-xl transition-all pointer-events-auto',
           isLight
             ? 'bg-white border-slate-200/80 shadow-slate-200/40'
             : 'bg-[#111827] border-white/10 shadow-black/50',
@@ -265,6 +265,7 @@ export default function ModuloSelector() {
         <div className="py-1">
           <a
             href="/perfil"
+            onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); window.location.assign('/perfil') }}
             className={`w-full flex items-center gap-3 px-4 py-2.5 text-[13px] font-medium transition-colors
               ${isLight ? 'text-slate-600 hover:bg-slate-50 hover:text-slate-900' : 'text-slate-300 hover:bg-white/[0.04] hover:text-white'}`}
           >
@@ -275,42 +276,42 @@ export default function ModuloSelector() {
           {isAdmin && (
             <>
               <div className={`h-px mx-3 my-1 ${isLight ? 'bg-slate-100' : 'bg-white/[0.06]'}`} />
-              <button
-                type="button"
+              <a
+                href="/admin/usuarios"
                 onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); window.location.assign('/admin/usuarios') }}
                 className={`w-full flex items-center gap-3 px-4 py-2.5 text-[13px] font-medium transition-colors
                   ${isLight ? 'text-slate-600 hover:bg-slate-50 hover:text-slate-900' : 'text-slate-300 hover:bg-white/[0.04] hover:text-white'}`}
               >
                 <ShieldCheck size={15} className="shrink-0 opacity-50" />
                 {'Usu\u00e1rios'}
-              </button>
-              <button
-                type="button"
+              </a>
+              <a
+                href="/cadastros"
                 onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); window.location.assign('/cadastros') }}
                 className={`w-full flex items-center gap-3 px-4 py-2.5 text-[13px] font-medium transition-colors
                   ${isLight ? 'text-slate-600 hover:bg-slate-50 hover:text-slate-900' : 'text-slate-300 hover:bg-white/[0.04] hover:text-white'}`}
               >
                 <Settings size={15} className="shrink-0 opacity-50" />
                 Cadastros
-              </button>
-              <button
-                type="button"
+              </a>
+              <a
+                href="/admin/integracoes"
                 onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); window.location.assign('/admin/integracoes') }}
                 className={`w-full flex items-center gap-3 px-4 py-2.5 text-[13px] font-medium transition-colors
                   ${isLight ? 'text-slate-600 hover:bg-slate-50 hover:text-slate-900' : 'text-slate-300 hover:bg-white/[0.04] hover:text-white'}`}
               >
                 <Link2 size={15} className="shrink-0 opacity-50" />
                 {'Integra\u00e7\u00f5es'}
-              </button>
-              <button
-                type="button"
+              </a>
+              <a
+                href="/admin/desenvolvimento"
                 onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); window.location.assign('/admin/desenvolvimento') }}
                 className={`w-full flex items-center gap-3 px-4 py-2.5 text-[13px] font-medium transition-colors
                   ${isLight ? 'text-slate-600 hover:bg-slate-50 hover:text-slate-900' : 'text-slate-300 hover:bg-white/[0.04] hover:text-white'}`}
               >
                 <Code2 size={15} className="shrink-0 opacity-50" />
                 Desenvolvimento
-              </button>
+              </a>
             </>
           )}
         </div>
