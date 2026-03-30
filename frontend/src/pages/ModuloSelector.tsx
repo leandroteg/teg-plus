@@ -226,6 +226,11 @@ export default function ModuloSelector() {
     if (route) navigate(route)
   }
 
+  function handleAvatarNavigate(route: string) {
+    setAvatarOpen(false)
+    requestAnimationFrame(() => navigate(route))
+  }
+
   async function handleLogout() {
     await signOut()
     navigate('/login', { replace: true })
@@ -264,7 +269,8 @@ export default function ModuloSelector() {
 
         <div className="py-1">
           <button
-            onClick={() => { setAvatarOpen(false); navigate('/perfil') }}
+            type="button"
+            onClick={(e) => { e.stopPropagation(); handleAvatarNavigate('/perfil') }}
             className={`w-full flex items-center gap-3 px-4 py-2.5 text-[13px] font-medium transition-colors
               ${isLight ? 'text-slate-600 hover:bg-slate-50 hover:text-slate-900' : 'text-slate-300 hover:bg-white/[0.04] hover:text-white'}`}
           >
@@ -276,15 +282,17 @@ export default function ModuloSelector() {
             <>
               <div className={`h-px mx-3 my-1 ${isLight ? 'bg-slate-100' : 'bg-white/[0.06]'}`} />
               <button
-                onClick={() => { setAvatarOpen(false); navigate('/admin/usuarios') }}
+                type="button"
+                onClick={(e) => { e.stopPropagation(); handleAvatarNavigate('/admin/usuarios') }}
                 className={`w-full flex items-center gap-3 px-4 py-2.5 text-[13px] font-medium transition-colors
                   ${isLight ? 'text-slate-600 hover:bg-slate-50 hover:text-slate-900' : 'text-slate-300 hover:bg-white/[0.04] hover:text-white'}`}
               >
                 <ShieldCheck size={15} className="shrink-0 opacity-50" />
-                Usuarios
+                Usuários
               </button>
               <button
-                onClick={() => { setAvatarOpen(false); navigate('/cadastros') }}
+                type="button"
+                onClick={(e) => { e.stopPropagation(); handleAvatarNavigate('/cadastros') }}
                 className={`w-full flex items-center gap-3 px-4 py-2.5 text-[13px] font-medium transition-colors
                   ${isLight ? 'text-slate-600 hover:bg-slate-50 hover:text-slate-900' : 'text-slate-300 hover:bg-white/[0.04] hover:text-white'}`}
               >
@@ -292,15 +300,17 @@ export default function ModuloSelector() {
                 Cadastros
               </button>
               <button
-                onClick={() => { setAvatarOpen(false); navigate('/admin/integracoes') }}
+                type="button"
+                onClick={(e) => { e.stopPropagation(); handleAvatarNavigate('/admin/integracoes') }}
                 className={`w-full flex items-center gap-3 px-4 py-2.5 text-[13px] font-medium transition-colors
                   ${isLight ? 'text-slate-600 hover:bg-slate-50 hover:text-slate-900' : 'text-slate-300 hover:bg-white/[0.04] hover:text-white'}`}
               >
                 <Link2 size={15} className="shrink-0 opacity-50" />
-                Integracoes
+                Integrações
               </button>
               <button
-                onClick={() => { setAvatarOpen(false); navigate('/admin/desenvolvimento') }}
+                type="button"
+                onClick={(e) => { e.stopPropagation(); handleAvatarNavigate('/admin/desenvolvimento') }}
                 className={`w-full flex items-center gap-3 px-4 py-2.5 text-[13px] font-medium transition-colors
                   ${isLight ? 'text-slate-600 hover:bg-slate-50 hover:text-slate-900' : 'text-slate-300 hover:bg-white/[0.04] hover:text-white'}`}
               >
@@ -317,6 +327,7 @@ export default function ModuloSelector() {
           }`}>
             {THEME_OPTS.map(({ value, icon, label }) => (
               <button
+                type="button"
                 key={value}
                 onClick={() => setTheme(value)}
                 className={[
@@ -335,6 +346,7 @@ export default function ModuloSelector() {
 
         <div className={`border-t ${isLight ? 'border-slate-100' : 'border-white/[0.06]'}`}>
           <button
+            type="button"
             onClick={handleLogout}
             className={`w-full flex items-center gap-3 px-4 py-2.5 text-[13px] font-medium transition-colors
               ${isLight ? 'text-red-500 hover:bg-red-50' : 'text-red-400 hover:bg-red-500/10'}`}
@@ -447,6 +459,7 @@ export default function ModuloSelector() {
           </p>
           <div className="relative" ref={avatarMenuRef}>
             <button
+              type="button"
               onClick={() => setAvatarOpen(o => !o)}
               className={[
                 'w-8 h-8 text-[11px] rounded-full flex items-center justify-center',

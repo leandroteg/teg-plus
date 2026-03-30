@@ -127,6 +127,12 @@ export const ALCADA_LABEL: Record<number, string> = {
   4: 'CEO (sem limite)',
 }
 
+// Hotfix de acentuação consistente (evita variação de encoding por ambiente)
+ALCADA_LABEL[0] = 'Sem alçada'
+ALCADA_LABEL[1] = 'Coordenador (até R$ 5.000)'
+ALCADA_LABEL[2] = 'Gerente (até R$ 25.000)'
+ALCADA_LABEL[3] = 'Diretor (até R$ 100.000)'
+
 export interface Perfil {
   id: string
   auth_id: string
@@ -464,7 +470,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const resetPassword = async (identifier: string) => {
     if (!identifier.includes('@')) {
-      return { error: 'Recuperacao por usuario nao disponivel. Use o e-mail de login ou fale com o administrador.' }
+      return { error: 'Recuperação por usuário não disponível. Use o e-mail de login ou fale com o administrador.' }
     }
     const email = identifier.trim().toLowerCase()
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
@@ -481,7 +487,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const updatePerfil = async (
     data: Partial<Pick<Perfil, 'nome' | 'cargo' | 'departamento'>>
   ) => {
-    if (!user) return { error: 'Nao autenticado' }
+    if (!user) return { error: 'Não autenticado' }
     const { data: updated, error } = await supabase
       .from('sys_perfis')
       .update(data)
@@ -498,7 +504,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const clearPasswordReset = () => setPendingPasswordReset(false)
 
   const markSenhaDefinida = async () => {
-    if (!user) return { error: 'Nao autenticado' }
+    if (!user) return { error: 'Não autenticado' }
     const { error } = await supabase
       .from('sys_perfis')
       .update({ senha_definida: true })
@@ -605,14 +611,13 @@ export function useAuth() {
 }
 
 function translateError(msg: string): string {
-  if (msg.includes('Invalid login credentials')) return 'Usuario/e-mail ou senha incorretos'
+  if (msg.includes('Invalid login credentials')) return 'Usuário/e-mail ou senha incorretos'
   if (msg.includes('Email not confirmed')) return 'Confirme seu e-mail antes de entrar'
   if (msg.includes('Too many requests')) return 'Muitas tentativas. Aguarde um momento'
-  if (msg.includes('User already registered')) return 'Este e-mail ja esta cadastrado'
+  if (msg.includes('User already registered')) return 'Este e-mail já está cadastrado'
   if (msg.includes('Email rate limit exceeded')) return 'Limite de e-mails atingido. Tente mais tarde'
   if (msg.includes('Password should be')) return 'A senha deve ter pelo menos 6 caracteres'
   if (msg.includes('New password should be')) return 'A nova senha deve ter pelo menos 6 caracteres'
   if (msg.includes('same password')) return 'A nova senha deve ser diferente da atual'
   return msg
 }
-
