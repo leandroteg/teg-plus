@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { createClient } from '@supabase/supabase-js'
 import {
   Users, UserPlus, Search, ChevronLeft, Shield,
   Check, X, AlertCircle, Mail, RefreshCw,
@@ -10,19 +11,166 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../services/supabase'
 import {
   useAuth,
-  type Perfil, type Role,
+  type Perfil, type Role, type PapelGlobal,
   ROLE_LABEL, ROLE_COLOR, ALCADA_LABEL, MODULOS_ERP, MODULOS_ERP_GROUPED,
 } from '../contexts/AuthContext'
 import { GRUPO_CONTRATO_OPTIONS } from '../constants/contratos'
 
+const INTERNAL_LOGIN_DOMAIN = 'login.teg.local'
+const INTERNAL_SIGNUP_DOMAIN = 'login.teg.local.com'
+const N8N_BASE = import.meta.env.VITE_N8N_WEBHOOK_URL?.replace(/\/$/, '') || ''
+
+type CadastroResult = {
+  nome: string
+  username: string
+  login_email: string
+  senha_temporaria: string
+  email_contato?: string
+  whatsapp?: string
+}
+
+function normalizeUsername(raw: string) {
+  const base = raw
+    .trim()
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9. ]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+
+  if (!base) return 'usuario'
+  const parts = base.split(' ').filter(Boolean)
+  if (parts.length === 1) return parts[0].replace(/\.+/g, '.')
+  return `${parts[0]}.${parts[parts.length - 1]}`.replace(/\.+/g, '.')
+}
+
+function randomToken(len = 10) {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789'
+  if (typeof crypto !== 'undefined' && crypto.getRandomValues) {
+    const arr = new Uint8Array(len)
+    crypto.getRandomValues(arr)
+    return Array.from(arr, b => chars[b % chars.length]).join('')
+  }
+  return Array.from({ length: len }, () => chars[Math.floor(Math.random() * chars.length)]).join('')
+}
+
+function buildSenhaTemporaria() {
+  return `Teg@${randomToken(10)}#`
+}
+
+function buildCredenciaisMessage(data: CadastroResult) {
+  return [
+    `Acesso TEG+ criado para ${data.nome}`,
+    `Usuário: ${data.username}`,
+    `Login: ${data.login_email}`,
+    `Senha temporária: ${data.senha_temporaria}`,
+    'No primeiro acesso, alterar a senha.',
+  ].join('\n')
+}
+
+function openShareEmail(destinatario: string, message: string) {
+  const subject = encodeURIComponent('Acesso TEG+')
+  const body = encodeURIComponent(message)
+  window.open(`mailto:${destinatario}?subject=${subject}&body=${body}`, '_blank')
+}
+
+function openShareWhatsApp(whatsapp: string, message: string) {
+  const numero = whatsapp.replace(/\D/g, '')
+  const text = encodeURIComponent(message)
+  window.open(`https://wa.me/${numero}?text=${text}`, '_blank')
+}
+
 // ── Roles config (novo sistema 5 perfis) ─────────────────────────────────────
-const ROLES: { value: Role; label: string; color: string }[] = [
-  { value: 'administrador', label: 'Administrador', color: 'bg-red-100 text-red-700 border-red-200' },
-  { value: 'diretor',       label: 'Diretor',       color: 'bg-violet-100 text-violet-700 border-violet-200' },
-  { value: 'gestor',        label: 'Gestor',        color: 'bg-blue-100 text-blue-700 border-blue-200' },
-  { value: 'requisitante',  label: 'Requisitante',  color: 'bg-emerald-100 text-emerald-700 border-emerald-200' },
-  { value: 'visitante',     label: 'Visitante',     color: 'bg-slate-100 text-slate-600 border-slate-200' },
+const PAPEIS: { value: PapelGlobal; label: string; color: string }[] = [
+  { value: 'requisitante', label: 'Requisitante', color: 'bg-sky-100 text-sky-700 border-sky-200' },
+  { value: 'equipe', label: 'Equipe', color: 'bg-cyan-100 text-cyan-700 border-cyan-200' },
+  { value: 'supervisor', label: 'Supervisor', color: 'bg-orange-100 text-orange-700 border-orange-200' },
+  { value: 'diretor', label: 'Diretor', color: 'bg-violet-100 text-violet-700 border-violet-200' },
+  { value: 'ceo', label: 'CEO', color: 'bg-fuchsia-100 text-fuchsia-700 border-fuchsia-200' },
 ]
+
+function mapPapelToLegacyRole(papel: PapelGlobal): Role {
+  switch (papel) {
+    case 'diretor':
+      return 'diretor'
+    case 'ceo':
+      return 'administrador'
+    case 'supervisor':
+    case 'equipe':
+      return 'gestor'
+    default:
+      return 'requisitante'
+  }
+}
+
+function resolvePapelFromPerfil(perfil: Perfil): PapelGlobal {
+  const direto = perfil.papel_global as PapelGlobal | undefined
+  if (direto && PAPEIS.some(p => p.value === direto)) return direto
+  const role = String(perfil.role ?? '').toLowerCase()
+  if (role === 'administrador' || role === 'admin') return 'ceo'
+  if (role === 'diretor' || role === 'gerente') return 'diretor'
+  if (role === 'gestor' || role === 'aprovador') return 'supervisor'
+  if (role === 'comprador') return 'equipe'
+  return 'requisitante'
+}
+
+function normalizeModuloForSetor(modulo: string) {
+  if (modulo === 'patrimonial') return 'patrimonio'
+  if (modulo === 'apontamentos') return 'financeiro'
+  return modulo
+}
+
+async function syncPerfilSetores(
+  perfilId: string,
+  modulos: Record<string, boolean>,
+  papel: PapelGlobal
+) {
+  const ativos = Object.entries(modulos)
+    .filter(([, enabled]) => Boolean(enabled))
+    .map(([modulo]) => normalizeModuloForSetor(modulo))
+
+  try {
+    if (ativos.length === 0) {
+      await supabase
+        .from('sys_perfil_setores')
+        .update({ ativo: false })
+        .eq('perfil_id', perfilId)
+      return
+    }
+
+    const uniqueModulos = Array.from(new Set(ativos))
+    const { data: setores, error: setoresError } = await supabase
+      .from('sys_setores')
+      .select('id, modulo_key')
+      .in('modulo_key', uniqueModulos)
+      .eq('ativo', true)
+
+    if (setoresError) throw setoresError
+    if (!setores || setores.length === 0) return
+
+    await supabase
+      .from('sys_perfil_setores')
+      .update({ ativo: false })
+      .eq('perfil_id', perfilId)
+
+    const rows = setores.map(setor => ({
+      perfil_id: perfilId,
+      setor_id: setor.id,
+      papel,
+      aprovador_tecnico: papel === 'supervisor' || papel === 'diretor' || papel === 'ceo',
+      ativo: true,
+    }))
+
+    const { error: upsertErr } = await supabase
+      .from('sys_perfil_setores')
+      .upsert(rows, { onConflict: 'perfil_id,setor_id' })
+
+    if (upsertErr) throw upsertErr
+  } catch {
+    // fallback silencioso: legado (role + modulos) continua operando
+  }
+}
 
 // ── Avatar inline ──────────────────────────────────────────────────────────────
 const AVATAR_COLORS = [
@@ -130,7 +278,7 @@ function usePerfis() {
 function useUpdateUser() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: async (payload: Partial<Perfil> & { id: string }) => {
+    mutationFn: async (payload: Partial<Perfil> & { id: string; papel_global?: PapelGlobal }) => {
       const { id, ...data } = payload
       const { data: updated, error } = await supabase
         .from('sys_perfis')
@@ -139,35 +287,213 @@ function useUpdateUser() {
         .select()
         .single()
       if (error) throw error
+      if (data.modulos || data.papel_global) {
+        const nextPapel = (data.papel_global as PapelGlobal | undefined) ?? resolvePapelFromPerfil(updated as Perfil)
+        await syncPerfilSetores(id, (data.modulos as Record<string, boolean> | undefined) ?? ((updated as Perfil).modulos ?? {}), nextPapel)
+      }
       return updated as Perfil
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['perfis'] }),
   })
 }
 
-function useConvidarUsuario() {
+function useCadastrarUsuario() {
   const { perfil: myPerfil } = useAuth()
+
+  const ensureUniqueUsername = async (base: string) => {
+    let candidate = base
+    let suffix = 2
+
+    while (suffix < 100) {
+      const loginA = `${candidate}@${INTERNAL_LOGIN_DOMAIN}`
+      const loginB = `${candidate}@${INTERNAL_SIGNUP_DOMAIN}`
+
+      const { count, error } = await supabase
+        .from('sys_perfis')
+        .select('id', { count: 'exact', head: true })
+        .in('email', [loginA, loginB])
+
+      if (error) throw error
+      if (!count) return candidate
+
+      candidate = `${base}.${suffix}`
+      suffix += 1
+    }
+
+    throw new Error('Não foi possível gerar um usuário único. Tente outro nome.')
+  }
+
+  const createDetachedClient = () => {
+    const url = import.meta.env.VITE_SUPABASE_URL || 'https://uzfjfucrinokeuwpbeie.supabase.co'
+    const anon = import.meta.env.VITE_SUPABASE_ANON_KEY
+      || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InV6ZmpmdWNyaW5va2V1d3BiZWllIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIyMDE2NTgsImV4cCI6MjA4Nzc3NzY1OH0.eFf_TTijVffZxnl2xlm_Mncji1bQRHyosAALawrtZbk'
+    return createClient(url, anon, {
+      auth: {
+        persistSession: false,
+        autoRefreshToken: false,
+        detectSessionInUrl: false,
+      },
+    })
+  }
+
+  const waitForPerfil = async (authId: string) => {
+    for (let i = 0; i < 8; i += 1) {
+      const { data } = await supabase
+        .from('sys_perfis')
+        .select('*')
+        .eq('auth_id', authId)
+        .maybeSingle()
+      if (data) return data as Perfil
+      await new Promise(resolve => setTimeout(resolve, 300))
+    }
+    return null
+  }
+
+  const cadastrarViaN8n = async (payload: {
+    nome: string
+    username: string
+    login_email: string
+    signup_email: string
+    senha_temporaria: string
+    role: Role
+    papel_global: PapelGlobal
+    alcada_nivel: number
+    modulos: Record<string, boolean>
+    criado_por: string | null
+  }) => {
+    if (!N8N_BASE) return null
+
+    const res = await fetch(`${N8N_BASE}/usuarios/cadastrar`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    })
+    if (!res.ok) {
+      const txt = await res.text().catch(() => '')
+      throw new Error(txt || 'Falha ao cadastrar usuário no fluxo de automação.')
+    }
+    const out = await res.json().catch(() => ({}))
+    return out as Record<string, unknown>
+  }
+
   return useMutation({
     mutationFn: async ({
-      email, nome, role, alcada_nivel, modulos,
+      nome, email_contato, whatsapp, username, papel_global, alcada_nivel, modulos,
     }: {
-      email: string; nome: string; role: Role
+      nome: string
+      email_contato?: string
+      whatsapp?: string
+      username?: string
+      papel_global: PapelGlobal
       alcada_nivel: number; modulos: Record<string, boolean>
     }) => {
+      const role = mapPapelToLegacyRole(papel_global)
+      const baseUsername = normalizeUsername(username || nome)
+      const finalUsername = await ensureUniqueUsername(baseUsername)
+      const loginEmail = `${finalUsername}@${INTERNAL_LOGIN_DOMAIN}`
+      const signupEmail = `${finalUsername}@${INTERNAL_SIGNUP_DOMAIN}`
+      const senhaTemporaria = buildSenhaTemporaria()
+
+      // 1) Tenta via n8n (fluxo recomendado para produção)
+      try {
+        await cadastrarViaN8n({
+          nome,
+          username: finalUsername,
+          login_email: loginEmail,
+          signup_email: signupEmail,
+          senha_temporaria: senhaTemporaria,
+          role,
+          papel_global,
+          alcada_nivel,
+          modulos,
+          criado_por: myPerfil?.id ?? null,
+        })
+
+        const { data: perfilN8n } = await supabase
+          .from('sys_perfis')
+          .select('id')
+          .eq('email', loginEmail)
+          .maybeSingle()
+
+        if (perfilN8n?.id) {
+          await syncPerfilSetores(perfilN8n.id, modulos, papel_global)
+        }
+
+        return {
+          nome,
+          username: finalUsername,
+          login_email: loginEmail,
+          senha_temporaria: senhaTemporaria,
+          email_contato,
+          whatsapp,
+        } satisfies CadastroResult
+      } catch (n8nErr) {
+        // segue para fallback local
+        if (!N8N_BASE) {
+          // sem n8n configurado, usa fallback local
+        } else {
+          console.warn('[AdminUsuarios] n8n indisponível, usando fallback local:', n8nErr)
+        }
+      }
+
+      // 2) Fallback local: convite + signup desacoplado (não troca sessão do admin)
       const { error: convErr } = await supabase
         .from('sys_convites')
         .insert({
-          email, role, alcada_nivel, modulos,
+          email: signupEmail,
+          role,
+          papel_global,
+          alcada_nivel,
+          modulos,
           nome_sugerido: nome || null,
           convidado_por: myPerfil?.id,
         })
       if (convErr) throw convErr
 
-      const { error: otpErr } = await supabase.auth.signInWithOtp({
-        email,
-        options: { emailRedirectTo: `${window.location.origin}/bem-vindo` },
+      const detached = createDetachedClient()
+      const { data: signUpData, error: signUpErr } = await detached.auth.signUp({
+        email: signupEmail,
+        password: senhaTemporaria,
+        options: {
+          data: { nome, username: finalUsername, origem: 'admin_usuarios' },
+        },
       })
-      if (otpErr) throw otpErr
+
+      if (signUpErr) throw signUpErr
+      if (!signUpData?.user?.id) {
+        throw new Error('Cadastro iniciado, mas sem retorno de usuário no Auth.')
+      }
+
+      const perfilCriado = await waitForPerfil(signUpData.user.id)
+      if (!perfilCriado) {
+        throw new Error('Usuário criado no Auth, mas perfil não ficou disponível a tempo.')
+      }
+
+      const { error: updErr } = await supabase
+        .from('sys_perfis')
+        .update({
+          nome,
+          email: loginEmail,
+          role,
+          papel_global,
+          alcada_nivel,
+          modulos,
+          senha_definida: true,
+          ativo: true,
+        })
+        .eq('id', perfilCriado.id)
+
+      if (updErr) throw updErr
+      await syncPerfilSetores(perfilCriado.id, modulos, papel_global)
+
+      return {
+        nome,
+        username: finalUsername,
+        login_email: loginEmail,
+        senha_temporaria: senhaTemporaria,
+        email_contato,
+        whatsapp,
+      } satisfies CadastroResult
     },
   })
 }
@@ -178,7 +504,7 @@ function UserDetailPanel({
 }: { user: Perfil; onClose: () => void }) {
   const update = useUpdateUser()
   const [editing, setEditing] = useState(false)
-  const [role,    setRole]    = useState<Role>(user.role)
+  const [papelGlobal, setPapelGlobal] = useState<PapelGlobal>(resolvePapelFromPerfil(user))
   const [alcada,  setAlcada]  = useState(user.alcada_nivel)
   const [ativo,   setAtivo]   = useState(user.ativo)
   const [modulos, setModulos] = useState<Record<string, boolean>>(user.modulos ?? {})
@@ -189,13 +515,21 @@ function UserDetailPanel({
     setModulos(m => ({ ...m, [key]: !m[key] }))
 
   const handleSave = async () => {
-    await update.mutateAsync({ id: user.id, role, alcada_nivel: alcada, ativo, modulos, permissoes_especiais: permEspeciais })
+    await update.mutateAsync({
+      id: user.id,
+      role: mapPapelToLegacyRole(papelGlobal),
+      papel_global: papelGlobal,
+      alcada_nivel: alcada,
+      ativo,
+      modulos,
+      permissoes_especiais: permEspeciais,
+    })
     setSuccess(true)
     setTimeout(() => { setSuccess(false); setEditing(false) }, 1200)
   }
 
   const handleCancel = () => {
-    setRole(user.role)
+    setPapelGlobal(resolvePapelFromPerfil(user))
     setAlcada(user.alcada_nivel)
     setAtivo(user.ativo)
     setModulos(user.modulos ?? {})
@@ -296,11 +630,11 @@ function UserDetailPanel({
               Perfil de Acesso
             </label>
             <div className="flex flex-wrap gap-2">
-              {ROLES.map(r => (
+              {PAPEIS.map(r => (
                 <button key={r.value}
-                  onClick={() => setRole(r.value)}
+                  onClick={() => setPapelGlobal(r.value)}
                   className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all ${
-                    role === r.value ? r.color + ' ring-2 ring-offset-1 ring-current' : 'bg-white text-slate-400 border-slate-200 hover:border-slate-300'
+                    papelGlobal === r.value ? r.color + ' ring-2 ring-offset-1 ring-current' : 'bg-white text-slate-400 border-slate-200 hover:border-slate-300'
                   }`}
                 >
                   {r.label}
@@ -339,7 +673,7 @@ function UserDetailPanel({
           />
 
           {/* ── Permissões Especiais ─────────────────────────────────── */}
-          {modulos?.contratos && role !== 'administrador' && (
+          {modulos?.contratos && mapPapelToLegacyRole(papelGlobal) !== 'administrador' && (
             <div className="space-y-2">
               <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Permissões Contratos</label>
               <div className="grid grid-cols-2 gap-2">
@@ -409,15 +743,20 @@ function UserDetailPanel({
   )
 }
 
-// ── Modal: Convidar usuário ────────────────────────────────────────────────────
-function ConviteModal({ onClose }: { onClose: () => void }) {
-  const convidar = useConvidarUsuario()
+// ── Modal: Cadastrar usuário ──────────────────────────────────────────────────
+function CadastroUsuarioModal({ onClose }: { onClose: () => void }) {
+  const cadastrar = useCadastrarUsuario()
   const [form, setForm] = useState({
-    email: '', nome: '', role: 'requisitante' as Role,
+    nome: '',
+    username: '',
+    email_contato: '',
+    whatsapp: '',
+    papel_global: 'requisitante' as PapelGlobal,
     alcada_nivel: 0,
     modulos: { compras: true } as Record<string, boolean>,
   })
-  const [success, setSuccess] = useState(false)
+  const [result, setResult] = useState<CadastroResult | null>(null)
+  const [copied, setCopied] = useState(false)
 
   const set = (k: string) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
     setForm(f => ({ ...f, [k]: e.target.value }))
@@ -427,9 +766,27 @@ function ConviteModal({ onClose }: { onClose: () => void }) {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    await convidar.mutateAsync(form)
-    setSuccess(true)
-    setTimeout(onClose, 2000)
+    const output = await cadastrar.mutateAsync({
+      nome: form.nome.trim(),
+      username: form.username.trim() || undefined,
+      email_contato: form.email_contato.trim() || undefined,
+      whatsapp: form.whatsapp.trim() || undefined,
+      papel_global: form.papel_global,
+      alcada_nivel: form.alcada_nivel,
+      modulos: form.modulos,
+    })
+    setResult(output)
+  }
+
+  const handleCopy = async () => {
+    if (!result) return
+    try {
+      await navigator.clipboard.writeText(buildCredenciaisMessage(result))
+      setCopied(true)
+      setTimeout(() => setCopied(false), 1800)
+    } catch {
+      setCopied(false)
+    }
   }
 
   return (
@@ -440,54 +797,135 @@ function ConviteModal({ onClose }: { onClose: () => void }) {
             <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
               <UserPlus size={15} className="text-primary" />
             </div>
-            <h3 className="font-bold text-navy">Convidar Usuário</h3>
+            <h3 className="font-bold text-navy">Cadastrar Usuário</h3>
           </div>
           <button onClick={onClose} className="text-slate-400 hover:text-slate-600">
             <X size={18} />
           </button>
         </div>
 
-        {success ? (
-          <div className="p-8 text-center space-y-3">
-            <div className="w-14 h-14 rounded-full bg-green-100 flex items-center justify-center mx-auto">
-              <CheckCircle size={28} className="text-green-600" />
+        {result ? (
+          <div className="p-6 space-y-4">
+            <div className="text-center space-y-3">
+              <div className="w-14 h-14 rounded-full bg-green-100 flex items-center justify-center mx-auto">
+                <CheckCircle size={28} className="text-green-600" />
+              </div>
+              <p className="font-bold text-navy">Usuário cadastrado com sucesso!</p>
+              <p className="text-sm text-slate-500">Compartilhe os dados de acesso com segurança.</p>
             </div>
-            <p className="font-bold text-navy">Convite enviado!</p>
-            <p className="text-sm text-slate-500">O usuário receberá um link de acesso por e-mail.</p>
+
+            <div className="rounded-xl border border-emerald-100 bg-emerald-50 p-3 space-y-1.5 text-xs">
+              <p className="text-slate-600"><span className="font-semibold">Nome:</span> {result.nome}</p>
+              <p className="text-slate-600"><span className="font-semibold">Usuário:</span> {result.username}</p>
+              <p className="text-slate-600"><span className="font-semibold">Login:</span> {result.login_email}</p>
+              <p className="text-slate-600"><span className="font-semibold">Senha temporária:</span> {result.senha_temporaria}</p>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+              <button
+                type="button"
+                onClick={handleCopy}
+                className={`py-2 rounded-xl text-xs font-semibold border ${
+                  copied ? 'border-emerald-300 text-emerald-700 bg-emerald-50' : 'border-slate-200 text-slate-600 hover:bg-slate-50'
+                }`}
+              >
+                {copied ? 'Copiado!' : 'Copiar dados'}
+              </button>
+              <button
+                type="button"
+                disabled={!result.email_contato}
+                onClick={() => {
+                  if (!result.email_contato) return
+                  openShareEmail(result.email_contato, buildCredenciaisMessage(result))
+                }}
+                className="py-2 rounded-xl text-xs font-semibold border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                E-mail
+              </button>
+              <button
+                type="button"
+                disabled={!result.whatsapp}
+                onClick={() => {
+                  if (!result.whatsapp) return
+                  openShareWhatsApp(result.whatsapp, buildCredenciaisMessage(result))
+                }}
+                className="py-2 rounded-xl text-xs font-semibold border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                WhatsApp
+              </button>
+            </div>
+
+            <button
+              type="button"
+              onClick={onClose}
+              className="w-full py-2.5 rounded-xl bg-primary text-white text-sm font-semibold hover:bg-indigo-500"
+            >
+              Fechar
+            </button>
           </div>
         ) : (
           <form onSubmit={handleSubmit} className="p-5 space-y-4 max-h-[75vh] overflow-y-auto">
-            {/* Email + nome */}
-            {[
-              { key: 'email', label: 'E-mail', type: 'email', placeholder: 'usuario@teguniao.com.br' },
-              { key: 'nome',  label: 'Nome (opcional)', type: 'text', placeholder: 'Nome completo' },
-            ].map(({ key, label, type, placeholder }) => (
-              <div key={key}>
-                <label className="block text-xs font-semibold text-slate-600 mb-1.5">{label}</label>
+            <div>
+              <label className="block text-xs font-semibold text-slate-600 mb-1.5">Nome completo</label>
+              <input
+                type="text"
+                value={form.nome}
+                onChange={set('nome')}
+                placeholder="Nome completo"
+                required
+                className="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-sm
+                  focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary bg-slate-50 focus:bg-white"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-600 mb-1.5">Usuário (opcional)</label>
+              <input
+                type="text"
+                value={form.username}
+                onChange={e => setForm(f => ({ ...f, username: normalizeUsername(e.target.value) }))}
+                placeholder="nome.sobrenome"
+                className="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-sm
+                  focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary bg-slate-50 focus:bg-white"
+              />
+              <p className="text-[10px] text-slate-400 mt-1">Se vazio, o sistema gera automaticamente.</p>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              <div>
+                <label className="block text-xs font-semibold text-slate-600 mb-1.5">E-mail para compartilhar</label>
                 <input
-                  type={type}
-                  value={(form as Record<string, unknown>)[key] as string}
-                  onChange={set(key)}
-                  placeholder={placeholder}
-                  required={key === 'email'}
+                  type="email"
+                  value={form.email_contato}
+                  onChange={set('email_contato')}
+                  placeholder="opcional"
                   className="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-sm
                     focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary bg-slate-50 focus:bg-white"
                 />
               </div>
-            ))}
+              <div>
+                <label className="block text-xs font-semibold text-slate-600 mb-1.5">WhatsApp para compartilhar</label>
+                <input
+                  type="text"
+                  value={form.whatsapp}
+                  onChange={set('whatsapp')}
+                  placeholder="(xx) xxxxx-xxxx"
+                  className="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-sm
+                    focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary bg-slate-50 focus:bg-white"
+                />
+              </div>
+            </div>
 
             {/* Role */}
             <div>
-              <label className="block text-xs font-semibold text-slate-600 mb-1.5">Perfil de acesso</label>
+              <label className="block text-xs font-semibold text-slate-600 mb-1.5">Papel (alçada operacional)</label>
               <select
-                value={form.role}
-                onChange={e => setForm(f => ({ ...f, role: e.target.value as Role }))}
+                value={form.papel_global}
+                onChange={e => setForm(f => ({ ...f, papel_global: e.target.value as PapelGlobal }))}
                 className="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-sm
                   focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary bg-slate-50"
               >
-                {(Object.entries(ROLE_LABEL) as [Role, string][]).map(([r, label]) => (
-                  <option key={r} value={r}>{label}</option>
-                ))}
+                {PAPEIS.map(p => <option key={p.value} value={p.value}>{p.label}</option>)}
               </select>
             </div>
 
@@ -517,9 +955,10 @@ function ConviteModal({ onClose }: { onClose: () => void }) {
               })}
             />
 
-            {convidar.isError && (
-              <div className="flex items-center gap-2 bg-red-50 text-red-600 rounded-xl px-3 py-2 text-xs">
-                <AlertCircle size={13} /> Erro ao enviar convite. Verifique o e-mail.
+            {cadastrar.isError && (
+              <div className="flex items-start gap-2 bg-red-50 text-red-600 rounded-xl px-3 py-2 text-xs">
+                <AlertCircle size={13} className="mt-0.5" />
+                <span>{cadastrar.error instanceof Error ? cadastrar.error.message : 'Erro ao cadastrar usuário.'}</span>
               </div>
             )}
 
@@ -528,12 +967,12 @@ function ConviteModal({ onClose }: { onClose: () => void }) {
                 className="flex-1 py-2.5 rounded-xl border border-slate-200 text-sm font-semibold text-slate-600">
                 Cancelar
               </button>
-              <button type="submit" disabled={convidar.isPending}
+              <button type="submit" disabled={cadastrar.isPending || !form.nome.trim()}
                 className="flex-1 py-2.5 rounded-xl bg-primary text-white text-sm font-semibold
                   flex items-center justify-center gap-1.5 hover:bg-indigo-500 disabled:opacity-60">
-                {convidar.isPending
+                {cadastrar.isPending
                   ? <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                  : <><Mail size={14} /> Enviar convite</>}
+                  : <><UserPlus size={14} /> Cadastrar</>}
               </button>
             </div>
           </form>
@@ -547,20 +986,20 @@ function ConviteModal({ onClose }: { onClose: () => void }) {
 export default function AdminUsuarios() {
   const navigate = useNavigate()
   const { data: perfis, isLoading, refetch, isFetching } = usePerfis()
-  const update = useUpdateUser()
 
   const [search,       setSearch]       = useState('')
   const [filterRole,   setFilterRole]   = useState<Role | 'todos'>('todos')
   const [expandedUser, setExpandedUser] = useState<string | null>(null)
-  const [showConvite,  setShowConvite]  = useState(false)
+  const [showCadastro, setShowCadastro] = useState(false)
 
   const filtered = useMemo(() => {
     if (!perfis) return []
     return perfis.filter(p => {
+      const roleOrPapel = (p.papel_global as Role | undefined) || p.role
       const matchSearch = !search ||
         p.nome.toLowerCase().includes(search.toLowerCase()) ||
         p.email.toLowerCase().includes(search.toLowerCase())
-      const matchRole = filterRole === 'todos' || p.role === filterRole
+      const matchRole = filterRole === 'todos' || roleOrPapel === filterRole
       return matchSearch && matchRole
     })
   }, [perfis, search, filterRole])
@@ -568,7 +1007,8 @@ export default function AdminUsuarios() {
   const stats = useMemo(() => {
     if (!perfis) return {}
     return perfis.reduce((acc, p) => {
-      acc[p.role] = (acc[p.role] ?? 0) + 1
+      const roleOrPapel = (p.papel_global as Role | undefined) || p.role
+      acc[roleOrPapel] = (acc[roleOrPapel] ?? 0) + 1
       return acc
     }, {} as Record<string, number>)
   }, [perfis])
@@ -578,7 +1018,7 @@ export default function AdminUsuarios() {
 
   return (
     <>
-      {showConvite && <ConviteModal onClose={() => { setShowConvite(false); refetch() }} />}
+      {showCadastro && <CadastroUsuarioModal onClose={() => { setShowCadastro(false); refetch() }} />}
 
       <div className="space-y-4">
         {/* Header */}
@@ -597,15 +1037,15 @@ export default function AdminUsuarios() {
             <RefreshCw size={15} />
           </button>
           <button
-            onClick={() => setShowConvite(true)}
+            onClick={() => setShowCadastro(true)}
             className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-primary text-white text-xs font-bold shadow-lg hover:bg-indigo-500 active:scale-95 transition-all">
-            <UserPlus size={14} /> Convidar
+            <UserPlus size={14} /> Cadastrar
           </button>
         </div>
 
         {/* Stats de roles */}
-        <div className="grid grid-cols-3 gap-2">
-          {(['administrador', 'gestor', 'requisitante'] as Role[]).map(r => {
+        <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+          {(['requisitante', 'equipe', 'supervisor', 'diretor', 'ceo'] as Role[]).map(r => {
             const c = ROLE_COLOR[r]
             return (
               <div key={r} className={`rounded-xl p-3 ${c.bg}`}>
@@ -629,7 +1069,7 @@ export default function AdminUsuarios() {
             />
           </div>
           <div className="flex gap-1.5 overflow-x-auto pb-1">
-            {(['todos', ...Object.keys(ROLE_LABEL)] as (Role | 'todos')[]).map(r => (
+            {(['todos', 'requisitante', 'equipe', 'supervisor', 'diretor', 'ceo'] as (Role | 'todos')[]).map(r => (
               <button key={r} onClick={() => setFilterRole(r)}
                 className={`flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-semibold transition-all
                   ${filterRole === r
@@ -670,7 +1110,7 @@ export default function AdminUsuarios() {
                       </div>
                       <p className="text-xs text-slate-400 truncate">{p.email}</p>
                       <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
-                        <RoleBadge role={p.role} />
+                        <RoleBadge role={(p.papel_global as Role) || p.role} />
                         {p.alcada_nivel > 0 && (
                           <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-navy/10 text-navy text-[10px] font-semibold">
                             <Shield size={9} /> N{p.alcada_nivel}

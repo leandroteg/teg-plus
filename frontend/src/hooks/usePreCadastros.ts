@@ -51,10 +51,14 @@ const TABLE_MAP: Record<string, string> = {
 // ── Hook ────────────────────────────────────────────────────────────────────────
 
 export function usePreCadastros() {
-  const { perfil, isAdmin } = useAuth()
+  const { perfil, isAdmin, papelGlobal, canTechnicalApprove } = useAuth()
   const qc = useQueryClient()
 
-  const isAdminOrDirector = isAdmin || perfil?.role === 'gerente'
+  const isAdminOrDirector =
+    isAdmin
+    || papelGlobal === 'diretor'
+    || papelGlobal === 'ceo'
+    || canTechnicalApprove('cadastros')
 
   // Fetch pending pre-cadastros (admin/director only)
   const { data: pendentes = [], isLoading } = useQuery({
