@@ -265,7 +265,6 @@ export default function ModuloSelector() {
         <div className="py-1">
           <a
             href="/perfil"
-            onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); window.location.assign('/perfil') }}
             className={`w-full flex items-center gap-3 px-4 py-2.5 text-[13px] font-medium transition-colors
               ${isLight ? 'text-slate-600 hover:bg-slate-50 hover:text-slate-900' : 'text-slate-300 hover:bg-white/[0.04] hover:text-white'}`}
           >
@@ -278,7 +277,6 @@ export default function ModuloSelector() {
               <div className={`h-px mx-3 my-1 ${isLight ? 'bg-slate-100' : 'bg-white/[0.06]'}`} />
               <a
                 href="/admin/usuarios"
-                onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); window.location.assign('/admin/usuarios') }}
                 className={`w-full flex items-center gap-3 px-4 py-2.5 text-[13px] font-medium transition-colors
                   ${isLight ? 'text-slate-600 hover:bg-slate-50 hover:text-slate-900' : 'text-slate-300 hover:bg-white/[0.04] hover:text-white'}`}
               >
@@ -287,7 +285,6 @@ export default function ModuloSelector() {
               </a>
               <a
                 href="/cadastros"
-                onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); window.location.assign('/cadastros') }}
                 className={`w-full flex items-center gap-3 px-4 py-2.5 text-[13px] font-medium transition-colors
                   ${isLight ? 'text-slate-600 hover:bg-slate-50 hover:text-slate-900' : 'text-slate-300 hover:bg-white/[0.04] hover:text-white'}`}
               >
@@ -296,7 +293,6 @@ export default function ModuloSelector() {
               </a>
               <a
                 href="/admin/integracoes"
-                onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); window.location.assign('/admin/integracoes') }}
                 className={`w-full flex items-center gap-3 px-4 py-2.5 text-[13px] font-medium transition-colors
                   ${isLight ? 'text-slate-600 hover:bg-slate-50 hover:text-slate-900' : 'text-slate-300 hover:bg-white/[0.04] hover:text-white'}`}
               >
@@ -305,7 +301,6 @@ export default function ModuloSelector() {
               </a>
               <a
                 href="/admin/desenvolvimento"
-                onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); window.location.assign('/admin/desenvolvimento') }}
                 className={`w-full flex items-center gap-3 px-4 py-2.5 text-[13px] font-medium transition-colors
                   ${isLight ? 'text-slate-600 hover:bg-slate-50 hover:text-slate-900' : 'text-slate-300 hover:bg-white/[0.04] hover:text-white'}`}
               >
