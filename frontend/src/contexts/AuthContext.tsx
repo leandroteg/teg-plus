@@ -469,10 +469,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   const resetPassword = async (identifier: string) => {
-    if (!identifier.includes('@')) {
-      return { error: 'Recuperação por usuário não disponível. Use o e-mail de login ou fale com o administrador.' }
+    const candidates = resolveIdentifierCandidates(identifier)
+    if (candidates.length === 0) {
+      return { error: 'Informe usuário ou e-mail para recuperar a senha.' }
     }
-    const email = identifier.trim().toLowerCase()
+
+    const email = candidates[0]
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
       redirectTo: `${window.location.origin}/nova-senha`,
     })

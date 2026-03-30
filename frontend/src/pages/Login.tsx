@@ -8,6 +8,21 @@ import ThemeToggle from '../components/ThemeToggle'
 
 type View = 'login' | 'reset'
 
+function normalizeLoginUsername(v: string) {
+  const cleaned = v
+    .trim()
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+  const normalized = cleaned
+    .replace(/\s+/g, '.')
+    .replace(/[^a-z0-9@._-]/g, '')
+    .replace(/\.{2,}/g, '.')
+    .replace(/^\./, '')
+    .replace(/\.$/, '')
+  return normalized
+}
+
 // ── Sub-componentes fora do Login para evitar remount a cada render ──────────
 // IMPORTANTE: definir componentes DENTRO do componente pai faz React
 // desmontar/remontar a cada re-render, causando perda de foco nos inputs.
@@ -98,8 +113,9 @@ export default function Login() {
   const { user, loading, signIn, resetPassword } = useAuth()
   const { isDark, isLightSidebar: isLight } = useTheme()
 
-  const [view,     setView]     = useState<View>('login')
-  const [email,    setEmail]    = useState('')
+  const [view,      setView]      = useState<View>('login')
+  const [loginUser, setLoginUser] = useState('')
+  const [resetEmail, setResetEmail] = useState('')
   const [password, setPassword] = useState('')
   const [showPass, setShowPass] = useState(false)
   const [busy,     setBusy]     = useState(false)
@@ -116,17 +132,17 @@ export default function Login() {
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault(); clr(); setBusy(true)
-    const { error } = await signIn(email, password)
+    const { error } = await signIn(loginUser, password)
     setBusy(false)
     if (error) setError(error)
   }
 
   const handleReset = async (e: React.FormEvent) => {
     e.preventDefault(); clr(); setBusy(true)
-    const { error } = await resetPassword(email)
+    const { error } = await resetPassword(resetEmail)
     setBusy(false)
     if (error) { setError(error); return }
-    setSuccess('Link de recuperação enviado! Verifique seu e-mail.')
+    setSuccess('Link de recupera\u00e7\u00e3o enviado! Verifique seu e-mail.')
   }
 
   // ── Views ─────────────────────────────────────────────────────────
@@ -150,7 +166,7 @@ export default function Login() {
             <LogoTeg size={120} animated={false} glowing={false} />
           </div>
           <p className="text-xs text-slate-400 mt-0.5 font-medium tracking-wide uppercase">
-            Sistema ERP · Acesso Restrito
+            {'Sistema ERP \u00b7 Acesso Restrito'}
           </p>
         </div>
 
@@ -161,11 +177,11 @@ export default function Login() {
           {view === 'login' && (
             <form onSubmit={handleLogin} className="p-5 space-y-4">
               <InputField
-                label="E-mail corporativo"
-                type="email"
-                value={email}
-                onChange={v => { setEmail(v); clr() }}
-                placeholder="voce@teguniao.com.br"
+                label={'Usu\u00e1rio ou e-mail'}
+                type="text"
+                value={loginUser}
+                onChange={v => { setLoginUser(normalizeLoginUsername(v)); clr() }}
+                placeholder="nome.sobrenome ou email"
                 icon={Mail}
                 autoFocus
               />
@@ -187,7 +203,7 @@ export default function Login() {
 
               <div className="text-right -mt-1">
                 <button type="button"
-                  onClick={() => { setView('reset'); clr() }}
+                  onClick={() => { setView('reset'); setResetEmail(''); clr() }}
                   className="text-xs text-primary hover:underline font-medium">
                   Esqueci a senha
                 </button>
@@ -208,18 +224,18 @@ export default function Login() {
                 </p>
               </div>
               <InputField
-                label="Seu e-mail" type="email"
-                value={email}
-                onChange={v => { setEmail(v); clr() }}
-                placeholder="voce@teguniao.com.br"
+                label={'Usu\u00e1rio ou e-mail'} type="text"
+                value={resetEmail}
+                onChange={v => { setResetEmail(normalizeLoginUsername(v)); clr() }}
+                placeholder="nome.sobrenome ou email"
                 icon={Mail} autoFocus
               />
               <Feedback error={error} success={success} />
-              <SubmitBtn label="Enviar link de recuperação" busy={busy} />
+              <SubmitBtn label={'Enviar link de recupera\u00e7\u00e3o'} busy={busy} />
               <button type="button"
                 onClick={() => { setView('login'); clr() }}
                 className="w-full text-center text-xs text-slate-500 hover:text-navy transition-colors">
-                ← Voltar ao login
+                {'\u2190 Voltar ao login'}
               </button>
             </form>
           )}
@@ -228,7 +244,7 @@ export default function Login() {
 
         {/* Footer */}
         <p className="text-center text-xs text-slate-400 mt-5">
-          TEG+ ERP v2.0 · Acesso apenas para colaboradores autorizados
+          {'TEG+ ERP v2.0 \u00b7 Acesso apenas para colaboradores autorizados'}
         </p>
       </div>
     </div>
