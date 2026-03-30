@@ -19,7 +19,6 @@ function normalizeLoginUsername(v: string) {
     .replace(/[^a-z0-9@._-]/g, '')
     .replace(/\.{2,}/g, '.')
     .replace(/^\./, '')
-    .replace(/\.$/, '')
   return normalized
 }
 
