@@ -167,6 +167,7 @@ import FrotasHome from './pages/frotas/FrotasHome'
 import FrotaHub      from './pages/frotas/frota/FrotaHub'
 import ManutencaoHub from './pages/frotas/manutencao/ManutencaoHub'
 import OperacaoHub   from './pages/frotas/operacao/OperacaoHub'
+import SolicitacoesFrotas from './pages/frotas/SolicitacoesFrotas'
 
 // Admin
 import AdminUsuarios from './pages/AdminUsuarios'
@@ -267,10 +268,11 @@ export default function App() {
           {/* Módulo Frotas */}
           <Route element={<ModuleRoute moduleKey="frotas" />}>
             <Route element={<FrotasLayout />}>
-              <Route path="/frotas"            element={<FrotasHome />} />
-              <Route path="/frotas/frota"      element={<FrotaHub />} />
-              <Route path="/frotas/manutencao" element={<ManutencaoHub />} />
-              <Route path="/frotas/operacao"   element={<OperacaoHub />} />
+              <Route path="/frotas"                element={<FrotasHome />} />
+              <Route path="/frotas/solicitacoes"  element={<SolicitacoesFrotas />} />
+              <Route path="/frotas/frota"          element={<FrotaHub />} />
+              <Route path="/frotas/manutencao"     element={<ManutencaoHub />} />
+              <Route path="/frotas/operacao"       element={<OperacaoHub />} />
             </Route>
           </Route>
 
