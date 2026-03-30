@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react'
 import {
-  Search, Plus, Car, Cog, Gauge, Timer, AlertTriangle,
+  Search, Plus, Car, Cog, Gauge, Timer,
   FileText, ShieldAlert, Wrench, ClipboardList, MapPin, Warehouse,
   LayoutGrid, LayoutList,
 } from 'lucide-react'
@@ -97,132 +97,128 @@ function VeiculoCard({ v, osCount, isLight, onAlocar, onOS, onChecklist }: Veicu
   const diasSeguro = diasAte(v.vencimento_seguro)
   const crlvColor   = docAlertColor(diasCrlv, isLight)
   const seguroColor = docAlertColor(diasSeguro, isLight)
-  const hasDocAlert = crlvColor !== '' || seguroColor !== ''
 
   const identificador = isMaquina && v.numero_serie ? v.numero_serie : v.placa
 
   return (
-    <div className={`rounded-2xl border transition-all duration-200 hover:shadow-lg group ${
-      isLight
-        ? 'bg-white border-slate-200 hover:border-rose-300 hover:shadow-rose-500/10'
-        : 'bg-slate-800/50 border-white/[0.06] hover:border-rose-500/40 hover:shadow-rose-500/5'
+    <div className={`rounded-2xl border shadow-sm transition-all hover:shadow-md ${
+      isLight ? 'bg-white border-slate-200' : 'bg-[#1e293b] border-white/[0.06]'
     }`}>
       <div className="p-4">
-        {/* Header */}
-        <div className="flex items-start justify-between gap-2 mb-3">
-          <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-2 mb-0.5">
-              <span className={`text-base font-extrabold tracking-wide ${isLight ? 'text-slate-800' : 'text-white'}`}>
+        <div className="flex items-start gap-3">
+          {/* Icon box */}
+          <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${
+            isMaquina
+              ? (isLight ? 'bg-violet-50' : 'bg-violet-500/10')
+              : (isLight ? 'bg-sky-50'    : 'bg-sky-500/10')
+          }`}>
+            {isMaquina
+              ? <Cog  size={16} className={isLight ? 'text-violet-600' : 'text-violet-400'} />
+              : <Car  size={16} className={isLight ? 'text-sky-600'    : 'text-sky-400'} />
+            }
+          </div>
+
+          {/* Main content */}
+          <div className="flex-1 min-w-0">
+            {/* Title + OSBadge */}
+            <div className="flex items-start justify-between gap-1 mb-0.5">
+              <p className={`text-sm font-bold truncate ${isLight ? 'text-slate-800' : 'text-white'}`}>
                 {identificador}
-              </span>
+              </p>
               {osCount > 0 && <OSBadge count={osCount} isLight={isLight} />}
             </div>
-            <p className={`text-xs truncate ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
-              {v.marca} {v.modelo} {v.ano_mod ? `· ${v.ano_mod}` : ''}
+
+            {/* Subtitle */}
+            <p className="text-[11px] text-slate-500 truncate">
+              {v.marca} {v.modelo}{v.ano_mod ? ` · ${v.ano_mod}` : ''}
             </p>
+
+            {/* Badges row */}
+            <div className="flex flex-wrap items-center gap-1.5 mt-2">
+              {/* Propriedade */}
+              <span className={`inline-flex items-center text-[10px] font-semibold px-2 py-0.5 rounded-full ${isLight ? prop.light : prop.dark}`}>
+                {prop.label}
+              </span>
+
+              {/* Preventiva */}
+              <span className={`inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full border ${isLight ? prevStyle.light : prevStyle.dark}`}>
+                <Wrench size={9} />
+                {isMaquina && v.km_proxima_preventiva
+                  ? `Prev. ${fmtNum(v.km_proxima_preventiva)} h`
+                  : v.km_proxima_preventiva
+                  ? `Prev. ${fmtNum(v.km_proxima_preventiva)} km`
+                  : v.data_proxima_preventiva
+                  ? `Prev. ${new Date(v.data_proxima_preventiva).toLocaleDateString('pt-BR')}`
+                  : 'Preventiva OK'}
+              </span>
+            </div>
+
+            {/* Meta row */}
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-2 text-[10px] text-slate-400">
+              {/* KM / Hs */}
+              {isMaquina ? (
+                v.horimetro_atual !== undefined && (
+                  <span className="flex items-center gap-1">
+                    <Timer size={10} /> {fmtNum(v.horimetro_atual)} h
+                  </span>
+                )
+              ) : (
+                <span className="flex items-center gap-1">
+                  <Gauge size={10} /> {fmtNum(v.hodometro_atual)} km
+                </span>
+              )}
+
+              {/* CRLV alert */}
+              {crlvColor && (
+                <span className={`flex items-center gap-1 font-semibold ${crlvColor}`}>
+                  <FileText size={9} />
+                  CRLV {diasCrlv !== null && diasCrlv <= 0 ? 'vencido' : `${diasCrlv}d`}
+                </span>
+              )}
+
+              {/* Seguro alert */}
+              {seguroColor && (
+                <span className={`flex items-center gap-1 font-semibold ${seguroColor}`}>
+                  <FileText size={9} />
+                  Seguro {diasSeguro !== null && diasSeguro <= 0 ? 'vencido' : `${diasSeguro}d`}
+                </span>
+              )}
+            </div>
           </div>
-          {/* Tipo badge */}
-          <span className={`shrink-0 inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full border ${
-            isMaquina
-              ? (isLight ? 'bg-violet-50 text-violet-700 border-violet-200' : 'bg-violet-500/10 text-violet-400 border-violet-500/20')
-              : (isLight ? 'bg-sky-50 text-sky-700 border-sky-200'           : 'bg-sky-500/10 text-sky-400 border-sky-500/20')
-          }`}>
-            {isMaquina ? <Cog size={9} /> : <Car size={9} />}
-            {isMaquina ? 'Máquina' : 'Veículo'}
-          </span>
         </div>
-
-        {/* Badges row */}
-        <div className="flex flex-wrap items-center gap-1.5 mb-3">
-          <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${isLight ? prop.light : prop.dark}`}>
-            {prop.label}
-          </span>
-
-          {/* Odômetro / Horímetro */}
-          {isMaquina ? (
-            v.horimetro_atual !== undefined && (
-              <span className={`inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full ${
-                isLight ? 'bg-slate-100 text-slate-600' : 'bg-slate-700/60 text-slate-300'
-              }`}>
-                <Timer size={9} />
-                {fmtNum(v.horimetro_atual)} h
-              </span>
-            )
-          ) : (
-            <span className={`inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full ${
-              isLight ? 'bg-slate-100 text-slate-600' : 'bg-slate-700/60 text-slate-300'
-            }`}>
-              <Gauge size={9} />
-              {fmtNum(v.hodometro_atual)} km
-            </span>
-          )}
-
-          {/* Próxima preventiva */}
-          <span className={`inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full border ${isLight ? prevStyle.light : prevStyle.dark}`}>
-            <Wrench size={9} />
-            {isMaquina && v.km_proxima_preventiva
-              ? `Prev. ${fmtNum(v.km_proxima_preventiva)} h`
-              : v.km_proxima_preventiva
-              ? `Prev. ${fmtNum(v.km_proxima_preventiva)} km`
-              : v.data_proxima_preventiva
-              ? `Prev. ${new Date(v.data_proxima_preventiva).toLocaleDateString('pt-BR')}`
-              : 'Preventiva OK'}
-          </span>
-        </div>
-
-        {/* Document alerts */}
-        {hasDocAlert && (
-          <div className={`flex flex-wrap gap-1.5 mb-3 p-2 rounded-xl ${
-            isLight ? 'bg-red-50 border border-red-100' : 'bg-red-500/5 border border-red-500/10'
-          }`}>
-            <AlertTriangle size={11} className={isLight ? 'text-red-500 mt-px' : 'text-red-400 mt-px'} />
-            {crlvColor && (
-              <span className={`text-[10px] font-semibold ${crlvColor}`}>
-                <FileText size={9} className="inline mr-0.5" />
-                CRLV {diasCrlv !== null && diasCrlv <= 0 ? 'VENCIDO' : `vence em ${diasCrlv}d`}
-              </span>
-            )}
-            {seguroColor && (
-              <span className={`text-[10px] font-semibold ${seguroColor}`}>
-                <ShieldAlert size={9} className="inline mr-0.5" />
-                Seguro {diasSeguro !== null && diasSeguro <= 0 ? 'VENCIDO' : `vence em ${diasSeguro}d`}
-              </span>
-            )}
-          </div>
-        )}
       </div>
 
-      {/* Actions */}
-      <div className={`flex items-center gap-1 px-4 pb-4`}>
+      {/* Actions footer */}
+      <div className="flex items-center gap-2 px-4 pb-4">
         <button
           onClick={() => onAlocar(v.id)}
-          className={`flex-1 flex items-center justify-center gap-1.5 text-xs font-semibold py-1.5 rounded-xl transition-all ${
+          className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl border text-[11px] font-semibold transition-all ${
             isLight
-              ? 'bg-rose-500 text-white hover:bg-rose-600 shadow-sm shadow-rose-500/30'
-              : 'bg-rose-500/90 text-white hover:bg-rose-500 shadow-sm shadow-rose-500/20'
+              ? 'bg-rose-50 border-rose-200 text-rose-600 hover:bg-rose-100'
+              : 'bg-rose-500/10 border-rose-500/25 text-rose-300 hover:bg-rose-500/[0.18]'
           }`}
         >
           <MapPin size={11} /> Alocar
         </button>
         <button
           onClick={() => onOS(v.id)}
-          className={`flex items-center justify-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-xl transition-all ${
+          className={`flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl border text-[11px] font-semibold transition-all ${
             isLight
-              ? 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-              : 'bg-slate-700/60 text-slate-300 hover:bg-slate-700'
+              ? 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'
+              : 'bg-white/[0.04] border-white/[0.06] text-slate-300 hover:bg-white/[0.08]'
           }`}
         >
           <Wrench size={11} /> OS
         </button>
         <button
           onClick={() => onChecklist(v.id)}
-          className={`flex items-center justify-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-xl transition-all ${
+          className={`flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl border text-[11px] font-semibold transition-all ${
             isLight
-              ? 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-              : 'bg-slate-700/60 text-slate-300 hover:bg-slate-700'
+              ? 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'
+              : 'bg-white/[0.04] border-white/[0.06] text-slate-300 hover:bg-white/[0.08]'
           }`}
         >
-          <ClipboardList size={11} /> Checklist
+          <ClipboardList size={11} />
         </button>
       </div>
     </div>

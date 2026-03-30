@@ -207,87 +207,83 @@ function AlocacaoCard({ a, osCount, isLight, onRetorno }: AlocacaoCardProps) {
   const retAtrasado = a.data_retorno_prev && new Date(a.data_retorno_prev) < new Date()
 
   return (
-    <div className={`rounded-2xl border transition-all duration-200 hover:shadow-lg ${
-      isLight
-        ? 'bg-white border-slate-200 hover:border-rose-300 hover:shadow-rose-500/10'
-        : 'bg-slate-800/50 border-white/[0.06] hover:border-rose-500/40 hover:shadow-rose-500/5'
+    <div className={`rounded-2xl border shadow-sm transition-all hover:shadow-md ${
+      isLight ? 'bg-white border-slate-200' : 'bg-[#1e293b] border-white/[0.06]'
     }`}>
       <div className="p-4">
-        {/* Header */}
-        <div className="flex items-start justify-between gap-2 mb-3">
-          <div className="flex items-center gap-2 min-w-0">
-            <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 ${
-              isMaquina
-                ? (isLight ? 'bg-violet-50 text-violet-600' : 'bg-violet-500/10 text-violet-400')
-                : (isLight ? 'bg-sky-50 text-sky-600'       : 'bg-sky-500/10 text-sky-400')
-            }`}>
-              {isMaquina ? <Cog size={15} /> : <Car size={15} />}
-            </div>
-            <div className="min-w-0">
-              <p className={`text-sm font-extrabold tracking-wide truncate ${isLight ? 'text-slate-800' : 'text-white'}`}>
+        <div className="flex items-start gap-3">
+          {/* Icon box */}
+          <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${
+            isMaquina
+              ? (isLight ? 'bg-violet-50' : 'bg-violet-500/10')
+              : (isLight ? 'bg-sky-50'    : 'bg-sky-500/10')
+          }`}>
+            {isMaquina
+              ? <Cog size={16} className={isLight ? 'text-violet-600' : 'text-violet-400'} />
+              : <Car size={16} className={isLight ? 'text-sky-600'    : 'text-sky-400'} />
+            }
+          </div>
+
+          {/* Main content */}
+          <div className="flex-1 min-w-0">
+            {/* Title + OSBadge */}
+            <div className="flex items-start justify-between gap-1 mb-0.5">
+              <p className={`text-sm font-bold truncate ${isLight ? 'text-slate-800' : 'text-white'}`}>
                 {identificador}
               </p>
-              <p className={`text-xs truncate ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>
-                {a.veiculo?.marca} {a.veiculo?.modelo}
-              </p>
+              {osCount > 0 && <OSBadge count={osCount} isLight={isLight} />}
             </div>
-          </div>
-          {osCount > 0 && <OSBadge count={osCount} isLight={isLight} />}
-        </div>
 
-        {/* Details */}
-        <div className="space-y-1.5 mb-4">
-          <div className={`flex items-center gap-2 text-xs rounded-xl px-3 py-2 ${
-            isLight ? 'bg-slate-50' : 'bg-slate-700/30'
-          }`}>
-            <Building2 size={12} className="shrink-0 text-rose-500" />
-            <span className={`font-medium truncate ${isLight ? 'text-slate-700' : 'text-slate-200'}`}>
-              {a.obra?.nome ?? a.centro_custo_id ?? 'Sem destino'}
-            </span>
-          </div>
+            {/* Subtitle */}
+            <p className="text-[11px] text-slate-500 truncate">
+              {a.veiculo?.marca} {a.veiculo?.modelo}
+            </p>
 
-          <div className="grid grid-cols-2 gap-1.5">
-            <div className={`flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-xl ${
-              isLight ? 'bg-slate-50 text-slate-500' : 'bg-slate-700/20 text-slate-400'
-            }`}>
-              <CalendarDays size={11} className="shrink-0" />
-              <span>Saída: {a.data_saida ? new Date(a.data_saida).toLocaleDateString('pt-BR') : '—'}</span>
-            </div>
-            <div className={`flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-xl ${
-              retAtrasado
-                ? (isLight ? 'bg-red-50 text-red-600' : 'bg-red-500/10 text-red-400')
-                : (isLight ? 'bg-slate-50 text-slate-500' : 'bg-slate-700/20 text-slate-400')
-            }`}>
-              <CalendarDays size={11} className="shrink-0" />
-              <span>
-                Ret: {a.data_retorno_prev ? new Date(a.data_retorno_prev).toLocaleDateString('pt-BR') : '—'}
-                {retAtrasado ? ' ⚠' : ''}
+            {/* Badges row */}
+            <div className="flex flex-wrap items-center gap-1.5 mt-2">
+              {/* Obra / CC */}
+              <span className={`inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full max-w-[160px] truncate ${
+                isLight ? 'bg-rose-50 text-rose-700' : 'bg-rose-500/10 text-rose-300'
+              }`}>
+                <Building2 size={9} className="shrink-0" />
+                {a.obra?.nome ?? a.centro_custo_id ?? 'Sem destino'}
               </span>
             </div>
-          </div>
 
-          {a.responsavel_nome && (
-            <div className={`flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-xl ${
-              isLight ? 'bg-slate-50 text-slate-500' : 'bg-slate-700/20 text-slate-400'
-            }`}>
-              <User size={11} className="shrink-0" />
-              <span className="truncate">{a.responsavel_nome}</span>
+            {/* Meta row */}
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-2 text-[10px] text-slate-400">
+              {/* Saída */}
+              <span className="flex items-center gap-1">
+                <CalendarDays size={10} /> Saída: {fmtDate(a.data_saida)}
+              </span>
+
+              {/* Retorno previsto */}
+              <span className={`flex items-center gap-1 ${retAtrasado ? (isLight ? 'text-red-600 font-semibold' : 'text-red-400 font-semibold') : ''}`}>
+                <CalendarDays size={10} /> Ret: {fmtDate(a.data_retorno_prev)}{retAtrasado ? ' ⚠' : ''}
+              </span>
+
+              {/* Responsável */}
+              {a.responsavel_nome && (
+                <span className="flex items-center gap-1">
+                  <User size={10} /> {a.responsavel_nome}
+                </span>
+              )}
             </div>
-          )}
+          </div>
         </div>
       </div>
 
-      {/* Action */}
-      <div className={`px-4 pb-4`}>
+      {/* Action footer */}
+      <div className="px-4 pb-4">
         <button
           onClick={() => onRetorno(a)}
-          className={`w-full flex items-center justify-center gap-1.5 text-xs font-semibold py-2 rounded-xl transition-all ${
+          className={`w-full flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl border text-[11px] font-semibold transition-all ${
             isLight
-              ? 'bg-slate-100 text-slate-600 hover:bg-rose-50 hover:text-rose-600'
-              : 'bg-slate-700/60 text-slate-300 hover:bg-rose-500/10 hover:text-rose-400'
+              ? 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-rose-50 hover:border-rose-200 hover:text-rose-600'
+              : 'bg-white/[0.04] border-white/[0.06] text-slate-300 hover:bg-rose-500/10 hover:border-rose-500/25 hover:text-rose-300'
           }`}
         >
-          <CornerDownLeft size={12} /> Registrar Retorno
+          <CornerDownLeft size={11} /> Registrar Retorno
         </button>
       </div>
     </div>
