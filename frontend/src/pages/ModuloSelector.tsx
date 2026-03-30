@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import {
   LogOut, X, Lock, Megaphone, User, Link2, Code2,
   // Category icons
@@ -177,7 +177,7 @@ export default function ModuloSelector() {
   const [avatarOpen, setAvatarOpen] = useState(false)
   const avatarMenuRef = useRef<HTMLDivElement>(null)
 
-  const nome = perfil?.nome ?? 'Usuário'
+  const nome = perfil?.nome ?? 'Usu\u00e1rio'
   const role = (perfil?.role ?? 'visitante') as Role
   const primeiroNome = nome.split(' ')[0]
   const initials = nome.trim().split(/\s+/).slice(0, 2).map(s => s[0]).join('').toUpperCase() || 'U'
@@ -226,6 +226,11 @@ export default function ModuloSelector() {
     if (route) navigate(route)
   }
 
+  function handleAvatarNavigate(route: string) {
+    setAvatarOpen(false)
+    navigate(route)
+  }
+
   async function handleLogout() {
     await signOut()
     navigate('/login', { replace: true })
@@ -263,55 +268,55 @@ export default function ModuloSelector() {
         </div>
 
         <div className="py-1">
-          <Link
-            to="/perfil"
-            onClick={() => setAvatarOpen(false)}
+          <button
+            type="button"
+            onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); handleAvatarNavigate('/perfil') }}
             className={`w-full flex items-center gap-3 px-4 py-2.5 text-[13px] font-medium transition-colors
               ${isLight ? 'text-slate-600 hover:bg-slate-50 hover:text-slate-900' : 'text-slate-300 hover:bg-white/[0.04] hover:text-white'}`}
           >
             <User size={15} className="shrink-0 opacity-50" />
             Meu Perfil
-          </Link>
+          </button>
 
           {isAdmin && (
             <>
               <div className={`h-px mx-3 my-1 ${isLight ? 'bg-slate-100' : 'bg-white/[0.06]'}`} />
-              <Link
-                to="/admin/usuarios"
-                onClick={() => setAvatarOpen(false)}
+              <button
+                type="button"
+                onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); handleAvatarNavigate('/admin/usuarios') }}
                 className={`w-full flex items-center gap-3 px-4 py-2.5 text-[13px] font-medium transition-colors
                   ${isLight ? 'text-slate-600 hover:bg-slate-50 hover:text-slate-900' : 'text-slate-300 hover:bg-white/[0.04] hover:text-white'}`}
               >
                 <ShieldCheck size={15} className="shrink-0 opacity-50" />
                 {'Usu\u00e1rios'}
-              </Link>
-              <Link
-                to="/cadastros"
-                onClick={() => setAvatarOpen(false)}
+              </button>
+              <button
+                type="button"
+                onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); handleAvatarNavigate('/cadastros') }}
                 className={`w-full flex items-center gap-3 px-4 py-2.5 text-[13px] font-medium transition-colors
                   ${isLight ? 'text-slate-600 hover:bg-slate-50 hover:text-slate-900' : 'text-slate-300 hover:bg-white/[0.04] hover:text-white'}`}
               >
                 <Settings size={15} className="shrink-0 opacity-50" />
                 Cadastros
-              </Link>
-              <Link
-                to="/admin/integracoes"
-                onClick={() => setAvatarOpen(false)}
+              </button>
+              <button
+                type="button"
+                onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); handleAvatarNavigate('/admin/integracoes') }}
                 className={`w-full flex items-center gap-3 px-4 py-2.5 text-[13px] font-medium transition-colors
                   ${isLight ? 'text-slate-600 hover:bg-slate-50 hover:text-slate-900' : 'text-slate-300 hover:bg-white/[0.04] hover:text-white'}`}
               >
                 <Link2 size={15} className="shrink-0 opacity-50" />
                 {'Integra\u00e7\u00f5es'}
-              </Link>
-              <Link
-                to="/admin/desenvolvimento"
-                onClick={() => setAvatarOpen(false)}
+              </button>
+              <button
+                type="button"
+                onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); handleAvatarNavigate('/admin/desenvolvimento') }}
                 className={`w-full flex items-center gap-3 px-4 py-2.5 text-[13px] font-medium transition-colors
                   ${isLight ? 'text-slate-600 hover:bg-slate-50 hover:text-slate-900' : 'text-slate-300 hover:bg-white/[0.04] hover:text-white'}`}
               >
                 <Code2 size={15} className="shrink-0 opacity-50" />
                 Desenvolvimento
-              </Link>
+              </button>
             </>
           )}
         </div>
@@ -654,13 +659,13 @@ export default function ModuloSelector() {
 
         {/* Subtitle below mandala */}
         <p className={`text-[11px] font-medium tracking-wide mt-2 ${isLight ? 'text-slate-400' : 'text-slate-600'}`}>
-          Selecione uma área para acessar
+          {'Selecione uma \u00e1rea para acessar'}
         </p>
       </section>
 
       {/* Footer */}
       <p className={`relative z-10 text-center text-[10px] pb-4 ${isLight ? 'text-slate-400' : 'text-slate-700'}`}>
-        Acesso restrito a colaboradores autorizados · TEG+ ERP v2.0
+        {'Acesso restrito a colaboradores autorizados \u00b7 TEG+ ERP v2.0'}
       </p>
 
       {/* ── Mural Popup (mobile: bottom-sheet · desktop: centered modal) ── */}
