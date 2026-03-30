@@ -176,7 +176,6 @@ export default function ModuloSelector() {
   const [muralOpen, setMuralOpen] = useState(false)
   const [avatarOpen, setAvatarOpen] = useState(false)
   const avatarMenuRef = useRef<HTMLDivElement>(null)
-  const avatarNavigatingRef = useRef(false)
 
   const nome = perfil?.nome ?? 'Usu\u00e1rio'
   const role = (perfil?.role ?? 'visitante') as Role
@@ -227,17 +226,6 @@ export default function ModuloSelector() {
     if (route) navigate(route)
   }
 
-  function handleAvatarNavigate(route: string, e?: { preventDefault: () => void; stopPropagation: () => void }) {
-    if (e) {
-      e.preventDefault()
-      e.stopPropagation()
-    }
-    if (avatarNavigatingRef.current) return
-    avatarNavigatingRef.current = true
-    setAvatarOpen(false)
-    window.location.assign(route)
-  }
-
   async function handleLogout() {
     await signOut()
     navigate('/login', { replace: true })
@@ -275,22 +263,21 @@ export default function ModuloSelector() {
         </div>
 
         <div className="py-1">
-          <button
-            type="button"
-            onMouseDown={(e) => handleAvatarNavigate('/perfil', e)}
+          <a
+            href="/perfil"
             className={`w-full flex items-center gap-3 px-4 py-2.5 text-[13px] font-medium transition-colors
               ${isLight ? 'text-slate-600 hover:bg-slate-50 hover:text-slate-900' : 'text-slate-300 hover:bg-white/[0.04] hover:text-white'}`}
           >
             <User size={15} className="shrink-0 opacity-50" />
             Meu Perfil
-          </button>
+          </a>
 
           {isAdmin && (
             <>
               <div className={`h-px mx-3 my-1 ${isLight ? 'bg-slate-100' : 'bg-white/[0.06]'}`} />
               <button
                 type="button"
-                onMouseDown={(e) => handleAvatarNavigate('/admin/usuarios', e)}
+                onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); window.location.assign('/admin/usuarios') }}
                 className={`w-full flex items-center gap-3 px-4 py-2.5 text-[13px] font-medium transition-colors
                   ${isLight ? 'text-slate-600 hover:bg-slate-50 hover:text-slate-900' : 'text-slate-300 hover:bg-white/[0.04] hover:text-white'}`}
               >
@@ -299,7 +286,7 @@ export default function ModuloSelector() {
               </button>
               <button
                 type="button"
-                onMouseDown={(e) => handleAvatarNavigate('/cadastros', e)}
+                onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); window.location.assign('/cadastros') }}
                 className={`w-full flex items-center gap-3 px-4 py-2.5 text-[13px] font-medium transition-colors
                   ${isLight ? 'text-slate-600 hover:bg-slate-50 hover:text-slate-900' : 'text-slate-300 hover:bg-white/[0.04] hover:text-white'}`}
               >
@@ -308,7 +295,7 @@ export default function ModuloSelector() {
               </button>
               <button
                 type="button"
-                onMouseDown={(e) => handleAvatarNavigate('/admin/integracoes', e)}
+                onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); window.location.assign('/admin/integracoes') }}
                 className={`w-full flex items-center gap-3 px-4 py-2.5 text-[13px] font-medium transition-colors
                   ${isLight ? 'text-slate-600 hover:bg-slate-50 hover:text-slate-900' : 'text-slate-300 hover:bg-white/[0.04] hover:text-white'}`}
               >
@@ -317,7 +304,7 @@ export default function ModuloSelector() {
               </button>
               <button
                 type="button"
-                onMouseDown={(e) => handleAvatarNavigate('/admin/desenvolvimento', e)}
+                onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); window.location.assign('/admin/desenvolvimento') }}
                 className={`w-full flex items-center gap-3 px-4 py-2.5 text-[13px] font-medium transition-colors
                   ${isLight ? 'text-slate-600 hover:bg-slate-50 hover:text-slate-900' : 'text-slate-300 hover:bg-white/[0.04] hover:text-white'}`}
               >
