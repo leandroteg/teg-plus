@@ -124,7 +124,6 @@ const Endomarketing = lazy(() => import('./pages/rh/Endomarketing'))
 const RHPainel = lazy(() => import('./pages/rh/RHPainel'))
 const RHAdmissao = lazy(() => import('./pages/rh/RHAdmissao'))
 const RHColaboradores = lazy(() => import('./pages/rh/RHColaboradores'))
-const RHColaboradorDetalhe = lazy(() => import('./pages/rh/RHColaboradorDetalhe'))
 const RHMovimentacoes = lazy(() => import('./pages/rh/RHMovimentacoes'))
 const RHDesligamento = lazy(() => import('./pages/rh/RHDesligamento'))
 
@@ -280,14 +279,14 @@ export default function App() {
               <Route path="/rh/mural"  element={<Lazy><MuralAdmin /></Lazy>} />
             </Route>
             <Route element={<CulturaLayout />}>
-              <Route path="/rh/cultura"       element={<LazyDash><CulturaHome /></LazyDash>} />
-              <Route path="/rh/cultura/mural" element={<Lazy><MuralAdmin /></Lazy>} />
+              <Route path="/rh/cultura"                element={<LazyDash><CulturaHome /></LazyDash>} />
+              <Route path="/rh/cultura/mural"          element={<Lazy><MuralAdmin /></Lazy>} />
+              <Route path="/rh/cultura/endomarketing"  element={<Lazy><Endomarketing /></Lazy>} />
             </Route>
             <Route element={<HeadcountLayout />}>
               <Route path="/rh/headcount"               element={<LazyDash><RHPainel /></LazyDash>} />
               <Route path="/rh/headcount/admissao"      element={<Lazy><RHAdmissao /></Lazy>} />
               <Route path="/rh/headcount/colaboradores" element={<Lazy><RHColaboradores /></Lazy>} />
-              <Route path="/rh/headcount/colaboradores/:id" element={<Lazy><RHColaboradorDetalhe /></Lazy>} />
               <Route path="/rh/headcount/movimentacoes" element={<Lazy><RHMovimentacoes /></Lazy>} />
               <Route path="/rh/headcount/desligamento"  element={<Lazy><RHDesligamento /></Lazy>} />
             </Route>
