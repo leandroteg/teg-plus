@@ -26,6 +26,8 @@ export interface NavItem {
   adminOnly?: boolean
   /** Permite que requisitantes acessem este item (ex: nova solicitação) */
   requisitanteAllowed?: boolean
+  /** Restrito a supervisor/diretor/ceo — oculto para equipe e requisitante */
+  supervisorOnly?: boolean
   action?: () => void
   actionMenu?: {
     title?: string
@@ -340,10 +342,12 @@ export default function ModuleLayout({
   const headerModuleName = mobileModuleName ?? config.moduleName
   const visibleNav = config.nav.filter(n => !n.adminOnly || isAdmin)
   const isRequisitante = !isAdmin && papelGlobal === 'requisitante'
-  const visibleNavForRole = useMemo(
-    () => (isRequisitante ? visibleNav.filter(isNovaSolicitacaoItem) : visibleNav),
-    [isRequisitante, visibleNav]
-  )
+  const isEquipe = !isAdmin && papelGlobal === 'equipe'
+  const visibleNavForRole = useMemo(() => {
+    if (isRequisitante) return visibleNav.filter(isNovaSolicitacaoItem)
+    if (isEquipe) return visibleNav.filter(n => !n.supervisorOnly)
+    return visibleNav
+  }, [isRequisitante, isEquipe, visibleNav])
   // home do módulo = primeiro item com end:true
   const homeRoute = config.nav.find(n => n.end === true)?.to ?? '/'
 
