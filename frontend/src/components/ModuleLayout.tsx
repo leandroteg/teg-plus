@@ -1,7 +1,7 @@
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { LayoutGrid, LogOut, Shield, Settings, ChevronLeft, Menu, X, User, Code2, Link2, ClipboardList, Plus } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
-import { useState, useEffect, useMemo, lazy, Suspense } from 'react'
+import { useState, useEffect, useMemo, useRef, lazy, Suspense, createContext, useContext } from 'react'
 import { useAuth, ROLE_LABEL, ROLE_COLOR } from '../contexts/AuthContext'
 import { useTheme } from '../contexts/ThemeContext'
 import LogoTeg from './LogoTeg'
@@ -9,6 +9,10 @@ import NotificationBell from './NotificationBell'
 import ApprovalBadge from './ApprovalBadge'
 
 const MinhasSolicitacoesEmbedded = lazy(() => import('../pages/MinhasSolicitacoes'))
+
+// Contexto para páginas filho saberem que estão dentro de um módulo com requisitante ativo
+export const RequisitanteCtx = createContext<{ homeRoute: string } | null>(null)
+export function useRequisitanteCtx() { return useContext(RequisitanteCtx) }
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -352,12 +356,26 @@ export default function ModuleLayout({
   // home do módulo = primeiro item com end:true
   const homeRoute = config.nav.find(n => n.end === true)?.to ?? '/'
 
+  // Guarda o pathname que estava aberto quando ?nova= estava na URL.
+  // Quando a página filho limpa o param (ex: CPPipeline), não redirecionamos
+  // imediatamente — deixamos o modal abrir. A navegação de volta acontece
+  // via RequisitanteCtx.homeRoute chamado no onClose do modal filho.
+  const novaFlowPathRef = useRef<string | null>(null)
+
   useEffect(() => {
     if (!isRequisitante) return
-    // Permite qualquer URL com ?nova= (fluxo de criação via modal)
-    if (new URLSearchParams(location.search).has('nova')) return
-    // Fora do home e sem fluxo nova → volta para home (ex: modal fechou)
-    if (location.pathname !== homeRoute) navigate(homeRoute, { replace: true })
+    const isNovaFlow = new URLSearchParams(location.search).has('nova')
+    if (isNovaFlow) {
+      novaFlowPathRef.current = location.pathname
+      return
+    }
+    // Se ainda estamos no mesmo path que tinha ?nova= (filho limpou o param),
+    // não redirecionar — modal está abrindo/aberto.
+    if (novaFlowPathRef.current === location.pathname) return
+    // Voltou ao home → limpa o ref
+    if (location.pathname === homeRoute) { novaFlowPathRef.current = null; return }
+    // Qualquer outro path sem nova → volta para home
+    navigate(homeRoute, { replace: true })
   }, [isRequisitante, homeRoute, location.pathname, location.search, navigate])
 
   async function handleLogout() {
@@ -874,6 +892,7 @@ export default function ModuleLayout({
   }, [config.mobileNav, bottomNavMaxItems, visibleNavForRole, isRequisitante])
 
   return (
+    <RequisitanteCtx.Provider value={isRequisitante ? { homeRoute } : null}>
     <div className={`min-h-screen ${isDark ? 'bg-[#0c1222]' : ls ? 'bg-slate-50' : 'bg-slate-100'}`}>
 
       {/* ══════════════════════════════════════════════════════════════
@@ -995,5 +1014,6 @@ export default function ModuleLayout({
         </nav>
       </div>
     </div>
+    </RequisitanteCtx.Provider>
   )
 }

@@ -10,6 +10,7 @@ import {
 } from 'lucide-react'
 import { useQueryClient } from '@tanstack/react-query'
 import { useNavigate, useSearchParams } from 'react-router-dom'
+import { useRequisitanteCtx } from '../../components/ModuleLayout'
 import { useTheme } from '../../contexts/ThemeContext'
 import {
   useContasPagar,
@@ -2508,6 +2509,8 @@ function LoteCard({
 
 export default function CPPipeline() {
   const { isDark } = useTheme()
+  const navigate = useNavigate()
+  const requisitanteCtx = useRequisitanteCtx()
   const qc = useQueryClient()
   const [searchParams, setSearchParams] = useSearchParams()
   const [activeTab, setActiveTab] = useState<PipelineStageId>('previsto')
@@ -3718,10 +3721,12 @@ export default function CPPipeline() {
             onClose={() => {
               setShowNovaSolicitacao(false)
               setNovaSolicitacaoKind(null)
+              if (requisitanteCtx) navigate(requisitanteCtx.homeRoute, { replace: true })
             }}
             onSuccess={() => {
               setActiveTab('previsto')
               showToast('success', 'Previsão de pagamento criada em Previstos')
+              if (requisitanteCtx) navigate(requisitanteCtx.homeRoute, { replace: true })
             }}
           />
         ) : (
@@ -3730,10 +3735,12 @@ export default function CPPipeline() {
             onClose={() => {
               setShowNovaSolicitacao(false)
               setNovaSolicitacaoKind(null)
+              if (requisitanteCtx) navigate(requisitanteCtx.homeRoute, { replace: true })
             }}
             onSuccess={() => {
               setActiveTab('confirmado')
               showToast('success', 'Solicitação extraordinária criada em Confirmados')
+              if (requisitanteCtx) navigate(requisitanteCtx.homeRoute, { replace: true })
             }}
           />
         )
