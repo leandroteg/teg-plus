@@ -2041,7 +2041,20 @@ export default function AdminUsuarios() {
                         <td className="px-3 py-3">
                           <div className="flex items-center gap-2">
                             <Avatar nome={p.nome} size="sm" />
-                            <p className="font-semibold text-navy max-w-[220px] truncate">{p.nome}</p>
+                            <p className="font-semibold text-navy max-w-[220px] truncate flex-1">{p.nome}</p>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setQuickEditUserId(null)
+                                setViewMode('cards')
+                                setExpandedUser(p.id)
+                              }}
+                              className="inline-flex items-center justify-center w-7 h-7 rounded-lg border border-slate-200 bg-slate-50/80 text-slate-500 hover:text-primary hover:border-primary/30 hover:bg-primary/5 transition-colors"
+                              title={`Editar ${p.nome}`}
+                              aria-label={`Editar ${p.nome}`}
+                            >
+                              <Edit3 size={12} className="opacity-80" />
+                            </button>
                           </div>
                         </td>
                         <td className="px-3 py-3 text-slate-500">{p.email}</td>
