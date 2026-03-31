@@ -508,8 +508,16 @@ function useChangePassword() {
           body: JSON.stringify({ auth_id, password }),
         }
       )
-      const json = await res.json()
-      if (!res.ok) throw new Error(json.error ?? 'Erro ao alterar senha')
+      const raw = await res.text()
+      let json: Record<string, any> = {}
+      if (raw) {
+        try {
+          json = JSON.parse(raw)
+        } catch {
+          json = {}
+        }
+      }
+      if (!res.ok) throw new Error((json.error as string | undefined) ?? 'Erro ao alterar senha')
       return json
     },
   })
