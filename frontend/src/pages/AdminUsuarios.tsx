@@ -179,11 +179,12 @@ function applyModuloPapeisOnPermissoes(
 
 function resolvePapelByModulo(
   modulo: string,
-  moduloPapeis: Record<string, PapelGlobal> | undefined
+  moduloPapeis: Record<string, PapelGlobal> | undefined,
+  defaultPapel: PapelGlobal = 'equipe'
 ): PapelGlobal {
-  if (!moduloPapeis) return 'requisitante'
+  if (!moduloPapeis) return defaultPapel
   const normalized = normalizeModuloForSetor(modulo)
-  return moduloPapeis[modulo] || moduloPapeis[normalized] || 'requisitante'
+  return moduloPapeis[modulo] || moduloPapeis[normalized] || defaultPapel
 }
 
 async function updatePerfilWithSync(
@@ -220,7 +221,8 @@ async function updatePerfilWithSync(
     await syncPerfilSetores(
       id,
       (rest.modulos as Record<string, boolean> | undefined) ?? ((updated as Perfil).modulos ?? {}),
-      moduloPapeis
+      moduloPapeis,
+      papel_global ?? 'equipe'
     )
   }
 
@@ -230,7 +232,8 @@ async function updatePerfilWithSync(
 async function syncPerfilSetores(
   perfilId: string,
   modulos: Record<string, boolean>,
-  moduloPapeis?: Record<string, PapelGlobal>
+  moduloPapeis?: Record<string, PapelGlobal>,
+  defaultPapel: PapelGlobal = 'equipe'
 ) {
   const ativos = Object.entries(modulos)
     .filter(([, enabled]) => Boolean(enabled))
@@ -261,7 +264,7 @@ async function syncPerfilSetores(
       .eq('perfil_id', perfilId)
 
     const rows = setores.map(setor => {
-      const papelSetor = resolvePapelByModulo(setor.modulo_key, moduloPapeis)
+      const papelSetor = resolvePapelByModulo(setor.modulo_key, moduloPapeis, defaultPapel)
       return ({
       perfil_id: perfilId,
       setor_id: setor.id,
@@ -645,7 +648,7 @@ function useCadastrarUsuario() {
           .maybeSingle()
 
         if (perfilN8n?.id) {
-          await syncPerfilSetores(perfilN8n.id, modulos)
+          await syncPerfilSetores(perfilN8n.id, modulos, undefined, papel_global)
         }
 
         return {
@@ -713,7 +716,7 @@ function useCadastrarUsuario() {
         .eq('id', perfilCriado.id)
 
       if (updErr) throw updErr
-      await syncPerfilSetores(perfilCriado.id, modulos)
+      await syncPerfilSetores(perfilCriado.id, modulos, undefined, papel_global)
 
       return {
         nome,
