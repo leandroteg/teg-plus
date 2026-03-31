@@ -16,7 +16,12 @@ window.addEventListener('unhandledrejection', (e) => {
 
 const queryClient = new QueryClient({
   defaultOptions: {
-    queries: { staleTime: 30_000, retry: 2 },
+    queries: {
+      staleTime: 30_000,
+      retry: 2,
+      gcTime: 1000 * 60 * 60 * 24, // 24h — keep cache for offline access
+      networkMode: 'offlineFirst',  // Return cached data immediately, then revalidate
+    },
   },
 })
 
