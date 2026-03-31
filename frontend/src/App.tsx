@@ -30,6 +30,8 @@ import FiscalLayout from './components/FiscalLayout'
 import EstoqueLayout from './components/EstoqueLayout'
 import LogisticaLayout from './components/LogisticaLayout'
 import FrotasLayout from './components/FrotasLayout'
+import CulturaLayout from './components/CulturaLayout'
+import HeadcountLayout from './components/HeadcountLayout'
 
 // ── Páginas lazy (code-split por rota) ────────────────────────────────────────
 const ModuloSelector = lazy(() => import('./pages/ModuloSelector'))
@@ -117,6 +119,14 @@ const CategoriasFinanceiras = lazy(() => import('./pages/cadastros/CategoriasFin
 // RH
 const RHHome = lazy(() => import('./pages/rh/RHHome'))
 const MuralAdmin = lazy(() => import('./pages/rh/MuralAdmin'))
+const CulturaHome = lazy(() => import('./pages/rh/CulturaHome'))
+const Endomarketing = lazy(() => import('./pages/rh/Endomarketing'))
+const RHPainel = lazy(() => import('./pages/rh/RHPainel'))
+const RHAdmissao = lazy(() => import('./pages/rh/RHAdmissao'))
+const RHColaboradores = lazy(() => import('./pages/rh/RHColaboradores'))
+const RHColaboradorDetalhe = lazy(() => import('./pages/rh/RHColaboradorDetalhe'))
+const RHMovimentacoes = lazy(() => import('./pages/rh/RHMovimentacoes'))
+const RHDesligamento = lazy(() => import('./pages/rh/RHDesligamento'))
 
 // Financeiro
 const DashboardFinanceiro = lazy(() => import('./pages/financeiro/DashboardFinanceiro'))
@@ -268,6 +278,18 @@ export default function App() {
             <Route element={<RHLayout />}>
               <Route path="/rh"        element={<LazyDash><RHHome /></LazyDash>} />
               <Route path="/rh/mural"  element={<Lazy><MuralAdmin /></Lazy>} />
+            </Route>
+            <Route element={<CulturaLayout />}>
+              <Route path="/rh/cultura"       element={<LazyDash><CulturaHome /></LazyDash>} />
+              <Route path="/rh/cultura/mural" element={<Lazy><MuralAdmin /></Lazy>} />
+            </Route>
+            <Route element={<HeadcountLayout />}>
+              <Route path="/rh/headcount"               element={<LazyDash><RHPainel /></LazyDash>} />
+              <Route path="/rh/headcount/admissao"      element={<Lazy><RHAdmissao /></Lazy>} />
+              <Route path="/rh/headcount/colaboradores" element={<Lazy><RHColaboradores /></Lazy>} />
+              <Route path="/rh/headcount/colaboradores/:id" element={<Lazy><RHColaboradorDetalhe /></Lazy>} />
+              <Route path="/rh/headcount/movimentacoes" element={<Lazy><RHMovimentacoes /></Lazy>} />
+              <Route path="/rh/headcount/desligamento"  element={<Lazy><RHDesligamento /></Lazy>} />
             </Route>
           </Route>
 
