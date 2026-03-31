@@ -1499,6 +1499,7 @@ export default function AdminUsuarios() {
   const [filterAtivo,  setFilterAtivo]  = useState<'todos' | 'ativos' | 'inativos'>('todos')
   const [filterAlcada, setFilterAlcada] = useState<number | 'todos'>('todos')
   const [filterModulo, setFilterModulo] = useState<string | 'todos'>('todos')
+  const [filterModuloPapel, setFilterModuloPapel] = useState<PapelGlobal | 'todos'>('todos')
   const [showFilters,  setShowFilters]  = useState(false)
   const [viewMode,     setViewMode]     = useState<'table' | 'cards'>('table')
   const [expandedUser, setExpandedUser] = useState<string | null>(null)
@@ -1517,6 +1518,7 @@ export default function AdminUsuarios() {
     if (!perfis) return []
     return perfis.filter(p => {
       const papel = resolvePapelFromPerfil(p)
+      const moduloPapeis = extractModuloPapeis(p.permissoes_especiais as Record<string, any> | undefined)
       const matchSearch = !search ||
         p.nome.toLowerCase().includes(search.toLowerCase()) ||
         p.email.toLowerCase().includes(search.toLowerCase())
@@ -1529,9 +1531,16 @@ export default function AdminUsuarios() {
             : !p.ativo
       const matchAlcada = filterAlcada === 'todos' || p.alcada_nivel === filterAlcada
       const matchModulo = filterModulo === 'todos' || Boolean(p.modulos?.[filterModulo])
-      return matchSearch && matchRole && matchAtivo && matchAlcada && matchModulo
+      const matchModuloPapel = filterModuloPapel === 'todos'
+        ? true
+        : (
+            filterModulo !== 'todos'
+            && Boolean(p.modulos?.[filterModulo])
+            && resolvePapelByModulo(filterModulo, moduloPapeis) === filterModuloPapel
+          )
+      return matchSearch && matchRole && matchAtivo && matchAlcada && matchModulo && matchModuloPapel
     })
-  }, [perfis, search, filterRole, filterAtivo, filterAlcada, filterModulo])
+  }, [perfis, search, filterRole, filterAtivo, filterAlcada, filterModulo, filterModuloPapel])
 
   const stats = useMemo(() => {
     if (!perfis) return {}
@@ -1573,6 +1582,12 @@ export default function AdminUsuarios() {
       setBulkModuloPapeis({})
     }
   }, [bulkTouchSetores])
+
+  useEffect(() => {
+    if (filterModulo === 'todos' && filterModuloPapel !== 'todos') {
+      setFilterModuloPapel('todos')
+    }
+  }, [filterModulo, filterModuloPapel])
 
   const toggleSelectOne = (id: string) => {
     setSelectedIds(prev => (
@@ -1785,7 +1800,7 @@ export default function AdminUsuarios() {
 
           {showFilters && (
             <div className="bg-white rounded-2xl border border-slate-200 p-3 shadow-card">
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-2">
+              <div className="grid grid-cols-1 md:grid-cols-5 gap-2">
                 <div>
                   <label className="block text-[11px] font-semibold text-slate-500 mb-1">Papel</label>
                   <select
@@ -1837,6 +1852,20 @@ export default function AdminUsuarios() {
                     ))}
                   </select>
                 </div>
+                <div>
+                  <label className="block text-[11px] font-semibold text-slate-500 mb-1">Papel no módulo</label>
+                  <select
+                    value={filterModuloPapel}
+                    disabled={filterModulo === 'todos'}
+                    onChange={e => setFilterModuloPapel(e.target.value as PapelGlobal | 'todos')}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <option value="todos">Todos</option>
+                    {PAPEIS.map(p => (
+                      <option key={p.value} value={p.value}>{p.label}</option>
+                    ))}
+                  </select>
+                </div>
               </div>
 
               <div className="flex justify-end pt-2">
@@ -1847,6 +1876,7 @@ export default function AdminUsuarios() {
                     setFilterAtivo('todos')
                     setFilterAlcada('todos')
                     setFilterModulo('todos')
+                    setFilterModuloPapel('todos')
                   }}
                   className="px-3 py-1.5 rounded-lg border border-slate-200 text-xs font-semibold text-slate-500 hover:bg-slate-50"
                 >
@@ -2036,9 +2066,9 @@ export default function AdminUsuarios() {
                               setViewMode('cards')
                               setExpandedUser(p.id)
                             }}
-                            className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-slate-200 text-xs font-semibold text-slate-600 hover:bg-white"
+                            className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-slate-200 bg-slate-50/80 text-xs font-semibold text-slate-500 hover:text-primary hover:border-primary/30 hover:bg-primary/5 transition-colors"
                           >
-                            <Eye size={12} />
+                            <Edit3 size={12} className="opacity-80" />
                             Editar
                           </button>
                         </td>
