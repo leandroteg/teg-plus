@@ -3,7 +3,7 @@ import ModuleLayout from './ModuleLayout'
 
 const NAV = [
   { to: '/frotas',                   icon: LayoutDashboard, label: 'Painel',             end: true },
-  { to: '/frotas/solicitacoes',      icon: Plus,            label: 'Nova Solicitação'              },
+  { to: '/frotas/solicitacoes',      icon: Plus,            label: 'Nova Solicitação', requisitanteAllowed: true },
   { to: '/frotas/frota',             icon: Truck,           label: 'Frota & Máquinas'              },
   { to: '/frotas/manutencao',        icon: Wrench,          label: 'Manutenção'                    },
   { to: '/frotas/operacao',          icon: Gauge,           label: 'Operação & Controle'           },

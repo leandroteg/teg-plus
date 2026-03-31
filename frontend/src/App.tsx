@@ -33,6 +33,7 @@ import FrotasLayout from './components/FrotasLayout'
 import CulturaLayout from './components/CulturaLayout'
 import HeadcountLayout from './components/HeadcountLayout'
 import ApontamentosLayout from './components/ApontamentosLayout'
+import PatrimonialLayout from './components/PatrimonialLayout'
 
 // ── Páginas lazy (code-split por rota) ────────────────────────────────────────
 const ModuloSelector = lazy(() => import('./pages/ModuloSelector'))
@@ -166,6 +167,12 @@ const Ordens = lazy(() => import('./pages/frotas/Ordens'))
 const Checklists = lazy(() => import('./pages/frotas/Checklists'))
 const Abastecimentos = lazy(() => import('./pages/frotas/Abastecimentos'))
 const Telemetria = lazy(() => import('./pages/frotas/Telemetria'))
+const SolicitacoesFrotas = lazy(() => import('./pages/frotas/SolicitacoesFrotas'))
+
+// Patrimonial (módulo próprio)
+const PatrimonialHome = lazy(() => import('./pages/patrimonial/PatrimonialHome'))
+const PatrimonialMovimentacoes = lazy(() => import('./pages/patrimonial/Movimentacoes'))
+const PatrimonialPatrimonio = lazy(() => import('./pages/patrimonial/Patrimonio'))
 
 // Admin
 const AdminUsuarios = lazy(() => import('./pages/AdminUsuarios'))
@@ -278,11 +285,21 @@ export default function App() {
           <Route element={<ModuleRoute moduleKey="frotas" />}>
             <Route element={<FrotasLayout />}>
               <Route path="/frotas"                      element={<LazyDash><FrotasHome /></LazyDash>} />
+              <Route path="/frotas/solicitacoes"         element={<Lazy><SolicitacoesFrotas /></Lazy>} />
               <Route path="/frotas/veiculos"             element={<Lazy><Veiculos /></Lazy>} />
               <Route path="/frotas/ordens"               element={<Lazy><Ordens /></Lazy>} />
               <Route path="/frotas/checklists"           element={<Lazy><Checklists /></Lazy>} />
               <Route path="/frotas/abastecimentos"       element={<Lazy><Abastecimentos /></Lazy>} />
               <Route path="/frotas/telemetria"           element={<Lazy><Telemetria /></Lazy>} />
+            </Route>
+          </Route>
+
+          {/* Módulo Patrimonial */}
+          <Route element={<ModuleRoute moduleKey="patrimonial" />}>
+            <Route element={<PatrimonialLayout />}>
+              <Route path="/patrimonial"               element={<LazyDash><PatrimonialHome /></LazyDash>} />
+              <Route path="/patrimonial/movimentacoes" element={<Lazy><PatrimonialMovimentacoes /></Lazy>} />
+              <Route path="/patrimonial/patrimonio"    element={<Lazy><PatrimonialPatrimonio /></Lazy>} />
             </Route>
           </Route>
 

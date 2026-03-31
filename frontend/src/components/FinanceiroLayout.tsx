@@ -10,11 +10,12 @@ export default function FinanceiroLayout() {
   const NAV = [
     { to: '/financeiro',                      icon: LayoutDashboard, label: 'Painel',           end: true },
     {
-      to: '/financeiro/nova-solicitacao',
+      to: '/financeiro/contas-a-pagar',
       icon: Plus,
       label: 'Nova Solicitação',
       end: false,
       accent: true,
+      requisitanteAllowed: true,
       actionMenu: {
         title: 'Nova solicitação',
         items: [

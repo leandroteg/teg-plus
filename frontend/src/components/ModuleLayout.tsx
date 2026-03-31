@@ -24,6 +24,8 @@ export interface NavItem {
   label: string
   end?: boolean
   adminOnly?: boolean
+  /** Permite que requisitantes acessem este item (ex: nova solicitação) */
+  requisitanteAllowed?: boolean
   action?: () => void
   actionMenu?: {
     title?: string
@@ -84,7 +86,9 @@ function normalizeLabel(text: string): string {
 }
 
 function isNovaSolicitacaoItem(item: NavItem): boolean {
-  return normalizeLabel(item.label).includes('nova solicitacao')
+  if (item.requisitanteAllowed === true) return true
+  const n = normalizeLabel(item.label)
+  return n.includes('nova solicitacao') || n.includes('nova requisicao') || n.includes('nova movimentacao')
 }
 
 // ── Accent color class map ────────────────────────────────────────────────────
