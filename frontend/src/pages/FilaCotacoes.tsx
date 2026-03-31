@@ -7,11 +7,13 @@ import {
 } from 'lucide-react'
 import { useTheme } from '../contexts/ThemeContext'
 import { useCotacoes } from '../hooks/useCotacoes'
+import { useCategorias } from '../hooks/useCategorias'
 import { useDecisaoRequisicao } from '../hooks/useAprovacoes'
 import { useEmitirPedido, useCancelarRequisicao } from '../hooks/usePedidos'
 import { useAuth } from '../contexts/AuthContext'
 import EmitirPedidoModal from '../components/EmitirPedidoModal'
 import type { StatusCotacao, Cotacao } from '../types'
+import { minCotacoesPorValor } from '../utils/cotacoesPolicy'
 
 // ── Formatters ──────────────────────────────────────────────────────────────
 
@@ -59,8 +61,16 @@ function diasEmAberto(createdAt: string) {
   return Math.floor((Date.now() - new Date(createdAt).getTime()) / 86_400_000)
 }
 
-function AlertaCotacoes({ valor, isDark }: { valor: number; isDark: boolean }) {
-  const minCot = valor <= 500 ? 1 : valor <= 2000 ? 2 : 3
+function AlertaCotacoes({
+  valor,
+  regras,
+  isDark,
+}: {
+  valor: number
+  regras?: { ate_500: number; '501_a_2k': number; acima_2k: number }
+  isDark: boolean
+}) {
+  const minCot = minCotacoesPorValor(valor, regras)
   if (minCot === 1) return null
   return (
     <div className={`flex items-start gap-1.5 rounded-xl px-3 py-2 ${isDark ? 'bg-amber-500/10 border border-amber-500/20' : 'bg-amber-50 border border-amber-200'}`}>
@@ -185,8 +195,11 @@ function CotDetailModal({ cot, onClose, isDark, isAdmin, atLeastComprador, onDec
   onEmitir: () => void; onCancelar: () => void; isEmitting: boolean; isCancelling: boolean
   onOpenCotacao: () => void
 }) {
+  const { data: categorias = [] } = useCategorias()
   const [observacao, setObservacao] = useState('')
   const valor = cot.valor_selecionado ?? (cot.requisicao as any)?.valor_estimado ?? 0
+  const categoriaCodigo = ((cot.requisicao as any)?.categoria ?? '') as string
+  const categoriaRegra = categorias.find(c => c.codigo === categoriaCodigo)?.cotacoes_regras
   const dias = diasEmAberto(cot.created_at)
   const concluida = cot.status === 'concluida'
   const reqStatus = cot.requisicao?.status
@@ -226,7 +239,7 @@ function CotDetailModal({ cot, onClose, isDark, isAdmin, atLeastComprador, onDec
             )}
           </div>
 
-          {!concluida && <AlertaCotacoes valor={valor} isDark={isDark} />}
+          {!concluida && <AlertaCotacoes valor={valor} regras={categoriaRegra} isDark={isDark} />}
 
           {/* Status chips */}
           {concluida && reqStatus === 'cotacao_enviada' && (

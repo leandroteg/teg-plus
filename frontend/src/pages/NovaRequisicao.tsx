@@ -15,6 +15,7 @@ import CategoryCard from '../components/CategoryCard'
 import NumericInput from '../components/NumericInput'
 import ItemAutocomplete from '../components/ItemAutocomplete'
 import type { RequisicaoItem, Urgencia, AiParseResult, CategoriaMaterial } from '../types'
+import { minCotacoesPorValor } from '../utils/cotacoesPolicy'
 
 
 const fmt = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
@@ -25,13 +26,6 @@ const emptyItem = (): RequisicaoItem => ({
   valor_unitario_estimado: 0,
   destino_operacional: 'estoque',
 })
-
-function minCotacoes(valor: number, regras?: { ate_500: number; '501_a_2k': number; acima_2k: number }) {
-  if (!regras) return valor <= 500 ? 1 : valor <= 2000 ? 2 : 3
-  if (valor <= 500) return regras.ate_500
-  if (valor <= 2000) return regras['501_a_2k']
-  return regras.acima_2k
-}
 
 function Stepper({ step }: { step: number }) {
   const steps = ['Categoria', 'Detalhes', 'Confirmar']
@@ -153,7 +147,7 @@ export default function NovaRequisicao() {
   const [refParseMsg, setRefParseMsg]       = useState<{ type: 'success' | 'error'; text: string } | null>(null)
 
   const total  = itens.reduce((s, i) => s + i.quantidade * i.valor_unitario_estimado, 0)
-  const minCot = categoria ? minCotacoes(total, categoria.cotacoes_regras) : 1
+  const minCot = categoria ? minCotacoesPorValor(total, categoria.cotacoes_regras) : 1
 
   // ── Prefill from SuperTEG (sessionStorage) ──────────────────────────────
   useEffect(() => {

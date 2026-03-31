@@ -6,6 +6,7 @@ import {
   ScrollText,
 } from 'lucide-react'
 import { useCotacao, useFinalizarCotacao } from '../hooks/useCotacoes'
+import { useCategorias } from '../hooks/useCategorias'
 import { useEmitirPedido, useCancelarRequisicao } from '../hooks/usePedidos'
 import { useAuth } from '../contexts/AuthContext'
 import type { Cotacao, ItemPreco } from '../types'
@@ -17,6 +18,7 @@ import { supabase } from '../services/supabase'
 import { api } from '../services/api'
 import type { CnpjResult } from '../services/api'
 import NumericInput from '../components/NumericInput'
+import { minCotacoesPorValor } from '../utils/cotacoesPolicy'
 
 const fmt = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
 
@@ -222,13 +224,6 @@ function ItemPricingTable({
       </button>
     </div>
   )
-}
-
-// Cotações mínimas pelo valor
-function getMinCot(valor: number) {
-  if (valor <= 500)  return 1
-  if (valor <= 2000) return 2
-  return 3
 }
 
 // ── CNPJ mask: XX.XXX.XXX/XXXX-XX ────────────────────────────────────────────
@@ -526,6 +521,7 @@ export default function CotacaoForm() {
   const { id } = useParams<{ id: string }>()
   const nav = useNavigate()
   const { data: cotacao, isLoading } = useCotacao(id)
+  const { data: categorias = [] } = useCategorias()
   const submitMutation = useFinalizarCotacao()
 
   const [fornecedores, setFornecedores] = useState<FornecedorForm[]>([
@@ -741,7 +737,9 @@ export default function CotacaoForm() {
 
   const validos = fornecedores.filter(f => f.fornecedor_nome.trim() && f.valor_total > 0)
   const valorRef = (cotacao?.requisicao as any)?.valor_estimado ?? 0
-  const minCot   = getMinCot(valorRef)
+  const categoriaCodigo = ((cotacao?.requisicao as any)?.categoria ?? '') as string
+  const categoriaRegra = categorias.find(c => c.codigo === categoriaCodigo)?.cotacoes_regras
+  const minCot = minCotacoesPorValor(valorRef, categoriaRegra)
 
   // Validação + feedback claro em cada etapa
   const canSubmit = validos.length > 0 && (semCotacoesMinimas || validos.length >= minCot) && (!semCotacoesMinimas || justificativa.trim().length > 0)
