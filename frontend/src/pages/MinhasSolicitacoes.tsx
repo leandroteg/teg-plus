@@ -433,6 +433,21 @@ export default function MinhasSolicitacoes({
       )}
 
       <div className={embedded ? 'py-4 space-y-3' : 'max-w-2xl mx-auto px-4 py-4 space-y-3'}>
+        {/* Título no modo embedded */}
+        {embedded && (
+          <div className="flex items-center gap-2.5 pb-2 border-b border-slate-100">
+            <div className="w-7 h-7 rounded-xl bg-indigo-100 flex items-center justify-center">
+              <ClipboardList size={14} className="text-indigo-600" />
+            </div>
+            <div>
+              <h1 className="text-sm font-bold text-slate-800">Minhas Solicitações</h1>
+              <p className="text-[11px] text-slate-400">
+                {isLoading ? 'Carregando…' : `${abertas.length} em aberto · ${encerradas.length} encerrada${encerradas.length !== 1 ? 's' : ''}`}
+              </p>
+            </div>
+          </div>
+        )}
+
         {/* Tabs no modo embedded (acima dos filtros) */}
         {embedded && (
           <div className="flex gap-1 border-b border-slate-100 -mt-1 mb-2">
