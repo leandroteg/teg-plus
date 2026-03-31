@@ -1,7 +1,7 @@
-import { NavLink, Outlet, useNavigate } from 'react-router-dom'
+import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { LayoutGrid, LogOut, Shield, Settings, ChevronLeft, Menu, X, User, Code2, Link2 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useAuth, ROLE_LABEL, ROLE_COLOR } from '../contexts/AuthContext'
 import { useTheme } from '../contexts/ThemeContext'
 import LogoTeg from './LogoTeg'
@@ -73,6 +73,18 @@ function getInitials(name: string): string {
   const parts = name.trim().split(/\s+/)
   if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase()
   return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
+}
+
+function normalizeLabel(text: string): string {
+  return text
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim()
+}
+
+function isNovaSolicitacaoItem(item: NavItem): boolean {
+  return normalizeLabel(item.label).includes('nova solicitacao')
 }
 
 // ── Accent color class map ────────────────────────────────────────────────────
@@ -259,9 +271,10 @@ export default function ModuleLayout({
   bottomNavMaxItems,
   ...config
 }: ModuleConfig) {
-  const { perfil, isAdmin, signOut, role } = useAuth()
+  const { perfil, isAdmin, signOut, role, papelGlobal } = useAuth()
   const { isDark, isLightSidebar, theme, setTheme } = useTheme()
   const navigate = useNavigate()
+  const location = useLocation()
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [avatarOpen, setAvatarOpen] = useState(false)
   const [openNavMenu, setOpenNavMenu] = useState<{ id: string; top: number; left: number } | null>(null)
@@ -322,6 +335,29 @@ export default function ModuleLayout({
 
   const headerModuleName = mobileModuleName ?? config.moduleName
   const visibleNav = config.nav.filter(n => !n.adminOnly || isAdmin)
+  const isRequisitante = !isAdmin && papelGlobal === 'requisitante'
+  const visibleNavForRole = useMemo(
+    () => (isRequisitante ? visibleNav.filter(isNovaSolicitacaoItem) : visibleNav),
+    [isRequisitante, visibleNav]
+  )
+  const allowedRequisitantePaths = useMemo(
+    () => visibleNav.filter(isNovaSolicitacaoItem).map(item => item.to),
+    [visibleNav]
+  )
+
+  useEffect(() => {
+    if (!isRequisitante) return
+
+    if (allowedRequisitantePaths.length === 0) {
+      if (location.pathname !== '/') navigate('/', { replace: true })
+      return
+    }
+
+    const canAccess = allowedRequisitantePaths.some(path =>
+      location.pathname === path || location.pathname.startsWith(`${path}/`)
+    )
+    if (!canAccess) navigate(allowedRequisitantePaths[0], { replace: true })
+  }, [isRequisitante, allowedRequisitantePaths, location.pathname, navigate])
 
   async function handleLogout() {
     await signOut()
@@ -375,7 +411,7 @@ export default function ModuleLayout({
   // ── Render helpers ──────────────────────────────────────────────────────────
 
   function renderNavItems() {
-    return visibleNav.map(({ to, icon: Icon, label, end, adminOnly, action, actionMenu, accent }) => {
+    return visibleNavForRole.map(({ to, icon: Icon, label, end, adminOnly, action, actionMenu, accent }) => {
       if (actionMenu) {
         const isOpen = openNavMenu?.id === to
         return (
@@ -464,7 +500,7 @@ export default function ModuleLayout({
   function renderSectionedNav() {
     return (
       <>
-        {visibleNav.map(({ to, icon: Icon, label, end }) => (
+        {visibleNavForRole.map(({ to, icon: Icon, label, end }) => (
           <NavLink key={to} to={to} end={end} className={sidebarLinkClass}>
             <Icon size={16} className="shrink-0" />
             <span>{label}</span>
@@ -489,7 +525,7 @@ export default function ModuleLayout({
   }
 
   function renderCadastrosLink() {
-    if (!showCadastrosLink) return null
+    if (!showCadastrosLink || isRequisitante) return null
     return (
       <>
         <div className={variant === 'compact'
@@ -752,7 +788,7 @@ export default function ModuleLayout({
           {drawerOpen && (
             <nav className={`md:hidden flex flex-col gap-1 p-4 border-b
               ${ls ? 'bg-white border-slate-200' : 'border-white/6 bg-white/[0.03]'}`}>
-              {visibleNav.map(n => (
+              {visibleNavForRole.map(n => (
                 <NavLink
                   key={n.to}
                   to={n.to}
@@ -764,7 +800,7 @@ export default function ModuleLayout({
                   {n.label}
                 </NavLink>
               ))}
-              {showCadastrosLink && (
+              {showCadastrosLink && !isRequisitante && (
                 <>
                   <div className={`h-px mx-1 my-1 ${ls ? 'bg-slate-100' : 'bg-white/5'}`} />
                   <NavLink
@@ -793,8 +829,16 @@ export default function ModuleLayout({
   //  FULL VARIANT  (default — lg breakpoint, sidebar + bottom nav, user card)
   // ══════════════════════════════════════════════════════════════════════════════
 
-  const mobileBottomNav = config.mobileNav
-    ?? (bottomNavMaxItems ? visibleNav.slice(0, bottomNavMaxItems) : visibleNav)
+  const mobileBottomNav = useMemo(() => {
+    const baseNav = config.mobileNav
+      ?? (bottomNavMaxItems ? visibleNavForRole.slice(0, bottomNavMaxItems) : visibleNavForRole)
+
+    if (!isRequisitante) return baseNav
+
+    const filtered = baseNav.filter(isNovaSolicitacaoItem)
+    if (filtered.length > 0) return filtered
+    return visibleNavForRole.filter(isNovaSolicitacaoItem)
+  }, [config.mobileNav, bottomNavMaxItems, visibleNavForRole, isRequisitante])
 
   return (
     <div className={`min-h-screen ${isDark ? 'bg-[#0c1222]' : ls ? 'bg-slate-50' : 'bg-slate-100'}`}>
@@ -852,7 +896,7 @@ export default function ModuleLayout({
 
         {/* ── Navigation ────────────────────────────────────── */}
         <nav className={`flex-1 px-3 py-3 overflow-y-auto styled-scrollbar ${config.navSections ? 'space-y-1' : 'space-y-0.5'}`}>
-          {config.navSections ? renderSectionedNav() : renderNavItems()}
+          {config.navSections && !isRequisitante ? renderSectionedNav() : renderNavItems()}
           {renderCadastrosLink()}
 
         </nav>
