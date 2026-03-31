@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react'
+import { useState, useMemo, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   CheckCircle, XCircle, ChevronDown, ChevronRight, ChevronUp,
@@ -8,7 +8,7 @@ import {
   History, ListChecks, Timer, TrendingUp, Filter,
   Calendar, FileText, Download, Eye, HelpCircle,
   Paperclip, Square, CheckSquare, Package,
-  Truck, MapPin,
+  Truck, MapPin, Smartphone,
 } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../services/supabase'
@@ -1746,11 +1746,64 @@ function TabHistorico() {
 
 type Tab = 'pendentes' | 'historico'
 
+// ── AprovAi PWA Install ──────────────────────────────────────────────────────
+
+function useAprovAiInstall() {
+  const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null)
+  const [isStandalone, setIsStandalone] = useState(false)
+
+  useEffect(() => {
+    // Inject AprovAi-specific manifest
+    const existing = document.querySelector('link[rel="manifest"]')
+    const link = document.createElement('link')
+    link.rel = 'manifest'
+    link.href = '/aprovaai.webmanifest'
+    if (existing) existing.remove()
+    document.head.appendChild(link)
+
+    // Update theme-color for AprovAi
+    document.querySelectorAll('meta[name="theme-color"]').forEach(m => m.remove())
+    const meta = document.createElement('meta')
+    meta.name = 'theme-color'
+    meta.content = '#312e81'
+    document.head.appendChild(meta)
+
+    setIsStandalone(
+      window.matchMedia('(display-mode: standalone)').matches ||
+      (navigator as unknown as { standalone?: boolean }).standalone === true
+    )
+
+    const handler = (e: Event) => {
+      e.preventDefault()
+      setDeferredPrompt(e as BeforeInstallPromptEvent)
+    }
+    window.addEventListener('beforeinstallprompt', handler)
+
+    return () => {
+      window.removeEventListener('beforeinstallprompt', handler)
+      // Restore TEG+ manifest on unmount
+      link.remove()
+      meta.remove()
+    }
+  }, [])
+
+  const install = useCallback(async () => {
+    if (!deferredPrompt) return
+    await (deferredPrompt as BeforeInstallPromptEvent & { prompt: () => Promise<void> }).prompt()
+    setDeferredPrompt(null)
+  }, [deferredPrompt])
+
+  return { canInstall: !!deferredPrompt, install, isStandalone }
+}
+
+type BeforeInstallPromptEvent = Event & { prompt: () => Promise<void> }
+
 export default function AprovAi() {
   const navigate = useNavigate()
   const { perfil } = useAuth()
   const [activeTab, setActiveTab] = useState<Tab>('pendentes')
   const { data: aprovacoes, isLoading, isError, refetch } = useAprovacoesPendentes()
+  const { canInstall, install, isStandalone } = useAprovAiInstall()
 
   const aprovadorNome = perfil?.nome ?? 'Aprovador'
   const aprovadorEmail = perfil?.email ?? ''
@@ -1763,13 +1816,29 @@ export default function AprovAi() {
 
       {/* Header */}
       <header className="px-4 pt-6 pb-5">
-        <button
-          onClick={() => navigate(-1)}
-          className="flex items-center gap-1.5 text-indigo-300 hover:text-white transition-colors mb-4"
-        >
-          <ArrowLeft size={18} />
-          <span className="text-xs font-semibold">Voltar</span>
-        </button>
+        <div className="flex items-center justify-between mb-4">
+          {!isStandalone && (
+            <button
+              onClick={() => navigate(-1)}
+              className="flex items-center gap-1.5 text-indigo-300 hover:text-white transition-colors"
+            >
+              <ArrowLeft size={18} />
+              <span className="text-xs font-semibold">Voltar</span>
+            </button>
+          )}
+          {!isStandalone && <div />}
+          {canInstall && (
+            <button
+              onClick={install}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl
+                bg-white/10 backdrop-blur-sm border border-white/20
+                text-white/80 hover:text-white hover:bg-white/20 transition-all text-[11px] font-semibold"
+            >
+              <Smartphone size={13} />
+              Instalar App
+            </button>
+          )}
+        </div>
 
         <div className="text-center">
           <div className="flex items-center justify-center gap-2 mb-1">
