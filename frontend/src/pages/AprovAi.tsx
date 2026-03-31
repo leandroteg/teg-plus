@@ -1753,21 +1753,6 @@ function useAprovAiInstall() {
   const [isStandalone, setIsStandalone] = useState(false)
 
   useEffect(() => {
-    // Inject AprovAi-specific manifest
-    const existing = document.querySelector('link[rel="manifest"]')
-    const link = document.createElement('link')
-    link.rel = 'manifest'
-    link.href = '/aprovaai.webmanifest'
-    if (existing) existing.remove()
-    document.head.appendChild(link)
-
-    // Update theme-color for AprovAi
-    document.querySelectorAll('meta[name="theme-color"]').forEach(m => m.remove())
-    const meta = document.createElement('meta')
-    meta.name = 'theme-color'
-    meta.content = '#312e81'
-    document.head.appendChild(meta)
-
     setIsStandalone(
       window.matchMedia('(display-mode: standalone)').matches ||
       (navigator as unknown as { standalone?: boolean }).standalone === true
@@ -1781,9 +1766,6 @@ function useAprovAiInstall() {
 
     return () => {
       window.removeEventListener('beforeinstallprompt', handler)
-      // Restore TEG+ manifest on unmount
-      link.remove()
-      meta.remove()
     }
   }, [])
 

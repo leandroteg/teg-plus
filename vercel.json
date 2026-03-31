@@ -3,7 +3,10 @@
   "outputDirectory": "frontend/dist",
   "installCommand": "cd frontend && npm install",
   "framework": "vite",
-  "rewrites": [{ "source": "/((?!api|_vercel).*)", "destination": "/index.html" }],
+  "rewrites": [
+    { "source": "/aprovaai", "destination": "/aprovaai.html" },
+    { "source": "/((?!api|_vercel|aprovaai).*)", "destination": "/index.html" }
+  ],
   "headers": [
     {
       "source": "/assets/(.*)",
