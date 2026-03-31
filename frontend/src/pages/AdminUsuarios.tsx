@@ -1050,6 +1050,7 @@ export default function AdminUsuarios() {
   const [bulkAlcada, setBulkAlcada] = useState<number | ''>('')
   const [bulkTouchSetores, setBulkTouchSetores] = useState(false)
   const [bulkModulos, setBulkModulos] = useState<Record<string, boolean>>(() => createEmptyModulosMap())
+  const [showBatchEditor, setShowBatchEditor] = useState(false)
   const selectAllRef = useRef<HTMLInputElement | null>(null)
 
   const filtered = useMemo(() => {
@@ -1127,6 +1128,7 @@ export default function AdminUsuarios() {
       modulos: bulkTouchSetores ? bulkModulos : undefined,
     })
     setExpandedUser(null)
+    setShowBatchEditor(false)
     clearBatch()
   }
 
@@ -1195,7 +1197,7 @@ export default function AdminUsuarios() {
           </div>
         </div>
 
-        <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center justify-between gap-2 flex-wrap">
           <div className="inline-flex rounded-xl border border-slate-200 bg-white p-1">
             <button
               onClick={() => setViewMode('table')}
@@ -1214,100 +1216,124 @@ export default function AdminUsuarios() {
               Cards
             </button>
           </div>
-          <div className="text-xs text-slate-500">{selectedIds.length} selecionado(s)</div>
+          <div className="flex items-center gap-2 ml-auto">
+            <span className="text-xs text-slate-500">{selectedIds.length} selecionado(s)</span>
+            <button
+              type="button"
+              onClick={() => setShowBatchEditor(v => !v)}
+              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all ${
+                showBatchEditor
+                  ? 'bg-primary text-white border-primary shadow'
+                  : 'bg-white text-slate-600 border-slate-200 hover:border-primary/40 hover:text-primary'
+              }`}
+            >
+              <Edit3 size={12} />
+              Editar
+            </button>
+          </div>
         </div>
 
-        <div className="bg-white rounded-2xl border border-slate-200 p-3 sm:p-4 space-y-3">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <p className="text-xs font-semibold text-slate-600">Edicao em lote</p>
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={toggleSelectAllVisible}
-                className="px-3 py-1.5 rounded-lg border border-slate-200 text-xs font-semibold text-slate-600 hover:bg-slate-50"
-              >
-                {allVisibleSelected ? 'Desmarcar visiveis' : 'Selecionar visiveis'}
-              </button>
-              <button
-                type="button"
-                onClick={clearBatch}
-                className="px-3 py-1.5 rounded-lg border border-slate-200 text-xs font-semibold text-slate-500 hover:bg-slate-50"
-              >
-                Limpar
-              </button>
+        {showBatchEditor && (
+          <div className="bg-white rounded-2xl border border-slate-200 p-3 sm:p-4 space-y-3 shadow-card">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <p className="text-xs font-semibold text-slate-600">Edicao em lote</p>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={toggleSelectAllVisible}
+                  className="px-3 py-1.5 rounded-lg border border-slate-200 text-xs font-semibold text-slate-600 hover:bg-slate-50"
+                >
+                  {allVisibleSelected ? 'Desmarcar visiveis' : 'Selecionar visiveis'}
+                </button>
+                <button
+                  type="button"
+                  onClick={clearBatch}
+                  className="px-3 py-1.5 rounded-lg border border-slate-200 text-xs font-semibold text-slate-500 hover:bg-slate-50"
+                >
+                  Limpar
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowBatchEditor(false)}
+                  className="w-8 h-8 rounded-lg border border-slate-200 text-slate-400 hover:text-slate-600 hover:bg-slate-50 flex items-center justify-center"
+                  aria-label="Fechar edicao em lote"
+                >
+                  <X size={14} />
+                </button>
+              </div>
             </div>
-          </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-            <div>
-              <label className="block text-[11px] font-semibold text-slate-500 mb-1">Papel</label>
-              <select
-                value={bulkPapel}
-                onChange={e => setBulkPapel(e.target.value as PapelGlobal | '')}
-                className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
-              >
-                <option value="">Nao alterar</option>
-                {PAPEIS.map(p => <option key={p.value} value={p.value}>{p.label}</option>)}
-              </select>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+              <div>
+                <label className="block text-[11px] font-semibold text-slate-500 mb-1">Papel</label>
+                <select
+                  value={bulkPapel}
+                  onChange={e => setBulkPapel(e.target.value as PapelGlobal | '')}
+                  className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                >
+                  <option value="">Nao alterar</option>
+                  {PAPEIS.map(p => <option key={p.value} value={p.value}>{p.label}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="block text-[11px] font-semibold text-slate-500 mb-1">Alcada</label>
+                <select
+                  value={bulkAlcada}
+                  onChange={e => setBulkAlcada(e.target.value === '' ? '' : Number(e.target.value))}
+                  className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                >
+                  <option value="">Nao alterar</option>
+                  {[0, 1, 2, 3, 4].map(n => (
+                    <option key={n} value={n}>{ALCADA_LABEL[n]}</option>
+                  ))}
+                </select>
+              </div>
             </div>
-            <div>
-              <label className="block text-[11px] font-semibold text-slate-500 mb-1">Alcada</label>
-              <select
-                value={bulkAlcada}
-                onChange={e => setBulkAlcada(e.target.value === '' ? '' : Number(e.target.value))}
-                className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
-              >
-                <option value="">Nao alterar</option>
-                {[0, 1, 2, 3, 4].map(n => (
-                  <option key={n} value={n}>{ALCADA_LABEL[n]}</option>
-                ))}
-              </select>
-            </div>
-          </div>
 
-          <div className="space-y-2">
-            <label className="inline-flex items-center gap-2 text-xs font-semibold text-slate-600 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={bulkTouchSetores}
-                onChange={e => setBulkTouchSetores(e.target.checked)}
-                className="rounded border-slate-300 text-primary focus:ring-primary/30"
-              />
-              Alterar setores/modulos em lote
-            </label>
-            {bulkTouchSetores && (
-              <div className="rounded-xl border border-slate-100 p-2.5 bg-slate-50/60">
-                <ModuloCheckboxGroup
-                  modulos={bulkModulos}
-                  onToggle={key => setBulkModulos(prev => ({ ...prev, [key]: !prev[key] }))}
-                  onSetAll={(keys, val) => setBulkModulos(prev => {
-                    const next = { ...prev }
-                    keys.forEach(k => { next[k] = val })
-                    return next
-                  })}
+            <div className="space-y-2">
+              <label className="inline-flex items-center gap-2 text-xs font-semibold text-slate-600 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={bulkTouchSetores}
+                  onChange={e => setBulkTouchSetores(e.target.checked)}
+                  className="rounded border-slate-300 text-primary focus:ring-primary/30"
                 />
+                Alterar setores/modulos em lote
+              </label>
+              {bulkTouchSetores && (
+                <div className="rounded-xl border border-slate-100 p-2.5 bg-slate-50/60">
+                  <ModuloCheckboxGroup
+                    modulos={bulkModulos}
+                    onToggle={key => setBulkModulos(prev => ({ ...prev, [key]: !prev[key] }))}
+                    onSetAll={(keys, val) => setBulkModulos(prev => {
+                      const next = { ...prev }
+                      keys.forEach(k => { next[k] = val })
+                      return next
+                    })}
+                  />
+                </div>
+              )}
+            </div>
+
+            {bulkUpdate.isError && (
+              <div className="flex items-center gap-2 bg-red-50 text-red-600 rounded-xl px-3 py-2 text-xs">
+                <AlertCircle size={12} />
+                <span>{bulkUpdate.error instanceof Error ? bulkUpdate.error.message : 'Falha ao aplicar alteracoes em lote.'}</span>
               </div>
             )}
+
+            <button
+              type="button"
+              disabled={bulkUpdate.isPending || selectedIds.length === 0}
+              onClick={applyBatch}
+              className="w-full sm:w-auto px-4 py-2 rounded-xl bg-primary text-white text-xs font-semibold hover:bg-indigo-500 disabled:opacity-60 disabled:cursor-not-allowed inline-flex items-center justify-center gap-1.5"
+            >
+              {bulkUpdate.isPending
+                ? <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                : <><Check size={13} /> Aplicar em {selectedIds.length} usuario(s)</>}
+            </button>
           </div>
-
-          {bulkUpdate.isError && (
-            <div className="flex items-center gap-2 bg-red-50 text-red-600 rounded-xl px-3 py-2 text-xs">
-              <AlertCircle size={12} />
-              <span>{bulkUpdate.error instanceof Error ? bulkUpdate.error.message : 'Falha ao aplicar alteracoes em lote.'}</span>
-            </div>
-          )}
-
-          <button
-            type="button"
-            disabled={bulkUpdate.isPending || selectedIds.length === 0}
-            onClick={applyBatch}
-            className="w-full sm:w-auto px-4 py-2 rounded-xl bg-primary text-white text-xs font-semibold hover:bg-indigo-500 disabled:opacity-60 disabled:cursor-not-allowed inline-flex items-center justify-center gap-1.5"
-          >
-            {bulkUpdate.isPending
-              ? <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-              : <><Check size={13} /> Aplicar em {selectedIds.length} usuario(s)</>}
-          </button>
-        </div>
+        )}
 
         {/* Lista de usuários */}
         {isLoading ? (
