@@ -521,9 +521,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const papelGlobal: PapelGlobal = perfil?.papel_global ?? mapLegacyRoleToPapel(legacyRole)
   const role: Role = legacyRole
   const isAdmin = legacyRole === 'administrador' || legacyRole === 'admin'
+  const hasFullAccess = isAdmin || legacyRole === 'diretor'
 
   const hasModule = (mod: string): boolean => {
-    if (isAdmin) return true
+    if (hasFullAccess) return true
     const normalized = normalizeModuleKey(mod)
 
     if (rbacV2Enabled && perfilSetores.length > 0) {
@@ -539,7 +540,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   const hasSetorPapel = (mod: string, papeis: PapelGlobal[] = ['equipe', 'supervisor', 'diretor', 'ceo']) => {
-    if (isAdmin) return true
+    if (hasFullAccess) return true
     const normalized = normalizeModuleKey(mod)
 
     if (!rbacV2Enabled || perfilSetores.length === 0) {
@@ -555,8 +556,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   const canTechnicalApprove = (mod: string): boolean => {
-    if (isAdmin) return true
-    if (papelGlobal === 'diretor' || papelGlobal === 'ceo') return hasModule(mod)
+    if (hasFullAccess) return true
+    if (papelGlobal === 'ceo') return hasModule(mod)
 
     const normalized = normalizeModuleKey(mod)
     if (rbacV2Enabled && perfilSetores.length > 0) {
