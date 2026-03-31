@@ -42,7 +42,6 @@ interface Pillar {
   glow: string
   accent: string
   subs: SubMod[]
-  emBreve?: boolean
 }
 
 const PILLARS: Pillar[] = [
@@ -51,14 +50,13 @@ const PILLARS: Pillar[] = [
     label: 'Projetos',
     tagline: 'Gestão de obras e segurança',
     Icon: FolderKanban,
-    emBreve: true,
     grad: 'from-blue-500/20 to-indigo-600/20',
     border: 'border-indigo-500/25',
     glow: 'rgba(99,102,241,0.18)',
     accent: '#818CF8',
     subs: [
-      { key: 'egp', label: 'EGP', desc: 'Escritório de gestão de projetos', Icon: Settings, active: true, route: '/egp' },
-      { key: 'obras', label: 'Obras', desc: 'Acompanhamento de obras ativas', Icon: HardHat, active: true, route: '/obras' },
+      { key: 'egp', label: 'EGP', desc: 'Escritório de gestão de projetos', Icon: Settings, active: false, route: '/egp' },
+      { key: 'obras', label: 'Obras', desc: 'Acompanhamento de obras ativas', Icon: HardHat, active: false, route: '/obras' },
       { key: 'ssma', label: 'SS/MA', desc: 'Saúde, segurança e meio ambiente', Icon: ShieldCheck, active: false, route: '/ssma' },
     ],
   },
@@ -106,10 +104,10 @@ const PILLARS: Pillar[] = [
     glow: 'rgba(139,92,246,0.16)',
     accent: '#A78BFA',
     subs: [
-      { key: 'headcount', label: 'Headcount', desc: 'Admissão, colaboradores, movimentações e desligamento', Icon: Users, active: true, route: '/rh/headcount' },
+      { key: 'headcount', label: 'Headcount', desc: 'Admissão, colaboradores, movimentações e desligamento', Icon: Users, active: false, route: '/rh/headcount' },
       { key: 'rs', label: 'R&S', desc: 'Recrutamento e seleção de talentos', Icon: UserSearch, active: false, route: '' },
       { key: 'performance', label: 'Performance', desc: 'Avaliações, metas e feedbacks', Icon: Target, active: false, route: '' },
-      { key: 'cultura', label: 'Cultura', desc: 'Engajamento, clima e mural de recados', Icon: Heart, active: true, route: '/rh/cultura' },
+      { key: 'cultura', label: 'Cultura', desc: 'Engajamento, clima e mural de recados', Icon: Heart, active: false, route: '/rh/cultura' },
       { key: 'dp', label: 'DP', desc: 'Folha, ponto e benefícios', Icon: Calculator, active: false, route: '' },
     ],
   },
@@ -651,11 +649,6 @@ export default function ModuloSelector() {
                   ) : (
                     <span className={`text-[10px] flex items-center gap-1 ${isLight ? 'text-slate-400' : 'text-slate-600'}`}>
                       <Lock size={9} /> Em breve
-                    </span>
-                  )}
-                  {hasActive && p.emBreve && (
-                    <span className={`text-[9px] font-medium ${isLight ? 'text-slate-400/70' : 'text-slate-600/60'}`}>
-                      Em breve +
                     </span>
                   )}
                 </div>
