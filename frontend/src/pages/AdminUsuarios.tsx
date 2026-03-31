@@ -6,6 +6,7 @@ import {
   Check, X, AlertCircle, Mail, RefreshCw,
   CheckCircle, Power, Edit3, ChevronDown, ChevronUp,
   Calendar, Clock, Briefcase, Building2, Eye,
+  LayoutGrid, LayoutList, SlidersHorizontal,
 } from 'lucide-react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../services/supabase'
@@ -1042,6 +1043,10 @@ export default function AdminUsuarios() {
 
   const [search,       setSearch]       = useState('')
   const [filterRole,   setFilterRole]   = useState<Role | 'todos'>('todos')
+  const [filterAtivo,  setFilterAtivo]  = useState<'todos' | 'ativos' | 'inativos'>('todos')
+  const [filterAlcada, setFilterAlcada] = useState<number | 'todos'>('todos')
+  const [filterModulo, setFilterModulo] = useState<string | 'todos'>('todos')
+  const [showFilters,  setShowFilters]  = useState(false)
   const [viewMode,     setViewMode]     = useState<'table' | 'cards'>('table')
   const [expandedUser, setExpandedUser] = useState<string | null>(null)
   const [showCadastro, setShowCadastro] = useState(false)
@@ -1056,20 +1061,28 @@ export default function AdminUsuarios() {
   const filtered = useMemo(() => {
     if (!perfis) return []
     return perfis.filter(p => {
-      const roleOrPapel = (p.papel_global as Role | undefined) || p.role
+      const papel = resolvePapelFromPerfil(p)
       const matchSearch = !search ||
         p.nome.toLowerCase().includes(search.toLowerCase()) ||
         p.email.toLowerCase().includes(search.toLowerCase())
-      const matchRole = filterRole === 'todos' || roleOrPapel === filterRole
-      return matchSearch && matchRole
+      const matchRole = filterRole === 'todos' || papel === filterRole
+      const matchAtivo =
+        filterAtivo === 'todos'
+          ? true
+          : filterAtivo === 'ativos'
+            ? p.ativo
+            : !p.ativo
+      const matchAlcada = filterAlcada === 'todos' || p.alcada_nivel === filterAlcada
+      const matchModulo = filterModulo === 'todos' || Boolean(p.modulos?.[filterModulo])
+      return matchSearch && matchRole && matchAtivo && matchAlcada && matchModulo
     })
-  }, [perfis, search, filterRole])
+  }, [perfis, search, filterRole, filterAtivo, filterAlcada, filterModulo])
 
   const stats = useMemo(() => {
     if (!perfis) return {}
     return perfis.reduce((acc, p) => {
-      const roleOrPapel = (p.papel_global as Role | undefined) || p.role
-      acc[roleOrPapel] = (acc[roleOrPapel] ?? 0) + 1
+      const papel = resolvePapelFromPerfil(p)
+      acc[papel] = (acc[papel] ?? 0) + 1
       return acc
     }, {} as Record<string, number>)
   }, [perfis])
@@ -1172,56 +1185,54 @@ export default function AdminUsuarios() {
           })}
         </div>
 
-        {/* Busca + filtro */}
+        {/* Toolbar + filtros */}
         <div className="space-y-2">
-          <div className="relative">
-            <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-            <input
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-              placeholder="Buscar por nome ou e-mail..."
-              className="w-full pl-9 pr-4 py-2.5 rounded-xl border border-slate-200 bg-white text-sm
-                focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
-            />
-          </div>
-          <div className="flex gap-1.5 overflow-x-auto pb-1">
-            {(['todos', 'requisitante', 'equipe', 'supervisor', 'diretor', 'ceo'] as (Role | 'todos')[]).map(r => (
-              <button key={r} onClick={() => setFilterRole(r)}
-                className={`flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-semibold transition-all
-                  ${filterRole === r
-                    ? 'bg-primary text-white shadow'
-                    : 'bg-white text-slate-500 border border-slate-200 hover:border-primary/40'}`}>
-                {r === 'todos' ? 'Todos' : ROLE_LABEL[r as Role]}
-              </button>
-            ))}
-          </div>
-        </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="relative flex-1 min-w-[220px]">
+              <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+              <input
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+                placeholder="Buscar por nome ou e-mail..."
+                className="w-full pl-9 pr-4 py-2.5 rounded-xl border border-slate-200 bg-white text-sm
+                  focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+              />
+            </div>
 
-        <div className="flex items-center justify-between gap-2 flex-wrap">
-          <div className="inline-flex rounded-xl border border-slate-200 bg-white p-1">
             <button
-              onClick={() => setViewMode('table')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
-                viewMode === 'table' ? 'bg-primary text-white' : 'text-slate-500 hover:bg-slate-50'
+              type="button"
+              onClick={() => setShowFilters(v => !v)}
+              className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border text-xs font-semibold transition-all ${
+                showFilters
+                  ? 'bg-primary/10 border-primary/30 text-primary'
+                  : 'bg-white border-slate-200 text-slate-600 hover:border-primary/40 hover:text-primary'
               }`}
             >
-              Tabela
+              <SlidersHorizontal size={14} />
+              Filtros
             </button>
-            <button
-              onClick={() => setViewMode('cards')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
-                viewMode === 'cards' ? 'bg-primary text-white' : 'text-slate-500 hover:bg-slate-50'
-              }`}
-            >
-              Cards
-            </button>
-          </div>
-          <div className="flex items-center gap-2 ml-auto">
-            <span className="text-xs text-slate-500">{selectedIds.length} selecionado(s)</span>
+
+            <div className="inline-flex rounded-xl border overflow-hidden border-slate-200 bg-white">
+              <button
+                onClick={() => setViewMode('cards')}
+                className={`p-2 transition-colors ${viewMode === 'cards' ? 'bg-primary/10 text-primary' : 'text-slate-400 hover:text-slate-600'}`}
+                title="Visualização em cards"
+              >
+                <LayoutGrid size={14} />
+              </button>
+              <button
+                onClick={() => setViewMode('table')}
+                className={`p-2 transition-colors ${viewMode === 'table' ? 'bg-primary/10 text-primary' : 'text-slate-400 hover:text-slate-600'}`}
+                title="Visualização em tabela"
+              >
+                <LayoutList size={14} />
+              </button>
+            </div>
+
             <button
               type="button"
               onClick={() => setShowBatchEditor(v => !v)}
-              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all ${
+              className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold border transition-all ${
                 showBatchEditor
                   ? 'bg-primary text-white border-primary shadow'
                   : 'bg-white text-slate-600 border-slate-200 hover:border-primary/40 hover:text-primary'
@@ -1231,6 +1242,83 @@ export default function AdminUsuarios() {
               Editar
             </button>
           </div>
+
+          <div className="flex items-center justify-end">
+            <span className="text-xs text-slate-500">{selectedIds.length} selecionado(s)</span>
+          </div>
+
+          {showFilters && (
+            <div className="bg-white rounded-2xl border border-slate-200 p-3 shadow-card">
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-2">
+                <div>
+                  <label className="block text-[11px] font-semibold text-slate-500 mb-1">Papel</label>
+                  <select
+                    value={filterRole}
+                    onChange={e => setFilterRole(e.target.value as Role | 'todos')}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                  >
+                    <option value="todos">Todos</option>
+                    {(['requisitante', 'equipe', 'supervisor', 'diretor', 'ceo'] as Role[]).map(r => (
+                      <option key={r} value={r}>{ROLE_LABEL[r]}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-[11px] font-semibold text-slate-500 mb-1">Status</label>
+                  <select
+                    value={filterAtivo}
+                    onChange={e => setFilterAtivo(e.target.value as 'todos' | 'ativos' | 'inativos')}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                  >
+                    <option value="todos">Todos</option>
+                    <option value="ativos">Ativos</option>
+                    <option value="inativos">Inativos</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-[11px] font-semibold text-slate-500 mb-1">Alçada</label>
+                  <select
+                    value={filterAlcada}
+                    onChange={e => setFilterAlcada(e.target.value === 'todos' ? 'todos' : Number(e.target.value))}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                  >
+                    <option value="todos">Todas</option>
+                    {[0, 1, 2, 3, 4].map(n => (
+                      <option key={n} value={n}>{ALCADA_LABEL[n]}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-[11px] font-semibold text-slate-500 mb-1">Módulo</label>
+                  <select
+                    value={filterModulo}
+                    onChange={e => setFilterModulo(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                  >
+                    <option value="todos">Todos</option>
+                    {MODULOS_ERP.map(mod => (
+                      <option key={mod.key} value={mod.key}>{mod.label}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div className="flex justify-end pt-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setFilterRole('todos')
+                    setFilterAtivo('todos')
+                    setFilterAlcada('todos')
+                    setFilterModulo('todos')
+                  }}
+                  className="px-3 py-1.5 rounded-lg border border-slate-200 text-xs font-semibold text-slate-500 hover:bg-slate-50"
+                >
+                  Limpar filtros
+                </button>
+              </div>
+            </div>
+          )}
         </div>
 
         {showBatchEditor && (
