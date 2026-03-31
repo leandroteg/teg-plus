@@ -8,7 +8,7 @@ import {
   History, ListChecks, Timer, TrendingUp, Filter,
   Calendar, FileText, Download, Eye, HelpCircle,
   Paperclip, Square, CheckSquare, Package,
-  Truck, MapPin, Smartphone,
+  Truck, MapPin, Smartphone, Wallet,
 } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../services/supabase'
@@ -99,6 +99,17 @@ const tipoConfig: Record<TipoAprovacao, {
     badgeText: 'text-orange-700',
     headerBg: 'bg-gradient-to-r from-orange-500 to-amber-600',
   },
+  solicitacao_adiantamento: {
+    label: 'Solicitação de Adiantamento',
+    icon: Wallet,
+    color: 'emerald',
+    bgLight: 'bg-emerald-50',
+    textColor: 'text-emerald-700',
+    borderColor: 'border-emerald-200',
+    badgeBg: 'bg-emerald-100',
+    badgeText: 'text-emerald-700',
+    headerBg: 'bg-gradient-to-r from-emerald-600 to-teal-500',
+  },
 }
 
 const tipoOrder: TipoAprovacao[] = [
@@ -107,6 +118,7 @@ const tipoOrder: TipoAprovacao[] = [
   'minuta_contratual',
   'requisicao_compra',
   'aprovacao_transporte',
+  'solicitacao_adiantamento',
 ]
 
 function timeLeft(dateStr?: string): string {
@@ -1465,6 +1477,7 @@ function TabPendentes({
       minuta_contratual: [],
       requisicao_compra: [],
       aprovacao_transporte: [],
+      solicitacao_adiantamento: [],
     }
     for (const apr of aprovacoes ?? []) {
       const tipo = apr.tipo_aprovacao || 'requisicao_compra'

@@ -138,9 +138,10 @@ const Tesouraria = lazy(() => import('./pages/financeiro/Tesouraria'))
 const Relatorios = lazy(() => import('./pages/financeiro/Relatorios'))
 const Configuracoes = lazy(() => import('./pages/financeiro/Configuracoes'))
 
-// Apontamentos
-const ApontamentosHome = lazy(() => import('./pages/apontamentos/ApontamentosHome'))
+// Despesas
+const DespesasHome = lazy(() => import('./pages/despesas/DespesasHome'))
 const ApontamentosCartao = lazy(() => import('./pages/apontamentos/ApontamentosCartao'))
+const DespesasAdiantamentos = lazy(() => import('./pages/despesas/DespesasAdiantamentos'))
 
 // Fiscal
 const NotasFiscais = lazy(() => import('./pages/financeiro/NotasFiscais'))
@@ -245,9 +246,12 @@ export default function App() {
           {/* Módulo Apontamentos */}
           <Route element={<ModuleRoute moduleKey="apontamentos" />}>
             <Route element={<ApontamentosLayout />}>
-              <Route path="/apontamentos" element={<Lazy><ApontamentosHome /></Lazy>} />
-              <Route path="/apontamentos/novo" element={<Navigate to="/apontamentos/realizados" replace />} />
-              <Route path="/apontamentos/realizados" element={<Lazy><ApontamentosCartao /></Lazy>} />
+              <Route path="/despesas" element={<Lazy><DespesasHome /></Lazy>} />
+              <Route path="/despesas/cartoes" element={<Lazy><ApontamentosCartao /></Lazy>} />
+              <Route path="/despesas/adiantamentos" element={<Lazy><DespesasAdiantamentos /></Lazy>} />
+              <Route path="/apontamentos" element={<Navigate to="/despesas" replace />} />
+              <Route path="/apontamentos/novo" element={<Navigate to="/despesas/cartoes?nova=1" replace />} />
+              <Route path="/apontamentos/realizados" element={<Navigate to="/despesas/cartoes" replace />} />
             </Route>
           </Route>
 

@@ -442,7 +442,7 @@ export default function ApontamentosCartao() {
         <div>
           <h1 className={`text-xl font-extrabold flex items-center gap-2 ${isDark ? 'text-white' : 'text-slate-800'}`}>
             <CreditCard size={20} className="text-emerald-600" />
-            Apontamentos de Cartão
+            Cartões Corporativos
           </h1>
           <p className={`text-xs mt-0.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
             Olá, {(perfil?.nome ?? 'Usuário').split(' ')[0]} · Registre seus gastos corporativos e anexe comprovantes
