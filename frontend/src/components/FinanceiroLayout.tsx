@@ -1,5 +1,5 @@
 import {
-  LayoutDashboard, Receipt, DollarSign, BarChart3, Landmark, Plus, Calendar, CreditCard,
+  LayoutDashboard, Receipt, DollarSign, BarChart3, Landmark, Plus, Calendar,
 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import ModuleLayout from './ModuleLayout'
@@ -38,7 +38,6 @@ export default function FinanceiroLayout() {
     { to: '/financeiro/contas-a-pagar',       icon: Receipt,         label: 'Contas a Pagar',   end: false },
     { to: '/financeiro/cr',                   icon: DollarSign,      label: 'Contas a Receber', end: false },
     { to: '/financeiro/tesouraria',           icon: Landmark,        label: 'Tesouraria',       end: false },
-    { to: '/financeiro/conciliacao-cartoes',  icon: CreditCard,      label: 'Concil. Cartões',  end: false },
     { to: '/financeiro/relatorios',           icon: BarChart3,       label: 'Relatórios',       end: false },
   ]
 
