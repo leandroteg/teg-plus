@@ -27,9 +27,7 @@ function InputField({
   label, type = 'text', value, onChange, placeholder, autoFocus, icon: Icon, suffix,
 }: InputFieldProps) {
   // autoComplete correto evita que o browser autofill pule de campo
-  const autoComplete = type === 'password' ? 'current-password'
-    : type === 'email'    ? 'username email'
-    : 'off'
+  const autoComplete = type === 'password' ? 'current-password' : 'username'
 
   return (
     <div>
@@ -114,16 +112,18 @@ export default function Login() {
 
   // ── Handlers ──────────────────────────────────────────────────────
 
+  const toEmail = (v: string) => v.includes('@') ? v : `${v}@login.teg.local`
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault(); clr(); setBusy(true)
-    const { error } = await signIn(email, password)
+    const { error } = await signIn(toEmail(email), password)
     setBusy(false)
     if (error) setError(error)
   }
 
   const handleReset = async (e: React.FormEvent) => {
     e.preventDefault(); clr(); setBusy(true)
-    const { error } = await resetPassword(email)
+    const { error } = await resetPassword(toEmail(email))
     setBusy(false)
     if (error) { setError(error); return }
     setSuccess('Link de recuperação enviado! Verifique seu e-mail.')
@@ -161,11 +161,11 @@ export default function Login() {
           {view === 'login' && (
             <form onSubmit={handleLogin} className="p-5 space-y-4">
               <InputField
-                label="E-mail corporativo"
-                type="email"
+                label="Login"
+                type="text"
                 value={email}
                 onChange={v => { setEmail(v); clr() }}
-                placeholder="voce@teguniao.com.br"
+                placeholder="nome.sobrenome"
                 icon={Mail}
                 autoFocus
               />
@@ -208,10 +208,10 @@ export default function Login() {
                 </p>
               </div>
               <InputField
-                label="Seu e-mail" type="email"
+                label="Login" type="text"
                 value={email}
                 onChange={v => { setEmail(v); clr() }}
-                placeholder="voce@teguniao.com.br"
+                placeholder="nome.sobrenome"
                 icon={Mail} autoFocus
               />
               <Feedback error={error} success={success} />

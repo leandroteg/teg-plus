@@ -783,7 +783,7 @@ export default function AdminUsuarios() {
                         <p className="text-sm font-bold text-navy truncate">{p.nome}</p>
                         {!p.ativo && <span className="text-[10px] bg-red-100 text-red-600 rounded-full px-1.5 py-0.5 font-semibold">Inativo</span>}
                       </div>
-                      <p className="text-xs text-slate-400 truncate">{p.email}</p>
+                      <p className="text-xs text-slate-400 truncate">{p.email.split('@')[0]}</p>
                       <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
                         <RoleBadge role={p.role} />
                         {p.alcada_nivel > 0 && (
