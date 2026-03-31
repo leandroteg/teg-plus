@@ -97,7 +97,43 @@ export function useUploadComunicadoImagem() {
   })
 }
 
-// ── Geração com IA ────────────────────────────────
+// ── Geração de Imagem com IA ──────────────────────
+export interface GerarImagemIAPayload {
+  tipo: string
+  tipo_label: string
+  formato: string
+  formato_label: string
+  dimensoes: string
+  instrucoes: string
+  identidade: {
+    nome_empresa: string
+    slogan: string | null
+    cor_primaria: string
+    cor_secundaria: string
+    logo_url: string | null
+  }
+}
+
+export interface GerarImagemIAResponse {
+  imagem_url: string
+}
+
+export function useGerarImagemIA() {
+  return useMutation<GerarImagemIAResponse, Error, GerarImagemIAPayload>({
+    mutationFn: async (payload) => {
+      const res = await fetch(`${N8N_BASE}/endomarketing/gerar-imagem`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      })
+      if (!res.ok) throw new Error(`Erro ${res.status}: ${await res.text()}`)
+      const data = await res.json()
+      return Array.isArray(data) ? data[0] : data
+    },
+  })
+}
+
+// ── Geração de Texto com IA ───────────────────────
 export interface GerarComunicadoPayload {
   tipo: string
   formato: string

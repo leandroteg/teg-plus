@@ -12,7 +12,7 @@ import { useTheme } from '../../contexts/ThemeContext'
 import {
   useIdentidadeVisual, useSalvarIdentidadeVisual, useUploadLogo,
   useComunicados, useSalvarComunicado, useExcluirComunicado,
-  useUploadComunicadoImagem, useGerarComunicadoIA,
+  useUploadComunicadoImagem, useGerarImagemIA,
   type GerarComunicadoResponse,
 } from '../../hooks/useEndomarketing'
 import type { TipoComunicado, FormatoComunicado, IdentidadeVisual } from '../../types/rh'
@@ -266,16 +266,20 @@ function TabGerarComunicado({ identidade }: { identidade: IdentidadeVisual }) {
   const [tipo, setTipo] = useState<TipoComunicado>('aviso_geral')
   const [formato, setFormato] = useState<FormatoComunicado>('feed')
 
-  // Step 2
-  const [inputTexto, setInputTexto] = useState('')
-  const gerarIA = useGerarComunicadoIA()
+  // Step 2 — modo
+  const [modo, setModo] = useState<'template' | 'ia'>('template')
 
-  // Step 3
+  // Step 3a — Template: campos manuais
   const [texto, setTexto] = useState<GerarComunicadoResponse>({
     titulo: '', subtitulo: '', corpo: '', destaques: [], rodape: '',
   })
 
-  // Step 4
+  // Step 3b — IA: instrucoes livres
+  const [instrucoes, setInstrucoes] = useState('')
+  const gerarImagemIA = useGerarImagemIA()
+  const [imagemGeradaUrl, setImagemGeradaUrl] = useState('')
+
+  // Step 4 shared
   const templateRef = useRef<HTMLDivElement | null>(null)
   const salvarCom = useSalvarComunicado()
   const uploadImg = useUploadComunicadoImagem()
@@ -290,15 +294,24 @@ function TabGerarComunicado({ identidade }: { identidade: IdentidadeVisual }) {
     ? 'w-full px-3 py-2.5 rounded-xl bg-white border border-slate-200 text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-400/50'
     : 'w-full px-3 py-2.5 rounded-xl bg-white/6 border border-white/10 text-sm text-white placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-400/50'
 
-  async function handleGerarIA() {
-    const result = await gerarIA.mutateAsync({
+  async function handleGerarImagemIAClick() {
+    const result = await gerarImagemIA.mutateAsync({
       tipo,
+      tipo_label: tipoInfo.label,
       formato,
-      input_usuario: inputTexto,
-      identidade_visual: identidade,
+      formato_label: fmtInfo.label,
+      dimensoes: fmtInfo.dims,
+      instrucoes,
+      identidade: {
+        nome_empresa: 'TEG União Energia',
+        slogan: identidade.slogan ?? null,
+        cor_primaria: identidade.cor_primaria,
+        cor_secundaria: identidade.cor_secundaria,
+        logo_url: identidade.logo_url ?? null,
+      },
     })
-    setTexto(result)
-    setStep(3)
+    setImagemGeradaUrl(result.imagem_url)
+    setStep(4)
   }
 
   async function captureCanvas(): Promise<HTMLCanvasElement | null> {
@@ -356,7 +369,25 @@ function TabGerarComunicado({ identidade }: { identidade: IdentidadeVisual }) {
         imagem_url: imagemUrl,
         largura: fmtInfo.w,
         altura: fmtInfo.h,
-        input_usuario: inputTexto,
+        input_usuario: null,
+      })
+      setSaved(true)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function handleSalvarImagemIA() {
+    setSaving(true)
+    try {
+      await salvarCom.mutateAsync({
+        tipo,
+        formato,
+        titulo: tipoInfo.label,
+        imagem_url: imagemGeradaUrl,
+        largura: fmtInfo.w,
+        altura: fmtInfo.h,
+        input_usuario: instrucoes,
       })
       setSaved(true)
     } finally {
@@ -377,8 +408,8 @@ function TabGerarComunicado({ identidade }: { identidade: IdentidadeVisual }) {
   // ── Step indicators ──
   const steps = [
     { n: 1, label: 'Tipo + Formato' },
-    { n: 2, label: 'Informacoes' },
-    { n: 3, label: 'Texto' },
+    { n: 2, label: 'Modo' },
+    { n: 3, label: modo === 'ia' ? 'Instrucoes' : 'Conteudo' },
     { n: 4, label: 'Imagem' },
   ]
 
@@ -480,27 +511,68 @@ function TabGerarComunicado({ identidade }: { identidade: IdentidadeVisual }) {
         </div>
       )}
 
-      {/* Step 2: Input */}
+      {/* Step 2: Seletor de Modo */}
       {step === 2 && (
         <div className="space-y-4">
-          <div className={`p-4 rounded-2xl border ${isLight ? 'bg-white border-slate-200' : 'glass-card'}`}>
-            <label className={`text-xs font-semibold block mb-2 ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>
-              Informacoes para o comunicado
-            </label>
-            <textarea
-              className={`${inp} min-h-[160px] resize-y`}
-              value={inputTexto}
-              onChange={e => setInputTexto(e.target.value)}
-              placeholder={tipoInfo.placeholder}
-            />
-            <div className="flex items-center justify-between mt-2">
-              <span className={`text-[10px] ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>
-                {inputTexto.length} caracteres
-              </span>
-            </div>
+          <p className={`text-xs font-semibold ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>
+            Como deseja criar o comunicado?
+          </p>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {/* Usar Template */}
+            <button
+              onClick={() => setModo('template')}
+              className={`flex flex-col items-start gap-3 p-5 rounded-2xl border text-left transition-all ${
+                modo === 'template'
+                  ? 'bg-indigo-600 border-indigo-500 shadow-lg shadow-indigo-500/20'
+                  : isLight
+                    ? 'border-slate-200 bg-white hover:border-indigo-300 hover:shadow-sm'
+                    : 'border-white/10 bg-white/[0.03] hover:border-indigo-500/40 hover:bg-white/[0.06]'
+              }`}
+            >
+              <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${
+                modo === 'template' ? 'bg-white/20' : isLight ? 'bg-indigo-50' : 'bg-indigo-500/15'
+              }`}>
+                <FileText size={20} className={modo === 'template' ? 'text-white' : 'text-indigo-400'} />
+              </div>
+              <div>
+                <p className={`text-sm font-bold ${modo === 'template' ? 'text-white' : isLight ? 'text-slate-800' : 'text-white'}`}>
+                  Usar Template
+                </p>
+                <p className={`text-[11px] mt-0.5 ${modo === 'template' ? 'text-white/70' : isLight ? 'text-slate-500' : 'text-slate-400'}`}>
+                  Preencha os campos manualmente e visualize o layout antes de salvar.
+                </p>
+              </div>
+            </button>
+
+            {/* Gerar com IA */}
+            <button
+              onClick={() => setModo('ia')}
+              className={`flex flex-col items-start gap-3 p-5 rounded-2xl border text-left transition-all ${
+                modo === 'ia'
+                  ? 'bg-indigo-600 border-indigo-500 shadow-lg shadow-indigo-500/20'
+                  : isLight
+                    ? 'border-slate-200 bg-white hover:border-indigo-300 hover:shadow-sm'
+                    : 'border-white/10 bg-white/[0.03] hover:border-indigo-500/40 hover:bg-white/[0.06]'
+              }`}
+            >
+              <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${
+                modo === 'ia' ? 'bg-white/20' : isLight ? 'bg-indigo-50' : 'bg-indigo-500/15'
+              }`}>
+                <Sparkles size={20} className={modo === 'ia' ? 'text-white' : 'text-indigo-400'} />
+              </div>
+              <div>
+                <p className={`text-sm font-bold ${modo === 'ia' ? 'text-white' : isLight ? 'text-slate-800' : 'text-white'}`}>
+                  Gerar com IA
+                </p>
+                <p className={`text-[11px] mt-0.5 ${modo === 'ia' ? 'text-white/70' : isLight ? 'text-slate-500' : 'text-slate-400'}`}>
+                  Descreva o que deseja e a IA gera a imagem completa com a identidade visual da empresa.
+                </p>
+              </div>
+            </button>
           </div>
 
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between pt-1">
             <button
               onClick={() => setStep(1)}
               className={`flex items-center gap-2 px-4 py-2.5 rounded-xl border text-sm font-semibold transition-colors ${
@@ -510,47 +582,30 @@ function TabGerarComunicado({ identidade }: { identidade: IdentidadeVisual }) {
               <ArrowLeft size={15} /> Voltar
             </button>
             <button
-              onClick={handleGerarIA}
-              disabled={!inputTexto.trim() || gerarIA.isPending}
-              className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-sm text-white font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              onClick={() => setStep(3)}
+              className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-sm text-white font-semibold transition-colors"
             >
-              {gerarIA.isPending ? (
-                <>
-                  <Sparkles size={15} className="animate-pulse" />
-                  Gerando...
-                </>
-              ) : (
-                <>
-                  <Sparkles size={15} />
-                  Gerar com IA
-                </>
-              )}
+              Proximo <ArrowRight size={15} />
             </button>
           </div>
-
-          {gerarIA.isError && (
-            <div className={`p-3 rounded-xl text-xs ${isLight ? 'bg-red-50 text-red-600 border border-red-200' : 'bg-red-500/10 text-red-300 border border-red-500/20'}`}>
-              Erro ao gerar comunicado. Tente novamente.
-            </div>
-          )}
         </div>
       )}
 
-      {/* Step 3: Preview Texto */}
-      {step === 3 && (
+      {/* Step 3a: Template — campos manuais */}
+      {step === 3 && modo === 'template' && (
         <div className="space-y-4">
           <div className={`p-5 rounded-2xl border space-y-4 ${isLight ? 'bg-white border-slate-200' : 'glass-card'}`}>
             <div>
               <label className={`text-[11px] font-semibold block mb-1.5 ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>Titulo</label>
-              <input className={inp} value={texto.titulo} onChange={e => setTexto(t => ({ ...t, titulo: e.target.value }))} />
+              <input className={inp} value={texto.titulo} onChange={e => setTexto(t => ({ ...t, titulo: e.target.value }))} placeholder="Ex: Parabéns, Maria!" />
             </div>
             <div>
               <label className={`text-[11px] font-semibold block mb-1.5 ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>Subtitulo</label>
-              <input className={inp} value={texto.subtitulo} onChange={e => setTexto(t => ({ ...t, subtitulo: e.target.value }))} />
+              <input className={inp} value={texto.subtitulo} onChange={e => setTexto(t => ({ ...t, subtitulo: e.target.value }))} placeholder="Ex: 5 anos de empresa" />
             </div>
             <div>
               <label className={`text-[11px] font-semibold block mb-1.5 ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>Corpo</label>
-              <textarea className={`${inp} min-h-[100px] resize-y`} value={texto.corpo} onChange={e => setTexto(t => ({ ...t, corpo: e.target.value }))} />
+              <textarea className={`${inp} min-h-[100px] resize-y`} value={texto.corpo} onChange={e => setTexto(t => ({ ...t, corpo: e.target.value }))} placeholder="Texto principal do comunicado..." />
             </div>
             <div>
               <div className="flex items-center justify-between mb-1.5">
@@ -572,7 +627,7 @@ function TabGerarComunicado({ identidade }: { identidade: IdentidadeVisual }) {
             </div>
             <div>
               <label className={`text-[11px] font-semibold block mb-1.5 ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>Rodape</label>
-              <input className={inp} value={texto.rodape} onChange={e => setTexto(t => ({ ...t, rodape: e.target.value }))} />
+              <input className={inp} value={texto.rodape} onChange={e => setTexto(t => ({ ...t, rodape: e.target.value }))} placeholder="Ex: TEG União Energia" />
             </div>
           </div>
 
@@ -590,21 +645,80 @@ function TabGerarComunicado({ identidade }: { identidade: IdentidadeVisual }) {
               disabled={!texto.titulo.trim()}
               className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-sm text-white font-semibold transition-colors disabled:opacity-50"
             >
-              <Palette size={15} /> Gerar Imagem
+              <Palette size={15} /> Visualizar
             </button>
           </div>
         </div>
       )}
 
-      {/* Step 4: Preview Imagem + Download */}
-      {step === 4 && (
+      {/* Step 3b: IA — instrucoes + gerar imagem */}
+      {step === 3 && modo === 'ia' && (
+        <div className="space-y-4">
+          <div className={`p-4 rounded-2xl border ${isLight ? 'bg-white border-slate-200' : 'glass-card'}`}>
+            <label className={`text-xs font-semibold block mb-2 ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>
+              Descreva o comunicado que deseja gerar
+            </label>
+            <textarea
+              className={`${inp} min-h-[160px] resize-y`}
+              value={instrucoes}
+              onChange={e => setInstrucoes(e.target.value)}
+              placeholder={tipoInfo.placeholder}
+            />
+            <div className="flex items-center justify-between mt-2">
+              <span className={`text-[10px] ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>
+                {instrucoes.length} caracteres
+              </span>
+              <span className={`text-[10px] ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>
+                A IA usará as cores e identidade visual da empresa automaticamente.
+              </span>
+            </div>
+          </div>
+
+          <div className="flex items-center justify-between">
+            <button
+              onClick={() => setStep(2)}
+              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl border text-sm font-semibold transition-colors ${
+                isLight ? 'border-slate-200 text-slate-600 hover:bg-slate-50' : 'border-white/10 text-slate-400 hover:bg-white/5'
+              }`}
+            >
+              <ArrowLeft size={15} /> Voltar
+            </button>
+            <button
+              onClick={handleGerarImagemIAClick}
+              disabled={!instrucoes.trim() || gerarImagemIA.isPending}
+              className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-sm text-white font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {gerarImagemIA.isPending ? (
+                <>
+                  <Sparkles size={15} className="animate-pulse" />
+                  Gerando imagem...
+                </>
+              ) : (
+                <>
+                  <Sparkles size={15} />
+                  Gerar Imagem
+                </>
+              )}
+            </button>
+          </div>
+
+          {gerarImagemIA.isError && (
+            <div className={`p-3 rounded-xl text-xs ${isLight ? 'bg-red-50 text-red-600 border border-red-200' : 'bg-red-500/10 text-red-300 border border-red-500/20'}`}>
+              Erro ao gerar imagem. Verifique a conexão com o n8n e tente novamente.
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Step 4a: Template — preview html2canvas + Download/Salvar */}
+      {step === 4 && modo === 'template' && (
         <div className="space-y-4">
           {saved ? (
             <div className={`flex flex-col items-center gap-4 py-12 rounded-2xl border ${isLight ? 'bg-emerald-50 border-emerald-200' : 'bg-emerald-500/5 border-emerald-500/20'}`}>
               <CheckCircle2 size={48} className="text-emerald-400" />
               <p className={`text-lg font-bold ${isLight ? 'text-emerald-700' : 'text-emerald-300'}`}>Comunicado salvo com sucesso!</p>
               <button
-                onClick={() => { setSaved(false); setStep(1); setInputTexto(''); setTexto({ titulo: '', subtitulo: '', corpo: '', destaques: [], rodape: '' }) }}
+                onClick={() => { setSaved(false); setStep(1); setTexto({ titulo: '', subtitulo: '', corpo: '', destaques: [], rodape: '' }); setInstrucoes(''); setImagemGeradaUrl('') }}
                 className="flex items-center gap-2 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-sm text-white font-semibold transition-colors"
               >
                 <Plus size={14} /> Novo Comunicado
@@ -640,6 +754,68 @@ function TabGerarComunicado({ identidade }: { identidade: IdentidadeVisual }) {
                 </button>
                 <button
                   onClick={handleSalvar}
+                  disabled={saving}
+                  className="flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-sm text-white font-semibold transition-colors disabled:opacity-50"
+                >
+                  <Save size={15} /> {saving ? 'Salvando...' : 'Salvar no Sistema'}
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+      )}
+
+      {/* Step 4b: IA — preview imagem gerada + Salvar/Descartar */}
+      {step === 4 && modo === 'ia' && (
+        <div className="space-y-4">
+          {saved ? (
+            <div className={`flex flex-col items-center gap-4 py-12 rounded-2xl border ${isLight ? 'bg-emerald-50 border-emerald-200' : 'bg-emerald-500/5 border-emerald-500/20'}`}>
+              <CheckCircle2 size={48} className="text-emerald-400" />
+              <p className={`text-lg font-bold ${isLight ? 'text-emerald-700' : 'text-emerald-300'}`}>Comunicado salvo com sucesso!</p>
+              <button
+                onClick={() => { setSaved(false); setStep(1); setTexto({ titulo: '', subtitulo: '', corpo: '', destaques: [], rodape: '' }); setInstrucoes(''); setImagemGeradaUrl('') }}
+                className="flex items-center gap-2 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-sm text-white font-semibold transition-colors"
+              >
+                <Plus size={14} /> Novo Comunicado
+              </button>
+            </div>
+          ) : (
+            <>
+              <div className="flex justify-center">
+                <div className={`rounded-2xl overflow-hidden border shadow-sm ${isLight ? 'border-slate-200' : 'border-white/10'}`}
+                  style={{ maxWidth: 480 }}>
+                  <img
+                    src={imagemGeradaUrl}
+                    alt="Imagem gerada pela IA"
+                    className="w-full h-auto block"
+                    style={{ aspectRatio: FORMATOS.find(f => f.value === formato)?.aspect }}
+                  />
+                </div>
+              </div>
+
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+                <button
+                  onClick={() => { setImagemGeradaUrl(''); setStep(3) }}
+                  className={`flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border text-sm font-semibold transition-colors ${
+                    isLight ? 'border-slate-200 text-slate-600 hover:bg-slate-50' : 'border-white/10 text-slate-400 hover:bg-white/5'
+                  }`}
+                >
+                  <XCircle size={15} /> Descartar
+                </button>
+                <div className="flex-1" />
+                <a
+                  href={imagemGeradaUrl}
+                  download={`comunicado-ia-${tipo}-${formato}-${Date.now()}.png`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className={`flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl border text-sm font-semibold transition-colors ${
+                    isLight ? 'border-indigo-200 text-indigo-600 bg-indigo-50 hover:bg-indigo-100' : 'border-indigo-500/30 text-indigo-300 bg-indigo-500/10 hover:bg-indigo-500/20'
+                  }`}
+                >
+                  <Download size={15} /> Baixar PNG
+                </a>
+                <button
+                  onClick={handleSalvarImagemIA}
                   disabled={saving}
                   className="flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-sm text-white font-semibold transition-colors disabled:opacity-50"
                 >
