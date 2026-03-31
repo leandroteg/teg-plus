@@ -4,11 +4,14 @@ import {
   User, Mail, Briefcase, Building2, Shield, Lock,
   LogOut, Edit3, Check, X, ChevronRight, Eye, EyeOff,
   AlertCircle, CheckCircle, Settings, Code2,
+  Volume2, VolumeX, BellRing,
 } from 'lucide-react'
 import {
   useAuth, ROLE_LABEL, ROLE_COLOR, ALCADA_LABEL, MODULOS_ERP, type Role,
 } from '../contexts/AuthContext'
 import { PasswordStrengthBar } from '../components/SetPasswordModal'
+import { useSound } from '../hooks/useSound'
+import { usePushNotifications } from '../hooks/usePushNotifications'
 
 // ── Avatar ─────────────────────────────────────────────────────────────────────
 const AVATAR_COLORS = [
@@ -464,6 +467,12 @@ export default function Perfil() {
           </button>
         </Section>
 
+        {/* ── Preferências do App ── */}
+        <Section title="Preferências">
+          <SoundToggle />
+          <PushToggle />
+        </Section>
+
         {/* ── Admin ── */}
         {isAdmin && (
           <Section title="Administração">
@@ -511,5 +520,59 @@ export default function Perfil() {
         </p>
       </div>
     </>
+  )
+}
+
+// ── Sound toggle ────────────────────────────────────────────────────────────────
+function SoundToggle() {
+  const { isMuted, toggleMute, play } = useSound()
+
+  return (
+    <button
+      onClick={() => { toggleMute(); if (isMuted) setTimeout(() => play('success'), 100) }}
+      className="w-full flex items-center gap-3 px-4 py-3 hover:bg-slate-50 transition-colors text-left border-b border-slate-50"
+    >
+      <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${isMuted ? 'bg-slate-100' : 'bg-teal-100'}`}>
+        {isMuted ? <VolumeX size={15} className="text-slate-400" /> : <Volume2 size={15} className="text-teal-600" />}
+      </div>
+      <div className="flex-1">
+        <p className="text-sm font-semibold text-navy">Sons de notificacao</p>
+        <p className="text-xs text-slate-400">{isMuted ? 'Desativados' : 'Ativados'}</p>
+      </div>
+      <div className={`w-10 h-6 rounded-full relative transition-colors ${isMuted ? 'bg-slate-200' : 'bg-teal-500'}`}>
+        <div className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform ${isMuted ? 'left-0.5' : 'left-[18px]'}`} />
+      </div>
+    </button>
+  )
+}
+
+// ── Push notifications toggle ───────────────────────────────────────────────────
+function PushToggle() {
+  const { isSupported, isSubscribed, subscribe, unsubscribe, loading } = usePushNotifications()
+
+  if (!isSupported) return null
+
+  const handleToggle = async () => {
+    if (isSubscribed) await unsubscribe()
+    else await subscribe()
+  }
+
+  return (
+    <button
+      onClick={handleToggle}
+      disabled={loading}
+      className="w-full flex items-center gap-3 px-4 py-3 hover:bg-slate-50 transition-colors text-left"
+    >
+      <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${isSubscribed ? 'bg-blue-100' : 'bg-slate-100'}`}>
+        <BellRing size={15} className={isSubscribed ? 'text-blue-600' : 'text-slate-400'} />
+      </div>
+      <div className="flex-1">
+        <p className="text-sm font-semibold text-navy">Notificacoes push</p>
+        <p className="text-xs text-slate-400">{isSubscribed ? 'Ativadas — receba alertas mesmo com app fechado' : 'Desativadas'}</p>
+      </div>
+      <div className={`w-10 h-6 rounded-full relative transition-colors ${isSubscribed ? 'bg-blue-500' : 'bg-slate-200'}`}>
+        <div className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform ${isSubscribed ? 'left-[18px]' : 'left-0.5'}`} />
+      </div>
+    </button>
   )
 }
