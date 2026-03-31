@@ -1,12 +1,14 @@
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
-import { LayoutGrid, LogOut, Shield, Settings, ChevronLeft, Menu, X, User, Code2, Link2, ClipboardList } from 'lucide-react'
+import { LayoutGrid, LogOut, Shield, Settings, ChevronLeft, Menu, X, User, Code2, Link2, ClipboardList, Plus } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, lazy, Suspense } from 'react'
 import { useAuth, ROLE_LABEL, ROLE_COLOR } from '../contexts/AuthContext'
 import { useTheme } from '../contexts/ThemeContext'
 import LogoTeg from './LogoTeg'
 import NotificationBell from './NotificationBell'
 import ApprovalBadge from './ApprovalBadge'
+
+const MinhasSolicitacoesEmbedded = lazy(() => import('../pages/MinhasSolicitacoes'))
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -421,6 +423,27 @@ export default function ModuleLayout({
 
   // ── Render helpers ──────────────────────────────────────────────────────────
 
+  function renderRequisitanteNav() {
+    const novaSolicitacaoItem = visibleNav.find(isNovaSolicitacaoItem)
+    return (
+      <div className="flex flex-col gap-2 px-1 py-2">
+        {novaSolicitacaoItem && (
+          <NavLink
+            to={novaSolicitacaoItem.to}
+            className={`flex items-center justify-center gap-2 px-4 py-3 rounded-xl text-sm font-semibold transition-all shadow-sm
+              ${ls
+                ? `${a.badgeBgLight} ${a.textLight} hover:opacity-90 active:scale-95`
+                : `${a.badgeBgDark} ${a.textDark} hover:opacity-90 active:scale-95`
+              }`}
+          >
+            <Plus size={16} strokeWidth={2.5} />
+            Nova Solicitação
+          </NavLink>
+        )}
+      </div>
+    )
+  }
+
   function renderNavItems() {
     return visibleNavForRole.map(({ to, icon: Icon, label, end, adminOnly, action, actionMenu, accent }) => {
       if (actionMenu) {
@@ -755,7 +778,7 @@ export default function ModuleLayout({
 
           {/* Nav */}
           <nav className="flex flex-col gap-1">
-            {renderNavItems()}
+            {isRequisitante ? renderRequisitanteNav() : renderNavItems()}
             {renderCadastrosLink()}
           </nav>
 
@@ -838,7 +861,9 @@ export default function ModuleLayout({
 
           {/* Page content */}
           <main className="flex-1 overflow-y-auto styled-scrollbar">
-            <Outlet />
+            {isRequisitante
+              ? <Suspense fallback={null}><MinhasSolicitacoesEmbedded embedded defaultModulo={config.moduleKey} /></Suspense>
+              : <Outlet />}
           </main>
         </div>
       </div>
@@ -916,7 +941,9 @@ export default function ModuleLayout({
 
         {/* ── Navigation ────────────────────────────────────── */}
         <nav className={`flex-1 px-3 py-3 overflow-y-auto styled-scrollbar ${config.navSections ? 'space-y-1' : 'space-y-0.5'}`}>
-          {config.navSections && !isRequisitante ? renderSectionedNav() : renderNavItems()}
+          {isRequisitante
+            ? renderRequisitanteNav()
+            : config.navSections ? renderSectionedNav() : renderNavItems()}
           {renderCadastrosLink()}
 
         </nav>
@@ -959,7 +986,9 @@ export default function ModuleLayout({
         {/* ── Page content ─────────────────────────────────────── */}
         <main className="flex-1 px-4 py-5 pb-28 lg:pb-8">
           <div className={`${maxWidth} mx-auto animate-page-enter`}>
-            <Outlet />
+            {isRequisitante
+              ? <Suspense fallback={null}><MinhasSolicitacoesEmbedded embedded defaultModulo={config.moduleKey} /></Suspense>
+              : <Outlet />}
           </div>
         </main>
 
