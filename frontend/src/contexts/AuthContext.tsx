@@ -518,7 +518,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   const legacyRole: Role = (perfil?.role ?? 'visitante') as Role
-  const papelGlobal: PapelGlobal = perfil?.papel_global ?? mapLegacyRoleToPapel(legacyRole)
+  const basePapelGlobal: PapelGlobal = perfil?.papel_global ?? mapLegacyRoleToPapel(legacyRole)
+  // Quando rbacV2 está ativo, o papel efetivo é o maior entre basePapelGlobal e os papeis dos setores
+  // (evita que usuários com role legado 'requisitante' fiquem travados mesmo tendo papel='equipe' nos setores)
+  const papelGlobal: PapelGlobal = (() => {
+    if (!rbacV2Enabled || perfilSetores.length === 0) return basePapelGlobal
+    const niveis: Record<PapelGlobal, number> = { requisitante: 1, equipe: 2, supervisor: 3, diretor: 4, ceo: 5 }
+    let best = basePapelGlobal
+    for (const s of perfilSetores) {
+      if ((niveis[s.papel] ?? 0) > (niveis[best] ?? 0)) best = s.papel
+    }
+    return best
+  })()
   const role: Role = legacyRole
   const isAdmin = legacyRole === 'administrador' || legacyRole === 'admin'
   const hasFullAccess = isAdmin || legacyRole === 'diretor'
