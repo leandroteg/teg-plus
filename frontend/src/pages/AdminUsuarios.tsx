@@ -111,7 +111,8 @@ function resolvePapelFromPerfil(perfil: Perfil): PapelGlobal {
   const role = String(perfil.role ?? '').toLowerCase()
   if (role === 'administrador' || role === 'admin') return 'ceo'
   if (role === 'diretor' || role === 'gerente') return 'diretor'
-  if (role === 'gestor' || role === 'aprovador') return 'supervisor'
+  if (role === 'supervisor' || role === 'aprovador') return 'supervisor'
+  if (role === 'gestor') return 'equipe'
   if (role === 'comprador') return 'equipe'
   return 'requisitante'
 }
