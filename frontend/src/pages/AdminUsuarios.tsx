@@ -674,8 +674,8 @@ function useCadastrarUsuario() {
 
 // ── Expanded User Detail + Inline Edit ────────────────────────────────────────
 function UserDetailPanel({
-  user, onClose,
-}: { user: Perfil; onClose: () => void }) {
+  user, onClose, forceEdit = false,
+}: { user: Perfil; onClose: () => void; forceEdit?: boolean }) {
   const update = useUpdateUser()
   const [editing, setEditing] = useState(false)
   const [papelGlobal, setPapelGlobal] = useState<PapelGlobal>(resolvePapelFromPerfil(user))
@@ -687,6 +687,10 @@ function UserDetailPanel({
     extractModuloPapeis(user.permissoes_especiais as Record<string, any>)
   )
   const [success, setSuccess] = useState(false)
+
+  useEffect(() => {
+    if (forceEdit) setEditing(true)
+  }, [forceEdit])
 
   const toggleMod = (key: string) =>
     setModulos(m => ({ ...m, [key]: !m[key] }))
@@ -1358,6 +1362,7 @@ export default function AdminUsuarios() {
   const [showFilters,  setShowFilters]  = useState(false)
   const [viewMode,     setViewMode]     = useState<'table' | 'cards'>('table')
   const [expandedUser, setExpandedUser] = useState<string | null>(null)
+  const [quickEditUserId, setQuickEditUserId] = useState<string | null>(null)
   const [showCadastro, setShowCadastro] = useState(false)
   const [selectedIds,  setSelectedIds]  = useState<string[]>([])
   const [bulkPapel, setBulkPapel] = useState<PapelGlobal | ''>('')
@@ -1398,7 +1403,11 @@ export default function AdminUsuarios() {
   }, [perfis])
 
   const toggleExpand = (id: string) =>
-    setExpandedUser(prev => prev === id ? null : id)
+    setExpandedUser(prev => {
+      const next = prev === id ? null : id
+      if (next !== quickEditUserId) setQuickEditUserId(null)
+      return next
+    })
 
   const selectedVisibleCount = useMemo(
     () => filtered.filter(user => selectedIds.includes(user.id)).length,
@@ -1450,6 +1459,19 @@ export default function AdminUsuarios() {
     setBulkModuloPapeis({})
   }
 
+  const handleToolbarEdit = () => {
+    if (selectedIds.length === 1) {
+      const [id] = selectedIds
+      setShowBatchEditor(false)
+      setViewMode('cards')
+      setExpandedUser(id)
+      setQuickEditUserId(id)
+      return
+    }
+    setQuickEditUserId(null)
+    setShowBatchEditor(v => !v)
+  }
+
   const applyBatch = async () => {
     await bulkUpdate.mutateAsync({
       ids: selectedIds,
@@ -1459,6 +1481,7 @@ export default function AdminUsuarios() {
       modulo_papeis: bulkTouchSetores && Object.keys(bulkModuloPapeis).length ? bulkModuloPapeis : undefined,
     })
     setExpandedUser(null)
+    setQuickEditUserId(null)
     setShowBatchEditor(false)
     clearBatch()
   }
@@ -1604,9 +1627,9 @@ export default function AdminUsuarios() {
 
             <button
               type="button"
-              onClick={() => setShowBatchEditor(v => !v)}
+              onClick={handleToolbarEdit}
               className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold border transition-all ${
-                showBatchEditor
+                showBatchEditor && selectedIds.length !== 1
                   ? 'bg-primary text-white border-primary shadow'
                   : 'bg-white text-slate-600 border-slate-200 hover:border-primary/40 hover:text-primary'
               }`}
@@ -1868,6 +1891,7 @@ export default function AdminUsuarios() {
                           <button
                             type="button"
                             onClick={() => {
+                              setQuickEditUserId(null)
                               setViewMode('cards')
                               setExpandedUser(p.id)
                             }}
@@ -1940,7 +1964,11 @@ export default function AdminUsuarios() {
                   {isExpanded && (
                     <UserDetailPanel
                       user={p}
-                      onClose={() => setExpandedUser(null)}
+                      forceEdit={quickEditUserId === p.id}
+                      onClose={() => {
+                        setExpandedUser(null)
+                        setQuickEditUserId(null)
+                      }}
                     />
                   )}
                 </div>
