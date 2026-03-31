@@ -861,7 +861,7 @@ export default function ModuleLayout({
 
           {/* Page content */}
           <main className="flex-1 overflow-y-auto styled-scrollbar">
-            {isRequisitante
+            {isRequisitante && location.pathname === homeRoute
               ? <Suspense fallback={null}><MinhasSolicitacoesEmbedded embedded defaultModulo={config.moduleKey} /></Suspense>
               : <Outlet />}
           </main>
@@ -984,7 +984,7 @@ export default function ModuleLayout({
         {/* ── Page content ─────────────────────────────────────── */}
         <main className="flex-1 px-4 py-5 pb-28 lg:pb-8">
           <div className={`${maxWidth} mx-auto animate-page-enter`}>
-            {isRequisitante
+            {isRequisitante && location.pathname === homeRoute
               ? <Suspense fallback={null}><MinhasSolicitacoesEmbedded embedded defaultModulo={config.moduleKey} /></Suspense>
               : <Outlet />}
           </div>
