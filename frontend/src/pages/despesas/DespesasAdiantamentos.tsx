@@ -3,7 +3,7 @@ import { Plus, Wallet, CheckCircle2, Clock3, XCircle, Send } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
 import { useAuth } from '../../contexts/AuthContext'
 import { useCadCentrosCusto, useCadClasses } from '../../hooks/useCadastros'
-import { useAdiantamentosDespesa, useCriarSolicitacaoAdiantamento } from '../../hooks/useDespesas'
+import { isDespesaSchemaMissing, useAdiantamentosDespesa, useCriarSolicitacaoAdiantamento } from '../../hooks/useDespesas'
 import NumericInput from '../../components/NumericInput'
 import type { StatusDespesaAdiantamento } from '../../types'
 
@@ -43,10 +43,11 @@ const EMPTY_FORM = {
 export default function DespesasAdiantamentos() {
   const { dark } = useTheme()
   const { perfil } = useAuth()
-  const { data: adiantamentos = [] } = useAdiantamentosDespesa()
+  const { data: adiantamentos = [], error: adiantamentosError } = useAdiantamentosDespesa()
   const { data: centros = [] } = useCadCentrosCusto()
   const { data: classes = [] } = useCadClasses({ tipo: 'despesa' })
   const criar = useCriarSolicitacaoAdiantamento()
+  const adiantamentosIndisponiveis = isDespesaSchemaMissing(adiantamentosError)
 
   const [showModal, setShowModal] = useState(false)
   const [erro, setErro] = useState('')
@@ -70,6 +71,10 @@ export default function DespesasAdiantamentos() {
     }
     if (!form.centro_custo || !form.classe_financeira) {
       setErro('Selecione centro de custo e classe financeira.')
+      return
+    }
+    if (adiantamentosIndisponiveis) {
+      setErro('Fluxo de adiantamentos ainda está em implantação no banco de dados.')
       return
     }
 
@@ -108,12 +113,19 @@ export default function DespesasAdiantamentos() {
             setErro('')
             setShowModal(true)
           }}
+          disabled={adiantamentosIndisponiveis}
           className="inline-flex items-center gap-2 rounded-2xl bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-500"
         >
           <Plus size={16} />
           Nova Solicitação
         </button>
       </div>
+
+      {adiantamentosIndisponiveis && (
+        <div className={`rounded-2xl border px-4 py-3 text-sm ${dark ? 'border-amber-500/20 bg-amber-500/10 text-amber-200' : 'border-amber-200 bg-amber-50 text-amber-800'}`}>
+          O layout do fluxo já está pronto, mas as solicitações serão liberadas depois que a migration de adiantamentos for aplicada no banco.
+        </div>
+      )}
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
         <div className={`rounded-3xl border p-5 ${dark ? 'border-white/10 bg-white/[0.03]' : 'border-slate-200 bg-white'}`}>

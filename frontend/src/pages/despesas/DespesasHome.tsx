@@ -2,7 +2,7 @@ import { useNavigate } from 'react-router-dom'
 import { CreditCard, Wallet, ArrowRight, CheckCircle2, Clock3 } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
 import { useApontamentosCartao } from '../../hooks/useCartoes'
-import { useAdiantamentosDespesa } from '../../hooks/useDespesas'
+import { isDespesaSchemaMissing, useAdiantamentosDespesa } from '../../hooks/useDespesas'
 
 const fmt = (v: number) =>
   v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
@@ -12,7 +12,8 @@ export default function DespesasHome() {
   const navigate = useNavigate()
 
   const { data: apontamentos = [] } = useApontamentosCartao()
-  const { data: adiantamentos = [] } = useAdiantamentosDespesa()
+  const { data: adiantamentos = [], error: adiantamentosError } = useAdiantamentosDespesa()
+  const adiantamentosIndisponiveis = isDespesaSchemaMissing(adiantamentosError)
 
   const totalCartoes = apontamentos.reduce((sum, item) => sum + Number(item.valor), 0)
   const totalAdiantamentos = adiantamentos.reduce((sum, item) => sum + Number(item.valor_solicitado), 0)
@@ -34,12 +35,17 @@ export default function DespesasHome() {
       title: 'Adiantamentos',
       subtitle: 'Solicitações para aprovação e futura prestação de contas',
       value: fmt(totalAdiantamentos),
-      meta: `${adiantamentosPendentes} aguardando gestor`,
+      meta: adiantamentosIndisponiveis
+        ? 'Aguardando configuração do banco'
+        : `${adiantamentosPendentes} aguardando gestor`,
       icon: Wallet,
       accent: dark ? 'from-emerald-500/20 to-teal-500/20' : 'from-emerald-50 to-teal-50',
       border: dark ? 'border-emerald-500/20' : 'border-emerald-200',
       iconColor: dark ? 'text-emerald-300' : 'text-emerald-600',
-      action: () => navigate('/despesas/adiantamentos'),
+      action: () => {
+        if (!adiantamentosIndisponiveis) navigate('/despesas/adiantamentos')
+      },
+      disabled: adiantamentosIndisponiveis,
     },
   ]
 
@@ -63,13 +69,20 @@ export default function DespesasHome() {
         </div>
       </div>
 
+      {adiantamentosIndisponiveis && (
+        <div className={`rounded-2xl border px-4 py-3 text-sm ${dark ? 'border-amber-500/20 bg-amber-500/10 text-amber-200' : 'border-amber-200 bg-amber-50 text-amber-800'}`}>
+          O fluxo de adiantamentos já está visível, mas ainda depende da migration no banco para liberar solicitações.
+        </div>
+      )}
+
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
         {cards.map(card => (
           <button
             key={card.title}
             type="button"
             onClick={card.action}
-            className={`rounded-3xl border bg-gradient-to-br ${card.accent} ${card.border} p-6 text-left transition hover:-translate-y-0.5`}
+            disabled={card.disabled}
+            className={`rounded-3xl border bg-gradient-to-br ${card.accent} ${card.border} p-6 text-left transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-70`}
           >
             <div className="flex items-start justify-between gap-4">
               <div className={`rounded-2xl p-3 ${dark ? 'bg-slate-950/30' : 'bg-white/80'}`}>
@@ -91,7 +104,7 @@ export default function DespesasHome() {
               </div>
               <div className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold ${dark ? 'bg-white/10 text-white' : 'bg-white text-slate-700'}`}>
                 <CheckCircle2 size={14} />
-                Abrir fluxo
+                {card.disabled ? 'Aguardando banco' : 'Abrir fluxo'}
               </div>
             </div>
           </button>
