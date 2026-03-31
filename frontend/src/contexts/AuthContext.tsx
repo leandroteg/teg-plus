@@ -513,10 +513,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!user) return { error: 'Não autenticado' }
     const { error } = await supabase
       .from('sys_perfis')
-      .update({ senha_definida: true })
+      .update({
+        senha_definida: true,
+        alterar_senha_proximo_login: false,
+      })
       .eq('auth_id', user.id)
     if (error) return { error: error.message }
-    setPerfil(prev => prev ? { ...prev, senha_definida: true } : prev)
+    setPerfil(prev => prev ? {
+      ...prev,
+      senha_definida: true,
+      alterar_senha_proximo_login: false,
+    } : prev)
     return { error: null }
   }
 

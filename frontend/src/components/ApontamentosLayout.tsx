@@ -1,6 +1,6 @@
 import { useNavigate } from 'react-router-dom'
 import {
-  LayoutDashboard, Plus, ClipboardList,
+  LayoutDashboard, Wallet, CreditCard,
 } from 'lucide-react'
 import ModuleLayout from './ModuleLayout'
 import type { NavItem } from './ModuleLayout'
@@ -9,15 +9,15 @@ export default function ApontamentosLayout() {
   const navigate = useNavigate()
 
   const NAV: NavItem[] = [
-    { to: '/apontamentos',            icon: LayoutDashboard, label: 'Painel',                  end: true },
-    { to: '/apontamentos/novo',       icon: Plus,            label: 'Novo Apontamento',         end: false, action: () => navigate(`/apontamentos/realizados?nova=${Date.now()}`), accent: true },
-    { to: '/apontamentos/realizados', icon: ClipboardList,   label: 'Apontamentos Realizados',  end: false },
+    { to: '/despesas', icon: LayoutDashboard, label: 'Painel', end: true },
+    { to: '/despesas/cartoes', icon: CreditCard, label: 'Cartões', end: false, action: () => navigate(`/despesas/cartoes?nova=${Date.now()}`), accent: true },
+    { to: '/despesas/adiantamentos', icon: Wallet, label: 'Adiantamentos', end: false },
   ]
 
   return (
     <ModuleLayout
       moduleKey="apontamentos"
-      moduleName="Apontamentos"
+      moduleName="Despesas"
       moduleEmoji="💳"
       accent="violet"
       nav={NAV}

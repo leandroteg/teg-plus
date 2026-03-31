@@ -42,6 +42,7 @@ function filtrarPorPermissao(
     const apr = a as unknown as Record<string, unknown>
     const modulo = (apr.modulo as string) ?? ''
     const aprovadorEmail = ((apr.aprovador_email as string) ?? '').toLowerCase()
+    if (aprovadorEmail && aprovadorEmail === email) return true
 
     // Requisitante: só vê aprovações endereçadas a ele
     if (papelGlobal === 'requisitante' || papelGlobal === 'equipe' || role === 'requisitante') {
@@ -370,6 +371,24 @@ export function useAprovacoesPendentes(tipo?: TipoAprovacao) {
         }
       }
 
+      const despIds = aprData
+        .filter(a => a.tipo_aprovacao === 'solicitacao_adiantamento')
+        .map(a => a.entidade_id)
+        .filter(Boolean)
+
+      const despMap = new Map<string, Record<string, unknown>>()
+      if (despIds.length > 0) {
+        try {
+          const { data: despData } = await supabase
+            .from('desp_adiantamentos')
+            .select('id, numero, solicitante_nome, favorecido_nome, centro_custo, finalidade, justificativa, valor_solicitado, data_limite_prestacao, status, created_at')
+            .in('id', despIds)
+          for (const item of despData ?? []) {
+            despMap.set(item.id, item)
+          }
+        } catch { /* despesas enrichment failed */ }
+      }
+
       // 6. Mescla aprovacoes com dados da requisicao/contrato/CP + cotacao
       const result = aprData
         .map(a => {
@@ -542,6 +561,21 @@ export function useAprovacoesPendentes(tipo?: TipoAprovacao) {
                 forma_pagamento: (fin.forma_pagamento as string) ?? '',
                 status_cp: (fin.status as string) ?? '',
               }
+            }
+          } else if (a.tipo_aprovacao === 'solicitacao_adiantamento') {
+            const desp = despMap.get(a.entidade_id)
+            requisicao = {
+              id: a.entidade_id,
+              numero: (desp?.numero as string) ?? a.entidade_numero ?? 'N/A',
+              solicitante_nome: (desp?.solicitante_nome as string) ?? '',
+              obra_nome: (desp?.centro_custo as string) ?? '',
+              descricao: (desp?.finalidade as string) ?? 'Solicitação de adiantamento',
+              justificativa: (desp?.justificativa as string) ?? undefined,
+              valor_estimado: Number(desp?.valor_solicitado ?? 0),
+              urgencia: 'normal',
+              status: 'em_aprovacao',
+              alcada_nivel: a.nivel,
+              created_at: (desp?.created_at as string) ?? a.created_at,
             }
           } else if (a.tipo_aprovacao === 'aprovacao_transporte') {
             const log = logMap.get(a.entidade_id)
@@ -1094,6 +1128,69 @@ export function useDecisaoGenerica() {
               })
               .eq('id', entidadeId)
           }
+        } else if (tipoAprovacao === 'solicitacao_adiantamento') {
+          const now = new Date().toISOString()
+          const hoje = new Date().toISOString().split('T')[0]
+
+          if (decisao === 'aprovada') {
+            const { data: adiantamento } = await supabase
+              .from('desp_adiantamentos')
+              .select('id, numero, solicitante_nome, favorecido_nome, centro_custo, classe_financeira, valor_solicitado, finalidade, justificativa, fin_conta_pagar_id')
+              .eq('id', entidadeId)
+              .maybeSingle()
+
+            let contaPagarId = (adiantamento?.fin_conta_pagar_id as string | null) ?? null
+
+            if (!contaPagarId) {
+              const { data: cp, error: cpError } = await supabase
+                .from('fin_contas_pagar')
+                .insert({
+                  fornecedor_nome: (adiantamento?.favorecido_nome as string) ?? 'Colaborador',
+                  origem: 'manual',
+                  valor_original: Number(adiantamento?.valor_solicitado ?? 0),
+                  valor_pago: 0,
+                  data_emissao: hoje,
+                  data_vencimento: hoje,
+                  data_vencimento_orig: hoje,
+                  centro_custo: (adiantamento?.centro_custo as string) ?? null,
+                  classe_financeira: (adiantamento?.classe_financeira as string) ?? null,
+                  natureza: 'adiantamento_colaborador',
+                  numero_documento: (adiantamento?.numero as string) ?? entidadeId,
+                  status: 'confirmado',
+                  descricao: `Adiantamento - ${(adiantamento?.finalidade as string) ?? ''}`.trim(),
+                  observacoes: [
+                    'Adiantamento de despesas aprovado pelo gestor.',
+                    adiantamento?.solicitante_nome ? `Solicitante: ${adiantamento.solicitante_nome as string}` : null,
+                    adiantamento?.justificativa ? `Justificativa: ${adiantamento.justificativa as string}` : null,
+                  ].filter(Boolean).join(' | '),
+                })
+                .select('id')
+                .single()
+
+              if (cpError) throw cpError
+              contaPagarId = cp?.id ?? null
+            }
+
+            await supabase
+              .from('desp_adiantamentos')
+              .update({
+                status: 'aprovado',
+                valor_aprovado: Number(adiantamento?.valor_solicitado ?? 0),
+                fin_conta_pagar_id: contaPagarId,
+                aprovado_por: aprovadorNome,
+                aprovado_em: now,
+                updated_at: now,
+              })
+              .eq('id', entidadeId)
+          } else {
+            await supabase
+              .from('desp_adiantamentos')
+              .update({
+                status: 'rejeitado',
+                updated_at: now,
+              })
+              .eq('id', entidadeId)
+          }
         } else if (tipoAprovacao === 'aprovacao_transporte') {
           const now = new Date().toISOString()
 
@@ -1161,6 +1258,7 @@ export function useDecisaoGenerica() {
       qc.invalidateQueries({ queryKey: ['con-solicitacoes-dashboard'] })
       qc.invalidateQueries({ queryKey: ['contas-pagar'] })
       qc.invalidateQueries({ queryKey: ['financeiro-dashboard'] })
+      qc.invalidateQueries({ queryKey: ['despesas-adiantamentos'] })
       qc.invalidateQueries({ queryKey: ['lotes-pagamento'] })
       qc.invalidateQueries({ queryKey: ['lote-detalhe'] })
       qc.invalidateQueries({ queryKey: ['log_solicitacoes'] })

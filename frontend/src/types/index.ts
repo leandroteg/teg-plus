@@ -121,7 +121,13 @@ export interface Requisicao {
   esclarecimento_em?: string
 }
 
-export type TipoAprovacao = 'requisicao_compra' | 'cotacao' | 'autorizacao_pagamento' | 'minuta_contratual' | 'aprovacao_transporte'
+export type TipoAprovacao =
+  | 'requisicao_compra'
+  | 'cotacao'
+  | 'autorizacao_pagamento'
+  | 'minuta_contratual'
+  | 'aprovacao_transporte'
+  | 'solicitacao_adiantamento'
 
 export interface Aprovacao {
   id: string
@@ -227,6 +233,43 @@ export interface AprovacaoPendente extends Aprovacao {
     tempo_estimado_h?: number
     solicitacoes?: Record<string, unknown>[]
   }
+}
+
+export type StatusDespesaAdiantamento =
+  | 'solicitado'
+  | 'aprovado'
+  | 'rejeitado'
+  | 'prestacao_pendente'
+  | 'prestacao_enviada'
+  | 'concluido'
+
+export interface DespesaAdiantamento {
+  id: string
+  numero: string
+  solicitante_id?: string
+  solicitante_nome: string
+  gestor_id?: string
+  gestor_nome?: string
+  gestor_email?: string
+  favorecido_nome: string
+  favorecido_email?: string
+  centro_custo?: string
+  centro_custo_id?: string
+  classe_financeira?: string
+  classe_financeira_id?: string
+  valor_solicitado: number
+  valor_aprovado?: number
+  finalidade: string
+  justificativa?: string
+  data_solicitacao: string
+  data_limite_prestacao?: string
+  status: StatusDespesaAdiantamento
+  fin_conta_pagar_id?: string
+  aprovado_por?: string
+  aprovado_em?: string
+  observacoes?: string
+  created_at: string
+  updated_at: string
 }
 
 export interface AprovacaoHistorico {

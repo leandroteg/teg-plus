@@ -58,7 +58,7 @@ export function PrivateRoute() {
 
   return (
     <>
-      {perfil && !perfil.senha_definida && <SetPasswordModal />}
+      {perfil && (!perfil.senha_definida || perfil.alterar_senha_proximo_login) && <SetPasswordModal />}
       <Outlet />
     </>
   )
@@ -88,7 +88,7 @@ export function AdminRoute() {
 
   return (
     <>
-      {perfil && !perfil.senha_definida && <SetPasswordModal />}
+      {perfil && (!perfil.senha_definida || perfil.alterar_senha_proximo_login) && <SetPasswordModal />}
       <Outlet />
     </>
   )
