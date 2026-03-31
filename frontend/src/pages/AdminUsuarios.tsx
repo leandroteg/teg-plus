@@ -129,6 +129,48 @@ function createEmptyModulosMap() {
   }, {} as Record<string, boolean>)
 }
 
+function isPapelGlobal(value: unknown): value is PapelGlobal {
+  return value === 'requisitante'
+    || value === 'equipe'
+    || value === 'supervisor'
+    || value === 'diretor'
+    || value === 'ceo'
+}
+
+function extractModuloPapeis(permissoes: Record<string, any> | null | undefined): Record<string, PapelGlobal> {
+  const raw = permissoes?.modulo_papeis
+  if (!raw || typeof raw !== 'object') return {}
+  const out: Record<string, PapelGlobal> = {}
+  for (const [key, value] of Object.entries(raw)) {
+    if (isPapelGlobal(value) && value !== 'requisitante') {
+      out[key] = value
+    }
+  }
+  return out
+}
+
+function applyModuloPapeisOnPermissoes(
+  permissoes: Record<string, any> | null | undefined,
+  moduloPapeis: Record<string, PapelGlobal>
+) {
+  const next = { ...(permissoes ?? {}) } as Record<string, any>
+  if (Object.keys(moduloPapeis).length === 0) {
+    delete next.modulo_papeis
+  } else {
+    next.modulo_papeis = moduloPapeis
+  }
+  return next
+}
+
+function resolvePapelByModulo(
+  modulo: string,
+  moduloPapeis: Record<string, PapelGlobal> | undefined
+): PapelGlobal {
+  if (!moduloPapeis) return 'requisitante'
+  const normalized = normalizeModuloForSetor(modulo)
+  return moduloPapeis[modulo] || moduloPapeis[normalized] || 'requisitante'
+}
+
 async function updatePerfilWithSync(
   payload: Partial<Perfil> & { id: string; papel_global?: PapelGlobal }
 ) {
@@ -155,12 +197,15 @@ async function updatePerfilWithSync(
 
   if (error) throw error
 
-  if (rest.modulos || papel_global) {
-    const nextPapel = papel_global ?? resolvePapelFromPerfil(updated as Perfil)
+  if (rest.modulos || rest.permissoes_especiais) {
+    const moduloPapeis = extractModuloPapeis(
+      (rest.permissoes_especiais as Record<string, any> | undefined)
+      ?? ((updated as Perfil).permissoes_especiais as Record<string, any> | undefined)
+    )
     await syncPerfilSetores(
       id,
       (rest.modulos as Record<string, boolean> | undefined) ?? ((updated as Perfil).modulos ?? {}),
-      nextPapel
+      moduloPapeis
     )
   }
 
@@ -170,7 +215,7 @@ async function updatePerfilWithSync(
 async function syncPerfilSetores(
   perfilId: string,
   modulos: Record<string, boolean>,
-  papel: PapelGlobal
+  moduloPapeis?: Record<string, PapelGlobal>
 ) {
   const ativos = Object.entries(modulos)
     .filter(([, enabled]) => Boolean(enabled))
@@ -200,13 +245,15 @@ async function syncPerfilSetores(
       .update({ ativo: false })
       .eq('perfil_id', perfilId)
 
-    const rows = setores.map(setor => ({
+    const rows = setores.map(setor => {
+      const papelSetor = resolvePapelByModulo(setor.modulo_key, moduloPapeis)
+      return ({
       perfil_id: perfilId,
       setor_id: setor.id,
-      papel,
-      aprovador_tecnico: papel === 'supervisor' || papel === 'diretor' || papel === 'ceo',
+      papel: papelSetor,
+      aprovador_tecnico: papelSetor === 'supervisor' || papelSetor === 'diretor' || papelSetor === 'ceo',
       ativo: true,
-    }))
+    })})
 
     const { error: upsertErr } = await supabase
       .from('sys_perfil_setores')
@@ -305,6 +352,49 @@ function ModuloCheckboxGroup({
 }
 
 // ── Hooks ──────────────────────────────────────────────────────────────────────
+function ModuloPapelEditor({
+  modulos,
+  moduloPapeis,
+  onChange,
+}: {
+  modulos: Record<string, boolean>
+  moduloPapeis: Record<string, PapelGlobal>
+  onChange: (modulo: string, papel: PapelGlobal | '') => void
+}) {
+  const ativos = MODULOS_ERP.filter(mod => Boolean(modulos?.[mod.key]))
+
+  if (ativos.length === 0) {
+    return (
+      <div className="rounded-xl border border-dashed border-slate-200 px-3 py-2 text-xs text-slate-400">
+        Marque ao menos um modulo para definir papel por modulo.
+      </div>
+    )
+  }
+
+  return (
+    <div className="space-y-2">
+      {ativos.map(mod => (
+        <div key={mod.key} className="grid grid-cols-[1fr_180px] gap-2 items-center">
+          <div className="text-xs text-slate-600 font-semibold flex items-center gap-1.5">
+            <span className="text-[11px]">{mod.icon}</span>
+            <span>{mod.label}</span>
+          </div>
+          <select
+            value={moduloPapeis[mod.key] ?? ''}
+            onChange={e => onChange(mod.key, e.target.value as PapelGlobal | '')}
+            className="px-2.5 py-1.5 rounded-lg border border-slate-200 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+          >
+            <option value="">Requisitante (padrao)</option>
+            {PAPEIS.map(p => (
+              <option key={p.value} value={p.value}>{p.label}</option>
+            ))}
+          </select>
+        </div>
+      ))}
+    </div>
+  )
+}
+
 function usePerfis() {
   return useQuery({
     queryKey: ['perfis'],
@@ -338,8 +428,9 @@ function useBulkUpdateUsers() {
       papel_global?: PapelGlobal
       alcada_nivel?: number
       modulos?: Record<string, boolean>
+      modulo_papeis?: Record<string, PapelGlobal>
     }) => {
-      const { ids, papel_global, alcada_nivel, modulos } = payload
+      const { ids, papel_global, alcada_nivel, modulos, modulo_papeis } = payload
       if (!ids.length) throw new Error('Selecione ao menos um usuário.')
 
       const changes: Partial<Perfil> & { papel_global?: PapelGlobal } = {}
@@ -350,12 +441,28 @@ function useBulkUpdateUsers() {
       if (typeof alcada_nivel === 'number') changes.alcada_nivel = alcada_nivel
       if (modulos) changes.modulos = modulos
 
-      if (Object.keys(changes).length === 0) {
+      if (Object.keys(changes).length === 0 && !modulo_papeis) {
         throw new Error('Defina ao menos um campo para aplicar em lote.')
       }
 
       for (const id of ids) {
-        await updatePerfilWithSync({ id, ...changes })
+        let payloadUpdate: Partial<Perfil> & { id: string; papel_global?: PapelGlobal } = { id, ...changes }
+        if (modulo_papeis) {
+          const { data: perfilAtual, error: perfilError } = await supabase
+            .from('sys_perfis')
+            .select('permissoes_especiais')
+            .eq('id', id)
+            .single()
+          if (perfilError) throw perfilError
+          payloadUpdate = {
+            ...payloadUpdate,
+            permissoes_especiais: applyModuloPapeisOnPermissoes(
+              (perfilAtual?.permissoes_especiais as Record<string, any> | undefined),
+              modulo_papeis
+            ),
+          }
+        }
+        await updatePerfilWithSync(payloadUpdate)
       }
 
       return { total: ids.length }
@@ -483,7 +590,7 @@ function useCadastrarUsuario() {
           .maybeSingle()
 
         if (perfilN8n?.id) {
-          await syncPerfilSetores(perfilN8n.id, modulos, papel_global)
+          await syncPerfilSetores(perfilN8n.id, modulos)
         }
 
         return {
@@ -551,7 +658,7 @@ function useCadastrarUsuario() {
         .eq('id', perfilCriado.id)
 
       if (updErr) throw updErr
-      await syncPerfilSetores(perfilCriado.id, modulos, papel_global)
+      await syncPerfilSetores(perfilCriado.id, modulos)
 
       return {
         nome,
@@ -576,10 +683,22 @@ function UserDetailPanel({
   const [ativo,   setAtivo]   = useState(user.ativo)
   const [modulos, setModulos] = useState<Record<string, boolean>>(user.modulos ?? {})
   const [permEspeciais, setPermEspeciais] = useState<Record<string, any>>(user.permissoes_especiais ?? {})
+  const [moduloPapeis, setModuloPapeis] = useState<Record<string, PapelGlobal>>(
+    extractModuloPapeis(user.permissoes_especiais as Record<string, any>)
+  )
   const [success, setSuccess] = useState(false)
 
   const toggleMod = (key: string) =>
     setModulos(m => ({ ...m, [key]: !m[key] }))
+
+  const setPapelModulo = (modulo: string, papel: PapelGlobal | '') => {
+    setModuloPapeis(prev => {
+      const next = { ...prev }
+      if (!papel || papel === 'requisitante') delete next[modulo]
+      else next[modulo] = papel
+      return next
+    })
+  }
 
   const handleSave = async () => {
     await update.mutateAsync({
@@ -589,7 +708,7 @@ function UserDetailPanel({
       alcada_nivel: alcada,
       ativo,
       modulos,
-      permissoes_especiais: permEspeciais,
+      permissoes_especiais: applyModuloPapeisOnPermissoes(permEspeciais, moduloPapeis),
     })
     setSuccess(true)
     setTimeout(() => { setSuccess(false); setEditing(false) }, 1200)
@@ -601,6 +720,7 @@ function UserDetailPanel({
     setAtivo(user.ativo)
     setModulos(user.modulos ?? {})
     setPermEspeciais(user.permissoes_especiais ?? {})
+    setModuloPapeis(extractModuloPapeis(user.permissoes_especiais as Record<string, any>))
     setEditing(false)
   }
 
@@ -738,6 +858,20 @@ function UserDetailPanel({
               return next
             })}
           />
+
+          <div className="space-y-2">
+            <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+              Papel por modulo
+            </label>
+            <ModuloPapelEditor
+              modulos={modulos}
+              moduloPapeis={moduloPapeis}
+              onChange={setPapelModulo}
+            />
+            <p className="text-[10px] text-slate-400">
+              Se nao definir, o modulo fica como Requisitante.
+            </p>
+          </div>
 
           {/* ── Permissões Especiais ─────────────────────────────────── */}
           {modulos?.contratos && mapPapelToLegacyRole(papelGlobal) !== 'administrador' && (
@@ -1064,6 +1198,8 @@ function BatchEditModal({
   bulkTouchSetores,
   onBulkTouchSetores,
   bulkModulos,
+  bulkModuloPapeis,
+  onBulkModuloPapel,
   onToggleModulo,
   onSetAllModulos,
   onApply,
@@ -1083,6 +1219,8 @@ function BatchEditModal({
   bulkTouchSetores: boolean
   onBulkTouchSetores: (value: boolean) => void
   bulkModulos: Record<string, boolean>
+  bulkModuloPapeis: Record<string, PapelGlobal>
+  onBulkModuloPapel: (modulo: string, papel: PapelGlobal | '') => void
   onToggleModulo: (key: string) => void
   onSetAllModulos: (keys: string[], val: boolean) => void
   onApply: () => Promise<void>
@@ -1160,12 +1298,17 @@ function BatchEditModal({
               Alterar areas/modulos
             </label>
             {bulkTouchSetores && (
-              <div className="rounded-xl border border-slate-100 p-2.5 bg-slate-50/60">
-                <ModuloCheckboxGroup
-                  modulos={bulkModulos}
-                  onToggle={onToggleModulo}
-                  onSetAll={onSetAllModulos}
-                />
+              <div className="rounded-xl border border-slate-100 p-2.5 bg-slate-50/60 space-y-3">
+                <ModuloCheckboxGroup modulos={bulkModulos} onToggle={onToggleModulo} onSetAll={onSetAllModulos} />
+                <div className="rounded-lg border border-slate-100 bg-white p-2.5 space-y-2">
+                  <label className="text-[11px] font-semibold text-slate-500">Papel no modulo</label>
+                  <ModuloPapelEditor
+                    modulos={bulkModulos}
+                    moduloPapeis={bulkModuloPapeis}
+                    onChange={onBulkModuloPapel}
+                  />
+                  <p className="text-[10px] text-slate-400">Nao definido = Requisitante.</p>
+                </div>
               </div>
             )}
           </div>
@@ -1221,6 +1364,7 @@ export default function AdminUsuarios() {
   const [bulkAlcada, setBulkAlcada] = useState<number | ''>('')
   const [bulkTouchSetores, setBulkTouchSetores] = useState(false)
   const [bulkModulos, setBulkModulos] = useState<Record<string, boolean>>(() => createEmptyModulosMap())
+  const [bulkModuloPapeis, setBulkModuloPapeis] = useState<Record<string, PapelGlobal>>({})
   const [showBatchEditor, setShowBatchEditor] = useState(false)
   const selectAllRef = useRef<HTMLInputElement | null>(null)
 
@@ -1275,6 +1419,12 @@ export default function AdminUsuarios() {
     setSelectedIds(prev => prev.filter(id => validIds.has(id)))
   }, [perfis])
 
+  useEffect(() => {
+    if (!bulkTouchSetores) {
+      setBulkModuloPapeis({})
+    }
+  }, [bulkTouchSetores])
+
   const toggleSelectOne = (id: string) => {
     setSelectedIds(prev => (
       prev.includes(id) ? prev.filter(item => item !== id) : [...prev, id]
@@ -1297,6 +1447,7 @@ export default function AdminUsuarios() {
     setBulkAlcada('')
     setBulkTouchSetores(false)
     setBulkModulos(createEmptyModulosMap())
+    setBulkModuloPapeis({})
   }
 
   const applyBatch = async () => {
@@ -1305,6 +1456,7 @@ export default function AdminUsuarios() {
       papel_global: bulkPapel || undefined,
       alcada_nivel: typeof bulkAlcada === 'number' ? bulkAlcada : undefined,
       modulos: bulkTouchSetores ? bulkModulos : undefined,
+      modulo_papeis: bulkTouchSetores && Object.keys(bulkModuloPapeis).length ? bulkModuloPapeis : undefined,
     })
     setExpandedUser(null)
     setShowBatchEditor(false)
@@ -1329,12 +1481,41 @@ export default function AdminUsuarios() {
           bulkTouchSetores={bulkTouchSetores}
           onBulkTouchSetores={setBulkTouchSetores}
           bulkModulos={bulkModulos}
-          onToggleModulo={key => setBulkModulos(prev => ({ ...prev, [key]: !prev[key] }))}
-          onSetAllModulos={(keys, val) => setBulkModulos(prev => {
-            const next = { ...prev }
-            keys.forEach(k => { next[k] = val })
-            return next
+          bulkModuloPapeis={bulkModuloPapeis}
+          onBulkModuloPapel={(modulo, papel) => {
+            setBulkModuloPapeis(prev => {
+              const next = { ...prev }
+              if (!papel || papel === 'requisitante') delete next[modulo]
+              else next[modulo] = papel
+              return next
+            })
+          }}
+          onToggleModulo={key => setBulkModulos(prev => {
+            const enabled = !prev[key]
+            if (!enabled) {
+              setBulkModuloPapeis(prevPapeis => {
+                if (!(key in prevPapeis)) return prevPapeis
+                const nextPapeis = { ...prevPapeis }
+                delete nextPapeis[key]
+                return nextPapeis
+              })
+            }
+            return { ...prev, [key]: enabled }
           })}
+          onSetAllModulos={(keys, val) => {
+            setBulkModulos(prev => {
+              const next = { ...prev }
+              keys.forEach(k => { next[k] = val })
+              return next
+            })
+            if (!val) {
+              setBulkModuloPapeis(prevPapeis => {
+                const nextPapeis = { ...prevPapeis }
+                keys.forEach(k => { delete nextPapeis[k] })
+                return nextPapeis
+              })
+            }
+          }}
           onApply={applyBatch}
           isPending={bulkUpdate.isPending}
           errorMessage={bulkUpdate.error instanceof Error ? bulkUpdate.error.message : (bulkUpdate.isError ? 'Erro ao editar em lote.' : null)}
