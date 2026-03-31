@@ -276,6 +276,7 @@ function TabGerarComunicado({ identidade }: { identidade: IdentidadeVisual }) {
 
   // Step 3b — IA: instrucoes livres
   const [instrucoes, setInstrucoes] = useState('')
+  const [incluirLogo, setIncluirLogo] = useState(true)
   const gerarImagemIA = useGerarImagemIA()
   const [imagemGeradaUrl, setImagemGeradaUrl] = useState('')
   const [imagemGeradaTexto, setImagemGeradaTexto] = useState('')
@@ -701,6 +702,28 @@ function TabGerarComunicado({ identidade }: { identidade: IdentidadeVisual }) {
             </div>
           </div>
 
+          {/* Toggle: Incluir Logo */}
+          {identidade.logo_url && (
+            <button
+              type="button"
+              onClick={() => setIncluirLogo(v => !v)}
+              className={`flex items-center gap-3 w-full px-4 py-3 rounded-2xl border transition-colors ${
+                incluirLogo
+                  ? isLight ? 'bg-indigo-50 border-indigo-200' : 'bg-indigo-500/10 border-indigo-500/30'
+                  : isLight ? 'bg-white border-slate-200 hover:bg-slate-50' : 'glass-card hover:bg-white/5'
+              }`}
+            >
+              {/* Switch visual */}
+              <div className={`relative flex-shrink-0 w-10 h-5 rounded-full transition-colors ${incluirLogo ? 'bg-indigo-500' : isLight ? 'bg-slate-300' : 'bg-slate-600'}`}>
+                <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${incluirLogo ? 'translate-x-5' : 'translate-x-0.5'}`} />
+              </div>
+              <img src={identidade.logo_url} alt="Logo" className="h-5 object-contain opacity-80" />
+              <span className={`text-xs font-semibold ${incluirLogo ? isLight ? 'text-indigo-700' : 'text-indigo-300' : isLight ? 'text-slate-500' : 'text-slate-400'}`}>
+                Incluir logo no comunicado
+              </span>
+            </button>
+          )}
+
           <div className="flex items-center justify-between">
             <button
               onClick={() => setStep(2)}
@@ -745,7 +768,7 @@ function TabGerarComunicado({ identidade }: { identidade: IdentidadeVisual }) {
               <CheckCircle2 size={48} className="text-emerald-400" />
               <p className={`text-lg font-bold ${isLight ? 'text-emerald-700' : 'text-emerald-300'}`}>Comunicado salvo com sucesso!</p>
               <button
-                onClick={() => { setSaved(false); setStep(1); setTexto({ titulo: '', subtitulo: '', corpo: '', destaques: [], rodape: '' }); setInstrucoes(''); setImagemGeradaUrl(''); setImagemGeradaTexto(''); setImagemGeradaFooter(''); setImagemGeradaCor1(''); setImagemGeradaCor2('') }}
+                onClick={() => { setSaved(false); setStep(1); setTexto({ titulo: '', subtitulo: '', corpo: '', destaques: [], rodape: '' }); setInstrucoes(''); setIncluirLogo(true); setImagemGeradaUrl(''); setImagemGeradaTexto(''); setImagemGeradaFooter(''); setImagemGeradaCor1(''); setImagemGeradaCor2('') }}
                 className="flex items-center gap-2 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-sm text-white font-semibold transition-colors"
               >
                 <Plus size={14} /> Novo Comunicado
@@ -800,7 +823,7 @@ function TabGerarComunicado({ identidade }: { identidade: IdentidadeVisual }) {
               <CheckCircle2 size={48} className="text-emerald-400" />
               <p className={`text-lg font-bold ${isLight ? 'text-emerald-700' : 'text-emerald-300'}`}>Comunicado salvo com sucesso!</p>
               <button
-                onClick={() => { setSaved(false); setStep(1); setTexto({ titulo: '', subtitulo: '', corpo: '', destaques: [], rodape: '' }); setInstrucoes(''); setImagemGeradaUrl(''); setImagemGeradaTexto(''); setImagemGeradaFooter(''); setImagemGeradaCor1(''); setImagemGeradaCor2('') }}
+                onClick={() => { setSaved(false); setStep(1); setTexto({ titulo: '', subtitulo: '', corpo: '', destaques: [], rodape: '' }); setInstrucoes(''); setIncluirLogo(true); setImagemGeradaUrl(''); setImagemGeradaTexto(''); setImagemGeradaFooter(''); setImagemGeradaCor1(''); setImagemGeradaCor2('') }}
                 className="flex items-center gap-2 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-sm text-white font-semibold transition-colors"
               >
                 <Plus size={14} /> Novo Comunicado
@@ -827,6 +850,17 @@ function TabGerarComunicado({ identidade }: { identidade: IdentidadeVisual }) {
                     className="absolute inset-0 w-full h-full object-cover"
                     crossOrigin="anonymous"
                   />
+                  {/* Logo — top-left (condicional ao toggle) */}
+                  {incluirLogo && identidade.logo_url && (
+                    <div className="absolute top-4 left-4 z-10">
+                      <img
+                        src={identidade.logo_url}
+                        alt="Logo"
+                        crossOrigin="anonymous"
+                        style={{ maxHeight: 48, maxWidth: 120, objectFit: 'contain', filter: 'drop-shadow(0 2px 6px rgba(0,0,0,0.5))' }}
+                      />
+                    </div>
+                  )}
                   {/* Text overlay */}
                   <div className="absolute inset-0 flex flex-col items-center justify-center p-6" style={{ background: 'rgba(0,0,0,0.15)' }}>
                     <p className="text-white font-bold text-center leading-snug drop-shadow-lg"
