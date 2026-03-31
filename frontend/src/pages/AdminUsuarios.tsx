@@ -495,30 +495,33 @@ function useBulkUpdateUsers() {
 function useChangePassword() {
   return useMutation({
     mutationFn: async ({ auth_id, password }: { auth_id: string; password: string }) => {
-      const { data: { session } } = await supabase.auth.getSession()
-      if (!session) throw new Error('Sessão expirada')
-      const res = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/admin-set-password`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${session.access_token}`,
-          },
-          body: JSON.stringify({ auth_id, password }),
+      const { data, error } = await supabase.functions.invoke('admin-set-password', {
+        body: { auth_id, password },
+      })
+
+      if (!error) {
+        const payload = (data ?? {}) as Record<string, any>
+        if (payload?.error) {
+          throw new Error(String(payload.error))
         }
-      )
-      const raw = await res.text()
-      let json: Record<string, any> = {}
-      if (raw) {
-        try {
-          json = JSON.parse(raw)
-        } catch {
-          json = {}
-        }
+        return payload
       }
-      if (!res.ok) throw new Error((json.error as string | undefined) ?? 'Erro ao alterar senha')
-      return json
+
+      // Fallback seguro: alguns ambientes não possuem Edge Function publicada.
+      const { data: rpcData, error: rpcError } = await supabase.rpc('admin_set_password_rpc', {
+        p_auth_id: auth_id,
+        p_password: password,
+      })
+
+      if (rpcError) {
+        throw new Error(rpcError.message || error.message || 'Erro ao alterar senha')
+      }
+
+      const payload = (rpcData ?? {}) as Record<string, any>
+      if (payload?.error) {
+        throw new Error(String(payload.error))
+      }
+      return payload
     },
   })
 }
