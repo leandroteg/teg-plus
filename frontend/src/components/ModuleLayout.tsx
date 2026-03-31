@@ -342,12 +342,10 @@ export default function ModuleLayout({
   const headerModuleName = mobileModuleName ?? config.moduleName
   const visibleNav = config.nav.filter(n => !n.adminOnly || isAdmin)
   const isRequisitante = !isAdmin && papelGlobal === 'requisitante'
-  const isEquipe = !isAdmin && papelGlobal === 'equipe'
   const visibleNavForRole = useMemo(() => {
     if (isRequisitante) return visibleNav.filter(isNovaSolicitacaoItem)
-    if (isEquipe) return visibleNav.filter(n => !n.supervisorOnly)
     return visibleNav
-  }, [isRequisitante, isEquipe, visibleNav])
+  }, [isRequisitante, visibleNav])
   // home do módulo = primeiro item com end:true
   const homeRoute = config.nav.find(n => n.end === true)?.to ?? '/'
 
