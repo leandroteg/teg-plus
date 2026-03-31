@@ -352,25 +352,13 @@ export default function ModuleLayout({
   // home do módulo = primeiro item com end:true
   const homeRoute = config.nav.find(n => n.end === true)?.to ?? '/'
 
-  const allowedRequisitantePaths = useMemo(() => {
-    const paths = new Set<string>()
-    paths.add(homeRoute)
-    visibleNav.filter(isNovaSolicitacaoItem).forEach(item => paths.add(item.to))
-    return Array.from(paths)
-  }, [visibleNav, homeRoute])
-
   useEffect(() => {
     if (!isRequisitante) return
-
     // Permite qualquer URL com ?nova= (fluxo de criação via modal)
-    const isNovaFlow = new URLSearchParams(location.search).has('nova')
-    if (isNovaFlow) return
-
-    const canAccess = allowedRequisitantePaths.some(path =>
-      location.pathname === path || location.pathname.startsWith(`${path}/`)
-    )
-    if (!canAccess) navigate(homeRoute, { replace: true })
-  }, [isRequisitante, allowedRequisitantePaths, homeRoute, location.pathname, location.search, navigate])
+    if (new URLSearchParams(location.search).has('nova')) return
+    // Fora do home e sem fluxo nova → volta para home (ex: modal fechou)
+    if (location.pathname !== homeRoute) navigate(homeRoute, { replace: true })
+  }, [isRequisitante, homeRoute, location.pathname, location.search, navigate])
 
   async function handleLogout() {
     await signOut()
