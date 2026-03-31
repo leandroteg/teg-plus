@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
-  LogOut, X, Lock, Megaphone, User, Link2, Code2,
+  LogOut, X, Lock, Megaphone, User, Link2, Code2, ClipboardList,
   // Category icons
   FolderKanban, Layers, Wallet, Users, Monitor, Rocket,
   // Sub-module icons
@@ -276,6 +276,16 @@ export default function ModuloSelector() {
           >
             <User size={15} className="shrink-0 opacity-50" />
             Meu Perfil
+          </button>
+
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); handleAvatarNavigate('/minhas-solicitacoes') }}
+            className={`w-full flex items-center gap-3 px-4 py-2.5 text-[13px] font-medium transition-colors
+              ${isLight ? 'text-slate-600 hover:bg-slate-50 hover:text-slate-900' : 'text-slate-300 hover:bg-white/[0.04] hover:text-white'}`}
+          >
+            <ClipboardList size={15} className="shrink-0 opacity-50" />
+            Minhas Solicitações
           </button>
 
           {isAdmin && (
