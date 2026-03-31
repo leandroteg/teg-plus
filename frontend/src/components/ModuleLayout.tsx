@@ -938,7 +938,7 @@ export default function ModuleLayout({
 
         {/* ── Page content ─────────────────────────────────────── */}
         <main className="flex-1 px-4 py-5 pb-28 lg:pb-8">
-          <div className={`${maxWidth} mx-auto`}>
+          <div className={`${maxWidth} mx-auto animate-page-enter`}>
             <Outlet />
           </div>
         </main>

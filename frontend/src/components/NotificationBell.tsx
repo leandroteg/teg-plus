@@ -2,12 +2,15 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { createPortal } from 'react-dom'
 import { Bell, Check, X, Edit3, AlertCircle, ChevronRight, UserPlus } from 'lucide-react'
 import { usePreCadastros, getEntityLabel, type PreCadastro } from '../hooks/usePreCadastros'
+import { useSound } from '../hooks/useSound'
 
 // ── Main Bell Component ─────────────────────────────────────────────────────────
 
 export default function NotificationBell({ isDark = false }: { isDark?: boolean }) {
   const { pendentes, count, isAdminOrDirector } = usePreCadastros()
+  const { play } = useSound()
   const [open, setOpen] = useState(false)
+  const prevCountRef = useRef(count)
   const [selected, setSelected] = useState<PreCadastro | null>(null)
   const btnRef = useRef<HTMLButtonElement>(null)
   const panelRef = useRef<HTMLDivElement>(null)
@@ -52,6 +55,14 @@ export default function NotificationBell({ isDark = false }: { isDark?: boolean 
       window.removeEventListener('resize', updatePos)
     }
   }, [open, updatePos])
+
+  // Play sound when notification count increases
+  useEffect(() => {
+    if (count > prevCountRef.current && prevCountRef.current >= 0) {
+      play('new-item')
+    }
+    prevCountRef.current = count
+  }, [count, play])
 
   if (!isAdminOrDirector) return null
 
