@@ -88,8 +88,18 @@ const PAPEIS: { value: PapelGlobal; label: string; color: string }[] = [
   { value: 'equipe', label: 'Equipe', color: 'bg-cyan-100 text-cyan-700 border-cyan-200' },
   { value: 'supervisor', label: 'Supervisor', color: 'bg-orange-100 text-orange-700 border-orange-200' },
   { value: 'diretor', label: 'Diretor', color: 'bg-violet-100 text-violet-700 border-violet-200' },
-  { value: 'ceo', label: 'CEO', color: 'bg-fuchsia-100 text-fuchsia-700 border-fuchsia-200' },
+  { value: 'ceo', label: 'Administrador', color: 'bg-fuchsia-100 text-fuchsia-700 border-fuchsia-200' },
 ]
+
+const ROLE_LABEL_UI: Partial<Record<Role, string>> = {
+  ceo: 'Administrador',
+  admin: 'Administrador',
+  administrador: 'Administrador',
+}
+
+function getRoleLabel(role: Role) {
+  return ROLE_LABEL_UI[role] ?? ROLE_LABEL[role]
+}
 
 function mapPapelToLegacyRole(papel: PapelGlobal): Role {
   switch (papel) {
@@ -291,7 +301,7 @@ function RoleBadge({ role }: { role: Role }) {
   return (
     <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold ${c.bg} ${c.text}`}>
       <span className={`w-1.5 h-1.5 rounded-full ${c.dot}`} />
-      {ROLE_LABEL[role]}
+      {getRoleLabel(role)}
     </span>
   )
 }
@@ -1705,7 +1715,7 @@ export default function AdminUsuarios() {
             return (
               <div key={r} className={`rounded-xl p-3 ${c.bg}`}>
                 <p className={`text-xl font-black ${c.text}`}>{stats[r] ?? 0}</p>
-                <p className={`text-xs font-semibold ${c.text} opacity-80`}>{ROLE_LABEL[r]}</p>
+                <p className={`text-xs font-semibold ${c.text} opacity-80`}>{getRoleLabel(r)}</p>
               </div>
             )
           })}
@@ -1785,7 +1795,7 @@ export default function AdminUsuarios() {
                   >
                     <option value="todos">Todos</option>
                     {(['requisitante', 'equipe', 'supervisor', 'diretor', 'ceo'] as Role[]).map(r => (
-                      <option key={r} value={r}>{ROLE_LABEL[r]}</option>
+                      <option key={r} value={r}>{getRoleLabel(r)}</option>
                     ))}
                   </select>
                 </div>
