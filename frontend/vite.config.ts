@@ -1,11 +1,33 @@
 import { resolve } from 'path'
-import { defineConfig } from 'vite'
+import { defineConfig, Plugin } from 'vite'
 import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
+
+import { readFileSync, writeFileSync } from 'fs'
+
+// Strip the vite-plugin-pwa injected manifest link from aprovaai.html
+// after the entire build (including PWA plugin) is complete
+function stripPwaManifestFromAprovAi(): Plugin {
+  return {
+    name: 'strip-pwa-manifest-aprovaai',
+    enforce: 'post',
+    closeBundle() {
+      const file = resolve(__dirname, 'dist', 'aprovaai.html')
+      try {
+        const html = readFileSync(file, 'utf-8')
+        const fixed = html.replace(/<link rel="manifest" href="\/manifest\.webmanifest">/g, '')
+        writeFileSync(file, fixed, 'utf-8')
+      } catch {
+        // file may not exist in dev mode
+      }
+    },
+  }
+}
 
 export default defineConfig({
   plugins: [
     react(),
+    stripPwaManifestFromAprovAi(),
     VitePWA({
       registerType: 'prompt',
       includeAssets: ['icons/*.png', 'sounds/*.mp3'],
