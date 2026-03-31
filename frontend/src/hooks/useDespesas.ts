@@ -22,6 +22,17 @@ function gerarNumeroAdiantamento() {
   return `AD-${yyyymm}-${seq}`
 }
 
+export function isDespesaSchemaMissing(error: unknown) {
+  if (!error || typeof error !== 'object') return false
+
+  const code = 'code' in error ? String(error.code ?? '') : ''
+  const message = 'message' in error ? String(error.message ?? '') : ''
+
+  return code === '42P01'
+    || message.includes('desp_adiantamentos')
+    || message.includes('relation')
+}
+
 export function useAdiantamentosDespesa(status?: string) {
   return useQuery<DespesaAdiantamento[]>({
     queryKey: ['despesas-adiantamentos', status],
@@ -103,7 +114,12 @@ export function useCriarSolicitacaoAdiantamento() {
         .select('*')
         .single()
 
-      if (adiantamentoError) throw adiantamentoError
+      if (adiantamentoError) {
+        if (isDespesaSchemaMissing(adiantamentoError)) {
+          throw new Error('Fluxo de adiantamentos ainda está em implantação no banco de dados.')
+        }
+        throw adiantamentoError
+      }
 
       const { data: aprovacao, error: aprovacaoError } = await supabase
         .from('apr_aprovacoes')
