@@ -396,7 +396,6 @@ export default function MinhasSolicitacoes({
               <ClipboardList size={16} className="text-indigo-600" />
             </div>
             <div>
-              <h1 className="text-sm font-bold text-slate-800">Minhas Solicitações</h1>
               <p className="text-[11px] text-slate-400">
                 {isLoading ? 'Carregando…' : `${abertas.length} em aberto · ${encerradas.length} encerrada${encerradas.length !== 1 ? 's' : ''}`}
               </p>
