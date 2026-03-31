@@ -590,7 +590,7 @@ export default function ListaRequisicoes() {
           <p className="text-sm font-medium">Nenhuma requisição nesta etapa</p>
         </div>
       ) : viewMode === 'cards' ? (
-        <div className="space-y-2 p-4">
+        <div className="space-y-2 p-4 stagger-children">
           {activeItems.map(r => (
             <ReqCard key={r.id} r={r} apr={aprovacaoMap.get(r.id)} isDark={isDark}
               onClick={() => setDetail(r)} />

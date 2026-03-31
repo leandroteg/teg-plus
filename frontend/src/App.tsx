@@ -6,6 +6,8 @@ import { PrivateRoute, AdminRoute } from './components/PrivateRoute'
 import ModuleRoute from './components/ModuleRoute'
 import Layout from './components/Layout'
 import PageSkeleton from './components/skeletons/PageSkeleton'
+import DashboardSkeleton from './components/skeletons/DashboardSkeleton'
+import TableSkeleton from './components/skeletons/TableSkeleton'
 import OfflineBanner from './components/OfflineBanner'
 import PWAInstallPrompt from './components/PWAInstallPrompt'
 import UpdateAvailable from './components/UpdateAvailable'
@@ -158,9 +160,15 @@ const Desenvolvimento = lazy(() => import('./pages/Desenvolvimento'))
 // SuperTEG AI Chat
 const SuperTEGChat = lazy(() => import('./components/SuperTEGChat'))
 
-// ── Suspense wrapper ──────────────────────────────────────────────────────────
+// ── Suspense wrappers with contextual skeletons ─────────────────────────────
 function Lazy({ children }: { children: React.ReactNode }) {
   return <Suspense fallback={<PageSkeleton />}>{children}</Suspense>
+}
+function LazyDash({ children }: { children: React.ReactNode }) {
+  return <Suspense fallback={<DashboardSkeleton />}>{children}</Suspense>
+}
+function LazyTable({ children }: { children: React.ReactNode }) {
+  return <Suspense fallback={<TableSkeleton />}>{children}</Suspense>
 }
 
 // ── Theme color sync (must be inside ThemeProvider) ───────────────────────────
@@ -198,8 +206,8 @@ export default function App() {
           {/* Módulo Financeiro */}
           <Route element={<ModuleRoute moduleKey="financeiro" />}>
             <Route element={<FinanceiroLayout />}>
-              <Route path="/financeiro"              element={<Lazy><DashboardFinanceiro /></Lazy>} />
-              <Route path="/financeiro/contas-a-pagar" element={<Lazy><CPPipeline /></Lazy>} />
+              <Route path="/financeiro"              element={<LazyDash><DashboardFinanceiro /></LazyDash>} />
+              <Route path="/financeiro/contas-a-pagar" element={<LazyTable><CPPipeline /></LazyTable>} />
               <Route path="/financeiro/cp"           element={<Navigate to="/financeiro/contas-a-pagar" replace />} />
               <Route path="/financeiro/cr"           element={<Lazy><ContasReceber /></Lazy>} />
               <Route path="/financeiro/aprovacoes"   element={<Navigate to="/financeiro/contas-a-pagar" replace />} />
@@ -224,7 +232,7 @@ export default function App() {
           {/* Módulo Estoque */}
           <Route element={<ModuleRoute moduleKey="estoque" />}>
             <Route element={<EstoqueLayout />}>
-              <Route path="/estoque"               element={<Lazy><EstoqueHome /></Lazy>} />
+              <Route path="/estoque"               element={<LazyDash><EstoqueHome /></LazyDash>} />
               <Route path="/estoque/itens"         element={<Lazy><Itens /></Lazy>} />
               <Route path="/estoque/movimentacoes" element={<Lazy><Movimentacoes /></Lazy>} />
               <Route path="/estoque/inventario"    element={<Lazy><Inventario /></Lazy>} />
@@ -236,7 +244,7 @@ export default function App() {
           {/* Módulo Logística */}
           <Route element={<ModuleRoute moduleKey="logistica" />}>
             <Route element={<LogisticaLayout />}>
-              <Route path="/logistica"                   element={<Lazy><LogisticaHome /></Lazy>} />
+              <Route path="/logistica"                   element={<LazyDash><LogisticaHome /></LazyDash>} />
               <Route path="/logistica/solicitacoes"      element={<Lazy><SolicitacoesPipeline /></Lazy>} />
               <Route path="/logistica/expedicao"         element={<Lazy><ExpedicaoPipeline /></Lazy>} />
               <Route path="/logistica/transportes"       element={<Lazy><TransportesPipeline /></Lazy>} />
@@ -246,7 +254,7 @@ export default function App() {
           {/* Módulo Frotas */}
           <Route element={<ModuleRoute moduleKey="frotas" />}>
             <Route element={<FrotasLayout />}>
-              <Route path="/frotas"                      element={<Lazy><FrotasHome /></Lazy>} />
+              <Route path="/frotas"                      element={<LazyDash><FrotasHome /></LazyDash>} />
               <Route path="/frotas/veiculos"             element={<Lazy><Veiculos /></Lazy>} />
               <Route path="/frotas/ordens"               element={<Lazy><Ordens /></Lazy>} />
               <Route path="/frotas/checklists"           element={<Lazy><Checklists /></Lazy>} />
@@ -258,7 +266,7 @@ export default function App() {
           {/* Módulo RH */}
           <Route element={<ModuleRoute moduleKey="rh" />}>
             <Route element={<RHLayout />}>
-              <Route path="/rh"        element={<Lazy><RHHome /></Lazy>} />
+              <Route path="/rh"        element={<LazyDash><RHHome /></LazyDash>} />
               <Route path="/rh/mural"  element={<Lazy><MuralAdmin /></Lazy>} />
             </Route>
           </Route>
@@ -266,7 +274,7 @@ export default function App() {
           {/* Módulo Contratos */}
           <Route element={<ModuleRoute moduleKey="contratos" />}>
             <Route element={<ContratosLayout />}>
-              <Route path="/contratos"            element={<Lazy><DashboardContratos /></Lazy>} />
+              <Route path="/contratos"            element={<LazyDash><DashboardContratos /></LazyDash>} />
               <Route path="/contratos/lista"      element={<Lazy><ListaContratos /></Lazy>} />
               <Route path="/contratos/novo"       element={<Lazy><NovoContrato /></Lazy>} />
               <Route path="/contratos/previsao"   element={<Lazy><ParcelasContratos /></Lazy>} />
@@ -287,7 +295,7 @@ export default function App() {
           {/* Módulo Controladoria */}
           <Route element={<ModuleRoute moduleKey="controladoria" />}>
             <Route element={<ControladoriaLayout />}>
-              <Route path="/controladoria"              element={<Lazy><ControladoriaHome /></Lazy>} />
+              <Route path="/controladoria"              element={<LazyDash><ControladoriaHome /></LazyDash>} />
               <Route path="/controladoria/orcamentos"   element={<Lazy><Orcamentos /></Lazy>} />
               <Route path="/controladoria/dre"          element={<Lazy><DRE /></Lazy>} />
               <Route path="/controladoria/kpis"         element={<Lazy><KPIs /></Lazy>} />
@@ -302,7 +310,7 @@ export default function App() {
           {/* Módulo Obras */}
           <Route element={<ModuleRoute moduleKey="obras" />}>
             <Route element={<ObrasLayout />}>
-              <Route path="/obras"                    element={<Lazy><ObrasHome /></Lazy>} />
+              <Route path="/obras"                    element={<LazyDash><ObrasHome /></LazyDash>} />
               <Route path="/obras/apontamentos"       element={<Lazy><Apontamentos /></Lazy>} />
               <Route path="/obras/rdo"                element={<Lazy><RDO /></Lazy>} />
               <Route path="/obras/adiantamentos"      element={<Lazy><AdiantamentosObras /></Lazy>} />
@@ -314,7 +322,7 @@ export default function App() {
           {/* Módulo EGP */}
           <Route element={<ModuleRoute moduleKey="egp" />}>
             <Route element={<EGPLayout />}>
-              <Route path="/egp"                              element={<Lazy><EGPHome /></Lazy>} />
+              <Route path="/egp"                              element={<LazyDash><EGPHome /></LazyDash>} />
               <Route path="/egp/portfolio"                    element={<Lazy><Portfolio /></Lazy>} />
               <Route path="/egp/portfolio/novo"               element={<Lazy><NovoPortfolio /></Lazy>} />
               <Route path="/egp/portfolio/:id"                element={<Lazy><PortfolioDetalhe /></Lazy>} />
@@ -339,7 +347,7 @@ export default function App() {
           {/* Módulo Cadastros */}
           <Route element={<ModuleRoute moduleKey="cadastros" />}>
             <Route element={<CadastrosLayout />}>
-              <Route path="/cadastros"                element={<Lazy><CadastrosHome /></Lazy>} />
+              <Route path="/cadastros"                element={<LazyDash><CadastrosHome /></LazyDash>} />
               <Route path="/cadastros/fornecedores"   element={<Lazy><FornecedoresCad /></Lazy>} />
               <Route path="/cadastros/itens"          element={<Lazy><ItensCad /></Lazy>} />
               <Route path="/cadastros/classes"        element={<Lazy><ClassesFinanceiras /></Lazy>} />
@@ -358,7 +366,7 @@ export default function App() {
           {/* Módulo Compras */}
           <Route element={<ModuleRoute moduleKey="compras" />}>
             <Route element={<Layout />}>
-              <Route path="/compras"     element={<Lazy><Dashboard /></Lazy>} />
+              <Route path="/compras"     element={<LazyDash><Dashboard /></LazyDash>} />
               <Route path="/nova"        element={<Lazy><NovaRequisicao /></Lazy>} />
               <Route path="/requisicoes" element={<Lazy><ListaRequisicoes /></Lazy>} />
               <Route path="/requisicoes/:id" element={<Lazy><RequisicaoDetalhe /></Lazy>} />

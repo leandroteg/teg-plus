@@ -1526,7 +1526,7 @@ export default function FiscalPipeline() {
               ))}
             </>
           ) : (
-            <div className="p-3 space-y-2">
+            <div className="p-3 space-y-2 stagger-children">
               {activeItems.map(sol => (
                 <NFCard key={sol.id} sol={sol}
                   onClick={() => setDetailSol(sol)}

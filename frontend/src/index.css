@@ -225,13 +225,42 @@
    Keyframes globais
    ══════════════════════════════════════════════════════════════════════════════ */
 
-/* ── Page enter animation ──────────────── */
+/* ── Page enter animation (opacity-only to avoid breaking fixed modals) ── */
 @keyframes pageEnter {
   from { opacity: 0; }
   to   { opacity: 1; }
 }
 .animate-page-enter {
-  animation: pageEnter 0.2s ease-out;
+  animation: pageEnter 0.3s ease-out;
+}
+
+/* ── Stagger children — apply to parent, children get cascading fade-in ── */
+.stagger-children > * {
+  opacity: 0;
+  animation: staggerItem 0.4s ease-out forwards;
+}
+@keyframes staggerItem {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+.stagger-children > *:nth-child(1)  { animation-delay: 0ms; }
+.stagger-children > *:nth-child(2)  { animation-delay: 40ms; }
+.stagger-children > *:nth-child(3)  { animation-delay: 80ms; }
+.stagger-children > *:nth-child(4)  { animation-delay: 120ms; }
+.stagger-children > *:nth-child(5)  { animation-delay: 160ms; }
+.stagger-children > *:nth-child(6)  { animation-delay: 200ms; }
+.stagger-children > *:nth-child(7)  { animation-delay: 240ms; }
+.stagger-children > *:nth-child(8)  { animation-delay: 280ms; }
+.stagger-children > *:nth-child(9)  { animation-delay: 320ms; }
+.stagger-children > *:nth-child(10) { animation-delay: 360ms; }
+.stagger-children > *:nth-child(n+11) { animation-delay: 400ms; }
+
+/* ── Card press effect ────────────────── */
+.card-press {
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+.card-press:active {
+  transform: scale(0.97);
 }
 
 /* ── Skeleton shimmer ──────────────────── */

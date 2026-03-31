@@ -1583,7 +1583,7 @@ export default function TransportesPipeline() {
               {activeItems.map(sol => <TrRow key={sol.id} sol={sol} onClick={() => openDetail(sol)} isDark={isDark} isSelected={selectedIds.has(sol.id)} onSelect={toggleSelect} />)}
             </>
           ) : (
-            <div className="space-y-2 p-4">
+            <div className="space-y-2 p-4 stagger-children">
               {displayItems.map(item => item.kind === 'viagem' ? (
                 <ViagemTrGroupCard
                   key={`vg-${item.viagemId}`}

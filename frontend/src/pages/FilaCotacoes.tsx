@@ -475,7 +475,7 @@ export default function FilaCotacoes() {
           <p className="text-sm font-medium">Nenhuma cotação nesta etapa</p>
         </div>
       ) : viewMode === 'cards' ? (
-        <div className="space-y-2 p-4">
+        <div className="space-y-2 p-4 stagger-children">
           {activeItems.map(cot => <CotCard key={cot.id} cot={cot} isDark={isDark} onClick={() => setDetail(cot)} />)}
         </div>
       ) : (

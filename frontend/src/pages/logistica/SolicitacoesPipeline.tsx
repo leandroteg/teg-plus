@@ -1679,7 +1679,7 @@ export default function SolicitacoesPipeline() {
               )}
             </>
           ) : (
-            <div className="space-y-2 p-4">
+            <div className="space-y-2 p-4 stagger-children">
               {displayItems.map(item =>
                 item.kind === 'viagem' ? (
                   <ViagemCard key={`vg-${item.viagemId}`} item={item} onClick={sol => setDetail(sol)} onOpenDetail={setViagemDetail} isDark={isDark} selectedIds={selectedIds} onToggleViagem={toggleViagem}

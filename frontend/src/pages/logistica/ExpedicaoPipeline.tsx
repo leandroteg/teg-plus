@@ -962,7 +962,7 @@ export default function ExpedicaoPipeline() {
               {activeItems.map(sol => <ExpRow key={sol.id} sol={sol} onClick={() => setDetail(sol)} isDark={isDark} isSelected={selectedIds.has(sol.id)} onSelect={toggleSelect} />)}
             </>
           ) : (
-            <div className="space-y-2 p-4">
+            <div className="space-y-2 p-4 stagger-children">
               {displayItems.map(item => item.kind === 'viagem' ? (
                 <ViagemGroupCard
                   key={`vg-${item.viagemId}`}

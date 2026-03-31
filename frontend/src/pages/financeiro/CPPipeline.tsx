@@ -3648,7 +3648,7 @@ export default function CPPipeline() {
               })}
             </>
           ) : isLoteStageTab ? (
-            <div className="space-y-3 p-4">
+            <div className="space-y-3 p-4 stagger-children">
               {activeLotes.map(summary => {
                 const actions = buildLoteActions(summary)
                 return (
@@ -3694,7 +3694,7 @@ export default function CPPipeline() {
               ))}
             </>
           ) : (
-            <div className="space-y-2 p-4">
+            <div className="space-y-2 p-4 stagger-children">
               {activeCPs.map(cp => (
                 <CPCard
                   key={cp.id}

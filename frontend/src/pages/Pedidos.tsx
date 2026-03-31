@@ -2054,7 +2054,7 @@ export default function Pedidos() {
           </p>
         </div>
       ) : viewMode === 'cards' ? (
-        <div className="space-y-2 p-4">
+        <div className="space-y-2 p-4 stagger-children">
           {sorted.map(p => (
             <PedCard key={p.id} pedido={p} dark={dark} onClick={() => setSelectedPedido(p)} />
           ))}
