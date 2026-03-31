@@ -129,16 +129,18 @@ export default function Login() {
 
   // ── Handlers ──────────────────────────────────────────────────────
 
+  const toEmail = (v: string) => v.includes('@') ? v : `${v}@login.teg.local`
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault(); clr(); setBusy(true)
-    const { error } = await signIn(loginUser, password)
+    const { error } = await signIn(toEmail(loginUser), password)
     setBusy(false)
     if (error) setError(error)
   }
 
   const handleReset = async (e: React.FormEvent) => {
     e.preventDefault(); clr(); setBusy(true)
-    const { error } = await resetPassword(resetEmail)
+    const { error } = await resetPassword(toEmail(resetEmail))
     setBusy(false)
     if (error) { setError(error); return }
     setSuccess('Link de recupera\u00e7\u00e3o enviado! Verifique seu e-mail.')
