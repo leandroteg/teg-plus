@@ -778,7 +778,7 @@ export default function ModuleLayout({
 
           {/* Nav */}
           <nav className="flex flex-col gap-1">
-            {isRequisitante ? renderRequisitanteNav() : renderNavItems()}
+            {renderNavItems()}
             {renderCadastrosLink()}
           </nav>
 
@@ -941,9 +941,7 @@ export default function ModuleLayout({
 
         {/* ── Navigation ────────────────────────────────────── */}
         <nav className={`flex-1 px-3 py-3 overflow-y-auto styled-scrollbar ${config.navSections ? 'space-y-1' : 'space-y-0.5'}`}>
-          {isRequisitante
-            ? renderRequisitanteNav()
-            : config.navSections ? renderSectionedNav() : renderNavItems()}
+          {config.navSections ? renderSectionedNav() : renderNavItems()}
           {renderCadastrosLink()}
 
         </nav>
