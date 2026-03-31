@@ -22,12 +22,18 @@ const MODULO_MAP: Record<string, string> = {
 }
 
 // Filtra aprovações baseado no perfil do usuário
-function filtrarPorPermissao(items: AprovacaoPendente[], perfil: Perfil | null): AprovacaoPendente[] {
+function filtrarPorPermissao(
+  items: AprovacaoPendente[],
+  perfil: Perfil | null,
+  hasModule: (mod: string) => boolean
+): AprovacaoPendente[] {
   if (!perfil) return []
   // Administrador vê tudo
-  if (perfil.role === 'administrador') return items
+  const role = String(perfil.role ?? '').toLowerCase()
+  const papelGlobal = String(perfil.papel_global ?? '').toLowerCase()
+  if (role === 'administrador' || role === 'admin' || papelGlobal === 'ceo') return items
   // Visitante não vê nada
-  if (perfil.role === 'visitante') return []
+  if (role === 'visitante') return []
 
   const modulosUsuario = perfil.modulos ?? {}
   const email = perfil.email?.toLowerCase() ?? ''
@@ -38,23 +44,23 @@ function filtrarPorPermissao(items: AprovacaoPendente[], perfil: Perfil | null):
     const aprovadorEmail = ((apr.aprovador_email as string) ?? '').toLowerCase()
 
     // Requisitante: só vê aprovações endereçadas a ele
-    if (perfil.role === 'requisitante') {
+    if (papelGlobal === 'requisitante' || papelGlobal === 'equipe' || role === 'requisitante') {
       return aprovadorEmail === email
     }
 
     // Gestor/Diretor: vê aprovações dos módulos que tem acesso
     const moduloKey = MODULO_MAP[modulo] ?? modulo
     if (!moduloKey) return true // sem módulo definido → mostra
-    return modulosUsuario[moduloKey] === true
+    return hasModule(moduloKey) || modulosUsuario[moduloKey] === true
   })
 }
 
 // ── Aprovacoes Pendentes (multi-tipo) ──────────────────────────────────────────
 
 export function useAprovacoesPendentes(tipo?: TipoAprovacao) {
-  const { perfil } = useAuth()
+  const { perfil, hasModule } = useAuth()
   return useQuery<AprovacaoPendente[]>({
-    queryKey: ['aprovacoes-pendentes', tipo, perfil?.role, perfil?.email],
+    queryKey: ['aprovacoes-pendentes', tipo, perfil?.role, perfil?.papel_global, perfil?.email],
     queryFn: async () => {
       // Aprovações de pagamento são criadas APENAS via Lotes (useEnviarLoteAprovacao)
       // Não há mais sync automático de CPs individuais.
@@ -678,7 +684,7 @@ export function useAprovacoesPendentes(tipo?: TipoAprovacao) {
         .filter((a): a is AprovacaoPendente => a !== null)
 
       // Filtra por permissão do usuário logado
-      return filtrarPorPermissao(result, perfil)
+      return filtrarPorPermissao(result, perfil, hasModule)
     },
     refetchInterval: 15_000,
     refetchOnMount: 'always',

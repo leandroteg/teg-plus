@@ -1,21 +1,22 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
-  LogOut, X, Lock, Megaphone,
+  LogOut, X, Lock, Megaphone, User, Link2, Code2,
   // Category icons
   FolderKanban, Layers, Wallet, Users, Monitor, Rocket,
   // Sub-module icons
   Settings, HardHat, ShieldCheck, ShoppingCart, Truck,
   Package, Building2, Car, Banknote, BarChart3, FileText,
-  UserCog, UserSearch, Server, Bot, Target, Store, Receipt, CreditCard, Heart, Calculator,
+  UserCog, UserSearch, Server, Bot, Target, Store, Receipt, CreditCard, Heart, Calculator, Laptop, Moon, Sun,
   type LucideIcon,
 } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { useTheme } from '../contexts/ThemeContext'
 import LogoTeg from '../components/LogoTeg'
 import MuralPopup from '../components/MuralPopup'
-import ThemeToggle from '../components/ThemeToggle'
 import ApprovalBadge from '../components/ApprovalBadge'
+import NotificationBell from '../components/NotificationBell'
+import { ROLE_LABEL, ROLE_COLOR, type Role } from '../contexts/AuthContext'
 
 // ═══════════════════════════════════════════════════════════════════════════════
 //  DATA
@@ -146,20 +147,41 @@ const BRAND = {
   glow: 'rgba(20,184,166,0.22)',
 }
 
+const AVATAR_COLORS = [
+  'bg-violet-500', 'bg-indigo-500', 'bg-sky-500',
+  'bg-emerald-500', 'bg-amber-500', 'bg-rose-500',
+]
+
+function hashString(s: string) {
+  let h = 0
+  for (let i = 0; i < s.length; i += 1) h = (h << 5) - h + s.charCodeAt(i)
+  return h
+}
+
+function getAvatarColor(name: string) {
+  return AVATAR_COLORS[Math.abs(hashString(name)) % AVATAR_COLORS.length]
+}
+
 // ═══════════════════════════════════════════════════════════════════════════════
 //  MAIN COMPONENT
 // ═══════════════════════════════════════════════════════════════════════════════
 
 export default function ModuloSelector() {
   const { perfil, isAdmin, signOut } = useAuth()
-  const { isLightSidebar: isLight, theme } = useTheme()
+  const { isLightSidebar: isLight, theme, setTheme } = useTheme()
   const navigate = useNavigate()
   const [openPillar, setOpenPillar] = useState<Pillar | null>(null)
   const [overlayVisible, setOverlayVisible] = useState(false)
   const [entered, setEntered] = useState(false)
   const [muralOpen, setMuralOpen] = useState(false)
+  const [avatarOpen, setAvatarOpen] = useState(false)
+  const avatarMenuRef = useRef<HTMLDivElement>(null)
 
-  const primeiroNome = (perfil?.nome ?? 'Usuário').split(' ')[0]
+  const nome = perfil?.nome ?? 'Usu\u00e1rio'
+  const role = (perfil?.role ?? 'visitante') as Role
+  const primeiroNome = nome.split(' ')[0]
+  const initials = nome.trim().split(/\s+/).slice(0, 2).map(s => s[0]).join('').toUpperCase() || 'U'
+  const avatarBg = getAvatarColor(nome)
   const hora = new Date().getHours()
   const saudacao = hora < 12 ? 'Bom dia' : hora < 18 ? 'Boa tarde' : 'Boa noite'
 
@@ -204,19 +226,162 @@ export default function ModuloSelector() {
     if (route) navigate(route)
   }
 
+  function handleAvatarNavigate(route: string) {
+    setAvatarOpen(false)
+    requestAnimationFrame(() => navigate(route))
+  }
+
   async function handleLogout() {
     await signOut()
     navigate('/login', { replace: true })
   }
 
-  // ESC to close
+  const THEME_OPTS = [
+    { value: 'original' as const, Icon: Laptop, label: 'Auto' },
+    { value: 'dark' as const, Icon: Moon, label: 'Dark' },
+    { value: 'light' as const, Icon: Sun, label: 'Light' },
+  ]
+
+  function renderAvatarDropdown() {
+    if (!avatarOpen) return null
+
+    return (
+      <div
+        className={[
+          'absolute right-0 top-full mt-2 z-[120] w-60 rounded-2xl border overflow-hidden shadow-xl transition-all pointer-events-auto',
+          isLight
+            ? 'bg-white border-slate-200/80 shadow-slate-200/40'
+            : 'bg-[#111827] border-white/10 shadow-black/50',
+        ].join(' ')}
+        style={{ animation: 'fadeSlideIn 150ms ease-out' }}
+      >
+        <div className={`px-4 pt-3.5 pb-3 border-b ${isLight ? 'border-slate-100' : 'border-white/[0.06]'}`}>
+          <div className="flex items-center gap-3">
+            <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white text-sm font-extrabold shrink-0 ${avatarBg}`}>
+              {initials}
+            </div>
+            <div className="min-w-0">
+              <p className={`text-[13px] font-semibold truncate ${isLight ? 'text-slate-800' : 'text-slate-100'}`}>{nome}</p>
+              <span className={`text-[11px] font-medium ${ROLE_COLOR[role].text}`}>{ROLE_LABEL[role]}</span>
+            </div>
+          </div>
+        </div>
+
+        <div className="py-1">
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); handleAvatarNavigate('/perfil') }}
+            className={`w-full flex items-center gap-3 px-4 py-2.5 text-[13px] font-medium transition-colors
+              ${isLight ? 'text-slate-600 hover:bg-slate-50 hover:text-slate-900' : 'text-slate-300 hover:bg-white/[0.04] hover:text-white'}`}
+          >
+            <User size={15} className="shrink-0 opacity-50" />
+            Meu Perfil
+          </button>
+
+          {isAdmin && (
+            <>
+              <div className={`h-px mx-3 my-1 ${isLight ? 'bg-slate-100' : 'bg-white/[0.06]'}`} />
+              <button
+                type="button"
+                onClick={(e) => { e.stopPropagation(); handleAvatarNavigate('/admin/usuarios') }}
+                className={`w-full flex items-center gap-3 px-4 py-2.5 text-[13px] font-medium transition-colors
+                  ${isLight ? 'text-slate-600 hover:bg-slate-50 hover:text-slate-900' : 'text-slate-300 hover:bg-white/[0.04] hover:text-white'}`}
+              >
+                <ShieldCheck size={15} className="shrink-0 opacity-50" />
+                {'Usu\u00e1rios'}
+              </button>
+              <button
+                type="button"
+                onClick={(e) => { e.stopPropagation(); handleAvatarNavigate('/cadastros') }}
+                className={`w-full flex items-center gap-3 px-4 py-2.5 text-[13px] font-medium transition-colors
+                  ${isLight ? 'text-slate-600 hover:bg-slate-50 hover:text-slate-900' : 'text-slate-300 hover:bg-white/[0.04] hover:text-white'}`}
+              >
+                <Settings size={15} className="shrink-0 opacity-50" />
+                Cadastros
+              </button>
+              <button
+                type="button"
+                onClick={(e) => { e.stopPropagation(); handleAvatarNavigate('/admin/integracoes') }}
+                className={`w-full flex items-center gap-3 px-4 py-2.5 text-[13px] font-medium transition-colors
+                  ${isLight ? 'text-slate-600 hover:bg-slate-50 hover:text-slate-900' : 'text-slate-300 hover:bg-white/[0.04] hover:text-white'}`}
+              >
+                <Link2 size={15} className="shrink-0 opacity-50" />
+                {'Integra\u00e7\u00f5es'}
+              </button>
+              <button
+                type="button"
+                onClick={(e) => { e.stopPropagation(); handleAvatarNavigate('/admin/desenvolvimento') }}
+                className={`w-full flex items-center gap-3 px-4 py-2.5 text-[13px] font-medium transition-colors
+                  ${isLight ? 'text-slate-600 hover:bg-slate-50 hover:text-slate-900' : 'text-slate-300 hover:bg-white/[0.04] hover:text-white'}`}
+              >
+                <Code2 size={15} className="shrink-0 opacity-50" />
+                Desenvolvimento
+              </button>
+            </>
+          )}
+        </div>
+
+        <div className={`px-3 py-2.5 border-t ${isLight ? 'border-slate-100' : 'border-white/[0.06]'}`}>
+          <div className={`flex items-center gap-0.5 p-0.5 rounded-lg border w-full ${
+            isLight ? 'bg-slate-100/80 border-slate-200' : 'bg-white/5 border-white/[0.06]'
+          }`}>
+            {THEME_OPTS.map(({ value, Icon, label }) => (
+              <button
+                type="button"
+                key={value}
+                onClick={() => setTheme(value)}
+                className={[
+                  'flex-1 flex items-center justify-center gap-1 rounded-md px-1.5 py-1.5 text-[10px] font-semibold transition-all duration-150',
+                  theme === value
+                    ? isLight ? 'bg-white text-slate-700 shadow-sm' : 'bg-white/10 text-white shadow-sm'
+                    : isLight ? 'text-slate-400 hover:text-slate-600' : 'text-slate-500 hover:text-slate-300',
+                ].join(' ')}
+              >
+                <Icon size={11} className="shrink-0" />
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className={`border-t ${isLight ? 'border-slate-100' : 'border-white/[0.06]'}`}>
+          <button
+            type="button"
+            onClick={handleLogout}
+            className={`w-full flex items-center gap-3 px-4 py-2.5 text-[13px] font-medium transition-colors
+              ${isLight ? 'text-red-500 hover:bg-red-50' : 'text-red-400 hover:bg-red-500/10'}`}
+          >
+            <LogOut size={15} className="shrink-0 opacity-60" />
+            Sair
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  // ESC to close overlays
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
-      if (e.key === 'Escape' && openPillar) handleClosePillar()
+      if (e.key !== 'Escape') return
+      if (avatarOpen) setAvatarOpen(false)
+      if (openPillar) handleClosePillar()
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  })
+  }, [openPillar, avatarOpen])
+
+  // Close avatar dropdown on outside click
+  useEffect(() => {
+    if (!avatarOpen) return
+    function onPointerDown(e: MouseEvent) {
+      if (!avatarMenuRef.current) return
+      if (!avatarMenuRef.current.contains(e.target as Node)) {
+        setAvatarOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', onPointerDown)
+    return () => document.removeEventListener('mousedown', onPointerDown)
+  }, [avatarOpen])
 
   // Lock body scroll when overlay is open
   useEffect(() => {
@@ -260,11 +425,11 @@ export default function ModuloSelector() {
       )}
 
       {/* ── Header ──────────────────────────────────────────────── */}
-      <header className="relative z-10 flex items-center justify-between px-5 sm:px-8 pt-5 animate-fade-in">
+      <header className="relative z-40 flex items-center justify-between px-5 sm:px-8 pt-5 animate-fade-in">
         <div className="flex items-center gap-2.5">
           <div className={`w-1.5 h-1.5 rounded-full animate-pulse ${isLight ? 'bg-teal-500' : 'bg-teal-400'}`} />
           <span className={`text-[11px] font-semibold uppercase tracking-widest ${isLight ? 'text-teal-600' : 'text-teal-400/70'}`}>TEG+ ERP</span>
-          <span className={isLight ? 'text-slate-300' : 'text-slate-700'}>·</span>
+          <span className={isLight ? 'text-slate-300' : 'text-slate-700'}>&middot;</span>
           <span className={`text-[11px] font-medium ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>v2.0</span>
         </div>
 
@@ -286,29 +451,35 @@ export default function ModuloSelector() {
 
           {/* Approval badge */}
           <ApprovalBadge isDark={!isLight} />
+          <NotificationBell isDark={!isLight} />
 
           {/* Greeting */}
           <p className={`text-sm font-semibold hidden sm:block ${isLight ? 'text-slate-700' : 'text-white/90'}`}>
             {saudacao}, <span className="text-gradient-teal">{primeiroNome}</span>
           </p>
-          <span className={`hidden sm:block w-px h-4 ${isLight ? 'bg-slate-200' : 'bg-slate-700'}`} />
-          <ThemeToggle variant={isLight ? 'light' : 'dark'} compact />
-          <button
-            onClick={handleLogout}
-            className={`flex items-center gap-1.5 text-xs transition-colors py-1.5 px-3 rounded-lg ${
-              isLight
-                ? 'text-slate-400 hover:text-slate-600 hover:bg-slate-100'
-                : 'text-slate-500 hover:text-slate-300 hover:bg-white/5'
-            }`}
-          >
-            <LogOut size={13} />
-            Sair
-          </button>
+          <div className="relative" ref={avatarMenuRef}>
+            <button
+              type="button"
+              onClick={() => setAvatarOpen(o => !o)}
+              className={[
+                'w-8 h-8 text-[11px] rounded-full flex items-center justify-center',
+                'text-white font-extrabold shrink-0 ring-2 transition-all duration-200',
+                'hover:scale-105 active:scale-95 cursor-pointer select-none',
+                avatarBg,
+                isLight ? 'ring-slate-200/60 hover:ring-slate-300' : 'ring-white/10 hover:ring-white/25',
+                avatarOpen ? (isLight ? 'ring-slate-400 scale-105' : 'ring-white/40 scale-105') : '',
+              ].join(' ')}
+              title={`${nome} - ${ROLE_LABEL[role]}`}
+            >
+              {initials}
+            </button>
+            {renderAvatarDropdown()}
+          </div>
         </div>
       </header>
 
       {/* ── Main content ────────────────────────────────────────── */}
-      <section className="relative z-10 flex-1 flex flex-col items-center justify-center px-4 py-2 sm:py-8 lg:py-4">
+      <section className="relative z-0 flex-1 flex flex-col items-center justify-center px-4 py-2 sm:py-8 lg:py-4">
 
         {/* Mobile greeting (hidden on sm+) */}
         <p className={`text-sm font-semibold mb-1 sm:hidden ${isLight ? 'text-slate-700' : 'text-white/90'}`}>
@@ -488,13 +659,13 @@ export default function ModuloSelector() {
 
         {/* Subtitle below mandala */}
         <p className={`text-[11px] font-medium tracking-wide mt-2 ${isLight ? 'text-slate-400' : 'text-slate-600'}`}>
-          Selecione uma área para acessar
+          {'Selecione uma \u00e1rea para acessar'}
         </p>
       </section>
 
       {/* Footer */}
       <p className={`relative z-10 text-center text-[10px] pb-4 ${isLight ? 'text-slate-400' : 'text-slate-700'}`}>
-        Acesso restrito a colaboradores autorizados · TEG+ ERP v2.0
+        {'Acesso restrito a colaboradores autorizados \u00b7 TEG+ ERP v2.0'}
       </p>
 
       {/* ── Mural Popup (mobile: bottom-sheet · desktop: centered modal) ── */}

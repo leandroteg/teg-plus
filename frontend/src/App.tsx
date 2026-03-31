@@ -41,6 +41,7 @@ import PreparaMinuta from './pages/contratos/PreparaMinuta'
 import ResumoExecutivoPage from './pages/contratos/ResumoExecutivo'
 import Assinaturas from './pages/contratos/Assinaturas'
 import GestaoContratos from './pages/contratos/GestaoContratos'
+import ContratoDetalhe from './pages/contratos/ContratoDetalhe'
 import ModelosContrato from './pages/contratos/ModelosContrato'
 
 // Módulo Controladoria
@@ -113,6 +114,7 @@ import RHDesligamento from './pages/rh/RHDesligamento'
 import CulturaLayout from './components/CulturaLayout'
 import CulturaHome from './pages/rh/CulturaHome'
 import MuralAdmin from './pages/rh/MuralAdmin'
+import Endomarketing from './pages/rh/Endomarketing'
 
 // Módulo Financeiro
 import FinanceiroLayout from './components/FinanceiroLayout'
@@ -162,11 +164,10 @@ import Recebimentos from './pages/logistica/Recebimentos'
 // Módulo Frotas
 import FrotasLayout from './components/FrotasLayout'
 import FrotasHome from './pages/frotas/FrotasHome'
-import Veiculos from './pages/frotas/Veiculos'
-import Ordens from './pages/frotas/Ordens'
-import Checklists from './pages/frotas/Checklists'
-import Abastecimentos from './pages/frotas/Abastecimentos'
-import Telemetria from './pages/frotas/Telemetria'
+import FrotaHub      from './pages/frotas/frota/FrotaHub'
+import ManutencaoHub from './pages/frotas/manutencao/ManutencaoHub'
+import OperacaoHub   from './pages/frotas/operacao/OperacaoHub'
+import SolicitacoesFrotas from './pages/frotas/SolicitacoesFrotas'
 
 // Admin
 import AdminUsuarios from './pages/AdminUsuarios'
@@ -267,12 +268,11 @@ export default function App() {
           {/* Módulo Frotas */}
           <Route element={<ModuleRoute moduleKey="frotas" />}>
             <Route element={<FrotasLayout />}>
-              <Route path="/frotas"                      element={<FrotasHome />} />
-              <Route path="/frotas/veiculos"             element={<Veiculos />} />
-              <Route path="/frotas/ordens"               element={<Ordens />} />
-              <Route path="/frotas/checklists"           element={<Checklists />} />
-              <Route path="/frotas/abastecimentos"       element={<Abastecimentos />} />
-              <Route path="/frotas/telemetria"           element={<Telemetria />} />
+              <Route path="/frotas"                element={<FrotasHome />} />
+              <Route path="/frotas/solicitacoes"  element={<SolicitacoesFrotas />} />
+              <Route path="/frotas/frota"          element={<FrotaHub />} />
+              <Route path="/frotas/manutencao"     element={<ManutencaoHub />} />
+              <Route path="/frotas/operacao"       element={<OperacaoHub />} />
             </Route>
           </Route>
 
@@ -292,8 +292,9 @@ export default function App() {
             </Route>
             {/* Sub-módulo Cultura */}
             <Route element={<CulturaLayout />}>
-              <Route path="/rh/cultura"       element={<CulturaHome />} />
-              <Route path="/rh/cultura/mural" element={<MuralAdmin />} />
+              <Route path="/rh/cultura"                element={<CulturaHome />} />
+              <Route path="/rh/cultura/mural"            element={<MuralAdmin />} />
+              <Route path="/rh/cultura/endomarketing"    element={<Endomarketing />} />
             </Route>
           </Route>
 
@@ -313,6 +314,7 @@ export default function App() {
               <Route path="/contratos/solicitacoes/:id/resumo" element={<ResumoExecutivoPage />} />
               <Route path="/contratos/assinaturas"  element={<Assinaturas />} />
               <Route path="/contratos/gestao"       element={<GestaoContratos />} />
+              <Route path="/contratos/detalhe/:id"  element={<ContratoDetalhe />} />
               <Route path="/contratos/modelos"      element={<ModelosContrato />} />
             </Route>
           </Route>

@@ -127,40 +127,65 @@ export default function FrotasHome() {
       {(veiculos ?? []).length > 0 && (
         <div className={`${isLight ? 'bg-white border-slate-200 shadow-sm' : 'bg-[#1e293b] border-white/[0.06]'} rounded-2xl border p-4`}>
           <div className="flex items-center justify-between mb-3">
-            <h2 className={`text-sm font-semibold flex items-center gap-2 ${isLight ? 'text-slate-800' : 'text-white'}`}>
-              <Car size={15} className="text-teal-500" />
-              Status da Frota
-            </h2>
-            <div className="flex items-center gap-3 text-[10px] text-slate-500">
-              {[
-                ['disponivel','bg-emerald-400','Disponivel'],
-                ['em_uso','bg-sky-400','Em Uso'],
-                ['em_manutencao','bg-amber-400','Manutencao'],
-                ['bloqueado','bg-red-400','Bloqueado'],
-              ].map(([, dotCls, lbl]) => (
-                <span key={lbl} className="flex items-center gap-1">
-                  <span className={`w-2 h-2 rounded-full ${dotCls}`} />
-                  {lbl}
-                </span>
-              ))}
+            <div>
+              <h2 className={`text-sm font-semibold flex items-center gap-2 ${isLight ? 'text-slate-800' : 'text-white'}`}>
+                <Car size={15} className="text-teal-500" />
+                Status da Frota
+              </h2>
+              <p className={`text-[11px] mt-0.5 ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>Visão geral da frota, manutenções e ocorrências</p>
             </div>
           </div>
-          <div className="flex flex-wrap gap-2">
-            {(veiculos ?? []).filter(v => v.status !== 'baixado').map(v => (
-              <div
-                key={v.id}
-                title={`${v.marca} ${v.modelo} — ${v.status.replace('_',' ')}`}
-                className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] ${
-                  isLight
-                    ? 'bg-slate-100 border border-slate-200 text-slate-600'
-                    : 'bg-white/[0.04] border border-white/[0.06] text-slate-300'
-                }`}
-              >
-                <span className={`w-2 h-2 rounded-full ${STATUS_VEICULO_DOT[v.status] ?? 'bg-slate-600'}`} />
-                {v.placa}
+          {(() => {
+            const counts: Record<string, number> = {}
+            for (const v of (veiculos ?? []).filter(v => v.status !== 'baixado')) {
+              counts[v.status] = (counts[v.status] ?? 0) + 1
+            }
+            const total = Object.values(counts).reduce((a, b) => a + b, 0)
+            const segments = [
+              { key: 'disponivel',    label: 'Disponível',   value: counts.disponivel ?? 0,    bar: 'bg-emerald-500' },
+              { key: 'em_uso',        label: 'Em Uso',        value: counts.em_uso ?? 0,        bar: 'bg-sky-500' },
+              { key: 'em_manutencao', label: 'Manutenção',    value: counts.em_manutencao ?? 0, bar: 'bg-amber-500' },
+              { key: 'bloqueado',     label: 'Bloqueado',     value: counts.bloqueado ?? 0,     bar: 'bg-red-500' },
+            ].filter(s => s.value > 0)
+
+            return total === 0 ? null : (
+              <div className="space-y-2">
+                {/* Bar */}
+                <div className={`flex h-8 rounded-xl overflow-hidden ${isLight ? 'bg-slate-100' : 'bg-white/[0.06]'}`}>
+                  {segments.map(s => {
+                    const pct = (s.value / total) * 100
+                    const showLabel = pct >= 18
+                    return (
+                      <div
+                        key={s.key}
+                        className={`${s.bar} flex items-center justify-center transition-all`}
+                        style={{ width: `${Math.max(pct, 4)}%` }}
+                        title={`${s.label}: ${s.value}`}
+                      >
+                        {showLabel && (
+                          <span className="text-[10px] font-bold text-white drop-shadow-sm px-1 truncate">
+                            {s.label} {s.value}
+                          </span>
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
+                {/* Legend */}
+                <div className="flex flex-wrap gap-x-4 gap-y-1">
+                  {segments.map(s => (
+                    <span key={s.key} className={`flex items-center gap-1.5 text-[10px] font-medium ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>
+                      <span className={`w-2 h-2 rounded-full ${s.bar}`} />
+                      {s.label}: <strong>{s.value}</strong>
+                    </span>
+                  ))}
+                  <span className={`flex items-center gap-1 text-[10px] font-medium ml-auto ${isLight ? 'text-slate-500' : 'text-slate-500'}`}>
+                    Total: {total}
+                  </span>
+                </div>
               </div>
-            ))}
-          </div>
+            )
+          })()}
         </div>
       )}
 

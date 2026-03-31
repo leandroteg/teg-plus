@@ -245,10 +245,9 @@ export function normalizarParcelasPlanejadas(
   const cleaned = parcelas
     .map((parcela, index) => ({
       numero: index + 1,
-      valor: roundCurrency(Number(parcela.valor ?? 0)),
-      data_vencimento: parcela.data_vencimento ?? toIsoDate(new Date()),
+      valor: roundCurrency(Number(parcela.valor) || 0),
+      data_vencimento: parcela.data_vencimento || '',
     }))
-    .filter((parcela) => parcela.valor >= 0 && Boolean(parcela.data_vencimento))
 
   if (!cleaned.length) return []
   if (typeof valorTotal !== 'number' || !Number.isFinite(valorTotal)) return cleaned

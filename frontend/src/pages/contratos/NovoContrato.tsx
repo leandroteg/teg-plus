@@ -9,6 +9,7 @@ import { useLookupCentrosCusto, useLookupClassesFinanceiras } from '../../hooks/
 import SearchableSelect from '../../components/SearchableSelect'
 import type { SelectOption } from '../../components/SearchableSelect'
 import type { NovoContratoPayload, RecorrenciaContrato, TipoContrato, StatusContrato } from '../../types/contratos'
+import NumericInput from '../../components/NumericInput'
 
 const RECORRENCIAS: { value: RecorrenciaContrato; label: string }[] = [
   { value: 'mensal',        label: 'Mensal' },
@@ -260,10 +261,10 @@ export default function NovoContrato() {
                 <div className="grid grid-cols-3 gap-2">
                   <input value={it.unidade} onChange={e => updateItem(idx, 'unidade', e.target.value)}
                     placeholder="un" className={inputClass} />
-                  <input type="number" value={it.quantidade || ''} onChange={e => updateItem(idx, 'quantidade', parseFloat(e.target.value) || 0)}
-                    placeholder="Qtd" className={inputClass} min="0" step="0.01" />
-                  <input type="number" value={it.valor_unitario || ''} onChange={e => updateItem(idx, 'valor_unitario', parseFloat(e.target.value) || 0)}
-                    placeholder="Valor Un." className={inputClass} min="0" step="0.01" />
+                  <NumericInput value={it.quantidade} onChange={v => updateItem(idx, 'quantidade', v)}
+                    placeholder="Qtd" className={inputClass} min={0} step={0.01} />
+                  <NumericInput value={it.valor_unitario} onChange={v => updateItem(idx, 'valor_unitario', v)}
+                    placeholder="Valor Un." className={inputClass} min={0} step={0.01} />
                 </div>
                 <p className="text-[10px] text-right text-slate-500 font-semibold">
                   Subtotal: {(it.quantidade * it.valor_unitario).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}

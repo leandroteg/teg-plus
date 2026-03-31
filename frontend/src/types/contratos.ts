@@ -536,7 +536,7 @@ export interface NovaSolicitacaoPayload {
 
 // ── Certisign Assinaturas ───────────────────────────────────────────
 
-export type StatusAssinaturaType = 'pendente' | 'enviado' | 'parcialmente_assinado' | 'assinado' | 'recusado' | 'expirado' | 'cancelado'
+export type StatusAssinaturaType = 'pendente' | 'enviado' | 'parcialmente_assinado' | 'assinado' | 'recusado' | 'expirado' | 'cancelado' | 'erro'
 export type ProvedorAssinatura = 'certisign' | 'manual'
 export type TipoAssinatura = 'eletronica' | 'digital_icp'
 

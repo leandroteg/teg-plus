@@ -28,6 +28,11 @@ const fmt = (v: number) =>
 const fmtDate = (d: string) =>
   new Date(d + 'T00:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit' })
 
+const formatControlNumber = (value?: number) => {
+  if (!value || value <= 0) return 'Pendente'
+  return String(value)
+}
+
 const BANDEIRA_LABEL: Record<BandeiraCartao, string> = {
   visa: 'Visa', mastercard: 'Mastercard', elo: 'Elo',
   amex: 'Amex', hipercard: 'Hipercard', outro: 'Outro',
@@ -165,8 +170,8 @@ function ApontamentoModal({
                 {editing ? 'Editar Apontamento' : 'Novo Apontamento'}
               </h3>
               {!editing && (
-                <p className="text-[10px] text-emerald-500 font-semibold mt-0.5">
-                  Lancamento #{nextIndex}
+                <p className="text-[10px] text-emerald-500 font-semibold mt-0.5 uppercase tracking-[0.18em]">
+                  Proximo controle: {formatControlNumber(nextIndex)}
                 </p>
               )}
               <p className="text-[10px] text-slate-400">Registre o gasto no cartão corporativo</p>
@@ -369,7 +374,7 @@ export default function ApontamentosCartao() {
     )
   }, [apontamentos, busca])
 
-  const numberingById = useMemo(() => {
+  const fallbackNumberingById = useMemo(() => {
     const ordered = [...apontamentos].sort((a, b) => {
       const byDate = a.data_lancamento.localeCompare(b.data_lancamento)
       if (byDate !== 0) return byDate
@@ -387,7 +392,7 @@ export default function ApontamentosCartao() {
   const totalValor = apontamentos.reduce((s, a) => s + a.valor, 0)
   const countEnviado  = apontamentos.filter(a => a.status === 'enviado').length
   const countConc     = apontamentos.filter(a => a.status === 'conciliado').length
-  const nextApontamentoIndex = Object.keys(numberingById).length + 1
+  const nextApontamentoIndex = Object.keys(fallbackNumberingById).length + 1
 
   function showToast(type: 'success' | 'error', msg: string) {
     setToast({ type, msg })
@@ -560,7 +565,7 @@ export default function ApontamentosCartao() {
             const cfg = STATUS_CONFIG[a.status]
             const StatusIcon = cfg.icon
             const isEditable = a.status === 'rascunho'
-            const displayIndex = numberingById[a.id] ?? 0
+            const displayNumber = a.numero ?? fallbackNumberingById[a.id]
 
             return (
               <div
@@ -568,10 +573,16 @@ export default function ApontamentosCartao() {
                 className={`rounded-xl border px-4 py-3 flex items-center gap-3 transition-all
                   ${isDark ? 'bg-[#1e293b] border-white/[0.06] hover:border-white/[0.12]' : 'bg-white border-slate-200 hover:border-slate-300 hover:shadow-sm'}`}
               >
-                <div className={`w-8 shrink-0 text-sm font-extrabold text-right ${
-                  isDark ? 'text-slate-400' : 'text-slate-500'
+                <div className={`min-w-[118px] shrink-0 rounded-xl border px-3 py-2 ${
+                  isDark
+                    ? 'border-emerald-500/20 bg-emerald-500/10'
+                    : 'border-emerald-200 bg-emerald-50'
                 }`}>
-                  {displayIndex}
+                  <p className={`text-sm font-black tracking-[0.18em] text-center ${
+                    isDark ? 'text-emerald-100' : 'text-emerald-800'
+                  }`}>
+                    {formatControlNumber(displayNumber)}
+                  </p>
                 </div>
 
                 {/* Status dot */}

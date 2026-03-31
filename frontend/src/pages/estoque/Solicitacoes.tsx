@@ -10,6 +10,7 @@ import {
 } from '../../hooks/useEstoque'
 import { useTheme } from '../../contexts/ThemeContext'
 import type { EstSolicitacao, StatusSolicitacao } from '../../types/estoque'
+import NumericInput from '../../components/NumericInput'
 
 const STATUS_CONFIG: Record<StatusSolicitacao, { label: string; bg: string; text: string; dot: string }> = {
   aberta:       { label: 'Aberta',       bg: 'bg-blue-50',    text: 'text-blue-700',    dot: 'bg-blue-500'    },
@@ -365,11 +366,10 @@ function NovaSolicitacaoModal({
                         ))}
                       </select>
                     </div>
-                    <input
-                      type="number"
+                    <NumericInput
                       min={1}
                       value={item.quantidade}
-                      onChange={e => updateItem(idx, 'quantidade', Number(e.target.value))}
+                      onChange={v => updateItem(idx, 'quantidade', v)}
                       className={`w-20 ${inputCls} text-xs text-center`}
                       placeholder="Qtd"
                     />

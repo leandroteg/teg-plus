@@ -328,6 +328,11 @@ export default function ModuleLayout({
     navigate('/login', { replace: true })
   }
 
+  function handleAvatarNavigate(route: string) {
+    setAvatarOpen(false)
+    requestAnimationFrame(() => navigate(route))
+  }
+
   function goBack() {
     if (typeof backRoute === 'number') navigate(backRoute)
     else navigate(backRoute)
@@ -568,7 +573,8 @@ export default function ModuleLayout({
         {/* ── Links ── */}
         <div className="py-1">
           <button
-            onClick={() => { setAvatarOpen(false); navigate('/perfil') }}
+            type="button"
+            onClick={(e) => { e.stopPropagation(); handleAvatarNavigate('/perfil') }}
             className={`w-full flex items-center gap-3 px-4 py-2.5 text-[13px] font-medium transition-colors
               ${ls ? 'text-slate-600 hover:bg-slate-50 hover:text-slate-900' : 'text-slate-300 hover:bg-white/[0.04] hover:text-white'}`}
           >
@@ -580,12 +586,13 @@ export default function ModuleLayout({
             <>
               <div className={`h-px mx-3 my-1 ${ls ? 'bg-slate-100' : 'bg-white/[0.06]'}`} />
               <button
-                onClick={() => { setAvatarOpen(false); navigate('/admin/usuarios') }}
+                type="button"
+                onClick={(e) => { e.stopPropagation(); handleAvatarNavigate('/admin/usuarios') }}
                 className={`w-full flex items-center gap-3 px-4 py-2.5 text-[13px] font-medium transition-colors
                   ${ls ? 'text-slate-600 hover:bg-slate-50 hover:text-slate-900' : 'text-slate-300 hover:bg-white/[0.04] hover:text-white'}`}
               >
                 <Shield size={15} className="shrink-0 opacity-50" />
-                Usuarios
+                Usuários
               </button>
               <button
                 onClick={() => { setAvatarOpen(false); navigate('/cadastros') }}
@@ -596,15 +603,17 @@ export default function ModuleLayout({
                 Cadastros
               </button>
               <button
-                onClick={() => { setAvatarOpen(false); navigate('/admin/integracoes') }}
+                type="button"
+                onClick={(e) => { e.stopPropagation(); handleAvatarNavigate('/admin/integracoes') }}
                 className={`w-full flex items-center gap-3 px-4 py-2.5 text-[13px] font-medium transition-colors
                   ${ls ? 'text-slate-600 hover:bg-slate-50 hover:text-slate-900' : 'text-slate-300 hover:bg-white/[0.04] hover:text-white'}`}
               >
                 <Link2 size={15} className="shrink-0 opacity-50" />
-                Integracoes
+                Integrações
               </button>
               <button
-                onClick={() => { setAvatarOpen(false); navigate('/admin/desenvolvimento') }}
+                type="button"
+                onClick={(e) => { e.stopPropagation(); handleAvatarNavigate('/admin/desenvolvimento') }}
                 className={`w-full flex items-center gap-3 px-4 py-2.5 text-[13px] font-medium transition-colors
                   ${ls ? 'text-slate-600 hover:bg-slate-50 hover:text-slate-900' : 'text-slate-300 hover:bg-white/[0.04] hover:text-white'}`}
               >
@@ -621,6 +630,7 @@ export default function ModuleLayout({
             ${ls ? 'bg-slate-100/80 border-slate-200' : 'bg-white/5 border-white/[0.06]'}`}>
             {THEME_OPTS.map(({ value, icon, label }) => (
               <button
+                type="button"
                 key={value}
                 onClick={() => setTheme(value)}
                 className={[
@@ -640,6 +650,7 @@ export default function ModuleLayout({
         {/* ── Logout ── */}
         <div className={`border-t ${ls ? 'border-slate-100' : 'border-white/[0.06]'}`}>
           <button
+            type="button"
             onClick={handleLogout}
             className={`w-full flex items-center gap-3 px-4 py-2.5 text-[13px] font-medium transition-colors
               ${ls ? 'text-red-500 hover:bg-red-50' : 'text-red-400 hover:bg-red-500/10'}`}

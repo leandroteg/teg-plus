@@ -245,3 +245,39 @@ export const CHECKLIST_DESLIGAMENTO: Record<string, string> = {
   revogacao_acessos: 'Acessos revogados no sistema',
   entrega_documentos: 'Documentos entregues ao colaborador',
 }
+
+// ── Endomarketing ────────────────────────────────────────────────────────────
+
+export interface IdentidadeVisual {
+  id: string
+  logo_url: string | null
+  cor_primaria: string
+  cor_secundaria: string
+  cor_fundo: string
+  cor_texto: string
+  fonte_titulo: string
+  fonte_corpo: string
+  slogan: string | null
+  updated_at: string
+}
+
+export type TipoComunicado = 'aviso_geral' | 'aniversariante' | 'boas_vindas' | 'reconhecimento' | 'evento' | 'treinamento' | 'seguranca' | 'resultado' | 'campanha_interna' | 'personalizado'
+
+export type FormatoComunicado = 'story' | 'feed' | 'paisagem' | 'a4'
+
+export interface Comunicado {
+  id: string
+  tipo: TipoComunicado
+  titulo: string
+  subtitulo: string | null
+  conteudo_texto: string | null
+  conteudo_html: string | null
+  imagem_url: string | null
+  formato: FormatoComunicado
+  largura: number
+  altura: number
+  input_usuario: string | null
+  criado_por: string | null
+  created_at: string
+  updated_at: string
+}

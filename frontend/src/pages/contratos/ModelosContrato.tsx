@@ -10,6 +10,7 @@ import {
 import { useAuth } from '../../contexts/AuthContext'
 import { GRUPO_CONTRATO_OPTIONS, GRUPO_CONTRATO_LABEL } from '../../constants/contratos'
 import type { GrupoContrato } from '../../types/contratos'
+import NumericInput from '../../components/NumericInput'
 import { supabase } from '../../services/supabase'
 
 const RECORRENCIAS = [
@@ -208,10 +209,10 @@ function ModeloForm({
               <div className="grid grid-cols-3 gap-2">
                 <input value={it.unidade} onChange={e => updateItem(idx, 'unidade', e.target.value)}
                   placeholder="un" className={inputClass} />
-                <input type="number" value={it.quantidade || ''} onChange={e => updateItem(idx, 'quantidade', parseFloat(e.target.value) || 0)}
-                  placeholder="Qtd" className={inputClass} min="0" step="0.01" />
-                <input type="number" value={it.valor_unitario || ''} onChange={e => updateItem(idx, 'valor_unitario', parseFloat(e.target.value) || 0)}
-                  placeholder="Valor Un." className={inputClass} min="0" step="0.01" />
+                <NumericInput value={it.quantidade} onChange={v => updateItem(idx, 'quantidade', v)}
+                  placeholder="Qtd" className={inputClass} min={0} step={0.01} />
+                <NumericInput value={it.valor_unitario} onChange={v => updateItem(idx, 'valor_unitario', v)}
+                  placeholder="Valor Un." className={inputClass} min={0} step={0.01} />
               </div>
             </div>
           ))

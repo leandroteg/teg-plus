@@ -1,11 +1,11 @@
 import { useNavigate } from 'react-router-dom'
-import { ShieldCheck } from 'lucide-react'
+import { ClipboardCheck } from 'lucide-react'
 import { useAprovacaoKPIs } from '../hooks/useAprovacoes'
 import { useAuth } from '../contexts/AuthContext'
 
 /**
  * Compact badge that shows pending approval count.
- * Clicking navigates to /aprovacoes (AprovAi).
+ * Clicking navigates to /aprovaai (AprovAi).
  * Only visible to admin/director users.
  */
 export default function ApprovalBadge({ isDark = false }: { isDark?: boolean }) {
@@ -16,6 +16,10 @@ export default function ApprovalBadge({ isDark = false }: { isDark?: boolean }) 
   if (!isAdmin) return null
 
   const count = kpis?.totalPendentes ?? 0
+  const title =
+    count > 0
+      ? `${count} aprovacao${count !== 1 ? 'es' : ''} pendente${count !== 1 ? 's' : ''}`
+      : 'AprovAi - Centro de Aprovacoes'
 
   return (
     <button
@@ -25,9 +29,9 @@ export default function ApprovalBadge({ isDark = false }: { isDark?: boolean }) 
           ? 'text-slate-400 hover:text-violet-300 hover:bg-violet-500/10'
           : 'text-slate-400 hover:text-violet-600 hover:bg-violet-50'
       }`}
-      title={count > 0 ? `${count} aprovacao${count !== 1 ? 'es' : ''} pendente${count !== 1 ? 's' : ''}` : 'AprovAi — Centro de Aprovacoes'}
+      title={title}
     >
-      <ShieldCheck className="w-4.5 h-4.5" strokeWidth={1.8} />
+      <ClipboardCheck className="w-4.5 h-4.5" strokeWidth={1.8} />
       {count > 0 && (
         <span
           className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] flex items-center justify-center px-1 rounded-full bg-violet-500 text-white text-[10px] font-bold leading-none shadow-sm"

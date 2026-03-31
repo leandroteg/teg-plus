@@ -1,3 +1,4 @@
+import { useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   CreditCard, Plus, ClipboardList,
@@ -8,6 +9,11 @@ import { useApontamentosCartao } from '../../hooks/useCartoes'
 
 const fmt = (v: number) =>
   v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
+
+const formatControlNumber = (value?: number) => {
+  if (!value || value <= 0) return 'Pendente'
+  return String(value)
+}
 
 export default function ApontamentosHome() {
   const { dark } = useTheme()
@@ -44,6 +50,17 @@ export default function ApontamentosHome() {
       bg:    dark ? 'bg-emerald-500/10' : 'bg-emerald-50',
     },
   ]
+
+  const fallbackNumberingById = useMemo(() => {
+    const ordered = [...todos].sort((a, b) => {
+      const byDate = a.data_lancamento.localeCompare(b.data_lancamento)
+      if (byDate !== 0) return byDate
+      const byCreatedAt = (a.created_at ?? '').localeCompare(b.created_at ?? '')
+      if (byCreatedAt !== 0) return byCreatedAt
+      return a.id.localeCompare(b.id)
+    })
+    return Object.fromEntries(ordered.map((item, index) => [item.id, index + 1]))
+  }, [todos])
 
   const recentes = todos.slice(0, 6)
 
@@ -136,8 +153,17 @@ export default function ApontamentosHome() {
           </div>
           <div className="divide-y divide-slate-100 dark:divide-slate-700">
             {recentes.map(ap => (
-              <div key={ap.id} className="px-4 py-3 flex items-center justify-between">
-                <div className="min-w-0">
+              <div key={ap.id} className="px-4 py-3 flex items-center gap-3 justify-between">
+                <div className={`min-w-[108px] rounded-xl border px-3 py-2 shrink-0 ${
+                  dark ? 'border-violet-500/20 bg-violet-500/10' : 'border-violet-200 bg-violet-50'
+                }`}>
+                  <p className={`text-sm font-black tracking-[0.18em] text-center ${
+                    dark ? 'text-violet-100' : 'text-violet-800'
+                  }`}>
+                    {formatControlNumber(ap.numero ?? fallbackNumberingById[ap.id])}
+                  </p>
+                </div>
+                <div className="min-w-0 flex-1">
                   <p className={`text-sm font-medium truncate ${dark ? 'text-slate-200' : 'text-slate-700'}`}>
                     {ap.descricao}
                   </p>
