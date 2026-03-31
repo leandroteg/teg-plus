@@ -277,7 +277,7 @@ export default function ModuleLayout({
   bottomNavMaxItems,
   ...config
 }: ModuleConfig) {
-  const { perfil, isAdmin, signOut, role, papelGlobal } = useAuth()
+  const { perfil, isAdmin, signOut, role, papelGlobal, getPapelForModule } = useAuth()
   const { isDark, isLightSidebar, theme, setTheme } = useTheme()
   const navigate = useNavigate()
   const location = useLocation()
@@ -341,7 +341,8 @@ export default function ModuleLayout({
 
   const headerModuleName = mobileModuleName ?? config.moduleName
   const visibleNav = config.nav.filter(n => !n.adminOnly || isAdmin)
-  const isRequisitante = !isAdmin && papelGlobal === 'requisitante'
+  const moduloPapel = getPapelForModule(config.moduleKey)
+  const isRequisitante = !isAdmin && moduloPapel === 'requisitante'
   const visibleNavForRole = useMemo(() => {
     if (isRequisitante) return visibleNav.filter(isNovaSolicitacaoItem)
     return visibleNav

@@ -241,6 +241,9 @@ interface AuthContextType {
   canTechnicalApprove: (mod: string) => boolean
   atLeast: (role: Role | string) => boolean
   permissoesEspeciais: (modulo: string) => Record<string, unknown>
+  /** Retorna o papel efetivo do usuário para um módulo específico,
+   *  lendo de permissoes_especiais.modulo_papeis antes do papel global */
+  getPapelForModule: (moduleKey: string) => PapelGlobal
 }
 
 const AuthContext = createContext<AuthContextType | null>(null)
@@ -614,6 +617,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     canTechnicalApprove,
     atLeast: (r) => currentNivel >= (ROLE_NIVEL[r] ?? 0),
     permissoesEspeciais: (modulo: string) => perfil?.permissoes_especiais?.[modulo] ?? {},
+    getPapelForModule: (moduleKey: string): PapelGlobal => {
+      const normalized = normalizeModuleKey(moduleKey)
+      const moduloPapeis = (perfil?.permissoes_especiais as any)?.modulo_papeis
+      if (moduloPapeis && typeof moduloPapeis === 'object') {
+        const p = moduloPapeis[moduleKey] ?? moduloPapeis[normalized]
+        if (p && ['requisitante','equipe','supervisor','diretor','ceo'].includes(p)) return p as PapelGlobal
+      }
+      return papelGlobal
+    },
   }
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
