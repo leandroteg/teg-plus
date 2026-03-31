@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import {
   FileText, Clock, CheckCircle, DollarSign,
   RefreshCw, Settings, TrendingUp, AlertTriangle,
-  ShoppingCart, Package, ChevronRight,
+  Package, ChevronRight,
 } from 'lucide-react'
 import { useDashboard } from '../hooks/useDashboard'
 import { useRequisicoes } from '../hooks/useRequisicoes'
@@ -36,23 +36,6 @@ const PIPELINE_ETAPAS = [
 ]
 
 // ── Avatar helpers ──────────────────────────────────────────────────────────
-const AVATAR_COLORS: Record<string, string> = {
-  Lauany:  'bg-violet-500',
-  Fernando:'bg-amber-500',
-  Aline:   'bg-emerald-500',
-}
-
-function Avatar({ nome, size = 'sm' }: { nome: string; size?: 'sm' | 'md' }) {
-  const initials = nome.slice(0, 2).toUpperCase()
-  const bg = AVATAR_COLORS[nome.split(' ')[0]] ?? `bg-slate-500`
-  const cls = size === 'md' ? 'w-9 h-9 text-sm font-bold' : 'w-6 h-6 text-[10px] font-bold'
-  return (
-    <div className={`${cls} ${bg} rounded-full flex items-center justify-center text-white flex-shrink-0`}>
-      {initials}
-    </div>
-  )
-}
-
 // ── KPI Card ────────────────────────────────────────────────────────────────
 function KpiCard({ titulo, valor, icon: Icon, cor, subtitulo }: {
   titulo: string; valor: number | string; icon: typeof FileText;
@@ -119,20 +102,6 @@ export default function Dashboard() {
   const recentes = pipelineFilter !== null
     ? reqs.filter(r => PIPELINE_ETAPAS[pipelineFilter].statuses.includes(r.status))
     : reqs.slice(0, 10)
-
-  // Compradores stats
-  const compradorStats = (() => {
-    const map = new Map<string, { nome: string; total: number; pendentes: number; valor: number }>()
-    for (const r of reqs) {
-      if (!r.comprador_nome) continue
-      const prev = map.get(r.comprador_nome) ?? { nome: r.comprador_nome, total: 0, pendentes: 0, valor: 0 }
-      prev.total++
-      if (['pendente', 'em_aprovacao', 'em_cotacao', 'cotacao_enviada'].includes(r.status)) prev.pendentes++
-      prev.valor += r.valor_estimado ?? 0
-      map.set(r.comprador_nome, prev)
-    }
-    return Array.from(map.values()).sort((a, b) => b.total - a.total)
-  })()
 
   return (
     <div className="space-y-5">
@@ -203,32 +172,6 @@ export default function Dashboard() {
           })}
         </div>
       </section>
-
-      {/* ── Compradores ────────────────────────────────────────────────── */}
-      {compradorStats.length > 0 && (
-        <section>
-          <h2 className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-2 flex items-center gap-1.5">
-            <ShoppingCart size={12} /> Compradores
-          </h2>
-          <div className="space-y-2">
-            {compradorStats.map(c => (
-              <div key={c.nome} className="bg-white rounded-2xl px-4 py-3 border border-slate-200 shadow-sm flex items-center gap-3">
-                <Avatar nome={c.nome} size="md" />
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-bold text-slate-800 truncate">{c.nome}</p>
-                  <p className="text-xs text-slate-400 mt-0.5">
-                    {c.total} {c.total === 1 ? 'requisição' : 'requisições'}
-                    {c.pendentes > 0 && (
-                      <span className="ml-1.5 text-amber-600 font-semibold">· {c.pendentes} em andamento</span>
-                    )}
-                  </p>
-                </div>
-                <p className="text-sm font-extrabold text-teal-600 flex-shrink-0">{fmt(c.valor)}</p>
-              </div>
-            ))}
-          </div>
-        </section>
-      )}
 
       {/* ── Por Obra ───────────────────────────────────────────────────── */}
       {por_obra.length > 0 && (
