@@ -36,9 +36,10 @@
       @keyframes spin {
         to { transform: rotate(360deg); }
       }
-      /* Safe area for standalone PWA on notched devices */
+      /* Safe area for standalone PWA — applied to #root, not body,
+         so fixed modals (inset-0) still cover the full viewport */
       @supports (padding-top: env(safe-area-inset-top)) {
-        body.standalone-mode {
+        body.standalone-mode #root {
           padding-top: env(safe-area-inset-top);
           padding-bottom: env(safe-area-inset-bottom);
           padding-left: env(safe-area-inset-left);
@@ -46,16 +47,15 @@
         }
       }
     </style>
-
+  </head>
+  <body class="bg-gray-100">
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
     <script>
       // Detect standalone mode and add class for safe-area padding
       if (window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone) {
         document.body.classList.add('standalone-mode');
       }
     </script>
-  </head>
-  <body class="bg-gray-100">
-    <div id="root"></div>
-    <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
