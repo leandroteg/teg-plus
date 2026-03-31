@@ -60,6 +60,10 @@ function buildSenhaTemporaria() {
   return `Teg@${randomToken(10)}#`
 }
 
+function formatLoginUsuario(email: string) {
+  return email.replace(/@(login\.teg\.local|login\.teg\.local\.com)$/i, '')
+}
+
 function buildCredenciaisMessage(data: CadastroResult) {
   return [
     `Acesso TEG+ criado para ${data.nome}`,
@@ -2002,7 +2006,7 @@ export default function AdminUsuarios() {
         ) : viewMode === 'table' ? (
           <div className="bg-white rounded-2xl shadow-card overflow-hidden border border-slate-200">
             <div className="overflow-x-auto">
-              <table className="min-w-[920px] w-full text-sm">
+              <table className="min-w-[860px] w-full text-sm">
                 <thead className="bg-slate-50 border-b border-slate-200">
                   <tr className="text-left text-[11px] uppercase tracking-wider text-slate-500">
                     <th className="px-3 py-3 w-10">
@@ -2018,15 +2022,14 @@ export default function AdminUsuarios() {
                     <th className="px-3 py-3">Login</th>
                     <th className="px-3 py-3">Papel</th>
                     <th className="px-3 py-3">Alcada</th>
-                    <th className="px-3 py-3">Setores</th>
+                    <th className="px-3 py-3">Módulos</th>
                     <th className="px-3 py-3">Status</th>
-                    <th className="px-3 py-3 text-right">Acoes</th>
                   </tr>
                 </thead>
                 <tbody>
                   {filtered.map(p => {
                     const isSelected = selectedIds.includes(p.id)
-                    const enabledModules = Object.values(p.modulos ?? {}).filter(Boolean).length
+                    const enabledModulos = MODULOS_ERP.filter(mod => Boolean(p.modulos?.[mod.key]))
                     const displayPapel = resolvePapelFromPerfil(p) as Role
                     return (
                       <tr key={p.id} className="border-b border-slate-100 hover:bg-slate-50/60">
@@ -2039,30 +2042,49 @@ export default function AdminUsuarios() {
                           />
                         </td>
                         <td className="px-3 py-3">
-                          <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-2.5">
                             <Avatar nome={p.nome} size="sm" />
-                            <p className="font-semibold text-navy max-w-[220px] truncate flex-1">{p.nome}</p>
+                            <div className="min-w-0 flex-1">
+                              <p className="font-semibold text-[13px] text-navy truncate max-w-[210px]">{p.nome}</p>
+                            </div>
                             <button
                               type="button"
                               onClick={() => {
-                                setQuickEditUserId(null)
+                                setQuickEditUserId(p.id)
                                 setViewMode('cards')
                                 setExpandedUser(p.id)
                               }}
-                              className="inline-flex items-center justify-center w-7 h-7 rounded-lg border border-slate-200 bg-slate-50/80 text-slate-500 hover:text-primary hover:border-primary/30 hover:bg-primary/5 transition-colors"
+                              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg border border-primary/25 bg-primary/5 text-primary hover:bg-primary/10 transition-colors text-[11px] font-semibold"
                               title={`Editar ${p.nome}`}
                               aria-label={`Editar ${p.nome}`}
                             >
                               <Edit3 size={12} className="opacity-80" />
+                              Editar
                             </button>
                           </div>
                         </td>
-                        <td className="px-3 py-3 text-slate-500">{p.email}</td>
+                        <td className="px-3 py-3 text-slate-500">{formatLoginUsuario(p.email)}</td>
                         <td className="px-3 py-3">
                           <RoleBadge role={displayPapel} />
                         </td>
                         <td className="px-3 py-3 text-slate-600 text-xs">{ALCADA_LABEL[p.alcada_nivel]}</td>
-                        <td className="px-3 py-3 text-slate-500 text-xs">{enabledModules} modulo(s)</td>
+                        <td className="px-3 py-3">
+                          <div className="flex flex-wrap gap-1 max-w-[300px]">
+                            {enabledModulos.length === 0 && (
+                              <span className="text-[11px] text-slate-400">Sem módulos</span>
+                            )}
+                            {enabledModulos.map(mod => (
+                              <span
+                                key={`${p.id}-${mod.key}`}
+                                className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-slate-100 text-slate-600 text-[10px] font-semibold"
+                                title={mod.label}
+                              >
+                                <span className="text-[10px]">{mod.icon}</span>
+                                {mod.label}
+                              </span>
+                            ))}
+                          </div>
+                        </td>
                         <td className="px-3 py-3">
                           <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold ${
                             p.ativo ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-600'
@@ -2070,20 +2092,6 @@ export default function AdminUsuarios() {
                             <span className={`w-1.5 h-1.5 rounded-full ${p.ativo ? 'bg-green-500' : 'bg-red-500'}`} />
                             {p.ativo ? 'Ativo' : 'Inativo'}
                           </span>
-                        </td>
-                        <td className="px-3 py-3 text-right">
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setQuickEditUserId(null)
-                              setViewMode('cards')
-                              setExpandedUser(p.id)
-                            }}
-                            className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-slate-200 bg-slate-50/80 text-xs font-semibold text-slate-500 hover:text-primary hover:border-primary/30 hover:bg-primary/5 transition-colors"
-                          >
-                            <Edit3 size={12} className="opacity-80" />
-                            Editar
-                          </button>
                         </td>
                       </tr>
                     )
