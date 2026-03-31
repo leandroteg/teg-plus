@@ -132,20 +132,34 @@ function createEmptyModulosMap() {
 async function updatePerfilWithSync(
   payload: Partial<Perfil> & { id: string; papel_global?: PapelGlobal }
 ) {
-  const { id, ...data } = payload
-  const { data: updated, error } = await supabase
+  const { id, papel_global, ...rest } = payload
+  const data = { ...rest } as Partial<Perfil> & { papel_global?: PapelGlobal }
+  if (papel_global) data.papel_global = papel_global
+
+  const runUpdate = async (body: Partial<Perfil>) => supabase
     .from('sys_perfis')
-    .update(data)
+    .update(body)
     .eq('id', id)
     .select()
     .single()
+
+  let { data: updated, error } = await runUpdate(data)
+
+  // Compatibilidade: alguns bancos ainda não têm coluna papel_global.
+  if (error && papel_global && /papel_global/i.test(String(error.message || ''))) {
+    const { papel_global: _pg, ...fallbackData } = data
+    const retry = await runUpdate(fallbackData)
+    updated = retry.data
+    error = retry.error
+  }
+
   if (error) throw error
 
-  if (data.modulos || data.papel_global) {
-    const nextPapel = (data.papel_global as PapelGlobal | undefined) ?? resolvePapelFromPerfil(updated as Perfil)
+  if (rest.modulos || papel_global) {
+    const nextPapel = papel_global ?? resolvePapelFromPerfil(updated as Perfil)
     await syncPerfilSetores(
       id,
-      (data.modulos as Record<string, boolean> | undefined) ?? ((updated as Perfil).modulos ?? {}),
+      (rest.modulos as Record<string, boolean> | undefined) ?? ((updated as Perfil).modulos ?? {}),
       nextPapel
     )
   }
@@ -1036,6 +1050,158 @@ function CadastroUsuarioModal({ onClose }: { onClose: () => void }) {
 }
 
 // ── Página Principal ───────────────────────────────────────────────────────────
+function BatchEditModal({
+  open,
+  onClose,
+  selectedCount,
+  allVisibleSelected,
+  onSelectVisible,
+  onClear,
+  bulkPapel,
+  onBulkPapel,
+  bulkAlcada,
+  onBulkAlcada,
+  bulkTouchSetores,
+  onBulkTouchSetores,
+  bulkModulos,
+  onToggleModulo,
+  onSetAllModulos,
+  onApply,
+  isPending,
+  errorMessage,
+}: {
+  open: boolean
+  onClose: () => void
+  selectedCount: number
+  allVisibleSelected: boolean
+  onSelectVisible: () => void
+  onClear: () => void
+  bulkPapel: PapelGlobal | ''
+  onBulkPapel: (value: PapelGlobal | '') => void
+  bulkAlcada: number | ''
+  onBulkAlcada: (value: number | '') => void
+  bulkTouchSetores: boolean
+  onBulkTouchSetores: (value: boolean) => void
+  bulkModulos: Record<string, boolean>
+  onToggleModulo: (key: string) => void
+  onSetAllModulos: (keys: string[], val: boolean) => void
+  onApply: () => Promise<void>
+  isPending: boolean
+  errorMessage: string | null
+}) {
+  if (!open) return null
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/40 flex items-end sm:items-center justify-center p-0 sm:p-4">
+      <div className="bg-white w-full sm:max-w-3xl rounded-t-3xl sm:rounded-2xl shadow-2xl overflow-hidden">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
+          <div>
+            <h3 className="font-bold text-navy text-base">Edicao em lote</h3>
+            <p className="text-xs text-slate-400 mt-0.5">{selectedCount} usuario(s) selecionado(s)</p>
+          </div>
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-600">
+            <X size={18} />
+          </button>
+        </div>
+
+        <div className="p-5 space-y-4 max-h-[80vh] overflow-y-auto">
+          <div className="flex flex-wrap items-center gap-2 justify-end">
+            <button
+              type="button"
+              onClick={onSelectVisible}
+              className="px-3 py-1.5 rounded-lg border border-slate-200 text-xs font-semibold text-slate-600 hover:bg-slate-50"
+            >
+              {allVisibleSelected ? 'Desmarcar visiveis' : 'Selecionar visiveis'}
+            </button>
+            <button
+              type="button"
+              onClick={onClear}
+              className="px-3 py-1.5 rounded-lg border border-slate-200 text-xs font-semibold text-slate-500 hover:bg-slate-50"
+            >
+              Limpar
+            </button>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div>
+              <label className="block text-[11px] font-semibold text-slate-500 mb-1">Papel</label>
+              <select
+                value={bulkPapel}
+                onChange={e => onBulkPapel(e.target.value as PapelGlobal | '')}
+                className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+              >
+                <option value="">Nao alterar</option>
+                {PAPEIS.map(p => <option key={p.value} value={p.value}>{p.label}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="block text-[11px] font-semibold text-slate-500 mb-1">Alcada</label>
+              <select
+                value={bulkAlcada}
+                onChange={e => onBulkAlcada(e.target.value === '' ? '' : Number(e.target.value))}
+                className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+              >
+                <option value="">Nao alterar</option>
+                {[0, 1, 2, 3, 4].map(n => (
+                  <option key={n} value={n}>{ALCADA_LABEL[n]}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <label className="inline-flex items-center gap-2 text-xs font-semibold text-slate-600 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={bulkTouchSetores}
+                onChange={e => onBulkTouchSetores(e.target.checked)}
+                className="rounded border-slate-300 text-primary focus:ring-primary/30"
+              />
+              Alterar areas/modulos
+            </label>
+            {bulkTouchSetores && (
+              <div className="rounded-xl border border-slate-100 p-2.5 bg-slate-50/60">
+                <ModuloCheckboxGroup
+                  modulos={bulkModulos}
+                  onToggle={onToggleModulo}
+                  onSetAll={onSetAllModulos}
+                />
+              </div>
+            )}
+          </div>
+
+          {errorMessage && (
+            <div className="flex items-center gap-2 bg-red-50 text-red-600 rounded-xl px-3 py-2 text-xs">
+              <AlertCircle size={12} />
+              <span>{errorMessage}</span>
+            </div>
+          )}
+
+          <div className="flex gap-2 pt-1">
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex-1 py-2.5 rounded-xl border border-slate-200 text-sm font-semibold text-slate-600"
+            >
+              Cancelar
+            </button>
+            <button
+              type="button"
+              disabled={isPending || selectedCount === 0}
+              onClick={onApply}
+              className="flex-1 py-2.5 rounded-xl bg-primary text-white text-sm font-semibold hover:bg-indigo-500 disabled:opacity-60 disabled:cursor-not-allowed inline-flex items-center justify-center gap-1.5"
+            >
+              {isPending
+                ? <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                : <><Check size={13} /> Aplicar em {selectedCount} usuario(s)</>}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export default function AdminUsuarios() {
   const navigate = useNavigate()
   const { data: perfis, isLoading, refetch, isFetching } = usePerfis()
@@ -1148,6 +1314,32 @@ export default function AdminUsuarios() {
   return (
     <>
       {showCadastro && <CadastroUsuarioModal onClose={() => { setShowCadastro(false); refetch() }} />}
+      {showBatchEditor && (
+        <BatchEditModal
+          open={showBatchEditor}
+          onClose={() => setShowBatchEditor(false)}
+          selectedCount={selectedIds.length}
+          allVisibleSelected={allVisibleSelected}
+          onSelectVisible={toggleSelectAllVisible}
+          onClear={clearBatch}
+          bulkPapel={bulkPapel}
+          onBulkPapel={setBulkPapel}
+          bulkAlcada={bulkAlcada}
+          onBulkAlcada={setBulkAlcada}
+          bulkTouchSetores={bulkTouchSetores}
+          onBulkTouchSetores={setBulkTouchSetores}
+          bulkModulos={bulkModulos}
+          onToggleModulo={key => setBulkModulos(prev => ({ ...prev, [key]: !prev[key] }))}
+          onSetAllModulos={(keys, val) => setBulkModulos(prev => {
+            const next = { ...prev }
+            keys.forEach(k => { next[k] = val })
+            return next
+          })}
+          onApply={applyBatch}
+          isPending={bulkUpdate.isPending}
+          errorMessage={bulkUpdate.error instanceof Error ? bulkUpdate.error.message : (bulkUpdate.isError ? 'Erro ao editar em lote.' : null)}
+        />
+      )}
 
       <div className="space-y-4">
         {/* Header */}
@@ -1321,7 +1513,7 @@ export default function AdminUsuarios() {
           )}
         </div>
 
-        {showBatchEditor && (
+        {false && (
           <div className="bg-white rounded-2xl border border-slate-200 p-3 sm:p-4 space-y-3 shadow-card">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <p className="text-xs font-semibold text-slate-600">Edicao em lote</p>
