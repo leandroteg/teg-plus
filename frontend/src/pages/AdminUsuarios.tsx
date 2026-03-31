@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { createClient } from '@supabase/supabase-js'
 import {
@@ -119,6 +119,37 @@ function normalizeModuloForSetor(modulo: string) {
   if (modulo === 'patrimonial') return 'patrimonio'
   if (modulo === 'apontamentos') return 'financeiro'
   return modulo
+}
+
+function createEmptyModulosMap() {
+  return MODULOS_ERP.reduce((acc, item) => {
+    acc[item.key] = false
+    return acc
+  }, {} as Record<string, boolean>)
+}
+
+async function updatePerfilWithSync(
+  payload: Partial<Perfil> & { id: string; papel_global?: PapelGlobal }
+) {
+  const { id, ...data } = payload
+  const { data: updated, error } = await supabase
+    .from('sys_perfis')
+    .update(data)
+    .eq('id', id)
+    .select()
+    .single()
+  if (error) throw error
+
+  if (data.modulos || data.papel_global) {
+    const nextPapel = (data.papel_global as PapelGlobal | undefined) ?? resolvePapelFromPerfil(updated as Perfil)
+    await syncPerfilSetores(
+      id,
+      (data.modulos as Record<string, boolean> | undefined) ?? ((updated as Perfil).modulos ?? {}),
+      nextPapel
+    )
+  }
+
+  return updated as Perfil
 }
 
 async function syncPerfilSetores(
@@ -278,20 +309,41 @@ function usePerfis() {
 function useUpdateUser() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: async (payload: Partial<Perfil> & { id: string; papel_global?: PapelGlobal }) => {
-      const { id, ...data } = payload
-      const { data: updated, error } = await supabase
-        .from('sys_perfis')
-        .update(data)
-        .eq('id', id)
-        .select()
-        .single()
-      if (error) throw error
-      if (data.modulos || data.papel_global) {
-        const nextPapel = (data.papel_global as PapelGlobal | undefined) ?? resolvePapelFromPerfil(updated as Perfil)
-        await syncPerfilSetores(id, (data.modulos as Record<string, boolean> | undefined) ?? ((updated as Perfil).modulos ?? {}), nextPapel)
+    mutationFn: async (payload: Partial<Perfil> & { id: string; papel_global?: PapelGlobal }) =>
+      updatePerfilWithSync(payload),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['perfis'] }),
+  })
+}
+
+function useBulkUpdateUsers() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (payload: {
+      ids: string[]
+      papel_global?: PapelGlobal
+      alcada_nivel?: number
+      modulos?: Record<string, boolean>
+    }) => {
+      const { ids, papel_global, alcada_nivel, modulos } = payload
+      if (!ids.length) throw new Error('Selecione ao menos um usuário.')
+
+      const changes: Partial<Perfil> & { papel_global?: PapelGlobal } = {}
+      if (papel_global) {
+        changes.papel_global = papel_global
+        changes.role = mapPapelToLegacyRole(papel_global)
       }
-      return updated as Perfil
+      if (typeof alcada_nivel === 'number') changes.alcada_nivel = alcada_nivel
+      if (modulos) changes.modulos = modulos
+
+      if (Object.keys(changes).length === 0) {
+        throw new Error('Defina ao menos um campo para aplicar em lote.')
+      }
+
+      for (const id of ids) {
+        await updatePerfilWithSync({ id, ...changes })
+      }
+
+      return { total: ids.length }
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['perfis'] }),
   })
@@ -986,11 +1038,19 @@ function CadastroUsuarioModal({ onClose }: { onClose: () => void }) {
 export default function AdminUsuarios() {
   const navigate = useNavigate()
   const { data: perfis, isLoading, refetch, isFetching } = usePerfis()
+  const bulkUpdate = useBulkUpdateUsers()
 
   const [search,       setSearch]       = useState('')
   const [filterRole,   setFilterRole]   = useState<Role | 'todos'>('todos')
+  const [viewMode,     setViewMode]     = useState<'table' | 'cards'>('table')
   const [expandedUser, setExpandedUser] = useState<string | null>(null)
   const [showCadastro, setShowCadastro] = useState(false)
+  const [selectedIds,  setSelectedIds]  = useState<string[]>([])
+  const [bulkPapel, setBulkPapel] = useState<PapelGlobal | ''>('')
+  const [bulkAlcada, setBulkAlcada] = useState<number | ''>('')
+  const [bulkTouchSetores, setBulkTouchSetores] = useState(false)
+  const [bulkModulos, setBulkModulos] = useState<Record<string, boolean>>(() => createEmptyModulosMap())
+  const selectAllRef = useRef<HTMLInputElement | null>(null)
 
   const filtered = useMemo(() => {
     if (!perfis) return []
@@ -1015,6 +1075,60 @@ export default function AdminUsuarios() {
 
   const toggleExpand = (id: string) =>
     setExpandedUser(prev => prev === id ? null : id)
+
+  const selectedVisibleCount = useMemo(
+    () => filtered.filter(user => selectedIds.includes(user.id)).length,
+    [filtered, selectedIds]
+  )
+  const allVisibleSelected = filtered.length > 0 && selectedVisibleCount === filtered.length
+  const hasPartialVisibleSelection = selectedVisibleCount > 0 && !allVisibleSelected
+
+  useEffect(() => {
+    if (selectAllRef.current) {
+      selectAllRef.current.indeterminate = hasPartialVisibleSelection
+    }
+  }, [hasPartialVisibleSelection])
+
+  useEffect(() => {
+    if (!perfis) return
+    const validIds = new Set(perfis.map(p => p.id))
+    setSelectedIds(prev => prev.filter(id => validIds.has(id)))
+  }, [perfis])
+
+  const toggleSelectOne = (id: string) => {
+    setSelectedIds(prev => (
+      prev.includes(id) ? prev.filter(item => item !== id) : [...prev, id]
+    ))
+  }
+
+  const toggleSelectAllVisible = () => {
+    const visibleIds = filtered.map(p => p.id)
+    setSelectedIds(prev => {
+      if (allVisibleSelected) {
+        return prev.filter(id => !visibleIds.includes(id))
+      }
+      return Array.from(new Set([...prev, ...visibleIds]))
+    })
+  }
+
+  const clearBatch = () => {
+    setSelectedIds([])
+    setBulkPapel('')
+    setBulkAlcada('')
+    setBulkTouchSetores(false)
+    setBulkModulos(createEmptyModulosMap())
+  }
+
+  const applyBatch = async () => {
+    await bulkUpdate.mutateAsync({
+      ids: selectedIds,
+      papel_global: bulkPapel || undefined,
+      alcada_nivel: typeof bulkAlcada === 'number' ? bulkAlcada : undefined,
+      modulos: bulkTouchSetores ? bulkModulos : undefined,
+    })
+    setExpandedUser(null)
+    clearBatch()
+  }
 
   return (
     <>
@@ -1081,6 +1195,120 @@ export default function AdminUsuarios() {
           </div>
         </div>
 
+        <div className="flex items-center justify-between gap-2">
+          <div className="inline-flex rounded-xl border border-slate-200 bg-white p-1">
+            <button
+              onClick={() => setViewMode('table')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                viewMode === 'table' ? 'bg-primary text-white' : 'text-slate-500 hover:bg-slate-50'
+              }`}
+            >
+              Tabela
+            </button>
+            <button
+              onClick={() => setViewMode('cards')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                viewMode === 'cards' ? 'bg-primary text-white' : 'text-slate-500 hover:bg-slate-50'
+              }`}
+            >
+              Cards
+            </button>
+          </div>
+          <div className="text-xs text-slate-500">{selectedIds.length} selecionado(s)</div>
+        </div>
+
+        <div className="bg-white rounded-2xl border border-slate-200 p-3 sm:p-4 space-y-3">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <p className="text-xs font-semibold text-slate-600">Edicao em lote</p>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={toggleSelectAllVisible}
+                className="px-3 py-1.5 rounded-lg border border-slate-200 text-xs font-semibold text-slate-600 hover:bg-slate-50"
+              >
+                {allVisibleSelected ? 'Desmarcar visiveis' : 'Selecionar visiveis'}
+              </button>
+              <button
+                type="button"
+                onClick={clearBatch}
+                className="px-3 py-1.5 rounded-lg border border-slate-200 text-xs font-semibold text-slate-500 hover:bg-slate-50"
+              >
+                Limpar
+              </button>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+            <div>
+              <label className="block text-[11px] font-semibold text-slate-500 mb-1">Papel</label>
+              <select
+                value={bulkPapel}
+                onChange={e => setBulkPapel(e.target.value as PapelGlobal | '')}
+                className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+              >
+                <option value="">Nao alterar</option>
+                {PAPEIS.map(p => <option key={p.value} value={p.value}>{p.label}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="block text-[11px] font-semibold text-slate-500 mb-1">Alcada</label>
+              <select
+                value={bulkAlcada}
+                onChange={e => setBulkAlcada(e.target.value === '' ? '' : Number(e.target.value))}
+                className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+              >
+                <option value="">Nao alterar</option>
+                {[0, 1, 2, 3, 4].map(n => (
+                  <option key={n} value={n}>{ALCADA_LABEL[n]}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <label className="inline-flex items-center gap-2 text-xs font-semibold text-slate-600 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={bulkTouchSetores}
+                onChange={e => setBulkTouchSetores(e.target.checked)}
+                className="rounded border-slate-300 text-primary focus:ring-primary/30"
+              />
+              Alterar setores/modulos em lote
+            </label>
+            {bulkTouchSetores && (
+              <div className="rounded-xl border border-slate-100 p-2.5 bg-slate-50/60">
+                <ModuloCheckboxGroup
+                  modulos={bulkModulos}
+                  onToggle={key => setBulkModulos(prev => ({ ...prev, [key]: !prev[key] }))}
+                  onSetAll={(keys, val) => setBulkModulos(prev => {
+                    const next = { ...prev }
+                    keys.forEach(k => { next[k] = val })
+                    return next
+                  })}
+                />
+              </div>
+            )}
+          </div>
+
+          {bulkUpdate.isError && (
+            <div className="flex items-center gap-2 bg-red-50 text-red-600 rounded-xl px-3 py-2 text-xs">
+              <AlertCircle size={12} />
+              <span>{bulkUpdate.error instanceof Error ? bulkUpdate.error.message : 'Falha ao aplicar alteracoes em lote.'}</span>
+            </div>
+          )}
+
+          <button
+            type="button"
+            disabled={bulkUpdate.isPending || selectedIds.length === 0}
+            onClick={applyBatch}
+            className="w-full sm:w-auto px-4 py-2 rounded-xl bg-primary text-white text-xs font-semibold hover:bg-indigo-500 disabled:opacity-60 disabled:cursor-not-allowed inline-flex items-center justify-center gap-1.5"
+          >
+            {bulkUpdate.isPending
+              ? <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+              : <><Check size={13} /> Aplicar em {selectedIds.length} usuario(s)</>}
+          </button>
+        </div>
+
         {/* Lista de usuários */}
         {isLoading ? (
           <div className="flex items-center justify-center h-32">
@@ -1091,10 +1319,89 @@ export default function AdminUsuarios() {
             <Users size={40} className="mx-auto mb-3 opacity-30" />
             <p className="text-sm font-medium">Nenhum usuário encontrado</p>
           </div>
+        ) : viewMode === 'table' ? (
+          <div className="bg-white rounded-2xl shadow-card overflow-hidden border border-slate-200">
+            <div className="overflow-x-auto">
+              <table className="min-w-[920px] w-full text-sm">
+                <thead className="bg-slate-50 border-b border-slate-200">
+                  <tr className="text-left text-[11px] uppercase tracking-wider text-slate-500">
+                    <th className="px-3 py-3 w-10">
+                      <input
+                        ref={selectAllRef}
+                        type="checkbox"
+                        checked={allVisibleSelected}
+                        onChange={toggleSelectAllVisible}
+                        className="rounded border-slate-300 text-primary focus:ring-primary/30"
+                      />
+                    </th>
+                    <th className="px-3 py-3">Usuario</th>
+                    <th className="px-3 py-3">Login</th>
+                    <th className="px-3 py-3">Papel</th>
+                    <th className="px-3 py-3">Alcada</th>
+                    <th className="px-3 py-3">Setores</th>
+                    <th className="px-3 py-3">Status</th>
+                    <th className="px-3 py-3 text-right">Acoes</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filtered.map(p => {
+                    const isSelected = selectedIds.includes(p.id)
+                    const enabledModules = Object.values(p.modulos ?? {}).filter(Boolean).length
+                    return (
+                      <tr key={p.id} className="border-b border-slate-100 hover:bg-slate-50/60">
+                        <td className="px-3 py-3">
+                          <input
+                            type="checkbox"
+                            checked={isSelected}
+                            onChange={() => toggleSelectOne(p.id)}
+                            className="rounded border-slate-300 text-primary focus:ring-primary/30"
+                          />
+                        </td>
+                        <td className="px-3 py-3">
+                          <div className="flex items-center gap-2">
+                            <Avatar nome={p.nome} size="sm" />
+                            <p className="font-semibold text-navy max-w-[220px] truncate">{p.nome}</p>
+                          </div>
+                        </td>
+                        <td className="px-3 py-3 text-slate-500">{p.email}</td>
+                        <td className="px-3 py-3">
+                          <RoleBadge role={(p.papel_global as Role) || p.role} />
+                        </td>
+                        <td className="px-3 py-3 text-slate-600 text-xs">{ALCADA_LABEL[p.alcada_nivel]}</td>
+                        <td className="px-3 py-3 text-slate-500 text-xs">{enabledModules} modulo(s)</td>
+                        <td className="px-3 py-3">
+                          <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold ${
+                            p.ativo ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-600'
+                          }`}>
+                            <span className={`w-1.5 h-1.5 rounded-full ${p.ativo ? 'bg-green-500' : 'bg-red-500'}`} />
+                            {p.ativo ? 'Ativo' : 'Inativo'}
+                          </span>
+                        </td>
+                        <td className="px-3 py-3 text-right">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setViewMode('cards')
+                              setExpandedUser(p.id)
+                            }}
+                            className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-slate-200 text-xs font-semibold text-slate-600 hover:bg-white"
+                          >
+                            <Eye size={12} />
+                            Editar
+                          </button>
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
         ) : (
           <div className="space-y-2">
             {filtered.map(p => {
               const isExpanded = expandedUser === p.id
+              const isSelected = selectedIds.includes(p.id)
               return (
                 <div key={p.id} className={`bg-white rounded-2xl shadow-card overflow-hidden transition-all ${!p.ativo ? 'opacity-60' : ''}`}>
                   {/* Card header - clickable */}
@@ -1102,6 +1409,16 @@ export default function AdminUsuarios() {
                     onClick={() => toggleExpand(p.id)}
                     className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-slate-50/50 transition-colors"
                   >
+                    <input
+                      type="checkbox"
+                      checked={isSelected}
+                      onChange={e => {
+                        e.stopPropagation()
+                        toggleSelectOne(p.id)
+                      }}
+                      onClick={e => e.stopPropagation()}
+                      className="w-4 h-4 rounded border-slate-300 text-primary focus:ring-primary/30"
+                    />
                     <Avatar nome={p.nome} />
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
@@ -1148,3 +1465,4 @@ export default function AdminUsuarios() {
     </>
   )
 }
+
