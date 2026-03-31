@@ -116,6 +116,10 @@ export interface GerarImagemIAPayload {
 
 export interface GerarImagemIAResponse {
   imagem_url: string
+  instrucoes?: string
+  footer_text?: string
+  cor_primaria?: string
+  cor_secundaria?: string
 }
 
 export function useGerarImagemIA() {

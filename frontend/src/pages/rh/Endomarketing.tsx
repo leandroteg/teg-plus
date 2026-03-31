@@ -278,6 +278,11 @@ function TabGerarComunicado({ identidade }: { identidade: IdentidadeVisual }) {
   const [instrucoes, setInstrucoes] = useState('')
   const gerarImagemIA = useGerarImagemIA()
   const [imagemGeradaUrl, setImagemGeradaUrl] = useState('')
+  const [imagemGeradaTexto, setImagemGeradaTexto] = useState('')
+  const [imagemGeradaFooter, setImagemGeradaFooter] = useState('')
+  const [imagemGeradaCor1, setImagemGeradaCor1] = useState('')
+  const [imagemGeradaCor2, setImagemGeradaCor2] = useState('')
+  const iaCompositeRef = useRef<HTMLDivElement | null>(null)
 
   // Step 4 shared
   const templateRef = useRef<HTMLDivElement | null>(null)
@@ -311,6 +316,10 @@ function TabGerarComunicado({ identidade }: { identidade: IdentidadeVisual }) {
       },
     })
     setImagemGeradaUrl(result.imagem_url)
+    setImagemGeradaTexto(result.instrucoes || instrucoes)
+    setImagemGeradaFooter(result.footer_text || '')
+    setImagemGeradaCor1(result.cor_primaria || identidade.cor_primaria)
+    setImagemGeradaCor2(result.cor_secundaria || identidade.cor_secundaria)
     setStep(4)
   }
 
@@ -380,11 +389,29 @@ function TabGerarComunicado({ identidade }: { identidade: IdentidadeVisual }) {
   async function handleSalvarImagemIA() {
     setSaving(true)
     try {
+      // Capture the composite (background + text overlay) using html2canvas
+      let finalUrl = imagemGeradaUrl
+      if (iaCompositeRef.current) {
+        try {
+          const { default: html2canvas } = await import('html2canvas')
+          const canvas = await html2canvas(iaCompositeRef.current, {
+            useCORS: true,
+            allowTaint: false,
+            scale: 2,
+            width: iaCompositeRef.current.offsetWidth,
+            height: iaCompositeRef.current.offsetHeight,
+          })
+          const blob: Blob = await new Promise(res => canvas.toBlob(b => res(b!), 'image/png'))
+          finalUrl = await uploadImg.mutateAsync(blob)
+        } catch {
+          // fallback to background URL if canvas fails
+        }
+      }
       await salvarCom.mutateAsync({
         tipo,
         formato,
         titulo: tipoInfo.label,
-        imagem_url: imagemGeradaUrl,
+        imagem_url: finalUrl,
         largura: fmtInfo.w,
         altura: fmtInfo.h,
         input_usuario: instrucoes,
@@ -718,7 +745,7 @@ function TabGerarComunicado({ identidade }: { identidade: IdentidadeVisual }) {
               <CheckCircle2 size={48} className="text-emerald-400" />
               <p className={`text-lg font-bold ${isLight ? 'text-emerald-700' : 'text-emerald-300'}`}>Comunicado salvo com sucesso!</p>
               <button
-                onClick={() => { setSaved(false); setStep(1); setTexto({ titulo: '', subtitulo: '', corpo: '', destaques: [], rodape: '' }); setInstrucoes(''); setImagemGeradaUrl('') }}
+                onClick={() => { setSaved(false); setStep(1); setTexto({ titulo: '', subtitulo: '', corpo: '', destaques: [], rodape: '' }); setInstrucoes(''); setImagemGeradaUrl(''); setImagemGeradaTexto(''); setImagemGeradaFooter(''); setImagemGeradaCor1(''); setImagemGeradaCor2('') }}
                 className="flex items-center gap-2 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-sm text-white font-semibold transition-colors"
               >
                 <Plus size={14} /> Novo Comunicado
@@ -773,7 +800,7 @@ function TabGerarComunicado({ identidade }: { identidade: IdentidadeVisual }) {
               <CheckCircle2 size={48} className="text-emerald-400" />
               <p className={`text-lg font-bold ${isLight ? 'text-emerald-700' : 'text-emerald-300'}`}>Comunicado salvo com sucesso!</p>
               <button
-                onClick={() => { setSaved(false); setStep(1); setTexto({ titulo: '', subtitulo: '', corpo: '', destaques: [], rodape: '' }); setInstrucoes(''); setImagemGeradaUrl('') }}
+                onClick={() => { setSaved(false); setStep(1); setTexto({ titulo: '', subtitulo: '', corpo: '', destaques: [], rodape: '' }); setInstrucoes(''); setImagemGeradaUrl(''); setImagemGeradaTexto(''); setImagemGeradaFooter(''); setImagemGeradaCor1(''); setImagemGeradaCor2('') }}
                 className="flex items-center gap-2 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-sm text-white font-semibold transition-colors"
               >
                 <Plus size={14} /> Novo Comunicado
@@ -781,21 +808,45 @@ function TabGerarComunicado({ identidade }: { identidade: IdentidadeVisual }) {
             </div>
           ) : (
             <>
+              {/* Composite: AI background + text overlay */}
               <div className="flex justify-center">
-                <div className={`rounded-2xl overflow-hidden border shadow-sm ${isLight ? 'border-slate-200' : 'border-white/10'}`}
-                  style={{ maxWidth: 480 }}>
+                <div
+                  ref={iaCompositeRef}
+                  className="relative rounded-2xl overflow-hidden border shadow-lg"
+                  style={{
+                    maxWidth: 480,
+                    width: '100%',
+                    aspectRatio: fmtInfo.aspect,
+                    background: `linear-gradient(135deg, ${imagemGeradaCor1 || '#6366f1'}, ${imagemGeradaCor2 || '#8b5cf6'})`,
+                  }}
+                >
+                  {/* Background image from Imagen */}
                   <img
                     src={imagemGeradaUrl}
-                    alt="Imagem gerada pela IA"
-                    className="w-full h-auto block"
-                    style={{ aspectRatio: FORMATOS.find(f => f.value === formato)?.aspect }}
+                    alt=""
+                    className="absolute inset-0 w-full h-full object-cover"
+                    crossOrigin="anonymous"
                   />
+                  {/* Text overlay */}
+                  <div className="absolute inset-0 flex flex-col items-center justify-center p-6" style={{ background: 'rgba(0,0,0,0.15)' }}>
+                    <p className="text-white font-bold text-center leading-snug drop-shadow-lg"
+                      style={{ fontSize: 'clamp(1rem, 4vw, 2rem)', textShadow: '0 2px 8px rgba(0,0,0,0.6)', maxWidth: '85%' }}>
+                      {imagemGeradaTexto}
+                    </p>
+                  </div>
+                  {/* Footer strip */}
+                  {imagemGeradaFooter && (
+                    <div className="absolute bottom-0 inset-x-0 px-4 py-2 text-center"
+                      style={{ background: 'rgba(0,0,0,0.45)', backdropFilter: 'blur(4px)' }}>
+                      <p className="text-white/90 text-xs font-semibold tracking-wide drop-shadow">{imagemGeradaFooter}</p>
+                    </div>
+                  )}
                 </div>
               </div>
 
               <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
                 <button
-                  onClick={() => { setImagemGeradaUrl(''); setStep(3) }}
+                  onClick={() => { setImagemGeradaUrl(''); setImagemGeradaTexto(''); setImagemGeradaFooter(''); setImagemGeradaCor1(''); setImagemGeradaCor2(''); setStep(3) }}
                   className={`flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border text-sm font-semibold transition-colors ${
                     isLight ? 'border-slate-200 text-slate-600 hover:bg-slate-50' : 'border-white/10 text-slate-400 hover:bg-white/5'
                   }`}
