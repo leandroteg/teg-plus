@@ -4,7 +4,7 @@ import {
   Users, UserPlus, Search, ChevronLeft, Shield,
   Check, X, AlertCircle, Mail, RefreshCw,
   CheckCircle, Power, Edit3, ChevronDown, ChevronUp,
-  Calendar, Clock, Briefcase, Building2, Eye,
+  Calendar, Clock, Briefcase, Building2, Lock, Eye, EyeOff,
 } from 'lucide-react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../services/supabase'
@@ -145,6 +145,29 @@ function useUpdateUser() {
   })
 }
 
+function useChangePassword() {
+  return useMutation({
+    mutationFn: async ({ auth_id, password }: { auth_id: string; password: string }) => {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) throw new Error('Sessão expirada')
+      const res = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/admin-set-password`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${session.access_token}`,
+          },
+          body: JSON.stringify({ auth_id, password }),
+        }
+      )
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error ?? 'Erro ao alterar senha')
+      return json
+    },
+  })
+}
+
 function useConvidarUsuario() {
   const { perfil: myPerfil } = useAuth()
   return useMutation({
@@ -177,19 +200,41 @@ function UserDetailPanel({
   user, onClose,
 }: { user: Perfil; onClose: () => void }) {
   const update = useUpdateUser()
+  const changePwd = useChangePassword()
   const [editing, setEditing] = useState(false)
   const [role,    setRole]    = useState<Role>(user.role)
   const [alcada,  setAlcada]  = useState(user.alcada_nivel)
   const [ativo,   setAtivo]   = useState(user.ativo)
+  const [altProxLogin, setAltProxLogin] = useState(user.alterar_senha_proximo_login ?? false)
   const [modulos, setModulos] = useState<Record<string, boolean>>(user.modulos ?? {})
   const [permEspeciais, setPermEspeciais] = useState<Record<string, any>>(user.permissoes_especiais ?? {})
+  const [novaSenha,    setNovaSenha]    = useState('')
+  const [confirmSenha, setConfirmSenha] = useState('')
+  const [showSenha,    setShowSenha]    = useState(false)
+  const [senhaError,   setSenhaError]   = useState('')
   const [success, setSuccess] = useState(false)
 
   const toggleMod = (key: string) =>
     setModulos(m => ({ ...m, [key]: !m[key] }))
 
   const handleSave = async () => {
-    await update.mutateAsync({ id: user.id, role, alcada_nivel: alcada, ativo, modulos, permissoes_especiais: permEspeciais })
+    setSenhaError('')
+    if (novaSenha) {
+      if (novaSenha.length < 6) {
+        setSenhaError('A senha deve ter pelo menos 6 caracteres')
+        return
+      }
+      if (novaSenha !== confirmSenha) {
+        setSenhaError('As senhas não coincidem')
+        return
+      }
+      await changePwd.mutateAsync({ auth_id: user.auth_id, password: novaSenha })
+    }
+    await update.mutateAsync({
+      id: user.id, role, alcada_nivel: alcada, ativo, modulos,
+      permissoes_especiais: permEspeciais,
+      alterar_senha_proximo_login: altProxLogin,
+    })
     setSuccess(true)
     setTimeout(() => { setSuccess(false); setEditing(false) }, 1200)
   }
@@ -198,8 +243,12 @@ function UserDetailPanel({
     setRole(user.role)
     setAlcada(user.alcada_nivel)
     setAtivo(user.ativo)
+    setAltProxLogin(user.alterar_senha_proximo_login ?? false)
     setModulos(user.modulos ?? {})
     setPermEspeciais(user.permissoes_especiais ?? {})
+    setNovaSenha('')
+    setConfirmSenha('')
+    setSenhaError('')
     setEditing(false)
   }
 
@@ -260,12 +309,20 @@ function UserDetailPanel({
           </div>
         )}
 
-        {/* Senha definida status */}
-        <div className="flex items-center gap-2 text-xs">
-          <span className={`w-2 h-2 rounded-full ${user.senha_definida ? 'bg-green-500' : 'bg-amber-500'}`} />
-          <span className="text-slate-500">
-            {user.senha_definida ? 'Senha definida' : 'Senha pendente (magic link)'}
-          </span>
+        {/* Senha status */}
+        <div className="flex flex-col gap-1">
+          <div className="flex items-center gap-2 text-xs">
+            <span className={`w-2 h-2 rounded-full ${user.senha_definida ? 'bg-green-500' : 'bg-amber-500'}`} />
+            <span className="text-slate-500">
+              {user.senha_definida ? 'Senha definida' : 'Senha pendente (magic link)'}
+            </span>
+          </div>
+          {user.alterar_senha_proximo_login && (
+            <div className="flex items-center gap-2 text-xs">
+              <span className="w-2 h-2 rounded-full bg-orange-400" />
+              <span className="text-orange-600 font-medium">Redefinição de senha pendente no próximo login</span>
+            </div>
+          )}
         </div>
       </div>
 
@@ -368,22 +425,80 @@ function UserDetailPanel({
             </div>
           )}
 
-          {/* Ativo/inativo */}
-          <div className="flex items-center justify-between bg-white rounded-xl px-4 py-3">
-            <div>
-              <p className="text-xs font-semibold text-navy">Conta ativa</p>
-              <p className="text-[10px] text-slate-400">Usuário pode fazer login</p>
+          {/* Senha */}
+          <div className="space-y-2">
+            <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+              Alterar Senha <span className="normal-case font-normal text-slate-400">(deixe em branco para manter)</span>
+            </label>
+            <div className="relative">
+              <Lock size={12} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+              <input
+                type={showSenha ? 'text' : 'password'}
+                value={novaSenha}
+                onChange={e => { setNovaSenha(e.target.value); setSenhaError('') }}
+                placeholder="Nova senha"
+                className="w-full pl-8 pr-9 py-2 rounded-xl border border-slate-200 text-xs
+                  focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary bg-slate-50 focus:bg-white"
+              />
+              <button type="button" onClick={() => setShowSenha(v => !v)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
+                {showSenha ? <EyeOff size={12} /> : <Eye size={12} />}
+              </button>
             </div>
-            <button onClick={() => setAtivo(v => !v)}
-              className={`w-11 h-6 rounded-full transition-colors relative ${ativo ? 'bg-green-500' : 'bg-slate-300'}`}>
-              <span className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-all ${ativo ? 'right-0.5' : 'left-0.5'}`} />
-            </button>
+            {novaSenha && (
+              <div className="relative">
+                <Lock size={12} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                <input
+                  type={showSenha ? 'text' : 'password'}
+                  value={confirmSenha}
+                  onChange={e => { setConfirmSenha(e.target.value); setSenhaError('') }}
+                  placeholder="Confirmar nova senha"
+                  className="w-full pl-8 pr-4 py-2 rounded-xl border border-slate-200 text-xs
+                    focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary bg-slate-50 focus:bg-white"
+                />
+              </div>
+            )}
+            {senhaError && (
+              <div className="flex items-center gap-1.5 text-red-600 text-xs">
+                <AlertCircle size={11} /> {senhaError}
+              </div>
+            )}
+          </div>
+
+          {/* Checkboxes: ativo + alterar senha próximo login */}
+          <div className="space-y-2 bg-white rounded-xl px-4 py-3">
+            <label className="flex items-center gap-3 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={ativo}
+                onChange={e => setAtivo(e.target.checked)}
+                className="w-4 h-4 rounded border-slate-300 text-primary focus:ring-primary/30 cursor-pointer"
+              />
+              <div>
+                <p className="text-xs font-semibold text-navy">Conta ativa</p>
+                <p className="text-[10px] text-slate-400">Usuário pode fazer login</p>
+              </div>
+            </label>
+            <div className="border-t border-slate-100" />
+            <label className="flex items-center gap-3 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={altProxLogin}
+                onChange={e => setAltProxLogin(e.target.checked)}
+                className="w-4 h-4 rounded border-slate-300 text-amber-500 focus:ring-amber-400/30 cursor-pointer"
+              />
+              <div>
+                <p className="text-xs font-semibold text-navy">Alterar senha no próximo login</p>
+                <p className="text-[10px] text-slate-400">Usuário será obrigado a redefinir a senha</p>
+              </div>
+            </label>
           </div>
 
           {/* Error */}
-          {update.isError && (
+          {(update.isError || changePwd.isError) && (
             <div className="flex items-center gap-2 bg-red-50 text-red-600 rounded-xl px-3 py-2 text-xs">
-              <AlertCircle size={12} /> Erro ao salvar. Tente novamente.
+              <AlertCircle size={12} />
+              {changePwd.isError ? (changePwd.error as Error)?.message : 'Erro ao salvar. Tente novamente.'}
             </div>
           )}
 
@@ -393,12 +508,12 @@ function UserDetailPanel({
               className="flex-1 py-2.5 rounded-xl border border-slate-200 text-xs font-semibold text-slate-600 hover:bg-white transition-colors">
               Cancelar
             </button>
-            <button onClick={handleSave} disabled={update.isPending || success}
+            <button onClick={handleSave} disabled={update.isPending || changePwd.isPending || success}
               className="flex-1 py-2.5 rounded-xl bg-primary text-white font-semibold text-xs
                 flex items-center justify-center gap-1.5 hover:bg-indigo-500 disabled:opacity-60 transition-all">
               {success
                 ? <><CheckCircle size={13} /> Salvo!</>
-                : update.isPending
+                : (update.isPending || changePwd.isPending)
                   ? <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                   : <><Check size={13} /> Salvar alterações</>}
             </button>
@@ -668,7 +783,7 @@ export default function AdminUsuarios() {
                         <p className="text-sm font-bold text-navy truncate">{p.nome}</p>
                         {!p.ativo && <span className="text-[10px] bg-red-100 text-red-600 rounded-full px-1.5 py-0.5 font-semibold">Inativo</span>}
                       </div>
-                      <p className="text-xs text-slate-400 truncate">{p.email}</p>
+                      <p className="text-xs text-slate-400 truncate">{p.email.split('@')[0]}</p>
                       <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
                         <RoleBadge role={p.role} />
                         {p.alcada_nivel > 0 && (
