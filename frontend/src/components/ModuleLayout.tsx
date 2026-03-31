@@ -344,24 +344,28 @@ export default function ModuleLayout({
     () => (isRequisitante ? visibleNav.filter(isNovaSolicitacaoItem) : visibleNav),
     [isRequisitante, visibleNav]
   )
-  const allowedRequisitantePaths = useMemo(
-    () => visibleNav.filter(isNovaSolicitacaoItem).map(item => item.to),
-    [visibleNav]
-  )
+  // home do módulo = primeiro item com end:true
+  const homeRoute = config.nav.find(n => n.end === true)?.to ?? '/'
+
+  const allowedRequisitantePaths = useMemo(() => {
+    const paths = new Set<string>()
+    paths.add(homeRoute)
+    visibleNav.filter(isNovaSolicitacaoItem).forEach(item => paths.add(item.to))
+    return Array.from(paths)
+  }, [visibleNav, homeRoute])
 
   useEffect(() => {
     if (!isRequisitante) return
 
-    if (allowedRequisitantePaths.length === 0) {
-      if (location.pathname !== '/') navigate('/', { replace: true })
-      return
-    }
+    // Permite qualquer URL com ?nova= (fluxo de criação via modal)
+    const isNovaFlow = new URLSearchParams(location.search).has('nova')
+    if (isNovaFlow) return
 
     const canAccess = allowedRequisitantePaths.some(path =>
       location.pathname === path || location.pathname.startsWith(`${path}/`)
     )
-    if (!canAccess) navigate(allowedRequisitantePaths[0], { replace: true })
-  }, [isRequisitante, allowedRequisitantePaths, location.pathname, navigate])
+    if (!canAccess) navigate(homeRoute, { replace: true })
+  }, [isRequisitante, allowedRequisitantePaths, homeRoute, location.pathname, location.search, navigate])
 
   async function handleLogout() {
     await signOut()

@@ -10,7 +10,7 @@ export default function FiscalLayout() {
 
   const NAV: NavItem[] = [
     { to: '/fiscal',             icon: LayoutDashboard, label: 'Painel',                  end: true },
-    { to: '/fiscal/pipeline', icon: Plus, label: 'Nova Solicitação', end: false, action: () => navigate(`/fiscal/pipeline?nova=${Date.now()}`), accent: true, requisitanteAllowed: true },
+    { to: '/fiscal', icon: Plus, label: 'Nova Solicitação', end: false, action: () => navigate(`/fiscal/pipeline?nova=${Date.now()}`), accent: true, requisitanteAllowed: true },
     { to: '/fiscal/pipeline',    icon: Kanban,          label: 'Emissão de Nota Fiscal',   end: false },
     { to: '/fiscal/historico',   icon: ClipboardList,   label: 'Histórico NF',             end: false },
   ]

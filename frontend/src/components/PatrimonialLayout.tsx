@@ -11,7 +11,7 @@ export default function PatrimonialLayout() {
   const NAV: NavItem[] = [
     { to: '/patrimonial', icon: LayoutDashboard, label: 'Painel', end: true },
     {
-      to: '/patrimonial/movimentacoes',
+      to: '/patrimonial',
       icon: Plus,
       label: 'Nova Movimenta\u00e7\u00e3o',
       action: () => navigate('/patrimonial/movimentacoes?nova=1'),

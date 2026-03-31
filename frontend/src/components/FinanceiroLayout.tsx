@@ -10,7 +10,7 @@ export default function FinanceiroLayout() {
   const NAV = [
     { to: '/financeiro',                      icon: LayoutDashboard, label: 'Painel',           end: true },
     {
-      to: '/financeiro/contas-a-pagar',
+      to: '/financeiro',
       icon: Plus,
       label: 'Nova Solicitação',
       end: false,
