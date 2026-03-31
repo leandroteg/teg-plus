@@ -5,6 +5,7 @@ import {
   RefreshCw, Settings, TrendingUp, AlertTriangle,
   Package, ChevronRight, ShoppingCart, Timer,
   ArrowRight, CalendarClock, XCircle, Zap,
+  CalendarDays, MapPin,
 } from 'lucide-react'
 import { useDashboard } from '../hooks/useDashboard'
 import { useRequisicoes } from '../hooks/useRequisicoes'
@@ -127,14 +128,6 @@ function HorizontalStatusBar({
           })}
         </div>
       )}
-      <div className="flex flex-wrap gap-x-3 gap-y-1 mt-2">
-        {segments.map(seg => (
-          <span key={seg.key} className="flex items-center gap-1 text-[10px] text-slate-500">
-            <span className={`w-2 h-2 rounded-full ${seg.barClass}`} />
-            {seg.label}: <span className={`font-bold ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>{seg.value}</span>
-          </span>
-        ))}
-      </div>
     </div>
   )
 }
@@ -485,32 +478,36 @@ export default function Dashboard() {
 
       {/* Filtros */}
       <div className="flex items-center gap-2">
-        <div className="flex gap-1 flex-1">
-          {[['semana', 'Sem'], ['mes', 'Mês'], ['trimestre', 'Trim'], ['tudo', 'Tudo']].map(([val, lbl]) => (
+        <div className={`flex items-center gap-0.5 p-1 rounded-2xl ${isDark ? 'bg-white/[0.04] border border-white/[0.06]' : 'bg-slate-100 border border-slate-200'}`}>
+          <CalendarDays size={11} className={`ml-1.5 mr-0.5 shrink-0 ${isDark ? 'text-slate-500' : 'text-slate-400'}`} />
+          {[['semana', '7d'], ['mes', '30d'], ['trimestre', '90d'], ['tudo', '∞']].map(([val, lbl]) => (
             <button key={val} onClick={() => setPeriodo(val)}
-              className={`px-2.5 py-1.5 rounded-full text-[11px] font-semibold transition-all ${
+              className={`px-2.5 py-1 rounded-xl text-[11px] font-bold transition-all ${
                 periodo === val
                   ? 'bg-teal-600 text-white shadow-sm'
-                  : isDark ? 'bg-white/5 text-slate-400 border border-white/10' : 'bg-white text-slate-500 border border-slate-200'
+                  : isDark ? 'text-slate-400 hover:text-slate-200' : 'text-slate-500 hover:text-slate-700'
               }`}>
               {lbl}
             </button>
           ))}
         </div>
-        <select
-          value={obraFilter}
-          onChange={e => setObraFilter(e.target.value)}
-          className={`text-[11px] font-semibold rounded-full px-2.5 py-1.5 border transition-all appearance-none cursor-pointer max-w-[140px] truncate ${
-            obraFilter
-              ? 'bg-teal-50 border-teal-300 text-teal-700'
-              : isDark ? 'bg-white/5 border-white/10 text-slate-400' : 'bg-white border-slate-200 text-slate-500'
-          }`}
-        >
-          <option value="">Todas obras</option>
-          {obras.map(o => (
-            <option key={o.id} value={o.id}>{o.codigo ? `${o.codigo} - ` : ''}{o.nome}</option>
-          ))}
-        </select>
+        <div className="relative flex items-center">
+          <MapPin size={11} className={`absolute left-2.5 pointer-events-none z-10 ${obraFilter ? 'text-teal-600' : isDark ? 'text-slate-500' : 'text-slate-400'}`} />
+          <select
+            value={obraFilter}
+            onChange={e => setObraFilter(e.target.value)}
+            className={`text-[11px] font-semibold rounded-2xl pl-7 pr-3 py-2 border transition-all appearance-none cursor-pointer max-w-[140px] truncate ${
+              obraFilter
+                ? 'bg-teal-50 border-teal-300 text-teal-700'
+                : isDark ? 'bg-white/[0.04] border-white/[0.06] text-slate-400' : 'bg-slate-100 border-slate-200 text-slate-500'
+            }`}
+          >
+            <option value="">Todas obras</option>
+            {obras.map(o => (
+              <option key={o.id} value={o.id}>{o.codigo ? `${o.codigo} - ` : ''}{o.nome}</option>
+            ))}
+          </select>
+        </div>
       </div>
 
       {/* Hero 2 colunas */}
@@ -524,11 +521,14 @@ export default function Dashboard() {
                 <p className={`text-[11px] font-bold uppercase tracking-[0.24em] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
                   Núcleo de Compras
                 </p>
-                <h2 className={`mt-1.5 text-[1.9rem] md:text-[2.45rem] leading-none font-black tracking-tight ${isDark ? 'text-white' : 'text-slate-900'}`}>
+                <p className={`mt-1 text-[11px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+                  Total em compras no período
+                </p>
+                <h2 className={`mt-0.5 text-[1.4rem] md:text-[1.85rem] leading-none font-black tracking-tight ${isDark ? 'text-white' : 'text-slate-900'}`}>
                   {fmt(kpis.valor_total_mes)}
                 </h2>
-                <p className={`mt-2 text-[13px] ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
-                  {kpis.total_mes} RC(s) no período · {kpis.aguardando_aprovacao} aguardando aprovação · {kpis.aprovadas_mes} aprovadas
+                <p className={`mt-2 text-[11px] ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+                  {kpis.total_mes} RC(s) · {kpis.aguardando_aprovacao} aguard. aprov. · {kpis.aprovadas_mes} aprovadas
                 </p>
               </div>
               <div className={`hidden md:flex w-12 h-12 rounded-2xl items-center justify-center ${isDark ? 'bg-teal-500/10' : 'bg-teal-50'}`}>
@@ -550,10 +550,10 @@ export default function Dashboard() {
                 note={kpis.aguardando_aprovacao > 5 ? 'atenção: fila alta' : 'fila sob controle'}
               />
               <SpotlightMetric
-                label="Valor Total"
-                value={fmt(kpis.valor_total_mes)}
-                tone="indigo"
-                note="em compras no período"
+                label="Aprovadas"
+                value={kpis.aprovadas_mes}
+                tone="emerald"
+                note="no período selecionado"
               />
               <SpotlightMetric
                 label="Tempo Médio Aprov."
@@ -568,48 +568,42 @@ export default function Dashboard() {
         {/* Janela Crítica */}
         <section className={`rounded-3xl shadow-sm overflow-hidden ${cardClass}`}>
           <div className="p-4 md:p-5 space-y-3">
-            <div className="flex items-start justify-between gap-3">
+            <div className="flex items-center justify-between gap-3">
               <div>
                 <p className={`text-[11px] font-bold uppercase tracking-[0.24em] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
                   Janela Crítica
                 </p>
-                <h2 className={`mt-1.5 text-base md:text-[17px] font-black ${isDark ? 'text-white' : 'text-slate-900'}`}>
+                <h2 className={`mt-0.5 text-sm font-black ${isDark ? 'text-white' : 'text-slate-900'}`}>
                   O que exige ação agora
                 </h2>
               </div>
-              <div className={`w-10 h-10 rounded-2xl flex items-center justify-center ${urgentes.length > 0 ? 'bg-red-50' : isDark ? 'bg-white/5' : 'bg-slate-50'}`}>
-                <AlertTriangle size={16} className={urgentes.length > 0 ? 'text-red-500' : 'text-slate-400'} />
+              <div className={`w-8 h-8 rounded-xl flex items-center justify-center ${urgentes.length > 0 ? 'bg-red-50' : isDark ? 'bg-white/5' : 'bg-slate-50'}`}>
+                <AlertTriangle size={14} className={urgentes.length > 0 ? 'text-red-500' : 'text-slate-400'} />
               </div>
             </div>
-
-            <div className={`rounded-2xl p-3 ${urgentes.length > 0 ? 'bg-red-50 border border-red-100' : isDark ? 'bg-white/[0.03] border border-white/[0.06]' : 'bg-slate-50 border border-slate-100'}`}>
-              <div className="flex items-end justify-between gap-3">
-                <div>
-                  <p className={`text-[11px] font-bold uppercase tracking-widest ${urgentes.length > 0 ? 'text-red-600' : isDark ? 'text-slate-400' : 'text-slate-500'}`}>
-                    Urgentes Pendentes
-                  </p>
-                  <p className={`mt-1.5 text-[2rem] leading-none font-black ${urgentes.length > 0 ? 'text-red-600' : isDark ? 'text-white' : 'text-slate-800'}`}>
-                    {urgentes.length}
-                  </p>
-                </div>
-                <div className="text-right">
-                  <p className={`text-xs font-semibold ${vencidasAVencer.length > 0 ? 'text-amber-600' : isDark ? 'text-slate-400' : 'text-slate-500'}`}>
-                    {vencidasAVencer.length} vencidas/à vencer
-                  </p>
-                  <p className={`text-[10px] mt-0.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
-                    prazo: data de necessidade
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-2.5">
+            <div className="grid grid-cols-2 gap-2">
+              <MiniInfoCard
+                label="Urgentes"
+                value={urgentes.length}
+                note={urgentes.length > 0 ? 'requerem ação' : 'tudo ok'}
+                icon={Zap}
+                iconTone={urgentes.length > 0 ? 'text-red-500' : 'text-slate-400'}
+                isDark={isDark}
+              />
+              <MiniInfoCard
+                label="Vencidas/À Vencer"
+                value={vencidasAVencer.length}
+                note="data de necessidade"
+                icon={CalendarClock}
+                iconTone={vencidasAVencer.length > 0 ? 'text-amber-500' : 'text-slate-400'}
+                isDark={isDark}
+              />
               <MiniInfoCard
                 label="Rejeitadas"
                 value={kpis.rejeitadas_mes}
                 note="no período"
                 icon={XCircle}
-                iconTone="text-red-500"
+                iconTone="text-red-400"
                 isDark={isDark}
               />
               <MiniInfoCard
@@ -631,40 +625,14 @@ export default function Dashboard() {
           <h2 className={`text-sm font-extrabold flex items-center gap-1.5 ${isDark ? 'text-white' : 'text-slate-800'}`}>
             <TrendingUp size={14} className="text-teal-500" /> Pulso por Status
           </h2>
-          {pipelineFilter !== null && (
-            <button onClick={() => setPipelineFilter(null)} className="text-[10px] text-teal-600 font-semibold">
-              Ver todos ×
-            </button>
-          )}
         </div>
-        <div className="p-4 space-y-3">
+        <div className="px-4 py-3">
           <HorizontalStatusBar
             isDark={isDark}
             title="Distribuição atual do pipeline"
             emptyLabel="Nenhuma RC no período"
             segments={statusSegments}
           />
-          <div className="grid grid-cols-7 gap-1 pt-1">
-            {PIPELINE_ETAPAS.map((etapa, i) => {
-              const count = pipelineContagens[i]
-              const active = pipelineFilter === i
-              return (
-                <button key={etapa.key} onClick={() => setPipelineFilter(active ? null : i)}
-                  className={`flex flex-col items-center gap-1 p-2 rounded-xl border transition-all ${
-                    active
-                      ? `${etapa.bg} ${etapa.border} shadow-sm`
-                      : isDark ? 'bg-white/[0.03] border-white/[0.06] hover:bg-white/[0.06]' : 'bg-white border-slate-200 hover:border-slate-300'
-                  }`}>
-                  <span className={`text-base font-extrabold leading-none ${active ? etapa.color : count > 0 ? (isDark ? 'text-slate-300' : 'text-slate-700') : isDark ? 'text-slate-600' : 'text-slate-300'}`}>
-                    {count}
-                  </span>
-                  <span className={`text-[8px] font-semibold text-center leading-tight ${active ? etapa.color : isDark ? 'text-slate-500' : 'text-slate-400'}`}>
-                    {etapa.label}
-                  </span>
-                </button>
-              )
-            })}
-          </div>
         </div>
       </section>
 
