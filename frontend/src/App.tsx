@@ -32,6 +32,7 @@ import LogisticaLayout from './components/LogisticaLayout'
 import FrotasLayout from './components/FrotasLayout'
 import CulturaLayout from './components/CulturaLayout'
 import HeadcountLayout from './components/HeadcountLayout'
+import ApontamentosLayout from './components/ApontamentosLayout'
 
 // ── Páginas lazy (code-split por rota) ────────────────────────────────────────
 const ModuloSelector = lazy(() => import('./pages/ModuloSelector'))
@@ -136,6 +137,10 @@ const Tesouraria = lazy(() => import('./pages/financeiro/Tesouraria'))
 const Relatorios = lazy(() => import('./pages/financeiro/Relatorios'))
 const Configuracoes = lazy(() => import('./pages/financeiro/Configuracoes'))
 
+// Apontamentos
+const ApontamentosHome = lazy(() => import('./pages/apontamentos/ApontamentosHome'))
+const ApontamentosCartao = lazy(() => import('./pages/apontamentos/ApontamentosCartao'))
+
 // Fiscal
 const NotasFiscais = lazy(() => import('./pages/financeiro/NotasFiscais'))
 const FiscalPipeline = lazy(() => import('./pages/fiscal/FiscalPipeline'))
@@ -227,6 +232,15 @@ export default function App() {
               <Route path="/financeiro/tesouraria"    element={<Lazy><Tesouraria /></Lazy>} />
               <Route path="/financeiro/relatorios"   element={<Lazy><Relatorios /></Lazy>} />
               <Route path="/financeiro/configuracoes" element={<Navigate to="/admin/integracoes" replace />} />
+            </Route>
+          </Route>
+
+          {/* Módulo Apontamentos */}
+          <Route element={<ModuleRoute moduleKey="apontamentos" />}>
+            <Route element={<ApontamentosLayout />}>
+              <Route path="/apontamentos" element={<Lazy><ApontamentosHome /></Lazy>} />
+              <Route path="/apontamentos/novo" element={<Navigate to="/apontamentos/realizados" replace />} />
+              <Route path="/apontamentos/realizados" element={<Lazy><ApontamentosCartao /></Lazy>} />
             </Route>
           </Route>
 
