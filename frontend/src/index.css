@@ -225,6 +225,44 @@
    Keyframes globais
    ══════════════════════════════════════════════════════════════════════════════ */
 
+/* ── Page enter animation ──────────────── */
+@keyframes pageEnter {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.animate-page-enter {
+  animation: pageEnter 0.25s ease-out both;
+}
+
+/* ── Skeleton shimmer ──────────────────── */
+@keyframes shimmerSkeleton {
+  0%   { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+.skeleton-shimmer {
+  background: linear-gradient(90deg,
+    transparent 0%, rgba(148,163,184,0.08) 50%, transparent 100%);
+  background-size: 200% 100%;
+  animation: shimmerSkeleton 1.5s ease-in-out infinite;
+}
+[data-theme="dark"] .skeleton-shimmer {
+  background: linear-gradient(90deg,
+    transparent 0%, rgba(148,163,184,0.05) 50%, transparent 100%);
+  background-size: 200% 100%;
+  animation: shimmerSkeleton 1.5s ease-in-out infinite;
+}
+
+/* ── Bounce in ─────────────────────────── */
+@keyframes bounceIn {
+  0%   { transform: scale(0.3); opacity: 0; }
+  50%  { transform: scale(1.05); }
+  70%  { transform: scale(0.9); }
+  100% { transform: scale(1); opacity: 1; }
+}
+.animate-bounce-in {
+  animation: bounceIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) both;
+}
+
 /* Ken Burns — zoom suave nas imagens do slideshow */
 @keyframes kenBurns {
   0%   { transform: scale(1)    translate(0%,    0%); }
