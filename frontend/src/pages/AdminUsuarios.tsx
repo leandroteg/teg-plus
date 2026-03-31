@@ -301,10 +301,12 @@ function ModuloCheckboxGroup({
   modulos,
   onToggle,
   onSetAll,
+  disabled = false,
 }: {
   modulos: Record<string, boolean>
   onToggle: (key: string) => void
   onSetAll: (keys: string[], val: boolean) => void
+  disabled?: boolean
 }) {
   const allKeys = MODULOS_ERP.map(m => m.key)
   const selectedCount = allKeys.filter(k => modulos[k]).length
@@ -316,11 +318,11 @@ function ModuloCheckboxGroup({
           Módulos ({selectedCount} de {allKeys.length})
         </label>
         <div className="flex gap-1.5">
-          <button type="button" onClick={() => onSetAll(allKeys, true)}
-            className="text-[10px] font-semibold text-primary hover:underline">Todos</button>
+          <button type="button" onClick={() => onSetAll(allKeys, true)} disabled={disabled}
+            className="text-[10px] font-semibold text-primary hover:underline disabled:opacity-40 disabled:cursor-not-allowed">Todos</button>
           <span className="text-slate-300">·</span>
-          <button type="button" onClick={() => onSetAll(allKeys, false)}
-            className="text-[10px] font-semibold text-slate-400 hover:underline">Nenhum</button>
+          <button type="button" onClick={() => onSetAll(allKeys, false)} disabled={disabled}
+            className="text-[10px] font-semibold text-slate-400 hover:underline disabled:opacity-40 disabled:cursor-not-allowed">Nenhum</button>
         </div>
       </div>
       <div className="space-y-2.5">
@@ -333,9 +335,10 @@ function ModuloCheckboxGroup({
                   className={`flex items-center gap-1.5 px-2 py-1.5 rounded-lg cursor-pointer transition-all text-xs
                     ${modulos[key]
                       ? 'bg-primary/8 text-primary font-semibold'
-                      : 'text-slate-500 hover:bg-slate-50'}`}>
+                      : 'text-slate-500 hover:bg-slate-50'} ${disabled ? 'opacity-55 cursor-not-allowed' : ''}`}>
                   <input
                     type="checkbox"
+                    disabled={disabled}
                     checked={!!modulos[key]}
                     onChange={() => onToggle(key)}
                     className="w-3.5 h-3.5 rounded border-slate-300 text-primary focus:ring-primary/30 cursor-pointer"
@@ -357,17 +360,19 @@ function ModuloPapelEditor({
   modulos,
   moduloPapeis,
   onChange,
+  disabled = false,
 }: {
   modulos: Record<string, boolean>
   moduloPapeis: Record<string, PapelGlobal>
   onChange: (modulo: string, papel: PapelGlobal | '') => void
+  disabled?: boolean
 }) {
   const ativos = MODULOS_ERP.filter(mod => Boolean(modulos?.[mod.key]))
 
   if (ativos.length === 0) {
     return (
       <div className="rounded-xl border border-dashed border-slate-200 px-3 py-2 text-xs text-slate-400">
-        Marque ao menos um modulo para definir papel por modulo.
+        Marque ao menos um módulo para definir papel por módulo.
       </div>
     )
   }
@@ -382,10 +387,11 @@ function ModuloPapelEditor({
           </div>
           <select
             value={moduloPapeis[mod.key] ?? ''}
+            disabled={disabled}
             onChange={e => onChange(mod.key, e.target.value as PapelGlobal | '')}
-            className="px-2.5 py-1.5 rounded-lg border border-slate-200 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+            className="px-2.5 py-1.5 rounded-lg border border-slate-200 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary disabled:opacity-60 disabled:cursor-not-allowed"
           >
-            <option value="">Requisitante (padrao)</option>
+            <option value="">Requisitante (padrão)</option>
             {PAPEIS.map(p => (
               <option key={p.value} value={p.value}>{p.label}</option>
             ))}
@@ -1239,8 +1245,8 @@ function BatchEditModal({
       <div className="bg-white w-full sm:max-w-3xl rounded-t-3xl sm:rounded-2xl shadow-2xl overflow-hidden">
         <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
           <div>
-            <h3 className="font-bold text-navy text-base">Edicao em lote</h3>
-            <p className="text-xs text-slate-400 mt-0.5">{selectedCount} usuario(s) selecionado(s)</p>
+            <h3 className="font-bold text-navy text-base">Edição em lote</h3>
+            <p className="text-xs text-slate-400 mt-0.5">{selectedCount} usuário(s) selecionado(s)</p>
           </div>
           <button onClick={onClose} className="text-slate-400 hover:text-slate-600">
             <X size={18} />
@@ -1254,7 +1260,7 @@ function BatchEditModal({
               onClick={onSelectVisible}
               className="px-3 py-1.5 rounded-lg border border-slate-200 text-xs font-semibold text-slate-600 hover:bg-slate-50"
             >
-              {allVisibleSelected ? 'Desmarcar visiveis' : 'Selecionar visiveis'}
+              {allVisibleSelected ? 'Desmarcar visíveis' : 'Selecionar visíveis'}
             </button>
             <button
               type="button"
@@ -1273,18 +1279,18 @@ function BatchEditModal({
                 onChange={e => onBulkPapel(e.target.value as PapelGlobal | '')}
                 className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
               >
-                <option value="">Nao alterar</option>
+                <option value="">Não alterar</option>
                 {PAPEIS.map(p => <option key={p.value} value={p.value}>{p.label}</option>)}
               </select>
             </div>
             <div>
-              <label className="block text-[11px] font-semibold text-slate-500 mb-1">Alcada</label>
+              <label className="block text-[11px] font-semibold text-slate-500 mb-1">Alçada</label>
               <select
                 value={bulkAlcada}
                 onChange={e => onBulkAlcada(e.target.value === '' ? '' : Number(e.target.value))}
                 className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
               >
-                <option value="">Nao alterar</option>
+                <option value="">Não alterar</option>
                 {[0, 1, 2, 3, 4].map(n => (
                   <option key={n} value={n}>{ALCADA_LABEL[n]}</option>
                 ))}
@@ -1300,22 +1306,33 @@ function BatchEditModal({
                 onChange={e => onBulkTouchSetores(e.target.checked)}
                 className="rounded border-slate-300 text-primary focus:ring-primary/30"
               />
-              Alterar areas/modulos
+              Aplicar alterações em áreas/módulos
             </label>
-            {bulkTouchSetores && (
-              <div className="rounded-xl border border-slate-100 p-2.5 bg-slate-50/60 space-y-3">
-                <ModuloCheckboxGroup modulos={bulkModulos} onToggle={onToggleModulo} onSetAll={onSetAllModulos} />
-                <div className="rounded-lg border border-slate-100 bg-white p-2.5 space-y-2">
-                  <label className="text-[11px] font-semibold text-slate-500">Papel no modulo</label>
-                  <ModuloPapelEditor
-                    modulos={bulkModulos}
-                    moduloPapeis={bulkModuloPapeis}
-                    onChange={onBulkModuloPapel}
-                  />
-                  <p className="text-[10px] text-slate-400">Nao definido = Requisitante.</p>
-                </div>
+            <div className={`rounded-xl border border-slate-100 p-2.5 space-y-3 transition-all ${bulkTouchSetores ? 'bg-slate-50/60' : 'bg-slate-50/30'}`}>
+              <div className="rounded-lg border border-slate-100 bg-white p-2.5">
+                <ModuloCheckboxGroup
+                  modulos={bulkModulos}
+                  onToggle={onToggleModulo}
+                  onSetAll={onSetAllModulos}
+                  disabled={!bulkTouchSetores}
+                />
               </div>
-            )}
+              <div className="rounded-lg border border-slate-100 bg-white p-2.5 space-y-2">
+                <label className="text-[11px] font-semibold text-slate-500">Papel no módulo</label>
+                <ModuloPapelEditor
+                  modulos={bulkModulos}
+                  moduloPapeis={bulkModuloPapeis}
+                  onChange={onBulkModuloPapel}
+                  disabled={!bulkTouchSetores}
+                />
+                <p className="text-[10px] text-slate-400">Não definido = Requisitante.</p>
+              </div>
+              {!bulkTouchSetores && (
+                <p className="text-[11px] text-slate-500">
+                  Ative a opção acima para aplicar alterações de módulos e papel por módulo.
+                </p>
+              )}
+            </div>
           </div>
 
           {errorMessage && (
@@ -1341,7 +1358,7 @@ function BatchEditModal({
             >
               {isPending
                 ? <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                : <><Check size={13} /> Aplicar em {selectedCount} usuario(s)</>}
+                : <><Check size={13} /> Aplicar em {selectedCount} usuário(s)</>}
             </button>
           </div>
         </div>
