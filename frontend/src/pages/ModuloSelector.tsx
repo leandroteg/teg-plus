@@ -425,7 +425,7 @@ export default function ModuloSelector() {
       )}
 
       {/* ── Header ──────────────────────────────────────────────── */}
-      <header className="relative z-10 flex items-center justify-between px-5 sm:px-8 pt-5 animate-fade-in">
+      <header className="relative z-40 flex items-center justify-between px-5 sm:px-8 pt-5 animate-fade-in">
         <div className="flex items-center gap-2.5">
           <div className={`w-1.5 h-1.5 rounded-full animate-pulse ${isLight ? 'bg-teal-500' : 'bg-teal-400'}`} />
           <span className={`text-[11px] font-semibold uppercase tracking-widest ${isLight ? 'text-teal-600' : 'text-teal-400/70'}`}>TEG+ ERP</span>
@@ -479,7 +479,7 @@ export default function ModuloSelector() {
       </header>
 
       {/* ── Main content ────────────────────────────────────────── */}
-      <section className="relative z-10 flex-1 flex flex-col items-center justify-center px-4 py-2 sm:py-8 lg:py-4">
+      <section className="relative z-0 flex-1 flex flex-col items-center justify-center px-4 py-2 sm:py-8 lg:py-4">
 
         {/* Mobile greeting (hidden on sm+) */}
         <p className={`text-sm font-semibold mb-1 sm:hidden ${isLight ? 'text-slate-700' : 'text-white/90'}`}>
