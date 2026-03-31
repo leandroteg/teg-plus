@@ -1857,6 +1857,7 @@ export default function AdminUsuarios() {
                   {filtered.map(p => {
                     const isSelected = selectedIds.includes(p.id)
                     const enabledModules = Object.values(p.modulos ?? {}).filter(Boolean).length
+                    const displayPapel = resolvePapelFromPerfil(p) as Role
                     return (
                       <tr key={p.id} className="border-b border-slate-100 hover:bg-slate-50/60">
                         <td className="px-3 py-3">
@@ -1875,7 +1876,7 @@ export default function AdminUsuarios() {
                         </td>
                         <td className="px-3 py-3 text-slate-500">{p.email}</td>
                         <td className="px-3 py-3">
-                          <RoleBadge role={(p.papel_global as Role) || p.role} />
+                          <RoleBadge role={displayPapel} />
                         </td>
                         <td className="px-3 py-3 text-slate-600 text-xs">{ALCADA_LABEL[p.alcada_nivel]}</td>
                         <td className="px-3 py-3 text-slate-500 text-xs">{enabledModules} modulo(s)</td>
@@ -1913,6 +1914,7 @@ export default function AdminUsuarios() {
             {filtered.map(p => {
               const isExpanded = expandedUser === p.id
               const isSelected = selectedIds.includes(p.id)
+              const displayPapel = resolvePapelFromPerfil(p) as Role
               return (
                 <div key={p.id} className={`bg-white rounded-2xl shadow-card overflow-hidden transition-all ${!p.ativo ? 'opacity-60' : ''}`}>
                   {/* Card header - clickable */}
@@ -1938,7 +1940,7 @@ export default function AdminUsuarios() {
                       </div>
                       <p className="text-xs text-slate-400 truncate">{p.email}</p>
                       <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
-                        <RoleBadge role={(p.papel_global as Role) || p.role} />
+                        <RoleBadge role={displayPapel} />
                         {p.alcada_nivel > 0 && (
                           <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-navy/10 text-navy text-[10px] font-semibold">
                             <Shield size={9} /> N{p.alcada_nivel}
