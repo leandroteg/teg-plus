@@ -425,21 +425,21 @@ export default function ModuleLayout({
 
   function renderRequisitanteNav() {
     const novaSolicitacaoItem = visibleNav.find(isNovaSolicitacaoItem)
+    if (!novaSolicitacaoItem) return null
+    const Icon = novaSolicitacaoItem.icon
     return (
       <div className="flex flex-col gap-2 px-1 py-2">
-        {novaSolicitacaoItem && (
-          <NavLink
-            to={novaSolicitacaoItem.to}
-            className={`flex items-center justify-center gap-2 px-4 py-3 rounded-xl text-sm font-semibold transition-all shadow-sm
-              ${ls
-                ? `${a.badgeBgLight} ${a.textLight} hover:opacity-90 active:scale-95`
-                : `${a.badgeBgDark} ${a.textDark} hover:opacity-90 active:scale-95`
-              }`}
-          >
-            <Plus size={16} strokeWidth={2.5} />
-            Nova Solicitação
-          </NavLink>
-        )}
+        <NavLink
+          to={novaSolicitacaoItem.to}
+          className={`flex items-center justify-center gap-2 px-4 py-3 rounded-xl text-sm font-semibold transition-all shadow-sm
+            ${ls
+              ? `${a.badgeBgLight} ${a.textLight} hover:opacity-90 active:scale-95`
+              : `${a.badgeBgDark} ${a.textDark} hover:opacity-90 active:scale-95`
+            }`}
+        >
+          {Icon ? <Icon size={16} strokeWidth={2.5} /> : <Plus size={16} strokeWidth={2.5} />}
+          {novaSolicitacaoItem.label}
+        </NavLink>
       </div>
     )
   }
