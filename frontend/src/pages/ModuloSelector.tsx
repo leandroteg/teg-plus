@@ -42,6 +42,7 @@ interface Pillar {
   glow: string
   accent: string
   subs: SubMod[]
+  emBreve?: boolean
 }
 
 const PILLARS: Pillar[] = [
@@ -50,6 +51,7 @@ const PILLARS: Pillar[] = [
     label: 'Projetos',
     tagline: 'Gestão de obras e segurança',
     Icon: FolderKanban,
+    emBreve: true,
     grad: 'from-blue-500/20 to-indigo-600/20',
     border: 'border-indigo-500/25',
     glow: 'rgba(99,102,241,0.18)',
@@ -649,6 +651,11 @@ export default function ModuloSelector() {
                   ) : (
                     <span className={`text-[10px] flex items-center gap-1 ${isLight ? 'text-slate-400' : 'text-slate-600'}`}>
                       <Lock size={9} /> Em breve
+                    </span>
+                  )}
+                  {hasActive && p.emBreve && (
+                    <span className={`text-[9px] font-medium ${isLight ? 'text-slate-400/70' : 'text-slate-600/60'}`}>
+                      Em breve +
                     </span>
                   )}
                 </div>
