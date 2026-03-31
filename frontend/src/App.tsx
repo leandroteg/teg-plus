@@ -45,6 +45,7 @@ const CotacaoForm = lazy(() => import('./pages/CotacaoForm'))
 const Aprovacao = lazy(() => import('./pages/Aprovacao'))
 const AprovAi = lazy(() => import('./pages/AprovAi'))
 const Perfil = lazy(() => import('./pages/Perfil'))
+const MinhasSolicitacoes = lazy(() => import('./pages/MinhasSolicitacoes'))
 const Pedidos = lazy(() => import('./pages/Pedidos'))
 const RequisicaoDetalhe = lazy(() => import('./pages/RequisicaoDetalhe'))
 const SSMA = lazy(() => import('./pages/SSMA'))
@@ -224,6 +225,7 @@ export default function App() {
 
           {/* Global: Perfil */}
           <Route path="/perfil" element={<Lazy><Perfil /></Lazy>} />
+          <Route path="/minhas-solicitacoes" element={<Lazy><MinhasSolicitacoes /></Lazy>} />
 
           {/* Módulo Financeiro */}
           <Route element={<ModuleRoute moduleKey="financeiro" />}>
