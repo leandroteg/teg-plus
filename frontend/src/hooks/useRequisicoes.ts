@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import type { Requisicao, NovaRequisicaoPayload, RequisicaoItem } from '../types'
 import { supabase } from '../services/supabase'
 import { api } from '../services/api'
+import { useAuth } from '../contexts/AuthContext'
 
 // Tabelas: cmp_requisicoes (módulo Compras)
 const TABLE = 'cmp_requisicoes'
@@ -55,6 +56,7 @@ export function useRequisicoes(status?: string, search?: string) {
 
 export function useCriarRequisicao() {
   const qc = useQueryClient()
+  const { perfil } = useAuth()
   return useMutation({
     mutationFn: async (payload: NovaRequisicaoPayload) => {
       const n8nUrl = import.meta.env.VITE_N8N_WEBHOOK_URL || ''
@@ -131,13 +133,11 @@ export function useCriarRequisicao() {
         } catch { /* non-critical */ }
       }
 
-      const { data: { user } } = await supabase.auth.getUser()
-
       const { data: req, error: reqError } = await supabase
         .from('cmp_requisicoes')
         .insert({
           numero,
-          solicitante_id:   user?.id ?? null,
+          solicitante_id:   perfil?.id ?? null,
           solicitante_nome: payload.solicitante_nome,
           obra_nome:        payload.obra_nome,
           obra_id:          payload.obra_id    || null,
