@@ -310,6 +310,43 @@ export function useAnexosParcela(parcelaId: string | undefined) {
   })
 }
 
+// ── Upload de Arquivo do Contrato ──────────────────────────────────────────
+export function useUploadContratoArquivo() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ contratoId, file }: { contratoId: string; file: File }) => {
+      const ext = file.name.split('.').pop()
+      const path = `contratos/${contratoId}/${Date.now()}_${file.name.replace(/[^a-zA-Z0-9._-]/g, '_')}`
+
+      // 1. Upload to storage
+      const { error: uploadError } = await supabase.storage
+        .from('contratos-anexos')
+        .upload(path, file, { upsert: true })
+      if (uploadError) throw uploadError
+
+      // 2. Get public URL
+      const { data: urlData } = supabase.storage
+        .from('contratos-anexos')
+        .getPublicUrl(path)
+
+      // 3. Save URL to contract
+      const { data, error } = await supabase
+        .from('con_contratos')
+        .update({ arquivo_url: urlData.publicUrl })
+        .eq('id', contratoId)
+        .select()
+        .single()
+      if (error) throw error
+      return data as Contrato
+    },
+    onSuccess: (data) => {
+      qc.invalidateQueries({ queryKey: ['contratos'] })
+      qc.invalidateQueries({ queryKey: ['contrato', data.id] })
+      qc.invalidateQueries({ queryKey: ['contrato-detalhe', data.id] })
+    },
+  })
+}
+
 // ── Medições ────────────────────────────────────────────────────────────────
 export function useMedicoes(contratoId?: string) {
   return useQuery<ContratoMedicao[]>({

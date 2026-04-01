@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import {
@@ -6,9 +6,11 @@ import {
   FileSignature, RefreshCw, Download, ExternalLink, Calendar,
   Building2, MapPin, Loader2, AlertTriangle, CheckCircle2,
   CircleDot, ArrowUpRight, ArrowDownRight, Hash, Briefcase,
+  Pencil, X, Check, Upload, Folder, File as FileIcon,
 } from 'lucide-react'
 import { supabase } from '../../services/supabase'
 import { GRUPO_CONTRATO_LABEL } from '../../constants/contratos'
+import { useAtualizarContrato, useUploadContratoArquivo } from '../../hooks/useContratos'
 import type {
   Contrato, Parcela, ContratoAditivo, ContratoReajuste, ContratoMedicao,
   Minuta, Assinatura, SolicitacaoHistorico, Solicitacao,
@@ -55,6 +57,71 @@ const PARCELA_STATUS: Record<StatusParcela, { label: string; dot: string; bg: st
   liberado:  { label: 'Liberado',  dot: 'bg-blue-400',    bg: 'bg-blue-50',    text: 'text-blue-700' },
   pago:      { label: 'Pago',      dot: 'bg-emerald-500', bg: 'bg-emerald-50', text: 'text-emerald-700' },
   cancelado: { label: 'Cancelado', dot: 'bg-red-400',     bg: 'bg-red-50',     text: 'text-red-600' },
+}
+
+// ── Editable Link Field ───────────────────────────────────────────────────────
+function EditableLink({ label, value, saving, onSave }: {
+  label: string
+  value?: string | null
+  saving?: boolean
+  onSave: (v: string) => void
+}) {
+  const [editing, setEditing] = useState(false)
+  const [draft, setDraft] = useState(value ?? '')
+
+  const handleSave = () => {
+    onSave(draft.trim())
+    setEditing(false)
+  }
+
+  if (editing) {
+    return (
+      <div className="col-span-2 md:col-span-3">
+        <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-1">{label}</p>
+        <div className="flex items-center gap-2">
+          <input
+            autoFocus
+            value={draft}
+            onChange={e => setDraft(e.target.value)}
+            onKeyDown={e => { if (e.key === 'Enter') handleSave(); if (e.key === 'Escape') setEditing(false) }}
+            className="text-sm border border-slate-200 rounded-lg px-3 py-1.5 flex-1 min-w-0 focus:outline-none focus:ring-2 focus:ring-indigo-300"
+            placeholder="https://empresa.sharepoint.com/..."
+          />
+          <button onClick={handleSave} disabled={saving} className="p-1.5 rounded-lg text-emerald-600 hover:bg-emerald-50 transition-colors disabled:opacity-50">
+            {saving ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}
+          </button>
+          <button onClick={() => { setDraft(value ?? ''); setEditing(false) }} className="p-1.5 rounded-lg text-slate-400 hover:bg-slate-100 transition-colors">
+            <X size={14} />
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="col-span-2 md:col-span-3">
+      <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-0.5">{label}</p>
+      <div className="flex items-center gap-1.5">
+        {value ? (
+          <a
+            href={value}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-sm text-indigo-600 hover:text-indigo-800 hover:underline flex items-center gap-1.5 truncate max-w-sm"
+          >
+            <Folder size={13} className="shrink-0" />
+            <span className="truncate">{value}</span>
+            <ExternalLink size={11} className="shrink-0 opacity-60" />
+          </a>
+        ) : (
+          <span className="text-sm text-slate-400">—</span>
+        )}
+        <button onClick={() => { setDraft(value ?? ''); setEditing(true) }} className="p-1 rounded-lg text-slate-300 hover:text-slate-500 hover:bg-slate-100 transition-colors shrink-0">
+          <Pencil size={11} />
+        </button>
+      </div>
+    </div>
+  )
 }
 
 // ── Collapsible Section ──────────────────────────────────────────────────────
@@ -129,6 +196,12 @@ function Empty({ text }: { text: string }) {
 export default function ContratoDetalhe() {
   const { id } = useParams<{ id: string }>()
   const nav = useNavigate()
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
+  // ── Mutations ─────────────────────────────────────────────────────────
+  const atualizarContrato = useAtualizarContrato()
+  const uploadArquivo = useUploadContratoArquivo()
+  const [uploadErro, setUploadErro] = useState<string | null>(null)
 
   // ── Data loading ──────────────────────────────────────────────────────────
   const { data: contrato, isLoading: loadingContrato } = useQuery({
@@ -355,6 +428,12 @@ export default function ContratoDetalhe() {
           <Field label="Data Assinatura" value={fmtDate(contrato.data_assinatura)} />
           {contrato.indice_reajuste && <Field label="Indice Reajuste" value={contrato.indice_reajuste} />}
           {contrato.garantia_tipo && <Field label="Garantia" value={`${contrato.garantia_tipo}${contrato.garantia_valor ? ' - ' + fmt(contrato.garantia_valor) : ''}`} />}
+          <EditableLink
+            label="Diretório do Contrato"
+            value={contrato.diretorio_url}
+            saving={atualizarContrato.isPending}
+            onSave={v => atualizarContrato.mutate({ id: contrato.id, diretorio_url: v || undefined })}
+          />
         </div>
       </Section>
 
@@ -393,6 +472,84 @@ export default function ContratoDetalhe() {
 
       {/* ── Section 3: Documentos ─────────────────────────────────────────── */}
       <Section icon={FileSignature} title="Documentos" count={minutas.length + assinaturas.length} defaultOpen={true}>
+
+        {/* Upload do Contrato */}
+        <div className="mb-4 pb-4 border-b border-slate-100">
+          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">Arquivo do Contrato</p>
+          {contrato.arquivo_url ? (
+            <div className="flex items-center justify-between bg-indigo-50 rounded-xl px-4 py-3">
+              <div className="flex items-center gap-3 min-w-0">
+                <FileIcon size={16} className="text-indigo-500 shrink-0" />
+                <div className="min-w-0">
+                  <p className="text-xs font-semibold text-slate-700 truncate">
+                    {contrato.arquivo_url.split('/').pop()?.replace(/_/g, ' ') ?? 'Contrato'}
+                  </p>
+                  <p className="text-[10px] text-slate-400">Arquivo do contrato</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2 shrink-0">
+                <a
+                  href={contrato.arquivo_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-1.5 text-[11px] font-semibold text-indigo-600 hover:text-indigo-800 bg-white rounded-lg px-3 py-1.5 border border-indigo-200 hover:bg-indigo-50 transition-colors"
+                >
+                  <ExternalLink size={11} /> Visualizar
+                </a>
+                <a
+                  href={contrato.arquivo_url}
+                  download
+                  className="p-1.5 rounded-lg text-indigo-500 hover:bg-white border border-transparent hover:border-indigo-200 transition-colors"
+                >
+                  <Download size={13} />
+                </a>
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  className="p-1.5 rounded-lg text-slate-400 hover:bg-white border border-transparent hover:border-slate-200 transition-colors"
+                  title="Substituir arquivo"
+                >
+                  <Pencil size={13} />
+                </button>
+              </div>
+            </div>
+          ) : (
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              disabled={uploadArquivo.isPending}
+              className="flex items-center gap-2 w-full border-2 border-dashed border-slate-200 rounded-xl px-4 py-3 text-sm text-slate-400 hover:border-indigo-300 hover:text-indigo-500 hover:bg-indigo-50/50 transition-colors disabled:opacity-50"
+            >
+              {uploadArquivo.isPending ? (
+                <Loader2 size={15} className="animate-spin" />
+              ) : (
+                <Upload size={15} />
+              )}
+              {uploadArquivo.isPending ? 'Enviando...' : 'Upload Contrato (PDF, DOCX, imagem...)'}
+            </button>
+          )}
+          <input
+            ref={fileInputRef}
+            type="file"
+            className="hidden"
+            accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png,.webp"
+            onChange={async e => {
+              const file = e.target.files?.[0]
+              if (!file) return
+              setUploadErro(null)
+              try {
+                await uploadArquivo.mutateAsync({ contratoId: contrato.id, file })
+              } catch (err: unknown) {
+                setUploadErro(err instanceof Error ? err.message : 'Erro ao enviar arquivo')
+              }
+              e.target.value = ''
+            }}
+          />
+          {uploadErro && (
+            <p className="text-xs text-red-500 mt-1.5 flex items-center gap-1">
+              <AlertTriangle size={11} /> {uploadErro}
+            </p>
+          )}
+        </div>
+
         {minutas.length === 0 && assinaturas.length === 0 ? (
           <Empty text="Nenhum documento registrado" />
         ) : (

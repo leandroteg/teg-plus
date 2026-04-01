@@ -79,6 +79,7 @@ export interface Contrato {
   status: StatusContrato
   // Arquivo
   arquivo_url?: string
+  diretorio_url?: string
   // Contraparte direta (contratos sem FK de fornecedor/cliente)
   contraparte_nome?: string
   valor_mensal?: number
