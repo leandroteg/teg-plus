@@ -246,9 +246,14 @@ function CotacaoConcluida({ cotacao, nav }: { cotacao: Cotacao; nav: ReturnType<
   const [showEmitirModal, setShowEmitirModal] = useState(false)
   const [solicitandoContrato, setSolicitandoContrato] = useState(false)
 
+  const { data: categorias = [] } = useCategorias()
   const req = cotacao.requisicao
   const canEmitPedido = atLeast('comprador') && req?.status === 'cotacao_aprovada'
   const isRecorrente = (req as any)?.compra_recorrente === true
+  const valorReq = cotacao.valor_selecionado ?? (req as any)?.valor_estimado ?? 0
+  const categoriaTipo = categorias.find(c => c.codigo === (req as any)?.categoria)?.tipo
+  const isServico = categoriaTipo === 'servico'
+  const deveContrato = isRecorrente || (isServico && valorReq > 2000)
 
   // ── Solicitar Contrato (compra recorrente) ───────────────────────────────
   const handleSolicitarContrato = async () => {
@@ -331,11 +336,11 @@ function CotacaoConcluida({ cotacao, nav }: { cotacao: Cotacao; nav: ReturnType<
 
       {/* ── Emitir Pedido / Solicitar Contrato / Cancelar ────────────── */}
       {canEmitPedido && (
-        <div className={`bg-white rounded-2xl border-2 ${isRecorrente ? 'border-indigo-200' : 'border-teal-200'} shadow-sm overflow-hidden`}>
-          <div className={`${isRecorrente ? 'bg-indigo-50' : 'bg-teal-50'} px-4 py-3 border-b ${isRecorrente ? 'border-indigo-100' : 'border-teal-100'}`}>
-            <p className={`text-xs font-bold ${isRecorrente ? 'text-indigo-700' : 'text-teal-700'} uppercase tracking-wider flex items-center gap-2`}>
-              {isRecorrente ? <ScrollText size={14} /> : <FileText size={14} />}
-              {isRecorrente ? 'Próximo Passo — Solicitação de Contrato' : 'Próximo Passo — Emissão de Pedido'}
+        <div className={`bg-white rounded-2xl border-2 ${deveContrato ? 'border-indigo-200' : 'border-teal-200'} shadow-sm overflow-hidden`}>
+          <div className={`${deveContrato ? 'bg-indigo-50' : 'bg-teal-50'} px-4 py-3 border-b ${deveContrato ? 'border-indigo-100' : 'border-teal-100'}`}>
+            <p className={`text-xs font-bold ${deveContrato ? 'text-indigo-700' : 'text-teal-700'} uppercase tracking-wider flex items-center gap-2`}>
+              {deveContrato ? <ScrollText size={14} /> : <FileText size={14} />}
+              {deveContrato ? 'Próximo Passo — Solicitação de Contrato' : 'Próximo Passo — Emissão de Pedido'}
             </p>
           </div>
 
@@ -395,7 +400,7 @@ function CotacaoConcluida({ cotacao, nav }: { cotacao: Cotacao; nav: ReturnType<
                   Cancelar RC
                 </button>
 
-                {isRecorrente ? (
+                {deveContrato ? (
                   <button
                     disabled={solicitandoContrato || cancelarMutation.isPending}
                     onClick={handleSolicitarContrato}
@@ -449,7 +454,7 @@ function CotacaoConcluida({ cotacao, nav }: { cotacao: Cotacao; nav: ReturnType<
           open
           onClose={() => setShowEmitirModal(false)}
           requisicaoId={req.id}
-          compraRecorrente={(req as any).compra_recorrente === true}
+          compraRecorrente={deveContrato}
           onSolicitarContrato={async () => {
             try {
               const num = `SOL-CON-${new Date().getFullYear()}-${String(Math.floor(Math.random() * 9000) + 1000)}`

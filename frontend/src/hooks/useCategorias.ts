@@ -11,7 +11,7 @@ export function useCategorias() {
         .select(`
           id, codigo, nome, keywords, cor, icone,
           comprador_nome, alcada1_aprovador, alcada1_limite,
-          cotacoes_regras, politica_resumo
+          cotacoes_regras, politica_resumo, tipo
         `)
         .eq('ativo', true)
         .order('nome')
