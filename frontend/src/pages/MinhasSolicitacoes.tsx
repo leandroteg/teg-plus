@@ -128,16 +128,17 @@ function timeAgo(iso: string | null | undefined) {
 
 // ── Hook de dados ──────────────────────────────────────────────────────────────
 function useMinhasSolicitacoes() {
-  const { user } = useAuth()
+  const { user, perfil } = useAuth()
+  const solicitanteId = perfil?.id ?? user?.id
   return useQuery({
-    queryKey: ['minhas-solicitacoes', user?.id],
-    enabled: !!user?.id,
+    queryKey: ['minhas-solicitacoes', solicitanteId],
+    enabled: !!solicitanteId,
     staleTime: 30_000,
     queryFn: async () => {
       const { data, error } = await supabase
         .from('vw_minhas_solicitacoes' as any)
         .select('*')
-        .eq('solicitante_id', user!.id)
+        .eq('solicitante_id', solicitanteId!)
         .order('created_at', { ascending: false })
       if (error) throw error
       return (data ?? []) as SolicitacaoItem[]
