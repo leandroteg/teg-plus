@@ -372,29 +372,11 @@ export default function Dashboard() {
   const { data, isLoading, isError, refetch } = useDashboard(periodo, obraFilter || undefined)
   const { data: todasReqs = [] } = useRequisicoes()
 
-  if (isPlaceholder) return <SetupRequired />
-  if (isLoading) return <Loader />
-
+  // ── Todos os hooks/useMemo ANTES de qualquer early return (Rules of Hooks) ───
   const kpis = data?.kpis ?? EMPTY_KPIS
   const por_obra = data?.por_obra ?? []
   const aprovacoes_pendentes = data?.aprovacoes_pendentes ?? []
   const reqs = todasReqs.length > 0 ? todasReqs : (data?.requisicoes_recentes ?? [])
-
-  const aprovacaoMap = new Map<string, Aprovacao>(
-    aprovacoes_pendentes.map(a => [a.requisicao_id, a])
-  )
-
-  const pipelineContagens = PIPELINE_ETAPAS.map(etapa =>
-    reqs.filter(r => etapa.statuses.includes(r.status)).length
-  )
-
-  const statusSegments = PIPELINE_ETAPAS
-    .map((etapa, i) => ({ key: etapa.key, label: etapa.label, value: pipelineContagens[i], barClass: etapa.barClass }))
-    .filter(s => s.value > 0)
-
-  const recentes = pipelineFilter !== null
-    ? reqs.filter(r => PIPELINE_ETAPAS[pipelineFilter].statuses.includes(r.status))
-    : reqs.slice(0, 8)
 
   const hoje = Date.now()
   const tresDias = 3 * 24 * 3600_000
@@ -425,6 +407,25 @@ export default function Dashboard() {
       }),
     [reqs, hoje]
   )
+
+  if (isPlaceholder) return <SetupRequired />
+  if (isLoading) return <Loader />
+
+  const aprovacaoMap = new Map<string, Aprovacao>(
+    aprovacoes_pendentes.map(a => [a.requisicao_id, a])
+  )
+
+  const pipelineContagens = PIPELINE_ETAPAS.map(etapa =>
+    reqs.filter(r => etapa.statuses.includes(r.status)).length
+  )
+
+  const statusSegments = PIPELINE_ETAPAS
+    .map((etapa, i) => ({ key: etapa.key, label: etapa.label, value: pipelineContagens[i], barClass: etapa.barClass }))
+    .filter(s => s.value > 0)
+
+  const recentes = pipelineFilter !== null
+    ? reqs.filter(r => PIPELINE_ETAPAS[pipelineFilter].statuses.includes(r.status))
+    : reqs.slice(0, 8)
 
   const tempoMedio = kpis.tempo_medio_aprovacao_horas > 0
     ? kpis.tempo_medio_aprovacao_horas >= 24
