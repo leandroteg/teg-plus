@@ -336,20 +336,6 @@ function Loader() {
   )
 }
 
-function ErrorPanel({ error, refetch }: { error: unknown; refetch: () => void }) {
-  const { isDark } = useTheme()
-  const errMsg = ((error as any)?.message ?? (error as any)?.details ?? 'Erro desconhecido') as string
-  return (
-    <div className="flex flex-col items-center justify-center py-16 gap-4">
-      <p className={`font-semibold ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>Erro ao carregar dados</p>
-      <p className="text-xs text-red-500 font-mono">{errMsg}</p>
-      <button onClick={refetch}
-        className="flex items-center gap-2 px-4 py-2 bg-teal-500/10 text-teal-600 rounded-xl text-sm font-semibold">
-        <RefreshCw size={14} /> Tentar novamente
-      </button>
-    </div>
-  )
-}
 
 function SetupRequired() {
   return (
@@ -383,12 +369,11 @@ export default function Dashboard() {
   const [obraFilter, setObraFilter] = useState('')
   const [pipelineFilter, setPipelineFilter] = useState<number | null>(null)
   const obras = useLookupObras()
-  const { data, isLoading, isFetching, isError, error, refetch, failureCount } = useDashboard(periodo, obraFilter || undefined)
+  const { data, isLoading, isError, refetch } = useDashboard(periodo, obraFilter || undefined)
   const { data: todasReqs = [] } = useRequisicoes()
 
   if (isPlaceholder) return <SetupRequired />
-  if (isLoading || (isFetching && failureCount > 0 && failureCount < 3)) return <Loader />
-  if (isError) return <ErrorPanel error={error} refetch={refetch} />
+  if (isLoading) return <Loader />
 
   const kpis = data?.kpis ?? EMPTY_KPIS
   const por_obra = data?.por_obra ?? []
@@ -457,6 +442,19 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-5">
+
+      {/* Banner de erro não-bloqueante */}
+      {isError && (
+        <div className="flex items-center justify-between gap-3 px-4 py-2.5 bg-amber-50 border border-amber-200 rounded-xl text-sm">
+          <span className="text-amber-700 font-medium">Falha ao carregar dados — exibindo última versão disponível</span>
+          <button
+            onClick={() => refetch()}
+            className="flex items-center gap-1.5 text-xs font-semibold text-amber-600 hover:text-amber-800 whitespace-nowrap"
+          >
+            <RefreshCw size={12} /> Tentar novamente
+          </button>
+        </div>
+      )}
 
       {/* Header */}
       <div className="flex items-center justify-between">
