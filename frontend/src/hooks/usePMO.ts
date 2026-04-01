@@ -423,7 +423,7 @@ export function useGerarTAPIA() {
         body: JSON.stringify(payload),
       })
       if (!res.ok) throw new Error('Erro ao gerar TAP via IA')
-      return res.json() as Promise<Partial<PMOTAP>>
+      return res.json().catch(() => ({})) as Promise<Partial<PMOTAP>>
     },
   })
 }
@@ -441,7 +441,7 @@ export function useGerarEAPIA() {
         body: JSON.stringify(payload),
       })
       if (!res.ok) throw new Error('Erro ao gerar EAP via IA')
-      return res.json() as Promise<Partial<PMOEAP>[]>
+      return res.json().catch(() => ([])) as Promise<Partial<PMOEAP>[]>
     },
   })
 }
@@ -460,7 +460,7 @@ export function useGerarCronogramaIA() {
         body: JSON.stringify(payload),
       })
       if (!res.ok) throw new Error('Erro ao gerar cronograma via IA')
-      return res.json() as Promise<Partial<PMOTarefa>[]>
+      return res.json().catch(() => ([])) as Promise<Partial<PMOTarefa>[]>
     },
   })
 }

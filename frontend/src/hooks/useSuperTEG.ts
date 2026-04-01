@@ -101,7 +101,7 @@ export function useSuperTEG() {
           }),
         })
 
-        const raw = await res.json()
+        const raw = await res.json().catch(() => ({}))
         const data = Array.isArray(raw) ? raw[0] : raw
         const { content, actions } = parseResponse(data)
 
@@ -251,7 +251,7 @@ export function useSuperTEG() {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ file_base64: base64, file_name: file.name, mime_type: file.type || 'application/pdf' }),
           })
-          const parseData = await parseRes.json()
+          const parseData = await parseRes.json().catch(() => ({}))
           if (parseData?.success && parseData?.fornecedores?.length > 0) {
             extractedData = parseData
           }

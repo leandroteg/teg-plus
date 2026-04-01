@@ -952,7 +952,7 @@ export function useMelhorarMinuta() {
         body: JSON.stringify(payload),
       })
       if (!res.ok) throw new Error(`Erro ao melhorar minuta: ${res.status}`)
-      const result = await res.json()
+      const result = await res.json().catch(() => ({}))
 
       // Save melhorias to Supabase
       if (result.success && result.melhorias) {
@@ -1038,7 +1038,7 @@ export function useGerarMinutaPDF() {
           signal: controller.signal,
         })
         if (!res.ok) throw new Error(`Erro ao gerar minuta: ${res.status}`)
-        return res.json()
+        return res.json().catch(() => ({}))
       } finally {
         clearTimeout(timeout)
       }
@@ -1102,7 +1102,7 @@ export function useGerarResumoAI() {
         body: JSON.stringify(payload),
       })
       if (!res.ok) throw new Error(`Erro ao gerar resumo: ${res.status}`)
-      return res.json()
+      return res.json().catch(() => ({}))
     },
   })
 }
@@ -1139,7 +1139,7 @@ export function useAnalisarMinuta() {
         body: JSON.stringify(payload),
       })
       if (!res.ok) throw new Error(`Erro na analise: ${res.status}`)
-      const result = await res.json()
+      const result = await res.json().catch(() => ({}))
 
       let analise = normalizeMinutaAiAnalise(result?.analise ?? result)
 

@@ -40,6 +40,13 @@ async function fetchWithRetry(url: string, init?: RequestInit, retries = 2, time
   }
 }
 
+// Parseia JSON de forma segura: retorna {} se body vazio (evita "Unexpected end of JSON input")
+async function safeJson<T>(res: Response): Promise<T> {
+  const text = await res.text()
+  if (!text || !text.trim()) return {} as T
+  return JSON.parse(text) as T
+}
+
 async function request<T>(path: string, options?: RequestInit, timeoutMs = 30_000): Promise<T> {
   await acquireSlot()
   try {
@@ -48,7 +55,7 @@ async function request<T>(path: string, options?: RequestInit, timeoutMs = 30_00
       ...options,
     }, 2, timeoutMs)
     if (!res.ok) throw new Error(`Erro ${res.status}: ${res.statusText}`)
-    return res.json() as Promise<T>
+    return safeJson<T>(res)
   } finally {
     releaseSlot()
   }
@@ -150,14 +157,14 @@ export const api = {
     if (!res.ok) {
       return { cnpj: limpo, razao_social: '', nome_fantasia: '', situacao: '', endereco: { cep: '', logradouro: '', numero: '', complemento: '', bairro: '', cidade: '', uf: '' }, telefone: '', email: '', error: true, message: `CNPJ não encontrado (${res.status})` }
     }
-    const r = await res.json()
+    const r = await res.json().catch(() => ({}))
     let socios = normalizeSocios(r as Record<string, unknown>)
     // Se BrasilAPI não retornou sócios, tenta ReceitaWS como fallback
     if (!socios.length) {
       try {
         const rws = await fetch(`https://receitaws.com.br/v1/cnpj/${limpo}`)
         if (rws.ok) {
-          const rwsData = await rws.json()
+          const rwsData = await rws.json().catch(() => ({}))
           socios = normalizeSocios(rwsData as Record<string, unknown>)
         }
       } catch { /* ignora erro do fallback */ }
@@ -222,7 +229,7 @@ export const api = {
     if (!res.ok) {
       return { cep: limpo, logradouro: '', bairro: '', cidade: '', uf: '', error: true, message: `CEP não encontrado (${res.status})` }
     }
-    const r = await res.json()
+    const r = await res.json().catch(() => ({}))
     return {
       cep: String(r.cep ?? '').replace(/\D/g, ''),
       logradouro: r.street ?? '',
