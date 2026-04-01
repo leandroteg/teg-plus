@@ -25,9 +25,11 @@ const ICON_MAP: Record<string, LucideIcon> = {
 
 // Avatar colorido determinístico por nome
 const AVATAR_COLORS: Record<string, string> = {
-  Lauany:  'bg-violet-500',
-  Fernando:'bg-amber-500',
-  Aline:   'bg-emerald-500',
+  Lauany:     'bg-violet-500',
+  Fernando:   'bg-amber-500',
+  Aline:      'bg-emerald-500',
+  Elton:      'bg-sky-500',
+  Claudionor: 'bg-rose-500',
 }
 
 function getAvatarColor(nome: string) {
@@ -105,7 +107,7 @@ function CategoryCard({ categoria, selected = false, onClick }: Props) {
                 </svg>
               </div>
               <span className="text-[11px] text-slate-500">
-                Aprovação ≤R$2k: <strong className="text-slate-700">{categoria.alcada1_aprovador}</strong>
+                Aprovação &lt;R$3k: <strong className="text-slate-700">{categoria.alcada1_aprovador}</strong>
               </span>
             </div>
           )}
