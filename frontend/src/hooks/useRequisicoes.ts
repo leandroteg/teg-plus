@@ -48,9 +48,11 @@ export function useRequisicoes(status?: string, search?: string) {
         comprador: undefined,
       })) as Requisicao[]
     },
-    refetchInterval: 60_000,
+    refetchInterval: false,
+    refetchOnMount: true,
+    refetchOnWindowFocus: false,
     retry: false,
-    staleTime: 30_000,
+    staleTime: 0,
   })
 }
 
