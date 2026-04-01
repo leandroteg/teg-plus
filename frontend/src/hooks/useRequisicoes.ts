@@ -131,10 +131,13 @@ export function useCriarRequisicao() {
         } catch { /* non-critical */ }
       }
 
+      const { data: { user } } = await supabase.auth.getUser()
+
       const { data: req, error: reqError } = await supabase
         .from('cmp_requisicoes')
         .insert({
           numero,
+          solicitante_id:   user?.id ?? null,
           solicitante_nome: payload.solicitante_nome,
           obra_nome:        payload.obra_nome,
           obra_id:          payload.obra_id    || null,
