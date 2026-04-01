@@ -523,7 +523,7 @@ export default function Dashboard() {
               </div>
             </div>
 
-            <div className="grid grid-cols-2 lg:grid-cols-3 gap-2.5 flex-1">
+            <div className="grid grid-cols-3 gap-2.5 flex-1">
               <SpotlightMetric
                 label="Valor Total"
                 value={fmt(kpis.valor_total_mes)}
@@ -537,19 +537,7 @@ export default function Dashboard() {
                 note="solicitações abertas"
               />
               <SpotlightMetric
-                label="Aguard. Aprovação"
-                value={kpis.aguardando_aprovacao}
-                tone={kpis.aguardando_aprovacao > 5 ? 'amber' : 'sky'}
-                note={`SLA: 48h · ${kpis.aguardando_aprovacao > 5 ? 'fila alta' : 'sob controle'}`}
-              />
-              <SpotlightMetric
-                label="Aprovadas"
-                value={kpis.aprovadas_mes}
-                tone="emerald"
-                note="SLA: encerrar em ≤5d"
-              />
-              <SpotlightMetric
-                label="Tempo Médio Aprov."
+                label="Lead Time"
                 value={tempoMedio}
                 tone={kpis.tempo_medio_aprovacao_horas > 48 ? 'amber' : 'emerald'}
                 note={kpis.tempo_medio_aprovacao_horas > 48 ? 'acima SLA 48h' : 'dentro SLA 48h'}
