@@ -737,7 +737,7 @@ export default function NovaRequisicao() {
         </div>
 
         <div className={`rounded-2xl border px-4 py-3 space-y-3 ${
-        compraRecorrente ? 'border-indigo-200 bg-indigo-50/60' : 'border-red-200 bg-red-50'
+        compraRecorrente ? 'border-indigo-200 bg-indigo-50/60' : 'border-red-300 bg-red-100'
       }`}>
         <div className="flex items-start justify-between gap-3">
           <div>
