@@ -6,6 +6,7 @@ import {
   LayoutList, LayoutGrid, Download, Loader2, Building2, Calendar,
 } from 'lucide-react'
 import { useTheme } from '../contexts/ThemeContext'
+import { supabase } from '../services/supabase'
 import { useCotacoes } from '../hooks/useCotacoes'
 import { useCategorias } from '../hooks/useCategorias'
 import { useDecisaoRequisicao } from '../hooks/useAprovacoes'
@@ -322,6 +323,7 @@ export default function FilaCotacoes() {
   const [emitirCotacao, setEmitirCotacao] = useState<Cotacao | null>(null)
 
   const { data: cotacoes = [], isLoading } = useCotacoes()
+  const { data: categorias = [] } = useCategorias()
   const decisaoMutation = useDecisaoRequisicao()
   const emitirPedidoMutation = useEmitirPedido()
   const cancelarMutation = useCancelarRequisicao()
@@ -553,37 +555,81 @@ export default function FilaCotacoes() {
         />
       )}
 
-      {emitirCotacao?.requisicao && (
-        <EmitirPedidoModal
-          open
-          onClose={() => setEmitirCotacao(null)}
-          requisicaoId={emitirCotacao.requisicao.id}
-          cotacao={{
-            id: emitirCotacao.id,
-            fornecedorNome: emitirCotacao.fornecedor_selecionado_nome ?? "N/A",
-            valorTotal: emitirCotacao.valor_selecionado ?? emitirCotacao.requisicao.valor_estimado,
-            compradorId: emitirCotacao.comprador_id,
-          }}
-          onConfirm={(payload) => {
-            emitirPedidoMutation.mutate({
-              requisicaoId: emitirCotacao.requisicao.id,
-              ...payload,
-            }, {
-              onSuccess: (pedido) => {
+      {emitirCotacao?.requisicao && (() => {
+        const req = emitirCotacao.requisicao
+        const valorEmitir = emitirCotacao.valor_selecionado ?? (req as any).valor_estimado ?? 0
+        const catTipo = categorias.find(c => c.codigo === (req as any).categoria)?.tipo
+        const deveContrato = (req as any).compra_recorrente === true || (catTipo === 'servico' && valorEmitir > 2000)
+        return (
+          <EmitirPedidoModal
+            open
+            onClose={() => setEmitirCotacao(null)}
+            requisicaoId={req.id}
+            compraRecorrente={deveContrato}
+            cotacao={{
+              id: emitirCotacao.id,
+              fornecedorNome: emitirCotacao.fornecedor_selecionado_nome ?? "N/A",
+              valorTotal: valorEmitir,
+              compradorId: emitirCotacao.comprador_id,
+            }}
+            onSolicitarContrato={async () => {
+              try {
+                const year = new Date().getFullYear()
+                const prefix = `SOL-CON-${year}-`
+                const { count } = await supabase.from('con_solicitacoes').select('id', { count: 'exact', head: true }).like('numero', `${prefix}%`)
+                const seq = String((count ?? 0) + 1).padStart(3, '0')
+                const numero = `${prefix}${seq}`
+                const { error: solErr } = await supabase.from('con_solicitacoes').insert({
+                  numero,
+                  objeto: req.descricao,
+                  categoria_contrato: 'prestacao_servico',
+                  grupo_contrato: 'prestacao_servicos',
+                  tipo_contrato: 'despesa',
+                  tipo_contraparte: 'fornecedor',
+                  contraparte_nome: emitirCotacao.fornecedor_selecionado_nome ?? 'A definir',
+                  obra_id: (req as any).obra_id ?? null,
+                  valor_estimado: valorEmitir,
+                  solicitante_id: perfil?.id ?? null,
+                  solicitante_nome: perfil?.nome ?? null,
+                  etapa_atual: 'solicitacao',
+                  status: 'em_andamento',
+                  requisicao_origem_id: req.id,
+                  urgencia: 'normal',
+                  documentos_ref: [],
+                })
+                if (solErr) throw solErr
+                await supabase.from('cmp_requisicoes').update({ status: 'aguardando_contrato' }).eq('id', req.id)
                 setEmitirCotacao(null)
                 setDetail(null)
-                setToast({ type: "success", msg: `${pedido.numero_pedido} emitido` })
+                setToast({ type: 'success', msg: `Solicitação de contrato ${numero} criada` })
                 setTimeout(() => setToast(null), 4000)
-              },
-              onError: (err: any) => {
-                setToast({ type: "error", msg: `Erro: ${err?.message || "erro"}` })
+                nav('/contratos/solicitacoes')
+              } catch (err: any) {
+                setToast({ type: 'error', msg: `Erro: ${err?.message || 'falha ao criar solicitação'}` })
                 setTimeout(() => setToast(null), 5000)
-              },
-            })
-          }}
-          isSubmitting={emitirPedidoMutation.isPending}
-        />
-      )}
+              }
+            }}
+            onConfirm={(payload) => {
+              emitirPedidoMutation.mutate({
+                requisicaoId: req.id,
+                ...payload,
+              }, {
+                onSuccess: (pedido) => {
+                  setEmitirCotacao(null)
+                  setDetail(null)
+                  setToast({ type: "success", msg: `${pedido.numero_pedido} emitido` })
+                  setTimeout(() => setToast(null), 4000)
+                },
+                onError: (err: any) => {
+                  setToast({ type: "error", msg: `Erro: ${err?.message || "erro"}` })
+                  setTimeout(() => setToast(null), 5000)
+                },
+              })
+            }}
+            isSubmitting={emitirPedidoMutation.isPending}
+          />
+        )
+      })()}
     </div>
   )
 }

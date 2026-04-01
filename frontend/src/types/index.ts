@@ -30,6 +30,7 @@ export interface CategoriaMaterial {
   alcada1_limite?: number
   cotacoes_regras?: { ate_500: number; '501_a_2k': number; acima_2k: number }
   politica_resumo?: string
+  tipo?: string  // 'produto' | 'servico'
 }
 
 export interface Pedido {
