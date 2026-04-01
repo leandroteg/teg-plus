@@ -383,11 +383,11 @@ export default function Dashboard() {
   const [obraFilter, setObraFilter] = useState('')
   const [pipelineFilter, setPipelineFilter] = useState<number | null>(null)
   const obras = useLookupObras()
-  const { data, isLoading, isError, error, refetch } = useDashboard(periodo, obraFilter || undefined)
+  const { data, isLoading, isFetching, isError, error, refetch, failureCount } = useDashboard(periodo, obraFilter || undefined)
   const { data: todasReqs = [] } = useRequisicoes()
 
   if (isPlaceholder) return <SetupRequired />
-  if (isLoading) return <Loader />
+  if (isLoading || (isFetching && failureCount > 0 && failureCount < 3)) return <Loader />
   if (isError) return <ErrorPanel error={error} refetch={refetch} />
 
   const kpis = data?.kpis ?? EMPTY_KPIS
