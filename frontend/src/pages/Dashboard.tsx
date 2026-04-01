@@ -453,8 +453,8 @@ export default function Dashboard() {
         </div>
       )}
 
-      {/* Header */}
-      <div className="flex items-center justify-between">
+      {/* Header + Filtros na mesma linha */}
+      <div className="flex items-center justify-between gap-3 flex-wrap">
         <div>
           <h1 className={`text-xl font-extrabold ${isDark ? 'text-white' : 'text-slate-900'}`}>
             Painel — Compras
@@ -463,45 +463,43 @@ export default function Dashboard() {
             Requisições, cotações e pedidos de compra
           </p>
         </div>
-        <button
-          onClick={() => refetch()}
-          className={`flex items-center gap-1.5 text-xs transition-colors ${isDark ? 'text-slate-500 hover:text-teal-400' : 'text-slate-400 hover:text-teal-600'}`}
-        >
-          <RefreshCw size={12} /> Atualizar
-        </button>
-      </div>
-
-      {/* Filtros */}
-      <div className="flex items-center gap-2">
-        <div className={`flex items-center gap-0.5 p-1 rounded-2xl ${isDark ? 'bg-white/[0.04] border border-white/[0.06]' : 'bg-slate-100 border border-slate-200'}`}>
-          <CalendarDays size={11} className={`ml-1.5 mr-0.5 shrink-0 ${isDark ? 'text-slate-500' : 'text-slate-400'}`} />
-          {[['semana', '7d'], ['mes', '30d'], ['trimestre', '90d'], ['tudo', '∞']].map(([val, lbl]) => (
-            <button key={val} onClick={() => setPeriodo(val)}
-              className={`px-2.5 py-1 rounded-xl text-[11px] font-bold transition-all ${
-                periodo === val
-                  ? 'bg-teal-600 text-white shadow-sm'
-                  : isDark ? 'text-slate-400 hover:text-slate-200' : 'text-slate-500 hover:text-slate-700'
-              }`}>
-              {lbl}
-            </button>
-          ))}
-        </div>
-        <div className="relative flex items-center">
-          <MapPin size={11} className={`absolute left-2.5 pointer-events-none z-10 ${obraFilter ? 'text-teal-600' : isDark ? 'text-slate-500' : 'text-slate-400'}`} />
-          <select
-            value={obraFilter}
-            onChange={e => setObraFilter(e.target.value)}
-            className={`text-[11px] font-semibold rounded-2xl pl-7 pr-3 py-2 border transition-all appearance-none cursor-pointer max-w-[140px] truncate ${
-              obraFilter
-                ? 'bg-teal-50 border-teal-300 text-teal-700'
-                : isDark ? 'bg-white/[0.04] border-white/[0.06] text-slate-400' : 'bg-slate-100 border-slate-200 text-slate-500'
-            }`}
-          >
-            <option value="">Todas obras</option>
-            {obras.map(o => (
-              <option key={o.id} value={o.id}>{o.codigo ? `${o.codigo} - ` : ''}{o.nome}</option>
+        <div className="flex items-center gap-2 flex-wrap">
+          <div className={`flex items-center gap-0.5 p-1 rounded-2xl ${isDark ? 'bg-white/[0.04] border border-white/[0.06]' : 'bg-slate-100 border border-slate-200'}`}>
+            <CalendarDays size={11} className={`ml-1.5 mr-0.5 shrink-0 ${isDark ? 'text-slate-500' : 'text-slate-400'}`} />
+            {[['semana', '7d'], ['mes', '30d'], ['trimestre', '90d'], ['tudo', '∞']].map(([val, lbl]) => (
+              <button key={val} onClick={() => setPeriodo(val)}
+                className={`px-2.5 py-1 rounded-xl text-[11px] font-bold transition-all ${
+                  periodo === val
+                    ? 'bg-teal-600 text-white shadow-sm'
+                    : isDark ? 'text-slate-400 hover:text-slate-200' : 'text-slate-500 hover:text-slate-700'
+                }`}>
+                {lbl}
+              </button>
             ))}
-          </select>
+          </div>
+          <div className="relative flex items-center">
+            <MapPin size={11} className={`absolute left-2.5 pointer-events-none z-10 ${obraFilter ? 'text-teal-600' : isDark ? 'text-slate-500' : 'text-slate-400'}`} />
+            <select
+              value={obraFilter}
+              onChange={e => setObraFilter(e.target.value)}
+              className={`text-[11px] font-semibold rounded-2xl pl-7 pr-3 py-2 border transition-all appearance-none cursor-pointer max-w-[140px] truncate ${
+                obraFilter
+                  ? 'bg-teal-50 border-teal-300 text-teal-700'
+                  : isDark ? 'bg-white/[0.04] border-white/[0.06] text-slate-400' : 'bg-slate-100 border-slate-200 text-slate-500'
+              }`}
+            >
+              <option value="">Todas obras</option>
+              {obras.map(o => (
+                <option key={o.id} value={o.id}>{o.codigo ? `${o.codigo} - ` : ''}{o.nome}</option>
+              ))}
+            </select>
+          </div>
+          <button
+            onClick={() => refetch()}
+            className={`flex items-center gap-1.5 text-xs transition-colors ${isDark ? 'text-slate-500 hover:text-teal-400' : 'text-slate-400 hover:text-teal-600'}`}
+          >
+            <RefreshCw size={12} /> Atualizar
+          </button>
         </div>
       </div>
 
