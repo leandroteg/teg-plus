@@ -203,7 +203,7 @@ export default function EmitirPedidoModal({
     )
 
     setClasseId(classeSelecionada?.id ?? '')
-    setCentroId(requisicao.centro_custo_id ?? (obra as any)?.centro_custo_id ?? '')
+    setCentroId((obra as any)?.centro_custo_id ?? requisicao.centro_custo_id ?? '')
     setCondicaoPagamento(cotacaoResolvida?.condicaoPagamento ?? '')
     setDataPrevistaEntrega('')
     setObservacoes('')
@@ -376,14 +376,14 @@ export default function EmitirPedidoModal({
                 <div className="rounded-2xl border border-cyan-200 bg-cyan-50 px-4 py-3">
                   <p className="text-[11px] font-bold text-cyan-700">Centro de Custo sugerido</p>
                   <p className="mt-1 text-sm font-semibold text-slate-800">
-                    {requisicao.centro_custo || (obraSelecionada as any)?.centro_custo?.codigo || 'Confirmacao manual necessaria'}
+                    {(obraSelecionada as any)?.centro_custo?.codigo || requisicao.centro_custo || '—'}
                   </p>
                   <p className="mt-1 text-[11px] text-slate-500">
-                    {requisicao.centro_custo
-                      ? 'Puxado da requisicao atual.'
-                      : (obraSelecionada as any)?.centro_custo_id
-                        ? 'Puxado automaticamente da obra vinculada.'
-                        : 'Selecione manualmente para emitir o pedido.'}
+                    {(obraSelecionada as any)?.centro_custo_id
+                      ? 'Puxado automaticamente da obra vinculada.'
+                      : requisicao.centro_custo
+                        ? 'Puxado da requisicao (fallback).'
+                        : 'Nenhum centro de custo vinculado.'}
                   </p>
                 </div>
               </div>
