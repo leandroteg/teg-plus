@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   ShoppingCart, Clock, CheckCircle, AlertTriangle, ChevronRight, Info,
-  XCircle, MessageSquare, FileText, Ban, Search, X, ArrowUp, ArrowDown,
+  XCircle, MessageSquare, FileText, ScrollText, Ban, Search, X, ArrowUp, ArrowDown,
   LayoutList, LayoutGrid, Download, Loader2, Building2, Calendar,
 } from 'lucide-react'
 import { useTheme } from '../contexts/ThemeContext'
@@ -201,6 +201,9 @@ function CotDetailModal({ cot, onClose, isDark, isAdmin, atLeastComprador, onDec
   const valor = cot.valor_selecionado ?? (cot.requisicao as any)?.valor_estimado ?? 0
   const categoriaCodigo = ((cot.requisicao as any)?.categoria ?? '') as string
   const categoriaRegra = categorias.find(c => c.codigo === categoriaCodigo)?.cotacoes_regras
+  const catTipo = categorias.find(c => c.codigo === categoriaCodigo)?.tipo
+  const isRecorrente = (cot.requisicao as any)?.compra_recorrente === true
+  const deveContrato = isRecorrente || (catTipo === 'servico' && valor > 2000)
   const dias = diasEmAberto(cot.created_at)
   const concluida = cot.status === 'concluida'
   const reqStatus = cot.requisicao?.status
@@ -277,18 +280,21 @@ function CotDetailModal({ cot, onClose, isDark, isAdmin, atLeastComprador, onDec
             </div>
           )}
 
-          {/* Emitir pedido */}
+          {/* Emitir pedido / Solicitar contrato */}
           {atLeastComprador && concluida && reqStatus === 'cotacao_aprovada' && (
-            <div className={`pt-3 space-y-2 ${isDark ? 'border-t border-white/[0.06]' : 'border-t border-teal-100'}`}>
-              <p className={`text-[10px] font-bold text-center uppercase tracking-wide ${isDark ? 'text-teal-400' : 'text-teal-600'}`}>Emissão de Pedido</p>
+            <div className={`pt-3 space-y-2 ${isDark ? 'border-t border-white/[0.06]' : deveContrato ? 'border-t border-indigo-100' : 'border-t border-teal-100'}`}>
+              <p className={`text-[10px] font-bold text-center uppercase tracking-wide ${isDark ? (deveContrato ? 'text-indigo-400' : 'text-teal-400') : deveContrato ? 'text-indigo-600' : 'text-teal-600'}`}>
+                {deveContrato ? 'Solicitação de Contrato' : 'Emissão de Pedido'}
+              </p>
               <div className="flex gap-2">
                 <button disabled={isCancelling || isEmitting} onClick={onCancelar}
                   className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-bold text-red-500 bg-red-50 border border-red-200 hover:bg-red-100 transition-all disabled:opacity-50">
                   {isCancelling ? <Loader2 size={14} className="animate-spin" /> : <Ban size={14} />} Cancelar
                 </button>
                 <button disabled={isEmitting || isCancelling} onClick={onEmitir}
-                  className="flex-[2] flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-bold text-white bg-teal-500 hover:bg-teal-600 shadow-sm transition-all disabled:opacity-50">
-                  {isEmitting ? <Loader2 size={14} className="animate-spin" /> : <FileText size={14} />} Emitir Pedido
+                  className={`flex-[2] flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-bold text-white shadow-sm transition-all disabled:opacity-50 ${deveContrato ? 'bg-indigo-500 hover:bg-indigo-600' : 'bg-teal-500 hover:bg-teal-600'}`}>
+                  {isEmitting ? <Loader2 size={14} className="animate-spin" /> : deveContrato ? <ScrollText size={14} /> : <FileText size={14} />}
+                  {deveContrato ? 'Solicitar Contrato' : 'Emitir Pedido'}
                 </button>
               </div>
             </div>
