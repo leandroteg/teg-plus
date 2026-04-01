@@ -741,7 +741,7 @@ export default function NovaRequisicao() {
       }`}>
         <div className="flex items-start justify-between gap-3">
           <div>
-            <label className="text-xs font-semibold text-slate-500 block">Compra/Contratação recorrente</label>
+            <label className="text-xs font-semibold text-slate-500 block">Compra/Serviço Recorrente</label>
             <p className="text-xs text-slate-500 mt-1">
               Esta solicitação passará pela área de Contratos para formalização
             </p>
