@@ -4,7 +4,7 @@ import {
   User, Mail, Briefcase, Building2, Shield, Lock,
   LogOut, Edit3, Check, X, ChevronRight, Eye, EyeOff,
   AlertCircle, CheckCircle, Settings, Code2,
-  Volume2, VolumeX, BellRing,
+  Volume2, VolumeX, BellRing, ChevronLeft,
 } from 'lucide-react'
 import {
   useAuth, ROLE_LABEL, ROLE_COLOR, ALCADA_LABEL, MODULOS_ERP, type Role,
@@ -357,6 +357,14 @@ export default function Perfil() {
       )}
 
       <div className="space-y-4">
+
+        {/* ── Botão Voltar ── */}
+        <button
+          onClick={() => navigate(-1)}
+          className="flex items-center gap-1.5 text-xs text-slate-500 hover:text-indigo-600 transition-colors"
+        >
+          <ChevronLeft size={14} /> Voltar
+        </button>
 
         {/* ── Hero card ── */}
         <div className="bg-white rounded-2xl shadow-card overflow-hidden">

@@ -1242,6 +1242,25 @@ export function useDecisaoGenerica() {
               }).eq('id', entidadeId)
             }
           }
+        } else if (tipoAprovacao === 'cotacao') {
+          // Avanca status da requisicao de cotacao_enviada → cotacao_aprovada/rejeitada
+          if (decisao === 'aprovada') {
+            await supabase
+              .from('cmp_requisicoes')
+              .update({ status: 'cotacao_aprovada' })
+              .eq('id', entidadeId)
+          } else if (decisao === 'rejeitada') {
+            await supabase
+              .from('cmp_requisicoes')
+              .update({ status: 'cotacao_rejeitada' })
+              .eq('id', entidadeId)
+          } else {
+            // esclarecimento
+            await supabase
+              .from('cmp_requisicoes')
+              .update({ status: 'em_esclarecimento' })
+              .eq('id', entidadeId)
+          }
         }
       } catch (e) {
         console.warn('Aviso: entidade fonte nao atualizada:', e)
@@ -1263,6 +1282,10 @@ export function useDecisaoGenerica() {
       qc.invalidateQueries({ queryKey: ['lote-detalhe'] })
       qc.invalidateQueries({ queryKey: ['log_solicitacoes'] })
       qc.invalidateQueries({ queryKey: ['log_viagens'] })
+      qc.invalidateQueries({ queryKey: ['cotacoes'] })
+      qc.invalidateQueries({ queryKey: ['cotacao'] })
+      qc.invalidateQueries({ queryKey: ['requisicoes'] })
+      qc.invalidateQueries({ queryKey: ['requisicao'] })
     },
   })
 }

@@ -455,7 +455,17 @@ function buildPdfHtml(pedido: Pedido, EMPRESA: EmpresaData = EMPRESA_FALLBACK): 
   .footer { margin-top: 30px; padding-top: 12px; border-top: 2px solid #e2e8f0; text-align: center; }
   .footer p { font-size: 9px; color: #94a3b8; line-height: 1.5; }
   .footer .disclaimer { font-size: 8px; color: #cbd5e1; margin-top: 4px; }
-  @media print { body { padding: 0; } .page { padding: 20px; } button { display: none !important; } }
+  @media print {
+    body { padding: 0; }
+    .page { padding: 20px; }
+    button { display: none !important; }
+    .header { background: #ffffff !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; border: 1px solid #e2e8f0 !important; }
+    .company-name { color: #1e293b !important; }
+    .company-cnpj { color: #475569 !important; }
+    .doc-title { color: #0d9488 !important; }
+    .doc-number { color: #1e293b !important; }
+    .doc-date { color: #475569 !important; }
+  }
 </style></head>
 <body><div class="page">
   <div class="header">
