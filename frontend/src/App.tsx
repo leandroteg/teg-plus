@@ -64,6 +64,7 @@ const PreparaMinuta = lazy(() => import('./pages/contratos/PreparaMinuta'))
 const ResumoExecutivoPage = lazy(() => import('./pages/contratos/ResumoExecutivo'))
 const Assinaturas = lazy(() => import('./pages/contratos/Assinaturas'))
 const GestaoContratos = lazy(() => import('./pages/contratos/GestaoContratos'))
+const ContratoDetalhe = lazy(() => import('./pages/contratos/ContratoDetalhe'))
 const EquipePJ = lazy(() => import('./pages/contratos/EquipePJ'))
 const ModelosContrato = lazy(() => import('./pages/contratos/ModelosContrato'))
 
@@ -344,8 +345,9 @@ export default function App() {
               <Route path="/contratos/solicitacoes/:id/minuta" element={<Lazy><PreparaMinuta /></Lazy>} />
               <Route path="/contratos/solicitacoes/:id/resumo" element={<Lazy><ResumoExecutivoPage /></Lazy>} />
               <Route path="/contratos/assinaturas"  element={<Lazy><Assinaturas /></Lazy>} />
-              <Route path="/contratos/gestao"       element={<Lazy><GestaoContratos /></Lazy>} />
-              <Route path="/contratos/equipe-pj"    element={<Lazy><EquipePJ /></Lazy>} />
+              <Route path="/contratos/gestao"           element={<Lazy><GestaoContratos /></Lazy>} />
+              <Route path="/contratos/detalhe/:id"    element={<Lazy><ContratoDetalhe /></Lazy>} />
+              <Route path="/contratos/equipe-pj"      element={<Lazy><EquipePJ /></Lazy>} />
               <Route path="/contratos/modelos"      element={<Lazy><ModelosContrato /></Lazy>} />
             </Route>
           </Route>
