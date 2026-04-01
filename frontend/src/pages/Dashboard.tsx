@@ -457,7 +457,7 @@ export default function Dashboard() {
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <div>
           <h1 className={`text-xl font-extrabold ${isDark ? 'text-white' : 'text-slate-900'}`}>
-            Painel — Compras
+            Painel - Compras
           </h1>
           <p className={`text-xs mt-0.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
             Requisições, cotações e pedidos de compra
@@ -504,63 +504,63 @@ export default function Dashboard() {
       </div>
 
       {/* Hero 2 colunas */}
-      <div className="grid grid-cols-1 xl:grid-cols-[1.52fr_0.88fr] gap-3">
+      <div className="grid grid-cols-1 xl:grid-cols-[1.52fr_0.88fr] gap-3 items-stretch">
 
         {/* Núcleo de Compras */}
-        <section className={`rounded-3xl shadow-sm overflow-hidden ${cardClass}`}>
-          <div className="p-4 md:p-5 space-y-4">
-            <div className="flex items-start justify-between gap-4">
+        <section className={`rounded-3xl shadow-sm overflow-hidden flex flex-col ${cardClass}`}>
+          <div className="p-4 md:p-5 flex flex-col gap-4 flex-1">
+            <div className="flex items-center justify-between gap-4">
               <div>
                 <p className={`text-[11px] font-bold uppercase tracking-[0.24em] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
                   Núcleo de Compras
                 </p>
-                <p className={`mt-1 text-[11px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
-                  Total em compras no período
-                </p>
-                <h2 className={`mt-0.5 text-[1.4rem] md:text-[1.85rem] leading-none font-black tracking-tight ${isDark ? 'text-white' : 'text-slate-900'}`}>
-                  {fmt(kpis.valor_total_mes)}
+                <h2 className={`mt-0.5 text-sm font-black ${isDark ? 'text-white' : 'text-slate-900'}`}>
+                  Indicadores do período selecionado
                 </h2>
-                <p className={`mt-2 text-[11px] ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
-                  {kpis.total_mes} RC(s) · {kpis.aguardando_aprovacao} aguard. aprov. · {kpis.aprovadas_mes} aprovadas
-                </p>
               </div>
-              <div className={`hidden md:flex w-12 h-12 rounded-2xl items-center justify-center ${isDark ? 'bg-teal-500/10' : 'bg-teal-50'}`}>
-                <ShoppingCart size={22} className="text-teal-500" />
+              <div className={`hidden md:flex w-10 h-10 rounded-2xl items-center justify-center shrink-0 ${isDark ? 'bg-teal-500/10' : 'bg-teal-50'}`}>
+                <ShoppingCart size={18} className="text-teal-500" />
               </div>
             </div>
 
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5">
+            <div className="grid grid-cols-2 lg:grid-cols-3 gap-2.5 flex-1">
+              <SpotlightMetric
+                label="Valor Total"
+                value={fmt(kpis.valor_total_mes)}
+                tone="teal"
+                note="volume no período"
+              />
               <SpotlightMetric
                 label="Total RCs"
                 value={kpis.total_mes}
-                tone="teal"
-                note="no período selecionado"
+                tone="sky"
+                note="solicitações abertas"
               />
               <SpotlightMetric
                 label="Aguard. Aprovação"
                 value={kpis.aguardando_aprovacao}
                 tone={kpis.aguardando_aprovacao > 5 ? 'amber' : 'sky'}
-                note={kpis.aguardando_aprovacao > 5 ? 'atenção: fila alta' : 'fila sob controle'}
+                note={`SLA: 48h · ${kpis.aguardando_aprovacao > 5 ? 'fila alta' : 'sob controle'}`}
               />
               <SpotlightMetric
                 label="Aprovadas"
                 value={kpis.aprovadas_mes}
                 tone="emerald"
-                note="no período selecionado"
+                note="SLA: encerrar em ≤5d"
               />
               <SpotlightMetric
                 label="Tempo Médio Aprov."
                 value={tempoMedio}
                 tone={kpis.tempo_medio_aprovacao_horas > 48 ? 'amber' : 'emerald'}
-                note={kpis.tempo_medio_aprovacao_horas > 48 ? 'acima do SLA 48h' : 'dentro do SLA'}
+                note={kpis.tempo_medio_aprovacao_horas > 48 ? 'acima SLA 48h' : 'dentro SLA 48h'}
               />
             </div>
           </div>
         </section>
 
         {/* Janela Crítica */}
-        <section className={`rounded-3xl shadow-sm overflow-hidden ${cardClass}`}>
-          <div className="p-4 md:p-5 space-y-3">
+        <section className={`rounded-3xl shadow-sm overflow-hidden flex flex-col ${cardClass}`}>
+          <div className="p-4 md:p-5 flex flex-col gap-3 flex-1">
             <div className="flex items-center justify-between gap-3">
               <div>
                 <p className={`text-[11px] font-bold uppercase tracking-[0.24em] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
