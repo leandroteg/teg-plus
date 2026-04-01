@@ -589,7 +589,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       )
     }
 
-    return legacyRole === 'diretor' || legacyRole === 'gerente' || legacyRole === 'gestor' || legacyRole === 'aprovador'
+    return legacyRole === 'diretor' || legacyRole === 'supervisor' || legacyRole === 'gerente' || legacyRole === 'gestor' || legacyRole === 'aprovador'
   }
 
   const currentNivel = Math.max(ROLE_NIVEL[legacyRole] ?? 0, ROLE_NIVEL[papelGlobal] ?? 0)
@@ -620,7 +620,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     canManage: isAdmin,
     hasModule,
     hasSetorPapel,
-    canApprove: (nivel) => isAdmin || papelGlobal === 'ceo' || (perfil?.alcada_nivel ?? 0) >= nivel,
+    canApprove: (nivel) => {
+      if (isAdmin || papelGlobal === 'ceo') return true
+      if (papelGlobal === 'diretor') return true            // diretor aprova todos os níveis
+      if (papelGlobal === 'supervisor' && nivel <= 1) return true  // supervisor aprova nível 1 (≤R$2k)
+      return (perfil?.alcada_nivel ?? 0) >= nivel           // fallback: alçada explícita no perfil
+    },
     canTechnicalApprove,
     atLeast: (r) => currentNivel >= (ROLE_NIVEL[r] ?? 0),
     permissoesEspeciais: (modulo: string) => perfil?.permissoes_especiais?.[modulo] ?? {},
