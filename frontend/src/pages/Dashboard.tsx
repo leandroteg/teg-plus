@@ -203,7 +203,7 @@ function UrgentesCard({ reqs, isDark, nav }: { reqs: Requisicao[]; isDark: boole
                     {r.urgencia === 'critica' ? 'CRÍTICA' : 'URGENTE'}
                   </span>
                 </div>
-                <p className={`text-[10px] truncate ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{r.descricao}</p>
+                <p className={`text-[10px] truncate ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{(r as any).justificativa || r.descricao}</p>
               </div>
               <div className="text-right shrink-0">
                 <StatusBadge status={r.status} size="sm" />
@@ -263,7 +263,7 @@ function VencidasCard({ reqs, isDark, nav }: { reqs: Requisicao[]; isDark: boole
                       : <span className="text-[9px] bg-amber-100 text-amber-700 font-bold px-1.5 py-0.5 rounded-full">À VENCER</span>
                     }
                   </div>
-                  <p className={`text-[10px] truncate ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{r.descricao}</p>
+                  <p className={`text-[10px] truncate ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{(r as any).justificativa || r.descricao}</p>
                 </div>
                 <div className="text-right shrink-0">
                   <StatusBadge status={r.status} size="sm" />
@@ -305,7 +305,7 @@ function RecentCard({ r, aprovacao, isDark, nav }: { r: any; aprovacao?: Aprovac
             </span>
           )}
         </div>
-        <p className={`text-xs font-semibold truncate ${isDark ? 'text-slate-200' : 'text-slate-800'}`}>{r.descricao}</p>
+        <p className={`text-xs font-semibold truncate ${isDark ? 'text-slate-200' : 'text-slate-800'}`}>{(r as any).justificativa || r.descricao}</p>
         {aprovacao && (
           <div className="flex items-center gap-1 mt-1">
             <Clock size={9} className="text-amber-500" />
