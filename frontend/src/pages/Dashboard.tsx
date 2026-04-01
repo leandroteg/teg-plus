@@ -433,10 +433,6 @@ export default function Dashboard() {
       : `${Math.round(kpis.tempo_medio_aprovacao_horas)}h`
     : '—'
 
-  const cotacaoCount = reqs.filter(r =>
-    ['em_cotacao', 'cotacao_enviada', 'cotacao_aprovada'].includes(r.status)
-  ).length
-
   const cardClass = isDark
     ? 'bg-[#1e293b] border border-white/[0.06]'
     : 'bg-white border border-slate-200'
@@ -595,22 +591,6 @@ export default function Dashboard() {
                 note="data de necessidade"
                 icon={CalendarClock}
                 iconTone={vencidasAVencer.length > 0 ? 'text-amber-500' : 'text-slate-400'}
-                isDark={isDark}
-              />
-              <MiniInfoCard
-                label="Rejeitadas"
-                value={kpis.rejeitadas_mes}
-                note="no período"
-                icon={XCircle}
-                iconTone="text-red-400"
-                isDark={isDark}
-              />
-              <MiniInfoCard
-                label="Em Cotação"
-                value={cotacaoCount}
-                note="aguardando definição"
-                icon={FileText}
-                iconTone="text-violet-500"
                 isDark={isDark}
               />
             </div>
