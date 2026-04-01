@@ -1136,7 +1136,7 @@ function PedCard({ pedido, dark, onClick }: { pedido: PedidoListItem; dark: bool
         {pedido.requisicao && (
           <p className={`text-xs truncate ${dark ? 'text-slate-400' : 'text-slate-500'}`}>
             <span className={`font-mono ${dark ? 'text-slate-500' : 'text-slate-300'}`}>{pedido.requisicao.numero}</span>
-            {' · '}{pedido.requisicao.descricao}
+            {' · '}{pedido.requisicao.justificativa || pedido.requisicao.descricao}
             {pedido.requisicao.obra_nome && <span className={dark ? 'text-slate-500' : 'text-slate-400'}> · {pedido.requisicao.obra_nome}</span>}
           </p>
         )}
@@ -1568,14 +1568,14 @@ function DetailModal({
             </div>
           )}
 
-          {pedido.requisicao?.descricao && (
+          {(pedido.requisicao?.justificativa || pedido.requisicao?.descricao) && (
             <div className={`rounded-xl p-3 border ${dark ? 'bg-white/[0.02] border-white/10' : 'bg-slate-50 border-slate-200'}`}>
-              <p className={`text-[11px] font-semibold uppercase tracking-wide mb-1 ${sub}`}>Resumo da RC</p>
-              <p className={`text-xs leading-relaxed ${sub}`}>{pedido.requisicao.descricao}</p>
-              {pedido.requisicao.justificativa && (
+              <p className={`text-[11px] font-semibold uppercase tracking-wide mb-1 ${sub}`}>Descrição da RC</p>
+              <p className={`text-xs leading-relaxed ${sub}`}>{pedido.requisicao.justificativa || pedido.requisicao.descricao}</p>
+              {pedido.requisicao.descricao && pedido.requisicao.descricao !== pedido.requisicao.justificativa && (
                 <div className={`mt-2 pt-2 border-t ${dark ? 'border-white/10' : 'border-slate-200'}`}>
-                  <p className={`text-[10px] font-bold uppercase tracking-wider mb-0.5 ${dark ? 'text-teal-400' : 'text-teal-600'}`}>Descrição</p>
-                  <p className={`text-xs leading-relaxed ${dark ? 'text-teal-200' : 'text-teal-800'}`}>{pedido.requisicao.justificativa}</p>
+                  <p className={`text-[10px] font-bold uppercase tracking-wider mb-0.5 ${dark ? 'text-teal-400' : 'text-teal-600'}`}>Detalhes adicionais</p>
+                  <p className={`text-xs leading-relaxed ${dark ? 'text-teal-200' : 'text-teal-800'}`}>{pedido.requisicao.descricao}</p>
                 </div>
               )}
             </div>

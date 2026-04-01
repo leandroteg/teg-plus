@@ -316,7 +316,7 @@ function CotacaoConcluida({ cotacao, nav }: { cotacao: Cotacao; nav: ReturnType<
       {/* RC Info */}
       <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm">
         <p className="text-xs text-slate-400 font-mono mb-1">{req?.numero}</p>
-        <p className="text-sm font-bold text-slate-800">{req?.descricao}</p>
+        <p className="text-sm font-bold text-slate-800">{req?.justificativa || req?.descricao}</p>
         <div className="flex justify-between items-center mt-1">
           <p className="text-xs text-slate-400">{req?.obra_nome}</p>
           <p className="text-sm font-extrabold text-teal-600">{fmt(cotacao.valor_selecionado ?? req?.valor_estimado ?? 0)}</p>
@@ -829,15 +829,15 @@ export default function CotacaoForm() {
                 <span className="text-[10px] font-bold bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-lg">Recorrente</span>
               )}
             </div>
-            <p className="text-sm font-bold text-slate-800 mt-0.5">{cotacao.requisicao.descricao}</p>
+            <p className="text-sm font-bold text-slate-800 mt-0.5">{cotacao.requisicao.justificativa || cotacao.requisicao.descricao}</p>
             <div className="flex justify-between mt-1">
               <span className="text-xs text-slate-400">{cotacao.requisicao.obra_nome}</span>
               <span className="text-sm font-extrabold text-teal-600">{fmt(valorRef)}</span>
             </div>
-            {cotacao.requisicao.justificativa && (
+            {cotacao.requisicao.descricao && cotacao.requisicao.descricao !== cotacao.requisicao.justificativa && (
               <div className="mt-2 pt-2 border-t border-slate-100 rounded-lg bg-teal-50/50 px-3 py-2">
-                <p className="text-[10px] font-bold uppercase tracking-wider mb-0.5 text-teal-600">Descrição</p>
-                <p className="text-xs leading-relaxed text-teal-800">{cotacao.requisicao.justificativa}</p>
+                <p className="text-[10px] font-bold uppercase tracking-wider mb-0.5 text-teal-600">Detalhes adicionais</p>
+                <p className="text-xs leading-relaxed text-teal-800">{cotacao.requisicao.descricao}</p>
               </div>
             )}
           </div>
