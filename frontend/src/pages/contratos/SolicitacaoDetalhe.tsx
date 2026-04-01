@@ -770,7 +770,7 @@ function EtapaActions({ etapa, solicitacaoId, onAvancar, onCancel, onEnviarAssin
 
     case 'aprovacao_diretoria': {
       const { role } = useAuth()
-      const canApproveHere = role === 'administrador' || role === 'diretor'
+      const canApproveHere = role === 'administrador' || role === 'diretor' || role === 'supervisor'
       const [approving, setApproving] = useState(false)
       return (
         <>
