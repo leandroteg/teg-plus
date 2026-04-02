@@ -38,6 +38,7 @@ const EMPTY_FORM = {
   finalidade: '',
   justificativa: '',
   valor_solicitado: 0,
+  data_pagamento: '',
   data_limite_prestacao: '',
   centro_custo: '',
   centro_custo_id: '',
@@ -140,6 +141,7 @@ export default function DespesasAdiantamentos() {
         finalidade: form.finalidade,
         justificativa: form.justificativa,
         valor_solicitado: Number(form.valor_solicitado),
+        data_pagamento: form.data_pagamento || undefined,
         data_limite_prestacao: form.data_limite_prestacao || undefined,
         centro_custo: form.centro_custo,
         centro_custo_id: form.centro_custo_id || undefined,
@@ -301,6 +303,10 @@ export default function DespesasAdiantamentos() {
               <div>
                 <label className="mb-1.5 block text-xs font-semibold text-slate-500">Valor solicitado</label>
                 <NumericInput value={form.valor_solicitado} onChange={value => setForm(prev => ({ ...prev, valor_solicitado: value }))} className={inputCls} placeholder="0" />
+              </div>
+              <div>
+                <label className="mb-1.5 block text-xs font-semibold text-slate-500">Data de pagamento</label>
+                <input type="date" value={form.data_pagamento} onChange={e => setForm(prev => ({ ...prev, data_pagamento: e.target.value }))} className={inputCls} />
               </div>
               <div>
                 <label className="mb-1.5 block text-xs font-semibold text-slate-500">Limite para prestação</label>
