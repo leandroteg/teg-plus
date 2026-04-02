@@ -7,6 +7,8 @@ type NovaSolicitacaoAdiantamentoPayload = {
   finalidade: string
   justificativa?: string
   valor_solicitado: number
+  favorecido_nome: string
+  favorecido_email?: string
   data_limite_prestacao?: string
   centro_custo?: string
   centro_custo_id?: string
@@ -96,8 +98,8 @@ export function useCriarSolicitacaoAdiantamento() {
           gestor_id: gestor.id,
           gestor_nome: gestor.nome,
           gestor_email: gestor.email,
-          favorecido_nome: perfil.nome,
-          favorecido_email: perfil.email,
+          favorecido_nome: payload.favorecido_nome.trim(),
+          favorecido_email: payload.favorecido_email?.trim() || null,
           centro_custo: payload.centro_custo || null,
           centro_custo_id: payload.centro_custo_id || null,
           classe_financeira: payload.classe_financeira || null,

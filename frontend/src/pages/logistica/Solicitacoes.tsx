@@ -13,6 +13,7 @@ import { useCriarSolicitacao as useCriarSolicitacaoNF } from '../../hooks/useSol
 import { useConsultaCNPJ } from '../../hooks/useConsultas'
 import { StatusBadge } from './LogisticaHome'
 import { useTheme } from '../../contexts/ThemeContext'
+import { useAuth } from '../../contexts/AuthContext'
 import type { CriarSolicitacaoPayload, TipoTransporte, StatusSolicitacao } from '../../types/logistica'
 import { useNavigate } from 'react-router-dom'
 import { useLookupCentrosCusto } from '../../hooks/useLookups'
@@ -58,6 +59,7 @@ function getAlcada(valor?: number) {
 
 export default function Solicitacoes() {
   const { isDark } = useTheme()
+  const { hasSetorPapel } = useAuth()
   const [busca, setBusca] = useState('')
   const [statusFiltro, setStatusFiltro] = useState<string>('')
   const [showForm, setShowForm] = useState(false)
@@ -80,6 +82,7 @@ export default function Solicitacoes() {
   const criar = useCriarSolicitacao()
   const atualizarStatus = useAtualizarStatusSolicitacao()
   const aprovar = useAprovarSolicitacao()
+  const canApproveLogistica = hasSetorPapel('logistica', ['supervisor', 'diretor', 'ceo'])
   const planejar = usePlanejaarSolicitacao()
   const criarNF = useCriarSolicitacaoNF()
   const cnpjLookup = useConsultaCNPJ(useCallback((r) => {
@@ -304,12 +307,14 @@ export default function Solicitacoes() {
                       )}
                       {s.status === 'aguardando_aprovacao' && (
                         <>
-                          <ActionBtn
-                            label="Aprovar"
-                            color="bg-emerald-600 hover:bg-emerald-700"
-                            loading={aprovar.isPending}
-                            onClick={() => setAprovacaoModal({ id: s.id, titulo: s.numero })}
-                          />
+                          {canApproveLogistica && (
+                            <ActionBtn
+                              label="Aprovar"
+                              color="bg-emerald-600 hover:bg-emerald-700"
+                              loading={aprovar.isPending}
+                              onClick={() => setAprovacaoModal({ id: s.id, titulo: s.numero })}
+                            />
+                          )}
                         </>
                       )}
                       {s.status === 'aprovado' && (

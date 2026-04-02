@@ -161,19 +161,16 @@ function ApontamentoModal({
       <div className={`w-full max-w-lg rounded-2xl shadow-2xl ${isDark ? 'bg-[#1e293b]' : 'bg-white'}`}>
         {/* Header */}
         <div className={`flex items-center justify-between px-5 py-4 border-b ${isDark ? 'border-white/[0.06]' : 'border-slate-100'}`}>
-          <div className="flex items-center gap-2">
-            <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${isDark ? 'bg-emerald-500/15' : 'bg-emerald-50'}`}>
-              <Receipt size={18} className="text-emerald-600" />
+          <div className="flex items-center gap-3">
+            <div className={`min-w-[42px] h-10 px-3 rounded-xl flex items-center justify-center ${isDark ? 'bg-emerald-500/15' : 'bg-emerald-50'}`}>
+              <span className={`text-sm font-bold ${isDark ? 'text-emerald-200' : 'text-emerald-700'}`}>
+                {formatControlNumber(nextIndex)}
+              </span>
             </div>
             <div>
               <h3 className={`text-base font-bold ${isDark ? 'text-white' : 'text-slate-800'}`}>
                 {editing ? 'Editar Apontamento' : 'Novo Apontamento'}
               </h3>
-              {!editing && (
-                <p className="text-[10px] text-emerald-500 font-semibold mt-0.5 uppercase tracking-[0.18em]">
-                  Proximo controle: {formatControlNumber(nextIndex)}
-                </p>
-              )}
               <p className="text-[10px] text-slate-400">Registre o gasto no cartão corporativo</p>
             </div>
           </div>
@@ -573,12 +570,12 @@ export default function ApontamentosCartao() {
                 className={`rounded-xl border px-4 py-3 flex items-center gap-3 transition-all
                   ${isDark ? 'bg-[#1e293b] border-white/[0.06] hover:border-white/[0.12]' : 'bg-white border-slate-200 hover:border-slate-300 hover:shadow-sm'}`}
               >
-                <div className={`min-w-[118px] shrink-0 rounded-xl border px-3 py-2 ${
+                <div className={`min-w-[86px] shrink-0 rounded-lg border px-3 py-1.5 ${
                   isDark
                     ? 'border-emerald-500/20 bg-emerald-500/10'
                     : 'border-emerald-200 bg-emerald-50'
                 }`}>
-                  <p className={`text-sm font-black tracking-[0.18em] text-center ${
+                  <p className={`text-xs font-bold tracking-[0.04em] text-center ${
                     isDark ? 'text-emerald-100' : 'text-emerald-800'
                   }`}>
                     {formatControlNumber(displayNumber)}

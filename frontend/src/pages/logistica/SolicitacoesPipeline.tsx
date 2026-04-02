@@ -6,6 +6,7 @@ import {
   ShieldCheck, Plus, Save, Loader2, Trash2, Route,
 } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
+import { useAuth } from '../../contexts/AuthContext'
 import {
   useSolicitacoes, useAtualizarStatusSolicitacao,
   useAprovarSolicitacao, usePlanejaarSolicitacao,
@@ -1140,6 +1141,7 @@ function NovaSolicitacaoModal({ isDark, onClose, onSuccess }: {
 // ── Main Page ────────────────────────────────────────────────────────────────
 
 export default function SolicitacoesPipeline() {
+  const { hasSetorPapel } = useAuth()
   const { isDark } = useTheme()
   const [searchParams, setSearchParams] = useSearchParams()
   const [activeTab, setActiveTab] = useState<StatusSolicitacaoPipeline>('solicitado')
@@ -1181,6 +1183,7 @@ export default function SolicitacoesPipeline() {
   const atualizarViagem = useAtualizarViagem()
   const enviarViagemAprovacao = useEnviarViagemAprovacao()
   const aprovarViagem = useAprovarViagem()
+  const canApproveLogistica = hasSetorPapel('logistica', ['supervisor', 'diretor', 'ceo'])
 
   // Group by status
   const grouped = useMemo(() => {
@@ -1442,6 +1445,11 @@ export default function SolicitacoesPipeline() {
   }
 
   const handleAprovar = async (ids: string[]) => {
+    if (!canApproveLogistica) {
+      showToast('error', 'Somente Supervisor de Logística ou Diretor pode aprovar viagens')
+      return
+    }
+
     try {
       const solsToApprove = solicitacoes.filter(s => ids.includes(s.id))
       const viagemIds = new Set<string>()
@@ -1510,7 +1518,9 @@ export default function SolicitacoesPipeline() {
     planejado:            { label: 'Enviar p/ Aprovação',   icon: ShieldCheck,  className: 'bg-amber-600 hover:bg-amber-700 text-white' },
     aguardando_aprovacao: { label: 'Aprovar',               icon: CheckCircle2, className: 'bg-emerald-600 hover:bg-emerald-700 text-white' },
   }
-  const bulk = BULK_ACTIONS[activeTab]
+  const bulk = activeTab === 'aguardando_aprovacao' && !canApproveLogistica
+    ? undefined
+    : BULK_ACTIONS[activeTab]
   const selectedInTab = activeItems.filter(s => selectedIds.has(s.id))
   const urgentCt = activeItems.filter(s => s.urgente).length
 

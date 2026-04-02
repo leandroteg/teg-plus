@@ -77,7 +77,8 @@ type ContratoAction = {
   confirmBg: string
   confirmHover: string
   needsMotivo: boolean
-  minRole: 'comprador' | 'gerente'
+  minRole?: 'comprador' | 'gerente'
+  requireContratoSupervisor?: boolean
 }
 
 const ACTIONS: Record<string, ContratoAction[]> = {
@@ -88,12 +89,12 @@ const ACTIONS: Record<string, ContratoAction[]> = {
     { key: 'liberar', label: 'Liberar Pagamentos', toStatus: 'vigente', icon: Banknote, bg: 'bg-emerald-50', border: 'border-emerald-200', text: 'text-emerald-600', hoverBg: 'hover:bg-emerald-100', confirmBg: 'bg-emerald-600', confirmHover: 'hover:bg-emerald-700', needsMotivo: false, minRole: 'comprador' },
   ],
   vigente: [
-    { key: 'suspender', label: 'Suspender', toStatus: 'suspenso', icon: Pause, bg: 'bg-amber-50', border: 'border-amber-200', text: 'text-amber-600', hoverBg: 'hover:bg-amber-100', confirmBg: 'bg-amber-500', confirmHover: 'hover:bg-amber-600', needsMotivo: true, minRole: 'comprador' },
+    { key: 'suspender', label: 'Suspender', toStatus: 'suspenso', icon: Pause, bg: 'bg-amber-50', border: 'border-amber-200', text: 'text-amber-600', hoverBg: 'hover:bg-amber-100', confirmBg: 'bg-amber-500', confirmHover: 'hover:bg-amber-600', needsMotivo: true, requireContratoSupervisor: true },
     { key: 'encerrar', label: 'Encerrar', toStatus: 'encerrado', icon: Lock, bg: 'bg-slate-50', border: 'border-slate-200', text: 'text-slate-600', hoverBg: 'hover:bg-slate-100', confirmBg: 'bg-slate-600', confirmHover: 'hover:bg-slate-700', needsMotivo: true, minRole: 'gerente' },
     { key: 'rescindir', label: 'Rescindir', toStatus: 'rescindido', icon: AlertOctagon, bg: 'bg-red-50', border: 'border-red-200', text: 'text-red-600', hoverBg: 'hover:bg-red-100', confirmBg: 'bg-red-600', confirmHover: 'hover:bg-red-700', needsMotivo: true, minRole: 'gerente' },
   ],
   suspenso: [
-    { key: 'reativar', label: 'Reativar', toStatus: 'vigente', icon: RotateCcw, bg: 'bg-blue-50', border: 'border-blue-200', text: 'text-blue-600', hoverBg: 'hover:bg-blue-100', confirmBg: 'bg-blue-600', confirmHover: 'hover:bg-blue-700', needsMotivo: false, minRole: 'comprador' },
+    { key: 'reativar', label: 'Reativar', toStatus: 'vigente', icon: RotateCcw, bg: 'bg-blue-50', border: 'border-blue-200', text: 'text-blue-600', hoverBg: 'hover:bg-blue-100', confirmBg: 'bg-blue-600', confirmHover: 'hover:bg-blue-700', needsMotivo: false, requireContratoSupervisor: true },
     { key: 'encerrar', label: 'Encerrar', toStatus: 'encerrado', icon: Lock, bg: 'bg-slate-50', border: 'border-slate-200', text: 'text-slate-600', hoverBg: 'hover:bg-slate-100', confirmBg: 'bg-slate-600', confirmHover: 'hover:bg-slate-700', needsMotivo: true, minRole: 'gerente' },
     { key: 'rescindir', label: 'Rescindir', toStatus: 'rescindido', icon: AlertOctagon, bg: 'bg-red-50', border: 'border-red-200', text: 'text-red-600', hoverBg: 'hover:bg-red-100', confirmBg: 'bg-red-600', confirmHover: 'hover:bg-red-700', needsMotivo: true, minRole: 'gerente' },
   ],
@@ -102,7 +103,7 @@ const ACTIONS: Record<string, ContratoAction[]> = {
 // ── Contrato Card ───────────────────────────────────────────────────────────
 function ContratoCard({ contrato, onToast }: { contrato: Contrato; onToast: (type: 'success' | 'error', msg: string) => void }) {
   const nav = useNavigate()
-  const { atLeast } = useAuth()
+  const { atLeast, hasSetorPapel } = useAuth()
   const atualizarContrato = useAtualizarContrato()
   const [expanded, setExpanded] = useState(false)
   const [confirmAction, setConfirmAction] = useState<ContratoAction | null>(null)
@@ -126,7 +127,12 @@ function ContratoCard({ contrato, onToast }: { contrato: Contrato; onToast: (typ
     (new Date(contrato.data_fim_previsto).getTime() - Date.now()) / (1000 * 60 * 60 * 24)
   )
 
-  const actions = (ACTIONS[contrato.status] ?? []).filter(a => atLeast(a.minRole))
+  const canManageContrato = hasSetorPapel('contratos', ['supervisor', 'diretor', 'ceo'])
+  const actions = (ACTIONS[contrato.status] ?? []).filter(action => {
+    if (action.requireContratoSupervisor) return canManageContrato
+    if (action.minRole) return atLeast(action.minRole)
+    return false
+  })
   const isFinal = contrato.status === 'encerrado' || contrato.status === 'rescindido'
 
   const handleConfirm = () => {

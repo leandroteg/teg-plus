@@ -693,6 +693,10 @@ function EtapaActions({ etapa, solicitacaoId, onAvancar, onCancel, onEnviarAssin
   nav: ReturnType<typeof useNavigate>
   jaEnviado?: boolean
 }) {
+  const { role, hasSetorPapel } = useAuth()
+  const canReleaseExecution = role === 'administrador'
+    || role === 'diretor'
+    || hasSetorPapel('contratos', ['supervisor', 'diretor', 'ceo'])
   const btnPrimary = `w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-bold
     transition-all disabled:opacity-50`
   const btnSecondary = `w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-semibold
@@ -769,7 +773,6 @@ function EtapaActions({ etapa, solicitacaoId, onAvancar, onCancel, onEnviarAssin
       )
 
     case 'aprovacao_diretoria': {
-      const { role } = useAuth()
       const canApproveHere = role === 'administrador' || role === 'diretor' || role === 'supervisor'
       const [approving, setApproving] = useState(false)
       return (
@@ -864,7 +867,7 @@ function EtapaActions({ etapa, solicitacaoId, onAvancar, onCancel, onEnviarAssin
         <>
           <button
             onClick={() => onAvancar('concluido')}
-            disabled={isPending}
+            disabled={isPending || !canReleaseExecution}
             className={`${btnPrimary} bg-emerald-600 text-white hover:bg-emerald-700 shadow-sm`}
           >
             {isPending ? spinner : <Unlock size={13} />}
@@ -884,6 +887,7 @@ function EtapaActions({ etapa, solicitacaoId, onAvancar, onCancel, onEnviarAssin
 export default function SolicitacaoDetalhe() {
   const { id } = useParams<{ id: string }>()
   const nav = useNavigate()
+  const { role, hasSetorPapel } = useAuth()
 
   const { data: solicitacao, isLoading } = useSolicitacao(id)
   const { data: resumoExecutivo } = useResumoExecutivo(id)
@@ -957,6 +961,9 @@ export default function SolicitacaoDetalhe() {
   const etapa = s.etapa_atual
   const valorContrato = Number(resumoExecutivo?.valor_total ?? s.valor_estimado ?? 0)
   const destinoFinanceiro = s.tipo_contrato === 'receita' ? 'cr' : 'cp'
+  const canReleaseExecution = role === 'administrador'
+    || role === 'diretor'
+    || hasSetorPapel('contratos', ['supervisor', 'diretor', 'ceo'])
 
   const handleAvancar = async (
     etapaPara: EtapaSolicitacao,
@@ -1010,6 +1017,11 @@ export default function SolicitacaoDetalhe() {
   }
 
   const handleLiberarExecucao = async () => {
+    if (!canReleaseExecution) {
+      setExecucaoErro('Somente Supervisor de Contratos ou Diretor pode liberar a execução.')
+      return
+    }
+
     const parcelasNormalizadas = normalizarParcelasPlanejadas(
       parcelasPlanejadas.filter(p => p.data_vencimento && p.valor > 0),
       valorContrato
@@ -1227,7 +1239,7 @@ export default function SolicitacaoDetalhe() {
                   <>
                     <button
                       onClick={handleLiberarExecucao}
-                      disabled={avancarEtapa.isPending}
+                      disabled={avancarEtapa.isPending || !canReleaseExecution}
                       className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-bold bg-emerald-600 text-white hover:bg-emerald-700 shadow-sm transition-all disabled:opacity-50"
                     >
                       {avancarEtapa.isPending

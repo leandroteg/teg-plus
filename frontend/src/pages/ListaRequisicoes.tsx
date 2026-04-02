@@ -367,7 +367,7 @@ function DetailModal({ r, apr, onClose, isDark, canDecide, onDecisao, isProcessi
 export default function ListaRequisicoes() {
   const navigate = useNavigate()
   const { isDark } = useTheme()
-  const { isAdmin, atLeast, perfil } = useAuth()
+  const { isAdmin, atLeast, perfil, canTechnicalApprove } = useAuth()
 
   const [activeTab, setActiveTab] = useState<PipelineTab>('pendente')
   const [busca, setBusca] = useState('')
@@ -645,7 +645,13 @@ export default function ListaRequisicoes() {
           apr={aprovacaoMap.get(detail.id)}
           isDark={isDark}
           onClose={() => setDetail(null)}
-          canDecide={isAdmin && ['pendente', 'em_aprovacao', 'em_esclarecimento', 'cotacao_enviada'].includes(detail.status)}
+          canDecide={
+            (
+              ['pendente', 'em_aprovacao', 'em_esclarecimento'].includes(detail.status)
+              && canTechnicalApprove('compras')
+            )
+            || (detail.status === 'cotacao_enviada' && isAdmin)
+          }
           isProcessing={decisaoMutation.isPending}
           onDecisao={(decisao, obs) => handleDecisao(detail.id, detail.numero, detail.alcada_nivel, decisao, obs, detail.categoria, detail.status)}
           onEmitir={() => setEmitirRequisicao(detail)}

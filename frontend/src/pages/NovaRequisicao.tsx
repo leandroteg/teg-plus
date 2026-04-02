@@ -155,9 +155,6 @@ export default function NovaRequisicao() {
       sessionStorage.removeItem('superteg-prefill-rc')
       const pf = JSON.parse(raw)
 
-      if (pf.cotacao_referencia_url) {
-        setRefParseMsg({ type: 'success', text: `Arquivo ${pf.cotacao_referencia_nome || 'PDF'} carregado via SuperTEG` })
-      }
 
       // Clean item names: remove leading verbs/articles ("Fornecimento de" → keep noun)
       const cleanName = (s: string) =>
@@ -359,7 +356,6 @@ export default function NovaRequisicao() {
   const updateItem = (idx: number, field: keyof RequisicaoItem, value: string | number) =>
     setItens(prev => prev.map((item, i) => i === idx ? { ...item, [field]: value } : item))
 
-  // ── Extrair dados do arquivo de referência (cotação) via IA ─────────────
 
   const [submitting, setSubmitting] = useState(false)
   const [savingDraft, setSavingDraft] = useState(false)
@@ -604,7 +600,6 @@ export default function NovaRequisicao() {
                   onClick={(event) => {
                     event.stopPropagation()
                     setReferenciaFile(null)
-                    setRefParseMsg(null)
                     if (referenciaInputRef.current) referenciaInputRef.current.value = ''
                   }}
                   className="rounded-full bg-white p-2 text-slate-400 transition hover:text-red-500"
@@ -612,7 +607,6 @@ export default function NovaRequisicao() {
                   <X size={14} />
                 </button>
               </div>
-              {/* Visualizar e baixar o arquivo anexado */}
               <div className="flex gap-2">
                 <a
                   href={URL.createObjectURL(referenciaFile)}
@@ -657,13 +651,6 @@ export default function NovaRequisicao() {
             <option value="">Selecione a obra</option>
             {obras.map(o => <option key={o.id} value={o.id}>{o.codigo ? `${o.codigo} - ` : ''}{o.nome}</option>)}
           </select>
-          {(() => { const o = obras.find(x => x.id === obraId); return o?.centro_custo_id ? (
-            <p className="mt-1.5 flex items-center gap-1.5 text-[11px] text-teal-700 bg-teal-50 border border-teal-100 rounded-lg px-2.5 py-1.5">
-              <span className="font-bold">CC preenchido automaticamente:</span>
-              <span className="font-mono font-semibold">{o.centro_custo_codigo}</span>
-              {o.centro_custo_descricao && <span className="text-teal-500">— {o.centro_custo_descricao}</span>}
-            </p>
-          ) : null })()}
         </div>
 
         <div>
@@ -703,11 +690,11 @@ export default function NovaRequisicao() {
         </div>
 
         <div className={`rounded-2xl border px-4 py-3 space-y-3 ${
-        compraRecorrente ? 'border-indigo-200 bg-indigo-50/60' : 'border-red-300 bg-red-100'
+        compraRecorrente ? 'border-indigo-200 bg-indigo-50/60' : 'border-slate-200 bg-white'
       }`}>
         <div className="flex items-start justify-between gap-3">
           <div>
-            <label className="text-xs font-semibold text-slate-500 block">Compra/Serviço Recorrente</label>
+            <label className="text-xs font-semibold text-slate-500 block">Compra/Contratação recorrente</label>
             <p className="text-xs text-slate-500 mt-1">
               Esta solicitação passará pela área de Contratos para formalização
             </p>
@@ -937,13 +924,6 @@ export default function NovaRequisicao() {
           <option value="">Selecione a obra</option>
           {obras.map(o => <option key={o.id} value={o.id}>{o.codigo ? `${o.codigo} - ` : ''}{o.nome}</option>)}
         </select>
-        {(() => { const o = obras.find(x => x.id === obraId); return o?.centro_custo_id ? (
-          <p className="mt-1.5 flex items-center gap-1.5 text-[11px] text-teal-700 bg-teal-50 border border-teal-100 rounded-lg px-2.5 py-1.5">
-            <span className="font-bold">CC preenchido automaticamente:</span>
-            <span className="font-mono font-semibold">{o.centro_custo_codigo}</span>
-            {o.centro_custo_descricao && <span className="text-teal-500">— {o.centro_custo_descricao}</span>}
-          </p>
-        ) : null })()}
       </div>
 
       <div>

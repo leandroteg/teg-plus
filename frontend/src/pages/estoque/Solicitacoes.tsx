@@ -9,6 +9,7 @@ import {
   useEstoqueItens,
 } from '../../hooks/useEstoque'
 import { useTheme } from '../../contexts/ThemeContext'
+import { useAuth } from '../../contexts/AuthContext'
 import type { EstSolicitacao, StatusSolicitacao } from '../../types/estoque'
 import NumericInput from '../../components/NumericInput'
 
@@ -52,6 +53,7 @@ type ItemForm = { item_id?: string; descricao_livre?: string; quantidade: number
 
 export default function Solicitacoes() {
   const { isLightSidebar: isLight } = useTheme()
+  const { hasSetorPapel } = useAuth()
   const [statusFiltro, setStatusFiltro] = useState<StatusSolicitacao | ''>('')
   const [showForm, setShowForm] = useState(false)
   const [expandedId, setExpandedId] = useState<string | null>(null)
@@ -61,6 +63,8 @@ export default function Solicitacoes() {
   )
   const criarSolicitacao = useCriarSolicitacao()
   const atualizarSolicitacao = useAtualizarSolicitacao()
+  const canApproveSaida = hasSetorPapel('estoque', ['supervisor', 'diretor', 'ceo'])
+    || hasSetorPapel('patrimonial', ['supervisor', 'diretor', 'ceo'])
 
   const card = isLight
     ? 'bg-white border-slate-200 shadow-sm'
@@ -120,7 +124,12 @@ export default function Solicitacoes() {
             const cfg = STATUS_CONFIG[sol.status]
             const urgCfg = URGENCIA_CONFIG[sol.urgencia]
             const isExpanded = expandedId === sol.id
-            const transitions = STATUS_TRANSITIONS[sol.status] ?? []
+            const transitions = (STATUS_TRANSITIONS[sol.status] ?? []).filter(transition => {
+              if (sol.status === 'aberta' && transition.next === 'aprovada') {
+                return canApproveSaida
+              }
+              return true
+            })
 
             return (
               <div key={sol.id} className={`rounded-2xl border overflow-hidden ${card}`}>

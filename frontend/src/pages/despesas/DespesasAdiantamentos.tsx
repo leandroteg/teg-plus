@@ -1,10 +1,13 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Plus, Wallet, CheckCircle2, Clock3, XCircle, Send } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
 import { useAuth } from '../../contexts/AuthContext'
-import { useCadCentrosCusto, useCadClasses } from '../../hooks/useCadastros'
+import { useCadCentrosCusto, useCadClasses, useCadFornecedores } from '../../hooks/useCadastros'
 import { isDespesaSchemaMissing, useAdiantamentosDespesa, useCriarSolicitacaoAdiantamento } from '../../hooks/useDespesas'
+import { useRHColaboradores } from '../../hooks/useRH'
 import NumericInput from '../../components/NumericInput'
+import SearchableSelect from '../../components/SearchableSelect'
+import type { SelectOption } from '../../components/SearchableSelect'
 import type { StatusDespesaAdiantamento } from '../../types'
 
 const fmt = (v: number) =>
@@ -29,6 +32,9 @@ const STATUS_LABEL: Record<StatusDespesaAdiantamento, string> = {
 }
 
 const EMPTY_FORM = {
+  favorecido_key: '',
+  favorecido_nome: '',
+  favorecido_email: '',
   finalidade: '',
   justificativa: '',
   valor_solicitado: 0,
@@ -40,18 +46,62 @@ const EMPTY_FORM = {
   observacoes: '',
 }
 
+type FavorecidoOption = SelectOption & {
+  email?: string
+}
+
 export default function DespesasAdiantamentos() {
   const { dark } = useTheme()
   const { perfil } = useAuth()
   const { data: adiantamentos = [], error: adiantamentosError } = useAdiantamentosDespesa()
   const { data: centros = [] } = useCadCentrosCusto()
   const { data: classes = [] } = useCadClasses({ tipo: 'despesa' })
+  const { data: colaboradoresAtivos = [] } = useRHColaboradores({ ativo: true })
+  const { data: fornecedoresAtivos = [] } = useCadFornecedores({ ativo: true })
   const criar = useCriarSolicitacaoAdiantamento()
   const adiantamentosIndisponiveis = isDespesaSchemaMissing(adiantamentosError)
 
   const [showModal, setShowModal] = useState(false)
   const [erro, setErro] = useState('')
   const [form, setForm] = useState(EMPTY_FORM)
+
+  const favorecidoOptions = useMemo<FavorecidoOption[]>(() => {
+    const colaboradores = colaboradoresAtivos.map(colaborador => {
+      const tipoContrato = (colaborador.tipo_contrato || 'CLT').toUpperCase()
+      const tipoLabel = tipoContrato === 'PJ' ? 'Colaborador PJ' : 'Funcionário'
+      return {
+        value: `colaborador:${colaborador.id}`,
+        label: colaborador.nome,
+        code: tipoLabel,
+        description: [colaborador.email, colaborador.cargo, colaborador.cnpj_pj].filter(Boolean).join(' • '),
+        email: colaborador.email,
+      }
+    })
+
+    const fornecedores = fornecedoresAtivos.map(fornecedor => ({
+      value: `fornecedor:${fornecedor.id}`,
+      label: fornecedor.nome_fantasia?.trim() || fornecedor.razao_social,
+      code: 'PJ',
+      description: [fornecedor.razao_social, fornecedor.cnpj, fornecedor.email].filter(Boolean).join(' • '),
+      email: fornecedor.email,
+    }))
+
+    return [...colaboradores, ...fornecedores].sort((a, b) => a.label.localeCompare(b.label, 'pt-BR'))
+  }, [colaboradoresAtivos, fornecedoresAtivos])
+
+  useEffect(() => {
+    if (!showModal || form.favorecido_key) return
+
+    const colaboradorAtual = colaboradoresAtivos.find(colaborador => colaborador.perfil_id === perfil?.id)
+    if (!colaboradorAtual) return
+
+    setForm(prev => ({
+      ...prev,
+      favorecido_key: `colaborador:${colaboradorAtual.id}`,
+      favorecido_nome: colaboradorAtual.nome,
+      favorecido_email: colaboradorAtual.email || '',
+    }))
+  }, [showModal, form.favorecido_key, colaboradoresAtivos, perfil?.id])
 
   const stats = useMemo(() => ({
     solicitado: adiantamentos.filter(item => item.status === 'solicitado').length,
@@ -69,6 +119,10 @@ export default function DespesasAdiantamentos() {
       setErro('Preencha a finalidade e o valor solicitado.')
       return
     }
+    if (!form.favorecido_nome.trim()) {
+      setErro('Selecione o favorecido da solicitação.')
+      return
+    }
     if (!form.centro_custo || !form.classe_financeira) {
       setErro('Selecione centro de custo e classe financeira.')
       return
@@ -81,6 +135,8 @@ export default function DespesasAdiantamentos() {
     setErro('')
     try {
       await criar.mutateAsync({
+        favorecido_nome: form.favorecido_nome,
+        favorecido_email: form.favorecido_email || undefined,
         finalidade: form.finalidade,
         justificativa: form.justificativa,
         valor_solicitado: Number(form.valor_solicitado),
@@ -111,6 +167,7 @@ export default function DespesasAdiantamentos() {
           type="button"
           onClick={() => {
             setErro('')
+            setForm(EMPTY_FORM)
             setShowModal(true)
           }}
           disabled={adiantamentosIndisponiveis}
@@ -143,9 +200,10 @@ export default function DespesasAdiantamentos() {
       </div>
 
       <div className={`overflow-hidden rounded-3xl border ${dark ? 'border-white/10 bg-white/[0.03]' : 'border-slate-200 bg-white'}`}>
-        <div className={`grid grid-cols-[1.1fr,1.6fr,0.9fr,1fr,1fr] gap-4 border-b px-5 py-3 text-[11px] font-semibold uppercase tracking-[0.14em] ${dark ? 'border-white/10 text-slate-400' : 'border-slate-100 text-slate-500'}`}>
+        <div className={`grid grid-cols-[1fr,1.4fr,1fr,1fr,1fr,0.9fr] gap-4 border-b px-5 py-3 text-[11px] font-semibold uppercase tracking-[0.14em] ${dark ? 'border-white/10 text-slate-400' : 'border-slate-100 text-slate-500'}`}>
           <span>Número</span>
           <span>Finalidade</span>
+          <span>Solicitante</span>
           <span>Favorecido</span>
           <span>Valor</span>
           <span>Status</span>
@@ -157,7 +215,7 @@ export default function DespesasAdiantamentos() {
             </div>
           )}
           {adiantamentos.map(item => (
-            <div key={item.id} className="grid grid-cols-[1.1fr,1.6fr,0.9fr,1fr,1fr] gap-4 px-5 py-4 text-sm">
+            <div key={item.id} className="grid grid-cols-[1fr,1.4fr,1fr,1fr,1fr,0.9fr] gap-4 px-5 py-4 text-sm">
               <div>
                 <p className={`font-bold ${dark ? 'text-white' : 'text-slate-900'}`}>{item.numero}</p>
                 <p className={`text-xs ${dark ? 'text-slate-500' : 'text-slate-400'}`}>{new Date(item.data_solicitacao).toLocaleDateString('pt-BR')}</p>
@@ -167,6 +225,10 @@ export default function DespesasAdiantamentos() {
                 {item.justificativa && (
                   <p className={`mt-1 text-xs ${dark ? 'text-slate-500' : 'text-slate-400'}`}>{item.justificativa}</p>
                 )}
+              </div>
+              <div>
+                <p className={`${dark ? 'text-slate-200' : 'text-slate-700'}`}>{item.solicitante_nome || 'Usuário não identificado'}</p>
+                <p className={`text-xs ${dark ? 'text-slate-500' : 'text-slate-400'}`}>{item.gestor_nome || 'Gestor não identificado'}</p>
               </div>
               <div>
                 <p className={`${dark ? 'text-slate-200' : 'text-slate-700'}`}>{item.favorecido_nome}</p>
@@ -210,7 +272,23 @@ export default function DespesasAdiantamentos() {
               </div>
               <div>
                 <label className="mb-1.5 block text-xs font-semibold text-slate-500">Favorecido</label>
-                <input value={perfil?.nome || ''} disabled className={`${inputCls} opacity-70`} />
+                <SearchableSelect
+                  options={favorecidoOptions}
+                  value={form.favorecido_key}
+                  onChange={value => {
+                    const selected = favorecidoOptions.find(option => option.value === value)
+                    setForm(prev => ({
+                      ...prev,
+                      favorecido_key: value,
+                      favorecido_nome: selected?.label || '',
+                      favorecido_email: selected?.email || '',
+                    }))
+                  }}
+                  placeholder="Buscar funcionário ativo ou PJ..."
+                />
+                <p className={`mt-1 text-[11px] ${dark ? 'text-slate-500' : 'text-slate-400'}`}>
+                  Funcionários ativos e PJs cadastrados ficam disponíveis nesta busca.
+                </p>
               </div>
               <div className="md:col-span-2">
                 <label className="mb-1.5 block text-xs font-semibold text-slate-500">Finalidade</label>
