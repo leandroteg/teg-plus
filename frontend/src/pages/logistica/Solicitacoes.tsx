@@ -176,11 +176,6 @@ export default function Solicitacoes() {
           <h1 className={`text-xl font-extrabold ${isDark ? 'text-white' : 'text-navy'}`}>Solicitações</h1>
           <p className={`text-xs mt-0.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{filtradas.length} registros</p>
         </div>
-        <button onClick={() => setShowForm(true)}
-          className="flex items-center gap-1.5 bg-orange-600 hover:bg-orange-700 text-white
-            text-sm font-semibold px-4 py-2 rounded-xl transition-colors shadow-sm">
-          <Plus size={15} /> Nova Solicitação
-        </button>
       </div>
 
       {/* ── Filtros ─────────────────────────────────────────────── */}

@@ -1543,11 +1543,6 @@ export default function SolicitacoesPipeline() {
             {solicitacoes.filter(s => ['solicitado','planejado','aguardando_aprovacao'].includes(s.status)).length} solicitações no pipeline
           </p>
         </div>
-        <button onClick={() => setShowNovaSolicitacao(true)}
-          className="flex items-center gap-1.5 bg-orange-600 hover:bg-orange-700 text-white
-            text-sm font-semibold px-4 py-2 rounded-xl transition-colors shadow-sm">
-          <Plus size={15} /> Nova Solicitação
-        </button>
       </div>
 
       {/* Horizontal Tabs */}
