@@ -65,6 +65,8 @@ export function useCriarSolicitacaoAdiantamento() {
         throw new Error('Perfil do solicitante não carregado.')
       }
 
+      // ── Resolver aprovador ──────────────────────────────────────────────────
+      // 1º tenta o gestor direto no RH; se não encontrar, cai no admin/diretor
       const { data: colaborador, error: colaboradorError } = await supabase
         .from('rh_colaboradores')
         .select('id, nome, email, gestor_id')
@@ -72,19 +74,46 @@ export function useCriarSolicitacaoAdiantamento() {
         .maybeSingle()
 
       if (colaboradorError) throw colaboradorError
-      if (!colaborador?.gestor_id) {
-        throw new Error('Nenhum gestor vinculado ao solicitante no RH.')
-      }
 
-      const { data: gestor, error: gestorError } = await supabase
-        .from('rh_colaboradores')
-        .select('id, nome, email')
-        .eq('id', colaborador.gestor_id)
-        .maybeSingle()
+      let aprovadorRhId: string | null = null
+      let aprovadorNome = ''
+      let aprovadorEmail = ''
 
-      if (gestorError) throw gestorError
-      if (!gestor?.email) {
-        throw new Error('O gestor do solicitante está sem e-mail cadastrado no RH.')
+      if (colaborador?.gestor_id) {
+        const { data: gestor, error: gestorError } = await supabase
+          .from('rh_colaboradores')
+          .select('id, nome, email, perfil_id')
+          .eq('id', colaborador.gestor_id)
+          .maybeSingle()
+        if (gestorError) throw gestorError
+        if (!gestor?.email) throw new Error('O gestor do solicitante está sem e-mail cadastrado no RH.')
+        aprovadorRhId = gestor.id
+        aprovadorNome = gestor.nome
+        aprovadorEmail = gestor.email
+      } else {
+        // Fallback fixo: Leandro Maia Mallet (aprovador padrão de adiantamentos)
+        // Se não encontrar, tenta qualquer outro admin/diretor
+        const { data: adminPrincipal, error: adminError } = await supabase
+          .from('sys_perfis')
+          .select('id, nome, email')
+          .ilike('nome', '%LEANDRO MAIA MALLET%')
+          .maybeSingle()
+
+        const { data: adminFallback } = adminPrincipal ? { data: null } : await supabase
+          .from('sys_perfis')
+          .select('id, nome, email')
+          .in('role', ['administrador', 'diretor'])
+          .neq('id', perfil.id)
+          .not('email', 'is', null)
+          .order('nome')
+          .limit(1)
+          .maybeSingle()
+
+        const admin = adminPrincipal ?? adminFallback
+        if (adminError) throw adminError
+        if (!admin?.email) throw new Error('Nenhum gestor ou administrador disponível para aprovação.')
+        aprovadorNome = admin.nome
+        aprovadorEmail = admin.email
       }
 
       const numero = gerarNumeroAdiantamento()
@@ -96,9 +125,9 @@ export function useCriarSolicitacaoAdiantamento() {
           numero,
           solicitante_id: perfil.id,
           solicitante_nome: perfil.nome,
-          gestor_id: gestor.id,
-          gestor_nome: gestor.nome,
-          gestor_email: gestor.email,
+          gestor_id: aprovadorRhId,
+          gestor_nome: aprovadorNome,
+          gestor_email: aprovadorEmail,
           favorecido_nome: payload.favorecido_nome.trim(),
           favorecido_email: payload.favorecido_email?.trim() || null,
           centro_custo: payload.centro_custo || null,
@@ -132,8 +161,8 @@ export function useCriarSolicitacaoAdiantamento() {
           tipo_aprovacao: 'solicitacao_adiantamento',
           entidade_id: adiantamento.id,
           entidade_numero: numero,
-          aprovador_nome: gestor.nome,
-          aprovador_email: gestor.email,
+          aprovador_nome: aprovadorNome,
+          aprovador_email: aprovadorEmail,
           nivel: 1,
           status: 'pendente',
           data_limite: new Date(Date.now() + 48 * 3600_000).toISOString(),
