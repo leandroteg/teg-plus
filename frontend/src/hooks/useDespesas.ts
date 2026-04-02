@@ -66,23 +66,57 @@ export function useCriarSolicitacaoAdiantamento() {
       }
 
       // ── Resolver aprovador ──────────────────────────────────────────────────
-      // 1º tenta o gestor direto no RH; se não encontrar, cai no admin/diretor
+      // Regras de roteamento (em ordem de prioridade):
+      //   1. UF da obra onde o colaborador está lotado:
+      //      MG → Welton Aparecido Pereira
+      //      MS → Leandro Maia Mallet
+      //   2. UF do próprio colaborador (endereço): mesma lógica acima
+      //   3. Gestor direto cadastrado no RH
+      //   4. Fallback: Leandro Maia Mallet
+
       const { data: colaborador, error: colaboradorError } = await supabase
         .from('rh_colaboradores')
-        .select('id, nome, email, gestor_id')
+        .select('id, nome, email, gestor_id, uf, obra_id')
         .eq('perfil_id', perfil.id)
         .maybeSingle()
 
       if (colaboradorError) throw colaboradorError
 
+      // Determinar UF efetiva: prioriza a obra, depois o endereço do colaborador
+      let ufEfetiva: string | null = null
+      if (colaborador?.obra_id) {
+        const { data: obra } = await supabase
+          .from('sys_obras')
+          .select('uf')
+          .eq('id', colaborador.obra_id)
+          .maybeSingle()
+        ufEfetiva = obra?.uf?.toUpperCase() ?? null
+      }
+      if (!ufEfetiva && colaborador?.uf) {
+        ufEfetiva = colaborador.uf.toUpperCase()
+      }
+
+      // Buscar aprovadores nomeados por UF
+      const [{ data: welton }, { data: leandro }] = await Promise.all([
+        supabase.from('sys_perfis').select('id, nome, email').ilike('nome', '%WELTON APARECIDO PEREIRA%').maybeSingle(),
+        supabase.from('sys_perfis').select('id, nome, email').ilike('nome', '%LEANDRO MAIA MALLET%').maybeSingle(),
+      ])
+
       let aprovadorRhId: string | null = null
       let aprovadorNome = ''
       let aprovadorEmail = ''
 
-      if (colaborador?.gestor_id) {
+      if (ufEfetiva === 'MG' && welton?.email) {
+        aprovadorNome = welton.nome
+        aprovadorEmail = welton.email
+      } else if (ufEfetiva === 'MS' && leandro?.email) {
+        aprovadorNome = leandro.nome
+        aprovadorEmail = leandro.email
+      } else if (colaborador?.gestor_id) {
+        // Fallback: gestor direto no RH
         const { data: gestor, error: gestorError } = await supabase
           .from('rh_colaboradores')
-          .select('id, nome, email, perfil_id')
+          .select('id, nome, email')
           .eq('id', colaborador.gestor_id)
           .maybeSingle()
         if (gestorError) throw gestorError
@@ -91,27 +125,9 @@ export function useCriarSolicitacaoAdiantamento() {
         aprovadorNome = gestor.nome
         aprovadorEmail = gestor.email
       } else {
-        // Fallback fixo: Leandro Maia Mallet (aprovador padrão de adiantamentos)
-        // Se não encontrar, tenta qualquer outro admin/diretor
-        const { data: adminPrincipal, error: adminError } = await supabase
-          .from('sys_perfis')
-          .select('id, nome, email')
-          .ilike('nome', '%LEANDRO MAIA MALLET%')
-          .maybeSingle()
-
-        const { data: adminFallback } = adminPrincipal ? { data: null } : await supabase
-          .from('sys_perfis')
-          .select('id, nome, email')
-          .in('role', ['administrador', 'diretor'])
-          .neq('id', perfil.id)
-          .not('email', 'is', null)
-          .order('nome')
-          .limit(1)
-          .maybeSingle()
-
-        const admin = adminPrincipal ?? adminFallback
-        if (adminError) throw adminError
-        if (!admin?.email) throw new Error('Nenhum gestor ou administrador disponível para aprovação.')
+        // Fallback final: Leandro Maia Mallet
+        const admin = leandro ?? null
+        if (!admin?.email) throw new Error('Nenhum aprovador disponível para esta solicitação.')
         aprovadorNome = admin.nome
         aprovadorEmail = admin.email
       }
