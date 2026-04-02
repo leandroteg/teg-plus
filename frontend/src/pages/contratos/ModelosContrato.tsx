@@ -8,7 +8,7 @@ import {
   type ModeloContrato,
 } from '../../hooks/useContratos'
 import { useAuth } from '../../contexts/AuthContext'
-import { GRUPO_CONTRATO_OPTIONS, GRUPO_CONTRATO_LABEL } from '../../constants/contratos'
+import { GRUPO_CONTRATO_OPTIONS, getGrupoContratoLabel } from '../../constants/contratos'
 import type { GrupoContrato } from '../../types/contratos'
 import { supabase } from '../../services/supabase'
 
@@ -304,7 +304,7 @@ function ModeloCard({
                 {isDespesa ? 'Despesa' : 'Receita'}
               </span>
               <span className="inline-flex items-center text-[10px] font-semibold rounded-full px-2 py-0.5 bg-teal-50 text-teal-700">
-                {GRUPO_CONTRATO_LABEL[modelo.grupo_contrato as GrupoContrato] ?? modelo.grupo_contrato ?? 'Outro'}
+                {getGrupoContratoLabel(modelo.grupo_contrato)}
               </span>
               <span className="inline-flex items-center text-[10px] font-semibold rounded-full px-2 py-0.5 bg-violet-50 text-violet-700">
                 {RECORRENCIAS.find(r => r.value === modelo.recorrencia)?.label ?? modelo.recorrencia}

@@ -7,8 +7,8 @@ import {
   FileSignature, Pause,
 } from 'lucide-react'
 import { useContratosDashboard, useContratos, useAditivos, useParcelas as useParcelasList } from '../../hooks/useContratos'
-import { GRUPO_CONTRATO_LABEL } from '../../constants/contratos'
-import type { TipoContrato, GrupoContrato } from '../../types/contratos'
+import { getGrupoContratoLabel } from '../../constants/contratos'
+import type { TipoContrato } from '../../types/contratos'
 
 const fmt = (v: number) =>
   v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 })
@@ -225,7 +225,7 @@ export default function DashboardContratos() {
                 {sorted.map(([grupo, count]) => (
                   <div key={grupo} className="flex items-center gap-3">
                     <span className="text-xs text-slate-600 w-48 truncate text-right">
-                      {GRUPO_CONTRATO_LABEL[grupo as GrupoContrato] ?? grupo}
+                      {getGrupoContratoLabel(grupo)}
                     </span>
                     <div className="flex-1 h-5 bg-slate-100 rounded-full overflow-hidden">
                       <div className="h-full bg-gradient-to-r from-indigo-400 to-violet-500 rounded-full transition-all"

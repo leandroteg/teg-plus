@@ -18,8 +18,7 @@ import {
   useResumoExecutivo,
   useAssinaturas,
 } from '../../hooks/useSolicitacoes'
-import { GRUPO_CONTRATO_LABEL } from '../../constants/contratos'
-import type { GrupoContrato } from '../../types/contratos'
+import { getGrupoContratoLabel } from '../../constants/contratos'
 import type { EtapaSolicitacao, ParcelaPlanejada, Solicitacao, TipoAssinatura } from '../../types/contratos'
 import { calcularDiferencaParcelas, normalizarParcelasPlanejadas, sugerirParcelasContrato } from '../../utils/contratosParcelas'
 
@@ -1058,7 +1057,7 @@ export default function SolicitacaoDetalhe() {
                 />
                 <InfoItem label="Tipo de Contrato" value={TIPO_LABEL[s.tipo_contrato] ?? s.tipo_contrato} icon={Tag} />
                 <InfoItem label="Categoria" value={(() => {
-                  const grupoLabel = GRUPO_CONTRATO_LABEL[s.grupo_contrato as GrupoContrato] ?? s.grupo_contrato ?? s.categoria_contrato
+                  const grupoLabel = getGrupoContratoLabel(s.grupo_contrato ?? s.categoria_contrato)
                   return s.subtipo_contrato ? `${grupoLabel} — ${s.subtipo_contrato}` : grupoLabel
                 })()} icon={Tag} />
                 <InfoItem label="Valor Estimado" value={s.valor_estimado ? fmt(s.valor_estimado) : undefined} icon={DollarSign} />

@@ -26,9 +26,9 @@ import {
   useUploadMinutaFile,
 } from '../../hooks/useSolicitacoes'
 import type { MelhoriaMinuta, MinutaTextoGerado } from '../../hooks/useSolicitacoes'
-import type { Minuta, TipoMinuta, StatusMinuta, MinutaAiAnalise, ConfigAnalise, GrupoContrato } from '../../types/contratos'
+import type { Minuta, TipoMinuta, StatusMinuta, MinutaAiAnalise, ConfigAnalise } from '../../types/contratos'
 import { useModelosContrato } from '../../hooks/useContratos'
-import { GRUPO_CONTRATO_LABEL } from '../../constants/contratos'
+import { getGrupoContratoLabel } from '../../constants/contratos'
 import { supabase } from '../../services/supabase'
 import { getEmpresa } from '../../services/empresa'
 import { jsPDF } from 'jspdf'
@@ -1745,7 +1745,7 @@ export default function PreparaMinuta() {
         }
 
         // HEADER — formal contract style
-        const tipoLabel = GRUPO_CONTRATO_LABEL[solicitacao.grupo_contrato as GrupoContrato] ?? solicitacao.categoria_contrato ?? ''
+        const tipoLabel = getGrupoContratoLabel(solicitacao.grupo_contrato ?? solicitacao.categoria_contrato)
         const tituloContrato = tipoLabel ? `CONTRATO DE ${tipoLabel.toUpperCase()}` : 'MINUTA CONTRATUAL'
         pdf.setFont('helvetica', 'bold'); pdf.setFontSize(14); pdf.setTextColor(30, 41, 59)
         pdf.text(tituloContrato, pw / 2, 20, { align: 'center' })
@@ -2087,7 +2087,7 @@ export default function PreparaMinuta() {
             <div className="bg-gradient-to-br from-violet-50 to-indigo-50 rounded-2xl p-5 border border-violet-100">
               <h3 className="text-sm font-bold text-violet-900 mb-3 flex items-center gap-2">
                 <FileStack size={16} className="text-violet-600" />
-                Biblioteca de Modelos — {GRUPO_CONTRATO_LABEL[solicitacao?.grupo_contrato as GrupoContrato] ?? ''}
+                Biblioteca de Modelos — {getGrupoContratoLabel(solicitacao?.grupo_contrato)}
               </h3>
               <div className="space-y-2">
                 {modelosDisponiveis.map(modelo => (

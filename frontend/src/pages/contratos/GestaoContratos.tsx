@@ -13,7 +13,7 @@ import { useAuth } from '../../contexts/AuthContext'
 import type { Contrato } from '../../types/contratos'
 import type { StatusAditivo, TipoAditivo } from '../../types/contratos'
 import type { StatusContrato, GrupoContrato } from '../../types/contratos'
-import { GRUPO_CONTRATO_OPTIONS, GRUPO_CONTRATO_LABEL } from '../../constants/contratos'
+import { GRUPO_CONTRATO_OPTIONS, getGrupoContratoLabel } from '../../constants/contratos'
 
 // ── Formatters ──────────────────────────────────────────────────────────────
 const fmt = (v: number) =>
@@ -463,7 +463,7 @@ function TabContratos() {
                 {filtered.map(c => {
                   const sc = STATUS_CONTRATO[c.status] ?? STATUS_CONTRATO.em_negociacao
                   const isReceita = c.tipo_contrato === 'receita'
-                  const grupoLabel = GRUPO_CONTRATO_LABEL?.[c.grupo_contrato as any] ?? c.grupo_contrato ?? '—'
+                  const grupoLabel = getGrupoContratoLabel(c.grupo_contrato)
                   const contraparte = c.fornecedor?.razao_social || c.fornecedor?.nome_fantasia || c.cliente?.nome || '—'
                   return (
                     <tr key={c.id} onClick={() => nav(`/contratos/previsao?contrato=${c.id}`)} className="hover:bg-slate-50/80 transition-colors cursor-pointer">
