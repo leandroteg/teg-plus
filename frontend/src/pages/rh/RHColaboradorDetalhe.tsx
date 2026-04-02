@@ -189,6 +189,7 @@ export default function RHColaboradorDetalhe({ id, onBack }: { id: string; onBac
                 <p className={`text-sm ${isLight ? 'text-slate-700' : 'text-slate-300'}`}>{colab.obra?.nome || '—'}</p>
               )}
             </div>
+            <FieldSelect label="Local de trabalho (UF)" value={data?.local_trabalho_uf} onChange={v => set('local_trabalho_uf', v || undefined)} options={UFS} editable={editMode} cls={inputCls} isLight={isLight} />
             <Field label="Salário" value={data?.salario != null ? String(data.salario) : ''} onChange={v => set('salario', Number(v) || undefined)}
               editable={editMode} type="number" cls={inputCls} isLight={isLight} />
             <Field label="Data Admissão" value={data?.data_admissao} onChange={v => set('data_admissao', v)} editable={editMode} type="date" cls={inputCls} isLight={isLight} />

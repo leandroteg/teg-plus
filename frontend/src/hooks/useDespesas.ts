@@ -76,15 +76,17 @@ export function useCriarSolicitacaoAdiantamento() {
 
       const { data: colaborador, error: colaboradorError } = await supabase
         .from('rh_colaboradores')
-        .select('id, nome, email, gestor_id, uf, obra_id')
+        .select('id, nome, email, gestor_id, uf, obra_id, local_trabalho_uf')
         .eq('perfil_id', perfil.id)
         .maybeSingle()
 
       if (colaboradorError) throw colaboradorError
 
-      // Determinar UF efetiva: prioriza a obra, depois o endereço do colaborador
+      // Determinar UF efetiva (prioridade: campo explícito > obra > endereço)
       let ufEfetiva: string | null = null
-      if (colaborador?.obra_id) {
+      if (colaborador?.local_trabalho_uf) {
+        ufEfetiva = colaborador.local_trabalho_uf.toUpperCase()
+      } else if (colaborador?.obra_id) {
         const { data: obra } = await supabase
           .from('sys_obras')
           .select('uf')
@@ -125,8 +127,8 @@ export function useCriarSolicitacaoAdiantamento() {
         aprovadorNome = gestor.nome
         aprovadorEmail = gestor.email
       } else {
-        // Fallback final: Leandro Maia Mallet
-        const admin = leandro ?? null
+        // Fallback final: Welton (sem UF definida)
+        const admin = welton ?? leandro ?? null
         if (!admin?.email) throw new Error('Nenhum aprovador disponível para esta solicitação.')
         aprovadorNome = admin.nome
         aprovadorEmail = admin.email
