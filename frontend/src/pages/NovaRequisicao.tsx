@@ -4,7 +4,7 @@ import {
   Sparkles, Send, PlusCircle, Trash2, ChevronLeft, ChevronRight,
   AlertCircle, Check, Layers, FileText, Search, Upload, FileUp,
   ChevronDown, X, FileImage, Eye, Pencil, CheckCircle2, Loader2,
-  Package, MapPin, Zap, Save,
+  Package, MapPin, Zap, Save, ExternalLink, Download,
 } from 'lucide-react'
 import { useCriarRequisicao } from '../hooks/useRequisicoes'
 import { useAiParse, readFileForAi, isBinaryFile, isImageFile } from '../hooks/useAiParse'
@@ -143,8 +143,6 @@ export default function NovaRequisicao() {
   const [aiPreview, setAiPreview]           = useState<AiParseResult | null>(null)
   const [previewItens, setPreviewItens]     = useState<RequisicaoItem[]>([])
   const [showPreview, setShowPreview]       = useState(false)
-  const [refParsing, setRefParsing]         = useState(false)
-  const [refParseMsg, setRefParseMsg]       = useState<{ type: 'success' | 'error'; text: string } | null>(null)
 
   const total  = itens.reduce((s, i) => s + i.quantidade * i.valor_unitario_estimado, 0)
   const minCot = categoria ? minCotacoesPorValor(total, categoria.cotacoes_regras) : 1
@@ -362,39 +360,6 @@ export default function NovaRequisicao() {
     setItens(prev => prev.map((item, i) => i === idx ? { ...item, [field]: value } : item))
 
   // ── Extrair dados do arquivo de referência (cotação) via IA ─────────────
-  const handleExtrairReferencia = async () => {
-    if (!referenciaFile || refParsing) return
-    setRefParsing(true)
-    setRefParseMsg(null)
-    try {
-      const fileData = await readFileForAi(referenciaFile)
-      const payload: { texto: string; solicitante_nome?: string; arquivo?: { base64: string; nome: string; mime: string } } = {
-        texto: `Extrair itens, quantidades, unidades e valores desta cotação/proposta comercial: ${referenciaFile.name}`,
-        solicitante_nome: perfil?.nome || solicitante,
-      }
-      if (fileData.arquivo) {
-        payload.arquivo = fileData.arquivo
-      } else if (fileData.texto) {
-        payload.texto += `\n\nConteúdo do arquivo:\n${fileData.texto}`
-      }
-
-      const result: AiParseResult = await aiParse.mutateAsync(payload)
-      const sanitized = sanitizeItems(result.itens)
-
-      if (sanitized.length > 0 && sanitized.some(i => i.descricao.trim())) {
-        // Aplicar diretamente os itens extraídos ao formulário
-        // matchCatalogItems já foi chamado dentro de useAiParse — itens com match terão est_item_id
-        applyAiResult(result, sanitized, `Itens extraídos de ${referenciaFile.name}`)
-        setRefParseMsg({ type: 'success', text: `${sanitized.length} itens extraídos e preenchidos` })
-      } else {
-        setRefParseMsg({ type: 'error', text: 'Não foi possível extrair itens do arquivo. Tente usar o Assistente IA no passo anterior.' })
-      }
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Erro ao processar o arquivo. Tente novamente.'
-      setRefParseMsg({ type: 'error', text: msg })
-    }
-    setRefParsing(false)
-  }
 
   const [submitting, setSubmitting] = useState(false)
   const [savingDraft, setSavingDraft] = useState(false)
@@ -647,25 +612,26 @@ export default function NovaRequisicao() {
                   <X size={14} />
                 </button>
               </div>
-              {/* BotÃ£o para extrair dados com IA */}
-              <button
-                type="button"
-                disabled={refParsing}
-                onClick={(e) => { e.stopPropagation(); handleExtrairReferencia() }}
-                className="w-full flex items-center justify-center gap-2 py-2 px-3 rounded-xl text-xs font-bold transition-all bg-gradient-to-r from-violet-500 to-purple-600 text-white hover:from-violet-600 hover:to-purple-700 shadow-sm disabled:opacity-60"
-              >
-                {refParsing ? (
-                  <><Loader2 size={14} className="animate-spin" /> Extraindo dados...</>
-                ) : (
-                  <><Sparkles size={14} /> Extrair itens e valores com IA</>
-                )}
-              </button>
-              {refParseMsg && (
-                <p className={`text-[11px] font-medium flex items-center gap-1 ${refParseMsg.type === 'success' ? 'text-emerald-600' : 'text-red-500'}`}>
-                  {refParseMsg.type === 'success' ? <Check size={12} /> : <AlertCircle size={12} />}
-                  {refParseMsg.text}
-                </p>
-              )}
+              {/* Visualizar e baixar o arquivo anexado */}
+              <div className="flex gap-2">
+                <a
+                  href={URL.createObjectURL(referenciaFile)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={e => e.stopPropagation()}
+                  className="flex-1 flex items-center justify-center gap-1.5 py-1.5 px-3 rounded-xl text-xs font-semibold border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 transition-colors"
+                >
+                  <ExternalLink size={12} /> Visualizar
+                </a>
+                <a
+                  href={URL.createObjectURL(referenciaFile)}
+                  download={referenciaFile.name}
+                  onClick={e => e.stopPropagation()}
+                  className="flex-1 flex items-center justify-center gap-1.5 py-1.5 px-3 rounded-xl text-xs font-semibold border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 transition-colors"
+                >
+                  <Download size={12} /> Download
+                </a>
+              </div>
             </div>
           ) : (
             <div className="flex items-center gap-3">
