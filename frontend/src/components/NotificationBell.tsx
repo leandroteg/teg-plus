@@ -1,13 +1,15 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { createPortal } from 'react-dom'
-import { Bell, Check, X, Edit3, AlertCircle, ChevronRight, UserPlus } from 'lucide-react'
+import { Bell, Check, X, AlertCircle, ChevronRight, UserPlus } from 'lucide-react'
 import { usePreCadastros, getEntityLabel, type PreCadastro } from '../hooks/usePreCadastros'
 import { useSound } from '../hooks/useSound'
+import ItemFormModal from './ItemFormModal'
+import type { EstItem } from '../types/estoque'
 
 // ── Main Bell Component ─────────────────────────────────────────────────────────
 
 export default function NotificationBell({ isDark = false }: { isDark?: boolean }) {
-  const { pendentes, count, isAdminOrDirector } = usePreCadastros()
+  const { pendentes, count, isAdminOrDirector, marcarAprovado, rejeitar } = usePreCadastros()
   const { play } = useSound()
   const [open, setOpen] = useState(false)
   const prevCountRef = useRef(count)
@@ -15,6 +17,9 @@ export default function NotificationBell({ isDark = false }: { isDark?: boolean 
   const btnRef = useRef<HTMLButtonElement>(null)
   const panelRef = useRef<HTMLDivElement>(null)
   const [pos, setPos] = useState({ top: 0, right: 0 })
+
+  // Item modal state (for pre-cadastros of type 'itens')
+  const [itemModal, setItemModal] = useState<{ pre: PreCadastro; key: number } | null>(null)
 
   // Calculate position from button rect
   const updatePos = useCallback(() => {
@@ -140,7 +145,14 @@ export default function NotificationBell({ isDark = false }: { isDark?: boolean 
               pendentes.map(pre => (
                 <button
                   key={pre.id}
-                  onClick={() => setSelected(pre)}
+                  onClick={() => {
+                    if (pre.entidade === 'itens') {
+                      setOpen(false)
+                      setItemModal({ pre, key: Date.now() })
+                    } else {
+                      setSelected(pre)
+                    }
+                  }}
                   className={`w-full text-left px-4 py-3 flex items-center gap-3 transition-colors duration-150 border-b last:border-b-0 ${
                     isDark
                       ? 'border-white/5 hover:bg-white/5'
@@ -177,6 +189,34 @@ export default function NotificationBell({ isDark = false }: { isDark?: boolean 
           to   { opacity: 1; transform: translateY(0); }
         }
       `}</style>
+
+      {/* Item form modal — opens when clicking a pre-cadastro of type 'itens' */}
+      {itemModal && (() => {
+        const d = itemModal.pre.dados
+        const initialData: Partial<EstItem> = {
+          descricao: typeof d.descricao === 'string' ? d.descricao : '',
+          unidade: (typeof d.unidade === 'string' ? d.unidade : 'UN') as EstItem['unidade'],
+          valor_medio: typeof d.valor_medio === 'number' ? d.valor_medio : 0,
+        }
+        return (
+          <ItemFormModal
+            key={itemModal.key}
+            open
+            initialData={initialData}
+            onClose={() => setItemModal(null)}
+            onSaved={async () => {
+              await marcarAprovado.mutateAsync({ id: itemModal.pre.id })
+              setItemModal(null)
+            }}
+            onReject={async (motivo) => {
+              await rejeitar.mutateAsync({ id: itemModal.pre.id, motivo })
+              setItemModal(null)
+            }}
+            solicitanteNome={itemModal.pre.solicitante_nome ?? undefined}
+            solicitadoEm={itemModal.pre.created_at}
+          />
+        )
+      })()}
     </>
   )
 }

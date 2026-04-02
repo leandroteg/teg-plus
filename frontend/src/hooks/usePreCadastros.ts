@@ -115,6 +115,26 @@ export function usePreCadastros() {
     },
   })
 
+  // Mark as approved without re-inserting data (used when item was saved via the full form modal)
+  const marcarAprovado = useMutation({
+    mutationFn: async ({ id }: { id: string }) => {
+      const { error } = await supabase
+        .from('sys_pre_cadastros')
+        .update({
+          status: 'aprovado',
+          revisado_por: perfil?.auth_id,
+          revisor_nome: perfil?.nome,
+        })
+        .eq('id', id)
+      if (error) throw error
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['pre-cadastros'] })
+      qc.invalidateQueries({ queryKey: ['est-itens'] })
+      qc.invalidateQueries({ queryKey: ['lookups'] })
+    },
+  })
+
   // Reject mutation
   const rejeitar = useMutation({
     mutationFn: async ({ id, motivo }: { id: string; motivo: string }) => {
@@ -140,6 +160,7 @@ export function usePreCadastros() {
     isLoading,
     isAdminOrDirector,
     aprovar,
+    marcarAprovado,
     rejeitar,
   }
 }
