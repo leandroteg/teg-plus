@@ -62,6 +62,25 @@ function diasEmAberto(createdAt: string) {
   return Math.floor((Date.now() - new Date(createdAt).getTime()) / 86_400_000)
 }
 
+function getDescricaoPrincipal(cot: Cotacao) {
+  const req = cot.requisicao as (Cotacao['requisicao'] & {
+    itens?: Array<{ descricao?: string | null }>
+  }) | undefined
+
+  const descricaoItem = (req?.itens ?? [])
+    .map(item => (item?.descricao ?? '').trim())
+    .find(Boolean)
+  if (descricaoItem) return descricaoItem
+
+  const justificativa = (req?.justificativa ?? '').trim()
+  if (justificativa) return justificativa
+
+  const descricao = (req?.descricao ?? '').trim()
+  if (descricao) return descricao
+
+  return 'Sem descrição'
+}
+
 function AlertaCotacoes({
   valor,
   regras,
@@ -86,7 +105,7 @@ function AlertaCotacoes({
 function exportCSV(items: Cotacao[], stageName: string) {
   const headers = ['RC', 'Descrição', 'Obra', 'Valor', 'Fornecedor', 'Status', 'Dias']
   const rows = items.map(c => [
-    c.requisicao?.numero ?? '', c.requisicao?.descricao ?? '', c.requisicao?.obra_nome ?? '',
+    c.requisicao?.numero ?? '', getDescricaoPrincipal(c), c.requisicao?.obra_nome ?? '',
     c.valor_selecionado ?? c.requisicao?.valor_estimado ?? 0,
     c.fornecedor_selecionado_nome ?? '', c.status, diasEmAberto(c.created_at),
   ])
@@ -107,6 +126,7 @@ function CotCard({ cot, isDark, onClick }: { cot: Cotacao; isDark: boolean; onCl
   const valor = cot.valor_selecionado ?? (cot.requisicao as any)?.valor_estimado ?? 0
   const dias = diasEmAberto(cot.created_at)
   const concluida = cot.status === 'concluida'
+  const descricaoPrincipal = getDescricaoPrincipal(cot)
 
   return (
     <div onClick={onClick}
@@ -143,7 +163,7 @@ function CotCard({ cot, isDark, onClick }: { cot: Cotacao; isDark: boolean; onCl
 
       {/* Descrição */}
       <p className={`text-sm font-semibold line-clamp-2 leading-snug ${isDark ? 'text-white' : 'text-slate-800'}`}>
-        {cot.requisicao?.descricao}
+        {descricaoPrincipal}
       </p>
 
       {/* Obra + Necessidade + Valor */}
@@ -207,6 +227,7 @@ function CotDetailModal({ cot, onClose, isDark, isAdmin, atLeastComprador, onDec
   const dias = diasEmAberto(cot.created_at)
   const concluida = cot.status === 'concluida'
   const reqStatus = cot.requisicao?.status
+  const descricaoPrincipal = getDescricaoPrincipal(cot)
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-sm p-4" onClick={onClose}>
@@ -223,7 +244,7 @@ function CotDetailModal({ cot, onClose, isDark, isAdmin, atLeastComprador, onDec
         </div>
 
         <div className="p-5 space-y-4">
-          <p className={`text-sm font-semibold ${isDark ? 'text-white' : 'text-slate-800'}`}>{cot.requisicao?.descricao}</p>
+          <p className={`text-sm font-semibold ${isDark ? 'text-white' : 'text-slate-800'}`}>{descricaoPrincipal}</p>
 
           {/* Descrição da compra */}
           {cot.requisicao?.justificativa && (
@@ -369,6 +390,7 @@ export default function FilaCotacoes() {
       const t = busca.toLowerCase()
       items = items.filter(c =>
         (c.requisicao?.numero ?? '').toLowerCase().includes(t) ||
+        getDescricaoPrincipal(c).toLowerCase().includes(t) ||
         (c.requisicao?.descricao ?? '').toLowerCase().includes(t) ||
         (c.requisicao?.obra_nome ?? '').toLowerCase().includes(t) ||
         (c.fornecedor_selecionado_nome ?? '').toLowerCase().includes(t)
@@ -519,7 +541,7 @@ export default function FilaCotacoes() {
                 <tr key={cot.id} onClick={() => setDetail(cot)}
                   className={`cursor-pointer transition-all ${isDark ? 'hover:bg-white/[0.03] border-t border-white/[0.04]' : 'hover:bg-slate-50 border-t border-slate-100'}`}>
                   <td className={`px-3 py-2 font-mono ${isDark ? 'text-teal-400' : 'text-teal-600'}`}>{cot.requisicao?.numero ?? '—'}</td>
-                  <td className={`px-3 py-2 max-w-[200px] truncate ${isDark ? 'text-white' : 'text-slate-800'}`}>{cot.requisicao?.descricao}</td>
+                  <td className={`px-3 py-2 max-w-[200px] truncate ${isDark ? 'text-white' : 'text-slate-800'}`}>{getDescricaoPrincipal(cot)}</td>
                   <td className={`px-3 py-2 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{cot.requisicao?.obra_nome}</td>
                   <td className={`px-3 py-2 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{cot.requisicao?.data_necessidade ? new Date(cot.requisicao.data_necessidade).toLocaleDateString('pt-BR') : '—'}</td>
                   <td className="px-3 py-2 text-center">{cot.requisicao?.urgencia && cot.requisicao.urgencia !== 'normal' ? (
