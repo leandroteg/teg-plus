@@ -63,15 +63,7 @@ function diasEmAberto(createdAt: string) {
 }
 
 function getDescricaoPrincipal(cot: Cotacao) {
-  const req = cot.requisicao as (Cotacao['requisicao'] & {
-    itens?: Array<{ descricao?: string | null }>
-  }) | undefined
-
-  const descricaoItem = (req?.itens ?? [])
-    .map(item => (item?.descricao ?? '').trim())
-    .find(Boolean)
-  if (descricaoItem) return descricaoItem
-
+  const req = cot.requisicao
   const justificativa = (req?.justificativa ?? '').trim()
   if (justificativa) return justificativa
 
