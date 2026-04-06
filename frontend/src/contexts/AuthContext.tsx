@@ -185,6 +185,7 @@ export const MODULOS_ERP_GROUPED: GrupoModulos[] = [
       { key: 'estoque', label: 'Estoque', icon: '📦' },
       { key: 'patrimonial', label: 'Patrimonial', icon: '🏛️' },
       { key: 'frotas', label: 'Frotas', icon: '🚛' },
+      { key: 'locacoes', label: 'Locação Imóveis', icon: '🏘️' },
     ],
   },
   {

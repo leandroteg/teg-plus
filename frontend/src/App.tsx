@@ -34,6 +34,7 @@ import CulturaLayout from './components/CulturaLayout'
 import HeadcountLayout from './components/HeadcountLayout'
 import ApontamentosLayout from './components/ApontamentosLayout'
 import PatrimonialLayout from './components/PatrimonialLayout'
+import LocacaoLayout from './components/LocacaoLayout'
 
 // ── Páginas lazy (code-split por rota) ────────────────────────────────────────
 const ModuloSelector = lazy(() => import('./pages/ModuloSelector'))
@@ -172,6 +173,16 @@ const Abastecimentos = lazy(() => import('./pages/frotas/Abastecimentos'))
 const Telemetria = lazy(() => import('./pages/frotas/Telemetria'))
 const SolicitacoesFrotas = lazy(() => import('./pages/frotas/SolicitacoesFrotas'))
 
+// Locacao
+const LocacaoHome = lazy(() => import('./pages/locacao/LocacaoHome'))
+const EntradasPipeline = lazy(() => import('./pages/locacao/EntradasPipeline'))
+const SaidaPipeline = lazy(() => import('./pages/locacao/SaidaPipeline'))
+const LocAtivos = lazy(() => import('./pages/locacao/Ativos'))
+const LocFaturas = lazy(() => import('./pages/locacao/Faturas'))
+const LocManutencoesServicos = lazy(() => import('./pages/locacao/ManutencoesServicos'))
+const LocAditivosRenovacoes = lazy(() => import('./pages/locacao/AditivosRenovacoes'))
+const LocAcordos = lazy(() => import('./pages/locacao/Acordos'))
+
 // Patrimonial (módulo próprio)
 const PatrimonialHome = lazy(() => import('./pages/patrimonial/PatrimonialHome'))
 const PatrimonialMovimentacoes = lazy(() => import('./pages/patrimonial/Movimentacoes'))
@@ -298,6 +309,20 @@ export default function App() {
               <Route path="/frotas/checklists"           element={<Lazy><Checklists /></Lazy>} />
               <Route path="/frotas/abastecimentos"       element={<Lazy><Abastecimentos /></Lazy>} />
               <Route path="/frotas/telemetria"           element={<Lazy><Telemetria /></Lazy>} />
+            </Route>
+          </Route>
+
+          {/* Módulo Locação de Imóveis */}
+          <Route element={<ModuleRoute moduleKey="locacoes" />}>
+            <Route element={<LocacaoLayout />}>
+              <Route path="/locacoes"          element={<LazyDash><LocacaoHome /></LazyDash>} />
+              <Route path="/locacoes/entradas" element={<Lazy><EntradasPipeline /></Lazy>} />
+              <Route path="/locacoes/saida"    element={<Lazy><SaidaPipeline /></Lazy>} />
+              <Route path="/locacoes/ativos"   element={<Lazy><LocAtivos /></Lazy>} />
+              <Route path="/locacoes/faturas"  element={<Lazy><LocFaturas /></Lazy>} />
+              <Route path="/locacoes/servicos" element={<Lazy><LocManutencoesServicos /></Lazy>} />
+              <Route path="/locacoes/aditivos" element={<Lazy><LocAditivosRenovacoes /></Lazy>} />
+              <Route path="/locacoes/acordos"  element={<Lazy><LocAcordos /></Lazy>} />
             </Route>
           </Route>
 
