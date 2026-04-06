@@ -43,13 +43,11 @@ function MiniInfoCard({ label, value, note, icon: Icon, iconTone, isDark }: {
   label: string; value: string | number; note?: string; icon: typeof Building2; iconTone: string; isDark: boolean
 }) {
   return (
-    <div className={`rounded-xl p-3 flex items-center gap-3 ${isDark ? 'bg-white/[0.03]' : 'bg-slate-50/80'}`}>
-      <Icon size={14} className={iconTone} />
-      <div>
-        <p className={`text-lg font-extrabold leading-none ${isDark ? 'text-white' : 'text-slate-900'}`}>{value}</p>
-        <p className={`text-[9px] font-bold uppercase tracking-wider mt-0.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{label}</p>
-        {note && <p className={`text-[8px] ${isDark ? 'text-slate-600' : 'text-slate-400'}`}>{note}</p>}
-      </div>
+    <div className={`rounded-xl p-4 flex flex-col items-center justify-center gap-1.5 flex-1 ${isDark ? 'bg-white/[0.03]' : 'bg-slate-50/80'}`}>
+      <Icon size={16} className={iconTone} />
+      <p className={`text-2xl font-extrabold leading-none ${isDark ? 'text-white' : 'text-slate-900'}`}>{value}</p>
+      <p className={`text-[9px] font-bold uppercase tracking-wider text-center ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{label}</p>
+      {note && <p className={`text-[8px] text-center ${isDark ? 'text-slate-600' : 'text-slate-400'}`}>{note}</p>}
     </div>
   )
 }
@@ -217,7 +215,7 @@ export default function LocacaoHome() {
                 <AlertTriangle size={14} className={urgentes.length > 0 || faturasVencidas.length > 0 ? 'text-red-500' : 'text-slate-400'} />
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-2 gap-2 flex-1">
               <MiniInfoCard
                 label="Faturas vencendo"
                 value={kpis?.faturasVencendo ?? 0}
