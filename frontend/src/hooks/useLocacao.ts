@@ -101,7 +101,7 @@ export function useEntradas(filtros?: { status?: StatusEntrada }) {
     queryFn: async () => {
       let q = supabase
         .from('loc_entradas')
-        .select(`*, imovel:loc_imoveis(id, descricao, endereco, cidade, uf, codigo)`)
+        .select(`*, imovel:loc_imoveis(id, descricao, endereco, cidade, uf, codigo, centro_custo_id, locador_nome, valor_aluguel_mensal), centro_custo:sys_centros_custo!loc_entradas_centro_custo_fk(id, codigo, descricao)`)
         .order('created_at', { ascending: false })
 
       if (filtros?.status) q = q.eq('status', filtros.status)
@@ -120,7 +120,7 @@ export function useEntrada(id: string | undefined) {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('loc_entradas')
-        .select(`*, imovel:loc_imoveis(*)`)
+        .select(`*, imovel:loc_imoveis(*), centro_custo:sys_centros_custo!loc_entradas_centro_custo_fk(id, codigo, descricao)`)
         .eq('id', id)
         .single()
       if (error) throw error
@@ -172,7 +172,7 @@ export function useSaidas(filtros?: { status?: StatusSaida }) {
     queryFn: async () => {
       let q = supabase
         .from('loc_saidas')
-        .select(`*, imovel:loc_imoveis(id, descricao, endereco, cidade, uf, codigo)`)
+        .select(`*, imovel:loc_imoveis(id, descricao, endereco, cidade, uf, codigo, centro_custo_id, locador_nome, valor_aluguel_mensal, centro_custo:sys_centros_custo(id, codigo, descricao))`)
         .order('created_at', { ascending: false })
 
       if (filtros?.status) q = q.eq('status', filtros.status)

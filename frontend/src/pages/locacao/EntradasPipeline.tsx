@@ -2,7 +2,7 @@ import { useState, useMemo, useCallback } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import {
   Building2, X, Search, ArrowUp, ArrowDown, LayoutList, LayoutGrid,
-  MapPin, Calendar, User, ClipboardCheck, FileText, CheckCircle2,
+  MapPin, Calendar, User, ClipboardCheck, FileText, CheckCircle2, Landmark,
 } from 'lucide-react'
 import { useEntradas, useAtualizarStatusEntrada } from '../../hooks/useLocacao'
 import { useTheme } from '../../contexts/ThemeContext'
@@ -92,6 +92,7 @@ function EntradaDetailModal({ entrada, onClose, onAction, isDark }: {
               {entrada.valor_aluguel != null && <div><p className={txtMuted}>Valor Aluguel</p><p className={`font-semibold ${txtMain}`}>{entrada.valor_aluguel.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p></div>}
               {entrada.data_prevista_inicio && <div><p className={txtMuted}>Início Previsto</p><p className={`font-semibold ${txtMain}`}>{fmtDate(entrada.data_prevista_inicio)}</p></div>}
               {entrada.dia_vencimento != null && <div><p className={txtMuted}>Dia Vencimento</p><p className={`font-semibold ${txtMain}`}>Dia {entrada.dia_vencimento}</p></div>}
+              {(entrada as any).centro_custo?.descricao && <div><p className={txtMuted}>Centro de Custo</p><p className={`font-semibold ${txtMain}`}>{(entrada as any).centro_custo.codigo} — {(entrada as any).centro_custo.descricao}</p></div>}
               {entrada.responsavel_id && <div><p className={txtMuted}>Responsável</p><p className={`font-semibold ${txtMain}`}>Atribuído</p></div>}
             </div>
           </div>
@@ -163,6 +164,7 @@ function EntradaCard({ entrada, onClick, isDark }: { entrada: LocEntrada; onClic
       </div>
       {entrada.locador_nome && <p className={`text-xs flex items-center gap-1 mb-1 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}><User size={11} /> {entrada.locador_nome}</p>}
       <p className={`text-xs flex items-center gap-1 mb-1 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}><MapPin size={11} /> {[entrada.cidade, entrada.uf].filter(Boolean).join(', ') || '—'}</p>
+      {(entrada as any).centro_custo?.descricao && <p className={`text-xs flex items-center gap-1 mb-1 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}><Landmark size={11} /> {(entrada as any).centro_custo.descricao}</p>}
       {entrada.data_prevista_inicio && <p className={`text-xs flex items-center gap-1 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}><Calendar size={11} /> {fmtDate(entrada.data_prevista_inicio)}</p>}
     </button>
   )
@@ -175,8 +177,9 @@ function EntradaRow({ entrada, onClick, isDark }: { entrada: LocEntrada; onClick
     <button type="button" onClick={onClick} className={`w-full flex items-center gap-2 px-3 py-2 text-left border-b transition-all ${isDark ? 'border-white/[0.04] hover:bg-white/[0.04]' : 'border-slate-100 hover:bg-slate-50'}`}>
       <span className={`w-2 h-2 rounded-full shrink-0 ${accent.dot}`} />
       <span className={`flex-1 text-xs font-semibold truncate ${isDark ? 'text-white' : 'text-slate-800'}`}>{entrada.endereco || entrada.imovel?.descricao || '—'}</span>
-      <span className={`w-[120px] text-xs truncate shrink-0 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{entrada.locador_nome || '—'}</span>
-      <span className={`w-[100px] text-xs truncate shrink-0 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{entrada.cidade || '—'}</span>
+      <span className={`w-[100px] text-xs truncate shrink-0 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{(entrada as any).centro_custo?.descricao || '—'}</span>
+      <span className={`w-[100px] text-xs truncate shrink-0 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{entrada.locador_nome || '—'}</span>
+      <span className={`w-[80px] text-xs truncate shrink-0 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{entrada.cidade || '—'}</span>
       <span className={`w-[70px] text-xs text-right shrink-0 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{fmtDate(entrada.data_prevista_inicio)}</span>
     </button>
   )
@@ -286,7 +289,7 @@ export default function EntradasPipeline() {
         ) : (
           <div>
             <div className={`flex items-center gap-2 px-3 py-1 border-b text-[10px] font-semibold uppercase tracking-wider ${isDark ? 'border-white/[0.06] text-slate-600' : 'border-slate-100 text-slate-400'}`}>
-              <span className="w-2 shrink-0" /><span className="flex-1">Endereço</span><span className="w-[120px] shrink-0">Locador</span><span className="w-[100px] shrink-0">Cidade</span><span className="w-[70px] shrink-0 text-right">Data</span>
+              <span className="w-2 shrink-0" /><span className="flex-1">Endereço</span><span className="w-[100px] shrink-0">C. Custo</span><span className="w-[100px] shrink-0">Locador</span><span className="w-[80px] shrink-0">Cidade</span><span className="w-[70px] shrink-0 text-right">Data</span>
             </div>
             {activeItems.map(e => <EntradaRow key={e.id} entrada={e} onClick={() => setDetail(e)} isDark={isDark} />)}
           </div>

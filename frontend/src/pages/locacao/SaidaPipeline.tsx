@@ -3,7 +3,7 @@ import { useSearchParams } from 'react-router-dom'
 import {
   ArrowRightFromLine, X, Search, ArrowUp, ArrowDown, LayoutList, LayoutGrid,
   MapPin, Calendar, ClipboardCheck, FileText, CheckCircle2, AlertTriangle,
-  ShieldAlert, DollarSign,
+  ShieldAlert, DollarSign, Landmark,
 } from 'lucide-react'
 import { useSaidas, useAtualizarStatusSaida, useImoveis } from '../../hooks/useLocacao'
 import { useTheme } from '../../contexts/ThemeContext'
@@ -108,6 +108,7 @@ function SaidaDetailModal({ saida, onClose, onAction, isDark }: {
                 </div>
               )}
               {saida.responsavel_id && <div><p className={txtMuted}>Responsável</p><p className={`font-semibold ${txtMain}`}>Atribuído</p></div>}
+              {(imo as any)?.centro_custo?.descricao && <div><p className={txtMuted}>Centro de Custo</p><p className={`font-semibold ${txtMain}`}>{(imo as any).centro_custo.codigo} — {(imo as any).centro_custo.descricao}</p></div>}
               {imo?.locador_nome && <div><p className={txtMuted}>Locador</p><p className={`font-semibold ${txtMain}`}>{imo.locador_nome}</p></div>}
               {imo?.valor_aluguel_mensal != null && <div><p className={txtMuted}>Aluguel Mensal</p><p className={`font-semibold ${txtMain}`}>{fmtCur(imo.valor_aluguel_mensal)}</p></div>}
             </div>
@@ -209,6 +210,7 @@ function SaidaCard({ saida, onClick, isDark }: { saida: LocSaida; onClick: () =>
         </span>
       </div>
       <p className={`text-xs flex items-center gap-1 mb-1 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}><MapPin size={11} /> {[imo?.cidade, imo?.uf].filter(Boolean).join(', ') || '—'}</p>
+      {(imo as any)?.centro_custo?.descricao && <p className={`text-xs flex items-center gap-1 mb-1 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}><Landmark size={11} /> {(imo as any).centro_custo.descricao}</p>}
       {saida.data_limite_saida && (
         <p className={`text-xs flex items-center gap-1 mb-1 ${isUrgent ? 'text-amber-600 font-semibold' : isDark ? 'text-slate-500' : 'text-slate-400'}`}>
           <Calendar size={11} /> Limite: {fmtDate(saida.data_limite_saida)}
@@ -230,7 +232,8 @@ function SaidaRow({ saida, onClick, isDark }: { saida: LocSaida; onClick: () => 
     <button type="button" onClick={onClick} className={`w-full flex items-center gap-2 px-3 py-2 text-left border-b transition-all ${isDark ? 'border-white/[0.04] hover:bg-white/[0.04]' : 'border-slate-100 hover:bg-slate-50'}`}>
       <span className={`w-2 h-2 rounded-full shrink-0 ${accent.dot}`} />
       <span className={`flex-1 text-xs font-semibold truncate ${isDark ? 'text-white' : 'text-slate-800'}`}>{imo?.descricao || imo?.endereco || '—'}</span>
-      <span className={`w-[100px] text-xs truncate shrink-0 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{imo?.cidade || '—'}</span>
+      <span className={`w-[100px] text-xs truncate shrink-0 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{(imo as any)?.centro_custo?.descricao || '—'}</span>
+      <span className={`w-[80px] text-xs truncate shrink-0 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{imo?.cidade || '—'}</span>
       <span className={`w-[80px] text-xs text-right shrink-0 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{fmtDate(saida.data_limite_saida)}</span>
       <span className={`w-[80px] text-xs text-right shrink-0 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{fmtCur(saida.caucao_valor) || '—'}</span>
     </button>
@@ -347,7 +350,7 @@ export default function SaidaPipeline() {
         ) : (
           <div>
             <div className={`flex items-center gap-2 px-3 py-1 border-b text-[10px] font-semibold uppercase tracking-wider ${isDark ? 'border-white/[0.06] text-slate-600' : 'border-slate-100 text-slate-400'}`}>
-              <span className="w-2 shrink-0" /><span className="flex-1">Imóvel</span><span className="w-[100px] shrink-0">Cidade</span><span className="w-[80px] shrink-0 text-right">Limite</span><span className="w-[80px] shrink-0 text-right">Caução</span>
+              <span className="w-2 shrink-0" /><span className="flex-1">Imóvel</span><span className="w-[100px] shrink-0">C. Custo</span><span className="w-[80px] shrink-0">Cidade</span><span className="w-[80px] shrink-0 text-right">Limite</span><span className="w-[80px] shrink-0 text-right">Caução</span>
             </div>
             {activeItems.map(s => <SaidaRow key={s.id} saida={s} onClick={() => setDetail(s)} isDark={isDark} />)}
           </div>
