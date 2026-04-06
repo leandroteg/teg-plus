@@ -177,11 +177,7 @@ const SolicitacoesFrotas = lazy(() => import('./pages/frotas/SolicitacoesFrotas'
 const LocacaoHome = lazy(() => import('./pages/locacao/LocacaoHome'))
 const EntradasPipeline = lazy(() => import('./pages/locacao/EntradasPipeline'))
 const SaidaPipeline = lazy(() => import('./pages/locacao/SaidaPipeline'))
-const LocAtivos = lazy(() => import('./pages/locacao/Ativos'))
-const LocFaturas = lazy(() => import('./pages/locacao/Faturas'))
-const LocManutencoesServicos = lazy(() => import('./pages/locacao/ManutencoesServicos'))
-const LocAditivosRenovacoes = lazy(() => import('./pages/locacao/AditivosRenovacoes'))
-const LocAcordos = lazy(() => import('./pages/locacao/Acordos'))
+const LocGestao = lazy(() => import('./pages/locacao/Gestao'))
 
 // Patrimonial (módulo próprio)
 const PatrimonialHome = lazy(() => import('./pages/patrimonial/PatrimonialHome'))
@@ -317,12 +313,8 @@ export default function App() {
             <Route element={<LocacaoLayout />}>
               <Route path="/locacoes"          element={<LazyDash><LocacaoHome /></LazyDash>} />
               <Route path="/locacoes/entradas" element={<Lazy><EntradasPipeline /></Lazy>} />
+              <Route path="/locacoes/gestao"   element={<Lazy><LocGestao /></Lazy>} />
               <Route path="/locacoes/saida"    element={<Lazy><SaidaPipeline /></Lazy>} />
-              <Route path="/locacoes/ativos"   element={<Lazy><LocAtivos /></Lazy>} />
-              <Route path="/locacoes/faturas"  element={<Lazy><LocFaturas /></Lazy>} />
-              <Route path="/locacoes/servicos" element={<Lazy><LocManutencoesServicos /></Lazy>} />
-              <Route path="/locacoes/aditivos" element={<Lazy><LocAditivosRenovacoes /></Lazy>} />
-              <Route path="/locacoes/acordos"  element={<Lazy><LocAcordos /></Lazy>} />
             </Route>
           </Route>
 
