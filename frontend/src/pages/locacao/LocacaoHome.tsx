@@ -65,25 +65,23 @@ function MiniInfoCard({ label, value, Icon, tone, isDark }: {
   )
 }
 
-function HorizontalStatusBar({ segments, isDark }: {
-  segments: { label: string; count: number; color: string }[]; isDark: boolean
+function HorizontalStatusBar({ segments, isDark, inline }: {
+  segments: { label: string; count: number; color: string }[]; isDark: boolean; inline?: boolean
 }) {
   const total = segments.reduce((s, seg) => s + seg.count, 0)
-  if (total === 0) return null
   const colors: Record<string, string> = {
     slate: 'bg-slate-400', blue: 'bg-blue-500', violet: 'bg-violet-500', emerald: 'bg-emerald-500',
     amber: 'bg-amber-500', red: 'bg-red-500', green: 'bg-green-500',
   }
-  return (
-    <div className={`rounded-2xl border p-4 ${isDark ? 'bg-white/[0.03] border-white/[0.06]' : 'bg-white border-slate-200'}`}>
-      <p className={`text-[9px] font-bold uppercase tracking-wider mb-2 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Pulso por Status</p>
+  const content = (
+    <>
       <div className="flex rounded-full overflow-hidden h-3 gap-px">
-        {segments.filter(s => s.count > 0).map(seg => (
+        {total > 0 ? segments.filter(s => s.count > 0).map(seg => (
           <div key={seg.label} className={`${colors[seg.color] || 'bg-slate-300'} transition-all`} style={{ width: `${(seg.count / total) * 100}%` }} title={`${seg.label}: ${seg.count}`} />
-        ))}
+        )) : <div className={`flex-1 ${isDark ? 'bg-white/[0.06]' : 'bg-slate-100'}`} />}
       </div>
       <div className="flex flex-wrap gap-x-4 gap-y-1 mt-2">
-        {segments.filter(s => s.count > 0).map(seg => (
+        {segments.map(seg => (
           <div key={seg.label} className="flex items-center gap-1.5">
             <span className={`w-2 h-2 rounded-full ${colors[seg.color] || 'bg-slate-300'}`} />
             <span className={`text-[10px] ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{seg.label}</span>
@@ -91,6 +89,13 @@ function HorizontalStatusBar({ segments, isDark }: {
           </div>
         ))}
       </div>
+    </>
+  )
+  if (inline) return <div>{content}</div>
+  return (
+    <div className={`rounded-2xl border p-4 ${isDark ? 'bg-white/[0.03] border-white/[0.06]' : 'bg-white border-slate-200'}`}>
+      <p className={`text-[9px] font-bold uppercase tracking-wider mb-2 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Pulso por Status</p>
+      {content}
     </div>
   )
 }
@@ -159,45 +164,28 @@ export default function LocacaoHome() {
           </div>
         </div>
 
-        {/* Janela Crítica */}
+        {/* Janela Crítica — 2 quadrados */}
         <div className={`rounded-2xl border p-5 ${bg}`}>
-          <p className={`text-[9px] font-bold uppercase tracking-wider mb-4 ${isDark ? 'text-amber-400' : 'text-amber-600'}`}>Janela Crítica</p>
-          <div className="grid grid-cols-1 gap-2.5">
+          <p className={`text-[9px] font-bold uppercase tracking-wider mb-3 ${isDark ? 'text-amber-400' : 'text-amber-600'}`}>Janela Crítica</p>
+          <div className="grid grid-cols-2 gap-2.5">
             <MiniInfoCard label="Faturas vencendo (7d)" value={kpis?.faturasVencendo ?? 0} Icon={AlertCircle} tone={(kpis?.faturasVencendo ?? 0) > 0 ? 'amber' : 'slate'} isDark={isDark} />
             <MiniInfoCard label="Manutenções abertas" value={kpis?.manutencoesAbertas ?? 0} Icon={Wrench} tone={(kpis?.manutencoesAbertas ?? 0) > 0 ? 'red' : 'slate'} isDark={isDark} />
-            <MiniInfoCard label="Contratos expirando (60d)" value={kpis?.contratosExpirando ?? 0} Icon={Calendar} tone={(kpis?.contratosExpirando ?? 0) > 0 ? 'orange' : 'slate'} isDark={isDark} />
           </div>
         </div>
       </div>
 
-      {/* Pulso por Status — Entradas */}
-      {entradas.length > 0 && <HorizontalStatusBar segments={entradaSegments} isDark={isDark} />}
-
-      {/* Pulso por Status — Saídas */}
-      {saidas.length > 0 && (
-        <div className={`rounded-2xl border p-4 ${bg}`}>
-          <p className={`text-[9px] font-bold uppercase tracking-wider mb-2 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Devoluções por Status</p>
-          <div className="flex rounded-full overflow-hidden h-3 gap-px">
-            {saidaSegments.filter(s => s.count > 0).map(seg => {
-              const colors: Record<string, string> = { amber: 'bg-amber-500', blue: 'bg-blue-500', red: 'bg-red-500', violet: 'bg-violet-500', slate: 'bg-slate-400' }
-              const total = saidaSegments.reduce((s, x) => s + x.count, 0)
-              return <div key={seg.label} className={`${colors[seg.color] || 'bg-slate-300'}`} style={{ width: `${(seg.count / total) * 100}%` }} title={`${seg.label}: ${seg.count}`} />
-            })}
-          </div>
-          <div className="flex flex-wrap gap-x-4 gap-y-1 mt-2">
-            {saidaSegments.filter(s => s.count > 0).map(seg => {
-              const colors: Record<string, string> = { amber: 'bg-amber-500', blue: 'bg-blue-500', red: 'bg-red-500', violet: 'bg-violet-500', slate: 'bg-slate-400' }
-              return (
-                <div key={seg.label} className="flex items-center gap-1.5">
-                  <span className={`w-2 h-2 rounded-full ${colors[seg.color] || 'bg-slate-300'}`} />
-                  <span className={`text-[10px] ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{seg.label}</span>
-                  <span className={`text-[10px] font-bold ${isDark ? 'text-white' : 'text-slate-700'}`}>{seg.count}</span>
-                </div>
-              )
-            })}
-          </div>
+      {/* Pulso por Situação */}
+      <div className={`rounded-2xl border p-4 space-y-4 ${bg}`}>
+        <p className={`text-[9px] font-bold uppercase tracking-wider ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Pulso por Situação</p>
+        <div>
+          <p className={`text-[10px] font-semibold mb-1.5 ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>Entradas</p>
+          <HorizontalStatusBar segments={entradaSegments} isDark={isDark} inline />
         </div>
-      )}
+        <div>
+          <p className={`text-[10px] font-semibold mb-1.5 ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>Devoluções</p>
+          <HorizontalStatusBar segments={saidaSegments} isDark={isDark} inline />
+        </div>
+      </div>
 
       {/* Faturas Próximas + Solicitações Urgentes */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
