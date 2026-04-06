@@ -125,7 +125,7 @@ nodes = [
     {
         "parameters": {
             "method": "POST",
-            "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=AIzaSyBqG01e0fXQDBNAxNNmvA4JoQ0s6U-IHBM",
+            "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={{ $env.GEMINI_API_KEY }}",
             "sendBody": True,
             "specifyBody": "json",
             "jsonBody": "={{ $json.__bodyJson }}",
