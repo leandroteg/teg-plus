@@ -306,7 +306,7 @@ export default function LocacaoHome() {
                       <AlertTriangle size={11} className="text-red-500 shrink-0" />
                       <span className={`text-xs font-semibold truncate ${isDark ? 'text-red-300' : 'text-red-700'}`}>{imo.endereco || imo.descricao}</span>
                     </div>
-                    <p className={`text-[10px] ${txtMuted}`}>Venceu {fmtDate((imo as any).contrato?.data_fim_previsto)}</p>
+                    <p className={`text-[10px] ${txtMuted}`}>{imo.cidade || ''}{imo.cidade ? ' · ' : ''}Venceu {fmtDate((imo as any).contrato?.data_fim_previsto)}</p>
                   </div>
                   <span className={`shrink-0 text-[10px] font-bold px-2 py-0.5 rounded-full ${isDark ? 'bg-red-500/15 text-red-300' : 'bg-red-100 text-red-700'}`}>Vencido</span>
                 </div>
@@ -318,7 +318,7 @@ export default function LocacaoHome() {
                       <Calendar size={11} className="text-amber-500 shrink-0" />
                       <span className={`text-xs font-semibold truncate ${isDark ? 'text-amber-300' : 'text-amber-700'}`}>{imo.endereco || imo.descricao}</span>
                     </div>
-                    <p className={`text-[10px] ${txtMuted}`}>Vence {fmtDate((imo as any).contrato?.data_fim_previsto)}</p>
+                    <p className={`text-[10px] ${txtMuted}`}>{imo.cidade || ''}{imo.cidade ? ' · ' : ''}Vence {fmtDate((imo as any).contrato?.data_fim_previsto)}</p>
                   </div>
                   <span className={`shrink-0 text-[10px] font-bold px-2 py-0.5 rounded-full ${isDark ? 'bg-amber-500/15 text-amber-300' : 'bg-amber-100 text-amber-700'}`}>Vencendo</span>
                 </div>
