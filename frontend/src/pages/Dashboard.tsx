@@ -503,15 +503,6 @@ export default function Dashboard() {
           >
             <RefreshCw size={12} /> Atualizar
           </button>
-            <button key={val} onClick={() => setPeriodo(val)}
-              className={`px-2.5 py-1 rounded-xl text-[11px] font-bold transition-all ${
-                periodo === val
-                  ? 'bg-teal-600 text-white shadow-sm'
-                  : isDark ? 'text-slate-400 hover:text-slate-200' : 'text-slate-500 hover:text-slate-700'
-              }`}>
-              {lbl}
-            </button>
-          ))}
         </div>
         <div className="relative flex items-center">
           <MapPin size={11} className={`absolute left-2.5 pointer-events-none z-10 ${obraFilter ? 'text-teal-600' : isDark ? 'text-slate-500' : 'text-slate-400'}`} />
