@@ -651,6 +651,13 @@ export default function NovaRequisicao() {
             <option value="">Selecione a obra</option>
             {obras.map(o => <option key={o.id} value={o.id}>{o.codigo ? `${o.codigo} - ` : ''}{o.nome}</option>)}
           </select>
+          {(() => { const o = obras.find(x => x.id === obraId); return o?.centro_custo_id ? (
+            <p className="mt-1.5 flex items-center gap-1.5 text-[11px] text-teal-700 bg-teal-50 border border-teal-100 rounded-lg px-2.5 py-1.5">
+              <span className="font-bold">CC preenchido automaticamente:</span>
+              <span className="font-mono font-semibold">{o.centro_custo_codigo}</span>
+              {o.centro_custo_descricao && <span className="text-teal-500">— {o.centro_custo_descricao}</span>}
+            </p>
+          ) : null })()}
         </div>
 
         <div>
@@ -690,11 +697,11 @@ export default function NovaRequisicao() {
         </div>
 
         <div className={`rounded-2xl border px-4 py-3 space-y-3 ${
-        compraRecorrente ? 'border-indigo-200 bg-indigo-50/60' : 'border-slate-200 bg-white'
+        compraRecorrente ? 'border-indigo-200 bg-indigo-50/60' : 'border-red-300 bg-red-100'
       }`}>
         <div className="flex items-start justify-between gap-3">
           <div>
-            <label className="text-xs font-semibold text-slate-500 block">Compra/Contratação recorrente</label>
+            <label className="text-xs font-semibold text-slate-500 block">Compra/Serviço Recorrente</label>
             <p className="text-xs text-slate-500 mt-1">
               Esta solicitação passará pela área de Contratos para formalização
             </p>
@@ -924,6 +931,13 @@ export default function NovaRequisicao() {
           <option value="">Selecione a obra</option>
           {obras.map(o => <option key={o.id} value={o.id}>{o.codigo ? `${o.codigo} - ` : ''}{o.nome}</option>)}
         </select>
+        {(() => { const o = obras.find(x => x.id === obraId); return o?.centro_custo_id ? (
+          <p className="mt-1.5 flex items-center gap-1.5 text-[11px] text-teal-700 bg-teal-50 border border-teal-100 rounded-lg px-2.5 py-1.5">
+            <span className="font-bold">CC preenchido automaticamente:</span>
+            <span className="font-mono font-semibold">{o.centro_custo_codigo}</span>
+            {o.centro_custo_descricao && <span className="text-teal-500">— {o.centro_custo_descricao}</span>}
+          </p>
+        ) : null })()}
       </div>
 
       <div>

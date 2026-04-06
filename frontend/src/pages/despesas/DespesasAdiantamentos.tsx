@@ -25,6 +25,7 @@ function addBusinessDays(dateStr: string, days: number): string {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
 }
 
+
 const STATUS_STYLE: Record<StatusDespesaAdiantamento, string> = {
   solicitado: 'bg-amber-100 text-amber-700',
   aprovado: 'bg-emerald-100 text-emerald-700',
@@ -62,6 +63,7 @@ const EMPTY_FORM = {
 type FavorecidoOption = SelectOption & {
   email?: string
 }
+
 
 export default function DespesasAdiantamentos() {
   const { dark } = useTheme()
@@ -124,6 +126,7 @@ export default function DespesasAdiantamentos() {
     const limite = addBusinessDays(form.data_pagamento, 5)
     setForm(prev => ({ ...prev, data_limite_prestacao: limite }))
   }, [form.data_pagamento])
+
 
   const stats = useMemo(() => ({
     solicitado: adiantamentos.filter(item => item.status === 'solicitado').length,
