@@ -610,7 +610,7 @@ export default function FilaCotacoes() {
                   obra_id: (req as any).obra_id ?? null,
                   valor_estimado: valorEmitir,
                   solicitante_id: perfil?.id ?? null,
-                  solicitante_nome: perfil?.nome ?? null,
+                  solicitante_nome: perfil?.nome || perfil?.email || 'Sistema',
                   etapa_atual: 'solicitacao',
                   status: 'em_andamento',
                   requisicao_origem_id: req.id,

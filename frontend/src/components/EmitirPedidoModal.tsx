@@ -709,11 +709,14 @@ export default function EmitirPedidoModal({
               isLoading ||
               !requisicao ||
               !cotacaoResolvida?.id ||
-              !classeId ||
-              !centroId ||
-              adiantamentoInvalido ||
-              !parcelasValidas ||
-              diferencaParcelas !== 0
+              // Para "Solicitar Contrato" não são necessários campos financeiros do PO
+              (!compraRecorrente && (
+                !classeId ||
+                !centroId ||
+                adiantamentoInvalido ||
+                !parcelasValidas ||
+                diferencaParcelas !== 0
+              ))
             }
             className={`inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-white text-sm font-bold disabled:opacity-50 ${
               compraRecorrente ? 'bg-indigo-600 hover:bg-indigo-700' : 'bg-teal-600 hover:bg-teal-700'
