@@ -664,23 +664,28 @@ export default function CotacaoForm() {
       const preenchidos = prev.filter(f => f.fornecedor_nome.trim() || f.valor_total > 0)
 
       const novos: FornecedorForm[] = parsed.map(p => {
-        const itens: ItemPreco[] = (p.itens ?? []).map(it => ({
-          descricao:      it.descricao,
-          qtd:            it.qtd,
-          valor_unitario: it.valor_unitario,
-          valor_total:    Math.round(it.qtd * it.valor_unitario * 100) / 100,
-        }))
-        const totalItens = calcTotalItems(itens)
+        // Só inclui itens que realmente têm preço — itens sem valor são descartados
+        const itensComValor: ItemPreco[] = (p.itens ?? [])
+          .filter(it => it.valor_unitario > 0)
+          .map(it => ({
+            descricao:      it.descricao,
+            qtd:            it.qtd,
+            valor_unitario: it.valor_unitario,
+            valor_total:    Math.round(it.qtd * it.valor_unitario * 100) / 100,
+          }))
+        const totalItens = calcTotalItems(itensComValor)
+        // Se há itens com preço → usa a soma deles; senão usa o total do documento
+        const valorTotal = itensComValor.length > 0 ? totalItens : (p.valor_total || 0)
         return {
           fornecedor_nome:    p.fornecedor_nome || '',
           fornecedor_cnpj:    p.fornecedor_cnpj ? maskCNPJ(p.fornecedor_cnpj) : '',
           fornecedor_contato: p.fornecedor_contato || '',
-          valor_total:        itens.length > 0 ? totalItens : (p.valor_total || 0),
+          valor_total:        valorTotal,
           prazo_entrega_dias: p.prazo_entrega_dias || 0,
           condicao_pagamento: p.condicao_pagamento || '',
           observacao:         p.observacao || '',
           arquivo_url:        uploadedPath,
-          itens_precos:       itens,
+          itens_precos:       itensComValor,
         }
       })
 
@@ -992,7 +997,7 @@ export default function CotacaoForm() {
             <div className="grid grid-cols-2 gap-2">
               <div>
                 <label className="text-[10px] text-slate-400 font-semibold">
-                  {forn.itens_precos.length > 0
+                  {calcTotalItems(forn.itens_precos) > 0
                     ? (cotacao?.requisicao as any)?.compra_recorrente ? 'Valor Mensal (calculado)' : 'Valor Total (calculado)'
                     : (cotacao?.requisicao as any)?.compra_recorrente ? 'Valor Mensal *' : 'Valor Total *'}
                 </label>
@@ -1001,16 +1006,16 @@ export default function CotacaoForm() {
                   <NumericInput
                     required={idx < minCot && !semCotacoesMinimas}
                     min={0.01} step={0.01}
-                    readOnly={forn.itens_precos.length > 0}
+                    readOnly={calcTotalItems(forn.itens_precos) > 0}
                     className={`w-full border rounded-xl pl-9 pr-3 py-2 text-sm font-semibold focus:ring-2 focus:ring-teal-300 outline-none transition-shadow ${
-                      forn.itens_precos.length > 0
+                      calcTotalItems(forn.itens_precos) > 0
                         ? 'bg-teal-50 border-teal-200 text-teal-700 cursor-default'
                         : triedSubmit && !forn.valor_total && idx < minCot && !semCotacoesMinimas
                           ? 'border-red-300 bg-red-50/30'
                           : 'border-slate-200'
                     }`}
                     value={forn.valor_total}
-                    onChange={v => forn.itens_precos.length === 0 && updateFornecedor(idx, 'valor_total', v)}
+                    onChange={v => calcTotalItems(forn.itens_precos) === 0 && updateFornecedor(idx, 'valor_total', v)}
                   />
                 </div>
               </div>
