@@ -1,380 +1,341 @@
-import { useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { useState, useMemo } from 'react'
+import { useNavigate } from 'react-router-dom'
 import {
-  FileText, Clock, CheckCircle, DollarSign, Sparkles,
+  FileText, Clock,
   RefreshCw, Settings, TrendingUp, AlertTriangle,
-  ShoppingCart, Package, ChevronRight,
+  Package, ChevronRight, ShoppingCart, Timer,
+  ArrowRight, CalendarClock, XCircle, Zap,
+  CalendarDays, MapPin,
 } from 'lucide-react'
 import { useDashboard } from '../hooks/useDashboard'
 import { useRequisicoes } from '../hooks/useRequisicoes'
 import { useLookupObras } from '../hooks/useLookups'
+import { useTheme } from '../contexts/ThemeContext'
 import StatusBadge from '../components/StatusBadge'
-import FluxoTimeline from '../components/FluxoTimeline'
 import { isPlaceholder } from '../services/supabase'
-import type { StatusRequisicao, DashboardData, Aprovacao } from '../types'
+import type { StatusRequisicao, DashboardData, Aprovacao, Requisicao } from '../types'
 
+// ── Formatadores ─────────────────────────────────────────────────────────────
 const fmt = (v: number) =>
   v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 })
 
-const fmtData = (d: string) =>
-  new Date(d).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })
+const fmtData = (d?: string) =>
+  d ? new Date(d).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }) : '—'
 
+// ── Constantes ───────────────────────────────────────────────────────────────
 const EMPTY_KPIS: DashboardData['kpis'] = {
   total_mes: 0, aguardando_aprovacao: 0, aprovadas_mes: 0,
   rejeitadas_mes: 0, valor_total_mes: 0, tempo_medio_aprovacao_horas: 0,
 }
 
-// ── Funil pipeline — 7 etapas ──────────────────────────────────────────────
 const PIPELINE_ETAPAS = [
-  { label: 'Pendentes',  statuses: ['rascunho', 'pendente'],                color: 'text-amber-600',  bg: 'bg-amber-50',  border: 'border-amber-200'   },
-  { label: 'Valid. Téc.',statuses: ['em_aprovacao'],                        color: 'text-blue-600',   bg: 'bg-blue-50',   border: 'border-blue-200'    },
-  { label: 'Cotação',    statuses: ['aprovada', 'em_cotacao', 'cotacao_enviada'], color: 'text-violet-600', bg: 'bg-violet-50', border: 'border-violet-200' },
-  { label: 'Aprov. Fin.',statuses: ['cotacao_aprovada'],                    color: 'text-indigo-600', bg: 'bg-indigo-50', border: 'border-indigo-200'   },
-  { label: 'Pedido',     statuses: ['pedido_emitido'],                      color: 'text-cyan-600',   bg: 'bg-cyan-50',   border: 'border-cyan-200'    },
-  { label: 'Entrega',    statuses: ['em_entrega', 'entregue'],              color: 'text-teal-600',   bg: 'bg-teal-50',   border: 'border-teal-200'    },
-  { label: 'Pagamento',  statuses: ['aguardando_pgto', 'pago'],             color: 'text-emerald-600',bg: 'bg-emerald-50',border: 'border-emerald-200' },
+  { key: 'pendentes',  label: 'Pendentes',   statuses: ['rascunho', 'pendente'] as StatusRequisicao[],                         color: 'text-amber-600',   bg: 'bg-amber-50',   border: 'border-amber-200',   barClass: 'bg-amber-400'   },
+  { key: 'valid_tec',  label: 'Valid. Téc.', statuses: ['em_aprovacao'] as StatusRequisicao[],                                 color: 'text-blue-600',    bg: 'bg-blue-50',    border: 'border-blue-200',    barClass: 'bg-blue-500'    },
+  { key: 'cotacao',    label: 'Cotação',     statuses: ['aprovada', 'em_cotacao', 'cotacao_enviada'] as StatusRequisicao[],    color: 'text-violet-600',  bg: 'bg-violet-50',  border: 'border-violet-200',  barClass: 'bg-violet-500'  },
+  { key: 'aprov_fin',  label: 'Aprov. Fin.', statuses: ['cotacao_aprovada'] as StatusRequisicao[],                             color: 'text-indigo-600',  bg: 'bg-indigo-50',  border: 'border-indigo-200',  barClass: 'bg-indigo-500'  },
+  { key: 'pedido',     label: 'Pedido',      statuses: ['pedido_emitido'] as StatusRequisicao[],                               color: 'text-cyan-600',    bg: 'bg-cyan-50',    border: 'border-cyan-200',    barClass: 'bg-cyan-500'    },
+  { key: 'entrega',    label: 'Entrega',     statuses: ['em_entrega', 'entregue'] as StatusRequisicao[],                      color: 'text-teal-600',    bg: 'bg-teal-50',    border: 'border-teal-200',    barClass: 'bg-teal-500'    },
+  { key: 'pagamento',  label: 'Pagamento',   statuses: ['aguardando_pgto', 'pago'] as StatusRequisicao[],                     color: 'text-emerald-600', bg: 'bg-emerald-50', border: 'border-emerald-200', barClass: 'bg-emerald-500' },
 ]
 
-// ── Avatar helpers ──────────────────────────────────────────────────────────
-const AVATAR_COLORS: Record<string, string> = {
-  Lauany:  'bg-violet-500',
-  Fernando:'bg-amber-500',
-  Aline:   'bg-emerald-500',
+const STATUS_ATIVO: StatusRequisicao[] = [
+  'rascunho', 'pendente', 'em_aprovacao', 'aprovada', 'em_esclarecimento',
+  'em_cotacao', 'cotacao_enviada', 'cotacao_aprovada', 'pedido_emitido',
+  'em_entrega', 'entregue', 'aguardando_pgto',
+]
+
+const NIVEL_LABEL: Record<number, string> = { 1: 'Coordenador', 2: 'Gerente', 3: 'Diretor', 4: 'CEO' }
+
+// ── toneClasses helper ────────────────────────────────────────────────────────
+function toneClasses(
+  tone: 'sky' | 'emerald' | 'cyan' | 'amber' | 'teal' | 'orange' | 'blue' | 'violet' | 'red' | 'slate' | 'indigo'
+) {
+  const map = {
+    sky:     { text: 'text-sky-600',     soft: 'bg-sky-50 text-sky-700 border-sky-100',             icon: 'bg-sky-50 text-sky-500'     },
+    emerald: { text: 'text-emerald-600', soft: 'bg-emerald-50 text-emerald-700 border-emerald-100', icon: 'bg-emerald-50 text-emerald-500' },
+    cyan:    { text: 'text-cyan-600',    soft: 'bg-cyan-50 text-cyan-700 border-cyan-100',           icon: 'bg-cyan-50 text-cyan-500'   },
+    amber:   { text: 'text-amber-600',   soft: 'bg-amber-50 text-amber-700 border-amber-100',       icon: 'bg-amber-50 text-amber-500' },
+    teal:    { text: 'text-teal-600',    soft: 'bg-teal-50 text-teal-700 border-teal-100',           icon: 'bg-teal-50 text-teal-500'   },
+    orange:  { text: 'text-orange-600',  soft: 'bg-orange-50 text-orange-700 border-orange-100',    icon: 'bg-orange-50 text-orange-500' },
+    blue:    { text: 'text-blue-600',    soft: 'bg-blue-50 text-blue-700 border-blue-100',           icon: 'bg-blue-50 text-blue-500'   },
+    violet:  { text: 'text-violet-600',  soft: 'bg-violet-50 text-violet-700 border-violet-100',    icon: 'bg-violet-50 text-violet-500' },
+    red:     { text: 'text-red-600',     soft: 'bg-red-50 text-red-700 border-red-100',             icon: 'bg-red-50 text-red-500'     },
+    slate:   { text: 'text-slate-500',   soft: 'bg-slate-50 text-slate-600 border-slate-100',       icon: 'bg-slate-50 text-slate-400' },
+    indigo:  { text: 'text-indigo-600',  soft: 'bg-indigo-50 text-indigo-700 border-indigo-100',    icon: 'bg-indigo-50 text-indigo-500' },
+  } as const
+  return map[tone]
 }
 
-function Avatar({ nome, size = 'sm' }: { nome: string; size?: 'sm' | 'md' }) {
-  const initials = nome.slice(0, 2).toUpperCase()
-  const bg = AVATAR_COLORS[nome.split(' ')[0]] ?? `bg-slate-500`
-  const cls = size === 'md' ? 'w-9 h-9 text-sm font-bold' : 'w-6 h-6 text-[10px] font-bold'
+// ── Sub-componentes ───────────────────────────────────────────────────────────
+function SpotlightMetric({
+  label, value, note, tone,
+}: {
+  label: string
+  value: number | string
+  note: string
+  tone: 'sky' | 'emerald' | 'cyan' | 'amber' | 'teal' | 'slate' | 'indigo' | 'orange' | 'blue' | 'violet' | 'red'
+}) {
+  const { isDark } = useTheme()
+  const palette = toneClasses(tone)
   return (
-    <div className={`${cls} ${bg} rounded-full flex items-center justify-center text-white flex-shrink-0`}>
-      {initials}
+    <div className={`rounded-2xl border px-3.5 py-2.5 ${isDark ? 'border-white/[0.06] bg-white/[0.03]' : `${palette.soft} border`}`}>
+      <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500">{label}</p>
+      <p className={`mt-1.5 text-[1.85rem] leading-none font-black ${palette.text}`}>{value}</p>
+      <p className={`text-[10px] mt-1 leading-snug ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{note}</p>
     </div>
   )
 }
 
-// ── KPI Card ────────────────────────────────────────────────────────────────
-function KpiCard({ titulo, valor, icon: Icon, cor, subtitulo }: {
-  titulo: string; valor: number | string; icon: typeof FileText;
-  cor: string; subtitulo?: string
+function HorizontalStatusBar({
+  title, segments, emptyLabel, isDark,
+}: {
+  title: string
+  segments: Array<{ key: string; label: string; value: number; barClass: string }>
+  emptyLabel: string
+  isDark: boolean
+}) {
+  const total = segments.reduce((sum, s) => sum + s.value, 0)
+  return (
+    <div>
+      <div className="flex items-center justify-between gap-3 mb-2">
+        <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500">{title}</p>
+        <p className={`text-[10px] font-semibold ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{total} RC(s)</p>
+      </div>
+      {segments.length === 0 ? (
+        <div className={`h-10 rounded-xl flex items-center justify-center text-[10px] font-semibold ${isDark ? 'bg-white/[0.04] text-slate-500' : 'bg-slate-50 text-slate-400'}`}>
+          {emptyLabel}
+        </div>
+      ) : (
+        <div className={`flex h-10 rounded-xl overflow-hidden ${isDark ? 'bg-white/[0.04]' : 'bg-slate-100'}`}>
+          {segments.map(seg => {
+            const pct = (seg.value / total) * 100
+            const showLabel = pct >= 14
+            const showValue = pct >= 22
+            return (
+              <div
+                key={seg.key}
+                className={`${seg.barClass} relative flex items-center justify-center transition-all`}
+                style={{ width: `${Math.max(pct, 4)}%` }}
+                title={`${seg.label}: ${seg.value}`}
+              >
+                {showLabel && (
+                  <span className="text-[10px] font-bold text-white drop-shadow-sm truncate px-2">
+                    {seg.label} {showValue ? seg.value : ''}
+                  </span>
+                )}
+              </div>
+            )
+          })}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function MiniInfoCard({
+  label, value, note, icon: Icon, iconTone, isDark,
+}: {
+  label: string; value: number; note: string
+  icon: typeof FileText; iconTone: string; isDark: boolean
 }) {
   return (
-    <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-200">
-      <div className="flex items-center gap-2 mb-2">
-        <Icon size={14} className={cor} />
-        <span className="text-[11px] text-slate-500 font-semibold">{titulo}</span>
+    <div className={`rounded-2xl border px-3.5 py-3 ${isDark ? 'border-white/[0.06] bg-white/[0.03]' : 'border-slate-100 bg-slate-50/80'}`}>
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className={`text-[10px] font-bold uppercase tracking-widest ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{label}</p>
+          <p className={`mt-1.5 text-[1.85rem] leading-none font-black ${isDark ? 'text-white' : 'text-slate-900'}`}>{value}</p>
+          <p className={`text-[10px] mt-1 leading-snug ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{note}</p>
+        </div>
+        <div className={`w-8 h-8 rounded-xl flex items-center justify-center ${isDark ? 'bg-white/5' : 'bg-white'}`}>
+          <Icon size={14} className={iconTone} />
+        </div>
       </div>
-      <p className={`text-2xl font-extrabold ${cor} leading-none`}>{valor}</p>
-      {subtitulo && <p className="text-[10px] text-slate-400 mt-1">{subtitulo}</p>}
     </div>
   )
 }
 
-export default function Dashboard() {
-  const nav = useNavigate()
-  const [periodo, setPeriodo] = useState('trimestre')
-  const [obraFilter, setObraFilter] = useState('')
-  const [pipelineFilter, setPipelineFilter] = useState<number | null>(null)
-  const obras = useLookupObras()
-  const { data, isLoading, isError, error, refetch } = useDashboard(periodo, obraFilter || undefined)
-  const { data: todasReqs } = useRequisicoes()
+function EmptyPanel({ isDark, title, description }: { isDark: boolean; title: string; description: string }) {
+  return (
+    <div className={`px-4 py-6 text-center ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+      <p className={`text-xs font-bold ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>{title}</p>
+      <p className="text-[10px] mt-1">{description}</p>
+    </div>
+  )
+}
 
-  if (isPlaceholder) return <SetupRequired />
-  if (isLoading)    return <Loader />
-
-  if (isError) {
-    const errObj = error as unknown as Record<string, unknown>
-    const errMsg = (errObj?.message as string) || (errObj?.details as string) || 'Erro desconhecido'
-    return (
-      <div className="flex flex-col items-center justify-center py-16 gap-4">
-        <div className="text-center max-w-xs">
-          <p className="text-slate-700 font-semibold mb-1">Erro ao carregar dados</p>
-          <p className="text-xs text-red-500 font-mono mb-1">{errMsg}</p>
-        </div>
-        <button onClick={() => refetch()}
-          className="flex items-center gap-2 px-4 py-2 bg-teal-500/10 text-teal-700 rounded-xl text-sm font-semibold">
-          <RefreshCw size={14} /> Tentar novamente
+// ── UrgentesCard ──────────────────────────────────────────────────────────────
+function UrgentesCard({ reqs, isDark, nav }: { reqs: Requisicao[]; isDark: boolean; nav: ReturnType<typeof useNavigate> }) {
+  return (
+    <section className={`rounded-2xl shadow-sm overflow-hidden ${isDark ? 'bg-[#1e293b] border border-red-500/30' : 'bg-white border border-red-200'}`}>
+      <div className={`px-4 py-3 flex items-center justify-between ${isDark ? 'border-b border-red-500/20' : 'border-b border-red-100'}`}>
+        <h2 className={`text-sm font-extrabold flex items-center gap-1.5 ${isDark ? 'text-red-400' : 'text-red-800'}`}>
+          <Zap size={14} className="text-red-500" /> Requisições Urgentes
+        </h2>
+        <button
+          onClick={() => nav('/requisicoes')}
+          className="text-[10px] text-red-600 font-semibold flex items-center gap-0.5"
+        >
+          Ver todas <ArrowRight size={10} />
         </button>
       </div>
-    )
-  }
-
-  const kpis                  = data?.kpis ?? EMPTY_KPIS
-  const por_obra              = data?.por_obra ?? []
-  const requisicoes_recentes  = data?.requisicoes_recentes ?? []
-  const aprovacoes_pendentes  = data?.aprovacoes_pendentes ?? []
-  const reqs                  = todasReqs ?? requisicoes_recentes
-
-  // Mapa: requisicao_id → aprovação pendente (para mostrar aprovador no card)
-  const aprovacaoMap = new Map<string, Aprovacao>(
-    aprovacoes_pendentes.map(a => [a.requisicao_id, a])
+      {reqs.length === 0 ? (
+        <EmptyPanel
+          isDark={isDark}
+          title="Nenhuma requisição urgente"
+          description="Requisições marcadas como urgente ou crítica aparecem aqui para priorização imediata."
+        />
+      ) : (
+        <div className={`divide-y ${isDark ? 'divide-white/[0.04]' : 'divide-red-50'}`}>
+          {reqs.slice(0, 5).map(r => (
+            <button
+              key={r.id}
+              type="button"
+              onClick={() => nav(`/requisicoes/${r.id}`)}
+              className={`w-full text-left flex items-center gap-3 px-4 py-3 transition-colors ${isDark ? 'hover:bg-white/[0.03]' : 'hover:bg-red-50/50'}`}
+            >
+              <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${r.urgencia === 'critica' ? (isDark ? 'bg-red-500/20' : 'bg-red-100') : (isDark ? 'bg-amber-500/10' : 'bg-amber-50')}`}>
+                <AlertTriangle size={14} className={r.urgencia === 'critica' ? 'text-red-500' : 'text-amber-500'} />
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-1.5">
+                  <p className={`text-xs font-extrabold font-mono ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>{r.numero}</p>
+                  <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full ${r.urgencia === 'critica' ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700'}`}>
+                    {r.urgencia === 'critica' ? 'CRÍTICA' : 'URGENTE'}
+                  </span>
+                </div>
+                <p className={`text-[10px] truncate ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{(r as any).justificativa || r.descricao}</p>
+              </div>
+              <div className="text-right shrink-0">
+                <StatusBadge status={r.status} size="sm" />
+                <p className={`text-[10px] mt-0.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{r.obra_nome}</p>
+              </div>
+            </button>
+          ))}
+        </div>
+      )}
+    </section>
   )
+}
 
-  // Contagem por etapa do pipeline
-  const pipelineContagens = PIPELINE_ETAPAS.map(etapa =>
-    reqs.filter(r => etapa.statuses.includes(r.status)).length
-  )
-
-  // Filtro de recentes baseado no pipeline selecionado
-  const recentes = pipelineFilter !== null
-    ? reqs.filter(r => PIPELINE_ETAPAS[pipelineFilter].statuses.includes(r.status))
-    : reqs.slice(0, 10)
-
-  // Compradores stats
-  const compradorStats = (() => {
-    const map = new Map<string, { nome: string; total: number; pendentes: number; valor: number }>()
-    for (const r of reqs) {
-      if (!r.comprador_nome) continue
-      const prev = map.get(r.comprador_nome) ?? { nome: r.comprador_nome, total: 0, pendentes: 0, valor: 0 }
-      prev.total++
-      if (['pendente', 'em_aprovacao', 'em_cotacao', 'cotacao_enviada'].includes(r.status)) prev.pendentes++
-      prev.valor += r.valor_estimado ?? 0
-      map.set(r.comprador_nome, prev)
-    }
-    return Array.from(map.values()).sort((a, b) => b.total - a.total)
-  })()
-
+// ── VencidasCard ──────────────────────────────────────────────────────────────
+function VencidasCard({ reqs, isDark, nav }: { reqs: Requisicao[]; isDark: boolean; nav: ReturnType<typeof useNavigate> }) {
+  const hoje = Date.now()
   return (
-    <div className="space-y-5">
-
-      {/* ── AprovAi Banner ─────────────────────────────────────────────── */}
-      <Link to="/aprovaai"
-        className="block rounded-2xl p-4 active:scale-[0.98] transition-all"
-        style={{ background: 'linear-gradient(135deg, #6366F1 0%, #8B5CF6 100%)', boxShadow: '0 8px 24px rgba(99,102,241,0.25)' }}>
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="bg-white/20 rounded-xl p-2.5">
-              <Sparkles size={18} className="text-white" />
-            </div>
-            <div>
-              <h3 className="text-white font-bold text-sm leading-none">AprovAi</h3>
-              <p className="text-indigo-200 text-xs mt-0.5">Aprovações pendentes com 1 toque</p>
-            </div>
-          </div>
-          <div className="bg-white/20 backdrop-blur-sm rounded-xl px-3 py-1.5 flex items-center gap-1.5">
-            <span className="text-white text-xl font-extrabold">{kpis.aguardando_aprovacao}</span>
-            <span className="text-indigo-200 text-xs">pendente{kpis.aguardando_aprovacao !== 1 ? 's' : ''}</span>
-          </div>
-        </div>
-      </Link>
-
-      {/* ── Filtros compactos (Período + Obra) ────────────────────────── */}
-      <div className="flex items-center gap-2">
-        <div className="flex gap-1 flex-1">
-          {[['semana', 'Sem'], ['mes', 'Mês'], ['trimestre', 'Trim'], ['tudo', 'Tudo']].map(([val, lbl]) => (
-            <button key={val} onClick={() => setPeriodo(val)}
-              className={`px-2.5 py-1.5 rounded-full text-[11px] font-semibold transition-all ${
-                periodo === val ? 'bg-slate-800 text-white shadow-sm' : 'bg-white text-slate-500 border border-slate-200'
-              }`}>
-              {lbl}
-            </button>
-          ))}
-        </div>
-        <select
-          value={obraFilter}
-          onChange={e => setObraFilter(e.target.value)}
-          className={`text-[11px] font-semibold rounded-full px-2.5 py-1.5 border transition-all appearance-none cursor-pointer max-w-[140px] truncate ${
-            obraFilter ? 'bg-teal-50 border-teal-300 text-teal-700' : 'bg-white border-slate-200 text-slate-500'
-          }`}
+    <section className={`rounded-2xl shadow-sm overflow-hidden ${isDark ? 'bg-[#1e293b] border border-amber-500/30' : 'bg-white border border-amber-200'}`}>
+      <div className={`px-4 py-3 flex items-center justify-between ${isDark ? 'border-b border-amber-500/20' : 'border-b border-amber-100'}`}>
+        <h2 className={`text-sm font-extrabold flex items-center gap-1.5 ${isDark ? 'text-amber-400' : 'text-amber-800'}`}>
+          <CalendarClock size={14} className="text-amber-500" /> Vencidas / À vencer
+        </h2>
+        <button
+          onClick={() => nav('/requisicoes')}
+          className="text-[10px] text-amber-600 font-semibold flex items-center gap-0.5"
         >
-          <option value="">Todas obras</option>
-          {obras.map(o => (
-            <option key={o.id} value={o.id}>{o.codigo ? `${o.codigo} - ` : ''}{o.nome}</option>
-          ))}
-        </select>
+          Ver todas <ArrowRight size={10} />
+        </button>
       </div>
-
-      {/* ── KPIs ───────────────────────────────────────────────────────── */}
-      <div className="grid grid-cols-2 gap-3">
-        <KpiCard titulo="Total RCs"    valor={kpis.total_mes}              icon={FileText}    cor="text-teal-600"    />
-        <KpiCard titulo="Aguardando"   valor={kpis.aguardando_aprovacao}   icon={Clock}       cor="text-amber-600"   />
-        <KpiCard titulo="Aprovadas"    valor={kpis.aprovadas_mes}          icon={CheckCircle} cor="text-emerald-600" />
-        <KpiCard titulo="Valor Total"  valor={fmt(kpis.valor_total_mes)}   icon={DollarSign}  cor="text-teal-600"    subtitulo="no período" />
-      </div>
-
-      {/* ── Funil Pipeline ─────────────────────────────────────────────── */}
-      <section>
-        <div className="flex items-center justify-between mb-2">
-          <h2 className="text-xs font-bold text-slate-500 uppercase tracking-widest flex items-center gap-1.5">
-            <TrendingUp size={12} /> Pipeline
-          </h2>
-          {pipelineFilter !== null && (
-            <button onClick={() => setPipelineFilter(null)} className="text-[10px] text-teal-600 font-semibold">
-              Ver todos ×
-            </button>
-          )}
-        </div>
-        <div className="grid grid-cols-7 gap-1">
-          {PIPELINE_ETAPAS.map((etapa, i) => {
-            const count  = pipelineContagens[i]
-            const active = pipelineFilter === i
+      {reqs.length === 0 ? (
+        <EmptyPanel
+          isDark={isDark}
+          title="Nenhuma RC vencida ou próxima do prazo"
+          description="RCs com prazo de necessidade vencido ou vencendo nos próximos 3 dias aparecem aqui."
+        />
+      ) : (
+        <div className={`divide-y ${isDark ? 'divide-white/[0.04]' : 'divide-amber-50'}`}>
+          {reqs.slice(0, 5).map(r => {
+            const dataNecessidade = (r as any).data_necessidade as string | undefined
+            const prazoTs = dataNecessidade ? new Date(dataNecessidade).getTime() : 0
+            const vencida = prazoTs > 0 && prazoTs < hoje
             return (
-              <button key={etapa.label} onClick={() => setPipelineFilter(active ? null : i)}
-                className={`flex flex-col items-center gap-1 p-2 rounded-xl border transition-all ${
-                  active ? `${etapa.bg} ${etapa.border} shadow-sm` : 'bg-white border-slate-200 hover:border-slate-300'
-                }`}>
-                <span className={`text-base font-extrabold leading-none ${active ? etapa.color : count > 0 ? 'text-slate-700' : 'text-slate-300'}`}>
-                  {count}
-                </span>
-                <span className={`text-[8px] font-semibold text-center leading-tight ${active ? etapa.color : 'text-slate-400'}`}>
-                  {etapa.label}
-                </span>
+              <button
+                key={r.id}
+                type="button"
+                onClick={() => nav(`/requisicoes/${r.id}`)}
+                className={`w-full text-left flex items-center gap-3 px-4 py-3 transition-colors ${isDark ? 'hover:bg-white/[0.03]' : 'hover:bg-amber-50/50'}`}
+              >
+                <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${vencida ? (isDark ? 'bg-red-500/10' : 'bg-red-50') : (isDark ? 'bg-amber-500/10' : 'bg-amber-50')}`}>
+                  {vencida ? <XCircle size={14} className="text-red-500" /> : <Timer size={14} className="text-amber-500" />}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-1.5">
+                    <p className={`text-xs font-extrabold font-mono ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>{r.numero}</p>
+                    {vencida
+                      ? <span className="text-[9px] bg-red-100 text-red-700 font-bold px-1.5 py-0.5 rounded-full">VENCIDA</span>
+                      : <span className="text-[9px] bg-amber-100 text-amber-700 font-bold px-1.5 py-0.5 rounded-full">À VENCER</span>
+                    }
+                  </div>
+                  <p className={`text-[10px] truncate ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{(r as any).justificativa || r.descricao}</p>
+                </div>
+                <div className="text-right shrink-0">
+                  <StatusBadge status={r.status} size="sm" />
+                  {dataNecessidade && (
+                    <p className={`text-[9px] mt-0.5 font-semibold ${vencida ? 'text-red-500' : 'text-amber-600'}`}>
+                      Prazo: {fmtData(dataNecessidade)}
+                    </p>
+                  )}
+                </div>
               </button>
             )
           })}
         </div>
-      </section>
-
-      {/* ── Compradores ────────────────────────────────────────────────── */}
-      {compradorStats.length > 0 && (
-        <section>
-          <h2 className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-2 flex items-center gap-1.5">
-            <ShoppingCart size={12} /> Compradores
-          </h2>
-          <div className="space-y-2">
-            {compradorStats.map(c => (
-              <div key={c.nome} className="bg-white rounded-2xl px-4 py-3 border border-slate-200 shadow-sm flex items-center gap-3">
-                <Avatar nome={c.nome} size="md" />
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-bold text-slate-800 truncate">{c.nome}</p>
-                  <p className="text-xs text-slate-400 mt-0.5">
-                    {c.total} {c.total === 1 ? 'requisição' : 'requisições'}
-                    {c.pendentes > 0 && (
-                      <span className="ml-1.5 text-amber-600 font-semibold">· {c.pendentes} em andamento</span>
-                    )}
-                  </p>
-                </div>
-                <p className="text-sm font-extrabold text-teal-600 flex-shrink-0">{fmt(c.valor)}</p>
-              </div>
-            ))}
-          </div>
-        </section>
       )}
+    </section>
+  )
+}
 
-      {/* ── Por Obra ───────────────────────────────────────────────────── */}
-      {por_obra.length > 0 && (
-        <section>
-          <h2 className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-2 flex items-center gap-1.5">
-            <Package size={12} /> Por Obra
-          </h2>
-          <div className="space-y-2">
-            {por_obra.map(o => {
-              const maxValor = Math.max(...por_obra.map(x => x.valor), 1)
-              const pct = Math.round((o.valor / maxValor) * 100)
-              return (
-                <div key={o.obra_nome} className="bg-white rounded-2xl p-3.5 border border-slate-200 shadow-sm">
-                  <div className="flex justify-between items-start mb-2">
-                    <div>
-                      <p className="text-sm font-bold text-slate-800">{o.obra_nome}</p>
-                      <p className="text-xs text-slate-400">{o.total} RC{o.total !== 1 ? 's' : ''}</p>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-sm font-extrabold text-teal-600">{fmt(o.valor)}</p>
-                      {o.pendentes > 0 && (
-                        <span className="text-[10px] text-amber-600 font-semibold flex items-center gap-0.5 justify-end mt-0.5">
-                          <AlertTriangle size={9} /> {o.pendentes} pend.
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                  <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                    <div className="h-full rounded-full bg-teal-500 transition-all duration-500" style={{ width: `${pct}%` }} />
-                  </div>
-                </div>
-              )
-            })}
-          </div>
-        </section>
-      )}
+// ── RecentCard ────────────────────────────────────────────────────────────────
+function RecentCard({ r, aprovacao, isDark, nav }: { r: any; aprovacao?: Aprovacao; isDark: boolean; nav: ReturnType<typeof useNavigate> }) {
+  const approvalLabel = r.status === 'pendente' ? 'Aguard. Valid. Técnica'
+    : r.status === 'em_aprovacao' ? 'Em Validação Técnica'
+    : r.status === 'cotacao_aprovada' ? 'Aguard. Aprov. Financeira'
+    : undefined
 
-      {/* ── Recentes ───────────────────────────────────────────────────── */}
-      <section>
-        <div className="flex items-center justify-between mb-2">
-          <h2 className="text-xs font-bold text-slate-500 uppercase tracking-widest flex items-center gap-1.5">
-            <TrendingUp size={12} />
-            {pipelineFilter !== null ? PIPELINE_ETAPAS[pipelineFilter].label : 'Recentes'}
-          </h2>
-          <button onClick={() => nav('/requisicoes')}
-            className="flex items-center gap-0.5 text-[10px] text-teal-600 font-semibold">
-            Ver todas <ChevronRight size={11} />
-          </button>
-        </div>
-        <div className="space-y-2">
-          {recentes.length === 0 ? (
-            <p className="text-center text-slate-400 text-sm py-8">Nenhuma requisição encontrada</p>
-          ) : (
-            recentes.slice(0, 8).map(r => (
-              <RecentCard key={r.id} r={r} aprovacao={aprovacaoMap.get(r.id)} />
-            ))
+  return (
+    <button
+      type="button"
+      onClick={() => nav(`/requisicoes/${r.id}`)}
+      className={`w-full text-left flex items-center gap-3 px-4 py-3 transition-colors ${isDark ? 'hover:bg-white/[0.03]' : 'hover:bg-slate-50'}`}
+    >
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2 mb-1">
+          <span className={`text-[10px] font-mono ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{r.numero}</span>
+          <StatusBadge status={r.status as StatusRequisicao} size="sm" customLabel={approvalLabel} />
+          {(r.urgencia === 'urgente' || r.urgencia === 'critica') && (
+            <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full ${r.urgencia === 'critica' ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700'}`}>
+              {r.urgencia === 'critica' ? 'CRÍTICA' : 'URGENTE'}
+            </span>
           )}
         </div>
-      </section>
-    </div>
-  )
-}
-
-// ── Helpers de aprovação ─────────────────────────────────────────────────────
-const NIVEL_LABEL: Record<number, string> = {
-  1: 'Coordenador',
-  2: 'Gerente',
-  3: 'Diretor',
-  4: 'CEO',
-}
-
-/** Retorna label específico do passo de aprovação, ou undefined se não aplicável */
-function getApprovalStatusLabel(status: string): string | undefined {
-  if (status === 'pendente')      return 'Aguard. Valid. Técnica'
-  if (status === 'em_aprovacao')  return 'Em Validação Técnica'
-  if (status === 'cotacao_aprovada') return 'Aguard. Aprov. Financeira'
-  return undefined
-}
-
-function RecentCard({ r, aprovacao }: { r: any; aprovacao?: Aprovacao }) {
-  const approvalLabel = getApprovalStatusLabel(r.status)
-
-  return (
-    <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4">
-      {/* Linha 1: número + status */}
-      <div className="flex justify-between items-center gap-2 mb-2">
-        <span className="text-[10px] font-mono text-slate-400">{r.numero}</span>
-        <StatusBadge status={r.status as StatusRequisicao} size="sm" customLabel={approvalLabel} />
+        <p className={`text-xs font-semibold truncate ${isDark ? 'text-slate-200' : 'text-slate-800'}`}>{(r as any).justificativa || r.descricao}</p>
+        {aprovacao && (
+          <div className="flex items-center gap-1 mt-1">
+            <Clock size={9} className="text-amber-500" />
+            <span className="text-[10px] text-amber-600 font-medium truncate">
+              Aguardando {aprovacao.aprovador_nome}
+              {aprovacao.nivel ? ` (${NIVEL_LABEL[aprovacao.nivel] ?? `Nível ${aprovacao.nivel}`})` : ''}
+            </span>
+          </div>
+        )}
       </div>
-
-      {/* Descrição */}
-      <p className="text-sm font-semibold text-slate-800 line-clamp-1 mb-2">{r.descricao}</p>
-
-      {/* Info do aprovador pendente */}
-      {aprovacao && (
-        <div className="flex items-center gap-1.5 mb-2 px-2 py-1.5 bg-amber-50 rounded-lg border border-amber-100">
-          <Clock size={11} className="text-amber-500 flex-shrink-0" />
-          <span className="text-[10px] text-amber-700 font-medium truncate">
-            Aguardando {aprovacao.aprovador_nome}
-            {aprovacao.nivel ? ` (${NIVEL_LABEL[aprovacao.nivel] ?? `Nível ${aprovacao.nivel}`})` : ''}
-          </span>
-        </div>
-      )}
-
-      {/* FluxoTimeline compact */}
-      <FluxoTimeline status={r.status} compact className="mb-2" />
-
-      {/* Rodapé */}
-      <div className="flex items-center justify-between pt-2 border-t border-slate-50">
-        <span className="text-xs text-slate-400 truncate max-w-[60%]">{r.obra_nome}</span>
-        <span className="text-sm font-extrabold text-teal-600">
+      <div className="text-right shrink-0">
+        <p className={`text-xs truncate max-w-[80px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{r.obra_nome}</p>
+        <p className="text-sm font-extrabold text-teal-600">
           {r.valor_estimado?.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 }) ?? '—'}
-        </span>
+        </p>
       </div>
-    </div>
+    </button>
   )
 }
 
+// ── Loader / Error / Setup ────────────────────────────────────────────────────
 function Loader() {
+  const { isDark } = useTheme()
   return (
     <div className="flex items-center justify-center py-20">
-      <div className="w-8 h-8 border-[3px] border-teal-500 border-t-transparent rounded-full animate-spin" />
+      <div className={`w-8 h-8 border-[3px] border-t-transparent rounded-full animate-spin ${isDark ? 'border-teal-400' : 'border-teal-500'}`} />
     </div>
   )
 }
+
 
 function SetupRequired() {
   return (
@@ -396,6 +357,353 @@ function SetupRequired() {
           Copiar Anon Key no Supabase →
         </a>
       </div>
+    </div>
+  )
+}
+
+// ── Dashboard principal ───────────────────────────────────────────────────────
+export default function Dashboard() {
+  const nav = useNavigate()
+  const { isDark } = useTheme()
+  const [periodo, setPeriodo] = useState('trimestre')
+  const [obraFilter, setObraFilter] = useState('')
+  const [pipelineFilter, setPipelineFilter] = useState<number | null>(null)
+  const obras = useLookupObras()
+  const { data, isLoading, isError, refetch } = useDashboard(periodo, obraFilter || undefined)
+  const { data: todasReqs = [] } = useRequisicoes()
+
+  // ── Todos os hooks/useMemo ANTES de qualquer early return (Rules of Hooks) ───
+  const kpis = data?.kpis ?? EMPTY_KPIS
+  const por_obra = data?.por_obra ?? []
+  const aprovacoes_pendentes = data?.aprovacoes_pendentes ?? []
+  const reqs = todasReqs.length > 0 ? todasReqs : (data?.requisicoes_recentes ?? [])
+  const hoje = Date.now()
+  const tresDias = 3 * 24 * 3600_000
+
+  const urgentes = useMemo(() =>
+    reqs
+      .filter(r => (r.urgencia === 'urgente' || r.urgencia === 'critica') && STATUS_ATIVO.includes(r.status))
+      .sort((a, b) => {
+        if (a.urgencia === 'critica' && b.urgencia !== 'critica') return -1
+        if (b.urgencia === 'critica' && a.urgencia !== 'critica') return 1
+        return new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+      }),
+    [reqs]
+  )
+
+  const vencidasAVencer = useMemo(() =>
+    reqs
+      .filter(r => {
+        const dataNecessidade = (r as any).data_necessidade as string | undefined
+        if (!dataNecessidade || !STATUS_ATIVO.includes(r.status)) return false
+        const ts = new Date(dataNecessidade).getTime()
+        return ts <= hoje + tresDias
+      })
+      .sort((a, b) => {
+        const tsA = new Date((a as any).data_necessidade).getTime()
+        const tsB = new Date((b as any).data_necessidade).getTime()
+        return tsA - tsB
+      }),
+    [reqs, hoje]
+  )
+
+  if (isPlaceholder) return <SetupRequired />
+  if (isLoading) return <Loader />
+
+  const aprovacaoMap = new Map<string, Aprovacao>(
+    aprovacoes_pendentes.map(a => [a.requisicao_id, a])
+  )
+
+  const pipelineContagens = PIPELINE_ETAPAS.map(etapa =>
+    reqs.filter(r => etapa.statuses.includes(r.status)).length
+  )
+
+  const statusSegments = PIPELINE_ETAPAS
+    .map((etapa, i) => ({ key: etapa.key, label: etapa.label, value: pipelineContagens[i], barClass: etapa.barClass }))
+    .filter(s => s.value > 0)
+
+  const recentes = pipelineFilter !== null
+    ? reqs.filter(r => PIPELINE_ETAPAS[pipelineFilter].statuses.includes(r.status))
+    : reqs.slice(0, 8)
+  const tempoMedio = kpis.tempo_medio_aprovacao_horas > 0
+    ? kpis.tempo_medio_aprovacao_horas >= 24
+      ? `${(kpis.tempo_medio_aprovacao_horas / 24).toFixed(1)}d`
+      : `${Math.round(kpis.tempo_medio_aprovacao_horas)}h`
+    : '—'
+
+  const cotacaoCount = reqs.filter(r =>
+    ['em_cotacao', 'cotacao_enviada', 'cotacao_aprovada'].includes(r.status)
+  ).length
+
+
+  const cardClass = isDark
+    ? 'bg-[#1e293b] border border-white/[0.06]'
+    : 'bg-white border border-slate-200'
+
+  return (
+    <div className="space-y-5">
+
+      {/* Banner de erro não-bloqueante */}
+      {isError && (
+        <div className="flex items-center justify-between gap-3 px-4 py-2.5 bg-amber-50 border border-amber-200 rounded-xl text-sm">
+          <span className="text-amber-700 font-medium">Falha ao carregar dados — exibindo última versão disponível</span>
+          <button
+            onClick={() => refetch()}
+            className="flex items-center gap-1.5 text-xs font-semibold text-amber-600 hover:text-amber-800 whitespace-nowrap"
+          >
+            <RefreshCw size={12} /> Tentar novamente
+          </button>
+        </div>
+      )}
+
+      {/* Header + Filtros na mesma linha */}
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <div>
+          <h1 className={`text-xl font-extrabold ${isDark ? 'text-white' : 'text-slate-900'}`}>
+            Painel - Compras
+          </h1>
+          <p className={`text-xs mt-0.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+            Requisições, cotações e pedidos de compra
+          </p>
+        </div>
+        <div className="flex items-center gap-2 flex-wrap">
+          <div className={`flex items-center gap-0.5 p-1 rounded-2xl ${isDark ? 'bg-white/[0.04] border border-white/[0.06]' : 'bg-slate-100 border border-slate-200'}`}>
+            <CalendarDays size={11} className={`ml-1.5 mr-0.5 shrink-0 ${isDark ? 'text-slate-500' : 'text-slate-400'}`} />
+            {[['semana', '7d'], ['mes', '30d'], ['trimestre', '90d'], ['tudo', '∞']].map(([val, lbl]) => (
+              <button key={val} onClick={() => setPeriodo(val)}
+                className={`px-2.5 py-1 rounded-xl text-[11px] font-bold transition-all ${
+                  periodo === val
+                    ? 'bg-teal-600 text-white shadow-sm'
+                    : isDark ? 'text-slate-400 hover:text-slate-200' : 'text-slate-500 hover:text-slate-700'
+                }`}>
+                {lbl}
+              </button>
+            ))}
+          </div>
+          <div className="relative flex items-center">
+            <MapPin size={11} className={`absolute left-2.5 pointer-events-none z-10 ${obraFilter ? 'text-teal-600' : isDark ? 'text-slate-500' : 'text-slate-400'}`} />
+            <select
+              value={obraFilter}
+              onChange={e => setObraFilter(e.target.value)}
+              className={`text-[11px] font-semibold rounded-2xl pl-7 pr-3 py-2 border transition-all appearance-none cursor-pointer max-w-[140px] truncate ${
+                obraFilter
+                  ? 'bg-teal-50 border-teal-300 text-teal-700'
+                  : isDark ? 'bg-white/[0.04] border-white/[0.06] text-slate-400' : 'bg-slate-100 border-slate-200 text-slate-500'
+              }`}
+            >
+              <option value="">Todas obras</option>
+              {obras.map(o => (
+                <option key={o.id} value={o.id}>{o.codigo ? `${o.codigo} - ` : ''}{o.nome}</option>
+              ))}
+            </select>
+          </div>
+          <button
+            onClick={() => refetch()}
+            className={`flex items-center gap-1.5 text-xs transition-colors ${isDark ? 'text-slate-500 hover:text-teal-400' : 'text-slate-400 hover:text-teal-600'}`}
+          >
+            <RefreshCw size={12} /> Atualizar
+          </button>
+        </div>
+        <div className="relative flex items-center">
+          <MapPin size={11} className={`absolute left-2.5 pointer-events-none z-10 ${obraFilter ? 'text-teal-600' : isDark ? 'text-slate-500' : 'text-slate-400'}`} />
+          <select
+            value={obraFilter}
+            onChange={e => setObraFilter(e.target.value)}
+            className={`text-[11px] font-semibold rounded-2xl pl-7 pr-3 py-2 border transition-all appearance-none cursor-pointer max-w-[140px] truncate ${
+              obraFilter
+                ? 'bg-teal-50 border-teal-300 text-teal-700'
+                : isDark ? 'bg-white/[0.04] border-white/[0.06] text-slate-400' : 'bg-slate-100 border-slate-200 text-slate-500'
+            }`}
+          >
+            <option value="">Todas obras</option>
+            {obras.map(o => (
+              <option key={o.id} value={o.id}>{o.codigo ? `${o.codigo} - ` : ''}{o.nome}</option>
+            ))}
+          </select>
+        </div>
+      </div>
+
+      {/* Hero 2 colunas */}
+      <div className="grid grid-cols-1 xl:grid-cols-[1.52fr_0.88fr] gap-3 items-stretch">
+
+        {/* Núcleo de Compras */}
+        <section className={`rounded-3xl shadow-sm overflow-hidden flex flex-col ${cardClass}`}>
+          <div className="p-4 md:p-5 flex flex-col gap-4 flex-1">
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <p className={`text-[11px] font-bold uppercase tracking-[0.24em] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+                  Núcleo de Compras
+                </p>
+                <h2 className={`mt-0.5 text-sm font-black ${isDark ? 'text-white' : 'text-slate-900'}`}>
+                  Indicadores do período selecionado
+                </h2>
+              </div>
+              <div className={`hidden md:flex w-10 h-10 rounded-2xl items-center justify-center shrink-0 ${isDark ? 'bg-teal-500/10' : 'bg-teal-50'}`}>
+                <ShoppingCart size={18} className="text-teal-500" />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-3 gap-2.5 flex-1">
+              <SpotlightMetric
+                label="Valor Total"
+                value={fmt(kpis.valor_total_mes)}
+                tone="teal"
+                note="volume no período"
+              />
+              <SpotlightMetric
+                label="Total RCs"
+                value={kpis.total_mes}
+                tone="sky"
+                note="solicitações abertas"
+              />
+              <SpotlightMetric
+                label="Lead Time"
+                value={tempoMedio}
+                tone={kpis.tempo_medio_aprovacao_horas > 48 ? 'amber' : 'emerald'}
+                note={kpis.tempo_medio_aprovacao_horas > 48 ? 'acima SLA 48h' : 'dentro SLA 48h'}
+              />
+            </div>
+          </div>
+        </section>
+
+        {/* Janela Crítica */}
+        <section className={`rounded-3xl shadow-sm overflow-hidden flex flex-col ${cardClass}`}>
+          <div className="p-4 md:p-5 flex flex-col gap-3 flex-1">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className={`text-[11px] font-bold uppercase tracking-[0.24em] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+                  Janela Crítica
+                </p>
+                <h2 className={`mt-0.5 text-sm font-black ${isDark ? 'text-white' : 'text-slate-900'}`}>
+                  O que exige ação agora
+                </h2>
+              </div>
+              <div className={`w-8 h-8 rounded-xl flex items-center justify-center ${urgentes.length > 0 ? 'bg-red-50' : isDark ? 'bg-white/5' : 'bg-slate-50'}`}>
+                <AlertTriangle size={14} className={urgentes.length > 0 ? 'text-red-500' : 'text-slate-400'} />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <MiniInfoCard
+                label="Urgentes"
+                value={urgentes.length}
+                note={urgentes.length > 0 ? 'requerem ação' : 'tudo ok'}
+                icon={Zap}
+                iconTone={urgentes.length > 0 ? 'text-red-500' : 'text-slate-400'}
+                isDark={isDark}
+              />
+              <MiniInfoCard
+                label="Vencidas/À Vencer"
+                value={vencidasAVencer.length}
+                note="data de necessidade"
+                icon={CalendarClock}
+                iconTone={vencidasAVencer.length > 0 ? 'text-amber-500' : 'text-slate-400'}
+                isDark={isDark}
+              />
+              <MiniInfoCard
+                label="Rejeitadas"
+                value={kpis.rejeitadas_mes}
+                note="no período"
+                icon={XCircle}
+                iconTone="text-red-400"
+                isDark={isDark}
+              />
+              <MiniInfoCard
+                label="Em Cotação"
+                value={cotacaoCount}
+                note="aguardando definição"
+                icon={FileText}
+                iconTone="text-violet-500"
+                isDark={isDark}
+              />
+            </div>
+          </div>
+        </section>
+      </div>
+
+      {/* Pulso por Status */}
+      <section className={`rounded-2xl shadow-sm overflow-hidden ${cardClass}`}>
+        <div className={`px-4 py-3 flex items-center justify-between ${isDark ? 'border-b border-white/[0.06]' : 'border-b border-slate-100'}`}>
+          <h2 className={`text-sm font-extrabold flex items-center gap-1.5 ${isDark ? 'text-white' : 'text-slate-800'}`}>
+            <TrendingUp size={14} className="text-teal-500" /> Pulso por Status
+          </h2>
+        </div>
+        <div className="px-4 py-3">
+          <HorizontalStatusBar
+            isDark={isDark}
+            title="Distribuição atual do pipeline"
+            emptyLabel="Nenhuma RC no período"
+            segments={statusSegments}
+          />
+        </div>
+      </section>
+
+      {/* Urgentes + Vencidas */}
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-3">
+        <UrgentesCard reqs={urgentes} isDark={isDark} nav={nav} />
+        <VencidasCard reqs={vencidasAVencer} isDark={isDark} nav={nav} />
+      </div>
+
+      {/* Por Obra */}
+      {por_obra.length > 0 && (
+        <section className={`rounded-2xl shadow-sm overflow-hidden ${cardClass}`}>
+          <div className={`px-4 py-3 flex items-center justify-between ${isDark ? 'border-b border-white/[0.06]' : 'border-b border-slate-100'}`}>
+            <h2 className={`text-sm font-extrabold flex items-center gap-1.5 ${isDark ? 'text-white' : 'text-slate-800'}`}>
+              <Package size={14} className="text-slate-500" /> Por Obra
+            </h2>
+          </div>
+          <div className="p-4 space-y-2">
+            {por_obra.map(o => {
+              const maxValor = Math.max(...por_obra.map(x => x.valor), 1)
+              const pct = Math.round((o.valor / maxValor) * 100)
+              return (
+                <div key={o.obra_nome} className={`rounded-2xl p-3.5 border ${isDark ? 'bg-white/[0.03] border-white/[0.06]' : 'bg-slate-50/80 border-slate-100'}`}>
+                  <div className="flex justify-between items-start mb-2">
+                    <div>
+                      <p className={`text-sm font-bold ${isDark ? 'text-slate-200' : 'text-slate-800'}`}>{o.obra_nome}</p>
+                      <p className={`text-xs ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{o.total} RC{o.total !== 1 ? 's' : ''}</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-sm font-extrabold text-teal-600">{fmt(o.valor)}</p>
+                      {o.pendentes > 0 && (
+                        <span className="text-[10px] text-amber-600 font-semibold flex items-center gap-0.5 justify-end mt-0.5">
+                          <AlertTriangle size={9} /> {o.pendentes} pend.
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <div className={`h-1.5 rounded-full overflow-hidden ${isDark ? 'bg-white/[0.06]' : 'bg-slate-200'}`}>
+                    <div className="h-full rounded-full bg-teal-500 transition-all duration-500" style={{ width: `${pct}%` }} />
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </section>
+      )}
+
+      {/* Recentes */}
+      <section className={`rounded-2xl shadow-sm overflow-hidden ${cardClass}`}>
+        <div className={`px-4 py-3 flex items-center justify-between ${isDark ? 'border-b border-white/[0.06]' : 'border-b border-slate-100'}`}>
+          <h2 className={`text-sm font-extrabold flex items-center gap-1.5 ${isDark ? 'text-white' : 'text-slate-800'}`}>
+            <Clock size={14} className="text-slate-500" />
+            {pipelineFilter !== null ? PIPELINE_ETAPAS[pipelineFilter].label : 'Recentes'}
+          </h2>
+          <button onClick={() => nav('/requisicoes')}
+            className="flex items-center gap-0.5 text-[10px] text-teal-600 font-semibold">
+            Ver todas <ChevronRight size={11} />
+          </button>
+        </div>
+        <div className={`divide-y ${isDark ? 'divide-white/[0.04]' : 'divide-slate-50'}`}>
+          {recentes.length === 0 ? (
+            <EmptyPanel isDark={isDark} title="Nenhuma requisição encontrada" description="Ajuste os filtros de período ou obra para ver mais resultados." />
+          ) : (
+            recentes.slice(0, 8).map(r => (
+              <RecentCard key={r.id} r={r} aprovacao={aprovacaoMap.get(r.id)} isDark={isDark} nav={nav} />
+            ))
+          )}
+        </div>
+      </section>
+
     </div>
   )
 }
