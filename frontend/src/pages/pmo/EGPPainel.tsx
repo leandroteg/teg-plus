@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
-  RefreshCw, AlertTriangle, Users, Zap, Scale,
+  RefreshCw, AlertTriangle, Zap,
   TrendingUp, Clock, MapPin, Activity, DollarSign,
   CalendarClock, BarChart3, ChevronRight,
 } from 'lucide-react'
@@ -192,17 +192,6 @@ function useEGPKpis(obraFilter: string) {
         .eq('status', 'pendente')
         .lt('prazo', new Date().toISOString())
 
-      // Multas ativas
-      let multasQ = supabase
-        .from('pmo_multas')
-        .select('id', { count: 'exact', head: true })
-        .in('status', ['notificada', 'contestada', 'confirmada'])
-
-      // Recursos criticos (quantidade_real < quantidade_planejada * 0.7)
-      let recursosQ = supabase
-        .from('pmo_histograma')
-        .select('id, quantidade_planejada, quantidade_real')
-
       // Indicadores snapshot (latest per portfolio for IDP)
       let indicadoresQ = supabase
         .from('pmo_indicadores_snapshot')
@@ -219,24 +208,17 @@ function useEGPKpis(obraFilter: string) {
         if (ids.length > 0) {
           riscosQ = riscosQ.in('portfolio_id', ids)
           acoesQ = acoesQ.in('portfolio_id', ids)
-          multasQ = multasQ.in('portfolio_id', ids)
-          recursosQ = recursosQ.in('portfolio_id', ids)
           indicadoresQ = indicadoresQ.in('portfolio_id', ids)
         } else {
-          return { riscosCriticos: 0, recursosCriticos: 0, acoesCriticas: 0, multasAtivas: 0, indicadores: [] as Array<{ portfolio_id: string | null; idp: number | null; pct_valor_executado: number | null }> }
+          return { riscosCriticos: 0, acoesCriticas: 0, indicadores: [] as Array<{ portfolio_id: string | null; idp: number | null; pct_valor_executado: number | null }> }
         }
       }
 
-      const [riscosRes, acoesRes, multasRes, recursosRes, indicadoresRes] = await Promise.all([
+      const [riscosRes, acoesRes, indicadoresRes] = await Promise.all([
         riscosQ,
         acoesQ,
-        multasQ,
-        recursosQ,
         indicadoresQ,
       ])
-
-      const recursos = (recursosRes.data ?? []) as Array<{ id: string; quantidade_planejada: number; quantidade_real: number }>
-      const recursosCriticos = recursos.filter(r => r.quantidade_real < r.quantidade_planejada * 0.7).length
 
       // Deduplicate indicadores: keep latest per portfolio_id
       const indRaw = (indicadoresRes.data ?? []) as Array<{ portfolio_id: string | null; idp: number | null; pct_valor_executado: number | null }>
@@ -252,9 +234,7 @@ function useEGPKpis(obraFilter: string) {
 
       return {
         riscosCriticos: riscosRes.count ?? 0,
-        recursosCriticos,
         acoesCriticas: acoesRes.count ?? 0,
-        multasAtivas: multasRes.count ?? 0,
         indicadores,
       }
     },
@@ -522,27 +502,11 @@ export default function EGPPainel() {
                 isDark={isDark}
               />
               <MiniInfoCard
-                label="Recursos Criticos"
-                value={kpis?.recursosCriticos ?? 0}
-                note={(kpis?.recursosCriticos ?? 0) > 0 ? 'abaixo de 70% plan.' : 'equipe adequada'}
-                icon={Users}
-                iconTone={(kpis?.recursosCriticos ?? 0) > 0 ? 'text-amber-500' : 'text-slate-400'}
-                isDark={isDark}
-              />
-              <MiniInfoCard
                 label="Acoes Criticas"
                 value={kpis?.acoesCriticas ?? 0}
                 note={(kpis?.acoesCriticas ?? 0) > 0 ? 'pendentes c/ prazo vencido' : 'nenhuma atrasada'}
                 icon={Zap}
                 iconTone={(kpis?.acoesCriticas ?? 0) > 0 ? 'text-red-500' : 'text-slate-400'}
-                isDark={isDark}
-              />
-              <MiniInfoCard
-                label="Multas Ativas"
-                value={kpis?.multasAtivas ?? 0}
-                note={(kpis?.multasAtivas ?? 0) > 0 ? 'notif./contest./confirm.' : 'nenhuma multa ativa'}
-                icon={Scale}
-                iconTone={(kpis?.multasAtivas ?? 0) > 0 ? 'text-amber-500' : 'text-slate-400'}
                 isDark={isDark}
               />
             </div>
