@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import {
   FileText, Clock,
   RefreshCw, Settings, TrendingUp, AlertTriangle,
-  Package, ChevronRight, ShoppingCart, Timer,
+  ChevronRight, ShoppingCart, Timer,
   ArrowRight, CalendarClock, XCircle, Zap,
   CalendarDays, MapPin,
 } from 'lucide-react'
@@ -374,9 +374,9 @@ export default function Dashboard() {
 
   // ── Todos os hooks/useMemo ANTES de qualquer early return (Rules of Hooks) ───
   const kpis = data?.kpis ?? EMPTY_KPIS
-  const por_obra = data?.por_obra ?? []
   const aprovacoes_pendentes = data?.aprovacoes_pendentes ?? []
   const reqs = todasReqs.length > 0 ? todasReqs : (data?.requisicoes_recentes ?? [])
+
   const hoje = Date.now()
   const tresDias = 3 * 24 * 3600_000
 
@@ -425,16 +425,12 @@ export default function Dashboard() {
   const recentes = pipelineFilter !== null
     ? reqs.filter(r => PIPELINE_ETAPAS[pipelineFilter].statuses.includes(r.status))
     : reqs.slice(0, 8)
+
   const tempoMedio = kpis.tempo_medio_aprovacao_horas > 0
     ? kpis.tempo_medio_aprovacao_horas >= 24
       ? `${(kpis.tempo_medio_aprovacao_horas / 24).toFixed(1)}d`
       : `${Math.round(kpis.tempo_medio_aprovacao_horas)}h`
     : '—'
-
-  const cotacaoCount = reqs.filter(r =>
-    ['em_cotacao', 'cotacao_enviada', 'cotacao_aprovada'].includes(r.status)
-  ).length
-
 
   const cardClass = isDark
     ? 'bg-[#1e293b] border border-white/[0.06]'
@@ -503,23 +499,6 @@ export default function Dashboard() {
           >
             <RefreshCw size={12} /> Atualizar
           </button>
-        </div>
-        <div className="relative flex items-center">
-          <MapPin size={11} className={`absolute left-2.5 pointer-events-none z-10 ${obraFilter ? 'text-teal-600' : isDark ? 'text-slate-500' : 'text-slate-400'}`} />
-          <select
-            value={obraFilter}
-            onChange={e => setObraFilter(e.target.value)}
-            className={`text-[11px] font-semibold rounded-2xl pl-7 pr-3 py-2 border transition-all appearance-none cursor-pointer max-w-[140px] truncate ${
-              obraFilter
-                ? 'bg-teal-50 border-teal-300 text-teal-700'
-                : isDark ? 'bg-white/[0.04] border-white/[0.06] text-slate-400' : 'bg-slate-100 border-slate-200 text-slate-500'
-            }`}
-          >
-            <option value="">Todas obras</option>
-            {obras.map(o => (
-              <option key={o.id} value={o.id}>{o.codigo ? `${o.codigo} - ` : ''}{o.nome}</option>
-            ))}
-          </select>
         </div>
       </div>
 
@@ -599,22 +578,6 @@ export default function Dashboard() {
                 iconTone={vencidasAVencer.length > 0 ? 'text-amber-500' : 'text-slate-400'}
                 isDark={isDark}
               />
-              <MiniInfoCard
-                label="Rejeitadas"
-                value={kpis.rejeitadas_mes}
-                note="no período"
-                icon={XCircle}
-                iconTone="text-red-400"
-                isDark={isDark}
-              />
-              <MiniInfoCard
-                label="Em Cotação"
-                value={cotacaoCount}
-                note="aguardando definição"
-                icon={FileText}
-                iconTone="text-violet-500"
-                isDark={isDark}
-              />
             </div>
           </div>
         </section>
@@ -642,44 +605,6 @@ export default function Dashboard() {
         <UrgentesCard reqs={urgentes} isDark={isDark} nav={nav} />
         <VencidasCard reqs={vencidasAVencer} isDark={isDark} nav={nav} />
       </div>
-
-      {/* Por Obra */}
-      {por_obra.length > 0 && (
-        <section className={`rounded-2xl shadow-sm overflow-hidden ${cardClass}`}>
-          <div className={`px-4 py-3 flex items-center justify-between ${isDark ? 'border-b border-white/[0.06]' : 'border-b border-slate-100'}`}>
-            <h2 className={`text-sm font-extrabold flex items-center gap-1.5 ${isDark ? 'text-white' : 'text-slate-800'}`}>
-              <Package size={14} className="text-slate-500" /> Por Obra
-            </h2>
-          </div>
-          <div className="p-4 space-y-2">
-            {por_obra.map(o => {
-              const maxValor = Math.max(...por_obra.map(x => x.valor), 1)
-              const pct = Math.round((o.valor / maxValor) * 100)
-              return (
-                <div key={o.obra_nome} className={`rounded-2xl p-3.5 border ${isDark ? 'bg-white/[0.03] border-white/[0.06]' : 'bg-slate-50/80 border-slate-100'}`}>
-                  <div className="flex justify-between items-start mb-2">
-                    <div>
-                      <p className={`text-sm font-bold ${isDark ? 'text-slate-200' : 'text-slate-800'}`}>{o.obra_nome}</p>
-                      <p className={`text-xs ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{o.total} RC{o.total !== 1 ? 's' : ''}</p>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-sm font-extrabold text-teal-600">{fmt(o.valor)}</p>
-                      {o.pendentes > 0 && (
-                        <span className="text-[10px] text-amber-600 font-semibold flex items-center gap-0.5 justify-end mt-0.5">
-                          <AlertTriangle size={9} /> {o.pendentes} pend.
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                  <div className={`h-1.5 rounded-full overflow-hidden ${isDark ? 'bg-white/[0.06]' : 'bg-slate-200'}`}>
-                    <div className="h-full rounded-full bg-teal-500 transition-all duration-500" style={{ width: `${pct}%` }} />
-                  </div>
-                </div>
-              )
-            })}
-          </div>
-        </section>
-      )}
 
       {/* Recentes */}
       <section className={`rounded-2xl shadow-sm overflow-hidden ${cardClass}`}>
