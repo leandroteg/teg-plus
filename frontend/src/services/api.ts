@@ -120,7 +120,7 @@ export const api = {
     request<ParseCotacaoResult>('/compras/parse-cotacao', {
       method: 'POST',
       body: JSON.stringify(data),
-    }, 60_000),
+    }, 120_000),
 
   enviarEmailPedido: (data: {
     pedido_id: string;

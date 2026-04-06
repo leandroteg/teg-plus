@@ -252,7 +252,9 @@ async function parseArquivoComGemini(arquivo: { base64: string; nome: string; mi
   const N8N_URL = import.meta.env.VITE_N8N_WEBHOOK_URL || 'https://teg-agents-n8n.nmmcas.easypanel.host/webhook'
 
   const controller = new AbortController()
-  const timeout = setTimeout(() => controller.abort(), 90_000)
+  // PDFs grandes (20-50MB) podem demorar mais para processar
+  const timeoutMs = arquivo.base64.length > 15_000_000 ? 180_000 : 90_000
+  const timeout = setTimeout(() => controller.abort(), timeoutMs)
 
   const prompt = `Analise este documento (cotação, proposta comercial, lista de materiais ou similar) e extraia TODOS os itens para uma requisição de compra.
 
@@ -273,6 +275,61 @@ Nome do arquivo: ${arquivo.nome}`
 
     // Estratégia 1: Gemini API direto (se tiver key)
     if (GEMINI_KEY) {
+      const mimeType = arquivo.mime || 'application/pdf'
+      const base64Size = arquivo.base64.length
+      let filePart: Record<string, unknown>
+
+      // Arquivos > 15MB base64 (~11MB real): usar Gemini File API para upload
+      if (base64Size > 15_000_000) {
+        // 1. Converter base64 para blob
+        const byteChars = atob(arquivo.base64)
+        const byteArr = new Uint8Array(byteChars.length)
+        for (let i = 0; i < byteChars.length; i++) byteArr[i] = byteChars.charCodeAt(i)
+        const blob = new Blob([byteArr], { type: mimeType })
+
+        // 2. Upload via Gemini File API (resumable)
+        const uploadResp = await fetch(
+          `https://generativelanguage.googleapis.com/upload/v1beta/files?key=${GEMINI_KEY}`,
+          {
+            method: 'POST',
+            headers: {
+              'X-Goog-Upload-Command': 'upload, finalize',
+              'X-Goog-Upload-Header-Content-Length': String(blob.size),
+              'X-Goog-Upload-Header-Content-Type': mimeType,
+              'Content-Type': mimeType,
+            },
+            body: blob,
+            signal: controller.signal,
+          }
+        )
+        if (!uploadResp.ok) throw new Error(`Gemini upload ${uploadResp.status}`)
+        const uploadData = await uploadResp.json()
+        const fileUri = uploadData.file?.uri
+        if (!fileUri) throw new Error('Gemini File API: URI não retornada')
+
+        // 3. Aguardar processamento (polling por estado ACTIVE)
+        const fileName = uploadData.file?.name
+        if (fileName) {
+          for (let i = 0; i < 30; i++) {
+            const statusResp = await fetch(
+              `https://generativelanguage.googleapis.com/v1beta/${fileName}?key=${GEMINI_KEY}`,
+              { signal: controller.signal }
+            )
+            if (statusResp.ok) {
+              const statusData = await statusResp.json()
+              if (statusData.state === 'ACTIVE') break
+              if (statusData.state === 'FAILED') throw new Error('Gemini: falha ao processar arquivo')
+            }
+            await new Promise(r => setTimeout(r, 2000))
+          }
+        }
+
+        filePart = { file_data: { mime_type: mimeType, file_uri: fileUri } }
+      } else {
+        // Arquivo pequeno: inline_data direto
+        filePart = { inline_data: { mime_type: mimeType, data: arquivo.base64 } }
+      }
+
       const resp = await fetch(
         `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_KEY}`,
         {
@@ -280,7 +337,7 @@ Nome do arquivo: ${arquivo.nome}`
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             contents: [{ parts: [
-              { inline_data: { mime_type: arquivo.mime || 'application/pdf', data: arquivo.base64 } },
+              filePart,
               { text: prompt },
             ] }],
             generationConfig: { temperature: 0.1, maxOutputTokens: 8192 },

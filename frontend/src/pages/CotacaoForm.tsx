@@ -23,7 +23,7 @@ import { minCotacoesPorValor } from '../utils/cotacoesPolicy'
 const fmt = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
 
 const FILE_ACCEPTED = ['image/jpeg', 'image/png', 'image/webp', 'application/pdf']
-const FILE_MAX_SIZE = 10 * 1024 * 1024
+const FILE_MAX_SIZE = 50 * 1024 * 1024
 
 interface FornecedorForm {
   fornecedor_nome:    string
@@ -707,7 +707,7 @@ export default function CotacaoForm() {
       return
     }
     if (file.size > FILE_MAX_SIZE) {
-      setUploadError(prev => ({ ...prev, [idx]: 'Máximo 10 MB' }))
+      setUploadError(prev => ({ ...prev, [idx]: 'Máximo 50 MB' }))
       return
     }
 
