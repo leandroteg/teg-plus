@@ -29,7 +29,7 @@ export function useImoveis(filtros?: { status?: string }) {
     queryFn: async () => {
       let q = supabase
         .from('loc_imoveis')
-        .select('*')
+        .select(`*, centro_custo:sys_centros_custo(id, codigo, descricao), contrato:con_contratos!loc_imoveis_contrato_fk(id, numero, data_inicio, data_fim_previsto, data_assinatura, contraparte_nome, status)`)
         .order('created_at', { ascending: false })
 
       if (filtros?.status) q = q.eq('status', filtros.status)
