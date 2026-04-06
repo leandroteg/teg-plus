@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import {
   ArrowLeft, Rocket, ClipboardCheck, Users, MessageSquare,
-  Plus, Trash2, Save, Edit3, X, Check, ChevronRight,
+  Plus, Trash2, Save, Edit3, X, Check,
 } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
 import {
@@ -19,6 +19,12 @@ const TABS: { key: Tab; label: string; icon: React.ElementType }[] = [
   { key: 'stakeholders', label: 'Stakeholders', icon: Users },
   { key: 'comunicacao', label: 'Comunicação', icon: MessageSquare },
 ]
+
+const TAB_ACCENT: Record<Tab, { bg: string; bgActive: string; text: string; textActive: string; border: string; bgDark: string; bgActiveDark: string; textDark: string; textActiveDark: string; borderDark: string }> = {
+  tap:           { bg: 'hover:bg-amber-50',  bgActive: 'bg-amber-50',  text: 'text-amber-600',  textActive: 'text-amber-800',  border: 'border-amber-500',  bgDark: 'hover:bg-white/[0.03]', bgActiveDark: 'bg-amber-500/10',  textDark: 'text-amber-400',  textActiveDark: 'text-amber-300',  borderDark: 'border-amber-500/40' },
+  stakeholders:  { bg: 'hover:bg-sky-50',    bgActive: 'bg-sky-50',    text: 'text-sky-600',    textActive: 'text-sky-800',    border: 'border-sky-500',    bgDark: 'hover:bg-white/[0.03]', bgActiveDark: 'bg-sky-500/10',    textDark: 'text-sky-400',    textActiveDark: 'text-sky-300',    borderDark: 'border-sky-500/40' },
+  comunicacao:   { bg: 'hover:bg-violet-50', bgActive: 'bg-violet-50', text: 'text-violet-600', textActive: 'text-violet-800', border: 'border-violet-500', bgDark: 'hover:bg-white/[0.03]', bgActiveDark: 'bg-violet-500/10', textDark: 'text-violet-400', textActiveDark: 'text-violet-300', borderDark: 'border-violet-500/40' },
+}
 
 const INFLUENCIA_OPTS: { value: string; label: string }[] = [
   { value: 'baixa', label: 'Baixa' },
@@ -65,29 +71,30 @@ export default function EGPIniciacao() {
       </div>
 
       {/* Tab bar */}
-      <div className="flex items-center gap-1 flex-wrap">
-        {TABS.map((t, idx) => {
+      <div className={`flex gap-1 p-1 rounded-2xl border overflow-x-auto hide-scrollbar ${
+        isLight ? 'bg-slate-50 border-slate-200' : 'bg-white/[0.02] border-white/[0.06]'
+      }`}>
+        {TABS.map(t => {
           const Icon = t.icon
           const active = tab === t.key
+          const a = TAB_ACCENT[t.key]
           return (
-            <div key={t.key} className="flex items-center gap-1">
-              {idx > 0 && (
-                <ChevronRight size={14} className={isLight ? 'text-slate-300' : 'text-slate-600'} />
-              )}
-              <button
-                onClick={() => setTab(t.key)}
-                className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-semibold transition-all ${
-                  active
-                    ? 'bg-amber-500 text-white shadow-md shadow-amber-500/25'
-                    : isLight
-                      ? 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                      : 'bg-slate-800 text-slate-400 hover:bg-slate-700'
-                }`}
-              >
-                <Icon size={14} />
-                {t.label}
-              </button>
-            </div>
+            <button
+              key={t.key}
+              onClick={() => setTab(t.key)}
+              className={`min-w-fit md:flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm whitespace-nowrap transition-all border ${
+                active
+                  ? isLight
+                    ? `${a.bgActive} ${a.textActive} ${a.border} font-bold shadow-sm`
+                    : `${a.bgActiveDark} ${a.textActiveDark} ${a.borderDark} font-bold shadow-sm`
+                  : isLight
+                    ? `${a.bg} ${a.text} font-medium border-transparent`
+                    : `${a.bgDark} ${a.textDark} font-medium border-transparent`
+              }`}
+            >
+              <Icon size={15} className="shrink-0" />
+              {t.label}
+            </button>
           )
         })}
       </div>

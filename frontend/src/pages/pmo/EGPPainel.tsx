@@ -556,7 +556,7 @@ export default function EGPPainel() {
                   <button
                     key={p.id}
                     type="button"
-                    onClick={() => nav(`/pmo/portfolio/${p.id}`)}
+                    onClick={() => nav(`/egp/portfolio/${p.id}`)}
                     className={`w-full text-left flex items-center gap-3 px-4 py-3 transition-colors ${isDark ? 'hover:bg-white/[0.03]' : 'hover:bg-red-50/50'}`}
                   >
                     <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${isDark ? 'bg-red-500/20' : 'bg-red-100'}`}>
@@ -606,7 +606,7 @@ export default function EGPPainel() {
                   <button
                     key={p.id}
                     type="button"
-                    onClick={() => nav(`/pmo/portfolio/${p.id}`)}
+                    onClick={() => nav(`/egp/portfolio/${p.id}`)}
                     className={`w-full text-left flex items-center gap-3 px-4 py-3 transition-colors ${isDark ? 'hover:bg-white/[0.03]' : 'hover:bg-amber-50/50'}`}
                   >
                     <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${isDark ? 'bg-amber-500/10' : 'bg-amber-50'}`}>
@@ -672,7 +672,7 @@ export default function EGPPainel() {
           <h2 className={`text-sm font-extrabold flex items-center gap-1.5 ${isDark ? 'text-white' : 'text-slate-800'}`}>
             <Clock size={14} className="text-slate-500" /> Recentes
           </h2>
-          <button onClick={() => nav('/pmo')}
+          <button onClick={() => nav('/egp/portfolio')}
             className="flex items-center gap-0.5 text-[10px] text-teal-600 font-semibold">
             Ver portfólio <ChevronRight size={11} />
           </button>
