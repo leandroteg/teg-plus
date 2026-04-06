@@ -23,12 +23,13 @@ export default function Gestao() {
   return (
     <div className="flex flex-col h-full">
       {/* Sub-tabs */}
-      <div className={`flex items-center gap-1 px-4 pt-4 pb-0 border-b ${isDark ? 'border-white/[0.06]' : 'border-slate-200'}`}>
+      <div className={`flex items-center gap-0.5 px-4 pt-4 pb-0 border-b overflow-x-auto
+        ${isDark ? 'border-white/[0.06]' : 'border-slate-200'}`}>
         {TABS.map(t => (
           <button
             key={t.key}
             onClick={() => setTab(t.key)}
-            className={`px-3 py-2 text-xs font-semibold rounded-t-lg transition-all border-b-2 -mb-px ${
+            className={`px-3 py-2 text-xs font-semibold whitespace-nowrap rounded-t-lg transition-all border-b-2 -mb-px ${
               tab === t.key
                 ? isDark
                   ? 'border-indigo-400 text-indigo-300'
@@ -44,12 +45,12 @@ export default function Gestao() {
       </div>
 
       {/* Content */}
-      <div className="flex-1 overflow-auto">
-        {tab === 'ativos'   && <Ativos />}
-        {tab === 'faturas'  && <Faturas />}
-        {tab === 'servicos' && <ManutencoesServicos />}
-        {tab === 'aditivos' && <AditivosRenovacoes />}
-        {tab === 'acordos'  && <Acordos />}
+      <div className="flex-1 overflow-auto p-4">
+        {tab === 'ativos'    && <Ativos />}
+        {tab === 'faturas'   && <Faturas />}
+        {tab === 'servicos'  && <ManutencoesServicos />}
+        {tab === 'aditivos'  && <AditivosRenovacoes />}
+        {tab === 'acordos'   && <Acordos />}
       </div>
     </div>
   )

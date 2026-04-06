@@ -14,7 +14,7 @@ export default function LocacaoLayout() {
     {
       to: '/locacoes',
       icon: Plus,
-      label: '+ Nova Solicitação',
+      label: 'Nova Solicitação',
       end: false,
       action: () => setShowModal(true),
       accent: true,
