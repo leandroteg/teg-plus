@@ -111,6 +111,7 @@ const ColaboradoresCad = lazy(() => import('./pages/cadastros/ColaboradoresCad')
 const EmpresasCad = lazy(() => import('./pages/cadastros/EmpresasCad'))
 const GruposFinanceiros = lazy(() => import('./pages/cadastros/GruposFinanceiros'))
 const CategoriasFinanceiras = lazy(() => import('./pages/cadastros/CategoriasFinanceiras'))
+const Bases = lazy(() => import('./pages/cadastros/Bases'))
 
 // RH
 const RHHome = lazy(() => import('./pages/rh/RHHome'))
@@ -435,6 +436,7 @@ export default function App() {
               <Route path="/cadastros/empresas"       element={<Lazy><EmpresasCad /></Lazy>} />
               <Route path="/cadastros/grupos"          element={<Lazy><GruposFinanceiros /></Lazy>} />
               <Route path="/cadastros/categorias"      element={<Lazy><CategoriasFinanceiras /></Lazy>} />
+              <Route path="/cadastros/bases"           element={<Lazy><Bases /></Lazy>} />
             </Route>
           </Route>
 
