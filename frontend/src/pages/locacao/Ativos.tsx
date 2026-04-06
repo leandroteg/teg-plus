@@ -1,235 +1,329 @@
-import { useState } from 'react'
-import { Building2, Search, List, LayoutGrid } from 'lucide-react'
+import { useState, useMemo } from 'react'
+import {
+  Building2, Search, LayoutList, LayoutGrid, X, MapPin, Calendar, Phone,
+  User, FileText, Clock, CheckCircle2, AlertTriangle,
+} from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
-import { useImoveis } from '../../hooks/useLocacao'
-import type { LocImovel } from '../../types/locacao'
+import { useImoveis, useAditivos, useEntradas, useVistorias } from '../../hooks/useLocacao'
+import type { LocImovel, LocAditivo } from '../../types/locacao'
 
-// ── Formatters ───────────────────────────────────────────────────────────────
-const fmtCurrency = (v?: number) =>
-  v != null
-    ? new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v)
-    : '—'
+const fmtDate = (d?: string) => d ? new Date(d + 'T12:00:00').toLocaleDateString('pt-BR') : '—'
+const fmtCur = (v?: number) => v != null ? v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) : '—'
 
-// ── Status config ─────────────────────────────────────────────────────────────
 const STATUS_CFG: Record<string, { label: string; dot: string; bg: string; text: string }> = {
-  ativo:      { label: 'Ativo',      dot: 'bg-green-500',  bg: 'bg-green-50',  text: 'text-green-700' },
-  em_entrada: { label: 'Em Entrada', dot: 'bg-blue-400',   bg: 'bg-blue-50',   text: 'text-blue-700' },
-  em_saida:   { label: 'Em Saída',   dot: 'bg-amber-400',  bg: 'bg-amber-50',  text: 'text-amber-700' },
-  inativo:    { label: 'Inativo',    dot: 'bg-slate-400',  bg: 'bg-slate-100', text: 'text-slate-600' },
+  ativo:      { label: 'Ativo',      dot: 'bg-emerald-500', bg: 'bg-emerald-50', text: 'text-emerald-700' },
+  inativo:    { label: 'Inativo',    dot: 'bg-slate-400',   bg: 'bg-slate-100',  text: 'text-slate-600' },
+  em_entrada: { label: 'Em Entrada', dot: 'bg-blue-500',    bg: 'bg-blue-50',    text: 'text-blue-700' },
+  em_saida:   { label: 'Em Saída',   dot: 'bg-amber-500',   bg: 'bg-amber-50',   text: 'text-amber-700' },
 }
 
-function StatusBadge({ status }: { status: string }) {
-  const cfg = STATUS_CFG[status] ?? { label: status, dot: 'bg-slate-400', bg: 'bg-slate-100', text: 'text-slate-600' }
-  return (
-    <span className={`inline-flex items-center gap-1 rounded-full text-[10px] font-semibold px-2 py-0.5 ${cfg.bg} ${cfg.text}`}>
-      <span className={`w-1.5 h-1.5 rounded-full ${cfg.dot}`} />
-      {cfg.label}
-    </span>
-  )
-}
+type ViewMode = 'table' | 'cards'
 
-const STATUS_OPTS = [
-  { value: '',         label: 'Todos' },
-  { value: 'ativo',      label: 'Ativo' },
-  { value: 'inativo',    label: 'Inativo' },
-  { value: 'em_entrada', label: 'Em Entrada' },
-  { value: 'em_saida',   label: 'Em Saída' },
-]
-
-// ── Table Row ─────────────────────────────────────────────────────────────────
-function TableRow({ im, isDark }: { im: LocImovel; isDark: boolean }) {
-  const txt = isDark ? 'text-white' : 'text-slate-900'
-  const txtMuted = isDark ? 'text-slate-400' : 'text-slate-500'
-  return (
-    <tr className={`border-b transition-colors cursor-pointer
-      ${isDark ? 'border-white/[0.04] hover:bg-white/[0.03]' : 'border-slate-100 hover:bg-slate-50'}`}>
-      <td className="px-4 py-3">
-        <p className={`text-sm font-semibold ${txt}`}>{im.descricao}</p>
-        {(im.cidade || im.uf) && (
-          <p className={`text-xs mt-0.5 ${txtMuted}`}>{[im.cidade, im.uf].filter(Boolean).join('/')}</p>
-        )}
-      </td>
-      <td className={`px-4 py-3 text-sm ${txtMuted}`}>{im.locador_nome ?? '—'}</td>
-      <td className={`px-4 py-3 text-sm ${txtMuted}`}>{fmtCurrency(im.valor_aluguel_mensal)}</td>
-      <td className={`px-4 py-3 text-sm ${txtMuted}`}>
-        {im.dia_vencimento ? `Dia ${im.dia_vencimento}` : '—'}
-      </td>
-      <td className="px-4 py-3">
-        <StatusBadge status={im.status} />
-      </td>
-    </tr>
-  )
-}
-
-// ── Card ──────────────────────────────────────────────────────────────────────
-function ImovelCard({ im, isDark }: { im: LocImovel; isDark: boolean }) {
-  const txt = isDark ? 'text-white' : 'text-slate-900'
-  const txtMuted = isDark ? 'text-slate-400' : 'text-slate-500'
-  const enderecoCompleto = [im.endereco, im.numero, im.bairro].filter(Boolean).join(', ')
-  const cidadeUF = [im.cidade, im.uf].filter(Boolean).join('/')
+// ── Detail Modal ─────────────────────────────────────────────────────────────
+function ImovelDetailModal({ imovel, aditivos, onClose, isDark }: {
+  imovel: LocImovel; aditivos: LocAditivo[]; onClose: () => void; isDark: boolean
+}) {
+  const bg = isDark ? 'bg-[#1e293b]' : 'bg-white'
+  const cardBg = isDark ? 'bg-white/[0.04]' : 'bg-slate-50'
+  const txtMuted = isDark ? 'text-slate-400' : 'text-slate-400'
+  const txtMain = isDark ? 'text-white' : 'text-slate-800'
+  const contrato = (imovel as any).contrato
+  const cc = (imovel as any).centro_custo
+  const stCfg = STATUS_CFG[imovel.status] || STATUS_CFG.ativo
+  const imovelAditivos = aditivos.filter(a => a.imovel_id === imovel.id)
 
   return (
-    <div className={`rounded-xl border p-4 transition-all cursor-pointer
-      ${isDark
-        ? 'bg-white/[0.03] border-white/[0.06] hover:bg-white/[0.06]'
-        : 'bg-white border-slate-200 hover:border-indigo-200 hover:shadow-sm'}`}>
-      {/* Linha 1 */}
-      <div className="flex items-start justify-between gap-2 mb-1.5">
-        <p className={`text-sm font-bold ${txt}`}>{im.descricao}</p>
-        <StatusBadge status={im.status} />
-      </div>
-      {/* Linha 2 */}
-      {(enderecoCompleto || cidadeUF) && (
-        <p className={`text-xs mb-2 ${txtMuted}`}>
-          {[enderecoCompleto, cidadeUF].filter(Boolean).join(' — ')}
-        </p>
-      )}
-      {/* Linha 3 */}
-      <div className={`flex flex-wrap items-center gap-x-3 gap-y-1 text-xs ${txtMuted}`}>
-        {im.locador_nome && <span>Locador: <span className={`font-medium ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>{im.locador_nome}</span></span>}
-        <span>{fmtCurrency(im.valor_aluguel_mensal)}<span className="font-normal">/mês</span></span>
-        {im.dia_vencimento && <span>Venc. dia {im.dia_vencimento}</span>}
-      </div>
-      {/* Ações */}
-      <div className="mt-3">
-        <button className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-colors
-          ${isDark
-            ? 'border-indigo-500/40 text-indigo-400 hover:bg-indigo-500/10'
-            : 'border-indigo-300 text-indigo-700 hover:bg-indigo-50'}`}>
-          Ver detalhes
-        </button>
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-sm p-4" onClick={onClose}>
+      <div className={`rounded-2xl shadow-2xl w-full max-w-lg max-h-[85vh] overflow-y-auto ${bg}`} onClick={e => e.stopPropagation()}>
+        {/* Header */}
+        <div className={`flex items-center justify-between px-5 py-4 border-b sticky top-0 z-10 ${isDark ? 'border-white/[0.06] bg-[#1e293b]' : 'border-slate-100 bg-white'} rounded-t-2xl`}>
+          <div className="flex items-center gap-2 min-w-0">
+            <Building2 size={18} className="text-indigo-600 shrink-0" />
+            <h3 className={`text-base font-bold truncate ${txtMain}`}>{imovel.endereco || imovel.descricao}</h3>
+          </div>
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-600 shrink-0"><X size={18} /></button>
+        </div>
+
+        <div className="p-5 space-y-4">
+          {/* Status */}
+          <div className="flex items-center justify-end">
+            <span className={`inline-flex items-center gap-1.5 rounded-full font-semibold px-3 py-1 text-xs ${stCfg.bg} ${stCfg.text}`}>
+              <span className={`w-2 h-2 rounded-full ${stCfg.dot}`} /> {stCfg.label}
+            </span>
+          </div>
+
+          {/* Endereço */}
+          <div className={`rounded-xl p-4 ${isDark ? 'bg-indigo-500/10 border border-indigo-500/20' : 'bg-indigo-50 border border-indigo-200'}`}>
+            <p className="text-[9px] font-bold text-indigo-500 uppercase tracking-wider mb-2">Endereço</p>
+            <div className="space-y-1">
+              {imovel.endereco && <p className={`text-sm font-bold ${txtMain}`}>{imovel.endereco}{imovel.numero ? `, ${imovel.numero}` : ''}</p>}
+              {imovel.complemento && <p className={`text-xs ${txtMuted}`}>{imovel.complemento}</p>}
+              {imovel.bairro && <p className={`text-xs ${txtMuted}`}>{imovel.bairro}</p>}
+              <p className={`text-xs ${txtMuted}`}>{[imovel.cidade, imovel.uf].filter(Boolean).join(' — ')}{imovel.cep ? ` · CEP ${imovel.cep}` : ''}</p>
+              {imovel.area_m2 != null && <p className={`text-xs ${txtMuted}`}>{imovel.area_m2} m²</p>}
+            </div>
+          </div>
+
+          {/* Contrato */}
+          {contrato && (
+            <div className={`rounded-xl p-4 ${cardBg}`}>
+              <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-2.5">Contrato</p>
+              <div className="grid grid-cols-2 gap-x-4 gap-y-2.5 text-xs">
+                {contrato.numero && <div><p className={txtMuted}>Número</p><p className={`font-semibold ${txtMain}`}>{contrato.numero}</p></div>}
+                {contrato.data_inicio && <div><p className={txtMuted}>Início</p><p className={`font-semibold ${txtMain}`}>{fmtDate(contrato.data_inicio)}</p></div>}
+                {contrato.data_fim_previsto && <div><p className={txtMuted}>Vencimento</p><p className={`font-semibold ${txtMain}`}>{fmtDate(contrato.data_fim_previsto)}</p></div>}
+                {contrato.data_assinatura && <div><p className={txtMuted}>Assinatura</p><p className={`font-semibold ${txtMain}`}>{fmtDate(contrato.data_assinatura)}</p></div>}
+                {contrato.status && <div><p className={txtMuted}>Status Contrato</p><p className={`font-semibold ${txtMain}`}>{contrato.status}</p></div>}
+              </div>
+            </div>
+          )}
+
+          {/* Proprietário / Imobiliária */}
+          <div className={`rounded-xl p-4 ${cardBg}`}>
+            <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-2.5">Proprietário / Imobiliária</p>
+            <div className="grid grid-cols-2 gap-x-4 gap-y-2.5 text-xs">
+              {imovel.locador_nome && <div><p className={txtMuted}>Locador</p><p className={`font-semibold ${txtMain}`}>{imovel.locador_nome}</p></div>}
+              {imovel.locador_cpf_cnpj && <div><p className={txtMuted}>CPF/CNPJ</p><p className={`font-semibold ${txtMain}`}>{imovel.locador_cpf_cnpj}</p></div>}
+              {imovel.locador_contato && <div className="col-span-2"><p className={txtMuted}>Contato</p><p className={`font-semibold ${txtMain}`}>{imovel.locador_contato}</p></div>}
+              {contrato?.contraparte_nome && contrato.contraparte_nome !== imovel.locador_nome && (
+                <div className="col-span-2"><p className={txtMuted}>Contraparte (contrato)</p><p className={`font-semibold ${txtMain}`}>{contrato.contraparte_nome}</p></div>
+              )}
+            </div>
+          </div>
+
+          {/* Dados financeiros */}
+          <div className={`rounded-xl p-4 ${cardBg}`}>
+            <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-2.5">Financeiro</p>
+            <div className="grid grid-cols-2 gap-x-4 gap-y-2.5 text-xs">
+              {imovel.valor_aluguel_mensal != null && <div><p className={txtMuted}>Aluguel Mensal</p><p className={`font-semibold ${txtMain}`}>{fmtCur(imovel.valor_aluguel_mensal)}</p></div>}
+              {imovel.dia_vencimento != null && <div><p className={txtMuted}>Dia Vencimento</p><p className={`font-semibold ${txtMain}`}>Dia {imovel.dia_vencimento}</p></div>}
+              {cc?.descricao && <div><p className={txtMuted}>Centro de Custo</p><p className={`font-semibold ${txtMain}`}>{cc.codigo} — {cc.descricao}</p></div>}
+            </div>
+          </div>
+
+          {/* Linha do tempo — Aditivos & Renovações */}
+          <div className={`rounded-xl p-4 ${cardBg}`}>
+            <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-2.5">Aditivos & Renovações</p>
+            {imovelAditivos.length === 0 ? (
+              <p className={`text-xs ${txtMuted}`}>Nenhum aditivo registrado.</p>
+            ) : (
+              <div className="space-y-0">
+                {imovelAditivos.map((ad, i) => (
+                  <div key={ad.id} className="flex gap-3 items-start">
+                    <div className="flex flex-col items-center">
+                      <div className={`w-2.5 h-2.5 rounded-full mt-1 ${ad.status === 'assinado' ? 'bg-emerald-500' : ad.status === 'aguardando_assinatura' ? 'bg-amber-500' : 'bg-slate-400'}`} />
+                      {i < imovelAditivos.length - 1 && <div className={`w-px flex-1 min-h-[20px] ${isDark ? 'bg-white/[0.06]' : 'bg-slate-200'}`} />}
+                    </div>
+                    <div className="pb-3 min-w-0">
+                      <p className={`text-xs font-semibold ${txtMain}`}>{ad.tipo === 'renovacao' ? 'Renovação' : ad.tipo === 'reajuste' ? 'Reajuste' : ad.tipo === 'alteracao_valor' ? 'Alteração de Valor' : 'Aditivo'}</p>
+                      <p className={`text-[10px] ${txtMuted}`}>
+                        {ad.data_inicio ? fmtDate(ad.data_inicio) : '—'} → {ad.data_fim ? fmtDate(ad.data_fim) : '—'}
+                        {ad.novo_valor != null && ` · ${fmtCur(ad.novo_valor)}`}
+                      </p>
+                      {ad.observacoes && <p className={`text-[10px] ${txtMuted} mt-0.5`}>{ad.observacoes}</p>}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Fechar */}
+          <div className="flex gap-2 pt-1">
+            <button onClick={onClose} className={`flex-1 py-3 rounded-xl border text-sm font-semibold transition-all ${isDark ? 'border-white/[0.06] text-slate-300' : 'border-slate-200 text-slate-600 hover:bg-slate-50'}`}>Fechar</button>
+          </div>
+        </div>
       </div>
     </div>
   )
 }
 
-// ── Main ──────────────────────────────────────────────────────────────────────
+// ── Main ─────────────────────────────────────────────────────────────────────
 export default function Ativos() {
   const { isDark } = useTheme()
   const { data: imoveis = [], isLoading } = useImoveis()
-  const [search, setSearch] = useState('')
-  const [statusFilter, setStatusFilter] = useState('ativo')
-  const [view, setView] = useState<'table' | 'card'>('table')
+  const { data: aditivos = [] } = useAditivos()
 
-  const txt = isDark ? 'text-white' : 'text-slate-900'
-  const txtMuted = isDark ? 'text-slate-400' : 'text-slate-500'
+  const [busca, setBusca] = useState('')
+  const [statusFilter, setStatusFilter] = useState('todos')
+  const [cidadeFilter, setCidadeFilter] = useState('')
+  const [ccFilter, setCcFilter] = useState('')
+  const [vencFilter, setVencFilter] = useState('')
+  const [viewMode, setViewMode] = useState<ViewMode>('table')
+  const [detail, setDetail] = useState<LocImovel | null>(null)
 
-  const filtered = imoveis.filter(im => {
-    if (statusFilter && im.status !== statusFilter) return false
-    if (search) {
-      const q = search.toLowerCase()
-      return (
-        im.descricao.toLowerCase().includes(q) ||
-        im.cidade?.toLowerCase().includes(q) ||
-        im.endereco?.toLowerCase().includes(q) ||
-        im.locador_nome?.toLowerCase().includes(q) ||
-        im.codigo?.toLowerCase().includes(q)
-      )
+  // Opções únicas para filtros
+  const cidades = useMemo(() => [...new Set(imoveis.map(i => i.cidade).filter(Boolean))].sort() as string[], [imoveis])
+  const centrosCusto = useMemo(() => {
+    const seen = new Map<string, string>()
+    imoveis.forEach(i => { const cc = (i as any).centro_custo; if (cc?.id) seen.set(cc.id, cc.descricao) })
+    return [...seen.entries()].sort((a, b) => a[1].localeCompare(b[1]))
+  }, [imoveis])
+
+  const filtrados = useMemo(() => {
+    let items = [...imoveis]
+    if (busca) { const q = busca.toLowerCase(); items = items.filter(i => [i.descricao, i.endereco, i.locador_nome, i.cidade].some(v => v?.toLowerCase().includes(q))) }
+    if (statusFilter !== 'todos') items = items.filter(i => i.status === statusFilter)
+    if (cidadeFilter) items = items.filter(i => i.cidade === cidadeFilter)
+    if (ccFilter) items = items.filter(i => (i as any).centro_custo?.id === ccFilter)
+    if (vencFilter) {
+      const today = new Date().toISOString().split('T')[0]
+      if (vencFilter === 'vencido') items = items.filter(i => { const d = (i as any).contrato?.data_fim_previsto; return d && d < today })
+      else if (vencFilter === '30d') items = items.filter(i => { const d = (i as any).contrato?.data_fim_previsto; const lim = new Date(Date.now() + 30 * 86400000).toISOString().split('T')[0]; return d && d >= today && d <= lim })
+      else if (vencFilter === '90d') items = items.filter(i => { const d = (i as any).contrato?.data_fim_previsto; const lim = new Date(Date.now() + 90 * 86400000).toISOString().split('T')[0]; return d && d >= today && d <= lim })
     }
-    return true
-  })
+    return items
+  }, [imoveis, busca, statusFilter, cidadeFilter, ccFilter, vencFilter])
 
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center py-20">
-        <div className="w-8 h-8 border-[3px] border-indigo-500 border-t-transparent rounded-full animate-spin" />
-      </div>
-    )
-  }
+  const statuses = [
+    { key: 'todos', label: 'Todos' },
+    { key: 'ativo', label: 'Ativo' },
+    { key: 'inativo', label: 'Inativo' },
+    { key: 'em_entrada', label: 'Em Entrada' },
+    { key: 'em_saida', label: 'Em Saída' },
+  ]
+
+  if (isLoading) return <div className="flex justify-center py-8"><div className="w-5 h-5 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" /></div>
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-3">
       {/* Toolbar */}
       <div className="flex flex-wrap items-center gap-2">
         {/* Busca */}
-        <div className={`flex items-center gap-2 rounded-xl border px-3 py-2 flex-1 min-w-[180px]
-          ${isDark ? 'bg-white/[0.04] border-white/10' : 'bg-white border-slate-200'}`}>
-          <Search size={14} className={txtMuted} />
-          <input
-            type="text"
-            placeholder="Buscar imóvel..."
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            className={`flex-1 text-sm bg-transparent outline-none
-              ${isDark ? 'text-white placeholder-slate-500' : 'text-slate-800 placeholder-slate-400'}`}
-          />
+        <div className="relative flex-1 min-w-[160px] max-w-xs">
+          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+          <input type="text" value={busca} onChange={e => setBusca(e.target.value)} placeholder="Buscar imóvel..."
+            className={`w-full pl-9 pr-3 py-2 rounded-xl border text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/30 ${isDark ? 'bg-white/[0.04] border-white/[0.06] text-slate-200' : 'border-slate-200 bg-white'}`} />
+          {busca && <button onClick={() => setBusca('')} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400"><X size={12} /></button>}
         </div>
-        {/* Filtros status */}
-        <div className="flex gap-1 flex-wrap">
-          {STATUS_OPTS.map(opt => (
-            <button
-              key={opt.value}
-              onClick={() => setStatusFilter(opt.value)}
-              className={`px-3 py-2 rounded-xl text-xs font-semibold border transition-all ${
-                statusFilter === opt.value
-                  ? 'bg-indigo-600 text-white border-indigo-600'
-                  : isDark
-                  ? 'border-white/10 text-slate-400 hover:border-white/20'
-                  : 'border-slate-200 text-slate-500 hover:border-slate-300'
-              }`}
-            >
-              {opt.label}
+
+        {/* Status */}
+        <div className="flex items-center gap-0.5">
+          {statuses.map(s => (
+            <button key={s.key} onClick={() => setStatusFilter(s.key)}
+              className={`px-2.5 py-1.5 rounded-lg text-[11px] font-medium transition-all ${statusFilter === s.key ? isDark ? 'bg-white/[0.08] text-white' : 'bg-slate-100 text-slate-800' : isDark ? 'text-slate-500' : 'text-slate-400 hover:bg-slate-50'}`}>
+              {s.label}
             </button>
           ))}
         </div>
-        {/* Toggle view */}
-        <div className="flex items-center gap-1">
-          <button
-            onClick={() => setView('table')}
-            className={`p-1.5 rounded-lg transition-colors ${view === 'table'
-              ? isDark ? 'bg-white/10 text-white' : 'bg-indigo-100 text-indigo-700'
-              : isDark ? 'text-slate-400 hover:text-slate-200' : 'text-slate-400 hover:text-slate-600'}`}>
-            <List size={16} />
-          </button>
-          <button
-            onClick={() => setView('card')}
-            className={`p-1.5 rounded-lg transition-colors ${view === 'card'
-              ? isDark ? 'bg-white/10 text-white' : 'bg-indigo-100 text-indigo-700'
-              : isDark ? 'text-slate-400 hover:text-slate-200' : 'text-slate-400 hover:text-slate-600'}`}>
-            <LayoutGrid size={16} />
-          </button>
+
+        {/* Centro de Custo */}
+        <select value={ccFilter} onChange={e => setCcFilter(e.target.value)}
+          className={`rounded-lg border px-2 py-1.5 text-[11px] ${isDark ? 'bg-white/[0.04] border-white/[0.06] text-slate-200' : 'border-slate-200 bg-white text-slate-600'}`}>
+          <option value="">Centro de Custo</option>
+          {centrosCusto.map(([id, nome]) => <option key={id} value={id}>{nome}</option>)}
+        </select>
+
+        {/* Cidade */}
+        <select value={cidadeFilter} onChange={e => setCidadeFilter(e.target.value)}
+          className={`rounded-lg border px-2 py-1.5 text-[11px] ${isDark ? 'bg-white/[0.04] border-white/[0.06] text-slate-200' : 'border-slate-200 bg-white text-slate-600'}`}>
+          <option value="">Cidade</option>
+          {cidades.map(c => <option key={c} value={c}>{c}</option>)}
+        </select>
+
+        {/* Vencimento */}
+        <select value={vencFilter} onChange={e => setVencFilter(e.target.value)}
+          className={`rounded-lg border px-2 py-1.5 text-[11px] ${isDark ? 'bg-white/[0.04] border-white/[0.06] text-slate-200' : 'border-slate-200 bg-white text-slate-600'}`}>
+          <option value="">Vencimento</option>
+          <option value="vencido">Vencidos</option>
+          <option value="30d">Próximos 30 dias</option>
+          <option value="90d">Próximos 90 dias</option>
+        </select>
+
+        {/* Toggle */}
+        <div className={`flex items-center rounded-lg border overflow-hidden ml-auto ${isDark ? 'border-white/[0.06]' : 'border-slate-200'}`}>
+          <button onClick={() => setViewMode('table')} className={`p-1.5 ${viewMode === 'table' ? isDark ? 'bg-white/[0.08] text-white' : 'bg-slate-100 text-slate-700' : isDark ? 'text-slate-500' : 'text-slate-400'}`}><LayoutList size={14} /></button>
+          <button onClick={() => setViewMode('cards')} className={`p-1.5 ${viewMode === 'cards' ? isDark ? 'bg-white/[0.08] text-white' : 'bg-slate-100 text-slate-700' : isDark ? 'text-slate-500' : 'text-slate-400'}`}><LayoutGrid size={14} /></button>
         </div>
       </div>
 
-      {/* Contador */}
-      <p className={`text-xs ${txtMuted}`}>{filtered.length} imóvel(is)</p>
+      {/* Count */}
+      <p className={`text-[11px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{filtrados.length} imóvel(is)</p>
 
-      {filtered.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-20 gap-3">
-          <Building2 size={40} className={txtMuted} />
-          <p className={`text-sm ${txtMuted}`}>Nenhum imóvel encontrado</p>
+      {/* Content */}
+      {filtrados.length === 0 ? (
+        <div className={`flex flex-col items-center justify-center py-12 ${isDark ? 'text-slate-600' : 'text-slate-300'}`}>
+          <Building2 size={36} className="mb-2" /><p className="text-sm">Nenhum imóvel encontrado</p>
         </div>
-      ) : view === 'table' ? (
-        /* Table View */
-        <div className={`rounded-xl border overflow-hidden
-          ${isDark ? 'bg-white/[0.02] border-white/[0.06]' : 'bg-white border-slate-200'}`}>
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className={`border-b ${isDark ? 'border-white/[0.06]' : 'border-slate-100'}`}>
-                  {['Imóvel', 'Locador', 'Valor/mês', 'Vencimento', 'Status'].map(h => (
-                    <th key={h} className={`text-left text-[10px] font-bold uppercase tracking-wider px-4 py-3 ${txtMuted}`}>
-                      {h}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {filtered.map(im => (
-                  <TableRow key={im.id} im={im} isDark={isDark} />
-                ))}
-              </tbody>
-            </table>
-          </div>
+      ) : viewMode === 'table' ? (
+        <div className={`rounded-xl border overflow-hidden ${isDark ? 'border-white/[0.06]' : 'border-slate-200'}`}>
+          <table className="w-full text-xs">
+            <thead>
+              <tr className={isDark ? 'bg-white/[0.02] text-slate-500' : 'bg-slate-50 text-slate-400'}>
+                <th className="text-left px-3 py-2 font-semibold">IMÓVEL</th>
+                <th className="text-left px-3 py-2 font-semibold">LOCADOR</th>
+                <th className="text-left px-3 py-2 font-semibold">C. CUSTO</th>
+                <th className="text-left px-3 py-2 font-semibold">CIDADE</th>
+                <th className="text-right px-3 py-2 font-semibold">VALOR/MÊS</th>
+                <th className="text-right px-3 py-2 font-semibold">VENCIMENTO</th>
+                <th className="text-center px-3 py-2 font-semibold">STATUS</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filtrados.map(imo => {
+                const st = STATUS_CFG[imo.status] || STATUS_CFG.ativo
+                const contrato = (imo as any).contrato
+                const cc = (imo as any).centro_custo
+                const venc = contrato?.data_fim_previsto
+                const isExpiring = venc && new Date(venc) <= new Date(Date.now() + 30 * 86400000) && new Date(venc) >= new Date()
+                const isExpired = venc && new Date(venc) < new Date()
+                return (
+                  <tr key={imo.id} onClick={() => setDetail(imo)}
+                    className={`cursor-pointer transition-all ${isDark ? 'border-b border-white/[0.04] hover:bg-white/[0.04]' : 'border-b border-slate-100 hover:bg-slate-50'}`}>
+                    <td className="px-3 py-2.5">
+                      <p className={`font-semibold truncate max-w-[250px] ${isDark ? 'text-white' : 'text-slate-800'}`}>{imo.endereco || imo.descricao}</p>
+                    </td>
+                    <td className={`px-3 py-2.5 truncate max-w-[150px] ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{imo.locador_nome || '—'}</td>
+                    <td className={`px-3 py-2.5 truncate max-w-[100px] ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{cc?.descricao || '—'}</td>
+                    <td className={`px-3 py-2.5 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{imo.cidade || '—'}</td>
+                    <td className={`px-3 py-2.5 text-right font-semibold ${isDark ? 'text-white' : 'text-slate-700'}`}>{fmtCur(imo.valor_aluguel_mensal)}</td>
+                    <td className={`px-3 py-2.5 text-right ${isExpired ? 'text-red-600 font-bold' : isExpiring ? 'text-amber-600 font-semibold' : isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+                      {venc ? fmtDate(venc) : '—'}
+                      {isExpired && <AlertTriangle size={10} className="inline ml-1 text-red-500" />}
+                      {isExpiring && !isExpired && <Clock size={10} className="inline ml-1 text-amber-500" />}
+                    </td>
+                    <td className="px-3 py-2.5 text-center">
+                      <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold ${st.bg} ${st.text}`}>
+                        <span className={`w-1.5 h-1.5 rounded-full ${st.dot}`} /> {st.label}
+                      </span>
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
         </div>
       ) : (
-        /* Card View */
         <div className="space-y-2">
-          {filtered.map(im => (
-            <ImovelCard key={im.id} im={im} isDark={isDark} />
-          ))}
+          {filtrados.map(imo => {
+            const st = STATUS_CFG[imo.status] || STATUS_CFG.ativo
+            const contrato = (imo as any).contrato
+            const cc = (imo as any).centro_custo
+            const venc = contrato?.data_fim_previsto
+            return (
+              <button key={imo.id} type="button" onClick={() => setDetail(imo)}
+                className={`w-full text-left rounded-xl border p-3 transition-all ${isDark ? 'bg-white/[0.03] border-white/[0.06] hover:bg-white/[0.06]' : 'bg-white border-slate-200 hover:shadow-md'}`}>
+                <div className="flex items-start justify-between gap-2 mb-1">
+                  <p className={`text-sm font-semibold truncate ${isDark ? 'text-white' : 'text-slate-800'}`}>{imo.endereco || imo.descricao}</p>
+                  <span className={`shrink-0 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold ${st.bg} ${st.text}`}>
+                    <span className={`w-1.5 h-1.5 rounded-full ${st.dot}`} /> {st.label}
+                  </span>
+                </div>
+                {imo.locador_nome && <p className={`text-xs flex items-center gap-1 mb-0.5 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}><User size={11} /> {imo.locador_nome}</p>}
+                <p className={`text-xs flex items-center gap-1 mb-0.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}><MapPin size={11} /> {imo.cidade || '—'}</p>
+                {cc?.descricao && <p className={`text-xs flex items-center gap-1 mb-0.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}><FileText size={11} /> {cc.descricao}</p>}
+                <div className="flex items-center justify-between mt-1">
+                  <span className={`text-xs font-semibold ${isDark ? 'text-white' : 'text-slate-700'}`}>{fmtCur(imo.valor_aluguel_mensal)}</span>
+                  {venc && <span className={`text-[10px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}><Calendar size={10} className="inline mr-1" />Venc: {fmtDate(venc)}</span>}
+                </div>
+              </button>
+            )
+          })}
         </div>
       )}
+
+      {/* Modal */}
+      {detail && <ImovelDetailModal imovel={detail} aditivos={aditivos} onClose={() => setDetail(null)} isDark={isDark} />}
     </div>
   )
 }
