@@ -553,6 +553,74 @@ export function useGerarCronogramaIA() {
   })
 }
 
+// ── Parse OSC (upload PDF → n8n → parsed data) ────────────────────────────
+
+export interface OSCParsed {
+  portfolio: Partial<PMOPortfolio>
+  tap: Partial<PMOTAP>
+}
+
+export function useParseOSC() {
+  return useMutation({
+    mutationFn: async (payload: {
+      file_base64?: string
+      file_url?: string
+      file_name: string
+      mime_type: string
+    }): Promise<OSCParsed> => {
+      const res = await fetch(`${N8N_BASE}/egp/parse-osc`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      })
+      if (!res.ok) throw new Error('Erro ao processar OSC via IA')
+      return res.json() as Promise<OSCParsed>
+    },
+  })
+}
+
+export function useConfirmarOSC() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (parsed: OSCParsed) => {
+      // 1) Create portfolio
+      const { data: portfolio, error: errP } = await supabase
+        .from('pmo_portfolio')
+        .insert({
+          ...parsed.portfolio,
+          status: parsed.portfolio.status || 'em_analise_ate',
+          valor_total_osc: parsed.portfolio.valor_total_osc || 0,
+          valor_faturado: 0,
+          custo_orcado: parsed.portfolio.custo_orcado || 0,
+          custo_planejado: 0,
+          custo_real: 0,
+          multa_valor_estimado: 0,
+        })
+        .select()
+        .single()
+      if (errP) throw errP
+
+      // 2) Create TAP linked to portfolio
+      if (parsed.tap && Object.keys(parsed.tap).length > 0) {
+        const { error: errT } = await supabase
+          .from('pmo_tap')
+          .insert({
+            ...parsed.tap,
+            portfolio_id: portfolio.id,
+            status: 'rascunho',
+            orcamento_total: parsed.tap.orcamento_total || 0,
+          })
+        if (errT) console.warn('Erro ao criar TAP:', errT.message)
+      }
+
+      return portfolio as PMOPortfolio
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['pmo-portfolios'] })
+    },
+  })
+}
+
 // ── Stakeholders ────────────────────────────────────────────────────────────
 
 export function useStakeholders(portfolioId: string | undefined) {

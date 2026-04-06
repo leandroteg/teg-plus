@@ -1,12 +1,14 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useRef, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   RefreshCw, AlertTriangle, Zap,
   TrendingUp, Clock, MapPin, Activity, DollarSign,
   CalendarClock, BarChart3, ChevronRight,
+  Upload, FileText, Loader2, CheckCircle, X, Sparkles,
 } from 'lucide-react'
 import { useQuery } from '@tanstack/react-query'
-import { usePortfolios } from '../../hooks/usePMO'
+import { usePortfolios, useParseOSC, useConfirmarOSC } from '../../hooks/usePMO'
+import type { OSCParsed } from '../../hooks/usePMO'
 import { useLookupObras } from '../../hooks/useLookups'
 import { useTheme } from '../../contexts/ThemeContext'
 import { supabase } from '../../services/supabase'
@@ -277,11 +279,305 @@ function useRecentes() {
   })
 }
 
+// ── Upload OSC Modal ─────────────────────────────────────────────────────────
+
+const ACCEPTED_OSC = ['application/pdf', 'image/jpeg', 'image/png', 'image/webp']
+const MAX_SIZE_OSC = 50 * 1024 * 1024
+const STORAGE_THRESHOLD_OSC = 8 * 1024 * 1024
+
+function fileToBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => resolve((reader.result as string).split(',')[1])
+    reader.onerror = reject
+    reader.readAsDataURL(file)
+  })
+}
+
+async function uploadToTempStorage(file: File): Promise<{ path: string; url: string }> {
+  const ext = file.name.split('.').pop() || 'pdf'
+  const path = `osc-parse/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`
+  const { error } = await supabase.storage.from('temp-uploads').upload(path, file, {
+    contentType: file.type,
+    upsert: false,
+  })
+  if (error) throw new Error(`Upload falhou: ${error.message}`)
+  const { data } = supabase.storage.from('temp-uploads').getPublicUrl(path)
+  return { path, url: data.publicUrl }
+}
+
+type UploadStep = 'idle' | 'uploading' | 'parsing' | 'review' | 'saving' | 'done' | 'error'
+
+function UploadOSCModal({ open, onClose, isDark }: { open: boolean; onClose: () => void; isDark: boolean }) {
+  const nav = useNavigate()
+  const inputRef = useRef<HTMLInputElement>(null)
+  const [step, setStep] = useState<UploadStep>('idle')
+  const [fileName, setFileName] = useState('')
+  const [error, setError] = useState('')
+  const [parsed, setParsed] = useState<OSCParsed | null>(null)
+  const [dragOver, setDragOver] = useState(false)
+  const parseOSC = useParseOSC()
+  const confirmar = useConfirmarOSC()
+
+  const reset = useCallback(() => {
+    setStep('idle')
+    setFileName('')
+    setError('')
+    setParsed(null)
+    setDragOver(false)
+  }, [])
+
+  const handleClose = useCallback(() => {
+    reset()
+    onClose()
+  }, [reset, onClose])
+
+  const processFile = useCallback(async (file: File) => {
+    if (!ACCEPTED_OSC.includes(file.type)) {
+      setError('Formato não suportado. Use PDF, JPG, PNG ou WebP.')
+      setStep('error')
+      return
+    }
+    if (file.size > MAX_SIZE_OSC) {
+      setError('Arquivo muito grande. Máximo 50 MB.')
+      setStep('error')
+      return
+    }
+
+    setFileName(file.name)
+    setStep('uploading')
+    setError('')
+
+    try {
+      let payload: { file_base64?: string; file_url?: string; file_name: string; mime_type: string }
+
+      if (file.size > STORAGE_THRESHOLD_OSC) {
+        const { url } = await uploadToTempStorage(file)
+        payload = { file_url: url, file_name: file.name, mime_type: file.type }
+      } else {
+        const b64 = await fileToBase64(file)
+        payload = { file_base64: b64, file_name: file.name, mime_type: file.type }
+      }
+
+      setStep('parsing')
+      const result = await parseOSC.mutateAsync(payload)
+      setParsed(result)
+      setStep('review')
+    } catch (err: any) {
+      setError(err?.message || 'Erro ao processar OSC')
+      setStep('error')
+    }
+  }, [parseOSC])
+
+  const handleConfirm = useCallback(async () => {
+    if (!parsed) return
+    setStep('saving')
+    try {
+      const portfolio = await confirmar.mutateAsync(parsed)
+      setStep('done')
+      setTimeout(() => {
+        handleClose()
+        nav(`/egp/iniciacao/${portfolio.id}`)
+      }, 1200)
+    } catch (err: any) {
+      setError(err?.message || 'Erro ao salvar contrato')
+      setStep('error')
+    }
+  }, [parsed, confirmar, handleClose, nav])
+
+  const handleDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault()
+    setDragOver(false)
+    const file = e.dataTransfer.files[0]
+    if (file) processFile(file)
+  }, [processFile])
+
+  const handleFileInput = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (file) processFile(file)
+    e.target.value = ''
+  }, [processFile])
+
+  if (!open) return null
+
+  const cardCls = isDark
+    ? 'bg-slate-800 border-slate-700 text-white'
+    : 'bg-white border-slate-200 text-slate-800'
+
+  const fmtV = (v: number | undefined) =>
+    v ? v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 }) : '-'
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm" onClick={handleClose}>
+      <div className={`w-full max-w-lg rounded-2xl border shadow-2xl ${cardCls}`} onClick={e => e.stopPropagation()}>
+        {/* Header */}
+        <div className="flex items-center justify-between px-5 py-4 border-b border-inherit">
+          <div className="flex items-center gap-2">
+            <Sparkles size={16} className="text-teal-500" />
+            <h2 className="text-sm font-bold">Upload de OSC</h2>
+          </div>
+          <button onClick={handleClose} className="p-1 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors">
+            <X size={16} />
+          </button>
+        </div>
+
+        {/* Body */}
+        <div className="px-5 py-5">
+          {(step === 'idle' || step === 'error') && (
+            <div>
+              <div
+                onDragOver={e => { e.preventDefault(); setDragOver(true) }}
+                onDragLeave={() => setDragOver(false)}
+                onDrop={handleDrop}
+                onClick={() => inputRef.current?.click()}
+                className={`flex flex-col items-center justify-center gap-3 py-10 rounded-2xl border-2 border-dashed cursor-pointer transition-all ${
+                  dragOver
+                    ? 'border-teal-400 bg-teal-50/50 dark:bg-teal-500/10'
+                    : isDark
+                      ? 'border-slate-600 hover:border-teal-500/50 hover:bg-white/[0.02]'
+                      : 'border-slate-200 hover:border-teal-300 hover:bg-teal-50/30'
+                }`}
+              >
+                <Upload size={28} className={dragOver ? 'text-teal-500' : isDark ? 'text-slate-500' : 'text-slate-300'} />
+                <div className="text-center">
+                  <p className={`text-sm font-semibold ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>
+                    Arraste o PDF da OSC aqui
+                  </p>
+                  <p className={`text-xs mt-1 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+                    ou clique para selecionar — PDF, JPG, PNG (até 50 MB)
+                  </p>
+                </div>
+                <input ref={inputRef} type="file" accept=".pdf,.jpg,.jpeg,.png,.webp" className="hidden" onChange={handleFileInput} />
+              </div>
+              {step === 'error' && (
+                <div className="mt-3 flex items-center gap-2 px-3 py-2 rounded-xl bg-red-50 dark:bg-red-500/10 text-red-600 dark:text-red-400 text-xs font-medium">
+                  <AlertTriangle size={14} /> {error}
+                </div>
+              )}
+              <p className={`text-xs mt-3 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+                A IA vai extrair os dados da OSC e gerar uma TAP automaticamente. Você revisa antes de confirmar.
+              </p>
+            </div>
+          )}
+
+          {(step === 'uploading' || step === 'parsing') && (
+            <div className="flex flex-col items-center gap-4 py-8">
+              <Loader2 size={32} className="text-teal-500 animate-spin" />
+              <div className="text-center">
+                <p className={`text-sm font-semibold ${isDark ? 'text-white' : 'text-slate-700'}`}>
+                  {step === 'uploading' ? 'Enviando arquivo...' : 'Analisando OSC com IA...'}
+                </p>
+                <p className={`text-xs mt-1 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+                  {fileName}
+                </p>
+              </div>
+            </div>
+          )}
+
+          {step === 'review' && parsed && (
+            <div className="space-y-4">
+              <div className={`rounded-xl border p-4 space-y-2 ${isDark ? 'bg-white/[0.03] border-white/[0.06]' : 'bg-slate-50 border-slate-100'}`}>
+                <h3 className={`text-xs font-bold uppercase tracking-wide ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Contrato / OSC</h3>
+                <div className="grid grid-cols-2 gap-2 text-sm">
+                  <div>
+                    <p className={`text-[10px] font-semibold uppercase ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Nome da obra</p>
+                    <p className="font-medium">{parsed.portfolio.nome_obra || '-'}</p>
+                  </div>
+                  <div>
+                    <p className={`text-[10px] font-semibold uppercase ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Nº OSC</p>
+                    <p className="font-medium">{parsed.portfolio.numero_osc || '-'}</p>
+                  </div>
+                  <div>
+                    <p className={`text-[10px] font-semibold uppercase ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Tipo</p>
+                    <p className="font-medium capitalize">{parsed.portfolio.tipo_osc || '-'}</p>
+                  </div>
+                  <div>
+                    <p className={`text-[10px] font-semibold uppercase ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Valor Total</p>
+                    <p className="font-medium">{fmtV(parsed.portfolio.valor_total_osc)}</p>
+                  </div>
+                  <div className="col-span-2">
+                    <p className={`text-[10px] font-semibold uppercase ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Cidade/Estado</p>
+                    <p className="font-medium">{parsed.portfolio.cidade_estado || '-'}</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className={`rounded-xl border p-4 space-y-2 ${isDark ? 'bg-white/[0.03] border-white/[0.06]' : 'bg-slate-50 border-slate-100'}`}>
+                <h3 className={`text-xs font-bold uppercase tracking-wide ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>TAP Gerada</h3>
+                <div className="grid grid-cols-2 gap-2 text-sm">
+                  <div>
+                    <p className={`text-[10px] font-semibold uppercase ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Projeto</p>
+                    <p className="font-medium">{parsed.tap.nome_projeto || '-'}</p>
+                  </div>
+                  <div>
+                    <p className={`text-[10px] font-semibold uppercase ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Cliente</p>
+                    <p className="font-medium">{parsed.tap.cliente || '-'}</p>
+                  </div>
+                  <div className="col-span-2">
+                    <p className={`text-[10px] font-semibold uppercase ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Objetivo</p>
+                    <p className="font-medium line-clamp-2">{parsed.tap.objetivo || '-'}</p>
+                  </div>
+                  <div>
+                    <p className={`text-[10px] font-semibold uppercase ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Orçamento</p>
+                    <p className="font-medium">{fmtV(parsed.tap.orcamento_total)}</p>
+                  </div>
+                  <div>
+                    <p className={`text-[10px] font-semibold uppercase ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Riscos</p>
+                    <p className="font-medium">{(parsed.tap.riscos_principais as any[])?.length ?? 0} identificados</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {step === 'saving' && (
+            <div className="flex flex-col items-center gap-4 py-8">
+              <Loader2 size={32} className="text-teal-500 animate-spin" />
+              <p className={`text-sm font-semibold ${isDark ? 'text-white' : 'text-slate-700'}`}>
+                Registrando contrato e TAP...
+              </p>
+            </div>
+          )}
+
+          {step === 'done' && (
+            <div className="flex flex-col items-center gap-4 py-8">
+              <CheckCircle size={32} className="text-emerald-500" />
+              <div className="text-center">
+                <p className={`text-sm font-semibold ${isDark ? 'text-white' : 'text-slate-700'}`}>
+                  Contrato registrado com sucesso!
+                </p>
+                <p className={`text-xs mt-1 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+                  Redirecionando para Iniciação...
+                </p>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Footer */}
+        {step === 'review' && (
+          <div className="flex items-center justify-end gap-2 px-5 py-3 border-t border-inherit">
+            <button onClick={reset}
+              className={`px-4 py-2 rounded-xl text-xs font-semibold transition-all ${isDark ? 'bg-slate-700 text-slate-300 hover:bg-slate-600' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}>
+              Cancelar
+            </button>
+            <button onClick={handleConfirm}
+              className="px-4 py-2 rounded-xl text-xs font-semibold bg-teal-500 text-white hover:bg-teal-600 transition-all shadow-md shadow-teal-500/20 flex items-center gap-1.5">
+              <CheckCircle size={14} /> Confirmar e Cadastrar
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
 // ── Dashboard principal ───────────────────────────────────────────────────────
 export default function EGPPainel() {
   const nav = useNavigate()
   const { isDark } = useTheme()
   const [obraFilter, setObraFilter] = useState('')
+  const [uploadOpen, setUploadOpen] = useState(false)
   const obras = useLookupObras()
 
   const { data: portfolios = [], isLoading, isError, refetch: refetchPortfolios } = usePortfolios(
@@ -425,6 +721,14 @@ export default function EGPPainel() {
             </select>
           </div>
           <button
+            onClick={() => setUploadOpen(true)}
+            className={`flex items-center gap-1.5 px-3 py-2 rounded-2xl text-xs font-semibold transition-all ${
+              isDark ? 'bg-teal-500/10 text-teal-400 hover:bg-teal-500/20' : 'bg-teal-50 text-teal-600 hover:bg-teal-100'
+            }`}
+          >
+            <Upload size={12} /> Upload OSC
+          </button>
+          <button
             onClick={() => refetch()}
             className={`flex items-center gap-1.5 text-xs transition-colors ${isDark ? 'text-slate-500 hover:text-teal-400' : 'text-slate-400 hover:text-teal-600'}`}
           >
@@ -432,6 +736,9 @@ export default function EGPPainel() {
           </button>
         </div>
       </div>
+
+      {/* Upload OSC Modal */}
+      <UploadOSCModal open={uploadOpen} onClose={() => setUploadOpen(false)} isDark={isDark} />
 
       {/* Hero 2 colunas */}
       <div className="grid grid-cols-1 xl:grid-cols-[1.52fr_0.88fr] gap-3 items-stretch">
