@@ -8,7 +8,7 @@ export default function EGPPlanejamentoHub() {
       title="Planejamento"
       icon={Compass}
       accent="text-blue-500"
-      description="EAP, Cronograma, Histograma, Orcamento e Riscos"
+      description="EAP, Cronograma, Histograma, Orçamento e Riscos"
     />
   )
 }

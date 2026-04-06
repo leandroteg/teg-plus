@@ -8,7 +8,7 @@ export default function EGPControleHub() {
       title="Controle"
       icon={BarChart3}
       accent="text-emerald-500"
-      description="Medicoes, Eventos, Status Report e Indicadores"
+      description="Medições, Eventos, Status Report e Indicadores"
     />
   )
 }

@@ -17,12 +17,12 @@ type Tab = 'tap' | 'stakeholders' | 'comunicacao'
 const TABS: { key: Tab; label: string; icon: React.ElementType }[] = [
   { key: 'tap', label: 'TAP', icon: ClipboardCheck },
   { key: 'stakeholders', label: 'Stakeholders', icon: Users },
-  { key: 'comunicacao', label: 'Comunicacao', icon: MessageSquare },
+  { key: 'comunicacao', label: 'Comunicação', icon: MessageSquare },
 ]
 
 const INFLUENCIA_OPTS: { value: string; label: string }[] = [
   { value: 'baixa', label: 'Baixa' },
-  { value: 'media', label: 'Media' },
+  { value: 'media', label: 'Média' },
   { value: 'alta', label: 'Alta' },
 ]
 
@@ -55,7 +55,7 @@ export default function EGPIniciacao() {
       <div>
         <h1 className={`text-xl font-bold flex items-center gap-2 ${isLight ? 'text-slate-800' : 'text-white'}`}>
           <Rocket size={20} className="text-amber-500" />
-          Iniciacao
+          Iniciação
         </h1>
         {portfolio && (
           <p className={`text-sm mt-1 ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
@@ -139,7 +139,7 @@ function TAPPanel({ portfolioId, isLight }: { portfolioId?: string; isLight: boo
 
   const STATUS_CFG: Record<string, { label: string; cls: string }> = {
     rascunho: { label: 'Rascunho', cls: isLight ? 'bg-slate-100 text-slate-600' : 'bg-slate-500/15 text-slate-400' },
-    em_aprovacao: { label: 'Em Aprovacao', cls: isLight ? 'bg-amber-100 text-amber-700' : 'bg-amber-500/15 text-amber-400' },
+    em_aprovacao: { label: 'Em Aprovação', cls: isLight ? 'bg-amber-100 text-amber-700' : 'bg-amber-500/15 text-amber-400' },
     aprovado: { label: 'Aprovado', cls: isLight ? 'bg-emerald-100 text-emerald-700' : 'bg-emerald-500/15 text-emerald-400' },
     rejeitado: { label: 'Rejeitado', cls: isLight ? 'bg-red-100 text-red-700' : 'bg-red-500/15 text-red-400' },
   }
@@ -183,10 +183,10 @@ function TAPPanel({ portfolioId, isLight }: { portfolioId?: string; isLight: boo
 
       {/* Identificacao */}
       <div className={cardCls}>
-        <h3 className={`text-sm font-bold mb-4 ${isLight ? 'text-slate-700' : 'text-white'}`}>Identificacao</h3>
+        <h3 className={`text-sm font-bold mb-4 ${isLight ? 'text-slate-700' : 'text-white'}`}>Identificação</h3>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <Field label="Nome do Projeto" value={form.nome_projeto} editing={editing} onChange={v => setForm(f => ({ ...f, nome_projeto: v }))} labelCls={labelCls} valueCls={valueCls} inputCls={inputCls} />
-          <Field label="Numero" value={form.numero_projeto} editing={editing} onChange={v => setForm(f => ({ ...f, numero_projeto: v }))} labelCls={labelCls} valueCls={valueCls} inputCls={inputCls} />
+          <Field label="Número" value={form.numero_projeto} editing={editing} onChange={v => setForm(f => ({ ...f, numero_projeto: v }))} labelCls={labelCls} valueCls={valueCls} inputCls={inputCls} />
           <Field label="Cliente" value={form.cliente} editing={editing} onChange={v => setForm(f => ({ ...f, cliente: v }))} labelCls={labelCls} valueCls={valueCls} inputCls={inputCls} />
           <Field label="Gerente do Projeto" value={form.gerente_projeto} editing={editing} onChange={v => setForm(f => ({ ...f, gerente_projeto: v }))} labelCls={labelCls} valueCls={valueCls} inputCls={inputCls} />
           <Field label="Patrocinador" value={form.patrocinador_cliente} editing={editing} onChange={v => setForm(f => ({ ...f, patrocinador_cliente: v }))} labelCls={labelCls} valueCls={valueCls} inputCls={inputCls} />
@@ -216,7 +216,7 @@ function TAPPanel({ portfolioId, isLight }: { portfolioId?: string; isLight: boo
             <p className={valueCls}>{(form.escopo_inclui ?? []).join('; ') || '-'}</p>
           </div>
           <div>
-            <p className={labelCls}>Escopo Nao Inclui</p>
+            <p className={labelCls}>Escopo Não Inclui</p>
             <p className={valueCls}>{(form.escopo_nao_inclui ?? []).join('; ') || '-'}</p>
           </div>
         </div>
@@ -224,10 +224,10 @@ function TAPPanel({ portfolioId, isLight }: { portfolioId?: string; isLight: boo
 
       {/* Classificacao */}
       <div className={cardCls}>
-        <h3 className={`text-sm font-bold mb-4 ${isLight ? 'text-slate-700' : 'text-white'}`}>Classificacao</h3>
+        <h3 className={`text-sm font-bold mb-4 ${isLight ? 'text-slate-700' : 'text-white'}`}>Classificação</h3>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <div>
-            <p className={labelCls}>Urgencia</p>
+            <p className={labelCls}>Urgência</p>
             <ClassBadge value={form.classificacao_urgencia} isLight={isLight} />
           </div>
           <div>
@@ -239,7 +239,7 @@ function TAPPanel({ portfolioId, isLight }: { portfolioId?: string; isLight: boo
             <ClassBadge value={form.classificacao_faturamento as string} isLight={isLight} />
           </div>
           <div>
-            <p className={labelCls}>Duracao</p>
+            <p className={labelCls}>Duração</p>
             <ClassBadge value={form.classificacao_duracao} isLight={isLight} />
           </div>
         </div>
@@ -247,7 +247,7 @@ function TAPPanel({ portfolioId, isLight }: { portfolioId?: string; isLight: boo
 
       {/* Orcamento */}
       <div className={cardCls}>
-        <h3 className={`text-sm font-bold mb-4 ${isLight ? 'text-slate-700' : 'text-white'}`}>Orcamento</h3>
+        <h3 className={`text-sm font-bold mb-4 ${isLight ? 'text-slate-700' : 'text-white'}`}>Orçamento</h3>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
             <p className={labelCls}>Total</p>
@@ -256,7 +256,7 @@ function TAPPanel({ portfolioId, isLight }: { portfolioId?: string; isLight: boo
             </p>
           </div>
           <div>
-            <p className={labelCls}>Referencia</p>
+            <p className={labelCls}>Referência</p>
             <p className={valueCls}>{form.orcamento_referencia || '-'}</p>
           </div>
         </div>
@@ -279,9 +279,9 @@ function TAPPanel({ portfolioId, isLight }: { portfolioId?: string; isLight: boo
           )}
         </div>
         <div className={cardCls}>
-          <h3 className={`text-sm font-bold mb-3 ${isLight ? 'text-slate-700' : 'text-white'}`}>Restricoes</h3>
+          <h3 className={`text-sm font-bold mb-3 ${isLight ? 'text-slate-700' : 'text-white'}`}>Restrições</h3>
           {(form.restricoes ?? []).length === 0 ? (
-            <p className={`text-sm ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>Nenhuma restricao</p>
+            <p className={`text-sm ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>Nenhuma restrição</p>
           ) : (
             <ul className="space-y-1">
               {(form.restricoes ?? []).map((r, i) => (
@@ -296,7 +296,7 @@ function TAPPanel({ portfolioId, isLight }: { portfolioId?: string; isLight: boo
 
       {/* Observacoes */}
       <div className={cardCls}>
-        <h3 className={`text-sm font-bold mb-3 ${isLight ? 'text-slate-700' : 'text-white'}`}>Observacoes</h3>
+        <h3 className={`text-sm font-bold mb-3 ${isLight ? 'text-slate-700' : 'text-white'}`}>Observações</h3>
         {editing ? (
           <textarea
             value={form.observacoes ?? ''}
@@ -332,8 +332,8 @@ function ClassBadge({ value, isLight }: { value?: string; isLight: boolean }) {
   const map: Record<string, { label: string; light: string; dark: string }> = {
     baixa: { label: 'Baixa', light: 'bg-emerald-100 text-emerald-700', dark: 'bg-emerald-500/15 text-emerald-400' },
     baixo: { label: 'Baixo', light: 'bg-emerald-100 text-emerald-700', dark: 'bg-emerald-500/15 text-emerald-400' },
-    media: { label: 'Media', light: 'bg-amber-100 text-amber-700', dark: 'bg-amber-500/15 text-amber-400' },
-    medio: { label: 'Medio', light: 'bg-amber-100 text-amber-700', dark: 'bg-amber-500/15 text-amber-400' },
+    media: { label: 'Média', light: 'bg-amber-100 text-amber-700', dark: 'bg-amber-500/15 text-amber-400' },
+    medio: { label: 'Médio', light: 'bg-amber-100 text-amber-700', dark: 'bg-amber-500/15 text-amber-400' },
     alta: { label: 'Alta', light: 'bg-red-100 text-red-700', dark: 'bg-red-500/15 text-red-400' },
     alto: { label: 'Alto', light: 'bg-red-100 text-red-700', dark: 'bg-red-500/15 text-red-400' },
   }
@@ -404,10 +404,10 @@ function StakeholdersPanel({ portfolioId, isLight }: { portfolioId?: string; isL
             <tr className={isLight ? 'bg-slate-50' : 'bg-white/[0.02]'}>
               <th className={thCls}>Nome</th>
               <th className={thCls}>Papel</th>
-              <th className={thCls}>Organizacao</th>
-              <th className={thCls}>Influencia</th>
-              <th className={thCls}>Estrategia</th>
-              <th className={`${thCls} w-20`}>Acoes</th>
+              <th className={thCls}>Organização</th>
+              <th className={thCls}>Influência</th>
+              <th className={thCls}>Estratégia</th>
+              <th className={`${thCls} w-20`}>Ações</th>
             </tr>
           </thead>
           <tbody>
@@ -463,13 +463,13 @@ function StakeholdersPanel({ portfolioId, isLight }: { portfolioId?: string; isL
               <tr className={`border-t ${isLight ? 'border-slate-100 bg-amber-50/30' : 'border-white/[0.04] bg-amber-500/5'}`}>
                 <td className={tdCls}><input className={inputCls} placeholder="Nome" value={newRow.nome ?? ''} onChange={e => setNewRow(r => ({ ...r, nome: e.target.value }))} /></td>
                 <td className={tdCls}><input className={inputCls} placeholder="Papel" value={newRow.papel ?? ''} onChange={e => setNewRow(r => ({ ...r, papel: e.target.value }))} /></td>
-                <td className={tdCls}><input className={inputCls} placeholder="Organizacao" value={newRow.organizacao ?? ''} onChange={e => setNewRow(r => ({ ...r, organizacao: e.target.value }))} /></td>
+                <td className={tdCls}><input className={inputCls} placeholder="Organização" value={newRow.organizacao ?? ''} onChange={e => setNewRow(r => ({ ...r, organizacao: e.target.value }))} /></td>
                 <td className={tdCls}>
                   <select className={inputCls} value={newRow.influencia ?? 'media'} onChange={e => setNewRow(r => ({ ...r, influencia: e.target.value as PMOStakeholder['influencia'] }))}>
                     {INFLUENCIA_OPTS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
                   </select>
                 </td>
-                <td className={tdCls}><input className={inputCls} placeholder="Estrategia" value={newRow.estrategia ?? ''} onChange={e => setNewRow(r => ({ ...r, estrategia: e.target.value }))} /></td>
+                <td className={tdCls}><input className={inputCls} placeholder="Estratégia" value={newRow.estrategia ?? ''} onChange={e => setNewRow(r => ({ ...r, estrategia: e.target.value }))} /></td>
                 <td className={tdCls}>
                   <div className="flex items-center gap-1">
                     <button onClick={handleAdd} disabled={criar.isPending} className="text-emerald-500 hover:text-emerald-600"><Check size={14} /></button>
@@ -502,7 +502,7 @@ function StakeholdersPanel({ portfolioId, isLight }: { portfolioId?: string; isL
 function InfluenciaBadge({ value, isLight }: { value?: string; isLight: boolean }) {
   const map: Record<string, { label: string; light: string; dark: string }> = {
     baixa: { label: 'Baixa', light: 'bg-emerald-100 text-emerald-700', dark: 'bg-emerald-500/15 text-emerald-400' },
-    media: { label: 'Media', light: 'bg-amber-100 text-amber-700', dark: 'bg-amber-500/15 text-amber-400' },
+    media: { label: 'Média', light: 'bg-amber-100 text-amber-700', dark: 'bg-amber-500/15 text-amber-400' },
     alta: { label: 'Alta', light: 'bg-red-100 text-red-700', dark: 'bg-red-500/15 text-red-400' },
   }
   const m = map[value ?? ''] ?? { label: '-', light: 'bg-slate-100 text-slate-600', dark: 'bg-slate-500/15 text-slate-400' }
@@ -567,11 +567,11 @@ function ComunicacaoPanel({ portfolioId, isLight }: { portfolioId?: string; isLi
           <thead>
             <tr className={isLight ? 'bg-slate-50' : 'bg-white/[0.02]'}>
               <th className={thCls}>Item</th>
-              <th className={thCls}>Destinatario</th>
-              <th className={thCls}>Frequencia</th>
+              <th className={thCls}>Destinatário</th>
+              <th className={thCls}>Frequência</th>
               <th className={thCls}>Canal</th>
-              <th className={thCls}>Responsavel</th>
-              <th className={`${thCls} w-20`}>Acoes</th>
+              <th className={thCls}>Responsável</th>
+              <th className={`${thCls} w-20`}>Ações</th>
             </tr>
           </thead>
           <tbody>

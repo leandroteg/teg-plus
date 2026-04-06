@@ -18,9 +18,9 @@ type Tab = 'status_report' | 'licoes' | 'aceite' | 'desmobilizacao'
 
 const TABS: { key: Tab; label: string; icon: React.ElementType }[] = [
   { key: 'status_report', label: 'Status Report', icon: FileText },
-  { key: 'licoes', label: 'Licoes Aprendidas', icon: Lightbulb },
+  { key: 'licoes', label: 'Lições Aprendidas', icon: Lightbulb },
   { key: 'aceite', label: 'Aceite', icon: Award },
-  { key: 'desmobilizacao', label: 'Desmobilizacao', icon: PackageX },
+  { key: 'desmobilizacao', label: 'Desmobilização', icon: PackageX },
 ]
 
 const fmtBRL = (v: number) =>
@@ -227,10 +227,10 @@ function LicoesPanel({ portfolioId, isLight }: { portfolioId?: string; isLight: 
           <thead>
             <tr className={isLight ? 'bg-slate-50' : 'bg-white/[0.02]'}>
               <th className={thCls}>Fase</th>
-              <th className={thCls}>Descricao</th>
+              <th className={thCls}>Descrição</th>
               <th className={thCls}>Tipo</th>
-              <th className={thCls}>Recomendacao</th>
-              <th className={`${thCls} w-20`}>Acoes</th>
+              <th className={thCls}>Recomendação</th>
+              <th className={`${thCls} w-20`}>Ações</th>
             </tr>
           </thead>
           <tbody>
@@ -283,14 +283,14 @@ function LicoesPanel({ portfolioId, isLight }: { portfolioId?: string; isLight: 
             {adding && (
               <tr className={`border-t ${isLight ? 'border-slate-100 bg-teal-50/30' : 'border-white/[0.04] bg-teal-500/5'}`}>
                 <td className={tdCls}><input className={inputCls} placeholder="Fase" value={newRow.fase ?? ''} onChange={e => setNewRow(r => ({ ...r, fase: e.target.value }))} /></td>
-                <td className={tdCls}><input className={inputCls} placeholder="Descricao" value={newRow.descricao ?? ''} onChange={e => setNewRow(r => ({ ...r, descricao: e.target.value }))} /></td>
+                <td className={tdCls}><input className={inputCls} placeholder="Descrição" value={newRow.descricao ?? ''} onChange={e => setNewRow(r => ({ ...r, descricao: e.target.value }))} /></td>
                 <td className={tdCls}>
                   <select className={inputCls} value={newRow.tipo ?? 'positivo'} onChange={e => setNewRow(r => ({ ...r, tipo: e.target.value as 'positivo' | 'negativo' }))}>
                     <option value="positivo">Positivo</option>
                     <option value="negativo">Negativo</option>
                   </select>
                 </td>
-                <td className={tdCls}><input className={inputCls} placeholder="Recomendacao" value={newRow.recomendacao ?? ''} onChange={e => setNewRow(r => ({ ...r, recomendacao: e.target.value }))} /></td>
+                <td className={tdCls}><input className={inputCls} placeholder="Recomendação" value={newRow.recomendacao ?? ''} onChange={e => setNewRow(r => ({ ...r, recomendacao: e.target.value }))} /></td>
                 <td className={tdCls}>
                   <div className="flex items-center gap-1">
                     <button onClick={handleAdd} disabled={criar.isPending} className="text-emerald-500 hover:text-emerald-600"><Check size={14} /></button>
@@ -312,7 +312,7 @@ function LicoesPanel({ portfolioId, isLight }: { portfolioId?: string; isLight: 
               isLight ? 'text-teal-600 hover:text-teal-700' : 'text-teal-400 hover:text-teal-300'
             }`}
           >
-            <Plus size={14} /> Adicionar licao
+            <Plus size={14} /> Adicionar lição
           </button>
         </div>
       )}
@@ -460,7 +460,7 @@ function AceitePanel({ portfolioId, isLight }: { portfolioId?: string; isLight: 
           </div>
         </div>
         <div className="mt-4">
-          <p className={labelCls}>Observacoes</p>
+          <p className={labelCls}>Observações</p>
           {editing ? (
             <textarea
               value={form.observacoes ?? ''}
@@ -482,7 +482,7 @@ function AceitePanel({ portfolioId, isLight }: { portfolioId?: string; isLight: 
 const DESMOB_STATUS_OPTS = [
   { value: 'pendente', label: 'Pendente' },
   { value: 'em_andamento', label: 'Em Andamento' },
-  { value: 'concluido', label: 'Concluido' },
+  { value: 'concluido', label: 'Concluído' },
 ]
 
 function DesmobilizacaoPanel({ portfolioId, isLight }: { portfolioId?: string; isLight: boolean }) {
@@ -543,10 +543,10 @@ function DesmobilizacaoPanel({ portfolioId, isLight }: { portfolioId?: string; i
               <th className={thCls}>Item</th>
               <th className={thCls}>Categoria</th>
               <th className={thCls}>Status</th>
-              <th className={thCls}>Responsavel</th>
+              <th className={thCls}>Responsável</th>
               <th className={thCls}>Data Prevista</th>
               <th className={thCls}>Data Real</th>
-              <th className={`${thCls} w-20`}>Acoes</th>
+              <th className={`${thCls} w-20`}>Ações</th>
             </tr>
           </thead>
           <tbody>
@@ -618,7 +618,7 @@ function DesmobilizacaoPanel({ portfolioId, isLight }: { portfolioId?: string; i
                     {DESMOB_STATUS_OPTS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
                   </select>
                 </td>
-                <td className={tdCls}><input className={inputCls} placeholder="Responsavel" value={newRow.responsavel ?? ''} onChange={e => setNewRow(r => ({ ...r, responsavel: e.target.value }))} /></td>
+                <td className={tdCls}><input className={inputCls} placeholder="Responsável" value={newRow.responsavel ?? ''} onChange={e => setNewRow(r => ({ ...r, responsavel: e.target.value }))} /></td>
                 <td className={tdCls}><input type="date" className={inputCls} value={newRow.data_prevista ?? ''} onChange={e => setNewRow(r => ({ ...r, data_prevista: e.target.value }))} /></td>
                 <td className={tdCls}><input type="date" className={inputCls} value={newRow.data_real ?? ''} onChange={e => setNewRow(r => ({ ...r, data_real: e.target.value }))} /></td>
                 <td className={tdCls}>
@@ -654,7 +654,7 @@ function DesmobStatusBadge({ value, isLight }: { value?: string; isLight: boolea
   const map: Record<string, { label: string; light: string; dark: string }> = {
     pendente: { label: 'Pendente', light: 'bg-slate-100 text-slate-600', dark: 'bg-slate-500/15 text-slate-400' },
     em_andamento: { label: 'Em Andamento', light: 'bg-amber-100 text-amber-700', dark: 'bg-amber-500/15 text-amber-400' },
-    concluido: { label: 'Concluido', light: 'bg-emerald-100 text-emerald-700', dark: 'bg-emerald-500/15 text-emerald-400' },
+    concluido: { label: 'Concluído', light: 'bg-emerald-100 text-emerald-700', dark: 'bg-emerald-500/15 text-emerald-400' },
   }
   const m = map[value ?? ''] ?? { label: '-', light: 'bg-slate-100 text-slate-600', dark: 'bg-slate-500/15 text-slate-400' }
   return <span className={`inline-block text-[10px] font-semibold px-2 py-0.5 rounded-full ${isLight ? m.light : m.dark}`}>{m.label}</span>

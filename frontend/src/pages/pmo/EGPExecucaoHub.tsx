@@ -5,10 +5,10 @@ export default function EGPExecucaoHub() {
   return (
     <EGPPortfolioHub
       screen="execucao"
-      title="Execucao"
+      title="Execução"
       icon={Zap}
       accent="text-violet-500"
-      description="Cronograma, Histograma, Custos, Riscos e Plano de Acao"
+      description="Cronograma, Histograma, Custos, Riscos e Plano de Ação"
     />
   )
 }

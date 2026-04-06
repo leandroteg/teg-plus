@@ -20,7 +20,7 @@ const TABS: { key: Tab; label: string; icon: React.ElementType }[] = [
   { key: 'eap', label: 'EAP', icon: Network },
   { key: 'cronograma', label: 'Cronograma', icon: CalendarDays },
   { key: 'histograma', label: 'Histograma', icon: BarChart3 },
-  { key: 'orcamento', label: 'Orcamento', icon: DollarSign },
+  { key: 'orcamento', label: 'Orçamento', icon: DollarSign },
   { key: 'riscos', label: 'Riscos', icon: AlertTriangle },
 ]
 
@@ -162,8 +162,8 @@ function EAPPanel({ portfolioId, isLight }: { portfolioId?: string; isLight: boo
           <table className="w-full min-w-[640px]">
             <thead>
               <tr className={isLight ? 'bg-slate-50' : 'bg-white/[0.02]'}>
-                <th className={thCls}>Codigo</th>
-                <th className={thCls}>Titulo</th>
+                <th className={thCls}>Código</th>
+                <th className={thCls}>Título</th>
                 <th className={thCls}>Fase</th>
                 <th className={`${thCls} text-right`}>Peso %</th>
               </tr>
@@ -215,9 +215,9 @@ function CronogramaPanel({ portfolioId, isLight }: { portfolioId?: string; isLig
   if (isLoading) return <Spinner />
 
   const statusCfg: Record<string, { label: string; light: string; dark: string }> = {
-    nao_iniciada: { label: 'Nao Iniciada', light: 'bg-slate-100 text-slate-600', dark: 'bg-slate-500/15 text-slate-400' },
+    nao_iniciada: { label: 'Não Iniciada', light: 'bg-slate-100 text-slate-600', dark: 'bg-slate-500/15 text-slate-400' },
     em_andamento: { label: 'Em Andamento', light: 'bg-blue-100 text-blue-700', dark: 'bg-blue-500/15 text-blue-400' },
-    concluida: { label: 'Concluida', light: 'bg-emerald-100 text-emerald-700', dark: 'bg-emerald-500/15 text-emerald-400' },
+    concluida: { label: 'Concluída', light: 'bg-emerald-100 text-emerald-700', dark: 'bg-emerald-500/15 text-emerald-400' },
     atrasada: { label: 'Atrasada', light: 'bg-red-100 text-red-700', dark: 'bg-red-500/15 text-red-400' },
     bloqueada: { label: 'Bloqueada', light: 'bg-amber-100 text-amber-700', dark: 'bg-amber-500/15 text-amber-400' },
     cancelada: { label: 'Cancelada', light: 'bg-slate-100 text-slate-500', dark: 'bg-slate-600/15 text-slate-500' },
@@ -236,11 +236,11 @@ function CronogramaPanel({ portfolioId, isLight }: { portfolioId?: string; isLig
             <thead>
               <tr className={isLight ? 'bg-slate-50' : 'bg-white/[0.02]'}>
                 <th className={thCls}>Tarefa</th>
-                <th className={thCls}>Responsavel</th>
-                <th className={thCls}>Inicio Plan.</th>
-                <th className={thCls}>Termino Plan.</th>
+                <th className={thCls}>Responsável</th>
+                <th className={thCls}>Início Plan.</th>
+                <th className={thCls}>Término Plan.</th>
                 <th className={thCls}>Status</th>
-                <th className={`${thCls} text-right`}>% Concluido</th>
+                <th className={`${thCls} text-right`}>% Concluído</th>
               </tr>
             </thead>
             <tbody>
@@ -300,7 +300,7 @@ function HistogramaPanel({ portfolioId, isLight }: { portfolioId?: string; isLig
     return acc
   }, {})
 
-  const catLabels: Record<string, string> = { MOD: 'Mao de Obra Direta', MOI: 'Mao de Obra Indireta', maquinario: 'Maquinario' }
+  const catLabels: Record<string, string> = { MOD: 'Mão de Obra Direta', MOI: 'Mão de Obra Indireta', maquinario: 'Maquinário' }
   const catColors: Record<string, { plan: string; real: string }> = {
     MOD: { plan: 'bg-blue-500', real: 'bg-blue-300' }, MOI: { plan: 'bg-violet-500', real: 'bg-violet-300' }, maquinario: { plan: 'bg-teal-500', real: 'bg-teal-300' },
   }
@@ -309,7 +309,7 @@ function HistogramaPanel({ portfolioId, isLight }: { portfolioId?: string; isLig
     return (
       <div className={cardCls}>
         <div className={`text-center py-10 text-sm ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>
-          Nenhum dado de histograma disponivel.
+          Nenhum dado de histograma disponível.
         </div>
       </div>
     )
@@ -420,7 +420,7 @@ function OrcamentoPanel({ portfolioId, isLight }: { portfolioId?: string; isLigh
               <th className={thCls}>Fase</th>
               <th className={`${thCls} text-right`}>Valor Previsto</th>
               <th className={`${thCls} text-right`}>Valor Realizado</th>
-              <th className={`${thCls} w-20`}>Acoes</th>
+              <th className={`${thCls} w-20`}>Ações</th>
             </tr>
           </thead>
           <tbody>
@@ -502,8 +502,8 @@ function OrcamentoPanel({ portfolioId, isLight }: { portfolioId?: string; isLigh
 
 // ── Riscos Panel ────────────────────────────────────────────────────────────
 
-const PROB_OPTS = [{ value: 'baixa', label: 'Baixa' }, { value: 'media', label: 'Media' }, { value: 'alta', label: 'Alta' }, { value: 'muito_alta', label: 'Muito Alta' }]
-const IMPACTO_OPTS = [{ value: 'baixo', label: 'Baixo' }, { value: 'medio', label: 'Medio' }, { value: 'alto', label: 'Alto' }, { value: 'muito_alto', label: 'Muito Alto' }]
+const PROB_OPTS = [{ value: 'baixa', label: 'Baixa' }, { value: 'media', label: 'Média' }, { value: 'alta', label: 'Alta' }, { value: 'muito_alta', label: 'Muito Alta' }]
+const IMPACTO_OPTS = [{ value: 'baixo', label: 'Baixo' }, { value: 'medio', label: 'Médio' }, { value: 'alto', label: 'Alto' }, { value: 'muito_alto', label: 'Muito Alto' }]
 const STATUS_RISCO_OPTS = [{ value: 'aberto', label: 'Aberto' }, { value: 'mitigando', label: 'Mitigando' }, { value: 'aceito', label: 'Aceito' }, { value: 'fechado', label: 'Fechado' }]
 
 function RiscosPanel({ portfolioId, isLight }: { portfolioId?: string; isLight: boolean }) {
@@ -568,14 +568,14 @@ function RiscosPanel({ portfolioId, isLight }: { portfolioId?: string; isLight: 
         <table className="w-full min-w-[900px]">
           <thead>
             <tr className={isLight ? 'bg-slate-50' : 'bg-white/[0.02]'}>
-              <th className={thCls}>Descricao</th>
+              <th className={thCls}>Descrição</th>
               <th className={thCls}>Categoria</th>
               <th className={thCls}>Prob.</th>
               <th className={thCls}>Impacto</th>
               <th className={thCls}>Resposta</th>
-              <th className={thCls}>Responsavel</th>
+              <th className={thCls}>Responsável</th>
               <th className={thCls}>Status</th>
-              <th className={`${thCls} w-20`}>Acoes</th>
+              <th className={`${thCls} w-20`}>Ações</th>
             </tr>
           </thead>
           <tbody>
@@ -640,7 +640,7 @@ function RiscosPanel({ portfolioId, isLight }: { portfolioId?: string; isLight: 
 
             {adding && (
               <tr className={`border-t ${isLight ? 'border-slate-100 bg-blue-50/30' : 'border-white/[0.04] bg-blue-500/5'}`}>
-                <td className={tdCls}><input className={inputCls} placeholder="Descricao" value={newRow.descricao ?? ''} onChange={e => setNewRow(r => ({ ...r, descricao: e.target.value }))} /></td>
+                <td className={tdCls}><input className={inputCls} placeholder="Descrição" value={newRow.descricao ?? ''} onChange={e => setNewRow(r => ({ ...r, descricao: e.target.value }))} /></td>
                 <td className={tdCls}><input className={inputCls} placeholder="Categoria" value={newRow.categoria ?? ''} onChange={e => setNewRow(r => ({ ...r, categoria: e.target.value }))} /></td>
                 <td className={tdCls}>
                   <select className={inputCls} value={newRow.probabilidade ?? 'media'} onChange={e => setNewRow(r => ({ ...r, probabilidade: e.target.value as PMORisco['probabilidade'] }))}>
@@ -653,7 +653,7 @@ function RiscosPanel({ portfolioId, isLight }: { portfolioId?: string; isLight: 
                   </select>
                 </td>
                 <td className={tdCls}><input className={inputCls} placeholder="Resposta" value={newRow.resposta ?? ''} onChange={e => setNewRow(r => ({ ...r, resposta: e.target.value }))} /></td>
-                <td className={tdCls}><input className={inputCls} placeholder="Responsavel" value={newRow.responsavel ?? ''} onChange={e => setNewRow(r => ({ ...r, responsavel: e.target.value }))} /></td>
+                <td className={tdCls}><input className={inputCls} placeholder="Responsável" value={newRow.responsavel ?? ''} onChange={e => setNewRow(r => ({ ...r, responsavel: e.target.value }))} /></td>
                 <td className={tdCls}>
                   <select className={inputCls} value={newRow.status ?? 'aberto'} onChange={e => setNewRow(r => ({ ...r, status: e.target.value as PMORisco['status'] }))}>
                     {STATUS_RISCO_OPTS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}

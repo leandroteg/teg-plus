@@ -17,7 +17,7 @@ import type {
 type Tab = 'medicoes' | 'eventos' | 'status_report' | 'indicadores'
 
 const TABS: { key: Tab; label: string; icon: React.ElementType }[] = [
-  { key: 'medicoes', label: 'Medicoes', icon: Ruler },
+  { key: 'medicoes', label: 'Medições', icon: Ruler },
   { key: 'eventos', label: 'Eventos', icon: AlertTriangle },
   { key: 'status_report', label: 'Status Report', icon: FileText },
   { key: 'indicadores', label: 'Indicadores', icon: Activity },
@@ -164,17 +164,17 @@ function MedicoesPanel({ portfolioId, isLight }: { portfolioId?: string; isLight
         isLight ? 'bg-white border-slate-200 shadow-sm' : 'bg-white/[0.03] border-white/[0.06]'
       }`}>
         <h3 className={`text-sm font-bold px-5 pt-5 pb-3 ${isLight ? 'text-slate-700' : 'text-white'}`}>
-          Itens de Medicao
+          Itens de Medição
         </h3>
         {(!itens || itens.length === 0) ? (
-          <EmptyState isLight={isLight} message="Nenhum item de medicao cadastrado" />
+          <EmptyState isLight={isLight} message="Nenhum item de medição cadastrado" />
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead>
                 <tr className={`border-b ${isLight ? 'border-slate-100' : 'border-white/[0.06]'}`}>
                   <th className={thCls}>#</th>
-                  <th className={thCls}>Descricao</th>
+                  <th className={thCls}>Descrição</th>
                   <th className={thCls}>Unidade</th>
                   <th className={thCls + ' text-right'}>Qtd Prevista</th>
                   <th className={thCls + ' text-right'}>Preco Unit.</th>
@@ -226,7 +226,7 @@ function EventosPanel({ portfolioId, isLight }: { portfolioId?: string; isLight:
     pendente: { label: 'Pendente', cls: isLight ? 'bg-amber-100 text-amber-700' : 'bg-amber-500/15 text-amber-400' },
     aprovado: { label: 'Aprovado', cls: isLight ? 'bg-emerald-100 text-emerald-700' : 'bg-emerald-500/15 text-emerald-400' },
     reprovado: { label: 'Reprovado', cls: isLight ? 'bg-red-100 text-red-700' : 'bg-red-500/15 text-red-400' },
-    em_analise: { label: 'Em Analise', cls: isLight ? 'bg-blue-100 text-blue-700' : 'bg-blue-500/15 text-blue-400' },
+    em_analise: { label: 'Em Análise', cls: isLight ? 'bg-blue-100 text-blue-700' : 'bg-blue-500/15 text-blue-400' },
   }
 
   const STATUS_MULTA_CFG: Record<string, { label: string; cls: string }> = {
@@ -239,7 +239,7 @@ function EventosPanel({ portfolioId, isLight }: { portfolioId?: string; isLight:
 
   const IMPACTO_CFG: Record<string, { label: string; cls: string }> = {
     baixo: { label: 'Baixo', cls: isLight ? 'bg-emerald-100 text-emerald-700' : 'bg-emerald-500/15 text-emerald-400' },
-    medio: { label: 'Medio', cls: isLight ? 'bg-amber-100 text-amber-700' : 'bg-amber-500/15 text-amber-400' },
+    medio: { label: 'Médio', cls: isLight ? 'bg-amber-100 text-amber-700' : 'bg-amber-500/15 text-amber-400' },
     alto: { label: 'Alto', cls: isLight ? 'bg-red-100 text-red-700' : 'bg-red-500/15 text-red-400' },
   }
 
@@ -250,18 +250,18 @@ function EventosPanel({ portfolioId, isLight }: { portfolioId?: string; isLight:
         <div className="px-5 pt-5 pb-3">
           <h3 className={`text-sm font-bold flex items-center gap-2 ${isLight ? 'text-slate-700' : 'text-white'}`}>
             <TrendingUp size={14} className="text-emerald-500" />
-            Mudancas
+            Mudanças
           </h3>
         </div>
         {(!mudancas || mudancas.length === 0) ? (
-          <EmptyState isLight={isLight} message="Nenhuma mudanca registrada" />
+          <EmptyState isLight={isLight} message="Nenhuma mudança registrada" />
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead>
                 <tr className={`border-b ${isLight ? 'border-slate-100' : 'border-white/[0.06]'}`}>
                   <th className={thCls}>Tipo</th>
-                  <th className={thCls}>Descricao</th>
+                  <th className={thCls}>Descrição</th>
                   <th className={thCls}>Impacto Prazo</th>
                   <th className={thCls}>Parecer</th>
                 </tr>
@@ -320,7 +320,7 @@ function EventosPanel({ portfolioId, isLight }: { portfolioId?: string; isLight:
               <thead>
                 <tr className={`border-b ${isLight ? 'border-slate-100' : 'border-white/[0.06]'}`}>
                   <th className={thCls}>Tipo</th>
-                  <th className={thCls}>Descricao</th>
+                  <th className={thCls}>Descrição</th>
                   <th className={thCls + ' text-right'}>Valor Estimado</th>
                   <th className={thCls}>Status</th>
                 </tr>
@@ -378,7 +378,7 @@ function StatusReportPanel({ portfolioId, isLight }: { portfolioId?: string; isL
   const STATUS_CFG: Record<string, { label: string; cls: string }> = {
     rascunho: { label: 'Rascunho', cls: isLight ? 'bg-slate-100 text-slate-600' : 'bg-slate-500/15 text-slate-400' },
     publicado: { label: 'Publicado', cls: isLight ? 'bg-emerald-100 text-emerald-700' : 'bg-emerald-500/15 text-emerald-400' },
-    revisao: { label: 'Revisao', cls: isLight ? 'bg-amber-100 text-amber-700' : 'bg-amber-500/15 text-amber-400' },
+    revisao: { label: 'Revisão', cls: isLight ? 'bg-amber-100 text-amber-700' : 'bg-amber-500/15 text-amber-400' },
   }
 
   if (!reports || reports.length === 0) {
@@ -503,12 +503,12 @@ function IndicadoresPanel({ portfolioId, isLight }: { portfolioId?: string; isLi
       icon: AlertTriangle,
     },
     {
-      label: 'Producao Mensal',
+      label: 'Produção Mensal',
       value: fmtNum(latest.producao_mensal),
       icon: Activity,
     },
     {
-      label: 'Taxa Frequencia',
+      label: 'Taxa Frequência',
       value: latest.taxa_frequencia != null ? latest.taxa_frequencia.toFixed(2) : '-',
       icon: FileText,
     },

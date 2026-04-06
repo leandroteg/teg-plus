@@ -26,21 +26,21 @@ const fmtDataHora = (d?: string) =>
 
 // ── Status config ────────────────────────────────────────────────────────────
 const STATUS_CONFIG: Array<{ key: StatusPortfolio; label: string; barClass: string }> = [
-  { key: 'em_analise_ate', label: 'Em Analise ATE', barClass: 'bg-amber-400' },
-  { key: 'revisao_cliente', label: 'Revisao Cliente', barClass: 'bg-violet-500' },
+  { key: 'em_analise_ate', label: 'Em Análise ATE', barClass: 'bg-amber-400' },
+  { key: 'revisao_cliente', label: 'Revisão Cliente', barClass: 'bg-violet-500' },
   { key: 'liberado_iniciar', label: 'Liberado Iniciar', barClass: 'bg-blue-500' },
   { key: 'obra_andamento', label: 'Em Andamento', barClass: 'bg-emerald-500' },
   { key: 'obra_paralisada', label: 'Paralisada', barClass: 'bg-red-500' },
-  { key: 'obra_concluida', label: 'Concluida', barClass: 'bg-slate-400' },
+  { key: 'obra_concluida', label: 'Concluída', barClass: 'bg-slate-400' },
 ]
 
 const STATUS_LABEL: Record<string, string> = {
-  em_analise_ate: 'Em Analise ATE',
-  revisao_cliente: 'Revisao Cliente',
+  em_analise_ate: 'Em Análise ATE',
+  revisao_cliente: 'Revisão Cliente',
   liberado_iniciar: 'Liberado Iniciar',
   obra_andamento: 'Em Andamento',
   obra_paralisada: 'Paralisada',
-  obra_concluida: 'Concluida',
+  obra_concluida: 'Concluída',
   cancelada: 'Cancelada',
 }
 
@@ -261,13 +261,13 @@ function useRecentes() {
         items.push({ id: m.id, tipo: 'Multa', descricao: m.descricao, created_at: m.created_at, status: m.status })
       }
       for (const r of (reunioesRes.data ?? []) as any[]) {
-        items.push({ id: r.id, tipo: 'Reuniao', descricao: `${r.tipo} - ${r.data}`, created_at: r.created_at, status: r.status })
+        items.push({ id: r.id, tipo: 'Reunião', descricao: `${r.tipo} - ${r.data}`, created_at: r.created_at, status: r.status })
       }
       for (const m of (mudancasRes.data ?? []) as any[]) {
-        items.push({ id: m.id, tipo: 'Mudanca', descricao: m.descricao, created_at: m.created_at, status: m.parecer })
+        items.push({ id: m.id, tipo: 'Mudança', descricao: m.descricao, created_at: m.created_at, status: m.parecer })
       }
       for (const a of (acoesRes.data ?? []) as any[]) {
-        items.push({ id: a.id, tipo: 'Acao', descricao: a.descricao, created_at: a.created_at, status: a.status })
+        items.push({ id: a.id, tipo: 'Ação', descricao: a.descricao, created_at: a.created_at, status: a.status })
       }
 
       items.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
@@ -386,7 +386,7 @@ export default function EGPPainel() {
       {/* Banner de erro */}
       {isError && (
         <div className="flex items-center justify-between gap-3 px-4 py-2.5 bg-amber-50 border border-amber-200 rounded-xl text-sm">
-          <span className="text-amber-700 font-medium">Falha ao carregar dados — exibindo ultima versao disponivel</span>
+          <span className="text-amber-700 font-medium">Falha ao carregar dados — exibindo última versão disponível</span>
           <button
             onClick={() => refetch()}
             className="flex items-center gap-1.5 text-xs font-semibold text-amber-600 hover:text-amber-800 whitespace-nowrap"
@@ -403,7 +403,7 @@ export default function EGPPainel() {
             Painel — EGP
           </h1>
           <p className={`text-xs mt-0.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
-            Portfolio de obras, indicadores e alertas criticos
+            Portfólio de obras, indicadores e alertas críticos
           </p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
@@ -442,10 +442,10 @@ export default function EGPPainel() {
             <div className="flex items-center justify-between gap-4">
               <div>
                 <p className={`text-[11px] font-bold uppercase tracking-[0.24em] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
-                  Nucleo EGP
+                  Núcleo EGP
                 </p>
                 <h2 className={`mt-0.5 text-sm font-black ${isDark ? 'text-white' : 'text-slate-900'}`}>
-                  Indicadores consolidados do portfolio
+                  Indicadores consolidados do portfólio
                 </h2>
               </div>
               <div className={`hidden md:flex w-10 h-10 rounded-2xl items-center justify-center shrink-0 ${isDark ? 'bg-teal-500/10' : 'bg-teal-50'}`}>
@@ -455,16 +455,16 @@ export default function EGPPainel() {
 
             <div className="grid grid-cols-3 gap-2.5 flex-1">
               <SpotlightMetric
-                label="Avanco Fisico"
+                label="Avanço Físico"
                 value={fmtPct(avancoFisico)}
                 tone="teal"
-                note="media do portfolio"
+                note="média do portfólio"
               />
               <SpotlightMetric
                 label="Prazo"
                 value={`${desvioPrazo > 0 ? '+' : ''}${desvioPrazo}d`}
                 tone={desvioPrazo < 0 ? 'amber' : 'emerald'}
-                note={desvioPrazo < 0 ? 'atrasado em media' : 'dentro do prazo'}
+                note={desvioPrazo < 0 ? 'atrasado em média' : 'dentro do prazo'}
               />
               <SpotlightMetric
                 label="Custo Real"
@@ -482,10 +482,10 @@ export default function EGPPainel() {
             <div className="flex items-center justify-between gap-3">
               <div>
                 <p className={`text-[11px] font-bold uppercase tracking-[0.24em] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
-                  Janela Critica
+                  Janela Crítica
                 </p>
                 <h2 className={`mt-0.5 text-sm font-black ${isDark ? 'text-white' : 'text-slate-900'}`}>
-                  O que exige acao agora
+                  O que exige ação agora
                 </h2>
               </div>
               <div className={`w-8 h-8 rounded-xl flex items-center justify-center ${(kpis?.riscosCriticos ?? 0) > 0 ? 'bg-red-50' : isDark ? 'bg-white/5' : 'bg-slate-50'}`}>
@@ -494,15 +494,15 @@ export default function EGPPainel() {
             </div>
             <div className="grid grid-cols-2 gap-2">
               <MiniInfoCard
-                label="Riscos Criticos"
+                label="Riscos Críticos"
                 value={kpis?.riscosCriticos ?? 0}
-                note={(kpis?.riscosCriticos ?? 0) > 0 ? 'alta prob. + alto impacto' : 'nenhum risco critico'}
+                note={(kpis?.riscosCriticos ?? 0) > 0 ? 'alta prob. + alto impacto' : 'nenhum risco crítico'}
                 icon={AlertTriangle}
                 iconTone={(kpis?.riscosCriticos ?? 0) > 0 ? 'text-red-500' : 'text-slate-400'}
                 isDark={isDark}
               />
               <MiniInfoCard
-                label="Acoes Criticas"
+                label="Ações Críticas"
                 value={kpis?.acoesCriticas ?? 0}
                 note={(kpis?.acoesCriticas ?? 0) > 0 ? 'pendentes c/ prazo vencido' : 'nenhuma atrasada'}
                 icon={Zap}
@@ -524,7 +524,7 @@ export default function EGPPainel() {
         <div className="px-4 py-3">
           <HorizontalStatusBar
             isDark={isDark}
-            title="Distribuicao atual do portfolio"
+            title="Distribuição atual do portfólio"
             emptyLabel="Nenhuma OSC cadastrada"
             segments={statusSegments}
             totalLabel="OSC(s)"
@@ -595,8 +595,8 @@ export default function EGPPainel() {
           {spiCriticos.length === 0 ? (
             <EmptyPanel
               isDark={isDark}
-              title="Nenhuma OSC com SPI critico"
-              description="OSCs com indice de performance de prazo abaixo de 0.85 aparecem aqui."
+              title="Nenhuma OSC com SPI crítico"
+              description="OSCs com índice de performance de prazo abaixo de 0.85 aparecem aqui."
             />
           ) : (
             <div className={`divide-y ${isDark ? 'divide-white/[0.04]' : 'divide-amber-50'}`}>
@@ -674,25 +674,25 @@ export default function EGPPainel() {
           </h2>
           <button onClick={() => nav('/pmo')}
             className="flex items-center gap-0.5 text-[10px] text-teal-600 font-semibold">
-            Ver portfolio <ChevronRight size={11} />
+            Ver portfólio <ChevronRight size={11} />
           </button>
         </div>
         <div className={`divide-y ${isDark ? 'divide-white/[0.04]' : 'divide-slate-50'}`}>
           {recentes.length === 0 ? (
-            <EmptyPanel isDark={isDark} title="Nenhuma atividade recente" description="Atualizacoes de multas, reunioes, mudancas e acoes aparecem aqui." />
+            <EmptyPanel isDark={isDark} title="Nenhuma atividade recente" description="Atualizações de multas, reuniões, mudanças e ações aparecem aqui." />
           ) : (
             recentes.map(r => {
               const tipoColors: Record<string, string> = {
                 Multa: 'bg-red-100 text-red-700',
-                Reuniao: 'bg-blue-100 text-blue-700',
-                Mudanca: 'bg-violet-100 text-violet-700',
-                Acao: 'bg-amber-100 text-amber-700',
+                Reunião: 'bg-blue-100 text-blue-700',
+                Mudança: 'bg-violet-100 text-violet-700',
+                Ação: 'bg-amber-100 text-amber-700',
               }
               const tipoIcons: Record<string, string> = {
                 Multa: 'text-red-500',
-                Reuniao: 'text-blue-500',
-                Mudanca: 'text-violet-500',
-                Acao: 'text-amber-500',
+                Reunião: 'text-blue-500',
+                Mudança: 'text-violet-500',
+                Ação: 'text-amber-500',
               }
               return (
                 <div

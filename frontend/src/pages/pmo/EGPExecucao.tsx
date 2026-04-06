@@ -21,7 +21,7 @@ const TABS: { key: Tab; label: string; icon: React.ElementType }[] = [
   { key: 'histograma', label: 'Histograma', icon: BarChart3 },
   { key: 'custos', label: 'Custos', icon: DollarSign },
   { key: 'riscos', label: 'Riscos', icon: AlertTriangle },
-  { key: 'plano_acao', label: 'Plano de Acao', icon: ClipboardList },
+  { key: 'plano_acao', label: 'Plano de Ação', icon: ClipboardList },
 ]
 
 const fmtBRL = (v: number) =>
@@ -29,10 +29,10 @@ const fmtBRL = (v: number) =>
 
 const fmtPct = (v: number) => `${(v * 100).toFixed(1)}%`
 
-const PROB_LABELS: Record<string, string> = { baixa: 'Baixa', media: 'Media', alta: 'Alta', muito_alta: 'Muito Alta' }
-const IMP_LABELS: Record<string, string> = { baixo: 'Baixo', medio: 'Medio', alto: 'Alto', muito_alto: 'Muito Alto' }
+const PROB_LABELS: Record<string, string> = { baixa: 'Baixa', media: 'Média', alta: 'Alta', muito_alta: 'Muito Alta' }
+const IMP_LABELS: Record<string, string> = { baixo: 'Baixo', medio: 'Médio', alto: 'Alto', muito_alto: 'Muito Alto' }
 const STATUS_RISCO_LABELS: Record<string, string> = { aberto: 'Aberto', mitigando: 'Mitigando', fechado: 'Fechado', aceito: 'Aceito' }
-const STATUS_ACAO_LABELS: Record<string, string> = { pendente: 'Pendente', em_andamento: 'Em Andamento', concluida: 'Concluida', cancelada: 'Cancelada' }
+const STATUS_ACAO_LABELS: Record<string, string> = { pendente: 'Pendente', em_andamento: 'Em Andamento', concluida: 'Concluída', cancelada: 'Cancelada' }
 
 // ── Main ────────────────────────────────────────────────────────────────────
 
@@ -60,7 +60,7 @@ export default function EGPExecucao() {
       <div>
         <h1 className={`text-xl font-bold flex items-center gap-2 ${isLight ? 'text-slate-800' : 'text-white'}`}>
           <Zap size={20} className="text-violet-500" />
-          Execucao
+          Execução
         </h1>
         {portfolio && (
           <p className={`text-sm mt-1 ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
@@ -162,11 +162,11 @@ function CronogramaPanel({ portfolioId, obraId, isLight }: { portfolioId?: strin
             <tr className={isLight ? 'bg-slate-50' : 'bg-white/[0.02]'}>
               <th className={thCls}>Tarefa</th>
               <th className={thCls}>Status</th>
-              <th className={thCls}>Inicio Real</th>
-              <th className={thCls}>Termino Real</th>
-              <th className={thCls}>% Concluido</th>
+              <th className={thCls}>Início Real</th>
+              <th className={thCls}>Término Real</th>
+              <th className={thCls}>% Concluído</th>
               <th className={thCls}>Despachos</th>
-              <th className={`${thCls} w-16`}>Acoes</th>
+              <th className={`${thCls} w-16`}>Ações</th>
             </tr>
           </thead>
           <tbody>
@@ -223,7 +223,7 @@ function CronogramaPanel({ portfolioId, obraId, isLight }: { portfolioId?: strin
                       </button>
                       <button
                         onClick={() => nav(`/contratos/solicitacoes/nova?obra_id=${obraId}`)}
-                        title="Solicitar Contratacao"
+                        title="Solicitar Contratação"
                         className={`p-1 rounded-lg transition-colors ${isLight ? 'hover:bg-violet-50 text-violet-500' : 'hover:bg-violet-500/10 text-violet-400'}`}
                       >
                         <FileSignature size={14} />
@@ -275,7 +275,7 @@ function HistogramaPanel({ portfolioId, isLight }: { portfolioId?: string; isLig
     return acc
   }, {})
 
-  const catLabels: Record<string, string> = { mod: 'MOD', moi: 'MOI', maquinario: 'Maquinario' }
+  const catLabels: Record<string, string> = { mod: 'MOD', moi: 'MOI', maquinario: 'Maquinário' }
   const thCls = `text-[10px] uppercase tracking-wide font-semibold px-3 py-2 text-left ${isLight ? 'text-slate-400' : 'text-slate-500'}`
   const tdCls = `px-3 py-2.5 text-sm ${isLight ? 'text-slate-700' : 'text-slate-200'}`
 
@@ -306,7 +306,7 @@ function HistogramaPanel({ portfolioId, isLight }: { portfolioId?: string; isLig
             <table className="w-full min-w-[640px]">
               <thead>
                 <tr className={isLight ? 'bg-slate-50' : 'bg-white/[0.02]'}>
-                  <th className={thCls}>Funcao</th>
+                  <th className={thCls}>Função</th>
                   <th className={thCls}>Mes/Semana</th>
                   <th className={thCls}>Planejado</th>
                   <th className={thCls}>Real</th>
@@ -394,7 +394,7 @@ function CustosPanel({ portfolioId, isLight }: { portfolioId?: string; isLight: 
           {real > 0 ? idc.toFixed(2) : '-'}
         </p>
         <p className={`text-xs mt-1 ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>
-          {idc >= 1 ? 'Dentro do orcamento' : idc >= 0.9 ? 'Atencao' : real > 0 ? 'Acima do orcamento' : 'Sem dados'}
+          {idc >= 1 ? 'Dentro do orçamento' : idc >= 0.9 ? 'Atenção' : real > 0 ? 'Acima do orçamento' : 'Sem dados'}
         </p>
       </div>
 
@@ -417,7 +417,7 @@ function CustosPanel({ portfolioId, isLight }: { portfolioId?: string; isLight: 
         </p>
       </div>
       <div className={cardCls}>
-        <p className={labelCls}>Custo Orcado</p>
+        <p className={labelCls}>Custo Orçado</p>
         <p className={`text-lg font-bold ${isLight ? 'text-slate-800' : 'text-white'}`}>
           {fmtBRL(portfolio?.custo_orcado ?? 0)}
         </p>
@@ -537,14 +537,14 @@ function RiscosPanel({ portfolioId, isLight }: { portfolioId?: string; isLight: 
           <table className="w-full min-w-[800px]">
             <thead>
               <tr className={isLight ? 'bg-slate-50' : 'bg-white/[0.02]'}>
-                <th className={thCls}>Descricao</th>
+                <th className={thCls}>Descrição</th>
                 <th className={thCls}>Categoria</th>
                 <th className={thCls}>Prob.</th>
                 <th className={thCls}>Impacto</th>
                 <th className={thCls}>Resposta</th>
-                <th className={thCls}>Responsavel</th>
+                <th className={thCls}>Responsável</th>
                 <th className={thCls}>Status</th>
-                <th className={`${thCls} w-20`}>Acoes</th>
+                <th className={`${thCls} w-20`}>Ações</th>
               </tr>
             </thead>
             <tbody>
@@ -619,7 +619,7 @@ function RiscosPanel({ portfolioId, isLight }: { portfolioId?: string; isLight: 
 
               {adding && (
                 <tr className={`border-t ${isLight ? 'border-slate-100 bg-violet-50/30' : 'border-white/[0.04] bg-violet-500/5'}`}>
-                  <td className={tdCls}><input className={inputCls} placeholder="Descricao" value={newRow.descricao ?? ''} onChange={e => setNewRow(r => ({ ...r, descricao: e.target.value }))} /></td>
+                  <td className={tdCls}><input className={inputCls} placeholder="Descrição" value={newRow.descricao ?? ''} onChange={e => setNewRow(r => ({ ...r, descricao: e.target.value }))} /></td>
                   <td className={tdCls}><input className={inputCls} placeholder="Categoria" value={newRow.categoria ?? ''} onChange={e => setNewRow(r => ({ ...r, categoria: e.target.value }))} /></td>
                   <td className={tdCls}>
                     <select className={inputCls} value={newRow.probabilidade ?? 'media'} onChange={e => setNewRow(r => ({ ...r, probabilidade: e.target.value as PMORisco['probabilidade'] }))}>
@@ -632,7 +632,7 @@ function RiscosPanel({ portfolioId, isLight }: { portfolioId?: string; isLight: 
                     </select>
                   </td>
                   <td className={tdCls}><input className={inputCls} placeholder="Resposta" value={newRow.resposta ?? ''} onChange={e => setNewRow(r => ({ ...r, resposta: e.target.value }))} /></td>
-                  <td className={tdCls}><input className={inputCls} placeholder="Responsavel" value={newRow.responsavel ?? ''} onChange={e => setNewRow(r => ({ ...r, responsavel: e.target.value }))} /></td>
+                  <td className={tdCls}><input className={inputCls} placeholder="Responsável" value={newRow.responsavel ?? ''} onChange={e => setNewRow(r => ({ ...r, responsavel: e.target.value }))} /></td>
                   <td className={tdCls}>
                     <select className={inputCls} value={newRow.status ?? 'aberto'} onChange={e => setNewRow(r => ({ ...r, status: e.target.value as PMORisco['status'] }))}>
                       {Object.entries(STATUS_RISCO_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
@@ -728,13 +728,13 @@ function PlanoAcaoPanel({ portfolioId, isLight }: { portfolioId?: string; isLigh
         <table className="w-full min-w-[800px]">
           <thead>
             <tr className={isLight ? 'bg-slate-50' : 'bg-white/[0.02]'}>
-              <th className={thCls}>Descricao</th>
+              <th className={thCls}>Descrição</th>
               <th className={thCls}>Tipo Desvio</th>
-              <th className={thCls}>Responsavel</th>
+              <th className={thCls}>Responsável</th>
               <th className={thCls}>Prazo</th>
               <th className={thCls}>Status</th>
-              <th className={thCls}>Evidencia</th>
-              <th className={`${thCls} w-20`}>Acoes</th>
+              <th className={thCls}>Evidência</th>
+              <th className={`${thCls} w-20`}>Ações</th>
             </tr>
           </thead>
           <tbody>
@@ -796,16 +796,16 @@ function PlanoAcaoPanel({ portfolioId, isLight }: { portfolioId?: string; isLigh
 
             {adding && (
               <tr className={`border-t ${isLight ? 'border-slate-100 bg-violet-50/30' : 'border-white/[0.04] bg-violet-500/5'}`}>
-                <td className={tdCls}><input className={inputCls} placeholder="Descricao" value={newRow.descricao ?? ''} onChange={e => setNewRow(r => ({ ...r, descricao: e.target.value }))} /></td>
+                <td className={tdCls}><input className={inputCls} placeholder="Descrição" value={newRow.descricao ?? ''} onChange={e => setNewRow(r => ({ ...r, descricao: e.target.value }))} /></td>
                 <td className={tdCls}><input className={inputCls} placeholder="Tipo desvio" value={newRow.tipo_desvio ?? ''} onChange={e => setNewRow(r => ({ ...r, tipo_desvio: e.target.value }))} /></td>
-                <td className={tdCls}><input className={inputCls} placeholder="Responsavel" value={newRow.responsavel ?? ''} onChange={e => setNewRow(r => ({ ...r, responsavel: e.target.value }))} /></td>
+                <td className={tdCls}><input className={inputCls} placeholder="Responsável" value={newRow.responsavel ?? ''} onChange={e => setNewRow(r => ({ ...r, responsavel: e.target.value }))} /></td>
                 <td className={tdCls}><input type="date" className={inputCls} value={newRow.prazo ?? ''} onChange={e => setNewRow(r => ({ ...r, prazo: e.target.value }))} /></td>
                 <td className={tdCls}>
                   <select className={inputCls} value={newRow.status ?? 'pendente'} onChange={e => setNewRow(r => ({ ...r, status: e.target.value as PMOPlanoAcao['status'] }))}>
                     {Object.entries(STATUS_ACAO_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
                   </select>
                 </td>
-                <td className={tdCls}><input className={inputCls} placeholder="URL evidencia" value={newRow.evidencia_url ?? ''} onChange={e => setNewRow(r => ({ ...r, evidencia_url: e.target.value }))} /></td>
+                <td className={tdCls}><input className={inputCls} placeholder="URL evidência" value={newRow.evidencia_url ?? ''} onChange={e => setNewRow(r => ({ ...r, evidencia_url: e.target.value }))} /></td>
                 <td className={tdCls}>
                   <div className="flex items-center gap-1">
                     <button onClick={handleAdd} disabled={criar.isPending} className="text-emerald-500 hover:text-emerald-600"><Check size={14} /></button>
@@ -826,7 +826,7 @@ function PlanoAcaoPanel({ portfolioId, isLight }: { portfolioId?: string; isLigh
               isLight ? 'text-violet-600 hover:text-violet-700' : 'text-violet-400 hover:text-violet-300'
             }`}
           >
-            <Plus size={14} /> Adicionar acao
+            <Plus size={14} /> Adicionar ação
           </button>
         </div>
       )}

@@ -8,7 +8,7 @@ export default function EGPEncerramentoHub() {
       title="Encerramento"
       icon={CheckCircle2}
       accent="text-teal-500"
-      description="Status Report, Licoes Aprendidas, Aceite e Desmobilizacao"
+      description="Status Report, Lições Aprendidas, Aceite e Desmobilização"
     />
   )
 }
