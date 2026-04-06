@@ -1,8 +1,10 @@
 import { useState, useMemo } from 'react'
+import { useNavigate } from 'react-router-dom'
 import {
   Package2, Plus, Search, AlertTriangle, LayoutList, LayoutGrid,
   X, Save, Loader2, Download, Truck, PackageCheck, RefreshCw, ClipboardCheck,
   CheckCircle2, Warehouse, Building2, Ban, History, ArrowUpRight, ArrowDownRight,
+  Tag, ClipboardList,
 } from 'lucide-react'
 import {
   useEstoqueItens, useSalvarItem, useSaldos, useBases,
@@ -72,10 +74,12 @@ function fmtCurrency(v: number) {
 
 export default function Itens() {
   const { isDark } = useTheme()
+  const navigate = useNavigate()
   const [activeTab, setActiveTab] = useState<EstoquePipelineTab>('em_estoque')
   const [viewMode, setViewMode] = useState<ViewMode>('list')
   const [busca, setBusca] = useState('')
   const [curvaFiltro, setCurvaFiltro] = useState('')
+  const [categoriaFiltro, setCategoriaFiltro] = useState('')
   const [showForm, setShowForm] = useState(false)
   const [editItem, setEditItem] = useState<Partial<EstItem> | null>(null)
   const [baseFilter, setBaseFilter] = useState('')
@@ -92,19 +96,29 @@ export default function Itens() {
 
   const accent = isDark ? STATUS_ACCENT_DARK : STATUS_ACCENT
 
+  // Categorias únicas extraídas dos itens em estoque (#138)
+  const categoriasDisponiveis = useMemo(() => {
+    const cats = saldos
+      .map(s => s.item?.categoria)
+      .filter((c): c is string => !!c?.trim())
+    return [...new Set(cats)].sort((a, b) => a.localeCompare(b, 'pt-BR'))
+  }, [saldos])
+
   // Filtered data per tab
   const saldosFiltrados = useMemo(() => {
     let list = saldos.filter(s => s.saldo > 0)
     if (curvaFiltro) list = list.filter(s => s.item?.curva_abc === curvaFiltro)
+    if (categoriaFiltro) list = list.filter(s => s.item?.categoria === categoriaFiltro)
     if (busca.trim()) {
       const t = busca.toLowerCase()
       list = list.filter(s =>
         (s.item?.descricao ?? '').toLowerCase().includes(t) ||
-        (s.item?.codigo ?? '').toLowerCase().includes(t)
+        (s.item?.codigo ?? '').toLowerCase().includes(t) ||
+        (s.item?.categoria ?? '').toLowerCase().includes(t)
       )
     }
     return list
-  }, [saldos, curvaFiltro, busca])
+  }, [saldos, curvaFiltro, categoriaFiltro, busca])
 
   const entradasFiltradas = useMemo(() => {
     if (!busca.trim()) return entradas
@@ -285,6 +299,33 @@ export default function Itens() {
             </div>
           )}
 
+          {activeTab === 'em_estoque' && categoriasDisponiveis.length > 0 && (
+            <div className="relative flex items-center">
+              <Tag size={12} className={`absolute left-2 ${isDark ? 'text-slate-500' : 'text-slate-400'}`} />
+              <select
+                value={categoriaFiltro}
+                onChange={e => setCategoriaFiltro(e.target.value)}
+                className={`pl-6 pr-2 py-1.5 rounded-lg border text-xs
+                  focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400
+                  ${isDark ? 'border-white/[0.08] bg-white/[0.03] text-slate-200' : 'border-slate-200 bg-white text-slate-700'}
+                  ${categoriaFiltro ? (isDark ? 'border-blue-500 text-blue-300' : 'border-blue-400 text-blue-700') : ''}`}
+              >
+                <option value="">Todas as categorias</option>
+                {categoriasDisponiveis.map(cat => (
+                  <option key={cat} value={cat}>{cat}</option>
+                ))}
+              </select>
+              {categoriaFiltro && (
+                <button
+                  onClick={() => setCategoriaFiltro('')}
+                  className="absolute right-1.5 text-slate-400 hover:text-slate-600"
+                >
+                  <X size={10} />
+                </button>
+              )}
+            </div>
+          )}
+
           <div className={`flex items-center rounded-lg border overflow-hidden ${isDark ? 'border-white/[0.06]' : 'border-slate-200'}`}>
             <button onClick={() => setViewMode('list')}
               className={`p-1.5 transition-all ${viewMode === 'list'
@@ -327,7 +368,7 @@ export default function Itens() {
           <>
             {activeTab === 'em_estoque' && (
               viewMode === 'list'
-                ? <SaldosList data={saldosFiltrados} isDark={isDark} onEdit={openEdit} onClickItem={(id) => setContaCorrenteItemId(id)} />
+                ? <SaldosList data={saldosFiltrados} isDark={isDark} onEdit={openEdit} onClickItem={(id) => setContaCorrenteItemId(id)} onSolicitar={() => navigate('/estoque/solicitacoes')} />
                 : <SaldosCards data={saldosFiltrados} isDark={isDark} onClickItem={(id) => setContaCorrenteItemId(id)} />
             )}
             {activeTab === 'aguardando_entrada' && (
@@ -376,7 +417,7 @@ export default function Itens() {
 // Em Estoque — List & Cards
 // ═════════════════════════════════════════════════════════════════════════════
 
-function SaldosList({ data, isDark, onEdit, onClickItem }: { data: EstSaldo[]; isDark: boolean; onEdit: (item: EstItem) => void; onClickItem: (itemId: string) => void }) {
+function SaldosList({ data, isDark, onEdit, onClickItem, onSolicitar }: { data: EstSaldo[]; isDark: boolean; onEdit: (item: EstItem) => void; onClickItem: (itemId: string) => void; onSolicitar?: () => void }) {
   if (data.length === 0) return <EmptyState icon={Package2} msg="Nenhum item em estoque" sub="Os itens aparecerão aqui quando houver saldo" isDark={isDark} />
   return (
     <>
@@ -389,7 +430,7 @@ function SaldosList({ data, isDark, onEdit, onClickItem }: { data: EstSaldo[]; i
         <span className="w-[80px] shrink-0 text-right">Saldo</span>
         <span className="w-[60px] shrink-0 text-right">Reserv.</span>
         <span className="w-[80px] shrink-0 text-right">Disp.</span>
-        <span className="w-[40px] shrink-0" />
+        <span className="w-[90px] shrink-0" />
       </div>
       {/* Rows */}
       {data.map(s => {
@@ -429,7 +470,16 @@ function SaldosList({ data, isDark, onEdit, onClickItem }: { data: EstSaldo[]; i
             }`}>
               {disponivel} {s.item?.unidade}
             </span>
-            <span className="w-[40px] shrink-0 text-right">
+            <span className="w-[90px] shrink-0 flex items-center justify-end gap-2">
+              <button
+                onClick={(e) => { e.stopPropagation(); onSolicitar?.() }}
+                title="Nova solicitação de retirada"
+                className={`flex items-center gap-0.5 text-[10px] font-semibold transition-colors ${
+                  isDark ? 'text-teal-400 hover:text-teal-300' : 'text-teal-600 hover:text-teal-700'
+                }`}
+              >
+                <ClipboardList size={11} /> Solicitar
+              </button>
               <button
                 onClick={(e) => { e.stopPropagation(); s.item && onEdit(s.item as EstItem) }}
                 className="text-[10px] text-blue-600 font-semibold hover:underline"
