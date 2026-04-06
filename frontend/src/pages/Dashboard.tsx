@@ -283,11 +283,21 @@ function VencidasCard({ reqs, isDark, nav }: { reqs: Requisicao[]; isDark: boole
 }
 
 // ── RecentCard ────────────────────────────────────────────────────────────────
+function formatUserHandle(nome: string): string {
+  const parts = nome?.trim().split(/\s+/) ?? []
+  if (parts.length === 0) return ''
+  const first = parts[0].toLowerCase()
+  const last = parts.length > 1 ? parts[parts.length - 1].toLowerCase() : ''
+  return last ? `${first}.${last}` : first
+}
+
 function RecentCard({ r, aprovacao, isDark, nav }: { r: any; aprovacao?: Aprovacao; isDark: boolean; nav: ReturnType<typeof useNavigate> }) {
   const approvalLabel = r.status === 'pendente' ? 'Aguard. Valid. Técnica'
     : r.status === 'em_aprovacao' ? 'Em Validação Técnica'
     : r.status === 'cotacao_aprovada' ? 'Aguard. Aprov. Financeira'
     : undefined
+
+  const userHandle = r.solicitante_nome ? formatUserHandle(r.solicitante_nome) : null
 
   return (
     <button
@@ -298,6 +308,9 @@ function RecentCard({ r, aprovacao, isDark, nav }: { r: any; aprovacao?: Aprovac
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 mb-1">
           <span className={`text-[10px] font-mono ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{r.numero}</span>
+          {userHandle && (
+            <span className={`text-[10px] font-mono ${isDark ? 'text-slate-600' : 'text-slate-400'}`}>{userHandle}</span>
+          )}
           <StatusBadge status={r.status as StatusRequisicao} size="sm" customLabel={approvalLabel} />
           {(r.urgencia === 'urgente' || r.urgencia === 'critica') && (
             <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full ${r.urgencia === 'critica' ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700'}`}>
