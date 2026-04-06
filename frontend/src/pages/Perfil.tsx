@@ -360,7 +360,7 @@ export default function Perfil() {
 
         {/* ── Botão Voltar ── */}
         <button
-          onClick={() => navigate(-1)}
+          onClick={() => window.history.length > 2 ? navigate(-1) : navigate('/')}
           className="flex items-center gap-1.5 text-xs text-slate-500 hover:text-indigo-600 transition-colors"
         >
           <ChevronLeft size={14} /> Voltar
