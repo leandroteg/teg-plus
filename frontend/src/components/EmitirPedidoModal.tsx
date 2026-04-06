@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { X, FileText, Loader2, AlertTriangle } from 'lucide-react'
+import { X, FileText, Loader2, AlertTriangle, Ban } from 'lucide-react'
 import { useCadCentrosCusto, useCadClasses, useCadObras } from '../hooks/useCadastros'
 import SearchableSelect from './SearchableSelect'
 import type { SelectOption } from './SearchableSelect'
@@ -190,6 +190,8 @@ export default function EmitirPedidoModal({
   const [adiantamentoData, setAdiantamentoData] = useState('')
   const [parcelasEditaveis, setParcelasEditaveis] = useState<ParcelaEditavel[]>([])
   const [parcelasEditadasManualmente, setParcelasEditadasManualmente] = useState(false)
+  const [naoSolicitarContrato, setNaoSolicitarContrato] = useState(false)
+  const [justNaoContrato, setJustNaoContrato] = useState('')
 
   useEffect(() => {
     if (!open || !requisicao) return
@@ -211,12 +213,16 @@ export default function EmitirPedidoModal({
     setAdiantamentoValor('')
     setAdiantamentoData('')
     setParcelasEditadasManualmente(false)
+    setNaoSolicitarContrato(false)
+    setJustNaoContrato('')
   }, [open, requisicao, cotacaoResolvida?.condicaoPagamento, obras, classes, classeResumo.valor])
 
   const classeSelecionada = classes.find((item) => item.id === classeId)
   const centroSelecionado = centros.find((item) => item.id === centroId)
   const obraSelecionada = obras.find((item) => item.id === requisicao?.obra_id)
   const valorTotal = cotacaoResolvida?.valorTotal ?? 0
+  // fluxo efetivo: contrato OU dispensado pelo comprador
+  const fluxoContrato = !!compraRecorrente && !naoSolicitarContrato
   const valorAdiantamento = Math.round((Number(adiantamentoValor || 0) || 0) * 100) / 100
   const adiantamentoInvalido = temAdiantamento && (valorAdiantamento <= 0 || valorAdiantamento > valorTotal || !adiantamentoData)
   const saldoParcelado = Math.max(0, Math.round(((temAdiantamento ? valorTotal - valorAdiantamento : valorTotal)) * 100) / 100)
@@ -358,6 +364,63 @@ export default function EmitirPedidoModal({
                   </p>
                 </div>
               </div>
+
+              {/* Banner: compra recorrente / serviço exige contrato */}
+              {compraRecorrente && (
+                <div className={`rounded-2xl border p-4 space-y-3 transition-colors ${
+                  naoSolicitarContrato
+                    ? 'border-amber-300 bg-amber-50'
+                    : 'border-indigo-200 bg-indigo-50'
+                }`}>
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex items-start gap-2">
+                      <div className={`w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 ${
+                        naoSolicitarContrato ? 'bg-amber-100' : 'bg-indigo-100'
+                      }`}>
+                        {naoSolicitarContrato
+                          ? <Ban size={14} className="text-amber-600" />
+                          : <FileText size={14} className="text-indigo-600" />}
+                      </div>
+                      <div>
+                        <p className={`text-xs font-bold ${naoSolicitarContrato ? 'text-amber-700' : 'text-indigo-700'}`}>
+                          {naoSolicitarContrato ? 'Contrato dispensado — emitir pedido direto' : 'Esta compra requer formalizacao via Contratos'}
+                        </p>
+                        <p className={`text-[11px] mt-0.5 ${naoSolicitarContrato ? 'text-amber-600' : 'text-indigo-500'}`}>
+                          {naoSolicitarContrato
+                            ? 'Preencha a justificativa e complete os dados financeiros abaixo.'
+                            : 'Ao confirmar, sera aberta uma solicitacao de contrato no modulo Contratos.'}
+                        </p>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => { setNaoSolicitarContrato(v => !v); setJustNaoContrato('') }}
+                      className={`text-[10px] font-bold px-3 py-1.5 rounded-lg border transition-colors flex-shrink-0 ${
+                        naoSolicitarContrato
+                          ? 'border-indigo-200 bg-white text-indigo-600 hover:bg-indigo-50'
+                          : 'border-amber-300 bg-white text-amber-700 hover:bg-amber-50'
+                      }`}
+                    >
+                      {naoSolicitarContrato ? 'Voltar ao Contrato' : 'Dispensar Contrato'}
+                    </button>
+                  </div>
+
+                  {naoSolicitarContrato && (
+                    <div>
+                      <label className="block text-[11px] font-bold text-amber-700 mb-1">
+                        Justificativa para dispensa de contrato *
+                      </label>
+                      <textarea
+                        value={justNaoContrato}
+                        onChange={e => setJustNaoContrato(e.target.value)}
+                        placeholder="Ex.: Compra pontual, fornecedor nao aceita contrato, urgencia operacional..."
+                        rows={2}
+                        className="w-full border border-amber-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-300 bg-white resize-none"
+                      />
+                    </div>
+                  )}
+                </div>
+              )}
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <div className="rounded-2xl border border-teal-200 bg-teal-50 px-4 py-3">
@@ -677,7 +740,7 @@ export default function EmitirPedidoModal({
           </button>
           <button
             onClick={(e) => {
-              if (compraRecorrente && onSolicitarContrato) {
+              if (fluxoContrato && onSolicitarContrato) {
                 e.preventDefault()
                 onSolicitarContrato()
               } else {
@@ -691,7 +754,9 @@ export default function EmitirPedidoModal({
                   centroCustoId: centroSelecionado?.id,
                   centroCusto: centroSelecionado?.codigo,
                   condicaoPagamento: condicaoPagamento || cotacaoResolvida?.condicaoPagamento || undefined,
-                  observacoes,
+                  observacoes: naoSolicitarContrato && justNaoContrato.trim()
+                    ? `[Contrato dispensado: ${justNaoContrato.trim()}]${observacoes ? `\n${observacoes}` : ''}`
+                    : observacoes,
                   dataPrevistaEntrega,
                   parcelasPreview: parcelasEditaveis.map((parcela) => ({
                     numero: parcela.numero,
@@ -709,8 +774,8 @@ export default function EmitirPedidoModal({
               isLoading ||
               !requisicao ||
               !cotacaoResolvida?.id ||
-              // Para "Solicitar Contrato" não são necessários campos financeiros do PO
-              (!compraRecorrente && (
+              (naoSolicitarContrato && !justNaoContrato.trim()) ||
+              (!fluxoContrato && (
                 !classeId ||
                 !centroId ||
                 adiantamentoInvalido ||
@@ -719,11 +784,11 @@ export default function EmitirPedidoModal({
               ))
             }
             className={`inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-white text-sm font-bold disabled:opacity-50 ${
-              compraRecorrente ? 'bg-indigo-600 hover:bg-indigo-700' : 'bg-teal-600 hover:bg-teal-700'
+              fluxoContrato ? 'bg-indigo-600 hover:bg-indigo-700' : 'bg-teal-600 hover:bg-teal-700'
             }`}
           >
             {isSubmitting ? <Loader2 size={15} className="animate-spin" /> : <FileText size={15} />}
-            {compraRecorrente ? 'Solicitar Contrato' : 'Emitir Pedido'}
+            {fluxoContrato ? 'Solicitar Contrato' : 'Emitir Pedido'}
           </button>
         </div>
       </div>
