@@ -56,36 +56,35 @@ function ImovelDetailModal({ imovel, aditivos, onClose, isDark }: {
           <div className={`rounded-xl p-4 ${isDark ? 'bg-indigo-500/10 border border-indigo-500/20' : 'bg-indigo-50 border border-indigo-200'}`}>
             <p className="text-[9px] font-bold text-indigo-500 uppercase tracking-wider mb-2">Endereço</p>
             <div className="space-y-1">
-              {imovel.endereco && <p className={`text-sm font-bold ${txtMain}`}>{imovel.endereco}{imovel.numero ? `, ${imovel.numero}` : ''}</p>}
+              <p className={`text-sm font-bold ${txtMain}`}>{imovel.endereco || imovel.descricao || 'Não informado'}{imovel.numero ? `, ${imovel.numero}` : ''}</p>
               {imovel.complemento && <p className={`text-xs ${txtMuted}`}>{imovel.complemento}</p>}
               {imovel.bairro && <p className={`text-xs ${txtMuted}`}>{imovel.bairro}</p>}
-              <p className={`text-xs ${txtMuted}`}>{[imovel.cidade, imovel.uf].filter(Boolean).join(' — ')}{imovel.cep ? ` · CEP ${imovel.cep}` : ''}</p>
-              {imovel.area_m2 != null && <p className={`text-xs ${txtMuted}`}>{imovel.area_m2} m²</p>}
+              <p className={`text-xs ${txtMuted}`}>{[imovel.cidade, imovel.uf].filter(Boolean).join(' — ') || 'Cidade não informada'}{imovel.cep ? ` · CEP ${imovel.cep}` : ''}</p>
+              <p className={`text-xs ${txtMuted}`}>{imovel.area_m2 != null ? `${imovel.area_m2} m²` : 'Área não informada'}</p>
             </div>
           </div>
 
           {/* Contrato */}
-          {contrato && (
-            <div className={`rounded-xl p-4 ${cardBg}`}>
-              <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-2.5">Contrato</p>
-              <div className="grid grid-cols-2 gap-x-4 gap-y-2.5 text-xs">
-                {contrato.numero && <div><p className={txtMuted}>Número</p><p className={`font-semibold ${txtMain}`}>{contrato.numero}</p></div>}
-                {contrato.data_inicio && <div><p className={txtMuted}>Início</p><p className={`font-semibold ${txtMain}`}>{fmtDate(contrato.data_inicio)}</p></div>}
-                {contrato.data_fim_previsto && <div><p className={txtMuted}>Vencimento</p><p className={`font-semibold ${txtMain}`}>{fmtDate(contrato.data_fim_previsto)}</p></div>}
-                {contrato.data_assinatura && <div><p className={txtMuted}>Assinatura</p><p className={`font-semibold ${txtMain}`}>{fmtDate(contrato.data_assinatura)}</p></div>}
-                {contrato.status && <div><p className={txtMuted}>Status Contrato</p><p className={`font-semibold ${txtMain}`}>{contrato.status}</p></div>}
-              </div>
+          <div className={`rounded-xl p-4 ${cardBg}`}>
+            <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-2.5">Contrato</p>
+            <div className="grid grid-cols-2 gap-x-4 gap-y-2.5 text-xs">
+              <div><p className={txtMuted}>Número</p><p className={`font-semibold ${txtMain}`}>{contrato?.numero || 'Não informado'}</p></div>
+              <div><p className={txtMuted}>Data de Entrada</p><p className={`font-semibold ${txtMain}`}>{contrato?.data_inicio ? fmtDate(contrato.data_inicio) : 'Não informada'}</p></div>
+              <div><p className={txtMuted}>Vencimento</p><p className={`font-semibold ${txtMain}`}>{contrato?.data_fim_previsto ? fmtDate(contrato.data_fim_previsto) : 'Não informado'}</p></div>
+              <div><p className={txtMuted}>Data Assinatura</p><p className={`font-semibold ${txtMain}`}>{contrato?.data_assinatura ? fmtDate(contrato.data_assinatura) : 'Não informada'}</p></div>
+              <div><p className={txtMuted}>Status Contrato</p><p className={`font-semibold ${txtMain}`}>{contrato?.status || 'Não informado'}</p></div>
+              <div><p className={txtMuted}>Cadastrado em</p><p className={`font-semibold ${txtMain}`}>{imovel.created_at ? fmtDate(imovel.created_at.split('T')[0]) : '—'}</p></div>
             </div>
-          )}
+          </div>
 
           {/* Proprietário / Imobiliária */}
           <div className={`rounded-xl p-4 ${cardBg}`}>
             <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-2.5">Proprietário / Imobiliária</p>
             <div className="grid grid-cols-2 gap-x-4 gap-y-2.5 text-xs">
-              {imovel.locador_nome && <div><p className={txtMuted}>Locador</p><p className={`font-semibold ${txtMain}`}>{imovel.locador_nome}</p></div>}
-              {imovel.locador_cpf_cnpj && <div><p className={txtMuted}>CPF/CNPJ</p><p className={`font-semibold ${txtMain}`}>{imovel.locador_cpf_cnpj}</p></div>}
-              {imovel.locador_contato && <div className="col-span-2"><p className={txtMuted}>Contato</p><p className={`font-semibold ${txtMain}`}>{imovel.locador_contato}</p></div>}
-              {contrato?.contraparte_nome && contrato.contraparte_nome !== imovel.locador_nome && (
+              <div><p className={txtMuted}>Locador / Proprietário</p><p className={`font-semibold ${txtMain}`}>{imovel.locador_nome || 'Não informado'}</p></div>
+              <div><p className={txtMuted}>CPF/CNPJ</p><p className={`font-semibold ${txtMain}`}>{imovel.locador_cpf_cnpj || 'Não informado'}</p></div>
+              <div className="col-span-2"><p className={txtMuted}>Contato do Proprietário</p><p className={`font-semibold ${txtMain}`}>{imovel.locador_contato || 'Não informado'}</p></div>
+              {contrato?.contraparte_nome && (
                 <div className="col-span-2"><p className={txtMuted}>Contraparte (contrato)</p><p className={`font-semibold ${txtMain}`}>{contrato.contraparte_nome}</p></div>
               )}
             </div>
@@ -95,17 +94,23 @@ function ImovelDetailModal({ imovel, aditivos, onClose, isDark }: {
           <div className={`rounded-xl p-4 ${cardBg}`}>
             <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-2.5">Financeiro</p>
             <div className="grid grid-cols-2 gap-x-4 gap-y-2.5 text-xs">
-              {imovel.valor_aluguel_mensal != null && <div><p className={txtMuted}>Aluguel Mensal</p><p className={`font-semibold ${txtMain}`}>{fmtCur(imovel.valor_aluguel_mensal)}</p></div>}
-              {imovel.dia_vencimento != null && <div><p className={txtMuted}>Dia Vencimento</p><p className={`font-semibold ${txtMain}`}>Dia {imovel.dia_vencimento}</p></div>}
-              {cc?.descricao && <div><p className={txtMuted}>Centro de Custo</p><p className={`font-semibold ${txtMain}`}>{cc.codigo} — {cc.descricao}</p></div>}
+              <div><p className={txtMuted}>Aluguel Mensal</p><p className={`font-semibold ${txtMain}`}>{imovel.valor_aluguel_mensal != null ? fmtCur(imovel.valor_aluguel_mensal) : 'Não informado'}</p></div>
+              <div><p className={txtMuted}>Dia Vencimento</p><p className={`font-semibold ${txtMain}`}>{imovel.dia_vencimento != null ? `Dia ${imovel.dia_vencimento}` : 'Não informado'}</p></div>
+              <div className="col-span-2"><p className={txtMuted}>Centro de Custo</p><p className={`font-semibold ${txtMain}`}>{cc?.descricao ? `${cc.codigo} — ${cc.descricao}` : 'Não atribuído'}</p></div>
             </div>
+          </div>
+
+          {/* Checklist de Vistoria */}
+          <div className={`rounded-xl p-4 ${cardBg}`}>
+            <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-2.5">Checklist de Vistoria</p>
+            <p className={`text-xs ${txtMuted}`}>Nenhuma vistoria registrada para este imóvel.</p>
           </div>
 
           {/* Linha do tempo — Aditivos & Renovações */}
           <div className={`rounded-xl p-4 ${cardBg}`}>
             <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-2.5">Aditivos & Renovações</p>
             {imovelAditivos.length === 0 ? (
-              <p className={`text-xs ${txtMuted}`}>Nenhum aditivo registrado.</p>
+              <p className={`text-xs ${txtMuted}`}>Nenhum aditivo ou renovação registrado.</p>
             ) : (
               <div className="space-y-0">
                 {imovelAditivos.map((ad, i) => (
