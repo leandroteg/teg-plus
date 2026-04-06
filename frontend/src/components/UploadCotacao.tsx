@@ -166,8 +166,8 @@ export default function UploadCotacao({ onParsed, disabled, cotacaoId, requisica
     try {
       let result: { success: boolean; fornecedores?: FornecedorParsed[]; error?: string }
 
-      // Arquivo grande ou Gemini disponível: usar Gemini direto (sem base64 via n8n)
-      const useGeminiDirect = GEMINI_KEY && (file.size > LARGE_FILE_THRESHOLD || !cotacaoId)
+      // Sempre preferir Gemini direto quando key disponível (n8n parse-cotacao é instável)
+      const useGeminiDirect = !!GEMINI_KEY
 
       if (useGeminiDirect) {
         try {
