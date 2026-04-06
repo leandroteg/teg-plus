@@ -70,14 +70,10 @@ const ModelosContrato = lazy(() => import('./pages/contratos/ModelosContrato'))
 
 // Controladoria
 const ControladoriaHome = lazy(() => import('./pages/controladoria/ControladoriaHome'))
-const Orcamentos = lazy(() => import('./pages/controladoria/Orcamentos'))
-const DRE = lazy(() => import('./pages/controladoria/DRE'))
-const KPIs = lazy(() => import('./pages/controladoria/KPIs'))
-const Cenarios = lazy(() => import('./pages/controladoria/Cenarios'))
-const PlanoOrcamentario = lazy(() => import('./pages/controladoria/PlanoOrcamentario'))
-const ControleOrcamentario = lazy(() => import('./pages/controladoria/ControleOrcamentario'))
-const PainelIndicadores = lazy(() => import('./pages/controladoria/PainelIndicadores'))
-const AlertasDesvio = lazy(() => import('./pages/controladoria/AlertasDesvio'))
+const ControleOrcamentarioHub = lazy(() => import('./pages/controladoria/ControleOrcamentarioHub'))
+const ControleCustosHub = lazy(() => import('./pages/controladoria/ControleCustosHub'))
+const ControleProjetosHub = lazy(() => import('./pages/controladoria/ControleProjetosHub'))
+const CenariosHub = lazy(() => import('./pages/controladoria/CenariosHub'))
 
 // Obras
 const ObrasHome = lazy(() => import('./pages/obras/ObrasHome'))
@@ -160,12 +156,10 @@ const TransportesPipeline = lazy(() => import('./pages/logistica/TransportesPipe
 
 // Frotas
 const FrotasHome = lazy(() => import('./pages/frotas/FrotasHome'))
-const Veiculos = lazy(() => import('./pages/frotas/Veiculos'))
-const Ordens = lazy(() => import('./pages/frotas/Ordens'))
-const Checklists = lazy(() => import('./pages/frotas/Checklists'))
-const Abastecimentos = lazy(() => import('./pages/frotas/Abastecimentos'))
-const Telemetria = lazy(() => import('./pages/frotas/Telemetria'))
 const SolicitacoesFrotas = lazy(() => import('./pages/frotas/SolicitacoesFrotas'))
+const FrotaHub = lazy(() => import('./pages/frotas/frota/FrotaHub'))
+const ManutencaoHub = lazy(() => import('./pages/frotas/manutencao/ManutencaoHub'))
+const OperacaoHub = lazy(() => import('./pages/frotas/operacao/OperacaoHub'))
 
 // Patrimonial (módulo próprio)
 const PatrimonialHome = lazy(() => import('./pages/patrimonial/PatrimonialHome'))
@@ -286,13 +280,11 @@ export default function App() {
           {/* Módulo Frotas */}
           <Route element={<ModuleRoute moduleKey="frotas" />}>
             <Route element={<FrotasLayout />}>
-              <Route path="/frotas"                      element={<LazyDash><FrotasHome /></LazyDash>} />
-              <Route path="/frotas/solicitacoes"         element={<Lazy><SolicitacoesFrotas /></Lazy>} />
-              <Route path="/frotas/veiculos"             element={<Lazy><Veiculos /></Lazy>} />
-              <Route path="/frotas/ordens"               element={<Lazy><Ordens /></Lazy>} />
-              <Route path="/frotas/checklists"           element={<Lazy><Checklists /></Lazy>} />
-              <Route path="/frotas/abastecimentos"       element={<Lazy><Abastecimentos /></Lazy>} />
-              <Route path="/frotas/telemetria"           element={<Lazy><Telemetria /></Lazy>} />
+              <Route path="/frotas"                element={<LazyDash><FrotasHome /></LazyDash>} />
+              <Route path="/frotas/solicitacoes"  element={<Lazy><SolicitacoesFrotas /></Lazy>} />
+              <Route path="/frotas/frota"         element={<Lazy><FrotaHub /></Lazy>} />
+              <Route path="/frotas/manutencao"    element={<Lazy><ManutencaoHub /></Lazy>} />
+              <Route path="/frotas/operacao"      element={<Lazy><OperacaoHub /></Lazy>} />
             </Route>
           </Route>
 
@@ -350,15 +342,11 @@ export default function App() {
           {/* Módulo Controladoria */}
           <Route element={<ModuleRoute moduleKey="controladoria" />}>
             <Route element={<ControladoriaLayout />}>
-              <Route path="/controladoria"              element={<LazyDash><ControladoriaHome /></LazyDash>} />
-              <Route path="/controladoria/orcamentos"   element={<Lazy><Orcamentos /></Lazy>} />
-              <Route path="/controladoria/dre"          element={<Lazy><DRE /></Lazy>} />
-              <Route path="/controladoria/kpis"         element={<Lazy><KPIs /></Lazy>} />
-              <Route path="/controladoria/cenarios"     element={<Lazy><Cenarios /></Lazy>} />
-              <Route path="/controladoria/plano-orcamentario" element={<Lazy><PlanoOrcamentario /></Lazy>} />
-              <Route path="/controladoria/controle-orcamentario" element={<Lazy><ControleOrcamentario /></Lazy>} />
-              <Route path="/controladoria/indicadores" element={<Lazy><PainelIndicadores /></Lazy>} />
-              <Route path="/controladoria/alertas"     element={<Lazy><AlertasDesvio /></Lazy>} />
+              <Route path="/controladoria"                          element={<LazyDash><ControladoriaHome /></LazyDash>} />
+              <Route path="/controladoria/controle-orcamentario" element={<Lazy><ControleOrcamentarioHub /></Lazy>} />
+              <Route path="/controladoria/controle-custos"        element={<Lazy><ControleCustosHub /></Lazy>} />
+              <Route path="/controladoria/controle-projetos"      element={<Lazy><ControleProjetosHub /></Lazy>} />
+              <Route path="/controladoria/cenarios"               element={<Lazy><CenariosHub /></Lazy>} />
             </Route>
           </Route>
 
