@@ -55,7 +55,7 @@ const PILLARS: Pillar[] = [
     glow: 'rgba(99,102,241,0.18)',
     accent: '#818CF8',
     subs: [
-      { key: 'egp', label: 'EGP', desc: 'Escritório de gestão de projetos', Icon: Settings, active: false, route: '/egp' },
+      { key: 'egp', label: 'EGP', desc: 'Escritório de gestão de projetos', Icon: Settings, active: true, route: '/egp' },
       { key: 'obras', label: 'Obras', desc: 'Acompanhamento de obras ativas', Icon: HardHat, active: false, route: '/obras' },
       { key: 'ssma', label: 'SS/MA', desc: 'Saúde, segurança e meio ambiente', Icon: ShieldCheck, active: false, route: '/ssma' },
     ],
