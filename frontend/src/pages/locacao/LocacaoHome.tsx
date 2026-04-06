@@ -118,12 +118,16 @@ export default function LocacaoHome() {
   const imoveisEmEntrada = useMemo(() => imoveis.filter(i => i.status === 'em_entrada').length, [imoveis])
   const imoveisEmSaida = useMemo(() => imoveis.filter(i => i.status === 'em_saida').length, [imoveis])
 
-  // Urgentes + vencidas
-  const urgentes = useMemo(() => solicitacoes.filter(s => s.urgencia === 'urgente' || s.urgencia === 'alta'), [solicitacoes])
-  const faturasVencidas = useMemo(() => {
+  // Contratos vencendo/vencidos (via join no useImoveis)
+  const contratosVencidos = useMemo(() => {
     const today = new Date().toISOString().split('T')[0]
-    return faturas.filter(f => f.status !== 'pago' && f.vencimento && f.vencimento < today)
-  }, [faturas])
+    return imoveis.filter(i => { const d = (i as any).contrato?.data_fim_previsto; return d && d < today && i.status === 'ativo' })
+  }, [imoveis])
+  const contratosVencendo = useMemo(() => {
+    const today = new Date().toISOString().split('T')[0]
+    const lim = new Date(Date.now() + 90 * 86400000).toISOString().split('T')[0]
+    return imoveis.filter(i => { const d = (i as any).contrato?.data_fim_previsto; return d && d >= today && d <= lim && i.status === 'ativo' })
+  }, [imoveis])
 
   // Próximas faturas
   const proximasFaturas = useMemo(() =>
@@ -144,7 +148,9 @@ export default function LocacaoHome() {
       { key: 'e_assinatura', label: 'Ent. Assinatura', value: entradaCounts['aguardando_assinatura'] || 0, barClass: 'bg-violet-500' },
       { key: 'e_liberado', label: 'Liberado', value: entradaCounts['liberado'] || 0, barClass: 'bg-emerald-500' },
       // Gestão
-      { key: 'g_ativo', label: 'Ativos', value: imoveisAtivos, barClass: 'bg-indigo-500' },
+      { key: 'g_ativo', label: 'Ativos', value: imoveisAtivos - contratosVencendo.length - contratosVencidos.length, barClass: 'bg-indigo-500' },
+      { key: 'g_vencendo', label: 'Vencendo', value: contratosVencendo.length, barClass: 'bg-amber-400' },
+      { key: 'g_vencido', label: 'Vencidos', value: contratosVencidos.length, barClass: 'bg-red-600' },
       { key: 'g_entrada', label: 'Em Entrada', value: imoveisEmEntrada, barClass: 'bg-cyan-500' },
       { key: 'g_saida', label: 'Em Saída', value: imoveisEmSaida, barClass: 'bg-orange-500' },
       // Devoluções
@@ -154,7 +160,7 @@ export default function LocacaoHome() {
       { key: 's_encerramento', label: 'Encerramento', value: saidaCounts['encerramento_contratual'] || 0, barClass: 'bg-violet-400' },
       { key: 's_encerrado', label: 'Encerrado', value: saidaCounts['encerrado'] || 0, barClass: 'bg-slate-500' },
     ]
-  }, [entradas, saidas, imoveisAtivos, imoveisEmEntrada, imoveisEmSaida])
+  }, [entradas, saidas, imoveisAtivos, imoveisEmEntrada, imoveisEmSaida, contratosVencendo, contratosVencidos])
 
   if (isLoading) return <div className="flex items-center justify-center py-20"><div className="w-8 h-8 border-[3px] border-indigo-500 border-t-transparent rounded-full animate-spin" /></div>
 
@@ -286,23 +292,35 @@ export default function LocacaoHome() {
 
         <div className={`rounded-2xl border p-4 ${bg}`}>
           <div className="flex items-center justify-between mb-3">
-            <p className={`text-sm font-bold ${txt}`}>Solicitações Urgentes</p>
-            <button onClick={() => nav('/locacoes/gestao')} className="text-xs text-indigo-500 hover:text-indigo-600 font-semibold flex items-center gap-1">Ver todas <ArrowRight size={12} /></button>
+            <p className={`text-sm font-bold ${txt}`}>Contratos Vencendo / Vencidos</p>
+            <button onClick={() => nav('/locacoes/gestao')} className="text-xs text-indigo-500 hover:text-indigo-600 font-semibold flex items-center gap-1">Ver todos <ArrowRight size={12} /></button>
           </div>
-          {urgentes.length === 0 ? (
-            <p className={`text-xs ${txtMuted}`}>Nenhuma solicitação urgente.</p>
+          {contratosVencidos.length === 0 && contratosVencendo.length === 0 ? (
+            <p className={`text-xs ${txtMuted}`}>Nenhum contrato vencendo ou vencido.</p>
           ) : (
             <div className="space-y-2">
-              {urgentes.slice(0, 4).map(sol => (
-                <div key={sol.id} className={`flex items-center justify-between gap-2 rounded-lg p-2 ${isDark ? 'bg-red-500/5 border border-red-500/10' : 'bg-red-50 border border-red-100'}`}>
+              {contratosVencidos.slice(0, 3).map(imo => (
+                <div key={imo.id} className={`flex items-center justify-between gap-2 rounded-lg p-2 ${isDark ? 'bg-red-500/5 border border-red-500/10' : 'bg-red-50 border border-red-100'}`}>
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-1.5">
                       <AlertTriangle size={11} className="text-red-500 shrink-0" />
-                      <span className={`text-xs font-semibold truncate ${isDark ? 'text-red-300' : 'text-red-700'}`}>{sol.titulo}</span>
+                      <span className={`text-xs font-semibold truncate ${isDark ? 'text-red-300' : 'text-red-700'}`}>{imo.endereco || imo.descricao}</span>
                     </div>
-                    <p className={`text-[10px] ${txtMuted}`}>{sol.imovel?.descricao || '—'}</p>
+                    <p className={`text-[10px] ${txtMuted}`}>Venceu {fmtDate((imo as any).contrato?.data_fim_previsto)}</p>
                   </div>
-                  <span className={`shrink-0 text-[10px] font-bold px-2 py-0.5 rounded-full ${isDark ? 'bg-red-500/15 text-red-300' : 'bg-red-100 text-red-700'}`}>{sol.urgencia}</span>
+                  <span className={`shrink-0 text-[10px] font-bold px-2 py-0.5 rounded-full ${isDark ? 'bg-red-500/15 text-red-300' : 'bg-red-100 text-red-700'}`}>Vencido</span>
+                </div>
+              ))}
+              {contratosVencendo.slice(0, 3).map(imo => (
+                <div key={imo.id} className={`flex items-center justify-between gap-2 rounded-lg p-2 ${isDark ? 'bg-amber-500/5 border border-amber-500/10' : 'bg-amber-50 border border-amber-100'}`}>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-1.5">
+                      <Calendar size={11} className="text-amber-500 shrink-0" />
+                      <span className={`text-xs font-semibold truncate ${isDark ? 'text-amber-300' : 'text-amber-700'}`}>{imo.endereco || imo.descricao}</span>
+                    </div>
+                    <p className={`text-[10px] ${txtMuted}`}>Vence {fmtDate((imo as any).contrato?.data_fim_previsto)}</p>
+                  </div>
+                  <span className={`shrink-0 text-[10px] font-bold px-2 py-0.5 rounded-full ${isDark ? 'bg-amber-500/15 text-amber-300' : 'bg-amber-100 text-amber-700'}`}>Vencendo</span>
                 </div>
               ))}
             </div>
