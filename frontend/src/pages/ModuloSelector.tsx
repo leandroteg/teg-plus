@@ -6,7 +6,7 @@ import {
   FolderKanban, Layers, Wallet, Users, Monitor, Rocket,
   // Sub-module icons
   Settings, HardHat, ShieldCheck, ShoppingCart, Truck,
-  Package, Building2, Car, Banknote, BarChart3, FileText,
+  Package, Building2, Car, Banknote, BarChart3, FileText, KeySquare,
   UserCog, UserSearch, Server, Bot, Target, Store, Receipt, CreditCard, Heart, Calculator, Laptop, Moon, Sun,
   type LucideIcon,
 } from 'lucide-react'
@@ -75,6 +75,7 @@ const PILLARS: Pillar[] = [
       { key: 'estoque', label: 'Estoque', desc: 'Almoxarifado e inventário', Icon: Package, active: true, route: '/estoque' },
       { key: 'patrimonial', label: 'Patrimonial', desc: 'Ativos e depreciação', Icon: Building2, active: true, route: '/patrimonial' },
       { key: 'frotas', label: 'Frotas', desc: 'Veículos, OS e telemetria', Icon: Car, active: true, route: '/frotas' },
+      { key: 'locacoes', label: 'Locação Imóveis', desc: 'Entradas, gestão e saída de imóveis', Icon: KeySquare, active: true, route: '/locacoes' },
     ],
   },
   {
