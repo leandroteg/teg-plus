@@ -637,6 +637,25 @@ export default function CotacaoForm() {
     }))
   }, [])
 
+  // ── Pré-preenche itens da RC em todos os fornecedores ainda vazios ──────────
+  useEffect(() => {
+    const itens = cotacao?.requisicao?.itens
+    if (!itens?.length) return
+    const itensPrecos: ItemPreco[] = itens.map(item => ({
+      descricao: item.descricao,
+      qtd: item.quantidade,
+      valor_unitario: 0,
+      valor_total: 0,
+    }))
+    setFornecedores(prev =>
+      prev.map(f =>
+        f.itens_precos.length === 0
+          ? { ...f, itens_precos: itensPrecos }
+          : f,
+      ),
+    )
+  }, [cotacao?.requisicao?.itens])
+
   // ── AI Upload: preenche fornecedores automaticamente (incluindo itens) ───────
   const handleAiParsed = useCallback(async (parsed: {
     fornecedor_nome: string
