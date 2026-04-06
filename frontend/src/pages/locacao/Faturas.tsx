@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { FileText, Search, List, LayoutGrid, Upload, Send } from 'lucide-react'
+import { useState, useMemo } from 'react'
+import { FileText, Search, List, LayoutGrid, Upload, Send, ArrowUp, ArrowDown } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
 import { useFaturas } from '../../hooks/useLocacao'
 import type { StatusFatura, TipoFatura, LocFatura } from '../../types/locacao'
@@ -133,21 +133,43 @@ export default function Faturas() {
   const [statusFilter, setStatusFilter] = useState<StatusFatura | ''>('')
   const [tipoFilter, setTipoFilter] = useState<TipoFatura | ''>('')
   const [view, setView] = useState<'table' | 'card'>('table')
+  const [sortCol, setSortCol] = useState<string>('')
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc')
+  const toggleSort = (col: string) => {
+    if (sortCol === col) setSortDir(d => d === 'asc' ? 'desc' : 'asc')
+    else { setSortCol(col); setSortDir('asc') }
+  }
 
   const txtMuted = isDark ? 'text-slate-400' : 'text-slate-500'
 
-  const filtered = faturas.filter(fat => {
-    if (statusFilter && fat.status !== statusFilter) return false
-    if (tipoFilter && fat.tipo !== tipoFilter) return false
-    if (search) {
-      const q = search.toLowerCase()
-      return (
-        fat.imovel?.descricao?.toLowerCase().includes(q) ||
-        fat.descricao?.toLowerCase().includes(q)
-      )
+  const filtered = useMemo(() => {
+    let items = faturas.filter(fat => {
+      if (statusFilter && fat.status !== statusFilter) return false
+      if (tipoFilter && fat.tipo !== tipoFilter) return false
+      if (search) {
+        const q = search.toLowerCase()
+        return fat.imovel?.descricao?.toLowerCase().includes(q) || fat.descricao?.toLowerCase().includes(q)
+      }
+      return true
+    })
+    if (sortCol) {
+      items = [...items].sort((a, b) => {
+        let va: any, vb: any
+        switch (sortCol) {
+          case 'imovel': va = a.imovel?.descricao || ''; vb = b.imovel?.descricao || ''; break
+          case 'tipo': va = a.tipo; vb = b.tipo; break
+          case 'competencia': va = a.competencia || ''; vb = b.competencia || ''; break
+          case 'vencimento': va = a.vencimento || '9999'; vb = b.vencimento || '9999'; break
+          case 'previsto': va = a.valor_previsto ?? 0; vb = b.valor_previsto ?? 0; break
+          case 'confirmado': va = a.valor_confirmado ?? 0; vb = b.valor_confirmado ?? 0; break
+          default: return 0
+        }
+        const cmp = typeof va === 'number' ? va - vb : String(va).localeCompare(String(vb))
+        return sortDir === 'asc' ? cmp : -cmp
+      })
     }
-    return true
-  })
+    return items
+  }, [faturas, statusFilter, tipoFilter, search, sortCol, sortDir])
 
   if (isLoading) {
     return (
@@ -239,9 +261,22 @@ export default function Faturas() {
             <table className="w-full">
               <thead>
                 <tr className={`border-b ${isDark ? 'border-white/[0.06]' : 'border-slate-100'}`}>
-                  {['Imóvel', 'Tipo', 'Competência', 'Vencimento', 'Previsto', 'Confirmado', 'Status'].map(h => (
-                    <th key={h} className={`text-left text-[10px] font-bold uppercase tracking-wider px-4 py-3 ${txtMuted}`}>
-                      {h}
+                  {[
+                    { key: 'imovel', label: 'Imóvel' },
+                    { key: 'tipo', label: 'Tipo' },
+                    { key: 'competencia', label: 'Competência' },
+                    { key: 'vencimento', label: 'Vencimento' },
+                    { key: 'previsto', label: 'Previsto' },
+                    { key: 'confirmado', label: 'Confirmado' },
+                    { key: '', label: 'Status' },
+                  ].map(col => (
+                    <th key={col.label}
+                      className={`text-left text-[10px] font-bold uppercase tracking-wider px-4 py-3 ${txtMuted} ${col.key ? 'cursor-pointer select-none hover:text-slate-600' : ''}`}
+                      onClick={() => col.key && toggleSort(col.key)}>
+                      <span className="inline-flex items-center gap-1">
+                        {col.label}
+                        {sortCol === col.key && (sortDir === 'asc' ? <ArrowUp size={10} /> : <ArrowDown size={10} />)}
+                      </span>
                     </th>
                   ))}
                 </tr>

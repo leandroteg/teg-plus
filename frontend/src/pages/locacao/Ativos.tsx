@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react'
 import {
   Building2, Search, LayoutList, LayoutGrid, X, MapPin, Calendar, Phone,
-  User, FileText, Clock, CheckCircle2, AlertTriangle,
+  User, FileText, Clock, CheckCircle2, AlertTriangle, ArrowUp, ArrowDown,
 } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
 import { useImoveis, useAditivos, useEntradas, useVistorias } from '../../hooks/useLocacao'
@@ -151,6 +151,12 @@ export default function Ativos() {
   const [vencFilter, setVencFilter] = useState('')
   const [viewMode, setViewMode] = useState<ViewMode>('table')
   const [detail, setDetail] = useState<LocImovel | null>(null)
+  const [sortCol, setSortCol] = useState<string>('')
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc')
+  const toggleSort = (col: string) => {
+    if (sortCol === col) setSortDir(d => d === 'asc' ? 'desc' : 'asc')
+    else { setSortCol(col); setSortDir('asc') }
+  }
 
   // Opções únicas para filtros
   const cidades = useMemo(() => [...new Set(imoveis.map(i => i.cidade).filter(Boolean))].sort() as string[], [imoveis])
@@ -172,8 +178,24 @@ export default function Ativos() {
       else if (vencFilter === '30d') items = items.filter(i => { const d = (i as any).contrato?.data_fim_previsto; const lim = new Date(Date.now() + 30 * 86400000).toISOString().split('T')[0]; return d && d >= today && d <= lim })
       else if (vencFilter === '90d') items = items.filter(i => { const d = (i as any).contrato?.data_fim_previsto; const lim = new Date(Date.now() + 90 * 86400000).toISOString().split('T')[0]; return d && d >= today && d <= lim })
     }
+    if (sortCol) {
+      items.sort((a, b) => {
+        let va: any, vb: any
+        switch (sortCol) {
+          case 'imovel': va = a.endereco || a.descricao || ''; vb = b.endereco || b.descricao || ''; break
+          case 'locador': va = a.locador_nome || ''; vb = b.locador_nome || ''; break
+          case 'cc': va = (a as any).centro_custo?.descricao || ''; vb = (b as any).centro_custo?.descricao || ''; break
+          case 'cidade': va = a.cidade || ''; vb = b.cidade || ''; break
+          case 'valor': va = a.valor_aluguel_mensal ?? 0; vb = b.valor_aluguel_mensal ?? 0; break
+          case 'vencimento': va = (a as any).contrato?.data_fim_previsto || '9999'; vb = (b as any).contrato?.data_fim_previsto || '9999'; break
+          default: return 0
+        }
+        const cmp = typeof va === 'number' ? va - vb : String(va).localeCompare(String(vb))
+        return sortDir === 'asc' ? cmp : -cmp
+      })
+    }
     return items
-  }, [imoveis, busca, statusFilter, cidadeFilter, ccFilter, vencFilter])
+  }, [imoveis, busca, statusFilter, cidadeFilter, ccFilter, vencFilter, sortCol, sortDir])
 
   const statuses = [
     { key: 'todos', label: 'Todos' },
@@ -250,13 +272,23 @@ export default function Ativos() {
           <table className="w-full text-xs">
             <thead>
               <tr className={isDark ? 'bg-white/[0.02] text-slate-500' : 'bg-slate-50 text-slate-400'}>
-                <th className="text-left px-3 py-2 font-semibold">IMÓVEL</th>
-                <th className="text-left px-3 py-2 font-semibold">LOCADOR</th>
-                <th className="text-left px-3 py-2 font-semibold">C. CUSTO</th>
-                <th className="text-left px-3 py-2 font-semibold">CIDADE</th>
-                <th className="text-right px-3 py-2 font-semibold">VALOR/MÊS</th>
-                <th className="text-right px-3 py-2 font-semibold">VENCIMENTO</th>
-                <th className="text-center px-3 py-2 font-semibold">STATUS</th>
+                {[
+                  { key: 'imovel', label: 'IMÓVEL', align: 'text-left' },
+                  { key: 'locador', label: 'LOCADOR', align: 'text-left' },
+                  { key: 'cc', label: 'C. CUSTO', align: 'text-left' },
+                  { key: 'cidade', label: 'CIDADE', align: 'text-left' },
+                  { key: 'valor', label: 'VALOR/MÊS', align: 'text-right' },
+                  { key: 'vencimento', label: 'VENCIMENTO', align: 'text-right' },
+                  { key: '', label: 'STATUS', align: 'text-center' },
+                ].map(col => (
+                  <th key={col.label} className={`${col.align} px-3 py-2 font-semibold ${col.key ? 'cursor-pointer select-none hover:text-slate-600' : ''}`}
+                    onClick={() => col.key && toggleSort(col.key)}>
+                    <span className="inline-flex items-center gap-1">
+                      {col.label}
+                      {sortCol === col.key && (sortDir === 'asc' ? <ArrowUp size={10} /> : <ArrowDown size={10} />)}
+                    </span>
+                  </th>
+                ))}
               </tr>
             </thead>
             <tbody>
