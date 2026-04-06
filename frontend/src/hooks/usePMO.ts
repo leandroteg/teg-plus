@@ -1,7 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../services/supabase'
 import type {
-  PMOPortfolio, PMOTAP, PMOEAP, PMOTarefa,
+  PMOPortfolio, PMOProjeto, PMOTAP, PMOEAP, PMOTarefa,
   PMOMedicaoResumo, PMOMedicaoPeriodo, PMOMedicaoItem, PMOMedicaoItemPeriodo,
   PMOHistograma, PMOFluxoOS, PMOStatusReport,
   PMOMulta, PMOReuniao, PMOMudanca, PMOIndicadoresSnapshot,
@@ -81,6 +81,91 @@ export function useAtualizarPortfolio() {
     onSuccess: (_, vars) => {
       qc.invalidateQueries({ queryKey: ['pmo-portfolios'] })
       qc.invalidateQueries({ queryKey: ['pmo-portfolio', vars.id] })
+    },
+  })
+}
+
+// ── Projetos ────────────────────────────────────────────────────────────────
+
+export function useProjetos(portfolioId: string | undefined) {
+  return useQuery<PMOProjeto[]>({
+    queryKey: ['pmo-projetos', portfolioId],
+    enabled: !!portfolioId,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('pmo_projetos')
+        .select('*, centro_custo:sys_centros_custo!centro_custo_id(id, nome, codigo)')
+        .eq('portfolio_id', portfolioId!)
+        .order('created_at', { ascending: false })
+      if (error) return []
+      return (data ?? []) as PMOProjeto[]
+    },
+  })
+}
+
+export function useProjeto(id: string | undefined) {
+  return useQuery<PMOProjeto | null>({
+    queryKey: ['pmo-projeto', id],
+    enabled: !!id,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('pmo_projetos')
+        .select('*, centro_custo:sys_centros_custo!centro_custo_id(id, nome, codigo)')
+        .eq('id', id!)
+        .single()
+      if (error) return null
+      return data as PMOProjeto
+    },
+  })
+}
+
+export function useCriarProjeto() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (payload: Partial<PMOProjeto>) => {
+      const { data, error } = await supabase
+        .from('pmo_projetos')
+        .insert(payload)
+        .select()
+        .single()
+      if (error) throw error
+      return data as PMOProjeto
+    },
+    onSuccess: (_, vars) => {
+      qc.invalidateQueries({ queryKey: ['pmo-projetos', vars.portfolio_id] })
+    },
+  })
+}
+
+export function useAtualizarProjeto() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ id, ...payload }: Partial<PMOProjeto> & { id: string }) => {
+      const { data, error } = await supabase
+        .from('pmo_projetos')
+        .update(payload)
+        .eq('id', id)
+        .select()
+        .single()
+      if (error) throw error
+      return data as PMOProjeto
+    },
+    onSuccess: (d) => {
+      qc.invalidateQueries({ queryKey: ['pmo-projetos', d.portfolio_id] })
+      qc.invalidateQueries({ queryKey: ['pmo-projeto', d.id] })
+    },
+  })
+}
+
+export function useDeletarProjeto() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from('pmo_projetos').delete().eq('id', id)
+      if (error) throw error
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['pmo-projetos'] })
     },
   })
 }

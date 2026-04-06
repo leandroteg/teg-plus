@@ -3,15 +3,17 @@ import { useParams, useNavigate } from 'react-router-dom'
 import {
   ArrowLeft, Zap, CalendarDays, BarChart3, DollarSign, AlertTriangle,
   ClipboardList, Plus, Trash2, Save, Edit3, X, Check,
-  ShoppingCart, Truck, FileSignature,
+  ShoppingCart, Truck, FileSignature, FolderKanban, ChevronRight,
 } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
 import {
-  usePortfolio, useTarefas, useAtualizarTarefa,
+  usePortfolio, useProjetos, useCriarProjeto,
+  useTarefas, useAtualizarTarefa,
   useHistograma,
   useRiscosEGP, useCriarRisco, useAtualizarRisco, useDeletarRisco,
   usePlanoAcao, useCriarAcao, useAtualizarAcao, useDeletarAcao,
 } from '../../hooks/usePMO'
+import { useLookups } from '../../hooks/useLookups'
 import type { PMOTarefa, PMORisco, PMOPlanoAcao, PMOHistograma } from '../../types/pmo'
 
 type Tab = 'cronograma' | 'histograma' | 'custos' | 'riscos' | 'plano_acao'
@@ -49,19 +51,39 @@ export default function EGPExecucao() {
   const { portfolioId } = useParams<{ portfolioId: string }>()
   const nav = useNavigate()
   const [tab, setTab] = useState<Tab>('cronograma')
+  const [projetoId, setProjetoId] = useState<string | null>(null)
+  const [criando, setCriando] = useState(false)
+  const [novoProjeto, setNovoProjeto] = useState({ nome: '', centro_custo_id: '' })
 
   const { data: portfolio } = usePortfolio(portfolioId)
+  const { data: projetos, isLoading: loadingProjetos } = useProjetos(portfolioId)
+  const criarProjeto = useCriarProjeto()
+  const { data: lookups } = useLookups()
+
+  const projetoAtivo = projetos?.find(p => p.id === projetoId) ?? null
+
+  const handleCriarProjeto = async () => {
+    if (!portfolioId || !novoProjeto.nome.trim()) return
+    const p = await criarProjeto.mutateAsync({
+      portfolio_id: portfolioId,
+      nome: novoProjeto.nome.trim(),
+      centro_custo_id: novoProjeto.centro_custo_id || undefined,
+    })
+    setProjetoId(p.id)
+    setCriando(false)
+    setNovoProjeto({ nome: '', centro_custo_id: '' })
+  }
 
   return (
     <div className="space-y-6 p-4 md:p-6">
       {/* Back */}
       <button
-        onClick={() => nav('/egp/execucao')}
+        onClick={() => projetoId ? setProjetoId(null) : nav('/egp/execucao')}
         className={`flex items-center gap-1 text-sm transition-colors ${
           isLight ? 'text-slate-400 hover:text-slate-700' : 'text-slate-500 hover:text-slate-300'
         }`}
       >
-        <ArrowLeft size={14} /> Voltar
+        <ArrowLeft size={14} /> {projetoId ? 'Voltar aos Projetos' : 'Voltar'}
       </button>
 
       {/* Header */}
@@ -72,11 +94,117 @@ export default function EGPExecucao() {
         </h1>
         {portfolio && (
           <p className={`text-sm mt-1 ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
-            {portfolio.nome_obra} - {portfolio.numero_osc}
+            {portfolio.nome_obra} - {portfolio.numero_osc}{projetoAtivo ? ` → ${projetoAtivo.nome}` : ''}
           </p>
         )}
       </div>
 
+      {/* Project selector or Tabs */}
+      {!projetoId ? (
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <h2 className={`text-sm font-bold flex items-center gap-2 ${isLight ? 'text-slate-700' : 'text-slate-200'}`}>
+              <FolderKanban size={16} className="text-violet-500" /> Projetos do Contrato
+            </h2>
+            <button
+              onClick={() => setCriando(!criando)}
+              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all ${
+                isLight ? 'bg-violet-50 text-violet-600 hover:bg-violet-100' : 'bg-violet-500/10 text-violet-400 hover:bg-violet-500/20'
+              }`}
+            >
+              <Plus size={14} /> Novo Projeto
+            </button>
+          </div>
+
+          {criando && (
+            <div className={`rounded-2xl border p-4 space-y-3 ${isLight ? 'bg-white border-slate-200 shadow-sm' : 'bg-white/[0.03] border-white/[0.06]'}`}>
+              <input
+                type="text"
+                value={novoProjeto.nome}
+                onChange={e => setNovoProjeto(p => ({ ...p, nome: e.target.value }))}
+                placeholder="Nome do projeto"
+                className={`w-full rounded-xl border px-3 py-2 text-sm focus:outline-none focus:ring-2 ${
+                  isLight ? 'bg-white border-slate-200 focus:ring-violet-500/20 focus:border-violet-400' : 'bg-slate-800/60 border-slate-700 focus:ring-violet-500/20 focus:border-violet-500 text-white'
+                }`}
+              />
+              <select
+                value={novoProjeto.centro_custo_id}
+                onChange={e => setNovoProjeto(p => ({ ...p, centro_custo_id: e.target.value }))}
+                className={`w-full rounded-xl border px-3 py-2 text-sm focus:outline-none focus:ring-2 ${
+                  isLight ? 'bg-white border-slate-200 focus:ring-violet-500/20 focus:border-violet-400' : 'bg-slate-800/60 border-slate-700 focus:ring-violet-500/20 focus:border-violet-500 text-white'
+                }`}
+              >
+                <option value="">Centro de custo (opcional)</option>
+                {(lookups?.centros_custo ?? []).map(cc => (
+                  <option key={cc.id} value={cc.id}>{cc.codigo} - {cc.descricao}</option>
+                ))}
+              </select>
+              <div className="flex gap-2">
+                <button onClick={handleCriarProjeto} disabled={!novoProjeto.nome.trim() || criarProjeto.isPending}
+                  className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-semibold bg-violet-500 text-white hover:bg-violet-600 transition-all disabled:opacity-50">
+                  <Check size={12} /> Criar
+                </button>
+                <button onClick={() => setCriando(false)}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all ${isLight ? 'bg-slate-100 text-slate-600' : 'bg-slate-700 text-slate-300'}`}>
+                  Cancelar
+                </button>
+              </div>
+            </div>
+          )}
+
+          {loadingProjetos ? (
+            <div className="flex items-center justify-center py-12">
+              <div className="w-6 h-6 border-2 border-violet-500/30 border-t-violet-500 rounded-full animate-spin" />
+            </div>
+          ) : (projetos ?? []).length === 0 ? (
+            <div className={`rounded-2xl border p-12 text-center ${isLight ? 'bg-white border-slate-200 shadow-sm' : 'bg-white/[0.03] border-white/[0.06]'}`}>
+              <FolderKanban size={32} className="mx-auto mb-3 opacity-40" />
+              <p className={`text-sm font-medium ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>Nenhum projeto cadastrado</p>
+              <p className={`text-xs mt-1 ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>Crie um projeto para iniciar a execução</p>
+            </div>
+          ) : (
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              {(projetos ?? []).filter(p => p.status !== 'cancelado').map(p => {
+                const statusCfg: Record<string, { label: string; cls: string }> = {
+                  ativo:     { label: 'Ativo',     cls: isLight ? 'bg-emerald-100 text-emerald-700' : 'bg-emerald-500/15 text-emerald-400' },
+                  suspenso:  { label: 'Suspenso',  cls: isLight ? 'bg-amber-100 text-amber-700' : 'bg-amber-500/15 text-amber-400' },
+                  concluido: { label: 'Concluído', cls: isLight ? 'bg-slate-100 text-slate-600' : 'bg-slate-500/15 text-slate-400' },
+                  cancelado: { label: 'Cancelado', cls: isLight ? 'bg-red-100 text-red-600' : 'bg-red-500/15 text-red-400' },
+                }
+                const st = statusCfg[p.status] ?? statusCfg.ativo
+                return (
+                  <button
+                    key={p.id}
+                    onClick={() => setProjetoId(p.id)}
+                    className={`group text-left rounded-2xl border p-4 transition-all duration-200 ${
+                      isLight
+                        ? 'bg-white border-slate-200 hover:border-violet-300 hover:shadow-lg hover:shadow-violet-500/10'
+                        : 'bg-slate-800/50 border-slate-700 hover:border-violet-500/50 hover:shadow-lg hover:shadow-violet-500/5'
+                    }`}
+                  >
+                    <div className="flex items-start justify-between gap-2 mb-2">
+                      <h3 className={`font-semibold text-sm ${isLight ? 'text-slate-800' : 'text-white'}`}>{p.nome}</h3>
+                      <span className={`shrink-0 text-[10px] font-semibold px-2 py-0.5 rounded-full ${st.cls}`}>{st.label}</span>
+                    </div>
+                    {p.centro_custo && (
+                      <p className={`text-xs ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>CC: {p.centro_custo.codigo} - {p.centro_custo.nome}</p>
+                    )}
+                    {p.responsavel && (
+                      <p className={`text-xs mt-0.5 ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>{p.responsavel}</p>
+                    )}
+                    <div className={`flex items-center gap-1 mt-3 text-xs font-medium transition-colors ${
+                      isLight ? 'text-violet-500 group-hover:text-violet-600' : 'text-violet-400 group-hover:text-violet-300'
+                    }`}>
+                      Acessar Execução <ChevronRight size={14} className="group-hover:translate-x-0.5 transition-transform" />
+                    </div>
+                  </button>
+                )
+              })}
+            </div>
+          )}
+        </div>
+      ) : (
+        <>
       {/* Tab bar */}
       <div className={`flex gap-1 p-1 rounded-2xl border overflow-x-auto hide-scrollbar ${
         isLight ? 'bg-slate-50 border-slate-200' : 'bg-white/[0.02] border-white/[0.06]'
@@ -112,6 +240,8 @@ export default function EGPExecucao() {
       {tab === 'custos' && <CustosPanel portfolioId={portfolioId} isLight={isLight} />}
       {tab === 'riscos' && <RiscosPanel portfolioId={portfolioId} isLight={isLight} />}
       {tab === 'plano_acao' && <PlanoAcaoPanel portfolioId={portfolioId} isLight={isLight} />}
+        </>
+      )}
     </div>
   )
 }

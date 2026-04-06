@@ -69,6 +69,24 @@ export interface PMOPortfolio {
   obra?: { id: string; nome: string; codigo: string }
 }
 
+export interface PMOProjeto {
+  id: string
+  portfolio_id: string
+  centro_custo_id?: string
+  nome: string
+  codigo?: string
+  descricao?: string
+  status: 'ativo' | 'suspenso' | 'concluido' | 'cancelado'
+  responsavel?: string
+  data_inicio?: string
+  data_termino_previsto?: string
+  data_termino_real?: string
+  created_at: string
+  updated_at: string
+  // Joins
+  centro_custo?: { id: string; nome: string; codigo: string }
+}
+
 export interface PMOTAP {
   id: string
   portfolio_id: string

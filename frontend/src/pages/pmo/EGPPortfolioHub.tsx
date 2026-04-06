@@ -84,7 +84,7 @@ export default function EGPPortfolioHub({
             type="text"
             value={search}
             onChange={e => setSearch(e.target.value)}
-            placeholder="Buscar portfólio..."
+            placeholder="Buscar contrato..."
             className={`w-full pl-9 pr-3 py-2 rounded-xl border text-sm transition-all ${
               isLight
                 ? 'bg-white border-slate-200 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400'
@@ -99,7 +99,7 @@ export default function EGPPortfolioHub({
         isLight ? 'bg-blue-50 text-blue-700 border border-blue-100' : 'bg-blue-500/10 text-blue-400 border border-blue-500/20'
       }`}>
         <Icon size={16} />
-        Selecione um portfólio para acessar {title.toLowerCase()}
+        Selecione um contrato para acessar {title.toLowerCase()}
       </div>
 
       {/* Portfolio Grid */}
@@ -108,8 +108,8 @@ export default function EGPPortfolioHub({
           isLight ? 'bg-slate-50 border-slate-200 text-slate-500' : 'bg-slate-800/40 border-slate-700 text-slate-400'
         }`}>
           <Icon size={32} className="mx-auto mb-3 opacity-40" />
-          <p className="font-medium">Nenhum portfólio encontrado</p>
-          <p className="text-sm mt-1 opacity-70">Crie um portfólio no Painel EGP para começar</p>
+          <p className="font-medium">Nenhum contrato encontrado</p>
+          <p className="text-sm mt-1 opacity-70">Cadastre um contrato no Painel EGP para começar</p>
         </div>
       ) : (
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
