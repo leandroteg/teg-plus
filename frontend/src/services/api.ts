@@ -116,11 +116,12 @@ export const api = {
     mime_type: string
     cotacao_id?: string
     requisicao_id?: string
+    file_url?: string
   }) =>
     request<ParseCotacaoResult>('/compras/parse-cotacao', {
       method: 'POST',
       body: JSON.stringify(data),
-    }, 120_000),
+    }, 180_000),
 
   enviarEmailPedido: (data: {
     pedido_id: string;

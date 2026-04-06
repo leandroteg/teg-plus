@@ -1,108 +1,7 @@
 import { useState, useRef, useCallback } from 'react'
 import { Upload, FileImage, Loader2, CheckCircle, AlertTriangle, Sparkles, X } from 'lucide-react'
 import { api } from '../services/api'
-
-// ── Gemini direto para arquivos grandes ────────────────────────────────────
-const GEMINI_KEY = import.meta.env.VITE_GEMINI_API_KEY as string | undefined
-const LARGE_FILE_THRESHOLD = 8 * 1024 * 1024 // 8 MB — acima disso usa Gemini File API
-
-async function parseCotacaoViaGemini(file: File): Promise<{
-  success: boolean
-  fornecedores?: { fornecedor_nome: string; fornecedor_cnpj?: string; fornecedor_contato?: string; valor_total: number; prazo_entrega_dias?: number; condicao_pagamento?: string; itens?: { descricao: string; qtd: number; valor_unitario: number; valor_total: number }[]; observacao?: string }[]
-  error?: string
-}> {
-  if (!GEMINI_KEY) throw new Error('Gemini API key não configurada')
-
-  const mimeType = file.type || 'application/pdf'
-  const controller = new AbortController()
-  const timeout = setTimeout(() => controller.abort(), 180_000)
-
-  try {
-    let filePart: Record<string, unknown>
-
-    if (file.size > LARGE_FILE_THRESHOLD) {
-      // Upload via File API
-      const uploadResp = await fetch(
-        `https://generativelanguage.googleapis.com/upload/v1beta/files?key=${GEMINI_KEY}`,
-        {
-          method: 'POST',
-          headers: {
-            'X-Goog-Upload-Command': 'upload, finalize',
-            'X-Goog-Upload-Header-Content-Length': String(file.size),
-            'X-Goog-Upload-Header-Content-Type': mimeType,
-            'Content-Type': mimeType,
-          },
-          body: file,
-          signal: controller.signal,
-        }
-      )
-      if (!uploadResp.ok) throw new Error(`Upload falhou: ${uploadResp.status}`)
-      const uploadData = await uploadResp.json()
-      const fileUri = uploadData.file?.uri
-      if (!fileUri) throw new Error('File API não retornou URI')
-
-      // Aguardar processamento
-      const fileName = uploadData.file?.name
-      if (fileName) {
-        for (let i = 0; i < 30; i++) {
-          const st = await fetch(`https://generativelanguage.googleapis.com/v1beta/${fileName}?key=${GEMINI_KEY}`, { signal: controller.signal })
-          if (st.ok) {
-            const sd = await st.json()
-            if (sd.state === 'ACTIVE') break
-            if (sd.state === 'FAILED') throw new Error('Processamento do arquivo falhou')
-          }
-          await new Promise(r => setTimeout(r, 2000))
-        }
-      }
-      filePart = { file_data: { mime_type: mimeType, file_uri: fileUri } }
-    } else {
-      // Inline base64
-      const buf = await file.arrayBuffer()
-      const base64 = btoa(String.fromCharCode(...new Uint8Array(buf)))
-      filePart = { inline_data: { mime_type: mimeType, data: base64 } }
-    }
-
-    const prompt = `Analise esta cotação/proposta comercial e extraia os dados de cada fornecedor.
-
-Retorne SOMENTE JSON válido (sem markdown) no formato:
-{"fornecedores":[{"fornecedor_nome":"","fornecedor_cnpj":"","fornecedor_contato":"","valor_total":0,"prazo_entrega_dias":0,"condicao_pagamento":"","itens":[{"descricao":"","qtd":1,"valor_unitario":0,"valor_total":0}],"observacao":""}]}
-
-Regras:
-- Extraia TODOS os itens com descrição, quantidade, valor unitário e total
-- Se houver múltiplos fornecedores, liste cada um separadamente
-- CNPJ no formato XX.XXX.XXX/XXXX-XX
-- Valores numéricos sem formatação (usar ponto decimal)
-- Se o documento for uma proposta/orçamento de um único fornecedor, retorne um array com 1 fornecedor`
-
-    const resp = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_KEY}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{ parts: [filePart, { text: prompt }] }],
-          generationConfig: { temperature: 0.1, maxOutputTokens: 8192 },
-        }),
-        signal: controller.signal,
-      }
-    )
-    if (!resp.ok) throw new Error(`Gemini ${resp.status}`)
-    const gd = await resp.json()
-    const raw = gd.candidates?.[0]?.content?.parts?.[0]?.text || ''
-    const cleaned = raw.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim()
-    let data: Record<string, unknown>
-    try { data = JSON.parse(cleaned) } catch {
-      const m = cleaned.match(/\{[\s\S]*\}/)
-      if (m) data = JSON.parse(m[0])
-      else return { success: false, error: 'Resposta inválida da IA' }
-    }
-    const fornecedores = (data.fornecedores as Record<string, unknown>[]) || []
-    if (fornecedores.length === 0) return { success: false, error: 'Nenhum fornecedor encontrado' }
-    return { success: true, fornecedores: fornecedores as never[] }
-  } finally {
-    clearTimeout(timeout)
-  }
-}
+import { supabase } from '../services/supabase'
 
 interface FornecedorParsed {
   fornecedor_nome: string
@@ -124,6 +23,8 @@ interface Props {
 
 const ACCEPTED = ['image/jpeg', 'image/png', 'image/webp', 'application/pdf']
 const MAX_SIZE = 50 * 1024 * 1024 // 50 MB
+// Acima deste limiar, faz upload pro Storage e manda URL pro n8n (evita body enorme)
+const STORAGE_THRESHOLD = 8 * 1024 * 1024 // 8 MB
 
 function fileToBase64(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -135,6 +36,26 @@ function fileToBase64(file: File): Promise<string> {
     reader.onerror = reject
     reader.readAsDataURL(file)
   })
+}
+
+/** Upload para Supabase Storage e retorna URL pública temporária */
+async function uploadToStorage(file: File): Promise<{ path: string; url: string }> {
+  const ext = file.name.split('.').pop() || 'pdf'
+  const path = `cotacao-parse/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`
+
+  const { error } = await supabase.storage.from('temp-uploads').upload(path, file, {
+    contentType: file.type,
+    upsert: false,
+  })
+  if (error) throw new Error(`Upload falhou: ${error.message}`)
+
+  const { data } = supabase.storage.from('temp-uploads').getPublicUrl(path)
+  return { path, url: data.publicUrl }
+}
+
+/** Remove arquivo temporário do Storage */
+async function cleanupStorage(path: string) {
+  try { await supabase.storage.from('temp-uploads').remove([path]) } catch { /* best effort */ }
 }
 
 type Status = 'idle' | 'processing' | 'success' | 'error'
@@ -163,44 +84,50 @@ export default function UploadCotacao({ onParsed, disabled, cotacaoId, requisica
     setStatus('processing')
     setError('')
 
+    let storagePath: string | null = null
+
     try {
-      let result: { success: boolean; fornecedores?: FornecedorParsed[]; error?: string }
+      let result
 
-      // Sempre preferir Gemini direto quando key disponível (n8n parse-cotacao é instável)
-      const useGeminiDirect = !!GEMINI_KEY
+      if (file.size > STORAGE_THRESHOLD) {
+        // Arquivo grande: upload pro Storage, envia URL pro n8n (que baixa e processa)
+        const uploaded = await uploadToStorage(file)
+        storagePath = uploaded.path
 
-      if (useGeminiDirect) {
         try {
-          result = await parseCotacaoViaGemini(file)
-        } catch (geminiErr) {
-          // Fallback para n8n se Gemini falhar e arquivo for pequeno
-          if (file.size <= LARGE_FILE_THRESHOLD) {
-            const base64 = await fileToBase64(file)
-            result = await api.parseCotacaoFile({ file_base64: base64, file_name: file.name, mime_type: file.type, cotacao_id: cotacaoId, requisicao_id: requisicaoId })
-          } else {
-            throw geminiErr
-          }
+          result = await api.parseCotacaoFile({
+            file_base64: '',
+            file_name: file.name,
+            mime_type: file.type,
+            cotacao_id: cotacaoId,
+            requisicao_id: requisicaoId,
+            file_url: uploaded.url,
+          })
+        } catch (fetchErr) {
+          handleFetchError(fetchErr)
+          return
+        } finally {
+          cleanupStorage(uploaded.path)
+          storagePath = null
         }
       } else {
-        // Arquivo pequeno sem Gemini key: n8n
+        // Arquivo até 8MB: base64 inline direto
         const base64 = await fileToBase64(file)
         try {
-          result = await api.parseCotacaoFile({ file_base64: base64, file_name: file.name, mime_type: file.type, cotacao_id: cotacaoId, requisicao_id: requisicaoId })
+          result = await api.parseCotacaoFile({
+            file_base64: base64,
+            file_name: file.name,
+            mime_type: file.type,
+            cotacao_id: cotacaoId,
+            requisicao_id: requisicaoId,
+          })
         } catch (fetchErr) {
-          const msg = fetchErr instanceof Error ? fetchErr.message : ''
-          if (msg.includes('Failed to fetch') || msg.includes('NetworkError') || msg.includes('AbortError') || msg.includes('Tempo limite') || msg.includes('ECONNREFUSED')) {
-            setError('Serviço de IA indisponível no momento. Preencha os dados manualmente.')
-          } else if (msg.includes('Erro 5')) {
-            setError('Erro interno no serviço de IA (500). Tente novamente em instantes.')
-          } else {
-            setError(msg || 'Erro ao conectar com o serviço de IA. Preencha manualmente.')
-          }
-          setStatus('error')
+          handleFetchError(fetchErr)
           return
         }
       }
 
-      if (result.success && result.fornecedores?.length) {
+      if (result.success && result.fornecedores?.length > 0) {
         setStatus('success')
         onParsed(result.fornecedores, file)
       } else {
@@ -208,10 +135,24 @@ export default function UploadCotacao({ onParsed, disabled, cotacaoId, requisica
         setStatus('error')
       }
     } catch (err) {
+      // Cleanup storage se ficou pendente
+      if (storagePath) cleanupStorage(storagePath)
       setError(err instanceof Error ? err.message : 'Erro inesperado ao processar arquivo.')
       setStatus('error')
     }
-  }, [onParsed])
+
+    function handleFetchError(fetchErr: unknown) {
+      const msg = fetchErr instanceof Error ? fetchErr.message : ''
+      if (msg.includes('Failed to fetch') || msg.includes('NetworkError') || msg.includes('AbortError') || msg.includes('Tempo limite') || msg.includes('ECONNREFUSED')) {
+        setError('Serviço de IA indisponível no momento. Preencha os dados manualmente.')
+      } else if (msg.includes('Erro 5')) {
+        setError('Erro interno no serviço de IA (500). Tente novamente em instantes.')
+      } else {
+        setError(msg || 'Erro ao conectar com o serviço de IA. Preencha manualmente.')
+      }
+      setStatus('error')
+    }
+  }, [onParsed, cotacaoId, requisicaoId])
 
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault()
