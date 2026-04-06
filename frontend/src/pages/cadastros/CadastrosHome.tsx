@@ -31,12 +31,18 @@ const SECTIONS = [
   },
   {
     title: 'Entidades',
-    subtitle: 'Fornecedores, Colaboradores e Itens',
+    subtitle: 'Fornecedores e Colaboradores',
     entities: [
       { key: 'fornecedores',  label: 'Fornecedores',  icon: Building2, route: '/cadastros/fornecedores',  color: 'emerald', emoji: '🏢' },
       { key: 'colaboradores', label: 'Colaboradores',  icon: Users,     route: '/cadastros/colaboradores', color: 'rose',    emoji: '👷' },
-      { key: 'itens',         label: 'Itens',          icon: Package2,  route: '/cadastros/itens',         color: 'blue',    emoji: '📦' },
-      { key: 'bases',          label: 'Bases',          icon: Warehouse, route: '/cadastros/bases',         color: 'teal',    emoji: '🏭' },
+    ],
+  },
+  {
+    title: 'Estoque',
+    subtitle: 'Catalogo de itens e bases / almoxarifados',
+    entities: [
+      { key: 'itens',  label: 'Itens',  icon: Package2,  route: '/cadastros/itens',  color: 'blue', emoji: '📦' },
+      { key: 'bases',  label: 'Bases',  icon: Warehouse, route: '/cadastros/bases',  color: 'teal', emoji: '🏭' },
     ],
   },
 ] as const
