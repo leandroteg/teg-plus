@@ -1,6 +1,5 @@
 import {
-  LayoutDashboard, Building2, FileText, Wrench,
-  RefreshCw, Handshake, ArrowRightFromLine, Plus,
+  LayoutDashboard, Building2, FolderOpen, ArrowRightFromLine, Plus,
 } from 'lucide-react'
 import { useState } from 'react'
 import ModuleLayout from './ModuleLayout'
@@ -11,7 +10,7 @@ export default function LocacaoLayout() {
   const [showModal, setShowModal] = useState(false)
 
   const NAV: NavItem[] = [
-    { to: '/locacoes',              icon: LayoutDashboard,     label: 'Painel',                   end: true },
+    { to: '/locacoes',              icon: LayoutDashboard,     label: 'Painel',           end: true },
     {
       to: '/locacoes',
       icon: Plus,
@@ -20,13 +19,9 @@ export default function LocacaoLayout() {
       action: () => setShowModal(true),
       accent: true,
     },
-    { to: '/locacoes/entradas',     icon: Building2,           label: 'Entradas'                  },
-    { to: '/locacoes/ativos',       icon: Building2,           label: 'Ativos'                    },
-    { to: '/locacoes/faturas',      icon: FileText,            label: 'Faturas'                   },
-    { to: '/locacoes/servicos',     icon: Wrench,              label: 'Manutenções e Serviços'    },
-    { to: '/locacoes/aditivos',     icon: RefreshCw,           label: 'Aditivos & Renovações'     },
-    { to: '/locacoes/acordos',      icon: Handshake,           label: 'Acordos'                   },
-    { to: '/locacoes/saida',        icon: ArrowRightFromLine,  label: 'Saída'                     },
+    { to: '/locacoes/entradas',     icon: Building2,           label: 'Entradas'          },
+    { to: '/locacoes/gestao',       icon: FolderOpen,          label: 'Gestão'            },
+    { to: '/locacoes/saida',        icon: ArrowRightFromLine,  label: 'Devoluções'        },
   ]
 
   return (
