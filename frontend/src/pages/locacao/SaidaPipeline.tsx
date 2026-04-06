@@ -301,6 +301,11 @@ export default function SaidaPipeline() {
 
   return (
     <div className={`rounded-2xl border overflow-hidden ${isDark ? 'bg-[#0f172a] border-white/[0.06]' : 'bg-white border-slate-200'}`}>
+      {/* Header */}
+      <div className={`px-4 pt-4 pb-2 ${isDark ? '' : ''}`}>
+        <h1 className={`text-lg font-extrabold ${isDark ? 'text-white' : 'text-slate-900'}`}>Devoluções</h1>
+        <p className={`text-xs mt-0.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Pipeline de devolução de imóveis</p>
+      </div>
       {/* Tabs */}
       <div className={`flex gap-1 p-1 pb-2 rounded-t-2xl border-b overflow-x-auto hide-scrollbar ${isDark ? 'bg-white/[0.02] border-white/[0.06]' : 'bg-slate-50 border-slate-200'}`}>
         {SAIDA_PIPELINE_STAGES.map(stage => {
