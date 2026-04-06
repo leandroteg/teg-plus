@@ -84,6 +84,11 @@ export default function UploadCotacao({ onParsed, disabled, cotacaoId, requisica
     setStatus('processing')
     setError('')
 
+    // Gera nome padronizado: Cotacao-[id].[ext] para facilitar identificação no storage/n8n
+    const ext = file.name.includes('.') ? file.name.slice(file.name.lastIndexOf('.')) : ''
+    const refId = cotacaoId || requisicaoId || Date.now().toString()
+    const cotacaoFileName = `Cotacao-${refId}${ext}`
+
     let storagePath: string | null = null
 
     try {
@@ -97,7 +102,7 @@ export default function UploadCotacao({ onParsed, disabled, cotacaoId, requisica
         try {
           result = await api.parseCotacaoFile({
             file_base64: '',
-            file_name: file.name,
+            file_name: cotacaoFileName,
             mime_type: file.type,
             cotacao_id: cotacaoId,
             requisicao_id: requisicaoId,
@@ -116,7 +121,7 @@ export default function UploadCotacao({ onParsed, disabled, cotacaoId, requisica
         try {
           result = await api.parseCotacaoFile({
             file_base64: base64,
-            file_name: file.name,
+            file_name: cotacaoFileName,
             mime_type: file.type,
             cotacao_id: cotacaoId,
             requisicao_id: requisicaoId,

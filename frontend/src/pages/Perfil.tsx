@@ -358,13 +358,22 @@ export default function Perfil() {
 
       <div className="space-y-4">
 
-        {/* ── Botão Voltar ── */}
-        <button
-          onClick={() => window.history.length > 2 ? navigate(-1) : navigate('/')}
-          className="flex items-center gap-1.5 text-xs text-slate-500 hover:text-indigo-600 transition-colors"
-        >
-          <ChevronLeft size={14} /> Voltar
-        </button>
+        {/* ── Botão Fechar / Voltar ── */}
+        <div className="flex items-center justify-between">
+          <button
+            onClick={() => window.history.length > 2 ? navigate(-1) : navigate('/')}
+            className="flex items-center gap-1.5 text-xs font-medium text-slate-500 hover:text-indigo-600 transition-colors"
+          >
+            <ChevronLeft size={14} /> Voltar
+          </button>
+          <button
+            onClick={() => window.history.length > 2 ? navigate(-1) : navigate('/')}
+            aria-label="Fechar"
+            className="w-8 h-8 flex items-center justify-center rounded-full bg-slate-100 text-slate-500 hover:bg-slate-200 hover:text-slate-700 transition-colors"
+          >
+            <X size={16} />
+          </button>
+        </div>
 
         {/* ── Hero card ── */}
         <div className="bg-white rounded-2xl shadow-card overflow-hidden">

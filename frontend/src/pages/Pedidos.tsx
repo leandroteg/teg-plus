@@ -428,7 +428,7 @@ function buildPdfHtml(pedido: Pedido, EMPRESA: EmpresaData = EMPRESA_FALLBACK): 
 
   return `<!DOCTYPE html>
 <html><head><meta charset="UTF-8">
-<title>Pedido de Compra #${numero}</title>
+<title>PC_${numero}_${esc(pedido.fornecedor_nome).replace(/[^a-zA-Z0-9À-ÿ _-]/g, '').trim().replace(/\s+/g, '_').slice(0, 40)}</title>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body { font-family: Arial, Helvetica, sans-serif; color: #1e293b; font-size: 12px; }
@@ -459,12 +459,7 @@ function buildPdfHtml(pedido: Pedido, EMPRESA: EmpresaData = EMPRESA_FALLBACK): 
     body { padding: 0; }
     .page { padding: 20px; }
     button { display: none !important; }
-    .header { background: #ffffff !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; border: 1px solid #e2e8f0 !important; }
-    .company-name { color: #1e293b !important; }
-    .company-cnpj { color: #475569 !important; }
-    .doc-title { color: #0d9488 !important; }
-    .doc-number { color: #1e293b !important; }
-    .doc-date { color: #475569 !important; }
+    .header { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   }
 </style></head>
 <body><div class="page">

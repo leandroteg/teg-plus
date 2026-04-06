@@ -1842,11 +1842,11 @@ function CPDetailModal({ cp, stageStatus, onClose, onAction, isDark }: {
                               </label>
                               <div className="min-w-0">
                                 <p className={`truncate font-semibold ${isDark ? 'text-white' : 'text-slate-800'}`}>{item.cp?.fornecedor_nome || 'Item sem fornecedor'}</p>
-                                <p className={`truncate text-[11px] ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{item.cp?.descricao || 'â€”'}</p>
+                                <p className={`truncate text-[11px] ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{item.cp?.descricao || '—'}</p>
                               </div>
-                              <span className={`truncate text-[11px] ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{item.cp?.numero_documento || 'â€”'}</span>
-                              <span className={`text-[11px] ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{item.cp ? fmtData(item.cp.data_vencimento) : 'â€”'}</span>
-                              <span className="text-right text-[11px] font-semibold text-emerald-600">{item.cp ? fmt(item.cp.valor_original) : 'â€”'}</span>
+                              <span className={`truncate text-[11px] ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{item.cp?.numero_documento || '—'}</span>
+                              <span className={`text-[11px] ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{item.cp ? fmtData(item.cp.data_vencimento) : '—'}</span>
+                              <span className=”text-right text-[11px] font-semibold text-emerald-600”>{item.cp ? fmt(item.cp.valor_original) : '—'}</span>
                               <span className={`inline-flex h-fit rounded-full px-2 py-0.5 text-[10px] font-semibold ${
                                 selectedApprovalItemIds.includes(item.cp_id)
                                   ? isDark ? 'bg-emerald-500/10 text-emerald-300' : 'bg-emerald-50 text-emerald-700'
@@ -2753,7 +2753,7 @@ export default function CPPipeline() {
       const visibleValue = currentItems.reduce((sum, cp) => sum + cp.valor_original, 0)
       const loteDate = new Date((lote?.created_at ?? currentItems[0]?.created_at ?? new Date().toISOString())).toLocaleDateString('pt-BR')
       const loteValue = totalValue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
-      const headerLabel = `${lote?.numero_lote ?? `Lote ${loteId.slice(0, 8)}`} â€¢ ${loteDate} â€¢ ${loteValue}`
+      const headerLabel = `${lote?.numero_lote ?? `Lote ${loteId.slice(0, 8)}`} • ${loteDate} • ${loteValue}`
       const { progress, progressLabel } = getLoteProgress(activeTab, lote?.status)
 
       return {
