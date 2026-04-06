@@ -4,8 +4,8 @@ import {
   User, FileText, Clock, CheckCircle2, AlertTriangle, ArrowUp, ArrowDown,
 } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
-import { useImoveis, useAditivos, useEntradas, useVistorias } from '../../hooks/useLocacao'
-import type { LocImovel, LocAditivo } from '../../types/locacao'
+import { useImoveis, useAditivos, useVistorias } from '../../hooks/useLocacao'
+import type { LocImovel, LocAditivo, LocVistoria } from '../../types/locacao'
 
 const fmtDate = (d?: string) => d ? new Date(d + 'T12:00:00').toLocaleDateString('pt-BR') : '—'
 const fmtCur = (v?: number) => v != null ? v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) : '—'
@@ -20,8 +20,8 @@ const STATUS_CFG: Record<string, { label: string; dot: string; bg: string; text:
 type ViewMode = 'table' | 'cards'
 
 // ── Detail Modal ─────────────────────────────────────────────────────────────
-function ImovelDetailModal({ imovel, aditivos, onClose, isDark }: {
-  imovel: LocImovel; aditivos: LocAditivo[]; onClose: () => void; isDark: boolean
+function ImovelDetailModal({ imovel, aditivos, vistorias, onClose, isDark }: {
+  imovel: LocImovel; aditivos: LocAditivo[]; vistorias: LocVistoria[]; onClose: () => void; isDark: boolean
 }) {
   const bg = isDark ? 'bg-[#1e293b]' : 'bg-white'
   const cardBg = isDark ? 'bg-white/[0.04]' : 'bg-slate-50'
@@ -31,6 +31,7 @@ function ImovelDetailModal({ imovel, aditivos, onClose, isDark }: {
   const cc = (imovel as any).centro_custo
   const stCfg = STATUS_CFG[imovel.status] || STATUS_CFG.ativo
   const imovelAditivos = aditivos.filter(a => a.imovel_id === imovel.id)
+  const imovelVistorias = vistorias.filter(v => v.imovel_id === imovel.id)
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-sm p-4" onClick={onClose}>
@@ -100,10 +101,75 @@ function ImovelDetailModal({ imovel, aditivos, onClose, isDark }: {
             </div>
           </div>
 
-          {/* Checklist de Vistoria */}
+          {/* Vistorias */}
           <div className={`rounded-xl p-4 ${cardBg}`}>
-            <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-2.5">Checklist de Vistoria</p>
-            <p className={`text-xs ${txtMuted}`}>Nenhuma vistoria registrada para este imóvel.</p>
+            <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-2.5">Vistorias</p>
+            {imovelVistorias.length === 0 ? (
+              <p className={`text-xs ${txtMuted}`}>Nenhuma vistoria registrada para este imóvel.</p>
+            ) : (
+              <div className="space-y-3">
+                {imovelVistorias.map(v => (
+                  <div key={v.id} className={`rounded-lg p-3 border ${isDark ? 'border-white/[0.06] bg-white/[0.02]' : 'border-slate-200 bg-white'}`}>
+                    {/* Cabeçalho da vistoria */}
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-2">
+                        <span className={`text-xs font-bold ${txtMain}`}>{v.tipo === 'entrada' ? 'Vistoria de Entrada' : 'Vistoria de Saída'}</span>
+                        <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold ${
+                          v.status === 'concluida' ? 'bg-emerald-50 text-emerald-700' :
+                          v.status === 'em_andamento' ? 'bg-blue-50 text-blue-700' :
+                          'bg-slate-100 text-slate-600'
+                        }`}>
+                          {v.status === 'concluida' ? 'Concluída' : v.status === 'em_andamento' ? 'Em Andamento' : 'Pendente'}
+                        </span>
+                      </div>
+                      {v.tem_pendencias && (
+                        <span className="text-[10px] font-bold text-red-500 flex items-center gap-1"><AlertTriangle size={10} /> Pendências</span>
+                      )}
+                    </div>
+                    {/* Dados */}
+                    <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-xs mb-2">
+                      <div><p className={txtMuted}>Data</p><p className={`font-semibold ${txtMain}`}>{v.data_vistoria ? fmtDate(v.data_vistoria) : 'Não realizada'}</p></div>
+                      <div><p className={txtMuted}>Responsável</p><p className={`font-semibold ${txtMain}`}>{v.responsavel_id ? 'Atribuído' : 'Não atribuído'}</p></div>
+                    </div>
+                    {/* Observações */}
+                    {v.observacoes_gerais && (
+                      <p className={`text-[10px] ${txtMuted} mb-2`}>{v.observacoes_gerais}</p>
+                    )}
+                    {/* Checklist de itens */}
+                    {v.itens && v.itens.length > 0 && (
+                      <div className="mt-2">
+                        <p className={`text-[9px] font-bold uppercase tracking-wider mb-1.5 ${txtMuted}`}>Checklist ({v.itens.length} itens)</p>
+                        <div className={`rounded-lg overflow-hidden border ${isDark ? 'border-white/[0.06]' : 'border-slate-100'}`}>
+                          {v.itens.map(item => (
+                            <div key={item.id} className={`flex items-center gap-2 px-2.5 py-1.5 text-[11px] border-b last:border-0 ${isDark ? 'border-white/[0.04]' : 'border-slate-50'}`}>
+                              <span className={`w-4 h-4 rounded flex items-center justify-center text-[9px] font-bold ${
+                                item.divergencia ? 'bg-red-100 text-red-600' : 'bg-emerald-100 text-emerald-600'
+                              }`}>{item.divergencia ? '!' : '✓'}</span>
+                              <span className={`flex-1 ${txtMain}`}>{item.ambiente} — {item.item}</span>
+                              <span className={`text-[10px] ${txtMuted}`}>
+                                {item.estado_entrada || item.estado_saida || '—'}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    {/* PDF Anexo */}
+                    {v.pdf_url ? (
+                      <button
+                        onClick={(e) => { e.stopPropagation(); window.open(v.pdf_url!, '_blank') }}
+                        className={`mt-2 flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-colors ${
+                          isDark ? 'border-indigo-500/30 text-indigo-400 hover:bg-indigo-500/10' : 'border-indigo-200 text-indigo-600 hover:bg-indigo-50'
+                        }`}>
+                        <FileText size={12} /> Ver PDF da Vistoria
+                      </button>
+                    ) : (
+                      <p className={`text-[10px] mt-2 ${txtMuted}`}>Nenhum PDF anexado.</p>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Linha do tempo — Aditivos & Renovações */}
@@ -148,6 +214,7 @@ export default function Ativos() {
   const { isDark } = useTheme()
   const { data: imoveis = [], isLoading } = useImoveis()
   const { data: aditivos = [] } = useAditivos()
+  const { data: vistorias = [] } = useVistorias()
 
   const [busca, setBusca] = useState('')
   const [statusFilter, setStatusFilter] = useState('todos')
@@ -360,7 +427,7 @@ export default function Ativos() {
       )}
 
       {/* Modal */}
-      {detail && <ImovelDetailModal imovel={detail} aditivos={aditivos} onClose={() => setDetail(null)} isDark={isDark} />}
+      {detail && <ImovelDetailModal imovel={detail} aditivos={aditivos} vistorias={vistorias} onClose={() => setDetail(null)} isDark={isDark} />}
     </div>
   )
 }
