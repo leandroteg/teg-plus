@@ -338,3 +338,162 @@ export interface PMOIndicadoresSnapshot {
   dados_extras: Record<string, unknown>
   created_at: string
 }
+
+// ── Stakeholders ──
+export interface PMOStakeholder {
+  id: string
+  portfolio_id: string
+  nome: string
+  papel?: string
+  organizacao?: string
+  influencia?: 'baixa' | 'media' | 'alta'
+  estrategia?: string
+  created_at?: string
+}
+
+// ── Comunicação ──
+export interface PMOComunicacao {
+  id: string
+  portfolio_id: string
+  item: string
+  destinatario?: string
+  frequencia?: string
+  canal?: string
+  responsavel?: string
+  created_at?: string
+}
+
+// ── Orçamento ──
+export interface PMOOrcamento {
+  id: string
+  portfolio_id: string
+  disciplina: string
+  insumo?: string
+  fase?: string
+  valor_previsto: number
+  valor_realizado: number
+  created_at?: string
+  updated_at?: string
+}
+
+// ── Riscos ──
+export type ProbabilidadeRisco = 'baixa' | 'media' | 'alta' | 'muito_alta'
+export type ImpactoRisco = 'baixo' | 'medio' | 'alto' | 'muito_alto'
+export type StatusRisco = 'aberto' | 'mitigando' | 'fechado' | 'aceito'
+
+export interface PMORisco {
+  id: string
+  portfolio_id: string
+  descricao: string
+  categoria?: string
+  probabilidade?: ProbabilidadeRisco
+  impacto?: ImpactoRisco
+  resposta?: string
+  responsavel?: string
+  status: StatusRisco
+  created_at?: string
+  updated_at?: string
+}
+
+// ── Plano de Ação ──
+export type StatusAcao = 'pendente' | 'em_andamento' | 'concluida' | 'cancelada'
+
+export interface PMOPlanoAcao {
+  id: string
+  portfolio_id: string
+  descricao: string
+  tipo_desvio?: string
+  responsavel?: string
+  prazo?: string
+  status: StatusAcao
+  evidencia_url?: string
+  created_at?: string
+  updated_at?: string
+}
+
+// ── Entregáveis ──
+export type StatusEntregavel = 'pendente' | 'em_andamento' | 'concluido' | 'atrasado'
+
+export interface PMOEntregavel {
+  id: string
+  portfolio_id: string
+  eap_id?: string
+  titulo: string
+  responsavel?: string
+  pct_conclusao: number
+  status: StatusEntregavel
+  data_prevista?: string
+  data_real?: string
+  created_at?: string
+  updated_at?: string
+}
+
+// ── Documentos ──
+export type StatusDocumento = 'vigente' | 'a_vencer' | 'vencido' | 'renovado' | 'na'
+
+export interface PMODocumento {
+  id: string
+  portfolio_id: string
+  tipo: string
+  descricao?: string
+  data_emissao?: string
+  data_vencimento?: string
+  status: StatusDocumento
+  arquivo_url?: string
+  created_at?: string
+  updated_at?: string
+}
+
+// ── Avanço Físico ──
+export interface PMOAvancoFisico {
+  id: string
+  portfolio_id: string
+  semana?: number
+  mes?: string
+  pct_planejado: number
+  pct_executado: number
+  observacoes?: string
+  created_at?: string
+}
+
+// ── Lições Aprendidas ──
+export interface PMOLicaoAprendida {
+  id: string
+  portfolio_id: string
+  fase?: string
+  descricao: string
+  tipo?: 'positivo' | 'negativo'
+  recomendacao?: string
+  created_at?: string
+}
+
+// ── Aceite ──
+export type StatusAceite = 'pendente' | 'assinado' | 'rejeitado'
+
+export interface PMOAceite {
+  id: string
+  portfolio_id: string
+  contrato_id?: string
+  data_aceite?: string
+  assinatura_url?: string
+  observacoes?: string
+  status: StatusAceite
+  created_at?: string
+  updated_at?: string
+}
+
+// ── Desmobilização ──
+export type StatusDesmobilizacao = 'pendente' | 'em_andamento' | 'concluido'
+
+export interface PMODesmobilizacao {
+  id: string
+  portfolio_id: string
+  item: string
+  categoria?: string
+  status: StatusDesmobilizacao
+  responsavel?: string
+  data_prevista?: string
+  data_real?: string
+  created_at?: string
+  updated_at?: string
+}

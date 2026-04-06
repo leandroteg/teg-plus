@@ -87,26 +87,21 @@ const AdiantamentosObras = lazy(() => import('./pages/obras/Adiantamentos'))
 const PrestacaoContas = lazy(() => import('./pages/obras/PrestacaoContas'))
 const PlanejamentoEquipe = lazy(() => import('./pages/obras/PlanejamentoEquipe'))
 
-// EGP
-const EGPHome = lazy(() => import('./pages/pmo/PMOHome'))
+// EGP — Ciclo de Vida (6 visões)
+const EGPPainel = lazy(() => import('./pages/pmo/EGPPainel'))
+const EGPIniciacaoHub = lazy(() => import('./pages/pmo/EGPIniciacaoHub'))
+const EGPIniciacao = lazy(() => import('./pages/pmo/EGPIniciacao'))
+const EGPPlanejamentoHub = lazy(() => import('./pages/pmo/EGPPlanejamentoHub'))
+const EGPPlanejamento = lazy(() => import('./pages/pmo/EGPPlanejamento'))
+const EGPExecucaoHub = lazy(() => import('./pages/pmo/EGPExecucaoHub'))
+const EGPExecucao = lazy(() => import('./pages/pmo/EGPExecucao'))
+const EGPControleHub = lazy(() => import('./pages/pmo/EGPControleHub'))
+const EGPControle = lazy(() => import('./pages/pmo/EGPControle'))
+const EGPEncerramentoHub = lazy(() => import('./pages/pmo/EGPEncerramentoHub'))
+const EGPEncerramento = lazy(() => import('./pages/pmo/EGPEncerramento'))
 const Portfolio = lazy(() => import('./pages/pmo/Portfolio'))
 const PortfolioDetalhe = lazy(() => import('./pages/pmo/PortfolioDetalhe'))
 const NovoPortfolio = lazy(() => import('./pages/pmo/NovoPortfolio'))
-const EAP = lazy(() => import('./pages/pmo/EAP'))
-const TapHub = lazy(() => import('./pages/pmo/TapHub'))
-const TapPage = lazy(() => import('./pages/pmo/TapPage'))
-const EAPHub = lazy(() => import('./pages/pmo/EAPHub'))
-const CronogramaEGP = lazy(() => import('./pages/pmo/Cronograma'))
-const CronogramaHub = lazy(() => import('./pages/pmo/CronogramaHub'))
-const MedicoesEGP = lazy(() => import('./pages/pmo/Medicoes'))
-const MedicoesHub = lazy(() => import('./pages/pmo/MedicoesHub'))
-const HistogramaEGP = lazy(() => import('./pages/pmo/Histograma'))
-const HistogramaHub = lazy(() => import('./pages/pmo/HistogramaHub'))
-const ControleCustos = lazy(() => import('./pages/pmo/ControleCustos'))
-const CustosHub = lazy(() => import('./pages/pmo/CustosHub'))
-const FluxoOS = lazy(() => import('./pages/pmo/FluxoOS'))
-const ReunioesEGP = lazy(() => import('./pages/pmo/Reunioes'))
-const StatusReportList = lazy(() => import('./pages/pmo/StatusReportList'))
 
 // Cadastros
 const CadastrosHome = lazy(() => import('./pages/cadastros/CadastrosHome'))
@@ -379,28 +374,46 @@ export default function App() {
             </Route>
           </Route>
 
-          {/* Módulo EGP */}
+          {/* Módulo EGP — Ciclo de Vida */}
           <Route element={<ModuleRoute moduleKey="egp" />}>
             <Route element={<EGPLayout />}>
-              <Route path="/egp"                              element={<LazyDash><EGPHome /></LazyDash>} />
-              <Route path="/egp/portfolio"                    element={<Lazy><Portfolio /></Lazy>} />
-              <Route path="/egp/portfolio/novo"               element={<Lazy><NovoPortfolio /></Lazy>} />
-              <Route path="/egp/portfolio/:id"                element={<Lazy><PortfolioDetalhe /></Lazy>} />
-              <Route path="/egp/tap"                          element={<Lazy><TapHub /></Lazy>} />
-              <Route path="/egp/tap/:portfolioId"              element={<Lazy><TapPage /></Lazy>} />
-              <Route path="/egp/eap"                          element={<Lazy><EAPHub /></Lazy>} />
-              <Route path="/egp/eap/:portfolioId"             element={<Lazy><EAP /></Lazy>} />
-              <Route path="/egp/cronograma"                   element={<Lazy><CronogramaHub /></Lazy>} />
-              <Route path="/egp/cronograma/:portfolioId"      element={<Lazy><CronogramaEGP /></Lazy>} />
-              <Route path="/egp/medicoes"                     element={<Lazy><MedicoesHub /></Lazy>} />
-              <Route path="/egp/medicoes/:portfolioId"        element={<Lazy><MedicoesEGP /></Lazy>} />
-              <Route path="/egp/histograma"                   element={<Lazy><HistogramaHub /></Lazy>} />
-              <Route path="/egp/histograma/:portfolioId"      element={<Lazy><HistogramaEGP /></Lazy>} />
-              <Route path="/egp/custos"                       element={<Lazy><CustosHub /></Lazy>} />
-              <Route path="/egp/custos/:portfolioId"          element={<Lazy><ControleCustos /></Lazy>} />
-              <Route path="/egp/fluxo-os"                     element={<Lazy><FluxoOS /></Lazy>} />
-              <Route path="/egp/reunioes"                     element={<Lazy><ReunioesEGP /></Lazy>} />
-              <Route path="/egp/indicadores"                  element={<Lazy><StatusReportList /></Lazy>} />
+              {/* Painel */}
+              <Route path="/egp"                                  element={<LazyDash><EGPPainel /></LazyDash>} />
+              {/* Iniciação */}
+              <Route path="/egp/iniciacao"                        element={<Lazy><EGPIniciacaoHub /></Lazy>} />
+              <Route path="/egp/iniciacao/:portfolioId"           element={<Lazy><EGPIniciacao /></Lazy>} />
+              {/* Planejamento */}
+              <Route path="/egp/planejamento"                     element={<Lazy><EGPPlanejamentoHub /></Lazy>} />
+              <Route path="/egp/planejamento/:portfolioId"        element={<Lazy><EGPPlanejamento /></Lazy>} />
+              {/* Execução */}
+              <Route path="/egp/execucao"                         element={<Lazy><EGPExecucaoHub /></Lazy>} />
+              <Route path="/egp/execucao/:portfolioId"            element={<Lazy><EGPExecucao /></Lazy>} />
+              {/* Controle */}
+              <Route path="/egp/controle"                         element={<Lazy><EGPControleHub /></Lazy>} />
+              <Route path="/egp/controle/:portfolioId"            element={<Lazy><EGPControle /></Lazy>} />
+              {/* Encerramento */}
+              <Route path="/egp/encerramento"                     element={<Lazy><EGPEncerramentoHub /></Lazy>} />
+              <Route path="/egp/encerramento/:portfolioId"        element={<Lazy><EGPEncerramento /></Lazy>} />
+              {/* Portfólio (mantido para acesso direto) */}
+              <Route path="/egp/portfolio"                        element={<Lazy><Portfolio /></Lazy>} />
+              <Route path="/egp/portfolio/novo"                   element={<Lazy><NovoPortfolio /></Lazy>} />
+              <Route path="/egp/portfolio/:id"                    element={<Lazy><PortfolioDetalhe /></Lazy>} />
+              {/* Legacy redirects — rotas antigas → novas visões */}
+              <Route path="/egp/tap"                              element={<Navigate to="/egp/iniciacao" replace />} />
+              <Route path="/egp/tap/:portfolioId"                 element={<Navigate to="/egp/iniciacao" replace />} />
+              <Route path="/egp/eap"                              element={<Navigate to="/egp/planejamento" replace />} />
+              <Route path="/egp/eap/:portfolioId"                 element={<Navigate to="/egp/planejamento" replace />} />
+              <Route path="/egp/cronograma"                       element={<Navigate to="/egp/execucao" replace />} />
+              <Route path="/egp/cronograma/:portfolioId"          element={<Navigate to="/egp/execucao" replace />} />
+              <Route path="/egp/medicoes"                         element={<Navigate to="/egp/controle" replace />} />
+              <Route path="/egp/medicoes/:portfolioId"            element={<Navigate to="/egp/controle" replace />} />
+              <Route path="/egp/histograma"                       element={<Navigate to="/egp/execucao" replace />} />
+              <Route path="/egp/histograma/:portfolioId"          element={<Navigate to="/egp/execucao" replace />} />
+              <Route path="/egp/custos"                           element={<Navigate to="/egp/execucao" replace />} />
+              <Route path="/egp/custos/:portfolioId"              element={<Navigate to="/egp/execucao" replace />} />
+              <Route path="/egp/fluxo-os"                         element={<Navigate to="/egp/execucao" replace />} />
+              <Route path="/egp/reunioes"                         element={<Navigate to="/egp/controle" replace />} />
+              <Route path="/egp/indicadores"                      element={<Navigate to="/egp/controle" replace />} />
             </Route>
           </Route>
 

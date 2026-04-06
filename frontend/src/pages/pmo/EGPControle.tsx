@@ -1,0 +1,572 @@
+import { useState } from 'react'
+import { useParams, useNavigate } from 'react-router-dom'
+import {
+  ArrowLeft, BarChart3, Ruler, Calendar, TrendingUp,
+  Scale, FileText, Activity, AlertTriangle, ChevronRight,
+} from 'lucide-react'
+import { useTheme } from '../../contexts/ThemeContext'
+import {
+  usePortfolio, useMedicaoResumo, useMedicaoItens,
+  useMudancas, useMultas, useStatusReports, useIndicadores,
+} from '../../hooks/usePMO'
+import type {
+  PMOMedicaoResumo, PMOMedicaoItem, PMOMudanca, PMOMulta,
+  PMOStatusReport, PMOIndicadoresSnapshot,
+} from '../../types/pmo'
+
+type Tab = 'medicoes' | 'eventos' | 'status_report' | 'indicadores'
+
+const TABS: { key: Tab; label: string; icon: React.ElementType }[] = [
+  { key: 'medicoes', label: 'Medicoes', icon: Ruler },
+  { key: 'eventos', label: 'Eventos', icon: AlertTriangle },
+  { key: 'status_report', label: 'Status Report', icon: FileText },
+  { key: 'indicadores', label: 'Indicadores', icon: Activity },
+]
+
+const fmtBRL = (v: number) =>
+  v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
+
+const fmtPct = (v: number) => `${(v * 100).toFixed(1)}%`
+
+const fmtNum = (v?: number | null) => (v != null ? v.toLocaleString('pt-BR') : '-')
+
+const fmtData = (d?: string) =>
+  d ? new Date(d + 'T00:00:00').toLocaleDateString('pt-BR') : '-'
+
+// ── Main ────────────────────────────────────────────────────────────────────
+
+export default function EGPControle() {
+  const { isLightSidebar: isLight } = useTheme()
+  const { portfolioId } = useParams<{ portfolioId: string }>()
+  const nav = useNavigate()
+  const [tab, setTab] = useState<Tab>('medicoes')
+
+  const { data: portfolio } = usePortfolio(portfolioId)
+
+  return (
+    <div className="space-y-6 p-4 md:p-6">
+      {/* Back */}
+      <button
+        onClick={() => nav('/egp/controle')}
+        className={`flex items-center gap-1 text-sm transition-colors ${
+          isLight ? 'text-slate-400 hover:text-slate-700' : 'text-slate-500 hover:text-slate-300'
+        }`}
+      >
+        <ArrowLeft size={14} /> Voltar
+      </button>
+
+      {/* Header */}
+      <div>
+        <h1 className={`text-xl font-bold flex items-center gap-2 ${isLight ? 'text-slate-800' : 'text-white'}`}>
+          <BarChart3 size={20} className="text-emerald-500" />
+          Controle
+        </h1>
+        {portfolio && (
+          <p className={`text-sm mt-1 ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
+            {portfolio.nome_obra} - {portfolio.numero_osc}
+          </p>
+        )}
+      </div>
+
+      {/* Tab bar */}
+      <div className="flex items-center gap-1 flex-wrap">
+        {TABS.map((t, idx) => {
+          const Icon = t.icon
+          const active = tab === t.key
+          return (
+            <div key={t.key} className="flex items-center gap-1">
+              {idx > 0 && (
+                <ChevronRight size={14} className={isLight ? 'text-slate-300' : 'text-slate-600'} />
+              )}
+              <button
+                onClick={() => setTab(t.key)}
+                className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-semibold transition-all ${
+                  active
+                    ? 'bg-emerald-500 text-white shadow-md shadow-emerald-500/25'
+                    : isLight
+                      ? 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                      : 'bg-slate-800 text-slate-400 hover:bg-slate-700'
+                }`}
+              >
+                <Icon size={14} />
+                {t.label}
+              </button>
+            </div>
+          )
+        })}
+      </div>
+
+      {/* Tab content */}
+      {tab === 'medicoes' && <MedicoesPanel portfolioId={portfolioId} isLight={isLight} />}
+      {tab === 'eventos' && <EventosPanel portfolioId={portfolioId} isLight={isLight} />}
+      {tab === 'status_report' && <StatusReportPanel portfolioId={portfolioId} isLight={isLight} />}
+      {tab === 'indicadores' && <IndicadoresPanel portfolioId={portfolioId} isLight={isLight} />}
+    </div>
+  )
+}
+
+// ── Medicoes Panel ──────────────────────────────────────────────────────────
+
+function MedicoesPanel({ portfolioId, isLight }: { portfolioId?: string; isLight: boolean }) {
+  const { data: resumo, isLoading: loadResumo } = useMedicaoResumo(portfolioId)
+  const { data: itens, isLoading: loadItens } = useMedicaoItens(portfolioId)
+
+  if (loadResumo || loadItens) return <Spinner />
+
+  const cardCls = `rounded-2xl border p-5 ${
+    isLight ? 'bg-white border-slate-200 shadow-sm' : 'bg-white/[0.03] border-white/[0.06]'
+  }`
+  const labelCls = `text-xs font-semibold uppercase tracking-wide mb-1 ${isLight ? 'text-slate-400' : 'text-slate-500'}`
+  const valueCls = `text-lg font-bold ${isLight ? 'text-slate-800' : 'text-white'}`
+  const thCls = `text-left text-xs font-semibold uppercase tracking-wide py-3 px-4 ${
+    isLight ? 'text-slate-400 bg-slate-50' : 'text-slate-500 bg-white/[0.02]'
+  }`
+  const tdCls = `py-3 px-4 text-sm ${isLight ? 'text-slate-700' : 'text-slate-300'}`
+
+  return (
+    <div className="space-y-4">
+      {/* Summary cards */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className={cardCls}>
+          <p className={labelCls}>Valor Contrato</p>
+          <p className={valueCls}>{resumo ? fmtBRL(resumo.valor_contrato) : '-'}</p>
+        </div>
+        <div className={cardCls}>
+          <p className={labelCls}>Total Medido</p>
+          <p className={valueCls}>{resumo ? fmtBRL(resumo.total_medido_valor) : '-'}</p>
+          {resumo && (
+            <p className={`text-xs mt-0.5 ${isLight ? 'text-emerald-600' : 'text-emerald-400'}`}>
+              {fmtPct(resumo.total_medido_pct)}
+            </p>
+          )}
+        </div>
+        <div className={cardCls}>
+          <p className={labelCls}>A Medir</p>
+          <p className={valueCls}>{resumo ? fmtBRL(resumo.total_a_medir_valor) : '-'}</p>
+          {resumo && (
+            <p className={`text-xs mt-0.5 ${isLight ? 'text-amber-600' : 'text-amber-400'}`}>
+              {fmtPct(resumo.total_a_medir_pct)}
+            </p>
+          )}
+        </div>
+        <div className={cardCls + ' flex items-center justify-center'}>
+          <button
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold bg-emerald-500 text-white hover:bg-emerald-600 transition-all shadow-md shadow-emerald-500/20"
+          >
+            <Scale size={14} />
+            Solicitar Faturamento
+          </button>
+        </div>
+      </div>
+
+      {/* Items table */}
+      <div className={`rounded-2xl border overflow-hidden ${
+        isLight ? 'bg-white border-slate-200 shadow-sm' : 'bg-white/[0.03] border-white/[0.06]'
+      }`}>
+        <h3 className={`text-sm font-bold px-5 pt-5 pb-3 ${isLight ? 'text-slate-700' : 'text-white'}`}>
+          Itens de Medicao
+        </h3>
+        {(!itens || itens.length === 0) ? (
+          <EmptyState isLight={isLight} message="Nenhum item de medicao cadastrado" />
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr className={`border-b ${isLight ? 'border-slate-100' : 'border-white/[0.06]'}`}>
+                  <th className={thCls}>#</th>
+                  <th className={thCls}>Descricao</th>
+                  <th className={thCls}>Unidade</th>
+                  <th className={thCls + ' text-right'}>Qtd Prevista</th>
+                  <th className={thCls + ' text-right'}>Preco Unit.</th>
+                  <th className={thCls + ' text-right'}>Valor Total</th>
+                </tr>
+              </thead>
+              <tbody>
+                {itens.map(item => (
+                  <tr
+                    key={item.id}
+                    className={`border-b transition-colors ${
+                      isLight ? 'border-slate-50 hover:bg-slate-50/50' : 'border-white/[0.03] hover:bg-white/[0.02]'
+                    }`}
+                  >
+                    <td className={tdCls + ' font-mono text-xs'}>{item.numero_medicao}</td>
+                    <td className={`${tdCls} font-medium ${isLight ? 'text-slate-800' : 'text-white'}`}>{item.item_descricao}</td>
+                    <td className={tdCls}>{item.unidade ?? '-'}</td>
+                    <td className={tdCls + ' text-right font-mono'}>{fmtNum(item.quantidade_prevista)}</td>
+                    <td className={tdCls + ' text-right font-mono'}>{fmtBRL(item.preco_unitario)}</td>
+                    <td className={`${tdCls} text-right font-mono font-semibold ${isLight ? 'text-slate-800' : 'text-white'}`}>{fmtBRL(item.valor_total)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// ── Eventos Panel ───────────────────────────────────────────────────────────
+
+function EventosPanel({ portfolioId, isLight }: { portfolioId?: string; isLight: boolean }) {
+  const { data: mudancas, isLoading: loadM } = useMudancas(portfolioId)
+  const { data: multas, isLoading: loadMu } = useMultas(portfolioId)
+
+  if (loadM || loadMu) return <Spinner />
+
+  const cardCls = `rounded-2xl border overflow-hidden ${
+    isLight ? 'bg-white border-slate-200 shadow-sm' : 'bg-white/[0.03] border-white/[0.06]'
+  }`
+  const thCls = `text-left text-xs font-semibold uppercase tracking-wide py-3 px-4 ${
+    isLight ? 'text-slate-400 bg-slate-50' : 'text-slate-500 bg-white/[0.02]'
+  }`
+  const tdCls = `py-3 px-4 text-sm ${isLight ? 'text-slate-700' : 'text-slate-300'}`
+
+  const PARECER_CFG: Record<string, { label: string; cls: string }> = {
+    pendente: { label: 'Pendente', cls: isLight ? 'bg-amber-100 text-amber-700' : 'bg-amber-500/15 text-amber-400' },
+    aprovado: { label: 'Aprovado', cls: isLight ? 'bg-emerald-100 text-emerald-700' : 'bg-emerald-500/15 text-emerald-400' },
+    reprovado: { label: 'Reprovado', cls: isLight ? 'bg-red-100 text-red-700' : 'bg-red-500/15 text-red-400' },
+    em_analise: { label: 'Em Analise', cls: isLight ? 'bg-blue-100 text-blue-700' : 'bg-blue-500/15 text-blue-400' },
+  }
+
+  const STATUS_MULTA_CFG: Record<string, { label: string; cls: string }> = {
+    notificada: { label: 'Notificada', cls: isLight ? 'bg-amber-100 text-amber-700' : 'bg-amber-500/15 text-amber-400' },
+    em_defesa: { label: 'Em Defesa', cls: isLight ? 'bg-blue-100 text-blue-700' : 'bg-blue-500/15 text-blue-400' },
+    confirmada: { label: 'Confirmada', cls: isLight ? 'bg-red-100 text-red-700' : 'bg-red-500/15 text-red-400' },
+    cancelada: { label: 'Cancelada', cls: isLight ? 'bg-slate-100 text-slate-600' : 'bg-slate-500/15 text-slate-400' },
+    paga: { label: 'Paga', cls: isLight ? 'bg-emerald-100 text-emerald-700' : 'bg-emerald-500/15 text-emerald-400' },
+  }
+
+  const IMPACTO_CFG: Record<string, { label: string; cls: string }> = {
+    baixo: { label: 'Baixo', cls: isLight ? 'bg-emerald-100 text-emerald-700' : 'bg-emerald-500/15 text-emerald-400' },
+    medio: { label: 'Medio', cls: isLight ? 'bg-amber-100 text-amber-700' : 'bg-amber-500/15 text-amber-400' },
+    alto: { label: 'Alto', cls: isLight ? 'bg-red-100 text-red-700' : 'bg-red-500/15 text-red-400' },
+  }
+
+  return (
+    <div className="space-y-4">
+      {/* Mudancas */}
+      <div className={cardCls}>
+        <div className="px-5 pt-5 pb-3">
+          <h3 className={`text-sm font-bold flex items-center gap-2 ${isLight ? 'text-slate-700' : 'text-white'}`}>
+            <TrendingUp size={14} className="text-emerald-500" />
+            Mudancas
+          </h3>
+        </div>
+        {(!mudancas || mudancas.length === 0) ? (
+          <EmptyState isLight={isLight} message="Nenhuma mudanca registrada" />
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr className={`border-b ${isLight ? 'border-slate-100' : 'border-white/[0.06]'}`}>
+                  <th className={thCls}>Tipo</th>
+                  <th className={thCls}>Descricao</th>
+                  <th className={thCls}>Impacto Prazo</th>
+                  <th className={thCls}>Parecer</th>
+                </tr>
+              </thead>
+              <tbody>
+                {mudancas.map(m => {
+                  const imp = IMPACTO_CFG[m.impacto_prazo] ?? { label: m.impacto_prazo, cls: '' }
+                  const par = PARECER_CFG[m.parecer] ?? { label: m.parecer, cls: '' }
+                  return (
+                    <tr
+                      key={m.id}
+                      className={`border-b transition-colors ${
+                        isLight ? 'border-slate-50 hover:bg-slate-50/50' : 'border-white/[0.03] hover:bg-white/[0.02]'
+                      }`}
+                    >
+                      <td className={tdCls}>
+                        <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full capitalize ${
+                          isLight ? 'bg-slate-100 text-slate-600' : 'bg-slate-700 text-slate-300'
+                        }`}>
+                          {m.tipo.replace(/_/g, ' ')}
+                        </span>
+                      </td>
+                      <td className={tdCls + ' max-w-xs truncate'}>{m.descricao}</td>
+                      <td className={tdCls}>
+                        <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${imp.cls}`}>
+                          {imp.label}
+                        </span>
+                      </td>
+                      <td className={tdCls}>
+                        <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${par.cls}`}>
+                          {par.label}
+                        </span>
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      {/* Multas */}
+      <div className={cardCls}>
+        <div className="px-5 pt-5 pb-3">
+          <h3 className={`text-sm font-bold flex items-center gap-2 ${isLight ? 'text-slate-700' : 'text-white'}`}>
+            <AlertTriangle size={14} className="text-red-500" />
+            Multas
+          </h3>
+        </div>
+        {(!multas || multas.length === 0) ? (
+          <EmptyState isLight={isLight} message="Nenhuma multa registrada" />
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr className={`border-b ${isLight ? 'border-slate-100' : 'border-white/[0.06]'}`}>
+                  <th className={thCls}>Tipo</th>
+                  <th className={thCls}>Descricao</th>
+                  <th className={thCls + ' text-right'}>Valor Estimado</th>
+                  <th className={thCls}>Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {multas.map(mu => {
+                  const st = STATUS_MULTA_CFG[mu.status] ?? { label: mu.status, cls: '' }
+                  return (
+                    <tr
+                      key={mu.id}
+                      className={`border-b transition-colors ${
+                        isLight ? 'border-slate-50 hover:bg-slate-50/50' : 'border-white/[0.03] hover:bg-white/[0.02]'
+                      }`}
+                    >
+                      <td className={tdCls}>
+                        <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full capitalize ${
+                          isLight ? 'bg-red-50 text-red-600' : 'bg-red-500/10 text-red-400'
+                        }`}>
+                          {mu.tipo_multa.replace(/_/g, ' ')}
+                        </span>
+                      </td>
+                      <td className={tdCls + ' max-w-xs truncate'}>{mu.descricao}</td>
+                      <td className={`${tdCls} text-right font-mono font-semibold ${isLight ? 'text-red-600' : 'text-red-400'}`}>
+                        {fmtBRL(mu.valor_estimado)}
+                      </td>
+                      <td className={tdCls}>
+                        <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${st.cls}`}>
+                          {st.label}
+                        </span>
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// ── Status Report Panel ─────────────────────────────────────────────────────
+
+function StatusReportPanel({ portfolioId, isLight }: { portfolioId?: string; isLight: boolean }) {
+  const { data: reports, isLoading } = useStatusReports(portfolioId)
+
+  if (isLoading) return <Spinner />
+
+  const cardCls = `rounded-2xl border p-5 ${
+    isLight ? 'bg-white border-slate-200 shadow-sm' : 'bg-white/[0.03] border-white/[0.06]'
+  }`
+  const labelCls = `text-xs font-semibold uppercase tracking-wide mb-1 ${isLight ? 'text-slate-400' : 'text-slate-500'}`
+
+  const STATUS_CFG: Record<string, { label: string; cls: string }> = {
+    rascunho: { label: 'Rascunho', cls: isLight ? 'bg-slate-100 text-slate-600' : 'bg-slate-500/15 text-slate-400' },
+    publicado: { label: 'Publicado', cls: isLight ? 'bg-emerald-100 text-emerald-700' : 'bg-emerald-500/15 text-emerald-400' },
+    revisao: { label: 'Revisao', cls: isLight ? 'bg-amber-100 text-amber-700' : 'bg-amber-500/15 text-amber-400' },
+  }
+
+  if (!reports || reports.length === 0) {
+    return <EmptyState isLight={isLight} message="Nenhum status report cadastrado" />
+  }
+
+  return (
+    <div className="space-y-4">
+      {reports.map(r => {
+        const st = STATUS_CFG[r.status] ?? STATUS_CFG.rascunho
+        const delta = r.delta_faturamento
+        const deltaColor = delta >= 0
+          ? (isLight ? 'text-emerald-600' : 'text-emerald-400')
+          : (isLight ? 'text-red-600' : 'text-red-400')
+
+        return (
+          <div key={r.id} className={cardCls}>
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-3">
+                <div className={`w-8 h-8 rounded-xl flex items-center justify-center ${
+                  isLight ? 'bg-emerald-50' : 'bg-emerald-500/10'
+                }`}>
+                  <Calendar size={14} className="text-emerald-500" />
+                </div>
+                <div>
+                  <p className={`text-sm font-bold ${isLight ? 'text-slate-800' : 'text-white'}`}>
+                    {r.periodo}
+                  </p>
+                  <p className={`text-xs ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>
+                    {fmtData(r.data_report)}
+                  </p>
+                </div>
+              </div>
+              <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${st.cls}`}>
+                {st.label}
+              </span>
+            </div>
+
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div>
+                <p className={labelCls}>OS Total</p>
+                <p className={`text-lg font-bold ${isLight ? 'text-slate-800' : 'text-white'}`}>
+                  {r.os_total}
+                </p>
+              </div>
+              <div>
+                <p className={labelCls}>Faturamento Atual</p>
+                <p className={`text-lg font-bold ${isLight ? 'text-slate-800' : 'text-white'}`}>
+                  {fmtBRL(r.faturamento_atual)}
+                </p>
+              </div>
+              <div>
+                <p className={labelCls}>Meta Faturamento</p>
+                <p className={`text-lg font-bold ${isLight ? 'text-slate-800' : 'text-white'}`}>
+                  {fmtBRL(r.meta_faturamento)}
+                </p>
+              </div>
+              <div>
+                <p className={labelCls}>Delta</p>
+                <p className={`text-lg font-bold ${deltaColor}`}>
+                  {delta >= 0 ? '+' : ''}{fmtBRL(delta)}
+                </p>
+              </div>
+            </div>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
+// ── Indicadores Panel ───────────────────────────────────────────────────────
+
+function IndicadoresPanel({ portfolioId, isLight }: { portfolioId?: string; isLight: boolean }) {
+  const { data: snapshots, isLoading } = useIndicadores(portfolioId)
+
+  if (isLoading) return <Spinner />
+
+  const latest = snapshots?.[0]
+
+  if (!latest) {
+    return <EmptyState isLight={isLight} message="Nenhum snapshot de indicadores encontrado" />
+  }
+
+  const cardCls = `rounded-2xl border p-5 ${
+    isLight ? 'bg-white border-slate-200 shadow-sm' : 'bg-white/[0.03] border-white/[0.06]'
+  }`
+  const labelCls = `text-xs font-semibold uppercase tracking-wide mb-1 ${isLight ? 'text-slate-400' : 'text-slate-500'}`
+  const valueCls = `text-2xl font-bold ${isLight ? 'text-slate-800' : 'text-white'}`
+
+  const getIndexColor = (v?: number | null) => {
+    if (v == null) return isLight ? 'text-slate-400' : 'text-slate-500'
+    if (v >= 1) return isLight ? 'text-emerald-600' : 'text-emerald-400'
+    if (v >= 0.9) return isLight ? 'text-amber-600' : 'text-amber-400'
+    return isLight ? 'text-red-600' : 'text-red-400'
+  }
+
+  const metrics: { label: string; value: string; color?: string; icon: React.ElementType }[] = [
+    {
+      label: 'SPI (IDP)',
+      value: latest.idp != null ? latest.idp.toFixed(2) : '-',
+      color: getIndexColor(latest.idp),
+      icon: TrendingUp,
+    },
+    {
+      label: 'CPI (IDC)',
+      value: latest.idc != null ? latest.idc.toFixed(2) : '-',
+      color: getIndexColor(latest.idc),
+      icon: BarChart3,
+    },
+    {
+      label: '% Valor Executado',
+      value: latest.pct_valor_executado != null ? fmtPct(latest.pct_valor_executado) : '-',
+      icon: Scale,
+    },
+    {
+      label: 'Multas Acumuladas',
+      value: latest.multas_acumuladas != null ? fmtBRL(latest.multas_acumuladas) : '-',
+      color: latest.multas_acumuladas && latest.multas_acumuladas > 0
+        ? (isLight ? 'text-red-600' : 'text-red-400')
+        : undefined,
+      icon: AlertTriangle,
+    },
+    {
+      label: 'Producao Mensal',
+      value: fmtNum(latest.producao_mensal),
+      icon: Activity,
+    },
+    {
+      label: 'Taxa Frequencia',
+      value: latest.taxa_frequencia != null ? latest.taxa_frequencia.toFixed(2) : '-',
+      icon: FileText,
+    },
+    {
+      label: 'Horas Trabalhadas',
+      value: fmtNum(latest.horas_trabalhadas),
+      icon: Ruler,
+    },
+  ]
+
+  return (
+    <div className="space-y-4">
+      {/* Snapshot date */}
+      <p className={`text-xs ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>
+        Snapshot: {fmtData(latest.data_snapshot)}
+      </p>
+
+      {/* Metric cards grid */}
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+        {metrics.map(m => {
+          const Icon = m.icon
+          return (
+            <div key={m.label} className={cardCls}>
+              <div className="flex items-center gap-2 mb-3">
+                <div className={`w-7 h-7 rounded-lg flex items-center justify-center ${
+                  isLight ? 'bg-emerald-50' : 'bg-emerald-500/10'
+                }`}>
+                  <Icon size={13} className="text-emerald-500" />
+                </div>
+                <p className={`${labelCls} !mb-0`}>{m.label}</p>
+              </div>
+              <p className={`${valueCls} ${m.color ?? ''}`}>
+                {m.value}
+              </p>
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+// ── Shared helpers ──────────────────────────────────────────────────────────
+
+function Spinner() {
+  return (
+    <div className="flex items-center justify-center py-20">
+      <div className="w-6 h-6 border-2 border-emerald-500/30 border-t-emerald-500 rounded-full animate-spin" />
+    </div>
+  )
+}
+
+function EmptyState({ isLight, message }: { isLight: boolean; message: string }) {
+  return (
+    <div className={`rounded-2xl border p-10 text-center ${
+      isLight ? 'bg-white border-slate-200' : 'bg-white/[0.03] border-white/[0.06]'
+    }`}>
+      <p className={`text-sm ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>{message}</p>
+    </div>
+  )
+}
