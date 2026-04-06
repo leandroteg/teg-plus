@@ -16,6 +16,7 @@ type NovaSolicitacaoAdiantamentoPayload = {
   classe_financeira?: string
   classe_financeira_id?: string
   observacoes?: string
+  solicitante_email?: string
 }
 
 function gerarNumeroAdiantamento() {
@@ -143,6 +144,7 @@ export function useCriarSolicitacaoAdiantamento() {
           numero,
           solicitante_id: perfil.id,
           solicitante_nome: perfil.nome,
+          solicitante_email: perfil.email,
           gestor_id: aprovadorRhId,
           gestor_nome: aprovadorNome,
           gestor_email: aprovadorEmail,

@@ -1,0 +1,193 @@
+{
+  "name": "TEG+ | Despesas - Aviso Prestação Adiantamento Vencida",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 10 * * 1-5"
+            }
+          ]
+        }
+      },
+      "id": "cron-diario",
+      "name": "Cron Dias Úteis 07h BRT",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [260, 300],
+      "notes": "Executa de segunda a sexta às 10:00 UTC (07:00 BRT)"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $vars.supabase_url + '/rest/v1/rpc/desp_atualizar_status_apos_pagamento' }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "apikey", "value": "={{ $vars.supabase_service_role_key }}" },
+            { "name": "Authorization", "value": "={{ 'Bearer ' + $vars.supabase_service_role_key }}" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "bodyContentType": "json",
+        "body": "{}"
+      },
+      "id": "transicionar-status",
+      "name": "Transicionar Aprovados → Prestação Pendente",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [480, 300],
+      "notes": "Muda status='aprovado' para 'prestacao_pendente' quando data_pagamento <= hoje"
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $vars.supabase_url + '/rest/v1/desp_adiantamentos_prestacao_vencida?select=*&order=dias_vencido.desc' }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "apikey", "value": "={{ $vars.supabase_service_role_key }}" },
+            { "name": "Authorization", "value": "={{ 'Bearer ' + $vars.supabase_service_role_key }}" }
+          ]
+        }
+      },
+      "id": "buscar-vencidos",
+      "name": "Buscar Adiantamentos Vencidos",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [700, 300],
+      "notes": "Retorna apenas os que ainda não tiveram aviso enviado hoje"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "number": [
+            {
+              "value1": "={{ $json.length }}",
+              "operation": "larger",
+              "value2": 0
+            }
+          ]
+        }
+      },
+      "id": "tem-vencidos",
+      "name": "Tem Adiantamentos Vencidos?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [920, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\nconst vencidos = items[0].json;\n\nif (!Array.isArray(vencidos) || vencidos.length === 0) {\n  return [];\n}\n\nreturn vencidos.map(item => ({\n  json: {\n    id: item.id,\n    numero: item.numero,\n    solicitante_nome: item.solicitante_nome,\n    solicitante_email: item.solicitante_email,\n    gestor_nome: item.gestor_nome,\n    gestor_email: item.gestor_email,\n    favorecido_nome: item.favorecido_nome,\n    valor_solicitado: item.valor_solicitado,\n    data_pagamento: item.data_pagamento,\n    data_limite_prestacao: item.data_limite_prestacao,\n    dias_vencido: item.dias_vencido\n  }\n}));"
+      },
+      "id": "expandir-lista",
+      "name": "Expandir Lista de Vencidos",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1140, 220]
+    },
+    {
+      "parameters": {
+        "jsCode": "const item = $input.first().json;\n\nconst fmtBRL = (v) => {\n  const num = parseFloat(v) || 0;\n  return num.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });\n};\n\nconst fmtDate = (d) => {\n  if (!d) return '—';\n  const [y, m, day] = d.split('-');\n  return `${day}/${m}/${y}`;\n};\n\nconst diasVencido = parseInt(item.dias_vencido) || 0;\nconst urgencia = diasVencido >= 10 ? '🔴 URGENTE' : diasVencido >= 5 ? '🟡 Atenção' : '⚠️ Aviso';\n\nconst assunto = `${urgencia} – Prestação de contas pendente: Adiantamento ${item.numero}`;\n\nconst corpo = `\n<div style=\"font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;\">\n  <div style=\"background: #f59e0b; color: white; padding: 20px 24px; border-radius: 12px 12px 0 0;\">\n    <h2 style=\"margin: 0; font-size: 18px;\">⏰ Prestação de Contas Vencida</h2>\n    <p style=\"margin: 4px 0 0; opacity: 0.9; font-size: 13px;\">TEG+ · Adiantamentos</p>\n  </div>\n  <div style=\"background: #fff; border: 1px solid #e5e7eb; border-top: none; padding: 24px; border-radius: 0 0 12px 12px;\">\n    <p style=\"color: #374151;\">Olá, <strong>${item.solicitante_nome}</strong>!</p>\n    <p style=\"color: #374151;\">O prazo para prestação de contas do adiantamento abaixo venceu há <strong>${diasVencido} dia(s)</strong>. Por favor, regularize o quanto antes.</p>\n\n    <div style=\"background: #fef3c7; border: 1px solid #f59e0b; border-radius: 8px; padding: 16px; margin: 20px 0;\">\n      <table style=\"width: 100%; border-collapse: collapse; font-size: 14px;\">\n        <tr><td style=\"color: #6b7280; padding: 4px 0;\">Número:</td><td style=\"font-weight: bold; color: #111827;\">${item.numero}</td></tr>\n        <tr><td style=\"color: #6b7280; padding: 4px 0;\">Favorecido:</td><td style=\"color: #111827;\">${item.favorecido_nome}</td></tr>\n        <tr><td style=\"color: #6b7280; padding: 4px 0;\">Valor:</td><td style=\"font-weight: bold; color: #111827;\">${fmtBRL(item.valor_solicitado)}</td></tr>\n        <tr><td style=\"color: #6b7280; padding: 4px 0;\">Data de pagamento:</td><td style=\"color: #111827;\">${fmtDate(item.data_pagamento)}</td></tr>\n        <tr><td style=\"color: #6b7280; padding: 4px 0;\">Prazo limite:</td><td style=\"font-weight: bold; color: #dc2626;\">${fmtDate(item.data_limite_prestacao)}</td></tr>\n        <tr><td style=\"color: #6b7280; padding: 4px 0;\">Dias em atraso:</td><td style=\"font-weight: bold; color: #dc2626;\">${diasVencido} dia(s)</td></tr>\n      </table>\n    </div>\n\n    <p style=\"color: #374151;\">Acesse o sistema TEG+ para registrar sua prestação de contas com os comprovantes dos gastos realizados.</p>\n\n    <p style=\"color: #6b7280; font-size: 12px; margin-top: 24px; border-top: 1px solid #e5e7eb; padding-top: 12px;\">\n      Seu gestor <strong>${item.gestor_nome}</strong> também foi copiado neste aviso.\n    </p>\n  </div>\n</div>\n`;\n\nreturn [{\n  json: {\n    ...item,\n    email_assunto: assunto,\n    email_corpo: corpo\n  }\n}];"
+      },
+      "id": "montar-email",
+      "name": "Montar E-mail de Aviso",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1360, 220]
+    },
+    {
+      "parameters": {
+        "fromEmail": "noreply@teg.com.br",
+        "toEmail": "={{ $json.solicitante_email }}",
+        "ccEmail": "={{ $json.gestor_email }}",
+        "subject": "={{ $json.email_assunto }}",
+        "emailFormat": "html",
+        "html": "={{ $json.email_corpo }}"
+      },
+      "id": "enviar-email",
+      "name": "Enviar E-mail ao Solicitante",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [1580, 220],
+      "credentials": {
+        "smtp": {
+          "id": "smtp-teg",
+          "name": "SMTP TEG+"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $vars.supabase_url + '/rest/v1/rpc/desp_marcar_aviso_prestacao' }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "apikey", "value": "={{ $vars.supabase_service_role_key }}" },
+            { "name": "Authorization", "value": "={{ 'Bearer ' + $vars.supabase_service_role_key }}" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "bodyContentType": "json",
+        "jsonBody": "={{ JSON.stringify({ p_id: $json.id }) }}"
+      },
+      "id": "marcar-aviso-enviado",
+      "name": "Marcar Aviso Enviado no Supabase",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1800, 220],
+      "notes": "Registra aviso_prestacao_enviado_em para evitar reenvio no mesmo dia"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\"ok\": true, \"mensagem\": \"Nenhum adiantamento com prestação vencida hoje.\"}"
+      },
+      "id": "sem-vencidos",
+      "name": "Nenhum Vencido",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [1140, 400]
+    }
+  ],
+  "connections": {
+    "Cron Dias Úteis 07h BRT": {
+      "main": [[{ "node": "Transicionar Aprovados → Prestação Pendente", "type": "main", "index": 0 }]]
+    },
+    "Transicionar Aprovados → Prestação Pendente": {
+      "main": [[{ "node": "Buscar Adiantamentos Vencidos", "type": "main", "index": 0 }]]
+    },
+    "Buscar Adiantamentos Vencidos": {
+      "main": [[{ "node": "Tem Adiantamentos Vencidos?", "type": "main", "index": 0 }]]
+    },
+    "Tem Adiantamentos Vencidos?": {
+      "main": [
+        [{ "node": "Expandir Lista de Vencidos", "type": "main", "index": 0 }],
+        [{ "node": "Nenhum Vencido", "type": "main", "index": 0 }]
+      ]
+    },
+    "Expandir Lista de Vencidos": {
+      "main": [[{ "node": "Montar E-mail de Aviso", "type": "main", "index": 0 }]]
+    },
+    "Montar E-mail de Aviso": {
+      "main": [[{ "node": "Enviar E-mail ao Solicitante", "type": "main", "index": 0 }]]
+    },
+    "Enviar E-mail ao Solicitante": {
+      "main": [[{ "node": "Marcar Aviso Enviado no Supabase", "type": "main", "index": 0 }]]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "errorWorkflow": ""
+  },
+  "meta": {
+    "description": "Executa diariamente (dias úteis, 07h BRT):\n1. Transiciona adiantamentos aprovados com data_pagamento <= hoje para prestacao_pendente\n2. Busca todos com prestacao_pendente e data_limite_prestacao vencida (ainda não avisados hoje)\n3. Envia e-mail ao solicitante com CC ao gestor\n4. Registra o timestamp do aviso no Supabase"
+  },
+  "tags": ["despesas", "adiantamentos", "prestacao", "email", "cron"]
+}

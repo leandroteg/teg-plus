@@ -13,6 +13,18 @@ import type { StatusDespesaAdiantamento } from '../../types'
 const fmt = (v: number) =>
   v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
 
+function addBusinessDays(dateStr: string, days: number): string {
+  const [y, m, d] = dateStr.split('-').map(Number)
+  const date = new Date(y, m - 1, d)
+  let added = 0
+  while (added < days) {
+    date.setDate(date.getDate() + 1)
+    const dow = date.getDay()
+    if (dow !== 0 && dow !== 6) added++
+  }
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
+}
+
 const STATUS_STYLE: Record<StatusDespesaAdiantamento, string> = {
   solicitado: 'bg-amber-100 text-amber-700',
   aprovado: 'bg-emerald-100 text-emerald-700',
@@ -103,6 +115,15 @@ export default function DespesasAdiantamentos() {
       favorecido_email: colaboradorAtual.email || '',
     }))
   }, [showModal, form.favorecido_key, colaboradoresAtivos, perfil?.id])
+
+  useEffect(() => {
+    if (!form.data_pagamento) {
+      setForm(prev => ({ ...prev, data_limite_prestacao: '' }))
+      return
+    }
+    const limite = addBusinessDays(form.data_pagamento, 5)
+    setForm(prev => ({ ...prev, data_limite_prestacao: limite }))
+  }, [form.data_pagamento])
 
   const stats = useMemo(() => ({
     solicitado: adiantamentos.filter(item => item.status === 'solicitado').length,
@@ -309,8 +330,17 @@ export default function DespesasAdiantamentos() {
                 <input type="date" value={form.data_pagamento} onChange={e => setForm(prev => ({ ...prev, data_pagamento: e.target.value }))} className={inputCls} />
               </div>
               <div>
-                <label className="mb-1.5 block text-xs font-semibold text-slate-500">Limite para prestação</label>
-                <input type="date" value={form.data_limite_prestacao} onChange={e => setForm(prev => ({ ...prev, data_limite_prestacao: e.target.value }))} className={inputCls} />
+                <label className="mb-1.5 block text-xs font-semibold text-slate-500">
+                  Limite para prestação
+                  <span className={`ml-1.5 font-normal ${dark ? 'text-slate-500' : 'text-slate-400'}`}>(5 dias úteis após o pagamento)</span>
+                </label>
+                <input
+                  type="date"
+                  value={form.data_limite_prestacao}
+                  readOnly
+                  disabled={!form.data_pagamento}
+                  className={`${inputCls} cursor-default opacity-70`}
+                />
               </div>
               <div>
                 <label className="mb-1.5 block text-xs font-semibold text-slate-500">Centro de custo</label>
