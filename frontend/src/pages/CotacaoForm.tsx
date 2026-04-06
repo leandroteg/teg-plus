@@ -47,16 +47,24 @@ const calcTotalItems = (itens: ItemPreco[]) =>
   Math.round(itens.reduce((s, i) => s + i.valor_total, 0) * 100) / 100
 
 // ── Tabela de itens e preços por fornecedor ──────────────────────────────────
+type ReqItem = { id: string; descricao: string; quantidade: number; unidade: string; valor_unitario_estimado: number }
+
 function ItemPricingTable({
   items,
   onChange,
+  reqItens = [],
 }: {
   items: ItemPreco[]
   onChange: (items: ItemPreco[]) => void
+  reqItens?: ReqItem[]
 }) {
   const [itemResults, setItemResults] = useState<Record<number, any[]>>({})
   const [itemOpen, setItemOpen] = useState<Record<number, boolean>>({})
   const itemTimerRef = useRef<Record<number, ReturnType<typeof setTimeout>>>({})
+
+  // Itens da requisição que ainda não foram adicionados
+  const usedDescs = new Set(items.map(it => it.descricao.toLowerCase().trim()))
+  const availableReqItens = reqItens.filter(ri => !usedDescs.has(ri.descricao.toLowerCase().trim()))
 
   const addItem = () =>
     onChange([...items, { descricao: '', qtd: 1, valor_unitario: 0, valor_total: 0 }])
@@ -79,14 +87,28 @@ function ItemPricingTable({
     onChange(updated)
   }
 
+  // Filtra itens da requisição pelo texto digitado
+  const filterReqItens = (query: string) => {
+    if (!query.trim()) return availableReqItens
+    const q = query.toLowerCase()
+    return availableReqItens.filter(ri => ri.descricao.toLowerCase().includes(q))
+  }
+
   const searchItem = useCallback((i: number, query: string) => {
     updateItem(i, 'descricao', query)
     if (itemTimerRef.current[i]) clearTimeout(itemTimerRef.current[i])
+
+    // Mostra itens da requisição imediatamente (sem debounce)
+    const reqMatches = filterReqItens(query)
     if (query.trim().length < 2) {
-      setItemResults(prev => ({ ...prev, [i]: [] }))
-      setItemOpen(prev => ({ ...prev, [i]: false }))
+      // Sem query: mostra só itens da requisição
+      setItemResults(prev => ({ ...prev, [i]: reqMatches.map(ri => ({ ...ri, _fromReq: true })) }))
+      setItemOpen(prev => ({ ...prev, [i]: reqMatches.length > 0 }))
       return
     }
+    // Com query: mostra itens da requisição + busca no estoque
+    setItemResults(prev => ({ ...prev, [i]: reqMatches.map(ri => ({ ...ri, _fromReq: true })) }))
+    setItemOpen(prev => ({ ...prev, [i]: true }))
     itemTimerRef.current[i] = setTimeout(async () => {
       const { data } = await supabase
         .from('est_itens')
@@ -95,14 +117,28 @@ function ItemPricingTable({
         .eq('ativo', true)
         .order('descricao')
         .limit(8)
-      setItemResults(prev => ({ ...prev, [i]: data || [] }))
-      setItemOpen(prev => ({ ...prev, [i]: (data?.length ?? 0) > 0 }))
+      const reqResults = filterReqItens(query).map(ri => ({ ...ri, _fromReq: true }))
+      setItemResults(prev => ({ ...prev, [i]: [...reqResults, ...(data || [])] }))
+      setItemOpen(prev => ({ ...prev, [i]: reqResults.length > 0 || (data?.length ?? 0) > 0 }))
     }, 300)
-  }, [])
+  }, [availableReqItens])
 
   const selectItem = useCallback((i: number, est: any) => {
     onChange(items.map((item, idx) => {
       if (idx !== i) return item
+      if (est._fromReq) {
+        // Item da requisição: usa quantidade e valor estimado
+        const qtd = est.quantidade || item.qtd
+        const vu = est.valor_unitario_estimado || 0
+        return {
+          ...item,
+          descricao: est.descricao,
+          qtd,
+          valor_unitario: vu,
+          valor_total: Math.round(qtd * vu * 100) / 100,
+        }
+      }
+      // Item do estoque
       const vu = est.valor_medio || 0
       return {
         ...item,
@@ -158,22 +194,38 @@ function ItemPricingTable({
                   value={item.descricao}
                   onChange={e => searchItem(i, e.target.value)}
                   onFocus={() => {
-                    if (item.descricao.trim().length >= 2 && (itemResults[i]?.length ?? 0) > 0)
+                    // Ao focar, mostra itens da requisição mesmo sem digitar
+                    const reqMatches = filterReqItens(item.descricao)
+                    if (reqMatches.length > 0 || (item.descricao.trim().length >= 2 && (itemResults[i]?.length ?? 0) > 0)) {
+                      if (reqMatches.length > 0 && !item.descricao.trim()) {
+                        setItemResults(prev => ({ ...prev, [i]: reqMatches.map(ri => ({ ...ri, _fromReq: true })) }))
+                      }
                       setItemOpen(prev => ({ ...prev, [i]: true }))
+                    }
                   }}
                   onBlur={() => setTimeout(() => setItemOpen(prev => ({ ...prev, [i]: false })), 150)}
                 />
                 {itemOpen[i] && (itemResults[i]?.length ?? 0) > 0 && (
-                  <div className="absolute z-50 left-0 w-64 mt-0.5 bg-white border border-slate-200 rounded-xl shadow-lg overflow-hidden max-h-48 overflow-y-auto">
-                    {itemResults[i].map((est: any) => (
+                  <div className="absolute z-50 left-0 w-72 mt-0.5 bg-white border border-slate-200 rounded-xl shadow-lg overflow-hidden max-h-56 overflow-y-auto">
+                    {itemResults[i].map((est: any, ri: number) => (
                       <button
-                        key={est.id}
+                        key={est.id || `req-${ri}`}
                         type="button"
-                        className="w-full text-left px-2.5 py-2 hover:bg-teal-50 transition-colors border-b border-slate-100 last:border-0"
+                        className={`w-full text-left px-2.5 py-2 transition-colors border-b border-slate-100 last:border-0 ${
+                          est._fromReq ? 'hover:bg-amber-50 bg-amber-50/30' : 'hover:bg-teal-50'
+                        }`}
                         onMouseDown={() => selectItem(i, est)}
                       >
-                        <p className="text-[11px] font-semibold text-slate-800 truncate">{est.descricao}</p>
-                        <p className="text-[10px] text-slate-400">{est.codigo} · {est.unidade}{est.valor_medio ? ` · ${est.valor_medio.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}` : ''}</p>
+                        <p className="text-[11px] font-semibold text-slate-800 truncate">
+                          {est._fromReq && <span className="text-[9px] font-bold text-amber-600 mr-1">REQUISIÇÃO</span>}
+                          {est.descricao}
+                        </p>
+                        <p className="text-[10px] text-slate-400">
+                          {est._fromReq
+                            ? `${est.quantidade} ${est.unidade || 'un'}${est.valor_unitario_estimado ? ` · ${est.valor_unitario_estimado.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}/un` : ''}`
+                            : `${est.codigo} · ${est.unidade}${est.valor_medio ? ` · ${est.valor_medio.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}` : ''}`
+                          }
+                        </p>
                       </button>
                     ))}
                   </div>
@@ -1011,6 +1063,7 @@ export default function CotacaoForm() {
             <ItemPricingTable
               items={forn.itens_precos}
               onChange={items => updateFornecedorItems(idx, items)}
+              reqItens={(cotacao?.requisicao as any)?.itens ?? []}
             />
 
             <div className="grid grid-cols-2 gap-2">
