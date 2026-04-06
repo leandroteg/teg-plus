@@ -137,11 +137,8 @@ export function useDashboard(periodo = 'trimestre', obraId?: string) {
       // Fallback: consultas diretas (sem RPC)
       return fetchDashboardDireto(periodo)
     },
-    retry: 2,
-    retryDelay: 1_500,
-    staleTime: 0,              // sempre refetch ao montar o dashboard
-    refetchOnMount: true,
-    refetchOnWindowFocus: false, // evita re-render que fecha modais
-    refetchInterval: false,      // sem auto-refresh que fecha modais
+    refetchInterval: 60_000,   // 60s reduz carga em 50 usuários
+    retry: false,              // sem retry automático (evita thundering herd)
+    staleTime: 30_000,
   })
 }
