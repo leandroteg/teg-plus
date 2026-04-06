@@ -2,100 +2,95 @@ import { useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   Building2, DollarSign, AlertCircle, Wrench, Calendar, ArrowRight,
-  MapPin, AlertTriangle, FileText, RefreshCw, KeySquare,
+  AlertTriangle, RefreshCw, KeySquare, TrendingUp, Zap, CalendarClock,
 } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
 import {
-  useLocacaoKPIs, useFaturas, useEntradas, useSaidas, useSolicitacoesLocacao,
+  useLocacaoKPIs, useFaturas, useEntradas, useSaidas, useSolicitacoesLocacao, useImoveis,
 } from '../../hooks/useLocacao'
 import {
   ENTRADA_PIPELINE_STAGES, SAIDA_PIPELINE_STAGES, TIPO_FATURA_LABEL, STATUS_FATURA_LABEL,
 } from '../../types/locacao'
-import type { StatusEntrada, StatusSaida } from '../../types/locacao'
 
 const fmtCurrency = (v: number) =>
   new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 }).format(v)
 const fmtDate = (d?: string) =>
   d ? new Date(d + 'T00:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }) : '—'
 
-// ── Reusable components ─────────────────────────────────────────────────────
-function SpotlightMetric({ label, value, Icon, tone, isDark }: {
-  label: string; value: string | number; Icon: typeof Building2; tone: string; isDark: boolean
+// ── SpotlightMetric (padrão Compras) ─────────────────────────────────────────
+function SpotlightMetric({ label, value, tone, note, isDark }: {
+  label: string; value: string | number; tone: string; note?: string; isDark: boolean
 }) {
-  const tones: Record<string, { icon: string; iconBg: string }> = {
-    indigo:  { icon: 'text-indigo-500',  iconBg: isDark ? 'bg-indigo-500/10' : 'bg-indigo-50' },
-    emerald: { icon: 'text-emerald-500', iconBg: isDark ? 'bg-emerald-500/10' : 'bg-emerald-50' },
-    amber:   { icon: 'text-amber-500',   iconBg: isDark ? 'bg-amber-500/10' : 'bg-amber-50' },
-    red:     { icon: 'text-red-500',     iconBg: isDark ? 'bg-red-500/10' : 'bg-red-50' },
-    sky:     { icon: 'text-sky-500',     iconBg: isDark ? 'bg-sky-500/10' : 'bg-sky-50' },
-    slate:   { icon: 'text-slate-400',   iconBg: isDark ? 'bg-white/[0.04]' : 'bg-slate-50' },
+  const tones: Record<string, string> = {
+    indigo: isDark ? 'text-indigo-400' : 'text-indigo-600',
+    emerald: isDark ? 'text-emerald-400' : 'text-emerald-600',
+    teal: isDark ? 'text-teal-400' : 'text-teal-600',
+    sky: isDark ? 'text-sky-400' : 'text-sky-600',
+    amber: isDark ? 'text-amber-400' : 'text-amber-600',
+    slate: isDark ? 'text-slate-400' : 'text-slate-500',
   }
-  const t = tones[tone] || tones.slate
   return (
-    <div className="flex items-center gap-3">
-      <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${t.iconBg}`}>
-        <Icon size={18} className={t.icon} />
-      </div>
+    <div className={`rounded-2xl p-3 ${isDark ? 'bg-white/[0.03]' : 'bg-slate-50/80'}`}>
+      <p className={`text-[10px] font-bold uppercase tracking-wider mb-1 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{label}</p>
+      <p className={`text-[1.85rem] font-extrabold leading-none ${tones[tone] || tones.slate}`}>{value}</p>
+      {note && <p className={`text-[9px] mt-1 ${isDark ? 'text-slate-600' : 'text-slate-400'}`}>{note}</p>}
+    </div>
+  )
+}
+
+// ── MiniInfoCard (padrão Compras) ────────────────────────────────────────────
+function MiniInfoCard({ label, value, note, icon: Icon, iconTone, isDark }: {
+  label: string; value: string | number; note?: string; icon: typeof Building2; iconTone: string; isDark: boolean
+}) {
+  return (
+    <div className={`rounded-xl p-3 flex items-center gap-3 ${isDark ? 'bg-white/[0.03]' : 'bg-slate-50/80'}`}>
+      <Icon size={14} className={iconTone} />
       <div>
-        <p className={`text-[1.85rem] font-extrabold leading-none ${isDark ? 'text-white' : 'text-slate-900'}`}>{value}</p>
-        <p className={`text-[10px] uppercase tracking-widest font-semibold mt-0.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{label}</p>
+        <p className={`text-lg font-extrabold leading-none ${isDark ? 'text-white' : 'text-slate-900'}`}>{value}</p>
+        <p className={`text-[9px] font-bold uppercase tracking-wider mt-0.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{label}</p>
+        {note && <p className={`text-[8px] ${isDark ? 'text-slate-600' : 'text-slate-400'}`}>{note}</p>}
       </div>
     </div>
   )
 }
 
-function MiniInfoCard({ label, value, Icon, tone, isDark }: {
-  label: string; value: string | number; Icon: typeof Building2; tone: string; isDark: boolean
+// ── HorizontalStatusBar (padrão Compras — barra única h-10) ──────────────────
+function HorizontalStatusBar({ title, segments, emptyLabel, isDark }: {
+  title: string
+  segments: { key: string; label: string; value: number; barClass: string }[]
+  emptyLabel: string; isDark: boolean
 }) {
-  const tones: Record<string, { bg: string; text: string; iconColor: string }> = {
-    amber:   { bg: isDark ? 'bg-amber-500/10 border-amber-500/20' : 'bg-amber-50 border-amber-200', text: isDark ? 'text-amber-300' : 'text-amber-800', iconColor: 'text-amber-500' },
-    red:     { bg: isDark ? 'bg-red-500/10 border-red-500/20' : 'bg-red-50 border-red-200', text: isDark ? 'text-red-300' : 'text-red-800', iconColor: 'text-red-500' },
-    orange:  { bg: isDark ? 'bg-orange-500/10 border-orange-500/20' : 'bg-orange-50 border-orange-200', text: isDark ? 'text-orange-300' : 'text-orange-800', iconColor: 'text-orange-500' },
-    slate:   { bg: isDark ? 'bg-white/[0.03] border-white/[0.06]' : 'bg-slate-50 border-slate-200', text: isDark ? 'text-slate-300' : 'text-slate-700', iconColor: 'text-slate-400' },
-  }
-  const t = tones[tone] || tones.slate
+  const total = segments.reduce((s, seg) => s + seg.value, 0)
   return (
-    <div className={`rounded-xl border p-3 flex items-center gap-2.5 ${t.bg}`}>
-      <Icon size={14} className={t.iconColor} />
-      <div>
-        <p className={`text-lg font-extrabold leading-none ${t.text}`}>{value}</p>
-        <p className={`text-[9px] uppercase tracking-wider font-semibold mt-0.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{label}</p>
+    <div>
+      <div className="flex items-center justify-between gap-3 mb-2">
+        <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500">{title}</p>
+        <p className={`text-[10px] font-semibold ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{total} imóvel(is)</p>
       </div>
-    </div>
-  )
-}
-
-function HorizontalStatusBar({ segments, isDark, inline }: {
-  segments: { label: string; count: number; color: string }[]; isDark: boolean; inline?: boolean
-}) {
-  const total = segments.reduce((s, seg) => s + seg.count, 0)
-  const colors: Record<string, string> = {
-    slate: 'bg-slate-400', blue: 'bg-blue-500', violet: 'bg-violet-500', emerald: 'bg-emerald-500',
-    amber: 'bg-amber-500', red: 'bg-red-500', green: 'bg-green-500',
-  }
-  const content = (
-    <>
-      <div className="flex rounded-full overflow-hidden h-3 gap-px">
-        {total > 0 ? segments.filter(s => s.count > 0).map(seg => (
-          <div key={seg.label} className={`${colors[seg.color] || 'bg-slate-300'} transition-all`} style={{ width: `${(seg.count / total) * 100}%` }} title={`${seg.label}: ${seg.count}`} />
-        )) : <div className={`flex-1 ${isDark ? 'bg-white/[0.06]' : 'bg-slate-100'}`} />}
-      </div>
-      <div className="flex flex-wrap gap-x-4 gap-y-1 mt-2">
-        {segments.map(seg => (
-          <div key={seg.label} className="flex items-center gap-1.5">
-            <span className={`w-2 h-2 rounded-full ${colors[seg.color] || 'bg-slate-300'}`} />
-            <span className={`text-[10px] ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{seg.label}</span>
-            <span className={`text-[10px] font-bold ${isDark ? 'text-white' : 'text-slate-700'}`}>{seg.count}</span>
-          </div>
-        ))}
-      </div>
-    </>
-  )
-  if (inline) return <div>{content}</div>
-  return (
-    <div className={`rounded-2xl border p-4 ${isDark ? 'bg-white/[0.03] border-white/[0.06]' : 'bg-white border-slate-200'}`}>
-      <p className={`text-[9px] font-bold uppercase tracking-wider mb-2 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Pulso por Status</p>
-      {content}
+      {total === 0 ? (
+        <div className={`h-10 rounded-xl flex items-center justify-center text-[10px] font-semibold ${isDark ? 'bg-white/[0.04] text-slate-500' : 'bg-slate-50 text-slate-400'}`}>
+          {emptyLabel}
+        </div>
+      ) : (
+        <div className={`flex h-10 rounded-xl overflow-hidden ${isDark ? 'bg-white/[0.04]' : 'bg-slate-100'}`}>
+          {segments.map(seg => {
+            if (seg.value === 0) return null
+            const pct = (seg.value / total) * 100
+            const showLabel = pct >= 14
+            const showValue = pct >= 22
+            return (
+              <div key={seg.key} className={`${seg.barClass} relative flex items-center justify-center transition-all`}
+                style={{ width: `${Math.max(pct, 4)}%` }} title={`${seg.label}: ${seg.value}`}>
+                {showLabel && (
+                  <span className="text-[10px] font-bold text-white drop-shadow-sm truncate px-2">
+                    {seg.label} {showValue ? seg.value : ''}
+                  </span>
+                )}
+              </div>
+            )
+          })}
+        </div>
+      )}
     </div>
   )
 }
@@ -109,31 +104,59 @@ export default function LocacaoHome() {
   const { data: entradas = [] } = useEntradas()
   const { data: saidas = [] } = useSaidas()
   const { data: solicitacoes = [] } = useSolicitacoesLocacao()
+  const { data: imoveis = [] } = useImoveis()
 
-  const bg = isDark ? 'bg-white/[0.03] border-white/[0.06]' : 'bg-white border-slate-200'
+  const cardClass = isDark ? 'bg-[#1e293b] border border-white/[0.06]' : 'bg-white border border-slate-200'
   const txt = isDark ? 'text-white' : 'text-slate-900'
   const txtMuted = isDark ? 'text-slate-400' : 'text-slate-500'
+  const bg = isDark ? 'bg-white/[0.03] border-white/[0.06]' : 'bg-white border-slate-200'
 
-  // Pipeline segments
-  const entradaSegments = useMemo(() =>
-    ENTRADA_PIPELINE_STAGES.map(s => ({ label: s.label, count: entradas.filter(e => e.status === s.key).length, color: s.color }))
-  , [entradas])
+  // Contagens p/ pipeline
+  const entradasAndamento = useMemo(() => entradas.filter(e => e.status !== 'liberado'), [entradas])
+  const saidasAndamento = useMemo(() => saidas.filter(s => s.status !== 'encerrado'), [saidas])
 
-  const saidaSegments = useMemo(() =>
-    SAIDA_PIPELINE_STAGES.map(s => ({ label: s.label, count: saidas.filter(sa => sa.status === s.key).length, color: s.color }))
-  , [saidas])
+  // Imóveis por situação
+  const imoveisAtivos = useMemo(() => imoveis.filter(i => i.status === 'ativo').length, [imoveis])
+  const imoveisEmEntrada = useMemo(() => imoveis.filter(i => i.status === 'em_entrada').length, [imoveis])
+  const imoveisEmSaida = useMemo(() => imoveis.filter(i => i.status === 'em_saida').length, [imoveis])
 
-  // Próximas 5 faturas não pagas
+  // Urgentes + vencidas
+  const urgentes = useMemo(() => solicitacoes.filter(s => s.urgencia === 'urgente' || s.urgencia === 'alta'), [solicitacoes])
+  const faturasVencidas = useMemo(() => {
+    const today = new Date().toISOString().split('T')[0]
+    return faturas.filter(f => f.status !== 'pago' && f.vencimento && f.vencimento < today)
+  }, [faturas])
+
+  // Próximas faturas
   const proximasFaturas = useMemo(() =>
     [...faturas].filter(f => f.status !== 'pago' && f.vencimento).sort((a, b) => (a.vencimento ?? '').localeCompare(b.vencimento ?? '')).slice(0, 5)
   , [faturas])
 
-  // Entradas/saídas em andamento
-  const entradasAndamento = useMemo(() => entradas.filter(e => e.status !== 'liberado').slice(0, 5), [entradas])
-  const saidasAndamento = useMemo(() => saidas.filter(s => s.status !== 'encerrado').slice(0, 5), [saidas])
+  // Status bar — barra ÚNICA com todos os status
+  const statusSegments = useMemo(() => {
+    const entradaCounts: Record<string, number> = {}
+    entradas.forEach(e => { entradaCounts[e.status] = (entradaCounts[e.status] || 0) + 1 })
+    const saidaCounts: Record<string, number> = {}
+    saidas.forEach(s => { saidaCounts[s.status] = (saidaCounts[s.status] || 0) + 1 })
 
-  // Solicitações urgentes
-  const urgentes = useMemo(() => solicitacoes.filter(s => s.urgencia === 'urgente' || s.urgencia === 'alta').slice(0, 4), [solicitacoes])
+    return [
+      // Entradas
+      { key: 'e_pendente', label: 'Ent. Pendente', value: entradaCounts['pendente'] || 0, barClass: 'bg-slate-400' },
+      { key: 'e_vistoria', label: 'Ent. Vistoria', value: entradaCounts['aguardando_vistoria'] || 0, barClass: 'bg-blue-500' },
+      { key: 'e_assinatura', label: 'Ent. Assinatura', value: entradaCounts['aguardando_assinatura'] || 0, barClass: 'bg-violet-500' },
+      { key: 'e_liberado', label: 'Liberado', value: entradaCounts['liberado'] || 0, barClass: 'bg-emerald-500' },
+      // Gestão
+      { key: 'g_ativo', label: 'Ativos', value: imoveisAtivos, barClass: 'bg-indigo-500' },
+      { key: 'g_entrada', label: 'Em Entrada', value: imoveisEmEntrada, barClass: 'bg-cyan-500' },
+      { key: 'g_saida', label: 'Em Saída', value: imoveisEmSaida, barClass: 'bg-orange-500' },
+      // Devoluções
+      { key: 's_pendente', label: 'Dev. Pendente', value: saidaCounts['pendente'] || 0, barClass: 'bg-amber-500' },
+      { key: 's_vistoria', label: 'Dev. Vistoria', value: saidaCounts['aguardando_vistoria'] || 0, barClass: 'bg-sky-500' },
+      { key: 's_pendencias', label: 'Pendências', value: saidaCounts['solucionando_pendencias'] || 0, barClass: 'bg-red-500' },
+      { key: 's_encerramento', label: 'Encerramento', value: saidaCounts['encerramento_contratual'] || 0, barClass: 'bg-violet-400' },
+      { key: 's_encerrado', label: 'Encerrado', value: saidaCounts['encerrado'] || 0, barClass: 'bg-slate-500' },
+    ]
+  }, [entradas, saidas, imoveisAtivos, imoveisEmEntrada, imoveisEmSaida])
 
   if (isLoading) return <div className="flex items-center justify-center py-20"><div className="w-8 h-8 border-[3px] border-indigo-500 border-t-transparent rounded-full animate-spin" /></div>
 
@@ -152,42 +175,88 @@ export default function LocacaoHome() {
         </button>
       </div>
 
-      {/* Hero: 2 colunas */}
-      <div className="grid grid-cols-1 lg:grid-cols-[1.52fr_0.88fr] gap-3">
-        {/* Núcleo */}
-        <div className={`rounded-2xl border p-5 ${bg}`}>
-          <p className={`text-[9px] font-bold uppercase tracking-wider mb-4 ${isDark ? 'text-indigo-400' : 'text-indigo-500'}`}>Núcleo de Locações</p>
-          <div className="grid grid-cols-3 gap-4">
-            <SpotlightMetric label="Imóveis Ativos" value={kpis?.imoveisAtivos ?? 0} Icon={Building2} tone="indigo" isDark={isDark} />
-            <SpotlightMetric label="Valor Total/mês" value={fmtCurrency(kpis?.valorTotalMensal ?? 0)} Icon={DollarSign} tone="emerald" isDark={isDark} />
-            <SpotlightMetric label="Em Andamento" value={(entradasAndamento.length + saidasAndamento.length)} Icon={ArrowRight} tone="sky" isDark={isDark} />
+      {/* Hero 2 colunas */}
+      <div className="grid grid-cols-1 xl:grid-cols-[1.52fr_0.88fr] gap-3 items-stretch">
+        {/* Núcleo de Locações */}
+        <section className={`rounded-3xl shadow-sm overflow-hidden flex flex-col ${cardClass}`}>
+          <div className="p-4 md:p-5 flex flex-col gap-4 flex-1">
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <p className={`text-[11px] font-bold uppercase tracking-[0.24em] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+                  Núcleo de Locações
+                </p>
+                <h2 className={`mt-0.5 text-sm font-black ${txt}`}>
+                  Indicadores gerais
+                </h2>
+              </div>
+              <div className={`hidden md:flex w-10 h-10 rounded-2xl items-center justify-center shrink-0 ${isDark ? 'bg-indigo-500/10' : 'bg-indigo-50'}`}>
+                <KeySquare size={18} className="text-indigo-500" />
+              </div>
+            </div>
+            <div className="grid grid-cols-3 gap-2.5 flex-1">
+              <SpotlightMetric label="Imóveis Ativos" value={kpis?.imoveisAtivos ?? 0} tone="indigo" note="carteira ativa" isDark={isDark} />
+              <SpotlightMetric label="Valor Total/mês" value={fmtCurrency(kpis?.valorTotalMensal ?? 0)} tone="emerald" note="aluguéis mensais" isDark={isDark} />
+              <SpotlightMetric label="Em Andamento" value={entradasAndamento.length + saidasAndamento.length} tone="sky" note="entradas + devoluções" isDark={isDark} />
+            </div>
           </div>
-        </div>
+        </section>
 
-        {/* Janela Crítica — 2 quadrados */}
-        <div className={`rounded-2xl border p-5 ${bg}`}>
-          <p className={`text-[9px] font-bold uppercase tracking-wider mb-3 ${isDark ? 'text-amber-400' : 'text-amber-600'}`}>Janela Crítica</p>
-          <div className="grid grid-cols-2 gap-2.5">
-            <MiniInfoCard label="Faturas vencendo (7d)" value={kpis?.faturasVencendo ?? 0} Icon={AlertCircle} tone={(kpis?.faturasVencendo ?? 0) > 0 ? 'amber' : 'slate'} isDark={isDark} />
-            <MiniInfoCard label="Manutenções abertas" value={kpis?.manutencoesAbertas ?? 0} Icon={Wrench} tone={(kpis?.manutencoesAbertas ?? 0) > 0 ? 'red' : 'slate'} isDark={isDark} />
+        {/* Janela Crítica */}
+        <section className={`rounded-3xl shadow-sm overflow-hidden flex flex-col ${cardClass}`}>
+          <div className="p-4 md:p-5 flex flex-col gap-3 flex-1">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className={`text-[11px] font-bold uppercase tracking-[0.24em] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+                  Janela Crítica
+                </p>
+                <h2 className={`mt-0.5 text-sm font-black ${txt}`}>
+                  O que exige ação agora
+                </h2>
+              </div>
+              <div className={`w-8 h-8 rounded-xl flex items-center justify-center ${urgentes.length > 0 || faturasVencidas.length > 0 ? 'bg-red-50' : isDark ? 'bg-white/5' : 'bg-slate-50'}`}>
+                <AlertTriangle size={14} className={urgentes.length > 0 || faturasVencidas.length > 0 ? 'text-red-500' : 'text-slate-400'} />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <MiniInfoCard
+                label="Faturas vencendo"
+                value={kpis?.faturasVencendo ?? 0}
+                note="próximos 7 dias"
+                icon={Zap}
+                iconTone={(kpis?.faturasVencendo ?? 0) > 0 ? 'text-amber-500' : 'text-slate-400'}
+                isDark={isDark}
+              />
+              <MiniInfoCard
+                label="Manutenções"
+                value={kpis?.manutencoesAbertas ?? 0}
+                note="abertas/em andamento"
+                icon={Wrench}
+                iconTone={(kpis?.manutencoesAbertas ?? 0) > 0 ? 'text-red-500' : 'text-slate-400'}
+                isDark={isDark}
+              />
+            </div>
           </div>
-        </div>
+        </section>
       </div>
 
-      {/* Pulso por Situação */}
-      <div className={`rounded-2xl border p-4 space-y-4 ${bg}`}>
-        <p className={`text-[9px] font-bold uppercase tracking-wider ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Pulso por Situação</p>
-        <div>
-          <p className={`text-[10px] font-semibold mb-1.5 ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>Entradas</p>
-          <HorizontalStatusBar segments={entradaSegments} isDark={isDark} inline />
+      {/* Pulso por Status — barra única */}
+      <section className={`rounded-2xl shadow-sm overflow-hidden ${cardClass}`}>
+        <div className={`px-4 py-3 flex items-center justify-between ${isDark ? 'border-b border-white/[0.06]' : 'border-b border-slate-100'}`}>
+          <h2 className={`text-sm font-extrabold flex items-center gap-1.5 ${txt}`}>
+            <TrendingUp size={14} className="text-indigo-500" /> Pulso por Situação
+          </h2>
         </div>
-        <div>
-          <p className={`text-[10px] font-semibold mb-1.5 ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>Devoluções</p>
-          <HorizontalStatusBar segments={saidaSegments} isDark={isDark} inline />
+        <div className="px-4 py-3">
+          <HorizontalStatusBar
+            isDark={isDark}
+            title="Distribuição atual — entradas, gestão e devoluções"
+            emptyLabel="Nenhum imóvel registrado"
+            segments={statusSegments}
+          />
         </div>
-      </div>
+      </section>
 
-      {/* Faturas Próximas + Solicitações Urgentes */}
+      {/* Faturas + Urgentes */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <div className={`rounded-2xl border p-4 ${bg}`}>
           <div className="flex items-center justify-between mb-3">
@@ -226,7 +295,7 @@ export default function LocacaoHome() {
             <p className={`text-xs ${txtMuted}`}>Nenhuma solicitação urgente.</p>
           ) : (
             <div className="space-y-2">
-              {urgentes.map(sol => (
+              {urgentes.slice(0, 4).map(sol => (
                 <div key={sol.id} className={`flex items-center justify-between gap-2 rounded-lg p-2 ${isDark ? 'bg-red-500/5 border border-red-500/10' : 'bg-red-50 border border-red-100'}`}>
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-1.5">
@@ -243,7 +312,7 @@ export default function LocacaoHome() {
         </div>
       </div>
 
-      {/* Entradas + Saídas em Andamento */}
+      {/* Entradas + Devoluções em Andamento */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <div className={`rounded-2xl border p-4 ${bg}`}>
           <div className="flex items-center justify-between mb-3">
@@ -254,7 +323,7 @@ export default function LocacaoHome() {
             <p className={`text-xs ${txtMuted}`}>Nenhuma entrada em andamento.</p>
           ) : (
             <div className="space-y-2">
-              {entradasAndamento.map(e => {
+              {entradasAndamento.slice(0, 5).map(e => {
                 const stage = ENTRADA_PIPELINE_STAGES.find(s => s.key === e.status)
                 return (
                   <div key={e.id} className="flex items-center justify-between gap-2">
@@ -279,14 +348,14 @@ export default function LocacaoHome() {
             <p className={`text-xs ${txtMuted}`}>Nenhuma devolução em andamento.</p>
           ) : (
             <div className="space-y-2">
-              {saidasAndamento.map(s => {
+              {saidasAndamento.slice(0, 5).map(s => {
                 const stage = SAIDA_PIPELINE_STAGES.find(st => st.key === s.status)
                 const isUrgent = s.data_limite_saida && new Date(s.data_limite_saida) <= new Date(Date.now() + 7 * 86400000)
                 return (
                   <div key={s.id} className="flex items-center justify-between gap-2">
                     <div className="min-w-0 flex-1">
                       <span className={`text-xs font-medium truncate block ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>{s.imovel?.descricao ?? '—'}</span>
-                      {s.data_limite_saida && <p className={`text-[10px] ${isUrgent ? 'text-amber-600 font-semibold' : txtMuted}`}>Limite: {fmtDate(s.data_limite_saida)}{isUrgent ? ' ⚠' : ''}</p>}
+                      {s.data_limite_saida && <p className={`text-[10px] ${isUrgent ? 'text-amber-600 font-semibold' : txtMuted}`}>Limite: {fmtDate(s.data_limite_saida)}</p>}
                     </div>
                     {stage && <span className={`shrink-0 text-[10px] font-semibold px-2 py-0.5 rounded-full ${stage.badgeClass}`}>{stage.label}</span>}
                   </div>
