@@ -217,8 +217,8 @@ export default function LocacaoHome() {
                   O que exige ação agora
                 </h2>
               </div>
-              <div className={`w-8 h-8 rounded-xl flex items-center justify-center ${urgentes.length > 0 || faturasVencidas.length > 0 ? 'bg-red-50' : isDark ? 'bg-white/5' : 'bg-slate-50'}`}>
-                <AlertTriangle size={14} className={urgentes.length > 0 || faturasVencidas.length > 0 ? 'text-red-500' : 'text-slate-400'} />
+              <div className={`w-8 h-8 rounded-xl flex items-center justify-center ${contratosVencidos.length > 0 ? 'bg-red-50' : isDark ? 'bg-white/5' : 'bg-slate-50'}`}>
+                <AlertTriangle size={14} className={contratosVencidos.length > 0 || contratosVencendo.length > 0 ? 'text-red-500' : 'text-slate-400'} />
               </div>
             </div>
             <div className="grid grid-cols-2 gap-2 flex-1">
