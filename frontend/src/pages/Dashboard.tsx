@@ -419,7 +419,6 @@ export default function Dashboard() {
 
   // ── Todos os hooks/useMemo ANTES de qualquer early return ───
   const kpis = data?.kpis ?? EMPTY_KPIS
-  const por_obra = data?.por_obra ?? []
   const aprovacoes_pendentes = data?.aprovacoes_pendentes ?? []
   const reqs = todasReqs.length > 0 ? todasReqs : (data?.requisicoes_recentes ?? [])
   const hoje = Date.now()
@@ -744,66 +743,76 @@ export default function Dashboard() {
         <VencidasCard items={vencidasAVencer} isDark={isDark} nav={nav} />
       </div>
 
-      {/* Por Obra */}
-      {por_obra.length > 0 && (
+      {/* Recentes + Pedidos por Obra */}
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-3">
+        {/* Recentes */}
         <section className={`rounded-2xl shadow-sm overflow-hidden ${cardClass}`}>
           <div className={`px-4 py-3 flex items-center justify-between ${isDark ? 'border-b border-white/[0.06]' : 'border-b border-slate-100'}`}>
             <h2 className={`text-sm font-extrabold flex items-center gap-1.5 ${isDark ? 'text-white' : 'text-slate-800'}`}>
-              <Package size={14} className="text-slate-500" /> Por Obra
+              <Clock size={14} className="text-slate-500" />
+              {pipelineFilter !== null ? PIPELINE_ETAPAS[pipelineFilter].label : 'Recentes'}
             </h2>
+            <button onClick={() => nav('/requisicoes')}
+              className="flex items-center gap-0.5 text-[10px] text-teal-600 font-semibold">
+              Ver todas <ChevronRight size={11} />
+            </button>
           </div>
-          <div className="p-4 space-y-2">
-            {por_obra.map(o => {
-              const maxValor = Math.max(...por_obra.map(x => x.valor), 1)
-              const pct = Math.round((o.valor / maxValor) * 100)
-              return (
-                <div key={o.obra_nome} className={`rounded-2xl p-3.5 border ${isDark ? 'bg-white/[0.03] border-white/[0.06]' : 'bg-slate-50/80 border-slate-100'}`}>
-                  <div className="flex justify-between items-start mb-2">
-                    <div>
-                      <p className={`text-sm font-bold ${isDark ? 'text-slate-200' : 'text-slate-800'}`}>{o.obra_nome}</p>
-                      <p className={`text-xs ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{o.total} RC{o.total !== 1 ? 's' : ''}</p>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-sm font-extrabold text-teal-600">{fmt(o.valor)}</p>
-                      {o.pendentes > 0 && (
-                        <span className="text-[10px] text-amber-600 font-semibold flex items-center gap-0.5 justify-end mt-0.5">
-                          <AlertTriangle size={9} /> {o.pendentes} pend.
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                  <div className={`h-1.5 rounded-full overflow-hidden ${isDark ? 'bg-white/[0.06]' : 'bg-slate-200'}`}>
-                    <div className="h-full rounded-full bg-teal-500 transition-all duration-500" style={{ width: `${pct}%` }} />
-                  </div>
-                </div>
-              )
-            })}
+          <div className={`divide-y ${isDark ? 'divide-white/[0.04]' : 'divide-slate-50'}`}>
+            {recentes.length === 0 ? (
+              <EmptyPanel isDark={isDark} title="Nenhuma requisicao encontrada" description="Ajuste os filtros de periodo ou obra para ver mais resultados." />
+            ) : (
+              recentes.slice(0, 8).map(r => (
+                <RecentCard key={r.id} r={r} aprovacao={aprovacaoMap.get(r.id)} isDark={isDark} nav={nav} />
+              ))
+            )}
           </div>
         </section>
-      )}
 
-      {/* Recentes */}
-      <section className={`rounded-2xl shadow-sm overflow-hidden ${cardClass}`}>
-        <div className={`px-4 py-3 flex items-center justify-between ${isDark ? 'border-b border-white/[0.06]' : 'border-b border-slate-100'}`}>
-          <h2 className={`text-sm font-extrabold flex items-center gap-1.5 ${isDark ? 'text-white' : 'text-slate-800'}`}>
-            <Clock size={14} className="text-slate-500" />
-            {pipelineFilter !== null ? PIPELINE_ETAPAS[pipelineFilter].label : 'Recentes'}
-          </h2>
-          <button onClick={() => nav('/requisicoes')}
-            className="flex items-center gap-0.5 text-[10px] text-teal-600 font-semibold">
-            Ver todas <ChevronRight size={11} />
-          </button>
-        </div>
-        <div className={`divide-y ${isDark ? 'divide-white/[0.04]' : 'divide-slate-50'}`}>
-          {recentes.length === 0 ? (
-            <EmptyPanel isDark={isDark} title="Nenhuma requisicao encontrada" description="Ajuste os filtros de periodo ou obra para ver mais resultados." />
-          ) : (
-            recentes.slice(0, 8).map(r => (
-              <RecentCard key={r.id} r={r} aprovacao={aprovacaoMap.get(r.id)} isDark={isDark} nav={nav} />
-            ))
-          )}
-        </div>
-      </section>
+        {/* Pedidos por Obra */}
+        <section className={`rounded-2xl shadow-sm overflow-hidden ${cardClass}`}>
+          <div className={`px-4 py-3 ${isDark ? 'border-b border-white/[0.06]' : 'border-b border-slate-100'}`}>
+            <h2 className={`text-sm font-extrabold flex items-center gap-1.5 ${isDark ? 'text-white' : 'text-slate-800'}`}>
+              <Package size={14} className="text-teal-500" /> Pedidos por Obra
+            </h2>
+          </div>
+          <div className="p-4 space-y-2.5">
+            {(() => {
+              const obraMap = new Map<string, { nome: string; valor: number; qtd: number }>()
+              todosPedidos.forEach(p => {
+                if (p.status === 'cancelado') return
+                const nome = (p.requisicao as any)?.obra_nome || 'Sem obra'
+                const cur = obraMap.get(nome) || { nome, valor: 0, qtd: 0 }
+                cur.valor += p.valor_total ?? 0
+                cur.qtd += 1
+                obraMap.set(nome, cur)
+              })
+              const sorted = Array.from(obraMap.values()).sort((a, b) => b.valor - a.valor)
+              const maxVal = sorted[0]?.valor || 1
+              if (sorted.length === 0) return (
+                <EmptyPanel isDark={isDark} title="Nenhum pedido" description="Pedidos emitidos por obra aparecem aqui." />
+              )
+              return sorted.map(o => (
+                <div key={o.nome} className="flex items-center gap-3">
+                  <p className={`text-[11px] font-semibold text-right shrink-0 w-[120px] truncate ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+                    {o.nome}
+                  </p>
+                  <div className="flex-1 relative">
+                    <div className={`h-6 rounded-full overflow-hidden ${isDark ? 'bg-white/[0.04]' : 'bg-slate-100'}`}>
+                      <div
+                        className="h-full rounded-full bg-gradient-to-r from-teal-400 to-teal-600 transition-all duration-500"
+                        style={{ width: `${Math.max((o.valor / maxVal) * 100, 4)}%` }}
+                      />
+                    </div>
+                  </div>
+                  <p className={`text-[11px] font-extrabold shrink-0 w-[70px] text-right ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
+                    {fmt(o.valor)}
+                  </p>
+                </div>
+              ))
+            })()}
+          </div>
+        </section>
+      </div>
 
     </div>
   )
