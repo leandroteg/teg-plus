@@ -433,13 +433,28 @@ export default function Dashboard() {
     [todosPedidos]
   )
 
-  // ── Converter tudo para DashItem ───
+  // ── Converter tudo para DashItem (sem duplicar fluxo) ───
+  // Cada requisição aparece apenas no estágio mais avançado:
+  // pedido > cotação > RC
   const allItems = useMemo(() => {
     const items: DashItem[] = []
 
-    // RCs
+    // IDs de requisições que já têm pedido ativo
+    const reqComPedido = new Set<string>()
+    todosPedidos.forEach(p => {
+      if (PEDIDO_ATIVO.includes(p.status) && p.requisicao_id) reqComPedido.add(p.requisicao_id)
+    })
+
+    // IDs de requisições que já têm cotação ativa
+    const reqComCotacao = new Set<string>()
+    todasCotacoes.forEach(c => {
+      if (COTACAO_ATIVA.includes(c.status) && c.requisicao_id) reqComCotacao.add(c.requisicao_id)
+    })
+
+    // RCs — só se NÃO tem cotação nem pedido ativo
     reqs.forEach(r => {
       if (!STATUS_ATIVO.includes(r.status)) return
+      if (reqComPedido.has(r.id) || reqComCotacao.has(r.id)) return
       items.push({
         id: r.id, tipo: 'rc', numero: r.numero,
         descricao: (r as any).justificativa || r.descricao,
@@ -450,9 +465,10 @@ export default function Dashboard() {
       })
     })
 
-    // Cotações
+    // Cotações — só se NÃO tem pedido ativo
     todasCotacoes.forEach(c => {
       if (!COTACAO_ATIVA.includes(c.status)) return
+      if (reqComPedido.has(c.requisicao_id)) return
       const req = c.requisicao as any
       items.push({
         id: c.id, tipo: 'cotacao',
@@ -465,7 +481,7 @@ export default function Dashboard() {
       })
     })
 
-    // Pedidos
+    // Pedidos — sempre aparecem (estágio mais avançado)
     todosPedidos.forEach(p => {
       if (!PEDIDO_ATIVO.includes(p.status)) return
       const req = p.requisicao as any
@@ -521,24 +537,17 @@ export default function Dashboard() {
     [allItems, hoje]
   )
 
-  // ── Contagens por prazo para o Pulso ───
+  // ── Contagens por prazo para o Pulso (barra única) ───
   const prazoCounts = useMemo(() => {
-    const calc = (items: DashItem[]) => {
-      let noPrazo = 0, aVencer = 0, vencido = 0
-      items.forEach(item => {
-        if (!item.prazo) { noPrazo++; return }
-        const ts = new Date(item.prazo).getTime()
-        if (ts < hoje) vencido++
-        else if (ts <= hoje + tresDias) aVencer++
-        else noPrazo++
-      })
-      return { noPrazo, aVencer, vencido }
-    }
-    return {
-      rcs: calc(allItems.filter(i => i.tipo === 'rc')),
-      cotacoes: calc(allItems.filter(i => i.tipo === 'cotacao')),
-      pedidos: calc(allItems.filter(i => i.tipo === 'pedido')),
-    }
+    let noPrazo = 0, aVencer = 0, vencido = 0
+    allItems.forEach(item => {
+      if (!item.prazo) { noPrazo++; return }
+      const ts = new Date(item.prazo).getTime()
+      if (ts < hoje) vencido++
+      else if (ts <= hoje + tresDias) aVencer++
+      else noPrazo++
+    })
+    return { noPrazo, aVencer, vencido }
   }, [allItems, hoje])
 
   if (isPlaceholder) return <SetupRequired />
@@ -722,12 +731,8 @@ export default function Dashboard() {
           </div>
         </div>
         <div className="px-4 py-3 space-y-3">
-          <PrazoBar label="Requisicoes" {...prazoCounts.rcs} isDark={isDark} />
-          <PrazoBar label="Cotacoes" {...prazoCounts.cotacoes} isDark={isDark} />
-          <PrazoBar label="Pedidos" {...prazoCounts.pedidos} isDark={isDark} />
-          {prazoCounts.rcs.noPrazo + prazoCounts.rcs.aVencer + prazoCounts.rcs.vencido === 0
-            && prazoCounts.cotacoes.noPrazo + prazoCounts.cotacoes.aVencer + prazoCounts.cotacoes.vencido === 0
-            && prazoCounts.pedidos.noPrazo + prazoCounts.pedidos.aVencer + prazoCounts.pedidos.vencido === 0 && (
+          <PrazoBar label="RCs / Cotacoes / Pedidos" {...prazoCounts} isDark={isDark} />
+          {prazoCounts.noPrazo + prazoCounts.aVencer + prazoCounts.vencido === 0 && (
             <p className={`text-center text-[10px] py-2 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Nenhum item ativo no periodo</p>
           )}
         </div>
