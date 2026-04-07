@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import type { Cotacao, NovaCotacaoPayload, ItemPreco } from '../types'
 import { supabase } from '../services/supabase'
 import { api } from '../services/api'
+import { calcularRecomendacao } from '../utils/cotacaoRecomendacao'
 
 // Tabelas: cmp_cotacoes, cmp_cotacao_fornecedores (módulo Compras)
 const TABLE_COT  = 'cmp_cotacoes'
@@ -225,6 +226,28 @@ export function useFinalizarCotacao() {
       // 6. Cria aprovação financeira pendente em apr_aprovacoes
       if (rcData) {
         const aprovadorNome = (rcData.valor_estimado ?? 0) > 2000 ? 'Laucídio' : 'Welton'
+
+        // Monta texto de recomendação multi-critério
+        const fornParaScore = (fornInserted ?? []).map(fi => {
+          const orig = fornecedores.find(f => f.fornecedor_nome === fi.fornecedor_nome)
+          return {
+            id: fi.id,
+            cotacao_id: cotacao_id,
+            fornecedor_nome: fi.fornecedor_nome,
+            valor_total: fi.valor_total,
+            prazo_entrega_dias: orig?.prazo_entrega_dias || undefined,
+            condicao_pagamento: orig?.condicao_pagamento || undefined,
+            itens_precos: [] as any[],
+            selecionado: false,
+          }
+        })
+        const rec = calcularRecomendacao(fornParaScore)
+        const obsText = rec
+          ? `Aprovacao financeira — ${rec.resumo}`
+          : `Aprovacao financeira — menor cotacao: ${vencedor?.fornecedor_nome ?? 'N/A'} (${
+              vencedor ? vencedor.valor_total.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) : 'N/A'
+            })`
+
         const { error: aprError } = await supabase
           .from('apr_aprovacoes')
           .insert({
@@ -236,9 +259,7 @@ export function useFinalizarCotacao() {
             aprovador_email: '',
             nivel: rcData.alcada_nivel ?? 1,
             status: 'pendente',
-            observacao: `Aprovação financeira — menor cotação: ${vencedor?.fornecedor_nome ?? 'N/A'} (${
-              vencedor ? vencedor.valor_total.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) : 'N/A'
-            })`,
+            observacao: obsText,
           })
         if (aprError) console.warn('Aviso: aprovação financeira não criada:', aprError.message)
       }
