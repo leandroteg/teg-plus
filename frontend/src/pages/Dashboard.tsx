@@ -5,15 +5,17 @@ import {
   RefreshCw, Settings, TrendingUp, AlertTriangle,
   Package, ChevronRight, ShoppingCart, Timer,
   ArrowRight, CalendarClock, XCircle, Zap,
-  CalendarDays, MapPin,
+  CalendarDays, MapPin, Truck,
 } from 'lucide-react'
 import { useDashboard } from '../hooks/useDashboard'
 import { useRequisicoes } from '../hooks/useRequisicoes'
+import { usePedidos } from '../hooks/usePedidos'
+import { useCotacoes } from '../hooks/useCotacoes'
 import { useLookupObras } from '../hooks/useLookups'
 import { useTheme } from '../contexts/ThemeContext'
 import StatusBadge from '../components/StatusBadge'
 import { isPlaceholder } from '../services/supabase'
-import type { StatusRequisicao, DashboardData, Aprovacao, Requisicao } from '../types'
+import type { StatusRequisicao, DashboardData, Aprovacao, Requisicao, Pedido, Cotacao } from '../types'
 
 // ── Formatadores ─────────────────────────────────────────────────────────────
 const fmt = (v: number) =>
@@ -44,7 +46,34 @@ const STATUS_ATIVO: StatusRequisicao[] = [
   'em_entrega', 'entregue', 'aguardando_pgto',
 ]
 
+const PEDIDO_ATIVO = ['emitido', 'confirmado', 'em_entrega', 'parcialmente_recebido']
+const COTACAO_ATIVA = ['pendente', 'em_andamento']
+
 const NIVEL_LABEL: Record<number, string> = { 1: 'Coordenador', 2: 'Gerente', 3: 'Diretor', 4: 'CEO' }
+
+// ── Item unificado para urgentes/vencidas ────────────────────────────────────
+type DashItemTipo = 'rc' | 'cotacao' | 'pedido'
+interface DashItem {
+  id: string
+  tipo: DashItemTipo
+  numero: string
+  descricao: string
+  obra_nome?: string
+  urgencia?: string
+  status: string
+  prazo?: string        // data do prazo (necessidade / limite / prevista entrega)
+  prazoLabel?: string   // "Necessidade" / "Limite Cotação" / "Entrega"
+  valor?: number
+  created_at: string
+  navTo: string
+}
+
+const TIPO_LABEL: Record<DashItemTipo, string> = { rc: 'RC', cotacao: 'Cotação', pedido: 'Pedido' }
+const TIPO_COLOR: Record<DashItemTipo, string> = {
+  rc: 'bg-sky-100 text-sky-700',
+  cotacao: 'bg-violet-100 text-violet-700',
+  pedido: 'bg-cyan-100 text-cyan-700',
+}
 
 // ── toneClasses helper ────────────────────────────────────────────────────────
 function toneClasses(
@@ -86,48 +115,42 @@ function SpotlightMetric({
   )
 }
 
-function HorizontalStatusBar({
-  title, segments, emptyLabel, isDark,
+function PrazoBar({
+  label, noPrazo, aVencer, vencido, isDark,
 }: {
-  title: string
-  segments: Array<{ key: string; label: string; value: number; barClass: string }>
-  emptyLabel: string
-  isDark: boolean
+  label: string; noPrazo: number; aVencer: number; vencido: number; isDark: boolean
 }) {
-  const total = segments.reduce((sum, s) => sum + s.value, 0)
+  const total = noPrazo + aVencer + vencido
+  if (total === 0) return null
   return (
     <div>
-      <div className="flex items-center justify-between gap-3 mb-2">
-        <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500">{title}</p>
-        <p className={`text-[10px] font-semibold ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{total} RC(s)</p>
+      <div className="flex items-center justify-between gap-3 mb-1.5">
+        <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500">{label}</p>
+        <p className={`text-[10px] font-semibold ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{total} total</p>
       </div>
-      {segments.length === 0 ? (
-        <div className={`h-10 rounded-xl flex items-center justify-center text-[10px] font-semibold ${isDark ? 'bg-white/[0.04] text-slate-500' : 'bg-slate-50 text-slate-400'}`}>
-          {emptyLabel}
-        </div>
-      ) : (
-        <div className={`flex h-10 rounded-xl overflow-hidden ${isDark ? 'bg-white/[0.04]' : 'bg-slate-100'}`}>
-          {segments.map(seg => {
-            const pct = (seg.value / total) * 100
-            const showLabel = pct >= 14
-            const showValue = pct >= 22
-            return (
-              <div
-                key={seg.key}
-                className={`${seg.barClass} relative flex items-center justify-center transition-all`}
-                style={{ width: `${Math.max(pct, 4)}%` }}
-                title={`${seg.label}: ${seg.value}`}
-              >
-                {showLabel && (
-                  <span className="text-[10px] font-bold text-white drop-shadow-sm truncate px-2">
-                    {seg.label} {showValue ? seg.value : ''}
-                  </span>
-                )}
-              </div>
-            )
-          })}
-        </div>
-      )}
+      <div className={`flex h-8 rounded-xl overflow-hidden ${isDark ? 'bg-white/[0.04]' : 'bg-slate-100'}`}>
+        {noPrazo > 0 && (
+          <div className="bg-emerald-500 relative flex items-center justify-center transition-all"
+            style={{ width: `${Math.max((noPrazo / total) * 100, 6)}%` }}
+            title={`No prazo: ${noPrazo}`}>
+            {(noPrazo / total) >= 0.15 && <span className="text-[10px] font-bold text-white px-1">No prazo {noPrazo}</span>}
+          </div>
+        )}
+        {aVencer > 0 && (
+          <div className="bg-amber-400 relative flex items-center justify-center transition-all"
+            style={{ width: `${Math.max((aVencer / total) * 100, 6)}%` }}
+            title={`À vencer: ${aVencer}`}>
+            {(aVencer / total) >= 0.15 && <span className="text-[10px] font-bold text-white px-1">À vencer {aVencer}</span>}
+          </div>
+        )}
+        {vencido > 0 && (
+          <div className="bg-red-500 relative flex items-center justify-center transition-all"
+            style={{ width: `${Math.max((vencido / total) * 100, 6)}%` }}
+            title={`Vencido: ${vencido}`}>
+            {(vencido / total) >= 0.15 && <span className="text-[10px] font-bold text-white px-1">Vencido {vencido}</span>}
+          </div>
+        )}
+      </div>
     </div>
   )
 }
@@ -163,13 +186,76 @@ function EmptyPanel({ isDark, title, description }: { isDark: boolean; title: st
   )
 }
 
+// ── ItemRow unificado (RC / Cotação / Pedido) ────────────────────────────────
+function ItemRow({ item, isDark, nav, variant }: {
+  item: DashItem; isDark: boolean; nav: ReturnType<typeof useNavigate>
+  variant: 'urgente' | 'vencida'
+}) {
+  const hoje = Date.now()
+  const prazoTs = item.prazo ? new Date(item.prazo).getTime() : 0
+  const vencida = prazoTs > 0 && prazoTs < hoje
+
+  return (
+    <button
+      type="button"
+      onClick={() => nav(item.navTo)}
+      className={`w-full text-left flex items-center gap-3 px-4 py-3 transition-colors ${
+        variant === 'urgente'
+          ? (isDark ? 'hover:bg-white/[0.03]' : 'hover:bg-red-50/50')
+          : (isDark ? 'hover:bg-white/[0.03]' : 'hover:bg-amber-50/50')
+      }`}
+    >
+      <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${
+        variant === 'urgente'
+          ? (item.urgencia === 'critica' ? (isDark ? 'bg-red-500/20' : 'bg-red-100') : (isDark ? 'bg-amber-500/10' : 'bg-amber-50'))
+          : (vencida ? (isDark ? 'bg-red-500/10' : 'bg-red-50') : (isDark ? 'bg-amber-500/10' : 'bg-amber-50'))
+      }`}>
+        {variant === 'urgente'
+          ? <AlertTriangle size={14} className={item.urgencia === 'critica' ? 'text-red-500' : 'text-amber-500'} />
+          : (vencida ? <XCircle size={14} className="text-red-500" /> : <Timer size={14} className="text-amber-500" />)
+        }
+      </div>
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-1.5">
+          <p className={`text-xs font-extrabold font-mono ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>{item.numero}</p>
+          <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full ${TIPO_COLOR[item.tipo]}`}>
+            {TIPO_LABEL[item.tipo]}
+          </span>
+          {variant === 'urgente' && item.urgencia && (
+            <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full ${item.urgencia === 'critica' ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700'}`}>
+              {item.urgencia === 'critica' ? 'CRITICA' : 'URGENTE'}
+            </span>
+          )}
+          {variant === 'vencida' && (
+            vencida
+              ? <span className="text-[9px] bg-red-100 text-red-700 font-bold px-1.5 py-0.5 rounded-full">VENCIDA</span>
+              : <span className="text-[9px] bg-amber-100 text-amber-700 font-bold px-1.5 py-0.5 rounded-full">A VENCER</span>
+          )}
+        </div>
+        <p className={`text-[10px] truncate ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{item.descricao}</p>
+      </div>
+      <div className="text-right shrink-0">
+        {item.obra_nome && <p className={`text-[10px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{item.obra_nome}</p>}
+        {item.prazo && variant === 'vencida' && (
+          <p className={`text-[9px] mt-0.5 font-semibold ${vencida ? 'text-red-500' : 'text-amber-600'}`}>
+            {item.prazoLabel}: {fmtData(item.prazo)}
+          </p>
+        )}
+        {item.valor != null && item.valor > 0 && (
+          <p className="text-[10px] font-bold text-teal-600">{fmt(item.valor)}</p>
+        )}
+      </div>
+    </button>
+  )
+}
+
 // ── UrgentesCard ──────────────────────────────────────────────────────────────
-function UrgentesCard({ reqs, isDark, nav }: { reqs: Requisicao[]; isDark: boolean; nav: ReturnType<typeof useNavigate> }) {
+function UrgentesCard({ items, isDark, nav }: { items: DashItem[]; isDark: boolean; nav: ReturnType<typeof useNavigate> }) {
   return (
     <section className={`rounded-2xl shadow-sm overflow-hidden ${isDark ? 'bg-[#1e293b] border border-red-500/30' : 'bg-white border border-red-200'}`}>
       <div className={`px-4 py-3 flex items-center justify-between ${isDark ? 'border-b border-red-500/20' : 'border-b border-red-100'}`}>
         <h2 className={`text-sm font-extrabold flex items-center gap-1.5 ${isDark ? 'text-red-400' : 'text-red-800'}`}>
-          <Zap size={14} className="text-red-500" /> Requisições Urgentes
+          <Zap size={14} className="text-red-500" /> Urgentes
         </h2>
         <button
           onClick={() => nav('/requisicoes')}
@@ -178,38 +264,16 @@ function UrgentesCard({ reqs, isDark, nav }: { reqs: Requisicao[]; isDark: boole
           Ver todas <ArrowRight size={10} />
         </button>
       </div>
-      {reqs.length === 0 ? (
+      {items.length === 0 ? (
         <EmptyPanel
           isDark={isDark}
-          title="Nenhuma requisição urgente"
-          description="Requisições marcadas como urgente ou crítica aparecem aqui para priorização imediata."
+          title="Nenhum item urgente"
+          description="Requisições, cotações e pedidos urgentes ou críticos aparecem aqui."
         />
       ) : (
         <div className={`divide-y ${isDark ? 'divide-white/[0.04]' : 'divide-red-50'}`}>
-          {reqs.slice(0, 5).map(r => (
-            <button
-              key={r.id}
-              type="button"
-              onClick={() => nav(`/requisicoes/${r.id}`)}
-              className={`w-full text-left flex items-center gap-3 px-4 py-3 transition-colors ${isDark ? 'hover:bg-white/[0.03]' : 'hover:bg-red-50/50'}`}
-            >
-              <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${r.urgencia === 'critica' ? (isDark ? 'bg-red-500/20' : 'bg-red-100') : (isDark ? 'bg-amber-500/10' : 'bg-amber-50')}`}>
-                <AlertTriangle size={14} className={r.urgencia === 'critica' ? 'text-red-500' : 'text-amber-500'} />
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-1.5">
-                  <p className={`text-xs font-extrabold font-mono ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>{r.numero}</p>
-                  <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full ${r.urgencia === 'critica' ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700'}`}>
-                    {r.urgencia === 'critica' ? 'CRÍTICA' : 'URGENTE'}
-                  </span>
-                </div>
-                <p className={`text-[10px] truncate ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{(r as any).justificativa || r.descricao}</p>
-              </div>
-              <div className="text-right shrink-0">
-                <StatusBadge status={r.status} size="sm" />
-                <p className={`text-[10px] mt-0.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{r.obra_nome}</p>
-              </div>
-            </button>
+          {items.slice(0, 6).map(item => (
+            <ItemRow key={`${item.tipo}-${item.id}`} item={item} isDark={isDark} nav={nav} variant="urgente" />
           ))}
         </div>
       )}
@@ -218,13 +282,12 @@ function UrgentesCard({ reqs, isDark, nav }: { reqs: Requisicao[]; isDark: boole
 }
 
 // ── VencidasCard ──────────────────────────────────────────────────────────────
-function VencidasCard({ reqs, isDark, nav }: { reqs: Requisicao[]; isDark: boolean; nav: ReturnType<typeof useNavigate> }) {
-  const hoje = Date.now()
+function VencidasCard({ items, isDark, nav }: { items: DashItem[]; isDark: boolean; nav: ReturnType<typeof useNavigate> }) {
   return (
     <section className={`rounded-2xl shadow-sm overflow-hidden ${isDark ? 'bg-[#1e293b] border border-amber-500/30' : 'bg-white border border-amber-200'}`}>
       <div className={`px-4 py-3 flex items-center justify-between ${isDark ? 'border-b border-amber-500/20' : 'border-b border-amber-100'}`}>
         <h2 className={`text-sm font-extrabold flex items-center gap-1.5 ${isDark ? 'text-amber-400' : 'text-amber-800'}`}>
-          <CalendarClock size={14} className="text-amber-500" /> Vencidas / À vencer
+          <CalendarClock size={14} className="text-amber-500" /> Vencidas / A vencer
         </h2>
         <button
           onClick={() => nav('/requisicoes')}
@@ -233,49 +296,17 @@ function VencidasCard({ reqs, isDark, nav }: { reqs: Requisicao[]; isDark: boole
           Ver todas <ArrowRight size={10} />
         </button>
       </div>
-      {reqs.length === 0 ? (
+      {items.length === 0 ? (
         <EmptyPanel
           isDark={isDark}
-          title="Nenhuma RC vencida ou próxima do prazo"
-          description="RCs com prazo de necessidade vencido ou vencendo nos próximos 3 dias aparecem aqui."
+          title="Nenhum item vencido ou proximo do prazo"
+          description="RCs, cotacoes e pedidos com prazo vencido ou nos proximos 3 dias aparecem aqui."
         />
       ) : (
         <div className={`divide-y ${isDark ? 'divide-white/[0.04]' : 'divide-amber-50'}`}>
-          {reqs.slice(0, 5).map(r => {
-            const dataNecessidade = (r as any).data_necessidade as string | undefined
-            const prazoTs = dataNecessidade ? new Date(dataNecessidade).getTime() : 0
-            const vencida = prazoTs > 0 && prazoTs < hoje
-            return (
-              <button
-                key={r.id}
-                type="button"
-                onClick={() => nav(`/requisicoes/${r.id}`)}
-                className={`w-full text-left flex items-center gap-3 px-4 py-3 transition-colors ${isDark ? 'hover:bg-white/[0.03]' : 'hover:bg-amber-50/50'}`}
-              >
-                <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${vencida ? (isDark ? 'bg-red-500/10' : 'bg-red-50') : (isDark ? 'bg-amber-500/10' : 'bg-amber-50')}`}>
-                  {vencida ? <XCircle size={14} className="text-red-500" /> : <Timer size={14} className="text-amber-500" />}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-1.5">
-                    <p className={`text-xs font-extrabold font-mono ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>{r.numero}</p>
-                    {vencida
-                      ? <span className="text-[9px] bg-red-100 text-red-700 font-bold px-1.5 py-0.5 rounded-full">VENCIDA</span>
-                      : <span className="text-[9px] bg-amber-100 text-amber-700 font-bold px-1.5 py-0.5 rounded-full">À VENCER</span>
-                    }
-                  </div>
-                  <p className={`text-[10px] truncate ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{(r as any).justificativa || r.descricao}</p>
-                </div>
-                <div className="text-right shrink-0">
-                  <StatusBadge status={r.status} size="sm" />
-                  {dataNecessidade && (
-                    <p className={`text-[9px] mt-0.5 font-semibold ${vencida ? 'text-red-500' : 'text-amber-600'}`}>
-                      Prazo: {fmtData(dataNecessidade)}
-                    </p>
-                  )}
-                </div>
-              </button>
-            )
-          })}
+          {items.slice(0, 6).map(item => (
+            <ItemRow key={`${item.tipo}-${item.id}`} item={item} isDark={isDark} nav={nav} variant="vencida" />
+          ))}
         </div>
       )}
     </section>
@@ -292,8 +323,8 @@ function formatUserHandle(nome: string): string {
 }
 
 function RecentCard({ r, aprovacao, isDark, nav }: { r: any; aprovacao?: Aprovacao; isDark: boolean; nav: ReturnType<typeof useNavigate> }) {
-  const approvalLabel = r.status === 'pendente' ? 'Aguard. Valid. Técnica'
-    : r.status === 'em_aprovacao' ? 'Em Validação Técnica'
+  const approvalLabel = r.status === 'pendente' ? 'Aguard. Valid. Tecnica'
+    : r.status === 'em_aprovacao' ? 'Em Validacao Tecnica'
     : r.status === 'cotacao_aprovada' ? 'Aguard. Aprov. Financeira'
     : undefined
 
@@ -314,7 +345,7 @@ function RecentCard({ r, aprovacao, isDark, nav }: { r: any; aprovacao?: Aprovac
           <StatusBadge status={r.status as StatusRequisicao} size="sm" customLabel={approvalLabel} />
           {(r.urgencia === 'urgente' || r.urgencia === 'critica') && (
             <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full ${r.urgencia === 'critica' ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700'}`}>
-              {r.urgencia === 'critica' ? 'CRÍTICA' : 'URGENTE'}
+              {r.urgencia === 'critica' ? 'CRITICA' : 'URGENTE'}
             </span>
           )}
         </div>
@@ -324,7 +355,7 @@ function RecentCard({ r, aprovacao, isDark, nav }: { r: any; aprovacao?: Aprovac
             <Clock size={9} className="text-amber-500" />
             <span className="text-[10px] text-amber-600 font-medium truncate">
               Aguardando {aprovacao.aprovador_nome}
-              {aprovacao.nivel ? ` (${NIVEL_LABEL[aprovacao.nivel] ?? `Nível ${aprovacao.nivel}`})` : ''}
+              {aprovacao.nivel ? ` (${NIVEL_LABEL[aprovacao.nivel] ?? `Nivel ${aprovacao.nivel}`})` : ''}
             </span>
           </div>
         )}
@@ -349,16 +380,15 @@ function Loader() {
   )
 }
 
-
 function SetupRequired() {
   return (
     <div className="flex flex-col items-center justify-center py-10 gap-4 px-4">
       <div className="bg-amber-50 border border-amber-200 rounded-2xl p-6 w-full max-w-sm space-y-4">
         <div className="flex items-center gap-3">
           <Settings size={24} className="text-amber-500 shrink-0" />
-          <h2 className="font-bold text-slate-800">Configuração necessária</h2>
+          <h2 className="font-bold text-slate-800">Configuracao necessaria</h2>
         </div>
-        <p className="text-sm text-slate-600">Configure as variáveis de ambiente do Supabase no Vercel.</p>
+        <p className="text-sm text-slate-600">Configure as variaveis de ambiente do Supabase no Vercel.</p>
         <div className="space-y-2 text-xs font-mono bg-slate-900 text-emerald-400 rounded-xl p-3">
           <p className="text-slate-400"># Vercel → Settings → Environment Variables</p>
           <p>VITE_SUPABASE_URL</p>
@@ -384,8 +414,10 @@ export default function Dashboard() {
   const obras = useLookupObras()
   const { data, isLoading, isError, refetch } = useDashboard(periodo, obraFilter || undefined)
   const { data: todasReqs = [] } = useRequisicoes()
+  const { data: todosPedidos = [] } = usePedidos()
+  const { data: todasCotacoes = [] } = useCotacoes()
 
-  // ── Todos os hooks/useMemo ANTES de qualquer early return (Rules of Hooks) ───
+  // ── Todos os hooks/useMemo ANTES de qualquer early return ───
   const kpis = data?.kpis ?? EMPTY_KPIS
   const por_obra = data?.por_obra ?? []
   const aprovacoes_pendentes = data?.aprovacoes_pendentes ?? []
@@ -393,32 +425,121 @@ export default function Dashboard() {
   const hoje = Date.now()
   const tresDias = 3 * 24 * 3600_000
 
+  // Valor total de pedidos emitidos
+  const valorTotalPedidos = useMemo(() =>
+    todosPedidos
+      .filter(p => p.status !== 'cancelado')
+      .reduce((sum, p) => sum + (p.valor_total ?? 0), 0),
+    [todosPedidos]
+  )
+
+  // ── Converter tudo para DashItem ───
+  const allItems = useMemo(() => {
+    const items: DashItem[] = []
+
+    // RCs
+    reqs.forEach(r => {
+      if (!STATUS_ATIVO.includes(r.status)) return
+      items.push({
+        id: r.id, tipo: 'rc', numero: r.numero,
+        descricao: (r as any).justificativa || r.descricao,
+        obra_nome: r.obra_nome, urgencia: r.urgencia, status: r.status,
+        prazo: (r as any).data_necessidade || undefined,
+        prazoLabel: 'Necessidade', valor: r.valor_estimado,
+        created_at: r.created_at, navTo: `/requisicoes/${r.id}`,
+      })
+    })
+
+    // Cotações
+    todasCotacoes.forEach(c => {
+      if (!COTACAO_ATIVA.includes(c.status)) return
+      const req = c.requisicao as any
+      items.push({
+        id: c.id, tipo: 'cotacao',
+        numero: req?.numero ? `${req.numero}/COT` : `COT-${c.id.slice(0, 6)}`,
+        descricao: req?.justificativa || req?.descricao || 'Cotacao em andamento',
+        obra_nome: req?.obra_nome, urgencia: req?.urgencia, status: c.status,
+        prazo: c.data_limite || undefined,
+        prazoLabel: 'Limite', valor: c.valor_selecionado ?? undefined,
+        created_at: c.created_at, navTo: `/cotacoes/${c.requisicao_id}`,
+      })
+    })
+
+    // Pedidos
+    todosPedidos.forEach(p => {
+      if (!PEDIDO_ATIVO.includes(p.status)) return
+      const req = p.requisicao as any
+      items.push({
+        id: p.id, tipo: 'pedido',
+        numero: p.numero_pedido || `PED-${p.id.slice(0, 6)}`,
+        descricao: req?.justificativa || req?.descricao || p.fornecedor_nome,
+        obra_nome: req?.obra_nome, urgencia: req?.urgencia, status: p.status,
+        prazo: p.data_prevista_entrega || undefined,
+        prazoLabel: 'Entrega', valor: p.valor_total ?? undefined,
+        created_at: p.created_at, navTo: `/pedidos`,
+      })
+    })
+
+    return items
+  }, [reqs, todasCotacoes, todosPedidos])
+
+  // ── Urgentes (RCs urgentes/criticas + pedidos em atraso) ───
   const urgentes = useMemo(() =>
-    reqs
-      .filter(r => (r.urgencia === 'urgente' || r.urgencia === 'critica') && STATUS_ATIVO.includes(r.status))
+    allItems
+      .filter(item => {
+        if (item.urgencia === 'urgente' || item.urgencia === 'critica') return true
+        // Pedidos em atraso de entrega são urgentes
+        if (item.tipo === 'pedido' && item.prazo) {
+          return new Date(item.prazo).getTime() < hoje
+        }
+        return false
+      })
       .sort((a, b) => {
         if (a.urgencia === 'critica' && b.urgencia !== 'critica') return -1
         if (b.urgencia === 'critica' && a.urgencia !== 'critica') return 1
-        return new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+        // Pedidos atrasados primeiro
+        const aPrazo = a.prazo ? new Date(a.prazo).getTime() : Infinity
+        const bPrazo = b.prazo ? new Date(b.prazo).getTime() : Infinity
+        return aPrazo - bPrazo
       }),
-    [reqs]
+    [allItems, hoje]
   )
 
+  // ── Vencidas/À vencer (todos com prazo <= hoje + 3 dias) ───
   const vencidasAVencer = useMemo(() =>
-    reqs
-      .filter(r => {
-        const dataNecessidade = (r as any).data_necessidade as string | undefined
-        if (!dataNecessidade || !STATUS_ATIVO.includes(r.status)) return false
-        const ts = new Date(dataNecessidade).getTime()
+    allItems
+      .filter(item => {
+        if (!item.prazo) return false
+        const ts = new Date(item.prazo).getTime()
         return ts <= hoje + tresDias
       })
       .sort((a, b) => {
-        const tsA = new Date((a as any).data_necessidade).getTime()
-        const tsB = new Date((b as any).data_necessidade).getTime()
+        const tsA = new Date(a.prazo!).getTime()
+        const tsB = new Date(b.prazo!).getTime()
         return tsA - tsB
       }),
-    [reqs, hoje]
+    [allItems, hoje]
   )
+
+  // ── Contagens por prazo para o Pulso ───
+  const prazoCounts = useMemo(() => {
+    const calc = (items: DashItem[]) => {
+      let noPrazo = 0, aVencer = 0, vencido = 0
+      items.forEach(item => {
+        if (!item.prazo) { noPrazo++; return }
+        const ts = new Date(item.prazo).getTime()
+        if (ts < hoje) vencido++
+        else if (ts <= hoje + tresDias) aVencer++
+        else noPrazo++
+      })
+      return { noPrazo, aVencer, vencido }
+    }
+    return {
+      rcs: calc(allItems.filter(i => i.tipo === 'rc')),
+      cotacoes: calc(allItems.filter(i => i.tipo === 'cotacao')),
+      pedidos: calc(allItems.filter(i => i.tipo === 'pedido')),
+    }
+  }, [allItems, hoje])
 
   if (isPlaceholder) return <SetupRequired />
   if (isLoading) return <Loader />
@@ -427,23 +548,15 @@ export default function Dashboard() {
     aprovacoes_pendentes.map(a => [a.requisicao_id, a])
   )
 
-  const pipelineContagens = PIPELINE_ETAPAS.map(etapa =>
-    reqs.filter(r => etapa.statuses.includes(r.status)).length
-  )
-
-  const statusSegments = PIPELINE_ETAPAS
-    .map((etapa, i) => ({ key: etapa.key, label: etapa.label, value: pipelineContagens[i], barClass: etapa.barClass }))
-    .filter(s => s.value > 0)
-
   const recentes = pipelineFilter !== null
     ? reqs.filter(r => PIPELINE_ETAPAS[pipelineFilter].statuses.includes(r.status))
     : reqs.slice(0, 8)
+
   const tempoMedio = kpis.tempo_medio_aprovacao_horas > 0
     ? kpis.tempo_medio_aprovacao_horas >= 24
       ? `${(kpis.tempo_medio_aprovacao_horas / 24).toFixed(1)}d`
       : `${Math.round(kpis.tempo_medio_aprovacao_horas)}h`
     : '—'
-
 
   const cardClass = isDark
     ? 'bg-[#1e293b] border border-white/[0.06]'
@@ -452,10 +565,10 @@ export default function Dashboard() {
   return (
     <div className="space-y-5">
 
-      {/* Banner de erro não-bloqueante */}
+      {/* Banner de erro */}
       {isError && (
         <div className="flex items-center justify-between gap-3 px-4 py-2.5 bg-amber-50 border border-amber-200 rounded-xl text-sm">
-          <span className="text-amber-700 font-medium">Falha ao carregar dados — exibindo última versão disponível</span>
+          <span className="text-amber-700 font-medium">Falha ao carregar dados — exibindo ultima versao disponivel</span>
           <button
             onClick={() => refetch()}
             className="flex items-center gap-1.5 text-xs font-semibold text-amber-600 hover:text-amber-800 whitespace-nowrap"
@@ -465,14 +578,14 @@ export default function Dashboard() {
         </div>
       )}
 
-      {/* Header + Filtros na mesma linha */}
+      {/* Header + Filtros */}
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <div>
           <h1 className={`text-xl font-extrabold ${isDark ? 'text-white' : 'text-slate-900'}`}>
             Painel - Compras
           </h1>
           <p className={`text-xs mt-0.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
-            Requisições, cotações e pedidos de compra
+            Requisicoes, cotacoes e pedidos de compra
           </p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
@@ -513,38 +626,21 @@ export default function Dashboard() {
             <RefreshCw size={12} /> Atualizar
           </button>
         </div>
-        <div className="relative flex items-center">
-          <MapPin size={11} className={`absolute left-2.5 pointer-events-none z-10 ${obraFilter ? 'text-teal-600' : isDark ? 'text-slate-500' : 'text-slate-400'}`} />
-          <select
-            value={obraFilter}
-            onChange={e => setObraFilter(e.target.value)}
-            className={`text-[11px] font-semibold rounded-2xl pl-7 pr-3 py-2 border transition-all appearance-none cursor-pointer max-w-[140px] truncate ${
-              obraFilter
-                ? 'bg-teal-50 border-teal-300 text-teal-700'
-                : isDark ? 'bg-white/[0.04] border-white/[0.06] text-slate-400' : 'bg-slate-100 border-slate-200 text-slate-500'
-            }`}
-          >
-            <option value="">Todas obras</option>
-            {obras.map(o => (
-              <option key={o.id} value={o.id}>{o.codigo ? `${o.codigo} - ` : ''}{o.nome}</option>
-            ))}
-          </select>
-        </div>
       </div>
 
       {/* Hero 2 colunas */}
       <div className="grid grid-cols-1 xl:grid-cols-[1.52fr_0.88fr] gap-3 items-stretch">
 
-        {/* Núcleo de Compras */}
+        {/* Nucleo de Compras */}
         <section className={`rounded-3xl shadow-sm overflow-hidden flex flex-col ${cardClass}`}>
           <div className="p-4 md:p-5 flex flex-col gap-4 flex-1">
             <div className="flex items-center justify-between gap-4">
               <div>
                 <p className={`text-[11px] font-bold uppercase tracking-[0.24em] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
-                  Núcleo de Compras
+                  Nucleo de Compras
                 </p>
                 <h2 className={`mt-0.5 text-sm font-black ${isDark ? 'text-white' : 'text-slate-900'}`}>
-                  Indicadores do período selecionado
+                  Indicadores do periodo selecionado
                 </h2>
               </div>
               <div className={`hidden md:flex w-10 h-10 rounded-2xl items-center justify-center shrink-0 ${isDark ? 'bg-teal-500/10' : 'bg-teal-50'}`}>
@@ -554,16 +650,16 @@ export default function Dashboard() {
 
             <div className="grid grid-cols-3 gap-2.5 flex-1">
               <SpotlightMetric
-                label="Valor Total"
-                value={fmt(kpis.valor_total_mes)}
+                label="Valor Pedidos"
+                value={fmt(valorTotalPedidos)}
                 tone="teal"
-                note="volume no período"
+                note="pedidos emitidos"
               />
               <SpotlightMetric
                 label="Total RCs"
                 value={kpis.total_mes}
                 tone="sky"
-                note="solicitações abertas"
+                note="solicitacoes abertas"
               />
               <SpotlightMetric
                 label="Lead Time"
@@ -575,16 +671,16 @@ export default function Dashboard() {
           </div>
         </section>
 
-        {/* Janela Crítica */}
+        {/* Janela Critica */}
         <section className={`rounded-3xl shadow-sm overflow-hidden flex flex-col ${cardClass}`}>
           <div className="p-4 md:p-5 flex flex-col gap-3 flex-1">
             <div className="flex items-center justify-between gap-3">
               <div>
                 <p className={`text-[11px] font-bold uppercase tracking-[0.24em] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
-                  Janela Crítica
+                  Janela Critica
                 </p>
                 <h2 className={`mt-0.5 text-sm font-black ${isDark ? 'text-white' : 'text-slate-900'}`}>
-                  O que exige ação agora
+                  O que exige acao agora
                 </h2>
               </div>
               <div className={`w-8 h-8 rounded-xl flex items-center justify-center ${urgentes.length > 0 ? 'bg-red-50' : isDark ? 'bg-white/5' : 'bg-slate-50'}`}>
@@ -595,15 +691,15 @@ export default function Dashboard() {
               <MiniInfoCard
                 label="Urgentes"
                 value={urgentes.length}
-                note={urgentes.length > 0 ? 'requerem ação' : 'tudo ok'}
+                note={urgentes.length > 0 ? 'RCs + pedidos atrasados' : 'tudo ok'}
                 icon={Zap}
                 iconTone={urgentes.length > 0 ? 'text-red-500' : 'text-slate-400'}
                 isDark={isDark}
               />
               <MiniInfoCard
-                label="Vencidas/À Vencer"
+                label="Vencidas/A Vencer"
                 value={vencidasAVencer.length}
-                note="data de necessidade"
+                note="RCs + cotacoes + pedidos"
                 icon={CalendarClock}
                 iconTone={vencidasAVencer.length > 0 ? 'text-amber-500' : 'text-slate-400'}
                 isDark={isDark}
@@ -613,27 +709,34 @@ export default function Dashboard() {
         </section>
       </div>
 
-      {/* Pulso por Status */}
+      {/* Pulso por Prazo */}
       <section className={`rounded-2xl shadow-sm overflow-hidden ${cardClass}`}>
         <div className={`px-4 py-3 flex items-center justify-between ${isDark ? 'border-b border-white/[0.06]' : 'border-b border-slate-100'}`}>
           <h2 className={`text-sm font-extrabold flex items-center gap-1.5 ${isDark ? 'text-white' : 'text-slate-800'}`}>
-            <TrendingUp size={14} className="text-teal-500" /> Pulso por Status
+            <TrendingUp size={14} className="text-teal-500" /> Pulso por Prazo
           </h2>
+          <div className="flex items-center gap-3">
+            <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-emerald-500" /> <span className="text-[10px] text-slate-500">No prazo</span></span>
+            <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-amber-400" /> <span className="text-[10px] text-slate-500">A vencer</span></span>
+            <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-red-500" /> <span className="text-[10px] text-slate-500">Vencido</span></span>
+          </div>
         </div>
-        <div className="px-4 py-3">
-          <HorizontalStatusBar
-            isDark={isDark}
-            title="Distribuição atual do pipeline"
-            emptyLabel="Nenhuma RC no período"
-            segments={statusSegments}
-          />
+        <div className="px-4 py-3 space-y-3">
+          <PrazoBar label="Requisicoes" {...prazoCounts.rcs} isDark={isDark} />
+          <PrazoBar label="Cotacoes" {...prazoCounts.cotacoes} isDark={isDark} />
+          <PrazoBar label="Pedidos" {...prazoCounts.pedidos} isDark={isDark} />
+          {prazoCounts.rcs.noPrazo + prazoCounts.rcs.aVencer + prazoCounts.rcs.vencido === 0
+            && prazoCounts.cotacoes.noPrazo + prazoCounts.cotacoes.aVencer + prazoCounts.cotacoes.vencido === 0
+            && prazoCounts.pedidos.noPrazo + prazoCounts.pedidos.aVencer + prazoCounts.pedidos.vencido === 0 && (
+            <p className={`text-center text-[10px] py-2 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Nenhum item ativo no periodo</p>
+          )}
         </div>
       </section>
 
       {/* Urgentes + Vencidas */}
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-3">
-        <UrgentesCard reqs={urgentes} isDark={isDark} nav={nav} />
-        <VencidasCard reqs={vencidasAVencer} isDark={isDark} nav={nav} />
+        <UrgentesCard items={urgentes} isDark={isDark} nav={nav} />
+        <VencidasCard items={vencidasAVencer} isDark={isDark} nav={nav} />
       </div>
 
       {/* Por Obra */}
@@ -688,7 +791,7 @@ export default function Dashboard() {
         </div>
         <div className={`divide-y ${isDark ? 'divide-white/[0.04]' : 'divide-slate-50'}`}>
           {recentes.length === 0 ? (
-            <EmptyPanel isDark={isDark} title="Nenhuma requisição encontrada" description="Ajuste os filtros de período ou obra para ver mais resultados." />
+            <EmptyPanel isDark={isDark} title="Nenhuma requisicao encontrada" description="Ajuste os filtros de periodo ou obra para ver mais resultados." />
           ) : (
             recentes.slice(0, 8).map(r => (
               <RecentCard key={r.id} r={r} aprovacao={aprovacaoMap.get(r.id)} isDark={isDark} nav={nav} />
