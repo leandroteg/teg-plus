@@ -281,7 +281,8 @@ function ModeloCard({
   onEdit: () => void
   onDelete: () => void
 }) {
-  const { atLeast } = useAuth()
+  const { atLeast, hasSetorPapel } = useAuth()
+  const canManage = hasSetorPapel('contratos', ['supervisor', 'diretor', 'ceo'])
   const [expanded, setExpanded] = useState(false)
   const isDespesa = modelo.tipo_contrato === 'despesa'
   const excluir = useExcluirModelo()
@@ -366,14 +367,14 @@ function ModeloCard({
         )}
 
         {/* Actions */}
-        {atLeast('comprador') && (
+        {(atLeast('comprador') || canManage) && (
           <div className="flex gap-2 mt-3">
             <button onClick={onEdit}
               className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-violet-50 border border-violet-200 text-[11px] font-semibold text-violet-600 hover:bg-violet-100 transition-all">
               <Edit3 size={11} />
               Editar
             </button>
-            {atLeast('gerente') && (
+            {(atLeast('gerente') || canManage) && (
               <button
                 onClick={() => {
                   if (confirm('Excluir este modelo? Esta ação não pode ser desfeita.')) onDelete()
@@ -394,7 +395,8 @@ function ModeloCard({
 // ── Página Principal ─────────────────────────────────────────────────────────
 
 export default function ModelosContrato() {
-  const { atLeast } = useAuth()
+  const { atLeast, hasSetorPapel } = useAuth()
+  const canManage = hasSetorPapel('contratos', ['supervisor', 'diretor', 'ceo'])
   const { data: modelos = [], isLoading } = useModelosContrato()
   const criarModelo = useCriarModelo()
   const atualizarModelo = useAtualizarModelo()
@@ -495,7 +497,7 @@ export default function ModelosContrato() {
             <p className="text-xs text-slate-400 mt-0.5">Templates reutilizáveis para contratos</p>
           </div>
         </div>
-        {atLeast('comprador') && (
+        {(atLeast('comprador') || canManage) && (
           <button onClick={() => setMode('create')}
             className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-violet-600 text-white text-xs font-bold hover:bg-violet-700 transition-all shadow-sm">
             <Plus size={14} />

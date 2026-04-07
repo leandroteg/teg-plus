@@ -130,7 +130,7 @@ function ContratoCard({ contrato, onToast }: { contrato: Contrato; onToast: (typ
   const canManageContrato = hasSetorPapel('contratos', ['supervisor', 'diretor', 'ceo'])
   const actions = (ACTIONS[contrato.status] ?? []).filter(action => {
     if (action.requireContratoSupervisor) return canManageContrato
-    if (action.minRole) return atLeast(action.minRole)
+    if (action.minRole) return atLeast(action.minRole) || canManageContrato
     return false
   })
   const isFinal = contrato.status === 'encerrado' || contrato.status === 'rescindido'
