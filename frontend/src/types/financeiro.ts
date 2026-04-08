@@ -56,6 +56,7 @@ export interface Fornecedor {
   banco_nome?: string
   agencia?: string
   conta?: string
+  boleto?: boolean
   pix_chave?: string
   pix_tipo?: string
   omie_id?: number

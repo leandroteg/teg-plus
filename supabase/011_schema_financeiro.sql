@@ -28,6 +28,7 @@ CREATE TABLE IF NOT EXISTS cmp_fornecedores (
   agencia         VARCHAR(10),
   conta           VARCHAR(20),
   tipo_conta      VARCHAR(20) DEFAULT 'corrente', -- corrente, poupanca
+  boleto          BOOLEAN DEFAULT false,
   pix_chave       VARCHAR(100),
   pix_tipo        VARCHAR(20), -- cpf, cnpj, email, telefone, aleatoria
   -- Integração

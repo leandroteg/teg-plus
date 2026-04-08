@@ -38,6 +38,7 @@ const EMPTY_FORM: FornecedorFormData = {
   banco_nome: '',
   agencia: '',
   conta: '',
+  boleto: false,
   pix_chave: '',
   pix_tipo: '',
   ativo: true,
@@ -226,26 +227,39 @@ export default function FornecedorCadastroModal({
               </span>
             </div>
 
+            <label className={`mt-4 inline-flex items-center gap-2 text-sm font-semibold ${text}`}>
+              <input
+                type="checkbox"
+                checked={Boolean(form.boleto)}
+                onChange={(event) => setField('boleto', event.target.checked)}
+                className="h-4 w-4 rounded border-slate-300 text-teal-600 focus:ring-teal-500"
+              />
+              Recebe por boleto
+            </label>
+            <p className={`text-[11px] mt-1 ${subtext}`}>
+              Ao marcar boleto, Banco, AgÃªncia, Conta e PIX deixam de ser obrigatÃ³rios.
+            </p>
+
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-4">
               <div>
                 <label className={`block text-xs font-bold mb-1 ${subtext}`}>Banco</label>
-                <input value={form.banco_nome ?? ''} onChange={(event) => setField('banco_nome', event.target.value)} placeholder="Banco" className={`input-base ${input}`} />
+                <input value={form.banco_nome ?? ''} disabled={Boolean(form.boleto)} onChange={(event) => setField('banco_nome', event.target.value)} placeholder="Banco" className={`input-base ${input} ${form.boleto ? 'opacity-60 cursor-not-allowed' : ''}`} />
               </div>
               <div>
                 <label className={`block text-xs font-bold mb-1 ${subtext}`}>Agência</label>
-                <input value={form.agencia ?? ''} onChange={(event) => setField('agencia', event.target.value)} placeholder="0000" className={`input-base ${input}`} />
+                <input value={form.agencia ?? ''} disabled={Boolean(form.boleto)} onChange={(event) => setField('agencia', event.target.value)} placeholder="0000" className={`input-base ${input} ${form.boleto ? 'opacity-60 cursor-not-allowed' : ''}`} />
               </div>
               <div>
                 <label className={`block text-xs font-bold mb-1 ${subtext}`}>Conta</label>
-                <input value={form.conta ?? ''} onChange={(event) => setField('conta', event.target.value)} placeholder="00000-0" className={`input-base ${input}`} />
+                <input value={form.conta ?? ''} disabled={Boolean(form.boleto)} onChange={(event) => setField('conta', event.target.value)} placeholder="00000-0" className={`input-base ${input} ${form.boleto ? 'opacity-60 cursor-not-allowed' : ''}`} />
               </div>
               <div>
                 <label className={`block text-xs font-bold mb-1 ${subtext}`}>Chave PIX</label>
-                <input value={form.pix_chave ?? ''} onChange={(event) => setField('pix_chave', event.target.value)} placeholder="Chave PIX" className={`input-base ${input}`} />
+                <input value={form.pix_chave ?? ''} disabled={Boolean(form.boleto)} onChange={(event) => setField('pix_chave', event.target.value)} placeholder="Chave PIX" className={`input-base ${input} ${form.boleto ? 'opacity-60 cursor-not-allowed' : ''}`} />
               </div>
               <div>
                 <label className={`block text-xs font-bold mb-1 ${subtext}`}>Tipo PIX</label>
-                <select value={form.pix_tipo ?? ''} onChange={(event) => setField('pix_tipo', event.target.value)} className={`input-base ${input}`}>
+                <select value={form.pix_tipo ?? ''} disabled={Boolean(form.boleto)} onChange={(event) => setField('pix_tipo', event.target.value)} className={`input-base ${input} ${form.boleto ? 'opacity-60 cursor-not-allowed' : ''}`}>
                   <option value="">Selecione</option>
                   <option value="cpf">CPF</option>
                   <option value="cnpj">CNPJ</option>
