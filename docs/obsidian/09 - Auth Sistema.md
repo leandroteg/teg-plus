@@ -4,7 +4,7 @@ type: segurança
 status: ativo
 tags: [auth, supabase, autenticação, permissões, roles, rbac]
 criado: 2026-03-02
-atualizado: 2026-04-07
+atualizado: 2026-04-08
 relacionado: ["[[06 - Supabase]]", "[[02 - Frontend Stack]]", "[[03 - Páginas e Rotas]]"]
 ---
 
@@ -107,6 +107,8 @@ Roles do campo `sys_perfis.role`:
 | `requisitante` | 1 | Cria requisições |
 | `visitante` | 0 | Leitura apenas |
 
+> **`PAPEL_TO_LEGACY_ROLE`** — mapa de PapelGlobal → Role legado usado em `atLeast()`. Correção aplicada em 2026-04-07: `supervisor` agora mapeia para `'supervisor'` (nível 4), e não mais para `'gestor'` (nível 3) como era antes.
+
 ### PapelGlobal — Hierarquia Unificada
 
 O PapelGlobal é a hierarquia de cargos usada transversalmente em todos os módulos:
@@ -130,6 +132,12 @@ sys_role_permissoes   → Permissões granulares por role
 ```
 
 > **Status:** A estrutura RBAC v2 com tabelas dedicadas está planejada. Atualmente, o controle é feito via `sys_perfis.role` + `sys_perfis.modulos` + helpers no `AuthContext`.
+
+> **permissoes_especiais.modulo_papeis** — campo JSON em `sys_perfis` que permite atribuir um PapelGlobal por módulo sem precisar do RBAC v2 completo:
+> ```json
+> { "modulo_papeis": { "contratos": "supervisor", "fiscal": "gestor" } }
+> ```
+> Usado como fallback em `papelGlobal`, `hasSetorPapel` e `canTechnicalApprove`.
 
 ---
 
@@ -191,9 +199,20 @@ Retorna o papel específico do usuário para um módulo (override por módulo).
 getPapelForModule('contratos') // → 'supervisor'
 ```
 
-### `canTechnicalApprove`
+### `hasSetorPapel(mod, papeis[])`
 
-Usado no fluxo de validação técnica (aprovação não-financeira). Permite que equipe técnica valide documentos, laudos ou checklists sem autoridade de alçada.
+Verifica se o usuário possui um dos papéis especificados no módulo informado. Prioridade:
+1. RBAC v2 (`sys_perfil_setores`) — se ativo
+2. `permissoes_especiais.modulo_papeis[mod]` — fallback sem RBAC v2
+3. PapelGlobal — último fallback
+
+### `canTechnicalApprove(mod)`
+
+Usado no fluxo de validação técnica (aprovação não-financeira). Verifica, em ordem:
+1. `permissoes_especiais.modulo_papeis[mod]` ∈ `{supervisor, diretor, ceo}`
+2. PapelGlobal ≥ supervisor
+
+Permite que equipe técnica valide documentos, laudos ou checklists sem autoridade de alçada financeira.
 
 ---
 

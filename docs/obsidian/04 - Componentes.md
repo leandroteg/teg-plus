@@ -4,7 +4,7 @@ type: frontend
 status: ativo
 tags: [frontend, componentes, react, ui]
 criado: 2026-03-02
-atualizado: 2026-04-07
+atualizado: 2026-04-08
 relacionado: ["[[02 - Frontend Stack]]", "[[03 - Páginas e Rotas]]"]
 ---
 
@@ -311,7 +311,15 @@ Timeline específica para o fluxo de locação de equipamentos. Etapas: solicita
 
 ### `CategoryCard.tsx`
 
-Card de seleção de categoria no wizard de nova requisição.
+Card de seleção de categoria no wizard de nova requisição. Exibe apenas **ícone + nome** da categoria. Dados de comprador e aprovador foram removidos para simplificar o visual e reduzir o espaço ocupado (2026-04-08).
+
+```
+┌─────────────────────────────────┐
+│  [ícone]  Nome da Categoria  ✓ │  ← check só quando selecionado
+└─────────────────────────────────┘
+```
+
+**Props:** `categoria`, `selected`, `onClick`
 
 ### `Pagination.tsx`
 
