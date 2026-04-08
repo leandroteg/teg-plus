@@ -51,3 +51,9 @@ Implementar o módulo completo de Logística e Transportes com fluxo de 9 etapas
 - Despacho bloqueado enquanto checklist incompleto ou sem NF-e autorizada
 - SLA de 4h para confirmação de recebimento
 - Assinatura digital gerada como `CONF-{timestamp.toString(36)}`
+
+## Links
+- [[23 - Módulo Logística e Transportes]]
+- [[Database/Tarefas/TASK-019 - Logistica Core|TASK-019 — Logística Core]]
+- [[07 - Schema Database]]
+- [[20 - Módulo Financeiro]]

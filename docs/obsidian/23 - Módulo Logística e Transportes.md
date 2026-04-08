@@ -301,4 +301,13 @@ Ao aprovar/concluir um transporte, o sistema pode gerar automaticamente um regis
 
 ---
 
-*Documentação gerada em 2026-03-03. Atualizado em 2026-04-07: PlanejamentoRotaModal com Leaflet, RomaneioDocumentoCard, integração financeira.*
+## Links Relacionados
+
+- [[07 - Schema Database]] — Tabelas `log_*`
+- [[20 - Módulo Financeiro]] — Integração CP via transporte
+- [[05 - Hooks Customizados]] — Hooks `useLogistica*`
+- [[03 - Páginas e Rotas]] — Rotas `/logistica/*`
+- [[Database/Tarefas/TASK-019 - Logistica Core|TASK-019 — Logística Core]]
+- [[Database/Milestones/MS-006 - Modulo Logistica Transportes|MS-006b — Logística]]
+
+*Documentação gerada em 2026-03-03. Atualizado em 2026-04-08.*

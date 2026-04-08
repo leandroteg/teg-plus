@@ -58,3 +58,7 @@ Visão financeira consolidada para a diretoria: orçado vs realizado por obra, D
 
 ## Progresso
 `███████░░░` 75%
+
+## Links
+- [[30 - Módulo Controladoria]]
+- [[20 - Módulo Financeiro]]

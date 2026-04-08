@@ -26,4 +26,7 @@ Fluxo completo de cotação: comprador recebe fila, insere preços de fornecedor
 > Entregue. Inclui recomendacao AI multi-criterio desde Abr 2026.
 
 ## Tarefa Relacionada
-[[TASK-006 - Cotacoes End-to-End]]
+- [[Database/Tarefas/TASK-006 - Cotacoes End-to-End|TASK-006 — Cotações End-to-End]]
+- [[Database/Milestones/MS-002 - Cotacoes e Notificacoes|MS-002 — Cotações e Notificações]]
+- [[14 - Compradores e Categorias]]
+- [[26 - Upload Inteligente Cotacao]]

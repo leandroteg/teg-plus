@@ -51,3 +51,9 @@ Implementar o módulo completo de Manutenção e Uso de Frotas com fluxo de OS e
 - Desvio de abastecimento: km/L < 85% da média histórica → alerta
 - Cotação: mínimo 1 fornecedor para selecionar, mas spec recomenda 3+
 - Numeração automática: `FRO-OS-YYYY-NNNN` via trigger PostgreSQL
+
+## Links
+- [[24 - Módulo Frotas e Manutenção]]
+- [[Database/Tarefas/TASK-020 - Frotas Core|TASK-020 — Frotas Core]]
+- [[07 - Schema Database]]
+- [[20 - Módulo Financeiro]]

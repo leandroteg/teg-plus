@@ -3,6 +3,8 @@ title: "⚙️ SETUP — Plugins e Configuração"
 type: setup
 tags: [setup, obsidian, plugins, dataview, configuracao]
 criado: 2026-03-02
+atualizado: 2026-04-08
+relacionado: ["[[00 - TEG+ INDEX]]"]
 ---
 
 # ⚙️ Setup do Vault TEG+

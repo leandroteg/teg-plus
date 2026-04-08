@@ -26,3 +26,5 @@ Toda ação relevante no sistema deve ser registrada com: quem fez, quando, de o
 
 ## Links
 - [[07 - Schema Database]]
+- [[09 - Auth Sistema]]
+- [[06 - Supabase]]
