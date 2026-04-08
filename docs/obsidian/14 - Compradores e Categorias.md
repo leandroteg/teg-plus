@@ -11,11 +11,12 @@ relacionado: ["[[11 - Fluxo Requisição]]", "[[07 - Schema Database]]", "[[13 -
 
 ## Compradores Ativos
 
-| Comprador | Email | Categorias Responsáveis |
-|-----------|-------|------------------------|
-| **Lauany** | lauany@teg.com.br | Materiais de Obra, EPI/EPC, Ferramental, Centro de Distribuição, Demais Aquisições |
-| **Fernando** | fernando@teg.com.br | Frota/Equipamentos, Serviços, Locação |
-| **Aline** | aline@teg.com.br | Mobilização, Alojamento, Alimentação, Escritório |
+| Comprador    | Email               | Categorias Responsáveis                                                            |
+| ------------ | ------------------- | ---------------------------------------------------------------------------------- |
+| **Lauany**   | lauany@teg.com.br   | Materiais de Obra, EPI/EPC, Ferramental, Centro de Distribuição, Demais Aquisições |
+| **Fernando** | fernando@teg.com.br | Frota/Equipamentos, Serviços, Locação                                              |
+| **Aline**    | aline@teg.com.br    | Mobilização, Alojamento, Alimentação, Escritório                                   |
+|              |                     |                                                                                    |
 
 ---
 
