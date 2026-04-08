@@ -4,7 +4,7 @@ import {
   Sparkles, Send, PlusCircle, Trash2, ChevronLeft, ChevronRight,
   AlertCircle, Check, Layers, FileText, Search, Upload, FileUp,
   ChevronDown, X, FileImage, Eye, Pencil, CheckCircle2, Loader2,
-  Package, MapPin, Zap, Save, ExternalLink, Download,
+  Package, MapPin, Zap, Save,
 } from 'lucide-react'
 import { useCriarRequisicao } from '../hooks/useRequisicoes'
 import { useAiParse, readFileForAi, isBinaryFile, isImageFile } from '../hooks/useAiParse'
@@ -383,7 +383,7 @@ export default function NovaRequisicao() {
 
   const submit = async () => {
     if (!justificativa.trim()) {
-      setSubmitError('Preencha a Descrição da compra antes de enviar.')
+      setSubmitError('Preencha o Motivo da compra antes de enviar.')
       return
     }
     if (urgencia !== 'normal' && !justificativaUrgencia.trim()) {
@@ -548,18 +548,16 @@ export default function NovaRequisicao() {
       )}
 
       <div>
-        <label className="text-xs font-semibold text-slate-500 mb-1 block">Solicitante *</label>
-        <input required className={`w-full border rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-teal-300 outline-none ${
-          stepErrors.some(e => e.includes('solicitante')) ? 'border-red-300 bg-red-50/30' : 'border-slate-200'
-        }`}
-          placeholder="Seu nome completo" value={solicitante} onChange={e => setSolicitante(e.target.value)} />
+        <label className="text-xs font-semibold text-slate-500 mb-1 block">Solicitante</label>
+        <input disabled className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm bg-slate-50 text-slate-600 cursor-not-allowed outline-none opacity-100"
+          value={solicitante} />
       </div>
 
       <div>
-        <label className="text-xs font-semibold text-slate-500 mb-1 block">Descri&ccedil;&atilde;o <span className="text-red-400">*</span></label>
+        <label className="text-xs font-semibold text-slate-500 mb-1 block">Motivo <span className="text-red-400">*</span></label>
         <textarea rows={3} required
           className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-teal-300 outline-none"
-          placeholder="Descreva o que quer comprar e para que precisa dessa compra"
+          placeholder="Por que essa compra é necessária? Para qual finalidade?"
           value={justificativa} onChange={e => setJustificativa(e.target.value)} />
       </div>
 
@@ -607,25 +605,31 @@ export default function NovaRequisicao() {
                   <X size={14} />
                 </button>
               </div>
-              <div className="flex gap-2">
-                <a
-                  href={URL.createObjectURL(referenciaFile)}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  onClick={e => e.stopPropagation()}
-                  className="flex-1 flex items-center justify-center gap-1.5 py-1.5 px-3 rounded-xl text-xs font-semibold border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 transition-colors"
-                >
-                  <ExternalLink size={12} /> Visualizar
-                </a>
-                <a
-                  href={URL.createObjectURL(referenciaFile)}
-                  download={referenciaFile.name}
-                  onClick={e => e.stopPropagation()}
-                  className="flex-1 flex items-center justify-center gap-1.5 py-1.5 px-3 rounded-xl text-xs font-semibold border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 transition-colors"
-                >
-                  <Download size={12} /> Download
-                </a>
-              </div>
+              <button
+                type="button"
+                disabled={aiParse.isPending}
+                onClick={async (e) => {
+                  e.stopPropagation()
+                  try {
+                    const fileData = await readFileForAi(referenciaFile)
+                    const result = await aiParse.mutateAsync({
+                      texto: fileData.texto ?? '',
+                      solicitante_nome: solicitante,
+                      arquivo: fileData.arquivo,
+                    })
+                    if (result.itens?.length > 0) {
+                      setItens(result.itens)
+                      if (typeof result.confianca === 'number') setConfianca(result.confianca)
+                    }
+                  } catch { /* erro silencioso — usuário pode preencher manualmente */ }
+                }}
+                className="w-full flex items-center justify-center gap-2 py-2 px-3 rounded-xl text-xs font-semibold bg-teal-500 text-white hover:bg-teal-600 disabled:opacity-60 transition-colors"
+              >
+                {aiParse.isPending
+                  ? <><Loader2 size={12} className="animate-spin" /> Lendo itens...</>
+                  : <><Sparkles size={12} /> Ler itens com IA</>
+                }
+              </button>
             </div>
           ) : (
             <div className="flex items-center gap-3">
@@ -915,11 +919,9 @@ export default function NovaRequisicao() {
       )}
 
       <div>
-        <label className="text-xs font-semibold text-slate-500 mb-1 block">Solicitante *</label>
-        <input required className={`w-full border rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-teal-300 outline-none ${
-          stepErrors.some(e => e.includes('solicitante')) ? 'border-red-300 bg-red-50/30' : 'border-slate-200'
-        }`}
-          placeholder="Seu nome completo" value={solicitante} onChange={e => setSolicitante(e.target.value)} />
+        <label className="text-xs font-semibold text-slate-500 mb-1 block">Solicitante</label>
+        <input disabled className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm bg-slate-50 text-slate-600 cursor-not-allowed outline-none opacity-100"
+          value={solicitante} />
       </div>
 
       <div>
@@ -951,10 +953,10 @@ export default function NovaRequisicao() {
       </div>
 
       <div>
-        <label className="text-xs font-semibold text-slate-500 mb-1 block">Descrição <span className="text-red-400">*</span></label>
+        <label className="text-xs font-semibold text-slate-500 mb-1 block">Motivo <span className="text-red-400">*</span></label>
         <textarea rows={3} required
           className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-teal-300 outline-none"
-          placeholder="Descreva o que quer comprar e para que precisa dessa compra"
+          placeholder="Por que essa compra é necessária? Para qual finalidade?"
           value={justificativa} onChange={e => setJustificativa(e.target.value)} />
       </div>
 
