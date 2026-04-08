@@ -125,16 +125,16 @@ atualizado: 2026-04-08
 
 | Fluxo | O que faz | Doc |
 |-------|-----------|-----|
-| Requisicao de Compra | Solicitar materiais/servicos via wizard 3 etapas | [[11 - Fluxo Requisicao]] |
-| Aprovacao (AprovAi) | Aprovar/rejeitar via celular, link direto | [[12 - Fluxo Aprovacao]] |
+| Requisicao de Compra | Solicitar materiais/servicos via wizard 3 etapas | [[11 - Fluxo Requisição]] |
+| Aprovacao (AprovAi) | Aprovar/rejeitar via celular, link direto | [[12 - Fluxo Aprovação]] |
 | Cotacao e Pedido | Comparar fornecedores e emitir PO | [[14 - Compradores e Categorias]] |
-| Contratos | Solicitar, analisar minuta AI, aprovar, assinar | [[27 - Modulo Contratos Gestao]] |
+| Contratos | Solicitar, analisar minuta AI, aprovar, assinar | [[27 - Módulo Contratos Gestão]] |
 | Pagamento | Liberar parcela, anexar NF, confirmar pgto | [[21 - Fluxo Pagamento]] |
-| Estoque | Movimentar materiais, inventario, patrimonio | [[22 - Modulo Estoque e Patrimonial]] |
-| Logistica | Solicitar transporte, rastrear, receber | [[23 - Modulo Logistica e Transportes]] |
-| Frotas | OS manutencao, checklist, abastecimento | [[24 - Modulo Frotas e Manutencao]] |
-| Fiscal | Pipeline de notas fiscais | [[29 - Modulo Fiscal]] |
-| Obras | Apontamentos, RDO, adiantamentos | [[32 - Modulo Obras]] |
+| Estoque | Movimentar materiais, inventario, patrimonio | [[22 - Módulo Estoque e Patrimonial]] |
+| Logistica | Solicitar transporte, rastrear, receber | [[23 - Módulo Logística e Transportes]] |
+| Frotas | OS manutencao, checklist, abastecimento | [[24 - Módulo Frotas e Manutenção]] |
+| Fiscal | Pipeline de notas fiscais | [[29 - Módulo Fiscal]] |
+| Obras | Apontamentos, RDO, adiantamentos | [[32 - Módulo Obras]] |
 
 ### Permissoes e Papeis
 
@@ -159,38 +159,38 @@ atualizado: 2026-04-08
 | Visao geral | [[01 - Arquitetura Geral]] |
 | Premissas | [[00 - Premissas do Projeto]] |
 | Frontend | [[02 - Frontend Stack]] |
-| Paginas & Rotas | [[03 - Paginas e Rotas]] |
+| Paginas & Rotas | [[03 - Páginas e Rotas]] |
 | Componentes | [[04 - Componentes]] |
 | Hooks | [[05 - Hooks Customizados]] |
 | Banco de Dados | [[06 - Supabase]] |
 | Schema SQL | [[07 - Schema Database]] |
-| Migracoes | [[08 - Migracoes SQL]] |
+| Migracoes | [[08 - Migrações SQL]] |
 | Autenticacao | [[09 - Auth Sistema]] |
 | Automacao | [[10 - n8n Workflows]] |
-| Fluxo Requisicao | [[11 - Fluxo Requisicao]] |
-| Fluxo Aprovacao | [[12 - Fluxo Aprovacao]] |
-| Alcadas | [[13 - Alcadas]] |
+| Fluxo Requisicao | [[11 - Fluxo Requisição]] |
+| Fluxo Aprovacao | [[12 - Fluxo Aprovação]] |
+| Alcadas | [[13 - Alçadas]] |
 | Compradores & Categorias | [[14 - Compradores e Categorias]] |
 | Deploy & GitHub | [[15 - Deploy e GitHub]] |
-| Variaveis de Ambiente | [[16 - Variaveis de Ambiente]] |
+| Variaveis de Ambiente | [[16 - Variáveis de Ambiente]] |
 | Roadmap | [[17 - Roadmap]] |
-| Glossario | [[18 - Glossario]] |
-| Integracao Omie ERP | [[19 - Integracao Omie]] |
-| Modulo Financeiro | [[20 - Modulo Financeiro]] |
+| Glossario | [[18 - Glossário]] |
+| Integracao Omie ERP | [[19 - Integração Omie]] |
+| Modulo Financeiro | [[20 - Módulo Financeiro]] |
 | Fluxo de Pagamento | [[21 - Fluxo Pagamento]] |
-| Modulo Estoque e Patrimonial | [[22 - Modulo Estoque e Patrimonial]] |
-| Modulo Logistica | [[23 - Modulo Logistica e Transportes]] |
-| Modulo Frotas | [[24 - Modulo Frotas e Manutencao]] |
+| Modulo Estoque e Patrimonial | [[22 - Módulo Estoque e Patrimonial]] |
+| Modulo Logistica | [[23 - Módulo Logística e Transportes]] |
+| Modulo Frotas | [[24 - Módulo Frotas e Manutenção]] |
 | Mural de Recados | [[25 - Mural de Recados]] |
 | Upload Inteligente Cotacao | [[26 - Upload Inteligente Cotacao]] |
-| Modulo Contratos | [[27 - Modulo Contratos Gestao]] |
-| Modulo Cadastros AI | [[28 - Modulo Cadastros AI]] |
-| Modulo Fiscal | [[29 - Modulo Fiscal]] |
-| Modulo Controladoria | [[30 - Modulo Controladoria]] |
-| Modulo PMO/EGP | [[31 - Modulo PMO-EGP]] |
-| Modulo Obras | [[32 - Modulo Obras]] |
-| Modulo SSMA | [[33 - Modulo SSMA]] |
-| Modulo Locacao | [[34 - Modulo Locacao]] |
+| Modulo Contratos | [[27 - Módulo Contratos Gestão]] |
+| Modulo Cadastros AI | [[28 - Módulo Cadastros AI]] |
+| Modulo Fiscal | [[29 - Módulo Fiscal]] |
+| Modulo Controladoria | [[30 - Módulo Controladoria]] |
+| Modulo PMO/EGP | [[31 - Módulo PMO-EGP]] |
+| Modulo Obras | [[32 - Módulo Obras]] |
+| Modulo SSMA | [[33 - Módulo SSMA]] |
+| Modulo Locacao | [[34 - Módulo Locação]] |
 
 ---
 
@@ -355,6 +355,6 @@ graph LR
 
 ## Setup do Vault
 
-Para configurar este vault Obsidian, veja [[SETUP - Plugins Necessarios]].
+Para configurar este vault Obsidian, veja [[SETUP - Plugins Necessários]].
 
 *Vault gerado em 2026-03-02 a partir do codigo-fonte. Ultima atualizacao: 2026-04-08.*

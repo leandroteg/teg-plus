@@ -294,12 +294,12 @@ graph TD
 | [[MS-012 - Controladoria BI\|MS-012]] | Controladoria e BI | Q1-2026 | 75% |
 | [[MS-013 - Monday PMO\|MS-013]] | Monday.com PMO | Q4-2026 | 0% |
 | [[MS-014 - Modulo Cadastros AI\|MS-014]] | Cadastros AI (Master Data) | Q1-2026 | 100% |
-| [[MS-015 - Modulo Fiscal\|MS-015]] | Fiscal — NF Pipeline | Q1-2026 | 80% |
-| [[MS-016 - Modulo PMO EGP\|MS-016]] | PMO/EGP | Q1-2026 | 80% |
-| [[MS-017 - Modulo Obras\|MS-017]] | Obras | Q1-2026 | 75% |
-| [[MS-018 - Modulo Locacao\|MS-018]] | Locação | Q1-2026 | 100% |
-| [[MS-019 - RBAC v2\|MS-019]] | RBAC v2 | Q1-2026 | 100% |
-| [[MS-020 - Dashboard Unificado\|MS-020]] | Dashboard Unificado Compras | Q1-2026 | 100% |
+| MS-015 | Fiscal — NF Pipeline ([[29 - Módulo Fiscal]]) | Q1-2026 | 80% |
+| MS-016 | PMO/EGP ([[31 - Módulo PMO-EGP]]) | Q1-2026 | 80% |
+| MS-017 | Obras ([[32 - Módulo Obras]]) | Q1-2026 | 75% |
+| MS-018 | Locação ([[34 - Módulo Locação]]) | Q1-2026 | 100% |
+| MS-019 | RBAC v2 ([[09 - Auth Sistema]]) | Q1-2026 | 100% |
+| MS-020 | Dashboard Unificado Compras | Q1-2026 | 100% |
 
 ---
 
