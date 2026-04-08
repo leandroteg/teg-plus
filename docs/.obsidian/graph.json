@@ -6,53 +6,17 @@
   "hideUnresolved": false,
   "showOrphans": true,
   "collapse-color-groups": false,
-  "colorGroups": [
-    {
-      "query": "path:obsidian/Paineis",
-      "color": {
-        "a": 1,
-        "rgb": 4488562
-      }
-    },
-    {
-      "query": "path:obsidian/Database/ADRs",
-      "color": {
-        "a": 1,
-        "rgb": 9342606
-      }
-    },
-    {
-      "query": "path:obsidian/Database",
-      "color": {
-        "a": 1,
-        "rgb": 16750848
-      }
-    },
-    {
-      "query": "path:plans",
-      "color": {
-        "a": 1,
-        "rgb": 9342606
-      }
-    },
-    {
-      "query": "path:obsidian file:(00 -|01 -|02 -|03 -|04 -|05 -|06 -|07 -|08 -|09 -|10 -|11 -|12 -|13 -|14 -|15 -|16 -|17 -|18 -|19 -|20 -|21 -|22 -|23 -|24 -|25 -|26 -|27 -|28 -|29 -|30 -|31 -|32 -|33 -|34 -|SETUP)",
-      "color": {
-        "a": 1,
-        "rgb": 5570815
-      }
-    }
-  ],
+  "colorGroups": [],
   "collapse-display": true,
-  "showArrow": true,
+  "showArrow": false,
   "textFadeMultiplier": 0,
-  "nodeSizeMultiplier": 1.2,
+  "nodeSizeMultiplier": 1,
   "lineSizeMultiplier": 1,
   "collapse-forces": true,
   "centerStrength": 0.518713248970312,
   "repelStrength": 10,
   "linkStrength": 1,
   "linkDistance": 250,
-  "scale": 0.32423332021846224,
+  "scale": 0.18462328129603045,
   "close": true
 }
