@@ -248,8 +248,8 @@ export default function NovaSolicitacao() {
   // Auto-calc prazo from dates
   useEffect(() => {
     if (dataInicioPrevista && dataFimPrevista) {
-      const start = new Date(dataInicioPrevista)
-      const end = new Date(dataFimPrevista)
+      const start = new Date(dataInicioPrevista + 'T12:00:00')
+      const end = new Date(dataFimPrevista + 'T12:00:00')
       const diff = (end.getFullYear() - start.getFullYear()) * 12 + (end.getMonth() - start.getMonth())
       if (diff > 0) setPrazoMeses(diff)
     }

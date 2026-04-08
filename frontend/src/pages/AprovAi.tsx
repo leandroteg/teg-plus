@@ -1307,7 +1307,7 @@ function MinutaExecutiveSummary({ resumo, referencia }: {
         <div className="bg-violet-50/60 rounded-xl p-3">
           <div className="flex items-center gap-2 mb-2">
             <Sparkles size={13} className="text-violet-500" />
-            <span className="text-[11px] font-bold text-violet-600 uppercase tracking-wider">Parecer / Resumo Executivo</span>
+            <span className="text-[11px] font-bold text-violet-600 uppercase tracking-wider">Resumo do Contrato</span>
             {typeof resumo.ai_score === 'number' && (
               <span className={`ml-auto text-[11px] font-extrabold px-2 py-0.5 rounded-full ${
                 resumo.ai_score >= 80 ? 'bg-emerald-100 text-emerald-700' :
@@ -1812,15 +1812,13 @@ export default function AprovAi() {
       {/* Header */}
       <header className="px-4 pt-6 pb-5">
         <div className="flex items-center justify-between mb-4">
-          {!isStandalone && (
-            <button
-              onClick={() => navigate(-1)}
-              className="flex items-center gap-1.5 text-indigo-300 hover:text-white transition-colors"
-            >
-              <ArrowLeft size={18} />
-              <span className="text-xs font-semibold">Voltar</span>
-            </button>
-          )}
+          <button
+            onClick={() => isStandalone ? navigate('/') : navigate(-1)}
+            className="flex items-center gap-1.5 text-indigo-300 hover:text-white transition-colors"
+          >
+            <ArrowLeft size={18} />
+            <span className="text-xs font-semibold">Voltar</span>
+          </button>
           {!isStandalone && <div />}
           {canInstall && (
             <button

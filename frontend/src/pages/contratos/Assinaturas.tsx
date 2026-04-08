@@ -38,7 +38,7 @@ const fmt = (v: number) =>
   v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 })
 
 const fmtData = (d: string) =>
-  new Date(d).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit' })
+  new Date(d.length === 10 ? d + 'T12:00:00' : d).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit' })
 
 function normalizeSignatarios(value: Assinatura['signatarios'] | string | null | undefined): Signatario[] {
   if (Array.isArray(value)) return value.filter(Boolean)

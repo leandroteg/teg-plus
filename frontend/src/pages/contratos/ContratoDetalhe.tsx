@@ -29,15 +29,15 @@ const fmtCompact = (v: number) =>
       : fmt(v)
 
 const fmtDate = (d?: string | null) =>
-  d ? new Date(d + 'T00:00:00').toLocaleDateString('pt-BR') : '—'
+  d ? new Date(d + 'T12:00:00').toLocaleDateString('pt-BR') : '—'
 
 const fmtDateTime = (d?: string | null) =>
   d ? new Date(d).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' }) : '—'
 
 const diffMonths = (start?: string, end?: string) => {
   if (!start || !end) return null
-  const s = new Date(start)
-  const e = new Date(end)
+  const s = new Date(start + 'T12:00:00')
+  const e = new Date(end + 'T12:00:00')
   return Math.max(1, Math.round((e.getTime() - s.getTime()) / (30.44 * 24 * 60 * 60 * 1000)))
 }
 

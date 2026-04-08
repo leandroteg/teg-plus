@@ -402,34 +402,52 @@ export function useAprovacoesPendentes(tipo?: TipoAprovacao) {
             const minuta = minutaMap.get(a.entidade_id)
             const resumoExec = resumoMap.get(a.entidade_id)
 
+            // Issue #199: Resumo deve ser sobre o documento enviado para aprovacao
             // Issue #44: Usar resumo executivo (nao analise antiga da minuta)
             // Issue #43: Formatar como texto estruturado com secoes claras
             let aiResumo: string | null = null
-            if (resumoExec) {
+            {
               const sections: string[] = []
-              if (resumoExec.objeto_resumo) {
-                sections.push(`OBJETO\n${resumoExec.objeto_resumo as string}`)
-              }
-              const partes = resumoExec.partes_envolvidas as string | null
-              if (partes) {
-                sections.push(`PARTES ENVOLVIDAS\n${partes}`)
-              }
-              const vigencia = resumoExec.vigencia as string | null
+              // Dados factuais do contrato (sempre presentes)
+              const objResumo = (resumoExec?.objeto_resumo as string) ?? (con?.objeto as string)
+              if (objResumo) sections.push(`OBJETO DO CONTRATO\n${objResumo}`)
+
+              const contraparte = (con?.contraparte_nome as string)
+              if (contraparte) sections.push(`CONTRAPARTE\n${contraparte}`)
+
+              const tipo = (con?.tipo_contrato as string)
+              if (tipo) sections.push(`TIPO\n${tipo === 'despesa' ? 'Contrato de Despesa' : tipo === 'receita' ? 'Contrato de Receita' : tipo}`)
+
+              const partes = resumoExec?.partes_envolvidas as string | null
+              if (partes) sections.push(`PARTES ENVOLVIDAS\n${partes}`)
+
+              const vigencia = resumoExec?.vigencia as string | null
+              const vigIni = (con?.data_inicio as string)
+              const vigFim = (con?.data_fim as string)
               if (vigencia) {
                 sections.push(`VIGENCIA\n${vigencia}`)
+              } else if (vigIni && vigFim) {
+                sections.push(`VIGENCIA\n${vigIni} a ${vigFim}`)
               }
-              const riscos = resumoExec.riscos as Array<{ descricao: string; nivel?: string }> | null
-              if (riscos && riscos.length > 0) {
-                sections.push(`RISCOS\n${riscos.map(r => `• [${(r.nivel ?? 'medio').toUpperCase()}] ${r.descricao}`).join('\n')}`)
+
+              const valor = resumoExec?.valor_total as number | null ?? (Number(con?.valor_estimado) || null)
+              if (valor) sections.push(`VALOR ESTIMADO\nR$ ${valor.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`)
+
+              // Parecer AI (quando houver resumo executivo completo)
+              if (resumoExec) {
+                const riscos = resumoExec.riscos as Array<{ descricao: string; nivel?: string }> | null
+                if (riscos && riscos.length > 0) {
+                  sections.push(`RISCOS IDENTIFICADOS\n${riscos.map(r => `• [${(r.nivel ?? 'medio').toUpperCase()}] ${r.descricao}`).join('\n')}`)
+                }
+                const oportunidades = resumoExec.oportunidades as Array<{ descricao: string }> | null
+                if (oportunidades && oportunidades.length > 0) {
+                  sections.push(`OPORTUNIDADES\n${oportunidades.map(o => `• ${o.descricao}`).join('\n')}`)
+                }
+                if (resumoExec.recomendacao) {
+                  sections.push(`RECOMENDACAO\n${resumoExec.recomendacao as string}`)
+                }
               }
-              const oportunidades = resumoExec.oportunidades as Array<{ descricao: string }> | null
-              if (oportunidades && oportunidades.length > 0) {
-                sections.push(`OPORTUNIDADES\n${oportunidades.map(o => `• ${o.descricao}`).join('\n')}`)
-              }
-              if (resumoExec.recomendacao) {
-                sections.push(`RECOMENDACAO\n${resumoExec.recomendacao as string}`)
-              }
-              aiResumo = sections.join('\n\n') || null
+              aiResumo = sections.length > 0 ? sections.join('\n\n') : null
             }
 
             requisicao = {

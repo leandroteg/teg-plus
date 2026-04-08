@@ -31,8 +31,11 @@ import NumericInput from '../../components/NumericInput'
 const fmt = (v: number) =>
   v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
 
+const safeDate = (d: string) =>
+  new Date(d.length === 10 ? d + 'T12:00:00' : d)
+
 const fmtData = (d: string) =>
-  new Date(d).toLocaleDateString('pt-BR', {
+  safeDate(d).toLocaleDateString('pt-BR', {
     day: '2-digit', month: '2-digit', year: 'numeric',
   })
 

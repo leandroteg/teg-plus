@@ -31,7 +31,7 @@ function toIsoDate(date: Date) {
 
 function parseDate(value?: string | null) {
   if (!value) return null
-  const parsed = new Date(`${value}T00:00:00`)
+  const parsed = new Date(`${value}T12:00:00`)
   return Number.isNaN(parsed.getTime()) ? null : parsed
 }
 
