@@ -263,6 +263,7 @@ export interface DespesaAdiantamento {
   finalidade: string
   justificativa?: string
   data_solicitacao: string
+  data_pagamento?: string
   data_limite_prestacao?: string
   status: StatusDespesaAdiantamento
   fin_conta_pagar_id?: string

@@ -210,3 +210,31 @@ export function useCriarSolicitacaoAdiantamento() {
     },
   })
 }
+
+export function useAtualizarClasseAdiantamento() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async ({
+      id,
+      classe_financeira,
+      classe_financeira_id,
+    }: {
+      id: string
+      classe_financeira: string
+      classe_financeira_id: string
+    }) => {
+      const { error } = await supabase
+        .from('desp_adiantamentos')
+        .update({
+          classe_financeira,
+          classe_financeira_id,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', id)
+      if (error) throw error
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['despesas-adiantamentos'] })
+    },
+  })
+}

@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Plus, Wallet, CheckCircle2, Clock3, XCircle, Send } from 'lucide-react'
+import { Plus, Wallet, CheckCircle2, Clock3, XCircle, Send, AlertCircle, ChevronRight, Save, Loader2 } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
 import { useAuth } from '../../contexts/AuthContext'
 import { useCadCentrosCusto, useCadClasses, useCadFornecedores } from '../../hooks/useCadastros'
-import { isDespesaSchemaMissing, useAdiantamentosDespesa, useCriarSolicitacaoAdiantamento } from '../../hooks/useDespesas'
+import { isDespesaSchemaMissing, useAdiantamentosDespesa, useCriarSolicitacaoAdiantamento, useAtualizarClasseAdiantamento } from '../../hooks/useDespesas'
 import { useRHColaboradores } from '../../hooks/useRH'
 import NumericInput from '../../components/NumericInput'
 import SearchableSelect from '../../components/SearchableSelect'
@@ -55,8 +55,6 @@ const EMPTY_FORM = {
   data_limite_prestacao: '',
   centro_custo: '',
   centro_custo_id: '',
-  classe_financeira: '',
-  classe_financeira_id: '',
   observacoes: '',
 }
 
@@ -74,11 +72,15 @@ export default function DespesasAdiantamentos() {
   const { data: colaboradoresAtivos = [] } = useRHColaboradores({ ativo: true })
   const { data: fornecedoresAtivos = [] } = useCadFornecedores({ ativo: true })
   const criar = useCriarSolicitacaoAdiantamento()
+  const atualizarClasse = useAtualizarClasseAdiantamento()
   const adiantamentosIndisponiveis = isDespesaSchemaMissing(adiantamentosError)
 
   const [showModal, setShowModal] = useState(false)
   const [erro, setErro] = useState('')
   const [form, setForm] = useState(EMPTY_FORM)
+  const [detalheItem, setDetalheItem] = useState<typeof adiantamentos[0] | null>(null)
+  const [detalheClasseId, setDetalheClasseId] = useState('')
+  const [detalheErroCls, setDetalheErroCls] = useState('')
 
   const favorecidoOptions = useMemo<FavorecidoOption[]>(() => {
     const colaboradores = colaboradoresAtivos.map(colaborador => {
@@ -148,8 +150,8 @@ export default function DespesasAdiantamentos() {
       setErro('Selecione o favorecido da solicitação.')
       return
     }
-    if (!form.centro_custo || !form.classe_financeira) {
-      setErro('Selecione centro de custo e classe financeira.')
+    if (!form.centro_custo) {
+      setErro('Selecione o centro de custo.')
       return
     }
     if (adiantamentosIndisponiveis) {
@@ -169,8 +171,6 @@ export default function DespesasAdiantamentos() {
         data_limite_prestacao: form.data_limite_prestacao || undefined,
         centro_custo: form.centro_custo,
         centro_custo_id: form.centro_custo_id || undefined,
-        classe_financeira: form.classe_financeira,
-        classe_financeira_id: form.classe_financeira_id || undefined,
         observacoes: form.observacoes,
       })
       setShowModal(false)
@@ -240,39 +240,52 @@ export default function DespesasAdiantamentos() {
               Nenhuma solicitação de adiantamento cadastrada ainda.
             </div>
           )}
-          {adiantamentos.map(item => (
-            <div key={item.id} className="grid grid-cols-[1fr,1.4fr,1fr,1fr,1fr,0.9fr] gap-4 px-5 py-4 text-sm">
-              <div>
-                <p className={`font-bold ${dark ? 'text-white' : 'text-slate-900'}`}>{item.numero}</p>
-                <p className={`text-xs ${dark ? 'text-slate-500' : 'text-slate-400'}`}>{new Date(item.data_solicitacao).toLocaleDateString('pt-BR')}</p>
+          {adiantamentos.map(item => {
+            const semClasse = !item.classe_financeira && item.status !== 'rejeitado' && item.status !== 'concluido'
+            return (
+              <div
+                key={item.id}
+                onClick={() => {
+                  setDetalheItem(item)
+                  setDetalheClasseId(item.classe_financeira_id || '')
+                  setDetalheErroCls('')
+                }}
+                className={`grid grid-cols-[1fr,1.4fr,1fr,1fr,1fr,0.9fr] gap-4 px-5 py-4 text-sm cursor-pointer transition-colors ${dark ? 'hover:bg-white/[0.03]' : 'hover:bg-slate-50'}`}
+              >
+                <div>
+                  <p className={`font-bold ${dark ? 'text-white' : 'text-slate-900'}`}>{item.numero}</p>
+                  <p className={`text-xs ${dark ? 'text-slate-500' : 'text-slate-400'}`}>{new Date(item.data_solicitacao).toLocaleDateString('pt-BR')}</p>
+                </div>
+                <div>
+                  <p className={`${dark ? 'text-slate-200' : 'text-slate-700'}`}>{item.finalidade}</p>
+                  {semClasse && (
+                    <span className="mt-1 inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-700">
+                      <AlertCircle size={10} /> Classe não definida
+                    </span>
+                  )}
+                </div>
+                <div>
+                  <p className={`${dark ? 'text-slate-200' : 'text-slate-700'}`}>{item.solicitante_nome || 'Usuário não identificado'}</p>
+                  <p className={`text-xs ${dark ? 'text-slate-500' : 'text-slate-400'}`}>{item.gestor_nome || 'Gestor não identificado'}</p>
+                </div>
+                <div>
+                  <p className={`${dark ? 'text-slate-200' : 'text-slate-700'}`}>{item.favorecido_nome}</p>
+                </div>
+                <div>
+                  <p className={`font-semibold ${dark ? 'text-white' : 'text-slate-900'}`}>{fmt(Number(item.valor_solicitado))}</p>
+                  {item.centro_custo && (
+                    <p className={`text-xs ${dark ? 'text-slate-500' : 'text-slate-400'}`}>{item.centro_custo}</p>
+                  )}
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${STATUS_STYLE[item.status]}`}>
+                    {STATUS_LABEL[item.status]}
+                  </span>
+                  <ChevronRight size={14} className={dark ? 'text-slate-600' : 'text-slate-300'} />
+                </div>
               </div>
-              <div>
-                <p className={`${dark ? 'text-slate-200' : 'text-slate-700'}`}>{item.finalidade}</p>
-                {item.justificativa && (
-                  <p className={`mt-1 text-xs ${dark ? 'text-slate-500' : 'text-slate-400'}`}>{item.justificativa}</p>
-                )}
-              </div>
-              <div>
-                <p className={`${dark ? 'text-slate-200' : 'text-slate-700'}`}>{item.solicitante_nome || 'Usuário não identificado'}</p>
-                <p className={`text-xs ${dark ? 'text-slate-500' : 'text-slate-400'}`}>{item.gestor_nome || 'Gestor não identificado'}</p>
-              </div>
-              <div>
-                <p className={`${dark ? 'text-slate-200' : 'text-slate-700'}`}>{item.favorecido_nome}</p>
-                <p className={`text-xs ${dark ? 'text-slate-500' : 'text-slate-400'}`}>{item.gestor_nome || 'Gestor não identificado'}</p>
-              </div>
-              <div>
-                <p className={`font-semibold ${dark ? 'text-white' : 'text-slate-900'}`}>{fmt(Number(item.valor_solicitado))}</p>
-                {item.centro_custo && (
-                  <p className={`text-xs ${dark ? 'text-slate-500' : 'text-slate-400'}`}>{item.centro_custo}</p>
-                )}
-              </div>
-              <div className="flex items-start">
-                <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${STATUS_STYLE[item.status]}`}>
-                  {STATUS_LABEL[item.status]}
-                </span>
-              </div>
-            </div>
-          ))}
+            )
+          })}
         </div>
       </div>
 
@@ -361,28 +374,6 @@ export default function DespesasAdiantamentos() {
                 >
                   <option value="">Selecione</option>
                   {centros.map(item => (
-                    <option key={item.id} value={item.id}>
-                      {item.codigo ? `${item.codigo} - ${item.descricao || item.codigo}` : item.descricao}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="mb-1.5 block text-xs font-semibold text-slate-500">Classe financeira</label>
-                <select
-                  value={form.classe_financeira_id}
-                  onChange={e => {
-                    const selected = classes.find(item => item.id === e.target.value)
-                    setForm(prev => ({
-                      ...prev,
-                      classe_financeira_id: e.target.value,
-                      classe_financeira: selected?.codigo || selected?.descricao || '',
-                    }))
-                  }}
-                  className={inputCls}
-                >
-                  <option value="">Selecione</option>
-                  {classes.map(item => (
                     <option key={item.id} value={item.id}>
                       {item.codigo ? `${item.codigo} - ${item.descricao || item.codigo}` : item.descricao}
                     </option>
