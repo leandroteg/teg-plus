@@ -1,10 +1,12 @@
-import { useState, useCallback, useRef } from 'react'
+import { useState, useCallback, useRef, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import {
   ChevronLeft, PlusCircle, Trash2, Send, CheckCircle, Info, AlertTriangle,
   Paperclip, FileText, X, Loader2, Eye, Ban, CheckCircle2, PackagePlus,
+  ScrollText,
 } from 'lucide-react'
 import { useCotacao, useFinalizarCotacao } from '../hooks/useCotacoes'
+import { useCategorias } from '../hooks/useCategorias'
 import { useEmitirPedido, useCancelarRequisicao } from '../hooks/usePedidos'
 import { useAuth } from '../contexts/AuthContext'
 import type { Cotacao, ItemPreco } from '../types'
@@ -15,11 +17,13 @@ import EmitirPedidoModal from '../components/EmitirPedidoModal'
 import { supabase } from '../services/supabase'
 import { api } from '../services/api'
 import type { CnpjResult } from '../services/api'
+import NumericInput from '../components/NumericInput'
+import { minCotacoesPorValor } from '../utils/cotacoesPolicy'
 
 const fmt = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
 
 const FILE_ACCEPTED = ['image/jpeg', 'image/png', 'image/webp', 'application/pdf']
-const FILE_MAX_SIZE = 10 * 1024 * 1024
+const FILE_MAX_SIZE = 50 * 1024 * 1024
 
 interface FornecedorForm {
   fornecedor_nome:    string
@@ -43,13 +47,25 @@ const calcTotalItems = (itens: ItemPreco[]) =>
   Math.round(itens.reduce((s, i) => s + i.valor_total, 0) * 100) / 100
 
 // ── Tabela de itens e preços por fornecedor ──────────────────────────────────
+type ReqItem = { id: string; descricao: string; quantidade: number; unidade: string; valor_unitario_estimado: number }
+
 function ItemPricingTable({
   items,
   onChange,
+  reqItens = [],
 }: {
   items: ItemPreco[]
   onChange: (items: ItemPreco[]) => void
+  reqItens?: ReqItem[]
 }) {
+  const [itemResults, setItemResults] = useState<Record<number, any[]>>({})
+  const [itemOpen, setItemOpen] = useState<Record<number, boolean>>({})
+  const itemTimerRef = useRef<Record<number, ReturnType<typeof setTimeout>>>({})
+
+  // Itens da requisição que ainda não foram adicionados
+  const usedDescs = new Set(items.map(it => it.descricao.toLowerCase().trim()))
+  const availableReqItens = reqItens.filter(ri => !usedDescs.has(ri.descricao.toLowerCase().trim()))
+
   const addItem = () =>
     onChange([...items, { descricao: '', qtd: 1, valor_unitario: 0, valor_total: 0 }])
 
@@ -70,6 +86,75 @@ function ItemPricingTable({
     })
     onChange(updated)
   }
+
+  // Filtra itens da requisição pelo texto digitado
+  const filterReqItens = (query: string) => {
+    if (!query.trim()) return availableReqItens
+    const q = query.toLowerCase()
+    return availableReqItens.filter(ri => ri.descricao.toLowerCase().includes(q))
+  }
+
+  const searchItem = useCallback((i: number, query: string) => {
+    updateItem(i, 'descricao', query)
+    if (itemTimerRef.current[i]) clearTimeout(itemTimerRef.current[i])
+
+    // Mostra itens da requisição imediatamente (sem debounce)
+    const reqMatches = filterReqItens(query)
+    if (query.trim().length < 2) {
+      // Sem query: mostra só itens da requisição
+      setItemResults(prev => ({ ...prev, [i]: reqMatches.map(ri => ({ ...ri, _fromReq: true })) }))
+      setItemOpen(prev => ({ ...prev, [i]: reqMatches.length > 0 }))
+      return
+    }
+    // Com query: mostra itens da requisição + busca no estoque
+    setItemResults(prev => ({ ...prev, [i]: reqMatches.map(ri => ({ ...ri, _fromReq: true })) }))
+    setItemOpen(prev => ({ ...prev, [i]: true }))
+    itemTimerRef.current[i] = setTimeout(async () => {
+      const { data } = await supabase
+        .from('est_itens')
+        .select('id, codigo, descricao, unidade, valor_medio')
+        .ilike('descricao', `%${query}%`)
+        .eq('ativo', true)
+        .order('descricao')
+        .limit(8)
+      const reqResults = filterReqItens(query).map(ri => ({ ...ri, _fromReq: true }))
+      setItemResults(prev => ({ ...prev, [i]: [...reqResults, ...(data || [])] }))
+      setItemOpen(prev => ({ ...prev, [i]: reqResults.length > 0 || (data?.length ?? 0) > 0 }))
+    }, 300)
+  }, [availableReqItens])
+
+  const selectItem = useCallback((i: number, est: any) => {
+    onChange(items.map((item, idx) => {
+      if (idx !== i) return item
+      if (est._fromReq) {
+        // Item da requisição: usa quantidade e valor estimado
+        const qtd = est.quantidade || item.qtd
+        const vu = est.valor_unitario_estimado || 0
+        return {
+          ...item,
+          descricao: est.descricao,
+          qtd,
+          valor_unitario: vu,
+          valor_total: Math.round(qtd * vu * 100) / 100,
+        }
+      }
+      // Item do estoque
+      const vu = est.valor_medio || 0
+      return {
+        ...item,
+        descricao: est.descricao,
+        valor_unitario: vu,
+        valor_total: Math.round(item.qtd * vu * 100) / 100,
+      }
+    }))
+    setItemOpen(prev => ({ ...prev, [i]: false }))
+  }, [items, onChange])
+
+  // Close dropdowns when items array shrinks
+  useEffect(() => {
+    setItemResults({})
+    setItemOpen({})
+  }, [items.length])
 
   const total = calcTotalItems(items)
   const fmtLocal = (v: number) => v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
@@ -101,12 +186,51 @@ function ItemPricingTable({
               key={i}
               className="grid grid-cols-[1fr_44px_80px_68px_24px] gap-1 px-2 py-1.5 border-b border-slate-50 last:border-0 items-center"
             >
-              <input
-                className="text-[11px] bg-white border border-slate-200 rounded px-1.5 py-1 outline-none focus:ring-1 focus:ring-teal-300 w-full"
-                placeholder="Descrição"
-                value={item.descricao}
-                onChange={e => updateItem(i, 'descricao', e.target.value)}
-              />
+              <div className="relative">
+                <input
+                  className="text-[11px] bg-white border border-slate-200 rounded px-1.5 py-1 outline-none focus:ring-1 focus:ring-teal-300 w-full"
+                  placeholder="Descrição"
+                  autoComplete="off"
+                  value={item.descricao}
+                  onChange={e => searchItem(i, e.target.value)}
+                  onFocus={() => {
+                    // Ao focar, mostra itens da requisição mesmo sem digitar
+                    const reqMatches = filterReqItens(item.descricao)
+                    if (reqMatches.length > 0 || (item.descricao.trim().length >= 2 && (itemResults[i]?.length ?? 0) > 0)) {
+                      if (reqMatches.length > 0 && !item.descricao.trim()) {
+                        setItemResults(prev => ({ ...prev, [i]: reqMatches.map(ri => ({ ...ri, _fromReq: true })) }))
+                      }
+                      setItemOpen(prev => ({ ...prev, [i]: true }))
+                    }
+                  }}
+                  onBlur={() => setTimeout(() => setItemOpen(prev => ({ ...prev, [i]: false })), 150)}
+                />
+                {itemOpen[i] && (itemResults[i]?.length ?? 0) > 0 && (
+                  <div className="absolute z-50 left-0 w-72 mt-0.5 bg-white border border-slate-200 rounded-xl shadow-lg overflow-hidden max-h-56 overflow-y-auto">
+                    {itemResults[i].map((est: any, ri: number) => (
+                      <button
+                        key={est.id || `req-${ri}`}
+                        type="button"
+                        className={`w-full text-left px-2.5 py-2 transition-colors border-b border-slate-100 last:border-0 ${
+                          est._fromReq ? 'hover:bg-amber-50 bg-amber-50/30' : 'hover:bg-teal-50'
+                        }`}
+                        onMouseDown={() => selectItem(i, est)}
+                      >
+                        <p className="text-[11px] font-semibold text-slate-800 truncate">
+                          {est._fromReq && <span className="text-[9px] font-bold text-amber-600 mr-1">REQUISIÇÃO</span>}
+                          {est.descricao}
+                        </p>
+                        <p className="text-[10px] text-slate-400">
+                          {est._fromReq
+                            ? `${est.quantidade} ${est.unidade || 'un'}${est.valor_unitario_estimado ? ` · ${est.valor_unitario_estimado.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}/un` : ''}`
+                            : `${est.codigo} · ${est.unidade}${est.valor_medio ? ` · ${est.valor_medio.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}` : ''}`
+                          }
+                        </p>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
               <input
                 type="number" min="0.001" step="any"
                 className="text-[11px] bg-white border border-slate-200 rounded px-1 py-1 text-center outline-none focus:ring-1 focus:ring-teal-300 w-full"
@@ -154,13 +278,6 @@ function ItemPricingTable({
   )
 }
 
-// Cotações mínimas pelo valor
-function getMinCot(valor: number) {
-  if (valor <= 500)  return 1
-  if (valor <= 2000) return 2
-  return 3
-}
-
 // ── CNPJ mask: XX.XXX.XXX/XXXX-XX ────────────────────────────────────────────
 function maskCNPJ(value: string): string {
   const digits = value.replace(/\D/g, '').slice(0, 14)
@@ -174,14 +291,75 @@ function maskCNPJ(value: string): string {
 // ── Cotação Concluída (com botões Emitir Pedido / Cancelar) ─────────────────
 
 function CotacaoConcluida({ cotacao, nav }: { cotacao: Cotacao; nav: ReturnType<typeof useNavigate> }) {
-  const { atLeast } = useAuth()
+  const { atLeast, perfil } = useAuth()
   const emitirMutation = useEmitirPedido()
   const cancelarMutation = useCancelarRequisicao()
   const [pedidoToast, setPedidoToast] = useState<{ type: 'success' | 'error'; msg: string } | null>(null)
   const [showEmitirModal, setShowEmitirModal] = useState(false)
+  const [solicitandoContrato, setSolicitandoContrato] = useState(false)
 
+  const { data: categorias = [] } = useCategorias()
   const req = cotacao.requisicao
   const canEmitPedido = atLeast('comprador') && req?.status === 'cotacao_aprovada'
+  const isRecorrente = (req as any)?.compra_recorrente === true
+  const valorReq = cotacao.valor_selecionado ?? (req as any)?.valor_estimado ?? 0
+  const categoriaTipo = categorias.find(c => c.codigo === (req as any)?.categoria)?.tipo
+  const isServico = categoriaTipo === 'servico'
+  const deveContrato = isRecorrente || (isServico && valorReq > 2000)
+
+  // ── Solicitar Contrato (compra recorrente) ───────────────────────────────
+  const handleSolicitarContrato = async () => {
+    if (!req || !perfil) return
+    setSolicitandoContrato(true)
+    try {
+      // Generate numero: SOL-CON-YYYY-NNN
+      const year = new Date().getFullYear()
+      const prefix = `SOL-CON-${year}-`
+      const { count } = await supabase
+        .from('con_solicitacoes')
+        .select('id', { count: 'exact', head: true })
+        .like('numero', `${prefix}%`)
+      const seq = String((count ?? 0) + 1).padStart(3, '0')
+      const numero = `${prefix}${seq}`
+
+      const { error: insertErr } = await supabase
+        .from('con_solicitacoes')
+        .insert({
+          numero,
+          objeto: req.descricao,
+          categoria_contrato: 'prestacao_servico',
+          grupo_contrato: 'prestacao_servicos',
+          tipo_contrato: 'despesa',
+          tipo_contraparte: 'fornecedor',
+          contraparte_nome: cotacao.fornecedor_selecionado_nome ?? 'A definir',
+          obra_id: (req as any).obra_id ?? null,
+          valor_estimado: cotacao.valor_selecionado ?? req.valor_estimado ?? 0,
+          solicitante_id: perfil.id,
+          solicitante_nome: perfil.nome,
+          etapa_atual: 'solicitacao',
+          status: 'em_andamento',
+          requisicao_origem_id: req.id,
+          urgencia: 'normal',
+          documentos_ref: [],
+        })
+      if (insertErr) throw insertErr
+
+      // Update requisição status
+      const { error: updErr } = await supabase
+        .from('cmp_requisicoes')
+        .update({ status: 'aguardando_contrato' })
+        .eq('id', req.id)
+      if (updErr) throw updErr
+
+      setPedidoToast({ type: 'success', msg: 'Solicitação de contrato criada com sucesso' })
+      setTimeout(() => nav('/contratos/solicitacoes'), 2000)
+    } catch (err: any) {
+      setPedidoToast({ type: 'error', msg: `Erro ao solicitar contrato: ${err?.message || 'erro desconhecido'}` })
+      setTimeout(() => setPedidoToast(null), 5000)
+    } finally {
+      setSolicitandoContrato(false)
+    }
+  }
 
   return (
     <div className="space-y-4">
@@ -195,7 +373,7 @@ function CotacaoConcluida({ cotacao, nav }: { cotacao: Cotacao; nav: ReturnType<
       {/* RC Info */}
       <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm">
         <p className="text-xs text-slate-400 font-mono mb-1">{req?.numero}</p>
-        <p className="text-sm font-bold text-slate-800">{req?.descricao}</p>
+        <p className="text-sm font-bold text-slate-800">{req?.justificativa || req?.descricao}</p>
         <div className="flex justify-between items-center mt-1">
           <p className="text-xs text-slate-400">{req?.obra_nome}</p>
           <p className="text-sm font-extrabold text-teal-600">{fmt(cotacao.valor_selecionado ?? req?.valor_estimado ?? 0)}</p>
@@ -208,13 +386,13 @@ function CotacaoConcluida({ cotacao, nav }: { cotacao: Cotacao; nav: ReturnType<
       {/* Comparativo */}
       {cotacao.fornecedores && <CotacaoComparativo fornecedores={cotacao.fornecedores} readOnly />}
 
-      {/* ── Emitir Pedido / Cancelar ────────────────────────────────────── */}
+      {/* ── Emitir Pedido / Solicitar Contrato / Cancelar ────────────── */}
       {canEmitPedido && (
-        <div className="bg-white rounded-2xl border-2 border-teal-200 shadow-sm overflow-hidden">
-          <div className="bg-teal-50 px-4 py-3 border-b border-teal-100">
-            <p className="text-xs font-bold text-teal-700 uppercase tracking-wider flex items-center gap-2">
-              <FileText size={14} />
-              Próximo Passo — Emissão de Pedido
+        <div className={`bg-white rounded-2xl border-2 ${deveContrato ? 'border-indigo-200' : 'border-teal-200'} shadow-sm overflow-hidden`}>
+          <div className={`${deveContrato ? 'bg-indigo-50' : 'bg-teal-50'} px-4 py-3 border-b ${deveContrato ? 'border-indigo-100' : 'border-teal-100'}`}>
+            <p className={`text-xs font-bold ${deveContrato ? 'text-indigo-700' : 'text-teal-700'} uppercase tracking-wider flex items-center gap-2`}>
+              {deveContrato ? <ScrollText size={14} /> : <FileText size={14} />}
+              {deveContrato ? 'Próximo Passo — Solicitação de Contrato' : 'Próximo Passo — Emissão de Pedido'}
             </p>
           </div>
 
@@ -250,7 +428,7 @@ function CotacaoConcluida({ cotacao, nav }: { cotacao: Cotacao; nav: ReturnType<
             {!emitirMutation.isSuccess && !cancelarMutation.isSuccess && (
               <div className="grid grid-cols-2 gap-3">
                 <button
-                  disabled={cancelarMutation.isPending || emitirMutation.isPending}
+                  disabled={cancelarMutation.isPending || emitirMutation.isPending || solicitandoContrato}
                   onClick={() => {
                     if (!confirm('Cancelar esta requisição? Esta ação não pode ser desfeita.')) return
                     cancelarMutation.mutate(req!.id, {
@@ -274,18 +452,33 @@ function CotacaoConcluida({ cotacao, nav }: { cotacao: Cotacao; nav: ReturnType<
                   Cancelar RC
                 </button>
 
-                <button
-                  disabled={emitirMutation.isPending || cancelarMutation.isPending}
-                  onClick={() => setShowEmitirModal(true)}
-                  className="flex items-center justify-center gap-2 py-3.5 rounded-xl text-sm font-bold
-                    text-white bg-teal-500 border-2 border-teal-500 hover:bg-teal-600 shadow-lg shadow-teal-500/20
-                    active:scale-[0.98] transition-all disabled:opacity-50"
-                >
-                  {emitirMutation.isPending
-                    ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                    : <FileText size={16} />}
-                  Emitir Pedido
-                </button>
+                {deveContrato ? (
+                  <button
+                    disabled={solicitandoContrato || cancelarMutation.isPending}
+                    onClick={handleSolicitarContrato}
+                    className="flex items-center justify-center gap-2 py-3.5 rounded-xl text-sm font-bold
+                      text-white bg-indigo-500 border-2 border-indigo-500 hover:bg-indigo-600 shadow-lg shadow-indigo-500/20
+                      active:scale-[0.98] transition-all disabled:opacity-50"
+                  >
+                    {solicitandoContrato
+                      ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      : <ScrollText size={16} />}
+                    Solicitar Contrato
+                  </button>
+                ) : (
+                  <button
+                    disabled={emitirMutation.isPending || cancelarMutation.isPending}
+                    onClick={() => setShowEmitirModal(true)}
+                    className="flex items-center justify-center gap-2 py-3.5 rounded-xl text-sm font-bold
+                      text-white bg-teal-500 border-2 border-teal-500 hover:bg-teal-600 shadow-lg shadow-teal-500/20
+                      active:scale-[0.98] transition-all disabled:opacity-50"
+                  >
+                    {emitirMutation.isPending
+                      ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      : <FileText size={16} />}
+                    Emitir Pedido
+                  </button>
+                )}
               </div>
             )}
 
@@ -313,6 +506,30 @@ function CotacaoConcluida({ cotacao, nav }: { cotacao: Cotacao; nav: ReturnType<
           open
           onClose={() => setShowEmitirModal(false)}
           requisicaoId={req.id}
+          compraRecorrente={deveContrato}
+          onSolicitarContrato={async () => {
+            try {
+              const num = `SOL-CON-${new Date().getFullYear()}-${String(Math.floor(Math.random() * 9000) + 1000)}`
+              const { error: solErr } = await supabase.from('con_solicitacoes').insert({
+                numero: num,
+                grupo_contrato: 'prestacao_servicos',
+                tipo_contrato: 'despesa',
+                obra_id: req.obra_id || null,
+                valor_estimado: cotacao.valor_selecionado || req.valor_estimado || 0,
+                solicitante_id: perfil?.id || null,
+                etapa_atual: 'solicitacao',
+                status: 'em_andamento',
+                requisicao_origem_id: req.id,
+              })
+              if (solErr) throw solErr
+              await supabase.from('cmp_requisicoes').update({ status: 'aguardando_contrato' }).eq('id', req.id)
+              setShowEmitirModal(false)
+              setPedidoToast({ type: 'success', msg: `Solicitação de contrato ${num} criada` })
+              setTimeout(() => nav('/contratos/solicitacoes'), 1500)
+            } catch (err: any) {
+              setPedidoToast({ type: 'error', msg: `Erro: ${err?.message || 'falha ao criar solicitação'}` })
+            }
+          }}
           cotacao={{
             id: cotacao.id,
             fornecedorNome: cotacao.fornecedor_selecionado_nome ?? "N/A",
@@ -361,6 +578,7 @@ export default function CotacaoForm() {
   const { id } = useParams<{ id: string }>()
   const nav = useNavigate()
   const { data: cotacao, isLoading } = useCotacao(id)
+  const { data: categorias = [] } = useCategorias()
   const submitMutation = useFinalizarCotacao()
 
   const [fornecedores, setFornecedores] = useState<FornecedorForm[]>([
@@ -375,6 +593,11 @@ export default function CotacaoForm() {
   const [cnpjLoading, setCnpjLoading] = useState<Record<number, boolean>>({})
   const [cnpjStatus, setCnpjStatus] = useState<Record<number, { ok: boolean; msg: string }>>({})
   const cnpjLastRef = useRef<Record<number, string>>({})
+
+  // ── Fornecedor autocomplete state ─────────────────────────────────────────
+  const [fornResults, setFornResults] = useState<Record<number, any[]>>({})
+  const [fornOpen, setFornOpen] = useState<Record<number, boolean>>({})
+  const searchTimerRef = useRef<Record<number, ReturnType<typeof setTimeout>>>({})
 
   const handleCnpjLookup = useCallback(async (idx: number, rawCnpj: string) => {
     const digits = rawCnpj.replace(/\D/g, '')
@@ -427,6 +650,37 @@ export default function CotacaoForm() {
   const updateFornecedor = (idx: number, field: keyof FornecedorForm, value: string | number) =>
     setFornecedores(prev => prev.map((f, i) => i === idx ? { ...f, [field]: value } : f))
 
+  const searchFornecedor = useCallback((idx: number, query: string) => {
+    setFornecedores(prev => prev.map((f, i) => i === idx ? { ...f, fornecedor_nome: query } : f))
+    if (searchTimerRef.current[idx]) clearTimeout(searchTimerRef.current[idx])
+    if (query.trim().length < 2) {
+      setFornResults(prev => ({ ...prev, [idx]: [] }))
+      setFornOpen(prev => ({ ...prev, [idx]: false }))
+      return
+    }
+    searchTimerRef.current[idx] = setTimeout(async () => {
+      const { data } = await supabase
+        .from('cmp_fornecedores')
+        .select('id, nome_fantasia, razao_social, cnpj, telefone, email, contato_nome, cidade, uf')
+        .or(`nome_fantasia.ilike.%${query}%,razao_social.ilike.%${query}%`)
+        .eq('ativo', true)
+        .limit(8)
+      setFornResults(prev => ({ ...prev, [idx]: data || [] }))
+      setFornOpen(prev => ({ ...prev, [idx]: (data?.length ?? 0) > 0 }))
+    }, 300)
+  }, [])
+
+  const selectFornecedor = useCallback((idx: number, f: any) => {
+    const contato = [f.telefone, f.email].filter(Boolean).join(' / ')
+    setFornecedores(prev => prev.map((item, i) => i !== idx ? item : {
+      ...item,
+      fornecedor_nome: f.nome_fantasia || f.razao_social || '',
+      fornecedor_cnpj: f.cnpj || '',
+      fornecedor_contato: contato || f.contato_nome || '',
+    }))
+    setFornOpen(prev => ({ ...prev, [idx]: false }))
+  }, [])
+
   const updateFornecedorItems = useCallback((idx: number, itens: ItemPreco[]) => {
     setFornecedores(prev => prev.map((f, i) => {
       if (i !== idx) return f
@@ -434,6 +688,25 @@ export default function CotacaoForm() {
       return { ...f, itens_precos: itens, valor_total: total > 0 ? total : f.valor_total }
     }))
   }, [])
+
+  // ── Pré-preenche itens da RC em todos os fornecedores ainda vazios ──────────
+  useEffect(() => {
+    const itens = cotacao?.requisicao?.itens
+    if (!itens?.length) return
+    const itensPrecos: ItemPreco[] = itens.map(item => ({
+      descricao: item.descricao,
+      qtd: item.quantidade,
+      valor_unitario: 0,
+      valor_total: 0,
+    }))
+    setFornecedores(prev =>
+      prev.map(f =>
+        f.itens_precos.length === 0
+          ? { ...f, itens_precos: itensPrecos }
+          : f,
+      ),
+    )
+  }, [cotacao?.requisicao?.itens])
 
   // ── AI Upload: preenche fornecedores automaticamente (incluindo itens) ───────
   const handleAiParsed = useCallback(async (parsed: {
@@ -462,23 +735,28 @@ export default function CotacaoForm() {
       const preenchidos = prev.filter(f => f.fornecedor_nome.trim() || f.valor_total > 0)
 
       const novos: FornecedorForm[] = parsed.map(p => {
-        const itens: ItemPreco[] = (p.itens ?? []).map(it => ({
-          descricao:      it.descricao,
-          qtd:            it.qtd,
-          valor_unitario: it.valor_unitario,
-          valor_total:    Math.round(it.qtd * it.valor_unitario * 100) / 100,
-        }))
-        const totalItens = calcTotalItems(itens)
+        // Só inclui itens que realmente têm preço — itens sem valor são descartados
+        const itensComValor: ItemPreco[] = (p.itens ?? [])
+          .filter(it => it.valor_unitario > 0)
+          .map(it => ({
+            descricao:      it.descricao,
+            qtd:            it.qtd,
+            valor_unitario: it.valor_unitario,
+            valor_total:    Math.round(it.qtd * it.valor_unitario * 100) / 100,
+          }))
+        const totalItens = calcTotalItems(itensComValor)
+        // Se há itens com preço → usa a soma deles; senão usa o total do documento
+        const valorTotal = itensComValor.length > 0 ? totalItens : (p.valor_total || 0)
         return {
           fornecedor_nome:    p.fornecedor_nome || '',
           fornecedor_cnpj:    p.fornecedor_cnpj ? maskCNPJ(p.fornecedor_cnpj) : '',
           fornecedor_contato: p.fornecedor_contato || '',
-          valor_total:        itens.length > 0 ? totalItens : (p.valor_total || 0),
+          valor_total:        valorTotal,
           prazo_entrega_dias: p.prazo_entrega_dias || 0,
           condicao_pagamento: p.condicao_pagamento || '',
           observacao:         p.observacao || '',
           arquivo_url:        uploadedPath,
-          itens_precos:       itens,
+          itens_precos:       itensComValor,
         }
       })
 
@@ -505,7 +783,7 @@ export default function CotacaoForm() {
       return
     }
     if (file.size > FILE_MAX_SIZE) {
-      setUploadError(prev => ({ ...prev, [idx]: 'Máximo 10 MB' }))
+      setUploadError(prev => ({ ...prev, [idx]: 'Máximo 50 MB' }))
       return
     }
 
@@ -540,7 +818,9 @@ export default function CotacaoForm() {
 
   const validos = fornecedores.filter(f => f.fornecedor_nome.trim() && f.valor_total > 0)
   const valorRef = (cotacao?.requisicao as any)?.valor_estimado ?? 0
-  const minCot   = getMinCot(valorRef)
+  const categoriaCodigo = ((cotacao?.requisicao as any)?.categoria ?? '') as string
+  const categoriaRegra = categorias.find(c => c.codigo === categoriaCodigo)?.cotacoes_regras
+  const minCot = minCotacoesPorValor(valorRef, categoriaRegra)
 
   // Validação + feedback claro em cada etapa
   const canSubmit = validos.length > 0 && (semCotacoesMinimas || validos.length >= minCot) && (!semCotacoesMinimas || justificativa.trim().length > 0)
@@ -624,16 +904,21 @@ export default function CotacaoForm() {
       {cotacao?.requisicao && (
         <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm space-y-3">
           <div>
-            <p className="text-xs text-slate-400 font-mono">{cotacao.requisicao.numero}</p>
-            <p className="text-sm font-bold text-slate-800 mt-0.5">{cotacao.requisicao.descricao}</p>
+            <div className="flex items-center gap-2">
+              <p className="text-xs text-slate-400 font-mono">{cotacao.requisicao.numero}</p>
+              {(cotacao.requisicao as any)?.compra_recorrente && (
+                <span className="text-[10px] font-bold bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-lg">Recorrente</span>
+              )}
+            </div>
+            <p className="text-sm font-bold text-slate-800 mt-0.5">{cotacao.requisicao.justificativa || cotacao.requisicao.descricao}</p>
             <div className="flex justify-between mt-1">
               <span className="text-xs text-slate-400">{cotacao.requisicao.obra_nome}</span>
               <span className="text-sm font-extrabold text-teal-600">{fmt(valorRef)}</span>
             </div>
-            {cotacao.requisicao.justificativa && (
+            {cotacao.requisicao.descricao && cotacao.requisicao.descricao !== cotacao.requisicao.justificativa && (
               <div className="mt-2 pt-2 border-t border-slate-100 rounded-lg bg-teal-50/50 px-3 py-2">
-                <p className="text-[10px] font-bold uppercase tracking-wider mb-0.5 text-teal-600">Descrição</p>
-                <p className="text-xs leading-relaxed text-teal-800">{cotacao.requisicao.justificativa}</p>
+                <p className="text-[10px] font-bold uppercase tracking-wider mb-0.5 text-teal-600">Detalhes adicionais</p>
+                <p className="text-xs leading-relaxed text-teal-800">{cotacao.requisicao.descricao}</p>
               </div>
             )}
           </div>
@@ -659,6 +944,8 @@ export default function CotacaoForm() {
       <UploadCotacao
         onParsed={handleAiParsed}
         disabled={cotacao?.status === 'concluida'}
+        cotacaoId={id}
+        requisicaoId={cotacao?.requisicao_id}
       />
 
       {/* Progresso de fornecedores */}
@@ -702,16 +989,42 @@ export default function CotacaoForm() {
           </div>
 
           <div className="px-4 pb-4 space-y-3">
-            <input
-              required={idx < minCot && !semCotacoesMinimas}
-              className={`w-full border rounded-xl px-3 py-2.5 text-sm font-semibold focus:ring-2 focus:ring-teal-300 focus:border-teal-400 outline-none transition-shadow ${
-                triedSubmit && !forn.fornecedor_nome.trim() && idx < minCot && !semCotacoesMinimas
-                  ? 'border-red-300 bg-red-50/30' : 'border-slate-200'
-              }`}
-              placeholder="Nome do fornecedor *"
-              value={forn.fornecedor_nome}
-              onChange={e => updateFornecedor(idx, 'fornecedor_nome', e.target.value)}
-            />
+            <div className="relative">
+              <input
+                required={idx < minCot && !semCotacoesMinimas}
+                autoComplete="off"
+                className={`w-full border rounded-xl px-3 py-2.5 text-sm font-semibold focus:ring-2 focus:ring-teal-300 focus:border-teal-400 outline-none transition-shadow ${
+                  triedSubmit && !forn.fornecedor_nome.trim() && idx < minCot && !semCotacoesMinimas
+                    ? 'border-red-300 bg-red-50/30' : 'border-slate-200'
+                }`}
+                placeholder="Nome do fornecedor *"
+                value={forn.fornecedor_nome}
+                onChange={e => searchFornecedor(idx, e.target.value)}
+                onFocus={() => {
+                  if (forn.fornecedor_nome.trim().length >= 2 && (fornResults[idx]?.length ?? 0) > 0)
+                    setFornOpen(prev => ({ ...prev, [idx]: true }))
+                }}
+                onBlur={() => setTimeout(() => setFornOpen(prev => ({ ...prev, [idx]: false })), 150)}
+              />
+              {fornOpen[idx] && (fornResults[idx]?.length ?? 0) > 0 && (
+                <div className="absolute z-50 w-full mt-1 bg-white border border-slate-200 rounded-xl shadow-lg overflow-hidden max-h-56 overflow-y-auto">
+                  {fornResults[idx].map((f: any) => (
+                    <button
+                      key={f.id}
+                      type="button"
+                      className="w-full text-left px-3 py-2.5 hover:bg-teal-50 transition-colors border-b border-slate-100 last:border-0"
+                      onMouseDown={() => selectFornecedor(idx, f)}
+                    >
+                      <p className="text-sm font-semibold text-slate-800 truncate">{f.nome_fantasia || f.razao_social}</p>
+                      {f.nome_fantasia && f.razao_social && f.nome_fantasia !== f.razao_social && (
+                        <p className="text-[11px] text-slate-400 truncate">{f.razao_social}</p>
+                      )}
+                      <p className="text-[10px] text-slate-400">{[f.cidade, f.uf].filter(Boolean).join(' – ')}{f.cnpj ? ` · ${f.cnpj}` : ''}</p>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
 
             <div className="grid grid-cols-2 gap-2">
               <div className="relative">
@@ -750,38 +1063,41 @@ export default function CotacaoForm() {
             <ItemPricingTable
               items={forn.itens_precos}
               onChange={items => updateFornecedorItems(idx, items)}
+              reqItens={(cotacao?.requisicao as any)?.itens ?? []}
             />
 
             <div className="grid grid-cols-2 gap-2">
               <div>
                 <label className="text-[10px] text-slate-400 font-semibold">
-                  {forn.itens_precos.length > 0 ? 'Valor Total (calculado)' : 'Valor Total *'}
+                  {calcTotalItems(forn.itens_precos) > 0
+                    ? (cotacao?.requisicao as any)?.compra_recorrente ? 'Valor Mensal (calculado)' : 'Valor Total (calculado)'
+                    : (cotacao?.requisicao as any)?.compra_recorrente ? 'Valor Mensal *' : 'Valor Total *'}
                 </label>
                 <div className="relative">
                   <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-slate-400 font-semibold">R$</span>
-                  <input
+                  <NumericInput
                     required={idx < minCot && !semCotacoesMinimas}
-                    type="number" min="0.01" step="0.01"
-                    readOnly={forn.itens_precos.length > 0}
+                    min={0.01} step={0.01}
+                    readOnly={calcTotalItems(forn.itens_precos) > 0}
                     className={`w-full border rounded-xl pl-9 pr-3 py-2 text-sm font-semibold focus:ring-2 focus:ring-teal-300 outline-none transition-shadow ${
-                      forn.itens_precos.length > 0
+                      calcTotalItems(forn.itens_precos) > 0
                         ? 'bg-teal-50 border-teal-200 text-teal-700 cursor-default'
                         : triedSubmit && !forn.valor_total && idx < minCot && !semCotacoesMinimas
                           ? 'border-red-300 bg-red-50/30'
                           : 'border-slate-200'
                     }`}
-                    value={forn.valor_total || ''}
-                    onChange={e => forn.itens_precos.length === 0 && updateFornecedor(idx, 'valor_total', parseFloat(e.target.value) || 0)}
+                    value={forn.valor_total}
+                    onChange={v => calcTotalItems(forn.itens_precos) === 0 && updateFornecedor(idx, 'valor_total', v)}
                   />
                 </div>
               </div>
               <div>
                 <label className="text-[10px] text-slate-400 font-semibold">Prazo (dias)</label>
-                <input
-                  type="number" min="1"
+                <NumericInput
+                  min={1}
                   className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-teal-300 outline-none transition-shadow"
-                  value={forn.prazo_entrega_dias || ''}
-                  onChange={e => updateFornecedor(idx, 'prazo_entrega_dias', parseInt(e.target.value) || 0)}
+                  value={forn.prazo_entrega_dias}
+                  onChange={v => updateFornecedor(idx, 'prazo_entrega_dias', v)}
                 />
               </div>
             </div>

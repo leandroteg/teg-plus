@@ -9,7 +9,7 @@ import { useVoiceRecorder } from '../hooks/useVoiceRecorder'
 import {
   Sparkles, X, RotateCcw, Send, Mic, Square, XCircle,
   BarChart3, ClipboardList, Package, Lightbulb, ExternalLink,
-  ArrowRight, Minus,
+  ArrowRight, Minus, Paperclip, FileText,
   type LucideIcon,
 } from 'lucide-react'
 
@@ -31,7 +31,9 @@ export default function SuperTEGChat() {
   const [isOpen, setIsOpen]   = useState(false)
   const [input, setInput]     = useState('')
   const [toast, setToast]     = useState<string | null>(null)
-  const { messages, isLoading, sendMessage, sendAudio, clearMessages, pendingAction, consumePendingAction } = useSuperTEG()
+  const [attachedFile, setAttachedFile] = useState<File | null>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const { messages, isLoading, sendMessage, sendMessageWithFile, sendAudio, clearMessages, pendingAction, consumePendingAction } = useSuperTEG()
   const voice = useVoiceRecorder()
   const scrollRef = useRef<HTMLDivElement>(null)
   const inputRef  = useRef<HTMLTextAreaElement>(null)
@@ -53,29 +55,33 @@ export default function SuperTEGChat() {
     const label = pendingAction.label || 'pagina'
     setToast(`Abrindo ${label}...`)
 
+    // Navigate faster (500ms) — enough for user to see the toast
     const timer = setTimeout(() => {
       const action = consumePendingAction()
       if (action?.path) {
-        navigate(action.path)
-        // Minimize chat instead of closing
         setIsOpen(false)
+        // Small delay to let chat close animation finish
+        setTimeout(() => navigate(action.path!), 100)
       }
-      // Clear toast after navigation
-      setTimeout(() => setToast(null), 1500)
-    }, 1800)
+      setTimeout(() => setToast(null), 1000)
+    }, 500)
 
     return () => clearTimeout(timer)
   }, [pendingAction, consumePendingAction, navigate])
 
   const handleSend = useCallback(() => {
-    if (!input.trim() || isLoading) return
-    sendMessage(input)
+    if ((!input.trim() && !attachedFile) || isLoading) return
+    if (attachedFile) {
+      sendMessageWithFile(input || `Analise este arquivo: ${attachedFile.name}`, attachedFile)
+      setAttachedFile(null)
+    } else {
+      sendMessage(input)
+    }
     setInput('')
-    // Reset textarea height after send
     if (inputRef.current) {
       inputRef.current.style.height = 'auto'
     }
-  }, [input, isLoading, sendMessage])
+  }, [input, isLoading, sendMessage, sendMessageWithFile, attachedFile])
 
   const handleKey = (e: KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend() }
@@ -261,19 +267,46 @@ export default function SuperTEGChat() {
               </div>
             ) : (
               /* Normal input state */
-              <div className="flex items-end gap-2 bg-slate-50 rounded-xl px-3.5 py-2.5 border border-slate-200/80 focus-within:border-teal-400 focus-within:ring-2 focus-within:ring-teal-50 transition-all duration-200">
+              <div className="flex flex-col gap-1.5">
+                {/* Attached file preview */}
+                {attachedFile && (
+                  <div className="flex items-center gap-2 bg-indigo-50 border border-indigo-200 rounded-lg px-2.5 py-1.5 mx-1">
+                    <FileText className="w-3.5 h-3.5 text-indigo-500 shrink-0" />
+                    <span className="text-[11px] font-medium text-indigo-700 truncate flex-1">{attachedFile.name}</span>
+                    <span className="text-[9px] text-indigo-400 shrink-0">{(attachedFile.size / 1024).toFixed(0)} KB</span>
+                    <button onClick={() => setAttachedFile(null)} className="text-indigo-400 hover:text-red-500 shrink-0">
+                      <X className="w-3 h-3" />
+                    </button>
+                  </div>
+                )}
+                <div className="flex items-end gap-2 bg-slate-50 rounded-xl px-3.5 py-2.5 border border-slate-200/80 focus-within:border-teal-400 focus-within:ring-2 focus-within:ring-teal-50 transition-all duration-200">
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  className="hidden"
+                  accept=".pdf,.xlsx,.xls,.csv,.doc,.docx,.jpg,.jpeg,.png,.webp"
+                  onChange={e => { if (e.target.files?.[0]) setAttachedFile(e.target.files[0]); e.target.value = '' }}
+                />
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={isLoading}
+                  className="w-8 h-8 rounded-lg text-slate-400 flex items-center justify-center shrink-0 disabled:opacity-20 hover:text-indigo-600 hover:bg-indigo-50 active:scale-90 transition-all duration-150"
+                  title="Anexar arquivo"
+                >
+                  <Paperclip className="w-4 h-4" strokeWidth={2} />
+                </button>
                 <textarea
                   ref={inputRef}
                   rows={1}
                   value={input}
                   onChange={e => { setInput(e.target.value); autoResize() }}
                   onKeyDown={handleKey}
-                  placeholder="Digite ou envie audio... (Shift+Enter = nova linha)"
+                  placeholder={attachedFile ? "Descreva o que deseja fazer com o arquivo..." : "Digite ou envie audio..."}
                   className="flex-1 bg-transparent text-slate-700 text-[13px] placeholder-slate-400 outline-none min-w-0 resize-none leading-relaxed max-h-[120px] overflow-y-auto"
                   style={{ scrollbarWidth: 'thin' }}
                   disabled={isLoading}
                 />
-                {!input.trim() && voice.isSupported && (
+                {!input.trim() && !attachedFile && voice.isSupported && (
                   <button
                     onClick={handleMicPress}
                     disabled={isLoading}
@@ -285,11 +318,12 @@ export default function SuperTEGChat() {
                 )}
                 <button
                   onClick={handleSend}
-                  disabled={!input.trim() || isLoading}
+                  disabled={(!input.trim() && !attachedFile) || isLoading}
                   className="w-8 h-8 rounded-lg bg-teal-600 text-white flex items-center justify-center shrink-0 disabled:opacity-20 disabled:cursor-not-allowed hover:bg-teal-500 active:scale-90 transition-all duration-150"
                 >
                   <Send className="w-3.5 h-3.5" strokeWidth={2.2} />
                 </button>
+              </div>
               </div>
             )}
             <p className="text-center text-[9px] text-slate-300 mt-1.5 select-none tracking-wide">

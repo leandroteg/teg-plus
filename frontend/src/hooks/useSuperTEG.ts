@@ -1,5 +1,6 @@
 import { useState, useCallback, useRef, useEffect } from 'react'
 import { useAuth } from '../contexts/AuthContext'
+import { supabase } from '../services/supabase'
 
 const WEBHOOK_URL = 'https://teg-agents-n8n.nmmcas.easypanel.host/webhook/superteg/chat'
 
@@ -100,7 +101,7 @@ export function useSuperTEG() {
           }),
         })
 
-        const raw = await res.json()
+        const raw = await res.json().catch(() => ({}))
         const data = Array.isArray(raw) ? raw[0] : raw
         const { content, actions } = parseResponse(data)
 
@@ -209,6 +210,92 @@ export function useSuperTEG() {
     [perfil]
   )
 
+  const sendMessageWithFile = useCallback(
+    async (text: string, file: File) => {
+      if (busyRef.current) return
+      busyRef.current = true
+      setIsLoading(true)
+
+      const userMsg: ChatMessage = {
+        id: `u_${Date.now()}`,
+        role: 'user',
+        content: `${text}\n📎 ${file.name} (${(file.size / 1024).toFixed(0)} KB)`,
+        timestamp: new Date().toISOString(),
+      }
+      setMessages(prev => [...prev, userMsg])
+
+      try {
+        // 1. Upload to Supabase Storage
+        const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_')
+        const path = `superteg-uploads/${Date.now()}_${safeName}`
+        const { error: upErr } = await supabase.storage
+          .from('cotacoes-docs')
+          .upload(path, file, { upsert: true, contentType: file.type || 'application/pdf' })
+        if (upErr) throw new Error('Falha no upload: ' + upErr.message)
+
+        const { data: { publicUrl } } = supabase.storage.from('cotacoes-docs').getPublicUrl(path)
+
+        // 2. Extract data from PDF via parse-cotacao (IA)
+        const N8N_BASE = 'https://teg-agents-n8n.nmmcas.easypanel.host/webhook'
+        const reader = new FileReader()
+        const base64 = await new Promise<string>((resolve, reject) => {
+          reader.onload = () => resolve((reader.result as string).split(',')[1])
+          reader.onerror = reject
+          reader.readAsDataURL(file)
+        })
+
+        let extractedData: Record<string, unknown> = {}
+        try {
+          const parseRes = await fetch(`${N8N_BASE}/compras/parse-cotacao`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ file_base64: base64, file_name: file.name, mime_type: file.type || 'application/pdf' }),
+          })
+          const parseData = await parseRes.json().catch(() => ({}))
+          if (parseData?.success && parseData?.fornecedores?.length > 0) {
+            extractedData = parseData
+          }
+        } catch { /* parse falhou — ainda navega com arquivo */ }
+
+        // 3. Save prefill data in sessionStorage and navigate to NovaRequisicao
+        const prefill = {
+          descricao: text || file.name.replace(/\.[^.]+$/, '').replace(/[_-]/g, ' '),
+          cotacao_referencia_url: publicUrl,
+          cotacao_referencia_nome: file.name,
+          mensagem_usuario: text,
+          ...(extractedData as Record<string, unknown>),
+        }
+        sessionStorage.setItem('superteg-prefill-rc', JSON.stringify(prefill))
+
+        const totalItens = (extractedData as any)?.fornecedores?.[0]?.itens?.length || 0
+        const totalFornecedores = (extractedData as any)?.fornecedores?.length || 0
+
+        setMessages(prev => [...prev, {
+          id: `a_${Date.now()}`,
+          role: 'assistant',
+          content: totalItens > 0
+            ? `Extraido ${totalItens} iten(s) de ${totalFornecedores} fornecedor(es) do arquivo. Abrindo formulario pre-preenchido...`
+            : `Arquivo recebido. Abrindo formulario de requisicao com o arquivo anexado...`,
+          actions: [{ type: 'navigate' as const, path: '/nova', label: 'Nova Requisicao' }],
+          timestamp: new Date().toISOString(),
+        }])
+
+        setPendingAction({ type: 'navigate', path: '/nova', label: 'Nova Requisicao' })
+      } catch (err) {
+        setMessages(prev => [...prev, {
+          id: `e_${Date.now()}`,
+          role: 'assistant',
+          content: `Erro ao processar arquivo: ${err instanceof Error ? err.message : 'erro desconhecido'}`,
+          timestamp: new Date().toISOString(),
+        }])
+      } finally {
+        busyRef.current = false
+        setIsLoading(false)
+      }
+    },
+    [perfil]
+  )
+
   const clearMessages = useCallback(() => {
     setMessages([])
     sessionStorage.removeItem('superteg-history')
@@ -222,5 +309,5 @@ export function useSuperTEG() {
     return action
   }, [pendingAction])
 
-  return { messages, isLoading, sendMessage, sendAudio, clearMessages, pendingAction, consumePendingAction }
+  return { messages, isLoading, sendMessage, sendMessageWithFile, sendAudio, clearMessages, pendingAction, consumePendingAction }
 }

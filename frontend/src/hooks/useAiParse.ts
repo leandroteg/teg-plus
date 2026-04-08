@@ -246,77 +246,155 @@ export interface AiParseVars {
   arquivo?: { base64: string; nome: string; mime: string }
 }
 
-// ── Parse arquivo binário via OCR+Gemini (upload temp → n8n OCR) ─────────────
+// ── Parse arquivo binário via Gemini (direto ou n8n fallback) ─────────────────
 async function parseArquivoComGemini(arquivo: { base64: string; nome: string; mime: string }, textoExtra?: string): Promise<AiParseResult> {
+  const GEMINI_KEY = import.meta.env.VITE_GEMINI_API_KEY
   const N8N_URL = import.meta.env.VITE_N8N_WEBHOOK_URL || 'https://teg-agents-n8n.nmmcas.easypanel.host/webhook'
 
-  // 1. Converter base64 para blob e upload temporário no Supabase Storage
-  const byteChars = atob(arquivo.base64)
-  const bytes = new Uint8Array(byteChars.length)
-  for (let i = 0; i < byteChars.length; i++) bytes[i] = byteChars.charCodeAt(i)
-  const blob = new Blob([bytes], { type: arquivo.mime })
-
-  const tempPath = `temp-ai-parse/${Date.now()}_${arquivo.nome.replace(/[^a-zA-Z0-9._-]/g, '_')}`
-  const { error: uploadErr } = await supabase.storage.from('cotacoes-docs').upload(tempPath, blob, { upsert: true })
-  if (uploadErr) throw new Error(`Erro ao fazer upload temporário: ${uploadErr.message}`)
-
-  const { data: urlData } = supabase.storage.from('cotacoes-docs').getPublicUrl(tempPath)
-  const publicUrl = urlData.publicUrl
-
-  // 2. Chamar endpoint OCR existente que usa Gemini
   const controller = new AbortController()
-  const timeout = setTimeout(() => controller.abort(), 90_000)
+  // PDFs grandes (20-50MB) podem demorar mais para processar
+  const timeoutMs = arquivo.base64.length > 15_000_000 ? 180_000 : 90_000
+  const timeout = setTimeout(() => controller.abort(), timeoutMs)
+
+  const prompt = `Analise este documento (cotação, proposta comercial, lista de materiais ou similar) e extraia TODOS os itens para uma requisição de compra.
+
+Retorne SOMENTE JSON válido (sem markdown, sem blocos de código) no formato:
+{"itens":[{"descricao":"descrição completa do item","quantidade":1,"unidade":"un","valor_unitario_estimado":0.00}],"obra_sugerida":"","urgencia_sugerida":"normal","categoria_sugerida":"consumo","justificativa_sugerida":"","confianca":0.85,"fornecedor_nome":"","fornecedor_cnpj":"","condicao_pagamento":"","validade_proposta":""}
+
+Regras:
+- Unidades: un, par, jg, kg, ton, m, m², m³, L, pc, cx, rl, hr, vb
+- Se o valor unitário não estiver claro, use 0
+- Inclua TODOS os itens encontrados
+- Se for proposta com valor total por item, calcule o unitário dividindo pela quantidade
+- categoria_sugerida: eletrico|civil|ferramentas|epi|servicos|consumo
+${textoExtra ? '\nContexto: ' + textoExtra : ''}
+Nome do arquivo: ${arquivo.nome}`
 
   try {
-    const resp = await fetch(`${N8N_URL}/compras/ocr`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        anexo_id: `temp_${Date.now()}`,
-        url: publicUrl,
-        mime_type: arquivo.mime,
-        nome_arquivo: arquivo.nome,
-      }),
-      signal: controller.signal,
-    })
+    let data: Record<string, unknown>
 
-    if (!resp.ok) {
-      const errText = await resp.text().catch(() => '')
-      throw new Error(`Erro ${resp.status} do servidor de IA: ${errText.substring(0, 200)}`)
+    // Estratégia 1: Gemini API direto (se tiver key)
+    if (GEMINI_KEY) {
+      const mimeType = arquivo.mime || 'application/pdf'
+      const base64Size = arquivo.base64.length
+      let filePart: Record<string, unknown>
+
+      // Arquivos > 15MB base64 (~11MB real): usar Gemini File API para upload
+      if (base64Size > 15_000_000) {
+        // 1. Converter base64 para blob
+        const byteChars = atob(arquivo.base64)
+        const byteArr = new Uint8Array(byteChars.length)
+        for (let i = 0; i < byteChars.length; i++) byteArr[i] = byteChars.charCodeAt(i)
+        const blob = new Blob([byteArr], { type: mimeType })
+
+        // 2. Upload via Gemini File API (resumable)
+        const uploadResp = await fetch(
+          `https://generativelanguage.googleapis.com/upload/v1beta/files?key=${GEMINI_KEY}`,
+          {
+            method: 'POST',
+            headers: {
+              'X-Goog-Upload-Command': 'upload, finalize',
+              'X-Goog-Upload-Header-Content-Length': String(blob.size),
+              'X-Goog-Upload-Header-Content-Type': mimeType,
+              'Content-Type': mimeType,
+            },
+            body: blob,
+            signal: controller.signal,
+          }
+        )
+        if (!uploadResp.ok) throw new Error(`Gemini upload ${uploadResp.status}`)
+        const uploadData = await uploadResp.json()
+        const fileUri = uploadData.file?.uri
+        if (!fileUri) throw new Error('Gemini File API: URI não retornada')
+
+        // 3. Aguardar processamento (polling por estado ACTIVE)
+        const fileName = uploadData.file?.name
+        if (fileName) {
+          for (let i = 0; i < 30; i++) {
+            const statusResp = await fetch(
+              `https://generativelanguage.googleapis.com/v1beta/${fileName}?key=${GEMINI_KEY}`,
+              { signal: controller.signal }
+            )
+            if (statusResp.ok) {
+              const statusData = await statusResp.json()
+              if (statusData.state === 'ACTIVE') break
+              if (statusData.state === 'FAILED') throw new Error('Gemini: falha ao processar arquivo')
+            }
+            await new Promise(r => setTimeout(r, 2000))
+          }
+        }
+
+        filePart = { file_data: { mime_type: mimeType, file_uri: fileUri } }
+      } else {
+        // Arquivo pequeno: inline_data direto
+        filePart = { inline_data: { mime_type: mimeType, data: arquivo.base64 } }
+      }
+
+      const resp = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_KEY}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{ parts: [
+              filePart,
+              { text: prompt },
+            ] }],
+            generationConfig: { temperature: 0.1, maxOutputTokens: 8192 },
+          }),
+          signal: controller.signal,
+        }
+      )
+      if (!resp.ok) throw new Error(`Gemini ${resp.status}`)
+      const gd = await resp.json()
+      const raw = gd.candidates?.[0]?.content?.parts?.[0]?.text || ''
+      const cleaned = raw.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim()
+      try { data = JSON.parse(cleaned) } catch {
+        const m = cleaned.match(/\{[\s\S]*\}/)
+        if (m) data = JSON.parse(m[0])
+        else throw new Error('JSON inválido do Gemini')
+      }
+    } else {
+      // Estratégia 2: n8n endpoint (fallback)
+      const resp = await fetch(`${N8N_URL}/compras/parse-documento-ai`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ base64: arquivo.base64, nome: arquivo.nome, mime_type: arquivo.mime, texto_extra: textoExtra || '' }),
+        signal: controller.signal,
+      })
+      if (!resp.ok) throw new Error(`Erro ${resp.status} do servidor de IA`)
+      data = await resp.json()
     }
 
-    const data = await resp.json()
-    const llm = data.llm_dados || data
-
-    // Converter formato OCR para AiParseResult
-    const itens = (llm.itens || []).map((item: Record<string, unknown>) => ({
+    // Converter resultado para AiParseResult
+    const rawItens = (data.itens as Record<string, unknown>[]) || []
+    const itens = rawItens.map(item => ({
       descricao: String(item.descricao || '').trim(),
       quantidade: Number(item.qtd || item.quantidade || 1),
       unidade: String(item.unidade || 'un').toLowerCase(),
       valor_unitario_estimado: Number(item.valor_unit || item.valor_unitario || item.valor_unitario_estimado || 0),
-    })).filter((i: { descricao: string }) => i.descricao.length > 1)
+    })).filter(i => i.descricao.length > 1)
 
-    // Detectar categoria a partir dos itens
-    const joined = itens.map((i: { descricao: string }) => i.descricao).join(' ').toLowerCase()
-    let categoria = 'consumo'
-    if (/cabo|fio|disjuntor|transformador|conector|xlpe/i.test(joined)) categoria = 'eletrico'
-    else if (/cimento|areia|concreto|ferro|brita|tubo/i.test(joined)) categoria = 'civil'
-    else if (/chave|alicate|furadeira|ferramenta|serra/i.test(joined)) categoria = 'ferramentas'
-    else if (/epi|luva|capacete|bota|oculos/i.test(joined)) categoria = 'epi'
-    else if (/locacao|guindaste|transporte|frete/i.test(joined)) categoria = 'servicos'
+    const joined = itens.map(i => i.descricao).join(' ').toLowerCase()
+    let categoria = (data.categoria_sugerida as string) || 'consumo'
+    if (!data.categoria_sugerida) {
+      if (/cabo|fio|disjuntor|transformador|conector|xlpe/i.test(joined)) categoria = 'eletrico'
+      else if (/cimento|areia|concreto|ferro|brita|tubo/i.test(joined)) categoria = 'civil'
+      else if (/chave|alicate|furadeira|ferramenta|serra/i.test(joined)) categoria = 'ferramentas'
+      else if (/epi|luva|capacete|bota|oculos/i.test(joined)) categoria = 'epi'
+      else if (/locacao|guindaste|transporte|frete/i.test(joined)) categoria = 'servicos'
+    }
 
     return {
       itens: itens.length > 0 ? itens : [{ descricao: `Documento: ${arquivo.nome}`, quantidade: 1, unidade: 'un', valor_unitario_estimado: 0 }],
-      obra_sugerida: '',
-      urgencia_sugerida: 'normal',
+      obra_sugerida: (data.obra_sugerida as string) || '',
+      urgencia_sugerida: (data.urgencia_sugerida as string) || 'normal',
       categoria_sugerida: categoria,
-      justificativa_sugerida: `Itens extraídos de ${arquivo.nome}${llm.fornecedor_nome ? ` — Fornecedor: ${llm.fornecedor_nome}` : ''}`,
-      confianca: itens.length > 0 ? 0.9 : 0.3,
+      justificativa_sugerida: (data.justificativa_sugerida as string) || `Itens extraídos de ${arquivo.nome}${data.fornecedor_nome ? ` — Fornecedor: ${data.fornecedor_nome}` : ''}`,
+      confianca: itens.length > 0 ? (Number(data.confianca) || 0.9) : 0.3,
     }
   } finally {
     clearTimeout(timeout)
-    // Limpar arquivo temporário (fire and forget)
-    supabase.storage.from('cotacoes-docs').remove([tempPath]).catch(() => {})
   }
 }
 

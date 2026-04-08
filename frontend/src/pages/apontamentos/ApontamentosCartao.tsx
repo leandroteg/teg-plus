@@ -1,4 +1,5 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import {
   CreditCard, Plus, Search, Calendar, Filter,
   Upload, Trash2, Send, X, Check, Eye, Receipt,
@@ -27,6 +28,11 @@ const fmt = (v: number) =>
 const fmtDate = (d: string) =>
   new Date(d + 'T00:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit' })
 
+const formatControlNumber = (value?: number) => {
+  if (!value || value <= 0) return 'Pendente'
+  return String(value)
+}
+
 const BANDEIRA_LABEL: Record<BandeiraCartao, string> = {
   visa: 'Visa', mastercard: 'Mastercard', elo: 'Elo',
   amex: 'Amex', hipercard: 'Hipercard', outro: 'Outro',
@@ -43,7 +49,7 @@ const STATUS_CONFIG: Record<StatusApontamentoCartao, {
   light: string
   dark: string
 }> = {
-  rascunho:   { label: 'Rascunho',   icon: Clock,         light: 'bg-slate-100 text-slate-600',       dark: 'bg-slate-500/15 text-slate-400' },
+  rascunho:   { label: 'Pendente',   icon: Clock,         light: 'bg-slate-100 text-slate-600',       dark: 'bg-slate-500/15 text-slate-400' },
   enviado:    { label: 'Enviado',    icon: CheckCircle2,  light: 'bg-blue-100 text-blue-700',         dark: 'bg-blue-500/15 text-blue-300' },
   conciliado: { label: 'Conciliado', icon: Check,         light: 'bg-emerald-100 text-emerald-700',   dark: 'bg-emerald-500/15 text-emerald-300' },
   rejeitado:  { label: 'Rejeitado',  icon: XCircle,       light: 'bg-red-100 text-red-700',           dark: 'bg-red-500/15 text-red-300' },
@@ -76,11 +82,13 @@ function CardBadge({ bandeira, ultimos4, nome }: { bandeira: BandeiraCartao; ult
 function ApontamentoModal({
   isDark,
   editing,
+  nextIndex,
   onClose,
   onSaved,
 }: {
   isDark: boolean
   editing: ApontamentoCartao | null
+  nextIndex: number
   onClose: () => void
   onSaved: (msg: string) => void
 }) {
@@ -153,9 +161,11 @@ function ApontamentoModal({
       <div className={`w-full max-w-lg rounded-2xl shadow-2xl ${isDark ? 'bg-[#1e293b]' : 'bg-white'}`}>
         {/* Header */}
         <div className={`flex items-center justify-between px-5 py-4 border-b ${isDark ? 'border-white/[0.06]' : 'border-slate-100'}`}>
-          <div className="flex items-center gap-2">
-            <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${isDark ? 'bg-emerald-500/15' : 'bg-emerald-50'}`}>
-              <Receipt size={18} className="text-emerald-600" />
+          <div className="flex items-center gap-3">
+            <div className={`min-w-[42px] h-10 px-3 rounded-xl flex items-center justify-center ${isDark ? 'bg-emerald-500/15' : 'bg-emerald-50'}`}>
+              <span className={`text-sm font-bold ${isDark ? 'text-emerald-200' : 'text-emerald-700'}`}>
+                {formatControlNumber(nextIndex)}
+              </span>
             </div>
             <div>
               <h3 className={`text-base font-bold ${isDark ? 'text-white' : 'text-slate-800'}`}>
@@ -322,6 +332,7 @@ function ApontamentoModal({
 export default function ApontamentosCartao() {
   const { isDark } = useTheme()
   const { perfil } = useAuth()
+  const [searchParams] = useSearchParams()
 
   const [filtroCartao, setFiltroCartao] = useState('')
   const [filtroStatus, setFiltroStatus] = useState<StatusApontamentoCartao | ''>('')
@@ -330,6 +341,11 @@ export default function ApontamentosCartao() {
   const [dataFim, setDataFim] = useState('')
   const [showModal, setShowModal] = useState(false)
   const [editing, setEditing] = useState<ApontamentoCartao | null>(null)
+
+  // Abre modal automaticamente quando ?nova= está presente na URL
+  useEffect(() => {
+    if (searchParams.has('nova')) setShowModal(true)
+  }, [searchParams])
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null)
   const [toast, setToast] = useState<{ type: 'success' | 'error'; msg: string } | null>(null)
 
@@ -355,11 +371,25 @@ export default function ApontamentosCartao() {
     )
   }, [apontamentos, busca])
 
+  const fallbackNumberingById = useMemo(() => {
+    const ordered = [...apontamentos].sort((a, b) => {
+      const byDate = a.data_lancamento.localeCompare(b.data_lancamento)
+      if (byDate !== 0) return byDate
+
+      const byCreatedAt = a.created_at.localeCompare(b.created_at)
+      if (byCreatedAt !== 0) return byCreatedAt
+
+      return a.id.localeCompare(b.id)
+    })
+
+    return Object.fromEntries(ordered.map((item, index) => [item.id, index + 1]))
+  }, [apontamentos])
+
   // KPIs
   const totalValor = apontamentos.reduce((s, a) => s + a.valor, 0)
-  const countRascunho = apontamentos.filter(a => a.status === 'rascunho').length
   const countEnviado  = apontamentos.filter(a => a.status === 'enviado').length
   const countConc     = apontamentos.filter(a => a.status === 'conciliado').length
+  const nextApontamentoIndex = Object.keys(fallbackNumberingById).length + 1
 
   function showToast(type: 'success' | 'error', msg: string) {
     setToast({ type, msg })
@@ -409,7 +439,7 @@ export default function ApontamentosCartao() {
         <div>
           <h1 className={`text-xl font-extrabold flex items-center gap-2 ${isDark ? 'text-white' : 'text-slate-800'}`}>
             <CreditCard size={20} className="text-emerald-600" />
-            Apontamentos de Cartão
+            Cartões Corporativos
           </h1>
           <p className={`text-xs mt-0.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
             Olá, {(perfil?.nome ?? 'Usuário').split(' ')[0]} · Registre seus gastos corporativos e anexe comprovantes
@@ -426,16 +456,10 @@ export default function ApontamentosCartao() {
       </div>
 
       {/* ── KPIs ────────────────────────────────────────────────── */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         <div className={card('p-3.5')}>
           <p className="text-[10px] text-slate-400 font-semibold uppercase tracking-widest mb-1">Total Período</p>
           <p className={`text-base font-extrabold ${isDark ? 'text-white' : 'text-slate-800'}`}>{fmt(totalValor)}</p>
-        </div>
-        <div className={card('p-3.5')}>
-          <p className="text-[10px] text-amber-500 font-semibold uppercase tracking-widest mb-1 flex items-center gap-1">
-            <Clock size={9} /> Rascunho
-          </p>
-          <p className="text-base font-extrabold text-amber-600">{countRascunho}</p>
         </div>
         <div className={card('p-3.5')}>
           <p className="text-[10px] text-blue-500 font-semibold uppercase tracking-widest mb-1 flex items-center gap-1">
@@ -490,7 +514,7 @@ export default function ApontamentosCartao() {
               ${isDark ? 'bg-white/[0.03] border-white/[0.06] text-slate-300' : 'border-slate-200 bg-slate-50 text-slate-600'}`}
           >
             <option value="">Todos os status</option>
-            <option value="rascunho">Rascunho</option>
+            <option value="rascunho">Pendente</option>
             <option value="enviado">Enviado</option>
             <option value="conciliado">Conciliado</option>
             <option value="rejeitado">Rejeitado</option>
@@ -538,6 +562,7 @@ export default function ApontamentosCartao() {
             const cfg = STATUS_CONFIG[a.status]
             const StatusIcon = cfg.icon
             const isEditable = a.status === 'rascunho'
+            const displayNumber = a.numero ?? fallbackNumberingById[a.id]
 
             return (
               <div
@@ -545,6 +570,18 @@ export default function ApontamentosCartao() {
                 className={`rounded-xl border px-4 py-3 flex items-center gap-3 transition-all
                   ${isDark ? 'bg-[#1e293b] border-white/[0.06] hover:border-white/[0.12]' : 'bg-white border-slate-200 hover:border-slate-300 hover:shadow-sm'}`}
               >
+                <div className={`min-w-[86px] shrink-0 rounded-lg border px-3 py-1.5 ${
+                  isDark
+                    ? 'border-emerald-500/20 bg-emerald-500/10'
+                    : 'border-emerald-200 bg-emerald-50'
+                }`}>
+                  <p className={`text-xs font-bold tracking-[0.04em] text-center ${
+                    isDark ? 'text-emerald-100' : 'text-emerald-800'
+                  }`}>
+                    {formatControlNumber(displayNumber)}
+                  </p>
+                </div>
+
                 {/* Status dot */}
                 <div className={`w-2 h-2 rounded-full shrink-0 ${
                   a.status === 'conciliado' ? 'bg-emerald-500' :
@@ -670,6 +707,7 @@ export default function ApontamentosCartao() {
         <ApontamentoModal
           isDark={isDark}
           editing={editing}
+          nextIndex={nextApontamentoIndex}
           onClose={() => { setShowModal(false); setEditing(null) }}
           onSaved={msg => showToast('success', msg)}
         />

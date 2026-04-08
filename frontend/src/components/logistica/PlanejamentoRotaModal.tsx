@@ -57,6 +57,17 @@ interface RotaCalculada {
   polyline?: string
 }
 
+interface WaypointStop {
+  lat: number
+  lng: number
+  label: string
+}
+
+interface WaypointPlan {
+  stops: WaypointStop[]
+  legRanges: Array<{ startLegIndex: number; endLegIndexExclusive: number }>
+}
+
 interface Props {
   isDark: boolean
   solicitacoes: LogSolicitacao[]  // Solicitações selecionadas para planejar
@@ -108,6 +119,154 @@ function createIcon(color: string, label?: string) {
       ">${label}</span>` : ''}
     </div>`,
   })
+}
+
+function toRadians(value: number) {
+  return value * Math.PI / 180
+}
+
+function haversineKm(a: { lat: number; lng: number }, b: { lat: number; lng: number }) {
+  const R = 6371
+  const dLat = toRadians(b.lat - a.lat)
+  const dLng = toRadians(b.lng - a.lng)
+  const originLat = toRadians(a.lat)
+  const destLat = toRadians(b.lat)
+  const angle =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(originLat) * Math.cos(destLat) * Math.sin(dLng / 2) ** 2
+  return R * 2 * Math.atan2(Math.sqrt(angle), Math.sqrt(1 - angle))
+}
+
+function normalizeStopLabel(value?: string) {
+  return String(value ?? '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+function sameStop(
+  a: { lat?: number; lng?: number; label?: string },
+  b: { lat?: number; lng?: number; label?: string },
+) {
+  if (typeof a.lat === 'number' && typeof a.lng === 'number' && typeof b.lat === 'number' && typeof b.lng === 'number') {
+    return haversineKm({ lat: a.lat, lng: a.lng }, { lat: b.lat, lng: b.lng }) <= 5
+  }
+  return normalizeStopLabel(a.label) !== '' && normalizeStopLabel(a.label) === normalizeStopLabel(b.label)
+}
+
+function originStopOf(ponto: PontoRota) {
+  return {
+    lat: ponto.lat_origem,
+    lng: ponto.lng_origem,
+    label: ponto.endereco_origem || ponto.solicitacao?.origem || '',
+  }
+}
+
+function destinoStopOf(ponto: PontoRota) {
+  return {
+    lat: ponto.lat_destino,
+    lng: ponto.lng_destino,
+    label: ponto.endereco_destino || ponto.solicitacao?.destino || '',
+  }
+}
+
+function optimizePontosOrder(pontos: PontoRota[]) {
+  if (pontos.length <= 1) return pontos
+
+  const indexed = pontos.map((ponto, index) => ({ ponto, index }))
+  const remaining = [...indexed]
+  const ordered: typeof indexed = []
+
+  const startingCandidates = indexed.filter(candidate =>
+    !indexed.some(other =>
+      other.ponto.id !== candidate.ponto.id &&
+      sameStop(destinoStopOf(other.ponto), originStopOf(candidate.ponto))
+    )
+  )
+
+  const start =
+    startingCandidates.sort((a, b) => a.index - b.index)[0]
+    ?? indexed[0]
+
+  ordered.push(start)
+  remaining.splice(remaining.findIndex(item => item.ponto.id === start.ponto.id), 1)
+
+  while (remaining.length > 0) {
+    const current = ordered[ordered.length - 1].ponto
+    const currentDestino = destinoStopOf(current)
+
+    const next = remaining
+      .map(candidate => {
+        const candidateOrigem = originStopOf(candidate.ponto)
+        const exactMatch = sameStop(currentDestino, candidateOrigem)
+        const deadheadKm =
+          typeof currentDestino.lat === 'number' &&
+          typeof currentDestino.lng === 'number' &&
+          typeof candidateOrigem.lat === 'number' &&
+          typeof candidateOrigem.lng === 'number'
+            ? haversineKm(
+                { lat: currentDestino.lat, lng: currentDestino.lng },
+                { lat: candidateOrigem.lat, lng: candidateOrigem.lng },
+              )
+            : exactMatch
+              ? 0
+              : Number.POSITIVE_INFINITY
+
+        return { ...candidate, exactMatch, deadheadKm }
+      })
+      .sort((a, b) => {
+        if (a.exactMatch !== b.exactMatch) return a.exactMatch ? -1 : 1
+        if (a.deadheadKm !== b.deadheadKm) return a.deadheadKm - b.deadheadKm
+        return a.index - b.index
+      })[0]
+
+    ordered.push(next)
+    remaining.splice(remaining.findIndex(item => item.ponto.id === next.ponto.id), 1)
+  }
+
+  return ordered.map(item => item.ponto)
+}
+
+function buildWaypointPlan(pontos: PontoRota[]): WaypointPlan {
+  const stops: WaypointStop[] = []
+  const legRanges: WaypointPlan['legRanges'] = []
+
+  const pushStop = (stop: WaypointStop) => {
+    const last = stops[stops.length - 1]
+    if (!last || !sameStop(last, stop)) {
+      stops.push(stop)
+    }
+    return stops.length - 1
+  }
+
+  pontos.forEach(ponto => {
+    const origem = originStopOf(ponto)
+    const destino = destinoStopOf(ponto)
+
+    if (typeof origem.lat !== 'number' || typeof origem.lng !== 'number' || typeof destino.lat !== 'number' || typeof destino.lng !== 'number') {
+      return
+    }
+
+    const origemIndex = pushStop({
+      lat: origem.lat,
+      lng: origem.lng,
+      label: origem.label,
+    })
+    const destinoIndex = pushStop({
+      lat: destino.lat,
+      lng: destino.lng,
+      label: destino.label,
+    })
+
+    legRanges.push({
+      startLegIndex: origemIndex,
+      endLegIndexExclusive: destinoIndex,
+    })
+  })
+
+  return { stops, legRanges }
 }
 
 // ── Map bounds fitter ────────────────────────────────────────────────────────
@@ -691,16 +850,31 @@ export default function PlanejamentoRotaModal({ isDark, solicitacoes, allSolicit
     }))
   )
 
-  // Rota calculada
-  const [rota, setRota] = useState<RotaCalculada | null>(null)
+  // Rota calculada — pré-popular com dados existentes da solicitação/viagem
+  const [rota, setRota] = useState<RotaCalculada | null>(() => {
+    const s = solicitacoes[0]
+    if (s?.distancia_km || s?.tempo_estimado_h) {
+      return {
+        distancia_total_km: s.distancia_km ?? 0,
+        duracao_total_horas: s.tempo_estimado_h ?? 0,
+        polyline: (s as any).rota_polyline || undefined,
+        pontos: [],
+      }
+    }
+    return null
+  })
   const [calculando, setCalculando] = useState(false)
 
-  // Planning fields — pré-preencher com initialData quando editando
-  const [modal, setModal] = useState(initialData?.modal || '')
-  const [motorista, setMotorista] = useState(initialData?.motorista_nome || '')
-  const [placa, setPlaca] = useState(initialData?.veiculo_placa || '')
-  const [dataPartida, setDataPartida] = useState(initialData?.data_prevista_saida || '')
-  const [custo, setCusto] = useState<number | ''>(initialData?.custo_estimado ?? '')
+  // Planning fields — pré-preencher com initialData ou dados da primeira solicitação
+  const s0 = solicitacoes[0]
+  const [modal, setModal] = useState(initialData?.modal || s0?.modal || '')
+  const [motorista, setMotorista] = useState(initialData?.motorista_nome || s0?.motorista_nome || '')
+  const [placa, setPlaca] = useState(initialData?.veiculo_placa || s0?.veiculo_placa || '')
+  const [dataPartida, setDataPartida] = useState(() => {
+    const d = initialData?.data_prevista_saida || s0?.data_prevista_saida || ''
+    return d ? d.slice(0, 16) : ''
+  })
+  const [custo, setCusto] = useState<number | ''>(initialData?.custo_estimado ?? s0?.custo_estimado ?? '')
   const [salvando, setSalvando] = useState(false)
 
   // Adicionar mais solicitações
@@ -825,12 +999,9 @@ export default function PlanejamentoRotaModal({ isDark, solicitacoes, allSolicit
 
   // Calcular rota via OSRM (gratuito, trajeto real de carro)
   const calcularRota = async () => {
-    const waypoints = pontos.flatMap(p => {
-      const pts: Array<{ lat: number; lng: number; label: string }> = []
-      if (p.lat_origem && p.lng_origem) pts.push({ lat: p.lat_origem, lng: p.lng_origem, label: p.endereco_origem })
-      if (p.lat_destino && p.lng_destino) pts.push({ lat: p.lat_destino, lng: p.lng_destino, label: p.endereco_destino })
-      return pts
-    })
+    const orderedPontos = optimizePontosOrder(pontos)
+    const waypointPlan = buildWaypointPlan(orderedPontos)
+    const waypoints = waypointPlan.stops
 
     if (waypoints.length < 2) return
 
@@ -860,35 +1031,48 @@ export default function PlanejamentoRotaModal({ isDark, solicitacoes, allSolicit
 
           // Atualizar distâncias por trecho (leg) se houver múltiplos pontos
           if (route.legs && route.legs.length > 0) {
-            setPontos(prev => prev.map((p, i) => {
-              const leg = route.legs[i]
-              if (!leg) return p
+            const updatedPontos = orderedPontos.map((ponto, index) => {
+              const range = waypointPlan.legRanges[index]
+              if (!range) return ponto
+
+              const serviceLegs = route.legs.slice(range.startLegIndex, range.endLegIndexExclusive)
+              const serviceDistance = serviceLegs.reduce((sum: number, leg: { distance?: number }) => sum + (leg.distance || 0), 0)
+              const serviceDuration = serviceLegs.reduce((sum: number, leg: { duration?: number }) => sum + (leg.duration || 0), 0)
+
               return {
-                ...p,
-                distancia_km: Math.round(leg.distance / 1000),
-                duracao_horas: Math.round(leg.duration / 3600 * 10) / 10,
+                ...ponto,
+                distancia_km: Math.round(serviceDistance / 1000),
+                duracao_horas: Math.round(serviceDuration / 3600 * 10) / 10,
               }
-            }))
+            })
+
+            setPontos(updatedPontos)
+          } else {
+            setPontos(orderedPontos)
           }
           return
         }
       }
       throw new Error('OSRM failed')
     } catch {
-      // Fallback: haversine estimado
       let totalKm = 0
       const pts: Array<{ lat: number; lng: number }> = []
-      pontos.forEach(p => {
+      const updatedPontos = orderedPontos.map(p => {
         if (p.lat_origem && p.lng_origem && p.lat_destino && p.lng_destino) {
-          const R = 6371
-          const dLat = (p.lat_destino - p.lat_origem) * Math.PI / 180
-          const dLon = (p.lng_destino - p.lng_origem) * Math.PI / 180
-          const a = Math.sin(dLat / 2) ** 2 + Math.cos(p.lat_origem * Math.PI / 180) * Math.cos(p.lat_destino * Math.PI / 180) * Math.sin(dLon / 2) ** 2
-          const d = R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
-          totalKm += d
+          const directKm = haversineKm(
+            { lat: p.lat_origem, lng: p.lng_origem },
+            { lat: p.lat_destino, lng: p.lng_destino },
+          )
+          totalKm += directKm
           pts.push({ lat: p.lat_origem, lng: p.lng_origem })
           pts.push({ lat: p.lat_destino, lng: p.lng_destino })
+          return {
+            ...p,
+            distancia_km: Math.round(directKm * 1.3),
+            duracao_horas: Math.round(((directKm * 1.3) / 60) * 10) / 10,
+          }
         }
+        return p
       })
       if (totalKm > 0) {
         setRota({
@@ -896,6 +1080,7 @@ export default function PlanejamentoRotaModal({ isDark, solicitacoes, allSolicit
           duracao_total_horas: Math.round((totalKm * 1.3) / 60 * 10) / 10,
           pontos: pts,
         })
+        setPontos(updatedPontos)
       }
     } finally {
       setCalculando(false)

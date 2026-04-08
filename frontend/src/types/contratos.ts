@@ -79,6 +79,11 @@ export interface Contrato {
   status: StatusContrato
   // Arquivo
   arquivo_url?: string
+  diretorio_url?: string
+  // Contraparte direta (contratos sem FK de fornecedor/cliente)
+  contraparte_nome?: string
+  valor_mensal?: number
+  recorrente?: boolean
   // Audit
   created_at: string
   updated_at: string
@@ -536,7 +541,7 @@ export interface NovaSolicitacaoPayload {
 
 // ── Certisign Assinaturas ───────────────────────────────────────────
 
-export type StatusAssinaturaType = 'pendente' | 'enviado' | 'parcialmente_assinado' | 'assinado' | 'recusado' | 'expirado' | 'cancelado'
+export type StatusAssinaturaType = 'pendente' | 'enviado' | 'parcialmente_assinado' | 'assinado' | 'recusado' | 'expirado' | 'cancelado' | 'erro'
 export type ProvedorAssinatura = 'certisign' | 'manual'
 export type TipoAssinatura = 'eletronica' | 'digital_icp'
 

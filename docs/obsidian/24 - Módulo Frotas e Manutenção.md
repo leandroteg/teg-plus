@@ -184,7 +184,9 @@ frontend/src/
 
 **Migration:** `supabase/017_frotas_manutencao.sql`
 
-### Tabelas
+### Tabelas (18 — prefixo `fro_`)
+
+**Originais (017_frotas_manutencao.sql):**
 
 | Tabela | Descrição |
 |--------|-----------|
@@ -198,6 +200,19 @@ frontend/src/
 | `fro_ocorrencias_telemetria` | Eventos de mau uso rastreados |
 | `fro_fornecedores` | Oficinas, autopeças, borracharias |
 | `fro_avaliacoes_fornecedor` | Avaliações prazo/qualidade/preço |
+
+**Redesign (068_fro_redesign.sql):**
+
+| Tabela | Descrição |
+|--------|-----------|
+| `fro_acessorios` | Catálogo de acessórios (extintor, triângulo, macaco, etc.) |
+| `fro_veiculo_acessorios` | Vínculo N:N veículo-acessório com validade |
+| `fro_alocacoes` | Alocação de veículos a obras/motoristas com período |
+| `fro_checklist_templates` | Templates de checklist por tipo de veículo |
+| `fro_checklist_template_itens` | Itens de cada template |
+| `fro_checklist_execucoes` | Execuções de checklist (instâncias preenchidas) |
+| `fro_checklist_execucao_itens` | Respostas de cada item da execução |
+| `fro_multas` | Registro de multas de trânsito por veículo/motorista |
 
 ### Triggers
 

@@ -141,7 +141,7 @@ function ReqCard({ r, apr, isDark, onClick }: {
       </div>
 
       {/* Descrição */}
-      <p className={`text-sm font-semibold line-clamp-2 leading-snug ${isDark ? 'text-white' : 'text-slate-800'}`}>{r.descricao}</p>
+      <p className={`text-sm font-semibold line-clamp-2 leading-snug ${isDark ? 'text-white' : 'text-slate-800'}`}>{r.justificativa || r.descricao}</p>
 
       {/* Obra + Necessidade + Valor */}
       <div className="flex items-center justify-between">
@@ -155,7 +155,12 @@ function ReqCard({ r, apr, isDark, onClick }: {
             </span>
           )}
         </div>
-        <span className={`text-sm font-extrabold ${isDark ? 'text-teal-400' : 'text-teal-600'}`}>{fmt(r.valor_estimado)}</span>
+        <div className="flex items-center gap-1.5">
+          {(r as any).compra_recorrente && (
+            <span className="text-[8px] font-bold bg-indigo-100 text-indigo-700 px-1.5 py-0.5 rounded">MENSAL</span>
+          )}
+          <span className={`text-sm font-extrabold ${isDark ? 'text-teal-400' : 'text-teal-600'}`}>{fmt(r.valor_estimado)}</span>
+        </div>
       </div>
 
       {/* Comprador + data + chip */}
@@ -211,13 +216,13 @@ function DetailModal({ r, apr, onClose, isDark, canDecide, onDecisao, isProcessi
 
         <div className="p-5 space-y-4">
           {/* Resumo */}
-          <p className={`text-sm font-semibold ${isDark ? 'text-white' : 'text-slate-800'}`}>{r.descricao}</p>
+          <p className={`text-sm font-semibold ${isDark ? 'text-white' : 'text-slate-800'}`}>{r.justificativa || r.descricao}</p>
 
-          {/* Descrição da compra */}
-          {r.justificativa && (
+          {/* Detalhes adicionais */}
+          {r.descricao && r.descricao !== r.justificativa && (
             <div className={`rounded-xl px-3.5 py-2.5 ${isDark ? 'bg-teal-500/10 border border-teal-500/20' : 'bg-teal-50 border border-teal-100'}`}>
-              <p className={`text-[10px] font-bold uppercase tracking-wider mb-1 ${isDark ? 'text-teal-400' : 'text-teal-600'}`}>Descrição</p>
-              <p className={`text-xs leading-relaxed ${isDark ? 'text-teal-200' : 'text-teal-800'}`}>{r.justificativa}</p>
+              <p className={`text-[10px] font-bold uppercase tracking-wider mb-1 ${isDark ? 'text-teal-400' : 'text-teal-600'}`}>Detalhes adicionais</p>
+              <p className={`text-xs leading-relaxed ${isDark ? 'text-teal-200' : 'text-teal-800'}`}>{r.descricao}</p>
             </div>
           )}
 
@@ -231,8 +236,13 @@ function DetailModal({ r, apr, onClose, isDark, canDecide, onDecisao, isProcessi
               <p>{r.obra_nome}</p>
             </div>
             <div>
-              <p className={`font-bold mb-0.5 ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>Valor Estimado</p>
-              <p className={`font-extrabold ${isDark ? 'text-teal-400' : 'text-teal-600'}`}>{fmt(r.valor_estimado)}</p>
+              <p className={`font-bold mb-0.5 ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>{(r as any).compra_recorrente ? 'Valor Mensal' : 'Valor Estimado'}</p>
+              <div className="flex items-center gap-1.5">
+                <p className={`font-extrabold ${isDark ? 'text-teal-400' : 'text-teal-600'}`}>{fmt(r.valor_estimado)}</p>
+                {(r as any).compra_recorrente && (
+                  <span className="text-[8px] font-bold bg-indigo-100 text-indigo-700 px-1.5 py-0.5 rounded">RECORRENTE</span>
+                )}
+              </div>
             </div>
             <div>
               <p className={`font-bold mb-0.5 ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>Solicitante</p>
@@ -263,6 +273,26 @@ function DetailModal({ r, apr, onClose, isDark, canDecide, onDecisao, isProcessi
               </div>
             )}
           </div>
+
+          {/* Justificativa de urgência */}
+          {r.urgencia !== 'normal' && r.justificativa_urgencia && (
+            <div className={`rounded-xl px-3.5 py-2.5 ${
+              r.urgencia === 'critica'
+                ? isDark ? 'bg-red-500/10 border border-red-500/20' : 'bg-red-50 border border-red-100'
+                : isDark ? 'bg-amber-500/10 border border-amber-500/20' : 'bg-amber-50 border border-amber-100'
+            }`}>
+              <p className={`text-[10px] font-bold uppercase tracking-wider mb-1 ${
+                r.urgencia === 'critica'
+                  ? isDark ? 'text-red-400' : 'text-red-600'
+                  : isDark ? 'text-amber-400' : 'text-amber-600'
+              }`}>Justificativa de Urgência</p>
+              <p className={`text-xs leading-relaxed ${
+                r.urgencia === 'critica'
+                  ? isDark ? 'text-red-200' : 'text-red-800'
+                  : isDark ? 'text-amber-200' : 'text-amber-800'
+              }`}>{r.justificativa_urgencia}</p>
+            </div>
+          )}
 
           {r.esclarecimento_msg && (
             <div className={`rounded-xl px-3 py-2.5 ${isDark ? 'bg-amber-500/10 border border-amber-500/20' : 'bg-amber-50 border border-amber-200'}`}>
@@ -337,7 +367,7 @@ function DetailModal({ r, apr, onClose, isDark, canDecide, onDecisao, isProcessi
 export default function ListaRequisicoes() {
   const navigate = useNavigate()
   const { isDark } = useTheme()
-  const { isAdmin, atLeast, perfil } = useAuth()
+  const { isAdmin, atLeast, perfil, canTechnicalApprove } = useAuth()
 
   const [activeTab, setActiveTab] = useState<PipelineTab>('pendente')
   const [busca, setBusca] = useState('')
@@ -560,7 +590,7 @@ export default function ListaRequisicoes() {
           <p className="text-sm font-medium">Nenhuma requisição nesta etapa</p>
         </div>
       ) : viewMode === 'cards' ? (
-        <div className="space-y-2 p-4">
+        <div className="space-y-2 p-4 stagger-children">
           {activeItems.map(r => (
             <ReqCard key={r.id} r={r} apr={aprovacaoMap.get(r.id)} isDark={isDark}
               onClick={() => setDetail(r)} />
@@ -588,13 +618,16 @@ export default function ListaRequisicoes() {
                 <tr key={r.id} onClick={() => setDetail(r)}
                   className={`cursor-pointer transition-all ${isDark ? 'hover:bg-white/[0.03] border-t border-white/[0.04]' : 'hover:bg-slate-50 border-t border-slate-100'}`}>
                   <td className={`px-3 py-2 font-mono ${isDark ? 'text-teal-400' : 'text-teal-600'}`}>{r.numero}</td>
-                  <td className={`px-3 py-2 max-w-[200px] truncate ${isDark ? 'text-white' : 'text-slate-800'}`}>{r.descricao}</td>
+                  <td className={`px-3 py-2 max-w-[200px] truncate ${isDark ? 'text-white' : 'text-slate-800'}`}>{r.justificativa || r.descricao}</td>
                   <td className={`px-3 py-2 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{r.obra_nome}</td>
                   <td className={`px-3 py-2 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{r.data_necessidade ? new Date(r.data_necessidade).toLocaleDateString('pt-BR') : '—'}</td>
                   <td className="px-3 py-2 text-center">{r.urgencia && r.urgencia !== 'normal' ? (
                     <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${r.urgencia === 'critica' ? (isDark ? 'bg-red-500/20 text-red-400' : 'bg-red-100 text-red-700') : (isDark ? 'bg-amber-500/20 text-amber-400' : 'bg-amber-100 text-amber-700')}`}>{r.urgencia}</span>
                   ) : <span className={isDark ? 'text-slate-600' : 'text-slate-300'}>—</span>}</td>
-                  <td className={`px-3 py-2 text-right font-bold ${isDark ? 'text-teal-400' : 'text-teal-600'}`}>{fmt(r.valor_estimado)}</td>
+                  <td className={`px-3 py-2 text-right font-bold ${isDark ? 'text-teal-400' : 'text-teal-600'}`}>
+                    {fmt(r.valor_estimado)}
+                    {(r as any).compra_recorrente && <span className="text-[8px] font-bold text-indigo-500 ml-1">/mês</span>}
+                  </td>
                   <td className={`px-3 py-2 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{r.solicitante_nome.split(' ')[0]}</td>
                   <td className="px-3 py-2"><StatusBadge status={r.status as StatusRequisicao} size="sm" customLabel={getApprovalStatusLabel(r.status)} /></td>
                   <td className={`px-3 py-2 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{fmtData(r.created_at)}</td>
@@ -612,7 +645,13 @@ export default function ListaRequisicoes() {
           apr={aprovacaoMap.get(detail.id)}
           isDark={isDark}
           onClose={() => setDetail(null)}
-          canDecide={isAdmin && ['pendente', 'em_aprovacao', 'em_esclarecimento', 'cotacao_enviada'].includes(detail.status)}
+          canDecide={
+            (
+              ['pendente', 'em_aprovacao', 'em_esclarecimento'].includes(detail.status)
+              && canTechnicalApprove('compras')
+            )
+            || (detail.status === 'cotacao_enviada' && isAdmin)
+          }
           isProcessing={decisaoMutation.isPending}
           onDecisao={(decisao, obs) => handleDecisao(detail.id, detail.numero, detail.alcada_nivel, decisao, obs, detail.categoria, detail.status)}
           onEmitir={() => setEmitirRequisicao(detail)}

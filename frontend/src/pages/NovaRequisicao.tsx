@@ -1,10 +1,10 @@
-import { useState, useRef, useCallback } from 'react'
+import { useState, useRef, useCallback, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   Sparkles, Send, PlusCircle, Trash2, ChevronLeft, ChevronRight,
   AlertCircle, Check, Layers, FileText, Search, Upload, FileUp,
   ChevronDown, X, FileImage, Eye, Pencil, CheckCircle2, Loader2,
-  Package, MapPin, Zap, Save,
+  Package, MapPin, Zap, Save, ExternalLink, Download,
 } from 'lucide-react'
 import { useCriarRequisicao } from '../hooks/useRequisicoes'
 import { useAiParse, readFileForAi, isBinaryFile, isImageFile } from '../hooks/useAiParse'
@@ -12,8 +12,10 @@ import { useCategorias } from '../hooks/useCategorias'
 import { useLookupObras } from '../hooks/useLookups'
 import { useAuth } from '../contexts/AuthContext'
 import CategoryCard from '../components/CategoryCard'
+import NumericInput from '../components/NumericInput'
 import ItemAutocomplete from '../components/ItemAutocomplete'
 import type { RequisicaoItem, Urgencia, AiParseResult, CategoriaMaterial } from '../types'
+import { minCotacoesPorValor } from '../utils/cotacoesPolicy'
 
 
 const fmt = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
@@ -25,44 +27,37 @@ const emptyItem = (): RequisicaoItem => ({
   destino_operacional: 'estoque',
 })
 
-function minCotacoes(valor: number, regras?: { ate_500: number; '501_a_2k': number; acima_2k: number }) {
-  if (!regras) return valor <= 500 ? 1 : valor <= 2000 ? 2 : 3
-  if (valor <= 500) return regras.ate_500
-  if (valor <= 2000) return regras['501_a_2k']
-  return regras.acima_2k
-}
-
 function Stepper({ step }: { step: number }) {
   const steps = ['Categoria', 'Detalhes', 'Confirmar']
   return (
-    <div className="mb-6 w-full">
-      <div className="flex items-center gap-0">
-      {steps.map((label, i) => {
-        const idx = i + 1
-        const done = idx < step
-        const active = idx === step
-        return (
-          <div key={label} className="flex items-center flex-1 min-w-0">
-            <div className="flex flex-col items-center">
-              <div className={`
-                w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-extrabold flex-shrink-0 transition-all
-                ${done   ? 'bg-teal-500 text-white' : ''}
-                ${active ? 'bg-teal-400 text-white ring-4 ring-teal-400/20' : ''}
-                ${!done && !active ? 'bg-slate-100 text-slate-400' : ''}
-              `}>
-                {done ? <Check size={13} strokeWidth={3} /> : idx}
+    <div className="mb-6 flex justify-center">
+      <div className="flex w-full max-w-3xl items-start justify-center px-4 sm:px-6">
+        {steps.map((label, i) => {
+          const idx = i + 1
+          const done = idx < step
+          const active = idx === step
+          return (
+            <div key={label} className="flex min-w-0 items-center">
+              <div className="flex flex-col items-center">
+                <div className={`
+                  w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-extrabold flex-shrink-0 transition-all
+                  ${done   ? 'bg-teal-500 text-white' : ''}
+                  ${active ? 'bg-teal-400 text-white ring-4 ring-teal-400/20' : ''}
+                  ${!done && !active ? 'bg-slate-100 text-slate-400' : ''}
+                `}>
+                  {done ? <Check size={13} strokeWidth={3} /> : idx}
+                </div>
+                <span className={`text-[10px] font-semibold mt-1 whitespace-nowrap
+                  ${active ? 'text-teal-600' : done ? 'text-teal-500' : 'text-slate-400'}`}>
+                  {label}
+                </span>
               </div>
-              <span className={`text-[10px] font-semibold mt-1 whitespace-nowrap
-                ${active ? 'text-teal-600' : done ? 'text-teal-500' : 'text-slate-400'}`}>
-                {label}
-              </span>
+              {i < steps.length - 1 && (
+                <div className={`h-px w-24 sm:w-40 md:w-52 mx-3 sm:mx-5 mt-[-12px] ${done ? 'bg-teal-400' : 'bg-slate-200'}`} />
+              )}
             </div>
-            {i < steps.length - 1 && (
-              <div className={`flex-1 h-px mx-1 mt-[-12px] ${done ? 'bg-teal-400' : 'bg-slate-200'}`} />
-            )}
-          </div>
-        )
-      })}
+          )
+        })}
       </div>
     </div>
   )
@@ -133,6 +128,7 @@ export default function NovaRequisicao() {
   const [descricao, setDescricao]           = useState('')
   const [justificativa, setJustificativa]   = useState('')
   const [urgencia, setUrgencia]             = useState<Urgencia>('normal')
+  const [justificativaUrgencia, setJustificativaUrgencia] = useState('')
   const [dataNecessidade, setDataNecessidade] = useState('')
   const [compraRecorrente, setCompraRecorrente] = useState(false)
   const [valorMensal, setValorMensal] = useState('')
@@ -147,11 +143,59 @@ export default function NovaRequisicao() {
   const [aiPreview, setAiPreview]           = useState<AiParseResult | null>(null)
   const [previewItens, setPreviewItens]     = useState<RequisicaoItem[]>([])
   const [showPreview, setShowPreview]       = useState(false)
-  const [refParsing, setRefParsing]         = useState(false)
-  const [refParseMsg, setRefParseMsg]       = useState<{ type: 'success' | 'error'; text: string } | null>(null)
 
   const total  = itens.reduce((s, i) => s + i.quantidade * i.valor_unitario_estimado, 0)
-  const minCot = categoria ? minCotacoes(total, categoria.cotacoes_regras) : 1
+  const minCot = categoria ? minCotacoesPorValor(total, categoria.cotacoes_regras) : 1
+
+  // ── Prefill from SuperTEG (sessionStorage) ──────────────────────────────
+  useEffect(() => {
+    try {
+      const raw = sessionStorage.getItem('superteg-prefill-rc')
+      if (!raw) return
+      sessionStorage.removeItem('superteg-prefill-rc')
+      const pf = JSON.parse(raw)
+
+
+      // Clean item names: remove leading verbs/articles ("Fornecimento de" → keep noun)
+      const cleanName = (s: string) =>
+        s.replace(/^(fornecimento|contrata[cç][aã]o|presta[cç][aã]o|aquisi[cç][aã]o|servi[cç]os?)\s+d[eao]s?\s+/i, '')
+         .replace(/^(o|a|os|as|um|uma|uns|umas|de|do|da|dos|das)\s+/i, '')
+         .trim()
+
+      // Apply extracted items from parse-cotacao
+      const fornecedores = pf.fornecedores as Array<{ nome_fornecedor?: string; itens?: RequisicaoItem[] }> | undefined
+      if (fornecedores?.length && fornecedores[0]?.itens?.length) {
+        const rawItens = fornecedores[0].itens.map((it: any) => ({
+          descricao: cleanName(String(it.descricao ?? it.nome ?? '').trim()),
+          quantidade: parseFloat(String(it.quantidade ?? it.qtd ?? 1)) || 1,
+          unidade: String(it.unidade ?? 'un').toLowerCase(),
+          valor_unitario_estimado: parseFloat(String(it.valor_unitario ?? it.valor_unitario_estimado ?? 0)) || 0,
+        })).filter((it: RequisicaoItem) => it.descricao.length > 0)
+        if (rawItens.length > 0) setItens(rawItens)
+
+        // Build smart description from item names
+        const nomes = rawItens.map((it: RequisicaoItem) => it.descricao)
+        const desc = nomes.length <= 3
+          ? nomes.join(', ')
+          : `${nomes.slice(0, 2).join(', ')} e mais ${nomes.length - 2} item(ns)`
+        const fornNome = fornecedores[0].nome_fornecedor
+        setDescricao(fornNome ? `${desc} — ${fornNome}` : desc)
+
+        // User message goes to justificativa only if it's not just the filename
+        if (pf.mensagem_usuario && !pf.mensagem_usuario.includes(pf.cotacao_referencia_nome || '___')) {
+          setJustificativa(pf.mensagem_usuario)
+        }
+
+        // Skip to step 2 (Detalhes) since items are already filled
+        setStep(2)
+      } else {
+        // No items extracted — just fill description
+        if (pf.descricao) setDescricao(pf.descricao)
+        if (pf.mensagem_usuario) setJustificativa(pf.mensagem_usuario)
+      }
+    } catch { /* ignore parse errors */ }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const filteredCats = categorias.filter(cat =>
     !searchCat.trim() ||
@@ -312,41 +356,6 @@ export default function NovaRequisicao() {
   const updateItem = (idx: number, field: keyof RequisicaoItem, value: string | number) =>
     setItens(prev => prev.map((item, i) => i === idx ? { ...item, [field]: value } : item))
 
-  // ── Extrair dados do arquivo de referência (cotação) via IA ─────────────
-  const handleExtrairReferencia = async () => {
-    if (!referenciaFile || refParsing) return
-    setRefParsing(true)
-    setRefParseMsg(null)
-    try {
-      const fileData = await readFileForAi(referenciaFile)
-      const payload: { texto: string; solicitante_nome?: string; arquivo?: { base64: string; nome: string; mime: string } } = {
-        texto: `Extrair itens, quantidades, unidades e valores desta cotação/proposta comercial: ${referenciaFile.name}`,
-        solicitante_nome: perfil?.nome || solicitante,
-      }
-      if (fileData.arquivo) {
-        payload.arquivo = fileData.arquivo
-      } else if (fileData.texto) {
-        payload.texto += `\n\nConteúdo do arquivo:\n${fileData.texto}`
-      }
-
-      const result: AiParseResult = await aiParse.mutateAsync(payload)
-      const sanitized = sanitizeItems(result.itens)
-
-      if (sanitized.length > 0 && sanitized.some(i => i.descricao.trim())) {
-        // Mostra preview antes de aplicar
-        setAiPreview(result)
-        setPreviewItens(sanitized)
-        setShowPreview(true)
-        setRefParseMsg({ type: 'success', text: `${sanitized.length} itens extraídos do arquivo` })
-      } else {
-        setRefParseMsg({ type: 'error', text: 'Não foi possível extrair itens do arquivo. Tente usar o Assistente IA no passo anterior.' })
-      }
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Erro ao processar o arquivo. Tente novamente.'
-      setRefParseMsg({ type: 'error', text: msg })
-    }
-    setRefParsing(false)
-  }
 
   const [submitting, setSubmitting] = useState(false)
   const [savingDraft, setSavingDraft] = useState(false)
@@ -359,6 +368,7 @@ export default function NovaRequisicao() {
     descricao:        buildResumoRequisicao(itens, descricao),
     justificativa,
     urgencia,
+    justificativa_urgencia: urgencia !== 'normal' ? justificativaUrgencia : undefined,
     categoria:        categoria?.codigo,
     itens,
     data_necessidade: dataNecessidade || undefined,
@@ -367,13 +377,17 @@ export default function NovaRequisicao() {
     ai_confianca:     confianca,
     arquivo_referencia: referenciaFile || undefined,
     compra_recorrente: compraRecorrente,
-    valor_mensal: compraRecorrente ? (parseFloat(valorMensal) || 0) : undefined,
+    valor_mensal: undefined, // preenchido na etapa de cotação
     rascunho,
   })
 
   const submit = async () => {
     if (!justificativa.trim()) {
       setSubmitError('Preencha a Descrição da compra antes de enviar.')
+      return
+    }
+    if (urgencia !== 'normal' && !justificativaUrgencia.trim()) {
+      setSubmitError('Preencha a justificativa de urgência antes de enviar.')
       return
     }
     setSubmitError(null)
@@ -586,7 +600,6 @@ export default function NovaRequisicao() {
                   onClick={(event) => {
                     event.stopPropagation()
                     setReferenciaFile(null)
-                    setRefParseMsg(null)
                     if (referenciaInputRef.current) referenciaInputRef.current.value = ''
                   }}
                   className="rounded-full bg-white p-2 text-slate-400 transition hover:text-red-500"
@@ -594,25 +607,25 @@ export default function NovaRequisicao() {
                   <X size={14} />
                 </button>
               </div>
-              {/* BotÃ£o para extrair dados com IA */}
-              <button
-                type="button"
-                disabled={refParsing}
-                onClick={(e) => { e.stopPropagation(); handleExtrairReferencia() }}
-                className="w-full flex items-center justify-center gap-2 py-2 px-3 rounded-xl text-xs font-bold transition-all bg-gradient-to-r from-violet-500 to-purple-600 text-white hover:from-violet-600 hover:to-purple-700 shadow-sm disabled:opacity-60"
-              >
-                {refParsing ? (
-                  <><Loader2 size={14} className="animate-spin" /> Extraindo dados...</>
-                ) : (
-                  <><Sparkles size={14} /> Extrair itens e valores com IA</>
-                )}
-              </button>
-              {refParseMsg && (
-                <p className={`text-[11px] font-medium flex items-center gap-1 ${refParseMsg.type === 'success' ? 'text-emerald-600' : 'text-red-500'}`}>
-                  {refParseMsg.type === 'success' ? <Check size={12} /> : <AlertCircle size={12} />}
-                  {refParseMsg.text}
-                </p>
-              )}
+              <div className="flex gap-2">
+                <a
+                  href={URL.createObjectURL(referenciaFile)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={e => e.stopPropagation()}
+                  className="flex-1 flex items-center justify-center gap-1.5 py-1.5 px-3 rounded-xl text-xs font-semibold border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 transition-colors"
+                >
+                  <ExternalLink size={12} /> Visualizar
+                </a>
+                <a
+                  href={URL.createObjectURL(referenciaFile)}
+                  download={referenciaFile.name}
+                  onClick={e => e.stopPropagation()}
+                  className="flex-1 flex items-center justify-center gap-1.5 py-1.5 px-3 rounded-xl text-xs font-semibold border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 transition-colors"
+                >
+                  <Download size={12} /> Download
+                </a>
+              </div>
             </div>
           ) : (
             <div className="flex items-center gap-3">
@@ -638,6 +651,13 @@ export default function NovaRequisicao() {
             <option value="">Selecione a obra</option>
             {obras.map(o => <option key={o.id} value={o.id}>{o.codigo ? `${o.codigo} - ` : ''}{o.nome}</option>)}
           </select>
+          {(() => { const o = obras.find(x => x.id === obraId); return o?.centro_custo_id ? (
+            <p className="mt-1.5 flex items-center gap-1.5 text-[11px] text-teal-700 bg-teal-50 border border-teal-100 rounded-lg px-2.5 py-1.5">
+              <span className="font-bold">CC preenchido automaticamente:</span>
+              <span className="font-mono font-semibold">{o.centro_custo_codigo}</span>
+              {o.centro_custo_descricao && <span className="text-teal-500">— {o.centro_custo_descricao}</span>}
+            </p>
+          ) : null })()}
         </div>
 
         <div>
@@ -677,13 +697,13 @@ export default function NovaRequisicao() {
         </div>
 
         <div className={`rounded-2xl border px-4 py-3 space-y-3 ${
-        compraRecorrente ? 'border-indigo-200 bg-indigo-50/60' : 'border-slate-200 bg-white'
+        compraRecorrente ? 'border-indigo-200 bg-indigo-50/60' : 'border-red-300 bg-red-100'
       }`}>
         <div className="flex items-start justify-between gap-3">
           <div>
-            <label className="text-xs font-semibold text-slate-500 block">Compra recorrente</label>
+            <label className="text-xs font-semibold text-slate-500 block">Compra/Serviço Recorrente</label>
             <p className="text-xs text-slate-500 mt-1">
-              Esta solicitacao segue para Contratos e volta para Pedidos depois da formalizacao contratual.
+              Esta solicitação passará pela área de Contratos para formalização
             </p>
           </div>
           <div className="inline-flex rounded-xl border border-slate-200 bg-slate-50 p-1">
@@ -710,31 +730,33 @@ export default function NovaRequisicao() {
           </div>
         </div>
 
-        {compraRecorrente && (
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div>
-              <label className="text-xs font-semibold text-slate-500 mb-1 block">Valor mensal *</label>
-              <input
-                type="number"
-                min="0"
-                step="0.01"
-                className={`w-full border rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-indigo-300 outline-none ${
-                  stepErrors.some(e => e.includes('valor mensal')) ? 'border-red-300 bg-red-50/30' : 'border-slate-200'
-                }`}
-                placeholder="0,00"
-                value={valorMensal}
-                onChange={e => setValorMensal(e.target.value)}
-              />
-            </div>
-            <div className="rounded-xl border border-indigo-100 bg-white px-3 py-2.5">
-              <span className="text-[11px] font-semibold uppercase tracking-wide text-indigo-500">Fluxo</span>
-              <p className="mt-1 text-sm font-bold text-slate-800">Contratos &gt; Elaboracao</p>
-              <p className="mt-1 text-[11px] text-slate-500">Os itens desta RC serao levados como escopo da solicitacao contratual.</p>
-            </div>
-          </div>
-        )}
         </div>
       </div>
+
+      {/* Justificativa de urgência (linha separada abaixo do grid) */}
+      {urgencia !== 'normal' && (
+        <div className={`rounded-2xl border px-4 py-3 ${
+          urgencia === 'critica' ? 'border-red-200 bg-red-50/40' : 'border-amber-200 bg-amber-50/40'
+        }`}>
+          <label className={`text-xs font-semibold block mb-1.5 ${
+            urgencia === 'critica' ? 'text-red-600' : 'text-amber-600'
+          }`}>
+            Justificativa de urgência *
+          </label>
+          <textarea
+            rows={2}
+            required
+            className={`w-full border rounded-xl px-3 py-2 text-sm outline-none transition-all ${
+              urgencia === 'critica'
+                ? 'border-red-300 bg-white focus:ring-2 focus:ring-red-300 placeholder:text-red-300'
+                : 'border-amber-300 bg-white focus:ring-2 focus:ring-amber-300 placeholder:text-amber-300'
+            }`}
+            placeholder="Explique o motivo da urgência desta requisição..."
+            value={justificativaUrgencia}
+            onChange={e => setJustificativaUrgencia(e.target.value)}
+          />
+        </div>
+      )}
 
       <div>
         <div className="flex justify-between items-center mb-2">
@@ -779,9 +801,9 @@ export default function NovaRequisicao() {
             <div className="grid grid-cols-3 gap-2">
               <div>
                 <label className="text-[10px] text-slate-400">Qtd</label>
-                <input required type="number" min="0.01" step="0.01"
+                <NumericInput required min={0.01} step={0.01}
                   className="w-full border border-slate-200 rounded-xl px-2 py-1.5 text-sm focus:ring-2 focus:ring-teal-300 outline-none"
-                  value={item.quantidade || ''} onChange={e => updateItem(idx, 'quantidade', parseFloat(e.target.value) || 0)} />
+                  value={item.quantidade} onChange={v => updateItem(idx, 'quantidade', v)} />
               </div>
               <div>
                 <label className="text-[10px] text-slate-400">Unidade</label>
@@ -792,92 +814,13 @@ export default function NovaRequisicao() {
               </div>
               <div>
                 <label className="text-[10px] text-slate-400">Vlr. Unit.</label>
-                <input type="number" min="0" step="0.01"
+                <NumericInput min={0} step={0.01}
                   className="w-full border border-slate-200 rounded-xl px-2 py-1.5 text-sm focus:ring-2 focus:ring-teal-300 outline-none"
-                  value={item.valor_unitario_estimado || ''} onChange={e => updateItem(idx, 'valor_unitario_estimado', parseFloat(e.target.value) || 0)} />
+                  value={item.valor_unitario_estimado} onChange={v => updateItem(idx, 'valor_unitario_estimado', v)} />
               </div>
             </div>
           </div>
         ))}
-      </div>
-
-      <div className="hidden">
-        <label className="text-xs font-semibold text-slate-500 mb-1.5 block">Referência de cotação</label>
-        <div
-          className={`rounded-2xl border-2 border-dashed p-4 transition-all cursor-pointer ${
-            referenciaFile
-              ? 'border-teal-300 bg-teal-50/40'
-              : 'border-slate-200 bg-slate-50/60 hover:border-teal-300 hover:bg-teal-50/20'
-          }`}
-          onClick={() => referenciaInputRef.current?.click()}
-        >
-          <input
-            ref={referenciaInputRef}
-            type="file"
-            className="hidden"
-            accept=".pdf,.xlsx,.xls,.csv,.doc,.docx,.jpg,.jpeg,.png,.webp"
-            onChange={(event) => {
-              if (event.target.files?.[0]) setReferenciaFile(event.target.files[0])
-            }}
-          />
-
-          {referenciaFile ? (
-            <div className="space-y-2">
-              <div className="flex items-center justify-between gap-3">
-                <div className="flex items-center gap-3 min-w-0">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white text-teal-600 shadow-sm">
-                    <FileUp size={18} />
-                  </div>
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-semibold text-slate-700">{referenciaFile.name}</p>
-                    <p className="text-[11px] text-slate-400">{(referenciaFile.size / 1024).toFixed(1)} KB</p>
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  onClick={(event) => {
-                    event.stopPropagation()
-                    setReferenciaFile(null)
-                    setRefParseMsg(null)
-                    if (referenciaInputRef.current) referenciaInputRef.current.value = ''
-                  }}
-                  className="rounded-full bg-white p-2 text-slate-400 transition hover:text-red-500"
-                >
-                  <X size={14} />
-                </button>
-              </div>
-              {/* Botão para extrair dados com IA */}
-              <button
-                type="button"
-                disabled={refParsing}
-                onClick={(e) => { e.stopPropagation(); handleExtrairReferencia() }}
-                className="w-full flex items-center justify-center gap-2 py-2 px-3 rounded-xl text-xs font-bold transition-all bg-gradient-to-r from-violet-500 to-purple-600 text-white hover:from-violet-600 hover:to-purple-700 shadow-sm disabled:opacity-60"
-              >
-                {refParsing ? (
-                  <><Loader2 size={14} className="animate-spin" /> Extraindo dados...</>
-                ) : (
-                  <><Sparkles size={14} /> Extrair itens e valores com IA</>
-                )}
-              </button>
-              {refParseMsg && (
-                <p className={`text-[11px] font-medium flex items-center gap-1 ${refParseMsg.type === 'success' ? 'text-emerald-600' : 'text-red-500'}`}>
-                  {refParseMsg.type === 'success' ? <Check size={12} /> : <AlertCircle size={12} />}
-                  {refParseMsg.text}
-                </p>
-              )}
-            </div>
-          ) : (
-            <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white text-slate-400 shadow-sm">
-                <Upload size={18} />
-              </div>
-              <div>
-                <p className="text-sm font-semibold text-slate-700">Anexar referência de cotação</p>
-                <p className="text-[11px] text-slate-400">PDF, planilha, imagem ou documento de apoio.</p>
-              </div>
-            </div>
-          )}
-        </div>
       </div>
 
       <div>
@@ -897,7 +840,7 @@ export default function NovaRequisicao() {
           <div className="text-right">
             <span className="text-xs text-teal-500">Cotações mínimas</span>
             <p className="text-2xl font-black text-teal-600">
-              {compraRecorrente ? fmt(parseFloat(valorMensal) || 0) : minCot}
+              {minCot}
             </p>
           </div>
         </div>
@@ -930,7 +873,7 @@ export default function NovaRequisicao() {
               if (!solicitante.trim()) errs.push('Informe o nome do solicitante')
               if (!obraNome) errs.push('Selecione a obra')
               if (itens.every(i => !i.descricao.trim())) errs.push('Adicione ao menos um item com descricao')
-              if (compraRecorrente && (parseFloat(valorMensal) || 0) <= 0) errs.push('Informe o valor mensal da compra recorrente')
+              // valor mensal agora é preenchido na etapa de cotação, não na requisição
               if (dataNecessidade) {
                 const today = new Date().toISOString().split('T')[0]
                 if (dataNecessidade < today) errs.push('Data de necessidade nao pode ser no passado')
@@ -988,6 +931,13 @@ export default function NovaRequisicao() {
           <option value="">Selecione a obra</option>
           {obras.map(o => <option key={o.id} value={o.id}>{o.codigo ? `${o.codigo} - ` : ''}{o.nome}</option>)}
         </select>
+        {(() => { const o = obras.find(x => x.id === obraId); return o?.centro_custo_id ? (
+          <p className="mt-1.5 flex items-center gap-1.5 text-[11px] text-teal-700 bg-teal-50 border border-teal-100 rounded-lg px-2.5 py-1.5">
+            <span className="font-bold">CC preenchido automaticamente:</span>
+            <span className="font-mono font-semibold">{o.centro_custo_codigo}</span>
+            {o.centro_custo_descricao && <span className="text-teal-500">— {o.centro_custo_descricao}</span>}
+          </p>
+        ) : null })()}
       </div>
 
       <div>
@@ -1024,6 +974,27 @@ export default function NovaRequisicao() {
             </button>
           ))}
         </div>
+
+        {/* Justificativa de urgência (aparece quando urgência != normal) */}
+        {urgencia !== 'normal' && (
+          <div className="mt-3">
+            <label className={`text-xs font-semibold mb-1 block ${urgencia === 'critica' ? 'text-red-600' : 'text-amber-600'}`}>
+              Justificativa de urgência <span className="text-red-400">*</span>
+            </label>
+            <textarea
+              rows={2}
+              required
+              className={`w-full border rounded-xl px-3 py-2.5 text-sm outline-none transition-all ${
+                urgencia === 'critica'
+                  ? 'border-red-300 bg-red-50/50 focus:ring-2 focus:ring-red-300 placeholder:text-red-300'
+                  : 'border-amber-300 bg-amber-50/50 focus:ring-2 focus:ring-amber-300 placeholder:text-amber-300'
+              }`}
+              placeholder="Explique o motivo da urgência desta requisição..."
+              value={justificativaUrgencia}
+              onChange={e => setJustificativaUrgencia(e.target.value)}
+            />
+          </div>
+        )}
       </div>
 
       <div>
@@ -1078,9 +1049,9 @@ export default function NovaRequisicao() {
             <div className="grid grid-cols-3 gap-2">
               <div>
                 <label className="text-[10px] text-slate-400">Qtd</label>
-                <input required type="number" min="0.01" step="0.01"
+                <NumericInput required min={0.01} step={0.01}
                   className="w-full border border-slate-200 rounded-xl px-2 py-1.5 text-sm focus:ring-2 focus:ring-teal-300 outline-none"
-                  value={item.quantidade || ''} onChange={e => updateItem(idx, 'quantidade', parseFloat(e.target.value) || 0)} />
+                  value={item.quantidade} onChange={v => updateItem(idx, 'quantidade', v)} />
               </div>
               <div>
                 <label className="text-[10px] text-slate-400">Unidade</label>
@@ -1091,9 +1062,9 @@ export default function NovaRequisicao() {
               </div>
               <div>
                 <label className="text-[10px] text-slate-400">Vlr. Unit.</label>
-                <input type="number" min="0" step="0.01"
+                <NumericInput min={0} step={0.01}
                   className="w-full border border-slate-200 rounded-xl px-2 py-1.5 text-sm focus:ring-2 focus:ring-teal-300 outline-none"
-                  value={item.valor_unitario_estimado || ''} onChange={e => updateItem(idx, 'valor_unitario_estimado', parseFloat(e.target.value) || 0)} />
+                  value={item.valor_unitario_estimado} onChange={v => updateItem(idx, 'valor_unitario_estimado', v)} />
               </div>
             </div>
           </div>
@@ -1194,6 +1165,11 @@ export default function NovaRequisicao() {
               <p className={`font-bold ${urgencia === 'critica' ? 'text-red-600' : urgencia === 'urgente' ? 'text-amber-600' : 'text-emerald-600'}`}>
                 {urgencia.charAt(0).toUpperCase() + urgencia.slice(1)}
               </p>
+              {urgencia !== 'normal' && justificativaUrgencia && (
+                <p className={`text-xs mt-0.5 italic ${urgencia === 'critica' ? 'text-red-500' : 'text-amber-500'}`}>
+                  {justificativaUrgencia}
+                </p>
+              )}
             </div>
             <div>
               <span className="text-[11px] text-slate-400">Valor estimado</span>
@@ -1201,8 +1177,8 @@ export default function NovaRequisicao() {
             </div>
             {compraRecorrente && (
               <div>
-                <span className="text-[11px] text-slate-400">Valor mensal</span>
-                <p className="font-extrabold text-indigo-700 text-base">{fmt(parseFloat(valorMensal) || 0)}</p>
+                <span className="text-[11px] text-slate-400">Tipo</span>
+                <p className="font-extrabold text-indigo-700 text-base">Recorrente</p>
               </div>
             )}
           </div>

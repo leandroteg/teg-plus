@@ -5,33 +5,118 @@ import {
 import { User, Session } from '@supabase/supabase-js'
 import { supabase } from '../services/supabase'
 
-// ── Tipos ──────────────────────────────────────────────────────────────────────
+export type PapelGlobal =
+  | 'requisitante'
+  | 'equipe'
+  | 'supervisor'
+  | 'diretor'
+  | 'ceo'
 
 export type Role =
-  | 'administrador' | 'diretor' | 'gestor'
-  | 'requisitante' | 'visitante'
+  | 'administrador'
+  | 'diretor'
+  | 'gestor'
+  | 'requisitante'
+  | 'visitante'
+  | 'equipe'
+  | 'supervisor'
+  | 'ceo'
+  | 'admin'
+  | 'gerente'
+  | 'aprovador'
+  | 'comprador'
+
+export interface PerfilSetor {
+  id: string
+  setor_id: string
+  setor_codigo: string
+  setor_nome: string
+  modulo_key: string
+  papel: PapelGlobal
+  aprovador_tecnico: boolean
+  ativo: boolean
+}
+
+const PAPEL_LABEL: Record<PapelGlobal, string> = {
+  requisitante: 'Requisitante',
+  equipe: 'Equipe',
+  supervisor: 'Supervisor',
+  diretor: 'Diretor',
+  ceo: 'CEO',
+}
 
 export const ROLE_LABEL: Record<Role, string> = {
   administrador: 'Administrador',
-  diretor:       'Diretor',
-  gestor:        'Gestor',
-  requisitante:  'Requisitante',
-  visitante:     'Visitante',
+  diretor: 'Diretor',
+  gestor: 'Gestor',
+  requisitante: 'Requisitante',
+  visitante: 'Visitante',
+  equipe: 'Equipe',
+  supervisor: 'Supervisor',
+  ceo: 'CEO',
+  admin: 'Administrador',
+  gerente: 'Diretor',
+  aprovador: 'Supervisor',
+  comprador: 'Equipe',
 }
 
 export const ROLE_COLOR: Record<Role, { bg: string; text: string; dot: string }> = {
   administrador: { bg: 'bg-violet-100', text: 'text-violet-700', dot: 'bg-violet-500' },
-  diretor:       { bg: 'bg-indigo-100', text: 'text-indigo-700', dot: 'bg-indigo-500' },
-  gestor:        { bg: 'bg-amber-100',  text: 'text-amber-700',  dot: 'bg-amber-500'  },
-  requisitante:  { bg: 'bg-sky-100',    text: 'text-sky-700',    dot: 'bg-sky-500'    },
-  visitante:     { bg: 'bg-slate-100',  text: 'text-slate-600',  dot: 'bg-slate-400'  },
+  diretor: { bg: 'bg-indigo-100', text: 'text-indigo-700', dot: 'bg-indigo-500' },
+  gestor: { bg: 'bg-amber-100', text: 'text-amber-700', dot: 'bg-amber-500' },
+  requisitante: { bg: 'bg-sky-100', text: 'text-sky-700', dot: 'bg-sky-500' },
+  visitante: { bg: 'bg-slate-100', text: 'text-slate-600', dot: 'bg-slate-400' },
+  equipe: { bg: 'bg-cyan-100', text: 'text-cyan-700', dot: 'bg-cyan-500' },
+  supervisor: { bg: 'bg-orange-100', text: 'text-orange-700', dot: 'bg-orange-500' },
+  ceo: { bg: 'bg-fuchsia-100', text: 'text-fuchsia-700', dot: 'bg-fuchsia-500' },
+  admin: { bg: 'bg-violet-100', text: 'text-violet-700', dot: 'bg-violet-500' },
+  gerente: { bg: 'bg-indigo-100', text: 'text-indigo-700', dot: 'bg-indigo-500' },
+  aprovador: { bg: 'bg-orange-100', text: 'text-orange-700', dot: 'bg-orange-500' },
+  comprador: { bg: 'bg-cyan-100', text: 'text-cyan-700', dot: 'bg-cyan-500' },
 }
 
 export const ROLE_NIVEL: Record<string, number> = {
-  administrador: 5, diretor: 4, gestor: 3,
-  requisitante: 2, visitante: 1,
-  // backward compat — RLS e código legado usam nomes antigos
-  admin: 5, gerente: 4, aprovador: 3, comprador: 3,
+  ceo: 7,
+  administrador: 6, admin: 6,
+  diretor: 5, gerente: 5,
+  supervisor: 4, aprovador: 4,
+  gestor: 3, equipe: 3, comprador: 3,
+  requisitante: 2,
+  visitante: 1,
+}
+
+const PAPEL_TO_LEGACY_ROLE: Record<PapelGlobal, Role> = {
+  requisitante: 'requisitante',
+  equipe: 'gestor',
+  supervisor: 'supervisor',
+  diretor: 'diretor',
+  ceo: 'administrador',
+}
+
+function mapLegacyRoleToPapel(role?: string | null): PapelGlobal {
+  switch ((role ?? '').toLowerCase()) {
+    case 'ceo':
+      return 'ceo'
+    case 'diretor':
+    case 'gerente':
+      return 'diretor'
+    case 'supervisor':
+    case 'aprovador':
+      return 'supervisor'
+    case 'equipe':
+    case 'comprador':
+    case 'gestor':
+      return 'equipe'
+    default:
+      return 'requisitante'
+  }
+}
+
+function normalizeModuleKey(mod: string): string {
+  if (mod === 'patrimonial') return 'patrimonio'
+  if (mod === 'patrimonio') return 'patrimonio'
+  if (mod === 'apontamentos') return 'financeiro'
+  return mod
 }
 
 export const ALCADA_LABEL: Record<number, string> = {
@@ -42,6 +127,12 @@ export const ALCADA_LABEL: Record<number, string> = {
   4: 'CEO (sem limite)',
 }
 
+// Hotfix de acentuação consistente (evita variação de encoding por ambiente)
+ALCADA_LABEL[0] = 'Sem alçada'
+ALCADA_LABEL[1] = 'Coordenador (até R$ 5.000)'
+ALCADA_LABEL[2] = 'Gerente (até R$ 25.000)'
+ALCADA_LABEL[3] = 'Diretor (até R$ 100.000)'
+
 export interface Perfil {
   id: string
   auth_id: string
@@ -51,12 +142,16 @@ export interface Perfil {
   departamento: string | null
   avatar_url: string | null
   role: Role
+  papel_global?: PapelGlobal | null
   alcada_nivel: number
   modulos: Record<string, boolean>
   permissoes_especiais: Record<string, Record<string, unknown>>
   preferencias: Record<string, unknown>
   ativo: boolean
   senha_definida: boolean
+  alterar_senha_proximo_login: boolean
+  role_id: string | null
+  colaborador_id: string | null
   ultimo_acesso: string | null
   created_at: string
   updated_at: string
@@ -77,29 +172,30 @@ export const MODULOS_ERP_GROUPED: GrupoModulos[] = [
   {
     label: 'Projetos',
     modulos: [
-      { key: 'egp',    label: 'EGP',    icon: '📊' },
-      { key: 'obras',  label: 'Obras',  icon: '🏗️' },
-      { key: 'ssma',   label: 'SSMA',   icon: '⛑️' },
+      { key: 'egp', label: 'EGP', icon: '📊' },
+      { key: 'obras', label: 'Obras', icon: '🏗️' },
+      { key: 'ssma', label: 'SSMA', icon: '⛑️' },
     ],
   },
   {
     label: 'Suprimentos',
     modulos: [
-      { key: 'compras',    label: 'Compras',    icon: '🛒' },
-      { key: 'logistica',  label: 'Logística',  icon: '🚚' },
-      { key: 'estoque',    label: 'Estoque',    icon: '📦' },
-      { key: 'patrimonial',label: 'Patrimonial',icon: '🏛️' },
-      { key: 'frotas',     label: 'Frotas',     icon: '🚛' },
+      { key: 'compras', label: 'Compras', icon: '🛒' },
+      { key: 'logistica', label: 'Logística', icon: '🚚' },
+      { key: 'estoque', label: 'Estoque', icon: '📦' },
+      { key: 'patrimonial', label: 'Patrimonial', icon: '🏛️' },
+      { key: 'frotas', label: 'Frotas', icon: '🚛' },
+      { key: 'locacoes', label: 'Locação Imóveis', icon: '🏘️' },
     ],
   },
   {
     label: 'Backoffice',
     modulos: [
-      { key: 'financeiro',    label: 'Financeiro',    icon: '💰' },
-      { key: 'fiscal',        label: 'Fiscal',        icon: '🧾' },
+      { key: 'financeiro', label: 'Financeiro', icon: '💰' },
+      { key: 'fiscal', label: 'Fiscal', icon: '🧾' },
       { key: 'controladoria', label: 'Controladoria', icon: '📈' },
-      { key: 'contratos',     label: 'Contratos',     icon: '📋' },
-      { key: 'cadastros',     label: 'Cadastros',     icon: '⚙️' },
+      { key: 'contratos', label: 'Contratos', icon: '📋' },
+      { key: 'cadastros', label: 'Cadastros', icon: '⚙️' },
     ],
   },
   {
@@ -110,10 +206,7 @@ export const MODULOS_ERP_GROUPED: GrupoModulos[] = [
   },
 ]
 
-// Flat array derivado (backward compat)
 export const MODULOS_ERP: ModuloERP[] = MODULOS_ERP_GROUPED.flatMap(g => g.modulos)
-
-// ── Context ────────────────────────────────────────────────────────────────────
 
 interface AuthContextType {
   user: User | null
@@ -121,11 +214,14 @@ interface AuthContextType {
   session: Session | null
   loading: boolean
   perfilReady: boolean
+  rbacV2Enabled: boolean
+  papelGlobal: PapelGlobal
+  perfilSetores: PerfilSetor[]
 
-  signIn: (email: string, password: string) => Promise<{ error: string | null }>
-  signInMagicLink: (email: string) => Promise<{ error: string | null }>
+  signIn: (identifier: string, password: string) => Promise<{ error: string | null }>
+  signInMagicLink: (identifier: string) => Promise<{ error: string | null }>
   signOut: () => Promise<void>
-  resetPassword: (email: string) => Promise<{ error: string | null }>
+  resetPassword: (identifier: string) => Promise<{ error: string | null }>
   updatePassword: (newPassword: string) => Promise<{ error: string | null }>
 
   updatePerfil: (data: Partial<Pick<Perfil, 'nome' | 'cargo' | 'departamento'>>) => Promise<{ error: string | null }>
@@ -141,33 +237,111 @@ interface AuthContextType {
   isGerente: boolean
   canManage: boolean
   hasModule: (mod: string) => boolean
+  hasSetorPapel: (mod: string, papeis?: PapelGlobal[]) => boolean
   canApprove: (nivel: number) => boolean
+  canTechnicalApprove: (mod: string) => boolean
   atLeast: (role: Role | string) => boolean
   permissoesEspeciais: (modulo: string) => Record<string, unknown>
+  /** Retorna o papel efetivo do usuário para um módulo específico,
+   *  lendo de permissoes_especiais.modulo_papeis antes do papel global */
+  getPapelForModule: (moduleKey: string) => PapelGlobal
 }
 
 const AuthContext = createContext<AuthContextType | null>(null)
 
-// ── Provider ───────────────────────────────────────────────────────────────────
-
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user,        setUser]        = useState<User | null>(null)
-  const [session,     setSession]     = useState<Session | null>(null)
-  const [perfil,      setPerfil]      = useState<Perfil | null>(null)
-  const [loading,     setLoading]     = useState(true)
+  const [user, setUser] = useState<User | null>(null)
+  const [session, setSession] = useState<Session | null>(null)
+  const [perfil, setPerfil] = useState<Perfil | null>(null)
+  const [loading, setLoading] = useState(true)
   const [perfilReady, setPerfilReady] = useState(false)
   const [pendingPasswordReset, setPendingPasswordReset] = useState(false)
+  const [rbacV2Enabled, setRbacV2Enabled] = useState(false)
+  const [perfilSetores, setPerfilSetores] = useState<PerfilSetor[]>([])
 
-  // Guard: evita chamadas concorrentes a loadPerfil
-  const loadingRef    = useRef(false)
-  // Rastreia se o usuário foi autenticado e se o perfil carregou com sucesso
-  // (usados no safety net para detectar lock travado do Supabase)
-  const userRef        = useRef<User | null>(null)
+  const loadingRef = useRef(false)
+  const userRef = useRef<User | null>(null)
   const perfilLoadedRef = useRef(false)
+  const LOGIN_DOMAIN = 'login.teg.local'
+  const LOGIN_FALLBACK_DOMAIN = 'login.teg.local.com'
 
-  // ── loadPerfil ───────────────────────────────────────────────────
-  // Busca perfil do DB. Se não existir, tenta criar (auto-provisionamento).
-  // Se sessão inválida (user deletado), força logout.
+  const resolveIdentifierCandidates = useCallback((identifier: string): string[] => {
+    const input = identifier.trim().toLowerCase()
+    if (!input) return []
+    if (!input.includes('@')) {
+      return [`${input}@${LOGIN_DOMAIN}`, `${input}@${LOGIN_FALLBACK_DOMAIN}`]
+    }
+    const [local, domain] = input.split('@')
+    if (!local || !domain) return [input]
+    if (domain === LOGIN_DOMAIN || domain === LOGIN_FALLBACK_DOMAIN) return [input]
+    if (domain === 'teguniao.com.br') {
+      return [`${local}@${LOGIN_DOMAIN}`, `${local}@${LOGIN_FALLBACK_DOMAIN}`]
+    }
+    return [input]
+  }, [])
+
+  const loadRbacContext = useCallback(async (perfilData: Perfil | null) => {
+    if (!perfilData?.id) {
+      setRbacV2Enabled(false)
+      setPerfilSetores([])
+      return
+    }
+
+    try {
+      const { data: flagData, error: flagError } = await supabase.rpc('get_feature_flag', {
+        p_chave: 'rbac_v2_enabled',
+        p_default: false,
+      })
+
+      if (flagError) {
+        setRbacV2Enabled(false)
+        setPerfilSetores([])
+        return
+      }
+
+      const enabled = Boolean(flagData)
+      setRbacV2Enabled(enabled)
+
+      if (!enabled) {
+        setPerfilSetores([])
+        return
+      }
+
+      const { data, error } = await supabase
+        .from('sys_perfil_setores')
+        .select('id, papel, aprovador_tecnico, ativo, setor:sys_setores(id, codigo, nome, modulo_key, ativo)')
+        .eq('perfil_id', perfilData.id)
+        .eq('ativo', true)
+
+      if (error || !data) {
+        setPerfilSetores([])
+        return
+      }
+
+      const rows: PerfilSetor[] = (data as Array<Record<string, unknown>>)
+        .map(row => {
+          const setor = row.setor as Record<string, unknown> | null
+          if (!setor) return null
+          return {
+            id: String(row.id),
+            setor_id: String(setor.id),
+            setor_codigo: String(setor.codigo),
+            setor_nome: String(setor.nome),
+            modulo_key: String(setor.modulo_key),
+            papel: String(row.papel ?? 'equipe') as PapelGlobal,
+            aprovador_tecnico: Boolean(row.aprovador_tecnico),
+            ativo: Boolean(row.ativo),
+          } satisfies PerfilSetor
+        })
+        .filter((v): v is PerfilSetor => Boolean(v))
+
+      setPerfilSetores(rows)
+    } catch {
+      setRbacV2Enabled(false)
+      setPerfilSetores([])
+    }
+  }, [])
+
   const loadPerfil = useCallback(async (authId: string) => {
     if (loadingRef.current) return
     loadingRef.current = true
@@ -180,25 +354,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         .single()
 
       if (data) {
-        setPerfil(data as Perfil)
+        const loaded = data as Perfil
+        setPerfil(loaded)
         perfilLoadedRef.current = true
+        loadRbacContext(loaded)
         supabase.rpc('registrar_acesso', { p_auth_id: authId })
         return
       }
 
-      // PGRST116 = nenhuma linha encontrada → tenta criar perfil
       if (error?.code === 'PGRST116') {
-        // Verifica se a sessão ainda é válida (servidor)
         const { data: { user: authUser }, error: sessErr } = await supabase.auth.getUser()
-
         if (sessErr || !authUser) {
-          // Sessão inválida (user foi deletado) → limpa localmente e redireciona
           await supabase.auth.signOut()
           return
         }
 
         const email = authUser.email ?? ''
-        const nome  = (authUser.user_metadata?.full_name as string)
+        const nome = (authUser.user_metadata?.full_name as string)
           || (authUser.user_metadata?.nome as string)
           || email.split('@')[0]
 
@@ -209,69 +381,60 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           .single()
 
         if (criado) {
-          setPerfil(criado as Perfil)
+          const loaded = criado as Perfil
+          setPerfil(loaded)
           perfilLoadedRef.current = true
+          loadRbacContext(loaded)
         }
       }
-      // Outros erros (tabela não criada etc.) → perfil null, sem crash
     } catch {
-      // Silencioso
+      setRbacV2Enabled(false)
+      setPerfilSetores([])
     } finally {
       loadingRef.current = false
       setPerfilReady(true)
     }
-  }, [])
+  }, [loadRbacContext])
 
   const reloadPerfil = useCallback(async () => {
     setPerfilReady(false)
     if (user?.id) await loadPerfil(user.id)
   }, [user, loadPerfil])
 
-  // ── Inicialização: ÚNICO source of truth = onAuthStateChange ────
-  //
-  // REGRA CRÍTICA: o callback NÃO pode ser async!
-  // O GoTrueClient do Supabase usa um lock interno para serializar eventos.
-  // Se o callback for async e fizer await (ex: await loadPerfil), o lock
-  // fica preso até o await resolver — impedindo qualquer novo evento
-  // (SIGNED_IN, SIGNED_OUT, TOKEN_REFRESHED) de ser processado.
-  // Isso causa deadlock quando: token expira → refresh trava → signOut trava.
-  //
-  // Solução: callback síncrono + loadPerfil fire-and-forget com .finally().
   useEffect(() => {
     perfilLoadedRef.current = false
     userRef.current = null
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (_event, session) => {
-        setSession(session)
-        setUser(session?.user ?? null)
-        userRef.current = session?.user ?? null
+      (event, currentSession) => {
+        setSession(currentSession)
+        setUser(currentSession?.user ?? null)
+        userRef.current = currentSession?.user ?? null
 
-        // Detecta redirecionamento de recovery link
-        if (_event === 'PASSWORD_RECOVERY') {
+        if (event === 'PASSWORD_RECOVERY') {
           setPendingPasswordReset(true)
         }
 
-        if (session?.user) {
-          // Reset mutex — chamada anterior pode ter travado sem resetar
+        if (currentSession?.user) {
           loadingRef.current = false
-          loadPerfil(session.user.id).finally(() => setLoading(false))
+          loadPerfil(currentSession.user.id).finally(() => setLoading(false))
         } else {
           setPerfil(null)
+          setPerfilSetores([])
+          setRbacV2Enabled(false)
           setPerfilReady(true)
           setLoading(false)
         }
       }
     )
 
-    // Safety net: se após 4s o perfil não carregou, força estado limpo.
-    // Cenários: rede lenta, Supabase fora, token refresh loop.
     const safety = setTimeout(() => {
       if (userRef.current && !perfilLoadedRef.current) {
         supabase.auth.signOut({ scope: 'local' }).catch(() => {})
         setUser(null)
         setSession(null)
         setPerfil(null)
+        setPerfilSetores([])
       }
       loadingRef.current = false
       setLoading(false)
@@ -284,14 +447,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [loadPerfil])
 
-  // ── Auth actions ─────────────────────────────────────────────────
+  const signIn = async (identifier: string, password: string) => {
+    const candidates = resolveIdentifierCandidates(identifier)
+    let lastError: string | null = null
 
-  const signIn = async (email: string, password: string) => {
-    const { error } = await supabase.auth.signInWithPassword({ email, password })
-    return { error: error ? translateError(error.message) : null }
+    for (const email of candidates) {
+      const { error } = await supabase.auth.signInWithPassword({ email, password })
+      if (!error) return { error: null }
+      lastError = error.message
+    }
+
+    return { error: translateError(lastError ?? 'Falha ao autenticar') }
   }
 
-  const signInMagicLink = async (email: string) => {
+  const signInMagicLink = async (identifier: string) => {
+    const email = resolveIdentifierCandidates(identifier)[0] ?? identifier.trim().toLowerCase()
     const { error } = await supabase.auth.signInWithOtp({
       email,
       options: { emailRedirectTo: window.location.origin },
@@ -301,10 +471,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signOut = async () => {
     await supabase.auth.signOut()
-    // onAuthStateChange(SIGNED_OUT) vai limpar o resto
   }
 
-  const resetPassword = async (email: string) => {
+  const resetPassword = async (identifier: string) => {
+    const candidates = resolveIdentifierCandidates(identifier)
+    if (candidates.length === 0) {
+      return { error: 'Informe usuário ou e-mail para recuperar a senha.' }
+    }
+
+    const email = candidates[0]
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
       redirectTo: `${window.location.origin}/nova-senha`,
     })
@@ -315,8 +490,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const { error } = await supabase.auth.updateUser({ password: newPassword })
     return { error: error ? translateError(error.message) : null }
   }
-
-  // ── Perfil actions ───────────────────────────────────────────────
 
   const updatePerfil = async (
     data: Partial<Pick<Perfil, 'nome' | 'cargo' | 'departamento'>>
@@ -329,7 +502,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       .select()
       .single()
     if (error) return { error: error.message }
-    setPerfil(updated as Perfil)
+    const loaded = updated as Perfil
+    setPerfil(loaded)
+    loadRbacContext(loaded)
     return { error: null }
   }
 
@@ -339,16 +514,116 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!user) return { error: 'Não autenticado' }
     const { error } = await supabase
       .from('sys_perfis')
-      .update({ senha_definida: true })
+      .update({
+        senha_definida: true,
+        alterar_senha_proximo_login: false,
+      })
       .eq('auth_id', user.id)
     if (error) return { error: error.message }
-    setPerfil(prev => prev ? { ...prev, senha_definida: true } : prev)
+    setPerfil(prev => prev ? {
+      ...prev,
+      senha_definida: true,
+      alterar_senha_proximo_login: false,
+    } : prev)
     return { error: null }
   }
 
-  // ── Permission helpers ───────────────────────────────────────────
+  const legacyRole: Role = (perfil?.role ?? 'visitante') as Role
+  const basePapelGlobal: PapelGlobal = perfil?.papel_global ?? mapLegacyRoleToPapel(legacyRole)
+  // Quando rbacV2 está ativo, o papel efetivo é o maior entre basePapelGlobal e os papeis dos setores
+  // (evita que usuários com role legado 'requisitante' fiquem travados mesmo tendo papel='equipe' nos setores)
+  // Eleva papel global usando modulo_papeis (permissoes_especiais) ou perfil_setores (RBAC v2)
+  const papelGlobal: PapelGlobal = (() => {
+    const niveis: Record<PapelGlobal, number> = { requisitante: 1, equipe: 2, supervisor: 3, diretor: 4, ceo: 5 }
+    let best = basePapelGlobal
 
-  const role: Role = perfil?.role ?? 'visitante'
+    // RBAC v2: elevar com base nos setores
+    if (rbacV2Enabled && perfilSetores.length > 0) {
+      for (const s of perfilSetores) {
+        if ((niveis[s.papel] ?? 0) > (niveis[best] ?? 0)) best = s.papel
+      }
+    }
+
+    // Fallback: elevar com base em modulo_papeis (permissoes_especiais)
+    const moduloPapeis = (perfil?.permissoes_especiais as any)?.modulo_papeis
+    if (moduloPapeis && typeof moduloPapeis === 'object') {
+      for (const p of Object.values(moduloPapeis) as string[]) {
+        if (niveis[p as PapelGlobal] > (niveis[best] ?? 0)) best = p as PapelGlobal
+      }
+    }
+
+    return best
+  })()
+  const role: Role = legacyRole
+  const isAdmin = legacyRole === 'administrador' || legacyRole === 'admin'
+  const hasFullAccess = isAdmin || legacyRole === 'diretor'
+
+  const hasModule = (mod: string): boolean => {
+    if (hasFullAccess) return true
+    const normalized = normalizeModuleKey(mod)
+
+    if (rbacV2Enabled && perfilSetores.length > 0) {
+      const hasBySetor = perfilSetores.some(s => s.ativo && normalizeModuleKey(s.modulo_key) === normalized)
+      if (hasBySetor) return true
+    }
+
+    if (perfil?.modulos?.[mod] === true) return true
+    if (perfil?.modulos?.[normalized] === true) return true
+    if (mod === 'patrimonial') return perfil?.modulos?.estoque === true
+    if (mod === 'apontamentos') return perfil?.modulos?.financeiro === true
+    return false
+  }
+
+  const hasSetorPapel = (mod: string, papeis: PapelGlobal[] = ['equipe', 'supervisor', 'diretor', 'ceo']) => {
+    if (hasFullAccess) return true
+    const normalized = normalizeModuleKey(mod)
+
+    // RBAC v2: checar setores
+    if (rbacV2Enabled && perfilSetores.length > 0) {
+      return perfilSetores.some(s =>
+        s.ativo
+        && normalizeModuleKey(s.modulo_key) === normalized
+        && papeis.includes(s.papel)
+      )
+    }
+
+    // Fallback: checar modulo_papeis em permissoes_especiais
+    const moduloPapeis = (perfil?.permissoes_especiais as any)?.modulo_papeis
+    if (moduloPapeis && typeof moduloPapeis === 'object') {
+      const papelMod = moduloPapeis[mod] ?? moduloPapeis[normalized]
+      if (papelMod && papeis.includes(papelMod)) return hasModule(mod)
+    }
+
+    // Último fallback: papel global
+    if (papeis.includes(papelGlobal)) return hasModule(mod)
+
+    return false
+  }
+
+  const canTechnicalApprove = (mod: string): boolean => {
+    if (hasFullAccess) return true
+    if (papelGlobal === 'ceo') return hasModule(mod)
+
+    const normalized = normalizeModuleKey(mod)
+    if (rbacV2Enabled && perfilSetores.length > 0) {
+      return perfilSetores.some(s =>
+        s.ativo
+        && normalizeModuleKey(s.modulo_key) === normalized
+        && (s.aprovador_tecnico || s.papel === 'supervisor' || s.papel === 'diretor' || s.papel === 'ceo')
+      )
+    }
+
+    // Checar modulo_papeis para aprovação técnica no módulo específico
+    const moduloPapeis = (perfil?.permissoes_especiais as any)?.modulo_papeis
+    if (moduloPapeis && typeof moduloPapeis === 'object') {
+      const papelMod = moduloPapeis[mod] ?? moduloPapeis[normalized]
+      if (papelMod === 'supervisor' || papelMod === 'diretor' || papelMod === 'ceo') return hasModule(mod)
+    }
+
+    return legacyRole === 'diretor' || legacyRole === 'supervisor' || legacyRole === 'gerente' || legacyRole === 'gestor' || legacyRole === 'aprovador'
+  }
+
+  const currentNivel = Math.max(ROLE_NIVEL[legacyRole] ?? 0, ROLE_NIVEL[papelGlobal] ?? 0)
 
   const value: AuthContextType = {
     user,
@@ -356,6 +631,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     session,
     loading,
     perfilReady,
+    rbacV2Enabled,
+    papelGlobal,
+    perfilSetores,
     signIn,
     signInMagicLink,
     signOut,
@@ -367,24 +645,34 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     pendingPasswordReset,
     clearPasswordReset,
     role,
-    roleLabel:  ROLE_LABEL[role],
-    isAdmin:    role === 'administrador',
-    isGerente:  ROLE_NIVEL[role] >= ROLE_NIVEL['diretor'],
-    canManage:  role === 'administrador',
-    hasModule:  (mod) => {
-      if (perfil?.modulos?.[mod] === true) return true
-      if (mod === 'patrimonial') return perfil?.modulos?.estoque === true
-      return false
+    roleLabel: rbacV2Enabled ? PAPEL_LABEL[papelGlobal] : (ROLE_LABEL[role] ?? ROLE_LABEL.requisitante),
+    isAdmin,
+    isGerente: currentNivel >= (ROLE_NIVEL.diretor ?? 5),
+    canManage: isAdmin,
+    hasModule,
+    hasSetorPapel,
+    canApprove: (nivel) => {
+      if (isAdmin || papelGlobal === 'ceo') return true
+      if (papelGlobal === 'diretor') return true            // diretor aprova todos os níveis
+      if (papelGlobal === 'supervisor' && nivel <= 1) return true  // supervisor aprova nível 1 (≤R$2k)
+      return (perfil?.alcada_nivel ?? 0) >= nivel           // fallback: alçada explícita no perfil
     },
-    canApprove: (nivel) => role === 'administrador' || (perfil?.alcada_nivel ?? 0) >= nivel,
-    atLeast:    (r) => (ROLE_NIVEL[role] ?? 0) >= (ROLE_NIVEL[r] ?? 0),
+    canTechnicalApprove,
+    atLeast: (r) => currentNivel >= (ROLE_NIVEL[r] ?? 0),
     permissoesEspeciais: (modulo: string) => perfil?.permissoes_especiais?.[modulo] ?? {},
+    getPapelForModule: (moduleKey: string): PapelGlobal => {
+      const normalized = normalizeModuleKey(moduleKey)
+      const moduloPapeis = (perfil?.permissoes_especiais as any)?.modulo_papeis
+      if (moduloPapeis && typeof moduloPapeis === 'object') {
+        const p = moduloPapeis[moduleKey] ?? moduloPapeis[normalized]
+        if (p && ['requisitante','equipe','supervisor','diretor','ceo'].includes(p)) return p as PapelGlobal
+      }
+      return papelGlobal
+    },
   }
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }
-
-// ── Hook público ───────────────────────────────────────────────────────────────
 
 export function useAuth() {
   const ctx = useContext(AuthContext)
@@ -392,16 +680,14 @@ export function useAuth() {
   return ctx
 }
 
-// ── Traduções de erros do Supabase ─────────────────────────────────────────────
-
 function translateError(msg: string): string {
-  if (msg.includes('Invalid login credentials'))  return 'E-mail ou senha incorretos'
-  if (msg.includes('Email not confirmed'))         return 'Confirme seu e-mail antes de entrar'
-  if (msg.includes('Too many requests'))           return 'Muitas tentativas. Aguarde um momento'
-  if (msg.includes('User already registered'))     return 'Este e-mail já está cadastrado'
-  if (msg.includes('Email rate limit exceeded'))   return 'Limite de e-mails atingido. Tente mais tarde'
-  if (msg.includes('Password should be'))          return 'A senha deve ter pelo menos 6 caracteres'
-  if (msg.includes('New password should be'))      return 'A nova senha deve ter pelo menos 6 caracteres'
-  if (msg.includes('same password'))               return 'A nova senha deve ser diferente da atual'
+  if (msg.includes('Invalid login credentials')) return 'Usuário/e-mail ou senha incorretos'
+  if (msg.includes('Email not confirmed')) return 'Confirme seu e-mail antes de entrar'
+  if (msg.includes('Too many requests')) return 'Muitas tentativas. Aguarde um momento'
+  if (msg.includes('User already registered')) return 'Este e-mail já está cadastrado'
+  if (msg.includes('Email rate limit exceeded')) return 'Limite de e-mails atingido. Tente mais tarde'
+  if (msg.includes('Password should be')) return 'A senha deve ter pelo menos 6 caracteres'
+  if (msg.includes('New password should be')) return 'A nova senha deve ter pelo menos 6 caracteres'
+  if (msg.includes('same password')) return 'A nova senha deve ser diferente da atual'
   return msg
 }

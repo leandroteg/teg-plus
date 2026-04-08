@@ -22,12 +22,18 @@ const MODULO_MAP: Record<string, string> = {
 }
 
 // Filtra aprovações baseado no perfil do usuário
-function filtrarPorPermissao(items: AprovacaoPendente[], perfil: Perfil | null): AprovacaoPendente[] {
+function filtrarPorPermissao(
+  items: AprovacaoPendente[],
+  perfil: Perfil | null,
+  hasModule: (mod: string) => boolean
+): AprovacaoPendente[] {
   if (!perfil) return []
   // Administrador vê tudo
-  if (perfil.role === 'administrador') return items
+  const role = String(perfil.role ?? '').toLowerCase()
+  const papelGlobal = String(perfil.papel_global ?? '').toLowerCase()
+  if (role === 'administrador' || role === 'admin' || papelGlobal === 'ceo') return items
   // Visitante não vê nada
-  if (perfil.role === 'visitante') return []
+  if (role === 'visitante') return []
 
   const modulosUsuario = perfil.modulos ?? {}
   const email = perfil.email?.toLowerCase() ?? ''
@@ -36,25 +42,26 @@ function filtrarPorPermissao(items: AprovacaoPendente[], perfil: Perfil | null):
     const apr = a as unknown as Record<string, unknown>
     const modulo = (apr.modulo as string) ?? ''
     const aprovadorEmail = ((apr.aprovador_email as string) ?? '').toLowerCase()
+    if (aprovadorEmail && aprovadorEmail === email) return true
 
     // Requisitante: só vê aprovações endereçadas a ele
-    if (perfil.role === 'requisitante') {
+    if (papelGlobal === 'requisitante' || papelGlobal === 'equipe' || role === 'requisitante') {
       return aprovadorEmail === email
     }
 
     // Gestor/Diretor: vê aprovações dos módulos que tem acesso
     const moduloKey = MODULO_MAP[modulo] ?? modulo
     if (!moduloKey) return true // sem módulo definido → mostra
-    return modulosUsuario[moduloKey] === true
+    return hasModule(moduloKey) || modulosUsuario[moduloKey] === true
   })
 }
 
 // ── Aprovacoes Pendentes (multi-tipo) ──────────────────────────────────────────
 
 export function useAprovacoesPendentes(tipo?: TipoAprovacao) {
-  const { perfil } = useAuth()
+  const { perfil, hasModule } = useAuth()
   return useQuery<AprovacaoPendente[]>({
-    queryKey: ['aprovacoes-pendentes', tipo, perfil?.role, perfil?.email],
+    queryKey: ['aprovacoes-pendentes', tipo, perfil?.role, perfil?.papel_global, perfil?.email],
     queryFn: async () => {
       // Aprovações de pagamento são criadas APENAS via Lotes (useEnviarLoteAprovacao)
       // Não há mais sync automático de CPs individuais.
@@ -364,6 +371,24 @@ export function useAprovacoesPendentes(tipo?: TipoAprovacao) {
         }
       }
 
+      const despIds = aprData
+        .filter(a => a.tipo_aprovacao === 'solicitacao_adiantamento')
+        .map(a => a.entidade_id)
+        .filter(Boolean)
+
+      const despMap = new Map<string, Record<string, unknown>>()
+      if (despIds.length > 0) {
+        try {
+          const { data: despData } = await supabase
+            .from('desp_adiantamentos')
+            .select('id, numero, solicitante_nome, favorecido_nome, centro_custo, finalidade, justificativa, valor_solicitado, data_limite_prestacao, status, created_at')
+            .in('id', despIds)
+          for (const item of despData ?? []) {
+            despMap.set(item.id, item)
+          }
+        } catch { /* despesas enrichment failed */ }
+      }
+
       // 6. Mescla aprovacoes com dados da requisicao/contrato/CP + cotacao
       const result = aprData
         .map(a => {
@@ -537,6 +562,21 @@ export function useAprovacoesPendentes(tipo?: TipoAprovacao) {
                 status_cp: (fin.status as string) ?? '',
               }
             }
+          } else if (a.tipo_aprovacao === 'solicitacao_adiantamento') {
+            const desp = despMap.get(a.entidade_id)
+            requisicao = {
+              id: a.entidade_id,
+              numero: (desp?.numero as string) ?? a.entidade_numero ?? 'N/A',
+              solicitante_nome: (desp?.solicitante_nome as string) ?? '',
+              obra_nome: (desp?.centro_custo as string) ?? '',
+              descricao: (desp?.finalidade as string) ?? 'Solicitação de adiantamento',
+              justificativa: (desp?.justificativa as string) ?? undefined,
+              valor_estimado: Number(desp?.valor_solicitado ?? 0),
+              urgencia: 'normal',
+              status: 'em_aprovacao',
+              alcada_nivel: a.nivel,
+              created_at: (desp?.created_at as string) ?? a.created_at,
+            }
           } else if (a.tipo_aprovacao === 'aprovacao_transporte') {
             const log = logMap.get(a.entidade_id)
             const viagem = viagemMap.get(a.entidade_id)
@@ -678,7 +718,7 @@ export function useAprovacoesPendentes(tipo?: TipoAprovacao) {
         .filter((a): a is AprovacaoPendente => a !== null)
 
       // Filtra por permissão do usuário logado
-      return filtrarPorPermissao(result, perfil)
+      return filtrarPorPermissao(result, perfil, hasModule)
     },
     refetchInterval: 15_000,
     refetchOnMount: 'always',
@@ -1088,6 +1128,69 @@ export function useDecisaoGenerica() {
               })
               .eq('id', entidadeId)
           }
+        } else if (tipoAprovacao === 'solicitacao_adiantamento') {
+          const now = new Date().toISOString()
+          const hoje = new Date().toISOString().split('T')[0]
+
+          if (decisao === 'aprovada') {
+            const { data: adiantamento } = await supabase
+              .from('desp_adiantamentos')
+              .select('id, numero, solicitante_nome, favorecido_nome, centro_custo, classe_financeira, valor_solicitado, finalidade, justificativa, fin_conta_pagar_id')
+              .eq('id', entidadeId)
+              .maybeSingle()
+
+            let contaPagarId = (adiantamento?.fin_conta_pagar_id as string | null) ?? null
+
+            if (!contaPagarId) {
+              const { data: cp, error: cpError } = await supabase
+                .from('fin_contas_pagar')
+                .insert({
+                  fornecedor_nome: (adiantamento?.favorecido_nome as string) ?? 'Colaborador',
+                  origem: 'manual',
+                  valor_original: Number(adiantamento?.valor_solicitado ?? 0),
+                  valor_pago: 0,
+                  data_emissao: hoje,
+                  data_vencimento: hoje,
+                  data_vencimento_orig: hoje,
+                  centro_custo: (adiantamento?.centro_custo as string) ?? null,
+                  classe_financeira: (adiantamento?.classe_financeira as string) ?? null,
+                  natureza: 'adiantamento_colaborador',
+                  numero_documento: (adiantamento?.numero as string) ?? entidadeId,
+                  status: 'confirmado',
+                  descricao: `Adiantamento - ${(adiantamento?.finalidade as string) ?? ''}`.trim(),
+                  observacoes: [
+                    'Adiantamento de despesas aprovado pelo gestor.',
+                    adiantamento?.solicitante_nome ? `Solicitante: ${adiantamento.solicitante_nome as string}` : null,
+                    adiantamento?.justificativa ? `Justificativa: ${adiantamento.justificativa as string}` : null,
+                  ].filter(Boolean).join(' | '),
+                })
+                .select('id')
+                .single()
+
+              if (cpError) throw cpError
+              contaPagarId = cp?.id ?? null
+            }
+
+            await supabase
+              .from('desp_adiantamentos')
+              .update({
+                status: 'aprovado',
+                valor_aprovado: Number(adiantamento?.valor_solicitado ?? 0),
+                fin_conta_pagar_id: contaPagarId,
+                aprovado_por: aprovadorNome,
+                aprovado_em: now,
+                updated_at: now,
+              })
+              .eq('id', entidadeId)
+          } else {
+            await supabase
+              .from('desp_adiantamentos')
+              .update({
+                status: 'rejeitado',
+                updated_at: now,
+              })
+              .eq('id', entidadeId)
+          }
         } else if (tipoAprovacao === 'aprovacao_transporte') {
           const now = new Date().toISOString()
 
@@ -1139,6 +1242,25 @@ export function useDecisaoGenerica() {
               }).eq('id', entidadeId)
             }
           }
+        } else if (tipoAprovacao === 'cotacao') {
+          // Avanca status da requisicao de cotacao_enviada → cotacao_aprovada/rejeitada
+          if (decisao === 'aprovada') {
+            await supabase
+              .from('cmp_requisicoes')
+              .update({ status: 'cotacao_aprovada' })
+              .eq('id', entidadeId)
+          } else if (decisao === 'rejeitada') {
+            await supabase
+              .from('cmp_requisicoes')
+              .update({ status: 'cotacao_rejeitada' })
+              .eq('id', entidadeId)
+          } else {
+            // esclarecimento
+            await supabase
+              .from('cmp_requisicoes')
+              .update({ status: 'em_esclarecimento' })
+              .eq('id', entidadeId)
+          }
         }
       } catch (e) {
         console.warn('Aviso: entidade fonte nao atualizada:', e)
@@ -1155,10 +1277,15 @@ export function useDecisaoGenerica() {
       qc.invalidateQueries({ queryKey: ['con-solicitacoes-dashboard'] })
       qc.invalidateQueries({ queryKey: ['contas-pagar'] })
       qc.invalidateQueries({ queryKey: ['financeiro-dashboard'] })
+      qc.invalidateQueries({ queryKey: ['despesas-adiantamentos'] })
       qc.invalidateQueries({ queryKey: ['lotes-pagamento'] })
       qc.invalidateQueries({ queryKey: ['lote-detalhe'] })
       qc.invalidateQueries({ queryKey: ['log_solicitacoes'] })
       qc.invalidateQueries({ queryKey: ['log_viagens'] })
+      qc.invalidateQueries({ queryKey: ['cotacoes'] })
+      qc.invalidateQueries({ queryKey: ['cotacao'] })
+      qc.invalidateQueries({ queryKey: ['requisicoes'] })
+      qc.invalidateQueries({ queryKey: ['requisicao'] })
     },
   })
 }

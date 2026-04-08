@@ -2,7 +2,7 @@ export type StatusRequisicao =
   | 'rascunho' | 'pendente' | 'em_aprovacao'
   | 'aprovada' | 'rejeitada' | 'em_esclarecimento'
   | 'em_cotacao' | 'cotacao_enviada' | 'cotacao_aprovada' | 'cotacao_rejeitada'
-  | 'pedido_emitido' | 'em_entrega' | 'entregue'
+  | 'pedido_emitido' | 'aguardando_contrato' | 'em_entrega' | 'entregue'
   | 'aguardando_pgto' | 'pago'
   | 'comprada' | 'cancelada'
 
@@ -30,6 +30,7 @@ export interface CategoriaMaterial {
   alcada1_limite?: number
   cotacoes_regras?: { ate_500: number; '501_a_2k': number; acima_2k: number }
   politica_resumo?: string
+  tipo?: string  // 'produto' | 'servico'
 }
 
 export interface Pedido {
@@ -115,12 +116,19 @@ export interface Requisicao {
   ai_confianca?: number
   arquivo_url?: string
   created_at: string
+  justificativa_urgencia?: string
   esclarecimento_msg?: string
   esclarecimento_por?: string
   esclarecimento_em?: string
 }
 
-export type TipoAprovacao = 'requisicao_compra' | 'cotacao' | 'autorizacao_pagamento' | 'minuta_contratual' | 'aprovacao_transporte'
+export type TipoAprovacao =
+  | 'requisicao_compra'
+  | 'cotacao'
+  | 'autorizacao_pagamento'
+  | 'minuta_contratual'
+  | 'aprovacao_transporte'
+  | 'solicitacao_adiantamento'
 
 export interface Aprovacao {
   id: string
@@ -228,6 +236,44 @@ export interface AprovacaoPendente extends Aprovacao {
   }
 }
 
+export type StatusDespesaAdiantamento =
+  | 'solicitado'
+  | 'aprovado'
+  | 'rejeitado'
+  | 'prestacao_pendente'
+  | 'prestacao_enviada'
+  | 'concluido'
+
+export interface DespesaAdiantamento {
+  id: string
+  numero: string
+  solicitante_id?: string
+  solicitante_nome: string
+  gestor_id?: string
+  gestor_nome?: string
+  gestor_email?: string
+  favorecido_nome: string
+  favorecido_email?: string
+  centro_custo?: string
+  centro_custo_id?: string
+  classe_financeira?: string
+  classe_financeira_id?: string
+  valor_solicitado: number
+  valor_aprovado?: number
+  finalidade: string
+  justificativa?: string
+  data_solicitacao: string
+  data_pagamento?: string
+  data_limite_prestacao?: string
+  status: StatusDespesaAdiantamento
+  fin_conta_pagar_id?: string
+  aprovado_por?: string
+  aprovado_em?: string
+  observacoes?: string
+  created_at: string
+  updated_at: string
+}
+
 export interface AprovacaoHistorico {
   id: string
   modulo: string
@@ -312,6 +358,7 @@ export interface NovaRequisicaoPayload {
   justificativa?: string
   categoria?: string
   urgencia: Urgencia
+  justificativa_urgencia?: string
   data_necessidade?: string
   itens: RequisicaoItem[]
   texto_original?: string
@@ -319,6 +366,8 @@ export interface NovaRequisicaoPayload {
   ai_confianca?: number
   arquivo_referencia?: File
   rascunho?: boolean
+  compra_recorrente?: boolean
+  valor_mensal?: number
 }
 
 export interface NovaCotacaoPayload {

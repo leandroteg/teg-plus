@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no" />
+    <meta name="theme-color" content="#312e81" />
+    <meta name="description" content="AprovAi — Aprovacoes inteligentes com 1 toque" />
+    <meta name="application-name" content="AprovAi" />
+    <meta name="apple-mobile-web-app-title" content="AprovAi" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <link rel="manifest" href="/aprovaai.webmanifest" />
+    <link rel="icon" type="image/png" href="/icons/aprovaai-192.png" />
+    <link rel="apple-touch-icon" href="/icons/aprovaai-192.png" />
+    <title>AprovAi</title>
+
+    <style>
+      #root:empty {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 100vh;
+        background: linear-gradient(160deg, #312e81 0%, #4f46e5 40%, #6d28d9 100%);
+      }
+      #root:empty::after {
+        content: '';
+        width: 40px;
+        height: 40px;
+        border: 3px solid rgba(255,255,255,0.15);
+        border-top-color: #fff;
+        border-radius: 50%;
+        animation: spin 0.8s linear infinite;
+      }
+      @keyframes spin {
+        to { transform: rotate(360deg); }
+      }
+      @supports (padding-top: env(safe-area-inset-top)) {
+        body.standalone-mode #root {
+          padding-top: env(safe-area-inset-top);
+          padding-bottom: env(safe-area-inset-bottom);
+          padding-left: env(safe-area-inset-left);
+          padding-right: env(safe-area-inset-right);
+        }
+      }
+    </style>
+  </head>
+  <body class="bg-gray-100">
+    <div id="root"></div>
+    <script type="module" src="/src/aprovaai-main.tsx"></script>
+    <script>
+      if (window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone) {
+        document.body.classList.add('standalone-mode');
+      }
+    </script>
+  </body>
+</html>

@@ -16,6 +16,7 @@ import {
 import type { LogSolicitacao, StatusExpedicaoPipeline } from '../../types/logistica'
 import { EXPEDICAO_PIPELINE_STAGES } from '../../types/logistica'
 import { hasRomaneioDocumento, RomaneioDocumentoCard } from '../../components/logistica/RomaneioDocumentoCard'
+import { getDocumentoFiscalContext, getDocumentoFiscalLabel } from '../../utils/logisticaFiscal'
 
 // ── Formatters ───────────────────────────────────────────────────────────────
 
@@ -83,21 +84,15 @@ function exportCSV(items: LogSolicitacao[], stageName: string) {
   URL.revokeObjectURL(url)
 }
 
-// ── UF Detection ─────────────────────────────────────────────────────────────
+function hasDocumentoFiscalPronto(sol: LogSolicitacao) {
+  if (hasRomaneioDocumento(sol)) return true
+  if (sol.status === 'nfe_emitida') return true
+  if (sol.status === 'transporte_pendente') return true
+  if (sol.nfe?.status === 'autorizada') return true
 
-const CIDADES_MG = [
-  'araxa', 'araxá', 'frutal', 'ituiutaba', 'paracatu',
-  'perdizes', 'rio paranaiba', 'rio paranaíba', 'tres marias', 'três marias',
-]
-
-function detectUF(destino: string): 'MG' | 'outro' | 'indefinido' {
-  if (!destino) return 'indefinido'
-  const d = destino.toLowerCase().trim()
-  if (CIDADES_MG.some(c => d.includes(c))) return 'MG'
-  if (d.includes('se ') && !d.includes('campo grande')) return 'MG'
-  if (d.includes('campo grande') || d.includes('/ms') || d.includes(' ms')) return 'outro'
-  if (d.endsWith('/mg') || d.endsWith(' mg')) return 'MG'
-  return 'indefinido'
+  return ['transporte_pendente', 'aguardando_coleta', 'em_transito', 'entregue', 'concluido'].includes(sol.status)
+    && !!sol.doc_fiscal_tipo
+    && sol.doc_fiscal_tipo !== 'nenhum'
 }
 
 // ── Detail Modal ─────────────────────────────────────────────────────────────
@@ -115,6 +110,7 @@ function DetailModal({ sol, onClose, onAction, isDark, allSolicitacoes }: {
   onAction: (action: string, sol: LogSolicitacao) => void; isDark: boolean
   allSolicitacoes: LogSolicitacao[]
 }) {
+  const fiscalCtx = getDocumentoFiscalContext(sol)
   const { data: checklist } = useChecklistExpedicao(sol.id)
   const salvarChecklist = useSalvarChecklistExpedicao()
   const todosMarcados = ITEMS_CHECKLIST.every(([k, , fotoObrig]) => {
@@ -161,13 +157,9 @@ function DetailModal({ sol, onClose, onAction, isDark, allSolicitacoes }: {
   const irmasViagem = sol.viagem_id
     ? allSolicitacoes.filter(s => s.viagem_id === sol.viagem_id && s.id !== sol.id)
     : []
-  const irmasDocPronto = irmasViagem.every(s =>
-    s.status === 'romaneio_emitido' || s.status === 'nfe_emitida'
-  )
+  const irmasDocPronto = irmasViagem.every(hasDocumentoFiscalPronto)
   const viagemBloqueada = sol.viagem_id != null && !irmasDocPronto
-  const irmasPendentes = irmasViagem.filter(s =>
-    s.status !== 'romaneio_emitido' && s.status !== 'nfe_emitida'
-  )
+  const irmasPendentes = irmasViagem.filter(s => !hasDocumentoFiscalPronto(s))
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-sm p-4" onClick={onClose}>
@@ -193,14 +185,16 @@ function DetailModal({ sol, onClose, onAction, isDark, allSolicitacoes }: {
 
           <div className={`rounded-xl p-4 space-y-2 ${isDark ? 'bg-white/[0.04]' : 'bg-slate-50'}`}>
             <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-xs">
-              <div><span className="text-slate-400">Origem:</span> <span className="font-semibold">{sol.origem}</span></div>
-              <div><span className="text-slate-400">Destino:</span> <span className="font-semibold">{sol.destino}</span></div>
+              <div><span className="text-slate-400">Origem:</span> <span className="font-semibold">{fiscalCtx.origemLabel}</span></div>
+              <div><span className="text-slate-400">Destino:</span> <span className="font-semibold">{fiscalCtx.destinoLabel}</span></div>
+              {(fiscalCtx.origemUf || fiscalCtx.destinoUf) && <div><span className="text-slate-400">UFs:</span> <span className="font-semibold">{fiscalCtx.origemUf || '—'} → {fiscalCtx.destinoUf || '—'}</span></div>}
               {sol.obra_nome && <div><span className="text-slate-400">Obra:</span> <span className="font-semibold">{sol.obra_nome}</span></div>}
               {sol.centro_custo && <div><span className="text-slate-400">Centro Custo:</span> <span className="font-semibold">{sol.centro_custo}</span></div>}
               {sol.motorista_nome && <div><span className="text-slate-400">Motorista:</span> <span className="font-semibold">{sol.motorista_nome}</span></div>}
               {sol.veiculo_placa && <div><span className="text-slate-400">Placa:</span> <span className="font-mono font-semibold">{sol.veiculo_placa}</span></div>}
               {sol.modal && <div><span className="text-slate-400">Modal:</span> <span className="font-semibold capitalize">{sol.modal.replace(/_/g, ' ')}</span></div>}
               {sol.doc_fiscal_tipo && <div><span className="text-slate-400">Doc. Fiscal:</span> <span className="font-semibold capitalize">{sol.doc_fiscal_tipo}</span></div>}
+              <div className="col-span-2"><span className="text-slate-400">Regra Fiscal:</span> <span className="font-semibold">{getDocumentoFiscalLabel(fiscalCtx.regra)}</span></div>
               {sol.peso_total_kg != null && <div><span className="text-slate-400">Peso:</span> <span className="font-semibold">{sol.peso_total_kg} kg</span></div>}
               {sol.volumes_total != null && <div><span className="text-slate-400">Volumes:</span> <span className="font-semibold">{sol.volumes_total}</span></div>}
             </div>
@@ -346,21 +340,28 @@ function DetailModal({ sol, onClose, onAction, isDark, allSolicitacoes }: {
                 <Truck size={15} /> Despachar
               </button>
             )}
-            {sol.status === 'romaneio_emitido' && (() => {
-              const uf = detectUF(sol.destino)
-              return uf === 'outro' || uf === 'indefinido' ? (
-                <button onClick={() => onAction('solicitarNF', sol)} className="flex-1 py-3 rounded-xl bg-amber-600 text-white text-sm font-bold hover:bg-amber-700 transition-all flex items-center justify-center gap-2">
-                  <FileText size={15} /> Solicitar NF
-                </button>
-              ) : (
-                <button onClick={() => !viagemBloqueada && onAction('concluir', sol)} disabled={viagemBloqueada}
-                  className={`flex-1 py-3 rounded-xl text-sm font-bold transition-all flex items-center justify-center gap-2 ${
-                    viagemBloqueada ? 'bg-slate-200 text-slate-400 cursor-not-allowed' : 'bg-emerald-600 text-white hover:bg-emerald-700'
-                  }`}>
-                  <CheckCircle2 size={15} /> Concluir Expedição
-                </button>
-              )
-            })()}
+            {sol.status === 'romaneio_emitido' && (
+              <>
+                {(fiscalCtx.regra === 'romaneio' || fiscalCtx.regra === 'indefinido') && (
+                  <button onClick={() => onAction('emitirRomaneio', sol)} className="flex-1 py-3 rounded-xl bg-blue-600 text-white text-sm font-bold hover:bg-blue-700 transition-all flex items-center justify-center gap-2">
+                    <ScrollText size={15} /> Emitir Romaneio
+                  </button>
+                )}
+                {(fiscalCtx.regra === 'nf' || fiscalCtx.regra === 'indefinido') && (
+                  <button onClick={() => onAction('solicitarNF', sol)} className="flex-1 py-3 rounded-xl bg-amber-600 text-white text-sm font-bold hover:bg-amber-700 transition-all flex items-center justify-center gap-2">
+                    <FileText size={15} /> Solicitar NF
+                  </button>
+                )}
+                {hasRomaneioDocumento(sol) && (
+                  <button onClick={() => !viagemBloqueada && onAction('concluir', sol)} disabled={viagemBloqueada}
+                    className={`flex-1 py-3 rounded-xl text-sm font-bold transition-all flex items-center justify-center gap-2 ${
+                      viagemBloqueada ? 'bg-slate-200 text-slate-400 cursor-not-allowed' : 'bg-emerald-600 text-white hover:bg-emerald-700'
+                    }`}>
+                    <CheckCircle2 size={15} /> Concluir Expedição
+                  </button>
+                )}
+              </>
+            )}
             {sol.status === 'nfe_emitida' && (
               <button onClick={() => !viagemBloqueada && onAction('concluir', sol)} disabled={viagemBloqueada}
                 className={`flex-1 py-3 rounded-xl text-sm font-bold transition-all flex items-center justify-center gap-2 ${
@@ -736,19 +737,46 @@ export default function ExpedicaoPipeline() {
     } catch { showToast('error', 'Erro ao emitir romaneio') }
   }
 
+  const handleDespachar = async (ids: string[]) => {
+    try {
+      const updatedAt = new Date().toISOString()
+      for (const id of ids) {
+        // Buscar solicitação para determinar regra fiscal
+        const sol = solicitacoes.find(s => s.id === id)
+        const fiscalCtx = sol ? getDocumentoFiscalContext(sol) : null
+        const isRomaneio = fiscalCtx?.regra === 'romaneio' || fiscalCtx?.regra === 'indefinido'
+
+        const { error } = await supabase
+          .from('log_solicitacoes')
+          .update({
+            status: 'romaneio_emitido',
+            doc_fiscal_tipo: isRomaneio ? 'romaneio' : (sol as any)?.doc_fiscal_tipo || 'nenhum',
+            updated_at: updatedAt,
+          })
+          .eq('id', id)
+        if (error) throw error
+      }
+      qc.invalidateQueries({ queryKey: ['log_solicitacoes'] })
+      showToast('success', `${ids.length} carga(s) despachada(s) para preparação documental`)
+      setSelectedIds(new Set())
+    } catch { showToast('error', 'Erro ao despachar cargas') }
+  }
+
   const handleBulkAction = () => {
     const ids = Array.from(selectedIds)
     if (ids.length === 0) return
-    if (activeTab === 'aprovado') handleEmitirRomaneio(ids)
+    if (activeTab === 'aprovado') handleDespachar(ids)
   }
 
   const handleSolicitarNF = async (sol: LogSolicitacao) => {
+    const fiscalCtx = getDocumentoFiscalContext(sol)
     try {
       await solicitarNF.mutateAsync({
         solicitacao_id: sol.id,
         fornecedor_nome: sol.origem,
         valor_total: 0,
         descricao: `NF ref. expedi\u00e7\u00e3o #${sol.numero} - ${sol.origem} -> ${sol.destino}`,
+        destinatario_uf: fiscalCtx.destinoUf || undefined,
       })
       showToast('success', 'NF solicitada ao fiscal com sucesso')
       setNfModal(null)
@@ -759,12 +787,25 @@ export default function ExpedicaoPipeline() {
   const handleDetailAction = async (action: string, sol: LogSolicitacao) => {
     closeDetail()
     if (action === 'emitirRomaneio') handleEmitirRomaneio([sol.id])
-    if (action === 'despachar') handleEmitirRomaneio([sol.id])
+    if (action === 'despachar') handleDespachar([sol.id])
     if (action === 'solicitarNF') setNfModal(sol)
     if (action === 'concluir') {
-      await supabase.from('log_solicitacoes').update({ status: 'aguardando_coleta', updated_at: new Date().toISOString() }).eq('id', sol.id)
+      const updatedAt = new Date().toISOString()
+      const fiscalCtx = getDocumentoFiscalContext(sol)
+      const isRomaneio = fiscalCtx.regra === 'romaneio' || fiscalCtx.regra === 'indefinido'
+      const nextStatus = await supabase
+        .from('log_solicitacoes')
+        .update({
+          status: 'transporte_pendente',
+          doc_fiscal_tipo: isRomaneio ? 'romaneio' : sol.doc_fiscal_tipo || 'nenhum',
+          updated_at: updatedAt,
+        })
+        .eq('id', sol.id)
+
+      if (nextStatus.error) throw nextStatus.error
+
       qc.invalidateQueries({ queryKey: ['log_solicitacoes'] })
-      showToast('success', `Expedição ${sol.numero} concluída — aguardando coleta`)
+      showToast('success', `Expedição ${sol.numero} concluída — pronta para transporte`)
     }
   }
 
@@ -776,7 +817,7 @@ export default function ExpedicaoPipeline() {
   }
 
   const BULK_ACTIONS: Partial<Record<StatusExpedicaoPipeline, { label: string; icon: typeof CheckCircle2; className: string }>> = {
-    aprovado: { label: 'Emitir Romaneio', icon: ScrollText, className: 'bg-blue-600 hover:bg-blue-700 text-white' },
+    aprovado: { label: 'Despachar', icon: Truck, className: 'bg-emerald-600 hover:bg-emerald-700 text-white' },
   }
   const bulk = BULK_ACTIONS[activeTab]
   const selectedInTab = activeItems.filter(s => selectedIds.has(s.id))
@@ -921,7 +962,7 @@ export default function ExpedicaoPipeline() {
               {activeItems.map(sol => <ExpRow key={sol.id} sol={sol} onClick={() => setDetail(sol)} isDark={isDark} isSelected={selectedIds.has(sol.id)} onSelect={toggleSelect} />)}
             </>
           ) : (
-            <div className="space-y-2 p-4">
+            <div className="space-y-2 p-4 stagger-children">
               {displayItems.map(item => item.kind === 'viagem' ? (
                 <ViagemGroupCard
                   key={`vg-${item.viagemId}`}
@@ -956,8 +997,9 @@ export default function ExpedicaoPipeline() {
               </p>
               <div className={`rounded-xl p-4 space-y-2 text-xs ${isDark ? 'bg-white/[0.04]' : 'bg-slate-50'}`}>
               <div><span className="text-slate-400">{'Expedi\u00e7\u00e3o:'}</span> <span className="font-semibold">#{nfModal.numero}</span></div>
-                <div><span className="text-slate-400">Origem:</span> <span className="font-semibold">{nfModal.origem}</span></div>
-                <div><span className="text-slate-400">Destino:</span> <span className="font-semibold">{nfModal.destino}</span></div>
+                <div><span className="text-slate-400">Origem:</span> <span className="font-semibold">{getDocumentoFiscalContext(nfModal).origemLabel}</span></div>
+                <div><span className="text-slate-400">Destino:</span> <span className="font-semibold">{getDocumentoFiscalContext(nfModal).destinoLabel}</span></div>
+                <div><span className="text-slate-400">Regra Fiscal:</span> <span className="font-semibold">{getDocumentoFiscalLabel(getDocumentoFiscalContext(nfModal).regra)}</span></div>
                 {nfModal.obra_nome && <div><span className="text-slate-400">Obra:</span> <span className="font-semibold">{nfModal.obra_nome}</span></div>}
               </div>
               <div className="flex gap-2">

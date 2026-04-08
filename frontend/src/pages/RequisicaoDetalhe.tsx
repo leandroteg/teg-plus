@@ -37,7 +37,7 @@ export default function RequisicaoDetalhe() {
   const decisaoMutation = useDecisaoRequisicao()
   const emitirPedidoMutation = useEmitirPedido()
   const cancelarMutation = useCancelarRequisicao()
-  const { isAdmin, atLeast, perfil } = useAuth()
+  const { isAdmin, atLeast, perfil, canTechnicalApprove } = useAuth()
 
   // Cotação vinculada à RC
   const showCotacao = req && ['em_cotacao', 'cotacao_enviada', 'cotacao_aprovada', 'cotacao_rejeitada', 'pedido_emitido'].includes(req.status)
@@ -51,10 +51,13 @@ export default function RequisicaoDetalhe() {
   const [showEmitirModal, setShowEmitirModal] = useState(false)
 
   // Decisão técnica (pendente/em_aprovacao/esclarecimento) OU financeira (cotacao_enviada)
-  const canDecide = isAdmin && req && (
-    ['pendente', 'em_aprovacao', 'em_esclarecimento'].includes(req.status) ||
-    req.status === 'cotacao_enviada'
-  )
+  const canDecideTechnical = !!req
+    && ['pendente', 'em_aprovacao', 'em_esclarecimento'].includes(req.status)
+    && canTechnicalApprove('compras')
+  const canDecideFinancial = !!req
+    && req.status === 'cotacao_enviada'
+    && isAdmin
+  const canDecide = canDecideTechnical || canDecideFinancial
 
   const handleDecisao = (decisao: 'aprovada' | 'rejeitada' | 'esclarecimento') => {
     if (!req || !perfil) return

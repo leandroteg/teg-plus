@@ -1,6 +1,6 @@
 import { useNavigate } from 'react-router-dom'
 import {
-  Building, Building2, Package2, Tag, Target, HardHat, Users,
+  Building, Building2, Package2, Tag, Target, HardHat, Users, Warehouse,
   Layers, FolderTree, Plus, Sparkles, ArrowRight,
 } from 'lucide-react'
 import {
@@ -8,7 +8,7 @@ import {
   useCadObras, useCadColaboradores, useCadEmpresas,
   useCadGrupos, useCadCategorias,
 } from '../../hooks/useCadastros'
-import { useEstoqueItens } from '../../hooks/useEstoque'
+import { useEstoqueItens, useBases } from '../../hooks/useEstoque'
 
 const SECTIONS = [
   {
@@ -31,11 +31,18 @@ const SECTIONS = [
   },
   {
     title: 'Entidades',
-    subtitle: 'Fornecedores, Colaboradores e Itens',
+    subtitle: 'Fornecedores e Colaboradores',
     entities: [
       { key: 'fornecedores',  label: 'Fornecedores',  icon: Building2, route: '/cadastros/fornecedores',  color: 'emerald', emoji: '🏢' },
       { key: 'colaboradores', label: 'Colaboradores',  icon: Users,     route: '/cadastros/colaboradores', color: 'rose',    emoji: '👷' },
-      { key: 'itens',         label: 'Itens',          icon: Package2,  route: '/cadastros/itens',         color: 'blue',    emoji: '📦' },
+    ],
+  },
+  {
+    title: 'Estoque',
+    subtitle: 'Catalogo de itens e bases / almoxarifados',
+    entities: [
+      { key: 'itens',  label: 'Itens',  icon: Package2,  route: '/cadastros/itens',  color: 'blue', emoji: '📦' },
+      { key: 'bases',  label: 'Bases',  icon: Warehouse, route: '/cadastros/bases',  color: 'teal', emoji: '🏭' },
     ],
   },
 ] as const
@@ -57,6 +64,7 @@ export default function CadastrosHome() {
   const { data: empresas = [] } = useCadEmpresas()
   const { data: fornecedores = [] } = useCadFornecedores()
   const { data: itens = [] } = useEstoqueItens()
+  const { data: bases = [] } = useBases()
   const { data: classes = [] } = useCadClasses()
   const { data: centros = [] } = useCadCentrosCusto()
   const { data: obras = [] } = useCadObras()
@@ -74,6 +82,7 @@ export default function CadastrosHome() {
     colaboradores: colaboradores.length,
     grupos: grupos.length,
     categorias: categorias.length,
+    bases: bases.length,
   }
 
   return (

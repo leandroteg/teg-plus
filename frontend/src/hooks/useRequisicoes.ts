@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import type { Requisicao, NovaRequisicaoPayload, RequisicaoItem } from '../types'
 import { supabase } from '../services/supabase'
 import { api } from '../services/api'
+import { useAuth } from '../contexts/AuthContext'
 
 // Tabelas: cmp_requisicoes (módulo Compras)
 const TABLE = 'cmp_requisicoes'
@@ -23,10 +24,11 @@ export function useRequisicoes(status?: string, search?: string) {
         .from(TABLE)
         .select(`
           id, numero, solicitante_nome, obra_nome, obra_id,
-          descricao, justificativa, valor_estimado, urgencia, status,
+          descricao, justificativa, valor_estimado, urgencia, justificativa_urgencia, status,
           alcada_nivel, categoria, comprador_id, centro_custo, centro_custo_id,
           classe_financeira, classe_financeira_id, texto_original, ai_confianca,
           esclarecimento_msg, esclarecimento_por, esclarecimento_em,
+          compra_recorrente,
           created_at,
           comprador:cmp_compradores(nome, email)
         `)
@@ -46,14 +48,17 @@ export function useRequisicoes(status?: string, search?: string) {
         comprador: undefined,
       })) as Requisicao[]
     },
-    refetchInterval: 60_000,
+    refetchInterval: false,
+    refetchOnMount: true,
+    refetchOnWindowFocus: false,
     retry: false,
-    staleTime: 30_000,
+    staleTime: 0,
   })
 }
 
 export function useCriarRequisicao() {
   const qc = useQueryClient()
+  const { perfil } = useAuth()
   return useMutation({
     mutationFn: async (payload: NovaRequisicaoPayload) => {
       const n8nUrl = import.meta.env.VITE_N8N_WEBHOOK_URL || ''
@@ -134,12 +139,15 @@ export function useCriarRequisicao() {
         .from('cmp_requisicoes')
         .insert({
           numero,
+          solicitante_id:   perfil?.id ?? null,
           solicitante_nome: payload.solicitante_nome,
           obra_nome:        payload.obra_nome,
           obra_id:          payload.obra_id    || null,
           descricao:        payload.descricao,
           justificativa:    payload.justificativa || null,
           urgencia:         payload.urgencia,
+          justificativa_urgencia: payload.justificativa_urgencia || null,
+          compra_recorrente: payload.compra_recorrente || false,
           status:           payload.rascunho ? 'rascunho' : 'em_aprovacao',
           categoria:        payload.categoria  || null,
           comprador_id:     compradorId,

@@ -1,14 +1,15 @@
 import { useMemo, useState } from 'react'
 import {
   Landmark, Plus, Search, X, Save, Loader2,
-  TrendingDown, AlertTriangle, CheckCircle2, Wrench,
+  TrendingDown, AlertTriangle, CheckCircle2, Wrench, Truck,
   ArrowLeftRight, FileText, ChevronDown, ChevronRight, RefreshCw,
-  LayoutGrid, LayoutList,
+  LayoutGrid, LayoutList, MapPin,
 } from 'lucide-react'
 import {
   useImobilizados, useSalvarImobilizado, useBaixarImobilizado,
   usePatrimonialKPIs, useCalcularDepreciacao,
   useMovimentacoesPatrimonial, useTermosResponsabilidade,
+  useTransferirAtivo, useTransferencias,
 } from '../../hooks/usePatrimonial'
 import { useBases } from '../../hooks/useEstoque'
 import { useTheme } from '../../contexts/ThemeContext'
@@ -63,11 +64,14 @@ export default function Patrimonial({
   const [viewMode, setViewMode] = useState<ViewMode>('cards')
   const [showDepreciarModal, setShowDepreciarModal] = useState(false)
   const [depreciarCompetencia, setDepreciarCompetencia] = useState(COMPETENCIA)
+  const [transferirAtivo, setTransferirAtivo] = useState<PatImobilizado | null>(null)
+  const [filtroBase, setFiltroBase] = useState<string>('')
 
   const filtroAtivo = forcedStatusFiltro ?? statusFiltro
-  const { data: imobs = [], isLoading } = useImobilizados(
-    filtroAtivo ? { status: filtroAtivo } : undefined
-  )
+  const { data: imobs = [], isLoading } = useImobilizados({
+    ...(filtroAtivo ? { status: filtroAtivo } : {}),
+    ...(filtroBase ? { base_id: filtroBase } : {}),
+  })
   const { data: kpis } = usePatrimonialKPIs()
   const { data: bases = [] } = useBases()
   const salvar = useSalvarImobilizado()
@@ -156,7 +160,7 @@ export default function Patrimonial({
           {[
             { color: 'bg-blue-500',   val: kpis.total_imobilizados, valCls: 'text-blue-600',   lbl: 'Total Ativos' },
             { color: 'bg-indigo-500', val: fmt(kpis.valor_total_liquido), valCls: 'text-indigo-600', lbl: 'Valor L\u00edquido' },
-            { color: 'bg-amber-500',  val: kpis.imobilizados_em_manutencao, valCls: 'text-amber-600', lbl: 'Em Manuten\u00e7\u00e3o' },
+            { color: 'bg-amber-500',  val: fmt(kpis.depreciacao_acumulada ?? 0), valCls: 'text-amber-600', lbl: 'Deprecia\u00e7\u00e3o Acum.' },
             { color: 'bg-red-500',    val: kpis.termos_pendentes, valCls: 'text-red-600',    lbl: 'Termos Pendentes' },
           ].map(({ color, val, valCls, lbl }) => (
             <div key={lbl} className={`rounded-2xl border overflow-hidden flex ${card}`}>
@@ -183,6 +187,21 @@ export default function Patrimonial({
               ${isLight ? 'border-slate-200 bg-white text-slate-800' : 'border-white/[0.08] bg-white/[0.03] text-slate-200 placeholder:text-slate-500'}`}
           />
         </div>
+        <select
+          value={filtroBase}
+          onChange={e => setFiltroBase(e.target.value)}
+          className={`px-3 py-2 rounded-xl border text-xs font-semibold
+            focus:outline-none focus:ring-2 focus:ring-violet-500/30
+            ${filtroBase
+              ? isLight ? 'border-violet-300 bg-violet-50 text-violet-700' : 'border-violet-400/40 bg-violet-500/10 text-violet-300'
+              : isLight ? 'border-slate-200 bg-white text-slate-600' : 'border-white/[0.08] bg-white/[0.03] text-slate-300'
+            }`}
+        >
+          <option value="">Todas as Bases</option>
+          {bases.filter(b => b.ativa).map(b => (
+            <option key={b.id} value={b.id}>{b.codigo ? `${b.codigo} — ${b.nome}` : b.nome}</option>
+          ))}
+        </select>
         {!forcedStatusFiltro && !showDepreciadosOnly && (
           <select
             value={statusFiltro}
@@ -247,6 +266,7 @@ export default function Patrimonial({
               setExpandedId={setExpandedId}
               onEdit={() => { setEditItem({ ...imob }); setShowForm(true) }}
               onBaixa={() => setShowBaixaModal(imob.id)}
+              onTransferir={() => setTransferirAtivo(imob)}
               isLight={isLight}
               card={card}
             />
@@ -276,6 +296,7 @@ export default function Patrimonial({
                     setExpandedId={setExpandedId}
                     onEdit={() => { setEditItem({ ...imob }); setShowForm(true) }}
                     onBaixa={() => setShowBaixaModal(imob.id)}
+                    onTransferir={() => setTransferirAtivo(imob)}
                     isLight={isLight}
                   />
                 ))}
@@ -394,6 +415,16 @@ export default function Patrimonial({
           </div>
         </div>
       )}
+
+      {/* -- Modal Transferir Ativo --------------------------------- */}
+      {transferirAtivo && (
+        <TransferirAtivoModal
+          ativo={transferirAtivo}
+          bases={bases}
+          onClose={() => setTransferirAtivo(null)}
+          isLight={isLight}
+        />
+      )}
     </div>
   )
 }
@@ -405,6 +436,7 @@ function ImobilizadoCard({
   setExpandedId,
   onEdit,
   onBaixa,
+  onTransferir,
   isLight,
   card,
 }: {
@@ -413,6 +445,7 @@ function ImobilizadoCard({
   setExpandedId: (id: string | null) => void
   onEdit: () => void
   onBaixa: () => void
+  onTransferir: () => void
   isLight: boolean
   card: string
 }) {
@@ -438,11 +471,15 @@ function ImobilizadoCard({
             </span>
           </div>
           <p className={`text-xs mt-0.5 truncate ${isLight ? 'text-slate-600' : 'text-slate-300'}`}>{imob.descricao}</p>
-          <p className={`text-[10px] ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>
-            {imob.categoria}
-            {imob.responsavel_nome ? ` - ${imob.responsavel_nome}` : ''}
-            {imob.base_nome ? ` - ${imob.base_nome}` : ''}
-          </p>
+          <div className={`flex items-center gap-2 text-[10px] ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>
+            <span>{imob.categoria}</span>
+            {imob.responsavel_nome && <span>· {imob.responsavel_nome}</span>}
+            {imob.base_nome && (
+              <span className="inline-flex items-center gap-0.5 text-violet-500 font-semibold">
+                <MapPin size={9} /> {imob.base_nome}
+              </span>
+            )}
+          </div>
         </div>
         <div className="text-right shrink-0 mr-2 hidden sm:block">
           <p className={`text-sm font-extrabold ${isLight ? 'text-slate-700' : 'text-slate-200'}`}>{fmt(imob.valor_atual ?? imob.valor_aquisicao)}</p>
@@ -464,6 +501,7 @@ function ImobilizadoCard({
           imob={imob}
           onEdit={onEdit}
           onBaixa={onBaixa}
+          onTransferir={onTransferir}
           isLight={isLight}
         />
       )}
@@ -477,6 +515,7 @@ function ImobilizadoTableRow({
   setExpandedId,
   onEdit,
   onBaixa,
+  onTransferir,
   isLight,
 }: {
   imob: PatImobilizado
@@ -484,6 +523,7 @@ function ImobilizadoTableRow({
   setExpandedId: (id: string | null) => void
   onEdit: () => void
   onBaixa: () => void
+  onTransferir: () => void
   isLight: boolean
 }) {
   const cfg = STATUS_CONFIG[imob.status]
@@ -521,7 +561,10 @@ function ImobilizadoTableRow({
       <td className={`px-4 py-2 ${isLight ? 'text-slate-600' : 'text-slate-300'}`}>
           <div className="min-w-[140px]">
             <p>{imob.responsavel_nome || '--'}</p>
-            <p className={`text-[11px] ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>{imob.base_nome || 'Sem base'}</p>
+            <p className={`text-[11px] flex items-center gap-0.5 ${imob.base_nome ? 'text-violet-500 font-semibold' : isLight ? 'text-slate-400' : 'text-slate-500'}`}>
+              {imob.base_nome && <MapPin size={9} />}
+              {imob.base_nome || 'Sem base'}
+            </p>
           </div>
         </td>
       <td className={`px-4 py-2 text-right font-extrabold ${isLight ? 'text-slate-700' : 'text-slate-200'}`}>
@@ -560,6 +603,7 @@ function ImobilizadoTableRow({
               imob={imob}
               onEdit={onEdit}
               onBaixa={onBaixa}
+              onTransferir={onTransferir}
               isLight={isLight}
             />
           </td>
@@ -570,10 +614,11 @@ function ImobilizadoTableRow({
 }
 
 function ImobilizadoDetail({
-  imob, onEdit, onBaixa, isLight
-}: { imob: PatImobilizado; onEdit: () => void; onBaixa: () => void; isLight: boolean }) {
+  imob, onEdit, onBaixa, onTransferir, isLight
+}: { imob: PatImobilizado; onEdit: () => void; onBaixa: () => void; onTransferir: () => void; isLight: boolean }) {
   const { data: movs = [] } = useMovimentacoesPatrimonial(imob.id)
   const { data: termos = [] } = useTermosResponsabilidade(imob.id)
+  const { data: transferencias = [] } = useTransferencias(imob.id)
 
   const detailBg = isLight ? 'bg-slate-50' : 'bg-white/[0.03]'
   const subtext = isLight ? 'text-slate-400' : 'text-slate-500'
@@ -650,6 +695,26 @@ function ImobilizadoDetail({
         </div>
       )}
 
+      {/* Transferencias recentes */}
+      {transferencias.length > 0 && (
+        <div>
+          <p className={`text-[10px] font-bold uppercase tracking-widest mb-2 flex items-center gap-1 ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
+            <Truck size={10} /> Transferencias
+          </p>
+          <div className="space-y-1">
+            {transferencias.slice(0, 3).map((t: any) => (
+              <div key={t.id} className={`flex items-center justify-between text-xs py-1 border-b ${isLight ? 'border-slate-50' : 'border-white/[0.04]'}`}>
+                <span className={isLight ? 'text-slate-600' : 'text-slate-300'}>
+                  {t.base_origem_nome || 'Sem base'} &rarr; {t.base_destino_nome}
+                </span>
+                <span className={subtext}>{new Date(t.data_transferencia).toLocaleDateString('pt-BR')}</span>
+                {t.motivo && <span className={`truncate max-w-[120px] ${subtext}`} title={t.motivo}>{t.motivo}</span>}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Acoes */}
       <div className="flex gap-2 pt-1">
         <button onClick={onEdit}
@@ -657,6 +722,13 @@ function ImobilizadoDetail({
             text-blue-700 text-xs font-semibold transition-colors">
           <RefreshCw size={12} /> Editar
         </button>
+        {imob.status !== 'baixado' && (
+          <button onClick={onTransferir}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-50 hover:bg-indigo-100
+              text-indigo-700 text-xs font-semibold transition-colors">
+            <Truck size={12} /> Transferir
+          </button>
+        )}
         {imob.status !== 'baixado' && (
           <button onClick={onBaixa}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-50 hover:bg-red-100
@@ -809,6 +881,153 @@ function ImobilizadoFormModal({
               text-white text-sm font-semibold transition-colors disabled:opacity-60 shadow-sm">
             {saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
             Salvar
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// -- Modal Transferir Ativo -------------------------------------------------------
+function TransferirAtivoModal({
+  ativo,
+  bases,
+  onClose,
+  isLight,
+}: {
+  ativo: PatImobilizado
+  bases: any[]
+  onClose: () => void
+  isLight: boolean
+}) {
+  const [baseDestinoId, setBaseDestinoId] = useState('')
+  const [motivo, setMotivo] = useState('')
+  const [observacoes, setObservacoes] = useState('')
+  const transferir = useTransferirAtivo()
+
+  const baseDestino = bases.find(b => b.id === baseDestinoId)
+  const canSubmit = !!baseDestinoId && baseDestinoId !== ativo.base_id
+
+  const modalBg = isLight ? 'bg-white' : 'bg-[#111827]'
+  const borderB = isLight ? 'border-slate-100' : 'border-white/[0.06]'
+  const labelCls = isLight ? 'text-slate-600' : 'text-slate-300'
+  const inputCls = isLight
+    ? 'input-base'
+    : 'input-base bg-white/[0.04] border-white/[0.08] text-slate-200 placeholder:text-slate-500'
+
+  async function handleTransferir() {
+    if (!canSubmit || !baseDestino) return
+    await transferir.mutateAsync({
+      imobilizado_id: ativo.id,
+      base_origem_id: ativo.base_id ?? null,
+      base_origem_nome: ativo.base_nome ?? null,
+      base_destino_id: baseDestinoId,
+      base_destino_nome: baseDestino.nome,
+      responsavel_id: null,
+      responsavel_nome: ativo.responsavel_nome ?? null,
+      motivo: motivo || undefined,
+      observacoes: observacoes || undefined,
+    })
+    onClose()
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+      <div className={`${modalBg} rounded-2xl shadow-2xl w-full max-w-md`}>
+        <div className={`flex items-center justify-between px-6 py-4 border-b ${borderB}`}>
+          <h2 className={`text-lg font-extrabold ${isLight ? 'text-slate-800' : 'text-white'}`}>
+            Transferir Ativo
+          </h2>
+          <button
+            onClick={onClose}
+            className={`w-8 h-8 rounded-lg flex items-center justify-center ${
+              isLight ? 'hover:bg-slate-100 text-slate-500' : 'hover:bg-white/[0.06] text-slate-400'
+            }`}
+          >
+            <X size={16} />
+          </button>
+        </div>
+
+        <div className="p-6 space-y-4">
+          {/* Ativo info */}
+          <div className={`rounded-xl p-3 ${isLight ? 'bg-slate-50' : 'bg-white/[0.03]'}`}>
+            <p className={`text-xs font-bold ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>Ativo</p>
+            <p className={`text-sm font-extrabold mt-0.5 ${isLight ? 'text-slate-800' : 'text-white'}`}>
+              {ativo.numero_patrimonio} - {ativo.descricao}
+            </p>
+          </div>
+
+          {/* Origem */}
+          <div>
+            <label className={`block text-xs font-bold mb-1 ${labelCls}`}>Origem</label>
+            <div className={`px-3 py-2 rounded-xl border text-sm ${
+              isLight ? 'border-slate-200 bg-slate-50 text-slate-600' : 'border-white/[0.08] bg-white/[0.02] text-slate-400'
+            }`}>
+              {ativo.base_nome || 'Sem base definida'}
+            </div>
+          </div>
+
+          {/* Destino */}
+          <div>
+            <label className={`block text-xs font-bold mb-1 ${labelCls}`}>Base Destino *</label>
+            <select
+              value={baseDestinoId}
+              onChange={e => setBaseDestinoId(e.target.value)}
+              className={inputCls}
+            >
+              <option value="">Selecione a base destino...</option>
+              {bases
+                .filter(b => b.id !== ativo.base_id)
+                .map(b => (
+                  <option key={b.id} value={b.id}>{b.nome}</option>
+                ))}
+            </select>
+          </div>
+
+          {/* Motivo */}
+          <div>
+            <label className={`block text-xs font-bold mb-1 ${labelCls}`}>Motivo</label>
+            <textarea
+              value={motivo}
+              onChange={e => setMotivo(e.target.value)}
+              rows={2}
+              className={`${inputCls} resize-none`}
+              placeholder="Ex: Transferencia por demanda da obra..."
+            />
+          </div>
+
+          {/* Observacoes */}
+          <div>
+            <label className={`block text-xs font-bold mb-1 ${labelCls}`}>Observacoes</label>
+            <textarea
+              value={observacoes}
+              onChange={e => setObservacoes(e.target.value)}
+              rows={2}
+              className={`${inputCls} resize-none`}
+              placeholder="Observacoes adicionais..."
+            />
+          </div>
+        </div>
+
+        <div className={`px-6 py-4 border-t flex justify-end gap-2 ${borderB}`}>
+          <button
+            onClick={onClose}
+            className={`px-4 py-2 rounded-xl border text-sm font-semibold transition-colors ${
+              isLight
+                ? 'border-slate-200 text-slate-600 hover:bg-slate-50'
+                : 'border-white/[0.08] text-slate-400 hover:bg-white/[0.04]'
+            }`}
+          >
+            Cancelar
+          </button>
+          <button
+            onClick={handleTransferir}
+            disabled={transferir.isPending || !canSubmit}
+            className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700
+              text-white text-sm font-semibold transition-colors disabled:opacity-60 shadow-sm"
+          >
+            {transferir.isPending ? <Loader2 size={14} className="animate-spin" /> : <Truck size={14} />}
+            Confirmar Transferencia
           </button>
         </div>
       </div>

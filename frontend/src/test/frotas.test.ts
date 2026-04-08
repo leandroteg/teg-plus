@@ -32,7 +32,7 @@ const CATEGORIAS_VEICULO: CategoriaVeiculo[] = [
 ]
 
 const STATUS_VEICULO: StatusVeiculo[] = [
-  'disponivel', 'em_uso', 'em_manutencao', 'bloqueado', 'baixado',
+  'disponivel', 'em_uso', 'em_manutencao', 'bloqueado', 'baixado', 'em_entrada', 'aguardando_saida',
 ]
 
 const STATUS_OS: StatusOS[] = [
@@ -1334,14 +1334,16 @@ describe('Validações extras de tipos Frotas', () => {
 
   describe('Status do veículo — cores (Veiculos.tsx)', () => {
     const STATUS_CFG: Record<StatusVeiculo, { label: string; cls: string }> = {
-      disponivel:    { label: 'Disponível',  cls: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30' },
-      em_uso:        { label: 'Em Uso',      cls: 'bg-sky-500/15 text-sky-300 border-sky-500/30' },
-      em_manutencao: { label: 'Manutenção',  cls: 'bg-amber-500/15 text-amber-300 border-amber-500/30' },
-      bloqueado:     { label: 'Bloqueado',   cls: 'bg-red-500/15 text-red-300 border-red-500/30' },
-      baixado:       { label: 'Baixado',     cls: 'bg-slate-500/10 text-slate-500 border-slate-500/20' },
+      disponivel:      { label: 'Disponível',  cls: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30' },
+      em_uso:          { label: 'Em Uso',      cls: 'bg-sky-500/15 text-sky-300 border-sky-500/30' },
+      em_manutencao:   { label: 'Manutenção',  cls: 'bg-amber-500/15 text-amber-300 border-amber-500/30' },
+      bloqueado:       { label: 'Bloqueado',   cls: 'bg-red-500/15 text-red-300 border-red-500/30' },
+      baixado:         { label: 'Baixado',     cls: 'bg-slate-500/10 text-slate-500 border-slate-500/20' },
+      em_entrada:      { label: 'Em Entrada',  cls: 'bg-violet-500/15 text-violet-300 border-violet-500/30' },
+      aguardando_saida:{ label: 'Ag. Saída',   cls: 'bg-orange-500/15 text-orange-300 border-orange-500/30' },
     }
 
-    it('todos os 5 status de veículo têm cores definidas', () => {
+    it('todos os 7 status de veículo têm cores definidas', () => {
       STATUS_VEICULO.forEach(status => {
         expect(STATUS_CFG[status]).toBeDefined()
         expect(STATUS_CFG[status].label).toBeTruthy()

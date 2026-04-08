@@ -1,13 +1,15 @@
 import { useState, useMemo } from 'react'
+import { useNavigate } from 'react-router-dom'
 import {
   Package2, Plus, Search, AlertTriangle, LayoutList, LayoutGrid,
   X, Save, Loader2, Download, Truck, PackageCheck, RefreshCw, ClipboardCheck,
-  CheckCircle2, Warehouse, Building2, Ban,
+  CheckCircle2, Warehouse, Building2, Ban, History, ArrowUpRight, ArrowDownRight,
+  Tag, ClipboardList,
 } from 'lucide-react'
 import {
-  useEstoqueItens, useSalvarItem, useSaldos,
+  useEstoqueItens, useSalvarItem, useSaldos, useBases,
   useAguardandoEntrada, useEmMovimentacao, useLiberadosRetirada,
-  useConfirmarEntrada,
+  useConfirmarEntrada, useContaCorrenteItem,
 } from '../../hooks/useEstoque'
 import { useTheme } from '../../contexts/ThemeContext'
 import type {
@@ -72,15 +74,20 @@ function fmtCurrency(v: number) {
 
 export default function Itens() {
   const { isDark } = useTheme()
+  const navigate = useNavigate()
   const [activeTab, setActiveTab] = useState<EstoquePipelineTab>('em_estoque')
   const [viewMode, setViewMode] = useState<ViewMode>('list')
   const [busca, setBusca] = useState('')
   const [curvaFiltro, setCurvaFiltro] = useState('')
+  const [categoriaFiltro, setCategoriaFiltro] = useState('')
   const [showForm, setShowForm] = useState(false)
   const [editItem, setEditItem] = useState<Partial<EstItem> | null>(null)
+  const [baseFilter, setBaseFilter] = useState('')
+  const [contaCorrenteItemId, setContaCorrenteItemId] = useState<string | undefined>(undefined)
 
   // Data
-  const { data: saldos = [], isLoading: loadingSaldos } = useSaldos()
+  const { data: bases = [] } = useBases()
+  const { data: saldos = [], isLoading: loadingSaldos } = useSaldos(baseFilter || undefined)
   const { data: entradas = [], isLoading: loadingEntradas } = useAguardandoEntrada()
   const { data: liberados = [], isLoading: loadingLiberados } = useLiberadosRetirada()
   const { data: movs = [], isLoading: loadingMovs } = useEmMovimentacao()
@@ -89,19 +96,29 @@ export default function Itens() {
 
   const accent = isDark ? STATUS_ACCENT_DARK : STATUS_ACCENT
 
+  // Categorias únicas extraídas dos itens em estoque (#138)
+  const categoriasDisponiveis = useMemo(() => {
+    const cats = saldos
+      .map(s => s.item?.categoria)
+      .filter((c): c is string => !!c?.trim())
+    return [...new Set(cats)].sort((a, b) => a.localeCompare(b, 'pt-BR'))
+  }, [saldos])
+
   // Filtered data per tab
   const saldosFiltrados = useMemo(() => {
     let list = saldos.filter(s => s.saldo > 0)
     if (curvaFiltro) list = list.filter(s => s.item?.curva_abc === curvaFiltro)
+    if (categoriaFiltro) list = list.filter(s => s.item?.categoria === categoriaFiltro)
     if (busca.trim()) {
       const t = busca.toLowerCase()
       list = list.filter(s =>
         (s.item?.descricao ?? '').toLowerCase().includes(t) ||
-        (s.item?.codigo ?? '').toLowerCase().includes(t)
+        (s.item?.codigo ?? '').toLowerCase().includes(t) ||
+        (s.item?.categoria ?? '').toLowerCase().includes(t)
       )
     }
     return list
-  }, [saldos, curvaFiltro, busca])
+  }, [saldos, curvaFiltro, categoriaFiltro, busca])
 
   const entradasFiltradas = useMemo(() => {
     if (!busca.trim()) return entradas
@@ -248,6 +265,21 @@ export default function Itens() {
           </div>
 
           {activeTab === 'em_estoque' && (
+            <select
+              value={baseFilter}
+              onChange={e => setBaseFilter(e.target.value)}
+              className={`px-2 py-1.5 rounded-lg border text-xs
+                focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400
+                ${isDark ? 'border-white/[0.08] bg-white/[0.03] text-slate-200' : 'border-slate-200 bg-white text-slate-700'}`}
+            >
+              <option value="">Estoque Geral</option>
+              {bases.map(b => (
+                <option key={b.id} value={b.id}>{b.nome}</option>
+              ))}
+            </select>
+          )}
+
+          {activeTab === 'em_estoque' && (
             <div className="flex gap-1">
               {(['', 'A', 'B', 'C'] as const).map(c => (
                 <button
@@ -264,6 +296,33 @@ export default function Itens() {
                   {c === '' ? 'Todos' : c}
                 </button>
               ))}
+            </div>
+          )}
+
+          {activeTab === 'em_estoque' && categoriasDisponiveis.length > 0 && (
+            <div className="relative flex items-center">
+              <Tag size={12} className={`absolute left-2 ${isDark ? 'text-slate-500' : 'text-slate-400'}`} />
+              <select
+                value={categoriaFiltro}
+                onChange={e => setCategoriaFiltro(e.target.value)}
+                className={`pl-6 pr-2 py-1.5 rounded-lg border text-xs
+                  focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400
+                  ${isDark ? 'border-white/[0.08] bg-white/[0.03] text-slate-200' : 'border-slate-200 bg-white text-slate-700'}
+                  ${categoriaFiltro ? (isDark ? 'border-blue-500 text-blue-300' : 'border-blue-400 text-blue-700') : ''}`}
+              >
+                <option value="">Todas as categorias</option>
+                {categoriasDisponiveis.map(cat => (
+                  <option key={cat} value={cat}>{cat}</option>
+                ))}
+              </select>
+              {categoriaFiltro && (
+                <button
+                  onClick={() => setCategoriaFiltro('')}
+                  className="absolute right-1.5 text-slate-400 hover:text-slate-600"
+                >
+                  <X size={10} />
+                </button>
+              )}
             </div>
           )}
 
@@ -309,8 +368,8 @@ export default function Itens() {
           <>
             {activeTab === 'em_estoque' && (
               viewMode === 'list'
-                ? <SaldosList data={saldosFiltrados} isDark={isDark} onEdit={openEdit} />
-                : <SaldosCards data={saldosFiltrados} isDark={isDark} />
+                ? <SaldosList data={saldosFiltrados} isDark={isDark} onEdit={openEdit} onClickItem={(id) => setContaCorrenteItemId(id)} onSolicitar={() => navigate('/estoque/solicitacoes')} />
+                : <SaldosCards data={saldosFiltrados} isDark={isDark} onClickItem={(id) => setContaCorrenteItemId(id)} />
             )}
             {activeTab === 'aguardando_entrada' && (
               viewMode === 'list'
@@ -342,6 +401,14 @@ export default function Itens() {
           isDark={isDark}
         />
       )}
+
+      {contaCorrenteItemId && (
+        <ContaCorrenteModal
+          itemId={contaCorrenteItemId}
+          onClose={() => setContaCorrenteItemId(undefined)}
+          isDark={isDark}
+        />
+      )}
     </div>
   )
 }
@@ -350,7 +417,7 @@ export default function Itens() {
 // Em Estoque — List & Cards
 // ═════════════════════════════════════════════════════════════════════════════
 
-function SaldosList({ data, isDark, onEdit }: { data: EstSaldo[]; isDark: boolean; onEdit: (item: EstItem) => void }) {
+function SaldosList({ data, isDark, onEdit, onClickItem, onSolicitar }: { data: EstSaldo[]; isDark: boolean; onEdit: (item: EstItem) => void; onClickItem: (itemId: string) => void; onSolicitar?: () => void }) {
   if (data.length === 0) return <EmptyState icon={Package2} msg="Nenhum item em estoque" sub="Os itens aparecerão aqui quando houver saldo" isDark={isDark} />
   return (
     <>
@@ -363,7 +430,7 @@ function SaldosList({ data, isDark, onEdit }: { data: EstSaldo[]; isDark: boolea
         <span className="w-[80px] shrink-0 text-right">Saldo</span>
         <span className="w-[60px] shrink-0 text-right">Reserv.</span>
         <span className="w-[80px] shrink-0 text-right">Disp.</span>
-        <span className="w-[40px] shrink-0" />
+        <span className="w-[90px] shrink-0" />
       </div>
       {/* Rows */}
       {data.map(s => {
@@ -371,7 +438,7 @@ function SaldosList({ data, isDark, onEdit }: { data: EstSaldo[]; isDark: boolea
         const curva = CURVA_COLOR[s.item?.curva_abc ?? 'C']
         const disponivel = s.saldo - (s.saldo_reservado ?? 0)
         return (
-          <div key={s.id} className={`flex items-center gap-2 px-3 py-1.5 border-b cursor-pointer transition-all ${
+          <div key={s.id} onClick={() => s.item_id && onClickItem(s.item_id)} className={`flex items-center gap-2 px-3 py-1.5 border-b cursor-pointer transition-all ${
             isDark ? 'border-white/[0.04] hover:bg-white/[0.03]' : 'border-slate-100 hover:bg-slate-50'
           }`}>
             <span className={`text-[11px] font-mono font-bold w-[70px] shrink-0 ${isDark ? 'text-blue-400' : 'text-blue-700'}`}>
@@ -403,7 +470,16 @@ function SaldosList({ data, isDark, onEdit }: { data: EstSaldo[]; isDark: boolea
             }`}>
               {disponivel} {s.item?.unidade}
             </span>
-            <span className="w-[40px] shrink-0 text-right">
+            <span className="w-[90px] shrink-0 flex items-center justify-end gap-2">
+              <button
+                onClick={(e) => { e.stopPropagation(); onSolicitar?.() }}
+                title="Nova solicitação de retirada"
+                className={`flex items-center gap-0.5 text-[10px] font-semibold transition-colors ${
+                  isDark ? 'text-teal-400 hover:text-teal-300' : 'text-teal-600 hover:text-teal-700'
+                }`}
+              >
+                <ClipboardList size={11} /> Solicitar
+              </button>
               <button
                 onClick={(e) => { e.stopPropagation(); s.item && onEdit(s.item as EstItem) }}
                 className="text-[10px] text-blue-600 font-semibold hover:underline"
@@ -418,7 +494,7 @@ function SaldosList({ data, isDark, onEdit }: { data: EstSaldo[]; isDark: boolea
   )
 }
 
-function SaldosCards({ data, isDark }: { data: EstSaldo[]; isDark: boolean }) {
+function SaldosCards({ data, isDark, onClickItem }: { data: EstSaldo[]; isDark: boolean; onClickItem: (itemId: string) => void }) {
   if (data.length === 0) return <EmptyState icon={Package2} msg="Nenhum item em estoque" sub="Os itens aparecerão aqui quando houver saldo" isDark={isDark} />
   return (
     <div className="space-y-2 p-4">
@@ -427,7 +503,7 @@ function SaldosCards({ data, isDark }: { data: EstSaldo[]; isDark: boolean }) {
         const curva = CURVA_COLOR[s.item?.curva_abc ?? 'C']
         const disponivel = s.saldo - (s.saldo_reservado ?? 0)
         return (
-          <div key={s.id} className={`rounded-2xl border p-4 cursor-pointer transition-all group flex flex-col ${
+          <div key={s.id} onClick={() => s.item_id && onClickItem(s.item_id)} className={`rounded-2xl border p-4 cursor-pointer transition-all group flex flex-col ${
             isDark
               ? 'border-white/[0.06] hover:border-blue-500/30 hover:shadow-lg hover:shadow-blue-500/5 bg-white/[0.02]'
               : 'border-slate-200 hover:border-blue-300 hover:shadow-md bg-white'
@@ -844,6 +920,147 @@ function EmptyState({ icon: Icon, msg, sub, isDark }: { icon: any; msg: string; 
       </div>
       <p className={`text-sm font-semibold ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{msg}</p>
       {sub && <p className={`text-xs mt-1 ${isDark ? 'text-slate-600' : 'text-slate-400'}`}>{sub}</p>}
+    </div>
+  )
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// Conta Corrente Modal
+// ═════════════════════════════════════════════════════════════════════════════
+
+function ContaCorrenteModal({ itemId, onClose, isDark }: { itemId: string; onClose: () => void; isDark: boolean }) {
+  const { data, isLoading } = useContaCorrenteItem(itemId)
+  const saldos = data?.saldos ?? []
+  const movs = data?.movimentacoes ?? []
+
+  const modalBg = isDark ? 'bg-[#111827]' : 'bg-white'
+  const borderB = isDark ? 'border-white/[0.06]' : 'border-slate-100'
+
+  // Compute running balance chronologically
+  const movsComSaldo = useMemo(() => {
+    let running = 0
+    return movs.map(m => {
+      const isEntrada = ['entrada', 'transferencia_in', 'ajuste_positivo', 'devolucao'].includes(m.tipo)
+      running += isEntrada ? m.quantidade : -m.quantidade
+      return { ...m, saldo_acumulado: running }
+    })
+  }, [movs])
+
+  const itemInfo = movs[0]?.item
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+      <div className={`${modalBg} rounded-2xl shadow-2xl w-full max-w-3xl max-h-[90vh] flex flex-col`}>
+        {/* Header */}
+        <div className={`flex items-center justify-between px-6 py-4 border-b ${borderB} shrink-0`}>
+          <div className="flex items-center gap-3">
+            <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${isDark ? 'bg-blue-500/20' : 'bg-blue-100'}`}>
+              <History size={18} className={isDark ? 'text-blue-400' : 'text-blue-600'} />
+            </div>
+            <div>
+              <h2 className={`text-lg font-extrabold ${isDark ? 'text-white' : 'text-slate-800'}`}>
+                Conta Corrente
+              </h2>
+              <p className={`text-xs ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+                {itemInfo ? `${itemInfo.codigo} — ${itemInfo.descricao}` : 'Carregando...'}
+              </p>
+            </div>
+          </div>
+          <button onClick={onClose} className={`w-8 h-8 rounded-lg flex items-center justify-center ${isDark ? 'hover:bg-white/[0.06] text-slate-400' : 'hover:bg-slate-100 text-slate-500'}`}>
+            <X size={16} />
+          </button>
+        </div>
+
+        {isLoading ? (
+          <div className="flex items-center justify-center py-16">
+            <div className="w-8 h-8 border-[3px] border-blue-500 border-t-transparent rounded-full animate-spin" />
+          </div>
+        ) : (
+          <div className="overflow-y-auto flex-1">
+            {/* Saldo por Base */}
+            {saldos.length > 0 && (
+              <div className={`px-6 py-4 border-b ${borderB}`}>
+                <h3 className={`text-xs font-bold uppercase tracking-wider mb-3 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+                  Saldo Atual por Base
+                </h3>
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+                  {saldos.map(s => (
+                    <div key={s.id} className={`rounded-xl border p-3 ${isDark ? 'border-white/[0.06] bg-white/[0.02]' : 'border-slate-200 bg-slate-50'}`}>
+                      <p className={`text-[10px] font-semibold ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+                        {s.base?.nome ?? 'Base'}
+                      </p>
+                      <p className={`text-lg font-extrabold mt-0.5 ${isDark ? 'text-white' : 'text-slate-800'}`}>
+                        {s.saldo}
+                      </p>
+                      {(s.saldo_reservado ?? 0) > 0 && (
+                        <p className={`text-[10px] ${isDark ? 'text-amber-400' : 'text-amber-600'}`}>
+                          Reservado: {s.saldo_reservado}
+                        </p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Movimentacoes */}
+            <div className="px-6 py-4">
+              <h3 className={`text-xs font-bold uppercase tracking-wider mb-3 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+                Historico de Movimentacoes ({movsComSaldo.length})
+              </h3>
+              {movsComSaldo.length === 0 ? (
+                <p className={`text-sm text-center py-8 ${isDark ? 'text-slate-600' : 'text-slate-400'}`}>
+                  Nenhuma movimentacao registrada
+                </p>
+              ) : (
+                <div className="space-y-0">
+                  {/* Header */}
+                  <div className={`flex items-center gap-2 px-2 py-1 text-[10px] font-semibold uppercase tracking-wider ${isDark ? 'text-slate-600' : 'text-slate-400'}`}>
+                    <span className="w-[70px] shrink-0">Data</span>
+                    <span className="w-[90px] shrink-0">Tipo</span>
+                    <span className="w-[60px] shrink-0 text-right">Qtd</span>
+                    <span className="flex-1 min-w-0">Base</span>
+                    <span className="w-[100px] shrink-0 hidden md:block">Responsavel</span>
+                    <span className="w-[60px] shrink-0 text-right">Saldo</span>
+                  </div>
+                  {/* Rows (newest first for display) */}
+                  {[...movsComSaldo].reverse().map(m => {
+                    const isEntrada = ['entrada', 'transferencia_in', 'ajuste_positivo', 'devolucao'].includes(m.tipo)
+                    return (
+                      <div key={m.id} className={`flex items-center gap-2 px-2 py-1.5 border-t ${isDark ? 'border-white/[0.04]' : 'border-slate-100'}`}>
+                        <span className={`text-[11px] w-[70px] shrink-0 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+                          {fmtDate(m.criado_em)}
+                        </span>
+                        <span className="w-[90px] shrink-0 flex items-center gap-1">
+                          {isEntrada
+                            ? <ArrowUpRight size={11} className="text-emerald-500" />
+                            : <ArrowDownRight size={11} className="text-red-500" />
+                          }
+                          <span className={`text-[11px] font-medium ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
+                            {TIPO_LABEL[m.tipo] ?? m.tipo}
+                          </span>
+                        </span>
+                        <span className={`text-[11px] font-semibold text-right w-[60px] shrink-0 ${isEntrada ? 'text-emerald-600' : 'text-red-500'}`}>
+                          {isEntrada ? '+' : '-'}{m.quantidade}
+                        </span>
+                        <span className={`text-[11px] truncate flex-1 min-w-0 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+                          {m.base?.nome ?? '—'}
+                        </span>
+                        <span className={`text-[11px] truncate w-[100px] shrink-0 hidden md:block ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+                          {m.responsavel_nome ?? '—'}
+                        </span>
+                        <span className={`text-[11px] font-bold text-right w-[60px] shrink-0 ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>
+                          {m.saldo_acumulado}
+                        </span>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   )
 }

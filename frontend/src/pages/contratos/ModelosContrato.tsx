@@ -10,6 +10,7 @@ import {
 import { useAuth } from '../../contexts/AuthContext'
 import { GRUPO_CONTRATO_OPTIONS, GRUPO_CONTRATO_LABEL } from '../../constants/contratos'
 import type { GrupoContrato } from '../../types/contratos'
+import NumericInput from '../../components/NumericInput'
 import { supabase } from '../../services/supabase'
 
 const RECORRENCIAS = [
@@ -208,10 +209,10 @@ function ModeloForm({
               <div className="grid grid-cols-3 gap-2">
                 <input value={it.unidade} onChange={e => updateItem(idx, 'unidade', e.target.value)}
                   placeholder="un" className={inputClass} />
-                <input type="number" value={it.quantidade || ''} onChange={e => updateItem(idx, 'quantidade', parseFloat(e.target.value) || 0)}
-                  placeholder="Qtd" className={inputClass} min="0" step="0.01" />
-                <input type="number" value={it.valor_unitario || ''} onChange={e => updateItem(idx, 'valor_unitario', parseFloat(e.target.value) || 0)}
-                  placeholder="Valor Un." className={inputClass} min="0" step="0.01" />
+                <NumericInput value={it.quantidade} onChange={v => updateItem(idx, 'quantidade', v)}
+                  placeholder="Qtd" className={inputClass} min={0} step={0.01} />
+                <NumericInput value={it.valor_unitario} onChange={v => updateItem(idx, 'valor_unitario', v)}
+                  placeholder="Valor Un." className={inputClass} min={0} step={0.01} />
               </div>
             </div>
           ))
@@ -280,7 +281,8 @@ function ModeloCard({
   onEdit: () => void
   onDelete: () => void
 }) {
-  const { atLeast } = useAuth()
+  const { atLeast, hasSetorPapel } = useAuth()
+  const canManage = hasSetorPapel('contratos', ['supervisor', 'diretor', 'ceo'])
   const [expanded, setExpanded] = useState(false)
   const isDespesa = modelo.tipo_contrato === 'despesa'
   const excluir = useExcluirModelo()
@@ -365,14 +367,14 @@ function ModeloCard({
         )}
 
         {/* Actions */}
-        {atLeast('comprador') && (
+        {(atLeast('comprador') || canManage) && (
           <div className="flex gap-2 mt-3">
             <button onClick={onEdit}
               className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-violet-50 border border-violet-200 text-[11px] font-semibold text-violet-600 hover:bg-violet-100 transition-all">
               <Edit3 size={11} />
               Editar
             </button>
-            {atLeast('gerente') && (
+            {(atLeast('gerente') || canManage) && (
               <button
                 onClick={() => {
                   if (confirm('Excluir este modelo? Esta ação não pode ser desfeita.')) onDelete()
@@ -393,7 +395,8 @@ function ModeloCard({
 // ── Página Principal ─────────────────────────────────────────────────────────
 
 export default function ModelosContrato() {
-  const { atLeast } = useAuth()
+  const { atLeast, hasSetorPapel } = useAuth()
+  const canManage = hasSetorPapel('contratos', ['supervisor', 'diretor', 'ceo'])
   const { data: modelos = [], isLoading } = useModelosContrato()
   const criarModelo = useCriarModelo()
   const atualizarModelo = useAtualizarModelo()
@@ -494,7 +497,7 @@ export default function ModelosContrato() {
             <p className="text-xs text-slate-400 mt-0.5">Templates reutilizáveis para contratos</p>
           </div>
         </div>
-        {atLeast('comprador') && (
+        {(atLeast('comprador') || canManage) && (
           <button onClick={() => setMode('create')}
             className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-violet-600 text-white text-xs font-bold hover:bg-violet-700 transition-all shadow-sm">
             <Plus size={14} />

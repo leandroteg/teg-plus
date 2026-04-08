@@ -1,8 +1,9 @@
 // CotacaoComparativo.tsx — Comparativo de fornecedores (total + matriz por item)
 import { useCallback, useMemo } from 'react'
-import { Check, Trophy, FileText, ExternalLink, Package } from 'lucide-react'
+import { Check, Trophy, FileText, ExternalLink, Package, Sparkles } from 'lucide-react'
 import type { CotacaoFornecedor, ItemSelecionado } from '../types'
 import { supabase } from '../services/supabase'
+import { calcularRecomendacao } from '../utils/cotacaoRecomendacao'
 
 function formatBRL(val: number) {
   return val.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
@@ -24,6 +25,13 @@ export default function CotacaoComparativo({ fornecedores, onSelect, readOnly = 
     const { data } = await supabase.storage.from('cotacoes-docs').createSignedUrl(path, 3600)
     if (data?.signedUrl) window.open(data.signedUrl, '_blank')
   }, [])
+
+  const recomendacao = useMemo(() => calcularRecomendacao(fornecedores), [fornecedores])
+  const scoreMap = useMemo(() => {
+    const m = new Map<string, number>()
+    recomendacao?.scores.forEach(s => m.set(s.id, s.score))
+    return m
+  }, [recomendacao])
 
   if (fornecedores.length === 0) return null
 
@@ -145,20 +153,28 @@ export default function CotacaoComparativo({ fornecedores, onSelect, readOnly = 
                       }`}>
                         {formatBRL(f.valor_total)}
                       </span>
-                      {(isBest || isSelected) && (
-                        <div className="flex items-center justify-end gap-0.5 mt-0.5">
-                          {isSelected && (
-                            <span className="text-[9px] font-bold text-teal-600 flex items-center gap-0.5">
-                              <Check size={8} /> Selecionado
-                            </span>
-                          )}
-                          {!isSelected && isBest && (
-                            <span className="text-[9px] font-bold text-amber-600 flex items-center gap-0.5">
-                              <Trophy size={8} /> Menor preço
-                            </span>
-                          )}
-                        </div>
-                      )}
+                      <div className="flex items-center justify-end gap-1 mt-0.5 flex-wrap">
+                        {isSelected && (
+                          <span className="text-[9px] font-bold text-teal-600 flex items-center gap-0.5">
+                            <Check size={8} /> Selecionado
+                          </span>
+                        )}
+                        {!isSelected && isBest && (
+                          <span className="text-[9px] font-bold text-amber-600 flex items-center gap-0.5">
+                            <Trophy size={8} /> Menor preco
+                          </span>
+                        )}
+                        {recomendacao?.recomendadoId === f.id && (
+                          <span className="text-[9px] font-bold text-indigo-600 flex items-center gap-0.5">
+                            <Sparkles size={8} /> Recomendado
+                          </span>
+                        )}
+                        {scoreMap.has(f.id) && (
+                          <span className="text-[9px] font-medium text-slate-400">
+                            {scoreMap.get(f.id)}pts
+                          </span>
+                        )}
+                      </div>
                     </td>
                   )
                 })}
@@ -192,14 +208,24 @@ export default function CotacaoComparativo({ fornecedores, onSelect, readOnly = 
                             <Check size={9} /> Selecionado
                           </span>
                         )}
+                        {recomendacao?.recomendadoId === f.id && (
+                          <span className="inline-flex items-center gap-0.5 bg-indigo-100 text-indigo-700 text-[10px] font-bold px-1.5 py-0.5 rounded-full">
+                            <Sparkles size={9} /> Recomendado
+                          </span>
+                        )}
                       </div>
                       {f.fornecedor_cnpj && (
                         <p className="text-[11px] text-slate-400 font-mono mt-0.5">{f.fornecedor_cnpj}</p>
                       )}
                     </div>
-                    <p className={`text-base font-black flex-shrink-0 ${isBest ? 'text-teal-600' : 'text-slate-700'}`}>
-                      {formatBRL(f.valor_total)}
-                    </p>
+                    <div className="text-right flex-shrink-0">
+                      <p className={`text-base font-black ${isBest ? 'text-teal-600' : 'text-slate-700'}`}>
+                        {formatBRL(f.valor_total)}
+                      </p>
+                      {scoreMap.has(f.id) && (
+                        <p className="text-[10px] text-slate-400 font-semibold">{scoreMap.get(f.id)} pts</p>
+                      )}
+                    </div>
                   </div>
                   <div className="grid grid-cols-2 gap-1.5 text-[11px] text-slate-600 mb-3">
                     {f.prazo_entrega_dias != null && (
@@ -265,6 +291,11 @@ export default function CotacaoComparativo({ fornecedores, onSelect, readOnly = 
                               <Check size={9} /> Selecionado
                             </span>
                           )}
+                          {recomendacao?.recomendadoId === f.id && (
+                            <span className="inline-flex items-center gap-0.5 bg-indigo-100 text-indigo-700 text-[10px] font-bold px-1.5 py-0.5 rounded-full">
+                              <Sparkles size={9} /> Recomendado
+                            </span>
+                          )}
                         </div>
                         {f.fornecedor_cnpj && (
                           <p className="text-[11px] text-slate-400 font-mono mt-0.5">{f.fornecedor_cnpj}</p>
@@ -274,6 +305,9 @@ export default function CotacaoComparativo({ fornecedores, onSelect, readOnly = 
                         <span className={`font-black text-base ${isBest ? 'text-teal-600' : 'text-slate-700'}`}>
                           {formatBRL(f.valor_total)}
                         </span>
+                        {scoreMap.has(f.id) && (
+                          <p className="text-[10px] text-slate-400 font-semibold mt-0.5">{scoreMap.get(f.id)} pts</p>
+                        )}
                       </td>
                       <td className="px-4 py-3 text-center">
                         {f.prazo_entrega_dias != null
@@ -318,6 +352,19 @@ export default function CotacaoComparativo({ fornecedores, onSelect, readOnly = 
             </table>
           </div>
         </>
+      )}
+
+      {/* Card de recomendação */}
+      {recomendacao && fornecedores.length >= 2 && (
+        <div className="mx-4 mb-4 mt-2 flex items-start gap-2.5 rounded-xl bg-indigo-50 border border-indigo-200 px-3.5 py-2.5">
+          <Sparkles size={14} className="text-indigo-500 shrink-0 mt-0.5" />
+          <div className="min-w-0">
+            <p className="text-[11px] font-bold text-indigo-800">{recomendacao.resumo}</p>
+            <p className="text-[10px] text-indigo-500 mt-0.5">
+              Score: {recomendacao.scores.map(s => `${s.nome} ${s.score}pts`).join(' · ')}
+            </p>
+          </div>
+        </div>
       )}
     </div>
   )

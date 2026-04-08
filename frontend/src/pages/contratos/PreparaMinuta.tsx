@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import { useParams, useNavigate } from 'react-router-dom'
 import {
   ArrowLeft, FileText, Plus, Upload, ExternalLink, Check,
@@ -1414,6 +1415,7 @@ export default function PreparaMinuta() {
   const atualizarResumo = useAtualizarResumo()
   const avancarEtapa = useAvancarEtapa()
   const analisarMinuta = useAnalisarMinuta()
+  const qc = useQueryClient()
   const atualizarConfig = useAtualizarConfigAnalise()
   const uploadFile = useUploadMinutaFile()
   const melhorarMinuta = useMelhorarMinuta()
@@ -2100,19 +2102,47 @@ export default function PreparaMinuta() {
                     </div>
                     {modelo.arquivo_url ? (
                       <button
-                        onClick={async () => {
+                        disabled={uploadFile.isPending}
+                        onClick={async (e) => {
+                          e.stopPropagation()
+                          const btn = e.currentTarget
+                          btn.textContent = 'Carregando...'
+                          btn.disabled = true
                           try {
                             const resp = await fetch(modelo.arquivo_url!)
+                            if (!resp.ok) throw new Error(`Erro ao baixar modelo: ${resp.status}`)
                             const blob = await resp.blob()
-                            const fileName = `modelo_${modelo.nome.replace(/\s+/g, '_')}.pdf`
-                            const file = new File([blob], fileName, { type: blob.type })
-                            await uploadFile.mutateAsync({
-                              solicitacao_id: solicitacao!.id,
+                            const ext = modelo.arquivo_url!.split('.').pop()?.toLowerCase() || 'pdf'
+                            const mimeType = ext === 'docx' ? 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+                              : ext === 'doc' ? 'application/msword' : 'application/pdf'
+                            const fileName = `modelo_${modelo.nome.replace(/\s+/g, '_')}.${ext}`
+                            const file = new File([blob], fileName, { type: mimeType })
+                            const uploaded = await uploadFile.mutateAsync({
+                              solicitacaoId: solicitacao!.id,
                               file,
-                              tipo: 'modelo' as any,
                             })
-                          } catch (err) {
+                            await supabase.from('con_minutas').insert({
+                              solicitacao_id: solicitacao!.id,
+                              versao: (minutas?.length ?? 0) + 1,
+                              tipo: 'modelo',
+                              titulo: modelo.nome,
+                              arquivo_url: uploaded.arquivo_url,
+                              arquivo_nome: fileName,
+                              status: 'em_revisao',
+                            })
+                            qc.invalidateQueries({ queryKey: ['con-minutas', solicitacao!.id] })
+                            btn.textContent = '✓ Carregado!'
+                            btn.className = 'px-3 py-1.5 text-xs font-semibold rounded-lg bg-emerald-600 text-white'
+                          } catch (err: any) {
                             console.error('Erro ao usar modelo:', err)
+                            btn.textContent = 'Erro!'
+                            btn.className = 'px-3 py-1.5 text-xs font-semibold rounded-lg bg-red-600 text-white'
+                            alert(`Erro ao carregar modelo: ${err?.message || 'erro desconhecido'}`)
+                            setTimeout(() => {
+                              btn.textContent = 'Usar como base'
+                              btn.className = 'px-3 py-1.5 text-xs font-semibold rounded-lg bg-violet-600 text-white hover:bg-violet-700 transition-colors'
+                              btn.disabled = false
+                            }, 2000)
                           }
                         }}
                         className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-violet-600 text-white hover:bg-violet-700 transition-colors"

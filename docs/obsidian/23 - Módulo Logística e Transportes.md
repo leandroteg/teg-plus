@@ -277,4 +277,28 @@ erDiagram
 
 ---
 
-*Documentação gerada em 2026-03-03. Atualizado em 2026-03-12: remoção do módulo Transportadoras (integrado ao Cadastros/Fornecedores) e simplificação do formulário Nova Solicitação.*
+## Componentes Especiais
+
+### PlanejamentoRotaModal
+
+Modal de planejamento de rota com:
+- Mapa interativo via **Leaflet** (OpenStreetMap)
+- Autocomplete de endereços para origem e destino
+- Cálculo de distância estimada
+- Seleção de modal, transportadora e veículo
+
+### RomaneioDocumentoCard
+
+Card de documento do romaneio de carga exibido na expedição, com dados do transporte, NF-e, itens e checklist.
+
+---
+
+## Integração Financeira
+
+Ao aprovar/concluir um transporte, o sistema pode gerar automaticamente um registro em `fin_contas_pagar` para pagamento da transportadora:
+- Aprovação de transporte com custo → cria CP com status `previsto`
+- Confirmação de entrega → atualiza CP para `aguardando_aprovacao`
+
+---
+
+*Documentação gerada em 2026-03-03. Atualizado em 2026-04-07: PlanejamentoRotaModal com Leaflet, RomaneioDocumentoCard, integração financeira.*

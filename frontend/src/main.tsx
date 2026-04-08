@@ -16,7 +16,12 @@ window.addEventListener('unhandledrejection', (e) => {
 
 const queryClient = new QueryClient({
   defaultOptions: {
-    queries: { staleTime: 30_000, retry: 2 },
+    queries: {
+      staleTime: 30_000,
+      retry: 2,
+      gcTime: 1000 * 60 * 5,        // 5min — evita cache antigo
+      refetchOnWindowFocus: true,
+    },
   },
 })
 

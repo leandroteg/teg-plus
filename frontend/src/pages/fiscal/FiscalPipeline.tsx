@@ -1099,8 +1099,9 @@ function NFCard({ sol, onClick, isDark, isSelected, onSelect }: {
 
 export default function FiscalPipeline() {
   const { isDark } = useTheme()
-  const { role } = useAuth()
+  const { role, hasSetorPapel } = useAuth()
   const isGestor = role === 'admin' || role === 'gerente'
+    || hasSetorPapel('fiscal', ['supervisor', 'diretor', 'ceo'])
 
   // State
   const [activeTab, setActiveTab] = useState<StatusFiscalPipeline>('pendente')
@@ -1526,7 +1527,7 @@ export default function FiscalPipeline() {
               ))}
             </>
           ) : (
-            <div className="p-3 space-y-2">
+            <div className="p-3 space-y-2 stagger-children">
               {activeItems.map(sol => (
                 <NFCard key={sol.id} sol={sol}
                   onClick={() => setDetailSol(sol)}

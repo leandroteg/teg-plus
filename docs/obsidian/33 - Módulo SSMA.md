@@ -108,6 +108,25 @@ Prefixo de tabelas: `ssm_`
 
 ---
 
+## Controle de Vencimentos
+
+O módulo implementa rastreamento automático de vencimento para 3 tipos de item:
+
+| Item | Validade Típica | Alerta |
+|------|-----------------|--------|
+| **Treinamentos NR** | 1-2 anos conforme NR | 30 dias antes do vencimento |
+| **EPIs** | Conforme fabricante (CA) | 30 dias antes da validade |
+| **ASOs** | 6-12 meses conforme função | 30 dias antes do vencimento |
+
+### Função `ssm_gerar_alertas_vencimento()`
+
+Função PostgreSQL executada diariamente via cron/n8n que:
+1. Verifica todos os treinamentos, EPIs e ASOs com validade nos próximos 30 dias
+2. Gera alertas na tabela de notificações do sistema
+3. Notifica o gestor de SSMA e o colaborador afetado
+
+---
+
 ## Links Relacionados
 
 - [[03 - Páginas e Rotas]] — Rota `/ssma`

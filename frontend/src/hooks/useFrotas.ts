@@ -11,6 +11,8 @@ import type {
   StatusVeiculo, CategoriaVeiculo,
   StatusOS, PrioridadeOS, StatusOcorrenciaTel, TipoChecklist,
   CriarOSPayload, CriarChecklistPayload, RegistrarAbastecimentoPayload,
+  FroAlocacao, FroMulta, FroChecklistTemplate, FroChecklistExecucao, FroAcessorio,
+  StatusAlocacao, TipoMulta, StatusMulta, TipoChecklist2,
 } from '../types/frotas'
 
 // ── Veículos ──────────────────────────────────────────────────────────────────
@@ -608,6 +610,148 @@ export function useFrotasKPIs() {
         custo_abastecimento_mes:(abastRes.data ?? []).reduce((s, a) => s + (a.valor_total ?? 0), 0),
         ocorrencias_abertas:    (otelRes.data ?? []).length,
       } as FrotasKPIs
+    },
+  })
+}
+
+// ── Alocações ─────────────────────────────────────────────────────────────────
+
+export function useAlocacoes(filtros?: { status?: StatusAlocacao; veiculo_id?: string }) {
+  return useQuery({
+    queryKey: ['fro_alocacoes', filtros],
+    queryFn: async () => {
+      let q = supabase
+        .from('fro_alocacoes')
+        .select(`*, veiculo:fro_veiculos(id,placa,modelo,marca,categoria), obra:sys_obras(id,nome,codigo)`)
+        .order('data_saida', { ascending: false })
+      if (filtros?.status)     q = q.eq('status', filtros.status)
+      if (filtros?.veiculo_id) q = q.eq('veiculo_id', filtros.veiculo_id)
+      const { data, error } = await q
+      if (error) throw error
+      return data as FroAlocacao[]
+    },
+  })
+}
+
+export function useCriarAlocacao() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (payload: Omit<FroAlocacao, 'id' | 'created_at' | 'updated_at' | 'veiculo' | 'obra'>) => {
+      const { error } = await supabase.from('fro_alocacoes').insert(payload)
+      if (error) throw error
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['fro_alocacoes'] })
+      qc.invalidateQueries({ queryKey: ['fro_veiculos'] })
+    },
+  })
+}
+
+export function useEncerrarAlocacao() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ id, hodometro_retorno, horimetro_retorno, observacoes }: {
+      id: string; hodometro_retorno?: number; horimetro_retorno?: number; observacoes?: string
+    }) => {
+      const { error } = await supabase
+        .from('fro_alocacoes')
+        .update({ status: 'encerrada', data_retorno_real: new Date().toISOString(), hodometro_retorno, horimetro_retorno, observacoes })
+        .eq('id', id)
+      if (error) throw error
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['fro_alocacoes'] })
+      qc.invalidateQueries({ queryKey: ['fro_veiculos'] })
+    },
+  })
+}
+
+// ── Multas & Pedágios ─────────────────────────────────────────────────────────
+
+export function useMultas(filtros?: { tipo?: TipoMulta; status?: StatusMulta }) {
+  return useQuery({
+    queryKey: ['fro_multas', filtros],
+    queryFn: async () => {
+      let q = supabase
+        .from('fro_multas')
+        .select(`*, veiculo:fro_veiculos(id,placa,modelo), obra:sys_obras(id,nome)`)
+        .order('created_at', { ascending: false })
+      if (filtros?.tipo)   q = q.eq('tipo', filtros.tipo)
+      if (filtros?.status) q = q.eq('status', filtros.status)
+      const { data, error } = await q
+      if (error) throw error
+      return data as FroMulta[]
+    },
+  })
+}
+
+export function useSalvarMulta() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (payload: Partial<FroMulta> & { veiculo_id: string; tipo: TipoMulta; valor: number }) => {
+      const { id, created_at, updated_at, veiculo, obra, ...data } = payload as FroMulta
+      if (id) {
+        const { error } = await supabase.from('fro_multas').update(data).eq('id', id)
+        if (error) throw error
+      } else {
+        const { error } = await supabase.from('fro_multas').insert(data)
+        if (error) throw error
+      }
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['fro_multas'] }),
+  })
+}
+
+// ── Checklist Templates ───────────────────────────────────────────────────────
+
+export function useChecklistTemplates(tipo?: TipoChecklist2) {
+  return useQuery({
+    queryKey: ['fro_checklist_templates', tipo],
+    queryFn: async () => {
+      let q = supabase
+        .from('fro_checklist_templates')
+        .select(`*, itens:fro_checklist_template_itens(*)`)
+        .eq('ativo', true)
+        .order('nome')
+      if (tipo) q = q.eq('tipo', tipo)
+      const { data, error } = await q
+      if (error) throw error
+      return data as FroChecklistTemplate[]
+    },
+  })
+}
+
+export function useChecklistExecucoes(veiculo_id?: string) {
+  return useQuery({
+    queryKey: ['fro_checklist_execucoes', veiculo_id],
+    queryFn: async () => {
+      let q = supabase
+        .from('fro_checklist_execucoes')
+        .select(`*,
+          template:fro_checklist_templates(id,nome,tipo),
+          veiculo:fro_veiculos(id,placa,modelo),
+          itens:fro_checklist_execucao_itens(*, template_item:fro_checklist_template_itens(*))
+        `)
+        .order('created_at', { ascending: false })
+      if (veiculo_id) q = q.eq('veiculo_id', veiculo_id)
+      const { data, error } = await q
+      if (error) throw error
+      return data as FroChecklistExecucao[]
+    },
+  })
+}
+
+export function useAcessorios() {
+  return useQuery({
+    queryKey: ['fro_acessorios'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('fro_acessorios')
+        .select('*')
+        .eq('ativo', true)
+        .order('nome')
+      if (error) throw error
+      return data as FroAcessorio[]
     },
   })
 }

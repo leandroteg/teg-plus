@@ -242,6 +242,7 @@ export function useSalvarObra() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['cad-obras'] })
       qc.invalidateQueries({ queryKey: ['obras'] })
+      qc.invalidateQueries({ queryKey: ['lookups'] })
     },
   })
 }

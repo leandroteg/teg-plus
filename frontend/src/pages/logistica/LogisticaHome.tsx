@@ -36,6 +36,7 @@ const STATUS_LABEL: Record<string, { label: string; dot: string; bg: string; tex
   aprovado: { label: 'Aprovado', dot: 'bg-indigo-400', bg: 'bg-indigo-50', text: 'text-indigo-700' },
   romaneio_emitido: { label: 'Romaneio', dot: 'bg-teal-400', bg: 'bg-teal-50', text: 'text-teal-700' },
   nfe_emitida: { label: 'NF-e emitida', dot: 'bg-violet-400', bg: 'bg-violet-50', text: 'text-violet-700' },
+  transporte_pendente: { label: 'Transp. pendente', dot: 'bg-slate-400', bg: 'bg-slate-100', text: 'text-slate-700' },
   aguardando_coleta: { label: 'Aguard. coleta', dot: 'bg-cyan-400', bg: 'bg-cyan-50', text: 'text-cyan-700' },
   em_transito: { label: 'Em transito', dot: 'bg-orange-400', bg: 'bg-orange-50', text: 'text-orange-700' },
   entregue: { label: 'Entregue', dot: 'bg-teal-400', bg: 'bg-teal-50', text: 'text-teal-700' },
@@ -50,7 +51,7 @@ const TIPO_LABEL: Record<string, string> = {
   transferencia_maquina: 'Transf. maquina',
 }
 
-const OPERATIONAL_STATUSES = ['planejado', 'aprovado', 'nfe_emitida', 'aguardando_coleta', 'em_transito'] as const
+const OPERATIONAL_STATUSES = ['planejado', 'aprovado', 'transporte_pendente', 'aguardando_coleta', 'em_transito'] as const
 
 function parseDate(value?: string) {
   if (!value) return 0
@@ -117,7 +118,7 @@ export default function LogisticaHome() {
     status: ['solicitado', 'planejado', 'aguardando_aprovacao'],
   })
   const { data: operacionais = [] } = useSolicitacoes({ status: [...OPERATIONAL_STATUSES] })
-  const { data: aguardandoColeta = [] } = useSolicitacoes({ status: ['nfe_emitida', 'aguardando_coleta'] })
+  const { data: aguardandoColeta = [] } = useSolicitacoes({ status: ['transporte_pendente', 'aguardando_coleta'] })
   const { data: transportesAtivos = [] } = useTransportes()
 
   const operationalView = useMemo(() => {
@@ -217,13 +218,17 @@ export default function LogisticaHome() {
       return `/logistica/solicitacoes?${params.toString()}`
     }
 
-    if (sol.status === 'aprovado' || sol.status === 'romaneio_emitido' || (sol.status === 'nfe_emitida' && sol.doc_fiscal_tipo !== 'nf')) {
-      params.set('tab', sol.status === 'nfe_emitida' ? 'nfe_emitida' : sol.status)
+    if (sol.status === 'aprovado') {
+      params.set('tab', sol.status)
       params.set('item', sol.id)
       return `/logistica/expedicao?${params.toString()}`
     }
 
-    params.set('tab', sol.status === 'nfe_emitida' ? 'nfe_emitida' : sol.status)
+    if (sol.status === 'nfe_emitida' || sol.status === 'romaneio_emitido' || sol.status === 'transporte_pendente') {
+      params.set('tab', 'transporte_pendente')
+    } else {
+      params.set('tab', sol.status)
+    }
     params.set('item', sol.id)
     return `/logistica/transportes?${params.toString()}`
   }

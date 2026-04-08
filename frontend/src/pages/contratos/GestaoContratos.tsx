@@ -77,7 +77,8 @@ type ContratoAction = {
   confirmBg: string
   confirmHover: string
   needsMotivo: boolean
-  minRole: 'comprador' | 'gerente'
+  minRole?: 'comprador' | 'gerente'
+  requireContratoSupervisor?: boolean
 }
 
 const ACTIONS: Record<string, ContratoAction[]> = {
@@ -88,12 +89,12 @@ const ACTIONS: Record<string, ContratoAction[]> = {
     { key: 'liberar', label: 'Liberar Pagamentos', toStatus: 'vigente', icon: Banknote, bg: 'bg-emerald-50', border: 'border-emerald-200', text: 'text-emerald-600', hoverBg: 'hover:bg-emerald-100', confirmBg: 'bg-emerald-600', confirmHover: 'hover:bg-emerald-700', needsMotivo: false, minRole: 'comprador' },
   ],
   vigente: [
-    { key: 'suspender', label: 'Suspender', toStatus: 'suspenso', icon: Pause, bg: 'bg-amber-50', border: 'border-amber-200', text: 'text-amber-600', hoverBg: 'hover:bg-amber-100', confirmBg: 'bg-amber-500', confirmHover: 'hover:bg-amber-600', needsMotivo: true, minRole: 'comprador' },
+    { key: 'suspender', label: 'Suspender', toStatus: 'suspenso', icon: Pause, bg: 'bg-amber-50', border: 'border-amber-200', text: 'text-amber-600', hoverBg: 'hover:bg-amber-100', confirmBg: 'bg-amber-500', confirmHover: 'hover:bg-amber-600', needsMotivo: true, requireContratoSupervisor: true },
     { key: 'encerrar', label: 'Encerrar', toStatus: 'encerrado', icon: Lock, bg: 'bg-slate-50', border: 'border-slate-200', text: 'text-slate-600', hoverBg: 'hover:bg-slate-100', confirmBg: 'bg-slate-600', confirmHover: 'hover:bg-slate-700', needsMotivo: true, minRole: 'gerente' },
     { key: 'rescindir', label: 'Rescindir', toStatus: 'rescindido', icon: AlertOctagon, bg: 'bg-red-50', border: 'border-red-200', text: 'text-red-600', hoverBg: 'hover:bg-red-100', confirmBg: 'bg-red-600', confirmHover: 'hover:bg-red-700', needsMotivo: true, minRole: 'gerente' },
   ],
   suspenso: [
-    { key: 'reativar', label: 'Reativar', toStatus: 'vigente', icon: RotateCcw, bg: 'bg-blue-50', border: 'border-blue-200', text: 'text-blue-600', hoverBg: 'hover:bg-blue-100', confirmBg: 'bg-blue-600', confirmHover: 'hover:bg-blue-700', needsMotivo: false, minRole: 'comprador' },
+    { key: 'reativar', label: 'Reativar', toStatus: 'vigente', icon: RotateCcw, bg: 'bg-blue-50', border: 'border-blue-200', text: 'text-blue-600', hoverBg: 'hover:bg-blue-100', confirmBg: 'bg-blue-600', confirmHover: 'hover:bg-blue-700', needsMotivo: false, requireContratoSupervisor: true },
     { key: 'encerrar', label: 'Encerrar', toStatus: 'encerrado', icon: Lock, bg: 'bg-slate-50', border: 'border-slate-200', text: 'text-slate-600', hoverBg: 'hover:bg-slate-100', confirmBg: 'bg-slate-600', confirmHover: 'hover:bg-slate-700', needsMotivo: true, minRole: 'gerente' },
     { key: 'rescindir', label: 'Rescindir', toStatus: 'rescindido', icon: AlertOctagon, bg: 'bg-red-50', border: 'border-red-200', text: 'text-red-600', hoverBg: 'hover:bg-red-100', confirmBg: 'bg-red-600', confirmHover: 'hover:bg-red-700', needsMotivo: true, minRole: 'gerente' },
   ],
@@ -102,7 +103,7 @@ const ACTIONS: Record<string, ContratoAction[]> = {
 // ── Contrato Card ───────────────────────────────────────────────────────────
 function ContratoCard({ contrato, onToast }: { contrato: Contrato; onToast: (type: 'success' | 'error', msg: string) => void }) {
   const nav = useNavigate()
-  const { atLeast } = useAuth()
+  const { atLeast, hasSetorPapel } = useAuth()
   const atualizarContrato = useAtualizarContrato()
   const [expanded, setExpanded] = useState(false)
   const [confirmAction, setConfirmAction] = useState<ContratoAction | null>(null)
@@ -114,8 +115,10 @@ function ContratoCard({ contrato, onToast }: { contrato: Contrato; onToast: (typ
     ? contrato.fornecedor?.razao_social
       ?? contrato.fornecedor?.nome_fantasia
       ?? contrato.solicitacao?.contraparte_nome
+      ?? contrato.contraparte_nome
     : contrato.cliente?.nome
       ?? contrato.solicitacao?.contraparte_nome
+      ?? contrato.contraparte_nome
   const linhaContexto = [contraparte, contrato.numero, contrato.centro_custo]
     .filter(Boolean)
     .join(' • ')
@@ -124,7 +127,12 @@ function ContratoCard({ contrato, onToast }: { contrato: Contrato; onToast: (typ
     (new Date(contrato.data_fim_previsto).getTime() - Date.now()) / (1000 * 60 * 60 * 24)
   )
 
-  const actions = (ACTIONS[contrato.status] ?? []).filter(a => atLeast(a.minRole))
+  const canManageContrato = hasSetorPapel('contratos', ['supervisor', 'diretor', 'ceo'])
+  const actions = (ACTIONS[contrato.status] ?? []).filter(action => {
+    if (action.requireContratoSupervisor) return canManageContrato
+    if (action.minRole) return atLeast(action.minRole) || canManageContrato
+    return false
+  })
   const isFinal = contrato.status === 'encerrado' || contrato.status === 'rescindido'
 
   const handleConfirm = () => {
@@ -218,7 +226,7 @@ function ContratoCard({ contrato, onToast }: { contrato: Contrato; onToast: (typ
         {/* Action buttons */}
         <div className="flex flex-wrap gap-2 mt-3">
           <button
-            onClick={() => nav(`/contratos/previsao?contrato=${contrato.id}`)}
+            onClick={() => nav(`/contratos/detalhe/${contrato.id}`)}
             className="flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl
               bg-indigo-50 border border-indigo-200 text-[11px] font-semibold text-indigo-600
               hover:bg-indigo-100 transition-all"
@@ -449,13 +457,12 @@ function TabContratos() {
               <thead>
                 <tr className="border-b border-slate-100">
                   <th className="text-left px-3 py-2.5 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Número</th>
-                  <th className="text-left px-3 py-2.5 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Objeto</th>
-                  <th className="text-left px-3 py-2.5 text-[10px] font-bold text-slate-400 uppercase tracking-widest hidden lg:table-cell">Contraparte</th>
-                  <th className="text-left px-3 py-2.5 text-[10px] font-bold text-slate-400 uppercase tracking-widest hidden md:table-cell">Grupo</th>
-                  <th className="text-center px-3 py-2.5 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Tipo</th>
+                  <th className="text-left px-3 py-2.5 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Contraparte</th>
+                  <th className="text-left px-3 py-2.5 text-[10px] font-bold text-slate-400 uppercase tracking-widest hidden sm:table-cell">Grupo</th>
+                  <th className="text-center px-3 py-2.5 text-[10px] font-bold text-slate-400 uppercase tracking-widest hidden md:table-cell">Tipo</th>
                   <th className="text-right px-3 py-2.5 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Valor</th>
                   <th className="text-center px-3 py-2.5 text-[10px] font-bold text-slate-400 uppercase tracking-widest hidden sm:table-cell">Status</th>
-                  <th className="text-right px-3 py-2.5 text-[10px] font-bold text-slate-400 uppercase tracking-widest hidden md:table-cell">Vencimento</th>
+                  <th className="text-right px-3 py-2.5 text-[10px] font-bold text-slate-400 uppercase tracking-widest hidden lg:table-cell">Vencimento</th>
                   <th className="text-center px-3 py-2.5 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Ação</th>
                 </tr>
               </thead>
@@ -464,29 +471,29 @@ function TabContratos() {
                   const sc = STATUS_CONTRATO[c.status] ?? STATUS_CONTRATO.em_negociacao
                   const isReceita = c.tipo_contrato === 'receita'
                   const grupoLabel = GRUPO_CONTRATO_LABEL?.[c.grupo_contrato as any] ?? c.grupo_contrato ?? '—'
-                  const contraparte = c.fornecedor?.razao_social || c.fornecedor?.nome_fantasia || c.cliente?.nome || '—'
+                  const contraparte = c.fornecedor?.razao_social || c.fornecedor?.nome_fantasia || c.cliente?.nome || (c as any).solicitacao?.contraparte_nome || (c as any).contraparte_nome || '—'
                   return (
-                    <tr key={c.id} onClick={() => nav(`/contratos/previsao?contrato=${c.id}`)} className="hover:bg-slate-50/80 transition-colors cursor-pointer">
+                    <tr key={c.id} onClick={() => nav(`/contratos/detalhe/${c.id}`)} className="hover:bg-slate-50/80 transition-colors cursor-pointer">
                       <td className="px-3 py-2.5">
-                        <span className="text-xs font-mono font-semibold text-indigo-600 bg-indigo-50 rounded-md px-2 py-0.5">{c.numero}</span>
+                        <span className="text-[10px] font-mono font-semibold text-indigo-600 bg-indigo-50 rounded-md px-1.5 py-0.5 whitespace-nowrap">{c.numero}</span>
                       </td>
                       <td className="px-3 py-2.5">
-                        <p className="text-sm font-semibold text-slate-700 truncate max-w-[220px]">{c.objeto}</p>
+                        <p className="text-xs font-semibold text-slate-700 truncate max-w-[200px]">{contraparte}</p>
                         {c.obra?.nome && <p className="text-[10px] text-slate-400 truncate">{c.obra.nome}</p>}
                       </td>
-                      <td className="px-3 py-2.5 hidden lg:table-cell">
-                        <p className="text-xs text-slate-600 truncate max-w-[160px]">{contraparte}</p>
+                      <td className="px-3 py-2.5 hidden sm:table-cell">
+                        <span className="text-[10px] px-2 py-0.5 rounded-full bg-teal-50 text-teal-700 whitespace-nowrap">{grupoLabel}</span>
                       </td>
-                      <td className="px-3 py-2.5 hidden md:table-cell">
-                        <span className="text-[10px] px-2 py-0.5 rounded-full bg-teal-50 text-teal-700">{grupoLabel}</span>
-                      </td>
-                      <td className="px-3 py-2.5 text-center">
+                      <td className="px-3 py-2.5 text-center hidden md:table-cell">
                         <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${isReceita ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'}`}>
                           {isReceita ? 'Receita' : 'Despesa'}
                         </span>
                       </td>
-                      <td className={`px-3 py-2.5 text-right text-xs font-bold ${isReceita ? 'text-emerald-600' : 'text-amber-600'}`}>
-                        {fmt(c.valor_total + (c.valor_aditivos || 0))}
+                      <td className={`px-3 py-2.5 text-right ${isReceita ? 'text-emerald-600' : 'text-amber-600'}`}>
+                        <span className="text-xs font-bold">{fmt(c.valor_total + (c.valor_aditivos || 0))}</span>
+                        {(c as any).valor_mensal && (
+                          <p className="text-[9px] text-indigo-500 font-semibold">{fmt((c as any).valor_mensal)}/mês</p>
+                        )}
                       </td>
                       <td className="px-3 py-2.5 text-center hidden sm:table-cell">
                         <span className={`inline-flex items-center gap-1 rounded-full text-[10px] font-semibold px-2 py-0.5 ${sc.bg} ${sc.text}`}>
@@ -494,13 +501,13 @@ function TabContratos() {
                           {sc.label}
                         </span>
                       </td>
-                      <td className="px-3 py-2.5 text-right hidden md:table-cell">
+                      <td className="px-3 py-2.5 text-right hidden lg:table-cell">
                         <span className="text-[11px] text-slate-400">{c.data_fim_previsto ? fmtData(c.data_fim_previsto) : '—'}</span>
                       </td>
                       <td className="px-3 py-2.5 text-center">
-                        <button onClick={e => { e.stopPropagation() }}
+                        <button onClick={e => { e.stopPropagation(); nav(`/contratos/detalhe/${c.id}`) }}
                           className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[10px] font-semibold text-indigo-600 bg-indigo-50 border border-indigo-100 hover:bg-indigo-100 transition-all">
-                          <Eye size={11} /> Ver
+                          <Eye size={11} /> Detalhes
                         </button>
                       </td>
                     </tr>
@@ -799,8 +806,8 @@ function TabVencimentos() {
     const fim = new Date(c.data_fim_previsto).getTime()
     const dias = Math.ceil((fim - hoje) / (1000 * 60 * 60 * 24))
     const contraparte = c.tipo_contrato === 'despesa'
-      ? c.fornecedor?.razao_social ?? c.fornecedor?.nome_fantasia ?? '—'
-      : c.cliente?.nome ?? '—'
+      ? c.fornecedor?.razao_social ?? c.fornecedor?.nome_fantasia ?? (c as any).solicitacao?.contraparte_nome ?? (c as any).contraparte_nome ?? '—'
+      : c.cliente?.nome ?? (c as any).solicitacao?.contraparte_nome ?? (c as any).contraparte_nome ?? '—'
     return { ...c, dias, contraparte }
   }).sort((a, b) => a.dias - b.dias)
 

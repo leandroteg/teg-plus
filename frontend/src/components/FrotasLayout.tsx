@@ -1,16 +1,12 @@
-import {
-  LayoutDashboard, Car, Wrench, ClipboardCheck,
-  Fuel, Radio,
-} from 'lucide-react'
+import { LayoutDashboard, Truck, Wrench, Gauge, Plus } from 'lucide-react'
 import ModuleLayout from './ModuleLayout'
 
 const NAV = [
-  { to: '/frotas',                 icon: LayoutDashboard, label: 'Painel',            end: true },
-  { to: '/frotas/veiculos',        icon: Car,             label: 'Veículos'                     },
-  { to: '/frotas/ordens',          icon: Wrench,          label: 'Ordens de Serviço'            },
-  { to: '/frotas/checklists',      icon: ClipboardCheck,  label: 'Checklists'                   },
-  { to: '/frotas/abastecimentos',  icon: Fuel,            label: 'Abastecimentos'               },
-  { to: '/frotas/telemetria',      icon: Radio,           label: 'Telemetria'                   },
+  { to: '/frotas',                   icon: LayoutDashboard, label: 'Painel',             end: true },
+  { to: '/frotas/solicitacoes',       icon: Plus,            label: 'Nova Solicitação', requisitanteAllowed: true },
+  { to: '/frotas/frota',             icon: Truck,           label: 'Frota & Máquinas'              },
+  { to: '/frotas/manutencao',        icon: Wrench,          label: 'Manutenção'                    },
+  { to: '/frotas/operacao',          icon: Gauge,           label: 'Operação & Controle'           },
 ]
 
 export default function FrotasLayout() {
@@ -21,7 +17,7 @@ export default function FrotasLayout() {
       moduleEmoji="🚗"
       accent="rose"
       nav={NAV}
-      moduleSubtitle="Manutenção & Uso"
+      moduleSubtitle="Veículos & Máquinas"
     />
   )
 }

@@ -6,6 +6,7 @@ import {
   ShieldCheck, Plus, Save, Loader2, Trash2, Route,
 } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
+import { useAuth } from '../../contexts/AuthContext'
 import {
   useSolicitacoes, useAtualizarStatusSolicitacao,
   useAprovarSolicitacao, usePlanejaarSolicitacao,
@@ -17,6 +18,7 @@ import { useLookupCentrosCusto } from '../../hooks/useLookups'
 import type { LogSolicitacao, StatusSolicitacaoPipeline, CriarSolicitacaoPayload, TipoTransporte } from '../../types/logistica'
 import { SOLICITACAO_PIPELINE_STAGES } from '../../types/logistica'
 import { lazy, Suspense } from 'react'
+import { getDocumentoFiscalContext, mergeCidadeUf } from '../../utils/logisticaFiscal'
 
 const PlanejamentoRotaModal = lazy(() => import('../../components/logistica/PlanejamentoRotaModal'))
 
@@ -91,9 +93,9 @@ function exportCSV(items: LogSolicitacao[], stageName: string) {
 
 // ── Detail Modal ─────────────────────────────────────────────────────────────
 
-function DetailModal({ sol, onClose, onAction, isDark }: {
+function DetailModal({ sol, onClose, onAction, onEdit, isDark }: {
   sol: LogSolicitacao; onClose: () => void
-  onAction: (action: string, sol: LogSolicitacao) => void; isDark: boolean
+  onAction: (action: string, sol: LogSolicitacao) => void; onEdit?: () => void; isDark: boolean
 }) {
   const bg = isDark ? 'bg-[#1e293b]' : 'bg-white'
   const cardBg = isDark ? 'bg-white/[0.04]' : 'bg-slate-50'
@@ -101,6 +103,7 @@ function DetailModal({ sol, onClose, onAction, isDark }: {
   const txtMuted = isDark ? 'text-slate-400' : 'text-slate-400'
   const txtMain = isDark ? 'text-white' : 'text-slate-800'
   const fmtCurrency = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
+  const fiscalCtx = getDocumentoFiscalContext(sol)
 
   const hasPlanning = !!(sol.modal || sol.motorista_nome || sol.veiculo_placa || sol.data_prevista_saida || sol.custo_estimado != null || sol.transportadora || sol.rota_planejada)
   const hasLoad = !!(sol.descricao || sol.peso_total_kg || sol.volumes_total || sol.carga_especial || sol.observacoes_carga || (sol.itens && sol.itens.length > 0))
@@ -143,15 +146,21 @@ function DetailModal({ sol, onClose, onAction, isDark }: {
             <p className="text-[9px] font-bold text-orange-500 uppercase tracking-wider mb-2">Rota</p>
             <div className="flex items-center gap-3 text-sm">
               <div className="flex-1">
-                <p className={`font-bold ${txtMain}`}>{sol.origem}</p>
+                <p className={`font-bold ${txtMain}`}>{fiscalCtx.origemLabel}</p>
                 <p className={`text-[10px] ${txtMuted}`}>Origem</p>
               </div>
               <div className="text-orange-400 text-lg font-bold">→</div>
               <div className="flex-1 text-right">
-                <p className={`font-bold ${txtMain}`}>{sol.destino}</p>
+                <p className={`font-bold ${txtMain}`}>{fiscalCtx.destinoLabel}</p>
                 <p className={`text-[10px] ${txtMuted}`}>Destino</p>
               </div>
             </div>
+            {(fiscalCtx.origemUf || fiscalCtx.destinoUf) && (
+              <div className="flex items-center justify-between gap-2 mt-3 pt-3 border-t border-orange-200/60 text-[10px]">
+                <span className={txtMuted}>UFs da rota</span>
+                <span className={`font-semibold ${txtMain}`}>{fiscalCtx.origemUf || '—'} → {fiscalCtx.destinoUf || '—'}</span>
+              </div>
+            )}
             {/* KM + Tempo Estimado */}
             {(sol.distancia_km || sol.tempo_estimado_h) && (
               <div className="flex items-center gap-3 mt-3 pt-3 border-t border-orange-200/60">
@@ -333,14 +342,29 @@ function DetailModal({ sol, onClose, onAction, isDark }: {
               </button>
             )}
             {sol.status === 'planejado' && (
-              <button onClick={() => onAction('enviarAprovacao', sol)} className="flex-1 py-3 rounded-xl bg-amber-600 text-white text-sm font-bold hover:bg-amber-700 transition-all flex items-center justify-center gap-2">
-                <ShieldCheck size={15} /> Enviar p/ Aprovação
-              </button>
+              <>
+                {onEdit && (
+                  <button onClick={() => { onClose(); onEdit() }} className={`py-3 px-4 rounded-xl border text-sm font-semibold transition-all flex items-center gap-1.5 ${isDark ? 'border-white/[0.06] text-violet-400 hover:bg-violet-500/10' : 'border-violet-200 text-violet-600 hover:bg-violet-50'}`}>
+                    <FileText size={14} /> Editar
+                  </button>
+                )}
+                <button onClick={() => onAction('enviarAprovacao', sol)} className="flex-1 py-3 rounded-xl bg-amber-600 text-white text-sm font-bold hover:bg-amber-700 transition-all flex items-center justify-center gap-2">
+                  <ShieldCheck size={15} /> Enviar p/ Aprovação
+                </button>
+              </>
             )}
             {sol.status === 'aguardando_aprovacao' && (
-              <button onClick={() => onAction('aprovar', sol)} className="flex-1 py-3 rounded-xl bg-emerald-600 text-white text-sm font-bold hover:bg-emerald-700 transition-all flex items-center justify-center gap-2">
-                <CheckCircle2 size={15} /> Aprovar
-              </button>
+              <>
+                <button onClick={() => onAction('devolver', sol)} className={`py-3 px-4 rounded-xl border text-sm font-semibold transition-all flex items-center gap-1.5 ${isDark ? 'border-white/[0.06] text-amber-400' : 'border-amber-200 text-amber-600 hover:bg-amber-50'}`}>
+                  Devolver
+                </button>
+                <button onClick={() => onAction('recusar', sol)} className={`py-3 px-4 rounded-xl border text-sm font-semibold transition-all flex items-center gap-1.5 ${isDark ? 'border-white/[0.06] text-red-400' : 'border-red-200 text-red-600 hover:bg-red-50'}`}>
+                  Recusar
+                </button>
+                <button onClick={() => onAction('aprovar', sol)} className="flex-1 py-3 rounded-xl bg-emerald-600 text-white text-sm font-bold hover:bg-emerald-700 transition-all flex items-center justify-center gap-2">
+                  <CheckCircle2 size={15} /> Aprovar
+                </button>
+              </>
             )}
           </div>
         </div>
@@ -504,9 +528,17 @@ function ViagemDetailModal({ item, onClose, onAction, onEdit, isDark }: {
               </>
             )}
             {status === 'aguardando_aprovacao' && (
-              <button onClick={() => onAction('aprovar', sols)} className="flex-1 py-3 rounded-xl bg-emerald-600 text-white text-sm font-bold hover:bg-emerald-700 transition-all flex items-center justify-center gap-2">
-                <CheckCircle2 size={15} /> Aprovar
-              </button>
+              <>
+                <button onClick={() => onAction('devolver', sols)} className={`py-3 px-4 rounded-xl border text-sm font-semibold transition-all flex items-center gap-1.5 ${isDark ? 'border-white/[0.06] text-amber-400' : 'border-amber-200 text-amber-600 hover:bg-amber-50'}`}>
+                  Devolver
+                </button>
+                <button onClick={() => onAction('recusar', sols)} className={`py-3 px-4 rounded-xl border text-sm font-semibold transition-all flex items-center gap-1.5 ${isDark ? 'border-white/[0.06] text-red-400' : 'border-red-200 text-red-600 hover:bg-red-50'}`}>
+                  Recusar
+                </button>
+                <button onClick={() => onAction('aprovar', sols)} className="flex-1 py-3 rounded-xl bg-emerald-600 text-white text-sm font-bold hover:bg-emerald-700 transition-all flex items-center justify-center gap-2">
+                  <CheckCircle2 size={15} /> Aprovar
+                </button>
+              </>
             )}
           </div>
         </div>
@@ -933,7 +965,13 @@ function NovaSolicitacaoModal({ isDark, onClose, onSuccess }: {
 
   async function handleCriar() {
     if (!canSubmit) return
-    await criar.mutateAsync({ ...form, itens: itensForm.length > 0 ? itensForm : undefined })
+    const { origem_uf: _origemUf, destino_uf: _destinoUf, ...baseForm } = form
+    await criar.mutateAsync({
+      ...baseForm,
+      origem: mergeCidadeUf(form.origem, origemUF),
+      destino: mergeCidadeUf(form.destino, destinoUF),
+      itens: itensForm.length > 0 ? itensForm : undefined,
+    })
     onSuccess()
     onClose()
   }
@@ -1103,6 +1141,7 @@ function NovaSolicitacaoModal({ isDark, onClose, onSuccess }: {
 // ── Main Page ────────────────────────────────────────────────────────────────
 
 export default function SolicitacoesPipeline() {
+  const { hasSetorPapel } = useAuth()
   const { isDark } = useTheme()
   const [searchParams, setSearchParams] = useSearchParams()
   const [activeTab, setActiveTab] = useState<StatusSolicitacaoPipeline>('solicitado')
@@ -1144,6 +1183,7 @@ export default function SolicitacoesPipeline() {
   const atualizarViagem = useAtualizarViagem()
   const enviarViagemAprovacao = useEnviarViagemAprovacao()
   const aprovarViagem = useAprovarViagem()
+  const canApproveLogistica = hasSetorPapel('logistica', ['supervisor', 'diretor', 'ceo'])
 
   // Group by status
   const grouped = useMemo(() => {
@@ -1405,6 +1445,11 @@ export default function SolicitacoesPipeline() {
   }
 
   const handleAprovar = async (ids: string[]) => {
+    if (!canApproveLogistica) {
+      showToast('error', 'Somente Supervisor de Logística ou Diretor pode aprovar viagens')
+      return
+    }
+
     try {
       const solsToApprove = solicitacoes.filter(s => ids.includes(s.id))
       const viagemIds = new Set<string>()
@@ -1473,7 +1518,9 @@ export default function SolicitacoesPipeline() {
     planejado:            { label: 'Enviar p/ Aprovação',   icon: ShieldCheck,  className: 'bg-amber-600 hover:bg-amber-700 text-white' },
     aguardando_aprovacao: { label: 'Aprovar',               icon: CheckCircle2, className: 'bg-emerald-600 hover:bg-emerald-700 text-white' },
   }
-  const bulk = BULK_ACTIONS[activeTab]
+  const bulk = activeTab === 'aguardando_aprovacao' && !canApproveLogistica
+    ? undefined
+    : BULK_ACTIONS[activeTab]
   const selectedInTab = activeItems.filter(s => selectedIds.has(s.id))
   const urgentCt = activeItems.filter(s => s.urgente).length
 
@@ -1496,11 +1543,6 @@ export default function SolicitacoesPipeline() {
             {solicitacoes.filter(s => ['solicitado','planejado','aguardando_aprovacao'].includes(s.status)).length} solicitações no pipeline
           </p>
         </div>
-        <button onClick={() => setShowNovaSolicitacao(true)}
-          className="flex items-center gap-1.5 bg-orange-600 hover:bg-orange-700 text-white
-            text-sm font-semibold px-4 py-2 rounded-xl transition-colors shadow-sm">
-          <Plus size={15} /> Nova Solicitação
-        </button>
       </div>
 
       {/* Horizontal Tabs */}
@@ -1642,7 +1684,7 @@ export default function SolicitacoesPipeline() {
               )}
             </>
           ) : (
-            <div className="space-y-2 p-4">
+            <div className="space-y-2 p-4 stagger-children">
               {displayItems.map(item =>
                 item.kind === 'viagem' ? (
                   <ViagemCard key={`vg-${item.viagemId}`} item={item} onClick={sol => setDetail(sol)} onOpenDetail={setViagemDetail} isDark={isDark} selectedIds={selectedIds} onToggleViagem={toggleViagem}
@@ -1656,7 +1698,7 @@ export default function SolicitacoesPipeline() {
         </div>
       </div>
 
-      {detail && <DetailModal sol={detail} onClose={closeDetail} onAction={handleDetailAction} isDark={isDark} />}
+      {detail && <DetailModal sol={detail} onClose={closeDetail} onAction={handleDetailAction} onEdit={detail.status === 'planejado' ? () => { closeDetail(); setEditandoViagemId(null); setShowPlanejamento([detail]) } : undefined} isDark={isDark} />}
       {viagemDetail && <ViagemDetailModal item={viagemDetail} onClose={closeViagemDetail} onAction={handleViagemDetailAction} onEdit={() => handleEditViagem(viagemDetail)} isDark={isDark} />}
       {showNovaSolicitacao && (
         <NovaSolicitacaoModal
@@ -1673,7 +1715,7 @@ export default function SolicitacoesPipeline() {
             allSolicitacoes={solicitacoes}
             onClose={() => { setShowPlanejamento([]); setEditandoViagemId(null) }}
             onSave={handleSavePlanejamento}
-            initialData={editandoViagemId ? {
+            initialData={(editandoViagemId || showPlanejamento[0]?.status === 'planejado') ? {
               modal: showPlanejamento[0]?.modal || undefined,
               motorista_nome: showPlanejamento[0]?.motorista_nome || undefined,
               veiculo_placa: showPlanejamento[0]?.veiculo_placa || undefined,

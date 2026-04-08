@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react'
+import { useState, useMemo, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   CheckCircle, XCircle, ChevronDown, ChevronRight, ChevronUp,
@@ -8,7 +8,7 @@ import {
   History, ListChecks, Timer, TrendingUp, Filter,
   Calendar, FileText, Download, Eye, HelpCircle,
   Paperclip, Square, CheckSquare, Package,
-  Truck, MapPin,
+  Truck, MapPin, Smartphone, Wallet,
 } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../services/supabase'
@@ -99,6 +99,17 @@ const tipoConfig: Record<TipoAprovacao, {
     badgeText: 'text-orange-700',
     headerBg: 'bg-gradient-to-r from-orange-500 to-amber-600',
   },
+  solicitacao_adiantamento: {
+    label: 'Solicitação de Adiantamento',
+    icon: Wallet,
+    color: 'emerald',
+    bgLight: 'bg-emerald-50',
+    textColor: 'text-emerald-700',
+    borderColor: 'border-emerald-200',
+    badgeBg: 'bg-emerald-100',
+    badgeText: 'text-emerald-700',
+    headerBg: 'bg-gradient-to-r from-emerald-600 to-teal-500',
+  },
 }
 
 const tipoOrder: TipoAprovacao[] = [
@@ -107,6 +118,7 @@ const tipoOrder: TipoAprovacao[] = [
   'minuta_contratual',
   'requisicao_compra',
   'aprovacao_transporte',
+  'solicitacao_adiantamento',
 ]
 
 function timeLeft(dateStr?: string): string {
@@ -143,7 +155,13 @@ function AprovacaoCard({ aprovacao, aprovadorNome, aprovadorEmail }: {
   const [expanded, setExpanded] = useState(false)
   const [observacao, setObservacao] = useState('')
   const [action, setAction] = useState<'aprovada' | 'rejeitada' | 'esclarecimento' | null>(null)
-  const [alertaCotacao, setAlertaCotacao] = useState<{ sem_cotacoes_minimas: boolean; justificativa?: string } | null>(null)
+  const [alertaCotacao, setAlertaCotacao] = useState<{
+    sem_cotacoes_minimas: boolean
+    justificativa?: string
+    cotacoes_count?: number
+    cotacoes_minimo?: number
+    cotacoes_insuficientes?: boolean
+  } | null>(null)
 
   const req  = aprovacao.requisicao
   const cot  = aprovacao.cotacao_resumo
@@ -311,16 +329,37 @@ function AprovacaoCard({ aprovacao, aprovadorNome, aprovadorEmail }: {
           )}
         </div>
 
-        {/* Alerta: cotações obrigatórias faltantes (#38) */}
-        {alertaCotacao?.sem_cotacoes_minimas && (
+        {/* Alerta: cotações insuficientes conforme política (#164) */}
+        {alertaCotacao?.cotacoes_insuficientes && (
           <div className="mt-3 bg-amber-50 border border-amber-300 rounded-xl p-3 flex gap-2.5">
             <AlertTriangle size={16} className="text-amber-600 shrink-0 mt-0.5" />
             <div>
               <p className="text-xs font-bold text-amber-800">
-                Cotação sem número mínimo de fornecedores
+                Numero de cotacoes inferior ao exigido pela politica ({alertaCotacao.cotacoes_count ?? 0} de {alertaCotacao.cotacoes_minimo ?? '?'} minimo)
               </p>
               <p className="text-[11px] text-amber-700 mt-0.5 leading-relaxed">
-                O comprador enviou esta cotação sem atingir o mínimo exigido. Avalie com cautela.
+                A quantidade de fornecedores/propostas esta abaixo do minimo exigido pela politica de compras. Avalie com cautela.
+              </p>
+              {alertaCotacao.justificativa && (
+                <div className="mt-1.5 bg-white border border-amber-200 rounded-lg px-2.5 py-1.5">
+                  <p className="text-[10px] font-semibold text-amber-600 uppercase tracking-wide mb-0.5">Justificativa:</p>
+                  <p className="text-[11px] text-amber-800 italic">{alertaCotacao.justificativa}</p>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Alerta: cotações obrigatórias faltantes — flag manual (#38) */}
+        {alertaCotacao?.sem_cotacoes_minimas && !alertaCotacao?.cotacoes_insuficientes && (
+          <div className="mt-3 bg-amber-50 border border-amber-300 rounded-xl p-3 flex gap-2.5">
+            <AlertTriangle size={16} className="text-amber-600 shrink-0 mt-0.5" />
+            <div>
+              <p className="text-xs font-bold text-amber-800">
+                Cotacao sem numero minimo de fornecedores
+              </p>
+              <p className="text-[11px] text-amber-700 mt-0.5 leading-relaxed">
+                O comprador enviou esta cotacao sem atingir o minimo exigido. Avalie com cautela.
               </p>
               {alertaCotacao.justificativa && (
                 <div className="mt-1.5 bg-white border border-amber-200 rounded-lg px-2.5 py-1.5">
@@ -423,6 +462,14 @@ function GenericPendingCard({ aprovacao, aprovadorNome, aprovadorEmail }: {
   const handleDecision = async (decisao: 'aprovada' | 'rejeitada') => {
     setAction(decisao)
     try {
+      // Build selectedItemIds array for lote approval so useDecisaoGenerica
+      // respects per-item decisions (Bug #181: rejected items were being approved)
+      const selectedItemIdsArray = decisao === 'aprovada'
+        && aprovacao.pagamento_detalhes?.is_lote
+        && aprovacao.pagamento_detalhes.itens?.length
+        ? Array.from(selectedItemIds)
+        : undefined
+
       await mutation.mutateAsync({
         aprovacaoId: aprovacao.id,
         entidadeId: aprovacao.entidade_id,
@@ -434,24 +481,8 @@ function GenericPendingCard({ aprovacao, aprovadorNome, aprovadorEmail }: {
         observacao: observacao || undefined,
         aprovadorNome,
         aprovadorEmail,
+        selectedItemIds: selectedItemIdsArray,
       })
-
-      // After generic approval succeeds, apply per-item decisions for lotes
-      if (decisao === 'aprovada' && aprovacao.pagamento_detalhes?.is_lote && aprovacao.pagamento_detalhes.itens?.length) {
-        const allItems = aprovacao.pagamento_detalhes.itens
-        for (const item of allItems) {
-          const itemDecisao = selectedItemIds.has(item.id) ? 'aprovado' : 'rejeitado'
-          await supabase
-            .from('fin_lote_itens')
-            .update({
-              decisao: itemDecisao,
-              decidido_por: perfil?.nome ?? aprovadorNome ?? 'Aprovador',
-              decidido_em: new Date().toISOString(),
-            })
-            .eq('lote_id', aprovacao.entidade_id)
-            .eq('cp_id', item.id)
-        }
-      }
     } catch { /* error handled by mutation state */ }
   }
 
@@ -1446,6 +1477,7 @@ function TabPendentes({
       minuta_contratual: [],
       requisicao_compra: [],
       aprovacao_transporte: [],
+      solicitacao_adiantamento: [],
     }
     for (const apr of aprovacoes ?? []) {
       const tipo = apr.tipo_aprovacao || 'requisicao_compra'
@@ -1727,11 +1759,46 @@ function TabHistorico() {
 
 type Tab = 'pendentes' | 'historico'
 
+// ── AprovAi PWA Install ──────────────────────────────────────────────────────
+
+function useAprovAiInstall() {
+  const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null)
+  const [isStandalone, setIsStandalone] = useState(false)
+
+  useEffect(() => {
+    setIsStandalone(
+      window.matchMedia('(display-mode: standalone)').matches ||
+      (navigator as unknown as { standalone?: boolean }).standalone === true
+    )
+
+    const handler = (e: Event) => {
+      e.preventDefault()
+      setDeferredPrompt(e as BeforeInstallPromptEvent)
+    }
+    window.addEventListener('beforeinstallprompt', handler)
+
+    return () => {
+      window.removeEventListener('beforeinstallprompt', handler)
+    }
+  }, [])
+
+  const install = useCallback(async () => {
+    if (!deferredPrompt) return
+    await (deferredPrompt as BeforeInstallPromptEvent & { prompt: () => Promise<void> }).prompt()
+    setDeferredPrompt(null)
+  }, [deferredPrompt])
+
+  return { canInstall: !!deferredPrompt, install, isStandalone }
+}
+
+type BeforeInstallPromptEvent = Event & { prompt: () => Promise<void> }
+
 export default function AprovAi() {
   const navigate = useNavigate()
   const { perfil } = useAuth()
   const [activeTab, setActiveTab] = useState<Tab>('pendentes')
   const { data: aprovacoes, isLoading, isError, refetch } = useAprovacoesPendentes()
+  const { canInstall, install, isStandalone } = useAprovAiInstall()
 
   const aprovadorNome = perfil?.nome ?? 'Aprovador'
   const aprovadorEmail = perfil?.email ?? ''
@@ -1744,13 +1811,29 @@ export default function AprovAi() {
 
       {/* Header */}
       <header className="px-4 pt-6 pb-5">
-        <button
-          onClick={() => navigate(-1)}
-          className="flex items-center gap-1.5 text-indigo-300 hover:text-white transition-colors mb-4"
-        >
-          <ArrowLeft size={18} />
-          <span className="text-xs font-semibold">Voltar</span>
-        </button>
+        <div className="flex items-center justify-between mb-4">
+          {!isStandalone && (
+            <button
+              onClick={() => navigate(-1)}
+              className="flex items-center gap-1.5 text-indigo-300 hover:text-white transition-colors"
+            >
+              <ArrowLeft size={18} />
+              <span className="text-xs font-semibold">Voltar</span>
+            </button>
+          )}
+          {!isStandalone && <div />}
+          {canInstall && (
+            <button
+              onClick={install}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl
+                bg-white/10 backdrop-blur-sm border border-white/20
+                text-white/80 hover:text-white hover:bg-white/20 transition-all text-[11px] font-semibold"
+            >
+              <Smartphone size={13} />
+              Instalar App
+            </button>
+          )}
+        </div>
 
         <div className="text-center">
           <div className="flex items-center justify-center gap-2 mb-1">

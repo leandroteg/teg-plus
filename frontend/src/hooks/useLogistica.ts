@@ -651,11 +651,13 @@ export function useEmitirNFe() {
         .single()
       if (error) throw error
 
-      // Atualiza status da solicitação
-      await supabase
+      const updateBase = { updated_at: new Date().toISOString() }
+      const nextStatus = await supabase
         .from('log_solicitacoes')
-        .update({ status: 'nfe_emitida', updated_at: new Date().toISOString() })
+        .update({ status: 'transporte_pendente', ...updateBase })
         .eq('id', payload.solicitacao_id)
+
+      if (nextStatus.error) throw nextStatus.error
 
       return data as LogNFe
     },
@@ -699,17 +701,22 @@ export function useEmitirRomaneio() {
       solicitacao_id: string
       romaneio_url: string
     }) => {
+      const baseUpdate = {
+        romaneio_url: payload.romaneio_url,
+        doc_fiscal_tipo: 'romaneio' as const,
+        updated_at: new Date().toISOString(),
+      }
+
       const { data, error } = await supabase
         .from('log_solicitacoes')
         .update({
-          status: 'romaneio_emitido',
-          romaneio_url: payload.romaneio_url,
-          doc_fiscal_tipo: 'romaneio',
-          updated_at: new Date().toISOString(),
+          status: 'transporte_pendente',
+          ...baseUpdate,
         })
         .eq('id', payload.solicitacao_id)
         .select()
         .single()
+
       if (error) throw error
       return data as LogSolicitacao
     },
@@ -1063,6 +1070,9 @@ export function useConfirmarRecebimento() {
       divergencias,
       avaliacao_qualidade,
       observacoes,
+      destino,
+      base_id,
+      fotos_urls,
     }: {
       id: string
       solicitacao_id: string
@@ -1076,6 +1086,9 @@ export function useConfirmarRecebimento() {
       divergencias?: string
       avaliacao_qualidade?: number
       observacoes?: string
+      destino?: 'consumo' | 'patrimonial' | 'nenhum'
+      base_id?: string
+      fotos_urls?: string[]
     }) => {
       const { data: { user } } = await supabase.auth.getUser()
       const agora = new Date().toISOString()
@@ -1091,12 +1104,49 @@ export function useConfirmarRecebimento() {
           confirmado_por: user?.id,
           confirmado_em: agora,
           assinatura_digital: `CONF-${Date.now().toString(36).toUpperCase()}`,
+          destino: destino || 'nenhum',
+          base_id: base_id || null,
+          fotos_recebimento: fotos_urls && fotos_urls.length > 0 ? fotos_urls : [],
           updated_at: agora,
         })
         .eq('id', id)
         .select()
         .single()
       if (error) throw error
+
+      // Buscar dados da solicitação para criar registros
+      const { data: sol } = await supabase
+        .from('log_solicitacoes')
+        .select('numero, descricao, obra_nome, centro_custo, peso_total_kg, volumes_total')
+        .eq('id', solicitacao_id)
+        .single()
+
+      if ((status === 'confirmado' || status === 'parcial') && destino === 'consumo' && base_id) {
+        // Criar entrada direta no estoque
+        const { error: estErr } = await supabase.from('est_movimentacoes').insert({
+          tipo: 'entrada',
+          base_id,
+          quantidade: sol?.volumes_total || 1,
+          observacao: `Recebimento logístico ${sol?.numero || ''} — ${sol?.descricao || ''}`,
+          obra_nome: sol?.obra_nome || null,
+          centro_custo: sol?.centro_custo || null,
+          responsavel_id: user?.id,
+        })
+        if (estErr) console.error('[Logística→Estoque] Erro ao criar movimentação:', estErr)
+      }
+
+      if ((status === 'confirmado' || status === 'parcial') && destino === 'patrimonial') {
+        // Criar registro patrimonial pendente
+        const { error: patErr } = await supabase.from('pat_imobilizados').insert({
+          numero_patrimonio: `PAT-LOG-${Date.now().toString(36).toUpperCase()}`,
+          descricao: `${sol?.descricao || sol?.numero || 'Item logístico'}`,
+          categoria: 'GERAL',
+          status: 'pendente_registro',
+          responsavel_id: user?.id,
+          data_aquisicao: agora.split('T')[0],
+        })
+        if (patErr) console.error('[Logística→Patrimonial] Erro ao criar imobilizado:', patErr)
+      }
 
       if (status === 'confirmado' || status === 'parcial') {
         await supabase
@@ -1113,6 +1163,9 @@ export function useConfirmarRecebimento() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['log_recebimentos'] })
       qc.invalidateQueries({ queryKey: ['log_solicitacoes'] })
+      qc.invalidateQueries({ queryKey: ['est-movimentacoes'] })
+      qc.invalidateQueries({ queryKey: ['est-saldos'] })
+      qc.invalidateQueries({ queryKey: ['pat-imobilizados'] })
     },
   })
 }
@@ -1216,7 +1269,7 @@ export function useLogisticaKPIs() {
       const totalAbertas = await supabase
         .from('log_solicitacoes')
         .select('id', { count: 'exact', head: true })
-        .in('status', ['solicitado', 'planejado', 'aguardando_aprovacao', 'aprovado', 'nfe_emitida', 'romaneio_emitido', 'aguardando_coleta'])
+        .in('status', ['solicitado', 'planejado', 'aguardando_aprovacao', 'aprovado', 'transporte_pendente', 'aguardando_coleta'])
 
       return {
         total_solicitacoes: solTotal.count ?? 0,
