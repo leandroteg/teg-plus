@@ -4,7 +4,7 @@ type: index
 status: ativo
 tags: [teg-plus, erp, moc, index]
 criado: 2026-03-02
-atualizado: 2026-04-07
+atualizado: 2026-04-08
 ---
 
 # TEG+ ERP — Mapa da Aplicacao
@@ -16,14 +16,17 @@ atualizado: 2026-04-07
 
 ## Paineis de Gestao
 
-| Painel | Descricao |
-|--------|-----------|
-| [[Paineis/PAINEL PRINCIPAL\|Painel Principal]] | Central de comando — KPIs, status, alertas |
-| [[Paineis/BI Dashboard\|BI Dashboard]] | Visao executiva visual com graficos |
-| [[Paineis/Tasks Board\|Tasks Board]] | Kanban de tarefas por status e sprint |
-| [[Paineis/Roadmap Board\|Roadmap]] | Timeline de milestones e progresso |
-| [[Paineis/Issues Board\|Issues Board]] | Tracker de bugs e problemas |
-| [[Paineis/Requisitos Board\|Requisitos]] | Rastreabilidade de requisitos |
+| Painel | Descricao | Audiencia |
+|--------|-----------|-----------|
+| [[Paineis/PAINEL PRINCIPAL\|Painel Principal]] | Central de comando — KPIs, status, alertas | DEV + GESTAO |
+| [[Paineis/BI Dashboard\|BI Dashboard]] | Visao executiva visual com graficos | GESTAO |
+| [[Paineis/Dev Hub BI\|Dev Hub BI]] | Analytics de desenvolvimento, velocidade, saude | DEV |
+| [[Paineis/Tasks Board\|Tasks Board]] | Kanban de tarefas por status e sprint | DEV |
+| [[Paineis/Roadmap Board\|Roadmap]] | Timeline de milestones e progresso | DEV + GESTAO |
+| [[Paineis/Issues Board\|Issues Board]] | Tracker de bugs e problemas | DEV |
+| [[Paineis/Execucao Board\|Execucao Board]] | Pipeline de melhorias e bug fixes (GitHub) | DEV |
+| [[Paineis/Requisitos Board\|Requisitos]] | Rastreabilidade de requisitos | DEV + GESTAO |
+| [[Paineis/Relatorio Desenvolvimento\|Relatorio Dev]] | Scorecard semanal e velocidade | DEV |
 
 ### Dashboards por Modulo
 
@@ -47,6 +50,105 @@ atualizado: 2026-04-07
 | HHT | 5% | Q3 2026 |
 
 > **Como usar:** edite os arquivos em `Database/Tarefas/`, `Database/Issues/`, `Database/Requisitos/` ou `Database/Milestones/` — os paineis atualizam automaticamente via Dataview.
+
+---
+
+## Database — Rastreamento de Projeto
+
+> Os paineis acima sao gerados automaticamente a partir dos arquivos abaixo via Dataview.
+> Cada arquivo tem frontmatter padronizado (`status`, `modulo`, `sprint`, `milestone`).
+
+### Milestones (entregas macro)
+
+| ID | Titulo | Status |
+|----|--------|--------|
+| [[Database/Milestones/MS-001 - Modulo Compras Core\|MS-001]] | Modulo Compras Core | Concluido |
+| [[Database/Milestones/MS-002 - Cotacoes e Notificacoes\|MS-002]] | Cotacoes e Notificacoes | Concluido |
+| [[Database/Milestones/MS-003 - HHt e Schema v2\|MS-003]] | HHT e Schema v2 | Em andamento |
+| [[Database/Milestones/MS-004 - Modulo Financeiro\|MS-004]] | Modulo Financeiro | Concluido |
+| [[Database/Milestones/MS-005 - AI TEG+ Agent\|MS-005]] | AI TEG+ Agent | Concluido |
+| [[Database/Milestones/MS-006 - Modulo Estoque Patrimonial\|MS-006]] | Estoque e Patrimonial | Concluido |
+| [[Database/Milestones/MS-006 - Modulo Logistica Transportes\|MS-006b]] | Logistica e Transportes | Concluido |
+| [[Database/Milestones/MS-007 - Modulo Frotas Manutencao\|MS-007]] | Frotas e Manutencao | Concluido |
+| [[Database/Milestones/MS-008 - Modulo RH Completo\|MS-008]] | RH Completo | Em andamento |
+| [[Database/Milestones/MS-009 - Modulo SSMA\|MS-009]] | Modulo SSMA | Q2-Q3 2026 |
+| [[Database/Milestones/MS-010 - Modulo Contratos Medicoes\|MS-010]] | Contratos e Medicoes | Em andamento |
+| [[Database/Milestones/MS-011 - AI TEG+ Agent\|MS-011]] | AI Agent v2 (Claude) | Em andamento |
+| [[Database/Milestones/MS-012 - Controladoria BI\|MS-012]] | Controladoria BI | Concluido |
+| [[Database/Milestones/MS-013 - Monday PMO\|MS-013]] | PMO/EGP | Concluido |
+| [[Database/Milestones/MS-014 - Modulo Cadastros AI\|MS-014]] | Cadastros AI | Concluido |
+
+### Tarefas (sprints + entregas)
+
+> Tarefas ativas e pendentes — para historico completo, veja [[Paineis/Tasks Board]]
+
+| ID | Titulo | Modulo | Status |
+|----|--------|--------|--------|
+| [[Database/Tarefas/TASK-025 - Contratos Gestao Medicoes\|TASK-025]] | Contratos e Medicoes | contratos | Em andamento |
+| [[Database/Tarefas/TASK-027 - Estoque Solicitacoes Transferencias\|TASK-027]] | Estoque Solicitacoes | estoque | Em andamento |
+| [[Database/Tarefas/TASK-028 - Frotas Telemetria Custos\|TASK-028]] | Frotas Telemetria | frotas | Em andamento |
+| [[Database/Tarefas/TASK-029 - Controladoria DRE\|TASK-029]] | Controladoria DRE | controladoria | Em andamento |
+| [[Database/Tarefas/TASK-030 - Testes CI CD\|TASK-030]] | Testes e CI/CD | infra | Backlog |
+
+### Requisitos (especificacoes funcionais)
+
+> Para board completo, veja [[Paineis/Requisitos Board]]
+
+| ID | Titulo | Status |
+|----|--------|--------|
+| [[Database/Requisitos/REQ-001 - Notificacoes Automaticas\|REQ-001]] | Notificacoes Automaticas | Entregue |
+| [[Database/Requisitos/REQ-004 - Interface Mobile Aprovadores\|REQ-004]] | Interface Mobile (AprovAi) | Entregue |
+| [[Database/Requisitos/REQ-006 - Integracao Omie\|REQ-006]] | Integracao Omie | Entregue |
+| [[Database/Requisitos/REQ-007 - Agente IA Conversacional\|REQ-007]] | Agente IA Conversacional | Entregue |
+
+### Issues conhecidas
+
+> Para board completo, veja [[Paineis/Issues Board]] e [[Paineis/Execucao Board]]
+
+| ID | Titulo | Severidade | Status |
+|----|--------|-----------|--------|
+| [[Database/Issues/ISSUE-001 - Token expiracao producao\|ISSUE-001]] | Token expiracao producao | alta | Resolvida |
+| [[Database/Issues/ISSUE-002 - Dashboard volume alto\|ISSUE-002]] | Dashboard volume alto | media | Resolvida |
+| [[Database/Issues/ISSUE-005 - Ausencia de testes automatizados\|ISSUE-005]] | Ausencia de testes | alta | Aberta |
+
+### Planos de Arquitetura
+
+| Documento | Modulo | Status |
+|-----------|--------|--------|
+| [[Requisitos/PLAN-CONTRATOS-v2\|PLAN-CONTRATOS-v2]] | Contratos | Executado (Mar 2026) |
+
+---
+
+## Guia do Usuario — Como usar o TEG+
+
+> Fluxos principais explicados para usuarios finais (nao-tecnicos).
+
+| Fluxo | O que faz | Doc |
+|-------|-----------|-----|
+| Requisicao de Compra | Solicitar materiais/servicos via wizard 3 etapas | [[11 - Fluxo Requisicao]] |
+| Aprovacao (AprovAi) | Aprovar/rejeitar via celular, link direto | [[12 - Fluxo Aprovacao]] |
+| Cotacao e Pedido | Comparar fornecedores e emitir PO | [[14 - Compradores e Categorias]] |
+| Contratos | Solicitar, analisar minuta AI, aprovar, assinar | [[27 - Modulo Contratos Gestao]] |
+| Pagamento | Liberar parcela, anexar NF, confirmar pgto | [[21 - Fluxo Pagamento]] |
+| Estoque | Movimentar materiais, inventario, patrimonio | [[22 - Modulo Estoque e Patrimonial]] |
+| Logistica | Solicitar transporte, rastrear, receber | [[23 - Modulo Logistica e Transportes]] |
+| Frotas | OS manutencao, checklist, abastecimento | [[24 - Modulo Frotas e Manutencao]] |
+| Fiscal | Pipeline de notas fiscais | [[29 - Modulo Fiscal]] |
+| Obras | Apontamentos, RDO, adiantamentos | [[32 - Modulo Obras]] |
+
+### Permissoes e Papeis
+
+| Papel | Nivel | O que pode fazer |
+|-------|-------|------------------|
+| CEO | 7 | Tudo — visao global |
+| Admin | 6 | Tudo — configuracao do sistema |
+| Diretor/Gerente | 5 | Aprovacoes finais, gestao de modulo |
+| Supervisor/Aprovador | 4 | Aprovacoes tecnicas, edicoes no modulo |
+| Gestor/Comprador | 3 | Operacao diaria (cotacoes, pedidos) |
+| Requisitante | 2 | Criar requisicoes |
+| Visitante | 1 | Somente leitura |
+
+> Permissoes sao definidas por modulo via `modulo_papeis` — veja [[09 - Auth Sistema]]
 
 ---
 
@@ -249,4 +351,10 @@ graph LR
 
 ---
 
-*Vault gerado em 2026-03-02 a partir do codigo-fonte. Ultima atualizacao: 2026-04-07.*
+---
+
+## Setup do Vault
+
+Para configurar este vault Obsidian, veja [[SETUP - Plugins Necessarios]].
+
+*Vault gerado em 2026-03-02 a partir do codigo-fonte. Ultima atualizacao: 2026-04-08.*

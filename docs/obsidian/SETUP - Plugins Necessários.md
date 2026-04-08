@@ -61,24 +61,40 @@ Para manter o vault sincronizado com o repositório:
 docs/obsidian/                 ← Raiz do vault
 │
 ├── 📊 Paineis/                ← Dashboards Dataview (NÃO editar diretamente)
-│   ├── PAINEL PRINCIPAL.md
-│   ├── Tasks Board.md
-│   ├── Roadmap Board.md
-│   ├── Issues Board.md
-│   └── Requisitos Board.md
+│   ├── PAINEL PRINCIPAL.md    → Central de comando com KPIs
+│   ├── BI Dashboard.md        → Visao executiva com graficos
+│   ├── Dev Hub BI.md          → Analytics de desenvolvimento
+│   ├── Tasks Board.md         → Kanban de tarefas
+│   ├── Roadmap Board.md       → Timeline de milestones
+│   ├── Issues Board.md        → Tracker de bugs
+│   ├── Execucao Board.md      → Pipeline de melhorias (GitHub)
+│   ├── Requisitos Board.md    → Rastreabilidade de requisitos
+│   ├── Relatorio Dev.md       → Scorecard semanal
+│   ├── Compras Dashboard.md   → Dashboard modulo Compras
+│   ├── Financeiro Dashboard   → Dashboard modulo Financeiro
+│   ├── Estoque Dashboard.md   → Dashboard modulo Estoque
+│   ├── Logistica Dashboard    → Dashboard modulo Logistica
+│   ├── Frotas Dashboard.md    → Dashboard modulo Frotas
+│   ├── Cadastros Dashboard    → Dashboard modulo Cadastros
+│   └── RH Dashboard.md        → Dashboard modulo RH
 │
-├── 🗄️ Database/               ← AQUI você edita para atualizar os painéis
-│   ├── Tarefas/               → TASK-XXX.md (status, prioridade, sprint, etc.)
-│   ├── Issues/                → ISSUE-XXX.md (severidade, status, módulo)
-│   ├── Requisitos/            → REQ-XXX.md (categoria, status, prioridade)
-│   └── Milestones/            → MS-XXX.md (progresso 0-100, status, fase)
+├── 🗄️ Database/               ← AQUI voce edita para atualizar os paineis
+│   ├── Tarefas/               → TASK-XXX.md (30 tarefas)
+│   ├── Issues/                → ISSUE-XXX.md (8 issues)
+│   ├── Requisitos/            → REQ-XXX.md (18 requisitos)
+│   └── Milestones/            → MS-XXX.md (14 milestones)
 │
-├── 📚 Documentação/           ← Notas de arquitetura (01 a 18)
-│   ├── 00 - TEG+ INDEX.md
-│   ├── 01 - Arquitetura Geral.md
-│   └── ... (18 notas)
+├── 📋 Requisitos/             ← Planos de arquitetura
+│   └── PLAN-CONTRATOS-v2.md   → Plano contratos v2 (concluido)
 │
-└── SETUP - Plugins Necessários.md ← Esta nota
+├── 📚 Documentacao Tecnica    ← Notas numeradas (00 a 34)
+│   ├── 00 - TEG+ INDEX.md    → Mapa central (comece aqui!)
+│   ├── 00 - Premissas.md     → Premissas do projeto
+│   ├── 01..18 - Infra         → Arquitetura, frontend, DB, auth, etc.
+│   ├── 19..26 - Funcional     → Integracao Omie, financeiro, estoque, etc.
+│   └── 27..34 - Modulos       → Contratos, fiscal, controladoria, etc.
+│
+└── SETUP - Plugins Necessarios.md ← Esta nota
 ```
 
 ---
