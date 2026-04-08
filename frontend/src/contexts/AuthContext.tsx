@@ -88,7 +88,7 @@ export const ROLE_NIVEL: Record<string, number> = {
 const PAPEL_TO_LEGACY_ROLE: Record<PapelGlobal, Role> = {
   requisitante: 'requisitante',
   equipe: 'gestor',
-  supervisor: 'gestor',
+  supervisor: 'supervisor',
   diretor: 'diretor',
   ceo: 'administrador',
 }
@@ -532,13 +532,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const basePapelGlobal: PapelGlobal = perfil?.papel_global ?? mapLegacyRoleToPapel(legacyRole)
   // Quando rbacV2 está ativo, o papel efetivo é o maior entre basePapelGlobal e os papeis dos setores
   // (evita que usuários com role legado 'requisitante' fiquem travados mesmo tendo papel='equipe' nos setores)
+  // Eleva papel global usando modulo_papeis (permissoes_especiais) ou perfil_setores (RBAC v2)
   const papelGlobal: PapelGlobal = (() => {
-    if (!rbacV2Enabled || perfilSetores.length === 0) return basePapelGlobal
     const niveis: Record<PapelGlobal, number> = { requisitante: 1, equipe: 2, supervisor: 3, diretor: 4, ceo: 5 }
     let best = basePapelGlobal
-    for (const s of perfilSetores) {
-      if ((niveis[s.papel] ?? 0) > (niveis[best] ?? 0)) best = s.papel
+
+    // RBAC v2: elevar com base nos setores
+    if (rbacV2Enabled && perfilSetores.length > 0) {
+      for (const s of perfilSetores) {
+        if ((niveis[s.papel] ?? 0) > (niveis[best] ?? 0)) best = s.papel
+      }
     }
+
+    // Fallback: elevar com base em modulo_papeis (permissoes_especiais)
+    const moduloPapeis = (perfil?.permissoes_especiais as any)?.modulo_papeis
+    if (moduloPapeis && typeof moduloPapeis === 'object') {
+      for (const p of Object.values(moduloPapeis) as string[]) {
+        if (niveis[p as PapelGlobal] > (niveis[best] ?? 0)) best = p as PapelGlobal
+      }
+    }
+
     return best
   })()
   const role: Role = legacyRole
@@ -565,16 +578,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (hasFullAccess) return true
     const normalized = normalizeModuleKey(mod)
 
-    if (!rbacV2Enabled || perfilSetores.length === 0) {
-      const fallbackRole = PAPEL_TO_LEGACY_ROLE[papelGlobal]
-      return hasModule(mod) && (ROLE_NIVEL[fallbackRole] ?? 0) >= 3
+    // RBAC v2: checar setores
+    if (rbacV2Enabled && perfilSetores.length > 0) {
+      return perfilSetores.some(s =>
+        s.ativo
+        && normalizeModuleKey(s.modulo_key) === normalized
+        && papeis.includes(s.papel)
+      )
     }
 
-    return perfilSetores.some(s =>
-      s.ativo
-      && normalizeModuleKey(s.modulo_key) === normalized
-      && papeis.includes(s.papel)
-    )
+    // Fallback: checar modulo_papeis em permissoes_especiais
+    const moduloPapeis = (perfil?.permissoes_especiais as any)?.modulo_papeis
+    if (moduloPapeis && typeof moduloPapeis === 'object') {
+      const papelMod = moduloPapeis[mod] ?? moduloPapeis[normalized]
+      if (papelMod && papeis.includes(papelMod)) return hasModule(mod)
+    }
+
+    // Último fallback: papel global
+    if (papeis.includes(papelGlobal)) return hasModule(mod)
+
+    return false
   }
 
   const canTechnicalApprove = (mod: string): boolean => {
@@ -588,6 +611,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         && normalizeModuleKey(s.modulo_key) === normalized
         && (s.aprovador_tecnico || s.papel === 'supervisor' || s.papel === 'diretor' || s.papel === 'ceo')
       )
+    }
+
+    // Checar modulo_papeis para aprovação técnica no módulo específico
+    const moduloPapeis = (perfil?.permissoes_especiais as any)?.modulo_papeis
+    if (moduloPapeis && typeof moduloPapeis === 'object') {
+      const papelMod = moduloPapeis[mod] ?? moduloPapeis[normalized]
+      if (papelMod === 'supervisor' || papelMod === 'diretor' || papelMod === 'ceo') return hasModule(mod)
     }
 
     return legacyRole === 'diretor' || legacyRole === 'supervisor' || legacyRole === 'gerente' || legacyRole === 'gestor' || legacyRole === 'aprovador'

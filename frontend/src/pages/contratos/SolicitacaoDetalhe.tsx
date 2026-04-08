@@ -774,6 +774,7 @@ function EtapaActions({ etapa, solicitacaoId, onAvancar, onCancel, onEnviarAssin
 
     case 'aprovacao_diretoria': {
       const canApproveHere = role === 'administrador' || role === 'diretor' || role === 'supervisor'
+        || hasSetorPapel('contratos', ['supervisor', 'diretor', 'ceo'])
       const [approving, setApproving] = useState(false)
       return (
         <>
