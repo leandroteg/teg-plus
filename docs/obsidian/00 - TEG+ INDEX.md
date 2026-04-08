@@ -192,6 +192,25 @@ atualizado: 2026-04-08
 | Modulo SSMA | [[33 - Módulo SSMA]] |
 | Modulo Locacao | [[34 - Módulo Locação]] |
 
+### Dev Guides (Novos)
+
+| Area | Nota |
+|------|------|
+| Onboarding | [[35 - Onboarding DEV]] |
+| Contribuicao | [[36 - Guia de Contribuição]] |
+| Troubleshooting | [[37 - Troubleshooting FAQ]] |
+| Mapa de APIs | [[38 - Mapa de APIs]] |
+| Modelo de Dados ERD | [[39 - Modelo de Dados ERD]] |
+| ADRs | [[40 - ADRs Index]] |
+| Seguranca e RLS | [[41 - Segurança e RLS]] |
+| Testes | [[42 - Estratégia de Testes]] |
+| Runbook Incidentes | [[43 - Runbook de Incidentes]] |
+| Changelog | [[44 - Changelog]] |
+| Mapa Integracoes | [[45 - Mapa de Integrações]] |
+| Performance | [[46 - Performance e Monitoring]] |
+| Disaster Recovery | [[47 - Disaster Recovery]] |
+| Guia de Estilo UI | [[48 - Guia de Estilo UI]] |
+
 ---
 
 ## Arquitetura em 3 Camadas

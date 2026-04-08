@@ -15,6 +15,20 @@
       }
     },
     {
+      "query": "path:obsidian/Database/ADRs",
+      "color": {
+        "a": 1,
+        "rgb": 9342606
+      }
+    },
+    {
+      "query": "path:obsidian/Database",
+      "color": {
+        "a": 1,
+        "rgb": 16750848
+      }
+    },
+    {
       "query": "path:plans",
       "color": {
         "a": 1,
@@ -22,59 +36,10 @@
       }
     },
     {
-      "query": "path:obsidian/Database/Tarefas",
-      "color": {
-        "a": 1,
-        "rgb": 16750848
-      }
-    },
-    {
-      "query": "path:obsidian/Database/Milestones",
-      "color": {
-        "a": 1,
-        "rgb": 16776960
-      }
-    },
-    {
-      "query": "path:obsidian/Database/Issues",
-      "color": {
-        "a": 1,
-        "rgb": 16729156
-      }
-    },
-    {
-      "query": "path:obsidian/Database/Requisitos",
-      "color": {
-        "a": 1,
-        "rgb": 43775
-      }
-    },
-    {
-      "query": "file:(11 -|12 -|13 -|14 -|21 -|25 -|26 -) path:obsidian",
-      "color": {
-        "a": 1,
-        "rgb": 2003199
-      }
-    },
-    {
-      "query": "file:(20 -|22 -|23 -|24 -|27 -|28 -|29 -|30 -|31 -|32 -|33 -|34 -) path:obsidian",
+      "query": "path:obsidian file:(00 -|01 -|02 -|03 -|04 -|05 -|06 -|07 -|08 -|09 -|10 -|11 -|12 -|13 -|14 -|15 -|16 -|17 -|18 -|19 -|20 -|21 -|22 -|23 -|24 -|25 -|26 -|27 -|28 -|29 -|30 -|31 -|32 -|33 -|34 -|SETUP)",
       "color": {
         "a": 1,
         "rgb": 5570815
-      }
-    },
-    {
-      "query": "file:(00 -|01 -|02 -|03 -|04 -|05 -|06 -|07 -|08 -|09 -|10 -|15 -|16 -|17 -|18 -|19 -|SETUP) path:obsidian",
-      "color": {
-        "a": 1,
-        "rgb": 8947967
-      }
-    },
-    {
-      "query": "path:obsidian/Database/Planos",
-      "color": {
-        "a": 1,
-        "rgb": 9342606
       }
     }
   ],
@@ -88,6 +53,6 @@
   "repelStrength": 10,
   "linkStrength": 1,
   "linkDistance": 250,
-  "scale": 0.3242333202184626,
+  "scale": 0.32423332021846235,
   "close": true
 }
