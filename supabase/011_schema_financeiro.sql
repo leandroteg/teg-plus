@@ -82,6 +82,7 @@ CREATE TABLE IF NOT EXISTS fin_contas_pagar (
   natureza            VARCHAR(50), -- servico, material, folha, imposto, etc
   -- Pagamento
   forma_pagamento     VARCHAR(30), -- boleto, transferencia, pix, cheque
+  cartao_id           UUID REFERENCES fin_cartoes_credito(id),
   numero_documento    VARCHAR(50), -- numero NF, boleto, etc
   -- Status
   status              VARCHAR(30) DEFAULT 'previsto'
@@ -108,6 +109,7 @@ CREATE INDEX IF NOT EXISTS idx_fin_cp_status ON fin_contas_pagar(status);
 CREATE INDEX IF NOT EXISTS idx_fin_cp_vencimento ON fin_contas_pagar(data_vencimento);
 CREATE INDEX IF NOT EXISTS idx_fin_cp_fornecedor ON fin_contas_pagar(fornecedor_id);
 CREATE INDEX IF NOT EXISTS idx_fin_cp_pedido ON fin_contas_pagar(pedido_id);
+CREATE INDEX IF NOT EXISTS idx_fin_cp_cartao ON fin_contas_pagar(cartao_id);
 CREATE INDEX IF NOT EXISTS idx_fin_cp_cc ON fin_contas_pagar(centro_custo);
 CREATE INDEX IF NOT EXISTS idx_fin_cp_projeto ON fin_contas_pagar(projeto_id);
 

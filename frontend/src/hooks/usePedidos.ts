@@ -107,6 +107,9 @@ export interface EmitirPedidoPayload {
   valorTotal: number
   compradorId?: string
   condicaoPagamento?: string
+  formaPagamento?: 'pix' | 'cartao' | 'boleto' | 'transferencia'
+  cartaoId?: string
+  cartaoNome?: string
   observacoes?: string
   dataPrevistaEntrega?: string
   classeFinanceiraId?: string
@@ -173,6 +176,9 @@ export function useEmitirPedido() {
         valorTotal,
         compradorId,
         condicaoPagamento,
+        formaPagamento,
+        cartaoId,
+        cartaoNome,
         observacoes,
         dataPrevistaEntrega,
         classeFinanceira,
@@ -265,7 +271,10 @@ export function useEmitirPedido() {
           data_pedido: now.toISOString().split('T')[0],
           data_prevista_entrega: dataPrevistaEntrega || null,
           condicao_pagamento: condicaoPagamento || null,
-          observacoes: observacoes || null,
+          observacoes: [
+            observacoes?.trim() || null,
+            formaPagamento === 'cartao' && cartaoNome ? `CartÃ£o selecionado: ${cartaoNome}` : null,
+          ].filter(Boolean).join(' | ') || null,
           classe_financeira: classeFinanceira || null,
           classe_financeira_id: classeFinanceiraId || null,
           centro_custo: centroCusto || null,
@@ -338,6 +347,8 @@ export function useEmitirPedido() {
         projeto_id: requisicao.projeto_id || null,
         descricao: buildDescricaoParcela(requisicao.descricao, parcela, parcelasSanitizadas.length),
         natureza: 'material',
+        forma_pagamento: formaPagamento || null,
+        cartao_id: formaPagamento === 'cartao' ? cartaoId || null : null,
         observacoes: condicaoPagamento ? `Condição: ${condicaoPagamento}` : null,
       }))
 

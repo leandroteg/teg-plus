@@ -85,6 +85,7 @@ export interface ContaPagar {
   projeto_id?: string
   natureza?: string
   forma_pagamento?: string
+  cartao_id?: string
   numero_documento?: string
   status: StatusCP
   aprovado_por?: string
