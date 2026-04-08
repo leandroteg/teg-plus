@@ -1741,15 +1741,37 @@ export default function AdminUsuarios() {
           </button>
         </div>
 
-        {/* Stats de roles */}
-        <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+        {/* Abas de roles (clicáveis para filtrar) */}
+        <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
+          <button
+            type="button"
+            onClick={() => setFilterRole('todos')}
+            className={`rounded-xl p-3 text-left transition-all ${
+              filterRole === 'todos'
+                ? 'bg-slate-200 ring-2 ring-slate-400 ring-offset-1'
+                : 'bg-slate-100 hover:bg-slate-150 opacity-70 hover:opacity-100'
+            }`}
+          >
+            <p className="text-xl font-black text-slate-700">{perfis?.length ?? 0}</p>
+            <p className="text-xs font-semibold text-slate-500">Todos</p>
+          </button>
           {(['requisitante', 'equipe', 'supervisor', 'diretor', 'ceo'] as Role[]).map(r => {
             const c = ROLE_COLOR[r]
+            const isActive = filterRole === r
             return (
-              <div key={r} className={`rounded-xl p-3 ${c.bg}`}>
+              <button
+                key={r}
+                type="button"
+                onClick={() => setFilterRole(isActive ? 'todos' : r)}
+                className={`rounded-xl p-3 text-left transition-all ${c.bg} ${
+                  isActive
+                    ? 'ring-2 ring-current ring-offset-1 shadow-md scale-[1.02]'
+                    : 'opacity-70 hover:opacity-100'
+                }`}
+              >
                 <p className={`text-xl font-black ${c.text}`}>{stats[r] ?? 0}</p>
-                <p className={`text-xs font-semibold ${c.text} opacity-80`}>{getRoleLabel(r)}</p>
-              </div>
+                <p className={`text-xs font-semibold ${c.text} ${isActive ? '' : 'opacity-80'}`}>{getRoleLabel(r)}</p>
+              </button>
             )
           })}
         </div>
