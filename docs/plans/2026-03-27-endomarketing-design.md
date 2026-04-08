@@ -56,3 +56,7 @@ aviso_geral, aniversariante, boas_vindas, reconhecimento, evento, treinamento, s
 1. **GerarComunicado** — wizard: tipo → formato → input → gerar IA → preview texto → gerar imagem → salvar
 2. **HistoricoComunicados** — grid de cards com thumbnail, tipo badge, data, download
 3. **IdentidadeVisual** — form com logo upload, color pickers, fontes, slogan, preview ao vivo
+
+
+## Links
+- [[obsidian/25 - Mural de Recados]]

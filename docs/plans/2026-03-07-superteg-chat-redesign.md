@@ -29,3 +29,7 @@
 - Markdown/link rendering logic
 - Responsiveness
 - sessionStorage persistence
+
+
+## Links
+- [[obsidian/28 - Módulo Cadastros AI]]

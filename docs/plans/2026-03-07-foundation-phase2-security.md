@@ -203,3 +203,7 @@ Apply to critical tables: `fin_contas_pagar`, `fin_contas_receber`, `con_contrat
 - role_at_least() is battle-tested from Phase 1
 - No frontend code changes = no risk of UI regression
 - Each migration is independent and can be rolled back individually
+
+
+## Links
+- [[obsidian/09 - Auth Sistema]]

@@ -895,3 +895,8 @@ cd frontend && npm run build
 Expected: Clean build (no frontend changes)
 
 **Step 5: Commit + push** — `chore: Foundation Phase 2 complete — security hardening`
+
+
+## Links
+- [[obsidian/01 - Arquitetura Geral]]
+- [[obsidian/09 - Auth Sistema]]

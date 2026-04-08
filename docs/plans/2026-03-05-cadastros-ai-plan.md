@@ -1231,3 +1231,7 @@ git push origin main
 | 4. Pages | 7 entity pages | 40 min |
 | 5. Polish | Financeiro hooks + verification | 10 min |
 | **Total** | **18 tasks** | **~100 min** |
+
+
+## Links
+- [[obsidian/28 - Módulo Cadastros AI]]

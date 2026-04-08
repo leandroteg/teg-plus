@@ -856,3 +856,7 @@ git pull --rebase && git push
 | `frontend/src/hooks/useEndomarketing.ts` | Modify | + `useGerarImagemIA`, tipos `GerarImagemIAPayload/Response` |
 | `frontend/src/pages/rh/Endomarketing.tsx` | Modify | Wizard: seletor modo, Step 3a template manual, Step 3b IA, Step 4b preview IA |
 | n8n workflow (UI) | Create | `Endomarketing - Gerar Imagem IA` — webhook + Code + Gemini Generate Image + HTTP Upload + Respond |
+
+
+## Links
+- [[obsidian/25 - Mural de Recados]]

@@ -303,6 +303,60 @@ graph TD
 
 ---
 
+## Design Docs e Planos de Implementacao
+
+> Documentos tecnicos de design e plano de cada feature implementada.
+
+### Infraestrutura e Arquitetura
+| Data | Documento | Modulo |
+|------|-----------|--------|
+| Mar 04 | [[plans/2026-03-04-approval-flow-design\|Approval Flow Design]] | [[12 - Fluxo Aprovação]] |
+| Mar 04 | [[plans/2026-03-04-approval-flow-plan\|Approval Flow Plan]] | [[12 - Fluxo Aprovação]] |
+| Mar 05 | [[plans/2026-03-05-split-layout-design\|Split Layout Design]] | [[02 - Frontend Stack]] |
+| Mar 06 | [[plans/2026-03-06-foundation-phase1\|Foundation Phase 1]] | [[01 - Arquitetura Geral]] |
+| Mar 07 | [[plans/2026-03-07-foundation-phase2\|Foundation Phase 2]] | [[01 - Arquitetura Geral]] |
+| Mar 07 | [[plans/2026-03-07-foundation-phase2-security\|Security Hardening]] | [[09 - Auth Sistema]] |
+| Mar 07 | [[plans/2026-03-07-avatar-dropdown-design\|Avatar Dropdown]] | [[04 - Componentes]] |
+| Mar 07 | [[plans/2026-03-07-issue-batch-fixes-design\|Issue Batch Fixes Design]] | Geral |
+| Mar 07 | [[plans/2026-03-07-issue-batch-fixes\|Issue Batch Fixes Plan]] | Geral |
+| Mar 22 | [[plans/2026-03-22-permissoes-granulares-design\|Permissoes Granulares]] | [[09 - Auth Sistema]] |
+
+### Modulos Operacionais
+| Data | Documento | Modulo |
+|------|-----------|--------|
+| Mar 05 | [[plans/2026-03-05-cadastros-ai-design\|Cadastros AI Design]] | [[28 - Módulo Cadastros AI]] |
+| Mar 05 | [[plans/2026-03-05-cadastros-ai-plan\|Cadastros AI Plan]] | [[28 - Módulo Cadastros AI]] |
+| Mar 05 | [[plans/2026-03-05-fiscal-notas-fiscais-design\|Fiscal NF Design]] | [[29 - Módulo Fiscal]] |
+| Mar 05 | [[plans/2026-03-05-fiscal-notas-fiscais-plan\|Fiscal NF Plan]] | [[29 - Módulo Fiscal]] |
+| Mar 07 | [[plans/2026-03-07-recebimento-integration-design\|Recebimento Integration]] | [[22 - Módulo Estoque e Patrimonial]] |
+| Mar 07 | [[plans/2026-03-07-superteg-chat-redesign\|SuperTEG Chat Redesign]] | [[28 - Módulo Cadastros AI]] |
+| Mar 09 | [[plans/2026-03-09-nf-romaneio-fiscal-redesign\|NF Romaneio Redesign]] | [[29 - Módulo Fiscal]] |
+| Mar 12 | [[plans/2026-03-12-tesouraria-design\|Tesouraria Design]] | [[20 - Módulo Financeiro]] |
+| Mar 12 | [[plans/2026-03-12-tesouraria-plan\|Tesouraria Plan]] | [[20 - Módulo Financeiro]] |
+| Mar 27 | [[plans/2026-03-27-endomarketing-design\|Endomarketing Design]] | [[25 - Mural de Recados]] |
+| Mar 30 | [[plans/2026-03-30-frotas-maquinas-design\|Frotas Maquinas Design]] | [[24 - Módulo Frotas e Manutenção]] |
+| Mar 30 | [[plans/2026-03-30-frotas-maquinas-impl\|Frotas Maquinas Impl]] | [[24 - Módulo Frotas e Manutenção]] |
+| Mar 31 | [[plans/2026-03-31-compras-dashboard-redesign\|Compras Dashboard Redesign]] | [[14 - Compradores e Categorias]] |
+| Mar 31 | [[plans/2026-03-31-endomarketing-imagem-ia-design\|Endomarketing IA Design]] | [[25 - Mural de Recados]] |
+| Mar 31 | [[plans/2026-03-31-endomarketing-imagem-ia\|Endomarketing IA Plan]] | [[25 - Mural de Recados]] |
+
+### Contratos e Assinatura Digital
+| Data | Documento | Modulo |
+|------|-----------|--------|
+| Mar 11 | [[plans/2026-03-11-certisign-integration-design\|Certisign Design]] | [[27 - Módulo Contratos Gestão]] |
+| Mar 11 | [[plans/2026-03-11-certisign-implementation-plan\|Certisign Plan]] | [[27 - Módulo Contratos Gestão]] |
+| Mar 22 | [[plans/2026-03-22-biblioteca-modelos-minuta-design\|Biblioteca Minutas Design]] | [[27 - Módulo Contratos Gestão]] |
+| Mar 22 | [[plans/2026-03-22-biblioteca-modelos-minuta\|Biblioteca Minutas Plan]] | [[27 - Módulo Contratos Gestão]] |
+| Mar 22 | [[plans/2026-03-22-filtros-grupo-acompanhamento-gestao\|Filtros Gestao Plan]] | [[27 - Módulo Contratos Gestão]] |
+
+### PMO e Gestao de Projetos
+| Data | Documento | Modulo |
+|------|-----------|--------|
+| Abr 06 | [[plans/2026-04-06-egp-ciclo-vida-design\|EGP Ciclo de Vida Design]] | [[31 - Módulo PMO-EGP]] |
+| Abr 06 | [[plans/2026-04-06-egp-ciclo-vida-plan\|EGP Ciclo de Vida Plan]] | [[31 - Módulo PMO-EGP]] |
+
+---
+
 ## Links Relacionados
 
 - [[00 - TEG+ INDEX]] — Status atual consolidado

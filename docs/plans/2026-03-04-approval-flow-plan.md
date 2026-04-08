@@ -553,3 +553,7 @@ git add -A
 git commit -m "feat: complete approval flow — esclarecimento, detail page, comments, AprovAi integration"
 git push origin main
 ```
+
+
+## Links
+- [[obsidian/12 - Fluxo Aprovação]]

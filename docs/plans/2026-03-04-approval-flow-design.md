@@ -72,3 +72,7 @@ Quando admin decide via ListaRequisicoes ou RequisicaoDetalhe:
 - Textarea em todos os pontos de decisão
 - Obrigatório para esclarecimento, opcional para aprovar/rejeitar
 - Salvo em `apr_aprovacoes.observacao`
+
+
+## Links
+- [[obsidian/12 - Fluxo Aprovação]]

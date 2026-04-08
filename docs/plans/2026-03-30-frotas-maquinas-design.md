@@ -356,3 +356,7 @@ frontend/src/types/frotas.ts  ← expandir
 frontend/src/hooks/useFrotas.ts ← expandir
 supabase/068_fro_redesign.sql ← migration
 ```
+
+
+## Links
+- [[obsidian/24 - Módulo Frotas e Manutenção]]

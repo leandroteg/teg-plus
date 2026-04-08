@@ -1296,3 +1296,7 @@ cd /c/teg-plus && git add -A && git commit -m "feat(frotas): módulo Frotas & M�
 Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>"
 git push
 ```
+
+
+## Links
+- [[obsidian/24 - Módulo Frotas e Manutenção]]

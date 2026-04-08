@@ -72,3 +72,7 @@ Redesign the ModuloSelector home page from a single-column centered layout to a 
 - Same `useBanners()` hook from `hooks/useMural.ts`
 - Same `MuralBanner` type
 - Same default slides when no banners exist
+
+
+## Links
+- [[obsidian/02 - Frontend Stack]]

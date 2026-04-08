@@ -207,3 +207,7 @@ Base URL: `https://api.portaldeassinaturas.com.br` (configurar no n8n)
 Auth: Header `Authorization: Bearer {token}` (credencial no n8n)
 
 > Nota: Endpoints exatos a confirmar com documentação Certisign após login no portal do desenvolvedor. O workflow n8n será parametrizado para ajustar facilmente.
+
+
+## Links
+- [[obsidian/27 - Módulo Contratos Gestão]]
