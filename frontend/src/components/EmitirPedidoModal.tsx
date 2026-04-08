@@ -746,7 +746,7 @@ export default function EmitirPedidoModal({
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-bold text-slate-600 mb-1.5">Forma de Pagamento</label>
+                  <label className="block text-xs font-bold text-slate-600 mb-1.5">Meio de Pagamento</label>
                   <select
                     value={formaPagamento}
                     onChange={(event) => setFormaPagamento(event.target.value as FormaPagamentoPedido | '')}
@@ -758,31 +758,32 @@ export default function EmitirPedidoModal({
                     ))}
                   </select>
                   <p className="mt-1 text-[11px] text-slate-400">
-                    Define como as parcelas vao seguir para o financeiro.
+                    Selecione como esse pedido sera pago no financeiro.
                   </p>
                 </div>
 
-                <div>
-                  <label className="block text-xs font-bold text-slate-600 mb-1.5">Cartao</label>
-                  <select
-                    value={cartaoId}
-                    disabled={formaPagamento !== 'cartao'}
-                    onChange={(event) => setCartaoId(event.target.value)}
-                    className={`w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-teal-300 bg-white ${formaPagamento !== 'cartao' ? 'opacity-60 cursor-not-allowed bg-slate-50' : ''}`}
-                  >
-                    <option value="">{formaPagamento === 'cartao' ? 'Selecionar cartao...' : 'Selecione Cartao na forma de pagamento'}</option>
-                    {cartoes.map((cartao) => (
-                      <option key={cartao.id} value={cartao.id}>
-                        {cartao.nome}{cartao.ultimos4 ? ` • ${cartao.ultimos4}` : ''}
-                      </option>
-                    ))}
-                  </select>
-                  <p className="mt-1 text-[11px] text-slate-400">
-                    {formaPagamento === 'cartao'
-                      ? 'Escolha qual cartao corporativo sera usado nesse pagamento.'
-                      : 'A lista de cartoes aparece quando a forma de pagamento for Cartao.'}
-                  </p>
-                </div>
+                {formaPagamento === 'cartao' ? (
+                  <div>
+                    <label className="block text-xs font-bold text-slate-600 mb-1.5">Qual Cartao</label>
+                    <select
+                      value={cartaoId}
+                      onChange={(event) => setCartaoId(event.target.value)}
+                      className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-teal-300 bg-white"
+                    >
+                      <option value="">Selecionar cartao...</option>
+                      {cartoes.map((cartao) => (
+                        <option key={cartao.id} value={cartao.id}>
+                          {cartao.nome}{cartao.ultimos4 ? ` • ${cartao.ultimos4}` : ''}
+                        </option>
+                      ))}
+                    </select>
+                    <p className="mt-1 text-[11px] text-slate-400">
+                      Escolha qual cartao corporativo sera usado nesse pagamento.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="hidden md:block" />
+                )}
               </div>
 
               <div className="rounded-2xl border border-amber-200 bg-amber-50/70 p-4 space-y-3">
