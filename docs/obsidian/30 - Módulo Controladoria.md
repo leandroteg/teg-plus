@@ -175,6 +175,26 @@ flowchart LR
 
 ---
 
+## RPCs do Banco
+
+| RPC | Descrição |
+|-----|-----------|
+| `ctrl_calcular_dre_mes(obra_id, ano, mes)` | Calcula DRE simplificado para uma obra em um mês específico — receitas, custos diretos, margem |
+| `ctrl_gerar_snapshot_kpis()` | Gera snapshot diário de KPIs por obra — margem, CPI, SPI, desvio orçamentário — salvo em `ctrl_kpis_snapshot` |
+
+Os snapshots são executados via cron n8n diariamente e alimentam o dashboard de indicadores com série histórica.
+
+---
+
+## Indicadores de Produção
+
+Além dos KPIs financeiros, a Controladoria acompanha indicadores de produção por obra:
+- HH/km de rede construída
+- Custo/km
+- Produtividade por frente de trabalho
+
+---
+
 ## Links Relacionados
 
 - [[03 - Páginas e Rotas]] — Rotas do módulo

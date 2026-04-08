@@ -2,25 +2,37 @@
 title: Supabase — Banco de Dados e Auth
 type: infraestrutura
 status: ativo
-tags: [supabase, postgresql, auth, realtime, rls]
+tags: [supabase, postgresql, auth, realtime, rls, storage]
 criado: 2026-03-02
-relacionado: ["[[01 - Arquitetura Geral]]", "[[07 - Schema Database]]", "[[08 - Migrações SQL]]", "[[09 - Auth Sistema]]"]
+atualizado: 2026-04-07
+relacionado: ["[[01 - Arquitetura Geral]]", "[[07 - Schema Database]]", "[[08 - Migracoes SQL]]", "[[09 - Auth Sistema]]"]
 ---
 
 # Supabase — TEG+ ERP
 
-## Visão Geral
+## Visao Geral
 
-O Supabase é o **backend principal** do TEG+, fornecendo:
-- **PostgreSQL 15** — banco relacional com RPC e views
-- **Auth** — autenticação com magic link + email/senha
-- **Realtime** — push de atualizações via WebSocket
-- **Row Level Security** — controle de acesso por linha
-- **Storage** — (não usado ainda)
+O Supabase e o **backend principal** do TEG+, fornecendo:
+- **PostgreSQL 15** — banco relacional com 170+ tabelas, 90+ RPCs, views materializadas
+- **Auth** — autenticacao com email/senha + magic link, auto-criacao de perfil
+- **Realtime** — push de atualizacoes via WebSocket (subscriptions para live updates)
+- **Row Level Security** — controle de acesso por linha em todas as tabelas
+- **Storage** — 4 buckets para documentos, banners, uploads e endomarketing
+- **RBAC v2** — controle de acesso granular por setor via sys_perfil_setores
+
+### Numeros
+
+| Metrica | Valor |
+|---------|-------|
+| Tabelas | 170+ |
+| Prefixos de tabela | 18 |
+| RPCs (functions) | 90+ |
+| Migrations | 75 |
+| Storage buckets | 4 |
 
 ---
 
-## Configuração
+## Configuracao
 
 ```ts
 // src/services/supabase.ts
@@ -32,127 +44,186 @@ export const supabase = createClient(
 )
 ```
 
-Veja [[16 - Variáveis de Ambiente]] para configuração das chaves.
+Veja [[16 - Variaveis de Ambiente]] para configuracao das chaves.
 
 ---
 
 ## Acesso por Camada
 
-| Camada | Chave | Permissões |
+| Camada | Chave | Permissoes |
 |--------|-------|-----------|
-| Frontend (browser) | `anon key` | Acesso restrito por RLS |
+| Frontend (browser) | `anon key` | Acesso restrito por RLS + RBAC v2 |
 | n8n (server-side) | `service_role key` | Bypass completo do RLS |
 | Supabase Studio | Admin | Acesso total |
 
 ---
 
+## Autenticacao
+
+### Metodos suportados
+- **Email/senha** — login padrao
+- **Magic link** — login sem senha via e-mail
+- **Auto-profile creation** — ao criar conta, trigger cria perfil automaticamente em `sys_perfis`
+
+### Fluxo de auth
+```
+Usuario -> Login (email/senha ou magic link)
+  -> Supabase Auth valida
+  -> Token JWT gerado
+  -> AuthContext carrega perfil + permissoes (RBAC v2)
+  -> Redirect para ModuloSelector
+```
+
+---
+
+## RBAC v2 — Controle de Acesso por Setor
+
+| Tabela | Descricao |
+|--------|-----------|
+| `sys_perfil_setores` | Vincula usuario a setor(es) com role especifica |
+| `sys_roles` | Define roles disponiveis no sistema |
+| `sys_role_permissoes` | Mapeia permissoes granulares por role, modulo e acao |
+
+O RBAC v2 permite que um usuario tenha roles diferentes em setores diferentes (ex: admin em Compras, viewer em Financeiro).
+
+---
+
 ## Row Level Security (RLS)
 
-**Princípio:** todo acesso ao banco é filtrado por RLS.
+**Principio:** todo acesso ao banco e filtrado por RLS. Todas as 170+ tabelas possuem policies ativas.
 
-### Políticas principais:
+### Politicas principais:
 ```sql
--- Usuários veem apenas suas próprias requisições (ou todas se for admin)
-CREATE POLICY "requisicoes_read" ON requisicoes
+-- Usuarios veem apenas dados do seu setor/role
+CREATE POLICY "read_by_sector" ON tabela
   FOR SELECT USING (
-    solicitante_id = auth.uid()
+    EXISTS (
+      SELECT 1 FROM sys_perfil_setores ps
+      WHERE ps.user_id = auth.uid()
+      AND ps.setor = 'modulo'
+    )
     OR EXISTS (SELECT 1 FROM perfis WHERE id = auth.uid() AND role = 'admin')
   );
 
--- Aprovadores veem suas aprovações pendentes
+-- Aprovadores veem suas aprovacoes pendentes
 CREATE POLICY "aprovacoes_read" ON aprovacoes
   FOR SELECT USING (aprovador_id = auth.uid());
 
--- Leitura pública para aprovação por token (sem auth)
+-- Leitura publica para aprovacao por token (sem auth)
 CREATE POLICY "aprovacao_publica" ON aprovacoes
   FOR SELECT USING (token IS NOT NULL);
 ```
 
-> n8n usa `service_role` → bypass total do RLS
+> n8n usa `service_role` -> bypass total do RLS
+
+---
+
+## Storage Buckets
+
+| Bucket | Uso | Acesso |
+|--------|-----|--------|
+| `cotacoes-docs` | Documentos de cotacao (PDFs, planilhas) | Autenticado |
+| `mural-banners` | Banners do BannerSlideshow (imagens) | Publico (leitura) |
+| `temp-uploads` | Uploads temporarios durante formularios | Autenticado |
+| `endomarketing` | Materiais de endomarketing e RH | Autenticado |
 
 ---
 
 ## Realtime Subscriptions
 
-O frontend se inscreve em mudanças das tabelas principais:
+O frontend se inscreve em mudancas das tabelas principais para live updates:
 
 ```ts
-// Atualização automática do dashboard
+// Atualizacao automatica via invalidacao de cache
 supabase
-  .channel('dashboard')
-  .on('postgres_changes', { event: '*', schema: 'public', table: 'requisicoes' },
-    () => queryClient.invalidateQueries(['dashboard'])
+  .channel('module-updates')
+  .on('postgres_changes', { event: '*', schema: 'public', table: 'cmp_requisicoes' },
+    () => queryClient.invalidateQueries(['requisicoes'])
   )
-  .on('postgres_changes', { event: '*', schema: 'public', table: 'aprovacoes' },
+  .on('postgres_changes', { event: '*', schema: 'public', table: 'apr_aprovacoes' },
     () => queryClient.invalidateQueries(['aprovacoes'])
+  )
+  .on('postgres_changes', { event: '*', schema: 'public', table: 'fin_contas_pagar' },
+    () => queryClient.invalidateQueries(['contas-pagar'])
   )
   .subscribe()
 ```
 
----
-
-## Funções e Views
-
-### RPCs (Remote Procedure Calls)
-
-| Função | Parâmetros | Retorno |
-|--------|-----------|---------|
-| `get_dashboard_compras` | `p_periodo, p_obra_id` | JSON agregado com KPIs |
-| `gerar_numero_requisicao` | — | `string` (RC-YYYYMM-XXXX) |
-| `determinar_alcada` | `valor numeric` | `integer` (1-4) |
-
-### Views
-
-| View | Descrição |
-|------|-----------|
-| `vw_dashboard_requisicoes` | Requisições com dados relacionados |
-| `vw_requisicoes_completas` | Join completo: req + itens + aprovações |
-| `vw_kpis_compras` | KPIs agregados |
-| `vw_requisicoes_por_obra` | Agrupamento por obra |
+Realtime e usado em: aprovacoes pendentes, dashboard KPIs, pipeline de cotacoes, status de transportes, e notificacoes do AprovAi.
 
 ---
 
-## Estrutura de Tabelas
+## Funcoes RPC (90+)
+
+### Exemplos por modulo:
+
+| Funcao | Modulo | Descricao |
+|--------|--------|-----------|
+| `get_dashboard_compras` | Compras | KPIs agregados do dashboard |
+| `gerar_numero_requisicao` | Compras | Gera RC-YYYYMM-XXXX |
+| `determinar_alcada` | Aprovacoes | Retorna alcada 1-4 por valor |
+| `get_dashboard_financeiro` | Financeiro | KPIs financeiros |
+| `get_dre_consolidado` | Controladoria | DRE por periodo e obra |
+| `get_kpis_frotas` | Frotas | Indicadores de frota |
+| `get_portfolio_summary` | PMO/EGP | Resumo do portfolio |
+| `get_cotacao_recomendacao` | Compras | Motor de recomendacao AI para cotacoes |
+| `calcular_depreciacao` | Patrimonio | Calculo de depreciacao mensal |
+| `get_saldo_estoque` | Estoque | Saldo por item e almoxarifado |
+
+---
+
+## Prefixos de Tabelas (18)
+
+| Prefixo | Modulo | Exemplos |
+|---------|--------|----------|
+| `sys_` | Sistema | sys_perfil_setores, sys_roles, sys_role_permissoes, sys_obras, sys_perfis |
+| `cmp_` | Compras | cmp_requisicoes, cmp_itens_requisicao, cmp_pedidos, cmp_fornecedores |
+| `fin_` | Financeiro | fin_contas_pagar, fin_contas_receber, fin_conciliacao |
+| `con_` | Contratos | con_contratos, con_medicoes, con_aditivos, con_parcelas |
+| `ctrl_` | Controladoria | ctrl_orcamentos, ctrl_dre, ctrl_kpis, ctrl_cenarios |
+| `log_` | Logistica | log_transportes, log_recebimentos, log_expedicao |
+| `est_` | Estoque | est_itens, est_movimentacoes, est_inventario |
+| `pat_` | Patrimonio | pat_imobilizados, pat_depreciacao |
+| `fro_` | Frotas | fro_veiculos, fro_ordens_servico, fro_checklists, fro_abastecimentos |
+| `obr_` | Obras | obr_apontamentos, obr_rdo, obr_adiantamentos |
+| `pmo_` | PMO/EGP | pmo_portfolios, pmo_eap, pmo_cronograma, pmo_medicoes |
+| `rh_` | RH | rh_colaboradores, rh_mural_banners |
+| `ssm_` | SSMA | ssm_ocorrencias |
+| `fis_` | Fiscal | fis_notas_fiscais, fis_solicitacoes_nf |
+| `egp_` | EGP | egp_tap, egp_reunioes, egp_status_reports |
+| `loc_` | Locacao | loc_contratos, loc_equipamentos, loc_medicoes |
+| `apr_` | Aprovacoes | apr_aprovacoes, apr_alcadas |
+| `cot_` | Cotacoes | cot_cotacoes, cot_itens_cotacao, cot_recomendacoes |
 
 Ver detalhes completos em [[07 - Schema Database]].
 
-### Prefixos por módulo (schema v2):
-- `sys_*` → Sistema (obras, usuários, perfis, logs)
-- `cmp_*` → Compras (requisições, itens, categorias, compradores, pedidos)
-- `apr_*` → Aprovações (aprovações, alçadas)
-- `cot_*` → Cotações (reservado)
-
 ---
 
-## Migrações
+## Migracoes (75)
 
-Ver histórico completo em [[08 - Migrações SQL]].
+Ver historico completo em [[08 - Migracoes SQL]].
 
-```
-001 → Schema base
-002 → Seed usuários
-003 → RPC dashboard
-004 → Schema cotações
-005 → Políticas públicas
-006 → Auth integração
-006b → Fix perfil
-007 → Fluxo real
-008 → Escalabilidade
-009 → Fix RLS admin
-010 → Fix dashboard
-```
+As 75 migracoes cobrem:
+- Schema base e seed de dados iniciais
+- RPCs de dashboard e KPIs por modulo
+- Politicas RLS para todas as tabelas
+- RBAC v2 (sys_perfil_setores, sys_roles, sys_role_permissoes)
+- Storage buckets e politicas de acesso
+- Triggers para auto-criacao de perfil, numeracao automatica, e cascatas
+- Views materializadas para dashboards
+- Motor de recomendacao de cotacao
 
 ---
 
 ## Obras Cadastradas
 
-| Código | Nome | Município |
+| Codigo | Nome | Municipio |
 |--------|------|-----------|
 | SE-FRU | SE Frutal | Frutal - MG |
 | SE-PAR | SE Paracatu | Paracatu - MG |
 | SE-PER | SE Perdizes | Perdizes - MG |
-| SE-TM | SE Três Marias | Três Marias - MG |
-| SE-RP | SE Rio Paranaíba | Rio Paranaíba - MG |
+| SE-TM | SE Tres Marias | Tres Marias - MG |
+| SE-RP | SE Rio Paranaiba | Rio Paranaiba - MG |
 | SE-ITU | SE Ituiutaba | Ituiutaba - MG |
 
 ---
@@ -160,8 +231,8 @@ Ver histórico completo em [[08 - Migrações SQL]].
 ## Links Relacionados
 
 - [[07 - Schema Database]] — Tabelas e colunas detalhadas
-- [[08 - Migrações SQL]] — Histórico de migrations
-- [[09 - Auth Sistema]] — Autenticação Supabase
-- [[13 - Alçadas]] — Regras de alçada no banco
-- [[14 - Compradores e Categorias]] — Tabelas de negócio
-- [[16 - Variáveis de Ambiente]] — Chaves de acesso
+- [[08 - Migracoes SQL]] — Historico de migrations
+- [[09 - Auth Sistema]] — Autenticacao Supabase
+- [[13 - Alcadas]] — Regras de alcada no banco
+- [[14 - Compradores e Categorias]] — Tabelas de negocio
+- [[16 - Variaveis de Ambiente]] — Chaves de acesso

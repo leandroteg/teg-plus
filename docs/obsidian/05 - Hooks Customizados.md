@@ -4,42 +4,106 @@ type: frontend
 status: ativo
 tags: [frontend, hooks, react-query, dados]
 criado: 2026-03-02
-atualizado: 2026-03-05
+atualizado: 2026-04-07
 relacionado: ["[[02 - Frontend Stack]]", "[[06 - Supabase]]", "[[10 - n8n Workflows]]"]
 ---
 
 # Hooks Customizados — TEG+ ERP
 
 > Todos os hooks usam **TanStack Query v5** para cache, refetch e loading states.
+> Total: **47 hooks** organizados por módulo.
 
 ```
 src/hooks/
-├── useDashboard.ts        → KPIs e pipeline do dashboard Compras
-├── useRequisicoes.ts      → CRUD de requisições
-├── useAprovacoes.ts       → Listagem e processamento de aprovações
-├── useCotacoes.ts         → Fila de cotações do comprador
-├── usePedidos.ts          → Ordens de compra
-├── useCategorias.ts       → Categorias com regras e compradores
-├── useAiParse.ts          → Parse de texto livre → requisição estruturada
-├── useAnexos.ts           → Upload e listagem de anexos
-├── useOmie.ts             → Integração Omie ERP (sync, fornecedores)
-├── useFinanceiro.ts       → CP, CR, aprovações de pagamento
-├── useEstoque.ts          → Almoxarifado, inventário, patrimonial
-├── useLogistica.ts        → Transportes, expedição, recebimentos
-├── usePatrimonial.ts      → Imobilizados e depreciação
-├── useFrotas.ts           → Veículos, OS, checklists, abastecimentos
-├── useMural.ts            → Banners do Mural de Recados
-├── useContratos.ts        → Contratos, parcelas, liberação, pagamento
-└── useCadastros.ts        → Master data: 6 entidades + AI parse [novo]
+├── ── Compras (6) ──────────────────────────────────────────────
+│   ├── useDashboard.ts        → KPIs e pipeline do dashboard
+│   ├── useRequisicoes.ts      → CRUD de requisições
+│   ├── useCotacoes.ts         → Fila de cotações do comprador
+│   ├── useConsultas.ts        → Consultas de RC (busca, filtros)
+│   ├── usePedidos.ts          → Ordens de compra
+│   └── useRecebimento.ts      → Recebimento de materiais
+│
+├── ── Financeiro (4) ───────────────────────────────────────────
+│   ├── useFinanceiro.ts       → CP, CR, aprovações de pagamento
+│   ├── useLotesPagamento.ts   → Lotes de pagamento batch
+│   ├── useCartoes.ts          → Cartões corporativos
+│   └── useNotasFiscais.ts     → NFs emitidas/recebidas
+│
+├── ── Contratos (2) ────────────────────────────────────────────
+│   ├── useContratos.ts        → Contratos, parcelas, liberação
+│   └── useAprovacoes.ts       → Aprovações multi-tipo
+│
+├── ── Logística (1) ────────────────────────────────────────────
+│   └── useLogistica.ts        → Transportes, expedição, recebimentos
+│
+├── ── Frotas (1) ───────────────────────────────────────────────
+│   └── useFrotas.ts           → Veículos, OS, checklists, abastecimentos
+│
+├── ── RH (3) ───────────────────────────────────────────────────
+│   ├── useRH.ts               → Colaboradores, funções, mobilizações
+│   ├── useEndomarketing.ts    → Comunicação interna
+│   └── useMural.ts            → Banners do Mural de Recados
+│
+├── ── Estoque (1) ──────────────────────────────────────────────
+│   └── useEstoque.ts          → Almoxarifado, inventário, movimentações
+│
+├── ── Obras (1) ────────────────────────────────────────────────
+│   └── useObras.ts            → Apontamentos, RDO, adiantamentos
+│
+├── ── Cadastros (2) ────────────────────────────────────────────
+│   ├── useCadastros.ts        → Master data (6 entidades + AI parse)
+│   └── useCategorias.ts       → Categorias com regras e compradores
+│
+├── ── PMO / EGP (1) ────────────────────────────────────────────
+│   └── usePMO.ts              → Portfólio, TAP, EAP, cronograma
+│
+├── ── Controladoria (1) ────────────────────────────────────────
+│   └── useControladoria.ts    → DRE, orçamentos, KPIs, cenários
+│
+├── ── Patrimônio (1) ───────────────────────────────────────────
+│   └── usePatrimonial.ts      → Imobilizados e depreciação
+│
+├── ── Locação (1) ──────────────────────────────────────────────
+│   └── useLocacao.ts          → Acordos, vistorias, fluxo locação
+│
+├── ── Despesas (2) ─────────────────────────────────────────────
+│   ├── useDespesas.ts         → Controle de despesas
+│   └── useCartoes.ts          → Cartões corporativos (compartilhado)
+│
+├── ── Fiscal (1) ───────────────────────────────────────────────
+│   └── useSolicitacoesNF.ts   → Pipeline de solicitações de NF
+│
+├── ── Utility (16) ─────────────────────────────────────────────
+│   ├── useLookups.ts          → Tabelas de lookup (obras, categorias, etc.)
+│   ├── usePermissoes.ts       → Permissões RBAC v2 por módulo
+│   ├── useAiParse.ts          → Parse de texto livre → estruturado
+│   ├── useSuperTEG.ts         → Chat AI SuperTEG
+│   ├── useAnexos.ts           → Upload e listagem de anexos
+│   ├── useOmie.ts             → Integração Omie ERP (sync)
+│   ├── useOmieApi.ts          → API calls Omie via n8n
+│   ├── useOnlineStatus.ts     → Detecção de status online/offline
+│   ├── usePWAInstall.ts       → Prompt de instalação PWA
+│   ├── usePushNotifications.ts→ Notificações push (Web Push API)
+│   ├── useSound.ts            → Efeitos sonoros (notificação, sucesso)
+│   ├── useVoiceRecorder.ts    → Gravação de áudio (MediaRecorder API)
+│   ├── usePagination.ts       → Lógica de paginação
+│   ├── useSmartForm.ts        → Formulário inteligente com validação
+│   ├── usePreCadastros.ts     → Pré-cadastros via SuperTEG
+│   └── useSolicitacoes.ts     → Solicitações genéricas
+│
+└── ── Tesouraria (1) ───────────────────────────────────────────
+    └── useTesouraria.ts       → Fluxo de caixa, saldos, conciliação
 ```
 
 ---
 
-## `useDashboard`
+## Compras
+
+### `useDashboard`
 
 **Arquivo:** `src/hooks/useDashboard.ts`
 
-**Responsabilidade:** Busca KPIs, pipeline e dados agregados do dashboard.
+Busca KPIs, pipeline e dados agregados do dashboard de Compras.
 
 ```ts
 const { kpis, porStatus, porObra, recentes, isLoading } = useDashboard({
@@ -57,255 +121,333 @@ const { kpis, porStatus, porObra, recentes, isLoading } = useDashboard({
 **Retorno:**
 ```ts
 {
-  kpis: {
-    total: number
-    pendentes: number
-    aprovadas: number
-    em_cotacao: number
-    valor_total: number
-    valor_aprovado: number
-  }
+  kpis: { total, pendentes, aprovadas, em_cotacao, valor_total, valor_aprovado }
   porStatus: { status: string; count: number }[]
   porObra: { obra: string; count: number; valor: number }[]
   recentes: Requisicao[]
 }
 ```
 
----
-
-## `useRequisicoes`
+### `useRequisicoes`
 
 **Arquivo:** `src/hooks/useRequisicoes.ts`
 
-**Responsabilidade:** CRUD completo de requisições.
+CRUD completo de requisições.
 
 ```ts
-const {
-  requisicoes,
-  isLoading,
-  criarRequisicao,
-  isCreating
-} = useRequisicoes({ status?, obra_id?, page?, limit? })
+const { requisicoes, isLoading, criarRequisicao, isCreating } = useRequisicoes({ status?, obra_id?, page?, limit? })
 ```
 
-**Queries:**
-- `GET` — lista com filtros, paginada
-- Query key: `['requisicoes', filtros]`
+**Mutations:** `criarRequisicao(payload)` — invalida `['requisicoes']` e `['dashboard']`
 
-**Mutations:**
-```ts
-criarRequisicao(payload) // → n8n POST /compras/requisicao
-                         //   ou Supabase direto (fallback)
-```
-
-**Invalidação:** após mutação invalida `['requisicoes']` e `['dashboard']`
-
----
-
-## `useAprovacoes`
-
-**Arquivo:** `src/hooks/useAprovacoes.ts`
-
-**Responsabilidade:** Listagem e processamento de aprovações.
-
-```ts
-const { aprovacoes, processar } = useAprovacoes({
-  aprovador_id?: string
-  status?: 'pendente' | 'aprovada' | 'rejeitada'
-})
-```
-
-**Mutations:**
-```ts
-processar({ token, decisao, observacao })
-// → n8n POST /compras/aprovacao
-```
-
----
-
-## `useCotacoes`
+### `useCotacoes`
 
 **Arquivo:** `src/hooks/useCotacoes.ts`
 
-**Responsabilidade:** Fila de cotações do comprador.
+Fila de cotações do comprador logado.
 
 ```ts
 const { fila, cotacao, submeter } = useCotacoes(id?)
 ```
 
-**Queries:**
-- Lista: todas cotações pendentes do comprador logado
-- Detalhe: cotação específica por ID com itens
+### `useConsultas`
 
-**Mutations:**
-```ts
-submeter(cotacaoData)  // → n8n POST /compras/cotacao
-```
+**Arquivo:** `src/hooks/useConsultas.ts`
 
----
+Consultas de requisições com filtros avançados (status, obra, período, solicitante).
 
-## `usePedidos`
+### `usePedidos`
 
 **Arquivo:** `src/hooks/usePedidos.ts`
 
-**Responsabilidade:** Listagem de pedidos de compra gerados.
+Listagem de pedidos de compra gerados. Fonte: tabela `cmp_pedidos`.
 
-```ts
-const { pedidos, isLoading } = usePedidos({ obra_id?, status? })
-```
+### `useRecebimento`
 
-**Fonte:** Tabela `cmp_pedidos` via Supabase direto
+**Arquivo:** `src/hooks/useRecebimento.ts`
 
----
-
-## `useCategorias`
-
-**Arquivo:** `src/hooks/useCategorias.ts`
-
-**Responsabilidade:** Lista de categorias com regras e compradores.
-
-```ts
-const { categorias } = useCategorias()
-```
-
-**Fonte:** Tabela `cmp_categorias` via Supabase
-**Cache:** `staleTime: Infinity` (dados estáticos)
-
-**Retorno por categoria:**
-```ts
-{
-  id, codigo, nome,
-  comprador_nome, comprador_email,
-  alcada1_limite,
-  cotacoes_regras,   // "1 cotação até R$1k..."
-  keywords,          // para AI detection
-  icone, cor
-}
-```
+Gestão de recebimento de materiais. Suporta recebimento parcial, vinculação com estoque, e criação automática de movimentações.
 
 ---
 
-## `useAiParse`
+## Financeiro
 
-**Arquivo:** `src/hooks/useAiParse.ts`
+### `useFinanceiro`
 
-**Responsabilidade:** Parseia texto livre para requisição estruturada.
+**Arquivo:** `src/hooks/useFinanceiro.ts`
+
+Hook principal do módulo financeiro: Contas a Pagar, Contas a Receber, aprovações de pagamento.
+
+### `useLotesPagamento`
+
+**Arquivo:** `src/hooks/useLotesPagamento.ts`
+
+Gestão de lotes de pagamento (batch payment approval). Permite aprovar/rejeitar títulos em lote com decisões parciais.
+
+### `useCartoes`
+
+**Arquivo:** `src/hooks/useCartoes.ts`
+
+Gestão de cartões corporativos e controle de despesas por cartão (compartilhado entre Financeiro e Despesas).
+
+### `useNotasFiscais`
+
+**Arquivo:** `src/hooks/useNotasFiscais.ts`
+
+Notas fiscais emitidas e recebidas. Pipeline de NFs com status e histórico.
+
+---
+
+## Contratos
+
+### `useContratos`
+
+**Arquivo:** `src/hooks/useContratos.ts`
+
+Contratos, parcelas, medições, liberação de pagamento. Integração com financeiro.
+
+### `useAprovacoes`
+
+**Arquivo:** `src/hooks/useAprovacoes.ts`
+
+Aprovações multi-tipo: `requisicao_compra`, `cotacao`, `autorizacao_pagamento`, `minuta_contratual`.
 
 ```ts
-const { parse, resultado, isParsing } = useAiParse()
-
-// Uso
-parse({
-  texto: "Preciso de 10 capacetes e 5 pares de luvas para obra de Frutal",
-  solicitante_nome: "João Silva"
-})
-```
-
-**Fluxo:**
-1. Envia para `POST /compras/requisicao-ai` no n8n
-2. n8n usa LLM para extrair itens
-3. Fallback: parser local por keywords se n8n indisponível
-
-**Retorno:**
-```ts
-{
-  itens: { descricao, quantidade, unidade, categoria_sugerida }[]
-  obra_sugerida: string
-  categoria_sugerida: string
-  comprador_sugerido: string
-  confianca: number  // 0-1
-  observacoes: string
-}
+const { aprovacoes, processar } = useAprovacoes({ aprovador_id?, status?, tipo? })
 ```
 
 ---
 
-## `useMural` ⭐ (novo)
+## Logística
+
+### `useLogistica`
+
+**Arquivo:** `src/hooks/useLogistica.ts`
+
+Transportes, expedição, recebimentos, solicitações. Pipeline com 9 etapas.
+
+---
+
+## Frotas
+
+### `useFrotas`
+
+**Arquivo:** `src/hooks/useFrotas.ts`
+
+Veículos, ordens de serviço, checklists, abastecimentos, telemetria.
+
+---
+
+## RH
+
+### `useRH`
+
+Colaboradores, funções, departamentos, mobilizações e desmobilizações.
+
+### `useEndomarketing`
+
+Comunicação interna, campanhas e eventos.
+
+### `useMural`
 
 **Arquivo:** `src/hooks/useMural.ts`
 
-Gestão completa dos banners do Mural de Recados. Usado em `BannerSlideshow` (tela inicial) e `MuralAdmin` (admin RH).
+Gestão dos banners do Mural de Recados.
 
-### `useBanners()` — Slideshow
+**Sub-hooks exportados:**
 ```ts
-const { data: banners } = useBanners()
-// banners ativos e vigentes, ordem ASC
-// fixa=sempre; campanha=data_inicio≤hoje≤data_fim (filtro client-side)
-// staleTime: 5 min | queryKey: ['mural-banners-active']
+useBanners()             // Slideshow: banners ativos e vigentes
+useBannersAdmin()        // Admin: todos os banners
+useSalvarBanner()        // INSERT/UPDATE
+useToggleBanner()        // Toggle ativo/inativo
+useExcluirBanner()       // DELETE
+useUploadBannerImagem()  // Upload → bucket 'mural-banners'
 ```
 
-### `useBannersAdmin()` — Gestão
-```ts
-const { data: banners } = useBannersAdmin()
-// TODOS os banners, inclusive inativos e fora do período
-// queryKey: ['mural-banners-admin']
-```
-
-### Mutations
-```ts
-useSalvarBanner()          // INSERT (sem id) ou UPDATE (com id)
-useToggleBanner()          // toggle ativo/inativo inline: { id, ativo }
-useExcluirBanner()         // DELETE por id
-useUploadBannerImagem()    // upload → bucket 'mural-banners' → publicUrl
-```
-
-**Tipo exportado:**
-```ts
-interface MuralBanner {
-  id: string; titulo: string; subtitulo?: string; imagem_url: string
-  tipo: 'fixa' | 'campanha'; ativo: boolean; ordem: number
-  data_inicio?: string; data_fim?: string   // 'YYYY-MM-DD'
-  cor_titulo?: string; cor_subtitulo?: string; criado_por?: string
-  created_at: string; updated_at: string
-}
-```
-
-Ver [[25 - Mural de Recados]] para documentação completa.
+Ver [[25 - Mural de Recados]].
 
 ---
 
-## `useCadastros` ⭐ (novo)
+## Estoque
+
+### `useEstoque`
+
+**Arquivo:** `src/hooks/useEstoque.ts`
+
+Almoxarifado, inventário, movimentações, itens do catálogo. Curva ABC.
+
+---
+
+## Obras
+
+### `useObras`
+
+**Arquivo:** `src/hooks/useObras.ts`
+
+Apontamentos, RDO (Relatório Diário de Obra), adiantamentos, prestação de contas, planejamento de equipe.
+
+---
+
+## Cadastros
+
+### `useCadastros`
 
 **Arquivo:** `src/hooks/useCadastros.ts`
 
-Módulo unificado com **13 hooks** para gerenciamento de dados mestres + AI parsing.
+Módulo unificado com hooks para gerenciamento de dados mestres + AI parsing.
 
-### Query Hooks (10)
-```ts
-useCadFornecedores()       // → cmp_fornecedores (SELECT *)
-useCadClasses()            // → fin_classes_financeiras (SELECT * ORDER BY codigo)
-useCadCentrosCusto()       // → sys_centros_custo + join obras
-useCadObras()              // → obras (SELECT *)
-useCadColaboradores()      // → rh_colaboradores + join obras
-```
-
-### Mutation Hooks (5)
-```ts
-useSalvarFornecedor()      // → upsert cmp_fornecedores | invalida ['cad-fornecedores', 'fornecedores']
-useSalvarClasse()          // → upsert fin_classes_financeiras | invalida ['cad-classes']
-useSalvarCentroCusto()     // → upsert sys_centros_custo | invalida ['cad-centros-custo']
-useSalvarObra()            // → upsert obras | invalida ['cad-obras', 'obras']
-useSalvarColaborador()     // → upsert rh_colaboradores | invalida ['cad-colaboradores']
-```
-
-### AI Hook
-```ts
-const { mutateAsync: parse, isPending } = useAiCadastroParse()
-
-// Uso:
-parse({ entity: 'fornecedor', content: '12.345.678/0001-90' })
-// → Tenta BrasilAPI (CNPJ) → n8n webhook → regex fallback
-// → Retorna: { fields: [{ name, value, confidence }], raw }
-```
-
-**Estratégia AI (3 camadas):**
-1. **CNPJ** → `brasilapi.com.br/api/cnpj/v1/{cnpj}` (grátis, 95% confidence)
-2. **Arquivo/Texto** → `n8n POST /cadastros/ai-parse` (LLM extraction)
-3. **Fallback** → Regex local (50-60% confidence)
+**Query Hooks:** `useCadFornecedores`, `useCadClasses`, `useCadCentrosCusto`, `useCadObras`, `useCadColaboradores`
+**Mutation Hooks:** `useSalvarFornecedor`, `useSalvarClasse`, `useSalvarCentroCusto`, `useSalvarObra`, `useSalvarColaborador`
+**AI Hook:** `useAiCadastroParse` — 3 camadas (BrasilAPI CNPJ → n8n LLM → regex fallback)
 
 **Cross-module invalidation:** Mutations invalidam cache do cadastros E do módulo original.
 
-Ver [[28 - Módulo Cadastros AI]] para documentação completa.
+Ver [[28 - Módulo Cadastros AI]].
+
+### `useCategorias`
+
+**Arquivo:** `src/hooks/useCategorias.ts`
+
+Lista de categorias com regras e compradores. Cache: `staleTime: Infinity` (dados estáticos).
+
+---
+
+## PMO / EGP
+
+### `usePMO`
+
+**Arquivo:** `src/hooks/usePMO.ts`
+
+Portfólio de projetos, TAP (Termo de Abertura), EAP (Estrutura Analítica), cronograma Gantt, medições, histograma de recursos, status reports.
+
+---
+
+## Controladoria
+
+### `useControladoria`
+
+**Arquivo:** `src/hooks/useControladoria.ts`
+
+DRE, orçamentos, KPIs operacionais, cenários, indicadores de produção, alertas.
+
+---
+
+## Patrimônio
+
+### `usePatrimonial`
+
+**Arquivo:** `src/hooks/usePatrimonial.ts`
+
+Imobilizados, depreciação linear, baixas, transferências entre obras.
+
+---
+
+## Locação
+
+### `useLocacao`
+
+Acordos de locação de equipamentos, vistorias (entrada/saída), fluxo de locação, comparativos.
+
+---
+
+## Despesas
+
+### `useDespesas`
+
+Controle de despesas operacionais, categorização, aprovações.
+
+### `useCartoes`
+
+Cartões corporativos (compartilhado com Financeiro).
+
+---
+
+## Fiscal
+
+### `useSolicitacoesNF`
+
+**Arquivo:** `src/hooks/useSolicitacoesNF.ts`
+
+Pipeline de solicitações de nota fiscal. Fluxo: Logística → Fiscal → Emissão.
+
+---
+
+## Hooks Utilitários
+
+### `useLookups`
+
+**Arquivo:** `src/hooks/useLookups.ts`
+
+Tabelas de lookup centralizadas (obras, categorias, compradores, centros de custo, etc.). Cache longo, compartilhado entre módulos.
+
+### `usePermissoes`
+
+Permissões [[09 - Auth Sistema|RBAC v2]] por módulo. Expõe: `hasModule()`, `hasSetorPapel()`, `atLeast()`, `canApprove()`.
+
+### `useAiParse`
+
+**Arquivo:** `src/hooks/useAiParse.ts`
+
+Parse de texto livre para requisição estruturada via n8n + Gemini.
+
+```ts
+const { parse, resultado, isParsing } = useAiParse()
+parse({ texto: "Preciso de 10 capacetes para Frutal", solicitante_nome: "João" })
+```
+
+**Retorno:** `{ itens[], obra_sugerida, categoria_sugerida, confianca }`
+
+### `useSuperTEG`
+
+**Arquivo:** `src/hooks/useSuperTEG.ts`
+
+Interface com o agente AI SuperTEG via n8n. Gerencia sessão, histórico e envio de mensagens.
+
+### `useAnexos`
+
+**Arquivo:** `src/hooks/useAnexos.ts`
+
+Upload e listagem de anexos em qualquer módulo. Supabase Storage.
+
+### `useOmie` / `useOmieApi`
+
+**Arquivos:** `src/hooks/useOmie.ts`, `src/hooks/useOmieApi.ts`
+
+Integração com Omie ERP. `useOmie` gerencia sync; `useOmieApi` faz chamadas via n8n.
+
+### `useOnlineStatus`
+
+Detecta se o usuário está online/offline via `navigator.onLine` + event listeners.
+
+### `usePWAInstall`
+
+Gerencia o prompt de instalação PWA (`beforeinstallprompt` event).
+
+### `usePushNotifications`
+
+Integração com Web Push API para notificações push no navegador.
+
+### `useSound`
+
+Efeitos sonoros para eventos (nova notificação, sucesso, erro). Usa Web Audio API.
+
+### `useVoiceRecorder`
+
+**Arquivo:** `src/hooks/useVoiceRecorder.ts`
+
+Gravação de áudio via MediaRecorder API. Usado para input por voz no SuperTEG.
+
+### `usePagination`
+
+**Arquivo:** `src/hooks/usePagination.ts`
+
+Lógica de paginação reutilizável. Props: `totalItems`, `pageSize`. Retorna: `page`, `totalPages`, `setPage`.
+
+### `useSmartForm`
+
+**Arquivo:** `src/hooks/useSmartForm.ts`
+
+Formulário inteligente com validação, dirty tracking e auto-save.
 
 ---
 
@@ -313,36 +455,29 @@ Ver [[28 - Módulo Cadastros AI]] para documentação completa.
 
 ```mermaid
 graph LR
-    MOD[ModuloSelector] --> UB[useBanners]
-    MA[MuralAdmin] --> UBA[useBannersAdmin]
-    MA --> USB[useSalvarBanner]
-    MA --> UTB[useToggleBanner]
-    MA --> UEB[useExcluirBanner]
-
-    D[Dashboard.tsx] --> UD[useDashboard]
+    D[Dashboard] --> UD[useDashboard]
     NR[NovaRequisicao] --> UR[useRequisicoes]
     NR --> UC[useCategorias]
     NR --> UA[useAiParse]
-    LR[ListaRequisicoes] --> UR
     FC[FilaCotacoes] --> UCT[useCotacoes]
-    AI[AprovAi] --> UAP[useAprovacoes]
-    APV[Aprovacao] --> UAP
-
-    UB --> SB[(Supabase\nmural_banners)]
-    UD --> SB2[(Supabase RPC)]
-    UR --> N8N[n8n Webhooks]
+    APV[Aprovacao] --> UAP[useAprovacoes]
+    
+    FIN[FinanceiroHome] --> UF[useFinanceiro]
+    FIN --> ULP[useLotesPagamento]
+    
+    CADH[CadastrosHome] --> UCD[useCadastros]
+    UCD --> BAPI[BrasilAPI]
+    UCD --> N8N[n8n Webhooks]
+    
+    UD --> SB[(Supabase)]
+    UR --> SB
     UA --> N8N
-    UAP --> N8N
-    UCT --> N8N
-    UC --> SB2
-
-    CADH[CadastrosHome] --> UCF[useCadFornecedores]
-    FORNC[FornecedoresCad] --> UCF
-    FORNC --> USF[useSalvarFornecedor]
-    FORNC --> UAIP[useAiCadastroParse]
-    UAIP --> BAPI[BrasilAPI]
-    UAIP --> N8N
-    UCF --> SB2
+    UAP --> SB
+    UCT --> SB
+    UF --> SB
+    
+    ST[SuperTEGChat] --> UST[useSuperTEG]
+    UST --> N8N
 ```
 
 ---
@@ -350,10 +485,10 @@ graph LR
 ## Links Relacionados
 
 - [[02 - Frontend Stack]] — TanStack Query setup
+- [[04 - Componentes]] — Componentes que consomem os hooks
 - [[06 - Supabase]] — Fonte de dados
+- [[09 - Auth Sistema]] — RBAC e permissões (usePermissoes)
 - [[10 - n8n Workflows]] — Webhooks chamados pelas mutations
-- [[11 - Fluxo Requisição]] — Fluxo de criação
-- [[12 - Fluxo Aprovação]] — Fluxo de aprovação
 - [[25 - Mural de Recados]] — useMural detalhado
 - [[27 - Módulo Contratos Gestão]] — useContratos detalhado
 - [[28 - Módulo Cadastros AI]] — useCadastros detalhado

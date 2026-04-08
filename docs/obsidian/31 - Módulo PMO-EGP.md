@@ -206,6 +206,49 @@ Prefixo de tabelas: `pmo_`
 
 ---
 
+## Fases do Ciclo de Vida do Projeto
+
+O EGP estrutura cada portfólio em 5 fases do PMBOK:
+
+1. **Iniciação** — TAP, análise de viabilidade, stakeholders
+2. **Planejamento** — EAP, cronograma, histograma, orçamento
+3. **Execução** — Acompanhamento de atividades, medições, custos
+4. **Controle** — Status reports, KPIs (CPI/SPI), alertas de desvio
+5. **Encerramento** — Lições aprendidas, aceite final, desmobilização
+
+---
+
+## Geração de TAP por IA
+
+O TAP (Termo de Abertura do Projeto) pode ser gerado automaticamente via **Gemini AI**:
+- Input: dados básicos do portfólio (cliente, escopo, valor, prazo)
+- Output: objetivo, justificativa, escopo macro, premissas, restrições, riscos iniciais, equipe sugerida
+- A geração é acionada via botão na tela `TapPage.tsx` e chama endpoint n8n
+
+A tabela `egp_tap` armazena TAPs gerados e editados manualmente.
+
+---
+
+## Tabelas Adicionais
+
+Além das 13 tabelas com prefixo `pmo_`, o módulo utiliza:
+
+| Tabela | Descrição |
+|--------|-----------|
+| `egp_tap` | Termos de Abertura do Projeto gerados por IA ou manual |
+| `pmo_mudancas` | Registro de mudanças de escopo/prazo/custo |
+| `pmo_penalidades` | Multas e penalidades contratuais por atraso |
+
+---
+
+## Dimensão do Módulo
+
+- **Páginas:** 32 (maior módulo do sistema)
+- **Tipos:** 517 linhas em `src/types/pmo.ts`
+- **Hooks:** `usePMO.ts` com 11+ hooks React Query
+
+---
+
 ## Links Relacionados
 
 - [[03 - Páginas e Rotas]] — Rotas do módulo

@@ -178,6 +178,17 @@ As tabelas do módulo fiscal utilizam o prefixo `fis_`.
 
 ---
 
+## Funções de Sincronização
+
+| Função | Descrição |
+|--------|-----------|
+| `sync_nf_from_pedido_anexo()` | Cria solicitação de NF automaticamente quando um anexo de NF é adicionado a um pedido de compra |
+| `fis_sync_nf_to_logistica()` | Sincroniza NF emitida com o módulo de Logística, atualizando `log_nfe` com dados fiscais |
+
+Essas funções conectam o módulo Fiscal aos fluxos de Compras e Logística, evitando retrabalho manual.
+
+---
+
 ## Links Relacionados
 
 - [[03 - Páginas e Rotas]] — Rotas do módulo

@@ -192,6 +192,30 @@ supabase/
 
 ---
 
+## Lifecycle do Contrato
+
+```
+rascunho → em_negociacao → assinado → vigente → (suspenso) → encerrado / rescindido
+```
+
+---
+
+## Recomendação AI para Cotações
+
+O arquivo `src/utils/cotacaoRecomendacao.ts` implementa um motor de recomendação para seleção de fornecedores em cotações de contrato. Analisa histórico de preços, prazos, avaliações e compliance para sugerir a melhor opção.
+
+---
+
+## Permissões — Supervisor
+
+Mudança recente: o role **supervisor** agora pode:
+- Gerenciar modelos de minuta (`con_modelos`)
+- Executar ações sobre contratos (liberar, aprovar, rejeitar)
+
+Anteriormente essas ações eram restritas a gerente/diretor.
+
+---
+
 ## Links Relacionados
 
 - [[20 - Módulo Financeiro]] — Integracao CP/CR via parcelas
