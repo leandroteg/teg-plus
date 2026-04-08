@@ -357,6 +357,23 @@ export default function NovaRequisicao() {
     setItens(prev => prev.map((item, i) => i === idx ? { ...item, [field]: value } : item))
 
 
+  const handleReferenciaFileParse = useCallback(async (file: File) => {
+    try {
+      const fileData = await readFileForAi(file)
+      const result = await aiParse.mutateAsync({
+        texto: fileData.texto ?? '',
+        solicitante_nome: solicitante,
+        arquivo: fileData.arquivo,
+      })
+      if (result.itens?.length > 0) {
+        setItens(result.itens)
+        if (typeof result.confianca === 'number') setConfianca(result.confianca)
+      }
+    } catch {
+      // Mantem o preenchimento manual e o botao como fallback
+    }
+  }, [aiParse, solicitante])
+
   const [submitting, setSubmitting] = useState(false)
   const [savingDraft, setSavingDraft] = useState(false)
   const urgente = urgencia !== 'normal'
@@ -576,8 +593,11 @@ export default function NovaRequisicao() {
             type="file"
             className="hidden"
             accept=".pdf,.xlsx,.xls,.csv,.doc,.docx,.jpg,.jpeg,.png,.webp"
-            onChange={(event) => {
-              if (event.target.files?.[0]) setReferenciaFile(event.target.files[0])
+            onChange={async (event) => {
+              const file = event.target.files?.[0]
+              if (!file) return
+              setReferenciaFile(file)
+              await handleReferenciaFileParse(file)
             }}
           />
 
@@ -610,18 +630,7 @@ export default function NovaRequisicao() {
                 disabled={aiParse.isPending}
                 onClick={async (e) => {
                   e.stopPropagation()
-                  try {
-                    const fileData = await readFileForAi(referenciaFile)
-                    const result = await aiParse.mutateAsync({
-                      texto: fileData.texto ?? '',
-                      solicitante_nome: solicitante,
-                      arquivo: fileData.arquivo,
-                    })
-                    if (result.itens?.length > 0) {
-                      setItens(result.itens)
-                      if (typeof result.confianca === 'number') setConfianca(result.confianca)
-                    }
-                  } catch { /* erro silencioso — usuário pode preencher manualmente */ }
+                  await handleReferenciaFileParse(referenciaFile)
                 }}
                 className="w-full flex items-center justify-center gap-2 py-2 px-3 rounded-xl text-xs font-semibold bg-teal-500 text-white hover:bg-teal-600 disabled:opacity-60 transition-colors"
               >
