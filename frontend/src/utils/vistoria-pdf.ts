@@ -91,9 +91,67 @@ function tipoLabel(t: TipoVistoria): string {
   return t === 'entrada' ? 'ENTRADA' : 'SAÍDA'
 }
 
+// ── Image Loader (fotos) ────────────────────────────────────────────────────
+
+interface LoadedImage {
+  dataUrl: string
+  format: 'PNG' | 'JPEG'
+  width: number
+  height: number
+}
+
+async function loadImageAsBase64(url: string): Promise<LoadedImage | null> {
+  try {
+    const resp = await fetch(url, { mode: 'cors' })
+    if (!resp.ok) return null
+    const blob = await resp.blob()
+    return new Promise((resolve) => {
+      const reader = new FileReader()
+      reader.onloadend = () => {
+        const dataUrl = reader.result as string
+        const img = new Image()
+        img.onload = () => resolve({
+          dataUrl,
+          format: blob.type.includes('jpeg') || blob.type.includes('jpg') ? 'JPEG' : 'PNG',
+          width: img.naturalWidth || img.width || 1,
+          height: img.naturalHeight || img.height || 1,
+        })
+        img.onerror = () => resolve(null)
+        img.src = dataUrl
+      }
+      reader.onerror = () => resolve(null)
+      reader.readAsDataURL(blob)
+    })
+  } catch {
+    return null
+  }
+}
+
+/** Load multiple images concurrently with a timeout per image */
+async function loadFotoImages(
+  fotos: LocVistoriaFoto[],
+): Promise<Map<string, LoadedImage>> {
+  const results = new Map<string, LoadedImage>()
+  const TIMEOUT = 8000 // 8s per foto
+
+  await Promise.allSettled(
+    fotos.map(async (foto) => {
+      try {
+        const loaded = await Promise.race([
+          loadImageAsBase64(foto.url),
+          new Promise<null>((resolve) => setTimeout(() => resolve(null), TIMEOUT)),
+        ])
+        if (loaded) results.set(foto.id, loaded)
+      } catch { /* skip */ }
+    }),
+  )
+
+  return results
+}
+
 // ── Build PDF ───────────────────────────────────────────────────────────────
 
-function buildVistoriaDoc(
+async function buildVistoriaDoc(
   data: VistoriaPdfData,
   empresa: EmpresaData,
   logo: string | null,
@@ -486,27 +544,102 @@ function buildVistoriaDoc(
   }
 
   // ══════════════════════════════════════════════════════════════════════════
-  // SECTION: FOTOS (lista de referências)
+  // SECTION: FOTOS (imagens embarcadas no PDF)
   // ══════════════════════════════════════════════════════════════════════════
 
   if (data.fotos && data.fotos.length > 0) {
-    checkPage(15)
+    // Load all photo images
+    const fotoImages = await loadFotoImages(data.fotos)
+
+    // Start a new page for photos section
+    doc.addPage()
+    y = M
+
     sectionTitle('REGISTRO FOTOGRÁFICO')
     doc.setFont('helvetica', 'normal')
     doc.setFontSize(8)
     doc.setTextColor(...DARK)
     doc.text(`${data.fotos.length} foto(s) registrada(s) durante a vistoria.`, M, y)
-    y += 5
-    doc.setFontSize(7)
-    doc.setTextColor(...MID)
-    data.fotos.forEach((foto, i) => {
-      checkPage(6)
-      const desc = foto.descricao || `Foto ${i + 1}`
-      const dt = fmtDate(foto.created_at)
-      doc.text(`${i + 1}. ${desc} — ${dt}`, M + 3, y)
-      y += 4
-    })
-    y += 4
+    y += 6
+
+    // Layout: 2 images per row
+    const IMG_W = (CW - 6) / 2  // ~87mm each, 6mm gap
+    const IMG_H = 60             // 60mm height per photo
+    const GAP = 6
+    const CARD_PADDING = 2
+    const CAPTION_H = 8
+
+    const fotos = data.fotos
+    for (let i = 0; i < fotos.length; i += 2) {
+      const rowHeight = IMG_H + CAPTION_H + CARD_PADDING * 2 + 4
+      checkPage(rowHeight)
+
+      for (let col = 0; col < 2 && i + col < fotos.length; col++) {
+        const foto = fotos[i + col]
+        const img = fotoImages.get(foto.id)
+        const x = M + col * (IMG_W + GAP)
+
+        // Card background
+        doc.setFillColor(248, 250, 252)
+        doc.setDrawColor(...LIGHT)
+        doc.setLineWidth(0.3)
+        doc.roundedRect(x, y, IMG_W, IMG_H + CAPTION_H + CARD_PADDING * 2, 2, 2, 'FD')
+
+        if (img) {
+          // Calculate aspect-fit dimensions
+          const ratio = img.width / Math.max(img.height, 1)
+          const maxW = IMG_W - CARD_PADDING * 2
+          const maxH = IMG_H - CARD_PADDING
+          let renderW = maxW
+          let renderH = renderW / Math.max(ratio, 0.01)
+
+          if (renderH > maxH) {
+            renderH = maxH
+            renderW = renderH * Math.max(ratio, 0.01)
+          }
+
+          // Center the image in the card
+          const imgX = x + CARD_PADDING + (maxW - renderW) / 2
+          const imgY = y + CARD_PADDING + (maxH - renderH) / 2
+
+          try {
+            doc.addImage(img.dataUrl, img.format, imgX, imgY, renderW, renderH)
+          } catch {
+            // If addImage fails, show placeholder
+            doc.setFont('helvetica', 'normal')
+            doc.setFontSize(7)
+            doc.setTextColor(...MID)
+            doc.text('Imagem indisponível', x + IMG_W / 2, y + IMG_H / 2, { align: 'center' })
+          }
+        } else {
+          // No image loaded - placeholder
+          doc.setFont('helvetica', 'normal')
+          doc.setFontSize(7)
+          doc.setTextColor(...MID)
+          doc.text('Imagem indisponível', x + IMG_W / 2, y + IMG_H / 2, { align: 'center' })
+        }
+
+        // Caption below image
+        const captionY = y + IMG_H + CARD_PADDING + 3
+        doc.setFont('helvetica', 'bold')
+        doc.setFontSize(7)
+        doc.setTextColor(...DARK)
+        // Parse descricao: format is "Ambiente|Item" from upload
+        const desc = foto.descricao || `Foto ${i + col + 1}`
+        const [ambiente, item] = desc.includes('|') ? desc.split('|') : [desc, '']
+        const caption = item ? `${ambiente} — ${item}` : ambiente
+        const captionTrunc = caption.length > 45 ? caption.slice(0, 42) + '...' : caption
+        doc.text(captionTrunc, x + CARD_PADDING + 1, captionY)
+
+        // Date
+        doc.setFont('helvetica', 'normal')
+        doc.setFontSize(6)
+        doc.setTextColor(...MID)
+        doc.text(fmtDate(foto.created_at), x + IMG_W - CARD_PADDING - 1, captionY, { align: 'right' })
+      }
+
+      y += IMG_H + CAPTION_H + CARD_PADDING * 2 + 6
+    }
   }
 
   // ══════════════════════════════════════════════════════════════════════════
@@ -562,7 +695,7 @@ export function getVistoriaPdfFileName(data: VistoriaPdfData): string {
 export async function gerarVistoriaPdfBlob(data: VistoriaPdfData): Promise<Blob> {
   const empresa = await getEmpresa().catch(() => EMPRESA_FALLBACK)
   const logo = await loadLogoBase64(empresa.logoUrl)
-  const doc = buildVistoriaDoc(data, empresa, logo)
+  const doc = await buildVistoriaDoc(data, empresa, logo)
   return doc.output('blob')
 }
 
