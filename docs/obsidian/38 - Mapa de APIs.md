@@ -2,9 +2,10 @@
 title: Mapa de APIs e Endpoints
 type: dev-guide
 status: ativo
-tags: [api, endpoints, supabase, rpc, webhooks, n8n, edge-functions]
+tags: [api, endpoints, supabase, rpc, webhooks, n8n, edge-functions, cnpj, parse]
 criado: 2026-04-08
-relacionado: ["[[00 - TEG+ INDEX]]", "[[01 - Arquitetura Geral]]", "[[06 - Supabase]]", "[[10 - n8n Workflows]]", "[[19 - Integração Omie]]"]
+atualizado: 2026-04-09
+relacionado: ["[[00 - TEG+ INDEX]]", "[[01 - Arquitetura Geral]]", "[[06 - Supabase]]", "[[10 - n8n Workflows]]", "[[45 - Mapa de Integrações]]", "[[49 - SuperTEG AI Agent]]"]
 ---
 
 # 🔌 Mapa de APIs & Endpoints — TEG+ ERP
@@ -20,9 +21,10 @@ flowchart LR
     FE -->|POST| N8N[n8n Webhooks]
     FE -->|Auth| AUTH[Supabase Auth]
     FE -->|Storage| STG[Supabase Storage]
-    N8N -->|API| OMIE[Omie ERP]
+    N8N -->|API| BRASIL[BrasilAPI\nCNPJ/CEP]
     N8N -->|API| WPP[WhatsApp/Evolution]
-    N8N -->|API| AI[OpenAI/Claude]
+    N8N -->|API| AI[OpenAI/Claude/Gemini]
+    N8N -->|API| PLACA[Consulta Placa]
 ```
 
 ---
@@ -74,6 +76,7 @@ Funções server-side para lógica complexa:
 | `aprovar_requisicao` | Compras | Aprovação com validação de alçada | `requisicao_id, token, decisao` |
 | `calcular_saldo_estoque` | Estoque | Saldo por item/base | `item_id, base_id` |
 | `gerar_numero_sequencial` | Sistema | Próximo número (REQ, PO, CT) | `prefixo, obra_id` |
+| `fn_log_viagem_recalcular` | Logística | Recalcula paradas e custo rateado | `p_viagem_id` |
 
 ### Padrão de chamada
 
@@ -87,22 +90,146 @@ const { data, error } = await supabase.rpc('aprovar_requisicao', {
 
 ---
 
-## 3. n8n Webhooks
+## 3. n8n Webhooks — Parses e Automações
 
-Endpoints expostos pelo n8n para automações:
+### 3.1 Parse de Cotação (AI)
+
+| Item | Detalhe |
+|------|---------|
+| **Webhook** | `POST /webhook/compras/parse-cotacao` |
+| **Módulo** | Compras |
+| **Timeout** | 180s |
+
+**Payload:**
+```json
+{
+  "file_base64": "<base64>",
+  "file_name": "cotacao.pdf",
+  "mime_type": "application/pdf"
+}
+```
+
+**Resposta:**
+```json
+{
+  "success": true,
+  "fornecedores": [
+    {
+      "fornecedor_nome": "ABC Ltda",
+      "fornecedor_cnpj": "12345678000190",
+      "valor_total": 15000,
+      "prazo_entrega_dias": 10,
+      "condicao_pagamento": "30/60",
+      "itens": [
+        {
+          "descricao": "Cabo XLPE 240mm",
+          "qtd": 100,
+          "valor_unitario": 150,
+          "valor_total": 15000,
+          "match_status": "auto_match"
+        }
+      ]
+    }
+  ],
+  "parser_confidence": 0.92
+}
+```
+
+---
+
+### 3.2 Consulta CNPJ
+
+| Item | Detalhe |
+|------|---------|
+| **Webhook** | `POST /webhook/consulta-cnpj` |
+| **Módulo** | Cadastros |
+| **Fallbacks** | BrasilAPI → ReceitaWS |
+
+**Payload:**
+```json
+{ "valor": "12345678000190" }
+```
+
+**Resposta normalizada:**
+```json
+{
+  "cnpj": "12345678000190",
+  "razao_social": "EMPRESA XYZ LTDA",
+  "nome_fantasia": "XYZ",
+  "situacao": "ATIVA",
+  "endereco": {
+    "cep": "30130000",
+    "logradouro": "Rua da Bahia",
+    "numero": "100",
+    "bairro": "Centro",
+    "cidade": "Belo Horizonte",
+    "uf": "MG"
+  },
+  "telefone": "31999999999",
+  "email": "contato@xyz.com",
+  "socios": [{ "nome": "João Silva", "qualificacao": "Administrador" }]
+}
+```
+
+**Hook frontend**: `useConsultaCNPJ(onResult?)` — auto-fill no blur, cache local, retry automático
+
+---
+
+### 3.3 Consulta CEP
+
+| Item | Detalhe |
+|------|---------|
+| **Webhook** | `POST /webhook/consulta-cep` |
+| **Módulo** | Cadastros, Logística |
+
+**Payload:**
+```json
+{ "valor": "30130000" }
+```
+
+**Resposta**: logradouro, bairro, cidade, estado
+
+---
+
+### 3.4 Consulta Placa
+
+| Item | Detalhe |
+|------|---------|
+| **Webhook** | `POST /webhook/consulta-placa` |
+| **Módulo** | Frotas |
+
+**Payload:**
+```json
+{ "valor": "ABC1D23" }
+```
+
+**Resposta**: marca, modelo, ano, combustível, categoria, cor
+
+---
+
+### 3.5 SuperTEG Chat (Agente AI)
+
+| Item | Detalhe |
+|------|---------|
+| **Webhook** | `POST /webhook/superteg/chat` |
+| **Módulo** | Sistema |
+| **Sessão** | Via `session_id` no payload |
+
+Ver [[49 - SuperTEG AI Agent]] para documentação completa.
+
+---
+
+### 3.6 Outros Webhooks
 
 | Webhook | Método | Módulo | Descrição |
 |---------|--------|--------|-----------|
 | `/webhook/requisicao-criada` | POST | Compras | Notificação + início workflow aprovação |
 | `/webhook/aprovacao-token` | POST | Aprovações | Processar decisão via token (WhatsApp/email) |
-| `/webhook/cotacao-upload` | POST | Compras | Upload inteligente de cotação (AI parse) |
 | `/webhook/contrato-analise` | POST | Contratos | Análise AI de minuta → resumo executivo |
-| `/webhook/omie-sync` | POST | Financeiro | Sync bidirecional com Omie ERP |
-| `/webhook/omie-cp-sync` | POST | Financeiro | Sync contas a pagar |
-| `/webhook/whatsapp-send` | POST | Sistema | Envio de mensagem WhatsApp |
 | `/webhook/nf-parse` | POST | Fiscal | Parse de XML de NF-e |
-| `/webhook/superteg-chat` | POST | AI | Chat com agente AI SuperTEG |
+| `/webhook/whatsapp-send` | POST | Sistema | Envio de mensagem WhatsApp |
 | `/webhook/cadastro-ai` | POST | Cadastros | Enriquecimento AI de cadastro |
+| `/webhook/logistica/consulta-cep` | POST | Logística | Consulta CEP para rota |
 
 ### Padrão de chamada
 
@@ -116,7 +243,16 @@ const response = await fetch(`${import.meta.env.VITE_N8N_WEBHOOK_URL}/contrato-a
 
 ---
 
-## 4. Supabase Auth
+## 4. APIs Externas (Fallback direto do frontend)
+
+| API | Endpoint | Uso | Quando |
+|-----|----------|-----|--------|
+| BrasilAPI CNPJ | `brasilapi.com.br/api/cnpj/v1/{cnpj}` | Dados de empresa | Fallback 1 do n8n |
+| ReceitaWS CNPJ | `receitaws.com.br/v1/cnpj/{cnpj}` | Sócios de empresa | Fallback 2 (apenas sócios) |
+
+---
+
+## 5. Supabase Auth
 
 | Endpoint | Método | Descrição |
 |----------|--------|-----------|
@@ -128,37 +264,17 @@ const response = await fetch(`${import.meta.env.VITE_N8N_WEBHOOK_URL}/contrato-a
 
 ---
 
-## 5. Supabase Storage (Buckets)
+## 6. Supabase Storage (Buckets)
 
 | Bucket | Módulo | Conteúdo |
 |--------|--------|----------|
 | `cotacoes` | Compras | PDFs e imagens de cotações |
+| `cotacoes-docs` | Compras/SuperTEG | Docs enviados via SuperTEG para parse |
 | `contratos` | Contratos | Minutas, anexos, docs assinados |
 | `notas-fiscais` | Fiscal | XMLs e PDFs de NF-e/NFS-e |
 | `comprovantes` | Financeiro | Comprovantes de pagamento |
 | `obras` | Obras | Fotos, RDOs |
 | `avatars` | Sistema | Fotos de perfil |
-
----
-
-## 6. Integrações Externas
-
-### Omie ERP
-- **Base URL**: `https://app.omie.com.br/api/v1/`
-- **Auth**: App Key + App Secret (via n8n)
-- **Endpoints usados**: `/geral/clientes/`, `/financas/contapagar/`, `/financas/contareceber/`
-- **Rate limit**: 3 requisições/segundo
-- Ver [[19 - Integração Omie]] para mapeamento completo
-
-### WhatsApp (Evolution API)
-- Envio de notificações de aprovação
-- Processamento de respostas (aprovar/rejeitar via botão)
-
-### AI (OpenAI / Claude)
-- Parse inteligente de cotações (extração de dados de PDF)
-- Análise de minutas contratuais
-- Chat SuperTEG (agente conversacional)
-- Enriquecimento de cadastros
 
 ---
 
@@ -168,5 +284,6 @@ const response = await fetch(`${import.meta.env.VITE_N8N_WEBHOOK_URL}/contrato-a
 - [[06 - Supabase]]
 - [[07 - Schema Database]]
 - [[10 - n8n Workflows]]
-- [[19 - Integração Omie]]
+- [[45 - Mapa de Integrações]]
 - [[41 - Segurança e RLS]]
+- [[49 - SuperTEG AI Agent]]

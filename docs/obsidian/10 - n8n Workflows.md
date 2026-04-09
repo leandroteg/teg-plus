@@ -5,7 +5,7 @@ status: ativo
 tags: [n8n, automacao, webhooks, workflows, integracao, ai, superteg]
 criado: 2026-03-02
 atualizado: 2026-04-07
-relacionado: ["[[01 - Arquitetura Geral]]", "[[07 - Schema Database]]", "[[11 - Fluxo Requisição]]", "[[12 - Fluxo Aprovação]]", "[[19 - Integração Omie]]", "[[20 - Módulo Financeiro]]", "[[28 - Módulo Cadastros AI]]", "[[38 - Mapa de APIs]]", "[[45 - Mapa de Integrações]]", "[[ADR-003 - n8n Orquestrador]]"]
+relacionado: ["[[01 - Arquitetura Geral]]", "[[07 - Schema Database]]", "[[11 - Fluxo Requisição]]", "[[12 - Fluxo Aprovação]]", "[[19 - Integração Omie]]", "[[20 - Módulo Financeiro]]", "[[28 - Módulo Cadastros AI]]", "[[38 - Mapa de APIs]]", "[[45 - Mapa de Integrações]]", "[[49 - SuperTEG AI Agent]]", "[[ADR-003 - n8n Orquestrador]]"]
 ---
 
 # n8n Workflows — TEG+ ERP

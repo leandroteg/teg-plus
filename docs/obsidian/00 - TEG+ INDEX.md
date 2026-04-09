@@ -10,7 +10,7 @@ atualizado: 2026-04-08
 # TEG+ ERP — Mapa da Aplicacao
 
 > Sistema ERP modular para gestao de obras de engenharia eletrica/transmissao.
-> **16 modulos operacionais** · 170+ tabelas · 75 migrations · 90+ RPCs · 200+ paginas
+> **16 modulos operacionais** · 170+ tabelas · 108 migrations SQL · 90+ RPCs · 200+ paginas
 
 ---
 
@@ -28,25 +28,48 @@ atualizado: 2026-04-08
 | [[Paineis/Requisitos Board\|Requisitos]] | Rastreabilidade de requisitos | DEV + GESTAO |
 | [[Paineis/Relatorio Desenvolvimento\|Relatorio Dev]] | Scorecard semanal e velocidade | DEV |
 
-### Dashboards por Modulo
+### Dashboards por Pilar
+
+**Suprimentos**
 
 | Dashboard | Completude | Status |
 |-----------|-----------|--------|
 | [[Paineis/Compras Dashboard\|Compras]] | 95% | Operacional |
-| [[Paineis/Financeiro Dashboard\|Financeiro]] | 70% | Operacional |
-| [[Paineis/Estoque Dashboard\|Estoque]] | 65% | Em evolucao |
 | [[Paineis/Logistica Dashboard\|Logistica]] | 85% | Operacional |
+| [[Paineis/Estoque Dashboard\|Estoque]] | 65% | Em evolucao |
+| Patrimonio | 60% | Em evolucao |
 | [[Paineis/Frotas Dashboard\|Frotas]] | 85% | Operacional |
-| [[Paineis/Cadastros Dashboard\|Cadastros]] | 100% | Operacional |
+| Locacao | 100% | Operacional |
+
+**Backoffice**
+
+| Dashboard | Completude | Status |
+|-----------|-----------|--------|
+| [[Paineis/Financeiro Dashboard\|Financeiro]] | 70% | Operacional |
 | Fiscal | 80% | Operacional |
 | Controladoria | 75% | Operacional |
+| Contratos | 85% | Operacional |
+
+**Projetos**
+
+| Dashboard | Completude | Status |
+|-----------|-----------|--------|
 | PMO/EGP | 80% | Operacional |
 | Obras | 75% | Operacional |
-| Contratos | 85% | Operacional |
-| Patrimonio | 60% | Em evolucao |
-| [[Paineis/RH Dashboard\|RH]] | 15% | Em evolucao |
-| Locacao | 40% | NOVO — Abr 2026 |
 | SSMA | 10% | Q2-Q3 2026 |
+
+**RH**
+
+| Dashboard | Completude | Status |
+|-----------|-----------|--------|
+| [[Paineis/RH Dashboard\|RH/Headcount]] | 15% | Em evolucao |
+| Cultura/Mural | 100% | Operacional |
+
+**Transversais**
+
+| Dashboard | Completude | Status |
+|-----------|-----------|--------|
+| [[Paineis/Cadastros Dashboard\|Cadastros AI]] | 100% | Operacional |
 | HHT | 5% | Q3 2026 |
 
 > **Como usar:** edite os arquivos em `Database/Tarefas/`, `Database/Issues/`, `Database/Requisitos/` ou `Database/Milestones/` — os paineis atualizam automaticamente via Dataview.
@@ -154,6 +177,8 @@ atualizado: 2026-04-08
 
 ## Documentacao Tecnica
 
+### Infraestrutura e Plataforma
+
 | Area | Nota |
 |------|------|
 | Visao geral | [[01 - Arquitetura Geral]] |
@@ -167,32 +192,78 @@ atualizado: 2026-04-08
 | Migracoes | [[08 - Migrações SQL]] |
 | Autenticacao | [[09 - Auth Sistema]] |
 | Automacao | [[10 - n8n Workflows]] |
-| Fluxo Requisicao | [[11 - Fluxo Requisição]] |
-| Fluxo Aprovacao | [[12 - Fluxo Aprovação]] |
-| Alcadas | [[13 - Alçadas]] |
-| Compradores & Categorias | [[14 - Compradores e Categorias]] |
 | Deploy & GitHub | [[15 - Deploy e GitHub]] |
 | Variaveis de Ambiente | [[16 - Variáveis de Ambiente]] |
 | Roadmap | [[17 - Roadmap]] |
 | Glossario | [[18 - Glossário]] |
-| Integracao Omie ERP | [[19 - Integração Omie]] |
-| Modulo Financeiro | [[20 - Módulo Financeiro]] |
-| Fluxo de Pagamento | [[21 - Fluxo Pagamento]] |
-| Modulo Estoque e Patrimonial | [[22 - Módulo Estoque e Patrimonial]] |
-| Modulo Logistica | [[23 - Módulo Logística e Transportes]] |
-| Modulo Frotas | [[24 - Módulo Frotas e Manutenção]] |
-| Mural de Recados | [[25 - Mural de Recados]] |
-| Upload Inteligente Cotacao | [[26 - Upload Inteligente Cotacao]] |
-| Modulo Contratos | [[27 - Módulo Contratos Gestão]] |
-| Modulo Cadastros AI | [[28 - Módulo Cadastros AI]] |
-| Modulo Fiscal | [[29 - Módulo Fiscal]] |
-| Modulo Controladoria | [[30 - Módulo Controladoria]] |
-| Modulo PMO/EGP | [[31 - Módulo PMO-EGP]] |
-| Modulo Obras | [[32 - Módulo Obras]] |
-| Modulo SSMA | [[33 - Módulo SSMA]] |
-| Modulo Locacao | [[34 - Módulo Locação]] |
+| Cadastros AI (Master Data) | [[28 - Módulo Cadastros AI]] |
+| SuperTEG AI Agent | [[49 - SuperTEG AI Agent]] |
+| Fluxos Inter-Modulos | [[50 - Fluxos Inter-Módulos]] |
 
-### Dev Guides (Novos)
+---
+
+### Modulos por Pilar
+
+#### 🟢 Suprimentos (6 modulos)
+
+| Modulo | Status | Doc |
+|--------|--------|-----|
+| Compras | ✅ 95% | [[11 - Fluxo Requisição]], [[12 - Fluxo Aprovação]], [[13 - Alçadas]], [[14 - Compradores e Categorias]], [[26 - Upload Inteligente Cotacao]] |
+| Logistica | ✅ 85% | [[23 - Módulo Logística e Transportes]] |
+| Estoque | ✅ 65% | [[22 - Módulo Estoque e Patrimonial]] |
+| Patrimonial | ✅ 60% | [[22 - Módulo Estoque e Patrimonial]] |
+| Frotas | ✅ 85% | [[24 - Módulo Frotas e Manutenção]] |
+| Locacao Imoveis | ✅ 100% | [[34 - Módulo Locação]] |
+
+#### 🔵 Backoffice (5 modulos)
+
+| Modulo | Status | Doc |
+|--------|--------|-----|
+| Financeiro | ✅ 70% | [[20 - Módulo Financeiro]], [[21 - Fluxo Pagamento]] |
+| Despesas | ✅ Ativo | *(parte do Financeiro — cartoes corporativos e adiantamentos)* |
+| Fiscal | ✅ 80% | [[29 - Módulo Fiscal]] |
+| Controladoria | ✅ 75% | [[30 - Módulo Controladoria]] |
+| Contratos | ✅ 85% | [[27 - Módulo Contratos Gestão]] |
+
+#### 🟣 Projetos (3 modulos)
+
+| Modulo | Status | Doc |
+|--------|--------|-----|
+| EGP (PMO) | ✅ 80% | [[31 - Módulo PMO-EGP]] |
+| Obras | ✅ 75% | [[32 - Módulo Obras]] |
+| SSMA | 🟡 10% stub | [[33 - Módulo SSMA]] |
+
+#### 🟠 RH (5 sub-modulos)
+
+| Modulo | Status | Doc |
+|--------|--------|-----|
+| Headcount | ✅ Ativo | *(admissao, colaboradores, movimentacoes, desligamento)* |
+| Cultura | ✅ Ativo | [[25 - Mural de Recados]] |
+| R&S (Recrutamento) | ⬜ Inativo | *(planejado Q2-Q3 2026)* |
+| Performance | ⬜ Inativo | *(planejado Q2-Q3 2026)* |
+| DP (Dept. Pessoal) | ⬜ Inativo | *(planejado — integracao Seculum)* |
+
+#### ⬜ Planejados
+
+| Modulo | Pilar | Previsao | Doc |
+|--------|-------|----------|-----|
+| HHT (Horas Trabalho) | Projetos | Q3 2026 | — |
+| TI | IT | Futuro | — |
+| AI Agents | IT | Futuro | [[49 - SuperTEG AI Agent]] |
+| Estrategico | Expansao | Futuro | — |
+| Comercial | Expansao | Futuro | — |
+
+#### Integracoes Externas
+
+| Area | Status | Doc |
+|------|--------|-----|
+| Integracao Omie ERP | ⏳ Futuro (~Jun 2026) | [[19 - Integração Omie]] |
+| Mapa de Integracoes | Referencia | [[45 - Mapa de Integrações]] |
+| Mapa de APIs | Referencia | [[38 - Mapa de APIs]] |
+
+---
+
+### Dev Guides
 
 | Area | Nota |
 |------|------|
@@ -210,6 +281,8 @@ atualizado: 2026-04-08
 | Performance | [[46 - Performance e Monitoring]] |
 | Disaster Recovery | [[47 - Disaster Recovery]] |
 | Guia de Estilo UI | [[48 - Guia de Estilo UI]] |
+| SuperTEG AI Agent | [[49 - SuperTEG AI Agent]] |
+| Fluxos Inter-Modulos | [[50 - Fluxos Inter-Módulos]] |
 
 ---
 
@@ -234,91 +307,78 @@ graph TD
 
 ---
 
-## Modulos da Aplicacao (16)
+## Modulos por Pilar (19 modulos)
 
 ```mermaid
-graph LR
-    M[TEG+ ERP] --> C[Compras]
-    M --> F[Financeiro]
-    M --> E[Estoque]
-    M --> L[Logistica]
-    M --> FR[Frotas]
-    M --> R[RH]
-    M --> SS[SSMA]
-    M --> K[Contratos]
-    M --> CAD[Cadastros]
-    M --> FIS[Fiscal]
-    M --> CTRL[Controladoria]
-    M --> PMO[PMO/EGP]
-    M --> OBR[Obras]
-    M --> PAT[Patrimonio]
-    M --> LOC[Locacao]
-    M --> HHT[HHT]
+graph TD
+    TEG[TEG+ ERP]
 
-    CAD --> CAD1[Fornecedores AI]
-    CAD --> CAD2[Itens]
-    CAD --> CAD3[Classes Fin.]
-    CAD --> CAD4[C. Custo]
-    CAD --> CAD5[Obras AI]
-    CAD --> CAD6[Colaboradores AI]
+    subgraph SUPRIMENTOS["🟢 Suprimentos"]
+        C[Compras]
+        L[Logistica]
+        E[Estoque]
+        PAT[Patrimonial]
+        FR[Frotas]
+        LOC[Locacao]
+    end
+
+    subgraph BACKOFFICE["🔵 Backoffice"]
+        F[Financeiro]
+        DESP[Despesas]
+        FIS[Fiscal]
+        CTRL[Controladoria]
+        K[Contratos]
+    end
+
+    subgraph PROJETOS["🟣 Projetos"]
+        PMO[EGP/PMO]
+        OBR[Obras]
+        SS[SSMA]
+    end
+
+    subgraph PESSOAS["🟠 RH"]
+        HC[Headcount]
+        CULT[Cultura]
+        DP[DP]
+    end
+
+    TEG --> SUPRIMENTOS
+    TEG --> BACKOFFICE
+    TEG --> PROJETOS
+    TEG --> PESSOAS
 
     C --> C1[Requisicoes]
     C --> C2[Cotacoes]
-    C --> C3[Aprovacoes]
-    C --> C4[Pedidos]
-
-    E --> E1[Almoxarifado]
-    E --> E2[Inventario]
-
-    PAT --> PAT1[Imobilizados]
-    PAT --> PAT2[Depreciacao]
+    C --> C3[Pedidos]
 
     L --> L1[Solicitacoes]
     L --> L2[Expedicao]
     L --> L3[Transportes]
-    L --> L4[Recebimentos]
 
-    FR --> FR1[OS Manutencao]
-    FR --> FR2[Checklists]
-    FR --> FR3[Telemetria]
-
-    FIS --> FIS1[Pipeline NF]
-    FIS --> FIS2[Historico NF]
-
-    CTRL --> CTRL1[DRE]
-    CTRL --> CTRL2[KPIs]
-    CTRL --> CTRL3[Orcamentos]
-    CTRL --> CTRL4[Alertas]
+    F --> F1[CP/CR]
+    F --> F2[Tesouraria]
 
     PMO --> PMO1[Portfolio]
     PMO --> PMO2[EAP/TAP]
     PMO --> PMO3[Cronograma]
-    PMO --> PMO4[Medicoes]
 
-    OBR --> OBR1[Apontamentos]
-    OBR --> OBR2[RDO]
-    OBR --> OBR3[Adiantamentos]
-
-    LOC --> LOC1[Contratos Locacao]
-    LOC --> LOC2[Equipamentos]
-    LOC --> LOC3[Medicoes]
-
-    style C  fill:#10B981,color:#fff
-    style F  fill:#10B981,color:#fff
-    style E  fill:#3B82F6,color:#fff
-    style L  fill:#EA580C,color:#fff
+    style C fill:#10B981,color:#fff
+    style L fill:#EA580C,color:#fff
+    style E fill:#3B82F6,color:#fff
+    style PAT fill:#3B82F6,color:#fff
     style FR fill:#F43F5E,color:#fff
-    style R  fill:#64748B,color:#fff
-    style SS fill:#64748B,color:#fff
-    style K  fill:#8B5CF6,color:#fff
-    style CAD fill:#8B5CF6,color:#fff
+    style LOC fill:#D97706,color:#fff
+    style F fill:#10B981,color:#fff
+    style DESP fill:#10B981,color:#fff
     style FIS fill:#F59E0B,color:#fff
     style CTRL fill:#14B8A6,color:#fff
+    style K fill:#8B5CF6,color:#fff
     style PMO fill:#6366F1,color:#fff
     style OBR fill:#059669,color:#fff
-    style PAT fill:#3B82F6,color:#fff
-    style LOC fill:#D97706,color:#fff
-    style HHT fill:#64748B,color:#fff
+    style SS fill:#64748B,color:#fff
+    style HC fill:#EC4899,color:#fff
+    style CULT fill:#EC4899,color:#fff
+    style DP fill:#64748B,color:#fff
 ```
 
 ---
@@ -331,18 +391,18 @@ graph LR
 | Aprovacoes multi-nivel | Entregue | 4 alcadas, token-based |
 | AprovAi (mobile) | Entregue | Interface responsiva, multi-tipo |
 | Dashboard KPIs | Entregue | RPC + realtime |
-| Schema Supabase | Entregue | 75 migrations, 170+ tabelas |
+| Schema Supabase | Entregue | 108 migrations SQL, 170+ tabelas |
 | AI Parse requisicoes | Entregue | Keywords + n8n |
 | Cotacoes | Entregue | Regras de alcada + bypass sem minimo + recomendacao AI |
 | PO — PDF e Compartilhamento | Entregue | Sem deps externas, WhatsApp + E-mail |
 | Fluxo Pagamento (Compras->Fin) | Entregue | Triggers, anexos, comprovante |
-| Financeiro (Omie ERP) | Entregue | CP, CR, Fornecedores, 4 squads n8n |
+| Financeiro | Entregue | CP, CR, Tesouraria, Despesas (Omie futuro ~Jun 2026) |
 | Estoque e Patrimonial | Entregue | Almoxarifado, inventario, imobilizados, depreciacao |
-| Logistica e Transportes | Entregue | 9 etapas, NF-e, rastreamento, avaliacoes |
+| Logistica e Transportes | Entregue | 15 status, NF-e, viagens, rastreamento |
 | Frotas e Manutencao | Entregue | OS, checklist, abastecimento, telemetria |
 | Mural de Recados | Entregue | Slideshow corporativo + gestao admin RH |
 | Contratos v2 | Entregue | Fluxo 7 etapas, solicitacoes, minutas AI, analise juridica, PDF, AprovAi |
-| AprovAi Multi-tipo | Entregue | 4 tipos: Compras, Pagamentos, Minutas Contratuais, Validacao Tec. Requisicao |
+| AprovAi Multi-tipo | Entregue | 6 tipos: Compras, Pagamentos, Minutas, Validacao Tec., Transporte, Adiantamento |
 | ApprovalBadge (Header) | Entregue | Badge com contador de pendencias no header global |
 | Cadastros AI (Master Data) | Entregue | 6 entidades, MagicModal AI/Manual, CNPJ/CPF lookup, em todos os modulos |
 | Fiscal — Emissao NF | Entregue | Pipeline Kanban + historico NFs + Painel Fiscal |

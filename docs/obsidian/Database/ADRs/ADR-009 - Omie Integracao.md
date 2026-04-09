@@ -11,13 +11,15 @@ tags: [adr, omie, integracao, erp, financeiro]
 # ADR-009 — Integração com Omie ERP via n8n
 
 ## Status
-✅ Aceito
+✅ Aceito (decisão arquitetural aprovada — implementação prevista para ~Jun 2026)
 
 ## Contexto
 TEG+ gerencia operação (compras, logística, contratos) mas precisa de ERP contábil para emissão de NF, DRE, obrigações fiscais. Reescrever contabilidade seria inviável.
 
 ## Decisão
-Integrar com Omie ERP via API REST, orquestrado por n8n. Omie é o sistema contábil/fiscal; TEG+ é o sistema operacional. Sync bidirecional de CP, CR, e cadastros.
+Integrar com Omie ERP via API REST, orquestrado por n8n. Omie será o sistema contábil/fiscal; TEG+ é o sistema operacional. Escopo inicial: emissão de lotes de pagamento e conciliação bancária (não sync bidirecional completo).
+
+> **Nota (Abr 2026):** Hooks `useOmie.ts` e `useOmieApi.ts` já existem no frontend como preparação, mas a integração real com a API Omie ainda não está ativa em produção.
 
 ## Alternativas Consideradas
 1. **Construir módulo contábil** — Complexidade regulatória (SPED, NFe) inviável

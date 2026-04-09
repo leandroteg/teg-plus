@@ -6,7 +6,7 @@ status: em_desenvolvimento
 tags: [locacao, imoveis, vistoria, faturas, acordos, aditivos, pipeline]
 criado: 2026-04-07
 atualizado: 2026-04-07
-relacionado: ["[[27 - Módulo Contratos Gestão]]", "[[20 - Módulo Financeiro]]", "[[03 - Páginas e Rotas]]"]
+relacionado: ["[[PILAR - Suprimentos]]", "[[27 - Módulo Contratos Gestão]]", "[[20 - Módulo Financeiro]]", "[[03 - Páginas e Rotas]]"]
 ---
 
 # Módulo Locação de Imóveis

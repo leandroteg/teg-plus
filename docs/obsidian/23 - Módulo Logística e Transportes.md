@@ -6,6 +6,7 @@ status: ativo
 tags: [logistica, transportes, nfe, rastreamento, expedicao, recebimento]
 criado: 2026-03-03
 atualizado: 2026-03-12
+relacionado: ["[[PILAR - Suprimentos]]", "[[50 - Fluxos Inter-Módulos]]"]
 ---
 
 # Módulo Logística e Transportes
@@ -14,7 +15,7 @@ atualizado: 2026-03-12
 
 ---
 
-## Fluxo Principal (9 etapas)
+## Fluxo Principal (12 status + 2 terminais)
 
 ```mermaid
 flowchart LR
@@ -48,13 +49,16 @@ flowchart LR
 | `planejado` | Blue | Modal, transportadora e veículo definidos |
 | `aguardando_aprovacao` | Amber | Custo > R$500 — aguarda alçada |
 | `aprovado` | Indigo | Aprovado — pronto para expedição |
+| `romaneio_emitido` | Purple | Romaneio emitido para expedição |
 | `nfe_emitida` | Violet | NF-e autorizada na SEFAZ |
+| `transporte_pendente` | Amber | Aguardando despacho |
+| `aguardando_coleta` | Amber | Aguardando coleta pela transportadora |
 | `em_transito` | Orange | Carga em movimento |
 | `entregue` | Teal | Recebido no destino fisicamente |
 | `confirmado` | Emerald | Recebimento confirmado pelo destinatário |
 | `concluido` | Green | Processo encerrado |
-| `recusado` | Red | Recusado na validação |
-| `cancelado` | Gray | Cancelado em qualquer etapa |
+| `recusado` | Red | Recusado na validação (terminal) |
+| `cancelado` | Gray | Cancelado em qualquer etapa (terminal) |
 
 ---
 

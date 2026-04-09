@@ -5,7 +5,7 @@ status: ativo
 tags: [arquitetura, stack, infraestrutura]
 criado: 2026-03-02
 atualizado: 2026-04-07
-relacionado: ["[[00 - TEG+ INDEX]]", "[[02 - Frontend Stack]]", "[[06 - Supabase]]", "[[10 - n8n Workflows]]", "[[15 - Deploy e GitHub]]", "[[38 - Mapa de APIs]]", "[[45 - Mapa de Integrações]]", "[[ADR-002 - Stack Supabase]]", "[[ADR-003 - n8n Orquestrador]]", "[[ADR-004 - Frontend SPA React]]"]
+relacionado: ["[[00 - TEG+ INDEX]]", "[[02 - Frontend Stack]]", "[[06 - Supabase]]", "[[10 - n8n Workflows]]", "[[15 - Deploy e GitHub]]", "[[38 - Mapa de APIs]]", "[[45 - Mapa de Integrações]]", "[[49 - SuperTEG AI Agent]]", "[[50 - Fluxos Inter-Módulos]]", "[[ADR-002 - Stack Supabase]]", "[[ADR-003 - n8n Orquestrador]]", "[[ADR-004 - Frontend SPA React]]"]
 ---
 
 # Arquitetura Geral — TEG+ ERP

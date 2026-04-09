@@ -5,7 +5,7 @@ import {
   Users, UserPlus, Search, ChevronLeft, Shield,
   Check, X, AlertCircle, Mail, RefreshCw,
   CheckCircle, Power, Edit3, ChevronDown, ChevronUp,
-  Calendar, Clock, Briefcase, Building2, Eye, EyeOff, Lock,
+  Calendar, Clock, Briefcase, Building2, Eye, EyeOff, Lock, Loader2,
   LayoutGrid, LayoutList, SlidersHorizontal,
 } from 'lucide-react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
@@ -529,6 +529,23 @@ function useChangePassword() {
   })
 }
 
+function useDeleteUser() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (userId: string) => {
+      // 1. Delete perfil (cascade will handle related records)
+      const { error: perfilErr } = await supabase.from('sys_perfis').delete().eq('id', userId)
+      if (perfilErr) throw perfilErr
+      // 2. Delete from auth.users via RPC or direct
+      await supabase.rpc('admin_delete_user_rpc', { p_user_id: userId }).catch(() => {
+        // If RPC doesn't exist, try edge function
+        return supabase.functions.invoke('admin-delete-user', { body: { user_id: userId } })
+      })
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['admin-users'] }),
+  })
+}
+
 function useCadastrarUsuario() {
   const { perfil: myPerfil } = useAuth()
 
@@ -674,7 +691,6 @@ function useCadastrarUsuario() {
         .insert({
           email: signupEmail,
           role,
-          papel_global,
           alcada_nivel,
           modulos,
           nome_sugerido: nome || null,
@@ -736,6 +752,8 @@ function UserDetailPanel({
 }: { user: Perfil; onClose: () => void; forceEdit?: boolean }) {
   const update = useUpdateUser()
   const changePwd = useChangePassword()
+  const deleteUser = useDeleteUser()
+  const [confirmDelete, setConfirmDelete] = useState(false)
   const [editing, setEditing] = useState(false)
   const [papelGlobal, setPapelGlobal] = useState<PapelGlobal>(resolvePapelFromPerfil(user))
   const [alcada,  setAlcada]  = useState(user.alcada_nivel)
@@ -901,7 +919,32 @@ function UserDetailPanel({
               }`}>
             <Power size={12} /> {user.ativo ? 'Desativar' : 'Ativar'}
           </button>
+          <button onClick={() => setConfirmDelete(true)}
+            className="flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold border-2 border-red-200 text-red-500 hover:bg-red-50 transition-all">
+            <X size={12} />
+          </button>
         </div>
+        {confirmDelete && (
+          <div className="px-4 pb-3">
+            <div className="rounded-xl border-2 border-red-200 bg-red-50 p-3">
+              <p className="text-xs font-bold text-red-700 mb-2">Excluir {user.nome}?</p>
+              <p className="text-[10px] text-red-600 mb-3">Esta acao e irreversivel. O usuario sera removido permanentemente.</p>
+              <div className="flex gap-2">
+                <button onClick={() => setConfirmDelete(false)}
+                  className="flex-1 py-1.5 rounded-lg text-xs font-semibold border border-slate-200 text-slate-600">
+                  Cancelar
+                </button>
+                <button
+                  onClick={async () => { await deleteUser.mutateAsync(user.id); onClose() }}
+                  disabled={deleteUser.isPending}
+                  className="flex-1 py-1.5 rounded-lg text-xs font-bold bg-red-600 text-white hover:bg-red-700 flex items-center justify-center gap-1">
+                  {deleteUser.isPending ? <Loader2 size={12} className="animate-spin" /> : <X size={12} />}
+                  Confirmar Exclusao
+                </button>
+              </div>
+            </div>
+          </div>
+        )
       ) : (
         <div className="px-4 pb-4 space-y-4 border-t border-slate-100 pt-4">
           {/* Role */}

@@ -4,7 +4,7 @@ type: processo
 status: ativo
 tags: [requisição, fluxo, compras, processo]
 criado: 2026-03-02
-relacionado: ["[[10 - n8n Workflows]]", "[[12 - Fluxo Aprovação]]", "[[13 - Alçadas]]", "[[14 - Compradores e Categorias]]"]
+relacionado: ["[[PILAR - Suprimentos]]", "[[10 - n8n Workflows]]", "[[12 - Fluxo Aprovação]]", "[[13 - Alçadas]]", "[[14 - Compradores e Categorias]]"]
 ---
 
 # Fluxo de Requisição — TEG+ ERP

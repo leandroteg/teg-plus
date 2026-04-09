@@ -6,6 +6,7 @@ status: ativo
 tags: [frotas, manutencao, telemetria, checklist, abastecimento]
 criado: 2026-03-03
 atualizado: 2026-03-12
+relacionado: ["[[PILAR - Suprimentos]]"]
 ---
 
 # Módulo Manutenção e Uso de Frotas
