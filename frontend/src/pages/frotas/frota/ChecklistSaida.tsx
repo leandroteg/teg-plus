@@ -1,9 +1,13 @@
+import { useState } from 'react'
 import { ClipboardCheck, Car, Cog, CheckCircle2, ClipboardList } from 'lucide-react'
 import { useTheme } from '../../../contexts/ThemeContext'
 import { useVeiculos } from '../../../hooks/useFrotas'
+import FrotasChecklistModal from '../../../components/frotas/FrotasChecklistModal'
+import type { FroVeiculo } from '../../../types/frotas'
 
 export default function ChecklistSaida() {
   const { isLightSidebar: isLight } = useTheme()
+  const [selectedVeiculo, setSelectedVeiculo] = useState<FroVeiculo | null>(null)
 
   const { data: veiculos = [], isLoading } = useVeiculos({ status: 'aguardando_saida' })
 
@@ -97,17 +101,28 @@ export default function ChecklistSaida() {
                 </span>
 
                 {/* Action */}
-                <button className={`flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-xl transition-all whitespace-nowrap ${
-                  isLight
-                    ? 'bg-rose-500 text-white hover:bg-rose-600 shadow-sm shadow-rose-500/30'
-                    : 'bg-rose-500/90 text-white hover:bg-rose-500 shadow-sm shadow-rose-500/20'
-                }`}>
+                <button
+                  onClick={() => setSelectedVeiculo(v)}
+                  className={`flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-xl transition-all whitespace-nowrap ${
+                    isLight
+                      ? 'bg-rose-500 text-white hover:bg-rose-600 shadow-sm shadow-rose-500/30'
+                      : 'bg-rose-500/90 text-white hover:bg-rose-500 shadow-sm shadow-rose-500/20'
+                  }`}>
                   <ClipboardList size={12} /> Preencher Checklist
                 </button>
               </div>
             )
           })}
         </div>
+      )}
+
+      {/* Checklist Modal */}
+      {selectedVeiculo && (
+        <FrotasChecklistModal
+          veiculo={selectedVeiculo}
+          tipoChecklist="pre_viagem"
+          onClose={() => setSelectedVeiculo(null)}
+        />
       )}
     </div>
   )

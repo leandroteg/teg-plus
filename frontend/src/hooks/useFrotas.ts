@@ -12,6 +12,7 @@ import type {
   StatusOS, PrioridadeOS, StatusOcorrenciaTel, TipoChecklist,
   CriarOSPayload, CriarChecklistPayload, RegistrarAbastecimentoPayload,
   FroAlocacao, FroMulta, FroChecklistTemplate, FroChecklistExecucao, FroAcessorio,
+  FroChecklistFoto,
   StatusAlocacao, TipoMulta, StatusMulta, TipoChecklist2,
 } from '../types/frotas'
 
@@ -752,6 +753,85 @@ export function useAcessorios() {
         .order('nome')
       if (error) throw error
       return data as FroAcessorio[]
+    },
+  })
+}
+
+// ── Checklist Fotos ─────────────────────────────────────────────────────────
+
+export function useUploadChecklistFoto() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ execucaoId, file, descricao }: {
+      execucaoId: string; file: File; descricao?: string
+    }) => {
+      const ext = file.name.split('.').pop() || 'jpg'
+      const path = `${execucaoId}/${Date.now()}.${ext}`
+      const { error: upErr } = await supabase.storage
+        .from('fro-checklist-fotos')
+        .upload(path, file, { upsert: false, contentType: file.type })
+      if (upErr) throw upErr
+      const { data: { publicUrl } } = supabase.storage.from('fro-checklist-fotos').getPublicUrl(path)
+      const { error: dbErr } = await supabase.from('fro_checklist_fotos').insert({
+        execucao_id: execucaoId, url: publicUrl, descricao,
+      })
+      if (dbErr) throw dbErr
+      return publicUrl
+    },
+    onSuccess: (_d, { execucaoId }) => qc.invalidateQueries({ queryKey: ['fro_checklist_fotos', execucaoId] }),
+  })
+}
+
+export function useChecklistFotos(execucaoId?: string) {
+  return useQuery({
+    queryKey: ['fro_checklist_fotos', execucaoId || ''],
+    queryFn: async () => {
+      if (!execucaoId) return []
+      const { data, error } = await supabase
+        .from('fro_checklist_fotos')
+        .select('*')
+        .eq('execucao_id', execucaoId)
+        .order('created_at')
+      if (error) throw error
+      return (data ?? []) as FroChecklistFoto[]
+    },
+    enabled: !!execucaoId,
+  })
+}
+
+export function useAtualizarChecklistExecucao() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (payload: {
+      id: string; status?: string; observacoes_gerais?: string;
+      tem_pendencias?: boolean; nivel_combustivel?: string;
+      hodometro_registro?: number; concluido_at?: string;
+    }) => {
+      const { id, ...updates } = payload
+      const { error } = await supabase.from('fro_checklist_execucoes').update(updates).eq('id', id)
+      if (error) throw error
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['fro_checklist_execucoes'] })
+    },
+  })
+}
+
+export function useSalvarChecklistExecucaoItens() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ execucaoId, itens }: {
+      execucaoId: string;
+      itens: Array<{ template_item_id: string; conforme?: boolean; estado?: string; observacao?: string; foto_url?: string }>
+    }) => {
+      // Delete existing and re-insert
+      await supabase.from('fro_checklist_execucao_itens').delete().eq('execucao_id', execucaoId)
+      const rows = itens.map(it => ({ execucao_id: execucaoId, ...it }))
+      const { error } = await supabase.from('fro_checklist_execucao_itens').insert(rows)
+      if (error) throw error
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['fro_checklist_execucoes'] })
     },
   })
 }

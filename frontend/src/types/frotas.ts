@@ -362,6 +362,19 @@ export interface FroChecklistTemplateItem {
   permite_foto: boolean
 }
 
+// ── Checklist Vistoria (graded inspection) ──────────────────────────────────
+export type EstadoItemVeiculo = 'otimo' | 'bom' | 'regular' | 'ruim' | 'nao_se_aplica'
+export type NivelCombustivel = 'vazio' | '1/4' | '1/2' | '3/4' | 'cheio'
+
+export interface FroChecklistFoto {
+  id: string
+  execucao_id: string
+  item_id?: string
+  url: string
+  descricao?: string
+  created_at: string
+}
+
 export interface FroChecklistExecucao {
   id: string
   template_id: string
@@ -376,6 +389,10 @@ export interface FroChecklistExecucao {
   observacoes?: string
   created_at: string
   concluido_at?: string
+  observacoes_gerais?: string
+  tem_pendencias?: boolean
+  nivel_combustivel?: NivelCombustivel
+  hodometro_registro?: number
   template?: FroChecklistTemplate
   veiculo?: Pick<FroVeiculo, 'id' | 'placa' | 'modelo'>
   itens?: FroChecklistExecucaoItem[]
@@ -388,6 +405,7 @@ export interface FroChecklistExecucaoItem {
   conforme?: boolean
   foto_url?: string
   observacao?: string
+  estado?: EstadoItemVeiculo
   template_item?: FroChecklistTemplateItem
 }
 

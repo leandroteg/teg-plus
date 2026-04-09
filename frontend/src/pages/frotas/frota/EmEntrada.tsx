@@ -2,10 +2,13 @@ import { useState } from 'react'
 import { LogIn, Plus, Car, Cog, ClipboardList } from 'lucide-react'
 import { useTheme } from '../../../contexts/ThemeContext'
 import { useVeiculos } from '../../../hooks/useFrotas'
+import FrotasChecklistModal from '../../../components/frotas/FrotasChecklistModal'
+import type { FroVeiculo } from '../../../types/frotas'
 
 export default function EmEntrada() {
   const { isLightSidebar: isLight } = useTheme()
   const [_open, setOpen] = useState(false)
+  const [selectedVeiculo, setSelectedVeiculo] = useState<FroVeiculo | null>(null)
 
   const { data: veiculos = [], isLoading } = useVeiculos({ status: 'em_entrada' })
 
@@ -119,17 +122,28 @@ export default function EmEntrada() {
                 </span>
 
                 {/* Action */}
-                <button className={`flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-xl transition-all whitespace-nowrap ${
-                  isLight
-                    ? 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                    : 'bg-slate-700/60 text-slate-300 hover:bg-slate-700'
-                }`}>
+                <button
+                  onClick={() => setSelectedVeiculo(v)}
+                  className={`flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-xl transition-all whitespace-nowrap ${
+                    isLight
+                      ? 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                      : 'bg-slate-700/60 text-slate-300 hover:bg-slate-700'
+                  }`}>
                   <ClipboardList size={12} /> Continuar Vistoria
                 </button>
               </div>
             )
           })}
         </div>
+      )}
+
+      {/* Checklist Modal (devolução / pós-viagem) */}
+      {selectedVeiculo && (
+        <FrotasChecklistModal
+          veiculo={selectedVeiculo}
+          tipoChecklist="pos_viagem"
+          onClose={() => setSelectedVeiculo(null)}
+        />
       )}
     </div>
   )
