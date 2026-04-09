@@ -25,10 +25,14 @@
             "id": "7fe4d3337b96e7cc",
             "type": "leaf",
             "state": {
-              "type": "graph",
-              "state": {},
-              "icon": "lucide-git-fork",
-              "title": "Visualização em gráfico"
+              "type": "markdown",
+              "state": {
+                "file": "obsidian/45 - Mapa de Integrações.md",
+                "mode": "source",
+                "source": false
+              },
+              "icon": "lucide-file",
+              "title": "45 - Mapa de Integrações"
             }
           }
         ],
@@ -223,6 +227,10 @@
   },
   "active": "7fe4d3337b96e7cc",
   "lastOpenFiles": [
+    "obsidian/38 - Mapa de APIs.md",
+    "obsidian/37 - Troubleshooting FAQ.md",
+    "obsidian/48 - Guia de Estilo UI.md",
+    "obsidian/00 - Premissas do Projeto.md",
     "obsidian/Requisitos/PLAN-CONTRATOS-v2.md",
     "obsidian/Database/ADRs/ADR-010 - Regra Contrato R2000.md",
     "obsidian/Database/ADRs/ADR-009 - Omie Integracao.md",
@@ -234,7 +242,6 @@
     "obsidian/Database/ADRs/ADR-003 - n8n Orquestrador.md",
     "obsidian/Database/ADRs/ADR-002 - Stack Supabase.md",
     "obsidian/Database/ADRs/ADR-001 - Timezone BRT.md",
-    "obsidian/48 - Guia de Estilo UI.md",
     "obsidian/47 - Disaster Recovery.md",
     "obsidian/46 - Performance e Monitoring.md",
     "obsidian/45 - Mapa de Integrações.md",
@@ -244,12 +251,9 @@
     "obsidian/41 - Segurança e RLS.md",
     "obsidian/40 - ADRs Index.md",
     "obsidian/39 - Modelo de Dados ERD.md",
-    "obsidian/38 - Mapa de APIs.md",
-    "obsidian/37 - Troubleshooting FAQ.md",
     "obsidian/36 - Guia de Contribuição.md",
     "obsidian/35 - Onboarding DEV.md",
     "obsidian/Database/ADRs",
-    "obsidian/Paineis/BI Dashboard.md",
     "obsidian/sedUAvgrk",
     "obsidian/sedBlhKPZ",
     "obsidian/sedAJ64Wi",

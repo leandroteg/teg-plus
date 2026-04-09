@@ -5,7 +5,7 @@ status: ativo
 tags: [contratos, parcelas, pagamento, recebimento, financeiro, fornecedores, ai, minuta, pdf]
 criado: 2026-03-05
 atualizado: 2026-03-10
-relacionado: ["[[20 - Módulo Financeiro]]", "[[07 - Schema Database]]", "[[21 - Fluxo Pagamento]]", "[[12 - Fluxo Aprovação]]", "[[ADR-001 - Timezone BRT]]", "[[ADR-010 - Regra Contrato R2000]]"]
+relacionado: ["[[20 - Módulo Financeiro]]", "[[07 - Schema Database]]", "[[21 - Fluxo Pagamento]]", "[[12 - Fluxo Aprovação]]", "[[45 - Mapa de Integrações]]", "[[50 - Fluxos Inter-Módulos]]", "[[ADR-001 - Timezone BRT]]", "[[ADR-010 - Regra Contrato R2000]]"]
 ---
 
 # Módulo Contratos v2 — Gestão Completa com AI
