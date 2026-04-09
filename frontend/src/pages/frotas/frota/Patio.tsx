@@ -6,6 +6,7 @@ import {
 } from 'lucide-react'
 import { useTheme } from '../../../contexts/ThemeContext'
 import { useVeiculos, useOrdensServico } from '../../../hooks/useFrotas'
+import AlocarVeiculoModal from '../../../components/frotas/AlocarVeiculoModal'
 import type { FroVeiculo } from '../../../types/frotas'
 
 // ── helpers ───────────────────────────────────────────────────────────────────
@@ -386,6 +387,7 @@ export default function Patio() {
   const { isLightSidebar: isLight } = useTheme()
   const [search, setSearch] = useState('')
   const [viewMode, setViewMode] = useState<'cards' | 'table'>('cards')
+  const [alocarVeiculo, setAlocarVeiculo] = useState<FroVeiculo | null>(null)
 
   const { data: veiculos = [], isLoading } = useVeiculos({ status: 'disponivel' })
   const { data: ordens  = [] } = useOrdensServico({
@@ -412,8 +414,11 @@ export default function Patio() {
     )
   }, [veiculos, search])
 
-  // stub handlers — real modals would live in a parent layer
-  const handleAlocar    = (_id: string) => { /* TODO: abrir modal alocação */ }
+  // handlers
+  const handleAlocar    = (id: string) => {
+    const v = filtered.find(x => x.id === id)
+    if (v) setAlocarVeiculo(v)
+  }
   const handleOS        = (_id: string) => { /* TODO: abrir modal OS */ }
   const handleChecklist = (_id: string) => { /* TODO: abrir modal checklist */ }
 
@@ -565,6 +570,14 @@ export default function Patio() {
             </table>
           </div>
         </div>
+      )}
+
+      {/* Modal Alocar */}
+      {alocarVeiculo && (
+        <AlocarVeiculoModal
+          veiculo={alocarVeiculo}
+          onClose={() => setAlocarVeiculo(null)}
+        />
       )}
     </div>
   )
