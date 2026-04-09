@@ -281,8 +281,8 @@ describe('TC-FRO-UNIT — Testes Unitários Frotas', () => {
 
   // TC-FRO-UNIT-002 ────────────────────────────────────────────────────────
   describe('TC-FRO-UNIT-002: Transições de status de veículo', () => {
-    it('deve ter 5 status possíveis', () => {
-      expect(STATUS_VEICULO).toHaveLength(5)
+    it('deve ter 7 status possíveis', () => {
+      expect(STATUS_VEICULO).toHaveLength(7)
     })
 
     it('status operacionais: disponivel, em_uso, em_manutencao, bloqueado', () => {
