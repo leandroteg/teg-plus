@@ -903,48 +903,50 @@ function UserDetailPanel({
 
       {/* Action bar or Edit form */}
       {!editing ? (
-        <div className="px-4 pb-3 flex gap-2">
-          <button onClick={() => setEditing(true)}
-            className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl bg-primary text-white text-xs font-bold hover:bg-indigo-500 active:scale-[0.98] transition-all">
-            <Edit3 size={12} /> Editar Permissões
-          </button>
-          <button onClick={async () => {
-            await update.mutateAsync({ id: user.id, ativo: !user.ativo })
-          }}
-            disabled={update.isPending}
-            className={`flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold border-2 transition-all
-              ${user.ativo
-                ? 'border-red-200 text-red-600 hover:bg-red-50'
-                : 'border-green-200 text-green-600 hover:bg-green-50'
-              }`}>
-            <Power size={12} /> {user.ativo ? 'Desativar' : 'Ativar'}
-          </button>
-          <button onClick={() => setConfirmDelete(true)}
-            className="flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold border-2 border-red-200 text-red-500 hover:bg-red-50 transition-all">
-            <X size={12} />
-          </button>
-        </div>
-        {confirmDelete && (
-          <div className="px-4 pb-3">
-            <div className="rounded-xl border-2 border-red-200 bg-red-50 p-3">
-              <p className="text-xs font-bold text-red-700 mb-2">Excluir {user.nome}?</p>
-              <p className="text-[10px] text-red-600 mb-3">Esta acao e irreversivel. O usuario sera removido permanentemente.</p>
-              <div className="flex gap-2">
-                <button onClick={() => setConfirmDelete(false)}
-                  className="flex-1 py-1.5 rounded-lg text-xs font-semibold border border-slate-200 text-slate-600">
-                  Cancelar
-                </button>
-                <button
-                  onClick={async () => { await deleteUser.mutateAsync(user.id); onClose() }}
-                  disabled={deleteUser.isPending}
-                  className="flex-1 py-1.5 rounded-lg text-xs font-bold bg-red-600 text-white hover:bg-red-700 flex items-center justify-center gap-1">
-                  {deleteUser.isPending ? <Loader2 size={12} className="animate-spin" /> : <X size={12} />}
-                  Confirmar Exclusao
-                </button>
+        <>
+          <div className="px-4 pb-3 flex gap-2">
+            <button onClick={() => setEditing(true)}
+              className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl bg-primary text-white text-xs font-bold hover:bg-indigo-500 active:scale-[0.98] transition-all">
+              <Edit3 size={12} /> Editar Permissões
+            </button>
+            <button onClick={async () => {
+              await update.mutateAsync({ id: user.id, ativo: !user.ativo })
+            }}
+              disabled={update.isPending}
+              className={`flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold border-2 transition-all
+                ${user.ativo
+                  ? 'border-red-200 text-red-600 hover:bg-red-50'
+                  : 'border-green-200 text-green-600 hover:bg-green-50'
+                }`}>
+              <Power size={12} /> {user.ativo ? 'Desativar' : 'Ativar'}
+            </button>
+            <button onClick={() => setConfirmDelete(true)}
+              className="flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold border-2 border-red-200 text-red-500 hover:bg-red-50 transition-all">
+              <X size={12} />
+            </button>
+          </div>
+          {confirmDelete && (
+            <div className="px-4 pb-3">
+              <div className="rounded-xl border-2 border-red-200 bg-red-50 p-3">
+                <p className="text-xs font-bold text-red-700 mb-2">Excluir {user.nome}?</p>
+                <p className="text-[10px] text-red-600 mb-3">Esta acao e irreversivel. O usuario sera removido permanentemente.</p>
+                <div className="flex gap-2">
+                  <button onClick={() => setConfirmDelete(false)}
+                    className="flex-1 py-1.5 rounded-lg text-xs font-semibold border border-slate-200 text-slate-600">
+                    Cancelar
+                  </button>
+                  <button
+                    onClick={async () => { await deleteUser.mutateAsync(user.id); onClose() }}
+                    disabled={deleteUser.isPending}
+                    className="flex-1 py-1.5 rounded-lg text-xs font-bold bg-red-600 text-white hover:bg-red-700 flex items-center justify-center gap-1">
+                    {deleteUser.isPending ? <Loader2 size={12} className="animate-spin" /> : <X size={12} />}
+                    Confirmar Exclusao
+                  </button>
+                </div>
               </div>
             </div>
-          </div>
-        )
+          )}
+        </>
       ) : (
         <div className="px-4 pb-4 space-y-4 border-t border-slate-100 pt-4">
           {/* Role */}
