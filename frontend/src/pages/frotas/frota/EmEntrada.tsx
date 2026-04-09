@@ -3,11 +3,12 @@ import { LogIn, Plus, Car, Cog, ClipboardList } from 'lucide-react'
 import { useTheme } from '../../../contexts/ThemeContext'
 import { useVeiculos } from '../../../hooks/useFrotas'
 import FrotasChecklistModal from '../../../components/frotas/FrotasChecklistModal'
+import RegistrarEntradaModal from '../../../components/frotas/RegistrarEntradaModal'
 import type { FroVeiculo } from '../../../types/frotas'
 
 export default function EmEntrada() {
   const { isLightSidebar: isLight } = useTheme()
-  const [_open, setOpen] = useState(false)
+  const [openRegistrar, setOpenRegistrar] = useState(false)
   const [selectedVeiculo, setSelectedVeiculo] = useState<FroVeiculo | null>(null)
 
   const { data: veiculos = [], isLoading } = useVeiculos({ status: 'em_entrada' })
@@ -33,7 +34,7 @@ export default function EmEntrada() {
           </p>
         </div>
         <button
-          onClick={() => setOpen(true)}
+          onClick={() => setOpenRegistrar(true)}
           className={`flex items-center gap-1.5 text-xs font-semibold px-3 py-2 rounded-xl transition-all ${
             isLight
               ? 'bg-rose-500 text-white hover:bg-rose-600 shadow-sm shadow-rose-500/30'
@@ -68,7 +69,7 @@ export default function EmEntrada() {
             Quando um ativo novo ou retornando de locação iniciar o processo de entrada e vistoria, ele aparecerá aqui.
           </p>
           <button
-            onClick={() => setOpen(true)}
+            onClick={() => setOpenRegistrar(true)}
             className={`mt-5 flex items-center gap-1.5 text-xs font-semibold px-4 py-2 rounded-xl transition-all ${
               isLight
                 ? 'bg-rose-500 text-white hover:bg-rose-600 shadow-sm shadow-rose-500/30'
@@ -135,6 +136,11 @@ export default function EmEntrada() {
             )
           })}
         </div>
+      )}
+
+      {/* Modal Registrar Entrada */}
+      {openRegistrar && (
+        <RegistrarEntradaModal onClose={() => setOpenRegistrar(false)} />
       )}
 
       {/* Checklist Modal (devolução / pós-viagem) */}
