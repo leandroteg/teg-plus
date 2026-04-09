@@ -3,12 +3,14 @@ import { useSearchParams } from 'react-router-dom'
 import {
   Building2, X, Search, ArrowUp, ArrowDown, LayoutList, LayoutGrid,
   MapPin, Calendar, User, ClipboardCheck, FileText, CheckCircle2, Landmark,
+  Download, Share2, Loader2,
 } from 'lucide-react'
-import { useEntradas, useAtualizarStatusEntrada, useVistorias } from '../../hooks/useLocacao'
+import { useEntradas, useAtualizarStatusEntrada, useVistorias, useVistoriaFotos } from '../../hooks/useLocacao'
 import { useTheme } from '../../contexts/ThemeContext'
 import type { LocEntrada, StatusEntrada } from '../../types/locacao'
 import { ENTRADA_PIPELINE_STAGES } from '../../types/locacao'
 import VistoriaModal from '../../components/locacao/VistoriaModal'
+import { downloadVistoriaPdf, compartilharVistoriaWhatsApp, type VistoriaPdfData } from '../../utils/vistoria-pdf'
 
 // ── Accent maps ──────────────────────────────────────────────────────────────
 type AccentSet = { bg: string; bgActive: string; text: string; textActive: string; dot: string; badge: string; border: string }
@@ -62,6 +64,28 @@ function EntradaDetailModal({ entrada, onClose, onAction, isDark, onOpenVistoria
   const { data: vistorias = [] } = useVistorias({ imovel_id: entrada.imovel_id })
   const vistoria = vistorias.find(v => v.entrada_id === entrada.id && v.tipo === 'entrada')
   const itensPreenchidos = vistoria?.itens?.filter(it => it.estado_entrada).length || 0
+  const { data: vistoriaFotos = [] } = useVistoriaFotos(vistoria?.id)
+  const [geratingPdf, setGeratingPdf] = useState(false)
+
+  const vistoriaPdfData: VistoriaPdfData | null = vistoria ? {
+    vistoria,
+    entrada,
+    imovel: vistoria.imovel || entrada.imovel,
+    itens: vistoria.itens || [],
+    fotos: vistoriaFotos,
+  } : null
+
+  const handleDownloadPdf = async () => {
+    if (!vistoriaPdfData) return
+    setGeratingPdf(true)
+    try { await downloadVistoriaPdf(vistoriaPdfData) } finally { setGeratingPdf(false) }
+  }
+
+  const handleSharePdf = async () => {
+    if (!vistoriaPdfData) return
+    setGeratingPdf(true)
+    try { await compartilharVistoriaWhatsApp(vistoriaPdfData) } finally { setGeratingPdf(false) }
+  }
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-sm p-4" onClick={onClose}>
@@ -161,15 +185,29 @@ function EntradaDetailModal({ entrada, onClose, onAction, isDark, onOpenVistoria
             </div>
           )}
 
-          {/* PDF da vistoria (se disponível) */}
-          {vistoria?.pdf_url && (
-            <a href={vistoria.pdf_url} target="_blank" rel="noreferrer"
-              className={`flex items-center gap-2 rounded-xl p-3 border text-xs font-semibold transition-colors ${
-                isDark ? 'border-indigo-500/30 text-indigo-400 hover:bg-indigo-500/10 bg-indigo-500/5'
-                       : 'border-indigo-200 text-indigo-600 hover:bg-indigo-50 bg-indigo-50/50'
-              }`}>
-              <FileText size={14} /> Ver PDF da Vistoria
-            </a>
+          {/* PDF da vistoria — gerado dinamicamente */}
+          {vistoria && vistoria.status === 'concluida' && (
+            <div className={`rounded-xl p-3 border space-y-2 ${
+              isDark ? 'border-indigo-500/20 bg-indigo-500/5' : 'border-indigo-200 bg-indigo-50/50'
+            }`}>
+              <p className="text-[9px] font-bold text-indigo-500 uppercase tracking-wider">Laudo de Vistoria</p>
+              <div className="flex gap-2">
+                <button onClick={handleDownloadPdf} disabled={geratingPdf}
+                  className={`flex-1 flex items-center justify-center gap-2 rounded-xl py-2.5 text-xs font-semibold transition-colors ${
+                    isDark ? 'bg-indigo-500/20 text-indigo-300 hover:bg-indigo-500/30' : 'bg-indigo-100 text-indigo-700 hover:bg-indigo-200'
+                  } ${geratingPdf ? 'opacity-50' : ''}`}>
+                  {geratingPdf ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
+                  Baixar PDF
+                </button>
+                <button onClick={handleSharePdf} disabled={geratingPdf}
+                  className={`flex-1 flex items-center justify-center gap-2 rounded-xl py-2.5 text-xs font-semibold transition-colors ${
+                    isDark ? 'bg-emerald-500/20 text-emerald-300 hover:bg-emerald-500/30' : 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200'
+                  } ${geratingPdf ? 'opacity-50' : ''}`}>
+                  <Share2 size={14} />
+                  Enviar
+                </button>
+              </div>
+            </div>
           )}
 
           {/* Ações */}
