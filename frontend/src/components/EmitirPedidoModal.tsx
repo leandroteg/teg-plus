@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import { X, FileText, Loader2, AlertTriangle, Ban, CheckCircle2, Landmark } from 'lucide-react'
 import { useCadCentrosCusto, useCadClasses, useCadObras } from '../hooks/useCadastros'
 import { useCartoesCredito } from '../hooks/useCartoes'
+import { useEditorLock } from '../hooks/useEditorLock'
 import SearchableSelect from './SearchableSelect'
 import type { SelectOption } from './SearchableSelect'
 import type { RequisicaoItem } from '../types'
@@ -108,6 +109,11 @@ export default function EmitirPedidoModal({
   const { data: centros = [] } = useCadCentrosCusto()
   const { data: obras = [] } = useCadObras()
   const { data: cartoes = [] } = useCartoesCredito()
+  const { isLocked, blockedByName } = useEditorLock({
+    resourceType: 'cmp_requisicao',
+    resourceId: requisicaoId,
+    enabled: open && Boolean(requisicaoId),
+  })
 
   const { data, isLoading, error } = useQuery({
     queryKey: ['emitir-pedido-modal', requisicaoId, cotacao?.id ?? 'auto'],
@@ -398,6 +404,8 @@ export default function EmitirPedidoModal({
   }
 
   const handleSubmit = async () => {
+    if (isLocked) return
+
     if (fluxoContrato && onSolicitarContrato) {
       onSolicitarContrato()
       return
@@ -465,6 +473,16 @@ export default function EmitirPedidoModal({
         </div>
 
         <div className="p-6 space-y-5 max-h-[80vh] overflow-y-auto">
+          {isLocked && (
+            <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-4 text-sm text-amber-700 flex items-start gap-2">
+              <AlertTriangle size={16} className="mt-0.5 flex-shrink-0" />
+              <div>
+                <p className="font-bold">{blockedByName ?? 'Outro usuario'} esta editando</p>
+                <p className="text-xs mt-1">A emissao fica bloqueada ate essa pessoa finalizar a alteracao.</p>
+              </div>
+            </div>
+          )}
+
           {isLoading && (
             <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-8 flex items-center justify-center gap-2 text-slate-500">
               <Loader2 size={16} className="animate-spin" />
@@ -479,7 +497,7 @@ export default function EmitirPedidoModal({
           )}
 
           {!isLoading && !error && requisicao && (
-            <>
+            <fieldset disabled={isLocked} className={isLocked ? 'space-y-5 opacity-60' : 'space-y-5'}>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                 <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
                   <p className="text-[11px] font-semibold text-slate-500">Obra</p>
@@ -1018,7 +1036,7 @@ export default function EmitirPedidoModal({
                   </div>
                 </div>
               )}
-            </>
+            </fieldset>
           )}
         </div>
 
@@ -1033,6 +1051,7 @@ export default function EmitirPedidoModal({
             onClick={handleSubmit}
             disabled={
               isSubmitting ||
+              isLocked ||
               isLoading ||
               !requisicao ||
               !cotacaoResolvida?.id ||

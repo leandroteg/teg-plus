@@ -11,6 +11,7 @@ import { useCotacoes } from '../hooks/useCotacoes'
 import { useCategorias } from '../hooks/useCategorias'
 import { useDecisaoRequisicao } from '../hooks/useAprovacoes'
 import { useEmitirPedido, useCancelarRequisicao } from '../hooks/usePedidos'
+import { useEditorLock } from '../hooks/useEditorLock'
 import { useAuth } from '../contexts/AuthContext'
 import EmitirPedidoModal from '../components/EmitirPedidoModal'
 import type { StatusCotacao, Cotacao } from '../types'
@@ -349,6 +350,12 @@ export default function FilaCotacoes() {
   const [viewMode, setViewMode] = useState<ViewMode>('cards')
   const [detail, setDetail] = useState<Cotacao | null>(null)
   const [emitirCotacao, setEmitirCotacao] = useState<Cotacao | null>(null)
+  const detailReqId = detail?.requisicao?.id
+  const { isLocked: isDetailLocked, blockedByName: detailBlockedByName } = useEditorLock({
+    resourceType: 'cmp_requisicao',
+    resourceId: detailReqId,
+    enabled: Boolean(detailReqId),
+  })
 
   const { data: cotacoes = [], isLoading } = useCotacoes()
   const { data: categorias = [] } = useCategorias()
@@ -557,9 +564,22 @@ export default function FilaCotacoes() {
           onDecisao={(decisao, obs) => {
             const req = detail.requisicao
             if (!req) return
+            if (isDetailLocked) {
+              setToast({ type: 'error', msg: `${detailBlockedByName ?? 'Outro usuário'} está editando ${req.numero}` })
+              setTimeout(() => setToast(null), 5000)
+              return
+            }
             handleDecisao(req.id, req.numero, req.alcada_nivel, decisao, obs, req.categoria, req.status)
           }}
-          onEmitir={() => setEmitirCotacao(detail)}
+          onEmitir={() => {
+            const req = detail.requisicao
+            if (isDetailLocked && req) {
+              setToast({ type: 'error', msg: `${detailBlockedByName ?? 'Outro usuário'} está editando ${req.numero}` })
+              setTimeout(() => setToast(null), 5000)
+              return
+            }
+            setEmitirCotacao(detail)
+          }}
           onCancelar={() => {
             const req = detail.requisicao
             if (!req) return
@@ -571,7 +591,16 @@ export default function FilaCotacoes() {
           }}
           isEmitting={emitirPedidoMutation.isPending}
           isCancelling={cancelarMutation.isPending}
-          onOpenCotacao={() => { setDetail(null); nav(`/cotacoes/${detail.id}`) }}
+          onOpenCotacao={() => {
+            const req = detail.requisicao
+            if (isDetailLocked && req) {
+              setToast({ type: 'error', msg: `${detailBlockedByName ?? 'Outro usuÃ¡rio'} estÃ¡ editando ${req.numero}` })
+              setTimeout(() => setToast(null), 5000)
+              return
+            }
+            setDetail(null)
+            nav(`/cotacoes/${detail.id}`)
+          }}
         />
       )}
 
