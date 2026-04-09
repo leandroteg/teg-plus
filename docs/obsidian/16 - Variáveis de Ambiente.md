@@ -22,6 +22,9 @@ VITE_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
 
 # n8n
 VITE_N8N_WEBHOOK_URL=https://seu-n8n.com/webhook
+
+# Web Push (VAPID)
+VITE_VAPID_PUBLIC_KEY=BNxxxxxxxxxxxxxxxxxxxxxxx...
 ```
 
 ---
@@ -46,6 +49,12 @@ VITE_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFz
 | Variável | Tipo | Descrição |
 |----------|------|-----------|
 | `VITE_N8N_WEBHOOK_URL` | URL base | URL base dos webhooks sem trailing slash |
+
+### Web Push
+
+| Variável | Tipo | Descrição |
+|----------|------|-----------|
+| `VITE_VAPID_PUBLIC_KEY` | Chave pública | Chave VAPID para notificações push no browser |
 
 **Exemplo:**
 ```env

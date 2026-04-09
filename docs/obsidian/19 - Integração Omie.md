@@ -1,10 +1,10 @@
 ---
 title: Integração Omie ERP
 type: integração
-status: ativo
+status: futuro
 tags: [omie, erp, n8n, squads, financeiro, integração]
 criado: 2026-03-03
-atualizado: 2026-03-03
+atualizado: 2026-04-09
 relacionado: ["[[10 - n8n Workflows]]", "[[20 - Módulo Financeiro]]", "[[07 - Schema Database]]", "[[08 - Migrações SQL]]", "[[45 - Mapa de Integrações]]", "[[ADR-009 - Omie Integracao]]"]
 ---
 
@@ -12,7 +12,9 @@ relacionado: ["[[10 - n8n Workflows]]", "[[20 - Módulo Financeiro]]", "[[07 - S
 
 ## Visão Geral
 
-O TEG+ se conecta ao **Omie ERP** para sincronização bidirecional de dados financeiros. O **n8n** atua como middleware, orquestrando chamadas à API Omie e persistindo os dados no Supabase.
+> **⏳ Status: FUTURO (~Jun 2026)** — Esta integração ainda não está ativa. O mapeamento abaixo documenta a arquitetura planejada.
+
+O TEG+ se conectará ao **Omie ERP** para **emissão de lotes de pagamento** e **conciliação bancária**. O **n8n** atuará como middleware, orquestrando chamadas à API Omie e persistindo os dados no Supabase.
 
 ```mermaid
 flowchart LR
@@ -23,7 +25,10 @@ flowchart LR
     DB -->|RLS query| FE
 ```
 
-**Omie é a fonte de verdade** para cadastros (fornecedores, CP, CR). O TEG+ controla aprovações e pode gravar aprovações de volta no Omie.
+**Escopo planejado (NÃO é sync bidirecional completo):**
+- Emissão de lotes de contas a pagar para pagamento em massa
+- Conciliação de pagamentos (TEG+ ↔ Omie)
+- **NÃO inclui**: sync geral de cadastros, fiscal, CR
 
 ---
 

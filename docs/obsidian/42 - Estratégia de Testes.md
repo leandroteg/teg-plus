@@ -28,6 +28,8 @@ relacionado: ["[[00 - TEG+ INDEX]]", "[[15 - Deploy e GitHub]]", "[[36 - Guia de
 
 **Regra**: Testar o que quebra em produção. Não testar por vaidade de cobertura.
 
+**Estado atual**: 13 arquivos de teste em `src/test/` cobrindo auth, compras, contratos, estoque, frotas, logística, financeiro, e2e smoke. Testes rodam localmente via `npm run test` (Vitest). CI/CD ainda não executa testes automaticamente — apenas build + TypeScript check.
+
 ---
 
 ## Stack de Testes
@@ -38,7 +40,7 @@ relacionado: ["[[00 - TEG+ INDEX]]", "[[15 - Deploy e GitHub]]", "[[36 - Guia de
 | **React Testing Library** | Component | Renderização e interação |
 | **MSW** (Mock Service Worker) | API Mock | Simular Supabase e n8n |
 | **Playwright** | E2E | Fluxos críticos de ponta a ponta |
-| **GitHub Actions** | CI | Rodar testes em cada PR |
+| **GitHub Actions** | CI | Build + TypeScript check (testes ainda não integrados) |
 
 ---
 

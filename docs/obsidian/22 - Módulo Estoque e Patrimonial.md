@@ -1,7 +1,7 @@
 ---
 title: "22 - Módulo Estoque e Patrimonial"
 type: módulo
-status: em_desenvolvimento
+status: ativo
 tags: [estoque, patrimonial, almoxarifado, inventario, depreciacao, imobilizados]
 criado: 2026-03-03
 atualizado: 2026-03-03

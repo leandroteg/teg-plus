@@ -27,19 +27,21 @@ flowchart TD
 
 ---
 
-## Modelo de Permissões (RBAC)
+## Modelo de Permissões (RBAC v2)
 
-### Perfis de Usuário
+### Hierarquia de Papéis
 
-| Perfil (`perfil_tipo`) | Nível | Acesso |
-|------------------------|-------|--------|
-| `admin` | Sistema | Tudo — todas obras, todos módulos |
-| `diretoria` | Empresa | Todas obras da empresa, aprovações de alto valor |
-| `gerente` | Obra | Obra específica, todos módulos liberados |
-| `coordenador` | Módulo | Obra + módulos específicos |
-| `analista` | Operação | Obra + módulo + operações CRUD |
-| `operador` | Leitura+ | Obra + módulo + leitura + criação limitada |
-| `visualizador` | Leitura | Apenas leitura na obra/módulo |
+| Papel | Nível | Aliases | Acesso |
+|-------|-------|---------|--------|
+| CEO | 7 | `ceo` | Tudo — visão global, aprovações finais |
+| Administrador | 6 | `administrador`, `admin` | Tudo — configuração do sistema |
+| Diretor/Gerente | 5 | `diretor`, `gerente` | Aprovações finais, gestão de módulo |
+| Supervisor/Aprovador | 4 | `supervisor`, `aprovador` | Aprovações técnicas, edições no módulo |
+| Gestor/Comprador | 3 | `gestor`, `equipe`, `comprador` | Operação diária (cotações, pedidos) |
+| Requisitante | 2 | `requisitante` | Criar requisições |
+| Visitante | 1 | `visitante` | Somente leitura |
+
+> **RBAC v2** implementado via `sys_perfil_setores`, `sys_roles`, `sys_role_permissoes` (migration 068). O sistema mantém compatibilidade com `sys_perfis.role` via mapeamento no `AuthContext.tsx`.
 
 ### Controle de Módulos
 
