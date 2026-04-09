@@ -8,6 +8,13 @@
   "collapse-color-groups": false,
   "colorGroups": [
     {
+      "query": "file:PILAR",
+      "color": {
+        "a": 1,
+        "rgb": 14423100
+      }
+    },
+    {
       "query": "path:obsidian/Paineis",
       "color": {
         "a": 1,
