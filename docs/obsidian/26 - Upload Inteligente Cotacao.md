@@ -5,7 +5,7 @@ status: ativo
 modulo: compras
 tags: [ia, gemini, upload, cotacao, ocr, compras]
 criado: 2026-03-04
-relacionado: ["[[10 - n8n Workflows]]", "[[04 - Componentes]]", "[[14 - Compradores e Categorias]]", "[[11 - Fluxo Requisição]]"]
+relacionado: ["[[10 - n8n Workflows]]", "[[04 - Componentes]]", "[[14 - Compradores e Categorias]]", "[[11 - Fluxo Requisição]]", "[[ADR-008 - AI Parse Cotacoes]]"]
 ---
 
 # Upload Inteligente de Cotacao

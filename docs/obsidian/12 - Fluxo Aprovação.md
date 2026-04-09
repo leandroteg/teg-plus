@@ -5,7 +5,7 @@ status: ativo
 tags: [aprovação, alçada, token, workflow, multi-nível, aprovaai, multi-tipo]
 criado: 2026-03-02
 atualizado: 2026-03-10
-relacionado: ["[[11 - Fluxo Requisição]]", "[[13 - Alçadas]]", "[[10 - n8n Workflows]]", "[[09 - Auth Sistema]]", "[[27 - Módulo Contratos Gestão]]", "[[20 - Módulo Financeiro]]"]
+relacionado: ["[[11 - Fluxo Requisição]]", "[[13 - Alçadas]]", "[[10 - n8n Workflows]]", "[[09 - Auth Sistema]]", "[[27 - Módulo Contratos Gestão]]", "[[20 - Módulo Financeiro]]", "[[ADR-005 - PWA AprovAi]]", "[[ADR-007 - Aprovacao Token]]"]
 ---
 
 # Fluxo de Aprovação — TEG+ ERP

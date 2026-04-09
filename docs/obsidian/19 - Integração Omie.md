@@ -5,7 +5,7 @@ status: ativo
 tags: [omie, erp, n8n, squads, financeiro, integração]
 criado: 2026-03-03
 atualizado: 2026-03-03
-relacionado: ["[[10 - n8n Workflows]]", "[[20 - Módulo Financeiro]]", "[[07 - Schema Database]]", "[[08 - Migrações SQL]]"]
+relacionado: ["[[10 - n8n Workflows]]", "[[20 - Módulo Financeiro]]", "[[07 - Schema Database]]", "[[08 - Migrações SQL]]", "[[45 - Mapa de Integrações]]", "[[ADR-009 - Omie Integracao]]"]
 ---
 
 # Integração Omie ERP — TEG+

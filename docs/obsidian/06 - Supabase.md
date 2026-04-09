@@ -5,7 +5,7 @@ status: ativo
 tags: [supabase, postgresql, auth, realtime, rls, storage]
 criado: 2026-03-02
 atualizado: 2026-04-07
-relacionado: ["[[01 - Arquitetura Geral]]", "[[07 - Schema Database]]", "[[08 - Migrações SQL]]", "[[09 - Auth Sistema]]"]
+relacionado: ["[[01 - Arquitetura Geral]]", "[[07 - Schema Database]]", "[[08 - Migrações SQL]]", "[[09 - Auth Sistema]]", "[[38 - Mapa de APIs]]", "[[41 - Segurança e RLS]]", "[[47 - Disaster Recovery]]", "[[ADR-002 - Stack Supabase]]"]
 ---
 
 # Supabase — TEG+ ERP

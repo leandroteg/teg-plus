@@ -5,7 +5,7 @@ status: ativo
 tags: [auth, supabase, autenticação, permissões, roles, rbac]
 criado: 2026-03-02
 atualizado: 2026-04-08
-relacionado: ["[[06 - Supabase]]", "[[02 - Frontend Stack]]", "[[03 - Páginas e Rotas]]"]
+relacionado: ["[[06 - Supabase]]", "[[02 - Frontend Stack]]", "[[03 - Páginas e Rotas]]", "[[41 - Segurança e RLS]]", "[[ADR-007 - Aprovacao Token]]"]
 ---
 
 # Auth Sistema — TEG+ ERP

@@ -4,7 +4,7 @@ type: infraestrutura
 status: ativo
 tags: [deploy, vercel, github, ci-cd, infraestrutura]
 criado: 2026-03-02
-relacionado: ["[[01 - Arquitetura Geral]]", "[[16 - Variáveis de Ambiente]]"]
+relacionado: ["[[01 - Arquitetura Geral]]", "[[16 - Variáveis de Ambiente]]", "[[35 - Onboarding DEV]]", "[[36 - Guia de Contribuição]]", "[[42 - Estratégia de Testes]]", "[[44 - Changelog]]"]
 ---
 
 # Deploy e GitHub — TEG+ ERP

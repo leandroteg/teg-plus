@@ -89,12 +89,21 @@ docs/obsidian/                 ← Raiz do vault
 ├── 📋 Requisitos/             ← Planos de arquitetura
 │   └── PLAN-CONTRATOS-v2.md   → Plano contratos v2 (concluido)
 │
-├── 📚 Documentacao Tecnica    ← Notas numeradas (00 a 34)
+├── 📚 Documentacao Tecnica    ← Notas numeradas (00 a 48)
 │   ├── 00 - TEG+ INDEX.md    → Mapa central (comece aqui!)
 │   ├── 00 - Premissas.md     → Premissas do projeto
 │   ├── 01..18 - Infra         → Arquitetura, frontend, DB, auth, etc.
 │   ├── 19..26 - Funcional     → Integracao Omie, financeiro, estoque, etc.
-│   └── 27..34 - Modulos       → Contratos, fiscal, controladoria, etc.
+│   ├── 27..34 - Modulos       → Contratos, fiscal, controladoria, etc.
+│   └── 35..48 - Dev Guides    → Onboarding, contributing, APIs, testes, etc.
+│
+├── 📐 Database/ADRs/          ← Architecture Decision Records (10 ADRs)
+│   ├── ADR-001 - Timezone BRT → Por que T12:00:00
+│   ├── ADR-002..004           → Stack (Supabase, n8n, React)
+│   ├── ADR-005..007           → PWA, prefixos, tokens
+│   └── ADR-008..010           → AI parse, Omie, regra R$2000
+│
+├── 📂 plans/                   ← Design docs (32 planos de implementacao)
 │
 └── SETUP - Plugins Necessarios.md ← Esta nota
 ```

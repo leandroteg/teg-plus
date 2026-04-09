@@ -122,7 +122,8 @@ graph LR
 | Auth | Magic link + email/senha, RBAC v2, 6 roles |
 | n8n Workflows | 16 workflows ativos (compras, financeiro, AI parse, WhatsApp) |
 | Deploy | Vercel (frontend) + Easypanel (n8n) |
-| Obsidian Vault | 33+ docs, painéis Dataview |
+| Obsidian Vault | 48 docs técnicos, 10 ADRs, 32 design docs, painéis Dataview |
+| Dev Guides | [[35 - Onboarding DEV\|Onboarding]], [[36 - Guia de Contribuição\|Contributing]], [[40 - ADRs Index\|ADRs]], [[42 - Estratégia de Testes\|Testes]], [[43 - Runbook de Incidentes\|Runbook]] |
 
 ---
 
@@ -370,3 +371,7 @@ graph TD
 - [[31 - Módulo PMO-EGP]] — Módulo PMO/EGP
 - [[32 - Módulo Obras]] — Módulo Obras
 - [[33 - Módulo SSMA]] — Módulo SSMA (planejado)
+- [[35 - Onboarding DEV]] — Guia para novos devs
+- [[40 - ADRs Index]] — Decisões arquiteturais
+- [[44 - Changelog]] — Histórico de releases
+- [[45 - Mapa de Integrações]] — Integrações externas

@@ -5,7 +5,7 @@ status: ativo
 tags: [frontend, react, vite, typescript, tailwind]
 criado: 2026-03-02
 atualizado: 2026-04-07
-relacionado: ["[[01 - Arquitetura Geral]]", "[[03 - Páginas e Rotas]]", "[[04 - Componentes]]", "[[05 - Hooks Customizados]]"]
+relacionado: ["[[01 - Arquitetura Geral]]", "[[03 - Páginas e Rotas]]", "[[04 - Componentes]]", "[[05 - Hooks Customizados]]", "[[48 - Guia de Estilo UI]]", "[[ADR-004 - Frontend SPA React]]"]
 ---
 
 # Frontend Stack — TEG+ ERP
