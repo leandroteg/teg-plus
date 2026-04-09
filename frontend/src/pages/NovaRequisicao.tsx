@@ -357,23 +357,6 @@ export default function NovaRequisicao() {
     setItens(prev => prev.map((item, i) => i === idx ? { ...item, [field]: value } : item))
 
 
-  const handleReferenciaFileParse = useCallback(async (file: File) => {
-    try {
-      const fileData = await readFileForAi(file)
-      const result = await aiParse.mutateAsync({
-        texto: fileData.texto ?? '',
-        solicitante_nome: solicitante,
-        arquivo: fileData.arquivo,
-      })
-      if (result.itens?.length > 0) {
-        setItens(result.itens)
-        if (typeof result.confianca === 'number') setConfianca(result.confianca)
-      }
-    } catch {
-      // Mantem o preenchimento manual e o botao como fallback
-    }
-  }, [aiParse, solicitante])
-
   const [submitting, setSubmitting] = useState(false)
   const [savingDraft, setSavingDraft] = useState(false)
   const urgente = urgencia !== 'normal'
@@ -597,7 +580,19 @@ export default function NovaRequisicao() {
               const file = event.target.files?.[0]
               if (!file) return
               setReferenciaFile(file)
-              await handleReferenciaFileParse(file)
+              // Auto-parse: lê itens com IA automaticamente ao anexar
+              try {
+                const fileData = await readFileForAi(file)
+                const result = await aiParse.mutateAsync({
+                  texto: fileData.texto ?? '',
+                  solicitante_nome: solicitante,
+                  arquivo: fileData.arquivo,
+                })
+                if (result.itens?.length > 0) {
+                  setItens(sanitizeItems(result.itens))
+                  if (typeof result.confianca === 'number') setConfianca(result.confianca)
+                }
+              } catch { /* erro silencioso — usuário pode preencher manualmente */ }
             }}
           />
 
@@ -613,32 +608,25 @@ export default function NovaRequisicao() {
                     <p className="text-[11px] text-slate-400">{(referenciaFile.size / 1024).toFixed(1)} KB</p>
                   </div>
                 </div>
-                <button
-                  type="button"
-                  onClick={(event) => {
-                    event.stopPropagation()
-                    setReferenciaFile(null)
-                    if (referenciaInputRef.current) referenciaInputRef.current.value = ''
-                  }}
-                  className="rounded-full bg-white p-2 text-slate-400 transition hover:text-red-500"
-                >
-                  <X size={14} />
-                </button>
+                <div className="flex items-center gap-1.5">
+                  {aiParse.isPending && (
+                    <span className="flex items-center gap-1.5 text-[11px] font-semibold text-teal-600 bg-teal-50 border border-teal-100 rounded-full px-2.5 py-1">
+                      <Loader2 size={12} className="animate-spin" /> Lendo itens...
+                    </span>
+                  )}
+                  <button
+                    type="button"
+                    onClick={(event) => {
+                      event.stopPropagation()
+                      setReferenciaFile(null)
+                      if (referenciaInputRef.current) referenciaInputRef.current.value = ''
+                    }}
+                    className="rounded-full bg-white p-2 text-slate-400 transition hover:text-red-500"
+                  >
+                    <X size={14} />
+                  </button>
+                </div>
               </div>
-              <button
-                type="button"
-                disabled={aiParse.isPending}
-                onClick={async (e) => {
-                  e.stopPropagation()
-                  await handleReferenciaFileParse(referenciaFile)
-                }}
-                className="w-full flex items-center justify-center gap-2 py-2 px-3 rounded-xl text-xs font-semibold bg-teal-500 text-white hover:bg-teal-600 disabled:opacity-60 transition-colors"
-              >
-                {aiParse.isPending
-                  ? <><Loader2 size={12} className="animate-spin" /> Lendo itens...</>
-                  : <><Sparkles size={12} /> Ler itens com IA</>
-                }
-              </button>
             </div>
           ) : (
             <div className="flex items-center gap-3">

@@ -1741,36 +1741,32 @@ export default function AdminUsuarios() {
           </button>
         </div>
 
-        {/* Abas de roles (clicáveis para filtrar) */}
+        {/* Stats de roles — clicáveis para filtrar */}
         <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
           <button
-            type="button"
             onClick={() => setFilterRole('todos')}
             className={`rounded-xl p-3 text-left transition-all ${
               filterRole === 'todos'
-                ? 'bg-slate-200 ring-2 ring-slate-400 ring-offset-1'
-                : 'bg-slate-100 hover:bg-slate-150 opacity-70 hover:opacity-100'
+                ? 'bg-slate-800 ring-2 ring-slate-800 shadow-lg'
+                : 'bg-slate-100 hover:bg-slate-200'
             }`}
           >
-            <p className="text-xl font-black text-slate-700">{perfis?.length ?? 0}</p>
-            <p className="text-xs font-semibold text-slate-500">Todos</p>
+            <p className={`text-xl font-black ${filterRole === 'todos' ? 'text-white' : 'text-slate-700'}`}>{perfis?.length ?? 0}</p>
+            <p className={`text-xs font-semibold ${filterRole === 'todos' ? 'text-slate-300' : 'text-slate-500'}`}>Todos</p>
           </button>
           {(['requisitante', 'equipe', 'supervisor', 'diretor', 'ceo'] as Role[]).map(r => {
             const c = ROLE_COLOR[r]
-            const isActive = filterRole === r
+            const active = filterRole === r
             return (
               <button
                 key={r}
-                type="button"
-                onClick={() => setFilterRole(isActive ? 'todos' : r)}
-                className={`rounded-xl p-3 text-left transition-all ${c.bg} ${
-                  isActive
-                    ? 'ring-2 ring-current ring-offset-1 shadow-md scale-[1.02]'
-                    : 'opacity-70 hover:opacity-100'
+                onClick={() => setFilterRole(active ? 'todos' : r)}
+                className={`rounded-xl p-3 text-left transition-all ${
+                  active ? `${c.bg} ring-2 ring-offset-1 ${c.text.replace('text-', 'ring-')} shadow-lg` : `${c.bg} hover:shadow-md`
                 }`}
               >
                 <p className={`text-xl font-black ${c.text}`}>{stats[r] ?? 0}</p>
-                <p className={`text-xs font-semibold ${c.text} ${isActive ? '' : 'opacity-80'}`}>{getRoleLabel(r)}</p>
+                <p className={`text-xs font-semibold ${c.text} opacity-80`}>{getRoleLabel(r)}</p>
               </button>
             )
           })}
@@ -2069,7 +2065,7 @@ export default function AdminUsuarios() {
                     const displayPapel = resolvePapelFromPerfil(p) as Role
                     return (
                       <tr key={p.id} className="border-b border-slate-100 hover:bg-slate-50/60">
-                        <td className="px-3 py-2">
+                        <td className="px-3 py-3">
                           <input
                             type="checkbox"
                             checked={isSelected}
@@ -2077,7 +2073,7 @@ export default function AdminUsuarios() {
                             className="rounded border-slate-300 text-primary focus:ring-primary/30"
                           />
                         </td>
-                        <td className="px-3 py-2">
+                        <td className="px-3 py-3">
                           <div className="flex items-center gap-2.5">
                             <Avatar nome={p.nome} size="sm" />
                             <div className="min-w-0 flex-1">
@@ -2099,28 +2095,29 @@ export default function AdminUsuarios() {
                             </button>
                           </div>
                         </td>
-                        <td className="px-3 py-2 text-slate-500">{formatLoginUsuario(p.email)}</td>
-                        <td className="px-3 py-2">
+                        <td className="px-3 py-3 text-slate-500">{formatLoginUsuario(p.email)}</td>
+                        <td className="px-3 py-3">
                           <RoleBadge role={displayPapel} />
                         </td>
-                        <td className="px-3 py-2 text-slate-600 text-xs">{ALCADA_LABEL[p.alcada_nivel]}</td>
-                        <td className="px-2 py-2">
-                          <div className="flex items-center gap-0.5 flex-nowrap">
+                        <td className="px-3 py-3 text-slate-600 text-xs">{ALCADA_LABEL[p.alcada_nivel]}</td>
+                        <td className="px-3 py-3">
+                          <div className="flex flex-wrap gap-1 max-w-[300px]">
                             {enabledModulos.length === 0 && (
-                              <span className="text-[11px] text-slate-400">—</span>
+                              <span className="text-[11px] text-slate-400">Sem módulos</span>
                             )}
                             {enabledModulos.map(mod => (
                               <span
                                 key={`${p.id}-${mod.key}`}
-                                className="inline-flex items-center justify-center w-[22px] h-[22px] rounded bg-slate-100 text-[10px] cursor-default shrink-0"
+                                className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-slate-100 text-slate-600 text-[10px] font-semibold"
                                 title={mod.label}
                               >
-                                {mod.icon}
+                                <span className="text-[10px]">{mod.icon}</span>
+                                {mod.label}
                               </span>
                             ))}
                           </div>
                         </td>
-                        <td className="px-3 py-2">
+                        <td className="px-3 py-3">
                           <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold ${
                             p.ativo ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-600'
                           }`}>

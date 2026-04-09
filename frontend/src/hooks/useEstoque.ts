@@ -122,6 +122,7 @@ export function useSalvarItem() {
   return useMutation({
     mutationFn: async (payload: Partial<EstItem> & { id?: string }) => {
       const { id, ...rest } = payload
+      if (rest.descricao) rest.descricao = rest.descricao.replace(/^"+|"+$/g, '').trim()
       if (id) {
         const { error } = await supabase.from('est_itens').update(rest).eq('id', id)
         if (error) throw error
