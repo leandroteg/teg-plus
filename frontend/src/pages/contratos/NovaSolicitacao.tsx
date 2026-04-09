@@ -20,6 +20,22 @@ import { GRUPO_CONTRATO_OPTIONS } from '../../constants/contratos'
 
 // ── CNPJ helpers ──────────────────────────────────────────────────────────────
 
+function validarCNPJ(digits: string): boolean {
+  if (digits.length !== 14) return false
+  if (/^(\d)\1{13}$/.test(digits)) return false // all same digit
+  const calc = (d: string, weights: number[]) => {
+    const sum = weights.reduce((acc, w, i) => acc + parseInt(d[i]) * w, 0)
+    const rem = sum % 11
+    return rem < 2 ? 0 : 11 - rem
+  }
+  const w1 = [5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2]
+  const w2 = [6, 5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2]
+  return (
+    calc(digits, w1) === parseInt(digits[12]) &&
+    calc(digits, w2) === parseInt(digits[13])
+  )
+}
+
 function maskCNPJ(value: string): string {
   const d = value.replace(/\D/g, '').slice(0, 14)
   if (d.length <= 2) return d
@@ -37,6 +53,9 @@ interface CnpjResult {
   endereco?: { cep: string; logradouro: string; numero: string; complemento: string; bairro: string; cidade: string; uf: string }
   telefone: string
   email: string
+  representante_nome?: string
+  representante_cpf?: string
+  representante_cargo?: string
   error?: boolean
   message?: string
 }
@@ -220,6 +239,8 @@ export default function NovaSolicitacao() {
   const [justificativa, setJustificativa] = useState('')
   const [valorEstimadoDisplay, setValorEstimadoDisplay] = useState('')
   const [formaPagamento, setFormaPagamento] = useState('')
+
+  const isRecorrente = /\b(mensal|bimestral|trimestral|semestral|anual)\b/i.test(formaPagamento)
   const [descricaoEscopo, setDescricaoEscopo] = useState('')
 
   // Step 3 — Vigencia e Classificacao
@@ -260,6 +281,10 @@ export default function NovaSolicitacao() {
   const handleCnpjLookup = useCallback(async (rawCnpj: string) => {
     const digits = rawCnpj.replace(/\D/g, '')
     if (digits.length !== 14) return
+    if (!validarCNPJ(digits)) {
+      setCnpjStatus({ ok: false, msg: 'CNPJ inválido' })
+      return
+    }
     if (cnpjLastRef.current === digits) return
     cnpjLastRef.current = digits
 
@@ -370,7 +395,13 @@ export default function NovaSolicitacao() {
     objeto: objeto.trim(),
     descricao_escopo: descricaoEscopo.trim() || undefined,
     justificativa: justificativa.trim() || undefined,
-    valor_estimado: valorEstimadoDisplay ? parseBRL(valorEstimadoDisplay) : undefined,
+    valor_mensal: isRecorrente && valorEstimadoDisplay ? parseBRL(valorEstimadoDisplay) : undefined,
+    valor_estimado: valorEstimadoDisplay
+      ? isRecorrente && typeof prazoMeses === 'number' && prazoMeses > 0
+        ? parseBRL(valorEstimadoDisplay) * prazoMeses
+        : parseBRL(valorEstimadoDisplay)
+      : undefined,
+    recorrente: isRecorrente || undefined,
     forma_pagamento: formaPagamento.trim() || undefined,
     data_inicio_prevista: dataInicioPrevista || undefined,
     data_fim_prevista: dataFimPrevista || undefined,
@@ -840,7 +871,9 @@ export default function NovaSolicitacao() {
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className={labelClass}>Valor Contratado / Estimado</label>
+              <label className={labelClass}>
+                {isRecorrente ? `Valor por Período (${formaPagamento.trim()})` : 'Valor Contratado / Estimado'}
+              </label>
               <div className="relative">
                 <DollarSign size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                 <span className="absolute left-8 top-1/2 -translate-y-1/2 text-xs font-semibold text-slate-400">
@@ -854,6 +887,11 @@ export default function NovaSolicitacao() {
                   inputMode="numeric"
                 />
               </div>
+              {isRecorrente && valorEstimadoDisplay && typeof prazoMeses === 'number' && prazoMeses > 0 && (
+                <p className="text-[10px] text-indigo-500 mt-1 font-medium">
+                  Total estimado: {(parseBRL(valorEstimadoDisplay) * prazoMeses).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })} ({prazoMeses} meses)
+                </p>
+              )}
             </div>
             <div>
               <label className={labelClass}>Forma de Pagamento</label>
