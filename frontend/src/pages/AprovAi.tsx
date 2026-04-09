@@ -9,6 +9,7 @@ import {
   Calendar, FileText, Download, Eye, HelpCircle,
   Paperclip, Square, CheckSquare, Package,
   Truck, MapPin, Smartphone, Wallet,
+  Info, X, Tag, Briefcase, Hash, List,
 } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../services/supabase'
@@ -19,7 +20,10 @@ import {
   useHistoricoAprovacoes,
   useAprovacaoKPIs,
 } from '../hooks/useAprovacoes'
+import { useEditorLock } from '../hooks/useEditorLock'
 import type { HistoricoFiltros } from '../hooks/useAprovacoes'
+import { useRequisicao } from '../hooks/useRequisicoes'
+import { useCotacaoByRequisicao } from '../hooks/useCotacoes'
 import FluxoTimeline from '../components/FluxoTimeline'
 import type { AprovacaoPendente, AprovacaoHistorico, TipoAprovacao } from '../types'
 
@@ -153,6 +157,7 @@ function AprovacaoCard({ aprovacao, aprovadorNome, aprovadorEmail }: {
 }) {
   const mutation = useDecisaoRequisicao()
   const [expanded, setExpanded] = useState(false)
+  const [showDetalhes, setShowDetalhes] = useState(false)
   const [observacao, setObservacao] = useState('')
   const [action, setAction] = useState<'aprovada' | 'rejeitada' | 'esclarecimento' | null>(null)
   const [alertaCotacao, setAlertaCotacao] = useState<{
@@ -165,6 +170,12 @@ function AprovacaoCard({ aprovacao, aprovadorNome, aprovadorEmail }: {
 
   const req  = aprovacao.requisicao
   const cot  = aprovacao.cotacao_resumo
+  const { data: reqDetalhe, isLoading: loadingDetalhe } = useRequisicao(showDetalhes ? req?.id : undefined)
+  const { isLocked, blockedByName } = useEditorLock({
+    resourceType: 'cmp_requisicao',
+    resourceId: aprovacao.requisicao_id,
+    enabled: Boolean(aprovacao.requisicao_id),
+  })
 
   // Busca alerta de cotações obrigatórias faltantes (#38)
   useEffect(() => {
@@ -180,6 +191,7 @@ function AprovacaoCard({ aprovacao, aprovadorNome, aprovadorEmail }: {
   const alc  = getAlcada(req.valor_estimado, aprovacao.nivel)
 
   const handleDecision = async (decisao: 'aprovada' | 'rejeitada') => {
+    if (isLocked) return
     setAction(decisao)
     try {
       await mutation.mutateAsync({
@@ -197,6 +209,7 @@ function AprovacaoCard({ aprovacao, aprovadorNome, aprovadorEmail }: {
   }
 
   const handleEsclarecimento = async () => {
+    if (isLocked) return
     if (!observacao.trim()) {
       setExpanded(true)
       setAction('esclarecimento')
@@ -380,11 +393,17 @@ function AprovacaoCard({ aprovacao, aprovadorNome, aprovadorEmail }: {
 
         {expanded && (
           <div className="mt-3">
+            {isLocked && (
+              <div className="mb-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] font-semibold text-amber-700">
+                {blockedByName ?? 'Outro usuário'} está editando esta requisição.
+              </div>
+            )}
             <label className="text-xs text-slate-400">
               {action === 'esclarecimento' ? 'Descreva o esclarecimento necessário (obrigatório)' : 'Observação (opcional)'}
             </label>
             <textarea
               rows={2}
+              disabled={isLocked}
               className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm mt-1 focus:ring-2 focus:ring-indigo-300 outline-none"
               placeholder={action === 'esclarecimento' ? 'O que precisa ser esclarecido...' : 'Motivo da decisão...'}
               value={observacao}
@@ -394,39 +413,47 @@ function AprovacaoCard({ aprovacao, aprovadorNome, aprovadorEmail }: {
         )}
       </div>
 
-      {/* Botoes de acao -- 3 colunas */}
-      <div className="grid grid-cols-3 border-t border-slate-100">
+      {/* Botoes de acao -- 4 colunas */}
+      <div className="grid grid-cols-4 border-t border-slate-100">
         <button
           type="button"
-          disabled={mutation.isPending}
+          disabled={mutation.isPending || isLocked}
           onClick={() => handleDecision('rejeitada')}
           className="flex flex-col items-center justify-center gap-1 py-4 text-xs font-bold text-red-500 hover:bg-red-50 active:bg-red-100 transition border-r border-slate-100 disabled:opacity-50"
         >
           {mutation.isPending && action === 'rejeitada'
             ? <div className="w-5 h-5 border-2 border-red-400 border-t-transparent rounded-full animate-spin" />
-            : <XCircle size={20} />}
+            : <XCircle size={18} />}
           <span>Rejeitar</span>
         </button>
         <button
           type="button"
-          disabled={mutation.isPending}
+          disabled={mutation.isPending || isLocked}
           onClick={handleEsclarecimento}
           className="flex flex-col items-center justify-center gap-1 py-4 text-xs font-bold text-amber-600 hover:bg-amber-50 active:bg-amber-100 transition border-r border-slate-100 disabled:opacity-50"
         >
           {mutation.isPending && action === 'esclarecimento'
             ? <div className="w-5 h-5 border-2 border-amber-400 border-t-transparent rounded-full animate-spin" />
-            : <MessageSquare size={20} />}
+            : <MessageSquare size={18} />}
           <span>Esclarecer</span>
         </button>
         <button
           type="button"
-          disabled={mutation.isPending}
+          onClick={() => setShowDetalhes(true)}
+          className="flex flex-col items-center justify-center gap-1 py-4 text-xs font-bold text-indigo-500 hover:bg-indigo-50 active:bg-indigo-100 transition border-r border-slate-100"
+        >
+          <Info size={18} />
+          <span>Detalhes</span>
+        </button>
+        <button
+          type="button"
+          disabled={mutation.isPending || isLocked}
           onClick={() => handleDecision('aprovada')}
           className="flex flex-col items-center justify-center gap-1 py-4 text-xs font-bold text-emerald-600 hover:bg-emerald-50 active:bg-emerald-100 transition disabled:opacity-50"
         >
           {mutation.isPending && action === 'aprovada'
             ? <div className="w-5 h-5 border-2 border-emerald-400 border-t-transparent rounded-full animate-spin" />
-            : <CheckCircle size={20} />}
+            : <CheckCircle size={18} />}
           <span>Aprovar</span>
         </button>
       </div>
@@ -435,6 +462,193 @@ function AprovacaoCard({ aprovacao, aprovadorNome, aprovadorEmail }: {
         <p className="text-red-500 text-xs text-center py-2 border-t border-red-100">
           Erro ao processar: {mutation.error?.message || 'Tente novamente.'}
         </p>
+      )}
+
+      {/* ── Modal Detalhes ── */}
+      {showDetalhes && (
+        <div className="fixed inset-0 z-50 flex items-end" onClick={() => setShowDetalhes(false)}>
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
+          <div
+            className="relative w-full bg-white rounded-t-3xl shadow-2xl max-h-[85vh] flex flex-col"
+            onClick={e => e.stopPropagation()}
+          >
+            {/* Handle */}
+            <div className="flex justify-center pt-3 pb-1">
+              <div className="w-10 h-1 rounded-full bg-slate-200" />
+            </div>
+
+            {/* Header */}
+            <div className="flex items-center justify-between px-5 py-3 border-b border-slate-100">
+              <div>
+                <p className="text-sm font-extrabold text-slate-800">{req.numero}</p>
+                <p className="text-[11px] text-slate-400 mt-0.5">{req.solicitante_nome}</p>
+              </div>
+              <button
+                onClick={() => setShowDetalhes(false)}
+                className="p-2 rounded-xl hover:bg-slate-100 text-slate-400 transition"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Body */}
+            <div className="overflow-y-auto flex-1 px-5 py-4 space-y-4">
+
+              {/* Descrição */}
+              <div className="bg-slate-50 rounded-2xl p-3.5">
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Descrição</p>
+                <p className="text-sm text-slate-700">{req.descricao}</p>
+                {req.justificativa && (
+                  <p className="text-[11px] text-slate-500 mt-1.5 italic">{req.justificativa}</p>
+                )}
+              </div>
+
+              {/* Detalhes principais */}
+              <div className="bg-slate-50 rounded-2xl p-3.5">
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                  <List size={10} /> Detalhes
+                </p>
+                <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-[11px]">
+                  <div>
+                    <span className="text-slate-400">Obra:</span>{' '}
+                    <span className="font-semibold text-slate-700">{req.obra_nome}</span>
+                  </div>
+                  {req.categoria && (
+                    <div>
+                      <span className="text-slate-400">Categoria:</span>{' '}
+                      <span className="font-medium text-slate-600">{req.categoria.replace(/_/g, ' ')}</span>
+                    </div>
+                  )}
+                  {req.centro_custo && (
+                    <div>
+                      <span className="text-slate-400">Centro de Custo:</span>{' '}
+                      <span className="font-semibold text-slate-700">{req.centro_custo}</span>
+                    </div>
+                  )}
+                  {req.classe_financeira && (
+                    <div>
+                      <span className="text-slate-400">Classe Fin.:</span>{' '}
+                      <span className="font-semibold text-violet-600">{req.classe_financeira}</span>
+                    </div>
+                  )}
+                  <div>
+                    <span className="text-slate-400">Solicitante:</span>{' '}
+                    <span className="font-semibold text-slate-700">{req.solicitante_nome}</span>
+                  </div>
+                  {req.created_at && (
+                    <div>
+                      <span className="text-slate-400">Data:</span>{' '}
+                      <span className="font-medium text-slate-600">
+                        {new Date(req.created_at).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit' })}
+                      </span>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Cotação */}
+              {cot && (
+                <div className="bg-emerald-50 rounded-2xl p-3.5">
+                  <p className="text-[10px] font-bold text-emerald-600 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                    <Sparkles size={10} /> Melhor Cotação
+                  </p>
+                  <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-[11px]">
+                    <div className="col-span-2">
+                      <span className="text-slate-400">Fornecedor:</span>{' '}
+                      <span className="font-semibold text-slate-700">{cot.fornecedor_nome}</span>
+                    </div>
+                    <div>
+                      <span className="text-slate-400">Valor:</span>{' '}
+                      <span className="font-extrabold text-emerald-600">{fmt(cot.valor)}</span>
+                    </div>
+                    <div>
+                      <span className="text-slate-400">Prazo:</span>{' '}
+                      <span className="font-medium text-slate-600">{cot.prazo_dias}d</span>
+                    </div>
+                    <div>
+                      <span className="text-slate-400">Cotações:</span>{' '}
+                      <span className="font-medium text-slate-600">{cot.total_cotados} fornecedor{cot.total_cotados !== 1 ? 'es' : ''}</span>
+                    </div>
+                    {cot.valor < req.valor_estimado && (
+                      <div className="col-span-2 flex items-center gap-1 text-emerald-600 font-semibold">
+                        <Sparkles size={11} />
+                        Economia de {fmt(req.valor_estimado - cot.valor)} ({Math.round((1 - cot.valor / req.valor_estimado) * 100)}%)
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Valor estimado (sem cotação) */}
+              {!cot && (
+                <div className="bg-indigo-50 rounded-2xl p-3.5 flex justify-between items-center">
+                  <span className="text-xs text-indigo-500 font-semibold">Valor Estimado</span>
+                  <span className="text-lg font-extrabold text-indigo-600">{fmt(req.valor_estimado)}</span>
+                </div>
+              )}
+
+              {/* Itens da requisição */}
+              {loadingDetalhe ? (
+                <div className="flex justify-center py-4">
+                  <div className="w-5 h-5 border-2 border-indigo-400 border-t-transparent rounded-full animate-spin" />
+                </div>
+              ) : reqDetalhe?.itens && reqDetalhe.itens.length > 0 && (
+                <div className="bg-slate-50 rounded-2xl p-3.5">
+                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                    <Package size={10} /> Itens ({reqDetalhe.itens.length})
+                  </p>
+                  <div className="space-y-2">
+                    {reqDetalhe.itens.map((item, i) => (
+                      <div key={item.id ?? i} className="bg-white rounded-xl px-3 py-2.5 border border-slate-100">
+                        <p className="text-[11px] font-semibold text-slate-700">{item.descricao}</p>
+                        <div className="flex items-center gap-3 mt-1 text-[10px] text-slate-400">
+                          <span>{item.quantidade} {item.unidade}</span>
+                          {item.valor_unitario_estimado > 0 && (
+                            <>
+                              <span>×</span>
+                              <span>{fmt(item.valor_unitario_estimado)}</span>
+                              <span className="ml-auto font-semibold text-slate-600">
+                                {fmt(item.quantidade * item.valor_unitario_estimado)}
+                              </span>
+                            </>
+                          )}
+                        </div>
+                        {item.classe_financeira_descricao && (
+                          <p className="text-[10px] text-violet-500 mt-0.5">{item.classe_financeira_descricao}</p>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Esclarecimento pendente */}
+              {req.esclarecimento_msg && (
+                <div className="bg-amber-50 border border-amber-200 rounded-2xl p-3.5">
+                  <p className="text-[10px] font-bold text-amber-600 uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
+                    <MessageSquare size={10} /> Esclarecimento solicitado
+                  </p>
+                  <p className="text-[11px] text-amber-800">{req.esclarecimento_msg}</p>
+                  {req.esclarecimento_por && (
+                    <p className="text-[10px] text-amber-500 mt-1">Por: {req.esclarecimento_por}</p>
+                  )}
+                </div>
+              )}
+
+              {/* Link para página completa */}
+              <a
+                href={`/requisicoes/${req.id}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center justify-center gap-2 w-full py-3 rounded-2xl border border-indigo-200 text-indigo-600 text-sm font-semibold hover:bg-indigo-50 transition"
+              >
+                <ExternalLink size={14} /> Abrir página completa
+              </a>
+
+              <div className="h-4" />
+            </div>
+          </div>
+        </div>
       )}
     </div>
   )
@@ -455,6 +669,13 @@ function GenericPendingCard({ aprovacao, aprovadorNome, aprovadorEmail }: {
   const [selectedItemIds, setSelectedItemIds] = useState<Set<string>>(
     new Set(aprovacao.pagamento_detalhes?.itens?.map(i => i.id) ?? [])
   )
+
+  const [showDetalhes, setShowDetalhes] = useState(false)
+  const req = aprovacao.requisicao
+  const cot = aprovacao.cotacao_resumo
+  const isDetalheCotacao = showDetalhes && aprovacao.tipo_aprovacao === 'cotacao'
+  const { data: reqDetalhe, isLoading: loadingDetalhe } = useRequisicao(isDetalheCotacao ? req?.id : undefined)
+  const { data: cotacaoDetalhe } = useCotacaoByRequisicao(isDetalheCotacao ? req?.id : undefined)
 
   const tipo = tipoConfig[aprovacao.tipo_aprovacao] || tipoConfig.requisicao_compra
   const IconComp = tipo.icon
@@ -862,7 +1083,7 @@ function GenericPendingCard({ aprovacao, aprovadorNome, aprovadorEmail }: {
           </div>
         )}
       </div>
-      <div className="grid grid-cols-3 border-t border-slate-100">
+      <div className={`grid ${aprovacao.tipo_aprovacao === 'cotacao' ? 'grid-cols-4' : 'grid-cols-3'} border-t border-slate-100`}>
         <button
           type="button"
           disabled={mutation.isPending}
@@ -883,6 +1104,16 @@ function GenericPendingCard({ aprovacao, aprovadorNome, aprovadorEmail }: {
           <MessageSquare size={16} />
           Esclarecer
         </button>
+        {aprovacao.tipo_aprovacao === 'cotacao' && (
+          <button
+            type="button"
+            onClick={() => setShowDetalhes(true)}
+            className="flex items-center justify-center gap-1.5 py-3.5 text-xs font-bold text-blue-500 hover:bg-blue-50 active:bg-blue-100 transition border-r border-slate-100"
+          >
+            <Info size={16} />
+            Detalhes
+          </button>
+        )}
         <button
           type="button"
           disabled={mutation.isPending}
@@ -900,6 +1131,254 @@ function GenericPendingCard({ aprovacao, aprovadorNome, aprovadorEmail }: {
         <p className="text-red-500 text-xs text-center py-2 border-t border-red-100">
           Erro ao processar: {mutation.error?.message || 'Tente novamente.'}
         </p>
+      )}
+
+      {/* ── Modal Detalhes (cotacao) ── */}
+      {showDetalhes && aprovacao.tipo_aprovacao === 'cotacao' && (
+        <div className="fixed inset-0 z-50 flex items-end" onClick={() => setShowDetalhes(false)}>
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
+          <div
+            className="relative w-full bg-white rounded-t-3xl shadow-2xl max-h-[85vh] flex flex-col"
+            onClick={e => e.stopPropagation()}
+          >
+            {/* Handle */}
+            <div className="flex justify-center pt-3 pb-1">
+              <div className="w-10 h-1 rounded-full bg-slate-200" />
+            </div>
+
+            {/* Header */}
+            <div className="flex items-center justify-between px-5 py-3 border-b border-slate-100">
+              <div>
+                <p className="text-sm font-extrabold text-slate-800">{aprovacao.entidade_numero || req?.numero}</p>
+                <p className="text-[11px] text-slate-400 mt-0.5">{req?.solicitante_nome}</p>
+              </div>
+              <button
+                onClick={() => setShowDetalhes(false)}
+                className="p-2 rounded-xl hover:bg-slate-100 text-slate-400 transition"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Body */}
+            <div className="overflow-y-auto flex-1 px-5 py-4 space-y-4">
+
+              {/* Descrição */}
+              {req?.descricao && (
+                <div className="bg-slate-50 rounded-2xl p-3.5">
+                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Descrição</p>
+                  <p className="text-sm text-slate-700">{req.descricao}</p>
+                  {req.justificativa && (
+                    <p className="text-[11px] text-slate-500 mt-1.5 italic">{req.justificativa}</p>
+                  )}
+                </div>
+              )}
+
+              {/* Detalhes principais */}
+              {req && (
+                <div className="bg-slate-50 rounded-2xl p-3.5">
+                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                    <List size={10} /> Detalhes
+                  </p>
+                  <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-[11px]">
+                    <div>
+                      <span className="text-slate-400">Obra:</span>{' '}
+                      <span className="font-semibold text-slate-700">{req.obra_nome}</span>
+                    </div>
+                    {req.categoria && (
+                      <div>
+                        <span className="text-slate-400">Categoria:</span>{' '}
+                        <span className="font-medium text-slate-600">{req.categoria.replace(/_/g, ' ')}</span>
+                      </div>
+                    )}
+                    {req.centro_custo && (
+                      <div>
+                        <span className="text-slate-400">Centro de Custo:</span>{' '}
+                        <span className="font-semibold text-slate-700">{req.centro_custo}</span>
+                      </div>
+                    )}
+                    {req.classe_financeira && (
+                      <div>
+                        <span className="text-slate-400">Classe Fin.:</span>{' '}
+                        <span className="font-semibold text-violet-600">{req.classe_financeira}</span>
+                      </div>
+                    )}
+                    <div>
+                      <span className="text-slate-400">Solicitante:</span>{' '}
+                      <span className="font-semibold text-slate-700">{req.solicitante_nome}</span>
+                    </div>
+                    {req.created_at && (
+                      <div>
+                        <span className="text-slate-400">Data:</span>{' '}
+                        <span className="font-medium text-slate-600">
+                          {new Date(req.created_at).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit' })}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Cotação */}
+              {cot ? (
+                <div className="bg-emerald-50 rounded-2xl p-3.5">
+                  <p className="text-[10px] font-bold text-emerald-600 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                    <Sparkles size={10} /> Melhor Cotação
+                  </p>
+                  <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-[11px]">
+                    <div className="col-span-2">
+                      <span className="text-slate-400">Fornecedor:</span>{' '}
+                      <span className="font-semibold text-slate-700">{cot.fornecedor_nome}</span>
+                    </div>
+                    <div>
+                      <span className="text-slate-400">Valor:</span>{' '}
+                      <span className="font-extrabold text-emerald-600">{fmt(cot.valor)}</span>
+                    </div>
+                    <div>
+                      <span className="text-slate-400">Prazo:</span>{' '}
+                      <span className="font-medium text-slate-600">{cot.prazo_dias}d</span>
+                    </div>
+                    <div>
+                      <span className="text-slate-400">Cotações:</span>{' '}
+                      <span className="font-medium text-slate-600">{cot.total_cotados} fornecedor{cot.total_cotados !== 1 ? 'es' : ''}</span>
+                    </div>
+                    {req && cot.valor < req.valor_estimado && (
+                      <div className="col-span-2 flex items-center gap-1 text-emerald-600 font-semibold">
+                        <Sparkles size={11} />
+                        Economia de {fmt(req.valor_estimado - cot.valor)} ({Math.round((1 - cot.valor / req.valor_estimado) * 100)}%)
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ) : req && req.valor_estimado > 0 && (
+                <div className="bg-blue-50 rounded-2xl p-3.5 flex justify-between items-center">
+                  <span className="text-xs text-blue-500 font-semibold">Valor Estimado</span>
+                  <span className="text-lg font-extrabold text-blue-600">{fmt(req.valor_estimado)}</span>
+                </div>
+              )}
+
+              {/* Timeline de cotações */}
+              {cotacaoDetalhe && (
+                <div className="bg-slate-50 rounded-2xl p-3.5">
+                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                    <List size={10} /> Linha do Tempo da Cotação
+                  </p>
+                  <div className="space-y-1.5 text-[11px] mb-3">
+                    {cotacaoDetalhe.comprador_nome && (
+                      <div>
+                        <span className="text-slate-400">Comprador:</span>{' '}
+                        <span className="font-semibold text-slate-700">{cotacaoDetalhe.comprador_nome}</span>
+                      </div>
+                    )}
+                    {cotacaoDetalhe.data_conclusao && (
+                      <div>
+                        <span className="text-slate-400">Data da cotação:</span>{' '}
+                        <span className="font-medium text-slate-600">
+                          {new Date(cotacaoDetalhe.data_conclusao).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit' })}
+                        </span>
+                      </div>
+                    )}
+                    {!cotacaoDetalhe.data_conclusao && cotacaoDetalhe.created_at && (
+                      <div>
+                        <span className="text-slate-400">Iniciada em:</span>{' '}
+                        <span className="font-medium text-slate-600">
+                          {new Date(cotacaoDetalhe.created_at).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit' })}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                  {cotacaoDetalhe.fornecedores && cotacaoDetalhe.fornecedores.length > 0 && (
+                    <>
+                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">
+                        Todas as cotações ({cotacaoDetalhe.fornecedores.length})
+                      </p>
+                      <div className="space-y-1.5">
+                        {[...cotacaoDetalhe.fornecedores]
+                          .sort((a, b) => a.valor_total - b.valor_total)
+                          .map((f, i) => (
+                          <div key={f.id ?? i} className={`flex items-center gap-2 px-3 py-2 rounded-xl ${f.selecionado ? 'bg-emerald-100 border border-emerald-200' : 'bg-white border border-slate-100'}`}>
+                            {f.selecionado && <Sparkles size={11} className="text-emerald-600 shrink-0" />}
+                            <div className="flex-1 min-w-0">
+                              <p className={`text-[11px] font-semibold truncate ${f.selecionado ? 'text-emerald-700' : 'text-slate-700'}`}>{f.fornecedor_nome}</p>
+                              {f.prazo_entrega_dias != null && (
+                                <p className="text-[10px] text-slate-400">Prazo: {f.prazo_entrega_dias}d</p>
+                              )}
+                            </div>
+                            <span className={`text-[11px] font-extrabold shrink-0 ${f.selecionado ? 'text-emerald-600' : 'text-slate-600'}`}>
+                              {fmt(f.valor_total)}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </>
+                  )}
+                </div>
+              )}
+
+              {/* Itens da requisição */}
+              {loadingDetalhe ? (
+                <div className="flex justify-center py-4">
+                  <div className="w-5 h-5 border-2 border-blue-400 border-t-transparent rounded-full animate-spin" />
+                </div>
+              ) : reqDetalhe?.itens && reqDetalhe.itens.length > 0 && (
+                <div className="bg-slate-50 rounded-2xl p-3.5">
+                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                    <Package size={10} /> Itens ({reqDetalhe.itens.length})
+                  </p>
+                  <div className="space-y-2">
+                    {reqDetalhe.itens.map((item, i) => (
+                      <div key={item.id ?? i} className="bg-white rounded-xl px-3 py-2.5 border border-slate-100">
+                        <p className="text-[11px] font-semibold text-slate-700">{item.descricao}</p>
+                        <div className="flex items-center gap-3 mt-1 text-[10px] text-slate-400">
+                          <span>{item.quantidade} {item.unidade}</span>
+                          {item.valor_unitario_estimado > 0 && (
+                            <>
+                              <span>×</span>
+                              <span>{fmt(item.valor_unitario_estimado)}</span>
+                              <span className="ml-auto font-semibold text-slate-600">
+                                {fmt(item.quantidade * item.valor_unitario_estimado)}
+                              </span>
+                            </>
+                          )}
+                        </div>
+                        {item.classe_financeira_descricao && (
+                          <p className="text-[10px] text-violet-500 mt-0.5">{item.classe_financeira_descricao}</p>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Esclarecimento pendente */}
+              {req?.esclarecimento_msg && (
+                <div className="bg-amber-50 border border-amber-200 rounded-2xl p-3.5">
+                  <p className="text-[10px] font-bold text-amber-600 uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
+                    <MessageSquare size={10} /> Esclarecimento solicitado
+                  </p>
+                  <p className="text-[11px] text-amber-800">{req.esclarecimento_msg}</p>
+                  {req.esclarecimento_por && (
+                    <p className="text-[10px] text-amber-500 mt-1">Por: {req.esclarecimento_por}</p>
+                  )}
+                </div>
+              )}
+
+              {/* Link para página completa */}
+              {req?.id && (
+                <a
+                  href={`/requisicoes/${req.id}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center justify-center gap-2 w-full py-3 rounded-2xl border border-blue-200 text-blue-600 text-sm font-semibold hover:bg-blue-50 transition"
+                >
+                  <ExternalLink size={14} /> Abrir página completa
+                </a>
+              )}
+
+              <div className="h-4" />
+            </div>
+          </div>
+        </div>
       )}
     </div>
   )

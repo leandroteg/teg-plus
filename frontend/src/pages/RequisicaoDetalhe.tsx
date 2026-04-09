@@ -4,12 +4,13 @@ import {
   ArrowLeft, Building, User, Calendar, Tag, Package,
   CheckCircle, XCircle, MessageSquare, AlertTriangle,
   ChevronDown, ChevronUp, ShoppingCart, UserCog, ExternalLink,
-  FileText, Ban,
+  FileText, Ban, Send,
 } from 'lucide-react'
-import { useRequisicao } from '../hooks/useRequisicoes'
+import { useRequisicao, useReenviarEsclarecimento } from '../hooks/useRequisicoes'
 import { useDecisaoRequisicao } from '../hooks/useAprovacoes'
 import { useCotacaoByRequisicao } from '../hooks/useCotacoes'
 import { useEmitirPedido, useCancelarRequisicao } from '../hooks/usePedidos'
+import { useEditorLock } from '../hooks/useEditorLock'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../services/supabase'
 import StatusBadge from '../components/StatusBadge'
@@ -35,6 +36,7 @@ export default function RequisicaoDetalhe() {
   const navigate = useNavigate()
   const { data: req, isLoading, error } = useRequisicao(id)
   const decisaoMutation = useDecisaoRequisicao()
+  const reenviarMutation = useReenviarEsclarecimento()
   const emitirPedidoMutation = useEmitirPedido()
   const cancelarMutation = useCancelarRequisicao()
   const { isAdmin, atLeast, perfil, canTechnicalApprove } = useAuth()
@@ -45,6 +47,7 @@ export default function RequisicaoDetalhe() {
 
   const [observacao, setObservacao] = useState('')
   const [showObservacao, setShowObservacao] = useState(false)
+  const [respostaEsclarecimento, setRespostaEsclarecimento] = useState('')
   const [showItens, setShowItens] = useState(true)
   const [pendingAction, setPendingAction] = useState<'aprovada' | 'rejeitada' | 'esclarecimento' | null>(null)
   const [pedidoToast, setPedidoToast] = useState<{ type: 'success' | 'error'; msg: string } | null>(null)
@@ -58,9 +61,22 @@ export default function RequisicaoDetalhe() {
     && req.status === 'cotacao_enviada'
     && isAdmin
   const canDecide = canDecideTechnical || canDecideFinancial
+  const canEmitPedido = !!req
+    && atLeast('comprador')
+    && req.status === 'cotacao_aprovada'
+  const canMutateComprasReq = canDecide || canEmitPedido || req?.status === 'em_esclarecimento'
+  const { isLocked, blockedByName } = useEditorLock({
+    resourceType: 'cmp_requisicao',
+    resourceId: id,
+    enabled: Boolean(id) && canMutateComprasReq,
+  })
 
   const handleDecisao = (decisao: 'aprovada' | 'rejeitada' | 'esclarecimento') => {
     if (!req || !perfil) return
+    if (isLocked) {
+      setPedidoToast({ type: 'error', msg: `${blockedByName ?? 'Outro usuário'} está editando esta requisição.` })
+      return
+    }
     if (decisao === 'esclarecimento' && !observacao.trim()) {
       setShowObservacao(true)
       setPendingAction('esclarecimento')
@@ -138,9 +154,23 @@ export default function RequisicaoDetalhe() {
         <FluxoTimeline status={req.status} />
       </div>
 
+      {isLocked && (
+        <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 flex items-start gap-2">
+          <AlertTriangle size={16} className="text-amber-600 flex-shrink-0 mt-0.5" />
+          <div>
+            <p className="text-sm font-bold text-amber-700">
+              {blockedByName ?? 'Outro usuário'} está editando
+            </p>
+            <p className="text-xs text-amber-600 mt-1">
+              Esta requisição fica bloqueada para evitar conflito até a finalização da edição.
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* Alerta Esclarecimento */}
       {req.status === 'em_esclarecimento' && (
-        <div className="bg-amber-50 border-2 border-amber-200 rounded-2xl p-4 space-y-2">
+        <div className="bg-amber-50 border-2 border-amber-200 rounded-2xl p-4 space-y-3">
           <div className="flex items-center gap-2">
             <AlertTriangle size={16} className="text-amber-600 flex-shrink-0" />
             <span className="text-sm font-bold text-amber-700">Esclarecimento Solicitado</span>
@@ -150,6 +180,53 @@ export default function RequisicaoDetalhe() {
             <span>Por: {req.esclarecimento_por}</span>
             {req.esclarecimento_em && <span>· {fmtData(req.esclarecimento_em)}</span>}
           </div>
+
+          {/* Reenviar para aprovador */}
+          {!reenviarMutation.isSuccess && (
+            <div className="pt-2 border-t border-amber-200 space-y-2">
+              <p className="text-xs font-semibold text-amber-700">Responder e reenviar ao aprovador:</p>
+              <textarea
+                rows={2}
+                value={respostaEsclarecimento}
+                disabled={isLocked}
+                onChange={e => setRespostaEsclarecimento(e.target.value)}
+                placeholder="Descreva o esclarecimento prestado (opcional)..."
+                className="w-full border border-amber-300 bg-white rounded-xl px-3 py-2 text-sm
+                  focus:ring-2 focus:ring-amber-400 outline-none placeholder-amber-300"
+              />
+              <button
+                disabled={reenviarMutation.isPending || isLocked}
+                onClick={() => {
+                  if (!perfil) return
+                  reenviarMutation.mutate({
+                    requisicaoId: req.id,
+                    requisicaoNumero: req.numero,
+                    alcadaNivel: req.alcada_nivel,
+                    solicitanteNome: perfil.nome,
+                    resposta: respostaEsclarecimento.trim() || undefined,
+                  })
+                }}
+                className="w-full flex items-center justify-center gap-2 py-3 rounded-xl
+                  bg-amber-500 text-white text-sm font-bold hover:bg-amber-600
+                  active:scale-[0.98] transition-all disabled:opacity-50"
+              >
+                {reenviarMutation.isPending
+                  ? <div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+                  : <Send size={15} />}
+                Reenviar para Aprovador
+              </button>
+              {reenviarMutation.isError && (
+                <p className="text-xs text-red-600">Erro ao reenviar. Tente novamente.</p>
+              )}
+            </div>
+          )}
+
+          {reenviarMutation.isSuccess && (
+            <div className="pt-2 border-t border-amber-200 flex items-center gap-2 text-sm font-semibold text-emerald-700">
+              <CheckCircle size={16} className="text-emerald-500" />
+              Reenviado ao aprovador com sucesso
+            </div>
+          )}
         </div>
       )}
 
@@ -325,7 +402,7 @@ export default function RequisicaoDetalhe() {
       )}
 
       {/* ── Emitir Pedido / Cancelar — cotação aprovada ───────────────────────── */}
-      {atLeast('comprador') && req.status === 'cotacao_aprovada' && (
+      {canEmitPedido && (
         <div className="bg-white rounded-2xl border-2 border-teal-200 shadow-sm overflow-hidden">
           <div className="bg-teal-50 px-4 py-3 border-b border-teal-100">
             <p className="text-xs font-bold text-teal-700 uppercase tracking-wider flex items-center gap-2">
@@ -366,7 +443,7 @@ export default function RequisicaoDetalhe() {
             {!emitirPedidoMutation.isSuccess && !cancelarMutation.isSuccess && (
               <div className="grid grid-cols-2 gap-3">
                 <button
-                  disabled={cancelarMutation.isPending || emitirPedidoMutation.isPending}
+                  disabled={cancelarMutation.isPending || emitirPedidoMutation.isPending || isLocked}
                   onClick={() => {
                     if (!confirm('Cancelar esta requisição? Esta ação não pode ser desfeita.')) return
                     cancelarMutation.mutate(req.id, {
@@ -391,7 +468,7 @@ export default function RequisicaoDetalhe() {
                 </button>
 
                 <button
-                  disabled={emitirPedidoMutation.isPending || cancelarMutation.isPending}
+                  disabled={emitirPedidoMutation.isPending || cancelarMutation.isPending || isLocked}
                   onClick={() => setShowEmitirModal(true)}
                   className="flex items-center justify-center gap-2 py-3.5 rounded-xl text-sm font-bold
                     text-white bg-teal-500 border-2 border-teal-500 hover:bg-teal-600 shadow-lg shadow-teal-500/20
@@ -498,6 +575,7 @@ export default function RequisicaoDetalhe() {
               {showObservacao && (
                 <textarea
                   rows={3}
+                  disabled={isLocked}
                   className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-300 outline-none"
                   placeholder={pendingAction === 'esclarecimento'
                     ? 'Descreva o que precisa ser esclarecido... (obrigatório)'
@@ -510,7 +588,7 @@ export default function RequisicaoDetalhe() {
               {/* Botões */}
               <div className="grid grid-cols-3 gap-2">
                 <button
-                  disabled={decisaoMutation.isPending}
+                  disabled={decisaoMutation.isPending || isLocked}
                   onClick={() => handleDecisao('rejeitada')}
                   className="flex items-center justify-center gap-1.5 py-3 rounded-xl text-xs font-bold
                     text-red-500 bg-red-50 border border-red-200 hover:bg-red-100 active:scale-[0.98]
@@ -522,7 +600,7 @@ export default function RequisicaoDetalhe() {
                   Rejeitar
                 </button>
                 <button
-                  disabled={decisaoMutation.isPending}
+                  disabled={decisaoMutation.isPending || isLocked}
                   onClick={() => handleDecisao('esclarecimento')}
                   className="flex items-center justify-center gap-1.5 py-3 rounded-xl text-xs font-bold
                     text-amber-600 bg-amber-50 border border-amber-200 hover:bg-amber-100 active:scale-[0.98]
@@ -534,7 +612,7 @@ export default function RequisicaoDetalhe() {
                   Esclarecer
                 </button>
                 <button
-                  disabled={decisaoMutation.isPending}
+                  disabled={decisaoMutation.isPending || isLocked}
                   onClick={() => handleDecisao('aprovada')}
                   className="flex items-center justify-center gap-1.5 py-3 rounded-xl text-xs font-bold
                     text-emerald-600 bg-emerald-50 border border-emerald-200 hover:bg-emerald-100 active:scale-[0.98]

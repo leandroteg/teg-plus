@@ -9,6 +9,7 @@ import { useCotacao, useFinalizarCotacao } from '../hooks/useCotacoes'
 import { useCategorias } from '../hooks/useCategorias'
 import { useEmitirPedido, useCancelarRequisicao } from '../hooks/usePedidos'
 import { useAuth } from '../contexts/AuthContext'
+import { useEditorLock } from '../hooks/useEditorLock'
 import type { Cotacao, ItemPreco } from '../types'
 import CotacaoComparativo from '../components/CotacaoComparativo'
 import FluxoTimeline from '../components/FluxoTimeline'
@@ -580,6 +581,11 @@ export default function CotacaoForm() {
   const { data: cotacao, isLoading } = useCotacao(id)
   const { data: categorias = [] } = useCategorias()
   const submitMutation = useFinalizarCotacao()
+  const { isLocked, blockedByName } = useEditorLock({
+    resourceType: 'cmp_requisicao',
+    resourceId: cotacao?.requisicao_id ?? id,
+    enabled: Boolean(cotacao?.requisicao_id ?? id),
+  })
 
   const [fornecedores, setFornecedores] = useState<FornecedorForm[]>([
     emptyFornecedor(), emptyFornecedor(),
@@ -830,6 +836,11 @@ export default function CotacaoForm() {
     setToast(null)
     setTriedSubmit(true)
 
+    if (isLocked) {
+      setToast({ type: 'error', msg: `${blockedByName ?? 'Outro usuário'} está editando esta cotação no momento.` })
+      return
+    }
+
     // Validações com feedback explícito
     if (!id || !cotacao) {
       setToast({ type: 'error', msg: 'Cotação não encontrada. Recarregue a página.' })
@@ -893,12 +904,27 @@ export default function CotacaoForm() {
   // ── Formulário de nova cotação ────────────────────────────────────────────
   return (
     <form onSubmit={submit} noValidate className="space-y-4">
+      {isLocked && (
+        <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 flex items-start gap-3">
+          <AlertTriangle size={18} className="text-amber-600 mt-0.5 flex-shrink-0" />
+          <div>
+            <p className="text-sm font-bold text-amber-700">
+              {blockedByName ?? 'Outro usuário'} está editando
+            </p>
+            <p className="text-xs text-amber-600 mt-1">
+              Esta cotação está bloqueada temporariamente para evitar conflito de alterações.
+            </p>
+          </div>
+        </div>
+      )}
       <div className="flex items-center gap-2">
         <button type="button" onClick={() => nav('/cotacoes')} className="p-1">
           <ChevronLeft size={18} className="text-slate-500" />
         </button>
         <h2 className="text-lg font-extrabold text-slate-800">Inserir Cotação</h2>
       </div>
+
+      <fieldset disabled={isLocked} className={isLocked ? 'space-y-4 opacity-60' : 'space-y-4'}>
 
       {/* RC Info + Timeline */}
       {cotacao?.requisicao && (
@@ -943,7 +969,7 @@ export default function CotacaoForm() {
       {/* Upload inteligente com IA */}
       <UploadCotacao
         onParsed={handleAiParsed}
-        disabled={cotacao?.status === 'concluida'}
+        disabled={cotacao?.status === 'concluida' || isLocked}
         cotacaoId={id}
         requisicaoId={cotacao?.requisicao_id}
       />
@@ -1262,9 +1288,9 @@ export default function CotacaoForm() {
       {/* Submit */}
       <button
         type="submit"
-        disabled={submitMutation.isPending || !canSubmit}
+        disabled={submitMutation.isPending || !canSubmit || isLocked}
         className={`w-full rounded-2xl py-4 font-extrabold flex items-center justify-center gap-2 shadow-xl active:scale-[0.98] transition-all ${
-          canSubmit && !submitMutation.isPending
+          canSubmit && !submitMutation.isPending && !isLocked
             ? 'bg-teal-500 text-white shadow-teal-500/25 hover:bg-teal-600'
             : 'bg-slate-300 text-slate-500 shadow-slate-200/25 cursor-not-allowed'
         }`}
@@ -1288,6 +1314,7 @@ export default function CotacaoForm() {
           }
         </p>
       )}
+      </fieldset>
     </form>
   )
 }

@@ -11,6 +11,7 @@ import { useRequisicoes } from '../hooks/useRequisicoes'
 import { useLookupObras } from '../hooks/useLookups'
 import { useAprovacoesPendentes, useDecisaoRequisicao } from '../hooks/useAprovacoes'
 import { useEmitirPedido, useCancelarRequisicao } from '../hooks/usePedidos'
+import { useEditorLock } from '../hooks/useEditorLock'
 import { useAuth } from '../contexts/AuthContext'
 import StatusBadge from '../components/StatusBadge'
 import FluxoTimeline from '../components/FluxoTimeline'
@@ -376,6 +377,12 @@ export default function ListaRequisicoes() {
   const [viewMode, setViewMode] = useState<ViewMode>('cards')
   const [detail, setDetail] = useState<Requisicao | null>(null)
   const [emitirRequisicao, setEmitirRequisicao] = useState<Requisicao | null>(null)
+  const detailReqId = detail?.id
+  const { isLocked: isDetailLocked, blockedByName: detailBlockedByName } = useEditorLock({
+    resourceType: 'cmp_requisicao',
+    resourceId: detailReqId,
+    enabled: Boolean(detailReqId),
+  })
 
   const obras = useLookupObras()
   const { data: requisicoes = [], isLoading } = useRequisicoes()
@@ -653,8 +660,22 @@ export default function ListaRequisicoes() {
             || (detail.status === 'cotacao_enviada' && isAdmin)
           }
           isProcessing={decisaoMutation.isPending}
-          onDecisao={(decisao, obs) => handleDecisao(detail.id, detail.numero, detail.alcada_nivel, decisao, obs, detail.categoria, detail.status)}
-          onEmitir={() => setEmitirRequisicao(detail)}
+          onDecisao={(decisao, obs) => {
+            if (isDetailLocked) {
+              setToast({ type: 'error', msg: `${detailBlockedByName ?? 'Outro usuário'} está editando ${detail.numero}` })
+              setTimeout(() => setToast(null), 5000)
+              return
+            }
+            handleDecisao(detail.id, detail.numero, detail.alcada_nivel, decisao, obs, detail.categoria, detail.status)
+          }}
+          onEmitir={() => {
+            if (isDetailLocked) {
+              setToast({ type: 'error', msg: `${detailBlockedByName ?? 'Outro usuário'} está editando ${detail.numero}` })
+              setTimeout(() => setToast(null), 5000)
+              return
+            }
+            setEmitirRequisicao(detail)
+          }}
           onCancelar={() => {
             if (!confirm('Cancelar esta requisição?')) return
             cancelarMutation.mutate(detail.id, {
