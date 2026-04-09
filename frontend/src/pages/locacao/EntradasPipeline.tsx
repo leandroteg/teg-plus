@@ -4,10 +4,11 @@ import {
   Building2, X, Search, ArrowUp, ArrowDown, LayoutList, LayoutGrid,
   MapPin, Calendar, User, ClipboardCheck, FileText, CheckCircle2, Landmark,
 } from 'lucide-react'
-import { useEntradas, useAtualizarStatusEntrada } from '../../hooks/useLocacao'
+import { useEntradas, useAtualizarStatusEntrada, useVistorias } from '../../hooks/useLocacao'
 import { useTheme } from '../../contexts/ThemeContext'
 import type { LocEntrada, StatusEntrada } from '../../types/locacao'
 import { ENTRADA_PIPELINE_STAGES } from '../../types/locacao'
+import VistoriaModal from '../../components/locacao/VistoriaModal'
 
 // ── Accent maps ──────────────────────────────────────────────────────────────
 type AccentSet = { bg: string; bgActive: string; text: string; textActive: string; dot: string; badge: string; border: string }
@@ -39,9 +40,10 @@ const SORT_OPTIONS: { field: SortField; label: string }[] = [
 const fmtDate = (d?: string) => d ? new Date(d + 'T12:00:00').toLocaleDateString('pt-BR') : '—'
 
 // ── Detail Modal ─────────────────────────────────────────────────────────────
-function EntradaDetailModal({ entrada, onClose, onAction, isDark }: {
+function EntradaDetailModal({ entrada, onClose, onAction, isDark, onOpenVistoria }: {
   entrada: LocEntrada; onClose: () => void
   onAction: (action: string, e: LocEntrada) => void; isDark: boolean
+  onOpenVistoria: (e: LocEntrada) => void
 }) {
   const bg = isDark ? 'bg-[#1e293b]' : 'bg-white'
   const cardBg = isDark ? 'bg-white/[0.04]' : 'bg-slate-50'
@@ -49,6 +51,17 @@ function EntradaDetailModal({ entrada, onClose, onAction, isDark }: {
   const txtMain = isDark ? 'text-white' : 'text-slate-800'
   const accent = isDark ? STATUS_ACCENT_DARK[entrada.status] : STATUS_ACCENT[entrada.status]
   const stage = ENTRADA_PIPELINE_STAGES.find(s => s.key === entrada.status)
+
+  // Data limite vistoria = data_prevista_inicio - 7 dias
+  const dataLimiteVistoria = entrada.data_prevista_inicio
+    ? new Date(new Date(entrada.data_prevista_inicio + 'T12:00:00').getTime() - 7 * 24 * 60 * 60 * 1000)
+    : null
+  const diasParaLimite = dataLimiteVistoria ? Math.ceil((dataLimiteVistoria.getTime() - Date.now()) / (24 * 60 * 60 * 1000)) : null
+
+  // Vistoria info
+  const { data: vistorias = [] } = useVistorias({ imovel_id: entrada.imovel_id })
+  const vistoria = vistorias.find(v => v.entrada_id === entrada.id && v.tipo === 'entrada')
+  const itensPreenchidos = vistoria?.itens?.filter(it => it.estado_entrada).length || 0
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-sm p-4" onClick={onClose}>
@@ -120,6 +133,45 @@ function EntradaDetailModal({ entrada, onClose, onAction, isDark }: {
             </div>
           </div>
 
+          {/* Data limite vistoria (pendente) */}
+          {entrada.status === 'pendente' && dataLimiteVistoria && (
+            <div className={`rounded-xl p-3 border flex items-center gap-3 ${
+              diasParaLimite != null && diasParaLimite <= 3
+                ? isDark ? 'bg-red-500/10 border-red-500/20' : 'bg-red-50 border-red-200'
+                : diasParaLimite != null && diasParaLimite <= 7
+                ? isDark ? 'bg-amber-500/10 border-amber-500/20' : 'bg-amber-50 border-amber-200'
+                : isDark ? 'bg-white/[0.03] border-white/[0.06]' : 'bg-slate-50 border-slate-100'
+            }`}>
+              <Calendar size={16} className={
+                diasParaLimite != null && diasParaLimite <= 3 ? 'text-red-500'
+                : diasParaLimite != null && diasParaLimite <= 7 ? 'text-amber-500'
+                : txtMuted
+              } />
+              <div>
+                <p className={`text-xs font-semibold ${txtMain}`}>Data limite para vistoria</p>
+                <p className={`text-xs ${
+                  diasParaLimite != null && diasParaLimite <= 3 ? 'text-red-500 font-bold'
+                  : diasParaLimite != null && diasParaLimite <= 7 ? 'text-amber-600 font-semibold'
+                  : txtMuted
+                }`}>
+                  {fmtDate(dataLimiteVistoria.toISOString().split('T')[0])}
+                  {diasParaLimite != null && ` (${diasParaLimite <= 0 ? 'ATRASADO' : `${diasParaLimite}d restantes`})`}
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* PDF da vistoria (se disponível) */}
+          {vistoria?.pdf_url && (
+            <a href={vistoria.pdf_url} target="_blank" rel="noreferrer"
+              className={`flex items-center gap-2 rounded-xl p-3 border text-xs font-semibold transition-colors ${
+                isDark ? 'border-indigo-500/30 text-indigo-400 hover:bg-indigo-500/10 bg-indigo-500/5'
+                       : 'border-indigo-200 text-indigo-600 hover:bg-indigo-50 bg-indigo-50/50'
+              }`}>
+              <FileText size={14} /> Ver PDF da Vistoria
+            </a>
+          )}
+
           {/* Ações */}
           <div className="flex gap-2 pt-1">
             <button onClick={onClose} className={`flex-1 py-3 rounded-xl border text-sm font-semibold transition-all ${isDark ? 'border-white/[0.06] text-slate-300' : 'border-slate-200 text-slate-600 hover:bg-slate-50'}`}>Fechar</button>
@@ -134,8 +186,9 @@ function EntradaDetailModal({ entrada, onClose, onAction, isDark }: {
               </>
             )}
             {entrada.status === 'aguardando_vistoria' && (
-              <button onClick={() => onAction('vistoria_concluida', entrada)} className="flex-1 py-3 rounded-xl bg-indigo-600 text-white text-sm font-bold hover:bg-indigo-700 flex items-center justify-center gap-2">
-                <CheckCircle2 size={15} /> Vistoria Concluída
+              <button onClick={() => onOpenVistoria(entrada)} className="flex-1 py-3 rounded-xl bg-indigo-600 text-white text-sm font-bold hover:bg-indigo-700 flex items-center justify-center gap-2">
+                <ClipboardCheck size={15} />
+                {itensPreenchidos > 0 ? `Continuar Vistoria (${itensPreenchidos}/64)` : 'Iniciar Vistoria'}
               </button>
             )}
             {entrada.status === 'aguardando_assinatura' && (
@@ -195,6 +248,7 @@ export default function EntradasPipeline() {
 
   const [activeTab, setActiveTab] = useState<StatusEntrada>(() => (searchParams.get('tab') as StatusEntrada) || 'pendente')
   const [detail, setDetail] = useState<LocEntrada | null>(null)
+  const [vistoriaEntrada, setVistoriaEntrada] = useState<LocEntrada | null>(null)
   const [busca, setBusca] = useState('')
   const [sortField, setSortField] = useState<SortField>('data')
   const [sortDir, setSortDir] = useState<SortDir>('desc')
@@ -301,7 +355,9 @@ export default function EntradasPipeline() {
         )}
       </div>
 
-      {detail && <EntradaDetailModal entrada={detail} onClose={() => setDetail(null)} onAction={handleAction} isDark={isDark} />}
+      {detail && <EntradaDetailModal entrada={detail} onClose={() => setDetail(null)} onAction={handleAction} isDark={isDark}
+        onOpenVistoria={(e) => { setDetail(null); setVistoriaEntrada(e) }} />}
+      {vistoriaEntrada && <VistoriaModal entrada={vistoriaEntrada} onClose={() => setVistoriaEntrada(null)} />}
     </div>
   )
 }
