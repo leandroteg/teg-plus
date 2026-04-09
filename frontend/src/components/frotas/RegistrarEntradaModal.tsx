@@ -86,8 +86,8 @@ export default function RegistrarEntradaModal({ onClose }: Props) {
               <LogIn size={16} className="text-white" />
             </div>
             <div>
-              <h3 className={`text-base font-bold ${txt}`}>Registrar Retorno</h3>
-              <p className={`text-[11px] ${txtMuted}`}>Selecione o veículo que está retornando à frota</p>
+              <h3 className={`text-base font-bold ${txt}`}>Registrar Devolução</h3>
+              <p className={`text-[11px] ${txtMuted}`}>Selecione o veículo que está sendo devolvido</p>
             </div>
           </div>
           <button onClick={onClose} className="text-slate-400 hover:text-slate-600"><X size={18} /></button>
@@ -194,7 +194,7 @@ export default function RegistrarEntradaModal({ onClose }: Props) {
                 className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold bg-rose-500 text-white hover:bg-rose-600 shadow-sm shadow-rose-500/30 transition-all ${salvar.isPending ? 'opacity-50' : ''}`}
               >
                 {salvar.isPending ? <Loader2 size={14} className="animate-spin" /> : <LogIn size={14} />}
-                Registrar Retorno
+                Registrar Devolução
               </button>
             </div>
           </div>

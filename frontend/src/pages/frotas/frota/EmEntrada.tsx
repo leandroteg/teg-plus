@@ -41,7 +41,7 @@ export default function EmEntrada() {
               : 'bg-rose-500/90 text-white hover:bg-rose-500 shadow-sm shadow-rose-500/20'
           }`}
         >
-          <Plus size={13} /> Registrar Entrada
+          <Plus size={13} /> Registrar Devolução
         </button>
       </div>
 
@@ -76,7 +76,7 @@ export default function EmEntrada() {
                 : 'bg-rose-500/90 text-white hover:bg-rose-500 shadow-sm shadow-rose-500/20'
             }`}
           >
-            <Plus size={13} /> Registrar Entrada
+            <Plus size={13} /> Registrar Devolução
           </button>
         </div>
       )}
