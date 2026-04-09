@@ -139,33 +139,36 @@ export default function VistoriaModal({ entrada, onClose }: Props) {
     const pendingFotos = offline.data.fotos
     if (!pendingFotos.length) return
 
-    await Promise.allSettled(
-      pendingFotos.map(async (foto) => {
-        try {
-          const blob = dataUrlToBlob(foto.dataUrl)
-          const ext = blob.type.includes('png') ? 'png' : 'jpg'
-          const path = `${vid}/${foto.ambiente}/${foto.timestamp}.${ext}`
+    for (const foto of pendingFotos) {
+      try {
+        const blob = dataUrlToBlob(foto.dataUrl)
+        const ext = blob.type.includes('png') ? 'png' : 'jpg'
+        const path = `${vid}/${foto.ambiente}/${foto.timestamp}.${ext}`
 
-          const { error: upErr } = await supabase.storage
-            .from('vistoria-fotos')
-            .upload(path, blob, { upsert: false, contentType: blob.type })
-          if (upErr) throw upErr
+        console.log(`[VistoriaModal] Uploading foto: ${path} (${(blob.size / 1024).toFixed(0)}KB)`)
 
-          const { data: { publicUrl } } = supabase.storage
-            .from('vistoria-fotos')
-            .getPublicUrl(path)
+        const { error: upErr } = await supabase.storage
+          .from('vistoria-fotos')
+          .upload(path, blob, { upsert: true, contentType: blob.type })
+        if (upErr) { console.error('[VistoriaModal] Storage error:', upErr); continue }
 
-          await supabase.from('loc_vistoria_fotos').insert({
-            vistoria_id: vid,
-            url: publicUrl,
-            descricao: `${foto.ambiente}|${foto.item}`,
-            tipo: 'entrada',
-          })
-        } catch (err) {
-          console.error('[VistoriaModal] Falha no upload de foto offline:', err)
-        }
-      }),
-    )
+        const { data: { publicUrl } } = supabase.storage
+          .from('vistoria-fotos')
+          .getPublicUrl(path)
+
+        const { error: dbErr } = await supabase.from('loc_vistoria_fotos').insert({
+          vistoria_id: vid,
+          url: publicUrl,
+          descricao: `${foto.ambiente}|${foto.item}`,
+          tipo: 'entrada',
+        })
+        if (dbErr) { console.error('[VistoriaModal] DB insert error:', dbErr); continue }
+
+        console.log(`[VistoriaModal] Foto uploaded OK: ${path}`)
+      } catch (err) {
+        console.error('[VistoriaModal] Unexpected foto upload error:', err)
+      }
+    }
   }, [offline.data.fotos])
 
   const doSave = useCallback(async (saveItens: ChecklistItem[], saveObs: string) => {
