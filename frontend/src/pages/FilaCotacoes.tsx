@@ -62,6 +62,15 @@ function diasEmAberto(createdAt: string) {
   return Math.floor((Date.now() - new Date(createdAt).getTime()) / 86_400_000)
 }
 
+function shouldShowInCotacoes(cot: Cotacao) {
+  const reqStatus = cot.requisicao?.status
+
+  if (cot.status === 'pendente' || cot.status === 'em_andamento') return true
+
+  // Cotações concluídas ficam nesta tela apenas enquanto aguardam decisão financeira.
+  return cot.status === 'concluida' && reqStatus === 'cotacao_enviada'
+}
+
 function getDescricaoPrincipal(cot: Cotacao) {
   const req = cot.requisicao
   const justificativa = (req?.justificativa ?? '').trim()
@@ -353,17 +362,8 @@ export default function FilaCotacoes() {
     const map = new Map<PipelineTab, Cotacao[]>()
     for (const stage of PIPELINE_STAGES) map.set(stage.status, [])
 
-    // Filter out finalized items
-    const statusesFinalizados = ['pedido_emitido', 'em_entrega', 'entregue', 'comprada', 'cancelada', 'aguardando_pgto', 'pago']
-
     for (const cot of cotacoes) {
-      const reqStatus = cot.requisicao?.status
-
-      // "Em Aprovação" mostra itens aguardando decisão financeira OU prontos para emitir pedido.
-      if (cot.status === 'concluida' && reqStatus && reqStatus !== 'cotacao_enviada' && reqStatus !== 'cotacao_aprovada') continue
-
-      // Skip finalized
-      if (cot.status === 'concluida' && reqStatus && statusesFinalizados.includes(reqStatus)) continue
+      if (!shouldShowInCotacoes(cot)) continue
 
       for (const stage of PIPELINE_STAGES) {
         if (stage.cotStatuses.includes(cot.status)) {

@@ -263,7 +263,7 @@ const PIPELINE_STAGES: {
 }[] = [
   {
     key: 'pendente',
-    label: 'Pendente',
+    label: 'Pedidos Aprovados',
     icon: ClipboardList,
     matchFn: p => isPendingEmission(p),
   },
@@ -321,7 +321,7 @@ const statusConfig: Record<string, { bg: string; text: string; label: string; bg
 const pendingEmissionStatus = {
   bg: 'bg-amber-100',
   text: 'text-amber-700',
-  label: 'Aguardando Emissao',
+  label: 'Pedido Aprovado',
   bgDark: 'bg-amber-900/40',
   textDark: 'text-amber-300',
 }
