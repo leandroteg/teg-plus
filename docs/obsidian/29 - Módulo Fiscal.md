@@ -6,7 +6,7 @@ status: ativo
 tags: [fiscal, nfe, emissao, solicitacao, nota-fiscal]
 criado: 2026-03-12
 atualizado: 2026-03-12
-relacionado: ["[[20 - Módulo Financeiro]]", "[[23 - Módulo Logística e Transportes]]", "[[03 - Páginas e Rotas]]"]
+relacionado: ["[[PILAR - Backoffice]]", "[[20 - Módulo Financeiro]]", "[[23 - Módulo Logística e Transportes]]", "[[03 - Páginas e Rotas]]"]
 ---
 
 # Módulo Fiscal

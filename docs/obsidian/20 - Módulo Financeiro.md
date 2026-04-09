@@ -5,7 +5,7 @@ status: ativo
 tags: [financeiro, contas-a-pagar, contas-a-receber, fornecedores, omie, aprovacao]
 criado: 2026-03-03
 atualizado: 2026-03-10
-relacionado: ["[[19 - Integração Omie]]", "[[21 - Fluxo Pagamento]]", "[[07 - Schema Database]]", "[[11 - Fluxo Requisição]]", "[[12 - Fluxo Aprovação]]", "[[50 - Fluxos Inter-Módulos]]"]
+relacionado: ["[[PILAR - Backoffice]]", "[[19 - Integração Omie]]", "[[21 - Fluxo Pagamento]]", "[[07 - Schema Database]]", "[[11 - Fluxo Requisição]]", "[[12 - Fluxo Aprovação]]", "[[50 - Fluxos Inter-Módulos]]"]
 ---
 
 # Módulo Financeiro — TEG+

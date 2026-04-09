@@ -4,7 +4,7 @@ type: regra-de-negócio
 status: ativo
 tags: [compradores, categorias, compras, regras]
 criado: 2026-03-02
-relacionado: ["[[11 - Fluxo Requisição]]", "[[07 - Schema Database]]", "[[13 - Alçadas]]"]
+relacionado: ["[[PILAR - Suprimentos]]", "[[11 - Fluxo Requisição]]", "[[07 - Schema Database]]", "[[13 - Alçadas]]"]
 ---
 
 # Compradores e Categorias — TEG+ ERP

@@ -6,7 +6,7 @@ status: ativo
 tags: [logistica, transportes, nfe, rastreamento, expedicao, recebimento]
 criado: 2026-03-03
 atualizado: 2026-03-12
-relacionado: ["[[50 - Fluxos Inter-Módulos]]"]
+relacionado: ["[[PILAR - Suprimentos]]", "[[50 - Fluxos Inter-Módulos]]"]
 ---
 
 # Módulo Logística e Transportes

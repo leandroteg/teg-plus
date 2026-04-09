@@ -6,7 +6,7 @@ status: ativo
 tags: [pmo, egp, portfolio, eap, cronograma, medicoes, gestao-projetos]
 criado: 2026-03-12
 atualizado: 2026-03-12
-relacionado: ["[[27 - Módulo Contratos Gestão]]", "[[32 - Módulo Obras]]", "[[30 - Módulo Controladoria]]", "[[03 - Páginas e Rotas]]"]
+relacionado: ["[[PILAR - Projetos]]", "[[27 - Módulo Contratos Gestão]]", "[[32 - Módulo Obras]]", "[[30 - Módulo Controladoria]]", "[[03 - Páginas e Rotas]]"]
 ---
 
 # Módulo PMO/EGP — Escritório de Gestão de Projetos

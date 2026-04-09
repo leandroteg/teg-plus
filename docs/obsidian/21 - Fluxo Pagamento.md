@@ -5,7 +5,7 @@ status: ativo
 tags: [pagamento, compras, financeiro, pedido, anexos, trigger]
 criado: 2026-03-03
 atualizado: 2026-03-03
-relacionado: ["[[11 - Fluxo Requisição]]", "[[12 - Fluxo Aprovação]]", "[[20 - Módulo Financeiro]]", "[[07 - Schema Database]]", "[[08 - Migrações SQL]]"]
+relacionado: ["[[PILAR - Backoffice]]", "[[11 - Fluxo Requisição]]", "[[12 - Fluxo Aprovação]]", "[[20 - Módulo Financeiro]]", "[[07 - Schema Database]]", "[[08 - Migrações SQL]]"]
 ---
 
 # Fluxo de Pagamento — Compras → Financeiro

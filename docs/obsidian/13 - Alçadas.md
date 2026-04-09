@@ -4,7 +4,7 @@ type: regra-de-negócio
 status: ativo
 tags: [alçadas, aprovação, limites, financeiro, regras]
 criado: 2026-03-02
-relacionado: ["[[12 - Fluxo Aprovação]]", "[[07 - Schema Database]]", "[[09 - Auth Sistema]]"]
+relacionado: ["[[PILAR - Suprimentos]]", "[[12 - Fluxo Aprovação]]", "[[07 - Schema Database]]", "[[09 - Auth Sistema]]"]
 ---
 
 # Alçadas de Aprovação — TEG+ ERP

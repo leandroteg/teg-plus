@@ -6,7 +6,7 @@ status: planejado
 tags: [ssma, seguranca, saude, meio-ambiente, nr, epi, dds]
 criado: 2026-03-12
 atualizado: 2026-03-12
-relacionado: ["[[32 - Módulo Obras]]", "[[17 - Roadmap]]", "[[03 - Páginas e Rotas]]"]
+relacionado: ["[[PILAR - Projetos]]", "[[32 - Módulo Obras]]", "[[17 - Roadmap]]", "[[03 - Páginas e Rotas]]"]
 ---
 
 # Módulo SSMA — Segurança, Saúde e Meio Ambiente
