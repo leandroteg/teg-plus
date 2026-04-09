@@ -515,6 +515,10 @@ export interface NovaSolicitacaoPayload {
   contraparte_cnpj?: string
   contraparte_telefone?: string
   contraparte_email?: string
+  contraparte_endereco?: string
+  contraparte_representante_nome?: string
+  contraparte_representante_cpf?: string
+  contraparte_representante_cargo?: string
   contraparte_id?: string
   fornecedor_cadastrado?: string
   contrato_vigente_fornecedor?: string
@@ -527,6 +531,8 @@ export interface NovaSolicitacaoPayload {
   descricao_escopo?: string
   justificativa?: string
   valor_estimado?: number
+  valor_mensal?: number
+  recorrente?: boolean
   forma_pagamento?: string
   data_inicio_prevista?: string
   data_fim_prevista?: string
