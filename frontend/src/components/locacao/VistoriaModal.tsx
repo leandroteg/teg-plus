@@ -14,8 +14,9 @@ import {
   useUploadVistoriaFoto, useVistoriaFotos, useVistorias, useAtualizarStatusEntrada,
 } from '../../hooks/useLocacao'
 import { useOnlineStatus } from '../../hooks/useOnlineStatus'
-import { useVistoriaOffline } from '../../hooks/useVistoriaOffline'
+import { useVistoriaOffline, dataUrlToBlob } from '../../hooks/useVistoriaOffline'
 import type { LocEntrada, LocVistoria, StatusEntrada } from '../../types/locacao'
+import { supabase } from '../../services/supabase'
 
 // ── Mobile Detection ─────────────────────────────────────────────────────────
 
@@ -133,6 +134,40 @@ export default function VistoriaModal({ entrada, onClose }: Props) {
     uploadFoto.mutate({ vistoriaId, file, descricao: `${ambiente}|${item}`, tipo: 'entrada' })
   }, [vistoriaId, uploadFoto])
 
+  /** Upload all offline photos (base64) to Supabase before clearing localStorage */
+  const uploadOfflineFotos = useCallback(async (vid: string) => {
+    const pendingFotos = offline.data.fotos
+    if (!pendingFotos.length) return
+
+    await Promise.allSettled(
+      pendingFotos.map(async (foto) => {
+        try {
+          const blob = dataUrlToBlob(foto.dataUrl)
+          const ext = blob.type.includes('png') ? 'png' : 'jpg'
+          const path = `${vid}/${foto.ambiente}/${foto.timestamp}.${ext}`
+
+          const { error: upErr } = await supabase.storage
+            .from('vistoria-fotos')
+            .upload(path, blob, { upsert: false, contentType: blob.type })
+          if (upErr) throw upErr
+
+          const { data: { publicUrl } } = supabase.storage
+            .from('vistoria-fotos')
+            .getPublicUrl(path)
+
+          await supabase.from('loc_vistoria_fotos').insert({
+            vistoria_id: vid,
+            url: publicUrl,
+            descricao: `${foto.ambiente}|${foto.item}`,
+            tipo: 'entrada',
+          })
+        } catch (err) {
+          console.error('[VistoriaModal] Falha no upload de foto offline:', err)
+        }
+      }),
+    )
+  }, [offline.data.fotos])
+
   const doSave = useCallback(async (saveItens: ChecklistItem[], saveObs: string) => {
     if (!vistoriaId) return
     await salvarItens.mutateAsync({
@@ -173,6 +208,8 @@ export default function VistoriaModal({ entrada, onClose }: Props) {
     try {
       if (isOnline && vistoriaId) {
         await doSave(itens, obsGerais)
+        // Upload any pending offline photos
+        await uploadOfflineFotos(vistoriaId)
         offline.markSynced()
       } else {
         offline.setItens(itens)
@@ -193,6 +230,8 @@ export default function VistoriaModal({ entrada, onClose }: Props) {
     setSaving(true)
     try {
       if (isOnline && vistoriaId) {
+        // Upload offline photos BEFORE concluding (so they persist in Supabase)
+        await uploadOfflineFotos(vistoriaId)
         await doConclude(itens, obsGerais)
         offline.markSynced()
         offline.clear()
