@@ -12,12 +12,13 @@ import {
 } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
 import { useOnlineStatus } from '../../hooks/useOnlineStatus'
-import { useVistoriaOffline, type OfflineFoto } from '../../hooks/useVistoriaOffline'
+import { useVistoriaOffline, dataUrlToBlob, type OfflineFoto } from '../../hooks/useVistoriaOffline'
 import {
   ITENS_POR_AMBIENTE, buildDefaultItens,
   type ChecklistItem,
 } from './VistoriaChecklist'
 import type { LocEntrada, EstadoItem } from '../../types/locacao'
+import { supabase } from '../../services/supabase'
 
 // ── Estado visual config ─────────────────────────────────────────────────────
 
@@ -198,12 +199,51 @@ export default function VistoriaMobile({ entrada, vistoriaId, onClose, onSave, o
     setOfflineFotos(prev => prev.filter(f => f.id !== id))
   }
 
+  // Upload offline photos to Supabase storage
+  const uploadOfflineFotos = async (vid: string) => {
+    const pendingFotos = offline.data.fotos
+    if (!pendingFotos.length) return
+
+    await Promise.allSettled(
+      pendingFotos.map(async (foto) => {
+        try {
+          const blob = dataUrlToBlob(foto.dataUrl)
+          const ext = blob.type.includes('png') ? 'png' : 'jpg'
+          const path = `${vid}/${foto.ambiente}/${foto.timestamp}.${ext}`
+
+          const { error: upErr } = await supabase.storage
+            .from('vistoria-fotos')
+            .upload(path, blob, { upsert: false, contentType: blob.type })
+          if (upErr) throw upErr
+
+          const { data: { publicUrl } } = supabase.storage
+            .from('vistoria-fotos')
+            .getPublicUrl(path)
+
+          await supabase.from('loc_vistoria_fotos').insert({
+            vistoria_id: vid,
+            url: publicUrl,
+            descricao: `${foto.ambiente}|${foto.item}`,
+            tipo: 'entrada',
+          })
+        } catch (err) {
+          console.error('[VistoriaMobile] Falha no upload de foto:', err)
+        }
+      }),
+    )
+  }
+
   // Save / Conclude
   const handleSave = async () => {
     setSaving(true)
     try {
-      if (isOnline) { await onSave(itens, obsGerais); offline.markSynced() }
-      else { offline.setStatus('rascunho') }
+      if (isOnline) {
+        await onSave(itens, obsGerais)
+        if (vistoriaId) await uploadOfflineFotos(vistoriaId)
+        offline.markSynced()
+      } else {
+        offline.setStatus('rascunho')
+      }
       onClose()
     } catch { offline.setStatus('rascunho'); onClose() }
     finally { setSaving(false) }
@@ -212,8 +252,15 @@ export default function VistoriaMobile({ entrada, vistoriaId, onClose, onSave, o
   const handleConcluir = async () => {
     setSaving(true)
     try {
-      if (isOnline) { await onConcluir(itens, obsGerais); offline.markSynced(); offline.clear() }
-      else { offline.setStatus('concluida') }
+      if (isOnline) {
+        // Upload photos FIRST, before concluding
+        if (vistoriaId) await uploadOfflineFotos(vistoriaId)
+        await onConcluir(itens, obsGerais)
+        offline.markSynced()
+        offline.clear()
+      } else {
+        offline.setStatus('concluida')
+      }
       onClose()
     } catch { offline.setStatus('concluida'); onClose() }
     finally { setSaving(false); setShowConfirm(false) }
