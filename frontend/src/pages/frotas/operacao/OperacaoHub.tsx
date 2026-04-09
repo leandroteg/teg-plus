@@ -38,8 +38,8 @@ export default function OperacaoHub() {
               className={`flex items-center gap-2 px-4 py-2.5 text-sm font-semibold whitespace-nowrap rounded-t-xl border-b-2 transition-all ${
                 isActive
                   ? isLight
-                    ? 'border-b-teal-600 text-teal-700 bg-teal-50'
-                    : 'border-b-teal-400 text-teal-300 bg-teal-500/10'
+                    ? 'border-b-rose-500 text-rose-700 bg-rose-50'
+                    : 'border-b-rose-400 text-rose-300 bg-rose-500/10'
                   : isLight
                     ? 'border-b-transparent text-slate-500 hover:text-slate-700 hover:bg-slate-50'
                     : 'border-b-transparent text-slate-400 hover:text-white hover:bg-white/5'

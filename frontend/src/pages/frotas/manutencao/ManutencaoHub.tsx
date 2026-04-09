@@ -23,37 +23,36 @@ const TABS: Tab[] = [
 ]
 
 export default function ManutencaoHub() {
-  const [tab, setTab] = useState<TabId>('os')
+  const [active, setActive] = useState<TabId>('os')
   const { isLightSidebar: isLight } = useTheme()
 
-  const Comp = TABS.find(t => t.id === tab)?.component ?? OSAbertas
+  const Comp = TABS.find(t => t.id === active)?.component ?? OSAbertas
 
   return (
     <div className="flex flex-col h-full">
       <div
-        className={`flex items-center gap-1 px-4 sm:px-6 pt-4 pb-0 border-b overflow-x-auto ${
+        className={`flex gap-1 px-4 sm:px-6 pt-4 pb-0 border-b overflow-x-auto ${
           isLight ? 'border-slate-200' : 'border-white/[0.06]'
         }`}
       >
-        {TABS.map(t => {
-          const Icon   = t.icon
-          const active = tab === t.id
+        {TABS.map(({ id, label, icon: Icon }) => {
+          const isActive = active === id
           return (
             <button
-              key={t.id}
-              onClick={() => setTab(t.id)}
-              className={`flex items-center gap-1.5 px-3 py-2.5 text-xs font-semibold whitespace-nowrap rounded-t-lg border-b-2 transition-all ${
-                active
-                  ? 'border-rose-500 text-rose-500'
-                  : `border-transparent ${
-                      isLight
-                        ? 'text-slate-500 hover:text-slate-700'
-                        : 'text-slate-400 hover:text-slate-200'
-                    }`
+              key={id}
+              onClick={() => setActive(id)}
+              className={`flex items-center gap-2 px-4 py-2.5 text-sm font-semibold whitespace-nowrap rounded-t-xl border-b-2 transition-all ${
+                isActive
+                  ? isLight
+                    ? 'border-b-rose-500 text-rose-700 bg-rose-50'
+                    : 'border-b-rose-400 text-rose-300 bg-rose-500/10'
+                  : isLight
+                    ? 'border-b-transparent text-slate-500 hover:text-slate-700 hover:bg-slate-50'
+                    : 'border-b-transparent text-slate-400 hover:text-white hover:bg-white/5'
               }`}
             >
-              <Icon size={13} />
-              {t.label}
+              <Icon size={15} />
+              {label}
             </button>
           )
         })}
