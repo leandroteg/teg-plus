@@ -1,9 +1,9 @@
-import { useState, useRef } from 'react'
-import { Camera, ChevronDown, ChevronUp, X, ImageIcon } from 'lucide-react'
+import { useState, useRef, useMemo } from 'react'
+import { Camera, ChevronDown, ChevronUp, X, ImageIcon, Plus, Pencil, Check, Trash2 } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
 import type { EstadoItem, LocVistoriaItem, LocVistoriaFoto } from '../../types/locacao'
 
-const AMBIENTES = [
+const AMBIENTES_PADRAO = [
   'Recepcao / Entrada',
   'Sala',
   'Cozinha',
@@ -13,6 +13,9 @@ const AMBIENTES = [
   'Garagem',
   'Area Externa',
 ]
+
+/** @deprecated use AMBIENTES_PADRAO */
+const AMBIENTES = AMBIENTES_PADRAO
 
 const ITENS_POR_AMBIENTE = [
   'Piso',
@@ -25,7 +28,7 @@ const ITENS_POR_AMBIENTE = [
   'Iluminacao',
 ]
 
-export { AMBIENTES, ITENS_POR_AMBIENTE }
+export { AMBIENTES, AMBIENTES_PADRAO, ITENS_POR_AMBIENTE }
 
 const ESTADOS: { value: EstadoItem; label: string; color: string }[] = [
   { value: 'otimo',         label: 'Otimo',      color: 'bg-green-100 text-green-700 border-green-300' },
@@ -65,6 +68,22 @@ export default function VistoriaChecklist({ tipo, itens: externalItens, onChange
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({})
   const fileRef = useRef<HTMLInputElement>(null)
   const [pendingUpload, setPendingUpload] = useState<{ ambiente: string; item: string } | null>(null)
+  const [editingAmbiente, setEditingAmbiente] = useState<string | null>(null)
+  const [editNome, setEditNome] = useState('')
+  const editInputRef = useRef<HTMLInputElement>(null)
+
+  // Derive unique ambientes from itens (preserves order of first appearance)
+  const ambientes = useMemo(() => {
+    const seen = new Set<string>()
+    const result: string[] = []
+    for (const it of itens) {
+      if (!seen.has(it.ambiente)) {
+        seen.add(it.ambiente)
+        result.push(it.ambiente)
+      }
+    }
+    return result
+  }, [itens])
 
   const toggleAmbiente = (ambiente: string) => {
     setCollapsed(prev => ({ ...prev, [ambiente]: !prev[ambiente] }))
@@ -74,6 +93,63 @@ export default function VistoriaChecklist({ tipo, itens: externalItens, onChange
     const next = itens.map((it, i) => i === idx ? { ...it, [field]: value } : it)
     setItens(next)
     onChange?.(next)
+  }
+
+  // ── Area management ──────────────────────────────────────────────────────
+  const startEditAmbiente = (ambiente: string) => {
+    setEditingAmbiente(ambiente)
+    setEditNome(ambiente)
+    setTimeout(() => editInputRef.current?.select(), 50)
+  }
+
+  const confirmEditAmbiente = () => {
+    if (!editingAmbiente || !editNome.trim()) return
+    const trimmed = editNome.trim()
+    if (trimmed === editingAmbiente) { setEditingAmbiente(null); return }
+    // Avoid duplicate names
+    if (ambientes.includes(trimmed)) { setEditingAmbiente(null); return }
+    const next = itens.map(it =>
+      it.ambiente === editingAmbiente ? { ...it, ambiente: trimmed } : it
+    )
+    setItens(next)
+    onChange?.(next)
+    // Transfer collapsed state
+    setCollapsed(prev => {
+      const copy = { ...prev }
+      if (editingAmbiente in copy) {
+        copy[trimmed] = copy[editingAmbiente]
+        delete copy[editingAmbiente]
+      }
+      return copy
+    })
+    setEditingAmbiente(null)
+  }
+
+  const addAmbiente = () => {
+    let name = 'Nova Area'
+    let counter = 1
+    while (ambientes.includes(name)) {
+      counter++
+      name = `Nova Area ${counter}`
+    }
+    const newItens = ITENS_POR_AMBIENTE.map(item => ({
+      ambiente: name,
+      item,
+      estado: null as EstadoItem | null,
+      observacao: '',
+    }))
+    const next = [...itens, ...newItens]
+    setItens(next)
+    onChange?.(next)
+    // Auto-start editing the name
+    setTimeout(() => startEditAmbiente(name), 100)
+  }
+
+  const removeAmbiente = (ambiente: string) => {
+    const next = itens.filter(it => it.ambiente !== ambiente)
+    setItens(next)
+    onChange?.(next)
+    setCollapsed(prev => { const copy = { ...prev }; delete copy[ambiente]; return copy })
   }
 
   const handleFotoClick = (ambiente: string, item: string) => {
@@ -90,7 +166,7 @@ export default function VistoriaChecklist({ tipo, itens: externalItens, onChange
     setPendingUpload(null)
   }
 
-  const grouped = AMBIENTES.map(ambiente => ({
+  const grouped = ambientes.map(ambiente => ({
     ambiente,
     items: itens.map((it, idx) => ({ ...it, idx })).filter(it => it.ambiente === ambiente),
   }))
@@ -109,29 +185,87 @@ export default function VistoriaChecklist({ tipo, itens: externalItens, onChange
           const itemIds = items.map(it => `${ambiente}|${it.item}`)
           return !f.item_id ? f.descricao === ambiente : itemIds.some(iid => f.descricao === iid)
         })
+        const isEditing = editingAmbiente === ambiente
 
         return (
           <div key={ambiente} className={`rounded-xl border overflow-hidden ${bg}`}>
-            <button
-              type="button"
-              onClick={() => toggleAmbiente(ambiente)}
-              className={`w-full flex items-center justify-between px-4 py-3 ${headerBg}`}
-            >
-              <div className="flex items-center gap-2">
-                <span className={`text-sm font-semibold ${txt}`}>{ambiente}</span>
-                {ambienteFotos.length > 0 && (
-                  <span className="flex items-center gap-1 text-[10px] font-medium text-indigo-500">
-                    <ImageIcon size={10} /> {ambienteFotos.length}
-                  </span>
+            <div className={`flex items-center justify-between px-4 py-3 ${headerBg}`}>
+              <div className="flex items-center gap-2 min-w-0 flex-1">
+                {isEditing && !readOnly ? (
+                  <form
+                    className="flex items-center gap-1.5 flex-1"
+                    onSubmit={e => { e.preventDefault(); confirmEditAmbiente() }}
+                  >
+                    <input
+                      ref={editInputRef}
+                      type="text"
+                      value={editNome}
+                      onChange={e => setEditNome(e.target.value)}
+                      onBlur={confirmEditAmbiente}
+                      onKeyDown={e => e.key === 'Escape' && setEditingAmbiente(null)}
+                      className={`text-sm font-semibold rounded-lg px-2 py-1 border outline-none w-full max-w-[200px] ${
+                        isDark
+                          ? 'bg-white/10 border-indigo-500/50 text-white'
+                          : 'bg-white border-indigo-400 text-slate-800'
+                      }`}
+                      autoFocus
+                    />
+                    <button type="submit" className="text-emerald-500 hover:text-emerald-600 shrink-0" title="Confirmar">
+                      <Check size={14} />
+                    </button>
+                  </form>
+                ) : (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => toggleAmbiente(ambiente)}
+                      className="flex items-center gap-2 min-w-0 flex-1 text-left"
+                    >
+                      <span className={`text-sm font-semibold truncate ${txt}`}>{ambiente}</span>
+                      {ambienteFotos.length > 0 && (
+                        <span className="flex items-center gap-1 text-[10px] font-medium text-indigo-500 shrink-0">
+                          <ImageIcon size={10} /> {ambienteFotos.length}
+                        </span>
+                      )}
+                    </button>
+                    {!readOnly && (
+                      <button
+                        type="button"
+                        onClick={() => startEditAmbiente(ambiente)}
+                        className={`p-1 rounded-md transition-colors shrink-0 ${
+                          isDark ? 'text-slate-500 hover:text-indigo-400 hover:bg-white/5'
+                                 : 'text-slate-400 hover:text-indigo-600 hover:bg-indigo-50'
+                        }`}
+                        title="Renomear area"
+                      >
+                        <Pencil size={12} />
+                      </button>
+                    )}
+                  </>
                 )}
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 shrink-0 ml-2">
                 <span className={`text-xs ${txtMuted}`}>
                   {items.filter(it => it.estado !== null).length}/{items.length}
                 </span>
-                {collapsed[ambiente] ? <ChevronDown size={14} className={txtMuted} /> : <ChevronUp size={14} className={txtMuted} />}
+                {!readOnly && (
+                  <button
+                    type="button"
+                    onClick={() => removeAmbiente(ambiente)}
+                    className={`p-1 rounded-md transition-colors ${
+                      isDark ? 'text-slate-500 hover:text-red-400 hover:bg-red-500/10'
+                             : 'text-slate-400 hover:text-red-600 hover:bg-red-50'
+                    }`}
+                    title="Remover area"
+                  >
+                    <Trash2 size={12} />
+                  </button>
+                )}
+                <button type="button" onClick={() => toggleAmbiente(ambiente)} className={txtMuted}>
+                  {collapsed[ambiente] ? <ChevronDown size={14} /> : <ChevronUp size={14} />}
+                </button>
               </div>
-            </button>
+            </div>
 
             {!collapsed[ambiente] && (
               <div className="divide-y divide-slate-100">
@@ -225,6 +359,22 @@ export default function VistoriaChecklist({ tipo, itens: externalItens, onChange
           </div>
         )
       })}
+
+      {/* Add area button */}
+      {!readOnly && (
+        <button
+          type="button"
+          onClick={addAmbiente}
+          className={`w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl border-2 border-dashed transition-colors ${
+            isDark
+              ? 'border-white/10 text-slate-400 hover:border-indigo-500/40 hover:text-indigo-400 hover:bg-indigo-500/5'
+              : 'border-slate-200 text-slate-400 hover:border-indigo-400 hover:text-indigo-600 hover:bg-indigo-50'
+          }`}
+        >
+          <Plus size={16} />
+          <span className="text-sm font-semibold">Adicionar Area</span>
+        </button>
+      )}
     </div>
   )
 }
