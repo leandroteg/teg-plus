@@ -674,7 +674,6 @@ function useCadastrarUsuario() {
         .insert({
           email: signupEmail,
           role,
-          papel_global,
           alcada_nivel,
           modulos,
           nome_sugerido: nome || null,
