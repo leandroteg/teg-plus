@@ -89,7 +89,7 @@ const PILLARS: Pillar[] = [
     accent: '#34D399',
     subs: [
       { key: 'financeiro', label: 'Financeiro', desc: 'Contas, aprovações e conciliação', Icon: Banknote, active: true, route: '/financeiro' },
-      { key: 'apontamentos', label: 'Despesas', desc: 'Cartões corporativos e adiantamentos', Icon: CreditCard, active: true, route: '/despesas', adminOnly: false },
+      { key: 'apontamentos', label: 'Minhas Despesas', desc: 'Cartões corporativos e adiantamentos', Icon: CreditCard, active: true, route: '/despesas', adminOnly: false },
       { key: 'fiscal', label: 'Fiscal', desc: 'Notas fiscais e créditos PIS/COFINS', Icon: Receipt, active: true, route: '/fiscal' },
       { key: 'controladoria', label: 'Controladoria', desc: 'Indicadores e relatórios gerenciais', Icon: BarChart3, active: true, route: '/controladoria' },
       { key: 'contratos', label: 'Contratos', desc: 'Gestão de contratos e SLAs', Icon: FileText, active: true, route: '/contratos' },

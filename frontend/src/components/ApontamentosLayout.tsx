@@ -17,7 +17,7 @@ export default function ApontamentosLayout() {
   return (
     <ModuleLayout
       moduleKey="apontamentos"
-      moduleName="Despesas"
+      moduleName="Minhas Despesas"
       moduleEmoji="💳"
       accent="violet"
       nav={NAV}
