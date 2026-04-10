@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from 'react'
+import { useState, useRef, useCallback, useEffect } from 'react'
 import { Navigate, useNavigate } from 'react-router-dom'
 import { Mail, Lock, ArrowRight, AlertCircle, CheckCircle, Eye, EyeOff } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
@@ -53,6 +53,11 @@ const VORTEX_CSS = `
 .vortex-btn{position:relative;overflow:hidden}
 .vortex-btn::before{content:'';position:absolute;top:0;left:-100%;width:50%;height:100%;background:linear-gradient(90deg,transparent,rgba(255,255,255,0.25),transparent);transition:none}
 .vortex-btn:hover::before{animation:vortex-shimmer 0.8s ease}
+@keyframes vortex-loading-bar{from{width:0%}to{width:100%}}
+@keyframes vortex-fade-in{from{opacity:0;transform:scale(0.95)}to{opacity:1;transform:scale(1)}}
+@keyframes vortex-text-glow{0%,100%{text-shadow:0 0 20px rgba(20,184,166,0.3)}50%{text-shadow:0 0 40px rgba(20,184,166,0.6),0 0 80px rgba(99,102,241,0.2)}}
+@keyframes vortex-ring-pulse{0%{transform:translate(-50%,-50%) scale(0.8);opacity:0.6}50%{transform:translate(-50%,-50%) scale(1.2);opacity:0.2}100%{transform:translate(-50%,-50%) scale(1.6);opacity:0}}
+@keyframes vortex-dots{0%,80%,100%{opacity:0.3}40%{opacity:1}}
 `
 
 export default function Login() {
@@ -70,6 +75,30 @@ export default function Login() {
   const [success, setSuccess] = useState<string | null>(null)
   const [warping, setWarping] = useState(false)
   const [shaking, setShaking] = useState(false)
+  const [transitioning, setTransitioning] = useState(false)
+  const [loadProgress, setLoadProgress] = useState(0)
+  const bgMusicRef = useRef<HTMLAudioElement | null>(null)
+
+  // Background music — desktop only, loop, low volume
+  useEffect(() => {
+    const isDesktop = window.innerWidth >= 768
+    if (!isDesktop) return
+    const audio = new Audio('/sounds/login-bg.mp4')
+    audio.loop = true
+    audio.volume = 0.08
+    bgMusicRef.current = audio
+    // Autoplay needs user interaction; start on first click
+    const startMusic = () => {
+      audio.play().catch(() => {})
+      document.removeEventListener('click', startMusic)
+    }
+    document.addEventListener('click', startMusic)
+    return () => {
+      document.removeEventListener('click', startMusic)
+      audio.pause()
+      audio.src = ''
+    }
+  }, [])
 
   if (!loading && user) return <Navigate to="/" replace />
 
@@ -84,8 +113,28 @@ export default function Login() {
       setError(err); setShaking(true); playError()
       setTimeout(() => setShaking(false), 600)
     } else {
+      // Fase 1: warp visual (0.8s)
       setWarping(true); playWarp()
-      setTimeout(() => nav('/'), 900)
+      // Fade out music
+      if (bgMusicRef.current) {
+        const m = bgMusicRef.current
+        const fadeOut = setInterval(() => { m.volume = Math.max(0, m.volume - 0.01); if (m.volume <= 0) { clearInterval(fadeOut); m.pause() } }, 30)
+      }
+      // Fase 2: loading transition (3s)
+      setTimeout(() => {
+        setWarping(false); setTransitioning(true); setLoadProgress(0)
+        // Animate progress bar
+        const start = Date.now()
+        const dur = 3000
+        const tick = () => {
+          const elapsed = Date.now() - start
+          const pct = Math.min(elapsed / dur, 1)
+          setLoadProgress(pct * 100)
+          if (pct < 1) requestAnimationFrame(tick)
+          else setTimeout(() => nav('/'), 200)
+        }
+        requestAnimationFrame(tick)
+      }, 900)
     }
   }
 
@@ -153,6 +202,86 @@ export default function Login() {
   const t = THEMES[theme]
 
   const cssVars = { '--v-focus-border': t.focusBorder, '--v-focus-shadow': t.focusShadow, '--v-text-dim': t.textDim } as React.CSSProperties
+
+  // ── Loading transition screen ──────────────────────────────────────
+  if (transitioning) {
+    return (
+      <>
+        <style>{VORTEX_CSS}</style>
+        <div className="fixed inset-0 flex flex-col items-center justify-center" style={{
+          background: `radial-gradient(ellipse at 50% 40%, #07111f, #040a14)`,
+        }}>
+          {/* Pulsing rings behind logo */}
+          {[1, 2, 3].map(i => (
+            <div key={i} className="absolute pointer-events-none" style={{
+              left: '50%', top: '45%', width: 200 + i * 80, height: 200 + i * 80,
+              borderRadius: '50%', border: '1px solid rgba(20,184,166,0.15)',
+              transform: 'translate(-50%,-50%)',
+              animation: `vortex-ring-pulse ${2 + i * 0.5}s ${i * 0.3}s ease-out infinite`,
+            }} />
+          ))}
+
+          {/* Center glow */}
+          <div className="absolute pointer-events-none" style={{
+            left: '50%', top: '45%', transform: 'translate(-50%,-50%)',
+            width: 400, height: 400, borderRadius: '50%',
+            background: 'radial-gradient(circle, rgba(20,184,166,0.1) 0%, transparent 60%)',
+          }} />
+
+          {/* Logo */}
+          <div style={{ animation: 'vortex-fade-in 0.6s ease-out', marginBottom: 32 }}>
+            <LogoTeg size={100} animated={false} glowing={false} />
+          </div>
+
+          {/* TEG+ text */}
+          <h1 style={{
+            color: '#fff', fontSize: '2rem', fontWeight: 900, letterSpacing: '0.3em',
+            animation: 'vortex-text-glow 2s ease-in-out infinite',
+            marginBottom: 8,
+          }}>TEG+</h1>
+
+          <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: 12, fontWeight: 500, letterSpacing: '0.15em', textTransform: 'uppercase', marginBottom: 40 }}>
+            Carregando seu ambiente
+          </p>
+
+          {/* Progress bar */}
+          <div style={{ width: 280, height: 3, borderRadius: 2, background: 'rgba(255,255,255,0.06)', overflow: 'hidden', marginBottom: 16 }}>
+            <div style={{
+              height: '100%', borderRadius: 2,
+              background: 'linear-gradient(90deg, #14b8a6, #6366f1)',
+              width: `${loadProgress}%`,
+              transition: 'width 0.05s linear',
+              boxShadow: '0 0 12px rgba(20,184,166,0.4)',
+            }} />
+          </div>
+
+          {/* Loading dots */}
+          <div style={{ display: 'flex', gap: 6 }}>
+            {[0, 1, 2].map(i => (
+              <div key={i} style={{
+                width: 6, height: 6, borderRadius: '50%',
+                background: 'rgba(20,184,166,0.6)',
+                animation: `vortex-dots 1.2s ${i * 0.2}s ease-in-out infinite`,
+              }} />
+            ))}
+          </div>
+
+          {/* Floating particles in transition */}
+          <div className="fixed inset-0 pointer-events-none overflow-hidden">
+            {PARTICLES.slice(0, 8).map((p, i) => (
+              <div key={i} style={{
+                position: 'absolute', left: `${p.left}%`, bottom: '-10px',
+                width: p.size + 1, height: p.size + 1, borderRadius: '50%',
+                background: `rgba(20,184,166,0.3)`,
+                boxShadow: `0 0 ${p.size * 3}px rgba(20,184,166,0.2)`,
+                animation: `vortex-particle ${p.dur}s ${p.delay}s linear infinite`,
+              }} />
+            ))}
+          </div>
+        </div>
+      </>
+    )
+  }
 
   return (
     <>
