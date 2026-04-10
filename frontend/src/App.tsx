@@ -330,7 +330,7 @@ export default function App() {
           {/* Módulo RH */}
           <Route element={<ModuleRoute moduleKey="rh" />}>
             <Route element={<RHLayout />}>
-              <Route path="/rh"        element={<LazyDash><RHHome /></LazyDash>} />
+              <Route path="/rh"        element={<Navigate to="/rh/headcount" replace />} />
               <Route path="/rh/mural"  element={<Lazy><MuralAdmin /></Lazy>} />
             </Route>
             <Route element={<CulturaLayout />}>

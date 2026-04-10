@@ -105,10 +105,10 @@ const PILLARS: Pillar[] = [
     glow: 'rgba(139,92,246,0.16)',
     accent: '#A78BFA',
     subs: [
-      { key: 'headcount', label: 'Headcount', desc: 'Admissão, colaboradores, movimentações e desligamento', Icon: Users, active: false, route: '/rh/headcount' },
+      { key: 'headcount', label: 'Headcount', desc: 'Admissão, colaboradores, movimentações e desligamento', Icon: Users, active: true, route: '/rh/headcount' },
       { key: 'rs', label: 'R&S', desc: 'Recrutamento e seleção de talentos', Icon: UserSearch, active: false, route: '' },
       { key: 'performance', label: 'Performance', desc: 'Avaliações, metas e feedbacks', Icon: Target, active: false, route: '' },
-      { key: 'cultura', label: 'Cultura', desc: 'Engajamento, clima e mural de recados', Icon: Heart, active: false, route: '/rh/cultura' },
+      { key: 'cultura', label: 'Cultura', desc: 'Engajamento, clima e mural de recados', Icon: Heart, active: true, route: '/rh/cultura' },
       { key: 'dp', label: 'DP', desc: 'Folha, ponto e benefícios', Icon: Calculator, active: false, route: '' },
     ],
   },
