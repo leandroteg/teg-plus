@@ -249,7 +249,8 @@ function VeiculoModal({
 
 // ── Main ──────────────────────────────────────────────────────────────────────
 export default function Veiculos() {
-  const { isLightSidebar: isLight } = useTheme()
+  const { isDark } = useTheme()
+  const isLight = !isDark
   const [busca, setBusca]     = useState('')
   const [modal, setModal]     = useState<Partial<FroVeiculo> | null>(null)
   const [statusFiltro, setStatusFiltro] = useState<StatusVeiculo | ''>('')

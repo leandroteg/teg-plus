@@ -4,13 +4,13 @@ type: index
 status: ativo
 tags: [teg-plus, erp, moc, index]
 criado: 2026-03-02
-atualizado: 2026-04-08
+atualizado: 2026-04-10
 ---
 
 # TEG+ ERP — Mapa da Aplicacao
 
 > Sistema ERP modular para gestao de obras de engenharia eletrica/transmissao.
-> **16 modulos operacionais** · 170+ tabelas · 108 migrations SQL · 90+ RPCs · 200+ paginas
+> **16 modulos** · 170+ tabelas · 108 migrations SQL · 90+ RPCs · 200+ paginas
 
 ---
 
@@ -56,7 +56,7 @@ atualizado: 2026-04-08
 |-----------|-----------|--------|
 | PMO/EGP | 80% | Operacional |
 | Obras | 75% | Operacional |
-| SSMA | 10% | Q2-Q3 2026 |
+| SSMA | 0% | Q3 2026 (nao iniciado) |
 
 **RH**
 
@@ -231,7 +231,7 @@ atualizado: 2026-04-08
 |--------|--------|-----|
 | EGP (PMO) | ✅ 80% | [[31 - Módulo PMO-EGP]] |
 | Obras | ✅ 75% | [[32 - Módulo Obras]] |
-| SSMA | 🟡 10% stub | [[33 - Módulo SSMA]] |
+| SSMA | 🔴 0% nao iniciado | [[33 - Módulo SSMA]] |
 
 #### 🟠 RH (5 sub-modulos)
 
@@ -430,6 +430,7 @@ graph TD
 
 ---
 
+<<<<<<< HEAD
 ---
 
 ## Setup do Vault
@@ -437,3 +438,6 @@ graph TD
 Para configurar este vault Obsidian, veja [[SETUP - Plugins Necessários]].
 
 *Vault gerado em 2026-03-02 a partir do codigo-fonte. Ultima atualizacao: 2026-04-08.*
+=======
+*Vault gerado em 2026-03-02 a partir do codigo-fonte. Ultima atualizacao: 2026-04-10.*
+>>>>>>> dec3f64 (docs: README.md, ARCHITECTURE.md, atualiza Obsidian e SETUP)

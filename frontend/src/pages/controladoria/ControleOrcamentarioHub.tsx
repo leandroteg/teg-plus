@@ -1,8 +1,9 @@
 import { useMemo } from 'react'
-import { BriefcaseBusiness, ClipboardList, ScanSearch, Siren } from 'lucide-react'
+import { BriefcaseBusiness, ClipboardList, ScanSearch, Siren, FileText } from 'lucide-react'
 import { useSearchParams } from 'react-router-dom'
 import ControladoriaFlow, { type FlowStep } from '../../components/ControladoriaFlow'
 import PlanoOrcamentario from './PlanoOrcamentario'
+import PlanoOrcamentarioVisual from './PlanoOrcamentarioVisual'
 import Orcamentos from './Orcamentos'
 import ControleOrcamentario from './ControleOrcamentario'
 import AlertasDesvio from './AlertasDesvio'
@@ -14,6 +15,13 @@ const STEPS: FlowStep[] = [
     description: 'Defina a base anual e a distribuição trimestral do orçamento.',
     icon: ClipboardList,
     accent: { bg: 'hover:bg-slate-50', bgActive: 'bg-slate-100', text: 'text-slate-600', textActive: 'text-slate-800', border: 'border-slate-400', badge: 'bg-slate-200 text-slate-700' },
+  },
+  {
+    key: 'visao-executiva',
+    label: 'Visão Executiva',
+    description: 'Documento consolidado com cenários, receitas, custos e KPIs do plano 2026.',
+    icon: FileText,
+    accent: { bg: 'hover:bg-emerald-50', bgActive: 'bg-emerald-50', text: 'text-emerald-600', textActive: 'text-emerald-800', border: 'border-emerald-500', badge: 'bg-emerald-100 text-emerald-700' },
   },
   {
     key: 'budget-area',
@@ -42,6 +50,8 @@ function getStepComponent(step: string) {
   switch (step) {
     case 'plano':
       return <PlanoOrcamentario />
+    case 'visao-executiva':
+      return <PlanoOrcamentarioVisual />
     case 'budget-area':
       return <Orcamentos />
     case 'acoes':

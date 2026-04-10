@@ -1,64 +1,153 @@
 import { useState } from 'react'
 import { CalendarDays, Fuel, AlertCircle, Radio, BarChart3 } from 'lucide-react'
 import { useTheme } from '../../../contexts/ThemeContext'
+import { useAbastecimentos, useOcorrenciasTel } from '../../../hooks/useFrotas'
 import AgendaAlocacao from './AgendaAlocacao'
 import AbastecimentosOp from './AbastecimentosOp'
 import MultasPedagios from './MultasPedagios'
 import TelemetriaOp from './TelemetriaOp'
 import Indicadores from './Indicadores'
 
-// ── Tab Config ────────────────────────────────────────────────────────────────
+// ── Tab Config ───────────────────────────────────────────────────────────────
+
 type TabKey = 'agenda' | 'abastecimentos' | 'multas' | 'telemetria' | 'indicadores'
 
-const TABS: Array<{ key: TabKey; label: string; icon: React.ElementType }> = [
-  { key: 'agenda',          label: 'Agenda',            icon: CalendarDays },
-  { key: 'abastecimentos',  label: 'Abastecimentos',    icon: Fuel },
-  { key: 'multas',          label: 'Multas & Pedágios', icon: AlertCircle },
-  { key: 'telemetria',      label: 'Telemetria',        icon: Radio },
-  { key: 'indicadores',     label: 'Indicadores',       icon: BarChart3 },
+const TABS: Array<{ key: TabKey; label: string }> = [
+  { key: 'agenda',          label: 'Agenda'            },
+  { key: 'abastecimentos',  label: 'Abastecimentos'    },
+  { key: 'multas',          label: 'Multas & Pedágios' },
+  { key: 'telemetria',      label: 'Telemetria'        },
+  { key: 'indicadores',     label: 'Indicadores'       },
 ]
 
-// ── Component ─────────────────────────────────────────────────────────────────
+const TAB_ICONS: Record<TabKey, React.ElementType> = {
+  agenda:         CalendarDays,
+  abastecimentos: Fuel,
+  multas:         AlertCircle,
+  telemetria:     Radio,
+  indicadores:    BarChart3,
+}
+
+const TAB_ACCENT: Record<TabKey, {
+  bg: string; bgActive: string; text: string; textActive: string; border: string
+}> = {
+  agenda: {
+    bg: 'hover:bg-sky-50',       bgActive: 'bg-sky-50',
+    text: 'text-sky-600',        textActive: 'text-sky-800',
+    border: 'border-sky-500',
+  },
+  abastecimentos: {
+    bg: 'hover:bg-amber-50',     bgActive: 'bg-amber-50',
+    text: 'text-amber-600',      textActive: 'text-amber-800',
+    border: 'border-amber-500',
+  },
+  multas: {
+    bg: 'hover:bg-rose-50',      bgActive: 'bg-rose-50',
+    text: 'text-rose-600',       textActive: 'text-rose-800',
+    border: 'border-rose-500',
+  },
+  telemetria: {
+    bg: 'hover:bg-violet-50',    bgActive: 'bg-violet-50',
+    text: 'text-violet-600',     textActive: 'text-violet-800',
+    border: 'border-violet-500',
+  },
+  indicadores: {
+    bg: 'hover:bg-emerald-50',   bgActive: 'bg-emerald-50',
+    text: 'text-emerald-600',    textActive: 'text-emerald-800',
+    border: 'border-emerald-500',
+  },
+}
+
+const TAB_ACCENT_DARK: Record<TabKey, {
+  bg: string; bgActive: string; text: string; textActive: string; border: string
+}> = {
+  agenda: {
+    bg: 'hover:bg-sky-500/10',     bgActive: 'bg-sky-500/15',
+    text: 'text-sky-400',          textActive: 'text-sky-200',
+    border: 'border-sky-500/40',
+  },
+  abastecimentos: {
+    bg: 'hover:bg-amber-500/10',   bgActive: 'bg-amber-500/15',
+    text: 'text-amber-400',        textActive: 'text-amber-200',
+    border: 'border-amber-500/40',
+  },
+  multas: {
+    bg: 'hover:bg-rose-500/10',    bgActive: 'bg-rose-500/15',
+    text: 'text-rose-400',         textActive: 'text-rose-200',
+    border: 'border-rose-500/40',
+  },
+  telemetria: {
+    bg: 'hover:bg-violet-500/10',  bgActive: 'bg-violet-500/15',
+    text: 'text-violet-400',       textActive: 'text-violet-200',
+    border: 'border-violet-500/40',
+  },
+  indicadores: {
+    bg: 'hover:bg-emerald-500/10', bgActive: 'bg-emerald-500/15',
+    text: 'text-emerald-400',      textActive: 'text-emerald-200',
+    border: 'border-emerald-500/40',
+  },
+}
+
+const COMPS: Record<TabKey, React.ComponentType> = {
+  agenda:         AgendaAlocacao,
+  abastecimentos: AbastecimentosOp,
+  multas:         MultasPedagios,
+  telemetria:     TelemetriaOp,
+  indicadores:    Indicadores,
+}
+
+// ── Component ────────────────────────────────────────────────────────────────
+
 export default function OperacaoHub() {
-  const { isLightSidebar: isLight } = useTheme()
   const [active, setActive] = useState<TabKey>('agenda')
+  const { isDark } = useTheme()
+  const { data: abastecimentos = [] } = useAbastecimentos()
+  const { data: ocorrencias = [] } = useOcorrenciasTel()
+  const counts: Record<TabKey, number> = {
+    agenda: 0,
+    abastecimentos: abastecimentos.length,
+    multas: ocorrencias.length,
+    telemetria: 0,
+    indicadores: 0,
+  }
+  const Comp = COMPS[active] ?? AgendaAlocacao
 
   return (
-    <div className="flex flex-col h-full">
-      {/* Tab Bar */}
-      <div className={`flex gap-1 px-4 pt-4 pb-0 border-b overflow-x-auto ${
-        isLight ? 'bg-white border-slate-200' : 'bg-[#0f172a] border-white/[0.06]'
-      }`}>
-        {TABS.map(({ key, label, icon: Icon }) => {
-          const isActive = active === key
-          return (
-            <button
-              key={key}
-              onClick={() => setActive(key)}
-              className={`flex items-center gap-2 px-4 py-2.5 text-sm font-semibold whitespace-nowrap rounded-t-xl border-b-2 transition-all ${
-                isActive
-                  ? isLight
-                    ? 'border-b-teal-600 text-teal-700 bg-teal-50'
-                    : 'border-b-teal-400 text-teal-300 bg-teal-500/10'
-                  : isLight
-                    ? 'border-b-transparent text-slate-500 hover:text-slate-700 hover:bg-slate-50'
-                    : 'border-b-transparent text-slate-400 hover:text-white hover:bg-white/5'
-              }`}
-            >
-              <Icon size={15} />
-              {label}
-            </button>
-          )
-        })}
+    <div className="flex flex-col h-full -mx-4 md:mx-0">
+      <div className="px-3 sm:px-4 md:px-6 pt-4 pb-3">
+        <div className={`flex gap-1 overflow-x-auto hide-scrollbar rounded-2xl border p-1 ${
+          isDark ? 'border-white/[0.06] bg-white/[0.02]' : 'border-slate-200 bg-slate-50'
+        }`}>
+          {TABS.map((tab) => {
+            const isActive = active === tab.key
+            const Icon = TAB_ICONS[tab.key]
+            const accent = isDark ? TAB_ACCENT_DARK[tab.key] : TAB_ACCENT[tab.key]
+            return (
+              <button
+                key={tab.key}
+                onClick={() => setActive(tab.key)}
+                className={`min-w-fit whitespace-nowrap rounded-xl border px-3 py-2 text-sm transition-all md:px-4 md:py-2.5 md:flex-1 ${
+                  isActive
+                    ? `${accent.bgActive} ${accent.textActive} ${accent.border} font-bold shadow-sm`
+                    : `${accent.bg} ${accent.text} border-transparent font-medium ${isDark ? 'hover:bg-white/[0.06] hover:shadow-sm' : 'hover:bg-white hover:shadow-sm'}`
+                } flex items-center justify-center gap-2`}
+              >
+                <Icon size={15} className="shrink-0" />
+                {tab.label}
+                {counts[tab.key] > 0 && (
+                  <span className={`min-w-[20px] h-5 px-1.5 rounded-full text-[10px] font-bold flex items-center justify-center ${
+                    isActive ? 'bg-white/25 text-current' : isDark ? 'bg-white/[0.08] text-slate-400' : 'bg-slate-200/80 text-slate-500'
+                  }`}>
+                    {counts[tab.key]}
+                  </span>
+                )}
+              </button>
+            )
+          })}
+        </div>
       </div>
-
-      {/* Content */}
-      <div className="flex-1 overflow-auto">
-        {active === 'agenda'         && <AgendaAlocacao />}
-        {active === 'abastecimentos' && <AbastecimentosOp />}
-        {active === 'multas'         && <MultasPedagios />}
-        {active === 'telemetria'     && <TelemetriaOp />}
-        {active === 'indicadores'    && <Indicadores />}
+      <div className="flex-1 overflow-auto px-3 sm:px-4 md:px-6">
+        <Comp />
       </div>
     </div>
   )

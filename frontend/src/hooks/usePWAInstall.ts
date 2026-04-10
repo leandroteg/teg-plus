@@ -5,12 +5,20 @@ interface BeforeInstallPromptEvent extends Event {
   userChoice: Promise<{ outcome: 'accepted' | 'dismissed' }>
 }
 
+// Global reference captured in index.html <script> before React mounts
+declare global {
+  interface Window {
+    __pwaInstallPrompt: BeforeInstallPromptEvent | null
+  }
+}
+
 export function usePWAInstall() {
-  const deferredPrompt = useRef<BeforeInstallPromptEvent | null>(null)
-  const [canInstall, setCanInstall] = useState(false)
+  const deferredPrompt = useRef<BeforeInstallPromptEvent | null>(
+    window.__pwaInstallPrompt ?? null
+  )
+  const [canInstall, setCanInstall] = useState(!!window.__pwaInstallPrompt)
   const [isInstalled, setIsInstalled] = useState(false)
 
-  // Detect if already running as standalone PWA
   useEffect(() => {
     const isStandalone =
       window.matchMedia('(display-mode: standalone)').matches ||
@@ -25,6 +33,7 @@ export function usePWAInstall() {
     const handler = (e: Event) => {
       e.preventDefault()
       deferredPrompt.current = e as BeforeInstallPromptEvent
+      window.__pwaInstallPrompt = e as BeforeInstallPromptEvent
       setCanInstall(true)
     }
 
@@ -33,16 +42,19 @@ export function usePWAInstall() {
       setIsInstalled(true)
       setCanInstall(false)
       deferredPrompt.current = null
+      window.__pwaInstallPrompt = null
     })
 
     return () => window.removeEventListener('beforeinstallprompt', handler)
   }, [])
 
   const promptInstall = useCallback(async () => {
-    if (!deferredPrompt.current) return false
-    deferredPrompt.current.prompt()
-    const { outcome } = await deferredPrompt.current.userChoice
+    const prompt = deferredPrompt.current ?? window.__pwaInstallPrompt
+    if (!prompt) return false
+    prompt.prompt()
+    const { outcome } = await prompt.userChoice
     deferredPrompt.current = null
+    window.__pwaInstallPrompt = null
     setCanInstall(false)
     return outcome === 'accepted'
   }, [])

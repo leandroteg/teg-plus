@@ -1,9 +1,16 @@
+import { useState } from 'react'
 import { ClipboardCheck, Car, Cog, CheckCircle2, ClipboardList } from 'lucide-react'
+import { useQueryClient } from '@tanstack/react-query'
 import { useTheme } from '../../../contexts/ThemeContext'
 import { useVeiculos } from '../../../hooks/useFrotas'
+import FrotasChecklistModal from '../../../components/frotas/FrotasChecklistModal'
+import type { FroVeiculo } from '../../../types/frotas'
 
 export default function ChecklistSaida() {
-  const { isLightSidebar: isLight } = useTheme()
+  const { isDark } = useTheme()
+  const isLight = !isDark
+  const queryClient = useQueryClient()
+  const [selectedVeiculo, setSelectedVeiculo] = useState<FroVeiculo | null>(null)
 
   const { data: veiculos = [], isLoading } = useVeiculos({ status: 'aguardando_saida' })
 
@@ -64,50 +71,67 @@ export default function ChecklistSaida() {
             return (
               <div
                 key={v.id}
-                className={`flex items-center gap-4 p-4 rounded-2xl border transition-all ${
+                className={`flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4 p-4 rounded-2xl border transition-all ${
                   isLight
                     ? 'bg-white border-slate-200 hover:border-rose-300 hover:shadow-sm'
                     : 'bg-slate-800/50 border-white/[0.06] hover:border-rose-500/30'
                 }`}
               >
-                {/* Icon */}
-                <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${
-                  isMaquina
-                    ? (isLight ? 'bg-violet-50 text-violet-600' : 'bg-violet-500/10 text-violet-400')
-                    : (isLight ? 'bg-sky-50 text-sky-600'       : 'bg-sky-500/10 text-sky-400')
-                }`}>
-                  {isMaquina ? <Cog size={18} /> : <Car size={18} />}
-                </div>
+                {/* Top line: Icon + Info */}
+                <div className="flex items-center gap-3">
+                  {/* Icon */}
+                  <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${
+                    isMaquina
+                      ? (isLight ? 'bg-violet-50 text-violet-600' : 'bg-violet-500/10 text-violet-400')
+                      : (isLight ? 'bg-sky-50 text-sky-600'       : 'bg-sky-500/10 text-sky-400')
+                  }`}>
+                    {isMaquina ? <Cog size={18} /> : <Car size={18} />}
+                  </div>
 
-                {/* Info */}
-                <div className="flex-1 min-w-0">
-                  <p className={`font-bold text-sm ${isLight ? 'text-slate-800' : 'text-white'}`}>
-                    {identificador}
-                  </p>
-                  <p className={`text-xs truncate ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
-                    {v.marca} {v.modelo}
-                  </p>
-                </div>
+                  {/* Info */}
+                  <div className="flex-1 min-w-0">
+                    <p className={`font-bold text-sm ${isLight ? 'text-slate-800' : 'text-white'}`}>
+                      {identificador}
+                    </p>
+                    <p className={`text-xs truncate ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
+                      {v.marca} {v.modelo}
+                    </p>
+                  </div>
 
-                {/* Status pill */}
-                <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${
-                  isLight ? 'bg-rose-100 text-rose-700' : 'bg-rose-500/15 text-rose-400'
-                }`}>
-                  Checklist pendente
-                </span>
+                  {/* Status pill - visible on mobile inline */}
+                  <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full shrink-0 ${
+                    isLight ? 'bg-rose-100 text-rose-700' : 'bg-rose-500/15 text-rose-400'
+                  }`}>
+                    Checklist pendente
+                  </span>
+                </div>
 
                 {/* Action */}
-                <button className={`flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-xl transition-all whitespace-nowrap ${
-                  isLight
-                    ? 'bg-rose-500 text-white hover:bg-rose-600 shadow-sm shadow-rose-500/30'
-                    : 'bg-rose-500/90 text-white hover:bg-rose-500 shadow-sm shadow-rose-500/20'
-                }`}>
+                <button
+                  onClick={() => setSelectedVeiculo(v)}
+                  className={`flex items-center justify-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-xl transition-all whitespace-nowrap w-full sm:w-auto sm:ml-auto ${
+                    isLight
+                      ? 'bg-rose-500 text-white hover:bg-rose-600 shadow-sm shadow-rose-500/30'
+                      : 'bg-rose-500/90 text-white hover:bg-rose-500 shadow-sm shadow-rose-500/20'
+                  }`}>
                   <ClipboardList size={12} /> Preencher Checklist
                 </button>
               </div>
             )
           })}
         </div>
+      )}
+
+      {/* Checklist Modal */}
+      {selectedVeiculo && (
+        <FrotasChecklistModal
+          veiculo={selectedVeiculo}
+          tipoChecklist="pre_viagem"
+          onClose={() => {
+            setSelectedVeiculo(null)
+            queryClient.invalidateQueries({ queryKey: ['fro_veiculos'] })
+          }}
+        />
       )}
     </div>
   )

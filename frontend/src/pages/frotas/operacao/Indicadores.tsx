@@ -102,7 +102,8 @@ function KpiCard({ label, value, sub, accent, alert, gauge, isLight }: KpiCardPr
 
 // ── Main ──────────────────────────────────────────────────────────────────────
 export default function Indicadores() {
-  const { isLightSidebar: isLight } = useTheme()
+  const { isDark } = useTheme()
+  const isLight = !isDark
 
   const mesAtual = new Date().toISOString().slice(0, 7)
 

@@ -1,11 +1,12 @@
 import { useState } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import {
   ArrowLeft, BarChart3, Ruler, Calendar, TrendingUp,
   Scale, FileText, Activity, AlertTriangle,
   Plus, Check, FolderKanban, ChevronRight,
 } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
+import { useEGPPortfolioId } from '../../contexts/EGPContractContext'
 import {
   usePortfolio, useProjetos, useCriarProjeto,
   useMedicaoResumo, useMedicaoItens,
@@ -47,7 +48,7 @@ const fmtData = (d?: string) =>
 
 export default function EGPControle() {
   const { isLightSidebar: isLight } = useTheme()
-  const { portfolioId } = useParams<{ portfolioId: string }>()
+  const portfolioId = useEGPPortfolioId()
   const nav = useNavigate()
   const [tab, setTab] = useState<Tab>('medicoes')
   const [projetoId, setProjetoId] = useState<string | null>(null)

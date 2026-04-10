@@ -197,7 +197,8 @@ function ChecklistRow({ ck, isLight }: { ck: FroChecklist; isLight: boolean }) {
 
 // ── Main ──────────────────────────────────────────────────────────────────────
 export default function Checklists() {
-  const { isLightSidebar: isLight } = useTheme()
+  const { isDark } = useTheme()
+  const isLight = !isDark
   const [modal, setModal]   = useState(false)
   const [dataFiltro, setDataFiltro] = useState(new Date().toISOString().split('T')[0])
   const [tipoFiltro, setTipoFiltro] = useState<TipoChecklist | ''>('')

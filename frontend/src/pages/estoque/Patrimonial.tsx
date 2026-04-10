@@ -156,7 +156,7 @@ export default function Patrimonial({
       )}
 
       {/* -- KPI Summary -------------------------------------------- */}
-      {kpis && (
+      {kpis && !hideHeader && (
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
           {[
             { color: 'bg-blue-500',   val: kpis.total_imobilizados, valCls: 'text-blue-600',   lbl: 'Total Ativos' },

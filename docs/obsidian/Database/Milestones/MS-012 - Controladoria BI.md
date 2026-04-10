@@ -16,18 +16,20 @@ tags: [milestone, controladoria, bi, dre, orcado, realizado]
 ## Visão Geral
 Visão financeira consolidada para a diretoria: orçado vs realizado por obra, DRE consolidado, centro de custo, forecast de caixa, EBITDA e dashboard executivo.
 
-## Estado Atual (2026-03-11)
+## Estado Atual (2026-04-10)
 
-### Frontend Implementado — 9 Páginas Operacionais
+### Frontend Implementado — 9 Páginas
 - [x] **ControladoriaHome** — Dashboard consolidado com KPIs
 - [x] **Orcamentos** — Gestão de orçamentos por obra (CRUD completo)
 - [x] **DRE** — Demonstrativo de Resultado do Exercício
 - [x] **KPIs** — Painel de indicadores com múltiplos tipos
 - [x] **Cenarios** — Análise de cenários (what-if)
 - [x] **PlanoOrcamentario** — Plano orçamentário por período
-- [x] **ControleOrcamentario** — Controle orçado vs realizado
+- [x] **ControleOrcamentario** — Controle orçado vs realizado *(funcionalidade principal entregue)*
 - [x] **PainelIndicadores** — Painel de indicadores executivo
 - [x] **AlertasDesvio** — Alertas de desvio com severidade
+
+> **Nota:** A parte mais utilizada e validada é o **Controle Orçamentário** (orçado vs realizado). As demais páginas estão implementadas mas ainda com uso limitado em produção.
 
 ### API e Backend
 - [x] Integração real com Supabase (queries diretas)

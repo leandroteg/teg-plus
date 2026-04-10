@@ -42,10 +42,13 @@ export default defineConfig({
         background_color: '#060D1B',
         categories: ['business', 'productivity'],
         icons: [
-          { src: '/icons/icon-192.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
-          { src: '/icons/icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'any' },
-          { src: '/icons/icon-192.png', sizes: '192x192', type: 'image/png', purpose: 'maskable' },
-          { src: '/icons/icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
+          { src: '/icons/icon-16x16.png', sizes: '16x16', type: 'image/png', purpose: 'any' },
+          { src: '/icons/icon-32x32.png', sizes: '32x32', type: 'image/png', purpose: 'any' },
+          { src: '/icons/icon-48x48.png', sizes: '48x48', type: 'image/png', purpose: 'any' },
+          { src: '/icons/icon-192x192.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
+          { src: '/icons/icon-512x512.png', sizes: '512x512', type: 'image/png', purpose: 'any' },
+          { src: '/icons/icon-192x192.png', sizes: '192x192', type: 'image/png', purpose: 'maskable' },
+          { src: '/icons/icon-512x512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
         ],
         shortcuts: [
           { name: 'Compras', short_name: 'Compras', url: '/compras', icons: [{ src: '/icons/icon-192.png', sizes: '192x192' }] },

@@ -60,7 +60,8 @@ function KPICard({
 
 // ── Main ──────────────────────────────────────────────────────────────────────
 export default function HistoricoOS() {
-  const { isLightSidebar: isLight } = useTheme()
+  const { isDark } = useTheme()
+  const isLight = !isDark
 
   const [mes, setMes]         = useState(mesAtual())
   const [filtroTipo, setFiltroTipo]     = useState<TipoOS | ''>('')
@@ -214,6 +215,7 @@ export default function HistoricoOS() {
             Nenhuma OS encontrada para os filtros selecionados
           </p>
         ) : (
+          <div className="overflow-x-auto">
           <table className="w-full">
             <thead>
               <tr className={`border-b ${divider}`}>
@@ -264,6 +266,7 @@ export default function HistoricoOS() {
               })}
             </tbody>
           </table>
+          </div>
         )}
       </div>
     </div>

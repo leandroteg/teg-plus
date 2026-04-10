@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import {
   ArrowLeft, Rocket, ClipboardCheck, Users, MessageSquare,
   Plus, Trash2, Save, Edit3, X, Check, FileStack, Clock, MapPin, Filter,
 } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
+import { useEGPPortfolioId } from '../../contexts/EGPContractContext'
 import {
   usePortfolio, useTAP, useSalvarTAP,
   useStakeholders, useCriarStakeholder, useAtualizarStakeholder, useDeletarStakeholder,
@@ -42,7 +43,7 @@ const fmtBRL = (v: number) =>
 
 export default function EGPIniciacao() {
   const { isLightSidebar: isLight } = useTheme()
-  const { portfolioId } = useParams<{ portfolioId: string }>()
+  const portfolioId = useEGPPortfolioId()
   const nav = useNavigate()
   const [tab, setTab] = useState<Tab>('tap')
 

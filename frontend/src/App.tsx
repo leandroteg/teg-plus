@@ -84,17 +84,12 @@ const AdiantamentosObras = lazy(() => import('./pages/obras/Adiantamentos'))
 const PrestacaoContas = lazy(() => import('./pages/obras/PrestacaoContas'))
 const PlanejamentoEquipe = lazy(() => import('./pages/obras/PlanejamentoEquipe'))
 
-// EGP — Ciclo de Vida (6 visões)
+// EGP — Ciclo de Vida (seletor de contrato persistente)
 const EGPPainel = lazy(() => import('./pages/pmo/EGPPainel'))
-const EGPIniciacaoHub = lazy(() => import('./pages/pmo/EGPIniciacaoHub'))
 const EGPIniciacao = lazy(() => import('./pages/pmo/EGPIniciacao'))
-const EGPPlanejamentoHub = lazy(() => import('./pages/pmo/EGPPlanejamentoHub'))
 const EGPPlanejamento = lazy(() => import('./pages/pmo/EGPPlanejamento'))
-const EGPExecucaoHub = lazy(() => import('./pages/pmo/EGPExecucaoHub'))
 const EGPExecucao = lazy(() => import('./pages/pmo/EGPExecucao'))
-const EGPControleHub = lazy(() => import('./pages/pmo/EGPControleHub'))
 const EGPControle = lazy(() => import('./pages/pmo/EGPControle'))
-const EGPEncerramentoHub = lazy(() => import('./pages/pmo/EGPEncerramentoHub'))
 const EGPEncerramento = lazy(() => import('./pages/pmo/EGPEncerramento'))
 const Portfolio = lazy(() => import('./pages/pmo/Portfolio'))
 const PortfolioDetalhe = lazy(() => import('./pages/pmo/PortfolioDetalhe'))
@@ -107,6 +102,7 @@ const ItensCad = lazy(() => import('./pages/cadastros/ItensCad'))
 const ClassesFinanceiras = lazy(() => import('./pages/cadastros/ClassesFinanceiras'))
 const CentrosCusto = lazy(() => import('./pages/cadastros/CentrosCusto'))
 const ObrasCad = lazy(() => import('./pages/cadastros/ObrasCad'))
+const ProjetosCad = lazy(() => import('./pages/cadastros/ProjetosCad'))
 const ColaboradoresCad = lazy(() => import('./pages/cadastros/ColaboradoresCad'))
 const EmpresasCad = lazy(() => import('./pages/cadastros/EmpresasCad'))
 const GruposFinanceiros = lazy(() => import('./pages/cadastros/GruposFinanceiros'))
@@ -139,6 +135,7 @@ const ApontamentosCartao = lazy(() => import('./pages/apontamentos/ApontamentosC
 const DespesasAdiantamentos = lazy(() => import('./pages/despesas/DespesasAdiantamentos'))
 
 // Fiscal
+const FiscalHome = lazy(() => import('./pages/fiscal/FiscalHome'))
 const NotasFiscais = lazy(() => import('./pages/financeiro/NotasFiscais'))
 const FiscalPipeline = lazy(() => import('./pages/fiscal/FiscalPipeline'))
 
@@ -258,7 +255,8 @@ export default function App() {
           {/* Módulo Fiscal */}
           <Route element={<ModuleRoute moduleKey="fiscal" />}>
             <Route element={<FiscalLayout />}>
-              <Route path="/fiscal"              element={<Lazy><NotasFiscais /></Lazy>} />
+              <Route path="/fiscal"              element={<LazyDash><FiscalHome /></LazyDash>} />
+              <Route path="/fiscal/notas"        element={<Lazy><NotasFiscais /></Lazy>} />
               <Route path="/fiscal/pipeline"     element={<Lazy><FiscalPipeline /></Lazy>} />
             </Route>
           </Route>
@@ -318,7 +316,7 @@ export default function App() {
           {/* Módulo RH */}
           <Route element={<ModuleRoute moduleKey="rh" />}>
             <Route element={<RHLayout />}>
-              <Route path="/rh"        element={<LazyDash><RHHome /></LazyDash>} />
+              <Route path="/rh"        element={<Navigate to="/rh/headcount" replace />} />
               <Route path="/rh/mural"  element={<Lazy><MuralAdmin /></Lazy>} />
             </Route>
             <Route element={<CulturaLayout />}>
@@ -385,20 +383,16 @@ export default function App() {
             <Route element={<EGPLayout />}>
               {/* Painel */}
               <Route path="/egp"                                  element={<LazyDash><EGPPainel /></LazyDash>} />
-              {/* Iniciação */}
-              <Route path="/egp/iniciacao"                        element={<Lazy><EGPIniciacaoHub /></Lazy>} />
+              {/* Ciclo de Vida — carregam contrato do seletor persistente */}
+              <Route path="/egp/iniciacao"                        element={<Lazy><EGPIniciacao /></Lazy>} />
               <Route path="/egp/iniciacao/:portfolioId"           element={<Lazy><EGPIniciacao /></Lazy>} />
-              {/* Planejamento */}
-              <Route path="/egp/planejamento"                     element={<Lazy><EGPPlanejamentoHub /></Lazy>} />
+              <Route path="/egp/planejamento"                     element={<Lazy><EGPPlanejamento /></Lazy>} />
               <Route path="/egp/planejamento/:portfolioId"        element={<Lazy><EGPPlanejamento /></Lazy>} />
-              {/* Execução */}
-              <Route path="/egp/execucao"                         element={<Lazy><EGPExecucaoHub /></Lazy>} />
+              <Route path="/egp/execucao"                         element={<Lazy><EGPExecucao /></Lazy>} />
               <Route path="/egp/execucao/:portfolioId"            element={<Lazy><EGPExecucao /></Lazy>} />
-              {/* Controle */}
-              <Route path="/egp/controle"                         element={<Lazy><EGPControleHub /></Lazy>} />
+              <Route path="/egp/controle"                         element={<Lazy><EGPControle /></Lazy>} />
               <Route path="/egp/controle/:portfolioId"            element={<Lazy><EGPControle /></Lazy>} />
-              {/* Encerramento */}
-              <Route path="/egp/encerramento"                     element={<Lazy><EGPEncerramentoHub /></Lazy>} />
+              <Route path="/egp/encerramento"                     element={<Lazy><EGPEncerramento /></Lazy>} />
               <Route path="/egp/encerramento/:portfolioId"        element={<Lazy><EGPEncerramento /></Lazy>} />
               {/* Portfólio (mantido para acesso direto) */}
               <Route path="/egp/portfolio"                        element={<Lazy><Portfolio /></Lazy>} />
@@ -432,6 +426,7 @@ export default function App() {
               <Route path="/cadastros/classes"        element={<Lazy><ClassesFinanceiras /></Lazy>} />
               <Route path="/cadastros/centros-custo"  element={<Lazy><CentrosCusto /></Lazy>} />
               <Route path="/cadastros/obras"          element={<Lazy><ObrasCad /></Lazy>} />
+              <Route path="/cadastros/projetos"      element={<Lazy><ProjetosCad /></Lazy>} />
               <Route path="/cadastros/colaboradores"  element={<Lazy><ColaboradoresCad /></Lazy>} />
               <Route path="/cadastros/empresas"       element={<Lazy><EmpresasCad /></Lazy>} />
               <Route path="/cadastros/grupos"          element={<Lazy><GruposFinanceiros /></Lazy>} />

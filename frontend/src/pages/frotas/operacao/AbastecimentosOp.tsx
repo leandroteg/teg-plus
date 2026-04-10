@@ -70,7 +70,7 @@ function NovoAbastecimentoModal({ onClose, isLight }: { onClose: () => void; isL
           </button>
         </div>
 
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
             <label className={lbl}>Veículo *</label>
             <select className={sel} value={form.veiculo_id} onChange={e => setForm(f => ({ ...f, veiculo_id: e.target.value }))} required>
@@ -86,7 +86,7 @@ function NovoAbastecimentoModal({ onClose, isLight }: { onClose: () => void; isL
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
             <label className={lbl}>Posto</label>
             <input className={inp} value={form.posto} onChange={e => setForm(f => ({ ...f, posto: e.target.value }))} placeholder="Nome do posto" />
@@ -99,7 +99,7 @@ function NovoAbastecimentoModal({ onClose, isLight }: { onClose: () => void; isL
           </div>
         </div>
 
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <div>
             <label className={lbl}>Hodômetro (km) *</label>
             <input type="number" className={inp} value={form.hodometro} onChange={e => setForm(f => ({ ...f, hodometro: e.target.value }))} required placeholder="55432" />
@@ -121,7 +121,7 @@ function NovoAbastecimentoModal({ onClose, isLight }: { onClose: () => void; isL
           <span className={`text-sm font-black ${isLight ? 'text-slate-800' : 'text-white'}`}>{totalEstimado}</span>
         </div>
 
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
             <label className={lbl}>Forma de pagamento</label>
             <select className={sel} value={form.forma_pagamento} onChange={e => setForm(f => ({ ...f, forma_pagamento: e.target.value as TipoPagamento }))}>
@@ -149,7 +149,8 @@ function NovoAbastecimentoModal({ onClose, isLight }: { onClose: () => void; isL
 
 // ── Main ──────────────────────────────────────────────────────────────────────
 export default function AbastecimentosOp() {
-  const { isLightSidebar: isLight } = useTheme()
+  const { isDark } = useTheme()
+  const isLight = !isDark
   const [modal, setModal]     = useState(false)
   const mesAtual = new Date().toISOString().slice(0, 7)
   const [mesFiltro, setMesFiltro] = useState(mesAtual)
@@ -169,14 +170,14 @@ export default function AbastecimentosOp() {
   return (
     <div className="p-4 sm:p-6 space-y-4">
 
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
           <h1 className={`text-xl font-bold flex items-center gap-2 ${isLight ? 'text-slate-800' : 'text-white'}`}>
             <Fuel size={20} className="text-teal-500" /> Abastecimentos
           </h1>
           <p className="text-sm text-slate-500">{abastecimentos.length} registros no mês</p>
         </div>
-        <button onClick={() => setModal(true)} className="flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-teal-500 to-teal-600 hover:from-teal-400 hover:to-teal-500 shadow-sm shadow-teal-500/20 text-sm text-white font-semibold">
+        <button onClick={() => setModal(true)} className="flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-teal-500 to-teal-600 hover:from-teal-400 hover:to-teal-500 shadow-sm shadow-teal-500/20 text-sm text-white font-semibold w-full sm:w-auto">
           <Plus size={15} /> Registrar
         </button>
       </div>
@@ -252,25 +253,27 @@ export default function AbastecimentosOp() {
       ) : (
         <div className="space-y-2">
           {abastecimentos.map(ab => (
-            <div key={ab.id} className={`rounded-xl shadow-sm px-4 py-3 flex items-center gap-4 ${isLight ? 'bg-white border border-slate-200' : 'bg-[#1e293b] border border-white/[0.06]'} ${ab.desvio_detectado ? 'border-red-500/30' : ''}`}>
-              {ab.desvio_detectado && <AlertTriangle size={14} className="text-red-400 shrink-0" />}
-              <div className="w-20 shrink-0">
-                <p className={`text-sm font-bold ${isLight ? 'text-slate-800' : 'text-white'}`}>{ab.veiculo?.placa}</p>
-                <p className="text-[10px] text-slate-500">{new Date(ab.data_abastecimento).toLocaleDateString('pt-BR')}</p>
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className={`text-xs ${isLight ? 'text-slate-600' : 'text-slate-300'}`}>{ab.posto ?? 'Posto não informado'}</p>
-                <p className="text-[11px] text-slate-500">{COMB_LABEL[ab.combustivel]} · {ab.litros % 1 === 0 ? ab.litros : ab.litros.toFixed(1)} L · {ab.hodometro.toLocaleString('pt-BR')} km</p>
+            <div key={ab.id} className={`rounded-xl shadow-sm px-4 py-3 flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 ${isLight ? 'bg-white border border-slate-200' : 'bg-[#1e293b] border border-white/[0.06]'} ${ab.desvio_detectado ? 'border-red-500/30' : ''}`}>
+              <div className="flex items-center gap-3 sm:gap-4">
+                {ab.desvio_detectado && <AlertTriangle size={14} className="text-red-400 shrink-0" />}
+                <div className="w-20 shrink-0">
+                  <p className={`text-sm font-bold ${isLight ? 'text-slate-800' : 'text-white'}`}>{ab.veiculo?.placa}</p>
+                  <p className="text-[10px] text-slate-500">{new Date(ab.data_abastecimento).toLocaleDateString('pt-BR')}</p>
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className={`text-xs ${isLight ? 'text-slate-600' : 'text-slate-300'}`}>{ab.posto ?? 'Posto não informado'}</p>
+                  <p className="text-[11px] text-slate-500">{COMB_LABEL[ab.combustivel]} · {ab.litros % 1 === 0 ? ab.litros : ab.litros.toFixed(1)} L · {ab.hodometro.toLocaleString('pt-BR')} km</p>
+                </div>
+                <div className="text-right shrink-0">
+                  <p className={`text-sm font-bold ${isLight ? 'text-slate-800' : 'text-white'}`}>{BRL(ab.valor_total ?? 0)}</p>
+                  <p className="text-[10px] text-slate-500">R$ {ab.valor_litro.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 3 })}/L</p>
+                </div>
               </div>
               <div className="hidden sm:block text-right">
                 <p className="text-xs text-slate-400">
                   {ab.km_litro ? `${ab.km_litro.toFixed(2)} km/L` : '—'}
                 </p>
                 <p className="text-[10px] text-slate-500">{PAG_LABEL[ab.forma_pagamento]}</p>
-              </div>
-              <div className="text-right shrink-0">
-                <p className={`text-sm font-bold ${isLight ? 'text-slate-800' : 'text-white'}`}>{BRL(ab.valor_total ?? 0)}</p>
-                <p className="text-[10px] text-slate-500">R$ {ab.valor_litro.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 3 })}/L</p>
               </div>
             </div>
           ))}

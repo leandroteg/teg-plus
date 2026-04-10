@@ -1,11 +1,12 @@
 import { useState } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import {
   ArrowLeft, Zap, CalendarDays, BarChart3, DollarSign, AlertTriangle,
   ClipboardList, Plus, Trash2, Save, Edit3, X, Check,
   ShoppingCart, Truck, FileSignature, FolderKanban, ChevronRight,
 } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
+import { useEGPPortfolioId } from '../../contexts/EGPContractContext'
 import {
   usePortfolio, useProjetos, useCriarProjeto,
   useTarefas, useAtualizarTarefa,
@@ -48,7 +49,7 @@ const STATUS_ACAO_LABELS: Record<string, string> = { pendente: 'Pendente', em_an
 
 export default function EGPExecucao() {
   const { isLightSidebar: isLight } = useTheme()
-  const { portfolioId } = useParams<{ portfolioId: string }>()
+  const portfolioId = useEGPPortfolioId()
   const nav = useNavigate()
   const [tab, setTab] = useState<Tab>('cronograma')
   const [projetoId, setProjetoId] = useState<string | null>(null)
