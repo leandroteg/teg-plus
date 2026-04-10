@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Building2, CheckCircle2, Loader2, X } from 'lucide-react'
+import { UpperInput } from './UpperInput'
 import { useSalvarFornecedor } from '../hooks/useCadastros'
 import { useConsultaCNPJ } from '../hooks/useConsultas'
 import {
@@ -167,11 +168,11 @@ export default function FornecedorCadastroModal({
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className={`block text-xs font-bold mb-1 ${subtext}`}>Razão Social *</label>
-              <input value={form.razao_social ?? ''} onChange={(event) => setField('razao_social', event.target.value)} placeholder="Razão social" className={`input-base ${input}`} />
+              <UpperInput value={form.razao_social ?? ''} onChange={(event) => setField('razao_social', event.target.value)} placeholder="Razão social" className={`input-base ${input}`} />
             </div>
             <div>
               <label className={`block text-xs font-bold mb-1 ${subtext}`}>Nome Fantasia</label>
-              <input value={form.nome_fantasia ?? ''} onChange={(event) => setField('nome_fantasia', event.target.value)} placeholder="Nome fantasia" className={`input-base ${input}`} />
+              <UpperInput value={form.nome_fantasia ?? ''} onChange={(event) => setField('nome_fantasia', event.target.value)} placeholder="Nome fantasia" className={`input-base ${input}`} />
             </div>
             <div>
               <label className={`block text-xs font-bold mb-1 ${subtext}`}>CNPJ *</label>
@@ -200,15 +201,15 @@ export default function FornecedorCadastroModal({
             </div>
             <div>
               <label className={`block text-xs font-bold mb-1 ${subtext}`}>Contato</label>
-              <input value={form.contato_nome ?? ''} onChange={(event) => setField('contato_nome', event.target.value)} placeholder="Nome do contato" className={`input-base ${input}`} />
+              <UpperInput value={form.contato_nome ?? ''} onChange={(event) => setField('contato_nome', event.target.value)} placeholder="Nome do contato" className={`input-base ${input}`} />
             </div>
             <div>
               <label className={`block text-xs font-bold mb-1 ${subtext}`}>Telefone</label>
-              <input value={form.telefone ?? ''} onChange={(event) => setField('telefone', event.target.value)} placeholder="(00) 00000-0000" className={`input-base ${input}`} />
+              <UpperInput value={form.telefone ?? ''} onChange={(event) => setField('telefone', event.target.value)} placeholder="(00) 00000-0000" className={`input-base ${input}`} />
             </div>
             <div>
               <label className={`block text-xs font-bold mb-1 ${subtext}`}>E-mail</label>
-              <input value={form.email ?? ''} onChange={(event) => setField('email', event.target.value)} placeholder="financeiro@empresa.com" className={`input-base ${input}`} />
+              <UpperInput value={form.email ?? ''} onChange={(event) => setField('email', event.target.value)} placeholder="financeiro@empresa.com" className={`input-base ${input}`} />
             </div>
           </div>
 
@@ -243,19 +244,19 @@ export default function FornecedorCadastroModal({
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-4">
               <div>
                 <label className={`block text-xs font-bold mb-1 ${subtext}`}>Banco</label>
-                <input value={form.banco_nome ?? ''} disabled={Boolean(form.boleto)} onChange={(event) => setField('banco_nome', event.target.value)} placeholder="Banco" className={`input-base ${input} ${form.boleto ? 'opacity-60 cursor-not-allowed' : ''}`} />
+                <UpperInput value={form.banco_nome ?? ''} disabled={Boolean(form.boleto)} onChange={(event) => setField('banco_nome', event.target.value)} placeholder="Banco" className={`input-base ${input} ${form.boleto ? 'opacity-60 cursor-not-allowed' : ''}`} />
               </div>
               <div>
                 <label className={`block text-xs font-bold mb-1 ${subtext}`}>Agência</label>
-                <input value={form.agencia ?? ''} disabled={Boolean(form.boleto)} onChange={(event) => setField('agencia', event.target.value)} placeholder="0000" className={`input-base ${input} ${form.boleto ? 'opacity-60 cursor-not-allowed' : ''}`} />
+                <UpperInput value={form.agencia ?? ''} disabled={Boolean(form.boleto)} onChange={(event) => setField('agencia', event.target.value)} placeholder="0000" className={`input-base ${input} ${form.boleto ? 'opacity-60 cursor-not-allowed' : ''}`} />
               </div>
               <div>
                 <label className={`block text-xs font-bold mb-1 ${subtext}`}>Conta</label>
-                <input value={form.conta ?? ''} disabled={Boolean(form.boleto)} onChange={(event) => setField('conta', event.target.value)} placeholder="00000-0" className={`input-base ${input} ${form.boleto ? 'opacity-60 cursor-not-allowed' : ''}`} />
+                <UpperInput value={form.conta ?? ''} disabled={Boolean(form.boleto)} onChange={(event) => setField('conta', event.target.value)} placeholder="00000-0" className={`input-base ${input} ${form.boleto ? 'opacity-60 cursor-not-allowed' : ''}`} />
               </div>
               <div>
                 <label className={`block text-xs font-bold mb-1 ${subtext}`}>Chave PIX</label>
-                <input value={form.pix_chave ?? ''} disabled={Boolean(form.boleto)} onChange={(event) => setField('pix_chave', event.target.value)} placeholder="Chave PIX" className={`input-base ${input} ${form.boleto ? 'opacity-60 cursor-not-allowed' : ''}`} />
+                <UpperInput value={form.pix_chave ?? ''} disabled={Boolean(form.boleto)} onChange={(event) => setField('pix_chave', event.target.value)} placeholder="Chave PIX" className={`input-base ${input} ${form.boleto ? 'opacity-60 cursor-not-allowed' : ''}`} />
               </div>
               <div>
                 <label className={`block text-xs font-bold mb-1 ${subtext}`}>Tipo PIX</label>

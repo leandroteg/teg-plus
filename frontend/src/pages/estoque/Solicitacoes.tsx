@@ -12,6 +12,7 @@ import { useTheme } from '../../contexts/ThemeContext'
 import { useAuth } from '../../contexts/AuthContext'
 import type { EstSolicitacao, StatusSolicitacao } from '../../types/estoque'
 import NumericInput from '../../components/NumericInput'
+import { UpperInput, UpperTextarea } from '../../components/UpperInput'
 
 const STATUS_CONFIG: Record<StatusSolicitacao, { label: string; bg: string; text: string; dot: string }> = {
   aberta:       { label: 'Aberta',       bg: 'bg-blue-50',    text: 'text-blue-700',    dot: 'bg-blue-500'    },
@@ -309,12 +310,12 @@ function NovaSolicitacaoModal({
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className={`block text-xs font-bold mb-1 ${labelCls}`}>Solicitante *</label>
-              <input value={solicitante} onChange={e => setSolicitante(e.target.value)}
+              <UpperInput value={solicitante} onChange={e => setSolicitante(e.target.value)}
                 className={inputCls} placeholder="Nome do solicitante..." />
             </div>
             <div>
               <label className={`block text-xs font-bold mb-1 ${labelCls}`}>Obra *</label>
-              <input value={obra} onChange={e => setObra(e.target.value)}
+              <UpperInput value={obra} onChange={e => setObra(e.target.value)}
                 className={inputCls} placeholder="Nome da obra..." />
             </div>
           </div>
@@ -338,7 +339,7 @@ function NovaSolicitacaoModal({
 
           <div>
             <label className={`block text-xs font-bold mb-1 ${labelCls}`}>Observacao</label>
-            <textarea value={observacao} onChange={e => setObservacao(e.target.value)}
+            <UpperTextarea value={observacao} onChange={e => setObservacao(e.target.value)}
               rows={2} className={`${inputCls} resize-none`} placeholder="Observacoes opcionais..." />
           </div>
 
@@ -390,7 +391,7 @@ function NovaSolicitacaoModal({
                     )}
                   </div>
                   {!item.item_id && (
-                    <input
+                    <UpperInput
                       value={item.descricao_livre ?? ''}
                       onChange={e => updateItem(idx, 'descricao_livre', e.target.value)}
                       className={`${inputCls} text-xs mt-2`}

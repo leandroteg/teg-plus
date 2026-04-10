@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Warehouse, Plus, Search, X, Save, Loader2 } from 'lucide-react'
+import { UpperInput } from '../../components/UpperInput'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../../services/supabase'
 import type { EstBase } from '../../types/estoque'
@@ -104,7 +105,7 @@ export default function Bases() {
 
       <div className="relative">
         <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-        <input value={busca} onChange={e => setBusca(e.target.value)}
+        <UpperInput value={busca} onChange={e => setBusca(e.target.value)}
           placeholder="Buscar por nome, codigo, CNPJ ou cidade..."
           className="w-full pl-9 pr-4 py-2 rounded-xl border border-slate-200 bg-white text-sm
             focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400" />
@@ -184,32 +185,32 @@ export default function Bases() {
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-bold text-slate-600 mb-1">Codigo</label>
-                  <input value={editItem.codigo ?? ''} onChange={e => setEditItem({ ...editItem, codigo: e.target.value })}
+                  <UpperInput value={editItem.codigo ?? ''} onChange={e => setEditItem({ ...editItem, codigo: e.target.value })}
                     className="input-base" placeholder="BASE-01" disabled={!!editItem.id} />
                 </div>
                 <div>
                   <label className="block text-xs font-bold text-slate-600 mb-1">Nome *</label>
-                  <input value={editItem.nome ?? ''} onChange={e => setEditItem({ ...editItem, nome: e.target.value })}
+                  <UpperInput value={editItem.nome ?? ''} onChange={e => setEditItem({ ...editItem, nome: e.target.value })}
                     className="input-base" placeholder="Almoxarifado Central" />
                 </div>
               </div>
 
               <div>
                 <label className="block text-xs font-bold text-slate-600 mb-1">CNPJ</label>
-                <input value={editItem.cnpj ?? ''} onChange={e => setEditItem({ ...editItem, cnpj: e.target.value })}
+                <UpperInput value={editItem.cnpj ?? ''} onChange={e => setEditItem({ ...editItem, cnpj: e.target.value })}
                   className="input-base" placeholder="00.000.000/0000-00" />
               </div>
 
               <div>
                 <label className="block text-xs font-bold text-slate-600 mb-1">Endereco</label>
-                <input value={editItem.endereco ?? ''} onChange={e => setEditItem({ ...editItem, endereco: e.target.value })}
+                <UpperInput value={editItem.endereco ?? ''} onChange={e => setEditItem({ ...editItem, endereco: e.target.value })}
                   className="input-base" placeholder="Rua, numero, complemento" />
               </div>
 
               <div className="grid grid-cols-3 gap-3">
                 <div className="col-span-1">
                   <label className="block text-xs font-bold text-slate-600 mb-1">Cidade</label>
-                  <input value={editItem.cidade ?? ''} onChange={e => setEditItem({ ...editItem, cidade: e.target.value })}
+                  <UpperInput value={editItem.cidade ?? ''} onChange={e => setEditItem({ ...editItem, cidade: e.target.value })}
                     className="input-base" placeholder="Cidade" />
                 </div>
                 <div>
@@ -222,7 +223,7 @@ export default function Bases() {
                 </div>
                 <div>
                   <label className="block text-xs font-bold text-slate-600 mb-1">CEP</label>
-                  <input value={editItem.cep ?? ''} onChange={e => setEditItem({ ...editItem, cep: e.target.value })}
+                  <UpperInput value={editItem.cep ?? ''} onChange={e => setEditItem({ ...editItem, cep: e.target.value })}
                     className="input-base" placeholder="00000-000" />
                 </div>
               </div>
@@ -230,7 +231,7 @@ export default function Bases() {
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-bold text-slate-600 mb-1">Telefone</label>
-                  <input value={editItem.telefone ?? ''} onChange={e => setEditItem({ ...editItem, telefone: e.target.value })}
+                  <UpperInput value={editItem.telefone ?? ''} onChange={e => setEditItem({ ...editItem, telefone: e.target.value })}
                     className="input-base" placeholder="(00) 00000-0000" />
                 </div>
                 <div>

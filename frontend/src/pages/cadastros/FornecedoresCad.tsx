@@ -3,6 +3,7 @@ import {
   Building2, Plus, Search, ChevronRight, CheckCircle2,
   Phone, Mail, MapPin, Loader2,
 } from 'lucide-react'
+import { UpperInput } from '../../components/UpperInput'
 import { useCadFornecedores, useSalvarFornecedor, useAiCadastroParse } from '../../hooks/useCadastros'
 import { useConsultaCNPJ, useConsultaCEP } from '../../hooks/useConsultas'
 import type { Fornecedor } from '../../types/financeiro'
@@ -148,7 +149,7 @@ export default function FornecedoresCad() {
       <div className="flex gap-2 flex-wrap">
         <div className="relative flex-1 min-w-[200px]">
           <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-          <input value={busca} onChange={e => setBusca(e.target.value)}
+          <UpperInput value={busca} onChange={e => setBusca(e.target.value)}
             placeholder="Buscar por nome, CNPJ..."
             className="w-full pl-9 pr-4 py-2 rounded-xl border border-slate-200 bg-white text-sm
               focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400" />

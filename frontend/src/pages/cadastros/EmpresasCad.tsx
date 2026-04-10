@@ -1,5 +1,6 @@
 import { useState, useCallback } from 'react'
 import { Building, Plus, Search, ChevronRight, X, Save, Loader2, CheckCircle2, Upload, ImageIcon } from 'lucide-react'
+import { UpperInput } from '../../components/UpperInput'
 import { useCadEmpresas, useSalvarEmpresa } from '../../hooks/useCadastros'
 import { useConsultaCNPJ } from '../../hooks/useConsultas'
 import { supabase } from '../../services/supabase'
@@ -85,7 +86,7 @@ export default function EmpresasCad() {
 
       <div className="relative">
         <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-        <input value={busca} onChange={e => setBusca(e.target.value)}
+        <UpperInput value={busca} onChange={e => setBusca(e.target.value)}
           placeholder="Buscar por nome ou codigo..."
           className="w-full pl-9 pr-4 py-2 rounded-xl border border-slate-200 bg-white text-sm
             focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400" />
@@ -153,7 +154,7 @@ export default function EmpresasCad() {
                 onChange={v => set('razao_social', v)} label="Razao Social" placeholder="Nome completo da empresa" required />
               <div>
                 <label className="block text-xs font-bold text-slate-600 mb-1">Nome Fantasia</label>
-                <input value={editItem.nome_fantasia ?? ''} onChange={e => set('nome_fantasia', e.target.value)}
+                <UpperInput value={editItem.nome_fantasia ?? ''} onChange={e => set('nome_fantasia', e.target.value)}
                   className="input-base" placeholder="Nome fantasia" />
               </div>
 
@@ -203,7 +204,7 @@ export default function EmpresasCad() {
                     <div key={i}>
                       <div className="flex items-center gap-2">
                         <div className="relative flex-1">
-                          <input
+                          <UpperInput
                             value={c.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, '$1.$2.$3/$4-$5')}
                             onChange={e => setCnpj(i, e.target.value)}
                             onBlur={() => { if (i === 0) cnpjLookup.consultar(c) }}
@@ -241,41 +242,41 @@ export default function EmpresasCad() {
                 <div className="space-y-3">
                   <div>
                     <label className="block text-xs font-bold text-slate-600 mb-1">{`Endere\u00e7o`}</label>
-                    <input value={(editItem as any).endereco ?? ''} onChange={e => set('endereco', e.target.value)}
+                    <UpperInput value={(editItem as any).endereco ?? ''} onChange={e => set('endereco', e.target.value)}
                       className="input-base" placeholder="Rua, número, bairro" />
                   </div>
                   <div className="grid grid-cols-3 gap-2">
                     <div>
                       <label className="block text-xs font-bold text-slate-600 mb-1">Cidade</label>
-                      <input value={(editItem as any).cidade ?? ''} onChange={e => set('cidade', e.target.value)}
+                      <UpperInput value={(editItem as any).cidade ?? ''} onChange={e => set('cidade', e.target.value)}
                         className="input-base" placeholder="Cidade" />
                     </div>
                     <div>
                       <label className="block text-xs font-bold text-slate-600 mb-1">UF</label>
-                      <input value={(editItem as any).uf ?? ''} onChange={e => set('uf', e.target.value)}
+                      <UpperInput value={(editItem as any).uf ?? ''} onChange={e => set('uf', e.target.value)}
                         className="input-base" placeholder="UF" maxLength={2} />
                     </div>
                     <div>
                       <label className="block text-xs font-bold text-slate-600 mb-1">CEP</label>
-                      <input value={(editItem as any).cep ?? ''} onChange={e => set('cep', e.target.value)}
+                      <UpperInput value={(editItem as any).cep ?? ''} onChange={e => set('cep', e.target.value)}
                         className="input-base" placeholder="00000-000" />
                     </div>
                   </div>
                   <div className="grid grid-cols-2 gap-2">
                     <div>
                       <label className="block text-xs font-bold text-slate-600 mb-1">Telefone</label>
-                      <input value={(editItem as any).telefone ?? ''} onChange={e => set('telefone', e.target.value)}
+                      <UpperInput value={(editItem as any).telefone ?? ''} onChange={e => set('telefone', e.target.value)}
                         className="input-base" placeholder="(00) 0000-0000" />
                     </div>
                     <div>
                       <label className="block text-xs font-bold text-slate-600 mb-1">E-mail</label>
-                      <input value={(editItem as any).email ?? ''} onChange={e => set('email', e.target.value)}
+                      <UpperInput value={(editItem as any).email ?? ''} onChange={e => set('email', e.target.value)}
                         className="input-base" placeholder="contato@empresa.com" />
                     </div>
                   </div>
                   <div>
                     <label className="block text-xs font-bold text-slate-600 mb-1">{`Inscri\u00e7\u00e3o Estadual`}</label>
-                    <input value={(editItem as any).inscricao_estadual ?? ''} onChange={e => set('inscricao_estadual', e.target.value)}
+                    <UpperInput value={(editItem as any).inscricao_estadual ?? ''} onChange={e => set('inscricao_estadual', e.target.value)}
                       className="input-base" placeholder="00.000.000-0" />
                   </div>
                 </div>

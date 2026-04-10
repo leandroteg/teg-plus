@@ -13,6 +13,7 @@ import { MapContainer, TileLayer, Marker, Popup, Polyline, useMap } from 'react-
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import { serializeViagemRotaPayload } from '../../utils/logisticaViagem'
+import { UpperInput } from '../UpperInput'
 
 // Fix leaflet default icon issue
 delete (L.Icon.Default.prototype as Record<string, unknown>)._getIconUrl
@@ -531,7 +532,7 @@ function EnderecoInput({
 
       {mode === 'endereco' ? (
         <div className="relative">
-          <input
+          <UpperInput
             type="text"
             value={value}
             onChange={e => handleEnderecoChange(e.target.value)}
@@ -552,7 +553,7 @@ function EnderecoInput({
         </div>
       ) : (
         <div className="relative">
-          <input
+          <UpperInput
             type="text"
             value={cepValue}
             onChange={e => handleCepChange(e.target.value)}
@@ -742,7 +743,7 @@ function DadosTransporte({ isDark, modal, setModal, motorista, setMotorista, pla
                 </div>
               ) : (
                 <>
-                  <input
+                  <UpperInput
                     type="text"
                     value={veiculoQuery}
                     onChange={e => { setVeiculoQuery(e.target.value); setVeiculoOpen(true) }}
@@ -805,14 +806,14 @@ function DadosTransporte({ isDark, modal, setModal, motorista, setMotorista, pla
         {/* Motorista */}
         <div>
           <label className={labelCls}>Motorista</label>
-          <input type="text" value={motorista} onChange={e => setMotorista(e.target.value)}
+          <UpperInput type="text" value={motorista} onChange={e => setMotorista(e.target.value)}
             placeholder="Nome" className={fieldCls} />
         </div>
 
         {/* Placa — readonly when vehicle selected, editable otherwise */}
         <div>
           <label className={labelCls}>Placa</label>
-          <input type="text" value={placa}
+          <UpperInput type="text" value={placa}
             onChange={e => { if (!veiculoSelecionado) setPlaca(e.target.value.toUpperCase()) }}
             readOnly={!!veiculoSelecionado}
             placeholder="ABC-1234"

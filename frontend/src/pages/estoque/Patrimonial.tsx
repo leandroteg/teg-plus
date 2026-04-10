@@ -5,6 +5,7 @@ import {
   ArrowLeftRight, FileText, ChevronDown, ChevronRight, RefreshCw,
   LayoutGrid, LayoutList, MapPin,
 } from 'lucide-react'
+import { UpperInput, UpperTextarea } from '../../components/UpperInput'
 import {
   useImobilizados, useSalvarImobilizado, useBaixarImobilizado,
   usePatrimonialKPIs, useCalcularDepreciacao,
@@ -392,7 +393,7 @@ export default function Patrimonial({
             <div className="p-6 space-y-4">
               <div>
                 <label className={`block text-xs font-bold mb-1 ${labelCls}`}>Motivo da Baixa *</label>
-                <textarea
+                <UpperTextarea
                   value={motivoBaixa}
                   onChange={e => setMotivoBaixa(e.target.value)}
                   rows={3} className={`${inputCls} resize-none`}
@@ -794,7 +795,7 @@ function ImobilizadoFormModal({
 
           <div>
             <label className={`block text-xs font-bold mb-1 ${labelCls}`}>Descricao *</label>
-            <input value={item.descricao ?? ''} onChange={e => set('descricao', e.target.value)}
+            <UpperInput value={item.descricao ?? ''} onChange={e => set('descricao', e.target.value)}
               className={inputCls} placeholder="Ex: Notebook Dell Inspiron 15..." />
           </div>
 
@@ -987,7 +988,7 @@ function TransferirAtivoModal({
           {/* Motivo */}
           <div>
             <label className={`block text-xs font-bold mb-1 ${labelCls}`}>Motivo</label>
-            <textarea
+            <UpperTextarea
               value={motivo}
               onChange={e => setMotivo(e.target.value)}
               rows={2}
@@ -999,7 +1000,7 @@ function TransferirAtivoModal({
           {/* Observacoes */}
           <div>
             <label className={`block text-xs font-bold mb-1 ${labelCls}`}>Observacoes</label>
-            <textarea
+            <UpperTextarea
               value={observacoes}
               onChange={e => setObservacoes(e.target.value)}
               rows={2}

@@ -1350,3 +1350,81 @@ export function useConfirmarAssinatura() {
     },
   })
 }
+
+// ── Reenviar Esclarecimento (contrato) ─────────────────────────────────────
+
+export function useReenviarEsclarecimentoContrato() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async ({
+      solicitacaoId,
+      solicitacaoNumero,
+      solicitanteNome,
+      resposta,
+    }: {
+      solicitacaoId: string
+      solicitacaoNumero: string
+      solicitanteNome: string
+      resposta?: string
+    }) => {
+      // 1. Limpa esclarecimento e volta status para aguardando_aprovacao
+      const { error: updErr } = await supabase
+        .from('con_solicitacoes')
+        .update({
+          status: 'aguardando_aprovacao',
+          esclarecimento_msg: null,
+          esclarecimento_por: null,
+          esclarecimento_em: null,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', solicitacaoId)
+      if (updErr) throw updErr
+
+      // 2. Busca dados para recriar aprovacao pendente
+      const { data: sol } = await supabase
+        .from('con_solicitacoes')
+        .select('objeto, contraparte_nome, valor_estimado')
+        .eq('id', solicitacaoId)
+        .single()
+
+      const valor = Number(sol?.valor_estimado ?? 0)
+      const nivel = valor > 100000 ? 4 : valor > 25000 ? 3 : valor > 5000 ? 2 : 1
+      const aprovadorNome = valor > 25000 ? 'Laucidio' : 'Welton'
+
+      const obs = resposta?.trim()
+        ? `Esclarecimento respondido por ${solicitanteNome}: ${resposta.trim()}`
+        : `Esclarecimento respondido por ${solicitanteNome}`
+
+      // 3. Insere novo registro pendente em apr_aprovacoes
+      await supabase.from('apr_aprovacoes').insert({
+        modulo: 'con',
+        tipo_aprovacao: 'minuta_contratual',
+        entidade_id: solicitacaoId,
+        entidade_numero: solicitacaoNumero,
+        aprovador_nome: aprovadorNome,
+        aprovador_email: '',
+        nivel,
+        status: 'pendente',
+        observacao: obs,
+        data_limite: new Date(Date.now() + 72 * 3600_000).toISOString(),
+      })
+
+      // 4. Registra historico
+      await supabase.from('con_solicitacao_historico').insert({
+        solicitacao_id: solicitacaoId,
+        etapa_de: 'aprovacao_diretoria',
+        etapa_para: 'aprovacao_diretoria',
+        observacao: obs,
+      })
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['con-solicitacoes'] })
+      qc.invalidateQueries({ queryKey: ['con-solicitacao'] })
+      qc.invalidateQueries({ queryKey: ['con-solicitacao-historico'] })
+      qc.invalidateQueries({ queryKey: ['aprovacoes-pendentes'] })
+      qc.invalidateQueries({ queryKey: ['aprovacoes-historico'] })
+      qc.invalidateQueries({ queryKey: ['aprovacoes-kpis'] })
+      qc.invalidateQueries({ queryKey: ['dashboard'] })
+    },
+  })
+}

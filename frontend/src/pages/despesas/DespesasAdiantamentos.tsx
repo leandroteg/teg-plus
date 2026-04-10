@@ -6,6 +6,7 @@ import { useCadCentrosCusto, useCadClasses, useCadFornecedores } from '../../hoo
 import { isDespesaSchemaMissing, useAdiantamentosDespesa, useCriarSolicitacaoAdiantamento, useAtualizarClasseAdiantamento } from '../../hooks/useDespesas'
 import { useRHColaboradores } from '../../hooks/useRH'
 import NumericInput from '../../components/NumericInput'
+import { UpperTextarea } from '../../components/UpperInput'
 import SearchableSelect from '../../components/SearchableSelect'
 import type { SelectOption } from '../../components/SearchableSelect'
 import type { StatusDespesaAdiantamento } from '../../types'
@@ -331,11 +332,11 @@ export default function DespesasAdiantamentos() {
               </div>
               <div className="md:col-span-2">
                 <label className="mb-1.5 block text-xs font-semibold text-slate-500">Finalidade</label>
-                <textarea rows={3} value={form.finalidade} onChange={e => setForm(prev => ({ ...prev, finalidade: e.target.value }))} className={inputCls} placeholder="Descreva o motivo do adiantamento" />
+                <UpperTextarea rows={3} value={form.finalidade} onChange={e => setForm(prev => ({ ...prev, finalidade: e.target.value }))} className={inputCls} placeholder="Descreva o motivo do adiantamento" />
               </div>
               <div className="md:col-span-2">
                 <label className="mb-1.5 block text-xs font-semibold text-slate-500">Justificativa</label>
-                <textarea rows={3} value={form.justificativa} onChange={e => setForm(prev => ({ ...prev, justificativa: e.target.value }))} className={inputCls} placeholder="Contexto para o gestor aprovar" />
+                <UpperTextarea rows={3} value={form.justificativa} onChange={e => setForm(prev => ({ ...prev, justificativa: e.target.value }))} className={inputCls} placeholder="Contexto para o gestor aprovar" />
               </div>
               <div>
                 <label className="mb-1.5 block text-xs font-semibold text-slate-500">Valor solicitado</label>
@@ -382,7 +383,7 @@ export default function DespesasAdiantamentos() {
               </div>
               <div className="md:col-span-2">
                 <label className="mb-1.5 block text-xs font-semibold text-slate-500">Observações</label>
-                <textarea rows={2} value={form.observacoes} onChange={e => setForm(prev => ({ ...prev, observacoes: e.target.value }))} className={inputCls} placeholder="Informações complementares para o financeiro" />
+                <UpperTextarea rows={2} value={form.observacoes} onChange={e => setForm(prev => ({ ...prev, observacoes: e.target.value }))} className={inputCls} placeholder="Informações complementares para o financeiro" />
               </div>
             </div>
 

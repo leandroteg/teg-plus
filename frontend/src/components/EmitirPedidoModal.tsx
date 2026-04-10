@@ -10,6 +10,7 @@ import type { RequisicaoItem } from '../types'
 import { supabase } from '../services/supabase'
 import { gerarPreviaParcelas, resumirHomogeneidade } from '../utils/pagamentos'
 import NumericInput from './NumericInput'
+import { UpperInput, UpperTextarea } from './UpperInput'
 
 type ModalCotacao = {
   id?: string
@@ -560,7 +561,7 @@ export default function EmitirPedidoModal({
                       <label className="block text-[11px] font-bold text-amber-700 mb-1">
                         Justificativa para dispensa de contrato *
                       </label>
-                      <textarea
+                      <UpperTextarea
                         value={justNaoContrato}
                         onChange={e => setJustNaoContrato(e.target.value)}
                         placeholder="Ex.: Compra pontual, fornecedor nao aceita contrato, urgencia operacional..."
@@ -598,7 +599,7 @@ export default function EmitirPedidoModal({
                     </label>
                     <div>
                       <label className="block text-[11px] font-bold text-slate-600 mb-1">PIX (chave)</label>
-                      <input
+                      <UpperInput
                         value={bancoPix}
                         disabled={bancoBoleto}
                         onChange={e => setBancoPix(e.target.value)}
@@ -624,7 +625,7 @@ export default function EmitirPedidoModal({
                     </div>
                     <div>
                       <label className="block text-[11px] font-bold text-slate-600 mb-1">Banco</label>
-                      <input
+                      <UpperInput
                         value={bancoBancoNome}
                         disabled={bancoBoleto}
                         onChange={e => setBancoBancoNome(e.target.value)}
@@ -635,7 +636,7 @@ export default function EmitirPedidoModal({
                     <div className="grid grid-cols-2 gap-2">
                       <div>
                         <label className="block text-[11px] font-bold text-slate-600 mb-1">Agência</label>
-                        <input
+                        <UpperInput
                           value={bancoAgencia}
                           disabled={bancoBoleto}
                           onChange={e => setBancoAgencia(e.target.value)}
@@ -645,7 +646,7 @@ export default function EmitirPedidoModal({
                       </div>
                       <div>
                         <label className="block text-[11px] font-bold text-slate-600 mb-1">Conta</label>
-                        <input
+                        <UpperInput
                           value={bancoConta}
                           disabled={bancoBoleto}
                           onChange={e => setBancoConta(e.target.value)}
@@ -741,7 +742,7 @@ export default function EmitirPedidoModal({
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-bold text-slate-600 mb-1.5">Condicao de Pagamento</label>
-                  <input
+                  <UpperInput
                     value={condicaoPagamento}
                     onChange={(event) => setCondicaoPagamento(event.target.value)}
                     className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-teal-300"
@@ -858,7 +859,7 @@ export default function EmitirPedidoModal({
 
               <div>
                 <label className="block text-xs font-bold text-slate-600 mb-1.5">Observacoes do Pedido</label>
-                <textarea
+                <UpperTextarea
                   value={observacoes}
                   onChange={(event) => setObservacoes(event.target.value)}
                   rows={3}
@@ -946,7 +947,7 @@ export default function EmitirPedidoModal({
                           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                             <div>
                               <label className="block text-[11px] font-semibold text-slate-500 mb-1">Descricao</label>
-                              <input
+                              <UpperInput
                                 value={parcela.tipo === 'adiantamento' ? 'Adiantamento' : parcela.descricao ?? ''}
                                 onChange={(event) => updateParcela(parcela.numero, { descricao: event.target.value })}
                                 readOnly={parcela.tipo === 'adiantamento'}

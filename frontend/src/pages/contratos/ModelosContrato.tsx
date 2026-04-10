@@ -11,6 +11,7 @@ import { useAuth } from '../../contexts/AuthContext'
 import { GRUPO_CONTRATO_OPTIONS, GRUPO_CONTRATO_LABEL } from '../../constants/contratos'
 import type { GrupoContrato } from '../../types/contratos'
 import NumericInput from '../../components/NumericInput'
+import { UpperInput, UpperTextarea } from '../../components/UpperInput'
 import { supabase } from '../../services/supabase'
 
 const RECORRENCIAS = [
@@ -160,17 +161,17 @@ function ModeloForm({
         <h2 className="text-sm font-extrabold text-slate-800">Dados do Modelo</h2>
         <div>
           <label className={labelClass}>Nome do Modelo *</label>
-          <input value={nome} onChange={e => setNome(e.target.value)}
+          <UpperInput value={nome} onChange={e => setNome(e.target.value)}
             placeholder="Ex: Contrato Padrão de Serviços" className={inputClass} />
         </div>
         <div>
           <label className={labelClass}>Objeto Padrão *</label>
-          <input value={objeto} onChange={e => setObjeto(e.target.value)}
+          <UpperInput value={objeto} onChange={e => setObjeto(e.target.value)}
             placeholder="Descrição resumida do objeto" className={inputClass} />
         </div>
         <div>
           <label className={labelClass}>Descrição Detalhada</label>
-          <textarea value={descricao} onChange={e => setDescricao(e.target.value)}
+          <UpperTextarea value={descricao} onChange={e => setDescricao(e.target.value)}
             placeholder="Detalhes do escopo, condições padrão, etc."
             rows={3} className={`${inputClass} resize-none`} />
         </div>
@@ -204,10 +205,10 @@ function ModeloForm({
                   <Trash2 size={13} />
                 </button>
               </div>
-              <input value={it.descricao} onChange={e => updateItem(idx, 'descricao', e.target.value)}
+              <UpperInput value={it.descricao} onChange={e => updateItem(idx, 'descricao', e.target.value)}
                 placeholder="Descrição do item" className={inputClass} />
               <div className="grid grid-cols-3 gap-2">
-                <input value={it.unidade} onChange={e => updateItem(idx, 'unidade', e.target.value)}
+                <UpperInput value={it.unidade} onChange={e => updateItem(idx, 'unidade', e.target.value)}
                   placeholder="un" className={inputClass} />
                 <NumericInput value={it.quantidade} onChange={v => updateItem(idx, 'quantidade', v)}
                   placeholder="Qtd" className={inputClass} min={0} step={0.01} />
@@ -236,7 +237,7 @@ function ModeloForm({
         </div>
         <div>
           <label className={labelClass}>Índice de Reajuste</label>
-          <input value={indiceReajuste} onChange={e => setIndiceReajuste(e.target.value)}
+          <UpperInput value={indiceReajuste} onChange={e => setIndiceReajuste(e.target.value)}
             placeholder="IPCA, IGP-M, INPC" className={inputClass} />
         </div>
       </div>

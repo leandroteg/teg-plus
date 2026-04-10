@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Plus, Radio, AlertTriangle, CheckCircle, MessageSquare, XCircle, X } from 'lucide-react'
+import { UpperInput, UpperTextarea } from '../../../components/UpperInput'
 import { useOcorrenciasTel, useAtualizarOcorrencia, useRegistrarOcorrencia, useVeiculos } from '../../../hooks/useFrotas'
 import { useTheme } from '../../../contexts/ThemeContext'
 import type { FroOcorrenciaTel, StatusOcorrenciaTel, TipoOcorrenciaTel } from '../../../types/frotas'
@@ -94,7 +95,7 @@ function OcorrenciaModal({ oc, onClose, isLight }: { oc: FroOcorrenciaTel; onClo
 
         <div>
           <label className={`block text-xs font-bold mb-1 ${isLight ? 'text-slate-600' : 'text-slate-300'}`}>Observações / Tratativa</label>
-          <textarea
+          <UpperTextarea
             className={`w-full px-3 py-2 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-teal-400/40 resize-none mt-1 ${
               isLight ? 'bg-white border border-slate-200 shadow-sm text-slate-800' : 'bg-white/6 border border-white/12 text-white'
             }`}
@@ -227,12 +228,12 @@ function NovaOcorrenciaModal({ onClose, isLight }: { onClose: () => void; isLigh
 
         <div>
           <label className={lbl}>Endereço / Local</label>
-          <input className={inp} value={form.endereco} onChange={e => setForm(f => ({ ...f, endereco: e.target.value }))} placeholder="Rodovia BR-040, km 512" />
+          <UpperInput className={inp} value={form.endereco} onChange={e => setForm(f => ({ ...f, endereco: e.target.value }))} placeholder="Rodovia BR-040, km 512" />
         </div>
 
         <div>
           <label className={lbl}>Observações</label>
-          <textarea className={inp + ' resize-none'} rows={2} value={form.observacoes} onChange={e => setForm(f => ({ ...f, observacoes: e.target.value }))} placeholder="Detalhes adicionais..." />
+          <UpperTextarea className={inp + ' resize-none'} rows={2} value={form.observacoes} onChange={e => setForm(f => ({ ...f, observacoes: e.target.value }))} placeholder="Detalhes adicionais..." />
         </div>
 
         <div className="flex gap-2">

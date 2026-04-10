@@ -19,6 +19,7 @@ import {
   useMinutas,
   useResumoExecutivo,
   useAssinaturas,
+  useReenviarEsclarecimentoContrato,
 } from '../../hooks/useSolicitacoes'
 import { GRUPO_CONTRATO_LABEL } from '../../constants/contratos'
 import type { GrupoContrato } from '../../types/contratos'
@@ -891,7 +892,7 @@ function EtapaActions({ etapa, solicitacaoId, onAvancar, onCancel, onEnviarAssin
 export default function SolicitacaoDetalhe() {
   const { id } = useParams<{ id: string }>()
   const nav = useNavigate()
-  const { role, hasSetorPapel } = useAuth()
+  const { role, hasSetorPapel, perfil } = useAuth()
 
   const { data: solicitacao, isLoading } = useSolicitacao(id)
   const { data: resumoExecutivo } = useResumoExecutivo(id)
@@ -901,6 +902,8 @@ export default function SolicitacaoDetalhe() {
   const { data: minutas } = useMinutas(id)
   const { data: assinaturas = [] } = useAssinaturas(id)
 
+  const reenviarMutation = useReenviarEsclarecimentoContrato()
+  const [respostaEsclarecimento, setRespostaEsclarecimento] = useState('')
   const [showCancelModal, setShowCancelModal] = useState(false)
   const [showCertisignModal, setShowCertisignModal] = useState(false)
   const [showConfirmarAssinaturaModal, setShowConfirmarAssinaturaModal] = useState(false)
@@ -1082,6 +1085,66 @@ export default function SolicitacaoDetalhe() {
           </p>
         </div>
       </div>
+
+      {/* ── Alerta Esclarecimento ─────────────────────────────────── */}
+      {s.status === 'em_esclarecimento' && (
+        <div className="bg-amber-50 border-2 border-amber-200 rounded-2xl p-4 space-y-3">
+          <div className="flex items-center gap-2">
+            <AlertTriangle size={16} className="text-amber-600 flex-shrink-0" />
+            <span className="text-sm font-bold text-amber-700">Esclarecimento Solicitado</span>
+          </div>
+          <p className="text-sm text-amber-700">{s.esclarecimento_msg}</p>
+          <div className="flex items-center gap-2 text-xs text-amber-500">
+            <span>Por: {s.esclarecimento_por}</span>
+            {s.esclarecimento_em && <span>· {fmtData(s.esclarecimento_em)}</span>}
+          </div>
+
+          {/* Reenviar para aprovador */}
+          {!reenviarMutation.isSuccess && (
+            <div className="pt-2 border-t border-amber-200 space-y-2">
+              <p className="text-xs font-semibold text-amber-700">Responder e reenviar ao aprovador:</p>
+              <textarea
+                rows={2}
+                value={respostaEsclarecimento}
+                onChange={e => setRespostaEsclarecimento(e.target.value)}
+                placeholder="Descreva o esclarecimento prestado (opcional)..."
+                className="w-full border border-amber-300 bg-white rounded-xl px-3 py-2 text-sm
+                  focus:ring-2 focus:ring-amber-400 outline-none placeholder-amber-300"
+              />
+              <button
+                disabled={reenviarMutation.isPending}
+                onClick={() => {
+                  if (!perfil) return
+                  reenviarMutation.mutate({
+                    solicitacaoId: s.id,
+                    solicitacaoNumero: s.numero,
+                    solicitanteNome: perfil.nome,
+                    resposta: respostaEsclarecimento,
+                  })
+                }}
+                className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl
+                  bg-amber-500 text-white text-sm font-bold hover:bg-amber-600
+                  active:scale-[0.98] transition-all disabled:opacity-50"
+              >
+                {reenviarMutation.isPending
+                  ? <div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+                  : <Send size={15} />}
+                Reenviar para Aprovador
+              </button>
+              {reenviarMutation.isError && (
+                <p className="text-xs text-red-600">Erro ao reenviar. Tente novamente.</p>
+              )}
+            </div>
+          )}
+
+          {reenviarMutation.isSuccess && (
+            <div className="pt-2 border-t border-amber-200 flex items-center gap-2 text-sm font-semibold text-emerald-700">
+              <CheckCircle2 size={16} className="text-emerald-500" />
+              Reenviado ao aprovador com sucesso
+            </div>
+          )}
+        </div>
+      )}
 
       {/* ── 2-column layout ─────────────────────────────────────────── */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">

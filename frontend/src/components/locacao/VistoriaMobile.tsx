@@ -11,6 +11,7 @@ import {
   WifiOff, Wifi, X, AlertTriangle, Sparkles, Eye,
 } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
+import { UpperInput, UpperTextarea } from '../UpperInput'
 import { useOnlineStatus } from '../../hooks/useOnlineStatus'
 import { useVistoriaOffline, dataUrlToBlob, type OfflineFoto } from '../../hooks/useVistoriaOffline'
 import {
@@ -410,7 +411,7 @@ export default function VistoriaMobile({ entrada, vistoriaId, onClose, onSave, o
           <div className="flex items-center justify-between mb-1">
             {editingAmbiente === currentAmbiente ? (
               <form className="flex items-center gap-2 flex-1" onSubmit={e => { e.preventDefault(); confirmEdit() }}>
-                <input ref={editInputRef} type="text" value={editNome}
+                <UpperInput ref={editInputRef} type="text" value={editNome}
                   onChange={e => setEditNome(e.target.value)} onBlur={confirmEdit}
                   className={`text-lg font-extrabold rounded-xl px-3 py-2 border outline-none flex-1 ${
                     isDark ? 'bg-white/[0.06] border-indigo-500/40 text-white' : 'bg-white border-indigo-300 text-slate-900'
@@ -461,7 +462,7 @@ export default function VistoriaMobile({ entrada, vistoriaId, onClose, onSave, o
           )}
           {activeTab === 0 && showObs && (
             <div className="animate-fadeIn">
-              <textarea rows={3} placeholder="Observacoes sobre o imovel..."
+              <UpperTextarea rows={3} placeholder="Observacoes sobre o imovel..."
                 value={obsGerais} onChange={e => setObsGeraisState(e.target.value)}
                 className={`w-full text-sm rounded-2xl px-4 py-3 border outline-none resize-none transition-colors ${
                   isDark
@@ -543,7 +544,7 @@ export default function VistoriaMobile({ entrada, vistoriaId, onClose, onSave, o
                   {/* Obs field */}
                   {hasObs && (
                     <div className="mt-3 animate-fadeIn">
-                      <input type="text" placeholder="Observacao..."
+                      <UpperInput type="text" placeholder="Observacao..."
                         value={observacao}
                         onChange={e => setObs(idx, e.target.value)}
                         className={`w-full text-[13px] rounded-xl px-3.5 py-2.5 border outline-none transition-colors ${

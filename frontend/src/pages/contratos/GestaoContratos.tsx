@@ -14,6 +14,7 @@ import type { Contrato } from '../../types/contratos'
 import type { StatusAditivo, TipoAditivo } from '../../types/contratos'
 import type { StatusContrato, GrupoContrato } from '../../types/contratos'
 import { GRUPO_CONTRATO_OPTIONS, GRUPO_CONTRATO_LABEL } from '../../constants/contratos'
+import { UpperInput, UpperTextarea } from '../../components/UpperInput'
 
 // ── Formatters ──────────────────────────────────────────────────────────────
 const fmt = (v: number) =>
@@ -268,7 +269,7 @@ function ContratoCard({ contrato, onToast }: { contrato: Contrato; onToast: (typ
               </p>
             </div>
             {confirmAction.needsMotivo && (
-              <textarea
+              <UpperTextarea
                 value={motivo}
                 onChange={e => setMotivo(e.target.value)}
                 placeholder="Motivo (obrigatorio)..."
@@ -376,7 +377,7 @@ function TabContratos() {
       <div className="flex flex-wrap items-center gap-3 mb-4">
         <div className="relative flex-1 min-w-[200px]">
           <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-          <input value={busca} onChange={e => setBusca(e.target.value)}
+          <UpperInput value={busca} onChange={e => setBusca(e.target.value)}
             placeholder="Buscar numero, objeto, contraparte..."
             className="w-full pl-9 pr-4 py-2 rounded-xl border border-slate-200 bg-white
               text-sm text-slate-700 placeholder-slate-400 focus:outline-none
@@ -583,7 +584,7 @@ function TabAditivos() {
 
       <div className="relative">
         <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-        <input value={busca} onChange={e => setBusca(e.target.value)}
+        <UpperInput value={busca} onChange={e => setBusca(e.target.value)}
           placeholder="Buscar aditivo, contrato..."
           className="w-full pl-9 pr-4 py-2.5 rounded-xl border border-slate-200 bg-white text-sm
             placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/30" />
@@ -724,7 +725,7 @@ function TabReajustes() {
 
       <div className="relative">
         <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-        <input value={busca} onChange={e => setBusca(e.target.value)}
+        <UpperInput value={busca} onChange={e => setBusca(e.target.value)}
           placeholder="Buscar índice, contrato..."
           className="w-full pl-9 pr-4 py-2.5 rounded-xl border border-slate-200 bg-white text-sm
             placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/30" />

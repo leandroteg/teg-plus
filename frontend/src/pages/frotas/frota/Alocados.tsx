@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { MapPin, Wrench, CornerDownLeft, X, Car, Cog, CalendarDays, Building2, LayoutGrid, LayoutList, User } from 'lucide-react'
+import { UpperTextarea } from '../../../components/UpperInput'
 import { useTheme } from '../../../contexts/ThemeContext'
 import { useAlocacoes, useEncerrarAlocacao, useOrdensServico } from '../../../hooks/useFrotas'
 import type { FroAlocacao } from '../../../types/frotas'
@@ -134,7 +135,7 @@ function RetornoModal({ alocacao, isLight, onClose, onConfirm, isPending }: Reto
             <label className={`text-xs font-semibold block mb-1 ${isLight ? 'text-slate-600' : 'text-slate-300'}`}>
               Observações
             </label>
-            <textarea
+            <UpperTextarea
               value={obs}
               onChange={e => setObs(e.target.value)}
               placeholder="Condições do retorno, ocorrências, etc."

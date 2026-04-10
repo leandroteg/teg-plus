@@ -17,6 +17,7 @@ import type {
   UrgenciaSolicitacao, NovaSolicitacaoPayload, TipoSolicitacao,
 } from '../../types/contratos'
 import { GRUPO_CONTRATO_OPTIONS } from '../../constants/contratos'
+import { UpperInput, UpperTextarea } from '../../components/UpperInput'
 
 // ── CNPJ helpers ──────────────────────────────────────────────────────────────
 
@@ -782,13 +783,13 @@ export default function NovaSolicitacao() {
             {/* Endereço + Representante legal */}
             <div>
               <label className={labelClass}>Endereço da Contraparte</label>
-              <input value={contraparteEndereco} onChange={e => setContraparteEndereco(e.target.value)}
+              <UpperInput value={contraparteEndereco} onChange={e => setContraparteEndereco(e.target.value)}
                 placeholder="Rua, número, bairro, cidade/UF, CEP" className={inputClass} />
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div>
                 <label className={labelClass}>Representante Legal</label>
-                <input value={contraparteRepNome} onChange={e => setContraparteRepNome(e.target.value)}
+                <UpperInput value={contraparteRepNome} onChange={e => setContraparteRepNome(e.target.value)}
                   placeholder="Nome completo" className={inputClass} />
               </div>
               <div>
@@ -798,7 +799,7 @@ export default function NovaSolicitacao() {
               </div>
               <div>
                 <label className={labelClass}>Cargo</label>
-                <input value={contraparteRepCargo} onChange={e => setContraparteRepCargo(e.target.value)}
+                <UpperInput value={contraparteRepCargo} onChange={e => setContraparteRepCargo(e.target.value)}
                   placeholder="Ex: Diretor, Sócio" className={inputClass} />
               </div>
             </div>
@@ -839,7 +840,7 @@ export default function NovaSolicitacao() {
           {/* Objeto + Justificativa */}
           <div>
             <label className={labelClass}>Objeto do Contrato *</label>
-            <input
+            <UpperInput
               value={objeto}
               onChange={e => setObjeto(e.target.value)}
               placeholder="Descrição resumida do objeto do contrato"
@@ -849,7 +850,7 @@ export default function NovaSolicitacao() {
 
           <div>
             <label className={labelClass}>Justificativa (responsavel, obra, setor, municipio e motivo)</label>
-            <textarea
+            <UpperTextarea
               value={justificativa}
               onChange={e => setJustificativa(e.target.value)}
               placeholder="Informe quem e o responsavel, obra, setor, municipio e o motivo da solicitacao..."
@@ -860,7 +861,7 @@ export default function NovaSolicitacao() {
 
           <div>
             <label className={labelClass}>Descricao do Escopo</label>
-            <textarea
+            <UpperTextarea
               value={descricaoEscopo}
               onChange={e => setDescricaoEscopo(e.target.value)}
               placeholder="Detalhe o escopo dos serviços ou fornecimentos..."
@@ -975,7 +976,7 @@ export default function NovaSolicitacao() {
             </div>
             <div>
               <label className={labelClass}>Índice de Reajuste</label>
-              <input
+              <UpperInput
                 value={indiceReajuste}
                 onChange={e => setIndiceReajuste(e.target.value)}
                 placeholder="IPCA, IGP-M, INPC"
@@ -986,7 +987,7 @@ export default function NovaSolicitacao() {
 
           <div>
             <label className={labelClass}>Informacoes Complementares</label>
-            <textarea
+            <UpperTextarea
               value={observacoes}
               onChange={e => setObservacoes(e.target.value)}
               placeholder="Informacoes adicionais, referencias, contatos..."

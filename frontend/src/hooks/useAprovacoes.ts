@@ -931,28 +931,55 @@ export function useDecisaoGenerica() {
       // 3. Atualizar entidade fonte conforme tipo de aprovacao
       try {
         if (tipoAprovacao === 'minuta_contratual') {
-          // Avanca etapa da solicitacao de contrato
-          const nextEtapa = decisao === 'aprovada' ? 'enviar_assinatura' : 'preparar_minuta'
-          await supabase
-            .from('con_solicitacoes')
-            .update({
-              etapa_atual: nextEtapa,
-              status: decisao === 'rejeitada' ? 'em_andamento' : 'em_andamento',
-              updated_at: new Date().toISOString(),
-            })
-            .eq('id', entidadeId)
+          if (decisao === 'esclarecimento') {
+            // Pede mais detalhes ao solicitante — permanece na mesma etapa
+            await supabase
+              .from('con_solicitacoes')
+              .update({
+                status: 'em_esclarecimento',
+                esclarecimento_msg: observacao || 'Esclarecimento solicitado',
+                esclarecimento_por: aprovadorNome,
+                esclarecimento_em: new Date().toISOString(),
+                updated_at: new Date().toISOString(),
+              })
+              .eq('id', entidadeId)
 
-          // Registra historico
-          await supabase
-            .from('con_solicitacao_historico')
-            .insert({
-              solicitacao_id: entidadeId,
-              etapa_de: 'aprovacao_diretoria',
-              etapa_para: nextEtapa,
-              observacao: decisao === 'aprovada'
-                ? `Aprovado por ${aprovadorNome}`
-                : `Rejeitado por ${aprovadorNome}: ${observacao ?? ''}`,
-            })
+            await supabase
+              .from('con_solicitacao_historico')
+              .insert({
+                solicitacao_id: entidadeId,
+                etapa_de: 'aprovacao_diretoria',
+                etapa_para: 'aprovacao_diretoria',
+                observacao: `Esclarecimento solicitado por ${aprovadorNome}: ${observacao ?? ''}`,
+              })
+          } else {
+            // Avanca etapa da solicitacao de contrato
+            const nextEtapa = decisao === 'aprovada' ? 'enviar_assinatura' : 'preparar_minuta'
+            await supabase
+              .from('con_solicitacoes')
+              .update({
+                etapa_atual: nextEtapa,
+                status: 'em_andamento',
+                // Limpa esclarecimento anterior se houver
+                esclarecimento_msg: null,
+                esclarecimento_por: null,
+                esclarecimento_em: null,
+                updated_at: new Date().toISOString(),
+              })
+              .eq('id', entidadeId)
+
+            // Registra historico
+            await supabase
+              .from('con_solicitacao_historico')
+              .insert({
+                solicitacao_id: entidadeId,
+                etapa_de: 'aprovacao_diretoria',
+                etapa_para: nextEtapa,
+                observacao: decisao === 'aprovada'
+                  ? `Aprovado por ${aprovadorNome}`
+                  : `Rejeitado por ${aprovadorNome}: ${observacao ?? ''}`,
+              })
+          }
         } else if (tipoAprovacao === 'autorizacao_pagamento') {
           const decisionAt = new Date().toISOString()
 
@@ -1292,6 +1319,8 @@ export function useDecisaoGenerica() {
       qc.invalidateQueries({ queryKey: ['aprovacoes-kpis'] })
       qc.invalidateQueries({ queryKey: ['dashboard'] })
       qc.invalidateQueries({ queryKey: ['con-solicitacoes'] })
+      qc.invalidateQueries({ queryKey: ['con-solicitacao'] })
+      qc.invalidateQueries({ queryKey: ['con-solicitacao-historico'] })
       qc.invalidateQueries({ queryKey: ['con-solicitacoes-dashboard'] })
       qc.invalidateQueries({ queryKey: ['contas-pagar'] })
       qc.invalidateQueries({ queryKey: ['financeiro-dashboard'] })

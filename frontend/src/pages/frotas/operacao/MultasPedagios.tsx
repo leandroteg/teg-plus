@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { AlertCircle, Plus, X, AlertTriangle } from 'lucide-react'
+import { UpperInput, UpperTextarea } from '../../../components/UpperInput'
 import { useMultas, useSalvarMulta, useVeiculos } from '../../../hooks/useFrotas'
 import { useTheme } from '../../../contexts/ThemeContext'
 import type { FroMulta, StatusMulta, TipoMulta } from '../../../types/frotas'
@@ -176,7 +177,7 @@ function RegistrarModal({
 
         <div>
           <label className={lbl}>Descrição</label>
-          <input
+          <UpperInput
             className={inp}
             value={form.descricao}
             onChange={e => setForm(f => ({ ...f, descricao: e.target.value }))}
@@ -186,7 +187,7 @@ function RegistrarModal({
 
         <div>
           <label className={lbl}>Observações</label>
-          <textarea
+          <UpperTextarea
             className={`${inp} resize-none`}
             rows={2}
             value={form.observacoes}

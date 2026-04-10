@@ -303,7 +303,7 @@ export type EtapaSolicitacao =
   | 'liberar_execucao' | 'concluido' | 'cancelado'
 
 export type StatusSolicitacao =
-  | 'rascunho' | 'em_andamento' | 'aguardando_aprovacao'
+  | 'rascunho' | 'em_andamento' | 'aguardando_aprovacao' | 'em_esclarecimento'
   | 'aprovado' | 'rejeitado' | 'cancelado' | 'concluido'
 
 export type TipoContraparte = 'fornecedor' | 'cliente' | 'pj'
@@ -440,6 +440,9 @@ export interface Solicitacao {
   motivo_cancelamento?: string
   responsavel_id?: string
   responsavel_nome?: string
+  esclarecimento_msg?: string
+  esclarecimento_por?: string
+  esclarecimento_em?: string
   created_at: string
   updated_at: string
   created_by?: string

@@ -30,6 +30,7 @@ import type { MelhoriaMinuta, MinutaTextoGerado } from '../../hooks/useSolicitac
 import type { Minuta, TipoMinuta, StatusMinuta, MinutaAiAnalise, ConfigAnalise, GrupoContrato } from '../../types/contratos'
 import { useModelosContrato } from '../../hooks/useContratos'
 import { GRUPO_CONTRATO_LABEL } from '../../constants/contratos'
+import { UpperTextarea } from '../../components/UpperInput'
 import { supabase } from '../../services/supabase'
 import { getEmpresa } from '../../services/empresa'
 import { jsPDF } from 'jspdf'
@@ -2144,10 +2145,24 @@ export default function PreparaMinuta() {
           )}
 
           {!hasFinalMinuta && minutas.length > 0 && (
-            <div className="bg-amber-50 rounded-xl border border-amber-200 px-4 py-3">
-              <p className="text-[10px] text-amber-700 font-semibold">
-                Adicione uma minuta com tipo "Final" para avançar para o Resumo Executivo.
-              </p>
+            <div className="space-y-2">
+              <div className="bg-amber-50 rounded-xl border border-amber-200 px-4 py-3">
+                <p className="text-[10px] text-amber-700 font-semibold">
+                  Adicione uma minuta com tipo "Final" para avançar para o Resumo Executivo.
+                </p>
+              </div>
+              <button
+                onClick={handleAvancarResumo}
+                disabled={avancarEtapa.isPending}
+                className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl
+                  border border-slate-200 text-slate-600 text-xs font-semibold
+                  hover:bg-slate-50 transition-all disabled:opacity-50"
+              >
+                {avancarEtapa.isPending
+                  ? <div className="w-3.5 h-3.5 border-2 border-slate-300/40 border-t-slate-500 rounded-full animate-spin" />
+                  : <ChevronRight size={13} />}
+                Prosseguir sem Análise IA
+              </button>
             </div>
           )}
         </div>
@@ -2352,7 +2367,7 @@ export default function PreparaMinuta() {
                 </div>
                 <div className="sm:col-span-2">
                   <label className={labelClass}>Descrição</label>
-                  <textarea
+                  <UpperTextarea
                     value={descricao}
                     onChange={e => setDescricao(e.target.value)}
                     placeholder="Observações sobre esta versão da minuta..."

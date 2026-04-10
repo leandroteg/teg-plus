@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Plus, Wrench, X, Clock, AlertTriangle, Car, Building2 } from 'lucide-react'
+import { UpperTextarea } from '../../../components/UpperInput'
 import { useOrdensServico, useCriarOS, useVeiculos } from '../../../hooks/useFrotas'
 import { useTheme } from '../../../contexts/ThemeContext'
 import type { FroOrdemServico, PrioridadeOS, TipoOS, StatusOS } from '../../../types/frotas'
@@ -165,7 +166,7 @@ function NovaOSModal({ onClose, isLight }: { onClose: () => void; isLight: boole
 
           <div>
             <label className={lbl}>Descrição do Problema *</label>
-            <textarea className={`${inp} resize-none`} rows={3} required
+            <UpperTextarea className={`${inp} resize-none`} rows={3} required
               placeholder="Descreva o problema identificado..."
               value={form.descricao_problema}
               onChange={e => setForm(f => ({ ...f, descricao_problema: e.target.value }))} />

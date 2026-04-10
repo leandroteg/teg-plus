@@ -10,6 +10,7 @@ import { useTheme } from '../../contexts/ThemeContext'
 import type { LocEntrada, StatusEntrada } from '../../types/locacao'
 import { ENTRADA_PIPELINE_STAGES } from '../../types/locacao'
 import VistoriaModal from '../../components/locacao/VistoriaModal'
+import { UpperInput } from '../../components/UpperInput'
 import { downloadVistoriaPdf, compartilharVistoriaWhatsApp, type VistoriaPdfData } from '../../utils/vistoria-pdf'
 
 // ── Accent maps ──────────────────────────────────────────────────────────────
@@ -357,7 +358,7 @@ export default function EntradasPipeline() {
       <div className={`px-4 py-2.5 border-b flex flex-wrap items-center gap-2 ${isDark ? 'border-white/[0.06]' : 'border-slate-100'}`}>
         <div className="relative flex-1 min-w-[180px] max-w-sm">
           <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-          <input type="text" value={busca} onChange={e => setBusca(e.target.value)} placeholder="Buscar endereço, locador, cidade..."
+          <UpperInput type="text" value={busca} onChange={e => setBusca(e.target.value)} placeholder="Buscar endereço, locador, cidade..."
             className={`w-full pl-9 pr-4 py-2 rounded-xl border text-xs placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 ${isDark ? 'bg-white/[0.04] border-white/[0.06] text-slate-200' : 'border-slate-200 bg-white text-slate-700'}`} />
           {busca && <button onClick={() => setBusca('')} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"><X size={12} /></button>}
         </div>

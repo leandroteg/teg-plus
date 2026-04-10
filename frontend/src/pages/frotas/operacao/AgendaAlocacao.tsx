@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { CalendarDays, Plus, CornerDownLeft, X } from 'lucide-react'
+import { UpperTextarea } from '../../../components/UpperInput'
 import {
   useAlocacoes,
   useCriarAlocacao,
@@ -100,7 +101,7 @@ function RetornoModal({
 
         <div>
           <label className={lbl}>Observações</label>
-          <textarea
+          <UpperTextarea
             className={`${inp} resize-none`}
             rows={2}
             value={obs}
@@ -262,7 +263,7 @@ function NovaAlocacaoModal({
 
         <div>
           <label className={lbl}>Observações</label>
-          <textarea
+          <UpperTextarea
             className={`${inp} resize-none`}
             rows={2}
             value={form.observacoes}
