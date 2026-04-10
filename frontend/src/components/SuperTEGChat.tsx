@@ -48,13 +48,13 @@ export default function SuperTEGChat() {
     if (isOpen) setTimeout(() => inputRef.current?.focus(), 150)
   }, [isOpen])
 
-  /* Greeting bubble — appears after login, disappears on click → opens chat */
+  /* Greeting bubble — only on home page ("/"), disappears on click → opens chat with greeting */
   const [showGreeting, setShowGreeting] = useState(false)
   const [greetingText, setGreetingText] = useState('')
   const greetingSent = useRef(false)
+  const isHomePage = location.pathname === '/' || location.pathname === ''
   useEffect(() => {
-    if (greetingSent.current || !perfil?.nome || isOpen) return
-    // Show greeting bubble after 2s on page load
+    if (greetingSent.current || !perfil?.nome || isOpen || !isHomePage) return
     const timer = setTimeout(() => {
       greetingSent.current = true
       const hour = new Date().getHours()
@@ -62,15 +62,22 @@ export default function SuperTEGChat() {
       const firstName = perfil.nome.split(' ')[0]
       setGreetingText(`${greeting}, ${firstName}!`)
       setShowGreeting(true)
-      // Auto-hide after 8s
       setTimeout(() => setShowGreeting(false), 8000)
     }, 2000)
     return () => clearTimeout(timer)
-  }, [perfil, isOpen])
+  }, [perfil, isOpen, isHomePage])
+  // Hide bubble when navigating away from home
+  useEffect(() => {
+    if (!isHomePage) setShowGreeting(false)
+  }, [isHomePage])
 
   const handleGreetingClick = () => {
     setShowGreeting(false)
     setIsOpen(true)
+    // Send greeting as first message from SuperTEG
+    if (messages.length === 0 && greetingText) {
+      setTimeout(() => sendMessage(greetingText), 300)
+    }
   }
 
   /* Auto-navigate on pending action */
