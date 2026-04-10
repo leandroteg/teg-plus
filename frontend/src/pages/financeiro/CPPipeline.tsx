@@ -1846,7 +1846,7 @@ function CPDetailModal({ cp, stageStatus, onClose, onAction, isDark }: {
                               </div>
                               <span className={`truncate text-[11px] ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{item.cp?.numero_documento || '—'}</span>
                               <span className={`text-[11px] ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{item.cp ? fmtData(item.cp.data_vencimento) : '—'}</span>
-                              <span className=”text-right text-[11px] font-semibold text-emerald-600”>{item.cp ? fmt(item.cp.valor_original) : '—'}</span>
+                              <span className="text-right text-[11px] font-semibold text-emerald-600">{item.cp ? fmt(item.cp.valor_original) : '—'}</span>
                               <span className={`inline-flex h-fit rounded-full px-2 py-0.5 text-[10px] font-semibold ${
                                 selectedApprovalItemIds.includes(item.cp_id)
                                   ? isDark ? 'bg-emerald-500/10 text-emerald-300' : 'bg-emerald-50 text-emerald-700'
