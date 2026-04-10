@@ -73,9 +73,15 @@ export default function FrotasChecklistModal({ veiculo, tipoChecklist, alocacaoI
   // Load template for the checklist type
   const { data: templates = [] } = useChecklistTemplates(tipoChecklist)
   const tipoAtivo = veiculo.tipo_ativo || 'veiculo'
-  const template = templates.find(
+  // Prefer templates that have items seeded (077 migration over 068 stubs)
+  const matchingTemplates = templates.filter(
     t => t.tipo_ativo === tipoAtivo || t.tipo_ativo === 'todos',
-  ) || templates[0] || null
+  )
+  const template = matchingTemplates.find(t => t.itens && t.itens.length > 0)
+    || matchingTemplates[0]
+    || templates.find(t => t.itens && t.itens.length > 0)
+    || templates[0]
+    || null
 
   // Load template items
   const { data: templateItems = [] } = useQuery({
@@ -118,12 +124,17 @@ export default function FrotasChecklistModal({ veiculo, tipoChecklist, alocacaoI
     ? 'bg-white/[0.05] border-white/10 text-white placeholder-slate-500 focus:border-rose-500'
     : 'bg-slate-50 border-slate-200 text-slate-700 placeholder-slate-400 focus:border-rose-400'
 
+  // Use template items from join if separate query returned empty
+  const effectiveItems = templateItems.length > 0
+    ? templateItems
+    : (template?.itens ?? [])
+
   // Initialize: create execution if needed, populate items
   useEffect(() => {
-    if (initialized || !template?.id || templateItems.length === 0) return
+    if (initialized || !template?.id || effectiveItems.length === 0) return
 
     // Build checklist from template
-    const baseItens = buildChecklistFromTemplate(templateItems)
+    const baseItens = buildChecklistFromTemplate(effectiveItems)
 
     // If there's an existing execution with saved items, merge them
     if (existingExecucao?.itens && existingExecucao.itens.length > 0) {
@@ -174,7 +185,7 @@ export default function FrotasChecklistModal({ veiculo, tipoChecklist, alocacaoI
 
     setItens(baseItens)
     setInitialized(true)
-  }, [initialized, template, templateItems, existingExecucao, isOnline, veiculo, alocacaoId])
+  }, [initialized, template, effectiveItems, existingExecucao, isOnline, veiculo, alocacaoId])
 
   const preenchidos = itens.filter(it => it.estado !== null).length
   const total = itens.length
