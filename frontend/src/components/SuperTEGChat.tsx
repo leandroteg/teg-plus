@@ -74,9 +74,9 @@ export default function SuperTEGChat() {
   const handleGreetingClick = () => {
     setShowGreeting(false)
     setIsOpen(true)
-    // Send greeting as first message from SuperTEG
-    if (messages.length === 0 && greetingText) {
-      setTimeout(() => sendMessage(greetingText), 300)
+    // Send greeting as message — always, even with history
+    if (greetingText) {
+      setTimeout(() => sendMessage(greetingText), 400)
     }
   }
 
