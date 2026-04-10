@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { LogIn, Warehouse, ClipboardCheck, MapPin } from 'lucide-react'
 import { useTheme } from '../../../contexts/ThemeContext'
+import { useVeiculos } from '../../../hooks/useFrotas'
 import EmEntrada      from './EmEntrada'
 import Patio          from './Patio'
 import ChecklistSaida from './ChecklistSaida'
@@ -86,6 +87,13 @@ const COMPS: Record<TabKey, React.ComponentType> = {
 export default function FrotaHub() {
   const [active, setActive] = useState<TabKey>('patio')
   const { isDark } = useTheme()
+  const { data: veiculos = [] } = useVeiculos()
+  const counts: Record<TabKey, number> = {
+    em_entrada: veiculos.filter(v => v.status === 'em_entrada').length,
+    patio: veiculos.filter(v => v.status === 'disponivel').length,
+    checklist_saida: veiculos.filter(v => v.status === 'aguardando_saida').length,
+    alocados: veiculos.filter(v => v.status === 'em_uso').length,
+  }
   const Comp = COMPS[active] ?? Patio
 
   return (
@@ -110,6 +118,13 @@ export default function FrotaHub() {
               >
                 <Icon size={15} className="shrink-0" />
                 {tab.label}
+                {counts[tab.key] > 0 && (
+                  <span className={`min-w-[20px] h-5 px-1.5 rounded-full text-[10px] font-bold flex items-center justify-center ${
+                    isActive ? 'bg-white/25 text-current' : isDark ? 'bg-white/[0.08] text-slate-400' : 'bg-slate-200/80 text-slate-500'
+                  }`}>
+                    {counts[tab.key]}
+                  </span>
+                )}
               </button>
             )
           })}

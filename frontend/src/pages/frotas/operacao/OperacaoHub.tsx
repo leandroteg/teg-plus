@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { CalendarDays, Fuel, AlertCircle, Radio, BarChart3 } from 'lucide-react'
 import { useTheme } from '../../../contexts/ThemeContext'
+import { useAbastecimentos, useOcorrenciasTel } from '../../../hooks/useFrotas'
 import AgendaAlocacao from './AgendaAlocacao'
 import AbastecimentosOp from './AbastecimentosOp'
 import MultasPedagios from './MultasPedagios'
@@ -100,6 +101,15 @@ const COMPS: Record<TabKey, React.ComponentType> = {
 export default function OperacaoHub() {
   const [active, setActive] = useState<TabKey>('agenda')
   const { isDark } = useTheme()
+  const { data: abastecimentos = [] } = useAbastecimentos()
+  const { data: ocorrencias = [] } = useOcorrenciasTel()
+  const counts: Record<TabKey, number> = {
+    agenda: 0,
+    abastecimentos: abastecimentos.length,
+    multas: ocorrencias.length,
+    telemetria: 0,
+    indicadores: 0,
+  }
   const Comp = COMPS[active] ?? AgendaAlocacao
 
   return (
@@ -124,6 +134,13 @@ export default function OperacaoHub() {
               >
                 <Icon size={15} className="shrink-0" />
                 {tab.label}
+                {counts[tab.key] > 0 && (
+                  <span className={`min-w-[20px] h-5 px-1.5 rounded-full text-[10px] font-bold flex items-center justify-center ${
+                    isActive ? 'bg-white/25 text-current' : isDark ? 'bg-white/[0.08] text-slate-400' : 'bg-slate-200/80 text-slate-500'
+                  }`}>
+                    {counts[tab.key]}
+                  </span>
+                )}
               </button>
             )
           })}

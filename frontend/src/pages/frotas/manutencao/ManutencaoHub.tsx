@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { CalendarDays, ClipboardList, Wrench, History } from 'lucide-react'
 import { useTheme } from '../../../contexts/ThemeContext'
+import { useOrdensServico, useChecklists } from '../../../hooks/useFrotas'
 import Planejamento         from './Planejamento'
 import ChecklistsManutencao from './ChecklistsManutencao'
 import OSAbertas            from './OSAbertas'
@@ -86,6 +87,14 @@ const COMPS: Record<TabKey, React.ComponentType> = {
 export default function ManutencaoHub() {
   const [active, setActive] = useState<TabKey>('os')
   const { isDark } = useTheme()
+  const { data: ordens = [] } = useOrdensServico()
+  const { data: checklists = [] } = useChecklists()
+  const counts: Record<TabKey, number> = {
+    planejamento: 0,
+    checklists: checklists.filter(c => c.status === 'pendente' || c.status === 'em_andamento').length,
+    os: ordens.filter(o => !['concluida', 'cancelada', 'rejeitada'].includes(o.status)).length,
+    historico: ordens.filter(o => o.status === 'concluida').length,
+  }
   const Comp = COMPS[active] ?? OSAbertas
 
   return (
@@ -110,6 +119,13 @@ export default function ManutencaoHub() {
               >
                 <Icon size={15} className="shrink-0" />
                 {tab.label}
+                {counts[tab.key] > 0 && (
+                  <span className={`min-w-[20px] h-5 px-1.5 rounded-full text-[10px] font-bold flex items-center justify-center ${
+                    isActive ? 'bg-white/25 text-current' : isDark ? 'bg-white/[0.08] text-slate-400' : 'bg-slate-200/80 text-slate-500'
+                  }`}>
+                    {counts[tab.key]}
+                  </span>
+                )}
               </button>
             )
           })}
