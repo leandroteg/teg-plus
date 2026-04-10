@@ -21,6 +21,12 @@
           navigator.serviceWorker.register('/sw.js')
         })
       }
+      // Capture beforeinstallprompt EARLY — before React mounts — so it's never missed
+      window.__pwaInstallPrompt = null;
+      window.addEventListener('beforeinstallprompt', function(e) {
+        e.preventDefault();
+        window.__pwaInstallPrompt = e;
+      });
     </script>
   </body>
 </html>
