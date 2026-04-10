@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Navigate } from 'react-router-dom'
-import { Mail, Lock, ArrowRight, AlertCircle, CheckCircle, Eye, EyeOff, Download, X, Share2, MoreVertical } from 'lucide-react'
+import { Mail, Lock, ArrowRight, AlertCircle, CheckCircle, Eye, EyeOff, Download, X, Share2 } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { useTheme } from '../contexts/ThemeContext'
 import { usePWAInstall } from '../hooks/usePWAInstall'
@@ -8,20 +8,6 @@ import LogoTeg from '../components/LogoTeg'
 import ThemeToggle from '../components/ThemeToggle'
 
 type View = 'login' | 'reset'
-
-function normalizeLoginUsername(v: string) {
-  const cleaned = v
-    .trim()
-    .toLowerCase()
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-  const normalized = cleaned
-    .replace(/\s+/g, '.')
-    .replace(/[^a-z0-9@._-]/g, '')
-    .replace(/\.{2,}/g, '.')
-    .replace(/^\./, '')
-  return normalized
-}
 
 // ── Sub-componentes fora do Login para evitar remount a cada render ──────────
 // IMPORTANTE: definir componentes DENTRO do componente pai faz React
@@ -112,12 +98,12 @@ function SubmitBtn({ label, busy }: { label: string; busy: boolean }) {
 export default function Login() {
   const { user, loading, signIn, resetPassword } = useAuth()
   const { isDark, isLightSidebar: isLight } = useTheme()
-  const { canInstall, isInstalled, promptInstall, isIOS } = usePWAInstall()
+  const { isInstalled, promptInstall, isIOS } = usePWAInstall()
 
-  const [view,      setView]      = useState<View>('login')
   const [showInstallGuide, setShowInstallGuide] = useState(false)
-  const [loginUser, setLoginUser] = useState('')
-  const [resetEmail, setResetEmail] = useState('')
+
+  const [view,     setView]     = useState<View>('login')
+  const [email,    setEmail]    = useState('')
   const [password, setPassword] = useState('')
   const [showPass, setShowPass] = useState(false)
   const [busy,     setBusy]     = useState(false)
@@ -132,21 +118,19 @@ export default function Login() {
 
   // ── Handlers ──────────────────────────────────────────────────────
 
-  const toEmail = (v: string) => v.includes('@') ? v : `${v}@login.teg.local`
-
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault(); clr(); setBusy(true)
-    const { error } = await signIn(toEmail(loginUser), password)
+    const { error } = await signIn(email, password)
     setBusy(false)
     if (error) setError(error)
   }
 
   const handleReset = async (e: React.FormEvent) => {
     e.preventDefault(); clr(); setBusy(true)
-    const { error } = await resetPassword(toEmail(resetEmail))
+    const { error } = await resetPassword(email)
     setBusy(false)
     if (error) { setError(error); return }
-    setSuccess('Link de recupera\u00e7\u00e3o enviado! Verifique seu e-mail.')
+    setSuccess('Link de recuperação enviado! Verifique seu e-mail.')
   }
 
   // ── Views ─────────────────────────────────────────────────────────
@@ -170,7 +154,7 @@ export default function Login() {
             <LogoTeg size={120} animated={false} glowing={false} />
           </div>
           <p className="text-xs text-slate-400 mt-0.5 font-medium tracking-wide uppercase">
-            {'Sistema ERP \u00b7 Acesso Restrito'}
+            Sistema ERP · Acesso Restrito
           </p>
         </div>
 
@@ -181,11 +165,11 @@ export default function Login() {
           {view === 'login' && (
             <form onSubmit={handleLogin} className="p-5 space-y-4">
               <InputField
-                label={'Usu\u00e1rio ou e-mail'}
-                type="text"
-                value={loginUser}
-                onChange={v => { setLoginUser(normalizeLoginUsername(v)); clr() }}
-                placeholder="nome.sobrenome ou email"
+                label="E-mail corporativo"
+                type="email"
+                value={email}
+                onChange={v => { setEmail(v); clr() }}
+                placeholder="voce@teguniao.com.br"
                 icon={Mail}
                 autoFocus
               />
@@ -207,7 +191,7 @@ export default function Login() {
 
               <div className="text-right -mt-1">
                 <button type="button"
-                  onClick={() => { setView('reset'); setResetEmail(''); clr() }}
+                  onClick={() => { setView('reset'); clr() }}
                   className="text-xs text-primary hover:underline font-medium">
                   Esqueci a senha
                 </button>
@@ -228,41 +212,43 @@ export default function Login() {
                 </p>
               </div>
               <InputField
-                label={'Usu\u00e1rio ou e-mail'} type="text"
-                value={resetEmail}
-                onChange={v => { setResetEmail(normalizeLoginUsername(v)); clr() }}
-                placeholder="nome.sobrenome ou email"
+                label="Seu e-mail" type="email"
+                value={email}
+                onChange={v => { setEmail(v); clr() }}
+                placeholder="voce@teguniao.com.br"
                 icon={Mail} autoFocus
               />
               <Feedback error={error} success={success} />
-              <SubmitBtn label={'Enviar link de recupera\u00e7\u00e3o'} busy={busy} />
+              <SubmitBtn label="Enviar link de recuperação" busy={busy} />
               <button type="button"
                 onClick={() => { setView('login'); clr() }}
                 className="w-full text-center text-xs text-slate-500 hover:text-navy transition-colors">
-                {'\u2190 Voltar ao login'}
+                ← Voltar ao login
               </button>
             </form>
           )}
 
         </div>
 
-        {/* Install App Button — always visible */}
-        <button
-          onClick={async () => {
-            const accepted = await promptInstall()
-            if (!accepted) setShowInstallGuide(true)
-          }}
-          className={`w-full mt-4 flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-semibold transition-all active:scale-[0.98] ${
-            isDark
-              ? 'bg-teal-500/15 border border-teal-400/25 text-teal-300 hover:bg-teal-500/25'
-              : 'bg-teal-50 border border-teal-200 text-teal-700 hover:bg-teal-100'
-          }`}
-        >
-          <Download size={16} />
-          Instalar App TEG+
-        </button>
+        {/* Install App Button — hidden if already installed as PWA */}
+        {!isInstalled && (
+          <button
+            onClick={async () => {
+              const accepted = await promptInstall()
+              if (!accepted && isIOS) setShowInstallGuide(true)
+            }}
+            className={`w-full mt-4 flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-semibold transition-all active:scale-[0.98] ${
+              isDark
+                ? 'bg-teal-500/15 border border-teal-400/25 text-teal-300 hover:bg-teal-500/25'
+                : 'bg-teal-50 border border-teal-200 text-teal-700 hover:bg-teal-100'
+            }`}
+          >
+            <Download size={16} />
+            Instalar App TEG+
+          </button>
+        )}
 
-        {/* Install Guide Modal */}
+        {/* Install Guide Modal — iOS only (Safari has no auto-install API) */}
         {showInstallGuide && (
           <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
             <div className={`w-full max-w-sm rounded-2xl p-6 space-y-5 ${
@@ -276,33 +262,17 @@ export default function Login() {
                   <X size={18} className="text-slate-400" />
                 </button>
               </div>
-
-              {isIOS ? (
-                <div className="space-y-4">
-                  <InstallStep n={1} isDark={isDark}>
-                    Toque em <Share2 size={14} className="inline text-blue-500 -mt-0.5" /> <strong>Compartilhar</strong> na barra do Safari
-                  </InstallStep>
-                  <InstallStep n={2} isDark={isDark}>
-                    Role e toque em <strong>"Adicionar à Tela de Início"</strong>
-                  </InstallStep>
-                  <InstallStep n={3} isDark={isDark}>
-                    Toque em <strong>"Adicionar"</strong>
-                  </InstallStep>
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  <InstallStep n={1} isDark={isDark}>
-                    Clique no menu <MoreVertical size={14} className="inline text-slate-500 -mt-0.5" /> do navegador (canto superior direito)
-                  </InstallStep>
-                  <InstallStep n={2} isDark={isDark}>
-                    Selecione <strong>"Instalar aplicativo"</strong> ou <strong>"Adicionar à tela inicial"</strong>
-                  </InstallStep>
-                  <InstallStep n={3} isDark={isDark}>
-                    Confirme clicando em <strong>"Instalar"</strong>
-                  </InstallStep>
-                </div>
-              )}
-
+              <div className="space-y-4">
+                <InstallStep n={1} isDark={isDark}>
+                  Toque em <Share2 size={14} className="inline text-blue-500 -mt-0.5" /> <strong>Compartilhar</strong> na barra do Safari
+                </InstallStep>
+                <InstallStep n={2} isDark={isDark}>
+                  Role e toque em <strong>{"Adicionar à Tela de Início"}</strong>
+                </InstallStep>
+                <InstallStep n={3} isDark={isDark}>
+                  Toque em <strong>{"Adicionar"}</strong>
+                </InstallStep>
+              </div>
               <p className={`text-[11px] text-center ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
                 O TEG+ vai abrir como um app nativo no seu dispositivo
               </p>
@@ -312,7 +282,7 @@ export default function Login() {
 
         {/* Footer */}
         <p className="text-center text-xs text-slate-400 mt-5">
-          {'TEG+ ERP v2.0 \u00b7 Acesso apenas para colaboradores autorizados'}
+          TEG+ ERP v2.0 · Acesso apenas para colaboradores autorizados
         </p>
       </div>
     </div>
