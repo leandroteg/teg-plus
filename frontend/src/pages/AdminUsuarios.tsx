@@ -533,14 +533,9 @@ function useDeleteUser() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (userId: string) => {
-      // 1. Delete perfil (cascade will handle related records)
-      const { error: perfilErr } = await supabase.from('sys_perfis').delete().eq('id', userId)
-      if (perfilErr) throw perfilErr
-      // 2. Delete from auth.users via RPC or direct
-      await supabase.rpc('admin_delete_user_rpc', { p_user_id: userId }).catch(() => {
-        // If RPC doesn't exist, try edge function
-        return supabase.functions.invoke('admin-delete-user', { body: { user_id: userId } })
-      })
+      // RPC apaga tudo na ordem: identities → convites → perfil → auth.users
+      const { error } = await supabase.rpc('admin_delete_user_rpc', { p_user_id: userId })
+      if (error) throw error
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['admin-users'] }),
   })
