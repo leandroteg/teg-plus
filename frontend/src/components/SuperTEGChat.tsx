@@ -9,7 +9,7 @@ import { useVoiceRecorder } from '../hooks/useVoiceRecorder'
 import {
   Sparkles, X, RotateCcw, Send, Mic, Square, XCircle,
   BarChart3, ClipboardList, Package, Lightbulb, ExternalLink,
-  ArrowRight, Minus, Paperclip, FileText,
+  ArrowRight, Minus, Paperclip, FileText, ShoppingCart, Truck, Banknote, FileSignature as FileContract,
   type LucideIcon,
 } from 'lucide-react'
 
@@ -47,6 +47,31 @@ export default function SuperTEGChat() {
   useEffect(() => {
     if (isOpen) setTimeout(() => inputRef.current?.focus(), 150)
   }, [isOpen])
+
+  /* Greeting bubble — appears after login, disappears on click → opens chat */
+  const [showGreeting, setShowGreeting] = useState(false)
+  const [greetingText, setGreetingText] = useState('')
+  const greetingSent = useRef(false)
+  useEffect(() => {
+    if (greetingSent.current || !perfil?.nome || isOpen) return
+    // Show greeting bubble after 2s on page load
+    const timer = setTimeout(() => {
+      greetingSent.current = true
+      const hour = new Date().getHours()
+      const greeting = hour < 12 ? 'Bom dia' : hour < 18 ? 'Boa tarde' : 'Boa noite'
+      const firstName = perfil.nome.split(' ')[0]
+      setGreetingText(`${greeting}, ${firstName}!`)
+      setShowGreeting(true)
+      // Auto-hide after 8s
+      setTimeout(() => setShowGreeting(false), 8000)
+    }, 2000)
+    return () => clearTimeout(timer)
+  }, [perfil, isOpen])
+
+  const handleGreetingClick = () => {
+    setShowGreeting(false)
+    setIsOpen(true)
+  }
 
   /* Auto-navigate on pending action */
   useEffect(() => {
@@ -132,6 +157,25 @@ export default function SuperTEGChat() {
 
   return (
     <>
+      {/* ── Greeting Bubble ──────────────────────────────────── */}
+      {showGreeting && !isOpen && (
+        <button
+          onClick={handleGreetingClick}
+          className="fixed bottom-[88px] right-4 sm:bottom-[76px] sm:right-6 z-[10001] animate-bounce-in"
+          style={{ animation: 'steg-welcome-in 0.5s ease-out both' }}
+        >
+          <div className="flex items-center gap-2.5 px-4 py-3 rounded-2xl bg-gradient-to-r from-teal-500 to-teal-600 text-white shadow-xl shadow-teal-500/30 hover:shadow-2xl hover:scale-105 active:scale-95 transition-all cursor-pointer max-w-[280px]">
+            <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center shrink-0">
+              <Sparkles size={16} />
+            </div>
+            <div className="text-left min-w-0">
+              <p className="text-sm font-bold leading-tight">{greetingText}</p>
+              <p className="text-[10px] text-teal-100 mt-0.5">Clique para conversar</p>
+            </div>
+          </div>
+        </button>
+      )}
+
       {/* ── Floating Action Button ─────────────────────────── */}
       {!isOpen && (
         <button
@@ -378,7 +422,19 @@ function BotAvatar({ size = 'sm' }: { size?: 'sm' | 'md' | 'lg' }) {
 
 // ── Welcome State ───────────────────────────────────────────────────────────────
 
+const MODULE_ACTIONS: { icon: LucideIcon; label: string; prompt: string; modules: string[] }[] = [
+  { icon: ShoppingCart, label: 'Compras',        prompt: 'O que temos de pendente em Compras?',         modules: ['compras'] },
+  { icon: Truck,        label: 'Logistica',       prompt: 'Qual o status das solicitações de logística?', modules: ['logistica'] },
+  { icon: Banknote,     label: 'Financeiro',      prompt: 'Qual o resumo do financeiro hoje?',           modules: ['financeiro'] },
+  { icon: FileContract, label: 'Contratos',       prompt: 'Quais contratos estão vencendo?',             modules: ['contratos'] },
+  { icon: BarChart3,    label: 'Resumo Geral',    prompt: 'Me de um resumo geral do sistema',            modules: [] },
+  { icon: Lightbulb,    label: 'Ajuda',           prompt: 'O que voce pode fazer por mim?',              modules: [] },
+]
+
 function WelcomeState({ name, onAction }: { name: string; onAction: (p: string) => void }) {
+  const hour = new Date().getHours()
+  const greeting = hour < 12 ? 'Bom dia' : hour < 18 ? 'Boa tarde' : 'Boa noite'
+
   return (
     <div
       className="flex flex-col items-center justify-center h-full text-center px-6"
@@ -389,15 +445,14 @@ function WelcomeState({ name, onAction }: { name: string; onAction: (p: string) 
       </div>
 
       <h4 className="text-slate-800 font-semibold text-lg mb-1 tracking-[-0.02em]">
-        Ola, {name}!
+        {greeting}, {name}!
       </h4>
-      <p className="text-slate-400 text-[13px] mb-8 max-w-[280px] leading-relaxed">
-        Sou o SuperTEG, seu assistente inteligente. Posso navegar pelo sistema,
-        consultar dados, fazer cadastros e registrar problemas.
+      <p className="text-slate-400 text-[13px] mb-6 max-w-[280px] leading-relaxed">
+        O que vamos fazer hoje?
       </p>
 
       <div className="grid grid-cols-2 gap-2.5 w-full max-w-[300px]">
-        {QUICK_ACTIONS.map((a, i) => (
+        {MODULE_ACTIONS.map((a, i) => (
           <button
             key={a.label}
             onClick={() => onAction(a.prompt)}
