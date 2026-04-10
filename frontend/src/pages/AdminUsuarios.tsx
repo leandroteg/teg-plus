@@ -685,53 +685,35 @@ function useCadastrarUsuario() {
         }
       }
 
-      // 2) Fallback local: convite + signup desacoplado (não troca sessão do admin)
-      const { error: convErr } = await supabase
-        .from('sys_convites')
-        .insert({
-          email: signupEmail,
-          role,
-          alcada_nivel,
-          modulos,
-          nome_sugerido: nome || null,
-          convidado_por: myPerfil?.id,
-        })
-      if (convErr) throw convErr
-
-      const detached = createDetachedClient()
-      const { data: signUpData, error: signUpErr } = await detached.auth.signUp({
-        email: signupEmail,
-        password: senhaTemporaria,
-        options: {
-          data: { nome, username: finalUsername, origem: 'admin_usuarios' },
-        },
+      // 2) Fallback local: criar user via RPC (bypass signUp email validation)
+      const { data: rpcData, error: rpcErr } = await supabase.rpc('admin_create_user_rpc', {
+        p_email: loginEmail,
+        p_password: senhaTemporaria,
+        p_nome: nome,
+        p_username: finalUsername,
       })
+      if (rpcErr) throw new Error(rpcErr.message || 'Erro ao criar usuário no Auth.')
+      const newUserId = rpcData as string
+      if (!newUserId) throw new Error('RPC retornou sem ID de usuário.')
 
-      if (signUpErr) throw signUpErr
-      if (!signUpData?.user?.id) {
-        throw new Error('Cadastro iniciado, mas sem retorno de usuário no Auth.')
-      }
-
-      const perfilCriado = await waitForPerfil(signUpData.user.id)
+      // Aguardar trigger criar perfil ou criar manualmente
+      let perfilCriado = await waitForPerfil(newUserId)
       if (!perfilCriado) {
-        throw new Error('Usuário criado no Auth, mas perfil não ficou disponível a tempo.')
+        // Trigger não criou, inserir manualmente
+        const { error: insErr } = await supabase.from('sys_perfis').insert({
+          id: newUserId, nome, email: loginEmail, role,
+          alcada_nivel, modulos, senha_definida: true, ativo: true,
+        })
+        if (insErr) throw insErr
+        perfilCriado = { id: newUserId } as any
+      } else {
+        const { error: updErr } = await supabase.from('sys_perfis').update({
+          nome, email: loginEmail, role, alcada_nivel, modulos,
+          senha_definida: true, ativo: true,
+        }).eq('id', perfilCriado.id)
+        if (updErr) throw updErr
       }
 
-      const { error: updErr } = await supabase
-        .from('sys_perfis')
-        .update({
-          nome,
-          email: loginEmail,
-          role,
-          papel_global,
-          alcada_nivel,
-          modulos,
-          senha_definida: true,
-          ativo: true,
-        })
-        .eq('id', perfilCriado.id)
-
-      if (updErr) throw updErr
       await syncPerfilSetores(perfilCriado.id, modulos, undefined, papel_global)
 
       return {
