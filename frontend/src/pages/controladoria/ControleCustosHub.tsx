@@ -1,9 +1,10 @@
 import { useMemo } from 'react'
-import { Activity, BarChart3, ChartColumnIncreasing, Siren } from 'lucide-react'
+import { Activity, BarChart3, ChartColumnIncreasing, Siren, FileBarChart } from 'lucide-react'
 import { useSearchParams } from 'react-router-dom'
 import ControladoriaFlow, { type FlowStep } from '../../components/ControladoriaFlow'
 import KPIs from './KPIs'
 import PainelIndicadores from './PainelIndicadores'
+import PainelIndicadoresVisual from './PainelIndicadoresVisual'
 import DRE from './DRE'
 import AlertasDesvio from './AlertasDesvio'
 
@@ -21,6 +22,13 @@ const STEPS: FlowStep[] = [
     description: 'Acompanhe os indicadores consolidados no mesmo padrão executivo dos demais módulos.',
     icon: BarChart3,
     accent: { bg: 'hover:bg-violet-50', bgActive: 'bg-violet-50', text: 'text-violet-600', textActive: 'text-violet-800', border: 'border-violet-500', badge: 'bg-violet-100 text-violet-700' },
+  },
+  {
+    key: 'follow-up',
+    label: 'Follow-up Indicadores',
+    description: 'Acompanhamento visual mensal dos indicadores de performance (Abr-Jun 2026).',
+    icon: FileBarChart,
+    accent: { bg: 'hover:bg-emerald-50', bgActive: 'bg-emerald-50', text: 'text-emerald-600', textActive: 'text-emerald-800', border: 'border-emerald-500', badge: 'bg-emerald-100 text-emerald-700' },
   },
   {
     key: 'evolucao-despesas',
@@ -42,6 +50,8 @@ function getStepComponent(step: string) {
   switch (step) {
     case 'definicao-indicadores':
       return <KPIs />
+    case 'follow-up':
+      return <PainelIndicadoresVisual />
     case 'evolucao-despesas':
       return <DRE />
     case 'acoes':

@@ -1,0 +1,762 @@
+<!DOCTYPE html>
+<!-- saved from url=(0102)file:///C:/Users/antonio.medeiros/Downloads/Plano%20Or%C3%A7amentt%C3%A1rio%20TEG%20-%20p%C3%A1g1.html -->
+<html lang="pt-BR"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+    
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Plano Orçamentário TEG União 2026 - Página 3</title>
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;700;800&family=Open+Sans:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --primary-blue: #003C71;
+            --accent-orange: #FF6B35;
+            --success-green: #27AE60;
+            --warning-yellow: #F39C12;
+            --danger-red: #E74C3C;
+            --text-dark: #2C3E50;
+            --white: #FFFFFF;
+        }
+
+        body {
+            font-family: 'Open Sans', sans-serif;
+            line-height: 1.2;
+            color: var(--text-dark);
+            background: white;
+        }
+
+        .page {
+            width: 210mm;
+            height: 297mm;
+            margin: 0 auto;
+            padding: 8mm;
+            background: white;
+        }
+
+        .header {
+            background: linear-gradient(135deg, var(--primary-blue) 0%, #004d8a 100%);
+            color: var(--white);
+            padding: 10px 20px;
+            border-radius: 8px;
+            margin-bottom: 8px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-family: 'Montserrat', sans-serif;
+            font-size: 18px;
+            font-weight: 800;
+            margin-bottom: 3px;
+        }
+
+        .header .subtitle {
+            font-size: 10px;
+            opacity: 0.95;
+        }
+
+        .section-title {
+            font-family: 'Montserrat', sans-serif;
+            font-size: 11px;
+            font-weight: 700;
+            color: var(--white);
+            margin-bottom: 6px;
+            padding: 6px 12px;
+            border-radius: 5px;
+            background: linear-gradient(135deg, var(--accent-orange) 0%, #ff8c5a 100%);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .scenarios-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+
+        .scenario-card {
+            border: 3px solid;
+            border-radius: 8px;
+            padding: 12px;
+            text-align: center;
+        }
+
+        .scenario-card.otimista {
+            background: #e8f5e9;
+            border-color: var(--success-green);
+        }
+
+        .scenario-card.realista {
+            background: #fff8e1;
+            border-color: var(--warning-yellow);
+        }
+
+        .scenario-card.conservador {
+            background: #ffebee;
+            border-color: var(--danger-red);
+        }
+
+        .scenario-card h3 {
+            font-family: 'Montserrat', sans-serif;
+            font-size: 12px;
+            font-weight: 700;
+            margin-bottom: 6px;
+        }
+
+        .scenario-card.otimista h3 {
+            color: var(--success-green);
+        }
+
+        .scenario-card.realista h3 {
+            color: var(--warning-yellow);
+        }
+
+        .scenario-card.conservador h3 {
+            color: var(--danger-red);
+        }
+
+        .scenario-value {
+            font-family: 'Montserrat', sans-serif;
+            font-size: 28px;
+            font-weight: 800;
+            margin: 8px 0;
+        }
+
+        .scenario-card.otimista .scenario-value {
+            color: var(--success-green);
+        }
+
+        .scenario-card.realista .scenario-value {
+            color: var(--warning-yellow);
+        }
+
+        .scenario-card.conservador .scenario-value {
+            color: var(--danger-red);
+        }
+
+        .scenario-label {
+            font-size: 10px;
+            color: #666;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 7px;
+            margin-bottom: 8px;
+        }
+
+        th {
+            background: var(--primary-blue);
+            color: var(--white);
+            padding: 4px 3px;
+            text-align: left;
+            font-family: 'Montserrat', sans-serif;
+            font-weight: 700;
+            border: 1px solid #999;
+            font-size: 7px;
+        }
+
+        td {
+            padding: 3px 3px;
+            border: 1px solid #ddd;
+            background: white;
+        }
+
+        .obra-row {
+            background: #f8f9fa;
+        }
+
+        .total-row {
+            background: #fff3e0;
+            font-weight: 700;
+            border-top: 2px solid var(--accent-orange);
+            font-size:12px;
+        }
+
+        .subtotal-row {
+            background: #e8f4f8;
+            font-weight: 600;
+        }
+
+        .numero {
+            text-align: right;
+        }
+
+        .total-ano {
+            font-weight: 600;
+            color: var(--accent-orange);
+        }
+
+        .kpis-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 8px;
+            margin-bottom: 2px;
+        }
+
+        .kpi-card {
+            background: var(--primary-blue);
+            color: white;
+            border-radius: 5px;
+            padding: 10px;
+            text-align: center;
+        }
+
+        .kpi-label {
+            font-size: 8px;
+            margin-bottom: 6px;
+            opacity: 0.9;
+        }
+
+        .kpi-value {
+            font-family: 'Montserrat', sans-serif;
+            font-size: 16px;
+            font-weight: 700;
+        }
+
+        .premissas-box {
+            background: #fff5f0;
+            border-left: 4px solid var(--accent-orange);
+            padding: 10px 12px;
+            margin-bottom: 8px;
+            border-radius: 4px;
+        }
+
+        .premissas-box h4 {
+            font-family: 'Montserrat', sans-serif;
+            font-size: 9px;
+            font-weight: 700;
+            color: var(--accent-orange);
+            margin-bottom: 6px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .premissas-box ul {
+            list-style: none;
+            padding: 0;
+            font-size: 7.5px;
+            line-height: 1.5;
+        }
+
+        .premissas-box li {
+            margin-bottom: 3px;
+            padding-left: 12px;
+            position: relative;
+        }
+
+        .premissas-box li::before {
+            content: "•";
+            position: absolute;
+            left: 0;
+            color: var(--accent-orange);
+            font-weight: 700;
+        }
+
+        .premissas-box strong {
+            color: var(--primary-blue);
+        }
+
+        footer {
+            text-align: center;
+            font-size: 6.5px;
+            color: #7F8C8D;
+            margin-top: 6px;
+            padding-top: 6px;
+            border-top: 2px solid #DFE6E9;
+            line-height: 1.3;
+        }
+
+        @media print {
+            body { background: white; }
+            .page { margin: 0; padding: 6mm; }
+        }
+    </style>
+</head>
+<body>
+    <div class="page">
+        <div class="header">
+            <h1>PLANO ORÇAMENTÁRIO 2026 - TEG UNIÃO</h1>
+            <div class="subtitle">Página 3 | Projeções Financeiras e Acompanhamento de Performance</div>
+        </div>
+
+        <!-- BLOCO 1: CENÁRIOS ORÇAMENTÁRIOS -->
+        <div class="section-title">
+            📊 CENÁRIOS ORÇAMENTÁRIOS 2026
+        </div>
+
+        <div class="scenarios-grid">
+            <div class="scenario-card otimista">
+                <h3>OTIMISTA</h3>
+                <div class="scenario-value">23%</div>
+                <div class="scenario-label">Margem de Lucro</div>
+            </div>
+
+            <div class="scenario-card realista">
+                <h3>REALISTA (META)</h3>
+                <div class="scenario-value">20%</div>
+                <div class="scenario-label">Margem de Lucro</div>
+            </div>
+
+            <div class="scenario-card conservador">
+                <h3>CONSERVADOR</h3>
+                <div class="scenario-value">17%</div>
+                <div class="scenario-label">Margem de Lucro</div>
+            </div>
+        </div>
+
+        <!-- BLOCO 2: FATURAMENTO PROJETADO POR POLO/OBRA -->
+        <div class="section-title">
+            💰 RECEITAS PROJETADAS POR POLO / OBRA (em milhões)
+        </div>
+        <table>
+            <thead>
+                <tr>
+                    <th style="width: 8%;">OSC</th>
+                    <th style="width: 30%;">POLO / DESCRIÇÃO</th>
+                    <th style="width: 10%;">1º TRI (Jan-Mar)</th>
+                    <th style="width: 10%;">2º TRI (Abr-Jun)</th>
+                    <th style="width: 10%;">3º TRI (Jul-Set)</th>
+                    <th style="width: 10%;">4º TRI (Out-Dez)</th>
+                    <th style="width: 11%;">TOTAL ANO</th>
+                    <th style="width: 8%;">MARGEM %</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr class="obra-row">
+                    <td>058/2025</td>
+                    <td>LD TRES MARIAS VARZEA DA PALMA 7 138</td>
+                    <td class="numero">R$ _____</td>
+                    <td class="numero">R$ _____</td>
+                    <td class="numero">R$ _____</td>
+                    <td class="numero">R$ _____</td>
+                    <td class="numero total-ano">30,90</td>
+                    <td class="numero">____%</td>
+                </tr>
+                <tr class="obra-row">
+                    <td>061/2025</td>
+                    <td>LD RIACHINHO 2 - URUCUIA 1 - 138</td>
+                    <td class="numero">R$ _____</td>
+                    <td class="numero">R$ _____</td>
+                    <td class="numero">R$ _____</td>
+                    <td class="numero">R$ _____</td>
+                    <td class="numero total-ano">20,50</td>
+                    <td class="numero">____%</td>
+                </tr>
+                <tr class="obra-row">
+                    <td>003/2025</td>
+                    <td>LD NOVA PONTE 2 - PERDIZES 2 - 138</td>
+                    <td class="numero">R$ _____</td>
+                    <td class="numero">R$ _____</td>
+                    <td class="numero">R$ _____</td>
+                    <td class="numero">R$ _____</td>
+                    <td class="numero total-ano">7,73</td>
+                    <td class="numero">____%</td>
+                </tr>
+                <tr class="obra-row">
+                    <td>042/2024</td>
+                    <td>LD ARAPUA 1 - RIO PARANAIBA 2-138</td>
+                    <td class="numero">R$ _____</td>
+                    <td class="numero">R$ _____</td>
+                    <td class="numero">R$ _____</td>
+                    <td class="numero">R$ _____</td>
+                    <td class="numero total-ano">6,60</td>
+                    <td class="numero">____%</td>
+                </tr>
+                <tr class="obra-row">
+                    <td>044/2025</td>
+                    <td>PARACATU 3/PARACATU 4 - 138</td>
+                    <td class="numero">R$ _____</td>
+                    <td class="numero">R$ _____</td>
+                    <td class="numero">R$ _____</td>
+                    <td class="numero">R$ _____</td>
+                    <td class="numero total-ano">5,62</td>
+                    <td class="numero">____%</td>
+                </tr>
+                <tr class="obra-row">
+                    <td>022/2025</td>
+                    <td>LD ARAXA 3 - CBMM - 138</td>
+                    <td class="numero">R$ _____</td>
+                    <td class="numero">R$ _____</td>
+                    <td class="numero">R$ _____</td>
+                    <td class="numero">R$ _____</td>
+                    <td class="numero total-ano">5,33</td>
+                    <td class="numero">____%</td>
+                </tr>
+                <tr class="obra-row">
+                    <td>019/2025</td>
+                    <td>LD CAMPOS ALTOS - SÃO GOTARDO 2 -138</td>
+                    <td class="numero">R$ _____</td>
+                    <td class="numero">R$ _____</td>
+                    <td class="numero">R$ _____</td>
+                    <td class="numero">R$ _____</td>
+                    <td class="numero total-ano">3,52</td>
+                    <td class="numero">____%</td>
+                </tr>
+                <tr class="obra-row">
+                    <td>036/2025</td>
+                    <td>LD COROMANDEL 2 - GUIMARANIA 1 - 138</td>
+                    <td class="numero">R$ _____</td>
+                    <td class="numero">R$ _____</td>
+                    <td class="numero">R$ _____</td>
+                    <td class="numero">R$ _____</td>
+                    <td class="numero total-ano">2,50</td>
+                    <td class="numero">____%</td>
+                </tr>
+                <tr class="obra-row">
+                    <td>020/2025</td>
+                    <td>LD ITUIUTABA 1 - ITUIUTABA 2-138</td>
+                    <td class="numero">R$ _____</td>
+                    <td class="numero">R$ _____</td>
+                    <td class="numero">R$ _____</td>
+                    <td class="numero">R$ _____</td>
+                    <td class="numero total-ano">1,83</td>
+                    <td class="numero">____%</td>
+                </tr>
+                <tr class="obra-row">
+                    <td>037/2025</td>
+                    <td>LD COROMANDEL 2 - PATROCINIO 138</td>
+                    <td class="numero">R$ _____</td>
+                    <td class="numero">R$ _____</td>
+                    <td class="numero">R$ _____</td>
+                    <td class="numero">R$ _____</td>
+                    <td class="numero total-ano">1,84</td>
+                    <td class="numero">____%</td>
+                </tr>
+                <tr class="obra-row">
+                    <td>041/2025</td>
+                    <td>LD PATROCINIO PATROCINIO 3 138</td>
+                    <td class="numero">R$ _____</td>
+                    <td class="numero">R$ _____</td>
+                    <td class="numero">R$ _____</td>
+                    <td class="numero">R$ _____</td>
+                    <td class="numero total-ano">1,59</td>
+                    <td class="numero">____%</td>
+                </tr>
+                <tr class="obra-row">
+                    <td>048/2025</td>
+                    <td>LD UBERLANDIA 7 - UBERLANDIA 11 - 138</td>
+                    <td class="numero">R$ _____</td>
+                    <td class="numero">R$ _____</td>
+                    <td class="numero">R$ _____</td>
+                    <td class="numero">R$ _____</td>
+                    <td class="numero total-ano">1,34</td>
+                    <td class="numero">____%</td>
+                </tr>
+                <tr class="obra-row">
+                    <td>021/2025</td>
+                    <td>LD ITUIUTABA 2- SANTA VITORIA - 138</td>
+                    <td class="numero">R$ _____</td>
+                    <td class="numero">R$ _____</td>
+                    <td class="numero">R$ _____</td>
+                    <td class="numero">R$ _____</td>
+                    <td class="numero total-ano">1,25</td>
+                    <td class="numero">____%</td>
+                </tr>
+                <tr class="obra-row">
+                    <td>063/2025</td>
+                    <td>LD GUIMARANIA 1/PATOS DE MINAS 1 - 138</td>
+                    <td class="numero">R$ _____</td>
+                    <td class="numero">R$ _____</td>
+                    <td class="numero">R$ _____</td>
+                    <td class="numero">R$ _____</td>
+                    <td class="numero total-ano">1,26</td>
+                    <td class="numero">____%</td>
+                </tr>
+                <tr class="obra-row">
+                    <td>11 OSC's menores</td>
+                    <td></td>
+                    <td class="numero">R$ _____</td>
+                    <td class="numero">R$ _____</td>
+                    <td class="numero">R$ _____</td>
+                    <td class="numero">R$ _____</td>
+                    <td class="numero total-ano">10,0</td>
+                    <td class="numero">____%</td>
+                </tr>
+                <tr class="total-row">
+                    <td colspan="2"><strong>TOTAL FATURAMENTO 2026</strong></td>
+                    <td class="numero"><strong>22,50 </strong></td>
+                    <td class="numero"><strong>22,50 </strong></td>
+                    <td class="numero"><strong>22,50 </strong></td>
+                    <td class="numero"><strong>22,50 </strong></td>
+                    <td class="numero"><strong>90,00</strong></td>
+                    <td class="numero"><strong>____%</strong></td>
+                </tr>
+            </tbody>
+        </table>
+
+        <!-- BLOCO 3: CUSTOS E DESPESAS -->
+        <div class="section-title">
+            💰 CUSTOS E DESPESAS - 2026 (em milhões)
+        </div>
+        <table style="font-size:8.5px;">
+            <thead>
+                <tr>
+                    <th style="width: 40%;">CENTRO DE CUSTO</th>
+                    <th style="width: 12%;">1º TRI</th>
+                    <th style="width: 12%;">2º TRI</th>
+                    <th style="width: 12%;">3º TRI</th>
+                    <th style="width: 12%;">4º TRI</th>
+                    <th style="width: 12%;">TOTAL ANO</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr class="subtotal-row">
+                    <td><strong>CUSTOS DIRETOS E IND. OBRAS</strong></td>
+                    <td class="numero"><strong>9,06</strong></td>
+                    <td class="numero"><strong>10,81</strong></td>
+                    <td class="numero"><strong>11,26</strong></td>
+                    <td class="numero"><strong>11,52</strong></td>
+                    <td class="numero"><strong>42,65</strong></td>
+                </tr>
+                <tr>
+                    <td>• Materiais (Aço, Concreto)</td>
+                    <td class="numero">1,55</td>
+                    <td class="numero">1,71</td>
+                    <td class="numero">1,71</td>
+                    <td class="numero">1,59</td>
+                    <td class="numero">6,56</td>
+                </tr>
+                <tr>
+                    <td>• Mão de Obra Direta</td>
+                    <td class="numero">4,22</td>
+                    <td class="numero">5,23</td>
+                    <td class="numero">5,69</td>
+                    <td class="numero">6,14</td>
+                    <td class="numero">21,29</td>
+                </tr>
+                <tr>
+                    <td>• Alojamentos e Alimentação</td>
+                    <td class="numero">0,99</td>
+                    <td class="numero">1,17</td>
+                    <td class="numero">1,18</td>
+                    <td class="numero">1,18</td>
+                    <td class="numero">4,51</td>
+                </tr>
+                <tr>
+                    <td>• Frotas</td>
+                    <td class="numero">1,08</td>
+                    <td class="numero">1,27</td>
+                    <td class="numero">1,26</td>
+                    <td class="numero">1,23</td>
+                    <td class="numero">4,85</td>
+                </tr>
+                <tr>
+                    <td>• Serviços Terc. + Outros C. Diretos</td>
+                    <td class="numero">0,65</td>
+                    <td class="numero">0,79</td>
+                    <td class="numero">0,79</td>
+                    <td class="numero">0,78</td>
+                    <td class="numero">3,00</td>
+                </tr>
+                <tr>
+                    <td>• Equipamentos, Ferramentas, EPI e Unif.</td>
+                    <td class="numero">0,56</td>
+                    <td class="numero">0,64</td>
+                    <td class="numero">0,64</td>
+                    <td class="numero">0,60</td>
+                    <td class="numero">2,45</td>
+                </tr>
+                <tr class="subtotal-row">
+                    <td><strong>DESPESAS ADMINISTRATIVAS</strong></td>
+                    <td class="numero"><strong>1,15</strong></td>
+                    <td class="numero"><strong>1,14</strong></td>
+                    <td class="numero"><strong>1,02</strong></td>
+                    <td class="numero"><strong>0,88</strong></td>
+                    <td class="numero"><strong>4,20</strong></td>
+                </tr>
+                <tr>
+                    <td>• Pessoal</td>
+                    <td class="numero">0,46</td>
+                    <td class="numero">0,53</td>
+                    <td class="numero">0,48</td>
+                    <td class="numero">0,38</td>
+                    <td class="numero">1,85</td>
+                </tr>
+                <tr>
+                    <td>• Administrativo</td>
+                    <td class="numero">0,38</td>
+                    <td class="numero">0,37</td>
+                    <td class="numero">0,38</td>
+                    <td class="numero">0,38</td>
+                    <td class="numero">1,51</td>
+                </tr>
+                <tr>
+                    <td>• Serviços Administrativos</td>
+                    <td class="numero">0,22</td>
+                    <td class="numero">0,13</td>
+                    <td class="numero">0,08</td>
+                    <td class="numero">0,08</td>
+                    <td class="numero">0,50</td>
+                </tr>
+                <tr>
+                    <td>• Sistemas</td>
+                    <td class="numero">0,04</td>
+                    <td class="numero">0,04</td>
+                    <td class="numero">0,04</td>
+                    <td class="numero">0,04</td>
+                    <td class="numero">0,17</td>
+                </tr>
+                <tr>
+                    <td>• Desp Fin. e Outra Desp Adm</td>
+                    <td class="numero">0,06</td>
+                    <td class="numero">0,08</td>
+                    <td class="numero">0,04</td>
+                    <td class="numero">0,01</td>
+                    <td class="numero">0,18</td>
+                </tr>
+                <tr class="subtotal-row">
+                    <td><strong>DESPESAS APÓS O LUCRO</strong></td>
+                    <td class="numero"><strong>4,93</strong></td>
+                    <td class="numero"><strong>4,58</strong></td>
+                    <td class="numero"><strong>4,88</strong></td>
+                    <td class="numero"><strong>4,45</strong></td>
+                    <td class="numero"><strong>18,84</strong></td>
+                </tr>
+                <tr>
+                    <td>• Amortizações</td>
+                    <td class="numero">1,81</td>
+                    <td class="numero">1,59</td>
+                    <td class="numero">2,02</td>
+                    <td class="numero">1,35</td>
+                    <td class="numero">6,77</td>
+                </tr>
+                <tr>
+                    <td>• Impostos Sob Faturamento</td>
+                    <td class="numero">1,23</td>
+                    <td class="numero">1,38</td>
+                    <td class="numero">1,28</td>
+                    <td class="numero">1,38</td>
+                    <td class="numero">5,26</td>
+                </tr>
+                <tr>
+                    <td>• Investimentos</td>
+                    <td class="numero">0,13</td>
+                    <td class="numero">0,09</td>
+                    <td class="numero">0,08</td>
+                    <td class="numero">0,08</td>
+                    <td class="numero">0,38</td>
+                </tr>
+                <tr>
+                    <td>• IRPJ/CSLL</td>
+                    <td class="numero">1,76</td>
+                    <td class="numero">1,53</td>
+                    <td class="numero">1,50</td>
+                    <td class="numero">1,64</td>
+                    <td class="numero">6,43</td>
+                </tr>
+                <tr class="total-row">
+                    <td><strong>TOTAL SAÍDAS</strong></td>
+                    <td class="numero"><strong>15,14</strong></td>
+                    <td class="numero"><strong>16,54</strong></td>
+                    <td class="numero"><strong>17,17</strong></td>
+                    <td class="numero"><strong>16,85</strong></td>
+                    <td class="numero"><strong>65,70</strong></td>
+                </tr>
+                <tr class="subtotal-row" style="background:#e8f5e9;">
+                    <td><strong>MARGEM DE CONTRIBUIÇÃO</strong></td>
+                    <td class="numero" style="color:#27AE60"><strong>13,44</strong></td>
+                    <td class="numero" style="color:#27AE60"><strong>11,69</strong></td>
+                    <td class="numero" style="color:#27AE60"><strong>11,24</strong></td>
+                    <td class="numero" style="color:#27AE60"><strong>10,98</strong></td>
+                    <td class="numero" style="color:#27AE60"><strong>47,35</strong></td>
+                </tr>
+                <tr class="subtotal-row" style="background:#e8f5e9;">
+                    <td><strong>LUCRO OPERACIONAL</strong></td>
+                    <td class="numero" style="color:#27AE60"><strong>12,29</strong></td>
+                    <td class="numero" style="color:#27AE60"><strong>10,54</strong></td>
+                    <td class="numero" style="color:#27AE60"><strong>10,21</strong></td>
+                    <td class="numero" style="color:#27AE60"><strong>10,10</strong></td>
+                    <td class="numero" style="color:#27AE60"><strong>43,14</strong></td>
+                </tr>
+                <tr class="subtotal-row" style="background:#DAFBE1;">
+                    <td><strong>LUCRO LÍQUIDO</strong></td>
+                    <td class="numero" style="color:#27AE60"><strong>7,36</strong></td>
+                    <td class="numero" style="color:#27AE60"><strong>5,96</strong></td>
+                    <td class="numero" style="color:#27AE60"><strong>5,33</strong></td>
+                    <td class="numero" style="color:#27AE60"><strong>5,65</strong></td>
+                    <td class="numero" style="color:#27AE60"><strong>24,30</strong></td>
+                </tr>
+                <tr style="background:#EBF5FB;">
+                    <td style="color:var(--primary-blue); font-weight:600;">Liberado p/ Investimentos (2%) *</td>
+                    <td class="numero" style="color:var(--primary-blue);">—</td>
+                    <td class="numero" style="color:var(--primary-blue);">—</td>
+                    <td class="numero" style="color:var(--primary-blue); font-weight:700;">0,90</td>
+                    <td class="numero" style="color:var(--primary-blue); font-weight:700;">0,90</td>
+                    <td class="numero" style="color:var(--primary-blue); font-weight:700;">1,80</td>
+                </tr>
+                <tr style="background:#FEF9E7;">
+                    <td style="color:#E67E22; font-weight:600;">Reserva de Contingência (2%)</td>
+                    <td class="numero" style="color:#E67E22;">0,45</td>
+                    <td class="numero" style="color:#E67E22;">0,45</td>
+                    <td class="numero" style="color:#E67E22;">0,45</td>
+                    <td class="numero" style="color:#E67E22;">0,45</td>
+                    <td class="numero" style="color:#E67E22; font-weight:700;">1,80</td>
+                </tr>
+                <tr class="total-row" style="background:#c8e6c9; border-top:3px solid #27AE60;">
+                    <td><strong>LUCRO LÍQUIDO PREVISTO</strong></td>
+                    <td class="numero" style="color:#27AE60"><strong>6,91</strong></td>
+                    <td class="numero" style="color:#27AE60"><strong>5,51</strong></td>
+                    <td class="numero" style="color:#27AE60"><strong>3,98</strong></td>
+                    <td class="numero" style="color:#27AE60"><strong>4,30</strong></td>
+                    <td class="numero" style="color:#27AE60"><strong>20,70</strong></td>
+                </tr>
+            </tbody>
+        </table>
+
+        <!-- BLOCO 4: KPIs DE ACOMPANHAMENTO -->
+        <div class="section-title">
+            ✅ KPIs DE ACOMPANHAMENTO MENSAL
+        </div>
+
+        <div class="kpis-grid">
+            <div class="kpi-card">
+                <div class="kpi-label">Faturamento Meta Anual</div>
+                <div class="kpi-value">R$ 90M</div>
+            </div>
+
+            <div class="kpi-card">
+                <div class="kpi-label">Margem de Lucro Meta</div>
+                <div class="kpi-value">23%</div>
+            </div>
+
+            <div class="kpi-card">
+                <div class="kpi-label">Lucro Líquido Previsto</div>
+                <div class="kpi-value">R$ 20,7M</div>
+            </div>
+
+            <div class="kpi-card">
+                <div class="kpi-label">Invest. + Reserva (4%)</div>
+                <div class="kpi-value">R$ 3,6M</div>
+            </div>
+        </div>
+
+        <!-- PREMISSAS E CONSIDERAÇÕES -->
+        <div class="premissas-box">
+            <h4>🎯 PREMISSAS E CONSIDERAÇÕES:</h4>
+            <ul>
+                <li><strong>Faturamento:</strong> Meta R$ 90M (R$ 7,5M/mês), distribuição linear trimestral R$ 22,5M</li>
+                <li><strong>Mão de Obra:</strong> Meta 300 colaboradores, custo médio R$ 3.102,51/mês por colaborador (CLT) + PJ R$ 275.484,82/mês</li>
+                <li><strong>Custos Diretos Obras:</strong> R$ 42,7M (47,4% do faturamento) — maior peso em Mão de Obra Direta (23,7%)</li>
+                <li><strong>Sazonalidade:</strong> Jan/Fev produtividade menor (férias coletivas Dez, retorno 12/Jan), Q1 custos menores</li>
+                <li><strong>Impostos:</strong> R$ 5,3M PIS/COFINS + R$ 6,4M IRPJ/CSLL = R$ 11,7M total</li>
+                <li><strong>Amortizações:</strong> R$ 6,8M/ano — consórcios e parcelamentos ativos</li>
+                <li><strong>Investimentos:</strong> R$ 381,7K orçados + R$ 1,8M liberado a partir de S2</li>
+                <li><strong>SELIC:</strong> Projeção média &gt;13% em 2026, impacto nas despesas financeiras R$ 183,7K/ano</li>
+            </ul>
+        </div>
+
+        <footer>
+            <strong>TEG UNIÃO</strong> | Plano Orçamentário 2026 - Revisão Mensal Obrigatória | Responsável: Controladoria<br>
+            Fechamento: Até dia 3 de cada mês | Reunião Diretoria: Mensal | Revisão Completa: Trimestral
+        </footer>
+    </div>
+
+</body></html>
