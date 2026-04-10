@@ -48,38 +48,31 @@ export default function SuperTEGChat() {
     if (isOpen) setTimeout(() => inputRef.current?.focus(), 150)
   }, [isOpen])
 
-  /* Greeting bubble — only on home page ("/"), disappears on click → opens chat with greeting */
+  /* Greeting bubble — shows on home page, every time */
   const [showGreeting, setShowGreeting] = useState(false)
-  const [greetingText, setGreetingText] = useState('')
-  const greetingSent = useRef(false)
   const isHomePage = location.pathname === '/' || location.pathname === ''
+
+  const getGreeting = () => {
+    const hour = new Date().getHours()
+    const greeting = hour < 12 ? 'Bom dia' : hour < 18 ? 'Boa tarde' : 'Boa noite'
+    const firstName = (perfil?.nome || '').split(' ')[0]
+    return `${greeting}, ${firstName}!`
+  }
+
+  // Show bubble when on home and chat is closed
   useEffect(() => {
-    if (greetingSent.current || !perfil?.nome || isOpen || !isHomePage) return
-    const timer = setTimeout(() => {
-      greetingSent.current = true
-      const hour = new Date().getHours()
-      const greeting = hour < 12 ? 'Bom dia' : hour < 18 ? 'Boa tarde' : 'Boa noite'
-      const firstName = perfil.nome.split(' ')[0]
-      setGreetingText(`${greeting}, ${firstName}!`)
-      setShowGreeting(true)
-      setTimeout(() => setShowGreeting(false), 8000)
-    }, 2000)
+    if (!perfil?.nome || isOpen || !isHomePage) { setShowGreeting(false); return }
+    const timer = setTimeout(() => setShowGreeting(true), 2000)
     return () => clearTimeout(timer)
   }, [perfil, isOpen, isHomePage])
-  // Hide bubble when navigating away from home
-  useEffect(() => {
-    if (!isHomePage) setShowGreeting(false)
-  }, [isHomePage])
 
   const handleGreetingClick = () => {
     setShowGreeting(false)
     setIsOpen(true)
-    // Inject greeting as assistant message (not user) — always works
-    if (greetingText) {
-      setTimeout(() => {
-        injectAssistantMessage(`${greetingText} O que vamos fazer hoje?`)
-      }, 300)
-    }
+    // Inject greeting as assistant message
+    setTimeout(() => {
+      injectAssistantMessage(`${getGreeting()} O que vamos fazer hoje?`)
+    }, 300)
   }
 
   /* Auto-navigate on pending action */
@@ -178,7 +171,7 @@ export default function SuperTEGChat() {
               <Sparkles size={16} />
             </div>
             <div className="text-left min-w-0">
-              <p className="text-sm font-bold leading-tight">{greetingText}</p>
+              <p className="text-sm font-bold leading-tight">{getGreeting()}</p>
               <p className="text-[10px] text-teal-100 mt-0.5">Clique para conversar</p>
             </div>
           </div>
