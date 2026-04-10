@@ -1,8 +1,9 @@
 import { useState } from 'react'
 import { Navigate } from 'react-router-dom'
-import { Mail, Lock, ArrowRight, AlertCircle, CheckCircle, Eye, EyeOff } from 'lucide-react'
+import { Mail, Lock, ArrowRight, AlertCircle, CheckCircle, Eye, EyeOff, Download } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { useTheme } from '../contexts/ThemeContext'
+import { usePWAInstall } from '../hooks/usePWAInstall'
 import LogoTeg from '../components/LogoTeg'
 import ThemeToggle from '../components/ThemeToggle'
 
@@ -111,6 +112,7 @@ function SubmitBtn({ label, busy }: { label: string; busy: boolean }) {
 export default function Login() {
   const { user, loading, signIn, resetPassword } = useAuth()
   const { isDark, isLightSidebar: isLight } = useTheme()
+  const { canInstall, isInstalled, promptInstall, isIOS } = usePWAInstall()
 
   const [view,      setView]      = useState<View>('login')
   const [loginUser, setLoginUser] = useState('')
@@ -242,6 +244,21 @@ export default function Login() {
           )}
 
         </div>
+
+        {/* Install App Button */}
+        {!isInstalled && (canInstall || isIOS) && (
+          <button
+            onClick={() => promptInstall()}
+            className={`w-full mt-4 flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-semibold transition-all active:scale-[0.98] ${
+              isDark
+                ? 'bg-teal-500/15 border border-teal-400/25 text-teal-300 hover:bg-teal-500/25'
+                : 'bg-teal-50 border border-teal-200 text-teal-700 hover:bg-teal-100'
+            }`}
+          >
+            <Download size={16} />
+            Instalar App TEG+
+          </button>
+        )}
 
         {/* Footer */}
         <p className="text-center text-xs text-slate-400 mt-5">
