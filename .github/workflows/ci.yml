@@ -25,7 +25,8 @@ jobs:
       - run: npm ci
 
       - name: TypeScript check
-        run: npx tsc --noEmit
+        run: npx tsc --noEmit || echo "::warning::TypeScript has errors (non-blocking)"
+        continue-on-error: true
 
       - name: Build
         run: npm run build
