@@ -1,8 +1,8 @@
 import { useNavigate } from 'react-router-dom'
 import {
   Landmark, TrendingDown, Wrench, FileText,
-  ArrowLeftRight, CheckCircle2, ArrowRight,
-  AlertTriangle, Archive, ArrowDownUp, DollarSign,
+  ArrowLeftRight, ArrowRight, Zap, CalendarClock,
+  Archive, ArrowDownUp,
 } from 'lucide-react'
 import { usePatrimonialKPIs, useImobilizados, useMovimentacoesPatrimonial } from '../../hooks/usePatrimonial'
 import { useTheme } from '../../contexts/ThemeContext'
@@ -19,6 +19,7 @@ function SpotlightMetric({ label, value, tone, note, isDark }: {
     emerald: isDark ? 'text-emerald-400' : 'text-emerald-600',
     red: isDark ? 'text-red-400' : 'text-red-600',
     indigo: isDark ? 'text-indigo-400' : 'text-indigo-600',
+    teal: isDark ? 'text-teal-400' : 'text-teal-600',
     slate: isDark ? 'text-slate-400' : 'text-slate-500',
   }
   return (
@@ -44,33 +45,30 @@ function MiniInfoCard({ label, value, note, icon: Icon, iconTone, isDark }: {
   )
 }
 
-// ── HorizontalStatusBar (padrao Compras) ────────────────────────────────────
-function HorizontalStatusBar({ title, segments, emptyLabel, isDark }: {
-  title: string
+// ── HorizontalStatusBar ─────────────────────────────────────────────────────
+function HorizontalStatusBar({ segments, isDark }: {
   segments: { key: string; label: string; value: number; barClass: string }[]
-  emptyLabel: string; isDark: boolean
+  isDark: boolean
 }) {
   const total = segments.reduce((s, seg) => s + seg.value, 0)
   return (
-    <div>
+    <>
       <div className="flex items-center justify-between gap-3 mb-2">
-        <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500">{title}</p>
+        <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Distribuicao por Status</p>
         <p className={`text-[10px] font-semibold ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{total} ativo(s)</p>
       </div>
       {total === 0 ? (
         <div className={`h-10 rounded-xl flex items-center justify-center text-[10px] font-semibold ${isDark ? 'bg-white/[0.04] text-slate-500' : 'bg-slate-50 text-slate-400'}`}>
-          {emptyLabel}
+          Nenhum ativo cadastrado
         </div>
       ) : (
         <div className={`flex h-10 rounded-xl overflow-hidden ${isDark ? 'bg-white/[0.04]' : 'bg-slate-100'}`}>
-          {segments.map(seg => {
-            if (seg.value === 0) return null
+          {segments.filter(s => s.value > 0).map(seg => {
             const pct = (seg.value / total) * 100
-            const showLabel = pct >= 14
             return (
               <div key={seg.key} className={`${seg.barClass} relative flex items-center justify-center transition-all`}
                 style={{ width: `${Math.max(pct, 4)}%` }} title={`${seg.label}: ${seg.value}`}>
-                {showLabel && (
+                {pct >= 14 && (
                   <span className="text-[10px] font-bold text-white drop-shadow-sm truncate px-2">
                     {seg.label} {pct >= 22 ? seg.value : ''}
                   </span>
@@ -80,7 +78,7 @@ function HorizontalStatusBar({ title, segments, emptyLabel, isDark }: {
           })}
         </div>
       )}
-    </div>
+    </>
   )
 }
 
@@ -94,56 +92,92 @@ export default function PatrimonialHome() {
   const { data: movimentacoes = [] } = useMovimentacoesPatrimonial()
 
   const aguardandoEntrada = imobilizados.filter(i => i.status === 'pendente_registro').length
-  const ativos = imobilizados.filter(i => i.status === 'ativo').length
+  const ativos = imobilizados.filter(i => ['ativo', 'cedido', 'em_transferencia'].includes(i.status)).length
   const emManutencao = kpis?.imobilizados_em_manutencao ?? 0
-  const depreciados = imobilizados.filter(i => (i.percentual_depreciado ?? 0) >= 100).length
+  const depreciados = imobilizados.filter(i => (i.percentual_depreciado ?? 0) >= 100 && i.status !== 'baixado').length
   const baixados = imobilizados.filter(i => i.status === 'baixado').length
   const recentes = movimentacoes.slice(0, 6)
 
-  const card = isDark ? 'bg-white/[0.03] border-white/[0.06]' : 'bg-white border-slate-200 shadow-sm'
-  const borderSub = isDark ? 'border-white/[0.04]' : 'border-slate-100'
+  const cardClass = isDark
+    ? 'bg-[#111827] border border-white/[0.06]'
+    : 'bg-white border border-slate-200'
 
   return (
     <div className="space-y-4">
-      {/* ── Spotlight KPIs ── */}
-      <div className={`rounded-2xl border overflow-hidden ${card}`}>
-        <div className="grid grid-cols-2 lg:grid-cols-4">
-          <SpotlightMetric label="Total Ativos" value={kpis?.total_imobilizados ?? 0} tone="amber" isDark={isDark} />
-          <SpotlightMetric label="Valor Liquido" value={fmt(kpis?.valor_total_liquido ?? 0)} tone="emerald" isDark={isDark} />
-          <SpotlightMetric label="Depreciacao Acum." value={fmt(kpis?.depreciacao_acumulada ?? 0)} tone="red" note={depreciados > 0 ? `${depreciados} totalmente depreciados` : undefined} isDark={isDark} />
-          <SpotlightMetric label="Valor Aquisicao" value={fmt(kpis?.valor_total_aquisicao ?? (kpis?.valor_total_liquido ?? 0) + (kpis?.depreciacao_acumulada ?? 0))} tone="indigo" isDark={isDark} />
+      {/* ── Row 1: Indicadores + Janela Critica ── */}
+      <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
+        {/* Indicadores (3/5) */}
+        <section className={`lg:col-span-3 rounded-3xl shadow-sm overflow-hidden flex flex-col ${cardClass}`}>
+          <div className="p-4 md:p-5 flex flex-col gap-3 flex-1">
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <p className={`text-[11px] font-bold uppercase tracking-[0.24em] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+                  Gestao Patrimonial
+                </p>
+                <h2 className={`mt-0.5 text-sm font-black ${isDark ? 'text-white' : 'text-slate-900'}`}>
+                  Indicadores do portfolio
+                </h2>
+              </div>
+              <div className={`hidden md:flex w-10 h-10 rounded-2xl items-center justify-center shrink-0 ${isDark ? 'bg-amber-500/10' : 'bg-amber-50'}`}>
+                <Landmark size={18} className="text-amber-500" />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-3 gap-2.5 flex-1">
+              <SpotlightMetric label="Total Ativos" value={kpis?.total_imobilizados ?? 0} tone="amber" isDark={isDark} note={`${ativos} em uso`} />
+              <SpotlightMetric label="Valor Liquido" value={fmt(kpis?.valor_total_liquido ?? 0)} tone="emerald" isDark={isDark} />
+              <SpotlightMetric label="Depreciacao Acum." value={fmt(kpis?.depreciacao_acumulada ?? 0)} tone="red" isDark={isDark} note={depreciados > 0 ? `${depreciados} totalmente depreciados` : 'nenhum 100% depreciado'} />
+            </div>
+          </div>
+        </section>
+
+        {/* Janela Critica (2/5) */}
+        <section className={`lg:col-span-2 rounded-3xl shadow-sm overflow-hidden flex flex-col ${cardClass}`}>
+          <div className="p-4 md:p-5 flex flex-col gap-3 flex-1">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className={`text-[11px] font-bold uppercase tracking-[0.24em] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+                  Janela Critica
+                </p>
+                <h2 className={`mt-0.5 text-sm font-black ${isDark ? 'text-white' : 'text-slate-900'}`}>
+                  O que exige acao agora
+                </h2>
+              </div>
+              <div className={`w-8 h-8 rounded-xl flex items-center justify-center ${
+                (aguardandoEntrada + (kpis?.termos_pendentes ?? 0)) > 0 ? 'bg-red-50' : isDark ? 'bg-white/5' : 'bg-slate-50'
+              }`}>
+                <Zap size={14} className={(aguardandoEntrada + (kpis?.termos_pendentes ?? 0)) > 0 ? 'text-red-500' : 'text-slate-400'} />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <MiniInfoCard label="Aguardando Entrada" value={aguardandoEntrada} icon={ArrowDownUp} iconTone={aguardandoEntrada > 0 ? (isDark ? 'text-violet-400' : 'text-violet-500') : 'text-slate-400'} note={aguardandoEntrada > 0 ? 'pendentes de registro' : 'tudo ok'} isDark={isDark} />
+              <MiniInfoCard label="Termos Pendentes" value={kpis?.termos_pendentes ?? 0} icon={FileText} iconTone={(kpis?.termos_pendentes ?? 0) > 0 ? (isDark ? 'text-red-400' : 'text-red-500') : 'text-slate-400'} note="responsabilidade" isDark={isDark} />
+              <MiniInfoCard label="Em Manutencao" value={emManutencao} icon={Wrench} iconTone={emManutencao > 0 ? (isDark ? 'text-amber-400' : 'text-amber-500') : 'text-slate-400'} isDark={isDark} />
+              <MiniInfoCard label="Baixados" value={baixados} icon={Archive} iconTone="text-slate-400" isDark={isDark} />
+            </div>
+          </div>
+        </section>
+      </div>
+
+      {/* ── Row 2: Status Bar ── */}
+      <section className={`rounded-2xl shadow-sm overflow-hidden ${cardClass}`}>
+        <div className="px-4 py-3">
+          <HorizontalStatusBar
+            isDark={isDark}
+            segments={[
+              { key: 'aguardando', label: 'Aguardando',  value: aguardandoEntrada, barClass: 'bg-violet-500' },
+              { key: 'ativo',      label: 'Ativos',      value: ativos,            barClass: 'bg-emerald-500' },
+              { key: 'manutencao', label: 'Manutencao',  value: emManutencao,      barClass: 'bg-amber-500' },
+              { key: 'depreciado', label: 'Depreciados', value: depreciados,       barClass: 'bg-red-500' },
+              { key: 'baixado',    label: 'Baixados',    value: baixados,          barClass: 'bg-slate-400' },
+            ]}
+          />
         </div>
-      </div>
+      </section>
 
-      {/* ── Info Cards Row ── */}
-      <div className={`rounded-2xl border overflow-hidden p-3 ${card}`}>
-        <div className="flex gap-3">
-          <MiniInfoCard label="Aguardando Entrada" value={aguardandoEntrada} icon={ArrowDownUp} iconTone={isDark ? 'text-violet-400' : 'text-violet-500'} isDark={isDark} />
-          <MiniInfoCard label="Em Manutencao" value={emManutencao} icon={Wrench} iconTone={isDark ? 'text-amber-400' : 'text-amber-500'} isDark={isDark} />
-          <MiniInfoCard label="Termos Pendentes" value={kpis?.termos_pendentes ?? 0} icon={FileText} iconTone={isDark ? 'text-red-400' : 'text-red-500'} isDark={isDark} />
-          <MiniInfoCard label="Baixados" value={baixados} icon={Archive} iconTone={isDark ? 'text-slate-400' : 'text-slate-400'} isDark={isDark} />
-        </div>
-      </div>
-
-      {/* ── Status Bar ── */}
-      <div className={`rounded-2xl border p-4 ${card}`}>
-        <HorizontalStatusBar
-          title="Distribuicao por Status"
-          isDark={isDark}
-          emptyLabel="Nenhum ativo cadastrado"
-          segments={[
-            { key: 'aguardando', label: 'Aguardando',    value: aguardandoEntrada, barClass: 'bg-violet-500' },
-            { key: 'ativo',      label: 'Ativos',        value: ativos,            barClass: 'bg-emerald-500' },
-            { key: 'manutencao', label: 'Manutencao',    value: emManutencao,      barClass: 'bg-amber-500' },
-            { key: 'depreciado', label: 'Depreciados',   value: depreciados,       barClass: 'bg-red-500' },
-            { key: 'baixado',    label: 'Baixados',      value: baixados,          barClass: 'bg-slate-400' },
-          ]}
-        />
-      </div>
-
-      {/* ── Movimentacoes Recentes ── */}
-      <div className={`rounded-2xl border overflow-hidden ${card}`}>
-        <div className={`px-4 py-3 border-b flex items-center justify-between ${borderSub}`}>
+      {/* ── Row 3: Movimentacoes Recentes ── */}
+      <section className={`rounded-2xl shadow-sm overflow-hidden ${cardClass}`}>
+        <div className={`px-4 py-3 border-b flex items-center justify-between ${isDark ? 'border-white/[0.04]' : 'border-slate-100'}`}>
           <h2 className={`text-sm font-extrabold flex items-center gap-1.5 ${isDark ? 'text-white' : 'text-slate-800'}`}>
             <ArrowLeftRight size={14} className="text-amber-500" />
             Movimentacoes Recentes
@@ -154,8 +188,8 @@ export default function PatrimonialHome() {
         </div>
         {recentes.length === 0 ? (
           <div className="px-4 py-12 text-center">
-            <ArrowLeftRight size={32} className={isDark ? 'text-slate-700 mx-auto mb-2' : 'text-slate-200 mx-auto mb-2'} />
-            <p className={`${isDark ? 'text-slate-500' : 'text-slate-400'} text-sm`}>Nenhuma movimentacao registrada</p>
+            <ArrowLeftRight size={32} className={`mx-auto mb-2 ${isDark ? 'text-slate-700' : 'text-slate-200'}`} />
+            <p className={`text-sm ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Nenhuma movimentacao registrada</p>
           </div>
         ) : (
           <div className={`divide-y ${isDark ? 'divide-white/[0.04]' : 'divide-slate-50'}`}>
@@ -181,7 +215,7 @@ export default function PatrimonialHome() {
             ))}
           </div>
         )}
-      </div>
+      </section>
     </div>
   )
 }
