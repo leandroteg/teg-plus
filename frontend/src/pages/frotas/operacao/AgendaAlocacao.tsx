@@ -944,7 +944,30 @@ export default function AgendaAlocacao() {
   const [novaModal, setNovaModal] = useState(false)
   const [retornoAloc, setRetornoAloc] = useState<FroAlocacao | null>(null)
 
-  const alocacoes = viewMode === 'tabela' ? alocacoesAtivas : todasAlocacoes
+  // Filtros
+  const [filtroAtivo, setFiltroAtivo] = useState('')
+  const [filtroPessoa, setFiltroPessoa] = useState('')
+  const [filtroObra, setFiltroObra] = useState('')
+  const [filtroStatus, setFiltroStatus] = useState<'' | 'ativa' | 'encerrada'>('')
+
+  const raw = viewMode === 'tabela' ? alocacoesAtivas : todasAlocacoes
+
+  // Opcoes unicas para selects
+  const veiculosUnicos = useMemo(() => [...new Set(raw.map(a => a.veiculo?.placa).filter(Boolean))].sort() as string[], [raw])
+  const pessoasUnicas = useMemo(() => [...new Set(raw.map(a => a.responsavel_nome).filter(Boolean))].sort() as string[], [raw])
+  const obrasUnicas = useMemo(() => [...new Set(raw.map(a => (a.obra as any)?.nome).filter(Boolean))].sort() as string[], [raw])
+
+  const alocacoes = useMemo(() => {
+    let items = raw
+    if (filtroAtivo) items = items.filter(a => a.veiculo?.placa === filtroAtivo)
+    if (filtroPessoa) items = items.filter(a => a.responsavel_nome === filtroPessoa)
+    if (filtroObra) items = items.filter(a => (a.obra as any)?.nome === filtroObra)
+    if (filtroStatus) items = items.filter(a => a.status === filtroStatus)
+    return items
+  }, [raw, filtroAtivo, filtroPessoa, filtroObra, filtroStatus])
+
+  const hasFilters = !!(filtroAtivo || filtroPessoa || filtroObra || filtroStatus)
+  const clearFilters = () => { setFiltroAtivo(''); setFiltroPessoa(''); setFiltroObra(''); setFiltroStatus('') }
   const isLoading = viewMode === 'tabela' ? loadingAtivas : loadingTodas
 
   const card = `rounded-2xl shadow-sm border ${
@@ -978,6 +1001,60 @@ export default function AgendaAlocacao() {
             <Plus size={15} /> Nova Alocação
           </button>
         </div>
+      </div>
+
+      {/* Filtros */}
+      <div className={`flex flex-wrap items-center gap-2 ${hasFilters ? '' : ''}`}>
+        <select value={filtroAtivo} onChange={e => setFiltroAtivo(e.target.value)}
+          className={`px-3 py-2 rounded-xl border text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-rose-500/30 ${
+            filtroAtivo
+              ? isLight ? 'border-rose-300 bg-rose-50 text-rose-700' : 'border-rose-400/40 bg-rose-500/10 text-rose-300'
+              : isLight ? 'border-slate-200 bg-white text-slate-600' : 'border-white/[0.08] bg-white/[0.03] text-slate-300'
+          }`}>
+          <option value="">Todos veiculos</option>
+          {veiculosUnicos.map(p => <option key={p} value={p}>{p}</option>)}
+        </select>
+        <select value={filtroPessoa} onChange={e => setFiltroPessoa(e.target.value)}
+          className={`px-3 py-2 rounded-xl border text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-rose-500/30 ${
+            filtroPessoa
+              ? isLight ? 'border-rose-300 bg-rose-50 text-rose-700' : 'border-rose-400/40 bg-rose-500/10 text-rose-300'
+              : isLight ? 'border-slate-200 bg-white text-slate-600' : 'border-white/[0.08] bg-white/[0.03] text-slate-300'
+          }`}>
+          <option value="">Todos responsaveis</option>
+          {pessoasUnicas.map(p => <option key={p} value={p}>{p}</option>)}
+        </select>
+        <select value={filtroObra} onChange={e => setFiltroObra(e.target.value)}
+          className={`px-3 py-2 rounded-xl border text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-rose-500/30 ${
+            filtroObra
+              ? isLight ? 'border-rose-300 bg-rose-50 text-rose-700' : 'border-rose-400/40 bg-rose-500/10 text-rose-300'
+              : isLight ? 'border-slate-200 bg-white text-slate-600' : 'border-white/[0.08] bg-white/[0.03] text-slate-300'
+          }`}>
+          <option value="">Todas obras</option>
+          {obrasUnicas.map(o => <option key={o} value={o}>{o}</option>)}
+        </select>
+        {viewMode !== 'tabela' && (
+          <select value={filtroStatus} onChange={e => setFiltroStatus(e.target.value as any)}
+            className={`px-3 py-2 rounded-xl border text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-rose-500/30 ${
+              filtroStatus
+                ? isLight ? 'border-rose-300 bg-rose-50 text-rose-700' : 'border-rose-400/40 bg-rose-500/10 text-rose-300'
+                : isLight ? 'border-slate-200 bg-white text-slate-600' : 'border-white/[0.08] bg-white/[0.03] text-slate-300'
+            }`}>
+            <option value="">Todos status</option>
+            <option value="ativa">Ativa</option>
+            <option value="encerrada">Encerrada</option>
+          </select>
+        )}
+        {hasFilters && (
+          <button onClick={clearFilters}
+            className={`flex items-center gap-1 px-3 py-2 rounded-xl text-xs font-semibold transition-colors ${
+              isLight ? 'text-slate-500 hover:bg-slate-100' : 'text-slate-400 hover:bg-white/[0.06]'
+            }`}>
+            <X size={12} /> Limpar
+          </button>
+        )}
+        <span className={`ml-auto text-[11px] ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>
+          {alocacoes.length} resultado{alocacoes.length !== 1 ? 's' : ''}
+        </span>
       </div>
 
       {/* Content */}
