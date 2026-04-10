@@ -149,7 +149,7 @@ const VORTEX_CSS = `
 
 export default function Login() {
   const { user, loading, signIn, resetPassword } = useAuth()
-  const { isDark } = useTheme()
+  const { theme, isDark } = useTheme()
   const nav = useNavigate()
 
   const [view, setView] = useState<View>('login')
@@ -189,34 +189,60 @@ export default function Login() {
     setSuccess('Link de recuperação enviado! Verifique seu e-mail.')
   }
 
-  // ── Theme ──────────────────────────────────────────────────────────
-  const t = isDark ? {
-    bgFrom: '#040a14', bgMid: '#07111f', bgTo: '#0a1628',
-    cardBg: 'rgba(10,30,60,0.55)', cardBorder: 'rgba(20,184,166,0.15)',
-    cardShadow: '0 30px 80px rgba(0,0,0,0.5), 0 0 1px rgba(20,184,166,0.4), 0 0 40px rgba(20,184,166,0.06), inset 0 1px 0 rgba(255,255,255,0.08)',
-    inputBg: 'rgba(255,255,255,0.06)', inputBorder: 'rgba(255,255,255,0.1)',
-    focusBorder: 'rgba(20,184,166,0.6)', focusShadow: '0 0 4px rgba(20,184,166,0.5), 0 0 24px rgba(20,184,166,0.12)',
-    text: '#ffffff', textMuted: 'rgba(255,255,255,0.55)', textDim: 'rgba(255,255,255,0.35)',
-    gridOp: 0.04, ringOp: 0.12, particleOp: 0.4,
-    btnGrad: 'linear-gradient(135deg, #14b8a6, #0d9488, #0f766e)',
-    errorColor: '#f87171', errorBg: 'rgba(248,113,113,0.1)', errorBorder: 'rgba(248,113,113,0.2)',
-    successBg: 'rgba(52,211,153,0.1)', successBorder: 'rgba(52,211,153,0.2)', successColor: '#34d399',
-    linkColor: '#5eead4', footerColor: 'rgba(255,255,255,0.2)',
-    backdrop: 'blur(24px) saturate(1.2)',
-  } : {
-    bgFrom: '#f1f5f9', bgMid: '#e2e8f0', bgTo: '#f8fafc',
-    cardBg: 'rgba(255,255,255,0.7)', cardBorder: 'rgba(99,102,241,0.12)',
-    cardShadow: '0 30px 80px rgba(0,0,0,0.12), 0 0 1px rgba(99,102,241,0.25), 0 0 40px rgba(99,102,241,0.04), inset 0 1px 0 rgba(255,255,255,0.9)',
-    inputBg: '#f1f5f9', inputBorder: '#cbd5e1',
-    focusBorder: 'rgba(99,102,241,0.5)', focusShadow: '0 0 4px rgba(99,102,241,0.3), 0 0 20px rgba(99,102,241,0.08)',
-    text: '#1e293b', textMuted: '#64748b', textDim: '#94a3b8',
-    gridOp: 0.06, ringOp: 0.1, particleOp: 0.15,
-    btnGrad: 'linear-gradient(135deg, #6366F1, #4F46E5, #4338CA)',
-    errorColor: '#ef4444', errorBg: 'rgba(239,68,68,0.06)', errorBorder: 'rgba(239,68,68,0.15)',
-    successBg: 'rgba(16,185,129,0.06)', successBorder: 'rgba(16,185,129,0.15)', successColor: '#059669',
-    linkColor: '#6366f1', footerColor: '#94a3b8',
-    backdrop: 'blur(16px) saturate(1.1)',
+  // ── Theme (3 variantes: dark / original / light) ────────────────────
+  const THEMES = {
+    dark: {
+      bgFrom: '#040a14', bgMid: '#07111f', bgTo: '#0a1628',
+      cardBg: 'rgba(10,30,60,0.55)', cardBorder: 'rgba(20,184,166,0.15)',
+      cardShadow: '0 30px 80px rgba(0,0,0,0.5), 0 0 1px rgba(20,184,166,0.4), 0 0 40px rgba(20,184,166,0.06), inset 0 1px 0 rgba(255,255,255,0.08)',
+      inputBg: 'rgba(255,255,255,0.06)', inputBorder: 'rgba(255,255,255,0.1)',
+      focusBorder: 'rgba(20,184,166,0.6)', focusShadow: '0 0 4px rgba(20,184,166,0.5), 0 0 24px rgba(20,184,166,0.12)',
+      text: '#ffffff', textMuted: 'rgba(255,255,255,0.55)', textDim: 'rgba(255,255,255,0.35)',
+      gridOp: 0.04, ringOp: 0.12, particleOp: 0.4,
+      glowColor: '20,184,166', glowColor2: '99,102,241', accentRgb: '20,184,166',
+      btnGrad: 'linear-gradient(135deg, #14b8a6, #0d9488, #0f766e)',
+      errorColor: '#f87171', errorBg: 'rgba(248,113,113,0.1)', errorBorder: 'rgba(248,113,113,0.2)',
+      successBg: 'rgba(52,211,153,0.1)', successBorder: 'rgba(52,211,153,0.2)', successColor: '#34d399',
+      linkColor: '#5eead4', footerColor: 'rgba(255,255,255,0.2)',
+      backdrop: 'blur(24px) saturate(1.2)',
+      showLightning: true,
+    },
+    original: {
+      // Meio-termo: fundo claro, mas efeitos coloridos vibrantes
+      bgFrom: '#eef2f7', bgMid: '#e0e7f1', bgTo: '#f0f4fa',
+      cardBg: 'rgba(255,255,255,0.85)', cardBorder: 'rgba(99,102,241,0.18)',
+      cardShadow: '0 30px 80px rgba(99,102,241,0.1), 0 0 1px rgba(99,102,241,0.3), 0 0 50px rgba(99,102,241,0.05), inset 0 1px 0 rgba(255,255,255,0.95)',
+      inputBg: 'rgba(241,245,249,0.9)', inputBorder: 'rgba(99,102,241,0.15)',
+      focusBorder: 'rgba(99,102,241,0.6)', focusShadow: '0 0 4px rgba(99,102,241,0.4), 0 0 24px rgba(99,102,241,0.1)',
+      text: '#1e293b', textMuted: '#475569', textDim: '#94a3b8',
+      gridOp: 0.08, ringOp: 0.15, particleOp: 0.3,
+      glowColor: '99,102,241', glowColor2: '20,184,166', accentRgb: '99,102,241',
+      btnGrad: 'linear-gradient(135deg, #6366F1, #4F46E5, #4338CA)',
+      errorColor: '#ef4444', errorBg: 'rgba(239,68,68,0.08)', errorBorder: 'rgba(239,68,68,0.15)',
+      successBg: 'rgba(16,185,129,0.08)', successBorder: 'rgba(16,185,129,0.15)', successColor: '#059669',
+      linkColor: '#6366f1', footerColor: '#94a3b8',
+      backdrop: 'blur(20px) saturate(1.15)',
+      showLightning: false,
+    },
+    light: {
+      // Clean minimal: fundo branco, efeitos muito sutis
+      bgFrom: '#f8fafc', bgMid: '#f1f5f9', bgTo: '#ffffff',
+      cardBg: '#ffffff', cardBorder: '#e2e8f0',
+      cardShadow: '0 25px 50px rgba(0,0,0,0.06), 0 0 0 1px rgba(0,0,0,0.03)',
+      inputBg: '#f8fafc', inputBorder: '#e2e8f0',
+      focusBorder: 'rgba(99,102,241,0.4)', focusShadow: '0 0 3px rgba(99,102,241,0.2), 0 0 12px rgba(99,102,241,0.05)',
+      text: '#1e293b', textMuted: '#64748b', textDim: '#94a3b8',
+      gridOp: 0.03, ringOp: 0.05, particleOp: 0.08,
+      glowColor: '99,102,241', glowColor2: '139,92,246', accentRgb: '99,102,241',
+      btnGrad: 'linear-gradient(135deg, #6366F1, #4F46E5, #4338CA)',
+      errorColor: '#ef4444', errorBg: 'rgba(239,68,68,0.05)', errorBorder: 'rgba(239,68,68,0.1)',
+      successBg: 'rgba(16,185,129,0.05)', successBorder: 'rgba(16,185,129,0.1)', successColor: '#059669',
+      linkColor: '#6366f1', footerColor: '#cbd5e1',
+      backdrop: undefined as string | undefined,
+      showLightning: false,
+    },
   }
+  const t = THEMES[theme]
 
   const cssVars = { '--v-focus-border': t.focusBorder, '--v-focus-shadow': t.focusShadow, '--v-text-dim': t.textDim } as React.CSSProperties
 
@@ -227,23 +253,27 @@ export default function Login() {
 
         {/* Floating glow orbs */}
         {[
-          { x: '20%', y: '30%', size: 300, color: isDark ? '20,184,166' : '99,102,241', anim: 'vortex-glow-float-1', dur: 12 },
-          { x: '70%', y: '20%', size: 250, color: isDark ? '99,102,241' : '139,92,246', anim: 'vortex-glow-float-2', dur: 16 },
-          { x: '50%', y: '70%', size: 350, color: isDark ? '14,165,233' : '99,102,241', anim: 'vortex-glow-float-3', dur: 20 },
-          { x: '80%', y: '60%', size: 200, color: isDark ? '20,184,166' : '59,130,246', anim: 'vortex-glow-float-1', dur: 14 },
-          { x: '10%', y: '70%', size: 220, color: isDark ? '139,92,246' : '20,184,166', anim: 'vortex-glow-float-2', dur: 18 },
-        ].map((orb, i) => (
-          <div key={`glow-${i}`} className="fixed pointer-events-none" style={{
-            left: orb.x, top: orb.y, width: orb.size, height: orb.size,
-            borderRadius: '50%',
-            background: `radial-gradient(circle, rgba(${orb.color},${isDark ? 0.15 : 0.08}) 0%, transparent 70%)`,
-            filter: `blur(${isDark ? 40 : 30}px)`,
-            animation: `${orb.anim} ${orb.dur}s ease-in-out infinite`,
-          }} />
-        ))}
+          { x: '20%', y: '30%', size: 300, colorKey: 0, anim: 'vortex-glow-float-1', dur: 12 },
+          { x: '70%', y: '20%', size: 250, colorKey: 1, anim: 'vortex-glow-float-2', dur: 16 },
+          { x: '50%', y: '70%', size: 350, colorKey: 0, anim: 'vortex-glow-float-3', dur: 20 },
+          { x: '80%', y: '60%', size: 200, colorKey: 1, anim: 'vortex-glow-float-1', dur: 14 },
+          { x: '10%', y: '70%', size: 220, colorKey: 0, anim: 'vortex-glow-float-2', dur: 18 },
+        ].map((orb, i) => {
+          const color = orb.colorKey === 0 ? t.glowColor : t.glowColor2
+          const intensity = theme === 'dark' ? 0.15 : theme === 'original' ? 0.12 : 0.06
+          return (
+            <div key={`glow-${i}`} className="fixed pointer-events-none" style={{
+              left: orb.x, top: orb.y, width: orb.size, height: orb.size,
+              borderRadius: '50%',
+              background: `radial-gradient(circle, rgba(${color},${intensity}) 0%, transparent 70%)`,
+              filter: `blur(${theme === 'dark' ? 40 : theme === 'original' ? 35 : 25}px)`,
+              animation: `${orb.anim} ${orb.dur}s ease-in-out infinite`,
+            }} />
+          )
+        })}
 
         {/* Lightning / energy flashes */}
-        {isDark && [
+        {t.showLightning && [
           { x: '15%', y: '25%', w: 2, h: 80, rot: 35, delay: 0 },
           { x: '78%', y: '40%', w: 1.5, h: 60, rot: -20, delay: 4 },
           { x: '45%', y: '15%', w: 1, h: 50, rot: 70, delay: 8 },
@@ -252,19 +282,19 @@ export default function Login() {
         ].map((l, i) => (
           <div key={`lightning-${i}`} className="fixed pointer-events-none" style={{
             left: l.x, top: l.y, width: l.w, height: l.h,
-            background: 'linear-gradient(180deg, transparent, rgba(20,184,166,0.8), rgba(99,102,241,0.6), transparent)',
+            background: `linear-gradient(180deg, transparent, rgba(${t.glowColor},0.8), rgba(${t.glowColor2},0.6), transparent)`,
             transform: `rotate(${l.rot}deg)`,
             borderRadius: 2,
             animation: `vortex-lightning 8s ${l.delay}s ease infinite`,
             filter: 'blur(1px)',
-            boxShadow: '0 0 8px rgba(20,184,166,0.4), 0 0 20px rgba(20,184,166,0.15)',
+            boxShadow: `0 0 8px rgba(${t.glowColor},0.4), 0 0 20px rgba(${t.glowColor},0.15)`,
           }} />
         ))}
 
         {/* Grid sci-fi */}
         <div className="fixed inset-0 pointer-events-none" style={{
           backgroundSize: '60px 60px',
-          backgroundImage: `linear-gradient(rgba(${isDark ? '20,184,166' : '99,102,241'},${t.gridOp}) 1px, transparent 1px), linear-gradient(90deg, rgba(${isDark ? '20,184,166' : '99,102,241'},${t.gridOp}) 1px, transparent 1px)`,
+          backgroundImage: `linear-gradient(rgba(${t.accentRgb},${t.gridOp}) 1px, transparent 1px), linear-gradient(90deg, rgba(${t.accentRgb},${t.gridOp}) 1px, transparent 1px)`,
           maskImage: 'radial-gradient(ellipse at center, black 20%, transparent 60%)',
           WebkitMaskImage: 'radial-gradient(ellipse at center, black 20%, transparent 60%)',
         }} />
@@ -279,7 +309,7 @@ export default function Login() {
           <div key={i} className="fixed pointer-events-none" style={{
             left: '50%', top: '50%', width: ring.size, height: ring.size,
             borderRadius: '50%',
-            border: `${ring.width}px solid rgba(${isDark ? '20,184,166' : '99,102,241'},${t.ringOp})`,
+            border: `${ring.width}px solid rgba(${t.accentRgb},${t.ringOp})`,
             transform: 'translate(-50%,-50%)',
             animation: `${ring.anim} ${ring.dur}s linear infinite`,
           }} />
@@ -291,8 +321,8 @@ export default function Login() {
             <div key={i} style={{
               position: 'absolute', left: `${p.left}%`, bottom: '-10px',
               width: p.size + 1, height: p.size + 1, borderRadius: '50%',
-              background: i % 2 === 0 ? `rgba(${isDark ? '20,184,166' : '99,102,241'},${t.particleOp})` : `rgba(${isDark ? '99,200,230' : '139,92,246'},${t.particleOp})`,
-              boxShadow: isDark ? `0 0 ${p.size * 2}px rgba(20,184,166,${t.particleOp * 0.5})` : undefined,
+              background: i % 2 === 0 ? `rgba(${t.glowColor},${t.particleOp})` : `rgba(${t.glowColor2},${t.particleOp})`,
+              boxShadow: theme !== 'light' ? `0 0 ${p.size * 2}px rgba(${t.glowColor},${t.particleOp * 0.5})` : undefined,
               animation: `vortex-particle ${p.dur}s ${p.delay}s linear infinite`,
             }} />
           ))}
@@ -309,9 +339,7 @@ export default function Login() {
         <div className="fixed pointer-events-none" style={{
           left: '50%', top: '45%', transform: 'translate(-50%,-50%)',
           width: 600, height: 600, borderRadius: '50%',
-          background: isDark
-            ? 'radial-gradient(circle, rgba(20,184,166,0.06) 0%, transparent 70%)'
-            : 'radial-gradient(circle, rgba(99,102,241,0.06) 0%, transparent 70%)',
+          background: `radial-gradient(circle, rgba(${t.glowColor},${theme === 'dark' ? 0.08 : theme === 'original' ? 0.06 : 0.03}) 0%, transparent 70%)`,
         }} />
 
         {/* Content */}
