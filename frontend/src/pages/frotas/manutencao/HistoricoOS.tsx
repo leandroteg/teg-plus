@@ -214,6 +214,7 @@ export default function HistoricoOS() {
             Nenhuma OS encontrada para os filtros selecionados
           </p>
         ) : (
+          <div className="overflow-x-auto">
           <table className="w-full">
             <thead>
               <tr className={`border-b ${divider}`}>
@@ -264,6 +265,7 @@ export default function HistoricoOS() {
               })}
             </tbody>
           </table>
+          </div>
         )}
       </div>
     </div>

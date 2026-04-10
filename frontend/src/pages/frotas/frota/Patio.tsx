@@ -105,30 +105,33 @@ function VeiculoCard({ v, osCount, isLight, onAlocar, onOS, onChecklist }: Veicu
     <div className={`rounded-2xl border shadow-sm transition-all hover:shadow-md ${
       isLight ? 'bg-white border-slate-200' : 'bg-[#1e293b] border-white/[0.06]'
     }`}>
-      <div className="flex items-center gap-3 px-4 py-3">
-        {/* Icon box */}
-        <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${
-          isMaquina
-            ? (isLight ? 'bg-violet-50' : 'bg-violet-500/10')
-            : (isLight ? 'bg-sky-50'    : 'bg-sky-500/10')
-        }`}>
-          {isMaquina
-            ? <Cog  size={16} className={isLight ? 'text-violet-600' : 'text-violet-400'} />
-            : <Car  size={16} className={isLight ? 'text-sky-600'    : 'text-sky-400'} />
-          }
-        </div>
-
-        {/* Placa + modelo */}
-        <div className="min-w-0 w-40 shrink-0">
-          <div className="flex items-center gap-1.5">
-            <p className={`text-sm font-bold truncate ${isLight ? 'text-slate-800' : 'text-white'}`}>
-              {identificador}
-            </p>
-            {osCount > 0 && <OSBadge count={osCount} isLight={isLight} />}
+      <div className="flex flex-col sm:flex-row sm:items-center gap-3 px-4 py-3">
+        {/* Top line: Icon + Placa/modelo */}
+        <div className="flex items-center gap-3">
+          {/* Icon box */}
+          <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${
+            isMaquina
+              ? (isLight ? 'bg-violet-50' : 'bg-violet-500/10')
+              : (isLight ? 'bg-sky-50'    : 'bg-sky-500/10')
+          }`}>
+            {isMaquina
+              ? <Cog  size={16} className={isLight ? 'text-violet-600' : 'text-violet-400'} />
+              : <Car  size={16} className={isLight ? 'text-sky-600'    : 'text-sky-400'} />
+            }
           </div>
-          <p className="text-[11px] text-slate-500 truncate">
-            {v.marca} {v.modelo}{v.ano_mod ? ` · ${v.ano_mod}` : ''}
-          </p>
+
+          {/* Placa + modelo */}
+          <div className="min-w-0 sm:w-40 shrink-0">
+            <div className="flex items-center gap-1.5">
+              <p className={`text-sm font-bold truncate ${isLight ? 'text-slate-800' : 'text-white'}`}>
+                {identificador}
+              </p>
+              {osCount > 0 && <OSBadge count={osCount} isLight={isLight} />}
+            </div>
+            <p className="text-[11px] text-slate-500 truncate">
+              {v.marca} {v.modelo}{v.ano_mod ? ` · ${v.ano_mod}` : ''}
+            </p>
+          </div>
         </div>
 
         {/* Badges */}
@@ -149,7 +152,7 @@ function VeiculoCard({ v, osCount, isLight, onAlocar, onOS, onChecklist }: Veicu
         </div>
 
         {/* Meta */}
-        <div className="flex items-center gap-x-3 text-[10px] text-slate-400 shrink-0 hidden md:flex">
+        <div className="hidden md:flex items-center gap-x-3 text-[10px] text-slate-400 shrink-0">
           {isMaquina ? (
             v.horimetro_atual !== undefined && (
               <span className="flex items-center gap-1">
@@ -176,13 +179,13 @@ function VeiculoCard({ v, osCount, isLight, onAlocar, onOS, onChecklist }: Veicu
         </div>
 
         {/* Spacer */}
-        <div className="flex-1" />
+        <div className="hidden sm:block flex-1" />
 
         {/* Actions */}
-        <div className="flex items-center gap-2 shrink-0">
+        <div className="flex items-center gap-2 w-full sm:w-auto">
           <button
             onClick={() => onAlocar(v.id)}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-[11px] font-semibold transition-all ${
+            className={`flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-xl border text-[11px] font-semibold transition-all ${
               isLight
                 ? 'bg-rose-50 border-rose-200 text-rose-600 hover:bg-rose-100'
                 : 'bg-rose-500/10 border-rose-500/25 text-rose-300 hover:bg-rose-500/[0.18]'
@@ -192,7 +195,7 @@ function VeiculoCard({ v, osCount, isLight, onAlocar, onOS, onChecklist }: Veicu
           </button>
           <button
             onClick={() => onOS(v.id)}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-[11px] font-semibold transition-all ${
+            className={`flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-xl border text-[11px] font-semibold transition-all ${
               isLight
                 ? 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'
                 : 'bg-white/[0.04] border-white/[0.06] text-slate-300 hover:bg-white/[0.08]'
@@ -202,7 +205,7 @@ function VeiculoCard({ v, osCount, isLight, onAlocar, onOS, onChecklist }: Veicu
           </button>
           <button
             onClick={() => onChecklist(v.id)}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-[11px] font-semibold transition-all ${
+            className={`flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-xl border text-[11px] font-semibold transition-all ${
               isLight
                 ? 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'
                 : 'bg-white/[0.04] border-white/[0.06] text-slate-300 hover:bg-white/[0.08]'
@@ -430,15 +433,15 @@ export default function Patio() {
             Ativos prontos para uso, sem alocação ativa
           </p>
         </div>
-        <div className="flex items-center gap-2">
-          <div className="relative">
+        <div className="flex items-center gap-2 w-full sm:w-auto">
+          <div className="relative flex-1 sm:flex-initial">
             <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
             <input
               type="text"
               value={search}
               onChange={e => setSearch(e.target.value)}
               placeholder="Buscar placa, modelo..."
-              className={`pl-8 pr-3 py-2 rounded-xl border text-xs w-52 transition-all focus:outline-none focus:ring-2 ${
+              className={`pl-8 pr-3 py-2 rounded-xl border text-xs w-full sm:w-52 transition-all focus:outline-none focus:ring-2 ${
                 isLight
                   ? 'bg-white border-slate-200 focus:ring-rose-500/20 focus:border-rose-400'
                   : 'bg-slate-800/60 border-slate-700 text-white focus:ring-rose-500/20 focus:border-rose-500'

@@ -174,7 +174,7 @@ function Templates({ isLight }: { isLight: boolean }) {
 
   if (isLoading) {
     return (
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
         {[1, 2, 3, 4].map(i => (
           <div key={i} className={`h-36 rounded-2xl animate-pulse ${isLight ? 'bg-slate-100' : 'bg-white/5'}`} />
         ))}
@@ -184,7 +184,7 @@ function Templates({ isLight }: { isLight: boolean }) {
 
   return (
     <>
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
         {templates.map(t => (
           <TemplateCard key={t.id} template={t} onVerItens={setSelected} isLight={isLight} />
         ))}
@@ -224,6 +224,7 @@ function Execucoes({ isLight }: { isLight: boolean }) {
       {execucoes.length === 0 ? (
         <p className="text-sm text-slate-500 text-center py-12">Nenhuma execução registrada</p>
       ) : (
+        <div className="overflow-x-auto">
         <table className="w-full">
           <thead>
             <tr className={`border-b ${divider}`}>
@@ -266,6 +267,7 @@ function Execucoes({ isLight }: { isLight: boolean }) {
             })}
           </tbody>
         </table>
+        </div>
       )}
     </div>
   )

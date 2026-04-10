@@ -210,30 +210,33 @@ function AlocacaoCard({ a, osCount, isLight, onRetorno }: AlocacaoCardProps) {
     <div className={`rounded-2xl border shadow-sm transition-all hover:shadow-md ${
       isLight ? 'bg-white border-slate-200' : 'bg-[#1e293b] border-white/[0.06]'
     }`}>
-      <div className="flex items-center gap-3 px-4 py-3">
-        {/* Icon box */}
-        <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${
-          isMaquina
-            ? (isLight ? 'bg-violet-50' : 'bg-violet-500/10')
-            : (isLight ? 'bg-sky-50'    : 'bg-sky-500/10')
-        }`}>
-          {isMaquina
-            ? <Cog size={16} className={isLight ? 'text-violet-600' : 'text-violet-400'} />
-            : <Car size={16} className={isLight ? 'text-sky-600'    : 'text-sky-400'} />
-          }
-        </div>
-
-        {/* Placa + modelo */}
-        <div className="min-w-0 w-40 shrink-0">
-          <div className="flex items-center gap-1.5">
-            <p className={`text-sm font-bold truncate ${isLight ? 'text-slate-800' : 'text-white'}`}>
-              {identificador}
-            </p>
-            {osCount > 0 && <OSBadge count={osCount} isLight={isLight} />}
+      <div className="flex flex-col sm:flex-row sm:items-center gap-3 px-4 py-3">
+        {/* Top line: Icon + Placa/modelo */}
+        <div className="flex items-center gap-3">
+          {/* Icon box */}
+          <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${
+            isMaquina
+              ? (isLight ? 'bg-violet-50' : 'bg-violet-500/10')
+              : (isLight ? 'bg-sky-50'    : 'bg-sky-500/10')
+          }`}>
+            {isMaquina
+              ? <Cog size={16} className={isLight ? 'text-violet-600' : 'text-violet-400'} />
+              : <Car size={16} className={isLight ? 'text-sky-600'    : 'text-sky-400'} />
+            }
           </div>
-          <p className="text-[11px] text-slate-500 truncate">
-            {a.veiculo?.marca} {a.veiculo?.modelo}
-          </p>
+
+          {/* Placa + modelo */}
+          <div className="min-w-0 sm:w-40 shrink-0">
+            <div className="flex items-center gap-1.5">
+              <p className={`text-sm font-bold truncate ${isLight ? 'text-slate-800' : 'text-white'}`}>
+                {identificador}
+              </p>
+              {osCount > 0 && <OSBadge count={osCount} isLight={isLight} />}
+            </div>
+            <p className="text-[11px] text-slate-500 truncate">
+              {a.veiculo?.marca} {a.veiculo?.modelo}
+            </p>
+          </div>
         </div>
 
         {/* Obra / CC badge */}
@@ -247,7 +250,7 @@ function AlocacaoCard({ a, osCount, isLight, onRetorno }: AlocacaoCardProps) {
         </div>
 
         {/* Dates + responsável */}
-        <div className="flex items-center gap-x-3 text-[10px] text-slate-400 shrink-0 hidden md:flex">
+        <div className="hidden md:flex items-center gap-x-3 text-[10px] text-slate-400 shrink-0">
           <span className="flex items-center gap-1">
             <CalendarDays size={10} /> Saída: {fmtDate(a.data_saida)}
           </span>
@@ -262,12 +265,12 @@ function AlocacaoCard({ a, osCount, isLight, onRetorno }: AlocacaoCardProps) {
         </div>
 
         {/* Spacer */}
-        <div className="flex-1" />
+        <div className="hidden sm:block flex-1" />
 
         {/* Action */}
         <button
           onClick={() => onRetorno(a)}
-          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-[11px] font-semibold transition-all shrink-0 ${
+          className={`flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-xl border text-[11px] font-semibold transition-all w-full sm:w-auto ${
             isLight
               ? 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-rose-50 hover:border-rose-200 hover:text-rose-600'
               : 'bg-white/[0.04] border-white/[0.06] text-slate-300 hover:bg-rose-500/10 hover:border-rose-500/25 hover:text-rose-300'

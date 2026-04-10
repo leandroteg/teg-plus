@@ -196,7 +196,7 @@ function NovaOcorrenciaModal({ onClose, isLight }: { onClose: () => void; isLigh
           </button>
         </div>
 
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
             <label className={lbl}>Veículo *</label>
             <select className={sel} value={form.veiculo_id} onChange={e => setForm(f => ({ ...f, veiculo_id: e.target.value }))} required>
@@ -214,7 +214,7 @@ function NovaOcorrenciaModal({ onClose, isLight }: { onClose: () => void; isLigh
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
             <label className={lbl}>Data/hora *</label>
             <input type="datetime-local" className={inp} value={form.data_ocorrencia} onChange={e => setForm(f => ({ ...f, data_ocorrencia: e.target.value }))} required />
@@ -267,14 +267,14 @@ export default function TelemetriaOp() {
 
   return (
     <div className="p-4 sm:p-6 space-y-4">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
           <h1 className={`text-xl font-bold flex items-center gap-2 ${isLight ? 'text-slate-800' : 'text-white'}`}>
             <Radio size={20} className="text-teal-500" /> Telemetria e Compliance
           </h1>
           <p className="text-sm text-slate-500">Ocorrências registradas pelo sistema de rastreamento</p>
         </div>
-        <button onClick={() => setNovaModal(true)} className="flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-teal-500 to-teal-600 hover:from-teal-400 hover:to-teal-500 shadow-sm shadow-teal-500/20 text-sm text-white font-semibold">
+        <button onClick={() => setNovaModal(true)} className="flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-teal-500 to-teal-600 hover:from-teal-400 hover:to-teal-500 shadow-sm shadow-teal-500/20 text-sm text-white font-semibold w-full sm:w-auto">
           <Plus size={15} /> Registrar Ocorrência
         </button>
       </div>

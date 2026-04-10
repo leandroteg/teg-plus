@@ -110,7 +110,7 @@ function AgendarModal({ onClose, isLight }: { onClose: () => void; isLight: bool
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className={lbl}>Prioridade</label>
               <select
@@ -251,7 +251,7 @@ export default function Planejamento() {
   return (
     <div className="p-4 sm:p-6 space-y-5 max-w-5xl">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
           <h1 className={`text-xl font-extrabold flex items-center gap-2 ${isLight ? 'text-slate-800' : 'text-white'}`}>
             <CalendarDays size={20} className="text-teal-500" />
@@ -263,7 +263,7 @@ export default function Planejamento() {
         </div>
         <button
           onClick={() => setModal(true)}
-          className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-teal-500 to-teal-600 hover:from-teal-400 hover:to-teal-500 text-sm text-white font-semibold shadow-sm shadow-teal-500/20 transition-all"
+          className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-teal-500 to-teal-600 hover:from-teal-400 hover:to-teal-500 text-sm text-white font-semibold shadow-sm shadow-teal-500/20 transition-all w-full sm:w-auto"
         >
           <Plus size={15} /> Agendar Preventiva
         </button>
@@ -319,6 +319,7 @@ export default function Planejamento() {
                   Nenhuma OS preventiva aprovada ou em execução
                 </p>
               ) : (
+                <div className="overflow-x-auto">
                 <table className="w-full">
                   <thead>
                     <tr className={`border-b ${divider}`}>
@@ -351,6 +352,7 @@ export default function Planejamento() {
                     ))}
                   </tbody>
                 </table>
+                </div>
               )}
             </div>
           </section>
@@ -367,6 +369,7 @@ export default function Planejamento() {
                   Nenhum veículo com plano de preventiva configurado
                 </p>
               ) : (
+                <div className="overflow-x-auto">
                 <table className="w-full">
                   <thead>
                     <tr className={`border-b ${divider}`}>
@@ -410,6 +413,7 @@ export default function Planejamento() {
                     })}
                   </tbody>
                 </table>
+                </div>
               )}
             </div>
           </section>

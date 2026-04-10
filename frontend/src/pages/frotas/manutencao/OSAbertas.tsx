@@ -142,7 +142,7 @@ function NovaOSModal({ onClose, isLight }: { onClose: () => void; isLight: boole
             </select>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className={lbl}>Tipo</label>
               <select className={`${inp} [&>option]:bg-slate-900`} value={form.tipo}
@@ -283,7 +283,7 @@ function KanbanColuna({ cfg, cards, isLight }: { cfg: ColunaCfg; cards: FroOrdem
   const countCls   = isLight ? ACCENT_COUNT_L[cfg.accent] : ACCENT_COUNT_D[cfg.accent]
 
   return (
-    <div className={`flex flex-col flex-shrink-0 w-[240px] rounded-2xl border-t-[3px] ${topBorder} overflow-hidden ${
+    <div className={`flex flex-col flex-shrink-0 w-[200px] sm:w-[240px] rounded-2xl border-t-[3px] ${topBorder} overflow-hidden ${
       isLight
         ? 'bg-slate-50/80 border-x border-b border-slate-200'
         : 'bg-[#0f172a]/60 border-x border-b border-white/[0.05]'
@@ -349,7 +349,7 @@ export default function OSAbertas() {
     <div className="flex flex-col h-full overflow-hidden p-4 sm:p-6 gap-4">
 
       {/* ── Header ──────────────────────────────────────────────── */}
-      <div className="flex items-center justify-between gap-4 shrink-0">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 shrink-0">
         <div>
           <h1 className={`text-lg font-extrabold flex items-center gap-2 ${isLight ? 'text-slate-800' : 'text-white'}`}>
             <Wrench size={18} className="text-rose-500" />
@@ -364,12 +364,12 @@ export default function OSAbertas() {
         <div className="flex items-center gap-2">
           {/* Alertas rápidos */}
           {criticas > 0 && (
-            <span className="flex items-center gap-1 text-[10px] font-bold px-2 py-1 rounded-lg bg-red-500/15 text-red-500 border border-red-500/20">
+            <span className="hidden sm:flex items-center gap-1 text-[10px] font-bold px-2 py-1 rounded-lg bg-red-500/15 text-red-500 border border-red-500/20">
               <AlertTriangle size={10} /> {criticas} crítica{criticas > 1 ? 's' : ''}
             </span>
           )}
           {altas > 0 && (
-            <span className="flex items-center gap-1 text-[10px] font-bold px-2 py-1 rounded-lg bg-orange-500/15 text-orange-500 border border-orange-500/20">
+            <span className="hidden sm:flex items-center gap-1 text-[10px] font-bold px-2 py-1 rounded-lg bg-orange-500/15 text-orange-500 border border-orange-500/20">
               {altas} alta{altas > 1 ? 's' : ''}
             </span>
           )}

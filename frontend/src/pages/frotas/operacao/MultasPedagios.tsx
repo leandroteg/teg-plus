@@ -96,7 +96,7 @@ function RegistrarModal({
           </button>
         </div>
 
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
             <label className={lbl}>Tipo *</label>
             <select
@@ -127,7 +127,7 @@ function RegistrarModal({
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
             <label className={lbl}>Data Infração</label>
             <input
@@ -148,7 +148,7 @@ function RegistrarModal({
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
             <label className={lbl}>Valor (R$) *</label>
             <input
@@ -276,7 +276,7 @@ export default function MultasPedagios() {
   return (
     <div className="p-4 sm:p-6 space-y-4">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
           <h1
             className={`text-xl font-bold flex items-center gap-2 ${
@@ -295,7 +295,7 @@ export default function MultasPedagios() {
         </div>
         <button
           onClick={() => setModal(true)}
-          className="flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-rose-500 to-rose-600 hover:from-rose-400 hover:to-rose-500 shadow-sm shadow-rose-500/20 text-sm text-white font-semibold"
+          className="flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-rose-500 to-rose-600 hover:from-rose-400 hover:to-rose-500 shadow-sm shadow-rose-500/20 text-sm text-white font-semibold w-full sm:w-auto"
         >
           <Plus size={15} /> Registrar
         </button>
