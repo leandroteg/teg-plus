@@ -1174,15 +1174,15 @@ function CadastroUsuarioModal({ onClose }: { onClose: () => void }) {
 
   return (
     <div className="fixed inset-0 bg-black/40 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
-      <div className="bg-white w-full sm:max-w-md rounded-t-3xl sm:rounded-2xl shadow-2xl overflow-hidden">
-        <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
+      <div className={`w-full sm:max-w-md rounded-t-3xl sm:rounded-2xl shadow-2xl overflow-hidden ${isDark ? 'bg-[#1e293b]' : 'bg-white'}`}>
+        <div className={`flex items-center justify-between px-5 py-4 border-b ${isDark ? 'border-white/[0.06]' : 'border-slate-100'}`}>
           <div className="flex items-center gap-2">
             <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
               <UserPlus size={15} className="text-primary" />
             </div>
-            <h3 className="font-bold text-navy">Cadastrar Usuário</h3>
+            <h3 className={`font-bold ${isDark ? 'text-white' : 'text-navy'}`}>Cadastrar Usuário</h3>
           </div>
-          <button onClick={onClose} className="text-slate-400 hover:text-slate-600">
+          <button onClick={onClose} className={isDark ? 'text-slate-500 hover:text-slate-300' : 'text-slate-400 hover:text-slate-600'}>
             <X size={18} />
           </button>
         </div>
@@ -1190,18 +1190,18 @@ function CadastroUsuarioModal({ onClose }: { onClose: () => void }) {
         {result ? (
           <div className="p-6 space-y-4">
             <div className="text-center space-y-3">
-              <div className="w-14 h-14 rounded-full bg-green-100 flex items-center justify-center mx-auto">
-                <CheckCircle size={28} className="text-green-600" />
+              <div className={`w-14 h-14 rounded-full flex items-center justify-center mx-auto ${isDark ? 'bg-green-500/15' : 'bg-green-100'}`}>
+                <CheckCircle size={28} className={isDark ? 'text-green-400' : 'text-green-600'} />
               </div>
-              <p className="font-bold text-navy">Usuário cadastrado com sucesso!</p>
-              <p className="text-sm text-slate-500">Compartilhe os dados de acesso com segurança.</p>
+              <p className={`font-bold ${isDark ? 'text-white' : 'text-navy'}`}>Usuário cadastrado com sucesso!</p>
+              <p className={`text-sm ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Compartilhe os dados de acesso com segurança.</p>
             </div>
 
-            <div className="rounded-xl border border-emerald-100 bg-emerald-50 p-3 space-y-1.5 text-xs">
-              <p className="text-slate-600"><span className="font-semibold">Nome:</span> {result.nome}</p>
-              <p className="text-slate-600"><span className="font-semibold">Usuário:</span> {result.username}</p>
-              <p className="text-slate-600"><span className="font-semibold">Login:</span> {result.login_email}</p>
-              <p className="text-slate-600"><span className="font-semibold">Senha temporária:</span> {result.senha_temporaria}</p>
+            <div className={`rounded-xl border p-3 space-y-1.5 text-xs ${isDark ? 'border-emerald-500/20 bg-emerald-500/10' : 'border-emerald-100 bg-emerald-50'}`}>
+              <p className={isDark ? 'text-slate-300' : 'text-slate-600'}><span className="font-semibold">Nome:</span> {result.nome}</p>
+              <p className={isDark ? 'text-slate-300' : 'text-slate-600'}><span className="font-semibold">Usuário:</span> {result.username}</p>
+              <p className={isDark ? 'text-slate-300' : 'text-slate-600'}><span className="font-semibold">Login:</span> {result.login_email}</p>
+              <p className={isDark ? 'text-slate-300' : 'text-slate-600'}><span className="font-semibold">Senha temporária:</span> {result.senha_temporaria}</p>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
@@ -1209,7 +1209,9 @@ function CadastroUsuarioModal({ onClose }: { onClose: () => void }) {
                 type="button"
                 onClick={handleCopy}
                 className={`py-2 rounded-xl text-xs font-semibold border ${
-                  copied ? 'border-emerald-300 text-emerald-700 bg-emerald-50' : 'border-slate-200 text-slate-600 hover:bg-slate-50'
+                  copied
+                    ? isDark ? 'border-emerald-500/30 text-emerald-400 bg-emerald-500/10' : 'border-emerald-300 text-emerald-700 bg-emerald-50'
+                    : isDark ? 'border-white/10 text-slate-300 hover:bg-white/[0.04]' : 'border-slate-200 text-slate-600 hover:bg-slate-50'
                 }`}
               >
                 {copied ? 'Copiado!' : 'Copiar dados'}
@@ -1221,7 +1223,7 @@ function CadastroUsuarioModal({ onClose }: { onClose: () => void }) {
                   if (!result.email_contato) return
                   openShareEmail(result.email_contato, buildCredenciaisMessage(result))
                 }}
-                className="py-2 rounded-xl text-xs font-semibold border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed"
+                className={`py-2 rounded-xl text-xs font-semibold border disabled:opacity-40 disabled:cursor-not-allowed ${isDark ? 'border-white/10 text-slate-300 hover:bg-white/[0.04]' : 'border-slate-200 text-slate-600 hover:bg-slate-50'}`}
               >
                 E-mail
               </button>
@@ -1232,7 +1234,7 @@ function CadastroUsuarioModal({ onClose }: { onClose: () => void }) {
                   if (!result.whatsapp) return
                   openShareWhatsApp(result.whatsapp, buildCredenciaisMessage(result))
                 }}
-                className="py-2 rounded-xl text-xs font-semibold border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed"
+                className={`py-2 rounded-xl text-xs font-semibold border disabled:opacity-40 disabled:cursor-not-allowed ${isDark ? 'border-white/10 text-slate-300 hover:bg-white/[0.04]' : 'border-slate-200 text-slate-600 hover:bg-slate-50'}`}
               >
                 WhatsApp
               </button>
@@ -1249,64 +1251,64 @@ function CadastroUsuarioModal({ onClose }: { onClose: () => void }) {
         ) : (
           <form onSubmit={handleSubmit} className="p-5 space-y-4 max-h-[75vh] overflow-y-auto">
             <div>
-              <label className="block text-xs font-semibold text-slate-600 mb-1.5">Nome completo</label>
+              <label className={`block text-xs font-semibold mb-1.5 ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>Nome completo</label>
               <input
                 type="text"
                 value={form.nome}
                 onChange={set('nome')}
                 placeholder="Nome completo"
                 required
-                className="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-sm
-                  focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary bg-slate-50 focus:bg-white"
+                className={`w-full px-3 py-2.5 rounded-xl border text-sm
+                  focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary ${isDark ? 'bg-white/[0.05] border-white/10 text-white placeholder-slate-500 focus:bg-white/[0.08]' : 'bg-slate-50 border-slate-200 focus:bg-white'}`}
               />
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-slate-600 mb-1.5">Usuário (opcional)</label>
+              <label className={`block text-xs font-semibold mb-1.5 ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>Usuário (opcional)</label>
               <input
                 type="text"
                 value={form.username}
                 onChange={e => setForm(f => ({ ...f, username: normalizeUsername(e.target.value) }))}
                 placeholder="nome.sobrenome"
-                className="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-sm
-                  focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary bg-slate-50 focus:bg-white"
+                className={`w-full px-3 py-2.5 rounded-xl border text-sm
+                  focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary ${isDark ? 'bg-white/[0.05] border-white/10 text-white placeholder-slate-500 focus:bg-white/[0.08]' : 'bg-slate-50 border-slate-200 focus:bg-white'}`}
               />
-              <p className="text-[10px] text-slate-400 mt-1">Se vazio, o sistema gera automaticamente.</p>
+              <p className={`text-[10px] mt-1 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Se vazio, o sistema gera automaticamente.</p>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
               <div>
-                <label className="block text-xs font-semibold text-slate-600 mb-1.5">E-mail para compartilhar</label>
+                <label className={`block text-xs font-semibold mb-1.5 ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>E-mail para compartilhar</label>
                 <input
                   type="email"
                   value={form.email_contato}
                   onChange={set('email_contato')}
                   placeholder="opcional"
-                  className="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-sm
-                    focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary bg-slate-50 focus:bg-white"
+                  className={`w-full px-3 py-2.5 rounded-xl border text-sm
+                    focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary ${isDark ? 'bg-white/[0.05] border-white/10 text-white placeholder-slate-500 focus:bg-white/[0.08]' : 'bg-slate-50 border-slate-200 focus:bg-white'}`}
                 />
               </div>
               <div>
-                <label className="block text-xs font-semibold text-slate-600 mb-1.5">WhatsApp para compartilhar</label>
+                <label className={`block text-xs font-semibold mb-1.5 ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>WhatsApp para compartilhar</label>
                 <input
                   type="text"
                   value={form.whatsapp}
                   onChange={set('whatsapp')}
                   placeholder="(xx) xxxxx-xxxx"
-                  className="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-sm
-                    focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary bg-slate-50 focus:bg-white"
+                  className={`w-full px-3 py-2.5 rounded-xl border text-sm
+                    focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary ${isDark ? 'bg-white/[0.05] border-white/10 text-white placeholder-slate-500 focus:bg-white/[0.08]' : 'bg-slate-50 border-slate-200 focus:bg-white'}`}
                 />
               </div>
             </div>
 
             {/* Role */}
             <div>
-              <label className="block text-xs font-semibold text-slate-600 mb-1.5">Papel (alçada operacional)</label>
+              <label className={`block text-xs font-semibold mb-1.5 ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>Papel (alçada operacional)</label>
               <select
                 value={form.papel_global}
                 onChange={e => setForm(f => ({ ...f, papel_global: e.target.value as PapelGlobal }))}
-                className="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-sm
-                  focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary bg-slate-50"
+                className={`w-full px-3 py-2.5 rounded-xl border text-sm
+                  focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary ${isDark ? 'bg-white/[0.05] border-white/10 text-white' : 'bg-slate-50 border-slate-200'}`}
               >
                 {PAPEIS.map(p => <option key={p.value} value={p.value}>{p.label}</option>)}
               </select>
@@ -1314,12 +1316,12 @@ function CadastroUsuarioModal({ onClose }: { onClose: () => void }) {
 
             {/* Alçada */}
             <div>
-              <label className="block text-xs font-semibold text-slate-600 mb-1.5">Alçada de aprovação</label>
+              <label className={`block text-xs font-semibold mb-1.5 ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>Alçada de aprovação</label>
               <select
                 value={form.alcada_nivel}
                 onChange={e => setForm(f => ({ ...f, alcada_nivel: Number(e.target.value) }))}
-                className="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-sm
-                  focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary bg-slate-50"
+                className={`w-full px-3 py-2.5 rounded-xl border text-sm
+                  focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary ${isDark ? 'bg-white/[0.05] border-white/10 text-white' : 'bg-slate-50 border-slate-200'}`}
               >
                 {[0, 1, 2, 3, 4].map(n => (
                   <option key={n} value={n}>{ALCADA_LABEL[n]}</option>
@@ -1339,7 +1341,7 @@ function CadastroUsuarioModal({ onClose }: { onClose: () => void }) {
             />
 
             {cadastrar.isError && (
-              <div className="flex items-start gap-2 bg-red-50 text-red-600 rounded-xl px-3 py-2 text-xs">
+              <div className={`flex items-start gap-2 rounded-xl px-3 py-2 text-xs ${isDark ? 'bg-red-500/10 text-red-400' : 'bg-red-50 text-red-600'}`}>
                 <AlertCircle size={13} className="mt-0.5" />
                 <span>{cadastrar.error instanceof Error ? cadastrar.error.message : 'Erro ao cadastrar usuário.'}</span>
               </div>
@@ -1347,7 +1349,7 @@ function CadastroUsuarioModal({ onClose }: { onClose: () => void }) {
 
             <div className="flex gap-2 pt-1">
               <button type="button" onClick={onClose}
-                className="flex-1 py-2.5 rounded-xl border border-slate-200 text-sm font-semibold text-slate-600">
+                className={`flex-1 py-2.5 rounded-xl border text-sm font-semibold ${isDark ? 'border-white/10 text-slate-400' : 'border-slate-200 text-slate-600'}`}>
                 Cancelar
               </button>
               <button type="submit" disabled={cadastrar.isPending || !form.nome.trim()}
@@ -1409,17 +1411,18 @@ function BatchEditModal({
   isPending: boolean
   errorMessage: string | null
 }) {
+  const { isDark } = useTheme()
   if (!open) return null
 
   return (
     <div className="fixed inset-0 z-50 bg-black/40 flex items-end sm:items-center justify-center p-0 sm:p-4">
-      <div className="bg-white w-full sm:max-w-3xl rounded-t-3xl sm:rounded-2xl shadow-2xl overflow-hidden">
-        <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
+      <div className={`w-full sm:max-w-3xl rounded-t-3xl sm:rounded-2xl shadow-2xl overflow-hidden ${isDark ? 'bg-[#1e293b]' : 'bg-white'}`}>
+        <div className={`flex items-center justify-between px-5 py-4 border-b ${isDark ? 'border-white/[0.06]' : 'border-slate-100'}`}>
           <div>
-            <h3 className="font-bold text-navy text-base">Edição em lote</h3>
-            <p className="text-xs text-slate-400 mt-0.5">{selectedCount} usuário(s) selecionado(s)</p>
+            <h3 className={`font-bold text-base ${isDark ? 'text-white' : 'text-navy'}`}>Edição em lote</h3>
+            <p className={`text-xs mt-0.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{selectedCount} usuário(s) selecionado(s)</p>
           </div>
-          <button onClick={onClose} className="text-slate-400 hover:text-slate-600">
+          <button onClick={onClose} className={isDark ? 'text-slate-500 hover:text-slate-300' : 'text-slate-400 hover:text-slate-600'}>
             <X size={18} />
           </button>
         </div>
@@ -1429,14 +1432,14 @@ function BatchEditModal({
             <button
               type="button"
               onClick={onSelectVisible}
-              className="px-3 py-1.5 rounded-lg border border-slate-200 text-xs font-semibold text-slate-600 hover:bg-slate-50"
+              className={`px-3 py-1.5 rounded-lg border text-xs font-semibold ${isDark ? 'border-white/10 text-slate-300 hover:bg-white/[0.04]' : 'border-slate-200 text-slate-600 hover:bg-slate-50'}`}
             >
               {allVisibleSelected ? 'Desmarcar visíveis' : 'Selecionar visíveis'}
             </button>
             <button
               type="button"
               onClick={onClear}
-              className="px-3 py-1.5 rounded-lg border border-slate-200 text-xs font-semibold text-slate-500 hover:bg-slate-50"
+              className={`px-3 py-1.5 rounded-lg border text-xs font-semibold ${isDark ? 'border-white/10 text-slate-400 hover:bg-white/[0.04]' : 'border-slate-200 text-slate-500 hover:bg-slate-50'}`}
             >
               Limpar
             </button>
@@ -1444,22 +1447,22 @@ function BatchEditModal({
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <div>
-              <label className="block text-[11px] font-semibold text-slate-500 mb-1">Papel</label>
+              <label className={`block text-[11px] font-semibold mb-1 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Papel</label>
               <select
                 value={bulkPapel}
                 onChange={e => onBulkPapel(e.target.value as PapelGlobal | '')}
-                className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                className={`w-full px-3 py-2 rounded-xl border text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary ${isDark ? 'bg-white/[0.05] border-white/10 text-white' : 'bg-white border-slate-200'}`}
               >
                 <option value="">Não alterar</option>
                 {PAPEIS.map(p => <option key={p.value} value={p.value}>{p.label}</option>)}
               </select>
             </div>
             <div>
-              <label className="block text-[11px] font-semibold text-slate-500 mb-1">Alçada</label>
+              <label className={`block text-[11px] font-semibold mb-1 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Alçada</label>
               <select
                 value={bulkAlcada}
                 onChange={e => onBulkAlcada(e.target.value === '' ? '' : Number(e.target.value))}
-                className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                className={`w-full px-3 py-2 rounded-xl border text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary ${isDark ? 'bg-white/[0.05] border-white/10 text-white' : 'bg-white border-slate-200'}`}
               >
                 <option value="">Não alterar</option>
                 {[0, 1, 2, 3, 4].map(n => (
@@ -1470,17 +1473,19 @@ function BatchEditModal({
           </div>
 
           <div className="space-y-2">
-            <label className="inline-flex items-center gap-2 text-xs font-semibold text-slate-600 cursor-pointer">
+            <label className={`inline-flex items-center gap-2 text-xs font-semibold cursor-pointer ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
               <input
                 type="checkbox"
                 checked={bulkTouchSetores}
                 onChange={e => onBulkTouchSetores(e.target.checked)}
-                className="rounded border-slate-300 text-primary focus:ring-primary/30"
+                className={`rounded text-primary focus:ring-primary/30 ${isDark ? 'border-white/20 bg-white/5' : 'border-slate-300'}`}
               />
               Aplicar alterações em áreas/módulos
             </label>
-            <div className={`rounded-xl border border-slate-100 p-2.5 space-y-3 transition-all ${bulkTouchSetores ? 'bg-slate-50/60' : 'bg-slate-50/30'}`}>
-              <div className="rounded-lg border border-slate-100 bg-white p-2.5">
+            <div className={`rounded-xl border p-2.5 space-y-3 transition-all ${isDark
+              ? `border-white/[0.06] ${bulkTouchSetores ? 'bg-white/[0.03]' : 'bg-white/[0.01]'}`
+              : `border-slate-100 ${bulkTouchSetores ? 'bg-slate-50/60' : 'bg-slate-50/30'}`}`}>
+              <div className={`rounded-lg border p-2.5 ${isDark ? 'border-white/[0.06] bg-white/[0.03]' : 'border-slate-100 bg-white'}`}>
                 <ModuloCheckboxGroup
                   modulos={bulkModulos}
                   onToggle={onToggleModulo}
@@ -1488,18 +1493,18 @@ function BatchEditModal({
                   disabled={!bulkTouchSetores}
                 />
               </div>
-              <div className="rounded-lg border border-slate-100 bg-white p-2.5 space-y-2">
-                <label className="text-[11px] font-semibold text-slate-500">Papel no módulo</label>
+              <div className={`rounded-lg border p-2.5 space-y-2 ${isDark ? 'border-white/[0.06] bg-white/[0.03]' : 'border-slate-100 bg-white'}`}>
+                <label className={`text-[11px] font-semibold ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Papel no módulo</label>
                 <ModuloPapelEditor
                   modulos={bulkModulos}
                   moduloPapeis={bulkModuloPapeis}
                   onChange={onBulkModuloPapel}
                   disabled={!bulkTouchSetores}
                 />
-                <p className="text-[10px] text-slate-400">Não definido = Requisitante.</p>
+                <p className={`text-[10px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Não definido = Requisitante.</p>
               </div>
               {!bulkTouchSetores && (
-                <p className="text-[11px] text-slate-500">
+                <p className={`text-[11px] ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
                   Ative a opção acima para aplicar alterações de módulos e papel por módulo.
                 </p>
               )}
@@ -1507,7 +1512,7 @@ function BatchEditModal({
           </div>
 
           {errorMessage && (
-            <div className="flex items-center gap-2 bg-red-50 text-red-600 rounded-xl px-3 py-2 text-xs">
+            <div className={`flex items-center gap-2 rounded-xl px-3 py-2 text-xs ${isDark ? 'bg-red-500/10 text-red-400' : 'bg-red-50 text-red-600'}`}>
               <AlertCircle size={12} />
               <span>{errorMessage}</span>
             </div>
@@ -1517,7 +1522,7 @@ function BatchEditModal({
             <button
               type="button"
               onClick={onClose}
-              className="flex-1 py-2.5 rounded-xl border border-slate-200 text-sm font-semibold text-slate-600"
+              className={`flex-1 py-2.5 rounded-xl border text-sm font-semibold ${isDark ? 'border-white/10 text-slate-400' : 'border-slate-200 text-slate-600'}`}
             >
               Cancelar
             </button>
@@ -1539,6 +1544,7 @@ function BatchEditModal({
 }
 
 export default function AdminUsuarios() {
+  const { isDark } = useTheme()
   const navigate = useNavigate()
   const { data: perfis, isLoading, refetch, isFetching } = usePerfis()
   const bulkUpdate = useBulkUpdateUsers()
@@ -1767,16 +1773,16 @@ export default function AdminUsuarios() {
         {/* Header */}
         <div className="flex items-center gap-3">
           <button onClick={() => navigate('/perfil')}
-            className="w-8 h-8 rounded-lg bg-white shadow-card flex items-center justify-center text-slate-500 hover:text-navy">
+            className={`w-8 h-8 rounded-lg shadow-card flex items-center justify-center ${isDark ? 'bg-white/[0.05] text-slate-400 hover:text-white' : 'bg-white text-slate-500 hover:text-navy'}`}>
             <ChevronLeft size={18} />
           </button>
           <div className="flex-1">
-            <h1 className="text-lg font-black text-navy leading-tight">Usuários</h1>
-            <p className="text-xs text-slate-400">{perfis?.length ?? 0} contas · {perfis?.filter(p => p.ativo).length ?? 0} ativas</p>
+            <h1 className={`text-lg font-black leading-tight ${isDark ? 'text-white' : 'text-navy'}`}>Usuários</h1>
+            <p className={`text-xs ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{perfis?.length ?? 0} contas · {perfis?.filter(p => p.ativo).length ?? 0} ativas</p>
           </div>
           <button
             onClick={() => refetch()}
-            className={`w-8 h-8 rounded-lg bg-white shadow-card flex items-center justify-center text-slate-400 hover:text-primary ${isFetching ? 'animate-spin' : ''}`}>
+            className={`w-8 h-8 rounded-lg shadow-card flex items-center justify-center hover:text-primary ${isFetching ? 'animate-spin' : ''} ${isDark ? 'bg-white/[0.05] text-slate-400' : 'bg-white text-slate-400'}`}>
             <RefreshCw size={15} />
           </button>
           <button
@@ -1793,11 +1799,11 @@ export default function AdminUsuarios() {
             className={`rounded-xl p-3 text-left transition-all ${
               filterRole === 'todos'
                 ? 'bg-slate-800 ring-2 ring-slate-800 shadow-lg'
-                : 'bg-slate-100 hover:bg-slate-200'
+                : isDark ? 'bg-white/[0.05] hover:bg-white/[0.08]' : 'bg-slate-100 hover:bg-slate-200'
             }`}
           >
-            <p className={`text-xl font-black ${filterRole === 'todos' ? 'text-white' : 'text-slate-700'}`}>{perfis?.length ?? 0}</p>
-            <p className={`text-xs font-semibold ${filterRole === 'todos' ? 'text-slate-300' : 'text-slate-500'}`}>Todos</p>
+            <p className={`text-xl font-black ${filterRole === 'todos' ? 'text-white' : isDark ? 'text-slate-200' : 'text-slate-700'}`}>{perfis?.length ?? 0}</p>
+            <p className={`text-xs font-semibold ${filterRole === 'todos' ? 'text-slate-300' : isDark ? 'text-slate-400' : 'text-slate-500'}`}>Todos</p>
           </button>
           {(['requisitante', 'equipe', 'supervisor', 'diretor', 'ceo'] as Role[]).map(r => {
             const c = ROLE_COLOR[r]
@@ -1821,13 +1827,13 @@ export default function AdminUsuarios() {
         <div className="space-y-2">
           <div className="flex flex-wrap items-center gap-2">
             <div className="relative flex-1 min-w-[220px]">
-              <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+              <Search size={14} className={`absolute left-3 top-1/2 -translate-y-1/2 ${isDark ? 'text-slate-500' : 'text-slate-400'}`} />
               <input
                 value={search}
                 onChange={e => setSearch(e.target.value)}
                 placeholder="Buscar por nome ou e-mail..."
-                className="w-full pl-9 pr-4 py-2.5 rounded-xl border border-slate-200 bg-white text-sm
-                  focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                className={`w-full pl-9 pr-4 py-2.5 rounded-xl border text-sm
+                  focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary ${isDark ? 'bg-white/[0.05] border-white/10 text-white placeholder-slate-500' : 'bg-white border-slate-200'}`}
               />
             </div>
 
@@ -1837,24 +1843,24 @@ export default function AdminUsuarios() {
               className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border text-xs font-semibold transition-all ${
                 showFilters
                   ? 'bg-primary/10 border-primary/30 text-primary'
-                  : 'bg-white border-slate-200 text-slate-600 hover:border-primary/40 hover:text-primary'
+                  : isDark ? 'bg-white/[0.05] border-white/10 text-slate-300 hover:border-primary/40 hover:text-primary' : 'bg-white border-slate-200 text-slate-600 hover:border-primary/40 hover:text-primary'
               }`}
             >
               <SlidersHorizontal size={14} />
               Filtros
             </button>
 
-            <div className="inline-flex rounded-xl border overflow-hidden border-slate-200 bg-white">
+            <div className={`inline-flex rounded-xl border overflow-hidden ${isDark ? 'border-white/10 bg-white/[0.05]' : 'border-slate-200 bg-white'}`}>
               <button
                 onClick={() => setViewMode('cards')}
-                className={`p-2 transition-colors ${viewMode === 'cards' ? 'bg-primary/10 text-primary' : 'text-slate-400 hover:text-slate-600'}`}
+                className={`p-2 transition-colors ${viewMode === 'cards' ? 'bg-primary/10 text-primary' : isDark ? 'text-slate-500 hover:text-slate-300' : 'text-slate-400 hover:text-slate-600'}`}
                 title="Visualização em cards"
               >
                 <LayoutGrid size={14} />
               </button>
               <button
                 onClick={() => setViewMode('table')}
-                className={`p-2 transition-colors ${viewMode === 'table' ? 'bg-primary/10 text-primary' : 'text-slate-400 hover:text-slate-600'}`}
+                className={`p-2 transition-colors ${viewMode === 'table' ? 'bg-primary/10 text-primary' : isDark ? 'text-slate-500 hover:text-slate-300' : 'text-slate-400 hover:text-slate-600'}`}
                 title="Visualização em tabela"
               >
                 <LayoutList size={14} />
@@ -1867,7 +1873,7 @@ export default function AdminUsuarios() {
               className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold border transition-all ${
                 showBatchEditor && selectedIds.length !== 1
                   ? 'bg-primary text-white border-primary shadow'
-                  : 'bg-white text-slate-600 border-slate-200 hover:border-primary/40 hover:text-primary'
+                  : isDark ? 'bg-white/[0.05] text-slate-300 border-white/10 hover:border-primary/40 hover:text-primary' : 'bg-white text-slate-600 border-slate-200 hover:border-primary/40 hover:text-primary'
               }`}
             >
               <Edit3 size={12} />
@@ -1877,7 +1883,7 @@ export default function AdminUsuarios() {
               <button
                 type="button"
                 onClick={() => setShowBatchDelete(true)}
-                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold border border-red-200 text-red-500 hover:bg-red-50 transition-all"
+                className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold border transition-all ${isDark ? 'border-red-500/30 text-red-400 hover:bg-red-500/10' : 'border-red-200 text-red-500 hover:bg-red-50'}`}
               >
                 <X size={12} />
                 Excluir ({selectedIds.length})
@@ -1886,31 +1892,31 @@ export default function AdminUsuarios() {
           </div>
 
           <div className="flex items-center justify-end">
-            <span className="text-xs text-slate-500">{selectedIds.length} selecionado(s)</span>
+            <span className={`text-xs ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{selectedIds.length} selecionado(s)</span>
           </div>
 
           {showBatchDelete && selectedIds.length > 0 && (
-            <div className="rounded-2xl border-2 border-red-200 bg-red-50 p-4">
-              <p className="text-sm font-bold text-red-700 mb-1">Excluir {selectedIds.length} usuario(s)?</p>
-              <p className="text-[10px] text-red-600 mb-3">
+            <div className={`rounded-2xl border-2 p-4 ${isDark ? 'border-red-500/30 bg-red-500/10' : 'border-red-200 bg-red-50'}`}>
+              <p className={`text-sm font-bold mb-1 ${isDark ? 'text-red-400' : 'text-red-700'}`}>Excluir {selectedIds.length} usuario(s)?</p>
+              <p className={`text-[10px] mb-3 ${isDark ? 'text-red-400/80' : 'text-red-600'}`}>
                 Acao irreversivel. Todos os usuarios selecionados serao removidos permanentemente (Auth + Perfil).
               </p>
               <div className="mb-3">
-                <p className="text-[10px] text-red-600 font-semibold mb-1.5">
-                  Digite <span className="font-black bg-red-100 px-1 rounded">EXCLUIR</span> para confirmar:
+                <p className={`text-[10px] font-semibold mb-1.5 ${isDark ? 'text-red-400/80' : 'text-red-600'}`}>
+                  Digite <span className={`font-black px-1 rounded ${isDark ? 'bg-red-500/20' : 'bg-red-100'}`}>EXCLUIR</span> para confirmar:
                 </p>
                 <input
                   type="text"
                   value={batchDeleteTyped}
                   onChange={e => setBatchDeleteTyped(e.target.value)}
                   placeholder="EXCLUIR"
-                  className="w-full text-xs rounded-lg px-3 py-2 border-2 border-red-200 bg-white text-red-700 placeholder-red-300 outline-none focus:border-red-400 font-bold uppercase tracking-wider"
+                  className={`w-full text-xs rounded-lg px-3 py-2 border-2 outline-none font-bold uppercase tracking-wider ${isDark ? 'border-red-500/30 bg-white/[0.05] text-red-400 placeholder-red-500/40 focus:border-red-500/50' : 'border-red-200 bg-white text-red-700 placeholder-red-300 focus:border-red-400'}`}
                   autoFocus
                 />
               </div>
               <div className="flex gap-2">
                 <button onClick={() => { setShowBatchDelete(false); setBatchDeleteTyped('') }}
-                  className="flex-1 py-2 rounded-xl text-xs font-semibold border border-slate-200 text-slate-600">
+                  className={`flex-1 py-2 rounded-xl text-xs font-semibold border ${isDark ? 'border-white/10 text-slate-400' : 'border-slate-200 text-slate-600'}`}>
                   Cancelar
                 </button>
                 <button
@@ -1925,14 +1931,14 @@ export default function AdminUsuarios() {
           )}
 
           {showFilters && (
-            <div className="bg-white rounded-2xl border border-slate-200 p-3 shadow-card">
+            <div className={`rounded-2xl border p-3 shadow-card ${isDark ? 'bg-[#1e293b] border-white/[0.06]' : 'bg-white border-slate-200'}`}>
               <div className="grid grid-cols-1 md:grid-cols-5 gap-2">
                 <div>
-                  <label className="block text-[11px] font-semibold text-slate-500 mb-1">Papel</label>
+                  <label className={`block text-[11px] font-semibold mb-1 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Papel</label>
                   <select
                     value={filterRole}
                     onChange={e => setFilterRole(e.target.value as Role | 'todos')}
-                    className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                    className={`w-full px-3 py-2 rounded-xl border text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary ${isDark ? 'bg-white/[0.05] border-white/10 text-white' : 'bg-white border-slate-200'}`}
                   >
                     <option value="todos">Todos</option>
                     {(['requisitante', 'equipe', 'supervisor', 'diretor', 'ceo'] as Role[]).map(r => (
@@ -1941,11 +1947,11 @@ export default function AdminUsuarios() {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-[11px] font-semibold text-slate-500 mb-1">Status</label>
+                  <label className={`block text-[11px] font-semibold mb-1 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Status</label>
                   <select
                     value={filterAtivo}
                     onChange={e => setFilterAtivo(e.target.value as 'todos' | 'ativos' | 'inativos')}
-                    className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                    className={`w-full px-3 py-2 rounded-xl border text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary ${isDark ? 'bg-white/[0.05] border-white/10 text-white' : 'bg-white border-slate-200'}`}
                   >
                     <option value="todos">Todos</option>
                     <option value="ativos">Ativos</option>
@@ -1953,11 +1959,11 @@ export default function AdminUsuarios() {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-[11px] font-semibold text-slate-500 mb-1">Alçada</label>
+                  <label className={`block text-[11px] font-semibold mb-1 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Alçada</label>
                   <select
                     value={filterAlcada}
                     onChange={e => setFilterAlcada(e.target.value === 'todos' ? 'todos' : Number(e.target.value))}
-                    className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                    className={`w-full px-3 py-2 rounded-xl border text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary ${isDark ? 'bg-white/[0.05] border-white/10 text-white' : 'bg-white border-slate-200'}`}
                   >
                     <option value="todos">Todas</option>
                     {[0, 1, 2, 3, 4].map(n => (
@@ -1966,11 +1972,11 @@ export default function AdminUsuarios() {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-[11px] font-semibold text-slate-500 mb-1">Módulo</label>
+                  <label className={`block text-[11px] font-semibold mb-1 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Módulo</label>
                   <select
                     value={filterModulo}
                     onChange={e => setFilterModulo(e.target.value)}
-                    className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                    className={`w-full px-3 py-2 rounded-xl border text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary ${isDark ? 'bg-white/[0.05] border-white/10 text-white' : 'bg-white border-slate-200'}`}
                   >
                     <option value="todos">Todos</option>
                     {MODULOS_ERP.map(mod => (
@@ -1979,12 +1985,12 @@ export default function AdminUsuarios() {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-[11px] font-semibold text-slate-500 mb-1">Papel no módulo</label>
+                  <label className={`block text-[11px] font-semibold mb-1 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Papel no módulo</label>
                   <select
                     value={filterModuloPapel}
                     disabled={filterModulo === 'todos'}
                     onChange={e => setFilterModuloPapel(e.target.value as PapelGlobal | 'todos')}
-                    className="w-full px-3 py-2 rounded-xl border border-slate-200 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary disabled:opacity-50 disabled:cursor-not-allowed"
+                    className={`w-full px-3 py-2 rounded-xl border text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary disabled:opacity-50 disabled:cursor-not-allowed ${isDark ? 'bg-white/[0.05] border-white/10 text-white' : 'bg-white border-slate-200'}`}
                   >
                     <option value="todos">Todos</option>
                     {PAPEIS.map(p => (
@@ -2004,7 +2010,7 @@ export default function AdminUsuarios() {
                     setFilterModulo('todos')
                     setFilterModuloPapel('todos')
                   }}
-                  className="px-3 py-1.5 rounded-lg border border-slate-200 text-xs font-semibold text-slate-500 hover:bg-slate-50"
+                  className={`px-3 py-1.5 rounded-lg border text-xs font-semibold ${isDark ? 'border-white/10 text-slate-400 hover:bg-white/[0.04]' : 'border-slate-200 text-slate-500 hover:bg-slate-50'}`}
                 >
                   Limpar filtros
                 </button>
@@ -2126,18 +2132,18 @@ export default function AdminUsuarios() {
             <p className="text-sm font-medium">Nenhum usuário encontrado</p>
           </div>
         ) : viewMode === 'table' ? (
-          <div className="bg-white rounded-2xl shadow-card overflow-hidden border border-slate-200">
+          <div className={`rounded-2xl shadow-card overflow-hidden border ${isDark ? 'bg-[#1e293b] border-white/[0.06]' : 'bg-white border-slate-200'}`}>
             <div className="overflow-x-auto">
               <table className="min-w-[860px] w-full text-sm">
-                <thead className="bg-slate-50 border-b border-slate-200">
-                  <tr className="text-left text-[11px] uppercase tracking-wider text-slate-500">
+                <thead className={`border-b ${isDark ? 'bg-white/[0.03] border-white/[0.06]' : 'bg-slate-50 border-slate-200'}`}>
+                  <tr className={`text-left text-[11px] uppercase tracking-wider ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
                     <th className="px-3 py-3 w-10">
                       <input
                         ref={selectAllRef}
                         type="checkbox"
                         checked={allVisibleSelected}
                         onChange={toggleSelectAllVisible}
-                        className="rounded border-slate-300 text-primary focus:ring-primary/30"
+                        className={`rounded text-primary focus:ring-primary/30 ${isDark ? 'border-white/20 bg-white/5' : 'border-slate-300'}`}
                       />
                     </th>
                     <th className="px-3 py-3">Usuario</th>
@@ -2154,20 +2160,20 @@ export default function AdminUsuarios() {
                     const enabledModulos = MODULOS_ERP.filter(mod => Boolean(p.modulos?.[mod.key]))
                     const displayPapel = resolvePapelFromPerfil(p) as Role
                     return (
-                      <tr key={p.id} className="border-b border-slate-100 hover:bg-slate-50/60">
+                      <tr key={p.id} className={`border-b ${isDark ? 'border-white/[0.04] hover:bg-white/[0.03]' : 'border-slate-100 hover:bg-slate-50/60'}`}>
                         <td className="px-3 py-3">
                           <input
                             type="checkbox"
                             checked={isSelected}
                             onChange={() => toggleSelectOne(p.id)}
-                            className="rounded border-slate-300 text-primary focus:ring-primary/30"
+                            className={`rounded text-primary focus:ring-primary/30 ${isDark ? 'border-white/20 bg-white/5' : 'border-slate-300'}`}
                           />
                         </td>
                         <td className="px-3 py-3">
                           <div className="flex items-center gap-2.5">
                             <Avatar nome={p.nome} size="sm" />
                             <div className="min-w-0 flex-1">
-                              <p className="font-semibold text-[13px] text-navy truncate max-w-[210px]">{p.nome}</p>
+                              <p className={`font-semibold text-[13px] truncate max-w-[210px] ${isDark ? 'text-white' : 'text-navy'}`}>{p.nome}</p>
                             </div>
                             <button
                               type="button"
@@ -2185,20 +2191,20 @@ export default function AdminUsuarios() {
                             </button>
                           </div>
                         </td>
-                        <td className="px-3 py-3 text-slate-500">{formatLoginUsuario(p.email)}</td>
+                        <td className={`px-3 py-3 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{formatLoginUsuario(p.email)}</td>
                         <td className="px-3 py-3">
                           <RoleBadge role={displayPapel} />
                         </td>
-                        <td className="px-3 py-3 text-slate-600 text-xs">{ALCADA_LABEL[p.alcada_nivel]}</td>
+                        <td className={`px-3 py-3 text-xs ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>{ALCADA_LABEL[p.alcada_nivel]}</td>
                         <td className="px-3 py-3">
                           <div className="flex flex-wrap gap-1 max-w-[300px]">
                             {enabledModulos.length === 0 && (
-                              <span className="text-[11px] text-slate-400">Sem módulos</span>
+                              <span className={`text-[11px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Sem módulos</span>
                             )}
                             {enabledModulos.map(mod => (
                               <span
                                 key={`${p.id}-${mod.key}`}
-                                className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-slate-100 text-slate-600 text-[10px] font-semibold"
+                                className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-semibold ${isDark ? 'bg-white/[0.06] text-slate-300' : 'bg-slate-100 text-slate-600'}`}
                                 title={mod.label}
                               >
                                 <span className="text-[10px]">{mod.icon}</span>
@@ -2229,11 +2235,11 @@ export default function AdminUsuarios() {
               const isSelected = selectedIds.includes(p.id)
               const displayPapel = resolvePapelFromPerfil(p) as Role
               return (
-                <div key={p.id} className={`bg-white rounded-2xl shadow-card overflow-hidden transition-all ${!p.ativo ? 'opacity-60' : ''}`}>
+                <div key={p.id} className={`rounded-2xl shadow-card overflow-hidden transition-all ${isDark ? 'bg-[#1e293b]' : 'bg-white'} ${!p.ativo ? 'opacity-60' : ''}`}>
                   {/* Card header - clickable */}
                   <button
                     onClick={() => toggleExpand(p.id)}
-                    className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-slate-50/50 transition-colors"
+                    className={`w-full flex items-center gap-3 px-4 py-3 text-left transition-colors ${isDark ? 'hover:bg-white/[0.03]' : 'hover:bg-slate-50/50'}`}
                   >
                     <input
                       type="checkbox"
@@ -2243,15 +2249,15 @@ export default function AdminUsuarios() {
                         toggleSelectOne(p.id)
                       }}
                       onClick={e => e.stopPropagation()}
-                      className="w-4 h-4 rounded border-slate-300 text-primary focus:ring-primary/30"
+                      className={`w-4 h-4 rounded text-primary focus:ring-primary/30 ${isDark ? 'border-white/20 bg-white/5' : 'border-slate-300'}`}
                     />
                     <Avatar nome={p.nome} />
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
-                        <p className="text-sm font-bold text-navy truncate">{p.nome}</p>
+                        <p className={`text-sm font-bold truncate ${isDark ? 'text-white' : 'text-navy'}`}>{p.nome}</p>
                         {!p.ativo && <span className="text-[10px] bg-red-100 text-red-600 rounded-full px-1.5 py-0.5 font-semibold">Inativo</span>}
                       </div>
-                      <p className="text-xs text-slate-400 truncate">{p.email.split('@')[0]}</p>
+                      <p className={`text-xs truncate ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{p.email.split('@')[0]}</p>
                       <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
                         <RoleBadge role={displayPapel} />
                         {p.alcada_nivel > 0 && (
@@ -2260,7 +2266,7 @@ export default function AdminUsuarios() {
                           </span>
                         )}
                         {p.modulos && (
-                          <span className="text-[10px] text-slate-400">
+                          <span className={`text-[10px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
                             {Object.values(p.modulos).filter(Boolean).length} módulos
                           </span>
                         )}
@@ -2269,7 +2275,7 @@ export default function AdminUsuarios() {
 
                     {/* Expand indicator */}
                     <div className={`w-7 h-7 rounded-lg flex items-center justify-center transition-colors ${
-                      isExpanded ? 'bg-primary/10 text-primary' : 'text-slate-300'
+                      isExpanded ? 'bg-primary/10 text-primary' : isDark ? 'text-slate-600' : 'text-slate-300'
                     }`}>
                       {isExpanded ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
                     </div>
