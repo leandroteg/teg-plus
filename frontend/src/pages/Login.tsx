@@ -13,104 +13,12 @@ function normalizeLoginUsername(v: string) {
   return cleaned.replace(/\s+/g, '.').replace(/[^a-z0-9@._-]/g, '').replace(/\.{2,}/g, '.').replace(/^\./, '')
 }
 
-// ── Sound helpers (synthesized, cinematic) ───────────────────────────────────
-const getCtx = () => { try { return new AudioContext() } catch { return null } }
-
-const playHover = () => {
-  const c = getCtx(); if (!c) return
-  const t = c.currentTime
-  // Soft tonal shimmer — high sine + filtered noise burst
-  const o = c.createOscillator(); const g = c.createGain(); const f = c.createBiquadFilter()
-  f.type = 'bandpass'; f.frequency.value = 4000; f.Q.value = 5
-  o.type = 'sine'; o.frequency.setValueAtTime(1800, t); o.frequency.exponentialRampToValueAtTime(2400, t + 0.08)
-  o.connect(f); f.connect(g); g.connect(c.destination)
-  g.gain.setValueAtTime(0.06, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.12)
-  o.start(t); o.stop(t + 0.12)
-  // Subtle noise layer
-  const buf = c.createBuffer(1, c.sampleRate * 0.05, c.sampleRate)
-  const d = buf.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * 0.3
-  const n = c.createBufferSource(); n.buffer = buf
-  const ng = c.createGain(); const nf = c.createBiquadFilter()
-  nf.type = 'highpass'; nf.frequency.value = 6000
-  n.connect(nf); nf.connect(ng); ng.connect(c.destination)
-  ng.gain.setValueAtTime(0.03, t); ng.gain.exponentialRampToValueAtTime(0.001, t + 0.06)
-  n.start(t); n.stop(t + 0.06)
-  setTimeout(() => c.close(), 300)
-}
-
-const playClick = () => {
-  const c = getCtx(); if (!c) return
-  const t = c.currentTime
-  // Crisp digital click — attack transient + tonal body + sub thump
-  const o1 = c.createOscillator(); const g1 = c.createGain()
-  o1.type = 'square'; o1.frequency.setValueAtTime(2200, t); o1.frequency.exponentialRampToValueAtTime(800, t + 0.04)
-  o1.connect(g1); g1.connect(c.destination)
-  g1.gain.setValueAtTime(0.08, t); g1.gain.exponentialRampToValueAtTime(0.001, t + 0.06)
-  o1.start(t); o1.stop(t + 0.06)
-  // Tonal body
-  const o2 = c.createOscillator(); const g2 = c.createGain(); const f2 = c.createBiquadFilter()
-  f2.type = 'lowpass'; f2.frequency.value = 2000
-  o2.type = 'sine'; o2.frequency.value = 600
-  o2.connect(f2); f2.connect(g2); g2.connect(c.destination)
-  g2.gain.setValueAtTime(0.1, t); g2.gain.exponentialRampToValueAtTime(0.001, t + 0.1)
-  o2.start(t); o2.stop(t + 0.1)
-  // Sub thump
-  const o3 = c.createOscillator(); const g3 = c.createGain()
-  o3.type = 'sine'; o3.frequency.setValueAtTime(120, t); o3.frequency.exponentialRampToValueAtTime(40, t + 0.08)
-  o3.connect(g3); g3.connect(c.destination)
-  g3.gain.setValueAtTime(0.12, t); g3.gain.exponentialRampToValueAtTime(0.001, t + 0.1)
-  o3.start(t); o3.stop(t + 0.1)
-  setTimeout(() => c.close(), 300)
-}
-
-const playError = () => {
-  const c = getCtx(); if (!c) return
-  const t = c.currentTime
-  // Descending buzz — two detuned saws + distortion feel
-  const o1 = c.createOscillator(); const o2 = c.createOscillator()
-  const g = c.createGain(); const f = c.createBiquadFilter()
-  f.type = 'lowpass'; f.frequency.value = 1500
-  o1.type = 'sawtooth'; o1.frequency.setValueAtTime(400, t); o1.frequency.exponentialRampToValueAtTime(150, t + 0.3)
-  o2.type = 'sawtooth'; o2.frequency.setValueAtTime(405, t); o2.frequency.exponentialRampToValueAtTime(148, t + 0.3)
-  o1.connect(f); o2.connect(f); f.connect(g); g.connect(c.destination)
-  g.gain.setValueAtTime(0.08, t); g.gain.setValueAtTime(0.08, t + 0.1); g.gain.exponentialRampToValueAtTime(0.001, t + 0.35)
-  o1.start(t); o2.start(t); o1.stop(t + 0.35); o2.stop(t + 0.35)
-  setTimeout(() => c.close(), 600)
-}
-
-const playWarp = () => {
-  const c = getCtx(); if (!c) return
-  const t = c.currentTime
-  // Cinematic warp: layered rising sweep + sub rumble + shimmer
-  // Layer 1: sine sweep 180→2000Hz
-  const o1 = c.createOscillator(); const g1 = c.createGain()
-  o1.type = 'sine'; o1.frequency.setValueAtTime(180, t); o1.frequency.exponentialRampToValueAtTime(2000, t + 1)
-  o1.connect(g1); g1.connect(c.destination)
-  g1.gain.setValueAtTime(0.08, t); g1.gain.setValueAtTime(0.12, t + 0.3); g1.gain.exponentialRampToValueAtTime(0.001, t + 1.2)
-  o1.start(t); o1.stop(t + 1.2)
-  // Layer 2: triangle sweep 120→1200Hz (detuned)
-  const o2 = c.createOscillator(); const g2 = c.createGain()
-  o2.type = 'triangle'; o2.frequency.setValueAtTime(120, t); o2.frequency.exponentialRampToValueAtTime(1200, t + 1.1)
-  o2.connect(g2); g2.connect(c.destination)
-  g2.gain.setValueAtTime(0.06, t); g2.gain.exponentialRampToValueAtTime(0.001, t + 1.3)
-  o2.start(t); o2.stop(t + 1.3)
-  // Layer 3: sub rumble
-  const o3 = c.createOscillator(); const g3 = c.createGain()
-  o3.type = 'sine'; o3.frequency.value = 50
-  o3.connect(g3); g3.connect(c.destination)
-  g3.gain.setValueAtTime(0.15, t); g3.gain.exponentialRampToValueAtTime(0.001, t + 0.8)
-  o3.start(t); o3.stop(t + 0.8)
-  // Layer 4: high shimmer noise
-  const buf = c.createBuffer(1, c.sampleRate * 0.6, c.sampleRate)
-  const d = buf.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1)
-  const n = c.createBufferSource(); n.buffer = buf
-  const ng = c.createGain(); const nf = c.createBiquadFilter()
-  nf.type = 'bandpass'; nf.frequency.setValueAtTime(3000, t); nf.frequency.exponentialRampToValueAtTime(8000, t + 0.8); nf.Q.value = 2
-  n.connect(nf); nf.connect(ng); ng.connect(c.destination)
-  ng.gain.setValueAtTime(0.02, t); ng.gain.setValueAtTime(0.04, t + 0.3); ng.gain.exponentialRampToValueAtTime(0.001, t + 1)
-  n.start(t); n.stop(t + 1)
-  setTimeout(() => c.close(), 2500)
-}
+// ── Sound helpers (Mixkit audio files) ───────────────────────────────────────
+const playSound = (src: string, vol = 0.3) => { try { const a = new Audio(src); a.volume = vol; a.play().catch(() => {}) } catch {} }
+const playHover = () => playSound('/sounds/options/mixkit-sci-fi-click.wav', 0.2)
+const playClick = () => playSound('/sounds/options/mixkit-confirmation-tone.wav', 0.3)
+const playError = () => playSound('/sounds/options/mixkit-wrong-answer.wav', 0.35)
+const playWarp = () => playSound('/sounds/options/mixkit-achievement-bell.wav', 0.4)
 
 // ── Particles (deterministic) ────────────────────────────────────────────────
 const PARTICLES = [
