@@ -480,7 +480,7 @@ function TimelineView({
   }`
 
   return (
-    <div className={`${card} overflow-hidden min-h-[420px]`}>
+    <div className={`${card} overflow-hidden`}>
       {/* Navigation header */}
       <div
         className={`flex items-center justify-between px-4 py-3 border-b ${
@@ -522,7 +522,7 @@ function TimelineView({
       </div>
 
       {vehicleRows.length === 0 ? (
-        <div className="p-12 text-center">
+        <div className="p-12 text-center min-h-[320px] flex flex-col items-center justify-center">
           <BarChart3
             size={32}
             className={`mx-auto mb-2 opacity-30 ${isLight ? 'text-slate-400' : 'text-slate-500'}`}
@@ -530,7 +530,7 @@ function TimelineView({
           <p className="text-sm text-slate-500">Nenhuma alocação no período</p>
         </div>
       ) : (
-        <div className="overflow-x-auto relative">
+        <div className="overflow-x-auto relative pb-1">
           {/* Day headers */}
           <div className="flex min-w-[800px]">
             {/* Vehicle label column */}
