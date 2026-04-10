@@ -55,7 +55,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
         theme,
         setTheme,
         isDark: theme === 'dark',
-        isLightSidebar: theme !== 'dark',
+        isLightSidebar: theme === 'light',
       }}
     >
       {children}
