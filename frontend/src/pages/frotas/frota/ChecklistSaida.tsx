@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { ClipboardCheck, Car, Cog, CheckCircle2, ClipboardList } from 'lucide-react'
+import { useQueryClient } from '@tanstack/react-query'
 import { useTheme } from '../../../contexts/ThemeContext'
 import { useVeiculos } from '../../../hooks/useFrotas'
 import FrotasChecklistModal from '../../../components/frotas/FrotasChecklistModal'
@@ -7,6 +8,7 @@ import type { FroVeiculo } from '../../../types/frotas'
 
 export default function ChecklistSaida() {
   const { isLightSidebar: isLight } = useTheme()
+  const queryClient = useQueryClient()
   const [selectedVeiculo, setSelectedVeiculo] = useState<FroVeiculo | null>(null)
 
   const { data: veiculos = [], isLoading } = useVeiculos({ status: 'aguardando_saida' })
@@ -121,7 +123,10 @@ export default function ChecklistSaida() {
         <FrotasChecklistModal
           veiculo={selectedVeiculo}
           tipoChecklist="pre_viagem"
-          onClose={() => setSelectedVeiculo(null)}
+          onClose={() => {
+            setSelectedVeiculo(null)
+            queryClient.invalidateQueries({ queryKey: ['fro_veiculos'] })
+          }}
         />
       )}
     </div>

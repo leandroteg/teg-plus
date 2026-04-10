@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react'
-import { X, MapPin, Loader2, Search, Building2, User, CalendarDays, Gauge, Timer } from 'lucide-react'
+import { X, MapPin, Loader2, Search, Building2, User, CalendarDays } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
 import { useCriarAlocacao, useSalvarVeiculo } from '../../hooks/useFrotas'
 import { useLookupObras, useLookupCentrosCusto } from '../../hooks/useLookups'
@@ -24,16 +24,13 @@ export default function AlocarVeiculoModal({ veiculo, onClose }: Props) {
   const [ccId, setCcId] = useState('')
   const [responsavelId, setResponsavelId] = useState('')
   const [dataRetornoPrev, setDataRetornoPrev] = useState('')
-  const [hodometroSaida, setHodometroSaida] = useState(String(veiculo.hodometro_atual ?? ''))
-  const [horimetroSaida, setHorimetroSaida] = useState(String(veiculo.horimetro_atual ?? ''))
   const [observacoes, setObservacoes] = useState('')
 
   const [buscaObra, setBuscaObra] = useState('')
   const [buscaCC, setBuscaCC] = useState('')
   const [buscaResp, setBuscaResp] = useState('')
 
-  const isMaquina = veiculo.tipo_ativo === 'maquina'
-  const identificador = isMaquina && veiculo.numero_serie ? veiculo.numero_serie : veiculo.placa
+  const identificador = veiculo.tipo_ativo === 'maquina' && veiculo.numero_serie ? veiculo.numero_serie : veiculo.placa
 
   const obrasFiltradas = useMemo(() => {
     if (!buscaObra.trim()) return obras
@@ -79,15 +76,13 @@ export default function AlocarVeiculoModal({ veiculo, onClose }: Props) {
         responsavel_nome: responsavelSelecionado?.nome ?? '',
         data_saida: new Date().toISOString(),
         data_retorno_prev: dataRetornoPrev || undefined,
-        hodometro_saida: hodometroSaida ? Number(hodometroSaida) : undefined,
-        horimetro_saida: horimetroSaida ? Number(horimetroSaida) : undefined,
         status: 'ativa',
         observacoes: observacoes.trim() || undefined,
       })
-      // Atualiza status do veículo para em_uso
+      // Atualiza status do veículo para aguardando_saida (checklist pendente)
       await salvarVeiculo.mutateAsync({
         id: veiculo.id,
-        status: 'em_uso' as any,
+        status: 'aguardando_saida' as any,
       })
       onClose()
     } catch (err) {
@@ -237,41 +232,6 @@ export default function AlocarVeiculoModal({ veiculo, onClose }: Props) {
               onChange={e => setDataRetornoPrev(e.target.value)}
               className={`w-full text-sm rounded-xl px-3 py-2.5 border outline-none transition-colors ${inputCls}`}
             />
-          </div>
-
-          {/* Hodômetro / Horímetro de saída */}
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className={`block text-xs font-semibold mb-1.5 ${txtMuted}`}>
-                {isMaquina ? (
-                  <><Timer size={11} className="inline mr-1" />Horímetro Saída (h)</>
-                ) : (
-                  <><Gauge size={11} className="inline mr-1" />Hodômetro Saída (km)</>
-                )}
-              </label>
-              <input
-                type="number"
-                value={isMaquina ? horimetroSaida : hodometroSaida}
-                onChange={e => isMaquina ? setHorimetroSaida(e.target.value) : setHodometroSaida(e.target.value)}
-                placeholder={isMaquina ? 'Ex: 3200' : 'Ex: 125400'}
-                className={`w-full text-sm rounded-xl px-3 py-2.5 border outline-none transition-colors ${inputCls}`}
-              />
-            </div>
-            {!isMaquina && (
-              <div>
-                <label className={`block text-xs font-semibold mb-1.5 ${txtMuted}`}>
-                  <Timer size={11} className="inline mr-1" />
-                  Horímetro (opcional)
-                </label>
-                <input
-                  type="number"
-                  value={horimetroSaida}
-                  onChange={e => setHorimetroSaida(e.target.value)}
-                  placeholder="Ex: 3200"
-                  className={`w-full text-sm rounded-xl px-3 py-2.5 border outline-none transition-colors ${inputCls}`}
-                />
-              </div>
-            )}
           </div>
 
           {/* Observações */}
