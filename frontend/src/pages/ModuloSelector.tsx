@@ -169,7 +169,10 @@ function getAvatarColor(name: string) {
 
 export default function ModuloSelector() {
   const { perfil, isAdmin, signOut } = useAuth()
-  const { isLightSidebar: isLight, theme, setTheme } = useTheme()
+  const { isLightSidebar: _isLightSidebar, theme, setTheme } = useTheme()
+  // Mandala: original = fundo claro + efeitos coloridos; dark = tudo escuro; light = tudo claro
+  const isLight = theme === 'light' || theme === 'original' // fundo e texto claro
+  const isGlow = theme === 'dark' || theme === 'original'   // efeitos coloridos nos cards
   const navigate = useNavigate()
   const [openPillar, setOpenPillar] = useState<Pillar | null>(null)
   const [overlayVisible, setOverlayVisible] = useState(false)
@@ -425,11 +428,11 @@ export default function ModuloSelector() {
         }}
       />
 
-      {/* ── Atmospheric glow layers (dark only) ────────────────── */}
-      {!isLight && (
+      {/* ── Atmospheric glow layers (dark + original) ────────────── */}
+      {isGlow && (
         <>
-          <div className="absolute inset-0 pointer-events-none" style={{ background: 'radial-gradient(ellipse 80% 55% at 50% -5%, rgba(20,184,166,0.18) 0%, transparent 65%)' }} />
-          <div className="absolute inset-0 pointer-events-none" style={{ background: 'radial-gradient(ellipse 50% 40% at 85% 85%, rgba(6,182,212,0.06) 0%, transparent 60%)' }} />
+          <div className="absolute inset-0 pointer-events-none" style={{ background: `radial-gradient(ellipse 80% 55% at 50% -5%, rgba(20,184,166,${theme === 'dark' ? 0.18 : 0.1}) 0%, transparent 65%)` }} />
+          <div className="absolute inset-0 pointer-events-none" style={{ background: `radial-gradient(ellipse 50% 40% at 85% 85%, rgba(99,102,241,${theme === 'dark' ? 0.06 : 0.05}) 0%, transparent 60%)` }} />
           <div className="absolute inset-0 pointer-events-none" style={{ background: 'radial-gradient(ellipse 40% 30% at 15% 70%, rgba(99,102,241,0.05) 0%, transparent 60%)' }} />
           <div className="absolute inset-0 grid-pattern pointer-events-none opacity-60" />
         </>
@@ -630,16 +633,16 @@ export default function ModuloSelector() {
                   <div
                     className={[
                       'rounded-2xl flex items-center justify-center border transition-all duration-250',
-                      isLight
-                        ? 'bg-white shadow-card group-hover:shadow-card-md group-hover:scale-110 group-hover:-translate-y-1'
-                        : 'glass-card group-hover:scale-110 group-hover:-translate-y-1',
+                      theme === 'dark'
+                        ? 'glass-card group-hover:scale-110 group-hover:-translate-y-1'
+                        : 'bg-white shadow-card group-hover:shadow-card-md group-hover:scale-110 group-hover:-translate-y-1',
                     ].join(' ')}
                     style={{
                       width: 68,
                       height: 68,
-                      borderColor: isLight ? undefined : p.accent + '30',
-                      boxShadow: !isLight
-                        ? `0 0 24px ${p.glow}, 0 0 48px ${p.glow.replace(/[\d.]+\)$/, '0.06)')}`
+                      borderColor: isGlow ? p.accent + '30' : undefined,
+                      boxShadow: isGlow
+                        ? `0 0 ${theme === 'dark' ? 24 : 16}px ${p.glow}, 0 0 ${theme === 'dark' ? 48 : 32}px ${p.glow.replace(/[\d.]+\)$/, theme === 'dark' ? '0.06)' : '0.04)')}`
                         : undefined,
                     }}
                   >
@@ -744,7 +747,7 @@ export default function ModuloSelector() {
 
             {/* Sub-module Mandala Content */}
             <div className="px-4 py-6 flex justify-center">
-              <SubMandalaView pillar={openPillar} onNav={handleNav} canAccess={canAccessSub} visible={overlayVisible} isLight={isLight} />
+              <SubMandalaView pillar={openPillar} onNav={handleNav} canAccess={canAccessSub} visible={overlayVisible} isLight={isLight} isGlow={isGlow} theme={theme} />
             </div>
           </div>
         </div>
@@ -757,12 +760,14 @@ export default function ModuloSelector() {
 //  SUB-MODULE MANDALA VIEW — Radial layout inside overlay
 // ═══════════════════════════════════════════════════════════════════════════════
 
-function SubMandalaView({ pillar, onNav, canAccess, visible, isLight }: {
+function SubMandalaView({ pillar, onNav, canAccess, visible, isLight, isGlow, theme }: {
   pillar: Pillar
   onNav: (r: string) => void
   canAccess: (s: SubMod) => boolean
   visible: boolean
   isLight: boolean
+  isGlow: boolean
+  theme: string
 }) {
   const [entered, setEntered] = useState(false)
 
@@ -910,16 +915,16 @@ function SubMandalaView({ pillar, onNav, canAccess, visible, isLight }: {
                 <div
                   className={[
                     'rounded-2xl flex items-center justify-center border transition-all duration-200',
-                    isLight
-                      ? 'bg-white shadow-card border-slate-200/80 group-hover:scale-110 group-hover:-translate-y-1 group-hover:shadow-card-md cursor-pointer'
-                      : 'glass-card group-hover:scale-110 group-hover:-translate-y-1 cursor-pointer',
+                    theme === 'dark'
+                      ? 'glass-card group-hover:scale-110 group-hover:-translate-y-1 cursor-pointer'
+                      : 'bg-white shadow-card border-slate-200/80 group-hover:scale-110 group-hover:-translate-y-1 group-hover:shadow-card-md cursor-pointer',
                   ].join(' ')}
                   style={{
                     width: 72,
                     height: 72,
-                    borderColor: !isLight ? pillar.accent + '35' : undefined,
-                    boxShadow: !isLight
-                      ? `0 0 20px ${pillar.glow}, 0 0 40px ${pillar.glow.replace(/[\d.]+\)$/, '0.08)')}`
+                    borderColor: isGlow ? pillar.accent + '35' : undefined,
+                    boxShadow: isGlow
+                      ? `0 0 ${theme === 'dark' ? 20 : 14}px ${pillar.glow}, 0 0 ${theme === 'dark' ? 40 : 28}px ${pillar.glow.replace(/[\d.]+\)$/, theme === 'dark' ? '0.08)' : '0.05)')}`
                       : 'none',
                   }}
                 >
