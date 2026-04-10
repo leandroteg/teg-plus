@@ -13,10 +13,27 @@ function normalizeLoginUsername(v: string) {
   return cleaned.replace(/\s+/g, '.').replace(/[^a-z0-9@._-]/g, '').replace(/\.{2,}/g, '.').replace(/^\./, '')
 }
 
-// ── Sound helpers (Web Audio API) ────────────────────────────────────────────
-const playHover = () => { try { const c = new AudioContext(); const o = c.createOscillator(); const g = c.createGain(); o.connect(g); g.connect(c.destination); o.frequency.value = 800; g.gain.value = 0.05; o.start(); g.gain.exponentialRampToValueAtTime(0.001, c.currentTime + 0.05); o.stop(c.currentTime + 0.06); setTimeout(() => c.close(), 200) } catch {} }
-const playClick = () => { try { const c = new AudioContext(); const o = c.createOscillator(); const g = c.createGain(); o.connect(g); g.connect(c.destination); o.frequency.value = 400; g.gain.value = 0.08; o.start(); g.gain.exponentialRampToValueAtTime(0.001, c.currentTime + 0.08); o.stop(c.currentTime + 0.1); setTimeout(() => c.close(), 200) } catch {} }
-const playWarp = () => { try { const c = new AudioContext(); const o = c.createOscillator(); const g = c.createGain(); o.connect(g); g.connect(c.destination); o.frequency.setValueAtTime(300, c.currentTime); o.frequency.exponentialRampToValueAtTime(1200, c.currentTime + 0.6); g.gain.value = 0.1; o.start(); g.gain.exponentialRampToValueAtTime(0.001, c.currentTime + 0.7); o.stop(c.currentTime + 0.8); setTimeout(() => c.close(), 1200) } catch {} }
+// ── Sound helpers (real audio files + Web Audio API for warp) ─────────────────
+const playSound = (src: string, vol = 0.3) => { try { const a = new Audio(src); a.volume = vol; a.play().catch(() => {}) } catch {} }
+const playHover = () => playSound('/sounds/hover.wav', 0.15)
+const playClick = () => playSound('/sounds/click.wav', 0.25)
+const playError = () => playSound('/sounds/error.wav', 0.3)
+const playWarp = () => {
+  // Rich warp: dual oscillator sweep + reverb-like delay
+  try {
+    const c = new AudioContext()
+    const g = c.createGain(); g.connect(c.destination); g.gain.value = 0.12
+    const o1 = c.createOscillator(); o1.type = 'sine'; o1.connect(g)
+    o1.frequency.setValueAtTime(200, c.currentTime); o1.frequency.exponentialRampToValueAtTime(1400, c.currentTime + 0.8)
+    const o2 = c.createOscillator(); o2.type = 'triangle'; o2.connect(g)
+    o2.frequency.setValueAtTime(150, c.currentTime); o2.frequency.exponentialRampToValueAtTime(900, c.currentTime + 1)
+    o1.start(); o2.start()
+    g.gain.exponentialRampToValueAtTime(0.001, c.currentTime + 1.2)
+    o1.stop(c.currentTime + 1.2); o2.stop(c.currentTime + 1.2)
+    setTimeout(() => c.close(), 2000)
+  } catch {}
+}
+const playIntro = () => playSound('/sounds/click.wav', 0.1)
 
 // ── Particles (deterministic) ────────────────────────────────────────────────
 const PARTICLES = [
@@ -42,6 +59,10 @@ const VORTEX_CSS = `
 @keyframes vortex-spin{to{transform:rotate(360deg)}}
 @keyframes vortex-radial-rotate{to{transform:translate(-50%,-50%) rotate(360deg)}}
 @keyframes vortex-pulse-ring{0%,100%{opacity:0.08;transform:translate(-50%,-50%) scale(1)}50%{opacity:0.15;transform:translate(-50%,-50%) scale(1.02)}}
+@keyframes vortex-glow-float-1{0%,100%{transform:translate(0,0) scale(1);opacity:0.4}25%{transform:translate(80px,-60px) scale(1.3);opacity:0.7}50%{transform:translate(-40px,-120px) scale(0.9);opacity:0.3}75%{transform:translate(-80px,40px) scale(1.1);opacity:0.6}}
+@keyframes vortex-glow-float-2{0%,100%{transform:translate(0,0) scale(1.1);opacity:0.3}33%{transform:translate(-100px,70px) scale(0.8);opacity:0.6}66%{transform:translate(60px,-80px) scale(1.4);opacity:0.5}}
+@keyframes vortex-glow-float-3{0%,100%{transform:translate(0,0) scale(0.9);opacity:0.5}50%{transform:translate(120px,60px) scale(1.2);opacity:0.3}}
+@keyframes vortex-lightning{0%,100%{opacity:0}48%{opacity:0}50%{opacity:0.8}52%{opacity:0}54%{opacity:0.4}56%{opacity:0}}
 .vortex-input:focus{border-color:var(--v-focus-border)!important;box-shadow:var(--v-focus-shadow)!important}
 .vortex-input::placeholder{color:var(--v-text-dim)}
 .vortex-btn{position:relative;overflow:hidden}
@@ -75,7 +96,7 @@ export default function Login() {
     const { error: err } = await signIn(toEmail(loginUser), password)
     setBusy(false)
     if (err) {
-      setError(err); setShaking(true)
+      setError(err); setShaking(true); playError()
       setTimeout(() => setShaking(false), 600)
     } else {
       setWarping(true); playWarp()
@@ -94,8 +115,8 @@ export default function Login() {
   // ── Theme ──────────────────────────────────────────────────────────
   const t = isDark ? {
     bgFrom: '#040a14', bgMid: '#07111f', bgTo: '#0a1628',
-    cardBg: 'rgba(10,30,60,0.65)', cardBorder: 'rgba(20,184,166,0.12)',
-    cardShadow: '0 0 80px rgba(20,184,166,0.08), 0 0 1px rgba(20,184,166,0.3), inset 0 1px 0 rgba(255,255,255,0.05)',
+    cardBg: 'rgba(10,30,60,0.55)', cardBorder: 'rgba(20,184,166,0.15)',
+    cardShadow: '0 30px 80px rgba(0,0,0,0.5), 0 0 1px rgba(20,184,166,0.4), 0 0 40px rgba(20,184,166,0.06), inset 0 1px 0 rgba(255,255,255,0.08)',
     inputBg: 'rgba(255,255,255,0.06)', inputBorder: 'rgba(255,255,255,0.1)',
     focusBorder: 'rgba(20,184,166,0.6)', focusShadow: '0 0 4px rgba(20,184,166,0.5), 0 0 24px rgba(20,184,166,0.12)',
     text: '#ffffff', textMuted: 'rgba(255,255,255,0.55)', textDim: 'rgba(255,255,255,0.35)',
@@ -107,8 +128,8 @@ export default function Login() {
     backdrop: 'blur(24px) saturate(1.2)',
   } : {
     bgFrom: '#f1f5f9', bgMid: '#e2e8f0', bgTo: '#f8fafc',
-    cardBg: 'rgba(255,255,255,0.75)', cardBorder: 'rgba(99,102,241,0.1)',
-    cardShadow: '0 25px 60px rgba(0,0,0,0.08), 0 0 1px rgba(99,102,241,0.2), inset 0 1px 0 rgba(255,255,255,0.8)',
+    cardBg: 'rgba(255,255,255,0.7)', cardBorder: 'rgba(99,102,241,0.12)',
+    cardShadow: '0 30px 80px rgba(0,0,0,0.12), 0 0 1px rgba(99,102,241,0.25), 0 0 40px rgba(99,102,241,0.04), inset 0 1px 0 rgba(255,255,255,0.9)',
     inputBg: '#f1f5f9', inputBorder: '#cbd5e1',
     focusBorder: 'rgba(99,102,241,0.5)', focusShadow: '0 0 4px rgba(99,102,241,0.3), 0 0 20px rgba(99,102,241,0.08)',
     text: '#1e293b', textMuted: '#64748b', textDim: '#94a3b8',
@@ -127,15 +148,41 @@ export default function Login() {
       <style>{VORTEX_CSS}</style>
       <div className="fixed inset-0 overflow-hidden" style={{ background: `radial-gradient(ellipse at 20% 50%, ${t.bgMid}, transparent 70%), radial-gradient(ellipse at 80% 20%, ${t.bgTo}, transparent 60%), ${t.bgFrom}`, ...cssVars }}>
 
-        {/* Radial lines — dense conic gradient for depth effect */}
-        <div className="fixed pointer-events-none" style={{
-          left: '50%', top: '50%', width: '200vmax', height: '200vmax',
-          transform: 'translate(-50%,-50%)',
-          background: `repeating-conic-gradient(from 0deg, rgba(${isDark ? '20,184,166' : '99,102,241'},${isDark ? 0.04 : 0.025}) 0deg, transparent 1.2deg, transparent 3deg)`,
-          animation: 'vortex-radial-rotate 120s linear infinite',
-          maskImage: 'radial-gradient(ellipse at center, black 10%, transparent 65%)',
-          WebkitMaskImage: 'radial-gradient(ellipse at center, black 10%, transparent 65%)',
-        }} />
+        {/* Floating glow orbs */}
+        {[
+          { x: '20%', y: '30%', size: 300, color: isDark ? '20,184,166' : '99,102,241', anim: 'vortex-glow-float-1', dur: 12 },
+          { x: '70%', y: '20%', size: 250, color: isDark ? '99,102,241' : '139,92,246', anim: 'vortex-glow-float-2', dur: 16 },
+          { x: '50%', y: '70%', size: 350, color: isDark ? '14,165,233' : '99,102,241', anim: 'vortex-glow-float-3', dur: 20 },
+          { x: '80%', y: '60%', size: 200, color: isDark ? '20,184,166' : '59,130,246', anim: 'vortex-glow-float-1', dur: 14 },
+          { x: '10%', y: '70%', size: 220, color: isDark ? '139,92,246' : '20,184,166', anim: 'vortex-glow-float-2', dur: 18 },
+        ].map((orb, i) => (
+          <div key={`glow-${i}`} className="fixed pointer-events-none" style={{
+            left: orb.x, top: orb.y, width: orb.size, height: orb.size,
+            borderRadius: '50%',
+            background: `radial-gradient(circle, rgba(${orb.color},${isDark ? 0.15 : 0.08}) 0%, transparent 70%)`,
+            filter: `blur(${isDark ? 40 : 30}px)`,
+            animation: `${orb.anim} ${orb.dur}s ease-in-out infinite`,
+          }} />
+        ))}
+
+        {/* Lightning / energy flashes */}
+        {isDark && [
+          { x: '15%', y: '25%', w: 2, h: 80, rot: 35, delay: 0 },
+          { x: '78%', y: '40%', w: 1.5, h: 60, rot: -20, delay: 4 },
+          { x: '45%', y: '15%', w: 1, h: 50, rot: 70, delay: 8 },
+          { x: '85%', y: '70%', w: 2, h: 70, rot: -45, delay: 2 },
+          { x: '25%', y: '80%', w: 1.5, h: 55, rot: 15, delay: 6 },
+        ].map((l, i) => (
+          <div key={`lightning-${i}`} className="fixed pointer-events-none" style={{
+            left: l.x, top: l.y, width: l.w, height: l.h,
+            background: 'linear-gradient(180deg, transparent, rgba(20,184,166,0.8), rgba(99,102,241,0.6), transparent)',
+            transform: `rotate(${l.rot}deg)`,
+            borderRadius: 2,
+            animation: `vortex-lightning 8s ${l.delay}s ease infinite`,
+            filter: 'blur(1px)',
+            boxShadow: '0 0 8px rgba(20,184,166,0.4), 0 0 20px rgba(20,184,166,0.15)',
+          }} />
+        ))}
 
         {/* Grid sci-fi */}
         <div className="fixed inset-0 pointer-events-none" style={{
