@@ -644,43 +644,39 @@ function useCadastrarUsuario() {
       const senhaTemporaria = buildSenhaTemporaria()
 
       // 1) Tenta via n8n (fluxo recomendado para produção)
-      try {
-        await cadastrarViaN8n({
-          nome,
-          username: finalUsername,
-          login_email: loginEmail,
-          signup_email: signupEmail,
-          senha_temporaria: senhaTemporaria,
-          role,
-          papel_global,
-          alcada_nivel,
-          modulos,
-          criado_por: myPerfil?.id ?? null,
-        })
+      if (N8N_BASE) {
+        try {
+          const n8nResult = await cadastrarViaN8n({
+            nome,
+            username: finalUsername,
+            login_email: loginEmail,
+            signup_email: signupEmail,
+            senha_temporaria: senhaTemporaria,
+            role,
+            papel_global,
+            alcada_nivel,
+            modulos,
+            criado_por: myPerfil?.id ?? null,
+          })
 
-        const { data: perfilN8n } = await supabase
-          .from('sys_perfis')
-          .select('id')
-          .eq('email', loginEmail)
-          .maybeSingle()
+          if (n8nResult) {
+            // Aguardar perfil ser criado pelo n8n
+            const { data: perfilN8n } = await supabase
+              .from('sys_perfis')
+              .select('id')
+              .eq('email', loginEmail)
+              .maybeSingle()
 
-        if (perfilN8n?.id) {
-          await syncPerfilSetores(perfilN8n.id, modulos, undefined, papel_global)
-        }
-
-        return {
-          nome,
-          username: finalUsername,
-          login_email: loginEmail,
-          senha_temporaria: senhaTemporaria,
-          email_contato,
-          whatsapp,
-        } satisfies CadastroResult
-      } catch (n8nErr) {
-        // segue para fallback local
-        if (!N8N_BASE) {
-          // sem n8n configurado, usa fallback local
-        } else {
+            if (perfilN8n?.id) {
+              await syncPerfilSetores(perfilN8n.id, modulos, undefined, papel_global)
+              return {
+                nome, username: finalUsername, login_email: loginEmail,
+                senha_temporaria: senhaTemporaria, email_contato, whatsapp,
+              } satisfies CadastroResult
+            }
+            // n8n respondeu OK mas perfil não apareceu → cai no fallback
+          }
+        } catch (n8nErr) {
           console.warn('[AdminUsuarios] n8n indisponível, usando fallback local:', n8nErr)
         }
       }
