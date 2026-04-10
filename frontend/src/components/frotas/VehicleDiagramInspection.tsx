@@ -209,242 +209,330 @@ function getConditionLabel(c?: DamageCondition): string {
   return CONDITIONS.find(cc => cc.value === c)?.label || '--'
 }
 
-// -- SVG view renderers -------------------------------------------------------
+// -- SVG view renderers (professional silhouettes) ----------------------------
+
+function SvgDefs({ isDark }: { isDark: boolean }) {
+  return (
+    <defs>
+      <linearGradient id="bodyGrad" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stopColor={isDark ? '#334155' : '#e2e8f0'} />
+        <stop offset="100%" stopColor={isDark ? '#1e293b' : '#cbd5e1'} />
+      </linearGradient>
+      <linearGradient id="glassGrad" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stopColor={isDark ? '#1e3a5f' : '#93c5fd'} stopOpacity="0.9" />
+        <stop offset="100%" stopColor={isDark ? '#0f2440' : '#bfdbfe'} stopOpacity="0.7" />
+      </linearGradient>
+      <linearGradient id="wheelGrad" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stopColor={isDark ? '#475569' : '#374151'} />
+        <stop offset="100%" stopColor={isDark ? '#1e293b' : '#1f2937'} />
+      </linearGradient>
+      <radialGradient id="rimGrad">
+        <stop offset="0%" stopColor={isDark ? '#64748b' : '#9ca3af'} />
+        <stop offset="100%" stopColor={isDark ? '#334155' : '#6b7280'} />
+      </radialGradient>
+      <linearGradient id="headlightGrad" x1="0" y1="0" x2="1" y2="0">
+        <stop offset="0%" stopColor="#fbbf24" stopOpacity="0.9" />
+        <stop offset="100%" stopColor="#fde68a" stopOpacity="0.5" />
+      </linearGradient>
+      <linearGradient id="taillightGrad" x1="0" y1="0" x2="1" y2="0">
+        <stop offset="0%" stopColor="#ef4444" stopOpacity="0.9" />
+        <stop offset="100%" stopColor="#fca5a5" stopOpacity="0.5" />
+      </linearGradient>
+      <filter id="shadow" x="-5%" y="-5%" width="110%" height="115%">
+        <feDropShadow dx="0" dy="0.5" stdDeviation="0.8" floodColor={isDark ? '#000' : '#64748b'} floodOpacity={isDark ? 0.5 : 0.2} />
+      </filter>
+    </defs>
+  )
+}
+
+function SvgWheel({ cx, cy, r = 9 }: { cx: number; cy: number; r?: number }) {
+  return (
+    <g>
+      <circle cx={cx} cy={cy} r={r} fill="url(#wheelGrad)" />
+      <circle cx={cx} cy={cy} r={r * 0.62} fill="url(#rimGrad)" />
+      <circle cx={cx} cy={cy} r={r * 0.22} fill="url(#wheelGrad)" />
+      {/* Spokes */}
+      {[0, 72, 144, 216, 288].map(a => {
+        const rad = (a * Math.PI) / 180
+        const ir = r * 0.28, or = r * 0.58
+        return <line key={a} x1={cx + ir * Math.cos(rad)} y1={cy + ir * Math.sin(rad)} x2={cx + or * Math.cos(rad)} y2={cy + or * Math.sin(rad)} stroke="#94a3b8" strokeWidth="0.5" strokeOpacity="0.6" />
+      })}
+    </g>
+  )
+}
 
 function SvgLateralEsq({ isDark }: { isDark: boolean }) {
-  const body = isDark ? '#1e293b' : '#e2e8f0'
-  const stroke = isDark ? '#64748b' : '#94a3b8'
-  const glass = isDark ? '#1e3a5f' : '#bfdbfe'
-  const wheel = isDark ? '#334155' : '#475569'
+  const stroke = isDark ? '#475569' : '#94a3b8'
+  const detail = isDark ? '#334155' : '#cbd5e1'
   return (
     <>
-      {/* Body silhouette */}
-      <path
-        d="M 12 68 L 12 58 Q 12 52 18 50 L 32 42 Q 36 26 40 18 L 45 14
-           Q 48 12 55 12 L 75 14 Q 82 16 84 24 L 88 40 Q 92 44 92 52
-           L 92 68"
-        fill={body} stroke={stroke} strokeWidth="1.2"
-      />
+      <SvgDefs isDark={isDark} />
+      {/* Body */}
+      <path d="M 7 66 L 7 60 C 7 56 9 54 11 52 L 16 48 L 26 44 L 33 40 C 35 32 38 24 41 19 L 44 16 C 46 14 49 13 53 13 L 70 13 C 74 13 77 14 79 16 L 82 20 C 84 26 86 34 87 40 L 90 44 C 92 46 93 50 93 54 L 93 66" fill="url(#bodyGrad)" stroke={stroke} strokeWidth="0.8" filter="url(#shadow)" strokeLinejoin="round" />
+      {/* Roofline highlight */}
+      <path d="M 42 18 C 46 14 52 13 56 13 L 68 13 C 72 13 76 14 78 17" fill="none" stroke={isDark ? '#64748b' : '#f1f5f9'} strokeWidth="0.4" opacity="0.6" />
       {/* Windows */}
-      <path
-        d="M 40 38 L 44 18 Q 46 14 52 14 L 58 14 L 58 38 Z"
-        fill={glass} stroke={stroke} strokeWidth="0.6" opacity="0.6"
-      />
-      <path
-        d="M 60 14 L 74 14 Q 78 15 80 24 L 82 38 L 60 38 Z"
-        fill={glass} stroke={stroke} strokeWidth="0.6" opacity="0.6"
-      />
-      {/* Door line */}
-      <line x1="59" y1="14" x2="59" y2="58" stroke={stroke} strokeWidth="0.6" />
+      <path d="M 39 39 L 43 20 C 44 16 47 15 50 15 L 56 15 L 56 39 Z" fill="url(#glassGrad)" stroke={stroke} strokeWidth="0.5" />
+      <path d="M 58 15 L 72 15 C 75 15 77 17 78 20 L 81 39 L 58 39 Z" fill="url(#glassGrad)" stroke={stroke} strokeWidth="0.5" />
+      {/* B-pillar */}
+      <line x1="57" y1="15" x2="57" y2="52" stroke={stroke} strokeWidth="0.7" />
+      {/* Door handle front */}
+      <rect x="49" y="43" width="5" height="1.2" rx="0.6" fill={detail} />
+      {/* Door handle rear */}
+      <rect x="66" y="43" width="5" height="1.2" rx="0.6" fill={detail} />
+      {/* Belt line */}
+      <path d="M 32 40 L 88 40" fill="none" stroke={stroke} strokeWidth="0.3" opacity="0.5" />
+      {/* Rocker panel */}
+      <path d="M 15 62 L 85 62" fill="none" stroke={stroke} strokeWidth="0.4" opacity="0.4" />
+      {/* Wheel arches */}
+      <path d="M 14 66 C 14 56 22 52 28 52 C 34 52 40 56 40 66" fill={isDark ? '#0f172a' : '#f8fafc'} stroke={stroke} strokeWidth="0.5" />
+      <path d="M 62 66 C 62 56 68 52 75 52 C 82 52 88 56 88 66" fill={isDark ? '#0f172a' : '#f8fafc'} stroke={stroke} strokeWidth="0.5" />
       {/* Wheels */}
-      <ellipse cx="26" cy="70" rx="10" ry="10" fill={wheel} stroke={stroke} strokeWidth="0.8" />
-      <ellipse cx="26" cy="70" rx="5" ry="5" fill={isDark ? '#1e293b' : '#cbd5e1'} />
-      <ellipse cx="74" cy="70" rx="10" ry="10" fill={wheel} stroke={stroke} strokeWidth="0.8" />
-      <ellipse cx="74" cy="70" rx="5" ry="5" fill={isDark ? '#1e293b' : '#cbd5e1'} />
-      {/* Bumper details */}
-      <line x1="8" y1="62" x2="14" y2="62" stroke={stroke} strokeWidth="0.8" />
-      <line x1="86" y1="55" x2="94" y2="55" stroke={stroke} strokeWidth="0.8" />
+      <SvgWheel cx={27} cy={66} r={10} />
+      <SvgWheel cx={75} cy={66} r={10} />
       {/* Headlight */}
-      <rect x="6" y="54" width="6" height="6" rx="1" fill={isDark ? '#fbbf24' : '#fde68a'} opacity="0.7" />
+      <path d="M 8 52 L 12 50 L 14 54 L 14 58 L 8 60 Z" fill="url(#headlightGrad)" stroke={stroke} strokeWidth="0.4" />
       {/* Taillight */}
-      <rect x="90" y="46" width="4" height="8" rx="1" fill={isDark ? '#ef4444' : '#fca5a5'} opacity="0.7" />
-      {/* Side mirror */}
-      <ellipse cx="38" cy="36" rx="3" ry="2" fill={stroke} />
+      <path d="M 92 46 L 93 48 L 93 56 L 91 58 L 90 54 Z" fill="url(#taillightGrad)" stroke={stroke} strokeWidth="0.4" />
+      {/* Mirror */}
+      <path d="M 37 36 C 35 35 34 37 35 39 L 39 38 Z" fill={detail} stroke={stroke} strokeWidth="0.3" />
+      {/* Front bumper */}
+      <path d="M 7 60 C 7 62 8 64 10 64 L 16 64" fill="none" stroke={stroke} strokeWidth="0.5" />
+      {/* Rear bumper */}
+      <path d="M 86 64 L 93 64 C 94 64 94 62 93 60" fill="none" stroke={stroke} strokeWidth="0.5" />
+      {/* Fuel cap */}
+      <rect x="83" y="42" width="2" height="2" rx="0.5" fill="none" stroke={detail} strokeWidth="0.3" />
     </>
   )
 }
 
 function SvgFrente({ isDark }: { isDark: boolean }) {
-  const body = isDark ? '#1e293b' : '#e2e8f0'
-  const stroke = isDark ? '#64748b' : '#94a3b8'
-  const glass = isDark ? '#1e3a5f' : '#bfdbfe'
+  const stroke = isDark ? '#475569' : '#94a3b8'
+  const detail = isDark ? '#334155' : '#cbd5e1'
   return (
     <>
-      {/* Body outline */}
-      <path
-        d="M 16 72 L 16 52 Q 16 46 20 42 L 24 38 Q 30 28 34 20
-           Q 38 14 50 14 Q 62 14 66 20 L 76 38 Q 80 42 84 46
-           Q 88 50 88 56 L 88 72"
-        fill={body} stroke={stroke} strokeWidth="1.2"
-      />
+      <SvgDefs isDark={isDark} />
+      {/* Body */}
+      <path d="M 14 72 L 14 56 C 14 50 16 46 20 42 L 26 36 C 30 28 36 20 42 16 C 44 14 47 13 50 13 C 53 13 56 14 58 16 C 64 20 70 28 74 36 L 80 42 C 84 46 86 50 86 56 L 86 72" fill="url(#bodyGrad)" stroke={stroke} strokeWidth="0.8" filter="url(#shadow)" strokeLinejoin="round" />
       {/* Windshield */}
-      <path
-        d="M 30 36 Q 34 20 50 18 Q 66 20 70 36 Z"
-        fill={glass} stroke={stroke} strokeWidth="0.6" opacity="0.6"
-      />
+      <path d="M 28 36 C 32 22 40 18 50 17 C 60 18 68 22 72 36 Z" fill="url(#glassGrad)" stroke={stroke} strokeWidth="0.5" />
       {/* Hood line */}
-      <path d="M 24 38 Q 50 42 76 38" fill="none" stroke={stroke} strokeWidth="0.5" />
+      <path d="M 22 40 C 36 43 64 43 78 40" fill="none" stroke={stroke} strokeWidth="0.4" />
+      {/* Hood crease */}
+      <line x1="50" y1="38" x2="50" y2="48" stroke={stroke} strokeWidth="0.2" opacity="0.3" />
       {/* Headlights */}
-      <rect x="14" y="44" width="14" height="8" rx="3" fill={isDark ? '#fbbf24' : '#fde68a'} opacity="0.7" />
-      <rect x="72" y="44" width="14" height="8" rx="3" fill={isDark ? '#fbbf24' : '#fde68a'} opacity="0.7" />
+      <path d="M 14 44 L 14 50 L 28 50 L 30 44 C 28 42 18 42 14 44 Z" fill="url(#headlightGrad)" stroke={stroke} strokeWidth="0.4" />
+      <path d="M 86 44 L 86 50 L 72 50 L 70 44 C 72 42 82 42 86 44 Z" fill="url(#headlightGrad)" stroke={stroke} strokeWidth="0.4" />
+      {/* DRL strips */}
+      <path d="M 16 49 L 27 49" stroke="#fbbf24" strokeWidth="0.6" opacity="0.8" strokeLinecap="round" />
+      <path d="M 73 49 L 84 49" stroke="#fbbf24" strokeWidth="0.6" opacity="0.8" strokeLinecap="round" />
       {/* Grille */}
-      <rect x="32" y="46" width="36" height="8" rx="2" fill={isDark ? '#0f172a' : '#cbd5e1'} stroke={stroke} strokeWidth="0.5" />
-      <line x1="40" y1="46" x2="40" y2="54" stroke={stroke} strokeWidth="0.3" />
-      <line x1="50" y1="46" x2="50" y2="54" stroke={stroke} strokeWidth="0.3" />
-      <line x1="60" y1="46" x2="60" y2="54" stroke={stroke} strokeWidth="0.3" />
-      {/* Bumper */}
-      <rect x="12" y="58" width="76" height="12" rx="4" fill={isDark ? '#0f172a' : '#f1f5f9'} stroke={stroke} strokeWidth="0.5" />
+      <rect x="30" y="48" width="40" height="8" rx="2" fill={isDark ? '#0f172a' : '#e2e8f0'} stroke={stroke} strokeWidth="0.5" />
+      {/* Grille slats */}
+      {[34, 40, 46, 52, 58, 64].map(x => <line key={x} x1={x} y1="49" x2={x} y2="55" stroke={stroke} strokeWidth="0.25" opacity="0.5" />)}
+      {/* Brand badge */}
+      <circle cx="50" cy="52" r="2" fill={detail} stroke={stroke} strokeWidth="0.3" />
+      {/* Lower bumper */}
+      <path d="M 12 58 C 12 56 14 55 18 55 L 82 55 C 86 55 88 56 88 58 L 88 68 C 88 70 86 72 84 72 L 16 72 C 14 72 12 70 12 68 Z" fill={isDark ? '#0f172a' : '#f1f5f9'} stroke={stroke} strokeWidth="0.4" />
+      {/* Air intake */}
+      <rect x="28" y="60" width="44" height="6" rx="2" fill={isDark ? '#020617' : '#e2e8f0'} stroke={stroke} strokeWidth="0.3" />
       {/* Fog lights */}
-      <circle cx="22" cy="64" r="3" fill={isDark ? '#fbbf24' : '#fde68a'} opacity="0.4" />
-      <circle cx="78" cy="64" r="3" fill={isDark ? '#fbbf24' : '#fde68a'} opacity="0.4" />
+      <ellipse cx="20" cy="64" rx="4" ry="3" fill={isDark ? '#fbbf24' : '#fef3c7'} opacity="0.4" stroke={stroke} strokeWidth="0.3" />
+      <ellipse cx="80" cy="64" rx="4" ry="3" fill={isDark ? '#fbbf24' : '#fef3c7'} opacity="0.4" stroke={stroke} strokeWidth="0.3" />
       {/* Mirrors */}
-      <rect x="10" y="38" width="6" height="4" rx="1" fill={stroke} />
-      <rect x="84" y="38" width="6" height="4" rx="1" fill={stroke} />
+      <path d="M 10 38 L 8 36 L 8 42 L 12 40 Z" fill={detail} stroke={stroke} strokeWidth="0.3" />
+      <path d="M 90 38 L 92 36 L 92 42 L 88 40 Z" fill={detail} stroke={stroke} strokeWidth="0.3" />
+      {/* License plate */}
+      <rect x="38" y="62" width="24" height="6" rx="0.5" fill={isDark ? '#1e293b' : '#fff'} stroke={stroke} strokeWidth="0.3" />
     </>
   )
 }
 
 function SvgLateralDir({ isDark }: { isDark: boolean }) {
-  const body = isDark ? '#1e293b' : '#e2e8f0'
-  const stroke = isDark ? '#64748b' : '#94a3b8'
-  const glass = isDark ? '#1e3a5f' : '#bfdbfe'
-  const wheel = isDark ? '#334155' : '#475569'
+  const stroke = isDark ? '#475569' : '#94a3b8'
+  const detail = isDark ? '#334155' : '#cbd5e1'
   return (
     <>
-      {/* Body silhouette (mirrored) */}
-      <path
-        d="M 88 68 L 88 58 Q 88 52 82 50 L 68 42 Q 64 26 60 18 L 55 14
-           Q 52 12 45 12 L 25 14 Q 18 16 16 24 L 12 40 Q 8 44 8 52
-           L 8 68"
-        fill={body} stroke={stroke} strokeWidth="1.2"
-      />
+      <SvgDefs isDark={isDark} />
+      {/* Body (mirrored) */}
+      <path d="M 93 66 L 93 60 C 93 56 91 54 89 52 L 84 48 L 74 44 L 67 40 C 65 32 62 24 59 19 L 56 16 C 54 14 51 13 47 13 L 30 13 C 26 13 23 14 21 16 L 18 20 C 16 26 14 34 13 40 L 10 44 C 8 46 7 50 7 54 L 7 66" fill="url(#bodyGrad)" stroke={stroke} strokeWidth="0.8" filter="url(#shadow)" strokeLinejoin="round" />
+      {/* Roofline */}
+      <path d="M 58 18 C 54 14 48 13 44 13 L 32 13 C 28 13 24 14 22 17" fill="none" stroke={isDark ? '#64748b' : '#f1f5f9'} strokeWidth="0.4" opacity="0.6" />
       {/* Windows */}
-      <path
-        d="M 60 38 L 56 18 Q 54 14 48 14 L 42 14 L 42 38 Z"
-        fill={glass} stroke={stroke} strokeWidth="0.6" opacity="0.6"
-      />
-      <path
-        d="M 40 14 L 26 14 Q 22 15 20 24 L 18 38 L 40 38 Z"
-        fill={glass} stroke={stroke} strokeWidth="0.6" opacity="0.6"
-      />
-      {/* Door line */}
-      <line x1="41" y1="14" x2="41" y2="58" stroke={stroke} strokeWidth="0.6" />
+      <path d="M 61 39 L 57 20 C 56 16 53 15 50 15 L 44 15 L 44 39 Z" fill="url(#glassGrad)" stroke={stroke} strokeWidth="0.5" />
+      <path d="M 42 15 L 28 15 C 25 15 23 17 22 20 L 19 39 L 42 39 Z" fill="url(#glassGrad)" stroke={stroke} strokeWidth="0.5" />
+      {/* B-pillar */}
+      <line x1="43" y1="15" x2="43" y2="52" stroke={stroke} strokeWidth="0.7" />
+      {/* Door handles */}
+      <rect x="46" y="43" width="5" height="1.2" rx="0.6" fill={detail} />
+      <rect x="29" y="43" width="5" height="1.2" rx="0.6" fill={detail} />
+      {/* Belt line */}
+      <path d="M 68 40 L 12 40" fill="none" stroke={stroke} strokeWidth="0.3" opacity="0.5" />
+      {/* Rocker panel */}
+      <path d="M 85 62 L 15 62" fill="none" stroke={stroke} strokeWidth="0.4" opacity="0.4" />
+      {/* Wheel arches */}
+      <path d="M 86 66 C 86 56 78 52 72 52 C 66 52 60 56 60 66" fill={isDark ? '#0f172a' : '#f8fafc'} stroke={stroke} strokeWidth="0.5" />
+      <path d="M 38 66 C 38 56 32 52 25 52 C 18 52 12 56 12 66" fill={isDark ? '#0f172a' : '#f8fafc'} stroke={stroke} strokeWidth="0.5" />
       {/* Wheels */}
-      <ellipse cx="74" cy="70" rx="10" ry="10" fill={wheel} stroke={stroke} strokeWidth="0.8" />
-      <ellipse cx="74" cy="70" rx="5" ry="5" fill={isDark ? '#1e293b' : '#cbd5e1'} />
-      <ellipse cx="26" cy="70" rx="10" ry="10" fill={wheel} stroke={stroke} strokeWidth="0.8" />
-      <ellipse cx="26" cy="70" rx="5" ry="5" fill={isDark ? '#1e293b' : '#cbd5e1'} />
-      {/* Bumper details */}
-      <line x1="92" y1="62" x2="86" y2="62" stroke={stroke} strokeWidth="0.8" />
-      <line x1="14" y1="55" x2="6" y2="55" stroke={stroke} strokeWidth="0.8" />
-      {/* Headlight */}
-      <rect x="88" y="54" width="6" height="6" rx="1" fill={isDark ? '#fbbf24' : '#fde68a'} opacity="0.7" />
+      <SvgWheel cx={73} cy={66} r={10} />
+      <SvgWheel cx={25} cy={66} r={10} />
       {/* Taillight */}
-      <rect x="6" y="46" width="4" height="8" rx="1" fill={isDark ? '#ef4444' : '#fca5a5'} opacity="0.7" />
-      {/* Side mirror */}
-      <ellipse cx="62" cy="36" rx="3" ry="2" fill={stroke} />
+      <path d="M 8 46 L 7 48 L 7 56 L 9 58 L 10 54 Z" fill="url(#taillightGrad)" stroke={stroke} strokeWidth="0.4" />
+      {/* Headlight */}
+      <path d="M 92 52 L 88 50 L 86 54 L 86 58 L 92 60 Z" fill="url(#headlightGrad)" stroke={stroke} strokeWidth="0.4" />
+      {/* Mirror */}
+      <path d="M 63 36 C 65 35 66 37 65 39 L 61 38 Z" fill={detail} stroke={stroke} strokeWidth="0.3" />
+      {/* Bumpers */}
+      <path d="M 93 60 C 93 62 92 64 90 64 L 84 64" fill="none" stroke={stroke} strokeWidth="0.5" />
+      <path d="M 14 64 L 7 64 C 6 64 6 62 7 60" fill="none" stroke={stroke} strokeWidth="0.5" />
+      {/* Fuel cap */}
+      <rect x="15" y="42" width="2" height="2" rx="0.5" fill="none" stroke={detail} strokeWidth="0.3" />
     </>
   )
 }
 
 function SvgTraseira({ isDark }: { isDark: boolean }) {
-  const body = isDark ? '#1e293b' : '#e2e8f0'
-  const stroke = isDark ? '#64748b' : '#94a3b8'
-  const glass = isDark ? '#1e3a5f' : '#bfdbfe'
+  const stroke = isDark ? '#475569' : '#94a3b8'
+  const detail = isDark ? '#334155' : '#cbd5e1'
   return (
     <>
-      {/* Body outline */}
-      <path
-        d="M 16 72 L 16 50 Q 16 40 22 34 L 28 28
-           Q 34 16 50 16 Q 66 16 72 28 L 78 34
-           Q 84 40 84 50 L 84 72"
-        fill={body} stroke={stroke} strokeWidth="1.2"
-      />
+      <SvgDefs isDark={isDark} />
+      {/* Body */}
+      <path d="M 14 72 L 14 52 C 14 44 18 38 24 32 L 30 26 C 34 20 40 16 50 16 C 60 16 66 20 70 26 L 76 32 C 82 38 86 44 86 52 L 86 72" fill="url(#bodyGrad)" stroke={stroke} strokeWidth="0.8" filter="url(#shadow)" strokeLinejoin="round" />
       {/* Rear window */}
-      <path
-        d="M 28 38 Q 36 24 50 22 Q 64 24 72 38 Z"
-        fill={glass} stroke={stroke} strokeWidth="0.6" opacity="0.6"
-      />
+      <path d="M 28 36 C 34 24 42 20 50 20 C 58 20 66 24 72 36 Z" fill="url(#glassGrad)" stroke={stroke} strokeWidth="0.5" />
       {/* Trunk line */}
-      <path d="M 22 26 Q 50 20 78 26" fill="none" stroke={stroke} strokeWidth="0.5" />
+      <path d="M 22 28 C 36 22 64 22 78 28" fill="none" stroke={stroke} strokeWidth="0.4" />
+      {/* Trunk crease */}
+      <line x1="50" y1="26" x2="50" y2="38" stroke={stroke} strokeWidth="0.2" opacity="0.3" />
       {/* Taillights */}
-      <rect x="14" y="44" width="14" height="10" rx="3" fill={isDark ? '#ef4444' : '#fca5a5'} opacity="0.7" />
-      <rect x="72" y="44" width="14" height="10" rx="3" fill={isDark ? '#ef4444' : '#fca5a5'} opacity="0.7" />
+      <path d="M 14 42 L 14 54 L 28 52 L 28 44 C 24 42 18 42 14 42 Z" fill="url(#taillightGrad)" stroke={stroke} strokeWidth="0.4" />
+      <path d="M 86 42 L 86 54 L 72 52 L 72 44 C 76 42 82 42 86 42 Z" fill="url(#taillightGrad)" stroke={stroke} strokeWidth="0.4" />
+      {/* LED strips */}
+      <path d="M 16 50 L 26 49" stroke="#ef4444" strokeWidth="0.5" opacity="0.7" strokeLinecap="round" />
+      <path d="M 74 49 L 84 50" stroke="#ef4444" strokeWidth="0.5" opacity="0.7" strokeLinecap="round" />
+      {/* Connecting bar */}
+      <rect x="30" y="46" width="40" height="2" rx="1" fill={detail} stroke={stroke} strokeWidth="0.3" />
       {/* Trunk handle */}
-      <rect x="42" y="40" width="16" height="2" rx="1" fill={stroke} />
+      <rect x="44" y="39" width="12" height="1.5" rx="0.75" fill={detail} stroke={stroke} strokeWidth="0.2" />
+      {/* Brand badge */}
+      <circle cx="50" cy="43" r="2" fill={detail} stroke={stroke} strokeWidth="0.3" />
       {/* Bumper */}
-      <rect x="12" y="60" width="76" height="12" rx="4" fill={isDark ? '#0f172a' : '#f1f5f9'} stroke={stroke} strokeWidth="0.5" />
-      {/* Exhaust pipes */}
-      <circle cx="24" cy="70" r="3" fill={isDark ? '#0f172a' : '#cbd5e1'} stroke={stroke} strokeWidth="0.4" />
-      <circle cx="76" cy="70" r="3" fill={isDark ? '#0f172a' : '#cbd5e1'} stroke={stroke} strokeWidth="0.4" />
-      {/* License plate area */}
-      <rect x="36" y="62" width="28" height="8" rx="1" fill={isDark ? '#0f172a' : '#fff'} stroke={stroke} strokeWidth="0.4" />
+      <path d="M 12 58 C 12 56 14 55 18 55 L 82 55 C 86 55 88 56 88 58 L 88 68 C 88 70 86 72 84 72 L 16 72 C 14 72 12 70 12 68 Z" fill={isDark ? '#0f172a' : '#f1f5f9'} stroke={stroke} strokeWidth="0.4" />
+      {/* Reflectors */}
+      <rect x="18" y="62" width="6" height="3" rx="1" fill={isDark ? '#ef4444' : '#fca5a5'} opacity="0.3" />
+      <rect x="76" y="62" width="6" height="3" rx="1" fill={isDark ? '#ef4444' : '#fca5a5'} opacity="0.3" />
+      {/* Exhaust */}
+      <ellipse cx="26" cy="70" rx="3.5" ry="2.5" fill={isDark ? '#020617' : '#d1d5db'} stroke={stroke} strokeWidth="0.3" />
+      <ellipse cx="74" cy="70" rx="3.5" ry="2.5" fill={isDark ? '#020617' : '#d1d5db'} stroke={stroke} strokeWidth="0.3" />
+      {/* License plate */}
+      <rect x="36" y="60" width="28" height="8" rx="1" fill={isDark ? '#1e293b' : '#fff'} stroke={stroke} strokeWidth="0.3" />
+      <rect x="38" y="61" width="24" height="6" rx="0.5" fill="none" stroke={stroke} strokeWidth="0.15" />
     </>
   )
 }
 
 function SvgTeto({ isDark }: { isDark: boolean }) {
-  const body = isDark ? '#1e293b' : '#e2e8f0'
-  const stroke = isDark ? '#64748b' : '#94a3b8'
+  const stroke = isDark ? '#475569' : '#94a3b8'
+  const detail = isDark ? '#334155' : '#cbd5e1'
   return (
     <>
-      {/* Roof outline (top-down) */}
-      <rect x="20" y="10" width="60" height="78" rx="14" fill={body} stroke={stroke} strokeWidth="1.2" />
-      {/* Roof panel lines */}
-      <rect x="28" y="24" width="44" height="48" rx="6" fill="none" stroke={stroke} strokeWidth="0.4" strokeDasharray="2 2" />
+      <SvgDefs isDark={isDark} />
+      {/* Body outline */}
+      <path d="M 28 10 C 36 6 64 6 72 10 L 76 14 C 80 20 82 30 82 42 L 82 56 C 82 68 80 78 76 84 L 72 88 C 64 92 36 92 28 88 L 24 84 C 20 78 18 68 18 56 L 18 42 C 18 30 20 20 24 14 Z" fill="url(#bodyGrad)" stroke={stroke} strokeWidth="0.8" filter="url(#shadow)" />
+      {/* Windshield area */}
+      <path d="M 30 16 C 38 12 62 12 70 16 L 72 20 L 72 26 L 28 26 L 28 20 Z" fill="url(#glassGrad)" stroke={stroke} strokeWidth="0.4" opacity="0.7" />
+      {/* Rear window */}
+      <path d="M 30 82 C 38 86 62 86 70 82 L 72 78 L 72 74 L 28 74 L 28 78 Z" fill="url(#glassGrad)" stroke={stroke} strokeWidth="0.4" opacity="0.7" />
+      {/* Roof panel */}
+      <rect x="26" y="28" width="48" height="44" rx="8" fill="none" stroke={stroke} strokeWidth="0.3" opacity="0.4" />
       {/* Center ridge */}
-      <line x1="50" y1="18" x2="50" y2="82" stroke={stroke} strokeWidth="0.3" strokeDasharray="1.5 1.5" />
-      {/* Antenna area */}
-      <circle cx="50" cy="12" r="3" fill={isDark ? '#475569' : '#94a3b8'} stroke={stroke} strokeWidth="0.5" />
-      <line x1="50" y1="9" x2="50" y2="5" stroke={stroke} strokeWidth="0.8" />
-      {/* Rack rails */}
-      <line x1="26" y1="30" x2="26" y2="62" stroke={stroke} strokeWidth="1" strokeLinecap="round" />
-      <line x1="74" y1="30" x2="74" y2="62" stroke={stroke} strokeWidth="1" strokeLinecap="round" />
-      {/* Cross bars */}
-      <line x1="26" y1="38" x2="74" y2="38" stroke={stroke} strokeWidth="0.6" />
-      <line x1="26" y1="54" x2="74" y2="54" stroke={stroke} strokeWidth="0.6" />
-      {/* Windshield area markers */}
-      <path d="M 26 18 Q 50 12 74 18" fill="none" stroke={stroke} strokeWidth="0.5" />
-      <path d="M 26 80 Q 50 86 74 80" fill="none" stroke={stroke} strokeWidth="0.5" />
+      <line x1="50" y1="22" x2="50" y2="78" stroke={stroke} strokeWidth="0.2" opacity="0.3" strokeDasharray="2 2" />
+      {/* A-pillar lines */}
+      <line x1="28" y1="22" x2="22" y2="34" stroke={stroke} strokeWidth="0.3" opacity="0.5" />
+      <line x1="72" y1="22" x2="78" y2="34" stroke={stroke} strokeWidth="0.3" opacity="0.5" />
+      {/* C-pillar lines */}
+      <line x1="28" y1="76" x2="22" y2="64" stroke={stroke} strokeWidth="0.3" opacity="0.5" />
+      <line x1="72" y1="76" x2="78" y2="64" stroke={stroke} strokeWidth="0.3" opacity="0.5" />
+      {/* Antenna */}
+      <rect x="48" y="8" width="4" height="3" rx="1" fill={detail} stroke={stroke} strokeWidth="0.3" />
+      {/* Sunroof */}
+      <rect x="36" y="36" width="28" height="22" rx="4" fill={isDark ? '#0f172a' : '#e2e8f0'} stroke={stroke} strokeWidth="0.3" opacity="0.5" />
+      {/* Side mirrors */}
+      <ellipse cx="16" cy="28" rx="3" ry="2" fill={detail} stroke={stroke} strokeWidth="0.3" />
+      <ellipse cx="84" cy="28" rx="3" ry="2" fill={detail} stroke={stroke} strokeWidth="0.3" />
     </>
   )
 }
 
 function SvgInterior({ isDark }: { isDark: boolean }) {
+  const stroke = isDark ? '#475569' : '#94a3b8'
   const panel = isDark ? '#334155' : '#cbd5e1'
-  const stroke = isDark ? '#64748b' : '#94a3b8'
   const seat = isDark ? '#1e293b' : '#e2e8f0'
+  const seatStitch = isDark ? '#475569' : '#d1d5db'
   return (
     <>
+      <SvgDefs isDark={isDark} />
       {/* Dashboard */}
-      <rect x="10" y="6" width="80" height="14" rx="3" fill={panel} stroke={stroke} strokeWidth="0.8" />
+      <path d="M 8 6 L 92 6 C 93 6 94 7 94 8 L 94 18 C 94 19 93 20 92 20 L 8 20 C 7 20 6 19 6 18 L 6 8 C 6 7 7 6 8 6 Z" fill={panel} stroke={stroke} strokeWidth="0.6" />
       {/* Instrument cluster */}
-      <rect x="18" y="8" width="16" height="10" rx="2" fill={isDark ? '#0f172a' : '#f1f5f9'} stroke={stroke} strokeWidth="0.4" />
+      <rect x="14" y="8" width="18" height="10" rx="2.5" fill={isDark ? '#0f172a' : '#f1f5f9'} stroke={stroke} strokeWidth="0.3" />
+      <circle cx="20" cy="13" r="3" fill="none" stroke={isDark ? '#22d3ee' : '#06b6d4'} strokeWidth="0.3" opacity="0.5" />
+      <circle cx="28" cy="13" r="3" fill="none" stroke={isDark ? '#22d3ee' : '#06b6d4'} strokeWidth="0.3" opacity="0.5" />
       {/* Center screen */}
-      <rect x="42" y="8" width="20" height="10" rx="2" fill={isDark ? '#1e3a5f' : '#bfdbfe'} stroke={stroke} strokeWidth="0.4" opacity="0.6" />
+      <rect x="40" y="8" width="22" height="10" rx="2" fill={isDark ? '#1e3a5f' : '#bfdbfe'} stroke={stroke} strokeWidth="0.3" opacity="0.8" />
+      <rect x="42" y="10" width="18" height="6" rx="1" fill={isDark ? '#0f172a' : '#eff6ff'} stroke="none" opacity="0.4" />
+      {/* AC vents */}
+      <rect x="36" y="10" width="3" height="6" rx="0.5" fill={isDark ? '#0f172a' : '#f1f5f9'} stroke={stroke} strokeWidth="0.2" />
+      <rect x="63" y="10" width="3" height="6" rx="0.5" fill={isDark ? '#0f172a' : '#f1f5f9'} stroke={stroke} strokeWidth="0.2" />
       {/* Glove box */}
-      <rect x="66" y="8" width="18" height="10" rx="2" fill={isDark ? '#0f172a' : '#f1f5f9'} stroke={stroke} strokeWidth="0.4" />
+      <rect x="68" y="8" width="22" height="10" rx="2" fill={isDark ? '#0f172a' : '#f1f5f9'} stroke={stroke} strokeWidth="0.3" />
 
       {/* Steering wheel */}
-      <circle cx="25" cy="32" r="10" fill="none" stroke={stroke} strokeWidth="1.2" />
-      <circle cx="25" cy="32" r="4" fill={panel} stroke={stroke} strokeWidth="0.5" />
+      <circle cx="24" cy="32" r="10" fill="none" stroke={stroke} strokeWidth="1" />
+      <circle cx="24" cy="32" r="9" fill="none" stroke={stroke} strokeWidth="0.3" opacity="0.3" />
+      <ellipse cx="24" cy="32" rx="4.5" ry="3.5" fill={panel} stroke={stroke} strokeWidth="0.4" />
       {/* Spokes */}
-      <line x1="25" y1="22" x2="25" y2="26" stroke={stroke} strokeWidth="0.8" />
-      <line x1="15" y1="32" x2="19" y2="32" stroke={stroke} strokeWidth="0.8" />
-      <line x1="31" y1="32" x2="35" y2="32" stroke={stroke} strokeWidth="0.8" />
+      <line x1="24" y1="22" x2="24" y2="27" stroke={stroke} strokeWidth="0.7" strokeLinecap="round" />
+      <line x1="14" y1="32" x2="18" y2="32" stroke={stroke} strokeWidth="0.7" strokeLinecap="round" />
+      <line x1="30" y1="32" x2="34" y2="32" stroke={stroke} strokeWidth="0.7" strokeLinecap="round" />
+      <line x1="18" y1="38" x2="21" y2="36" stroke={stroke} strokeWidth="0.5" strokeLinecap="round" />
+      <line x1="30" y1="38" x2="27" y2="36" stroke={stroke} strokeWidth="0.5" strokeLinecap="round" />
 
       {/* Console central */}
-      <rect x="38" y="22" width="24" height="42" rx="3" fill={isDark ? '#0f172a' : '#f1f5f9'} stroke={stroke} strokeWidth="0.6" />
-      {/* Gear shifter */}
-      <rect x="46" y="36" width="8" height="12" rx="2" fill={panel} stroke={stroke} strokeWidth="0.4" />
+      <rect x="38" y="22" width="24" height="44" rx="4" fill={isDark ? '#0f172a' : '#f1f5f9'} stroke={stroke} strokeWidth="0.5" />
+      {/* Climate controls */}
+      <circle cx="44" cy="28" r="2" fill={panel} stroke={stroke} strokeWidth="0.3" />
+      <circle cx="50" cy="28" r="2" fill={panel} stroke={stroke} strokeWidth="0.3" />
+      <circle cx="56" cy="28" r="2" fill={panel} stroke={stroke} strokeWidth="0.3" />
+      {/* Gear */}
+      <rect x="44" y="34" width="12" height="14" rx="3" fill={panel} stroke={stroke} strokeWidth="0.4" />
+      <circle cx="50" cy="40" r="2.5" fill={isDark ? '#64748b' : '#94a3b8'} stroke={stroke} strokeWidth="0.3" />
       {/* Cup holders */}
-      <circle cx="44" cy="56" r="3" fill={isDark ? '#0f172a' : '#fff'} stroke={stroke} strokeWidth="0.3" />
-      <circle cx="56" cy="56" r="3" fill={isDark ? '#0f172a' : '#fff'} stroke={stroke} strokeWidth="0.3" />
+      <circle cx="44" cy="56" r="3.5" fill={isDark ? '#020617' : '#e5e7eb'} stroke={stroke} strokeWidth="0.2" />
+      <circle cx="56" cy="56" r="3.5" fill={isDark ? '#020617' : '#e5e7eb'} stroke={stroke} strokeWidth="0.2" />
+      {/* Armrest */}
+      <rect x="42" y="62" width="16" height="4" rx="2" fill={panel} stroke={stroke} strokeWidth="0.3" />
 
       {/* Driver seat */}
-      <rect x="10" y="46" width="24" height="18" rx="4" fill={seat} stroke={stroke} strokeWidth="0.8" />
-      <path d="M 12 46 Q 22 42 32 46" fill="none" stroke={stroke} strokeWidth="0.4" />
+      <rect x="8" y="46" width="26" height="20" rx="5" fill={seat} stroke={stroke} strokeWidth="0.6" />
+      <path d="M 12 46 C 18 42 28 42 34 46" fill="none" stroke={seatStitch} strokeWidth="0.3" />
+      <path d="M 12 52 L 32 52" fill="none" stroke={seatStitch} strokeWidth="0.2" opacity="0.4" />
+      <path d="M 12 58 L 32 58" fill="none" stroke={seatStitch} strokeWidth="0.2" opacity="0.4" />
 
       {/* Passenger seat */}
-      <rect x="66" y="46" width="24" height="18" rx="4" fill={seat} stroke={stroke} strokeWidth="0.8" />
-      <path d="M 68 46 Q 78 42 88 46" fill="none" stroke={stroke} strokeWidth="0.4" />
+      <rect x="66" y="46" width="26" height="20" rx="5" fill={seat} stroke={stroke} strokeWidth="0.6" />
+      <path d="M 68 46 C 74 42 84 42 92 46" fill="none" stroke={seatStitch} strokeWidth="0.3" />
+      <path d="M 68 52 L 90 52" fill="none" stroke={seatStitch} strokeWidth="0.2" opacity="0.4" />
+      <path d="M 68 58 L 90 58" fill="none" stroke={seatStitch} strokeWidth="0.2" opacity="0.4" />
 
-      {/* Rear bench seat */}
-      <rect x="14" y="72" width="72" height="14" rx="4" fill={seat} stroke={stroke} strokeWidth="0.8" />
-      <line x1="50" y1="72" x2="50" y2="86" stroke={stroke} strokeWidth="0.3" strokeDasharray="1 1" />
+      {/* Rear bench */}
+      <rect x="12" y="74" width="76" height="14" rx="5" fill={seat} stroke={stroke} strokeWidth="0.6" />
+      <line x1="50" y1="74" x2="50" y2="88" stroke={seatStitch} strokeWidth="0.3" opacity="0.5" />
+      <path d="M 14 80 L 86 80" fill="none" stroke={seatStitch} strokeWidth="0.2" opacity="0.3" />
 
-      {/* Headliner line */}
-      <rect x="10" y="90" width="80" height="6" rx="2" fill={panel} stroke={stroke} strokeWidth="0.4" opacity="0.5" />
+      {/* Floor mats */}
+      <rect x="10" y="92" width="80" height="5" rx="2" fill={isDark ? '#0f172a' : '#f1f5f9'} stroke={stroke} strokeWidth="0.3" opacity="0.4" />
     </>
   )
 }
