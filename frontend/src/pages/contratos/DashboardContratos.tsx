@@ -91,15 +91,39 @@ export default function DashboardContratos() {
     return new Date(p.data_vencimento + 'T00:00:00') < hoje
   }).length
 
-  // Status bar
-  const STATUS_COLORS: Record<string, string> = {
-    em_negociacao: 'bg-yellow-400', assinado: 'bg-blue-400', vigente: 'bg-emerald-500',
-    suspenso: 'bg-orange-400', encerrado: 'bg-slate-400', rescindido: 'bg-red-400',
-  }
-  const statusCounts = Object.entries(STATUS_COLORS).map(([key, barClass]) => ({
-    key, barClass, label: key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
-    value: contratosAll.filter(c => c.status === key).length,
-  })).filter(s => s.value > 0)
+  // Status bar — segmentando vigentes em subcategorias
+  const vigentes = contratosAll.filter(c => c.status === 'vigente')
+  const vigentesOk = vigentes.filter(c => {
+    if (!c.data_fim_previsto) return true
+    const dias = Math.ceil((new Date(c.data_fim_previsto + 'T00:00:00').getTime() - hoje.getTime()) / 86400000)
+    return dias > 90
+  }).length
+  const aVencer90d = vigentes.filter(c => {
+    if (!c.data_fim_previsto) return false
+    const dias = Math.ceil((new Date(c.data_fim_previsto + 'T00:00:00').getTime() - hoje.getTime()) / 86400000)
+    return dias > 30 && dias <= 90
+  }).length
+  const aVencer30d = vigentes.filter(c => {
+    if (!c.data_fim_previsto) return false
+    const dias = Math.ceil((new Date(c.data_fim_previsto + 'T00:00:00').getTime() - hoje.getTime()) / 86400000)
+    return dias > 0 && dias <= 30
+  }).length
+  const vencidos = vigentes.filter(c => {
+    if (!c.data_fim_previsto) return false
+    return new Date(c.data_fim_previsto + 'T00:00:00') < hoje
+  }).length
+
+  const statusCounts = [
+    { key: 'em_negociacao', barClass: 'bg-yellow-400',  label: 'Em Negociacao',  value: contratosAll.filter(c => c.status === 'em_negociacao').length },
+    { key: 'assinado',      barClass: 'bg-blue-400',    label: 'Assinado',       value: contratosAll.filter(c => c.status === 'assinado').length },
+    { key: 'vigente_ok',    barClass: 'bg-emerald-500', label: 'Vigentes',       value: vigentesOk },
+    { key: 'a_vencer_90d',  barClass: 'bg-amber-400',   label: 'A Vencer 90d',   value: aVencer90d },
+    { key: 'a_vencer_30d',  barClass: 'bg-orange-500',  label: 'A Vencer 30d',   value: aVencer30d },
+    { key: 'vencidos',      barClass: 'bg-red-500',     label: 'Vencidos',       value: vencidos },
+    { key: 'suspenso',      barClass: 'bg-violet-400',  label: 'Suspenso',       value: contratosAll.filter(c => c.status === 'suspenso').length },
+    { key: 'encerrado',     barClass: 'bg-slate-400',   label: 'Encerrado',      value: contratosAll.filter(c => c.status === 'encerrado').length },
+    { key: 'rescindido',    barClass: 'bg-red-400',     label: 'Rescindido',     value: contratosAll.filter(c => c.status === 'rescindido').length },
+  ].filter(s => s.value > 0)
   const totalContratos = contratosAll.length || 1
 
   // Por grupo
