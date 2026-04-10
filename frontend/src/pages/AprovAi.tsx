@@ -377,7 +377,7 @@ function AprovacaoCard({ aprovacao, aprovadorNome, aprovadorEmail }: {
           {mutation.isPending && action === 'esclarecimento'
             ? <div className="w-5 h-5 border-2 border-amber-400 border-t-transparent rounded-full animate-spin" />
             : <MessageSquare size={20} />}
-          <span>Esclarecer</span>
+          <span>Solicitar Esclarecimentos</span>
         </button>
         <button
           type="button"
@@ -672,7 +672,7 @@ function GenericPendingCard({ aprovacao, aprovadorNome, aprovadorEmail }: {
           className="flex items-center justify-center gap-1.5 py-3.5 text-xs font-bold text-indigo-500 hover:bg-indigo-50 active:bg-indigo-100 transition border-r border-slate-100 disabled:opacity-50"
         >
           <MessageSquare size={16} />
-          Esclarecer
+          Solicitar Esclarecimentos
         </button>
         <button
           type="button"
