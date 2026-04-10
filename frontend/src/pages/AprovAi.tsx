@@ -412,13 +412,36 @@ function GenericPendingCard({ aprovacao, aprovadorNome, aprovadorEmail }: {
   const mutation = useDecisaoGenerica()
   const [expanded, setExpanded] = useState(false)
   const [observacao, setObservacao] = useState('')
-  const [action, setAction] = useState<'aprovada' | 'rejeitada' | null>(null)
+  const [action, setAction] = useState<'aprovada' | 'rejeitada' | 'esclarecimento' | null>(null)
   const [selectedItemIds, setSelectedItemIds] = useState<Set<string>>(
     new Set(aprovacao.pagamento_detalhes?.itens?.map(i => i.id) ?? [])
   )
 
   const tipo = tipoConfig[aprovacao.tipo_aprovacao] || tipoConfig.requisicao_compra
   const IconComp = tipo.icon
+
+  const handleEsclarecimento = async () => {
+    if (!observacao.trim()) {
+      setExpanded(true)
+      setAction('esclarecimento')
+      return
+    }
+    setAction('esclarecimento')
+    try {
+      await mutation.mutateAsync({
+        aprovacaoId: aprovacao.id,
+        entidadeId: aprovacao.entidade_id,
+        entidadeNumero: aprovacao.entidade_numero,
+        tipoAprovacao: aprovacao.tipo_aprovacao,
+        modulo: aprovacao.modulo,
+        nivel: aprovacao.nivel,
+        decisao: 'esclarecimento',
+        observacao,
+        aprovadorNome,
+        aprovadorEmail,
+      })
+    } catch { /* error handled by mutation state */ }
+  }
 
   const handleDecision = async (decisao: 'aprovada' | 'rejeitada') => {
     setAction(decisao)
@@ -459,13 +482,15 @@ function GenericPendingCard({ aprovacao, aprovadorNome, aprovadorEmail }: {
   if (mutation.isSuccess) {
     const colors = action === 'aprovada'
       ? { bg: 'bg-emerald-50 border-emerald-200', icon: 'text-emerald-500', text: 'text-emerald-700', msg: 'Aprovada' }
+      : action === 'esclarecimento'
+      ? { bg: 'bg-amber-50 border-amber-200', icon: 'text-amber-500', text: 'text-amber-700', msg: 'Esclarecimento solicitado' }
       : { bg: 'bg-red-50 border-red-200', icon: 'text-red-500', text: 'text-red-700', msg: 'Rejeitada' }
 
     return (
       <div className={`rounded-2xl p-6 text-center border-2 ${colors.bg}`}>
-        {action === 'aprovada'
-          ? <CheckCircle size={44} className={`${colors.icon} mx-auto mb-3`} />
-          : <XCircle size={44} className={`${colors.icon} mx-auto mb-3`} />}
+        {action === 'aprovada' && <CheckCircle size={44} className={`${colors.icon} mx-auto mb-3`} />}
+        {action === 'esclarecimento' && <MessageSquare size={44} className={`${colors.icon} mx-auto mb-3`} />}
+        {action === 'rejeitada' && <XCircle size={44} className={`${colors.icon} mx-auto mb-3`} />}
         <p className={`font-bold text-base ${colors.text}`}>
           {aprovacao.entidade_numero || tipo.label} — {colors.msg}
         </p>
@@ -642,11 +667,13 @@ function GenericPendingCard({ aprovacao, aprovadorNome, aprovadorEmail }: {
 
         {expanded && (
           <div className="mt-3">
-            <label className="text-xs text-slate-400">Observacao / Esclarecimento</label>
+            <label className="text-xs text-slate-400">
+              {action === 'esclarecimento' ? 'Descreva o esclarecimento necessario (obrigatorio)' : 'Observacao / Esclarecimento'}
+            </label>
             <textarea
               rows={2}
               className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm mt-1 focus:ring-2 focus:ring-indigo-300 outline-none"
-              placeholder="Descreva o que precisa ser esclarecido ou justifique sua decisao..."
+              placeholder={action === 'esclarecimento' ? 'O que precisa ser esclarecido...' : 'Descreva o que precisa ser esclarecido ou justifique sua decisao...'}
               value={observacao}
               onChange={e => setObservacao(e.target.value)}
             />
@@ -668,11 +695,13 @@ function GenericPendingCard({ aprovacao, aprovadorNome, aprovadorEmail }: {
         <button
           type="button"
           disabled={mutation.isPending}
-          onClick={() => setExpanded(!expanded)}
-          className="flex items-center justify-center gap-1.5 py-3.5 text-xs font-bold text-indigo-500 hover:bg-indigo-50 active:bg-indigo-100 transition border-r border-slate-100 disabled:opacity-50"
+          onClick={handleEsclarecimento}
+          className="flex items-center justify-center gap-1.5 py-3.5 text-xs font-bold text-amber-500 hover:bg-amber-50 active:bg-amber-100 transition border-r border-slate-100 disabled:opacity-50"
         >
-          <MessageSquare size={16} />
-          Solicitar Esclarecimentos
+          {mutation.isPending && action === 'esclarecimento'
+            ? <div className="w-4 h-4 border-2 border-amber-400 border-t-transparent rounded-full animate-spin" />
+            : <MessageSquare size={16} />}
+          {expanded && action === 'esclarecimento' ? 'Confirmar Esclarecimento' : 'Solicitar Esclarecimentos'}
         </button>
         <button
           type="button"
