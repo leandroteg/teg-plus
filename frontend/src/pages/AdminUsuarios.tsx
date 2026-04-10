@@ -920,7 +920,7 @@ function UserDetailPanel({
                 </button>
                 <button
                   onClick={async () => { await deleteUser.mutateAsync(user.id); onClose() }}
-                  disabled={deleteUser.isPending || deleteTyped !== 'EXCLUIR'}
+                  disabled={deleteUser.isPending || deleteTyped.trim().toUpperCase() !== 'EXCLUIR'}
                   className="flex-1 py-1.5 rounded-lg text-xs font-bold bg-red-600 text-white hover:bg-red-700 disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-1 transition-opacity">
                   {deleteUser.isPending ? <Loader2 size={12} className="animate-spin" /> : <X size={12} />}
                   Excluir Permanentemente
@@ -1690,12 +1690,14 @@ export default function AdminUsuarios() {
   }
 
   const applyBatchDelete = async () => {
-    for (const id of selectedIds) {
-      await batchDelete.mutateAsync(id)
+    const ids = [...selectedIds]
+    for (const id of ids) {
+      try { await batchDelete.mutateAsync(id) } catch { /* continue */ }
     }
     setSelectedIds([])
     setShowBatchDelete(false)
     setBatchDeleteTyped('')
+    refetch()
   }
 
   return (
@@ -1909,7 +1911,7 @@ export default function AdminUsuarios() {
                 </button>
                 <button
                   onClick={applyBatchDelete}
-                  disabled={batchDelete.isPending || batchDeleteTyped !== 'EXCLUIR'}
+                  disabled={batchDelete.isPending || batchDeleteTyped.trim().toUpperCase() !== 'EXCLUIR'}
                   className="flex-1 py-2 rounded-xl text-xs font-bold bg-red-600 text-white hover:bg-red-700 disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-1.5 transition-opacity">
                   {batchDelete.isPending ? <Loader2 size={12} className="animate-spin" /> : <X size={12} />}
                   Excluir {selectedIds.length} usuario(s)
