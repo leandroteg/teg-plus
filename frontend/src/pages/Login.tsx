@@ -72,7 +72,8 @@ const VORTEX_CSS = `
 
 export default function Login() {
   const { user, loading, signIn, resetPassword } = useAuth()
-  const { isDark } = useTheme()
+  const { isDark: _systemDark } = useTheme()
+  const isDark = true // Login sempre dark — não afeta o tema do resto do app
   const nav = useNavigate()
 
   const [view, setView] = useState<View>('login')
@@ -241,10 +242,8 @@ export default function Login() {
         <div className="relative z-10 min-h-screen flex items-center justify-center p-4">
           <div className="w-full max-w-sm" style={{ animation: 'vortex-entrance 0.8s ease-out' }}>
 
-            {/* Theme toggle */}
-            <div className="flex justify-center mb-4">
-              <ThemeToggle variant={isDark ? 'dark' : 'light'} compact />
-            </div>
+            {/* Spacer (login sempre dark) */}
+            <div className="mb-4" />
 
             {/* Logo */}
             <div className="text-center mb-7">
