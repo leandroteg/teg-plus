@@ -64,6 +64,7 @@ export interface ModuleConfig {
   bottomNavCompact?: boolean
   truncateBottomLabels?: boolean
   bottomNavMaxItems?: number
+  headerExtra?: React.ReactNode
 }
 
 // ── Avatar helpers (shared, extracted once) ────────────────────────────────────
@@ -281,6 +282,7 @@ export default function ModuleLayout({
   bottomNavCompact = true,
   truncateBottomLabels = false,
   bottomNavMaxItems,
+  headerExtra,
   ...config
 }: ModuleConfig) {
   const { perfil, isAdmin, signOut, role, papelGlobal, getPapelForModule } = useAuth()
@@ -882,6 +884,11 @@ export default function ModuleLayout({
 
           {/* Page content */}
           <main className="flex-1 overflow-y-auto styled-scrollbar">
+            {headerExtra && (
+              <div className={`px-4 py-2 border-b ${isDark ? 'border-white/[0.06] bg-slate-900/40' : 'border-slate-100 bg-slate-50/60'}`}>
+                {headerExtra}
+              </div>
+            )}
             {isRequisitante && location.pathname === homeRoute
               ? <Suspense fallback={null}><MinhasSolicitacoesEmbedded embedded defaultModulo={config.moduleKey} /></Suspense>
               : <Outlet />}
@@ -1004,6 +1011,11 @@ export default function ModuleLayout({
         </header>
 
         {/* ── Page content ─────────────────────────────────────── */}
+        {headerExtra && (
+          <div className={`px-4 py-2 border-b ${isDark ? 'border-white/[0.06] bg-slate-900/40' : 'border-slate-100 bg-slate-50/60'}`}>
+            {headerExtra}
+          </div>
+        )}
         <main className="flex-1 px-4 py-5 pb-28 lg:pb-8">
           <div className={`${maxWidth} mx-auto animate-page-enter`}>
             {isRequisitante && location.pathname === homeRoute

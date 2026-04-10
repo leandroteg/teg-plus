@@ -1,10 +1,11 @@
 import { useState } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import {
   ArrowLeft, Compass, Network, CalendarDays, BarChart3, DollarSign,
   AlertTriangle, Plus, Trash2, Save, Edit3, X, Check, Sparkles, FolderKanban, ChevronRight,
 } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
+import { useEGPPortfolioId } from '../../contexts/EGPContractContext'
 import {
   usePortfolio, useProjetos, useCriarProjeto,
   useEAP, useGerarEAPIA,
@@ -43,7 +44,7 @@ const fmtPct = (v: number) => `${v.toFixed(1)}%`
 
 export default function EGPPlanejamento() {
   const { isLightSidebar: isLight, isDark } = useTheme()
-  const { portfolioId } = useParams<{ portfolioId: string }>()
+  const portfolioId = useEGPPortfolioId()
   const nav = useNavigate()
   const [tab, setTab] = useState<Tab>('eap')
   const [projetoId, setProjetoId] = useState<string | null>(null)

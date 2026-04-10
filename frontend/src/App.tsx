@@ -84,17 +84,12 @@ const AdiantamentosObras = lazy(() => import('./pages/obras/Adiantamentos'))
 const PrestacaoContas = lazy(() => import('./pages/obras/PrestacaoContas'))
 const PlanejamentoEquipe = lazy(() => import('./pages/obras/PlanejamentoEquipe'))
 
-// EGP — Ciclo de Vida (6 visões)
+// EGP — Ciclo de Vida (seletor de contrato persistente)
 const EGPPainel = lazy(() => import('./pages/pmo/EGPPainel'))
-const EGPIniciacaoHub = lazy(() => import('./pages/pmo/EGPIniciacaoHub'))
 const EGPIniciacao = lazy(() => import('./pages/pmo/EGPIniciacao'))
-const EGPPlanejamentoHub = lazy(() => import('./pages/pmo/EGPPlanejamentoHub'))
 const EGPPlanejamento = lazy(() => import('./pages/pmo/EGPPlanejamento'))
-const EGPExecucaoHub = lazy(() => import('./pages/pmo/EGPExecucaoHub'))
 const EGPExecucao = lazy(() => import('./pages/pmo/EGPExecucao'))
-const EGPControleHub = lazy(() => import('./pages/pmo/EGPControleHub'))
 const EGPControle = lazy(() => import('./pages/pmo/EGPControle'))
-const EGPEncerramentoHub = lazy(() => import('./pages/pmo/EGPEncerramentoHub'))
 const EGPEncerramento = lazy(() => import('./pages/pmo/EGPEncerramento'))
 const Portfolio = lazy(() => import('./pages/pmo/Portfolio'))
 const PortfolioDetalhe = lazy(() => import('./pages/pmo/PortfolioDetalhe'))
@@ -388,20 +383,16 @@ export default function App() {
             <Route element={<EGPLayout />}>
               {/* Painel */}
               <Route path="/egp"                                  element={<LazyDash><EGPPainel /></LazyDash>} />
-              {/* Iniciação */}
-              <Route path="/egp/iniciacao"                        element={<Lazy><EGPIniciacaoHub /></Lazy>} />
+              {/* Ciclo de Vida — carregam contrato do seletor persistente */}
+              <Route path="/egp/iniciacao"                        element={<Lazy><EGPIniciacao /></Lazy>} />
               <Route path="/egp/iniciacao/:portfolioId"           element={<Lazy><EGPIniciacao /></Lazy>} />
-              {/* Planejamento */}
-              <Route path="/egp/planejamento"                     element={<Lazy><EGPPlanejamentoHub /></Lazy>} />
+              <Route path="/egp/planejamento"                     element={<Lazy><EGPPlanejamento /></Lazy>} />
               <Route path="/egp/planejamento/:portfolioId"        element={<Lazy><EGPPlanejamento /></Lazy>} />
-              {/* Execução */}
-              <Route path="/egp/execucao"                         element={<Lazy><EGPExecucaoHub /></Lazy>} />
+              <Route path="/egp/execucao"                         element={<Lazy><EGPExecucao /></Lazy>} />
               <Route path="/egp/execucao/:portfolioId"            element={<Lazy><EGPExecucao /></Lazy>} />
-              {/* Controle */}
-              <Route path="/egp/controle"                         element={<Lazy><EGPControleHub /></Lazy>} />
+              <Route path="/egp/controle"                         element={<Lazy><EGPControle /></Lazy>} />
               <Route path="/egp/controle/:portfolioId"            element={<Lazy><EGPControle /></Lazy>} />
-              {/* Encerramento */}
-              <Route path="/egp/encerramento"                     element={<Lazy><EGPEncerramentoHub /></Lazy>} />
+              <Route path="/egp/encerramento"                     element={<Lazy><EGPEncerramento /></Lazy>} />
               <Route path="/egp/encerramento/:portfolioId"        element={<Lazy><EGPEncerramento /></Lazy>} />
               {/* Portfólio (mantido para acesso direto) */}
               <Route path="/egp/portfolio"                        element={<Lazy><Portfolio /></Lazy>} />

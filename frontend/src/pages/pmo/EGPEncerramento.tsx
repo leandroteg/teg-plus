@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import {
   ArrowLeft, CheckCircle2, FileText, Lightbulb, Award, PackageX,
   Plus, Trash2, Save, Edit3, X, Check, ThumbsUp, ThumbsDown,
 } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
+import { useEGPPortfolioId } from '../../contexts/EGPContractContext'
 import {
   usePortfolio, useStatusReports,
   useLicoesAprendidas, useCriarLicao, useAtualizarLicao, useDeletarLicao,
@@ -36,7 +37,7 @@ const fmtBRL = (v: number) =>
 
 export default function EGPEncerramento() {
   const { isLightSidebar: isLight } = useTheme()
-  const { portfolioId } = useParams<{ portfolioId: string }>()
+  const portfolioId = useEGPPortfolioId()
   const nav = useNavigate()
   const [tab, setTab] = useState<Tab>('status_report')
 
