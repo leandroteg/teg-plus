@@ -609,10 +609,32 @@ function GenericPendingCard({ aprovacao, aprovadorNome, aprovadorEmail }: {
 
         {/* ── Resumo Executivo para Minuta Contratual ── */}
         {aprovacao.tipo_aprovacao === 'minuta_contratual' && aprovacao.minuta_resumo ? (
-          <MinutaExecutiveSummary
-            resumo={aprovacao.minuta_resumo}
-            referencia={aprovacao.requisicao?.numero ?? aprovacao.entidade_numero}
-          />
+          <>
+            <MinutaExecutiveSummary
+              resumo={aprovacao.minuta_resumo}
+              referencia={aprovacao.requisicao?.numero ?? aprovacao.entidade_numero}
+            />
+            {/* Banner: resposta ao esclarecimento anterior */}
+            {aprovacao.minuta_resumo.esclarecimento_msg && (
+              <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 space-y-1.5">
+                <div className="flex items-center gap-1.5">
+                  <MessageSquare size={13} className="text-amber-500 flex-shrink-0" />
+                  <span className="text-xs font-bold text-amber-700">Esclarecimento respondido</span>
+                </div>
+                <p className="text-xs text-amber-800 leading-relaxed">
+                  {aprovacao.minuta_resumo.esclarecimento_msg}
+                </p>
+                {aprovacao.minuta_resumo.esclarecimento_por && (
+                  <p className="text-[10px] text-amber-500">
+                    Solicitado por {aprovacao.minuta_resumo.esclarecimento_por}
+                    {aprovacao.minuta_resumo.esclarecimento_em
+                      ? ` · ${new Date(aprovacao.minuta_resumo.esclarecimento_em).toLocaleDateString('pt-BR')}`
+                      : ''}
+                  </p>
+                )}
+              </div>
+            )}
+          </>
         ) : aprovacao.tipo_aprovacao === 'autorizacao_pagamento' && aprovacao.pagamento_detalhes ? (
           <PagamentoDetalhesCard
             detalhes={aprovacao.pagamento_detalhes}

@@ -89,7 +89,7 @@ export function useAprovacoesPendentes(tipo?: TipoAprovacao) {
       if (conIds.length > 0) {
         const { data: conData } = await supabase
           .from('con_solicitacoes')
-          .select('id, numero, objeto, contraparte_nome, valor_estimado, tipo_contrato, etapa_atual')
+          .select('id, numero, objeto, contraparte_nome, valor_estimado, tipo_contrato, etapa_atual, status, esclarecimento_msg, esclarecimento_por, esclarecimento_em')
           .in('id', conIds)
         for (const c of conData ?? []) {
           conMap.set(c.id, c)
@@ -325,6 +325,9 @@ export function useAprovacoesPendentes(tipo?: TipoAprovacao) {
               arquivo_url: (minuta?.arquivo_url as string) ?? '',
               arquivo_nome: (minuta?.arquivo_nome as string) ?? '',
               ai_resumo: aiResumo,
+              esclarecimento_msg: (con?.esclarecimento_msg as string) ?? null,
+              esclarecimento_por: (con?.esclarecimento_por as string) ?? null,
+              esclarecimento_em: (con?.esclarecimento_em as string) ?? null,
               ai_score: null,
             }
           } else if (a.tipo_aprovacao === 'autorizacao_pagamento') {

@@ -159,6 +159,9 @@ export interface AprovacaoPendente extends Aprovacao {
     arquivo_nome: string
     ai_resumo: string | null
     ai_score: number | null
+    esclarecimento_msg?: string | null
+    esclarecimento_por?: string | null
+    esclarecimento_em?: string | null
   }
   pagamento_detalhes?: {
     is_lote?: boolean
