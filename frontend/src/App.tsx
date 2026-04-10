@@ -140,6 +140,7 @@ const ApontamentosCartao = lazy(() => import('./pages/apontamentos/ApontamentosC
 const DespesasAdiantamentos = lazy(() => import('./pages/despesas/DespesasAdiantamentos'))
 
 // Fiscal
+const FiscalHome = lazy(() => import('./pages/fiscal/FiscalHome'))
 const NotasFiscais = lazy(() => import('./pages/financeiro/NotasFiscais'))
 const FiscalPipeline = lazy(() => import('./pages/fiscal/FiscalPipeline'))
 
@@ -259,7 +260,8 @@ export default function App() {
           {/* Módulo Fiscal */}
           <Route element={<ModuleRoute moduleKey="fiscal" />}>
             <Route element={<FiscalLayout />}>
-              <Route path="/fiscal"              element={<Lazy><NotasFiscais /></Lazy>} />
+              <Route path="/fiscal"              element={<LazyDash><FiscalHome /></LazyDash>} />
+              <Route path="/fiscal/notas"        element={<Lazy><NotasFiscais /></Lazy>} />
               <Route path="/fiscal/pipeline"     element={<Lazy><FiscalPipeline /></Lazy>} />
             </Route>
           </Route>
