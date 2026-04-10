@@ -105,122 +105,112 @@ function VeiculoCard({ v, osCount, isLight, onAlocar, onOS, onChecklist }: Veicu
     <div className={`rounded-2xl border shadow-sm transition-all hover:shadow-md ${
       isLight ? 'bg-white border-slate-200' : 'bg-[#1e293b] border-white/[0.06]'
     }`}>
-      <div className="p-4">
-        <div className="flex items-start gap-3">
-          {/* Icon box */}
-          <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${
-            isMaquina
-              ? (isLight ? 'bg-violet-50' : 'bg-violet-500/10')
-              : (isLight ? 'bg-sky-50'    : 'bg-sky-500/10')
-          }`}>
-            {isMaquina
-              ? <Cog  size={16} className={isLight ? 'text-violet-600' : 'text-violet-400'} />
-              : <Car  size={16} className={isLight ? 'text-sky-600'    : 'text-sky-400'} />
-            }
-          </div>
-
-          {/* Main content */}
-          <div className="flex-1 min-w-0">
-            {/* Title + OSBadge */}
-            <div className="flex items-start justify-between gap-1 mb-0.5">
-              <p className={`text-sm font-bold truncate ${isLight ? 'text-slate-800' : 'text-white'}`}>
-                {identificador}
-              </p>
-              {osCount > 0 && <OSBadge count={osCount} isLight={isLight} />}
-            </div>
-
-            {/* Subtitle */}
-            <p className="text-[11px] text-slate-500 truncate">
-              {v.marca} {v.modelo}{v.ano_mod ? ` · ${v.ano_mod}` : ''}
-            </p>
-
-            {/* Badges row */}
-            <div className="flex flex-wrap items-center gap-1.5 mt-2">
-              {/* Propriedade */}
-              <span className={`inline-flex items-center text-[10px] font-semibold px-2 py-0.5 rounded-full ${isLight ? prop.light : prop.dark}`}>
-                {prop.label}
-              </span>
-
-              {/* Preventiva */}
-              <span className={`inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full border ${isLight ? prevStyle.light : prevStyle.dark}`}>
-                <Wrench size={9} />
-                {isMaquina && v.km_proxima_preventiva
-                  ? `Prev. ${fmtNum(v.km_proxima_preventiva)} h`
-                  : v.km_proxima_preventiva
-                  ? `Prev. ${fmtNum(v.km_proxima_preventiva)} km`
-                  : v.data_proxima_preventiva
-                  ? `Prev. ${new Date(v.data_proxima_preventiva).toLocaleDateString('pt-BR')}`
-                  : 'Preventiva OK'}
-              </span>
-            </div>
-
-            {/* Meta row */}
-            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-2 text-[10px] text-slate-400">
-              {/* KM / Hs */}
-              {isMaquina ? (
-                v.horimetro_atual !== undefined && (
-                  <span className="flex items-center gap-1">
-                    <Timer size={10} /> {fmtNum(v.horimetro_atual)} h
-                  </span>
-                )
-              ) : (
-                <span className="flex items-center gap-1">
-                  <Gauge size={10} /> {fmtNum(v.hodometro_atual)} km
-                </span>
-              )}
-
-              {/* CRLV alert */}
-              {crlvColor && (
-                <span className={`flex items-center gap-1 font-semibold ${crlvColor}`}>
-                  <FileText size={9} />
-                  CRLV {diasCrlv !== null && diasCrlv <= 0 ? 'vencido' : `${diasCrlv}d`}
-                </span>
-              )}
-
-              {/* Seguro alert */}
-              {seguroColor && (
-                <span className={`flex items-center gap-1 font-semibold ${seguroColor}`}>
-                  <FileText size={9} />
-                  Seguro {diasSeguro !== null && diasSeguro <= 0 ? 'vencido' : `${diasSeguro}d`}
-                </span>
-              )}
-            </div>
-          </div>
+      <div className="flex items-center gap-3 px-4 py-3">
+        {/* Icon box */}
+        <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${
+          isMaquina
+            ? (isLight ? 'bg-violet-50' : 'bg-violet-500/10')
+            : (isLight ? 'bg-sky-50'    : 'bg-sky-500/10')
+        }`}>
+          {isMaquina
+            ? <Cog  size={16} className={isLight ? 'text-violet-600' : 'text-violet-400'} />
+            : <Car  size={16} className={isLight ? 'text-sky-600'    : 'text-sky-400'} />
+          }
         </div>
-      </div>
 
-      {/* Actions footer */}
-      <div className="flex items-center gap-2 px-4 pb-4">
-        <button
-          onClick={() => onAlocar(v.id)}
-          className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl border text-[11px] font-semibold transition-all ${
-            isLight
-              ? 'bg-rose-50 border-rose-200 text-rose-600 hover:bg-rose-100'
-              : 'bg-rose-500/10 border-rose-500/25 text-rose-300 hover:bg-rose-500/[0.18]'
-          }`}
-        >
-          <MapPin size={11} /> Alocar
-        </button>
-        <button
-          onClick={() => onOS(v.id)}
-          className={`flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl border text-[11px] font-semibold transition-all ${
-            isLight
-              ? 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'
-              : 'bg-white/[0.04] border-white/[0.06] text-slate-300 hover:bg-white/[0.08]'
-          }`}
-        >
-          <Wrench size={11} /> OS
-        </button>
-        <button
-          onClick={() => onChecklist(v.id)}
-          className={`flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl border text-[11px] font-semibold transition-all ${
-            isLight
-              ? 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'
-              : 'bg-white/[0.04] border-white/[0.06] text-slate-300 hover:bg-white/[0.08]'
-          }`}
-        >
-          <ClipboardList size={11} />
-        </button>
+        {/* Placa + modelo */}
+        <div className="min-w-0 w-40 shrink-0">
+          <div className="flex items-center gap-1.5">
+            <p className={`text-sm font-bold truncate ${isLight ? 'text-slate-800' : 'text-white'}`}>
+              {identificador}
+            </p>
+            {osCount > 0 && <OSBadge count={osCount} isLight={isLight} />}
+          </div>
+          <p className="text-[11px] text-slate-500 truncate">
+            {v.marca} {v.modelo}{v.ano_mod ? ` · ${v.ano_mod}` : ''}
+          </p>
+        </div>
+
+        {/* Badges */}
+        <div className="flex flex-wrap items-center gap-1.5 shrink-0">
+          <span className={`inline-flex items-center text-[10px] font-semibold px-2 py-0.5 rounded-full ${isLight ? prop.light : prop.dark}`}>
+            {prop.label}
+          </span>
+          <span className={`inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full border ${isLight ? prevStyle.light : prevStyle.dark}`}>
+            <Wrench size={9} />
+            {isMaquina && v.km_proxima_preventiva
+              ? `Prev. ${fmtNum(v.km_proxima_preventiva)} h`
+              : v.km_proxima_preventiva
+              ? `Prev. ${fmtNum(v.km_proxima_preventiva)} km`
+              : v.data_proxima_preventiva
+              ? `Prev. ${new Date(v.data_proxima_preventiva).toLocaleDateString('pt-BR')}`
+              : 'Preventiva OK'}
+          </span>
+        </div>
+
+        {/* Meta */}
+        <div className="flex items-center gap-x-3 text-[10px] text-slate-400 shrink-0 hidden md:flex">
+          {isMaquina ? (
+            v.horimetro_atual !== undefined && (
+              <span className="flex items-center gap-1">
+                <Timer size={10} /> {fmtNum(v.horimetro_atual)} h
+              </span>
+            )
+          ) : (
+            <span className="flex items-center gap-1">
+              <Gauge size={10} /> {fmtNum(v.hodometro_atual)} km
+            </span>
+          )}
+          {crlvColor && (
+            <span className={`flex items-center gap-1 font-semibold ${crlvColor}`}>
+              <FileText size={9} />
+              CRLV {diasCrlv !== null && diasCrlv <= 0 ? 'vencido' : `${diasCrlv}d`}
+            </span>
+          )}
+          {seguroColor && (
+            <span className={`flex items-center gap-1 font-semibold ${seguroColor}`}>
+              <FileText size={9} />
+              Seguro {diasSeguro !== null && diasSeguro <= 0 ? 'vencido' : `${diasSeguro}d`}
+            </span>
+          )}
+        </div>
+
+        {/* Spacer */}
+        <div className="flex-1" />
+
+        {/* Actions */}
+        <div className="flex items-center gap-2 shrink-0">
+          <button
+            onClick={() => onAlocar(v.id)}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-[11px] font-semibold transition-all ${
+              isLight
+                ? 'bg-rose-50 border-rose-200 text-rose-600 hover:bg-rose-100'
+                : 'bg-rose-500/10 border-rose-500/25 text-rose-300 hover:bg-rose-500/[0.18]'
+            }`}
+          >
+            <MapPin size={11} /> Alocar
+          </button>
+          <button
+            onClick={() => onOS(v.id)}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-[11px] font-semibold transition-all ${
+              isLight
+                ? 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'
+                : 'bg-white/[0.04] border-white/[0.06] text-slate-300 hover:bg-white/[0.08]'
+            }`}
+          >
+            <Wrench size={11} /> OS
+          </button>
+          <button
+            onClick={() => onChecklist(v.id)}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-[11px] font-semibold transition-all ${
+              isLight
+                ? 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'
+                : 'bg-white/[0.04] border-white/[0.06] text-slate-300 hover:bg-white/[0.08]'
+            }`}
+          >
+            <ClipboardList size={11} />
+          </button>
+        </div>
       </div>
     </div>
   )
@@ -520,7 +510,7 @@ export default function Patio() {
 
       {/* Cards view */}
       {!isLoading && filtered.length > 0 && viewMode === 'cards' && (
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+        <div className="space-y-2">
           {filtered.map(v => (
             <VeiculoCard
               key={v.id}
