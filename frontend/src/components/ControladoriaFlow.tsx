@@ -79,15 +79,6 @@ export default function ControladoriaFlow({
             >
               <Icon size={15} className="shrink-0" />
               {step.label}
-              <span className={`text-[10px] font-bold rounded-full min-w-[22px] px-1.5 py-0.5 flex items-center justify-center ${
-                isActive
-                  ? accent.badge
-                  : isLight
-                    ? 'bg-slate-200/80 text-slate-500'
-                    : 'bg-white/[0.06] text-slate-500'
-              }`}>
-                {index + 1}
-              </span>
             </button>
           )
         })}
