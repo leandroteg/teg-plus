@@ -1,7 +1,7 @@
 import { useNavigate } from 'react-router-dom'
 import {
   Building, Building2, Package2, Tag, Target, HardHat, Users, Warehouse,
-  Layers, FolderTree, Plus, Sparkles, ArrowRight,
+  Layers, FolderTree, Plus, Sparkles, ArrowRight, FolderKanban,
 } from 'lucide-react'
 import {
   useCadFornecedores, useCadClasses, useCadCentrosCusto,
@@ -9,6 +9,8 @@ import {
   useCadGrupos, useCadCategorias,
 } from '../../hooks/useCadastros'
 import { useEstoqueItens, useBases } from '../../hooks/useEstoque'
+import { supabase } from '../../services/supabase'
+import { useQuery } from '@tanstack/react-query'
 
 const SECTIONS = [
   {
@@ -18,6 +20,7 @@ const SECTIONS = [
       { key: 'empresas',  label: 'Empresas',    icon: Building,  route: '/cadastros/empresas',     color: 'teal',   emoji: '🏛️' },
       { key: 'centros',   label: 'Centros Custo',icon: Target,    route: '/cadastros/centros-custo',color: 'cyan',   emoji: '🎯' },
       { key: 'obras',     label: 'Obras',        icon: HardHat,   route: '/cadastros/obras',        color: 'indigo', emoji: '🏗️' },
+      { key: 'projetos',  label: 'Projetos',     icon: FolderKanban, route: '/cadastros/projetos',  color: 'violet', emoji: '📋' },
     ],
   },
   {
@@ -65,6 +68,13 @@ export default function CadastrosHome() {
   const { data: colaboradores = [] } = useCadColaboradores()
   const { data: grupos = [] } = useCadGrupos()
   const { data: categorias = [] } = useCadCategorias()
+  const { data: projetos = [] } = useQuery({
+    queryKey: ['cad-projetos-count'],
+    queryFn: async () => {
+      const { data } = await supabase.from('pmo_projetos').select('id')
+      return data ?? []
+    },
+  })
 
   const counts: Record<string, number> = {
     empresas: empresas.length,
@@ -73,6 +83,7 @@ export default function CadastrosHome() {
     classes: classes.length,
     centros: centros.length,
     obras: obras.length,
+    projetos: projetos.length,
     colaboradores: colaboradores.length,
     grupos: grupos.length,
     categorias: categorias.length,

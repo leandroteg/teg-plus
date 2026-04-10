@@ -1,6 +1,6 @@
 import {
   LayoutDashboard, Building, Building2, Package2, Tag,
-  Target, HardHat, Users, Layers, FolderTree,
+  Target, HardHat, Users, Layers, FolderTree, FolderKanban,
 } from 'lucide-react'
 import ModuleLayout from './ModuleLayout'
 import type { NavItem, NavSection } from './ModuleLayout'
@@ -15,7 +15,8 @@ const NAV_SECTIONS: NavSection[] = [
     items: [
       { to: '/cadastros/empresas',      icon: Building,  label: 'Empresas'    },
       { to: '/cadastros/centros-custo',  icon: Target,    label: 'C. Custo'    },
-      { to: '/cadastros/obras',          icon: HardHat,   label: 'Obras'       },
+      { to: '/cadastros/obras',          icon: HardHat,      label: 'Obras'       },
+      { to: '/cadastros/projetos',      icon: FolderKanban, label: 'Projetos'    },
     ],
   },
   {
