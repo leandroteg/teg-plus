@@ -107,6 +107,7 @@ const ItensCad = lazy(() => import('./pages/cadastros/ItensCad'))
 const ClassesFinanceiras = lazy(() => import('./pages/cadastros/ClassesFinanceiras'))
 const CentrosCusto = lazy(() => import('./pages/cadastros/CentrosCusto'))
 const ObrasCad = lazy(() => import('./pages/cadastros/ObrasCad'))
+const ProjetosCad = lazy(() => import('./pages/cadastros/ProjetosCad'))
 const ColaboradoresCad = lazy(() => import('./pages/cadastros/ColaboradoresCad'))
 const EmpresasCad = lazy(() => import('./pages/cadastros/EmpresasCad'))
 const GruposFinanceiros = lazy(() => import('./pages/cadastros/GruposFinanceiros'))
@@ -432,6 +433,7 @@ export default function App() {
               <Route path="/cadastros/classes"        element={<Lazy><ClassesFinanceiras /></Lazy>} />
               <Route path="/cadastros/centros-custo"  element={<Lazy><CentrosCusto /></Lazy>} />
               <Route path="/cadastros/obras"          element={<Lazy><ObrasCad /></Lazy>} />
+              <Route path="/cadastros/projetos"      element={<Lazy><ProjetosCad /></Lazy>} />
               <Route path="/cadastros/colaboradores"  element={<Lazy><ColaboradoresCad /></Lazy>} />
               <Route path="/cadastros/empresas"       element={<Lazy><EmpresasCad /></Lazy>} />
               <Route path="/cadastros/grupos"          element={<Lazy><GruposFinanceiros /></Lazy>} />
