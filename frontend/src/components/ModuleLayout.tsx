@@ -519,10 +519,25 @@ export default function ModuleLayout({
       }
       if (action) {
         return (
-          <button key={to} onClick={action} className={`w-full text-left ${sidebarLinkClass({ isActive: false })}`}>
-            <Icon size={18} className={accent ? 'shrink-0 text-orange-500' : 'shrink-0'} />
-            <span className={accent ? 'text-orange-500 font-semibold' : undefined}>{label}</span>
+          <button key={to} onClick={action} className={accent
+            ? `w-full flex items-center gap-2.5 px-3 py-2.5 my-1 mx-2 rounded-xl text-sm font-bold transition-all ${
+              ls ? 'bg-orange-50 text-orange-600 hover:bg-orange-100 border border-orange-200' : 'bg-orange-500/15 text-orange-400 hover:bg-orange-500/25 border border-orange-500/20'
+            }`
+            : `w-full text-left ${sidebarLinkClass({ isActive: false })}`}>
+            <Icon size={16} className="shrink-0" />
+            <span>{label}</span>
           </button>
+        )
+      }
+      if (accent) {
+        return (
+          <NavLink key={to} to={to} end={end}
+            className={`flex items-center gap-2.5 px-3 py-2.5 my-1 mx-2 rounded-xl text-sm font-bold transition-all ${
+              ls ? 'bg-orange-50 text-orange-600 hover:bg-orange-100 border border-orange-200' : 'bg-orange-500/15 text-orange-400 hover:bg-orange-500/25 border border-orange-500/20'
+            }`}>
+            <Icon size={16} className="shrink-0" />
+            <span>{label}</span>
+          </NavLink>
         )
       }
       return (
