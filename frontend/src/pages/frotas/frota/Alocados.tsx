@@ -10,7 +10,7 @@ function OSBadge({ count, isLight }: { count: number; isLight: boolean }) {
   if (count === 0) return null
   return (
     <span className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full border ${
-      isLight ? 'bg-red-50 text-red-700 border-red-200' : 'bg-red-500/10 text-red-400 border-red-500/20'
+      !isDark ? 'bg-red-50 text-red-700 border-red-200' : 'bg-red-500/10 text-red-400 border-red-500/20'
     }`}>
       <Wrench size={9} />
       {count} OS
@@ -62,23 +62,23 @@ function RetornoModal({ alocacao, isLight, onClose, onConfirm, isPending }: Reto
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
 
       <div className={`relative w-full max-w-md rounded-2xl border shadow-2xl ${
-        isLight ? 'bg-white border-slate-200' : 'bg-[#1e293b] border-white/[0.08]'
+        !isDark ? 'bg-white border-slate-200' : 'bg-[#1e293b] border-white/[0.08]'
       }`}>
         {/* Header */}
         <div className={`flex items-center justify-between px-5 py-4 border-b ${
-          isLight ? 'border-slate-100' : 'border-white/[0.06]'
+          !isDark ? 'border-slate-100' : 'border-white/[0.06]'
         }`}>
           <div className="flex items-center gap-2">
             <div className={`w-8 h-8 rounded-xl flex items-center justify-center ${
-              isLight ? 'bg-rose-50 text-rose-600' : 'bg-rose-500/10 text-rose-400'
+              !isDark ? 'bg-rose-50 text-rose-600' : 'bg-rose-500/10 text-rose-400'
             }`}>
               <CornerDownLeft size={15} />
             </div>
             <div>
-              <p className={`text-sm font-bold ${isLight ? 'text-slate-800' : 'text-white'}`}>
+              <p className={`text-sm font-bold ${!isDark ? 'text-slate-800' : 'text-white'}`}>
                 Registrar Retorno
               </p>
-              <p className={`text-xs ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
+              <p className={`text-xs ${!isDark ? 'text-slate-500' : 'text-slate-400'}`}>
                 {identificador} — {alocacao.veiculo?.marca} {alocacao.veiculo?.modelo}
               </p>
             </div>
@@ -86,7 +86,7 @@ function RetornoModal({ alocacao, isLight, onClose, onConfirm, isPending }: Reto
           <button
             onClick={onClose}
             className={`w-7 h-7 rounded-lg flex items-center justify-center transition-colors ${
-              isLight ? 'hover:bg-slate-100 text-slate-500' : 'hover:bg-white/[0.06] text-slate-400'
+              !isDark ? 'hover:bg-slate-100 text-slate-500' : 'hover:bg-white/[0.06] text-slate-400'
             }`}
           >
             <X size={15} />
@@ -97,7 +97,7 @@ function RetornoModal({ alocacao, isLight, onClose, onConfirm, isPending }: Reto
         <div className="px-5 py-4 space-y-4">
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className={`text-xs font-semibold block mb-1 ${isLight ? 'text-slate-600' : 'text-slate-300'}`}>
+              <label className={`text-xs font-semibold block mb-1 ${!isDark ? 'text-slate-600' : 'text-slate-300'}`}>
                 Hodômetro retorno (km)
               </label>
               <input
@@ -113,7 +113,7 @@ function RetornoModal({ alocacao, isLight, onClose, onConfirm, isPending }: Reto
               />
             </div>
             <div>
-              <label className={`text-xs font-semibold block mb-1 ${isLight ? 'text-slate-600' : 'text-slate-300'}`}>
+              <label className={`text-xs font-semibold block mb-1 ${!isDark ? 'text-slate-600' : 'text-slate-300'}`}>
                 Horímetro retorno (h)
               </label>
               <input
@@ -131,7 +131,7 @@ function RetornoModal({ alocacao, isLight, onClose, onConfirm, isPending }: Reto
           </div>
 
           <div>
-            <label className={`text-xs font-semibold block mb-1 ${isLight ? 'text-slate-600' : 'text-slate-300'}`}>
+            <label className={`text-xs font-semibold block mb-1 ${!isDark ? 'text-slate-600' : 'text-slate-300'}`}>
               Observações
             </label>
             <textarea
@@ -150,13 +150,13 @@ function RetornoModal({ alocacao, isLight, onClose, onConfirm, isPending }: Reto
 
         {/* Footer */}
         <div className={`flex items-center justify-end gap-2 px-5 py-4 border-t ${
-          isLight ? 'border-slate-100' : 'border-white/[0.06]'
+          !isDark ? 'border-slate-100' : 'border-white/[0.06]'
         }`}>
           <button
             onClick={onClose}
             disabled={isPending}
             className={`text-xs font-semibold px-4 py-2 rounded-xl transition-all ${
-              isLight ? 'bg-slate-100 text-slate-600 hover:bg-slate-200' : 'bg-slate-700/60 text-slate-300 hover:bg-slate-700'
+              !isDark ? 'bg-slate-100 text-slate-600 hover:bg-slate-200' : 'bg-slate-700/60 text-slate-300 hover:bg-slate-700'
             }`}
           >
             Cancelar
@@ -208,7 +208,7 @@ function AlocacaoCard({ a, osCount, isLight, onRetorno }: AlocacaoCardProps) {
 
   return (
     <div className={`rounded-2xl border shadow-sm transition-all hover:shadow-md ${
-      isLight ? 'bg-white border-slate-200' : 'bg-[#1e293b] border-white/[0.06]'
+      !isDark ? 'bg-white border-slate-200' : 'bg-[#1e293b] border-white/[0.06]'
     }`}>
       <div className="flex flex-col sm:flex-row sm:items-center gap-3 px-4 py-3">
         {/* Top line: Icon + Placa/modelo */}
@@ -216,19 +216,19 @@ function AlocacaoCard({ a, osCount, isLight, onRetorno }: AlocacaoCardProps) {
           {/* Icon box */}
           <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${
             isMaquina
-              ? (isLight ? 'bg-violet-50' : 'bg-violet-500/10')
-              : (isLight ? 'bg-sky-50'    : 'bg-sky-500/10')
+              ? (!isDark ? 'bg-violet-50' : 'bg-violet-500/10')
+              : (!isDark ? 'bg-sky-50'    : 'bg-sky-500/10')
           }`}>
             {isMaquina
-              ? <Cog size={16} className={isLight ? 'text-violet-600' : 'text-violet-400'} />
-              : <Car size={16} className={isLight ? 'text-sky-600'    : 'text-sky-400'} />
+              ? <Cog size={16} className={!isDark ? 'text-violet-600' : 'text-violet-400'} />
+              : <Car size={16} className={!isDark ? 'text-sky-600'    : 'text-sky-400'} />
             }
           </div>
 
           {/* Placa + modelo */}
           <div className="min-w-0 sm:w-40 shrink-0">
             <div className="flex items-center gap-1.5">
-              <p className={`text-sm font-bold truncate ${isLight ? 'text-slate-800' : 'text-white'}`}>
+              <p className={`text-sm font-bold truncate ${!isDark ? 'text-slate-800' : 'text-white'}`}>
                 {identificador}
               </p>
               {osCount > 0 && <OSBadge count={osCount} isLight={isLight} />}
@@ -242,7 +242,7 @@ function AlocacaoCard({ a, osCount, isLight, onRetorno }: AlocacaoCardProps) {
         {/* Obra / CC badge */}
         <div className="shrink-0">
           <span className={`inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full max-w-[180px] truncate ${
-            isLight ? 'bg-rose-50 text-rose-700' : 'bg-rose-500/10 text-rose-300'
+            !isDark ? 'bg-rose-50 text-rose-700' : 'bg-rose-500/10 text-rose-300'
           }`}>
             <Building2 size={9} className="shrink-0" />
             {a.obra?.nome ?? a.centro_custo_id ?? 'Sem destino'}
@@ -254,7 +254,7 @@ function AlocacaoCard({ a, osCount, isLight, onRetorno }: AlocacaoCardProps) {
           <span className="flex items-center gap-1">
             <CalendarDays size={10} /> Saída: {fmtDate(a.data_saida)}
           </span>
-          <span className={`flex items-center gap-1 ${retAtrasado ? (isLight ? 'text-red-600 font-semibold' : 'text-red-400 font-semibold') : ''}`}>
+          <span className={`flex items-center gap-1 ${retAtrasado ? (!isDark ? 'text-red-600 font-semibold' : 'text-red-400 font-semibold') : ''}`}>
             <CalendarDays size={10} /> Ret: {fmtDate(a.data_retorno_prev)}{retAtrasado ? ' ⚠' : ''}
           </span>
           {a.responsavel_nome && (
@@ -286,7 +286,7 @@ function AlocacaoCard({ a, osCount, isLight, onRetorno }: AlocacaoCardProps) {
 // ── Alocados ──────────────────────────────────────────────────────────────────
 
 export default function Alocados() {
-  const { isLightSidebar: isLight } = useTheme()
+  const { isDark } = useTheme()
   const [retornoAloc, setRetornoAloc] = useState<FroAlocacao | null>(null)
   const [viewMode, setViewMode] = useState<'table' | 'cards'>('table')
 
@@ -315,7 +315,7 @@ export default function Alocados() {
 
   // ── Desktop table headers
   const thCls = `text-left text-[10px] font-bold uppercase tracking-wider px-4 py-3 ${
-    isLight ? 'text-slate-500' : 'text-slate-400'
+    !isDark ? 'text-slate-500' : 'text-slate-400'
   }`
 
   return (
@@ -323,18 +323,18 @@ export default function Alocados() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
-          <h2 className={`text-lg font-bold flex items-center gap-2 ${isLight ? 'text-slate-800' : 'text-white'}`}>
+          <h2 className={`text-lg font-bold flex items-center gap-2 ${!isDark ? 'text-slate-800' : 'text-white'}`}>
             <MapPin size={18} className="text-rose-500" />
             Alocados
             {alocacoes.length > 0 && (
               <span className={`ml-1 text-xs font-semibold px-2 py-0.5 rounded-full ${
-                isLight ? 'bg-rose-100 text-rose-700' : 'bg-rose-500/15 text-rose-400'
+                !isDark ? 'bg-rose-100 text-rose-700' : 'bg-rose-500/15 text-rose-400'
               }`}>
                 {alocacoes.length} em uso
               </span>
             )}
           </h2>
-          <p className={`text-xs mt-0.5 ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
+          <p className={`text-xs mt-0.5 ${!isDark ? 'text-slate-500' : 'text-slate-400'}`}>
             Ativos com alocação ativa em obras ou centros de custo
           </p>
         </div>
@@ -342,15 +342,15 @@ export default function Alocados() {
         {/* View toggle */}
         {alocacoes.length > 0 && (
           <div className={`flex items-center self-start sm:self-auto rounded-xl border overflow-hidden ${
-            isLight ? 'border-slate-200 bg-slate-50' : 'border-white/[0.06] bg-slate-800/40'
+            !isDark ? 'border-slate-200 bg-slate-50' : 'border-white/[0.06] bg-slate-800/40'
           }`}>
             <button
               onClick={() => setViewMode('table')}
               title="Visualização em tabela"
               className={`flex items-center justify-center w-8 h-8 transition-colors ${
                 viewMode === 'table'
-                  ? (isLight ? 'bg-white text-slate-800 shadow-sm' : 'bg-slate-700 text-white')
-                  : (isLight ? 'text-slate-400 hover:text-slate-600' : 'text-slate-500 hover:text-slate-300')
+                  ? (!isDark ? 'bg-white text-slate-800 shadow-sm' : 'bg-slate-700 text-white')
+                  : (!isDark ? 'text-slate-400 hover:text-slate-600' : 'text-slate-500 hover:text-slate-300')
               }`}
             >
               <LayoutList size={14} />
@@ -360,8 +360,8 @@ export default function Alocados() {
               title="Visualização em cards"
               className={`flex items-center justify-center w-8 h-8 transition-colors ${
                 viewMode === 'cards'
-                  ? (isLight ? 'bg-white text-slate-800 shadow-sm' : 'bg-slate-700 text-white')
-                  : (isLight ? 'text-slate-400 hover:text-slate-600' : 'text-slate-500 hover:text-slate-300')
+                  ? (!isDark ? 'bg-white text-slate-800 shadow-sm' : 'bg-slate-700 text-white')
+                  : (!isDark ? 'text-slate-400 hover:text-slate-600' : 'text-slate-500 hover:text-slate-300')
               }`}
             >
               <LayoutGrid size={14} />
@@ -380,17 +380,17 @@ export default function Alocados() {
       {/* Empty state */}
       {!isLoading && alocacoes.length === 0 && (
         <div className={`flex flex-col items-center justify-center py-20 rounded-2xl border ${
-          isLight ? 'bg-slate-50 border-slate-200' : 'bg-slate-800/30 border-white/[0.06]'
+          !isDark ? 'bg-slate-50 border-slate-200' : 'bg-slate-800/30 border-white/[0.06]'
         }`}>
           <div className={`w-14 h-14 rounded-2xl flex items-center justify-center mb-4 ${
-            isLight ? 'bg-slate-100' : 'bg-slate-700/40'
+            !isDark ? 'bg-slate-100' : 'bg-slate-700/40'
           }`}>
-            <MapPin size={24} className={isLight ? 'text-slate-400' : 'text-slate-500'} />
+            <MapPin size={24} className={!isDark ? 'text-slate-400' : 'text-slate-500'} />
           </div>
-          <p className={`font-semibold text-sm ${isLight ? 'text-slate-600' : 'text-slate-300'}`}>
+          <p className={`font-semibold text-sm ${!isDark ? 'text-slate-600' : 'text-slate-300'}`}>
             Nenhum ativo alocado
           </p>
-          <p className={`text-xs mt-1.5 max-w-xs text-center leading-relaxed ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>
+          <p className={`text-xs mt-1.5 max-w-xs text-center leading-relaxed ${!isDark ? 'text-slate-400' : 'text-slate-500'}`}>
             Ativos do pátio disponível podem ser alocados a obras e centros de custo. Alocações ativas aparecerão aqui.
           </p>
         </div>
@@ -399,11 +399,11 @@ export default function Alocados() {
       {/* Table view */}
       {!isLoading && alocacoes.length > 0 && viewMode === 'table' && (
         <div className={`rounded-2xl border overflow-hidden ${
-          isLight ? 'bg-white border-slate-200' : 'bg-slate-800/40 border-white/[0.06]'
+          !isDark ? 'bg-white border-slate-200' : 'bg-slate-800/40 border-white/[0.06]'
         }`}>
           <div className="overflow-x-auto">
             <table className="w-full">
-              <thead className={isLight ? 'bg-slate-50 border-b border-slate-100' : 'bg-slate-800/60 border-b border-white/[0.04]'}>
+              <thead className={!isDark ? 'bg-slate-50 border-b border-slate-100' : 'bg-slate-800/60 border-b border-white/[0.04]'}>
                 <tr>
                   <th className={thCls}>Ativo</th>
                   <th className={thCls}>Obra / CC</th>
@@ -433,8 +433,8 @@ export default function Alocados() {
                         <div className="flex items-center gap-2">
                           <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${
                             a.horimetro_saida !== undefined && a.horimetro_saida !== null
-                              ? (isLight ? 'bg-violet-50 text-violet-600' : 'bg-violet-500/10 text-violet-400')
-                              : (isLight ? 'bg-sky-50 text-sky-600'       : 'bg-sky-500/10 text-sky-400')
+                              ? (!isDark ? 'bg-violet-50 text-violet-600' : 'bg-violet-500/10 text-violet-400')
+                              : (!isDark ? 'bg-sky-50 text-sky-600'       : 'bg-sky-500/10 text-sky-400')
                           }`}>
                             {a.horimetro_saida !== undefined && a.horimetro_saida !== null
                               ? <Cog size={13} />
@@ -442,10 +442,10 @@ export default function Alocados() {
                             }
                           </div>
                           <div>
-                            <p className={`text-xs font-bold ${isLight ? 'text-slate-800' : 'text-white'}`}>
+                            <p className={`text-xs font-bold ${!isDark ? 'text-slate-800' : 'text-white'}`}>
                               {identificador}
                             </p>
-                            <p className={`text-[10px] ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>
+                            <p className={`text-[10px] ${!isDark ? 'text-slate-400' : 'text-slate-500'}`}>
                               {a.veiculo?.marca} {a.veiculo?.modelo}
                             </p>
                           </div>
@@ -455,8 +455,8 @@ export default function Alocados() {
                       {/* Obra */}
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-1.5">
-                          <Building2 size={12} className={isLight ? 'text-slate-400' : 'text-slate-500'} />
-                          <span className={`text-xs ${isLight ? 'text-slate-600' : 'text-slate-300'}`}>
+                          <Building2 size={12} className={!isDark ? 'text-slate-400' : 'text-slate-500'} />
+                          <span className={`text-xs ${!isDark ? 'text-slate-600' : 'text-slate-300'}`}>
                             {a.obra?.nome ?? a.centro_custo_id ?? '—'}
                           </span>
                         </div>
@@ -464,7 +464,7 @@ export default function Alocados() {
 
                       {/* Responsável */}
                       <td className="px-4 py-3">
-                        <span className={`text-xs ${isLight ? 'text-slate-600' : 'text-slate-300'}`}>
+                        <span className={`text-xs ${!isDark ? 'text-slate-600' : 'text-slate-300'}`}>
                           {a.responsavel_nome ?? '—'}
                         </span>
                       </td>
@@ -472,8 +472,8 @@ export default function Alocados() {
                       {/* Saída */}
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-1 text-xs">
-                          <CalendarDays size={11} className={isLight ? 'text-slate-400' : 'text-slate-500'} />
-                          <span className={isLight ? 'text-slate-600' : 'text-slate-300'}>
+                          <CalendarDays size={11} className={!isDark ? 'text-slate-400' : 'text-slate-500'} />
+                          <span className={!isDark ? 'text-slate-600' : 'text-slate-300'}>
                             {fmtDate(a.data_saida)}
                           </span>
                         </div>
@@ -483,8 +483,8 @@ export default function Alocados() {
                       <td className="px-4 py-3">
                         <span className={`text-xs font-medium ${
                           retAtrasado
-                            ? (isLight ? 'text-red-600' : 'text-red-400')
-                            : (isLight ? 'text-slate-600' : 'text-slate-300')
+                            ? (!isDark ? 'text-red-600' : 'text-red-400')
+                            : (!isDark ? 'text-slate-600' : 'text-slate-300')
                         }`}>
                           {fmtDate(a.data_retorno_prev)}
                           {retAtrasado && ' ⚠'}
@@ -495,7 +495,7 @@ export default function Alocados() {
                       <td className="px-4 py-3">
                         <OSBadge count={osCount} isLight={isLight} />
                         {osCount === 0 && (
-                          <span className={`text-[10px] ${isLight ? 'text-slate-300' : 'text-slate-600'}`}>—</span>
+                          <span className={`text-[10px] ${!isDark ? 'text-slate-300' : 'text-slate-600'}`}>—</span>
                         )}
                       </td>
 

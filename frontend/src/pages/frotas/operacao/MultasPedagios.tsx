@@ -68,19 +68,19 @@ function RegistrarModal({
       ? 'bg-white border border-slate-200 shadow-sm text-slate-800'
       : 'bg-white/6 border border-white/12 text-white'
   }`
-  const sel = inp + (isLight ? '' : ' [&>option]:bg-slate-900')
-  const lbl = `block text-xs font-bold mb-1 ${isLight ? 'text-slate-600' : 'text-slate-300'}`
+  const sel = inp + (!isDark ? '' : ' [&>option]:bg-slate-900')
+  const lbl = `block text-xs font-bold mb-1 ${!isDark ? 'text-slate-600' : 'text-slate-300'}`
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
       <form
         onSubmit={handleSubmit}
         className={`rounded-2xl shadow-2xl p-6 w-full max-w-lg space-y-4 ${
-          isLight ? 'bg-white border border-slate-200' : 'bg-[#1e293b] border border-white/[0.06]'
+          !isDark ? 'bg-white border border-slate-200' : 'bg-[#1e293b] border border-white/[0.06]'
         }`}
       >
         <div className="flex items-center justify-between">
-          <h2 className={`text-lg font-extrabold ${isLight ? 'text-slate-800' : 'text-white'}`}>
+          <h2 className={`text-lg font-extrabold ${!isDark ? 'text-slate-800' : 'text-white'}`}>
             Registrar Multa / Pedágio
           </h2>
           <button
@@ -224,7 +224,7 @@ type TipoFiltro = 'todos' | TipoMulta
 type StatusFiltro = '' | StatusMulta
 
 export default function MultasPedagios() {
-  const { isLightSidebar: isLight } = useTheme()
+  const { isDark } = useTheme()
   const salvar = useSalvarMulta()
   const [modal, setModal] = useState(false)
   const [tipoFiltro, setTipoFiltro] = useState<TipoFiltro>('todos')
@@ -256,7 +256,7 @@ export default function MultasPedagios() {
     .reduce((s, m) => s + m.valor, 0)
 
   const card = `rounded-2xl shadow-sm border ${
-    isLight ? 'bg-white border-slate-200' : 'bg-[#1e293b] border-white/[0.06]'
+    !isDark ? 'bg-white border-slate-200' : 'bg-[#1e293b] border-white/[0.06]'
   }`
   const th = `text-[10px] font-bold uppercase tracking-wide text-slate-500 px-4 py-3 text-left`
   const sel = `px-3 py-2 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-teal-400/40 ${
@@ -280,7 +280,7 @@ export default function MultasPedagios() {
         <div>
           <h1
             className={`text-xl font-bold flex items-center gap-2 ${
-              isLight ? 'text-slate-800' : 'text-white'
+              !isDark ? 'text-slate-800' : 'text-white'
             }`}
           >
             <AlertCircle size={20} className="text-rose-500" />
@@ -288,7 +288,7 @@ export default function MultasPedagios() {
           </h1>
           <p className="text-sm text-slate-500">
             {multas.length} registro{multas.length !== 1 ? 's' : ''} ·{' '}
-            <span className={`font-semibold ${isLight ? 'text-slate-700' : 'text-white'}`}>
+            <span className={`font-semibold ${!isDark ? 'text-slate-700' : 'text-white'}`}>
               {BRL(totalFiltrado)}
             </span>
           </p>
@@ -305,14 +305,14 @@ export default function MultasPedagios() {
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <div className={`${card} p-3 border-l-4 border-l-rose-500`}>
           <p className="text-[10px] text-slate-500 uppercase mb-1">Multas</p>
-          <p className={`text-base font-black ${isLight ? 'text-slate-800' : 'text-white'}`}>
+          <p className={`text-base font-black ${!isDark ? 'text-slate-800' : 'text-white'}`}>
             {BRL(totalMultasValor)}
           </p>
           <p className="text-[10px] text-slate-500">{totalMultasQtd} registros</p>
         </div>
         <div className={`${card} p-3 border-l-4 border-l-amber-500`}>
           <p className="text-[10px] text-slate-500 uppercase mb-1">Pedágios</p>
-          <p className={`text-base font-black ${isLight ? 'text-slate-800' : 'text-white'}`}>
+          <p className={`text-base font-black ${!isDark ? 'text-slate-800' : 'text-white'}`}>
             {BRL(totalPedagiosValor)}
           </p>
           <p className="text-[10px] text-slate-500">{totalPedagiosQtd} registros</p>
@@ -328,7 +328,7 @@ export default function MultasPedagios() {
           </p>
           <p
             className={`text-base font-black ${
-              multasVencidasQtd > 0 ? 'text-red-500' : isLight ? 'text-slate-800' : 'text-white'
+              multasVencidasQtd > 0 ? 'text-red-500' : !isDark ? 'text-slate-800' : 'text-white'
             }`}
           >
             {BRL(multasVencidasValor)}
@@ -337,7 +337,7 @@ export default function MultasPedagios() {
         </div>
         <div className={`${card} p-3 border-l-4 border-l-emerald-500`}>
           <p className="text-[10px] text-slate-500 uppercase mb-1">Pagas no Mês</p>
-          <p className={`text-base font-black ${isLight ? 'text-slate-800' : 'text-white'}`}>
+          <p className={`text-base font-black ${!isDark ? 'text-slate-800' : 'text-white'}`}>
             {BRL(pagasMesValor)}
           </p>
         </div>
@@ -345,7 +345,7 @@ export default function MultasPedagios() {
 
       {/* Filtros */}
       <div className="flex flex-wrap items-center gap-3">
-        <div className={`flex gap-1 p-1 rounded-xl ${isLight ? 'bg-slate-100 border border-slate-200' : 'bg-white/4 border border-white/8'}`}>
+        <div className={`flex gap-1 p-1 rounded-xl ${!isDark ? 'bg-slate-100 border border-slate-200' : 'bg-white/4 border border-white/8'}`}>
           {(['todos', 'multa', 'pedagio'] as TipoFiltro[]).map(t => (
             <button
               key={t}
@@ -378,7 +378,7 @@ export default function MultasPedagios() {
       {isLoading ? (
         <div className="space-y-2">
           {Array.from({ length: 5 }).map((_, i) => (
-            <div key={i} className={`rounded-xl h-14 animate-pulse ${isLight ? 'bg-slate-100' : 'bg-white/5'}`} />
+            <div key={i} className={`rounded-xl h-14 animate-pulse ${!isDark ? 'bg-slate-100' : 'bg-white/5'}`} />
           ))}
         </div>
       ) : multas.length === 0 ? (
@@ -391,7 +391,7 @@ export default function MultasPedagios() {
             <table className="w-full">
               <thead
                 className={`border-b ${
-                  isLight ? 'bg-slate-50 border-slate-200' : 'bg-white/4 border-white/8'
+                  !isDark ? 'bg-slate-50 border-slate-200' : 'bg-white/4 border-white/8'
                 }`}
               >
                 <tr>
@@ -412,7 +412,7 @@ export default function MultasPedagios() {
                     <tr
                       key={m.id}
                       className={`transition-colors ${
-                        isLight ? 'hover:bg-slate-50' : 'hover:bg-white/3'
+                        !isDark ? 'hover:bg-slate-50' : 'hover:bg-white/3'
                       }`}
                     >
                       <td className="px-4 py-3">
@@ -427,12 +427,12 @@ export default function MultasPedagios() {
                         </span>
                       </td>
                       <td className="px-4 py-3">
-                        <p className={`text-sm font-bold ${isLight ? 'text-slate-800' : 'text-white'}`}>
+                        <p className={`text-sm font-bold ${!isDark ? 'text-slate-800' : 'text-white'}`}>
                           {m.veiculo?.placa ?? '—'}
                         </p>
                         <p className="text-[10px] text-slate-500">{m.veiculo?.modelo}</p>
                       </td>
-                      <td className={`px-4 py-3 text-sm ${isLight ? 'text-slate-700' : 'text-slate-300'}`}>
+                      <td className={`px-4 py-3 text-sm ${!isDark ? 'text-slate-700' : 'text-slate-300'}`}>
                         {m.data_infracao ? new Date(m.data_infracao).toLocaleDateString('pt-BR') : '—'}
                       </td>
                       <td className="px-4 py-3">
@@ -441,7 +441,7 @@ export default function MultasPedagios() {
                             className={`text-sm font-semibold ${
                               vencido && m.status !== 'paga' && m.status !== 'cancelada'
                                 ? 'text-red-500'
-                                : isLight ? 'text-slate-700' : 'text-slate-300'
+                                : !isDark ? 'text-slate-700' : 'text-slate-300'
                             }`}
                           >
                             {new Date(m.data_vencimento).toLocaleDateString('pt-BR')}
@@ -450,10 +450,10 @@ export default function MultasPedagios() {
                           <span className="text-slate-400 text-sm">—</span>
                         )}
                       </td>
-                      <td className={`px-4 py-3 text-sm font-bold ${isLight ? 'text-slate-800' : 'text-white'}`}>
+                      <td className={`px-4 py-3 text-sm font-bold ${!isDark ? 'text-slate-800' : 'text-white'}`}>
                         {BRL(m.valor)}
                       </td>
-                      <td className={`px-4 py-3 text-xs ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>
+                      <td className={`px-4 py-3 text-xs ${!isDark ? 'text-slate-600' : 'text-slate-400'}`}>
                         {m.ait ?? '—'}
                       </td>
                       <td className="px-4 py-3">

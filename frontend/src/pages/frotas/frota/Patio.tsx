@@ -22,9 +22,9 @@ function diasAte(dateStr?: string): number | null {
 
 function docAlertColor(dias: number | null, isLight: boolean): string {
   if (dias === null) return ''
-  if (dias <= 0)  return isLight ? 'text-red-600'    : 'text-red-400'
-  if (dias <= 15) return isLight ? 'text-orange-600' : 'text-orange-400'
-  if (dias <= 30) return isLight ? 'text-amber-600'  : 'text-amber-400'
+  if (dias <= 0)  return !isDark ? 'text-red-600'    : 'text-red-400'
+  if (dias <= 15) return !isDark ? 'text-orange-600' : 'text-orange-400'
+  if (dias <= 30) return !isDark ? 'text-amber-600'  : 'text-amber-400'
   return ''
 }
 
@@ -62,7 +62,7 @@ function OSBadge({ count, isLight }: OSBadgeProps) {
   if (count === 0) return null
   return (
     <span className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full border ${
-      isLight ? 'bg-red-50 text-red-700 border-red-200' : 'bg-red-500/10 text-red-400 border-red-500/20'
+      !isDark ? 'bg-red-50 text-red-700 border-red-200' : 'bg-red-500/10 text-red-400 border-red-500/20'
     }`}>
       <Wrench size={9} />
       {count} OS aberta{count > 1 ? 's' : ''}
@@ -104,7 +104,7 @@ function VeiculoCard({ v, osCount, isLight, onAlocar, onOS, onChecklist }: Veicu
 
   return (
     <div className={`rounded-2xl border shadow-sm transition-all hover:shadow-md ${
-      isLight ? 'bg-white border-slate-200' : 'bg-[#1e293b] border-white/[0.06]'
+      !isDark ? 'bg-white border-slate-200' : 'bg-[#1e293b] border-white/[0.06]'
     }`}>
       <div className="flex flex-col sm:flex-row sm:items-center gap-3 px-4 py-3">
         {/* Top line: Icon + Placa/modelo */}
@@ -112,19 +112,19 @@ function VeiculoCard({ v, osCount, isLight, onAlocar, onOS, onChecklist }: Veicu
           {/* Icon box */}
           <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${
             isMaquina
-              ? (isLight ? 'bg-violet-50' : 'bg-violet-500/10')
-              : (isLight ? 'bg-sky-50'    : 'bg-sky-500/10')
+              ? (!isDark ? 'bg-violet-50' : 'bg-violet-500/10')
+              : (!isDark ? 'bg-sky-50'    : 'bg-sky-500/10')
           }`}>
             {isMaquina
-              ? <Cog  size={16} className={isLight ? 'text-violet-600' : 'text-violet-400'} />
-              : <Car  size={16} className={isLight ? 'text-sky-600'    : 'text-sky-400'} />
+              ? <Cog  size={16} className={!isDark ? 'text-violet-600' : 'text-violet-400'} />
+              : <Car  size={16} className={!isDark ? 'text-sky-600'    : 'text-sky-400'} />
             }
           </div>
 
           {/* Placa + modelo */}
           <div className="min-w-0 sm:w-40 shrink-0">
             <div className="flex items-center gap-1.5">
-              <p className={`text-sm font-bold truncate ${isLight ? 'text-slate-800' : 'text-white'}`}>
+              <p className={`text-sm font-bold truncate ${!isDark ? 'text-slate-800' : 'text-white'}`}>
                 {identificador}
               </p>
               {osCount > 0 && <OSBadge count={osCount} isLight={isLight} />}
@@ -137,10 +137,10 @@ function VeiculoCard({ v, osCount, isLight, onAlocar, onOS, onChecklist }: Veicu
 
         {/* Badges */}
         <div className="flex flex-wrap items-center gap-1.5 shrink-0">
-          <span className={`inline-flex items-center text-[10px] font-semibold px-2 py-0.5 rounded-full ${isLight ? prop.light : prop.dark}`}>
+          <span className={`inline-flex items-center text-[10px] font-semibold px-2 py-0.5 rounded-full ${!isDark ? prop.light : prop.dark}`}>
             {prop.label}
           </span>
-          <span className={`inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full border ${isLight ? prevStyle.light : prevStyle.dark}`}>
+          <span className={`inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full border ${!isDark ? prevStyle.light : prevStyle.dark}`}>
             <Wrench size={9} />
             {isMaquina && v.km_proxima_preventiva
               ? `Prev. ${fmtNum(v.km_proxima_preventiva)} h`
@@ -256,16 +256,16 @@ function VeiculoRow({ v, osCount, isLight, idx, onAlocar, onOS, onChecklist }: V
         <div className="flex items-center gap-2.5">
           <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${
             isMaquina
-              ? (isLight ? 'bg-violet-50 text-violet-600' : 'bg-violet-500/10 text-violet-400')
-              : (isLight ? 'bg-sky-50 text-sky-600'       : 'bg-sky-500/10 text-sky-400')
+              ? (!isDark ? 'bg-violet-50 text-violet-600' : 'bg-violet-500/10 text-violet-400')
+              : (!isDark ? 'bg-sky-50 text-sky-600'       : 'bg-sky-500/10 text-sky-400')
           }`}>
             {isMaquina ? <Cog size={13} /> : <Car size={13} />}
           </div>
           <div>
-            <p className={`text-xs font-bold ${isLight ? 'text-slate-800' : 'text-white'}`}>
+            <p className={`text-xs font-bold ${!isDark ? 'text-slate-800' : 'text-white'}`}>
               {identificador}
             </p>
-            <p className={`text-[10px] ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>
+            <p className={`text-[10px] ${!isDark ? 'text-slate-400' : 'text-slate-500'}`}>
               {isMaquina ? 'Máquina' : 'Veículo'}
             </p>
           </div>
@@ -274,24 +274,24 @@ function VeiculoRow({ v, osCount, isLight, idx, onAlocar, onOS, onChecklist }: V
 
       {/* Marca/Modelo */}
       <td className="px-4 py-3">
-        <p className={`text-xs font-medium ${isLight ? 'text-slate-700' : 'text-slate-200'}`}>
+        <p className={`text-xs font-medium ${!isDark ? 'text-slate-700' : 'text-slate-200'}`}>
           {v.marca} {v.modelo}
         </p>
         {v.ano_mod && (
-          <p className={`text-[10px] ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>{v.ano_mod}</p>
+          <p className={`text-[10px] ${!isDark ? 'text-slate-400' : 'text-slate-500'}`}>{v.ano_mod}</p>
         )}
       </td>
 
       {/* Propriedade */}
       <td className="px-4 py-3">
-        <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${isLight ? prop.light : prop.dark}`}>
+        <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${!isDark ? prop.light : prop.dark}`}>
           {prop.label}
         </span>
       </td>
 
       {/* KM / Hs */}
       <td className="px-4 py-3">
-        <span className={`inline-flex items-center gap-1 text-xs ${isLight ? 'text-slate-600' : 'text-slate-300'}`}>
+        <span className={`inline-flex items-center gap-1 text-xs ${!isDark ? 'text-slate-600' : 'text-slate-300'}`}>
           {isMaquina
             ? <><Timer size={11} /> {v.horimetro_atual !== undefined ? fmtNum(v.horimetro_atual) + ' h' : '—'}</>
             : <><Gauge size={11} /> {fmtNum(v.hodometro_atual)} km</>
@@ -301,7 +301,7 @@ function VeiculoRow({ v, osCount, isLight, idx, onAlocar, onOS, onChecklist }: V
 
       {/* Próxima Preventiva */}
       <td className="px-4 py-3">
-        <span className={`inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full border ${isLight ? prevStyle.light : prevStyle.dark}`}>
+        <span className={`inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full border ${!isDark ? prevStyle.light : prevStyle.dark}`}>
           <Wrench size={9} />
           {isMaquina && v.km_proxima_preventiva
             ? `${fmtNum(v.km_proxima_preventiva)} h`
@@ -329,7 +329,7 @@ function VeiculoRow({ v, osCount, isLight, idx, onAlocar, onOS, onChecklist }: V
             </span>
           ) : null}
           {!crlvColor && !seguroColor && (
-            <span className={`text-[10px] ${isLight ? 'text-slate-300' : 'text-slate-600'}`}>OK</span>
+            <span className={`text-[10px] ${!isDark ? 'text-slate-300' : 'text-slate-600'}`}>OK</span>
           )}
         </div>
       </td>
@@ -337,7 +337,7 @@ function VeiculoRow({ v, osCount, isLight, idx, onAlocar, onOS, onChecklist }: V
       {/* OS */}
       <td className="px-4 py-3">
         <OSBadge count={osCount} isLight={isLight} />
-        {osCount === 0 && <span className={`text-[10px] ${isLight ? 'text-slate-300' : 'text-slate-600'}`}>—</span>}
+        {osCount === 0 && <span className={`text-[10px] ${!isDark ? 'text-slate-300' : 'text-slate-600'}`}>—</span>}
       </td>
 
       {/* Ações */}
@@ -356,7 +356,7 @@ function VeiculoRow({ v, osCount, isLight, idx, onAlocar, onOS, onChecklist }: V
           <button
             onClick={() => onOS(v.id)}
             className={`inline-flex items-center gap-1 text-[10px] font-semibold px-2.5 py-1.5 rounded-lg transition-all ${
-              isLight ? 'bg-slate-100 text-slate-600 hover:bg-slate-200' : 'bg-slate-700/60 text-slate-300 hover:bg-slate-700'
+              !isDark ? 'bg-slate-100 text-slate-600 hover:bg-slate-200' : 'bg-slate-700/60 text-slate-300 hover:bg-slate-700'
             }`}
           >
             <Wrench size={10} /> OS
@@ -364,7 +364,7 @@ function VeiculoRow({ v, osCount, isLight, idx, onAlocar, onOS, onChecklist }: V
           <button
             onClick={() => onChecklist(v.id)}
             className={`inline-flex items-center gap-1 text-[10px] font-semibold px-2.5 py-1.5 rounded-lg transition-all ${
-              isLight ? 'bg-slate-100 text-slate-600 hover:bg-slate-200' : 'bg-slate-700/60 text-slate-300 hover:bg-slate-700'
+              !isDark ? 'bg-slate-100 text-slate-600 hover:bg-slate-200' : 'bg-slate-700/60 text-slate-300 hover:bg-slate-700'
             }`}
           >
             <ClipboardList size={10} />
@@ -378,7 +378,7 @@ function VeiculoRow({ v, osCount, isLight, idx, onAlocar, onOS, onChecklist }: V
 // ── Patio ─────────────────────────────────────────────────────────────────────
 
 export default function Patio() {
-  const { isLightSidebar: isLight } = useTheme()
+  const { isDark } = useTheme()
   const [search, setSearch] = useState('')
   const [viewMode, setViewMode] = useState<'cards' | 'table'>('cards')
   const [alocarVeiculo, setAlocarVeiculo] = useState<FroVeiculo | null>(null)
@@ -422,16 +422,16 @@ export default function Patio() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
-          <h2 className={`text-lg font-bold flex items-center gap-2 ${isLight ? 'text-slate-800' : 'text-white'}`}>
+          <h2 className={`text-lg font-bold flex items-center gap-2 ${!isDark ? 'text-slate-800' : 'text-white'}`}>
             <Warehouse size={18} className="text-rose-500" />
             Pátio
             <span className={`ml-1 text-xs font-semibold px-2 py-0.5 rounded-full ${
-              isLight ? 'bg-emerald-100 text-emerald-700' : 'bg-emerald-500/15 text-emerald-400'
+              !isDark ? 'bg-emerald-100 text-emerald-700' : 'bg-emerald-500/15 text-emerald-400'
             }`}>
               {veiculos.length} disponíve{veiculos.length === 1 ? 'l' : 'is'}
             </span>
           </h2>
-          <p className={`text-xs mt-0.5 ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
+          <p className={`text-xs mt-0.5 ${!isDark ? 'text-slate-500' : 'text-slate-400'}`}>
             Ativos prontos para uso, sem alocação ativa
           </p>
         </div>
@@ -453,15 +453,15 @@ export default function Patio() {
 
           {/* View toggle */}
           <div className={`flex items-center rounded-xl border overflow-hidden ${
-            isLight ? 'border-slate-200 bg-slate-50' : 'border-white/[0.06] bg-slate-800/40'
+            !isDark ? 'border-slate-200 bg-slate-50' : 'border-white/[0.06] bg-slate-800/40'
           }`}>
             <button
               onClick={() => setViewMode('table')}
               title="Visualização em tabela"
               className={`flex items-center justify-center w-8 h-8 transition-colors ${
                 viewMode === 'table'
-                  ? (isLight ? 'bg-white text-slate-800 shadow-sm' : 'bg-slate-700 text-white')
-                  : (isLight ? 'text-slate-400 hover:text-slate-600' : 'text-slate-500 hover:text-slate-300')
+                  ? (!isDark ? 'bg-white text-slate-800 shadow-sm' : 'bg-slate-700 text-white')
+                  : (!isDark ? 'text-slate-400 hover:text-slate-600' : 'text-slate-500 hover:text-slate-300')
               }`}
             >
               <LayoutList size={14} />
@@ -471,8 +471,8 @@ export default function Patio() {
               title="Visualização em cards"
               className={`flex items-center justify-center w-8 h-8 transition-colors ${
                 viewMode === 'cards'
-                  ? (isLight ? 'bg-white text-slate-800 shadow-sm' : 'bg-slate-700 text-white')
-                  : (isLight ? 'text-slate-400 hover:text-slate-600' : 'text-slate-500 hover:text-slate-300')
+                  ? (!isDark ? 'bg-white text-slate-800 shadow-sm' : 'bg-slate-700 text-white')
+                  : (!isDark ? 'text-slate-400 hover:text-slate-600' : 'text-slate-500 hover:text-slate-300')
               }`}
             >
               <LayoutGrid size={14} />
@@ -499,13 +499,13 @@ export default function Patio() {
       {/* Empty state */}
       {!isLoading && filtered.length === 0 && (
         <div className={`flex flex-col items-center justify-center py-16 rounded-2xl border ${
-          isLight ? 'bg-slate-50 border-slate-200' : 'bg-slate-800/30 border-white/[0.06]'
+          !isDark ? 'bg-slate-50 border-slate-200' : 'bg-slate-800/30 border-white/[0.06]'
         }`}>
-          <Warehouse size={36} className={`mb-3 ${isLight ? 'text-slate-300' : 'text-slate-600'}`} />
-          <p className={`font-semibold text-sm ${isLight ? 'text-slate-600' : 'text-slate-300'}`}>
+          <Warehouse size={36} className={`mb-3 ${!isDark ? 'text-slate-300' : 'text-slate-600'}`} />
+          <p className={`font-semibold text-sm ${!isDark ? 'text-slate-600' : 'text-slate-300'}`}>
             {search ? 'Nenhum ativo encontrado' : 'Pátio vazio'}
           </p>
-          <p className={`text-xs mt-1 ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>
+          <p className={`text-xs mt-1 ${!isDark ? 'text-slate-400' : 'text-slate-500'}`}>
             {search
               ? `Sem resultados para "${search}"`
               : 'Todos os ativos estão alocados ou em manutenção'}
@@ -533,15 +533,15 @@ export default function Patio() {
       {/* Table view */}
       {!isLoading && filtered.length > 0 && viewMode === 'table' && (
         <div className={`rounded-2xl border overflow-hidden ${
-          isLight ? 'bg-white border-slate-200' : 'bg-slate-800/40 border-white/[0.06]'
+          !isDark ? 'bg-white border-slate-200' : 'bg-slate-800/40 border-white/[0.06]'
         }`}>
           <div className="overflow-x-auto">
             <table className="w-full">
-              <thead className={isLight ? 'bg-slate-50 border-b border-slate-100' : 'bg-slate-800/60 border-b border-white/[0.04]'}>
+              <thead className={!isDark ? 'bg-slate-50 border-b border-slate-100' : 'bg-slate-800/60 border-b border-white/[0.04]'}>
                 <tr>
                   {(['Ativo', 'Marca / Modelo', 'Propriedade', 'KM / Hs', 'Próx. Preventiva', 'Documentos', 'OS', ''] as const).map(h => (
                     <th key={h} className={`text-left text-[10px] font-bold uppercase tracking-wider px-4 py-3 ${
-                      isLight ? 'text-slate-500' : 'text-slate-400'
+                      !isDark ? 'text-slate-500' : 'text-slate-400'
                     } ${h === '' ? 'text-right' : ''}`}>
                       {h}
                     </th>

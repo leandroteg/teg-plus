@@ -50,15 +50,15 @@ function ItensModal({
   onClose: () => void
   isLight: boolean
 }) {
-  const card = isLight ? 'bg-white border border-slate-200' : 'bg-[#1e293b] border border-white/[0.06]'
-  const divider = isLight ? 'border-slate-100' : 'border-white/[0.06]'
+  const card = !isDark ? 'bg-white border border-slate-200' : 'bg-[#1e293b] border border-white/[0.06]'
+  const divider = !isDark ? 'border-slate-100' : 'border-white/[0.06]'
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
       <div className={`rounded-2xl shadow-2xl w-full max-w-md max-h-[80vh] flex flex-col ${card}`}>
         <div className={`flex items-center justify-between px-5 py-3.5 border-b ${divider}`}>
           <div>
-            <p className={`text-sm font-extrabold ${isLight ? 'text-slate-800' : 'text-white'}`}>
+            <p className={`text-sm font-extrabold ${!isDark ? 'text-slate-800' : 'text-white'}`}>
               {template.nome}
             </p>
             <p className="text-[10px] text-slate-500">{(template.itens ?? []).length} itens</p>
@@ -79,14 +79,14 @@ function ItensModal({
               <div
                 key={item.id}
                 className={`flex items-start gap-3 p-2.5 rounded-xl ${
-                  isLight ? 'bg-slate-50 border border-slate-200' : 'bg-white/4 border border-white/[0.05]'
+                  !isDark ? 'bg-slate-50 border border-slate-200' : 'bg-white/4 border border-white/[0.05]'
                 }`}
               >
-                <span className={`text-[10px] font-bold mt-0.5 w-4 text-right shrink-0 ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>
+                <span className={`text-[10px] font-bold mt-0.5 w-4 text-right shrink-0 ${!isDark ? 'text-slate-400' : 'text-slate-500'}`}>
                   {item.ordem}
                 </span>
                 <div className="flex-1 min-w-0">
-                  <p className={`text-xs font-medium ${isLight ? 'text-slate-700' : 'text-slate-200'}`}>
+                  <p className={`text-xs font-medium ${!isDark ? 'text-slate-700' : 'text-slate-200'}`}>
                     {item.descricao}
                   </p>
                   <div className="flex gap-2 mt-1">
@@ -126,15 +126,15 @@ function TemplateCard({
   return (
     <div
       className={`rounded-2xl border p-4 flex flex-col gap-2.5 ${
-        isLight ? 'bg-white border-slate-200 shadow-sm' : 'bg-slate-800/50 border-white/[0.07]'
+        !isDark ? 'bg-white border-slate-200 shadow-sm' : 'bg-slate-800/50 border-white/[0.07]'
       }`}
     >
       <div className="flex items-start justify-between gap-2">
-        <p className={`text-sm font-extrabold leading-tight ${isLight ? 'text-slate-800' : 'text-white'}`}>
+        <p className={`text-sm font-extrabold leading-tight ${!isDark ? 'text-slate-800' : 'text-white'}`}>
           {template.nome}
         </p>
         <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full shrink-0 ${
-          isLight ? 'bg-emerald-100 text-emerald-700' : 'bg-emerald-500/15 text-emerald-400'
+          !isDark ? 'bg-emerald-100 text-emerald-700' : 'bg-emerald-500/15 text-emerald-400'
         }`}>
           Ativo
         </span>
@@ -145,20 +145,20 @@ function TemplateCard({
           {TIPO_LABEL[template.tipo]}
         </span>
         <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${
-          isLight ? 'bg-slate-100 text-slate-600' : 'bg-white/8 text-slate-400'
+          !isDark ? 'bg-slate-100 text-slate-600' : 'bg-white/8 text-slate-400'
         }`}>
           {tipoAtivoLabel}
         </span>
       </div>
 
-      <p className={`text-xs ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
+      <p className={`text-xs ${!isDark ? 'text-slate-500' : 'text-slate-400'}`}>
         {(template.itens ?? []).length} itens de verificação
       </p>
 
       <button
         onClick={() => onVerItens(template)}
         className={`flex items-center gap-1.5 text-xs font-semibold mt-auto pt-1 transition-colors ${
-          isLight ? 'text-teal-600 hover:text-teal-700' : 'text-teal-400 hover:text-teal-300'
+          !isDark ? 'text-teal-600 hover:text-teal-700' : 'text-teal-400 hover:text-teal-300'
         }`}
       >
         <Eye size={12} /> Ver Itens
@@ -176,7 +176,7 @@ function Templates({ isLight }: { isLight: boolean }) {
     return (
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
         {[1, 2, 3, 4].map(i => (
-          <div key={i} className={`h-36 rounded-2xl animate-pulse ${isLight ? 'bg-slate-100' : 'bg-white/5'}`} />
+          <div key={i} className={`h-36 rounded-2xl animate-pulse ${!isDark ? 'bg-slate-100' : 'bg-white/5'}`} />
         ))}
       </div>
     )
@@ -203,17 +203,17 @@ function Templates({ isLight }: { isLight: boolean }) {
 function Execucoes({ isLight }: { isLight: boolean }) {
   const { data: execucoes = [], isLoading } = useChecklistExecucoes()
 
-  const card = isLight ? 'bg-white border border-slate-200 shadow-sm' : 'bg-[#1e293b] border border-white/[0.06]'
-  const divider = isLight ? 'border-slate-100' : 'border-white/[0.04]'
-  const th = `px-3 py-2 text-left text-[10px] font-bold uppercase tracking-wide ${isLight ? 'text-slate-500' : 'text-slate-400'}`
-  const td = `px-3 py-2.5 text-xs ${isLight ? 'text-slate-700' : 'text-slate-300'}`
-  const trEven = isLight ? 'bg-slate-50/60' : 'bg-white/[0.02]'
+  const card = !isDark ? 'bg-white border border-slate-200 shadow-sm' : 'bg-[#1e293b] border border-white/[0.06]'
+  const divider = !isDark ? 'border-slate-100' : 'border-white/[0.04]'
+  const th = `px-3 py-2 text-left text-[10px] font-bold uppercase tracking-wide ${!isDark ? 'text-slate-500' : 'text-slate-400'}`
+  const td = `px-3 py-2.5 text-xs ${!isDark ? 'text-slate-700' : 'text-slate-300'}`
+  const trEven = !isDark ? 'bg-slate-50/60' : 'bg-white/[0.02]'
 
   if (isLoading) {
     return (
       <div className="space-y-2">
         {[1, 2, 3].map(i => (
-          <div key={i} className={`h-10 rounded-xl animate-pulse ${isLight ? 'bg-slate-100' : 'bg-white/5'}`} />
+          <div key={i} className={`h-10 rounded-xl animate-pulse ${!isDark ? 'bg-slate-100' : 'bg-white/5'}`} />
         ))}
       </div>
     )
@@ -243,7 +243,7 @@ function Execucoes({ isLight }: { isLight: boolean }) {
                 <tr key={ex.id} className={idx % 2 === 1 ? trEven : ''}>
                   <td className={td + ' font-semibold'}>
                     {ex.veiculo?.placa ?? '—'}
-                    <span className={`ml-1.5 font-normal ${isLight ? 'text-slate-500' : 'text-slate-500'}`}>
+                    <span className={`ml-1.5 font-normal ${!isDark ? 'text-slate-500' : 'text-slate-500'}`}>
                       {ex.veiculo?.modelo}
                     </span>
                   </td>
@@ -257,7 +257,7 @@ function Execucoes({ isLight }: { isLight: boolean }) {
                   </td>
                   <td className={td}>
                     <button className={`text-[10px] font-semibold flex items-center gap-1 transition-colors ${
-                      isLight ? 'text-teal-600 hover:text-teal-700' : 'text-teal-400 hover:text-teal-300'
+                      !isDark ? 'text-teal-600 hover:text-teal-700' : 'text-teal-400 hover:text-teal-300'
                     }`}>
                       <Eye size={11} /> Ver
                     </button>
@@ -277,14 +277,14 @@ function Execucoes({ isLight }: { isLight: boolean }) {
 type Aba = 'templates' | 'execucoes'
 
 export default function ChecklistsManutencao() {
-  const { isLightSidebar: isLight } = useTheme()
+  const { isDark } = useTheme()
   const [aba, setAba] = useState<Aba>('templates')
 
   return (
     <div className="p-4 sm:p-6 space-y-5">
       {/* Header */}
       <div>
-        <h1 className={`text-xl font-extrabold flex items-center gap-2 ${isLight ? 'text-slate-800' : 'text-white'}`}>
+        <h1 className={`text-xl font-extrabold flex items-center gap-2 ${!isDark ? 'text-slate-800' : 'text-white'}`}>
           <ClipboardList size={20} className="text-teal-500" />
           Checklists de Manutenção
         </h1>
@@ -293,14 +293,14 @@ export default function ChecklistsManutencao() {
 
       {/* Toggle */}
       <div className={`flex gap-1 p-1 rounded-xl w-fit ${
-        isLight ? 'bg-slate-100 border border-slate-200' : 'bg-white/4 border border-white/8'
+        !isDark ? 'bg-slate-100 border border-slate-200' : 'bg-white/4 border border-white/8'
       }`}>
         <button
           onClick={() => setAba('templates')}
           className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
             aba === 'templates'
               ? 'bg-teal-600 text-white shadow-sm'
-              : isLight ? 'text-slate-500 hover:text-slate-800' : 'text-slate-400 hover:text-white'
+              : !isDark ? 'text-slate-500 hover:text-slate-800' : 'text-slate-400 hover:text-white'
           }`}
         >
           <LayoutGrid size={12} /> Templates
@@ -310,7 +310,7 @@ export default function ChecklistsManutencao() {
           className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
             aba === 'execucoes'
               ? 'bg-teal-600 text-white shadow-sm'
-              : isLight ? 'text-slate-500 hover:text-slate-800' : 'text-slate-400 hover:text-white'
+              : !isDark ? 'text-slate-500 hover:text-slate-800' : 'text-slate-400 hover:text-white'
           }`}
         >
           <List size={12} /> Execuções

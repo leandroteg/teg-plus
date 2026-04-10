@@ -92,17 +92,9 @@ export default function PatrimonialHome() {
     <div className="space-y-3">
 
       {/* ── Titulo do Painel ── */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className={`text-lg font-extrabold ${isDark ? 'text-white' : 'text-slate-900'}`}>Painel Patrimonial</h1>
-          <p className={`text-xs mt-0.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Visao geral dos ativos, depreciacao e movimentacoes</p>
-        </div>
-        <button
-          onClick={() => nav('/patrimonial/movimentacoes?nova=1')}
-          className="flex items-center gap-1.5 bg-amber-600 hover:bg-amber-700 text-white text-sm font-semibold px-4 py-2 rounded-xl transition-colors shadow-sm"
-        >
-          <ArrowLeftRight size={15} /> Nova Movimentacao
-        </button>
+      <div>
+        <h1 className={`text-lg font-extrabold ${isDark ? 'text-white' : 'text-slate-900'}`}>Painel Patrimonial</h1>
+        <p className={`text-xs mt-0.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Visao geral dos ativos, depreciacao e movimentacoes</p>
       </div>
 
       {/* ── Hero: Indicadores + Janela Critica ── */}

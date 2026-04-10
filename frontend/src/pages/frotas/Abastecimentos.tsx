@@ -50,20 +50,20 @@ function NovoAbastecimentoModal({ onClose, isLight }: { onClose: () => void; isL
   }
 
   const inp = `w-full px-3 py-2 rounded-xl text-sm placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-teal-400/40 ${
-    isLight ? 'bg-white border border-slate-200 shadow-sm text-slate-800 hover:border-slate-300' : 'bg-white/6 border border-white/12 text-white hover:border-white/20'
+    !isDark ? 'bg-white border border-slate-200 shadow-sm text-slate-800 hover:border-slate-300' : 'bg-white/6 border border-white/12 text-white hover:border-white/20'
   }`
-  const lbl = 'block text-xs font-bold mb-1 ' + (isLight ? 'text-slate-600' : 'text-slate-300')
-  const sel = inp + (isLight ? '' : ' [&>option]:bg-slate-900')
+  const lbl = 'block text-xs font-bold mb-1 ' + (!isDark ? 'text-slate-600' : 'text-slate-300')
+  const sel = inp + (!isDark ? '' : ' [&>option]:bg-slate-900')
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-      <form onSubmit={handleSubmit} className={`rounded-2xl shadow-2xl p-6 w-full max-w-lg space-y-4 ${isLight ? 'bg-white border border-slate-200' : 'bg-[#1e293b] border border-white/[0.06]'}`}>
+      <form onSubmit={handleSubmit} className={`rounded-2xl shadow-2xl p-6 w-full max-w-lg space-y-4 ${!isDark ? 'bg-white border border-slate-200' : 'bg-[#1e293b] border border-white/[0.06]'}`}>
         <div className="flex items-center justify-between">
-          <h2 className={`text-lg font-extrabold ${isLight ? 'text-slate-800' : 'text-white'}`}>Registrar Abastecimento</h2>
+          <h2 className={`text-lg font-extrabold ${!isDark ? 'text-slate-800' : 'text-white'}`}>Registrar Abastecimento</h2>
           <button
             type="button"
             onClick={onClose}
-            className={`p-2 rounded-xl transition-colors ${isLight ? 'text-slate-400 hover:text-slate-600 hover:bg-slate-100' : 'text-slate-400 hover:text-white hover:bg-white/10'}`}
+            className={`p-2 rounded-xl transition-colors ${!isDark ? 'text-slate-400 hover:text-slate-600 hover:bg-slate-100' : 'text-slate-400 hover:text-white hover:bg-white/10'}`}
             title="Fechar"
           >
             <X className="w-5 h-5" />
@@ -116,10 +116,10 @@ function NovoAbastecimentoModal({ onClose, isLight }: { onClose: () => void; isL
 
         {/* Total estimado */}
         <div className={`flex items-center justify-between p-3 rounded-xl ${
-          isLight ? 'bg-slate-50 border border-slate-200' : 'bg-white/4 border border-white/8'
+          !isDark ? 'bg-slate-50 border border-slate-200' : 'bg-white/4 border border-white/8'
         }`}>
           <span className="text-xs text-slate-400">Total estimado</span>
-          <span className={`text-sm font-black ${isLight ? 'text-slate-800' : 'text-white'}`}>{totalEstimado}</span>
+          <span className={`text-sm font-black ${!isDark ? 'text-slate-800' : 'text-white'}`}>{totalEstimado}</span>
         </div>
 
         <div className="grid grid-cols-2 gap-3">
@@ -137,7 +137,7 @@ function NovoAbastecimentoModal({ onClose, isLight }: { onClose: () => void; isL
 
         <div className="flex gap-2">
           <button type="button" onClick={onClose} className={`flex-1 font-medium py-2.5 rounded-xl border text-sm ${
-            isLight ? 'border-slate-200 text-slate-500 hover:bg-slate-50' : 'border-white/10 text-slate-400 hover:bg-white/5'
+            !isDark ? 'border-slate-200 text-slate-500 hover:bg-slate-50' : 'border-white/10 text-slate-400 hover:bg-white/5'
           }`}>Cancelar</button>
           <button type="submit" disabled={registrar.isPending} className="flex-1 py-2.5 rounded-xl bg-gradient-to-r from-teal-500 to-teal-600 hover:from-teal-400 hover:to-teal-500 shadow-sm shadow-teal-500/20 text-sm text-white font-semibold disabled:opacity-50">
             {registrar.isPending ? 'Registrando...' : 'Registrar'}
@@ -150,7 +150,7 @@ function NovoAbastecimentoModal({ onClose, isLight }: { onClose: () => void; isL
 
 // ── Main ──────────────────────────────────────────────────────────────────────
 export default function Abastecimentos() {
-  const { isLightSidebar: isLight } = useTheme()
+  const { isDark } = useTheme()
   const [modal, setModal]     = useState(false)
   const mesAtual = new Date().toISOString().slice(0, 7)
   const [mesFiltro, setMesFiltro] = useState(mesAtual)
@@ -172,7 +172,7 @@ export default function Abastecimentos() {
 
       <div className="flex items-center justify-between">
         <div>
-          <h1 className={`text-xl font-bold flex items-center gap-2 ${isLight ? 'text-slate-800' : 'text-white'}`}>
+          <h1 className={`text-xl font-bold flex items-center gap-2 ${!isDark ? 'text-slate-800' : 'text-white'}`}>
             <Fuel size={20} className="text-teal-500" /> Abastecimentos
           </h1>
           <p className="text-sm text-slate-500">{abastecimentos.length} registros no mes</p>
@@ -188,7 +188,7 @@ export default function Abastecimentos() {
           <label className="text-[10px] text-slate-500 block mb-1">Mes</label>
           <input type="month" value={mesFiltro} onChange={e => setMesFiltro(e.target.value)}
             className={`px-3 py-2 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-teal-400/40 ${
-              isLight ? 'bg-slate-50 border border-slate-200 text-slate-800' : 'bg-white/6 border border-white/10 text-white'
+              !isDark ? 'bg-slate-50 border border-slate-200 text-slate-800' : 'bg-white/6 border border-white/10 text-white'
             }`} />
         </div>
         <div>
@@ -197,7 +197,7 @@ export default function Abastecimentos() {
             value={veiculoFiltro}
             onChange={e => setVeiculoFiltro(e.target.value)}
             className={`px-3 py-2 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-teal-400/40 ${
-              isLight ? 'bg-slate-50 border border-slate-200 text-slate-800' : 'bg-white/6 border border-white/10 text-white [&>option]:bg-slate-900'
+              !isDark ? 'bg-slate-50 border border-slate-200 text-slate-800' : 'bg-white/6 border border-white/10 text-white [&>option]:bg-slate-900'
             }`}
           >
             <option value="">Todos</option>
@@ -210,32 +210,32 @@ export default function Abastecimentos() {
 
       {/* KPI Cards */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <div className={`rounded-xl shadow-sm p-3 border-l-4 border-l-teal-500 ${isLight ? 'bg-white border border-slate-200' : 'bg-[#1e293b] border border-white/[0.06]'}`}>
+        <div className={`rounded-xl shadow-sm p-3 border-l-4 border-l-teal-500 ${!isDark ? 'bg-white border border-slate-200' : 'bg-[#1e293b] border border-white/[0.06]'}`}>
           <p className="text-[10px] text-slate-500 uppercase mb-1">Custo Total</p>
-          <p className={`text-lg font-black ${isLight ? 'text-slate-800' : 'text-white'}`}>{BRL(totalCusto)}</p>
+          <p className={`text-lg font-black ${!isDark ? 'text-slate-800' : 'text-white'}`}>{BRL(totalCusto)}</p>
         </div>
-        <div className={`rounded-xl shadow-sm p-3 border-l-4 border-l-sky-500 ${isLight ? 'bg-white border border-slate-200' : 'bg-[#1e293b] border border-white/[0.06]'}`}>
+        <div className={`rounded-xl shadow-sm p-3 border-l-4 border-l-sky-500 ${!isDark ? 'bg-white border border-slate-200' : 'bg-[#1e293b] border border-white/[0.06]'}`}>
           <p className="text-[10px] text-slate-500 uppercase mb-1">Total Litros</p>
-          <p className={`text-lg font-black ${isLight ? 'text-slate-800' : 'text-white'}`}>{totalLitros.toLocaleString('pt-BR', { maximumFractionDigits: 0 })} L</p>
+          <p className={`text-lg font-black ${!isDark ? 'text-slate-800' : 'text-white'}`}>{totalLitros.toLocaleString('pt-BR', { maximumFractionDigits: 0 })} L</p>
         </div>
-        <div className={`rounded-xl shadow-sm p-3 border-l-4 border-l-emerald-500 ${isLight ? 'bg-white border border-slate-200' : 'bg-[#1e293b] border border-white/[0.06]'}`}>
+        <div className={`rounded-xl shadow-sm p-3 border-l-4 border-l-emerald-500 ${!isDark ? 'bg-white border border-slate-200' : 'bg-[#1e293b] border border-white/[0.06]'}`}>
           <p className="text-[10px] text-slate-500 uppercase mb-1">Media km/L</p>
-          <p className={`text-lg font-black ${isLight ? 'text-slate-800' : 'text-white'}`}>{mediaKmL ? mediaKmL.toFixed(2) : '—'}</p>
+          <p className={`text-lg font-black ${!isDark ? 'text-slate-800' : 'text-white'}`}>{mediaKmL ? mediaKmL.toFixed(2) : '—'}</p>
         </div>
-        <div className={`rounded-xl shadow-sm p-3 border-l-4 ${desvios.length > 0 ? 'border-l-red-500' : 'border-l-slate-600'} ${isLight ? 'bg-white border border-slate-200' : 'bg-[#1e293b] border border-white/[0.06]'}`}>
+        <div className={`rounded-xl shadow-sm p-3 border-l-4 ${desvios.length > 0 ? 'border-l-red-500' : 'border-l-slate-600'} ${!isDark ? 'bg-white border border-slate-200' : 'bg-[#1e293b] border border-white/[0.06]'}`}>
           <p className="text-[10px] text-slate-500 uppercase mb-1">Desvios</p>
-          <p className={`text-lg font-black ${desvios.length > 0 ? 'text-red-400' : isLight ? 'text-slate-800' : 'text-white'}`}>{desvios.length}</p>
+          <p className={`text-lg font-black ${desvios.length > 0 ? 'text-red-400' : !isDark ? 'text-slate-800' : 'text-white'}`}>{desvios.length}</p>
         </div>
       </div>
 
       {/* Alertas de desvio */}
       {desvios.length > 0 && (
-        <div className={`rounded-xl shadow-sm p-3 border border-red-500/30 bg-red-500/5 space-y-1 ${isLight ? 'bg-white' : 'bg-[#1e293b]'}`}>
+        <div className={`rounded-xl shadow-sm p-3 border border-red-500/30 bg-red-500/5 space-y-1 ${!isDark ? 'bg-white' : 'bg-[#1e293b]'}`}>
           <p className="text-xs font-semibold text-red-400 flex items-center gap-1.5 mb-2">
             <AlertTriangle size={13} /> Desvios de Consumo Detectados
           </p>
           {desvios.map(d => (
-            <div key={d.id} className={`flex items-center justify-between text-xs ${isLight ? 'text-slate-600' : 'text-slate-300'}`}>
+            <div key={d.id} className={`flex items-center justify-between text-xs ${!isDark ? 'text-slate-600' : 'text-slate-300'}`}>
               <span>{d.veiculo?.placa} · {new Date(d.data_abastecimento).toLocaleDateString('pt-BR')}</span>
               <span className="text-red-400 font-semibold flex items-center gap-1">
                 <TrendingDown size={11} /> {d.percentual_desvio?.toFixed(1)}% abaixo da media
@@ -247,20 +247,20 @@ export default function Abastecimentos() {
 
       {/* Tabela */}
       {isLoading ? (
-        <div className="space-y-2">{Array.from({ length: 6 }).map((_, i) => <div key={i} className={`rounded-xl h-14 animate-pulse ${isLight ? 'bg-white border border-slate-200' : 'bg-[#1e293b] border border-white/[0.06]'}`} />)}</div>
+        <div className="space-y-2">{Array.from({ length: 6 }).map((_, i) => <div key={i} className={`rounded-xl h-14 animate-pulse ${!isDark ? 'bg-white border border-slate-200' : 'bg-[#1e293b] border border-white/[0.06]'}`} />)}</div>
       ) : abastecimentos.length === 0 ? (
         <p className="text-sm text-slate-500 text-center py-12">Nenhum abastecimento neste mes</p>
       ) : (
         <div className="space-y-2">
           {abastecimentos.map(ab => (
-            <div key={ab.id} className={`rounded-xl shadow-sm px-4 py-3 flex items-center gap-4 ${isLight ? 'bg-white border border-slate-200' : 'bg-[#1e293b] border border-white/[0.06]'} ${ab.desvio_detectado ? 'border-red-500/30' : ''}`}>
+            <div key={ab.id} className={`rounded-xl shadow-sm px-4 py-3 flex items-center gap-4 ${!isDark ? 'bg-white border border-slate-200' : 'bg-[#1e293b] border border-white/[0.06]'} ${ab.desvio_detectado ? 'border-red-500/30' : ''}`}>
               {ab.desvio_detectado && <AlertTriangle size={14} className="text-red-400 shrink-0" />}
               <div className="w-20 shrink-0">
-                <p className={`text-sm font-bold ${isLight ? 'text-slate-800' : 'text-white'}`}>{ab.veiculo?.placa}</p>
+                <p className={`text-sm font-bold ${!isDark ? 'text-slate-800' : 'text-white'}`}>{ab.veiculo?.placa}</p>
                 <p className="text-[10px] text-slate-500">{new Date(ab.data_abastecimento).toLocaleDateString('pt-BR')}</p>
               </div>
               <div className="flex-1 min-w-0">
-                <p className={`text-xs ${isLight ? 'text-slate-600' : 'text-slate-300'}`}>{ab.posto ?? 'Posto nao informado'}</p>
+                <p className={`text-xs ${!isDark ? 'text-slate-600' : 'text-slate-300'}`}>{ab.posto ?? 'Posto nao informado'}</p>
                 <p className="text-[11px] text-slate-500">{COMB_LABEL[ab.combustivel]} · {ab.litros % 1 === 0 ? ab.litros : ab.litros.toFixed(1)} L · {ab.hodometro.toLocaleString('pt-BR')} km</p>
               </div>
               <div className="hidden sm:block text-right">
@@ -270,7 +270,7 @@ export default function Abastecimentos() {
                 <p className="text-[10px] text-slate-500">{PAG_LABEL[ab.forma_pagamento]}</p>
               </div>
               <div className="text-right shrink-0">
-                <p className={`text-sm font-bold ${isLight ? 'text-slate-800' : 'text-white'}`}>{BRL(ab.valor_total ?? 0)}</p>
+                <p className={`text-sm font-bold ${!isDark ? 'text-slate-800' : 'text-white'}`}>{BRL(ab.valor_total ?? 0)}</p>
                 <p className="text-[10px] text-slate-500">R$ {ab.valor_litro.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 3 })}/L</p>
               </div>
             </div>

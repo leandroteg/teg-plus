@@ -41,14 +41,14 @@ function OcorrenciaModal({ oc, onClose, isLight }: { oc: FroOcorrenciaTel; onClo
     onClose()
   }
 
-  const valCls = isLight ? 'text-slate-800' : 'text-white'
+  const valCls = !isDark ? 'text-slate-800' : 'text-white'
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-      <div className={`rounded-2xl shadow-2xl p-6 w-full max-w-md space-y-4 ${isLight ? 'bg-white border border-slate-200' : 'bg-[#1e293b] border border-white/[0.06]'}`}>
+      <div className={`rounded-2xl shadow-2xl p-6 w-full max-w-md space-y-4 ${!isDark ? 'bg-white border border-slate-200' : 'bg-[#1e293b] border border-white/[0.06]'}`}>
         <div className="flex items-start justify-between">
-          <h2 className={`text-lg font-extrabold ${isLight ? 'text-slate-800' : 'text-white'}`}>Ocorrencia de Telemetria</h2>
-          <button onClick={onClose} className={`${isLight ? 'text-slate-400 hover:text-slate-700' : 'text-slate-500 hover:text-white'}`}><XCircle size={18} /></button>
+          <h2 className={`text-lg font-extrabold ${!isDark ? 'text-slate-800' : 'text-white'}`}>Ocorrencia de Telemetria</h2>
+          <button onClick={onClose} className={`${!isDark ? 'text-slate-400 hover:text-slate-700' : 'text-slate-500 hover:text-white'}`}><XCircle size={18} /></button>
         </div>
 
         {/* Info */}
@@ -95,10 +95,10 @@ function OcorrenciaModal({ oc, onClose, isLight }: { oc: FroOcorrenciaTel; onClo
 
         {/* Observacoes */}
         <div>
-          <label className={`block text-xs font-bold mb-1 ${isLight ? 'text-slate-600' : 'text-slate-300'}`}>Observacoes / Tratativa</label>
+          <label className={`block text-xs font-bold mb-1 ${!isDark ? 'text-slate-600' : 'text-slate-300'}`}>Observacoes / Tratativa</label>
           <textarea
             className={`w-full px-3 py-2 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-teal-400/40 resize-none mt-1 ${
-              isLight ? 'bg-white border border-slate-200 shadow-sm text-slate-800' : 'bg-white/6 border border-white/12 text-white'
+              !isDark ? 'bg-white border border-slate-200 shadow-sm text-slate-800' : 'bg-white/6 border border-white/12 text-white'
             }`}
             rows={3}
             value={observacoes}
@@ -109,7 +109,7 @@ function OcorrenciaModal({ oc, onClose, isLight }: { oc: FroOcorrenciaTel; onClo
 
         <div className="flex gap-2">
           <button onClick={onClose} className={`flex-1 font-medium py-2.5 rounded-xl border text-sm ${
-            isLight ? 'border-slate-200 text-slate-500 hover:bg-slate-50' : 'border-white/10 text-slate-400 hover:bg-white/5'
+            !isDark ? 'border-slate-200 text-slate-500 hover:bg-slate-50' : 'border-white/10 text-slate-400 hover:bg-white/5'
           }`}>Fechar</button>
           {oc.status !== 'encerrada' && (
             <button
@@ -135,11 +135,11 @@ function OcorrenciaRow({ oc, onSelect, isLight }: { oc: FroOcorrenciaTel; onSele
 
   return (
     <button onClick={onSelect} className={`w-full rounded-xl shadow-sm px-4 py-3 flex items-center gap-4 text-left transition-colors ${
-      isLight ? 'bg-white border border-slate-200 hover:bg-slate-50' : 'bg-[#1e293b] border border-white/[0.06] hover:bg-white/5'
+      !isDark ? 'bg-white border border-slate-200 hover:bg-slate-50' : 'bg-[#1e293b] border border-white/[0.06] hover:bg-white/5'
     }`}>
       <AlertTriangle size={15} className={oc.status === 'registrada' ? 'text-red-400' : oc.status === 'encerrada' ? 'text-slate-600' : 'text-amber-400'} />
       <div className="flex-1 min-w-0">
-        <p className={`text-sm font-semibold ${isLight ? 'text-slate-800' : 'text-white'}`}>{oc.veiculo?.placa} — {oc.veiculo?.marca} {oc.veiculo?.modelo}</p>
+        <p className={`text-sm font-semibold ${!isDark ? 'text-slate-800' : 'text-white'}`}>{oc.veiculo?.placa} — {oc.veiculo?.marca} {oc.veiculo?.modelo}</p>
         <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded border ${tipoCfg.cls}`}>{tipoCfg.label}</span>
       </div>
       {oc.velocidade && (
@@ -177,21 +177,21 @@ function NovaOcorrenciaModal({ onClose, isLight }: { onClose: () => void; isLigh
     onClose()
   }
 
-  const lbl = 'block text-xs font-bold mb-1 ' + (isLight ? 'text-slate-600' : 'text-slate-300')
+  const lbl = 'block text-xs font-bold mb-1 ' + (!isDark ? 'text-slate-600' : 'text-slate-300')
   const inp = `w-full px-3 py-2 rounded-xl text-sm placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-teal-400/40 ${
-    isLight ? 'bg-white border border-slate-200 shadow-sm text-slate-800' : 'bg-white/6 border border-white/12 text-white'
+    !isDark ? 'bg-white border border-slate-200 shadow-sm text-slate-800' : 'bg-white/6 border border-white/12 text-white'
   }`
-  const sel = inp + (isLight ? '' : ' [&>option]:bg-slate-900')
+  const sel = inp + (!isDark ? '' : ' [&>option]:bg-slate-900')
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-      <form onSubmit={handleSubmit} className={`rounded-2xl shadow-2xl p-6 w-full max-w-lg space-y-4 ${isLight ? 'bg-white border border-slate-200' : 'bg-[#1e293b] border border-white/[0.06]'}`}>
+      <form onSubmit={handleSubmit} className={`rounded-2xl shadow-2xl p-6 w-full max-w-lg space-y-4 ${!isDark ? 'bg-white border border-slate-200' : 'bg-[#1e293b] border border-white/[0.06]'}`}>
         <div className="flex items-center justify-between">
-          <h2 className={`text-lg font-extrabold ${isLight ? 'text-slate-800' : 'text-white'}`}>Registrar Ocorrencia</h2>
+          <h2 className={`text-lg font-extrabold ${!isDark ? 'text-slate-800' : 'text-white'}`}>Registrar Ocorrencia</h2>
           <button
             type="button"
             onClick={onClose}
-            className={`p-2 rounded-xl transition-colors ${isLight ? 'text-slate-400 hover:text-slate-600 hover:bg-slate-100' : 'text-slate-400 hover:text-white hover:bg-white/10'}`}
+            className={`p-2 rounded-xl transition-colors ${!isDark ? 'text-slate-400 hover:text-slate-600 hover:bg-slate-100' : 'text-slate-400 hover:text-white hover:bg-white/10'}`}
             title="Fechar"
           >
             <X className="w-5 h-5" />
@@ -239,7 +239,7 @@ function NovaOcorrenciaModal({ onClose, isLight }: { onClose: () => void; isLigh
 
         <div className="flex gap-2">
           <button type="button" onClick={onClose} className={`flex-1 font-medium py-2.5 rounded-xl border text-sm ${
-            isLight ? 'border-slate-200 text-slate-500 hover:bg-slate-50' : 'border-white/10 text-slate-400 hover:bg-white/5'
+            !isDark ? 'border-slate-200 text-slate-500 hover:bg-slate-50' : 'border-white/10 text-slate-400 hover:bg-white/5'
           }`}>Cancelar</button>
           <button type="submit" disabled={registrar.isPending} className="flex-1 py-2 rounded-xl bg-gradient-to-r from-teal-500 to-teal-600 hover:from-teal-400 hover:to-teal-500 shadow-sm shadow-teal-500/20 text-sm text-white font-semibold disabled:opacity-50">
             {registrar.isPending ? 'Registrando...' : 'Registrar'}
@@ -259,7 +259,7 @@ const TABS: Array<{ key: StatusOcorrenciaTel | 'todas'; label: string }> = [
 ]
 
 export default function Telemetria() {
-  const { isLightSidebar: isLight } = useTheme()
+  const { isDark } = useTheme()
   const [tabIdx, setTabIdx]   = useState(0)
   const [selected, setSelected] = useState<FroOcorrenciaTel | null>(null)
   const [novaModal, setNovaModal] = useState(false)
@@ -271,7 +271,7 @@ export default function Telemetria() {
     <div className="p-4 sm:p-6 space-y-4">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className={`text-xl font-bold flex items-center gap-2 ${isLight ? 'text-slate-800' : 'text-white'}`}>
+          <h1 className={`text-xl font-bold flex items-center gap-2 ${!isDark ? 'text-slate-800' : 'text-white'}`}>
             <Radio size={20} className="text-teal-500" /> Telemetria e Compliance
           </h1>
           <p className="text-sm text-slate-500">Ocorrencias registradas pelo sistema de rastreamento</p>
@@ -283,7 +283,7 @@ export default function Telemetria() {
 
       {/* Tabs */}
       <div className={`flex gap-1 p-1 rounded-xl w-fit flex-wrap ${
-        isLight ? 'bg-slate-100 border border-slate-200' : 'bg-white/4 border border-white/8'
+        !isDark ? 'bg-slate-100 border border-slate-200' : 'bg-white/4 border border-white/8'
       }`}>
         {TABS.map((t, i) => (
           <button
@@ -315,7 +315,7 @@ export default function Telemetria() {
 
       {/* Lista */}
       {isLoading ? (
-        <div className="space-y-2">{Array.from({ length: 5 }).map((_, i) => <div key={i} className={`rounded-xl h-16 animate-pulse ${isLight ? 'bg-white border border-slate-200 shadow-sm' : 'bg-[#1e293b] border border-white/[0.06]'}`} />)}</div>
+        <div className="space-y-2">{Array.from({ length: 5 }).map((_, i) => <div key={i} className={`rounded-xl h-16 animate-pulse ${!isDark ? 'bg-white border border-slate-200 shadow-sm' : 'bg-[#1e293b] border border-white/[0.06]'}`} />)}</div>
       ) : ocorrencias.length === 0 ? (
         <div className="text-center py-12">
           <CheckCircle size={32} className="text-emerald-400 mx-auto mb-2 opacity-60" />

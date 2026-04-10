@@ -70,14 +70,14 @@ function KpiCard({ label, value, sub, accent, alert, gauge, isLight }: KpiCardPr
   return (
     <div
       className={`rounded-2xl shadow-sm border-l-4 p-4 flex items-center gap-4 ${accent} ${
-        isLight ? 'bg-white border border-slate-200' : 'bg-[#1e293b] border border-white/[0.06]'
+        !isDark ? 'bg-white border border-slate-200' : 'bg-[#1e293b] border border-white/[0.06]'
       } ${alert ? 'ring-1 ring-red-500/40' : ''}`}
     >
       {gauge && (
         <div className="relative shrink-0 flex items-center justify-center" style={{ width: 72, height: 72 }}>
           <CircularGauge value={gauge.pct} color={gauge.color} />
           <span
-            className={`absolute text-sm font-black ${isLight ? 'text-slate-800' : 'text-white'}`}
+            className={`absolute text-sm font-black ${!isDark ? 'text-slate-800' : 'text-white'}`}
             style={{ top: '50%', left: '50%', transform: 'translate(-50%,-50%)' }}
           >
             {Math.round(gauge.pct)}%
@@ -88,7 +88,7 @@ function KpiCard({ label, value, sub, accent, alert, gauge, isLight }: KpiCardPr
         <p className="text-[10px] text-slate-500 uppercase tracking-wide mb-0.5">{label}</p>
         <p
           className={`text-2xl font-black leading-none ${
-            alert ? 'text-red-500' : isLight ? 'text-slate-800' : 'text-white'
+            alert ? 'text-red-500' : !isDark ? 'text-slate-800' : 'text-white'
           }`}
         >
           {value}
@@ -102,7 +102,7 @@ function KpiCard({ label, value, sub, accent, alert, gauge, isLight }: KpiCardPr
 
 // ── Main ──────────────────────────────────────────────────────────────────────
 export default function Indicadores() {
-  const { isLightSidebar: isLight } = useTheme()
+  const { isDark } = useTheme()
 
   const mesAtual = new Date().toISOString().slice(0, 7)
 
@@ -150,7 +150,7 @@ export default function Indicadores() {
       <div className="flex items-center gap-3">
         <BarChart3 size={20} className="text-teal-500" />
         <div>
-          <h1 className={`text-xl font-bold ${isLight ? 'text-slate-800' : 'text-white'}`}>
+          <h1 className={`text-xl font-bold ${!isDark ? 'text-slate-800' : 'text-white'}`}>
             Indicadores de Frota
           </h1>
           <p className="text-sm text-slate-500">Painel analítico — {mesAtual}</p>
@@ -227,12 +227,12 @@ export default function Indicadores() {
       {/* Status breakdown */}
       <div
         className={`rounded-2xl shadow-sm border p-4 ${
-          isLight ? 'bg-white border-slate-200' : 'bg-[#1e293b] border-white/[0.06]'
+          !isDark ? 'bg-white border-slate-200' : 'bg-[#1e293b] border-white/[0.06]'
         }`}
       >
         <p
           className={`text-sm font-bold mb-3 flex items-center gap-2 ${
-            isLight ? 'text-slate-700' : 'text-white'
+            !isDark ? 'text-slate-700' : 'text-white'
           }`}
         >
           <TrendingUp size={15} className="text-teal-500" /> Status da Frota

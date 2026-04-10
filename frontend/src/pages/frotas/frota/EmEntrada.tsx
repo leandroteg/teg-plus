@@ -10,7 +10,7 @@ import type { FroVeiculo } from '../../../types/frotas'
 import type { DivergenciaItem, DivergenciaZona } from '../../../components/frotas/ChecklistDivergenciasModal'
 
 export default function EmEntrada() {
-  const { isLightSidebar: isLight } = useTheme()
+  const { isDark } = useTheme()
   const queryClient = useQueryClient()
   const [openRegistrar, setOpenRegistrar] = useState(false)
   const [selectedVeiculo, setSelectedVeiculo] = useState<FroVeiculo | null>(null)
@@ -25,18 +25,18 @@ export default function EmEntrada() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
-          <h2 className={`text-lg font-bold flex items-center gap-2 ${isLight ? 'text-slate-800' : 'text-white'}`}>
+          <h2 className={`text-lg font-bold flex items-center gap-2 ${!isDark ? 'text-slate-800' : 'text-white'}`}>
             <LogIn size={18} className="text-rose-500" />
             Em Entrada
             {veiculos.length > 0 && (
               <span className={`ml-1 text-xs font-semibold px-2 py-0.5 rounded-full ${
-                isLight ? 'bg-amber-100 text-amber-700' : 'bg-amber-500/15 text-amber-400'
+                !isDark ? 'bg-amber-100 text-amber-700' : 'bg-amber-500/15 text-amber-400'
               }`}>
                 {veiculos.length} pendente{veiculos.length > 1 ? 's' : ''}
               </span>
             )}
           </h2>
-          <p className={`text-xs mt-0.5 ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
+          <p className={`text-xs mt-0.5 ${!isDark ? 'text-slate-500' : 'text-slate-400'}`}>
             Ativos em processo de entrada — aguardando conclusão da vistoria
           </p>
         </div>
@@ -62,17 +62,17 @@ export default function EmEntrada() {
       {/* Empty state */}
       {!isLoading && veiculos.length === 0 && (
         <div className={`flex flex-col items-center justify-center py-20 rounded-2xl border ${
-          isLight ? 'bg-slate-50 border-slate-200' : 'bg-slate-800/30 border-white/[0.06]'
+          !isDark ? 'bg-slate-50 border-slate-200' : 'bg-slate-800/30 border-white/[0.06]'
         }`}>
           <div className={`w-14 h-14 rounded-2xl flex items-center justify-center mb-4 ${
-            isLight ? 'bg-emerald-50' : 'bg-emerald-500/10'
+            !isDark ? 'bg-emerald-50' : 'bg-emerald-500/10'
           }`}>
-            <LogIn size={24} className={isLight ? 'text-emerald-600' : 'text-emerald-400'} />
+            <LogIn size={24} className={!isDark ? 'text-emerald-600' : 'text-emerald-400'} />
           </div>
-          <p className={`font-semibold text-sm ${isLight ? 'text-slate-700' : 'text-slate-300'}`}>
+          <p className={`font-semibold text-sm ${!isDark ? 'text-slate-700' : 'text-slate-300'}`}>
             Nenhuma entrada em andamento
           </p>
-          <p className={`text-xs mt-1.5 max-w-xs text-center leading-relaxed ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>
+          <p className={`text-xs mt-1.5 max-w-xs text-center leading-relaxed ${!isDark ? 'text-slate-400' : 'text-slate-500'}`}>
             Quando um ativo novo ou retornando de locação iniciar o processo de entrada e vistoria, ele aparecerá aqui.
           </p>
           <button
@@ -108,25 +108,25 @@ export default function EmEntrada() {
                   {/* Icon */}
                   <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${
                     isMaquina
-                      ? (isLight ? 'bg-violet-50 text-violet-600' : 'bg-violet-500/10 text-violet-400')
-                      : (isLight ? 'bg-sky-50 text-sky-600'       : 'bg-sky-500/10 text-sky-400')
+                      ? (!isDark ? 'bg-violet-50 text-violet-600' : 'bg-violet-500/10 text-violet-400')
+                      : (!isDark ? 'bg-sky-50 text-sky-600'       : 'bg-sky-500/10 text-sky-400')
                   }`}>
                     {isMaquina ? <Cog size={18} /> : <Car size={18} />}
                   </div>
 
                   {/* Info */}
                   <div className="flex-1 min-w-0">
-                    <p className={`font-bold text-sm ${isLight ? 'text-slate-800' : 'text-white'}`}>
+                    <p className={`font-bold text-sm ${!isDark ? 'text-slate-800' : 'text-white'}`}>
                       {identificador}
                     </p>
-                    <p className={`text-xs truncate ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
+                    <p className={`text-xs truncate ${!isDark ? 'text-slate-500' : 'text-slate-400'}`}>
                       {v.marca} {v.modelo}
                     </p>
                   </div>
 
                   {/* Status pill */}
                   <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full shrink-0 ${
-                    isLight ? 'bg-amber-100 text-amber-700' : 'bg-amber-500/15 text-amber-400'
+                    !isDark ? 'bg-amber-100 text-amber-700' : 'bg-amber-500/15 text-amber-400'
                   }`}>
                     Vistoria pendente
                   </span>

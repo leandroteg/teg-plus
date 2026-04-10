@@ -96,29 +96,29 @@ function VeiculoModal({
     onClose()
   }
 
-  const lbl = 'block text-xs font-bold mb-1 ' + (isLight ? 'text-slate-600' : 'text-slate-300')
+  const lbl = 'block text-xs font-bold mb-1 ' + (!isDark ? 'text-slate-600' : 'text-slate-300')
 
   const inp = `w-full px-3 py-2 rounded-xl text-sm placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-teal-400/40 ${
     isLight
       ? 'bg-white border border-slate-200 shadow-sm text-slate-800 hover:border-slate-300'
       : 'bg-white/6 border border-white/12 text-white hover:border-white/20'
   }`
-  const sel = inp + (isLight ? '' : ' [&>option]:bg-slate-900')
+  const sel = inp + (!isDark ? '' : ' [&>option]:bg-slate-900')
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
       <form
         onSubmit={handleSubmit}
         className={`rounded-2xl shadow-2xl p-6 w-full max-w-2xl space-y-4 max-h-[90vh] overflow-y-auto styled-scrollbar ${
-          isLight ? 'bg-white border border-slate-200' : 'bg-[#1e293b] border border-white/[0.06]'
+          !isDark ? 'bg-white border border-slate-200' : 'bg-[#1e293b] border border-white/[0.06]'
         }`}
       >
         <div className="flex items-center justify-between">
-          <h2 className={`text-lg font-extrabold ${isLight ? 'text-slate-800' : 'text-white'}`}>{inicial?.id ? 'Editar' : 'Novo'} Veiculo</h2>
+          <h2 className={`text-lg font-extrabold ${!isDark ? 'text-slate-800' : 'text-white'}`}>{inicial?.id ? 'Editar' : 'Novo'} Veiculo</h2>
           <button
             type="button"
             onClick={onClose}
-            className={`p-2 rounded-xl transition-colors ${isLight ? 'text-slate-400 hover:text-slate-600 hover:bg-slate-100' : 'text-slate-400 hover:text-white hover:bg-white/10'}`}
+            className={`p-2 rounded-xl transition-colors ${!isDark ? 'text-slate-400 hover:text-slate-600 hover:bg-slate-100' : 'text-slate-400 hover:text-white hover:bg-white/10'}`}
             title="Fechar"
           >
             <X className="w-5 h-5" />
@@ -234,7 +234,7 @@ function VeiculoModal({
 
         <div className="flex gap-2 pt-2">
           <button type="button" onClick={onClose} className={`flex-1 py-2.5 rounded-xl border text-sm font-medium transition-colors ${
-            isLight ? 'border-slate-200 text-slate-500 hover:bg-slate-50 hover:border-slate-300' : 'border-white/10 text-slate-400 hover:bg-white/5 hover:border-white/20'
+            !isDark ? 'border-slate-200 text-slate-500 hover:bg-slate-50 hover:border-slate-300' : 'border-white/10 text-slate-400 hover:bg-white/5 hover:border-white/20'
           }`}>
             Cancelar
           </button>
@@ -249,7 +249,7 @@ function VeiculoModal({
 
 // ── Main ──────────────────────────────────────────────────────────────────────
 export default function Veiculos() {
-  const { isLightSidebar: isLight } = useTheme()
+  const { isDark } = useTheme()
   const [busca, setBusca]     = useState('')
   const [modal, setModal]     = useState<Partial<FroVeiculo> | null>(null)
   const [statusFiltro, setStatusFiltro] = useState<StatusVeiculo | ''>('')
@@ -274,7 +274,7 @@ export default function Veiculos() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className={`text-xl font-bold flex items-center gap-2 ${isLight ? 'text-slate-800' : 'text-white'}`}>
+          <h1 className={`text-xl font-bold flex items-center gap-2 ${!isDark ? 'text-slate-800' : 'text-white'}`}>
             <Car size={20} className="text-teal-500" /> Veiculos
           </h1>
           <p className="text-sm text-slate-500">{veiculos.length} veiculo{veiculos.length !== 1 ? 's' : ''} cadastrado{veiculos.length !== 1 ? 's' : ''}</p>
@@ -303,12 +303,12 @@ export default function Veiculos() {
           />
         </div>
         <div>
-          <label className={`block text-xs font-medium mb-1 ${isLight ? 'text-slate-600' : 'text-slate-300'}`}>Status</label>
+          <label className={`block text-xs font-medium mb-1 ${!isDark ? 'text-slate-600' : 'text-slate-300'}`}>Status</label>
           <select
             value={statusFiltro}
             onChange={e => setStatusFiltro(e.target.value as StatusVeiculo | '')}
             className={`px-3 py-2 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-teal-400/40 ${
-              isLight ? 'bg-white border border-slate-200 shadow-sm text-slate-800 hover:border-slate-300' : 'bg-white/6 border border-white/12 text-white hover:border-white/20 [&>option]:bg-slate-900'
+              !isDark ? 'bg-white border border-slate-200 shadow-sm text-slate-800 hover:border-slate-300' : 'bg-white/6 border border-white/12 text-white hover:border-white/20 [&>option]:bg-slate-900'
             }`}
           >
             <option value="">Todos</option>
@@ -316,12 +316,12 @@ export default function Veiculos() {
           </select>
         </div>
         <div>
-          <label className={`block text-xs font-medium mb-1 ${isLight ? 'text-slate-600' : 'text-slate-300'}`}>Categoria</label>
+          <label className={`block text-xs font-medium mb-1 ${!isDark ? 'text-slate-600' : 'text-slate-300'}`}>Categoria</label>
           <select
             value={catFiltro}
             onChange={e => setCatFiltro(e.target.value as CategoriaVeiculo | '')}
             className={`px-3 py-2 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-teal-400/40 ${
-              isLight ? 'bg-white border border-slate-200 shadow-sm text-slate-800 hover:border-slate-300' : 'bg-white/6 border border-white/12 text-white hover:border-white/20 [&>option]:bg-slate-900'
+              !isDark ? 'bg-white border border-slate-200 shadow-sm text-slate-800 hover:border-slate-300' : 'bg-white/6 border border-white/12 text-white hover:border-white/20 [&>option]:bg-slate-900'
             }`}
           >
             <option value="">Todas</option>
@@ -334,7 +334,7 @@ export default function Veiculos() {
       {isLoading ? (
         <div className="space-y-2">
           {Array.from({ length: 5 }).map((_, i) => (
-            <div key={i} className={`rounded-xl h-16 animate-pulse ${isLight ? 'bg-white border border-slate-200 shadow-sm' : 'bg-[#1e293b] border border-white/[0.06]'}`} />
+            <div key={i} className={`rounded-xl h-16 animate-pulse ${!isDark ? 'bg-white border border-slate-200 shadow-sm' : 'bg-[#1e293b] border border-white/[0.06]'}`} />
           ))}
         </div>
       ) : filtrados.length === 0 ? (
@@ -350,24 +350,24 @@ export default function Veiculos() {
 
             return (
               <div key={v.id} className={`rounded-xl shadow-sm px-4 py-3 flex items-center gap-4 ${
-                isLight ? 'bg-white border border-slate-200' : 'bg-[#1e293b] border border-white/[0.06]'
+                !isDark ? 'bg-white border border-slate-200' : 'bg-[#1e293b] border border-white/[0.06]'
               }`}>
 
                 {/* Placa */}
                 <div className="w-24 shrink-0">
-                  <p className={`text-sm font-black tracking-widest ${isLight ? 'text-slate-800' : 'text-white'}`}>{v.placa}</p>
+                  <p className={`text-sm font-black tracking-widest ${!isDark ? 'text-slate-800' : 'text-white'}`}>{v.placa}</p>
                   <p className="text-[10px] text-slate-500">{CATEGORIA_LABEL[v.categoria]}</p>
                 </div>
 
                 {/* Modelo */}
                 <div className="flex-1 min-w-0">
-                  <p className={`text-sm font-semibold truncate ${isLight ? 'text-slate-800' : 'text-white'}`}>{v.marca} {v.modelo}</p>
+                  <p className={`text-sm font-semibold truncate ${!isDark ? 'text-slate-800' : 'text-white'}`}>{v.marca} {v.modelo}</p>
                   <p className="text-[11px] text-slate-500">{v.ano_fab}/{v.ano_mod} · {COMBUSTIVEL_LABEL[v.combustivel]}</p>
                 </div>
 
                 {/* Hodometro */}
                 <div className="hidden sm:block w-24 text-right">
-                  <p className={`text-sm font-semibold ${isLight ? 'text-slate-800' : 'text-white'}`}>{v.hodometro_atual.toLocaleString('pt-BR')} km</p>
+                  <p className={`text-sm font-semibold ${!isDark ? 'text-slate-800' : 'text-white'}`}>{v.hodometro_atual.toLocaleString('pt-BR')} km</p>
                   {warnPrev && <p className="text-[10px] text-amber-400">prev. proxima</p>}
                 </div>
 

@@ -72,16 +72,16 @@ function NovaOSModal({ onClose, isLight }: { onClose: () => void; isLight: boole
   }
 
   const inp = `w-full px-3 py-2.5 rounded-xl text-sm placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-teal-400/40 transition-colors ${
-    isLight ? 'bg-white border border-slate-200 shadow-sm text-slate-800 hover:border-slate-300' : 'bg-white/6 border border-white/12 text-white hover:border-white/20'
+    !isDark ? 'bg-white border border-slate-200 shadow-sm text-slate-800 hover:border-slate-300' : 'bg-white/6 border border-white/12 text-white hover:border-white/20'
   }`
-  const sel = inp + (isLight ? '' : ' [&>option]:bg-slate-900')
-  const lbl = `block text-xs font-bold mb-1 ${isLight ? 'text-slate-600' : 'text-slate-300'}`
+  const sel = inp + (!isDark ? '' : ' [&>option]:bg-slate-900')
+  const lbl = `block text-xs font-bold mb-1 ${!isDark ? 'text-slate-600' : 'text-slate-300'}`
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-      <form onSubmit={handleSubmit} className={`rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto styled-scrollbar ${isLight ? 'bg-white border border-slate-200' : 'bg-[#1e293b] border border-white/[0.06]'}`}>
-        <div className={`px-6 py-4 border-b ${isLight ? 'border-slate-100' : 'border-white/[0.06]'}`}>
-          <h2 className={`text-lg font-extrabold ${isLight ? 'text-slate-800' : 'text-white'}`}>Nova Ordem de Servico</h2>
+      <form onSubmit={handleSubmit} className={`rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto styled-scrollbar ${!isDark ? 'bg-white border border-slate-200' : 'bg-[#1e293b] border border-white/[0.06]'}`}>
+        <div className={`px-6 py-4 border-b ${!isDark ? 'border-slate-100' : 'border-white/[0.06]'}`}>
+          <h2 className={`text-lg font-extrabold ${!isDark ? 'text-slate-800' : 'text-white'}`}>Nova Ordem de Servico</h2>
         </div>
 
         <div className="p-5 space-y-4">
@@ -150,9 +150,9 @@ function NovaOSModal({ onClose, isLight }: { onClose: () => void; isLight: boole
 
         </div>
 
-        <div className={`px-6 py-4 border-t flex gap-2 ${isLight ? 'border-slate-100' : 'border-white/[0.06]'}`}>
+        <div className={`px-6 py-4 border-t flex gap-2 ${!isDark ? 'border-slate-100' : 'border-white/[0.06]'}`}>
           <button type="button" onClick={onClose} className={`flex-1 py-2.5 rounded-xl border text-sm font-medium transition-colors ${
-            isLight ? 'border-slate-200 text-slate-600 hover:bg-slate-50 hover:border-slate-300' : 'border-white/12 text-slate-300 hover:bg-white/5 hover:border-white/20'
+            !isDark ? 'border-slate-200 text-slate-600 hover:bg-slate-50 hover:border-slate-300' : 'border-white/12 text-slate-300 hover:bg-white/5 hover:border-white/20'
           }`}>Cancelar</button>
           <button type="submit" disabled={criar.isPending} className="flex-1 py-2.5 rounded-xl bg-gradient-to-r from-teal-500 to-teal-600 hover:from-teal-400 hover:to-teal-500 text-sm text-white font-semibold disabled:opacity-50 shadow-sm shadow-teal-500/20 transition-all">
             {criar.isPending ? 'Criando...' : 'Criar OS'}
@@ -186,9 +186,9 @@ function CotacoesPanel({ os, isLight }: { os: FroOrdemServico; isLight: boolean 
   }
 
   const inp = `w-full px-3 py-2 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-teal-400/40 ${
-    isLight ? 'bg-white border border-slate-200 shadow-sm text-slate-800' : 'bg-white/6 border border-white/12 text-white'
+    !isDark ? 'bg-white border border-slate-200 shadow-sm text-slate-800' : 'bg-white/6 border border-white/12 text-white'
   }`
-  const sel = inp + (isLight ? '' : ' [&>option]:bg-slate-900')
+  const sel = inp + (!isDark ? '' : ' [&>option]:bg-slate-900')
 
   return (
     <div className="mt-3 space-y-2">
@@ -203,7 +203,7 @@ function CotacoesPanel({ os, isLight }: { os: FroOrdemServico; isLight: boolean 
 
       {addOpen && (
         <form onSubmit={handleAddCotacao} className={`grid grid-cols-4 gap-2 p-3 rounded-xl ${
-          isLight ? 'bg-slate-50 border border-slate-200' : 'bg-white/4 border border-white/8'
+          !isDark ? 'bg-slate-50 border border-slate-200' : 'bg-white/4 border border-white/8'
         }`}>
           <select className={sel} value={form.fornecedor_id} onChange={e => setForm(f => ({ ...f, fornecedor_id: e.target.value }))} required>
             <option value="">Fornecedor...</option>
@@ -216,12 +216,12 @@ function CotacoesPanel({ os, isLight }: { os: FroOrdemServico; isLight: boolean 
       )}
 
       {cotacoes.map(cot => (
-        <div key={cot.id} className={`flex items-center gap-3 p-2.5 rounded-xl border text-xs ${cot.selecionado ? 'border-teal-500/40 bg-teal-500/8' : isLight ? 'border-slate-200 bg-slate-50' : 'border-white/8 bg-white/3'}`}>
+        <div key={cot.id} className={`flex items-center gap-3 p-2.5 rounded-xl border text-xs ${cot.selecionado ? 'border-teal-500/40 bg-teal-500/8' : !isDark ? 'border-slate-200 bg-slate-50' : 'border-white/8 bg-white/3'}`}>
           <div className="flex-1">
-            <p className={`font-semibold ${isLight ? 'text-slate-800' : 'text-white'}`}>{cot.fornecedor?.razao_social}</p>
+            <p className={`font-semibold ${!isDark ? 'text-slate-800' : 'text-white'}`}>{cot.fornecedor?.razao_social}</p>
             {cot.prazo_execucao_dias && <p className="text-slate-500">{cot.prazo_execucao_dias} dias</p>}
           </div>
-          <p className={`font-black ${isLight ? 'text-slate-800' : 'text-white'}`}>{BRL(cot.valor_total)}</p>
+          <p className={`font-black ${!isDark ? 'text-slate-800' : 'text-white'}`}>{BRL(cot.valor_total)}</p>
           {os.status === 'em_cotacao' && !cot.selecionado && cotacoes.length >= 1 && (
             <button
               onClick={() => selecionarCot.mutate({ cotacaoId: cot.id, osId: os.id, fornecedorId: cot.fornecedor_id, valor: cot.valor_total })}
@@ -272,19 +272,19 @@ function OSCard({ os, isLight }: { os: FroOrdemServico; isLight: boolean }) {
   }
 
   const modalInp = `w-full px-3 py-2.5 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-teal-400/40 resize-none ${
-    isLight ? 'bg-white border border-slate-200 shadow-sm text-slate-800' : 'bg-white/6 border border-white/12 text-white'
+    !isDark ? 'bg-white border border-slate-200 shadow-sm text-slate-800' : 'bg-white/6 border border-white/12 text-white'
   }`
-  const lbl = `block text-xs font-bold mb-1 ${isLight ? 'text-slate-600' : 'text-slate-300'}`
+  const lbl = `block text-xs font-bold mb-1 ${!isDark ? 'text-slate-600' : 'text-slate-300'}`
 
   return (
-    <div className={`rounded-2xl border ${os.prioridade === 'critica' ? 'border-red-500/30' : isLight ? 'border-slate-200' : 'border-white/[0.06]'} ${isLight ? 'bg-white shadow-sm' : 'bg-[#1e293b]'}`}>
+    <div className={`rounded-2xl border ${os.prioridade === 'critica' ? 'border-red-500/30' : !isDark ? 'border-slate-200' : 'border-white/[0.06]'} ${!isDark ? 'bg-white shadow-sm' : 'bg-[#1e293b]'}`}>
       <button className="w-full p-4 text-left" onClick={() => setExpanded(e => !e)}>
         <div className="flex items-start gap-3">
           <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded border uppercase shrink-0 ${pCfg.cls}`}>
             {pCfg.label}
           </span>
           <div className="flex-1 min-w-0">
-            <p className={`text-sm font-bold ${isLight ? 'text-slate-800' : 'text-white'}`}>
+            <p className={`text-sm font-bold ${!isDark ? 'text-slate-800' : 'text-white'}`}>
               {os.numero_os ?? '...'} · {os.veiculo?.placa}
             </p>
             <p className="text-[11px] text-slate-400 truncate">{os.descricao_problema}</p>
@@ -294,7 +294,7 @@ function OSCard({ os, isLight }: { os: FroOrdemServico; isLight: boolean }) {
             </div>
           </div>
           <div className="text-right shrink-0">
-            <p className={`text-xs font-bold ${isLight ? 'text-slate-800' : 'text-white'}`}>{os.valor_aprovado ? BRL(os.valor_aprovado) : os.valor_orcado ? BRL(os.valor_orcado) : '—'}</p>
+            <p className={`text-xs font-bold ${!isDark ? 'text-slate-800' : 'text-white'}`}>{os.valor_aprovado ? BRL(os.valor_aprovado) : os.valor_orcado ? BRL(os.valor_orcado) : '—'}</p>
             <p className="text-[10px] text-slate-500">{STATUS_LABEL[os.status]}</p>
           </div>
           {expanded ? <ChevronUp size={14} className="text-slate-500 shrink-0" /> : <ChevronDown size={14} className="text-slate-500 shrink-0" />}
@@ -302,7 +302,7 @@ function OSCard({ os, isLight }: { os: FroOrdemServico; isLight: boolean }) {
       </button>
 
       {expanded && (
-        <div className={`px-4 pb-4 pt-3 space-y-3 ${isLight ? 'border-t border-slate-200' : 'border-t border-white/5'}`}>
+        <div className={`px-4 pb-4 pt-3 space-y-3 ${!isDark ? 'border-t border-slate-200' : 'border-t border-white/5'}`}>
 
           {/* Alcada info */}
           {os.valor_orcado && (
@@ -369,12 +369,12 @@ function OSCard({ os, isLight }: { os: FroOrdemServico; isLight: boolean }) {
       {/* Modal Aprovar/Rejeitar */}
       {aprovModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60">
-          <div className={`rounded-2xl shadow-2xl p-5 w-full max-w-sm space-y-3 ${isLight ? 'bg-white border border-slate-200' : 'bg-[#1e293b] border border-white/[0.06]'}`}>
-            <h3 className={`text-sm font-bold ${isLight ? 'text-slate-800' : 'text-white'}`}>
+          <div className={`rounded-2xl shadow-2xl p-5 w-full max-w-sm space-y-3 ${!isDark ? 'bg-white border border-slate-200' : 'bg-[#1e293b] border border-white/[0.06]'}`}>
+            <h3 className={`text-sm font-bold ${!isDark ? 'text-slate-800' : 'text-white'}`}>
               {aprovModal === 'aprovar' ? 'Confirmar Aprovacao' : 'Rejeitar OS'}
             </h3>
             {aprovModal === 'aprovar' ? (
-              <p className="text-xs text-slate-400">Valor aprovado: <span className={`font-bold ${isLight ? 'text-slate-800' : 'text-white'}`}>{BRL(os.valor_orcado ?? 0)}</span></p>
+              <p className="text-xs text-slate-400">Valor aprovado: <span className={`font-bold ${!isDark ? 'text-slate-800' : 'text-white'}`}>{BRL(os.valor_orcado ?? 0)}</span></p>
             ) : (
               <div>
                 <label className={lbl}>Motivo da rejeicao *</label>
@@ -383,7 +383,7 @@ function OSCard({ os, isLight }: { os: FroOrdemServico; isLight: boolean }) {
             )}
             <div className="flex gap-2">
               <button onClick={() => setAprovModal(null)} className={`flex-1 py-2 rounded-xl border text-sm ${
-                isLight ? 'border-slate-200 text-slate-500' : 'border-white/10 text-slate-400'
+                !isDark ? 'border-slate-200 text-slate-500' : 'border-white/10 text-slate-400'
               }`}>Cancelar</button>
               <button
                 onClick={aprovModal === 'aprovar' ? handleAprovar : handleRejeitar}
@@ -399,8 +399,8 @@ function OSCard({ os, isLight }: { os: FroOrdemServico; isLight: boolean }) {
       {/* Modal Concluir */}
       {concluirModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60">
-          <div className={`rounded-2xl shadow-2xl p-5 w-full max-w-sm space-y-3 ${isLight ? 'bg-white border border-slate-200' : 'bg-[#1e293b] border border-white/[0.06]'}`}>
-            <h3 className={`text-sm font-bold ${isLight ? 'text-slate-800' : 'text-white'}`}>Concluir OS {os.numero_os}</h3>
+          <div className={`rounded-2xl shadow-2xl p-5 w-full max-w-sm space-y-3 ${!isDark ? 'bg-white border border-slate-200' : 'bg-[#1e293b] border border-white/[0.06]'}`}>
+            <h3 className={`text-sm font-bold ${!isDark ? 'text-slate-800' : 'text-white'}`}>Concluir OS {os.numero_os}</h3>
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className={lbl}>Hodometro saida (km)</label>
@@ -413,7 +413,7 @@ function OSCard({ os, isLight }: { os: FroOrdemServico; isLight: boolean }) {
             </div>
             <div className="flex gap-2">
               <button onClick={() => setConcluirModal(false)} className={`flex-1 py-2 rounded-xl border text-sm ${
-                isLight ? 'border-slate-200 text-slate-500' : 'border-white/10 text-slate-400'
+                !isDark ? 'border-slate-200 text-slate-500' : 'border-white/10 text-slate-400'
               }`}>Cancelar</button>
               <button onClick={handleConcluir} className="flex-1 py-2 rounded-xl bg-emerald-600 text-sm text-white font-semibold">
                 Concluir e Liberar Veiculo
@@ -434,7 +434,7 @@ const TABS = [
 ]
 
 export default function Ordens() {
-  const { isLightSidebar: isLight } = useTheme()
+  const { isDark } = useTheme()
   const [tab, setTab] = useState(0)
   const [novaOS, setNovaOS] = useState(false)
   const cur = TABS[tab]
@@ -445,7 +445,7 @@ export default function Ordens() {
     <div className="p-4 sm:p-6 space-y-4">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className={`text-xl font-bold flex items-center gap-2 ${isLight ? 'text-slate-800' : 'text-white'}`}>
+          <h1 className={`text-xl font-bold flex items-center gap-2 ${!isDark ? 'text-slate-800' : 'text-white'}`}>
             <Wrench size={20} className="text-teal-500" /> Ordens de Servico
           </h1>
           <p className="text-sm text-slate-500">{os.length} OS na aba atual</p>
@@ -457,7 +457,7 @@ export default function Ordens() {
 
       {/* Tabs */}
       <div className={`flex gap-1 p-1 rounded-xl w-fit ${
-        isLight ? 'bg-slate-100 border border-slate-200' : 'bg-white/4 border border-white/8'
+        !isDark ? 'bg-slate-100 border border-slate-200' : 'bg-white/4 border border-white/8'
       }`}>
         {TABS.map((t, i) => (
           <button
@@ -466,7 +466,7 @@ export default function Ordens() {
             className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
               tab === i
                 ? 'bg-teal-600 text-white shadow-sm'
-                : isLight ? 'text-slate-500 hover:text-slate-800' : 'text-slate-400 hover:text-white'
+                : !isDark ? 'text-slate-500 hover:text-slate-800' : 'text-slate-400 hover:text-white'
             }`}
           >
             {t.label}
@@ -476,7 +476,7 @@ export default function Ordens() {
 
       {/* Content */}
       {isLoading ? (
-        <div className="space-y-2">{Array.from({ length: 4 }).map((_, i) => <div key={i} className={`rounded-2xl h-20 animate-pulse ${isLight ? 'bg-slate-100' : 'bg-white/5'}`} />)}</div>
+        <div className="space-y-2">{Array.from({ length: 4 }).map((_, i) => <div key={i} className={`rounded-2xl h-20 animate-pulse ${!isDark ? 'bg-slate-100' : 'bg-white/5'}`} />)}</div>
       ) : os.length === 0 ? (
         <p className="text-sm text-slate-500 text-center py-12">Nenhuma OS nesta aba</p>
       ) : (
