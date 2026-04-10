@@ -1,5 +1,5 @@
-import { useState, useCallback } from 'react'
-import { Building, Plus, Search, ChevronRight, X, Save, Loader2, CheckCircle2, Upload, ImageIcon } from 'lucide-react'
+import { useState, useCallback, useMemo } from 'react'
+import { Building, Plus, Search, ChevronRight, X, Save, Loader2, CheckCircle2, Upload, ImageIcon, ArrowUp, ArrowDown, LayoutList, LayoutGrid, Trash2 } from 'lucide-react'
 import { useCadEmpresas, useSalvarEmpresa } from '../../hooks/useCadastros'
 import { useConsultaCNPJ } from '../../hooks/useConsultas'
 import { supabase } from '../../services/supabase'
@@ -15,6 +15,10 @@ export default function EmpresasCad() {
   const [busca, setBusca] = useState('')
   const [showForm, setShowForm] = useState(false)
   const [editItem, setEditItem] = useState<Partial<Empresa> | null>(null)
+  const [viewMode, setViewMode] = useState<'table' | 'card'>('table')
+  const [sortCol, setSortCol] = useState<string>('razao_social')
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc')
+  const [selected, setSelected] = useState<Set<string>>(new Set())
 
   const { data: empresas = [], isLoading } = useCadEmpresas()
   const salvar = useSalvarEmpresa()
@@ -27,13 +31,46 @@ export default function EmpresasCad() {
     } : prev)
   }, []))
 
-  const filtered = busca.trim()
-    ? empresas.filter(e =>
-        e.razao_social.toLowerCase().includes(busca.toLowerCase()) ||
-        e.nome_fantasia?.toLowerCase().includes(busca.toLowerCase()) ||
-        e.codigo.toLowerCase().includes(busca.toLowerCase())
+  const filtered = useMemo(() => {
+    let list = empresas
+    if (busca.trim()) {
+      const q = busca.toLowerCase()
+      list = list.filter(e =>
+        e.razao_social.toLowerCase().includes(q) ||
+        e.nome_fantasia?.toLowerCase().includes(q) ||
+        e.codigo.toLowerCase().includes(q)
       )
-    : empresas
+    }
+    list = [...list].sort((a, b) => {
+      const av = (a as any)[sortCol] ?? ''
+      const bv = (b as any)[sortCol] ?? ''
+      const cmp = String(av).localeCompare(String(bv), 'pt-BR', { sensitivity: 'base' })
+      return sortDir === 'asc' ? cmp : -cmp
+    })
+    return list
+  }, [empresas, busca, sortCol, sortDir])
+
+  const toggleSort = (col: string) => {
+    if (sortCol === col) setSortDir(d => d === 'asc' ? 'desc' : 'asc')
+    else { setSortCol(col); setSortDir('asc') }
+  }
+  const SortIcon = ({ col }: { col: string }) =>
+    sortCol === col ? (sortDir === 'asc' ? <ArrowUp size={12} /> : <ArrowDown size={12} />) : null
+
+  const toggleSelect = (id: string) => setSelected(prev => {
+    const next = new Set(prev); next.has(id) ? next.delete(id) : next.add(id); return next
+  })
+  const selectAll = () => {
+    if (selected.size === filtered.length) setSelected(new Set())
+    else setSelected(new Set(filtered.map(i => i.id)))
+  }
+  const handleBulkDelete = async () => {
+    if (!confirm(`Excluir ${selected.size} item(s)?`)) return
+    await supabase.from('sys_empresas').delete().in('id', [...selected])
+    setSelected(new Set())
+    salvar.reset?.()
+    window.location.reload()
+  }
 
   function openNew() { setEditItem({ ...EMPTY, cnpjs: [] }); setShowForm(true) }
   function openEdit(e: Empresa) { setEditItem({ ...e, cnpjs: [...(e.cnpjs || [])] }); setShowForm(true) }
@@ -74,7 +111,7 @@ export default function EmpresasCad() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-xl font-extrabold text-slate-800">Empresas</h1>
-          <p className="text-xs text-slate-400 mt-0.5">{filtered.length} empresas</p>
+          <p className="text-xs text-slate-400 mt-0.5">{filtered.length} item(s)</p>
         </div>
         <button onClick={openNew}
           className="flex items-center gap-1.5 bg-violet-600 hover:bg-violet-700 text-white
@@ -83,12 +120,25 @@ export default function EmpresasCad() {
         </button>
       </div>
 
-      <div className="relative">
-        <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-        <input value={busca} onChange={e => setBusca(e.target.value)}
-          placeholder="Buscar por nome ou codigo..."
-          className="w-full pl-9 pr-4 py-2 rounded-xl border border-slate-200 bg-white text-sm
-            focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400" />
+      {/* Toolbar */}
+      <div className="flex gap-2 flex-wrap items-center">
+        <div className="relative flex-1 min-w-[200px]">
+          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+          <input value={busca} onChange={e => setBusca(e.target.value)}
+            placeholder="Buscar por nome ou codigo..."
+            className="w-full pl-9 pr-4 py-2 rounded-xl border border-slate-200 bg-white text-sm
+              focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400" />
+        </div>
+        <div className="flex rounded-xl border border-slate-200 overflow-hidden">
+          <button onClick={() => setViewMode('table')}
+            className={`p-2 ${viewMode === 'table' ? 'bg-violet-600 text-white' : 'bg-white text-slate-400 hover:text-slate-600'}`}>
+            <LayoutList size={16} />
+          </button>
+          <button onClick={() => setViewMode('card')}
+            className={`p-2 ${viewMode === 'card' ? 'bg-violet-600 text-white' : 'bg-white text-slate-400 hover:text-slate-600'}`}>
+            <LayoutGrid size={16} />
+          </button>
+        </div>
       </div>
 
       {isLoading ? (
@@ -101,6 +151,47 @@ export default function EmpresasCad() {
           <p className="text-slate-500 font-semibold">Nenhuma empresa encontrada</p>
           <p className="text-slate-400 text-sm mt-1">Cadastre a primeira empresa</p>
         </div>
+      ) : viewMode === 'table' ? (
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-slate-100 bg-slate-50">
+                <th className="px-4 py-3 w-10">
+                  <input type="checkbox" checked={selected.size === filtered.length && filtered.length > 0}
+                    onChange={selectAll} className="rounded border-slate-300 text-violet-600 focus:ring-violet-500" />
+                </th>
+                <th className="text-left px-4 py-3 text-[10px] font-bold text-slate-500 uppercase tracking-widest cursor-pointer select-none" onClick={() => toggleSort('codigo')}>
+                  <span className="flex items-center gap-1">Codigo <SortIcon col="codigo" /></span>
+                </th>
+                <th className="text-left px-4 py-3 text-[10px] font-bold text-slate-500 uppercase tracking-widest cursor-pointer select-none" onClick={() => toggleSort('razao_social')}>
+                  <span className="flex items-center gap-1">Razao Social <SortIcon col="razao_social" /></span>
+                </th>
+                <th className="text-left px-4 py-3 text-[10px] font-bold text-slate-500 uppercase tracking-widest cursor-pointer select-none hidden md:table-cell" onClick={() => toggleSort('nome_fantasia')}>
+                  <span className="flex items-center gap-1">Nome Fantasia <SortIcon col="nome_fantasia" /></span>
+                </th>
+                <th className="text-center px-4 py-3 text-[10px] font-bold text-slate-500 uppercase tracking-widest cursor-pointer select-none" onClick={() => toggleSort('ativo')}>
+                  <span className="flex items-center justify-center gap-1">Status <SortIcon col="ativo" /></span>
+                </th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-50">
+              {filtered.map(e => (
+                <tr key={e.id} className="hover:bg-slate-50 transition-colors cursor-pointer" onClick={() => openEdit(e)}>
+                  <td className="px-4 py-2.5" onClick={ev => ev.stopPropagation()}>
+                    <input type="checkbox" checked={selected.has(e.id)} onChange={() => toggleSelect(e.id)}
+                      className="rounded border-slate-300 text-violet-600 focus:ring-violet-500" />
+                  </td>
+                  <td className="px-4 py-2.5 font-mono text-xs text-slate-600">{e.codigo}</td>
+                  <td className="px-4 py-2.5 font-semibold text-slate-800">{e.razao_social}</td>
+                  <td className="px-4 py-2.5 text-xs text-slate-500 hidden md:table-cell">{e.nome_fantasia || '—'}</td>
+                  <td className="px-4 py-2.5 text-center">
+                    <span className={`inline-block w-2 h-2 rounded-full ${e.ativo ? 'bg-emerald-400' : 'bg-slate-300'}`} />
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       ) : (
         <div className="space-y-2">
           {filtered.map(e => (
@@ -108,6 +199,10 @@ export default function EmpresasCad() {
               className={`bg-white rounded-2xl border shadow-sm p-4 hover:shadow-md cursor-pointer group transition-all
                 ${e.ativo ? 'border-slate-200' : 'border-slate-200 opacity-60'}`}>
               <div className="flex items-start gap-3">
+                <div className="flex items-center pt-1" onClick={ev => ev.stopPropagation()}>
+                  <input type="checkbox" checked={selected.has(e.id)} onChange={() => toggleSelect(e.id)}
+                    className="rounded border-slate-300 text-violet-600 focus:ring-violet-500" />
+                </div>
                 <div className="w-10 h-10 rounded-xl bg-teal-50 flex items-center justify-center shrink-0">
                   <Building size={16} className="text-teal-600" />
                 </div>
@@ -131,6 +226,16 @@ export default function EmpresasCad() {
               </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {/* Bulk delete bar */}
+      {selected.size > 0 && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 bg-slate-900 text-white px-6 py-3 rounded-2xl shadow-2xl flex items-center gap-4 text-sm font-semibold">
+          <span>{selected.size} selecionado(s)</span>
+          <button onClick={handleBulkDelete} className="flex items-center gap-1.5 bg-red-500 hover:bg-red-600 px-3 py-1.5 rounded-xl transition-colors">
+            <Trash2 size={14} /> Excluir
+          </button>
         </div>
       )}
 
@@ -235,14 +340,14 @@ export default function EmpresasCad() {
                 </div>
               </div>
 
-              {/* Endereço e contato */}
+              {/* Endereco e contato */}
               <div className="pt-2 border-t border-slate-100">
                 <p className="text-[10px] font-bold text-violet-500 uppercase tracking-wider mb-2">{`Endere\u00e7o e Contato`}</p>
                 <div className="space-y-3">
                   <div>
                     <label className="block text-xs font-bold text-slate-600 mb-1">{`Endere\u00e7o`}</label>
                     <input value={(editItem as any).endereco ?? ''} onChange={e => set('endereco', e.target.value)}
-                      className="input-base" placeholder="Rua, número, bairro" />
+                      className="input-base" placeholder="Rua, numero, bairro" />
                   </div>
                   <div className="grid grid-cols-3 gap-2">
                     <div>
