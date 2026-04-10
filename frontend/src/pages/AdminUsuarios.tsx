@@ -1557,6 +1557,9 @@ export default function AdminUsuarios() {
   const [bulkModulos, setBulkModulos] = useState<Record<string, boolean>>(() => createEmptyModulosMap())
   const [bulkModuloPapeis, setBulkModuloPapeis] = useState<Record<string, PapelGlobal>>({})
   const [showBatchEditor, setShowBatchEditor] = useState(false)
+  const [showBatchDelete, setShowBatchDelete] = useState(false)
+  const [batchDeleteTyped, setBatchDeleteTyped] = useState('')
+  const batchDelete = useDeleteUser()
   const selectAllRef = useRef<HTMLInputElement | null>(null)
 
   const filtered = useMemo(() => {
@@ -1684,6 +1687,15 @@ export default function AdminUsuarios() {
     setQuickEditUserId(null)
     setShowBatchEditor(false)
     clearBatch()
+  }
+
+  const applyBatchDelete = async () => {
+    for (const id of selectedIds) {
+      await batchDelete.mutateAsync(id)
+    }
+    setSelectedIds([])
+    setShowBatchDelete(false)
+    setBatchDeleteTyped('')
   }
 
   return (
@@ -1855,11 +1867,56 @@ export default function AdminUsuarios() {
               <Edit3 size={12} />
               Editar
             </button>
+            {selectedIds.length > 0 && (
+              <button
+                type="button"
+                onClick={() => setShowBatchDelete(true)}
+                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold border border-red-200 text-red-500 hover:bg-red-50 transition-all"
+              >
+                <X size={12} />
+                Excluir ({selectedIds.length})
+              </button>
+            )}
           </div>
 
           <div className="flex items-center justify-end">
             <span className="text-xs text-slate-500">{selectedIds.length} selecionado(s)</span>
           </div>
+
+          {showBatchDelete && selectedIds.length > 0 && (
+            <div className="rounded-2xl border-2 border-red-200 bg-red-50 p-4">
+              <p className="text-sm font-bold text-red-700 mb-1">Excluir {selectedIds.length} usuario(s)?</p>
+              <p className="text-[10px] text-red-600 mb-3">
+                Acao irreversivel. Todos os usuarios selecionados serao removidos permanentemente (Auth + Perfil).
+              </p>
+              <div className="mb-3">
+                <p className="text-[10px] text-red-600 font-semibold mb-1.5">
+                  Digite <span className="font-black bg-red-100 px-1 rounded">EXCLUIR</span> para confirmar:
+                </p>
+                <input
+                  type="text"
+                  value={batchDeleteTyped}
+                  onChange={e => setBatchDeleteTyped(e.target.value)}
+                  placeholder="EXCLUIR"
+                  className="w-full text-xs rounded-lg px-3 py-2 border-2 border-red-200 bg-white text-red-700 placeholder-red-300 outline-none focus:border-red-400 font-bold uppercase tracking-wider"
+                  autoFocus
+                />
+              </div>
+              <div className="flex gap-2">
+                <button onClick={() => { setShowBatchDelete(false); setBatchDeleteTyped('') }}
+                  className="flex-1 py-2 rounded-xl text-xs font-semibold border border-slate-200 text-slate-600">
+                  Cancelar
+                </button>
+                <button
+                  onClick={applyBatchDelete}
+                  disabled={batchDelete.isPending || batchDeleteTyped !== 'EXCLUIR'}
+                  className="flex-1 py-2 rounded-xl text-xs font-bold bg-red-600 text-white hover:bg-red-700 disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-1.5 transition-opacity">
+                  {batchDelete.isPending ? <Loader2 size={12} className="animate-spin" /> : <X size={12} />}
+                  Excluir {selectedIds.length} usuario(s)
+                </button>
+              </div>
+            </div>
+          )}
 
           {showFilters && (
             <div className="bg-white rounded-2xl border border-slate-200 p-3 shadow-card">
