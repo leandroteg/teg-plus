@@ -242,8 +242,10 @@ export default function Login() {
         <div className="relative z-10 min-h-screen flex items-center justify-center p-4">
           <div className="w-full max-w-sm" style={{ animation: 'vortex-entrance 0.8s ease-out' }}>
 
-            {/* Spacer (login sempre dark) */}
-            <div className="mb-4" />
+            {/* Theme toggle — muda o tema do app, login sempre dark visualmente */}
+            <div className="flex justify-center mb-4">
+              <ThemeToggle variant="dark" compact />
+            </div>
 
             {/* Logo */}
             <div className="text-center mb-7">
