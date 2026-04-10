@@ -682,35 +682,25 @@ function useCadastrarUsuario() {
       }
 
       // 2) Fallback local: criar user via RPC (bypass signUp email validation)
+      // RPC cria auth.users + auth.identities + sys_perfis de uma vez
       const { data: rpcData, error: rpcErr } = await supabase.rpc('admin_create_user_rpc', {
         p_email: loginEmail,
         p_password: senhaTemporaria,
         p_nome: nome,
         p_username: finalUsername,
       })
-      if (rpcErr) throw new Error(rpcErr.message || 'Erro ao criar usuário no Auth.')
+      if (rpcErr) throw new Error(rpcErr.message || 'Erro ao criar usuario no Auth.')
       const newUserId = rpcData as string
-      if (!newUserId) throw new Error('RPC retornou sem ID de usuário.')
+      if (!newUserId) throw new Error('RPC retornou sem ID de usuario.')
 
-      // Aguardar trigger criar perfil ou criar manualmente
-      let perfilCriado = await waitForPerfil(newUserId)
-      if (!perfilCriado) {
-        // Trigger não criou, inserir manualmente
-        const { error: insErr } = await supabase.from('sys_perfis').insert({
-          id: newUserId, nome, email: loginEmail, role,
-          alcada_nivel, modulos, senha_definida: true, ativo: true,
-        })
-        if (insErr) throw insErr
-        perfilCriado = { id: newUserId } as any
-      } else {
-        const { error: updErr } = await supabase.from('sys_perfis').update({
-          nome, email: loginEmail, role, alcada_nivel, modulos,
-          senha_definida: true, ativo: true,
-        }).eq('id', perfilCriado.id)
-        if (updErr) throw updErr
-      }
+      // Atualizar perfil com role, modulos e demais campos
+      const { error: updErr } = await supabase.from('sys_perfis').update({
+        nome, email: loginEmail, role, alcada_nivel, modulos,
+        senha_definida: true, ativo: true,
+      }).eq('id', newUserId)
+      if (updErr) throw updErr
 
-      await syncPerfilSetores(perfilCriado.id, modulos, undefined, papel_global)
+      await syncPerfilSetores(newUserId, modulos, undefined, papel_global)
 
       return {
         nome,
