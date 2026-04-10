@@ -246,7 +246,7 @@ export default function Login() {
         </div>
 
         {/* Install App Button */}
-        {!isInstalled && (canInstall || isIOS) && (
+        {!isInstalled && (
           <button
             onClick={() => promptInstall()}
             className={`w-full mt-4 flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-semibold transition-all active:scale-[0.98] ${
