@@ -63,10 +63,10 @@ function AgendarModal({ onClose, isLight }: { onClose: () => void; isLight: bool
       ? 'bg-white border border-slate-200 shadow-sm text-slate-800'
       : 'bg-white/6 border border-white/12 text-white'
   }`
-  const sel = inp + (!isDark ? '' : ' [&>option]:bg-slate-900')
-  const lbl = `block text-xs font-bold mb-1 ${!isDark ? 'text-slate-600' : 'text-slate-300'}`
-  const card = !isDark ? 'bg-white border border-slate-200' : 'bg-[#1e293b] border border-white/[0.06]'
-  const divider = !isDark ? 'border-slate-100' : 'border-white/[0.06]'
+  const sel = inp + (isLight ? '' : ' [&>option]:bg-slate-900')
+  const lbl = `block text-xs font-bold mb-1 ${isLight ? 'text-slate-600' : 'text-slate-300'}`
+  const card = isLight ? 'bg-white border border-slate-200' : 'bg-[#1e293b] border border-white/[0.06]'
+  const divider = isLight ? 'border-slate-100' : 'border-white/[0.06]'
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
@@ -76,7 +76,7 @@ function AgendarModal({ onClose, isLight }: { onClose: () => void; isLight: bool
       >
         <div className={`flex items-center gap-2 px-6 py-4 border-b ${divider}`}>
           <CalendarDays size={16} className="text-teal-500" />
-          <h2 className={`text-base font-extrabold ${!isDark ? 'text-slate-800' : 'text-white'}`}>
+          <h2 className={`text-base font-extrabold ${isLight ? 'text-slate-800' : 'text-white'}`}>
             Agendar Preventiva
           </h2>
         </div>
@@ -184,8 +184,8 @@ function AlertaVeiculoCard({
 
   const textCls =
     variant === 'vencida'
-      ? !isDark ? 'text-red-700' : 'text-red-300'
-      : !isDark ? 'text-amber-700' : 'text-amber-300'
+      ? isLight ? 'text-red-700' : 'text-red-300'
+      : isLight ? 'text-amber-700' : 'text-amber-300'
 
   const Icon = variant === 'vencida' ? AlertTriangle : Clock
 
@@ -198,21 +198,21 @@ function AlertaVeiculoCard({
         </p>
         <div className="flex flex-wrap gap-x-4 gap-y-0.5 mt-1">
           {veiculo.data_proxima_preventiva && (
-            <span className={`text-xs ${!isDark ? 'text-slate-600' : 'text-slate-400'}`}>
+            <span className={`text-xs ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>
               Data: {fmtDate(veiculo.data_proxima_preventiva)}
             </span>
           )}
           {veiculo.km_proxima_preventiva && (
-            <span className={`text-xs ${!isDark ? 'text-slate-600' : 'text-slate-400'}`}>
+            <span className={`text-xs ${isLight ? 'text-slate-600' : 'text-slate-400'}`}>
               Km próxima: {veiculo.km_proxima_preventiva.toLocaleString('pt-BR')} km
               {kmR !== null && (
-                <span className={`font-bold ml-1 ${kmR <= 0 ? (!isDark ? 'text-red-600' : 'text-red-400') : (!isDark ? 'text-amber-600' : 'text-amber-300')}`}>
+                <span className={`font-bold ml-1 ${kmR <= 0 ? (isLight ? 'text-red-600' : 'text-red-400') : (isLight ? 'text-amber-600' : 'text-amber-300')}`}>
                   ({kmR <= 0 ? `${Math.abs(kmR).toLocaleString('pt-BR')} km vencido` : `${kmR.toLocaleString('pt-BR')} km restantes`})
                 </span>
               )}
             </span>
           )}
-          <span className={`text-xs ${!isDark ? 'text-slate-500' : 'text-slate-500'}`}>
+          <span className={`text-xs ${isLight ? 'text-slate-500' : 'text-slate-500'}`}>
             Hodômetro atual: {veiculo.hodometro_atual.toLocaleString('pt-BR')} km
           </span>
         </div>
@@ -224,6 +224,7 @@ function AlertaVeiculoCard({
 // ── Main ──────────────────────────────────────────────────────────────────────
 export default function Planejamento() {
   const { isDark } = useTheme()
+  const isLight = !isDark
   const [modal, setModal] = useState(false)
 
   const { data: veiculos = [], isLoading: loadingVeiculos } = useVeiculos()
@@ -241,19 +242,19 @@ export default function Planejamento() {
 
   const loading = loadingVeiculos || loadingOS
 
-  const card = !isDark ? 'bg-white border border-slate-200 shadow-sm' : 'bg-[#1e293b] border border-white/[0.06]'
-  const sectionTitle = `text-sm font-extrabold mb-2 flex items-center gap-1.5 ${!isDark ? 'text-slate-700' : 'text-slate-200'}`
-  const th = `px-3 py-2 text-left text-[10px] font-bold uppercase tracking-wide ${!isDark ? 'text-slate-500' : 'text-slate-400'}`
-  const td = `px-3 py-2.5 text-xs ${!isDark ? 'text-slate-700' : 'text-slate-300'}`
-  const trEven = !isDark ? 'bg-slate-50/60' : 'bg-white/[0.02]'
-  const divider = !isDark ? 'border-slate-100' : 'border-white/[0.04]'
+  const card = isLight ? 'bg-white border border-slate-200 shadow-sm' : 'bg-[#1e293b] border border-white/[0.06]'
+  const sectionTitle = `text-sm font-extrabold mb-2 flex items-center gap-1.5 ${isLight ? 'text-slate-700' : 'text-slate-200'}`
+  const th = `px-3 py-2 text-left text-[10px] font-bold uppercase tracking-wide ${isLight ? 'text-slate-500' : 'text-slate-400'}`
+  const td = `px-3 py-2.5 text-xs ${isLight ? 'text-slate-700' : 'text-slate-300'}`
+  const trEven = isLight ? 'bg-slate-50/60' : 'bg-white/[0.02]'
+  const divider = isLight ? 'border-slate-100' : 'border-white/[0.04]'
 
   return (
     <div className="p-4 sm:p-6 space-y-5 max-w-5xl">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
-          <h1 className={`text-xl font-extrabold flex items-center gap-2 ${!isDark ? 'text-slate-800' : 'text-white'}`}>
+          <h1 className={`text-xl font-extrabold flex items-center gap-2 ${isLight ? 'text-slate-800' : 'text-white'}`}>
             <CalendarDays size={20} className="text-teal-500" />
             Planejamento de Preventivas
           </h1>
@@ -272,7 +273,7 @@ export default function Planejamento() {
       {loading ? (
         <div className="space-y-3">
           {[1, 2, 3].map(i => (
-            <div key={i} className={`h-14 rounded-2xl animate-pulse ${!isDark ? 'bg-slate-100' : 'bg-white/5'}`} />
+            <div key={i} className={`h-14 rounded-2xl animate-pulse ${isLight ? 'bg-slate-100' : 'bg-white/5'}`} />
           ))}
         </div>
       ) : (

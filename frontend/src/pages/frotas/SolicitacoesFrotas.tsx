@@ -12,6 +12,7 @@ const TIPO_OPTS: { value: TipoSolicitacao; label: string; desc: string; icon: ty
 
 export default function SolicitacoesFrotas() {
   const { isDark } = useTheme()
+  const isLight = !isDark
   const [tipo, setTipo]           = useState<TipoSolicitacao>('emprestimo')
   const [veiculoId, setVeiculoId] = useState('')
   const [destino, setDestino]     = useState('')
@@ -38,11 +39,11 @@ export default function SolicitacoesFrotas() {
     <div className="p-4 md:p-6 max-w-2xl space-y-5">
       {/* Header */}
       <div>
-        <h2 className={`text-lg font-bold flex items-center gap-2 ${!isDark ? 'text-slate-800' : 'text-white'}`}>
+        <h2 className={`text-lg font-bold flex items-center gap-2 ${isLight ? 'text-slate-800' : 'text-white'}`}>
           <Plus size={18} className="text-rose-500" />
           Nova Solicitação
         </h2>
-        <p className={`text-xs mt-0.5 ${!isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+        <p className={`text-xs mt-0.5 ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
           Solicite empréstimo de ativo ou abertura de OS de manutenção
         </p>
       </div>
@@ -57,7 +58,7 @@ export default function SolicitacoesFrotas() {
       <form onSubmit={handleSubmit} className="space-y-4">
         {/* Tipo */}
         <div className={`rounded-2xl border p-4 ${card}`}>
-          <p className={`text-xs font-bold uppercase tracking-wider mb-3 ${!isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+          <p className={`text-xs font-bold uppercase tracking-wider mb-3 ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
             Tipo de Solicitação
           </p>
           <div className="grid grid-cols-2 gap-3">
@@ -71,18 +72,18 @@ export default function SolicitacoesFrotas() {
                   onClick={() => setTipo(opt.value)}
                   className={`flex items-start gap-3 p-3 rounded-xl border text-left transition-all ${
                     active
-                      ? (!isDark ? 'bg-rose-50 border-rose-300 text-rose-700' : 'bg-rose-500/10 border-rose-500/40 text-rose-300')
-                      : (!isDark ? 'bg-slate-50 border-slate-200 text-slate-600 hover:border-slate-300' : 'bg-white/[0.03] border-white/[0.06] text-slate-300 hover:bg-white/[0.06]')
+                      ? (isLight ? 'bg-rose-50 border-rose-300 text-rose-700' : 'bg-rose-500/10 border-rose-500/40 text-rose-300')
+                      : (isLight ? 'bg-slate-50 border-slate-200 text-slate-600 hover:border-slate-300' : 'bg-white/[0.03] border-white/[0.06] text-slate-300 hover:bg-white/[0.06]')
                   }`}
                 >
                   <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 mt-0.5 ${
-                    active ? (!isDark ? 'bg-rose-100' : 'bg-rose-500/20') : (!isDark ? 'bg-slate-100' : 'bg-white/[0.06]')
+                    active ? (isLight ? 'bg-rose-100' : 'bg-rose-500/20') : (isLight ? 'bg-slate-100' : 'bg-white/[0.06]')
                   }`}>
-                    <Icon size={14} className={active ? (!isDark ? 'text-rose-600' : 'text-rose-400') : (!isDark ? 'text-slate-500' : 'text-slate-400')} />
+                    <Icon size={14} className={active ? (isLight ? 'text-rose-600' : 'text-rose-400') : (isLight ? 'text-slate-500' : 'text-slate-400')} />
                   </div>
                   <div>
                     <p className="text-xs font-bold">{opt.label}</p>
-                    <p className={`text-[10px] mt-0.5 leading-relaxed ${!isDark ? 'text-slate-400' : 'text-slate-500'}`}>{opt.desc}</p>
+                    <p className={`text-[10px] mt-0.5 leading-relaxed ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>{opt.desc}</p>
                   </div>
                 </button>
               )
@@ -92,14 +93,14 @@ export default function SolicitacoesFrotas() {
 
         {/* Fields */}
         <div className={`rounded-2xl border p-4 space-y-4 ${card}`}>
-          <p className={`text-xs font-bold uppercase tracking-wider ${!isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+          <p className={`text-xs font-bold uppercase tracking-wider ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
             Detalhes
           </p>
 
           {/* Ativo (only for emprestimo) */}
           {tipo === 'emprestimo' && (
             <div>
-              <label className={`text-xs font-semibold block mb-1.5 ${!isDark ? 'text-slate-600' : 'text-slate-300'}`}>
+              <label className={`text-xs font-semibold block mb-1.5 ${isLight ? 'text-slate-600' : 'text-slate-300'}`}>
                 <Car size={11} className="inline mr-1" />Ativo Solicitado
               </label>
               <select
@@ -123,7 +124,7 @@ export default function SolicitacoesFrotas() {
 
           {/* Destino / Obra */}
           <div>
-            <label className={`text-xs font-semibold block mb-1.5 ${!isDark ? 'text-slate-600' : 'text-slate-300'}`}>
+            <label className={`text-xs font-semibold block mb-1.5 ${isLight ? 'text-slate-600' : 'text-slate-300'}`}>
               <Building2 size={11} className="inline mr-1" />Obra / Centro de Custo
             </label>
             <input
@@ -142,7 +143,7 @@ export default function SolicitacoesFrotas() {
           {/* Dates */}
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className={`text-xs font-semibold block mb-1.5 ${!isDark ? 'text-slate-600' : 'text-slate-300'}`}>
+              <label className={`text-xs font-semibold block mb-1.5 ${isLight ? 'text-slate-600' : 'text-slate-300'}`}>
                 <CalendarDays size={11} className="inline mr-1" />Data de Início
               </label>
               <input
@@ -157,7 +158,7 @@ export default function SolicitacoesFrotas() {
               />
             </div>
             <div>
-              <label className={`text-xs font-semibold block mb-1.5 ${!isDark ? 'text-slate-600' : 'text-slate-300'}`}>
+              <label className={`text-xs font-semibold block mb-1.5 ${isLight ? 'text-slate-600' : 'text-slate-300'}`}>
                 <CalendarDays size={11} className="inline mr-1" />Retorno Previsto
               </label>
               <input
@@ -175,7 +176,7 @@ export default function SolicitacoesFrotas() {
 
           {/* Responsável */}
           <div>
-            <label className={`text-xs font-semibold block mb-1.5 ${!isDark ? 'text-slate-600' : 'text-slate-300'}`}>
+            <label className={`text-xs font-semibold block mb-1.5 ${isLight ? 'text-slate-600' : 'text-slate-300'}`}>
               <User size={11} className="inline mr-1" />Responsável
             </label>
             <input
@@ -193,7 +194,7 @@ export default function SolicitacoesFrotas() {
 
           {/* Observações */}
           <div>
-            <label className={`text-xs font-semibold block mb-1.5 ${!isDark ? 'text-slate-600' : 'text-slate-300'}`}>
+            <label className={`text-xs font-semibold block mb-1.5 ${isLight ? 'text-slate-600' : 'text-slate-300'}`}>
               <FileText size={11} className="inline mr-1" />Observações
             </label>
             <textarea

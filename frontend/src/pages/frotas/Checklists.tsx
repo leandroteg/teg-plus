@@ -66,17 +66,17 @@ function NovaChecklistModal({ onClose, isLight }: { onClose: () => void; isLight
   }
 
   const inp = `w-full px-3 py-2 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-teal-400/40 ${
-    !isDark ? 'bg-white border border-slate-200 shadow-sm text-slate-800 hover:border-slate-300' : 'bg-white/6 border border-white/12 text-white hover:border-white/20'
+    isLight ? 'bg-white border border-slate-200 shadow-sm text-slate-800 hover:border-slate-300' : 'bg-white/6 border border-white/12 text-white hover:border-white/20'
   }`
-  const lbl = 'block text-xs font-bold mb-1 ' + (!isDark ? 'text-slate-600' : 'text-slate-300')
-  const sel = inp + (!isDark ? '' : ' [&>option]:bg-slate-900')
+  const lbl = 'block text-xs font-bold mb-1 ' + (isLight ? 'text-slate-600' : 'text-slate-300')
+  const sel = inp + (isLight ? '' : ' [&>option]:bg-slate-900')
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-      <form onSubmit={handleSubmit} className={`rounded-2xl shadow-2xl p-6 w-full max-w-lg space-y-4 max-h-[90vh] overflow-y-auto styled-scrollbar ${!isDark ? 'bg-white border border-slate-200' : 'bg-[#1e293b] border border-white/[0.06]'}`}>
+      <form onSubmit={handleSubmit} className={`rounded-2xl shadow-2xl p-6 w-full max-w-lg space-y-4 max-h-[90vh] overflow-y-auto styled-scrollbar ${isLight ? 'bg-white border border-slate-200' : 'bg-[#1e293b] border border-white/[0.06]'}`}>
         <div className="flex items-center justify-between">
-          <h2 className={`text-lg font-extrabold ${!isDark ? 'text-slate-800' : 'text-white'}`}>Novo Checklist</h2>
-          <button type="button" onClick={onClose} className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors ${!isDark ? 'text-slate-400 hover:text-slate-600 hover:bg-slate-100' : 'text-slate-400 hover:text-white hover:bg-white/10'}`}>
+          <h2 className={`text-lg font-extrabold ${isLight ? 'text-slate-800' : 'text-white'}`}>Novo Checklist</h2>
+          <button type="button" onClick={onClose} className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors ${isLight ? 'text-slate-400 hover:text-slate-600 hover:bg-slate-100' : 'text-slate-400 hover:text-white hover:bg-white/10'}`}>
             <X size={18} />
           </button>
         </div>
@@ -122,7 +122,7 @@ function NovaChecklistModal({ onClose, isLight }: { onClose: () => void; isLight
             >
               {form[item.key as keyof typeof form]
                 ? <CheckCircle size={15} className="text-emerald-400 shrink-0" />
-                : <div className={`w-[15px] h-[15px] rounded-full border shrink-0 ${!isDark ? 'border-slate-300' : 'border-slate-600'}`} />
+                : <div className={`w-[15px] h-[15px] rounded-full border shrink-0 ${isLight ? 'border-slate-300' : 'border-slate-600'}`} />
               }
               {item.label}
             </button>
@@ -151,7 +151,7 @@ function NovaChecklistModal({ onClose, isLight }: { onClose: () => void; isLight
 
         <div className="flex gap-2">
           <button type="button" onClick={onClose} className={`flex-1 py-2.5 rounded-xl border text-sm font-medium ${
-            !isDark ? 'border-slate-200 text-slate-500 hover:bg-slate-50' : 'border-white/10 text-slate-400 hover:bg-white/5'
+            isLight ? 'border-slate-200 text-slate-500 hover:bg-slate-50' : 'border-white/10 text-slate-400 hover:bg-white/5'
           }`}>Cancelar</button>
           <button type="submit" disabled={criar.isPending || !form.veiculo_id} className="flex-1 py-2 rounded-xl bg-gradient-to-r from-teal-500 to-teal-600 hover:from-teal-400 hover:to-teal-500 shadow-sm shadow-teal-500/20 text-sm text-white font-semibold disabled:opacity-50">
             {criar.isPending ? 'Registrando...' : 'Registrar Checklist'}
@@ -168,7 +168,7 @@ function ChecklistRow({ ck, isLight }: { ck: FroChecklist; isLight: boolean }) {
   const total   = ITENS_CHECKLIST.length
 
   return (
-    <div className={`rounded-xl shadow-sm px-4 py-3 flex items-center gap-4 ${!isDark ? 'bg-white border border-slate-200' : 'bg-[#1e293b] border border-white/[0.06]'}`}>
+    <div className={`rounded-xl shadow-sm px-4 py-3 flex items-center gap-4 ${isLight ? 'bg-white border border-slate-200' : 'bg-[#1e293b] border border-white/[0.06]'}`}>
       <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${ck.liberado ? 'bg-emerald-500/20' : 'bg-red-500/20'}`}>
         {ck.liberado
           ? <CheckCircle size={16} className="text-emerald-400" />
@@ -176,7 +176,7 @@ function ChecklistRow({ ck, isLight }: { ck: FroChecklist; isLight: boolean }) {
         }
       </div>
       <div className="flex-1 min-w-0">
-        <p className={`text-sm font-semibold ${!isDark ? 'text-slate-800' : 'text-white'}`}>{ck.veiculo?.placa} — {ck.veiculo?.marca} {ck.veiculo?.modelo}</p>
+        <p className={`text-sm font-semibold ${isLight ? 'text-slate-800' : 'text-white'}`}>{ck.veiculo?.placa} — {ck.veiculo?.marca} {ck.veiculo?.modelo}</p>
         <p className="text-[11px] text-slate-500">{TIPO_LABEL[ck.tipo]} · {okCount}/{total} itens OK</p>
       </div>
       <div className="text-right">
@@ -197,6 +197,7 @@ function ChecklistRow({ ck, isLight }: { ck: FroChecklist; isLight: boolean }) {
 // ── Main ──────────────────────────────────────────────────────────────────────
 export default function Checklists() {
   const { isDark } = useTheme()
+  const isLight = !isDark
   const [modal, setModal]   = useState(false)
   const [dataFiltro, setDataFiltro] = useState(new Date().toISOString().split('T')[0])
   const [tipoFiltro, setTipoFiltro] = useState<TipoChecklist | ''>('')
@@ -213,7 +214,7 @@ export default function Checklists() {
     <div className="p-4 sm:p-6 space-y-4">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className={`text-xl font-bold flex items-center gap-2 ${!isDark ? 'text-slate-800' : 'text-white'}`}>
+          <h1 className={`text-xl font-bold flex items-center gap-2 ${isLight ? 'text-slate-800' : 'text-white'}`}>
             <ClipboardCheck size={20} className="text-teal-500" /> Checklists
           </h1>
           <p className="text-sm text-slate-500">
@@ -234,7 +235,7 @@ export default function Checklists() {
             value={dataFiltro}
             onChange={e => setDataFiltro(e.target.value)}
             className={`px-3 py-2 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-teal-400/40 ${
-              !isDark ? 'bg-slate-50 border border-slate-200 text-slate-800' : 'bg-white/6 border border-white/10 text-white'
+              isLight ? 'bg-slate-50 border border-slate-200 text-slate-800' : 'bg-white/6 border border-white/10 text-white'
             }`}
           />
         </div>
@@ -244,7 +245,7 @@ export default function Checklists() {
             value={tipoFiltro}
             onChange={e => setTipoFiltro(e.target.value as TipoChecklist | '')}
             className={`px-3 py-2 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-teal-400/40 ${
-              !isDark ? 'bg-slate-50 border border-slate-200 text-slate-800' : 'bg-white/6 border border-white/10 text-white [&>option]:bg-slate-900'
+              isLight ? 'bg-slate-50 border border-slate-200 text-slate-800' : 'bg-white/6 border border-white/10 text-white [&>option]:bg-slate-900'
             }`}
           >
             <option value="">Todos</option>
@@ -255,7 +256,7 @@ export default function Checklists() {
 
       {/* Lista */}
       {isLoading ? (
-        <div className="space-y-2">{Array.from({ length: 5 }).map((_, i) => <div key={i} className={`rounded-xl h-16 animate-pulse ${!isDark ? 'bg-white border border-slate-200' : 'bg-[#1e293b] border border-white/[0.06]'}`} />)}</div>
+        <div className="space-y-2">{Array.from({ length: 5 }).map((_, i) => <div key={i} className={`rounded-xl h-16 animate-pulse ${isLight ? 'bg-white border border-slate-200' : 'bg-[#1e293b] border border-white/[0.06]'}`} />)}</div>
       ) : checklists.length === 0 ? (
         <p className="text-sm text-slate-500 text-center py-12">Nenhum checklist encontrado para esta data</p>
       ) : (

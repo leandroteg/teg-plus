@@ -51,18 +51,18 @@ function RetornoModal({
       ? 'bg-white border border-slate-200 shadow-sm text-slate-800'
       : 'bg-white/6 border border-white/12 text-white'
   }`
-  const lbl = `block text-xs font-bold mb-1 ${!isDark ? 'text-slate-600' : 'text-slate-300'}`
+  const lbl = `block text-xs font-bold mb-1 ${isLight ? 'text-slate-600' : 'text-slate-300'}`
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
       <form
         onSubmit={handleSubmit}
         className={`rounded-2xl shadow-2xl p-6 w-full max-w-md space-y-4 ${
-          !isDark ? 'bg-white border border-slate-200' : 'bg-[#1e293b] border border-white/[0.06]'
+          isLight ? 'bg-white border border-slate-200' : 'bg-[#1e293b] border border-white/[0.06]'
         }`}
       >
         <div className="flex items-center justify-between">
-          <h2 className={`text-lg font-extrabold ${!isDark ? 'text-slate-800' : 'text-white'}`}>
+          <h2 className={`text-lg font-extrabold ${isLight ? 'text-slate-800' : 'text-white'}`}>
             Registrar Retorno
           </h2>
           <button
@@ -78,8 +78,8 @@ function RetornoModal({
           </button>
         </div>
 
-        <div className={`p-3 rounded-xl text-sm ${!isDark ? 'bg-slate-50 border border-slate-200' : 'bg-white/4 border border-white/8'}`}>
-          <p className={`font-semibold ${!isDark ? 'text-slate-800' : 'text-white'}`}>
+        <div className={`p-3 rounded-xl text-sm ${isLight ? 'bg-slate-50 border border-slate-200' : 'bg-white/4 border border-white/8'}`}>
+          <p className={`font-semibold ${isLight ? 'text-slate-800' : 'text-white'}`}>
             {alocacao.veiculo?.placa} — {alocacao.veiculo?.marca} {alocacao.veiculo?.modelo}
           </p>
           <p className="text-xs text-slate-500 mt-0.5">
@@ -172,19 +172,19 @@ function NovaAlocacaoModal({
       ? 'bg-white border border-slate-200 shadow-sm text-slate-800'
       : 'bg-white/6 border border-white/12 text-white'
   }`
-  const sel = inp + (!isDark ? '' : ' [&>option]:bg-slate-900')
-  const lbl = `block text-xs font-bold mb-1 ${!isDark ? 'text-slate-600' : 'text-slate-300'}`
+  const sel = inp + (isLight ? '' : ' [&>option]:bg-slate-900')
+  const lbl = `block text-xs font-bold mb-1 ${isLight ? 'text-slate-600' : 'text-slate-300'}`
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
       <form
         onSubmit={handleSubmit}
         className={`rounded-2xl shadow-2xl p-6 w-full max-w-lg space-y-4 ${
-          !isDark ? 'bg-white border border-slate-200' : 'bg-[#1e293b] border border-white/[0.06]'
+          isLight ? 'bg-white border border-slate-200' : 'bg-[#1e293b] border border-white/[0.06]'
         }`}
       >
         <div className="flex items-center justify-between">
-          <h2 className={`text-lg font-extrabold ${!isDark ? 'text-slate-800' : 'text-white'}`}>
+          <h2 className={`text-lg font-extrabold ${isLight ? 'text-slate-800' : 'text-white'}`}>
             Nova Alocação
           </h2>
           <button
@@ -299,12 +299,13 @@ function NovaAlocacaoModal({
 // ── Main ──────────────────────────────────────────────────────────────────────
 export default function AgendaAlocacao() {
   const { isDark } = useTheme()
+  const isLight = !isDark
   const { data: alocacoes = [], isLoading } = useAlocacoes({ status: 'ativa' })
   const [novaModal, setNovaModal] = useState(false)
   const [retornoAloc, setRetornoAloc] = useState<FroAlocacao | null>(null)
 
   const card = `rounded-2xl shadow-sm border ${
-    !isDark ? 'bg-white border-slate-200' : 'bg-[#1e293b] border-white/[0.06]'
+    isLight ? 'bg-white border-slate-200' : 'bg-[#1e293b] border-white/[0.06]'
   }`
   const th = `text-[10px] font-bold uppercase tracking-wide text-slate-500 px-4 py-3 text-left`
 
@@ -315,7 +316,7 @@ export default function AgendaAlocacao() {
         <div>
           <h1
             className={`text-xl font-bold flex items-center gap-2 ${
-              !isDark ? 'text-slate-800' : 'text-white'
+              isLight ? 'text-slate-800' : 'text-white'
             }`}
           >
             <CalendarDays size={20} className="text-rose-500" />
@@ -340,7 +341,7 @@ export default function AgendaAlocacao() {
             <div
               key={i}
               className={`rounded-xl h-14 animate-pulse ${
-                !isDark ? 'bg-slate-100' : 'bg-white/5'
+                isLight ? 'bg-slate-100' : 'bg-white/5'
               }`}
             />
           ))}
@@ -349,7 +350,7 @@ export default function AgendaAlocacao() {
         <div className={`${card} p-12 text-center`}>
           <CalendarDays
             size={32}
-            className={`mx-auto mb-2 opacity-30 ${!isDark ? 'text-slate-400' : 'text-slate-500'}`}
+            className={`mx-auto mb-2 opacity-30 ${isLight ? 'text-slate-400' : 'text-slate-500'}`}
           />
           <p className="text-sm text-slate-500">Nenhuma alocação ativa no momento</p>
         </div>
@@ -359,7 +360,7 @@ export default function AgendaAlocacao() {
             <table className="w-full">
               <thead
                 className={`border-b ${
-                  !isDark ? 'bg-slate-50 border-slate-200' : 'bg-white/4 border-white/8'
+                  isLight ? 'bg-slate-50 border-slate-200' : 'bg-white/4 border-white/8'
                 }`}
               >
                 <tr>
@@ -379,13 +380,13 @@ export default function AgendaAlocacao() {
                     <tr
                       key={al.id}
                       className={`transition-colors ${
-                        !isDark ? 'hover:bg-slate-50' : 'hover:bg-white/3'
+                        isLight ? 'hover:bg-slate-50' : 'hover:bg-white/3'
                       }`}
                     >
                       <td className="px-4 py-3">
                         <p
                           className={`text-sm font-bold ${
-                            !isDark ? 'text-slate-800' : 'text-white'
+                            isLight ? 'text-slate-800' : 'text-white'
                           }`}
                         >
                           {al.veiculo?.placa}
@@ -397,7 +398,7 @@ export default function AgendaAlocacao() {
                       <td className="px-4 py-3">
                         <p
                           className={`text-sm ${
-                            !isDark ? 'text-slate-700' : 'text-slate-200'
+                            isLight ? 'text-slate-700' : 'text-slate-200'
                           }`}
                         >
                           {al.obra?.nome ?? '—'}
@@ -408,14 +409,14 @@ export default function AgendaAlocacao() {
                       </td>
                       <td
                         className={`px-4 py-3 text-sm ${
-                          !isDark ? 'text-slate-700' : 'text-slate-300'
+                          isLight ? 'text-slate-700' : 'text-slate-300'
                         }`}
                       >
                         {al.responsavel_nome ?? '—'}
                       </td>
                       <td
                         className={`px-4 py-3 text-sm ${
-                          !isDark ? 'text-slate-700' : 'text-slate-300'
+                          isLight ? 'text-slate-700' : 'text-slate-300'
                         }`}
                       >
                         {FMT(al.data_saida)}
@@ -424,7 +425,7 @@ export default function AgendaAlocacao() {
                         {al.data_retorno_prev ? (
                           <span
                             className={`text-sm font-semibold ${
-                              vencido ? 'text-red-500' : !isDark ? 'text-slate-700' : 'text-slate-300'
+                              vencido ? 'text-red-500' : isLight ? 'text-slate-700' : 'text-slate-300'
                             }`}
                           >
                             {FMT(al.data_retorno_prev)}
@@ -441,7 +442,7 @@ export default function AgendaAlocacao() {
                       <td className="px-4 py-3">
                         <span
                           className={`text-sm font-bold ${
-                            !isDark ? 'text-slate-800' : 'text-white'
+                            isLight ? 'text-slate-800' : 'text-white'
                           }`}
                         >
                           {diasAlocado(al.data_saida)} d
