@@ -722,6 +722,7 @@ function UserDetailPanel({
   const changePwd = useChangePassword()
   const deleteUser = useDeleteUser()
   const [confirmDelete, setConfirmDelete] = useState(false)
+  const [deleteTyped, setDeleteTyped] = useState('')
   const [editing, setEditing] = useState(false)
   const [papelGlobal, setPapelGlobal] = useState<PapelGlobal>(resolvePapelFromPerfil(user))
   const [alcada,  setAlcada]  = useState(user.alcada_nivel)
@@ -896,18 +897,33 @@ function UserDetailPanel({
           <div className="px-4 pb-3">
             <div className="rounded-xl border-2 border-red-200 bg-red-50 p-3">
               <p className="text-xs font-bold text-red-700 mb-2">Excluir {user.nome}?</p>
-              <p className="text-[10px] text-red-600 mb-3">Esta acao e irreversivel. O usuario sera removido permanentemente.</p>
+              <p className="text-[10px] text-red-600 mb-3">
+                Esta acao e irreversivel. O usuario sera removido permanentemente do sistema, incluindo Auth e perfil.
+              </p>
+              <div className="mb-3">
+                <p className="text-[10px] text-red-600 font-semibold mb-1.5">
+                  Digite <span className="font-black bg-red-100 px-1 rounded">EXCLUIR</span> para confirmar:
+                </p>
+                <input
+                  type="text"
+                  value={deleteTyped}
+                  onChange={e => setDeleteTyped(e.target.value)}
+                  placeholder="EXCLUIR"
+                  className="w-full text-xs rounded-lg px-3 py-2 border-2 border-red-200 bg-white text-red-700 placeholder-red-300 outline-none focus:border-red-400 font-bold uppercase tracking-wider"
+                  autoFocus
+                />
+              </div>
               <div className="flex gap-2">
-                <button onClick={() => setConfirmDelete(false)}
+                <button onClick={() => { setConfirmDelete(false); setDeleteTyped('') }}
                   className="flex-1 py-1.5 rounded-lg text-xs font-semibold border border-slate-200 text-slate-600">
                   Cancelar
                 </button>
                 <button
                   onClick={async () => { await deleteUser.mutateAsync(user.id); onClose() }}
-                  disabled={deleteUser.isPending}
-                  className="flex-1 py-1.5 rounded-lg text-xs font-bold bg-red-600 text-white hover:bg-red-700 flex items-center justify-center gap-1">
+                  disabled={deleteUser.isPending || deleteTyped !== 'EXCLUIR'}
+                  className="flex-1 py-1.5 rounded-lg text-xs font-bold bg-red-600 text-white hover:bg-red-700 disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-1 transition-opacity">
                   {deleteUser.isPending ? <Loader2 size={12} className="animate-spin" /> : <X size={12} />}
-                  Confirmar Exclusao
+                  Excluir Permanentemente
                 </button>
               </div>
             </div>
