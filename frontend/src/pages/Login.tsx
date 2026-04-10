@@ -245,20 +245,18 @@ export default function Login() {
 
         </div>
 
-        {/* Install App Button */}
-        {!isInstalled && (
-          <button
-            onClick={() => promptInstall()}
-            className={`w-full mt-4 flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-semibold transition-all active:scale-[0.98] ${
-              isDark
-                ? 'bg-teal-500/15 border border-teal-400/25 text-teal-300 hover:bg-teal-500/25'
-                : 'bg-teal-50 border border-teal-200 text-teal-700 hover:bg-teal-100'
-            }`}
-          >
-            <Download size={16} />
-            Instalar App TEG+
-          </button>
-        )}
+        {/* Install App Button — always visible */}
+        <button
+          onClick={() => promptInstall()}
+          className={`w-full mt-4 flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-semibold transition-all active:scale-[0.98] ${
+            isDark
+              ? 'bg-teal-500/15 border border-teal-400/25 text-teal-300 hover:bg-teal-500/25'
+              : 'bg-teal-50 border border-teal-200 text-teal-700 hover:bg-teal-100'
+          }`}
+        >
+          <Download size={16} />
+          Instalar App TEG+
+        </button>
 
         {/* Footer */}
         <p className="text-center text-xs text-slate-400 mt-5">
