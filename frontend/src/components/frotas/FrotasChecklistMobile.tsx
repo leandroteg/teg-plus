@@ -16,6 +16,7 @@ import {
   type FrotasChecklistItem, type EstadoItemVeiculo,
 } from './FrotasChecklist'
 import type { FroVeiculo, FroChecklistTemplateItem } from '../../types/frotas'
+import VehicleDiagramInspection, { type ZoneDamage } from './VehicleDiagramInspection'
 
 // Stub import — the offline hook will be created by another agent.
 // For now we define a minimal type so the file compiles.
@@ -97,6 +98,9 @@ interface Props {
   onClose: () => void
   onSave: (data: ChecklistSaveData) => Promise<void>
   onConcluir: (data: ChecklistSaveData) => Promise<void>
+  /** Vehicle diagram zone damages (only for tipo_ativo='veiculo') */
+  zoneDamages?: ZoneDamage[]
+  onZoneDamagesChange?: (damages: ZoneDamage[]) => void
 }
 
 // -- Title by tipo ------------------------------------------------------------
@@ -120,7 +124,10 @@ export default function FrotasChecklistMobile({
   onClose,
   onSave,
   onConcluir,
+  zoneDamages = [],
+  onZoneDamagesChange,
 }: Props) {
+  const showDiagram = (veiculo.tipo_ativo || 'veiculo') === 'veiculo' && !!onZoneDamagesChange
   const { isDark } = useTheme()
   const isOnline = useOnlineStatus()
 
@@ -513,6 +520,17 @@ export default function FrotasChecklistMobile({
                     : 'bg-white border-slate-200 text-slate-700 placeholder-slate-400 focus:border-rose-400'
                 }`}
                 autoFocus
+              />
+            </div>
+          )}
+
+          {/* Vehicle Diagram (shown on first tab for vehicles) */}
+          {activeTab === 0 && showDiagram && (
+            <div className="mb-3">
+              <VehicleDiagramInspection
+                damages={zoneDamages}
+                onChange={onZoneDamagesChange!}
+                readOnly={false}
               />
             </div>
           )}

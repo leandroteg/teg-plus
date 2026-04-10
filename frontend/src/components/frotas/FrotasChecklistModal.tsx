@@ -2,6 +2,8 @@
 // FrotasChecklistModal.tsx -- Orchestrator for vehicle checklist
 // Detects viewport, delegates to FrotasChecklistMobile on mobile.
 // Desktop: renders modal with FrotasChecklist. Manages persistence.
+// Now includes VehicleDiagramInspection for tipo_ativo='veiculo' and
+// divergence detection for pos_viagem checklists.
 // ---------------------------------------------------------------------------
 
 import { useState, useEffect, useCallback } from 'react'
@@ -17,6 +19,15 @@ import FrotasChecklistMobile, {
   type ChecklistSaveData,
   type NivelCombustivel,
 } from './FrotasChecklistMobile'
+import VehicleDiagramInspection, {
+  type ZoneDamage,
+} from './VehicleDiagramInspection'
+import ChecklistDivergenciasModal, {
+  compareChecklistItems,
+  compareZoneDamages,
+  type DivergenciaItem,
+  type DivergenciaZona,
+} from './ChecklistDivergenciasModal'
 import {
   useChecklistTemplates,
   useChecklistExecucoes,
@@ -61,14 +72,18 @@ interface Props {
   tipoChecklist: TipoChecklist2
   alocacaoId?: string
   onClose: () => void
+  /** Called after conclude with divergence data (for pos_viagem) */
+  onConcluded?: (divergenciasItens: DivergenciaItem[], divergenciasZonas: DivergenciaZona[]) => void
 }
 
 // -- Component ----------------------------------------------------------------
 
-export default function FrotasChecklistModal({ veiculo, tipoChecklist, alocacaoId, onClose }: Props) {
+export default function FrotasChecklistModal({ veiculo, tipoChecklist, alocacaoId, onClose, onConcluded }: Props) {
   const { isDark } = useTheme()
   const isMobile = useIsMobile()
   const isOnline = useOnlineStatus()
+
+  const isVeiculo = (veiculo.tipo_ativo || 'veiculo') === 'veiculo'
 
   // Load template for the checklist type
   const { data: templates = [] } = useChecklistTemplates(tipoChecklist)
@@ -105,6 +120,24 @@ export default function FrotasChecklistModal({ veiculo, tipoChecklist, alocacaoI
     e => e.template_id === template?.id && e.status !== 'concluido',
   )
 
+  // Load the most recent concluded pre_viagem for divergence comparison
+  const { data: lastSaidaExecucao } = useQuery({
+    queryKey: ['fro_checklist_last_saida', veiculo.id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('fro_checklist_execucoes')
+        .select('*, itens:fro_checklist_execucao_itens(*, template_item:fro_checklist_template_itens(*))')
+        .eq('veiculo_id', veiculo.id)
+        .eq('status', 'concluido')
+        .order('concluido_at', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+      if (error) throw error
+      return data as (FroChecklistExecucao & { itens: any[] }) | null
+    },
+    enabled: tipoChecklist === 'pos_viagem',
+  })
+
   // State
   const [execucaoId, setExecucaoId] = useState<string | null>(existingExecucao?.id || null)
   const [itens, setItens] = useState<FrotasChecklistItem[]>([])
@@ -113,9 +146,13 @@ export default function FrotasChecklistModal({ veiculo, tipoChecklist, alocacaoI
   const [hodometroRegistro, setHodometroRegistro] = useState<number | null>(
     existingExecucao?.hodometro || veiculo.hodometro_atual || null,
   )
+  const [zoneDamages, setZoneDamages] = useState<ZoneDamage[]>([])
   const [saving, setSaving] = useState(false)
   const [confirming, setConfirming] = useState(false)
   const [initialized, setInitialized] = useState(false)
+  const [showDivergencias, setShowDivergencias] = useState(false)
+  const [divergenciasItens, setDivergenciasItens] = useState<DivergenciaItem[]>([])
+  const [divergenciasZonas, setDivergenciasZonas] = useState<DivergenciaZona[]>([])
 
   const bg = isDark ? 'bg-[#1e293b]' : 'bg-white'
   const txt = isDark ? 'text-white' : 'text-slate-900'
@@ -229,6 +266,39 @@ export default function FrotasChecklistModal({ veiculo, tipoChecklist, alocacaoI
     async (saveItens: FrotasChecklistItem[], eid: string, obs: string, hodo: number | null) => {
       await doSaveItems(saveItens, eid, obs, hodo)
 
+      // Save zone damages as JSON metadata on the execution
+      if (zoneDamages.length > 0) {
+        await supabase
+          .from('fro_checklist_execucoes')
+          .update({
+            // Store zone damages in observacoes_gerais as structured data
+            // We use a JSON prefix to differentiate
+            vistoria_visual: JSON.stringify(zoneDamages.map(d => ({
+              zone: d.zone,
+              condition: d.condition,
+              comment: d.comment,
+              photoCount: d.photos.length,
+            }))),
+          })
+          .eq('id', eid)
+      }
+
+      // Upload zone damage photos
+      for (const damage of zoneDamages) {
+        for (const photo of damage.photos) {
+          try {
+            const blob = dataUrlToBlob(photo.dataUrl)
+            const ext = photo.dataUrl.includes('png') ? 'png' : 'jpg'
+            const path = `checklist/${eid}/vistoria-${damage.zone}-${photo.id}.${ext}`
+            await supabase.storage
+              .from('frotas-fotos')
+              .upload(path, blob, { upsert: true, contentType: `image/${ext === 'png' ? 'png' : 'jpeg'}` })
+          } catch (err) {
+            console.error('[FrotasChecklistModal] Zone photo upload error:', err)
+          }
+        }
+      }
+
       // Mark execution as concluded
       const { error: concludeErr } = await supabase
         .from('fro_checklist_execucoes')
@@ -256,8 +326,47 @@ export default function FrotasChecklistModal({ veiculo, tipoChecklist, alocacaoI
           .update({ status: 'em_uso' })
           .eq('id', veiculo.id)
       }
+
+      // Divergence detection for pos_viagem
+      if (tipoChecklist === 'pos_viagem' && lastSaidaExecucao) {
+        // Load the current execution items for comparison
+        const { data: entradaItensDb } = await supabase
+          .from('fro_checklist_execucao_itens')
+          .select('*, template_item:fro_checklist_template_itens(*)')
+          .eq('execucao_id', eid)
+
+        const saidaItens = lastSaidaExecucao.itens || []
+        const entradaItens = entradaItensDb || []
+
+        const divItens = compareChecklistItems(saidaItens, entradaItens)
+
+        // Compare zone damages if available
+        let saidaDamages: ZoneDamage[] = []
+        try {
+          const saidaVisual = (lastSaidaExecucao as any).vistoria_visual
+          if (saidaVisual) {
+            saidaDamages = JSON.parse(saidaVisual).map((d: any) => ({
+              zone: d.zone,
+              condition: d.condition,
+              comment: d.comment || '',
+              photos: [],
+            }))
+          }
+        } catch { /* ignore parse errors */ }
+
+        const divZonas = compareZoneDamages(saidaDamages, zoneDamages)
+
+        setDivergenciasItens(divItens)
+        setDivergenciasZonas(divZonas)
+
+        if (divItens.length > 0 || divZonas.length > 0) {
+          setShowDivergencias(true)
+        }
+
+        onConcluded?.(divItens, divZonas)
+      }
     },
-    [doSaveItems, veiculo, tipoChecklist],
+    [doSaveItems, veiculo, tipoChecklist, zoneDamages, lastSaidaExecucao, onConcluded],
   )
 
   // Upload foto helper
@@ -326,7 +435,10 @@ export default function FrotasChecklistModal({ veiculo, tipoChecklist, alocacaoI
     setSaving(true)
     try {
       await doConclude(itens, execucaoId, obsGerais, hodometroRegistro)
-      onClose()
+      // Don't close if divergencias modal will show
+      if (!showDivergencias) {
+        onClose()
+      }
     } catch (err) {
       console.error('[FrotasChecklistModal] Conclude error:', err)
       onClose()
@@ -367,6 +479,22 @@ export default function FrotasChecklistModal({ veiculo, tipoChecklist, alocacaoI
     )
   }
 
+  // -- Divergencias Modal (shown after conclude) ------------------------------
+
+  if (showDivergencias) {
+    return (
+      <ChecklistDivergenciasModal
+        veiculo={veiculo}
+        divergenciasItens={divergenciasItens}
+        divergenciasZonas={divergenciasZonas}
+        onClose={() => {
+          setShowDivergencias(false)
+          onClose()
+        }}
+      />
+    )
+  }
+
   // -- Mobile Fullscreen ------------------------------------------------------
 
   if (isMobile) {
@@ -379,6 +507,8 @@ export default function FrotasChecklistModal({ veiculo, tipoChecklist, alocacaoI
         onClose={onClose}
         onSave={handleMobileSave}
         onConcluir={handleMobileConcluir}
+        zoneDamages={zoneDamages}
+        onZoneDamagesChange={isVeiculo ? setZoneDamages : undefined}
       />
     )
   }
@@ -516,6 +646,15 @@ export default function FrotasChecklistModal({ veiculo, tipoChecklist, alocacaoI
             />
           </div>
 
+          {/* Vehicle Diagram (only for tipo_ativo='veiculo') */}
+          {isVeiculo && (
+            <VehicleDiagramInspection
+              damages={zoneDamages}
+              onChange={setZoneDamages}
+              readOnly={false}
+            />
+          )}
+
           <FrotasChecklist
             itens={itens}
             onChange={setItens}
@@ -601,6 +740,11 @@ export default function FrotasChecklistModal({ veiculo, tipoChecklist, alocacaoI
                     O veiculo sera atualizado para "Em Uso".
                   </span>
                 )}
+                {tipoChecklist === 'pos_viagem' && (
+                  <span className="block mt-1 text-blue-600 font-semibold">
+                    Sera feita uma comparacao automatica com o checklist de saida.
+                  </span>
+                )}
                 {!isOnline && (
                   <span className="block mt-1 text-amber-600 font-semibold">
                     Offline: dados serao sincronizados quando a conexao for restaurada.
@@ -610,6 +754,12 @@ export default function FrotasChecklistModal({ veiculo, tipoChecklist, alocacaoI
                   <span className="block mt-1 text-red-500 font-semibold">
                     Atencao: {itens.filter(it => it.estado === 'ruim').length} item(ns) marcado(s)
                     como "Ruim".
+                  </span>
+                )}
+                {zoneDamages.filter(d => d.condition && d.condition !== 'sem_avaria').length > 0 && (
+                  <span className="block mt-1 text-red-500 font-semibold">
+                    {zoneDamages.filter(d => d.condition && d.condition !== 'sem_avaria').length} avaria(s)
+                    registrada(s) na vistoria visual.
                   </span>
                 )}
               </p>

@@ -15,12 +15,21 @@ import type {
 
 // ── Types ───────────────────────────────────────────────────────────────────
 
+export interface VistoriaVisualDamage {
+  zone: string
+  condition: string
+  comment?: string
+  photoCount?: number
+}
+
 export interface FrotasChecklistPdfData {
   execucao: FroChecklistExecucao
   veiculo: FroVeiculo
   itens: FroChecklistExecucaoItem[]
   fotos?: FroChecklistFoto[]
   alocacao?: { obra_nome?: string; centro_custo?: string; data_saida?: string; data_retorno_prev?: string }
+  /** Vehicle diagram zone damages for visual inspection */
+  vistoriaVisual?: VistoriaVisualDamage[]
 }
 
 // ── Logo Loader ─────────────────────────────────────────────────────────────
@@ -390,6 +399,181 @@ async function buildChecklistDoc(
   }
 
   y += 2
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // SECTION: VISTORIA VISUAL (vehicle diagram damages)
+  // ══════════════════════════════════════════════════════════════════════════
+
+  if (data.vistoriaVisual && data.vistoriaVisual.length > 0) {
+    const isVeiculo = (veiculo.tipo_ativo || 'veiculo') === 'veiculo'
+    if (isVeiculo) {
+      sectionTitle('VISTORIA VISUAL')
+
+      // Zone label map
+      const zoneLabelMap: Record<string, string> = {
+        parachoque_diant: 'Para-choque Dianteiro',
+        capo: 'Capô',
+        parabrisa: 'Para-brisa',
+        porta_diant_esq: 'Porta Diant. Esq.',
+        porta_tras_esq: 'Porta Tras. Esq.',
+        lateral_esq: 'Lateral Esquerda',
+        porta_diant_dir: 'Porta Diant. Dir.',
+        porta_tras_dir: 'Porta Tras. Dir.',
+        lateral_dir: 'Lateral Direita',
+        teto: 'Teto',
+        vidro_traseiro: 'Vidro Traseiro',
+        tampa_traseira: 'Tampa Traseira',
+        parachoque_tras: 'Para-choque Traseiro',
+        roda_de: 'Roda Diant. Esq.',
+        roda_dd: 'Roda Diant. Dir.',
+        roda_te: 'Roda Tras. Esq.',
+        roda_td: 'Roda Tras. Dir.',
+      }
+
+      const condColorMap: Record<string, readonly [number, number, number]> = {
+        sem_avaria: [16, 185, 129],
+        risco: [234, 179, 8],
+        amassado: [249, 115, 22],
+        quebrado: [239, 68, 68],
+        faltando: [220, 38, 38],
+      }
+
+      const condLabelMap: Record<string, string> = {
+        sem_avaria: 'Sem Avaria',
+        risco: 'Risco',
+        amassado: 'Amassado',
+        quebrado: 'Quebrado',
+        faltando: 'Faltando',
+      }
+
+      // Draw a simplified top-down car outline
+      const carX = M
+      const carY = y
+      const carW = 60
+      const carH = 80
+
+      // Car body
+      doc.setFillColor(241, 245, 249)
+      doc.setDrawColor(...LIGHT)
+      doc.setLineWidth(0.3)
+      doc.roundedRect(carX + 10, carY, carW - 20, carH, 8, 8, 'FD')
+
+      // Wheels
+      const wheelPositions = [
+        { x: carX + 5, y: carY + 10 },
+        { x: carX + carW - 11, y: carY + 10 },
+        { x: carX + 5, y: carY + carH - 18 },
+        { x: carX + carW - 11, y: carY + carH - 18 },
+      ]
+      for (const wp of wheelPositions) {
+        doc.setFillColor(71, 85, 105)
+        doc.roundedRect(wp.x, wp.y, 6, 8, 1.5, 1.5, 'F')
+      }
+
+      // Windshields
+      doc.setFillColor(191, 219, 254)
+      doc.roundedRect(carX + 15, carY + 16, carW - 30, 5, 1.5, 1.5, 'F')
+      doc.roundedRect(carX + 15, carY + carH - 21, carW - 30, 5, 1.5, 1.5, 'F')
+
+      // Direction labels
+      doc.setFont('helvetica', 'bold')
+      doc.setFontSize(6)
+      doc.setTextColor(...MID)
+      doc.text('FRENTE', carX + carW / 2, carY - 1, { align: 'center' })
+      doc.text('TRASEIRA', carX + carW / 2, carY + carH + 4, { align: 'center' })
+
+      // Draw damage dots on the car
+      const zonePositionMap: Record<string, { x: number; y: number }> = {
+        parachoque_diant: { x: carX + carW / 2, y: carY + 4 },
+        capo: { x: carX + carW / 2, y: carY + 11 },
+        parabrisa: { x: carX + carW / 2, y: carY + 18.5 },
+        porta_diant_esq: { x: carX + 13, y: carY + 28 },
+        porta_tras_esq: { x: carX + 13, y: carY + 42 },
+        lateral_esq: { x: carX + 13, y: carY + 52 },
+        porta_diant_dir: { x: carX + carW - 13, y: carY + 28 },
+        porta_tras_dir: { x: carX + carW - 13, y: carY + 42 },
+        lateral_dir: { x: carX + carW - 13, y: carY + 52 },
+        teto: { x: carX + carW / 2, y: carY + 38 },
+        vidro_traseiro: { x: carX + carW / 2, y: carY + carH - 18.5 },
+        tampa_traseira: { x: carX + carW / 2, y: carY + carH - 11 },
+        parachoque_tras: { x: carX + carW / 2, y: carY + carH - 4 },
+        roda_de: { x: carX + 8, y: carY + 14 },
+        roda_dd: { x: carX + carW - 8, y: carY + 14 },
+        roda_te: { x: carX + 8, y: carY + carH - 14 },
+        roda_td: { x: carX + carW - 8, y: carY + carH - 14 },
+      }
+
+      for (const damage of data.vistoriaVisual) {
+        const pos = zonePositionMap[damage.zone]
+        if (pos) {
+          const color = condColorMap[damage.condition] || [148, 163, 184]
+          doc.setFillColor(...color)
+          doc.circle(pos.x, pos.y, 2, 'F')
+        }
+      }
+
+      // Damage list next to diagram
+      const listX = carX + carW + 10
+      const listW = CW - carW - 10
+      let listY = carY
+
+      doc.setFont('helvetica', 'bold')
+      doc.setFontSize(8)
+      doc.setTextColor(...DARK)
+      doc.text('Zonas Inspecionadas', listX, listY)
+      listY += 5
+
+      const damages = data.vistoriaVisual.filter(d => d.condition !== 'sem_avaria')
+      const okCount = data.vistoriaVisual.filter(d => d.condition === 'sem_avaria').length
+
+      if (okCount > 0) {
+        doc.setFont('helvetica', 'normal')
+        doc.setFontSize(7)
+        doc.setTextColor(16, 185, 129)
+        doc.text(`${okCount} zona(s) sem avaria`, listX, listY)
+        listY += 4
+      }
+
+      if (damages.length > 0) {
+        doc.setFont('helvetica', 'bold')
+        doc.setFontSize(7)
+        doc.setTextColor(239, 68, 68)
+        doc.text(`${damages.length} avaria(s) encontrada(s):`, listX, listY)
+        listY += 5
+
+        for (const damage of damages) {
+          if (listY > carY + carH) break
+          const color = condColorMap[damage.condition] || [148, 163, 184]
+          doc.setFillColor(...color)
+          doc.circle(listX + 1.5, listY - 1.2, 1.2, 'F')
+
+          doc.setFont('helvetica', 'normal')
+          doc.setFontSize(7)
+          doc.setTextColor(...DARK)
+          const label = zoneLabelMap[damage.zone] || damage.zone
+          doc.text(label, listX + 5, listY)
+
+          doc.setFont('helvetica', 'bold')
+          doc.setFontSize(6)
+          doc.setTextColor(...color)
+          const condLabel = condLabelMap[damage.condition] || damage.condition
+          doc.text(condLabel, listX + 5 + doc.getTextWidth(label) + 2, listY)
+          listY += 4
+
+          if (damage.comment) {
+            doc.setFont('helvetica', 'normal')
+            doc.setFontSize(6)
+            doc.setTextColor(...MID)
+            const commentTrunc = damage.comment.length > 40 ? damage.comment.slice(0, 37) + '...' : damage.comment
+            doc.text(commentTrunc, listX + 5, listY)
+            listY += 3.5
+          }
+        }
+      }
+
+      y = Math.max(carY + carH + 8, listY + 4)
+    }
+  }
 
   // ══════════════════════════════════════════════════════════════════════════
   // SECTION: RESPONSÁVEL
