@@ -103,9 +103,9 @@ export default function OperacaoHub() {
   const Comp = COMPS[active] ?? AgendaAlocacao
 
   return (
-    <div className="flex flex-col h-full">
-      <div className="px-4 sm:px-6 pt-4 pb-3">
-        <div className={`flex gap-1 overflow-x-auto hide-scrollbar rounded-2xl border p-1 pb-2 ${
+    <div className="flex flex-col h-full -mx-4 md:mx-0">
+      <div className="px-3 sm:px-4 md:px-6 pt-4 pb-3">
+        <div className={`flex gap-1 overflow-x-auto hide-scrollbar rounded-2xl border p-1 ${
           isDark ? 'border-white/[0.06] bg-white/[0.02]' : 'border-slate-200 bg-slate-50'
         }`}>
           {TABS.map((tab) => {
@@ -116,7 +116,7 @@ export default function OperacaoHub() {
               <button
                 key={tab.key}
                 onClick={() => setActive(tab.key)}
-                className={`min-w-fit whitespace-nowrap rounded-xl border px-4 py-2.5 text-sm transition-all md:flex-1 ${
+                className={`min-w-fit whitespace-nowrap rounded-xl border px-3 py-2 text-sm transition-all md:px-4 md:py-2.5 md:flex-1 ${
                   isActive
                     ? `${accent.bgActive} ${accent.textActive} ${accent.border} font-bold shadow-sm`
                     : `${accent.bg} ${accent.text} border-transparent font-medium ${isDark ? 'hover:bg-white/[0.06] hover:shadow-sm' : 'hover:bg-white hover:shadow-sm'}`
@@ -129,7 +129,7 @@ export default function OperacaoHub() {
           })}
         </div>
       </div>
-      <div className="flex-1 overflow-auto">
+      <div className="flex-1 overflow-auto px-3 sm:px-4 md:px-6">
         <Comp />
       </div>
     </div>

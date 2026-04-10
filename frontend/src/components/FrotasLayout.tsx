@@ -117,6 +117,8 @@ export default function FrotasLayout() {
         accent="rose"
         nav={NAV}
         moduleSubtitle="Veículos & Máquinas"
+        bottomNavMaxItems={5}
+        truncateBottomLabels
       />
     </>
   )
