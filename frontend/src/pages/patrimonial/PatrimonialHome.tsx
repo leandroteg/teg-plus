@@ -1,8 +1,8 @@
 import { useNavigate } from 'react-router-dom'
 import {
   Landmark, TrendingDown, Wrench, FileText,
-  ArrowLeftRight, ArrowRight, Zap, CalendarClock,
-  Archive, ArrowDownUp,
+  ArrowLeftRight, ArrowRight, Zap,
+  Archive, ArrowDownUp, Clock, ChevronRight,
 } from 'lucide-react'
 import { usePatrimonialKPIs, useImobilizados, useMovimentacoesPatrimonial } from '../../hooks/usePatrimonial'
 import { useTheme } from '../../contexts/ThemeContext'
@@ -10,7 +10,7 @@ import { useTheme } from '../../contexts/ThemeContext'
 const fmt = (v: number) =>
   v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 })
 
-// ── SpotlightMetric (padrao Compras) ─────────────────────────────────────────
+// ── SpotlightMetric ──────────────────────────────────────────────────────────
 function SpotlightMetric({ label, value, tone, note, isDark }: {
   label: string; value: string | number; tone: string; note?: string; isDark: boolean
 }) {
@@ -18,8 +18,6 @@ function SpotlightMetric({ label, value, tone, note, isDark }: {
     amber: isDark ? 'text-amber-400' : 'text-amber-600',
     emerald: isDark ? 'text-emerald-400' : 'text-emerald-600',
     red: isDark ? 'text-red-400' : 'text-red-600',
-    indigo: isDark ? 'text-indigo-400' : 'text-indigo-600',
-    teal: isDark ? 'text-teal-400' : 'text-teal-600',
     slate: isDark ? 'text-slate-400' : 'text-slate-500',
   }
   return (
@@ -31,7 +29,7 @@ function SpotlightMetric({ label, value, tone, note, isDark }: {
   )
 }
 
-// ── MiniInfoCard (padrao Compras) ────────────────────────────────────────────
+// ── MiniInfoCard ─────────────────────────────────────────────────────────────
 function MiniInfoCard({ label, value, note, icon: Icon, iconTone, isDark }: {
   label: string; value: string | number; note?: string; icon: typeof Landmark; iconTone: string; isDark: boolean
 }) {
@@ -42,43 +40,6 @@ function MiniInfoCard({ label, value, note, icon: Icon, iconTone, isDark }: {
       <p className={`text-[9px] font-bold uppercase tracking-wider text-center ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{label}</p>
       {note && <p className={`text-[8px] text-center ${isDark ? 'text-slate-600' : 'text-slate-400'}`}>{note}</p>}
     </div>
-  )
-}
-
-// ── HorizontalStatusBar ─────────────────────────────────────────────────────
-function HorizontalStatusBar({ segments, isDark }: {
-  segments: { key: string; label: string; value: number; barClass: string }[]
-  isDark: boolean
-}) {
-  const total = segments.reduce((s, seg) => s + seg.value, 0)
-  return (
-    <>
-      <div className="flex items-center justify-between gap-3 mb-2">
-        <p className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Distribuicao por Status</p>
-        <p className={`text-[10px] font-semibold ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{total} ativo(s)</p>
-      </div>
-      {total === 0 ? (
-        <div className={`h-10 rounded-xl flex items-center justify-center text-[10px] font-semibold ${isDark ? 'bg-white/[0.04] text-slate-500' : 'bg-slate-50 text-slate-400'}`}>
-          Nenhum ativo cadastrado
-        </div>
-      ) : (
-        <div className={`flex h-10 rounded-xl overflow-hidden ${isDark ? 'bg-white/[0.04]' : 'bg-slate-100'}`}>
-          {segments.filter(s => s.value > 0).map(seg => {
-            const pct = (seg.value / total) * 100
-            return (
-              <div key={seg.key} className={`${seg.barClass} relative flex items-center justify-center transition-all`}
-                style={{ width: `${Math.max(pct, 4)}%` }} title={`${seg.label}: ${seg.value}`}>
-                {pct >= 14 && (
-                  <span className="text-[10px] font-bold text-white drop-shadow-sm truncate px-2">
-                    {seg.label} {pct >= 22 ? seg.value : ''}
-                  </span>
-                )}
-              </div>
-            )
-          })}
-        </div>
-      )}
-    </>
   )
 }
 
@@ -96,25 +57,63 @@ export default function PatrimonialHome() {
   const emManutencao = kpis?.imobilizados_em_manutencao ?? 0
   const depreciados = imobilizados.filter(i => (i.percentual_depreciado ?? 0) >= 100 && i.status !== 'baixado').length
   const baixados = imobilizados.filter(i => i.status === 'baixado').length
-  const recentes = movimentacoes.slice(0, 6)
+  const recentes = movimentacoes.slice(0, 8)
 
   const cardClass = isDark
     ? 'bg-[#111827] border border-white/[0.06]'
     : 'bg-white border border-slate-200'
 
+  // Status distribution for bar
+  const statusSegments = [
+    { key: 'aguardando', label: 'Aguardando',  value: aguardandoEntrada, barClass: 'bg-violet-500' },
+    { key: 'ativo',      label: 'Ativos',      value: ativos,            barClass: 'bg-emerald-500' },
+    { key: 'manutencao', label: 'Manutencao',  value: emManutencao,      barClass: 'bg-amber-500' },
+    { key: 'depreciado', label: 'Depreciados', value: depreciados,       barClass: 'bg-red-500' },
+    { key: 'baixado',    label: 'Baixados',    value: baixados,          barClass: 'bg-slate-400' },
+  ]
+  const totalAtivos = statusSegments.reduce((s, seg) => s + seg.value, 0)
+
+  // Categorias para chart
+  const catMap = new Map<string, { nome: string; valor: number; qtd: number }>()
+  imobilizados.filter(i => i.status !== 'baixado').forEach(i => {
+    const nome = i.categoria || 'Sem categoria'
+    const cur = catMap.get(nome) || { nome, valor: 0, qtd: 0 }
+    cur.valor += i.valor_liquido ?? i.valor_aquisicao ?? 0
+    cur.qtd += 1
+    catMap.set(nome, cur)
+  })
+  const categorias = Array.from(catMap.values()).sort((a, b) => b.valor - a.valor)
+  const maxCatVal = categorias[0]?.valor || 1
+
   return (
-    <div className="space-y-4">
-      {/* ── Row 1: Indicadores + Janela Critica ── */}
-      <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
-        {/* Indicadores (3/5) */}
-        <section className={`lg:col-span-3 rounded-3xl shadow-sm overflow-hidden flex flex-col ${cardClass}`}>
-          <div className="p-4 md:p-5 flex flex-col gap-3 flex-1">
+    <div className="space-y-3">
+
+      {/* ── Titulo do Painel ── */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className={`text-lg font-extrabold ${isDark ? 'text-white' : 'text-slate-900'}`}>Painel Patrimonial</h1>
+          <p className={`text-xs mt-0.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Visao geral dos ativos, depreciacao e movimentacoes</p>
+        </div>
+        <button
+          onClick={() => nav('/patrimonial/movimentacoes?nova=1')}
+          className="flex items-center gap-1.5 bg-amber-600 hover:bg-amber-700 text-white text-sm font-semibold px-4 py-2 rounded-xl transition-colors shadow-sm"
+        >
+          <ArrowLeftRight size={15} /> Nova Movimentacao
+        </button>
+      </div>
+
+      {/* ── Hero: Indicadores + Janela Critica ── */}
+      <div className="grid grid-cols-1 xl:grid-cols-[1.52fr_0.88fr] gap-3 items-stretch">
+
+        {/* Indicadores */}
+        <section className={`rounded-3xl shadow-sm overflow-hidden flex flex-col ${cardClass}`}>
+          <div className="p-4 md:p-5 flex flex-col gap-4 flex-1">
             <div className="flex items-center justify-between gap-4">
               <div>
                 <p className={`text-[11px] font-bold uppercase tracking-[0.24em] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
                   Gestao Patrimonial
                 </p>
-                <h2 className={`mt-0.5 text-sm font-black ${isDark ? 'text-white' : 'text-slate-900'}`}>
+                <h2 className={`mt-0.5 text-base font-black ${isDark ? 'text-white' : 'text-slate-900'}`}>
                   Indicadores do portfolio
                 </h2>
               </div>
@@ -125,21 +124,21 @@ export default function PatrimonialHome() {
 
             <div className="grid grid-cols-3 gap-2.5 flex-1">
               <SpotlightMetric label="Total Ativos" value={kpis?.total_imobilizados ?? 0} tone="amber" isDark={isDark} note={`${ativos} em uso`} />
-              <SpotlightMetric label="Valor Liquido" value={fmt(kpis?.valor_total_liquido ?? 0)} tone="emerald" isDark={isDark} />
+              <SpotlightMetric label="Valor Liquido" value={fmt(kpis?.valor_total_liquido ?? 0)} tone="emerald" isDark={isDark} note="valor contabil atual" />
               <SpotlightMetric label="Depreciacao Acum." value={fmt(kpis?.depreciacao_acumulada ?? 0)} tone="red" isDark={isDark} note={depreciados > 0 ? `${depreciados} totalmente depreciados` : 'nenhum 100% depreciado'} />
             </div>
           </div>
         </section>
 
-        {/* Janela Critica (2/5) */}
-        <section className={`lg:col-span-2 rounded-3xl shadow-sm overflow-hidden flex flex-col ${cardClass}`}>
+        {/* Janela Critica — somente 2 cards */}
+        <section className={`rounded-3xl shadow-sm overflow-hidden flex flex-col ${cardClass}`}>
           <div className="p-4 md:p-5 flex flex-col gap-3 flex-1">
             <div className="flex items-center justify-between gap-3">
               <div>
                 <p className={`text-[11px] font-bold uppercase tracking-[0.24em] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
                   Janela Critica
                 </p>
-                <h2 className={`mt-0.5 text-sm font-black ${isDark ? 'text-white' : 'text-slate-900'}`}>
+                <h2 className={`mt-0.5 text-base font-black ${isDark ? 'text-white' : 'text-slate-900'}`}>
                   O que exige acao agora
                 </h2>
               </div>
@@ -150,50 +149,78 @@ export default function PatrimonialHome() {
               </div>
             </div>
             <div className="grid grid-cols-2 gap-2">
-              <MiniInfoCard label="Aguardando Entrada" value={aguardandoEntrada} icon={ArrowDownUp} iconTone={aguardandoEntrada > 0 ? (isDark ? 'text-violet-400' : 'text-violet-500') : 'text-slate-400'} note={aguardandoEntrada > 0 ? 'pendentes de registro' : 'tudo ok'} isDark={isDark} />
-              <MiniInfoCard label="Termos Pendentes" value={kpis?.termos_pendentes ?? 0} icon={FileText} iconTone={(kpis?.termos_pendentes ?? 0) > 0 ? (isDark ? 'text-red-400' : 'text-red-500') : 'text-slate-400'} note="responsabilidade" isDark={isDark} />
-              <MiniInfoCard label="Em Manutencao" value={emManutencao} icon={Wrench} iconTone={emManutencao > 0 ? (isDark ? 'text-amber-400' : 'text-amber-500') : 'text-slate-400'} isDark={isDark} />
-              <MiniInfoCard label="Baixados" value={baixados} icon={Archive} iconTone="text-slate-400" isDark={isDark} />
+              <MiniInfoCard label="Aguardando Entrada" value={aguardandoEntrada} icon={ArrowDownUp}
+                iconTone={aguardandoEntrada > 0 ? (isDark ? 'text-violet-400' : 'text-violet-500') : 'text-slate-400'}
+                note={aguardandoEntrada > 0 ? 'pendentes de registro' : 'tudo ok'} isDark={isDark} />
+              <MiniInfoCard label="Termos Pendentes" value={kpis?.termos_pendentes ?? 0} icon={FileText}
+                iconTone={(kpis?.termos_pendentes ?? 0) > 0 ? (isDark ? 'text-red-400' : 'text-red-500') : 'text-slate-400'}
+                note="responsabilidade" isDark={isDark} />
             </div>
           </div>
         </section>
       </div>
 
-      {/* ── Row 2: Status Bar ── */}
+      {/* ── Pulso por Status (barra) ── */}
       <section className={`rounded-2xl shadow-sm overflow-hidden ${cardClass}`}>
+        <div className={`px-4 py-3 flex items-center justify-between ${isDark ? 'border-b border-white/[0.06]' : 'border-b border-slate-100'}`}>
+          <h2 className={`text-sm font-extrabold flex items-center gap-1.5 ${isDark ? 'text-white' : 'text-slate-800'}`}>
+            <Landmark size={14} className="text-amber-500" /> Pulso por Status
+          </h2>
+          <div className="flex items-center gap-3">
+            {statusSegments.filter(s => s.value > 0).map(s => (
+              <span key={s.key} className="flex items-center gap-1">
+                <span className={`w-2.5 h-2.5 rounded-full ${s.barClass}`} />
+                <span className="text-[10px] text-slate-500">{s.label}</span>
+              </span>
+            ))}
+          </div>
+        </div>
         <div className="px-4 py-3">
-          <HorizontalStatusBar
-            isDark={isDark}
-            segments={[
-              { key: 'aguardando', label: 'Aguardando',  value: aguardandoEntrada, barClass: 'bg-violet-500' },
-              { key: 'ativo',      label: 'Ativos',      value: ativos,            barClass: 'bg-emerald-500' },
-              { key: 'manutencao', label: 'Manutencao',  value: emManutencao,      barClass: 'bg-amber-500' },
-              { key: 'depreciado', label: 'Depreciados', value: depreciados,       barClass: 'bg-red-500' },
-              { key: 'baixado',    label: 'Baixados',    value: baixados,          barClass: 'bg-slate-400' },
-            ]}
-          />
+          {totalAtivos === 0 ? (
+            <div className={`h-10 rounded-xl flex items-center justify-center text-[10px] font-semibold ${isDark ? 'bg-white/[0.04] text-slate-500' : 'bg-slate-50 text-slate-400'}`}>
+              Nenhum ativo cadastrado
+            </div>
+          ) : (
+            <div className={`flex h-10 rounded-xl overflow-hidden ${isDark ? 'bg-white/[0.04]' : 'bg-slate-100'}`}>
+              {statusSegments.filter(s => s.value > 0).map(seg => {
+                const pct = (seg.value / totalAtivos) * 100
+                return (
+                  <div key={seg.key} className={`${seg.barClass} relative flex items-center justify-center transition-all`}
+                    style={{ width: `${Math.max(pct, 4)}%` }} title={`${seg.label}: ${seg.value}`}>
+                    {pct >= 14 && (
+                      <span className="text-[10px] font-bold text-white drop-shadow-sm truncate px-2">
+                        {seg.label} {pct >= 22 ? seg.value : ''}
+                      </span>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+          )}
         </div>
       </section>
 
-      {/* ── Row 3: Movimentacoes Recentes ── */}
-      <section className={`rounded-2xl shadow-sm overflow-hidden ${cardClass}`}>
-        <div className={`px-4 py-3 border-b flex items-center justify-between ${isDark ? 'border-white/[0.04]' : 'border-slate-100'}`}>
-          <h2 className={`text-sm font-extrabold flex items-center gap-1.5 ${isDark ? 'text-white' : 'text-slate-800'}`}>
-            <ArrowLeftRight size={14} className="text-amber-500" />
-            Movimentacoes Recentes
-          </h2>
-          <button onClick={() => nav('/patrimonial/movimentacoes')} className="text-[10px] text-amber-600 font-semibold flex items-center gap-0.5 hover:underline">
-            Ver todas <ArrowRight size={10} />
-          </button>
-        </div>
-        {recentes.length === 0 ? (
-          <div className="px-4 py-12 text-center">
-            <ArrowLeftRight size={32} className={`mx-auto mb-2 ${isDark ? 'text-slate-700' : 'text-slate-200'}`} />
-            <p className={`text-sm ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Nenhuma movimentacao registrada</p>
+      {/* ── Row: Movimentacoes Recentes + Por Categoria ── */}
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-3">
+
+        {/* Movimentacoes Recentes */}
+        <section className={`rounded-2xl shadow-sm overflow-hidden ${cardClass}`}>
+          <div className={`px-4 py-3 flex items-center justify-between ${isDark ? 'border-b border-white/[0.06]' : 'border-b border-slate-100'}`}>
+            <h2 className={`text-sm font-extrabold flex items-center gap-1.5 ${isDark ? 'text-white' : 'text-slate-800'}`}>
+              <Clock size={14} className="text-slate-500" /> Movimentacoes Recentes
+            </h2>
+            <button onClick={() => nav('/patrimonial/movimentacoes')} className="flex items-center gap-0.5 text-[10px] text-amber-600 font-semibold">
+              Ver todas <ChevronRight size={11} />
+            </button>
           </div>
-        ) : (
           <div className={`divide-y ${isDark ? 'divide-white/[0.04]' : 'divide-slate-50'}`}>
-            {recentes.map(mov => (
+            {recentes.length === 0 ? (
+              <div className="px-4 py-10 text-center">
+                <ArrowLeftRight size={28} className={`mx-auto mb-2 ${isDark ? 'text-slate-700' : 'text-slate-200'}`} />
+                <p className={`text-sm font-semibold ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Nenhuma movimentacao</p>
+                <p className={`text-[10px] ${isDark ? 'text-slate-600' : 'text-slate-400'}`}>Movimentacoes aparecem aqui</p>
+              </div>
+            ) : recentes.map(mov => (
               <div key={mov.id} className={`px-4 py-3 flex items-center justify-between gap-3 ${isDark ? 'hover:bg-white/[0.02]' : 'hover:bg-slate-50'} transition-colors`}>
                 <div className="min-w-0">
                   <p className={`text-sm font-semibold truncate ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>
@@ -214,8 +241,44 @@ export default function PatrimonialHome() {
               </div>
             ))}
           </div>
-        )}
-      </section>
+        </section>
+
+        {/* Valor por Categoria */}
+        <section className={`rounded-2xl shadow-sm overflow-hidden ${cardClass}`}>
+          <div className={`px-4 py-3 ${isDark ? 'border-b border-white/[0.06]' : 'border-b border-slate-100'}`}>
+            <h2 className={`text-sm font-extrabold flex items-center gap-1.5 ${isDark ? 'text-white' : 'text-slate-800'}`}>
+              <Landmark size={14} className="text-amber-500" /> Valor por Categoria
+            </h2>
+          </div>
+          <div className="p-4 space-y-2.5">
+            {categorias.length === 0 ? (
+              <div className="py-8 text-center">
+                <Archive size={28} className={`mx-auto mb-2 ${isDark ? 'text-slate-700' : 'text-slate-200'}`} />
+                <p className={`text-sm font-semibold ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Nenhum ativo</p>
+                <p className={`text-[10px] ${isDark ? 'text-slate-600' : 'text-slate-400'}`}>Categorias aparecem aqui</p>
+              </div>
+            ) : categorias.slice(0, 8).map(c => (
+              <div key={c.nome} className="flex items-center gap-3">
+                <p className={`text-[11px] font-semibold text-right shrink-0 w-[120px] truncate ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+                  {c.nome}
+                </p>
+                <div className="flex-1 relative">
+                  <div className={`h-6 rounded-full overflow-hidden ${isDark ? 'bg-white/[0.04]' : 'bg-slate-100'}`}>
+                    <div
+                      className="h-full rounded-full bg-gradient-to-r from-amber-400 to-amber-600 transition-all duration-500"
+                      style={{ width: `${Math.max((c.valor / maxCatVal) * 100, 4)}%` }}
+                    />
+                  </div>
+                </div>
+                <p className={`text-[11px] font-extrabold shrink-0 w-[70px] text-right ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>
+                  {fmt(c.valor)}
+                </p>
+              </div>
+            ))}
+          </div>
+        </section>
+      </div>
+
     </div>
   )
 }
