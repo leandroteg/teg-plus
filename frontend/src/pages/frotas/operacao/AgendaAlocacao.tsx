@@ -1191,10 +1191,10 @@ export default function AgendaAlocacao() {
         )
       ) : viewMode === 'timeline' ? (
         /* ── Timeline View ───────────────────────────────────────────── */
-        <TimelineView alocacoes={todasAlocacoes} isLight={isLight} />
+        <TimelineView alocacoes={alocacoes} isLight={isLight} />
       ) : (
         /* ── Calendar View ───────────────────────────────────────────── */
-        <CalendarView alocacoes={todasAlocacoes} isLight={isLight} />
+        <CalendarView alocacoes={alocacoes} isLight={isLight} />
       )}
 
       {novaModal && (
