@@ -165,11 +165,11 @@ export default function Login() {
           {view === 'login' && (
             <form onSubmit={handleLogin} className="p-5 space-y-4">
               <InputField
-                label="E-mail corporativo"
-                type="email"
+                label="Usuário ou e-mail"
+                type="text"
                 value={email}
                 onChange={v => { setEmail(v); clr() }}
-                placeholder="voce@teguniao.com.br"
+                placeholder="nome.sobrenome ou email"
                 icon={Mail}
                 autoFocus
               />
