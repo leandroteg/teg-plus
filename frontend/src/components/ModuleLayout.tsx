@@ -284,7 +284,7 @@ export default function ModuleLayout({
   ...config
 }: ModuleConfig) {
   const { perfil, isAdmin, signOut, role, papelGlobal, getPapelForModule } = useAuth()
-  const { isDark, isLightSidebar, theme, setTheme } = useTheme()
+  const { isDark, isLightSidebar, isDarkSidebar, theme, setTheme } = useTheme()
   const navigate = useNavigate()
   const location = useLocation()
   const [drawerOpen, setDrawerOpen] = useState(false)
@@ -337,7 +337,7 @@ export default function ModuleLayout({
     }
   }, [openNavMenu])
 
-  const ls = isLightSidebar
+  const ls = !isDarkSidebar // ls = light sidebar visual
   const a = ACCENT_CLASSES[config.accent] ?? ACCENT_CLASSES.teal
 
   const nome = perfil?.nome ?? 'Usuário'

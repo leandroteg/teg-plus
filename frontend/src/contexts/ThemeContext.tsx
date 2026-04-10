@@ -11,8 +11,10 @@ interface ThemeContextType {
   setTheme: (theme: Theme) => void
   /** true when dark theme is active (content area should be dark) */
   isDark: boolean
-  /** true when light theme is active (sidebar should be light) */
+  /** true when content should be light (original + light) */
   isLightSidebar: boolean
+  /** true when sidebar should be dark (original + dark) */
+  isDarkSidebar: boolean
 }
 
 // ── Context ─────────────────────────────────────────────────────────────────────
@@ -55,7 +57,8 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
         theme,
         setTheme,
         isDark: theme === 'dark',
-        isLightSidebar: theme === 'light',
+        isLightSidebar: theme !== 'dark',
+        isDarkSidebar: theme !== 'light',
       }}
     >
       {children}
