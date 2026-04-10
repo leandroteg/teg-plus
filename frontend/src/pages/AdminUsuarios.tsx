@@ -9,6 +9,7 @@ import {
   LayoutGrid, LayoutList, SlidersHorizontal,
 } from 'lucide-react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useTheme } from '../contexts/ThemeContext'
 import { supabase } from '../services/supabase'
 import {
   useAuth,
@@ -325,40 +326,41 @@ function ModuloCheckboxGroup({
   onSetAll: (keys: string[], val: boolean) => void
   disabled?: boolean
 }) {
+  const { isDark } = useTheme()
   const allKeys = MODULOS_ERP.map(m => m.key)
   const selectedCount = allKeys.filter(k => modulos[k]).length
 
   return (
     <div>
       <div className="flex items-center justify-between mb-2">
-        <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+        <label className={`text-[10px] font-bold uppercase tracking-wider ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
           Módulos ({selectedCount} de {allKeys.length})
         </label>
         <div className="flex gap-1.5">
           <button type="button" onClick={() => onSetAll(allKeys, true)} disabled={disabled}
             className="text-[10px] font-semibold text-primary hover:underline disabled:opacity-40 disabled:cursor-not-allowed">Todos</button>
-          <span className="text-slate-300">·</span>
+          <span className={isDark ? 'text-slate-600' : 'text-slate-300'}>·</span>
           <button type="button" onClick={() => onSetAll(allKeys, false)} disabled={disabled}
-            className="text-[10px] font-semibold text-slate-400 hover:underline disabled:opacity-40 disabled:cursor-not-allowed">Nenhum</button>
+            className={`text-[10px] font-semibold hover:underline disabled:opacity-40 disabled:cursor-not-allowed ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Nenhum</button>
         </div>
       </div>
       <div className="space-y-2.5">
         {MODULOS_ERP_GROUPED.map(group => (
           <div key={group.label}>
-            <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-1">{group.label}</p>
+            <p className={`text-[9px] font-bold uppercase tracking-widest mb-1 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{group.label}</p>
             <div className="grid grid-cols-2 gap-1">
               {group.modulos.map(({ key, label, icon }) => (
                 <label key={key}
                   className={`flex items-center gap-1.5 px-2 py-1.5 rounded-lg cursor-pointer transition-all text-xs
                     ${modulos[key]
                       ? 'bg-primary/8 text-primary font-semibold'
-                      : 'text-slate-500 hover:bg-slate-50'} ${disabled ? 'opacity-55 cursor-not-allowed' : ''}`}>
+                      : isDark ? 'text-slate-400 hover:bg-white/[0.04]' : 'text-slate-500 hover:bg-slate-50'} ${disabled ? 'opacity-55 cursor-not-allowed' : ''}`}>
                   <input
                     type="checkbox"
                     disabled={disabled}
                     checked={!!modulos[key]}
                     onChange={() => onToggle(key)}
-                    className="w-3.5 h-3.5 rounded border-slate-300 text-primary focus:ring-primary/30 cursor-pointer"
+                    className={`w-3.5 h-3.5 rounded text-primary focus:ring-primary/30 cursor-pointer ${isDark ? 'border-white/20 bg-white/5' : 'border-slate-300'}`}
                   />
                   <span className="text-[11px]">{icon}</span>
                   <span className="truncate">{label}</span>
@@ -384,11 +386,12 @@ function ModuloPapelEditor({
   onChange: (modulo: string, papel: PapelGlobal | '') => void
   disabled?: boolean
 }) {
+  const { isDark } = useTheme()
   const ativos = MODULOS_ERP.filter(mod => Boolean(modulos?.[mod.key]))
 
   if (ativos.length === 0) {
     return (
-      <div className="rounded-xl border border-dashed border-slate-200 px-3 py-2 text-xs text-slate-400">
+      <div className={`rounded-xl border border-dashed px-3 py-2 text-xs ${isDark ? 'border-white/10 text-slate-500' : 'border-slate-200 text-slate-400'}`}>
         Marque ao menos um módulo para definir papel por módulo.
       </div>
     )
@@ -398,7 +401,7 @@ function ModuloPapelEditor({
     <div className="space-y-2">
       {ativos.map(mod => (
         <div key={mod.key} className="grid grid-cols-[1fr_180px] gap-2 items-center">
-          <div className="text-xs text-slate-600 font-semibold flex items-center gap-1.5">
+          <div className={`text-xs font-semibold flex items-center gap-1.5 ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
             <span className="text-[11px]">{mod.icon}</span>
             <span>{mod.label}</span>
           </div>
@@ -406,7 +409,7 @@ function ModuloPapelEditor({
             value={moduloPapeis[mod.key] ?? ''}
             disabled={disabled}
             onChange={e => onChange(mod.key, e.target.value as PapelGlobal | '')}
-            className="px-2.5 py-1.5 rounded-lg border border-slate-200 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary disabled:opacity-60 disabled:cursor-not-allowed"
+            className={`px-2.5 py-1.5 rounded-lg border text-xs focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary disabled:opacity-60 disabled:cursor-not-allowed ${isDark ? 'bg-white/[0.05] border-white/10 text-white' : 'bg-white border-slate-200'}`}
           >
             <option value="">Requisitante (padrão)</option>
             {PAPEIS.map(p => (
@@ -676,8 +679,8 @@ function useCadastrarUsuario() {
         }
       }
 
-      // 2) Fallback local: criar user via RPC (bypass signUp email validation)
-      // RPC cria auth.users + auth.identities + sys_perfis de uma vez
+      // 2) Fallback local: RPC cria auth.users + auth.identities
+      // Trigger handle_new_auth_user cria sys_perfis via auth_id automaticamente
       const { data: rpcData, error: rpcErr } = await supabase.rpc('admin_create_user_rpc', {
         p_email: loginEmail,
         p_password: senhaTemporaria,
@@ -688,14 +691,18 @@ function useCadastrarUsuario() {
       const newUserId = rpcData as string
       if (!newUserId) throw new Error('RPC retornou sem ID de usuario.')
 
+      // Aguardar trigger criar perfil (busca por auth_id)
+      const perfilCriado = await waitForPerfil(newUserId)
+      if (!perfilCriado) throw new Error('Perfil nao foi criado pelo trigger. Tente novamente.')
+
       // Atualizar perfil com role, modulos e demais campos
       const { error: updErr } = await supabase.from('sys_perfis').update({
         nome, email: loginEmail, role, alcada_nivel, modulos,
         senha_definida: true, ativo: true,
-      }).eq('id', newUserId)
+      }).eq('id', perfilCriado.id)
       if (updErr) throw updErr
 
-      await syncPerfilSetores(newUserId, modulos, undefined, papel_global)
+      await syncPerfilSetores(perfilCriado.id, modulos, undefined, papel_global)
 
       return {
         nome,
@@ -713,6 +720,7 @@ function useCadastrarUsuario() {
 function UserDetailPanel({
   user, onClose, forceEdit = false,
 }: { user: Perfil; onClose: () => void; forceEdit?: boolean }) {
+  const { isDark } = useTheme()
   const update = useUpdateUser()
   const changePwd = useChangePassword()
   const deleteUser = useDeleteUser()
@@ -795,43 +803,43 @@ function UserDetailPanel({
     s ? new Date(s).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—'
 
   return (
-    <div className="border-t border-slate-100 bg-slate-50/50">
+    <div className={`border-t ${isDark ? 'border-white/[0.06] bg-white/[0.02]' : 'border-slate-100 bg-slate-50/50'}`}>
       {/* User info section */}
       <div className="px-4 py-4 space-y-3">
         {/* Basic Info Row */}
         <div className="grid grid-cols-2 gap-3">
           <div className="flex items-center gap-2 text-xs">
-            <Mail size={12} className="text-slate-400 shrink-0" />
-            <span className="text-slate-600 truncate">{user.email}</span>
+            <Mail size={12} className={`shrink-0 ${isDark ? 'text-slate-500' : 'text-slate-400'}`} />
+            <span className={`truncate ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>{user.email}</span>
           </div>
           <div className="flex items-center gap-2 text-xs">
-            <Briefcase size={12} className="text-slate-400 shrink-0" />
-            <span className="text-slate-600 truncate">{user.cargo || '—'}</span>
+            <Briefcase size={12} className={`shrink-0 ${isDark ? 'text-slate-500' : 'text-slate-400'}`} />
+            <span className={`truncate ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>{user.cargo || '—'}</span>
           </div>
           <div className="flex items-center gap-2 text-xs">
-            <Building2 size={12} className="text-slate-400 shrink-0" />
-            <span className="text-slate-600 truncate">{user.departamento || '—'}</span>
+            <Building2 size={12} className={`shrink-0 ${isDark ? 'text-slate-500' : 'text-slate-400'}`} />
+            <span className={`truncate ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>{user.departamento || '—'}</span>
           </div>
           <div className="flex items-center gap-2 text-xs">
-            <Shield size={12} className="text-slate-400 shrink-0" />
-            <span className="text-slate-600">{ALCADA_LABEL[user.alcada_nivel]}</span>
+            <Shield size={12} className={`shrink-0 ${isDark ? 'text-slate-500' : 'text-slate-400'}`} />
+            <span className={isDark ? 'text-slate-300' : 'text-slate-600'}>{ALCADA_LABEL[user.alcada_nivel]}</span>
           </div>
           <div className="flex items-center gap-2 text-xs">
-            <Calendar size={12} className="text-slate-400 shrink-0" />
-            <span className="text-slate-400">Desde: </span>
-            <span className="text-slate-600">{fmtDate(user.created_at)}</span>
+            <Calendar size={12} className={`shrink-0 ${isDark ? 'text-slate-500' : 'text-slate-400'}`} />
+            <span className={isDark ? 'text-slate-500' : 'text-slate-400'}>Desde: </span>
+            <span className={isDark ? 'text-slate-300' : 'text-slate-600'}>{fmtDate(user.created_at)}</span>
           </div>
           <div className="flex items-center gap-2 text-xs">
-            <Clock size={12} className="text-slate-400 shrink-0" />
-            <span className="text-slate-400">Acesso: </span>
-            <span className="text-slate-600">{fmtDate(user.ultimo_acesso)}</span>
+            <Clock size={12} className={`shrink-0 ${isDark ? 'text-slate-500' : 'text-slate-400'}`} />
+            <span className={isDark ? 'text-slate-500' : 'text-slate-400'}>Acesso: </span>
+            <span className={isDark ? 'text-slate-300' : 'text-slate-600'}>{fmtDate(user.ultimo_acesso)}</span>
           </div>
         </div>
 
         {/* Módulos atuais */}
         {!editing && (
           <div>
-            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">
+            <p className={`text-[10px] font-bold uppercase tracking-wider mb-1.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
               Módulos ({MODULOS_ERP.filter(m => user.modulos?.[m.key]).length} de {MODULOS_ERP.length})
             </p>
             <div className="flex gap-1 flex-wrap">
@@ -839,7 +847,7 @@ function UserDetailPanel({
                 <span key={key} className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md text-[10px] font-semibold ${
                   user.modulos?.[key]
                     ? 'bg-primary/10 text-primary'
-                    : 'bg-slate-100 text-slate-300'
+                    : isDark ? 'bg-white/[0.04] text-slate-600' : 'bg-slate-100 text-slate-300'
                 }`}>
                   <span className="text-[9px]">{icon}</span> {label}
                 </span>
@@ -852,7 +860,7 @@ function UserDetailPanel({
         <div className="flex flex-col gap-1">
           <div className="flex items-center gap-2 text-xs">
             <span className={`w-2 h-2 rounded-full ${user.senha_definida ? 'bg-green-500' : 'bg-amber-500'}`} />
-            <span className="text-slate-500">
+            <span className={isDark ? 'text-slate-400' : 'text-slate-500'}>
               {user.senha_definida ? 'Senha definida' : 'Senha pendente (magic link)'}
             </span>
           </div>
@@ -878,39 +886,39 @@ function UserDetailPanel({
             disabled={update.isPending}
             className={`flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold border-2 transition-all
               ${user.ativo
-                ? 'border-red-200 text-red-600 hover:bg-red-50'
-                : 'border-green-200 text-green-600 hover:bg-green-50'
+                ? isDark ? 'border-red-500/30 text-red-400 hover:bg-red-500/10' : 'border-red-200 text-red-600 hover:bg-red-50'
+                : isDark ? 'border-green-500/30 text-green-400 hover:bg-green-500/10' : 'border-green-200 text-green-600 hover:bg-green-50'
               }`}>
             <Power size={12} /> {user.ativo ? 'Desativar' : 'Ativar'}
           </button>
           <button onClick={() => setConfirmDelete(true)}
-            className="flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold border-2 border-red-200 text-red-500 hover:bg-red-50 transition-all">
+            className={`flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold border-2 transition-all ${isDark ? 'border-red-500/30 text-red-400 hover:bg-red-500/10' : 'border-red-200 text-red-500 hover:bg-red-50'}`}>
             <X size={12} />
           </button>
         </div>
         {confirmDelete && (
           <div className="px-4 pb-3">
-            <div className="rounded-xl border-2 border-red-200 bg-red-50 p-3">
-              <p className="text-xs font-bold text-red-700 mb-2">Excluir {user.nome}?</p>
-              <p className="text-[10px] text-red-600 mb-3">
+            <div className={`rounded-xl border-2 p-3 ${isDark ? 'border-red-500/30 bg-red-500/10' : 'border-red-200 bg-red-50'}`}>
+              <p className={`text-xs font-bold mb-2 ${isDark ? 'text-red-400' : 'text-red-700'}`}>Excluir {user.nome}?</p>
+              <p className={`text-[10px] mb-3 ${isDark ? 'text-red-400/80' : 'text-red-600'}`}>
                 Esta acao e irreversivel. O usuario sera removido permanentemente do sistema, incluindo Auth e perfil.
               </p>
               <div className="mb-3">
-                <p className="text-[10px] text-red-600 font-semibold mb-1.5">
-                  Digite <span className="font-black bg-red-100 px-1 rounded">EXCLUIR</span> para confirmar:
+                <p className={`text-[10px] font-semibold mb-1.5 ${isDark ? 'text-red-400/80' : 'text-red-600'}`}>
+                  Digite <span className={`font-black px-1 rounded ${isDark ? 'bg-red-500/20' : 'bg-red-100'}`}>EXCLUIR</span> para confirmar:
                 </p>
                 <input
                   type="text"
                   value={deleteTyped}
                   onChange={e => setDeleteTyped(e.target.value)}
                   placeholder="EXCLUIR"
-                  className="w-full text-xs rounded-lg px-3 py-2 border-2 border-red-200 bg-white text-red-700 placeholder-red-300 outline-none focus:border-red-400 font-bold uppercase tracking-wider"
+                  className={`w-full text-xs rounded-lg px-3 py-2 border-2 outline-none font-bold uppercase tracking-wider ${isDark ? 'border-red-500/30 bg-white/[0.05] text-red-400 placeholder-red-500/40 focus:border-red-500/50' : 'border-red-200 bg-white text-red-700 placeholder-red-300 focus:border-red-400'}`}
                   autoFocus
                 />
               </div>
               <div className="flex gap-2">
                 <button onClick={() => { setConfirmDelete(false); setDeleteTyped('') }}
-                  className="flex-1 py-1.5 rounded-lg text-xs font-semibold border border-slate-200 text-slate-600">
+                  className={`flex-1 py-1.5 rounded-lg text-xs font-semibold border ${isDark ? 'border-white/10 text-slate-400' : 'border-slate-200 text-slate-600'}`}>
                   Cancelar
                 </button>
                 <button
@@ -925,10 +933,10 @@ function UserDetailPanel({
           </div>
         )}
       </>) : (
-        <div className="px-4 pb-4 space-y-4 border-t border-slate-100 pt-4">
+        <div className={`px-4 pb-4 space-y-4 border-t pt-4 ${isDark ? 'border-white/[0.06]' : 'border-slate-100'}`}>
           {/* Role */}
           <div>
-            <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-2">
+            <label className={`block text-[10px] font-bold uppercase tracking-wider mb-2 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
               Perfil de Acesso
             </label>
             <div className="flex flex-wrap gap-2">
@@ -936,7 +944,7 @@ function UserDetailPanel({
                 <button key={r.value}
                   onClick={() => setPapelGlobal(r.value)}
                   className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all ${
-                    papelGlobal === r.value ? r.color + ' ring-2 ring-offset-1 ring-current' : 'bg-white text-slate-400 border-slate-200 hover:border-slate-300'
+                    papelGlobal === r.value ? r.color + ' ring-2 ring-offset-1 ring-current' : isDark ? 'bg-white/[0.05] text-slate-400 border-white/10 hover:border-white/20' : 'bg-white text-slate-400 border-slate-200 hover:border-slate-300'
                   }`}
                 >
                   {r.label}
@@ -947,14 +955,14 @@ function UserDetailPanel({
 
           {/* Alçada */}
           <div>
-            <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-2">
+            <label className={`block text-[10px] font-bold uppercase tracking-wider mb-2 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
               Alçada de Aprovação
             </label>
             <div className="grid grid-cols-1 gap-1">
               {([0, 1, 2, 3, 4] as const).map(n => (
                 <button key={n} onClick={() => setAlcada(n)}
                   className={`w-full flex items-center gap-2 px-3 py-2 rounded-xl border-2 text-left transition-all
-                    ${alcada === n ? 'border-primary bg-primary/5 text-primary' : 'border-slate-100 text-slate-600 hover:border-slate-200'}`}>
+                    ${alcada === n ? 'border-primary bg-primary/5 text-primary' : isDark ? 'border-white/[0.06] text-slate-300 hover:border-white/10' : 'border-slate-100 text-slate-600 hover:border-slate-200'}`}>
                   <Shield size={12} />
                   <span className="text-xs font-semibold">{ALCADA_LABEL[n]}</span>
                   {alcada === n && <Check size={12} className="ml-auto" />}
@@ -975,7 +983,7 @@ function UserDetailPanel({
           />
 
           <div className="space-y-2">
-            <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+            <label className={`text-[10px] font-bold uppercase tracking-wider ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
               Papel por modulo
             </label>
             <ModuloPapelEditor
@@ -983,7 +991,7 @@ function UserDetailPanel({
               moduloPapeis={moduloPapeis}
               onChange={setPapelModulo}
             />
-            <p className="text-[10px] text-slate-400">
+            <p className={`text-[10px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
               Se nao definir, o modulo fica como Requisitante.
             </p>
           </div>
@@ -991,10 +999,10 @@ function UserDetailPanel({
           {/* ── Permissões Especiais ─────────────────────────────────── */}
           {modulos?.contratos && mapPapelToLegacyRole(papelGlobal) !== 'administrador' && (
             <div className="space-y-2">
-              <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Permissões Contratos</label>
+              <label className={`text-xs font-bold uppercase tracking-wider ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Permissões Contratos</label>
               <div className="grid grid-cols-2 gap-2">
                 {GRUPO_CONTRATO_OPTIONS.map(g => (
-                  <label key={g.value} className="flex items-center gap-2 text-xs text-slate-600 cursor-pointer">
+                  <label key={g.value} className={`flex items-center gap-2 text-xs cursor-pointer ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
                     <input
                       type="checkbox"
                       checked={permEspeciais?.contratos?.grupos_permitidos?.includes(g.value) ?? false}
@@ -1008,46 +1016,46 @@ function UserDetailPanel({
                           contratos: { ...permEspeciais?.contratos, grupos_permitidos: updated }
                         })
                       }}
-                      className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                      className={`rounded text-indigo-600 focus:ring-indigo-500 ${isDark ? 'border-white/20 bg-white/5' : 'border-slate-300'}`}
                     />
                     {g.label}
                   </label>
                 ))}
               </div>
-              <p className="text-[10px] text-slate-400">Se nenhum grupo selecionado, acessa todos</p>
+              <p className={`text-[10px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Se nenhum grupo selecionado, acessa todos</p>
             </div>
           )}
 
           {/* Senha */}
           <div className="space-y-2">
-            <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider">
-              Alterar Senha <span className="normal-case font-normal text-slate-400">(deixe em branco para manter)</span>
+            <label className={`block text-[10px] font-bold uppercase tracking-wider ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+              Alterar Senha <span className={`normal-case font-normal ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>(deixe em branco para manter)</span>
             </label>
             <div className="relative">
-              <Lock size={12} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+              <Lock size={12} className={`absolute left-3 top-1/2 -translate-y-1/2 ${isDark ? 'text-slate-500' : 'text-slate-400'}`} />
               <input
                 type={showSenha ? 'text' : 'password'}
                 value={novaSenha}
                 onChange={e => { setNovaSenha(e.target.value); setSenhaError('') }}
                 placeholder="Nova senha"
-                className="w-full pl-8 pr-9 py-2 rounded-xl border border-slate-200 text-xs
-                  focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary bg-slate-50 focus:bg-white"
+                className={`w-full pl-8 pr-9 py-2 rounded-xl border text-xs
+                  focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary ${isDark ? 'bg-white/[0.05] border-white/10 text-white placeholder-slate-500 focus:bg-white/[0.08]' : 'bg-slate-50 border-slate-200 focus:bg-white'}`}
               />
               <button type="button" onClick={() => setShowSenha(v => !v)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
+                className={`absolute right-3 top-1/2 -translate-y-1/2 ${isDark ? 'text-slate-500 hover:text-slate-300' : 'text-slate-400 hover:text-slate-600'}`}>
                 {showSenha ? <EyeOff size={12} /> : <Eye size={12} />}
               </button>
             </div>
             {novaSenha && (
               <div className="relative">
-                <Lock size={12} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                <Lock size={12} className={`absolute left-3 top-1/2 -translate-y-1/2 ${isDark ? 'text-slate-500' : 'text-slate-400'}`} />
                 <input
                   type={showSenha ? 'text' : 'password'}
                   value={confirmSenha}
                   onChange={e => { setConfirmSenha(e.target.value); setSenhaError('') }}
                   placeholder="Confirmar nova senha"
-                  className="w-full pl-8 pr-4 py-2 rounded-xl border border-slate-200 text-xs
-                    focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary bg-slate-50 focus:bg-white"
+                  className={`w-full pl-8 pr-4 py-2 rounded-xl border text-xs
+                    focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary ${isDark ? 'bg-white/[0.05] border-white/10 text-white placeholder-slate-500 focus:bg-white/[0.08]' : 'bg-slate-50 border-slate-200 focus:bg-white'}`}
                 />
               </div>
             )}
@@ -1059,37 +1067,37 @@ function UserDetailPanel({
           </div>
 
           {/* Checkboxes: ativo + alterar senha próximo login */}
-          <div className="space-y-2 bg-white rounded-xl px-4 py-3">
+          <div className={`space-y-2 rounded-xl px-4 py-3 ${isDark ? 'bg-white/[0.03]' : 'bg-white'}`}>
             <label className="flex items-center gap-3 cursor-pointer select-none">
               <input
                 type="checkbox"
                 checked={ativo}
                 onChange={e => setAtivo(e.target.checked)}
-                className="w-4 h-4 rounded border-slate-300 text-primary focus:ring-primary/30 cursor-pointer"
+                className={`w-4 h-4 rounded text-primary focus:ring-primary/30 cursor-pointer ${isDark ? 'border-white/20 bg-white/5' : 'border-slate-300'}`}
               />
               <div>
-                <p className="text-xs font-semibold text-navy">Conta ativa</p>
-                <p className="text-[10px] text-slate-400">Usuário pode fazer login</p>
+                <p className={`text-xs font-semibold ${isDark ? 'text-white' : 'text-navy'}`}>Conta ativa</p>
+                <p className={`text-[10px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Usuário pode fazer login</p>
               </div>
             </label>
-            <div className="border-t border-slate-100" />
+            <div className={`border-t ${isDark ? 'border-white/[0.06]' : 'border-slate-100'}`} />
             <label className="flex items-center gap-3 cursor-pointer select-none">
               <input
                 type="checkbox"
                 checked={altProxLogin}
                 onChange={e => setAltProxLogin(e.target.checked)}
-                className="w-4 h-4 rounded border-slate-300 text-amber-500 focus:ring-amber-400/30 cursor-pointer"
+                className={`w-4 h-4 rounded text-amber-500 focus:ring-amber-400/30 cursor-pointer ${isDark ? 'border-white/20 bg-white/5' : 'border-slate-300'}`}
               />
               <div>
-                <p className="text-xs font-semibold text-navy">Alterar senha no próximo login</p>
-                <p className="text-[10px] text-slate-400">Usuário será obrigado a redefinir a senha</p>
+                <p className={`text-xs font-semibold ${isDark ? 'text-white' : 'text-navy'}`}>Alterar senha no próximo login</p>
+                <p className={`text-[10px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Usuário será obrigado a redefinir a senha</p>
               </div>
             </label>
           </div>
 
           {/* Error */}
           {(update.isError || changePwd.isError) && (
-            <div className="flex items-center gap-2 bg-red-50 text-red-600 rounded-xl px-3 py-2 text-xs">
+            <div className={`flex items-center gap-2 rounded-xl px-3 py-2 text-xs ${isDark ? 'bg-red-500/10 text-red-400' : 'bg-red-50 text-red-600'}`}>
               <AlertCircle size={12} />
               {changePwd.isError ? (changePwd.error as Error)?.message : 'Erro ao salvar. Tente novamente.'}
             </div>
@@ -1098,7 +1106,7 @@ function UserDetailPanel({
           {/* Buttons */}
           <div className="flex gap-2">
             <button onClick={handleCancel}
-              className="flex-1 py-2.5 rounded-xl border border-slate-200 text-xs font-semibold text-slate-600 hover:bg-white transition-colors">
+              className={`flex-1 py-2.5 rounded-xl border text-xs font-semibold transition-colors ${isDark ? 'border-white/10 text-slate-400 hover:bg-white/[0.04]' : 'border-slate-200 text-slate-600 hover:bg-white'}`}>
               Cancelar
             </button>
             <button onClick={handleSave} disabled={update.isPending || changePwd.isPending || success}
@@ -1119,6 +1127,7 @@ function UserDetailPanel({
 
 // ── Modal: Cadastrar usuário ──────────────────────────────────────────────────
 function CadastroUsuarioModal({ onClose }: { onClose: () => void }) {
+  const { isDark } = useTheme()
   const cadastrar = useCadastrarUsuario()
   const [form, setForm] = useState({
     nome: '',
