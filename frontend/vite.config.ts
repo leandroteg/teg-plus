@@ -39,13 +39,11 @@ export default defineConfig({
         display: 'standalone',
         orientation: 'any',
         theme_color: '#060D1B',
-        background_color: '#060D1B',
+        background_color: '#ffffff',
         categories: ['business', 'productivity'],
         icons: [
           { src: '/icons/icon-192.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
           { src: '/icons/icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'any' },
-          { src: '/icons/icon-192.png', sizes: '192x192', type: 'image/png', purpose: 'maskable' },
-          { src: '/icons/icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
         ],
         shortcuts: [
           { name: 'Compras', short_name: 'Compras', url: '/compras', icons: [{ src: '/icons/icon-192.png', sizes: '192x192' }] },
