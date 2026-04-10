@@ -33,7 +33,7 @@ export default function SuperTEGChat() {
   const [toast, setToast]     = useState<string | null>(null)
   const [attachedFile, setAttachedFile] = useState<File | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
-  const { messages, isLoading, sendMessage, sendMessageWithFile, sendAudio, clearMessages, pendingAction, consumePendingAction } = useSuperTEG()
+  const { messages, isLoading, sendMessage, sendMessageWithFile, sendAudio, clearMessages, pendingAction, consumePendingAction, injectAssistantMessage } = useSuperTEG()
   const voice = useVoiceRecorder()
   const scrollRef = useRef<HTMLDivElement>(null)
   const inputRef  = useRef<HTMLTextAreaElement>(null)
@@ -74,9 +74,11 @@ export default function SuperTEGChat() {
   const handleGreetingClick = () => {
     setShowGreeting(false)
     setIsOpen(true)
-    // Send greeting as message — always, even with history
+    // Inject greeting as assistant message (not user) — always works
     if (greetingText) {
-      setTimeout(() => sendMessage(greetingText), 400)
+      setTimeout(() => {
+        injectAssistantMessage(`${greetingText} O que vamos fazer hoje?`)
+      }, 300)
     }
   }
 

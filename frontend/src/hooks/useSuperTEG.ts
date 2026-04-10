@@ -354,5 +354,15 @@ export function useSuperTEG() {
     return action
   }, [pendingAction])
 
-  return { messages, isLoading, sendMessage, sendMessageWithFile, sendAudio, clearMessages, pendingAction, consumePendingAction }
+  const injectAssistantMessage = useCallback((text: string) => {
+    const msg: ChatMessage = {
+      id: `a_inject_${Date.now()}`,
+      role: 'assistant',
+      content: text,
+      timestamp: new Date().toISOString(),
+    }
+    setMessages(prev => [...prev, msg])
+  }, [])
+
+  return { messages, isLoading, sendMessage, sendMessageWithFile, sendAudio, clearMessages, pendingAction, consumePendingAction, injectAssistantMessage }
 }
