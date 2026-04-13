@@ -442,6 +442,62 @@ export function useConcluirInventario() {
   })
 }
 
+// ── Adicionar item avulso ao inventário ──────────────────────────────────────
+export function useAdicionarItemInventario() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (payload: {
+      inventario_id: string
+      item_id?: string
+      base_id?: string
+      descricao_livre?: string
+      unidade?: string
+      quantidade_fisica?: number
+    }) => {
+      const { error } = await supabase
+        .from('est_inventario_itens')
+        .insert({
+          inventario_id: payload.inventario_id,
+          item_id: payload.item_id ?? null,
+          base_id: payload.base_id ?? null,
+          saldo_sistema: 0,
+          saldo_contado: payload.quantidade_fisica ?? 0,
+          divergencia: payload.quantidade_fisica ?? 0,
+          ajuste_aplicado: false,
+          observacao: payload.descricao_livre
+            ? `Item avulso: ${payload.descricao_livre} (${payload.unidade ?? 'UN'})`
+            : undefined,
+        })
+      if (error) throw error
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['est-inventario'] })
+      qc.invalidateQueries({ queryKey: ['est-inventarios'] })
+    },
+  })
+}
+
+// ── Busca itens do catálogo (para inventário) ────────────────────────────────
+export function useInventarioItemSearch(search: string) {
+  return useQuery<EstItem[]>({
+    queryKey: ['est-itens-inv-search', search],
+    enabled: search.length >= 2,
+    queryFn: async () => {
+      const term = `%${search}%`
+      const { data, error } = await supabase
+        .from('est_itens')
+        .select('id, codigo, descricao, descricao_complementar, categoria, unidade, valor_medio')
+        .eq('ativo', true)
+        .or(`descricao.ilike.${term},descricao_complementar.ilike.${term},codigo.ilike.${term}`)
+        .order('descricao')
+        .limit(30)
+      if (error) return []
+      return (data ?? []) as EstItem[]
+    },
+    staleTime: 30_000,
+  })
+}
+
 // ── Pipeline: Aguardando Entrada (recebimento items pending validation) ──────
 export function useAguardandoEntrada() {
   return useQuery<EstoqueEntradaItem[]>({

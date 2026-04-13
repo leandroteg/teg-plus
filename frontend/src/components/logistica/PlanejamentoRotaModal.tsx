@@ -12,6 +12,8 @@ import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import { serializeViagemRotaPayload } from '../../utils/logisticaViagem'
 import { UpperInput } from '../UpperInput'
+import { useVeiculos } from '../../hooks/useFrotas'
+import type { FroVeiculo } from '../../types/frotas'
 
 // Fix leaflet default icon issue
 delete (L.Icon.Default.prototype as Record<string, unknown>)._getIconUrl
@@ -563,6 +565,7 @@ export default function PlanejamentoRotaModal({ isDark, solicitacoes, allSolicit
   const [dataPartida, setDataPartida] = useState('')
   const [custo, setCusto] = useState<number | ''>('')
   const [salvando, setSalvando] = useState(false)
+  const [erroSalvar, setErroSalvar] = useState('')
 
   // Adicionar mais solicitações
   const [showAddMenu, setShowAddMenu] = useState(false)
@@ -740,6 +743,9 @@ export default function PlanejamentoRotaModal({ isDark, solicitacoes, allSolicit
         data_prevista_saida: dataPartida || undefined,
         custo_estimado: custo !== '' ? custo : undefined,
       })
+    } catch (err) {
+      console.error(err)
+      setErroSalvar('Erro ao salvar planejamento')
     } finally {
       setSalvando(false)
     }
@@ -1141,6 +1147,12 @@ export default function PlanejamentoRotaModal({ isDark, solicitacoes, allSolicit
               Salvar Planejamento
             </button>
           </div>
+          {erroSalvar && (
+            <div className="flex items-center gap-2 mt-2 px-3 py-2 rounded-lg bg-red-500/10 text-red-400 text-xs font-medium">
+              <AlertTriangle size={14} />
+              {erroSalvar}
+            </div>
+          )}
         </div>
       </div>
 

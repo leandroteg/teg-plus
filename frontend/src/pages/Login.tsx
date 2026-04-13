@@ -1,8 +1,9 @@
 import { useState, useRef, useCallback, useEffect } from 'react'
 import { Navigate, useNavigate } from 'react-router-dom'
-import { Mail, Lock, ArrowRight, AlertCircle, CheckCircle, Eye, EyeOff } from 'lucide-react'
+import { Mail, Lock, ArrowRight, AlertCircle, CheckCircle, Eye, EyeOff, Download, X, Share2 } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { useTheme } from '../contexts/ThemeContext'
+import { usePWAInstall } from '../hooks/usePWAInstall'
 import LogoTeg from '../components/LogoTeg'
 import ThemeToggle from '../components/ThemeToggle'
 
@@ -62,8 +63,11 @@ const VORTEX_CSS = `
 
 export default function Login() {
   const { user, loading, signIn, resetPassword } = useAuth()
-  const { theme, isDark } = useTheme()
+  const { theme, isDark, isLightSidebar: isLight } = useTheme()
   const nav = useNavigate()
+  const { isInstalled, promptInstall, isIOS } = usePWAInstall()
+
+  const [showInstallGuide, setShowInstallGuide] = useState(false)
 
   const [view, setView] = useState<View>('login')
   const [loginUser, setLoginUser] = useState('')
@@ -550,7 +554,72 @@ export default function Login() {
             </p>
           </div>
         </div>
+
+        {/* Install App Button — hidden if already installed as PWA */}
+        {!isInstalled && (
+          <button
+            onClick={async () => {
+              const accepted = await promptInstall()
+              if (!accepted && isIOS) setShowInstallGuide(true)
+            }}
+            className={`w-full mt-4 flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-semibold transition-all active:scale-[0.98] ${
+              isDark
+                ? 'bg-teal-500/15 border border-teal-400/25 text-teal-300 hover:bg-teal-500/25'
+                : 'bg-teal-50 border border-teal-200 text-teal-700 hover:bg-teal-100'
+            }`}
+          >
+            <Download size={16} />
+            Instalar App TEG+
+          </button>
+        )}
+
+        {/* Install Guide Modal — iOS only (Safari has no auto-install API) */}
+        {showInstallGuide && (
+          <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+            <div className={`w-full max-w-sm rounded-2xl p-6 space-y-5 ${
+              isDark ? 'bg-slate-900 border border-white/10' : 'bg-white border border-slate-200 shadow-2xl'
+            }`}>
+              <div className="flex items-center justify-between">
+                <h3 className={`text-base font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>
+                  Instalar TEG+
+                </h3>
+                <button onClick={() => setShowInstallGuide(false)} className="p-1 rounded-lg hover:bg-slate-100/10">
+                  <X size={18} className="text-slate-400" />
+                </button>
+              </div>
+              <div className="space-y-4">
+                <InstallStep n={1} isDark={isDark}>
+                  Toque em <Share2 size={14} className="inline text-blue-500 -mt-0.5" /> <strong>Compartilhar</strong> na barra do Safari
+                </InstallStep>
+                <InstallStep n={2} isDark={isDark}>
+                  Role e toque em <strong>{"Adicionar à Tela de Início"}</strong>
+                </InstallStep>
+                <InstallStep n={3} isDark={isDark}>
+                  Toque em <strong>{"Adicionar"}</strong>
+                </InstallStep>
+              </div>
+              <p className={`text-[11px] text-center ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+                O TEG+ vai abrir como um app nativo no seu dispositivo
+              </p>
+            </div>
+          </div>
+        )}
       </div>
     </>
+  )
+}
+
+function InstallStep({ n, isDark, children }: { n: number; isDark: boolean; children: React.ReactNode }) {
+  return (
+    <div className="flex gap-3 items-start">
+      <div className={`w-7 h-7 rounded-full flex items-center justify-center shrink-0 text-xs font-bold ${
+        isDark ? 'bg-teal-500/20 text-teal-400' : 'bg-teal-100 text-teal-700'
+      }`}>
+        {n}
+      </div>
+      <p className={`text-sm pt-0.5 ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
+        {children}
+      </p>
+    </div>
   )
 }

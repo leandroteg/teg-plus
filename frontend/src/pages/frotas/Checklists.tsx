@@ -1,10 +1,11 @@
 import { useState } from 'react'
-import { Plus, ClipboardCheck, CheckCircle, XCircle, AlertTriangle, X } from 'lucide-react'
+import { Plus, ClipboardCheck, CheckCircle, XCircle, AlertTriangle, X, FileDown } from 'lucide-react'
 import { UpperTextarea } from '../../components/UpperInput'
 import { useChecklists, useCriarChecklist, useVeiculos } from '../../hooks/useFrotas'
 import { useTheme } from '../../contexts/ThemeContext'
 import { useAuth } from '../../contexts/AuthContext'
 import type { FroChecklist, TipoChecklist } from '../../types/frotas'
+import { gerarChecklistPDF } from '../../utils/frotas-checklist-pdf'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 const TIPO_LABEL: Record<TipoChecklist, string> = {
@@ -191,6 +192,22 @@ function ChecklistRow({ ck, isLight }: { ck: FroChecklist; isLight: boolean }) {
           {ck.observacoes}
         </div>
       )}
+      <button
+        type="button"
+        title="Gerar PDF"
+        onClick={(e) => {
+          e.stopPropagation()
+          const url = gerarChecklistPDF(ck)
+          window.open(url, '_blank')
+        }}
+        className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 transition-colors ${
+          isLight
+            ? 'text-slate-400 hover:text-teal-600 hover:bg-teal-50'
+            : 'text-slate-400 hover:text-teal-400 hover:bg-white/10'
+        }`}
+      >
+        <FileDown size={16} />
+      </button>
     </div>
   )
 }
