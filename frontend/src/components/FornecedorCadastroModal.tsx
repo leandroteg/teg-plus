@@ -209,7 +209,7 @@ export default function FornecedorCadastroModal({
             </div>
             <div>
               <label className={`block text-xs font-bold mb-1 ${subtext}`}>E-mail</label>
-              <UpperInput value={form.email ?? ''} onChange={(event) => setField('email', event.target.value)} placeholder="financeiro@empresa.com" className={`input-base ${input}`} />
+              <input value={form.email ?? ''} onChange={(event) => setField('email', event.target.value)} placeholder="financeiro@empresa.com" className={`input-base ${input}`} />
             </div>
           </div>
 
@@ -256,7 +256,7 @@ export default function FornecedorCadastroModal({
               </div>
               <div>
                 <label className={`block text-xs font-bold mb-1 ${subtext}`}>Chave PIX</label>
-                <UpperInput value={form.pix_chave ?? ''} disabled={Boolean(form.boleto)} onChange={(event) => setField('pix_chave', event.target.value)} placeholder="Chave PIX" className={`input-base ${input} ${form.boleto ? 'opacity-60 cursor-not-allowed' : ''}`} />
+                <input value={form.pix_chave ?? ''} disabled={Boolean(form.boleto)} onChange={(event) => setField('pix_chave', event.target.value)} placeholder="Chave PIX" className={`input-base ${input} ${form.boleto ? 'opacity-60 cursor-not-allowed' : ''}`} />
               </div>
               <div>
                 <label className={`block text-xs font-bold mb-1 ${subtext}`}>Tipo PIX</label>

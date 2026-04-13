@@ -4,6 +4,7 @@ import { useItemCatalogSearch } from '../hooks/useEstoque'
 import { useAuth } from '../contexts/AuthContext'
 import { supabase } from '../services/supabase'
 import type { EstItem } from '../types/estoque'
+import { toUpperNorm } from './UpperInput'
 
 // ── Map RC category (cmp_categorias.codigo) → est_itens.categoria ───────────
 const CATEGORY_MAP: Record<string, string[]> = {
@@ -118,9 +119,10 @@ export default function ItemAutocomplete({
   }, [])
 
   const handleInputChange = useCallback((v: string) => {
-    onChange(v)
+    const next = toUpperNorm(v)
+    onChange(next)
     if (debounceRef.current) clearTimeout(debounceRef.current)
-    debounceRef.current = setTimeout(() => setSearch(v.trim()), 300)
+    debounceRef.current = setTimeout(() => setSearch(next.trim()), 300)
     setShowDropdown(true)
     setShowCreateForm(false)
   }, [onChange])
@@ -147,7 +149,7 @@ export default function ItemAutocomplete({
   }
 
   function openCreateForm() {
-    setNewDesc(value || search)
+    setNewDesc(toUpperNorm(value || search))
     setNewUnidade('UN')
     setShowCreateForm(true)
   }
@@ -165,14 +167,14 @@ export default function ItemAutocomplete({
       const code = `${prefix}-${Date.now().toString(36).toUpperCase()}`
 
       // 1. Call n8n SuperTEG to standardize nomenclature (fix typos, casing)
-      let descPadronizada = newDesc.trim()
+      let descPadronizada = toUpperNorm(newDesc.trim())
       try {
         const N8N_URL = import.meta.env.VITE_N8N_WEBHOOK_URL || 'https://teg-agents-n8n.nmmcas.easypanel.host/webhook'
         const res = await fetch(`${N8N_URL}/padronizar-item`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            descricao: newDesc.trim(),
+            descricao: descPadronizada,
             categoria,
             unidade: newUnidade,
           }),
@@ -180,7 +182,7 @@ export default function ItemAutocomplete({
         })
         if (res.ok) {
           const json = await res.json()
-          if (json.descricao) descPadronizada = json.descricao
+          if (json.descricao) descPadronizada = toUpperNorm(json.descricao)
         }
       } catch {
         // n8n indisponível — usa descrição original
@@ -327,7 +329,7 @@ export default function ItemAutocomplete({
               </div>
               <input
                 value={newDesc}
-                onChange={e => setNewDesc(e.target.value)}
+                onChange={e => setNewDesc(toUpperNorm(e.target.value))}
                 placeholder="Descrição do item"
                 className={`w-full border rounded-lg px-2.5 py-1.5 text-sm ${bg} ${textColor} focus:ring-2 focus:ring-teal-300 outline-none`}
                 autoFocus

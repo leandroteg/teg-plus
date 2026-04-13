@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
 import { useSmartSearch } from '../hooks/useSmartForm'
+import { toUpperNorm } from './UpperInput'
 
 interface SmartTextFieldProps {
   table: string
@@ -25,9 +26,10 @@ export default function SmartTextField({
 
   // Debounce para buscar
   function handleChange(v: string) {
-    onChange(v)
+    const next = toUpperNorm(v)
+    onChange(next)
     if (debounceRef.current) clearTimeout(debounceRef.current)
-    debounceRef.current = setTimeout(() => setQuery(v), 300)
+    debounceRef.current = setTimeout(() => setQuery(next), 300)
   }
 
   // Fecha dropdown ao clicar fora

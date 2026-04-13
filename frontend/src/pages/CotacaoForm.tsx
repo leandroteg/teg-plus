@@ -20,6 +20,7 @@ import { api } from '../services/api'
 import type { CnpjResult } from '../services/api'
 import NumericInput from '../components/NumericInput'
 import { minCotacoesPorValor } from '../utils/cotacoesPolicy'
+import { toUpperNorm } from '../components/UpperInput'
 
 const fmt = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
 
@@ -73,10 +74,11 @@ function ItemPricingTable({
   const removeItem = (i: number) => onChange(items.filter((_, idx) => idx !== i))
 
   const updateItem = (i: number, field: keyof ItemPreco, raw: string) => {
+    const normalizedRaw = field === 'descricao' ? toUpperNorm(raw) : raw
     const updated = items.map((item, idx) => {
       if (idx !== i) return item
-      if (field === 'descricao') return { ...item, descricao: raw }
-      const val = parseFloat(raw) || 0
+      if (field === 'descricao') return { ...item, descricao: normalizedRaw }
+      const val = parseFloat(normalizedRaw) || 0
       const next = { ...item, [field]: val }
       if (field === 'qtd' || field === 'valor_unitario') {
         const qtd = field === 'qtd' ? val : item.qtd
@@ -96,12 +98,13 @@ function ItemPricingTable({
   }
 
   const searchItem = useCallback((i: number, query: string) => {
-    updateItem(i, 'descricao', query)
+    const normalizedQuery = toUpperNorm(query)
+    updateItem(i, 'descricao', normalizedQuery)
     if (itemTimerRef.current[i]) clearTimeout(itemTimerRef.current[i])
 
     // Mostra itens da requisição imediatamente (sem debounce)
-    const reqMatches = filterReqItens(query)
-    if (query.trim().length < 2) {
+    const reqMatches = filterReqItens(normalizedQuery)
+    if (normalizedQuery.trim().length < 2) {
       // Sem query: mostra só itens da requisição
       setItemResults(prev => ({ ...prev, [i]: reqMatches.map(ri => ({ ...ri, _fromReq: true })) }))
       setItemOpen(prev => ({ ...prev, [i]: reqMatches.length > 0 }))
@@ -114,11 +117,11 @@ function ItemPricingTable({
       const { data } = await supabase
         .from('est_itens')
         .select('id, codigo, descricao, unidade, valor_medio')
-        .ilike('descricao', `%${query}%`)
+        .ilike('descricao', `%${normalizedQuery}%`)
         .eq('ativo', true)
         .order('descricao')
         .limit(8)
-      const reqResults = filterReqItens(query).map(ri => ({ ...ri, _fromReq: true }))
+      const reqResults = filterReqItens(normalizedQuery).map(ri => ({ ...ri, _fromReq: true }))
       setItemResults(prev => ({ ...prev, [i]: [...reqResults, ...(data || [])] }))
       setItemOpen(prev => ({ ...prev, [i]: reqResults.length > 0 || (data?.length ?? 0) > 0 }))
     }, 300)
@@ -622,7 +625,7 @@ export default function CotacaoForm() {
       } else {
         setCnpjStatus(prev => ({ ...prev, [idx]: { ok: true, msg: result.situacao || 'Ativa' } }))
         // Auto-fill name and contact — always overwrite on CNPJ correction
-        const nomePreenchido = result.razao_social || result.nome_fantasia || ''
+        const nomePreenchido = toUpperNorm(result.razao_social || result.nome_fantasia || '')
         setFornecedores(prev => prev.map((f, i) => {
           if (i !== idx) return f
           return {
@@ -653,13 +656,18 @@ export default function CotacaoForm() {
     }
   }, [handleCnpjLookup])
 
-  const updateFornecedor = (idx: number, field: keyof FornecedorForm, value: string | number) =>
-    setFornecedores(prev => prev.map((f, i) => i === idx ? { ...f, [field]: value } : f))
+  const updateFornecedor = (idx: number, field: keyof FornecedorForm, value: string | number) => {
+    const normalized = typeof value === 'string' && field !== 'fornecedor_cnpj' && field !== 'fornecedor_contato'
+      ? toUpperNorm(value)
+      : value
+    setFornecedores(prev => prev.map((f, i) => i === idx ? { ...f, [field]: normalized } : f))
+  }
 
   const searchFornecedor = useCallback((idx: number, query: string) => {
-    setFornecedores(prev => prev.map((f, i) => i === idx ? { ...f, fornecedor_nome: query } : f))
+    const normalizedQuery = toUpperNorm(query)
+    setFornecedores(prev => prev.map((f, i) => i === idx ? { ...f, fornecedor_nome: normalizedQuery } : f))
     if (searchTimerRef.current[idx]) clearTimeout(searchTimerRef.current[idx])
-    if (query.trim().length < 2) {
+    if (normalizedQuery.trim().length < 2) {
       setFornResults(prev => ({ ...prev, [idx]: [] }))
       setFornOpen(prev => ({ ...prev, [idx]: false }))
       return
@@ -668,7 +676,7 @@ export default function CotacaoForm() {
       const { data } = await supabase
         .from('cmp_fornecedores')
         .select('id, nome_fantasia, razao_social, cnpj, telefone, email, contato_nome, cidade, uf')
-        .or(`nome_fantasia.ilike.%${query}%,razao_social.ilike.%${query}%`)
+        .or(`nome_fantasia.ilike.%${normalizedQuery}%,razao_social.ilike.%${normalizedQuery}%`)
         .eq('ativo', true)
         .limit(8)
       setFornResults(prev => ({ ...prev, [idx]: data || [] }))
@@ -680,7 +688,7 @@ export default function CotacaoForm() {
     const contato = [f.telefone, f.email].filter(Boolean).join(' / ')
     setFornecedores(prev => prev.map((item, i) => i !== idx ? item : {
       ...item,
-      fornecedor_nome: f.nome_fantasia || f.razao_social || '',
+      fornecedor_nome: toUpperNorm(f.nome_fantasia || f.razao_social || ''),
       fornecedor_cnpj: f.cnpj || '',
       fornecedor_contato: contato || f.contato_nome || '',
     }))
@@ -700,7 +708,7 @@ export default function CotacaoForm() {
     const itens = cotacao?.requisicao?.itens
     if (!itens?.length) return
     const itensPrecos: ItemPreco[] = itens.map(item => ({
-      descricao: item.descricao,
+      descricao: toUpperNorm(item.descricao),
       qtd: item.quantidade,
       valor_unitario: 0,
       valor_total: 0,
@@ -745,7 +753,7 @@ export default function CotacaoForm() {
         const itensComValor: ItemPreco[] = (p.itens ?? [])
           .filter(it => it.valor_unitario > 0)
           .map(it => ({
-            descricao:      it.descricao,
+            descricao:      toUpperNorm(it.descricao),
             qtd:            it.qtd,
             valor_unitario: it.valor_unitario,
             valor_total:    Math.round(it.qtd * it.valor_unitario * 100) / 100,
@@ -754,13 +762,13 @@ export default function CotacaoForm() {
         // Se há itens com preço → usa a soma deles; senão usa o total do documento
         const valorTotal = itensComValor.length > 0 ? totalItens : (p.valor_total || 0)
         return {
-          fornecedor_nome:    p.fornecedor_nome || '',
+          fornecedor_nome:    toUpperNorm(p.fornecedor_nome || ''),
           fornecedor_cnpj:    p.fornecedor_cnpj ? maskCNPJ(p.fornecedor_cnpj) : '',
           fornecedor_contato: p.fornecedor_contato || '',
           valor_total:        valorTotal,
           prazo_entrega_dias: p.prazo_entrega_dias || 0,
-          condicao_pagamento: p.condicao_pagamento || '',
-          observacao:         p.observacao || '',
+          condicao_pagamento: toUpperNorm(p.condicao_pagamento || ''),
+          observacao:         toUpperNorm(p.observacao || ''),
           arquivo_url:        uploadedPath,
           itens_precos:       itensComValor,
         }
@@ -864,18 +872,20 @@ export default function CotacaoForm() {
         cotacao_id: id,
         requisicao_id: cotacao.requisicao_id,
         fornecedores: validos.map(f => ({
-          fornecedor_nome:    f.fornecedor_nome,
+          fornecedor_nome:    toUpperNorm(f.fornecedor_nome),
           fornecedor_contato: f.fornecedor_contato || undefined,
           fornecedor_cnpj:    f.fornecedor_cnpj || undefined,
           valor_total:        f.valor_total,
           prazo_entrega_dias: f.prazo_entrega_dias || undefined,
-          condicao_pagamento: f.condicao_pagamento || undefined,
-          observacao:         f.observacao || undefined,
+          condicao_pagamento: f.condicao_pagamento ? toUpperNorm(f.condicao_pagamento) : undefined,
+          observacao:         f.observacao ? toUpperNorm(f.observacao) : undefined,
           arquivo_url:        f.arquivo_url || undefined,
-          itens_precos:       f.itens_precos.length > 0 ? f.itens_precos : undefined,
+          itens_precos:       f.itens_precos.length > 0
+            ? f.itens_precos.map(item => ({ ...item, descricao: toUpperNorm(item.descricao) }))
+            : undefined,
         })),
         sem_cotacoes_minimas: semCotacoesMinimas,
-        justificativa_sem_cotacoes: semCotacoesMinimas ? justificativa.trim() : undefined,
+        justificativa_sem_cotacoes: semCotacoesMinimas ? toUpperNorm(justificativa.trim()) : undefined,
       })
       setToast({ type: 'success', msg: 'Cotação enviada para aprovação!' })
       setTimeout(() => nav('/cotacoes'), 800)
@@ -1264,7 +1274,7 @@ export default function CotacaoForm() {
             <textarea
               required
               value={justificativa}
-              onChange={e => setJustificativa(e.target.value)}
+              onChange={e => setJustificativa(toUpperNorm(e.target.value))}
               placeholder="Justificativa obrigatória para envio sem cotações mínimas..."
               rows={3}
               className="w-full border border-amber-300 bg-white rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-amber-300 outline-none resize-none"
