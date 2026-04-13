@@ -11,10 +11,11 @@ interface SmartTextFieldProps {
   placeholder?: string
   required?: boolean
   className?: string
+  disabled?: boolean
 }
 
 export default function SmartTextField({
-  table, column, value, onChange, label, placeholder, required, className,
+  table, column, value, onChange, label, placeholder, required, className, disabled,
 }: SmartTextFieldProps) {
   const [query, setQuery] = useState('')
   const [showDropdown, setShowDropdown] = useState(false)
@@ -78,6 +79,7 @@ export default function SmartTextField({
         onFocus={() => { setFocused(true); if (value.length >= 2) setShowDropdown(true) }}
         onBlur={() => { setFocused(false); setTimeout(() => setShowDropdown(false), 200) }}
         placeholder={placeholder}
+        disabled={disabled}
         className="input-base"
       />
 

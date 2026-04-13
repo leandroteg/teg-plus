@@ -7,6 +7,7 @@ import { UpperInput } from '../../components/UpperInput'
 import { useCadFornecedores, useSalvarFornecedor, useAiCadastroParse } from '../../hooks/useCadastros'
 import { useConsultaCNPJ, useConsultaCEP } from '../../hooks/useConsultas'
 import { supabase } from '../../services/supabase'
+import { useAuth } from '../../contexts/AuthContext'
 import type { Fornecedor } from '../../types/financeiro'
 import type { AiCadastroResult } from '../../types/cadastros'
 import MagicModal from '../../components/MagicModal'
@@ -48,6 +49,7 @@ export default function FornecedoresCad() {
   const { data: fornecedores = [], isLoading } = useCadFornecedores()
   const salvar = useSalvarFornecedor()
   const aiParse = useAiCadastroParse()
+  const { isAdmin } = useAuth()
 
   const cnpjLookup = useConsultaCNPJ(useCallback((r) => {
     setEditItem(prev => prev ? {
@@ -79,7 +81,8 @@ export default function FornecedoresCad() {
       list = list.filter(f =>
         f.razao_social.toLowerCase().includes(q) ||
         f.nome_fantasia?.toLowerCase().includes(q) ||
-        f.cnpj?.includes(q)
+        f.cnpj?.includes(q) ||
+        f.numero_cadastro?.toLowerCase().includes(q)
       )
     }
     list = [...list].sort((a, b) => {
@@ -140,6 +143,10 @@ export default function FornecedoresCad() {
       ? 'text-emerald-700 font-semibold'
       : 'text-red-600 font-semibold'
     : ''
+  const sensitiveLocked = Boolean(editItem?.id && !isAdmin)
+  const sensitiveLockMessage = sensitiveLocked
+    ? 'Campos cadastrais e bancarios ficam bloqueados apos o cadastro. Solicite alteracao ao Leandro ou outro Admin.'
+    : null
 
   function getCnpjValidationMessage() {
     if (!editItem) return null
@@ -195,6 +202,13 @@ export default function FornecedoresCad() {
       alert('Razao Social e obrigatoria')
       return
     }
+    if (sensitiveLocked) {
+      const original = fornecedores.find(f => f.id === editItem.id)
+      if (original && hasSensitiveChanges(original, editItem)) {
+        alert('Campos importantes desse fornecedor precisam de aprovacao do Leandro ou outro Admin.')
+        return
+      }
+    }
     const cnpjMessage = getCnpjValidationMessage()
     if (cnpjMessage) {
       alert(cnpjMessage)
@@ -247,6 +261,15 @@ export default function FornecedoresCad() {
 
   const set = (k: string, v: any) => setEditItem(prev => prev ? { ...prev, [k]: v } : prev)
 
+  function hasSensitiveChanges(original: Fornecedor, next: Partial<Fornecedor>) {
+    const keys = [
+      'numero_cadastro', 'razao_social', 'nome_fantasia', 'cnpj', 'inscricao_estadual',
+      'endereco', 'cidade', 'uf', 'cep', 'banco_codigo', 'banco_nome', 'agencia',
+      'conta', 'tipo_conta', 'boleto', 'pix_chave', 'pix_tipo', 'omie_id', 'ativo',
+    ]
+    return keys.some(key => String((original as any)[key] ?? '') !== String((next as any)[key] ?? ''))
+  }
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
@@ -265,7 +288,7 @@ export default function FornecedoresCad() {
         <div className="relative flex-1 min-w-[200px]">
           <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
           <UpperInput value={busca} onChange={e => setBusca(e.target.value)}
-            placeholder="Buscar por nome, CNPJ..."
+            placeholder="Buscar por codigo, nome, CNPJ..."
             className="w-full pl-9 pr-4 py-2 rounded-xl border border-slate-200 bg-white text-sm
               focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400" />
         </div>
@@ -306,6 +329,9 @@ export default function FornecedoresCad() {
                   <input type="checkbox" checked={selected.size === filtered.length && filtered.length > 0}
                     onChange={selectAll} className="rounded border-slate-300 text-violet-600 focus:ring-violet-500" />
                 </th>
+                <th className="text-left px-4 py-3 text-[10px] font-bold text-slate-500 uppercase tracking-widest hidden sm:table-cell cursor-pointer select-none" onClick={() => toggleSort('numero_cadastro')}>
+                  <span className="flex items-center gap-1">Codigo <SortIcon col="numero_cadastro" /></span>
+                </th>
                 <th className="text-left px-4 py-3 text-[10px] font-bold text-slate-500 uppercase tracking-widest cursor-pointer select-none" onClick={() => toggleSort('razao_social')}>
                   <span className="flex items-center gap-1">Razao Social <SortIcon col="razao_social" /></span>
                 </th>
@@ -330,6 +356,7 @@ export default function FornecedoresCad() {
                     <input type="checkbox" checked={selected.has(f.id)} onChange={() => toggleSelect(f.id)}
                       className="rounded border-slate-300 text-violet-600 focus:ring-violet-500" />
                   </td>
+                  <td className="px-4 py-2.5 text-xs text-slate-500 font-mono hidden sm:table-cell">{f.numero_cadastro || '---'}</td>
                   <td className="px-4 py-2.5 font-semibold text-slate-800">{f.razao_social}</td>
                   <td className="px-4 py-2.5 text-xs text-slate-500 hidden md:table-cell">{f.nome_fantasia || '—'}</td>
                   <td className="px-4 py-2.5 text-xs text-slate-500 font-mono hidden lg:table-cell">
@@ -366,6 +393,11 @@ export default function FornecedoresCad() {
                   </div>
                   {f.nome_fantasia && (
                     <p className="text-[10px] text-slate-400">{f.nome_fantasia}</p>
+                  )}
+                  {f.numero_cadastro && (
+                    <span className="bg-slate-100 text-slate-500 px-2 py-0.5 rounded-full font-mono text-[10px] mt-1 mr-1 inline-block">
+                      {f.numero_cadastro}
+                    </span>
                   )}
                   {f.cnpj && (
                     <span className="bg-slate-50 text-slate-500 px-2 py-0.5 rounded-full font-mono text-[10px] mt-1 inline-block">
@@ -411,20 +443,31 @@ export default function FornecedoresCad() {
           aiDone={Object.keys(confidence).length > 0}
         >
           <div className="space-y-4">
+            {editItem.numero_cadastro && (
+              <div className="flex items-center justify-between rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+                <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Codigo do fornecedor</span>
+                <span className="font-mono text-sm font-bold text-slate-700">{editItem.numero_cadastro}</span>
+              </div>
+            )}
+            {sensitiveLockMessage && (
+              <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-700">
+                {sensitiveLockMessage}
+              </div>
+            )}
             <div className="grid grid-cols-2 gap-3">
               {confidence.razao_social !== undefined ? (
                 <ConfidenceField label="Razao Social" value={editItem.razao_social ?? ''} onChange={v => set('razao_social', v)}
-                  confidence={confidence.razao_social} required placeholder="Razao social da empresa" />
+                  confidence={confidence.razao_social} required placeholder="Razao social da empresa" disabled={sensitiveLocked} />
               ) : (
                 <SmartTextField table="cmp_fornecedores" column="razao_social" value={editItem.razao_social ?? ''}
-                  onChange={v => set('razao_social', v)} label="Razao Social" placeholder="Razao social da empresa" required />
+                  onChange={v => set('razao_social', v)} label="Razao Social" placeholder="Razao social da empresa" required disabled={sensitiveLocked} />
               )}
               {confidence.nome_fantasia !== undefined ? (
                 <ConfidenceField label="Nome Fantasia" value={editItem.nome_fantasia ?? ''} onChange={v => set('nome_fantasia', v)}
-                  confidence={confidence.nome_fantasia} placeholder="Nome fantasia" />
+                  confidence={confidence.nome_fantasia} placeholder="Nome fantasia" disabled={sensitiveLocked} />
               ) : (
                 <SmartTextField table="cmp_fornecedores" column="nome_fantasia" value={editItem.nome_fantasia ?? ''}
-                  onChange={v => set('nome_fantasia', v)} label="Nome Fantasia" placeholder="Nome fantasia" />
+                  onChange={v => set('nome_fantasia', v)} label="Nome Fantasia" placeholder="Nome fantasia" disabled={sensitiveLocked} />
               )}
             </div>
             <div className="grid grid-cols-2 gap-3">
@@ -432,6 +475,7 @@ export default function FornecedoresCad() {
                 <ConfidenceField label="CNPJ" value={editItem.cnpj ?? ''} onChange={handleCnpjChange}
                   confidence={confidence.cnpj} showConfidence={false} inputClassName={cnpjInputClassName}
                   placeholder="00.000.000/0000-00"
+                  disabled={sensitiveLocked}
                   onBlur={() => cnpjLookup.consultar(editItem.cnpj ?? '')} />
                 {cnpjLookup.loading && (
                   <div className="absolute right-2 top-7 flex items-center gap-1 text-violet-500">
@@ -460,6 +504,7 @@ export default function FornecedoresCad() {
               <div className="relative">
                 <ConfidenceField label="CEP" value={(editItem as any).cep ?? ''} onChange={handleCepChange}
                   confidence={confidence.cep} placeholder="00000-000"
+                  disabled={sensitiveLocked}
                   onBlur={() => cepLookup.consultar((editItem as any).cep ?? '')} />
                 {cepLookup.loading && (
                   <div className="absolute right-2 top-7 flex items-center gap-1 text-violet-500">
@@ -473,26 +518,26 @@ export default function FornecedoresCad() {
               </div>
             </div>
             <ConfidenceField label="Endereco" value={(editItem as any).endereco ?? ''} onChange={v => set('endereco', v)}
-              confidence={confidence.endereco} placeholder="Rua, numero, complemento" />
+              confidence={confidence.endereco} placeholder="Rua, numero, complemento" disabled={sensitiveLocked} />
             <div className="grid grid-cols-2 gap-3">
               <ConfidenceField label="Cidade" value={(editItem as any).cidade ?? ''} onChange={v => set('cidade', v)}
-                confidence={confidence.cidade} placeholder="Cidade" />
+                confidence={confidence.cidade} placeholder="Cidade" disabled={sensitiveLocked} />
               <ConfidenceField label="UF" value={(editItem as any).uf ?? ''} onChange={v => set('uf', v)}
-                confidence={confidence.uf} placeholder="MG" />
+                confidence={confidence.uf} placeholder="MG" disabled={sensitiveLocked} />
             </div>
 
             <div className="pt-3 border-t border-slate-100">
               <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3">Dados Bancarios</p>
               <div className="grid grid-cols-3 gap-3">
-                <ConfidenceField label="Banco" value={editItem.banco_nome ?? ''} onChange={v => set('banco_nome', v)} placeholder="Banco" />
-                <ConfidenceField label="Agencia" value={editItem.agencia ?? ''} onChange={v => set('agencia', v)} placeholder="0000" />
-                <ConfidenceField label="Conta" value={editItem.conta ?? ''} onChange={v => set('conta', v)} placeholder="00000-0" />
+                <ConfidenceField label="Banco" value={editItem.banco_nome ?? ''} onChange={v => set('banco_nome', v)} placeholder="Banco" disabled={sensitiveLocked} />
+                <ConfidenceField label="Agencia" value={editItem.agencia ?? ''} onChange={v => set('agencia', v)} placeholder="0000" disabled={sensitiveLocked} />
+                <ConfidenceField label="Conta" value={editItem.conta ?? ''} onChange={v => set('conta', v)} placeholder="00000-0" disabled={sensitiveLocked} />
               </div>
               <div className="grid grid-cols-2 gap-3 mt-3">
-                <ConfidenceField label="PIX Chave" value={editItem.pix_chave ?? ''} onChange={v => set('pix_chave', v)} placeholder="Chave PIX" />
+                <ConfidenceField label="PIX Chave" value={editItem.pix_chave ?? ''} onChange={v => set('pix_chave', v)} placeholder="Chave PIX" disabled={sensitiveLocked} />
                 <div>
                   <label className="block text-xs font-bold text-slate-600 mb-1">PIX Tipo</label>
-                  <select value={editItem.pix_tipo ?? ''} onChange={e => set('pix_tipo', e.target.value)} className="input-base">
+                  <select value={editItem.pix_tipo ?? ''} onChange={e => set('pix_tipo', e.target.value)} disabled={sensitiveLocked} className="input-base">
                     <option value="">Selecione</option>
                     <option value="cpf">CPF</option>
                     <option value="cnpj">CNPJ</option>
