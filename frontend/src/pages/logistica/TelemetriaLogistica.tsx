@@ -1,5 +1,5 @@
 import { useMemo } from 'react'
-import { Map, AlertTriangle, Gauge } from 'lucide-react'
+import { MapPin, AlertTriangle, Gauge } from 'lucide-react'
 import { useSearchParams } from 'react-router-dom'
 import ControladoriaFlow, { type FlowStep } from '../../components/ControladoriaFlow'
 import MapaAoVivo from '../../components/logistica/telemetria/MapaAoVivo'
@@ -11,7 +11,7 @@ const STEPS: FlowStep[] = [
     key: 'mapa',
     label: 'Mapa ao Vivo',
     description: 'Acompanhe a posição em tempo real de todos os veículos da frota.',
-    icon: Map,
+    icon: MapPin,
     accent: {
       bg: 'hover:bg-orange-50',
       bgActive: 'bg-orange-50',
