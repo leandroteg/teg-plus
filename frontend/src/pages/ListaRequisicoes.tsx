@@ -4,10 +4,10 @@ import {
   Search, X, CheckCircle, XCircle, MessageSquare, ChevronDown, ChevronUp,
   FileText, Ban, AlertTriangle, Calendar, ArrowUp, ArrowDown,
   LayoutList, LayoutGrid, Download, ClipboardList, ShieldCheck, Building2,
-  Loader2,
+  Loader2, Send,
 } from 'lucide-react'
 import { useTheme } from '../contexts/ThemeContext'
-import { useRequisicoes } from '../hooks/useRequisicoes'
+import { useRequisicoes, useReenviarEsclarecimento } from '../hooks/useRequisicoes'
 import { useLookupObras } from '../hooks/useLookups'
 import { useAprovacoesPendentes, useDecisaoRequisicao } from '../hooks/useAprovacoes'
 import { useEmitirPedido, useCancelarRequisicao } from '../hooks/usePedidos'
@@ -202,14 +202,16 @@ function ReqCard({ r, apr, isDark, onClick }: {
 
 // ── Detail Modal ────────────────────────────────────────────────────────────
 
-function DetailModal({ r, apr, onClose, isDark, canDecide, onDecisao, isProcessing, onEmitir, onCancelar, isEmitting, isCancelling }: {
+function DetailModal({ r, apr, onClose, isDark, canDecide, onDecisao, isProcessing, onEmitir, onCancelar, isEmitting, isCancelling, onReenviar, isReenviando }: {
   r: Requisicao; apr?: Aprovacao; onClose: () => void; isDark: boolean
   canDecide: boolean
   onDecisao: (decisao: 'aprovada' | 'rejeitada' | 'esclarecimento', obs: string) => void
   isProcessing: boolean
   onEmitir: () => void; onCancelar: () => void; isEmitting: boolean; isCancelling: boolean
+  onReenviar: (resposta: string) => void; isReenviando: boolean
 }) {
   const [observacao, setObservacao] = useState('')
+  const [respostaEsclarecimento, setRespostaEsclarecimento] = useState('')
   const approvalLabel = getApprovalStatusLabel(r.status)
   const atLeastComprador = true // will be checked externally
 
@@ -325,8 +327,32 @@ function DetailModal({ r, apr, onClose, isDark, canDecide, onDecisao, isProcessi
             </div>
           )}
 
-          {/* Ações de decisão */}
-          {canDecide && (
+          {/* Responder esclarecimento (para requisitante) */}
+          {r.status === 'em_esclarecimento' && (
+            <div className={`pt-3 space-y-3 ${isDark ? 'border-t border-white/[0.06]' : 'border-t border-amber-100'}`}>
+              <p className={`text-[10px] font-bold text-center uppercase tracking-wide ${isDark ? 'text-amber-400' : 'text-amber-600'}`}>Responder Esclarecimento</p>
+              <textarea
+                rows={3}
+                className={`w-full border rounded-xl px-3 py-2 text-sm outline-none ${
+                  isDark ? 'bg-white/5 border-amber-500/20 text-white placeholder:text-slate-500 focus:ring-2 focus:ring-amber-500/30'
+                    : 'border-amber-200 focus:ring-2 focus:ring-amber-400/30'
+                }`}
+                placeholder="Digite sua resposta ao esclarecimento..."
+                value={respostaEsclarecimento}
+                onChange={e => setRespostaEsclarecimento(e.target.value)}
+              />
+              <button
+                disabled={isReenviando || !respostaEsclarecimento.trim()}
+                onClick={() => onReenviar(respostaEsclarecimento)}
+                className="w-full flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-xs font-bold text-white bg-amber-500 border border-amber-500 hover:bg-amber-600 shadow-sm shadow-amber-500/20 active:scale-[0.98] transition-all disabled:opacity-50">
+                {isReenviando ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
+                Reenviar para Aprovacao
+              </button>
+            </div>
+          )}
+
+          {/* Ações de decisão (aprovador) */}
+          {canDecide && r.status !== 'em_esclarecimento' && (
             <div className={`pt-3 space-y-3 ${isDark ? 'border-t border-white/[0.06]' : 'border-t border-slate-100'}`}>
               <textarea
                 rows={2}
@@ -411,6 +437,7 @@ export default function ListaRequisicoes() {
   const { data: requisicoes = [], isLoading } = useRequisicoes()
   const { data: aprovacoes } = useAprovacoesPendentes()
   const decisaoMutation = useDecisaoRequisicao()
+  const reenviarMutation = useReenviarEsclarecimento()
   const emitirPedidoMutation = useEmitirPedido()
   const cancelarMutation = useCancelarRequisicao()
 
@@ -708,6 +735,26 @@ export default function ListaRequisicoes() {
           }}
           isEmitting={emitirPedidoMutation.isPending}
           isCancelling={cancelarMutation.isPending}
+          onReenviar={(resposta) => {
+            reenviarMutation.mutate({
+              requisicaoId: detail.id,
+              requisicaoNumero: detail.numero,
+              alcadaNivel: detail.alcada_nivel,
+              solicitanteNome: perfil?.nome ?? 'Solicitante',
+              resposta,
+            }, {
+              onSuccess: () => {
+                setDetail(null)
+                setToast({ type: 'success', msg: `${detail.numero}: Esclarecimento reenviado` })
+                setTimeout(() => setToast(null), 4000)
+              },
+              onError: () => {
+                setToast({ type: 'error', msg: `Erro ao reenviar esclarecimento` })
+                setTimeout(() => setToast(null), 5000)
+              },
+            })
+          }}
+          isReenviando={reenviarMutation.isPending}
         />
       )}
 
