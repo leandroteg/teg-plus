@@ -113,3 +113,7 @@
 
 - `/financeiro/tesouraria` → TesourariaCockpit (nova pagina)
 - Adicionado como item na nav do FinanceiroLayout
+
+
+## Links
+- [[obsidian/20 - Módulo Financeiro]]

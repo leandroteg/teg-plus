@@ -64,6 +64,7 @@ export interface ModuleConfig {
   bottomNavCompact?: boolean
   truncateBottomLabels?: boolean
   bottomNavMaxItems?: number
+  headerExtra?: React.ReactNode
 }
 
 // ── Avatar helpers (shared, extracted once) ────────────────────────────────────
@@ -281,10 +282,11 @@ export default function ModuleLayout({
   bottomNavCompact = true,
   truncateBottomLabels = false,
   bottomNavMaxItems,
+  headerExtra,
   ...config
 }: ModuleConfig) {
   const { perfil, isAdmin, signOut, role, papelGlobal, getPapelForModule } = useAuth()
-  const { isDark, isLightSidebar, theme, setTheme } = useTheme()
+  const { isDark, isLightSidebar, isDarkSidebar, theme, setTheme } = useTheme()
   const navigate = useNavigate()
   const location = useLocation()
   const [drawerOpen, setDrawerOpen] = useState(false)
@@ -337,7 +339,7 @@ export default function ModuleLayout({
     }
   }, [openNavMenu])
 
-  const ls = isLightSidebar
+  const ls = !isDarkSidebar // ls = light sidebar visual
   const a = ACCENT_CLASSES[config.accent] ?? ACCENT_CLASSES.teal
 
   const nome = perfil?.nome ?? 'Usuário'
@@ -519,10 +521,25 @@ export default function ModuleLayout({
       }
       if (action) {
         return (
-          <button key={to} onClick={action} className={`w-full text-left ${sidebarLinkClass({ isActive: false })}`}>
-            <Icon size={18} className={accent ? 'shrink-0 text-orange-500' : 'shrink-0'} />
-            <span className={accent ? 'text-orange-500 font-semibold' : undefined}>{label}</span>
+          <button key={to} onClick={action} className={accent
+            ? `w-full flex items-center gap-2.5 px-3 py-2.5 my-1 mx-2 rounded-xl text-sm font-bold transition-all ${
+              ls ? 'bg-orange-50 text-orange-600 hover:bg-orange-100 border border-orange-200' : 'bg-orange-500/15 text-orange-400 hover:bg-orange-500/25 border border-orange-500/20'
+            }`
+            : `w-full text-left ${sidebarLinkClass({ isActive: false })}`}>
+            <Icon size={16} className="shrink-0" />
+            <span>{label}</span>
           </button>
+        )
+      }
+      if (accent) {
+        return (
+          <NavLink key={to} to={to} end={end}
+            className={`flex items-center gap-2.5 px-3 py-2.5 my-1 mx-2 rounded-xl text-sm font-bold transition-all ${
+              ls ? 'bg-orange-50 text-orange-600 hover:bg-orange-100 border border-orange-200' : 'bg-orange-500/15 text-orange-400 hover:bg-orange-500/25 border border-orange-500/20'
+            }`}>
+            <Icon size={16} className="shrink-0" />
+            <span>{label}</span>
+          </NavLink>
         )
       }
       return (
@@ -867,6 +884,11 @@ export default function ModuleLayout({
 
           {/* Page content */}
           <main className="flex-1 overflow-y-auto styled-scrollbar">
+            {headerExtra && (
+              <div className={`px-4 py-2 border-b ${isDark ? 'border-white/[0.06] bg-slate-900/40' : 'border-slate-100 bg-slate-50/60'}`}>
+                {headerExtra}
+              </div>
+            )}
             {isRequisitante && location.pathname === homeRoute
               ? <Suspense fallback={null}><MinhasSolicitacoesEmbedded embedded defaultModulo={config.moduleKey} /></Suspense>
               : <Outlet />}
@@ -989,6 +1011,11 @@ export default function ModuleLayout({
         </header>
 
         {/* ── Page content ─────────────────────────────────────── */}
+        {headerExtra && (
+          <div className={`px-4 py-2 border-b ${isDark ? 'border-white/[0.06] bg-slate-900/40' : 'border-slate-100 bg-slate-50/60'}`}>
+            {headerExtra}
+          </div>
+        )}
         <main className="flex-1 px-4 py-5 pb-28 lg:pb-8">
           <div className={`${maxWidth} mx-auto animate-page-enter`}>
             {isRequisitante && location.pathname === homeRoute

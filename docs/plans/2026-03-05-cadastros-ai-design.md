@@ -226,3 +226,7 @@ Cards por entidade com:
 - Itens: ~10 campos, CSV import, catalogo parse
 - Obras: ~8 campos, contrato parse
 - Colaboradores: ~10 campos, CPF lookup, curriculo parse
+
+
+## Links
+- [[obsidian/28 - Módulo Cadastros AI]]

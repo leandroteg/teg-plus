@@ -11,7 +11,7 @@ relacionado: ["[[02 - Frontend Stack]]", "[[06 - Supabase]]", "[[10 - n8n Workfl
 # Hooks Customizados — TEG+ ERP
 
 > Todos os hooks usam **TanStack Query v5** para cache, refetch e loading states.
-> Total: **47 hooks** organizados por módulo.
+> Total: **46 hooks** organizados por módulo.
 
 ```
 src/hooks/

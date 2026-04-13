@@ -62,3 +62,8 @@ On INSERT to cmp_recebimento_itens:
 ### Patrimonial
 - Items with status=pendente_registro shown prominently
 - Gestor completes: vida_util, taxa_depreciacao, numero_patrimonio, responsavel
+
+
+## Links
+- [[obsidian/22 - Módulo Estoque e Patrimonial]]
+- [[obsidian/23 - Módulo Logística e Transportes]]

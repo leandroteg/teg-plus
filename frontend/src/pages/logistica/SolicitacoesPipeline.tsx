@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback, useEffect, useRef } from 'react'
+import { useState, useMemo, useCallback, useEffect } from 'react'
 import {
   ClipboardList, Search, X, CheckCircle2, Clock, AlertTriangle,
   Calendar, ArrowUp, ArrowDown, LayoutList, LayoutGrid, Download,
@@ -6,19 +6,16 @@ import {
   ShieldCheck, Plus, Save, Loader2, Trash2, Route,
 } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
-import { useAuth } from '../../contexts/AuthContext'
 import {
   useSolicitacoes, useAtualizarStatusSolicitacao,
   useAprovarSolicitacao, usePlanejaarSolicitacao,
   useEnviarParaAprovacao, useCriarSolicitacao,
-  useCriarViagem, useAtualizarViagem, useEnviarViagemAprovacao, useAprovarViagem,
 } from '../../hooks/useLogistica'
 import { useSearchParams } from 'react-router-dom'
 import { useLookupCentrosCusto } from '../../hooks/useLookups'
 import type { LogSolicitacao, StatusSolicitacaoPipeline, CriarSolicitacaoPayload, TipoTransporte } from '../../types/logistica'
 import { SOLICITACAO_PIPELINE_STAGES } from '../../types/logistica'
 import { lazy, Suspense } from 'react'
-import { getDocumentoFiscalContext, mergeCidadeUf } from '../../utils/logisticaFiscal'
 
 const PlanejamentoRotaModal = lazy(() => import('../../components/logistica/PlanejamentoRotaModal'))
 
@@ -43,11 +40,13 @@ const SORT_OPTIONS: { field: SortField; label: string }[] = [
   { field: 'data',    label: 'Data' },
   { field: 'origem',  label: 'Origem' },
   { field: 'destino', label: 'Destino' },
+  { field: 'tipo',    label: 'Tipo' },
 ]
 
 const TIPO_LABEL: Record<string, string> = {
   viagem:                 'Viagem',
   mobilizacao:            'Mobilização',
+  transferencia_material: 'Transf. Material',
   transferencia_maquina:  'Transf. Máquina',
 }
 
@@ -93,233 +92,55 @@ function exportCSV(items: LogSolicitacao[], stageName: string) {
 
 // ── Detail Modal ─────────────────────────────────────────────────────────────
 
-function DetailModal({ sol, onClose, onAction, onEdit, isDark }: {
+function DetailModal({ sol, onClose, onAction, isDark }: {
   sol: LogSolicitacao; onClose: () => void
-  onAction: (action: string, sol: LogSolicitacao) => void; onEdit?: () => void; isDark: boolean
+  onAction: (action: string, sol: LogSolicitacao) => void; isDark: boolean
 }) {
-  const bg = isDark ? 'bg-[#1e293b]' : 'bg-white'
-  const cardBg = isDark ? 'bg-white/[0.04]' : 'bg-slate-50'
-  const borderSub = isDark ? 'border-white/[0.06]' : 'border-slate-200'
-  const txtMuted = isDark ? 'text-slate-400' : 'text-slate-400'
-  const txtMain = isDark ? 'text-white' : 'text-slate-800'
-  const fmtCurrency = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
-  const fiscalCtx = getDocumentoFiscalContext(sol)
-
-  const hasPlanning = !!(sol.modal || sol.motorista_nome || sol.veiculo_placa || sol.data_prevista_saida || sol.custo_estimado != null || sol.transportadora || sol.rota_planejada)
-  const hasLoad = !!(sol.descricao || sol.peso_total_kg || sol.volumes_total || sol.carga_especial || sol.observacoes_carga || (sol.itens && sol.itens.length > 0))
-
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-sm p-4" onClick={onClose}>
-      <div className={`rounded-2xl shadow-2xl w-full max-w-lg max-h-[85vh] overflow-y-auto ${bg}`} onClick={e => e.stopPropagation()}>
-        {/* Header */}
-        <div className={`flex items-center justify-between px-5 py-4 border-b sticky top-0 z-10 ${isDark ? 'border-white/[0.06] bg-[#1e293b]' : 'border-slate-100 bg-white'} rounded-t-2xl`}>
+      <div className={`rounded-2xl shadow-2xl w-full max-w-lg max-h-[85vh] overflow-y-auto ${isDark ? 'bg-[#1e293b]' : 'bg-white'}`} onClick={e => e.stopPropagation()}>
+        <div className={`flex items-center justify-between px-5 py-4 border-b sticky top-0 z-10 ${isDark ? 'border-white/[0.06] bg-[#1e293b]' : 'border-slate-100 bg-white'}`}>
           <div className="flex items-center gap-2 min-w-0">
             <ClipboardList size={18} className="text-orange-600 shrink-0" />
-            <h3 className={`text-base font-bold truncate ${txtMain}`}>#{sol.numero}</h3>
+            <h3 className={`text-base font-bold truncate ${isDark ? 'text-white' : 'text-slate-800'}`}>#{sol.numero}</h3>
+            <span className={`text-[10px] px-2 py-0.5 rounded-full font-semibold ${isDark ? 'bg-orange-500/10 text-orange-400' : 'bg-orange-50 text-orange-700'}`}>
+              {TIPO_LABEL[sol.tipo] || sol.tipo}
+            </span>
           </div>
           <button onClick={onClose} className="text-slate-400 hover:text-slate-600 shrink-0"><X size={18} /></button>
         </div>
 
         <div className="p-5 space-y-4">
-          {/* Status + Urgência */}
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              {sol.urgente && (
-                <span className="text-[10px] font-bold text-red-500 bg-red-50 dark:bg-red-500/10 px-2 py-0.5 rounded-full flex items-center gap-1">
-                  <AlertTriangle size={10} /> URGENTE
-                </span>
-              )}
-              {sol.carga_especial && (
-                <span className="text-[10px] font-bold text-amber-600 bg-amber-50 dark:bg-amber-500/10 px-2 py-0.5 rounded-full">
-                  Carga Especial
-                </span>
-              )}
-            </div>
+            {sol.urgente && (
+              <span className="text-[10px] font-bold text-red-500 bg-red-50 dark:bg-red-500/10 px-2 py-0.5 rounded-full flex items-center gap-1">
+                <AlertTriangle size={10} /> URGENTE
+              </span>
+            )}
             <span className={`inline-flex items-center gap-1.5 rounded-full font-semibold px-3 py-1 text-xs ml-auto ${STATUS_ACCENT[sol.status]?.bgActive || 'bg-slate-100'} ${STATUS_ACCENT[sol.status]?.textActive || 'text-slate-700'}`}>
               <span className={`w-2 h-2 rounded-full ${STATUS_ACCENT[sol.status]?.dot || 'bg-slate-400'}`} />
               {SOLICITACAO_PIPELINE_STAGES.find(s => s.status === sol.status)?.label ?? sol.status}
             </span>
           </div>
 
-          {/* ── Rota ── */}
-          <div className={`rounded-xl p-4 ${isDark ? 'bg-orange-500/10 border border-orange-500/20' : 'bg-orange-50 border border-orange-200'}`}>
-            <p className="text-[9px] font-bold text-orange-500 uppercase tracking-wider mb-2">Rota</p>
-            <div className="flex items-center gap-3 text-sm">
-              <div className="flex-1">
-                <p className={`font-bold ${txtMain}`}>{fiscalCtx.origemLabel}</p>
-                <p className={`text-[10px] ${txtMuted}`}>Origem</p>
-              </div>
-              <div className="text-orange-400 text-lg font-bold">→</div>
-              <div className="flex-1 text-right">
-                <p className={`font-bold ${txtMain}`}>{fiscalCtx.destinoLabel}</p>
-                <p className={`text-[10px] ${txtMuted}`}>Destino</p>
-              </div>
+          <div className={`rounded-xl p-4 space-y-2 ${isDark ? 'bg-white/[0.04]' : 'bg-slate-50'}`}>
+            <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-xs">
+              <div><span className="text-slate-400">Origem:</span> <span className="font-semibold">{sol.origem}</span></div>
+              <div><span className="text-slate-400">Destino:</span> <span className="font-semibold">{sol.destino}</span></div>
+              {sol.obra_nome && <div><span className="text-slate-400">Obra:</span> <span className="font-semibold">{sol.obra_nome}</span></div>}
+              {sol.centro_custo && <div><span className="text-slate-400">Centro Custo:</span> <span className="font-semibold">{sol.centro_custo}</span></div>}
+              {sol.solicitante_nome && <div><span className="text-slate-400">Solicitante:</span> <span className="font-semibold">{sol.solicitante_nome}</span></div>}
+              {sol.data_desejada && <div><span className="text-slate-400">Data Desejada:</span> <span className="font-semibold">{fmtData(sol.data_desejada)}</span></div>}
+              {sol.modal && <div><span className="text-slate-400">Modal:</span> <span className="font-semibold capitalize">{sol.modal.replace(/_/g, ' ')}</span></div>}
+              {sol.motorista_nome && <div><span className="text-slate-400">Motorista:</span> <span className="font-semibold">{sol.motorista_nome}</span></div>}
+              {sol.veiculo_placa && <div><span className="text-slate-400">Placa:</span> <span className="font-mono font-semibold">{sol.veiculo_placa}</span></div>}
+              {sol.custo_estimado != null && <div><span className="text-slate-400">Custo Est.:</span> <span className="font-semibold text-emerald-600">R$ {sol.custo_estimado.toFixed(2)}</span></div>}
             </div>
-            {(fiscalCtx.origemUf || fiscalCtx.destinoUf) && (
-              <div className="flex items-center justify-between gap-2 mt-3 pt-3 border-t border-orange-200/60 text-[10px]">
-                <span className={txtMuted}>UFs da rota</span>
-                <span className={`font-semibold ${txtMain}`}>{fiscalCtx.origemUf || '—'} → {fiscalCtx.destinoUf || '—'}</span>
-              </div>
-            )}
-            {/* KM + Tempo Estimado */}
-            {(sol.distancia_km || sol.tempo_estimado_h) && (
-              <div className="flex items-center gap-3 mt-3 pt-3 border-t border-orange-200/60">
-                {sol.distancia_km != null && sol.distancia_km > 0 && (
-                  <div className={`flex-1 text-center rounded-lg py-1.5 ${isDark ? 'bg-orange-500/10' : 'bg-white/70'}`}>
-                    <p className={`text-base font-extrabold ${txtMain}`}>{Number(sol.distancia_km).toLocaleString('pt-BR', { maximumFractionDigits: 1 })} km</p>
-                    <p className={`text-[10px] ${txtMuted}`}>Distância</p>
-                  </div>
-                )}
-                {sol.tempo_estimado_h != null && sol.tempo_estimado_h > 0 && (
-                  <div className={`flex-1 text-center rounded-lg py-1.5 ${isDark ? 'bg-orange-500/10' : 'bg-white/70'}`}>
-                    <p className={`text-base font-extrabold ${txtMain}`}>
-                      {Number(sol.tempo_estimado_h) >= 1
-                        ? `${Math.floor(Number(sol.tempo_estimado_h))}h${Number(sol.tempo_estimado_h) % 1 ? `${Math.round((Number(sol.tempo_estimado_h) % 1) * 60)}min` : ''}`
-                        : `${Math.round(Number(sol.tempo_estimado_h) * 60)}min`}
-                    </p>
-                    <p className={`text-[10px] ${txtMuted}`}>Tempo Estimado</p>
-                  </div>
-                )}
-              </div>
-            )}
+            {sol.descricao && <p className="text-xs text-slate-500 mt-2 pt-2 border-t border-slate-200">{sol.descricao}</p>}
           </div>
-
-          {/* ── Dados Gerais ── */}
-          <div className={`rounded-xl p-4 ${cardBg}`}>
-            <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-2.5">Dados Gerais</p>
-            <div className="grid grid-cols-2 gap-x-4 gap-y-2.5 text-xs">
-              {sol.solicitante_nome && (
-                <div><p className={txtMuted}>Solicitante</p><p className={`font-semibold ${txtMain}`}>{sol.solicitante_nome}</p></div>
-              )}
-              {sol.obra_nome && (
-                <div><p className={txtMuted}>Obra</p><p className={`font-semibold ${txtMain}`}>{sol.obra_nome}</p></div>
-              )}
-              {sol.centro_custo && (
-                <div><p className={txtMuted}>Centro de Custo</p><p className={`font-semibold ${txtMain}`}>{sol.centro_custo}</p></div>
-              )}
-              {sol.data_desejada && (
-                <div><p className={txtMuted}>Data Desejada</p><p className={`font-semibold ${txtMain}`}>{fmtData(sol.data_desejada)}</p></div>
-              )}
-              {sol.oc_numero && (
-                <div><p className={txtMuted}>OC</p><p className={`font-semibold ${txtMain}`}>{sol.oc_numero}</p></div>
-              )}
-              {sol.tipo && (
-                <div><p className={txtMuted}>Tipo</p><p className={`font-semibold ${txtMain} capitalize`}>{sol.tipo.replace(/_/g, ' ')}</p></div>
-              )}
-            </div>
-            {sol.justificativa_urgencia && (
-              <div className="mt-2.5 pt-2.5 border-t border-dashed border-red-200">
-                <p className="text-[10px] font-bold text-red-500 uppercase mb-0.5">Justificativa Urgência</p>
-                <p className={`text-xs ${isDark ? 'text-red-300' : 'text-red-600'} italic`}>{sol.justificativa_urgencia}</p>
-              </div>
-            )}
-          </div>
-
-          {/* ── Carga & Itens ── */}
-          {hasLoad && (
-            <div className={`rounded-xl p-4 ${cardBg}`}>
-              <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-2.5">Carga</p>
-              {sol.descricao && (
-                <p className={`text-xs ${isDark ? 'text-slate-300' : 'text-slate-600'} mb-2.5`}>{sol.descricao}</p>
-              )}
-              <div className="grid grid-cols-3 gap-2 text-xs">
-                {sol.peso_total_kg != null && sol.peso_total_kg > 0 && (
-                  <div className={`rounded-lg p-2 text-center ${isDark ? 'bg-white/[0.04]' : 'bg-white'} border ${borderSub}`}>
-                    <p className={`text-lg font-extrabold ${txtMain}`}>{sol.peso_total_kg.toLocaleString('pt-BR')}</p>
-                    <p className={`text-[10px] ${txtMuted}`}>kg</p>
-                  </div>
-                )}
-                {sol.volumes_total != null && sol.volumes_total > 0 && (
-                  <div className={`rounded-lg p-2 text-center ${isDark ? 'bg-white/[0.04]' : 'bg-white'} border ${borderSub}`}>
-                    <p className={`text-lg font-extrabold ${txtMain}`}>{sol.volumes_total}</p>
-                    <p className={`text-[10px] ${txtMuted}`}>volumes</p>
-                  </div>
-                )}
-                {sol.itens && sol.itens.length > 0 && (
-                  <div className={`rounded-lg p-2 text-center ${isDark ? 'bg-white/[0.04]' : 'bg-white'} border ${borderSub}`}>
-                    <p className={`text-lg font-extrabold ${txtMain}`}>{sol.itens.length}</p>
-                    <p className={`text-[10px] ${txtMuted}`}>itens</p>
-                  </div>
-                )}
-              </div>
-              {sol.observacoes_carga && (
-                <p className={`text-[11px] ${txtMuted} italic mt-2`}>Obs.: {sol.observacoes_carga}</p>
-              )}
-              {/* Lista de itens */}
-              {sol.itens && sol.itens.length > 0 && (
-                <div className="mt-3 space-y-1">
-                  <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-1">Itens</p>
-                  {sol.itens.map(item => (
-                    <div key={item.id} className={`flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs ${isDark ? 'bg-white/[0.04]' : 'bg-white'} border ${borderSub}`}>
-                      <div className="flex-1 min-w-0">
-                        <span className={`font-medium ${txtMain}`}>{item.descricao}</span>
-                        {item.numero_serie && <span className={`ml-2 text-[10px] ${txtMuted}`}>S/N: {item.numero_serie}</span>}
-                      </div>
-                      <div className={`text-right shrink-0 ml-2 ${txtMuted}`}>
-                        <span className="font-semibold">{item.quantidade} {item.unidade}</span>
-                        {item.peso_kg != null && <span className="ml-1.5 text-[10px]">({item.peso_kg}kg)</span>}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* ── Planejamento Logístico ── */}
-          {hasPlanning && (
-            <div className={`rounded-xl p-4 ${isDark ? 'bg-violet-500/10 border border-violet-500/20' : 'bg-violet-50 border border-violet-200'}`}>
-              <p className="text-[9px] font-bold text-violet-500 uppercase tracking-wider mb-2.5">Planejamento Logístico</p>
-              <div className="grid grid-cols-2 gap-x-4 gap-y-2.5 text-xs">
-                {sol.modal && (
-                  <div><p className={txtMuted}>Modal</p><p className={`font-semibold ${txtMain} capitalize`}>{sol.modal.replace(/_/g, ' ')}</p></div>
-                )}
-                {sol.transportadora && (
-                  <div><p className={txtMuted}>Transportadora</p><p className={`font-semibold ${txtMain}`}>{sol.transportadora.nome_fantasia || sol.transportadora.razao_social}</p></div>
-                )}
-                {sol.motorista_nome && (
-                  <div>
-                    <p className={txtMuted}>Motorista</p>
-                    <p className={`font-semibold ${txtMain}`}>{sol.motorista_nome}</p>
-                    {sol.motorista_telefone && <p className={`text-[10px] ${txtMuted}`}>{sol.motorista_telefone}</p>}
-                  </div>
-                )}
-                {sol.veiculo_placa && (
-                  <div><p className={txtMuted}>Placa</p><p className={`font-mono font-bold ${txtMain}`}>{sol.veiculo_placa}</p></div>
-                )}
-                {sol.data_prevista_saida && (
-                  <div className="col-span-2">
-                    <p className={txtMuted}>Data e Hora de Saída</p>
-                    <p className={`font-semibold ${txtMain}`}>
-                      {new Date(sol.data_prevista_saida).toLocaleDateString('pt-BR', { weekday: 'short', day: '2-digit', month: '2-digit', year: 'numeric' })}
-                      {' às '}
-                      {new Date(sol.data_prevista_saida).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
-                    </p>
-                  </div>
-                )}
-                {sol.custo_estimado != null && (
-                  <div><p className={txtMuted}>Custo Estimado</p><p className="font-bold text-emerald-600">{fmtCurrency(sol.custo_estimado)}</p></div>
-                )}
-              </div>
-              {sol.restricoes_seguranca && (
-                <div className="mt-2.5 pt-2.5 border-t border-dashed border-violet-200">
-                  <p className="text-[10px] font-bold text-violet-500 uppercase mb-0.5">Restrições de Segurança</p>
-                  <p className={`text-xs ${isDark ? 'text-violet-300' : 'text-violet-700'} italic`}>{sol.restricoes_seguranca}</p>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* ── Observações ── */}
-          {sol.observacoes && (
-            <div className={`rounded-xl p-4 ${cardBg}`}>
-              <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Observações</p>
-              <p className={`text-xs ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>{sol.observacoes}</p>
-            </div>
-          )}
 
           {/* Progress */}
-          <div className={`rounded-xl p-3 ${cardBg}`}>
+          <div className={`rounded-xl p-3 ${isDark ? 'bg-white/[0.04]' : 'bg-slate-50'}`}>
             <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-2">Progresso</p>
             <div className="flex items-center gap-0.5">
               {SOLICITACAO_PIPELINE_STAGES.map((s, i) => {
@@ -331,7 +152,6 @@ function DetailModal({ sol, onClose, onAction, onEdit, isDark }: {
             </div>
           </div>
 
-          {/* Botões */}
           <div className="flex gap-2 pt-1">
             <button onClick={onClose} className={`flex-1 py-3 rounded-xl border text-sm font-semibold transition-all ${isDark ? 'border-white/[0.06] text-slate-300' : 'border-slate-200 text-slate-600 hover:bg-slate-50'}`}>
               Fechar
@@ -342,203 +162,14 @@ function DetailModal({ sol, onClose, onAction, onEdit, isDark }: {
               </button>
             )}
             {sol.status === 'planejado' && (
-              <>
-                {onEdit && (
-                  <button onClick={() => { onClose(); onEdit() }} className={`py-3 px-4 rounded-xl border text-sm font-semibold transition-all flex items-center gap-1.5 ${isDark ? 'border-white/[0.06] text-violet-400 hover:bg-violet-500/10' : 'border-violet-200 text-violet-600 hover:bg-violet-50'}`}>
-                    <FileText size={14} /> Editar
-                  </button>
-                )}
-                <button onClick={() => onAction('enviarAprovacao', sol)} className="flex-1 py-3 rounded-xl bg-amber-600 text-white text-sm font-bold hover:bg-amber-700 transition-all flex items-center justify-center gap-2">
-                  <ShieldCheck size={15} /> Enviar p/ Aprovação
-                </button>
-              </>
+              <button onClick={() => onAction('enviarAprovacao', sol)} className="flex-1 py-3 rounded-xl bg-amber-600 text-white text-sm font-bold hover:bg-amber-700 transition-all flex items-center justify-center gap-2">
+                <ShieldCheck size={15} /> Enviar p/ Aprovação
+              </button>
             )}
             {sol.status === 'aguardando_aprovacao' && (
-              <>
-                <button onClick={() => onAction('devolver', sol)} className={`py-3 px-4 rounded-xl border text-sm font-semibold transition-all flex items-center gap-1.5 ${isDark ? 'border-white/[0.06] text-amber-400' : 'border-amber-200 text-amber-600 hover:bg-amber-50'}`}>
-                  Devolver
-                </button>
-                <button onClick={() => onAction('recusar', sol)} className={`py-3 px-4 rounded-xl border text-sm font-semibold transition-all flex items-center gap-1.5 ${isDark ? 'border-white/[0.06] text-red-400' : 'border-red-200 text-red-600 hover:bg-red-50'}`}>
-                  Recusar
-                </button>
-                <button onClick={() => onAction('aprovar', sol)} className="flex-1 py-3 rounded-xl bg-emerald-600 text-white text-sm font-bold hover:bg-emerald-700 transition-all flex items-center justify-center gap-2">
-                  <CheckCircle2 size={15} /> Aprovar
-                </button>
-              </>
-            )}
-          </div>
-        </div>
-      </div>
-    </div>
-  )
-}
-
-// ── Viagem Detail Modal ──────────────────────────────────────────────────────
-
-function ViagemDetailModal({ item, onClose, onAction, onEdit, isDark }: {
-  item: Extract<DisplayItem, { kind: 'viagem' }>
-  onClose: () => void
-  onAction: (action: string, sols: LogSolicitacao[]) => void
-  onEdit: () => void
-  isDark: boolean
-}) {
-  const v = item.viagem
-  const sols = item.solicitacoes
-  const bg = isDark ? 'bg-[#1e293b]' : 'bg-white'
-  const cardBg = isDark ? 'bg-white/[0.04]' : 'bg-slate-50'
-  const borderSub = isDark ? 'border-white/[0.06]' : 'border-slate-200'
-  const txtMuted = isDark ? 'text-slate-400' : 'text-slate-400'
-  const txtMain = isDark ? 'text-white' : 'text-slate-800'
-  const fmtCurrency = (val: number) => val.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
-  const hasUrgent = sols.some(s => s.urgente)
-  const status = sols[0]?.status || 'planejado'
-  const origemPrincipal = v?.origem_principal || sols[0]?.origem || '—'
-  const destinoFinal = v?.destino_final || sols[sols.length - 1]?.destino || '—'
-  const pesoTotal = sols.reduce((acc, s) => acc + (s.peso_total_kg || 0), 0)
-  const volumesTotal = sols.reduce((acc, s) => acc + (s.volumes_total || 0), 0)
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-sm p-4" onClick={onClose}>
-      <div className={`rounded-2xl shadow-2xl w-full max-w-lg max-h-[85vh] overflow-y-auto ${bg}`} onClick={e => e.stopPropagation()}>
-        {/* Header */}
-        <div className={`flex items-center justify-between px-5 py-4 border-b sticky top-0 z-10 ${isDark ? 'border-white/[0.06] bg-[#1e293b]' : 'border-slate-100 bg-white'} rounded-t-2xl`}>
-          <div className="flex items-center gap-2 min-w-0">
-            <Route size={18} className="text-orange-600 shrink-0" />
-            <h3 className={`text-base font-bold truncate ${txtMain}`}>{v?.numero || 'Viagem'}</h3>
-            <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${isDark ? 'bg-orange-500/20 text-orange-300' : 'bg-orange-100 text-orange-700'}`}>
-              {sols.length} {sols.length === 1 ? 'parada' : 'paradas'}
-            </span>
-            {hasUrgent && <span className="text-[10px] font-bold text-red-500 bg-red-50 px-2 py-0.5 rounded-full">URGENTE</span>}
-          </div>
-          <button onClick={onClose} className="text-slate-400 hover:text-slate-600 shrink-0"><X size={18} /></button>
-        </div>
-
-        <div className="p-5 space-y-4">
-          {/* Rota principal */}
-          <div className={`${cardBg} rounded-xl p-3.5`}>
-            <div className="flex items-center gap-2 mb-2">
-              <MapPin size={14} className="text-orange-600" />
-              <span className={`text-xs font-bold ${isDark ? 'text-orange-400' : 'text-orange-700'}`}>Rota da Viagem</span>
-            </div>
-            <div className="flex items-center gap-2 text-sm">
-              <span className={`font-semibold ${txtMain}`}>{origemPrincipal}</span>
-              <span className="text-orange-400">→</span>
-              <span className={`font-semibold ${txtMain}`}>{destinoFinal}</span>
-            </div>
-            {(v?.distancia_total_km || v?.tempo_estimado_h) && (
-              <div className="flex gap-3 mt-1.5">
-                {v?.distancia_total_km != null && <span className="text-xs text-orange-600 font-medium">{Number(v.distancia_total_km).toFixed(0)} km</span>}
-                {v?.tempo_estimado_h != null && <span className="text-xs text-orange-600 font-medium">{Number(v.tempo_estimado_h).toFixed(1)}h estimadas</span>}
-              </div>
-            )}
-          </div>
-
-          {/* Roteiro de entregas */}
-          <div className={`border ${borderSub} rounded-xl overflow-hidden`}>
-            <div className={`${cardBg} px-3.5 py-2 border-b ${borderSub} flex items-center justify-between`}>
-              <span className={`text-xs font-bold ${txtMuted}`}>Roteiro de Entregas</span>
-              <div className={`flex gap-2 text-[10px] ${txtMuted}`}>
-                {pesoTotal > 0 && <span>{pesoTotal.toLocaleString('pt-BR')} kg</span>}
-                {volumesTotal > 0 && <span>· {volumesTotal} vol.</span>}
-              </div>
-            </div>
-            <div className={`divide-y ${isDark ? 'divide-white/[0.04]' : 'divide-slate-100'}`}>
-              {sols.map((s, i) => (
-                <div key={s.id} className="px-3.5 py-2.5">
-                  <div className="flex items-center justify-between mb-1">
-                    <div className="flex items-center gap-2">
-                      <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold ${isDark ? 'bg-orange-500/20 text-orange-400' : 'bg-orange-100 text-orange-700'}`}>
-                        {s.ordem_na_viagem ?? i + 1}
-                      </div>
-                      <span className={`text-[11px] font-mono font-bold ${isDark ? 'text-orange-400/80' : 'text-orange-600'}`}>{s.numero}</span>
-                    </div>
-                    <div className="flex items-center gap-1.5">
-                      {s.urgente && <span className="text-[9px] bg-red-100 text-red-700 px-1.5 py-0.5 rounded font-bold">URGENTE</span>}
-                    </div>
-                  </div>
-                  <div className={`flex items-center gap-1 text-xs ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
-                    <span>{s.origem}</span> <span className="text-orange-400">→</span> <span>{s.destino}</span>
-                  </div>
-                  <div className={`flex flex-wrap gap-x-3 gap-y-0.5 mt-1 text-[10px] ${txtMuted}`}>
-                    {s.obra_nome && <span>🏗️ {s.obra_nome}</span>}
-                    {s.solicitante_nome && <span>👤 {s.solicitante_nome}</span>}
-                    {s.centro_custo && <span>💼 {s.centro_custo}</span>}
-                    {s.peso_total_kg != null && s.peso_total_kg > 0 && <span>{s.peso_total_kg.toLocaleString('pt-BR')} kg</span>}
-                    {s.volumes_total != null && s.volumes_total > 0 && <span>{s.volumes_total} vol.</span>}
-                  </div>
-                  {s.descricao && <p className={`text-[10px] ${txtMuted} italic mt-0.5 line-clamp-1`}>{s.descricao}</p>}
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Planejamento logístico */}
-          {(sols[0]?.modal || sols[0]?.motorista_nome || sols[0]?.veiculo_placa || sols[0]?.data_prevista_saida) && (
-            <div className={`${isDark ? 'bg-blue-500/10' : 'bg-blue-50'} border ${isDark ? 'border-blue-500/20' : 'border-blue-200'} rounded-xl p-3.5 space-y-1.5`}>
-              <div className="flex items-center gap-2 mb-1">
-                <Truck size={13} className={`${isDark ? 'text-blue-400' : 'text-blue-600'}`} />
-                <span className={`text-[10px] font-bold uppercase tracking-wider ${isDark ? 'text-blue-400' : 'text-blue-700'}`}>Planejamento Logístico</span>
-              </div>
-              {sols[0]?.data_prevista_saida && (
-                <div className="flex justify-between text-xs">
-                  <span className={`${isDark ? 'text-blue-400/70' : 'text-blue-500'}`}>Data/Hora Saída</span>
-                  <span className={`font-medium ${isDark ? 'text-blue-300' : 'text-blue-800'}`}>{new Date(sols[0].data_prevista_saida).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' })}</span>
-                </div>
-              )}
-              {sols[0]?.modal && (
-                <div className="flex justify-between text-xs">
-                  <span className={`${isDark ? 'text-blue-400/70' : 'text-blue-500'}`}>Modal</span>
-                  <span className={`font-medium capitalize ${isDark ? 'text-blue-300' : 'text-blue-800'}`}>{sols[0].modal.replace(/_/g, ' ')}</span>
-                </div>
-              )}
-              {sols[0]?.motorista_nome && (
-                <div className="flex justify-between text-xs">
-                  <span className={`${isDark ? 'text-blue-400/70' : 'text-blue-500'}`}>Motorista</span>
-                  <span className={`font-medium ${isDark ? 'text-blue-300' : 'text-blue-800'}`}>{sols[0].motorista_nome}</span>
-                </div>
-              )}
-              {sols[0]?.veiculo_placa && (
-                <div className="flex justify-between text-xs">
-                  <span className={`${isDark ? 'text-blue-400/70' : 'text-blue-500'}`}>Veículo</span>
-                  <span className={`font-mono font-bold ${isDark ? 'text-blue-300' : 'text-blue-800'}`}>{sols[0].veiculo_placa}</span>
-                </div>
-              )}
-              {v?.custo_total != null && Number(v.custo_total) > 0 && (
-                <div className="flex justify-between text-xs pt-1 border-t border-blue-200/30">
-                  <span className={`${isDark ? 'text-blue-400/70' : 'text-blue-500'}`}>Custo Total</span>
-                  <span className={`font-bold ${isDark ? 'text-blue-300' : 'text-blue-800'}`}>{fmtCurrency(Number(v.custo_total))}</span>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Botões de ação */}
-          <div className="flex gap-2 pt-1">
-            <button onClick={onClose} className={`flex-1 py-3 rounded-xl border text-sm font-semibold transition-all ${isDark ? 'border-white/[0.06] text-slate-300' : 'border-slate-200 text-slate-600 hover:bg-slate-50'}`}>
-              Fechar
-            </button>
-            {status === 'planejado' && (
-              <>
-                <button onClick={() => { onClose(); onEdit() }} className={`py-3 px-4 rounded-xl border text-sm font-semibold transition-all flex items-center gap-1.5 ${isDark ? 'border-white/[0.06] text-violet-400 hover:bg-violet-500/10' : 'border-violet-200 text-violet-600 hover:bg-violet-50'}`}>
-                  <FileText size={14} /> Editar
-                </button>
-                <button onClick={() => onAction('enviarAprovacao', sols)} className="flex-1 py-3 rounded-xl bg-amber-600 text-white text-sm font-bold hover:bg-amber-700 transition-all flex items-center justify-center gap-2">
-                  <ShieldCheck size={15} /> Enviar p/ Aprovação
-                </button>
-              </>
-            )}
-            {status === 'aguardando_aprovacao' && (
-              <>
-                <button onClick={() => onAction('devolver', sols)} className={`py-3 px-4 rounded-xl border text-sm font-semibold transition-all flex items-center gap-1.5 ${isDark ? 'border-white/[0.06] text-amber-400' : 'border-amber-200 text-amber-600 hover:bg-amber-50'}`}>
-                  Devolver
-                </button>
-                <button onClick={() => onAction('recusar', sols)} className={`py-3 px-4 rounded-xl border text-sm font-semibold transition-all flex items-center gap-1.5 ${isDark ? 'border-white/[0.06] text-red-400' : 'border-red-200 text-red-600 hover:bg-red-50'}`}>
-                  Recusar
-                </button>
-                <button onClick={() => onAction('aprovar', sols)} className="flex-1 py-3 rounded-xl bg-emerald-600 text-white text-sm font-bold hover:bg-emerald-700 transition-all flex items-center justify-center gap-2">
-                  <CheckCircle2 size={15} /> Aprovar
-                </button>
-              </>
+              <button onClick={() => onAction('aprovar', sol)} className="flex-1 py-3 rounded-xl bg-emerald-600 text-white text-sm font-bold hover:bg-emerald-700 transition-all flex items-center justify-center gap-2">
+                <CheckCircle2 size={15} /> Aprovar
+              </button>
             )}
           </div>
         </div>
@@ -564,6 +195,10 @@ function SolRow({ sol, onClick, isDark, isSelected, onSelect }: {
 
       <span className={`text-[11px] font-mono font-bold w-[86px] shrink-0 whitespace-nowrap ${isDark ? 'text-orange-400' : 'text-orange-700'}`}>
         {sol.numero}
+      </span>
+
+      <span className={`text-[10px] px-1.5 py-0.5 rounded-md w-[96px] shrink-0 text-center font-medium ${isDark ? 'bg-white/[0.04] text-slate-400' : 'bg-slate-100 text-slate-500'}`}>
+        {TIPO_LABEL[sol.tipo] || sol.tipo}
       </span>
 
       <span className={`text-xs truncate w-[150px] shrink-0 ${isDark ? 'text-white' : 'text-slate-800'}`}>
@@ -606,6 +241,10 @@ function SolCard({ sol, onClick, isDark, isSelected, onSelect }: {
 
         <span className={`text-xs font-mono font-bold shrink-0 ${isDark ? 'text-orange-400' : 'text-orange-700'}`}>#{sol.numero}</span>
 
+        <span className={`text-[10px] px-1.5 py-0.5 rounded-md font-medium shrink-0 ${isDark ? 'bg-white/[0.04] text-slate-400' : 'bg-slate-100 text-slate-500'}`}>
+          {TIPO_LABEL[sol.tipo] || sol.tipo}
+        </span>
+
         <div className="flex items-center gap-1.5 min-w-0 flex-1 text-sm">
           <MapPin size={12} className={`shrink-0 ${isDark ? 'text-slate-500' : 'text-slate-400'}`} />
           <span className={`font-semibold truncate ${isDark ? 'text-white' : 'text-slate-800'}`}>{sol.origem}</span>
@@ -646,294 +285,12 @@ function SolCard({ sol, onClick, isDark, isSelected, onSelect }: {
   )
 }
 
-// ── Viagem grouped card ─────────────────────────────────────────────────────
-
-type DisplayItem =
-  | { kind: 'solo'; sol: LogSolicitacao }
-  | { kind: 'viagem'; viagemId: string; viagem: LogSolicitacao['viagem']; solicitacoes: LogSolicitacao[] }
-
-function ViagemCard({ item, onClick, onOpenDetail, isDark, selectedIds, onToggleViagem, onEditViagem }: {
-  item: Extract<DisplayItem, { kind: 'viagem' }>
-  onClick: (sol: LogSolicitacao) => void
-  onOpenDetail: (item: Extract<DisplayItem, { kind: 'viagem' }>) => void
-  isDark: boolean
-  selectedIds: Set<string>
-  onToggleViagem: (ids: string[]) => void
-  onEditViagem?: (item: Extract<DisplayItem, { kind: 'viagem' }>) => void
-}) {
-  const v = item.viagem
-  const sols = item.solicitacoes
-  const allIds = sols.map(s => s.id)
-  const allSelected = allIds.length > 0 && allIds.every(id => selectedIds.has(id))
-  const hasUrgent = sols.some(s => s.urgente)
-  const origemPrincipal = v?.origem_principal || sols[0]?.origem || '—'
-  const destinoFinal = v?.destino_final || sols[sols.length - 1]?.destino || '—'
-
-  return (
-    <div className={`rounded-2xl border overflow-hidden transition-all ${
-      isDark
-        ? `border-white/[0.06] ${allSelected ? 'bg-orange-500/10 border-orange-500/30' : 'bg-white/[0.02]'}`
-        : `border-orange-200 ${allSelected ? 'bg-orange-50 border-orange-300' : 'bg-white'}`
-    }`}>
-      {/* Header da viagem — clicável para abrir detalhes */}
-      <div className={`px-4 py-2.5 flex items-center gap-3 cursor-pointer ${isDark ? 'bg-orange-500/10 hover:bg-orange-500/15' : 'bg-gradient-to-r from-orange-50 to-amber-50 hover:from-orange-100 hover:to-amber-100'} transition-all`}
-        onClick={() => onOpenDetail(item)}>
-        <input type="checkbox" checked={allSelected}
-          onChange={e => { e.stopPropagation(); onToggleViagem(allIds) }}
-          className="w-3.5 h-3.5 rounded border-slate-300 text-orange-600 focus:ring-orange-500 shrink-0" />
-        <Route size={14} className="text-orange-600 shrink-0" />
-        <span className={`text-xs font-mono font-extrabold ${isDark ? 'text-orange-400' : 'text-orange-700'}`}>
-          {v?.numero || 'Viagem'}
-        </span>
-        <div className="flex items-center gap-1.5 text-sm flex-1 min-w-0">
-          <span className={`font-semibold truncate ${isDark ? 'text-white' : 'text-slate-800'}`}>{origemPrincipal}</span>
-          <span className={`${isDark ? 'text-slate-600' : 'text-orange-400'} shrink-0`}>→</span>
-          <span className={`font-semibold truncate ${isDark ? 'text-white' : 'text-slate-800'}`}>{destinoFinal}</span>
-        </div>
-        <div className="flex items-center gap-2 shrink-0">
-          {v?.distancia_total_km && (
-            <span className={`text-[10px] font-medium ${isDark ? 'text-orange-400/80' : 'text-orange-600'}`}>
-              {Number(v.distancia_total_km).toFixed(0)} km
-            </span>
-          )}
-          {v?.tempo_estimado_h && (
-            <span className={`text-[10px] font-medium ${isDark ? 'text-orange-400/80' : 'text-orange-600'}`}>
-              {Number(v.tempo_estimado_h).toFixed(1)}h
-            </span>
-          )}
-          <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold ${isDark ? 'bg-orange-500/20 text-orange-300' : 'bg-orange-100 text-orange-700'}`}>
-            {sols.length} {sols.length === 1 ? 'parada' : 'paradas'}
-          </span>
-          {hasUrgent && <span className="text-[10px] font-bold text-red-500 bg-red-50 dark:bg-red-500/10 px-2 py-0.5 rounded-full">URGENTE</span>}
-          {onEditViagem && (
-            <button onClick={e => { e.stopPropagation(); onEditViagem(item) }}
-              className={`text-[10px] px-2 py-0.5 rounded-lg font-semibold transition-all flex items-center gap-1 ${
-                isDark ? 'bg-white/[0.06] text-slate-400 hover:bg-white/[0.12] hover:text-white' : 'bg-slate-100 text-slate-500 hover:bg-violet-100 hover:text-violet-700'
-              }`}>
-              <FileText size={10} /> Editar
-            </button>
-          )}
-        </div>
-      </div>
-
-      {/* Planejamento resumido */}
-      {(v?.motorista_nome || v?.veiculo_placa || v?.modal) && (
-        <div className={`px-4 py-1.5 flex items-center gap-4 text-[10px] border-b ${isDark ? 'border-white/[0.04] text-slate-500' : 'border-orange-100 text-slate-400'}`}>
-          {v?.modal && <span className="capitalize">{(v.modal as string).replace(/_/g, ' ')}</span>}
-          {v?.motorista_nome && <span>🚛 {v.motorista_nome as string}</span>}
-          {v?.veiculo_placa && <span className="font-mono font-bold">{v.veiculo_placa as string}</span>}
-        </div>
-      )}
-
-      {/* Solicitações filhas */}
-      <div className={`divide-y ${isDark ? 'divide-white/[0.04]' : 'divide-slate-100'}`}>
-        {sols.map((sol, i) => (
-          <div key={sol.id} onClick={() => onClick(sol)}
-            className={`flex items-center gap-3 px-4 py-2 cursor-pointer transition-all ${
-              isDark ? 'hover:bg-white/[0.03]' : 'hover:bg-slate-50'
-            }`}>
-            <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0 ${
-              isDark ? 'bg-orange-500/20 text-orange-400' : 'bg-orange-100 text-orange-700'
-            }`}>{sol.ordem_na_viagem ?? i + 1}</div>
-            <span className={`text-[11px] font-mono font-bold shrink-0 ${isDark ? 'text-orange-400/70' : 'text-orange-600/70'}`}>{sol.numero}</span>
-            <div className="flex items-center gap-1 text-xs flex-1 min-w-0">
-              <span className={`truncate ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>{sol.origem}</span>
-              <span className={`${isDark ? 'text-slate-600' : 'text-slate-300'} shrink-0`}>→</span>
-              <span className={`truncate ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>{sol.destino}</span>
-            </div>
-            <div className="flex items-center gap-1.5 shrink-0">
-              {sol.obra_nome && (
-                <span className={`text-[10px] px-1.5 py-0.5 rounded-md ${isDark ? 'bg-white/[0.04] text-slate-500' : 'bg-slate-100 text-slate-500'}`}>
-                  <Building2 size={8} className="inline mr-0.5" />{sol.obra_nome}
-                </span>
-              )}
-              {sol.urgente && <AlertTriangle size={10} className="text-red-500" />}
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
-  )
-}
-
-function ViagemRow({ item, onClick, isDark, selectedIds, onToggleViagem }: {
-  item: Extract<DisplayItem, { kind: 'viagem' }>
-  onClick: (sol: LogSolicitacao) => void
-  isDark: boolean
-  selectedIds: Set<string>
-  onToggleViagem: (ids: string[]) => void
-}) {
-  const v = item.viagem
-  const sols = item.solicitacoes
-  const allIds = sols.map(s => s.id)
-  const allSelected = allIds.length > 0 && allIds.every(id => selectedIds.has(id))
-  const hasUrgent = sols.some(s => s.urgente)
-  const origemPrincipal = v?.origem_principal || sols[0]?.origem || '—'
-  const destinoFinal = v?.destino_final || sols[sols.length - 1]?.destino || '—'
-
-  return (
-    <div className={`border-b ${isDark ? 'border-white/[0.04]' : 'border-slate-100'}`}>
-      {/* Header row */}
-      <div className={`flex items-center gap-2 px-3 py-1.5 transition-all ${
-        isDark ? `hover:bg-white/[0.03] ${allSelected ? 'bg-orange-500/10' : ''}` : `hover:bg-orange-50/50 ${allSelected ? 'bg-orange-50' : ''}`
-      }`}>
-        <input type="checkbox" checked={allSelected}
-          onChange={e => { e.stopPropagation(); onToggleViagem(allIds) }}
-          className="w-3 h-3 rounded border-slate-300 text-orange-600 focus:ring-orange-500 shrink-0" />
-        {hasUrgent ? <AlertTriangle size={11} className="text-red-500 shrink-0" /> : <Route size={11} className="text-orange-500 shrink-0" />}
-        <span className={`text-[11px] font-mono font-bold w-[86px] shrink-0 whitespace-nowrap ${isDark ? 'text-orange-400' : 'text-orange-700'}`}>
-          {v?.numero || 'Viagem'}
-        </span>
-        <span className={`text-xs truncate w-[150px] shrink-0 ${isDark ? 'text-white' : 'text-slate-800'}`}>{origemPrincipal}</span>
-        <span className={`text-[10px] ${isDark ? 'text-slate-600' : 'text-slate-300'} shrink-0`}>→</span>
-        <span className={`text-xs truncate w-[150px] shrink-0 ${isDark ? 'text-white' : 'text-slate-800'}`}>{destinoFinal}</span>
-        <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold shrink-0 ${isDark ? 'bg-orange-500/20 text-orange-300' : 'bg-orange-100 text-orange-700'}`}>
-          {sols.length} paradas
-        </span>
-        <span className={`text-[11px] text-right w-[64px] shrink-0 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
-          {v?.data_prevista_saida ? fmtData(v.data_prevista_saida as string) : '—'}
-        </span>
-      </div>
-      {/* Nested rows */}
-      {sols.map((sol, i) => (
-        <div key={sol.id} onClick={() => onClick(sol)}
-          className={`flex items-center gap-2 px-3 py-1 cursor-pointer transition-all ${
-            isDark ? 'hover:bg-white/[0.02] bg-white/[0.01]' : 'hover:bg-slate-50 bg-slate-50/30'
-          }`}>
-          <span className="w-3 shrink-0" />
-          <div className={`w-4 h-4 rounded-full flex items-center justify-center text-[8px] font-bold shrink-0 ${
-            isDark ? 'bg-orange-500/15 text-orange-400' : 'bg-orange-100 text-orange-600'
-          }`}>{sol.ordem_na_viagem ?? i + 1}</div>
-          <span className={`text-[10px] font-mono w-[82px] shrink-0 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{sol.numero}</span>
-          <span className={`text-[11px] truncate w-[146px] shrink-0 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{sol.origem}</span>
-          <span className={`text-[9px] ${isDark ? 'text-slate-700' : 'text-slate-300'} shrink-0`}>→</span>
-          <span className={`text-[11px] truncate w-[146px] shrink-0 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{sol.destino}</span>
-          <span className={`text-[10px] truncate w-[104px] shrink-0 ${isDark ? 'text-slate-600' : 'text-slate-400'}`}>
-            {sol.obra_nome || ''}
-          </span>
-          {sol.urgente && <AlertTriangle size={9} className="text-red-500 shrink-0" />}
-        </div>
-      ))}
-    </div>
-  )
-}
-
-// ── Centro de Custo Autocomplete ─────────────────────────────────────────────
-
-function CentroCustoAutocomplete({ centrosCusto, value, onChange, isDark, inputCls }: {
-  centrosCusto: Array<{ id: string; codigo: string; descricao: string }>
-  value: string
-  onChange: (v: string) => void
-  isDark: boolean
-  inputCls: string
-}) {
-  const [query, setQuery] = useState('')
-  const [open, setOpen] = useState(false)
-  const containerRef = useRef<HTMLDivElement>(null)
-
-  // Click outside close
-  useEffect(() => {
-    const handler = (e: MouseEvent) => {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) setOpen(false)
-    }
-    document.addEventListener('mousedown', handler)
-    return () => document.removeEventListener('mousedown', handler)
-  }, [])
-
-  // Sort numerically by codigo
-  const sorted = useMemo(() =>
-    [...centrosCusto].sort((a, b) => {
-      const numA = parseInt(a.codigo.replace(/\D/g, '')) || 0
-      const numB = parseInt(b.codigo.replace(/\D/g, '')) || 0
-      return numA - numB
-    }),
-    [centrosCusto]
-  )
-
-  // Filter by query
-  const filtered = useMemo(() => {
-    if (!query) return sorted
-    const q = query.toLowerCase()
-    return sorted.filter(cc =>
-      cc.codigo.toLowerCase().includes(q) || cc.descricao.toLowerCase().includes(q)
-    )
-  }, [sorted, query])
-
-  // Display text for selected value
-  const selectedLabel = useMemo(() => {
-    if (!value) return ''
-    const found = centrosCusto.find(cc => cc.codigo === value)
-    return found ? `${found.codigo} - ${found.descricao}` : value
-  }, [value, centrosCusto])
-
-  const handleFocus = () => {
-    setQuery('')
-    setOpen(true)
-  }
-
-  const handleSelect = (cc: { codigo: string; descricao: string }) => {
-    onChange(cc.codigo)
-    setQuery('')
-    setOpen(false)
-  }
-
-  return (
-    <div ref={containerRef} className="relative">
-      <input
-        type="text"
-        value={open ? query : selectedLabel}
-        onChange={e => { setQuery(e.target.value); setOpen(true) }}
-        onFocus={handleFocus}
-        placeholder="Buscar centro de custo..."
-        className={inputCls}
-      />
-      {value && !open && (
-        <button
-          type="button"
-          onClick={() => { onChange(''); setQuery(''); }}
-          className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
-        >
-          <X size={14} />
-        </button>
-      )}
-      {open && filtered.length > 0 && (
-        <div className={`absolute z-50 left-0 right-0 mt-1 rounded-xl shadow-xl border max-h-52 overflow-y-auto ${
-          isDark ? 'bg-[#1e293b] border-white/10' : 'bg-white border-slate-200'
-        }`}>
-          {filtered.map(cc => (
-            <button
-              key={cc.id}
-              type="button"
-              onClick={() => handleSelect(cc)}
-              className={`w-full text-left px-3 py-2 text-sm transition-colors ${
-                cc.codigo === value
-                  ? isDark ? 'bg-orange-500/20 text-orange-300' : 'bg-orange-50 text-orange-700'
-                  : isDark ? 'text-slate-300 hover:bg-white/[0.06]' : 'text-slate-700 hover:bg-slate-50'
-              }`}
-            >
-              <span className="font-medium">{cc.codigo}</span>
-              <span className={isDark ? 'text-slate-500' : 'text-slate-400'}> - </span>
-              <span>{cc.descricao}</span>
-            </button>
-          ))}
-        </div>
-      )}
-      {open && filtered.length === 0 && query && (
-        <div className={`absolute z-50 left-0 right-0 mt-1 rounded-xl shadow-xl border px-3 py-3 text-sm ${
-          isDark ? 'bg-[#1e293b] border-white/10 text-slate-500' : 'bg-white border-slate-200 text-slate-400'
-        }`}>
-          Nenhum centro de custo encontrado
-        </div>
-      )}
-    </div>
-  )
-}
-
 // ── Nova Solicitação Modal ───────────────────────────────────────────────────
 
 const TIPO_LABELS: Record<TipoTransporte, string> = {
   viagem:                  'Viagem',
   mobilizacao:             'Mobilização',
+  transferencia_material:  'Transf. Material',
   transferencia_maquina:   'Transf. Máquina',
 }
 
@@ -943,7 +300,7 @@ const UF_LIST = [
 ] as const
 
 const EMPTY_FORM: CriarSolicitacaoPayload = {
-  tipo: 'viagem',
+  tipo: 'transferencia_material',
   origem: '',
   destino: '',
   descricao: '',
@@ -965,13 +322,7 @@ function NovaSolicitacaoModal({ isDark, onClose, onSuccess }: {
 
   async function handleCriar() {
     if (!canSubmit) return
-    const { origem_uf: _origemUf, destino_uf: _destinoUf, ...baseForm } = form
-    await criar.mutateAsync({
-      ...baseForm,
-      origem: mergeCidadeUf(form.origem, origemUF),
-      destino: mergeCidadeUf(form.destino, destinoUF),
-      itens: itensForm.length > 0 ? itensForm : undefined,
-    })
+    await criar.mutateAsync({ ...form, itens: itensForm.length > 0 ? itensForm : undefined })
     onSuccess()
     onClose()
   }
@@ -997,15 +348,24 @@ function NovaSolicitacaoModal({ isDark, onClose, onSuccess }: {
 
         {/* Body */}
         <div className="p-6 space-y-4">
-          <div>
-            <label className={labelCls}>Centro de Custo</label>
-            <CentroCustoAutocomplete
-              centrosCusto={centrosCusto}
-              value={form.centro_custo ?? ''}
-              onChange={v => set('centro_custo', v)}
-              isDark={isDark}
-              inputCls={inputCls}
-            />
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className={labelCls}>Tipo *</label>
+              <select value={form.tipo} onChange={e => set('tipo', e.target.value)} className={inputCls}>
+                {Object.entries(TIPO_LABELS).map(([k, v]) => (
+                  <option key={k} value={k}>{v}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className={labelCls}>Centro de Custo</label>
+              <select value={form.centro_custo ?? ''} onChange={e => set('centro_custo', e.target.value)} className={inputCls}>
+                <option value="">Selecione...</option>
+                {centrosCusto.map(cc => (
+                  <option key={cc.id} value={cc.codigo}>{cc.codigo} - {cc.descricao}</option>
+                ))}
+              </select>
+            </div>
           </div>
 
           {/* Origem */}
@@ -1141,9 +501,7 @@ function NovaSolicitacaoModal({ isDark, onClose, onSuccess }: {
 // ── Main Page ────────────────────────────────────────────────────────────────
 
 export default function SolicitacoesPipeline() {
-  const { hasSetorPapel } = useAuth()
   const { isDark } = useTheme()
-  const [searchParams, setSearchParams] = useSearchParams()
   const [activeTab, setActiveTab] = useState<StatusSolicitacaoPipeline>('solicitado')
   const [busca, setBusca] = useState('')
   const [detail, setDetail] = useState<LogSolicitacao | null>(null)
@@ -1154,36 +512,20 @@ export default function SolicitacoesPipeline() {
   const [viewMode, setViewMode] = useState<ViewMode>('cards')
   const [showNovaSolicitacao, setShowNovaSolicitacao] = useState(false)
   const [showPlanejamento, setShowPlanejamento] = useState<LogSolicitacao[]>([])
-  const [editandoViagemId, setEditandoViagemId] = useState<string | null>(null) // null = criando nova, string = editando existente
-  const [viagemDetail, setViagemDetail] = useState<Extract<DisplayItem, { kind: 'viagem' }> | null>(null)
 
+  // Abrir modal via ?nova=1 (clique no sidebar)
+  const [searchParams, setSearchParams] = useSearchParams()
   useEffect(() => {
-    const requestedTab = searchParams.get('tab')
-    if (requestedTab && SOLICITACAO_PIPELINE_STAGES.some(stage => stage.status === requestedTab)) {
-      setActiveTab(requestedTab as StatusSolicitacaoPipeline)
-    }
-
     if (searchParams.get('nova')) {
       setShowNovaSolicitacao(true)
-      const next = new URLSearchParams(searchParams)
-      next.delete('nova')
-      setSearchParams(next, { replace: true })
+      setSearchParams({}, { replace: true })
     }
   }, [searchParams, setSearchParams])
-
-  const urgentOnly = searchParams.get('urgent') === '1'
-  const requestedItemId = searchParams.get('item')
-  const requestedViagemId = searchParams.get('viagem')
 
   const { data: solicitacoes = [], isLoading } = useSolicitacoes()
   const atualizarStatus = useAtualizarStatusSolicitacao()
   const aprovar = useAprovarSolicitacao()
   const enviarParaAprovacao = useEnviarParaAprovacao()
-  const criarViagem = useCriarViagem()
-  const atualizarViagem = useAtualizarViagem()
-  const enviarViagemAprovacao = useEnviarViagemAprovacao()
-  const aprovarViagem = useAprovarViagem()
-  const canApproveLogistica = hasSetorPapel('logistica', ['supervisor', 'diretor', 'ceo'])
 
   // Group by status
   const grouped = useMemo(() => {
@@ -1199,9 +541,6 @@ export default function SolicitacoesPipeline() {
   // Filter + sort active tab
   const activeItems = useMemo(() => {
     let items = [...(grouped.get(activeTab) || [])]
-    if (urgentOnly) {
-      items = items.filter(s => s.urgente)
-    }
     if (busca) {
       const q = busca.toLowerCase()
       items = items.filter(s =>
@@ -1222,83 +561,10 @@ export default function SolicitacoesPipeline() {
       return sortDir === 'asc' ? cmp : -cmp
     })
     return items
-  }, [grouped, activeTab, urgentOnly, busca, sortField, sortDir])
-
-  // Agrupar solicitações com viagem_id num único DisplayItem de viagem
-  const displayItems = useMemo((): DisplayItem[] => {
-    const viagemGroups = new Map<string, LogSolicitacao[]>()
-    const solos: LogSolicitacao[] = []
-
-    for (const sol of activeItems) {
-      if (sol.viagem_id) {
-        const arr = viagemGroups.get(sol.viagem_id) || []
-        arr.push(sol)
-        viagemGroups.set(sol.viagem_id, arr)
-      } else {
-        solos.push(sol)
-      }
-    }
-
-    const result: DisplayItem[] = []
-    const viagemInserted = new Set<string>()
-
-    // Manter a ordem original: ao encontrar a primeira sol de uma viagem, inserir o grupo
-    for (const sol of activeItems) {
-      if (sol.viagem_id) {
-        if (!viagemInserted.has(sol.viagem_id)) {
-          viagemInserted.add(sol.viagem_id)
-          const sols = viagemGroups.get(sol.viagem_id)!
-          sols.sort((a, b) => (a.ordem_na_viagem ?? 0) - (b.ordem_na_viagem ?? 0))
-          result.push({
-            kind: 'viagem',
-            viagemId: sol.viagem_id,
-            viagem: sol.viagem,
-            solicitacoes: sols,
-          })
-        }
-      } else {
-        result.push({ kind: 'solo', sol })
-      }
-    }
-
-    return result
-  }, [activeItems])
-
-  useEffect(() => {
-    if (requestedViagemId) {
-      const viagem = displayItems.find(
-        (item): item is Extract<DisplayItem, { kind: 'viagem' }> => item.kind === 'viagem' && item.viagemId === requestedViagemId
-      )
-      if (viagem) {
-        setViagemDetail(viagem)
-        setDetail(null)
-      }
-      return
-    }
-
-    if (requestedItemId) {
-      const item = solicitacoes.find(sol => sol.id === requestedItemId)
-      if (item) {
-        setDetail(item)
-        setViagemDetail(null)
-      }
-    }
-  }, [requestedItemId, requestedViagemId, displayItems, solicitacoes])
+  }, [grouped, activeTab, busca, sortField, sortDir])
 
   const showToast = (type: 'success' | 'error', msg: string) => {
     setToast({ type, msg }); setTimeout(() => setToast(null), 4000)
-  }
-  const closeDetail = () => {
-    setDetail(null)
-    const next = new URLSearchParams(searchParams)
-    next.delete('item')
-    setSearchParams(next, { replace: true })
-  }
-  const closeViagemDetail = () => {
-    setViagemDetail(null)
-    const next = new URLSearchParams(searchParams)
-    next.delete('viagem')
-    setSearchParams(next, { replace: true })
   }
 
   const toggleSelect = (id: string) => {
@@ -1309,41 +575,18 @@ export default function SolicitacoesPipeline() {
     const all = ids.length > 0 && ids.every(id => selectedIds.has(id))
     setSelectedIds(all ? new Set() : new Set(ids))
   }
-  const toggleViagem = (ids: string[]) => {
-    setSelectedIds(prev => {
-      const next = new Set(prev)
-      const allIn = ids.every(id => next.has(id))
-      if (allIn) { ids.forEach(id => next.delete(id)) } else { ids.forEach(id => next.add(id)) }
-      return next
-    })
-  }
   const toggleSort = (field: SortField) => {
     if (sortField === field) setSortDir(d => d === 'asc' ? 'desc' : 'asc')
     else { setSortField(field); setSortDir('asc') }
   }
-  const switchTab = (status: StatusSolicitacaoPipeline) => {
-    setActiveTab(status)
-    setSelectedIds(new Set())
-    setBusca('')
-    const next = new URLSearchParams(searchParams)
-    next.set('tab', status)
-    setSearchParams(next, { replace: true })
-  }
+  const switchTab = (status: StatusSolicitacaoPipeline) => { setActiveTab(status); setSelectedIds(new Set()); setBusca('') }
 
   const planejar = usePlanejaarSolicitacao()
 
   // Actions
   const handlePlanejar = (ids: string[]) => {
     const sols = solicitacoes.filter(s => ids.includes(s.id))
-    if (sols.length > 0) {
-      setEditandoViagemId(null)
-      setShowPlanejamento(sols)
-    }
-  }
-
-  const handleEditViagem = (item: Extract<DisplayItem, { kind: 'viagem' }>) => {
-    setEditandoViagemId(item.viagemId)
-    setShowPlanejamento(item.solicitacoes)
+    if (sols.length > 0) setShowPlanejamento(sols)
   }
 
   const handleSavePlanejamento = async (data: {
@@ -1353,56 +596,23 @@ export default function SolicitacoesPipeline() {
     duracao_total_horas: number
     modal?: string
     motorista_nome?: string
-    motorista_telefone?: string
     veiculo_placa?: string
     data_prevista_saida?: string
     custo_estimado?: number
-    origem_principal?: string
-    destino_final?: string
-    rota_polyline?: string
   }) => {
     try {
-      const viagemPayload = {
-        solicitacaoIds: data.solicitacaoIds,
-        modal: data.modal,
-        motorista_nome: data.motorista_nome,
-        motorista_telefone: data.motorista_telefone,
-        veiculo_placa: data.veiculo_placa,
-        data_prevista_saida: data.data_prevista_saida,
-        custo_total: data.custo_estimado,
-        distancia_total_km: data.distancia_total_km || undefined,
-        tempo_estimado_h: data.duracao_total_horas || undefined,
-        origem_principal: data.origem_principal,
-        destino_final: data.destino_final,
-        rota_polyline: data.rota_polyline,
+      for (const id of data.solicitacaoIds) {
+        await planejar.mutateAsync({
+          id,
+          modal: data.modal,
+          motorista_nome: data.motorista_nome,
+          veiculo_placa: data.veiculo_placa,
+          data_prevista_saida: data.data_prevista_saida,
+          custo_estimado: data.custo_estimado,
+        })
       }
-
-      if (editandoViagemId) {
-        // Editando viagem existente
-        await atualizarViagem.mutateAsync({ viagemId: editandoViagemId, ...viagemPayload })
-        showToast('success', 'Viagem atualizada com sucesso')
-      } else if (data.solicitacaoIds.length > 1) {
-        // Múltiplas solicitações → criar Viagem (trip) que consolida todas
-        await criarViagem.mutateAsync(viagemPayload)
-        showToast('success', `Viagem criada com ${data.solicitacaoIds.length} solicitações`)
-      } else {
-        // Solicitação individual → fluxo original (sem viagem)
-        for (const id of data.solicitacaoIds) {
-          await planejar.mutateAsync({
-            id,
-            modal: data.modal,
-            motorista_nome: data.motorista_nome,
-            veiculo_placa: data.veiculo_placa,
-            data_prevista_saida: data.data_prevista_saida,
-            custo_estimado: data.custo_estimado,
-            distancia_km: data.distancia_total_km || undefined,
-            tempo_estimado_h: data.duracao_total_horas || undefined,
-          })
-        }
-        showToast('success', `${data.solicitacaoIds.length} solicitação(ões) planejada(s)`)
-      }
+      showToast('success', `${data.solicitacaoIds.length} solicitação(ões) planejada(s)`)
       setShowPlanejamento([])
-      setEditandoViagemId(null)
       setSelectedIds(new Set())
     } catch {
       showToast('error', 'Erro ao salvar planejamento')
@@ -1411,68 +621,15 @@ export default function SolicitacoesPipeline() {
 
   const handleEnviarAprovacao = async (ids: string[]) => {
     try {
-      // Agrupar por viagem_id para enviar aprovação consolidada
-      const solsToSend = solicitacoes.filter(s => ids.includes(s.id))
-      const viagemIds = new Set<string>()
-      const soloIds: string[] = []
-
-      for (const s of solsToSend) {
-        if (s.viagem_id) {
-          viagemIds.add(s.viagem_id)
-        } else {
-          soloIds.push(s.id)
-        }
-      }
-
-      // Enviar aprovação por viagem (uma aprovação para todas as solicitações da viagem)
-      for (const viagemId of viagemIds) {
-        await enviarViagemAprovacao.mutateAsync({ viagemId })
-      }
-
-      // Enviar aprovação individual para solicitações sem viagem
-      for (const id of soloIds) {
-        await enviarParaAprovacao.mutateAsync({ id })
-      }
-
-      const totalViagens = viagemIds.size
-      const totalSolo = soloIds.length
-      const msg = totalViagens > 0
-        ? `${totalViagens} viagem(ns) e ${totalSolo} solicitação(ões) enviada(s) para aprovação`
-        : `${totalSolo} enviada(s) para aprovação`
-      showToast('success', msg)
+      for (const id of ids) await enviarParaAprovacao.mutateAsync({ id })
+      showToast('success', `${ids.length} enviada(s) para aprovação`)
       setSelectedIds(new Set())
     } catch { showToast('error', 'Erro ao enviar para aprovação') }
   }
 
   const handleAprovar = async (ids: string[]) => {
-    if (!canApproveLogistica) {
-      showToast('error', 'Somente Supervisor de Logística ou Diretor pode aprovar viagens')
-      return
-    }
-
     try {
-      const solsToApprove = solicitacoes.filter(s => ids.includes(s.id))
-      const viagemIds = new Set<string>()
-      const soloIds: string[] = []
-
-      for (const s of solsToApprove) {
-        if (s.viagem_id) {
-          viagemIds.add(s.viagem_id)
-        } else {
-          soloIds.push(s.id)
-        }
-      }
-
-      // Aprovar viagens (aprova todas as solicitações vinculadas)
-      for (const viagemId of viagemIds) {
-        await aprovarViagem.mutateAsync({ viagemId, aprovado: true })
-      }
-
-      // Aprovar solicitações individuais
-      for (const id of soloIds) {
-        await aprovar.mutateAsync({ id, aprovado: true })
-      }
-
+      for (const id of ids) await aprovar.mutateAsync({ id, aprovado: true })
       showToast('success', `${ids.length} solicitação(ões) aprovada(s)`)
       setSelectedIds(new Set())
     } catch { showToast('error', 'Erro ao aprovar') }
@@ -1488,17 +645,8 @@ export default function SolicitacoesPipeline() {
     }
   }
 
-  const handleViagemDetailAction = (action: string, sols: LogSolicitacao[]) => {
-    closeViagemDetail()
-    const ids = sols.map(s => s.id)
-    switch (action) {
-      case 'enviarAprovacao': handleEnviarAprovacao(ids); break
-      case 'aprovar': handleAprovar(ids); break
-    }
-  }
-
   const handleDetailAction = (action: string, sol: LogSolicitacao) => {
-    closeDetail()
+    setDetail(null)
     switch (action) {
       case 'planejar': handlePlanejar([sol.id]); break
       case 'enviarAprovacao': handleEnviarAprovacao([sol.id]); break
@@ -1518,9 +666,7 @@ export default function SolicitacoesPipeline() {
     planejado:            { label: 'Enviar p/ Aprovação',   icon: ShieldCheck,  className: 'bg-amber-600 hover:bg-amber-700 text-white' },
     aguardando_aprovacao: { label: 'Aprovar',               icon: CheckCircle2, className: 'bg-emerald-600 hover:bg-emerald-700 text-white' },
   }
-  const bulk = activeTab === 'aguardando_aprovacao' && !canApproveLogistica
-    ? undefined
-    : BULK_ACTIONS[activeTab]
+  const bulk = BULK_ACTIONS[activeTab]
   const selectedInTab = activeItems.filter(s => selectedIds.has(s.id))
   const urgentCt = activeItems.filter(s => s.urgente).length
 
@@ -1543,6 +689,11 @@ export default function SolicitacoesPipeline() {
             {solicitacoes.filter(s => ['solicitado','planejado','aguardando_aprovacao'].includes(s.status)).length} solicitações no pipeline
           </p>
         </div>
+        <button onClick={() => setShowNovaSolicitacao(true)}
+          className="flex items-center gap-1.5 bg-orange-600 hover:bg-orange-700 text-white
+            text-sm font-semibold px-4 py-2 rounded-xl transition-colors shadow-sm">
+          <Plus size={15} /> Nova Solicitação
+        </button>
       </div>
 
       {/* Horizontal Tabs */}
@@ -1622,7 +773,7 @@ export default function SolicitacoesPipeline() {
           </button>
 
           <div className={`ml-auto flex items-center gap-3 text-[11px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
-            <span>{displayItems.length} {displayItems.length === 1 ? 'item' : 'itens'}</span>
+            <span>{activeItems.length} solicitação(ões)</span>
             {urgentCt > 0 && (
               <span className="flex items-center gap-1 text-red-500 font-bold">
                 <AlertTriangle size={11} /> {urgentCt} urgente{urgentCt > 1 ? 's' : ''}
@@ -1669,37 +820,28 @@ export default function SolicitacoesPipeline() {
                 <span className="w-3 shrink-0" />
                 <span className="w-[11px] shrink-0" />
                 <span className="w-[86px] shrink-0">Nº</span>
+                <span className="w-[96px] shrink-0 text-center">Tipo</span>
                 <span className="w-[150px] shrink-0">Origem</span>
                 <span className="w-3 shrink-0" />
                 <span className="w-[150px] shrink-0">Destino</span>
                 <span className="w-[104px] shrink-0">Obra</span>
                 <span className="w-[64px] shrink-0 text-right">Data</span>
               </div>
-              {displayItems.map(item =>
-                item.kind === 'viagem' ? (
-                  <ViagemRow key={`vg-${item.viagemId}`} item={item} onClick={sol => setDetail(sol)} isDark={isDark} selectedIds={selectedIds} onToggleViagem={toggleViagem} />
-                ) : (
-                  <SolRow key={item.sol.id} sol={item.sol} onClick={() => setDetail(item.sol)} isDark={isDark} isSelected={selectedIds.has(item.sol.id)} onSelect={toggleSelect} />
-                )
-              )}
+              {activeItems.map(sol => (
+                <SolRow key={sol.id} sol={sol} onClick={() => setDetail(sol)} isDark={isDark} isSelected={selectedIds.has(sol.id)} onSelect={toggleSelect} />
+              ))}
             </>
           ) : (
-            <div className="space-y-2 p-4 stagger-children">
-              {displayItems.map(item =>
-                item.kind === 'viagem' ? (
-                  <ViagemCard key={`vg-${item.viagemId}`} item={item} onClick={sol => setDetail(sol)} onOpenDetail={setViagemDetail} isDark={isDark} selectedIds={selectedIds} onToggleViagem={toggleViagem}
-                    onEditViagem={activeTab !== 'aguardando_aprovacao' ? handleEditViagem : undefined} />
-                ) : (
-                  <SolCard key={item.sol.id} sol={item.sol} onClick={() => setDetail(item.sol)} isDark={isDark} isSelected={selectedIds.has(item.sol.id)} onSelect={toggleSelect} />
-                )
-              )}
+            <div className="space-y-2 p-4">
+              {activeItems.map(sol => (
+                <SolCard key={sol.id} sol={sol} onClick={() => setDetail(sol)} isDark={isDark} isSelected={selectedIds.has(sol.id)} onSelect={toggleSelect} />
+              ))}
             </div>
           )}
         </div>
       </div>
 
-      {detail && <DetailModal sol={detail} onClose={closeDetail} onAction={handleDetailAction} onEdit={detail.status === 'planejado' ? () => { closeDetail(); setEditandoViagemId(null); setShowPlanejamento([detail]) } : undefined} isDark={isDark} />}
-      {viagemDetail && <ViagemDetailModal item={viagemDetail} onClose={closeViagemDetail} onAction={handleViagemDetailAction} onEdit={() => handleEditViagem(viagemDetail)} isDark={isDark} />}
+      {detail && <DetailModal sol={detail} onClose={() => setDetail(null)} onAction={handleDetailAction} isDark={isDark} />}
       {showNovaSolicitacao && (
         <NovaSolicitacaoModal
           isDark={isDark}
@@ -1713,15 +855,8 @@ export default function SolicitacoesPipeline() {
             isDark={isDark}
             solicitacoes={showPlanejamento}
             allSolicitacoes={solicitacoes}
-            onClose={() => { setShowPlanejamento([]); setEditandoViagemId(null) }}
+            onClose={() => setShowPlanejamento([])}
             onSave={handleSavePlanejamento}
-            initialData={(editandoViagemId || showPlanejamento[0]?.status === 'planejado') ? {
-              modal: showPlanejamento[0]?.modal || undefined,
-              motorista_nome: showPlanejamento[0]?.motorista_nome || undefined,
-              veiculo_placa: showPlanejamento[0]?.veiculo_placa || undefined,
-              data_prevista_saida: showPlanejamento[0]?.data_prevista_saida || undefined,
-              custo_estimado: showPlanejamento[0]?.custo_estimado || undefined,
-            } : undefined}
           />
         </Suspense>
       )}

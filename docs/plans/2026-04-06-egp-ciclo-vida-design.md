@@ -362,3 +362,7 @@ const NAV = [
   { to: '/egp/encerramento', icon: CheckCircle2,    label: 'Encerramento' },
 ]
 ```
+
+
+## Links
+- [[obsidian/31 - Módulo PMO-EGP]]

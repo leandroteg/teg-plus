@@ -141,3 +141,7 @@ Filtros aplicados → selecao → n8n /fiscal/nf/download-lote
 - Emissao de NF-e/NFS-e
 - Integracao SEFAZ
 - Cancelamento/inutilizacao
+
+
+## Links
+- [[obsidian/29 - Módulo Fiscal]]

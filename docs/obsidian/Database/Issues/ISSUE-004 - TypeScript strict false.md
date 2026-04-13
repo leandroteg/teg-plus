@@ -41,3 +41,5 @@ Commit `3dc22ad` (2026-03-07):
 
 ## Links
 - [[02 - Frontend Stack]]
+- [[Database/Tarefas/TASK-030 - Testes CI CD|TASK-030 — Testes e CI/CD]]
+- [[15 - Deploy e GitHub]]

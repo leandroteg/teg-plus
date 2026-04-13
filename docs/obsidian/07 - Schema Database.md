@@ -5,7 +5,7 @@ status: ativo
 tags: [supabase, postgresql, schema, tabelas, sql, relacionamentos]
 criado: 2026-03-02
 atualizado: 2026-03-08
-relacionado: ["[[06 - Supabase]]", "[[08 - Migracoes SQL]]", "[[13 - Alcadas]]", "[[14 - Compradores e Categorias]]", "[[19 - Integracao Omie]]", "[[21 - Fluxo Pagamento]]"]
+relacionado: ["[[06 - Supabase]]", "[[08 - Migrações SQL]]", "[[13 - Alçadas]]", "[[14 - Compradores e Categorias]]", "[[19 - Integração Omie]]", "[[21 - Fluxo Pagamento]]", "[[39 - Modelo de Dados ERD]]", "[[ADR-006 - Prefixos Schema]]"]
 ---
 
 # Schema do Banco de Dados - TEG+ ERP
@@ -1360,8 +1360,8 @@ RH → SISTEMA
 ## Links Relacionados
 
 - [[06 - Supabase]] - Configuracao e acesso
-- [[08 - Migracoes SQL]] - Historico de mudancas
-- [[13 - Alcadas]] - Tabela apr_alcadas detalhada
+- [[08 - Migrações SQL]] - Historico de mudancas
+- [[13 - Alçadas]] - Tabela apr_alcadas detalhada
 - [[14 - Compradores e Categorias]] - cmp_categorias e cmp_compradores
-- [[19 - Integracao Omie]] - Sync financeiro
+- [[19 - Integração Omie]] - Sync financeiro
 - [[21 - Fluxo Pagamento]] - Fluxo pedido → CP → pagamento

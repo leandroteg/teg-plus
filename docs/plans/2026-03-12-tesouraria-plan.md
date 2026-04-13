@@ -719,3 +719,7 @@ Verify Vercel build succeeds and page works in production.
 | 5 | Cockpit page (main UI) | pages/financeiro/Tesouraria.tsx |
 | 6 | Routes & navigation | FinanceiroLayout.tsx, App.tsx |
 | 7 | E2E test & deploy | — |
+
+
+## Links
+- [[obsidian/20 - Módulo Financeiro]]

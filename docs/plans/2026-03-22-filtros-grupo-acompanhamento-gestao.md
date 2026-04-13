@@ -223,3 +223,7 @@ Organizar os 4 componentes em grid responsivo:
 **Step 1:** `cd frontend && npx tsc --noEmit`
 **Step 2:** Verificar via preview que as telas renderizam sem erro
 **Step 3:** `git push origin main`
+
+
+## Links
+- [[obsidian/27 - Módulo Contratos Gestão]]

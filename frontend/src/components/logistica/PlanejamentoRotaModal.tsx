@@ -1,18 +1,17 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react'
 import {
   X, MapPin, Navigation, Clock, Ruler, Truck, Save, Loader2,
-  Search, Package2, Route, Plus, Trash2, GripVertical, ArrowRight, ArrowUp, ArrowDown,
+  Search, Package2, Route, Plus, Trash2, GripVertical, ArrowRight,
   Building2, ChevronDown, Zap, AlertTriangle, Calendar,
 } from 'lucide-react'
 import type { LogSolicitacao } from '../../types/logistica'
-import { useVeiculos } from '../../hooks/useFrotas'
-import type { FroVeiculo } from '../../types/frotas'
 
 // ── Leaflet imports ──────────────────────────────────────────────────────────
 import { MapContainer, TileLayer, Marker, Popup, Polyline, useMap } from 'react-leaflet'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import { serializeViagemRotaPayload } from '../../utils/logisticaViagem'
+import { UpperInput } from '../UpperInput'
 
 // Fix leaflet default icon issue
 delete (L.Icon.Default.prototype as Record<string, unknown>)._getIconUrl
@@ -54,18 +53,6 @@ interface RotaCalculada {
   distancia_total_km: number
   duracao_total_horas: number
   pontos: Array<{ lat: number; lng: number }>
-  polyline?: string
-}
-
-interface WaypointStop {
-  lat: number
-  lng: number
-  label: string
-}
-
-interface WaypointPlan {
-  stops: WaypointStop[]
-  legRanges: Array<{ startLegIndex: number; endLegIndexExclusive: number }>
 }
 
 interface Props {
@@ -80,22 +67,10 @@ interface Props {
     duracao_total_horas: number
     modal?: string
     motorista_nome?: string
-    motorista_telefone?: string
     veiculo_placa?: string
     data_prevista_saida?: string
     custo_estimado?: number
-    origem_principal?: string
-    destino_final?: string
-    rota_polyline?: string
   }) => Promise<void>
-  /** Dados iniciais para pré-preencher quando editando planejamento existente */
-  initialData?: {
-    modal?: string
-    motorista_nome?: string
-    veiculo_placa?: string
-    data_prevista_saida?: string
-    custo_estimado?: number
-  }
 }
 
 // ── Custom marker icons ──────────────────────────────────────────────────────
@@ -121,154 +96,6 @@ function createIcon(color: string, label?: string) {
   })
 }
 
-function toRadians(value: number) {
-  return value * Math.PI / 180
-}
-
-function haversineKm(a: { lat: number; lng: number }, b: { lat: number; lng: number }) {
-  const R = 6371
-  const dLat = toRadians(b.lat - a.lat)
-  const dLng = toRadians(b.lng - a.lng)
-  const originLat = toRadians(a.lat)
-  const destLat = toRadians(b.lat)
-  const angle =
-    Math.sin(dLat / 2) ** 2 +
-    Math.cos(originLat) * Math.cos(destLat) * Math.sin(dLng / 2) ** 2
-  return R * 2 * Math.atan2(Math.sqrt(angle), Math.sqrt(1 - angle))
-}
-
-function normalizeStopLabel(value?: string) {
-  return String(value ?? '')
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .toLowerCase()
-    .replace(/\s+/g, ' ')
-    .trim()
-}
-
-function sameStop(
-  a: { lat?: number; lng?: number; label?: string },
-  b: { lat?: number; lng?: number; label?: string },
-) {
-  if (typeof a.lat === 'number' && typeof a.lng === 'number' && typeof b.lat === 'number' && typeof b.lng === 'number') {
-    return haversineKm({ lat: a.lat, lng: a.lng }, { lat: b.lat, lng: b.lng }) <= 5
-  }
-  return normalizeStopLabel(a.label) !== '' && normalizeStopLabel(a.label) === normalizeStopLabel(b.label)
-}
-
-function originStopOf(ponto: PontoRota) {
-  return {
-    lat: ponto.lat_origem,
-    lng: ponto.lng_origem,
-    label: ponto.endereco_origem || ponto.solicitacao?.origem || '',
-  }
-}
-
-function destinoStopOf(ponto: PontoRota) {
-  return {
-    lat: ponto.lat_destino,
-    lng: ponto.lng_destino,
-    label: ponto.endereco_destino || ponto.solicitacao?.destino || '',
-  }
-}
-
-function optimizePontosOrder(pontos: PontoRota[]) {
-  if (pontos.length <= 1) return pontos
-
-  const indexed = pontos.map((ponto, index) => ({ ponto, index }))
-  const remaining = [...indexed]
-  const ordered: typeof indexed = []
-
-  const startingCandidates = indexed.filter(candidate =>
-    !indexed.some(other =>
-      other.ponto.id !== candidate.ponto.id &&
-      sameStop(destinoStopOf(other.ponto), originStopOf(candidate.ponto))
-    )
-  )
-
-  const start =
-    startingCandidates.sort((a, b) => a.index - b.index)[0]
-    ?? indexed[0]
-
-  ordered.push(start)
-  remaining.splice(remaining.findIndex(item => item.ponto.id === start.ponto.id), 1)
-
-  while (remaining.length > 0) {
-    const current = ordered[ordered.length - 1].ponto
-    const currentDestino = destinoStopOf(current)
-
-    const next = remaining
-      .map(candidate => {
-        const candidateOrigem = originStopOf(candidate.ponto)
-        const exactMatch = sameStop(currentDestino, candidateOrigem)
-        const deadheadKm =
-          typeof currentDestino.lat === 'number' &&
-          typeof currentDestino.lng === 'number' &&
-          typeof candidateOrigem.lat === 'number' &&
-          typeof candidateOrigem.lng === 'number'
-            ? haversineKm(
-                { lat: currentDestino.lat, lng: currentDestino.lng },
-                { lat: candidateOrigem.lat, lng: candidateOrigem.lng },
-              )
-            : exactMatch
-              ? 0
-              : Number.POSITIVE_INFINITY
-
-        return { ...candidate, exactMatch, deadheadKm }
-      })
-      .sort((a, b) => {
-        if (a.exactMatch !== b.exactMatch) return a.exactMatch ? -1 : 1
-        if (a.deadheadKm !== b.deadheadKm) return a.deadheadKm - b.deadheadKm
-        return a.index - b.index
-      })[0]
-
-    ordered.push(next)
-    remaining.splice(remaining.findIndex(item => item.ponto.id === next.ponto.id), 1)
-  }
-
-  return ordered.map(item => item.ponto)
-}
-
-function buildWaypointPlan(pontos: PontoRota[]): WaypointPlan {
-  const stops: WaypointStop[] = []
-  const legRanges: WaypointPlan['legRanges'] = []
-
-  const pushStop = (stop: WaypointStop) => {
-    const last = stops[stops.length - 1]
-    if (!last || !sameStop(last, stop)) {
-      stops.push(stop)
-    }
-    return stops.length - 1
-  }
-
-  pontos.forEach(ponto => {
-    const origem = originStopOf(ponto)
-    const destino = destinoStopOf(ponto)
-
-    if (typeof origem.lat !== 'number' || typeof origem.lng !== 'number' || typeof destino.lat !== 'number' || typeof destino.lng !== 'number') {
-      return
-    }
-
-    const origemIndex = pushStop({
-      lat: origem.lat,
-      lng: origem.lng,
-      label: origem.label,
-    })
-    const destinoIndex = pushStop({
-      lat: destino.lat,
-      lng: destino.lng,
-      label: destino.label,
-    })
-
-    legRanges.push({
-      startLegIndex: origemIndex,
-      endLegIndexExclusive: destinoIndex,
-    })
-  })
-
-  return { stops, legRanges }
-}
-
 // ── Map bounds fitter ────────────────────────────────────────────────────────
 
 function MapFitter({ points }: { points: Array<{ lat: number; lng: number }> }) {
@@ -281,12 +108,13 @@ function MapFitter({ points }: { points: Array<{ lat: number; lng: number }> }) 
   return null
 }
 
-// ── Address Autocomplete Input (Endereço + CEP) ─────────────────────────────
+// ── Address Autocomplete Input ───────────────────────────────────────────────
 
 function EnderecoInput({
   value,
   onChange,
   onSelect,
+  placeholder,
   isDark,
   label,
   icon: Icon,
@@ -294,6 +122,7 @@ function EnderecoInput({
   value: string
   onChange: (v: string) => void
   onSelect: (s: EnderecoSugestao) => void
+  placeholder: string
   isDark: boolean
   label: string
   icon: typeof MapPin
@@ -301,10 +130,8 @@ function EnderecoInput({
   const [sugestoes, setSugestoes] = useState<EnderecoSugestao[]>([])
   const [loading, setLoading] = useState(false)
   const [open, setOpen] = useState(false)
-  const [mode, setMode] = useState<'endereco' | 'cep'>('endereco')
-  const [cepValue, setCepValue] = useState('')
+  const [cepMode, setCepMode] = useState(false)
   const timerRef = useRef<ReturnType<typeof setTimeout>>()
-  const abortRef = useRef<AbortController>()
   const containerRef = useRef<HTMLDivElement>(null)
 
   // Click outside close
@@ -316,222 +143,98 @@ function EnderecoInput({
     return () => document.removeEventListener('mousedown', handler)
   }, [])
 
-  // ── Buscar endereço via Nominatim (gratuito, sem API key) ────────────────
-  const buscarEndereco = useCallback(async (query: string) => {
-    if (query.length < 3) { setSugestoes([]); setOpen(false); return }
-
-    // Cancel previous request
-    if (abortRef.current) abortRef.current.abort()
-    abortRef.current = new AbortController()
-
+  const buscar = useCallback(async (query: string) => {
+    if (query.length < 3) { setSugestoes([]); return }
     setLoading(true)
     try {
-      // Tenta n8n primeiro (timeout curto de 3s para não bloquear fallback)
-      try {
-        const n8nAbort = new AbortController()
-        const n8nTimer = setTimeout(() => n8nAbort.abort(), 3000)
-        // Also abort if parent aborts
-        abortRef.current.signal.addEventListener('abort', () => n8nAbort.abort())
-        const res = await fetch(`${N8N_URL}/logistica/autocomplete-endereco`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ query, pais: 'BR' }),
-          signal: n8nAbort.signal,
-        })
-        clearTimeout(n8nTimer)
-        if (res.ok) {
-          const json = await res.json()
-          const resultados = json.sugestoes || json.results || []
-          if (resultados.length > 0) {
-            setSugestoes(resultados)
-            setOpen(true)
-            return
-          }
-        }
-      } catch (e) {
-        if (abortRef.current?.signal.aborted) return
-      }
+      const isCep = /^\d{5}-?\d{0,3}$/.test(query.replace(/\s/g, ''))
+      const endpoint = isCep ? '/logistica/consulta-cep' : '/logistica/autocomplete-endereco'
+      const body = isCep ? { cep: query.replace(/\D/g, '') } : { query, pais: 'BR' }
 
-      // Fallback: Nominatim OpenStreetMap (gratuito)
-      const encoded = encodeURIComponent(query)
-      const res = await fetch(
-        `https://nominatim.openstreetmap.org/search?q=${encoded}&format=json&addressdetails=1&limit=6&countrycodes=br`,
-        { signal: abortRef.current.signal, headers: { 'Accept-Language': 'pt-BR' } }
-      )
+      const res = await fetch(`${N8N_URL}${endpoint}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+        signal: AbortSignal.timeout(8000),
+      })
+
       if (res.ok) {
-        const data = await res.json() as Array<{
-          display_name: string; lat: string; lon: string
-          address?: { road?: string; suburb?: string; city?: string; town?: string; state?: string; postcode?: string }
-        }>
-        const resultados: EnderecoSugestao[] = data.map(d => ({
-          descricao: d.display_name.replace(/, Brasil$/i, ''),
-          logradouro: d.address?.road,
-          bairro: d.address?.suburb,
-          cidade: d.address?.city || d.address?.town || '',
-          uf: d.address?.state || '',
-          cep: d.address?.postcode,
-          lat: parseFloat(d.lat),
-          lng: parseFloat(d.lon),
-        }))
+        const json = await res.json()
+        const resultados = json.sugestoes || json.results || (json.cidade ? [json] : [])
         setSugestoes(resultados)
         setOpen(resultados.length > 0)
       }
-    } catch (e) {
-      if (e instanceof DOMException && e.name === 'AbortError') return
-      // silent
-    } finally {
-      setLoading(false)
-    }
-  }, [])
-
-  // ── Buscar por CEP ────────────────────────────────────────────────────────
-  const buscarCep = useCallback(async (cep: string) => {
-    const limpo = cep.replace(/\D/g, '')
-    if (limpo.length < 5) { setSugestoes([]); setOpen(false); return }
-
-    if (abortRef.current) abortRef.current.abort()
-    abortRef.current = new AbortController()
-
-    setLoading(true)
-    try {
-      // Tenta n8n primeiro (timeout curto de 3s)
-      try {
-        const n8nAbort = new AbortController()
-        const n8nTimer = setTimeout(() => n8nAbort.abort(), 3000)
-        abortRef.current.signal.addEventListener('abort', () => n8nAbort.abort())
-        const res = await fetch(`${N8N_URL}/logistica/consulta-cep`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ cep: limpo }),
-          signal: n8nAbort.signal,
-        })
-        clearTimeout(n8nTimer)
-        if (res.ok) {
-          const json = await res.json()
-          if (json.cidade || json.city) {
+    } catch {
+      // Fallback: se CEP, buscar via BrasilAPI diretamente
+      const limpo = query.replace(/\D/g, '')
+      if (limpo.length === 8) {
+        try {
+          const res = await fetch(`https://brasilapi.com.br/api/cep/v2/${limpo}`)
+          if (res.ok) {
+            const d = await res.json()
             const sug: EnderecoSugestao = {
-              descricao: json.descricao || `${json.logradouro || json.street || ''}, ${json.bairro || json.neighborhood || ''}, ${json.cidade || json.city} - ${json.uf || json.state}`,
-              logradouro: json.logradouro || json.street,
-              bairro: json.bairro || json.neighborhood,
-              cidade: json.cidade || json.city || '',
-              uf: json.uf || json.state || '',
-              cep: json.cep || limpo,
-              lat: json.lat || json.latitude,
-              lng: json.lng || json.longitude,
+              descricao: `${d.street || ''}, ${d.neighborhood || ''}, ${d.city} - ${d.state}`,
+              logradouro: d.street,
+              bairro: d.neighborhood,
+              cidade: d.city,
+              uf: d.state,
+              cep: d.cep,
+              lat: d.location?.coordinates?.latitude,
+              lng: d.location?.coordinates?.longitude,
             }
             setSugestoes([sug])
             setOpen(true)
-            return
           }
-        }
-      } catch (e) {
-        if (abortRef.current?.signal.aborted) return
+        } catch { /* silent */ }
       }
-
-      // Fallback: BrasilAPI direto
-      if (limpo.length === 8) {
-        const res = await fetch(`https://brasilapi.com.br/api/cep/v2/${limpo}`, { signal: abortRef.current.signal })
-        if (res.ok) {
-          const d = await res.json()
-          const desc = [d.street, d.neighborhood, d.city ? `${d.city} - ${d.state}` : ''].filter(Boolean).join(', ')
-          const sug: EnderecoSugestao = {
-            descricao: desc,
-            logradouro: d.street,
-            bairro: d.neighborhood,
-            cidade: d.city,
-            uf: d.state,
-            cep: d.cep,
-            lat: d.location?.coordinates?.latitude,
-            lng: d.location?.coordinates?.longitude,
-          }
-          setSugestoes([sug])
-          setOpen(true)
-
-          // Se não tem lat/lng, geocodificar via Nominatim
-          if (!sug.lat && desc) {
-            try {
-              const geoRes = await fetch(
-                `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(desc + ', Brasil')}&format=json&limit=1`,
-                { headers: { 'Accept-Language': 'pt-BR' } }
-              )
-              if (geoRes.ok) {
-                const [geo] = await geoRes.json()
-                if (geo) {
-                  sug.lat = parseFloat(geo.lat)
-                  sug.lng = parseFloat(geo.lon)
-                  setSugestoes([{ ...sug }])
-                }
-              }
-            } catch { /* silent */ }
-          }
-        }
-      }
-    } catch (e) {
-      if (e instanceof DOMException && e.name === 'AbortError') return
     } finally {
       setLoading(false)
     }
   }, [])
 
-  // Debounced handlers
-  const handleEnderecoChange = (v: string) => {
+  const handleChange = (v: string) => {
     onChange(v)
     if (timerRef.current) clearTimeout(timerRef.current)
-    timerRef.current = setTimeout(() => buscarEndereco(v), 300)
+    timerRef.current = setTimeout(() => buscar(v), 400)
   }
-
-  const handleCepChange = (v: string) => {
-    // Format CEP: 01234-567
-    const digits = v.replace(/\D/g, '').slice(0, 8)
-    const formatted = digits.length > 5 ? `${digits.slice(0, 5)}-${digits.slice(5)}` : digits
-    setCepValue(formatted)
-    if (timerRef.current) clearTimeout(timerRef.current)
-    timerRef.current = setTimeout(() => buscarCep(digits), 300)
-  }
-
-  const handleSelect = (s: EnderecoSugestao) => {
-    const desc = s.descricao || `${s.logradouro || ''}, ${s.bairro || ''}, ${s.cidade} - ${s.uf}`.replace(/^, /, '')
-    onSelect(s)
-    onChange(desc)
-    if (s.cep) setCepValue(s.cep.replace(/(\d{5})(\d{3})/, '$1-$2'))
-    setOpen(false)
-    setSugestoes([])
-  }
-
-  const inputClass = `w-full pl-3 pr-9 py-2 rounded-xl border text-sm transition-all focus:outline-none focus:ring-2 ${
-    isDark
-      ? 'bg-white/[0.06] border-white/[0.08] text-slate-200 focus:ring-orange-500/30 focus:border-orange-500/50 placeholder-slate-600'
-      : 'bg-slate-50 border-slate-200 text-slate-700 focus:ring-orange-500/20 focus:border-orange-400 placeholder-slate-400'
-  }`
-
-  const tabClass = (active: boolean) => `px-3 py-1 rounded-lg text-[11px] font-bold transition-all ${
-    active
-      ? 'bg-orange-500 text-white shadow-sm'
-      : isDark
-        ? 'text-slate-500 hover:text-slate-300 hover:bg-white/[0.05]'
-        : 'text-slate-400 hover:text-slate-600 hover:bg-slate-100'
-  }`
 
   return (
     <div ref={containerRef} className="relative">
-      <div className="flex items-center justify-between mb-1.5">
-        <label className={`text-[10px] font-bold uppercase tracking-wider flex items-center gap-1.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
-          <Icon size={11} /> {label}
-        </label>
-        {/* Toggle: Endereço / CEP */}
-        <div className={`flex items-center gap-0.5 p-0.5 rounded-lg ${isDark ? 'bg-white/[0.04]' : 'bg-slate-100'}`}>
-          <button type="button" onClick={() => setMode('endereco')} className={tabClass(mode === 'endereco')}>
-            Endereço
-          </button>
-          <button type="button" onClick={() => setMode('cep')} className={tabClass(mode === 'cep')}>
-            CEP
+      <label className={`text-[10px] font-bold uppercase tracking-wider mb-1 flex items-center gap-1.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+        <Icon size={11} /> {label}
+      </label>
+      <div className="relative">
+        <input
+          type="text"
+          value={value}
+          onChange={e => handleChange(e.target.value)}
+          onFocus={() => sugestoes.length > 0 && setOpen(true)}
+          placeholder={placeholder}
+          className={`w-full pl-3 pr-10 py-2.5 rounded-xl border text-sm transition-all focus:outline-none focus:ring-2 ${
+            isDark
+              ? 'bg-white/[0.06] border-white/[0.08] text-slate-200 focus:ring-orange-500/30 focus:border-orange-500/50 placeholder-slate-600'
+              : 'bg-slate-50 border-slate-200 text-slate-700 focus:ring-orange-500/20 focus:border-orange-400 placeholder-slate-400'
+          }`}
+        />
+        <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
+          {loading && <Loader2 size={14} className="animate-spin text-orange-500" />}
+          <button
+            onClick={() => setCepMode(!cepMode)}
+            title={cepMode ? 'Buscar por endereço' : 'Buscar por CEP'}
+            className={`p-1 rounded-md transition-all ${
+              cepMode
+                ? 'bg-orange-500/20 text-orange-500'
+                : isDark ? 'text-slate-600 hover:text-slate-400' : 'text-slate-400 hover:text-slate-600'
+            }`}
+          >
+            <Search size={12} />
           </button>
         </div>
       </div>
 
       {mode === 'endereco' ? (
         <div className="relative">
-          <input
+          <UpperInput
             type="text"
             value={value}
             onChange={e => handleEnderecoChange(e.target.value)}
@@ -552,7 +255,7 @@ function EnderecoInput({
         </div>
       ) : (
         <div className="relative">
-          <input
+          <UpperInput
             type="text"
             value={cepValue}
             onChange={e => handleCepChange(e.target.value)}
@@ -582,27 +285,25 @@ function EnderecoInput({
 
       {/* Dropdown sugestões */}
       {open && sugestoes.length > 0 && (
-        <div className={`absolute z-50 left-0 right-0 mt-1 rounded-xl shadow-2xl border max-h-52 overflow-y-auto ${
+        <div className={`absolute z-50 left-0 right-0 mt-1 rounded-xl shadow-xl border max-h-48 overflow-y-auto ${
           isDark ? 'bg-[#1e293b] border-white/[0.1]' : 'bg-white border-slate-200'
-        }`} style={{ animation: 'fadeIn 0.15s ease-out' }}>
+        }`}>
           {sugestoes.map((s, i) => (
             <button
               key={i}
-              onClick={() => handleSelect(s)}
-              className={`w-full text-left px-3 py-2.5 text-sm flex items-start gap-2.5 transition-all ${
-                isDark ? 'hover:bg-orange-500/10 text-slate-300' : 'hover:bg-orange-50 text-slate-700'
+              onClick={() => {
+                onSelect(s)
+                onChange(s.descricao || `${s.cidade} - ${s.uf}`)
+                setOpen(false)
+              }}
+              className={`w-full text-left px-3 py-2.5 text-sm flex items-start gap-2 transition-all ${
+                isDark ? 'hover:bg-white/[0.06] text-slate-300' : 'hover:bg-orange-50 text-slate-700'
               } ${i > 0 ? isDark ? 'border-t border-white/[0.04]' : 'border-t border-slate-100' : ''}`}
             >
-              <div className={`mt-0.5 p-1 rounded-md shrink-0 ${isDark ? 'bg-orange-500/20' : 'bg-orange-100'}`}>
-                <MapPin size={12} className="text-orange-500" />
-              </div>
-              <div className="min-w-0 flex-1">
-                <div className="font-medium truncate">{s.descricao || `${s.cidade} - ${s.uf}`}</div>
-                <div className={`text-[11px] mt-0.5 flex items-center gap-2 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
-                  {s.cep && <span>CEP: {s.cep}</span>}
-                  {s.cidade && <span>{s.cidade}{s.uf ? ` - ${s.uf}` : ''}</span>}
-                  {s.lat != null && <span className="text-emerald-500">📍</span>}
-                </div>
+              <MapPin size={14} className="text-orange-500 mt-0.5 shrink-0" />
+              <div>
+                <div className="font-medium">{s.descricao || `${s.cidade} - ${s.uf}`}</div>
+                {s.cep && <div className={`text-[11px] mt-0.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>CEP: {s.cep}</div>}
               </div>
             </button>
           ))}
@@ -742,7 +443,7 @@ function DadosTransporte({ isDark, modal, setModal, motorista, setMotorista, pla
                 </div>
               ) : (
                 <>
-                  <input
+                  <UpperInput
                     type="text"
                     value={veiculoQuery}
                     onChange={e => { setVeiculoQuery(e.target.value); setVeiculoOpen(true) }}
@@ -805,14 +506,14 @@ function DadosTransporte({ isDark, modal, setModal, motorista, setMotorista, pla
         {/* Motorista */}
         <div>
           <label className={labelCls}>Motorista</label>
-          <input type="text" value={motorista} onChange={e => setMotorista(e.target.value)}
+          <UpperInput type="text" value={motorista} onChange={e => setMotorista(e.target.value)}
             placeholder="Nome" className={fieldCls} />
         </div>
 
         {/* Placa — readonly when vehicle selected, editable otherwise */}
         <div>
           <label className={labelCls}>Placa</label>
-          <input type="text" value={placa}
+          <UpperInput type="text" value={placa}
             onChange={e => { if (!veiculoSelecionado) setPlaca(e.target.value.toUpperCase()) }}
             readOnly={!!veiculoSelecionado}
             placeholder="ABC-1234"
@@ -837,9 +538,10 @@ function DadosTransporte({ isDark, modal, setModal, motorista, setMotorista, pla
   )
 }
 
+
 // ── Modal principal ──────────────────────────────────────────────────────────
 
-export default function PlanejamentoRotaModal({ isDark, solicitacoes, allSolicitacoes, onClose, onSave, initialData }: Props) {
+export default function PlanejamentoRotaModal({ isDark, solicitacoes, allSolicitacoes, onClose, onSave }: Props) {
   // Estado: Pontos de rota (cada solicitação = 1 ponto com origem+destino)
   const [pontos, setPontos] = useState<PontoRota[]>(() =>
     solicitacoes.map(sol => ({
@@ -850,31 +552,16 @@ export default function PlanejamentoRotaModal({ isDark, solicitacoes, allSolicit
     }))
   )
 
-  // Rota calculada — pré-popular com dados existentes da solicitação/viagem
-  const [rota, setRota] = useState<RotaCalculada | null>(() => {
-    const s = solicitacoes[0]
-    if (s?.distancia_km || s?.tempo_estimado_h) {
-      return {
-        distancia_total_km: s.distancia_km ?? 0,
-        duracao_total_horas: s.tempo_estimado_h ?? 0,
-        polyline: (s as any).rota_polyline || undefined,
-        pontos: [],
-      }
-    }
-    return null
-  })
+  // Rota calculada
+  const [rota, setRota] = useState<RotaCalculada | null>(null)
   const [calculando, setCalculando] = useState(false)
 
-  // Planning fields — pré-preencher com initialData ou dados da primeira solicitação
-  const s0 = solicitacoes[0]
-  const [modal, setModal] = useState(initialData?.modal || s0?.modal || '')
-  const [motorista, setMotorista] = useState(initialData?.motorista_nome || s0?.motorista_nome || '')
-  const [placa, setPlaca] = useState(initialData?.veiculo_placa || s0?.veiculo_placa || '')
-  const [dataPartida, setDataPartida] = useState(() => {
-    const d = initialData?.data_prevista_saida || s0?.data_prevista_saida || ''
-    return d ? d.slice(0, 16) : ''
-  })
-  const [custo, setCusto] = useState<number | ''>(initialData?.custo_estimado ?? s0?.custo_estimado ?? '')
+  // Planning fields
+  const [modal, setModal] = useState('')
+  const [motorista, setMotorista] = useState('')
+  const [placa, setPlaca] = useState('')
+  const [dataPartida, setDataPartida] = useState('')
+  const [custo, setCusto] = useState<number | ''>('')
   const [salvando, setSalvando] = useState(false)
 
   // Adicionar mais solicitações
@@ -929,17 +616,6 @@ export default function PlanejamentoRotaModal({ isDark, solicitacoes, allSolicit
     })
   }
 
-  const movePonto = (from: number, to: number) => {
-    if (to < 0 || to >= pontos.length) return
-    setPontos(prev => {
-      const next = [...prev]
-      const [moved] = next.splice(from, 1)
-      next.splice(to, 0, moved)
-      return next
-    })
-    setRota(null) // Invalidar rota calculada ao reordenar
-  }
-
   const addSolicitacao = (sol: LogSolicitacao) => {
     setPontos(prev => [...prev, {
       id: sol.id,
@@ -980,120 +656,79 @@ export default function PlanejamentoRotaModal({ isDark, solicitacoes, allSolicit
     })
   }
 
-  // Decode polyline6 (OSRM uses precision 5 by default)
-  function decodePolyline(encoded: string, precision = 5): Array<{ lat: number; lng: number }> {
-    const factor = 10 ** precision
-    const result: Array<{ lat: number; lng: number }> = []
-    let lat = 0, lng = 0, index = 0
-    while (index < encoded.length) {
-      let shift = 0, b: number, dlat = 0
-      do { b = encoded.charCodeAt(index++) - 63; dlat |= (b & 0x1f) << shift; shift += 5 } while (b >= 0x20)
-      lat += (dlat & 1) ? ~(dlat >> 1) : (dlat >> 1)
-      shift = 0; let dlng = 0
-      do { b = encoded.charCodeAt(index++) - 63; dlng |= (b & 0x1f) << shift; shift += 5 } while (b >= 0x20)
-      lng += (dlng & 1) ? ~(dlng >> 1) : (dlng >> 1)
-      result.push({ lat: lat / factor, lng: lng / factor })
-    }
-    return result
-  }
-
-  // Calcular rota via OSRM (gratuito, trajeto real de carro)
+  // Calcular rota via n8n
   const calcularRota = async () => {
-    const orderedPontos = optimizePontosOrder(pontos)
-    const waypointPlan = buildWaypointPlan(orderedPontos)
-    const waypoints = waypointPlan.stops
+    const waypoints = pontos.flatMap(p => {
+      const pts: Array<{ lat: number; lng: number; label: string }> = []
+      if (p.lat_origem && p.lng_origem) pts.push({ lat: p.lat_origem, lng: p.lng_origem, label: p.endereco_origem })
+      if (p.lat_destino && p.lng_destino) pts.push({ lat: p.lat_destino, lng: p.lng_destino, label: p.endereco_destino })
+      return pts
+    })
 
     if (waypoints.length < 2) return
 
     setCalculando(true)
     try {
-      // OSRM free API — trajeto real de carro com geometria
-      const coords = waypoints.map(w => `${w.lng},${w.lat}`).join(';')
-      const osrmUrl = `https://router.project-osrm.org/route/v1/driving/${coords}?overview=full&geometries=polyline&steps=false`
-      const res = await fetch(osrmUrl, { signal: AbortSignal.timeout(15000) })
+      const res = await fetch(`${N8N_URL}/logistica/calcular-rota`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ waypoints }),
+        signal: AbortSignal.timeout(15000),
+      })
 
       if (res.ok) {
         const json = await res.json()
-        if (json.code === 'Ok' && json.routes?.length > 0) {
-          const route = json.routes[0]
-          const distKm = Math.round(route.distance / 1000)
-          const durHrs = Math.round(route.duration / 3600 * 10) / 10
+        setRota({
+          distancia_total_km: json.distancia_km || json.distancia_total_km || 0,
+          duracao_total_horas: json.duracao_horas || json.duracao_total_horas || 0,
+          pontos: json.pontos || json.geometry || [],
+        })
 
-          // Decode polyline to get road geometry
-          const routePoints = decodePolyline(route.geometry)
-
-          setRota({
-            distancia_total_km: distKm,
-            duracao_total_horas: durHrs,
-            pontos: routePoints,
-            polyline: route.geometry,
-          })
-
-          // Atualizar distâncias por trecho (leg) se houver múltiplos pontos
-          if (route.legs && route.legs.length > 0) {
-            const updatedPontos = orderedPontos.map((ponto, index) => {
-              const range = waypointPlan.legRanges[index]
-              if (!range) return ponto
-
-              const serviceLegs = route.legs.slice(range.startLegIndex, range.endLegIndexExclusive)
-              const serviceDistance = serviceLegs.reduce((sum: number, leg: { distance?: number }) => sum + (leg.distance || 0), 0)
-              const serviceDuration = serviceLegs.reduce((sum: number, leg: { duration?: number }) => sum + (leg.duration || 0), 0)
-
-              return {
-                ...ponto,
-                distancia_km: Math.round(serviceDistance / 1000),
-                duracao_horas: Math.round(serviceDuration / 3600 * 10) / 10,
-              }
-            })
-
-            setPontos(updatedPontos)
-          } else {
-            setPontos(orderedPontos)
-          }
-          return
+        // Atualizar distâncias individuais se fornecido
+        if (json.trechos && Array.isArray(json.trechos)) {
+          setPontos(prev => prev.map((p, i) => ({
+            ...p,
+            distancia_km: json.trechos[i]?.distancia_km,
+            duracao_horas: json.trechos[i]?.duracao_horas,
+          })))
         }
       }
-      throw new Error('OSRM failed')
     } catch {
+      // Fallback: cálculo estimado por distância euclidiana (aprox)
       let totalKm = 0
       const pts: Array<{ lat: number; lng: number }> = []
-      const updatedPontos = orderedPontos.map(p => {
+      pontos.forEach(p => {
         if (p.lat_origem && p.lng_origem && p.lat_destino && p.lng_destino) {
-          const directKm = haversineKm(
-            { lat: p.lat_origem, lng: p.lng_origem },
-            { lat: p.lat_destino, lng: p.lng_destino },
-          )
-          totalKm += directKm
+          const d = haversine(p.lat_origem, p.lng_origem, p.lat_destino, p.lng_destino)
+          totalKm += d
           pts.push({ lat: p.lat_origem, lng: p.lng_origem })
           pts.push({ lat: p.lat_destino, lng: p.lng_destino })
-          return {
-            ...p,
-            distancia_km: Math.round(directKm * 1.3),
-            duracao_horas: Math.round(((directKm * 1.3) / 60) * 10) / 10,
-          }
         }
-        return p
       })
       if (totalKm > 0) {
         setRota({
-          distancia_total_km: Math.round(totalKm * 1.3),
-          duracao_total_horas: Math.round((totalKm * 1.3) / 60 * 10) / 10,
+          distancia_total_km: Math.round(totalKm * 1.3), // 30% road factor
+          duracao_total_horas: Math.round((totalKm * 1.3) / 60 * 10) / 10, // ~60km/h avg
           pontos: pts,
         })
-        setPontos(updatedPontos)
       }
     } finally {
       setCalculando(false)
     }
   }
 
+  // Haversine formula
+  function haversine(lat1: number, lon1: number, lat2: number, lon2: number) {
+    const R = 6371
+    const dLat = (lat2 - lat1) * Math.PI / 180
+    const dLon = (lon2 - lon1) * Math.PI / 180
+    const a = Math.sin(dLat / 2) ** 2 + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon / 2) ** 2
+    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+  }
+
   const handleSave = async () => {
     setSalvando(true)
     try {
-      // Determinar origem e destino da viagem a partir dos pontos da rota
-      const primeiraOrigem = pontos[0]?.endereco_origem || pontos[0]?.solicitacao?.origem || ''
-      const ultimoDestino = pontos[pontos.length - 1]?.endereco_destino || pontos[pontos.length - 1]?.solicitacao?.destino || ''
-
       await onSave({
         solicitacaoIds: pontos.map(p => p.id),
         rota: pontos,
@@ -1104,22 +739,6 @@ export default function PlanejamentoRotaModal({ isDark, solicitacoes, allSolicit
         veiculo_placa: placa || undefined,
         data_prevista_saida: dataPartida || undefined,
         custo_estimado: custo !== '' ? custo : undefined,
-        origem_principal: primeiraOrigem || undefined,
-        destino_final: ultimoDestino || undefined,
-        rota_polyline: serializeViagemRotaPayload({
-          version: 1,
-          polyline: rota?.polyline,
-          distancia_total_km: rota?.distancia_total_km || 0,
-          duracao_total_horas: rota?.duracao_total_horas || 0,
-          etapas: pontos.map((ponto, index) => ({
-            solicitacao_id: ponto.id,
-            ordem: index + 1,
-            origem: ponto.endereco_origem || ponto.solicitacao?.origem || '',
-            destino: ponto.endereco_destino || ponto.solicitacao?.destino || '',
-            distancia_km: ponto.distancia_km,
-            duracao_horas: ponto.duracao_horas,
-          })),
-        }),
       })
     } finally {
       setSalvando(false)
@@ -1137,19 +756,20 @@ export default function PlanejamentoRotaModal({ isDark, solicitacoes, allSolicit
         style={{ animation: 'slideUp 0.4s cubic-bezier(0.16,1,0.3,1)' }}
       >
         {/* ── Header ─────────────────────────────────────────────────────────── */}
-        <div className="relative overflow-hidden rounded-t-3xl shrink-0">
+        <div className="relative overflow-hidden">
           <div className="absolute inset-0 bg-gradient-to-r from-orange-600 via-amber-500 to-orange-600" />
-          <div className="relative px-6 py-5 flex items-center justify-between">
-            <div className="flex items-center gap-3 min-w-0">
-              <div className="w-10 h-10 rounded-xl bg-white/20 backdrop-blur-sm flex items-center justify-center shrink-0">
+          <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAiIGhlaWdodD0iNDAiIHZpZXdCb3g9IjAgMCA0MCA0MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZGVmcz48cGF0dGVybiBpZD0iZyIgd2lkdGg9IjQwIiBoZWlnaHQ9IjQwIiBwYXR0ZXJuVW5pdHM9InVzZXJTcGFjZU9uVXNlIj48cGF0aCBkPSJNMCAwaDQwdjQwSDB6IiBmaWxsPSJub25lIi8+PHBhdGggZD0iTTAgMGg0MHY0MEgweiIgZmlsbD0icmdiYSgyNTUsMjU1LDI1NSwwLjAzKSIvPjwvcGF0dGVybj48L2RlZnM+PHJlY3Qgd2lkdGg9IjQwIiBoZWlnaHQ9IjQwIiBmaWxsPSJ1cmwoI2cpIi8+PC9zdmc+')] opacity-40" />
+          <div className="relative px-6 py-4 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-white/20 backdrop-blur-sm flex items-center justify-center">
                 <Route size={20} className="text-white" />
               </div>
-              <div className="min-w-0">
+              <div>
                 <h2 className="text-lg font-extrabold text-white tracking-tight">Planejamento de Rota</h2>
-                <p className="text-xs text-white/70 truncate">{pontos.length} solicitação(ões) • Montagem de rota otimizada</p>
+                <p className="text-xs text-white/70">{pontos.length} solicitação(ões) • Montagem de rota otimizada</p>
               </div>
             </div>
-            <button onClick={onClose} className="p-2 rounded-xl bg-white/10 hover:bg-white/20 text-white transition-all shrink-0">
+            <button onClick={onClose} className="p-2 rounded-xl bg-white/10 hover:bg-white/20 text-white transition-all">
               <X size={18} />
             </button>
           </div>
@@ -1234,22 +854,10 @@ export default function PlanejamentoRotaModal({ isDark, solicitacoes, allSolicit
                       )}
                     </div>
                     {pontos.length > 1 && (
-                      <div className="flex items-center gap-0.5">
-                        <button onClick={() => movePonto(idx, idx - 1)} disabled={idx === 0}
-                          className={`p-1 rounded-lg transition-all disabled:opacity-20 ${isDark ? 'text-slate-500 hover:text-white hover:bg-white/[0.08]' : 'text-slate-400 hover:text-slate-700 hover:bg-slate-100'}`}
-                          title="Mover para cima">
-                          <ArrowUp size={12} />
-                        </button>
-                        <button onClick={() => movePonto(idx, idx + 1)} disabled={idx === pontos.length - 1}
-                          className={`p-1 rounded-lg transition-all disabled:opacity-20 ${isDark ? 'text-slate-500 hover:text-white hover:bg-white/[0.08]' : 'text-slate-400 hover:text-slate-700 hover:bg-slate-100'}`}
-                          title="Mover para baixo">
-                          <ArrowDown size={12} />
-                        </button>
-                        <button onClick={() => removePonto(idx)}
-                          className={`p-1 rounded-lg transition-all ${isDark ? 'text-slate-600 hover:text-red-400 hover:bg-red-500/10' : 'text-slate-400 hover:text-red-500 hover:bg-red-50'}`}>
-                          <Trash2 size={12} />
-                        </button>
-                      </div>
+                      <button onClick={() => removePonto(idx)}
+                        className={`p-1 rounded-lg transition-all ${isDark ? 'text-slate-600 hover:text-red-400 hover:bg-red-500/10' : 'text-slate-400 hover:text-red-500 hover:bg-red-50'}`}>
+                        <Trash2 size={12} />
+                      </button>
                     )}
                   </div>
 
@@ -1258,6 +866,7 @@ export default function PlanejamentoRotaModal({ isDark, solicitacoes, allSolicit
                     value={ponto.endereco_origem}
                     onChange={v => updatePonto(idx, 'endereco_origem', v)}
                     onSelect={s => handleSelectOrigem(idx, s)}
+                    placeholder="Endereço ou CEP de origem..."
                     isDark={isDark}
                     label="Origem"
                     icon={MapPin}
@@ -1273,6 +882,7 @@ export default function PlanejamentoRotaModal({ isDark, solicitacoes, allSolicit
                     value={ponto.endereco_destino}
                     onChange={v => updatePonto(idx, 'endereco_destino', v)}
                     onSelect={s => handleSelectDestino(idx, s)}
+                    placeholder="Endereço ou CEP de destino..."
                     isDark={isDark}
                     label="Destino"
                     icon={Navigation}
@@ -1348,14 +958,88 @@ export default function PlanejamentoRotaModal({ isDark, solicitacoes, allSolicit
             </div>
 
             {/* Planning fields */}
-            <DadosTransporte
-              isDark={isDark}
-              modal={modal} setModal={setModal}
-              motorista={motorista} setMotorista={setMotorista}
-              placa={placa} setPlaca={setPlaca}
-              dataPartida={dataPartida} setDataPartida={setDataPartida}
-              custo={custo} setCusto={setCusto}
-            />
+            <div className={`p-4 border-t space-y-3 ${isDark ? 'border-white/[0.06]' : 'border-slate-200'}`}>
+              <h3 className={`text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 mb-2 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+                <Truck size={12} /> Dados do Transporte
+              </h3>
+
+              <div className="grid grid-cols-2 gap-2.5">
+                {/* Modal */}
+                <div className="col-span-2">
+                  <label className={`text-[10px] font-bold uppercase tracking-wider mb-1 block ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+                    Modal
+                  </label>
+                  <select value={modal} onChange={e => setModal(e.target.value)}
+                    className={`w-full px-3 py-2.5 rounded-xl border text-sm appearance-none cursor-pointer transition-all focus:outline-none focus:ring-2 ${
+                      isDark
+                        ? 'bg-white/[0.06] border-white/[0.08] text-slate-200 focus:ring-orange-500/30'
+                        : 'bg-slate-50 border-slate-200 text-slate-700 focus:ring-orange-500/20'
+                    }`}>
+                    <option value="">Selecione...</option>
+                    <option value="frota_propria">Frota Própria</option>
+                    <option value="frota_locada">Frota Locada</option>
+                    <option value="transportadora">Transportadora</option>
+                    <option value="motoboy">Motoboy</option>
+                    <option value="correios">Correios</option>
+                  </select>
+                </div>
+
+                {/* Motorista */}
+                <div>
+                  <label className={`text-[10px] font-bold uppercase tracking-wider mb-1 block ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+                    Motorista
+                  </label>
+                  <input type="text" value={motorista} onChange={e => setMotorista(e.target.value)}
+                    placeholder="Nome"
+                    className={`w-full px-3 py-2.5 rounded-xl border text-sm transition-all focus:outline-none focus:ring-2 ${
+                      isDark
+                        ? 'bg-white/[0.06] border-white/[0.08] text-slate-200 focus:ring-orange-500/30 placeholder-slate-600'
+                        : 'bg-slate-50 border-slate-200 text-slate-700 focus:ring-orange-500/20 placeholder-slate-400'
+                    }`} />
+                </div>
+
+                {/* Placa */}
+                <div>
+                  <label className={`text-[10px] font-bold uppercase tracking-wider mb-1 block ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+                    Placa
+                  </label>
+                  <input type="text" value={placa} onChange={e => setPlaca(e.target.value.toUpperCase())}
+                    placeholder="ABC-1234"
+                    className={`w-full px-3 py-2.5 rounded-xl border text-sm transition-all focus:outline-none focus:ring-2 ${
+                      isDark
+                        ? 'bg-white/[0.06] border-white/[0.08] text-slate-200 focus:ring-orange-500/30 placeholder-slate-600'
+                        : 'bg-slate-50 border-slate-200 text-slate-700 focus:ring-orange-500/20 placeholder-slate-400'
+                    }`} />
+                </div>
+
+                {/* Data partida */}
+                <div>
+                  <label className={`text-[10px] font-bold uppercase tracking-wider mb-1 block ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+                    Saída prevista
+                  </label>
+                  <input type="datetime-local" value={dataPartida} onChange={e => setDataPartida(e.target.value)}
+                    className={`w-full px-3 py-2.5 rounded-xl border text-sm transition-all focus:outline-none focus:ring-2 ${
+                      isDark
+                        ? 'bg-white/[0.06] border-white/[0.08] text-slate-200 focus:ring-orange-500/30'
+                        : 'bg-slate-50 border-slate-200 text-slate-700 focus:ring-orange-500/20'
+                    }`} />
+                </div>
+
+                {/* Custo */}
+                <div>
+                  <label className={`text-[10px] font-bold uppercase tracking-wider mb-1 block ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+                    Custo estimado
+                  </label>
+                  <input type="number" min={0} step={0.01} value={custo} onChange={e => setCusto(e.target.value ? Number(e.target.value) : '')}
+                    placeholder="R$ 0,00"
+                    className={`w-full px-3 py-2.5 rounded-xl border text-sm transition-all focus:outline-none focus:ring-2 ${
+                      isDark
+                        ? 'bg-white/[0.06] border-white/[0.08] text-slate-200 focus:ring-orange-500/30 placeholder-slate-600'
+                        : 'bg-slate-50 border-slate-200 text-slate-700 focus:ring-orange-500/20 placeholder-slate-400'
+                    }`} />
+                </div>
+              </div>
+            </div>
           </div>
 
           {/* Right: Map + overview */}
@@ -1464,10 +1148,6 @@ export default function PlanejamentoRotaModal({ isDark, solicitacoes, allSolicit
         @keyframes slideUp {
           from { opacity: 0; transform: translateY(30px) scale(0.97); }
           to   { opacity: 1; transform: translateY(0) scale(1); }
-        }
-        @keyframes fadeIn {
-          from { opacity: 0; transform: translateY(-4px); }
-          to   { opacity: 1; transform: translateY(0); }
         }
       `}</style>
     </div>

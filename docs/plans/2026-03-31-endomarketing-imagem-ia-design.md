@@ -113,3 +113,7 @@ O workflow `Endomarketing - Gerar Comunicado` (texto) **não muda** — continua
 4. Modo Template: remover chamada IA, tornar campos editáveis diretamente
 5. Modo IA: implementar textarea + botão Gerar + preview + Salvar/Descartar
 6. Testar fluxo completo end-to-end
+
+
+## Links
+- [[obsidian/25 - Mural de Recados]]

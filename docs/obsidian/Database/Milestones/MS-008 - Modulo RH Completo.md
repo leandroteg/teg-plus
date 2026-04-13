@@ -2,10 +2,11 @@
 tipo: milestone
 id: MS-008
 titulo: "Módulo RH Completo — Colaboradores, Ponto, Folha"
-status: backlog
+status: em-andamento
 fase: Q2-2026
 data_alvo: 2026-06-30
-progresso: 5
+progresso: 15
+updated: 2026-04-10
 modulo: rh
 tags: [milestone, rh, colaboradores, ponto, folha, esocial]
 ---
@@ -32,8 +33,10 @@ Construção completa do módulo de Recursos Humanos: cadastro de colaboradores,
 - [ ] Triggers de validação
 
 ### Frontend
-- [ ] Layout RH (sidebar dedicada)
-- [ ] Página Colaboradores (CRUD)
+- [x] Layout RH (sidebar dedicada)
+- [x] Headcount — quadro de colaboradores por obra/cargo
+- [x] Cultura — mural de recados, banners corporativos
+- [ ] Página Colaboradores (CRUD completo)
 - [ ] Página Ponto Eletrônico
 - [ ] Página HHt (PWA mobile-first)
 - [ ] Página Folha de Pagamento
@@ -53,5 +56,10 @@ Construção completa do módulo de Recursos Humanos: cadastro de colaboradores,
 | [[TASK-010 - HHt App\|TASK-010]] | HHt App — Homem-hora | 🔵 em andamento |
 | [[TASK-018 - Integracao RH Folha\|TASK-018]] | Integração RH → Folha Financeiro | ⬜ backlog |
 
+## Estado Atual (2026-04-10)
+- **Headcount** implementado com visualização por obra e cargo
+- **Cultura/Mural** operacional com banners e gestão admin
+- Demais módulos (ponto, folha, férias, HHt) ainda não iniciados
+
 ## Progresso
-`█░░░░░░░░░` 5%
+`██░░░░░░░░` 15%

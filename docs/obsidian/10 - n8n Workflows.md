@@ -5,7 +5,7 @@ status: ativo
 tags: [n8n, automacao, webhooks, workflows, integracao, ai, superteg]
 criado: 2026-03-02
 atualizado: 2026-04-07
-relacionado: ["[[01 - Arquitetura Geral]]", "[[07 - Schema Database]]", "[[11 - Fluxo Requisicao]]", "[[12 - Fluxo Aprovacao]]", "[[19 - Integracao Omie]]", "[[20 - Modulo Financeiro]]", "[[28 - Modulo Cadastros AI]]"]
+relacionado: ["[[01 - Arquitetura Geral]]", "[[07 - Schema Database]]", "[[11 - Fluxo Requisição]]", "[[12 - Fluxo Aprovação]]", "[[19 - Integração Omie]]", "[[20 - Módulo Financeiro]]", "[[28 - Módulo Cadastros AI]]", "[[38 - Mapa de APIs]]", "[[45 - Mapa de Integrações]]", "[[49 - SuperTEG AI Agent]]", "[[ADR-003 - n8n Orquestrador]]"]
 ---
 
 # n8n Workflows — TEG+ ERP
@@ -294,7 +294,7 @@ Busca aprovacoes com `data_limite < now()` e `status = 'pendente'`. Atualiza par
 | Sync CR | j682f59Mlg6Ta6oN | Omie → `fin_contas_receber` |
 | Aprovacao Pagamento | XDKGIEUvjsf4nlWJ | AlterarStatusCP no Omie |
 
-Detalhes em [[19 - Integracao Omie]].
+Detalhes em [[19 - Integração Omie]].
 
 ---
 
@@ -335,7 +335,7 @@ Frontend api.ts
 - [[04 - Componentes]] — SuperTEGChat, UploadCotacao
 - [[05 - Hooks Customizados]] — useAiParse, useSuperTEG, useOmieApi
 - [[07 - Schema Database]] — Tabelas utilizadas pelos workflows
-- [[11 - Fluxo Requisicao]] — Fluxo detalhado de criacao
-- [[12 - Fluxo Aprovacao]] — Fluxo detalhado de aprovacao
-- [[19 - Integracao Omie]] — Squads Omie detalhados
-- [[28 - Modulo Cadastros AI]] — Pre-cadastros via SuperTEG
+- [[11 - Fluxo Requisição]] — Fluxo detalhado de criacao
+- [[12 - Fluxo Aprovação]] — Fluxo detalhado de aprovacao
+- [[19 - Integração Omie]] — Squads Omie detalhados
+- [[28 - Módulo Cadastros AI]] — Pre-cadastros via SuperTEG

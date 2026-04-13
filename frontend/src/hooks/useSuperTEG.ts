@@ -226,38 +226,83 @@ export function useSuperTEG() {
 
       try {
         // 1. Upload to Supabase Storage
+        // Docx/Word files go to contratos-anexos; PDFs/images go to cotacoes-docs
         const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_')
-        const path = `superteg-uploads/${Date.now()}_${safeName}`
-        const { error: upErr } = await supabase.storage
-          .from('cotacoes-docs')
-          .upload(path, file, { upsert: true, contentType: file.type || 'application/pdf' })
-        if (upErr) throw new Error('Falha no upload: ' + upErr.message)
+        const ts = Date.now()
+        const isDocx = file.type.includes('wordprocessingml') || file.name.toLowerCase().endsWith('.docx') || file.name.toLowerCase().endsWith('.doc')
+        const isPdfOrImage = file.type.includes('pdf') || file.type.startsWith('image/')
 
-        const { data: { publicUrl } } = supabase.storage.from('cotacoes-docs').getPublicUrl(path)
+        let publicUrl: string
+        if (isDocx) {
+          const path = `modelos/${ts}_${safeName}`
+          const { error: upErr } = await supabase.storage
+            .from('contratos-anexos')
+            .upload(path, file, { upsert: true, contentType: file.type || 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' })
+          if (upErr) throw new Error('Falha no upload: ' + upErr.message)
+          publicUrl = supabase.storage.from('contratos-anexos').getPublicUrl(path).data.publicUrl
+        } else {
+          const path = `superteg-uploads/${ts}_${safeName}`
+          const { error: upErr } = await supabase.storage
+            .from('cotacoes-docs')
+            .upload(path, file, { upsert: true, contentType: file.type || 'application/pdf' })
+          if (upErr) throw new Error('Falha no upload: ' + upErr.message)
+          publicUrl = supabase.storage.from('cotacoes-docs').getPublicUrl(path).data.publicUrl
+        }
 
-        // 2. Extract data from PDF via parse-cotacao (IA)
+        // 2. For contract templates (docx), skip OCR and store as reference document
+        if (isDocx) {
+          sessionStorage.setItem('superteg-prefill-contrato-doc', JSON.stringify({
+            documento_base_url: publicUrl,
+            documento_base_nome: file.name,
+          }))
+          setMessages(prev => [...prev, {
+            id: `a_${Date.now()}`,
+            role: 'assistant',
+            content: `Documento **${file.name}** enviado com sucesso. Ele esta disponivel como base para a minuta. Acesse **Preparar Minuta** na solicitacao para usa-lo como modelo.`,
+            timestamp: new Date().toISOString(),
+          }])
+          return  // finally block handles busyRef/setIsLoading
+        }
+
+        // 3. Extract data from PDF/image via OCR workflow (Gemini)
         const N8N_BASE = 'https://teg-agents-n8n.nmmcas.easypanel.host/webhook'
-        const reader = new FileReader()
-        const base64 = await new Promise<string>((resolve, reject) => {
-          reader.onload = () => resolve((reader.result as string).split(',')[1])
-          reader.onerror = reject
-          reader.readAsDataURL(file)
-        })
 
         let extractedData: Record<string, unknown> = {}
-        try {
-          const parseRes = await fetch(`${N8N_BASE}/compras/parse-cotacao`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ file_base64: base64, file_name: file.name, mime_type: file.type || 'application/pdf' }),
-          })
-          const parseData = await parseRes.json().catch(() => ({}))
-          if (parseData?.success && parseData?.fornecedores?.length > 0) {
-            extractedData = parseData
-          }
-        } catch { /* parse falhou — ainda navega com arquivo */ }
+        if (isPdfOrImage) {
+          try {
+            // Use the OCR workflow with a temporary ID (no DB record needed — PATCH on missing row = 200 no-op)
+            const tempId = crypto.randomUUID()
+            const parseRes = await fetch(`${N8N_BASE}/compras/ocr`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                anexo_id: tempId,
+                url: publicUrl,
+                mime_type: file.type || 'application/pdf',
+                nome_arquivo: file.name,
+              }),
+            })
+            const parseData = await parseRes.json().catch(() => ({}))
+            // Map OCR llm_dados format → fornecedores format expected by NovaRequisicao
+            if (parseData?.success && parseData?.llm_dados) {
+              const d = parseData.llm_dados
+              const itens = (d.itens || []).map((it: Record<string, unknown>) => ({
+                descricao: String(it.descricao ?? ''),
+                quantidade: Number(it.qtd ?? it.quantidade ?? 1) || 1,
+                unidade: String(it.unidade ?? 'un'),
+                valor_unitario: Number(it.valor_unit ?? it.valor_unitario ?? 0),
+              }))
+              if (itens.length > 0) {
+                extractedData = {
+                  success: true,
+                  fornecedores: [{ nome_fornecedor: d.fornecedor_nome || null, itens }],
+                }
+              }
+            }
+          } catch { /* parse falhou — ainda navega com arquivo */ }
+        }
 
-        // 3. Save prefill data in sessionStorage and navigate to NovaRequisicao
+        // 4. Save prefill data in sessionStorage and navigate to NovaRequisicao
         const prefill = {
           descricao: text || file.name.replace(/\.[^.]+$/, '').replace(/[_-]/g, ' '),
           cotacao_referencia_url: publicUrl,
@@ -309,5 +354,15 @@ export function useSuperTEG() {
     return action
   }, [pendingAction])
 
-  return { messages, isLoading, sendMessage, sendMessageWithFile, sendAudio, clearMessages, pendingAction, consumePendingAction }
+  const injectAssistantMessage = useCallback((text: string) => {
+    const msg: ChatMessage = {
+      id: `a_inject_${Date.now()}`,
+      role: 'assistant',
+      content: text,
+      timestamp: new Date().toISOString(),
+    }
+    setMessages(prev => [...prev, msg])
+  }, [])
+
+  return { messages, isLoading, sendMessage, sendMessageWithFile, sendAudio, clearMessages, pendingAction, consumePendingAction, injectAssistantMessage }
 }

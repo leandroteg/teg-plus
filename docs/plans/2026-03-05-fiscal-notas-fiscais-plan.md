@@ -584,3 +584,7 @@ Tasks 1-6 are sequential (each depends on previous).
 Task 7 (n8n) can be done in parallel with Tasks 4-6 but is needed for full functionality.
 
 For v1 MVP: Tasks 1-6 give a fully working page with manual upload + individual download. Task 7 adds AI parse + batch ZIP (can be added after).
+
+
+## Links
+- [[obsidian/29 - Módulo Fiscal]]

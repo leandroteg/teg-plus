@@ -36,3 +36,7 @@ Integração com Monday.com para gestão de portfólio das 6 obras, importação
 
 ## Progresso
 `░░░░░░░░░░` 0%
+
+## Links
+- [[31 - Módulo PMO-EGP]]
+- [[32 - Módulo Obras]]

@@ -11,6 +11,7 @@ import { useCotacoes } from '../hooks/useCotacoes'
 import { useCategorias } from '../hooks/useCategorias'
 import { useDecisaoRequisicao } from '../hooks/useAprovacoes'
 import { useEmitirPedido, useCancelarRequisicao } from '../hooks/usePedidos'
+import { useEditorLock } from '../hooks/useEditorLock'
 import { useAuth } from '../contexts/AuthContext'
 import EmitirPedidoModal from '../components/EmitirPedidoModal'
 import type { StatusCotacao, Cotacao } from '../types'
@@ -60,6 +61,15 @@ const SORT_OPTIONS: { field: SortField; label: string }[] = [
 
 function diasEmAberto(createdAt: string) {
   return Math.floor((Date.now() - new Date(createdAt).getTime()) / 86_400_000)
+}
+
+function shouldShowInCotacoes(cot: Cotacao) {
+  const reqStatus = cot.requisicao?.status
+
+  if (cot.status === 'pendente' || cot.status === 'em_andamento') return true
+
+  // Cotações concluídas ficam nesta tela apenas enquanto aguardam decisão financeira.
+  return cot.status === 'concluida' && reqStatus === 'cotacao_enviada'
 }
 
 function getDescricaoPrincipal(cot: Cotacao) {
@@ -340,6 +350,12 @@ export default function FilaCotacoes() {
   const [viewMode, setViewMode] = useState<ViewMode>('cards')
   const [detail, setDetail] = useState<Cotacao | null>(null)
   const [emitirCotacao, setEmitirCotacao] = useState<Cotacao | null>(null)
+  const detailReqId = detail?.requisicao?.id
+  const { isLocked: isDetailLocked, blockedByName: detailBlockedByName } = useEditorLock({
+    resourceType: 'cmp_requisicao',
+    resourceId: detailReqId,
+    enabled: Boolean(detailReqId),
+  })
 
   const { data: cotacoes = [], isLoading } = useCotacoes()
   const { data: categorias = [] } = useCategorias()
@@ -353,17 +369,8 @@ export default function FilaCotacoes() {
     const map = new Map<PipelineTab, Cotacao[]>()
     for (const stage of PIPELINE_STAGES) map.set(stage.status, [])
 
-    // Filter out finalized items
-    const statusesFinalizados = ['pedido_emitido', 'em_entrega', 'entregue', 'comprada', 'cancelada', 'aguardando_pgto', 'pago']
-
     for (const cot of cotacoes) {
-      const reqStatus = cot.requisicao?.status
-
-      // "Em Aprovação" mostra itens aguardando decisão financeira OU prontos para emitir pedido.
-      if (cot.status === 'concluida' && reqStatus && reqStatus !== 'cotacao_enviada' && reqStatus !== 'cotacao_aprovada') continue
-
-      // Skip finalized
-      if (cot.status === 'concluida' && reqStatus && statusesFinalizados.includes(reqStatus)) continue
+      if (!shouldShowInCotacoes(cot)) continue
 
       for (const stage of PIPELINE_STAGES) {
         if (stage.cotStatuses.includes(cot.status)) {
@@ -557,9 +564,22 @@ export default function FilaCotacoes() {
           onDecisao={(decisao, obs) => {
             const req = detail.requisicao
             if (!req) return
+            if (isDetailLocked) {
+              setToast({ type: 'error', msg: `${detailBlockedByName ?? 'Outro usuário'} está editando ${req.numero}` })
+              setTimeout(() => setToast(null), 5000)
+              return
+            }
             handleDecisao(req.id, req.numero, req.alcada_nivel, decisao, obs, req.categoria, req.status)
           }}
-          onEmitir={() => setEmitirCotacao(detail)}
+          onEmitir={() => {
+            const req = detail.requisicao
+            if (isDetailLocked && req) {
+              setToast({ type: 'error', msg: `${detailBlockedByName ?? 'Outro usuário'} está editando ${req.numero}` })
+              setTimeout(() => setToast(null), 5000)
+              return
+            }
+            setEmitirCotacao(detail)
+          }}
           onCancelar={() => {
             const req = detail.requisicao
             if (!req) return
@@ -571,7 +591,16 @@ export default function FilaCotacoes() {
           }}
           isEmitting={emitirPedidoMutation.isPending}
           isCancelling={cancelarMutation.isPending}
-          onOpenCotacao={() => { setDetail(null); nav(`/cotacoes/${detail.id}`) }}
+          onOpenCotacao={() => {
+            const req = detail.requisicao
+            if (isDetailLocked && req) {
+              setToast({ type: 'error', msg: `${detailBlockedByName ?? 'Outro usuÃ¡rio'} estÃ¡ editando ${req.numero}` })
+              setTimeout(() => setToast(null), 5000)
+              return
+            }
+            setDetail(null)
+            nav(`/cotacoes/${detail.id}`)
+          }}
         />
       )}
 

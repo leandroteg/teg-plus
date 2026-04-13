@@ -3,11 +3,15 @@ import { useSearchParams } from 'react-router-dom'
 import {
   Building2, X, Search, ArrowUp, ArrowDown, LayoutList, LayoutGrid,
   MapPin, Calendar, User, ClipboardCheck, FileText, CheckCircle2, Landmark,
+  Download, Share2, Loader2,
 } from 'lucide-react'
-import { useEntradas, useAtualizarStatusEntrada } from '../../hooks/useLocacao'
+import { useEntradas, useAtualizarStatusEntrada, useVistorias, useVistoriaFotos } from '../../hooks/useLocacao'
 import { useTheme } from '../../contexts/ThemeContext'
 import type { LocEntrada, StatusEntrada } from '../../types/locacao'
 import { ENTRADA_PIPELINE_STAGES } from '../../types/locacao'
+import VistoriaModal from '../../components/locacao/VistoriaModal'
+import { UpperInput } from '../../components/UpperInput'
+import { downloadVistoriaPdf, compartilharVistoriaWhatsApp, type VistoriaPdfData } from '../../utils/vistoria-pdf'
 
 // ── Accent maps ──────────────────────────────────────────────────────────────
 type AccentSet = { bg: string; bgActive: string; text: string; textActive: string; dot: string; badge: string; border: string }
@@ -39,9 +43,10 @@ const SORT_OPTIONS: { field: SortField; label: string }[] = [
 const fmtDate = (d?: string) => d ? new Date(d + 'T12:00:00').toLocaleDateString('pt-BR') : '—'
 
 // ── Detail Modal ─────────────────────────────────────────────────────────────
-function EntradaDetailModal({ entrada, onClose, onAction, isDark }: {
+function EntradaDetailModal({ entrada, onClose, onAction, isDark, onOpenVistoria }: {
   entrada: LocEntrada; onClose: () => void
   onAction: (action: string, e: LocEntrada) => void; isDark: boolean
+  onOpenVistoria: (e: LocEntrada) => void
 }) {
   const bg = isDark ? 'bg-[#1e293b]' : 'bg-white'
   const cardBg = isDark ? 'bg-white/[0.04]' : 'bg-slate-50'
@@ -49,6 +54,39 @@ function EntradaDetailModal({ entrada, onClose, onAction, isDark }: {
   const txtMain = isDark ? 'text-white' : 'text-slate-800'
   const accent = isDark ? STATUS_ACCENT_DARK[entrada.status] : STATUS_ACCENT[entrada.status]
   const stage = ENTRADA_PIPELINE_STAGES.find(s => s.key === entrada.status)
+
+  // Data limite vistoria = data_prevista_inicio - 7 dias
+  const dataLimiteVistoria = entrada.data_prevista_inicio
+    ? new Date(new Date(entrada.data_prevista_inicio + 'T12:00:00').getTime() - 7 * 24 * 60 * 60 * 1000)
+    : null
+  const diasParaLimite = dataLimiteVistoria ? Math.ceil((dataLimiteVistoria.getTime() - Date.now()) / (24 * 60 * 60 * 1000)) : null
+
+  // Vistoria info
+  const { data: vistorias = [] } = useVistorias({ imovel_id: entrada.imovel_id })
+  const vistoria = vistorias.find(v => v.entrada_id === entrada.id && v.tipo === 'entrada')
+  const itensPreenchidos = vistoria?.itens?.filter(it => it.estado_entrada).length || 0
+  const { data: vistoriaFotos = [] } = useVistoriaFotos(vistoria?.id)
+  const [geratingPdf, setGeratingPdf] = useState(false)
+
+  const vistoriaPdfData: VistoriaPdfData | null = vistoria ? {
+    vistoria,
+    entrada,
+    imovel: vistoria.imovel || entrada.imovel,
+    itens: vistoria.itens || [],
+    fotos: vistoriaFotos,
+  } : null
+
+  const handleDownloadPdf = async () => {
+    if (!vistoriaPdfData) return
+    setGeratingPdf(true)
+    try { await downloadVistoriaPdf(vistoriaPdfData) } finally { setGeratingPdf(false) }
+  }
+
+  const handleSharePdf = async () => {
+    if (!vistoriaPdfData) return
+    setGeratingPdf(true)
+    try { await compartilharVistoriaWhatsApp(vistoriaPdfData) } finally { setGeratingPdf(false) }
+  }
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-sm p-4" onClick={onClose}>
@@ -120,6 +158,59 @@ function EntradaDetailModal({ entrada, onClose, onAction, isDark }: {
             </div>
           </div>
 
+          {/* Data limite vistoria (pendente) */}
+          {entrada.status === 'pendente' && dataLimiteVistoria && (
+            <div className={`rounded-xl p-3 border flex items-center gap-3 ${
+              diasParaLimite != null && diasParaLimite <= 3
+                ? isDark ? 'bg-red-500/10 border-red-500/20' : 'bg-red-50 border-red-200'
+                : diasParaLimite != null && diasParaLimite <= 7
+                ? isDark ? 'bg-amber-500/10 border-amber-500/20' : 'bg-amber-50 border-amber-200'
+                : isDark ? 'bg-white/[0.03] border-white/[0.06]' : 'bg-slate-50 border-slate-100'
+            }`}>
+              <Calendar size={16} className={
+                diasParaLimite != null && diasParaLimite <= 3 ? 'text-red-500'
+                : diasParaLimite != null && diasParaLimite <= 7 ? 'text-amber-500'
+                : txtMuted
+              } />
+              <div>
+                <p className={`text-xs font-semibold ${txtMain}`}>Data limite para vistoria</p>
+                <p className={`text-xs ${
+                  diasParaLimite != null && diasParaLimite <= 3 ? 'text-red-500 font-bold'
+                  : diasParaLimite != null && diasParaLimite <= 7 ? 'text-amber-600 font-semibold'
+                  : txtMuted
+                }`}>
+                  {fmtDate(dataLimiteVistoria.toISOString().split('T')[0])}
+                  {diasParaLimite != null && ` (${diasParaLimite <= 0 ? 'ATRASADO' : `${diasParaLimite}d restantes`})`}
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* PDF da vistoria — gerado dinamicamente */}
+          {vistoria && vistoria.status === 'concluida' && (
+            <div className={`rounded-xl p-3 border space-y-2 ${
+              isDark ? 'border-indigo-500/20 bg-indigo-500/5' : 'border-indigo-200 bg-indigo-50/50'
+            }`}>
+              <p className="text-[9px] font-bold text-indigo-500 uppercase tracking-wider">Laudo de Vistoria</p>
+              <div className="flex gap-2">
+                <button onClick={handleDownloadPdf} disabled={geratingPdf}
+                  className={`flex-1 flex items-center justify-center gap-2 rounded-xl py-2.5 text-xs font-semibold transition-colors ${
+                    isDark ? 'bg-indigo-500/20 text-indigo-300 hover:bg-indigo-500/30' : 'bg-indigo-100 text-indigo-700 hover:bg-indigo-200'
+                  } ${geratingPdf ? 'opacity-50' : ''}`}>
+                  {geratingPdf ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
+                  Baixar PDF
+                </button>
+                <button onClick={handleSharePdf} disabled={geratingPdf}
+                  className={`flex-1 flex items-center justify-center gap-2 rounded-xl py-2.5 text-xs font-semibold transition-colors ${
+                    isDark ? 'bg-emerald-500/20 text-emerald-300 hover:bg-emerald-500/30' : 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200'
+                  } ${geratingPdf ? 'opacity-50' : ''}`}>
+                  <Share2 size={14} />
+                  Enviar
+                </button>
+              </div>
+            </div>
+          )}
+
           {/* Ações */}
           <div className="flex gap-2 pt-1">
             <button onClick={onClose} className={`flex-1 py-3 rounded-xl border text-sm font-semibold transition-all ${isDark ? 'border-white/[0.06] text-slate-300' : 'border-slate-200 text-slate-600 hover:bg-slate-50'}`}>Fechar</button>
@@ -134,8 +225,9 @@ function EntradaDetailModal({ entrada, onClose, onAction, isDark }: {
               </>
             )}
             {entrada.status === 'aguardando_vistoria' && (
-              <button onClick={() => onAction('vistoria_concluida', entrada)} className="flex-1 py-3 rounded-xl bg-indigo-600 text-white text-sm font-bold hover:bg-indigo-700 flex items-center justify-center gap-2">
-                <CheckCircle2 size={15} /> Vistoria Concluída
+              <button onClick={() => onOpenVistoria(entrada)} className="flex-1 py-3 rounded-xl bg-indigo-600 text-white text-sm font-bold hover:bg-indigo-700 flex items-center justify-center gap-2">
+                <ClipboardCheck size={15} />
+                {itensPreenchidos > 0 ? `Continuar Vistoria (${itensPreenchidos}/64)` : 'Iniciar Vistoria'}
               </button>
             )}
             {entrada.status === 'aguardando_assinatura' && (
@@ -195,6 +287,7 @@ export default function EntradasPipeline() {
 
   const [activeTab, setActiveTab] = useState<StatusEntrada>(() => (searchParams.get('tab') as StatusEntrada) || 'pendente')
   const [detail, setDetail] = useState<LocEntrada | null>(null)
+  const [vistoriaEntrada, setVistoriaEntrada] = useState<LocEntrada | null>(null)
   const [busca, setBusca] = useState('')
   const [sortField, setSortField] = useState<SortField>('data')
   const [sortDir, setSortDir] = useState<SortDir>('desc')
@@ -265,7 +358,7 @@ export default function EntradasPipeline() {
       <div className={`px-4 py-2.5 border-b flex flex-wrap items-center gap-2 ${isDark ? 'border-white/[0.06]' : 'border-slate-100'}`}>
         <div className="relative flex-1 min-w-[180px] max-w-sm">
           <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-          <input type="text" value={busca} onChange={e => setBusca(e.target.value)} placeholder="Buscar endereço, locador, cidade..."
+          <UpperInput type="text" value={busca} onChange={e => setBusca(e.target.value)} placeholder="Buscar endereço, locador, cidade..."
             className={`w-full pl-9 pr-4 py-2 rounded-xl border text-xs placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 ${isDark ? 'bg-white/[0.04] border-white/[0.06] text-slate-200' : 'border-slate-200 bg-white text-slate-700'}`} />
           {busca && <button onClick={() => setBusca('')} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"><X size={12} /></button>}
         </div>
@@ -301,7 +394,9 @@ export default function EntradasPipeline() {
         )}
       </div>
 
-      {detail && <EntradaDetailModal entrada={detail} onClose={() => setDetail(null)} onAction={handleAction} isDark={isDark} />}
+      {detail && <EntradaDetailModal entrada={detail} onClose={() => setDetail(null)} onAction={handleAction} isDark={isDark}
+        onOpenVistoria={(e) => { setDetail(null); setVistoriaEntrada(e) }} />}
+      {vistoriaEntrada && <VistoriaModal entrada={vistoriaEntrada} onClose={() => setVistoriaEntrada(null)} />}
     </div>
   )
 }

@@ -1,9 +1,9 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../services/supabase'
 import type {
-  LocImovel, LocEntrada, LocSaida, LocVistoria,
+  LocImovel, LocEntrada, LocSaida, LocVistoria, LocVistoriaFoto,
   LocFatura, LocSolicitacao, LocAcordo, LocAditivo,
-  StatusEntrada, StatusSaida, StatusFatura,
+  StatusEntrada, StatusSaida, StatusFatura, StatusVistoria, TipoVistoria,
   CriarEntradaPayload, CriarSolicitacaoPayload,
 } from '../types/locacao'
 
@@ -15,6 +15,7 @@ const QK = {
   saidas:       (f?: unknown) => ['loc_saidas', f],
   saida:        (id: string)  => ['loc_saida', id],
   vistorias:    (f?: unknown) => ['loc_vistorias', f],
+  vistoriaFotos:(id: string) => ['loc_vistoria_fotos', id],
   faturas:      (f?: unknown) => ['loc_faturas', f],
   solicitacoes: (f?: unknown) => ['loc_solicitacoes', f],
   acordos:      (f?: unknown) => ['loc_acordos', f],
@@ -253,6 +254,97 @@ export function useVistorias(filtros?: { imovel_id?: string; tipo?: string }) {
       if (error) throw error
       return (data ?? []) as LocVistoria[]
     },
+  })
+}
+
+export function useCriarVistoria() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (payload: {
+      imovel_id: string; tipo: TipoVistoria; entrada_id?: string; saida_id?: string
+    }) => {
+      const { data, error } = await supabase
+        .from('loc_vistorias')
+        .insert({ ...payload, status: 'pendente' as StatusVistoria })
+        .select()
+        .single()
+      if (error) throw error
+      return data as LocVistoria
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['loc_vistorias'] }),
+  })
+}
+
+export function useAtualizarVistoria() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ id, ...updates }: {
+      id: string; status?: StatusVistoria; observacoes_gerais?: string
+      tem_pendencias?: boolean; pdf_url?: string; data_vistoria?: string
+    }) => {
+      const { error } = await supabase.from('loc_vistorias').update(updates).eq('id', id)
+      if (error) throw error
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['loc_vistorias'] }),
+  })
+}
+
+export function useSalvarVistoriaItens() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ vistoriaId, itens }: {
+      vistoriaId: string
+      itens: { ambiente: string; item: string; estado_entrada?: string; estado_saida?: string; observacao?: string; ordem: number }[]
+    }) => {
+      // Delete existing and re-insert
+      await supabase.from('loc_vistoria_itens').delete().eq('vistoria_id', vistoriaId)
+      if (itens.length > 0) {
+        const rows = itens.map(it => ({ vistoria_id: vistoriaId, ...it }))
+        const { error } = await supabase.from('loc_vistoria_itens').insert(rows)
+        if (error) throw error
+      }
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['loc_vistorias'] }),
+  })
+}
+
+export function useUploadVistoriaFoto() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ vistoriaId, itemId, file, descricao, tipo }: {
+      vistoriaId: string; itemId?: string; file: File; descricao?: string; tipo?: TipoVistoria
+    }) => {
+      const ext = file.name.split('.').pop() || 'jpg'
+      const path = `${vistoriaId}/${itemId || 'geral'}/${Date.now()}.${ext}`
+      const { error: upErr } = await supabase.storage
+        .from('vistoria-fotos')
+        .upload(path, file, { upsert: false, contentType: file.type })
+      if (upErr) throw upErr
+      const { data: { publicUrl } } = supabase.storage.from('vistoria-fotos').getPublicUrl(path)
+      const { error: dbErr } = await supabase.from('loc_vistoria_fotos').insert({
+        vistoria_id: vistoriaId, item_id: itemId || null, url: publicUrl, descricao, tipo,
+      })
+      if (dbErr) throw dbErr
+      return publicUrl
+    },
+    onSuccess: (_d, { vistoriaId }) => qc.invalidateQueries({ queryKey: QK.vistoriaFotos(vistoriaId) }),
+  })
+}
+
+export function useVistoriaFotos(vistoriaId?: string) {
+  return useQuery({
+    queryKey: QK.vistoriaFotos(vistoriaId || ''),
+    queryFn: async () => {
+      if (!vistoriaId) return []
+      const { data, error } = await supabase
+        .from('loc_vistoria_fotos')
+        .select('*')
+        .eq('vistoria_id', vistoriaId)
+        .order('created_at')
+      if (error) throw error
+      return (data ?? []) as LocVistoriaFoto[]
+    },
+    enabled: !!vistoriaId,
   })
 }
 

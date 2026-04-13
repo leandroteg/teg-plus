@@ -1,6 +1,6 @@
 ---
 tipo: tarefa
-id: TASK-021
+id: TASK-019
 titulo: "Logística Core — Schema, Hooks e Páginas"
 status: concluido
 prioridade: alta
@@ -45,3 +45,8 @@ Implementar o módulo completo de Logística e Transportes conforme especificaç
 ## Resultado
 
 Módulo entregue e funcional com todas as telas implementadas.
+
+## Links
+- [[23 - Módulo Logística e Transportes]]
+- [[Database/Milestones/MS-006 - Modulo Logistica Transportes|MS-006b — Logística]]
+- [[07 - Schema Database]]

@@ -54,3 +54,8 @@ Gestão completa de contratos (cliente e fornecedor), boletins de medição, adi
 
 ## Progresso
 `████████▒░` 85%
+
+## Links
+- [[27 - Módulo Contratos Gestão]]
+- [[Requisitos/PLAN-CONTRATOS-v2|PLAN-CONTRATOS-v2]]
+- [[20 - Módulo Financeiro]]

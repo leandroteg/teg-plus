@@ -85,3 +85,7 @@ Same dropdown, positioned below avatar on mobile.
 1. `ModuleLayout.tsx` — main changes (avatar + dropdown + remove user card)
 2. `Layout.tsx` (Compras) — remove `/perfil` from NAV, remove `showAdminLink`/`profileRoute`
 3. `App.tsx` — move `/perfil` route to global scope
+
+
+## Links
+- [[obsidian/04 - Componentes]]

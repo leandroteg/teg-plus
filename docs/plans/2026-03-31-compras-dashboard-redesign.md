@@ -856,3 +856,7 @@ git commit -m "feat(compras): redesign painel seguindo padrao LogisticaHome
 
 Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>"
 ```
+
+
+## Links
+- [[obsidian/14 - Compradores e Categorias]]

@@ -4,6 +4,7 @@ import {
   AlertTriangle, Warehouse, FileText, Hash, Info,
   ArchiveRestore, Gem, Ban,
 } from 'lucide-react'
+import { UpperInput, UpperTextarea } from './UpperInput'
 import type { Pedido } from '../types'
 import type { RecebimentoItemForm, TipoDestino } from '../types/estoque'
 import {
@@ -217,7 +218,7 @@ export default function RecebimentoModal({
                 Observacoes
               </button>
               {showAdvanced && (
-                <textarea
+                <UpperTextarea
                   value={observacao}
                   onChange={e => setObservacao(e.target.value)}
                   rows={2}
@@ -415,7 +416,7 @@ function ItemRow({
               Justificativa obrigatoria:
             </p>
           </div>
-          <input
+          <UpperInput
             type="text"
             value={item.justificativa_destino ?? ''}
             onChange={e => onChange({ justificativa_destino: e.target.value })}
@@ -434,7 +435,7 @@ function ItemRow({
         <div className="px-3 pb-3 pt-1 border-t border-slate-100 grid grid-cols-3 gap-2">
           <div>
             <label className="block text-[10px] text-slate-400 mb-0.5">Lote</label>
-            <input
+            <UpperInput
               type="text"
               value={item.lote ?? ''}
               onChange={e => onChange({ lote: e.target.value })}
@@ -443,7 +444,7 @@ function ItemRow({
           </div>
           <div>
             <label className="block text-[10px] text-slate-400 mb-0.5">N. Serie</label>
-            <input
+            <UpperInput
               type="text"
               value={item.numero_serie ?? ''}
               onChange={e => onChange({ numero_serie: e.target.value })}

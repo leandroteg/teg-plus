@@ -5,7 +5,7 @@ status: ativo
 tags: [supabase, postgresql, auth, realtime, rls, storage]
 criado: 2026-03-02
 atualizado: 2026-04-07
-relacionado: ["[[01 - Arquitetura Geral]]", "[[07 - Schema Database]]", "[[08 - Migracoes SQL]]", "[[09 - Auth Sistema]]"]
+relacionado: ["[[01 - Arquitetura Geral]]", "[[07 - Schema Database]]", "[[08 - Migrações SQL]]", "[[09 - Auth Sistema]]", "[[38 - Mapa de APIs]]", "[[41 - Segurança e RLS]]", "[[47 - Disaster Recovery]]", "[[ADR-002 - Stack Supabase]]"]
 ---
 
 # Supabase — TEG+ ERP
@@ -44,7 +44,7 @@ export const supabase = createClient(
 )
 ```
 
-Veja [[16 - Variaveis de Ambiente]] para configuracao das chaves.
+Veja [[16 - Variáveis de Ambiente]] para configuracao das chaves.
 
 ---
 
@@ -201,7 +201,7 @@ Ver detalhes completos em [[07 - Schema Database]].
 
 ## Migracoes (75)
 
-Ver historico completo em [[08 - Migracoes SQL]].
+Ver historico completo em [[08 - Migrações SQL]].
 
 As 75 migracoes cobrem:
 - Schema base e seed de dados iniciais
@@ -231,8 +231,8 @@ As 75 migracoes cobrem:
 ## Links Relacionados
 
 - [[07 - Schema Database]] — Tabelas e colunas detalhadas
-- [[08 - Migracoes SQL]] — Historico de migrations
+- [[08 - Migrações SQL]] — Historico de migrations
 - [[09 - Auth Sistema]] — Autenticacao Supabase
-- [[13 - Alcadas]] — Regras de alcada no banco
+- [[13 - Alçadas]] — Regras de alcada no banco
 - [[14 - Compradores e Categorias]] — Tabelas de negocio
-- [[16 - Variaveis de Ambiente]] — Chaves de acesso
+- [[16 - Variáveis de Ambiente]] — Chaves de acesso

@@ -5,7 +5,7 @@ status: ativo
 tags: [contratos, parcelas, pagamento, recebimento, financeiro, fornecedores, ai, minuta, pdf]
 criado: 2026-03-05
 atualizado: 2026-03-10
-relacionado: ["[[20 - Módulo Financeiro]]", "[[07 - Schema Database]]", "[[21 - Fluxo Pagamento]]", "[[12 - Fluxo Aprovação]]"]
+relacionado: ["[[PILAR - Backoffice]]", "[[20 - Módulo Financeiro]]", "[[07 - Schema Database]]", "[[21 - Fluxo Pagamento]]", "[[12 - Fluxo Aprovação]]", "[[45 - Mapa de Integrações]]", "[[50 - Fluxos Inter-Módulos]]", "[[ADR-001 - Timezone BRT]]", "[[ADR-010 - Regra Contrato R2000]]"]
 ---
 
 # Módulo Contratos v2 — Gestão Completa com AI
@@ -200,19 +200,97 @@ rascunho → em_negociacao → assinado → vigente → (suspenso) → encerrado
 
 ---
 
+## Regra de Desvio para Contratos (Issue #189)
+
+Quando uma cotacao e finalizada, o sistema avalia se deve gerar **Pedido de Compra** ou **Solicitacao de Contrato**:
+
+```
+deveContrato = isRecorrente || (isServico && valor > 2000)
+```
+
+- **Servico > R$2.000**: desvia automaticamente para o modulo Contratos
+- **Compra recorrente**: desvia independente do valor
+- **Demais casos**: segue fluxo normal de Pedido de Compra
+
+**Arquivos**: `FilaCotacoes.tsx` (linhas 217-218, 579-582), `CotacaoForm.tsx` (linhas 305-308)
+
+Quando desviado:
+1. Cria registro em `con_solicitacoes` com `status = 'em_andamento'`
+2. Atualiza requisicao com `status = 'aguardando_contrato'`
+3. Botao muda de "Emitir Pedido" (teal) para "Solicitar Contrato" (indigo)
+
+---
+
 ## Recomendação AI para Cotações
 
-O arquivo `src/utils/cotacaoRecomendacao.ts` implementa um motor de recomendação para seleção de fornecedores em cotações de contrato. Analisa histórico de preços, prazos, avaliações e compliance para sugerir a melhor opção.
+O arquivo `src/utils/cotacaoRecomendacao.ts` implementa motor de recomendacao multi-criterio para selecao de fornecedores:
+
+| Criterio | Peso | Calculo |
+|----------|------|---------|
+| Preco | 50% | Melhor preco = 100pts, demais proporcionais |
+| Prazo de entrega | 30% | Menor prazo = 100pts |
+| Condicoes de pagamento | 20% | "a vista" = 100, "30 dias" = 80, etc. |
+
+Exibido em `CotacaoComparativo.tsx` com badge "Recomendado" e score por fornecedor.
+
+---
+
+## Resumo Executivo em Aprovacao (Issue #199)
+
+Quando uma minuta contratual entra em aprovacao no AprovAi, o sistema monta um resumo estruturado com:
+
+**Dados factuais do contrato** (sempre presentes):
+- Objeto do Contrato, Contraparte, Tipo, Partes Envolvidas, Vigencia, Valor Estimado
+
+**Parecer AI** (quando resumo executivo existe):
+- Riscos Identificados, Oportunidades, Recomendacao
+
+O titulo do card e "Resumo do Contrato" (nao mais "Parecer"). Isso garante que o aprovador veja os dados do **documento enviado**, nao pontos de melhoria.
+
+**Arquivo**: `useAprovacoes.ts` (linhas 405-475), `AprovAi.tsx` (`MinutaExecutiveSummary`)
+
+---
+
+## Tratamento de Datas — Timezone (Issue #198)
+
+Datas no formato `YYYY-MM-DD` (vindas de `<input type="date">`) sao interpretadas como UTC pelo JavaScript. Em BRT (UTC-3), isso causa shift de -1 dia.
+
+**Solucao padrao**: usar `T12:00:00` ao criar `Date` a partir de string de data pura:
+```ts
+// ERRADO: new Date("2026-04-08") → UTC midnight → BRT: 07/04
+// CORRETO: new Date("2026-04-08T12:00:00") → meio-dia local → sempre dia correto
+const safeDate = (d: string) => new Date(d.length === 10 ? d + 'T12:00:00' : d)
+```
+
+**Arquivos corrigidos**: `SolicitacaoDetalhe.tsx`, `SolicitacoesLista.tsx`, `PreparaMinuta.tsx`, `ResumoExecutivo.tsx`, `Assinaturas.tsx`, `ContratoDetalhe.tsx`, `NovaSolicitacao.tsx`, `contratosParcelas.ts`
 
 ---
 
 ## Permissões — Supervisor
 
-Mudança recente: o role **supervisor** agora pode:
-- Gerenciar modelos de minuta (`con_modelos`)
-- Executar ações sobre contratos (liberar, aprovar, rejeitar)
+O role **supervisor** pode:
+- Gerenciar modelos de minuta (`con_modelos`) — criar, editar, excluir
+- Executar acoes sobre contratos (liberar, aprovar, rejeitar) na Gestao
+- Aprovar minutas contratuais no AprovAi (`canTechnicalApprove`)
 
-Anteriormente essas ações eram restritas a gerente/diretor.
+A permissao e verificada via `hasSetorPapel('contratos', ['supervisor', 'diretor', 'ceo'])` que consulta `permissoes_especiais.modulo_papeis` do perfil.
+
+**Arquivos**: `ModelosContrato.tsx`, `GestaoContratos.tsx`, `SolicitacaoDetalhe.tsx`, `AuthContext.tsx`
+
+---
+
+## AprovAi — Modo PWA/Standalone
+
+O AprovAi pode ser instalado como app (PWA). Diferencas de comportamento:
+
+| Aspecto | Web | Standalone (PWA) |
+|---------|-----|-----------------|
+| Botao Voltar | `navigate(-1)` (historico) | `navigate('/')` (home) |
+| Botao Instalar | Visivel se disponivel | Oculto |
+
+O botao voltar e **sempre visivel** em ambos os modos (correcao Issue #200).
+
+**Arquivo**: `AprovAi.tsx` (funcao `useAprovAiInstall`)
 
 ---
 
@@ -222,3 +300,4 @@ Anteriormente essas ações eram restritas a gerente/diretor.
 - [[12 - Fluxo Aprovação]] — Aprovacao de minutas via AprovAi
 - [[07 - Schema Database]] — Tabelas `con_*`, `apr_aprovacoes`
 - [[21 - Fluxo Pagamento]] — Ciclo parcela → pagamento
+- [[09 - Auth Sistema]] — RBAC, `hasSetorPapel`, `modulo_papeis`

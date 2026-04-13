@@ -259,7 +259,8 @@ const TABS: Array<{ key: StatusOcorrenciaTel | 'todas'; label: string }> = [
 ]
 
 export default function Telemetria() {
-  const { isLightSidebar: isLight } = useTheme()
+  const { isDark } = useTheme()
+  const isLight = !isDark
   const [tabIdx, setTabIdx]   = useState(0)
   const [selected, setSelected] = useState<FroOcorrenciaTel | null>(null)
   const [novaModal, setNovaModal] = useState(false)

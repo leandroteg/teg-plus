@@ -1,9 +1,9 @@
-import { useState } from 'react'
-import { Camera, ChevronDown, ChevronUp } from 'lucide-react'
+import { useState, useRef, useMemo } from 'react'
+import { Camera, ChevronDown, ChevronUp, X, ImageIcon, Plus, Pencil, Check, Trash2 } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
-import type { EstadoItem, LocVistoriaItem } from '../../types/locacao'
+import type { EstadoItem, LocVistoriaItem, LocVistoriaFoto } from '../../types/locacao'
 
-const AMBIENTES = [
+const AMBIENTES_PADRAO = [
   'Recepcao / Entrada',
   'Sala',
   'Cozinha',
@@ -13,6 +13,9 @@ const AMBIENTES = [
   'Garagem',
   'Area Externa',
 ]
+
+/** @deprecated use AMBIENTES_PADRAO */
+const AMBIENTES = AMBIENTES_PADRAO
 
 const ITENS_POR_AMBIENTE = [
   'Piso',
@@ -24,6 +27,8 @@ const ITENS_POR_AMBIENTE = [
   'Hidraulica',
   'Iluminacao',
 ]
+
+export { AMBIENTES, AMBIENTES_PADRAO, ITENS_POR_AMBIENTE }
 
 const ESTADOS: { value: EstadoItem; label: string; color: string }[] = [
   { value: 'otimo',         label: 'Otimo',      color: 'bg-green-100 text-green-700 border-green-300' },
@@ -46,18 +51,39 @@ interface Props {
   onChange?: (itens: ChecklistItem[]) => void
   readOnly?: boolean
   comparativo?: LocVistoriaItem[]
+  fotos?: LocVistoriaFoto[]
+  onUploadFoto?: (ambiente: string, item: string, file: File) => void
+  uploadingFoto?: boolean
 }
 
-function buildDefaultItens(): ChecklistItem[] {
+export function buildDefaultItens(): ChecklistItem[] {
   return AMBIENTES.flatMap(ambiente =>
     ITENS_POR_AMBIENTE.map(item => ({ ambiente, item, estado: null, observacao: '' }))
   )
 }
 
-export default function VistoriaChecklist({ tipo, itens: externalItens, onChange, readOnly = false, comparativo }: Props) {
+export default function VistoriaChecklist({ tipo, itens: externalItens, onChange, readOnly = false, comparativo, fotos = [], onUploadFoto, uploadingFoto }: Props) {
   const { isDark } = useTheme()
   const [itens, setItens] = useState<ChecklistItem[]>(externalItens ?? buildDefaultItens())
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({})
+  const fileRef = useRef<HTMLInputElement>(null)
+  const [pendingUpload, setPendingUpload] = useState<{ ambiente: string; item: string } | null>(null)
+  const [editingAmbiente, setEditingAmbiente] = useState<string | null>(null)
+  const [editNome, setEditNome] = useState('')
+  const editInputRef = useRef<HTMLInputElement>(null)
+
+  // Derive unique ambientes from itens (preserves order of first appearance)
+  const ambientes = useMemo(() => {
+    const seen = new Set<string>()
+    const result: string[] = []
+    for (const it of itens) {
+      if (!seen.has(it.ambiente)) {
+        seen.add(it.ambiente)
+        result.push(it.ambiente)
+      }
+    }
+    return result
+  }, [itens])
 
   const toggleAmbiente = (ambiente: string) => {
     setCollapsed(prev => ({ ...prev, [ambiente]: !prev[ambiente] }))
@@ -69,7 +95,78 @@ export default function VistoriaChecklist({ tipo, itens: externalItens, onChange
     onChange?.(next)
   }
 
-  const grouped = AMBIENTES.map(ambiente => ({
+  // ── Area management ──────────────────────────────────────────────────────
+  const startEditAmbiente = (ambiente: string) => {
+    setEditingAmbiente(ambiente)
+    setEditNome(ambiente)
+    setTimeout(() => editInputRef.current?.select(), 50)
+  }
+
+  const confirmEditAmbiente = () => {
+    if (!editingAmbiente || !editNome.trim()) return
+    const trimmed = editNome.trim()
+    if (trimmed === editingAmbiente) { setEditingAmbiente(null); return }
+    // Avoid duplicate names
+    if (ambientes.includes(trimmed)) { setEditingAmbiente(null); return }
+    const next = itens.map(it =>
+      it.ambiente === editingAmbiente ? { ...it, ambiente: trimmed } : it
+    )
+    setItens(next)
+    onChange?.(next)
+    // Transfer collapsed state
+    setCollapsed(prev => {
+      const copy = { ...prev }
+      if (editingAmbiente in copy) {
+        copy[trimmed] = copy[editingAmbiente]
+        delete copy[editingAmbiente]
+      }
+      return copy
+    })
+    setEditingAmbiente(null)
+  }
+
+  const addAmbiente = () => {
+    let name = 'Nova Area'
+    let counter = 1
+    while (ambientes.includes(name)) {
+      counter++
+      name = `Nova Area ${counter}`
+    }
+    const newItens = ITENS_POR_AMBIENTE.map(item => ({
+      ambiente: name,
+      item,
+      estado: null as EstadoItem | null,
+      observacao: '',
+    }))
+    const next = [...itens, ...newItens]
+    setItens(next)
+    onChange?.(next)
+    // Auto-start editing the name
+    setTimeout(() => startEditAmbiente(name), 100)
+  }
+
+  const removeAmbiente = (ambiente: string) => {
+    const next = itens.filter(it => it.ambiente !== ambiente)
+    setItens(next)
+    onChange?.(next)
+    setCollapsed(prev => { const copy = { ...prev }; delete copy[ambiente]; return copy })
+  }
+
+  const handleFotoClick = (ambiente: string, item: string) => {
+    setPendingUpload({ ambiente, item })
+    fileRef.current?.click()
+  }
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (file && pendingUpload && onUploadFoto) {
+      onUploadFoto(pendingUpload.ambiente, pendingUpload.item, file)
+    }
+    e.target.value = ''
+    setPendingUpload(null)
+  }
+
+  const grouped = ambientes.map(ambiente => ({
     ambiente,
     items: itens.map((it, idx) => ({ ...it, idx })).filter(it => it.ambiente === ambiente),
   }))
@@ -81,90 +178,202 @@ export default function VistoriaChecklist({ tipo, itens: externalItens, onChange
 
   return (
     <div className="space-y-3">
-      {grouped.map(({ ambiente, items }) => (
-        <div key={ambiente} className={`rounded-xl border overflow-hidden ${bg}`}>
-          <button
-            type="button"
-            onClick={() => toggleAmbiente(ambiente)}
-            className={`w-full flex items-center justify-between px-4 py-3 ${headerBg}`}
-          >
-            <span className={`text-sm font-semibold ${txt}`}>{ambiente}</span>
-            <div className="flex items-center gap-2">
-              <span className={`text-xs ${txtMuted}`}>
-                {items.filter(it => it.estado !== null).length}/{items.length} preenchidos
-              </span>
-              {collapsed[ambiente] ? <ChevronDown size={14} className={txtMuted} /> : <ChevronUp size={14} className={txtMuted} />}
+      <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleFileChange} />
+
+      {grouped.map(({ ambiente, items }) => {
+        const ambienteFotos = fotos.filter(f => {
+          const itemIds = items.map(it => `${ambiente}|${it.item}`)
+          return !f.item_id ? f.descricao === ambiente : itemIds.some(iid => f.descricao === iid)
+        })
+        const isEditing = editingAmbiente === ambiente
+
+        return (
+          <div key={ambiente} className={`rounded-xl border overflow-hidden ${bg}`}>
+            <div className={`flex items-center justify-between px-4 py-3 ${headerBg}`}>
+              <div className="flex items-center gap-2 min-w-0 flex-1">
+                {isEditing && !readOnly ? (
+                  <form
+                    className="flex items-center gap-1.5 flex-1"
+                    onSubmit={e => { e.preventDefault(); confirmEditAmbiente() }}
+                  >
+                    <input
+                      ref={editInputRef}
+                      type="text"
+                      value={editNome}
+                      onChange={e => setEditNome(e.target.value)}
+                      onBlur={confirmEditAmbiente}
+                      onKeyDown={e => e.key === 'Escape' && setEditingAmbiente(null)}
+                      className={`text-sm font-semibold rounded-lg px-2 py-1 border outline-none w-full max-w-[200px] ${
+                        isDark
+                          ? 'bg-white/10 border-indigo-500/50 text-white'
+                          : 'bg-white border-indigo-400 text-slate-800'
+                      }`}
+                      autoFocus
+                    />
+                    <button type="submit" className="text-emerald-500 hover:text-emerald-600 shrink-0" title="Confirmar">
+                      <Check size={14} />
+                    </button>
+                  </form>
+                ) : (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => toggleAmbiente(ambiente)}
+                      className="flex items-center gap-2 min-w-0 flex-1 text-left"
+                    >
+                      <span className={`text-sm font-semibold truncate ${txt}`}>{ambiente}</span>
+                      {ambienteFotos.length > 0 && (
+                        <span className="flex items-center gap-1 text-[10px] font-medium text-indigo-500 shrink-0">
+                          <ImageIcon size={10} /> {ambienteFotos.length}
+                        </span>
+                      )}
+                    </button>
+                    {!readOnly && (
+                      <button
+                        type="button"
+                        onClick={() => startEditAmbiente(ambiente)}
+                        className={`p-1 rounded-md transition-colors shrink-0 ${
+                          isDark ? 'text-slate-500 hover:text-indigo-400 hover:bg-white/5'
+                                 : 'text-slate-400 hover:text-indigo-600 hover:bg-indigo-50'
+                        }`}
+                        title="Renomear area"
+                      >
+                        <Pencil size={12} />
+                      </button>
+                    )}
+                  </>
+                )}
+              </div>
+              <div className="flex items-center gap-2 shrink-0 ml-2">
+                <span className={`text-xs ${txtMuted}`}>
+                  {items.filter(it => it.estado !== null).length}/{items.length}
+                </span>
+                {!readOnly && (
+                  <button
+                    type="button"
+                    onClick={() => removeAmbiente(ambiente)}
+                    className={`p-1 rounded-md transition-colors ${
+                      isDark ? 'text-slate-500 hover:text-red-400 hover:bg-red-500/10'
+                             : 'text-slate-400 hover:text-red-600 hover:bg-red-50'
+                    }`}
+                    title="Remover area"
+                  >
+                    <Trash2 size={12} />
+                  </button>
+                )}
+                <button type="button" onClick={() => toggleAmbiente(ambiente)} className={txtMuted}>
+                  {collapsed[ambiente] ? <ChevronDown size={14} /> : <ChevronUp size={14} />}
+                </button>
+              </div>
             </div>
-          </button>
 
-          {!collapsed[ambiente] && (
-            <div className="divide-y divide-slate-100">
-              {items.map(({ idx, item, estado, observacao }) => {
-                const comp = comparativo?.find(c => c.ambiente === ambiente && c.item === item)
-                const hasDivergencia = comp && comp.estado_entrada && estado && comp.estado_entrada !== estado
+            {!collapsed[ambiente] && (
+              <div className="divide-y divide-slate-100">
+                {items.map(({ idx, item, estado, observacao }) => {
+                  const comp = comparativo?.find(c => c.ambiente === ambiente && c.item === item)
+                  const hasDivergencia = comp && comp.estado_entrada && estado && comp.estado_entrada !== estado
+                  const itemFotos = fotos.filter(f => f.descricao === `${ambiente}|${item}`)
 
-                return (
-                  <div key={item} className={`px-4 py-3 ${hasDivergencia ? (isDark ? 'bg-amber-500/5' : 'bg-amber-50') : ''}`}>
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0 flex-1">
-                        <p className={`text-sm font-medium ${txt}`}>{item}</p>
-                        {comp?.estado_entrada && (
-                          <p className={`text-xs mt-0.5 ${txtMuted}`}>
-                            Entrada: <span className="font-medium">{comp.estado_entrada}</span>
-                          </p>
+                  return (
+                    <div key={item} className={`px-4 py-3 ${hasDivergencia ? (isDark ? 'bg-amber-500/5' : 'bg-amber-50') : ''}`}>
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0 flex-1">
+                          <p className={`text-sm font-medium ${txt}`}>{item}</p>
+                          {comp?.estado_entrada && (
+                            <p className={`text-xs mt-0.5 ${txtMuted}`}>
+                              Entrada: <span className="font-medium">{comp.estado_entrada}</span>
+                            </p>
+                          )}
+                        </div>
+                        <div className="flex flex-wrap gap-1 shrink-0">
+                          {ESTADOS.map(({ value, label, color }) => (
+                            <button
+                              key={value}
+                              type="button"
+                              disabled={readOnly}
+                              onClick={() => updateItem(idx, 'estado', value)}
+                              className={[
+                                'px-2 py-0.5 rounded border text-[10px] font-semibold transition-all',
+                                estado === value ? color : isDark ? 'border-white/10 text-slate-400' : 'border-slate-200 text-slate-400',
+                              ].join(' ')}
+                            >
+                              {label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      {hasDivergencia && (
+                        <p className="text-xs mt-1 text-amber-600 font-medium">
+                          Divergencia detectada
+                        </p>
+                      )}
+
+                      <div className="flex items-center gap-2 mt-2">
+                        {!readOnly && (
+                          <input
+                            type="text"
+                            placeholder="Observacao..."
+                            value={observacao}
+                            onChange={e => updateItem(idx, 'observacao', e.target.value)}
+                            className={[
+                              'flex-1 text-xs rounded-lg px-3 py-1.5 border outline-none transition-colors',
+                              isDark
+                                ? 'bg-white/[0.05] border-white/10 text-white placeholder-slate-500 focus:border-indigo-500'
+                                : 'bg-slate-50 border-slate-200 text-slate-700 placeholder-slate-400 focus:border-indigo-400',
+                            ].join(' ')}
+                          />
+                        )}
+                        {!readOnly && onUploadFoto && (
+                          <button
+                            type="button"
+                            disabled={uploadingFoto}
+                            onClick={() => handleFotoClick(ambiente, item)}
+                            className={`p-1.5 rounded-lg border transition-colors shrink-0 ${
+                              isDark ? 'border-white/10 text-slate-400 hover:text-indigo-400 hover:border-indigo-500/30'
+                                     : 'border-slate-200 text-slate-400 hover:text-indigo-600 hover:border-indigo-300'
+                            } ${uploadingFoto ? 'opacity-50' : ''}`}
+                            title="Anexar foto"
+                          >
+                            <Camera size={14} />
+                          </button>
                         )}
                       </div>
-                      <div className="flex flex-wrap gap-1 shrink-0">
-                        {ESTADOS.map(({ value, label, color }) => (
-                          <button
-                            key={value}
-                            type="button"
-                            disabled={readOnly}
-                            onClick={() => updateItem(idx, 'estado', value)}
-                            className={[
-                              'px-2 py-0.5 rounded border text-[10px] font-semibold transition-all',
-                              estado === value ? color : isDark ? 'border-white/10 text-slate-400' : 'border-slate-200 text-slate-400',
-                            ].join(' ')}
-                          >
-                            {label}
-                          </button>
-                        ))}
-                      </div>
+
+                      {/* Thumbnails de fotos */}
+                      {itemFotos.length > 0 && (
+                        <div className="flex flex-wrap gap-2 mt-2">
+                          {itemFotos.map(f => (
+                            <a key={f.id} href={f.url} target="_blank" rel="noreferrer"
+                              className="w-12 h-12 rounded-lg overflow-hidden border border-slate-200 hover:border-indigo-400 transition-colors">
+                              <img src={f.url} alt="" className="w-full h-full object-cover" />
+                            </a>
+                          ))}
+                        </div>
+                      )}
                     </div>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+        )
+      })}
 
-                    {hasDivergencia && (
-                      <p className="text-xs mt-1 text-amber-600 font-medium">
-                        Divergencia detectada
-                      </p>
-                    )}
-
-                    {!readOnly && (
-                      <input
-                        type="text"
-                        placeholder="Observacao..."
-                        value={observacao}
-                        onChange={e => updateItem(idx, 'observacao', e.target.value)}
-                        className={[
-                          'mt-2 w-full text-xs rounded-lg px-3 py-1.5 border outline-none transition-colors',
-                          isDark
-                            ? 'bg-white/[0.05] border-white/10 text-white placeholder-slate-500 focus:border-indigo-500'
-                            : 'bg-slate-50 border-slate-200 text-slate-700 placeholder-slate-400 focus:border-indigo-400',
-                        ].join(' ')}
-                      />
-                    )}
-                  </div>
-                )
-              })}
-            </div>
-          )}
-        </div>
-      ))}
-
+      {/* Add area button */}
       {!readOnly && (
-        <div className={`rounded-xl border border-dashed p-4 text-center ${isDark ? 'border-white/10' : 'border-slate-200'}`}>
-          <Camera size={20} className={`mx-auto mb-1 ${txtMuted}`} />
-          <p className={`text-xs ${txtMuted}`}>Anexar fotos (em breve)</p>
-        </div>
+        <button
+          type="button"
+          onClick={addAmbiente}
+          className={`w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl border-2 border-dashed transition-colors ${
+            isDark
+              ? 'border-white/10 text-slate-400 hover:border-indigo-500/40 hover:text-indigo-400 hover:bg-indigo-500/5'
+              : 'border-slate-200 text-slate-400 hover:border-indigo-400 hover:text-indigo-600 hover:bg-indigo-50'
+          }`}
+        >
+          <Plus size={16} />
+          <span className="text-sm font-semibold">Adicionar Area</span>
+        </button>
       )}
     </div>
   )

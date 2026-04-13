@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { MapPin, Wrench, CornerDownLeft, X, Car, Cog, CalendarDays, Building2, LayoutGrid, LayoutList, User } from 'lucide-react'
+import { UpperTextarea } from '../../../components/UpperInput'
 import { useTheme } from '../../../contexts/ThemeContext'
 import { useAlocacoes, useEncerrarAlocacao, useOrdensServico } from '../../../hooks/useFrotas'
 import type { FroAlocacao } from '../../../types/frotas'
@@ -134,7 +135,7 @@ function RetornoModal({ alocacao, isLight, onClose, onConfirm, isPending }: Reto
             <label className={`text-xs font-semibold block mb-1 ${isLight ? 'text-slate-600' : 'text-slate-300'}`}>
               Observações
             </label>
-            <textarea
+            <UpperTextarea
               value={obs}
               onChange={e => setObs(e.target.value)}
               placeholder="Condições do retorno, ocorrências, etc."
@@ -210,8 +211,9 @@ function AlocacaoCard({ a, osCount, isLight, onRetorno }: AlocacaoCardProps) {
     <div className={`rounded-2xl border shadow-sm transition-all hover:shadow-md ${
       isLight ? 'bg-white border-slate-200' : 'bg-[#1e293b] border-white/[0.06]'
     }`}>
-      <div className="p-4">
-        <div className="flex items-start gap-3">
+      <div className="flex flex-col sm:flex-row sm:items-center gap-3 px-4 py-3">
+        {/* Top line: Icon + Placa/modelo */}
+        <div className="flex items-center gap-3">
           {/* Icon box */}
           <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${
             isMaquina
@@ -224,60 +226,52 @@ function AlocacaoCard({ a, osCount, isLight, onRetorno }: AlocacaoCardProps) {
             }
           </div>
 
-          {/* Main content */}
-          <div className="flex-1 min-w-0">
-            {/* Title + OSBadge */}
-            <div className="flex items-start justify-between gap-1 mb-0.5">
+          {/* Placa + modelo */}
+          <div className="min-w-0 sm:w-40 shrink-0">
+            <div className="flex items-center gap-1.5">
               <p className={`text-sm font-bold truncate ${isLight ? 'text-slate-800' : 'text-white'}`}>
                 {identificador}
               </p>
               {osCount > 0 && <OSBadge count={osCount} isLight={isLight} />}
             </div>
-
-            {/* Subtitle */}
             <p className="text-[11px] text-slate-500 truncate">
               {a.veiculo?.marca} {a.veiculo?.modelo}
             </p>
-
-            {/* Badges row */}
-            <div className="flex flex-wrap items-center gap-1.5 mt-2">
-              {/* Obra / CC */}
-              <span className={`inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full max-w-[160px] truncate ${
-                isLight ? 'bg-rose-50 text-rose-700' : 'bg-rose-500/10 text-rose-300'
-              }`}>
-                <Building2 size={9} className="shrink-0" />
-                {a.obra?.nome ?? a.centro_custo_id ?? 'Sem destino'}
-              </span>
-            </div>
-
-            {/* Meta row */}
-            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-2 text-[10px] text-slate-400">
-              {/* Saída */}
-              <span className="flex items-center gap-1">
-                <CalendarDays size={10} /> Saída: {fmtDate(a.data_saida)}
-              </span>
-
-              {/* Retorno previsto */}
-              <span className={`flex items-center gap-1 ${retAtrasado ? (isLight ? 'text-red-600 font-semibold' : 'text-red-400 font-semibold') : ''}`}>
-                <CalendarDays size={10} /> Ret: {fmtDate(a.data_retorno_prev)}{retAtrasado ? ' ⚠' : ''}
-              </span>
-
-              {/* Responsável */}
-              {a.responsavel_nome && (
-                <span className="flex items-center gap-1">
-                  <User size={10} /> {a.responsavel_nome}
-                </span>
-              )}
-            </div>
           </div>
         </div>
-      </div>
 
-      {/* Action footer */}
-      <div className="px-4 pb-4">
+        {/* Obra / CC badge */}
+        <div className="shrink-0">
+          <span className={`inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full max-w-[180px] truncate ${
+            isLight ? 'bg-rose-50 text-rose-700' : 'bg-rose-500/10 text-rose-300'
+          }`}>
+            <Building2 size={9} className="shrink-0" />
+            {a.obra?.nome ?? a.centro_custo_id ?? 'Sem destino'}
+          </span>
+        </div>
+
+        {/* Dates + responsável */}
+        <div className="hidden md:flex items-center gap-x-3 text-[10px] text-slate-400 shrink-0">
+          <span className="flex items-center gap-1">
+            <CalendarDays size={10} /> Saída: {fmtDate(a.data_saida)}
+          </span>
+          <span className={`flex items-center gap-1 ${retAtrasado ? (isLight ? 'text-red-600 font-semibold' : 'text-red-400 font-semibold') : ''}`}>
+            <CalendarDays size={10} /> Ret: {fmtDate(a.data_retorno_prev)}{retAtrasado ? ' ⚠' : ''}
+          </span>
+          {a.responsavel_nome && (
+            <span className="flex items-center gap-1">
+              <User size={10} /> {a.responsavel_nome}
+            </span>
+          )}
+        </div>
+
+        {/* Spacer */}
+        <div className="hidden sm:block flex-1" />
+
+        {/* Action */}
         <button
           onClick={() => onRetorno(a)}
-          className={`w-full flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl border text-[11px] font-semibold transition-all ${
+          className={`flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-xl border text-[11px] font-semibold transition-all w-full sm:w-auto ${
             isLight
               ? 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-rose-50 hover:border-rose-200 hover:text-rose-600'
               : 'bg-white/[0.04] border-white/[0.06] text-slate-300 hover:bg-rose-500/10 hover:border-rose-500/25 hover:text-rose-300'
@@ -293,7 +287,8 @@ function AlocacaoCard({ a, osCount, isLight, onRetorno }: AlocacaoCardProps) {
 // ── Alocados ──────────────────────────────────────────────────────────────────
 
 export default function Alocados() {
-  const { isLightSidebar: isLight } = useTheme()
+  const { isDark } = useTheme()
+  const isLight = !isDark
   const [retornoAloc, setRetornoAloc] = useState<FroAlocacao | null>(null)
   const [viewMode, setViewMode] = useState<'table' | 'cards'>('table')
 
@@ -530,7 +525,7 @@ export default function Alocados() {
 
       {/* Cards view */}
       {!isLoading && alocacoes.length > 0 && viewMode === 'cards' && (
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+        <div className="space-y-2">
           {alocacoes.map(a => (
             <AlocacaoCard
               key={a.id}

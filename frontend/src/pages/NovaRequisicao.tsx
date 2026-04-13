@@ -4,7 +4,7 @@ import {
   Sparkles, Send, PlusCircle, Trash2, ChevronLeft, ChevronRight,
   AlertCircle, Check, Layers, FileText, Search, Upload, FileUp,
   ChevronDown, X, FileImage, Eye, Pencil, CheckCircle2, Loader2,
-  Package, MapPin, Zap, Save, ExternalLink, Download,
+  Package, MapPin, Zap, Save,
 } from 'lucide-react'
 import { useCriarRequisicao } from '../hooks/useRequisicoes'
 import { useAiParse, readFileForAi, isBinaryFile, isImageFile } from '../hooks/useAiParse'
@@ -14,6 +14,7 @@ import { useAuth } from '../contexts/AuthContext'
 import CategoryCard from '../components/CategoryCard'
 import NumericInput from '../components/NumericInput'
 import ItemAutocomplete from '../components/ItemAutocomplete'
+import { toUpperNorm, UpperTextarea } from '../components/UpperInput'
 import type { RequisicaoItem, Urgencia, AiParseResult, CategoriaMaterial } from '../types'
 import { minCotacoesPorValor } from '../utils/cotacoesPolicy'
 
@@ -88,13 +89,13 @@ function parseCSVItems(text: string): RequisicaoItem[] {
 }
 
 function buildResumoRequisicao(itens: RequisicaoItem[], detalhes: string) {
-  if (detalhes.trim()) return detalhes.trim()
+  if (detalhes.trim()) return toUpperNorm(detalhes.trim())
 
   const descricoes = itens
     .map((item) => item.descricao.trim())
     .filter(Boolean)
 
-  if (descricoes.length === 0) return 'Solicitacao de compra'
+  if (descricoes.length === 0) return 'SOLICITACAO DE COMPRA'
   if (descricoes.length === 1) return descricoes[0]
   if (descricoes.length === 2) return `${descricoes[0]} e ${descricoes[1]}`
   return `${descricoes[0]}, ${descricoes[1]} e mais ${descricoes.length - 2} item(ns)`
@@ -166,7 +167,7 @@ export default function NovaRequisicao() {
       const fornecedores = pf.fornecedores as Array<{ nome_fornecedor?: string; itens?: RequisicaoItem[] }> | undefined
       if (fornecedores?.length && fornecedores[0]?.itens?.length) {
         const rawItens = fornecedores[0].itens.map((it: any) => ({
-          descricao: cleanName(String(it.descricao ?? it.nome ?? '').trim()),
+          descricao: toUpperNorm(cleanName(String(it.descricao ?? it.nome ?? '').trim())),
           quantidade: parseFloat(String(it.quantidade ?? it.qtd ?? 1)) || 1,
           unidade: String(it.unidade ?? 'un').toLowerCase(),
           valor_unitario_estimado: parseFloat(String(it.valor_unitario ?? it.valor_unitario_estimado ?? 0)) || 0,
@@ -179,19 +180,19 @@ export default function NovaRequisicao() {
           ? nomes.join(', ')
           : `${nomes.slice(0, 2).join(', ')} e mais ${nomes.length - 2} item(ns)`
         const fornNome = fornecedores[0].nome_fornecedor
-        setDescricao(fornNome ? `${desc} — ${fornNome}` : desc)
+        setDescricao(toUpperNorm(fornNome ? `${desc} - ${fornNome}` : desc))
 
         // User message goes to justificativa only if it's not just the filename
         if (pf.mensagem_usuario && !pf.mensagem_usuario.includes(pf.cotacao_referencia_nome || '___')) {
-          setJustificativa(pf.mensagem_usuario)
+          setJustificativa(toUpperNorm(pf.mensagem_usuario))
         }
 
         // Skip to step 2 (Detalhes) since items are already filled
         setStep(2)
       } else {
         // No items extracted — just fill description
-        if (pf.descricao) setDescricao(pf.descricao)
-        if (pf.mensagem_usuario) setJustificativa(pf.mensagem_usuario)
+        if (pf.descricao) setDescricao(toUpperNorm(pf.descricao))
+        if (pf.mensagem_usuario) setJustificativa(toUpperNorm(pf.mensagem_usuario))
       }
     } catch { /* ignore parse errors */ }
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -208,7 +209,7 @@ export default function NovaRequisicao() {
   const sanitizeItems = useCallback((items: RequisicaoItem[]): RequisicaoItem[] =>
     (items ?? [])
       .map(item => ({
-        descricao: String(item.descricao ?? '').trim(),
+        descricao: toUpperNorm(String(item.descricao ?? '').trim()),
         quantidade: typeof item.quantidade === 'number' ? item.quantidade : parseFloat(String(item.quantidade)) || 1,
         unidade: String(item.unidade || 'un').toLowerCase(),
         valor_unitario_estimado: typeof item.valor_unitario_estimado === 'number'
@@ -245,7 +246,7 @@ export default function NovaRequisicao() {
       setUrgencia(result.urgencia_sugerida)
     }
 
-    if (result.justificativa_sugerida)  setJustificativa(String(result.justificativa_sugerida))
+    if (result.justificativa_sugerida)  setJustificativa(toUpperNorm(String(result.justificativa_sugerida)))
     if (result.comprador_sugerido)      setCompradorSugerido(result.comprador_sugerido)
     if (result.categoria_sugerida) {
       const catEncontrada = categorias.find(c =>
@@ -255,7 +256,7 @@ export default function NovaRequisicao() {
       if (catEncontrada) setCategoria(catEncontrada)
     }
     setConfianca(typeof result.confianca === 'number' ? result.confianca : 0.5)
-    if (!descricao.trim()) setDescricao(textoOriginal || `Requisição processada via IA (${parsedItens.length} itens)`)
+    if (!descricao.trim()) setDescricao(toUpperNorm(textoOriginal || `Requisicao processada via IA (${parsedItens.length} itens)`))
     setStep(2)
   }, [perfil, solicitante, categorias, descricao])
 
@@ -282,7 +283,7 @@ export default function NovaRequisicao() {
           const csvItems = parseCSVItems(fileText)
           if (csvItems.length > 0) {
             setItens(csvItems)
-            if (!descricao.trim()) setDescricao(`Itens importados de ${fileToUse.name} (${csvItems.length} itens)`)
+            if (!descricao.trim()) setDescricao(toUpperNorm(`Itens importados de ${fileToUse.name} (${csvItems.length} itens)`))
             setConfianca(0.95)
             if (perfil?.nome && !solicitante.trim()) setSolicitante(perfil.nome)
             setAiProgress('done')
@@ -363,11 +364,11 @@ export default function NovaRequisicao() {
     obra_nome:        obraNome,
     obra_id:          obraId || undefined,
     descricao:        buildResumoRequisicao(itens, descricao),
-    justificativa,
+    justificativa:     toUpperNorm(justificativa),
     urgencia,
-    justificativa_urgencia: urgencia !== 'normal' ? justificativaUrgencia : undefined,
+    justificativa_urgencia: urgencia !== 'normal' ? toUpperNorm(justificativaUrgencia) : undefined,
     categoria:        categoria?.codigo,
-    itens,
+    itens:             itens.map(item => ({ ...item, descricao: toUpperNorm(item.descricao) })),
     data_necessidade: dataNecessidade || undefined,
     texto_original:   textoAi || undefined,
     comprador_id:     compradorSugerido?.id,
@@ -380,7 +381,7 @@ export default function NovaRequisicao() {
 
   const submit = async () => {
     if (!justificativa.trim()) {
-      setSubmitError('Preencha a Descrição da compra antes de enviar.')
+      setSubmitError('Preencha o Motivo da compra antes de enviar.')
       return
     }
     if (urgencia !== 'normal' && !justificativaUrgencia.trim()) {
@@ -545,18 +546,16 @@ export default function NovaRequisicao() {
       )}
 
       <div>
-        <label className="text-xs font-semibold text-slate-500 mb-1 block">Solicitante *</label>
-        <input required className={`w-full border rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-teal-300 outline-none ${
-          stepErrors.some(e => e.includes('solicitante')) ? 'border-red-300 bg-red-50/30' : 'border-slate-200'
-        }`}
-          placeholder="Seu nome completo" value={solicitante} onChange={e => setSolicitante(e.target.value)} />
+        <label className="text-xs font-semibold text-slate-500 mb-1 block">Solicitante</label>
+        <input disabled className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm bg-slate-50 text-slate-600 cursor-not-allowed outline-none opacity-100"
+          value={solicitante} />
       </div>
 
       <div>
-        <label className="text-xs font-semibold text-slate-500 mb-1 block">Descri&ccedil;&atilde;o <span className="text-red-400">*</span></label>
-        <textarea rows={3} required
+        <label className="text-xs font-semibold text-slate-500 mb-1 block">Motivo <span className="text-red-400">*</span></label>
+        <UpperTextarea rows={3} required
           className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-teal-300 outline-none"
-          placeholder="Descreva o que quer comprar e para que precisa dessa compra"
+          placeholder="Por que essa compra é necessária? Para qual finalidade?"
           value={justificativa} onChange={e => setJustificativa(e.target.value)} />
       </div>
 
@@ -766,7 +765,7 @@ export default function NovaRequisicao() {
           }`}>
             Justificativa de urgência *
           </label>
-          <textarea
+          <UpperTextarea
             rows={2}
             required
             className={`w-full border rounded-xl px-3 py-2 text-sm outline-none transition-all ${
@@ -848,7 +847,7 @@ export default function NovaRequisicao() {
 
       <div>
         <label className="text-xs font-semibold text-slate-500 mb-1 block">Detalhes adicionais</label>
-        <textarea rows={3}
+        <UpperTextarea rows={3}
           className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-teal-300 outline-none"
           placeholder="Informações complementares para a compra, entrega ou especificação."
           value={descricao} onChange={e => setDescricao(e.target.value)} />
@@ -938,11 +937,9 @@ export default function NovaRequisicao() {
       )}
 
       <div>
-        <label className="text-xs font-semibold text-slate-500 mb-1 block">Solicitante *</label>
-        <input required className={`w-full border rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-teal-300 outline-none ${
-          stepErrors.some(e => e.includes('solicitante')) ? 'border-red-300 bg-red-50/30' : 'border-slate-200'
-        }`}
-          placeholder="Seu nome completo" value={solicitante} onChange={e => setSolicitante(e.target.value)} />
+        <label className="text-xs font-semibold text-slate-500 mb-1 block">Solicitante</label>
+        <input disabled className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm bg-slate-50 text-slate-600 cursor-not-allowed outline-none opacity-100"
+          value={solicitante} />
       </div>
 
       <div>
@@ -965,7 +962,7 @@ export default function NovaRequisicao() {
 
       <div>
         <label className="text-xs font-semibold text-slate-500 mb-1 block">Descrição *</label>
-          <textarea rows={3}
+          <UpperTextarea rows={3}
           className={`w-full border rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-teal-300 outline-none ${
             stepErrors.some(e => e.includes('descricao')) ? 'border-red-300 bg-red-50/30' : 'border-slate-200'
           }`}
@@ -974,10 +971,10 @@ export default function NovaRequisicao() {
       </div>
 
       <div>
-        <label className="text-xs font-semibold text-slate-500 mb-1 block">Descrição <span className="text-red-400">*</span></label>
-        <textarea rows={3} required
+        <label className="text-xs font-semibold text-slate-500 mb-1 block">Motivo <span className="text-red-400">*</span></label>
+        <UpperTextarea rows={3} required
           className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-teal-300 outline-none"
-          placeholder="Descreva o que quer comprar e para que precisa dessa compra"
+          placeholder="Por que essa compra é necessária? Para qual finalidade?"
           value={justificativa} onChange={e => setJustificativa(e.target.value)} />
       </div>
 
@@ -1004,7 +1001,7 @@ export default function NovaRequisicao() {
             <label className={`text-xs font-semibold mb-1 block ${urgencia === 'critica' ? 'text-red-600' : 'text-amber-600'}`}>
               Justificativa de urgência <span className="text-red-400">*</span>
             </label>
-            <textarea
+            <UpperTextarea
               rows={2}
               required
               className={`w-full border rounded-xl px-3 py-2.5 text-sm outline-none transition-all ${

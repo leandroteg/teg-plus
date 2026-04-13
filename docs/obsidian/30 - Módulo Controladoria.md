@@ -6,7 +6,7 @@ status: ativo
 tags: [controladoria, dre, orcamento, kpis, alertas, bi]
 criado: 2026-03-12
 atualizado: 2026-03-12
-relacionado: ["[[20 - Módulo Financeiro]]", "[[27 - Módulo Contratos Gestão]]", "[[03 - Páginas e Rotas]]"]
+relacionado: ["[[PILAR - Backoffice]]", "[[20 - Módulo Financeiro]]", "[[27 - Módulo Contratos Gestão]]", "[[03 - Páginas e Rotas]]"]
 ---
 
 # Módulo Controladoria

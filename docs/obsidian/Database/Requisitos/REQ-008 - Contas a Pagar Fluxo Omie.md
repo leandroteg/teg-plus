@@ -4,7 +4,7 @@ id: REQ-008
 titulo: "Contas a Pagar — Fluxo Completo com Omie"
 categoria: funcional
 prioridade: critica
-status: em-andamento
+status: entregue
 modulo: financeiro
 sprint: Sprint-4
 milestone: MS-004

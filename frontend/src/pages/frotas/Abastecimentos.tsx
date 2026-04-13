@@ -150,7 +150,8 @@ function NovoAbastecimentoModal({ onClose, isLight }: { onClose: () => void; isL
 
 // ── Main ──────────────────────────────────────────────────────────────────────
 export default function Abastecimentos() {
-  const { isLightSidebar: isLight } = useTheme()
+  const { isDark } = useTheme()
+  const isLight = !isDark
   const [modal, setModal]     = useState(false)
   const mesAtual = new Date().toISOString().slice(0, 7)
   const [mesFiltro, setMesFiltro] = useState(mesAtual)

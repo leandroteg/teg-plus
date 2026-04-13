@@ -13,6 +13,7 @@ import { useAnexosPedido, useUploadAnexo, TIPO_LABEL } from '../../hooks/useAnex
 import { useRegistrarPagamento } from '../../hooks/usePedidos'
 import type { PedidoAnexo } from '../../hooks/useAnexos'
 import type { ContaPagar } from '../../types/financeiro'
+import { UpperInput } from '../../components/UpperInput'
 import { supabase } from '../../services/supabase'
 
 // ── SyncBar ───────────────────────────────────────────────────────────────────
@@ -285,13 +286,13 @@ function RegistrarPgtoModal({ cp, onClose, isDark }: RegistrarPgtoModalProps & {
             <div className="grid grid-cols-1 gap-2">
               <div>
                 <label className={`text-xs font-semibold mb-1 block ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>Centro de Custo</label>
-                <input value={editCC} onChange={e => setEditCC(e.target.value)}
+                <UpperInput value={editCC} onChange={e => setEditCC(e.target.value)}
                   placeholder={cp.centro_custo || 'Ex: ADM, Obra Frutal'}
                   className={`w-full px-3 py-2 rounded-xl border text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-400 ${isDark ? 'bg-[#1e293b] border-white/[0.06] text-slate-200' : 'border-slate-200 text-slate-700'}`} />
               </div>
               <div>
                 <label className={`text-xs font-semibold mb-1 block ${isDark ? 'text-slate-400' : 'text-slate-600'}`}>Classe Financeira</label>
-                <input value={editClasse} onChange={e => setEditClasse(e.target.value)}
+                <UpperInput value={editClasse} onChange={e => setEditClasse(e.target.value)}
                   placeholder={cp.classe_financeira || 'Ex: Material, Serviço'}
                   className={`w-full px-3 py-2 rounded-xl border text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-400 ${isDark ? 'bg-[#1e293b] border-white/[0.06] text-slate-200' : 'border-slate-200 text-slate-700'}`} />
               </div>
@@ -1020,7 +1021,7 @@ export default function ContasPagar() {
       <div className="flex flex-col sm:flex-row gap-3">
         <div className="relative flex-1 min-w-[220px]">
           <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-          <input type="text" value={busca} onChange={e => setBusca(e.target.value)}
+          <UpperInput type="text" value={busca} onChange={e => setBusca(e.target.value)}
             placeholder="Buscar fornecedor, documento..."
             className={`w-full pl-9 pr-4 py-2.5 rounded-xl border text-sm placeholder-slate-400 focus:outline-none
               focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-400

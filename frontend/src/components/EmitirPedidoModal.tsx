@@ -2,12 +2,15 @@ import { useEffect, useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { X, FileText, Loader2, AlertTriangle, Ban, CheckCircle2, Landmark } from 'lucide-react'
 import { useCadCentrosCusto, useCadClasses, useCadObras } from '../hooks/useCadastros'
+import { useCartoesCredito } from '../hooks/useCartoes'
+import { useEditorLock } from '../hooks/useEditorLock'
 import SearchableSelect from './SearchableSelect'
 import type { SelectOption } from './SearchableSelect'
 import type { RequisicaoItem } from '../types'
 import { supabase } from '../services/supabase'
 import { gerarPreviaParcelas, resumirHomogeneidade } from '../utils/pagamentos'
 import NumericInput from './NumericInput'
+import { UpperInput, UpperTextarea } from './UpperInput'
 
 type ModalCotacao = {
   id?: string
@@ -37,6 +40,27 @@ type ParcelaEditavel = {
   status_inicial?: 'confirmado' | 'previsto'
 }
 
+type FormaPagamentoPedido = 'pix' | 'cartao' | 'boleto' | 'transferencia'
+
+const FORMA_PAGAMENTO_OPTIONS: Array<{ value: FormaPagamentoPedido; label: string }> = [
+  { value: 'pix', label: 'Pix' },
+  { value: 'cartao', label: 'Cartao' },
+  { value: 'boleto', label: 'Boleto' },
+  { value: 'transferencia', label: 'Transferencia' },
+]
+
+function inferirFormaPagamentoInicial(fornecedor: {
+  boleto?: boolean | null
+  pix_chave?: string | null
+  banco_nome?: string | null
+  conta?: string | null
+} | null | undefined): FormaPagamentoPedido | '' {
+  if (fornecedor?.boleto) return 'boleto'
+  if (fornecedor?.pix_chave) return 'pix'
+  if (fornecedor?.banco_nome && fornecedor?.conta) return 'transferencia'
+  return ''
+}
+
 interface EmitirPedidoModalProps {
   open: boolean
   onClose: () => void
@@ -55,6 +79,9 @@ interface EmitirPedidoModalProps {
     centroCustoId?: string
     centroCusto?: string
     condicaoPagamento?: string
+    formaPagamento?: FormaPagamentoPedido
+    cartaoId?: string
+    cartaoNome?: string
     observacoes?: string
     dataPrevistaEntrega?: string
     parcelasPreview: Array<{
@@ -82,6 +109,12 @@ export default function EmitirPedidoModal({
   const { data: classes = [] } = useCadClasses({ tipo: 'despesa' })
   const { data: centros = [] } = useCadCentrosCusto()
   const { data: obras = [] } = useCadObras()
+  const { data: cartoes = [] } = useCartoesCredito()
+  const { isLocked, blockedByName } = useEditorLock({
+    resourceType: 'cmp_requisicao',
+    resourceId: requisicaoId,
+    enabled: open && Boolean(requisicaoId),
+  })
 
   const { data, isLoading, error } = useQuery({
     queryKey: ['emitir-pedido-modal', requisicaoId, cotacao?.id ?? 'auto'],
@@ -131,11 +164,11 @@ export default function EmitirPedidoModal({
         }
 
         // Lookup cmp_fornecedores for banking data
-        let fornecedorDB: { id: string; banco_nome?: string | null; agencia?: string | null; conta?: string | null; pix_chave?: string | null; pix_tipo?: string | null } | null = null
+        let fornecedorDB: { id: string; banco_nome?: string | null; agencia?: string | null; conta?: string | null; boleto?: boolean | null; pix_chave?: string | null; pix_tipo?: string | null } | null = null
         if (fornecedorCnpj) {
           const { data: fdb } = await supabase
             .from('cmp_fornecedores')
-            .select('id, banco_nome, agencia, conta, pix_chave, pix_tipo')
+            .select('id, banco_nome, agencia, conta, boleto, pix_chave, pix_tipo')
             .eq('cnpj', fornecedorCnpj)
             .maybeSingle()
           if (!fdb) {
@@ -143,7 +176,7 @@ export default function EmitirPedidoModal({
             const cleanCnpj = fornecedorCnpj.replace(/\D/g, '')
             const { data: fdb2 } = await supabase
               .from('cmp_fornecedores')
-              .select('id, banco_nome, agencia, conta, pix_chave, pix_tipo')
+              .select('id, banco_nome, agencia, conta, boleto, pix_chave, pix_tipo')
               .ilike('cnpj', `%${cleanCnpj}%`)
               .maybeSingle()
             fornecedorDB = fdb2 ?? null
@@ -210,6 +243,8 @@ export default function EmitirPedidoModal({
   const [classeId, setClasseId] = useState('')
   const [centroId, setCentroId] = useState('')
   const [condicaoPagamento, setCondicaoPagamento] = useState('')
+  const [formaPagamento, setFormaPagamento] = useState<FormaPagamentoPedido | ''>('')
+  const [cartaoId, setCartaoId] = useState('')
   const [dataPrevistaEntrega, setDataPrevistaEntrega] = useState('')
   const [observacoes, setObservacoes] = useState('')
   const [temAdiantamento, setTemAdiantamento] = useState(false)
@@ -222,6 +257,7 @@ export default function EmitirPedidoModal({
   const [bancoBancoNome, setBancoBancoNome] = useState('')
   const [bancoAgencia, setBancoAgencia] = useState('')
   const [bancoConta, setBancoConta] = useState('')
+  const [bancoBoleto, setBancoBoleto] = useState(false)
   const [bancoPix, setBancoPix] = useState('')
   const [bancoPixTipo, setBancoPixTipo] = useState('')
 
@@ -239,6 +275,8 @@ export default function EmitirPedidoModal({
     setClasseId(classeSelecionada?.id ?? '')
     setCentroId((obra as any)?.centro_custo_id ?? requisicao.centro_custo_id ?? '')
     setCondicaoPagamento(cotacaoResolvida?.condicaoPagamento ?? '')
+    setFormaPagamento(inferirFormaPagamentoInicial(data?.fornecedorDB))
+    setCartaoId('')
     setDataPrevistaEntrega('')
     setObservacoes('')
     setTemAdiantamento(false)
@@ -251,16 +289,24 @@ export default function EmitirPedidoModal({
     setBancoBancoNome(fdb?.banco_nome ?? '')
     setBancoAgencia(fdb?.agencia ?? '')
     setBancoConta(fdb?.conta ?? '')
+    setBancoBoleto(Boolean(fdb?.boleto))
     setBancoPix(fdb?.pix_chave ?? '')
     setBancoPixTipo(fdb?.pix_tipo ?? '')
   }, [open, requisicao, cotacaoResolvida?.condicaoPagamento, obras, classes, classeResumo.valor, data?.fornecedorDB])
+
+  useEffect(() => {
+    if (formaPagamento !== 'cartao' && cartaoId) {
+      setCartaoId('')
+    }
+  }, [formaPagamento, cartaoId])
 
   const classeSelecionada = classes.find((item) => item.id === classeId)
   const centroSelecionado = centros.find((item) => item.id === centroId)
   const obraSelecionada = obras.find((item) => item.id === requisicao?.obra_id)
   const fornecedorDB = data?.fornecedorDB ?? null
-  const bankingIncomplete = !!fornecedorDB && !fornecedorDB.pix_chave && (!fornecedorDB.banco_nome || !fornecedorDB.conta)
-  const bankingProvided = bancoPix.trim() || (bancoBancoNome.trim() && bancoConta.trim())
+  const cartaoSelecionado = cartoes.find((cartao) => cartao.id === cartaoId)
+  const bankingIncomplete = !!fornecedorDB && !fornecedorDB.boleto && !fornecedorDB.pix_chave && (!fornecedorDB.banco_nome || !fornecedorDB.conta)
+  const bankingProvided = bancoBoleto || bancoPix.trim() || (bancoBancoNome.trim() && bancoConta.trim())
   const valorTotal = cotacaoResolvida?.valorTotal ?? 0
   // fluxo efetivo: contrato OU dispensado pelo comprador
   const fluxoContrato = !!compraRecorrente && !naoSolicitarContrato
@@ -359,6 +405,8 @@ export default function EmitirPedidoModal({
   }
 
   const handleSubmit = async () => {
+    if (isLocked) return
+
     if (fluxoContrato && onSolicitarContrato) {
       onSolicitarContrato()
       return
@@ -367,6 +415,7 @@ export default function EmitirPedidoModal({
     // Save banking data to cmp_fornecedores if provided
     if (fornecedorDB?.id && bankingProvided) {
       await supabase.from('cmp_fornecedores').update({
+        boleto: bancoBoleto,
         ...(bancoPix.trim() ? { pix_chave: bancoPix.trim(), pix_tipo: bancoPixTipo || null } : {}),
         ...(bancoBancoNome.trim() ? { banco_nome: bancoBancoNome.trim() } : {}),
         ...(bancoAgencia.trim() ? { agencia: bancoAgencia.trim() } : {}),
@@ -385,9 +434,18 @@ export default function EmitirPedidoModal({
       centroCustoId: centroSelecionado?.id,
       centroCusto: centroSelecionado?.codigo,
       condicaoPagamento: condicaoPagamento || cotacaoResolvida?.condicaoPagamento || undefined,
-      observacoes: naoSolicitarContrato && justNaoContrato.trim()
-        ? `[Contrato dispensado: ${justNaoContrato.trim()}]${observacoes ? `\n${observacoes}` : ''}`
-        : observacoes,
+      formaPagamento: formaPagamento || undefined,
+      cartaoId: formaPagamento === 'cartao' ? cartaoId || undefined : undefined,
+      cartaoNome: formaPagamento === 'cartao' ? cartaoSelecionado?.nome : undefined,
+      observacoes: [
+        naoSolicitarContrato && justNaoContrato.trim()
+          ? `[Contrato dispensado: ${justNaoContrato.trim()}]`
+          : null,
+        formaPagamento === 'cartao' && cartaoSelecionado?.nome
+          ? `[Cartao selecionado: ${cartaoSelecionado.nome}]`
+          : null,
+        observacoes?.trim() || null,
+      ].filter(Boolean).join('\n') || undefined,
       dataPrevistaEntrega,
       parcelasPreview: parcelasEditaveis.map((parcela) => ({
         numero: parcela.numero,
@@ -416,6 +474,16 @@ export default function EmitirPedidoModal({
         </div>
 
         <div className="p-6 space-y-5 max-h-[80vh] overflow-y-auto">
+          {isLocked && (
+            <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-4 text-sm text-amber-700 flex items-start gap-2">
+              <AlertTriangle size={16} className="mt-0.5 flex-shrink-0" />
+              <div>
+                <p className="font-bold">{blockedByName ?? 'Outro usuario'} esta editando</p>
+                <p className="text-xs mt-1">A emissao fica bloqueada ate essa pessoa finalizar a alteracao.</p>
+              </div>
+            </div>
+          )}
+
           {isLoading && (
             <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-8 flex items-center justify-center gap-2 text-slate-500">
               <Loader2 size={16} className="animate-spin" />
@@ -430,7 +498,7 @@ export default function EmitirPedidoModal({
           )}
 
           {!isLoading && !error && requisicao && (
-            <>
+            <fieldset disabled={isLocked} className={isLocked ? 'space-y-5 opacity-60' : 'space-y-5'}>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                 <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
                   <p className="text-[11px] font-semibold text-slate-500">Obra</p>
@@ -493,7 +561,7 @@ export default function EmitirPedidoModal({
                       <label className="block text-[11px] font-bold text-amber-700 mb-1">
                         Justificativa para dispensa de contrato *
                       </label>
-                      <textarea
+                      <UpperTextarea
                         value={justNaoContrato}
                         onChange={e => setJustNaoContrato(e.target.value)}
                         placeholder="Ex.: Compra pontual, fornecedor nao aceita contrato, urgencia operacional..."
@@ -520,21 +588,32 @@ export default function EmitirPedidoModal({
                     </div>
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <label className="md:col-span-2 inline-flex items-center gap-2 text-[11px] font-bold text-slate-600">
+                      <input
+                        type="checkbox"
+                        checked={bancoBoleto}
+                        onChange={e => setBancoBoleto(e.target.checked)}
+                        className="h-4 w-4 rounded border-slate-300 text-violet-600 focus:ring-violet-500"
+                      />
+                      Receber por boleto
+                    </label>
                     <div>
                       <label className="block text-[11px] font-bold text-slate-600 mb-1">PIX (chave)</label>
-                      <input
+                      <UpperInput
                         value={bancoPix}
+                        disabled={bancoBoleto}
                         onChange={e => setBancoPix(e.target.value)}
                         placeholder="CPF, CNPJ, e-mail ou chave aleatória"
-                        className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-violet-300"
+                        className={`w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-violet-300 ${bancoBoleto ? 'opacity-60 cursor-not-allowed bg-slate-50' : ''}`}
                       />
                     </div>
                     <div>
                       <label className="block text-[11px] font-bold text-slate-600 mb-1">Tipo da chave PIX</label>
                       <select
                         value={bancoPixTipo}
+                        disabled={bancoBoleto}
                         onChange={e => setBancoPixTipo(e.target.value)}
-                        className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-violet-300 bg-white"
+                        className={`w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-violet-300 bg-white ${bancoBoleto ? 'opacity-60 cursor-not-allowed bg-slate-50' : ''}`}
                       >
                         <option value="">Selecionar...</option>
                         <option value="cpf">CPF</option>
@@ -546,30 +625,33 @@ export default function EmitirPedidoModal({
                     </div>
                     <div>
                       <label className="block text-[11px] font-bold text-slate-600 mb-1">Banco</label>
-                      <input
+                      <UpperInput
                         value={bancoBancoNome}
+                        disabled={bancoBoleto}
                         onChange={e => setBancoBancoNome(e.target.value)}
                         placeholder="Ex.: Itaú, Bradesco, Sicredi..."
-                        className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-violet-300"
+                        className={`w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-violet-300 ${bancoBoleto ? 'opacity-60 cursor-not-allowed bg-slate-50' : ''}`}
                       />
                     </div>
                     <div className="grid grid-cols-2 gap-2">
                       <div>
                         <label className="block text-[11px] font-bold text-slate-600 mb-1">Agência</label>
-                        <input
+                        <UpperInput
                           value={bancoAgencia}
+                          disabled={bancoBoleto}
                           onChange={e => setBancoAgencia(e.target.value)}
                           placeholder="0000"
-                          className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-violet-300"
+                          className={`w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-violet-300 ${bancoBoleto ? 'opacity-60 cursor-not-allowed bg-slate-50' : ''}`}
                         />
                       </div>
                       <div>
                         <label className="block text-[11px] font-bold text-slate-600 mb-1">Conta</label>
-                        <input
+                        <UpperInput
                           value={bancoConta}
+                          disabled={bancoBoleto}
                           onChange={e => setBancoConta(e.target.value)}
                           placeholder="00000-0"
-                          className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-violet-300"
+                          className={`w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-violet-300 ${bancoBoleto ? 'opacity-60 cursor-not-allowed bg-slate-50' : ''}`}
                         />
                       </div>
                     </div>
@@ -660,7 +742,7 @@ export default function EmitirPedidoModal({
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-bold text-slate-600 mb-1.5">Condicao de Pagamento</label>
-                  <input
+                  <UpperInput
                     value={condicaoPagamento}
                     onChange={(event) => setCondicaoPagamento(event.target.value)}
                     className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-teal-300"
@@ -679,6 +761,48 @@ export default function EmitirPedidoModal({
                     className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-teal-300"
                   />
                 </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-slate-600 mb-1.5">Meio de Pagamento</label>
+                  <select
+                    value={formaPagamento}
+                    onChange={(event) => setFormaPagamento(event.target.value as FormaPagamentoPedido | '')}
+                    className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-teal-300 bg-white"
+                  >
+                    <option value="">Selecionar...</option>
+                    {FORMA_PAGAMENTO_OPTIONS.map((option) => (
+                      <option key={option.value} value={option.value}>{option.label}</option>
+                    ))}
+                  </select>
+                  <p className="mt-1 text-[11px] text-slate-400">
+                    Selecione como esse pedido sera pago no financeiro.
+                  </p>
+                </div>
+
+                {formaPagamento === 'cartao' ? (
+                  <div>
+                    <label className="block text-xs font-bold text-slate-600 mb-1.5">Qual Cartao</label>
+                    <select
+                      value={cartaoId}
+                      onChange={(event) => setCartaoId(event.target.value)}
+                      className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-teal-300 bg-white"
+                    >
+                      <option value="">Selecionar cartao...</option>
+                      {cartoes.map((cartao) => (
+                        <option key={cartao.id} value={cartao.id}>
+                          {cartao.nome}{cartao.ultimos4 ? ` • ${cartao.ultimos4}` : ''}
+                        </option>
+                      ))}
+                    </select>
+                    <p className="mt-1 text-[11px] text-slate-400">
+                      Escolha qual cartao corporativo sera usado nesse pagamento.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="hidden md:block" />
+                )}
               </div>
 
               <div className="rounded-2xl border border-amber-200 bg-amber-50/70 p-4 space-y-3">
@@ -735,7 +859,7 @@ export default function EmitirPedidoModal({
 
               <div>
                 <label className="block text-xs font-bold text-slate-600 mb-1.5">Observacoes do Pedido</label>
-                <textarea
+                <UpperTextarea
                   value={observacoes}
                   onChange={(event) => setObservacoes(event.target.value)}
                   rows={3}
@@ -823,7 +947,7 @@ export default function EmitirPedidoModal({
                           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                             <div>
                               <label className="block text-[11px] font-semibold text-slate-500 mb-1">Descricao</label>
-                              <input
+                              <UpperInput
                                 value={parcela.tipo === 'adiantamento' ? 'Adiantamento' : parcela.descricao ?? ''}
                                 onChange={(event) => updateParcela(parcela.numero, { descricao: event.target.value })}
                                 readOnly={parcela.tipo === 'adiantamento'}
@@ -913,7 +1037,7 @@ export default function EmitirPedidoModal({
                   </div>
                 </div>
               )}
-            </>
+            </fieldset>
           )}
         </div>
 
@@ -928,11 +1052,14 @@ export default function EmitirPedidoModal({
             onClick={handleSubmit}
             disabled={
               isSubmitting ||
+              isLocked ||
               isLoading ||
               !requisicao ||
               !cotacaoResolvida?.id ||
               (naoSolicitarContrato && !justNaoContrato.trim()) ||
               (!fluxoContrato && (
+                !formaPagamento ||
+                (formaPagamento === 'cartao' && !cartaoId) ||
                 !classeId ||
                 !centroId ||
                 adiantamentoInvalido ||

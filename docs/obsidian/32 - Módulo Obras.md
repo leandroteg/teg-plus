@@ -6,7 +6,7 @@ status: ativo
 tags: [obras, apontamentos, rdo, adiantamentos, equipe, prestacao-contas]
 criado: 2026-03-12
 atualizado: 2026-03-12
-relacionado: ["[[31 - Módulo PMO-EGP]]", "[[20 - Módulo Financeiro]]", "[[03 - Páginas e Rotas]]"]
+relacionado: ["[[PILAR - Projetos]]", "[[31 - Módulo PMO-EGP]]", "[[20 - Módulo Financeiro]]", "[[03 - Páginas e Rotas]]"]
 ---
 
 # Módulo Obras

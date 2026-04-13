@@ -717,3 +717,7 @@ gh pr create --title "feat(egp): redesign ciclo de vida 6 visões" --body "..."
 | 8 | 8.1-8.2 | Cleanup + Deploy |
 
 **Cada fase pode ser commitada e deployada independentemente.**
+
+
+## Links
+- [[obsidian/31 - Módulo PMO-EGP]]

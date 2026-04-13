@@ -11,7 +11,8 @@ const TIPO_OPTS: { value: TipoSolicitacao; label: string; desc: string; icon: ty
 ]
 
 export default function SolicitacoesFrotas() {
-  const { isLightSidebar: isLight } = useTheme()
+  const { isDark } = useTheme()
+  const isLight = !isDark
   const [tipo, setTipo]           = useState<TipoSolicitacao>('emprestimo')
   const [veiculoId, setVeiculoId] = useState('')
   const [destino, setDestino]     = useState('')

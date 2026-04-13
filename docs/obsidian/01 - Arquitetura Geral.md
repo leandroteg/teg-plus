@@ -5,7 +5,7 @@ status: ativo
 tags: [arquitetura, stack, infraestrutura]
 criado: 2026-03-02
 atualizado: 2026-04-07
-relacionado: ["[[00 - TEG+ INDEX]]", "[[02 - Frontend Stack]]", "[[06 - Supabase]]", "[[10 - n8n Workflows]]", "[[15 - Deploy e GitHub]]"]
+relacionado: ["[[00 - TEG+ INDEX]]", "[[02 - Frontend Stack]]", "[[06 - Supabase]]", "[[10 - n8n Workflows]]", "[[15 - Deploy e GitHub]]", "[[38 - Mapa de APIs]]", "[[45 - Mapa de Integrações]]", "[[49 - SuperTEG AI Agent]]", "[[50 - Fluxos Inter-Módulos]]", "[[ADR-002 - Stack Supabase]]", "[[ADR-003 - n8n Orquestrador]]", "[[ADR-004 - Frontend SPA React]]"]
 ---
 
 # Arquitetura Geral — TEG+ ERP
@@ -79,7 +79,7 @@ flowchart TD
 │   │   ├── components/      → [[04 - Componentes]] (60+ compartilhados)
 │   │   ├── contexts/        → AuthContext, ThemeContext, etc.
 │   │   ├── hooks/           → [[05 - Hooks Customizados]] (47 hooks)
-│   │   ├── pages/           → [[03 - Paginas e Rotas]] (200+ paginas, 16 modulos)
+│   │   ├── pages/           → [[03 - Páginas e Rotas]] (200+ paginas, 16 modulos)
 │   │   ├── layouts/         → 18 module layouts (lazy-loaded)
 │   │   ├── services/
 │   │   │   ├── api.ts       → Cliente n8n webhooks
@@ -94,7 +94,7 @@ flowchart TD
 │   ├── tailwind.config.js
 │   └── tsconfig.json
 ├── supabase/
-│   └── migrations/          → [[08 - Migracoes SQL]] (75 migrations)
+│   └── migrations/          → [[08 - Migrações SQL]] (75 migrations)
 ├── n8n-docs/                 → [[10 - n8n Workflows]]
 ├── docs/obsidian/            → Este vault
 └── vercel.json               → [[15 - Deploy e GitHub]]
@@ -193,4 +193,4 @@ Cada modulo verifica permissoes via hook `usePermissions()` que consulta o perfi
 - [[06 - Supabase]] — Banco de dados e auth
 - [[10 - n8n Workflows]] — Automacoes e webhooks
 - [[15 - Deploy e GitHub]] — Infraestrutura de deploy
-- [[16 - Variaveis de Ambiente]] — Configuracao
+- [[16 - Variáveis de Ambiente]] — Configuracao

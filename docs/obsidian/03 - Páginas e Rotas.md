@@ -118,7 +118,7 @@ graph TD
 | `/contratos/relatorios` | `Relatorios.tsx` | Relatorios contratuais |
 | `/contratos/configuracoes` | `Configuracoes.tsx` | Config do modulo |
 
-Ver [[27 - Modulo Contratos Gestao]].
+Ver [[27 - Módulo Contratos Gestão]].
 
 ---
 
@@ -132,7 +132,7 @@ Ver [[27 - Modulo Contratos Gestao]].
 | `/controladoria/kpis` | `KPIs.tsx` | Indicadores de desempenho |
 | `/controladoria/cenarios` | `Cenarios.tsx` | Simulacao de cenarios financeiros |
 
-Ver [[30 - Modulo Controladoria]].
+Ver [[30 - Módulo Controladoria]].
 
 ---
 
@@ -149,7 +149,7 @@ Ver [[30 - Modulo Controladoria]].
 | `/logistica/transportadoras` | `Transportadoras.tsx` | Gestao de transportadoras |
 | `/logistica/avaliacoes` | `Avaliacoes.tsx` | Avaliacoes de transporte |
 
-Ver [[23 - Modulo Logistica e Transportes]].
+Ver [[23 - Módulo Logística e Transportes]].
 
 ---
 
@@ -198,7 +198,7 @@ Ver [[23 - Modulo Logistica e Transportes]].
 | `/frotas/relatorios` | `Relatorios.tsx` | — | Relatorios de frotas |
 | `/frotas/configuracoes` | `Configuracoes.tsx` | — | Config do modulo |
 
-Ver [[24 - Modulo Frotas e Manutencao]].
+Ver [[24 - Módulo Frotas e Manutenção]].
 
 ---
 
@@ -213,7 +213,7 @@ Ver [[24 - Modulo Frotas e Manutencao]].
 | `/obras/prestacao` | `PrestacaoContas.tsx` | Prestacao de contas de adiantamentos |
 | `/obras/equipe` | `PlanejamentoEquipe.tsx` | Planejamento e gestao de equipe por obra |
 
-Ver [[32 - Modulo Obras]].
+Ver [[32 - Módulo Obras]].
 
 ---
 
@@ -254,7 +254,7 @@ Ver [[32 - Modulo Obras]].
 | `/egp/configuracoes` | `Configuracoes.tsx` | — | Config do modulo |
 | `/egp/baseline` | `Baseline.tsx` | Planejamento | Gestao de baselines |
 
-Ver [[31 - Modulo PMO-EGP]].
+Ver [[31 - Módulo PMO-EGP]].
 
 ---
 
@@ -283,7 +283,7 @@ Ver [[31 - Modulo PMO-EGP]].
 | `/fiscal/pipeline` | `FiscalPipeline.tsx` | Pipeline Kanban de solicitacoes de NF (emissao) |
 | `/fiscal/historico` | `NotasFiscais.tsx` | Repositorio / historico de NFs emitidas |
 
-Ver [[29 - Modulo Fiscal]].
+Ver [[29 - Módulo Fiscal]].
 
 ---
 
@@ -303,7 +303,7 @@ Ver [[29 - Modulo Fiscal]].
 | `/cadastros/unidades` | `Unidades.tsx` | Unidades de medida | — |
 | `/cadastros/empresas` | `Empresas.tsx` | Empresas do grupo | — |
 
-> Acessivel de qualquer modulo via icone "Cadastros" na sidebar. Ver [[28 - Modulo Cadastros AI]].
+> Acessivel de qualquer modulo via icone "Cadastros" na sidebar. Ver [[28 - Módulo Cadastros AI]].
 
 ---
 
@@ -321,7 +321,7 @@ Ver [[29 - Modulo Fiscal]].
 | `/locacao/fornecedores` | `FornecedoresLocacao.tsx` | Locadores cadastrados |
 | `/locacao/relatorios` | `RelatoriosLocacao.tsx` | Relatorios de locacao |
 
-Ver [[34 - Modulo Locacao]].
+Ver [[34 - Módulo Locação]].
 
 ---
 
@@ -331,7 +331,7 @@ Ver [[34 - Modulo Locacao]].
 |------|-----------|-----------|
 | `/ssma` | `SSMA.tsx` | Tela informativa com roadmap do modulo (stub) |
 
-> SSMA esta implementado como stub informativo. Funcionalidades completas planejadas para Q2-Q4 2026. Ver [[33 - Modulo SSMA]].
+> SSMA esta implementado como stub informativo. Funcionalidades completas planejadas para Q2-Q4 2026. Ver [[33 - Módulo SSMA]].
 
 ---
 
@@ -389,11 +389,11 @@ Sem banners no banco, exibe 3 slides padrao. Gerenciado em `/rh/mural`. Ver [[25
 - [[05 - Hooks Customizados]] — Hooks de dados
 - [[09 - Auth Sistema]] — Autenticacao e guards
 - [[25 - Mural de Recados]] — Slideshow e gestao de banners
-- [[27 - Modulo Contratos Gestao]] — Rotas do modulo de contratos
-- [[28 - Modulo Cadastros AI]] — Rotas do modulo de cadastros AI
-- [[29 - Modulo Fiscal]] — Rotas do modulo fiscal
-- [[30 - Modulo Controladoria]] — Rotas do modulo de controladoria
-- [[31 - Modulo PMO-EGP]] — Rotas do modulo PMO/EGP
-- [[32 - Modulo Obras]] — Rotas do modulo de obras
-- [[33 - Modulo SSMA]] — Modulo SSMA (stub)
-- [[34 - Modulo Locacao]] — Modulo Locacao (novo)
+- [[27 - Módulo Contratos Gestão]] — Rotas do modulo de contratos
+- [[28 - Módulo Cadastros AI]] — Rotas do modulo de cadastros AI
+- [[29 - Módulo Fiscal]] — Rotas do modulo fiscal
+- [[30 - Módulo Controladoria]] — Rotas do modulo de controladoria
+- [[31 - Módulo PMO-EGP]] — Rotas do modulo PMO/EGP
+- [[32 - Módulo Obras]] — Rotas do modulo de obras
+- [[33 - Módulo SSMA]] — Modulo SSMA (stub)
+- [[34 - Módulo Locação]] — Modulo Locacao (novo)

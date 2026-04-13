@@ -6,6 +6,7 @@ import {
   CheckCircle2, Warehouse, Building2, Ban, History, ArrowUpRight, ArrowDownRight,
   Tag, ClipboardList,
 } from 'lucide-react'
+import { UpperInput } from '../../components/UpperInput'
 import {
   useEstoqueItens, useSalvarItem, useSaldos, useBases,
   useAguardandoEntrada, useEmMovimentacao, useLiberadosRetirada,
@@ -1118,7 +1119,7 @@ function ItemFormModal({
 
           <div>
             <label className={`block text-xs font-bold mb-1 ${labelCls}`}>Descrição *</label>
-            <input value={item.descricao ?? ''} onChange={e => set('descricao', e.target.value)}
+            <UpperInput value={item.descricao ?? ''} onChange={e => set('descricao', e.target.value)}
               className={inputCls} placeholder="Nome completo do item" />
           </div>
 

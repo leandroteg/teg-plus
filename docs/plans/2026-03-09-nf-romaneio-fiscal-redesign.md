@@ -358,3 +358,7 @@ git add -A
 git commit -m "feat(logistica+fiscal): romaneio/NF split + fiscal UI redesign + auto-sync"
 git push origin main
 ```
+
+
+## Links
+- [[obsidian/29 - Módulo Fiscal]]

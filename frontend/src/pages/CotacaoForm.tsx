@@ -9,6 +9,7 @@ import { useCotacao, useFinalizarCotacao } from '../hooks/useCotacoes'
 import { useCategorias } from '../hooks/useCategorias'
 import { useEmitirPedido, useCancelarRequisicao } from '../hooks/usePedidos'
 import { useAuth } from '../contexts/AuthContext'
+import { useEditorLock } from '../hooks/useEditorLock'
 import type { Cotacao, ItemPreco } from '../types'
 import CotacaoComparativo from '../components/CotacaoComparativo'
 import FluxoTimeline from '../components/FluxoTimeline'
@@ -19,6 +20,7 @@ import { api } from '../services/api'
 import type { CnpjResult } from '../services/api'
 import NumericInput from '../components/NumericInput'
 import { minCotacoesPorValor } from '../utils/cotacoesPolicy'
+import { toUpperNorm } from '../components/UpperInput'
 
 const fmt = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
 
@@ -72,10 +74,11 @@ function ItemPricingTable({
   const removeItem = (i: number) => onChange(items.filter((_, idx) => idx !== i))
 
   const updateItem = (i: number, field: keyof ItemPreco, raw: string) => {
+    const normalizedRaw = field === 'descricao' ? toUpperNorm(raw) : raw
     const updated = items.map((item, idx) => {
       if (idx !== i) return item
-      if (field === 'descricao') return { ...item, descricao: raw }
-      const val = parseFloat(raw) || 0
+      if (field === 'descricao') return { ...item, descricao: normalizedRaw }
+      const val = parseFloat(normalizedRaw) || 0
       const next = { ...item, [field]: val }
       if (field === 'qtd' || field === 'valor_unitario') {
         const qtd = field === 'qtd' ? val : item.qtd
@@ -95,12 +98,13 @@ function ItemPricingTable({
   }
 
   const searchItem = useCallback((i: number, query: string) => {
-    updateItem(i, 'descricao', query)
+    const normalizedQuery = toUpperNorm(query)
+    updateItem(i, 'descricao', normalizedQuery)
     if (itemTimerRef.current[i]) clearTimeout(itemTimerRef.current[i])
 
     // Mostra itens da requisição imediatamente (sem debounce)
-    const reqMatches = filterReqItens(query)
-    if (query.trim().length < 2) {
+    const reqMatches = filterReqItens(normalizedQuery)
+    if (normalizedQuery.trim().length < 2) {
       // Sem query: mostra só itens da requisição
       setItemResults(prev => ({ ...prev, [i]: reqMatches.map(ri => ({ ...ri, _fromReq: true })) }))
       setItemOpen(prev => ({ ...prev, [i]: reqMatches.length > 0 }))
@@ -113,11 +117,11 @@ function ItemPricingTable({
       const { data } = await supabase
         .from('est_itens')
         .select('id, codigo, descricao, unidade, valor_medio')
-        .ilike('descricao', `%${query}%`)
+        .ilike('descricao', `%${normalizedQuery}%`)
         .eq('ativo', true)
         .order('descricao')
         .limit(8)
-      const reqResults = filterReqItens(query).map(ri => ({ ...ri, _fromReq: true }))
+      const reqResults = filterReqItens(normalizedQuery).map(ri => ({ ...ri, _fromReq: true }))
       setItemResults(prev => ({ ...prev, [i]: [...reqResults, ...(data || [])] }))
       setItemOpen(prev => ({ ...prev, [i]: reqResults.length > 0 || (data?.length ?? 0) > 0 }))
     }, 300)
@@ -580,6 +584,11 @@ export default function CotacaoForm() {
   const { data: cotacao, isLoading } = useCotacao(id)
   const { data: categorias = [] } = useCategorias()
   const submitMutation = useFinalizarCotacao()
+  const { isLocked, blockedByName } = useEditorLock({
+    resourceType: 'cmp_requisicao',
+    resourceId: cotacao?.requisicao_id ?? id,
+    enabled: Boolean(cotacao?.requisicao_id ?? id),
+  })
 
   const [fornecedores, setFornecedores] = useState<FornecedorForm[]>([
     emptyFornecedor(), emptyFornecedor(),
@@ -616,7 +625,7 @@ export default function CotacaoForm() {
       } else {
         setCnpjStatus(prev => ({ ...prev, [idx]: { ok: true, msg: result.situacao || 'Ativa' } }))
         // Auto-fill name and contact — always overwrite on CNPJ correction
-        const nomePreenchido = result.razao_social || result.nome_fantasia || ''
+        const nomePreenchido = toUpperNorm(result.razao_social || result.nome_fantasia || '')
         setFornecedores(prev => prev.map((f, i) => {
           if (i !== idx) return f
           return {
@@ -647,13 +656,18 @@ export default function CotacaoForm() {
     }
   }, [handleCnpjLookup])
 
-  const updateFornecedor = (idx: number, field: keyof FornecedorForm, value: string | number) =>
-    setFornecedores(prev => prev.map((f, i) => i === idx ? { ...f, [field]: value } : f))
+  const updateFornecedor = (idx: number, field: keyof FornecedorForm, value: string | number) => {
+    const normalized = typeof value === 'string' && field !== 'fornecedor_cnpj' && field !== 'fornecedor_contato'
+      ? toUpperNorm(value)
+      : value
+    setFornecedores(prev => prev.map((f, i) => i === idx ? { ...f, [field]: normalized } : f))
+  }
 
   const searchFornecedor = useCallback((idx: number, query: string) => {
-    setFornecedores(prev => prev.map((f, i) => i === idx ? { ...f, fornecedor_nome: query } : f))
+    const normalizedQuery = toUpperNorm(query)
+    setFornecedores(prev => prev.map((f, i) => i === idx ? { ...f, fornecedor_nome: normalizedQuery } : f))
     if (searchTimerRef.current[idx]) clearTimeout(searchTimerRef.current[idx])
-    if (query.trim().length < 2) {
+    if (normalizedQuery.trim().length < 2) {
       setFornResults(prev => ({ ...prev, [idx]: [] }))
       setFornOpen(prev => ({ ...prev, [idx]: false }))
       return
@@ -662,7 +676,7 @@ export default function CotacaoForm() {
       const { data } = await supabase
         .from('cmp_fornecedores')
         .select('id, nome_fantasia, razao_social, cnpj, telefone, email, contato_nome, cidade, uf')
-        .or(`nome_fantasia.ilike.%${query}%,razao_social.ilike.%${query}%`)
+        .or(`nome_fantasia.ilike.%${normalizedQuery}%,razao_social.ilike.%${normalizedQuery}%`)
         .eq('ativo', true)
         .limit(8)
       setFornResults(prev => ({ ...prev, [idx]: data || [] }))
@@ -674,7 +688,7 @@ export default function CotacaoForm() {
     const contato = [f.telefone, f.email].filter(Boolean).join(' / ')
     setFornecedores(prev => prev.map((item, i) => i !== idx ? item : {
       ...item,
-      fornecedor_nome: f.nome_fantasia || f.razao_social || '',
+      fornecedor_nome: toUpperNorm(f.nome_fantasia || f.razao_social || ''),
       fornecedor_cnpj: f.cnpj || '',
       fornecedor_contato: contato || f.contato_nome || '',
     }))
@@ -694,7 +708,7 @@ export default function CotacaoForm() {
     const itens = cotacao?.requisicao?.itens
     if (!itens?.length) return
     const itensPrecos: ItemPreco[] = itens.map(item => ({
-      descricao: item.descricao,
+      descricao: toUpperNorm(item.descricao),
       qtd: item.quantidade,
       valor_unitario: 0,
       valor_total: 0,
@@ -739,7 +753,7 @@ export default function CotacaoForm() {
         const itensComValor: ItemPreco[] = (p.itens ?? [])
           .filter(it => it.valor_unitario > 0)
           .map(it => ({
-            descricao:      it.descricao,
+            descricao:      toUpperNorm(it.descricao),
             qtd:            it.qtd,
             valor_unitario: it.valor_unitario,
             valor_total:    Math.round(it.qtd * it.valor_unitario * 100) / 100,
@@ -748,13 +762,13 @@ export default function CotacaoForm() {
         // Se há itens com preço → usa a soma deles; senão usa o total do documento
         const valorTotal = itensComValor.length > 0 ? totalItens : (p.valor_total || 0)
         return {
-          fornecedor_nome:    p.fornecedor_nome || '',
+          fornecedor_nome:    toUpperNorm(p.fornecedor_nome || ''),
           fornecedor_cnpj:    p.fornecedor_cnpj ? maskCNPJ(p.fornecedor_cnpj) : '',
           fornecedor_contato: p.fornecedor_contato || '',
           valor_total:        valorTotal,
           prazo_entrega_dias: p.prazo_entrega_dias || 0,
-          condicao_pagamento: p.condicao_pagamento || '',
-          observacao:         p.observacao || '',
+          condicao_pagamento: toUpperNorm(p.condicao_pagamento || ''),
+          observacao:         toUpperNorm(p.observacao || ''),
           arquivo_url:        uploadedPath,
           itens_precos:       itensComValor,
         }
@@ -830,6 +844,11 @@ export default function CotacaoForm() {
     setToast(null)
     setTriedSubmit(true)
 
+    if (isLocked) {
+      setToast({ type: 'error', msg: `${blockedByName ?? 'Outro usuário'} está editando esta cotação no momento.` })
+      return
+    }
+
     // Validações com feedback explícito
     if (!id || !cotacao) {
       setToast({ type: 'error', msg: 'Cotação não encontrada. Recarregue a página.' })
@@ -853,18 +872,20 @@ export default function CotacaoForm() {
         cotacao_id: id,
         requisicao_id: cotacao.requisicao_id,
         fornecedores: validos.map(f => ({
-          fornecedor_nome:    f.fornecedor_nome,
+          fornecedor_nome:    toUpperNorm(f.fornecedor_nome),
           fornecedor_contato: f.fornecedor_contato || undefined,
           fornecedor_cnpj:    f.fornecedor_cnpj || undefined,
           valor_total:        f.valor_total,
           prazo_entrega_dias: f.prazo_entrega_dias || undefined,
-          condicao_pagamento: f.condicao_pagamento || undefined,
-          observacao:         f.observacao || undefined,
+          condicao_pagamento: f.condicao_pagamento ? toUpperNorm(f.condicao_pagamento) : undefined,
+          observacao:         f.observacao ? toUpperNorm(f.observacao) : undefined,
           arquivo_url:        f.arquivo_url || undefined,
-          itens_precos:       f.itens_precos.length > 0 ? f.itens_precos : undefined,
+          itens_precos:       f.itens_precos.length > 0
+            ? f.itens_precos.map(item => ({ ...item, descricao: toUpperNorm(item.descricao) }))
+            : undefined,
         })),
         sem_cotacoes_minimas: semCotacoesMinimas,
-        justificativa_sem_cotacoes: semCotacoesMinimas ? justificativa.trim() : undefined,
+        justificativa_sem_cotacoes: semCotacoesMinimas ? toUpperNorm(justificativa.trim()) : undefined,
       })
       setToast({ type: 'success', msg: 'Cotação enviada para aprovação!' })
       setTimeout(() => nav('/cotacoes'), 800)
@@ -893,12 +914,27 @@ export default function CotacaoForm() {
   // ── Formulário de nova cotação ────────────────────────────────────────────
   return (
     <form onSubmit={submit} noValidate className="space-y-4">
+      {isLocked && (
+        <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 flex items-start gap-3">
+          <AlertTriangle size={18} className="text-amber-600 mt-0.5 flex-shrink-0" />
+          <div>
+            <p className="text-sm font-bold text-amber-700">
+              {blockedByName ?? 'Outro usuário'} está editando
+            </p>
+            <p className="text-xs text-amber-600 mt-1">
+              Esta cotação está bloqueada temporariamente para evitar conflito de alterações.
+            </p>
+          </div>
+        </div>
+      )}
       <div className="flex items-center gap-2">
         <button type="button" onClick={() => nav('/cotacoes')} className="p-1">
           <ChevronLeft size={18} className="text-slate-500" />
         </button>
         <h2 className="text-lg font-extrabold text-slate-800">Inserir Cotação</h2>
       </div>
+
+      <fieldset disabled={isLocked} className={isLocked ? 'space-y-4 opacity-60' : 'space-y-4'}>
 
       {/* RC Info + Timeline */}
       {cotacao?.requisicao && (
@@ -943,7 +979,7 @@ export default function CotacaoForm() {
       {/* Upload inteligente com IA */}
       <UploadCotacao
         onParsed={handleAiParsed}
-        disabled={cotacao?.status === 'concluida'}
+        disabled={cotacao?.status === 'concluida' || isLocked}
         cotacaoId={id}
         requisicaoId={cotacao?.requisicao_id}
       />
@@ -1238,7 +1274,7 @@ export default function CotacaoForm() {
             <textarea
               required
               value={justificativa}
-              onChange={e => setJustificativa(e.target.value)}
+              onChange={e => setJustificativa(toUpperNorm(e.target.value))}
               placeholder="Justificativa obrigatória para envio sem cotações mínimas..."
               rows={3}
               className="w-full border border-amber-300 bg-white rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-amber-300 outline-none resize-none"
@@ -1262,9 +1298,9 @@ export default function CotacaoForm() {
       {/* Submit */}
       <button
         type="submit"
-        disabled={submitMutation.isPending || !canSubmit}
+        disabled={submitMutation.isPending || !canSubmit || isLocked}
         className={`w-full rounded-2xl py-4 font-extrabold flex items-center justify-center gap-2 shadow-xl active:scale-[0.98] transition-all ${
-          canSubmit && !submitMutation.isPending
+          canSubmit && !submitMutation.isPending && !isLocked
             ? 'bg-teal-500 text-white shadow-teal-500/25 hover:bg-teal-600'
             : 'bg-slate-300 text-slate-500 shadow-slate-200/25 cursor-not-allowed'
         }`}
@@ -1288,6 +1324,7 @@ export default function CotacaoForm() {
           }
         </p>
       )}
+      </fieldset>
     </form>
   )
 }

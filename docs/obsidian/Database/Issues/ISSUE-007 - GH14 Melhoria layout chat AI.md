@@ -49,4 +49,5 @@ Implementado em 2026-03-07/08 via commits `124dac4`, `075f466`, `2c5ccf2`:
 - Limpeza do storage ao limpar conversa
 
 ## Links
-- [[28 - SuperTEG AI Agent]]
+- [[28 - Módulo Cadastros AI]]
+- [[04 - Componentes]]

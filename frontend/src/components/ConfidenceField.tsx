@@ -1,4 +1,5 @@
 import { CheckCircle2, AlertTriangle, AlertCircle } from 'lucide-react'
+import { toUpperNorm } from './UpperInput'
 
 interface ConfidenceFieldProps {
   label: string
@@ -11,11 +12,12 @@ interface ConfidenceFieldProps {
   disabled?: boolean
   children?: React.ReactNode
   onBlur?: () => void
+  normalizeText?: boolean
 }
 
 export default function ConfidenceField({
   label, value, onChange, confidence, type = 'text',
-  placeholder, required, disabled, children, onBlur,
+  placeholder, required, disabled, children, onBlur, normalizeText = true,
 }: ConfidenceFieldProps) {
   const has = confidence !== undefined
 
@@ -56,7 +58,12 @@ export default function ConfidenceField({
         <input
           type={type}
           value={value ?? ''}
-          onChange={e => onChange(e.target.value)}
+          onChange={e => {
+            const next = normalizeText && type === 'text'
+              ? toUpperNorm(e.target.value)
+              : e.target.value
+            onChange(next)
+          }}
           onBlur={onBlur}
           placeholder={placeholder}
           disabled={disabled}

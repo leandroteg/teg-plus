@@ -64,3 +64,7 @@
 ## Não incluído neste ciclo
 - ISSUE-003 (fallback n8n): requer ambiente de testes controlado, apenas documentação
 - ISSUE-004 `strict: true` completo: pós lote C como fase 2
+
+
+## Links
+- [[obsidian/17 - Roadmap]]

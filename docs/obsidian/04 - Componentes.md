@@ -5,7 +5,7 @@ status: ativo
 tags: [frontend, componentes, react, ui]
 criado: 2026-03-02
 atualizado: 2026-04-08
-relacionado: ["[[02 - Frontend Stack]]", "[[03 - Páginas e Rotas]]"]
+relacionado: ["[[02 - Frontend Stack]]", "[[03 - Páginas e Rotas]]", "[[48 - Guia de Estilo UI]]", "[[36 - Guia de Contribuição]]"]
 ---
 
 # Componentes — TEG+ ERP

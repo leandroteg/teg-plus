@@ -263,7 +263,7 @@ const PIPELINE_STAGES: {
 }[] = [
   {
     key: 'pendente',
-    label: 'Pendente',
+    label: 'Pedidos Aprovados',
     icon: ClipboardList,
     matchFn: p => isPendingEmission(p),
   },
@@ -321,7 +321,7 @@ const statusConfig: Record<string, { bg: string; text: string; label: string; bg
 const pendingEmissionStatus = {
   bg: 'bg-amber-100',
   text: 'text-amber-700',
-  label: 'Aguardando Emissao',
+  label: 'Pedido Aprovado',
   bgDark: 'bg-amber-900/40',
   textDark: 'text-amber-300',
 }
@@ -1226,6 +1226,7 @@ function DetailModal({
   const [showFornecedorAtualizarModal, setShowFornecedorAtualizarModal] = useState(false)
   const [showFornecedorSelectorModal, setShowFornecedorSelectorModal] = useState(false)
   const [fornecedorVinculado, setFornecedorVinculado] = useState<Fornecedor | null>(null)
+  const [emitError, setEmitError] = useState<string | null>(null)
 
   const dias     = diasRestantes(pedido.data_prevista_entrega)
   const st       = getStatusMeta(pedido)
@@ -1256,17 +1257,15 @@ function DetailModal({
   }, [pending, pedido.id])
 
   const fornecedorDetectado = fornecedorResolvido?.fornecedorCorrespondente ?? null
-  const fornecedorAtivo = fornecedorVinculado
+  const fornecedorAtivo = fornecedorVinculado ?? fornecedorDetectado
   const fornecedorAtivoComplete = hasFornecedorPaymentData(fornecedorAtivo)
   const camposPagamentoPendentes = getFornecedorPaymentMissingFields(fornecedorAtivo)
-  const podeEmitirPedidoPendente = !pending || Boolean(fornecedorAtivo && fornecedorAtivoComplete)
+  const podeEmitirPedidoPendente = !pending || Boolean(fornecedorAtivo)
   const motivoBloqueioEmissao = !pending
     ? null
     : !fornecedorAtivo
       ? 'Vincule ou cadastre o fornecedor mestre antes de emitir o pedido.'
-      : !fornecedorAtivoComplete
-        ? `Atualize os dados de pagamento do fornecedor: ${camposPagamentoPendentes.join(', ')}.`
-        : null
+      : null
 
   const confirmarEntrega = async () => {
     setConfirmando(true)
@@ -1285,6 +1284,7 @@ function DetailModal({
 
   const handleFornecedorVinculado = async (fornecedor: Fornecedor) => {
     setFornecedorVinculado(fornecedor)
+    setEmitError(null)
     setShowFornecedorCadastroModal(false)
     setShowFornecedorAtualizarModal(false)
     setShowFornecedorSelectorModal(false)
@@ -1607,11 +1607,12 @@ function DetailModal({
                     onSuccess={() => { onClose(); window.location.href = '/contratos/solicitacoes' }}
                   />
                 ) : (
-                  <button
-                    onClick={() => {
-                      if (!podeEmitirPedidoPendente) return
-                      setShowEmitirModal(true)
-                    }}
+                    <button
+                      onClick={() => {
+                        if (!podeEmitirPedidoPendente) return
+                        setEmitError(null)
+                        setShowEmitirModal(true)
+                      }}
                     disabled={emitirPedido.isPending || !podeEmitirPedidoPendente}
                     className={`w-full flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-bold border transition-all disabled:cursor-not-allowed ${
                       podeEmitirPedidoPendente
@@ -1630,6 +1631,11 @@ function DetailModal({
                 {motivoBloqueioEmissao && (
                   <div className={`rounded-xl border px-3 py-2 text-[11px] ${dark ? 'border-white/10 bg-white/[0.03] text-slate-400' : 'border-slate-200 bg-slate-50 text-slate-500'}`}>
                     {motivoBloqueioEmissao}
+                  </div>
+                )}
+                {emitError && (
+                  <div className={`rounded-xl border px-3 py-2 text-[11px] ${dark ? 'border-red-500/30 bg-red-500/10 text-red-200' : 'border-red-200 bg-red-50 text-red-600'}`}>
+                    {emitError}
                   </div>
                 )}
               </>
@@ -1682,9 +1688,13 @@ function DetailModal({
                 fornecedorNome: fornecedorAtivo?.razao_social || payload.fornecedorNome,
               }, {
                 onSuccess: () => {
+                  setEmitError(null)
                   setShowEmitirModal(false)
                   onClose()
                   onEmitted?.()
+                },
+                onError: (err: any) => {
+                  setEmitError(`Erro ao emitir pedido: ${err?.message || 'erro desconhecido'}`)
                 },
               })
             }}

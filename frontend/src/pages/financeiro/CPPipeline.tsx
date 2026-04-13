@@ -46,6 +46,7 @@ import { useAnexosPedido, useUploadAnexo, TIPO_LABEL } from '../../hooks/useAnex
 import type { PedidoAnexo } from '../../hooks/useAnexos'
 import type { ContaPagar, Fornecedor, LotePagamento, StatusCP } from '../../types/financeiro'
 import { CP_PIPELINE_STAGES } from '../../types/financeiro'
+import { UpperInput, UpperTextarea } from '../../components/UpperInput'
 
 // ══ Formatters ══════════════════════════════════════════════════
 
@@ -934,12 +935,12 @@ function NovaSolicitacaoExtraordinariaModal({
 
           <div>
             <label className={labelCls}>Descrição *</label>
-            <textarea value={form.descricao} onChange={e => setField('descricao', e.target.value)} rows={3} className={`${inputCls} resize-none`} placeholder="Descreva o pagamento extraordinário" />
+            <UpperTextarea value={form.descricao} onChange={e => setField('descricao', e.target.value)} rows={3} className={`${inputCls} resize-none`} placeholder="Descreva o pagamento extraordinário" />
           </div>
 
           <div>
             <label className={labelCls}>Justificativa *</label>
-            <textarea value={form.justificativa} onChange={e => setField('justificativa', e.target.value)} rows={4} className={`${inputCls} resize-none`} placeholder="Explique por que este pagamento foge ao fluxo natural" />
+            <UpperTextarea value={form.justificativa} onChange={e => setField('justificativa', e.target.value)} rows={4} className={`${inputCls} resize-none`} placeholder="Explique por que este pagamento foge ao fluxo natural" />
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -1091,7 +1092,7 @@ function NovaSolicitacaoExtraordinariaModal({
               </div>
               <div>
                 <label className={labelCls}>Nome do Favorecido *</label>
-                <input value={form.favorecido} onChange={e => setField('favorecido', e.target.value)} className={inputCls} placeholder="Nome do favorecido" />
+                <UpperInput value={form.favorecido} onChange={e => setField('favorecido', e.target.value)} className={inputCls} placeholder="Nome do favorecido" />
               </div>
             </div>
             <div className={`rounded-xl border px-3 py-3 ${isDark ? 'border-white/[0.08] bg-white/[0.03]' : 'border-slate-200 bg-white'}`}>
@@ -1134,15 +1135,15 @@ function NovaSolicitacaoExtraordinariaModal({
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <label className={labelCls}>Banco</label>
-                <input value={form.banco_nome} onChange={e => setField('banco_nome', e.target.value)} className={inputCls} placeholder="Nome do banco" />
+                <UpperInput value={form.banco_nome} onChange={e => setField('banco_nome', e.target.value)} className={inputCls} placeholder="Nome do banco" />
               </div>
               <div>
                 <label className={labelCls}>Agência</label>
-                <input value={form.agencia} onChange={e => setField('agencia', e.target.value)} className={inputCls} placeholder="0001" />
+                <UpperInput value={form.agencia} onChange={e => setField('agencia', e.target.value)} className={inputCls} placeholder="0001" />
               </div>
               <div>
                 <label className={labelCls}>Conta</label>
-                <input value={form.conta} onChange={e => setField('conta', e.target.value)} className={inputCls} placeholder="12345-6" />
+                <UpperInput value={form.conta} onChange={e => setField('conta', e.target.value)} className={inputCls} placeholder="12345-6" />
               </div>
               <div>
                 <label className={labelCls}>Tipo PIX</label>
@@ -1157,7 +1158,7 @@ function NovaSolicitacaoExtraordinariaModal({
               </div>
               <div>
                 <label className={labelCls}>Chave PIX</label>
-                <input value={form.pix_chave} onChange={e => setField('pix_chave', e.target.value)} className={inputCls} placeholder="Informe a chave PIX" />
+                <UpperInput value={form.pix_chave} onChange={e => setField('pix_chave', e.target.value)} className={inputCls} placeholder="Informe a chave PIX" />
               </div>
             </div>
           </div>
@@ -1325,7 +1326,7 @@ function NovaPrevisaoPagamentoModal({
 
           <div>
             <label className={labelCls}>Nome *</label>
-            <input value={form.nome} onChange={e => setField('nome', e.target.value)} className={inputCls} placeholder="Ex.: Aluguel, licença, consultoria, condomínio" />
+            <UpperInput value={form.nome} onChange={e => setField('nome', e.target.value)} className={inputCls} placeholder="Ex.: Aluguel, licença, consultoria, condomínio" />
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -1358,7 +1359,7 @@ function NovaPrevisaoPagamentoModal({
               {ccOpen && (
                 <div className={`absolute z-30 mt-2 w-full rounded-2xl border shadow-xl overflow-hidden ${isDark ? 'border-white/[0.08] bg-slate-950' : 'border-slate-200 bg-white'}`}>
                   <div className="p-2 border-b border-inherit">
-                    <input value={ccBusca} onChange={e => setCcBusca(e.target.value)} className={inputCls} placeholder="Buscar centro de custo..." autoFocus />
+                    <UpperInput value={ccBusca} onChange={e => setCcBusca(e.target.value)} className={inputCls} placeholder="Buscar centro de custo..." autoFocus />
                   </div>
                   <div className="max-h-64 overflow-y-auto py-1">
                     {centrosFiltrados.map(cc => {
@@ -1403,7 +1404,7 @@ function NovaPrevisaoPagamentoModal({
               {classeOpen && (
                 <div className={`absolute z-30 mt-2 w-full rounded-2xl border shadow-xl overflow-hidden ${isDark ? 'border-white/[0.08] bg-slate-950' : 'border-slate-200 bg-white'}`}>
                   <div className="p-2 border-b border-inherit">
-                    <input value={classeBusca} onChange={e => setClasseBusca(e.target.value)} className={inputCls} placeholder="Buscar classe financeira..." autoFocus />
+                    <UpperInput value={classeBusca} onChange={e => setClasseBusca(e.target.value)} className={inputCls} placeholder="Buscar classe financeira..." autoFocus />
                   </div>
                   <div className="max-h-64 overflow-y-auto py-1">
                     {classesFiltradas.map(classe => {

@@ -46,4 +46,4 @@ Implementado em 2026-03-07 via commit `f7033b9`:
 
 ## Links
 - [[20 - Módulo Financeiro]]
-- [[TASK-008 - Dashboard financeiro basico]]
+- [[Database/Tarefas/TASK-004 - Dashboard KPIs|TASK-004 — Dashboard KPIs]]

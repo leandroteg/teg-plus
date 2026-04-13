@@ -6,6 +6,7 @@ status: ativo
 tags: [frotas, manutencao, telemetria, checklist, abastecimento]
 criado: 2026-03-03
 atualizado: 2026-03-12
+relacionado: ["[[PILAR - Suprimentos]]"]
 ---
 
 # Módulo Manutenção e Uso de Frotas
@@ -265,4 +266,13 @@ As seguintes issues de UX foram corrigidas no módulo Frotas:
 
 ---
 
-*Documentação gerada em 2026-03-03. Atualizado em 2026-03-12: registro de correções de UX (issues #92, #94, #102, #103).*
+## Links Relacionados
+
+- [[07 - Schema Database]] — Tabelas `fro_*`
+- [[20 - Módulo Financeiro]] — Integração CP via OS
+- [[05 - Hooks Customizados]] — Hooks `useFrotas*`
+- [[03 - Páginas e Rotas]] — Rotas `/frotas/*`
+- [[Database/Tarefas/TASK-020 - Frotas Core|TASK-020 — Frotas Core]]
+- [[Database/Milestones/MS-007 - Modulo Frotas Manutencao|MS-007 — Frotas]]
+
+*Documentação gerada em 2026-03-03. Atualizado em 2026-04-08.*

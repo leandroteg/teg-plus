@@ -19,6 +19,7 @@ import type { ApontamentoCartao, StatusApontamentoCartao, BandeiraCartao } from 
 import { useCadClasses, useCadCentrosCusto } from '../../hooks/useCadastros'
 import SearchableSelect from '../../components/SearchableSelect'
 import type { SelectOption } from '../../components/SearchableSelect'
+import { UpperInput, UpperTextarea } from '../../components/UpperInput'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -226,7 +227,7 @@ function ApontamentoModal({
           {/* Descrição */}
           <div>
             <label className={lbl}>Descrição *</label>
-            <input
+            <UpperInput
               type="text"
               placeholder="Ex: Almoço cliente, Material escritório..."
               value={form.descricao}
@@ -238,7 +239,7 @@ function ApontamentoModal({
           {/* Estabelecimento */}
           <div>
             <label className={lbl}>Estabelecimento</label>
-            <input
+            <UpperInput
               type="text"
               placeholder="Nome do local ou fornecedor"
               value={form.estabelecimento}
@@ -269,7 +270,7 @@ function ApontamentoModal({
           {/* Observações */}
           <div>
             <label className={lbl}>Observações</label>
-            <textarea
+            <UpperTextarea
               rows={2}
               placeholder="Notas adicionais..."
               value={form.observacoes}

@@ -24,4 +24,6 @@ O sistema de AI parse deve identificar corretamente categoria, obra, itens e urg
 - [x] Precisão medida: ≥ 90% nos casos testados
 
 ## Tarefa Relacionada
-[[TASK-001 - Portal de Requisicoes]]
+- [[Database/Tarefas/TASK-001 - Portal de Requisicoes|TASK-001 — Portal de Requisições]]
+- [[26 - Upload Inteligente Cotacao]]
+- [[10 - n8n Workflows]]

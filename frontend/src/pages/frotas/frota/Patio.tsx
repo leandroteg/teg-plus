@@ -2,11 +2,13 @@ import { useState, useMemo } from 'react'
 import {
   Search, Plus, Car, Cog, Gauge, Timer,
   FileText, ShieldAlert, Wrench, ClipboardList, MapPin, Warehouse,
-  LayoutGrid, LayoutList,
+  LayoutGrid, LayoutList, X, Loader2, Landmark,
 } from 'lucide-react'
 import { useTheme } from '../../../contexts/ThemeContext'
-import { useVeiculos, useOrdensServico } from '../../../hooks/useFrotas'
-import type { FroVeiculo } from '../../../types/frotas'
+import { useVeiculos, useOrdensServico, useSalvarVeiculo } from '../../../hooks/useFrotas'
+import { useBases } from '../../../hooks/useEstoque'
+import AlocarVeiculoModal from '../../../components/frotas/AlocarVeiculoModal'
+import type { FroVeiculo, CategoriaVeiculo, CombustivelVeiculo, PropriedadeVeiculo, TipoAtivo } from '../../../types/frotas'
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 
@@ -104,8 +106,9 @@ function VeiculoCard({ v, osCount, isLight, onAlocar, onOS, onChecklist }: Veicu
     <div className={`rounded-2xl border shadow-sm transition-all hover:shadow-md ${
       isLight ? 'bg-white border-slate-200' : 'bg-[#1e293b] border-white/[0.06]'
     }`}>
-      <div className="p-4">
-        <div className="flex items-start gap-3">
+      <div className="flex flex-col sm:flex-row sm:items-center gap-3 px-4 py-3">
+        {/* Top line: Icon + Placa/modelo */}
+        <div className="flex items-center gap-3">
           {/* Icon box */}
           <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${
             isMaquina
@@ -118,108 +121,100 @@ function VeiculoCard({ v, osCount, isLight, onAlocar, onOS, onChecklist }: Veicu
             }
           </div>
 
-          {/* Main content */}
-          <div className="flex-1 min-w-0">
-            {/* Title + OSBadge */}
-            <div className="flex items-start justify-between gap-1 mb-0.5">
+          {/* Placa + modelo */}
+          <div className="min-w-0 sm:w-40 shrink-0">
+            <div className="flex items-center gap-1.5">
               <p className={`text-sm font-bold truncate ${isLight ? 'text-slate-800' : 'text-white'}`}>
                 {identificador}
               </p>
               {osCount > 0 && <OSBadge count={osCount} isLight={isLight} />}
             </div>
-
-            {/* Subtitle */}
             <p className="text-[11px] text-slate-500 truncate">
               {v.marca} {v.modelo}{v.ano_mod ? ` · ${v.ano_mod}` : ''}
             </p>
-
-            {/* Badges row */}
-            <div className="flex flex-wrap items-center gap-1.5 mt-2">
-              {/* Propriedade */}
-              <span className={`inline-flex items-center text-[10px] font-semibold px-2 py-0.5 rounded-full ${isLight ? prop.light : prop.dark}`}>
-                {prop.label}
-              </span>
-
-              {/* Preventiva */}
-              <span className={`inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full border ${isLight ? prevStyle.light : prevStyle.dark}`}>
-                <Wrench size={9} />
-                {isMaquina && v.km_proxima_preventiva
-                  ? `Prev. ${fmtNum(v.km_proxima_preventiva)} h`
-                  : v.km_proxima_preventiva
-                  ? `Prev. ${fmtNum(v.km_proxima_preventiva)} km`
-                  : v.data_proxima_preventiva
-                  ? `Prev. ${new Date(v.data_proxima_preventiva).toLocaleDateString('pt-BR')}`
-                  : 'Preventiva OK'}
-              </span>
-            </div>
-
-            {/* Meta row */}
-            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-2 text-[10px] text-slate-400">
-              {/* KM / Hs */}
-              {isMaquina ? (
-                v.horimetro_atual !== undefined && (
-                  <span className="flex items-center gap-1">
-                    <Timer size={10} /> {fmtNum(v.horimetro_atual)} h
-                  </span>
-                )
-              ) : (
-                <span className="flex items-center gap-1">
-                  <Gauge size={10} /> {fmtNum(v.hodometro_atual)} km
-                </span>
-              )}
-
-              {/* CRLV alert */}
-              {crlvColor && (
-                <span className={`flex items-center gap-1 font-semibold ${crlvColor}`}>
-                  <FileText size={9} />
-                  CRLV {diasCrlv !== null && diasCrlv <= 0 ? 'vencido' : `${diasCrlv}d`}
-                </span>
-              )}
-
-              {/* Seguro alert */}
-              {seguroColor && (
-                <span className={`flex items-center gap-1 font-semibold ${seguroColor}`}>
-                  <FileText size={9} />
-                  Seguro {diasSeguro !== null && diasSeguro <= 0 ? 'vencido' : `${diasSeguro}d`}
-                </span>
-              )}
-            </div>
           </div>
         </div>
-      </div>
 
-      {/* Actions footer */}
-      <div className="flex items-center gap-2 px-4 pb-4">
-        <button
-          onClick={() => onAlocar(v.id)}
-          className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl border text-[11px] font-semibold transition-all ${
-            isLight
-              ? 'bg-rose-50 border-rose-200 text-rose-600 hover:bg-rose-100'
-              : 'bg-rose-500/10 border-rose-500/25 text-rose-300 hover:bg-rose-500/[0.18]'
-          }`}
-        >
-          <MapPin size={11} /> Alocar
-        </button>
-        <button
-          onClick={() => onOS(v.id)}
-          className={`flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl border text-[11px] font-semibold transition-all ${
-            isLight
-              ? 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'
-              : 'bg-white/[0.04] border-white/[0.06] text-slate-300 hover:bg-white/[0.08]'
-          }`}
-        >
-          <Wrench size={11} /> OS
-        </button>
-        <button
-          onClick={() => onChecklist(v.id)}
-          className={`flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl border text-[11px] font-semibold transition-all ${
-            isLight
-              ? 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'
-              : 'bg-white/[0.04] border-white/[0.06] text-slate-300 hover:bg-white/[0.08]'
-          }`}
-        >
-          <ClipboardList size={11} />
-        </button>
+        {/* Badges */}
+        <div className="flex flex-wrap items-center gap-1.5 shrink-0">
+          <span className={`inline-flex items-center text-[10px] font-semibold px-2 py-0.5 rounded-full ${isLight ? prop.light : prop.dark}`}>
+            {prop.label}
+          </span>
+          <span className={`inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full border ${isLight ? prevStyle.light : prevStyle.dark}`}>
+            <Wrench size={9} />
+            {isMaquina && v.km_proxima_preventiva
+              ? `Prev. ${fmtNum(v.km_proxima_preventiva)} h`
+              : v.km_proxima_preventiva
+              ? `Prev. ${fmtNum(v.km_proxima_preventiva)} km`
+              : v.data_proxima_preventiva
+              ? `Prev. ${new Date(v.data_proxima_preventiva).toLocaleDateString('pt-BR')}`
+              : 'Preventiva OK'}
+          </span>
+        </div>
+
+        {/* Meta */}
+        <div className="hidden md:flex items-center gap-x-3 text-[10px] text-slate-400 shrink-0">
+          {isMaquina ? (
+            v.horimetro_atual !== undefined && (
+              <span className="flex items-center gap-1">
+                <Timer size={10} /> {fmtNum(v.horimetro_atual)} h
+              </span>
+            )
+          ) : (
+            <span className="flex items-center gap-1">
+              <Gauge size={10} /> {fmtNum(v.hodometro_atual)} km
+            </span>
+          )}
+          {crlvColor && (
+            <span className={`flex items-center gap-1 font-semibold ${crlvColor}`}>
+              <FileText size={9} />
+              CRLV {diasCrlv !== null && diasCrlv <= 0 ? 'vencido' : `${diasCrlv}d`}
+            </span>
+          )}
+          {seguroColor && (
+            <span className={`flex items-center gap-1 font-semibold ${seguroColor}`}>
+              <FileText size={9} />
+              Seguro {diasSeguro !== null && diasSeguro <= 0 ? 'vencido' : `${diasSeguro}d`}
+            </span>
+          )}
+        </div>
+
+        {/* Spacer */}
+        <div className="hidden sm:block flex-1" />
+
+        {/* Actions */}
+        <div className="flex items-center gap-2 w-full sm:w-auto">
+          <button
+            onClick={() => onAlocar(v.id)}
+            className={`flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-xl border text-[11px] font-semibold transition-all ${
+              isLight
+                ? 'bg-rose-50 border-rose-200 text-rose-600 hover:bg-rose-100'
+                : 'bg-rose-500/10 border-rose-500/25 text-rose-300 hover:bg-rose-500/[0.18]'
+            }`}
+          >
+            <MapPin size={11} /> Alocar
+          </button>
+          <button
+            onClick={() => onOS(v.id)}
+            className={`flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-xl border text-[11px] font-semibold transition-all ${
+              isLight
+                ? 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'
+                : 'bg-white/[0.04] border-white/[0.06] text-slate-300 hover:bg-white/[0.08]'
+            }`}
+          >
+            <Wrench size={11} /> OS
+          </button>
+          <button
+            onClick={() => onChecklist(v.id)}
+            className={`flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-xl border text-[11px] font-semibold transition-all ${
+              isLight
+                ? 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'
+                : 'bg-white/[0.04] border-white/[0.06] text-slate-300 hover:bg-white/[0.08]'
+            }`}
+          >
+            <ClipboardList size={11} />
+          </button>
+        </div>
       </div>
     </div>
   )
@@ -383,9 +378,12 @@ function VeiculoRow({ v, osCount, isLight, idx, onAlocar, onOS, onChecklist }: V
 // ── Patio ─────────────────────────────────────────────────────────────────────
 
 export default function Patio() {
-  const { isLightSidebar: isLight } = useTheme()
+  const { isDark } = useTheme()
+  const isLight = !isDark
   const [search, setSearch] = useState('')
   const [viewMode, setViewMode] = useState<'cards' | 'table'>('cards')
+  const [alocarVeiculo, setAlocarVeiculo] = useState<FroVeiculo | null>(null)
+  const [showNovoAtivo, setShowNovoAtivo] = useState(false)
 
   const { data: veiculos = [], isLoading } = useVeiculos({ status: 'disponivel' })
   const { data: ordens  = [] } = useOrdensServico({
@@ -412,8 +410,11 @@ export default function Patio() {
     )
   }, [veiculos, search])
 
-  // stub handlers — real modals would live in a parent layer
-  const handleAlocar    = (_id: string) => { /* TODO: abrir modal alocação */ }
+  // handlers
+  const handleAlocar    = (id: string) => {
+    const v = filtered.find(x => x.id === id)
+    if (v) setAlocarVeiculo(v)
+  }
   const handleOS        = (_id: string) => { /* TODO: abrir modal OS */ }
   const handleChecklist = (_id: string) => { /* TODO: abrir modal checklist */ }
 
@@ -435,15 +436,15 @@ export default function Patio() {
             Ativos prontos para uso, sem alocação ativa
           </p>
         </div>
-        <div className="flex items-center gap-2">
-          <div className="relative">
+        <div className="flex items-center gap-2 w-full sm:w-auto">
+          <div className="relative flex-1 sm:flex-initial">
             <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
             <input
               type="text"
               value={search}
               onChange={e => setSearch(e.target.value)}
               placeholder="Buscar placa, modelo..."
-              className={`pl-8 pr-3 py-2 rounded-xl border text-xs w-52 transition-all focus:outline-none focus:ring-2 ${
+              className={`pl-8 pr-3 py-2 rounded-xl border text-xs w-full sm:w-52 transition-all focus:outline-none focus:ring-2 ${
                 isLight
                   ? 'bg-white border-slate-200 focus:ring-rose-500/20 focus:border-rose-400'
                   : 'bg-slate-800/60 border-slate-700 text-white focus:ring-rose-500/20 focus:border-rose-500'
@@ -479,7 +480,7 @@ export default function Patio() {
             </button>
           </div>
 
-          <button className={`flex items-center gap-1.5 text-xs font-semibold px-3 py-2 rounded-xl transition-all ${
+          <button onClick={() => setShowNovoAtivo(true)} className={`flex items-center gap-1.5 text-xs font-semibold px-3 py-2 rounded-xl transition-all ${
             isLight
               ? 'bg-rose-500 text-white hover:bg-rose-600 shadow-sm shadow-rose-500/30'
               : 'bg-rose-500/90 text-white hover:bg-rose-500 shadow-sm shadow-rose-500/20'
@@ -515,7 +516,7 @@ export default function Patio() {
 
       {/* Cards view */}
       {!isLoading && filtered.length > 0 && viewMode === 'cards' && (
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+        <div className="space-y-2">
           {filtered.map(v => (
             <VeiculoCard
               key={v.id}
@@ -566,6 +567,258 @@ export default function Patio() {
           </div>
         </div>
       )}
+
+      {/* Modal Alocar */}
+      {alocarVeiculo && (
+        <AlocarVeiculoModal
+          veiculo={alocarVeiculo}
+          onClose={() => setAlocarVeiculo(null)}
+        />
+      )}
+
+      {/* Modal Novo Ativo */}
+      {showNovoAtivo && (
+        <NovoAtivoModal onClose={() => setShowNovoAtivo(false)} isLight={isLight} />
+      )}
+    </div>
+  )
+}
+
+// ── NovoAtivoModal ───────────────────────────────────────────────────────────
+
+const CATEGORIAS: { value: CategoriaVeiculo; label: string }[] = [
+  { value: 'passeio', label: 'Passeio' }, { value: 'pickup', label: 'Pickup/SUV' },
+  { value: 'van', label: 'Van' }, { value: 'vuc', label: 'VUC' },
+  { value: 'truck', label: 'Truck' }, { value: 'carreta', label: 'Carreta' },
+  { value: 'moto', label: 'Moto' }, { value: 'onibus', label: 'Onibus' },
+]
+
+const COMBUSTIVEIS: { value: CombustivelVeiculo; label: string }[] = [
+  { value: 'flex', label: 'Flex' }, { value: 'gasolina', label: 'Gasolina' },
+  { value: 'diesel', label: 'Diesel' }, { value: 'etanol', label: 'Etanol' },
+  { value: 'eletrico', label: 'Eletrico' }, { value: 'gnv', label: 'GNV' },
+]
+
+const PROPRIEDADES: { value: PropriedadeVeiculo; label: string }[] = [
+  { value: 'propria', label: 'Propria' }, { value: 'locada', label: 'Locada' }, { value: 'cedida', label: 'Cedida' },
+]
+
+function NovoAtivoModal({ onClose, isLight }: { onClose: () => void; isLight: boolean }) {
+  const salvar = useSalvarVeiculo()
+  const { data: bases = [] } = useBases()
+  const isDark = !isLight
+
+  const [form, setForm] = useState({
+    placa: '', marca: '', modelo: '', ano_fab: '', ano_mod: '',
+    categoria: 'pickup' as CategoriaVeiculo,
+    combustivel: 'diesel' as CombustivelVeiculo,
+    propriedade: 'propria' as PropriedadeVeiculo,
+    tipo_ativo: 'veiculo' as TipoAtivo,
+    hodometro_atual: '0',
+    base_id: '',
+    valor_fipe: '',
+    data_aquisicao: '',
+    numero_serie: '',
+    observacoes: '',
+  })
+  const [registrarPatrimonio, setRegistrarPatrimonio] = useState(true)
+  const [success, setSuccess] = useState(false)
+
+  const bg = isDark ? 'bg-[#1e293b]' : 'bg-white'
+  const inp = `w-full px-3 py-2.5 rounded-xl text-sm outline-none transition-colors ${
+    isDark
+      ? 'bg-white/[0.06] border border-white/[0.12] text-white placeholder-slate-500 focus:border-rose-500'
+      : 'bg-white border border-slate-200 text-slate-800 placeholder-slate-400 focus:border-rose-400'
+  }`
+  const lbl = `block text-xs font-bold mb-1.5 ${isDark ? 'text-slate-300' : 'text-slate-600'}`
+
+  const set = (k: string, v: string) => setForm(f => ({ ...f, [k]: v }))
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    await salvar.mutateAsync({
+      placa: form.placa.toUpperCase(),
+      marca: form.marca, modelo: form.modelo,
+      ano_fab: form.ano_fab ? Number(form.ano_fab) : undefined,
+      ano_mod: form.ano_mod ? Number(form.ano_mod) : undefined,
+      categoria: form.categoria,
+      combustivel: form.combustivel,
+      propriedade: form.propriedade,
+      tipo_ativo: form.tipo_ativo,
+      hodometro_atual: Number(form.hodometro_atual) || 0,
+      base_id: form.base_id || undefined,
+      valor_fipe: form.valor_fipe ? Number(form.valor_fipe) : undefined,
+      data_aquisicao: form.data_aquisicao || undefined,
+      numero_serie: form.numero_serie || undefined,
+      observacoes: form.observacoes || undefined,
+      status: 'disponivel',
+    })
+    // TODO: se registrarPatrimonio, criar pat_imobilizados vinculado
+    setSuccess(true)
+  }
+
+  if (success) {
+    return (
+      <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-black/60 backdrop-blur-sm" onClick={onClose}>
+        <div className={`rounded-2xl shadow-2xl w-full max-w-md p-6 text-center ${bg}`} onClick={e => e.stopPropagation()}>
+          <div className="w-12 h-12 rounded-full bg-emerald-100 flex items-center justify-center mx-auto mb-3">
+            <Car size={24} className="text-emerald-600" />
+          </div>
+          <h3 className={`text-lg font-bold mb-1 ${isDark ? 'text-white' : 'text-slate-800'}`}>Ativo Cadastrado!</h3>
+          <p className={`text-sm mb-1 ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>
+            {form.placa.toUpperCase()} — {form.marca} {form.modelo}
+          </p>
+          {registrarPatrimonio && (
+            <p className={`text-xs mb-4 ${isDark ? 'text-amber-400' : 'text-amber-600'}`}>
+              <Landmark size={12} className="inline mr-1" />
+              Registrado tambem no Patrimonial
+            </p>
+          )}
+          <button onClick={onClose} className="w-full py-2.5 rounded-xl bg-rose-600 text-white text-sm font-bold hover:bg-rose-700">
+            Fechar
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-black/60 backdrop-blur-sm" onClick={onClose}>
+      <form onSubmit={handleSubmit} onClick={e => e.stopPropagation()}
+        className={`rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto border ${isDark ? 'border-white/[0.06]' : 'border-slate-200'} ${bg}`}>
+        <div className={`flex items-center justify-between px-5 py-4 border-b sticky top-0 z-10 rounded-t-2xl ${isDark ? 'border-white/[0.06] bg-[#1e293b]' : 'border-slate-100 bg-white'}`}>
+          <h2 className={`text-base font-extrabold flex items-center gap-2 ${isDark ? 'text-white' : 'text-slate-800'}`}>
+            <Car size={16} className="text-rose-500" /> Novo Ativo
+          </h2>
+          <button type="button" onClick={onClose} className="text-slate-400 hover:text-slate-600"><X size={18} /></button>
+        </div>
+
+        <div className="p-5 space-y-4">
+          {/* Tipo */}
+          <div className="flex gap-2">
+            {(['veiculo', 'maquina'] as TipoAtivo[]).map(t => (
+              <button key={t} type="button" onClick={() => set('tipo_ativo', t)}
+                className={`flex-1 py-2 rounded-xl text-xs font-bold border transition-all ${
+                  form.tipo_ativo === t
+                    ? 'bg-rose-500 text-white border-rose-500'
+                    : isDark ? 'border-white/10 text-slate-400' : 'border-slate-200 text-slate-500'
+                }`}>
+                {t === 'veiculo' ? 'Veiculo' : 'Maquina'}
+              </button>
+            ))}
+          </div>
+
+          {/* Placa + Marca + Modelo */}
+          <div className="grid grid-cols-3 gap-3">
+            <div>
+              <label className={lbl}>Placa *</label>
+              <input required className={`${inp} uppercase`} placeholder="ABC1D23" value={form.placa} onChange={e => set('placa', e.target.value)} />
+            </div>
+            <div>
+              <label className={lbl}>Marca *</label>
+              <input required className={inp} placeholder="Toyota" value={form.marca} onChange={e => set('marca', e.target.value)} />
+            </div>
+            <div>
+              <label className={lbl}>Modelo *</label>
+              <input required className={inp} placeholder="Hilux" value={form.modelo} onChange={e => set('modelo', e.target.value)} />
+            </div>
+          </div>
+
+          {/* Ano + Categoria + Combustivel */}
+          <div className="grid grid-cols-4 gap-3">
+            <div>
+              <label className={lbl}>Ano Fab</label>
+              <input type="number" className={inp} placeholder="2024" value={form.ano_fab} onChange={e => set('ano_fab', e.target.value)} />
+            </div>
+            <div>
+              <label className={lbl}>Ano Mod</label>
+              <input type="number" className={inp} placeholder="2025" value={form.ano_mod} onChange={e => set('ano_mod', e.target.value)} />
+            </div>
+            <div>
+              <label className={lbl}>Categoria</label>
+              <select className={inp} value={form.categoria} onChange={e => set('categoria', e.target.value)}>
+                {CATEGORIAS.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className={lbl}>Combustivel</label>
+              <select className={inp} value={form.combustivel} onChange={e => set('combustivel', e.target.value)}>
+                {COMBUSTIVEIS.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
+              </select>
+            </div>
+          </div>
+
+          {/* Propriedade + Base + Hodometro */}
+          <div className="grid grid-cols-3 gap-3">
+            <div>
+              <label className={lbl}>Propriedade</label>
+              <select className={inp} value={form.propriedade} onChange={e => set('propriedade', e.target.value)}>
+                {PROPRIEDADES.map(p => <option key={p.value} value={p.value}>{p.label}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className={lbl}>Base</label>
+              <select className={inp} value={form.base_id} onChange={e => set('base_id', e.target.value)}>
+                <option value="">Selecionar...</option>
+                {bases.filter(b => b.ativa).map(b => <option key={b.id} value={b.id}>{b.nome}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className={lbl}>{form.tipo_ativo === 'maquina' ? 'Horimetro' : 'Hodometro'}</label>
+              <input type="number" className={inp} placeholder="0" value={form.hodometro_atual} onChange={e => set('hodometro_atual', e.target.value)} />
+            </div>
+          </div>
+
+          {/* Valor + Data Aquisicao */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className={lbl}>Valor (R$)</label>
+              <input type="number" className={inp} placeholder="0" value={form.valor_fipe} onChange={e => set('valor_fipe', e.target.value)} />
+            </div>
+            <div>
+              <label className={lbl}>Data Aquisicao</label>
+              <input type="date" className={inp} value={form.data_aquisicao} onChange={e => set('data_aquisicao', e.target.value)} />
+            </div>
+          </div>
+
+          {/* Observacoes */}
+          <div>
+            <label className={lbl}>Observacoes</label>
+            <textarea className={`${inp} resize-none`} rows={2} placeholder="Detalhes adicionais..." value={form.observacoes} onChange={e => set('observacoes', e.target.value)} />
+          </div>
+
+          {/* Checkbox Patrimonio */}
+          <label className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-colors ${
+            registrarPatrimonio
+              ? isDark ? 'border-amber-500/30 bg-amber-500/10' : 'border-amber-300 bg-amber-50'
+              : isDark ? 'border-white/[0.08]' : 'border-slate-200'
+          }`}>
+            <input type="checkbox" checked={registrarPatrimonio} onChange={e => setRegistrarPatrimonio(e.target.checked)}
+              className="w-4 h-4 rounded accent-amber-500" />
+            <div>
+              <p className={`text-xs font-bold ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>
+                <Landmark size={12} className="inline mr-1 text-amber-500" />
+                Registrar no Patrimonial
+              </p>
+              <p className={`text-[10px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+                Cria automaticamente um imobilizado vinculado (pode desmarcar para cadastro retroativo)
+              </p>
+            </div>
+          </label>
+        </div>
+
+        <div className={`px-5 py-4 border-t flex gap-3 ${isDark ? 'border-white/[0.06]' : 'border-slate-100'}`}>
+          <button type="button" onClick={onClose}
+            className={`flex-1 py-2.5 rounded-xl border text-sm font-semibold ${isDark ? 'border-white/10 text-slate-300' : 'border-slate-200 text-slate-600'}`}>
+            Cancelar
+          </button>
+          <button type="submit" disabled={salvar.isPending || !form.placa || !form.marca || !form.modelo}
+            className="flex-1 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-sm text-white font-bold transition-colors disabled:opacity-50 flex items-center justify-center gap-2">
+            {salvar.isPending ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />}
+            Cadastrar Ativo
+          </button>
+        </div>
+      </form>
     </div>
   )
 }

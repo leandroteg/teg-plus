@@ -1,6 +1,6 @@
 ---
 tipo: tarefa
-id: TASK-022
+id: TASK-020
 titulo: "Frotas Core — Schema, Hooks e Páginas"
 status: concluido
 prioridade: alta
@@ -50,3 +50,8 @@ Implementar o módulo completo de Manutenção e Uso de Frotas conforme especifi
 ## Resultado
 
 Módulo entregue e funcional com todas as telas implementadas.
+
+## Links
+- [[24 - Módulo Frotas e Manutenção]]
+- [[Database/Milestones/MS-007 - Modulo Frotas Manutencao|MS-007 — Frotas]]
+- [[07 - Schema Database]]

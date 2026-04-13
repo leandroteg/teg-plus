@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Plus, Radio, AlertTriangle, CheckCircle, MessageSquare, XCircle, X } from 'lucide-react'
+import { UpperInput, UpperTextarea } from '../../../components/UpperInput'
 import { useOcorrenciasTel, useAtualizarOcorrencia, useRegistrarOcorrencia, useVeiculos } from '../../../hooks/useFrotas'
 import { useTheme } from '../../../contexts/ThemeContext'
 import type { FroOcorrenciaTel, StatusOcorrenciaTel, TipoOcorrenciaTel } from '../../../types/frotas'
@@ -94,7 +95,7 @@ function OcorrenciaModal({ oc, onClose, isLight }: { oc: FroOcorrenciaTel; onClo
 
         <div>
           <label className={`block text-xs font-bold mb-1 ${isLight ? 'text-slate-600' : 'text-slate-300'}`}>Observações / Tratativa</label>
-          <textarea
+          <UpperTextarea
             className={`w-full px-3 py-2 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-teal-400/40 resize-none mt-1 ${
               isLight ? 'bg-white border border-slate-200 shadow-sm text-slate-800' : 'bg-white/6 border border-white/12 text-white'
             }`}
@@ -196,7 +197,7 @@ function NovaOcorrenciaModal({ onClose, isLight }: { onClose: () => void; isLigh
           </button>
         </div>
 
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
             <label className={lbl}>Veículo *</label>
             <select className={sel} value={form.veiculo_id} onChange={e => setForm(f => ({ ...f, veiculo_id: e.target.value }))} required>
@@ -214,7 +215,7 @@ function NovaOcorrenciaModal({ onClose, isLight }: { onClose: () => void; isLigh
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
             <label className={lbl}>Data/hora *</label>
             <input type="datetime-local" className={inp} value={form.data_ocorrencia} onChange={e => setForm(f => ({ ...f, data_ocorrencia: e.target.value }))} required />
@@ -227,12 +228,12 @@ function NovaOcorrenciaModal({ onClose, isLight }: { onClose: () => void; isLigh
 
         <div>
           <label className={lbl}>Endereço / Local</label>
-          <input className={inp} value={form.endereco} onChange={e => setForm(f => ({ ...f, endereco: e.target.value }))} placeholder="Rodovia BR-040, km 512" />
+          <UpperInput className={inp} value={form.endereco} onChange={e => setForm(f => ({ ...f, endereco: e.target.value }))} placeholder="Rodovia BR-040, km 512" />
         </div>
 
         <div>
           <label className={lbl}>Observações</label>
-          <textarea className={inp + ' resize-none'} rows={2} value={form.observacoes} onChange={e => setForm(f => ({ ...f, observacoes: e.target.value }))} placeholder="Detalhes adicionais..." />
+          <UpperTextarea className={inp + ' resize-none'} rows={2} value={form.observacoes} onChange={e => setForm(f => ({ ...f, observacoes: e.target.value }))} placeholder="Detalhes adicionais..." />
         </div>
 
         <div className="flex gap-2">
@@ -257,7 +258,8 @@ const TABS: Array<{ key: StatusOcorrenciaTel; label: string }> = [
 ]
 
 export default function TelemetriaOp() {
-  const { isLightSidebar: isLight } = useTheme()
+  const { isDark } = useTheme()
+  const isLight = !isDark
   const [tabIdx, setTabIdx]     = useState(0)
   const [selected, setSelected] = useState<FroOcorrenciaTel | null>(null)
   const [novaModal, setNovaModal] = useState(false)
@@ -267,14 +269,14 @@ export default function TelemetriaOp() {
 
   return (
     <div className="p-4 sm:p-6 space-y-4">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
           <h1 className={`text-xl font-bold flex items-center gap-2 ${isLight ? 'text-slate-800' : 'text-white'}`}>
             <Radio size={20} className="text-teal-500" /> Telemetria e Compliance
           </h1>
           <p className="text-sm text-slate-500">Ocorrências registradas pelo sistema de rastreamento</p>
         </div>
-        <button onClick={() => setNovaModal(true)} className="flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-teal-500 to-teal-600 hover:from-teal-400 hover:to-teal-500 shadow-sm shadow-teal-500/20 text-sm text-white font-semibold">
+        <button onClick={() => setNovaModal(true)} className="flex items-center justify-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-teal-500 to-teal-600 hover:from-teal-400 hover:to-teal-500 shadow-sm shadow-teal-500/20 text-sm text-white font-semibold w-full sm:w-auto">
           <Plus size={15} /> Registrar Ocorrência
         </button>
       </div>

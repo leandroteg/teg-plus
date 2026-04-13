@@ -5,6 +5,7 @@ import {
 } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
 import { useImoveis, useAditivos, useVistorias } from '../../hooks/useLocacao'
+import { UpperInput } from '../../components/UpperInput'
 import type { LocImovel, LocAditivo, LocVistoria } from '../../types/locacao'
 
 const fmtDate = (d?: string) => d ? new Date(d + 'T12:00:00').toLocaleDateString('pt-BR') : '—'
@@ -286,7 +287,7 @@ export default function Ativos() {
         {/* Busca */}
         <div className="relative flex-1 min-w-[160px] max-w-xs">
           <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-          <input type="text" value={busca} onChange={e => setBusca(e.target.value)} placeholder="Buscar imóvel..."
+          <UpperInput type="text" value={busca} onChange={e => setBusca(e.target.value)} placeholder="Buscar imóvel..."
             className={`w-full pl-9 pr-3 py-2 rounded-xl border text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/30 ${isDark ? 'bg-white/[0.04] border-white/[0.06] text-slate-200' : 'border-slate-200 bg-white'}`} />
           {busca && <button onClick={() => setBusca('')} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400"><X size={12} /></button>}
         </div>

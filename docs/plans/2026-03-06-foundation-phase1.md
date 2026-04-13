@@ -913,3 +913,7 @@ git push -u origin feat/foundation-phase1
 
 **Total estimated files changed:** 12 modified, 4 created
 **Total estimated lines:** ~3500 lines removed (layout duplication), ~600 lines added (new components + hooks), ~200 lines SQL
+
+
+## Links
+- [[obsidian/01 - Arquitetura Geral]]
