@@ -77,6 +77,35 @@ export function useAprovacoesPendentes(tipo?: TipoAprovacao) {
         }
       }
 
+      // 3b. Busca historico de esclarecimentos para requisicoes
+      const escHistMap = new Map<string, { tipo: 'pedido' | 'resposta'; autor: string; msg: string; data: string }[]>()
+      if (cmpIds.length > 0) {
+        const { data: escData } = await supabase
+          .from(TABLE_APR)
+          .select('entidade_id, status, observacao, aprovador_nome, data_decisao, created_at')
+          .in('entidade_id', cmpIds)
+          .eq('modulo', 'cmp')
+          .in('status', ['esclarecimento', 'pendente'])
+          .not('observacao', 'is', null)
+          .order('created_at', { ascending: true })
+
+        for (const e of escData ?? []) {
+          const obs = (e.observacao as string) ?? ''
+          const isResposta = obs.startsWith('Esclarecimento respondido')
+          // Filtra: so registros de esclarecimento ou respostas de esclarecimento
+          if (e.status !== 'esclarecimento' && !isResposta) continue
+
+          const hist = escHistMap.get(e.entidade_id as string) ?? []
+          hist.push({
+            tipo: e.status === 'esclarecimento' ? 'pedido' : 'resposta',
+            autor: (e.aprovador_nome as string) ?? '',
+            msg: obs,
+            data: (e.data_decisao as string) ?? (e.created_at as string) ?? '',
+          })
+          escHistMap.set(e.entidade_id as string, hist)
+        }
+      }
+
       // 4. Busca dados de contratos (minuta_contratual)
       const conIds = aprData
         .filter(a => a.tipo_aprovacao === 'minuta_contratual')
@@ -498,6 +527,7 @@ export function useAprovacoesPendentes(tipo?: TipoAprovacao) {
             minuta_resumo: minutaResumo ?? undefined,
             pagamento_detalhes: pagamentoDetalhes ?? undefined,
             transporte_detalhes: transporteDetalhes ?? undefined,
+            esclarecimento_historico: escHistMap.get(a.entidade_id) ?? undefined,
           } as unknown as AprovacaoPendente
         })
         .filter((a): a is AprovacaoPendente => a !== null)

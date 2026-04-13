@@ -214,6 +214,12 @@ export interface AprovacaoPendente extends Aprovacao {
     peso_total_kg?: number
     volumes_total?: number
   }
+  esclarecimento_historico?: {
+    tipo: 'pedido' | 'resposta'
+    autor: string
+    msg: string
+    data: string
+  }[]
 }
 
 export interface AprovacaoHistorico {
