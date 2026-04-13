@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Plus, ClipboardCheck, CheckCircle, XCircle, AlertTriangle, X } from 'lucide-react'
+import { UpperTextarea } from '../../components/UpperInput'
 import { useChecklists, useCriarChecklist, useVeiculos } from '../../hooks/useFrotas'
 import { useTheme } from '../../contexts/ThemeContext'
 import { useAuth } from '../../contexts/AuthContext'
@@ -139,7 +140,7 @@ function NovaChecklistModal({ onClose, isLight }: { onClose: () => void; isLight
 
         <div>
           <label className={lbl}>Observacoes</label>
-          <textarea className={inp + ' resize-none'} rows={2} value={form.observacoes} onChange={e => setForm(f => ({ ...f, observacoes: e.target.value }))} placeholder="Anomalias, observacoes adicionais..." />
+          <UpperTextarea className={inp + ' resize-none'} rows={2} value={form.observacoes} onChange={e => setForm(f => ({ ...f, observacoes: e.target.value }))} placeholder="Anomalias, observacoes adicionais..." />
         </div>
 
         {erro && (
@@ -196,7 +197,8 @@ function ChecklistRow({ ck, isLight }: { ck: FroChecklist; isLight: boolean }) {
 
 // ── Main ──────────────────────────────────────────────────────────────────────
 export default function Checklists() {
-  const { isLightSidebar: isLight } = useTheme()
+  const { isDark } = useTheme()
+  const isLight = !isDark
   const [modal, setModal]   = useState(false)
   const [dataFiltro, setDataFiltro] = useState(new Date().toISOString().split('T')[0])
   const [tipoFiltro, setTipoFiltro] = useState<TipoChecklist | ''>('')

@@ -29,6 +29,7 @@ export type StatusSolicitacao =
   | 'aprovado'
   | 'romaneio_emitido'
   | 'nfe_emitida'
+  | 'transporte_pendente'
   | 'aguardando_coleta'
   | 'em_transito'
   | 'entregue'
@@ -182,7 +183,9 @@ export interface LogSolicitacao {
   oc_numero?: string
 
   origem: string
+  origem_uf?: string
   destino: string
+  destino_uf?: string
   rota_id?: string
   rota?: LogRota
 
@@ -418,7 +421,9 @@ export interface LogisticaKPIs {
 export interface CriarSolicitacaoPayload {
   tipo: TipoTransporte
   origem: string
+  origem_uf?: string
   destino: string
+  destino_uf?: string
   descricao?: string
   obra_nome?: string
   centro_custo?: string
@@ -464,7 +469,7 @@ export interface IniciarTransportePayload {
 
 export type StatusSolicitacaoPipeline = 'solicitado' | 'planejado' | 'aguardando_aprovacao'
 export type StatusExpedicaoPipeline = 'aprovado' | 'romaneio_emitido' | 'nfe_emitida'
-export type StatusTransportePipeline = 'nfe_emitida' | 'aguardando_coleta' | 'em_transito' | 'entregue' | 'concluido'
+export type StatusTransportePipeline = 'transporte_pendente' | 'aguardando_coleta' | 'em_transito' | 'entregue' | 'concluido'
 
 export const SOLICITACAO_PIPELINE_STAGES: { status: StatusSolicitacaoPipeline; label: string; color: string }[] = [
   { status: 'solicitado',            label: 'Pendentes',      color: 'slate' },
@@ -479,7 +484,7 @@ export const EXPEDICAO_PIPELINE_STAGES: { status: StatusExpedicaoPipeline; label
 ]
 
 export const TRANSPORTE_PIPELINE_STAGES: { status: StatusTransportePipeline; label: string; color: string }[] = [
-  { status: 'nfe_emitida',       label: 'Pendentes',          color: 'slate' },
+  { status: 'transporte_pendente', label: 'Transporte Pendente', color: 'slate' },
   { status: 'aguardando_coleta', label: 'Aguardando Coleta',  color: 'blue' },
   { status: 'em_transito',       label: 'Em Transporte',      color: 'amber' },
   { status: 'entregue',          label: 'Entregues',          color: 'teal' },

@@ -31,7 +31,7 @@ function toIsoDate(date: Date) {
 
 function parseDate(value?: string | null) {
   if (!value) return null
-  const parsed = new Date(`${value}T00:00:00`)
+  const parsed = new Date(`${value}T12:00:00`)
   return Number.isNaN(parsed.getTime()) ? null : parsed
 }
 
@@ -245,10 +245,9 @@ export function normalizarParcelasPlanejadas(
   const cleaned = parcelas
     .map((parcela, index) => ({
       numero: index + 1,
-      valor: roundCurrency(Number(parcela.valor ?? 0)),
-      data_vencimento: parcela.data_vencimento ?? toIsoDate(new Date()),
+      valor: roundCurrency(Number(parcela.valor) || 0),
+      data_vencimento: parcela.data_vencimento || '',
     }))
-    .filter((parcela) => parcela.valor >= 0 && Boolean(parcela.data_vencimento))
 
   if (!cleaned.length) return []
   if (typeof valorTotal !== 'number' || !Number.isFinite(valorTotal)) return cleaned

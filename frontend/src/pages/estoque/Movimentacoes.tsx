@@ -10,6 +10,8 @@ import {
 } from '../../hooks/useEstoque'
 import { useTheme } from '../../contexts/ThemeContext'
 import type { NovaMovimentacaoPayload, TipoMovimentacao } from '../../types/estoque'
+import NumericInput from '../../components/NumericInput'
+import { UpperInput, UpperTextarea } from '../../components/UpperInput'
 
 const TIPO_CONFIG: Record<TipoMovimentacao, { label: string; cor: string; bg: string; icon: typeof ArrowLeftRight }> = {
   entrada:           { label: 'Entrada',        cor: 'text-emerald-700', bg: 'bg-emerald-50', icon: ArrowDownCircle  },
@@ -273,14 +275,14 @@ export default function Movimentacoes() {
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className={`block text-xs font-bold mb-1 ${isLight ? 'text-slate-600' : 'text-slate-300'}`}>Quantidade *</label>
-                  <input type="number" min={0.001} step={0.001} value={payload.quantidade ?? 1}
-                    onChange={e => set('quantidade', Number(e.target.value))}
+                  <NumericInput min={0.001} step={0.001} value={payload.quantidade ?? 1}
+                    onChange={v => set('quantidade', v)}
                     className={inputCls} />
                 </div>
                 <div>
                   <label className={`block text-xs font-bold mb-1 ${isLight ? 'text-slate-600' : 'text-slate-300'}`}>Valor Unit. (R$)</label>
-                  <input type="number" min={0} step={0.01} value={payload.valor_unitario || ''}
-                    onChange={e => set('valor_unitario', Number(e.target.value))}
+                  <NumericInput min={0} step={0.01} value={payload.valor_unitario ?? 0}
+                    onChange={v => set('valor_unitario', v)}
                     className={inputCls} />
                 </div>
               </div>
@@ -288,7 +290,7 @@ export default function Movimentacoes() {
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className={`block text-xs font-bold mb-1 ${isLight ? 'text-slate-600' : 'text-slate-300'}`}>Obra / Destino</label>
-                  <input value={payload.obra_nome ?? ''} onChange={e => set('obra_nome', e.target.value)}
+                  <UpperInput value={payload.obra_nome ?? ''} onChange={e => set('obra_nome', e.target.value)}
                     className={inputCls} placeholder="Nome da obra..." />
                 </div>
                 <div>
@@ -306,14 +308,14 @@ export default function Movimentacoes() {
                 </div>
                 <div>
                   <label className={`block text-xs font-bold mb-1 ${isLight ? 'text-slate-600' : 'text-slate-300'}`}>Responsavel</label>
-                  <input value={payload.responsavel_nome ?? ''} onChange={e => set('responsavel_nome', e.target.value)}
+                  <UpperInput value={payload.responsavel_nome ?? ''} onChange={e => set('responsavel_nome', e.target.value)}
                     className={inputCls} placeholder="Nome..." />
                 </div>
               </div>
 
               <div>
                 <label className={`block text-xs font-bold mb-1 ${isLight ? 'text-slate-600' : 'text-slate-300'}`}>Observacao</label>
-                <textarea value={payload.observacao ?? ''} onChange={e => set('observacao', e.target.value)}
+                <UpperTextarea value={payload.observacao ?? ''} onChange={e => set('observacao', e.target.value)}
                   rows={2} className={`${inputCls} resize-none`} placeholder="Observacoes opcionais..." />
               </div>
             </div>

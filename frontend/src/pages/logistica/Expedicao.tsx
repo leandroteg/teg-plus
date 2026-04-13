@@ -9,62 +9,23 @@ import {
   useNFe, useCancelarNFe, useIniciarTransporte, useEmitirRomaneio, useSolicitarNFFiscal,
   useDespacharViagem,
 } from '../../hooks/useLogistica'
-import { gerarRomaneioPDF } from '../../utils/romaneio-pdf'
+import { buildRomaneioDataFromSolicitacao, gerarRomaneioPDF } from '../../utils/romaneio-pdf'
+import { getDocumentoFiscalContext, getDocumentoFiscalLabel } from '../../utils/logisticaFiscal'
 import { StatusBadge } from './LogisticaHome'
 import { useTheme } from '../../contexts/ThemeContext'
 import type { IniciarTransportePayload, LogSolicitacao } from '../../types/logistica'
 
-// ── UF Detection ──────────────────────────────────────────────────────────────
-
-const CIDADES_MG = [
-  'araxa', 'araxá', 'frutal', 'ituiutaba', 'paracatu',
-  'perdizes', 'rio paranaiba', 'rio paranaíba', 'tres marias', 'três marias',
-]
-
-function detectUF(destino: string): 'MG' | 'outro' | 'indefinido' {
-  if (!destino) return 'indefinido'
-  const d = destino.toLowerCase().trim()
-  if (CIDADES_MG.some(c => d.includes(c))) return 'MG'
-  if (d.includes('se ') && !d.includes('campo grande')) return 'MG'
-  if (d.includes('campo grande') || d.includes('/ms') || d.includes(' ms')) return 'outro'
-  if (d.endsWith('/mg') || d.endsWith(' mg')) return 'MG'
-  return 'indefinido'
-}
-
-function getDocLabel(uf: 'MG' | 'outro' | 'indefinido'): string {
-  switch (uf) {
-    case 'MG': return 'Transporte dentro de MG — Romaneio disponível'
-    case 'outro': return 'Transporte interestadual — NF obrigatória'
-    case 'indefinido': return 'Destino não identificado — escolha o documento fiscal'
-  }
-}
-
 // ── Romaneio download (standalone, used by getDocStatus and ExpedicaoDetail) ──
 
 function downloadRomaneio(s: LogSolicitacao) {
-  const url = gerarRomaneioPDF({
-    numero: s.numero,
-    origem: s.origem,
-    destino: s.destino,
-    obra_nome: s.obra_nome,
-    solicitante: s.solicitante_nome,
-    motorista_nome: s.motorista_nome,
-    veiculo_placa: s.veiculo_placa,
-    peso_total_kg: s.peso_total_kg,
-    volumes_total: s.volumes_total,
-    observacoes: s.observacoes_carga,
-    itens: (s.itens ?? []).map(i => ({
-      descricao: i.descricao,
-      quantidade: i.quantidade,
-      unidade: i.unidade,
-      peso_kg: i.peso_kg,
-    })),
-  })
-  const a = document.createElement('a')
-  a.href = url
-  a.download = `romaneio-${s.numero}.pdf`
-  a.click()
-  URL.revokeObjectURL(url)
+  void (async () => {
+    const url = await gerarRomaneioPDF(buildRomaneioDataFromSolicitacao(s))
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `romaneio-${s.numero}.pdf`
+    a.click()
+    window.setTimeout(() => URL.revokeObjectURL(url), 60_000)
+  })()
 }
 
 // ── Main Component ────────────────────────────────────────────────────────────
@@ -112,31 +73,15 @@ export default function Expedicao() {
     if (!romaneioModal) return
     const s = romaneioModal
 
-    const url = gerarRomaneioPDF({
-      numero: s.numero,
-      origem: s.origem,
-      destino: s.destino,
-      obra_nome: s.obra_nome,
-      solicitante: s.solicitante_nome,
-      motorista_nome: s.motorista_nome,
-      veiculo_placa: s.veiculo_placa,
-      peso_total_kg: s.peso_total_kg,
-      volumes_total: s.volumes_total,
-      observacoes: s.observacoes_carga,
-      itens: (s.itens ?? []).map(i => ({
-        descricao: i.descricao,
-        quantidade: i.quantidade,
-        unidade: i.unidade,
-        peso_kg: i.peso_kg,
-      })),
-    })
+    const url = await gerarRomaneioPDF(buildRomaneioDataFromSolicitacao(s))
 
     // Open PDF in new tab for the user
     window.open(url, '_blank')
+    window.setTimeout(() => URL.revokeObjectURL(url), 60_000)
 
     await emitirRomaneio.mutateAsync({
       solicitacao_id: s.id,
-      romaneio_url: url,
+      romaneio_url: '',
     })
 
     setRomaneioModal(null)
@@ -188,16 +133,16 @@ export default function Expedicao() {
   // ── Open NF modal with smart defaults ──
 
   function openNfModal(s: LogSolicitacao) {
-    const uf = detectUF(s.destino)
+    const fiscalCtx = getDocumentoFiscalContext(s)
     setNfModal(s)
     setNfForm({
       emitente_cnpj: '',
       emitente_nome: '',
       destinatario_cnpj: '',
       destinatario_nome: s.obra_nome ?? '',
-      destinatario_uf: uf === 'MG' ? 'MG' : uf === 'outro' ? '' : '',
+      destinatario_uf: fiscalCtx.destinoUf || '',
       valor_total: 0,
-      cfop: uf === 'MG' ? '5.949' : uf === 'outro' ? '6.949' : '',
+      cfop: fiscalCtx.regra === 'romaneio' ? '5.949' : fiscalCtx.regra === 'nf' ? '6.949' : '',
       natureza_operacao: 'Remessa de Materiais',
       descricao: '',
     })
@@ -327,7 +272,7 @@ export default function Expedicao() {
       <div className={`rounded-2xl px-4 py-3 flex items-start gap-2.5 ${isDark ? 'bg-amber-500/10 border border-amber-500/20' : 'bg-amber-50 border border-amber-200'}`}>
         <AlertTriangle size={16} className={`shrink-0 mt-0.5 ${isDark ? 'text-amber-400' : 'text-amber-600'}`} />
         <p className={`text-xs font-medium ${isDark ? 'text-amber-400' : 'text-amber-700'}`}>
-          <strong>Regra obrigatória:</strong> Nenhuma carga pode ser despachada sem documento fiscal (Romaneio para MG ou NF-e interestadual).
+          <strong>Regra obrigatória:</strong> Nenhuma carga pode ser despachada sem documento fiscal (Romaneio intrastadual ou NF-e interestadual).
           O sistema bloqueia o despacho até o documento ser emitido.
         </p>
       </div>
@@ -439,7 +384,7 @@ export default function Expedicao() {
                 </div>
                 <div>
                   <h2 className={`text-lg font-extrabold ${isDark ? 'text-white' : 'text-slate-800'}`}>Emitir Romaneio</h2>
-                  <p className={`text-[10px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Documento de carga MG → MG</p>
+                  <p className={`text-[10px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Documento operacional intrastadual</p>
                 </div>
               </div>
               <button onClick={() => setRomaneioModal(null)}
@@ -564,7 +509,7 @@ export default function Expedicao() {
                   <span className={`font-bold ${isDark ? 'text-violet-400' : 'text-violet-800'}`}>{nfModal.destino}</span>
                 </div>
                 <p className={`text-[11px] mt-1 ml-5 ${isDark ? 'text-violet-400' : 'text-violet-600'}`}>
-                  {detectUF(nfModal.destino) === 'outro' ? 'Transporte interestadual — NF obrigatória' : 'NF solicitada manualmente'}
+                  {getDocumentoFiscalContext(nfModal).regra === 'nf' ? 'Transporte interestadual — NF obrigatória' : 'NF solicitada manualmente'}
                 </p>
               </div>
 
@@ -1064,7 +1009,7 @@ function ExpedicaoDetail({
   const temRomaneio = solicitacao.status === 'romaneio_emitido'
   const nfSolicitada = solicitacao.doc_fiscal_tipo === 'nf' && solicitacao.status === 'aprovado'
   const temDocFiscal = temNfe || temRomaneio || solicitacao.status === 'nfe_emitida'
-  const uf = detectUF(solicitacao.destino)
+  const fiscalCtx = getDocumentoFiscalContext(solicitacao)
 
   const ITEMS_CHECKLIST = [
     ['itens_conferidos',       'Itens conferidos contra lista de materiais'],
@@ -1178,7 +1123,10 @@ function ExpedicaoDetail({
             <AlertTriangle size={14} className="text-amber-600" />
             <p className="text-xs font-semibold text-amber-700">Documento fiscal obrigatório para despacho</p>
           </div>
-          <p className="text-[10px] text-amber-600 ml-5">{getDocLabel(uf)}</p>
+          <p className="text-[10px] text-amber-600 ml-5">{getDocumentoFiscalLabel(fiscalCtx.regra)}</p>
+          {(fiscalCtx.origemUf || fiscalCtx.destinoUf) && (
+            <p className="text-[10px] text-amber-700 ml-5 mt-1 font-medium">UFs da rota: {fiscalCtx.origemUf || '—'} → {fiscalCtx.destinoUf || '—'}</p>
+          )}
         </div>
       )}
 
@@ -1188,22 +1136,17 @@ function ExpedicaoDetail({
         {!temDocFiscal && !nfSolicitada && (
           <>
             {/* MG → show Romaneio primary, NF secondary */}
-            {uf === 'MG' && (
+            {fiscalCtx.regra === 'romaneio' && (
               <>
                 <button onClick={onEmitirRomaneio}
                   className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-teal-600 hover:bg-teal-700
                     text-white text-xs font-semibold transition-all active:scale-[0.97]">
                   <ScrollText size={12} /> Emitir Romaneio
                 </button>
-                <button onClick={onSolicitarNF}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-violet-200 bg-violet-50 hover:bg-violet-100
-                    text-violet-700 text-xs font-semibold transition-all active:scale-[0.97]">
-                  <FileText size={12} /> Solicitar NF
-                </button>
               </>
             )}
             {/* Inter-state → show NF primary, Romaneio secondary */}
-            {uf === 'outro' && (
+            {fiscalCtx.regra === 'nf' && (
               <>
                 <button onClick={onSolicitarNF}
                   className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-violet-600 hover:bg-violet-700
@@ -1218,7 +1161,7 @@ function ExpedicaoDetail({
               </>
             )}
             {/* Indefinido → show both equal weight */}
-            {uf === 'indefinido' && (
+            {fiscalCtx.regra === 'indefinido' && (
               <>
                 <button onClick={onEmitirRomaneio}
                   className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-teal-600 hover:bg-teal-700

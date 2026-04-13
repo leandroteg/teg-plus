@@ -47,6 +47,88 @@ type PedidoListItem = Pedido & {
   source_cotacao?: Pick<Cotacao, 'id' | 'comprador_id'>
 }
 
+function SolicitarContratoForm({ valorMensal, pedido, onSuccess }: {
+  valorMensal: number
+  pedido: PedidoListItem
+  onSuccess: () => void
+}) {
+  const [prazoMeses, setPrazoMeses] = useState(12)
+  const [enviando, setEnviando] = useState(false)
+  const valorTotal = valorMensal * prazoMeses
+
+  const handleSolicitar = async () => {
+    if (prazoMeses < 1) return
+    setEnviando(true)
+    try {
+      const num = `SOL-CON-${new Date().getFullYear()}-${String(Math.floor(Math.random() * 9000) + 1000)}`
+      const { error: solErr } = await supabase.from('con_solicitacoes').insert({
+        numero: num,
+        objeto: pedido.requisicao?.descricao || 'Contrato recorrente',
+        solicitante_nome: (pedido.requisicao as any)?.solicitante_nome || 'Solicitante',
+        tipo_contraparte: 'fornecedor',
+        contraparte_nome: pedido.fornecedor_nome || 'A definir',
+        tipo_contrato: 'despesa',
+        categoria_contrato: 'prestacao_servico',
+        grupo_contrato: 'prestacao_servicos',
+        obra_id: (pedido.requisicao as any)?.obra_id || null,
+        valor_estimado: valorTotal,
+        valor_mensal: valorMensal,
+        prazo_meses: prazoMeses,
+        recorrente: true,
+        etapa_atual: 'solicitacao',
+        status: 'em_andamento',
+        requisicao_origem_id: pedido.requisicao_id,
+      })
+      if (solErr) throw solErr
+      await supabase.from('cmp_requisicoes').update({ status: 'aguardando_contrato' }).eq('id', pedido.requisicao_id)
+      onSuccess()
+    } catch (err: any) {
+      alert(`Erro: ${err?.message || 'falha ao criar solicitação'}`)
+      setEnviando(false)
+    }
+  }
+
+  const fmt = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
+
+  return (
+    <div className="space-y-3">
+      <div className="bg-indigo-50/60 border border-indigo-200 rounded-xl p-3 space-y-2.5">
+        <p className="text-[10px] font-bold text-indigo-600 uppercase tracking-wider">Contrato Recorrente</p>
+        <div className="grid grid-cols-2 gap-2">
+          <div>
+            <label className="text-[10px] text-indigo-500 font-semibold">Valor Mensal</label>
+            <p className="text-sm font-extrabold text-indigo-700">{fmt(valorMensal)}</p>
+          </div>
+          <div>
+            <label className="text-[10px] text-indigo-500 font-semibold block mb-1">Prazo (meses)</label>
+            <input
+              type="number" min={1} max={120}
+              value={prazoMeses}
+              onChange={e => setPrazoMeses(Math.max(1, parseInt(e.target.value) || 1))}
+              className="w-full border border-indigo-300 rounded-lg px-2.5 py-1.5 text-sm font-bold text-indigo-800 bg-white focus:ring-2 focus:ring-indigo-300 outline-none"
+            />
+          </div>
+        </div>
+        <div className="flex items-center justify-between pt-1 border-t border-indigo-200">
+          <span className="text-[10px] text-indigo-500 font-semibold">Valor Total do Contrato</span>
+          <span className="text-sm font-extrabold text-indigo-800">{fmt(valorTotal)}</span>
+        </div>
+        <p className="text-[10px] text-indigo-400">{fmt(valorMensal)}/mês × {prazoMeses} meses</p>
+      </div>
+      <button
+        onClick={handleSolicitar}
+        disabled={enviando || prazoMeses < 1}
+        className="w-full flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-bold border transition-all bg-indigo-600 text-white border-indigo-700 hover:bg-indigo-700 disabled:opacity-50"
+      >
+        {enviando
+          ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+          : <FileText size={16} />}
+        {enviando ? 'Criando...' : 'Solicitar Contrato'}
+      </button>
+    </div>
+  )
+}
+
 function FornecedorSelectorModal({
   open,
   dark,
@@ -181,7 +263,7 @@ const PIPELINE_STAGES: {
 }[] = [
   {
     key: 'pendente',
-    label: 'Pendente',
+    label: 'Pedidos Aprovados',
     icon: ClipboardList,
     matchFn: p => isPendingEmission(p),
   },
@@ -239,16 +321,38 @@ const statusConfig: Record<string, { bg: string; text: string; label: string; bg
 const pendingEmissionStatus = {
   bg: 'bg-amber-100',
   text: 'text-amber-700',
-  label: 'Aguardando Emissao',
+  label: 'Pedido Aprovado',
   bgDark: 'bg-amber-900/40',
   textDark: 'text-amber-300',
+}
+
+const aguardandoContratoStatus = {
+  bg: 'bg-indigo-100',
+  text: 'text-indigo-700',
+  label: 'Aguard. Contrato',
+  bgDark: 'bg-indigo-900/40',
+  textDark: 'text-indigo-300',
 }
 
 function isPendingEmission(pedido: PedidoListItem) {
   return pedido.pending_emissao === true
 }
 
+function isAguardandoContrato(pedido: PedidoListItem) {
+  return (pedido as any).aguardando_contrato === true
+}
+
+const contratoAtivoStatus = {
+  bg: 'bg-violet-100',
+  text: 'text-violet-700',
+  label: 'Contrato Ativo',
+  bgDark: 'bg-violet-900/40',
+  textDark: 'text-violet-300',
+}
+
 function getStatusMeta(pedido: PedidoListItem) {
+  if ((pedido as any).contrato_ativo) return contratoAtivoStatus
+  if (isAguardandoContrato(pedido)) return aguardandoContratoStatus
   return isPendingEmission(pedido)
     ? pendingEmissionStatus
     : (statusConfig[pedido.status] || statusConfig.emitido)
@@ -324,7 +428,7 @@ function buildPdfHtml(pedido: Pedido, EMPRESA: EmpresaData = EMPRESA_FALLBACK): 
 
   return `<!DOCTYPE html>
 <html><head><meta charset="UTF-8">
-<title>Pedido de Compra #${numero}</title>
+<title>PC_${numero}_${esc(pedido.fornecedor_nome).replace(/[^a-zA-Z0-9À-ÿ _-]/g, '').trim().replace(/\s+/g, '_').slice(0, 40)}</title>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body { font-family: Arial, Helvetica, sans-serif; color: #1e293b; font-size: 12px; }
@@ -351,7 +455,12 @@ function buildPdfHtml(pedido: Pedido, EMPRESA: EmpresaData = EMPRESA_FALLBACK): 
   .footer { margin-top: 30px; padding-top: 12px; border-top: 2px solid #e2e8f0; text-align: center; }
   .footer p { font-size: 9px; color: #94a3b8; line-height: 1.5; }
   .footer .disclaimer { font-size: 8px; color: #cbd5e1; margin-top: 4px; }
-  @media print { body { padding: 0; } .page { padding: 20px; } button { display: none !important; } }
+  @media print {
+    body { padding: 0; }
+    .page { padding: 20px; }
+    button { display: none !important; }
+    .header { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  }
 </style></head>
 <body><div class="page">
   <div class="header">
@@ -1032,7 +1141,7 @@ function PedCard({ pedido, dark, onClick }: { pedido: PedidoListItem; dark: bool
         {pedido.requisicao && (
           <p className={`text-xs truncate ${dark ? 'text-slate-400' : 'text-slate-500'}`}>
             <span className={`font-mono ${dark ? 'text-slate-500' : 'text-slate-300'}`}>{pedido.requisicao.numero}</span>
-            {' · '}{pedido.requisicao.descricao}
+            {' · '}{pedido.requisicao.justificativa || pedido.requisicao.descricao}
             {pedido.requisicao.obra_nome && <span className={dark ? 'text-slate-500' : 'text-slate-400'}> · {pedido.requisicao.obra_nome}</span>}
           </p>
         )}
@@ -1045,6 +1154,12 @@ function PedCard({ pedido, dark, onClick }: { pedido: PedidoListItem; dark: bool
           {isLiberado && !isPago && <span className="flex items-center gap-0.5 px-2 py-0.5 rounded-full text-[10px] font-bold bg-orange-100 text-orange-700"><Clock size={9} /> Aguard. Pgto</span>}
           {atrasado && <span className="flex items-center gap-0.5 text-[10px] text-red-600 font-bold"><AlertTriangle size={10} /> {Math.abs(dias!)}d atr.</span>}
           {parcial && qtdTotal > 0 && <span className="text-[10px] text-amber-600 font-bold">{qtdRecebidos}/{qtdTotal} receb.</span>}
+          {(pedido as any).contrato_ativo && (
+            <a href={`/contratos/gestao`} onClick={e => e.stopPropagation()}
+              className="flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-violet-50 text-violet-700 border border-violet-200 hover:bg-violet-100 transition-colors">
+              <ExternalLink size={9} /> Ver Contrato
+            </a>
+          )}
         </div>
 
         {/* Dates row */}
@@ -1111,6 +1226,7 @@ function DetailModal({
   const [showFornecedorAtualizarModal, setShowFornecedorAtualizarModal] = useState(false)
   const [showFornecedorSelectorModal, setShowFornecedorSelectorModal] = useState(false)
   const [fornecedorVinculado, setFornecedorVinculado] = useState<Fornecedor | null>(null)
+  const [emitError, setEmitError] = useState<string | null>(null)
 
   const dias     = diasRestantes(pedido.data_prevista_entrega)
   const st       = getStatusMeta(pedido)
@@ -1141,17 +1257,15 @@ function DetailModal({
   }, [pending, pedido.id])
 
   const fornecedorDetectado = fornecedorResolvido?.fornecedorCorrespondente ?? null
-  const fornecedorAtivo = fornecedorVinculado
+  const fornecedorAtivo = fornecedorVinculado ?? fornecedorDetectado
   const fornecedorAtivoComplete = hasFornecedorPaymentData(fornecedorAtivo)
   const camposPagamentoPendentes = getFornecedorPaymentMissingFields(fornecedorAtivo)
-  const podeEmitirPedidoPendente = !pending || Boolean(fornecedorAtivo && fornecedorAtivoComplete)
+  const podeEmitirPedidoPendente = !pending || Boolean(fornecedorAtivo)
   const motivoBloqueioEmissao = !pending
     ? null
     : !fornecedorAtivo
       ? 'Vincule ou cadastre o fornecedor mestre antes de emitir o pedido.'
-      : !fornecedorAtivoComplete
-        ? `Atualize os dados de pagamento do fornecedor: ${camposPagamentoPendentes.join(', ')}.`
-        : null
+      : null
 
   const confirmarEntrega = async () => {
     setConfirmando(true)
@@ -1170,6 +1284,7 @@ function DetailModal({
 
   const handleFornecedorVinculado = async (fornecedor: Fornecedor) => {
     setFornecedorVinculado(fornecedor)
+    setEmitError(null)
     setShowFornecedorCadastroModal(false)
     setShowFornecedorAtualizarModal(false)
     setShowFornecedorSelectorModal(false)
@@ -1458,14 +1573,14 @@ function DetailModal({
             </div>
           )}
 
-          {pedido.requisicao?.descricao && (
+          {(pedido.requisicao?.justificativa || pedido.requisicao?.descricao) && (
             <div className={`rounded-xl p-3 border ${dark ? 'bg-white/[0.02] border-white/10' : 'bg-slate-50 border-slate-200'}`}>
-              <p className={`text-[11px] font-semibold uppercase tracking-wide mb-1 ${sub}`}>Resumo da RC</p>
-              <p className={`text-xs leading-relaxed ${sub}`}>{pedido.requisicao.descricao}</p>
-              {pedido.requisicao.justificativa && (
+              <p className={`text-[11px] font-semibold uppercase tracking-wide mb-1 ${sub}`}>Descrição da RC</p>
+              <p className={`text-xs leading-relaxed ${sub}`}>{pedido.requisicao.justificativa || pedido.requisicao.descricao}</p>
+              {pedido.requisicao.descricao && pedido.requisicao.descricao !== pedido.requisicao.justificativa && (
                 <div className={`mt-2 pt-2 border-t ${dark ? 'border-white/10' : 'border-slate-200'}`}>
-                  <p className={`text-[10px] font-bold uppercase tracking-wider mb-0.5 ${dark ? 'text-teal-400' : 'text-teal-600'}`}>Descrição</p>
-                  <p className={`text-xs leading-relaxed ${dark ? 'text-teal-200' : 'text-teal-800'}`}>{pedido.requisicao.justificativa}</p>
+                  <p className={`text-[10px] font-bold uppercase tracking-wider mb-0.5 ${dark ? 'text-teal-400' : 'text-teal-600'}`}>Detalhes adicionais</p>
+                  <p className={`text-xs leading-relaxed ${dark ? 'text-teal-200' : 'text-teal-800'}`}>{pedido.requisicao.descricao}</p>
                 </div>
               )}
             </div>
@@ -1485,28 +1600,42 @@ function DetailModal({
           <div className="space-y-2 pt-1">
             {pending && (
               <>
-                <button
-                  onClick={() => {
-                    if (!podeEmitirPedidoPendente) return
-                    setShowEmitirModal(true)
-                  }}
-                  disabled={emitirPedido.isPending || !podeEmitirPedidoPendente}
-                  className={`w-full flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-bold border transition-all disabled:cursor-not-allowed ${
-                    podeEmitirPedidoPendente
-                      ? 'bg-teal-50 text-teal-700 border-teal-300 hover:bg-teal-500 hover:text-white'
-                      : dark
-                        ? 'bg-white/[0.04] text-slate-500 border-white/10'
-                        : 'bg-slate-100 text-slate-400 border-slate-200'
-                  }`}
-                >
-                  {emitirPedido.isPending
-                    ? <div className="w-4 h-4 border-2 border-teal-400 border-t-transparent rounded-full animate-spin" />
-                    : <FileText size={16} />}
-                  {emitirPedido.isPending ? 'Emitindo...' : 'Emitir Pedido'}
-                </button>
+                {(pedido.requisicao as any)?.compra_recorrente ? (
+                  <SolicitarContratoForm
+                    valorMensal={pedido.valor_total || 0}
+                    pedido={pedido}
+                    onSuccess={() => { onClose(); window.location.href = '/contratos/solicitacoes' }}
+                  />
+                ) : (
+                    <button
+                      onClick={() => {
+                        if (!podeEmitirPedidoPendente) return
+                        setEmitError(null)
+                        setShowEmitirModal(true)
+                      }}
+                    disabled={emitirPedido.isPending || !podeEmitirPedidoPendente}
+                    className={`w-full flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-bold border transition-all disabled:cursor-not-allowed ${
+                      podeEmitirPedidoPendente
+                        ? 'bg-teal-50 text-teal-700 border-teal-300 hover:bg-teal-500 hover:text-white'
+                        : dark
+                          ? 'bg-white/[0.04] text-slate-500 border-white/10'
+                          : 'bg-slate-100 text-slate-400 border-slate-200'
+                    }`}
+                  >
+                    {emitirPedido.isPending
+                      ? <div className="w-4 h-4 border-2 border-teal-400 border-t-transparent rounded-full animate-spin" />
+                      : <FileText size={16} />}
+                    {emitirPedido.isPending ? 'Emitindo...' : 'Emitir Pedido'}
+                  </button>
+                )}
                 {motivoBloqueioEmissao && (
                   <div className={`rounded-xl border px-3 py-2 text-[11px] ${dark ? 'border-white/10 bg-white/[0.03] text-slate-400' : 'border-slate-200 bg-slate-50 text-slate-500'}`}>
                     {motivoBloqueioEmissao}
+                  </div>
+                )}
+                {emitError && (
+                  <div className={`rounded-xl border px-3 py-2 text-[11px] ${dark ? 'border-red-500/30 bg-red-500/10 text-red-200' : 'border-red-200 bg-red-50 text-red-600'}`}>
+                    {emitError}
                   </div>
                 )}
               </>
@@ -1559,9 +1688,13 @@ function DetailModal({
                 fornecedorNome: fornecedorAtivo?.razao_social || payload.fornecedorNome,
               }, {
                 onSuccess: () => {
+                  setEmitError(null)
                   setShowEmitirModal(false)
                   onClose()
                   onEmitted?.()
+                },
+                onError: (err: any) => {
+                  setEmitError(`Erro ao emitir pedido: ${err?.message || 'erro desconhecido'}`)
                 },
               })
             }}
@@ -1663,8 +1796,8 @@ export default function Pedidos() {
   // Exclude cancelado
   const allPedidos = useMemo(() => (pedidos ?? []).filter(p => p.status !== 'cancelado'), [pedidos])
   const pedidosByReq = useMemo(() => new Set(allPedidos.map(p => p.requisicao_id).filter(Boolean)), [allPedidos])
-  const pendingApprovalPedidos = useMemo<PedidoListItem[]>(
-    () => cotacoes
+  const pendingApprovalPedidos = useMemo<PedidoListItem[]>(() => {
+    const pendingEmission = cotacoes
       .filter(c => c.status === 'concluida' && c.requisicao?.status === 'cotacao_aprovada')
       .filter(c => !pedidosByReq.has(c.requisicao_id))
       .map(c => ({
@@ -1674,7 +1807,7 @@ export default function Pedidos() {
         comprador_id: c.comprador_id,
         fornecedor_nome: c.fornecedor_selecionado_nome ?? 'Fornecedor nao definido',
         valor_total: c.valor_selecionado ?? c.requisicao?.valor_estimado,
-        status: 'emitido',
+        status: 'emitido' as const,
         created_at: c.data_conclusao ?? c.created_at,
         observacoes: c.observacao,
         requisicao: c.requisicao
@@ -1682,14 +1815,74 @@ export default function Pedidos() {
               numero: c.requisicao.numero,
               descricao: c.requisicao.descricao,
               obra_nome: c.requisicao.obra_nome,
+              obra_id: (c.requisicao as any).obra_id,
               categoria: c.requisicao.categoria,
+              compra_recorrente: (c.requisicao as any).compra_recorrente,
             }
           : undefined,
         pending_emissao: true,
         source_cotacao: { id: c.id, comprador_id: c.comprador_id },
-      })),
-    [cotacoes, pedidosByReq],
-  )
+      }))
+
+    // Requisições aguardando contrato (compra recorrente)
+    const aguardandoContrato = cotacoes
+      .filter(c => c.status === 'concluida' && c.requisicao?.status === 'aguardando_contrato')
+      .filter(c => !pedidosByReq.has(c.requisicao_id))
+      .map(c => ({
+        id: `aguardando-contrato-${c.id}`,
+        requisicao_id: c.requisicao_id,
+        cotacao_id: c.id,
+        comprador_id: c.comprador_id,
+        fornecedor_nome: c.fornecedor_selecionado_nome ?? 'Fornecedor nao definido',
+        valor_total: c.valor_selecionado ?? c.requisicao?.valor_estimado,
+        status: 'emitido' as const,
+        created_at: c.data_conclusao ?? c.created_at,
+        observacoes: c.observacao,
+        requisicao: c.requisicao
+          ? {
+              numero: c.requisicao.numero,
+              descricao: c.requisicao.descricao,
+              obra_nome: c.requisicao.obra_nome,
+              obra_id: (c.requisicao as any).obra_id,
+              categoria: c.requisicao.categoria,
+              compra_recorrente: (c.requisicao as any).compra_recorrente,
+            }
+          : undefined,
+        pending_emissao: true,
+        aguardando_contrato: true,
+        source_cotacao: { id: c.id, comprador_id: c.comprador_id },
+      }))
+
+    // Recorrentes com contrato formalizado → aba Encerrado com link
+    const contratoFormalizado = cotacoes
+      .filter(c => c.status === 'concluida' && c.requisicao?.status === 'pedido_emitido' && (c.requisicao as any)?.compra_recorrente)
+      .filter(c => !pedidosByReq.has(c.requisicao_id))
+      .map(c => ({
+        id: `contrato-${c.id}`,
+        requisicao_id: c.requisicao_id,
+        cotacao_id: c.id,
+        comprador_id: c.comprador_id,
+        fornecedor_nome: c.fornecedor_selecionado_nome ?? '',
+        valor_total: c.valor_selecionado ?? c.requisicao?.valor_estimado,
+        status: 'entregue' as const,
+        status_pagamento: 'pago' as const,
+        created_at: c.data_conclusao ?? c.created_at,
+        observacoes: 'Contrato formalizado',
+        requisicao: c.requisicao
+          ? {
+              numero: c.requisicao.numero,
+              descricao: c.requisicao.descricao,
+              obra_nome: c.requisicao.obra_nome,
+              categoria: c.requisicao.categoria,
+              compra_recorrente: true,
+            }
+          : undefined,
+        pending_emissao: false,
+        contrato_ativo: true,
+      }))
+
+    return [...pendingEmission, ...aguardandoContrato, ...contratoFormalizado]
+  }, [cotacoes, pedidosByReq])
   const allPedidoItems = useMemo<PedidoListItem[]>(
     () => [...pendingApprovalPedidos, ...allPedidos],
     [pendingApprovalPedidos, allPedidos],
@@ -1876,7 +2069,7 @@ export default function Pedidos() {
           </p>
         </div>
       ) : viewMode === 'cards' ? (
-        <div className="space-y-2 p-4">
+        <div className="space-y-2 p-4 stagger-children">
           {sorted.map(p => (
             <PedCard key={p.id} pedido={p} dark={dark} onClick={() => setSelectedPedido(p)} />
           ))}

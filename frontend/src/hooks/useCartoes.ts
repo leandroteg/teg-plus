@@ -210,12 +210,38 @@ export function useEnviarApontamento() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) throw new Error('Não autenticado')
+
+      const { data: ap, error } = await supabase
         .from('fin_apontamentos_cartao')
         .update({ status: 'enviado' })
         .eq('id', id)
         .eq('status', 'rascunho')
+        .select(`*, cartao:fin_cartoes_credito(id,nome,bandeira,ultimos4)`)
+        .single()
       if (error) throw error
+
+      // Notifica N8N para processar apontamento enviado
+      try {
+        await fetch(`${N8N_WEBHOOK_BASE}/apontamentos/cartao/enviado`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            apontamento_id: ap.id,
+            user_id: user.id,
+            descricao: ap.descricao,
+            valor: ap.valor,
+            data_lancamento: ap.data_lancamento,
+            estabelecimento: ap.estabelecimento,
+            cartao_id: ap.cartao_id,
+            centro_custo: ap.centro_custo,
+            classe_financeira: ap.classe_financeira,
+          }),
+        })
+      } catch {
+        // falha no webhook não bloqueia o fluxo
+      }
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['apontamentos-cartao'] }),
   })

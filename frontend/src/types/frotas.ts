@@ -5,10 +5,10 @@
 export type CategoriaVeiculo  = 'passeio' | 'pickup' | 'van' | 'vuc' | 'truck' | 'carreta' | 'moto' | 'onibus'
 export type CombustivelVeiculo = 'flex' | 'gasolina' | 'diesel' | 'etanol' | 'eletrico' | 'gnv'
 export type PropriedadeVeiculo = 'propria' | 'locada' | 'cedida'
-export type StatusVeiculo      = 'disponivel' | 'em_uso' | 'em_manutencao' | 'bloqueado' | 'baixado'
+export type StatusVeiculo      = 'disponivel' | 'em_uso' | 'em_manutencao' | 'bloqueado' | 'baixado' | 'em_entrada' | 'aguardando_saida'
 export type TipoOS             = 'preventiva' | 'corretiva' | 'sinistro' | 'revisao'
 export type PrioridadeOS       = 'critica' | 'alta' | 'media' | 'baixa'
-export type StatusOS           = 'aberta' | 'em_cotacao' | 'aguardando_aprovacao' | 'aprovada' | 'em_execucao' | 'concluida' | 'rejeitada' | 'cancelada'
+export type StatusOS           = 'pendente' | 'aberta' | 'em_cotacao' | 'aguardando_aprovacao' | 'aprovada' | 'em_execucao' | 'concluida' | 'rejeitada' | 'cancelada'
 export type TipoItemOS         = 'peca' | 'mao_obra' | 'outros'
 export type TipoPagamento      = 'cartao_frota' | 'dinheiro' | 'pix' | 'boleto'
 export type TipoChecklist      = 'pre_viagem' | 'pos_viagem' | 'pos_manutencao'
@@ -44,6 +44,14 @@ export interface FroVeiculo {
   data_proxima_preventiva?: string
   foto_url?: string
   observacoes?: string
+  // novos campos (migration 068)
+  tipo_ativo?: TipoAtivo
+  numero_serie?: string
+  horimetro_atual?: number
+  pat_item_id?: string
+  con_contrato_id?: string
+  base_atual_id?: string
+  responsavel_id?: string
   created_at: string
   updated_at: string
 }
@@ -284,4 +292,141 @@ export interface RegistrarAbastecimentoPayload {
   forma_pagamento: TipoPagamento
   numero_cupom?: string
   observacoes?: string
+}
+
+// ─── Novos tipos (redesign Frotas & Máquinas) ─────────────────────────────────
+
+export type TipoAtivo      = 'veiculo' | 'maquina'
+export type StatusAlocacao = 'ativa' | 'encerrada' | 'cancelada'
+export type TipoChecklist2 = 'pre_viagem' | 'pos_viagem' | 'entrega_locadora' | 'devolucao_locadora' | 'pre_manutencao' | 'pos_manutencao'
+export type TipoMulta      = 'multa' | 'pedagio'
+export type StatusMulta    = 'recebida' | 'contestada' | 'paga' | 'vencida' | 'cancelada'
+
+export interface FroAcessorio {
+  id: string
+  nome: string
+  descricao?: string
+  ativo: boolean
+  created_at: string
+}
+
+export interface FroVeiculoAcessorio {
+  id: string
+  veiculo_id: string
+  acessorio_id: string
+  observacoes?: string
+  created_at: string
+  acessorio?: FroAcessorio
+}
+
+export interface FroAlocacao {
+  id: string
+  veiculo_id: string
+  obra_id?: string
+  centro_custo_id?: string
+  responsavel_id?: string
+  responsavel_nome?: string
+  data_saida: string
+  data_retorno_prev?: string
+  data_retorno_real?: string
+  hodometro_saida?: number
+  hodometro_retorno?: number
+  horimetro_saida?: number
+  horimetro_retorno?: number
+  checklist_saida_id?: string
+  checklist_retorno_id?: string
+  status: StatusAlocacao
+  observacoes?: string
+  created_at: string
+  updated_at: string
+  veiculo?: Pick<FroVeiculo, 'id' | 'placa' | 'modelo' | 'marca' | 'categoria'>
+  obra?: { id: string; nome: string; codigo?: string }
+}
+
+export interface FroChecklistTemplate {
+  id: string
+  nome: string
+  tipo: TipoChecklist2
+  tipo_ativo: 'todos' | 'veiculo' | 'maquina'
+  ativo: boolean
+  created_at: string
+  itens?: FroChecklistTemplateItem[]
+}
+
+export interface FroChecklistTemplateItem {
+  id: string
+  template_id: string
+  ordem: number
+  descricao: string
+  obrigatorio: boolean
+  permite_foto: boolean
+}
+
+// ── Checklist Vistoria (graded inspection) ──────────────────────────────────
+export type EstadoItemVeiculo = 'otimo' | 'bom' | 'regular' | 'ruim' | 'nao_se_aplica'
+export type NivelCombustivel = 'vazio' | '1/4' | '1/2' | '3/4' | 'cheio'
+
+export interface FroChecklistFoto {
+  id: string
+  execucao_id: string
+  item_id?: string
+  url: string
+  descricao?: string
+  created_at: string
+}
+
+export interface FroChecklistExecucao {
+  id: string
+  template_id: string
+  veiculo_id: string
+  alocacao_id?: string
+  hodometro?: number
+  horimetro?: number
+  responsavel_id?: string
+  responsavel_nome?: string
+  status: 'pendente' | 'em_andamento' | 'concluido'
+  assinatura_url?: string
+  observacoes?: string
+  created_at: string
+  concluido_at?: string
+  observacoes_gerais?: string
+  tem_pendencias?: boolean
+  nivel_combustivel?: NivelCombustivel
+  hodometro_registro?: number
+  template?: FroChecklistTemplate
+  veiculo?: Pick<FroVeiculo, 'id' | 'placa' | 'modelo'>
+  itens?: FroChecklistExecucaoItem[]
+}
+
+export interface FroChecklistExecucaoItem {
+  id: string
+  execucao_id: string
+  template_item_id: string
+  conforme?: boolean
+  foto_url?: string
+  observacao?: string
+  estado?: EstadoItemVeiculo
+  template_item?: FroChecklistTemplateItem
+}
+
+export interface FroMulta {
+  id: string
+  veiculo_id: string
+  tipo: TipoMulta
+  data_infracao?: string
+  data_vencimento?: string
+  valor: number
+  ait?: string
+  descricao?: string
+  local?: string
+  responsavel_id?: string
+  obra_id?: string
+  status: StatusMulta
+  data_pagamento?: string
+  fin_cp_id?: string
+  observacoes?: string
+  created_at: string
+  updated_at: string
+  veiculo?: Pick<FroVeiculo, 'id' | 'placa' | 'modelo'>
+  obra?: { id: string; nome: string }
 }

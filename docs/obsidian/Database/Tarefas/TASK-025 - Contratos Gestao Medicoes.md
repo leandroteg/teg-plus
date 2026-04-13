@@ -11,7 +11,7 @@ estimativa: 21
 gasto: 13
 data_inicio: 2026-03-03
 data_fim: 2026-09-30
-updated: 2026-03-10
+updated: 2026-04-08
 tags: [tarefa, contratos, medicoes, boletim, aditivos, cronograma, ai, minuta, aprovacao]
 ---
 
@@ -50,7 +50,17 @@ Módulo completo de gestão de contratos: pipeline de 7 estágios com IA, geraç
 - `frontend/src/hooks/useAprovacoes.ts` — Enrichment minuta_contratual
 - `frontend/src/pages/AprovAi.tsx` — MinutaExecutiveSummary component
 
+## Entregas Adicionais — Abr 2026
+- [x] Fix #198: Correcao timezone datas de vigencia (T12:00:00)
+- [x] Fix #200: Botao voltar no AprovAi em modo standalone/PWA
+- [x] Fix #199: Resumo executivo em aprovacao mostra dados do contrato
+- [x] Fix #185: Permissoes supervisores corrigidas (RBAC via modulo_papeis)
+- [x] Regra R$2000: Servicos >R$2000 desviam para contratos automaticamente
+- [x] Recomendacao AI: Motor multi-criterio para selecao de fornecedores em cotacoes
+- [x] Permissoes supervisor: Gerenciar modelos, executar acoes em contratos
+
 ## Links
 - [[MS-010 - Modulo Contratos Medicoes]]
 - [[12 - Fluxo Aprovação]]
 - [[27 - Módulo Contratos Gestão]]
+- [[Requisitos/PLAN-CONTRATOS-v2]]

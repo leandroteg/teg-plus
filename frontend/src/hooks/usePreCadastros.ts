@@ -51,10 +51,14 @@ const TABLE_MAP: Record<string, string> = {
 // ── Hook ────────────────────────────────────────────────────────────────────────
 
 export function usePreCadastros() {
-  const { perfil, isAdmin } = useAuth()
+  const { perfil, isAdmin, papelGlobal, canTechnicalApprove } = useAuth()
   const qc = useQueryClient()
 
-  const isAdminOrDirector = isAdmin || perfil?.role === 'gerente'
+  const isAdminOrDirector =
+    isAdmin
+    || papelGlobal === 'diretor'
+    || papelGlobal === 'ceo'
+    || canTechnicalApprove('cadastros')
 
   // Fetch pending pre-cadastros (admin/director only)
   const { data: pendentes = [], isLoading } = useQuery({
@@ -111,6 +115,26 @@ export function usePreCadastros() {
     },
   })
 
+  // Mark as approved without re-inserting data (used when item was saved via the full form modal)
+  const marcarAprovado = useMutation({
+    mutationFn: async ({ id }: { id: string }) => {
+      const { error } = await supabase
+        .from('sys_pre_cadastros')
+        .update({
+          status: 'aprovado',
+          revisado_por: perfil?.auth_id,
+          revisor_nome: perfil?.nome,
+        })
+        .eq('id', id)
+      if (error) throw error
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['pre-cadastros'] })
+      qc.invalidateQueries({ queryKey: ['est-itens'] })
+      qc.invalidateQueries({ queryKey: ['lookups'] })
+    },
+  })
+
   // Reject mutation
   const rejeitar = useMutation({
     mutationFn: async ({ id, motivo }: { id: string; motivo: string }) => {
@@ -136,6 +160,7 @@ export function usePreCadastros() {
     isLoading,
     isAdminOrDirector,
     aprovar,
+    marcarAprovado,
     rejeitar,
   }
 }

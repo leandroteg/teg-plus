@@ -2,16 +2,20 @@ import { useState, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   ShoppingCart, Clock, CheckCircle, AlertTriangle, ChevronRight, Info,
-  XCircle, MessageSquare, FileText, Ban, Search, X, ArrowUp, ArrowDown,
+  XCircle, MessageSquare, FileText, ScrollText, Ban, Search, X, ArrowUp, ArrowDown,
   LayoutList, LayoutGrid, Download, Loader2, Building2, Calendar,
 } from 'lucide-react'
 import { useTheme } from '../contexts/ThemeContext'
+import { supabase } from '../services/supabase'
 import { useCotacoes } from '../hooks/useCotacoes'
+import { useCategorias } from '../hooks/useCategorias'
 import { useDecisaoRequisicao } from '../hooks/useAprovacoes'
 import { useEmitirPedido, useCancelarRequisicao } from '../hooks/usePedidos'
+import { useEditorLock } from '../hooks/useEditorLock'
 import { useAuth } from '../contexts/AuthContext'
 import EmitirPedidoModal from '../components/EmitirPedidoModal'
 import type { StatusCotacao, Cotacao } from '../types'
+import { minCotacoesPorValor } from '../utils/cotacoesPolicy'
 
 // ── Formatters ──────────────────────────────────────────────────────────────
 
@@ -59,8 +63,36 @@ function diasEmAberto(createdAt: string) {
   return Math.floor((Date.now() - new Date(createdAt).getTime()) / 86_400_000)
 }
 
-function AlertaCotacoes({ valor, isDark }: { valor: number; isDark: boolean }) {
-  const minCot = valor <= 500 ? 1 : valor <= 2000 ? 2 : 3
+function shouldShowInCotacoes(cot: Cotacao) {
+  const reqStatus = cot.requisicao?.status
+
+  if (cot.status === 'pendente' || cot.status === 'em_andamento') return true
+
+  // Cotações concluídas ficam nesta tela apenas enquanto aguardam decisão financeira.
+  return cot.status === 'concluida' && reqStatus === 'cotacao_enviada'
+}
+
+function getDescricaoPrincipal(cot: Cotacao) {
+  const req = cot.requisicao
+  const justificativa = (req?.justificativa ?? '').trim()
+  if (justificativa) return justificativa
+
+  const descricao = (req?.descricao ?? '').trim()
+  if (descricao) return descricao
+
+  return 'Sem descrição'
+}
+
+function AlertaCotacoes({
+  valor,
+  regras,
+  isDark,
+}: {
+  valor: number
+  regras?: { ate_500: number; '501_a_2k': number; acima_2k: number }
+  isDark: boolean
+}) {
+  const minCot = minCotacoesPorValor(valor, regras)
   if (minCot === 1) return null
   return (
     <div className={`flex items-start gap-1.5 rounded-xl px-3 py-2 ${isDark ? 'bg-amber-500/10 border border-amber-500/20' : 'bg-amber-50 border border-amber-200'}`}>
@@ -75,7 +107,7 @@ function AlertaCotacoes({ valor, isDark }: { valor: number; isDark: boolean }) {
 function exportCSV(items: Cotacao[], stageName: string) {
   const headers = ['RC', 'Descrição', 'Obra', 'Valor', 'Fornecedor', 'Status', 'Dias']
   const rows = items.map(c => [
-    c.requisicao?.numero ?? '', c.requisicao?.descricao ?? '', c.requisicao?.obra_nome ?? '',
+    c.requisicao?.numero ?? '', getDescricaoPrincipal(c), c.requisicao?.obra_nome ?? '',
     c.valor_selecionado ?? c.requisicao?.valor_estimado ?? 0,
     c.fornecedor_selecionado_nome ?? '', c.status, diasEmAberto(c.created_at),
   ])
@@ -96,6 +128,7 @@ function CotCard({ cot, isDark, onClick }: { cot: Cotacao; isDark: boolean; onCl
   const valor = cot.valor_selecionado ?? (cot.requisicao as any)?.valor_estimado ?? 0
   const dias = diasEmAberto(cot.created_at)
   const concluida = cot.status === 'concluida'
+  const descricaoPrincipal = getDescricaoPrincipal(cot)
 
   return (
     <div onClick={onClick}
@@ -132,7 +165,7 @@ function CotCard({ cot, isDark, onClick }: { cot: Cotacao; isDark: boolean; onCl
 
       {/* Descrição */}
       <p className={`text-sm font-semibold line-clamp-2 leading-snug ${isDark ? 'text-white' : 'text-slate-800'}`}>
-        {cot.requisicao?.descricao}
+        {descricaoPrincipal}
       </p>
 
       {/* Obra + Necessidade + Valor */}
@@ -147,9 +180,14 @@ function CotCard({ cot, isDark, onClick }: { cot: Cotacao; isDark: boolean; onCl
             </span>
           )}
         </div>
-        <span className={`text-sm font-extrabold ${concluida ? isDark ? 'text-emerald-400' : 'text-emerald-600' : isDark ? 'text-teal-400' : 'text-teal-600'}`}>
-          {fmt(valor)}
-        </span>
+        <div className="flex items-center gap-1.5">
+          {(cot.requisicao as any)?.compra_recorrente && (
+            <span className="text-[8px] font-bold bg-indigo-100 text-indigo-700 px-1.5 py-0.5 rounded">MENSAL</span>
+          )}
+          <span className={`text-sm font-extrabold ${concluida ? isDark ? 'text-emerald-400' : 'text-emerald-600' : isDark ? 'text-teal-400' : 'text-teal-600'}`}>
+            {fmt(valor)}
+          </span>
+        </div>
       </div>
 
       {/* Fornecedor selecionado */}
@@ -180,11 +218,18 @@ function CotDetailModal({ cot, onClose, isDark, isAdmin, atLeastComprador, onDec
   onEmitir: () => void; onCancelar: () => void; isEmitting: boolean; isCancelling: boolean
   onOpenCotacao: () => void
 }) {
+  const { data: categorias = [] } = useCategorias()
   const [observacao, setObservacao] = useState('')
   const valor = cot.valor_selecionado ?? (cot.requisicao as any)?.valor_estimado ?? 0
+  const categoriaCodigo = ((cot.requisicao as any)?.categoria ?? '') as string
+  const categoriaRegra = categorias.find(c => c.codigo === categoriaCodigo)?.cotacoes_regras
+  const catTipo = categorias.find(c => c.codigo === categoriaCodigo)?.tipo
+  const isRecorrente = (cot.requisicao as any)?.compra_recorrente === true
+  const deveContrato = isRecorrente || (catTipo === 'servico' && valor > 2000)
   const dias = diasEmAberto(cot.created_at)
   const concluida = cot.status === 'concluida'
   const reqStatus = cot.requisicao?.status
+  const descricaoPrincipal = getDescricaoPrincipal(cot)
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-sm p-4" onClick={onClose}>
@@ -201,7 +246,7 @@ function CotDetailModal({ cot, onClose, isDark, isAdmin, atLeastComprador, onDec
         </div>
 
         <div className="p-5 space-y-4">
-          <p className={`text-sm font-semibold ${isDark ? 'text-white' : 'text-slate-800'}`}>{cot.requisicao?.descricao}</p>
+          <p className={`text-sm font-semibold ${isDark ? 'text-white' : 'text-slate-800'}`}>{descricaoPrincipal}</p>
 
           {/* Descrição da compra */}
           {cot.requisicao?.justificativa && (
@@ -214,14 +259,14 @@ function CotDetailModal({ cot, onClose, isDark, isAdmin, atLeastComprador, onDec
           {/* Grid de dados */}
           <div className={`grid grid-cols-2 gap-3 text-xs ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
             <div><p className={`font-bold mb-0.5 ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>Obra</p><p>{cot.requisicao?.obra_nome}</p></div>
-            <div><p className={`font-bold mb-0.5 ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>Valor</p><p className={`font-extrabold ${isDark ? 'text-teal-400' : 'text-teal-600'}`}>{fmt(valor)}</p></div>
+            <div><p className={`font-bold mb-0.5 ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>{(cot.requisicao as any)?.compra_recorrente ? 'Valor Mensal' : 'Valor'}</p><div className="flex items-center gap-1.5"><p className={`font-extrabold ${isDark ? 'text-teal-400' : 'text-teal-600'}`}>{fmt(valor)}</p>{(cot.requisicao as any)?.compra_recorrente && <span className="text-[8px] font-bold bg-indigo-100 text-indigo-700 px-1.5 py-0.5 rounded">RECORRENTE</span>}</div></div>
             <div><p className={`font-bold mb-0.5 ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>Dias em aberto</p><p className={dias > 5 ? 'text-red-500 font-bold' : ''}>{dias}d</p></div>
             {cot.fornecedor_selecionado_nome && (
               <div><p className={`font-bold mb-0.5 ${isDark ? 'text-slate-300' : 'text-slate-700'}`}>Fornecedor</p><p className={isDark ? 'text-emerald-400' : 'text-emerald-600'}>{cot.fornecedor_selecionado_nome}</p></div>
             )}
           </div>
 
-          {!concluida && <AlertaCotacoes valor={valor} isDark={isDark} />}
+          {!concluida && <AlertaCotacoes valor={valor} regras={categoriaRegra} isDark={isDark} />}
 
           {/* Status chips */}
           {concluida && reqStatus === 'cotacao_enviada' && (
@@ -258,18 +303,21 @@ function CotDetailModal({ cot, onClose, isDark, isAdmin, atLeastComprador, onDec
             </div>
           )}
 
-          {/* Emitir pedido */}
+          {/* Emitir pedido / Solicitar contrato */}
           {atLeastComprador && concluida && reqStatus === 'cotacao_aprovada' && (
-            <div className={`pt-3 space-y-2 ${isDark ? 'border-t border-white/[0.06]' : 'border-t border-teal-100'}`}>
-              <p className={`text-[10px] font-bold text-center uppercase tracking-wide ${isDark ? 'text-teal-400' : 'text-teal-600'}`}>Emissão de Pedido</p>
+            <div className={`pt-3 space-y-2 ${isDark ? 'border-t border-white/[0.06]' : deveContrato ? 'border-t border-indigo-100' : 'border-t border-teal-100'}`}>
+              <p className={`text-[10px] font-bold text-center uppercase tracking-wide ${isDark ? (deveContrato ? 'text-indigo-400' : 'text-teal-400') : deveContrato ? 'text-indigo-600' : 'text-teal-600'}`}>
+                {deveContrato ? 'Solicitação de Contrato' : 'Emissão de Pedido'}
+              </p>
               <div className="flex gap-2">
                 <button disabled={isCancelling || isEmitting} onClick={onCancelar}
                   className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-bold text-red-500 bg-red-50 border border-red-200 hover:bg-red-100 transition-all disabled:opacity-50">
                   {isCancelling ? <Loader2 size={14} className="animate-spin" /> : <Ban size={14} />} Cancelar
                 </button>
                 <button disabled={isEmitting || isCancelling} onClick={onEmitir}
-                  className="flex-[2] flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-bold text-white bg-teal-500 hover:bg-teal-600 shadow-sm transition-all disabled:opacity-50">
-                  {isEmitting ? <Loader2 size={14} className="animate-spin" /> : <FileText size={14} />} Emitir Pedido
+                  className={`flex-[2] flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-bold text-white shadow-sm transition-all disabled:opacity-50 ${deveContrato ? 'bg-indigo-500 hover:bg-indigo-600' : 'bg-teal-500 hover:bg-teal-600'}`}>
+                  {isEmitting ? <Loader2 size={14} className="animate-spin" /> : deveContrato ? <ScrollText size={14} /> : <FileText size={14} />}
+                  {deveContrato ? 'Solicitar Contrato' : 'Emitir Pedido'}
                 </button>
               </div>
             </div>
@@ -302,8 +350,15 @@ export default function FilaCotacoes() {
   const [viewMode, setViewMode] = useState<ViewMode>('cards')
   const [detail, setDetail] = useState<Cotacao | null>(null)
   const [emitirCotacao, setEmitirCotacao] = useState<Cotacao | null>(null)
+  const detailReqId = detail?.requisicao?.id
+  const { isLocked: isDetailLocked, blockedByName: detailBlockedByName } = useEditorLock({
+    resourceType: 'cmp_requisicao',
+    resourceId: detailReqId,
+    enabled: Boolean(detailReqId),
+  })
 
   const { data: cotacoes = [], isLoading } = useCotacoes()
+  const { data: categorias = [] } = useCategorias()
   const decisaoMutation = useDecisaoRequisicao()
   const emitirPedidoMutation = useEmitirPedido()
   const cancelarMutation = useCancelarRequisicao()
@@ -314,17 +369,8 @@ export default function FilaCotacoes() {
     const map = new Map<PipelineTab, Cotacao[]>()
     for (const stage of PIPELINE_STAGES) map.set(stage.status, [])
 
-    // Filter out finalized items
-    const statusesFinalizados = ['pedido_emitido', 'em_entrega', 'entregue', 'comprada', 'cancelada', 'aguardando_pgto', 'pago']
-
     for (const cot of cotacoes) {
-      const reqStatus = cot.requisicao?.status
-
-      // "Em Aprovação" mostra itens aguardando decisão financeira OU prontos para emitir pedido.
-      if (cot.status === 'concluida' && reqStatus && reqStatus !== 'cotacao_enviada' && reqStatus !== 'cotacao_aprovada') continue
-
-      // Skip finalized
-      if (cot.status === 'concluida' && reqStatus && statusesFinalizados.includes(reqStatus)) continue
+      if (!shouldShowInCotacoes(cot)) continue
 
       for (const stage of PIPELINE_STAGES) {
         if (stage.cotStatuses.includes(cot.status)) {
@@ -343,6 +389,7 @@ export default function FilaCotacoes() {
       const t = busca.toLowerCase()
       items = items.filter(c =>
         (c.requisicao?.numero ?? '').toLowerCase().includes(t) ||
+        getDescricaoPrincipal(c).toLowerCase().includes(t) ||
         (c.requisicao?.descricao ?? '').toLowerCase().includes(t) ||
         (c.requisicao?.obra_nome ?? '').toLowerCase().includes(t) ||
         (c.fornecedor_selecionado_nome ?? '').toLowerCase().includes(t)
@@ -470,7 +517,7 @@ export default function FilaCotacoes() {
           <p className="text-sm font-medium">Nenhuma cotação nesta etapa</p>
         </div>
       ) : viewMode === 'cards' ? (
-        <div className="space-y-2 p-4">
+        <div className="space-y-2 p-4 stagger-children">
           {activeItems.map(cot => <CotCard key={cot.id} cot={cot} isDark={isDark} onClick={() => setDetail(cot)} />)}
         </div>
       ) : (
@@ -493,7 +540,7 @@ export default function FilaCotacoes() {
                 <tr key={cot.id} onClick={() => setDetail(cot)}
                   className={`cursor-pointer transition-all ${isDark ? 'hover:bg-white/[0.03] border-t border-white/[0.04]' : 'hover:bg-slate-50 border-t border-slate-100'}`}>
                   <td className={`px-3 py-2 font-mono ${isDark ? 'text-teal-400' : 'text-teal-600'}`}>{cot.requisicao?.numero ?? '—'}</td>
-                  <td className={`px-3 py-2 max-w-[200px] truncate ${isDark ? 'text-white' : 'text-slate-800'}`}>{cot.requisicao?.descricao}</td>
+                  <td className={`px-3 py-2 max-w-[200px] truncate ${isDark ? 'text-white' : 'text-slate-800'}`}>{getDescricaoPrincipal(cot)}</td>
                   <td className={`px-3 py-2 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{cot.requisicao?.obra_nome}</td>
                   <td className={`px-3 py-2 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{cot.requisicao?.data_necessidade ? new Date(cot.requisicao.data_necessidade).toLocaleDateString('pt-BR') : '—'}</td>
                   <td className="px-3 py-2 text-center">{cot.requisicao?.urgencia && cot.requisicao.urgencia !== 'normal' ? (
@@ -517,9 +564,22 @@ export default function FilaCotacoes() {
           onDecisao={(decisao, obs) => {
             const req = detail.requisicao
             if (!req) return
+            if (isDetailLocked) {
+              setToast({ type: 'error', msg: `${detailBlockedByName ?? 'Outro usuário'} está editando ${req.numero}` })
+              setTimeout(() => setToast(null), 5000)
+              return
+            }
             handleDecisao(req.id, req.numero, req.alcada_nivel, decisao, obs, req.categoria, req.status)
           }}
-          onEmitir={() => setEmitirCotacao(detail)}
+          onEmitir={() => {
+            const req = detail.requisicao
+            if (isDetailLocked && req) {
+              setToast({ type: 'error', msg: `${detailBlockedByName ?? 'Outro usuário'} está editando ${req.numero}` })
+              setTimeout(() => setToast(null), 5000)
+              return
+            }
+            setEmitirCotacao(detail)
+          }}
           onCancelar={() => {
             const req = detail.requisicao
             if (!req) return
@@ -531,41 +591,94 @@ export default function FilaCotacoes() {
           }}
           isEmitting={emitirPedidoMutation.isPending}
           isCancelling={cancelarMutation.isPending}
-          onOpenCotacao={() => { setDetail(null); nav(`/cotacoes/${detail.id}`) }}
+          onOpenCotacao={() => {
+            const req = detail.requisicao
+            if (isDetailLocked && req) {
+              setToast({ type: 'error', msg: `${detailBlockedByName ?? 'Outro usuÃ¡rio'} estÃ¡ editando ${req.numero}` })
+              setTimeout(() => setToast(null), 5000)
+              return
+            }
+            setDetail(null)
+            nav(`/cotacoes/${detail.id}`)
+          }}
         />
       )}
 
-      {emitirCotacao?.requisicao && (
-        <EmitirPedidoModal
-          open
-          onClose={() => setEmitirCotacao(null)}
-          requisicaoId={emitirCotacao.requisicao.id}
-          cotacao={{
-            id: emitirCotacao.id,
-            fornecedorNome: emitirCotacao.fornecedor_selecionado_nome ?? "N/A",
-            valorTotal: emitirCotacao.valor_selecionado ?? emitirCotacao.requisicao.valor_estimado,
-            compradorId: emitirCotacao.comprador_id,
-          }}
-          onConfirm={(payload) => {
-            emitirPedidoMutation.mutate({
-              requisicaoId: emitirCotacao.requisicao.id,
-              ...payload,
-            }, {
-              onSuccess: (pedido) => {
+      {emitirCotacao?.requisicao && (() => {
+        const req = emitirCotacao.requisicao
+        const valorEmitir = emitirCotacao.valor_selecionado ?? (req as any).valor_estimado ?? 0
+        const catTipo = categorias.find(c => c.codigo === (req as any).categoria)?.tipo
+        const deveContrato = (req as any).compra_recorrente === true || (catTipo === 'servico' && valorEmitir > 2000)
+        return (
+          <EmitirPedidoModal
+            open
+            onClose={() => setEmitirCotacao(null)}
+            requisicaoId={req.id}
+            compraRecorrente={deveContrato}
+            cotacao={{
+              id: emitirCotacao.id,
+              fornecedorNome: emitirCotacao.fornecedor_selecionado_nome ?? "N/A",
+              valorTotal: valorEmitir,
+              compradorId: emitirCotacao.comprador_id,
+            }}
+            onSolicitarContrato={async () => {
+              try {
+                const year = new Date().getFullYear()
+                const prefix = `SOL-CON-${year}-`
+                const { count } = await supabase.from('con_solicitacoes').select('id', { count: 'exact', head: true }).like('numero', `${prefix}%`)
+                const seq = String((count ?? 0) + 1).padStart(3, '0')
+                const numero = `${prefix}${seq}`
+                const { error: solErr } = await supabase.from('con_solicitacoes').insert({
+                  numero,
+                  objeto: req.descricao,
+                  categoria_contrato: 'prestacao_servico',
+                  grupo_contrato: 'prestacao_servicos',
+                  tipo_contrato: 'despesa',
+                  tipo_contraparte: 'fornecedor',
+                  contraparte_nome: emitirCotacao.fornecedor_selecionado_nome ?? 'A definir',
+                  obra_id: (req as any).obra_id ?? null,
+                  valor_estimado: valorEmitir,
+                  solicitante_id: perfil?.id ?? null,
+                  solicitante_nome: perfil?.nome || perfil?.email || 'Sistema',
+                  etapa_atual: 'solicitacao',
+                  status: 'em_andamento',
+                  requisicao_origem_id: req.id,
+                  urgencia: 'normal',
+                  documentos_ref: [],
+                })
+                if (solErr) throw solErr
+                await supabase.from('cmp_requisicoes').update({ status: 'aguardando_contrato' }).eq('id', req.id)
                 setEmitirCotacao(null)
                 setDetail(null)
-                setToast({ type: "success", msg: `${pedido.numero_pedido} emitido` })
+                setToast({ type: 'success', msg: `Solicitação de contrato ${numero} criada` })
                 setTimeout(() => setToast(null), 4000)
-              },
-              onError: (err: any) => {
-                setToast({ type: "error", msg: `Erro: ${err?.message || "erro"}` })
+                nav('/contratos/solicitacoes')
+              } catch (err: any) {
+                setToast({ type: 'error', msg: `Erro: ${err?.message || 'falha ao criar solicitação'}` })
                 setTimeout(() => setToast(null), 5000)
-              },
-            })
-          }}
-          isSubmitting={emitirPedidoMutation.isPending}
-        />
-      )}
+              }
+            }}
+            onConfirm={(payload) => {
+              emitirPedidoMutation.mutate({
+                requisicaoId: req.id,
+                ...payload,
+              }, {
+                onSuccess: (pedido) => {
+                  setEmitirCotacao(null)
+                  setDetail(null)
+                  setToast({ type: "success", msg: `${pedido.numero_pedido} emitido` })
+                  setTimeout(() => setToast(null), 4000)
+                },
+                onError: (err: any) => {
+                  setToast({ type: "error", msg: `Erro: ${err?.message || "erro"}` })
+                  setTimeout(() => setToast(null), 5000)
+                },
+              })
+            }}
+            isSubmitting={emitirPedidoMutation.isPending}
+          />
+        )
+      })()}
     </div>
   )
 }

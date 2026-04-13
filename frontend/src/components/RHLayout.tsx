@@ -1,9 +1,8 @@
-import { LayoutDashboard, ImagePlay } from 'lucide-react'
+import { LayoutDashboard } from 'lucide-react'
 import ModuleLayout from './ModuleLayout'
 
 const NAV = [
-  { to: '/rh',       icon: LayoutDashboard, label: 'Painel',           end: true },
-  { to: '/rh/mural', icon: ImagePlay,       label: 'Mural de Recados', adminOnly: true },
+  { to: '/rh', icon: LayoutDashboard, label: 'Módulos RH', end: true },
 ]
 
 export default function RHLayout() {
@@ -16,6 +15,7 @@ export default function RHLayout() {
       accent="violet"
       nav={NAV}
       moduleSubtitle="Pessoas & Organização"
+      variant="compact"
     />
   )
 }

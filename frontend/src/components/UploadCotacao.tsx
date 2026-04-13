@@ -1,6 +1,7 @@
 import { useState, useRef, useCallback } from 'react'
 import { Upload, FileImage, Loader2, CheckCircle, AlertTriangle, Sparkles, X } from 'lucide-react'
 import { api } from '../services/api'
+import { supabase } from '../services/supabase'
 
 interface FornecedorParsed {
   fornecedor_nome: string
@@ -16,14 +17,50 @@ interface FornecedorParsed {
 interface Props {
   onParsed: (fornecedores: FornecedorParsed[], file: File) => void
   disabled?: boolean
+  cotacaoId?: string
+  requisicaoId?: string
 }
 
 const ACCEPTED = ['image/jpeg', 'image/png', 'image/webp', 'application/pdf']
-const MAX_SIZE = 10 * 1024 * 1024 // 10 MB
+const MAX_SIZE = 50 * 1024 * 1024 // 50 MB
+// Acima deste limiar, faz upload pro Storage e manda URL pro n8n (evita body enorme)
+const STORAGE_THRESHOLD = 8 * 1024 * 1024 // 8 MB
+
+function fileToBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => {
+      const result = reader.result as string
+      resolve(result.split(',')[1])
+    }
+    reader.onerror = reject
+    reader.readAsDataURL(file)
+  })
+}
+
+/** Upload para Supabase Storage e retorna URL pública temporária */
+async function uploadToStorage(file: File): Promise<{ path: string; url: string }> {
+  const ext = file.name.split('.').pop() || 'pdf'
+  const path = `cotacao-parse/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`
+
+  const { error } = await supabase.storage.from('temp-uploads').upload(path, file, {
+    contentType: file.type,
+    upsert: false,
+  })
+  if (error) throw new Error(`Upload falhou: ${error.message}`)
+
+  const { data } = supabase.storage.from('temp-uploads').getPublicUrl(path)
+  return { path, url: data.publicUrl }
+}
+
+/** Remove arquivo temporário do Storage */
+async function cleanupStorage(path: string) {
+  try { await supabase.storage.from('temp-uploads').remove([path]) } catch { /* best effort */ }
+}
 
 type Status = 'idle' | 'processing' | 'success' | 'error'
 
-export default function UploadCotacao({ onParsed, disabled }: Props) {
+export default function UploadCotacao({ onParsed, disabled, cotacaoId, requisicaoId }: Props) {
   const [status, setStatus] = useState<Status>('idle')
   const [error, setError] = useState('')
   const [fileName, setFileName] = useState('')
@@ -38,7 +75,7 @@ export default function UploadCotacao({ onParsed, disabled }: Props) {
       return
     }
     if (file.size > MAX_SIZE) {
-      setError('Arquivo muito grande. Máximo 10 MB.')
+      setError('Arquivo muito grande. Máximo 50 MB.')
       setStatus('error')
       return
     }
@@ -47,44 +84,52 @@ export default function UploadCotacao({ onParsed, disabled }: Props) {
     setStatus('processing')
     setError('')
 
-    try {
-      // Converter para base64
-      const base64 = await new Promise<string>((resolve, reject) => {
-        const reader = new FileReader()
-        reader.onload = () => {
-          const result = reader.result as string
-          resolve(result.split(',')[1]) // Remove data:...;base64, prefix
-        }
-        reader.onerror = reject
-        reader.readAsDataURL(file)
-      })
+    // Gera nome padronizado: Cotacao-[id].[ext] para facilitar identificação no storage/n8n
+    const ext = file.name.includes('.') ? file.name.slice(file.name.lastIndexOf('.')) : ''
+    const refId = cotacaoId || requisicaoId || Date.now().toString()
+    const cotacaoFileName = `Cotacao-${refId}${ext}`
 
-      // Enviar para n8n (#29: melhor feedback de erro)
+    let storagePath: string | null = null
+
+    try {
       let result
-      try {
-        result = await api.parseCotacaoFile({
-          file_base64: base64,
-          file_name: file.name,
-          mime_type: file.type,
-        })
-      } catch (fetchErr) {
-        const msg = fetchErr instanceof Error ? fetchErr.message : ''
-        // Distingue erro de conectividade (n8n offline) de outros erros
-        if (
-          msg.includes('Failed to fetch') ||
-          msg.includes('NetworkError') ||
-          msg.includes('AbortError') ||
-          msg.includes('Tempo limite') ||
-          msg.includes('ECONNREFUSED')
-        ) {
-          setError('Serviço de IA indisponível no momento. Preencha os dados manualmente.')
-        } else if (msg.includes('Erro 5')) {
-          setError('Erro interno no serviço de IA (500). Tente novamente em instantes.')
-        } else {
-          setError(msg || 'Erro ao conectar com o serviço de IA. Preencha manualmente.')
+
+      if (file.size > STORAGE_THRESHOLD) {
+        // Arquivo grande: upload pro Storage, envia URL pro n8n (que baixa e processa)
+        const uploaded = await uploadToStorage(file)
+        storagePath = uploaded.path
+
+        try {
+          result = await api.parseCotacaoFile({
+            file_base64: '',
+            file_name: cotacaoFileName,
+            mime_type: file.type,
+            cotacao_id: cotacaoId,
+            requisicao_id: requisicaoId,
+            file_url: uploaded.url,
+          })
+        } catch (fetchErr) {
+          handleFetchError(fetchErr)
+          return
+        } finally {
+          cleanupStorage(uploaded.path)
+          storagePath = null
         }
-        setStatus('error')
-        return
+      } else {
+        // Arquivo até 8MB: base64 inline direto
+        const base64 = await fileToBase64(file)
+        try {
+          result = await api.parseCotacaoFile({
+            file_base64: base64,
+            file_name: cotacaoFileName,
+            mime_type: file.type,
+            cotacao_id: cotacaoId,
+            requisicao_id: requisicaoId,
+          })
+        } catch (fetchErr) {
+          handleFetchError(fetchErr)
+          return
+        }
       }
 
       if (result.success && result.fornecedores?.length > 0) {
@@ -95,10 +140,24 @@ export default function UploadCotacao({ onParsed, disabled }: Props) {
         setStatus('error')
       }
     } catch (err) {
+      // Cleanup storage se ficou pendente
+      if (storagePath) cleanupStorage(storagePath)
       setError(err instanceof Error ? err.message : 'Erro inesperado ao processar arquivo.')
       setStatus('error')
     }
-  }, [onParsed])
+
+    function handleFetchError(fetchErr: unknown) {
+      const msg = fetchErr instanceof Error ? fetchErr.message : ''
+      if (msg.includes('Failed to fetch') || msg.includes('NetworkError') || msg.includes('AbortError') || msg.includes('Tempo limite') || msg.includes('ECONNREFUSED')) {
+        setError('Serviço de IA indisponível no momento. Preencha os dados manualmente.')
+      } else if (msg.includes('Erro 5')) {
+        setError('Erro interno no serviço de IA (500). Tente novamente em instantes.')
+      } else {
+        setError(msg || 'Erro ao conectar com o serviço de IA. Preencha manualmente.')
+      }
+      setStatus('error')
+    }
+  }, [onParsed, cotacaoId, requisicaoId])
 
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault()
@@ -248,7 +307,7 @@ export default function UploadCotacao({ onParsed, disabled }: Props) {
         <div className="flex items-center gap-2 px-1">
           <FileImage size={12} className="text-slate-300" />
           <p className="text-[10px] text-slate-300">
-            JPG, PNG, WebP, PDF · Máx 10 MB
+            JPG, PNG, WebP, PDF · Máx 50 MB
           </p>
         </div>
       )}

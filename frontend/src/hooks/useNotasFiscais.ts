@@ -163,7 +163,7 @@ export function useParseNF() {
         body: JSON.stringify({ arquivo, nome }),
       })
       if (!res.ok) throw new Error(`Erro ao parsear NF: ${res.status}`)
-      return (await res.json()) as NfParseResult
+      return (await res.json().catch(() => ({}))) as NfParseResult
     },
   })
 }

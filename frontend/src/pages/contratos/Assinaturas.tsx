@@ -28,7 +28,7 @@ const STAGES: PipelineStage[] = [
   { key: 'pendente',  label: 'Pendente',     icon: Clock,        dot: 'bg-amber-500',   bg: 'bg-amber-50',   text: 'text-amber-700',   border: 'border-l-amber-500',   badge: 'bg-amber-100 text-amber-700', etapas: ['enviar_assinatura'] },
   { key: 'enviado',   label: 'Enviado',      icon: Send,         dot: 'bg-blue-500',    bg: 'bg-blue-50',    text: 'text-blue-700',    border: 'border-l-blue-500',    badge: 'bg-blue-100 text-blue-700', etapas: [] },
   { key: 'assinado',  label: 'Assinado',     icon: CheckCircle2, dot: 'bg-emerald-500', bg: 'bg-emerald-50', text: 'text-emerald-700', border: 'border-l-emerald-500', badge: 'bg-emerald-100 text-emerald-700', etapas: [] },
-  { key: 'arquivado', label: 'Arquivado',    icon: Archive,      dot: 'bg-cyan-500',    bg: 'bg-cyan-50',    text: 'text-cyan-700',    border: 'border-l-cyan-500',    badge: 'bg-cyan-100 text-cyan-700', etapas: ['arquivar'] },
+  { key: 'arquivado', label: 'Arquivado',    icon: Archive,      dot: 'bg-cyan-500',    bg: 'bg-cyan-50',    text: 'text-cyan-700',    border: 'border-l-cyan-500',    badge: 'bg-cyan-100 text-cyan-700', etapas: ['arquivar', 'liberar_execucao'] },
   { key: 'liberado',  label: 'Liberado',     icon: Unlock,       dot: 'bg-green-500',   bg: 'bg-green-50',   text: 'text-green-700',   border: 'border-l-green-500',   badge: 'bg-green-100 text-green-700', etapas: ['liberar_execucao'] },
 ]
 
@@ -38,7 +38,7 @@ const fmt = (v: number) =>
   v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 })
 
 const fmtData = (d: string) =>
-  new Date(d).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit' })
+  new Date(d.length === 10 ? d + 'T12:00:00' : d).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit' })
 
 function normalizeSignatarios(value: Assinatura['signatarios'] | string | null | undefined): Signatario[] {
   if (Array.isArray(value)) return value.filter(Boolean)
@@ -128,9 +128,11 @@ export default function AssinaturaPipeline() {
 
   // Fetch solicitacoes for the etapas relevant to signature pipeline
   const { data: pendentes = [], isLoading: l1 } = useSolicitacoes({ etapa_atual: 'enviar_assinatura' })
-  const { data: arquivadas = [], isLoading: l2 } = useSolicitacoes({ etapa_atual: 'arquivar' })
-  const { data: liberadas = [], isLoading: l3 } = useSolicitacoes({ etapa_atual: 'liberar_execucao' })
-  const isLoading = l1 || l2 || l3
+  const { data: arquivadas1 = [] } = useSolicitacoes({ etapa_atual: 'arquivar' })
+  const { data: arquivadas2 = [] } = useSolicitacoes({ etapa_atual: 'liberar_execucao' })
+  const arquivadas = useMemo(() => [...arquivadas1, ...arquivadas2], [arquivadas1, arquivadas2])
+  const { data: liberadas = [], isLoading: l3 } = useSolicitacoes({ etapa_atual: 'concluido' })
+  const isLoading = l1 || l3
 
   // Build unified items list
   const allItems = useMemo(() => {

@@ -1,14 +1,16 @@
 import { useNavigate } from 'react-router-dom'
 import {
-  Building, Building2, Package2, Tag, Target, HardHat, Users,
-  Layers, FolderTree, Plus, Sparkles, ArrowRight,
+  Building, Building2, Package2, Tag, Target, HardHat, Users, Warehouse,
+  Layers, FolderTree, Plus, Sparkles, ArrowRight, FolderKanban,
 } from 'lucide-react'
 import {
   useCadFornecedores, useCadClasses, useCadCentrosCusto,
   useCadObras, useCadColaboradores, useCadEmpresas,
   useCadGrupos, useCadCategorias,
 } from '../../hooks/useCadastros'
-import { useEstoqueItens } from '../../hooks/useEstoque'
+import { useEstoqueItens, useBases } from '../../hooks/useEstoque'
+import { supabase } from '../../services/supabase'
+import { useQuery } from '@tanstack/react-query'
 
 const SECTIONS = [
   {
@@ -18,6 +20,7 @@ const SECTIONS = [
       { key: 'empresas',  label: 'Empresas',    icon: Building,  route: '/cadastros/empresas',     color: 'teal',   emoji: '🏛️' },
       { key: 'centros',   label: 'Centros Custo',icon: Target,    route: '/cadastros/centros-custo',color: 'cyan',   emoji: '🎯' },
       { key: 'obras',     label: 'Obras',        icon: HardHat,   route: '/cadastros/obras',        color: 'indigo', emoji: '🏗️' },
+      { key: 'projetos',  label: 'Projetos',     icon: FolderKanban, route: '/cadastros/projetos',  color: 'violet', emoji: '📋' },
     ],
   },
   {
@@ -31,11 +34,18 @@ const SECTIONS = [
   },
   {
     title: 'Entidades',
-    subtitle: 'Fornecedores, Colaboradores e Itens',
+    subtitle: 'Fornecedores e Colaboradores',
     entities: [
       { key: 'fornecedores',  label: 'Fornecedores',  icon: Building2, route: '/cadastros/fornecedores',  color: 'emerald', emoji: '🏢' },
       { key: 'colaboradores', label: 'Colaboradores',  icon: Users,     route: '/cadastros/colaboradores', color: 'rose',    emoji: '👷' },
-      { key: 'itens',         label: 'Itens',          icon: Package2,  route: '/cadastros/itens',         color: 'blue',    emoji: '📦' },
+    ],
+  },
+  {
+    title: 'Estoque',
+    subtitle: 'Catalogo de itens e bases / almoxarifados',
+    entities: [
+      { key: 'itens',  label: 'Itens',  icon: Package2,  route: '/cadastros/itens',  color: 'blue', emoji: '📦' },
+      { key: 'bases',  label: 'Bases',  icon: Warehouse, route: '/cadastros/bases',  color: 'teal', emoji: '🏭' },
     ],
   },
 ] as const
@@ -57,12 +67,20 @@ export default function CadastrosHome() {
   const { data: empresas = [] } = useCadEmpresas()
   const { data: fornecedores = [] } = useCadFornecedores()
   const { data: itens = [] } = useEstoqueItens()
+  const { data: bases = [] } = useBases()
   const { data: classes = [] } = useCadClasses()
   const { data: centros = [] } = useCadCentrosCusto()
   const { data: obras = [] } = useCadObras()
   const { data: colaboradores = [] } = useCadColaboradores()
   const { data: grupos = [] } = useCadGrupos()
   const { data: categorias = [] } = useCadCategorias()
+  const { data: projetos = [] } = useQuery({
+    queryKey: ['cad-projetos-count'],
+    queryFn: async () => {
+      const { data } = await supabase.from('pmo_projetos').select('id')
+      return data ?? []
+    },
+  })
 
   const counts: Record<string, number> = {
     empresas: empresas.length,
@@ -71,9 +89,11 @@ export default function CadastrosHome() {
     classes: classes.length,
     centros: centros.length,
     obras: obras.length,
+    projetos: projetos.length,
     colaboradores: colaboradores.length,
     grupos: grupos.length,
     categorias: categorias.length,
+    bases: bases.length,
   }
 
   return (

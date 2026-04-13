@@ -4,7 +4,7 @@ id: REQ-009
 titulo: "Aprovação de Pagamentos — Alçada Diretoria"
 categoria: funcional
 prioridade: critica
-status: em-andamento
+status: entregue
 modulo: financeiro
 sprint: Sprint-4
 milestone: MS-004

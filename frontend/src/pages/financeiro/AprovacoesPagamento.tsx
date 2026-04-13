@@ -4,6 +4,7 @@ import {
   CheckCircle2, XCircle, Clock, Eye,
 } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
+import { UpperInput } from '../../components/UpperInput'
 import { useContasPagar, useAprovarPagamento } from '../../hooks/useFinanceiro'
 
 const fmt = (v: number) =>
@@ -140,7 +141,7 @@ export default function AprovacoesPagamento() {
       {/* ── Busca ───────────────────────────────────────────── */}
       <div className="relative">
         <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-        <input type="text" value={busca} onChange={e => setBusca(e.target.value)}
+        <UpperInput type="text" value={busca} onChange={e => setBusca(e.target.value)}
           placeholder="Buscar fornecedor, documento..."
           className={`w-full pl-9 pr-4 py-2.5 rounded-xl border text-sm placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-400 ${isDark ? 'bg-[#1e293b] border-white/[0.06] text-slate-200' : 'bg-white border-slate-200 text-slate-700'}`} />
       </div>

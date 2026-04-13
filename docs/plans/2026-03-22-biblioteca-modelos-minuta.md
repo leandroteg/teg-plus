@@ -370,3 +370,7 @@ git push origin main
 **Step 2: Verificar deploy no Vercel**
 
 Verificar build em https://teg-plus.vercel.app
+
+
+## Links
+- [[obsidian/27 - Módulo Contratos Gestão]]

@@ -4,7 +4,7 @@ id: REQ-018
 titulo: "Controle de Acesso por Alçadas — Módulo Financeiro"
 categoria: nao-funcional
 prioridade: alta
-status: em-andamento
+status: entregue
 modulo: financeiro
 sprint: Sprint-4
 milestone: MS-004

@@ -1,79 +1,150 @@
 import { useMemo, useState } from 'react'
-import { Archive, ArrowDownUp, Landmark, PackageCheck, TrendingDown } from 'lucide-react'
+import {
+  Archive, ArrowDownUp, Landmark, TrendingDown, MapPin,
+  Search, X, LayoutList, LayoutGrid, ArrowUp, ArrowDown, Plus,
+} from 'lucide-react'
 import PatrimonialLegacy from '../estoque/Patrimonial'
 import { useImobilizados } from '../../hooks/usePatrimonial'
+import { useBases } from '../../hooks/useEstoque'
 import { useTheme } from '../../contexts/ThemeContext'
 
-const TABS = [
-  { key: 'aguardando', label: 'Aguardando Entrada', icon: ArrowDownUp, accent: { active: 'bg-violet-50 text-violet-800 border-violet-500', idle: 'text-violet-600 hover:bg-violet-50', badge: 'bg-violet-100 text-violet-700', darkActive: 'bg-violet-500/10 text-violet-300 border-violet-400/40', darkIdle: 'text-violet-300 hover:bg-white/[0.03]', darkBadge: 'bg-violet-500/15 text-violet-200' }, filter: (pct: number, status: string) => status === 'pendente_registro' },
-  { key: 'patrimonio', label: 'Patrim\u00f4nio', icon: Landmark, accent: { active: 'bg-emerald-50 text-emerald-800 border-emerald-500', idle: 'text-emerald-600 hover:bg-emerald-50', badge: 'bg-emerald-100 text-emerald-700', darkActive: 'bg-emerald-500/10 text-emerald-300 border-emerald-400/40', darkIdle: 'text-emerald-300 hover:bg-white/[0.03]', darkBadge: 'bg-emerald-500/15 text-emerald-200' }, filter: (_pct: number, status: string) => ['ativo', 'cedido', 'em_transferencia', 'em_manutencao'].includes(status) },
-  { key: 'depreciado', label: 'Depreciado', icon: TrendingDown, accent: { active: 'bg-amber-50 text-amber-800 border-amber-500', idle: 'text-amber-600 hover:bg-amber-50', badge: 'bg-amber-100 text-amber-700', darkActive: 'bg-amber-500/10 text-amber-300 border-amber-400/40', darkIdle: 'text-amber-300 hover:bg-white/[0.03]', darkBadge: 'bg-amber-500/15 text-amber-200' }, filter: (pct: number, status: string) => pct >= 100 && status !== 'baixado' },
-  { key: 'baixado', label: 'Baixado', icon: Archive, accent: { active: 'bg-slate-100 text-slate-800 border-slate-400', idle: 'text-slate-600 hover:bg-slate-50', badge: 'bg-slate-200 text-slate-600', darkActive: 'bg-slate-500/10 text-slate-200 border-slate-400/40', darkIdle: 'text-slate-300 hover:bg-white/[0.03]', darkBadge: 'bg-slate-500/15 text-slate-200' }, filter: (_pct: number, status: string) => status === 'baixado' },
+// ── Pipeline stages ──────────────────────────────────────────────────────────
+
+type TabKey = 'aguardando' | 'patrimonio' | 'depreciado' | 'baixado'
+
+interface TabDef {
+  key: TabKey
+  label: string
+  icon: React.ElementType
+  filter: (pct: number, status: string) => boolean
+}
+
+const TABS: TabDef[] = [
+  { key: 'aguardando',  label: 'Aguardando Entrada', icon: ArrowDownUp,   filter: (_p, s) => s === 'pendente_registro' },
+  { key: 'patrimonio',  label: 'Patrimonio',         icon: Landmark,      filter: (_p, s) => ['ativo', 'cedido', 'em_transferencia'].includes(s) },
+  { key: 'depreciado',  label: 'Depreciado',         icon: TrendingDown,  filter: (p, s) => p >= 100 && s !== 'baixado' },
+  { key: 'baixado',     label: 'Baixado',            icon: Archive,       filter: (_p, s) => s === 'baixado' },
 ]
 
+type AccentSet = { bg: string; bgActive: string; text: string; textActive: string; dot: string; badge: string; border: string }
+
+const TAB_ACCENT: Record<TabKey, AccentSet> = {
+  aguardando: { bg:'bg-violet-50',  bgActive:'bg-violet-100',  text:'text-violet-500',  textActive:'text-violet-800',  dot:'bg-violet-500',  badge:'bg-violet-200/80 text-violet-700',  border:'border-violet-200' },
+  patrimonio: { bg:'bg-emerald-50', bgActive:'bg-emerald-100', text:'text-emerald-500', textActive:'text-emerald-800', dot:'bg-emerald-500', badge:'bg-emerald-200/80 text-emerald-700', border:'border-emerald-200' },
+  depreciado: { bg:'bg-amber-50',   bgActive:'bg-amber-100',   text:'text-amber-500',   textActive:'text-amber-800',   dot:'bg-amber-500',   badge:'bg-amber-200/80 text-amber-700',   border:'border-amber-200' },
+  baixado:    { bg:'bg-slate-50',   bgActive:'bg-slate-100',   text:'text-slate-500',   textActive:'text-slate-800',   dot:'bg-slate-400',   badge:'bg-slate-200/80 text-slate-600',   border:'border-slate-200' },
+}
+
+const TAB_ACCENT_DARK: Record<TabKey, AccentSet> = {
+  aguardando: { bg:'bg-violet-500/5',  bgActive:'bg-violet-500/15',  text:'text-violet-400',  textActive:'text-violet-200',  dot:'bg-violet-400',  badge:'bg-violet-500/15 text-violet-300',  border:'border-violet-500/20' },
+  patrimonio: { bg:'bg-emerald-500/5', bgActive:'bg-emerald-500/15', text:'text-emerald-400', textActive:'text-emerald-200', dot:'bg-emerald-400', badge:'bg-emerald-500/15 text-emerald-300', border:'border-emerald-500/20' },
+  depreciado: { bg:'bg-amber-500/5',   bgActive:'bg-amber-500/15',   text:'text-amber-400',   textActive:'text-amber-200',   dot:'bg-amber-400',   badge:'bg-amber-500/15 text-amber-300',   border:'border-amber-500/20' },
+  baixado:    { bg:'bg-white/[0.02]',  bgActive:'bg-white/[0.06]',   text:'text-slate-500',   textActive:'text-slate-200',   dot:'bg-slate-500',   badge:'bg-white/[0.06] text-slate-400',   border:'border-white/[0.08]' },
+}
+
+// ── Component ────────────────────────────────────────────────────────────────
+
 export default function PatrimonioPage() {
-  const { isLightSidebar: isLight } = useTheme()
-  const [tab, setTab] = useState(TABS[1].key)
-  const { data: imobilizados = [] } = useImobilizados()
+  const { isDark } = useTheme()
+  const isLight = !isDark
+  const [tab, setTab] = useState<TabKey>('patrimonio')
+  const [filtroBase, setFiltroBase] = useState('')
+  const { data: bases = [] } = useBases()
+  const { data: imobilizados = [] } = useImobilizados(
+    filtroBase ? { base_id: filtroBase } : undefined
+  )
 
   const counts = useMemo(() => {
     return Object.fromEntries(TABS.map(t => [
       t.key,
       imobilizados.filter(i => t.filter(i.percentual_depreciado ?? 0, i.status)).length,
-    ]))
+    ])) as Record<TabKey, number>
   }, [imobilizados])
 
   return (
-    <div className="space-y-4">
-      <div>
-        <h1 className={`text-xl font-extrabold ${isLight ? 'text-slate-800' : 'text-white'}`}>{'Patrim\u00f4nio'}</h1>
-        <p className={`text-xs mt-0.5 ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>{'Gest\u00e3o completa dos imobilizados por etapa do ciclo de vida'}</p>
-      </div>
-
-      <div className={`overflow-x-auto hide-scrollbar rounded-2xl border p-1 ${
-        isLight ? 'border-slate-200 bg-white' : 'border-white/[0.08] bg-white/[0.02]'
-      }`}>
-        <div className="flex min-w-max items-stretch gap-1">
-        {TABS.map(item => {
-          const active = item.key === tab
-          const Icon = item.icon
-          return (
-            <button
-              key={item.key}
-              onClick={() => setTab(item.key)}
-              className={`flex min-h-[52px] items-center gap-2 rounded-xl px-4 py-3 text-xs font-semibold transition-all border shrink-0 ${
-                active
-                  ? `${isLight ? item.accent.active : item.accent.darkActive} shadow-sm`
-                  : `${isLight ? item.accent.idle : item.accent.darkIdle} border-transparent`
-              }`}
-            >
-              <Icon size={13} className="shrink-0" />
-              {item.label}
-              <span className={`rounded-full min-w-[22px] h-[22px] px-1.5 flex items-center justify-center text-[10px] font-bold ${
-                active
-                  ? isLight ? item.accent.badge : item.accent.darkBadge
-                  : isLight ? 'bg-slate-100 text-slate-500' : 'bg-white/[0.06] text-slate-500'
-              }`}>
-                {counts[item.key] ?? 0}
-              </span>
-            </button>
-          )
-        })}
+    <div className={`rounded-2xl border overflow-hidden ${isDark ? 'bg-[#0f172a] border-white/[0.06]' : 'bg-white border-slate-200'}`}>
+      {/* Header */}
+      <div className="px-4 pt-4 pb-2 flex items-center justify-between">
+        <div>
+          <h1 className={`text-lg font-extrabold flex items-center gap-2 ${isDark ? 'text-white' : 'text-slate-900'}`}>
+            <Landmark size={18} className="text-amber-500" /> Patrimonio
+          </h1>
+          <p className={`text-xs mt-0.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+            Gestao completa dos imobilizados por etapa do ciclo de vida
+          </p>
+        </div>
+        {/* Filtro por Base */}
+        <div className="flex items-center gap-2">
+          <MapPin size={13} className={isDark ? 'text-slate-500' : 'text-slate-400'} />
+          <select
+            value={filtroBase}
+            onChange={e => setFiltroBase(e.target.value)}
+            className={`px-3 py-2 rounded-xl border text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-amber-500/30 ${
+              isDark
+                ? 'border-white/[0.08] bg-white/[0.03] text-slate-300'
+                : 'border-slate-200 bg-white text-slate-600'
+            }`}
+          >
+            <option value="">Todas as Bases</option>
+            {bases.filter(b => b.ativa).map(b => (
+              <option key={b.id} value={b.id}>{b.nome}</option>
+            ))}
+          </select>
         </div>
       </div>
 
-      {tab === 'aguardando' && (
-        <PatrimonialLegacy forcedStatusFiltro="pendente_registro" hideHeader />
-      )}
-      {tab === 'patrimonio' && (
-        <PatrimonialLegacy allowedStatuses={['ativo', 'cedido', 'em_transferencia', 'em_manutencao']} hideHeader />
-      )}
-      {tab === 'depreciado' && (
-        <PatrimonialLegacy showDepreciadosOnly hideHeader />
-      )}
-      {tab === 'baixado' && (
-        <PatrimonialLegacy forcedStatusFiltro="baixado" hideHeader />
-      )}
+      {/* Pipeline tabs */}
+      <div className={`flex gap-1 p-1 pb-2 rounded-t-2xl border-b overflow-x-auto hide-scrollbar ${
+        isDark ? 'bg-white/[0.02] border-white/[0.06]' : 'bg-slate-50 border-slate-200'
+      }`}>
+        {TABS.map(stage => {
+          const count = counts[stage.key] ?? 0
+          const isActive = tab === stage.key
+          const Icon = stage.icon
+          const a = isDark ? TAB_ACCENT_DARK[stage.key] : TAB_ACCENT[stage.key]
+          return (
+            <button key={stage.key} onClick={() => setTab(stage.key)}
+              className={`min-w-fit md:flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm whitespace-nowrap transition-all border ${
+                isActive
+                  ? `${a.bgActive} ${a.textActive} ${a.border} font-bold shadow-sm`
+                  : `${a.bg} ${a.text} font-medium border-transparent ${isDark ? '' : 'hover:bg-white hover:shadow-sm'}`
+              }`}>
+              <Icon size={15} className="shrink-0" /> {stage.label}
+              {count > 0 && (
+                <span className={`text-[10px] font-bold rounded-full min-w-[22px] px-1.5 py-0.5 ${
+                  isActive ? a.badge : isDark ? 'bg-white/[0.06] text-slate-500' : 'bg-slate-200/80 text-slate-500'
+                }`}>
+                  {count}
+                </span>
+              )}
+            </button>
+          )
+        })}
+      </div>
+
+      {/* Content — delegates to legacy Patrimonial component */}
+      <div className="min-h-[300px]">
+        {tab === 'aguardando' && (
+          <div className="p-4">
+            <PatrimonialLegacy forcedStatusFiltro="pendente_registro" hideHeader />
+          </div>
+        )}
+        {tab === 'patrimonio' && (
+          <div className="p-4">
+            <PatrimonialLegacy allowedStatuses={['ativo', 'cedido', 'em_transferencia']} hideHeader />
+          </div>
+        )}
+        {tab === 'depreciado' && (
+          <div className="p-4">
+            <PatrimonialLegacy showDepreciadosOnly hideHeader />
+          </div>
+        )}
+        {tab === 'baixado' && (
+          <div className="p-4">
+            <PatrimonialLegacy forcedStatusFiltro="baixado" hideHeader />
+          </div>
+        )}
+      </div>
     </div>
   )
 }

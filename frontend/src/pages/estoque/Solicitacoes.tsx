@@ -9,7 +9,10 @@ import {
   useEstoqueItens,
 } from '../../hooks/useEstoque'
 import { useTheme } from '../../contexts/ThemeContext'
+import { useAuth } from '../../contexts/AuthContext'
 import type { EstSolicitacao, StatusSolicitacao } from '../../types/estoque'
+import NumericInput from '../../components/NumericInput'
+import { UpperInput, UpperTextarea } from '../../components/UpperInput'
 
 const STATUS_CONFIG: Record<StatusSolicitacao, { label: string; bg: string; text: string; dot: string }> = {
   aberta:       { label: 'Aberta',       bg: 'bg-blue-50',    text: 'text-blue-700',    dot: 'bg-blue-500'    },
@@ -51,6 +54,7 @@ type ItemForm = { item_id?: string; descricao_livre?: string; quantidade: number
 
 export default function Solicitacoes() {
   const { isLightSidebar: isLight } = useTheme()
+  const { hasSetorPapel } = useAuth()
   const [statusFiltro, setStatusFiltro] = useState<StatusSolicitacao | ''>('')
   const [showForm, setShowForm] = useState(false)
   const [expandedId, setExpandedId] = useState<string | null>(null)
@@ -60,6 +64,8 @@ export default function Solicitacoes() {
   )
   const criarSolicitacao = useCriarSolicitacao()
   const atualizarSolicitacao = useAtualizarSolicitacao()
+  const canApproveSaida = hasSetorPapel('estoque', ['supervisor', 'diretor', 'ceo'])
+    || hasSetorPapel('patrimonial', ['supervisor', 'diretor', 'ceo'])
 
   const card = isLight
     ? 'bg-white border-slate-200 shadow-sm'
@@ -119,7 +125,12 @@ export default function Solicitacoes() {
             const cfg = STATUS_CONFIG[sol.status]
             const urgCfg = URGENCIA_CONFIG[sol.urgencia]
             const isExpanded = expandedId === sol.id
-            const transitions = STATUS_TRANSITIONS[sol.status] ?? []
+            const transitions = (STATUS_TRANSITIONS[sol.status] ?? []).filter(transition => {
+              if (sol.status === 'aberta' && transition.next === 'aprovada') {
+                return canApproveSaida
+              }
+              return true
+            })
 
             return (
               <div key={sol.id} className={`rounded-2xl border overflow-hidden ${card}`}>
@@ -299,12 +310,12 @@ function NovaSolicitacaoModal({
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className={`block text-xs font-bold mb-1 ${labelCls}`}>Solicitante *</label>
-              <input value={solicitante} onChange={e => setSolicitante(e.target.value)}
+              <UpperInput value={solicitante} onChange={e => setSolicitante(e.target.value)}
                 className={inputCls} placeholder="Nome do solicitante..." />
             </div>
             <div>
               <label className={`block text-xs font-bold mb-1 ${labelCls}`}>Obra *</label>
-              <input value={obra} onChange={e => setObra(e.target.value)}
+              <UpperInput value={obra} onChange={e => setObra(e.target.value)}
                 className={inputCls} placeholder="Nome da obra..." />
             </div>
           </div>
@@ -328,7 +339,7 @@ function NovaSolicitacaoModal({
 
           <div>
             <label className={`block text-xs font-bold mb-1 ${labelCls}`}>Observacao</label>
-            <textarea value={observacao} onChange={e => setObservacao(e.target.value)}
+            <UpperTextarea value={observacao} onChange={e => setObservacao(e.target.value)}
               rows={2} className={`${inputCls} resize-none`} placeholder="Observacoes opcionais..." />
           </div>
 
@@ -365,11 +376,10 @@ function NovaSolicitacaoModal({
                         ))}
                       </select>
                     </div>
-                    <input
-                      type="number"
+                    <NumericInput
                       min={1}
                       value={item.quantidade}
-                      onChange={e => updateItem(idx, 'quantidade', Number(e.target.value))}
+                      onChange={v => updateItem(idx, 'quantidade', v)}
                       className={`w-20 ${inputCls} text-xs text-center`}
                       placeholder="Qtd"
                     />
@@ -381,7 +391,7 @@ function NovaSolicitacaoModal({
                     )}
                   </div>
                   {!item.item_id && (
-                    <input
+                    <UpperInput
                       value={item.descricao_livre ?? ''}
                       onChange={e => updateItem(idx, 'descricao_livre', e.target.value)}
                       className={`${inputCls} text-xs mt-2`}

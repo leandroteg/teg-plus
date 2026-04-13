@@ -1,6 +1,8 @@
-import { useState } from 'react'
-import { Users, Plus, Search, ChevronRight, Phone, Mail, Briefcase } from 'lucide-react'
+import { useState, useMemo } from 'react'
+import { Users, Plus, Search, ChevronRight, Phone, Mail, Briefcase, ArrowUp, ArrowDown, LayoutList, LayoutGrid, Trash2 } from 'lucide-react'
+import { UpperInput } from '../../components/UpperInput'
 import { useCadColaboradores, useSalvarColaborador, useCadObras, useAiCadastroParse } from '../../hooks/useCadastros'
+import { supabase } from '../../services/supabase'
 import type { Colaborador } from '../../types/cadastros'
 import MagicModal from '../../components/MagicModal'
 import ConfidenceField from '../../components/ConfidenceField'
@@ -16,15 +18,52 @@ export default function ColaboradoresCad() {
   const [showForm, setShowForm] = useState(false)
   const [editItem, setEditItem] = useState<Partial<Colaborador> | null>(null)
   const [confidence, setConfidence] = useState<Record<string, number>>({})
+  const [viewMode, setViewMode] = useState<'table' | 'card'>('table')
+  const [sortCol, setSortCol] = useState<string>('nome')
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc')
+  const [selected, setSelected] = useState<Set<string>>(new Set())
 
   const { data: colaboradores = [], isLoading } = useCadColaboradores()
   const { data: obras = [] } = useCadObras()
   const salvar = useSalvarColaborador()
   const aiParse = useAiCadastroParse()
 
-  const filtered = busca.trim()
-    ? colaboradores.filter(c => c.nome.toLowerCase().includes(busca.toLowerCase()) || c.cpf?.includes(busca))
-    : colaboradores
+  const filtered = useMemo(() => {
+    let list = colaboradores
+    if (busca.trim()) {
+      const q = busca.toLowerCase()
+      list = list.filter(c => c.nome.toLowerCase().includes(q) || c.cpf?.includes(busca))
+    }
+    list = [...list].sort((a, b) => {
+      let av: any, bv: any
+      if (sortCol === 'obra') { av = a.obra?.nome ?? ''; bv = b.obra?.nome ?? '' }
+      else { av = (a as any)[sortCol] ?? ''; bv = (b as any)[sortCol] ?? '' }
+      const cmp = String(av).localeCompare(String(bv), 'pt-BR', { sensitivity: 'base' })
+      return sortDir === 'asc' ? cmp : -cmp
+    })
+    return list
+  }, [colaboradores, busca, sortCol, sortDir])
+
+  const toggleSort = (col: string) => {
+    if (sortCol === col) setSortDir(d => d === 'asc' ? 'desc' : 'asc')
+    else { setSortCol(col); setSortDir('asc') }
+  }
+  const SortIcon = ({ col }: { col: string }) =>
+    sortCol === col ? (sortDir === 'asc' ? <ArrowUp size={12} /> : <ArrowDown size={12} />) : null
+
+  const toggleSelect = (id: string) => setSelected(prev => {
+    const next = new Set(prev); next.has(id) ? next.delete(id) : next.add(id); return next
+  })
+  const selectAll = () => {
+    if (selected.size === filtered.length) setSelected(new Set())
+    else setSelected(new Set(filtered.map(i => i.id)))
+  }
+  const handleBulkDelete = async () => {
+    if (!confirm(`Excluir ${selected.size} item(s)?`)) return
+    await supabase.from('rh_colaboradores').delete().in('id', [...selected])
+    setSelected(new Set())
+    window.location.reload()
+  }
 
   function openNew() { setEditItem({ ...EMPTY }); setConfidence({}); setShowForm(true) }
   function openEdit(c: Colaborador) { setEditItem({ ...c }); setConfidence({}); setShowForm(true) }
@@ -48,7 +87,7 @@ export default function ColaboradoresCad() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-xl font-extrabold text-slate-800">Colaboradores</h1>
-          <p className="text-xs text-slate-400 mt-0.5">{filtered.length} colaboradores</p>
+          <p className="text-xs text-slate-400 mt-0.5">{filtered.length} item(s)</p>
         </div>
         <button onClick={openNew}
           className="flex items-center gap-1.5 bg-violet-600 hover:bg-violet-700 text-white
@@ -57,12 +96,24 @@ export default function ColaboradoresCad() {
         </button>
       </div>
 
-      <div className="relative">
-        <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-        <input value={busca} onChange={e => setBusca(e.target.value)}
-          placeholder="Buscar por nome ou CPF..."
-          className="w-full pl-9 pr-4 py-2 rounded-xl border border-slate-200 bg-white text-sm
-            focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400" />
+      <div className="flex gap-2 flex-wrap items-center">
+        <div className="relative flex-1 min-w-[200px]">
+          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+          <UpperInput value={busca} onChange={e => setBusca(e.target.value)}
+            placeholder="Buscar por nome ou CPF..."
+            className="w-full pl-9 pr-4 py-2 rounded-xl border border-slate-200 bg-white text-sm
+              focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400" />
+        </div>
+        <div className="flex rounded-xl border border-slate-200 overflow-hidden">
+          <button onClick={() => setViewMode('table')}
+            className={`p-2 ${viewMode === 'table' ? 'bg-violet-600 text-white' : 'bg-white text-slate-400 hover:text-slate-600'}`}>
+            <LayoutList size={16} />
+          </button>
+          <button onClick={() => setViewMode('card')}
+            className={`p-2 ${viewMode === 'card' ? 'bg-violet-600 text-white' : 'bg-white text-slate-400 hover:text-slate-600'}`}>
+            <LayoutGrid size={16} />
+          </button>
+        </div>
       </div>
 
       {isLoading ? (
@@ -75,6 +126,51 @@ export default function ColaboradoresCad() {
           <p className="text-slate-500 font-semibold">Nenhum colaborador encontrado</p>
           <p className="text-slate-400 text-sm mt-1">Cadastre o primeiro colaborador</p>
         </div>
+      ) : viewMode === 'table' ? (
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-slate-100 bg-slate-50">
+                <th className="px-4 py-3 w-10">
+                  <input type="checkbox" checked={selected.size === filtered.length && filtered.length > 0}
+                    onChange={selectAll} className="rounded border-slate-300 text-violet-600 focus:ring-violet-500" />
+                </th>
+                <th className="text-left px-4 py-3 text-[10px] font-bold text-slate-500 uppercase tracking-widest cursor-pointer select-none" onClick={() => toggleSort('nome')}>
+                  <span className="flex items-center gap-1">Nome <SortIcon col="nome" /></span>
+                </th>
+                <th className="text-left px-4 py-3 text-[10px] font-bold text-slate-500 uppercase tracking-widest hidden md:table-cell cursor-pointer select-none" onClick={() => toggleSort('cargo')}>
+                  <span className="flex items-center gap-1">Cargo <SortIcon col="cargo" /></span>
+                </th>
+                <th className="text-left px-4 py-3 text-[10px] font-bold text-slate-500 uppercase tracking-widest hidden md:table-cell cursor-pointer select-none" onClick={() => toggleSort('obra')}>
+                  <span className="flex items-center gap-1">Obra <SortIcon col="obra" /></span>
+                </th>
+                <th className="text-left px-4 py-3 text-[10px] font-bold text-slate-500 uppercase tracking-widest hidden lg:table-cell cursor-pointer select-none" onClick={() => toggleSort('telefone')}>
+                  <span className="flex items-center gap-1">Telefone <SortIcon col="telefone" /></span>
+                </th>
+                <th className="text-center px-4 py-3 text-[10px] font-bold text-slate-500 uppercase tracking-widest cursor-pointer select-none" onClick={() => toggleSort('ativo')}>
+                  <span className="flex items-center justify-center gap-1">Status <SortIcon col="ativo" /></span>
+                </th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-50">
+              {filtered.map(c => (
+                <tr key={c.id} className="hover:bg-slate-50 transition-colors cursor-pointer" onClick={() => openEdit(c)}>
+                  <td className="px-4 py-2.5" onClick={ev => ev.stopPropagation()}>
+                    <input type="checkbox" checked={selected.has(c.id)} onChange={() => toggleSelect(c.id)}
+                      className="rounded border-slate-300 text-violet-600 focus:ring-violet-500" />
+                  </td>
+                  <td className="px-4 py-2.5 font-semibold text-slate-800">{c.nome}</td>
+                  <td className="px-4 py-2.5 text-xs text-slate-500 hidden md:table-cell">{c.cargo || '—'}</td>
+                  <td className="px-4 py-2.5 text-xs text-slate-500 hidden md:table-cell">{c.obra?.nome || '—'}</td>
+                  <td className="px-4 py-2.5 text-xs text-slate-500 hidden lg:table-cell">{c.telefone || '—'}</td>
+                  <td className="px-4 py-2.5 text-center">
+                    <span className={`inline-block w-2 h-2 rounded-full ${c.ativo ? 'bg-emerald-400' : 'bg-slate-300'}`} />
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       ) : (
         <div className="space-y-2">
           {filtered.map(c => (
@@ -82,6 +178,10 @@ export default function ColaboradoresCad() {
               className={`bg-white rounded-2xl border shadow-sm p-4 hover:shadow-md cursor-pointer group transition-all
                 ${c.ativo ? 'border-slate-200' : 'border-slate-200 opacity-60'}`}>
               <div className="flex items-start gap-3">
+                <div className="flex items-center pt-1" onClick={ev => ev.stopPropagation()}>
+                  <input type="checkbox" checked={selected.has(c.id)} onChange={() => toggleSelect(c.id)}
+                    className="rounded border-slate-300 text-violet-600 focus:ring-violet-500" />
+                </div>
                 <div className="w-10 h-10 rounded-xl bg-rose-50 flex items-center justify-center shrink-0">
                   <Users size={16} className="text-rose-600" />
                 </div>
@@ -98,6 +198,15 @@ export default function ColaboradoresCad() {
               </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {selected.size > 0 && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 bg-slate-900 text-white px-6 py-3 rounded-2xl shadow-2xl flex items-center gap-4 text-sm font-semibold">
+          <span>{selected.size} selecionado(s)</span>
+          <button onClick={handleBulkDelete} className="flex items-center gap-1.5 bg-red-500 hover:bg-red-600 px-3 py-1.5 rounded-xl transition-colors">
+            <Trash2 size={14} /> Excluir
+          </button>
         </div>
       )}
 

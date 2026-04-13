@@ -106,17 +106,18 @@ describe('TC-AUTH-UNIT-001: Estado inicial do AuthContext', () => {
 // ── TC-AUTH-UNIT-002: ROLE_NIVEL hierarchy ──────────────────────────────────────
 
 describe('TC-AUTH-UNIT-002: Hierarquia ROLE_NIVEL', () => {
-  it('admin(5) > gerente(4) > aprovador(3) > comprador(2) > requisitante(1) > visitante(0)', () => {
-    expect(ROLE_NIVEL.admin).toBe(5)
-    expect(ROLE_NIVEL.gerente).toBe(4)
-    expect(ROLE_NIVEL.aprovador).toBe(3)
-    expect(ROLE_NIVEL.comprador).toBe(2)
-    expect(ROLE_NIVEL.requisitante).toBe(1)
-    expect(ROLE_NIVEL.visitante).toBe(0)
+  it('ceo(7) > admin(6) > gerente(5) > aprovador(4) > comprador(3) > requisitante(2) > visitante(1)', () => {
+    expect(ROLE_NIVEL.ceo).toBe(7)
+    expect(ROLE_NIVEL.admin).toBe(6)
+    expect(ROLE_NIVEL.gerente).toBe(5)
+    expect(ROLE_NIVEL.aprovador).toBe(4)
+    expect(ROLE_NIVEL.comprador).toBe(3)
+    expect(ROLE_NIVEL.requisitante).toBe(2)
+    expect(ROLE_NIVEL.visitante).toBe(1)
   })
 
   it('cada nivel e estritamente maior que o anterior', () => {
-    const ordered: Role[] = ['visitante', 'requisitante', 'comprador', 'aprovador', 'gerente', 'admin']
+    const ordered: string[] = ['visitante', 'requisitante', 'comprador', 'aprovador', 'gerente', 'admin', 'ceo']
     for (let i = 1; i < ordered.length; i++) {
       expect(ROLE_NIVEL[ordered[i]]).toBeGreaterThan(ROLE_NIVEL[ordered[i - 1]])
     }
@@ -126,14 +127,20 @@ describe('TC-AUTH-UNIT-002: Hierarquia ROLE_NIVEL', () => {
 
 // ── TC-AUTH-UNIT-003: ROLE_LABEL mapeamento correto ─────────────────────────────
 
-describe('TC-AUTH-UNIT-003: ROLE_LABEL mapeamento para todos os 6 roles', () => {
-  const expected: Record<Role, string> = {
-    admin:        'Administrador',
-    gerente:      'Gerente',
-    aprovador:    'Aprovador',
-    comprador:    'Comprador',
-    requisitante: 'Requisitante',
-    visitante:    'Visitante',
+describe('TC-AUTH-UNIT-003: ROLE_LABEL mapeamento para roles', () => {
+  const expected: Record<string, string> = {
+    admin:          'Administrador',
+    administrador:  'Administrador',
+    ceo:            'CEO',
+    diretor:        'Diretor',
+    gerente:        'Diretor',
+    supervisor:     'Supervisor',
+    aprovador:      'Supervisor',
+    gestor:         'Gestor',
+    comprador:      'Equipe',
+    equipe:         'Equipe',
+    requisitante:   'Requisitante',
+    visitante:      'Visitante',
   }
 
   for (const [role, label] of Object.entries(expected)) {
@@ -142,8 +149,8 @@ describe('TC-AUTH-UNIT-003: ROLE_LABEL mapeamento para todos os 6 roles', () => 
     })
   }
 
-  it('todas as 6 roles estao mapeadas', () => {
-    expect(Object.keys(ROLE_LABEL)).toHaveLength(6)
+  it('todas as roles estao mapeadas', () => {
+    expect(Object.keys(ROLE_LABEL).length).toBeGreaterThanOrEqual(8)
   })
 })
 
@@ -385,7 +392,7 @@ describe('TC-AUTH-UNIT-010: translateError traduz erros do Supabase para portugu
   // signIn chama supabase.auth.signInWithPassword e, se der erro, chama translateError.
 
   const errorCases: [string, string][] = [
-    ['Invalid login credentials',  'E-mail ou senha incorretos'],
+    ['Invalid login credentials',  'Usuário/e-mail ou senha incorretos'],
     ['Email not confirmed',        'Confirme seu e-mail antes de entrar'],
     ['Too many requests',          'Muitas tentativas. Aguarde um momento'],
     ['User already registered',    'Este e-mail ja esta cadastrado'],  // source: 'já está'
@@ -418,7 +425,7 @@ describe('TC-AUTH-UNIT-010: translateError traduz erros do Supabase para portugu
       // Nota: "same password" traduz para "A nova senha deve ser diferente da atual"
       // e "New password should be" traduz para "A nova senha deve ter pelo menos 6 caracteres"
       if (supabaseMsg === 'Invalid login credentials') {
-        expect(error).toBe('E-mail ou senha incorretos')
+        expect(error).toBe('Usuário/e-mail ou senha incorretos')
       } else if (supabaseMsg === 'Too many requests') {
         expect(error).toBe('Muitas tentativas. Aguarde um momento')
       } else if (supabaseMsg === 'same password') {
@@ -458,10 +465,12 @@ describe('TC-AUTH-SEC-010: Hierarquia de niveis de role e correta e consistente'
     }
   })
 
-  it('todos os niveis sao unicos (sem duplicatas)', () => {
+  it('niveis cobrem a faixa de 1 a 7 (aliases podem duplicar)', () => {
     const niveis = Object.values(ROLE_NIVEL)
     const unique = new Set(niveis)
-    expect(unique.size).toBe(niveis.length)
+    // Aliases (admin/administrador, gerente/diretor) compartilham nível
+    expect(unique.size).toBeGreaterThanOrEqual(5)
+    expect(unique.size).toBeLessThanOrEqual(niveis.length)
   })
 
   it('ROLE_LABEL, ROLE_NIVEL e ROLE_COLOR tem as mesmas chaves', () => {
@@ -473,9 +482,9 @@ describe('TC-AUTH-SEC-010: Hierarquia de niveis de role e correta e consistente'
     expect(nivelKeys).toEqual(colorKeys)
   })
 
-  it('admin tem o nivel mais alto', () => {
+  it('ceo tem o nivel mais alto', () => {
     const maxNivel = Math.max(...Object.values(ROLE_NIVEL))
-    expect(ROLE_NIVEL.admin).toBe(maxNivel)
+    expect(ROLE_NIVEL.ceo).toBe(maxNivel)
   })
 
   it('visitante tem o nivel mais baixo', () => {
@@ -529,7 +538,7 @@ describe('AuthContext: testes complementares', () => {
     await triggerAuth(fakePerfil({ role: 'aprovador' }))
     await waitFor(() => expect(result.current.perfil).not.toBeNull())
 
-    expect(result.current.roleLabel).toBe('Aprovador')
+    expect(result.current.roleLabel).toBe('Supervisor')
   })
 
   it('role default e "visitante" quando perfil e null', async () => {

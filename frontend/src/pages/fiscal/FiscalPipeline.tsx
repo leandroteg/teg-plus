@@ -25,6 +25,7 @@ import type { CriarSolicitacaoPayload } from '../../types/solicitacaoNF'
 import { useAuth } from '../../contexts/AuthContext'
 import { useTheme } from '../../contexts/ThemeContext'
 import { useConsultaCNPJ } from '../../hooks/useConsultas'
+import { UpperInput, UpperTextarea } from '../../components/UpperInput'
 
 // ── Formatters ──────────────────────────────────────────────────────────────
 
@@ -557,7 +558,7 @@ function SistemaEmissaoModal({ sol, isDark, onSubmit, onClose, isPending }: {
           {/* Section 5: Info Complementar */}
           <FormSection title="Info Complementares" icon={Info} isDark={isDark} defaultOpen={false}
             badge={infoComplementar.trim() ? 'preenchido' : undefined}>
-            <textarea value={infoComplementar} onChange={e => setInfoComplementar(e.target.value)}
+            <UpperTextarea value={infoComplementar} onChange={e => setInfoComplementar(e.target.value)}
               rows={3} placeholder="Informacoes complementares da NF-e..."
               className={`${inputCls} resize-none mt-2`} />
           </FormSection>
@@ -767,7 +768,7 @@ function RejectModal({ sol, isDark, onConfirm, onClose, isPending }: {
             <label className={`text-[11px] font-semibold mb-1.5 block ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
               Motivo da rejeicao *
             </label>
-            <textarea value={motivo} onChange={e => setMotivo(e.target.value)}
+            <UpperTextarea value={motivo} onChange={e => setMotivo(e.target.value)}
               placeholder="Descreva o motivo da rejeicao..." rows={3} autoFocus
               className={`w-full rounded-xl border px-3 py-2.5 text-sm resize-none transition-all duration-200
                 focus:outline-none focus:ring-2 focus:ring-red-500/30 focus:border-red-400 ${
@@ -1099,8 +1100,9 @@ function NFCard({ sol, onClick, isDark, isSelected, onSelect }: {
 
 export default function FiscalPipeline() {
   const { isDark } = useTheme()
-  const { role } = useAuth()
+  const { role, hasSetorPapel } = useAuth()
   const isGestor = role === 'admin' || role === 'gerente'
+    || hasSetorPapel('fiscal', ['supervisor', 'diretor', 'ceo'])
 
   // State
   const [activeTab, setActiveTab] = useState<StatusFiscalPipeline>('pendente')
@@ -1401,7 +1403,7 @@ export default function FiscalPipeline() {
           {/* Search */}
           <div className="relative flex-1 min-w-[180px] max-w-sm">
             <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-            <input type="text" value={busca} onChange={e => setBusca(e.target.value)}
+            <UpperInput type="text" value={busca} onChange={e => setBusca(e.target.value)}
               placeholder="Buscar fornecedor, NF, descricao..."
               className={`w-full pl-9 pr-4 py-2 rounded-xl border text-xs placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-amber-500/30 ${
                 isDark ? 'bg-white/[0.04] border-white/[0.06] text-slate-200' : 'border-slate-200 bg-white text-slate-700'
@@ -1526,7 +1528,7 @@ export default function FiscalPipeline() {
               ))}
             </>
           ) : (
-            <div className="p-3 space-y-2">
+            <div className="p-3 space-y-2 stagger-children">
               {activeItems.map(sol => (
                 <NFCard key={sol.id} sol={sol}
                   onClick={() => setDetailSol(sol)}
@@ -1699,14 +1701,14 @@ function NovaSolicitacaoNFModal({ isDark, onClose, onSubmit, isPending }: {
           {/* Descrição */}
           <div>
             <p className={label}>Descrição</p>
-            <textarea className={`${input} resize-none`} rows={2} placeholder="Descrição da solicitação..."
+            <UpperTextarea className={`${input} resize-none`} rows={2} placeholder="Descrição da solicitação..."
               value={form.descricao} onChange={e => set('descricao', e.target.value)} />
           </div>
 
           {/* Observações */}
           <div>
             <p className={label}>Observações</p>
-            <textarea className={`${input} resize-none`} rows={2} placeholder="Observações adicionais..."
+            <UpperTextarea className={`${input} resize-none`} rows={2} placeholder="Observações adicionais..."
               value={form.observacoes} onChange={e => set('observacoes', e.target.value)} />
           </div>
         </div>

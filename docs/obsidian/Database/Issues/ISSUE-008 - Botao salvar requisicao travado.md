@@ -51,5 +51,6 @@ Implementado em 2026-03-08 via commits `f2465b7` e `6bbdc8e`:
 - Handle de timeout limpo corretamente no unmount
 
 ## Links
-- [[05 - Modulo Compras]]
-- [[TASK-001 - Portal de requisicoes]]
+- [[11 - Fluxo Requisição]]
+- [[Database/Tarefas/TASK-001 - Portal de Requisicoes|TASK-001 — Portal de Requisições]]
+- [[05 - Hooks Customizados]]

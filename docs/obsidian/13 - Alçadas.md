@@ -4,7 +4,7 @@ type: regra-de-negócio
 status: ativo
 tags: [alçadas, aprovação, limites, financeiro, regras]
 criado: 2026-03-02
-relacionado: ["[[12 - Fluxo Aprovação]]", "[[07 - Schema Database]]", "[[09 - Auth Sistema]]"]
+relacionado: ["[[PILAR - Suprimentos]]", "[[12 - Fluxo Aprovação]]", "[[07 - Schema Database]]", "[[09 - Auth Sistema]]"]
 ---
 
 # Alçadas de Aprovação — TEG+ ERP
@@ -152,6 +152,55 @@ REQUISIÇÃO APROVADA ✅
 │  [Ver todas aprovações pendentes →]             │
 └─────────────────────────────────────────────────┘
 ```
+
+---
+
+## Função de Determinação de Alçada
+
+A função `apr_determinar_alcada()` é chamada automaticamente ao criar uma aprovação. Ela analisa o valor da requisição e retorna o nível máximo de alçada necessário:
+
+```sql
+-- Exemplo de uso na criação de aprovação
+SELECT apr_determinar_alcada(valor_total) AS nivel_alcada
+FROM cmp_requisicoes WHERE id = :req_id;
+```
+
+O resultado define quantos níveis sequenciais de aprovação são criados em `apr_aprovacoes`.
+
+---
+
+## Aprovação via Token (sem login)
+
+Aprovadores podem aprovar/rejeitar sem fazer login no sistema, diretamente via:
+
+- **WhatsApp:** link com token único enviado via n8n
+- **E-mail:** botão de aprovação no corpo do e-mail
+
+O token é gerado com validade igual ao prazo da alçada (24h/48h/72h) e permite ação única (aprovar ou rejeitar com observação).
+
+---
+
+## Integração com AprovAI
+
+O sistema de alçadas é usado por múltiplos tipos de aprovação via [[12 - Fluxo Aprovação|AprovAI]]:
+
+| Tipo de Aprovação | Origem |
+|-------------------|--------|
+| Compras (requisições) | Módulo Compras |
+| Pagamentos | Módulo Financeiro |
+| Minutas contratuais | Módulo Contratos |
+| Validação técnica | Requisições especiais |
+| Transportes | Módulo Logística |
+
+---
+
+## Hierarquia de Roles
+
+```
+requisitante < comprador < aprovador < supervisor < gerente/diretor < ceo
+```
+
+Cada role define o escopo de ação no sistema. A alçada é verificada contra o `nivel_alcada` do perfil do aprovador.
 
 ---
 

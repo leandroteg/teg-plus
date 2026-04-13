@@ -13,9 +13,11 @@ import { useCriarSolicitacao as useCriarSolicitacaoNF } from '../../hooks/useSol
 import { useConsultaCNPJ } from '../../hooks/useConsultas'
 import { StatusBadge } from './LogisticaHome'
 import { useTheme } from '../../contexts/ThemeContext'
+import { useAuth } from '../../contexts/AuthContext'
 import type { CriarSolicitacaoPayload, TipoTransporte, StatusSolicitacao } from '../../types/logistica'
 import { useNavigate } from 'react-router-dom'
 import { useLookupCentrosCusto } from '../../hooks/useLookups'
+import { mergeCidadeUf } from '../../utils/logisticaFiscal'
 
 const UF_LIST = [
   'AC','AL','AM','AP','BA','CE','DF','ES','GO','MA','MG','MS','MT',
@@ -57,6 +59,7 @@ function getAlcada(valor?: number) {
 
 export default function Solicitacoes() {
   const { isDark } = useTheme()
+  const { hasSetorPapel } = useAuth()
   const [busca, setBusca] = useState('')
   const [statusFiltro, setStatusFiltro] = useState<string>('')
   const [showForm, setShowForm] = useState(false)
@@ -79,6 +82,7 @@ export default function Solicitacoes() {
   const criar = useCriarSolicitacao()
   const atualizarStatus = useAtualizarStatusSolicitacao()
   const aprovar = useAprovarSolicitacao()
+  const canApproveLogistica = hasSetorPapel('logistica', ['supervisor', 'diretor', 'ceo'])
   const planejar = usePlanejaarSolicitacao()
   const criarNF = useCriarSolicitacaoNF()
   const cnpjLookup = useConsultaCNPJ(useCallback((r) => {
@@ -100,7 +104,13 @@ export default function Solicitacoes() {
   const set = (k: keyof CriarSolicitacaoPayload, v: any) => setForm(p => ({ ...p, [k]: v }))
 
   async function handleCriar() {
-    await criar.mutateAsync({ ...form, itens: itensForm.length > 0 ? itensForm : undefined })
+    const { origem_uf: _origemUf, destino_uf: _destinoUf, ...baseForm } = form
+    await criar.mutateAsync({
+      ...baseForm,
+      origem: mergeCidadeUf(form.origem, form.origem_uf),
+      destino: mergeCidadeUf(form.destino, form.destino_uf),
+      itens: itensForm.length > 0 ? itensForm : undefined,
+    })
     setShowForm(false)
     setForm({ ...EMPTY_FORM })
     setItensForm([])
@@ -149,8 +159,11 @@ export default function Solicitacoes() {
       origem: 'logistica',
       solicitacao_log_id: nfModal.solId,
     })
-    // Avançar status para nfe_emitida
-    await atualizarStatus.mutateAsync({ id: nfModal.solId, status: 'nfe_emitida' })
+    await atualizarStatus.mutateAsync({
+      id: nfModal.solId,
+      status: 'aprovado',
+      extra: { doc_fiscal_tipo: 'nf' },
+    })
     setNfModal(null)
   }
 
@@ -163,11 +176,6 @@ export default function Solicitacoes() {
           <h1 className={`text-xl font-extrabold ${isDark ? 'text-white' : 'text-navy'}`}>Solicitações</h1>
           <p className={`text-xs mt-0.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{filtradas.length} registros</p>
         </div>
-        <button onClick={() => setShowForm(true)}
-          className="flex items-center gap-1.5 bg-orange-600 hover:bg-orange-700 text-white
-            text-sm font-semibold px-4 py-2 rounded-xl transition-colors shadow-sm">
-          <Plus size={15} /> Nova Solicitação
-        </button>
       </div>
 
       {/* ── Filtros ─────────────────────────────────────────────── */}
@@ -294,12 +302,14 @@ export default function Solicitacoes() {
                       )}
                       {s.status === 'aguardando_aprovacao' && (
                         <>
-                          <ActionBtn
-                            label="Aprovar"
-                            color="bg-emerald-600 hover:bg-emerald-700"
-                            loading={aprovar.isPending}
-                            onClick={() => setAprovacaoModal({ id: s.id, titulo: s.numero })}
-                          />
+                          {canApproveLogistica && (
+                            <ActionBtn
+                              label="Aprovar"
+                              color="bg-emerald-600 hover:bg-emerald-700"
+                              loading={aprovar.isPending}
+                              onClick={() => setAprovacaoModal({ id: s.id, titulo: s.numero })}
+                            />
+                          )}
                         </>
                       )}
                       {s.status === 'aprovado' && (
@@ -336,6 +346,13 @@ export default function Solicitacoes() {
                             <ExternalLink size={12} /> Ver no Fiscal
                           </button>
                         </>
+                      )}
+                      {s.status === 'transporte_pendente' && (
+                        <button onClick={() => navigate('/logistica/transportes?tab=transporte_pendente')}
+                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-700 hover:bg-slate-800
+                            text-white text-xs font-semibold transition-colors shadow-sm">
+                          <Package2 size={12} /> Ir para Transportes
+                        </button>
                       )}
                       {(s.status === 'solicitado' || s.status === 'validando' || s.status === 'planejado') && (
                         <ActionBtn

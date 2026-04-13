@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import type { Requisicao, NovaRequisicaoPayload, RequisicaoItem } from '../types'
 import { supabase } from '../services/supabase'
 import { api } from '../services/api'
+import { useAuth } from '../contexts/AuthContext'
 
 // Tabelas: cmp_requisicoes (módulo Compras)
 const TABLE = 'cmp_requisicoes'
@@ -23,10 +24,11 @@ export function useRequisicoes(status?: string, search?: string) {
         .from(TABLE)
         .select(`
           id, numero, solicitante_nome, obra_nome, obra_id,
-          descricao, justificativa, valor_estimado, urgencia, status,
+          descricao, justificativa, valor_estimado, urgencia, justificativa_urgencia, status,
           alcada_nivel, categoria, comprador_id, centro_custo, centro_custo_id,
           classe_financeira, classe_financeira_id, texto_original, ai_confianca,
           esclarecimento_msg, esclarecimento_por, esclarecimento_em,
+          compra_recorrente,
           created_at,
           comprador:cmp_compradores(nome, email)
         `)
@@ -46,14 +48,17 @@ export function useRequisicoes(status?: string, search?: string) {
         comprador: undefined,
       })) as Requisicao[]
     },
-    refetchInterval: 60_000,
+    refetchInterval: false,
+    refetchOnMount: true,
+    refetchOnWindowFocus: false,
     retry: false,
-    staleTime: 30_000,
+    staleTime: 0,
   })
 }
 
 export function useCriarRequisicao() {
   const qc = useQueryClient()
+  const { perfil } = useAuth()
   return useMutation({
     mutationFn: async (payload: NovaRequisicaoPayload) => {
       const n8nUrl = import.meta.env.VITE_N8N_WEBHOOK_URL || ''
@@ -134,12 +139,15 @@ export function useCriarRequisicao() {
         .from('cmp_requisicoes')
         .insert({
           numero,
+          solicitante_id:   perfil?.id ?? null,
           solicitante_nome: payload.solicitante_nome,
           obra_nome:        payload.obra_nome,
           obra_id:          payload.obra_id    || null,
           descricao:        payload.descricao,
           justificativa:    payload.justificativa || null,
           urgencia:         payload.urgencia,
+          justificativa_urgencia: payload.justificativa_urgencia || null,
+          compra_recorrente: payload.compra_recorrente || false,
           status:           payload.rascunho ? 'rascunho' : 'em_aprovacao',
           categoria:        payload.categoria  || null,
           comprador_id:     compradorId,
@@ -264,6 +272,127 @@ export function useProcessarAprovacao() {
       api.processarAprovacao(vars.token, vars.decisao, vars.observacao),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['requisicoes'] })
+      qc.invalidateQueries({ queryKey: ['dashboard'] })
+    },
+  })
+}
+
+// ── Reenviar RC para aprovação após esclarecimento ───────────────────────────
+
+export function useReenviarEsclarecimento() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async ({
+      requisicaoId,
+      requisicaoNumero,
+      alcadaNivel,
+      solicitanteNome,
+      resposta,
+    }: {
+      requisicaoId: string
+      requisicaoNumero: string
+      alcadaNivel: number
+      solicitanteNome: string
+      resposta?: string
+    }) => {
+      // 1. Atualiza status de volta para em_aprovacao
+      const { error: reqError } = await supabase
+        .from(TABLE)
+        .update({ status: 'em_aprovacao' })
+        .eq('id', requisicaoId)
+      if (reqError) throw reqError
+
+      // 2. Busca aprovador da alçada para recriar o registro pendente
+      const { data: alcadaData } = await supabase
+        .from('apr_alcadas')
+        .select('id, prazo_horas, aprovador_padrao:sys_usuarios!aprovador_padrao_id(id, nome, email)')
+        .eq('nivel', alcadaNivel)
+        .eq('ativo', true)
+        .maybeSingle()
+
+      const aprovador = (alcadaData?.aprovador_padrao as unknown as { id: string; nome: string; email: string } | null)
+      const prazoHoras = (alcadaData?.prazo_horas as number) ?? 48
+      const dataLimite = new Date(Date.now() + prazoHoras * 3600_000).toISOString()
+      const obs = resposta?.trim()
+        ? `Esclarecimento respondido por ${solicitanteNome}: ${resposta.trim()}`
+        : `Esclarecimento respondido por ${solicitanteNome}`
+
+      // 3. Insere novo registro pendente em apr_aprovacoes
+      await supabase.from('apr_aprovacoes').insert({
+        modulo: 'cmp',
+        tipo_aprovacao: 'requisicao_compra',
+        entidade_id: requisicaoId,
+        entidade_numero: requisicaoNumero,
+        aprovador_nome: aprovador?.nome ?? solicitanteNome,
+        aprovador_email: aprovador?.email ?? 'pendente@teguniao.com.br',
+        nivel: alcadaNivel,
+        status: 'pendente',
+        observacao: obs,
+        data_limite: dataLimite,
+      })
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['requisicoes'] })
+      qc.invalidateQueries({ queryKey: ['requisicao'] })
+      qc.invalidateQueries({ queryKey: ['aprovacoes-pendentes'] })
+      qc.invalidateQueries({ queryKey: ['aprovacoes-historico'] })
+      qc.invalidateQueries({ queryKey: ['aprovacoes-kpis'] })
+      qc.invalidateQueries({ queryKey: ['dashboard'] })
+    },
+  })
+}
+
+// ── Enviar RC aprovada para cotação ──────────────────────────────────────────
+
+export function useEnviarParaCotacao() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async ({
+      requisicaoId,
+      categoria,
+    }: {
+      requisicaoId: string
+      categoria?: string
+    }) => {
+      // 1. Atualiza status para em_cotacao
+      const { error: reqError } = await supabase
+        .from(TABLE)
+        .update({ status: 'em_cotacao' })
+        .eq('id', requisicaoId)
+      if (reqError) throw reqError
+
+      // 2. Auto-criar cotacao
+      try {
+        let compradorId: string | null = null
+        if (categoria) {
+          const { data: compradores } = await supabase
+            .from('cmp_compradores')
+            .select('id, categorias')
+          const match = compradores?.find(
+            (c: { id: string; categorias: string[] }) =>
+              c.categorias?.includes(categoria)
+          )
+          compradorId = match?.id ?? null
+        }
+
+        const dataLimite = new Date()
+        dataLimite.setDate(dataLimite.getDate() + 5)
+
+        await supabase.from('cmp_cotacoes').insert({
+          requisicao_id: requisicaoId,
+          comprador_id: compradorId,
+          status: 'pendente',
+          data_limite: dataLimite.toISOString(),
+        })
+      } catch (e) {
+        console.warn('Aviso: cotacao nao criada automaticamente:', e)
+      }
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['requisicoes'] })
+      qc.invalidateQueries({ queryKey: ['requisicao'] })
+      qc.invalidateQueries({ queryKey: ['cotacoes'] })
+      qc.invalidateQueries({ queryKey: ['cotacao'] })
       qc.invalidateQueries({ queryKey: ['dashboard'] })
     },
   })

@@ -11,6 +11,7 @@ import {
 } from '../../hooks/useContratos'
 import { useAuth } from '../../contexts/AuthContext'
 import type { Parcela, ParcelaAnexo } from '../../types/contratos'
+import { UpperInput, UpperTextarea } from '../../components/UpperInput'
 
 const fmt = (v: number) =>
   v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 })
@@ -169,7 +170,7 @@ function LiberarModal({ parcela, isDespesa, onClose }: LiberarModalProps) {
           {/* NF Number */}
           <div>
             <p className="text-xs font-semibold text-slate-600 mb-1">Número da NF / Recibo</p>
-            <input value={nfNumero} onChange={e => setNfNumero(e.target.value)}
+            <UpperInput value={nfNumero} onChange={e => setNfNumero(e.target.value)}
               placeholder="Ex: NF-12345"
               className="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-sm text-slate-700
                 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-400" />
@@ -210,7 +211,7 @@ function LiberarModal({ parcela, isDespesa, onClose }: LiberarModalProps) {
               </span>
             </button>
 
-            <textarea value={observacao} onChange={e => setObservacao(e.target.value)}
+            <UpperTextarea value={observacao} onChange={e => setObservacao(e.target.value)}
               placeholder="Observação (opcional)" rows={2}
               className="mt-2 w-full px-3 py-2 rounded-xl border border-slate-200 text-xs
                 text-slate-700 placeholder-slate-400 focus:outline-none focus:ring-2
@@ -513,7 +514,7 @@ export default function ParcelasPage() {
       <div className="flex flex-col sm:flex-row gap-3">
         <div className="relative flex-1">
           <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-          <input type="text" value={busca} onChange={e => setBusca(e.target.value)}
+          <UpperInput value={busca} onChange={e => setBusca(e.target.value)}
             placeholder="Buscar contrato, NF..."
             className="w-full pl-9 pr-4 py-2.5 rounded-xl border border-slate-200 bg-white
               text-sm text-slate-700 placeholder-slate-400 focus:outline-none

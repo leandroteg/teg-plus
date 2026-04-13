@@ -7,6 +7,7 @@ import {
 } from 'lucide-react'
 import { useContratos } from '../../hooks/useContratos'
 import type { Contrato } from '../../types/contratos'
+import { UpperInput } from '../../components/UpperInput'
 
 const fmt = (v: number) =>
   v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 })
@@ -246,7 +247,7 @@ export default function ListaContratos() {
       <div className="flex flex-col sm:flex-row gap-3">
         <div className="relative flex-1">
           <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-          <input type="text" value={busca} onChange={e => setBusca(e.target.value)}
+          <UpperInput value={busca} onChange={e => setBusca(e.target.value)}
             placeholder="Buscar número, objeto, contraparte..."
             className="w-full pl-9 pr-4 py-2.5 rounded-xl border border-slate-200 bg-white
               text-sm text-slate-700 placeholder-slate-400 focus:outline-none

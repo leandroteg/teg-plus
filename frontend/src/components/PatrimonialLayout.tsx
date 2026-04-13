@@ -11,11 +11,12 @@ export default function PatrimonialLayout() {
   const NAV: NavItem[] = [
     { to: '/patrimonial', icon: LayoutDashboard, label: 'Painel', end: true },
     {
-      to: '/patrimonial/movimentacoes?nova=1',
+      to: '/patrimonial',
       icon: Plus,
       label: 'Nova Movimenta\u00e7\u00e3o',
       action: () => navigate('/patrimonial/movimentacoes?nova=1'),
       accent: true,
+      requisitanteAllowed: true,
     },
     { to: '/patrimonial/movimentacoes', icon: ArrowLeftRight, label: 'Movimenta\u00e7\u00f5es' },
     { to: '/patrimonial/patrimonio', icon: Landmark, label: 'Patrim\u00f4nio' },

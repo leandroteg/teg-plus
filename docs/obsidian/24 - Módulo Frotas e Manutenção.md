@@ -6,6 +6,7 @@ status: ativo
 tags: [frotas, manutencao, telemetria, checklist, abastecimento]
 criado: 2026-03-03
 atualizado: 2026-03-12
+relacionado: ["[[PILAR - Suprimentos]]"]
 ---
 
 # Módulo Manutenção e Uso de Frotas
@@ -184,7 +185,9 @@ frontend/src/
 
 **Migration:** `supabase/017_frotas_manutencao.sql`
 
-### Tabelas
+### Tabelas (18 — prefixo `fro_`)
+
+**Originais (017_frotas_manutencao.sql):**
 
 | Tabela | Descrição |
 |--------|-----------|
@@ -198,6 +201,19 @@ frontend/src/
 | `fro_ocorrencias_telemetria` | Eventos de mau uso rastreados |
 | `fro_fornecedores` | Oficinas, autopeças, borracharias |
 | `fro_avaliacoes_fornecedor` | Avaliações prazo/qualidade/preço |
+
+**Redesign (068_fro_redesign.sql):**
+
+| Tabela | Descrição |
+|--------|-----------|
+| `fro_acessorios` | Catálogo de acessórios (extintor, triângulo, macaco, etc.) |
+| `fro_veiculo_acessorios` | Vínculo N:N veículo-acessório com validade |
+| `fro_alocacoes` | Alocação de veículos a obras/motoristas com período |
+| `fro_checklist_templates` | Templates de checklist por tipo de veículo |
+| `fro_checklist_template_itens` | Itens de cada template |
+| `fro_checklist_execucoes` | Execuções de checklist (instâncias preenchidas) |
+| `fro_checklist_execucao_itens` | Respostas de cada item da execução |
+| `fro_multas` | Registro de multas de trânsito por veículo/motorista |
 
 ### Triggers
 
@@ -250,4 +266,13 @@ As seguintes issues de UX foram corrigidas no módulo Frotas:
 
 ---
 
-*Documentação gerada em 2026-03-03. Atualizado em 2026-03-12: registro de correções de UX (issues #92, #94, #102, #103).*
+## Links Relacionados
+
+- [[07 - Schema Database]] — Tabelas `fro_*`
+- [[20 - Módulo Financeiro]] — Integração CP via OS
+- [[05 - Hooks Customizados]] — Hooks `useFrotas*`
+- [[03 - Páginas e Rotas]] — Rotas `/frotas/*`
+- [[Database/Tarefas/TASK-020 - Frotas Core|TASK-020 — Frotas Core]]
+- [[Database/Milestones/MS-007 - Modulo Frotas Manutencao|MS-007 — Frotas]]
+
+*Documentação gerada em 2026-03-03. Atualizado em 2026-04-08.*

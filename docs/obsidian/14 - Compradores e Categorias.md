@@ -4,18 +4,19 @@ type: regra-de-negócio
 status: ativo
 tags: [compradores, categorias, compras, regras]
 criado: 2026-03-02
-relacionado: ["[[11 - Fluxo Requisição]]", "[[07 - Schema Database]]", "[[13 - Alçadas]]"]
+relacionado: ["[[PILAR - Suprimentos]]", "[[11 - Fluxo Requisição]]", "[[07 - Schema Database]]", "[[13 - Alçadas]]"]
 ---
 
 # Compradores e Categorias — TEG+ ERP
 
 ## Compradores Ativos
 
-| Comprador | Email | Categorias Responsáveis |
-|-----------|-------|------------------------|
-| **Lauany** | lauany@teg.com.br | Materiais de Obra, EPI/EPC, Ferramental, Centro de Distribuição, Demais Aquisições |
-| **Fernando** | fernando@teg.com.br | Frota/Equipamentos, Serviços, Locação |
-| **Aline** | aline@teg.com.br | Mobilização, Alojamento, Alimentação, Escritório |
+| Comprador    | Email               | Categorias Responsáveis                                                            |
+| ------------ | ------------------- | ---------------------------------------------------------------------------------- |
+| **Lauany**   | lauany@teg.com.br   | Materiais de Obra, EPI/EPC, Ferramental, Centro de Distribuição, Demais Aquisições |
+| **Fernando** | fernando@teg.com.br | Frota/Equipamentos, Serviços, Locação                                              |
+| **Aline**    | aline@teg.com.br    | Mobilização, Alojamento, Alimentação, Escritório                                   |
+|              |                     |                                                                                    |
 
 ---
 
@@ -217,6 +218,18 @@ Keywords match:
 → Categoria sugerida: EPI/EPC
 → Comprador sugerido: Lauany
 ```
+
+---
+
+## Política de Cotações (`cotacoesPolicy.ts`)
+
+A lógica de quantidade mínima de cotações por categoria e valor está implementada em `src/utils/cotacoesPolicy.ts`. A função `getMinCotacoes(categoria, valor)` retorna o número mínimo de fornecedores a cotizar, considerando as regras especiais de cada categoria (descritas acima) com fallback para a tabela padrão por valor.
+
+---
+
+## Filtro por Categoria no Dashboard
+
+O dashboard de Compras permite filtrar requisições por categoria, mostrando apenas os itens do comprador responsável. Compradores veem por padrão apenas suas categorias atribuídas; roles superiores (supervisor, gerente) veem todas as categorias.
 
 ---
 

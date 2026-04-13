@@ -1,12 +1,18 @@
-import { NavLink, Outlet, useNavigate } from 'react-router-dom'
-import { LayoutGrid, LogOut, Shield, Settings, ChevronLeft, Menu, X, User, Code2, Link2 } from 'lucide-react'
+import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
+import { LayoutGrid, LogOut, Shield, Settings, ChevronLeft, Menu, X, User, Code2, Link2, ClipboardList, Plus } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo, useRef, lazy, Suspense, createContext, useContext } from 'react'
 import { useAuth, ROLE_LABEL, ROLE_COLOR } from '../contexts/AuthContext'
 import { useTheme } from '../contexts/ThemeContext'
 import LogoTeg from './LogoTeg'
 import NotificationBell from './NotificationBell'
 import ApprovalBadge from './ApprovalBadge'
+
+const MinhasSolicitacoesEmbedded = lazy(() => import('../pages/MinhasSolicitacoes'))
+
+// Contexto para páginas filho saberem que estão dentro de um módulo com requisitante ativo
+export const RequisitanteCtx = createContext<{ homeRoute: string } | null>(null)
+export function useRequisitanteCtx() { return useContext(RequisitanteCtx) }
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -24,6 +30,10 @@ export interface NavItem {
   label: string
   end?: boolean
   adminOnly?: boolean
+  /** Permite que requisitantes acessem este item (ex: nova solicitação) */
+  requisitanteAllowed?: boolean
+  /** Restrito a supervisor/diretor/ceo — oculto para equipe e requisitante */
+  supervisorOnly?: boolean
   action?: () => void
   actionMenu?: {
     title?: string
@@ -54,6 +64,7 @@ export interface ModuleConfig {
   bottomNavCompact?: boolean
   truncateBottomLabels?: boolean
   bottomNavMaxItems?: number
+  headerExtra?: React.ReactNode
 }
 
 // ── Avatar helpers (shared, extracted once) ────────────────────────────────────
@@ -73,6 +84,20 @@ function getInitials(name: string): string {
   const parts = name.trim().split(/\s+/)
   if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase()
   return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
+}
+
+function normalizeLabel(text: string): string {
+  return text
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim()
+}
+
+function isNovaSolicitacaoItem(item: NavItem): boolean {
+  if (item.requisitanteAllowed === true) return true
+  const n = normalizeLabel(item.label)
+  return n.includes('nova solicitacao') || n.includes('nova requisicao') || n.includes('nova movimentacao')
 }
 
 // ── Accent color class map ────────────────────────────────────────────────────
@@ -257,11 +282,13 @@ export default function ModuleLayout({
   bottomNavCompact = true,
   truncateBottomLabels = false,
   bottomNavMaxItems,
+  headerExtra,
   ...config
 }: ModuleConfig) {
-  const { perfil, isAdmin, signOut, role } = useAuth()
-  const { isDark, isLightSidebar, theme, setTheme } = useTheme()
+  const { perfil, isAdmin, signOut, role, papelGlobal, getPapelForModule } = useAuth()
+  const { isDark, isLightSidebar, isDarkSidebar, theme, setTheme } = useTheme()
   const navigate = useNavigate()
+  const location = useLocation()
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [avatarOpen, setAvatarOpen] = useState(false)
   const [openNavMenu, setOpenNavMenu] = useState<{ id: string; top: number; left: number } | null>(null)
@@ -312,7 +339,7 @@ export default function ModuleLayout({
     }
   }, [openNavMenu])
 
-  const ls = isLightSidebar
+  const ls = !isDarkSidebar // ls = light sidebar visual
   const a = ACCENT_CLASSES[config.accent] ?? ACCENT_CLASSES.teal
 
   const nome = perfil?.nome ?? 'Usuário'
@@ -322,10 +349,45 @@ export default function ModuleLayout({
 
   const headerModuleName = mobileModuleName ?? config.moduleName
   const visibleNav = config.nav.filter(n => !n.adminOnly || isAdmin)
+  const moduloPapel = getPapelForModule(config.moduleKey)
+  const isRequisitante = !isAdmin && moduloPapel === 'requisitante'
+  const visibleNavForRole = useMemo(() => {
+    if (isRequisitante) return visibleNav.filter(isNovaSolicitacaoItem)
+    return visibleNav
+  }, [isRequisitante, visibleNav])
+  // home do módulo = primeiro item com end:true
+  const homeRoute = config.nav.find(n => n.end === true)?.to ?? '/'
+
+  // Guarda o pathname que estava aberto quando ?nova= estava na URL.
+  // Quando a página filho limpa o param (ex: CPPipeline), não redirecionamos
+  // imediatamente — deixamos o modal abrir. A navegação de volta acontece
+  // via RequisitanteCtx.homeRoute chamado no onClose do modal filho.
+  const novaFlowPathRef = useRef<string | null>(null)
+
+  useEffect(() => {
+    if (!isRequisitante) return
+    const isNovaFlow = new URLSearchParams(location.search).has('nova')
+    if (isNovaFlow) {
+      novaFlowPathRef.current = location.pathname
+      return
+    }
+    // Se ainda estamos no mesmo path que tinha ?nova= (filho limpou o param),
+    // não redirecionar — modal está abrindo/aberto.
+    if (novaFlowPathRef.current === location.pathname) return
+    // Voltou ao home → limpa o ref
+    if (location.pathname === homeRoute) { novaFlowPathRef.current = null; return }
+    // Qualquer outro path sem nova → volta para home
+    navigate(homeRoute, { replace: true })
+  }, [isRequisitante, homeRoute, location.pathname, location.search, navigate])
 
   async function handleLogout() {
     await signOut()
     navigate('/login', { replace: true })
+  }
+
+  function handleAvatarNavigate(route: string) {
+    setAvatarOpen(false)
+    requestAnimationFrame(() => navigate(route))
   }
 
   function goBack() {
@@ -369,8 +431,29 @@ export default function ModuleLayout({
 
   // ── Render helpers ──────────────────────────────────────────────────────────
 
+  function renderRequisitanteNav() {
+    const novaSolicitacaoItem = visibleNav.find(isNovaSolicitacaoItem)
+    if (!novaSolicitacaoItem) return null
+    const Icon = novaSolicitacaoItem.icon
+    return (
+      <div className="flex flex-col gap-2 px-1 py-2">
+        <NavLink
+          to={novaSolicitacaoItem.to}
+          className={`flex items-center justify-center gap-2 px-4 py-3 rounded-xl text-sm font-semibold transition-all shadow-sm
+            ${ls
+              ? `${a.badgeBgLight} ${a.textLight} hover:opacity-90 active:scale-95`
+              : `${a.badgeBgDark} ${a.textDark} hover:opacity-90 active:scale-95`
+            }`}
+        >
+          {Icon ? <Icon size={16} strokeWidth={2.5} /> : <Plus size={16} strokeWidth={2.5} />}
+          {novaSolicitacaoItem.label}
+        </NavLink>
+      </div>
+    )
+  }
+
   function renderNavItems() {
-    return visibleNav.map(({ to, icon: Icon, label, end, adminOnly, action, actionMenu, accent }) => {
+    return visibleNavForRole.map(({ to, icon: Icon, label, end, adminOnly, action, actionMenu, accent }) => {
       if (actionMenu) {
         const isOpen = openNavMenu?.id === to
         return (
@@ -438,10 +521,25 @@ export default function ModuleLayout({
       }
       if (action) {
         return (
-          <button key={to} onClick={action} className={`w-full text-left ${sidebarLinkClass({ isActive: false })}`}>
-            <Icon size={18} className={accent ? 'shrink-0 text-orange-500' : 'shrink-0'} />
-            <span className={accent ? 'text-orange-500 font-semibold' : undefined}>{label}</span>
+          <button key={to} onClick={action} className={accent
+            ? `w-full flex items-center gap-2.5 px-3 py-2.5 my-1 mx-2 rounded-xl text-sm font-bold transition-all ${
+              ls ? 'bg-orange-50 text-orange-600 hover:bg-orange-100 border border-orange-200' : 'bg-orange-500/15 text-orange-400 hover:bg-orange-500/25 border border-orange-500/20'
+            }`
+            : `w-full text-left ${sidebarLinkClass({ isActive: false })}`}>
+            <Icon size={16} className="shrink-0" />
+            <span>{label}</span>
           </button>
+        )
+      }
+      if (accent) {
+        return (
+          <NavLink key={to} to={to} end={end}
+            className={`flex items-center gap-2.5 px-3 py-2.5 my-1 mx-2 rounded-xl text-sm font-bold transition-all ${
+              ls ? 'bg-orange-50 text-orange-600 hover:bg-orange-100 border border-orange-200' : 'bg-orange-500/15 text-orange-400 hover:bg-orange-500/25 border border-orange-500/20'
+            }`}>
+            <Icon size={16} className="shrink-0" />
+            <span>{label}</span>
+          </NavLink>
         )
       }
       return (
@@ -459,7 +557,7 @@ export default function ModuleLayout({
   function renderSectionedNav() {
     return (
       <>
-        {visibleNav.map(({ to, icon: Icon, label, end }) => (
+        {visibleNavForRole.map(({ to, icon: Icon, label, end }) => (
           <NavLink key={to} to={to} end={end} className={sidebarLinkClass}>
             <Icon size={16} className="shrink-0" />
             <span>{label}</span>
@@ -484,7 +582,7 @@ export default function ModuleLayout({
   }
 
   function renderCadastrosLink() {
-    if (!showCadastrosLink) return null
+    if (!showCadastrosLink || isRequisitante) return null
     return (
       <>
         <div className={variant === 'compact'
@@ -568,24 +666,35 @@ export default function ModuleLayout({
         {/* ── Links ── */}
         <div className="py-1">
           <button
-            onClick={() => { setAvatarOpen(false); navigate('/perfil') }}
+            type="button"
+            onClick={(e) => { e.stopPropagation(); handleAvatarNavigate('/perfil') }}
             className={`w-full flex items-center gap-3 px-4 py-2.5 text-[13px] font-medium transition-colors
               ${ls ? 'text-slate-600 hover:bg-slate-50 hover:text-slate-900' : 'text-slate-300 hover:bg-white/[0.04] hover:text-white'}`}
           >
             <User size={15} className="shrink-0 opacity-50" />
             Meu Perfil
           </button>
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); handleAvatarNavigate('/minhas-solicitacoes') }}
+            className={`w-full flex items-center gap-3 px-4 py-2.5 text-[13px] font-medium transition-colors
+              ${ls ? 'text-slate-600 hover:bg-slate-50 hover:text-slate-900' : 'text-slate-300 hover:bg-white/[0.04] hover:text-white'}`}
+          >
+            <ClipboardList size={15} className="shrink-0 opacity-50" />
+            Minhas Solicitações
+          </button>
 
           {isAdmin && (
             <>
               <div className={`h-px mx-3 my-1 ${ls ? 'bg-slate-100' : 'bg-white/[0.06]'}`} />
               <button
-                onClick={() => { setAvatarOpen(false); navigate('/admin/usuarios') }}
+                type="button"
+                onClick={(e) => { e.stopPropagation(); handleAvatarNavigate('/admin/usuarios') }}
                 className={`w-full flex items-center gap-3 px-4 py-2.5 text-[13px] font-medium transition-colors
                   ${ls ? 'text-slate-600 hover:bg-slate-50 hover:text-slate-900' : 'text-slate-300 hover:bg-white/[0.04] hover:text-white'}`}
               >
                 <Shield size={15} className="shrink-0 opacity-50" />
-                Usuarios
+                Usuários
               </button>
               <button
                 onClick={() => { setAvatarOpen(false); navigate('/cadastros') }}
@@ -596,15 +705,17 @@ export default function ModuleLayout({
                 Cadastros
               </button>
               <button
-                onClick={() => { setAvatarOpen(false); navigate('/admin/integracoes') }}
+                type="button"
+                onClick={(e) => { e.stopPropagation(); handleAvatarNavigate('/admin/integracoes') }}
                 className={`w-full flex items-center gap-3 px-4 py-2.5 text-[13px] font-medium transition-colors
                   ${ls ? 'text-slate-600 hover:bg-slate-50 hover:text-slate-900' : 'text-slate-300 hover:bg-white/[0.04] hover:text-white'}`}
               >
                 <Link2 size={15} className="shrink-0 opacity-50" />
-                Integracoes
+                Integrações
               </button>
               <button
-                onClick={() => { setAvatarOpen(false); navigate('/admin/desenvolvimento') }}
+                type="button"
+                onClick={(e) => { e.stopPropagation(); handleAvatarNavigate('/admin/desenvolvimento') }}
                 className={`w-full flex items-center gap-3 px-4 py-2.5 text-[13px] font-medium transition-colors
                   ${ls ? 'text-slate-600 hover:bg-slate-50 hover:text-slate-900' : 'text-slate-300 hover:bg-white/[0.04] hover:text-white'}`}
               >
@@ -621,6 +732,7 @@ export default function ModuleLayout({
             ${ls ? 'bg-slate-100/80 border-slate-200' : 'bg-white/5 border-white/[0.06]'}`}>
             {THEME_OPTS.map(({ value, icon, label }) => (
               <button
+                type="button"
                 key={value}
                 onClick={() => setTheme(value)}
                 className={[
@@ -640,6 +752,7 @@ export default function ModuleLayout({
         {/* ── Logout ── */}
         <div className={`border-t ${ls ? 'border-slate-100' : 'border-white/[0.06]'}`}>
           <button
+            type="button"
             onClick={handleLogout}
             className={`w-full flex items-center gap-3 px-4 py-2.5 text-[13px] font-medium transition-colors
               ${ls ? 'text-red-500 hover:bg-red-50' : 'text-red-400 hover:bg-red-500/10'}`}
@@ -741,7 +854,7 @@ export default function ModuleLayout({
           {drawerOpen && (
             <nav className={`md:hidden flex flex-col gap-1 p-4 border-b
               ${ls ? 'bg-white border-slate-200' : 'border-white/6 bg-white/[0.03]'}`}>
-              {visibleNav.map(n => (
+              {visibleNavForRole.map(n => (
                 <NavLink
                   key={n.to}
                   to={n.to}
@@ -753,7 +866,7 @@ export default function ModuleLayout({
                   {n.label}
                 </NavLink>
               ))}
-              {showCadastrosLink && (
+              {showCadastrosLink && !isRequisitante && (
                 <>
                   <div className={`h-px mx-1 my-1 ${ls ? 'bg-slate-100' : 'bg-white/5'}`} />
                   <NavLink
@@ -771,7 +884,14 @@ export default function ModuleLayout({
 
           {/* Page content */}
           <main className="flex-1 overflow-y-auto styled-scrollbar">
-            <Outlet />
+            {headerExtra && (
+              <div className={`px-4 py-2 border-b ${isDark ? 'border-white/[0.06] bg-slate-900/40' : 'border-slate-100 bg-slate-50/60'}`}>
+                {headerExtra}
+              </div>
+            )}
+            {isRequisitante && location.pathname === homeRoute
+              ? <Suspense fallback={null}><MinhasSolicitacoesEmbedded embedded defaultModulo={config.moduleKey} /></Suspense>
+              : <Outlet />}
           </main>
         </div>
       </div>
@@ -782,10 +902,19 @@ export default function ModuleLayout({
   //  FULL VARIANT  (default — lg breakpoint, sidebar + bottom nav, user card)
   // ══════════════════════════════════════════════════════════════════════════════
 
-  const mobileBottomNav = config.mobileNav
-    ?? (bottomNavMaxItems ? visibleNav.slice(0, bottomNavMaxItems) : visibleNav)
+  const mobileBottomNav = useMemo(() => {
+    const baseNav = config.mobileNav
+      ?? (bottomNavMaxItems ? visibleNavForRole.slice(0, bottomNavMaxItems) : visibleNavForRole)
+
+    if (!isRequisitante) return baseNav
+
+    const filtered = baseNav.filter(isNovaSolicitacaoItem)
+    if (filtered.length > 0) return filtered
+    return visibleNavForRole.filter(isNovaSolicitacaoItem)
+  }, [config.mobileNav, bottomNavMaxItems, visibleNavForRole, isRequisitante])
 
   return (
+    <RequisitanteCtx.Provider value={isRequisitante ? { homeRoute } : null}>
     <div className={`min-h-screen ${isDark ? 'bg-[#0c1222]' : ls ? 'bg-slate-50' : 'bg-slate-100'}`}>
 
       {/* ══════════════════════════════════════════════════════════════
@@ -882,9 +1011,16 @@ export default function ModuleLayout({
         </header>
 
         {/* ── Page content ─────────────────────────────────────── */}
+        {headerExtra && (
+          <div className={`px-4 py-2 border-b ${isDark ? 'border-white/[0.06] bg-slate-900/40' : 'border-slate-100 bg-slate-50/60'}`}>
+            {headerExtra}
+          </div>
+        )}
         <main className="flex-1 px-4 py-5 pb-28 lg:pb-8">
-          <div className={`${maxWidth} mx-auto`}>
-            <Outlet />
+          <div className={`${maxWidth} mx-auto animate-page-enter`}>
+            {isRequisitante && location.pathname === homeRoute
+              ? <Suspense fallback={null}><MinhasSolicitacoesEmbedded embedded defaultModulo={config.moduleKey} /></Suspense>
+              : <Outlet />}
           </div>
         </main>
 
@@ -905,5 +1041,6 @@ export default function ModuleLayout({
         </nav>
       </div>
     </div>
+    </RequisitanteCtx.Provider>
   )
 }

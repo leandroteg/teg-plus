@@ -1,4 +1,6 @@
 import jsPDF from 'jspdf'
+import type { EmpresaData } from '../services/empresa'
+import { EMPRESA_FALLBACK, getEmpresa } from '../services/empresa'
 import type { LogSolicitacao } from '../types/logistica'
 
 export interface RomaneioData {
@@ -20,37 +22,110 @@ export interface RomaneioData {
   observacoes?: string
 }
 
-function buildRomaneioDoc(data: RomaneioData) {
+interface LoadedLogoAsset {
+  dataUrl: string
+  format: 'PNG' | 'JPEG'
+  width: number
+  height: number
+}
+
+async function loadLogoAsset(url: string): Promise<LoadedLogoAsset | null> {
+  try {
+    const resp = await fetch(url)
+    if (!resp.ok) return null
+    const blob = await resp.blob()
+    return new Promise((resolve) => {
+      const reader = new FileReader()
+      reader.onloadend = () => {
+        const dataUrl = reader.result as string
+        const img = new Image()
+        img.onload = () => resolve({
+          dataUrl,
+          format: blob.type === 'image/jpeg' || blob.type === 'image/jpg' ? 'JPEG' : 'PNG',
+          width: img.naturalWidth || img.width || 1,
+          height: img.naturalHeight || img.height || 1,
+        })
+        img.onerror = () => resolve(null)
+        img.src = dataUrl
+      }
+      reader.onerror = () => resolve(null)
+      reader.readAsDataURL(blob)
+    })
+  } catch {
+    return null
+  }
+}
+
+function buildRomaneioDoc(data: RomaneioData, empresa: EmpresaData, logoAsset?: LoadedLogoAsset | null) {
   const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
   const W = 210
-  const M = 15 // margin
-  const CW = W - 2 * M // content width
+  const M = 15
+  const CW = W - 2 * M
   let y = M
 
-  // ── Colors
-  const TEAL = [13, 148, 136] as const    // teal-600
-  const DARK = [30, 41, 59] as const      // slate-800
-  const MID = [100, 116, 139] as const    // slate-500
-  const LIGHT = [226, 232, 240] as const  // slate-200
+  const TEAL = [13, 148, 136] as const
+  const DARK = [30, 41, 59] as const
+  const MID = [100, 116, 139] as const
+  const LIGHT = [226, 232, 240] as const
 
-  // ── Header bar
-  doc.setFillColor(...TEAL)
-  doc.rect(0, 0, W, 28, 'F')
+  doc.setFillColor(...DARK)
+  doc.rect(0, 0, W, 34, 'F')
+
+  if (logoAsset) {
+    try {
+      const maxWidth = 24
+      const maxHeight = 24
+      const ratio = logoAsset.width / Math.max(logoAsset.height, 1)
+      let renderWidth = maxWidth
+      let renderHeight = renderWidth / Math.max(ratio, 0.01)
+
+      if (renderHeight > maxHeight) {
+        renderHeight = maxHeight
+        renderWidth = renderHeight * Math.max(ratio, 0.01)
+      }
+
+      const logoX = M
+      const logoY = 5 + (maxHeight - renderHeight) / 2
+      doc.addImage(logoAsset.dataUrl, logoAsset.format, logoX, logoY, renderWidth, renderHeight)
+    } catch {
+      // Keep rendering even if the logo fails.
+    }
+  }
+
   doc.setFont('helvetica', 'bold')
-  doc.setFontSize(18)
+  doc.setFontSize(11)
   doc.setTextColor(255, 255, 255)
-  doc.text('ROMANEIO DE CARGA', M, 13)
-  doc.setFontSize(10)
-  doc.setFont('helvetica', 'normal')
-  doc.text(`N\u00ba ${data.numero}`, M, 21)
-  const dataStr = new Date().toLocaleDateString('pt-BR', {
-    day: '2-digit', month: '2-digit', year: 'numeric',
-    hour: '2-digit', minute: '2-digit',
-  })
-  doc.text(dataStr, W - M, 21, { align: 'right' })
-  y = 36
+  doc.text(empresa.fantasia, M + 22, 11)
 
-  // ── Origin / Destination
+  doc.setFont('helvetica', 'normal')
+  doc.setFontSize(7)
+  doc.setTextColor(180, 190, 200)
+  doc.text(`CNPJ: ${empresa.cnpj}`, M + 22, 16)
+  if (empresa.endereco) {
+    doc.text(`${empresa.endereco}${empresa.cidade ? ` - ${empresa.cidade}/${empresa.uf ?? ''}` : ''}`, M + 22, 21)
+  }
+  if (empresa.telefone) {
+    doc.text(`${empresa.telefone}${empresa.email ? ` | ${empresa.email}` : ''}`, M + 22, 26)
+  }
+
+  doc.setFont('helvetica', 'bold')
+  doc.setFontSize(14)
+  doc.setTextColor(255, 255, 255)
+  doc.text('ROMANEIO DE CARGA', W - M, 13, { align: 'right' })
+  doc.setFontSize(10)
+  doc.text(`#${data.numero}`, W - M, 20, { align: 'right' })
+  doc.setFont('helvetica', 'normal')
+  doc.setFontSize(8)
+  const dataStr = new Date().toLocaleDateString('pt-BR', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  })
+  doc.text(dataStr, W - M, 26, { align: 'right' })
+  y = 42
+
   doc.setFontSize(8)
   doc.setTextColor(...MID)
   doc.text('ORIGEM', M, y)
@@ -71,13 +146,11 @@ function buildRomaneioDoc(data: RomaneioData) {
   }
   y += 4
 
-  // ── Separator
   doc.setDrawColor(...LIGHT)
   doc.setLineWidth(0.3)
   doc.line(M, y, W - M, y)
   y += 6
 
-  // ── Transport info
   if (data.motorista_nome || data.veiculo_placa) {
     doc.setFontSize(8)
     doc.setTextColor(...MID)
@@ -97,21 +170,19 @@ function buildRomaneioDoc(data: RomaneioData) {
     y += 6
   }
 
-  // ── Items table header
-  doc.setFillColor(241, 245, 249) // slate-100
+  doc.setFillColor(241, 245, 249)
   doc.rect(M, y, CW, 7, 'F')
   doc.setFontSize(7)
   doc.setFont('helvetica', 'bold')
   doc.setTextColor(...MID)
   const cols = [M + 2, M + 8, M + CW * 0.55, M + CW * 0.7, M + CW * 0.85]
   doc.text('#', cols[0], y + 5)
-  doc.text('DESCRI\u00c7\u00c3O', cols[1], y + 5)
+  doc.text('DESCRICAO', cols[1], y + 5)
   doc.text('QTD', cols[2], y + 5)
   doc.text('UNID', cols[3], y + 5)
   doc.text('PESO (kg)', cols[4], y + 5)
   y += 10
 
-  // ── Items rows
   doc.setFont('helvetica', 'normal')
   doc.setFontSize(9)
   data.itens.forEach((item, i) => {
@@ -121,7 +192,7 @@ function buildRomaneioDoc(data: RomaneioData) {
     }
     doc.setTextColor(...DARK)
     doc.text(String(i + 1), cols[0], y)
-    const desc = item.descricao.length > 45 ? item.descricao.slice(0, 45) + '...' : item.descricao
+    const desc = item.descricao.length > 45 ? `${item.descricao.slice(0, 45)}...` : item.descricao
     doc.text(desc, cols[1], y)
     doc.text(String(item.quantidade), cols[2], y)
     doc.text(item.unidade, cols[3], y)
@@ -134,7 +205,6 @@ function buildRomaneioDoc(data: RomaneioData) {
 
   y += 4
 
-  // ── Totals
   doc.setDrawColor(...LIGHT)
   doc.setLineWidth(0.5)
   doc.line(M, y, W - M, y)
@@ -146,11 +216,10 @@ function buildRomaneioDoc(data: RomaneioData) {
   doc.text(`Peso Total: ${data.peso_total_kg?.toFixed(1) ?? '-'} kg`, M + 70, y)
   y += 10
 
-  // ── Observations
   if (data.observacoes) {
     doc.setFontSize(8)
     doc.setTextColor(...MID)
-    doc.text('OBSERVA\u00c7\u00d5ES', M, y)
+    doc.text('OBSERVACOES', M, y)
     y += 4
     doc.setFontSize(9)
     doc.setTextColor(...DARK)
@@ -160,24 +229,23 @@ function buildRomaneioDoc(data: RomaneioData) {
     y += lines.length * 4.5 + 6
   }
 
-  // ── Signature area
-  if (y > 240) { doc.addPage(); y = M }
+  if (y > 240) {
+    doc.addPage()
+    y = M
+  }
   y = Math.max(y, 230)
   doc.setDrawColor(...LIGHT)
   doc.setLineWidth(0.3)
-  // Left signature
   doc.line(M, y, M + 75, y)
   doc.setFontSize(7)
   doc.setTextColor(...MID)
-  doc.text('Respons\u00e1vel Expedi\u00e7\u00e3o', M + 37.5, y + 4, { align: 'center' })
-  // Right signature
+  doc.text('Responsavel Expedicao', M + 37.5, y + 4, { align: 'center' })
   doc.line(W - M - 75, y, W - M, y)
   doc.text('Motorista / Transportador', W - M - 37.5, y + 4, { align: 'center' })
 
-  // ── Footer
   doc.setFontSize(6)
   doc.setTextColor(180, 180, 180)
-  doc.text(`TEG+ ERP \u2014 Romaneio gerado em ${dataStr}`, W / 2, 290, { align: 'center' })
+  doc.text(`TEG+ ERP - ${empresa.fantasia} - CNPJ ${empresa.cnpj} - Romaneio gerado em ${dataStr}`, W / 2, 290, { align: 'center' })
 
   return doc
 }
@@ -215,13 +283,15 @@ export function getRomaneioFileName(input: Pick<RomaneioData, 'numero'> | Pick<L
   return `romaneio-${input.numero}.pdf`
 }
 
-export function gerarRomaneioPdfBlob(data: RomaneioData | LogSolicitacao): Blob {
+export async function gerarRomaneioPdfBlob(data: RomaneioData | LogSolicitacao): Promise<Blob> {
   const payload = 'status' in data ? buildRomaneioDataFromSolicitacao(data) : data
-  const doc = buildRomaneioDoc(payload)
+  const empresa = await getEmpresa().catch(() => EMPRESA_FALLBACK)
+  const logoAsset = await loadLogoAsset(empresa.logoUrl)
+  const doc = buildRomaneioDoc(payload, empresa, logoAsset)
   return doc.output('blob')
 }
 
-export function gerarRomaneioPDF(data: RomaneioData | LogSolicitacao): string {
-  const blob = gerarRomaneioPdfBlob(data)
+export async function gerarRomaneioPDF(data: RomaneioData | LogSolicitacao): Promise<string> {
+  const blob = await gerarRomaneioPdfBlob(data)
   return URL.createObjectURL(blob)
 }

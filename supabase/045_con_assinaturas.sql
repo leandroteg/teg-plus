@@ -14,7 +14,7 @@ CREATE TABLE con_assinaturas (
   envelope_id             TEXT,
   status                  TEXT NOT NULL DEFAULT 'pendente'
                           CHECK (status IN ('pendente','enviado','parcialmente_assinado',
-                                            'assinado','recusado','expirado','cancelado')),
+                                            'assinado','recusado','expirado','cancelado','erro')),
   signatarios             JSONB NOT NULL DEFAULT '[]',
   enviado_em              TIMESTAMPTZ,
   concluido_em            TIMESTAMPTZ,

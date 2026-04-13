@@ -1,6 +1,6 @@
 import { useNavigate } from 'react-router-dom'
 import {
-  LayoutDashboard, Kanban, ClipboardList, Plus,
+  LayoutDashboard, Kanban, ClipboardList, Plus, FileText,
 } from 'lucide-react'
 import ModuleLayout from './ModuleLayout'
 import type { NavItem } from './ModuleLayout'
@@ -10,9 +10,9 @@ export default function FiscalLayout() {
 
   const NAV: NavItem[] = [
     { to: '/fiscal',             icon: LayoutDashboard, label: 'Painel',                  end: true },
-    { to: '/fiscal/pipeline#nova', icon: Plus,          label: 'Nova Solicitação',         end: false, action: () => navigate(`/fiscal/pipeline?nova=${Date.now()}`), accent: true },
-    { to: '/fiscal/pipeline',    icon: Kanban,          label: 'Emissão de Nota Fiscal',   end: false },
-    { to: '/fiscal/historico',   icon: ClipboardList,   label: 'Histórico NF',             end: false },
+    { to: '/fiscal', icon: Plus, label: 'Nova Solicitação', end: false, action: () => navigate(`/fiscal/pipeline?nova=${Date.now()}`), accent: true, requisitanteAllowed: true },
+    { to: '/fiscal/notas',       icon: FileText,        label: 'Notas Fiscais',            end: false },
+    { to: '/fiscal/pipeline',    icon: Kanban,          label: 'Pipeline Emissão',         end: false },
   ]
 
   return (

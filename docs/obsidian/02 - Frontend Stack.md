@@ -4,27 +4,42 @@ type: frontend
 status: ativo
 tags: [frontend, react, vite, typescript, tailwind]
 criado: 2026-03-02
-relacionado: ["[[01 - Arquitetura Geral]]", "[[03 - Páginas e Rotas]]", "[[04 - Componentes]]", "[[05 - Hooks Customizados]]"]
+atualizado: 2026-04-07
+relacionado: ["[[01 - Arquitetura Geral]]", "[[03 - Páginas e Rotas]]", "[[04 - Componentes]]", "[[05 - Hooks Customizados]]", "[[48 - Guia de Estilo UI]]", "[[ADR-004 - Frontend SPA React]]"]
 ---
 
 # Frontend Stack — TEG+ ERP
+
+## Numeros do Frontend
+
+| Metrica | Valor |
+|---------|-------|
+| Paginas | 200+ across 16 modulos |
+| Hooks customizados | 47 |
+| Module layouts | 18 (lazy-loaded) |
+| Componentes compartilhados | 60+ |
+| Arquivos de tipos | 30+ (4.551 linhas) |
+| Utility files | 16 |
+| Entry points | 2 (main.tsx + aprovaai-main.tsx) |
+
+---
 
 ## Tecnologias
 
 ### Runtime Dependencies
 
-| Pacote | Versão | Uso |
+| Pacote | Versao | Uso |
 |--------|--------|-----|
 | `react` | ^18.3.1 | UI framework |
 | `react-dom` | ^18.3.1 | DOM rendering |
 | `react-router-dom` | ^6.28.0 | Roteamento SPA |
 | `@tanstack/react-query` | ^5.60.0 | Data fetching & cache |
 | `@supabase/supabase-js` | ^2.45.0 | DB + Auth client |
-| `lucide-react` | ^0.460.0 | Ícones SVG |
+| `lucide-react` | ^0.460.0 | Icones SVG |
 
 ### Dev Dependencies
 
-| Pacote | Versão | Uso |
+| Pacote | Versao | Uso |
 |--------|--------|-----|
 | `vite` | ^6.0.0 | Build tool + dev server |
 | `typescript` | ^5.6.3 | Type system |
@@ -35,30 +50,101 @@ relacionado: ["[[01 - Arquitetura Geral]]", "[[03 - Páginas e Rotas]]", "[[04 -
 
 ---
 
+## Code Splitting e Lazy Loading
+
+Todas as paginas sao carregadas via `React.lazy()` + `Suspense` com 3 tipos de skeleton:
+
+| Skeleton | Uso |
+|----------|-----|
+| `DashboardSkeleton` | Dashboards e home pages dos modulos |
+| `TableSkeleton` | Listas, tabelas e grids de dados |
+| `FormSkeleton` | Formularios e wizards |
+
+```tsx
+const Dashboard = React.lazy(() => import('./pages/compras/Dashboard'))
+
+<Suspense fallback={<DashboardSkeleton />}>
+  <Dashboard />
+</Suspense>
+```
+
+Os 18 module layouts sao lazy-loaded individualmente, garantindo que o bundle inicial carregue apenas o necessario.
+
+---
+
+## PWA Support
+
+O TEG+ funciona como Progressive Web App:
+
+- **Install prompt** — detecta se pode ser instalado e oferece ao usuario
+- **Offline banner** — notifica quando sem conexao
+- **Push notifications** — notificacoes de aprovacoes pendentes e alertas
+- Service worker para cache de assets estaticos
+
+---
+
+## Dark Mode
+
+Implementado via `ThemeContext` que gerencia o tema globalmente:
+- Toggle no header do app
+- Persiste preferencia no localStorage
+- Todas as 200+ paginas suportam dark mode
+- Classes Tailwind `dark:` aplicadas consistentemente
+
+---
+
+## Entry Points
+
+### `main.tsx` — Aplicacao principal
+```tsx
+<QueryClientProvider client={queryClient}>
+  <BrowserRouter>
+    <ThemeProvider>
+      <AuthProvider>
+        <App />
+      </AuthProvider>
+    </ThemeProvider>
+  </BrowserRouter>
+</QueryClientProvider>
+```
+
+### `aprovaai-main.tsx` — AprovAi (bundle separado)
+Entry point independente para a interface de aprovacao mobile. Bundle separado para carregamento rapido em dispositivos moveis via link de aprovacao.
+
+---
+
 ## Scripts npm
 
 ```bash
-npm run dev      # Dev server → http://localhost:5173
-npm run build    # Build de produção → /dist
+npm run dev      # Dev server -> http://localhost:5173
+npm run build    # Build de producao -> /dist
 npm run preview  # Preview do build local
 ```
 
 ---
 
-## Configuração Vite (`vite.config.ts`)
+## Configuracao Vite (`vite.config.ts`)
 
 ```ts
 export default defineConfig({
   plugins: [react()],
   server: {
     port: 5173
+  },
+  build: {
+    rollupOptions: {
+      input: {
+        main: 'index.html',
+        aprovaai: 'aprovaai.html'  // Entry point separado
+      }
+    }
   }
 })
 ```
 
 ---
 
-## Configuração TypeScript (`tsconfig.json`)
+## Configuracao TypeScript (`tsconfig.json`)
 
 ```json
 {
@@ -83,15 +169,15 @@ export default defineConfig({
 
 | Token | Valor | Uso |
 |-------|-------|-----|
-| `primary` | Indigo `#6366F1` | Ações principais, links |
+| `primary` | Indigo `#6366F1` | Acoes principais, links |
 | `success` | Green `#10B981` | Status positivo |
-| `warning` | Amber `#F59E0B` | Alertas, pendências |
-| `danger` | Red `#EF4444` | Erros, rejeições |
+| `warning` | Amber `#F59E0B` | Alertas, pendencias |
+| `danger` | Red `#EF4444` | Erros, rejeicoes |
 | `navy` | `#0F172A` | Background sidebar |
 | `teal` | `#14B8A6` | Accent, hover |
-| `cyan` | `#06B6D4` | Accent secundário |
+| `cyan` | `#06B6D4` | Accent secundario |
 
-### Animações Custom
+### Animacoes Custom
 
 | Classe | Efeito |
 |--------|--------|
@@ -106,31 +192,16 @@ export default defineConfig({
 ### Shadows Custom
 
 ```
-shadow-card      → Card padrão
-shadow-card-md   → Card elevado
-shadow-glow-teal → Glow teal
-shadow-glow-cyan → Glow cyan
-shadow-sidebar   → Sidebar shadow
+shadow-card      -> Card padrao
+shadow-card-md   -> Card elevado
+shadow-glow-teal -> Glow teal
+shadow-glow-cyan -> Glow cyan
+shadow-sidebar   -> Sidebar shadow
 ```
 
 ---
 
-## Entry Point (`main.tsx`)
-
-```tsx
-// Setup global providers
-<QueryClientProvider client={queryClient}>
-  <BrowserRouter>
-    <AuthProvider>
-      <App />
-    </AuthProvider>
-  </BrowserRouter>
-</QueryClientProvider>
-```
-
----
-
-## Clientes de Serviço
+## Clientes de Servico
 
 ### `services/supabase.ts`
 ```ts
@@ -169,7 +240,7 @@ export const api = {
 ## Links Relacionados
 
 - [[03 - Páginas e Rotas]] — Estrutura de rotas do app
-- [[04 - Componentes]] — Componentes reutilizáveis
+- [[04 - Componentes]] — Componentes reutilizaveis
 - [[05 - Hooks Customizados]] — Hooks de dados
 - [[09 - Auth Sistema]] — AuthContext e providers
-- [[16 - Variáveis de Ambiente]] — Configuração de env vars
+- [[16 - Variáveis de Ambiente]] — Configuracao de env vars

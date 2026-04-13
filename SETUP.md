@@ -1,153 +1,147 @@
-# TEG+ Sistema de Compras - Guia de Setup
+# TEG+ ERP — Guia de Setup
 
 ## Arquitetura
 
 ```
-[React Mobile App] ---> [n8n Webhooks] ---> [Supabase PostgreSQL]
-     (Frontend)          (Orquestrador)       (Banco de Dados)
+[React SPA]  --->  [n8n Webhooks]  --->  [Supabase PostgreSQL]
+ (Vercel)          (EasyPanel)            (Auth + RLS + Realtime)
+     \                  |
+      \                 v
+       \----------->[AI Parse - Gemini Flash / Claude]
 ```
 
-## 1. Supabase
+> Para documentacao detalhada da arquitetura, ver [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
-### 1.1 Criar projeto
+## 1. Pre-requisitos
+
+- **Node.js 20+** (recomendado: LTS)
+- **Projeto Supabase** — criar em https://supabase.com
+- **Instancia n8n** — self-hosted (EasyPanel, Docker, etc.)
+- **Git** para controle de versao
+
+## 2. Supabase
+
+### 2.1 Criar projeto
 1. Acessar https://supabase.com
-2. Criar novo projeto "teg-plus"
-3. Anotar: Project URL, anon key, service_role key
+2. Criar projeto "teg-plus"
+3. Anotar: **Project URL**, **anon key**, **service_role key**
 
-### 1.2 Executar migrations
-No SQL Editor do Supabase, executar em ordem:
-1. `supabase/001_schema_compras.sql` - Schema principal
-2. `supabase/002_seed_usuarios.sql` - Usuarios iniciais
-3. `supabase/003_rpc_dashboard.sql` - RPCs do dashboard
+### 2.2 Executar migrations
+No SQL Editor do Supabase, executar em ordem numerica os arquivos de `supabase/`:
 
-### 1.3 Verificar
-- Tabelas criadas: obras, usuarios, alcadas, requisicoes, requisicao_itens, aprovacoes, atividades_log, configuracoes
-- Views criadas: vw_dashboard_requisicoes, vw_requisicoes_completas, vw_kpis_compras, vw_requisicoes_por_obra
-- RPC: get_dashboard_compras()
-- Realtime habilitado para: requisicoes, aprovacoes
+```
+001_schema_compras.sql       # Schema base de compras
+002_seed_usuarios.sql        # Usuarios iniciais e obras
+003_rpc_dashboard.sql        # RPCs do dashboard
+004_schema_cotacoes.sql      # Cotacoes e fornecedores
+...
+017_frotas_manutencao.sql    # Frotas, veiculos, OS
+...
+025_rls_granular.sql         # Politicas RLS granulares
+...
+042_apr_tipo_aprovacao.sql   # Tipos de aprovacao (4 tipos)
+043_cadastros_ai.sql         # Master data com AI
+044_lotes_pagamento.sql      # Lotes de pagamento e aprovacao parcial
+```
 
-## 2. n8n
+### 2.3 Verificar
+- ~90 tabelas criadas (prefixos: fin_, est_, log_, fro_, ctr_, cad_, apr_, ctrl_)
+- Views: vw_dashboard_requisicoes, vw_kpis_compras, etc.
+- RPCs: get_dashboard_compras, rpc_resolver_lote_status, rpc_registrar_pagamento_batch, generate_numero_lote
+- Realtime habilitado para tabelas principais
+- Storage buckets: cotacoes-docs, contratos-docs
 
-### 2.1 Credenciais
-1. Settings > Credentials > Add > Supabase
-2. Host: sua-url.supabase.co
-3. Service Role Key: (do Supabase)
+## 3. n8n
 
-### 2.2 Workflows
-Ja criados automaticamente:
-- TEG+ | Compras - Nova Requisicao (POST /compras/requisicao)
-- TEG+ | Compras - Processar Aprovacao (POST /compras/aprovacao)
-- TEG+ | Painel - API Dashboard Compras (GET /painel/compras)
+### 3.1 Credenciais
+Em Settings > Credentials, configurar:
+- **Supabase** — Host + Service Role Key
+- **Gemini** — API key para parse de documentos
+- **Evolution API** — WhatsApp (opcional)
 
-### 2.3 Configurar nodes
-Em cada workflow:
-1. Clicar em cada node Supabase
-2. Selecionar a credencial criada
-3. Verificar se o nome da tabela esta correto
-4. Salvar e ativar
+### 3.2 Workflows
+Importar os workflows de `n8n-workflows/`. Principais:
+- `TEG+ | Compras - Nova Requisicao` (POST /compras/requisicao)
+- `TEG+ | Compras - Processar Aprovacao` (POST /compras/aprovacao)
+- `TEG+ | Compras - Cotacao` (POST /compras/cotacao)
+- `TEG+ | Compras - Parse Cotacao AI` (POST /compras/parse-cotacao)
+- `TEG+ | Consulta CNPJ` (POST /consulta-cnpj)
+- `TEG+ | Consulta CEP` (POST /consulta-cep)
+- `TEG+ | Painel - Dashboard` (GET /painel/compras)
 
-## 3. Frontend React
+### 3.3 Ativar
+Em cada workflow: verificar nodes Supabase, selecionar credencial, salvar e ativar.
 
-### 3.1 Instalar
+## 4. Frontend
+
+### 4.1 Instalar
 ```bash
 cd frontend
 npm install
 ```
 
-### 3.2 Configurar .env
+### 4.2 Configurar .env
 ```bash
-cp .env.example .env
+cp .env.example .env.local
 ```
-Preencher:
-- VITE_SUPABASE_URL=https://xxx.supabase.co
-- VITE_SUPABASE_ANON_KEY=eyJ...
-- VITE_N8N_WEBHOOK_URL=https://seu-n8n.com/webhook
 
-### 3.3 Executar
+Preencher:
+```env
+VITE_SUPABASE_URL=https://xxx.supabase.co
+VITE_SUPABASE_ANON_KEY=eyJ...
+VITE_N8N_WEBHOOK_URL=https://seu-n8n.com/webhook
+```
+
+> **Importante:** Chaves sensiveis (service_role, LLM keys) ficam **somente** no n8n.
+
+### 4.3 Rodar
 ```bash
 npm run dev
+# Acessar http://localhost:5173
 ```
-Acessar: http://localhost:5173
 
-## 4. GitHub
-
-### 4.1 Criar repositorio
+### 4.4 Build de producao
 ```bash
-cd teg-plus
-git init
-git add .
-git commit -m "feat: setup inicial TEG+ Sistema de Compras"
-git remote add origin https://github.com/seu-org/teg-plus.git
-git push -u origin main
+npm run build   # Output em dist/
+npm run preview # Preview local do build
 ```
 
-## 5. Fluxo de Compras
+## 5. Deploy (Vercel)
 
-```
-Solicitante cria RC (React App)
-        |
-        v
-n8n valida e salva (Supabase)
-        |
-        v
-Determina alcada por valor
-        |
-        v
-Cria registro de aprovacao
-        |
-        v
-[Futuro: Notifica aprovador via WhatsApp/Email]
-        |
-        v
-Aprovador acessa link de aprovacao
-        |
-        v
-n8n processa decisao
-        |
-   [Aprovada?]
-   /         \
-  Sim        Nao
-  |           |
-  v           v
-Proximo    Requisicao
-nivel?     Rejeitada
-  |
- [Sim] -> Repete aprovacao
- [Nao] -> Requisicao Aprovada
-            |
-            v
-      [Futuro: Criar OC no Omie]
-```
+1. Conectar repositorio GitHub ao Vercel
+2. Configurar:
+   - **Framework Preset:** Vite
+   - **Root Directory:** `frontend`
+   - **Build Command:** `npm run build`
+   - **Output Directory:** `dist`
+3. Adicionar variaveis de ambiente (VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY, VITE_N8N_WEBHOOK_URL)
+4. Deploy automatico a cada push em `main`
 
-## Proximos Passos (Roadmap)
+O `vercel.json` ja configura SPA rewrites para React Router.
 
-### Mes 1 - Financeiro
-- [ ] Integrar notificacoes WhatsApp (Evolution API)
-- [ ] Integrar notificacoes Email (Microsoft 365)
-- [ ] Workflow NF-e automatica -> Contas a Pagar
-- [ ] Painel de vencimentos
+## 6. Modulos Disponiveis
 
-### Mes 2 - AI TEG+
-- [ ] AI Agent no WhatsApp para criar requisicoes
-- [ ] Cadastro de fornecedores via chat
-- [ ] Cotacao automatica
+| Modulo | Rota | Status |
+|--------|------|--------|
+| Compras | `/compras/*` | 95% operacional |
+| Financeiro | `/financeiro/*` | 65% operacional |
+| Estoque | `/estoque/*` | 60% operacional |
+| Logistica | `/logistica/*` | 85% operacional |
+| Frotas | `/frotas/*` | 80% operacional |
+| Contratos | `/contratos/*` | 85% operacional |
+| Cadastros | `/cadastros/*` | 100% operacional |
+| Controladoria | `/controladoria/*` | 75% (controle orcamentario) |
+| RH | `/rh/*` | 15% (headcount + cultura) |
+| SSMA | `/ssma` | 0% (stub) |
 
-### Mes 3 - Patrimonio + RH
-- [ ] Controle de patrimonio (R$ 22.5M)
-- [ ] Folha internalizada com rateio por obra
-- [ ] HHt integrado
+## 7. Documentacao
 
-### Mes 4 - Obras + PMO
-- [ ] App HHt mobile
-- [ ] Monday.com com 6 obras
-- [ ] SPI/CPI automatico
+A documentacao tecnica completa esta em `docs/obsidian/`. Para a melhor experiencia, abra como vault no [Obsidian](https://obsidian.md/) com plugins Dataview, Calendar, Kanban e Templater.
 
-### Mes 5 - Controladoria
-- [ ] P&L por projeto
-- [ ] Margem real mensal
-- [ ] Painel de contratos
+- [Arquitetura detalhada](docs/ARCHITECTURE.md)
+- [Roadmap estrategico](ROADMAP_ERP_WORLD_CLASS.md)
+- [Indice Obsidian](docs/obsidian/00%20-%20TEG+%20INDEX.md)
 
-### Mes 6 - AI Completo
-- [ ] AI TEG+ com todas as ferramentas
-- [ ] Painel Lovable com chat
-- [ ] Modulos "a definir" resolvidos
+---
+
+Ultima atualizacao: 2026-04-10

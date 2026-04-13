@@ -91,3 +91,7 @@ Aba Modelos (admin/gerente)
   └─ CRUD de modelos com grupo + upload de arquivo
   └─ Versionamento: nova versão = novo upload mantendo histórico
 ```
+
+
+## Links
+- [[obsidian/27 - Módulo Contratos Gestão]]

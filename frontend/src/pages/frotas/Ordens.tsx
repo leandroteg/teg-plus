@@ -434,7 +434,8 @@ const TABS = [
 ]
 
 export default function Ordens() {
-  const { isLightSidebar: isLight } = useTheme()
+  const { isDark } = useTheme()
+  const isLight = !isDark
   const [tab, setTab] = useState(0)
   const [novaOS, setNovaOS] = useState(false)
   const cur = TABS[tab]

@@ -632,3 +632,7 @@ gh pr create --title "feat(contratos): Certisign digital signature integration (
 
 Closes #76"
 ```
+
+
+## Links
+- [[obsidian/27 - Módulo Contratos Gestão]]

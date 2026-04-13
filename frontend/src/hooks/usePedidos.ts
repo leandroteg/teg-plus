@@ -18,7 +18,7 @@ export function usePedidos(status?: string) {
           status_pagamento, liberado_pagamento_em, liberado_pagamento_por, pago_em,
           centro_custo, centro_custo_id, classe_financeira, classe_financeira_id,
           condicao_pagamento, parcelas_preview,
-          requisicao:cmp_requisicoes(numero, descricao, justificativa, obra_nome, categoria, urgencia, data_necessidade, itens:cmp_requisicao_itens(descricao, quantidade, unidade, valor_unitario_estimado)),
+          requisicao:cmp_requisicoes(numero, descricao, justificativa, obra_nome, obra_id, categoria, urgencia, data_necessidade, compra_recorrente, solicitante_nome, itens:cmp_requisicao_itens(descricao, quantidade, unidade, valor_unitario_estimado)),
           comprador:cmp_compradores(nome)
         `)
         .order('data_prevista_entrega', { ascending: true })
@@ -107,6 +107,9 @@ export interface EmitirPedidoPayload {
   valorTotal: number
   compradorId?: string
   condicaoPagamento?: string
+  formaPagamento?: 'pix' | 'cartao' | 'boleto' | 'transferencia'
+  cartaoId?: string
+  cartaoNome?: string
   observacoes?: string
   dataPrevistaEntrega?: string
   classeFinanceiraId?: string
@@ -173,6 +176,9 @@ export function useEmitirPedido() {
         valorTotal,
         compradorId,
         condicaoPagamento,
+        formaPagamento,
+        cartaoId,
+        cartaoNome,
         observacoes,
         dataPrevistaEntrega,
         classeFinanceira,
@@ -265,7 +271,10 @@ export function useEmitirPedido() {
           data_pedido: now.toISOString().split('T')[0],
           data_prevista_entrega: dataPrevistaEntrega || null,
           condicao_pagamento: condicaoPagamento || null,
-          observacoes: observacoes || null,
+          observacoes: [
+            observacoes?.trim() || null,
+            formaPagamento === 'cartao' && cartaoNome ? `CartÃ£o selecionado: ${cartaoNome}` : null,
+          ].filter(Boolean).join(' | ') || null,
           classe_financeira: classeFinanceira || null,
           classe_financeira_id: classeFinanceiraId || null,
           centro_custo: centroCusto || null,
@@ -338,6 +347,8 @@ export function useEmitirPedido() {
         projeto_id: requisicao.projeto_id || null,
         descricao: buildDescricaoParcela(requisicao.descricao, parcela, parcelasSanitizadas.length),
         natureza: 'material',
+        forma_pagamento: formaPagamento || null,
+        cartao_id: formaPagamento === 'cartao' ? cartaoId || null : null,
         observacoes: condicaoPagamento ? `Condição: ${condicaoPagamento}` : null,
       }))
 

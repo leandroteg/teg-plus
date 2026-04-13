@@ -2,25 +2,66 @@
 <html lang="pt-BR">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-    <meta name="theme-color" content="#060D1B" />
-    <meta name="description" content="TEG+ ERP — Sistema interno de gestão movido por IA para obras de engenharia elétrica e transmissão" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no" />
+    <meta name="theme-color" content="#060D1B" media="(prefers-color-scheme: dark)" />
+    <meta name="theme-color" content="#f8fafc" media="(prefers-color-scheme: light)" />
+    <meta name="description" content="TEG+ ERP — Sistema interno de gestao movido por IA para obras de engenharia eletrica e transmissao" />
     <meta name="application-name" content="TEG+ ERP" />
-    <meta name="apple-mobile-web-app-title" content="TEG+ ERP" />
+    <meta name="apple-mobile-web-app-title" content="TEG+" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-    <link rel="manifest" href="/manifest.json" />
-    <title>TEG+ ERP · Interno movido por IA</title>
+    <meta name="mobile-web-app-capable" content="yes" />
+    <link rel="icon" type="image/png" href="/favicon.png" />
+    <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
+    <title>TEG+ ERP</title>
+
+    <!-- Splash screen styling while React loads -->
+    <style>
+      #root:empty {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 100vh;
+        background: #060D1B;
+      }
+      #root:empty::after {
+        content: '';
+        width: 40px;
+        height: 40px;
+        border: 3px solid rgba(20,184,166,0.15);
+        border-top-color: #14B8A6;
+        border-radius: 50%;
+        animation: spin 0.8s linear infinite;
+      }
+      @keyframes spin {
+        to { transform: rotate(360deg); }
+      }
+      /* Safe area for standalone PWA — applied to #root, not body,
+         so fixed modals (inset-0) still cover the full viewport */
+      @supports (padding-top: env(safe-area-inset-top)) {
+        body.standalone-mode #root {
+          padding-top: env(safe-area-inset-top);
+          padding-bottom: env(safe-area-inset-bottom);
+          padding-left: env(safe-area-inset-left);
+          padding-right: env(safe-area-inset-right);
+        }
+      }
+    </style>
   </head>
   <body class="bg-gray-100">
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
     <script>
-      if ('serviceWorker' in navigator) {
-        window.addEventListener('load', () => {
-          navigator.serviceWorker.register('/sw.js')
-        })
+      // Detect standalone mode and add class for safe-area padding
+      if (window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone) {
+        document.body.classList.add('standalone-mode');
       }
+      // Capture beforeinstallprompt EARLY — before React mounts — so it's never missed
+      window.__pwaInstallPrompt = null;
+      window.addEventListener('beforeinstallprompt', function(e) {
+        e.preventDefault();
+        window.__pwaInstallPrompt = e;
+      });
     </script>
   </body>
 </html>

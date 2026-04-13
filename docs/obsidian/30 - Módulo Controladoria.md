@@ -6,7 +6,7 @@ status: ativo
 tags: [controladoria, dre, orcamento, kpis, alertas, bi]
 criado: 2026-03-12
 atualizado: 2026-03-12
-relacionado: ["[[20 - Módulo Financeiro]]", "[[27 - Módulo Contratos Gestão]]", "[[03 - Páginas e Rotas]]"]
+relacionado: ["[[PILAR - Backoffice]]", "[[20 - Módulo Financeiro]]", "[[27 - Módulo Contratos Gestão]]", "[[03 - Páginas e Rotas]]"]
 ---
 
 # Módulo Controladoria
@@ -172,6 +172,26 @@ flowchart LR
 | **Compras** | Pedidos de compra emitidos alimentam custo realizado |
 | **Obras** | Apontamentos de HH calculam custo de mão de obra |
 | **Cadastros** | Classes financeiras e centros de custo estruturam o DRE |
+
+---
+
+## RPCs do Banco
+
+| RPC | Descrição |
+|-----|-----------|
+| `ctrl_calcular_dre_mes(obra_id, ano, mes)` | Calcula DRE simplificado para uma obra em um mês específico — receitas, custos diretos, margem |
+| `ctrl_gerar_snapshot_kpis()` | Gera snapshot diário de KPIs por obra — margem, CPI, SPI, desvio orçamentário — salvo em `ctrl_kpis_snapshot` |
+
+Os snapshots são executados via cron n8n diariamente e alimentam o dashboard de indicadores com série histórica.
+
+---
+
+## Indicadores de Produção
+
+Além dos KPIs financeiros, a Controladoria acompanha indicadores de produção por obra:
+- HH/km de rede construída
+- Custo/km
+- Produtividade por frente de trabalho
 
 ---
 

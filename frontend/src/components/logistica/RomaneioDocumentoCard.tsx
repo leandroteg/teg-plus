@@ -18,18 +18,22 @@ function buildRomaneioShareText(sol: LogSolicitacao) {
 }
 
 export function openGeneratedPdf(sol: LogSolicitacao) {
-  const url = gerarRomaneioPDF(sol)
-  window.open(url, '_blank', 'noopener,noreferrer')
-  window.setTimeout(() => URL.revokeObjectURL(url), 60_000)
+  void (async () => {
+    const url = await gerarRomaneioPDF(sol)
+    window.open(url, '_blank', 'noopener,noreferrer')
+    window.setTimeout(() => URL.revokeObjectURL(url), 60_000)
+  })()
 }
 
 export function downloadGeneratedPdf(sol: LogSolicitacao) {
-  const url = gerarRomaneioPDF(sol)
-  const a = document.createElement('a')
-  a.href = url
-  a.download = getRomaneioFileName(sol)
-  a.click()
-  window.setTimeout(() => URL.revokeObjectURL(url), 60_000)
+  void (async () => {
+    const url = await gerarRomaneioPDF(sol)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = getRomaneioFileName(sol)
+    a.click()
+    window.setTimeout(() => URL.revokeObjectURL(url), 60_000)
+  })()
 }
 
 async function compartilharWhatsApp(sol: LogSolicitacao): Promise<boolean> {
@@ -37,7 +41,7 @@ async function compartilharWhatsApp(sol: LogSolicitacao): Promise<boolean> {
 
   if (navigator.share && navigator.canShare) {
     try {
-      const blob = gerarRomaneioPdfBlob(sol)
+      const blob = await gerarRomaneioPdfBlob(sol)
       const file = new File([blob], getRomaneioFileName(sol), { type: 'application/pdf' })
       const shareData = { text, files: [file] }
       if (navigator.canShare(shareData)) {
@@ -157,23 +161,6 @@ export function RomaneioDocumentoCard({ sol, dark }: { sol: LogSolicitacao; dark
           >
             <Share2 size={14} />
             Compartilhar
-          </button>
-        </div>
-
-        <div className="flex gap-2 mt-4">
-          <button
-            onClick={() => openGeneratedPdf(sol)}
-            className={`flex-1 flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl text-sm font-semibold transition-colors ${dark ? 'bg-white/[0.05] text-slate-200 hover:bg-white/[0.08]' : 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-50'}`}
-          >
-            <ExternalLink size={15} />
-            Abrir PDF
-          </button>
-          <button
-            onClick={() => downloadGeneratedPdf(sol)}
-            className={`flex-1 flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl text-sm font-semibold transition-colors ${dark ? 'bg-white/[0.05] text-slate-200 hover:bg-white/[0.08]' : 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-50'}`}
-          >
-            <Download size={15} />
-            Baixar
           </button>
         </div>
       </div>

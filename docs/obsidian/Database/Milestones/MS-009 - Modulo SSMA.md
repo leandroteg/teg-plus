@@ -42,5 +42,8 @@ Módulo de Segurança, Saúde e Meio Ambiente para conformidade com NRs (NR-1, N
 | [[TASK-023 - SSMA Acidentes PT DDS\|TASK-023]] | Acidentes, PT e DDS | ⬜ backlog |
 | [[TASK-024 - SSMA EPI Inspecoes\|TASK-024]] | EPI e Inspeções | ⬜ backlog |
 
+## Estado Atual (2026-04-10)
+Nenhuma implementação iniciada. Módulo completamente em backlog. Página SSMA no frontend é apenas um stub placeholder.
+
 ## Progresso
 `░░░░░░░░░░` 0%

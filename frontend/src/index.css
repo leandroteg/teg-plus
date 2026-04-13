@@ -225,6 +225,73 @@
    Keyframes globais
    ══════════════════════════════════════════════════════════════════════════════ */
 
+/* ── Page enter animation (opacity-only to avoid breaking fixed modals) ── */
+@keyframes pageEnter {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+.animate-page-enter {
+  animation: pageEnter 0.3s ease-out;
+}
+
+/* ── Stagger children — apply to parent, children get cascading fade-in ── */
+.stagger-children > * {
+  opacity: 0;
+  animation: staggerItem 0.4s ease-out forwards;
+}
+@keyframes staggerItem {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+.stagger-children > *:nth-child(1)  { animation-delay: 0ms; }
+.stagger-children > *:nth-child(2)  { animation-delay: 40ms; }
+.stagger-children > *:nth-child(3)  { animation-delay: 80ms; }
+.stagger-children > *:nth-child(4)  { animation-delay: 120ms; }
+.stagger-children > *:nth-child(5)  { animation-delay: 160ms; }
+.stagger-children > *:nth-child(6)  { animation-delay: 200ms; }
+.stagger-children > *:nth-child(7)  { animation-delay: 240ms; }
+.stagger-children > *:nth-child(8)  { animation-delay: 280ms; }
+.stagger-children > *:nth-child(9)  { animation-delay: 320ms; }
+.stagger-children > *:nth-child(10) { animation-delay: 360ms; }
+.stagger-children > *:nth-child(n+11) { animation-delay: 400ms; }
+
+/* ── Card press effect ────────────────── */
+.card-press {
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+.card-press:active {
+  transform: scale(0.97);
+}
+
+/* ── Skeleton shimmer ──────────────────── */
+@keyframes shimmerSkeleton {
+  0%   { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+.skeleton-shimmer {
+  background: linear-gradient(90deg,
+    transparent 0%, rgba(148,163,184,0.08) 50%, transparent 100%);
+  background-size: 200% 100%;
+  animation: shimmerSkeleton 1.5s ease-in-out infinite;
+}
+[data-theme="dark"] .skeleton-shimmer {
+  background: linear-gradient(90deg,
+    transparent 0%, rgba(148,163,184,0.05) 50%, transparent 100%);
+  background-size: 200% 100%;
+  animation: shimmerSkeleton 1.5s ease-in-out infinite;
+}
+
+/* ── Bounce in ─────────────────────────── */
+@keyframes bounceIn {
+  0%   { transform: scale(0.3); opacity: 0; }
+  50%  { transform: scale(1.05); }
+  70%  { transform: scale(0.9); }
+  100% { transform: scale(1); opacity: 1; }
+}
+.animate-bounce-in {
+  animation: bounceIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) both;
+}
+
 /* Ken Burns — zoom suave nas imagens do slideshow */
 @keyframes kenBurns {
   0%   { transform: scale(1)    translate(0%,    0%); }

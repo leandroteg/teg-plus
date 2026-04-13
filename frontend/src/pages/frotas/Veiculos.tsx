@@ -7,11 +7,13 @@ import type { FroVeiculo, StatusVeiculo, CategoriaVeiculo, CombustivelVeiculo, P
 
 // ── Maps ──────────────────────────────────────────────────────────────────────
 const STATUS_CFG: Record<StatusVeiculo, { label: string; cls: string }> = {
-  disponivel:    { label: 'Disponivel',   cls: 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-500/30' },
-  em_uso:        { label: 'Em Uso',       cls: 'bg-sky-500/15 text-sky-700 dark:text-sky-300 border-sky-500/30' },
-  em_manutencao: { label: 'Manutencao',   cls: 'bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-500/30' },
-  bloqueado:     { label: 'Bloqueado',    cls: 'bg-red-500/15 text-red-700 dark:text-red-300 border-red-500/30' },
-  baixado:       { label: 'Baixado',      cls: 'bg-slate-500/10 text-slate-600 dark:text-slate-500 border-slate-500/20' },
+  disponivel:      { label: 'Disponivel',     cls: 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-500/30' },
+  em_uso:          { label: 'Em Uso',         cls: 'bg-sky-500/15 text-sky-700 dark:text-sky-300 border-sky-500/30' },
+  em_manutencao:   { label: 'Manutencao',     cls: 'bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-500/30' },
+  bloqueado:       { label: 'Bloqueado',      cls: 'bg-red-500/15 text-red-700 dark:text-red-300 border-red-500/30' },
+  baixado:         { label: 'Baixado',        cls: 'bg-slate-500/10 text-slate-600 dark:text-slate-500 border-slate-500/20' },
+  em_entrada:      { label: 'Em Entrada',     cls: 'bg-violet-500/15 text-violet-700 dark:text-violet-300 border-violet-500/30' },
+  aguardando_saida:{ label: 'Ag. Saida',      cls: 'bg-orange-500/15 text-orange-700 dark:text-orange-300 border-orange-500/30' },
 }
 
 const CATEGORIA_LABEL: Record<CategoriaVeiculo, string> = {
@@ -247,7 +249,8 @@ function VeiculoModal({
 
 // ── Main ──────────────────────────────────────────────────────────────────────
 export default function Veiculos() {
-  const { isLightSidebar: isLight } = useTheme()
+  const { isDark } = useTheme()
+  const isLight = !isDark
   const [busca, setBusca]     = useState('')
   const [modal, setModal]     = useState<Partial<FroVeiculo> | null>(null)
   const [statusFiltro, setStatusFiltro] = useState<StatusVeiculo | ''>('')

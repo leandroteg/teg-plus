@@ -226,6 +226,40 @@ export function useAvancarEtapa() {
         })
       if (histErr) throw histErr
 
+      // ── Criar aprovação ao avançar para aprovacao_diretoria ──
+      if (payload.etapaPara === 'aprovacao_diretoria') {
+        try {
+          const { data: sol } = await supabase
+            .from('con_solicitacoes')
+            .select('numero, objeto, valor_estimado, contraparte_nome')
+            .eq('id', payload.solicitacaoId)
+            .single()
+
+          // Verificar se já existe aprovação pendente
+          const { data: existing } = await supabase
+            .from('apr_aprovacoes')
+            .select('id')
+            .eq('entidade_id', payload.solicitacaoId)
+            .eq('modulo', 'con')
+            .eq('status', 'pendente')
+            .limit(1)
+
+          if (!existing?.length) {
+            await supabase.from('apr_aprovacoes').insert({
+              modulo: 'con',
+              tipo_aprovacao: 'minuta_contratual',
+              entidade_id: payload.solicitacaoId,
+              entidade_numero: sol?.numero ?? '',
+              nivel: 2,
+              status: 'pendente',
+            })
+          }
+        } catch (aprErr) {
+          console.error('Erro ao criar aprovação:', aprErr)
+          // Não bloqueia o avanço de etapa
+        }
+      }
+
       // ── Criar contrato em con_contratos ao liberar execucao ──
       if (payload.etapaPara === 'concluido') {
         try {
@@ -268,6 +302,8 @@ export function useAvancarEtapa() {
                   objeto:             sol.objeto,
                   descricao:          sol.descricao_escopo ?? undefined,
                   valor_total:        valorContrato,
+                  valor_mensal:       sol.valor_mensal ?? undefined,
+                  recorrente:         sol.recorrente ?? false,
                   data_assinatura:    today,
                   data_inicio:        sol.data_inicio_prevista ?? today,
                   data_fim_previsto:  sol.data_fim_prevista ?? today,
@@ -387,6 +423,14 @@ export function useAvancarEtapa() {
                 if (updateParcelaErr) throw updateParcelaErr
               }
             }
+          }
+          // ── Atualizar requisição de origem (compra recorrente) ──
+          if (sol?.requisicao_origem_id) {
+            await supabase
+              .from('cmp_requisicoes')
+              .update({ status: 'pedido_emitido' })
+              .eq('id', sol.requisicao_origem_id)
+              .eq('status', 'aguardando_contrato')
           }
         } catch (e) {
           console.warn('Aviso: con_contratos nao criado ao liberar execucao:', e)
@@ -831,7 +875,7 @@ export function useUploadMinutaFile() {
 
       const { error: uploadError } = await supabase.storage
         .from('contratos-anexos')
-        .upload(path, file, { upsert: false, contentType: file.type })
+        .upload(path, file, { upsert: true, contentType: file.type || 'application/pdf' })
       if (uploadError) throw new Error('Falha no upload: ' + uploadError.message)
 
       const { data: { publicUrl } } = supabase.storage
@@ -908,7 +952,7 @@ export function useMelhorarMinuta() {
         body: JSON.stringify(payload),
       })
       if (!res.ok) throw new Error(`Erro ao melhorar minuta: ${res.status}`)
-      const result = await res.json()
+      const result = await res.json().catch(() => ({}))
 
       // Save melhorias to Supabase
       if (result.success && result.melhorias) {
@@ -994,7 +1038,7 @@ export function useGerarMinutaPDF() {
           signal: controller.signal,
         })
         if (!res.ok) throw new Error(`Erro ao gerar minuta: ${res.status}`)
-        return res.json()
+        return res.json().catch(() => ({}))
       } finally {
         clearTimeout(timeout)
       }
@@ -1058,7 +1102,7 @@ export function useGerarResumoAI() {
         body: JSON.stringify(payload),
       })
       if (!res.ok) throw new Error(`Erro ao gerar resumo: ${res.status}`)
-      return res.json()
+      return res.json().catch(() => ({}))
     },
   })
 }
@@ -1095,7 +1139,7 @@ export function useAnalisarMinuta() {
         body: JSON.stringify(payload),
       })
       if (!res.ok) throw new Error(`Erro na analise: ${res.status}`)
-      const result = await res.json()
+      const result = await res.json().catch(() => ({}))
 
       let analise = normalizeMinutaAiAnalise(result?.analise ?? result)
 
@@ -1303,6 +1347,84 @@ export function useConfirmarAssinatura() {
       qc.invalidateQueries({ queryKey: ['con-assinaturas-all'] })
       qc.invalidateQueries({ queryKey: ['con-solicitacoes'] })
       qc.invalidateQueries({ queryKey: ['con-solicitacao', vars.solicitacao_id] })
+    },
+  })
+}
+
+// ── Reenviar Esclarecimento (contrato) ─────────────────────────────────────
+
+export function useReenviarEsclarecimentoContrato() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async ({
+      solicitacaoId,
+      solicitacaoNumero,
+      solicitanteNome,
+      resposta,
+    }: {
+      solicitacaoId: string
+      solicitacaoNumero: string
+      solicitanteNome: string
+      resposta?: string
+    }) => {
+      // 1. Limpa esclarecimento e volta status para aguardando_aprovacao
+      const { error: updErr } = await supabase
+        .from('con_solicitacoes')
+        .update({
+          status: 'aguardando_aprovacao',
+          esclarecimento_msg: null,
+          esclarecimento_por: null,
+          esclarecimento_em: null,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', solicitacaoId)
+      if (updErr) throw updErr
+
+      // 2. Busca dados para recriar aprovacao pendente
+      const { data: sol } = await supabase
+        .from('con_solicitacoes')
+        .select('objeto, contraparte_nome, valor_estimado')
+        .eq('id', solicitacaoId)
+        .single()
+
+      const valor = Number(sol?.valor_estimado ?? 0)
+      const nivel = valor > 100000 ? 4 : valor > 25000 ? 3 : valor > 5000 ? 2 : 1
+      const aprovadorNome = valor > 25000 ? 'Laucidio' : 'Welton'
+
+      const obs = resposta?.trim()
+        ? `Esclarecimento respondido por ${solicitanteNome}: ${resposta.trim()}`
+        : `Esclarecimento respondido por ${solicitanteNome}`
+
+      // 3. Insere novo registro pendente em apr_aprovacoes
+      await supabase.from('apr_aprovacoes').insert({
+        modulo: 'con',
+        tipo_aprovacao: 'minuta_contratual',
+        entidade_id: solicitacaoId,
+        entidade_numero: solicitacaoNumero,
+        aprovador_nome: aprovadorNome,
+        aprovador_email: '',
+        nivel,
+        status: 'pendente',
+        observacao: obs,
+        data_limite: new Date(Date.now() + 72 * 3600_000).toISOString(),
+      })
+
+      // 4. Registra historico
+      await supabase.from('con_solicitacao_historico').insert({
+        solicitacao_id: solicitacaoId,
+        etapa_de: 'aprovacao_diretoria',
+        etapa_para: 'aprovacao_diretoria',
+        observacao: obs,
+      })
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['con-solicitacoes'] })
+      qc.invalidateQueries({ queryKey: ['con-solicitacao'] })
+      qc.invalidateQueries({ queryKey: ['con-solicitacao-historico'] })
+      qc.invalidateQueries({ queryKey: ['aprovacoes-pendentes'] })
+      qc.invalidateQueries({ queryKey: ['aprovacoes-historico'] })
+      qc.invalidateQueries({ queryKey: ['aprovacoes-kpis'] })
+      qc.invalidateQueries({ queryKey: ['dashboard'] })
     },
   })
 }

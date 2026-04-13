@@ -4,7 +4,7 @@ type: infraestrutura
 status: ativo
 tags: [deploy, vercel, github, ci-cd, infraestrutura]
 criado: 2026-03-02
-relacionado: ["[[01 - Arquitetura Geral]]", "[[16 - Variáveis de Ambiente]]"]
+relacionado: ["[[01 - Arquitetura Geral]]", "[[16 - Variáveis de Ambiente]]", "[[35 - Onboarding DEV]]", "[[36 - Guia de Contribuição]]", "[[42 - Estratégia de Testes]]", "[[44 - Changelog]]"]
 ---
 
 # Deploy e GitHub — TEG+ ERP
@@ -36,9 +36,23 @@ flowchart LR
 {
   "buildCommand": "cd frontend && npm install && npm run build",
   "outputDirectory": "frontend/dist",
+  "installCommand": "cd frontend && npm install",
   "framework": "vite",
   "rewrites": [
-    { "source": "/(.*)", "destination": "/index.html" }
+    { "source": "/aprovaai", "destination": "/aprovaai.html" },
+    { "source": "/((?!api|_vercel|aprovaai).*)", "destination": "/index.html" }
+  ],
+  "headers": [
+    { "source": "/assets/(.*)", "headers": [{ "key": "Cache-Control", "value": "public, max-age=31536000, immutable" }] },
+    { "source": "/sw.js", "headers": [{ "key": "Cache-Control", "value": "no-cache, no-store, must-revalidate" }] },
+    { "source": "/workbox-:hash.js", "headers": [{ "key": "Cache-Control", "value": "no-cache, no-store, must-revalidate" }] },
+    { "source": "/manifest.webmanifest", "headers": [{ "key": "Cache-Control", "value": "no-cache" }] },
+    { "source": "/(.*)", "headers": [
+      { "key": "X-Content-Type-Options", "value": "nosniff" },
+      { "key": "X-Frame-Options", "value": "DENY" },
+      { "key": "Referrer-Policy", "value": "strict-origin-when-cross-origin" },
+      { "key": "Permissions-Policy", "value": "camera=(), microphone=(self), geolocation=()" }
+    ]}
   ]
 }
 ```
@@ -47,25 +61,19 @@ flowchart LR
 - Build: `cd frontend && npm install && npm run build`
 - Output: `frontend/dist`
 - Framework detectado: Vite
-- SPA rewrite: todas as rotas → `index.html` (necessário para React Router)
+- SPA rewrite: todas as rotas → `index.html` (exceto `/api`, `/_vercel`, `/aprovaai`)
+- AprovAi: bundle separado em `/aprovaai.html`
+- Headers de segurança: `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy`, `Permissions-Policy`
+- Cache: assets imutáveis (1 ano), service worker sem cache
 
 ---
 
 ## GitHub Actions
 
-**Status atual:** Nenhum workflow configurado.
-
-**Localização esperada:**
-```
-.github/
-└── workflows/
-    └── (vazio — não configurado)
-```
-
-**Recomendações futuras:**
+**Status atual:** CI configurado com build + TypeScript check.
 
 ```yaml
-# .github/workflows/ci.yml (sugerido)
+# .github/workflows/ci.yml
 name: CI
 
 on:
@@ -87,6 +95,8 @@ jobs:
       - run: cd frontend && npx tsc --noEmit
 ```
 
+> **Nota:** Testes automatizados (`npm run test`) ainda não estão integrados no CI.
+
 ---
 
 ## Variáveis de Ambiente no Vercel
@@ -98,6 +108,7 @@ No painel Vercel → Settings → Environment Variables:
 | `VITE_SUPABASE_URL` | Production + Preview | URL do projeto Supabase |
 | `VITE_SUPABASE_ANON_KEY` | Production + Preview | Chave anon pública |
 | `VITE_N8N_WEBHOOK_URL` | Production + Preview | Base URL dos webhooks n8n |
+| `VITE_VAPID_PUBLIC_KEY` | Production + Preview | Chave pública VAPID para Web Push |
 
 > **Importante:** prefixo `VITE_` é obrigatório para Vite expor as vars para o browser.
 

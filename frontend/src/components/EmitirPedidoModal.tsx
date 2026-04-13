@@ -1,12 +1,16 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { X, FileText, Loader2, AlertTriangle } from 'lucide-react'
+import { X, FileText, Loader2, AlertTriangle, Ban, CheckCircle2, Landmark } from 'lucide-react'
 import { useCadCentrosCusto, useCadClasses, useCadObras } from '../hooks/useCadastros'
+import { useCartoesCredito } from '../hooks/useCartoes'
+import { useEditorLock } from '../hooks/useEditorLock'
 import SearchableSelect from './SearchableSelect'
 import type { SelectOption } from './SearchableSelect'
 import type { RequisicaoItem } from '../types'
 import { supabase } from '../services/supabase'
 import { gerarPreviaParcelas, resumirHomogeneidade } from '../utils/pagamentos'
+import NumericInput from './NumericInput'
+import { UpperInput, UpperTextarea } from './UpperInput'
 
 type ModalCotacao = {
   id?: string
@@ -36,13 +40,37 @@ type ParcelaEditavel = {
   status_inicial?: 'confirmado' | 'previsto'
 }
 
+type FormaPagamentoPedido = 'pix' | 'cartao' | 'boleto' | 'transferencia'
+
+const FORMA_PAGAMENTO_OPTIONS: Array<{ value: FormaPagamentoPedido; label: string }> = [
+  { value: 'pix', label: 'Pix' },
+  { value: 'cartao', label: 'Cartao' },
+  { value: 'boleto', label: 'Boleto' },
+  { value: 'transferencia', label: 'Transferencia' },
+]
+
+function inferirFormaPagamentoInicial(fornecedor: {
+  boleto?: boolean | null
+  pix_chave?: string | null
+  banco_nome?: string | null
+  conta?: string | null
+} | null | undefined): FormaPagamentoPedido | '' {
+  if (fornecedor?.boleto) return 'boleto'
+  if (fornecedor?.pix_chave) return 'pix'
+  if (fornecedor?.banco_nome && fornecedor?.conta) return 'transferencia'
+  return ''
+}
+
 interface EmitirPedidoModalProps {
   open: boolean
   onClose: () => void
   requisicaoId: string
   cotacao?: ModalCotacao
+  compraRecorrente?: boolean
+  onSolicitarContrato?: () => void
   onConfirm: (payload: {
     cotacaoId: string
+    fornecedorId?: string
     fornecedorNome: string
     valorTotal: number
     compradorId?: string
@@ -51,6 +79,9 @@ interface EmitirPedidoModalProps {
     centroCustoId?: string
     centroCusto?: string
     condicaoPagamento?: string
+    formaPagamento?: FormaPagamentoPedido
+    cartaoId?: string
+    cartaoNome?: string
     observacoes?: string
     dataPrevistaEntrega?: string
     parcelasPreview: Array<{
@@ -70,12 +101,20 @@ export default function EmitirPedidoModal({
   onClose,
   requisicaoId,
   cotacao,
+  compraRecorrente,
+  onSolicitarContrato,
   onConfirm,
   isSubmitting,
 }: EmitirPedidoModalProps) {
   const { data: classes = [] } = useCadClasses({ tipo: 'despesa' })
   const { data: centros = [] } = useCadCentrosCusto()
   const { data: obras = [] } = useCadObras()
+  const { data: cartoes = [] } = useCartoesCredito()
+  const { isLocked, blockedByName } = useEditorLock({
+    resourceType: 'cmp_requisicao',
+    resourceId: requisicaoId,
+    enabled: open && Boolean(requisicaoId),
+  })
 
   const { data, isLoading, error } = useQuery({
     queryKey: ['emitir-pedido-modal', requisicaoId, cotacao?.id ?? 'auto'],
@@ -112,14 +151,38 @@ export default function EmitirPedidoModal({
         if (!cotacaoData) return null
 
         let condicaoPagamento = cotacao?.condicaoPagamento
-        if (!condicaoPagamento && cotacaoData.fornecedor_selecionado_id) {
+        let fornecedorCnpj: string | null = null
+        if (cotacaoData.fornecedor_selecionado_id) {
           const { data: fornecedor } = await supabase
             .from('cmp_cotacao_fornecedores')
-            .select('condicao_pagamento')
+            .select('condicao_pagamento, fornecedor_cnpj')
             .eq('id', cotacaoData.fornecedor_selecionado_id)
             .maybeSingle()
 
-          condicaoPagamento = fornecedor?.condicao_pagamento ?? undefined
+          if (!condicaoPagamento) condicaoPagamento = fornecedor?.condicao_pagamento ?? undefined
+          fornecedorCnpj = fornecedor?.fornecedor_cnpj ?? null
+        }
+
+        // Lookup cmp_fornecedores for banking data
+        let fornecedorDB: { id: string; banco_nome?: string | null; agencia?: string | null; conta?: string | null; boleto?: boolean | null; pix_chave?: string | null; pix_tipo?: string | null } | null = null
+        if (fornecedorCnpj) {
+          const { data: fdb } = await supabase
+            .from('cmp_fornecedores')
+            .select('id, banco_nome, agencia, conta, boleto, pix_chave, pix_tipo')
+            .eq('cnpj', fornecedorCnpj)
+            .maybeSingle()
+          if (!fdb) {
+            // try without formatting
+            const cleanCnpj = fornecedorCnpj.replace(/\D/g, '')
+            const { data: fdb2 } = await supabase
+              .from('cmp_fornecedores')
+              .select('id, banco_nome, agencia, conta, boleto, pix_chave, pix_tipo')
+              .ilike('cnpj', `%${cleanCnpj}%`)
+              .maybeSingle()
+            fornecedorDB = fdb2 ?? null
+          } else {
+            fornecedorDB = fdb
+          }
         }
 
         return {
@@ -128,7 +191,8 @@ export default function EmitirPedidoModal({
           valorTotal: cotacao?.valorTotal ?? cotacaoData.valor_selecionado ?? undefined,
           compradorId: cotacao?.compradorId ?? cotacaoData.comprador_id ?? undefined,
           condicaoPagamento,
-        } satisfies ModalCotacao
+          fornecedorDB,
+        } satisfies ModalCotacao & { fornecedorDB: typeof fornecedorDB }
       }
 
       if (cotacao?.id) {
@@ -153,6 +217,7 @@ export default function EmitirPedidoModal({
           itens: (((requisicao as any)?.itens ?? []) as RequisicaoItem[]),
         } as ModalRequisicao,
         cotacao: cotacaoResolvida,
+        fornecedorDB: (cotacaoResolvida as any)?.fornecedorDB ?? null,
       }
     },
     staleTime: 30_000,
@@ -178,6 +243,8 @@ export default function EmitirPedidoModal({
   const [classeId, setClasseId] = useState('')
   const [centroId, setCentroId] = useState('')
   const [condicaoPagamento, setCondicaoPagamento] = useState('')
+  const [formaPagamento, setFormaPagamento] = useState<FormaPagamentoPedido | ''>('')
+  const [cartaoId, setCartaoId] = useState('')
   const [dataPrevistaEntrega, setDataPrevistaEntrega] = useState('')
   const [observacoes, setObservacoes] = useState('')
   const [temAdiantamento, setTemAdiantamento] = useState(false)
@@ -185,6 +252,14 @@ export default function EmitirPedidoModal({
   const [adiantamentoData, setAdiantamentoData] = useState('')
   const [parcelasEditaveis, setParcelasEditaveis] = useState<ParcelaEditavel[]>([])
   const [parcelasEditadasManualmente, setParcelasEditadasManualmente] = useState(false)
+  const [naoSolicitarContrato, setNaoSolicitarContrato] = useState(false)
+  const [justNaoContrato, setJustNaoContrato] = useState('')
+  const [bancoBancoNome, setBancoBancoNome] = useState('')
+  const [bancoAgencia, setBancoAgencia] = useState('')
+  const [bancoConta, setBancoConta] = useState('')
+  const [bancoBoleto, setBancoBoleto] = useState(false)
+  const [bancoPix, setBancoPix] = useState('')
+  const [bancoPixTipo, setBancoPixTipo] = useState('')
 
   useEffect(() => {
     if (!open || !requisicao) return
@@ -198,20 +273,43 @@ export default function EmitirPedidoModal({
     )
 
     setClasseId(classeSelecionada?.id ?? '')
-    setCentroId(requisicao.centro_custo_id ?? (obra as any)?.centro_custo_id ?? '')
+    setCentroId((obra as any)?.centro_custo_id ?? requisicao.centro_custo_id ?? '')
     setCondicaoPagamento(cotacaoResolvida?.condicaoPagamento ?? '')
+    setFormaPagamento(inferirFormaPagamentoInicial(data?.fornecedorDB))
+    setCartaoId('')
     setDataPrevistaEntrega('')
     setObservacoes('')
     setTemAdiantamento(false)
     setAdiantamentoValor('')
     setAdiantamentoData('')
     setParcelasEditadasManualmente(false)
-  }, [open, requisicao, cotacaoResolvida?.condicaoPagamento, obras, classes, classeResumo.valor])
+    setNaoSolicitarContrato(false)
+    setJustNaoContrato('')
+    const fdb = data?.fornecedorDB
+    setBancoBancoNome(fdb?.banco_nome ?? '')
+    setBancoAgencia(fdb?.agencia ?? '')
+    setBancoConta(fdb?.conta ?? '')
+    setBancoBoleto(Boolean(fdb?.boleto))
+    setBancoPix(fdb?.pix_chave ?? '')
+    setBancoPixTipo(fdb?.pix_tipo ?? '')
+  }, [open, requisicao, cotacaoResolvida?.condicaoPagamento, obras, classes, classeResumo.valor, data?.fornecedorDB])
+
+  useEffect(() => {
+    if (formaPagamento !== 'cartao' && cartaoId) {
+      setCartaoId('')
+    }
+  }, [formaPagamento, cartaoId])
 
   const classeSelecionada = classes.find((item) => item.id === classeId)
   const centroSelecionado = centros.find((item) => item.id === centroId)
   const obraSelecionada = obras.find((item) => item.id === requisicao?.obra_id)
+  const fornecedorDB = data?.fornecedorDB ?? null
+  const cartaoSelecionado = cartoes.find((cartao) => cartao.id === cartaoId)
+  const bankingIncomplete = !!fornecedorDB && !fornecedorDB.boleto && !fornecedorDB.pix_chave && (!fornecedorDB.banco_nome || !fornecedorDB.conta)
+  const bankingProvided = bancoBoleto || bancoPix.trim() || (bancoBancoNome.trim() && bancoConta.trim())
   const valorTotal = cotacaoResolvida?.valorTotal ?? 0
+  // fluxo efetivo: contrato OU dispensado pelo comprador
+  const fluxoContrato = !!compraRecorrente && !naoSolicitarContrato
   const valorAdiantamento = Math.round((Number(adiantamentoValor || 0) || 0) * 100) / 100
   const adiantamentoInvalido = temAdiantamento && (valorAdiantamento <= 0 || valorAdiantamento > valorTotal || !adiantamentoData)
   const saldoParcelado = Math.max(0, Math.round(((temAdiantamento ? valorTotal - valorAdiantamento : valorTotal)) * 100) / 100)
@@ -306,6 +404,60 @@ export default function EmitirPedidoModal({
     setParcelasEditaveis(parcelasSugeridas)
   }
 
+  const handleSubmit = async () => {
+    if (isLocked) return
+
+    if (fluxoContrato && onSolicitarContrato) {
+      onSolicitarContrato()
+      return
+    }
+
+    // Save banking data to cmp_fornecedores if provided
+    if (fornecedorDB?.id && bankingProvided) {
+      await supabase.from('cmp_fornecedores').update({
+        boleto: bancoBoleto,
+        ...(bancoPix.trim() ? { pix_chave: bancoPix.trim(), pix_tipo: bancoPixTipo || null } : {}),
+        ...(bancoBancoNome.trim() ? { banco_nome: bancoBancoNome.trim() } : {}),
+        ...(bancoAgencia.trim() ? { agencia: bancoAgencia.trim() } : {}),
+        ...(bancoConta.trim() ? { conta: bancoConta.trim() } : {}),
+      }).eq('id', fornecedorDB.id)
+    }
+
+    onConfirm({
+      cotacaoId: cotacaoResolvida?.id || '',
+      fornecedorId: fornecedorDB?.id || undefined,
+      fornecedorNome: cotacaoResolvida?.fornecedorNome || 'N/A',
+      valorTotal: totalParcelas,
+      compradorId: cotacaoResolvida?.compradorId,
+      classeFinanceiraId: classeSelecionada?.id,
+      classeFinanceira: classeSelecionada?.codigo,
+      centroCustoId: centroSelecionado?.id,
+      centroCusto: centroSelecionado?.codigo,
+      condicaoPagamento: condicaoPagamento || cotacaoResolvida?.condicaoPagamento || undefined,
+      formaPagamento: formaPagamento || undefined,
+      cartaoId: formaPagamento === 'cartao' ? cartaoId || undefined : undefined,
+      cartaoNome: formaPagamento === 'cartao' ? cartaoSelecionado?.nome : undefined,
+      observacoes: [
+        naoSolicitarContrato && justNaoContrato.trim()
+          ? `[Contrato dispensado: ${justNaoContrato.trim()}]`
+          : null,
+        formaPagamento === 'cartao' && cartaoSelecionado?.nome
+          ? `[Cartao selecionado: ${cartaoSelecionado.nome}]`
+          : null,
+        observacoes?.trim() || null,
+      ].filter(Boolean).join('\n') || undefined,
+      dataPrevistaEntrega,
+      parcelasPreview: parcelasEditaveis.map((parcela) => ({
+        numero: parcela.numero,
+        valor: parcela.valor,
+        data_vencimento: parcela.data_vencimento,
+        descricao: parcela.tipo === 'adiantamento' ? 'Adiantamento' : parcela.descricao,
+        tipo: parcela.tipo,
+        status_inicial: parcela.status_inicial,
+      })),
+    })
+  }
+
   if (!open) return null
 
   return (
@@ -322,6 +474,16 @@ export default function EmitirPedidoModal({
         </div>
 
         <div className="p-6 space-y-5 max-h-[80vh] overflow-y-auto">
+          {isLocked && (
+            <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-4 text-sm text-amber-700 flex items-start gap-2">
+              <AlertTriangle size={16} className="mt-0.5 flex-shrink-0" />
+              <div>
+                <p className="font-bold">{blockedByName ?? 'Outro usuario'} esta editando</p>
+                <p className="text-xs mt-1">A emissao fica bloqueada ate essa pessoa finalizar a alteracao.</p>
+              </div>
+            </div>
+          )}
+
           {isLoading && (
             <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-8 flex items-center justify-center gap-2 text-slate-500">
               <Loader2 size={16} className="animate-spin" />
@@ -336,7 +498,7 @@ export default function EmitirPedidoModal({
           )}
 
           {!isLoading && !error && requisicao && (
-            <>
+            <fieldset disabled={isLocked} className={isLocked ? 'space-y-5 opacity-60' : 'space-y-5'}>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                 <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
                   <p className="text-[11px] font-semibold text-slate-500">Obra</p>
@@ -353,6 +515,149 @@ export default function EmitirPedidoModal({
                   </p>
                 </div>
               </div>
+
+              {/* Banner: compra recorrente / serviço exige contrato */}
+              {compraRecorrente && (
+                <div className={`rounded-2xl border p-4 space-y-3 transition-colors ${
+                  naoSolicitarContrato
+                    ? 'border-amber-300 bg-amber-50'
+                    : 'border-indigo-200 bg-indigo-50'
+                }`}>
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex items-start gap-2">
+                      <div className={`w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 ${
+                        naoSolicitarContrato ? 'bg-amber-100' : 'bg-indigo-100'
+                      }`}>
+                        {naoSolicitarContrato
+                          ? <Ban size={14} className="text-amber-600" />
+                          : <FileText size={14} className="text-indigo-600" />}
+                      </div>
+                      <div>
+                        <p className={`text-xs font-bold ${naoSolicitarContrato ? 'text-amber-700' : 'text-indigo-700'}`}>
+                          {naoSolicitarContrato ? 'Contrato dispensado — emitir pedido direto' : 'Esta compra requer formalizacao via Contratos'}
+                        </p>
+                        <p className={`text-[11px] mt-0.5 ${naoSolicitarContrato ? 'text-amber-600' : 'text-indigo-500'}`}>
+                          {naoSolicitarContrato
+                            ? 'Preencha a justificativa e complete os dados financeiros abaixo.'
+                            : 'Ao confirmar, sera aberta uma solicitacao de contrato no modulo Contratos.'}
+                        </p>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => { setNaoSolicitarContrato(v => !v); setJustNaoContrato('') }}
+                      className={`text-[10px] font-bold px-3 py-1.5 rounded-lg border transition-colors flex-shrink-0 ${
+                        naoSolicitarContrato
+                          ? 'border-indigo-200 bg-white text-indigo-600 hover:bg-indigo-50'
+                          : 'border-amber-300 bg-white text-amber-700 hover:bg-amber-50'
+                      }`}
+                    >
+                      {naoSolicitarContrato ? 'Voltar ao Contrato' : 'Dispensar Contrato'}
+                    </button>
+                  </div>
+
+                  {naoSolicitarContrato && (
+                    <div>
+                      <label className="block text-[11px] font-bold text-amber-700 mb-1">
+                        Justificativa para dispensa de contrato *
+                      </label>
+                      <UpperTextarea
+                        value={justNaoContrato}
+                        onChange={e => setJustNaoContrato(e.target.value)}
+                        placeholder="Ex.: Compra pontual, fornecedor nao aceita contrato, urgencia operacional..."
+                        rows={2}
+                        className="w-full border border-amber-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-300 bg-white resize-none"
+                      />
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* #127 – Banking data: shown when supplier exists in cmp_fornecedores but lacks payment details */}
+              {bankingIncomplete && (
+                <div className="rounded-2xl border border-violet-200 bg-violet-50 p-4 space-y-3">
+                  <div className="flex items-start gap-2">
+                    <div className="w-7 h-7 rounded-lg bg-violet-100 flex items-center justify-center flex-shrink-0">
+                      <Landmark size={14} className="text-violet-600" />
+                    </div>
+                    <div>
+                      <p className="text-xs font-bold text-violet-700">Dados bancários do fornecedor incompletos</p>
+                      <p className="text-[11px] text-violet-500 mt-0.5">
+                        Preencha abaixo para agilizar o pagamento. Os dados serão salvos no cadastro do fornecedor.
+                      </p>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <label className="md:col-span-2 inline-flex items-center gap-2 text-[11px] font-bold text-slate-600">
+                      <input
+                        type="checkbox"
+                        checked={bancoBoleto}
+                        onChange={e => setBancoBoleto(e.target.checked)}
+                        className="h-4 w-4 rounded border-slate-300 text-violet-600 focus:ring-violet-500"
+                      />
+                      Receber por boleto
+                    </label>
+                    <div>
+                      <label className="block text-[11px] font-bold text-slate-600 mb-1">PIX (chave)</label>
+                      <UpperInput
+                        value={bancoPix}
+                        disabled={bancoBoleto}
+                        onChange={e => setBancoPix(e.target.value)}
+                        placeholder="CPF, CNPJ, e-mail ou chave aleatória"
+                        className={`w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-violet-300 ${bancoBoleto ? 'opacity-60 cursor-not-allowed bg-slate-50' : ''}`}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[11px] font-bold text-slate-600 mb-1">Tipo da chave PIX</label>
+                      <select
+                        value={bancoPixTipo}
+                        disabled={bancoBoleto}
+                        onChange={e => setBancoPixTipo(e.target.value)}
+                        className={`w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-violet-300 bg-white ${bancoBoleto ? 'opacity-60 cursor-not-allowed bg-slate-50' : ''}`}
+                      >
+                        <option value="">Selecionar...</option>
+                        <option value="cpf">CPF</option>
+                        <option value="cnpj">CNPJ</option>
+                        <option value="email">E-mail</option>
+                        <option value="telefone">Telefone</option>
+                        <option value="aleatoria">Chave aleatória</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-[11px] font-bold text-slate-600 mb-1">Banco</label>
+                      <UpperInput
+                        value={bancoBancoNome}
+                        disabled={bancoBoleto}
+                        onChange={e => setBancoBancoNome(e.target.value)}
+                        placeholder="Ex.: Itaú, Bradesco, Sicredi..."
+                        className={`w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-violet-300 ${bancoBoleto ? 'opacity-60 cursor-not-allowed bg-slate-50' : ''}`}
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="block text-[11px] font-bold text-slate-600 mb-1">Agência</label>
+                        <UpperInput
+                          value={bancoAgencia}
+                          disabled={bancoBoleto}
+                          onChange={e => setBancoAgencia(e.target.value)}
+                          placeholder="0000"
+                          className={`w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-violet-300 ${bancoBoleto ? 'opacity-60 cursor-not-allowed bg-slate-50' : ''}`}
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[11px] font-bold text-slate-600 mb-1">Conta</label>
+                        <UpperInput
+                          value={bancoConta}
+                          disabled={bancoBoleto}
+                          onChange={e => setBancoConta(e.target.value)}
+                          placeholder="00000-0"
+                          className={`w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-violet-300 ${bancoBoleto ? 'opacity-60 cursor-not-allowed bg-slate-50' : ''}`}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <div className="rounded-2xl border border-teal-200 bg-teal-50 px-4 py-3">
@@ -371,14 +676,14 @@ export default function EmitirPedidoModal({
                 <div className="rounded-2xl border border-cyan-200 bg-cyan-50 px-4 py-3">
                   <p className="text-[11px] font-bold text-cyan-700">Centro de Custo sugerido</p>
                   <p className="mt-1 text-sm font-semibold text-slate-800">
-                    {requisicao.centro_custo || (obraSelecionada as any)?.centro_custo?.codigo || 'Confirmacao manual necessaria'}
+                    {(obraSelecionada as any)?.centro_custo?.codigo || requisicao.centro_custo || '—'}
                   </p>
                   <p className="mt-1 text-[11px] text-slate-500">
-                    {requisicao.centro_custo
-                      ? 'Puxado da requisicao atual.'
-                      : (obraSelecionada as any)?.centro_custo_id
-                        ? 'Puxado automaticamente da obra vinculada.'
-                        : 'Selecione manualmente para emitir o pedido.'}
+                    {(obraSelecionada as any)?.centro_custo_id
+                      ? 'Puxado automaticamente da obra vinculada.'
+                      : requisicao.centro_custo
+                        ? 'Puxado da requisicao (fallback).'
+                        : 'Nenhum centro de custo vinculado.'}
                   </p>
                 </div>
               </div>
@@ -437,7 +742,7 @@ export default function EmitirPedidoModal({
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-bold text-slate-600 mb-1.5">Condicao de Pagamento</label>
-                  <input
+                  <UpperInput
                     value={condicaoPagamento}
                     onChange={(event) => setCondicaoPagamento(event.target.value)}
                     className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-teal-300"
@@ -456,6 +761,48 @@ export default function EmitirPedidoModal({
                     className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-teal-300"
                   />
                 </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-slate-600 mb-1.5">Meio de Pagamento</label>
+                  <select
+                    value={formaPagamento}
+                    onChange={(event) => setFormaPagamento(event.target.value as FormaPagamentoPedido | '')}
+                    className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-teal-300 bg-white"
+                  >
+                    <option value="">Selecionar...</option>
+                    {FORMA_PAGAMENTO_OPTIONS.map((option) => (
+                      <option key={option.value} value={option.value}>{option.label}</option>
+                    ))}
+                  </select>
+                  <p className="mt-1 text-[11px] text-slate-400">
+                    Selecione como esse pedido sera pago no financeiro.
+                  </p>
+                </div>
+
+                {formaPagamento === 'cartao' ? (
+                  <div>
+                    <label className="block text-xs font-bold text-slate-600 mb-1.5">Qual Cartao</label>
+                    <select
+                      value={cartaoId}
+                      onChange={(event) => setCartaoId(event.target.value)}
+                      className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-teal-300 bg-white"
+                    >
+                      <option value="">Selecionar cartao...</option>
+                      {cartoes.map((cartao) => (
+                        <option key={cartao.id} value={cartao.id}>
+                          {cartao.nome}{cartao.ultimos4 ? ` • ${cartao.ultimos4}` : ''}
+                        </option>
+                      ))}
+                    </select>
+                    <p className="mt-1 text-[11px] text-slate-400">
+                      Escolha qual cartao corporativo sera usado nesse pagamento.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="hidden md:block" />
+                )}
               </div>
 
               <div className="rounded-2xl border border-amber-200 bg-amber-50/70 p-4 space-y-3">
@@ -512,7 +859,7 @@ export default function EmitirPedidoModal({
 
               <div>
                 <label className="block text-xs font-bold text-slate-600 mb-1.5">Observacoes do Pedido</label>
-                <textarea
+                <UpperTextarea
                   value={observacoes}
                   onChange={(event) => setObservacoes(event.target.value)}
                   rows={3}
@@ -600,7 +947,7 @@ export default function EmitirPedidoModal({
                           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                             <div>
                               <label className="block text-[11px] font-semibold text-slate-500 mb-1">Descricao</label>
-                              <input
+                              <UpperInput
                                 value={parcela.tipo === 'adiantamento' ? 'Adiantamento' : parcela.descricao ?? ''}
                                 onChange={(event) => updateParcela(parcela.numero, { descricao: event.target.value })}
                                 readOnly={parcela.tipo === 'adiantamento'}
@@ -610,12 +957,11 @@ export default function EmitirPedidoModal({
                             </div>
                             <div>
                               <label className="block text-[11px] font-semibold text-slate-500 mb-1">Valor</label>
-                              <input
-                                type="number"
-                                min="0"
-                                step="0.01"
+                              <NumericInput
+                                min={0}
+                                step={0.01}
                                 value={Number.isFinite(parcela.valor) ? parcela.valor : 0}
-                                onChange={(event) => updateParcela(parcela.numero, { valor: Number(event.target.value) })}
+                                onChange={v => updateParcela(parcela.numero, { valor: v })}
                                 className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-300"
                               />
                             </div>
@@ -660,7 +1006,38 @@ export default function EmitirPedidoModal({
                   )}
                 </div>
               </div>
-            </>
+              {/* #113 – Confirmation summary: visible when ready to emit */}
+              {!fluxoContrato && (classeId || centroId) && (
+                <div className={`rounded-2xl border p-4 space-y-2 ${
+                  classeId && centroId
+                    ? 'border-emerald-200 bg-emerald-50'
+                    : 'border-amber-200 bg-amber-50'
+                }`}>
+                  <div className="flex items-center gap-2 mb-1">
+                    {classeId && centroId
+                      ? <CheckCircle2 size={15} className="text-emerald-600 flex-shrink-0" />
+                      : <AlertTriangle size={15} className="text-amber-500 flex-shrink-0" />}
+                    <p className={`text-xs font-bold ${classeId && centroId ? 'text-emerald-700' : 'text-amber-700'}`}>
+                      {classeId && centroId ? 'Confirmação dos vínculos financeiros' : 'Preencha todos os campos antes de emitir'}
+                    </p>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                    <div className={`rounded-xl px-3 py-2 ${classeId ? 'bg-white border border-emerald-200' : 'bg-amber-100 border border-amber-300'}`}>
+                      <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wide">Classe Financeira</p>
+                      {classeSelecionada
+                        ? <p className="text-sm font-bold text-slate-800 mt-0.5">{classeSelecionada.codigo} — {classeSelecionada.descricao}</p>
+                        : <p className="text-sm font-semibold text-amber-600 mt-0.5">Não selecionada</p>}
+                    </div>
+                    <div className={`rounded-xl px-3 py-2 ${centroId ? 'bg-white border border-emerald-200' : 'bg-amber-100 border border-amber-300'}`}>
+                      <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wide">Centro de Custo</p>
+                      {centroSelecionado
+                        ? <p className="text-sm font-bold text-slate-800 mt-0.5">{centroSelecionado.codigo} — {centroSelecionado.descricao}</p>
+                        : <p className="text-sm font-semibold text-amber-600 mt-0.5">Não selecionado</p>}
+                    </div>
+                  </div>
+                </div>
+              )}
+            </fieldset>
           )}
         </div>
 
@@ -672,42 +1049,30 @@ export default function EmitirPedidoModal({
             Cancelar
           </button>
           <button
-            onClick={() => onConfirm({
-              cotacaoId: cotacaoResolvida?.id || '',
-              fornecedorNome: cotacaoResolvida?.fornecedorNome || 'N/A',
-              valorTotal: totalParcelas,
-              compradorId: cotacaoResolvida?.compradorId,
-              classeFinanceiraId: classeSelecionada?.id,
-              classeFinanceira: classeSelecionada?.codigo,
-              centroCustoId: centroSelecionado?.id,
-              centroCusto: centroSelecionado?.codigo,
-              condicaoPagamento: condicaoPagamento || cotacaoResolvida?.condicaoPagamento || undefined,
-              observacoes,
-              dataPrevistaEntrega,
-              parcelasPreview: parcelasEditaveis.map((parcela) => ({
-                numero: parcela.numero,
-                valor: parcela.valor,
-                data_vencimento: parcela.data_vencimento,
-                descricao: parcela.tipo === 'adiantamento' ? 'Adiantamento' : parcela.descricao,
-                tipo: parcela.tipo,
-                status_inicial: parcela.status_inicial,
-              })),
-            })}
+            onClick={handleSubmit}
             disabled={
               isSubmitting ||
+              isLocked ||
               isLoading ||
               !requisicao ||
               !cotacaoResolvida?.id ||
-              !classeId ||
-              !centroId ||
-              adiantamentoInvalido ||
-              !parcelasValidas ||
-              diferencaParcelas !== 0
+              (naoSolicitarContrato && !justNaoContrato.trim()) ||
+              (!fluxoContrato && (
+                !formaPagamento ||
+                (formaPagamento === 'cartao' && !cartaoId) ||
+                !classeId ||
+                !centroId ||
+                adiantamentoInvalido ||
+                !parcelasValidas ||
+                diferencaParcelas !== 0
+              ))
             }
-            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-teal-600 text-white text-sm font-bold hover:bg-teal-700 disabled:opacity-50"
+            className={`inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-white text-sm font-bold disabled:opacity-50 ${
+              fluxoContrato ? 'bg-indigo-600 hover:bg-indigo-700' : 'bg-teal-600 hover:bg-teal-700'
+            }`}
           >
             {isSubmitting ? <Loader2 size={15} className="animate-spin" /> : <FileText size={15} />}
-            Emitir Pedido
+            {fluxoContrato ? 'Solicitar Contrato' : 'Emitir Pedido'}
           </button>
         </div>
       </div>

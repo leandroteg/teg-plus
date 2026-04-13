@@ -6,7 +6,7 @@ status: ativo
 tags: [fiscal, nfe, emissao, solicitacao, nota-fiscal]
 criado: 2026-03-12
 atualizado: 2026-03-12
-relacionado: ["[[20 - Módulo Financeiro]]", "[[23 - Módulo Logística e Transportes]]", "[[03 - Páginas e Rotas]]"]
+relacionado: ["[[PILAR - Backoffice]]", "[[20 - Módulo Financeiro]]", "[[23 - Módulo Logística e Transportes]]", "[[03 - Páginas e Rotas]]"]
 ---
 
 # Módulo Fiscal
@@ -175,6 +175,17 @@ As tabelas do módulo fiscal utilizam o prefixo `fis_`.
 | `valor_total` | `fis_notas_fiscais` | Soma de `valor_total` das NFs emitidas no mês |
 | `nfs_por_origem` | `fis_notas_fiscais` | Agrupamento por campo `origem` |
 | `top_obras` | `fis_notas_fiscais` | Top 5 obras por valor total de NFs |
+
+---
+
+## Funções de Sincronização
+
+| Função | Descrição |
+|--------|-----------|
+| `sync_nf_from_pedido_anexo()` | Cria solicitação de NF automaticamente quando um anexo de NF é adicionado a um pedido de compra |
+| `fis_sync_nf_to_logistica()` | Sincroniza NF emitida com o módulo de Logística, atualizando `log_nfe` com dados fiscais |
+
+Essas funções conectam o módulo Fiscal aos fluxos de Compras e Logística, evitando retrabalho manual.
 
 ---
 

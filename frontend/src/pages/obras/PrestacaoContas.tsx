@@ -8,6 +8,7 @@ import {
   useRejeitarPrestacao,
 } from '../../hooks/useObras'
 import { useLookupObras } from '../../hooks/useLookups'
+import NumericInput from '../../components/NumericInput'
 import { supabase } from '../../services/supabase'
 import type { CategoriaPrestacao, StatusPrestacao, FormaPagamentoPrestacao } from '../../types/obras'
 
@@ -376,7 +377,7 @@ export default function PrestacaoContas() {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className={labelClass}>Valor (R$) *</label>
-                  <input type="number" value={form.valor} onChange={e => setForm(f => ({ ...f, valor: Number(e.target.value) }))} className={inputClass} min={0} step="0.01" />
+                  <NumericInput value={form.valor} onChange={v => setForm(f => ({ ...f, valor: v }))} className={inputClass} min={0} step={0.01} />
                 </div>
                 <div>
                   <label className={labelClass}>Data do Gasto *</label>

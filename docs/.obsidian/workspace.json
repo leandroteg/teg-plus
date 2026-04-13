@@ -13,15 +13,26 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "obsidian/Paineis/BI Dashboard.md",
+                "file": "obsidian/00 - TEG+ INDEX.md",
                 "mode": "source",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "BI Dashboard"
+              "title": "00 - TEG+ INDEX"
+            }
+          },
+          {
+            "id": "7fe4d3337b96e7cc",
+            "type": "leaf",
+            "state": {
+              "type": "graph",
+              "state": {},
+              "icon": "lucide-git-fork",
+              "title": "Visualização em gráfico"
             }
           }
-        ]
+        ],
+        "currentTab": 1
       }
     ],
     "direction": "vertical"
@@ -210,44 +221,44 @@
       "publish:Publicar mudanças": false
     }
   },
-  "active": "a4bc148162b73016",
+  "active": "7fe4d3337b96e7cc",
   "lastOpenFiles": [
-    "obsidian/Paineis/BI Dashboard.md",
-    "plans/2026-03-11-certisign-implementation-plan.md",
-    "plans/2026-03-11-certisign-integration-design.md",
-    "obsidian/07 - Schema Database.md",
-    "obsidian/06 - Supabase.md",
-    "obsidian/00 - TEG+ INDEX.md",
+    "obsidian/13 - Alçadas.md",
+    "obsidian/02 - Frontend Stack.md",
+    "obsidian/28 - Módulo Cadastros AI.md",
+    "obsidian/12 - Fluxo Aprovação.md",
+    "obsidian/17 - Roadmap.md",
+    "obsidian/10 - n8n Workflows.md",
+    "obsidian/30 - Módulo Controladoria.md",
+    "obsidian/PILAR - Backoffice.md",
     "obsidian/00 - Premissas do Projeto.md",
-    "obsidian/01 - Arquitetura Geral.md",
-    "obsidian/Paineis/Roadmap Board.md",
-    "plans/2026-03-09-nf-romaneio-fiscal-redesign.md",
-    "obsidian/Paineis/Dev Hub BI.md",
-    "plans/2026-03-07-superteg-chat-redesign.md",
-    "plans/2026-03-07-issue-batch-fixes.md",
-    "plans/2026-03-07-issue-batch-fixes-design.md",
-    "obsidian/Paineis/Estoque Dashboard.md",
-    "obsidian/22 - Módulo Estoque e Patrimonial.md",
-    "obsidian/Paineis/Relatorio Desenvolvimento.md",
-    "obsidian/Paineis/Execucao Board.md",
-    "obsidian/Database/Issues/ISSUE-008 - Botao salvar requisicao travado.md",
-    "obsidian/Database/Issues/ISSUE-007 - GH14 Melhoria layout chat AI.md",
-    "obsidian/Database/Issues/ISSUE-006 - GH13 Filtro datas dashboard financeiro.md",
-    "obsidian/Paineis/Compras Dashboard.md",
-    "obsidian/Paineis/Cadastros Dashboard.md",
-    "obsidian/27 - Módulo Contratos Gestão.md",
-    "obsidian/Paineis/Logistica Dashboard.md",
-    "obsidian/26 - Upload Inteligente Cotacao.md",
+    "obsidian/PILAR - RH.md",
+    "obsidian/PILAR - Projetos.md",
+    "obsidian/PILAR - Suprimentos.md",
+    "conflict-files-obsidian-git.md",
+    "obsidian/45 - Mapa de Integrações.md",
+    "obsidian/38 - Mapa de APIs.md",
+    "obsidian/37 - Troubleshooting FAQ.md",
+    "obsidian/48 - Guia de Estilo UI.md",
+    "obsidian/Requisitos/PLAN-CONTRATOS-v2.md",
+    "obsidian/Database/ADRs/ADR-010 - Regra Contrato R2000.md",
+    "obsidian/Database/ADRs/ADR-009 - Omie Integracao.md",
+    "obsidian/Database/ADRs/ADR-008 - AI Parse Cotacoes.md",
+    "obsidian/Database/ADRs/ADR-007 - Aprovacao Token.md",
+    "obsidian/Database/ADRs/ADR-006 - Prefixos Schema.md",
+    "obsidian/Database/ADRs/ADR-005 - PWA AprovAi.md",
+    "obsidian/Database/ADRs/ADR-004 - Frontend SPA React.md",
+    "obsidian/Database/ADRs/ADR-003 - n8n Orquestrador.md",
+    "obsidian/Database/ADRs",
+    "obsidian/sedUAvgrk",
+    "obsidian/sedBlhKPZ",
+    "obsidian/sedAJ64Wi",
+    "obsidian/Database/Requisitos/sedOP3nUE",
+    "obsidian/Database/Requisitos/sednoSRem",
     "obsidian/10 - n8n Workflows.md.tmp.28700.1772635214153",
     "plans",
     "obsidian/Paineis",
     "obsidian/Database/Tarefas",
-    "obsidian/Database/Requisitos",
-    "obsidian/Database/Milestones",
-    "obsidian/Database/Issues",
-    "obsidian/Database",
-    "Sem título.base",
-    "obsidian/obsidian.ps1",
     "Sem título.canvas"
   ]
 }

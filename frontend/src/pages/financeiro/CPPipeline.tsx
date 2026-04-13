@@ -10,6 +10,7 @@ import {
 } from 'lucide-react'
 import { useQueryClient } from '@tanstack/react-query'
 import { useNavigate, useSearchParams } from 'react-router-dom'
+import { useRequisitanteCtx } from '../../components/ModuleLayout'
 import { useTheme } from '../../contexts/ThemeContext'
 import {
   useContasPagar,
@@ -41,11 +42,11 @@ import type { SelectOption } from '../../components/SearchableSelect'
 import FornecedorCadastroModal, { type FornecedorFormData } from '../../components/FornecedorCadastroModal'
 import { useAuth } from '../../contexts/AuthContext'
 import { useDecisaoGenerica } from '../../hooks/useAprovacoes'
-import { useLookupCentrosCusto, useLookupClassesFinanceiras } from '../../hooks/useLookups'
 import { useAnexosPedido, useUploadAnexo, TIPO_LABEL } from '../../hooks/useAnexos'
 import type { PedidoAnexo } from '../../hooks/useAnexos'
 import type { ContaPagar, Fornecedor, LotePagamento, StatusCP } from '../../types/financeiro'
 import { CP_PIPELINE_STAGES } from '../../types/financeiro'
+import { UpperInput, UpperTextarea } from '../../components/UpperInput'
 
 // ══ Formatters ══════════════════════════════════════════════════
 
@@ -221,7 +222,6 @@ type NovaSolicitacaoExtraForm = {
   centro_custo: string
   classe_financeira: string
   valor: string
-  data_necessidade: string
   fornecedor_id: string
   fornecedor_cnpj: string
   favorecido: string
@@ -251,7 +251,6 @@ const EMPTY_EXTRA_FORM: NovaSolicitacaoExtraForm = {
   centro_custo: '',
   classe_financeira: '',
   valor: '',
-  data_necessidade: new Date().toISOString().split('T')[0],
   fornecedor_id: '',
   fornecedor_cnpj: '',
   favorecido: '',
@@ -279,13 +278,6 @@ function summarizeNames(values: string[], fallback: string) {
   if (unique.length === 1) return unique[0]
   if (unique.length === 2) return `${unique[0]} + ${unique[1]}`
   return `${unique[0]} + ${unique.length - 1}`
-}
-
-function formatFormaPagamentoLabel(value?: string | null) {
-  if (!value) return ''
-  return value
-    .replace(/_/g, ' ')
-    .replace(/\b\w/g, char => char.toUpperCase())
 }
 
 function getLoteProgress(activeTab: PipelineStageId, loteStatus?: string) {
@@ -779,7 +771,6 @@ function NovaSolicitacaoExtraordinariaModal({
     && form.centro_custo.length > 0
     && form.classe_financeira.length > 0
     && Number(form.valor) > 0
-    && form.data_necessidade.length > 0
     && form.fornecedor_id.length > 0
 
   const inputCls = `w-full rounded-xl px-3 py-2.5 text-sm outline-none transition-colors ${
@@ -902,7 +893,6 @@ function NovaSolicitacaoExtraordinariaModal({
         centro_custo: form.centro_custo,
         classe_financeira: form.classe_financeira,
         valor: Number(form.valor),
-        dataNecessidade: form.data_necessidade,
         solicitanteNome: perfil?.nome,
         fornecedorId: form.fornecedor_id || undefined,
         fornecedorNome: form.favorecido || undefined,
@@ -945,12 +935,12 @@ function NovaSolicitacaoExtraordinariaModal({
 
           <div>
             <label className={labelCls}>Descrição *</label>
-            <textarea value={form.descricao} onChange={e => setField('descricao', e.target.value)} rows={3} className={`${inputCls} resize-none`} placeholder="Descreva o pagamento extraordinário" />
+            <UpperTextarea value={form.descricao} onChange={e => setField('descricao', e.target.value)} rows={3} className={`${inputCls} resize-none`} placeholder="Descreva o pagamento extraordinário" />
           </div>
 
           <div>
             <label className={labelCls}>Justificativa *</label>
-            <textarea value={form.justificativa} onChange={e => setField('justificativa', e.target.value)} rows={4} className={`${inputCls} resize-none`} placeholder="Explique por que este pagamento foge ao fluxo natural" />
+            <UpperTextarea value={form.justificativa} onChange={e => setField('justificativa', e.target.value)} rows={4} className={`${inputCls} resize-none`} placeholder="Explique por que este pagamento foge ao fluxo natural" />
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -1062,15 +1052,9 @@ function NovaSolicitacaoExtraordinariaModal({
             </div>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div>
-              <label className={labelCls}>Valor *</label>
-              <input type="number" min="0" step="0.01" value={form.valor} onChange={e => setField('valor', e.target.value)} className={inputCls} placeholder="0,00" />
-            </div>
-            <div>
-              <label className={labelCls}>Data da necessidade *</label>
-              <input type="date" value={form.data_necessidade} onChange={e => setField('data_necessidade', e.target.value)} className={inputCls} />
-            </div>
+          <div>
+            <label className={labelCls}>Valor *</label>
+            <input type="number" min="0" step="0.01" value={form.valor} onChange={e => setField('valor', e.target.value)} className={inputCls} placeholder="0,00" />
           </div>
 
           <div className={`rounded-xl border p-4 space-y-3 ${isDark ? 'border-white/[0.08] bg-white/[0.03]' : 'border-slate-200 bg-slate-50/70'}`}>
@@ -1108,7 +1092,7 @@ function NovaSolicitacaoExtraordinariaModal({
               </div>
               <div>
                 <label className={labelCls}>Nome do Favorecido *</label>
-                <input value={form.favorecido} onChange={e => setField('favorecido', e.target.value)} className={inputCls} placeholder="Nome do favorecido" />
+                <UpperInput value={form.favorecido} onChange={e => setField('favorecido', e.target.value)} className={inputCls} placeholder="Nome do favorecido" />
               </div>
             </div>
             <div className={`rounded-xl border px-3 py-3 ${isDark ? 'border-white/[0.08] bg-white/[0.03]' : 'border-slate-200 bg-white'}`}>
@@ -1151,15 +1135,15 @@ function NovaSolicitacaoExtraordinariaModal({
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <label className={labelCls}>Banco</label>
-                <input value={form.banco_nome} onChange={e => setField('banco_nome', e.target.value)} className={inputCls} placeholder="Nome do banco" />
+                <UpperInput value={form.banco_nome} onChange={e => setField('banco_nome', e.target.value)} className={inputCls} placeholder="Nome do banco" />
               </div>
               <div>
                 <label className={labelCls}>Agência</label>
-                <input value={form.agencia} onChange={e => setField('agencia', e.target.value)} className={inputCls} placeholder="0001" />
+                <UpperInput value={form.agencia} onChange={e => setField('agencia', e.target.value)} className={inputCls} placeholder="0001" />
               </div>
               <div>
                 <label className={labelCls}>Conta</label>
-                <input value={form.conta} onChange={e => setField('conta', e.target.value)} className={inputCls} placeholder="12345-6" />
+                <UpperInput value={form.conta} onChange={e => setField('conta', e.target.value)} className={inputCls} placeholder="12345-6" />
               </div>
               <div>
                 <label className={labelCls}>Tipo PIX</label>
@@ -1174,7 +1158,7 @@ function NovaSolicitacaoExtraordinariaModal({
               </div>
               <div>
                 <label className={labelCls}>Chave PIX</label>
-                <input value={form.pix_chave} onChange={e => setField('pix_chave', e.target.value)} className={inputCls} placeholder="Informe a chave PIX" />
+                <UpperInput value={form.pix_chave} onChange={e => setField('pix_chave', e.target.value)} className={inputCls} placeholder="Informe a chave PIX" />
               </div>
             </div>
           </div>
@@ -1203,7 +1187,7 @@ function NovaSolicitacaoExtraordinariaModal({
 
           {!canSubmit && (
             <p className={`text-[11px] ${isDark ? 'text-amber-300' : 'text-amber-700'}`}>
-              Preencha descrição, justificativa, centro de custo, classe financeira, valor, data da necessidade e selecione/cadastre o fornecedor para liberar a criação.
+              Preencha descrição, justificativa, centro de custo, classe financeira, valor e selecione/cadastre o fornecedor para liberar a criação.
             </p>
           )}
           {erro && (
@@ -1342,7 +1326,7 @@ function NovaPrevisaoPagamentoModal({
 
           <div>
             <label className={labelCls}>Nome *</label>
-            <input value={form.nome} onChange={e => setField('nome', e.target.value)} className={inputCls} placeholder="Ex.: Aluguel, licença, consultoria, condomínio" />
+            <UpperInput value={form.nome} onChange={e => setField('nome', e.target.value)} className={inputCls} placeholder="Ex.: Aluguel, licença, consultoria, condomínio" />
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -1375,7 +1359,7 @@ function NovaPrevisaoPagamentoModal({
               {ccOpen && (
                 <div className={`absolute z-30 mt-2 w-full rounded-2xl border shadow-xl overflow-hidden ${isDark ? 'border-white/[0.08] bg-slate-950' : 'border-slate-200 bg-white'}`}>
                   <div className="p-2 border-b border-inherit">
-                    <input value={ccBusca} onChange={e => setCcBusca(e.target.value)} className={inputCls} placeholder="Buscar centro de custo..." autoFocus />
+                    <UpperInput value={ccBusca} onChange={e => setCcBusca(e.target.value)} className={inputCls} placeholder="Buscar centro de custo..." autoFocus />
                   </div>
                   <div className="max-h-64 overflow-y-auto py-1">
                     {centrosFiltrados.map(cc => {
@@ -1420,7 +1404,7 @@ function NovaPrevisaoPagamentoModal({
               {classeOpen && (
                 <div className={`absolute z-30 mt-2 w-full rounded-2xl border shadow-xl overflow-hidden ${isDark ? 'border-white/[0.08] bg-slate-950' : 'border-slate-200 bg-white'}`}>
                   <div className="p-2 border-b border-inherit">
-                    <input value={classeBusca} onChange={e => setClasseBusca(e.target.value)} className={inputCls} placeholder="Buscar classe financeira..." autoFocus />
+                    <UpperInput value={classeBusca} onChange={e => setClasseBusca(e.target.value)} className={inputCls} placeholder="Buscar classe financeira..." autoFocus />
                   </div>
                   <div className="max-h-64 overflow-y-auto py-1">
                     {classesFiltradas.map(classe => {
@@ -1859,11 +1843,11 @@ function CPDetailModal({ cp, stageStatus, onClose, onAction, isDark }: {
                               </label>
                               <div className="min-w-0">
                                 <p className={`truncate font-semibold ${isDark ? 'text-white' : 'text-slate-800'}`}>{item.cp?.fornecedor_nome || 'Item sem fornecedor'}</p>
-                                <p className={`truncate text-[11px] ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{item.cp?.descricao || 'â€”'}</p>
+                                <p className={`truncate text-[11px] ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{item.cp?.descricao || '—'}</p>
                               </div>
-                              <span className={`truncate text-[11px] ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{item.cp?.numero_documento || 'â€”'}</span>
-                              <span className={`text-[11px] ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{item.cp ? fmtData(item.cp.data_vencimento) : 'â€”'}</span>
-                              <span className="text-right text-[11px] font-semibold text-emerald-600">{item.cp ? fmt(item.cp.valor_original) : 'â€”'}</span>
+                              <span className={`truncate text-[11px] ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{item.cp?.numero_documento || '—'}</span>
+                              <span className={`text-[11px] ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{item.cp ? fmtData(item.cp.data_vencimento) : '—'}</span>
+                              <span className="text-right text-[11px] font-semibold text-emerald-600">{item.cp ? fmt(item.cp.valor_original) : '—'}</span>
                               <span className={`inline-flex h-fit rounded-full px-2 py-0.5 text-[10px] font-semibold ${
                                 selectedApprovalItemIds.includes(item.cp_id)
                                   ? isDark ? 'bg-emerald-500/10 text-emerald-300' : 'bg-emerald-50 text-emerald-700'
@@ -2526,6 +2510,8 @@ function LoteCard({
 
 export default function CPPipeline() {
   const { isDark } = useTheme()
+  const navigate = useNavigate()
+  const requisitanteCtx = useRequisitanteCtx()
   const qc = useQueryClient()
   const [searchParams, setSearchParams] = useSearchParams()
   const [activeTab, setActiveTab] = useState<PipelineStageId>('previsto')
@@ -2596,26 +2582,6 @@ export default function CPPipeline() {
     () => new Map(contas.map(cp => [cp.id, cp])),
     [contas],
   )
-
-  const pagCpSelecionadas = useMemo(
-    () => pagModal?.cpIds
-      .map(id => contasById.get(id))
-      .filter((cp): cp is ContaPagar => !!cp) ?? [],
-    [contasById, pagModal],
-  )
-
-  const pagFormaPagamentoLabel = useMemo(() => {
-    const formas = Array.from(new Set(
-      pagCpSelecionadas
-        .map(cp => cp.forma_pagamento?.trim().toLowerCase())
-        .filter((forma): forma is string => !!forma),
-    ))
-
-    if (formas.length === 0) return ''
-    if (formas.length === 1) return formatFormaPagamentoLabel(formas[0])
-    if (formas.includes('boleto')) return 'Múltiplas (inclui Boleto)'
-    return 'Múltiplas'
-  }, [pagCpSelecionadas])
 
   const lotesById = useMemo(
     () => new Map(lotes.map(lote => [lote.id, lote])),
@@ -2788,7 +2754,7 @@ export default function CPPipeline() {
       const visibleValue = currentItems.reduce((sum, cp) => sum + cp.valor_original, 0)
       const loteDate = new Date((lote?.created_at ?? currentItems[0]?.created_at ?? new Date().toISOString())).toLocaleDateString('pt-BR')
       const loteValue = totalValue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
-      const headerLabel = `${lote?.numero_lote ?? `Lote ${loteId.slice(0, 8)}`} â€¢ ${loteDate} â€¢ ${loteValue}`
+      const headerLabel = `${lote?.numero_lote ?? `Lote ${loteId.slice(0, 8)}`} • ${loteDate} • ${loteValue}`
       const { progress, progressLabel } = getLoteProgress(activeTab, lote?.status)
 
       return {
@@ -2947,7 +2913,7 @@ export default function CPPipeline() {
       .filter((lote): lote is LotePagamento => !!lote && lote.status === 'montando')
 
     if (lotesMontando.length === 0) {
-      showToast('error', 'Nenhum lote montando encontrado na selecao')
+      showToast('error', 'Nenhum lote montando encontrado na seleção')
       return
     }
 
@@ -2955,10 +2921,10 @@ export default function CPPipeline() {
       for (const lote of lotesMontando) {
         await enviarLoteMut.mutateAsync({ loteId: lote.id, lote })
       }
-      showToast('success', `${lotesMontando.length} lote(s) enviado(s) para aprovacao`)
+      showToast('success', `${lotesMontando.length} lote(s) enviado(s) para aprovação`)
       setSelectedIds(new Set())
     } catch {
-      showToast('error', 'Erro ao enviar lote para aprovacao')
+      showToast('error', 'Erro ao enviar lote para aprovação')
     }
   }
 
@@ -3042,7 +3008,11 @@ export default function CPPipeline() {
         else handleConfirmarPagamento(ids)
         break
       }
-      case 'pago': handleConciliar(ids); break
+      case 'pago':
+        if (window.confirm(`Conciliar ${ids.length} título(s) selecionado(s)?`)) {
+          handleConciliar(ids)
+        }
+        break
     }
   }
 
@@ -3238,14 +3208,6 @@ export default function CPPipeline() {
                 <input type="date" value={pagData} onChange={e => setPagData(e.target.value)}
                   className={`w-full mt-1 px-3 py-2 rounded-xl text-sm border ${isDark ? 'bg-slate-800 border-slate-700 text-white' : 'bg-slate-50 border-slate-200 text-slate-800'}`} />
               </div>
-              {pagFormaPagamentoLabel && (
-                <div>
-                  <label className={`text-[10px] font-bold uppercase tracking-wider ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Forma de pagamento</label>
-                  <div className={`mt-1 rounded-xl border px-3 py-2 text-sm font-semibold ${isDark ? 'border-emerald-500/20 bg-emerald-500/10 text-emerald-300' : 'border-emerald-200 bg-emerald-50 text-emerald-700'}`}>
-                    {pagFormaPagamentoLabel}
-                  </div>
-                </div>
-              )}
               {pagModal.pedidoId && (
                 <div>
                   <label className={`text-[10px] font-bold uppercase tracking-wider ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>Comprovante (opcional)</label>
@@ -3690,7 +3652,7 @@ export default function CPPipeline() {
               })}
             </>
           ) : isLoteStageTab ? (
-            <div className="space-y-3 p-4">
+            <div className="space-y-3 p-4 stagger-children">
               {activeLotes.map(summary => {
                 const actions = buildLoteActions(summary)
                 return (
@@ -3736,7 +3698,7 @@ export default function CPPipeline() {
               ))}
             </>
           ) : (
-            <div className="space-y-2 p-4">
+            <div className="space-y-2 p-4 stagger-children">
               {activeCPs.map(cp => (
                 <CPCard
                   key={cp.id}
@@ -3760,10 +3722,12 @@ export default function CPPipeline() {
             onClose={() => {
               setShowNovaSolicitacao(false)
               setNovaSolicitacaoKind(null)
+              if (requisitanteCtx) navigate(requisitanteCtx.homeRoute, { replace: true })
             }}
             onSuccess={() => {
               setActiveTab('previsto')
               showToast('success', 'Previsão de pagamento criada em Previstos')
+              if (requisitanteCtx) navigate(requisitanteCtx.homeRoute, { replace: true })
             }}
           />
         ) : (
@@ -3772,10 +3736,12 @@ export default function CPPipeline() {
             onClose={() => {
               setShowNovaSolicitacao(false)
               setNovaSolicitacaoKind(null)
+              if (requisitanteCtx) navigate(requisitanteCtx.homeRoute, { replace: true })
             }}
             onSuccess={() => {
               setActiveTab('confirmado')
               showToast('success', 'Solicitação extraordinária criada em Confirmados')
+              if (requisitanteCtx) navigate(requisitanteCtx.homeRoute, { replace: true })
             }}
           />
         )

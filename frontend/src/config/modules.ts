@@ -126,7 +126,6 @@ export const RH_CONFIG: ModuleMeta = {
   emoji: '👥',
   color: 'violet',
   navItems: [
-    { to: '/rh',       icon: LayoutDashboard, label: 'Painel',           end: true  },
-    { to: '/rh/mural', icon: ImagePlay,       label: 'Mural de Recados', end: false, adminOnly: true },
+    { to: '/rh', icon: LayoutDashboard, label: 'Módulos RH', end: true },
   ],
 }

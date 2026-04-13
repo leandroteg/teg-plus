@@ -128,3 +128,7 @@ AdminUsuarios → Editar Usuário
      ├─ Grupos Permitidos: [checkboxes dos 12 grupos]
      └─ Pode Aprovar: [toggle]
 ```
+
+
+## Links
+- [[obsidian/09 - Auth Sistema]]

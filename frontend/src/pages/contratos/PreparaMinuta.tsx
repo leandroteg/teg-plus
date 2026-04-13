@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import { useParams, useNavigate } from 'react-router-dom'
 import {
   ArrowLeft, FileText, Plus, Upload, ExternalLink, Check,
@@ -43,7 +44,7 @@ const fmt = (v: number) =>
   v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
 
 const fmtData = (d: string) =>
-  new Date(d).toLocaleDateString('pt-BR', {
+  new Date(d.length === 10 ? d + 'T12:00:00' : d).toLocaleDateString('pt-BR', {
     day: '2-digit', month: '2-digit', year: 'numeric',
   })
 
@@ -1414,6 +1415,7 @@ export default function PreparaMinuta() {
   const atualizarResumo = useAtualizarResumo()
   const avancarEtapa = useAvancarEtapa()
   const analisarMinuta = useAnalisarMinuta()
+  const qc = useQueryClient()
   const atualizarConfig = useAtualizarConfigAnalise()
   const uploadFile = useUploadMinutaFile()
   const melhorarMinuta = useMelhorarMinuta()
@@ -1717,120 +1719,190 @@ export default function PreparaMinuta() {
       // ── Helper: build PDF from AI-generated structured text ──────────
       const buildPdfFromAi = async (mtRaw: MinutaTextoGerado) => {
         const empresa = await getEmpresa()
+
+        // Portuguese ordinals for clause numbers (matches company template style)
+        const ORDINALS = ['PRIMEIRA','SEGUNDA','TERCEIRA','QUARTA','QUINTA','SEXTA','SÉTIMA','OITAVA','NONA','DÉCIMA',
+          'DÉCIMA PRIMEIRA','DÉCIMA SEGUNDA','DÉCIMA TERCEIRA','DÉCIMA QUARTA','DÉCIMA QUINTA',
+          'DÉCIMA SEXTA','DÉCIMA SÉTIMA','DÉCIMA OITAVA','DÉCIMA NONA','VIGÉSIMA']
+        const toOrdinal = (n: number) => ORDINALS[n - 1] ?? `${n}ª`
+
         // Normalize field names: n8n returns secoes/clausulas_finais/local_assinatura
         // but older code used clausulas/disposicoes_finais/local_data — accept both
-        const clausulas = (mtRaw.secoes ?? mtRaw.clausulas ?? []).map((s, i) => ({
-          numero: ('numero' in s && s.numero) ? s.numero : `CLÁUSULA ${String(i + 1).padStart(2, '0')}`,
-          titulo: s.titulo,
-          conteudo: s.conteudo,
-        }))
+        const clausulas = (mtRaw.secoes ?? mtRaw.clausulas ?? []).map((s, i) => {
+          // Clean title: strip redundant "CLÁUSULA N - " prefix if AI added it
+          const tituloLimpo = s.titulo
+            .replace(/^CLÁUSULA\s+\w+\s*[-–—]\s*/i, '')
+            .replace(/^CLAUSULA\s+\w+\s*[-–—]\s*/i, '')
+            .trim()
+          return {
+            ordem: i + 1,
+            titulo: tituloLimpo,
+            conteudo: s.conteudo,
+          }
+        })
         const disposicoes = mtRaw.clausulas_finais ?? mtRaw.disposicoes_finais ?? ''
         const localAssinatura = mtRaw.local_assinatura ?? mtRaw.local_data ?? ''
 
+        // ── PDF setup — A4, margins 25mm left/right (matches company template) ──
         const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
         const pw = pdf.internal.pageSize.getWidth()
         const ph = pdf.internal.pageSize.getHeight()
-        const mx = 20; const usable = pw - 2 * mx
-        let y = 25; const lineH = 5; const gapSm = 3; const gapMd = 8; const gapLg = 14
-        const ensureSpace = (need: number) => { if (y + need > ph - 20) { pdf.addPage(); y = 20 } }
-        const printText = (text: string, fontSize: number, opts?: { bold?: boolean; color?: [number,number,number]; indent?: number }) => {
-          pdf.setFont('helvetica', opts?.bold ? 'bold' : 'normal'); pdf.setFontSize(fontSize)
-          const col = opts?.color ?? [30, 30, 30]; pdf.setTextColor(col[0], col[1], col[2])
+        const mx = 25; const usable = pw - 2 * mx
+        const lineH = 5
+        const gapSm = 3; const gapMd = 8; const gapLg = 12
+        let y = 20
+
+        const ensureSpace = (need: number) => {
+          if (y + need > ph - 22) { pdf.addPage(); y = 20 }
+        }
+
+        // printText with word-wrap
+        const printText = (text: string, fontSize: number, opts?: {
+          bold?: boolean; color?: [number,number,number]; indent?: number; align?: 'left'|'center'
+        }) => {
+          pdf.setFont('helvetica', opts?.bold ? 'bold' : 'normal')
+          pdf.setFontSize(fontSize)
+          const col = opts?.color ?? [20, 20, 20]
+          pdf.setTextColor(col[0], col[1], col[2])
           const ind = opts?.indent ?? 0
-          for (const line of pdf.splitTextToSize(text, usable - ind)) { ensureSpace(lineH + 1); pdf.text(line, mx + ind, y); y += lineH }
-        }
-        const hr = (color?: [number,number,number]) => {
-          ensureSpace(4); const c = color ?? [200, 200, 200]
-          pdf.setDrawColor(c[0], c[1], c[2]); pdf.setLineWidth(0.3); pdf.line(mx, y, pw - mx, y); y += 3
-        }
-
-        // HEADER — formal contract style
-        const tipoLabel = GRUPO_CONTRATO_LABEL[solicitacao.grupo_contrato as GrupoContrato] ?? solicitacao.categoria_contrato ?? ''
-        const tituloContrato = tipoLabel ? `CONTRATO DE ${tipoLabel.toUpperCase()}` : 'MINUTA CONTRATUAL'
-        pdf.setFont('helvetica', 'bold'); pdf.setFontSize(14); pdf.setTextColor(30, 41, 59)
-        pdf.text(tituloContrato, pw / 2, 20, { align: 'center' })
-        pdf.setDrawColor(15, 118, 110); pdf.setLineWidth(0.8); pdf.line(mx, 24, pw - mx, 24)
-        y = 30
-
-        // PREAMBULO
-        if (mtRaw.preambulo) { printText(mtRaw.preambulo, 9, { color: [30, 41, 59] }); y += gapLg }
-
-        // CLAUSULAS (AI-generated — normalized from secoes/clausulas)
-        if (clausulas.length) {
-          hr([15, 118, 110]); y += gapSm
-          for (const cl of clausulas) {
-            ensureSpace(20)
-            printText(`${cl.numero} — ${cl.titulo}`, 11, { bold: true, color: [15, 118, 110] }); y += gapSm
-            printText(cl.conteudo, 9, { color: [30, 41, 59], indent: 2 }); y += gapLg
+          const lines = pdf.splitTextToSize(text, usable - ind)
+          for (const line of lines) {
+            ensureSpace(lineH + 1)
+            if (opts?.align === 'center') {
+              pdf.text(line, pw / 2, y, { align: 'center' })
+            } else {
+              pdf.text(line, mx + ind, y)
+            }
+            y += lineH
           }
         }
 
-        // DISPOSICOES FINAIS / CLAUSULAS FINAIS
+        const hr = (thick = false) => {
+          ensureSpace(4)
+          pdf.setDrawColor(0, 0, 0)
+          pdf.setLineWidth(thick ? 0.5 : 0.2)
+          pdf.line(mx, y, pw - mx, y)
+          y += thick ? 4 : 3
+        }
+
+        // ── LETTERHEAD ────────────────────────────────────────────────
+        // Company name top-right (small, subtle)
+        pdf.setFont('helvetica', 'bold'); pdf.setFontSize(7); pdf.setTextColor(100, 100, 100)
+        pdf.text(empresa.razao ?? 'TEG UNIÃO', pw - mx, 14, { align: 'right' })
+        if (empresa.cnpj) {
+          pdf.setFont('helvetica', 'normal'); pdf.setFontSize(6.5); pdf.setTextColor(140, 140, 140)
+          pdf.text(`CNPJ: ${empresa.cnpj}`, pw - mx, 18, { align: 'right' })
+        }
+
+        // ── TITLE ─────────────────────────────────────────────────────
+        const tipoLabel = GRUPO_CONTRATO_LABEL[solicitacao.grupo_contrato as GrupoContrato] ?? solicitacao.categoria_contrato ?? ''
+        const tituloContrato = tipoLabel ? `CONTRATO DE ${tipoLabel.toUpperCase()}` : 'CONTRATO DE PRESTAÇÃO DE SERVIÇOS'
+        pdf.setFont('helvetica', 'bold'); pdf.setFontSize(13); pdf.setTextColor(0, 0, 0)
+        pdf.text(tituloContrato, pw / 2, 26, { align: 'center' })
+        // Double underline (matches company template thick border)
+        pdf.setDrawColor(0, 0, 0); pdf.setLineWidth(0.6); pdf.line(mx, 29, pw - mx, 29)
+        pdf.setLineWidth(0.2); pdf.line(mx, 31, pw - mx, 31)
+        y = 38
+
+        // ── PREÂMBULO ─────────────────────────────────────────────────
+        if (mtRaw.preambulo) {
+          printText(mtRaw.preambulo, 9.5)
+          y += gapLg
+        }
+
+        // ── CLÁUSULAS ─────────────────────────────────────────────────
+        for (const cl of clausulas) {
+          ensureSpace(22)
+          const heading = `CLÁUSULA ${toOrdinal(cl.ordem)} – ${cl.titulo.toUpperCase()}`
+          printText(heading, 10, { bold: true, color: [0, 0, 0] })
+          y += gapSm
+          printText(cl.conteudo, 9.5, { indent: 5 })
+          y += gapLg
+        }
+
+        // ── DISPOSIÇÕES FINAIS ────────────────────────────────────────
         if (disposicoes) {
-          hr([100, 116, 139]); y += gapSm
-          printText('DISPOSICOES FINAIS', 11, { bold: true, color: [71, 85, 105] }); y += gapSm
-          printText(disposicoes, 9, { color: [30, 41, 59] }); y += gapLg
+          hr()
+          y += gapSm
+          printText('DISPOSIÇÕES FINAIS', 10, { bold: true, color: [0, 0, 0] })
+          y += gapSm
+          printText(disposicoes, 9.5, { indent: 5 })
+          y += gapLg
         }
 
-        // SIGNATURE BLOCK — formal, no duplication with AI-generated local_assinatura
-        ensureSpace(80); hr(); y += gapMd
+        // ── ASSINATURAS ───────────────────────────────────────────────
+        ensureSpace(90)
+        hr(true)
+        y += gapMd
 
-        // Skip AI local_assinatura text if it contains signature lines (avoid duplication)
-        const hasAiSignatures = localAssinatura && (localAssinatura.includes('___') || localAssinatura.includes('CONTRATANTE'))
-        if (localAssinatura && !hasAiSignatures) {
-          printText(localAssinatura, 9, { color: [100, 116, 139] }); y += 8
-        }
-
-        // Render clean signature blocks
-        const sigW = usable / 2 - 10
         const cidadeSig = empresa.cidade ?? 'Campo Grande'
+        const ufSig = empresa.uf ?? 'MS'
         const dataStr2 = new Date().toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' })
-        printText(`${cidadeSig}, ${dataStr2}.`, 9, { color: [100, 116, 139] }); y += 15
+        printText(`${cidadeSig}/${ufSig}, ${dataStr2}.`, 9.5)
+        y += gapLg
 
-        // CONTRATANTE
-        pdf.setDrawColor(100, 116, 139); pdf.setLineWidth(0.2)
-        pdf.line(mx, y, mx + sigW, y); y += 4
-        pdf.setFont('helvetica', 'bold'); pdf.setFontSize(8); pdf.setTextColor(71, 85, 105)
+        const sigLineW = usable * 0.55
+        const rep = solicitacao as any
+
+        // CONTRATANTE block
+        pdf.setDrawColor(0, 0, 0); pdf.setLineWidth(0.2)
+        pdf.line(mx, y, mx + sigLineW, y); y += 4
+        pdf.setFont('helvetica', 'bold'); pdf.setFontSize(8.5); pdf.setTextColor(0, 0, 0)
         pdf.text('CONTRATANTE', mx, y); y += 4
-        pdf.setFont('helvetica', 'normal'); pdf.setFontSize(7); pdf.setTextColor(100, 116, 139)
-        pdf.text(empresa.razao, mx, y); y += 3.5
-        pdf.text(`CNPJ: ${empresa.cnpj}`, mx, y); y += 3.5
-        if (empresa.endereco) pdf.text([empresa.endereco, empresa.cidade ? `${empresa.cidade}/${empresa.uf ?? ''}` : ''].filter(Boolean).join(' - '), mx, y); y += 10
+        pdf.setFont('helvetica', 'normal'); pdf.setFontSize(8); pdf.setTextColor(40, 40, 40)
+        pdf.text(empresa.razao ?? '', mx, y); y += 3.5
+        if (empresa.cnpj) { pdf.text(`CNPJ: ${empresa.cnpj}`, mx, y); y += 3.5 }
+        const endEmpresa = [empresa.endereco, empresa.cidade ? `${empresa.cidade}/${empresa.uf ?? ''}` : ''].filter(Boolean).join(' – ')
+        if (endEmpresa) {
+          for (const ln of pdf.splitTextToSize(endEmpresa, usable)) { pdf.text(ln, mx, y); y += 3.5 }
+        }
+        y += gapMd
 
-        // CONTRATADA
-        ensureSpace(30)
-        pdf.setDrawColor(100, 116, 139); pdf.setLineWidth(0.2)
-        pdf.line(mx, y, mx + sigW, y); y += 4
-        pdf.setFont('helvetica', 'bold'); pdf.setFontSize(8); pdf.setTextColor(71, 85, 105)
+        // CONTRATADA block
+        ensureSpace(35)
+        pdf.setDrawColor(0, 0, 0); pdf.setLineWidth(0.2)
+        pdf.line(mx, y, mx + sigLineW, y); y += 4
+        pdf.setFont('helvetica', 'bold'); pdf.setFontSize(8.5); pdf.setTextColor(0, 0, 0)
         pdf.text('CONTRATADA', mx, y); y += 4
-        pdf.setFont('helvetica', 'normal'); pdf.setFontSize(7); pdf.setTextColor(100, 116, 139)
-        pdf.text(solicitacao.contraparte_nome, mx, y); y += 3.5
+        pdf.setFont('helvetica', 'normal'); pdf.setFontSize(8); pdf.setTextColor(40, 40, 40)
+        pdf.text(solicitacao.contraparte_nome ?? '', mx, y); y += 3.5
         if (solicitacao.contraparte_cnpj) { pdf.text(`CNPJ: ${solicitacao.contraparte_cnpj}`, mx, y); y += 3.5 }
-        if ((solicitacao as any).contraparte_endereco) { pdf.text((solicitacao as any).contraparte_endereco, mx, y); y += 3.5 }
-        if ((solicitacao as any).contraparte_representante_nome) {
-          const rep = (solicitacao as any)
-          const repLine = [rep.contraparte_representante_nome, rep.contraparte_representante_cargo].filter(Boolean).join(' - ')
+        if (rep.contraparte_endereco) {
+          for (const ln of pdf.splitTextToSize(rep.contraparte_endereco, usable)) { pdf.text(ln, mx, y); y += 3.5 }
+        }
+        if (rep.contraparte_representante_nome) {
+          const repLine = [rep.contraparte_representante_nome, rep.contraparte_representante_cargo].filter(Boolean).join(' – ')
           pdf.text(repLine, mx, y); y += 3.5
           if (rep.contraparte_representante_cpf) { pdf.text(`CPF: ${rep.contraparte_representante_cpf}`, mx, y); y += 3.5 }
         }
-        y += 10
+        y += gapLg
 
-        // TESTEMUNHAS
-        ensureSpace(25)
-        pdf.setFont('helvetica', 'bold'); pdf.setFontSize(8); pdf.setTextColor(71, 85, 105)
-        pdf.text('TESTEMUNHAS', mx, y); y += 6
-        pdf.setDrawColor(148, 163, 184); pdf.setLineWidth(0.15)
-        pdf.line(mx, y, mx + sigW, y); pdf.line(pw - mx - sigW, y, pw - mx, y); y += 4
-        pdf.setFont('helvetica', 'normal'); pdf.setFontSize(7); pdf.setTextColor(148, 163, 184)
-        pdf.text('Nome:', mx, y); pdf.text('Nome:', pw - mx - sigW, y); y += 3.5
-        pdf.text('CPF:', mx, y); pdf.text('CPF:', pw - mx - sigW, y)
+        // TESTEMUNHAS block — two columns (matches company template)
+        ensureSpace(28)
+        pdf.setFont('helvetica', 'bold'); pdf.setFontSize(8.5); pdf.setTextColor(0, 0, 0)
+        pdf.text('TESTEMUNHAS', mx, y); y += 5
+        const tW = (usable - 10) / 2
+        pdf.setDrawColor(0, 0, 0); pdf.setLineWidth(0.2)
+        pdf.line(mx, y, mx + tW, y)
+        pdf.line(mx + tW + 10, y, mx + tW + 10 + tW, y)
+        y += 4
+        pdf.setFont('helvetica', 'normal'); pdf.setFontSize(8); pdf.setTextColor(40, 40, 40)
+        pdf.text('Nome:', mx, y); pdf.text('Nome:', mx + tW + 10, y); y += 3.5
+        pdf.text('CPF:', mx, y); pdf.text('CPF:', mx + tW + 10, y)
 
-        // FOOTER
+        // ── FOOTER on all pages ────────────────────────────────────────
         const totalPages = pdf.getNumberOfPages()
         for (let p = 1; p <= totalPages; p++) {
-          pdf.setPage(p); pdf.setFont('helvetica', 'normal'); pdf.setFontSize(7); pdf.setTextColor(148, 163, 184)
-          pdf.text('TEG+ ERP — Minuta gerada por IA', mx, ph - 8); pdf.text(`Pagina ${p} de ${totalPages}`, pw - mx, ph - 8, { align: 'right' })
+          pdf.setPage(p)
+          pdf.setDrawColor(180, 180, 180); pdf.setLineWidth(0.2)
+          pdf.line(mx, ph - 13, pw - mx, ph - 13)
+          pdf.setFont('helvetica', 'normal'); pdf.setFontSize(7); pdf.setTextColor(150, 150, 150)
+          pdf.text(empresa.razao ?? 'TEG UNIAO', mx, ph - 9)
+          pdf.text(`Página ${p} de ${totalPages}`, pw - mx, ph - 9, { align: 'right' })
         }
+
+        // Skip AI local_assinatura (we built our own clean block above)
+        void localAssinatura
         return pdf
       }
 
@@ -1850,26 +1922,27 @@ export default function PreparaMinuta() {
         let num = 1
 
         // Objeto
-        secoes.push({ titulo: `CLÁUSULA ${num++} - DO OBJETO`, conteudo: `O presente Contrato tem por objeto ${solicitacao.objeto}.${solicitacao.descricao_escopo ? ' ' + solicitacao.descricao_escopo : ''}` })
+        void num
+        secoes.push({ titulo: 'DO OBJETO', conteudo: `O presente Contrato tem por objeto ${solicitacao.objeto}.${solicitacao.descricao_escopo ? ' ' + solicitacao.descricao_escopo : ''}` })
 
         // Preco
-        secoes.push({ titulo: `CLÁUSULA ${num++} - DO PREÇO E CONDIÇÕES DE PAGAMENTO`, conteudo: `Pela execução dos serviços, a CONTRATANTE pagará à CONTRATADA o valor global de ${valorStr}.${solicitacao.forma_pagamento ? ' Forma de pagamento: ' + solicitacao.forma_pagamento + '.' : ' O pagamento será efetuado mediante medições mensais, no prazo de 30 dias.'}` })
+        secoes.push({ titulo: 'DO PAGAMENTO PELA PRESTAÇÃO DOS SERVIÇOS', conteudo: `Pela execução dos serviços, a CONTRATANTE pagará à CONTRATADA o valor global de ${valorStr}.${solicitacao.forma_pagamento ? ' Forma de pagamento: ' + solicitacao.forma_pagamento + '.' : ' O pagamento será efetuado mediante medições mensais, no prazo de 30 dias.'}` })
 
         // Prazo
         const prazoTxt = solicitacao.prazo_meses ? `${solicitacao.prazo_meses} meses` : 'conforme cronograma aprovado'
-        secoes.push({ titulo: `CLÁUSULA ${num++} - DO PRAZO`, conteudo: `O prazo para execução dos serviços é de ${prazoTxt}, contados a partir da assinatura deste instrumento ou emissão da Ordem de Serviço.` })
+        secoes.push({ titulo: 'DA FORMA DE PRESTAÇÃO DOS SERVIÇOS', conteudo: `Os serviços serão prestados pelo prazo de ${prazoTxt}, contados a partir da assinatura deste instrumento ou emissão da Ordem de Serviço.` })
 
         // Add all melhorias clausulas_melhoradas as formal contract clauses
         if (mel.clausulas_melhoradas?.length) {
           for (const c of mel.clausulas_melhoradas) {
-            secoes.push({ titulo: `CLÁUSULA ${num++} - ${c.nome.toUpperCase()}`, conteudo: c.texto_melhorado })
+            secoes.push({ titulo: c.nome.toUpperCase(), conteudo: c.texto_melhorado })
           }
         }
 
         // Add clausulas_novas
         if (mel.clausulas_novas?.length) {
           for (const c of mel.clausulas_novas) {
-            secoes.push({ titulo: `CLÁUSULA ${num++} - ${c.nome.toUpperCase()}`, conteudo: c.texto })
+            secoes.push({ titulo: c.nome.toUpperCase(), conteudo: c.texto })
           }
         }
 
@@ -2071,10 +2144,24 @@ export default function PreparaMinuta() {
           )}
 
           {!hasFinalMinuta && minutas.length > 0 && (
-            <div className="bg-amber-50 rounded-xl border border-amber-200 px-4 py-3">
-              <p className="text-[10px] text-amber-700 font-semibold">
-                Adicione uma minuta com tipo "Final" para avançar para o Resumo Executivo.
-              </p>
+            <div className="space-y-2">
+              <div className="bg-amber-50 rounded-xl border border-amber-200 px-4 py-3">
+                <p className="text-[10px] text-amber-700 font-semibold">
+                  Adicione uma minuta com tipo "Final" para avançar para o Resumo Executivo.
+                </p>
+              </div>
+              <button
+                onClick={handleAvancarResumo}
+                disabled={avancarEtapa.isPending}
+                className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl
+                  border border-slate-200 text-slate-600 text-xs font-semibold
+                  hover:bg-slate-50 transition-all disabled:opacity-50"
+              >
+                {avancarEtapa.isPending
+                  ? <div className="w-3.5 h-3.5 border-2 border-slate-300/40 border-t-slate-500 rounded-full animate-spin" />
+                  : <ChevronRight size={13} />}
+                Prosseguir sem Análise IA
+              </button>
             </div>
           )}
         </div>
@@ -2100,19 +2187,47 @@ export default function PreparaMinuta() {
                     </div>
                     {modelo.arquivo_url ? (
                       <button
-                        onClick={async () => {
+                        disabled={uploadFile.isPending}
+                        onClick={async (e) => {
+                          e.stopPropagation()
+                          const btn = e.currentTarget
+                          btn.textContent = 'Carregando...'
+                          btn.disabled = true
                           try {
                             const resp = await fetch(modelo.arquivo_url!)
+                            if (!resp.ok) throw new Error(`Erro ao baixar modelo: ${resp.status}`)
                             const blob = await resp.blob()
-                            const fileName = `modelo_${modelo.nome.replace(/\s+/g, '_')}.pdf`
-                            const file = new File([blob], fileName, { type: blob.type })
-                            await uploadFile.mutateAsync({
-                              solicitacao_id: solicitacao!.id,
+                            const ext = modelo.arquivo_url!.split('.').pop()?.toLowerCase() || 'pdf'
+                            const mimeType = ext === 'docx' ? 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+                              : ext === 'doc' ? 'application/msword' : 'application/pdf'
+                            const fileName = `modelo_${modelo.nome.replace(/\s+/g, '_')}.${ext}`
+                            const file = new File([blob], fileName, { type: mimeType })
+                            const uploaded = await uploadFile.mutateAsync({
+                              solicitacaoId: solicitacao!.id,
                               file,
-                              tipo: 'modelo' as any,
                             })
-                          } catch (err) {
+                            await supabase.from('con_minutas').insert({
+                              solicitacao_id: solicitacao!.id,
+                              versao: (minutas?.length ?? 0) + 1,
+                              tipo: 'modelo',
+                              titulo: modelo.nome,
+                              arquivo_url: uploaded.arquivo_url,
+                              arquivo_nome: fileName,
+                              status: 'em_revisao',
+                            })
+                            qc.invalidateQueries({ queryKey: ['con-minutas', solicitacao!.id] })
+                            btn.textContent = '✓ Carregado!'
+                            btn.className = 'px-3 py-1.5 text-xs font-semibold rounded-lg bg-emerald-600 text-white'
+                          } catch (err: any) {
                             console.error('Erro ao usar modelo:', err)
+                            btn.textContent = 'Erro!'
+                            btn.className = 'px-3 py-1.5 text-xs font-semibold rounded-lg bg-red-600 text-white'
+                            alert(`Erro ao carregar modelo: ${err?.message || 'erro desconhecido'}`)
+                            setTimeout(() => {
+                              btn.textContent = 'Usar como base'
+                              btn.className = 'px-3 py-1.5 text-xs font-semibold rounded-lg bg-violet-600 text-white hover:bg-violet-700 transition-colors'
+                              btn.disabled = false
+                            }, 2000)
                           }
                         }}
                         className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-violet-600 text-white hover:bg-violet-700 transition-colors"

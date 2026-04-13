@@ -6,7 +6,7 @@ status: planejado
 tags: [ssma, seguranca, saude, meio-ambiente, nr, epi, dds]
 criado: 2026-03-12
 atualizado: 2026-03-12
-relacionado: ["[[32 - Módulo Obras]]", "[[17 - Roadmap]]", "[[03 - Páginas e Rotas]]"]
+relacionado: ["[[PILAR - Projetos]]", "[[32 - Módulo Obras]]", "[[17 - Roadmap]]", "[[03 - Páginas e Rotas]]"]
 ---
 
 # Módulo SSMA — Segurança, Saúde e Meio Ambiente
@@ -105,6 +105,25 @@ Prefixo de tabelas: `ssm_`
 | `ssm_checklists` | Checklists de inspeção de segurança |
 | `ssm_auditorias` | Auditorias internas e planos de ação |
 | `ssm_indicadores` | Snapshots de LTIFR/TRIFR por obra e período |
+
+---
+
+## Controle de Vencimentos
+
+O módulo implementa rastreamento automático de vencimento para 3 tipos de item:
+
+| Item | Validade Típica | Alerta |
+|------|-----------------|--------|
+| **Treinamentos NR** | 1-2 anos conforme NR | 30 dias antes do vencimento |
+| **EPIs** | Conforme fabricante (CA) | 30 dias antes da validade |
+| **ASOs** | 6-12 meses conforme função | 30 dias antes do vencimento |
+
+### Função `ssm_gerar_alertas_vencimento()`
+
+Função PostgreSQL executada diariamente via cron/n8n que:
+1. Verifica todos os treinamentos, EPIs e ASOs com validade nos próximos 30 dias
+2. Gera alertas na tabela de notificações do sistema
+3. Notifica o gestor de SSMA e o colaborador afetado
 
 ---
 

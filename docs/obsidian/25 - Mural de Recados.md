@@ -6,6 +6,7 @@ status: entregue
 tags: [mural, comunicacao, banner, slideshow, rh, admin]
 criado: 2026-03-03
 atualizado: 2026-03-03
+relacionado: ["[[PILAR - RH]]"]
 ---
 
 # Mural de Recados — Comunicação Empresarial

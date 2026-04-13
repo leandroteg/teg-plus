@@ -37,7 +37,6 @@ export interface Pedido {
   requisicao_id?: string
   cotacao_id?: string
   comprador_id?: string
-  fornecedor_id?: string
   classe_financeira_id?: string
   centro_custo_id?: string
   numero_pedido?: string
@@ -160,6 +159,9 @@ export interface AprovacaoPendente extends Aprovacao {
     arquivo_nome: string
     ai_resumo: string | null
     ai_score: number | null
+    esclarecimento_msg?: string | null
+    esclarecimento_por?: string | null
+    esclarecimento_em?: string | null
   }
   pagamento_detalhes?: {
     is_lote?: boolean
@@ -203,29 +205,21 @@ export interface AprovacaoPendente extends Aprovacao {
     data_desejada?: string
     modal?: string
     motorista_nome?: string
-    motorista_telefone?: string
     veiculo_placa?: string
     custo_estimado?: number
     descricao?: string
     solicitante_nome?: string
     obra_nome?: string
-    centro_custo?: string
-    oc_numero?: string
     urgente?: boolean
-    justificativa_urgencia?: string
     peso_total_kg?: number
     volumes_total?: number
-    carga_especial?: boolean
-    observacoes_carga?: string
-    restricoes_seguranca?: string
-    // Campos de viagem (consolidada)
-    is_viagem?: boolean
-    viagem_numero?: string
-    qtd_paradas?: number
-    distancia_total_km?: number
-    tempo_estimado_h?: number
-    solicitacoes?: Record<string, unknown>[]
   }
+  esclarecimento_historico?: {
+    tipo: 'pedido' | 'resposta'
+    autor: string
+    msg: string
+    data: string
+  }[]
 }
 
 export interface AprovacaoHistorico {

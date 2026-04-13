@@ -13,6 +13,7 @@ import {
   useAvancarStatusCR, useRegistrarRecebimentoCR,
   useCompartilharNFEmail, useConciliarCRBatch,
 } from '../../hooks/useFinanceiro'
+import { UpperInput } from '../../components/UpperInput'
 import { useLastSync, useTriggerSync, useOmieConfig } from '../../hooks/useOmie'
 import { supabase } from '../../services/supabase'
 import type { ContaReceber, StatusCR } from '../../types/financeiro'
@@ -224,12 +225,12 @@ function FaturamentoModal({ cr, onClose, isDark }: { cr: ContaReceber; onClose: 
         <div className="space-y-3">
           <div>
             <label className="text-[10px] font-semibold text-slate-400 uppercase">Numero NF *</label>
-            <input value={nf} onChange={e => setNf(e.target.value)} className={inputCls} placeholder="000123" />
+            <UpperInput value={nf} onChange={e => setNf(e.target.value)} className={inputCls} placeholder="000123" />
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="text-[10px] font-semibold text-slate-400 uppercase">Serie</label>
-              <input value={serie} onChange={e => setSerie(e.target.value)} className={inputCls} placeholder="1" />
+              <UpperInput value={serie} onChange={e => setSerie(e.target.value)} className={inputCls} placeholder="1" />
             </div>
             <div>
               <label className="text-[10px] font-semibold text-slate-400 uppercase">Data Emissao</label>
@@ -238,7 +239,7 @@ function FaturamentoModal({ cr, onClose, isDark }: { cr: ContaReceber; onClose: 
           </div>
           <div>
             <label className="text-[10px] font-semibold text-slate-400 uppercase">Chave NFe (44 digitos)</label>
-            <input value={chave} onChange={e => setChave(e.target.value)} className={inputCls} placeholder="Opcional" maxLength={44} />
+            <UpperInput value={chave} onChange={e => setChave(e.target.value)} className={inputCls} placeholder="Opcional" maxLength={44} />
           </div>
 
           {/* DANFE Upload */}
@@ -915,7 +916,7 @@ export default function ContasReceber() {
           {/* Search */}
           <div className="relative flex-1 min-w-[180px] max-w-sm">
             <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-            <input
+            <UpperInput
               type="text" value={busca} onChange={e => setBusca(e.target.value)}
               placeholder="Buscar cliente, NF, CNPJ, CC..."
               className={`w-full pl-9 pr-4 py-2 rounded-xl border text-xs placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 ${

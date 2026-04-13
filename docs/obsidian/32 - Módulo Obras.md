@@ -6,7 +6,7 @@ status: ativo
 tags: [obras, apontamentos, rdo, adiantamentos, equipe, prestacao-contas]
 criado: 2026-03-12
 atualizado: 2026-03-12
-relacionado: ["[[31 - Módulo PMO-EGP]]", "[[20 - Módulo Financeiro]]", "[[03 - Páginas e Rotas]]"]
+relacionado: ["[[PILAR - Projetos]]", "[[31 - Módulo PMO-EGP]]", "[[20 - Módulo Financeiro]]", "[[03 - Páginas e Rotas]]"]
 ---
 
 # Módulo Obras
@@ -119,14 +119,16 @@ Prefixo de tabelas: `obr_`
 
 | Tabela | Descrição |
 |--------|-----------|
+| `obr_frentes` | Frentes de trabalho por obra |
 | `obr_apontamentos` | Apontamentos de HH por colaborador e obra |
-| `obr_apontamento_itens` | Itens detalhados de cada apontamento |
-| `obr_rdos` | Relatórios Diários de Obra |
-| `obr_rdo_fotos` | Fotos e evidências do RDO |
+| `obr_rdo` | Relatórios Diários de Obra |
 | `obr_adiantamentos` | Adiantamentos financeiros |
-| `obr_prestacoes` | Prestações de contas |
-| `obr_prestacao_itens` | Itens/comprovantes da prestação |
-| `obr_mobilizacoes` | Mobilizações de equipe |
+| `obr_prestacao_contas` | Prestações de contas com comprovantes |
+| `obr_equipes` | Composição de equipe por obra |
+| `obr_mobilizacoes` | Mobilizações e desmobilizações de equipe |
+| `obr_planejamento_equipe` | Planejamento de alocação de colaboradores por período |
+
+> **Nota:** `obr_planejamento_equipe` foi adicionado em migration separada (036) para integração com RH.
 
 ---
 

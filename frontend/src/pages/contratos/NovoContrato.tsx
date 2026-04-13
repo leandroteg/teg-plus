@@ -9,6 +9,8 @@ import { useLookupCentrosCusto, useLookupClassesFinanceiras } from '../../hooks/
 import SearchableSelect from '../../components/SearchableSelect'
 import type { SelectOption } from '../../components/SearchableSelect'
 import type { NovoContratoPayload, RecorrenciaContrato, TipoContrato, StatusContrato } from '../../types/contratos'
+import NumericInput from '../../components/NumericInput'
+import { UpperInput, UpperTextarea } from '../../components/UpperInput'
 
 const RECORRENCIAS: { value: RecorrenciaContrato; label: string }[] = [
   { value: 'mensal',        label: 'Mensal' },
@@ -161,7 +163,7 @@ export default function NovoContrato() {
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
             <label className={labelClass}>Número do Contrato *</label>
-            <input value={numero} onChange={e => setNumero(e.target.value)}
+            <UpperInput value={numero} onChange={e => setNumero(e.target.value)}
               placeholder="Ex: CTR-2026-001" className={inputClass} />
           </div>
           <div>
@@ -198,13 +200,13 @@ export default function NovoContrato() {
 
         <div>
           <label className={labelClass}>Objeto do Contrato *</label>
-          <input value={objeto} onChange={e => setObjeto(e.target.value)}
+          <UpperInput value={objeto} onChange={e => setObjeto(e.target.value)}
             placeholder="Descrição resumida do objeto" className={inputClass} />
         </div>
 
         <div>
           <label className={labelClass}>Descrição Detalhada</label>
-          <textarea value={descricao} onChange={e => setDescricao(e.target.value)}
+          <UpperTextarea value={descricao} onChange={e => setDescricao(e.target.value)}
             placeholder="Detalhes do escopo, condições, etc."
             rows={3} className={`${inputClass} resize-none`} />
         </div>
@@ -255,15 +257,15 @@ export default function NovoContrato() {
                     <Trash2 size={13} />
                   </button>
                 </div>
-                <input value={it.descricao} onChange={e => updateItem(idx, 'descricao', e.target.value)}
+                <UpperInput value={it.descricao} onChange={e => updateItem(idx, 'descricao', e.target.value)}
                   placeholder="Descrição do item" className={inputClass} />
                 <div className="grid grid-cols-3 gap-2">
-                  <input value={it.unidade} onChange={e => updateItem(idx, 'unidade', e.target.value)}
+                  <UpperInput value={it.unidade} onChange={e => updateItem(idx, 'unidade', e.target.value)}
                     placeholder="un" className={inputClass} />
-                  <input type="number" value={it.quantidade || ''} onChange={e => updateItem(idx, 'quantidade', parseFloat(e.target.value) || 0)}
-                    placeholder="Qtd" className={inputClass} min="0" step="0.01" />
-                  <input type="number" value={it.valor_unitario || ''} onChange={e => updateItem(idx, 'valor_unitario', parseFloat(e.target.value) || 0)}
-                    placeholder="Valor Un." className={inputClass} min="0" step="0.01" />
+                  <NumericInput value={it.quantidade} onChange={v => updateItem(idx, 'quantidade', v)}
+                    placeholder="Qtd" className={inputClass} min={0} step={0.01} />
+                  <NumericInput value={it.valor_unitario} onChange={v => updateItem(idx, 'valor_unitario', v)}
+                    placeholder="Valor Un." className={inputClass} min={0} step={0.01} />
                 </div>
                 <p className="text-[10px] text-right text-slate-500 font-semibold">
                   Subtotal: {(it.quantidade * it.valor_unitario).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
@@ -335,7 +337,7 @@ export default function NovoContrato() {
           </div>
           <div>
             <label className={labelClass}>Índice de Reajuste</label>
-            <input value={indiceReajuste} onChange={e => setIndiceReajuste(e.target.value)}
+            <UpperInput value={indiceReajuste} onChange={e => setIndiceReajuste(e.target.value)}
               placeholder="IPCA, IGP-M, INPC" className={inputClass} />
           </div>
         </div>
