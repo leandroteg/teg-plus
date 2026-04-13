@@ -1,10 +1,11 @@
-import { useMemo } from 'react'
+import { useMemo, lazy, Suspense } from 'react'
 import { MapPin, AlertTriangle, Gauge } from 'lucide-react'
 import { useSearchParams } from 'react-router-dom'
 import ControladoriaFlow, { type FlowStep } from '../../components/ControladoriaFlow'
-import MapaAoVivo from '../../components/logistica/telemetria/MapaAoVivo'
 import AlertasTelemetria from '../../components/logistica/telemetria/AlertasTelemetria'
 import KmUtilizacao from '../../components/logistica/telemetria/KmUtilizacao'
+
+const MapaAoVivo = lazy(() => import('../../components/logistica/telemetria/MapaAoVivo'))
 
 const STEPS: FlowStep[] = [
   {
@@ -59,7 +60,11 @@ function getStepComponent(step: string) {
       return <KmUtilizacao />
     case 'mapa':
     default:
-      return <MapaAoVivo />
+      return (
+        <Suspense fallback={<div className="flex items-center justify-center py-20 text-sm text-slate-400">Carregando mapa...</div>}>
+          <MapaAoVivo />
+        </Suspense>
+      )
   }
 }
 
