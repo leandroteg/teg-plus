@@ -39,3 +39,4 @@ npm-debug.log*
 wf_*.json
 fix_melhorar_n8n.py
 *.json
+.vercel
