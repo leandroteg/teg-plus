@@ -27,6 +27,11 @@ const normalizeStatus = (value?: string | null) =>
     .replace(/[\u0300-\u036f]/g, '')
     .trim()
     .toUpperCase()
+const formatStatus = (value?: string | null) => {
+  const normalized = normalizeStatus(value)
+  if (!normalized) return 'Situacao irregular'
+  return normalized.charAt(0) + normalized.slice(1).toLowerCase()
+}
 
 export default function FornecedoresCad() {
   const [busca, setBusca] = useState('')
@@ -127,6 +132,7 @@ export default function FornecedoresCad() {
   const lookupCnpjDigits = onlyDigits(cnpjLookup.dados?.cnpj)
   const cnpjLookupMatches = Boolean(cnpjLookup.dados && lookupCnpjDigits === currentCnpjDigits)
   const cnpjStatus = cnpjLookupMatches ? normalizeStatus(cnpjLookup.dados?.situacao) : ''
+  const cnpjStatusLabel = cnpjLookupMatches ? formatStatus(cnpjLookup.dados?.situacao) : ''
   const isCnpjActive = cnpjStatus === 'ATIVA'
   const invalidCnpjStatus = Boolean(cnpjStatus && !isCnpjActive)
 
@@ -138,7 +144,7 @@ export default function FornecedoresCad() {
     if (cnpjLookup.loading) return 'Aguarde a validacao do CNPJ.'
     if (!cnpjLookupMatches) return 'Busque e valide o CNPJ antes de salvar.'
     if (!isCnpjActive) {
-      const status = cnpjLookup.dados?.situacao || 'situacao irregular'
+      const status = cnpjStatusLabel || 'Situacao irregular'
       return `CNPJ ${status} nao pode ser cadastrado.`
     }
     return null
@@ -412,7 +418,7 @@ export default function FornecedoresCad() {
                 {cnpjLookupMatches && !cnpjLookup.erro && (
                   <p className={`text-[9px] mt-0.5 flex items-center gap-1 ${invalidCnpjStatus ? 'text-red-500' : 'text-emerald-600'}`}>
                     {invalidCnpjStatus ? <AlertCircle size={9} /> : <CheckCircle2 size={9} />}
-                    {cnpjLookup.dados.situacao}
+                    {cnpjStatusLabel}
                   </p>
                 )}
               </div>
