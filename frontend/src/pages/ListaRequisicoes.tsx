@@ -230,6 +230,16 @@ function DetailModal({ r, apr, onClose, isDark, canDecide, onDecisao, isProcessi
   const [respostaEsclarecimento, setRespostaEsclarecimento] = useState('')
   const approvalLabel = getApprovalStatusLabel(r.status)
   const atLeastComprador = true // will be checked externally
+  const esclarecimentos = r.esclarecimento_historico?.length
+    ? r.esclarecimento_historico
+    : r.esclarecimento_msg
+      ? [{
+          tipo: 'pedido' as const,
+          autor: r.esclarecimento_por ?? '',
+          msg: r.esclarecimento_msg,
+          data: r.esclarecimento_em ?? r.created_at,
+        }]
+      : []
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-sm p-4" onClick={onClose}>
@@ -326,7 +336,37 @@ function DetailModal({ r, apr, onClose, isDark, canDecide, onDecisao, isProcessi
             </div>
           )}
 
-          {r.esclarecimento_msg && (
+          {esclarecimentos.length > 0 && (
+            <div className={`rounded-xl px-3.5 py-2.5 space-y-2 ${isDark ? 'bg-amber-500/10 border border-amber-500/20' : 'bg-amber-50 border border-amber-200'}`}>
+              <div className="flex items-center gap-1.5 mb-1">
+                <MessageSquare size={13} className={isDark ? 'text-amber-400' : 'text-amber-600'} />
+                <p className={`text-[10px] font-bold uppercase tracking-wider ${isDark ? 'text-amber-400' : 'text-amber-700'}`}>Historico de Esclarecimentos</p>
+              </div>
+              {esclarecimentos.map((item, index) => {
+                const isResposta = item.tipo === 'resposta'
+                const msg = isResposta
+                  ? item.msg.replace(/^Esclarecimento respondido por [^:]+:\s*/, '')
+                  : item.msg
+                return (
+                  <div key={`${item.tipo}-${item.data}-${index}`} className={`rounded-lg px-2.5 py-2 ${isResposta ? isDark ? 'bg-emerald-500/10 border border-emerald-500/20' : 'bg-white border border-emerald-200' : isDark ? 'bg-amber-500/10 border border-amber-500/20' : 'bg-white/70 border border-amber-200'}`}>
+                    <p className={`text-[10px] font-bold uppercase tracking-wider mb-1 ${isResposta ? isDark ? 'text-emerald-400' : 'text-emerald-700' : isDark ? 'text-amber-400' : 'text-amber-700'}`}>
+                      {isResposta ? 'Resposta do Solicitante' : 'Esclarecimento Solicitado'}
+                    </p>
+                    <p className={`text-xs leading-relaxed ${isResposta ? isDark ? 'text-emerald-300' : 'text-emerald-700' : isDark ? 'text-amber-300' : 'text-amber-700'}`}>{msg}</p>
+                    {(item.autor || item.data) && (
+                      <p className={`text-[10px] mt-1.5 ${isResposta ? isDark ? 'text-emerald-500' : 'text-emerald-600' : isDark ? 'text-amber-500' : 'text-amber-500'}`}>
+                        {item.autor && <>Por: <span className="font-semibold">{item.autor}</span></>}
+                        {item.autor && item.data && ' · '}
+                        {item.data && fmtData(item.data)}
+                      </p>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+          )}
+
+          {false && r.esclarecimento_msg && (
             <div className={`rounded-xl px-3.5 py-2.5 ${isDark ? 'bg-amber-500/10 border border-amber-500/20' : 'bg-amber-50 border border-amber-200'}`}>
               <div className="flex items-center gap-1.5 mb-1">
                 <MessageSquare size={13} className={isDark ? 'text-amber-400' : 'text-amber-600'} />

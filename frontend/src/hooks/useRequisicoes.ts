@@ -16,6 +16,32 @@ function sanitizeFileName(name: string) {
     .replace(/^-|-$/g, '')
 }
 
+function buildEsclarecimentoHistorico(rows: any[]) {
+  const map = new Map<string, NonNullable<Requisicao['esclarecimento_historico']>>()
+
+  for (const row of rows) {
+    const obs = String(row.observacao ?? '').trim()
+    if (!obs) continue
+
+    const isResposta = obs.startsWith('Esclarecimento respondido')
+    if (row.status !== 'esclarecimento' && !isResposta) continue
+
+    const entidadeId = String(row.entidade_id ?? '')
+    if (!entidadeId) continue
+
+    const list = map.get(entidadeId) ?? []
+    list.push({
+      tipo: isResposta ? 'resposta' : 'pedido',
+      autor: String(row.aprovador_nome ?? ''),
+      msg: obs,
+      data: String(row.data_decisao ?? row.created_at ?? ''),
+    })
+    map.set(entidadeId, list)
+  }
+
+  return map
+}
+
 export function useRequisicoes(status?: string, search?: string) {
   return useQuery<Requisicao[]>({
     queryKey: ['requisicoes', status, search],
@@ -40,12 +66,30 @@ export function useRequisicoes(status?: string, search?: string) {
 
       const { data, error } = await query
       if (error) throw error
+      const rows = (data ?? []) as any[]
+      const ids = rows.map(r => r.id).filter(Boolean)
+      const historicoMap = new Map<string, NonNullable<Requisicao['esclarecimento_historico']>>()
+
+      if (ids.length > 0) {
+        const { data: historicoData } = await supabase
+          .from('apr_aprovacoes')
+          .select('entidade_id, status, observacao, aprovador_nome, data_decisao, created_at')
+          .in('entidade_id', ids)
+          .eq('modulo', 'cmp')
+          .not('observacao', 'is', null)
+          .order('created_at', { ascending: true })
+
+        for (const [id, historico] of buildEsclarecimentoHistorico(historicoData ?? [])) {
+          historicoMap.set(id, historico)
+        }
+      }
 
       // Flattens o join: comprador.nome → comprador_nome
-      return ((data ?? []) as any[]).map(r => ({
+      return rows.map(r => ({
         ...r,
         comprador_nome: r.comprador?.nome ?? undefined,
         comprador: undefined,
+        esclarecimento_historico: historicoMap.get(r.id),
       })) as Requisicao[]
     },
     refetchInterval: false,
