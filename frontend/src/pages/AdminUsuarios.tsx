@@ -1742,13 +1742,17 @@ export default function AdminUsuarios() {
         </div>
 
         {/* Stats de roles */}
-        <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
+          <div className="flex items-baseline gap-1.5 px-3 py-1.5 rounded-full bg-slate-100 border border-slate-200">
+            <span className="text-base font-black text-slate-700">{perfis?.length ?? 0}</span>
+            <span className="text-xs font-semibold text-slate-500">Todos</span>
+          </div>
           {(['requisitante', 'equipe', 'supervisor', 'diretor', 'ceo'] as Role[]).map(r => {
             const c = ROLE_COLOR[r]
             return (
-              <div key={r} className={`rounded-xl p-3 ${c.bg}`}>
-                <p className={`text-xl font-black ${c.text}`}>{stats[r] ?? 0}</p>
-                <p className={`text-xs font-semibold ${c.text} opacity-80`}>{getRoleLabel(r)}</p>
+              <div key={r} className={`flex items-baseline gap-1.5 px-3 py-1.5 rounded-full border border-transparent ${c.bg}`}>
+                <span className={`text-base font-black ${c.text}`}>{stats[r] ?? 0}</span>
+                <span className={`text-xs font-semibold ${c.text} opacity-80`}>{getRoleLabel(r)}</span>
               </div>
             )
           })}
@@ -1810,10 +1814,12 @@ export default function AdminUsuarios() {
               <Edit3 size={12} />
               Editar
             </button>
-          </div>
 
-          <div className="flex items-center justify-end">
-            <span className="text-xs text-slate-500">{selectedIds.length} selecionado(s)</span>
+            {selectedIds.length > 0 && (
+              <span className="text-xs font-semibold text-primary bg-primary/8 border border-primary/20 px-2.5 py-1.5 rounded-xl">
+                {selectedIds.length} selecionado(s)
+              </span>
+            )}
           </div>
 
           {showFilters && (
@@ -2083,11 +2089,11 @@ export default function AdminUsuarios() {
                         </td>
                         <td className="px-3 py-3 text-slate-600 text-xs">{ALCADA_LABEL[p.alcada_nivel]}</td>
                         <td className="px-3 py-3">
-                          <div className="flex flex-wrap gap-1 max-w-[300px]">
+                          <div className="flex flex-wrap gap-1 max-w-[240px]">
                             {enabledModulos.length === 0 && (
                               <span className="text-[11px] text-slate-400">Sem módulos</span>
                             )}
-                            {enabledModulos.map(mod => (
+                            {enabledModulos.slice(0, 3).map(mod => (
                               <span
                                 key={`${p.id}-${mod.key}`}
                                 className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-slate-100 text-slate-600 text-[10px] font-semibold"
@@ -2097,6 +2103,14 @@ export default function AdminUsuarios() {
                                 {mod.label}
                               </span>
                             ))}
+                            {enabledModulos.length > 3 && (
+                              <span
+                                className="inline-flex items-center px-1.5 py-0.5 rounded-md bg-slate-200 text-slate-500 text-[10px] font-semibold"
+                                title={enabledModulos.slice(3).map(m => m.label).join(', ')}
+                              >
+                                +{enabledModulos.length - 3}
+                              </span>
+                            )}
                           </div>
                         </td>
                         <td className="px-3 py-3">
