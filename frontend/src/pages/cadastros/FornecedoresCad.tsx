@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo } from 'react'
+import { useState, useCallback, useMemo, useEffect } from 'react'
 import {
   Building2, Plus, Search, ChevronRight, CheckCircle2, AlertCircle,
   Phone, Mail, Loader2, ArrowUp, ArrowDown, LayoutList, LayoutGrid, Trash2,
@@ -157,6 +157,17 @@ export default function FornecedoresCad() {
 
   const cnpjValidationMessage = getCnpjValidationMessage()
 
+  useEffect(() => {
+    const cep = onlyDigits((editItem as any)?.cep)
+    const hasEndereco = Boolean((editItem as any)?.endereco)
+    if (showForm && cep.length === 8 && !hasEndereco) {
+      cepLookup.consultar(cep)
+    }
+    if (hasEndereco && cepLookup.erro) {
+      cepLookup.limpar()
+    }
+  }, [showForm, (editItem as any)?.cep, (editItem as any)?.endereco, cepLookup.consultar, cepLookup.limpar, cepLookup.erro])
+
   function handleCnpjChange(value: string) {
     set('cnpj', onlyDigits(value).slice(0, 14))
     setCnpjDirty(true)
@@ -164,6 +175,16 @@ export default function FornecedoresCad() {
     setConfidence(prev => {
       const next = { ...prev }
       delete next.cnpj
+      return next
+    })
+  }
+
+  function handleCepChange(value: string) {
+    set('cep', onlyDigits(value).slice(0, 8))
+    cepLookup.limpar()
+    setConfidence(prev => {
+      const next = { ...prev }
+      delete next.cep
       return next
     })
   }
@@ -437,7 +458,7 @@ export default function FornecedoresCad() {
               <ConfidenceField label="Email" value={editItem.email ?? ''} onChange={v => set('email', v)}
                 confidence={confidence.email} type="email" placeholder="email@empresa.com" />
               <div className="relative">
-                <ConfidenceField label="CEP" value={(editItem as any).cep ?? ''} onChange={v => set('cep', v)}
+                <ConfidenceField label="CEP" value={(editItem as any).cep ?? ''} onChange={handleCepChange}
                   confidence={confidence.cep} placeholder="00000-000"
                   onBlur={() => cepLookup.consultar((editItem as any).cep ?? '')} />
                 {cepLookup.loading && (
