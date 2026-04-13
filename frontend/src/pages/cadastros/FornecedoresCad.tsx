@@ -135,6 +135,11 @@ export default function FornecedoresCad() {
   const cnpjStatusLabel = cnpjLookupMatches ? formatStatus(cnpjLookup.dados?.situacao) : ''
   const isCnpjActive = cnpjStatus === 'ATIVA'
   const invalidCnpjStatus = Boolean(cnpjStatus && !isCnpjActive)
+  const cnpjInputClassName = cnpjLookupMatches
+    ? isCnpjActive
+      ? 'text-emerald-700 font-semibold'
+      : 'text-red-600 font-semibold'
+    : ''
 
   function getCnpjValidationMessage() {
     if (!editItem) return null
@@ -404,7 +409,8 @@ export default function FornecedoresCad() {
             <div className="grid grid-cols-2 gap-3">
               <div className="relative">
                 <ConfidenceField label="CNPJ" value={editItem.cnpj ?? ''} onChange={handleCnpjChange}
-                  confidence={confidence.cnpj} showConfidence={false} placeholder="00.000.000/0000-00"
+                  confidence={confidence.cnpj} showConfidence={false} inputClassName={cnpjInputClassName}
+                  placeholder="00.000.000/0000-00"
                   onBlur={() => cnpjLookup.consultar(editItem.cnpj ?? '')} />
                 {cnpjLookup.loading && (
                   <div className="absolute right-2 top-7 flex items-center gap-1 text-violet-500">

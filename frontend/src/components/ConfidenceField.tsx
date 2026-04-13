@@ -14,11 +14,12 @@ interface ConfidenceFieldProps {
   onBlur?: () => void
   normalizeText?: boolean
   showConfidence?: boolean
+  inputClassName?: string
 }
 
 export default function ConfidenceField({
   label, value, onChange, confidence, type = 'text',
-  placeholder, required, disabled, children, onBlur, normalizeText = true, showConfidence = true,
+  placeholder, required, disabled, children, onBlur, normalizeText = true, showConfidence = true, inputClassName = '',
 }: ConfidenceFieldProps) {
   const has = showConfidence && confidence !== undefined
 
@@ -68,7 +69,7 @@ export default function ConfidenceField({
           onBlur={onBlur}
           placeholder={placeholder}
           disabled={disabled}
-          className={`input-base border-l-4 ${borderColor} ${bgColor} transition-all`}
+          className={`input-base border-l-4 ${borderColor} ${bgColor} ${inputClassName} transition-all`}
         />
       )}
     </div>
