@@ -92,7 +92,7 @@ export default defineConfig({
   server: { port: 5173, host: '127.0.0.1' },
   build: {
     target: 'es2020',
-    sourcemap: false,
+    sourcemap: true,
     cssCodeSplit: true,
     rollupOptions: {
       input: {
