@@ -16,6 +16,7 @@ import { useAuth } from '../contexts/AuthContext'
 import StatusBadge from '../components/StatusBadge'
 import FluxoTimeline from '../components/FluxoTimeline'
 import EmitirPedidoModal from '../components/EmitirPedidoModal'
+import { UpperTextarea } from '../components/UpperInput'
 import type { StatusRequisicao, Aprovacao, Requisicao } from '../types'
 
 // ── Formatters ──────────────────────────────────────────────────────────────
@@ -346,7 +347,7 @@ function DetailModal({ r, apr, onClose, isDark, canDecide, onDecisao, isProcessi
           {r.status === 'em_esclarecimento' && (
             <div className={`pt-3 space-y-3 ${isDark ? 'border-t border-white/[0.06]' : 'border-t border-amber-100'}`}>
               <p className={`text-[10px] font-bold text-center uppercase tracking-wide ${isDark ? 'text-amber-400' : 'text-amber-600'}`}>Responder Esclarecimento</p>
-              <textarea
+              <UpperTextarea
                 rows={3}
                 className={`w-full border rounded-xl px-3 py-2 text-sm outline-none ${
                   isDark ? 'bg-white/5 border-amber-500/20 text-white placeholder:text-slate-500 focus:ring-2 focus:ring-amber-500/30'
@@ -369,7 +370,7 @@ function DetailModal({ r, apr, onClose, isDark, canDecide, onDecisao, isProcessi
           {/* Ações de decisão (aprovador) */}
           {canDecide && r.status !== 'em_esclarecimento' && (
             <div className={`pt-3 space-y-3 ${isDark ? 'border-t border-white/[0.06]' : 'border-t border-slate-100'}`}>
-              <textarea
+              <UpperTextarea
                 rows={2}
                 className={`w-full border rounded-xl px-3 py-2 text-sm outline-none ${
                   isDark ? 'bg-white/5 border-white/10 text-white placeholder:text-slate-500 focus:ring-2 focus:ring-teal-500/30'

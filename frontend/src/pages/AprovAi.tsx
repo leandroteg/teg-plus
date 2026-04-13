@@ -21,6 +21,7 @@ import {
 } from '../hooks/useAprovacoes'
 import type { HistoricoFiltros } from '../hooks/useAprovacoes'
 import FluxoTimeline from '../components/FluxoTimeline'
+import { UpperTextarea } from '../components/UpperInput'
 import type { AprovacaoPendente, AprovacaoHistorico, TipoAprovacao } from '../types'
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
@@ -382,7 +383,7 @@ function AprovacaoCard({ aprovacao, aprovadorNome, aprovadorEmail }: {
             <label className="text-xs text-slate-400">
               {action === 'esclarecimento' ? 'Descreva o esclarecimento necessario (obrigatorio)' : 'Observacao (opcional)'}
             </label>
-            <textarea
+            <UpperTextarea
               rows={2}
               className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm mt-1 focus:ring-2 focus:ring-indigo-300 outline-none"
               placeholder={action === 'esclarecimento' ? 'O que precisa ser esclarecido...' : 'Motivo da decisao...'}
@@ -730,7 +731,7 @@ function GenericPendingCard({ aprovacao, aprovadorNome, aprovadorEmail }: {
             <label className="text-xs text-slate-400">
               {action === 'esclarecimento' ? 'Descreva o esclarecimento necessario (obrigatorio)' : 'Observacao / Esclarecimento'}
             </label>
-            <textarea
+            <UpperTextarea
               rows={2}
               className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm mt-1 focus:ring-2 focus:ring-indigo-300 outline-none"
               placeholder={action === 'esclarecimento' ? 'O que precisa ser esclarecido...' : 'Descreva o que precisa ser esclarecido ou justifique sua decisao...'}
