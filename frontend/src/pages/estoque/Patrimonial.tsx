@@ -32,6 +32,26 @@ const EMPTY_FORM: Partial<PatImobilizado> = {
   vida_util_meses: 60, taxa_depreciacao_anual: 20, valor_residual: 0,
 }
 
+const CATEGORIA_PREFIX: Record<string, string> = {
+  'Móveis': 'MOB',
+  'Veículos': 'VEI',
+  'Equipamentos': 'EQP',
+  'Informática': 'INF',
+}
+
+const CATEGORIAS_PADRAO = Object.keys(CATEGORIA_PREFIX)
+
+function getCategoriaPrefix(categoria: string): string {
+  return CATEGORIA_PREFIX[categoria] ?? 'PAT'
+}
+
+function gerarNumeroPatrimonio(categoria: string, imobs: PatImobilizado[]): string {
+  const prefix = getCategoriaPrefix(categoria)
+  const countInCategory = imobs.filter(i => i.categoria === categoria).length
+  const seq = String(countInCategory + 1).padStart(3, '0')
+  return `${prefix}-${seq}`
+}
+
 const COMPETENCIA = (() => {
   const d = new Date()
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
@@ -55,6 +75,7 @@ export default function Patrimonial({
   const { isLightSidebar: isLight } = useTheme()
   const [busca, setBusca] = useState('')
   const [statusFiltro, setStatusFiltro] = useState<string>('')
+  const [categoriaFiltro, setCategoriaFiltro] = useState<string>('')
   const [showForm, setShowForm] = useState(false)
   const [editItem, setEditItem] = useState<Partial<PatImobilizado> | null>(null)
   const [expandedId, setExpandedId] = useState<string | null>(null)
@@ -63,9 +84,23 @@ export default function Patrimonial({
   const [viewMode, setViewMode] = useState<ViewMode>('cards')
 
   const filtroAtivo = forcedStatusFiltro ?? statusFiltro
-  const { data: imobs = [], isLoading } = useImobilizados(
-    filtroAtivo ? { status: filtroAtivo } : undefined
-  )
+  const filtrosQuery = useMemo(() => {
+    const f: { status?: string; categoria?: string } = {}
+    if (filtroAtivo) f.status = filtroAtivo
+    if (categoriaFiltro) f.categoria = categoriaFiltro
+    return Object.keys(f).length > 0 ? f : undefined
+  }, [filtroAtivo, categoriaFiltro])
+  const { data: imobs = [], isLoading } = useImobilizados(filtrosQuery)
+
+  // All imobs (no filters) for unique categories list and sequential numbering
+  const { data: allImobs = [] } = useImobilizados()
+
+  const uniqueCategories = useMemo(() => {
+    const cats = new Set<string>()
+    allImobs.forEach(i => { if (i.categoria) cats.add(i.categoria) })
+    CATEGORIAS_PADRAO.forEach(c => cats.add(c))
+    return Array.from(cats).sort()
+  }, [allImobs])
   const { data: kpis } = usePatrimonialKPIs()
   const { data: bases = [] } = useBases()
   const salvar = useSalvarImobilizado()
@@ -195,6 +230,18 @@ export default function Patrimonial({
             ))}
           </select>
         )}
+        <select
+          value={categoriaFiltro}
+          onChange={e => setCategoriaFiltro(e.target.value)}
+          className={`px-3 py-2 rounded-xl border text-xs font-semibold
+            focus:outline-none focus:ring-2 focus:ring-blue-500/30
+            ${isLight ? 'border-slate-200 bg-white text-slate-600' : 'border-white/[0.08] bg-white/[0.03] text-slate-300'}`}
+        >
+          <option value="">Todas as categorias</option>
+          {uniqueCategories.map(cat => (
+            <option key={cat} value={cat}>{cat}</option>
+          ))}
+        </select>
         <div className={`flex items-center rounded-xl border overflow-hidden ${
           isLight ? 'border-slate-200 bg-white' : 'border-white/[0.08] bg-white/[0.03]'
         }`}>
@@ -288,6 +335,7 @@ export default function Patrimonial({
         <ImobilizadoFormModal
           item={editItem}
           bases={bases}
+          allImobs={allImobs}
           onChange={setEditItem}
           onSave={handleSave}
           onClose={() => { setShowForm(false); setEditItem(null) }}
@@ -610,17 +658,26 @@ function ImobilizadoDetail({
 
 // -- Form Modal ------------------------------------------------------------------
 function ImobilizadoFormModal({
-  item, bases, onChange, onSave, onClose, saving, isLight
+  item, bases, allImobs, onChange, onSave, onClose, saving, isLight
 }: {
   item: Partial<PatImobilizado>
   bases: any[]
+  allImobs: PatImobilizado[]
   onChange: (v: any) => void
   onSave: () => void
   onClose: () => void
   saving: boolean
   isLight: boolean
 }) {
+  const isNew = !item.id
   const set = (k: keyof PatImobilizado, v: any) => onChange({ ...item, [k]: v })
+  const setCategoria = (cat: string) => {
+    const updates: Partial<PatImobilizado> = { ...item, categoria: cat }
+    if (isNew && cat) {
+      updates.numero_patrimonio = gerarNumeroPatrimonio(cat, allImobs)
+    }
+    onChange(updates)
+  }
 
   const modalBg = isLight ? 'bg-white' : 'bg-[#111827]'
   const borderB = isLight ? 'border-slate-100' : 'border-white/[0.06]'
@@ -646,7 +703,12 @@ function ImobilizadoFormModal({
             <div>
               <label className={`block text-xs font-bold mb-1 ${labelCls}`}>{'N. Patrim\u00f4nio *'}</label>
               <input value={item.numero_patrimonio ?? ''} onChange={e => set('numero_patrimonio', e.target.value)}
-                className={inputCls} placeholder="PAT-0001" />
+                readOnly={isNew && !!item.categoria}
+                className={`${inputCls} ${isNew && !!item.categoria ? 'opacity-70 cursor-not-allowed' : ''}`}
+                placeholder={isNew ? 'Selecione a categoria para gerar' : 'PAT-0001'} />
+              {isNew && !!item.categoria && (
+                <p className={`text-[10px] mt-0.5 ${isLight ? 'text-blue-500' : 'text-blue-400'}`}>Gerado automaticamente pela categoria</p>
+              )}
             </div>
             <div>
               <label className={`block text-xs font-bold mb-1 ${labelCls}`}>Status</label>
@@ -668,8 +730,22 @@ function ImobilizadoFormModal({
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className={`block text-xs font-bold mb-1 ${labelCls}`}>Categoria</label>
-              <input value={item.categoria ?? ''} onChange={e => set('categoria', e.target.value)}
-                className={inputCls} placeholder="Ex: Veiculos, TI..." />
+              <select value={item.categoria ?? ''} onChange={e => setCategoria(e.target.value)}
+                className={inputCls}>
+                <option value="">Selecione...</option>
+                {CATEGORIAS_PADRAO.map(cat => (
+                  <option key={cat} value={cat}>{cat}</option>
+                ))}
+                {/* Show any existing categories not in the standard list */}
+                {allImobs
+                  .map(i => i.categoria)
+                  .filter((c, idx, arr) => c && !CATEGORIAS_PADRAO.includes(c) && arr.indexOf(c) === idx)
+                  .sort()
+                  .map(cat => (
+                    <option key={cat} value={cat}>{cat}</option>
+                  ))
+                }
+              </select>
             </div>
             <div>
               <label className={`block text-xs font-bold mb-1 ${labelCls}`}>Base</label>

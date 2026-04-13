@@ -1,11 +1,12 @@
 import { useState, useMemo } from 'react'
+import { useNavigate } from 'react-router-dom'
 import {
   Package2, Plus, Search, AlertTriangle, LayoutList, LayoutGrid,
   X, Save, Loader2, Download, Truck, PackageCheck, RefreshCw, ClipboardCheck,
   CheckCircle2, Warehouse, Building2, Ban,
 } from 'lucide-react'
 import {
-  useEstoqueItens, useSalvarItem, useSaldos,
+  useEstoqueItens, useSalvarItem, useSaldos, useBases,
   useAguardandoEntrada, useEmMovimentacao, useLiberadosRetirada,
   useConfirmarEntrada,
 } from '../../hooks/useEstoque'
@@ -78,8 +79,11 @@ export default function Itens() {
   const [curvaFiltro, setCurvaFiltro] = useState('')
   const [showForm, setShowForm] = useState(false)
   const [editItem, setEditItem] = useState<Partial<EstItem> | null>(null)
+  const [baseFiltroEntrada, setBaseFiltroEntrada] = useState('')
+  const [baseFiltroLiberado, setBaseFiltroLiberado] = useState('')
 
   // Data
+  const { data: bases = [] } = useBases()
   const { data: saldos = [], isLoading: loadingSaldos } = useSaldos()
   const { data: entradas = [], isLoading: loadingEntradas } = useAguardandoEntrada()
   const { data: liberados = [], isLoading: loadingLiberados } = useLiberadosRetirada()
@@ -104,12 +108,16 @@ export default function Itens() {
   }, [saldos, curvaFiltro, busca])
 
   const entradasFiltradas = useMemo(() => {
-    if (!busca.trim()) return entradas
-    const t = busca.toLowerCase()
-    return entradas.filter(e =>
-      e.descricao.toLowerCase().includes(t) || e.codigo.toLowerCase().includes(t)
-    )
-  }, [entradas, busca])
+    let list = entradas
+    if (baseFiltroEntrada) list = list.filter(e => e.base_nome === baseFiltroEntrada)
+    if (busca.trim()) {
+      const t = busca.toLowerCase()
+      list = list.filter(e =>
+        e.descricao.toLowerCase().includes(t) || e.codigo.toLowerCase().includes(t)
+      )
+    }
+    return list
+  }, [entradas, busca, baseFiltroEntrada])
 
   const movsFiltradas = useMemo(() => {
     if (!busca.trim()) return movs
@@ -120,14 +128,18 @@ export default function Itens() {
   }, [movs, busca])
 
   const liberadosFiltrados = useMemo(() => {
-    if (!busca.trim()) return liberados
-    const t = busca.toLowerCase()
-    return liberados.filter(s =>
-      s.numero.toLowerCase().includes(t) ||
-      s.solicitante_nome.toLowerCase().includes(t) ||
-      s.obra_nome.toLowerCase().includes(t)
-    )
-  }, [liberados, busca])
+    let list = liberados
+    if (baseFiltroLiberado) list = list.filter(s => s.obra_nome === baseFiltroLiberado)
+    if (busca.trim()) {
+      const t = busca.toLowerCase()
+      list = list.filter(s =>
+        s.numero.toLowerCase().includes(t) ||
+        s.solicitante_nome.toLowerCase().includes(t) ||
+        s.obra_nome.toLowerCase().includes(t)
+      )
+    }
+    return list
+  }, [liberados, busca, baseFiltroLiberado])
 
   const counts: Record<EstoquePipelineTab, number> = {
     aguardando_entrada: entradasFiltradas.length,
@@ -265,6 +277,34 @@ export default function Itens() {
                 </button>
               ))}
             </div>
+          )}
+
+          {activeTab === 'aguardando_entrada' && (
+            <select
+              value={baseFiltroEntrada}
+              onChange={e => setBaseFiltroEntrada(e.target.value)}
+              className={`px-2 py-1.5 rounded-lg border text-xs
+                focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400
+                ${isDark ? 'border-white/[0.08] bg-white/[0.03] text-slate-200' : 'border-slate-200 bg-white text-slate-800'}`}
+            >
+              <option value="">Todas as bases</option>
+              {bases.map(b => <option key={b.id} value={b.nome}>{b.nome}</option>)}
+            </select>
+          )}
+
+          {activeTab === 'liberado_retirada' && (
+            <select
+              value={baseFiltroLiberado}
+              onChange={e => setBaseFiltroLiberado(e.target.value)}
+              className={`px-2 py-1.5 rounded-lg border text-xs
+                focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400
+                ${isDark ? 'border-white/[0.08] bg-white/[0.03] text-slate-200' : 'border-slate-200 bg-white text-slate-800'}`}
+            >
+              <option value="">Todas as obras</option>
+              {[...new Set(liberados.map(s => s.obra_nome).filter(Boolean))].sort().map(obra => (
+                <option key={obra} value={obra}>{obra}</option>
+              ))}
+            </select>
           )}
 
           <div className={`flex items-center rounded-lg border overflow-hidden ${isDark ? 'border-white/[0.06]' : 'border-slate-200'}`}>
@@ -489,6 +529,7 @@ function DestinoBadge({ tipo, isDark }: { tipo?: string; isDark: boolean }) {
 }
 
 function EntradasList({ data, isDark, onConfirm, confirming }: { data: EstoqueEntradaItem[]; isDark: boolean; onConfirm: (ids: string[]) => void; confirming: boolean }) {
+  const navigate = useNavigate()
   if (data.length === 0) return <EmptyState icon={PackageCheck} msg="Nenhuma entrada pendente" sub="Os itens aparecerão aqui após confirmar recebimento" isDark={isDark} />
   return (
     <>
@@ -519,7 +560,14 @@ function EntradasList({ data, isDark, onConfirm, confirming }: { data: EstoqueEn
             <DestinoBadge tipo={e.tipo_destino} isDark={isDark} />
           </span>
           <span className={`text-[11px] font-mono w-[120px] shrink-0 truncate ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
-            {e.numero_pedido || '—'}
+            {e.numero_pedido ? (
+              <button
+                onClick={() => navigate(`/pedidos?busca=${encodeURIComponent(e.numero_pedido!)}`)}
+                className="text-blue-500 hover:text-blue-600 hover:underline cursor-pointer"
+              >
+                {e.numero_pedido}
+              </button>
+            ) : '—'}
           </span>
           <span className={`text-[11px] truncate w-[120px] shrink-0 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
             {e.fornecedor_nome || '—'}
@@ -556,6 +604,7 @@ function EntradasList({ data, isDark, onConfirm, confirming }: { data: EstoqueEn
 }
 
 function EntradasCards({ data, isDark, onConfirm, confirming }: { data: EstoqueEntradaItem[]; isDark: boolean; onConfirm: (ids: string[]) => void; confirming: boolean }) {
+  const navigate = useNavigate()
   if (data.length === 0) return <EmptyState icon={PackageCheck} msg="Nenhuma entrada pendente" sub="Os itens aparecerão aqui após confirmar recebimento" isDark={isDark} />
   return (
     <div className="space-y-2 p-4">
@@ -570,7 +619,18 @@ function EntradasCards({ data, isDark, onConfirm, confirming }: { data: EstoqueE
             <div className="flex items-start justify-between">
               <div className="min-w-0">
                 <p className={`font-mono text-[10px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
-                  {e.codigo || '—'} {e.numero_pedido ? `· ${e.numero_pedido}` : ''}
+                  {e.codigo || '—'}{' '}
+                  {e.numero_pedido ? (
+                    <>
+                      {'· '}
+                      <button
+                        onClick={() => navigate(`/pedidos?busca=${encodeURIComponent(e.numero_pedido!)}`)}
+                        className="text-blue-500 hover:text-blue-600 hover:underline cursor-pointer"
+                      >
+                        {e.numero_pedido}
+                      </button>
+                    </>
+                  ) : ''}
                 </p>
                 <p className={`font-semibold text-sm truncate mt-0.5 ${isDark ? 'text-white' : 'text-slate-800'}`}>
                   {e.descricao}

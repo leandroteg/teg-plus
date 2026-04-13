@@ -1,15 +1,15 @@
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import {
-  ClipboardList, Plus, CheckCircle2, Clock, X,
-  Save, Loader2, ChevronDown, ChevronRight,
+  ClipboardList, Plus, CheckCircle2, Clock, X, Search,
+  Save, Loader2, ChevronDown, ChevronRight, PackagePlus,
 } from 'lucide-react'
 import {
   useInventarios, useInventario,
   useAbrirInventario, useSalvarContagem, useConcluirInventario,
-  useBases,
+  useBases, useAdicionarItemInventario, useInventarioItemSearch,
 } from '../../hooks/useEstoque'
 import { useTheme } from '../../contexts/ThemeContext'
-import type { EstInventario, TipoInventario } from '../../types/estoque'
+import type { EstInventario, EstItem, TipoInventario } from '../../types/estoque'
 
 const STATUS_CONFIG = {
   aberto:       { label: 'Aberto',       bg: 'bg-blue-50',    text: 'text-blue-700',    dot: 'bg-blue-500'    },
@@ -188,6 +188,7 @@ function InventarioCard({
   const { data: detail } = useInventario(isExpanded ? inventario.id : undefined)
   const salvarContagem = useSalvarContagem()
   const [contagens, setContagens] = useState<Record<string, number>>({})
+  const [showAddItem, setShowAddItem] = useState(false)
 
   const itens = detail?.itens ?? []
   const contados = itens.filter(i => i.saldo_contado != null).length
@@ -236,6 +237,15 @@ function InventarioCard({
         {isExpanded ? <ChevronDown size={16} className="text-slate-400 shrink-0" /> : <ChevronRight size={16} className="text-slate-400 shrink-0" />}
       </div>
 
+      {showAddItem && (
+        <AdicionarItemModal
+          inventarioId={inventario.id}
+          baseId={inventario.base_id}
+          isLight={isLight}
+          onClose={() => setShowAddItem(false)}
+        />
+      )}
+
       {isExpanded && (
         <div className={`border-t ${isLight ? 'border-slate-100' : 'border-white/[0.04]'}`}>
           {inventario.status !== 'concluido' && inventario.status !== 'cancelado' && (
@@ -243,15 +253,27 @@ function InventarioCard({
               <p className={`text-xs ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
                 {contados}/{itens.length} itens contados
               </p>
-              <button
-                onClick={onConcluir}
-                disabled={concluding || contados === 0}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700
-                  text-white text-xs font-semibold transition-colors disabled:opacity-50"
-              >
-                {concluding ? <Loader2 size={12} className="animate-spin" /> : <CheckCircle2 size={12} />}
-                Concluir
-              </button>
+              <div className="flex items-center gap-2">
+                {inventario.status === 'aberto' && (
+                  <button
+                    onClick={() => setShowAddItem(true)}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700
+                      text-white text-xs font-semibold transition-colors"
+                  >
+                    <PackagePlus size={12} />
+                    Adicionar Item
+                  </button>
+                )}
+                <button
+                  onClick={onConcluir}
+                  disabled={concluding || contados === 0}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700
+                    text-white text-xs font-semibold transition-colors disabled:opacity-50"
+                >
+                  {concluding ? <Loader2 size={12} className="animate-spin" /> : <CheckCircle2 size={12} />}
+                  Concluir
+                </button>
+              </div>
             </div>
           )}
 
@@ -304,6 +326,242 @@ function InventarioCard({
           </div>
         </div>
       )}
+    </div>
+  )
+}
+
+// -- Modal Adicionar Item ao Inventario ----------------------------------------
+function AdicionarItemModal({
+  inventarioId, baseId, isLight, onClose,
+}: {
+  inventarioId: string
+  baseId?: string
+  isLight: boolean
+  onClose: () => void
+}) {
+  const adicionarItem = useAdicionarItemInventario()
+  const [search, setSearch] = useState('')
+  const [selectedItem, setSelectedItem] = useState<EstItem | null>(null)
+  const [modoLivre, setModoLivre] = useState(false)
+  const [nomeLivre, setNomeLivre] = useState('')
+  const [unidadeLivre, setUnidadeLivre] = useState('UN')
+  const [qtdFisica, setQtdFisica] = useState<number>(0)
+  const [showResults, setShowResults] = useState(false)
+  const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; msg: string } | null>(null)
+  const resultsRef = useRef<HTMLDivElement>(null)
+
+  const { data: resultados = [], isFetching } = useInventarioItemSearch(search)
+
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (resultsRef.current && !resultsRef.current.contains(e.target as Node)) {
+        setShowResults(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
+
+  async function handleSubmit() {
+    try {
+      if (modoLivre) {
+        if (!nomeLivre.trim()) {
+          setFeedback({ type: 'error', msg: 'Informe o nome do item' })
+          return
+        }
+        await adicionarItem.mutateAsync({
+          inventario_id: inventarioId,
+          base_id: baseId,
+          descricao_livre: nomeLivre.trim(),
+          unidade: unidadeLivre,
+          quantidade_fisica: qtdFisica,
+        })
+      } else {
+        if (!selectedItem) {
+          setFeedback({ type: 'error', msg: 'Selecione um item do catalogo' })
+          return
+        }
+        await adicionarItem.mutateAsync({
+          inventario_id: inventarioId,
+          item_id: selectedItem.id,
+          base_id: baseId,
+          quantidade_fisica: qtdFisica,
+        })
+      }
+      setFeedback({ type: 'success', msg: 'Item adicionado ao inventario' })
+      onClose()
+    } catch (err: any) {
+      setFeedback({ type: 'error', msg: err?.message ?? 'Erro ao adicionar item' })
+    }
+  }
+
+  const inputCls = isLight
+    ? 'input-base'
+    : 'input-base bg-white/[0.04] border-white/[0.08] text-slate-200 placeholder:text-slate-500'
+
+  const labelCls = isLight ? 'text-slate-600' : 'text-slate-300'
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+      <div className={`rounded-2xl shadow-2xl w-full max-w-md ${isLight ? 'bg-white' : 'bg-[#111827]'}`}>
+        {/* Header */}
+        <div className={`flex items-center justify-between px-6 py-4 border-b ${isLight ? 'border-slate-100' : 'border-white/[0.06]'}`}>
+          <h2 className={`text-lg font-extrabold ${isLight ? 'text-slate-800' : 'text-white'}`}>Adicionar Item ao Inventario</h2>
+          <button onClick={onClose}
+            className={`w-8 h-8 rounded-lg flex items-center justify-center ${isLight ? 'hover:bg-slate-100 text-slate-500' : 'hover:bg-white/[0.06] text-slate-400'}`}>
+            <X size={16} />
+          </button>
+        </div>
+
+        <div className="p-6 space-y-4">
+          {/* Toggle modo */}
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => { setModoLivre(false); setSelectedItem(null) }}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
+                !modoLivre
+                  ? 'bg-blue-600 text-white'
+                  : isLight ? 'bg-slate-100 text-slate-600' : 'bg-white/[0.06] text-slate-400'
+              }`}
+            >
+              Do Catalogo
+            </button>
+            <button
+              onClick={() => { setModoLivre(true); setSelectedItem(null); setSearch('') }}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
+                modoLivre
+                  ? 'bg-blue-600 text-white'
+                  : isLight ? 'bg-slate-100 text-slate-600' : 'bg-white/[0.06] text-slate-400'
+              }`}
+            >
+              Item Livre
+            </button>
+          </div>
+
+          {!modoLivre ? (
+            <>
+              {/* Search autocomplete */}
+              <div className="relative" ref={resultsRef}>
+                <label className={`block text-xs font-bold mb-1 ${labelCls}`}>Buscar item no catalogo</label>
+                <div className="relative">
+                  <Search size={14} className={`absolute left-3 top-1/2 -translate-y-1/2 ${isLight ? 'text-slate-400' : 'text-slate-500'}`} />
+                  <input
+                    value={search}
+                    onChange={e => { setSearch(e.target.value); setShowResults(true); setSelectedItem(null) }}
+                    onFocus={() => setShowResults(true)}
+                    className={`${inputCls} pl-9`}
+                    placeholder="Codigo ou descricao..."
+                  />
+                  {isFetching && <Loader2 size={14} className="absolute right-3 top-1/2 -translate-y-1/2 animate-spin text-blue-500" />}
+                </div>
+
+                {showResults && resultados.length > 0 && (
+                  <div className={`absolute z-10 mt-1 w-full max-h-48 overflow-y-auto rounded-xl border shadow-lg
+                    ${isLight ? 'bg-white border-slate-200' : 'bg-[#1a2332] border-white/[0.08]'}`}>
+                    {resultados.map(item => (
+                      <button
+                        key={item.id}
+                        onClick={() => {
+                          setSelectedItem(item)
+                          setSearch(item.descricao ?? '')
+                          setShowResults(false)
+                        }}
+                        className={`w-full text-left px-3 py-2 text-xs transition-colors
+                          ${isLight ? 'hover:bg-slate-50' : 'hover:bg-white/[0.04]'}`}
+                      >
+                        <p className={`font-semibold ${isLight ? 'text-slate-700' : 'text-slate-200'}`}>
+                          {item.descricao}
+                        </p>
+                        <p className={`text-[10px] ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>
+                          {item.codigo} - {item.unidade} {item.categoria ? `- ${item.categoria}` : ''}
+                        </p>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {selectedItem && (
+                <div className={`rounded-xl border p-3 ${isLight ? 'bg-blue-50 border-blue-100' : 'bg-blue-900/20 border-blue-800/30'}`}>
+                  <p className={`text-xs font-semibold ${isLight ? 'text-blue-800' : 'text-blue-300'}`}>{selectedItem.descricao}</p>
+                  <p className={`text-[10px] mt-0.5 ${isLight ? 'text-blue-600' : 'text-blue-400'}`}>
+                    Codigo: {selectedItem.codigo} | Unidade: {selectedItem.unidade}
+                  </p>
+                </div>
+              )}
+            </>
+          ) : (
+            <>
+              <div>
+                <label className={`block text-xs font-bold mb-1 ${labelCls}`}>Nome do item</label>
+                <input
+                  value={nomeLivre}
+                  onChange={e => setNomeLivre(e.target.value)}
+                  className={inputCls}
+                  placeholder="Descricao do material..."
+                />
+              </div>
+              <div>
+                <label className={`block text-xs font-bold mb-1 ${labelCls}`}>Unidade</label>
+                <select value={unidadeLivre} onChange={e => setUnidadeLivre(e.target.value)} className={inputCls}>
+                  <option value="UN">UN - Unidade</option>
+                  <option value="KG">KG - Quilograma</option>
+                  <option value="M">M - Metro</option>
+                  <option value="L">L - Litro</option>
+                  <option value="CX">CX - Caixa</option>
+                  <option value="PC">PC - Peca</option>
+                  <option value="M2">M2 - Metro Quadrado</option>
+                  <option value="M3">M3 - Metro Cubico</option>
+                  <option value="TON">TON - Tonelada</option>
+                </select>
+              </div>
+            </>
+          )}
+
+          <div>
+            <label className={`block text-xs font-bold mb-1 ${labelCls}`}>Quantidade fisica (contagem)</label>
+            <input
+              type="number"
+              min={0}
+              value={qtdFisica}
+              onChange={e => setQtdFisica(Number(e.target.value))}
+              className={inputCls}
+              placeholder="0"
+            />
+          </div>
+        </div>
+
+        {/* Feedback */}
+        {feedback && (
+          <div className={`mx-6 mb-2 flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium ${
+            feedback.type === 'success' ? 'bg-emerald-500/10 text-emerald-400' : 'bg-red-500/10 text-red-400'
+          }`}>
+            {feedback.type === 'success' ? <CheckCircle2 size={14} /> : <X size={14} />}
+            {feedback.msg}
+          </div>
+        )}
+
+        {/* Footer */}
+        <div className={`px-6 py-4 border-t flex justify-end gap-2 ${isLight ? 'border-slate-100' : 'border-white/[0.06]'}`}>
+          <button onClick={onClose}
+            className={`px-4 py-2 rounded-xl border text-sm font-semibold transition-colors
+              ${isLight ? 'border-slate-200 text-slate-600 hover:bg-slate-50' : 'border-white/[0.08] text-slate-400 hover:bg-white/[0.04]'}`}>
+            Cancelar
+          </button>
+          <button
+            onClick={handleSubmit}
+            disabled={adicionarItem.isPending || (!modoLivre && !selectedItem) || (modoLivre && !nomeLivre.trim())}
+            className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700
+              text-white text-sm font-semibold transition-colors disabled:opacity-60 shadow-sm"
+          >
+            {adicionarItem.isPending
+              ? <Loader2 size={14} className="animate-spin" />
+              : <PackagePlus size={14} />
+            }
+            Adicionar
+          </button>
+        </div>
+      </div>
     </div>
   )
 }
