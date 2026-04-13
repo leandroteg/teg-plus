@@ -260,8 +260,9 @@ export default function NovaRequisicao() {
     setStep(2)
   }, [perfil, solicitante, categorias, descricao])
 
-  // ── AI Parse Handler (with progress + preview) ──────────────────────────────
-  const handleAiParse = async () => {
+  // ── AI Parse Handler (auto-triggered on file attach) ────────────────────────
+  const handleAiParse = async (fileArg?: File) => {
+    const fileToUse = fileArg ?? selectedFile
     let textoFinal = textoAi
     let arquivoPayload: { base64: string; nome: string; mime: string } | undefined
 
@@ -269,22 +270,21 @@ export default function NovaRequisicao() {
     setAiPreview(null)
     setShowPreview(false)
 
-    if (selectedFile) {
+    if (fileToUse) {
       try {
         // CSV fast path -- parse directly without AI
-        if (selectedFile.name.match(/\.csv$/i)) {
+        if (fileToUse.name.match(/\.csv$/i)) {
           const fileText = await new Promise<string>((resolve, reject) => {
             const reader = new FileReader()
             reader.onload = () => resolve(reader.result as string)
             reader.onerror = reject
-            reader.readAsText(selectedFile)
+            reader.readAsText(fileToUse)
           })
           const csvItems = parseCSVItems(fileText)
           if (csvItems.length > 0) {
             setItens(csvItems)
-            if (!descricao.trim()) setDescricao(toUpperNorm(`Itens importados de ${selectedFile.name} (${csvItems.length} itens)`))
+            if (!descricao.trim()) setDescricao(toUpperNorm(`Itens importados de ${fileToUse.name} (${csvItems.length} itens)`))
             setConfianca(0.95)
-            // Issue #18: Auto-fill solicitante
             if (perfil?.nome && !solicitante.trim()) setSolicitante(perfil.nome)
             setAiProgress('done')
             setTimeout(() => { setAiProgress('idle'); setStep(2) }, 600)
@@ -293,13 +293,13 @@ export default function NovaRequisicao() {
         }
 
         // Read file (auto-detect: binary -> base64, text -> string)
-        const fileData = await readFileForAi(selectedFile)
+        const fileData = await readFileForAi(fileToUse)
 
         if (fileData.arquivo) {
           arquivoPayload = fileData.arquivo
         } else if (fileData.texto) {
           textoFinal = textoFinal
-            ? `${textoFinal}\n\nConteudo do arquivo ${selectedFile.name}:\n${fileData.texto}`
+            ? `${textoFinal}\n\nConteudo do arquivo ${fileToUse.name}:\n${fileData.texto}`
             : fileData.texto
         }
       } catch {
@@ -323,11 +323,8 @@ export default function NovaRequisicao() {
 
       const sanitized = sanitizeItems(result.itens)
       setAiProgress('done')
-
-      // Issue #17: Show preview before applying
-      setAiPreview(result)
-      setPreviewItens(sanitized.length > 0 ? sanitized : [emptyItem()])
-      setShowPreview(true)
+      applyAiResult(result, sanitized, textoFinal)
+      setTimeout(() => setAiProgress('idle'), 2000)
     } catch {
       setAiProgress('error')
       setTimeout(() => setAiProgress('idle'), 3000)
@@ -577,23 +574,12 @@ export default function NovaRequisicao() {
             type="file"
             className="hidden"
             accept=".pdf,.xlsx,.xls,.csv,.doc,.docx,.jpg,.jpeg,.png,.webp"
-            onChange={async (event) => {
+            onChange={(event) => {
               const file = event.target.files?.[0]
-              if (!file) return
-              setReferenciaFile(file)
-              // Auto-parse: lê itens com IA automaticamente ao anexar
-              try {
-                const fileData = await readFileForAi(file)
-                const result = await aiParse.mutateAsync({
-                  texto: fileData.texto ?? '',
-                  solicitante_nome: solicitante,
-                  arquivo: fileData.arquivo,
-                })
-                if (result.itens?.length > 0) {
-                  setItens(sanitizeItems(result.itens))
-                  if (typeof result.confianca === 'number') setConfianca(result.confianca)
-                }
-              } catch { /* erro silencioso — usuário pode preencher manualmente */ }
+              if (file) {
+                setReferenciaFile(file)
+                handleAiParse(file)
+              }
             }}
           />
 
@@ -609,25 +595,59 @@ export default function NovaRequisicao() {
                     <p className="text-[11px] text-slate-400">{(referenciaFile.size / 1024).toFixed(1)} KB</p>
                   </div>
                 </div>
-                <div className="flex items-center gap-1.5">
-                  {aiParse.isPending && (
-                    <span className="flex items-center gap-1.5 text-[11px] font-semibold text-teal-600 bg-teal-50 border border-teal-100 rounded-full px-2.5 py-1">
-                      <Loader2 size={12} className="animate-spin" /> Lendo itens...
+                <button
+                  type="button"
+                  onClick={(event) => {
+                    event.stopPropagation()
+                    setReferenciaFile(null)
+                    setAiProgress('idle')
+                    if (referenciaInputRef.current) referenciaInputRef.current.value = ''
+                  }}
+                  className="rounded-full bg-white p-2 text-slate-400 transition hover:text-red-500"
+                >
+                  <X size={14} />
+                </button>
+              </div>
+
+              {/* AI status / action area */}
+              {(aiProgress === 'reading' || aiProgress === 'parsing') ? (
+                <div className="flex items-center gap-2 px-3 py-2 bg-teal-50 rounded-xl border border-teal-200">
+                  <div className="w-4 h-4 border-2 border-teal-500 border-t-transparent rounded-full animate-spin shrink-0" />
+                  <span className="text-xs font-semibold text-teal-700">
+                    {aiProgress === 'reading' ? 'Lendo arquivo...' : 'Extraindo itens com IA...'}
+                  </span>
+                </div>
+              ) : aiProgress === 'error' ? (
+                <div className="flex items-center gap-2 px-3 py-2 bg-red-50 rounded-xl border border-red-200">
+                  <AlertCircle size={14} className="text-red-500 shrink-0" />
+                  <span className="text-xs text-red-600">Não foi possível extrair itens — preencha manualmente</span>
+                </div>
+              ) : (
+                <div className="flex items-center gap-2 flex-wrap">
+                  {aiProgress === 'done' && (
+                    <span className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                      <CheckCircle2 size={12} /> Itens preenchidos pela IA
                     </span>
                   )}
-                  <button
-                    type="button"
-                    onClick={(event) => {
-                      event.stopPropagation()
-                      setReferenciaFile(null)
-                      if (referenciaInputRef.current) referenciaInputRef.current.value = ''
-                    }}
-                    className="rounded-full bg-white p-2 text-slate-400 transition hover:text-red-500"
+                  <a
+                    href={URL.createObjectURL(referenciaFile)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={e => e.stopPropagation()}
+                    className="flex items-center gap-1.5 py-1.5 px-3 rounded-xl text-xs font-semibold border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 transition-colors"
                   >
-                    <X size={14} />
-                  </button>
+                    <ExternalLink size={12} /> Visualizar
+                  </a>
+                  <a
+                    href={URL.createObjectURL(referenciaFile)}
+                    download={referenciaFile.name}
+                    onClick={e => e.stopPropagation()}
+                    className="flex items-center gap-1.5 py-1.5 px-3 rounded-xl text-xs font-semibold border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 transition-colors"
+                  >
+                    <Download size={12} /> Download
+                  </a>
                 </div>
-              </div>
+              )}
             </div>
           ) : (
             <div className="flex items-center gap-3">
