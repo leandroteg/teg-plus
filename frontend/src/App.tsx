@@ -152,6 +152,7 @@ const LogisticaHome = lazy(() => import('./pages/logistica/LogisticaHome'))
 const SolicitacoesPipeline = lazy(() => import('./pages/logistica/SolicitacoesPipeline'))
 const ExpedicaoPipeline = lazy(() => import('./pages/logistica/ExpedicaoPipeline'))
 const TransportesPipeline = lazy(() => import('./pages/logistica/TransportesPipeline'))
+const TelemetriaLogistica = lazy(() => import('./pages/logistica/TelemetriaLogistica'))
 
 // Frotas
 const FrotasHome = lazy(() => import('./pages/frotas/FrotasHome'))
@@ -280,6 +281,7 @@ export default function App() {
               <Route path="/logistica/solicitacoes"      element={<Lazy><SolicitacoesPipeline /></Lazy>} />
               <Route path="/logistica/expedicao"         element={<Lazy><ExpedicaoPipeline /></Lazy>} />
               <Route path="/logistica/transportes"       element={<Lazy><TransportesPipeline /></Lazy>} />
+              <Route path="/logistica/telemetria"        element={<Lazy><TelemetriaLogistica /></Lazy>} />
             </Route>
           </Route>
 
