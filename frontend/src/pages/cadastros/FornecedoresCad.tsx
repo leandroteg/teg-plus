@@ -1,6 +1,6 @@
 import { useState, useCallback, useMemo } from 'react'
 import {
-  Building2, Plus, Search, ChevronRight, CheckCircle2,
+  Building2, Plus, Search, ChevronRight, CheckCircle2, AlertCircle,
   Phone, Mail, Loader2, ArrowUp, ArrowDown, LayoutList, LayoutGrid, Trash2,
 } from 'lucide-react'
 import { UpperInput } from '../../components/UpperInput'
@@ -20,6 +20,14 @@ const EMPTY: Partial<Fornecedor> = {
   ativo: true,
 }
 
+const onlyDigits = (value?: string | null) => String(value ?? '').replace(/\D/g, '')
+const normalizeStatus = (value?: string | null) =>
+  String(value ?? '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim()
+    .toUpperCase()
+
 export default function FornecedoresCad() {
   const [busca, setBusca] = useState('')
   const [showInactive, setShowInactive] = useState(false)
@@ -30,6 +38,7 @@ export default function FornecedoresCad() {
   const [sortCol, setSortCol] = useState<string>('razao_social')
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc')
   const [selected, setSelected] = useState<Set<string>>(new Set())
+  const [cnpjDirty, setCnpjDirty] = useState(false)
 
   const { data: fornecedores = [], isLoading } = useCadFornecedores()
   const salvar = useSalvarFornecedor()
@@ -101,19 +110,62 @@ export default function FornecedoresCad() {
   function openNew() {
     setEditItem({ ...EMPTY })
     setConfidence({})
+    setCnpjDirty(false)
+    cnpjLookup.limpar()
     setShowForm(true)
   }
   function openEdit(f: Fornecedor) {
     setEditItem({ ...f })
     setConfidence({})
+    setCnpjDirty(false)
+    cnpjLookup.limpar()
     setShowForm(true)
   }
-  function closeForm() { setShowForm(false); setEditItem(null); setConfidence({}) }
+  function closeForm() { setShowForm(false); setEditItem(null); setConfidence({}); setCnpjDirty(false); cnpjLookup.limpar() }
+
+  const currentCnpjDigits = onlyDigits(editItem?.cnpj)
+  const lookupCnpjDigits = onlyDigits(cnpjLookup.dados?.cnpj)
+  const cnpjLookupMatches = Boolean(cnpjLookup.dados && lookupCnpjDigits === currentCnpjDigits)
+  const cnpjStatus = cnpjLookupMatches ? normalizeStatus(cnpjLookup.dados?.situacao) : ''
+  const isCnpjActive = cnpjStatus === 'ATIVA'
+  const invalidCnpjStatus = Boolean(cnpjStatus && !isCnpjActive)
+
+  function getCnpjValidationMessage() {
+    if (!editItem) return null
+    const mustValidateCnpj = !editItem.id || cnpjDirty || cnpjLookupMatches || cnpjLookup.loading
+    if (!mustValidateCnpj) return null
+    if (currentCnpjDigits.length !== 14) return 'Informe um CNPJ com 14 digitos.'
+    if (cnpjLookup.loading) return 'Aguarde a validacao do CNPJ.'
+    if (!cnpjLookupMatches) return 'Busque e valide o CNPJ antes de salvar.'
+    if (!isCnpjActive) {
+      const status = cnpjLookup.dados?.situacao || 'situacao irregular'
+      return `CNPJ ${status} nao pode ser cadastrado.`
+    }
+    return null
+  }
+
+  const cnpjValidationMessage = getCnpjValidationMessage()
+
+  function handleCnpjChange(value: string) {
+    set('cnpj', onlyDigits(value).slice(0, 14))
+    setCnpjDirty(true)
+    cnpjLookup.limpar()
+    setConfidence(prev => {
+      const next = { ...prev }
+      delete next.cnpj
+      return next
+    })
+  }
 
   async function handleSave() {
     if (!editItem) return
     if (!editItem.razao_social?.trim()) {
       alert('Razao Social e obrigatoria')
+      return
+    }
+    const cnpjMessage = getCnpjValidationMessage()
+    if (cnpjMessage) {
+      alert(cnpjMessage)
       return
     }
     try {
@@ -320,6 +372,8 @@ export default function FornecedoresCad() {
           onClose={closeForm}
           onSave={handleSave}
           saving={salvar.isPending}
+          saveDisabled={Boolean(cnpjValidationMessage)}
+          saveDisabledReason={cnpjValidationMessage}
           onAiParse={handleAiParse}
           aiParsing={aiParse.isPending}
           aiDone={Object.keys(confidence).length > 0}
@@ -343,7 +397,7 @@ export default function FornecedoresCad() {
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="relative">
-                <ConfidenceField label="CNPJ" value={editItem.cnpj ?? ''} onChange={v => set('cnpj', v)}
+                <ConfidenceField label="CNPJ" value={editItem.cnpj ?? ''} onChange={handleCnpjChange}
                   confidence={confidence.cnpj} placeholder="00.000.000/0000-00"
                   onBlur={() => cnpjLookup.consultar(editItem.cnpj ?? '')} />
                 {cnpjLookup.loading && (
@@ -355,9 +409,10 @@ export default function FornecedoresCad() {
                 {cnpjLookup.erro && (
                   <p className="text-[9px] text-red-500 mt-0.5">{cnpjLookup.erro}</p>
                 )}
-                {cnpjLookup.dados && !cnpjLookup.erro && (
-                  <p className="text-[9px] text-emerald-600 mt-0.5 flex items-center gap-1">
-                    <CheckCircle2 size={9} /> {cnpjLookup.dados.situacao}
+                {cnpjLookupMatches && !cnpjLookup.erro && (
+                  <p className={`text-[9px] mt-0.5 flex items-center gap-1 ${invalidCnpjStatus ? 'text-red-500' : 'text-emerald-600'}`}>
+                    {invalidCnpjStatus ? <AlertCircle size={9} /> : <CheckCircle2 size={9} />}
+                    {cnpjLookup.dados.situacao}
                   </p>
                 )}
               </div>
