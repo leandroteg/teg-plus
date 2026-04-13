@@ -1,6 +1,6 @@
 import {
   LayoutDashboard, ClipboardList, Package2,
-  Truck, Plus,
+  Truck, Plus, Radio,
 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import ModuleLayout from './ModuleLayout'
@@ -16,6 +16,7 @@ export default function LogisticaLayout() {
     { to: '/logistica/solicitacoes',    icon: ClipboardList,   label: 'Solicitações',       end: false },
     { to: '/logistica/expedicao',       icon: Package2,        label: 'Expedição',          end: false },
     { to: '/logistica/transportes',     icon: Truck,           label: 'Transportes',        end: false },
+    { to: '/logistica/telemetria',      icon: Radio,           label: 'Telemetria',         end: false },
   ]
 
   return (
