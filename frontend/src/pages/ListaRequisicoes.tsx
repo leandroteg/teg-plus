@@ -4,10 +4,10 @@ import {
   Search, X, CheckCircle, XCircle, MessageSquare, ChevronDown, ChevronUp,
   FileText, Ban, AlertTriangle, Calendar, ArrowUp, ArrowDown,
   LayoutList, LayoutGrid, Download, ClipboardList, ShieldCheck, Building2,
-  Loader2, Send,
+  Loader2, Send, PackageCheck,
 } from 'lucide-react'
 import { useTheme } from '../contexts/ThemeContext'
-import { useRequisicoes, useReenviarEsclarecimento } from '../hooks/useRequisicoes'
+import { useRequisicoes, useReenviarEsclarecimento, useEnviarParaCotacao } from '../hooks/useRequisicoes'
 import { useLookupObras } from '../hooks/useLookups'
 import { useAprovacoesPendentes, useDecisaoRequisicao } from '../hooks/useAprovacoes'
 import { useEmitirPedido, useCancelarRequisicao } from '../hooks/usePedidos'
@@ -28,7 +28,7 @@ const fmtData = (d: string) =>
 
 // ── Types ───────────────────────────────────────────────────────────────────
 
-type PipelineTab = 'pendente' | 'em_validacao'
+type PipelineTab = 'pendente' | 'em_validacao' | 'aprovada'
 type SortField = 'data' | 'valor' | 'obra'
 type SortDir = 'asc' | 'desc'
 type ViewMode = 'list' | 'cards'
@@ -38,16 +38,19 @@ type ViewMode = 'list' | 'cards'
 const PIPELINE_STAGES: { status: PipelineTab; label: string; icon: typeof ClipboardList; statuses: string[] }[] = [
   { status: 'pendente',     label: 'Requisições Pendentes',   icon: ClipboardList, statuses: ['rascunho'] },
   { status: 'em_validacao', label: 'Em Validação Técnica',   icon: ShieldCheck,   statuses: ['pendente', 'em_aprovacao', 'em_esclarecimento'] },
+  { status: 'aprovada',     label: 'Aprovadas — Enviar p/ Cotação', icon: PackageCheck, statuses: ['aprovada'] },
 ]
 
 const STATUS_ACCENT: Record<PipelineTab, { bg: string; bgActive: string; text: string; textActive: string; dot: string; border: string }> = {
-  pendente:     { bg: 'hover:bg-amber-50',  bgActive: 'bg-amber-50',   text: 'text-amber-600',  textActive: 'text-amber-800',  dot: 'bg-amber-400',  border: 'border-amber-400' },
-  em_validacao: { bg: 'hover:bg-violet-50', bgActive: 'bg-violet-50',  text: 'text-violet-600', textActive: 'text-violet-800', dot: 'bg-violet-500', border: 'border-violet-500' },
+  pendente:     { bg: 'hover:bg-amber-50',    bgActive: 'bg-amber-50',     text: 'text-amber-600',    textActive: 'text-amber-800',    dot: 'bg-amber-400',    border: 'border-amber-400' },
+  em_validacao: { bg: 'hover:bg-violet-50',   bgActive: 'bg-violet-50',    text: 'text-violet-600',   textActive: 'text-violet-800',   dot: 'bg-violet-500',   border: 'border-violet-500' },
+  aprovada:     { bg: 'hover:bg-emerald-50',  bgActive: 'bg-emerald-50',   text: 'text-emerald-600',  textActive: 'text-emerald-800',  dot: 'bg-emerald-500',  border: 'border-emerald-500' },
 }
 
 const STATUS_ACCENT_DARK: Record<PipelineTab, { bg: string; bgActive: string; text: string; textActive: string }> = {
-  pendente:     { bg: 'hover:bg-white/[0.03]', bgActive: 'bg-amber-500/10',  text: 'text-amber-400',  textActive: 'text-amber-300' },
-  em_validacao: { bg: 'hover:bg-white/[0.03]', bgActive: 'bg-violet-500/10', text: 'text-violet-400', textActive: 'text-violet-300' },
+  pendente:     { bg: 'hover:bg-white/[0.03]', bgActive: 'bg-amber-500/10',   text: 'text-amber-400',   textActive: 'text-amber-300' },
+  em_validacao: { bg: 'hover:bg-white/[0.03]', bgActive: 'bg-violet-500/10',  text: 'text-violet-400',  textActive: 'text-violet-300' },
+  aprovada:     { bg: 'hover:bg-white/[0.03]', bgActive: 'bg-emerald-500/10', text: 'text-emerald-400', textActive: 'text-emerald-300' },
 }
 
 const SORT_OPTIONS: { field: SortField; label: string }[] = [
@@ -70,6 +73,7 @@ function getApprovalStatusLabel(status: string): string | undefined {
   if (status === 'pendente')          return 'Aguard. Valid. Técnica'
   if (status === 'em_aprovacao')      return 'Em Validação Técnica'
   if (status === 'em_esclarecimento') return 'Em Esclarecimento'
+  if (status === 'aprovada')          return 'RC Validada'
   return undefined
 }
 
@@ -164,6 +168,16 @@ function ReqCard({ r, apr, isDark, onClick }: {
         </div>
       </div>
 
+      {/* Aprovada — pronta para cotação */}
+      {r.status === 'aprovada' && (
+        <div className={`flex items-center gap-2 rounded-xl px-3 py-2 ${isDark ? 'bg-emerald-500/10 border border-emerald-500/20' : 'bg-emerald-50 border border-emerald-200'}`}>
+          <CheckCircle size={13} className={`flex-shrink-0 ${isDark ? 'text-emerald-400' : 'text-emerald-600'}`} />
+          <p className={`text-[10px] font-bold uppercase tracking-wider ${isDark ? 'text-emerald-400' : 'text-emerald-700'}`}>
+            Aprovada — Aguardando envio para cotacao
+          </p>
+        </div>
+      )}
+
       {/* Esclarecimento alert */}
       {r.status === 'em_esclarecimento' && r.esclarecimento_msg && (
         <div className={`flex items-start gap-2 rounded-xl px-3 py-2 ${isDark ? 'bg-amber-500/10 border border-amber-500/20' : 'bg-amber-50 border border-amber-200'}`}>
@@ -202,13 +216,14 @@ function ReqCard({ r, apr, isDark, onClick }: {
 
 // ── Detail Modal ────────────────────────────────────────────────────────────
 
-function DetailModal({ r, apr, onClose, isDark, canDecide, onDecisao, isProcessing, onEmitir, onCancelar, isEmitting, isCancelling, onReenviar, isReenviando }: {
+function DetailModal({ r, apr, onClose, isDark, canDecide, onDecisao, isProcessing, onEmitir, onCancelar, isEmitting, isCancelling, onReenviar, isReenviando, onEnviarCotacao, isEnviandoCotacao }: {
   r: Requisicao; apr?: Aprovacao; onClose: () => void; isDark: boolean
   canDecide: boolean
   onDecisao: (decisao: 'aprovada' | 'rejeitada' | 'esclarecimento', obs: string) => void
   isProcessing: boolean
   onEmitir: () => void; onCancelar: () => void; isEmitting: boolean; isCancelling: boolean
   onReenviar: (resposta: string) => void; isReenviando: boolean
+  onEnviarCotacao: () => void; isEnviandoCotacao: boolean
 }) {
   const [observacao, setObservacao] = useState('')
   const [respostaEsclarecimento, setRespostaEsclarecimento] = useState('')
@@ -382,6 +397,26 @@ function DetailModal({ r, apr, onClose, isDark, canDecide, onDecisao, isProcessi
             </div>
           )}
 
+          {/* Enviar para Cotação (requisição aprovada) */}
+          {r.status === 'aprovada' && (
+            <div className={`pt-3 space-y-3 ${isDark ? 'border-t border-white/[0.06]' : 'border-t border-emerald-100'}`}>
+              <div className={`flex items-center gap-2 rounded-xl px-3.5 py-2.5 ${isDark ? 'bg-emerald-500/10 border border-emerald-500/20' : 'bg-emerald-50 border border-emerald-200'}`}>
+                <CheckCircle size={16} className={isDark ? 'text-emerald-400' : 'text-emerald-600'} />
+                <div>
+                  <p className={`text-xs font-bold ${isDark ? 'text-emerald-400' : 'text-emerald-700'}`}>Validacao Tecnica Aprovada</p>
+                  <p className={`text-[10px] ${isDark ? 'text-emerald-500' : 'text-emerald-600'}`}>Revise os dados e envie para cotacao quando estiver pronto.</p>
+                </div>
+              </div>
+              <button
+                disabled={isEnviandoCotacao}
+                onClick={onEnviarCotacao}
+                className="w-full flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-xs font-bold text-white bg-emerald-500 border border-emerald-500 hover:bg-emerald-600 shadow-sm shadow-emerald-500/20 active:scale-[0.98] transition-all disabled:opacity-50">
+                {isEnviandoCotacao ? <Loader2 size={14} className="animate-spin" /> : <PackageCheck size={14} />}
+                Enviar para Cotacao
+              </button>
+            </div>
+          )}
+
           {/* Emitir Pedido / Cancelar */}
           {r.status === 'cotacao_aprovada' && (
             <div className={`pt-3 space-y-2 ${isDark ? 'border-t border-white/[0.06]' : 'border-t border-teal-100'}`}>
@@ -438,6 +473,7 @@ export default function ListaRequisicoes() {
   const { data: aprovacoes } = useAprovacoesPendentes()
   const decisaoMutation = useDecisaoRequisicao()
   const reenviarMutation = useReenviarEsclarecimento()
+  const enviarCotacaoMutation = useEnviarParaCotacao()
   const emitirPedidoMutation = useEmitirPedido()
   const cancelarMutation = useCancelarRequisicao()
 
@@ -755,6 +791,23 @@ export default function ListaRequisicoes() {
             })
           }}
           isReenviando={reenviarMutation.isPending}
+          onEnviarCotacao={() => {
+            enviarCotacaoMutation.mutate({
+              requisicaoId: detail.id,
+              categoria: detail.categoria,
+            }, {
+              onSuccess: () => {
+                setDetail(null)
+                setToast({ type: 'success', msg: `${detail.numero}: Enviada para cotação ✓` })
+                setTimeout(() => setToast(null), 4000)
+              },
+              onError: () => {
+                setToast({ type: 'error', msg: `Erro ao enviar para cotação` })
+                setTimeout(() => setToast(null), 5000)
+              },
+            })
+          }}
+          isEnviandoCotacao={enviarCotacaoMutation.isPending}
         />
       )}
 

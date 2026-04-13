@@ -1031,7 +1031,7 @@ export function useDecisaoRequisicao() {
         if (isFinancialApproval) {
           updates.status = 'cotacao_aprovada'
         } else {
-          updates.status = 'em_cotacao'
+          updates.status = 'aprovada'
         }
       } else if (decisao === 'rejeitada') {
         updates.status = isFinancialApproval ? 'cotacao_rejeitada' : 'rejeitada'
@@ -1079,35 +1079,6 @@ export function useDecisaoRequisicao() {
         .eq('entidade_id', requisicaoId)
         .eq('modulo', 'cmp')
         .eq('status', 'pendente')
-
-      // 3. Auto-criar cotacao quando aprovacao tecnica e concedida
-      if (decisao === 'aprovada' && !isFinancialApproval) {
-        try {
-          let compradorId: string | null = null
-          if (categoria) {
-            const { data: compradores } = await supabase
-              .from('cmp_compradores')
-              .select('id, categorias')
-            const match = compradores?.find(
-              (c: { id: string; categorias: string[] }) =>
-                c.categorias?.includes(categoria)
-            )
-            compradorId = match?.id ?? null
-          }
-
-          const dataLimite = new Date()
-          dataLimite.setDate(dataLimite.getDate() + 5)
-
-          await supabase.from('cmp_cotacoes').insert({
-            requisicao_id: requisicaoId,
-            comprador_id: compradorId,
-            status: 'pendente',
-            data_limite: dataLimite.toISOString(),
-          })
-        } catch (e) {
-          console.warn('Aviso: cotacao nao criada automaticamente:', e)
-        }
-      }
 
       return { decisao }
     },

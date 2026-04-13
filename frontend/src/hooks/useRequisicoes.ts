@@ -342,6 +342,62 @@ export function useReenviarEsclarecimento() {
   })
 }
 
+// ── Enviar RC aprovada para cotação ──────────────────────────────────────────
+
+export function useEnviarParaCotacao() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async ({
+      requisicaoId,
+      categoria,
+    }: {
+      requisicaoId: string
+      categoria?: string
+    }) => {
+      // 1. Atualiza status para em_cotacao
+      const { error: reqError } = await supabase
+        .from(TABLE)
+        .update({ status: 'em_cotacao' })
+        .eq('id', requisicaoId)
+      if (reqError) throw reqError
+
+      // 2. Auto-criar cotacao
+      try {
+        let compradorId: string | null = null
+        if (categoria) {
+          const { data: compradores } = await supabase
+            .from('cmp_compradores')
+            .select('id, categorias')
+          const match = compradores?.find(
+            (c: { id: string; categorias: string[] }) =>
+              c.categorias?.includes(categoria)
+          )
+          compradorId = match?.id ?? null
+        }
+
+        const dataLimite = new Date()
+        dataLimite.setDate(dataLimite.getDate() + 5)
+
+        await supabase.from('cmp_cotacoes').insert({
+          requisicao_id: requisicaoId,
+          comprador_id: compradorId,
+          status: 'pendente',
+          data_limite: dataLimite.toISOString(),
+        })
+      } catch (e) {
+        console.warn('Aviso: cotacao nao criada automaticamente:', e)
+      }
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['requisicoes'] })
+      qc.invalidateQueries({ queryKey: ['requisicao'] })
+      qc.invalidateQueries({ queryKey: ['cotacoes'] })
+      qc.invalidateQueries({ queryKey: ['cotacao'] })
+      qc.invalidateQueries({ queryKey: ['dashboard'] })
+    },
+  })
+}
+
 // ── Single requisicao with items ─────────────────────────────────────────────
 
 export interface RequisicaoDetalhe extends Requisicao {
