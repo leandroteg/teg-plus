@@ -5,8 +5,7 @@ import ControladoriaFlow, { type FlowStep } from '../../components/Controladoria
 import AlertasTelemetria from '../../components/logistica/telemetria/AlertasTelemetria'
 import KmUtilizacao from '../../components/logistica/telemetria/KmUtilizacao'
 
-// Minimal leaflet test - inline, no hooks, no data
-const MapaMinimo = lazy(() => import('../../components/logistica/telemetria/MapaMinimo'))
+const MapaAoVivo = lazy(() => import('../../components/logistica/telemetria/MapaAoVivo'))
 
 const STEPS: FlowStep[] = [
   {
@@ -63,7 +62,7 @@ function getStepComponent(step: string) {
     default:
       return (
         <Suspense fallback={<div className="flex items-center justify-center py-20 text-sm text-slate-400">Carregando mapa...</div>}>
-          <MapaMinimo />
+          <MapaAoVivo />
         </Suspense>
       )
   }
