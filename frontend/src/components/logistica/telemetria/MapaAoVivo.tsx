@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect } from 'react'
-import { Search, Radio } from 'lucide-react'
-import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet'
+import { Search, Radio, ChevronLeft, ChevronRight } from 'lucide-react'
+import { MapContainer, TileLayer, Marker, Popup, Tooltip, useMap } from 'react-leaflet'
 import * as L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import { useTheme } from '../../../contexts/ThemeContext'
@@ -34,16 +34,16 @@ function getStatusLabel(pos: TelUltimaPosicao): string {
 
 function createMarkerIcon(color: string) {
   const svg = `
-    <svg width="24" height="24" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-      <circle cx="12" cy="12" r="11" fill="${color}" stroke="white" stroke-width="2" opacity="0.9"/>
-      <circle cx="12" cy="12" r="5" fill="white" opacity="0.7"/>
+    <svg width="28" height="28" viewBox="0 0 28 28" xmlns="http://www.w3.org/2000/svg">
+      <circle cx="14" cy="14" r="12" fill="${color}" stroke="white" stroke-width="2.5" opacity="0.9"/>
+      <circle cx="14" cy="14" r="5" fill="white" opacity="0.8"/>
     </svg>`
   return L.divIcon({
     className: '',
     html: svg,
-    iconSize: [24, 24],
-    iconAnchor: [12, 12],
-    popupAnchor: [0, -14],
+    iconSize: [28, 28],
+    iconAnchor: [14, 14],
+    popupAnchor: [0, -16],
   })
 }
 
@@ -78,6 +78,19 @@ function FitBounds({ positions }: { positions: TelUltimaPosicao[] }) {
   return null
 }
 
+// ── Fly to selected ─────────────────────────────────────────────────────────
+
+function FlyTo({ position }: { position: [number, number] | null }) {
+  const map = useMap()
+
+  useEffect(() => {
+    if (!position) return
+    map.flyTo(position, 15, { duration: 0.8 })
+  }, [position, map])
+
+  return null
+}
+
 // ── Component ───────────────────────────────────────────────────────────────
 
 export default function MapaAoVivo() {
@@ -86,6 +99,7 @@ export default function MapaAoVivo() {
   const { data: veiculos = [] } = useVeiculos()
   const [busca, setBusca] = useState('')
   const [selecionado, setSelecionado] = useState<string | null>(null)
+  const [sidebarAberta, setSidebarAberta] = useState(true)
 
   // Map veiculos by id for quick lookup
   const veiculoMap = useMemo(
@@ -106,6 +120,24 @@ export default function MapaAoVivo() {
     })
   }, [posicoes, busca, veiculoMap])
 
+  // Fly-to position when selecting a vehicle
+  const flyToPosition = useMemo<[number, number] | null>(() => {
+    if (!selecionado) return null
+    const pos = posicoes.find(p => p.veiculo_id === selecionado)
+    return pos ? [pos.latitude, pos.longitude] : null
+  }, [selecionado, posicoes])
+
+  // Status counters
+  const contadores = useMemo(() => {
+    let movendo = 0, ocioso = 0, desligado = 0
+    for (const p of posicoes) {
+      if (!p.ignicao) desligado++
+      else if (p.velocidade > 0) movendo++
+      else ocioso++
+    }
+    return { movendo, ocioso, desligado }
+  }, [posicoes])
+
   // ── Empty state ─────────────────────────────────────────────────────────
   if (!isLoading && posicoes.length === 0) {
     return (
@@ -123,9 +155,11 @@ export default function MapaAoVivo() {
     : 'bg-[#1e293b] border border-white/[0.06]'
 
   return (
-    <div className={`flex rounded-2xl overflow-hidden h-[520px] ${cardCls}`}>
+    <div className={`flex rounded-2xl overflow-hidden h-[520px] relative ${cardCls}`}>
       {/* ── Sidebar ──────────────────────────────────────────────────────── */}
-      <div className={`w-72 flex flex-col shrink-0 border-r ${isLight ? 'border-slate-200' : 'border-white/[0.06]'}`}>
+      <div className={`flex flex-col shrink-0 border-r transition-all duration-300 ${
+        sidebarAberta ? 'w-72' : 'w-0 border-r-0 overflow-hidden'
+      } ${isLight ? 'border-slate-200' : 'border-white/[0.06]'}`}>
         {/* Search */}
         <div className="p-3">
           <div className={`flex items-center gap-2 rounded-xl px-3 py-2 text-sm ${
@@ -141,6 +175,22 @@ export default function MapaAoVivo() {
               onChange={e => setBusca(e.target.value)}
             />
           </div>
+        </div>
+
+        {/* Status tags */}
+        <div className="px-3 pb-2 flex gap-1.5 flex-wrap">
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/15 text-emerald-700 dark:text-emerald-300">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+            {contadores.movendo}
+          </span>
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-yellow-500/15 text-yellow-700 dark:text-yellow-300">
+            <span className="w-1.5 h-1.5 rounded-full bg-yellow-500" />
+            {contadores.ocioso}
+          </span>
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-500/15 text-slate-600 dark:text-slate-400">
+            <span className="w-1.5 h-1.5 rounded-full bg-slate-400" />
+            {contadores.desligado}
+          </span>
         </div>
 
         {/* Vehicle list */}
@@ -178,9 +228,14 @@ export default function MapaAoVivo() {
                         </p>
                       )}
                     </div>
-                    <span className="text-[10px] text-slate-400 shrink-0">
-                      {tempoRelativo(pos.cobli_ts)}
-                    </span>
+                    <div className="flex flex-col items-end gap-0.5 shrink-0">
+                      <span className="text-[9px] px-1.5 py-0.5 rounded font-bold" style={{ backgroundColor: color + '22', color }}>
+                        {getStatusLabel(pos)}
+                      </span>
+                      <span className="text-[10px] text-slate-400">
+                        {tempoRelativo(pos.cobli_ts)}
+                      </span>
+                    </div>
                   </button>
                 )
               })
@@ -193,6 +248,19 @@ export default function MapaAoVivo() {
           {busca.trim() && ` (filtrado de ${posicoes.length})`}
         </div>
       </div>
+
+      {/* ── Toggle sidebar button ────────────────────────────────────────── */}
+      <button
+        onClick={() => setSidebarAberta(!sidebarAberta)}
+        className={`absolute top-3 z-[1000] rounded-lg p-1.5 shadow-md transition-all ${
+          sidebarAberta ? 'left-[276px]' : 'left-3'
+        } ${isLight
+          ? 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'
+          : 'bg-[#1e293b] border border-white/[0.1] text-slate-300 hover:bg-white/[0.06]'
+        }`}
+      >
+        {sidebarAberta ? <ChevronLeft size={16} /> : <ChevronRight size={16} />}
+      </button>
 
       {/* ── Map ──────────────────────────────────────────────────────────── */}
       <div className="flex-1 relative">
@@ -208,26 +276,56 @@ export default function MapaAoVivo() {
           />
 
           <FitBounds positions={posicoesFiltradas} />
+          <FlyTo position={flyToPosition} />
 
           {posicoesFiltradas.map(pos => {
             const v = veiculoMap.get(pos.veiculo_id)
             const color = getStatusColor(pos)
+            const selected = selecionado === pos.veiculo_id
             return (
               <Marker
                 key={pos.veiculo_id}
                 position={[pos.latitude, pos.longitude]}
                 icon={createMarkerIcon(color)}
+                eventHandlers={{
+                  click: () => setSelecionado(selected ? null : pos.veiculo_id),
+                }}
               >
+                {/* Tooltip — always visible label on the map */}
+                <Tooltip
+                  direction="right"
+                  offset={[14, 0]}
+                  permanent={selected}
+                  className="leaflet-tooltip-placa"
+                >
+                  <span style={{ fontWeight: 700, fontSize: 11 }}>{pos.placa}</span>
+                  {' '}
+                  <span style={{
+                    fontSize: 9,
+                    fontWeight: 700,
+                    padding: '1px 5px',
+                    borderRadius: 4,
+                    backgroundColor: color + '22',
+                    color,
+                  }}>
+                    {getStatusLabel(pos)}
+                  </span>
+                </Tooltip>
+
+                {/* Popup — detailed info on click */}
                 <Popup>
-                  <div className="text-xs space-y-1 min-w-[140px]">
+                  <div className="text-xs space-y-1.5 min-w-[160px]">
                     <p className="font-bold text-sm text-slate-800">{pos.placa}</p>
                     {v && <p className="text-slate-500">{v.marca} {v.modelo}</p>}
-                    <p>
-                      <span className="font-semibold">{pos.velocidade}</span> km/h
-                      <span className="ml-2 px-1.5 py-0.5 rounded text-[10px] font-bold" style={{ backgroundColor: color + '22', color }}>
+                    <div className="flex items-center gap-2">
+                      <span className="font-semibold text-sm">{pos.velocidade} km/h</span>
+                      <span className="px-2 py-0.5 rounded text-[10px] font-bold" style={{ backgroundColor: color + '22', color }}>
                         {getStatusLabel(pos)}
                       </span>
-                    </p>
+                    </div>
+                    {pos.hodometro != null && (
+                      <p className="text-slate-400">Hodometro: {Math.round(pos.hodometro).toLocaleString('pt-BR')} km</p>
+                    )}
                     <p className="text-slate-400">{tempoRelativo(pos.cobli_ts)}</p>
                   </div>
                 </Popup>

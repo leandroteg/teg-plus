@@ -99,10 +99,8 @@ export default class ErrorBoundary extends Component<Props, State> {
             </button>
           </div>
           {this.state.error && (
-            <pre className="mt-6 p-3 rounded-lg bg-slate-100 dark:bg-slate-800 text-xs text-left text-red-600 dark:text-red-400 overflow-auto max-h-60">
+            <pre className="mt-6 p-3 rounded-lg bg-slate-100 dark:bg-slate-800 text-xs text-left text-red-600 dark:text-red-400 overflow-auto max-h-40">
               {this.state.error.message}
-              {'\n\n'}
-              {this.state.error.stack}
             </pre>
           )}
         </div>
