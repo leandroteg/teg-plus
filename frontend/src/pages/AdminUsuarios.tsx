@@ -814,6 +814,16 @@ function UserDetailPanel({
 
   return (
     <div className="border-t border-slate-100 bg-slate-50/50">
+      {/* ── Identidade do usuário sendo editado ─────────────────────────── */}
+      <div className="flex items-center gap-3 px-4 py-3 bg-primary/5 border-b border-primary/10">
+        <Avatar nome={user.nome} size="sm" />
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-bold text-navy truncate">{user.nome}</p>
+          <p className="text-[11px] text-slate-400 truncate">{formatLoginUsuario(user.email)}</p>
+        </div>
+        <RoleBadge role={resolvePapelFromPerfil(user) as Role} />
+      </div>
+
       {/* User info section */}
       <div className="px-4 py-4 space-y-3">
         {/* Basic Info Row */}
@@ -1530,6 +1540,7 @@ export default function AdminUsuarios() {
   const [bulkModulos, setBulkModulos] = useState<Record<string, boolean>>(() => createEmptyModulosMap())
   const [bulkModuloPapeis, setBulkModuloPapeis] = useState<Record<string, PapelGlobal>>({})
   const [showBatchEditor, setShowBatchEditor] = useState(false)
+  const [editModalUser,   setEditModalUser]   = useState<Perfil | null>(null)
   const selectAllRef = useRef<HTMLInputElement | null>(null)
 
   const filtered = useMemo(() => {
@@ -1635,10 +1646,11 @@ export default function AdminUsuarios() {
   const handleToolbarEdit = () => {
     if (selectedIds.length === 1) {
       const [id] = selectedIds
-      setShowBatchEditor(false)
-      setViewMode('cards')
-      setExpandedUser(id)
-      setQuickEditUserId(id)
+      const user = perfis?.find(p => p.id === id)
+      if (user) {
+        setEditModalUser(user)
+        setSelectedIds([])
+      }
       return
     }
     setQuickEditUserId(null)
@@ -1662,6 +1674,41 @@ export default function AdminUsuarios() {
   return (
     <>
       {showCadastro && <CadastroUsuarioModal onClose={() => { setShowCadastro(false); refetch() }} />}
+
+      {/* ── Modal de edição individual ──────────────────────────────────── */}
+      {editModalUser && (
+        <div
+          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/50 backdrop-blur-sm"
+          onClick={() => setEditModalUser(null)}
+        >
+          <div
+            className="w-full sm:max-w-lg max-h-[92vh] overflow-y-auto bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl"
+            onClick={e => e.stopPropagation()}
+          >
+            {/* Modal header */}
+            <div className="flex items-center gap-3 px-4 py-3 border-b border-slate-100 sticky top-0 bg-white z-10">
+              <Avatar nome={editModalUser.nome} />
+              <div className="flex-1 min-w-0">
+                <p className="font-bold text-navy text-sm truncate">{editModalUser.nome}</p>
+                <p className="text-[11px] text-slate-400">{formatLoginUsuario(editModalUser.email)}</p>
+              </div>
+              <button
+                onClick={() => setEditModalUser(null)}
+                className="w-8 h-8 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 flex items-center justify-center transition-colors"
+                aria-label="Fechar"
+              >
+                <X size={16} />
+              </button>
+            </div>
+            <UserDetailPanel
+              user={editModalUser}
+              forceEdit={true}
+              onClose={() => setEditModalUser(null)}
+            />
+          </div>
+        </div>
+      )}
+
       {showBatchEditor && (
         <BatchEditModal
           open={showBatchEditor}
@@ -1802,23 +1849,19 @@ export default function AdminUsuarios() {
               </button>
             </div>
 
-            <button
-              type="button"
-              onClick={handleToolbarEdit}
-              className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold border transition-all ${
-                showBatchEditor && selectedIds.length !== 1
-                  ? 'bg-primary text-white border-primary shadow'
-                  : 'bg-white text-slate-600 border-slate-200 hover:border-primary/40 hover:text-primary'
-              }`}
-            >
-              <Edit3 size={12} />
-              Editar
-            </button>
-
             {selectedIds.length > 0 && (
-              <span className="text-xs font-semibold text-primary bg-primary/8 border border-primary/20 px-2.5 py-1.5 rounded-xl">
-                {selectedIds.length} selecionado(s)
-              </span>
+              <button
+                type="button"
+                onClick={handleToolbarEdit}
+                className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold border transition-all ${
+                  showBatchEditor && selectedIds.length !== 1
+                    ? 'bg-primary text-white border-primary shadow'
+                    : 'bg-white text-slate-600 border-slate-200 hover:border-primary/40 hover:text-primary'
+                }`}
+              >
+                <Edit3 size={12} />
+                {selectedIds.length === 1 ? 'Editar' : `Editar em lote (${selectedIds.length})`}
+              </button>
             )}
           </div>
 
@@ -2070,9 +2113,8 @@ export default function AdminUsuarios() {
                             <button
                               type="button"
                               onClick={() => {
-                                setQuickEditUserId(p.id)
-                                setViewMode('cards')
-                                setExpandedUser(p.id)
+                                setSelectedIds([])
+                                setEditModalUser(p)
                               }}
                               className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg border border-primary/25 bg-primary/5 text-primary hover:bg-primary/10 transition-colors text-[11px] font-semibold"
                               title={`Editar ${p.nome}`}
