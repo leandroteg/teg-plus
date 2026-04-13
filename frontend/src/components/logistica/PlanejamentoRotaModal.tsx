@@ -8,7 +8,7 @@ import type { LogSolicitacao } from '../../types/logistica'
 
 // ── Leaflet imports ──────────────────────────────────────────────────────────
 import { MapContainer, TileLayer, Marker, Popup, Polyline, useMap } from 'react-leaflet'
-import L from 'leaflet'
+import * as L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import { serializeViagemRotaPayload } from '../../utils/logisticaViagem'
 import { UpperInput } from '../UpperInput'
@@ -16,12 +16,14 @@ import { useVeiculos } from '../../hooks/useFrotas'
 import type { FroVeiculo } from '../../types/frotas'
 
 // Fix leaflet default icon issue
-delete (L.Icon.Default.prototype as Record<string, unknown>)._getIconUrl
-L.Icon.Default.mergeOptions({
-  iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
-  iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
-  shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
-})
+try {
+  delete (L.Icon.Default.prototype as Record<string, unknown>)._getIconUrl
+  L.Icon.Default.mergeOptions({
+    iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
+    iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
+    shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
+  })
+} catch { /* leaflet not ready */ }
 
 const N8N_URL = import.meta.env.VITE_N8N_WEBHOOK_URL || 'https://teg-agents-n8n.nmmcas.easypanel.host/webhook'
 

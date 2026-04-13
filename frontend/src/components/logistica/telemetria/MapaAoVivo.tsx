@@ -1,20 +1,22 @@
 import { useState, useMemo, useEffect } from 'react'
 import { Search, Radio } from 'lucide-react'
 import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet'
-import L from 'leaflet'
+import * as L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import { useTheme } from '../../../contexts/ThemeContext'
 import { useUltimasPosicoes } from '../../../hooks/useTelemetria'
 import { useVeiculos } from '../../../hooks/useFrotas'
 import type { TelUltimaPosicao } from '../../../types/telemetria'
 
-// Fix leaflet default icon issue
-delete (L.Icon.Default.prototype as unknown as Record<string, unknown>)._getIconUrl
-L.Icon.Default.mergeOptions({
-  iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
-  iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
-  shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
-})
+// Fix leaflet default icon issue (safely)
+try {
+  delete (L.Icon.Default.prototype as Record<string, unknown>)._getIconUrl
+  L.Icon.Default.mergeOptions({
+    iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
+    iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
+    shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
+  })
+} catch { /* leaflet not ready */ }
 
 // ── Marker colors ───────────────────────────────────────────────────────────
 
