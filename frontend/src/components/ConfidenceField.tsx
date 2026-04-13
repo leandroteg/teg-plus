@@ -13,13 +13,14 @@ interface ConfidenceFieldProps {
   children?: React.ReactNode
   onBlur?: () => void
   normalizeText?: boolean
+  showConfidence?: boolean
 }
 
 export default function ConfidenceField({
   label, value, onChange, confidence, type = 'text',
-  placeholder, required, disabled, children, onBlur, normalizeText = true,
+  placeholder, required, disabled, children, onBlur, normalizeText = true, showConfidence = true,
 }: ConfidenceFieldProps) {
-  const has = confidence !== undefined
+  const has = showConfidence && confidence !== undefined
 
   const borderColor = !has ? 'border-l-transparent'
     : confidence >= 0.9 ? 'border-l-emerald-400'
