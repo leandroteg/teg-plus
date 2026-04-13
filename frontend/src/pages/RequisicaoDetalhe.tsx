@@ -17,6 +17,7 @@ import StatusBadge from '../components/StatusBadge'
 import FluxoTimeline from '../components/FluxoTimeline'
 import CotacaoComparativo from '../components/CotacaoComparativo'
 import EmitirPedidoModal from '../components/EmitirPedidoModal'
+import { UpperTextarea } from '../components/UpperInput'
 import type { StatusRequisicao } from '../types'
 
 const fmt = (v: number) =>
@@ -185,7 +186,7 @@ export default function RequisicaoDetalhe() {
           {!reenviarMutation.isSuccess && (
             <div className="pt-2 border-t border-amber-200 space-y-2">
               <p className="text-xs font-semibold text-amber-700">Responder e reenviar ao aprovador:</p>
-              <textarea
+              <UpperTextarea
                 rows={2}
                 value={respostaEsclarecimento}
                 disabled={isLocked}
@@ -573,7 +574,7 @@ export default function RequisicaoDetalhe() {
               </button>
 
               {showObservacao && (
-                <textarea
+                <UpperTextarea
                   rows={3}
                   disabled={isLocked}
                   className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-300 outline-none"

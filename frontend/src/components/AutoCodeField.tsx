@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { RefreshCw } from 'lucide-react'
 import { useNextCode } from '../hooks/useSmartForm'
+import { toUpperNorm } from './UpperInput'
 
 interface AutoCodeFieldProps {
   prefix: string
@@ -40,7 +41,7 @@ export default function AutoCodeField({
         </span>
         <input
           value={value}
-          onChange={e => { setManualEdit(true); onChange(e.target.value) }}
+          onChange={e => { setManualEdit(true); onChange(toUpperNorm(e.target.value)) }}
           disabled={disabled}
           className="input-base pl-16 pr-8 font-mono text-sm"
           placeholder={`${prefix}-001`}

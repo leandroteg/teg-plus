@@ -117,6 +117,12 @@ export interface Requisicao {
   esclarecimento_msg?: string
   esclarecimento_por?: string
   esclarecimento_em?: string
+  esclarecimento_historico?: {
+    tipo: 'pedido' | 'resposta'
+    autor: string
+    msg: string
+    data: string
+  }[]
 }
 
 export type TipoAprovacao = 'requisicao_compra' | 'cotacao' | 'autorizacao_pagamento' | 'minuta_contratual' | 'aprovacao_transporte'
@@ -214,6 +220,12 @@ export interface AprovacaoPendente extends Aprovacao {
     peso_total_kg?: number
     volumes_total?: number
   }
+  esclarecimento_historico?: {
+    tipo: 'pedido' | 'resposta'
+    autor: string
+    msg: string
+    data: string
+  }[]
 }
 
 export interface AprovacaoHistorico {

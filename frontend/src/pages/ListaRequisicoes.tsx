@@ -4,10 +4,10 @@ import {
   Search, X, CheckCircle, XCircle, MessageSquare, ChevronDown, ChevronUp,
   FileText, Ban, AlertTriangle, Calendar, ArrowUp, ArrowDown,
   LayoutList, LayoutGrid, Download, ClipboardList, ShieldCheck, Building2,
-  Loader2,
+  Loader2, Send, PackageCheck,
 } from 'lucide-react'
 import { useTheme } from '../contexts/ThemeContext'
-import { useRequisicoes } from '../hooks/useRequisicoes'
+import { useRequisicoes, useReenviarEsclarecimento, useEnviarParaCotacao } from '../hooks/useRequisicoes'
 import { useLookupObras } from '../hooks/useLookups'
 import { useAprovacoesPendentes, useDecisaoRequisicao } from '../hooks/useAprovacoes'
 import { useEmitirPedido, useCancelarRequisicao } from '../hooks/usePedidos'
@@ -16,6 +16,7 @@ import { useAuth } from '../contexts/AuthContext'
 import StatusBadge from '../components/StatusBadge'
 import FluxoTimeline from '../components/FluxoTimeline'
 import EmitirPedidoModal from '../components/EmitirPedidoModal'
+import { UpperTextarea } from '../components/UpperInput'
 import type { StatusRequisicao, Aprovacao, Requisicao } from '../types'
 
 // ── Formatters ──────────────────────────────────────────────────────────────
@@ -28,7 +29,7 @@ const fmtData = (d: string) =>
 
 // ── Types ───────────────────────────────────────────────────────────────────
 
-type PipelineTab = 'pendente' | 'em_validacao'
+type PipelineTab = 'pendente' | 'em_validacao' | 'aprovada'
 type SortField = 'data' | 'valor' | 'obra'
 type SortDir = 'asc' | 'desc'
 type ViewMode = 'list' | 'cards'
@@ -38,16 +39,19 @@ type ViewMode = 'list' | 'cards'
 const PIPELINE_STAGES: { status: PipelineTab; label: string; icon: typeof ClipboardList; statuses: string[] }[] = [
   { status: 'pendente',     label: 'Requisições Pendentes',   icon: ClipboardList, statuses: ['rascunho'] },
   { status: 'em_validacao', label: 'Em Validação Técnica',   icon: ShieldCheck,   statuses: ['pendente', 'em_aprovacao', 'em_esclarecimento'] },
+  { status: 'aprovada',     label: 'Aprovadas — Enviar p/ Cotação', icon: PackageCheck, statuses: ['aprovada'] },
 ]
 
 const STATUS_ACCENT: Record<PipelineTab, { bg: string; bgActive: string; text: string; textActive: string; dot: string; border: string }> = {
-  pendente:     { bg: 'hover:bg-amber-50',  bgActive: 'bg-amber-50',   text: 'text-amber-600',  textActive: 'text-amber-800',  dot: 'bg-amber-400',  border: 'border-amber-400' },
-  em_validacao: { bg: 'hover:bg-violet-50', bgActive: 'bg-violet-50',  text: 'text-violet-600', textActive: 'text-violet-800', dot: 'bg-violet-500', border: 'border-violet-500' },
+  pendente:     { bg: 'hover:bg-amber-50',    bgActive: 'bg-amber-50',     text: 'text-amber-600',    textActive: 'text-amber-800',    dot: 'bg-amber-400',    border: 'border-amber-400' },
+  em_validacao: { bg: 'hover:bg-violet-50',   bgActive: 'bg-violet-50',    text: 'text-violet-600',   textActive: 'text-violet-800',   dot: 'bg-violet-500',   border: 'border-violet-500' },
+  aprovada:     { bg: 'hover:bg-emerald-50',  bgActive: 'bg-emerald-50',   text: 'text-emerald-600',  textActive: 'text-emerald-800',  dot: 'bg-emerald-500',  border: 'border-emerald-500' },
 }
 
 const STATUS_ACCENT_DARK: Record<PipelineTab, { bg: string; bgActive: string; text: string; textActive: string }> = {
-  pendente:     { bg: 'hover:bg-white/[0.03]', bgActive: 'bg-amber-500/10',  text: 'text-amber-400',  textActive: 'text-amber-300' },
-  em_validacao: { bg: 'hover:bg-white/[0.03]', bgActive: 'bg-violet-500/10', text: 'text-violet-400', textActive: 'text-violet-300' },
+  pendente:     { bg: 'hover:bg-white/[0.03]', bgActive: 'bg-amber-500/10',   text: 'text-amber-400',   textActive: 'text-amber-300' },
+  em_validacao: { bg: 'hover:bg-white/[0.03]', bgActive: 'bg-violet-500/10',  text: 'text-violet-400',  textActive: 'text-violet-300' },
+  aprovada:     { bg: 'hover:bg-white/[0.03]', bgActive: 'bg-emerald-500/10', text: 'text-emerald-400', textActive: 'text-emerald-300' },
 }
 
 const SORT_OPTIONS: { field: SortField; label: string }[] = [
@@ -70,6 +74,7 @@ function getApprovalStatusLabel(status: string): string | undefined {
   if (status === 'pendente')          return 'Aguard. Valid. Técnica'
   if (status === 'em_aprovacao')      return 'Em Validação Técnica'
   if (status === 'em_esclarecimento') return 'Em Esclarecimento'
+  if (status === 'aprovada')          return 'RC Validada'
   return undefined
 }
 
@@ -164,6 +169,29 @@ function ReqCard({ r, apr, isDark, onClick }: {
         </div>
       </div>
 
+      {/* Aprovada — pronta para cotação */}
+      {r.status === 'aprovada' && (
+        <div className={`flex items-center gap-2 rounded-xl px-3 py-2 ${isDark ? 'bg-emerald-500/10 border border-emerald-500/20' : 'bg-emerald-50 border border-emerald-200'}`}>
+          <CheckCircle size={13} className={`flex-shrink-0 ${isDark ? 'text-emerald-400' : 'text-emerald-600'}`} />
+          <p className={`text-[10px] font-bold uppercase tracking-wider ${isDark ? 'text-emerald-400' : 'text-emerald-700'}`}>
+            Aprovada — Aguardando envio para cotacao
+          </p>
+        </div>
+      )}
+
+      {/* Esclarecimento alert */}
+      {r.status === 'em_esclarecimento' && r.esclarecimento_msg && (
+        <div className={`flex items-start gap-2 rounded-xl px-3 py-2 ${isDark ? 'bg-amber-500/10 border border-amber-500/20' : 'bg-amber-50 border border-amber-200'}`}>
+          <MessageSquare size={13} className={`flex-shrink-0 mt-0.5 ${isDark ? 'text-amber-400' : 'text-amber-600'}`} />
+          <div className="min-w-0">
+            <p className={`text-[10px] font-bold uppercase tracking-wider mb-0.5 ${isDark ? 'text-amber-400' : 'text-amber-700'}`}>
+              Esclarecimento solicitado{r.esclarecimento_por ? ` por ${r.esclarecimento_por.split(' ')[0]}` : ''}
+            </p>
+            <p className={`text-xs line-clamp-2 ${isDark ? 'text-amber-300' : 'text-amber-600'}`}>{r.esclarecimento_msg}</p>
+          </div>
+        </div>
+      )}
+
       {/* Comprador + data + chip */}
       <div className={`flex items-center justify-between pt-2 ${isDark ? 'border-t border-white/[0.04]' : 'border-t border-slate-50'}`}>
         <div className="flex items-center gap-2">
@@ -189,16 +217,29 @@ function ReqCard({ r, apr, isDark, onClick }: {
 
 // ── Detail Modal ────────────────────────────────────────────────────────────
 
-function DetailModal({ r, apr, onClose, isDark, canDecide, onDecisao, isProcessing, onEmitir, onCancelar, isEmitting, isCancelling }: {
+function DetailModal({ r, apr, onClose, isDark, canDecide, onDecisao, isProcessing, onEmitir, onCancelar, isEmitting, isCancelling, onReenviar, isReenviando, onEnviarCotacao, isEnviandoCotacao }: {
   r: Requisicao; apr?: Aprovacao; onClose: () => void; isDark: boolean
   canDecide: boolean
   onDecisao: (decisao: 'aprovada' | 'rejeitada' | 'esclarecimento', obs: string) => void
   isProcessing: boolean
   onEmitir: () => void; onCancelar: () => void; isEmitting: boolean; isCancelling: boolean
+  onReenviar: (resposta: string) => void; isReenviando: boolean
+  onEnviarCotacao: () => void; isEnviandoCotacao: boolean
 }) {
   const [observacao, setObservacao] = useState('')
+  const [respostaEsclarecimento, setRespostaEsclarecimento] = useState('')
   const approvalLabel = getApprovalStatusLabel(r.status)
   const atLeastComprador = true // will be checked externally
+  const esclarecimentos = r.esclarecimento_historico?.length
+    ? r.esclarecimento_historico
+    : r.esclarecimento_msg
+      ? [{
+          tipo: 'pedido' as const,
+          autor: r.esclarecimento_por ?? '',
+          msg: r.esclarecimento_msg,
+          data: r.esclarecimento_em ?? r.created_at,
+        }]
+      : []
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-sm p-4" onClick={onClose}>
@@ -295,17 +336,81 @@ function DetailModal({ r, apr, onClose, isDark, canDecide, onDecisao, isProcessi
             </div>
           )}
 
-          {r.esclarecimento_msg && (
-            <div className={`rounded-xl px-3 py-2.5 ${isDark ? 'bg-amber-500/10 border border-amber-500/20' : 'bg-amber-50 border border-amber-200'}`}>
-              <p className={`text-xs font-bold mb-1 ${isDark ? 'text-amber-400' : 'text-amber-700'}`}>Esclarecimento</p>
-              <p className={`text-xs ${isDark ? 'text-amber-300' : 'text-amber-600'}`}>{r.esclarecimento_msg}</p>
+          {esclarecimentos.length > 0 && (
+            <div className={`rounded-xl px-3.5 py-2.5 space-y-2 ${isDark ? 'bg-amber-500/10 border border-amber-500/20' : 'bg-amber-50 border border-amber-200'}`}>
+              <div className="flex items-center gap-1.5 mb-1">
+                <MessageSquare size={13} className={isDark ? 'text-amber-400' : 'text-amber-600'} />
+                <p className={`text-[10px] font-bold uppercase tracking-wider ${isDark ? 'text-amber-400' : 'text-amber-700'}`}>Historico de Esclarecimentos</p>
+              </div>
+              {esclarecimentos.map((item, index) => {
+                const isResposta = item.tipo === 'resposta'
+                const msg = isResposta
+                  ? item.msg.replace(/^Esclarecimento respondido por [^:]+:\s*/, '')
+                  : item.msg
+                return (
+                  <div key={`${item.tipo}-${item.data}-${index}`} className={`rounded-lg px-2.5 py-2 ${isResposta ? isDark ? 'bg-emerald-500/10 border border-emerald-500/20' : 'bg-white border border-emerald-200' : isDark ? 'bg-amber-500/10 border border-amber-500/20' : 'bg-white/70 border border-amber-200'}`}>
+                    <p className={`text-[10px] font-bold uppercase tracking-wider mb-1 ${isResposta ? isDark ? 'text-emerald-400' : 'text-emerald-700' : isDark ? 'text-amber-400' : 'text-amber-700'}`}>
+                      {isResposta ? 'Resposta do Solicitante' : 'Esclarecimento Solicitado'}
+                    </p>
+                    <p className={`text-xs leading-relaxed ${isResposta ? isDark ? 'text-emerald-300' : 'text-emerald-700' : isDark ? 'text-amber-300' : 'text-amber-700'}`}>{msg}</p>
+                    {(item.autor || item.data) && (
+                      <p className={`text-[10px] mt-1.5 ${isResposta ? isDark ? 'text-emerald-500' : 'text-emerald-600' : isDark ? 'text-amber-500' : 'text-amber-500'}`}>
+                        {item.autor && <>Por: <span className="font-semibold">{item.autor}</span></>}
+                        {item.autor && item.data && ' · '}
+                        {item.data && fmtData(item.data)}
+                      </p>
+                    )}
+                  </div>
+                )
+              })}
             </div>
           )}
 
-          {/* Ações de decisão */}
-          {canDecide && (
+          {false && r.esclarecimento_msg && (
+            <div className={`rounded-xl px-3.5 py-2.5 ${isDark ? 'bg-amber-500/10 border border-amber-500/20' : 'bg-amber-50 border border-amber-200'}`}>
+              <div className="flex items-center gap-1.5 mb-1">
+                <MessageSquare size={13} className={isDark ? 'text-amber-400' : 'text-amber-600'} />
+                <p className={`text-[10px] font-bold uppercase tracking-wider ${isDark ? 'text-amber-400' : 'text-amber-700'}`}>Esclarecimento Solicitado</p>
+              </div>
+              <p className={`text-xs leading-relaxed ${isDark ? 'text-amber-300' : 'text-amber-600'}`}>{r.esclarecimento_msg}</p>
+              {(r.esclarecimento_por || r.esclarecimento_em) && (
+                <p className={`text-[10px] mt-1.5 ${isDark ? 'text-amber-500' : 'text-amber-500'}`}>
+                  {r.esclarecimento_por && <>Por: <span className="font-semibold">{r.esclarecimento_por}</span></>}
+                  {r.esclarecimento_por && r.esclarecimento_em && ' · '}
+                  {r.esclarecimento_em && fmtData(r.esclarecimento_em)}
+                </p>
+              )}
+            </div>
+          )}
+
+          {/* Responder esclarecimento (para requisitante) */}
+          {r.status === 'em_esclarecimento' && (
+            <div className={`pt-3 space-y-3 ${isDark ? 'border-t border-white/[0.06]' : 'border-t border-amber-100'}`}>
+              <p className={`text-[10px] font-bold text-center uppercase tracking-wide ${isDark ? 'text-amber-400' : 'text-amber-600'}`}>Responder Esclarecimento</p>
+              <UpperTextarea
+                rows={3}
+                className={`w-full border rounded-xl px-3 py-2 text-sm outline-none ${
+                  isDark ? 'bg-white/5 border-amber-500/20 text-white placeholder:text-slate-500 focus:ring-2 focus:ring-amber-500/30'
+                    : 'border-amber-200 focus:ring-2 focus:ring-amber-400/30'
+                }`}
+                placeholder="Digite sua resposta ao esclarecimento..."
+                value={respostaEsclarecimento}
+                onChange={e => setRespostaEsclarecimento(e.target.value)}
+              />
+              <button
+                disabled={isReenviando || !respostaEsclarecimento.trim()}
+                onClick={() => onReenviar(respostaEsclarecimento)}
+                className="w-full flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-xs font-bold text-white bg-amber-500 border border-amber-500 hover:bg-amber-600 shadow-sm shadow-amber-500/20 active:scale-[0.98] transition-all disabled:opacity-50">
+                {isReenviando ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
+                Reenviar para Aprovacao
+              </button>
+            </div>
+          )}
+
+          {/* Ações de decisão (aprovador) */}
+          {canDecide && r.status !== 'em_esclarecimento' && (
             <div className={`pt-3 space-y-3 ${isDark ? 'border-t border-white/[0.06]' : 'border-t border-slate-100'}`}>
-              <textarea
+              <UpperTextarea
                 rows={2}
                 className={`w-full border rounded-xl px-3 py-2 text-sm outline-none ${
                   isDark ? 'bg-white/5 border-white/10 text-white placeholder:text-slate-500 focus:ring-2 focus:ring-teal-500/30'
@@ -330,6 +435,26 @@ function DetailModal({ r, apr, onClose, isDark, canDecide, onDecisao, isProcessi
                   Aprovar
                 </button>
               </div>
+            </div>
+          )}
+
+          {/* Enviar para Cotação (requisição aprovada) */}
+          {r.status === 'aprovada' && (
+            <div className={`pt-3 space-y-3 ${isDark ? 'border-t border-white/[0.06]' : 'border-t border-emerald-100'}`}>
+              <div className={`flex items-center gap-2 rounded-xl px-3.5 py-2.5 ${isDark ? 'bg-emerald-500/10 border border-emerald-500/20' : 'bg-emerald-50 border border-emerald-200'}`}>
+                <CheckCircle size={16} className={isDark ? 'text-emerald-400' : 'text-emerald-600'} />
+                <div>
+                  <p className={`text-xs font-bold ${isDark ? 'text-emerald-400' : 'text-emerald-700'}`}>Validacao Tecnica Aprovada</p>
+                  <p className={`text-[10px] ${isDark ? 'text-emerald-500' : 'text-emerald-600'}`}>Revise os dados e envie para cotacao quando estiver pronto.</p>
+                </div>
+              </div>
+              <button
+                disabled={isEnviandoCotacao}
+                onClick={onEnviarCotacao}
+                className="w-full flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-xs font-bold text-white bg-emerald-500 border border-emerald-500 hover:bg-emerald-600 shadow-sm shadow-emerald-500/20 active:scale-[0.98] transition-all disabled:opacity-50">
+                {isEnviandoCotacao ? <Loader2 size={14} className="animate-spin" /> : <PackageCheck size={14} />}
+                Enviar para Cotacao
+              </button>
             </div>
           )}
 
@@ -388,6 +513,8 @@ export default function ListaRequisicoes() {
   const { data: requisicoes = [], isLoading } = useRequisicoes()
   const { data: aprovacoes } = useAprovacoesPendentes()
   const decisaoMutation = useDecisaoRequisicao()
+  const reenviarMutation = useReenviarEsclarecimento()
+  const enviarCotacaoMutation = useEnviarParaCotacao()
   const emitirPedidoMutation = useEmitirPedido()
   const cancelarMutation = useCancelarRequisicao()
 
@@ -685,6 +812,43 @@ export default function ListaRequisicoes() {
           }}
           isEmitting={emitirPedidoMutation.isPending}
           isCancelling={cancelarMutation.isPending}
+          onReenviar={(resposta) => {
+            reenviarMutation.mutate({
+              requisicaoId: detail.id,
+              requisicaoNumero: detail.numero,
+              alcadaNivel: detail.alcada_nivel,
+              solicitanteNome: perfil?.nome ?? 'Solicitante',
+              resposta,
+            }, {
+              onSuccess: () => {
+                setDetail(null)
+                setToast({ type: 'success', msg: `${detail.numero}: Esclarecimento reenviado` })
+                setTimeout(() => setToast(null), 4000)
+              },
+              onError: () => {
+                setToast({ type: 'error', msg: `Erro ao reenviar esclarecimento` })
+                setTimeout(() => setToast(null), 5000)
+              },
+            })
+          }}
+          isReenviando={reenviarMutation.isPending}
+          onEnviarCotacao={() => {
+            enviarCotacaoMutation.mutate({
+              requisicaoId: detail.id,
+              categoria: detail.categoria,
+            }, {
+              onSuccess: () => {
+                setDetail(null)
+                setToast({ type: 'success', msg: `${detail.numero}: Enviada para cotação ✓` })
+                setTimeout(() => setToast(null), 4000)
+              },
+              onError: () => {
+                setToast({ type: 'error', msg: `Erro ao enviar para cotação` })
+                setTimeout(() => setToast(null), 5000)
+              },
+            })
+          }}
+          isEnviandoCotacao={enviarCotacaoMutation.isPending}
         />
       )}
 

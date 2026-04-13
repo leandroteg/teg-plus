@@ -47,6 +47,7 @@ export type TipoDocumento =
 
 export interface Fornecedor {
   id: string
+  numero_cadastro?: string
   razao_social: string
   nome_fantasia?: string
   cnpj?: string

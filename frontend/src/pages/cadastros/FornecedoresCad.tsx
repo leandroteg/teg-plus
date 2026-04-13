@@ -1,12 +1,13 @@
-import { useState, useCallback, useMemo } from 'react'
+import { useState, useCallback, useMemo, useEffect } from 'react'
 import {
-  Building2, Plus, Search, ChevronRight, CheckCircle2,
+  Building2, Plus, Search, ChevronRight, CheckCircle2, AlertCircle,
   Phone, Mail, Loader2, ArrowUp, ArrowDown, LayoutList, LayoutGrid, Trash2,
 } from 'lucide-react'
 import { UpperInput } from '../../components/UpperInput'
 import { useCadFornecedores, useSalvarFornecedor, useAiCadastroParse } from '../../hooks/useCadastros'
 import { useConsultaCNPJ, useConsultaCEP } from '../../hooks/useConsultas'
 import { supabase } from '../../services/supabase'
+import { useAuth } from '../../contexts/AuthContext'
 import type { Fornecedor } from '../../types/financeiro'
 import type { AiCadastroResult } from '../../types/cadastros'
 import MagicModal from '../../components/MagicModal'
@@ -20,6 +21,19 @@ const EMPTY: Partial<Fornecedor> = {
   ativo: true,
 }
 
+const onlyDigits = (value?: string | null) => String(value ?? '').replace(/\D/g, '')
+const normalizeStatus = (value?: string | null) =>
+  String(value ?? '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim()
+    .toUpperCase()
+const formatStatus = (value?: string | null) => {
+  const normalized = normalizeStatus(value)
+  if (!normalized) return 'Situacao irregular'
+  return normalized.charAt(0) + normalized.slice(1).toLowerCase()
+}
+
 export default function FornecedoresCad() {
   const [busca, setBusca] = useState('')
   const [showInactive, setShowInactive] = useState(false)
@@ -30,10 +44,12 @@ export default function FornecedoresCad() {
   const [sortCol, setSortCol] = useState<string>('razao_social')
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc')
   const [selected, setSelected] = useState<Set<string>>(new Set())
+  const [cnpjDirty, setCnpjDirty] = useState(false)
 
   const { data: fornecedores = [], isLoading } = useCadFornecedores()
   const salvar = useSalvarFornecedor()
   const aiParse = useAiCadastroParse()
+  const { isAdmin } = useAuth()
 
   const cnpjLookup = useConsultaCNPJ(useCallback((r) => {
     setEditItem(prev => prev ? {
@@ -65,7 +81,8 @@ export default function FornecedoresCad() {
       list = list.filter(f =>
         f.razao_social.toLowerCase().includes(q) ||
         f.nome_fantasia?.toLowerCase().includes(q) ||
-        f.cnpj?.includes(q)
+        f.cnpj?.includes(q) ||
+        f.numero_cadastro?.toLowerCase().includes(q)
       )
     }
     list = [...list].sort((a, b) => {
@@ -101,19 +118,100 @@ export default function FornecedoresCad() {
   function openNew() {
     setEditItem({ ...EMPTY })
     setConfidence({})
+    setCnpjDirty(false)
+    cnpjLookup.limpar()
     setShowForm(true)
   }
   function openEdit(f: Fornecedor) {
     setEditItem({ ...f })
     setConfidence({})
+    setCnpjDirty(false)
+    cnpjLookup.limpar()
     setShowForm(true)
   }
-  function closeForm() { setShowForm(false); setEditItem(null); setConfidence({}) }
+  function closeForm() { setShowForm(false); setEditItem(null); setConfidence({}); setCnpjDirty(false); cnpjLookup.limpar() }
+
+  const currentCnpjDigits = onlyDigits(editItem?.cnpj)
+  const lookupCnpjDigits = onlyDigits(cnpjLookup.dados?.cnpj)
+  const cnpjLookupMatches = Boolean(cnpjLookup.dados && lookupCnpjDigits === currentCnpjDigits)
+  const cnpjStatus = cnpjLookupMatches ? normalizeStatus(cnpjLookup.dados?.situacao) : ''
+  const cnpjStatusLabel = cnpjLookupMatches ? formatStatus(cnpjLookup.dados?.situacao) : ''
+  const isCnpjActive = cnpjStatus === 'ATIVA'
+  const invalidCnpjStatus = Boolean(cnpjStatus && !isCnpjActive)
+  const cnpjInputClassName = cnpjLookupMatches
+    ? isCnpjActive
+      ? 'text-emerald-700 font-semibold'
+      : 'text-red-600 font-semibold'
+    : ''
+  const sensitiveLocked = Boolean(editItem?.id && !isAdmin)
+  const sensitiveLockMessage = sensitiveLocked
+    ? 'Campos cadastrais e bancarios ficam bloqueados apos o cadastro. Solicite alteracao ao Leandro ou outro Admin.'
+    : null
+
+  function getCnpjValidationMessage() {
+    if (!editItem) return null
+    const mustValidateCnpj = !editItem.id || cnpjDirty || cnpjLookupMatches || cnpjLookup.loading
+    if (!mustValidateCnpj) return null
+    if (currentCnpjDigits.length !== 14) return 'Informe um CNPJ com 14 digitos.'
+    if (cnpjLookup.loading) return 'Aguarde a validacao do CNPJ.'
+    if (!cnpjLookupMatches) return 'Busque e valide o CNPJ antes de salvar.'
+    if (!isCnpjActive) {
+      const status = cnpjStatusLabel || 'Situacao irregular'
+      return `CNPJ ${status} nao pode ser cadastrado.`
+    }
+    return null
+  }
+
+  const cnpjValidationMessage = getCnpjValidationMessage()
+
+  useEffect(() => {
+    const cep = onlyDigits((editItem as any)?.cep)
+    const hasEndereco = Boolean((editItem as any)?.endereco)
+    if (showForm && cep.length === 8 && !hasEndereco) {
+      cepLookup.consultar(cep)
+    }
+    if (hasEndereco && cepLookup.erro) {
+      cepLookup.limpar()
+    }
+  }, [showForm, (editItem as any)?.cep, (editItem as any)?.endereco, cepLookup.consultar, cepLookup.limpar, cepLookup.erro])
+
+  function handleCnpjChange(value: string) {
+    set('cnpj', onlyDigits(value).slice(0, 14))
+    setCnpjDirty(true)
+    cnpjLookup.limpar()
+    setConfidence(prev => {
+      const next = { ...prev }
+      delete next.cnpj
+      return next
+    })
+  }
+
+  function handleCepChange(value: string) {
+    set('cep', onlyDigits(value).slice(0, 8))
+    cepLookup.limpar()
+    setConfidence(prev => {
+      const next = { ...prev }
+      delete next.cep
+      return next
+    })
+  }
 
   async function handleSave() {
     if (!editItem) return
     if (!editItem.razao_social?.trim()) {
       alert('Razao Social e obrigatoria')
+      return
+    }
+    if (sensitiveLocked) {
+      const original = fornecedores.find(f => f.id === editItem.id)
+      if (original && hasSensitiveChanges(original, editItem)) {
+        alert('Campos importantes desse fornecedor precisam de aprovacao do Leandro ou outro Admin.')
+        return
+      }
+    }
+    const cnpjMessage = getCnpjValidationMessage()
+    if (cnpjMessage) {
+      alert(cnpjMessage)
       return
     }
     try {
@@ -163,6 +261,15 @@ export default function FornecedoresCad() {
 
   const set = (k: string, v: any) => setEditItem(prev => prev ? { ...prev, [k]: v } : prev)
 
+  function hasSensitiveChanges(original: Fornecedor, next: Partial<Fornecedor>) {
+    const keys = [
+      'numero_cadastro', 'razao_social', 'nome_fantasia', 'cnpj', 'inscricao_estadual',
+      'endereco', 'cidade', 'uf', 'cep', 'banco_codigo', 'banco_nome', 'agencia',
+      'conta', 'tipo_conta', 'boleto', 'pix_chave', 'pix_tipo', 'omie_id', 'ativo',
+    ]
+    return keys.some(key => String((original as any)[key] ?? '') !== String((next as any)[key] ?? ''))
+  }
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
@@ -181,7 +288,7 @@ export default function FornecedoresCad() {
         <div className="relative flex-1 min-w-[200px]">
           <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
           <UpperInput value={busca} onChange={e => setBusca(e.target.value)}
-            placeholder="Buscar por nome, CNPJ..."
+            placeholder="Buscar por codigo, nome, CNPJ..."
             className="w-full pl-9 pr-4 py-2 rounded-xl border border-slate-200 bg-white text-sm
               focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400" />
         </div>
@@ -222,6 +329,9 @@ export default function FornecedoresCad() {
                   <input type="checkbox" checked={selected.size === filtered.length && filtered.length > 0}
                     onChange={selectAll} className="rounded border-slate-300 text-violet-600 focus:ring-violet-500" />
                 </th>
+                <th className="text-left px-4 py-3 text-[10px] font-bold text-slate-500 uppercase tracking-widest hidden sm:table-cell cursor-pointer select-none" onClick={() => toggleSort('numero_cadastro')}>
+                  <span className="flex items-center gap-1">Codigo <SortIcon col="numero_cadastro" /></span>
+                </th>
                 <th className="text-left px-4 py-3 text-[10px] font-bold text-slate-500 uppercase tracking-widest cursor-pointer select-none" onClick={() => toggleSort('razao_social')}>
                   <span className="flex items-center gap-1">Razao Social <SortIcon col="razao_social" /></span>
                 </th>
@@ -246,6 +356,7 @@ export default function FornecedoresCad() {
                     <input type="checkbox" checked={selected.has(f.id)} onChange={() => toggleSelect(f.id)}
                       className="rounded border-slate-300 text-violet-600 focus:ring-violet-500" />
                   </td>
+                  <td className="px-4 py-2.5 text-xs text-slate-500 font-mono hidden sm:table-cell">{f.numero_cadastro || '---'}</td>
                   <td className="px-4 py-2.5 font-semibold text-slate-800">{f.razao_social}</td>
                   <td className="px-4 py-2.5 text-xs text-slate-500 hidden md:table-cell">{f.nome_fantasia || '—'}</td>
                   <td className="px-4 py-2.5 text-xs text-slate-500 font-mono hidden lg:table-cell">
@@ -282,6 +393,11 @@ export default function FornecedoresCad() {
                   </div>
                   {f.nome_fantasia && (
                     <p className="text-[10px] text-slate-400">{f.nome_fantasia}</p>
+                  )}
+                  {f.numero_cadastro && (
+                    <span className="bg-slate-100 text-slate-500 px-2 py-0.5 rounded-full font-mono text-[10px] mt-1 mr-1 inline-block">
+                      {f.numero_cadastro}
+                    </span>
                   )}
                   {f.cnpj && (
                     <span className="bg-slate-50 text-slate-500 px-2 py-0.5 rounded-full font-mono text-[10px] mt-1 inline-block">
@@ -320,31 +436,48 @@ export default function FornecedoresCad() {
           onClose={closeForm}
           onSave={handleSave}
           saving={salvar.isPending}
+          saveDisabled={Boolean(cnpjValidationMessage)}
+          saveDisabledReason={cnpjValidationMessage}
           onAiParse={handleAiParse}
           aiParsing={aiParse.isPending}
           aiDone={Object.keys(confidence).length > 0}
         >
           <div className="space-y-4">
+            {editItem.id && (
+              <div className="flex items-center justify-between rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+                <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Codigo do fornecedor</span>
+                <span className={`font-mono text-sm font-bold ${editItem.numero_cadastro ? 'text-slate-700' : 'text-slate-400'}`}>
+                  {editItem.numero_cadastro || 'Aguardando geracao'}
+                </span>
+              </div>
+            )}
+            {sensitiveLockMessage && (
+              <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-700">
+                {sensitiveLockMessage}
+              </div>
+            )}
             <div className="grid grid-cols-2 gap-3">
               {confidence.razao_social !== undefined ? (
                 <ConfidenceField label="Razao Social" value={editItem.razao_social ?? ''} onChange={v => set('razao_social', v)}
-                  confidence={confidence.razao_social} required placeholder="Razao social da empresa" />
+                  confidence={confidence.razao_social} required placeholder="Razao social da empresa" disabled={sensitiveLocked} />
               ) : (
                 <SmartTextField table="cmp_fornecedores" column="razao_social" value={editItem.razao_social ?? ''}
-                  onChange={v => set('razao_social', v)} label="Razao Social" placeholder="Razao social da empresa" required />
+                  onChange={v => set('razao_social', v)} label="Razao Social" placeholder="Razao social da empresa" required disabled={sensitiveLocked} />
               )}
               {confidence.nome_fantasia !== undefined ? (
                 <ConfidenceField label="Nome Fantasia" value={editItem.nome_fantasia ?? ''} onChange={v => set('nome_fantasia', v)}
-                  confidence={confidence.nome_fantasia} placeholder="Nome fantasia" />
+                  confidence={confidence.nome_fantasia} placeholder="Nome fantasia" disabled={sensitiveLocked} />
               ) : (
                 <SmartTextField table="cmp_fornecedores" column="nome_fantasia" value={editItem.nome_fantasia ?? ''}
-                  onChange={v => set('nome_fantasia', v)} label="Nome Fantasia" placeholder="Nome fantasia" />
+                  onChange={v => set('nome_fantasia', v)} label="Nome Fantasia" placeholder="Nome fantasia" disabled={sensitiveLocked} />
               )}
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="relative">
-                <ConfidenceField label="CNPJ" value={editItem.cnpj ?? ''} onChange={v => set('cnpj', v)}
-                  confidence={confidence.cnpj} placeholder="00.000.000/0000-00"
+                <ConfidenceField label="CNPJ" value={editItem.cnpj ?? ''} onChange={handleCnpjChange}
+                  confidence={confidence.cnpj} showConfidence={false} inputClassName={cnpjInputClassName}
+                  placeholder="00.000.000/0000-00"
+                  disabled={sensitiveLocked}
                   onBlur={() => cnpjLookup.consultar(editItem.cnpj ?? '')} />
                 {cnpjLookup.loading && (
                   <div className="absolute right-2 top-7 flex items-center gap-1 text-violet-500">
@@ -355,9 +488,10 @@ export default function FornecedoresCad() {
                 {cnpjLookup.erro && (
                   <p className="text-[9px] text-red-500 mt-0.5">{cnpjLookup.erro}</p>
                 )}
-                {cnpjLookup.dados && !cnpjLookup.erro && (
-                  <p className="text-[9px] text-emerald-600 mt-0.5 flex items-center gap-1">
-                    <CheckCircle2 size={9} /> {cnpjLookup.dados.situacao}
+                {cnpjLookupMatches && !cnpjLookup.erro && (
+                  <p className={`text-[9px] mt-0.5 flex items-center gap-1 ${invalidCnpjStatus ? 'text-red-500' : 'text-emerald-600'}`}>
+                    {invalidCnpjStatus ? <AlertCircle size={9} /> : <CheckCircle2 size={9} />}
+                    {cnpjStatusLabel}
                   </p>
                 )}
               </div>
@@ -370,8 +504,9 @@ export default function FornecedoresCad() {
               <ConfidenceField label="Email" value={editItem.email ?? ''} onChange={v => set('email', v)}
                 confidence={confidence.email} type="email" placeholder="email@empresa.com" />
               <div className="relative">
-                <ConfidenceField label="CEP" value={(editItem as any).cep ?? ''} onChange={v => set('cep', v)}
+                <ConfidenceField label="CEP" value={(editItem as any).cep ?? ''} onChange={handleCepChange}
                   confidence={confidence.cep} placeholder="00000-000"
+                  disabled={sensitiveLocked}
                   onBlur={() => cepLookup.consultar((editItem as any).cep ?? '')} />
                 {cepLookup.loading && (
                   <div className="absolute right-2 top-7 flex items-center gap-1 text-violet-500">
@@ -385,26 +520,26 @@ export default function FornecedoresCad() {
               </div>
             </div>
             <ConfidenceField label="Endereco" value={(editItem as any).endereco ?? ''} onChange={v => set('endereco', v)}
-              confidence={confidence.endereco} placeholder="Rua, numero, complemento" />
+              confidence={confidence.endereco} placeholder="Rua, numero, complemento" disabled={sensitiveLocked} />
             <div className="grid grid-cols-2 gap-3">
               <ConfidenceField label="Cidade" value={(editItem as any).cidade ?? ''} onChange={v => set('cidade', v)}
-                confidence={confidence.cidade} placeholder="Cidade" />
+                confidence={confidence.cidade} placeholder="Cidade" disabled={sensitiveLocked} />
               <ConfidenceField label="UF" value={(editItem as any).uf ?? ''} onChange={v => set('uf', v)}
-                confidence={confidence.uf} placeholder="MG" />
+                confidence={confidence.uf} placeholder="MG" disabled={sensitiveLocked} />
             </div>
 
             <div className="pt-3 border-t border-slate-100">
               <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3">Dados Bancarios</p>
               <div className="grid grid-cols-3 gap-3">
-                <ConfidenceField label="Banco" value={editItem.banco_nome ?? ''} onChange={v => set('banco_nome', v)} placeholder="Banco" />
-                <ConfidenceField label="Agencia" value={editItem.agencia ?? ''} onChange={v => set('agencia', v)} placeholder="0000" />
-                <ConfidenceField label="Conta" value={editItem.conta ?? ''} onChange={v => set('conta', v)} placeholder="00000-0" />
+                <ConfidenceField label="Banco" value={editItem.banco_nome ?? ''} onChange={v => set('banco_nome', v)} placeholder="Banco" disabled={sensitiveLocked} />
+                <ConfidenceField label="Agencia" value={editItem.agencia ?? ''} onChange={v => set('agencia', v)} placeholder="0000" disabled={sensitiveLocked} />
+                <ConfidenceField label="Conta" value={editItem.conta ?? ''} onChange={v => set('conta', v)} placeholder="00000-0" disabled={sensitiveLocked} />
               </div>
               <div className="grid grid-cols-2 gap-3 mt-3">
-                <ConfidenceField label="PIX Chave" value={editItem.pix_chave ?? ''} onChange={v => set('pix_chave', v)} placeholder="Chave PIX" />
+                <ConfidenceField label="PIX Chave" value={editItem.pix_chave ?? ''} onChange={v => set('pix_chave', v)} placeholder="Chave PIX" disabled={sensitiveLocked} />
                 <div>
                   <label className="block text-xs font-bold text-slate-600 mb-1">PIX Tipo</label>
-                  <select value={editItem.pix_tipo ?? ''} onChange={e => set('pix_tipo', e.target.value)} className="input-base">
+                  <select value={editItem.pix_tipo ?? ''} onChange={e => set('pix_tipo', e.target.value)} disabled={sensitiveLocked} className="input-base">
                     <option value="">Selecione</option>
                     <option value="cpf">CPF</option>
                     <option value="cnpj">CNPJ</option>

@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
 import { useSmartSearch } from '../hooks/useSmartForm'
+import { toUpperNorm } from './UpperInput'
 
 interface SmartTextFieldProps {
   table: string
@@ -10,10 +11,11 @@ interface SmartTextFieldProps {
   placeholder?: string
   required?: boolean
   className?: string
+  disabled?: boolean
 }
 
 export default function SmartTextField({
-  table, column, value, onChange, label, placeholder, required, className,
+  table, column, value, onChange, label, placeholder, required, className, disabled,
 }: SmartTextFieldProps) {
   const [query, setQuery] = useState('')
   const [showDropdown, setShowDropdown] = useState(false)
@@ -25,9 +27,10 @@ export default function SmartTextField({
 
   // Debounce para buscar
   function handleChange(v: string) {
-    onChange(v)
+    const next = toUpperNorm(v)
+    onChange(next)
     if (debounceRef.current) clearTimeout(debounceRef.current)
-    debounceRef.current = setTimeout(() => setQuery(v), 300)
+    debounceRef.current = setTimeout(() => setQuery(next), 300)
   }
 
   // Fecha dropdown ao clicar fora
@@ -76,6 +79,7 @@ export default function SmartTextField({
         onFocus={() => { setFocused(true); if (value.length >= 2) setShowDropdown(true) }}
         onBlur={() => { setFocused(false); setTimeout(() => setShowDropdown(false), 200) }}
         placeholder={placeholder}
+        disabled={disabled}
         className="input-base"
       />
 

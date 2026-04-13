@@ -30,7 +30,6 @@ import type { MelhoriaMinuta, MinutaTextoGerado } from '../../hooks/useSolicitac
 import type { Minuta, TipoMinuta, StatusMinuta, MinutaAiAnalise, ConfigAnalise, GrupoContrato } from '../../types/contratos'
 import { useModelosContrato } from '../../hooks/useContratos'
 import { GRUPO_CONTRATO_LABEL } from '../../constants/contratos'
-import { UpperTextarea } from '../../components/UpperInput'
 import { supabase } from '../../services/supabase'
 import { getEmpresa } from '../../services/empresa'
 import { jsPDF } from 'jspdf'
@@ -2367,7 +2366,7 @@ export default function PreparaMinuta() {
                 </div>
                 <div className="sm:col-span-2">
                   <label className={labelClass}>Descrição</label>
-                  <UpperTextarea
+                  <textarea
                     value={descricao}
                     onChange={e => setDescricao(e.target.value)}
                     placeholder="Observações sobre esta versão da minuta..."

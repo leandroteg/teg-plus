@@ -77,6 +77,35 @@ export function useAprovacoesPendentes(tipo?: TipoAprovacao) {
         }
       }
 
+      // 3b. Busca historico de esclarecimentos para requisicoes
+      const escHistMap = new Map<string, { tipo: 'pedido' | 'resposta'; autor: string; msg: string; data: string }[]>()
+      if (cmpIds.length > 0) {
+        const { data: escData } = await supabase
+          .from(TABLE_APR)
+          .select('entidade_id, status, observacao, aprovador_nome, data_decisao, created_at')
+          .in('entidade_id', cmpIds)
+          .eq('modulo', 'cmp')
+          .in('status', ['esclarecimento', 'pendente'])
+          .not('observacao', 'is', null)
+          .order('created_at', { ascending: true })
+
+        for (const e of escData ?? []) {
+          const obs = (e.observacao as string) ?? ''
+          const isResposta = obs.startsWith('Esclarecimento respondido')
+          // Filtra: so registros de esclarecimento ou respostas de esclarecimento
+          if (e.status !== 'esclarecimento' && !isResposta) continue
+
+          const hist = escHistMap.get(e.entidade_id as string) ?? []
+          hist.push({
+            tipo: e.status === 'esclarecimento' ? 'pedido' : 'resposta',
+            autor: (e.aprovador_nome as string) ?? '',
+            msg: obs,
+            data: (e.data_decisao as string) ?? (e.created_at as string) ?? '',
+          })
+          escHistMap.set(e.entidade_id as string, hist)
+        }
+      }
+
       // 4. Busca dados de contratos (minuta_contratual)
       const conIds = aprData
         .filter(a => a.tipo_aprovacao === 'minuta_contratual')
@@ -498,6 +527,7 @@ export function useAprovacoesPendentes(tipo?: TipoAprovacao) {
             minuta_resumo: minutaResumo ?? undefined,
             pagamento_detalhes: pagamentoDetalhes ?? undefined,
             transporte_detalhes: transporteDetalhes ?? undefined,
+            esclarecimento_historico: escHistMap.get(a.entidade_id) ?? undefined,
           } as unknown as AprovacaoPendente
         })
         .filter((a): a is AprovacaoPendente => a !== null)
@@ -1031,7 +1061,7 @@ export function useDecisaoRequisicao() {
         if (isFinancialApproval) {
           updates.status = 'cotacao_aprovada'
         } else {
-          updates.status = 'em_cotacao'
+          updates.status = 'aprovada'
         }
       } else if (decisao === 'rejeitada') {
         updates.status = isFinancialApproval ? 'cotacao_rejeitada' : 'rejeitada'
@@ -1079,35 +1109,6 @@ export function useDecisaoRequisicao() {
         .eq('entidade_id', requisicaoId)
         .eq('modulo', 'cmp')
         .eq('status', 'pendente')
-
-      // 3. Auto-criar cotacao quando aprovacao tecnica e concedida
-      if (decisao === 'aprovada' && !isFinancialApproval) {
-        try {
-          let compradorId: string | null = null
-          if (categoria) {
-            const { data: compradores } = await supabase
-              .from('cmp_compradores')
-              .select('id, categorias')
-            const match = compradores?.find(
-              (c: { id: string; categorias: string[] }) =>
-                c.categorias?.includes(categoria)
-            )
-            compradorId = match?.id ?? null
-          }
-
-          const dataLimite = new Date()
-          dataLimite.setDate(dataLimite.getDate() + 5)
-
-          await supabase.from('cmp_cotacoes').insert({
-            requisicao_id: requisicaoId,
-            comprador_id: compradorId,
-            status: 'pendente',
-            data_limite: dataLimite.toISOString(),
-          })
-        } catch (e) {
-          console.warn('Aviso: cotacao nao criada automaticamente:', e)
-        }
-      }
 
       return { decisao }
     },

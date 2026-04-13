@@ -14,6 +14,7 @@ import { useEmitirPedido, useCancelarRequisicao } from '../hooks/usePedidos'
 import { useEditorLock } from '../hooks/useEditorLock'
 import { useAuth } from '../contexts/AuthContext'
 import EmitirPedidoModal from '../components/EmitirPedidoModal'
+import { UpperTextarea } from '../components/UpperInput'
 import type { StatusCotacao, Cotacao } from '../types'
 import { minCotacoesPorValor } from '../utils/cotacoesPolicy'
 
@@ -284,7 +285,7 @@ function CotDetailModal({ cot, onClose, isDark, isAdmin, atLeastComprador, onDec
           {isAdmin && concluida && reqStatus === 'cotacao_enviada' && (
             <div className={`pt-3 space-y-3 ${isDark ? 'border-t border-white/[0.06]' : 'border-t border-teal-100'}`}>
               <p className={`text-[10px] font-bold text-center uppercase tracking-wide ${isDark ? 'text-teal-400' : 'text-teal-600'}`}>Aprovação Financeira</p>
-              <textarea rows={2} className={`w-full border rounded-xl px-3 py-2 text-sm outline-none ${isDark ? 'bg-white/5 border-white/10 text-white placeholder:text-slate-500 focus:ring-2 focus:ring-teal-500/30' : 'border-slate-200 focus:ring-2 focus:ring-teal-400/30'}`}
+              <UpperTextarea rows={2} className={`w-full border rounded-xl px-3 py-2 text-sm outline-none ${isDark ? 'bg-white/5 border-white/10 text-white placeholder:text-slate-500 focus:ring-2 focus:ring-teal-500/30' : 'border-slate-200 focus:ring-2 focus:ring-teal-400/30'}`}
                 placeholder="Observação..." value={observacao} onChange={e => setObservacao(e.target.value)} />
               <div className="flex gap-2">
                 <button disabled={isProcessing} onClick={() => onDecisao('rejeitada', observacao)}

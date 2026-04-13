@@ -804,6 +804,16 @@ function UserDetailPanel({
 
   return (
     <div className={`border-t ${isDark ? 'border-white/[0.06] bg-white/[0.02]' : 'border-slate-100 bg-slate-50/50'}`}>
+      {/* ── Identidade do usuário sendo editado ─────────────────────────── */}
+      <div className={`flex items-center gap-3 px-4 py-3 border-b ${isDark ? 'bg-primary/10 border-primary/20' : 'bg-primary/5 border-primary/10'}`}>
+        <Avatar nome={user.nome} size="sm" />
+        <div className="flex-1 min-w-0">
+          <p className={`text-sm font-bold truncate ${isDark ? 'text-white' : 'text-navy'}`}>{user.nome}</p>
+          <p className="text-[11px] text-slate-400 truncate">{formatLoginUsuario(user.email)}</p>
+        </div>
+        <RoleBadge role={resolvePapelFromPerfil(user) as Role} />
+      </div>
+
       {/* User info section */}
       <div className="px-4 py-4 space-y-3">
         {/* Basic Info Row */}
@@ -1567,6 +1577,7 @@ export default function AdminUsuarios() {
   const [bulkModulos, setBulkModulos] = useState<Record<string, boolean>>(() => createEmptyModulosMap())
   const [bulkModuloPapeis, setBulkModuloPapeis] = useState<Record<string, PapelGlobal>>({})
   const [showBatchEditor, setShowBatchEditor] = useState(false)
+  const [editModalUser,   setEditModalUser]   = useState<Perfil | null>(null)
   const [showBatchDelete, setShowBatchDelete] = useState(false)
   const [batchDeleteTyped, setBatchDeleteTyped] = useState('')
   const batchDelete = useDeleteUser()
@@ -1675,10 +1686,11 @@ export default function AdminUsuarios() {
   const handleToolbarEdit = () => {
     if (selectedIds.length === 1) {
       const [id] = selectedIds
-      setShowBatchEditor(false)
-      setViewMode('cards')
-      setExpandedUser(id)
-      setQuickEditUserId(id)
+      const user = perfis?.find(p => p.id === id)
+      if (user) {
+        setEditModalUser(user)
+        setSelectedIds([])
+      }
       return
     }
     setQuickEditUserId(null)
@@ -1713,6 +1725,41 @@ export default function AdminUsuarios() {
   return (
     <>
       {showCadastro && <CadastroUsuarioModal onClose={() => { setShowCadastro(false); refetch() }} />}
+
+      {/* ── Modal de edição individual ──────────────────────────────────── */}
+      {editModalUser && (
+        <div
+          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/50 backdrop-blur-sm"
+          onClick={() => setEditModalUser(null)}
+        >
+          <div
+            className="w-full sm:max-w-lg max-h-[92vh] overflow-y-auto bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl"
+            onClick={e => e.stopPropagation()}
+          >
+            {/* Modal header */}
+            <div className="flex items-center gap-3 px-4 py-3 border-b border-slate-100 sticky top-0 bg-white z-10">
+              <Avatar nome={editModalUser.nome} />
+              <div className="flex-1 min-w-0">
+                <p className="font-bold text-navy text-sm truncate">{editModalUser.nome}</p>
+                <p className="text-[11px] text-slate-400">{formatLoginUsuario(editModalUser.email)}</p>
+              </div>
+              <button
+                onClick={() => setEditModalUser(null)}
+                className="w-8 h-8 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 flex items-center justify-center transition-colors"
+                aria-label="Fechar"
+              >
+                <X size={16} />
+              </button>
+            </div>
+            <UserDetailPanel
+              user={editModalUser}
+              forceEdit={true}
+              onClose={() => setEditModalUser(null)}
+            />
+          </div>
+        </div>
+      )}
+
       {showBatchEditor && (
         <BatchEditModal
           open={showBatchEditor}
@@ -1793,17 +1840,17 @@ export default function AdminUsuarios() {
         </div>
 
         {/* Stats de roles — clicáveis para filtrar */}
-        <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           <button
             onClick={() => setFilterRole('todos')}
-            className={`rounded-xl p-3 text-left transition-all ${
+            className={`flex items-baseline gap-1.5 px-3 py-1.5 rounded-full border transition-all ${
               filterRole === 'todos'
-                ? 'bg-slate-800 ring-2 ring-slate-800 shadow-lg'
-                : isDark ? 'bg-white/[0.05] hover:bg-white/[0.08]' : 'bg-slate-100 hover:bg-slate-200'
+                ? 'bg-slate-800 border-slate-800 shadow'
+                : isDark ? 'bg-white/[0.05] border-white/10 hover:bg-white/[0.09]' : 'bg-slate-100 border-slate-200 hover:bg-slate-200'
             }`}
           >
-            <p className={`text-xl font-black ${filterRole === 'todos' ? 'text-white' : isDark ? 'text-slate-200' : 'text-slate-700'}`}>{perfis?.length ?? 0}</p>
-            <p className={`text-xs font-semibold ${filterRole === 'todos' ? 'text-slate-300' : isDark ? 'text-slate-400' : 'text-slate-500'}`}>Todos</p>
+            <span className={`text-base font-black ${filterRole === 'todos' ? 'text-white' : isDark ? 'text-slate-200' : 'text-slate-700'}`}>{perfis?.length ?? 0}</span>
+            <span className={`text-xs font-semibold ${filterRole === 'todos' ? 'text-slate-300' : isDark ? 'text-slate-400' : 'text-slate-500'}`}>Todos</span>
           </button>
           {(['requisitante', 'equipe', 'supervisor', 'diretor', 'ceo'] as Role[]).map(r => {
             const c = ROLE_COLOR[r]
@@ -1812,12 +1859,12 @@ export default function AdminUsuarios() {
               <button
                 key={r}
                 onClick={() => setFilterRole(active ? 'todos' : r)}
-                className={`rounded-xl p-3 text-left transition-all ${
-                  active ? `${c.bg} ring-2 ring-offset-1 ${c.text.replace('text-', 'ring-')} shadow-lg` : `${c.bg} hover:shadow-md`
+                className={`flex items-baseline gap-1.5 px-3 py-1.5 rounded-full border transition-all ${
+                  active ? `${c.bg} border-transparent shadow` : `${c.bg} border-transparent hover:shadow-sm`
                 }`}
               >
-                <p className={`text-xl font-black ${c.text}`}>{stats[r] ?? 0}</p>
-                <p className={`text-xs font-semibold ${c.text} opacity-80`}>{getRoleLabel(r)}</p>
+                <span className={`text-base font-black ${c.text}`}>{stats[r] ?? 0}</span>
+                <span className={`text-xs font-semibold ${c.text} opacity-80`}>{getRoleLabel(r)}</span>
               </button>
             )
           })}
@@ -1867,32 +1914,31 @@ export default function AdminUsuarios() {
               </button>
             </div>
 
-            <button
-              type="button"
-              onClick={handleToolbarEdit}
-              className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold border transition-all ${
-                showBatchEditor && selectedIds.length !== 1
-                  ? 'bg-primary text-white border-primary shadow'
-                  : isDark ? 'bg-white/[0.05] text-slate-300 border-white/10 hover:border-primary/40 hover:text-primary' : 'bg-white text-slate-600 border-slate-200 hover:border-primary/40 hover:text-primary'
-              }`}
-            >
-              <Edit3 size={12} />
-              Editar
-            </button>
             {selectedIds.length > 0 && (
-              <button
-                type="button"
-                onClick={() => setShowBatchDelete(true)}
-                className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold border transition-all ${isDark ? 'border-red-500/30 text-red-400 hover:bg-red-500/10' : 'border-red-200 text-red-500 hover:bg-red-50'}`}
-              >
-                <X size={12} />
-                Excluir ({selectedIds.length})
-              </button>
+              <>
+                <button
+                  type="button"
+                  onClick={handleToolbarEdit}
+                  className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold border transition-all ${
+                    showBatchEditor && selectedIds.length !== 1
+                      ? 'bg-primary text-white border-primary shadow'
+                      : isDark ? 'bg-white/[0.05] text-slate-300 border-white/10 hover:border-primary/40 hover:text-primary' : 'bg-white text-slate-600 border-slate-200 hover:border-primary/40 hover:text-primary'
+                  }`}
+                >
+                  <Edit3 size={12} />
+                  {selectedIds.length === 1 ? 'Editar' : `Editar em lote (${selectedIds.length})`}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowBatchDelete(true)}
+                  className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold border transition-all ${isDark ? 'border-red-500/30 text-red-400 hover:bg-red-500/10' : 'border-red-200 text-red-500 hover:bg-red-50'}`}
+                >
+                  <X size={12} />
+                  Excluir ({selectedIds.length})
+                </button>
+                <span className={`text-xs ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{selectedIds.length} selecionado(s)</span>
+              </>
             )}
-          </div>
-
-          <div className="flex items-center justify-end">
-            <span className={`text-xs ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{selectedIds.length} selecionado(s)</span>
           </div>
 
           {showBatchDelete && selectedIds.length > 0 && (
@@ -2178,9 +2224,8 @@ export default function AdminUsuarios() {
                             <button
                               type="button"
                               onClick={() => {
-                                setQuickEditUserId(p.id)
-                                setViewMode('cards')
-                                setExpandedUser(p.id)
+                                setSelectedIds([])
+                                setEditModalUser(p)
                               }}
                               className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg border border-primary/25 bg-primary/5 text-primary hover:bg-primary/10 transition-colors text-[11px] font-semibold"
                               title={`Editar ${p.nome}`}
@@ -2197,11 +2242,11 @@ export default function AdminUsuarios() {
                         </td>
                         <td className={`px-3 py-3 text-xs ${isDark ? 'text-slate-300' : 'text-slate-600'}`}>{ALCADA_LABEL[p.alcada_nivel]}</td>
                         <td className="px-3 py-3">
-                          <div className="flex flex-wrap gap-1 max-w-[300px]">
+                          <div className="flex flex-wrap gap-1 max-w-[240px]">
                             {enabledModulos.length === 0 && (
                               <span className={`text-[11px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Sem módulos</span>
                             )}
-                            {enabledModulos.map(mod => (
+                            {enabledModulos.slice(0, 3).map(mod => (
                               <span
                                 key={`${p.id}-${mod.key}`}
                                 className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-semibold ${isDark ? 'bg-white/[0.06] text-slate-300' : 'bg-slate-100 text-slate-600'}`}
@@ -2211,6 +2256,14 @@ export default function AdminUsuarios() {
                                 {mod.label}
                               </span>
                             ))}
+                            {enabledModulos.length > 3 && (
+                              <span
+                                className="inline-flex items-center px-1.5 py-0.5 rounded-md bg-slate-200 text-slate-500 text-[10px] font-semibold"
+                                title={enabledModulos.slice(3).map(m => m.label).join(', ')}
+                              >
+                                +{enabledModulos.length - 3}
+                              </span>
+                            )}
                           </div>
                         </td>
                         <td className="px-3 py-3">

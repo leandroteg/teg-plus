@@ -14,6 +14,7 @@ import { useAuth } from '../contexts/AuthContext'
 import CategoryCard from '../components/CategoryCard'
 import NumericInput from '../components/NumericInput'
 import ItemAutocomplete from '../components/ItemAutocomplete'
+import { toUpperNorm, UpperTextarea } from '../components/UpperInput'
 import type { RequisicaoItem, Urgencia, AiParseResult, CategoriaMaterial } from '../types'
 import { minCotacoesPorValor } from '../utils/cotacoesPolicy'
 
@@ -88,13 +89,13 @@ function parseCSVItems(text: string): RequisicaoItem[] {
 }
 
 function buildResumoRequisicao(itens: RequisicaoItem[], detalhes: string) {
-  if (detalhes.trim()) return detalhes.trim()
+  if (detalhes.trim()) return toUpperNorm(detalhes.trim())
 
   const descricoes = itens
     .map((item) => item.descricao.trim())
     .filter(Boolean)
 
-  if (descricoes.length === 0) return 'Solicitacao de compra'
+  if (descricoes.length === 0) return 'SOLICITACAO DE COMPRA'
   if (descricoes.length === 1) return descricoes[0]
   if (descricoes.length === 2) return `${descricoes[0]} e ${descricoes[1]}`
   return `${descricoes[0]}, ${descricoes[1]} e mais ${descricoes.length - 2} item(ns)`
@@ -166,7 +167,7 @@ export default function NovaRequisicao() {
       const fornecedores = pf.fornecedores as Array<{ nome_fornecedor?: string; itens?: RequisicaoItem[] }> | undefined
       if (fornecedores?.length && fornecedores[0]?.itens?.length) {
         const rawItens = fornecedores[0].itens.map((it: any) => ({
-          descricao: cleanName(String(it.descricao ?? it.nome ?? '').trim()),
+          descricao: toUpperNorm(cleanName(String(it.descricao ?? it.nome ?? '').trim())),
           quantidade: parseFloat(String(it.quantidade ?? it.qtd ?? 1)) || 1,
           unidade: String(it.unidade ?? 'un').toLowerCase(),
           valor_unitario_estimado: parseFloat(String(it.valor_unitario ?? it.valor_unitario_estimado ?? 0)) || 0,
@@ -179,19 +180,19 @@ export default function NovaRequisicao() {
           ? nomes.join(', ')
           : `${nomes.slice(0, 2).join(', ')} e mais ${nomes.length - 2} item(ns)`
         const fornNome = fornecedores[0].nome_fornecedor
-        setDescricao(fornNome ? `${desc} — ${fornNome}` : desc)
+        setDescricao(toUpperNorm(fornNome ? `${desc} - ${fornNome}` : desc))
 
         // User message goes to justificativa only if it's not just the filename
         if (pf.mensagem_usuario && !pf.mensagem_usuario.includes(pf.cotacao_referencia_nome || '___')) {
-          setJustificativa(pf.mensagem_usuario)
+          setJustificativa(toUpperNorm(pf.mensagem_usuario))
         }
 
         // Skip to step 2 (Detalhes) since items are already filled
         setStep(2)
       } else {
         // No items extracted — just fill description
-        if (pf.descricao) setDescricao(pf.descricao)
-        if (pf.mensagem_usuario) setJustificativa(pf.mensagem_usuario)
+        if (pf.descricao) setDescricao(toUpperNorm(pf.descricao))
+        if (pf.mensagem_usuario) setJustificativa(toUpperNorm(pf.mensagem_usuario))
       }
     } catch { /* ignore parse errors */ }
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -208,7 +209,7 @@ export default function NovaRequisicao() {
   const sanitizeItems = useCallback((items: RequisicaoItem[]): RequisicaoItem[] =>
     (items ?? [])
       .map(item => ({
-        descricao: String(item.descricao ?? '').trim(),
+        descricao: toUpperNorm(String(item.descricao ?? '').trim()),
         quantidade: typeof item.quantidade === 'number' ? item.quantidade : parseFloat(String(item.quantidade)) || 1,
         unidade: String(item.unidade || 'un').toLowerCase(),
         valor_unitario_estimado: typeof item.valor_unitario_estimado === 'number'
@@ -245,7 +246,7 @@ export default function NovaRequisicao() {
       setUrgencia(result.urgencia_sugerida)
     }
 
-    if (result.justificativa_sugerida)  setJustificativa(String(result.justificativa_sugerida))
+    if (result.justificativa_sugerida)  setJustificativa(toUpperNorm(String(result.justificativa_sugerida)))
     if (result.comprador_sugerido)      setCompradorSugerido(result.comprador_sugerido)
     if (result.categoria_sugerida) {
       const catEncontrada = categorias.find(c =>
@@ -255,12 +256,13 @@ export default function NovaRequisicao() {
       if (catEncontrada) setCategoria(catEncontrada)
     }
     setConfianca(typeof result.confianca === 'number' ? result.confianca : 0.5)
-    if (!descricao.trim()) setDescricao(textoOriginal || `Requisição processada via IA (${parsedItens.length} itens)`)
+    if (!descricao.trim()) setDescricao(toUpperNorm(textoOriginal || `Requisicao processada via IA (${parsedItens.length} itens)`))
     setStep(2)
   }, [perfil, solicitante, categorias, descricao])
 
-  // ── AI Parse Handler (with progress + preview) ──────────────────────────────
-  const handleAiParse = async () => {
+  // ── AI Parse Handler (auto-triggered on file attach) ────────────────────────
+  const handleAiParse = async (fileArg?: File) => {
+    const fileToUse = fileArg ?? selectedFile
     let textoFinal = textoAi
     let arquivoPayload: { base64: string; nome: string; mime: string } | undefined
 
@@ -268,22 +270,21 @@ export default function NovaRequisicao() {
     setAiPreview(null)
     setShowPreview(false)
 
-    if (selectedFile) {
+    if (fileToUse) {
       try {
         // CSV fast path -- parse directly without AI
-        if (selectedFile.name.match(/\.csv$/i)) {
+        if (fileToUse.name.match(/\.csv$/i)) {
           const fileText = await new Promise<string>((resolve, reject) => {
             const reader = new FileReader()
             reader.onload = () => resolve(reader.result as string)
             reader.onerror = reject
-            reader.readAsText(selectedFile)
+            reader.readAsText(fileToUse)
           })
           const csvItems = parseCSVItems(fileText)
           if (csvItems.length > 0) {
             setItens(csvItems)
-            if (!descricao.trim()) setDescricao(`Itens importados de ${selectedFile.name} (${csvItems.length} itens)`)
+            if (!descricao.trim()) setDescricao(toUpperNorm(`Itens importados de ${fileToUse.name} (${csvItems.length} itens)`))
             setConfianca(0.95)
-            // Issue #18: Auto-fill solicitante
             if (perfil?.nome && !solicitante.trim()) setSolicitante(perfil.nome)
             setAiProgress('done')
             setTimeout(() => { setAiProgress('idle'); setStep(2) }, 600)
@@ -292,13 +293,13 @@ export default function NovaRequisicao() {
         }
 
         // Read file (auto-detect: binary -> base64, text -> string)
-        const fileData = await readFileForAi(selectedFile)
+        const fileData = await readFileForAi(fileToUse)
 
         if (fileData.arquivo) {
           arquivoPayload = fileData.arquivo
         } else if (fileData.texto) {
           textoFinal = textoFinal
-            ? `${textoFinal}\n\nConteudo do arquivo ${selectedFile.name}:\n${fileData.texto}`
+            ? `${textoFinal}\n\nConteudo do arquivo ${fileToUse.name}:\n${fileData.texto}`
             : fileData.texto
         }
       } catch {
@@ -322,11 +323,8 @@ export default function NovaRequisicao() {
 
       const sanitized = sanitizeItems(result.itens)
       setAiProgress('done')
-
-      // Issue #17: Show preview before applying
-      setAiPreview(result)
-      setPreviewItens(sanitized.length > 0 ? sanitized : [emptyItem()])
-      setShowPreview(true)
+      applyAiResult(result, sanitized, textoFinal)
+      setTimeout(() => setAiProgress('idle'), 2000)
     } catch {
       setAiProgress('error')
       setTimeout(() => setAiProgress('idle'), 3000)
@@ -366,11 +364,11 @@ export default function NovaRequisicao() {
     obra_nome:        obraNome,
     obra_id:          obraId || undefined,
     descricao:        buildResumoRequisicao(itens, descricao),
-    justificativa,
+    justificativa:     toUpperNorm(justificativa),
     urgencia,
-    justificativa_urgencia: urgencia !== 'normal' ? justificativaUrgencia : undefined,
+    justificativa_urgencia: urgencia !== 'normal' ? toUpperNorm(justificativaUrgencia) : undefined,
     categoria:        categoria?.codigo,
-    itens,
+    itens:             itens.map(item => ({ ...item, descricao: toUpperNorm(item.descricao) })),
     data_necessidade: dataNecessidade || undefined,
     texto_original:   textoAi || undefined,
     comprador_id:     compradorSugerido?.id,
@@ -555,7 +553,7 @@ export default function NovaRequisicao() {
 
       <div>
         <label className="text-xs font-semibold text-slate-500 mb-1 block">Motivo <span className="text-red-400">*</span></label>
-        <textarea rows={3} required
+        <UpperTextarea rows={3} required
           className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-teal-300 outline-none"
           placeholder="Por que essa compra é necessária? Para qual finalidade?"
           value={justificativa} onChange={e => setJustificativa(e.target.value)} />
@@ -576,23 +574,12 @@ export default function NovaRequisicao() {
             type="file"
             className="hidden"
             accept=".pdf,.xlsx,.xls,.csv,.doc,.docx,.jpg,.jpeg,.png,.webp"
-            onChange={async (event) => {
+            onChange={(event) => {
               const file = event.target.files?.[0]
-              if (!file) return
-              setReferenciaFile(file)
-              // Auto-parse: lê itens com IA automaticamente ao anexar
-              try {
-                const fileData = await readFileForAi(file)
-                const result = await aiParse.mutateAsync({
-                  texto: fileData.texto ?? '',
-                  solicitante_nome: solicitante,
-                  arquivo: fileData.arquivo,
-                })
-                if (result.itens?.length > 0) {
-                  setItens(sanitizeItems(result.itens))
-                  if (typeof result.confianca === 'number') setConfianca(result.confianca)
-                }
-              } catch { /* erro silencioso — usuário pode preencher manualmente */ }
+              if (file) {
+                setReferenciaFile(file)
+                handleAiParse(file)
+              }
             }}
           />
 
@@ -608,25 +595,59 @@ export default function NovaRequisicao() {
                     <p className="text-[11px] text-slate-400">{(referenciaFile.size / 1024).toFixed(1)} KB</p>
                   </div>
                 </div>
-                <div className="flex items-center gap-1.5">
-                  {aiParse.isPending && (
-                    <span className="flex items-center gap-1.5 text-[11px] font-semibold text-teal-600 bg-teal-50 border border-teal-100 rounded-full px-2.5 py-1">
-                      <Loader2 size={12} className="animate-spin" /> Lendo itens...
+                <button
+                  type="button"
+                  onClick={(event) => {
+                    event.stopPropagation()
+                    setReferenciaFile(null)
+                    setAiProgress('idle')
+                    if (referenciaInputRef.current) referenciaInputRef.current.value = ''
+                  }}
+                  className="rounded-full bg-white p-2 text-slate-400 transition hover:text-red-500"
+                >
+                  <X size={14} />
+                </button>
+              </div>
+
+              {/* AI status / action area */}
+              {(aiProgress === 'reading' || aiProgress === 'parsing') ? (
+                <div className="flex items-center gap-2 px-3 py-2 bg-teal-50 rounded-xl border border-teal-200">
+                  <div className="w-4 h-4 border-2 border-teal-500 border-t-transparent rounded-full animate-spin shrink-0" />
+                  <span className="text-xs font-semibold text-teal-700">
+                    {aiProgress === 'reading' ? 'Lendo arquivo...' : 'Extraindo itens com IA...'}
+                  </span>
+                </div>
+              ) : aiProgress === 'error' ? (
+                <div className="flex items-center gap-2 px-3 py-2 bg-red-50 rounded-xl border border-red-200">
+                  <AlertCircle size={14} className="text-red-500 shrink-0" />
+                  <span className="text-xs text-red-600">Não foi possível extrair itens — preencha manualmente</span>
+                </div>
+              ) : (
+                <div className="flex items-center gap-2 flex-wrap">
+                  {aiProgress === 'done' && (
+                    <span className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                      <CheckCircle2 size={12} /> Itens preenchidos pela IA
                     </span>
                   )}
-                  <button
-                    type="button"
-                    onClick={(event) => {
-                      event.stopPropagation()
-                      setReferenciaFile(null)
-                      if (referenciaInputRef.current) referenciaInputRef.current.value = ''
-                    }}
-                    className="rounded-full bg-white p-2 text-slate-400 transition hover:text-red-500"
+                  <a
+                    href={URL.createObjectURL(referenciaFile)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={e => e.stopPropagation()}
+                    className="flex items-center gap-1.5 py-1.5 px-3 rounded-xl text-xs font-semibold border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 transition-colors"
                   >
-                    <X size={14} />
-                  </button>
+                    <ExternalLink size={12} /> Visualizar
+                  </a>
+                  <a
+                    href={URL.createObjectURL(referenciaFile)}
+                    download={referenciaFile.name}
+                    onClick={e => e.stopPropagation()}
+                    className="flex items-center gap-1.5 py-1.5 px-3 rounded-xl text-xs font-semibold border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 transition-colors"
+                  >
+                    <Download size={12} /> Download
+                  </a>
                 </div>
-              </div>
+              )}
             </div>
           ) : (
             <div className="flex items-center gap-3">
@@ -744,7 +765,7 @@ export default function NovaRequisicao() {
           }`}>
             Justificativa de urgência *
           </label>
-          <textarea
+          <UpperTextarea
             rows={2}
             required
             className={`w-full border rounded-xl px-3 py-2 text-sm outline-none transition-all ${
@@ -826,7 +847,7 @@ export default function NovaRequisicao() {
 
       <div>
         <label className="text-xs font-semibold text-slate-500 mb-1 block">Detalhes adicionais</label>
-        <textarea rows={3}
+        <UpperTextarea rows={3}
           className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-teal-300 outline-none"
           placeholder="Informações complementares para a compra, entrega ou especificação."
           value={descricao} onChange={e => setDescricao(e.target.value)} />
@@ -941,7 +962,7 @@ export default function NovaRequisicao() {
 
       <div>
         <label className="text-xs font-semibold text-slate-500 mb-1 block">Descrição *</label>
-          <textarea rows={3}
+          <UpperTextarea rows={3}
           className={`w-full border rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-teal-300 outline-none ${
             stepErrors.some(e => e.includes('descricao')) ? 'border-red-300 bg-red-50/30' : 'border-slate-200'
           }`}
@@ -951,7 +972,7 @@ export default function NovaRequisicao() {
 
       <div>
         <label className="text-xs font-semibold text-slate-500 mb-1 block">Motivo <span className="text-red-400">*</span></label>
-        <textarea rows={3} required
+        <UpperTextarea rows={3} required
           className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-teal-300 outline-none"
           placeholder="Por que essa compra é necessária? Para qual finalidade?"
           value={justificativa} onChange={e => setJustificativa(e.target.value)} />
@@ -980,7 +1001,7 @@ export default function NovaRequisicao() {
             <label className={`text-xs font-semibold mb-1 block ${urgencia === 'critica' ? 'text-red-600' : 'text-amber-600'}`}>
               Justificativa de urgência <span className="text-red-400">*</span>
             </label>
-            <textarea
+            <UpperTextarea
               rows={2}
               required
               className={`w-full border rounded-xl px-3 py-2.5 text-sm outline-none transition-all ${

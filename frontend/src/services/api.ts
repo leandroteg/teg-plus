@@ -150,7 +150,7 @@ export const api = {
         })
         // Normaliza resposta do n8n proxy
         const result = normalizeCnpjResponse(raw, limpo)
-        return result
+        return await enrichCnpjWithReceitaWsIfNeeded(result, limpo)
       } catch { /* fallback abaixo */ }
     }
     // Fallback: BrasilAPI direto
@@ -170,7 +170,7 @@ export const api = {
         }
       } catch { /* ignora erro do fallback */ }
     }
-    return {
+    return await enrichCnpjWithReceitaWsIfNeeded({
       cnpj: String(r.cnpj ?? '').replace(/\D/g, ''),
       razao_social: r.razao_social ?? '',
       nome_fantasia: r.nome_fantasia ?? '',
@@ -187,7 +187,7 @@ export const api = {
       telefone: String(r.ddd_telefone_1 ?? '').replace(/\D/g, ''),
       email: (r.email ?? '').toLowerCase(),
       socios,
-    }
+    }, limpo)
   },
 
   consultarPlaca: async (placa: string): Promise<PlacaResult> => {
@@ -303,6 +303,53 @@ function normalizeCnpjResponse(r: Record<string, unknown>, cnpjDigits: string): 
 }
 
 // ── Types para consultas externas ────────────────────────────────────────
+function shouldEnrichCnpj(result: CnpjResult) {
+  return !result.endereco?.logradouro ||
+    !result.endereco?.numero ||
+    !result.endereco?.bairro ||
+    !result.telefone ||
+    !result.email ||
+    !result.socios?.length
+}
+
+function normalizePhone(value: unknown) {
+  const firstPhone = String(value ?? '').split('/')[0] ?? ''
+  return firstPhone.replace(/\D/g, '')
+}
+
+async function enrichCnpjWithReceitaWsIfNeeded(result: CnpjResult, cnpjDigits: string): Promise<CnpjResult> {
+  if (result.error || !shouldEnrichCnpj(result)) return result
+
+  try {
+    const res = await fetch(`https://receitaws.com.br/v1/cnpj/${cnpjDigits}`)
+    if (!res.ok) return result
+    const rws = await res.json().catch(() => ({})) as Record<string, unknown>
+    if (String(rws.status ?? '').toUpperCase() === 'ERROR') return result
+
+    return {
+      ...result,
+      cnpj: result.cnpj || String(rws.cnpj ?? cnpjDigits).replace(/\D/g, ''),
+      razao_social: result.razao_social || String(rws.nome ?? ''),
+      nome_fantasia: result.nome_fantasia || String(rws.fantasia ?? ''),
+      situacao: result.situacao || String(rws.situacao ?? ''),
+      endereco: {
+        cep: result.endereco?.cep || String(rws.cep ?? '').replace(/\D/g, ''),
+        logradouro: result.endereco?.logradouro || String(rws.logradouro ?? ''),
+        numero: result.endereco?.numero || String(rws.numero ?? ''),
+        complemento: result.endereco?.complemento || String(rws.complemento ?? ''),
+        bairro: result.endereco?.bairro || String(rws.bairro ?? ''),
+        cidade: result.endereco?.cidade || String(rws.municipio ?? ''),
+        uf: result.endereco?.uf || String(rws.uf ?? ''),
+      },
+      telefone: result.telefone || normalizePhone(rws.telefone),
+      email: result.email || String(rws.email ?? '').toLowerCase(),
+      socios: result.socios?.length ? result.socios : normalizeSocios(rws),
+    }
+  } catch {
+    return result
+  }
+}
+
 export interface CnpjResult {
   cnpj: string
   razao_social: string

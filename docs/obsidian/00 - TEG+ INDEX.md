@@ -430,14 +430,10 @@ graph TD
 
 ---
 
-<<<<<<< HEAD
 ---
 
 ## Setup do Vault
 
 Para configurar este vault Obsidian, veja [[SETUP - Plugins Necessários]].
 
-*Vault gerado em 2026-03-02 a partir do codigo-fonte. Ultima atualizacao: 2026-04-08.*
-=======
 *Vault gerado em 2026-03-02 a partir do codigo-fonte. Ultima atualizacao: 2026-04-10.*
->>>>>>> dec3f64 (docs: README.md, ARCHITECTURE.md, atualiza Obsidian e SETUP)
