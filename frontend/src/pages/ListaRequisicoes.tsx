@@ -164,6 +164,19 @@ function ReqCard({ r, apr, isDark, onClick }: {
         </div>
       </div>
 
+      {/* Esclarecimento alert */}
+      {r.status === 'em_esclarecimento' && r.esclarecimento_msg && (
+        <div className={`flex items-start gap-2 rounded-xl px-3 py-2 ${isDark ? 'bg-amber-500/10 border border-amber-500/20' : 'bg-amber-50 border border-amber-200'}`}>
+          <MessageSquare size={13} className={`flex-shrink-0 mt-0.5 ${isDark ? 'text-amber-400' : 'text-amber-600'}`} />
+          <div className="min-w-0">
+            <p className={`text-[10px] font-bold uppercase tracking-wider mb-0.5 ${isDark ? 'text-amber-400' : 'text-amber-700'}`}>
+              Esclarecimento solicitado{r.esclarecimento_por ? ` por ${r.esclarecimento_por.split(' ')[0]}` : ''}
+            </p>
+            <p className={`text-xs line-clamp-2 ${isDark ? 'text-amber-300' : 'text-amber-600'}`}>{r.esclarecimento_msg}</p>
+          </div>
+        </div>
+      )}
+
       {/* Comprador + data + chip */}
       <div className={`flex items-center justify-between pt-2 ${isDark ? 'border-t border-white/[0.04]' : 'border-t border-slate-50'}`}>
         <div className="flex items-center gap-2">
@@ -296,9 +309,19 @@ function DetailModal({ r, apr, onClose, isDark, canDecide, onDecisao, isProcessi
           )}
 
           {r.esclarecimento_msg && (
-            <div className={`rounded-xl px-3 py-2.5 ${isDark ? 'bg-amber-500/10 border border-amber-500/20' : 'bg-amber-50 border border-amber-200'}`}>
-              <p className={`text-xs font-bold mb-1 ${isDark ? 'text-amber-400' : 'text-amber-700'}`}>Esclarecimento</p>
-              <p className={`text-xs ${isDark ? 'text-amber-300' : 'text-amber-600'}`}>{r.esclarecimento_msg}</p>
+            <div className={`rounded-xl px-3.5 py-2.5 ${isDark ? 'bg-amber-500/10 border border-amber-500/20' : 'bg-amber-50 border border-amber-200'}`}>
+              <div className="flex items-center gap-1.5 mb-1">
+                <MessageSquare size={13} className={isDark ? 'text-amber-400' : 'text-amber-600'} />
+                <p className={`text-[10px] font-bold uppercase tracking-wider ${isDark ? 'text-amber-400' : 'text-amber-700'}`}>Esclarecimento Solicitado</p>
+              </div>
+              <p className={`text-xs leading-relaxed ${isDark ? 'text-amber-300' : 'text-amber-600'}`}>{r.esclarecimento_msg}</p>
+              {(r.esclarecimento_por || r.esclarecimento_em) && (
+                <p className={`text-[10px] mt-1.5 ${isDark ? 'text-amber-500' : 'text-amber-500'}`}>
+                  {r.esclarecimento_por && <>Por: <span className="font-semibold">{r.esclarecimento_por}</span></>}
+                  {r.esclarecimento_por && r.esclarecimento_em && ' · '}
+                  {r.esclarecimento_em && fmtData(r.esclarecimento_em)}
+                </p>
+              )}
             </div>
           )}
 
