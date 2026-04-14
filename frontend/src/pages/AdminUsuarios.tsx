@@ -47,6 +47,17 @@ function normalizeUsername(raw: string) {
   return `${parts[0]}.${parts[parts.length - 1]}`.replace(/\.+/g, '.')
 }
 
+// Sanitização leve usada enquanto o usuário digita: apenas remove caracteres
+// inválidos sem aplicar o auto-preenchimento "usuario" nem colapsar partes.
+// Isso evita o loop em que apagar o campo regenera o nome automaticamente.
+function sanitizeUsernameInput(raw: string) {
+  return raw
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9.]/g, '')
+}
+
 function randomToken(len = 10) {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789'
   if (typeof crypto !== 'undefined' && crypto.getRandomValues) {
@@ -1278,7 +1289,12 @@ function CadastroUsuarioModal({ onClose }: { onClose: () => void }) {
               <input
                 type="text"
                 value={form.username}
-                onChange={e => setForm(f => ({ ...f, username: normalizeUsername(e.target.value) }))}
+                onChange={e => setForm(f => ({ ...f, username: sanitizeUsernameInput(e.target.value) }))}
+                onBlur={e => {
+                  const v = e.target.value.trim()
+                  if (!v) return
+                  setForm(f => ({ ...f, username: normalizeUsername(v) }))
+                }}
                 placeholder="nome.sobrenome"
                 className={`w-full px-3 py-2.5 rounded-xl border text-sm
                   focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary ${isDark ? 'bg-white/[0.05] border-white/10 text-white placeholder-slate-500 focus:bg-white/[0.08]' : 'bg-slate-50 border-slate-200 focus:bg-white'}`}
