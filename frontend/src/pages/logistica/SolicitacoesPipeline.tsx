@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback, useEffect } from 'react'
+import { useState, useMemo, useCallback, useEffect, useRef } from 'react'
 import {
   ClipboardList, Search, X, CheckCircle2, Clock, AlertTriangle,
   Calendar, ArrowUp, ArrowDown, LayoutList, LayoutGrid, Download,
@@ -307,6 +307,85 @@ const EMPTY_FORM: CriarSolicitacaoPayload = {
   descricao: '',
 }
 
+// ── Endereço com autocomplete de bases ───────────────────────────────────────
+
+function EnderecoComBase({ label, value, onChange, uf, onUFChange, bases, isDark, inputCls, labelCls }: {
+  label: string; value: string; onChange: (v: string) => void
+  uf: string; onUFChange: (v: string) => void
+  bases: Array<{ id: string; nome: string; cidade?: string; uf?: string }>
+  isDark: boolean; inputCls: string; labelCls: string
+}) {
+  const [focused, setFocused] = useState(false)
+  const ref = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setFocused(false)
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [])
+
+  const filtradas = useMemo(() => {
+    if (!value.trim()) return bases
+    const q = value.toLowerCase()
+    return bases.filter(b =>
+      b.nome.toLowerCase().includes(q) ||
+      (b.cidade && b.cidade.toLowerCase().includes(q))
+    )
+  }, [bases, value])
+
+  const showDropdown = focused && filtradas.length > 0
+
+  return (
+    <div ref={ref}>
+      <label className={labelCls}>{label}</label>
+      <div className="grid grid-cols-[1fr_100px] gap-2">
+        <div className="relative">
+          <input
+            value={value}
+            onChange={e => onChange(e.target.value)}
+            onFocus={() => setFocused(true)}
+            className={inputCls}
+            placeholder="Cidade, endereço ou base..."
+          />
+          {showDropdown && (
+            <div className={`absolute z-50 left-0 right-0 mt-1 rounded-xl shadow-xl border max-h-48 overflow-y-auto ${
+              isDark ? 'bg-[#1e293b] border-white/[0.1]' : 'bg-white border-slate-200'
+            }`}>
+              {filtradas.map(b => (
+                <button
+                  key={b.id}
+                  type="button"
+                  onClick={() => {
+                    onChange(b.cidade ? `${b.nome} — ${b.cidade}` : b.nome)
+                    if (b.uf) onUFChange(b.uf)
+                    setFocused(false)
+                  }}
+                  className={`w-full text-left px-3 py-2 text-sm transition-colors ${
+                    isDark ? 'text-slate-200 hover:bg-white/[0.06]' : 'text-slate-700 hover:bg-slate-50'
+                  }`}
+                >
+                  <span className="font-semibold">{b.nome}</span>
+                  {b.cidade && (
+                    <span className={`ml-1.5 text-xs ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+                      {b.cidade}/{b.uf}
+                    </span>
+                  )}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+        <select value={uf} onChange={e => onUFChange(e.target.value)} className={inputCls}>
+          <option value="">UF</option>
+          {UF_LIST.map(u => <option key={u} value={u}>{u}</option>)}
+        </select>
+      </div>
+    </div>
+  )
+}
+
 function NovaSolicitacaoModal({ isDark, onClose, onSuccess }: {
   isDark: boolean; onClose: () => void; onSuccess: () => void
 }) {
@@ -371,50 +450,30 @@ function NovaSolicitacaoModal({ isDark, onClose, onSuccess }: {
           </div>
 
           {/* Origem */}
-          <div>
-            <label className={labelCls}>Origem *</label>
-            <div className="grid grid-cols-[1fr_100px] gap-2">
-              <div className="relative">
-                <input value={form.origem} onChange={e => set('origem', e.target.value)}
-                  className={inputCls} placeholder="Cidade, endereço ou base..."
-                  list="bases-origem" />
-                {bases.length > 0 && (
-                  <datalist id="bases-origem">
-                    {bases.map(b => (
-                      <option key={b.id} value={b.cidade ? `${b.nome} — ${b.cidade}` : b.nome} />
-                    ))}
-                  </datalist>
-                )}
-              </div>
-              <select value={origemUF} onChange={e => setOrigemUF(e.target.value)} className={inputCls}>
-                <option value="">UF</option>
-                {UF_LIST.map(uf => <option key={uf} value={uf}>{uf}</option>)}
-              </select>
-            </div>
-          </div>
+          <EnderecoComBase
+            label="Origem *"
+            value={form.origem}
+            onChange={v => set('origem', v)}
+            uf={origemUF}
+            onUFChange={setOrigemUF}
+            bases={bases}
+            isDark={isDark}
+            inputCls={inputCls}
+            labelCls={labelCls}
+          />
 
           {/* Destino */}
-          <div>
-            <label className={labelCls}>Destino *</label>
-            <div className="grid grid-cols-[1fr_100px] gap-2">
-              <div className="relative">
-                <input value={form.destino} onChange={e => set('destino', e.target.value)}
-                  className={inputCls} placeholder="Cidade, endereço ou base..."
-                  list="bases-destino" />
-                {bases.length > 0 && (
-                  <datalist id="bases-destino">
-                    {bases.map(b => (
-                      <option key={b.id} value={b.cidade ? `${b.nome} — ${b.cidade}` : b.nome} />
-                    ))}
-                  </datalist>
-                )}
-              </div>
-              <select value={destinoUF} onChange={e => setDestinoUF(e.target.value)} className={inputCls}>
-                <option value="">UF</option>
-                {UF_LIST.map(uf => <option key={uf} value={uf}>{uf}</option>)}
-              </select>
-            </div>
-          </div>
+          <EnderecoComBase
+            label="Destino *"
+            value={form.destino}
+            onChange={v => set('destino', v)}
+            uf={destinoUF}
+            onUFChange={setDestinoUF}
+            bases={bases}
+            isDark={isDark}
+            inputCls={inputCls}
+            labelCls={labelCls}
+          />
 
           <div>
             <label className={labelCls}>Data Desejada</label>
