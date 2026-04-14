@@ -189,6 +189,39 @@ O componente `NovaRequisicao.tsx` consome o prefill automaticamente:
 
 ---
 
+## Módulos Novos (Atualização 2026-04)
+
+O system prompt do SuperTEG foi atualizado para incluir:
+
+### Telemetria (Logística)
+- Mapa ao vivo GPS via Cobli (`/logistica/telemetria`)
+- Alertas de velocidade, frenagem brusca
+- KM rodada e utilização por veículo
+
+### Cautelas (Estoque)
+- Empréstimo/devolução de materiais (`/estoque/cautelas`)
+- Nova cautela (`/estoque/cautelas/nova`)
+- Minhas cautelas (`/minhas-cautelas`)
+
+### QR Code (Patrimonial)
+- Scanner QR no celular (`/patrimonial/scanner`)
+- Ficha do ativo com timeline (`/p/{numero}`)
+- Etiqueta PDF para impressão
+
+### Manutenção Preventiva (Frotas)
+- Planos por tipo de veículo (`/frotas/manutencao` → Planejamento)
+- 9 itens rastreados: óleo, filtros, pneus, freios, bateria, suspensão, correia, fluido
+- KM automático via telemetria Cobli
+- Checklists por veículo com alertas de troca
+
+### KPIs Cruzados (Frotas)
+- Custo/km por veículo (abastecimento + manutenção ÷ km telemetria)
+- Consumo real km/L
+- Score de motoristas (ocorrências ÷ km)
+- Painel de Motoristas via select no header do Dashboard Frotas
+
+---
+
 ## Links
 
 - [[26 - Upload Inteligente Cotacao]] — Parse de cotações detalhado
