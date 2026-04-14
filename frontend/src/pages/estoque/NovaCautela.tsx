@@ -192,10 +192,10 @@ export default function NovaCautela() {
   }`
 
   return (
-    <div className="space-y-4 max-w-2xl mx-auto pb-8">
+    <div className="space-y-3 sm:space-y-4 max-w-2xl mx-auto px-0 sm:px-0 pb-24 sm:pb-8">
 
-      {/* ── Header ───────────────────────────────────────────────────── */}
-      <div className="flex items-center gap-3">
+      {/* ── Header (sticky on mobile) ────────────────────────────────── */}
+      <div className={`flex items-center gap-3 sticky top-0 z-20 -mx-4 px-4 py-2 sm:static sm:mx-0 sm:px-0 sm:py-0 ${isDark ? 'bg-[#0f172a]/95' : 'bg-slate-50/95'} backdrop-blur-sm sm:backdrop-blur-none sm:bg-transparent`}>
         <button
           onClick={() => navigate('/estoque/cautelas')}
           className={`w-9 h-9 rounded-xl flex items-center justify-center transition-colors ${
@@ -259,7 +259,7 @@ export default function NovaCautela() {
 
       {/* ── Obra + Base ──────────────────────────────────────────────── */}
       <div className={cardCls}>
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
             <label className={labelCls}>Obra *</label>
             <select
@@ -383,27 +383,27 @@ export default function NovaCautela() {
                   <div className="flex items-center gap-1 shrink-0">
                     <button
                       onClick={() => updateQty(idx, -1)}
-                      className={`w-7 h-7 rounded-lg flex items-center justify-center transition-colors ${
+                      className={`w-9 h-9 sm:w-7 sm:h-7 rounded-lg flex items-center justify-center transition-colors active:scale-90 ${
                         isDark ? 'hover:bg-white/[0.08] text-slate-400' : 'hover:bg-slate-200 text-slate-500'
                       }`}
                     >
-                      <Minus size={12} />
+                      <Minus size={14} />
                     </button>
                     <span className={`w-8 text-center text-sm font-bold ${isDark ? 'text-white' : 'text-slate-800'}`}>
                       {item.quantidade}
                     </span>
                     <button
                       onClick={() => updateQty(idx, 1)}
-                      className={`w-7 h-7 rounded-lg flex items-center justify-center transition-colors ${
+                      className={`w-9 h-9 sm:w-7 sm:h-7 rounded-lg flex items-center justify-center transition-colors active:scale-90 ${
                         isDark ? 'hover:bg-white/[0.08] text-slate-400' : 'hover:bg-slate-200 text-slate-500'
                       }`}
                     >
-                      <Plus size={12} />
+                      <Plus size={14} />
                     </button>
                   </div>
                   <button
                     onClick={() => removeItem(idx)}
-                    className="w-7 h-7 rounded-lg flex items-center justify-center text-red-400 hover:bg-red-50 transition-colors shrink-0"
+                    className="w-9 h-9 sm:w-7 sm:h-7 rounded-lg flex items-center justify-center text-red-400 hover:bg-red-50 active:scale-90 transition-all shrink-0"
                   >
                     <X size={14} />
                   </button>
@@ -500,17 +500,34 @@ export default function NovaCautela() {
         </div>
       )}
 
-      {/* ── Submit ────────────────────────────────────────────────────── */}
-      <button
-        onClick={handleSubmit}
-        disabled={!canSubmit || submitting}
-        className="w-full flex items-center justify-center gap-2 py-3 rounded-xl
-          bg-teal-600 hover:bg-teal-700 text-white text-sm font-bold
-          transition-colors disabled:opacity-50 shadow-sm"
-      >
-        {submitting ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
-        Registrar Cautela
-      </button>
+      {/* ── Submit (fixed on mobile) ─────────────────────────────────── */}
+      <div className="hidden sm:block">
+        <button
+          onClick={handleSubmit}
+          disabled={!canSubmit || submitting}
+          className="w-full flex items-center justify-center gap-2 py-3 rounded-xl
+            bg-teal-600 hover:bg-teal-700 text-white text-sm font-bold
+            transition-all disabled:opacity-50 shadow-sm active:scale-[0.98]"
+        >
+          {submitting ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
+          Registrar Cautela
+        </button>
+      </div>
+
+      {/* Fixed bottom bar on mobile */}
+      <div className="fixed bottom-0 left-0 right-0 sm:hidden z-30 p-3 bg-white/95 dark:bg-[#0f172a]/95 backdrop-blur-sm border-t border-slate-200 dark:border-white/[0.06]">
+        <button
+          onClick={handleSubmit}
+          disabled={!canSubmit || submitting}
+          className="w-full flex items-center justify-center gap-2 py-3.5 rounded-xl
+            bg-teal-600 hover:bg-teal-700 text-white text-sm font-bold
+            transition-all disabled:opacity-50 shadow-lg shadow-teal-600/20 active:scale-[0.98]"
+        >
+          {submitting ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
+          Registrar Cautela
+          {itens.length > 0 && <span className="ml-1 bg-white/20 rounded-full px-2 py-0.5 text-xs">{itens.length} {itens.length === 1 ? 'item' : 'itens'}</span>}
+        </button>
+      </div>
     </div>
   )
 }
