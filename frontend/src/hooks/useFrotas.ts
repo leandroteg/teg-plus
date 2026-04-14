@@ -884,16 +884,69 @@ export function useScoreMotoristas(inicio?: string, fim?: string) {
 
 // ── Itens de Manutenção ─────────────────────────────────────────────────────
 
-export function useIntervalosPreventiva() {
+export function useIntervalosPreventiva(categoria?: string | null) {
   return useQuery<FroIntervaloPreventiva[]>({
-    queryKey: ['fro_intervalos_preventiva'],
+    queryKey: ['fro_intervalos_preventiva', categoria],
     queryFn: async () => {
+      // Busca overrides da categoria + defaults (categoria IS NULL)
       const { data, error } = await supabase
         .from('fro_intervalos_preventiva')
         .select('*')
+        .or(categoria ? `categoria.eq.${categoria},categoria.is.null` : 'categoria.is.null')
         .order('intervalo_km', { ascending: true })
       if (error) throw error
-      return data as FroIntervaloPreventiva[]
+      const items = data as (FroIntervaloPreventiva & { categoria?: string | null })[]
+      // Override: se existe pra categoria, usa; senão fallback pro default
+      const map = new Map<string, FroIntervaloPreventiva>()
+      for (const item of items) {
+        if (!map.has(item.tipo_item) || item.categoria === categoria) {
+          map.set(item.tipo_item, item)
+        }
+      }
+      return Array.from(map.values())
+    },
+  })
+}
+
+export function useSalvarIntervalosCategoria() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ categoria, intervalos }: {
+      categoria: string
+      intervalos: Array<{ tipo_item: string; descricao: string; intervalo_km: number; intervalo_meses: number | null }>
+    }) => {
+      // Upsert intervalos da categoria
+      const rows = intervalos.map(i => ({
+        tipo_item: i.tipo_item,
+        descricao: i.descricao,
+        intervalo_km: i.intervalo_km,
+        intervalo_meses: i.intervalo_meses,
+        categoria,
+      }))
+      const { error } = await supabase.from('fro_intervalos_preventiva').upsert(rows, {
+        onConflict: 'tipo_item,categoria',
+        ignoreDuplicates: false,
+      })
+      if (error) throw error
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['fro_intervalos_preventiva'] })
+    },
+  })
+}
+
+export function useResetarIntervalosCategoria() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (categoria: string) => {
+      const { error } = await supabase
+        .from('fro_intervalos_preventiva')
+        .delete()
+        .eq('categoria', categoria)
+      if (error) throw error
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['fro_intervalos_preventiva'] })
     },
   })
 }
