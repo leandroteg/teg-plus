@@ -386,6 +386,71 @@ export function useReenviarEsclarecimento() {
   })
 }
 
+// ── Reenviar RC após devolução do cotador ────────────────────────────────────
+// Solicitante editou itens/descrição e reenvia → reinicia ciclo na alçada 1
+
+export function useReenviarAposDevolucao() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async ({
+      requisicaoId,
+      requisicaoNumero,
+      solicitanteNome,
+      resposta,
+    }: {
+      requisicaoId: string
+      requisicaoNumero: string
+      solicitanteNome: string
+      resposta?: string
+    }) => {
+      // 1. Atualiza status para em_aprovacao e reseta alçada para 1
+      const { error: reqError } = await supabase
+        .from(TABLE)
+        .update({ status: 'em_aprovacao', alcada_nivel: 1 })
+        .eq('id', requisicaoId)
+      if (reqError) throw reqError
+
+      // 2. Busca aprovador da alçada 1
+      const { data: alcadaData } = await supabase
+        .from('apr_alcadas')
+        .select('id, prazo_horas, aprovador_padrao:sys_usuarios!aprovador_padrao_id(id, nome, email)')
+        .eq('nivel', 1)
+        .eq('ativo', true)
+        .maybeSingle()
+
+      const aprovador = (alcadaData?.aprovador_padrao as unknown as { id: string; nome: string; email: string } | null)
+      const prazoHoras = (alcadaData?.prazo_horas as number) ?? 48
+      const dataLimite = new Date(Date.now() + prazoHoras * 3600_000).toISOString()
+      const obs = resposta?.trim()
+        ? `RC reenviada por ${solicitanteNome} após devolução da cotação: ${resposta.trim()}`
+        : `RC reenviada por ${solicitanteNome} após devolução da cotação`
+
+      // 3. Insere novo registro pendente em apr_aprovacoes (alçada 1)
+      const { error: aprError } = await supabase.from('apr_aprovacoes').insert({
+        modulo: 'cmp',
+        tipo_aprovacao: 'requisicao_compra',
+        entidade_id: requisicaoId,
+        entidade_numero: requisicaoNumero,
+        aprovador_nome: aprovador?.nome ?? solicitanteNome,
+        aprovador_email: aprovador?.email ?? 'pendente@teguniao.com.br',
+        nivel: 1,
+        status: 'pendente',
+        observacao: obs,
+        data_limite: dataLimite,
+      })
+      if (aprError) throw aprError
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['requisicoes'] })
+      qc.invalidateQueries({ queryKey: ['requisicao'] })
+      qc.invalidateQueries({ queryKey: ['aprovacoes-pendentes'] })
+      qc.invalidateQueries({ queryKey: ['aprovacoes-historico'] })
+      qc.invalidateQueries({ queryKey: ['aprovacoes-kpis'] })
+      qc.invalidateQueries({ queryKey: ['dashboard'] })
+    },
+  })
+}
+
 // ── Enviar RC aprovada para cotação ──────────────────────────────────────────
 
 export function useEnviarParaCotacao() {

@@ -1,11 +1,14 @@
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from '../services/supabase'
 import type { Fornecedor } from '../types/financeiro'
+import { getFornecedorEmail, getFornecedorTelefone } from '../utils/fornecedorContato'
 
 type CotacaoFornecedorSelecionado = {
   id: string
   fornecedor_nome?: string | null
   fornecedor_contato?: string | null
+  fornecedor_telefone?: string | null
+  fornecedor_email?: string | null
   fornecedor_cnpj?: string | null
   condicao_pagamento?: string | null
 }
@@ -102,7 +105,7 @@ export function useFornecedorCotacaoResolver(cotacaoId?: string) {
       if (cotacao.fornecedor_selecionado_id) {
         const { data: selecionado, error: selecionadoError } = await supabase
           .from('cmp_cotacao_fornecedores')
-          .select('id, fornecedor_nome, fornecedor_contato, fornecedor_cnpj, condicao_pagamento')
+          .select('id, fornecedor_nome, fornecedor_contato, fornecedor_telefone, fornecedor_email, fornecedor_cnpj, condicao_pagamento')
           .eq('id', cotacao.fornecedor_selecionado_id)
           .maybeSingle()
 
@@ -113,7 +116,7 @@ export function useFornecedorCotacaoResolver(cotacaoId?: string) {
       if (!fornecedorCotacao) {
         const { data: fallback, error: fallbackError } = await supabase
           .from('cmp_cotacao_fornecedores')
-          .select('id, fornecedor_nome, fornecedor_contato, fornecedor_cnpj, condicao_pagamento')
+          .select('id, fornecedor_nome, fornecedor_contato, fornecedor_telefone, fornecedor_email, fornecedor_cnpj, condicao_pagamento')
           .eq('cotacao_id', cotacaoId)
           .eq('selecionado', true)
           .limit(1)
@@ -154,7 +157,10 @@ export function useFornecedorCotacaoResolver(cotacaoId?: string) {
         fornecedorCorrespondente,
         nomeCotacao,
         cnpjCotacao,
-        contatoCotacao: fornecedorCotacao?.fornecedor_contato ?? undefined,
+        contatoCotacao: ([
+          getFornecedorTelefone(fornecedorCotacao ?? {}),
+          getFornecedorEmail(fornecedorCotacao ?? {}),
+        ].filter(Boolean).join(' / ') || fornecedorCotacao?.fornecedor_contato) ?? undefined,
         condicaoPagamento: fornecedorCotacao?.condicao_pagamento ?? undefined,
         status: fornecedorCorrespondente
           ? (camposPagamentoFaltantes.length > 0 ? 'matched_missing_payment' : 'matched_complete')

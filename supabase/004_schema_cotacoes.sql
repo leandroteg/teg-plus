@@ -70,6 +70,8 @@ CREATE TABLE cotacao_fornecedores (
   cotacao_id UUID NOT NULL REFERENCES cotacoes(id) ON DELETE CASCADE,
   fornecedor_nome VARCHAR(255) NOT NULL,
   fornecedor_contato VARCHAR(255),
+  fornecedor_telefone VARCHAR(50),
+  fornecedor_email VARCHAR(255),
   fornecedor_cnpj VARCHAR(20),
   valor_total DECIMAL(15,2) NOT NULL,
   prazo_entrega_dias INT,

@@ -4,9 +4,9 @@ import {
   ArrowLeft, Building, User, Calendar, Tag, Package,
   CheckCircle, XCircle, MessageSquare, AlertTriangle,
   ChevronDown, ChevronUp, ShoppingCart, UserCog, ExternalLink,
-  FileText, Ban, Send,
+  FileText, Ban, Send, Undo2,
 } from 'lucide-react'
-import { useRequisicao, useReenviarEsclarecimento } from '../hooks/useRequisicoes'
+import { useRequisicao, useReenviarEsclarecimento, useReenviarAposDevolucao } from '../hooks/useRequisicoes'
 import { useDecisaoRequisicao } from '../hooks/useAprovacoes'
 import { useCotacaoByRequisicao } from '../hooks/useCotacoes'
 import { useEmitirPedido, useCancelarRequisicao } from '../hooks/usePedidos'
@@ -38,6 +38,7 @@ export default function RequisicaoDetalhe() {
   const { data: req, isLoading, error } = useRequisicao(id)
   const decisaoMutation = useDecisaoRequisicao()
   const reenviarMutation = useReenviarEsclarecimento()
+  const reenviarDevolucaoMutation = useReenviarAposDevolucao()
   const emitirPedidoMutation = useEmitirPedido()
   const cancelarMutation = useCancelarRequisicao()
   const { isAdmin, atLeast, perfil, canTechnicalApprove } = useAuth()
@@ -49,6 +50,7 @@ export default function RequisicaoDetalhe() {
   const [observacao, setObservacao] = useState('')
   const [showObservacao, setShowObservacao] = useState(false)
   const [respostaEsclarecimento, setRespostaEsclarecimento] = useState('')
+  const [respostaDevolucao, setRespostaDevolucao] = useState('')
   const [showItens, setShowItens] = useState(true)
   const [pendingAction, setPendingAction] = useState<'aprovada' | 'rejeitada' | 'esclarecimento' | null>(null)
   const [pedidoToast, setPedidoToast] = useState<{ type: 'success' | 'error'; msg: string } | null>(null)
@@ -65,7 +67,9 @@ export default function RequisicaoDetalhe() {
   const canEmitPedido = !!req
     && atLeast('comprador')
     && req.status === 'cotacao_aprovada'
-  const canMutateComprasReq = canDecide || canEmitPedido || req?.status === 'em_esclarecimento'
+  const canMutateComprasReq = canDecide || canEmitPedido
+    || req?.status === 'em_esclarecimento'
+    || req?.status === 'devolvida_solicitante'
   const { isLocked, blockedByName } = useEditorLock({
     resourceType: 'cmp_requisicao',
     resourceId: id,
@@ -166,6 +170,71 @@ export default function RequisicaoDetalhe() {
               Esta requisição fica bloqueada para evitar conflito até a finalização da edição.
             </p>
           </div>
+        </div>
+      )}
+
+      {/* Alerta Devolução pelo Cotador */}
+      {req.status === 'devolvida_solicitante' && (
+        <div className="bg-rose-50 border-2 border-rose-200 rounded-2xl p-4 space-y-3">
+          <div className="flex items-center gap-2">
+            <Undo2 size={16} className="text-rose-600 flex-shrink-0" />
+            <span className="text-sm font-bold text-rose-700">Devolvida pelo Cotador</span>
+          </div>
+          <p className="text-sm text-rose-700">{req.devolucao_msg}</p>
+          <div className="flex items-center gap-2 text-xs text-rose-500">
+            <span>Por: {req.devolucao_por}</span>
+            {req.devolucao_em && <span>· {fmtData(req.devolucao_em)}</span>}
+          </div>
+
+          <p className="text-[11px] text-rose-600 bg-rose-100/60 border border-rose-200 rounded-lg px-3 py-2">
+            <strong>Importante:</strong> ajuste os itens da requisição conforme necessário.
+            Ao reenviar, o ciclo de aprovação reinicia pela alçada 1.
+          </p>
+
+          {!reenviarDevolucaoMutation.isSuccess && (
+            <div className="pt-2 border-t border-rose-200 space-y-2">
+              <p className="text-xs font-semibold text-rose-700">Descrição do ajuste (opcional):</p>
+              <UpperTextarea
+                rows={2}
+                value={respostaDevolucao}
+                disabled={isLocked}
+                onChange={e => setRespostaDevolucao(e.target.value)}
+                placeholder="Explique brevemente o que foi ajustado..."
+                className="w-full border border-rose-300 bg-white rounded-xl px-3 py-2 text-sm
+                  focus:ring-2 focus:ring-rose-400 outline-none placeholder-rose-300"
+              />
+              <button
+                disabled={reenviarDevolucaoMutation.isPending || isLocked}
+                onClick={() => {
+                  if (!perfil) return
+                  reenviarDevolucaoMutation.mutate({
+                    requisicaoId: req.id,
+                    requisicaoNumero: req.numero,
+                    solicitanteNome: perfil.nome,
+                    resposta: respostaDevolucao.trim() || undefined,
+                  })
+                }}
+                className="w-full flex items-center justify-center gap-2 py-3 rounded-xl
+                  bg-rose-500 text-white text-sm font-bold hover:bg-rose-600
+                  active:scale-[0.98] transition-all disabled:opacity-50"
+              >
+                {reenviarDevolucaoMutation.isPending
+                  ? <div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+                  : <Send size={15} />}
+                Reenviar para Aprovação
+              </button>
+              {reenviarDevolucaoMutation.isError && (
+                <p className="text-xs text-red-600">Erro ao reenviar. Tente novamente.</p>
+              )}
+            </div>
+          )}
+
+          {reenviarDevolucaoMutation.isSuccess && (
+            <div className="pt-2 border-t border-rose-200 flex items-center gap-2 text-sm font-semibold text-emerald-700">
+              <CheckCircle size={16} className="text-emerald-500" />
+              Reenviado para aprovação com sucesso
+            </div>
+          )}
         </div>
       )}
 

@@ -7,6 +7,8 @@ interface FornecedorParsed {
   fornecedor_nome: string
   fornecedor_cnpj?: string
   fornecedor_contato?: string
+  fornecedor_telefone?: string
+  fornecedor_email?: string
   valor_total: number
   prazo_entrega_dias?: number
   condicao_pagamento?: string

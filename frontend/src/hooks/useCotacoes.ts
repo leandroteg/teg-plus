@@ -138,6 +138,8 @@ export interface FinalizarCotacaoPayload {
   fornecedores: {
     fornecedor_nome: string
     fornecedor_contato?: string
+    fornecedor_telefone?: string
+    fornecedor_email?: string
     fornecedor_cnpj?: string
     valor_total: number
     prazo_entrega_dias?: number
@@ -161,6 +163,8 @@ export function useFinalizarCotacao() {
         cotacao_id,
         fornecedor_nome: f.fornecedor_nome,
         fornecedor_contato: f.fornecedor_contato || null,
+        fornecedor_telefone: f.fornecedor_telefone || null,
+        fornecedor_email: f.fornecedor_email || null,
         fornecedor_cnpj: f.fornecedor_cnpj || null,
         valor_total: f.valor_total,
         prazo_entrega_dias: f.prazo_entrega_dias || null,
@@ -283,6 +287,80 @@ export function useFinalizarCotacao() {
       qc.invalidateQueries({ queryKey: ['requisicoes'] })
       qc.invalidateQueries({ queryKey: ['requisicao'] })
       qc.invalidateQueries({ queryKey: ['aprovacoes-pendentes'] })
+      qc.invalidateQueries({ queryKey: ['dashboard'] })
+    },
+  })
+}
+
+// ── Devolver requisição ao solicitante (disparado pelo cotador) ──────────────
+// Fluxo:
+//   1. Marca RC como 'devolvida_solicitante' e registra motivo/autor/data
+//   2. Cancela a cotação em andamento (status='cancelada')
+//   3. Invalida aprovações pendentes anteriores da RC (status='expirada')
+//   4. Solicitante reedita a RC e reenvia — inicia novo ciclo (ver
+//      useReenviarAposDevolucao em useRequisicoes.ts)
+
+export function useDevolverRequisicaoCotacao() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async ({
+      requisicaoId,
+      cotacaoId,
+      motivo,
+      cotadorNome,
+    }: {
+      requisicaoId: string
+      cotacaoId: string
+      motivo: string
+      cotadorNome: string
+    }) => {
+      const motivoTrim = motivo.trim()
+      if (motivoTrim.length < 20) {
+        throw new Error('Informe um motivo com pelo menos 20 caracteres.')
+      }
+
+      // 1. Atualiza RC → devolvida_solicitante
+      const { error: reqError } = await supabase
+        .from('cmp_requisicoes')
+        .update({
+          status: 'devolvida_solicitante',
+          devolucao_msg: motivoTrim,
+          devolucao_por: cotadorNome,
+          devolucao_em: new Date().toISOString(),
+        })
+        .eq('id', requisicaoId)
+      if (reqError) throw reqError
+
+      // 2. Cancela a cotação em andamento
+      const { error: cotError } = await supabase
+        .from(TABLE_COT)
+        .update({ status: 'cancelada' })
+        .eq('id', cotacaoId)
+      if (cotError) throw cotError
+
+      // 3. Invalida aprovações pendentes/esclarecimento anteriores da RC
+      //    (mantém histórico de decisões já tomadas — não mexe em aprovadas/rejeitadas)
+      const { error: aprError } = await supabase
+        .from('apr_aprovacoes')
+        .update({
+          status: 'expirada',
+          data_decisao: new Date().toISOString(),
+          observacao: `Invalidada — cotação devolvida ao solicitante por ${cotadorNome}: ${motivoTrim}`,
+        })
+        .eq('entidade_id', requisicaoId)
+        .eq('modulo', 'cmp')
+        .in('status', ['pendente', 'esclarecimento'])
+      if (aprError) throw aprError
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['cotacoes'] })
+      qc.invalidateQueries({ queryKey: ['cotacao'] })
+      qc.invalidateQueries({ queryKey: ['cotacao-req'] })
+      qc.invalidateQueries({ queryKey: ['requisicoes'] })
+      qc.invalidateQueries({ queryKey: ['requisicao'] })
+      qc.invalidateQueries({ queryKey: ['aprovacoes-pendentes'] })
+      qc.invalidateQueries({ queryKey: ['aprovacoes-historico'] })
+      qc.invalidateQueries({ queryKey: ['aprovacoes-kpis'] })
       qc.invalidateQueries({ queryKey: ['dashboard'] })
     },
   })

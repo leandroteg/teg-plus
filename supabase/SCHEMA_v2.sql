@@ -332,6 +332,8 @@ CREATE TABLE cmp_cotacao_fornecedores (
   cotacao_id          UUID NOT NULL REFERENCES cmp_cotacoes(id) ON DELETE CASCADE,
   fornecedor_nome     VARCHAR(255) NOT NULL,
   fornecedor_contato  VARCHAR(255),
+  fornecedor_telefone VARCHAR(50),
+  fornecedor_email    VARCHAR(255),
   fornecedor_cnpj     VARCHAR(18),
   valor_total         DECIMAL(15,2) NOT NULL DEFAULT 0,
   prazo_entrega_dias  INT,

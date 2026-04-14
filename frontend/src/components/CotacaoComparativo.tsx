@@ -4,6 +4,7 @@ import { Check, Trophy, FileText, ExternalLink, Package, Sparkles } from 'lucide
 import type { CotacaoFornecedor, ItemSelecionado } from '../types'
 import { supabase } from '../services/supabase'
 import { calcularRecomendacao } from '../utils/cotacaoRecomendacao'
+import { getFornecedorEmail, getFornecedorTelefone } from '../utils/fornecedorContato'
 
 function formatBRL(val: number) {
   return val.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
@@ -234,8 +235,11 @@ export default function CotacaoComparativo({ fornecedores, onSelect, readOnly = 
                     {f.condicao_pagamento && (
                       <div><span className="text-slate-400">Pgto:</span> <strong>{f.condicao_pagamento}</strong></div>
                     )}
-                    {f.fornecedor_contato && (
-                      <div className="col-span-2"><span className="text-slate-400">Contato:</span> {f.fornecedor_contato}</div>
+                    {getFornecedorTelefone(f) && (
+                      <div><span className="text-slate-400">Tel:</span> {getFornecedorTelefone(f)}</div>
+                    )}
+                    {getFornecedorEmail(f) && (
+                      <div><span className="text-slate-400">E-mail:</span> {getFornecedorEmail(f)}</div>
                     )}
                     {f.arquivo_url && (
                       <button
@@ -299,6 +303,11 @@ export default function CotacaoComparativo({ fornecedores, onSelect, readOnly = 
                         </div>
                         {f.fornecedor_cnpj && (
                           <p className="text-[11px] text-slate-400 font-mono mt-0.5">{f.fornecedor_cnpj}</p>
+                        )}
+                        {(getFornecedorTelefone(f) || getFornecedorEmail(f)) && (
+                          <p className="text-[11px] text-slate-400 mt-1">
+                            {[getFornecedorTelefone(f), getFornecedorEmail(f)].filter(Boolean).join(' | ')}
+                          </p>
                         )}
                       </td>
                       <td className="px-4 py-3 text-right">

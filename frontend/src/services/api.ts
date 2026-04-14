@@ -68,6 +68,8 @@ export interface ParseCotacaoResult {
     fornecedor_nome: string
     fornecedor_cnpj?: string
     fornecedor_contato?: string
+    fornecedor_telefone?: string
+    fornecedor_email?: string
     matched_supplier_id?: string
     supplier_match_status?: 'matched' | 'suggested' | 'new'
     supplier_confidence?: number

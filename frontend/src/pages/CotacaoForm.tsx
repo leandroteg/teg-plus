@@ -3,9 +3,9 @@ import { useParams, useNavigate } from 'react-router-dom'
 import {
   ChevronLeft, PlusCircle, Trash2, Send, CheckCircle, Info, AlertTriangle,
   Paperclip, FileText, X, Loader2, Eye, Ban, CheckCircle2, PackagePlus,
-  ScrollText,
+  ScrollText, Undo2,
 } from 'lucide-react'
-import { useCotacao, useFinalizarCotacao } from '../hooks/useCotacoes'
+import { useCotacao, useFinalizarCotacao, useDevolverRequisicaoCotacao } from '../hooks/useCotacoes'
 import { useCategorias } from '../hooks/useCategorias'
 import { useEmitirPedido, useCancelarRequisicao } from '../hooks/usePedidos'
 import { useAuth } from '../contexts/AuthContext'
@@ -20,7 +20,8 @@ import { api } from '../services/api'
 import type { CnpjResult } from '../services/api'
 import NumericInput from '../components/NumericInput'
 import { minCotacoesPorValor } from '../utils/cotacoesPolicy'
-import { toUpperNorm } from '../components/UpperInput'
+import { toUpperNorm, UpperTextarea } from '../components/UpperInput'
+import { joinFornecedorContato, splitFornecedorContato } from '../utils/fornecedorContato'
 
 const fmt = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
 
@@ -30,6 +31,8 @@ const FILE_MAX_SIZE = 50 * 1024 * 1024
 interface FornecedorForm {
   fornecedor_nome:    string
   fornecedor_contato: string
+  fornecedor_telefone: string
+  fornecedor_email: string
   fornecedor_cnpj:    string
   valor_total:        number
   prazo_entrega_dias: number
@@ -40,7 +43,7 @@ interface FornecedorForm {
 }
 
 const emptyFornecedor = (): FornecedorForm => ({
-  fornecedor_nome: '', fornecedor_contato: '', fornecedor_cnpj: '',
+  fornecedor_nome: '', fornecedor_contato: '', fornecedor_telefone: '', fornecedor_email: '', fornecedor_cnpj: '',
   valor_total: 0, prazo_entrega_dias: 0, condicao_pagamento: '', observacao: '',
   arquivo_url: '', itens_precos: [],
 })
@@ -68,8 +71,12 @@ function ItemPricingTable({
   const usedDescs = new Set(items.map(it => it.descricao.toLowerCase().trim()))
   const availableReqItens = reqItens.filter(ri => !usedDescs.has(ri.descricao.toLowerCase().trim()))
 
-  const addItem = () =>
+  const canAddItem = availableReqItens.length > 0
+
+  const addItem = () => {
+    if (!canAddItem) return
     onChange([...items, { descricao: '', qtd: 1, valor_unitario: 0, valor_total: 0 }])
+  }
 
   const removeItem = (i: number) => onChange(items.filter((_, idx) => idx !== i))
 
@@ -110,21 +117,10 @@ function ItemPricingTable({
       setItemOpen(prev => ({ ...prev, [i]: reqMatches.length > 0 }))
       return
     }
-    // Com query: mostra itens da requisição + busca no estoque
+    // Segurança: só autocompletar itens da RC — cotador não deve introduzir
+    // itens fora do escopo aprovado. Se faltar item, deve devolver ao solicitante.
     setItemResults(prev => ({ ...prev, [i]: reqMatches.map(ri => ({ ...ri, _fromReq: true })) }))
-    setItemOpen(prev => ({ ...prev, [i]: true }))
-    itemTimerRef.current[i] = setTimeout(async () => {
-      const { data } = await supabase
-        .from('est_itens')
-        .select('id, codigo, descricao, unidade, valor_medio')
-        .ilike('descricao', `%${normalizedQuery}%`)
-        .eq('ativo', true)
-        .order('descricao')
-        .limit(8)
-      const reqResults = filterReqItens(normalizedQuery).map(ri => ({ ...ri, _fromReq: true }))
-      setItemResults(prev => ({ ...prev, [i]: [...reqResults, ...(data || [])] }))
-      setItemOpen(prev => ({ ...prev, [i]: reqResults.length > 0 || (data?.length ?? 0) > 0 }))
-    }, 300)
+    setItemOpen(prev => ({ ...prev, [i]: reqMatches.length > 0 }))
   }, [availableReqItens])
 
   const selectItem = useCallback((i: number, est: any) => {
@@ -273,11 +269,23 @@ function ItemPricingTable({
       <button
         type="button"
         onClick={addItem}
-        className="w-full flex items-center justify-center gap-1.5 py-1.5 text-[11px] font-semibold text-teal-600 border border-dashed border-teal-200 rounded-xl hover:bg-teal-50 transition"
+        disabled={!canAddItem}
+        title={!canAddItem ? 'Todos os itens da RC já foram adicionados. Para alterar escopo, devolva ao solicitante.' : undefined}
+        className={`w-full flex items-center justify-center gap-1.5 py-1.5 text-[11px] font-semibold border border-dashed rounded-xl transition ${
+          canAddItem
+            ? 'text-teal-600 border-teal-200 hover:bg-teal-50'
+            : 'text-slate-300 border-slate-200 cursor-not-allowed'
+        }`}
       >
         <PlusCircle size={12} />
         {items.length === 0 ? 'Precificar por item (opcional)' : 'Adicionar item'}
       </button>
+      {!canAddItem && items.length > 0 && reqItens.length > 0 && (
+        <p className="text-[10px] text-slate-400 text-center mt-1">
+          Todos os itens da RC já foram adicionados. Se precisa alterar o escopo,
+          use <strong className="text-rose-500">Devolver ao Solicitante</strong>.
+        </p>
+      )}
     </div>
   )
 }
@@ -581,9 +589,15 @@ function CotacaoConcluida({ cotacao, nav }: { cotacao: Cotacao; nav: ReturnType<
 export default function CotacaoForm() {
   const { id } = useParams<{ id: string }>()
   const nav = useNavigate()
+  const { perfil } = useAuth()
   const { data: cotacao, isLoading } = useCotacao(id)
   const { data: categorias = [] } = useCategorias()
   const submitMutation = useFinalizarCotacao()
+  const devolverMutation = useDevolverRequisicaoCotacao()
+
+  // Modal devolver ao solicitante
+  const [showDevolverModal, setShowDevolverModal] = useState(false)
+  const [motivoDevolucao, setMotivoDevolucao] = useState('')
   const { isLocked, blockedByName } = useEditorLock({
     resourceType: 'cmp_requisicao',
     resourceId: cotacao?.requisicao_id ?? id,
@@ -628,10 +642,16 @@ export default function CotacaoForm() {
         const nomePreenchido = toUpperNorm(result.razao_social || result.nome_fantasia || '')
         setFornecedores(prev => prev.map((f, i) => {
           if (i !== idx) return f
+          const shouldFillTelefone = isCorrection || !f.fornecedor_telefone.trim()
+          const shouldFillEmail = isCorrection || !f.fornecedor_email.trim()
+          const telefone = shouldFillTelefone ? (result.telefone || '') : f.fornecedor_telefone
+          const email = shouldFillEmail ? (result.email || '') : f.fornecedor_email
           return {
             ...f,
             fornecedor_nome: (isCorrection || !f.fornecedor_nome.trim()) ? nomePreenchido : f.fornecedor_nome,
-            fornecedor_contato: (isCorrection || !f.fornecedor_contato.trim()) ? [result.telefone, result.email].filter(Boolean).join(' / ') : f.fornecedor_contato,
+            fornecedor_contato: (isCorrection || !f.fornecedor_contato.trim()) ? joinFornecedorContato(telefone, email, f.fornecedor_contato) : f.fornecedor_contato,
+            fornecedor_telefone: telefone,
+            fornecedor_email: email,
           }
         }))
       }
@@ -657,7 +677,11 @@ export default function CotacaoForm() {
   }, [handleCnpjLookup])
 
   const updateFornecedor = (idx: number, field: keyof FornecedorForm, value: string | number) => {
-    const normalized = typeof value === 'string' && field !== 'fornecedor_cnpj' && field !== 'fornecedor_contato'
+    const normalized = typeof value === 'string'
+      && field !== 'fornecedor_cnpj'
+      && field !== 'fornecedor_contato'
+      && field !== 'fornecedor_telefone'
+      && field !== 'fornecedor_email'
       ? toUpperNorm(value)
       : value
     setFornecedores(prev => prev.map((f, i) => i === idx ? { ...f, [field]: normalized } : f))
@@ -685,12 +709,14 @@ export default function CotacaoForm() {
   }, [])
 
   const selectFornecedor = useCallback((idx: number, f: any) => {
-    const contato = [f.telefone, f.email].filter(Boolean).join(' / ')
+    const contato = joinFornecedorContato(f.telefone, f.email, f.contato_nome)
     setFornecedores(prev => prev.map((item, i) => i !== idx ? item : {
       ...item,
       fornecedor_nome: toUpperNorm(f.nome_fantasia || f.razao_social || ''),
       fornecedor_cnpj: f.cnpj || '',
-      fornecedor_contato: contato || f.contato_nome || '',
+      fornecedor_contato: contato,
+      fornecedor_telefone: f.telefone || '',
+      fornecedor_email: f.email || '',
     }))
     setFornOpen(prev => ({ ...prev, [idx]: false }))
   }, [])
@@ -727,6 +753,8 @@ export default function CotacaoForm() {
     fornecedor_nome: string
     fornecedor_cnpj?: string
     fornecedor_contato?: string
+    fornecedor_telefone?: string
+    fornecedor_email?: string
     valor_total: number
     prazo_entrega_dias?: number
     condicao_pagamento?: string
@@ -761,10 +789,15 @@ export default function CotacaoForm() {
         const totalItens = calcTotalItems(itensComValor)
         // Se há itens com preço → usa a soma deles; senão usa o total do documento
         const valorTotal = itensComValor.length > 0 ? totalItens : (p.valor_total || 0)
+        const contatoSeparado = splitFornecedorContato(p.fornecedor_contato)
+        const telefone = p.fornecedor_telefone || contatoSeparado.telefone
+        const email = p.fornecedor_email || contatoSeparado.email
         return {
           fornecedor_nome:    toUpperNorm(p.fornecedor_nome || ''),
           fornecedor_cnpj:    p.fornecedor_cnpj ? maskCNPJ(p.fornecedor_cnpj) : '',
-          fornecedor_contato: p.fornecedor_contato || '',
+          fornecedor_contato: joinFornecedorContato(telefone, email, p.fornecedor_contato),
+          fornecedor_telefone: telefone,
+          fornecedor_email:   email,
           valor_total:        valorTotal,
           prazo_entrega_dias: p.prazo_entrega_dias || 0,
           condicao_pagamento: toUpperNorm(p.condicao_pagamento || ''),
@@ -873,7 +906,9 @@ export default function CotacaoForm() {
         requisicao_id: cotacao.requisicao_id,
         fornecedores: validos.map(f => ({
           fornecedor_nome:    toUpperNorm(f.fornecedor_nome),
-          fornecedor_contato: f.fornecedor_contato || undefined,
+          fornecedor_contato: joinFornecedorContato(f.fornecedor_telefone, f.fornecedor_email, f.fornecedor_contato) || undefined,
+          fornecedor_telefone: f.fornecedor_telefone || undefined,
+          fornecedor_email:   f.fornecedor_email || undefined,
           fornecedor_cnpj:    f.fornecedor_cnpj || undefined,
           valor_total:        f.valor_total,
           prazo_entrega_dias: f.prazo_entrega_dias || undefined,
@@ -1062,7 +1097,7 @@ export default function CotacaoForm() {
               )}
             </div>
 
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
               <div className="relative">
                 <input
                   className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-teal-300 outline-none transition-shadow font-mono"
@@ -1089,9 +1124,17 @@ export default function CotacaoForm() {
               </div>
               <input
                 className="border border-slate-200 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-teal-300 outline-none transition-shadow"
-                placeholder="Contato (tel/e-mail)"
-                value={forn.fornecedor_contato}
-                onChange={e => updateFornecedor(idx, 'fornecedor_contato', e.target.value)}
+                placeholder="Telefone"
+                type="tel"
+                value={forn.fornecedor_telefone}
+                onChange={e => updateFornecedor(idx, 'fornecedor_telefone', e.target.value)}
+              />
+              <input
+                className="border border-slate-200 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-teal-300 outline-none transition-shadow"
+                placeholder="E-mail"
+                type="email"
+                value={forn.fornecedor_email}
+                onChange={e => updateFornecedor(idx, 'fornecedor_email', e.target.value)}
               />
             </div>
 
@@ -1142,6 +1185,7 @@ export default function CotacaoForm() {
               <input
                 className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-teal-300 outline-none transition-shadow"
                 placeholder="Condição de pgto (30 dias, à vista...)"
+                maxLength={255}
                 value={forn.condicao_pagamento}
                 onChange={e => updateFornecedor(idx, 'condicao_pagamento', e.target.value)}
               />
@@ -1241,7 +1285,9 @@ export default function CotacaoForm() {
             id: String(i),
             cotacao_id: id ?? '',
             fornecedor_nome: f.fornecedor_nome,
-            fornecedor_contato: f.fornecedor_contato || undefined,
+            fornecedor_contato: joinFornecedorContato(f.fornecedor_telefone, f.fornecedor_email, f.fornecedor_contato) || undefined,
+            fornecedor_telefone: f.fornecedor_telefone || undefined,
+            fornecedor_email: f.fornecedor_email || undefined,
             fornecedor_cnpj: f.fornecedor_cnpj || undefined,
             valor_total: f.valor_total,
             prazo_entrega_dias: f.prazo_entrega_dias || undefined,
@@ -1295,10 +1341,29 @@ export default function CotacaoForm() {
         </div>
       )}
 
+      {/* Devolver ao Solicitante — alternativa segura a "adicionar itens fora do escopo" */}
+      {cotacao?.requisicao_id && cotacao?.status !== 'concluida' && !devolverMutation.isSuccess && (
+        <button
+          type="button"
+          disabled={devolverMutation.isPending || submitMutation.isPending || isLocked}
+          onClick={() => { setMotivoDevolucao(''); setShowDevolverModal(true) }}
+          className="w-full flex items-center justify-center gap-2 py-2.5 text-xs font-semibold text-rose-600 border border-rose-200 rounded-2xl hover:bg-rose-50 transition disabled:opacity-50"
+        >
+          <Undo2 size={14} /> Devolver ao Solicitante
+        </button>
+      )}
+
+      {devolverMutation.isSuccess && (
+        <div className="bg-rose-50 border border-rose-200 rounded-2xl p-4 flex items-center gap-2 text-sm font-semibold text-rose-700">
+          <CheckCircle size={16} className="text-rose-500" />
+          Requisição devolvida ao solicitante. As aprovações anteriores foram invalidadas.
+        </div>
+      )}
+
       {/* Submit */}
       <button
         type="submit"
-        disabled={submitMutation.isPending || !canSubmit || isLocked}
+        disabled={submitMutation.isPending || !canSubmit || isLocked || devolverMutation.isPending || devolverMutation.isSuccess}
         className={`w-full rounded-2xl py-4 font-extrabold flex items-center justify-center gap-2 shadow-xl active:scale-[0.98] transition-all ${
           canSubmit && !submitMutation.isPending && !isLocked
             ? 'bg-teal-500 text-white shadow-teal-500/25 hover:bg-teal-600'
@@ -1325,6 +1390,103 @@ export default function CotacaoForm() {
         </p>
       )}
       </fieldset>
+
+      {/* Modal: Devolver ao Solicitante */}
+      {showDevolverModal && cotacao?.requisicao_id && id && (
+        <div
+          className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-end sm:items-center justify-center p-4"
+          onClick={() => !devolverMutation.isPending && setShowDevolverModal(false)}
+        >
+          <div
+            className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="bg-gradient-to-r from-rose-500 to-rose-600 px-5 py-4 flex items-center gap-3">
+              <Undo2 size={20} className="text-white" />
+              <div>
+                <p className="text-sm font-bold text-white">Devolver ao Solicitante</p>
+                <p className="text-[11px] text-white/80">
+                  A RC voltará para edição e o ciclo de aprovação será reiniciado.
+                </p>
+              </div>
+            </div>
+
+            <div className="p-5 space-y-3">
+              <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-[11px] text-amber-700 leading-relaxed">
+                <p className="font-bold mb-1 flex items-center gap-1">
+                  <AlertTriangle size={12} /> Esta ação irá:
+                </p>
+                <ul className="list-disc pl-4 space-y-0.5">
+                  <li>Cancelar esta cotação em andamento</li>
+                  <li>Invalidar as aprovações técnicas anteriores</li>
+                  <li>Voltar a RC ao solicitante para edição</li>
+                  <li>Ao reenviar, passará novamente pela aprovação da alçada 1</li>
+                </ul>
+              </div>
+
+              <label className="block">
+                <span className="text-xs font-semibold text-slate-700 mb-1 block">
+                  Motivo da devolução <span className="text-rose-500">*</span>
+                </span>
+                <UpperTextarea
+                  rows={4}
+                  value={motivoDevolucao}
+                  onChange={e => setMotivoDevolucao(e.target.value)}
+                  placeholder="Explique ao solicitante o que precisa ser ajustado (mínimo 20 caracteres)..."
+                  className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-rose-300 outline-none resize-none"
+                />
+                <p className={`text-[10px] mt-1 ${motivoDevolucao.trim().length < 20 ? 'text-slate-400' : 'text-emerald-600'}`}>
+                  {motivoDevolucao.trim().length}/20 caracteres mínimos
+                </p>
+              </label>
+
+              {devolverMutation.isError && (
+                <p className="text-xs text-red-600">
+                  Erro ao devolver: {(devolverMutation.error as Error)?.message || 'tente novamente'}
+                </p>
+              )}
+
+              <div className="flex gap-2 pt-1">
+                <button
+                  type="button"
+                  disabled={devolverMutation.isPending}
+                  onClick={() => setShowDevolverModal(false)}
+                  className="flex-1 py-2.5 rounded-xl border border-slate-200 text-xs font-bold text-slate-600 hover:bg-slate-50 transition disabled:opacity-50"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  disabled={devolverMutation.isPending || motivoDevolucao.trim().length < 20 || !perfil}
+                  onClick={() => {
+                    if (!perfil || !cotacao.requisicao_id || !id) return
+                    devolverMutation.mutate(
+                      {
+                        requisicaoId: cotacao.requisicao_id,
+                        cotacaoId: id,
+                        motivo: motivoDevolucao,
+                        cotadorNome: perfil.nome,
+                      },
+                      {
+                        onSuccess: () => {
+                          setShowDevolverModal(false)
+                          setTimeout(() => nav('/cotacoes'), 1200)
+                        },
+                      }
+                    )
+                  }}
+                  className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl bg-rose-500 text-white text-xs font-bold hover:bg-rose-600 transition disabled:opacity-50"
+                >
+                  {devolverMutation.isPending
+                    ? <div className="w-3.5 h-3.5 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+                    : <Undo2 size={14} />}
+                  Confirmar Devolução
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </form>
   )
 }

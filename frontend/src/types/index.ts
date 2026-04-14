@@ -1,6 +1,7 @@
 export type StatusRequisicao =
   | 'rascunho' | 'pendente' | 'em_aprovacao'
   | 'aprovada' | 'rejeitada' | 'em_esclarecimento'
+  | 'devolvida_solicitante'
   | 'em_cotacao' | 'cotacao_enviada' | 'cotacao_aprovada' | 'cotacao_rejeitada'
   | 'pedido_emitido' | 'em_entrega' | 'entregue'
   | 'aguardando_pgto' | 'pago'
@@ -117,6 +118,9 @@ export interface Requisicao {
   esclarecimento_msg?: string
   esclarecimento_por?: string
   esclarecimento_em?: string
+  devolucao_msg?: string
+  devolucao_por?: string
+  devolucao_em?: string
   esclarecimento_historico?: {
     tipo: 'pedido' | 'resposta'
     autor: string
@@ -248,6 +252,8 @@ export interface CotacaoFornecedor {
   cotacao_id: string
   fornecedor_nome: string
   fornecedor_contato?: string
+  fornecedor_telefone?: string
+  fornecedor_email?: string
   fornecedor_cnpj?: string
   valor_total: number
   prazo_entrega_dias?: number
@@ -326,6 +332,8 @@ export interface NovaCotacaoPayload {
   fornecedores: {
     fornecedor_nome: string
     fornecedor_contato?: string
+    fornecedor_telefone?: string
+    fornecedor_email?: string
     fornecedor_cnpj?: string
     valor_total: number
     prazo_entrega_dias?: number

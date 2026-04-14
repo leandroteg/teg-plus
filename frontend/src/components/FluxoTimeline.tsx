@@ -16,7 +16,7 @@ const ETAPAS: Etapa[] = [
   {
     label:      'Requisição',
     shortLabel: 'RC',
-    statuses:   ['rascunho', 'pendente', 'em_esclarecimento'],
+    statuses:   ['rascunho', 'pendente', 'em_esclarecimento', 'devolvida_solicitante'],
   },
   {
     label:      'Valid. Técnica',
@@ -55,6 +55,7 @@ function getEtapaIndex(status: string): number {
   // Statuses de conclusão completa
   if (status === 'pago') return 7           // todas concluídas
   if (status === 'em_esclarecimento') return 0 // volta para etapa RC
+  if (status === 'devolvida_solicitante') return 0 // volta para etapa RC (devolvida pelo cotador)
   if (status === 'cancelada') return -1      // cancelada: sem etapa válida
   if (status === 'rejeitada') return -2      // rejeitada na aprovação RC
   if (status === 'cotacao_rejeitada') return -3 // rejeitada na aprov. financeira
