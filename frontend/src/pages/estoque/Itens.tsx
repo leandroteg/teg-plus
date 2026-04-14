@@ -7,9 +7,10 @@ import {
 import {
   useEstoqueItens, useSalvarItem, useSaldos, useBases,
   useAguardandoEntrada, useEmMovimentacao, useLiberadosRetirada,
-  useConfirmarEntrada, useContaCorrenteItem,
+  useConfirmarEntrada, useCancelarEntrada, useContaCorrenteItem,
 } from '../../hooks/useEstoque'
 import { useTheme } from '../../contexts/ThemeContext'
+import { useAuth } from '../../contexts/AuthContext'
 import type {
   EstItem, EstSaldo, EstSolicitacao, EstoqueEntradaItem, EstoqueMovimentacaoItem,
   EstoquePipelineTab,
@@ -72,6 +73,7 @@ function fmtCurrency(v: number) {
 
 export default function Itens() {
   const { isDark } = useTheme()
+  const { isAdmin } = useAuth()
   const [activeTab, setActiveTab] = useState<EstoquePipelineTab>('em_estoque')
   const [viewMode, setViewMode] = useState<ViewMode>('list')
   const [busca, setBusca] = useState('')
@@ -89,6 +91,12 @@ export default function Itens() {
   const { data: movs = [], isLoading: loadingMovs } = useEmMovimentacao()
   const salvar = useSalvarItem()
   const confirmarEntrada = useConfirmarEntrada()
+  const cancelarEntrada = useCancelarEntrada()
+
+  const handleCancelar = (ids: string[]) => {
+    if (!confirm(`Cancelar ${ids.length} entrada(s)? Esta ação não pode ser desfeita.`)) return
+    cancelarEntrada.mutate(ids)
+  }
 
   const accent = isDark ? STATUS_ACCENT_DARK : STATUS_ACCENT
 
@@ -332,8 +340,8 @@ export default function Itens() {
             )}
             {activeTab === 'aguardando_entrada' && (
               viewMode === 'list'
-                ? <EntradasList data={entradasFiltradas} isDark={isDark} onConfirm={(ids) => confirmarEntrada.mutate(ids)} confirming={confirmarEntrada.isPending} />
-                : <EntradasCards data={entradasFiltradas} isDark={isDark} onConfirm={(ids) => confirmarEntrada.mutate(ids)} confirming={confirmarEntrada.isPending} />
+                ? <EntradasList data={entradasFiltradas} isDark={isDark} onConfirm={(ids) => confirmarEntrada.mutate(ids)} confirming={confirmarEntrada.isPending} isAdmin={isAdmin} onCancel={handleCancelar} cancelling={cancelarEntrada.isPending} />
+                : <EntradasCards data={entradasFiltradas} isDark={isDark} onConfirm={(ids) => confirmarEntrada.mutate(ids)} confirming={confirmarEntrada.isPending} isAdmin={isAdmin} onCancel={handleCancelar} cancelling={cancelarEntrada.isPending} />
             )}
             {activeTab === 'liberado_retirada' && (
               viewMode === 'list'
@@ -514,7 +522,7 @@ function DestinoBadge({ tipo, isDark }: { tipo?: string; isDark: boolean }) {
   )
 }
 
-function EntradasList({ data, isDark, onConfirm, confirming }: { data: EstoqueEntradaItem[]; isDark: boolean; onConfirm: (ids: string[]) => void; confirming: boolean }) {
+function EntradasList({ data, isDark, onConfirm, confirming, isAdmin, onCancel, cancelling }: { data: EstoqueEntradaItem[]; isDark: boolean; onConfirm: (ids: string[]) => void; confirming: boolean; isAdmin: boolean; onCancel: (ids: string[]) => void; cancelling: boolean }) {
   if (data.length === 0) return <EmptyState icon={PackageCheck} msg="Nenhuma entrada pendente" sub="Os itens aparecerão aqui após confirmar recebimento" isDark={isDark} />
   return (
     <>
@@ -553,7 +561,17 @@ function EntradasList({ data, isDark, onConfirm, confirming }: { data: EstoqueEn
           <span className={`text-[11px] text-right w-[62px] shrink-0 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
             {fmtDate(e.criado_em)}
           </span>
-          <span className="w-[80px] shrink-0 text-right">
+          <span className="w-[120px] shrink-0 text-right flex items-center justify-end gap-1">
+            {isAdmin && (
+              <button
+                onClick={() => onCancel([e.id])}
+                disabled={cancelling}
+                className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-1 rounded-lg bg-red-500 text-white hover:bg-red-600 disabled:opacity-50 transition-all"
+              >
+                <Ban size={11} />
+                Cancelar
+              </button>
+            )}
             <button
               onClick={() => onConfirm([e.id])}
               disabled={confirming}
@@ -581,7 +599,7 @@ function EntradasList({ data, isDark, onConfirm, confirming }: { data: EstoqueEn
   )
 }
 
-function EntradasCards({ data, isDark, onConfirm, confirming }: { data: EstoqueEntradaItem[]; isDark: boolean; onConfirm: (ids: string[]) => void; confirming: boolean }) {
+function EntradasCards({ data, isDark, onConfirm, confirming, isAdmin, onCancel, cancelling }: { data: EstoqueEntradaItem[]; isDark: boolean; onConfirm: (ids: string[]) => void; confirming: boolean; isAdmin: boolean; onCancel: (ids: string[]) => void; cancelling: boolean }) {
   if (data.length === 0) return <EmptyState icon={PackageCheck} msg="Nenhuma entrada pendente" sub="Os itens aparecerão aqui após confirmar recebimento" isDark={isDark} />
   return (
     <div className="space-y-2 p-4">
@@ -618,6 +636,16 @@ function EntradasCards({ data, isDark, onConfirm, confirming }: { data: EstoqueE
               <span className={`text-[11px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
                 {e.base_nome ? `Base: ${e.base_nome}` : ''} {fmtDate(e.criado_em)}
               </span>
+              <div className="flex items-center gap-1.5">
+                {isAdmin && (
+                  <button
+                    onClick={() => onCancel([e.id])}
+                    disabled={cancelling}
+                    className="inline-flex items-center gap-1 text-[11px] font-bold px-3 py-1.5 rounded-lg bg-red-500 text-white hover:bg-red-600 disabled:opacity-50 transition-all"
+                  >
+                    <Ban size={12} /> Cancelar
+                  </button>
+                )}
               <button
                 onClick={() => onConfirm([e.id])}
                 disabled={confirming}
@@ -626,6 +654,7 @@ function EntradasCards({ data, isDark, onConfirm, confirming }: { data: EstoqueE
                 <CheckCircle2 size={12} />
                 Confirmar Entrada
               </button>
+              </div>
             </div>
           </div>
         )
