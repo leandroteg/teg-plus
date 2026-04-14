@@ -1,6 +1,6 @@
 import {
   LayoutDashboard, Package2, ArrowLeftRight,
-  ClipboardList, Plus, HandHelping,
+  ClipboardList, Plus, KeyRound, History,
 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import ModuleLayout from './ModuleLayout'
@@ -18,10 +18,10 @@ export default function EstoqueLayout() {
       action: () => navigate('/estoque/movimentacoes?nova=1'),
       accent: true,
     },
-    { to: '/estoque/movimentacoes', icon: ArrowLeftRight, label: 'Movimenta\u00e7\u00f5es', end: false },
+    { to: '/estoque/cautelas', icon: KeyRound, label: 'Cautelas', end: false },
     { to: '/estoque/itens', icon: Package2, label: 'Estoque', end: false },
     { to: '/estoque/inventario', icon: ClipboardList, label: 'Invent\u00e1rio', end: false },
-    { to: '/estoque/cautelas', icon: HandHelping, label: 'Cautelas', end: false },
+    { to: '/estoque/movimentacoes', icon: History, label: 'Hist\u00f3rico', end: false },
   ]
 
   return (
