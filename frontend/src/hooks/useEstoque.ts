@@ -512,7 +512,7 @@ export function useCancelarEntrada() {
     mutationFn: async (itemIds: string[]) => {
       const { error } = await supabase
         .from('cmp_recebimento_itens')
-        .update({ status: 'cancelado' })
+        .update({ status: 'rejeitado' })
         .in('id', itemIds)
       if (error) throw error
     },
