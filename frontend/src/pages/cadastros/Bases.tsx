@@ -1,8 +1,8 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useCallback } from 'react'
 import { Warehouse, Plus, Search, X, Save, Loader2, ArrowUp, ArrowDown, LayoutList, LayoutGrid, Trash2 } from 'lucide-react'
-import { UpperInput } from '../../components/UpperInput'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../../services/supabase'
+import { useCadEmpresas } from '../../hooks/useCadastros'
 import type { EstBase } from '../../types/estoque'
 
 const UFS = [
@@ -59,7 +59,28 @@ export default function Bases() {
   const [selected, setSelected] = useState<Set<string>>(new Set())
 
   const { data: bases = [], isLoading } = useAllBases()
+  const { data: empresas = [] } = useCadEmpresas()
   const salvar = useSalvarBase()
+  const [cepLoading, setCepLoading] = useState(false)
+
+  const buscarCep = useCallback(async (cep: string) => {
+    const digits = cep.replace(/\D/g, '')
+    if (digits.length !== 8) return
+    setCepLoading(true)
+    try {
+      const res = await fetch(`https://viacep.com.br/ws/${digits}/json/`)
+      const data = await res.json()
+      if (!data.erro) {
+        setEditItem(prev => prev ? {
+          ...prev,
+          endereco: data.logradouro || prev.endereco,
+          cidade: data.localidade || prev.cidade,
+          uf: data.uf || prev.uf,
+          cep: cep,
+        } : prev)
+      }
+    } catch {} finally { setCepLoading(false) }
+  }, [])
 
   const filtrados = useMemo(() => {
     let list = bases
@@ -142,7 +163,7 @@ export default function Bases() {
       <div className="flex gap-2 flex-wrap items-center">
         <div className="relative flex-1 min-w-[200px]">
           <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-          <UpperInput value={busca} onChange={e => setBusca(e.target.value)}
+          <input value={busca} onChange={e => setBusca(e.target.value)}
             placeholder="Buscar por nome, codigo, CNPJ ou cidade..."
             className="w-full pl-9 pr-4 py-2 rounded-xl border border-slate-200 bg-white text-sm
               focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400" />
@@ -282,59 +303,66 @@ export default function Bases() {
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-bold text-slate-600 mb-1">Codigo</label>
-                  <UpperInput value={editItem.codigo ?? ''} onChange={e => setEditItem({ ...editItem, codigo: e.target.value })}
-                    className="input-base" placeholder="BASE-01" disabled={!!editItem.id} />
+                  <input value={editItem.codigo ?? ''} onChange={e => setEditItem({ ...editItem, codigo: e.target.value })}
+                    className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500/20 focus:border-violet-400" placeholder="BASE-01" disabled={!!editItem.id} />
                 </div>
                 <div>
                   <label className="block text-xs font-bold text-slate-600 mb-1">Nome *</label>
-                  <UpperInput value={editItem.nome ?? ''} onChange={e => setEditItem({ ...editItem, nome: e.target.value })}
-                    className="input-base" placeholder="Almoxarifado Central" />
+                  <input value={editItem.nome ?? ''} onChange={e => setEditItem({ ...editItem, nome: e.target.value })}
+                    className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500/20 focus:border-violet-400" placeholder="Almoxarifado Central" />
                 </div>
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-slate-600 mb-1">CNPJ</label>
-                <UpperInput value={editItem.cnpj ?? ''} onChange={e => setEditItem({ ...editItem, cnpj: e.target.value })}
-                  className="input-base" placeholder="00.000.000/0000-00" />
+                <label className="block text-xs font-bold text-slate-600 mb-1">Empresa (CNPJ)</label>
+                <select value={editItem.cnpj ?? ''} onChange={e => setEditItem({ ...editItem, cnpj: e.target.value })}
+                  className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500/20 focus:border-violet-400">
+                  <option value="">Selecione a empresa...</option>
+                  {empresas.map(emp => (
+                    <option key={emp.id} value={emp.cnpj}>{emp.razao_social || emp.nome_fantasia} — {emp.cnpj}</option>
+                  ))}
+                </select>
               </div>
 
               <div>
                 <label className="block text-xs font-bold text-slate-600 mb-1">Endereco</label>
-                <UpperInput value={editItem.endereco ?? ''} onChange={e => setEditItem({ ...editItem, endereco: e.target.value })}
-                  className="input-base" placeholder="Rua, numero, complemento" />
+                <input value={editItem.endereco ?? ''} onChange={e => setEditItem({ ...editItem, endereco: e.target.value })}
+                  className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500/20 focus:border-violet-400" placeholder="Rua, numero, complemento" />
               </div>
 
               <div className="grid grid-cols-3 gap-3">
                 <div className="col-span-1">
                   <label className="block text-xs font-bold text-slate-600 mb-1">Cidade</label>
-                  <UpperInput value={editItem.cidade ?? ''} onChange={e => setEditItem({ ...editItem, cidade: e.target.value })}
-                    className="input-base" placeholder="Cidade" />
+                  <input value={editItem.cidade ?? ''} onChange={e => setEditItem({ ...editItem, cidade: e.target.value })}
+                    className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500/20 focus:border-violet-400" placeholder="Cidade" />
                 </div>
                 <div>
                   <label className="block text-xs font-bold text-slate-600 mb-1">UF</label>
                   <select value={editItem.uf ?? ''} onChange={e => setEditItem({ ...editItem, uf: e.target.value })}
-                    className="input-base">
+                    className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500/20 focus:border-violet-400">
                     <option value="">—</option>
                     {UFS.map(uf => <option key={uf} value={uf}>{uf}</option>)}
                   </select>
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-slate-600 mb-1">CEP</label>
-                  <UpperInput value={editItem.cep ?? ''} onChange={e => setEditItem({ ...editItem, cep: e.target.value })}
-                    className="input-base" placeholder="00000-000" />
+                  <label className="block text-xs font-bold text-slate-600 mb-1">CEP {cepLoading && <Loader2 size={10} className="inline animate-spin ml-1" />}</label>
+                  <input value={editItem.cep ?? ''}
+                    onChange={e => setEditItem({ ...editItem, cep: e.target.value })}
+                    onBlur={e => buscarCep(e.target.value)}
+                    className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500/20 focus:border-violet-400" placeholder="00000-000" />
                 </div>
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-bold text-slate-600 mb-1">Telefone</label>
-                  <UpperInput value={editItem.telefone ?? ''} onChange={e => setEditItem({ ...editItem, telefone: e.target.value })}
-                    className="input-base" placeholder="(00) 00000-0000" />
+                  <input value={editItem.telefone ?? ''} onChange={e => setEditItem({ ...editItem, telefone: e.target.value })}
+                    className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500/20 focus:border-violet-400" placeholder="(00) 00000-0000" />
                 </div>
                 <div>
                   <label className="block text-xs font-bold text-slate-600 mb-1">Email</label>
                   <input value={editItem.email ?? ''} onChange={e => setEditItem({ ...editItem, email: e.target.value })}
-                    className="input-base" placeholder="base@empresa.com" type="email" />
+                    className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500/20 focus:border-violet-400" placeholder="base@empresa.com" type="email" />
                 </div>
               </div>
 
