@@ -35,27 +35,6 @@ export default function PatrimonioPage() {
         <p className={`text-xs mt-0.5 ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>{'Gest\u00e3o completa dos imobilizados por etapa do ciclo de vida'}</p>
       </div>
 
-      {/* Filtro por Base */}
-      <div className="flex items-center gap-3">
-        <div className="flex items-center gap-1.5">
-          <MapPin size={13} className={isLight ? 'text-slate-400' : 'text-slate-500'} />
-          <select
-            value={filtroBase}
-            onChange={e => setFiltroBase(e.target.value)}
-            className={`px-3 py-2 rounded-xl border text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500/30 ${
-              isLight
-                ? 'border-slate-200 bg-white text-slate-600'
-                : 'border-white/[0.08] bg-white/[0.03] text-slate-300'
-            }`}
-          >
-            <option value="">Todas as Bases</option>
-            {bases.map(b => (
-              <option key={b.id} value={b.id}>{b.nome}</option>
-            ))}
-          </select>
-        </div>
-      </div>
-
       <div className={`overflow-x-auto hide-scrollbar rounded-2xl border p-1 ${
         isLight ? 'border-slate-200 bg-white' : 'border-white/[0.08] bg-white/[0.02]'
       }`}>
