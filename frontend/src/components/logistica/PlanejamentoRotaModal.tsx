@@ -12,6 +12,8 @@ import * as L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import { serializeViagemRotaPayload } from '../../utils/logisticaViagem'
 import { UpperInput } from '../UpperInput'
+import { useVeiculos } from '../../hooks/useFrotas'
+import type { FroVeiculo } from '../../types/frotas'
 
 // Fix leaflet default icon issue
 try {
