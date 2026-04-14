@@ -140,6 +140,9 @@ function OcorrenciaRow({ oc, onSelect, isLight }: { oc: FroOcorrenciaTel; onSele
       <div className="flex-1 min-w-0">
         <p className={`text-sm font-semibold ${isLight ? 'text-slate-800' : 'text-white'}`}>{oc.veiculo?.placa} — {oc.veiculo?.marca} {oc.veiculo?.modelo}</p>
         <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded border ${tipoCfg.cls}`}>{tipoCfg.label}</span>
+              {oc.observacoes?.startsWith('Auto-gerado') && (
+                <span className={`ml-1 text-[8px] font-bold px-1.5 py-0.5 rounded ${isLight ? 'bg-blue-100 text-blue-600' : 'bg-blue-500/15 text-blue-400'}`}>Auto</span>
+              )}
       </div>
       {oc.velocidade && (
         <span className="hidden sm:block text-xs text-red-600 dark:text-red-300 font-bold shrink-0">{oc.velocidade} km/h</span>

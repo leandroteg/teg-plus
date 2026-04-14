@@ -430,3 +430,56 @@ export interface FroMulta {
   veiculo?: Pick<FroVeiculo, 'id' | 'placa' | 'modelo'>
   obra?: { id: string; nome: string }
 }
+
+// ── Indicadores avançados (RPCs) ─────────────────────────────────────────────
+
+export interface FrotasCustoKm {
+  veiculo_id: string
+  placa: string
+  marca: string
+  modelo: string
+  custo_total: number
+  km_percorrido: number
+  custo_por_km: number
+}
+
+export interface FrotasConsumoReal {
+  veiculo_id: string
+  placa: string
+  km_percorrido: number
+  litros_total: number
+  km_por_litro: number
+}
+
+export interface ScoreMotorista {
+  motorista_id: string
+  nome: string
+  total_ocorrencias: number
+  ocorrencias_por_1000km: number
+}
+
+// ── Itens de Manutenção ─────────────────────────────────────────────────────
+
+export type TipoItemManutencao =
+  | 'oleo_motor' | 'filtro_oleo' | 'filtro_ar' | 'pneus' | 'bateria'
+  | 'freios_pastilhas' | 'suspensao' | 'correia_dentada' | 'fluido_freio'
+
+export interface FroIntervaloPreventiva {
+  id: string
+  tipo_item: TipoItemManutencao
+  descricao: string
+  intervalo_km: number
+  intervalo_meses: number | null
+}
+
+export interface FroItemManutencao {
+  id: string
+  veiculo_id: string
+  tipo_item: TipoItemManutencao
+  km_ultima_troca: number
+  data_ultima_troca: string | null
+  km_proxima_troca: number | null
+  observacoes: string | null
+  created_at: string
+  updated_at: string
+}
