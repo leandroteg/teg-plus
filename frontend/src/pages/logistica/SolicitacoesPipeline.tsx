@@ -13,6 +13,7 @@ import {
 } from '../../hooks/useLogistica'
 import { useSearchParams } from 'react-router-dom'
 import { useLookupCentrosCusto } from '../../hooks/useLookups'
+import { useBases } from '../../hooks/useEstoque'
 import type { LogSolicitacao, StatusSolicitacaoPipeline, CriarSolicitacaoPayload, TipoTransporte } from '../../types/logistica'
 import { SOLICITACAO_PIPELINE_STAGES } from '../../types/logistica'
 import { lazy, Suspense } from 'react'
@@ -315,6 +316,7 @@ function NovaSolicitacaoModal({ isDark, onClose, onSuccess }: {
   const [destinoUF, setDestinoUF] = useState('')
   const criar = useCriarSolicitacao()
   const centrosCusto = useLookupCentrosCusto()
+  const { data: bases = [] } = useBases()
 
   const set = (k: keyof CriarSolicitacaoPayload, v: any) => setForm(p => ({ ...p, [k]: v }))
 
@@ -371,9 +373,27 @@ function NovaSolicitacaoModal({ isDark, onClose, onSuccess }: {
           {/* Origem */}
           <div>
             <label className={labelCls}>Origem *</label>
+            {bases.length > 0 && (
+              <select
+                value=""
+                onChange={e => {
+                  const b = bases.find(b => b.id === e.target.value)
+                  if (b) {
+                    set('origem', b.cidade ? `${b.nome} — ${b.cidade}` : b.nome)
+                    if (b.uf) setOrigemUF(b.uf)
+                  }
+                }}
+                className={`${inputCls} mb-1.5 text-xs`}
+              >
+                <option value="">Selecionar base/estoque...</option>
+                {bases.map(b => (
+                  <option key={b.id} value={b.id}>{b.nome}{b.cidade ? ` — ${b.cidade}/${b.uf}` : ''}</option>
+                ))}
+              </select>
+            )}
             <div className="grid grid-cols-[1fr_100px] gap-2">
               <input value={form.origem} onChange={e => set('origem', e.target.value)}
-                className={inputCls} placeholder="Cidade" />
+                className={inputCls} placeholder="Cidade ou endereço" />
               <select value={origemUF} onChange={e => setOrigemUF(e.target.value)} className={inputCls}>
                 <option value="">UF</option>
                 {UF_LIST.map(uf => <option key={uf} value={uf}>{uf}</option>)}
@@ -384,9 +404,27 @@ function NovaSolicitacaoModal({ isDark, onClose, onSuccess }: {
           {/* Destino */}
           <div>
             <label className={labelCls}>Destino *</label>
+            {bases.length > 0 && (
+              <select
+                value=""
+                onChange={e => {
+                  const b = bases.find(b => b.id === e.target.value)
+                  if (b) {
+                    set('destino', b.cidade ? `${b.nome} — ${b.cidade}` : b.nome)
+                    if (b.uf) setDestinoUF(b.uf)
+                  }
+                }}
+                className={`${inputCls} mb-1.5 text-xs`}
+              >
+                <option value="">Selecionar base/estoque...</option>
+                {bases.map(b => (
+                  <option key={b.id} value={b.id}>{b.nome}{b.cidade ? ` — ${b.cidade}/${b.uf}` : ''}</option>
+                ))}
+              </select>
+            )}
             <div className="grid grid-cols-[1fr_100px] gap-2">
               <input value={form.destino} onChange={e => set('destino', e.target.value)}
-                className={inputCls} placeholder="Cidade" />
+                className={inputCls} placeholder="Cidade ou endereço" />
               <select value={destinoUF} onChange={e => setDestinoUF(e.target.value)} className={inputCls}>
                 <option value="">UF</option>
                 {UF_LIST.map(uf => <option key={uf} value={uf}>{uf}</option>)}
