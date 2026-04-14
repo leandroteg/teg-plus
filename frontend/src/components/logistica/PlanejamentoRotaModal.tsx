@@ -157,10 +157,26 @@ function EnderecoInput({
           const res = await fetch(`https://brasilapi.com.br/api/cep/v2/${limpo}`, { signal: AbortSignal.timeout(8000) })
           if (res.ok) {
             const d = await res.json()
+            const descricao = `${d.street || ''}, ${d.neighborhood || ''}, ${d.city} - ${d.state}`.replace(/^, /, '')
+            // BrasilAPI não retorna coordenadas — geocodificar via Nominatim
+            let lat = d.location?.coordinates?.latitude ?? null
+            let lng = d.location?.coordinates?.longitude ?? null
+            if (!lat || !lng) {
+              try {
+                const geoQ = d.street ? `${d.street}, ${d.city}, ${d.state}, Brazil` : `${d.city}, ${d.state}, Brazil`
+                const geoRes = await fetch(
+                  `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(geoQ)}&countrycodes=br&format=json&limit=1`,
+                  { headers: { 'Accept-Language': 'pt-BR' } },
+                )
+                if (geoRes.ok) {
+                  const geoData = await geoRes.json()
+                  if (geoData[0]) { lat = Number(geoData[0].lat); lng = Number(geoData[0].lon) }
+                }
+              } catch { /* silent */ }
+            }
             const sug: EnderecoSugestao = {
-              descricao: `${d.street || ''}, ${d.neighborhood || ''}, ${d.city} - ${d.state}`.replace(/^, /, ''),
-              logradouro: d.street, bairro: d.neighborhood, cidade: d.city, uf: d.state, cep: d.cep,
-              lat: d.location?.coordinates?.latitude, lng: d.location?.coordinates?.longitude,
+              descricao, logradouro: d.street, bairro: d.neighborhood, cidade: d.city, uf: d.state, cep: d.cep,
+              lat, lng,
             }
             setSugestoes([sug])
             setOpen(true)
