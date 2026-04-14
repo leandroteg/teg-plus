@@ -1,23 +1,21 @@
 import { useState } from 'react'
-import { CalendarDays, ClipboardList, Wrench, History, Settings2 } from 'lucide-react'
+import { CalendarDays, ClipboardList, Wrench, History } from 'lucide-react'
 import { useTheme } from '../../../contexts/ThemeContext'
-import { useOrdensServico, useChecklists, useItensManutencao } from '../../../hooks/useFrotas'
+import { useOrdensServico, useChecklists } from '../../../hooks/useFrotas'
 import Planejamento         from './Planejamento'
 import ChecklistsManutencao from './ChecklistsManutencao'
 import OSAbertas            from './OSAbertas'
 import HistoricoOS          from './HistoricoOS'
-import ItensManutencao      from './ItensManutencao'
 
 // ── Tab Config ───────────────────────────────────────────────────────────────
 
-type TabKey = 'planejamento' | 'checklists' | 'os' | 'historico' | 'itens'
+type TabKey = 'planejamento' | 'checklists' | 'os' | 'historico'
 
 const TABS: Array<{ key: TabKey; label: string }> = [
   { key: 'planejamento', label: 'Planejamento' },
   { key: 'checklists',   label: 'Checklists'   },
   { key: 'os',           label: 'OS Abertas'   },
   { key: 'historico',    label: 'Histórico'     },
-  { key: 'itens',        label: 'Itens & Peças' },
 ]
 
 const TAB_ICONS: Record<TabKey, React.ElementType> = {
@@ -25,7 +23,6 @@ const TAB_ICONS: Record<TabKey, React.ElementType> = {
   checklists:   ClipboardList,
   os:           Wrench,
   historico:    History,
-  itens:        Settings2,
 }
 
 const TAB_ACCENT: Record<TabKey, {
@@ -50,11 +47,6 @@ const TAB_ACCENT: Record<TabKey, {
     bg: 'hover:bg-emerald-50',   bgActive: 'bg-emerald-50',
     text: 'text-emerald-600',    textActive: 'text-emerald-800',
     border: 'border-emerald-500',
-  },
-  itens: {
-    bg: 'hover:bg-teal-50',      bgActive: 'bg-teal-50',
-    text: 'text-teal-600',       textActive: 'text-teal-800',
-    border: 'border-teal-500',
   },
 }
 
@@ -81,11 +73,6 @@ const TAB_ACCENT_DARK: Record<TabKey, {
     text: 'text-emerald-400',      textActive: 'text-emerald-200',
     border: 'border-emerald-500/40',
   },
-  itens: {
-    bg: 'hover:bg-teal-500/10',    bgActive: 'bg-teal-500/15',
-    text: 'text-teal-400',         textActive: 'text-teal-200',
-    border: 'border-teal-500/40',
-  },
 }
 
 const COMPS: Record<TabKey, React.ComponentType> = {
@@ -93,24 +80,22 @@ const COMPS: Record<TabKey, React.ComponentType> = {
   checklists:   ChecklistsManutencao,
   os:           OSAbertas,
   historico:    HistoricoOS,
-  itens:        ItensManutencao,
 }
 
 // ── Component ────────────────────────────────────────────────────────────────
 
 export default function ManutencaoHub() {
-  const [active, setActive] = useState<TabKey>('os')
+  const [active, setActive] = useState<TabKey>('planejamento')
   const { isDark } = useTheme()
   const { data: ordens = [] } = useOrdensServico()
   const { data: checklists = [] } = useChecklists()
   const counts: Record<TabKey, number> = {
     planejamento: 0,
-    checklists: checklists.filter(c => c.status === 'pendente' || c.status === 'em_andamento').length,
+    checklists: 0,
     os: ordens.filter(o => !['concluida', 'cancelada', 'rejeitada'].includes(o.status)).length,
     historico: ordens.filter(o => o.status === 'concluida').length,
-    itens: 0,
   }
-  const Comp = COMPS[active] ?? OSAbertas
+  const Comp = COMPS[active] ?? Planejamento
 
   return (
     <div className="flex flex-col h-full -mx-4 md:mx-0">
@@ -146,7 +131,7 @@ export default function ManutencaoHub() {
           })}
         </div>
       </div>
-      <div className="flex-1 overflow-hidden min-h-0 px-3 sm:px-4 md:px-6">
+      <div className="flex-1 overflow-auto px-3 sm:px-4 md:px-6">
         <Comp />
       </div>
     </div>

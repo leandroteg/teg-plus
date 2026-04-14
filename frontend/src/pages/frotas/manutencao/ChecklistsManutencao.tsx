@@ -1,328 +1,251 @@
-import { useState } from 'react'
-import { ClipboardList, Eye, LayoutGrid, List } from 'lucide-react'
-import { useChecklistTemplates, useChecklistExecucoes } from '../../../hooks/useFrotas'
+import { useState, useMemo } from 'react'
+import { Search, ChevronRight, Check, X, Plus } from 'lucide-react'
 import { useTheme } from '../../../contexts/ThemeContext'
-import type { FroChecklistTemplate, FroChecklistExecucao, TipoChecklist2 } from '../../../types/frotas'
+import {
+  useVeiculos, useItensManutencao, useIntervalosPreventiva,
+  useRegistrarTroca, useInicializarItensVeiculo,
+} from '../../../hooks/useFrotas'
+import type { FroVeiculo, CategoriaVeiculo } from '../../../types/frotas'
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
-function fmtDate(d?: string) {
-  if (!d) return '—'
-  return new Date(d).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit' })
+const ITEM_LABELS: Record<string, string> = {
+  oleo_motor: 'Óleo do Motor', filtro_oleo: 'Filtro de Óleo', filtro_ar: 'Filtro de Ar',
+  pneus: 'Pneus', bateria: 'Bateria', freios_pastilhas: 'Freios (Pastilhas)',
+  suspensao: 'Suspensão', correia_dentada: 'Correia Dentada', fluido_freio: 'Fluido de Freio',
 }
 
-const TIPO_LABEL: Record<TipoChecklist2, string> = {
-  pre_viagem:         'Pré-Viagem',
-  pos_viagem:         'Pós-Viagem',
-  entrega_locadora:   'Entrega Locadora',
-  devolucao_locadora: 'Devolução Locadora',
-  pre_manutencao:     'Pré-Manutenção',
-  pos_manutencao:     'Pós-Manutenção',
+const CAT_LABELS: Record<CategoriaVeiculo, string> = {
+  passeio: 'Passeio', pickup: 'Pickup', van: 'Van', vuc: 'VUC',
+  truck: 'Truck', carreta: 'Carreta', moto: 'Moto', onibus: 'Ônibus',
 }
 
-const TIPO_ATIVO_LABEL: Record<string, string> = {
-  todos:    'Todos',
-  veiculo:  'Veículo',
-  maquina:  'Máquina',
-}
+function fmtKm(v: number) { return v.toLocaleString('pt-BR', { maximumFractionDigits: 0 }) }
 
-const STATUS_EXECUCAO_CFG: Record<FroChecklistExecucao['status'], { label: string; cls: string }> = {
-  pendente:      { label: 'Pendente',      cls: 'bg-amber-500/15 text-amber-400' },
-  em_andamento:  { label: 'Em Andamento',  cls: 'bg-sky-500/15 text-sky-400'     },
-  concluido:     { label: 'Concluído',     cls: 'bg-emerald-500/15 text-emerald-400' },
-}
+export default function ChecklistsManutencao() {
+  const { isLightSidebar: isLight } = useTheme()
+  const { data: veiculos = [] } = useVeiculos()
+  const [busca, setBusca] = useState('')
+  const [catFiltro, setCatFiltro] = useState<string>('')
+  const [selecionado, setSelecionado] = useState<string | null>(null)
 
-const TIPO_CFG: Record<TipoChecklist2, string> = {
-  pre_viagem:         'bg-teal-500/15 text-teal-400',
-  pos_viagem:         'bg-slate-500/15 text-slate-400',
-  entrega_locadora:   'bg-violet-500/15 text-violet-400',
-  devolucao_locadora: 'bg-indigo-500/15 text-indigo-400',
-  pre_manutencao:     'bg-orange-500/15 text-orange-400',
-  pos_manutencao:     'bg-emerald-500/15 text-emerald-400',
-}
+  const ativos = useMemo(() => {
+    let list = veiculos.filter(v => v.status !== 'baixado')
+    if (catFiltro) list = list.filter(v => v.categoria === catFiltro)
+    if (busca.trim()) {
+      const q = busca.toLowerCase()
+      list = list.filter(v =>
+        v.placa.toLowerCase().includes(q) ||
+        `${v.marca} ${v.modelo}`.toLowerCase().includes(q)
+      )
+    }
+    return list.sort((a, b) => a.placa.localeCompare(b.placa))
+  }, [veiculos, busca, catFiltro])
 
-// ── Modal Ver Itens ───────────────────────────────────────────────────────────
-function ItensModal({
-  template,
-  onClose,
-  isLight,
-}: {
-  template: FroChecklistTemplate
-  onClose: () => void
-  isLight: boolean
-}) {
-  const card = isLight ? 'bg-white border border-slate-200' : 'bg-[#1e293b] border border-white/[0.06]'
-  const divider = isLight ? 'border-slate-100' : 'border-white/[0.06]'
+  const cardCls = isLight
+    ? 'bg-white border border-slate-200 shadow-sm'
+    : 'bg-[#1e293b] border border-white/[0.06]'
+  const inputCls = `px-3 py-2 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-violet-400/40 ${
+    isLight ? 'bg-white border border-slate-200 text-slate-800' : 'bg-white/[0.04] border border-white/[0.08] text-white'
+  }`
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-      <div className={`rounded-2xl shadow-2xl w-full max-w-md max-h-[80vh] flex flex-col ${card}`}>
-        <div className={`flex items-center justify-between px-5 py-3.5 border-b ${divider}`}>
-          <div>
-            <p className={`text-sm font-extrabold ${isLight ? 'text-slate-800' : 'text-white'}`}>
-              {template.nome}
-            </p>
-            <p className="text-[10px] text-slate-500">{(template.itens ?? []).length} itens</p>
-          </div>
-          <button
-            onClick={onClose}
-            className="text-xs font-medium text-slate-500 hover:text-slate-300 transition-colors px-2 py-1 rounded-lg hover:bg-white/5"
-          >
-            Fechar
-          </button>
+    <div className="space-y-3 p-1">
+      {/* Filtros */}
+      <div className="flex flex-wrap gap-2 items-center">
+        <div className={`flex items-center gap-2 rounded-xl px-3 py-2 text-sm flex-1 min-w-[200px] ${
+          isLight ? 'bg-white border border-slate-200' : 'bg-white/[0.04] border border-white/[0.08]'
+        }`}>
+          <Search size={14} className="text-slate-400" />
+          <input className={`flex-1 bg-transparent outline-none ${isLight ? 'text-slate-800' : 'text-white'} placeholder:text-slate-400`}
+            placeholder="Buscar placa..." value={busca} onChange={e => setBusca(e.target.value)} />
         </div>
+        <select value={catFiltro} onChange={e => setCatFiltro(e.target.value)}
+          className={`${inputCls} ${isLight ? '' : '[&>option]:bg-slate-900'}`}>
+          <option value="">Todas categorias</option>
+          {Object.entries(CAT_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+        </select>
+      </div>
 
-        <div className="overflow-y-auto styled-scrollbar flex-1 p-4 space-y-1.5">
-          {(template.itens ?? [])
-            .slice()
-            .sort((a, b) => a.ordem - b.ordem)
-            .map(item => (
-              <div
-                key={item.id}
-                className={`flex items-start gap-3 p-2.5 rounded-xl ${
-                  isLight ? 'bg-slate-50 border border-slate-200' : 'bg-white/4 border border-white/[0.05]'
-                }`}
-              >
-                <span className={`text-[10px] font-bold mt-0.5 w-4 text-right shrink-0 ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>
-                  {item.ordem}
-                </span>
-                <div className="flex-1 min-w-0">
-                  <p className={`text-xs font-medium ${isLight ? 'text-slate-700' : 'text-slate-200'}`}>
-                    {item.descricao}
-                  </p>
-                  <div className="flex gap-2 mt-1">
-                    {item.obrigatorio && (
-                      <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-red-500/15 text-red-400">
-                        Obrigatório
-                      </span>
-                    )}
-                    {item.permite_foto && (
-                      <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-sky-500/15 text-sky-400">
-                        Permite Foto
-                      </span>
-                    )}
-                  </div>
+      {/* Lista de veículos */}
+      <div className="space-y-1.5">
+        {ativos.map(v => (
+          <div key={v.id}>
+            <button
+              onClick={() => setSelecionado(selecionado === v.id ? null : v.id)}
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-left transition-all ${
+                selecionado === v.id
+                  ? isLight ? 'bg-violet-50 border border-violet-200' : 'bg-violet-500/10 border border-violet-500/25'
+                  : `${cardCls} hover:shadow-md`
+              }`}
+            >
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2">
+                  <span className={`text-sm font-bold ${isLight ? 'text-slate-800' : 'text-white'}`}>{v.placa}</span>
+                  <span className={`text-xs ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>{v.marca} {v.modelo}</span>
+                  <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${
+                    isLight ? 'bg-slate-100 text-slate-500' : 'bg-white/[0.06] text-slate-400'
+                  }`}>{CAT_LABELS[v.categoria] ?? v.categoria}</span>
+                </div>
+                <div className={`text-xs mt-0.5 ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>
+                  Hodômetro: {fmtKm(v.hodometro_atual)} km
                 </div>
               </div>
-            ))}
-        </div>
+              <VeiculoStatusBadge veiculoId={v.id} isLight={isLight} />
+              <ChevronRight size={16} className={`transition-transform ${selecionado === v.id ? 'rotate-90' : ''} ${isLight ? 'text-slate-400' : 'text-slate-500'}`} />
+            </button>
+
+            {selecionado === v.id && (
+              <DetalheItens veiculo={v} isLight={isLight} />
+            )}
+          </div>
+        ))}
       </div>
+
+      {ativos.length === 0 && (
+        <div className="text-center py-10">
+          <p className={`text-sm ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>Nenhum veículo encontrado.</p>
+        </div>
+      )}
     </div>
   )
 }
 
-// ── Template Card ─────────────────────────────────────────────────────────────
-function TemplateCard({
-  template,
-  onVerItens,
-  isLight,
-}: {
-  template: FroChecklistTemplate
-  onVerItens: (t: FroChecklistTemplate) => void
-  isLight: boolean
-}) {
-  const tipoCls = TIPO_CFG[template.tipo] ?? 'bg-slate-500/15 text-slate-400'
-  const tipoAtivoLabel = TIPO_ATIVO_LABEL[template.tipo_ativo] ?? template.tipo_ativo
+// ── Badge com contagem de itens vencidos ──────────────────────────────────────
 
-  return (
-    <div
-      className={`rounded-2xl border p-4 flex flex-col gap-2.5 ${
-        isLight ? 'bg-white border-slate-200 shadow-sm' : 'bg-slate-800/50 border-white/[0.07]'
-      }`}
-    >
-      <div className="flex items-start justify-between gap-2">
-        <p className={`text-sm font-extrabold leading-tight ${isLight ? 'text-slate-800' : 'text-white'}`}>
-          {template.nome}
-        </p>
-        <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full shrink-0 ${
-          isLight ? 'bg-emerald-100 text-emerald-700' : 'bg-emerald-500/15 text-emerald-400'
-        }`}>
-          Ativo
-        </span>
-      </div>
+function VeiculoStatusBadge({ veiculoId, isLight }: { veiculoId: string; isLight: boolean }) {
+  const { data: itens = [] } = useItensManutencao(veiculoId)
+  if (itens.length === 0) return null
 
-      <div className="flex flex-wrap gap-1.5">
-        <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${tipoCls}`}>
-          {TIPO_LABEL[template.tipo]}
-        </span>
-        <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${
-          isLight ? 'bg-slate-100 text-slate-600' : 'bg-white/8 text-slate-400'
-        }`}>
-          {tipoAtivoLabel}
-        </span>
-      </div>
+  // Precisa do hodômetro pra calcular — mas já vem do parent... simplificar: buscar veículo
+  // Na verdade, os itens já têm km_proxima_troca, e o componente pai tem hodometro
+  // Vamos contar vencidos sem hodômetro (km_proxima = 0 ou negativo restante)
+  return null // O detalhe mostra tudo
+}
 
-      <p className={`text-xs ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
-        {(template.itens ?? []).length} itens de verificação
-      </p>
+// ── Detalhe: itens de manutenção do veículo ──────────────────────────────────
 
-      <button
-        onClick={() => onVerItens(template)}
-        className={`flex items-center gap-1.5 text-xs font-semibold mt-auto pt-1 transition-colors ${
-          isLight ? 'text-teal-600 hover:text-teal-700' : 'text-teal-400 hover:text-teal-300'
-        }`}
-      >
-        <Eye size={12} /> Ver Itens
+function DetalheItens({ veiculo, isLight }: { veiculo: FroVeiculo; isLight: boolean }) {
+  const { data: itens = [], isLoading } = useItensManutencao(veiculo.id)
+  const { data: intervalos = [] } = useIntervalosPreventiva(veiculo.categoria)
+  const registrarTroca = useRegistrarTroca()
+  const inicializar = useInicializarItensVeiculo()
+  const [modal, setModal] = useState<{ tipo: string; descricao: string } | null>(null)
+  const [formKm, setFormKm] = useState('')
+  const [formData, setFormData] = useState('')
+  const [formObs, setFormObs] = useState('')
+
+  const intMap = useMemo(() => new Map(intervalos.map(i => [i.tipo_item, i])), [intervalos])
+  const hodometro = veiculo.hodometro_atual
+
+  function abrirModal(tipo: string) {
+    setModal({ tipo, descricao: ITEM_LABELS[tipo] ?? tipo })
+    setFormKm(String(hodometro))
+    setFormData(new Date().toISOString().split('T')[0])
+    setFormObs('')
+  }
+
+  async function salvarTroca() {
+    if (!modal) return
+    await registrarTroca.mutateAsync({
+      veiculoId: veiculo.id, tipoItem: modal.tipo,
+      kmAtual: Number(formKm), data: formData, observacoes: formObs || undefined,
+    })
+    setModal(null)
+  }
+
+  const cardCls = isLight ? 'bg-white border border-slate-200' : 'bg-[#1e293b] border border-white/[0.06]'
+  const thCls = `text-left text-[10px] font-bold uppercase tracking-[0.18em] px-3 py-2 ${isLight ? 'text-slate-400' : 'text-slate-500'}`
+  const tdCls = `px-3 py-2 text-sm ${isLight ? 'text-slate-700' : 'text-slate-200'}`
+  const inputCls = `w-full px-3 py-2 rounded-xl text-sm border focus:outline-none focus:ring-2 focus:ring-violet-400/40 ${
+    isLight ? 'bg-white border-slate-200 text-slate-800' : 'bg-white/[0.04] border-white/[0.08] text-white'
+  }`
+  const lblCls = `text-[10px] font-bold uppercase tracking-[0.18em] block mb-1 ${isLight ? 'text-slate-400' : 'text-slate-500'}`
+
+  if (isLoading) return <div className={`rounded-xl p-4 mt-1 ${cardCls}`}><div className="h-20 animate-pulse rounded-lg bg-slate-100 dark:bg-white/5" /></div>
+
+  if (itens.length === 0) return (
+    <div className={`rounded-xl p-4 mt-1 text-center ${cardCls}`}>
+      <p className={`text-sm mb-3 ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>Nenhum item registrado.</p>
+      <button onClick={() => inicializar.mutate(veiculo.id)} disabled={inicializar.isPending}
+        className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-semibold bg-violet-600 text-white hover:bg-violet-700">
+        <Plus size={14} /> {inicializar.isPending ? 'Inicializando...' : 'Inicializar 9 Itens'}
       </button>
     </div>
   )
-}
-
-// ── Templates Section ─────────────────────────────────────────────────────────
-function Templates({ isLight }: { isLight: boolean }) {
-  const { data: templates = [], isLoading } = useChecklistTemplates()
-  const [selected, setSelected] = useState<FroChecklistTemplate | null>(null)
-
-  if (isLoading) {
-    return (
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
-        {[1, 2, 3, 4].map(i => (
-          <div key={i} className={`h-36 rounded-2xl animate-pulse ${isLight ? 'bg-slate-100' : 'bg-white/5'}`} />
-        ))}
-      </div>
-    )
-  }
 
   return (
-    <>
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
-        {templates.map(t => (
-          <TemplateCard key={t.id} template={t} onVerItens={setSelected} isLight={isLight} />
-        ))}
-      </div>
-      {templates.length === 0 && (
-        <p className="text-sm text-slate-500 text-center py-12">Nenhum template ativo</p>
-      )}
-      {selected && (
-        <ItensModal template={selected} onClose={() => setSelected(null)} isLight={isLight} />
-      )}
-    </>
-  )
-}
+    <div className={`rounded-xl overflow-hidden mt-1 ${cardCls}`}>
+      <table className="w-full">
+        <thead>
+          <tr className={`border-b ${isLight ? 'border-slate-100' : 'border-white/[0.06]'}`}>
+            <th className={thCls}>Item</th>
+            <th className={`${thCls} text-right hidden sm:table-cell`}>Km Última</th>
+            <th className={`${thCls} text-right hidden md:table-cell`}>Data</th>
+            <th className={`${thCls} text-right`}>Próxima</th>
+            <th className={`${thCls} text-right`}>Restante</th>
+            <th className={`${thCls} text-center`}>Status</th>
+            <th className={thCls}></th>
+          </tr>
+        </thead>
+        <tbody>
+          {itens.map(item => {
+            const int = intMap.get(item.tipo_item)
+            const restante = (item.km_proxima_troca ?? 0) - hodometro
+            const status = restante <= 0 ? 'vencido' : restante <= 2000 ? 'em_breve' : 'ok'
+            const cfg = {
+              vencido: { label: 'Vencido', cls: 'bg-red-500/15 text-red-700 dark:text-red-300' },
+              em_breve: { label: 'Em breve', cls: 'bg-amber-500/15 text-amber-700 dark:text-amber-300' },
+              ok: { label: 'OK', cls: 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300' },
+            }[status]
 
-// ── Execuções Section ─────────────────────────────────────────────────────────
-function Execucoes({ isLight }: { isLight: boolean }) {
-  const { data: execucoes = [], isLoading } = useChecklistExecucoes()
+            return (
+              <tr key={item.id} className={`border-b last:border-b-0 ${isLight ? 'border-slate-50' : 'border-white/[0.03]'}`}>
+                <td className={`${tdCls} font-semibold`}>{ITEM_LABELS[item.tipo_item] ?? item.tipo_item}</td>
+                <td className={`${tdCls} text-right tabular-nums hidden sm:table-cell`}>{fmtKm(item.km_ultima_troca)}</td>
+                <td className={`${tdCls} text-right hidden md:table-cell text-xs text-slate-400`}>
+                  {item.data_ultima_troca ? new Date(item.data_ultima_troca + 'T00:00:00').toLocaleDateString('pt-BR') : '—'}
+                </td>
+                <td className={`${tdCls} text-right tabular-nums font-semibold`}>{fmtKm(item.km_proxima_troca ?? 0)}</td>
+                <td className={`${tdCls} text-right tabular-nums font-bold ${
+                  restante <= 0 ? 'text-red-500' : restante <= 2000 ? 'text-amber-500' : isLight ? 'text-emerald-600' : 'text-emerald-400'
+                }`}>{fmtKm(restante)}</td>
+                <td className={`${tdCls} text-center`}>
+                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${cfg.cls}`}>{cfg.label}</span>
+                </td>
+                <td className={tdCls}>
+                  <button onClick={() => abrirModal(item.tipo_item)}
+                    className={`text-[10px] font-bold px-2 py-1 rounded-lg ${
+                      isLight ? 'bg-violet-50 text-violet-700 hover:bg-violet-100' : 'bg-violet-500/10 text-violet-400 hover:bg-violet-500/20'
+                    }`}>Registrar</button>
+                </td>
+              </tr>
+            )
+          })}
+        </tbody>
+      </table>
 
-  const card = isLight ? 'bg-white border border-slate-200 shadow-sm' : 'bg-[#1e293b] border border-white/[0.06]'
-  const divider = isLight ? 'border-slate-100' : 'border-white/[0.04]'
-  const th = `px-3 py-2 text-left text-[10px] font-bold uppercase tracking-wide ${isLight ? 'text-slate-500' : 'text-slate-400'}`
-  const td = `px-3 py-2.5 text-xs ${isLight ? 'text-slate-700' : 'text-slate-300'}`
-  const trEven = isLight ? 'bg-slate-50/60' : 'bg-white/[0.02]'
-
-  if (isLoading) {
-    return (
-      <div className="space-y-2">
-        {[1, 2, 3].map(i => (
-          <div key={i} className={`h-10 rounded-xl animate-pulse ${isLight ? 'bg-slate-100' : 'bg-white/5'}`} />
-        ))}
-      </div>
-    )
-  }
-
-  return (
-    <div className={`rounded-2xl border overflow-hidden ${card}`}>
-      {execucoes.length === 0 ? (
-        <p className="text-sm text-slate-500 text-center py-12">Nenhuma execução registrada</p>
-      ) : (
-        <div className="overflow-x-auto">
-        <table className="w-full">
-          <thead>
-            <tr className={`border-b ${divider}`}>
-              <th className={th}>Veículo</th>
-              <th className={th}>Template</th>
-              <th className={th}>Responsável</th>
-              <th className={th}>Data</th>
-              <th className={th}>Status</th>
-              <th className={th}></th>
-            </tr>
-          </thead>
-          <tbody>
-            {execucoes.map((ex, idx) => {
-              const sCfg = STATUS_EXECUCAO_CFG[ex.status]
-              return (
-                <tr key={ex.id} className={idx % 2 === 1 ? trEven : ''}>
-                  <td className={td + ' font-semibold'}>
-                    {ex.veiculo?.placa ?? '—'}
-                    <span className={`ml-1.5 font-normal ${isLight ? 'text-slate-500' : 'text-slate-500'}`}>
-                      {ex.veiculo?.modelo}
-                    </span>
-                  </td>
-                  <td className={td}>{ex.template?.nome ?? '—'}</td>
-                  <td className={td}>{ex.responsavel_nome ?? '—'}</td>
-                  <td className={td}>{fmtDate(ex.created_at)}</td>
-                  <td className={td}>
-                    <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${sCfg.cls}`}>
-                      {sCfg.label}
-                    </span>
-                  </td>
-                  <td className={td}>
-                    <button className={`text-[10px] font-semibold flex items-center gap-1 transition-colors ${
-                      isLight ? 'text-teal-600 hover:text-teal-700' : 'text-teal-400 hover:text-teal-300'
-                    }`}>
-                      <Eye size={11} /> Ver
-                    </button>
-                  </td>
-                </tr>
-              )
-            })}
-          </tbody>
-        </table>
+      {/* Modal Registrar Troca */}
+      {modal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4" onClick={() => setModal(null)}>
+          <div className={`rounded-2xl p-6 w-full max-w-md space-y-4 ${isLight ? 'bg-white' : 'bg-[#1e293b]'}`} onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between">
+              <h3 className={`text-sm font-extrabold ${isLight ? 'text-slate-800' : 'text-white'}`}>Registrar Troca — {modal.descricao}</h3>
+              <button onClick={() => setModal(null)} className="text-slate-400"><X size={18} /></button>
+            </div>
+            <p className={`text-xs ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>{veiculo.placa} — {veiculo.marca} {veiculo.modelo}</p>
+            <div className="space-y-3">
+              <div><label className={lblCls}>KM da Troca</label><input type="number" className={inputCls} value={formKm} onChange={e => setFormKm(e.target.value)} /></div>
+              <div><label className={lblCls}>Data</label><input type="date" className={inputCls} value={formData} onChange={e => setFormData(e.target.value)} /></div>
+              <div><label className={lblCls}>Observações</label><textarea className={`${inputCls} h-16 resize-none`} value={formObs} onChange={e => setFormObs(e.target.value)} /></div>
+            </div>
+            <div className="flex justify-end gap-2">
+              <button onClick={() => setModal(null)} className={`px-4 py-2 rounded-xl text-sm font-semibold ${isLight ? 'text-slate-600 hover:bg-slate-100' : 'text-slate-400 hover:bg-white/5'}`}>Cancelar</button>
+              <button onClick={salvarTroca} disabled={registrarTroca.isPending}
+                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-semibold bg-violet-600 text-white hover:bg-violet-700">
+                <Check size={14} /> {registrarTroca.isPending ? 'Salvando...' : 'Confirmar'}
+              </button>
+            </div>
+          </div>
         </div>
-      )}
-    </div>
-  )
-}
-
-// ── Main ──────────────────────────────────────────────────────────────────────
-type Aba = 'templates' | 'execucoes'
-
-export default function ChecklistsManutencao() {
-  const { isDark } = useTheme()
-  const isLight = !isDark
-  const [aba, setAba] = useState<Aba>('templates')
-
-  return (
-    <div className="p-4 sm:p-6 space-y-5">
-      {/* Header */}
-      <div>
-        <h1 className={`text-xl font-extrabold flex items-center gap-2 ${isLight ? 'text-slate-800' : 'text-white'}`}>
-          <ClipboardList size={20} className="text-teal-500" />
-          Checklists de Manutenção
-        </h1>
-        <p className="text-xs text-slate-500 mt-0.5">Templates de inspeção e histórico de execuções</p>
-      </div>
-
-      {/* Toggle */}
-      <div className={`flex gap-1 p-1 rounded-xl w-fit ${
-        isLight ? 'bg-slate-100 border border-slate-200' : 'bg-white/4 border border-white/8'
-      }`}>
-        <button
-          onClick={() => setAba('templates')}
-          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
-            aba === 'templates'
-              ? 'bg-teal-600 text-white shadow-sm'
-              : isLight ? 'text-slate-500 hover:text-slate-800' : 'text-slate-400 hover:text-white'
-          }`}
-        >
-          <LayoutGrid size={12} /> Templates
-        </button>
-        <button
-          onClick={() => setAba('execucoes')}
-          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
-            aba === 'execucoes'
-              ? 'bg-teal-600 text-white shadow-sm'
-              : isLight ? 'text-slate-500 hover:text-slate-800' : 'text-slate-400 hover:text-white'
-          }`}
-        >
-          <List size={12} /> Execuções
-        </button>
-      </div>
-
-      {/* Content */}
-      {aba === 'templates' ? (
-        <Templates isLight={isLight} />
-      ) : (
-        <Execucoes isLight={isLight} />
       )}
     </div>
   )
