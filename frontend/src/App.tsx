@@ -319,8 +319,9 @@ export default function App() {
           <Route element={<ModuleRoute moduleKey="patrimonial" />}>
             <Route element={<PatrimonialLayout />}>
               <Route path="/patrimonial"               element={<LazyDash><PatrimonialHome /></LazyDash>} />
-              <Route path="/patrimonial/movimentacoes" element={<Lazy><PatrimonialMovimentacoes /></Lazy>} />
               <Route path="/patrimonial/patrimonio"    element={<Lazy><PatrimonialPatrimonio /></Lazy>} />
+              <Route path="/patrimonial/historico"    element={<Lazy><PatrimonialMovimentacoes /></Lazy>} />
+              <Route path="/patrimonial/movimentacoes" element={<Navigate to="/patrimonial/historico" replace />} />
               <Route path="/patrimonial/scanner"      element={<Lazy><ScannerQR /></Lazy>} />
             </Route>
           </Route>

@@ -19,8 +19,8 @@ export default function PatrimonialLayout() {
       requisitanteAllowed: true,
     },
     { to: '/patrimonial/scanner', icon: ScanLine, label: 'Consultar QR' },
-    { to: '/patrimonial/movimentacoes', icon: ArrowLeftRight, label: 'Movimenta\u00e7\u00f5es' },
     { to: '/patrimonial/patrimonio', icon: Landmark, label: 'Patrim\u00f4nio' },
+    { to: '/patrimonial/historico', icon: ArrowLeftRight, label: 'Hist\u00f3rico' },
   ]
 
   return (
