@@ -60,6 +60,8 @@ export default defineConfig({
         globPatterns: ['**/*.{js,css,html,ico,svg,woff2}'],
         maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
         globIgnores: ['**/bg-*.png', '**/node_modules/**'],
+        navigateFallback: 'index.html',
+        navigateFallbackDenylist: [/^\/api\//, /^\/aprovaai/],
         runtimeCaching: [
           {
             urlPattern: /^https:\/\/fonts\.googleapis\.com\/.*/i,
