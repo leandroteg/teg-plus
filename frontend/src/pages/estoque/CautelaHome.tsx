@@ -1,9 +1,9 @@
 import { useState, useMemo, useCallback } from 'react'
-import { useSearchParams } from 'react-router-dom'
+import { useSearchParams, useNavigate } from 'react-router-dom'
 import {
   Search, X, HandHelping, ArrowUp, ArrowDown, LayoutList, LayoutGrid,
   Clock, ClipboardCheck, CheckCircle2, PackageOpen, Archive,
-  User, Calendar, MapPin, Building2,
+  User, Calendar, MapPin, Building2, Plus,
 } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
 import { useCautelas, useAtualizarCautela } from '../../hooks/useCautelas'
@@ -80,6 +80,7 @@ function CautelaRow({ cautela, onClick, isDark }: { cautela: Cautela; onClick: (
 export default function CautelaHome() {
   const { isLightSidebar: isLight } = useTheme()
   const isDark = !isLight
+  const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
 
   const { data: cautelas = [], isLoading } = useCautelas()
@@ -124,9 +125,18 @@ export default function CautelaHome() {
   return (
     <div className={`rounded-2xl border overflow-hidden ${isDark ? 'bg-[#0f172a] border-white/[0.06]' : 'bg-white border-slate-200'}`}>
       {/* Header */}
-      <div className="px-4 pt-4 pb-2">
-        <h1 className={`text-lg font-extrabold ${isDark ? 'text-white' : 'text-slate-900'}`}>Cautelas</h1>
-        <p className={`text-xs mt-0.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Pipeline de retirada e devolução de materiais</p>
+      <div className="px-4 pt-4 pb-2 flex items-center justify-between">
+        <div>
+          <h1 className={`text-lg font-extrabold ${isDark ? 'text-white' : 'text-slate-900'}`}>Cautelas</h1>
+          <p className={`text-xs mt-0.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Pipeline de retirada e devolução de materiais</p>
+        </div>
+        <button
+          onClick={() => navigate('/estoque/cautelas/nova')}
+          className="flex items-center gap-1.5 bg-teal-600 hover:bg-teal-700 text-white
+            text-sm font-semibold px-4 py-2 rounded-xl transition-colors shadow-sm"
+        >
+          <Plus size={15} /> Nova Cautela
+        </button>
       </div>
 
       {/* Tabs */}
