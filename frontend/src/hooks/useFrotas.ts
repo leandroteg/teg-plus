@@ -331,10 +331,19 @@ export function useCriarChecklist() {
         .single()
       if (error) throw error
 
+      // pre_viagem completo → veículo vai pra "em_uso" (Alocados)
       if (todosOk && payload.tipo === 'pre_viagem') {
         await supabase
           .from('fro_veiculos')
           .update({ status: 'em_uso', ...(payload.hodometro ? { hodometro_atual: payload.hodometro } : {}) })
+          .eq('id', payload.veiculo_id)
+      }
+
+      // pos_viagem completo → veículo volta pra "disponivel" (Pátio)
+      if (todosOk && payload.tipo === 'pos_viagem') {
+        await supabase
+          .from('fro_veiculos')
+          .update({ status: 'disponivel', ...(payload.hodometro ? { hodometro_atual: payload.hodometro } : {}) })
           .eq('id', payload.veiculo_id)
       }
 
@@ -656,11 +665,29 @@ export function useEncerrarAlocacao() {
     mutationFn: async ({ id, hodometro_retorno, horimetro_retorno, observacoes }: {
       id: string; hodometro_retorno?: number; horimetro_retorno?: number; observacoes?: string
     }) => {
+      // Buscar veiculo_id da alocação
+      const { data: aloc } = await supabase
+        .from('fro_alocacoes')
+        .select('veiculo_id')
+        .eq('id', id)
+        .single()
+
       const { error } = await supabase
         .from('fro_alocacoes')
         .update({ status: 'encerrada', data_retorno_real: new Date().toISOString(), hodometro_retorno, horimetro_retorno, observacoes })
         .eq('id', id)
       if (error) throw error
+
+      // Mudar veículo pra "em_entrada" — só volta pra pátio após checklist de entrada
+      if (aloc?.veiculo_id) {
+        await supabase
+          .from('fro_veiculos')
+          .update({
+            status: 'em_entrada',
+            ...(hodometro_retorno ? { hodometro_atual: hodometro_retorno } : {}),
+          })
+          .eq('id', aloc.veiculo_id)
+      }
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['fro_alocacoes'] })
