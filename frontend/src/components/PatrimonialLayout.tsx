@@ -13,8 +13,8 @@ export default function PatrimonialLayout() {
     {
       to: '/patrimonial',
       icon: Plus,
-      label: 'Nova Movimenta\u00e7\u00e3o',
-      action: () => navigate('/patrimonial/movimentacoes?nova=1'),
+      label: 'Novo Patrim\u00f4nio',
+      action: () => navigate('/patrimonial/patrimonio?novo=1'),
       accent: true,
       requisitanteAllowed: true,
     },
