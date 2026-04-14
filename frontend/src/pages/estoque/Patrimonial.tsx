@@ -1,5 +1,5 @@
-import { useMemo, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useMemo, useState, useEffect } from 'react'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import {
   Landmark, Plus, Search, X, Save, Loader2,
   TrendingDown, AlertTriangle, CheckCircle2, Wrench, Truck,
@@ -56,6 +56,7 @@ export default function Patrimonial({
 }: PatrimonialProps) {
   const { isLightSidebar: isLight } = useTheme()
   const nav = useNavigate()
+  const [searchParams, setSearchParams] = useSearchParams()
   const [busca, setBusca] = useState('')
   const [statusFiltro, setStatusFiltro] = useState<string>('')
   const [showForm, setShowForm] = useState(false)
@@ -68,6 +69,16 @@ export default function Patrimonial({
   const [depreciarCompetencia, setDepreciarCompetencia] = useState(COMPETENCIA)
   const [transferirAtivo, setTransferirAtivo] = useState<PatImobilizado | null>(null)
   const [filtroBase, setFiltroBase] = useState<string>('')
+
+  // Open new form when navigated with ?novo=1
+  useEffect(() => {
+    if (searchParams.get('novo') === '1') {
+      setEditItem({ ...EMPTY })
+      setShowForm(true)
+      searchParams.delete('novo')
+      setSearchParams(searchParams, { replace: true })
+    }
+  }, [searchParams, setSearchParams])
 
   const filtroAtivo = forcedStatusFiltro ?? statusFiltro
   const { data: imobs = [], isLoading } = useImobilizados({
