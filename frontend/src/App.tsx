@@ -47,6 +47,7 @@ const Aprovacao = lazy(() => import('./pages/Aprovacao'))
 const AprovAi = lazy(() => import('./pages/AprovAi'))
 const Perfil = lazy(() => import('./pages/Perfil'))
 const MinhasSolicitacoes = lazy(() => import('./pages/MinhasSolicitacoes'))
+const MinhasCautelas = lazy(() => import('./pages/MinhasCautelas'))
 const Pedidos = lazy(() => import('./pages/Pedidos'))
 const RequisicaoDetalhe = lazy(() => import('./pages/RequisicaoDetalhe'))
 const SSMA = lazy(() => import('./pages/SSMA'))
@@ -146,7 +147,8 @@ const Movimentacoes = lazy(() => import('./pages/estoque/Movimentacoes'))
 const Inventario = lazy(() => import('./pages/estoque/Inventario'))
 const Patrimonial = lazy(() => import('./pages/estoque/Patrimonial'))
 const SolicitacoesEstoque = lazy(() => import('./pages/estoque/Solicitacoes'))
-const Cautelas = lazy(() => import('./pages/estoque/Cautelas'))
+const CautelaHome = lazy(() => import('./pages/estoque/CautelaHome'))
+const NovaCautela = lazy(() => import('./pages/estoque/NovaCautela'))
 
 // Logistica
 const LogisticaHome = lazy(() => import('./pages/logistica/LogisticaHome'))
@@ -172,6 +174,8 @@ const LocGestao = lazy(() => import('./pages/locacao/Gestao'))
 const PatrimonialHome = lazy(() => import('./pages/patrimonial/PatrimonialHome'))
 const PatrimonialMovimentacoes = lazy(() => import('./pages/patrimonial/Movimentacoes'))
 const PatrimonialPatrimonio = lazy(() => import('./pages/patrimonial/Patrimonio'))
+const ScannerQR = lazy(() => import('./pages/patrimonial/ScannerQR'))
+const FichaAtivo = lazy(() => import('./pages/patrimonial/FichaAtivo'))
 
 // Admin
 const AdminUsuarios = lazy(() => import('./pages/AdminUsuarios'))
@@ -223,6 +227,8 @@ export default function App() {
           {/* Global: Perfil */}
           <Route path="/perfil" element={<Lazy><Perfil /></Lazy>} />
           <Route path="/minhas-solicitacoes" element={<Lazy><MinhasSolicitacoes /></Lazy>} />
+          <Route path="/minhas-cautelas" element={<Lazy><MinhasCautelas /></Lazy>} />
+          <Route path="/p/:numero" element={<Lazy><FichaAtivo /></Lazy>} />
 
           {/* Módulo Financeiro */}
           <Route element={<ModuleRoute moduleKey="financeiro" />}>
@@ -272,7 +278,8 @@ export default function App() {
               <Route path="/estoque/inventario"    element={<Lazy><Inventario /></Lazy>} />
               <Route path="/estoque/patrimonial"   element={<Lazy><Patrimonial /></Lazy>} />
               <Route path="/estoque/solicitacoes" element={<Lazy><SolicitacoesEstoque /></Lazy>} />
-              <Route path="/estoque/cautelas" element={<Lazy><Cautelas /></Lazy>} />
+              <Route path="/estoque/cautelas" element={<Lazy><CautelaHome /></Lazy>} />
+              <Route path="/estoque/cautelas/nova" element={<Lazy><NovaCautela /></Lazy>} />
             </Route>
           </Route>
 
@@ -312,8 +319,10 @@ export default function App() {
           <Route element={<ModuleRoute moduleKey="patrimonial" />}>
             <Route element={<PatrimonialLayout />}>
               <Route path="/patrimonial"               element={<LazyDash><PatrimonialHome /></LazyDash>} />
-              <Route path="/patrimonial/movimentacoes" element={<Lazy><PatrimonialMovimentacoes /></Lazy>} />
               <Route path="/patrimonial/patrimonio"    element={<Lazy><PatrimonialPatrimonio /></Lazy>} />
+              <Route path="/patrimonial/historico"    element={<Lazy><PatrimonialMovimentacoes /></Lazy>} />
+              <Route path="/patrimonial/movimentacoes" element={<Navigate to="/patrimonial/historico" replace />} />
+              <Route path="/patrimonial/scanner"      element={<Lazy><ScannerQR /></Lazy>} />
             </Route>
           </Route>
 
