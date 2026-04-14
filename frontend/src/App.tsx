@@ -184,6 +184,7 @@ const SaidaPipeline = lazy(() => import('./pages/locacao/SaidaPipeline'))
 const LocGestao = lazy(() => import('./pages/locacao/Gestao'))
 
 // Patrimonial (módulo próprio)
+const FichaAtivo = lazy(() => import('./pages/patrimonial/FichaAtivo'))
 const PatrimonialHome = lazy(() => import('./pages/patrimonial/PatrimonialHome'))
 const PatrimonialMovimentacoes = lazy(() => import('./pages/patrimonial/Movimentacoes'))
 const PatrimonialPatrimonio = lazy(() => import('./pages/patrimonial/Patrimonio'))
@@ -239,6 +240,7 @@ export default function App() {
           <Route path="/perfil" element={<Lazy><Perfil /></Lazy>} />
           <Route path="/minhas-solicitacoes" element={<Lazy><MinhasSolicitacoes /></Lazy>} />
           <Route path="/minhas-cautelas" element={<Lazy><MinhasCautelas /></Lazy>} />
+          <Route path="/p/:numero" element={<Lazy><FichaAtivo /></Lazy>} />
 
           {/* Módulo Financeiro */}
           <Route element={<ModuleRoute moduleKey="financeiro" />}>
