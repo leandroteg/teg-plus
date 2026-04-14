@@ -64,37 +64,17 @@ export default function PatrimonioPage() {
   return (
     <div className={`rounded-2xl border overflow-hidden ${isDark ? 'bg-[#0f172a] border-white/[0.06]' : 'bg-white border-slate-200'}`}>
       {/* Header */}
-      <div className="px-4 pt-4 pb-2 flex items-center justify-between">
-        <div>
-          <h1 className={`text-lg font-extrabold flex items-center gap-2 ${isDark ? 'text-white' : 'text-slate-900'}`}>
-            <Landmark size={18} className="text-amber-500" /> Patrimonio
-          </h1>
-          <p className={`text-xs mt-0.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
-            Gestao completa dos imobilizados por etapa do ciclo de vida
-          </p>
-        </div>
-        {/* Filtro por Base */}
-        <div className="flex items-center gap-2">
-          <MapPin size={13} className={isDark ? 'text-slate-500' : 'text-slate-400'} />
-          <select
-            value={filtroBase}
-            onChange={e => setFiltroBase(e.target.value)}
-            className={`px-3 py-2 rounded-xl border text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-amber-500/30 ${
-              isDark
-                ? 'border-white/[0.08] bg-white/[0.03] text-slate-300'
-                : 'border-slate-200 bg-white text-slate-600'
-            }`}
-          >
-            <option value="">Todas as Bases</option>
-            {bases.filter(b => b.ativa).map(b => (
-              <option key={b.id} value={b.id}>{b.nome}</option>
-            ))}
-          </select>
-        </div>
+      <div className="px-4 pt-4 pb-2">
+        <h1 className={`text-lg font-extrabold flex items-center gap-2 ${isDark ? 'text-white' : 'text-slate-900'}`}>
+          <Landmark size={18} className="text-amber-500" /> Patrimônio
+        </h1>
+        <p className={`text-xs mt-0.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+          Gestão completa dos imobilizados por etapa do ciclo de vida
+        </p>
       </div>
 
       {/* Pipeline tabs */}
-      <div className={`flex gap-1 p-1 pb-2 rounded-t-2xl border-b overflow-x-auto hide-scrollbar ${
+      <div className={`flex gap-1 p-1 pb-2 border-b overflow-x-auto hide-scrollbar ${
         isDark ? 'bg-white/[0.02] border-white/[0.06]' : 'bg-slate-50 border-slate-200'
       }`}>
         {TABS.map(stage => {
