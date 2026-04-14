@@ -177,14 +177,14 @@ export default function Patrimonial({
       )}
 
       {/* -- Filtros ------------------------------------------------- */}
-      <div className="flex gap-2 flex-wrap">
-        <div className="relative flex-1 min-w-[200px]">
+      <div className="flex gap-2 items-center overflow-x-auto hide-scrollbar">
+        <div className="relative flex-1 min-w-[160px] max-w-xs">
           <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
           <input
             value={busca}
             onChange={e => setBusca(e.target.value)}
-            placeholder={'Buscar por patrim\u00f4nio, descri\u00e7\u00e3o ou categoria...'}
-            className={`w-full pl-9 pr-4 py-2 rounded-xl border text-sm
+            placeholder="Buscar patrimônio..."
+            className={`w-full pl-9 pr-4 py-2 rounded-xl border text-xs
               focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400
               ${isLight ? 'border-slate-200 bg-white text-slate-800' : 'border-white/[0.08] bg-white/[0.03] text-slate-200 placeholder:text-slate-500'}`}
           />
@@ -192,33 +192,33 @@ export default function Patrimonial({
         <select
           value={filtroBase}
           onChange={e => setFiltroBase(e.target.value)}
-          className={`px-3 py-2 rounded-xl border text-xs font-semibold
+          className={`px-2 py-2 rounded-xl border text-[11px] font-semibold shrink-0
             focus:outline-none focus:ring-2 focus:ring-violet-500/30
             ${filtroBase
               ? isLight ? 'border-violet-300 bg-violet-50 text-violet-700' : 'border-violet-400/40 bg-violet-500/10 text-violet-300'
               : isLight ? 'border-slate-200 bg-white text-slate-600' : 'border-white/[0.08] bg-white/[0.03] text-slate-300'
             }`}
         >
-          <option value="">Todas as Bases</option>
+          <option value="">Bases</option>
           {bases.filter(b => b.ativa).map(b => (
-            <option key={b.id} value={b.id}>{b.codigo ? `${b.codigo} — ${b.nome}` : b.nome}</option>
+            <option key={b.id} value={b.id}>{b.nome}</option>
           ))}
         </select>
         {!forcedStatusFiltro && !showDepreciadosOnly && (
           <select
             value={statusFiltro}
             onChange={e => setStatusFiltro(e.target.value)}
-            className={`px-3 py-2 rounded-xl border text-xs font-semibold
+            className={`px-2 py-2 rounded-xl border text-[11px] font-semibold shrink-0
               focus:outline-none focus:ring-2 focus:ring-blue-500/30
               ${isLight ? 'border-slate-200 bg-white text-slate-600' : 'border-white/[0.08] bg-white/[0.03] text-slate-300'}`}
           >
-            <option value="">Todos os status</option>
+            <option value="">Status</option>
             {Object.entries(STATUS_CONFIG).map(([k, v]) => (
               <option key={k} value={k}>{v.label}</option>
             ))}
           </select>
         )}
-        <div className={`flex items-center rounded-xl border overflow-hidden ${
+        <div className={`flex items-center rounded-xl border overflow-hidden shrink-0 ${
           isLight ? 'border-slate-200 bg-white' : 'border-white/[0.08] bg-white/[0.03]'
         }`}>
           <button
