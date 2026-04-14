@@ -6,7 +6,7 @@ const NAV = [
   { to: '/frotas/solicitacoes',       icon: Plus,            label: 'Nova Solicitação', requisitanteAllowed: true },
   { to: '/frotas/frota',             icon: Truck,           label: 'Frota & Máquinas'              },
   { to: '/frotas/manutencao',        icon: Wrench,          label: 'Manutenção'                    },
-  { to: '/frotas/operacao',          icon: Gauge,           label: 'Operação & Controle'           },
+  { to: '/frotas/operacao',          icon: Gauge,           label: 'Operação'           },
 ]
 
 export default function FrotasLayout() {
