@@ -100,16 +100,9 @@ export default function Movimentacoes() {
       {/* -- Header --------------------------------------------------- */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className={`text-xl font-extrabold ${isLight ? 'text-slate-800' : 'text-white'}`}>{'Movimenta\u00e7\u00f5es'}</h1>
+          <h1 className={`text-xl font-extrabold ${isLight ? 'text-slate-800' : 'text-white'}`}>Histórico</h1>
           <p className={`text-xs mt-0.5 ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>{filtradas.length} registros</p>
         </div>
-        <button
-          onClick={openForm}
-          className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white
-            text-sm font-semibold px-4 py-2 rounded-xl transition-colors shadow-sm"
-        >
-          <Plus size={15} /> Nova Movimentacao
-        </button>
       </div>
 
       {/* -- Filtros ------------------------------------------------- */}
