@@ -500,6 +500,7 @@ function ImobilizadoCard({
   isLight: boolean
   card: string
 }) {
+  const nav = useNavigate()
   const cfg = STATUS_CONFIG[imob.status]
   const isExpanded = expandedId === imob.id
   const pctDeprec = imob.percentual_depreciado ?? 0
