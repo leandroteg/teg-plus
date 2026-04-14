@@ -282,6 +282,45 @@ export default function PlanejamentoRotaModal({ isDark, solicitacoes, allSolicit
     }))
   )
 
+  // Auto-geocodificar endereços que já vêm da solicitação (sem coordenadas)
+  useEffect(() => {
+    async function geocode(endereco: string): Promise<{ lat: number; lng: number } | null> {
+      if (!endereco || endereco.length < 3) return null
+      try {
+        const res = await fetch(
+          `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(endereco)}&countrycodes=br&format=json&limit=1`,
+          { headers: { 'Accept-Language': 'pt-BR' } },
+        )
+        if (res.ok) {
+          const data = await res.json()
+          if (data[0]) return { lat: Number(data[0].lat), lng: Number(data[0].lon) }
+        }
+      } catch { /* silent */ }
+      return null
+    }
+
+    let cancelled = false
+    ;(async () => {
+      const updated = [...pontos]
+      let changed = false
+      for (let i = 0; i < updated.length; i++) {
+        if (cancelled) break
+        const p = updated[i]
+        if (p.endereco_origem && !p.lat_origem) {
+          const geo = await geocode(p.endereco_origem)
+          if (geo && !cancelled) { updated[i] = { ...updated[i], lat_origem: geo.lat, lng_origem: geo.lng }; changed = true }
+        }
+        if (p.endereco_destino && !p.lat_destino) {
+          const geo = await geocode(p.endereco_destino)
+          if (geo && !cancelled) { updated[i] = { ...updated[i], lat_destino: geo.lat, lng_destino: geo.lng }; changed = true }
+        }
+      }
+      if (changed && !cancelled) setPontos(updated)
+    })()
+    return () => { cancelled = true }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []) // Roda só na abertura do modal
+
   // Rota calculada
   const [rota, setRota] = useState<RotaCalculada | null>(null)
   const [calculando, setCalculando] = useState(false)
