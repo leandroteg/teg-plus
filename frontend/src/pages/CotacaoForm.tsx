@@ -789,18 +789,50 @@ export default function CotacaoForm() {
 
     // Itens da RC (normalizados para comparação)
     const rcItens = (cotacao?.requisicao as any)?.itens ?? []
-    const rcDescsNorm = new Set<string>(
-      rcItens.map((it: any) => toUpperNorm(String(it.descricao ?? '')).trim()).filter(Boolean)
-    )
-    // Fuzzy match: considera o item como "da RC" se a descricao normalizada
-    // contém ou está contida em alguma descricao da RC (≥5 chars em comum)
+    // Normaliza e tokeniza (palavras ≥3 chars, sem acento, uppercase)
+    const tokenize = (s: string) =>
+      toUpperNorm(String(s ?? ''))
+        .replace(/[^\w\s]/g, ' ')
+        .split(/\s+/)
+        .filter(t => t.length >= 3)
+
+    const rcTokensList: { descricao: string; tokens: Set<string> }[] = rcItens
+      .map((it: any) => ({
+        descricao: toUpperNorm(String(it.descricao ?? '')).trim(),
+        tokens: new Set(tokenize(it.descricao)),
+      }))
+      .filter((x: { descricao: string; tokens: Set<string> }) => x.descricao)
+
+    // Fuzzy match por overlap de tokens. Score = overlap / min(|tokensPDF|, |tokensRC|)
+    // Aceita quando score ≥ 0.4 E pelo menos 2 tokens em comum (ou match exato).
+    // Cada item da RC só pode ser mapeado 1x (evita duplicar).
+    const rcUsed = new Set<string>()
     const matchesRcItem = (desc: string): string | null => {
       const norm = toUpperNorm(desc).trim()
       if (!norm) return null
-      if (rcDescsNorm.has(norm)) return norm
-      for (const rcDesc of rcDescsNorm) {
-        if (rcDesc.length < 5 || norm.length < 5) continue
-        if (norm.includes(rcDesc) || rcDesc.includes(norm)) return rcDesc
+      // Match exato
+      for (const rc of rcTokensList) {
+        if (!rcUsed.has(rc.descricao) && rc.descricao === norm) {
+          rcUsed.add(rc.descricao)
+          return rc.descricao
+        }
+      }
+      const pdfTokens = new Set(tokenize(norm))
+      if (pdfTokens.size === 0) return null
+      let best: { desc: string; score: number; overlap: number } | null = null
+      for (const rc of rcTokensList) {
+        if (rcUsed.has(rc.descricao)) continue
+        if (rc.tokens.size === 0) continue
+        let overlap = 0
+        for (const t of pdfTokens) if (rc.tokens.has(t)) overlap++
+        const score = overlap / Math.min(pdfTokens.size, rc.tokens.size)
+        if (overlap >= 2 && score >= 0.4 && (!best || score > best.score)) {
+          best = { desc: rc.descricao, score, overlap }
+        }
+      }
+      if (best) {
+        rcUsed.add(best.desc)
+        return best.desc
       }
       return null
     }
