@@ -1,23 +1,21 @@
 import { useState } from 'react'
-import { CalendarDays, Fuel, AlertCircle, Radio, BarChart3 } from 'lucide-react'
+import { CalendarDays, Fuel, AlertCircle, Radio } from 'lucide-react'
 import { useTheme } from '../../../contexts/ThemeContext'
 import { useAbastecimentos, useOcorrenciasTel } from '../../../hooks/useFrotas'
 import AgendaAlocacao from './AgendaAlocacao'
 import AbastecimentosOp from './AbastecimentosOp'
 import MultasPedagios from './MultasPedagios'
 import TelemetriaOp from './TelemetriaOp'
-import Indicadores from './Indicadores'
 
 // ── Tab Config ───────────────────────────────────────────────────────────────
 
-type TabKey = 'agenda' | 'abastecimentos' | 'multas' | 'telemetria' | 'indicadores'
+type TabKey = 'agenda' | 'abastecimentos' | 'multas' | 'telemetria'
 
 const TABS: Array<{ key: TabKey; label: string }> = [
   { key: 'agenda',          label: 'Agenda'            },
   { key: 'abastecimentos',  label: 'Abastecimentos'    },
   { key: 'multas',          label: 'Multas & Pedágios' },
   { key: 'telemetria',      label: 'Telemetria'        },
-  { key: 'indicadores',     label: 'Indicadores'       },
 ]
 
 const TAB_ICONS: Record<TabKey, React.ElementType> = {
@@ -25,7 +23,6 @@ const TAB_ICONS: Record<TabKey, React.ElementType> = {
   abastecimentos: Fuel,
   multas:         AlertCircle,
   telemetria:     Radio,
-  indicadores:    BarChart3,
 }
 
 const TAB_ACCENT: Record<TabKey, {
@@ -50,11 +47,6 @@ const TAB_ACCENT: Record<TabKey, {
     bg: 'hover:bg-violet-50',    bgActive: 'bg-violet-50',
     text: 'text-violet-600',     textActive: 'text-violet-800',
     border: 'border-violet-500',
-  },
-  indicadores: {
-    bg: 'hover:bg-emerald-50',   bgActive: 'bg-emerald-50',
-    text: 'text-emerald-600',    textActive: 'text-emerald-800',
-    border: 'border-emerald-500',
   },
 }
 
@@ -81,11 +73,6 @@ const TAB_ACCENT_DARK: Record<TabKey, {
     text: 'text-violet-400',       textActive: 'text-violet-200',
     border: 'border-violet-500/40',
   },
-  indicadores: {
-    bg: 'hover:bg-emerald-500/10', bgActive: 'bg-emerald-500/15',
-    text: 'text-emerald-400',      textActive: 'text-emerald-200',
-    border: 'border-emerald-500/40',
-  },
 }
 
 const COMPS: Record<TabKey, React.ComponentType> = {
@@ -93,7 +80,6 @@ const COMPS: Record<TabKey, React.ComponentType> = {
   abastecimentos: AbastecimentosOp,
   multas:         MultasPedagios,
   telemetria:     TelemetriaOp,
-  indicadores:    Indicadores,
 }
 
 // ── Component ────────────────────────────────────────────────────────────────
@@ -108,7 +94,6 @@ export default function OperacaoHub() {
     abastecimentos: abastecimentos.length,
     multas: ocorrencias.length,
     telemetria: 0,
-    indicadores: 0,
   }
   const Comp = COMPS[active] ?? AgendaAlocacao
 
