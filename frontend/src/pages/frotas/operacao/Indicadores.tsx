@@ -6,6 +6,8 @@ import {
   useMultas,
   useAbastecimentos,
   useOrdensServico,
+  useFrotasCustoKm,
+  useFrotasConsumoReal,
 } from '../../../hooks/useFrotas'
 import { useTheme } from '../../../contexts/ThemeContext'
 
@@ -114,6 +116,23 @@ export default function Indicadores() {
   const { data: abastecimentos = [] } = useAbastecimentos({ mes: mesAtual })
   const { data: ordens = [] }      = useOrdensServico({ status: 'concluida' })
 
+  // Custo/km & consumo via RPCs
+  const inicioMes = `${mesAtual}-01`
+  const fimMes = (() => {
+    const [y, m] = mesAtual.split('-').map(Number)
+    const last = new Date(y, m, 0)
+    return `${last.getFullYear()}-${String(last.getMonth() + 1).padStart(2, '0')}-${String(last.getDate()).padStart(2, '0')}`
+  })()
+  const { data: custoKmData = [] } = useFrotasCustoKm(inicioMes, fimMes)
+  const { data: consumoData = [] } = useFrotasConsumoReal(inicioMes, fimMes)
+
+  const custoKmMedio = custoKmData.length > 0
+    ? custoKmData.reduce((s, v) => s + v.custo_por_km, 0) / custoKmData.length
+    : 0
+  const consumoMedio = consumoData.length > 0
+    ? consumoData.reduce((s, v) => s + v.km_por_litro, 0) / consumoData.length
+    : 0
+
   // ── Derived metrics ────────────────────────────────────────────────────────
   const totalAtivos   = veiculos.filter(v => v.status !== 'baixado').length
   const disponiveis   = veiculos.filter(v => v.status === 'disponivel').length
@@ -221,6 +240,24 @@ export default function Indicadores() {
           sub="requer atenção"
           accent={preventivasVencidas > 0 ? 'border-l-red-500' : 'border-l-slate-400'}
           alert={preventivasVencidas > 0}
+          isLight={isLight}
+        />
+      </div>
+
+      {/* KPI Grid — Row 3: Custo/km e Consumo */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <KpiCard
+          label="Custo/km Médio"
+          value={custoKmMedio.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 2 })}
+          sub={`${custoKmData.length} veículo(s) analisados`}
+          accent="border-l-fuchsia-500"
+          isLight={isLight}
+        />
+        <KpiCard
+          label="Consumo Médio"
+          value={`${consumoMedio.toFixed(2)} km/l`}
+          sub={`${consumoData.length} veículo(s) com dados`}
+          accent="border-l-cyan-500"
           isLight={isLight}
         />
       </div>

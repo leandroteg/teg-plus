@@ -14,6 +14,8 @@ import type {
   FroAlocacao, FroMulta, FroChecklistTemplate, FroChecklistExecucao, FroAcessorio,
   FroChecklistFoto,
   StatusAlocacao, TipoMulta, StatusMulta, TipoChecklist2,
+  FrotasCustoKm, FrotasConsumoReal, ScoreMotorista,
+  FroIntervaloPreventiva, FroItemManutencao,
 } from '../types/frotas'
 
 // ── Veículos ──────────────────────────────────────────────────────────────────
@@ -832,6 +834,138 @@ export function useSalvarChecklistExecucaoItens() {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['fro_checklist_execucoes'] })
+    },
+  })
+}
+
+// ── Indicadores avançados (RPCs) ─────────────────────────────────────────────
+
+export function useFrotasCustoKm(inicio?: string, fim?: string) {
+  return useQuery<FrotasCustoKm[]>({
+    queryKey: ['frotas_custo_km', inicio, fim],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc('rpc_frotas_custo_por_km', {
+        p_inicio: inicio!, p_fim: fim!
+      })
+      if (error) throw error
+      return (data ?? []) as FrotasCustoKm[]
+    },
+    enabled: !!inicio && !!fim,
+  })
+}
+
+export function useFrotasConsumoReal(inicio?: string, fim?: string) {
+  return useQuery<FrotasConsumoReal[]>({
+    queryKey: ['frotas_consumo_real', inicio, fim],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc('rpc_frotas_consumo_real', {
+        p_inicio: inicio!, p_fim: fim!
+      })
+      if (error) throw error
+      return (data ?? []) as FrotasConsumoReal[]
+    },
+    enabled: !!inicio && !!fim,
+  })
+}
+
+export function useScoreMotoristas(inicio?: string, fim?: string) {
+  return useQuery<ScoreMotorista[]>({
+    queryKey: ['frotas_score_motoristas', inicio, fim],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc('rpc_frotas_score_motorista', {
+        p_inicio: inicio!, p_fim: fim!
+      })
+      if (error) throw error
+      return (data ?? []) as ScoreMotorista[]
+    },
+    enabled: !!inicio && !!fim,
+  })
+}
+
+// ── Itens de Manutenção ─────────────────────────────────────────────────────
+
+export function useIntervalosPreventiva() {
+  return useQuery<FroIntervaloPreventiva[]>({
+    queryKey: ['fro_intervalos_preventiva'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('fro_intervalos_preventiva')
+        .select('*')
+        .order('intervalo_km', { ascending: true })
+      if (error) throw error
+      return data as FroIntervaloPreventiva[]
+    },
+  })
+}
+
+export function useItensManutencao(veiculoId?: string) {
+  return useQuery<FroItemManutencao[]>({
+    queryKey: ['fro_itens_manutencao', veiculoId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('fro_itens_manutencao')
+        .select('*')
+        .eq('veiculo_id', veiculoId!)
+        .order('tipo_item')
+      if (error) throw error
+      return data as FroItemManutencao[]
+    },
+    enabled: !!veiculoId,
+  })
+}
+
+export function useRegistrarTroca() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ veiculoId, tipoItem, kmAtual, data, observacoes }: {
+      veiculoId: string; tipoItem: string; kmAtual: number; data: string; observacoes?: string
+    }) => {
+      // Buscar intervalo padrão
+      const { data: intervalos } = await supabase
+        .from('fro_intervalos_preventiva')
+        .select('intervalo_km')
+        .eq('tipo_item', tipoItem)
+        .single()
+      const intervalo = intervalos?.intervalo_km ?? 10000
+      const { error } = await supabase.from('fro_itens_manutencao').upsert({
+        veiculo_id: veiculoId,
+        tipo_item: tipoItem,
+        km_ultima_troca: kmAtual,
+        data_ultima_troca: data,
+        km_proxima_troca: kmAtual + intervalo,
+        observacoes: observacoes || null,
+        updated_at: new Date().toISOString(),
+      }, { onConflict: 'veiculo_id,tipo_item' })
+      if (error) throw error
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['fro_itens_manutencao'] })
+    },
+  })
+}
+
+export function useInicializarItensVeiculo() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (veiculoId: string) => {
+      const tipos = [
+        'oleo_motor', 'filtro_oleo', 'filtro_ar', 'pneus', 'bateria',
+        'freios_pastilhas', 'suspensao', 'correia_dentada', 'fluido_freio',
+      ]
+      // Buscar intervalos
+      const { data: intervalos } = await supabase.from('fro_intervalos_preventiva').select('*')
+      const intMap = new Map((intervalos ?? []).map(i => [i.tipo_item, i.intervalo_km]))
+      const rows = tipos.map(t => ({
+        veiculo_id: veiculoId,
+        tipo_item: t,
+        km_ultima_troca: 0,
+        km_proxima_troca: intMap.get(t) ?? 10000,
+      }))
+      const { error } = await supabase.from('fro_itens_manutencao').upsert(rows, { onConflict: 'veiculo_id,tipo_item' })
+      if (error) throw error
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['fro_itens_manutencao'] })
     },
   })
 }

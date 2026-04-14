@@ -1,12 +1,15 @@
-import { useMemo } from 'react'
+import { useMemo, useState, lazy, Suspense } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   Car, AlertTriangle, Wrench, RefreshCw, TrendingUp, ArrowRight,
-  FileWarning, ShieldAlert,
+  FileWarning, ShieldAlert, ChevronDown,
 } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
 import { useFrotasKPIs, useOrdensServico, useVeiculos } from '../../hooks/useFrotas'
 import type { FrotasKPIs } from '../../types/frotas'
+
+const IndicadoresFrota = lazy(() => import('./paineis/IndicadoresFrota'))
+const PainelMotoristas = lazy(() => import('./paineis/PainelMotoristas'))
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 const BRL = (v: number) =>
@@ -100,6 +103,7 @@ function HorizontalStatusBar({ title, segments, emptyLabel, isDark }: {
 export default function FrotasHome() {
   const nav = useNavigate()
   const { isDark } = useTheme()
+  const [painelAtivo, setPainelAtivo] = useState<'painel' | 'indicadores' | 'motoristas'>('painel')
   const { data: kpis, isLoading, refetch } = useFrotasKPIs()
   const { data: osAbertas = [] } = useOrdensServico({
     status: ['aberta', 'em_cotacao', 'aguardando_aprovacao', 'aprovada', 'em_execucao'],
@@ -170,17 +174,48 @@ export default function FrotasHome() {
     <div className="space-y-4 p-4">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <div>
-          <h1 className={`text-xl font-extrabold flex items-center gap-2 ${txt}`}>
-            <Car size={22} className="text-rose-500" /> Painel de Frotas
-          </h1>
-          <p className={`text-xs mt-0.5 ${txtMuted}`}>Gestão da frota, manutenções e disponibilidade</p>
+        <div className="flex items-center gap-3">
+          <div>
+            <h1 className={`text-xl font-extrabold flex items-center gap-2 ${txt}`}>
+              <Car size={22} className="text-rose-500" /> Painel de Frotas
+            </h1>
+            <p className={`text-xs mt-0.5 ${txtMuted}`}>Gestão da frota, manutenções e disponibilidade</p>
+          </div>
+          <div className="relative">
+            <select
+              value={painelAtivo}
+              onChange={e => setPainelAtivo(e.target.value as 'painel' | 'indicadores' | 'motoristas')}
+              className={`appearance-none text-xs font-semibold rounded-lg pl-3 pr-7 py-1.5 cursor-pointer border transition-all ${
+                isDark
+                  ? 'bg-white/[0.06] border-white/[0.1] text-slate-300 hover:bg-white/[0.1]'
+                  : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'
+              }`}
+            >
+              <option value="painel">Painel</option>
+              <option value="indicadores">Indicadores</option>
+              <option value="motoristas">Motoristas</option>
+            </select>
+            <ChevronDown size={12} className={`absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none ${txtMuted}`} />
+          </div>
         </div>
         <button onClick={() => refetch()} className={`p-2 rounded-lg transition-all ${isDark ? 'hover:bg-white/[0.06] text-slate-500' : 'hover:bg-slate-100 text-slate-400'}`}>
           <RefreshCw size={16} />
         </button>
       </div>
 
+      {painelAtivo === 'indicadores' && (
+        <Suspense fallback={<div className="flex items-center justify-center py-20"><div className="w-8 h-8 border-[3px] border-rose-500 border-t-transparent rounded-full animate-spin" /></div>}>
+          <IndicadoresFrota />
+        </Suspense>
+      )}
+
+      {painelAtivo === 'motoristas' && (
+        <Suspense fallback={<div className="flex items-center justify-center py-20"><div className="w-8 h-8 border-[3px] border-rose-500 border-t-transparent rounded-full animate-spin" /></div>}>
+          <PainelMotoristas />
+        </Suspense>
+      )}
+
+      {painelAtivo === 'painel' && (<>
       {/* Hero 2 colunas */}
       <div className="grid grid-cols-1 xl:grid-cols-[1.52fr_0.88fr] gap-3 items-stretch">
         {/* Núcleo da Frota */}
@@ -331,6 +366,7 @@ export default function FrotasHome() {
           )}
         </div>
       </div>
+      </>)}
     </div>
   )
 }
