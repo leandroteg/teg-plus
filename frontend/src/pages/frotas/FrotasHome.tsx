@@ -2,10 +2,10 @@ import { useMemo, useState, lazy, Suspense } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   Car, AlertTriangle, Wrench, RefreshCw, TrendingUp, ArrowRight,
-  FileWarning, ShieldAlert, ChevronDown,
+  FileWarning, ShieldAlert, ChevronDown, Settings2,
 } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
-import { useFrotasKPIs, useOrdensServico, useVeiculos } from '../../hooks/useFrotas'
+import { useFrotasKPIs, useOrdensServico, useVeiculos, useItensManutencaoTodos } from '../../hooks/useFrotas'
 import type { FrotasKPIs } from '../../types/frotas'
 
 const IndicadoresFrota = lazy(() => import('./paineis/IndicadoresFrota'))
@@ -109,6 +109,33 @@ export default function FrotasHome() {
     status: ['aberta', 'em_cotacao', 'aguardando_aprovacao', 'aprovada', 'em_execucao'],
   })
   const { data: veiculos = [] } = useVeiculos()
+  const { data: todosItensManut = [] } = useItensManutencaoTodos()
+
+  // Manutenções vencendo/vencidas
+  const manutAlertas = useMemo(() => {
+    const result: Array<{ placa: string; marca: string; modelo: string; item: string; restante: number; vencido: boolean }> = []
+    for (const it of todosItensManut) {
+      const km = (it as Record<string, unknown>).hodometro_atual as number ?? 0
+      const proxima = it.km_proxima_troca ?? 0
+      const restante = proxima - km
+      if (restante <= 2000) {
+        const LABELS: Record<string, string> = {
+          oleo_motor: 'Óleo', filtro_oleo: 'Filtro Óleo', filtro_ar: 'Filtro Ar',
+          pneus: 'Pneus', bateria: 'Bateria', freios_pastilhas: 'Freios',
+          suspensao: 'Suspensão', correia_dentada: 'Correia', fluido_freio: 'Fluido Freio',
+        }
+        result.push({
+          placa: it.placa ?? '', marca: it.marca ?? '', modelo: it.modelo ?? '',
+          item: LABELS[it.tipo_item] ?? it.tipo_item,
+          restante, vencido: restante <= 0,
+        })
+      }
+    }
+    return result.sort((a, b) => a.restante - b.restante).slice(0, 8)
+  }, [todosItensManut])
+
+  const totalManutVencidas = manutAlertas.filter(m => m.vencido).length
+  const totalManutEmBreve = manutAlertas.filter(m => !m.vencido).length
 
   const cardClass = isDark ? 'bg-[#1e293b] border border-white/[0.06]' : 'bg-white border border-slate-200'
   const txt = isDark ? 'text-white' : 'text-slate-800'
@@ -254,17 +281,25 @@ export default function FrotasHome() {
                   O que exige ação agora
                 </h2>
               </div>
-              <div className={`w-8 h-8 rounded-xl flex items-center justify-center ${(k?.preventivas_vencidas ?? 0) > 0 ? 'bg-red-50' : isDark ? 'bg-white/5' : 'bg-slate-50'}`}>
-                <AlertTriangle size={14} className={(k?.preventivas_vencidas ?? 0) > 0 || (k?.os_criticas ?? 0) > 0 ? 'text-red-500' : 'text-slate-400'} />
+              <div className={`w-8 h-8 rounded-xl flex items-center justify-center ${(totalManutVencidas > 0 || (k?.os_criticas ?? 0) > 0) ? 'bg-red-50' : isDark ? 'bg-white/5' : 'bg-slate-50'}`}>
+                <Settings2 size={14} className={(totalManutVencidas > 0 || (k?.os_criticas ?? 0) > 0) ? 'text-red-500' : 'text-slate-400'} />
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-2 flex-1">
+            <div className="grid grid-cols-3 gap-2 flex-1">
               <MiniInfoCard
-                label="Preventivas Vencidas"
-                value={k?.preventivas_vencidas ?? 0}
-                note="atenção imediata"
+                label="Manut. Vencidas"
+                value={totalManutVencidas}
+                note="itens com troca atrasada"
                 icon={AlertTriangle}
-                iconTone={(k?.preventivas_vencidas ?? 0) > 0 ? 'text-red-500' : 'text-slate-400'}
+                iconTone={totalManutVencidas > 0 ? 'text-red-500' : 'text-slate-400'}
+                isDark={isDark}
+              />
+              <MiniInfoCard
+                label="Manut. Em Breve"
+                value={totalManutEmBreve}
+                note="próximos 2.000 km"
+                icon={Settings2}
+                iconTone={totalManutEmBreve > 0 ? 'text-amber-500' : 'text-slate-400'}
                 isDark={isDark}
               />
               <MiniInfoCard
@@ -325,41 +360,41 @@ export default function FrotasHome() {
           )}
         </div>
 
-        {/* Documentos Vencendo */}
+        {/* Manutenções Vencendo */}
         <div className={`rounded-2xl border p-4 ${bg}`}>
           <div className="flex items-center justify-between mb-3">
-            <p className={`text-sm font-bold ${txt}`}>Documentos Vencendo</p>
-            <button onClick={() => nav('/frotas/veiculos')} className="text-xs text-rose-500 hover:text-rose-600 font-semibold flex items-center gap-1">Ver todos <ArrowRight size={12} /></button>
+            <p className={`text-sm font-bold ${txt}`}>Manutenções Vencendo</p>
+            <button onClick={() => nav('/frotas/manutencao')} className="text-xs text-rose-500 hover:text-rose-600 font-semibold flex items-center gap-1">Ver todas <ArrowRight size={12} /></button>
           </div>
-          {docsVencendo.length === 0 ? (
-            <p className={`text-xs ${txtMuted}`}>Nenhum documento vencendo em breve.</p>
+          {manutAlertas.length === 0 ? (
+            <p className={`text-xs ${txtMuted}`}>Nenhuma manutenção vencendo ou vencida.</p>
           ) : (
             <div className="space-y-2">
-              {docsVencendo.map(v => (
-                <div key={v.id} className={`flex items-center justify-between gap-2 rounded-lg p-2 ${
-                  v.vencido
+              {manutAlertas.map((m, i) => (
+                <div key={i} className={`flex items-center justify-between gap-2 rounded-lg p-2 ${
+                  m.vencido
                     ? (isDark ? 'bg-red-500/5 border border-red-500/10' : 'bg-red-50 border border-red-100')
                     : (isDark ? 'bg-amber-500/5 border border-amber-500/10' : 'bg-amber-50 border border-amber-100')
                 }`}>
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-1.5">
-                      {v.vencido
+                      {m.vencido
                         ? <ShieldAlert size={11} className="text-red-500 shrink-0" />
                         : <FileWarning size={11} className="text-amber-500 shrink-0" />
                       }
                       <span className={`text-xs font-semibold truncate ${
-                        v.vencido
+                        m.vencido
                           ? (isDark ? 'text-red-300' : 'text-red-700')
                           : (isDark ? 'text-amber-300' : 'text-amber-700')
-                      }`}>{v.placa} — {v.marca} {v.modelo}</span>
+                      }`}>{m.placa} — {m.marca} {m.modelo}</span>
                     </div>
-                    <p className={`text-[10px] ${txtMuted}`}>{v.docs.join(' · ')}</p>
+                    <p className={`text-[10px] ${txtMuted}`}>{m.item} · {m.restante <= 0 ? `${Math.abs(m.restante).toLocaleString('pt-BR')} km atrasado` : `faltam ${m.restante.toLocaleString('pt-BR')} km`}</p>
                   </div>
                   <span className={`shrink-0 text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                    v.vencido
+                    m.vencido
                       ? (isDark ? 'bg-red-500/15 text-red-300' : 'bg-red-100 text-red-700')
                       : (isDark ? 'bg-amber-500/15 text-amber-300' : 'bg-amber-100 text-amber-700')
-                  }`}>{v.vencido ? 'Vencido' : 'Vencendo'}</span>
+                  }`}>{m.vencido ? 'Vencido' : 'Em breve'}</span>
                 </div>
               ))}
             </div>

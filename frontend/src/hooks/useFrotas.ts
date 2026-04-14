@@ -1015,6 +1015,25 @@ export function useHodometroEfetivo(veiculoId?: string, hodometroCadastro = 0) {
   })
 }
 
+// Todos os itens de manutenção (pra painel de alertas)
+export function useItensManutencaoTodos() {
+  return useQuery<(FroItemManutencao & { placa?: string; marca?: string; modelo?: string })[]>({
+    queryKey: ['fro_itens_manutencao', '__todos__'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('fro_itens_manutencao')
+        .select('*, veiculo:fro_veiculos!veiculo_id(placa, marca, modelo, hodometro_atual)')
+        .order('km_proxima_troca', { ascending: true })
+      if (error) throw error
+      return (data ?? []).map((d: Record<string, unknown>) => {
+        const v = d.veiculo as Record<string, unknown> | null
+        return { ...d, placa: v?.placa as string, marca: v?.marca as string, modelo: v?.modelo as string, hodometro_atual: v?.hodometro_atual as number }
+      }) as (FroItemManutencao & { placa?: string; marca?: string; modelo?: string; hodometro_atual?: number })[]
+    },
+    staleTime: 60_000,
+  })
+}
+
 export function useItensManutencao(veiculoId?: string) {
   return useQuery<FroItemManutencao[]>({
     queryKey: ['fro_itens_manutencao', veiculoId],
