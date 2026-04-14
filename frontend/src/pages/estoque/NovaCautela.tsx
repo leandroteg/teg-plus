@@ -514,8 +514,8 @@ export default function NovaCautela() {
         </button>
       </div>
 
-      {/* Fixed bottom bar on mobile */}
-      <div className="fixed bottom-0 left-0 right-0 sm:hidden z-30 p-3 bg-white/95 dark:bg-[#0f172a]/95 backdrop-blur-sm border-t border-slate-200 dark:border-white/[0.06]">
+      {/* Fixed bottom bar on mobile — above bottom nav (bottom-16) */}
+      <div className="fixed bottom-16 left-0 right-0 sm:hidden z-30 p-3 bg-white/95 dark:bg-[#0f172a]/95 backdrop-blur-sm border-t border-slate-200 dark:border-white/[0.06]">
         <button
           onClick={handleSubmit}
           disabled={!canSubmit || submitting}
