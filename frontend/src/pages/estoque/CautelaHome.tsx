@@ -1,7 +1,8 @@
 import { useState, useMemo } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import {
   Search, X, HandHelping, Package2, AlertTriangle, Clock,
-  LayoutList, LayoutGrid, ArrowUp, ArrowDown, Plus,
+  LayoutList, LayoutGrid, ArrowUp, ArrowDown, Plus, Users, History,
 } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
 import { useAuth } from '../../contexts/AuthContext'
@@ -12,260 +13,140 @@ import type { Cautela, StatusCautela } from '../../types/cautela'
 type Tab = 'minhas' | 'equipe' | 'historico'
 type SortField = 'data' | 'status' | 'obra'
 type SortDir = 'asc' | 'desc'
-type ViewMode = 'list' | 'cards'
+type ViewMode = 'cards' | 'list'
 
 const SORT_OPTIONS: { field: SortField; label: string }[] = [
-  { field: 'data',   label: 'Data' },
-  { field: 'status', label: 'Status' },
-  { field: 'obra',   label: 'Obra' },
+  { field: 'data', label: 'Data' }, { field: 'status', label: 'Status' }, { field: 'obra', label: 'Obra' },
 ]
 
-const ACTIVE_STATUSES: StatusCautela[] = [
-  'rascunho', 'pendente_aprovacao', 'aprovada', 'em_separacao', 'retirada', 'parcial_devolvida',
+const TAB_CONFIG: { key: Tab; label: string; icon: typeof HandHelping }[] = [
+  { key: 'minhas', label: 'Minhas', icon: Package2 },
+  { key: 'equipe', label: 'Equipe', icon: Users },
+  { key: 'historico', label: 'Histórico', icon: History },
 ]
+
+type AccentSet = { bg: string; bgActive: string; text: string; textActive: string; dot: string; badge: string; border: string }
+const TAB_ACCENT: Record<Tab, AccentSet> = {
+  minhas:    { bg:'bg-teal-50',    bgActive:'bg-teal-100',    text:'text-teal-500',    textActive:'text-teal-800',    dot:'bg-teal-500',    badge:'bg-teal-200/80 text-teal-700',    border:'border-teal-200' },
+  equipe:    { bg:'bg-blue-50',    bgActive:'bg-blue-100',    text:'text-blue-500',    textActive:'text-blue-800',    dot:'bg-blue-500',    badge:'bg-blue-200/80 text-blue-700',    border:'border-blue-200' },
+  historico: { bg:'bg-slate-50',   bgActive:'bg-slate-100',   text:'text-slate-500',   textActive:'text-slate-800',   dot:'bg-slate-400',   badge:'bg-slate-200/80 text-slate-600',   border:'border-slate-200' },
+}
+const TAB_ACCENT_DARK: Record<Tab, AccentSet> = {
+  minhas:    { bg:'bg-teal-500/5',  bgActive:'bg-teal-500/15',  text:'text-teal-400',  textActive:'text-teal-200',  dot:'bg-teal-400',  badge:'bg-teal-500/15 text-teal-300',  border:'border-teal-500/20' },
+  equipe:    { bg:'bg-blue-500/5',  bgActive:'bg-blue-500/15',  text:'text-blue-400',  textActive:'text-blue-200',  dot:'bg-blue-400',  badge:'bg-blue-500/15 text-blue-300',  border:'border-blue-500/20' },
+  historico: { bg:'bg-white/[0.02]',bgActive:'bg-white/[0.06]', text:'text-slate-500',  textActive:'text-slate-200', dot:'bg-slate-500', badge:'bg-white/[0.06] text-slate-400', border:'border-white/[0.08]' },
+}
+
+const ACTIVE_STATUSES: StatusCautela[] = ['rascunho', 'pendente_aprovacao', 'aprovada', 'em_separacao', 'retirada', 'parcial_devolvida']
 const HISTORY_STATUSES: StatusCautela[] = ['devolvida', 'vencida', 'cancelada']
 
 export default function CautelaHome() {
-  const { isLight } = useTheme()
+  const { isLightSidebar: isLight } = useTheme()
   const isDark = !isLight
   const { perfil } = useAuth()
   const userId = perfil?.id
+  const [searchParams, setSearchParams] = useSearchParams()
 
-  const [tab, setTab] = useState<Tab>('minhas')
-  const [search, setSearch] = useState('')
+  const [tab, setTab] = useState<Tab>(() => (searchParams.get('tab') as Tab) || 'minhas')
+  const [busca, setBusca] = useState('')
   const [sortField, setSortField] = useState<SortField>('data')
   const [sortDir, setSortDir] = useState<SortDir>('desc')
   const [viewMode, setViewMode] = useState<ViewMode>('cards')
 
-  // Data fetching
   const { data: minhas = [], isLoading: loadMinhas } = useMinhasCautelas(userId)
   const { data: todas = [], isLoading: loadTodas } = useCautelas()
   const { data: kpis } = useCautelaKPIs(userId)
 
-  // Derived lists
-  const equipe = useMemo(() =>
-    todas.filter(c => ACTIVE_STATUSES.includes(c.status)),
-    [todas]
-  )
-  const historico = useMemo(() =>
-    todas.filter(c => HISTORY_STATUSES.includes(c.status)),
-    [todas]
-  )
+  const equipe = useMemo(() => todas.filter(c => ACTIVE_STATUSES.includes(c.status)), [todas])
+  const historico = useMemo(() => todas.filter(c => HISTORY_STATUSES.includes(c.status)), [todas])
+  const counts: Record<Tab, number> = { minhas: minhas.length, equipe: equipe.length, historico: historico.length }
 
   const currentList = tab === 'minhas' ? minhas : tab === 'equipe' ? equipe : historico
   const isLoading = tab === 'minhas' ? loadMinhas : loadTodas
 
-  // Search + sort
-  const filtered = useMemo(() => {
-    let list = [...currentList]
-    if (search) {
-      const s = search.toLowerCase()
-      list = list.filter(c =>
-        (c.numero ?? '').toLowerCase().includes(s) ||
-        (c.obra_nome ?? '').toLowerCase().includes(s) ||
-        (c.solicitante_nome ?? '').toLowerCase().includes(s) ||
-        c.itens?.some(i =>
-          (i.item?.descricao ?? '').toLowerCase().includes(s) ||
-          (i.descricao_livre ?? '').toLowerCase().includes(s)
-        )
-      )
-    }
-    list.sort((a, b) => {
-      let cmp = 0
-      if (sortField === 'data') cmp = (a.criado_em ?? '').localeCompare(b.criado_em ?? '')
-      if (sortField === 'status') cmp = (a.status ?? '').localeCompare(b.status ?? '')
-      if (sortField === 'obra') cmp = (a.obra_nome ?? '').localeCompare(b.obra_nome ?? '')
-      return sortDir === 'desc' ? -cmp : cmp
-    })
-    return list
-  }, [currentList, search, sortField, sortDir])
-
-  // Styles
-  const bg = isDark ? 'bg-[#0f172a]' : 'bg-slate-50'
-  const cardBg = isDark ? 'bg-white/[0.04] border-white/[0.06]' : 'bg-white border-slate-200'
-  const txtMain = isDark ? 'text-white' : 'text-slate-800'
-  const txtMuted = isDark ? 'text-slate-400' : 'text-slate-500'
-  const inputBg = isDark ? 'bg-white/[0.06] text-white placeholder:text-slate-500 border-white/[0.08]' : 'bg-white text-slate-800 placeholder:text-slate-400 border-slate-200'
-
+  const switchTab = (t: Tab) => {
+    setTab(t); setBusca('')
+    setSearchParams(p => { p.set('tab', t); return p }, { replace: true })
+  }
   const toggleSort = (field: SortField) => {
     if (sortField === field) setSortDir(d => d === 'asc' ? 'desc' : 'asc')
     else { setSortField(field); setSortDir('desc') }
   }
 
+  const filtered = useMemo(() => {
+    let list = [...currentList]
+    if (busca) { const q = busca.toLowerCase(); list = list.filter(c => [c.numero, c.obra_nome, c.solicitante_nome].some(v => v?.toLowerCase().includes(q))) }
+    list.sort((a, b) => {
+      let c = 0
+      if (sortField === 'data') c = (a.criado_em ?? '').localeCompare(b.criado_em ?? '')
+      else if (sortField === 'status') c = (a.status ?? '').localeCompare(b.status ?? '')
+      else c = (a.obra_nome ?? '').localeCompare(b.obra_nome ?? '')
+      return sortDir === 'desc' ? -c : c
+    })
+    return list
+  }, [currentList, busca, sortField, sortDir])
+
+  if (isLoading) return <div className="flex justify-center py-12"><div className="w-6 h-6 border-2 border-teal-500 border-t-transparent rounded-full animate-spin" /></div>
+
   return (
-    <div className={`min-h-screen ${bg} pb-24`}>
-      <div className="max-w-3xl mx-auto px-4 pt-4 space-y-4">
+    <div className={`rounded-2xl border overflow-hidden ${isDark ? 'bg-[#0f172a] border-white/[0.06]' : 'bg-white border-slate-200'}`}>
+      {/* Header */}
+      <div className="px-4 pt-4 pb-2">
+        <h1 className={`text-lg font-extrabold ${isDark ? 'text-white' : 'text-slate-900'}`}>Cautelas</h1>
+        <p className={`text-xs mt-0.5 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Retirada e devolução de materiais</p>
+      </div>
 
-        {/* ── KPI Cards ── */}
-        <div className="flex gap-3 overflow-x-auto pb-1 -mx-4 px-4 scrollbar-hide">
-          <KPICard
-            label="Itens comigo"
-            value={kpis?.itens_comigo ?? 0}
-            color="teal"
-            icon={Package2}
-            isDark={isDark}
-          />
-          <KPICard
-            label="Vencidas"
-            value={kpis?.vencidas ?? 0}
-            color="red"
-            icon={AlertTriangle}
-            isDark={isDark}
-            pulse={!!kpis?.vencidas && kpis.vencidas > 0}
-          />
-          <KPICard
-            label="Devolver hoje"
-            value={kpis?.devolver_hoje ?? 0}
-            color="amber"
-            icon={Clock}
-            isDark={isDark}
-          />
-        </div>
-
-        {/* ── Tabs ── */}
-        <div className={`flex rounded-xl border p-1 ${isDark ? 'border-white/[0.08] bg-white/[0.03]' : 'border-slate-200 bg-slate-100'}`}>
-          {([
-            { key: 'minhas' as Tab, label: 'Minhas', count: minhas.length },
-            { key: 'equipe' as Tab, label: 'Equipe', count: equipe.length },
-            { key: 'historico' as Tab, label: 'Historico', count: historico.length },
-          ]).map(t => (
-            <button
-              key={t.key}
-              onClick={() => setTab(t.key)}
-              className={`flex-1 text-center py-2 rounded-lg text-xs font-semibold transition-all ${
-                tab === t.key
-                  ? isDark
-                    ? 'bg-teal-500/20 text-teal-300'
-                    : 'bg-white text-teal-700 shadow-sm'
-                  : isDark
-                    ? 'text-slate-400 hover:text-slate-300'
-                    : 'text-slate-500 hover:text-slate-700'
-              }`}
-            >
-              {t.label}
-              {t.count > 0 && (
-                <span className={`ml-1.5 inline-flex items-center justify-center rounded-full px-1.5 py-0.5 text-[9px] font-bold ${
-                  tab === t.key
-                    ? isDark ? 'bg-teal-500/30 text-teal-200' : 'bg-teal-100 text-teal-700'
-                    : isDark ? 'bg-white/[0.08] text-slate-400' : 'bg-slate-200 text-slate-600'
-                }`}>
-                  {t.count}
-                </span>
-              )}
+      {/* Tabs */}
+      <div className={`flex gap-1 p-1 pb-2 border-b overflow-x-auto hide-scrollbar ${isDark ? 'bg-white/[0.02] border-white/[0.06]' : 'bg-slate-50 border-slate-200'}`}>
+        {TAB_CONFIG.map(t => {
+          const count = counts[t.key]
+          const isActive = tab === t.key
+          const Icon = t.icon
+          const a = isDark ? TAB_ACCENT_DARK[t.key] : TAB_ACCENT[t.key]
+          return (
+            <button key={t.key} onClick={() => switchTab(t.key)} className={`min-w-fit md:flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm whitespace-nowrap transition-all border ${isActive ? `${a.bgActive} ${a.textActive} ${a.border} font-bold shadow-sm` : `${a.bg} ${a.text} font-medium border-transparent ${isDark ? '' : 'hover:bg-white hover:shadow-sm'}`}`}>
+              <Icon size={15} className="shrink-0" /> {t.label}
+              {count > 0 && <span className={`text-[10px] font-bold rounded-full min-w-[22px] px-1.5 py-0.5 ${isActive ? a.badge : isDark ? 'bg-white/[0.06] text-slate-500' : 'bg-slate-200/80 text-slate-500'}`}>{count}</span>}
             </button>
-          ))}
+          )
+        })}
+      </div>
+
+      {/* Toolbar */}
+      <div className={`px-4 py-2.5 border-b flex flex-wrap items-center gap-2 ${isDark ? 'border-white/[0.06]' : 'border-slate-100'}`}>
+        <div className="relative flex-1 min-w-[180px] max-w-sm">
+          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+          <input type="text" value={busca} onChange={e => setBusca(e.target.value)} placeholder="Buscar cautela..."
+            className={`w-full pl-9 pr-4 py-2 rounded-xl border text-xs placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-teal-500/30 ${isDark ? 'bg-white/[0.04] border-white/[0.06] text-slate-200' : 'border-slate-200 bg-white text-slate-700'}`} />
+          {busca && <button onClick={() => setBusca('')} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"><X size={12} /></button>}
         </div>
-
-        {/* ── Search + Sort + View ── */}
-        <div className="flex items-center gap-2">
-          <div className="flex-1 relative">
-            <Search size={14} className={`absolute left-3 top-1/2 -translate-y-1/2 ${txtMuted}`} />
-            <input
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-              placeholder="Buscar cautela..."
-              className={`w-full pl-9 pr-8 py-2 rounded-lg border text-xs ${inputBg}`}
-            />
-            {search && (
-              <button onClick={() => setSearch('')} className={`absolute right-2 top-1/2 -translate-y-1/2 ${txtMuted}`}>
-                <X size={14} />
-              </button>
-            )}
-          </div>
-
-          {/* Sort */}
-          <div className="flex items-center gap-1">
-            {SORT_OPTIONS.map(opt => (
-              <button
-                key={opt.field}
-                onClick={() => toggleSort(opt.field)}
-                className={`text-[10px] font-medium px-2 py-1.5 rounded-lg flex items-center gap-0.5 transition-all ${
-                  sortField === opt.field
-                    ? isDark ? 'bg-teal-500/20 text-teal-300' : 'bg-teal-50 text-teal-700'
-                    : isDark ? 'text-slate-400 hover:bg-white/[0.04]' : 'text-slate-500 hover:bg-slate-100'
-                }`}
-              >
-                {opt.label}
-                {sortField === opt.field && (sortDir === 'asc' ? <ArrowUp size={10} /> : <ArrowDown size={10} />)}
-              </button>
-            ))}
-          </div>
-
-          {/* View toggle */}
-          <button
-            onClick={() => setViewMode(v => v === 'cards' ? 'list' : 'cards')}
-            className={`p-1.5 rounded-lg ${isDark ? 'text-slate-400 hover:bg-white/[0.04]' : 'text-slate-500 hover:bg-slate-100'}`}
-          >
-            {viewMode === 'cards' ? <LayoutList size={14} /> : <LayoutGrid size={14} />}
-          </button>
+        <div className="flex items-center gap-0.5">
+          {SORT_OPTIONS.map(opt => { const isA = sortField === opt.field; return (
+            <button key={opt.field} onClick={() => toggleSort(opt.field)} className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-medium transition-all ${isA ? isDark ? 'bg-white/[0.08] text-white' : 'bg-slate-100 text-slate-800' : isDark ? 'text-slate-500 hover:text-slate-300' : 'text-slate-400 hover:text-slate-600 hover:bg-slate-50'}`}>
+              {opt.label} {isA && (sortDir === 'asc' ? <ArrowUp size={10} /> : <ArrowDown size={10} />)}
+            </button>
+          )})}
         </div>
+        <div className={`flex items-center rounded-lg border overflow-hidden ${isDark ? 'border-white/[0.06]' : 'border-slate-200'}`}>
+          <button onClick={() => setViewMode('list')} className={`p-1.5 ${viewMode === 'list' ? isDark ? 'bg-white/[0.08] text-white' : 'bg-slate-100 text-slate-700' : isDark ? 'text-slate-500' : 'text-slate-400'}`}><LayoutList size={14} /></button>
+          <button onClick={() => setViewMode('cards')} className={`p-1.5 ${viewMode === 'cards' ? isDark ? 'bg-white/[0.08] text-white' : 'bg-slate-100 text-slate-700' : isDark ? 'text-slate-500' : 'text-slate-400'}`}><LayoutGrid size={14} /></button>
+        </div>
+        <span className={`ml-auto text-[11px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>{filtered.length} {filtered.length === 1 ? 'cautela' : 'cautelas'}</span>
+      </div>
 
-        {/* ── List ── */}
-        {isLoading ? (
-          <div className="space-y-3">
-            {[1, 2, 3].map(i => (
-              <div key={i} className={`rounded-xl border p-4 animate-pulse ${cardBg}`}>
-                <div className={`h-4 rounded w-1/3 mb-3 ${isDark ? 'bg-white/[0.06]' : 'bg-slate-200'}`} />
-                <div className={`h-3 rounded w-2/3 mb-2 ${isDark ? 'bg-white/[0.04]' : 'bg-slate-100'}`} />
-                <div className={`h-2 rounded w-1/2 ${isDark ? 'bg-white/[0.03]' : 'bg-slate-100'}`} />
-              </div>
-            ))}
-          </div>
-        ) : filtered.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-16 gap-3">
-            <HandHelping size={40} className={isDark ? 'text-slate-600' : 'text-slate-300'} />
-            <p className={`text-sm font-medium ${txtMuted}`}>
-              {search ? 'Nenhuma cautela encontrada' : tab === 'minhas' ? 'Nenhum item sob sua custodia' : 'Sem cautelas'}
-            </p>
+      {/* Content */}
+      <div className="min-h-[200px]">
+        {filtered.length === 0 ? (
+          <div className={`flex flex-col items-center justify-center py-16 ${isDark ? 'text-slate-600' : 'text-slate-300'}`}>
+            <HandHelping size={40} className="mb-3" />
+            <p className="text-sm font-medium">{busca ? 'Nenhuma cautela encontrada' : tab === 'minhas' ? 'Nenhum item sob sua custódia' : 'Sem cautelas'}</p>
           </div>
         ) : (
-          <div className={viewMode === 'cards' ? 'space-y-3' : 'space-y-2'}>
-            {filtered.map(c => (
-              <CautelaCard
-                key={c.id}
-                cautela={c}
-                isDark={isDark}
-              />
-            ))}
+          <div className="space-y-2 p-4">
+            {filtered.map(c => <CautelaCard key={c.id} cautela={c} isDark={isDark} />)}
           </div>
         )}
       </div>
-
-      {/* ── FAB: Retirar Material ── */}
-      <div className="fixed bottom-20 left-0 right-0 px-4 max-w-3xl mx-auto z-30">
-        <button className="w-full py-3 rounded-xl bg-teal-600 hover:bg-teal-700 text-white font-semibold text-sm shadow-lg shadow-teal-600/20 flex items-center justify-center gap-2 transition-all">
-          <Plus size={16} />
-          Retirar Material
-        </button>
-      </div>
-    </div>
-  )
-}
-
-// ── KPI Card ────────────────────────────────────────────────────────────────
-
-function KPICard({ label, value, color, icon: Icon, isDark, pulse }: {
-  label: string
-  value: number
-  color: string
-  icon: typeof Package2
-  isDark: boolean
-  pulse?: boolean
-}) {
-  const colorMap: Record<string, { bg: string; bgDark: string; text: string; textDark: string; icon: string }> = {
-    teal:  { bg: 'bg-teal-50',  bgDark: 'bg-teal-500/10',  text: 'text-teal-700',  textDark: 'text-teal-300',  icon: 'text-teal-500' },
-    red:   { bg: 'bg-red-50',   bgDark: 'bg-red-500/10',   text: 'text-red-700',   textDark: 'text-red-300',   icon: 'text-red-500' },
-    amber: { bg: 'bg-amber-50', bgDark: 'bg-amber-500/10', text: 'text-amber-700', textDark: 'text-amber-300', icon: 'text-amber-500' },
-  }
-  const c = colorMap[color] ?? colorMap.teal
-
-  return (
-    <div className={`shrink-0 rounded-xl border p-3 min-w-[120px] ${isDark ? `${c.bgDark} border-white/[0.06]` : `${c.bg} border-slate-200`} ${pulse ? 'animate-pulse' : ''}`}>
-      <div className="flex items-center gap-2 mb-1">
-        <Icon size={14} className={c.icon} />
-        <span className={`text-[10px] font-medium ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>{label}</span>
-      </div>
-      <p className={`text-xl font-bold ${isDark ? c.textDark : c.text}`}>{value}</p>
     </div>
   )
 }
