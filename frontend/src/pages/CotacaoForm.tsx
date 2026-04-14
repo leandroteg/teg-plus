@@ -65,10 +65,11 @@ function ItemPricingTable({
 }) {
   const [itemResults, setItemResults] = useState<Record<number, any[]>>({})
   const [itemOpen, setItemOpen] = useState<Record<number, boolean>>({})
+  const [itemQuery, setItemQuery] = useState<Record<number, string>>({})
   const itemTimerRef = useRef<Record<number, ReturnType<typeof setTimeout>>>({})
 
   // Itens da requisição que ainda não foram adicionados
-  const usedDescs = new Set(items.map(it => it.descricao.toLowerCase().trim()))
+  const usedDescs = new Set(items.map(it => it.descricao.toLowerCase().trim()).filter(Boolean))
   const availableReqItens = reqItens.filter(ri => !usedDescs.has(ri.descricao.toLowerCase().trim()))
 
   const canAddItem = availableReqItens.length > 0
@@ -78,14 +79,15 @@ function ItemPricingTable({
     onChange([...items, { descricao: '', qtd: 1, valor_unitario: 0, valor_total: 0 }])
   }
 
-  const removeItem = (i: number) => onChange(items.filter((_, idx) => idx !== i))
+  const removeItem = (i: number) => {
+    onChange(items.filter((_, idx) => idx !== i))
+    setItemQuery(prev => { const n = { ...prev }; delete n[i]; return n })
+  }
 
   const updateItem = (i: number, field: keyof ItemPreco, raw: string) => {
-    const normalizedRaw = field === 'descricao' ? toUpperNorm(raw) : raw
     const updated = items.map((item, idx) => {
       if (idx !== i) return item
-      if (field === 'descricao') return { ...item, descricao: normalizedRaw }
-      const val = parseFloat(normalizedRaw) || 0
+      const val = parseFloat(raw) || 0
       const next = { ...item, [field]: val }
       if (field === 'qtd' || field === 'valor_unitario') {
         const qtd = field === 'qtd' ? val : item.qtd
@@ -104,24 +106,23 @@ function ItemPricingTable({
     return availableReqItens.filter(ri => ri.descricao.toLowerCase().includes(q))
   }
 
+  // Busca/filtragem do autocomplete — só atualiza query local, NÃO escreve em item.descricao.
+  // A descrição só é definida via selectItem (picking do dropdown da RC), impedindo que o
+  // cotador digite itens fora do escopo aprovado.
   const searchItem = useCallback((i: number, query: string) => {
     const normalizedQuery = toUpperNorm(query)
-    updateItem(i, 'descricao', normalizedQuery)
+    setItemQuery(prev => ({ ...prev, [i]: normalizedQuery }))
     if (itemTimerRef.current[i]) clearTimeout(itemTimerRef.current[i])
 
-    // Mostra itens da requisição imediatamente (sem debounce)
     const reqMatches = filterReqItens(normalizedQuery)
-    if (normalizedQuery.trim().length < 2) {
-      // Sem query: mostra só itens da requisição
-      setItemResults(prev => ({ ...prev, [i]: reqMatches.map(ri => ({ ...ri, _fromReq: true })) }))
-      setItemOpen(prev => ({ ...prev, [i]: reqMatches.length > 0 }))
-      return
-    }
-    // Segurança: só autocompletar itens da RC — cotador não deve introduzir
-    // itens fora do escopo aprovado. Se faltar item, deve devolver ao solicitante.
     setItemResults(prev => ({ ...prev, [i]: reqMatches.map(ri => ({ ...ri, _fromReq: true })) }))
     setItemOpen(prev => ({ ...prev, [i]: reqMatches.length > 0 }))
   }, [availableReqItens])
+
+  const clearItemDescricao = (i: number) => {
+    onChange(items.map((item, idx) => idx === i ? { ...item, descricao: '' } : item))
+    setItemQuery(prev => ({ ...prev, [i]: '' }))
+  }
 
   const selectItem = useCallback((i: number, est: any) => {
     onChange(items.map((item, idx) => {
@@ -186,26 +187,35 @@ function ItemPricingTable({
               key={i}
               className="grid grid-cols-[1fr_44px_80px_68px_24px] gap-1 px-2 py-1.5 border-b border-slate-50 last:border-0 items-center"
             >
-              <div className="relative">
+              <div className="relative flex items-center gap-1">
                 <input
-                  className="text-[11px] bg-white border border-slate-200 rounded px-1.5 py-1 outline-none focus:ring-1 focus:ring-teal-300 w-full"
-                  placeholder="Descrição"
+                  className={`text-[11px] border rounded px-1.5 py-1 outline-none focus:ring-1 focus:ring-teal-300 w-full ${
+                    item.descricao ? 'bg-teal-50/60 border-teal-200 text-slate-700 cursor-default' : 'bg-white border-slate-200'
+                  }`}
+                  placeholder="Selecione um item da RC..."
                   autoComplete="off"
-                  value={item.descricao}
+                  readOnly={!!item.descricao}
+                  value={item.descricao || (itemQuery[i] ?? '')}
                   onChange={e => searchItem(i, e.target.value)}
                   onFocus={() => {
-                    // Ao focar, mostra itens da requisição mesmo sem digitar
-                    const reqMatches = filterReqItens(item.descricao)
-                    if (reqMatches.length > 0 || (item.descricao.trim().length >= 2 && (itemResults[i]?.length ?? 0) > 0)) {
-                      if (reqMatches.length > 0 && !item.descricao.trim()) {
-                        setItemResults(prev => ({ ...prev, [i]: reqMatches.map(ri => ({ ...ri, _fromReq: true })) }))
-                      }
-                      setItemOpen(prev => ({ ...prev, [i]: true }))
-                    }
+                    if (item.descricao) return
+                    const reqMatches = filterReqItens(itemQuery[i] ?? '')
+                    setItemResults(prev => ({ ...prev, [i]: reqMatches.map(ri => ({ ...ri, _fromReq: true })) }))
+                    setItemOpen(prev => ({ ...prev, [i]: reqMatches.length > 0 }))
                   }}
                   onBlur={() => setTimeout(() => setItemOpen(prev => ({ ...prev, [i]: false })), 150)}
                 />
-                {itemOpen[i] && (itemResults[i]?.length ?? 0) > 0 && (
+                {item.descricao && (
+                  <button
+                    type="button"
+                    onClick={() => clearItemDescricao(i)}
+                    title="Limpar seleção"
+                    className="flex-shrink-0 text-slate-300 hover:text-rose-500 transition"
+                  >
+                    <X size={11} />
+                  </button>
+                )}
+                {itemOpen[i] && !item.descricao && (itemResults[i]?.length ?? 0) > 0 && (
                   <div className="absolute z-50 left-0 w-72 mt-0.5 bg-white border border-slate-200 rounded-xl shadow-lg overflow-hidden max-h-56 overflow-y-auto">
                     {itemResults[i].map((est: any, ri: number) => (
                       <button
@@ -284,6 +294,11 @@ function ItemPricingTable({
         <p className="text-[10px] text-slate-400 text-center mt-1">
           Todos os itens da RC já foram adicionados. Se precisa alterar o escopo,
           use <strong className="text-rose-500">Devolver ao Solicitante</strong>.
+        </p>
+      )}
+      {items.some(it => !it.descricao.trim()) && (
+        <p className="text-[10px] text-rose-500 text-center mt-1 font-semibold">
+          Existe item sem descrição selecionada da RC. Escolha um item do dropdown ou remova a linha.
         </p>
       )}
     </div>
@@ -772,20 +787,49 @@ export default function CotacaoForm() {
       } catch { /* upload falhou, segue sem anexo */ }
     }
 
+    // Itens da RC (normalizados para comparação)
+    const rcItens = (cotacao?.requisicao as any)?.itens ?? []
+    const rcDescsNorm = new Set<string>(
+      rcItens.map((it: any) => toUpperNorm(String(it.descricao ?? '')).trim()).filter(Boolean)
+    )
+    // Fuzzy match: considera o item como "da RC" se a descricao normalizada
+    // contém ou está contida em alguma descricao da RC (≥5 chars em comum)
+    const matchesRcItem = (desc: string): string | null => {
+      const norm = toUpperNorm(desc).trim()
+      if (!norm) return null
+      if (rcDescsNorm.has(norm)) return norm
+      for (const rcDesc of rcDescsNorm) {
+        if (rcDesc.length < 5 || norm.length < 5) continue
+        if (norm.includes(rcDesc) || rcDesc.includes(norm)) return rcDesc
+      }
+      return null
+    }
+
+    let itensForaEscopo = 0
+
     setFornecedores(prev => {
       const vazios      = prev.filter(f => !f.fornecedor_nome.trim() && f.valor_total === 0)
       const preenchidos = prev.filter(f => f.fornecedor_nome.trim() || f.valor_total > 0)
 
       const novos: FornecedorForm[] = parsed.map(p => {
-        // Só inclui itens que realmente têm preço — itens sem valor são descartados
+        // Só inclui itens que têm preço E batem com algum item da RC.
+        // Itens fora do escopo são descartados (contagem vai para toast de aviso).
         const itensComValor: ItemPreco[] = (p.itens ?? [])
           .filter(it => it.valor_unitario > 0)
-          .map(it => ({
-            descricao:      toUpperNorm(it.descricao),
-            qtd:            it.qtd,
-            valor_unitario: it.valor_unitario,
-            valor_total:    Math.round(it.qtd * it.valor_unitario * 100) / 100,
-          }))
+          .map(it => {
+            const rcMatch = matchesRcItem(it.descricao)
+            if (!rcMatch) {
+              itensForaEscopo++
+              return null
+            }
+            return {
+              descricao:      rcMatch, // usa a descrição canônica da RC
+              qtd:            it.qtd,
+              valor_unitario: it.valor_unitario,
+              valor_total:    Math.round(it.qtd * it.valor_unitario * 100) / 100,
+            }
+          })
+          .filter((x): x is ItemPreco => x !== null)
         const totalItens = calcTotalItems(itensComValor)
         // Se há itens com preço → usa a soma deles; senão usa o total do documento
         const valorTotal = itensComValor.length > 0 ? totalItens : (p.valor_total || 0)
@@ -816,7 +860,14 @@ export default function CotacaoForm() {
       while (result.length < 2) result.push(emptyFornecedor())
       return result
     })
-  }, [id])
+
+    if (itensForaEscopo > 0) {
+      setToast({
+        type: 'error',
+        msg: `${itensForaEscopo} item(ns) do PDF foram ignorados por não pertencerem à RC. Para incluí-los, devolva a requisição ao solicitante.`,
+      })
+    }
+  }, [id, cotacao?.requisicao])
 
   // ── Upload de arquivo por fornecedor ──────────────────────────────────────
   const [uploading, setUploading] = useState<Record<number, boolean>>({})
@@ -885,6 +936,18 @@ export default function CotacaoForm() {
     // Validações com feedback explícito
     if (!id || !cotacao) {
       setToast({ type: 'error', msg: 'Cotação não encontrada. Recarregue a página.' })
+      return
+    }
+
+    // Segurança: bloqueia itens sem descrição da RC (cotador não pode introduzir itens fora do escopo)
+    const itensInvalidos = fornecedores.some(f =>
+      f.itens_precos.some(it => !it.descricao.trim() && (it.valor_unitario > 0 || it.qtd > 0))
+    )
+    if (itensInvalidos) {
+      setToast({
+        type: 'error',
+        msg: 'Há itens sem descrição selecionada da RC. Escolha um item do dropdown ou remova a linha antes de enviar.',
+      })
       return
     }
     if (validos.length === 0) {
