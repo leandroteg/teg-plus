@@ -3,15 +3,11 @@
 // =============================================================================
 
 export type StatusCautela =
-  | 'rascunho'
-  | 'pendente_aprovacao'
+  | 'pendente'
   | 'aprovada'
-  | 'em_separacao'
-  | 'retirada'
-  | 'parcial_devolvida'
-  | 'devolvida'
-  | 'vencida'
-  | 'cancelada'
+  | 'em_aberto'
+  | 'em_devolucao'
+  | 'encerrada'
 
 export type UrgenciaCautela = 'normal' | 'urgente' | 'emergencia'
 
@@ -104,16 +100,17 @@ export const CAUTELA_PIPELINE_STAGES: Array<{
   status: StatusCautela
   label: string
   color: string
+  bgClass: string
+  textClass: string
+  dotClass: string
+  badgeClass: string
+  borderClass: string
 }> = [
-  { status: 'rascunho',            label: 'Rascunho',       color: 'slate' },
-  { status: 'pendente_aprovacao',  label: 'Pend. Aprovacao', color: 'amber' },
-  { status: 'aprovada',            label: 'Aprovada',       color: 'blue' },
-  { status: 'em_separacao',        label: 'Em Separacao',    color: 'violet' },
-  { status: 'retirada',            label: 'Retirada',       color: 'teal' },
-  { status: 'parcial_devolvida',   label: 'Parcial',        color: 'orange' },
-  { status: 'devolvida',           label: 'Devolvida',      color: 'emerald' },
-  { status: 'vencida',             label: 'Vencida',        color: 'red' },
-  { status: 'cancelada',           label: 'Cancelada',      color: 'slate' },
+  { status: 'pendente',      label: 'Pendente',       color: 'amber',   bgClass: 'bg-amber-50',   textClass: 'text-amber-700',   dotClass: 'bg-amber-500',   badgeClass: 'bg-amber-100 text-amber-700',   borderClass: 'border-amber-200' },
+  { status: 'aprovada',      label: 'Aprovada',       color: 'blue',    bgClass: 'bg-blue-50',    textClass: 'text-blue-700',    dotClass: 'bg-blue-500',    badgeClass: 'bg-blue-100 text-blue-700',     borderClass: 'border-blue-200' },
+  { status: 'em_aberto',     label: 'Em Aberto',      color: 'teal',    bgClass: 'bg-teal-50',    textClass: 'text-teal-700',    dotClass: 'bg-teal-500',    badgeClass: 'bg-teal-100 text-teal-700',     borderClass: 'border-teal-200' },
+  { status: 'em_devolucao',  label: 'Em Devolução',   color: 'violet',  bgClass: 'bg-violet-50',  textClass: 'text-violet-700',  dotClass: 'bg-violet-500',  badgeClass: 'bg-violet-100 text-violet-700', borderClass: 'border-violet-200' },
+  { status: 'encerrada',     label: 'Encerrada',      color: 'slate',   bgClass: 'bg-slate-100',  textClass: 'text-slate-600',   dotClass: 'bg-slate-400',   badgeClass: 'bg-slate-200 text-slate-600',   borderClass: 'border-slate-300' },
 ]
 
 // ── Payload for creating cautela ────────────────────────────────────────────

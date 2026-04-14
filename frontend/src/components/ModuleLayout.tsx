@@ -1,5 +1,5 @@
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
-import { LayoutGrid, LogOut, Shield, Settings, ChevronLeft, Menu, X, User, Code2, Link2, ClipboardList, Plus } from 'lucide-react'
+import { LayoutGrid, LogOut, Shield, Settings, ChevronLeft, Menu, X, User, Code2, Link2, ClipboardList, Plus, HandHelping } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { useState, useEffect, useMemo, useRef, lazy, Suspense, createContext, useContext } from 'react'
 import { useAuth, ROLE_LABEL, ROLE_COLOR } from '../contexts/AuthContext'
@@ -665,6 +665,15 @@ export default function ModuleLayout({
           >
             <ClipboardList size={15} className="shrink-0 opacity-50" />
             Minhas Solicitações
+          </button>
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); handleAvatarNavigate('/minhas-cautelas') }}
+            className={`w-full flex items-center gap-3 px-4 py-2.5 text-[13px] font-medium transition-colors
+              ${ls ? 'text-slate-600 hover:bg-slate-50 hover:text-slate-900' : 'text-slate-300 hover:bg-white/[0.04] hover:text-white'}`}
+          >
+            <HandHelping size={15} className="shrink-0 opacity-50" />
+            Minhas Cautelas
           </button>
 
           {isAdmin && (
