@@ -1,9 +1,10 @@
 import { useMemo, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import {
   Landmark, Plus, Search, X, Save, Loader2,
   TrendingDown, AlertTriangle, CheckCircle2, Wrench, Truck,
   ArrowLeftRight, FileText, ChevronDown, ChevronRight, RefreshCw,
-  LayoutGrid, LayoutList, MapPin,
+  LayoutGrid, LayoutList, MapPin, QrCode,
 } from 'lucide-react'
 import {
   useImobilizados, useSalvarImobilizado, useBaixarImobilizado,
@@ -54,6 +55,7 @@ export default function Patrimonial({
   hideHeader = false,
 }: PatrimonialProps) {
   const { isLightSidebar: isLight } = useTheme()
+  const nav = useNavigate()
   const [busca, setBusca] = useState('')
   const [statusFiltro, setStatusFiltro] = useState<string>('')
   const [showForm, setShowForm] = useState(false)
@@ -493,6 +495,13 @@ function ImobilizadoCard({
             <span className={`text-[10px] ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>{pctDeprec}%</span>
           </div>
         </div>
+        <button
+          onClick={e => { e.stopPropagation(); nav(`/p/${imob.numero_patrimonio}`) }}
+          className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 transition-colors ${isLight ? 'text-indigo-400 hover:bg-indigo-50 hover:text-indigo-600' : 'text-indigo-400 hover:bg-indigo-500/10'}`}
+          title="Ficha do ativo (QR Code)"
+        >
+          <QrCode size={16} />
+        </button>
         {isExpanded ? <ChevronDown size={16} className="text-slate-400 shrink-0" /> : <ChevronRight size={16} className="text-slate-400 shrink-0" />}
       </div>
 
@@ -526,6 +535,7 @@ function ImobilizadoTableRow({
   onTransferir: () => void
   isLight: boolean
 }) {
+  const nav = useNavigate()
   const cfg = STATUS_CONFIG[imob.status]
   const pctDeprec = imob.percentual_depreciado ?? 0
   const isExpanded = expandedId === imob.id
@@ -583,6 +593,14 @@ function ImobilizadoTableRow({
         </td>
       <td className="px-4 py-2">
           <div className="flex items-center justify-end gap-2">
+            <button
+              type="button"
+              onClick={() => nav(`/p/${imob.numero_patrimonio}`)}
+              className={`w-7 h-7 rounded-lg flex items-center justify-center transition-colors ${isLight ? 'text-indigo-400 hover:bg-indigo-50' : 'text-indigo-400 hover:bg-indigo-500/10'}`}
+              title="Ficha QR"
+            >
+              <QrCode size={14} />
+            </button>
             <button
               type="button"
               onClick={() => setExpandedId(isExpanded ? null : imob.id)}
