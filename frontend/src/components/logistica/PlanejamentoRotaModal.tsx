@@ -10,6 +10,8 @@ import type { LogSolicitacao } from '../../types/logistica'
 import { MapContainer, TileLayer, Marker, Popup, Polyline, useMap } from 'react-leaflet'
 import * as L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
+import { serializeViagemRotaPayload } from '../../utils/logisticaViagem'
+import { UpperInput } from '../UpperInput'
 
 // Fix leaflet default icon issue
 try {
@@ -150,7 +152,6 @@ function EnderecoInput({
       const isCep = /^\d{5}-?\d{0,3}$/.test(query.replace(/\s/g, ''))
 
       if (isCep) {
-        // BrasilAPI pra CEP
         const limpo = query.replace(/\D/g, '')
         if (limpo.length >= 8) {
           const res = await fetch(`https://brasilapi.com.br/api/cep/v2/${limpo}`, { signal: AbortSignal.timeout(8000) })
@@ -158,20 +159,14 @@ function EnderecoInput({
             const d = await res.json()
             const sug: EnderecoSugestao = {
               descricao: `${d.street || ''}, ${d.neighborhood || ''}, ${d.city} - ${d.state}`.replace(/^, /, ''),
-              logradouro: d.street,
-              bairro: d.neighborhood,
-              cidade: d.city,
-              uf: d.state,
-              cep: d.cep,
-              lat: d.location?.coordinates?.latitude,
-              lng: d.location?.coordinates?.longitude,
+              logradouro: d.street, bairro: d.neighborhood, cidade: d.city, uf: d.state, cep: d.cep,
+              lat: d.location?.coordinates?.latitude, lng: d.location?.coordinates?.longitude,
             }
             setSugestoes([sug])
             setOpen(true)
           }
         }
       } else {
-        // Nominatim (OpenStreetMap) pra autocomplete de endereço
         const res = await fetch(
           `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&countrycodes=br&format=json&addressdetails=1&limit=5`,
           { signal: AbortSignal.timeout(8000), headers: { 'Accept-Language': 'pt-BR' } },
@@ -185,10 +180,8 @@ function EnderecoInput({
               logradouro: addr?.road || addr?.pedestrian || '',
               bairro: addr?.suburb || addr?.neighbourhood || '',
               cidade: addr?.city || addr?.town || addr?.municipality || '',
-              uf: addr?.state || '',
-              cep: addr?.postcode || '',
-              lat: Number(r.lat),
-              lng: Number(r.lon),
+              uf: addr?.state || '', cep: addr?.postcode || '',
+              lat: Number(r.lat), lng: Number(r.lon),
             }
           })
           setSugestoes(resultados)
@@ -239,7 +232,58 @@ function EnderecoInput({
         </div>
       </div>
 
-      {/* Dropdown */}
+      {mode === 'endereco' ? (
+        <div className="relative">
+          <UpperInput
+            type="text"
+            value={value}
+            onChange={e => handleEnderecoChange(e.target.value)}
+            onFocus={() => sugestoes.length > 0 && setOpen(true)}
+            placeholder="Rua, Av, Cidade... (autocomplete)"
+            className={inputClass}
+          />
+          <button type="button"
+            onClick={() => { if (value.length >= 3) buscarEndereco(value) }}
+            disabled={loading || value.length < 3}
+            className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded-lg transition-all disabled:opacity-30 hover:bg-orange-100 dark:hover:bg-orange-500/20">
+            {loading ? (
+              <Loader2 size={14} className="animate-spin text-orange-500" />
+            ) : (
+              <Search size={13} className={`${isDark ? 'text-slate-500 hover:text-orange-400' : 'text-slate-400 hover:text-orange-600'} transition-colors`} />
+            )}
+          </button>
+        </div>
+      ) : (
+        <div className="relative">
+          <UpperInput
+            type="text"
+            value={cepValue}
+            onChange={e => handleCepChange(e.target.value)}
+            onFocus={() => sugestoes.length > 0 && setOpen(true)}
+            placeholder="01234-567"
+            maxLength={9}
+            className={inputClass}
+          />
+          <div className="absolute right-2.5 top-1/2 -translate-y-1/2 flex items-center gap-1">
+            {loading ? (
+              <Loader2 size={14} className="animate-spin text-orange-500" />
+            ) : (
+              <Building2 size={13} className={isDark ? 'text-slate-600' : 'text-slate-400'} />
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Show resolved address below CEP input */}
+      {mode === 'cep' && value && (
+        <div className={`mt-1 text-[11px] px-2 py-1 rounded-lg truncate ${
+          isDark ? 'bg-white/[0.03] text-slate-400' : 'bg-slate-50 text-slate-500'
+        }`}>
+          <MapPin size={10} className="inline mr-1 text-orange-400" />{value}
+        </div>
+      )}
+
+      {/* Dropdown sugestões */}
       {open && sugestoes.length > 0 && (
         <div className={`absolute z-50 left-0 right-0 mt-1 rounded-xl shadow-xl border max-h-48 overflow-y-auto ${
           isDark ? 'bg-[#1e293b] border-white/[0.1]' : 'bg-white border-slate-200'
@@ -269,6 +313,232 @@ function EnderecoInput({
   )
 }
 
+// ── Dados do Transporte (com integração Frotas) ─────────────────────────────
+
+function DadosTransporte({ isDark, modal, setModal, motorista, setMotorista, placa, setPlaca, dataPartida, setDataPartida, custo, setCusto }: {
+  isDark: boolean
+  modal: string; setModal: (v: string) => void
+  motorista: string; setMotorista: (v: string) => void
+  placa: string; setPlaca: (v: string) => void
+  dataPartida: string; setDataPartida: (v: string) => void
+  custo: number | ''; setCusto: (v: number | '') => void
+}) {
+  const isFrota = modal === 'frota_propria' || modal === 'frota_locada'
+  const { data: veiculos } = useVeiculos(isFrota ? undefined : { status: 'disponivel' as never })
+  const [veiculoQuery, setVeiculoQuery] = useState('')
+  const [veiculoOpen, setVeiculoOpen] = useState(false)
+  const [veiculoSelecionado, setVeiculoSelecionado] = useState<FroVeiculo | null>(null)
+  const veiculoRef = useRef<HTMLDivElement>(null)
+
+  // Click outside close
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (veiculoRef.current && !veiculoRef.current.contains(e.target as Node)) setVeiculoOpen(false)
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [])
+
+  // Filter & sort vehicles
+  const veiculosFiltrados = useMemo(() => {
+    if (!veiculos) return []
+    const list = veiculos.filter(v =>
+      v.status === 'disponivel' || v.status === 'em_uso'
+    )
+    if (!veiculoQuery) return list
+    const q = veiculoQuery.toLowerCase()
+    return list.filter(v =>
+      v.placa.toLowerCase().includes(q) ||
+      v.modelo.toLowerCase().includes(q) ||
+      v.marca.toLowerCase().includes(q) ||
+      (v.categoria && v.categoria.toLowerCase().includes(q))
+    )
+  }, [veiculos, veiculoQuery])
+
+  const handleSelectVeiculo = (v: FroVeiculo) => {
+    setVeiculoSelecionado(v)
+    setPlaca(v.placa)
+    setVeiculoQuery('')
+    setVeiculoOpen(false)
+    // Set modal based on propriedade
+    if (v.propriedade === 'locada') setModal('frota_locada')
+    else setModal('frota_propria')
+  }
+
+  const handleClearVeiculo = () => {
+    setVeiculoSelecionado(null)
+    setPlaca('')
+    setMotorista('')
+    setVeiculoQuery('')
+  }
+
+  const handleModalChange = (v: string) => {
+    setModal(v)
+    if (v !== 'frota_propria' && v !== 'frota_locada') {
+      setVeiculoSelecionado(null)
+      setVeiculoQuery('')
+    }
+  }
+
+  const PROP_LABEL: Record<string, string> = { propria: 'Próprio', locada: 'Locado', cedida: 'Cedido' }
+  const STATUS_COLORS: Record<string, string> = {
+    disponivel: isDark ? 'text-emerald-400' : 'text-emerald-600',
+    em_uso: isDark ? 'text-amber-400' : 'text-amber-600',
+  }
+
+  const fieldCls = `w-full px-3 py-2.5 rounded-xl border text-sm transition-all focus:outline-none focus:ring-2 ${
+    isDark
+      ? 'bg-white/[0.06] border-white/[0.08] text-slate-200 focus:ring-orange-500/30 placeholder-slate-600'
+      : 'bg-slate-50 border-slate-200 text-slate-700 focus:ring-orange-500/20 placeholder-slate-400'
+  }`
+
+  const labelCls = `text-[10px] font-bold uppercase tracking-wider mb-1 block ${isDark ? 'text-slate-500' : 'text-slate-400'}`
+
+  return (
+    <div className={`p-4 border-t space-y-3 ${isDark ? 'border-white/[0.06]' : 'border-slate-200'}`}>
+      <h3 className={`text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 mb-2 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+        <Truck size={12} /> Dados do Transporte
+      </h3>
+
+      <div className="grid grid-cols-2 gap-2.5">
+        {/* Modal */}
+        <div className="col-span-2">
+          <label className={labelCls}>Modal</label>
+          <select value={modal} onChange={e => handleModalChange(e.target.value)}
+            className={`${fieldCls} appearance-none cursor-pointer`}>
+            <option value="">Selecione...</option>
+            <option value="frota_propria">Frota Própria / Locada</option>
+            <option value="transportadora">Transportadora</option>
+            <option value="motoboy">Motoboy</option>
+            <option value="correios">Correios</option>
+          </select>
+        </div>
+
+        {/* Veículo selector — only when Frota */}
+        {isFrota && (
+          <div className="col-span-2" ref={veiculoRef}>
+            <label className={labelCls}>Veículo</label>
+            <div className="relative">
+              {veiculoSelecionado ? (
+                <div className={`flex items-center justify-between px-3 py-2 rounded-xl border ${
+                  isDark ? 'bg-orange-500/10 border-orange-500/30' : 'bg-orange-50 border-orange-200'
+                }`}>
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className={`text-sm font-bold ${isDark ? 'text-orange-300' : 'text-orange-700'}`}>
+                      {veiculoSelecionado.placa}
+                    </span>
+                    <span className={`text-xs truncate ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+                      {veiculoSelecionado.marca} {veiculoSelecionado.modelo}
+                    </span>
+                    <span className={`text-[10px] px-1.5 py-0.5 rounded-md font-medium ${
+                      isDark ? 'bg-white/[0.06] text-slate-400' : 'bg-slate-100 text-slate-500'
+                    }`}>
+                      {PROP_LABEL[veiculoSelecionado.propriedade] || veiculoSelecionado.propriedade}
+                    </span>
+                  </div>
+                  <button type="button" onClick={handleClearVeiculo}
+                    className={`p-1 rounded-lg transition-colors ${isDark ? 'hover:bg-white/10 text-slate-400' : 'hover:bg-slate-200 text-slate-400'}`}>
+                    <X size={14} />
+                  </button>
+                </div>
+              ) : (
+                <>
+                  <UpperInput
+                    type="text"
+                    value={veiculoQuery}
+                    onChange={e => { setVeiculoQuery(e.target.value); setVeiculoOpen(true) }}
+                    onFocus={() => setVeiculoOpen(true)}
+                    placeholder="Buscar por placa, modelo ou marca..."
+                    className={fieldCls}
+                  />
+                  <Search size={14} className={`absolute right-3 top-1/2 -translate-y-1/2 ${isDark ? 'text-slate-600' : 'text-slate-400'}`} />
+                </>
+              )}
+
+              {veiculoOpen && !veiculoSelecionado && (
+                <div className={`absolute z-50 left-0 right-0 mt-1 rounded-xl shadow-xl border max-h-56 overflow-y-auto ${
+                  isDark ? 'bg-[#1e293b] border-white/10' : 'bg-white border-slate-200'
+                }`} style={{ animation: 'fadeIn 0.15s ease-out' }}>
+                  {veiculosFiltrados.length === 0 ? (
+                    <div className={`px-3 py-3 text-sm ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+                      {veiculoQuery ? 'Nenhum veículo encontrado' : 'Carregando veículos...'}
+                    </div>
+                  ) : veiculosFiltrados.map(v => (
+                    <button
+                      key={v.id}
+                      type="button"
+                      onClick={() => handleSelectVeiculo(v)}
+                      className={`w-full text-left px-3 py-2.5 transition-colors flex items-center gap-3 ${
+                        isDark ? 'hover:bg-white/[0.06]' : 'hover:bg-slate-50'
+                      }`}
+                    >
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className={`text-sm font-bold font-mono ${isDark ? 'text-white' : 'text-slate-800'}`}>
+                            {v.placa}
+                          </span>
+                          <span className={`text-xs ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+                            {v.marca} {v.modelo} {v.ano_mod || ''}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-2 mt-0.5">
+                          <span className={`text-[10px] font-medium ${STATUS_COLORS[v.status] || (isDark ? 'text-slate-500' : 'text-slate-400')}`}>
+                            ● {v.status === 'disponivel' ? 'Disponível' : v.status === 'em_uso' ? 'Em uso' : v.status}
+                          </span>
+                          <span className={`text-[10px] ${isDark ? 'text-slate-600' : 'text-slate-400'}`}>
+                            {PROP_LABEL[v.propriedade] || v.propriedade}
+                          </span>
+                          {v.capacidade_carga_kg && (
+                            <span className={`text-[10px] ${isDark ? 'text-slate-600' : 'text-slate-400'}`}>
+                              {v.capacidade_carga_kg.toLocaleString('pt-BR')} kg
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Motorista */}
+        <div>
+          <label className={labelCls}>Motorista</label>
+          <UpperInput type="text" value={motorista} onChange={e => setMotorista(e.target.value)}
+            placeholder="Nome" className={fieldCls} />
+        </div>
+
+        {/* Placa — readonly when vehicle selected, editable otherwise */}
+        <div>
+          <label className={labelCls}>Placa</label>
+          <UpperInput type="text" value={placa}
+            onChange={e => { if (!veiculoSelecionado) setPlaca(e.target.value.toUpperCase()) }}
+            readOnly={!!veiculoSelecionado}
+            placeholder="ABC-1234"
+            className={`${fieldCls} ${veiculoSelecionado ? 'opacity-60 cursor-not-allowed' : ''}`} />
+        </div>
+
+        {/* Data partida */}
+        <div>
+          <label className={labelCls}>Saída prevista</label>
+          <input type="datetime-local" value={dataPartida} onChange={e => setDataPartida(e.target.value)}
+            className={fieldCls} />
+        </div>
+
+        {/* Custo */}
+        <div>
+          <label className={labelCls}>Custo estimado</label>
+          <input type="number" min={0} step={0.01} value={custo} onChange={e => setCusto(e.target.value ? Number(e.target.value) : '')}
+            placeholder="R$ 0,00" className={fieldCls} />
+        </div>
+      </div>
+    </div>
+  )
+}
+
+
 // ── Modal principal ──────────────────────────────────────────────────────────
 
 export default function PlanejamentoRotaModal({ isDark, solicitacoes, allSolicitacoes, onClose, onSave }: Props) {
@@ -282,7 +552,7 @@ export default function PlanejamentoRotaModal({ isDark, solicitacoes, allSolicit
     }))
   )
 
-  // Auto-geocodificar endereços que já vêm da solicitação (sem coordenadas)
+  // Auto-geocodificar endereços que vêm da solicitação (sem coordenadas)
   useEffect(() => {
     async function geocode(endereco: string): Promise<{ lat: number; lng: number } | null> {
       if (!endereco || endereco.length < 3) return null
@@ -298,7 +568,6 @@ export default function PlanejamentoRotaModal({ isDark, solicitacoes, allSolicit
       } catch { /* silent */ }
       return null
     }
-
     let cancelled = false
     ;(async () => {
       const updated = [...pontos]
@@ -319,7 +588,7 @@ export default function PlanejamentoRotaModal({ isDark, solicitacoes, allSolicit
     })()
     return () => { cancelled = true }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []) // Roda só na abertura do modal
+  }, [])
 
   // Rota calculada
   const [rota, setRota] = useState<RotaCalculada | null>(null)
@@ -332,7 +601,6 @@ export default function PlanejamentoRotaModal({ isDark, solicitacoes, allSolicit
   const [dataPartida, setDataPartida] = useState('')
   const [custo, setCusto] = useState<number | ''>('')
   const [salvando, setSalvando] = useState(false)
-  const [erroSalvar, setErroSalvar] = useState('')
 
   // Adicionar mais solicitações
   const [showAddMenu, setShowAddMenu] = useState(false)
@@ -426,7 +694,7 @@ export default function PlanejamentoRotaModal({ isDark, solicitacoes, allSolicit
     })
   }
 
-  // Calcular rota via OSRM (gratuito, sem n8n)
+  // Calcular rota via OSRM (direto, sem n8n)
   const calcularRota = async () => {
     const waypoints = pontos.flatMap(p => {
       const pts: Array<{ lat: number; lng: number; label: string }> = []
@@ -439,7 +707,6 @@ export default function PlanejamentoRotaModal({ isDark, solicitacoes, allSolicit
 
     setCalculando(true)
     try {
-      // OSRM: coords como lng,lat separados por ;
       const coords = waypoints.map(w => `${w.lng},${w.lat}`).join(';')
       const res = await fetch(
         `https://router.project-osrm.org/route/v1/driving/${coords}?overview=full&geometries=geojson&steps=true`,
@@ -454,21 +721,12 @@ export default function PlanejamentoRotaModal({ isDark, solicitacoes, allSolicit
           const duracaoHoras = Math.round((route.duration / 3600) * 100) / 100
           const routePoints = route.geometry?.coordinates?.map((c: number[]) => ({ lat: c[1], lng: c[0] })) || []
 
-          setRota({
-            distancia_total_km: distanciaKm,
-            duracao_total_horas: duracaoHoras,
-            pontos: routePoints,
-          })
+          setRota({ distancia_total_km: distanciaKm, duracao_total_horas: duracaoHoras, pontos: routePoints })
 
-          // Atualizar distâncias por trecho (legs)
           if (route.legs && Array.isArray(route.legs)) {
             setPontos(prev => prev.map((p, i) => {
               const leg = route.legs[i]
-              return leg ? {
-                ...p,
-                distancia_km: Math.round((leg.distance / 1000) * 10) / 10,
-                duracao_horas: Math.round((leg.duration / 3600) * 100) / 100,
-              } : p
+              return leg ? { ...p, distancia_km: Math.round((leg.distance / 1000) * 10) / 10, duracao_horas: Math.round((leg.duration / 3600) * 100) / 100 } : p
             }))
           }
         }
@@ -487,8 +745,8 @@ export default function PlanejamentoRotaModal({ isDark, solicitacoes, allSolicit
       })
       if (totalKm > 0) {
         setRota({
-          distancia_total_km: Math.round(totalKm * 1.3), // 30% road factor
-          duracao_total_horas: Math.round((totalKm * 1.3) / 60 * 10) / 10, // ~60km/h avg
+          distancia_total_km: Math.round(totalKm * 1.3),
+          duracao_total_horas: Math.round((totalKm * 1.3) / 60 * 10) / 10,
           pontos: pts,
         })
       }
@@ -520,9 +778,6 @@ export default function PlanejamentoRotaModal({ isDark, solicitacoes, allSolicit
         data_prevista_saida: dataPartida || undefined,
         custo_estimado: custo !== '' ? custo : undefined,
       })
-    } catch (err) {
-      console.error(err)
-      setErroSalvar('Erro ao salvar planejamento')
     } finally {
       setSalvando(false)
     }
@@ -924,12 +1179,6 @@ export default function PlanejamentoRotaModal({ isDark, solicitacoes, allSolicit
               Salvar Planejamento
             </button>
           </div>
-          {erroSalvar && (
-            <div className="flex items-center gap-2 mt-2 px-3 py-2 rounded-lg bg-red-500/10 text-red-400 text-xs font-medium">
-              <AlertTriangle size={14} />
-              {erroSalvar}
-            </div>
-          )}
         </div>
       </div>
 
