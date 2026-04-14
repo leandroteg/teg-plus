@@ -148,32 +148,16 @@ function EnderecoInput({
     setLoading(true)
     try {
       const isCep = /^\d{5}-?\d{0,3}$/.test(query.replace(/\s/g, ''))
-      const endpoint = isCep ? '/logistica/consulta-cep' : '/logistica/autocomplete-endereco'
-      const body = isCep ? { cep: query.replace(/\D/g, '') } : { query, pais: 'BR' }
 
-      const res = await fetch(`${N8N_URL}${endpoint}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-        signal: AbortSignal.timeout(8000),
-      })
-
-      if (res.ok) {
-        const json = await res.json()
-        const resultados = json.sugestoes || json.results || (json.cidade ? [json] : [])
-        setSugestoes(resultados)
-        setOpen(resultados.length > 0)
-      }
-    } catch {
-      // Fallback: se CEP, buscar via BrasilAPI diretamente
-      const limpo = query.replace(/\D/g, '')
-      if (limpo.length === 8) {
-        try {
-          const res = await fetch(`https://brasilapi.com.br/api/cep/v2/${limpo}`)
+      if (isCep) {
+        // BrasilAPI pra CEP
+        const limpo = query.replace(/\D/g, '')
+        if (limpo.length >= 8) {
+          const res = await fetch(`https://brasilapi.com.br/api/cep/v2/${limpo}`, { signal: AbortSignal.timeout(8000) })
           if (res.ok) {
             const d = await res.json()
             const sug: EnderecoSugestao = {
-              descricao: `${d.street || ''}, ${d.neighborhood || ''}, ${d.city} - ${d.state}`,
+              descricao: `${d.street || ''}, ${d.neighborhood || ''}, ${d.city} - ${d.state}`.replace(/^, /, ''),
               logradouro: d.street,
               bairro: d.neighborhood,
               cidade: d.city,
@@ -185,11 +169,34 @@ function EnderecoInput({
             setSugestoes([sug])
             setOpen(true)
           }
-        } catch { /* silent */ }
+        }
+      } else {
+        // Nominatim (OpenStreetMap) pra autocomplete de endereço
+        const res = await fetch(
+          `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&countrycodes=br&format=json&addressdetails=1&limit=5`,
+          { signal: AbortSignal.timeout(8000), headers: { 'Accept-Language': 'pt-BR' } },
+        )
+        if (res.ok) {
+          const data = await res.json()
+          const resultados: EnderecoSugestao[] = data.map((r: Record<string, unknown>) => {
+            const addr = r.address as Record<string, string> | undefined
+            return {
+              descricao: String(r.display_name ?? ''),
+              logradouro: addr?.road || addr?.pedestrian || '',
+              bairro: addr?.suburb || addr?.neighbourhood || '',
+              cidade: addr?.city || addr?.town || addr?.municipality || '',
+              uf: addr?.state || '',
+              cep: addr?.postcode || '',
+              lat: Number(r.lat),
+              lng: Number(r.lon),
+            }
+          })
+          setSugestoes(resultados)
+          setOpen(resultados.length > 0)
+        }
       }
-    } finally {
-      setLoading(false)
-    }
+    } catch { /* silent */ }
+    finally { setLoading(false) }
   }, [])
 
   const handleChange = (v: string) => {
@@ -380,7 +387,7 @@ export default function PlanejamentoRotaModal({ isDark, solicitacoes, allSolicit
     })
   }
 
-  // Calcular rota via n8n
+  // Calcular rota via OSRM (gratuito, sem n8n)
   const calcularRota = async () => {
     const waypoints = pontos.flatMap(p => {
       const pts: Array<{ lat: number; lng: number; label: string }> = []
@@ -393,32 +400,42 @@ export default function PlanejamentoRotaModal({ isDark, solicitacoes, allSolicit
 
     setCalculando(true)
     try {
-      const res = await fetch(`${N8N_URL}/logistica/calcular-rota`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ waypoints }),
-        signal: AbortSignal.timeout(15000),
-      })
+      // OSRM: coords como lng,lat separados por ;
+      const coords = waypoints.map(w => `${w.lng},${w.lat}`).join(';')
+      const res = await fetch(
+        `https://router.project-osrm.org/route/v1/driving/${coords}?overview=full&geometries=geojson&steps=true`,
+        { signal: AbortSignal.timeout(15000) },
+      )
 
       if (res.ok) {
         const json = await res.json()
-        setRota({
-          distancia_total_km: json.distancia_km || json.distancia_total_km || 0,
-          duracao_total_horas: json.duracao_horas || json.duracao_total_horas || 0,
-          pontos: json.pontos || json.geometry || [],
-        })
+        const route = json.routes?.[0]
+        if (route) {
+          const distanciaKm = Math.round((route.distance / 1000) * 10) / 10
+          const duracaoHoras = Math.round((route.duration / 3600) * 100) / 100
+          const routePoints = route.geometry?.coordinates?.map((c: number[]) => ({ lat: c[1], lng: c[0] })) || []
 
-        // Atualizar distâncias individuais se fornecido
-        if (json.trechos && Array.isArray(json.trechos)) {
-          setPontos(prev => prev.map((p, i) => ({
-            ...p,
-            distancia_km: json.trechos[i]?.distancia_km,
-            duracao_horas: json.trechos[i]?.duracao_horas,
-          })))
+          setRota({
+            distancia_total_km: distanciaKm,
+            duracao_total_horas: duracaoHoras,
+            pontos: routePoints,
+          })
+
+          // Atualizar distâncias por trecho (legs)
+          if (route.legs && Array.isArray(route.legs)) {
+            setPontos(prev => prev.map((p, i) => {
+              const leg = route.legs[i]
+              return leg ? {
+                ...p,
+                distancia_km: Math.round((leg.distance / 1000) * 10) / 10,
+                duracao_horas: Math.round((leg.duration / 3600) * 100) / 100,
+              } : p
+            }))
+          }
         }
       }
     } catch {
-      // Fallback: cálculo estimado por distância euclidiana (aprox)
+      // Fallback: cálculo estimado por distância euclidiana
       let totalKm = 0
       const pts: Array<{ lat: number; lng: number }> = []
       pontos.forEach(p => {
