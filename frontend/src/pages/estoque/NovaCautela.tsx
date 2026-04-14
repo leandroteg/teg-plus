@@ -500,34 +500,18 @@ export default function NovaCautela() {
         </div>
       )}
 
-      {/* ── Submit (fixed on mobile) ─────────────────────────────────── */}
-      <div className="hidden sm:block">
-        <button
-          onClick={handleSubmit}
-          disabled={!canSubmit || submitting}
-          className="w-full flex items-center justify-center gap-2 py-3 rounded-xl
-            bg-teal-600 hover:bg-teal-700 text-white text-sm font-bold
-            transition-all disabled:opacity-50 shadow-sm active:scale-[0.98]"
-        >
-          {submitting ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
-          Registrar Cautela
-        </button>
-      </div>
-
-      {/* Fixed bottom bar on mobile — above bottom nav (bottom-16) */}
-      <div className="fixed bottom-16 left-0 right-0 sm:hidden z-30 p-3 bg-white/95 dark:bg-[#0f172a]/95 backdrop-blur-sm border-t border-slate-200 dark:border-white/[0.06]">
-        <button
-          onClick={handleSubmit}
-          disabled={!canSubmit || submitting}
-          className="w-full flex items-center justify-center gap-2 py-3.5 rounded-xl
-            bg-teal-600 hover:bg-teal-700 text-white text-sm font-bold
-            transition-all disabled:opacity-50 shadow-lg shadow-teal-600/20 active:scale-[0.98]"
-        >
-          {submitting ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
-          Registrar Cautela
-          {itens.length > 0 && <span className="ml-1 bg-white/20 rounded-full px-2 py-0.5 text-xs">{itens.length} {itens.length === 1 ? 'item' : 'itens'}</span>}
-        </button>
-      </div>
+      {/* ── Submit (always inline, scrollable) ──────────────────────── */}
+      <button
+        onClick={handleSubmit}
+        disabled={!canSubmit || submitting}
+        className="w-full flex items-center justify-center gap-2 py-3.5 rounded-xl
+          bg-teal-600 hover:bg-teal-700 text-white text-sm font-bold
+          transition-all disabled:opacity-50 shadow-lg shadow-teal-600/20 active:scale-[0.98]"
+      >
+        {submitting ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
+        Registrar Cautela
+        {itens.length > 0 && <span className="ml-1 bg-white/20 rounded-full px-2 py-0.5 text-xs">{itens.length} {itens.length === 1 ? 'item' : 'itens'}</span>}
+      </button>
     </div>
   )
 }
