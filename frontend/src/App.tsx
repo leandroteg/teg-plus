@@ -175,6 +175,7 @@ const FichaAtivo = lazy(() => import('./pages/patrimonial/FichaAtivo'))
 const PatrimonialHome = lazy(() => import('./pages/patrimonial/PatrimonialHome'))
 const PatrimonialMovimentacoes = lazy(() => import('./pages/patrimonial/Movimentacoes'))
 const PatrimonialPatrimonio = lazy(() => import('./pages/patrimonial/Patrimonio'))
+const ScannerQR = lazy(() => import('./pages/patrimonial/ScannerQR'))
 
 // Admin
 const AdminUsuarios = lazy(() => import('./pages/AdminUsuarios'))
@@ -320,6 +321,7 @@ export default function App() {
               <Route path="/patrimonial"               element={<LazyDash><PatrimonialHome /></LazyDash>} />
               <Route path="/patrimonial/movimentacoes" element={<Lazy><PatrimonialMovimentacoes /></Lazy>} />
               <Route path="/patrimonial/patrimonio"    element={<Lazy><PatrimonialPatrimonio /></Lazy>} />
+              <Route path="/patrimonial/scanner"      element={<Lazy><ScannerQR /></Lazy>} />
             </Route>
           </Route>
 
