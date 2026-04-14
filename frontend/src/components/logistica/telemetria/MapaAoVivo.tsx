@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect } from 'react'
 import { Search, Radio, ChevronLeft, ChevronRight } from 'lucide-react'
-import { MapContainer, TileLayer, Marker, Popup, Tooltip, useMap } from 'react-leaflet'
+import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet'
 import * as L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import { useTheme } from '../../../contexts/ThemeContext'
@@ -32,18 +32,25 @@ function getStatusLabel(pos: TelUltimaPosicao): string {
   return 'Ocioso'
 }
 
-function createMarkerIcon(color: string) {
-  const svg = `
-    <svg width="28" height="28" viewBox="0 0 28 28" xmlns="http://www.w3.org/2000/svg">
-      <circle cx="14" cy="14" r="12" fill="${color}" stroke="white" stroke-width="2.5" opacity="0.9"/>
-      <circle cx="14" cy="14" r="5" fill="white" opacity="0.8"/>
-    </svg>`
+function createMarkerIcon(color: string, placa: string, statusLabel: string, velocidade: number) {
+  const html = `
+    <div style="position:relative;display:flex;align-items:center;gap:4px;white-space:nowrap;">
+      <svg width="28" height="28" viewBox="0 0 28 28" xmlns="http://www.w3.org/2000/svg" style="flex-shrink:0">
+        <circle cx="14" cy="14" r="12" fill="${color}" stroke="white" stroke-width="2.5" opacity="0.9"/>
+        <circle cx="14" cy="14" r="5" fill="white" opacity="0.8"/>
+      </svg>
+      <div style="background:white;border-radius:6px;padding:2px 6px;box-shadow:0 1px 4px rgba(0,0,0,0.18);font-size:10px;line-height:1.3;pointer-events:none;">
+        <b style="font-size:11px">${placa}</b>
+        <span style="margin-left:3px;padding:1px 4px;border-radius:3px;background:${color}22;color:${color};font-weight:700;font-size:9px">${statusLabel}</span>
+        ${velocidade > 0 ? `<span style="margin-left:3px;color:#64748b;font-size:9px">${velocidade} km/h</span>` : ''}
+      </div>
+    </div>`
   return L.divIcon({
     className: '',
-    html: svg,
-    iconSize: [28, 28],
+    html,
+    iconSize: [160, 28],
     iconAnchor: [14, 14],
-    popupAnchor: [0, -16],
+    popupAnchor: [60, -16],
   })
 }
 
@@ -281,46 +288,26 @@ export default function MapaAoVivo() {
           {posicoesFiltradas.map(pos => {
             const v = veiculoMap.get(pos.veiculo_id)
             const color = getStatusColor(pos)
+            const label = getStatusLabel(pos)
             const selected = selecionado === pos.veiculo_id
             return (
               <Marker
                 key={pos.veiculo_id}
                 position={[pos.latitude, pos.longitude]}
-                icon={createMarkerIcon(color)}
+                icon={createMarkerIcon(color, pos.placa, label, pos.velocidade)}
+                zIndexOffset={selected ? 1000 : 0}
                 eventHandlers={{
                   click: () => setSelecionado(selected ? null : pos.veiculo_id),
                 }}
               >
-                {/* Tooltip — always visible label on the map */}
-                <Tooltip
-                  direction="right"
-                  offset={[14, 0]}
-                  permanent={selected}
-                  className="leaflet-tooltip-placa"
-                >
-                  <span style={{ fontWeight: 700, fontSize: 11 }}>{pos.placa}</span>
-                  {' '}
-                  <span style={{
-                    fontSize: 9,
-                    fontWeight: 700,
-                    padding: '1px 5px',
-                    borderRadius: 4,
-                    backgroundColor: color + '22',
-                    color,
-                  }}>
-                    {getStatusLabel(pos)}
-                  </span>
-                </Tooltip>
-
-                {/* Popup — detailed info on click */}
                 <Popup>
-                  <div className="text-xs space-y-1.5 min-w-[160px]">
+                  <div className="text-xs space-y-1.5 min-w-[170px]">
                     <p className="font-bold text-sm text-slate-800">{pos.placa}</p>
                     {v && <p className="text-slate-500">{v.marca} {v.modelo}</p>}
                     <div className="flex items-center gap-2">
                       <span className="font-semibold text-sm">{pos.velocidade} km/h</span>
                       <span className="px-2 py-0.5 rounded text-[10px] font-bold" style={{ backgroundColor: color + '22', color }}>
-                        {getStatusLabel(pos)}
+                        {label}
                       </span>
                     </div>
                     {pos.hodometro != null && (
