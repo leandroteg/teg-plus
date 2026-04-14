@@ -322,6 +322,23 @@ export function useTransferirAtivo() {
   })
 }
 
+// ── Busca por número patrimônio ──────────────────────────────────────────────
+export function useAtivoByNumero(numero?: string) {
+  return useQuery<PatImobilizado | null>({
+    queryKey: ['pat-ativo-numero', numero],
+    enabled: !!numero,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('pat_imobilizados')
+        .select('*')
+        .eq('numero_patrimonio', numero!)
+        .single()
+      if (error) throw error
+      return data as PatImobilizado
+    },
+  })
+}
+
 // ── KPIs ──────────────────────────────────────────────────────────────────────
 export function usePatrimonialKPIs() {
   return useQuery<PatrimonialKPIs>({
