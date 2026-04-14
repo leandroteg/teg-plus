@@ -944,89 +944,15 @@ export default function PlanejamentoRotaModal({ isDark, solicitacoes, allSolicit
               )}
             </div>
 
-            {/* Planning fields */}
-            <div className={`p-4 border-t space-y-3 ${isDark ? 'border-white/[0.06]' : 'border-slate-200'}`}>
-              <h3 className={`text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 mb-2 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
-                <Truck size={12} /> Dados do Transporte
-              </h3>
-
-              <div className="grid grid-cols-2 gap-2.5">
-                {/* Modal */}
-                <div className="col-span-2">
-                  <label className={`text-[10px] font-bold uppercase tracking-wider mb-1 block ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
-                    Modal
-                  </label>
-                  <select value={modal} onChange={e => setModal(e.target.value)}
-                    className={`w-full px-3 py-2.5 rounded-xl border text-sm appearance-none cursor-pointer transition-all focus:outline-none focus:ring-2 ${
-                      isDark
-                        ? 'bg-white/[0.06] border-white/[0.08] text-slate-200 focus:ring-orange-500/30'
-                        : 'bg-slate-50 border-slate-200 text-slate-700 focus:ring-orange-500/20'
-                    }`}>
-                    <option value="">Selecione...</option>
-                    <option value="frota_propria">Frota Própria</option>
-                    <option value="frota_locada">Frota Locada</option>
-                    <option value="transportadora">Transportadora</option>
-                    <option value="motoboy">Motoboy</option>
-                    <option value="correios">Correios</option>
-                  </select>
-                </div>
-
-                {/* Motorista */}
-                <div>
-                  <label className={`text-[10px] font-bold uppercase tracking-wider mb-1 block ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
-                    Motorista
-                  </label>
-                  <input type="text" value={motorista} onChange={e => setMotorista(e.target.value)}
-                    placeholder="Nome"
-                    className={`w-full px-3 py-2.5 rounded-xl border text-sm transition-all focus:outline-none focus:ring-2 ${
-                      isDark
-                        ? 'bg-white/[0.06] border-white/[0.08] text-slate-200 focus:ring-orange-500/30 placeholder-slate-600'
-                        : 'bg-slate-50 border-slate-200 text-slate-700 focus:ring-orange-500/20 placeholder-slate-400'
-                    }`} />
-                </div>
-
-                {/* Placa */}
-                <div>
-                  <label className={`text-[10px] font-bold uppercase tracking-wider mb-1 block ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
-                    Placa
-                  </label>
-                  <input type="text" value={placa} onChange={e => setPlaca(e.target.value.toUpperCase())}
-                    placeholder="ABC-1234"
-                    className={`w-full px-3 py-2.5 rounded-xl border text-sm transition-all focus:outline-none focus:ring-2 ${
-                      isDark
-                        ? 'bg-white/[0.06] border-white/[0.08] text-slate-200 focus:ring-orange-500/30 placeholder-slate-600'
-                        : 'bg-slate-50 border-slate-200 text-slate-700 focus:ring-orange-500/20 placeholder-slate-400'
-                    }`} />
-                </div>
-
-                {/* Data partida */}
-                <div>
-                  <label className={`text-[10px] font-bold uppercase tracking-wider mb-1 block ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
-                    Saída prevista
-                  </label>
-                  <input type="datetime-local" value={dataPartida} onChange={e => setDataPartida(e.target.value)}
-                    className={`w-full px-3 py-2.5 rounded-xl border text-sm transition-all focus:outline-none focus:ring-2 ${
-                      isDark
-                        ? 'bg-white/[0.06] border-white/[0.08] text-slate-200 focus:ring-orange-500/30'
-                        : 'bg-slate-50 border-slate-200 text-slate-700 focus:ring-orange-500/20'
-                    }`} />
-                </div>
-
-                {/* Custo */}
-                <div>
-                  <label className={`text-[10px] font-bold uppercase tracking-wider mb-1 block ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
-                    Custo estimado
-                  </label>
-                  <input type="number" min={0} step={0.01} value={custo} onChange={e => setCusto(e.target.value ? Number(e.target.value) : '')}
-                    placeholder="R$ 0,00"
-                    className={`w-full px-3 py-2.5 rounded-xl border text-sm transition-all focus:outline-none focus:ring-2 ${
-                      isDark
-                        ? 'bg-white/[0.06] border-white/[0.08] text-slate-200 focus:ring-orange-500/30 placeholder-slate-600'
-                        : 'bg-slate-50 border-slate-200 text-slate-700 focus:ring-orange-500/20 placeholder-slate-400'
-                    }`} />
-                </div>
-              </div>
-            </div>
+            {/* Planning fields — using DadosTransporte component with vehicle selector */}
+            <DadosTransporte
+              isDark={isDark}
+              modal={modal} setModal={setModal}
+              motorista={motorista} setMotorista={setMotorista}
+              placa={placa} setPlaca={setPlaca}
+              dataPartida={dataPartida} setDataPartida={setDataPartida}
+              custo={custo} setCusto={setCusto}
+            />
           </div>
 
           {/* Right: Map + overview */}
