@@ -1,18 +1,16 @@
 import { useState, useMemo } from 'react'
-import { useNavigate } from 'react-router-dom'
 import {
   Package2, Plus, Search, AlertTriangle, LayoutList, LayoutGrid,
   X, Save, Loader2, Download, Truck, PackageCheck, RefreshCw, ClipboardCheck,
   CheckCircle2, Warehouse, Building2, Ban, History, ArrowUpRight, ArrowDownRight,
-  Tag, ClipboardList,
 } from 'lucide-react'
-import { UpperInput } from '../../components/UpperInput'
 import {
   useEstoqueItens, useSalvarItem, useSaldos, useBases,
   useAguardandoEntrada, useEmMovimentacao, useLiberadosRetirada,
-  useConfirmarEntrada, useContaCorrenteItem,
+  useConfirmarEntrada, useCancelarEntrada, useContaCorrenteItem,
 } from '../../hooks/useEstoque'
 import { useTheme } from '../../contexts/ThemeContext'
+import { useAuth } from '../../contexts/AuthContext'
 import type {
   EstItem, EstSaldo, EstSolicitacao, EstoqueEntradaItem, EstoqueMovimentacaoItem,
   EstoquePipelineTab,
@@ -75,17 +73,14 @@ function fmtCurrency(v: number) {
 
 export default function Itens() {
   const { isDark } = useTheme()
-  const navigate = useNavigate()
+  const { isAdmin } = useAuth()
   const [activeTab, setActiveTab] = useState<EstoquePipelineTab>('em_estoque')
   const [viewMode, setViewMode] = useState<ViewMode>('list')
   const [busca, setBusca] = useState('')
   const [curvaFiltro, setCurvaFiltro] = useState('')
-  const [categoriaFiltro, setCategoriaFiltro] = useState('')
   const [showForm, setShowForm] = useState(false)
   const [editItem, setEditItem] = useState<Partial<EstItem> | null>(null)
   const [baseFilter, setBaseFilter] = useState('')
-  const [baseFiltroEntrada, setBaseFiltroEntrada] = useState('')
-  const [baseFiltroLiberado, setBaseFiltroLiberado] = useState('')
   const [contaCorrenteItemId, setContaCorrenteItemId] = useState<string | undefined>(undefined)
 
   // Data
@@ -96,44 +91,36 @@ export default function Itens() {
   const { data: movs = [], isLoading: loadingMovs } = useEmMovimentacao()
   const salvar = useSalvarItem()
   const confirmarEntrada = useConfirmarEntrada()
+  const cancelarEntrada = useCancelarEntrada()
+
+  const handleCancelar = (ids: string[]) => {
+    if (!confirm(`Cancelar ${ids.length} entrada(s)? Esta ação não pode ser desfeita.`)) return
+    cancelarEntrada.mutate(ids)
+  }
 
   const accent = isDark ? STATUS_ACCENT_DARK : STATUS_ACCENT
-
-  // Categorias únicas extraídas dos itens em estoque (#138)
-  const categoriasDisponiveis = useMemo(() => {
-    const cats = saldos
-      .map(s => s.item?.categoria)
-      .filter((c): c is string => !!c?.trim())
-    return [...new Set(cats)].sort((a, b) => a.localeCompare(b, 'pt-BR'))
-  }, [saldos])
 
   // Filtered data per tab
   const saldosFiltrados = useMemo(() => {
     let list = saldos.filter(s => s.saldo > 0)
     if (curvaFiltro) list = list.filter(s => s.item?.curva_abc === curvaFiltro)
-    if (categoriaFiltro) list = list.filter(s => s.item?.categoria === categoriaFiltro)
     if (busca.trim()) {
       const t = busca.toLowerCase()
       list = list.filter(s =>
         (s.item?.descricao ?? '').toLowerCase().includes(t) ||
-        (s.item?.codigo ?? '').toLowerCase().includes(t) ||
-        (s.item?.categoria ?? '').toLowerCase().includes(t)
+        (s.item?.codigo ?? '').toLowerCase().includes(t)
       )
     }
     return list
-  }, [saldos, curvaFiltro, categoriaFiltro, busca])
+  }, [saldos, curvaFiltro, busca])
 
   const entradasFiltradas = useMemo(() => {
-    let list = entradas
-    if (baseFiltroEntrada) list = list.filter(e => e.base_nome === baseFiltroEntrada)
-    if (busca.trim()) {
-      const t = busca.toLowerCase()
-      list = list.filter(e =>
-        e.descricao.toLowerCase().includes(t) || e.codigo.toLowerCase().includes(t)
-      )
-    }
-    return list
-  }, [entradas, busca, baseFiltroEntrada])
+    if (!busca.trim()) return entradas
+    const t = busca.toLowerCase()
+    return entradas.filter(e =>
+      e.descricao.toLowerCase().includes(t) || e.codigo.toLowerCase().includes(t)
+    )
+  }, [entradas, busca])
 
   const movsFiltradas = useMemo(() => {
     if (!busca.trim()) return movs
@@ -144,18 +131,14 @@ export default function Itens() {
   }, [movs, busca])
 
   const liberadosFiltrados = useMemo(() => {
-    let list = liberados
-    if (baseFiltroLiberado) list = list.filter(s => s.obra_nome === baseFiltroLiberado)
-    if (busca.trim()) {
-      const t = busca.toLowerCase()
-      list = list.filter(s =>
-        s.numero.toLowerCase().includes(t) ||
-        s.solicitante_nome.toLowerCase().includes(t) ||
-        s.obra_nome.toLowerCase().includes(t)
-      )
-    }
-    return list
-  }, [liberados, busca, baseFiltroLiberado])
+    if (!busca.trim()) return liberados
+    const t = busca.toLowerCase()
+    return liberados.filter(s =>
+      s.numero.toLowerCase().includes(t) ||
+      s.solicitante_nome.toLowerCase().includes(t) ||
+      s.obra_nome.toLowerCase().includes(t)
+    )
+  }, [liberados, busca])
 
   const counts: Record<EstoquePipelineTab, number> = {
     aguardando_entrada: entradasFiltradas.length,
@@ -310,61 +293,6 @@ export default function Itens() {
             </div>
           )}
 
-          {activeTab === 'em_estoque' && categoriasDisponiveis.length > 0 && (
-            <div className="relative flex items-center">
-              <Tag size={12} className={`absolute left-2 ${isDark ? 'text-slate-500' : 'text-slate-400'}`} />
-              <select
-                value={categoriaFiltro}
-                onChange={e => setCategoriaFiltro(e.target.value)}
-                className={`pl-6 pr-2 py-1.5 rounded-lg border text-xs
-                  focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400
-                  ${isDark ? 'border-white/[0.08] bg-white/[0.03] text-slate-200' : 'border-slate-200 bg-white text-slate-700'}
-                  ${categoriaFiltro ? (isDark ? 'border-blue-500 text-blue-300' : 'border-blue-400 text-blue-700') : ''}`}
-              >
-                <option value="">Todas as categorias</option>
-                {categoriasDisponiveis.map(cat => (
-                  <option key={cat} value={cat}>{cat}</option>
-                ))}
-              </select>
-              {categoriaFiltro && (
-                <button
-                  onClick={() => setCategoriaFiltro('')}
-                  className="absolute right-1.5 text-slate-400 hover:text-slate-600"
-                >
-                  <X size={10} />
-                </button>
-              )}
-            </div>
-          )}
-
-          {activeTab === 'aguardando_entrada' && (
-            <select
-              value={baseFiltroEntrada}
-              onChange={e => setBaseFiltroEntrada(e.target.value)}
-              className={`px-2 py-1.5 rounded-lg border text-xs
-                focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400
-                ${isDark ? 'border-white/[0.08] bg-white/[0.03] text-slate-200' : 'border-slate-200 bg-white text-slate-800'}`}
-            >
-              <option value="">Todas as bases</option>
-              {bases.map(b => <option key={b.id} value={b.nome}>{b.nome}</option>)}
-            </select>
-          )}
-
-          {activeTab === 'liberado_retirada' && (
-            <select
-              value={baseFiltroLiberado}
-              onChange={e => setBaseFiltroLiberado(e.target.value)}
-              className={`px-2 py-1.5 rounded-lg border text-xs
-                focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400
-                ${isDark ? 'border-white/[0.08] bg-white/[0.03] text-slate-200' : 'border-slate-200 bg-white text-slate-800'}`}
-            >
-              <option value="">Todas as obras</option>
-              {[...new Set(liberados.map(s => s.obra_nome).filter(Boolean))].sort().map(obra => (
-                <option key={obra} value={obra}>{obra}</option>
-              ))}
-            </select>
-          )}
-
           <div className={`flex items-center rounded-lg border overflow-hidden ${isDark ? 'border-white/[0.06]' : 'border-slate-200'}`}>
             <button onClick={() => setViewMode('list')}
               className={`p-1.5 transition-all ${viewMode === 'list'
@@ -407,13 +335,13 @@ export default function Itens() {
           <>
             {activeTab === 'em_estoque' && (
               viewMode === 'list'
-                ? <SaldosList data={saldosFiltrados} isDark={isDark} onEdit={openEdit} onClickItem={(id) => setContaCorrenteItemId(id)} onSolicitar={() => navigate('/estoque/solicitacoes')} />
+                ? <SaldosList data={saldosFiltrados} isDark={isDark} onEdit={openEdit} onClickItem={(id) => setContaCorrenteItemId(id)} />
                 : <SaldosCards data={saldosFiltrados} isDark={isDark} onClickItem={(id) => setContaCorrenteItemId(id)} />
             )}
             {activeTab === 'aguardando_entrada' && (
               viewMode === 'list'
-                ? <EntradasList data={entradasFiltradas} isDark={isDark} onConfirm={(ids) => confirmarEntrada.mutate(ids)} confirming={confirmarEntrada.isPending} />
-                : <EntradasCards data={entradasFiltradas} isDark={isDark} onConfirm={(ids) => confirmarEntrada.mutate(ids)} confirming={confirmarEntrada.isPending} />
+                ? <EntradasList data={entradasFiltradas} isDark={isDark} onConfirm={(ids) => confirmarEntrada.mutate(ids)} confirming={confirmarEntrada.isPending} isAdmin={isAdmin} onCancel={handleCancelar} cancelling={cancelarEntrada.isPending} />
+                : <EntradasCards data={entradasFiltradas} isDark={isDark} onConfirm={(ids) => confirmarEntrada.mutate(ids)} confirming={confirmarEntrada.isPending} isAdmin={isAdmin} onCancel={handleCancelar} cancelling={cancelarEntrada.isPending} />
             )}
             {activeTab === 'liberado_retirada' && (
               viewMode === 'list'
@@ -456,7 +384,7 @@ export default function Itens() {
 // Em Estoque — List & Cards
 // ═════════════════════════════════════════════════════════════════════════════
 
-function SaldosList({ data, isDark, onEdit, onClickItem, onSolicitar }: { data: EstSaldo[]; isDark: boolean; onEdit: (item: EstItem) => void; onClickItem: (itemId: string) => void; onSolicitar?: () => void }) {
+function SaldosList({ data, isDark, onEdit, onClickItem }: { data: EstSaldo[]; isDark: boolean; onEdit: (item: EstItem) => void; onClickItem: (itemId: string) => void }) {
   if (data.length === 0) return <EmptyState icon={Package2} msg="Nenhum item em estoque" sub="Os itens aparecerão aqui quando houver saldo" isDark={isDark} />
   return (
     <>
@@ -469,7 +397,7 @@ function SaldosList({ data, isDark, onEdit, onClickItem, onSolicitar }: { data: 
         <span className="w-[80px] shrink-0 text-right">Saldo</span>
         <span className="w-[60px] shrink-0 text-right">Reserv.</span>
         <span className="w-[80px] shrink-0 text-right">Disp.</span>
-        <span className="w-[90px] shrink-0" />
+        <span className="w-[40px] shrink-0" />
       </div>
       {/* Rows */}
       {data.map(s => {
@@ -509,16 +437,7 @@ function SaldosList({ data, isDark, onEdit, onClickItem, onSolicitar }: { data: 
             }`}>
               {disponivel} {s.item?.unidade}
             </span>
-            <span className="w-[90px] shrink-0 flex items-center justify-end gap-2">
-              <button
-                onClick={(e) => { e.stopPropagation(); onSolicitar?.() }}
-                title="Nova solicitação de retirada"
-                className={`flex items-center gap-0.5 text-[10px] font-semibold transition-colors ${
-                  isDark ? 'text-teal-400 hover:text-teal-300' : 'text-teal-600 hover:text-teal-700'
-                }`}
-              >
-                <ClipboardList size={11} /> Solicitar
-              </button>
+            <span className="w-[40px] shrink-0 text-right">
               <button
                 onClick={(e) => { e.stopPropagation(); s.item && onEdit(s.item as EstItem) }}
                 className="text-[10px] text-blue-600 font-semibold hover:underline"
@@ -603,8 +522,7 @@ function DestinoBadge({ tipo, isDark }: { tipo?: string; isDark: boolean }) {
   )
 }
 
-function EntradasList({ data, isDark, onConfirm, confirming }: { data: EstoqueEntradaItem[]; isDark: boolean; onConfirm: (ids: string[]) => void; confirming: boolean }) {
-  const navigate = useNavigate()
+function EntradasList({ data, isDark, onConfirm, confirming, isAdmin, onCancel, cancelling }: { data: EstoqueEntradaItem[]; isDark: boolean; onConfirm: (ids: string[]) => void; confirming: boolean; isAdmin: boolean; onCancel: (ids: string[]) => void; cancelling: boolean }) {
   if (data.length === 0) return <EmptyState icon={PackageCheck} msg="Nenhuma entrada pendente" sub="Os itens aparecerão aqui após confirmar recebimento" isDark={isDark} />
   return (
     <>
@@ -635,14 +553,7 @@ function EntradasList({ data, isDark, onConfirm, confirming }: { data: EstoqueEn
             <DestinoBadge tipo={e.tipo_destino} isDark={isDark} />
           </span>
           <span className={`text-[11px] font-mono w-[120px] shrink-0 truncate ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
-            {e.numero_pedido ? (
-              <button
-                onClick={() => navigate(`/pedidos?busca=${encodeURIComponent(e.numero_pedido!)}`)}
-                className="text-blue-500 hover:text-blue-600 hover:underline cursor-pointer"
-              >
-                {e.numero_pedido}
-              </button>
-            ) : '—'}
+            {e.numero_pedido || '—'}
           </span>
           <span className={`text-[11px] truncate w-[120px] shrink-0 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
             {e.fornecedor_nome || '—'}
@@ -650,7 +561,17 @@ function EntradasList({ data, isDark, onConfirm, confirming }: { data: EstoqueEn
           <span className={`text-[11px] text-right w-[62px] shrink-0 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
             {fmtDate(e.criado_em)}
           </span>
-          <span className="w-[80px] shrink-0 text-right">
+          <span className="w-[120px] shrink-0 text-right flex items-center justify-end gap-1">
+            {isAdmin && (
+              <button
+                onClick={() => onCancel([e.id])}
+                disabled={cancelling}
+                className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-1 rounded-lg bg-red-500 text-white hover:bg-red-600 disabled:opacity-50 transition-all"
+              >
+                <Ban size={11} />
+                Cancelar
+              </button>
+            )}
             <button
               onClick={() => onConfirm([e.id])}
               disabled={confirming}
@@ -678,8 +599,7 @@ function EntradasList({ data, isDark, onConfirm, confirming }: { data: EstoqueEn
   )
 }
 
-function EntradasCards({ data, isDark, onConfirm, confirming }: { data: EstoqueEntradaItem[]; isDark: boolean; onConfirm: (ids: string[]) => void; confirming: boolean }) {
-  const navigate = useNavigate()
+function EntradasCards({ data, isDark, onConfirm, confirming, isAdmin, onCancel, cancelling }: { data: EstoqueEntradaItem[]; isDark: boolean; onConfirm: (ids: string[]) => void; confirming: boolean; isAdmin: boolean; onCancel: (ids: string[]) => void; cancelling: boolean }) {
   if (data.length === 0) return <EmptyState icon={PackageCheck} msg="Nenhuma entrada pendente" sub="Os itens aparecerão aqui após confirmar recebimento" isDark={isDark} />
   return (
     <div className="space-y-2 p-4">
@@ -694,18 +614,7 @@ function EntradasCards({ data, isDark, onConfirm, confirming }: { data: EstoqueE
             <div className="flex items-start justify-between">
               <div className="min-w-0">
                 <p className={`font-mono text-[10px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
-                  {e.codigo || '—'}{' '}
-                  {e.numero_pedido ? (
-                    <>
-                      {'· '}
-                      <button
-                        onClick={() => navigate(`/pedidos?busca=${encodeURIComponent(e.numero_pedido!)}`)}
-                        className="text-blue-500 hover:text-blue-600 hover:underline cursor-pointer"
-                      >
-                        {e.numero_pedido}
-                      </button>
-                    </>
-                  ) : ''}
+                  {e.codigo || '—'} {e.numero_pedido ? `· ${e.numero_pedido}` : ''}
                 </p>
                 <p className={`font-semibold text-sm truncate mt-0.5 ${isDark ? 'text-white' : 'text-slate-800'}`}>
                   {e.descricao}
@@ -727,6 +636,16 @@ function EntradasCards({ data, isDark, onConfirm, confirming }: { data: EstoqueE
               <span className={`text-[11px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
                 {e.base_nome ? `Base: ${e.base_nome}` : ''} {fmtDate(e.criado_em)}
               </span>
+              <div className="flex items-center gap-1.5">
+                {isAdmin && (
+                  <button
+                    onClick={() => onCancel([e.id])}
+                    disabled={cancelling}
+                    className="inline-flex items-center gap-1 text-[11px] font-bold px-3 py-1.5 rounded-lg bg-red-500 text-white hover:bg-red-600 disabled:opacity-50 transition-all"
+                  >
+                    <Ban size={12} /> Cancelar
+                  </button>
+                )}
               <button
                 onClick={() => onConfirm([e.id])}
                 disabled={confirming}
@@ -735,6 +654,7 @@ function EntradasCards({ data, isDark, onConfirm, confirming }: { data: EstoqueE
                 <CheckCircle2 size={12} />
                 Confirmar Entrada
               </button>
+              </div>
             </div>
           </div>
         )
@@ -1177,7 +1097,7 @@ function ItemFormModal({
 
           <div>
             <label className={`block text-xs font-bold mb-1 ${labelCls}`}>Descrição *</label>
-            <UpperInput value={item.descricao ?? ''} onChange={e => set('descricao', e.target.value)}
+            <input value={item.descricao ?? ''} onChange={e => set('descricao', e.target.value)}
               className={inputCls} placeholder="Nome completo do item" />
           </div>
 

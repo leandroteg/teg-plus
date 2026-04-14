@@ -563,6 +563,25 @@ export function useConfirmarEntrada() {
   })
 }
 
+export function useCancelarEntrada() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (itemIds: string[]) => {
+      const { error } = await supabase
+        .from('cmp_recebimento_itens')
+        .update({ status: 'cancelado' })
+        .in('id', itemIds)
+      if (error) throw error
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['est-aguardando-entrada'] })
+      qc.invalidateQueries({ queryKey: ['est-saldos'] })
+      qc.invalidateQueries({ queryKey: ['pedidos'] })
+      qc.invalidateQueries({ queryKey: ['recebimentos'] })
+    },
+  })
+}
+
 // ── Pipeline: Em Movimentação ────────────────────────────────────────────────
 export function useEmMovimentacao() {
   return useQuery<EstoqueMovimentacaoItem[]>({
