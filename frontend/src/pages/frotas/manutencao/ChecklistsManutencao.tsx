@@ -3,7 +3,7 @@ import { Search, ChevronRight, Check, X, Plus, LayoutList, LayoutGrid, AlertTria
 import { useTheme } from '../../../contexts/ThemeContext'
 import {
   useVeiculos, useItensManutencao, useIntervalosPreventiva,
-  useRegistrarTroca, useInicializarItensVeiculo,
+  useRegistrarTroca, useInicializarItensVeiculo, useHodometroEfetivo,
 } from '../../../hooks/useFrotas'
 import type { FroVeiculo, FroItemManutencao, CategoriaVeiculo } from '../../../types/frotas'
 
@@ -154,7 +154,10 @@ function VeiculoRow({ veiculo: v, isLight, isOpen, onToggle, cardCls }: {
   veiculo: FroVeiculo; isLight: boolean; isOpen: boolean; onToggle: () => void; cardCls: string
 }) {
   const { data: itens = [] } = useItensManutencao(v.id)
-  const alertas = itens.length > 0 ? countAlertas(itens, v.hodometro_atual) : null
+  const { data: hodo } = useHodometroEfetivo(v.id, v.hodometro_atual)
+  const kmEfetivo = hodo?.km ?? v.hodometro_atual
+  const alertas = itens.length > 0 ? countAlertas(itens, kmEfetivo) : null
+  const fonteLabel = hodo?.fonte === 'telemetria' ? 'via telemetria' : hodo?.fonte === 'checklist' ? 'via checklist' : ''
 
   return (
     <button onClick={onToggle}
@@ -172,7 +175,8 @@ function VeiculoRow({ veiculo: v, isLight, isOpen, onToggle, cardCls }: {
           }`}>{CAT_LABELS[v.categoria] ?? v.categoria}</span>
         </div>
         <div className={`text-xs mt-0.5 ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>
-          Hodômetro: {fmtKm(v.hodometro_atual)} km
+          Hodômetro: {kmEfetivo > 0 ? `${fmtKm(kmEfetivo)} km` : '—'}
+          {fonteLabel && <span className="ml-1 text-[10px] opacity-60">({fonteLabel})</span>}
         </div>
       </div>
       {/* Alertas */}
@@ -191,6 +195,11 @@ function VeiculoRow({ veiculo: v, isLight, isOpen, onToggle, cardCls }: {
           Sem itens
         </span>
       )}
+      {kmEfetivo === 0 && (
+        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-lg ${isLight ? 'bg-slate-100 text-slate-400' : 'bg-white/[0.06] text-slate-500'}`}>
+          Sem registro do hodômetro
+        </span>
+      )}
       <ChevronRight size={16} className={`transition-transform ${isOpen ? 'rotate-90' : ''} ${isLight ? 'text-slate-400' : 'text-slate-500'}`} />
     </button>
   )
@@ -202,7 +211,10 @@ function VeiculoCard({ veiculo: v, isLight, cardCls, isOpen, onToggle }: {
   veiculo: FroVeiculo; isLight: boolean; cardCls: string; isOpen: boolean; onToggle: () => void
 }) {
   const { data: itens = [] } = useItensManutencao(v.id)
-  const alertas = itens.length > 0 ? countAlertas(itens, v.hodometro_atual) : null
+  const { data: hodo } = useHodometroEfetivo(v.id, v.hodometro_atual)
+  const kmEfetivo = hodo?.km ?? v.hodometro_atual
+  const alertas = itens.length > 0 ? countAlertas(itens, kmEfetivo) : null
+  const fonteLabel = hodo?.fonte === 'telemetria' ? 'telemetria' : hodo?.fonte === 'checklist' ? 'checklist' : ''
 
   return (
     <button onClick={onToggle}
@@ -217,7 +229,8 @@ function VeiculoCard({ veiculo: v, isLight, cardCls, isOpen, onToggle }: {
       </div>
       <p className={`text-xs ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>{v.marca} {v.modelo}</p>
       <p className={`text-xs mt-1 ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>
-        Hodômetro: <span className="font-semibold">{fmtKm(v.hodometro_atual)} km</span>
+        Hodômetro: <span className="font-semibold">{kmEfetivo > 0 ? `${fmtKm(kmEfetivo)} km` : '—'}</span>
+        {fonteLabel && <span className="ml-1 text-[10px] opacity-60">({fonteLabel})</span>}
       </p>
 
       {/* Status badges */}
@@ -242,6 +255,11 @@ function VeiculoCard({ veiculo: v, isLight, cardCls, isOpen, onToggle }: {
             Sem itens
           </span>
         )}
+        {kmEfetivo === 0 && (
+          <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${isLight ? 'bg-slate-100 text-slate-400' : 'bg-white/[0.06] text-slate-500'}`}>
+            Sem registro do hodômetro
+          </span>
+        )}
       </div>
     </button>
   )
@@ -252,6 +270,7 @@ function VeiculoCard({ veiculo: v, isLight, cardCls, isOpen, onToggle }: {
 function DetalheItens({ veiculo, isLight }: { veiculo: FroVeiculo; isLight: boolean }) {
   const { data: itens = [], isLoading } = useItensManutencao(veiculo.id)
   const { data: intervalos = [] } = useIntervalosPreventiva(veiculo.categoria)
+  const { data: hodo } = useHodometroEfetivo(veiculo.id, veiculo.hodometro_atual)
   const registrarTroca = useRegistrarTroca()
   const inicializar = useInicializarItensVeiculo()
   const [modal, setModal] = useState<{ tipo: string; descricao: string } | null>(null)
@@ -260,7 +279,7 @@ function DetalheItens({ veiculo, isLight }: { veiculo: FroVeiculo; isLight: bool
   const [formObs, setFormObs] = useState('')
 
   const intMap = useMemo(() => new Map(intervalos.map(i => [i.tipo_item, i])), [intervalos])
-  const hodometro = veiculo.hodometro_atual
+  const hodometro = hodo?.km ?? veiculo.hodometro_atual
 
   function abrirModal(tipo: string) {
     setModal({ tipo, descricao: ITEM_LABELS[tipo] ?? tipo })

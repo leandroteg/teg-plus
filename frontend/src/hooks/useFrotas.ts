@@ -978,6 +978,43 @@ export function useResetarIntervalosCategoria() {
   })
 }
 
+// Hodômetro efetivo: telemetria > último checklist > cadastro
+export function useHodometroEfetivo(veiculoId?: string, hodometroCadastro = 0) {
+  return useQuery<{ km: number; fonte: 'telemetria' | 'checklist' | 'cadastro' }>({
+    queryKey: ['hodometro_efetivo', veiculoId],
+    queryFn: async () => {
+      // Se o cadastro já tem hodômetro (vindo da telemetria via trigger 083)
+      if (hodometroCadastro > 0) return { km: hodometroCadastro, fonte: 'telemetria' as const }
+
+      // Fallback: último checklist com hodômetro
+      if (veiculoId) {
+        const { data } = await supabase
+          .from('fro_checklists')
+          .select('hodometro')
+          .eq('veiculo_id', veiculoId)
+          .not('hodometro', 'is', null)
+          .order('data_checklist', { ascending: false })
+          .limit(1)
+        if (data?.[0]?.hodometro) return { km: data[0].hodometro, fonte: 'checklist' as const }
+
+        // Tentar execuções de checklist (novo sistema)
+        const { data: exec } = await supabase
+          .from('fro_checklist_execucoes')
+          .select('hodometro')
+          .eq('veiculo_id', veiculoId)
+          .not('hodometro', 'is', null)
+          .order('created_at', { ascending: false })
+          .limit(1)
+        if (exec?.[0]?.hodometro) return { km: Number(exec[0].hodometro), fonte: 'checklist' as const }
+      }
+
+      return { km: 0, fonte: 'cadastro' as const }
+    },
+    enabled: !!veiculoId,
+    staleTime: 60_000,
+  })
+}
+
 export function useItensManutencao(veiculoId?: string) {
   return useQuery<FroItemManutencao[]>({
     queryKey: ['fro_itens_manutencao', veiculoId],
