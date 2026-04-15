@@ -963,7 +963,11 @@ export default function ListaRequisicoes() {
           isReenviandoDevolucao={reenviarDevolucaoMutation.isPending}
           onAbrirDetalhe={() => {
             setDetail(null)
-            navigate(`/requisicoes/${detail.id}`)
+            // Para RCs devolvidas, vai direto para modo edição; outras para o detalhe
+            const rota = detail.status === 'devolvida_solicitante'
+              ? `/requisicoes/${detail.id}/editar`
+              : `/requisicoes/${detail.id}`
+            navigate(rota)
           }}
           onEnviarCotacao={() => {
             enviarCotacaoMutation.mutate({

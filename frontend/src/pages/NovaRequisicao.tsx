@@ -1,12 +1,12 @@
 import { useState, useRef, useCallback, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useParams } from 'react-router-dom'
 import {
   Sparkles, Send, PlusCircle, Trash2, ChevronLeft, ChevronRight,
   AlertCircle, Check, Layers, FileText, Search, Upload, FileUp,
   ChevronDown, X, FileImage, Eye, Pencil, CheckCircle2, Loader2,
   Package, MapPin, Zap, Save,
 } from 'lucide-react'
-import { useCriarRequisicao } from '../hooks/useRequisicoes'
+import { useCriarRequisicao, useAtualizarRequisicao, useRequisicao } from '../hooks/useRequisicoes'
 import { useAiParse, readFileForAi, isBinaryFile, isImageFile } from '../hooks/useAiParse'
 import { useCategorias } from '../hooks/useCategorias'
 import { useLookupObras } from '../hooks/useLookups'
@@ -105,7 +105,11 @@ function buildResumoRequisicao(itens: RequisicaoItem[], detalhes: string) {
 
 export default function NovaRequisicao() {
   const nav = useNavigate()
+  const { id: editId } = useParams<{ id?: string }>()
+  const isEditMode = Boolean(editId)
   const mutation = useCriarRequisicao()
+  const updateMutation = useAtualizarRequisicao()
+  const { data: reqExistente, isLoading: reqLoading } = useRequisicao(editId)
   const aiParse = useAiParse()
   const { data: categorias = [], isLoading: catLoading } = useCategorias()
   const obras = useLookupObras()
@@ -197,6 +201,47 @@ export default function NovaRequisicao() {
     } catch { /* ignore parse errors */ }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  // ── Pré-preenche campos quando em modo edição ───────────────────────────
+  const [editPrefilled, setEditPrefilled] = useState(false)
+  useEffect(() => {
+    if (!isEditMode || !reqExistente || editPrefilled || categorias.length === 0) return
+
+    const r = reqExistente
+    if (r.obra_id) setObraId(r.obra_id)
+    setDescricao(r.descricao ?? '')
+    setJustificativa(r.justificativa ?? '')
+    setUrgencia((r.urgencia as Urgencia) ?? 'normal')
+    setJustificativaUrgencia(r.justificativa_urgencia ?? '')
+    setCompraRecorrente(Boolean((r as any).compra_recorrente))
+    if ((r as any).data_necessidade) setDataNecessidade((r as any).data_necessidade)
+
+    if (r.categoria) {
+      const cat = categorias.find(c => c.codigo === r.categoria)
+      if (cat) setCategoria(cat)
+    }
+
+    if (r.itens && r.itens.length > 0) {
+      setItens(r.itens.map(it => ({
+        descricao: it.descricao ?? '',
+        quantidade: it.quantidade ?? 1,
+        unidade: it.unidade ?? 'un',
+        valor_unitario_estimado: it.valor_unitario_estimado ?? 0,
+        est_item_id: (it as any).est_item_id ?? undefined,
+        est_item_codigo: (it as any).est_item_codigo ?? undefined,
+        classe_financeira_id: (it as any).classe_financeira_id ?? undefined,
+        classe_financeira_codigo: (it as any).classe_financeira_codigo ?? undefined,
+        classe_financeira_descricao: (it as any).classe_financeira_descricao ?? undefined,
+        categoria_financeira_codigo: (it as any).categoria_financeira_codigo ?? undefined,
+        categoria_financeira_descricao: (it as any).categoria_financeira_descricao ?? undefined,
+        destino_operacional: (it as any).destino_operacional ?? 'estoque',
+      })))
+    }
+
+    // Abre direto na etapa 2 (Detalhes) já que a categoria já existe
+    setStep(2)
+    setEditPrefilled(true)
+  }, [isEditMode, reqExistente, editPrefilled, categorias])
 
   const filteredCats = categorias.filter(cat =>
     !searchCat.trim() ||
@@ -391,8 +436,17 @@ export default function NovaRequisicao() {
     setSubmitError(null)
     setSubmitting(true)
     try {
-      await mutation.mutateAsync(buildPayload(false))
-      nav('/requisicoes')
+      if (isEditMode && editId && reqExistente) {
+        await updateMutation.mutateAsync({
+          requisicaoId: editId,
+          statusAtual: reqExistente.status,
+          payload: buildPayload(false),
+        })
+        nav(`/requisicoes/${editId}`)
+      } else {
+        await mutation.mutateAsync(buildPayload(false))
+        nav('/requisicoes')
+      }
     } catch (err) {
       const msg = (err as Error)?.message || 'Erro ao enviar. Tente novamente.'
       setSubmitError(msg)
@@ -405,10 +459,20 @@ export default function NovaRequisicao() {
     setSubmitError(null)
     setSavingDraft(true)
     try {
-      await mutation.mutateAsync(buildPayload(true))
-      nav('/requisicoes')
+      if (isEditMode && editId && reqExistente) {
+        // Em modo edição "Salvar" apenas persiste alterações no status atual
+        await updateMutation.mutateAsync({
+          requisicaoId: editId,
+          statusAtual: reqExistente.status,
+          payload: buildPayload(false),
+        })
+        nav(`/requisicoes/${editId}`)
+      } else {
+        await mutation.mutateAsync(buildPayload(true))
+        nav('/requisicoes')
+      }
     } catch (err) {
-      const msg = (err as Error)?.message || 'Erro ao salvar rascunho. Tente novamente.'
+      const msg = (err as Error)?.message || 'Erro ao salvar. Tente novamente.'
       setSubmitError(msg)
     } finally {
       setSavingDraft(false)

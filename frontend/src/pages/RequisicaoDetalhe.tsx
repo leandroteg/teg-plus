@@ -4,7 +4,7 @@ import {
   ArrowLeft, Building, User, Calendar, Tag, Package,
   CheckCircle, XCircle, MessageSquare, AlertTriangle,
   ChevronDown, ChevronUp, ShoppingCart, UserCog, ExternalLink,
-  FileText, Ban, Send, Undo2,
+  FileText, Ban, Send, Undo2, Pencil,
 } from 'lucide-react'
 import { useRequisicao, useReenviarEsclarecimento, useReenviarAposDevolucao } from '../hooks/useRequisicoes'
 import { useDecisaoRequisicao } from '../hooks/useAprovacoes'
@@ -190,6 +190,18 @@ export default function RequisicaoDetalhe() {
             <strong>Importante:</strong> ajuste os itens da requisição conforme necessário.
             Ao reenviar, o ciclo de aprovação reinicia pela alçada 1.
           </p>
+
+          {!reenviarDevolucaoMutation.isSuccess && (
+            <button
+              disabled={isLocked}
+              onClick={() => navigate(`/requisicoes/${req.id}/editar`)}
+              className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl
+                bg-white border-2 border-rose-300 text-rose-600 text-sm font-bold
+                hover:bg-rose-50 active:scale-[0.98] transition-all disabled:opacity-50"
+            >
+              <Pencil size={14} /> Editar requisição (itens, obra, categoria…)
+            </button>
+          )}
 
           {!reenviarDevolucaoMutation.isSuccess && (
             <div className="pt-2 border-t border-rose-200 space-y-2">

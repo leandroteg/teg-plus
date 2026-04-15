@@ -395,6 +395,125 @@ export function useReenviarEsclarecimento() {
   })
 }
 
+// ── Atualizar RC (edição pelo solicitante antes da cotação) ─────────────────
+// Permitido apenas em status editáveis: rascunho, em_esclarecimento,
+// devolvida_solicitante. Demais status lançam erro para evitar corromper
+// fluxo de aprovação/cotação.
+
+const STATUS_EDITAVEIS = ['rascunho', 'em_esclarecimento', 'devolvida_solicitante'] as const
+
+export function useAtualizarRequisicao() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async ({
+      requisicaoId,
+      statusAtual,
+      payload,
+    }: {
+      requisicaoId: string
+      statusAtual: string
+      payload: NovaRequisicaoPayload
+    }) => {
+      if (!STATUS_EDITAVEIS.includes(statusAtual as typeof STATUS_EDITAVEIS[number])) {
+        throw new Error(`Esta requisição não pode ser editada no status "${statusAtual}".`)
+      }
+
+      // Recalcula totais/alçada/classes (mesma lógica do insert)
+      const valorEstimado = payload.itens.reduce(
+        (sum, item) => sum + (item.quantidade * (item.valor_unitario_estimado ?? 0)), 0
+      )
+      const alcadaNivel = valorEstimado > 2000 ? 2 : 1
+      const classesSnapshot = Array.from(new Set(
+        payload.itens
+          .map(item => item.classe_financeira_codigo?.trim())
+          .filter((value): value is string => Boolean(value)),
+      ))
+      const classeFinanceiraCodigo = classesSnapshot.length === 1 ? classesSnapshot[0] : null
+      const classeFinanceiraId = classesSnapshot.length === 1
+        ? payload.itens.find(item => item.classe_financeira_codigo === classeFinanceiraCodigo)?.classe_financeira_id ?? null
+        : null
+
+      // Centro de custo (a partir da obra, se trocou)
+      let centroCustoId: string | null = null
+      let centroCustoCodigo: string | null = null
+      if (payload.obra_id) {
+        try {
+          const { data: obra } = await supabase
+            .from('sys_obras')
+            .select('centro_custo_id, centro_custo:sys_centros_custo!centro_custo_id(codigo)')
+            .eq('id', payload.obra_id)
+            .maybeSingle()
+          centroCustoId = (obra as any)?.centro_custo_id ?? null
+          centroCustoCodigo = (obra as any)?.centro_custo?.codigo ?? null
+        } catch { /* mantém null */ }
+      }
+
+      // 1. Atualiza campos do cabeçalho (NÃO mexe em numero, solicitante_*, status, created_at)
+      const { error: reqError } = await supabase
+        .from(TABLE)
+        .update({
+          obra_nome:        payload.obra_nome,
+          obra_id:          payload.obra_id    || null,
+          descricao:        payload.descricao,
+          justificativa:    payload.justificativa || null,
+          urgencia:         payload.urgencia,
+          justificativa_urgencia: payload.justificativa_urgencia || null,
+          compra_recorrente: payload.compra_recorrente || false,
+          categoria:        payload.categoria  || null,
+          alcada_nivel:     alcadaNivel,
+          centro_custo:     centroCustoCodigo,
+          centro_custo_id:  centroCustoId,
+          classe_financeira: classeFinanceiraCodigo,
+          classe_financeira_id: classeFinanceiraId,
+          valor_estimado:   valorEstimado,
+          data_necessidade: (payload as any).data_necessidade || null,
+        })
+        .eq('id', requisicaoId)
+
+      if (reqError) throw new Error(reqError.message)
+
+      // 2. Substitui itens (delete-all + insert). Seguro porque status editáveis
+      //    nunca têm cotações/pedidos referenciando os itens.
+      const { error: delError } = await supabase
+        .from('cmp_requisicao_itens')
+        .delete()
+        .eq('requisicao_id', requisicaoId)
+      if (delError) throw new Error(`Falha ao limpar itens antigos: ${delError.message}`)
+
+      const itensNovos = payload.itens
+        .filter(i => i.descricao?.trim())
+        .map(item => ({
+          requisicao_id:            requisicaoId,
+          descricao:                item.descricao,
+          quantidade:               item.quantidade,
+          unidade:                  item.unidade || 'un',
+          valor_unitario_estimado:  item.valor_unitario_estimado ?? 0,
+          est_item_id:              item.est_item_id || null,
+          est_item_codigo:          item.est_item_codigo || null,
+          classe_financeira_id:     item.classe_financeira_id || null,
+          classe_financeira_codigo: item.classe_financeira_codigo || null,
+          classe_financeira_descricao: item.classe_financeira_descricao || null,
+          categoria_financeira_codigo: item.categoria_financeira_codigo || null,
+          categoria_financeira_descricao: item.categoria_financeira_descricao || null,
+          destino_operacional:      item.destino_operacional || 'estoque',
+        }))
+      if (itensNovos.length > 0) {
+        const { error: insError } = await supabase
+          .from('cmp_requisicao_itens')
+          .insert(itensNovos)
+        if (insError) throw new Error(`Falha ao gravar itens: ${insError.message}`)
+      }
+
+      return { id: requisicaoId }
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['requisicoes'] })
+      qc.invalidateQueries({ queryKey: ['requisicao'] })
+      qc.invalidateQueries({ queryKey: ['dashboard'] })
+    },
+  })
+}
+
 // ── Reenviar RC após devolução do cotador ────────────────────────────────────
 // Solicitante editou itens/descrição e reenvia → reinicia ciclo na alçada 1
 

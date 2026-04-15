@@ -458,6 +458,7 @@ export default function App() {
               <Route path="/nova"        element={<Lazy><NovaRequisicao /></Lazy>} />
               <Route path="/requisicoes" element={<Lazy><ListaRequisicoes /></Lazy>} />
               <Route path="/requisicoes/:id" element={<Lazy><RequisicaoDetalhe /></Lazy>} />
+              <Route path="/requisicoes/:id/editar" element={<Lazy><NovaRequisicao /></Lazy>} />
               <Route path="/cotacoes"    element={<Lazy><FilaCotacoes /></Lazy>} />
               <Route path="/cotacoes/:id" element={<Lazy><CotacaoForm /></Lazy>} />
               <Route path="/pedidos"     element={<Lazy><Pedidos /></Lazy>} />
