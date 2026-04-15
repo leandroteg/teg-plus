@@ -7,7 +7,7 @@ import {
   Loader2, Send, PackageCheck, Undo2,
 } from 'lucide-react'
 import { useTheme } from '../contexts/ThemeContext'
-import { useRequisicoes, useReenviarEsclarecimento, useEnviarParaCotacao } from '../hooks/useRequisicoes'
+import { useRequisicoes, useReenviarEsclarecimento, useEnviarParaCotacao, useReenviarAposDevolucao } from '../hooks/useRequisicoes'
 import { useLookupObras } from '../hooks/useLookups'
 import { useAprovacoesPendentes, useDecisaoRequisicao } from '../hooks/useAprovacoes'
 import { useEmitirPedido, useCancelarRequisicao } from '../hooks/usePedidos'
@@ -231,7 +231,7 @@ function ReqCard({ r, apr, isDark, onClick }: {
 
 // ── Detail Modal ────────────────────────────────────────────────────────────
 
-function DetailModal({ r, apr, onClose, isDark, canDecide, onDecisao, isProcessing, onEmitir, onCancelar, isEmitting, isCancelling, onReenviar, isReenviando, onEnviarCotacao, isEnviandoCotacao }: {
+function DetailModal({ r, apr, onClose, isDark, canDecide, onDecisao, isProcessing, onEmitir, onCancelar, isEmitting, isCancelling, onReenviar, isReenviando, onEnviarCotacao, isEnviandoCotacao, onReenviarDevolucao, isReenviandoDevolucao, onAbrirDetalhe }: {
   r: Requisicao; apr?: Aprovacao; onClose: () => void; isDark: boolean
   canDecide: boolean
   onDecisao: (decisao: 'aprovada' | 'rejeitada' | 'esclarecimento', obs: string) => void
@@ -239,9 +239,12 @@ function DetailModal({ r, apr, onClose, isDark, canDecide, onDecisao, isProcessi
   onEmitir: () => void; onCancelar: () => void; isEmitting: boolean; isCancelling: boolean
   onReenviar: (resposta: string) => void; isReenviando: boolean
   onEnviarCotacao: () => void; isEnviandoCotacao: boolean
+  onReenviarDevolucao: (resposta: string) => void; isReenviandoDevolucao: boolean
+  onAbrirDetalhe: () => void
 }) {
   const [observacao, setObservacao] = useState('')
   const [respostaEsclarecimento, setRespostaEsclarecimento] = useState('')
+  const [respostaDevolucao, setRespostaDevolucao] = useState('')
   const approvalLabel = getApprovalStatusLabel(r.status)
   const atLeastComprador = true // will be checked externally
   const esclarecimentos = r.esclarecimento_historico?.length
@@ -397,6 +400,55 @@ function DetailModal({ r, apr, onClose, isDark, canDecide, onDecisao, isProcessi
             </div>
           )}
 
+          {/* Devolvida pelo Comprador — motivo + resposta rápida */}
+          {r.status === 'devolvida_solicitante' && r.devolucao_msg && (
+            <div className={`rounded-xl px-3.5 py-3 space-y-3 ${isDark ? 'bg-rose-500/10 border border-rose-500/20' : 'bg-rose-50 border border-rose-200'}`}>
+              <div className="flex items-center gap-1.5">
+                <Undo2 size={13} className={isDark ? 'text-rose-400' : 'text-rose-600'} />
+                <p className={`text-[10px] font-bold uppercase tracking-wider ${isDark ? 'text-rose-400' : 'text-rose-700'}`}>
+                  Devolvida pelo Comprador{r.devolucao_por ? ` — ${r.devolucao_por}` : ''}
+                </p>
+              </div>
+              <p className={`text-xs leading-relaxed ${isDark ? 'text-rose-300' : 'text-rose-700'}`}>{r.devolucao_msg}</p>
+
+              <div className={`pt-2 space-y-2 ${isDark ? 'border-t border-rose-500/20' : 'border-t border-rose-200'}`}>
+                <p className={`text-[10px] font-bold uppercase tracking-wide ${isDark ? 'text-rose-400' : 'text-rose-600'}`}>
+                  Resposta rápida (opcional)
+                </p>
+                <UpperTextarea
+                  rows={2}
+                  className={`w-full border rounded-xl px-3 py-2 text-sm outline-none ${
+                    isDark ? 'bg-white/5 border-rose-500/20 text-white placeholder:text-slate-500 focus:ring-2 focus:ring-rose-500/30'
+                      : 'border-rose-200 bg-white focus:ring-2 focus:ring-rose-400/30'
+                  }`}
+                  placeholder="Se for só um esclarecimento, responda aqui e reenvie…"
+                  value={respostaDevolucao}
+                  onChange={e => setRespostaDevolucao(e.target.value)}
+                />
+                <div className="flex gap-2">
+                  <button
+                    disabled={isReenviandoDevolucao}
+                    onClick={onAbrirDetalhe}
+                    className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-xs font-bold transition-all disabled:opacity-50 ${
+                      isDark ? 'bg-white/5 text-rose-300 border border-rose-500/30 hover:bg-white/10'
+                        : 'bg-white text-rose-600 border border-rose-200 hover:bg-rose-50'
+                    }`}
+                  >
+                    <FileText size={14} /> Editar requisição
+                  </button>
+                  <button
+                    disabled={isReenviandoDevolucao}
+                    onClick={() => onReenviarDevolucao(respostaDevolucao)}
+                    className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-xs font-bold text-white bg-rose-500 border border-rose-500 hover:bg-rose-600 shadow-sm shadow-rose-500/20 active:scale-[0.98] transition-all disabled:opacity-50"
+                  >
+                    {isReenviandoDevolucao ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
+                    Responder e reenviar
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Responder esclarecimento (para requisitante) */}
           {r.status === 'em_esclarecimento' && (
             <div className={`pt-3 space-y-3 ${isDark ? 'border-t border-white/[0.06]' : 'border-t border-amber-100'}`}>
@@ -490,7 +542,7 @@ function DetailModal({ r, apr, onClose, isDark, canDecide, onDecisao, isProcessi
           )}
 
           {/* Botão ver detalhes completo */}
-          <button onClick={() => { onClose() }}
+          <button onClick={onAbrirDetalhe}
             className={`w-full py-2.5 rounded-xl text-xs font-bold transition-all ${
               isDark ? 'bg-white/5 text-slate-300 hover:bg-white/10' : 'bg-slate-50 text-slate-600 hover:bg-slate-100'
             }`}>
@@ -528,6 +580,7 @@ export default function ListaRequisicoes() {
   const { data: aprovacoes } = useAprovacoesPendentes()
   const decisaoMutation = useDecisaoRequisicao()
   const reenviarMutation = useReenviarEsclarecimento()
+  const reenviarDevolucaoMutation = useReenviarAposDevolucao()
   const enviarCotacaoMutation = useEnviarParaCotacao()
   const emitirPedidoMutation = useEmitirPedido()
   const cancelarMutation = useCancelarRequisicao()
@@ -889,6 +942,29 @@ export default function ListaRequisicoes() {
             })
           }}
           isReenviando={reenviarMutation.isPending}
+          onReenviarDevolucao={(resposta) => {
+            reenviarDevolucaoMutation.mutate({
+              requisicaoId: detail.id,
+              requisicaoNumero: detail.numero,
+              solicitanteNome: perfil?.nome ?? 'Solicitante',
+              resposta,
+            }, {
+              onSuccess: () => {
+                setDetail(null)
+                setToast({ type: 'success', msg: `${detail.numero}: Reenviada para aprovação` })
+                setTimeout(() => setToast(null), 4000)
+              },
+              onError: () => {
+                setToast({ type: 'error', msg: `Erro ao reenviar requisição` })
+                setTimeout(() => setToast(null), 5000)
+              },
+            })
+          }}
+          isReenviandoDevolucao={reenviarDevolucaoMutation.isPending}
+          onAbrirDetalhe={() => {
+            setDetail(null)
+            navigate(`/requisicoes/${detail.id}`)
+          }}
           onEnviarCotacao={() => {
             enviarCotacaoMutation.mutate({
               requisicaoId: detail.id,
