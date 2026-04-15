@@ -1,0 +1,473 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <title>Gestão de Grupos de E-mail</title>
+    <style>
+        body {
+            background-color: #f8f9fc;
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            display: flex;
+            justify-content: center;
+            padding: 50px 20px;
+            margin: 0;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 700px;
+        }
+
+        h1 {
+            text-align: center;
+            color: #4e73df;
+            font-weight: 300;
+            margin-bottom: 40px;
+        }
+
+        .group-card {
+            background: #ffffff;
+            border-radius: 16px;
+            padding: 25px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
+            border: 1px solid #e3e6f0;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            margin-bottom: 30px;
+        }
+
+        .group-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            border-bottom: 1px solid #f1f3f9;
+            padding-bottom: 20px;
+        }
+
+        .group-info h2 {
+            margin: 0;
+            font-size: 1.4rem;
+            color: #2e3b4e;
+        }
+
+        .group-email {
+            color: #4e73df;
+            font-weight: 500;
+            text-decoration: none;
+            font-size: 1rem;
+            display: block;
+            margin-top: 5px;
+        }
+
+        .btn-send {
+            text-decoration: none;
+            background: #4e73df;
+            color: white;
+            padding: 10px 20px;
+            border-radius: 10px;
+            font-weight: 600;
+            font-size: 0.85rem;
+            transition: 0.3s;
+            box-shadow: 0 4px 6px rgba(78, 115, 223, 0.2);
+            white-space: nowrap;
+        }
+
+        .btn-send:hover {
+            background: #224abe;
+            transform: translateY(-2px);
+        }
+
+        .members-section {
+            padding-top: 5px;
+        }
+
+        .members-label {
+            font-size: 0.75rem;
+            font-weight: 800;
+            color: #b7b9cc;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 10px;
+            display: block;
+        }
+
+        .members-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+
+        .member-item {
+            display: block;
+            margin-bottom: 8px;
+        }
+
+        .member-item a {
+            text-decoration: none;
+            color: #5a5c69;
+            background: #f1f3f9;
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            border: 1px solid #dee2e6;
+            display: inline-block;
+        }
+
+        .member-item a:hover {
+            color: #0078d7;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>Contatos por Grupo de e-mail</h1>
+
+    <!-- TEG (Equipe TEG) -->
+    <div class="group-card">
+        <div class="group-header">
+            <div class="group-info">
+                <h2>TEG (Equipe TEG)</h2>
+                <a href="mailto:todos@teguniao.com.br" class="group-email">todos@teguniao.com.br</a>
+            </div>
+            <a href="mailto:todos@teguniao.com.br" class="btn-send">ENVIAR E-MAIL</a>
+        </div>
+        <div class="members-section">
+            <span class="members-label">Membros do Grupo</span>
+            <ul class="members-list">
+                <li class="member-item"><a href="mailto:todos@teguniao.com.br">Equipe TEG</a></li>
+            </ul>
+        </div>
+    </div>
+
+    <!-- Admobras -->
+    <div class="group-card">
+        <div class="group-header">
+            <div class="group-info">
+                <h2>Admobras</h2>
+                <a href="mailto:admobras@teguniao.com.br" class="group-email">admobras@teguniao.com.br</a>
+            </div>
+            <a href="mailto:admobras@teguniao.com.br" class="btn-send">ENVIAR E-MAIL</a>
+        </div>
+        <div class="members-section">
+            <span class="members-label">Membros do Grupo</span>
+            <ul class="members-list">
+                <li class="member-item"><a href="mailto:alecio.carmo@teguniao.com.br">Alécio Soares do Carmo</a></li>
+                <li class="member-item"><a href="mailto:davi.santos@teguniao.com.br">Davi Capistrano dos Santos</a></li>
+                <li class="member-item"><a href="mailto:estefani.pereira@teguniao.com.br">Estefani Pereira</a></li>
+                <li class="member-item"><a href="mailto:karolyn.montes@teguniao.com.br">Karolyn Dias Nogueira Montes</a></li>
+                <li class="member-item"><a href="mailto:diovane.oliveira@teguniao.com.br">Diovane Nonato de Oliveira</a></li>
+            </ul>
+        </div>
+    </div>
+
+    <!-- Almoxarifado -->
+    <div class="group-card">
+        <div class="group-header">
+            <div class="group-info">
+                <h2>Almoxarifado</h2>
+                <a href="mailto:almoxarifado@teguniao.com.br" class="group-email">almoxarifado@teguniao.com.br</a>
+            </div>
+            <a href="mailto:almoxarifado@teguniao.com.br" class="btn-send">ENVIAR E-MAIL</a>
+        </div>
+        <div class="members-section">
+            <span class="members-label">Membros do Grupo</span>
+            <ul class="members-list">
+                <li class="member-item"><a href="mailto:aerson.oliveira@teguniao.com.br">Aerson Aloisio De Oliveira</a></li>
+                <li class="member-item"><a href="mailto:eder.rocha@teguniao.com.br">Eder Rocha</a></li>
+                <li class="member-item"><a href="mailto:erliton.silva@teguniao.com.br">Erliton Dos Santos Silva</a></li>
+                <li class="member-item"><a href="mailto:luciano.luiz@teguniao.com.br">Luciano Luiz</a></li>
+                <li class="member-item"><a href="mailto:marielson.macedo@teguniao.com.br">Marielson Macedo</a></li>
+                <li class="member-item"><a href="mailto:mauro.emiliano@teguniao.com.br">Mauro Emiliano</a></li>
+                <li class="member-item"><a href="mailto:carlos.medeiros@teguniao.com.br">Carlos Daniel de Lima Medeiros</a></li>
+            </ul>
+        </div>
+    </div>
+
+    <!-- Apoio (Menor Aprendiz) -->
+    <div class="group-card">
+        <div class="group-header">
+            <div class="group-info">
+                <h2>Apoio (Menor Aprendiz)</h2>
+                <a href="mailto:apoio@teguniao.com.br" class="group-email">apoio@teguniao.com.br</a>
+            </div>
+            <a href="mailto:apoio@teguniao.com.br" class="btn-send">ENVIAR E-MAIL</a>
+        </div>
+        <div class="members-section">
+            <span class="members-label">Membros do Grupo</span>
+            <ul class="members-list">
+                <li class="member-item"><a href="mailto:apoio1@teguniao.com.br">Julia Marques Frederico</a></li>
+                <li class="member-item"><a href="mailto:apoio2@teguniao.com.br">Marcos Vinícius Torres da Silva</a></li>
+                <li class="member-item"><a href="mailto:apoio2@teguniao.com.br">Samuel Oliveira Olivio</a></li>
+            </ul>
+        </div>
+    </div>
+
+    <!-- Contratos -->
+    <div class="group-card">
+        <div class="group-header">
+            <div class="group-info">
+                <h2>Contratos</h2>
+                <a href="mailto:contratos@teguniao.com.br" class="group-email">contratos@teguniao.com.br</a>
+            </div>
+            <a href="mailto:contratos@teguniao.com.br" class="btn-send">ENVIAR E-MAIL</a>
+        </div>
+        <div class="members-section">
+            <span class="members-label">Membros do Grupo</span>
+            <ul class="members-list">
+                <li class="member-item"><a href="mailto:jackeline.freire@teguniao.com.br">Jackeline Freire</a></li>
+                <li class="member-item"><a href="mailto:sirleid.benevides@teguniao.com.br">Sirleid Benevides</a></li>
+            </ul>
+        </div>
+    </div>
+
+    <!-- Controladoria -->
+    <div class="group-card">
+        <div class="group-header">
+            <div class="group-info">
+                <h2>Controladoria</h2>
+                <a href="mailto:controladoria@teguniao.com.br" class="group-email">controladoria@teguniao.com.br</a>
+            </div>
+            <a href="mailto:controladoria@teguniao.com.br" class="btn-send">ENVIAR E-MAIL</a>
+        </div>
+        <div class="members-section">
+            <span class="members-label">Membros do Grupo</span>
+            <ul class="members-list">
+                <li class="member-item"><a href="mailto:antonio.medeiros@teguniao.com.br">Antonio Medeiros</a></li>
+            </ul>
+        </div>
+    </div>
+
+    <!-- Diretoria -->
+    <div class="group-card">
+        <div class="group-header">
+            <div class="group-info">
+                <h2>Diretoria</h2>
+                <a href="mailto:diretoria@teguniao.com.br" class="group-email">diretoria@teguniao.com.br</a>
+            </div>
+            <a href="mailto:diretoria@teguniao.com.br" class="btn-send">ENVIAR E-MAIL</a>
+        </div>
+        <div class="members-section">
+            <span class="members-label">Membros do Grupo</span>
+            <ul class="members-list">
+                <li class="member-item"><a href="mailto:jackeline.freire@teguniao.com.br">Jackeline Freire</a></li>
+                <li class="member-item"><a href="mailto:laucidio@teguniao.com.br">Laucidio Pereira da Cunha Junior</a></li>
+                <li class="member-item"><a href="mailto:leandro.mallet@teguniao.com.br">Leandro Maia Mallet</a></li>
+                <li class="member-item"><a href="mailto:welton.pereira@teguniao.com.br">Welton Pereira</a></li>
+            </ul>
+        </div>
+    </div>
+
+    <!-- Engenharia -->
+    <div class="group-card">
+        <div class="group-header">
+            <div class="group-info">
+                <h2>Engenharia</h2>
+                <a href="mailto:engenharia@teguniao.com.br" class="group-email">engenharia@teguniao.com.br</a>
+            </div>
+            <a href="mailto:engenharia@teguniao.com.br" class="btn-send">ENVIAR E-MAIL</a>
+        </div>
+        <div class="members-section">
+            <span class="members-label">Membros do Grupo</span>
+            <ul class="members-list">
+                <li class="member-item"><a href="mailto:carlos.souza@teguniao.com.br">Carlos Eduardo De Souza</a></li>
+                <li class="member-item"><a href="mailto:julio.cesar@teguniao.com.br">Julio Cesar</a></li>
+                <li class="member-item"><a href="mailto:amanda.tostes@teguniao.com.br">Amanda Domingues</a></li>
+                <li class="member-item"><a href="mailto:leonardo.mendes@teguniao.com.br">Leonardo Mendes</a></li>
+                <li class="member-item"><a href="mailto:leo.rath@teguniao.com.br">Leo Erik Rath</a></li>
+                <li class="member-item"><a href="mailto:welton.pereira@teguniao.com.br">Welton Pereira</a></li>
+                <li class="member-item"><a href="mailto:tales.andrade@teguniao.com.br">Tales Andrade</a></li>
+                <li class="member-item"><a href="mailto:jonas.reis@teguniao.com.br">Jonas Reis</a></li>
+                <li class="member-item"><a href="mailto:adenilson.laube@teguniao.com.br">Edensilson Both Laube</a></li>
+                <li class="member-item"><a href="mailto:felipe.nunes@teguniao.com.br">Felipe Silva Nunes</a></li>
+            </ul>
+        </div>
+    </div>
+
+    <!-- Financeiro -->
+    <div class="group-card">
+        <div class="group-header">
+            <div class="group-info">
+                <h2>Financeiro</h2>
+                <a href="mailto:financeiro@teguniao.com.br" class="group-email">financeiro@teguniao.com.br</a>
+            </div>
+            <a href="mailto:financeiro@teguniao.com.br" class="btn-send">ENVIAR E-MAIL</a>
+        </div>
+        <div class="members-section">
+            <span class="members-label">Membros do Grupo</span>
+            <ul class="members-list">
+                <li class="member-item"><a href="mailto:naira.machado@teguniao.com.br">Naira Laís Machado</a></li>
+                <li class="member-item"><a href="mailto:patricia.alves@teguniao.com.br">Patricia Dos Santos Alves</a></li>
+                <li class="member-item"><a href="mailto:eduarda.almodi@teguniao.com.br">Maria Eduarda Almodi</a></li>
+                <li class="member-item"><a href="mailto:priscila.roman@teguniao.com.br">Priscila Aparecida Nabhan Roman</a></li>
+            </ul>
+        </div>
+    </div>
+
+    <!-- Frotas -->
+    <div class="group-card">
+        <div class="group-header">
+            <div class="group-info">
+                <h2>Frotas</h2>
+                <a href="mailto:frotas@teguniao.com.br" class="group-email">frotas@teguniao.com.br</a>
+            </div>
+            <a href="mailto:frotas@teguniao.com.br" class="btn-send">ENVIAR E-MAIL</a>
+        </div>
+        <div class="members-section">
+            <span class="members-label">Membros do Grupo</span>
+            <ul class="members-list">
+                <li class="member-item"><a href="mailto:rodolfo.almeida@teguniao.com.br">Rodolfo Campos Almeida</a></li>
+                <li class="member-item"><a href="mailto:fernando.maldonado@teguniao.com.br">Fernando Costa Maldonado</a></li>
+            </ul>
+        </div>
+    </div>
+
+    <!-- Ouvidoria -->
+    <div class="group-card">
+        <div class="group-header">
+            <div class="group-info">
+                <h2>Ouvidoria</h2>
+                <a href="mailto:ouvidoria@teguniao.com.br" class="group-email">ouvidoria@teguniao.com.br</a>
+            </div>
+            <a href="mailto:ouvidoria@teguniao.com.br" class="btn-send">ENVIAR E-MAIL</a>
+        </div>
+        <div class="members-section">
+            <span class="members-label">Membros do Grupo</span>
+            <ul class="members-list">
+                <li class="member-item"><a href="mailto:ouvidoria@teguniao.com.br">Ouvidoria</a></li>
+            </ul>
+        </div>
+    </div>
+
+    <!-- Prefeitos -->
+    <div class="group-card">
+        <div class="group-header">
+            <div class="group-info">
+                <h2>Prefeitos</h2>
+                <a href="mailto:prefeitos@teguniao.com.br" class="group-email">prefeitos@teguniao.com.br</a>
+            </div>
+            <a href="mailto:prefeitos@teguniao.com.br" class="btn-send">ENVIAR E-MAIL</a>
+        </div>
+        <div class="members-section">
+            <span class="members-label">Membros do Grupo</span>
+            <ul class="members-list">
+                <li class="member-item"><a href="mailto:giordano.cavalcante@teguniao.com.br">Giodano Bruno De Quiroz Cavalcante</a></li>
+                <li class="member-item"><a href="mailto:espedito.pereira@teguniao.com.br">Espedito Lucas de Souza Pereira</a></li>
+                <li class="member-item"><a href="mailto:lucas.miranda@teguniao.com.br">Lucas Correia Miranda</a></li>
+            </ul>
+        </div>
+    </div>
+
+    <!-- RH -->
+    <div class="group-card">
+        <div class="group-header">
+            <div class="group-info">
+                <h2>RH</h2>
+                <a href="mailto:rh@teguniao.com.br" class="group-email">rh@teguniao.com.br</a>
+            </div>
+            <a href="mailto:rh@teguniao.com.br" class="btn-send">ENVIAR E-MAIL</a>
+        </div>
+        <div class="members-section">
+            <span class="members-label">Membros do Grupo</span>
+            <ul class="members-list">
+                <li class="member-item"><a href="mailto:eleni.moreira@teguniao.com.br">Eleni Moreira</a></li>
+                <li class="member-item"><a href="mailto:keila.mariano@teguniao.com.br">Aline Correia</a></li>
+                <li class="member-item"><a href="mailto:wania.cabral@teguniao.com.br">Wania Cabral</a></li>
+                <li class="member-item"><a href="mailto:josiane.silva@teguniao.com.br">Josiene Peralta Da Silva</a></li>
+                <li class="member-item"><a href="mailto:apoio1@teguniao.com.br">Apoio 1</a></li>
+            </ul>
+        </div>
+    </div>
+
+    <!-- Segurança -->
+    <div class="group-card">
+        <div class="group-header">
+            <div class="group-info">
+                <h2>Segurança</h2>
+                <a href="mailto:seguranca@teguniao.com.br" class="group-email">seguranca@teguniao.com.br</a>
+            </div>
+            <a href="mailto:seguranca@teguniao.com.br" class="btn-send">ENVIAR E-MAIL</a>
+        </div>
+        <div class="members-section">
+            <span class="members-label">Membros do Grupo</span>
+            <ul class="members-list">
+                <li class="member-item"><a href="mailto:anaildes.santos@teguniao.com.br">Anaildes Santos</a></li>
+                <li class="member-item"><a href="mailto:elaine.almeida@teguniao.com.br">Elaine Almeida</a></li>
+                <li class="member-item"><a href="mailto:james.silva@teguniao.com.br">James Silva</a></li>
+                <li class="member-item"><a href="mailto:luciano.resende@teguniao.com.br">Luciano Dos Santos Resende</a></li>
+                <li class="member-item"><a href="mailto:khalliston.costa@teguniao.com.br">Khalliston Costa</a></li>
+                <li class="member-item"><a href="mailto:daniel.rodrigues@teguniao.com.br">Daniel Campos Rodrigues</a></li>
+                <li class="member-item"><a href="mailto:rosineia.santos@teguniao.com.br">Rosineia Lima Dos Santos</a></li>
+                <li class="member-item"><a href="mailto:ronald.santos@teguniao.com.br">Ronald Ferreira Santos</a></li>
+                <li class="member-item"><a href="mailto:wagner.oliveira@teguniao.com.br">Wagner Dos Santos Oliveira</a></li>
+                <li class="member-item"><a href="mailto:rosana.silva@teguniao.com.br">Rosana Barbosa Da Silva</a></li>
+                <li class="member-item"><a href="mailto:jadson.almeida@teguniao.com.br">Jadson Reis Almeida</a></li>
+            </ul>
+        </div>
+    </div>
+
+    <!-- Supervisor -->
+    <div class="group-card">
+        <div class="group-header">
+            <div class="group-info">
+                <h2>Supervisor</h2>
+                <a href="mailto:supervisor@teguniao.com.br" class="group-email">supervisor@teguniao.com.br</a>
+            </div>
+            <a href="mailto:supervisor@teguniao.com.br" class="btn-send">ENVIAR E-MAIL</a>
+        </div>
+        <div class="members-section">
+            <span class="members-label">Membros do Grupo</span>
+            <ul class="members-list">
+                <li class="member-item"><a href="mailto:dione.weike@teguniao.com.br">Dione Weike</a></li>
+                <li class="member-item"><a href="mailto:anselmo.lima@teguniao.com.br">Anselmo Pereira Lima</a></li>
+                <li class="member-item"><a href="mailto:roberson.junior@teguniao.com.br">Roberson Ribeiro Junior</a></li>
+                <li class="member-item"><a href="mailto:vinicios.inacio@teguniao.com.br">Vinicios Inácio</a></li>
+                <li class="member-item"><a href="mailto:evandro.ferreira@teguniao.com.br">Evandro Eugênio Ferreira</a></li>
+                <li class="member-item"><a href="mailto:edenilson.baldin@teguniao.com.br">Edensilson Cardozo Baldin</a></li>
+            </ul>
+        </div>
+    </div>
+
+    <!-- Suprimentos -->
+    <div class="group-card">
+        <div class="group-header">
+            <div class="group-info">
+                <h2>Suprimentos</h2>
+                <a href="mailto:suprimentos@teguniao.com.br" class="group-email">suprimentos@teguniao.com.br</a>
+            </div>
+            <a href="mailto:suprimentos@teguniao.com.br" class="btn-send">ENVIAR E-MAIL</a>
+        </div>
+        <div class="members-section">
+            <span class="members-label">Membros do Grupo</span>
+            <ul class="members-list">
+                <li class="member-item"><a href="mailto:aline.lara@teguniao.com.br">Aline Lara</a></li>
+                <li class="member-item"><a href="mailto:lauany.carraca@teguniao.com.br">Lauany Carrara</a></li>
+                <li class="member-item"><a href="mailto:claudionor.junior@teguniao.com.br">Claudionir Junior</a></li>
+                <li class="member-item"><a href="mailto:fernando.maldonado@teguniao.com.br">Fernando Costa Maldonado</a></li>
+            </ul>
+        </div>
+    </div>
+
+    <!-- TI -->
+    <div class="group-card">
+        <div class="group-header">
+            <div class="group-info">
+                <h2>TI</h2>
+                <a href="mailto:ti@teguniao.com.br" class="group-email">ti@teguniao.com.br</a>
+            </div>
+            <a href="mailto:ti@teguniao.com.br" class="btn-send">ENVIAR E-MAIL</a>
+        </div>
+        <div class="members-section">
+            <span class="members-label">Membros do Grupo</span>
+            <ul class="members-list">
+                <li class="member-item"><a href="mailto:elton.costa@teguniao.com.br">Elton Fernandes Costa</a></li>
+                <li class="member-item"><a href="mailto:gabriel.freitas@teguniao.com.br">Gabriel Ayardes De Freitas</a></li>
+            </ul>
+        </div>
+    </div>
+
+</div>
+
+</body>
+</html>
