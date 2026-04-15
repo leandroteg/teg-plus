@@ -178,7 +178,7 @@ export default function RequisicaoDetalhe() {
         <div className="bg-rose-50 border-2 border-rose-200 rounded-2xl p-4 space-y-3">
           <div className="flex items-center gap-2">
             <Undo2 size={16} className="text-rose-600 flex-shrink-0" />
-            <span className="text-sm font-bold text-rose-700">Devolvida pelo Cotador</span>
+            <span className="text-sm font-bold text-rose-700">Devolvida pelo Comprador</span>
           </div>
           <p className="text-sm text-rose-700">{req.devolucao_msg}</p>
           <div className="flex items-center gap-2 text-xs text-rose-500">

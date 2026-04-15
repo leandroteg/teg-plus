@@ -10,7 +10,7 @@ const config: Record<string, { dot: string; bg: string; text: string; label: str
   aprovada:          { dot: 'bg-emerald-400', bg: 'bg-emerald-50',  text: 'text-emerald-700', label: 'RC Validada'       },
   rejeitada:         { dot: 'bg-red-500',     bg: 'bg-red-50',      text: 'text-red-700',     label: 'Reprovada'         },
   em_esclarecimento: { dot: 'bg-amber-500',   bg: 'bg-amber-50',    text: 'text-amber-700',   label: 'Em Esclarecimento' },
-  devolvida_solicitante: { dot: 'bg-rose-500', bg: 'bg-rose-50',    text: 'text-rose-700',    label: 'Devolvida pelo Cotador' },
+  devolvida_solicitante: { dot: 'bg-rose-500', bg: 'bg-rose-50',    text: 'text-rose-700',    label: 'Devolvida pelo Comprador' },
   // ── Etapa 3: Cotação ───────────────────────────────────────────────────────
   em_cotacao:        { dot: 'bg-violet-500',  bg: 'bg-violet-50',   text: 'text-violet-700',  label: 'Em Cotação'        },
   cotacao_enviada:   { dot: 'bg-indigo-400',  bg: 'bg-indigo-50',   text: 'text-indigo-700',  label: 'Cotação Enviada'   },

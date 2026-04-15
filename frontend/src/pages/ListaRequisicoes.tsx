@@ -4,7 +4,7 @@ import {
   Search, X, CheckCircle, XCircle, MessageSquare, ChevronDown, ChevronUp,
   FileText, Ban, AlertTriangle, Calendar, ArrowUp, ArrowDown,
   LayoutList, LayoutGrid, Download, ClipboardList, ShieldCheck, Building2,
-  Loader2, Send, PackageCheck,
+  Loader2, Send, PackageCheck, Undo2,
 } from 'lucide-react'
 import { useTheme } from '../contexts/ThemeContext'
 import { useRequisicoes, useReenviarEsclarecimento, useEnviarParaCotacao } from '../hooks/useRequisicoes'
@@ -37,7 +37,7 @@ type ViewMode = 'list' | 'cards'
 // ── Pipeline stages ─────────────────────────────────────────────────────────
 
 const PIPELINE_STAGES: { status: PipelineTab; label: string; icon: typeof ClipboardList; statuses: string[] }[] = [
-  { status: 'pendente',     label: 'Requisições Pendentes',   icon: ClipboardList, statuses: ['rascunho'] },
+  { status: 'pendente',     label: 'Requisições Pendentes',   icon: ClipboardList, statuses: ['rascunho', 'devolvida_solicitante'] },
   { status: 'em_validacao', label: 'Em Validação Técnica',   icon: ShieldCheck,   statuses: ['pendente', 'em_aprovacao', 'em_esclarecimento'] },
   { status: 'aprovada',     label: 'Aprovadas — Enviar p/ Cotação', icon: PackageCheck, statuses: ['aprovada'] },
 ]
@@ -75,6 +75,7 @@ function getApprovalStatusLabel(status: string): string | undefined {
   if (status === 'em_aprovacao')      return 'Em Validação Técnica'
   if (status === 'em_esclarecimento') return 'Em Esclarecimento'
   if (status === 'aprovada')          return 'RC Validada'
+  if (status === 'devolvida_solicitante') return 'Devolvida pelo Comprador'
   return undefined
 }
 
@@ -188,6 +189,19 @@ function ReqCard({ r, apr, isDark, onClick }: {
               Esclarecimento solicitado{r.esclarecimento_por ? ` por ${r.esclarecimento_por.split(' ')[0]}` : ''}
             </p>
             <p className={`text-xs line-clamp-2 ${isDark ? 'text-amber-300' : 'text-amber-600'}`}>{r.esclarecimento_msg}</p>
+          </div>
+        </div>
+      )}
+
+      {/* Devolvida pelo Comprador alert */}
+      {r.status === 'devolvida_solicitante' && r.devolucao_msg && (
+        <div className={`flex items-start gap-2 rounded-xl px-3 py-2 ring-2 ring-rose-400/40 ${isDark ? 'bg-rose-500/10 border border-rose-500/30' : 'bg-rose-50 border border-rose-200'}`}>
+          <Undo2 size={13} className={`flex-shrink-0 mt-0.5 ${isDark ? 'text-rose-400' : 'text-rose-600'}`} />
+          <div className="min-w-0">
+            <p className={`text-[10px] font-bold uppercase tracking-wider mb-0.5 ${isDark ? 'text-rose-400' : 'text-rose-700'}`}>
+              Devolvida pelo Comprador{r.devolucao_por ? ` (${r.devolucao_por.split(' ')[0]})` : ''} — ajuste e reenvie
+            </p>
+            <p className={`text-xs line-clamp-2 ${isDark ? 'text-rose-300' : 'text-rose-600'}`}>{r.devolucao_msg}</p>
           </div>
         </div>
       )}
@@ -526,6 +540,15 @@ export default function ListaRequisicoes() {
     return map
   }, [aprovacoes])
 
+  // RCs minhas devolvidas pelo comprador — precisam de ajuste e reenvio
+  const minhasDevolvidas = useMemo(() => {
+    if (!perfil) return []
+    return requisicoes.filter(r =>
+      r.status === 'devolvida_solicitante' &&
+      r.solicitante_nome === perfil.nome
+    )
+  }, [requisicoes, perfil])
+
   // Group by pipeline tab
   const grouped = useMemo(() => {
     const map = new Map<PipelineTab, Requisicao[]>()
@@ -603,6 +626,40 @@ export default function ListaRequisicoes() {
           {toast.type === 'success' ? <CheckCircle size={16} /> : <XCircle size={16} />}
           {toast.msg}
         </div>
+      )}
+
+      {/* Notificação: minhas RCs devolvidas pelo comprador */}
+      {minhasDevolvidas.length > 0 && (
+        <button
+          onClick={() => {
+            setActiveTab('pendente')
+            const first = minhasDevolvidas[0]
+            if (first) setDetail(first)
+          }}
+          className={`w-full flex items-center gap-3 rounded-2xl border-2 px-4 py-3 text-left transition-all hover:shadow-md ${
+            isDark
+              ? 'bg-rose-500/10 border-rose-500/30 hover:bg-rose-500/15'
+              : 'bg-rose-50 border-rose-200 hover:bg-rose-100'
+          }`}
+        >
+          <span className="relative flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-rose-500/20">
+            <span className="absolute inset-0 rounded-full bg-rose-400/40 animate-ping" />
+            <Undo2 size={16} className="relative text-rose-600" />
+          </span>
+          <div className="min-w-0 flex-1">
+            <p className={`text-sm font-bold ${isDark ? 'text-rose-300' : 'text-rose-700'}`}>
+              {minhasDevolvidas.length === 1
+                ? '1 requisição sua foi devolvida pelo comprador'
+                : `${minhasDevolvidas.length} requisições suas foram devolvidas pelo comprador`}
+            </p>
+            <p className={`text-[11px] mt-0.5 ${isDark ? 'text-rose-400/80' : 'text-rose-600'}`}>
+              Toque para ver os ajustes solicitados e reenviar.
+            </p>
+          </div>
+          <span className="flex-shrink-0 rounded-full bg-rose-500 text-white text-[11px] font-bold px-2.5 py-1">
+            {minhasDevolvidas.length}
+          </span>
+        </button>
       )}
 
       <div className="flex items-center justify-between">

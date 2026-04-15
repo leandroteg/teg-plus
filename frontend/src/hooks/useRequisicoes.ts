@@ -43,8 +43,16 @@ function buildEsclarecimentoHistorico(rows: any[]) {
 }
 
 export function useRequisicoes(status?: string, search?: string) {
+  const { perfil, atLeast } = useAuth()
+  // Usuários abaixo de 'supervisor' só enxergam as próprias RCs (antes da
+  // etapa de Cotações). Supervisor+ / aprovador / diretor / admin / CEO
+  // mantêm visão ampla.
+  const visaoAmpla = atLeast('supervisor')
+  const solicitanteScopeId = !visaoAmpla ? perfil?.id ?? null : null
+
   return useQuery<Requisicao[]>({
-    queryKey: ['requisicoes', status, search],
+    queryKey: ['requisicoes', status, search, solicitanteScopeId],
+    enabled: visaoAmpla || Boolean(solicitanteScopeId),
     queryFn: async () => {
       let query = supabase
         .from(TABLE)
@@ -61,6 +69,7 @@ export function useRequisicoes(status?: string, search?: string) {
         .order('created_at', { ascending: false })
         .limit(100)
 
+      if (solicitanteScopeId) query = query.eq('solicitante_id', solicitanteScopeId)
       if (status) query = query.eq('status', status)
       if (search) query = query.ilike('descricao', `%${search}%`)
 
