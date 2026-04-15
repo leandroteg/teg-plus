@@ -620,7 +620,7 @@ export default function CotacaoForm() {
   })
 
   const [fornecedores, setFornecedores] = useState<FornecedorForm[]>([
-    emptyFornecedor(), emptyFornecedor(),
+    emptyFornecedor(),
   ])
   const [semCotacoesMinimas, setSemCotacoesMinimas] = useState(false)
   const [justificativa, setJustificativa] = useState('')
@@ -1146,7 +1146,7 @@ export default function CotacaoForm() {
                 <span className="text-[9px] font-bold bg-emerald-50 text-emerald-600 px-1.5 py-0.5 rounded-full">✓ Válido</span>
               )}
             </div>
-            {fornecedores.length > 2 && (
+            {fornecedores.length > 1 && (
               <button type="button" onClick={() => setFornecedores(p => p.filter((_, i) => i !== idx))}
                 className="p-1 rounded-lg hover:bg-red-50 transition">
                 <Trash2 size={14} className="text-red-400 hover:text-red-600 transition" />
@@ -1366,7 +1366,16 @@ export default function CotacaoForm() {
       {/* Adicionar fornecedor */}
       <button
         type="button"
-        onClick={() => setFornecedores(p => [...p, emptyFornecedor()])}
+        onClick={() => {
+          const rcItens = cotacao?.requisicao?.itens ?? []
+          const itensPrecos: ItemPreco[] = rcItens.map(item => ({
+            descricao: toUpperNorm(item.descricao),
+            qtd: item.quantidade,
+            valor_unitario: 0,
+            valor_total: 0,
+          }))
+          setFornecedores(p => [...p, { ...emptyFornecedor(), itens_precos: itensPrecos }])
+        }}
         className="w-full flex items-center justify-center gap-1.5 py-2.5 text-xs font-bold text-teal-600 border-2 border-dashed border-teal-300 rounded-2xl hover:bg-teal-50 transition"
       >
         <PlusCircle size={14} /> Adicionar Fornecedor

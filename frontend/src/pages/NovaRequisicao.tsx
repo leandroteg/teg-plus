@@ -6,7 +6,7 @@ import {
   ChevronDown, X, FileImage, Eye, Pencil, CheckCircle2, Loader2,
   Package, MapPin, Zap, Save,
 } from 'lucide-react'
-import { useCriarRequisicao, useAtualizarRequisicao, useRequisicao } from '../hooks/useRequisicoes'
+import { useCriarRequisicao, useAtualizarRequisicao, useRequisicao, useReenviarAposDevolucao } from '../hooks/useRequisicoes'
 import { useAiParse, readFileForAi, isBinaryFile, isImageFile } from '../hooks/useAiParse'
 import { useCategorias } from '../hooks/useCategorias'
 import { useLookupObras } from '../hooks/useLookups'
@@ -109,7 +109,9 @@ export default function NovaRequisicao() {
   const isEditMode = Boolean(editId)
   const mutation = useCriarRequisicao()
   const updateMutation = useAtualizarRequisicao()
+  const reenviarDevolucaoMutation = useReenviarAposDevolucao()
   const { data: reqExistente, isLoading: reqLoading } = useRequisicao(editId)
+  const isDevolvidaEdit = isEditMode && reqExistente?.status === 'devolvida_solicitante'
   const aiParse = useAiParse()
   const { data: categorias = [], isLoading: catLoading } = useCategorias()
   const obras = useLookupObras()
@@ -442,7 +444,17 @@ export default function NovaRequisicao() {
           statusAtual: reqExistente.status,
           payload: buildPayload(false),
         })
-        nav(`/requisicoes/${editId}`)
+        // RC devolvida: após salvar, reenvia automaticamente para aprovação (alçada 1)
+        if (reqExistente.status === 'devolvida_solicitante') {
+          await reenviarDevolucaoMutation.mutateAsync({
+            requisicaoId: editId,
+            requisicaoNumero: reqExistente.numero,
+            solicitanteNome: perfil?.nome ?? reqExistente.solicitante_nome,
+          })
+          nav('/requisicoes')
+        } else {
+          nav(`/requisicoes/${editId}`)
+        }
       } else {
         await mutation.mutateAsync(buildPayload(false))
         nav('/requisicoes')
@@ -1331,14 +1343,20 @@ export default function NovaRequisicao() {
           className="flex-1 bg-slate-100 text-slate-600 border border-slate-200 rounded-2xl py-3.5 font-bold text-sm flex items-center justify-center gap-2 disabled:opacity-50 hover:bg-slate-200 active:scale-[0.98] transition-all">
           {savingDraft
             ? <div className="w-4 h-4 border-2 border-slate-400 border-t-transparent rounded-full animate-spin" />
-            : <><Save size={16} /> Salvar Rascunho</>}
+            : <><Save size={16} /> {isDevolvidaEdit ? 'Salvar sem reenviar' : isEditMode ? 'Salvar' : 'Salvar Rascunho'}</>}
         </button>
 
         <button onClick={submit} disabled={submitting || savingDraft}
-          className="flex-[2] bg-teal-500 text-white rounded-2xl py-3.5 font-extrabold text-base flex items-center justify-center gap-2 disabled:opacity-50 shadow-xl shadow-teal-500/30 active:scale-[0.98] transition-all">
+          className={`flex-[2] text-white rounded-2xl py-3.5 font-extrabold text-base flex items-center justify-center gap-2 disabled:opacity-50 shadow-xl active:scale-[0.98] transition-all ${
+            isDevolvidaEdit
+              ? 'bg-rose-500 shadow-rose-500/30 hover:bg-rose-600'
+              : 'bg-teal-500 shadow-teal-500/30'
+          }`}>
           {submitting
             ? <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-            : <><Send size={18} /> Enviar Requisição</>}
+            : <><Send size={18} /> {isDevolvidaEdit
+                ? 'Salvar e reenviar para aprovação'
+                : isEditMode ? 'Salvar alterações' : 'Enviar Requisição'}</>}
         </button>
       </div>
 
