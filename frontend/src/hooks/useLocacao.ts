@@ -369,6 +369,19 @@ export function useFaturas(filtros?: { imovel_id?: string; status?: StatusFatura
   })
 }
 
+export function useCriarFatura() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (payload: Partial<LocFatura>) => {
+      const { error } = await supabase.from('loc_faturas').insert(payload)
+      if (error) throw error
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: QK.faturas() })
+    },
+  })
+}
+
 export function useAtualizarFatura() {
   const qc = useQueryClient()
   return useMutation({
