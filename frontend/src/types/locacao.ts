@@ -29,6 +29,8 @@ export type TipoFatura =
   | 'condominio'
   | 'telefone'
   | 'limpeza'
+  | 'seguro'
+  | 'caucao'
   | 'outro'
 
 export type StatusFatura = 'previsto' | 'lancado' | 'enviado_pagamento' | 'pago'
@@ -376,6 +378,8 @@ export const TIPO_FATURA_LABEL: Record<TipoFatura, string> = {
   condominio: 'Condominio',
   telefone: 'Telefone',
   limpeza: 'Limpeza',
+  seguro: 'Seguro',
+  caucao: 'Caucao',
   outro: 'Outro',
 }
 
