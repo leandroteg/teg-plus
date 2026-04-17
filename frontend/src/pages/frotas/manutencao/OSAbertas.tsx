@@ -236,7 +236,8 @@ function OSRow({ os, isDark, onClick }: { os: FroOrdemServico; isDark: boolean; 
   const t    = TIPO_LABEL[os.tipo]
   const dias = diasEmAberto(os.data_abertura)
   const valor = os.valor_final ?? os.valor_aprovado ?? os.valor_orcado
-  const accent = isDark ? STAGE_ACCENT_DARK[os.status] : STAGE_ACCENT[os.status]
+  const statusKey = (os.status === 'aberta' ? 'pendente' : os.status) as StageKey
+  const accent = isDark ? STAGE_ACCENT_DARK[statusKey] : STAGE_ACCENT[statusKey]
 
   return (
     <button type="button" onClick={onClick} className={`w-full flex items-center gap-2 px-3 py-2.5 text-left border-b transition-all ${
@@ -275,8 +276,9 @@ function OSDetailModal({ os, onClose, isDark }: { os: FroOrdemServico; onClose: 
   const t = TIPO_LABEL[os.tipo]
   const dias = diasEmAberto(os.data_abertura)
   const valor = os.valor_final ?? os.valor_aprovado ?? os.valor_orcado
-  const accent = isDark ? STAGE_ACCENT_DARK[os.status] : STAGE_ACCENT[os.status]
-  const stageLabel = STAGES.find(s => s.key === os.status)?.label || os.status
+  const statusKey = (os.status === 'aberta' ? 'pendente' : os.status) as StageKey
+  const accent = isDark ? STAGE_ACCENT_DARK[statusKey] : STAGE_ACCENT[statusKey]
+  const stageLabel = STAGES.find(s => s.key === statusKey)?.label || os.status
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4" onClick={onClose}>
@@ -366,7 +368,11 @@ export default function OSAbertas() {
   const grouped = useMemo(() => {
     const map = new Map<StageKey, FroOrdemServico[]>()
     STAGES.forEach(s => map.set(s.key, []))
-    ordens.forEach(o => map.get(o.status)?.push(o))
+    ordens.forEach(o => {
+      // Tratar 'aberta' como 'pendente' (ambos são estágio inicial)
+      const key = (o.status === 'aberta' ? 'pendente' : o.status) as StageKey
+      map.get(key)?.push(o)
+    })
     return map
   }, [ordens])
 

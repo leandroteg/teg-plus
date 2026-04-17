@@ -24,7 +24,8 @@
       "mcp__402c23fe-4707-49e1-a558-76f47f37d917__get_logs",
       "Skill(commit-commands:commit)",
       "Skill(commit-commands:commit:*)",
-      "mcp__c1fc4002-5f49-5f9d-a4e5-93c4ef5d6a75__google_drive_search"
+      "mcp__c1fc4002-5f49-5f9d-a4e5-93c4ef5d6a75__google_drive_search",
+      "mcp__402c23fe-4707-49e1-a558-76f47f37d917__execute_sql"
     ]
   }
 }
