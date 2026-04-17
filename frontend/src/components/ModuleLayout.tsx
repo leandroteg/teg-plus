@@ -1,7 +1,8 @@
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
+import { createPortal } from 'react-dom'
 import { LayoutGrid, LogOut, Shield, Settings, ChevronLeft, Menu, X, User, Code2, Link2, ClipboardList, Plus, HandHelping } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
-import { useState, useEffect, useMemo, useRef, lazy, Suspense, createContext, useContext } from 'react'
+import { useState, useEffect, useMemo, useRef, useCallback, lazy, Suspense, createContext, useContext } from 'react'
 import { useAuth, ROLE_LABEL, ROLE_COLOR } from '../contexts/AuthContext'
 import { useTheme } from '../contexts/ThemeContext'
 import LogoTeg from './LogoTeg'
@@ -291,7 +292,46 @@ export default function ModuleLayout({
   const location = useLocation()
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [avatarOpen, setAvatarOpen] = useState(false)
+  const avatarBtnRef = useRef<HTMLButtonElement>(null)
+  const [avatarPos, setAvatarPos] = useState<{ top: number; left?: number; right?: number }>({ top: 0, right: 0 })
   const [openNavMenu, setOpenNavMenu] = useState<{ id: string; top: number; left: number } | null>(null)
+
+  // Compute avatar dropdown position — anchor to right of sidebar button, or below in header/mobile
+  const updateAvatarPos = useCallback(() => {
+    if (!avatarBtnRef.current) return
+    const r = avatarBtnRef.current.getBoundingClientRect()
+    const panelW = 240
+    const panelH = 440 // approx max height of menu
+    const isInSidebar = r.left < window.innerWidth * 0.35
+    const isMobile = window.innerWidth < 640
+
+    if (isInSidebar && !isMobile) {
+      // Sidebar button: anchor to right of button
+      setAvatarPos({
+        top: Math.min(r.top, Math.max(8, window.innerHeight - panelH - 8)),
+        left: r.right + 12,
+      })
+    } else {
+      // Header/mobile: dropdown below, right-aligned
+      const rightVal = Math.max(8, window.innerWidth - r.right)
+      setAvatarPos({
+        top: r.bottom + 8,
+        right: rightVal + panelW > window.innerWidth - 8 ? (window.innerWidth - panelW) / 2 : rightVal,
+      })
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!avatarOpen) return
+    updateAvatarPos()
+    const onScroll = () => updateAvatarPos()
+    window.addEventListener('scroll', onScroll, true)
+    window.addEventListener('resize', updateAvatarPos)
+    return () => {
+      window.removeEventListener('scroll', onScroll, true)
+      window.removeEventListener('resize', updateAvatarPos)
+    }
+  }, [avatarOpen, updateAvatarPos])
 
   // Close avatar dropdown on click outside or Escape
   useEffect(() => {
@@ -615,6 +655,7 @@ export default function ModuleLayout({
     const dim = size === 'sm' ? 'w-8 h-8 text-[11px]' : 'w-9 h-9 text-xs'
     return (
       <button
+        ref={avatarBtnRef}
         onClick={() => setAvatarOpen(o => !o)}
         className={[
           dim, 'rounded-full flex items-center justify-center',
@@ -631,24 +672,24 @@ export default function ModuleLayout({
     )
   }
 
-  function renderAvatarDropdown(position: 'sidebar' | 'header' | 'compact-sidebar' = 'sidebar') {
+  function renderAvatarDropdown(_position: 'sidebar' | 'header' | 'compact-sidebar' = 'sidebar') {
     if (!avatarOpen) return null
-    const pos = position === 'compact-sidebar'
-      ? 'absolute right-0 bottom-12 z-[100]'
-      : position === 'sidebar'
-        ? 'absolute right-0 top-12 z-[100]'
-        : 'absolute right-0 top-full mt-2 z-[100]'
 
-    return (
+    const dropdownEl = (
       <div
+        data-avatar-menu
         className={[
-          pos, 'w-60 rounded-2xl border overflow-hidden',
+          'fixed z-[9999] w-60 rounded-2xl border overflow-hidden',
           'shadow-xl transition-all',
           ls
             ? 'bg-white border-slate-200/80 shadow-slate-200/40'
             : 'bg-[#111827] border-white/10 shadow-black/50',
         ].join(' ')}
-        style={{ animation: 'fadeSlideIn 150ms ease-out' }}
+        style={{
+          top: avatarPos.top,
+          ...(avatarPos.left !== undefined ? { left: avatarPos.left } : { right: avatarPos.right }),
+          animation: 'fadeSlideIn 150ms ease-out',
+        }}
       >
         {/* ── User info ── */}
         <div className={`px-4 pt-3.5 pb-3 border-b ${ls ? 'border-slate-100' : 'border-white/[0.06]'}`}>
@@ -772,6 +813,8 @@ export default function ModuleLayout({
         </div>
       </div>
     )
+
+    return createPortal(dropdownEl, document.body)
   }
 
   // ══════════════════════════════════════════════════════════════════════════════
