@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
-  LogOut, X, Lock, Megaphone, User, Link2, Code2, ClipboardList, HandHelping,
+  LogOut, X, Lock, Megaphone, User, Link2, Code2, ClipboardList, HandHelping, CheckSquare,
   // Category icons
   FolderKanban, Layers, Wallet, Users, Monitor, Rocket,
   // Sub-module icons
@@ -179,6 +179,7 @@ export default function ModuloSelector() {
   const [entered, setEntered] = useState(false)
   const [muralOpen, setMuralOpen] = useState(false)
   const [avatarOpen, setAvatarOpen] = useState(false)
+  const [quickActionsOpen, setQuickActionsOpen] = useState(false)
   const avatarMenuRef = useRef<HTMLDivElement>(null)
 
   const nome = perfil?.nome ?? 'Usu\u00e1rio'
@@ -587,8 +588,11 @@ export default function ModuloSelector() {
           </svg>
 
           {/* ── Center node: Logo TEG+ ──────────────────────────── */}
-          <div
-            className="absolute z-10"
+          <button
+            type="button"
+            onClick={() => setQuickActionsOpen(true)}
+            title="Minha area pessoal"
+            className="absolute z-10 group cursor-pointer bg-transparent border-0 p-0"
             style={{
               left: cx - 52,
               top: cy - 58,
@@ -597,7 +601,7 @@ export default function ModuloSelector() {
             }}
           >
             <div
-              className="w-full h-full rounded-full flex items-center justify-center border overflow-hidden"
+              className="w-full h-full rounded-full flex items-center justify-center border overflow-hidden transition-transform duration-300 group-hover:shadow-2xl"
               style={{
                 background: isLight
                   ? 'radial-gradient(circle, rgba(20,184,166,0.08), rgba(255,255,255,0.95))'
@@ -612,7 +616,7 @@ export default function ModuloSelector() {
             >
               <LogoTeg size={80} animated={false} glowing={false} />
             </div>
-          </div>
+          </button>
 
           {/* ── Orbital pillar nodes ────────────────────────────── */}
           {PILLARS.map((p, i) => {
@@ -694,6 +698,14 @@ export default function ModuloSelector() {
       {/* ── Mural Popup (mobile: bottom-sheet · desktop: centered modal) ── */}
       <MuralPopup open={muralOpen} onClose={() => setMuralOpen(false)} />
 
+      {/* ── Quick Actions Modal (center TEG+ logo click) ── */}
+      <QuickActionsModal
+        open={quickActionsOpen}
+        onClose={() => setQuickActionsOpen(false)}
+        isLight={isLight}
+        onNavigate={(path) => { setQuickActionsOpen(false); navigate(path) }}
+      />
+
       {/* ── Category Overlay — Sub-module Mandala ────────────────── */}
       {openPillar && (
         <div
@@ -761,6 +773,102 @@ export default function ModuloSelector() {
           </div>
         </div>
       )}
+    </div>
+  )
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+//  QUICK ACTIONS MODAL — Minha Area Pessoal (center logo click)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+function QuickActionsModal({ open, onClose, isLight, onNavigate }: {
+  open: boolean
+  onClose: () => void
+  isLight: boolean
+  onNavigate: (path: string) => void
+}) {
+  if (!open) return null
+
+  const tiles = [
+    { label: 'Minhas Tarefas',       icon: CheckSquare,    path: '/minhas-tarefas',       tone: 'teal',    desc: 'Pendencias em todos os modulos' },
+    { label: 'Minhas Solicitacoes',  icon: ClipboardList,  path: '/minhas-solicitacoes',  tone: 'indigo',  desc: 'Requisicoes e pedidos abertos' },
+    { label: 'Minhas Despesas',      icon: Receipt,        path: '/despesas',             tone: 'rose',    desc: 'Adiantamentos e reembolsos' },
+    { label: 'Minhas Cautelas',      icon: HandHelping,    path: '/minhas-cautelas',      tone: 'amber',   desc: 'Equipamentos sob sua custodia' },
+  ] as const
+
+  const toneMap: Record<string, { bg: string; text: string; bgDark: string; textDark: string; ring: string; ringDark: string }> = {
+    teal:   { bg: 'bg-teal-50',   text: 'text-teal-600',   bgDark: 'bg-teal-500/10',   textDark: 'text-teal-300',   ring: 'hover:ring-teal-300',   ringDark: 'hover:ring-teal-400/40' },
+    indigo: { bg: 'bg-indigo-50', text: 'text-indigo-600', bgDark: 'bg-indigo-500/10', textDark: 'text-indigo-300', ring: 'hover:ring-indigo-300', ringDark: 'hover:ring-indigo-400/40' },
+    rose:   { bg: 'bg-rose-50',   text: 'text-rose-600',   bgDark: 'bg-rose-500/10',   textDark: 'text-rose-300',   ring: 'hover:ring-rose-300',   ringDark: 'hover:ring-rose-400/40' },
+    amber:  { bg: 'bg-amber-50',  text: 'text-amber-600',  bgDark: 'bg-amber-500/10',  textDark: 'text-amber-300',  ring: 'hover:ring-amber-300',  ringDark: 'hover:ring-amber-400/40' },
+  }
+
+  return (
+    <div
+      className="fixed inset-0 z-[9999] flex items-center justify-center p-4"
+      onClick={onClose}
+    >
+      {/* Backdrop */}
+      <div className="absolute inset-0 bg-black/60 backdrop-blur-md" style={{ animation: 'qaFadeIn 180ms ease-out' }} />
+
+      {/* Modal */}
+      <div
+        onClick={e => e.stopPropagation()}
+        className={`relative w-full max-w-md rounded-3xl border overflow-hidden shadow-2xl ${
+          isLight ? 'bg-white border-slate-200' : 'bg-[#0f172a] border-white/[0.08]'
+        }`}
+        style={{ animation: 'qaModalIn 240ms cubic-bezier(0.22, 1, 0.36, 1)' }}
+      >
+        {/* Header */}
+        <div className={`flex items-center justify-between px-6 pt-5 pb-4 border-b ${isLight ? 'border-slate-100' : 'border-white/[0.06]'}`}>
+          <div className="flex items-center gap-3">
+            <LogoTeg size={32} animated={false} />
+            <div>
+              <p className={`text-[15px] font-extrabold leading-none ${isLight ? 'text-slate-900' : 'text-white'}`}>Area Pessoal</p>
+              <p className={`text-[11px] mt-0.5 ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>Acesso rapido ao que e seu</p>
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            className={`p-1.5 rounded-lg transition-colors ${isLight ? 'hover:bg-slate-100 text-slate-400' : 'hover:bg-white/[0.06] text-slate-500'}`}
+          >
+            <X size={16} />
+          </button>
+        </div>
+
+        {/* Grid */}
+        <div className="p-5 grid grid-cols-2 gap-3">
+          {tiles.map(t => {
+            const clr = toneMap[t.tone]
+            const Icon = t.icon
+            return (
+              <button
+                key={t.path}
+                onClick={() => onNavigate(t.path)}
+                className={`group rounded-2xl p-5 text-left transition-all duration-200 ring-1 ring-transparent ${
+                  isLight
+                    ? `bg-slate-50 hover:bg-white hover:shadow-lg ${clr.ring} active:scale-[0.98]`
+                    : `bg-white/[0.03] hover:bg-white/[0.06] ${clr.ringDark} active:scale-[0.98]`
+                }`}
+              >
+                <div className={`w-11 h-11 rounded-2xl flex items-center justify-center mb-3 transition-transform group-hover:scale-110 ${isLight ? clr.bg : clr.bgDark}`}>
+                  <Icon size={20} strokeWidth={2.2} className={isLight ? clr.text : clr.textDark} />
+                </div>
+                <p className={`text-[13px] font-extrabold leading-snug ${isLight ? 'text-slate-900' : 'text-white'}`}>{t.label}</p>
+                <p className={`text-[10px] mt-1 leading-tight ${isLight ? 'text-slate-500' : 'text-slate-500'}`}>{t.desc}</p>
+              </button>
+            )
+          })}
+        </div>
+      </div>
+
+      <style>{`
+        @keyframes qaFadeIn { from { opacity: 0 } to { opacity: 1 } }
+        @keyframes qaModalIn {
+          from { opacity: 0; transform: translateY(12px) scale(0.96); }
+          to   { opacity: 1; transform: translateY(0) scale(1); }
+        }
+      `}</style>
     </div>
   )
 }

@@ -1,6 +1,6 @@
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { createPortal } from 'react-dom'
-import { LayoutGrid, LogOut, Shield, Settings, ChevronLeft, Menu, X, User, Code2, Link2, ClipboardList, Plus, HandHelping, CheckSquare, Receipt } from 'lucide-react'
+import { LayoutGrid, LogOut, Shield, Settings, ChevronLeft, Menu, X, User, Code2, Link2, ClipboardList, Plus, HandHelping, CheckSquare } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { useState, useEffect, useMemo, useRef, useCallback, lazy, Suspense, createContext, useContext } from 'react'
 import { useAuth, ROLE_LABEL, ROLE_COLOR } from '../contexts/AuthContext'
@@ -291,7 +291,6 @@ export default function ModuleLayout({
   const navigate = useNavigate()
   const location = useLocation()
   const [drawerOpen, setDrawerOpen] = useState(false)
-  const [quickActionsOpen, setQuickActionsOpen] = useState(false)
   const [avatarOpen, setAvatarOpen] = useState(false)
   const [avatarPos, setAvatarPos] = useState<{ top: number; left?: number; right?: number }>({ top: 0, right: 0 })
   const [openNavMenu, setOpenNavMenu] = useState<{ id: string; top: number; left: number } | null>(null)
@@ -816,98 +815,6 @@ export default function ModuleLayout({
     return createPortal(dropdownEl, document.body)
   }
 
-  // ── Quick Actions Modal (logo click) ────────────────────────────────────────
-  function renderQuickActionsModal() {
-    if (!quickActionsOpen) return null
-    const close = () => setQuickActionsOpen(false)
-    const go = (path: string) => { close(); navigate(path) }
-
-    const tiles = [
-      { label: 'Minhas Tarefas',       icon: CheckSquare,    path: '/minhas-tarefas',       tone: 'teal',    desc: 'Pendencias em todos os modulos' },
-      { label: 'Minhas Solicitacoes',  icon: ClipboardList,  path: '/minhas-solicitacoes',  tone: 'indigo',  desc: 'Requisicoes e pedidos abertos' },
-      { label: 'Minhas Despesas',      icon: Receipt,        path: '/despesas',             tone: 'rose',    desc: 'Adiantamentos e reembolsos' },
-      { label: 'Minhas Cautelas',      icon: HandHelping,    path: '/minhas-cautelas',      tone: 'amber',   desc: 'Equipamentos sob sua custodia' },
-    ] as const
-
-    const toneMap: Record<string, { bg: string; text: string; bgDark: string; textDark: string; ring: string; ringDark: string }> = {
-      teal:   { bg: 'bg-teal-50',   text: 'text-teal-600',   bgDark: 'bg-teal-500/10',   textDark: 'text-teal-300',   ring: 'hover:ring-teal-300',   ringDark: 'hover:ring-teal-400/40' },
-      indigo: { bg: 'bg-indigo-50', text: 'text-indigo-600', bgDark: 'bg-indigo-500/10', textDark: 'text-indigo-300', ring: 'hover:ring-indigo-300', ringDark: 'hover:ring-indigo-400/40' },
-      rose:   { bg: 'bg-rose-50',   text: 'text-rose-600',   bgDark: 'bg-rose-500/10',   textDark: 'text-rose-300',   ring: 'hover:ring-rose-300',   ringDark: 'hover:ring-rose-400/40' },
-      amber:  { bg: 'bg-amber-50',  text: 'text-amber-600',  bgDark: 'bg-amber-500/10',  textDark: 'text-amber-300',  ring: 'hover:ring-amber-300',  ringDark: 'hover:ring-amber-400/40' },
-    }
-
-    const modalEl = (
-      <div
-        className="fixed inset-0 z-[9999] flex items-center justify-center p-4"
-        onClick={close}
-      >
-        {/* Backdrop */}
-        <div className="absolute inset-0 bg-black/60 backdrop-blur-md" style={{ animation: 'fadeIn 180ms ease-out' }} />
-
-        {/* Modal */}
-        <div
-          onClick={e => e.stopPropagation()}
-          className={`relative w-full max-w-md rounded-3xl border overflow-hidden shadow-2xl ${
-            ls ? 'bg-white border-slate-200' : 'bg-[#0f172a] border-white/[0.08]'
-          }`}
-          style={{ animation: 'modalIn 240ms cubic-bezier(0.22, 1, 0.36, 1)' }}
-        >
-          {/* Header */}
-          <div className={`flex items-center justify-between px-6 pt-5 pb-4 border-b ${ls ? 'border-slate-100' : 'border-white/[0.06]'}`}>
-            <div className="flex items-center gap-3">
-              <LogoTeg size={32} animated={false} />
-              <div>
-                <p className={`text-[15px] font-extrabold leading-none ${ls ? 'text-slate-900' : 'text-white'}`}>Area Pessoal</p>
-                <p className={`text-[11px] mt-0.5 ${ls ? 'text-slate-500' : 'text-slate-400'}`}>Acesso rapido ao que e seu</p>
-              </div>
-            </div>
-            <button
-              onClick={close}
-              className={`p-1.5 rounded-lg transition-colors ${ls ? 'hover:bg-slate-100 text-slate-400' : 'hover:bg-white/[0.06] text-slate-500'}`}
-            >
-              <X size={16} />
-            </button>
-          </div>
-
-          {/* Grid */}
-          <div className="p-5 grid grid-cols-2 gap-3">
-            {tiles.map(t => {
-              const clr = toneMap[t.tone]
-              const Icon = t.icon
-              return (
-                <button
-                  key={t.path}
-                  onClick={() => go(t.path)}
-                  className={`group rounded-2xl p-5 text-left transition-all duration-200 ring-1 ring-transparent ${
-                    ls
-                      ? `bg-slate-50 hover:bg-white hover:shadow-lg ${clr.ring} active:scale-[0.98]`
-                      : `bg-white/[0.03] hover:bg-white/[0.06] ${clr.ringDark} active:scale-[0.98]`
-                  }`}
-                >
-                  <div className={`w-11 h-11 rounded-2xl flex items-center justify-center mb-3 transition-transform group-hover:scale-110 ${ls ? clr.bg : clr.bgDark}`}>
-                    <Icon size={20} strokeWidth={2.2} className={ls ? clr.text : clr.textDark} />
-                  </div>
-                  <p className={`text-[13px] font-extrabold leading-snug ${ls ? 'text-slate-900' : 'text-white'}`}>{t.label}</p>
-                  <p className={`text-[10px] mt-1 leading-tight ${ls ? 'text-slate-500' : 'text-slate-500'}`}>{t.desc}</p>
-                </button>
-              )
-            })}
-          </div>
-        </div>
-
-        <style>{`
-          @keyframes fadeIn { from { opacity: 0 } to { opacity: 1 } }
-          @keyframes modalIn {
-            from { opacity: 0; transform: translateY(12px) scale(0.96); }
-            to   { opacity: 1; transform: translateY(0) scale(1); }
-          }
-        `}</style>
-      </div>
-    )
-
-    return createPortal(modalEl, document.body)
-  }
-
   // ══════════════════════════════════════════════════════════════════════════════
   //  COMPACT VARIANT  (Frotas, RH — md breakpoint, drawer mobile, no user card)
   // ══════════════════════════════════════════════════════════════════════════════
@@ -1037,7 +944,6 @@ export default function ModuleLayout({
               : <Outlet />}
           </main>
         </div>
-        {renderQuickActionsModal()}
       </div>
     )
   }
@@ -1073,10 +979,10 @@ export default function ModuleLayout({
         <div className={`px-4 pt-5 pb-4 border-b ${ls ? 'border-slate-100' : 'border-white/[0.06]'}`}>
           {/* Logo + wordmark + actions */}
           <div className="flex items-center gap-2.5 mb-4">
-            <button onClick={() => setQuickActionsOpen(true)} className="shrink-0" title="Acoes rapidas">
+            <button onClick={() => navigate('/')} className="shrink-0" title="Ir para início">
               <LogoTeg size={36} animated={false} />
             </button>
-            <button onClick={() => setQuickActionsOpen(true)} className="flex-1 min-w-0 text-left" title="Acoes rapidas">
+            <button onClick={() => navigate('/')} className="flex-1 min-w-0 text-left" title="Ir para início">
               <p className={`font-black text-lg tracking-tight leading-none ${ls ? 'text-slate-800' : 'text-white'}`}>TEG+</p>
               <p className={`text-[10px] font-medium mt-0.5 ${ls ? 'text-slate-400' : 'text-slate-500'}`}>ERP 2.0</p>
             </button>
@@ -1133,13 +1039,13 @@ export default function ModuleLayout({
           style={{ boxShadow: ls ? '0 1px 3px rgba(0,0,0,0.05)' : '0 2px 20px rgba(0,0,0,0.4)' }}
         >
           {/* Logo */}
-          <button onClick={() => setQuickActionsOpen(true)} className="shrink-0" title="Acoes rapidas">
+          <button onClick={() => navigate('/')} className="shrink-0" title="Ir para início">
             <LogoTeg size={28} animated={false} />
           </button>
 
           {/* Brand */}
           <div className="flex-1 min-w-0">
-            <button onClick={() => setQuickActionsOpen(true)} className="flex items-baseline gap-1.5">
+            <button onClick={() => navigate('/')} className="flex items-baseline gap-1.5">
               <h1 className={`text-sm font-black leading-none ${ls ? 'text-slate-800' : 'text-white'}`}>TEG+</h1>
               <span className={`text-[9px] font-semibold ${ls ? a.mobileHeaderLight : a.mobileHeaderDark}`}>{headerModuleName}</span>
             </button>
@@ -1184,7 +1090,6 @@ export default function ModuleLayout({
           </div>
         </nav>
       </div>
-      {renderQuickActionsModal()}
     </div>
     </RequisitanteCtx.Provider>
   )
