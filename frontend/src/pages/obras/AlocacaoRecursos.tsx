@@ -6,7 +6,7 @@ import {
 } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
 import { useAuth } from '../../contexts/AuthContext'
-import { useVeiculos, useAlocacoes, useCriarAlocacao } from '../../hooks/useFrotas'
+import { useVeiculos, useAlocacoes, useCriarAlocacao, useSalvarVeiculo } from '../../hooks/useFrotas'
 import { useObras } from '../../hooks/useFinanceiro'
 import type { FroVeiculo, FroAlocacao, StatusVeiculo, CategoriaVeiculo } from '../../types/frotas'
 
@@ -955,6 +955,7 @@ function NovaAlocacaoModal({ isDark, obras, veiculos, preset, onClose }: {
 }) {
   const { perfil } = useAuth()
   const criar = useCriarAlocacao()
+  const salvarVeiculo = useSalvarVeiculo()
 
   const [veiculoId, setVeiculoId]       = useState(preset?.veiculoId || '')
   const [obraId, setObraId]             = useState(preset?.obraId || '')
@@ -971,21 +972,38 @@ function NovaAlocacaoModal({ isDark, obras, veiculos, preset, onClose }: {
   }`
   const labelCls = `text-[10px] font-bold uppercase tracking-wider block mb-1 ${isDark ? 'text-slate-400' : 'text-slate-500'}`
 
-  const handleSave = () => {
+  const busy = criar.isPending || salvarVeiculo.isPending
+
+  const handleSave = async () => {
     if (!veiculoId || !obraId || !dataSaida) {
       alert('Selecione equipamento, obra e data de saida')
       return
     }
-    criar.mutate({
-      veiculo_id: veiculoId,
-      obra_id: obraId,
-      data_saida: dataSaida,
-      data_retorno_prev: dataRetornoPrev || undefined,
-      responsavel_id: perfil?.auth_id,
-      responsavel_nome: perfil?.nome,
-      status: 'ativa',
-      observacoes: observacoes || undefined,
-    } as never, { onSuccess: onClose })
+    try {
+      // 1. Cria a alocacao em fro_alocacoes (status: ativa)
+      await criar.mutateAsync({
+        veiculo_id: veiculoId,
+        obra_id: obraId,
+        data_saida: dataSaida,
+        data_retorno_prev: dataRetornoPrev || undefined,
+        responsavel_id: perfil?.auth_id,
+        responsavel_nome: perfil?.nome,
+        status: 'ativa',
+        observacoes: observacoes || undefined,
+      } as never)
+
+      // 2. Muda status do veiculo para 'aguardando_saida' → gera
+      //    pendencia na aba "Checklist Saida" do modulo Frotas
+      await salvarVeiculo.mutateAsync({
+        id: veiculoId,
+        status: 'aguardando_saida',
+      })
+
+      onClose()
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Erro desconhecido'
+      alert('Erro ao criar alocacao: ' + msg)
+    }
   }
 
   return (
@@ -1050,7 +1068,7 @@ function NovaAlocacaoModal({ isDark, obras, veiculos, preset, onClose }: {
 
           <div className={`rounded-lg p-2.5 text-[10px] ${isDark ? 'bg-orange-500/10 text-orange-300' : 'bg-orange-50 text-orange-700'}`}>
             <MapPin size={10} className="inline mr-1" />
-            Essa alocacao sera registrada em <strong>Frotas &gt; Operacao &gt; Alocacoes</strong>.
+            Um <strong>checklist de saida pendente</strong> sera gerado em <strong>Frotas &gt; Frota &gt; Checklist Saida</strong>. O equipamento so fica "em uso" apos o checklist ser preenchido.
           </div>
         </div>
 
@@ -1060,10 +1078,10 @@ function NovaAlocacaoModal({ isDark, obras, veiculos, preset, onClose }: {
           </button>
           <button
             onClick={handleSave}
-            disabled={criar.isPending}
+            disabled={busy}
             className="px-4 py-2 rounded-xl text-xs font-bold bg-orange-500 text-white hover:bg-orange-600 disabled:opacity-50 inline-flex items-center gap-1.5"
           >
-            {criar.isPending ? 'Salvando...' : (<><Send size={12} /> Criar alocacao</>)}
+            {busy ? 'Salvando...' : (<><Send size={12} /> Criar alocacao</>)}
           </button>
         </div>
       </div>
