@@ -98,8 +98,8 @@ export function usePreCadastros() {
         .insert(dados)
       if (insertError) throw insertError
 
-      // Update pre-cadastro status
-      const { error: updateError } = await supabase
+      // Update pre-cadastro status — use .select() to detect silent RLS failures
+      const { data: updated, error: updateError } = await supabase
         .from('sys_pre_cadastros')
         .update({
           status: 'aprovado',
@@ -108,9 +108,25 @@ export function usePreCadastros() {
           revisor_nome: perfil?.nome,
         })
         .eq('id', id)
+        .select()
       if (updateError) throw updateError
+      if (!updated || updated.length === 0) {
+        throw new Error('Sem permissao para atualizar o pre-cadastro. Contate o administrador.')
+      }
+      return { id }
     },
-    onSuccess: () => {
+    onMutate: async ({ id }) => {
+      await qc.cancelQueries({ queryKey: ['pre-cadastros'] })
+      const prev = qc.getQueryData<PreCadastro[]>(['pre-cadastros', 'pendente'])
+      qc.setQueryData<PreCadastro[]>(['pre-cadastros', 'pendente'], (old = []) =>
+        old.filter(p => p.id !== id),
+      )
+      return { prev }
+    },
+    onError: (_err, _vars, ctx) => {
+      if (ctx?.prev) qc.setQueryData(['pre-cadastros', 'pendente'], ctx.prev)
+    },
+    onSettled: () => {
       qc.invalidateQueries({ queryKey: ['pre-cadastros'] })
     },
   })
@@ -118,7 +134,7 @@ export function usePreCadastros() {
   // Mark as approved without re-inserting data (used when item was saved via the full form modal)
   const marcarAprovado = useMutation({
     mutationFn: async ({ id }: { id: string }) => {
-      const { error } = await supabase
+      const { data: updated, error } = await supabase
         .from('sys_pre_cadastros')
         .update({
           status: 'aprovado',
@@ -126,9 +142,25 @@ export function usePreCadastros() {
           revisor_nome: perfil?.nome,
         })
         .eq('id', id)
+        .select()
       if (error) throw error
+      if (!updated || updated.length === 0) {
+        throw new Error('Sem permissao para marcar como aprovado. Contate o administrador.')
+      }
+      return { id }
     },
-    onSuccess: () => {
+    onMutate: async ({ id }) => {
+      await qc.cancelQueries({ queryKey: ['pre-cadastros'] })
+      const prev = qc.getQueryData<PreCadastro[]>(['pre-cadastros', 'pendente'])
+      qc.setQueryData<PreCadastro[]>(['pre-cadastros', 'pendente'], (old = []) =>
+        old.filter(p => p.id !== id),
+      )
+      return { prev }
+    },
+    onError: (_err, _vars, ctx) => {
+      if (ctx?.prev) qc.setQueryData(['pre-cadastros', 'pendente'], ctx.prev)
+    },
+    onSettled: () => {
       qc.invalidateQueries({ queryKey: ['pre-cadastros'] })
       qc.invalidateQueries({ queryKey: ['est-itens'] })
       qc.invalidateQueries({ queryKey: ['lookups'] })
@@ -138,7 +170,7 @@ export function usePreCadastros() {
   // Reject mutation
   const rejeitar = useMutation({
     mutationFn: async ({ id, motivo }: { id: string; motivo: string }) => {
-      const { error } = await supabase
+      const { data: updated, error } = await supabase
         .from('sys_pre_cadastros')
         .update({
           status: 'rejeitado',
@@ -147,9 +179,25 @@ export function usePreCadastros() {
           revisor_nome: perfil?.nome,
         })
         .eq('id', id)
+        .select()
       if (error) throw error
+      if (!updated || updated.length === 0) {
+        throw new Error('Sem permissao para rejeitar o pre-cadastro. Contate o administrador.')
+      }
+      return { id }
     },
-    onSuccess: () => {
+    onMutate: async ({ id }) => {
+      await qc.cancelQueries({ queryKey: ['pre-cadastros'] })
+      const prev = qc.getQueryData<PreCadastro[]>(['pre-cadastros', 'pendente'])
+      qc.setQueryData<PreCadastro[]>(['pre-cadastros', 'pendente'], (old = []) =>
+        old.filter(p => p.id !== id),
+      )
+      return { prev }
+    },
+    onError: (_err, _vars, ctx) => {
+      if (ctx?.prev) qc.setQueryData(['pre-cadastros', 'pendente'], ctx.prev)
+    },
+    onSettled: () => {
       qc.invalidateQueries({ queryKey: ['pre-cadastros'] })
     },
   })

@@ -16,26 +16,37 @@ export default function NotificationBell({ isDark = false }: { isDark?: boolean 
   const [selected, setSelected] = useState<PreCadastro | null>(null)
   const btnRef = useRef<HTMLButtonElement>(null)
   const panelRef = useRef<HTMLDivElement>(null)
-  const [pos, setPos] = useState({ top: 0, right: 0 })
+  const [pos, setPos] = useState<{ top: number; left?: number; right?: number }>({ top: 0, right: 0 })
 
   // Item modal state (for pre-cadastros of type 'itens')
   const [itemModal, setItemModal] = useState<{ pre: PreCadastro; key: number } | null>(null)
 
-  // Calculate position from button rect
+  // Calculate position from button rect — anchor to side of sidebar (left) when sidebar,
+  // or dropdown below (right-aligned) when in top navbar
   const updatePos = useCallback(() => {
     if (!btnRef.current) return
     const r = btnRef.current.getBoundingClientRect()
     const panelW = Math.min(320, window.innerWidth - 16)
-    // Center panel horizontally on mobile, right-align on desktop
-    let rightVal = window.innerWidth - r.right
-    if (rightVal + panelW > window.innerWidth - 8) {
-      // Panel would overflow left — center it instead
-      rightVal = (window.innerWidth - panelW) / 2
+    const isInSidebar = r.left < window.innerWidth * 0.35 // button is in left third → sidebar
+    const isMobile = window.innerWidth < 640
+
+    if (isInSidebar && !isMobile) {
+      // Sidebar: anchor to right of button, same vertical as button top (like actionMenu)
+      setPos({
+        top: Math.min(r.top, window.innerHeight - 440),
+        left: r.right + 12,
+      })
+    } else {
+      // Top navbar or mobile: dropdown below, right-aligned to viewport
+      const rightVal = Math.max(8, window.innerWidth - r.right)
+      const safeRight = rightVal + panelW > window.innerWidth - 8
+        ? (window.innerWidth - panelW) / 2
+        : rightVal
+      setPos({
+        top: r.bottom + 4,
+        right: Math.max(8, safeRight),
+      })
     }
-    setPos({
-      top: r.bottom + 4,
-      right: Math.max(8, rightVal),
-    })
   }, [])
 
   // Close on click outside
@@ -103,7 +114,7 @@ export default function NotificationBell({ isDark = false }: { isDark?: boolean 
           }`}
           style={{
             top: pos.top,
-            right: pos.right,
+            ...(pos.left !== undefined ? { left: pos.left } : { right: pos.right }),
             maxWidth: 'calc(100vw - 16px)',
             animation: 'notif-slide 0.2s ease-out',
           }}
