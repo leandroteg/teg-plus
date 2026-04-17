@@ -1,6 +1,6 @@
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { createPortal } from 'react-dom'
-import { LayoutGrid, LogOut, Shield, Settings, ChevronLeft, Menu, X, User, Code2, Link2, ClipboardList, Plus, HandHelping } from 'lucide-react'
+import { LayoutGrid, LogOut, Shield, Settings, ChevronLeft, Menu, X, User, Code2, Link2, ClipboardList, Plus, HandHelping, CheckSquare } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { useState, useEffect, useMemo, useRef, useCallback, lazy, Suspense, createContext, useContext } from 'react'
 import { useAuth, ROLE_LABEL, ROLE_COLOR } from '../contexts/AuthContext'
@@ -714,6 +714,15 @@ export default function ModuleLayout({
           >
             <User size={15} className="shrink-0 opacity-50" />
             Meu Perfil
+          </button>
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); handleAvatarNavigate('/minhas-tarefas') }}
+            className={`w-full flex items-center gap-3 px-4 py-2.5 text-[13px] font-medium transition-colors
+              ${ls ? 'text-slate-600 hover:bg-slate-50 hover:text-slate-900' : 'text-slate-300 hover:bg-white/[0.04] hover:text-white'}`}
+          >
+            <CheckSquare size={15} className="shrink-0 opacity-50" />
+            Minhas Tarefas
           </button>
           <button
             type="button"
