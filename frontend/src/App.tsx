@@ -85,6 +85,7 @@ const RDO = lazy(() => import('./pages/obras/RDO'))
 const AdiantamentosObras = lazy(() => import('./pages/obras/Adiantamentos'))
 const PrestacaoContas = lazy(() => import('./pages/obras/PrestacaoContas'))
 const PlanejamentoEquipe = lazy(() => import('./pages/obras/PlanejamentoEquipe'))
+const AlocacaoRecursos = lazy(() => import('./pages/obras/AlocacaoRecursos'))
 
 // EGP — Ciclo de Vida (seletor de contrato persistente)
 const EGPPainel = lazy(() => import('./pages/pmo/EGPPainel'))
@@ -390,6 +391,7 @@ export default function App() {
               <Route path="/obras/adiantamentos"      element={<Lazy><AdiantamentosObras /></Lazy>} />
               <Route path="/obras/prestacao"          element={<Lazy><PrestacaoContas /></Lazy>} />
               <Route path="/obras/equipe"            element={<Lazy><PlanejamentoEquipe /></Lazy>} />
+              <Route path="/obras/alocacao-recursos"  element={<Lazy><AlocacaoRecursos /></Lazy>} />
             </Route>
           </Route>
 
