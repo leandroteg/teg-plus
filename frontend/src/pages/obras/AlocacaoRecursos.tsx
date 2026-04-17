@@ -1,8 +1,8 @@
-import { useMemo, useState, useCallback } from 'react'
+import { useMemo, useState, useCallback, useRef, useEffect } from 'react'
 import {
   Truck, Package, Search, Plus, X, LayoutGrid, List, CalendarRange,
   CheckCircle2, PauseCircle, Wrench, MapPin, Calendar, Clock,
-  AlertTriangle, ChevronDown, ChevronUp, ArrowRight, Send,
+  AlertTriangle, ChevronDown, ChevronUp, ArrowRight, Send, Filter,
 } from 'lucide-react'
 import { useTheme } from '../../contexts/ThemeContext'
 import { useAuth } from '../../contexts/AuthContext'
@@ -616,6 +616,42 @@ function KanbanView({
   onNewObra: () => void
 }) {
   const [dragId, setDragId] = useState<string | null>(null)
+  const [filtroOpen, setFiltroOpen] = useState(false)
+  const [obrasSelecionadas, setObrasSelecionadas] = useState<Set<string>>(
+    () => new Set(['pool', ...obras.map(o => o.id)])
+  )
+  const [buscaObra, setBuscaObra] = useState('')
+  const topScrollRef = useRef<HTMLDivElement | null>(null)
+  const mainScrollRef = useRef<HTMLDivElement | null>(null)
+
+  // Sincroniza scroll superior <-> inferior
+  useEffect(() => {
+    const top = topScrollRef.current
+    const main = mainScrollRef.current
+    if (!top || !main) return
+    let syncing = false
+    const onTop = () => {
+      if (syncing) return
+      syncing = true; main.scrollLeft = top.scrollLeft
+      requestAnimationFrame(() => syncing = false)
+    }
+    const onMain = () => {
+      if (syncing) return
+      syncing = true; top.scrollLeft = main.scrollLeft
+      requestAnimationFrame(() => syncing = false)
+    }
+    top.addEventListener('scroll', onTop)
+    main.addEventListener('scroll', onMain)
+    return () => { top.removeEventListener('scroll', onTop); main.removeEventListener('scroll', onMain) }
+  }, [])
+
+  // Atualiza selecao quando obras mudam
+  useEffect(() => {
+    setObrasSelecionadas(prev => {
+      if (prev.size === 0) return new Set(['pool', ...obras.map(o => o.id)])
+      return prev
+    })
+  }, [obras])
 
   const alocAtivaByVeic = useMemo(() => {
     const m = new Map<string, FroAlocacao>()
@@ -626,7 +662,6 @@ function KanbanView({
   // Group veiculos by current obra
   const columns = useMemo(() => {
     const cols: Array<{ id: string; name: string; veiculos: FroVeiculo[] }> = []
-    // Column: Sem obra (disponiveis)
     cols.push({
       id: 'pool',
       name: 'Disponiveis',
@@ -641,6 +676,14 @@ function KanbanView({
     })
     return cols
   }, [veiculos, obras, alocAtivaByVeic])
+
+  // Colunas visiveis apos filtro
+  const visibleColumns = useMemo(() => {
+    return columns.filter(c => obrasSelecionadas.has(c.id))
+  }, [columns, obrasSelecionadas])
+
+  // Largura total do conteudo pra sincronizar a barra superior
+  const contentWidth = (visibleColumns.length * (280 + 12)) + 212 // cols + gap + "nova alocacao"
 
   const txtMain  = isDark ? 'text-white' : 'text-slate-800'
   const txtMuted = isDark ? 'text-slate-400' : 'text-slate-500'
@@ -660,15 +703,106 @@ function KanbanView({
     setDragId(null)
   }, [dragId, onMoveToObra, alocAtivaByVeic])
 
+  const toggleObra = (id: string) => {
+    setObrasSelecionadas(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+  const selecionarTodas = () => setObrasSelecionadas(new Set(['pool', ...obras.map(o => o.id)]))
+  const limparSelecao = () => setObrasSelecionadas(new Set())
+
+  const obrasFiltradas = useMemo(() => {
+    if (!buscaObra) return obras
+    const q = buscaObra.toLowerCase()
+    return obras.filter(o => o.nome.toLowerCase().includes(q) || o.codigo?.toLowerCase().includes(q))
+  }, [obras, buscaObra])
+
   return (
     <div className="space-y-2">
-      <div className={`flex items-center gap-2 text-[11px] ${txtMuted}`}>
-        <AlertTriangle size={12} />
-        Arraste um equipamento para outro canteiro para criar uma alocacao.
+      {/* Controles: filtro + barra superior */}
+      <div className="flex items-center justify-between gap-2 flex-wrap">
+        <div className={`flex items-center gap-2 text-[11px] ${txtMuted}`}>
+          <AlertTriangle size={12} />
+          Arraste um equipamento para outro canteiro para criar uma alocacao.
+        </div>
+        <div className="flex items-center gap-2">
+          <span className={`text-[11px] ${txtMuted}`}>
+            {visibleColumns.length} / {columns.length} canteiros
+          </span>
+          <div className="relative">
+            <button
+              onClick={() => setFiltroOpen(o => !o)}
+              className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold border ${
+                isDark ? 'bg-white/[0.04] border-white/[0.08] text-slate-200 hover:bg-white/[0.08]' : 'bg-white border-slate-200 hover:bg-slate-50'
+              }`}
+            >
+              <Filter size={13} /> Filtrar obras
+              {obrasSelecionadas.size < columns.length && (
+                <span className="ml-1 px-1.5 py-0.5 rounded-full bg-orange-500 text-white text-[9px] font-bold">
+                  {obrasSelecionadas.size}
+                </span>
+              )}
+            </button>
+            {filtroOpen && (
+              <>
+                <div className="fixed inset-0 z-40" onClick={() => setFiltroOpen(false)} />
+                <div className={`absolute right-0 mt-1 w-[280px] max-h-[480px] rounded-xl border shadow-xl z-50 overflow-hidden ${
+                  isDark ? 'bg-[#0f172a] border-white/[0.1]' : 'bg-white border-slate-200'
+                }`}>
+                  <div className={`px-3 py-2 border-b flex items-center justify-between ${isDark ? 'border-white/[0.06]' : 'border-slate-100'}`}>
+                    <p className={`text-xs font-bold ${txtMain}`}>Obras visiveis</p>
+                    <div className="flex gap-1">
+                      <button onClick={selecionarTodas} className={`text-[9px] px-1.5 py-0.5 rounded font-semibold ${isDark ? 'bg-white/[0.08] text-slate-300 hover:bg-white/[0.12]' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}>Todas</button>
+                      <button onClick={limparSelecao} className={`text-[9px] px-1.5 py-0.5 rounded font-semibold ${isDark ? 'bg-white/[0.08] text-slate-300 hover:bg-white/[0.12]' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}>Nenhuma</button>
+                    </div>
+                  </div>
+                  <div className={`px-3 py-2 border-b ${isDark ? 'border-white/[0.06]' : 'border-slate-100'}`}>
+                    <div className="relative">
+                      <Search size={11} className="absolute left-2 top-1/2 -translate-y-1/2 text-slate-400" />
+                      <input
+                        value={buscaObra}
+                        onChange={e => setBuscaObra(e.target.value)}
+                        placeholder="Buscar obra..."
+                        className={`w-full pl-6 pr-2 py-1.5 rounded-lg text-xs outline-none focus:ring-2 focus:ring-orange-500/30 ${
+                          isDark ? 'bg-white/[0.04] border border-white/[0.06] text-slate-200' : 'bg-slate-50 border border-slate-200'
+                        }`}
+                      />
+                    </div>
+                  </div>
+                  <div className="overflow-y-auto max-h-[320px]">
+                    <label className={`flex items-center gap-2 px-3 py-1.5 cursor-pointer ${isDark ? 'hover:bg-white/[0.04]' : 'hover:bg-slate-50'}`}>
+                      <input type="checkbox" checked={obrasSelecionadas.has('pool')} onChange={() => toggleObra('pool')} className="accent-orange-500" />
+                      <span className={`text-xs font-semibold ${isDark ? 'text-emerald-300' : 'text-emerald-600'}`}>Disponiveis</span>
+                      <span className={`ml-auto text-[10px] ${txtMuted}`}>{columns[0]?.veiculos.length || 0}</span>
+                    </label>
+                    {obrasFiltradas.map(o => {
+                      const col = columns.find(c => c.id === o.id)
+                      return (
+                        <label key={o.id} className={`flex items-center gap-2 px-3 py-1.5 cursor-pointer ${isDark ? 'hover:bg-white/[0.04]' : 'hover:bg-slate-50'}`}>
+                          <input type="checkbox" checked={obrasSelecionadas.has(o.id)} onChange={() => toggleObra(o.id)} className="accent-orange-500" />
+                          <span className={`text-xs truncate ${txtMain}`} title={o.nome}>{o.nome}</span>
+                          <span className={`ml-auto text-[10px] ${txtMuted}`}>{col?.veiculos.length || 0}</span>
+                        </label>
+                      )
+                    })}
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
       </div>
 
-      <div className="flex gap-3 overflow-x-auto pb-3 styled-scrollbar">
-        {columns.map(col => (
+      {/* Barra de rolagem superior - sincronizada */}
+      <div ref={topScrollRef} className="overflow-x-auto overflow-y-hidden h-[14px] styled-scrollbar">
+        <div style={{ width: `${contentWidth}px`, height: 1 }} />
+      </div>
+
+      <div ref={mainScrollRef} className="flex gap-3 overflow-x-auto pb-3 styled-scrollbar">
+        {visibleColumns.map(col => (
           <div
             key={col.id}
             onDragOver={e => { e.preventDefault() }}
