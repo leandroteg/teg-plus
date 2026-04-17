@@ -292,46 +292,36 @@ export default function ModuleLayout({
   const location = useLocation()
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [avatarOpen, setAvatarOpen] = useState(false)
-  const avatarBtnRef = useRef<HTMLButtonElement>(null)
   const [avatarPos, setAvatarPos] = useState<{ top: number; left?: number; right?: number }>({ top: 0, right: 0 })
   const [openNavMenu, setOpenNavMenu] = useState<{ id: string; top: number; left: number } | null>(null)
 
-  // Compute avatar dropdown position — anchor to right of sidebar button, or below in header/mobile
-  const updateAvatarPos = useCallback(() => {
-    if (!avatarBtnRef.current) return
-    const r = avatarBtnRef.current.getBoundingClientRect()
+  // Compute avatar dropdown position from the clicked button rect
+  const computeAvatarPosFromRect = useCallback((r: DOMRect) => {
     const panelW = 240
     const panelH = 440 // approx max height of menu
     const isInSidebar = r.left < window.innerWidth * 0.35
     const isMobile = window.innerWidth < 640
 
     if (isInSidebar && !isMobile) {
-      // Sidebar button: anchor to right of button
-      setAvatarPos({
+      // Sidebar button: anchor to right of button (like NotificationBell / actionMenu)
+      return {
         top: Math.min(r.top, Math.max(8, window.innerHeight - panelH - 8)),
         left: r.right + 12,
-      })
-    } else {
-      // Header/mobile: dropdown below, right-aligned
-      const rightVal = Math.max(8, window.innerWidth - r.right)
-      setAvatarPos({
-        top: r.bottom + 8,
-        right: rightVal + panelW > window.innerWidth - 8 ? (window.innerWidth - panelW) / 2 : rightVal,
-      })
+      }
+    }
+    // Header/mobile: dropdown below, right-aligned
+    const rightVal = Math.max(8, window.innerWidth - r.right)
+    return {
+      top: r.bottom + 8,
+      right: rightVal + panelW > window.innerWidth - 8 ? (window.innerWidth - panelW) / 2 : rightVal,
     }
   }, [])
 
-  useEffect(() => {
-    if (!avatarOpen) return
-    updateAvatarPos()
-    const onScroll = () => updateAvatarPos()
-    window.addEventListener('scroll', onScroll, true)
-    window.addEventListener('resize', updateAvatarPos)
-    return () => {
-      window.removeEventListener('scroll', onScroll, true)
-      window.removeEventListener('resize', updateAvatarPos)
-    }
-  }, [avatarOpen, updateAvatarPos])
+  const toggleAvatar = useCallback((btn: HTMLElement | null) => {
+    if (avatarOpen) { setAvatarOpen(false); return }
+    if (btn) setAvatarPos(computeAvatarPosFromRect(btn.getBoundingClientRect()))
+    setAvatarOpen(true)
+  }, [avatarOpen, computeAvatarPosFromRect])
 
   // Close avatar dropdown on click outside or Escape
   useEffect(() => {
@@ -655,8 +645,7 @@ export default function ModuleLayout({
     const dim = size === 'sm' ? 'w-8 h-8 text-[11px]' : 'w-9 h-9 text-xs'
     return (
       <button
-        ref={avatarBtnRef}
-        onClick={() => setAvatarOpen(o => !o)}
+        onClick={e => toggleAvatar(e.currentTarget)}
         className={[
           dim, 'rounded-full flex items-center justify-center',
           'text-white font-extrabold shrink-0 ring-2 transition-all duration-200',
