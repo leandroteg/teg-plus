@@ -5,9 +5,11 @@ import {
   ClipboardCheck, ShieldCheck, Cog, FileSearch,
 } from 'lucide-react'
 import { UpperTextarea } from '../../../components/UpperInput'
-import { useOrdensServico, useCriarOS, useVeiculos } from '../../../hooks/useFrotas'
+import { useOrdensServico, useCriarOS, useVeiculos, useAlocacoes } from '../../../hooks/useFrotas'
 import { useTheme } from '../../../contexts/ThemeContext'
-import type { FroOrdemServico, PrioridadeOS, TipoOS, StatusOS } from '../../../types/frotas'
+import { formatCodigoCategoria } from '../../../components/frotas/veiculoObs'
+import VeiculoDetalhesModal from '../../../components/frotas/VeiculoDetalhesModal'
+import type { FroOrdemServico, PrioridadeOS, TipoOS, StatusOS, FroVeiculo, FroAlocacao } from '../../../types/frotas'
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 const BRL = (v: number) =>
@@ -176,11 +178,20 @@ function NovaOSModal({ onClose, isDark }: { onClose: () => void; isDark: boolean
 }
 
 // ── OS Card ──────────────────────────────────────────────────────────────────
-function OSCard({ os, isDark, onClick }: { os: FroOrdemServico; isDark: boolean; onClick: () => void }) {
+function OSCard({ os, veicFull, isDark, onClick, onVeicClick }: {
+  os: FroOrdemServico
+  veicFull?: FroVeiculo
+  isDark: boolean
+  onClick: () => void
+  onVeicClick?: () => void
+}) {
   const p    = PRIOR[os.prioridade]
   const t    = TIPO_LABEL[os.tipo]
   const dias = diasEmAberto(os.data_abertura)
   const valor = os.valor_final ?? os.valor_aprovado ?? os.valor_orcado
+  const { codigo, categoria } = veicFull
+    ? formatCodigoCategoria(veicFull)
+    : { codigo: os.veiculo?.placa ?? '—', categoria: '' }
 
   return (
     <button type="button" onClick={onClick} className={`w-full text-left rounded-xl border p-3 transition-all ${
@@ -189,18 +200,28 @@ function OSCard({ os, isDark, onClick }: { os: FroOrdemServico; isDark: boolean;
         : 'bg-white border-slate-200 hover:shadow-md hover:border-slate-300'
     }`}>
       <div className="flex items-start justify-between gap-2 mb-1.5">
-        <div className="flex items-center gap-1.5 min-w-0">
+        <div className="flex items-center gap-1.5 min-w-0 flex-1">
           <div className={`w-[3px] h-8 rounded-full shrink-0 ${p.bar}`} />
-          <div className="min-w-0">
-            <p className={`text-sm font-bold truncate ${isDark ? 'text-white' : 'text-slate-800'}`}>
-              {os.veiculo?.placa ?? '—'}
-              {os.veiculo?.modelo && (
-                <span className={`font-normal text-[11px] ml-1 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
-                  {os.veiculo.marca} {os.veiculo.modelo}
+          <div
+            className="min-w-0 flex-1 cursor-pointer hover:underline decoration-dotted"
+            onClick={e => { if (onVeicClick) { e.stopPropagation(); onVeicClick() } }}
+            title="Click para ver ficha do veículo"
+          >
+            <div className="flex items-baseline gap-1.5">
+              <span className={`text-xs font-extrabold font-mono ${isDark ? 'text-white' : 'text-slate-800'}`}>{codigo}</span>
+              {categoria && (
+                <span className={`text-[9px] font-bold uppercase tracking-wider ${isDark ? 'text-rose-400' : 'text-rose-600'}`}>
+                  {categoria}
                 </span>
               )}
+            </div>
+            <p className={`text-[10px] truncate ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+              {os.veiculo?.marca} {os.veiculo?.modelo}
+              {os.veiculo?.placa && (
+                <><span className={isDark ? 'text-slate-600' : 'text-slate-300'}> · </span><span className="font-mono font-semibold">{os.veiculo.placa}</span></>
+              )}
             </p>
-            {os.numero_os && <p className="text-[10px] text-slate-500 font-mono">{os.numero_os}</p>}
+            {os.numero_os && <p className="text-[9px] text-slate-500 font-mono mt-0.5">{os.numero_os}</p>}
           </div>
         </div>
         <div className="flex items-center gap-1.5 shrink-0">
@@ -231,13 +252,22 @@ function OSCard({ os, isDark, onClick }: { os: FroOrdemServico; isDark: boolean;
 }
 
 // ── OS Row ───────────────────────────────────────────────────────────────────
-function OSRow({ os, isDark, onClick }: { os: FroOrdemServico; isDark: boolean; onClick: () => void }) {
+function OSRow({ os, veicFull, isDark, onClick, onVeicClick }: {
+  os: FroOrdemServico
+  veicFull?: FroVeiculo
+  isDark: boolean
+  onClick: () => void
+  onVeicClick?: () => void
+}) {
   const p    = PRIOR[os.prioridade]
   const t    = TIPO_LABEL[os.tipo]
   const dias = diasEmAberto(os.data_abertura)
   const valor = os.valor_final ?? os.valor_aprovado ?? os.valor_orcado
   const statusKey = (os.status === 'aberta' ? 'pendente' : os.status) as StageKey
   const accent = isDark ? STAGE_ACCENT_DARK[statusKey] : STAGE_ACCENT[statusKey]
+  const { codigo, categoria } = veicFull
+    ? formatCodigoCategoria(veicFull)
+    : { codigo: os.veiculo?.placa ?? '—', categoria: '' }
 
   return (
     <button type="button" onClick={onClick} className={`w-full flex items-center gap-2 px-3 py-2.5 text-left border-b transition-all ${
@@ -245,14 +275,24 @@ function OSRow({ os, isDark, onClick }: { os: FroOrdemServico; isDark: boolean; 
     }`}>
       <div className={`w-[3px] h-6 rounded-full shrink-0 ${p.bar}`} />
       <span className={`w-2 h-2 rounded-full shrink-0 ${accent.dot}`} />
-      <span className={`flex-1 text-xs font-semibold truncate ${isDark ? 'text-white' : 'text-slate-800'}`}>
-        {os.veiculo?.placa ?? '—'}
-        {os.veiculo?.modelo && (
-          <span className={`font-normal ml-1 ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
-            {os.veiculo.marca} {os.veiculo.modelo}
+      <div
+        className="flex-1 min-w-0 cursor-pointer hover:underline decoration-dotted"
+        onClick={e => { if (onVeicClick) { e.stopPropagation(); onVeicClick() } }}
+        title="Click para ver ficha do veículo"
+      >
+        <div className="flex items-baseline gap-1.5 truncate">
+          <span className={`text-xs font-extrabold font-mono ${isDark ? 'text-white' : 'text-slate-800'}`}>{codigo}</span>
+          {categoria && (
+            <span className={`text-[9px] font-bold uppercase tracking-wider ${isDark ? 'text-rose-400' : 'text-rose-600'}`}>
+              {categoria}
+            </span>
+          )}
+          <span className={`text-[10px] truncate ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+            · {os.veiculo?.marca} {os.veiculo?.modelo}
+            {os.veiculo?.placa && <> · <span className="font-mono">{os.veiculo.placa}</span></>}
           </span>
-        )}
-      </span>
+        </div>
+      </div>
       <span className={`text-[10px] px-1.5 py-0.5 rounded-md font-bold shrink-0 ${t.cls}`}>{t.label}</span>
       <span className={`text-[9px] font-black px-1.5 py-0.5 rounded border shrink-0 ${p.badge}`}>{p.label}</span>
       <span className={`w-[50px] text-[10px] text-right shrink-0 ${dias > 14 ? 'text-red-500 font-bold' : isDark ? 'text-slate-500' : 'text-slate-400'}`}>
@@ -364,6 +404,16 @@ export default function OSAbertas() {
   const [viewMode, setViewMode] = useState<ViewMode>('cards')
 
   const { data: ordens = [], isLoading } = useOrdensServico()
+  const { data: veiculosAll = [] } = useVeiculos()
+  const { data: alocacoes = [] } = useAlocacoes({ status: 'ativa' })
+  const veicMap = useMemo(() => new Map(veiculosAll.map(v => [v.id, v])), [veiculosAll])
+  const alocByVeic = useMemo(() => new Map(alocacoes.map(a => [a.veiculo_id, a])), [alocacoes])
+  const [detalheVeic, setDetalheVeic] = useState<{ v: FroVeiculo; a?: FroAlocacao } | null>(null)
+  const openVeicDetalhe = (veiculo_id: string) => {
+    const v = veicMap.get(veiculo_id)
+    if (!v) return
+    setDetalheVeic({ v, a: alocByVeic.get(veiculo_id) })
+  }
 
   const grouped = useMemo(() => {
     const map = new Map<StageKey, FroOrdemServico[]>()
@@ -479,19 +529,35 @@ export default function OSAbertas() {
             <Wrench size={40} className="mb-3" /><p className="text-sm font-medium">Nenhuma OS nesta etapa</p>
           </div>
         ) : viewMode === 'cards' ? (
-          <div className="space-y-2 p-4">{activeItems.map(os => <OSCard key={os.id} os={os} isDark={isDark} onClick={() => setDetail(os)} />)}</div>
+          <div className="space-y-2 p-4">{activeItems.map(os => <OSCard key={os.id} os={os} veicFull={veicMap.get(os.veiculo_id)} isDark={isDark} onClick={() => setDetail(os)} onVeicClick={() => openVeicDetalhe(os.veiculo_id)} />)}</div>
         ) : (
           <div>
             <div className={`flex items-center gap-2 px-3 py-1 border-b text-[10px] font-semibold uppercase tracking-wider ${isDark ? 'border-white/[0.06] text-slate-600' : 'border-slate-100 text-slate-400'}`}>
               <span className="w-[3px]" /><span className="w-2" /><span className="flex-1">Veiculo</span><span className="w-[60px]">Tipo</span><span className="w-[60px]">Prior.</span><span className="w-[50px] text-right">Dias</span><span className="w-[70px] text-right">Valor</span>
             </div>
-            {activeItems.map(os => <OSRow key={os.id} os={os} isDark={isDark} onClick={() => setDetail(os)} />)}
+            {activeItems.map(os => <OSRow key={os.id} os={os} veicFull={veicMap.get(os.veiculo_id)} isDark={isDark} onClick={() => setDetail(os)} onVeicClick={() => openVeicDetalhe(os.veiculo_id)} />)}
           </div>
         )}
       </div>
 
       {detail && <OSDetailModal os={detail} onClose={() => setDetail(null)} isDark={isDark} />}
       {novaOS && <NovaOSModal onClose={() => setNovaOS(false)} isDark={isDark} />}
+      {detalheVeic && (
+        <VeiculoDetalhesModal
+          veiculo={detalheVeic.v}
+          isLight={!isDark}
+          onClose={() => setDetalheVeic(null)}
+          alocacaoInfo={detalheVeic.a ? {
+            id: detalheVeic.a.id,
+            obraId: detalheVeic.a.obra_id,
+            obra: detalheVeic.a.obra?.nome,
+            responsavel: detalheVeic.a.responsavel_nome ?? undefined,
+            dataSaida: detalheVeic.a.data_saida,
+            dataRetornoPrev: detalheVeic.a.data_retorno_prev,
+            observacoes: detalheVeic.a.observacoes ?? undefined,
+          } : undefined}
+        />
+      )}
     </div>
   )
 }

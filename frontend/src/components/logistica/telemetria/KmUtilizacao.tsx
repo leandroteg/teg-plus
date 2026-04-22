@@ -2,6 +2,15 @@ import { useState, useMemo } from 'react'
 import { Gauge } from 'lucide-react'
 import { useTheme } from '../../../contexts/ThemeContext'
 import { useKmPorVeiculo, useUtilizacaoVeiculos } from '../../../hooks/useTelemetria'
+import { useVeiculos, useAlocacoes } from '../../../hooks/useFrotas'
+import { formatCodigoCategoria } from '../../frotas/veiculoObs'
+import VeiculoDetalhesModal from '../../frotas/VeiculoDetalhesModal'
+import type { FroVeiculo, FroAlocacao, CategoriaVeiculo } from '../../../types/frotas'
+
+const CATEGORIA_LABEL: Record<CategoriaVeiculo, string> = {
+  passeio: 'Passeio', pickup: 'Pickup', van: 'Van', vuc: 'VUC',
+  truck: 'Truck', carreta: 'Carreta', moto: 'Moto', onibus: 'Ônibus',
+}
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -31,14 +40,38 @@ export default function KmUtilizacao() {
 
   const [inicio, setInicio] = useState(inicioDoMes)
   const [fim, setFim] = useState(fimDoMes)
+  const [filtroCat, setFiltroCat] = useState<CategoriaVeiculo | 'todos'>('todos')
+  const [filtroObra, setFiltroObra] = useState<string>('todas')
+  const [detalheVeic, setDetalheVeic] = useState<{ v: FroVeiculo; a?: FroAlocacao } | null>(null)
 
   const inicioISO = inicio ? inicio + 'T00:00:00' : undefined
   const fimISO = fim ? fim + 'T23:59:59' : undefined
 
   const { data: kmData = [], isLoading: loadingKm } = useKmPorVeiculo(inicioISO, fimISO)
   const { data: utilizacaoData = [], isLoading: loadingUtil } = useUtilizacaoVeiculos(inicioISO, fimISO)
+  const { data: veiculosAll = [] } = useVeiculos()
+  const { data: alocacoes = [] } = useAlocacoes({ status: 'ativa' })
 
-  const totalKm = useMemo(() => kmData.reduce((s, v) => s + v.km_percorrido, 0), [kmData])
+  const veicMap = useMemo(() => new Map(veiculosAll.map(v => [v.id, v])), [veiculosAll])
+  const alocByVeic = useMemo(() => new Map(alocacoes.map(a => [a.veiculo_id, a])), [alocacoes])
+
+  const obrasUnicas = useMemo(() => {
+    const s = new Set<string>()
+    alocacoes.forEach(a => { if (a.obra?.nome) s.add(a.obra.nome) })
+    return Array.from(s).sort()
+  }, [alocacoes])
+
+  // Filtra kmData pela categoria e obra do veiculo
+  const kmDataFiltered = useMemo(() => {
+    return kmData.filter(k => {
+      const v = veicMap.get(k.veiculo_id)
+      if (filtroCat !== 'todos' && v?.categoria !== filtroCat) return false
+      if (filtroObra !== 'todas' && alocByVeic.get(k.veiculo_id)?.obra?.nome !== filtroObra) return false
+      return true
+    })
+  }, [kmData, veicMap, alocByVeic, filtroCat, filtroObra])
+
+  const totalKm = useMemo(() => kmDataFiltered.reduce((s, v) => s + v.km_percorrido, 0), [kmDataFiltered])
 
   const isLoading = loadingKm || loadingUtil
 
@@ -46,30 +79,32 @@ export default function KmUtilizacao() {
     ? 'bg-white border border-slate-200 shadow-sm'
     : 'bg-[#1e293b] border border-white/[0.06]'
 
-  const inputCls = `px-3 py-2 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-teal-400/40 ${
-    isLight ? 'bg-white border border-slate-200 shadow-sm text-slate-800' : 'bg-white/[0.04] border border-white/[0.08] text-white'
+  const inputCls = `px-2.5 py-1.5 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-teal-400/40 ${
+    isLight ? 'bg-white border border-slate-200 text-slate-800' : 'bg-white/[0.04] border border-white/[0.08] text-white'
   }`
-
-  const lblCls = `text-[10px] font-bold uppercase tracking-[0.18em] ${isLight ? 'text-slate-400' : 'text-slate-500'}`
 
   const thCls = `text-left text-[10px] font-bold uppercase tracking-[0.18em] px-4 py-2 ${isLight ? 'text-slate-400' : 'text-slate-500'}`
 
   const tdCls = `px-4 py-2.5 text-sm ${isLight ? 'text-slate-700' : 'text-slate-200'}`
 
   return (
-    <div className="space-y-6">
-      {/* ── Date range ─────────────────────────────────────────────────── */}
-      <div className={`rounded-2xl p-4 ${cardCls}`}>
-        <div className="flex flex-wrap gap-3 items-end">
-          <div>
-            <label className={`block mb-1 ${lblCls}`}>Início</label>
-            <input type="date" className={inputCls} value={inicio} onChange={e => setInicio(e.target.value)} />
-          </div>
-          <div>
-            <label className={`block mb-1 ${lblCls}`}>Fim</label>
-            <input type="date" className={inputCls} value={fim} onChange={e => setFim(e.target.value)} />
-          </div>
-        </div>
+    <div className="space-y-3">
+      {/* ── Filtros inline ─────────────────────────────────────────────── */}
+      <div className="flex flex-wrap items-center gap-2">
+        <h2 className={`text-sm font-extrabold mr-auto ${isLight ? 'text-slate-800' : 'text-white'}`}>Utilização</h2>
+        <input type="date" className={inputCls} value={inicio} onChange={e => setInicio(e.target.value)} title="Início" />
+        <span className={`text-xs ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>→</span>
+        <input type="date" className={inputCls} value={fim} onChange={e => setFim(e.target.value)} title="Fim" />
+        <select value={filtroCat} onChange={e => setFiltroCat(e.target.value as CategoriaVeiculo | 'todos')} className={inputCls}>
+          <option value="todos">Todos tipos</option>
+          {Object.entries(CATEGORIA_LABEL).map(([k, v]) => (
+            <option key={k} value={k}>{v}</option>
+          ))}
+        </select>
+        <select value={filtroObra} onChange={e => setFiltroObra(e.target.value)} className={`${inputCls} max-w-[200px]`}>
+          <option value="todas">Todas obras</option>
+          {obrasUnicas.map(o => <option key={o} value={o}>{o}</option>)}
+        </select>
       </div>
 
       {isLoading ? (
@@ -89,14 +124,19 @@ export default function KmUtilizacao() {
         <>
           {/* ── Tabela Unica: KM + Utilizacao ────────────────────────── */}
           {(() => {
-            // Mescla kmData + utilizacaoData por veiculo_id
+            // Mescla kmDataFiltered + utilizacaoData por veiculo_id
             const utilMap = new Map(utilizacaoData.map(u => [u.veiculo_id, u]))
             const diasUteis = utilizacaoData[0]?.dias_uteis_periodo ?? 0
-            const rows = kmData.map(km => ({
+            const rows = kmDataFiltered.map(km => ({
               km,
               util: utilMap.get(km.veiculo_id),
             }))
-            if (rows.length === 0) return null
+            if (rows.length === 0) return (
+              <div className={`rounded-2xl py-12 text-center ${cardCls}`}>
+                <Gauge size={36} className={`mx-auto mb-2 ${isLight ? 'text-slate-300' : 'text-slate-600'}`} />
+                <p className="text-sm text-slate-500">Nenhum veículo encontrado com esses filtros</p>
+              </div>
+            )
 
             return (
               <div className={`rounded-2xl overflow-hidden ${cardCls}`}>
@@ -135,13 +175,35 @@ export default function KmUtilizacao() {
                             ? 'text-amber-600 dark:text-amber-400'
                             : 'text-emerald-600 dark:text-emerald-400'
 
+                        const veicFull = veicMap.get(v.veiculo_id)
+                        const { codigo, categoria } = veicFull
+                          ? formatCodigoCategoria(veicFull)
+                          : { codigo: v.placa, categoria: '' }
+
                         return (
-                          <tr key={v.veiculo_id} className={`border-b last:border-b-0 ${isLight ? 'border-slate-50' : 'border-white/[0.03]'}`}>
+                          <tr
+                            key={v.veiculo_id}
+                            onClick={() => {
+                              if (veicFull) setDetalheVeic({ v: veicFull, a: alocByVeic.get(v.veiculo_id) })
+                            }}
+                            className={`border-b last:border-b-0 cursor-pointer transition-colors ${
+                              isLight ? 'border-slate-50 hover:bg-slate-50' : 'border-white/[0.03] hover:bg-white/[0.02]'
+                            }`}
+                          >
                             <td className={tdCls}>
-                              <span className="font-bold">{v.placa}</span>
-                              {v.marca && (
-                                <span className="text-xs text-slate-400 ml-2">{v.marca} {v.modelo}</span>
-                              )}
+                              <div className="flex items-baseline gap-1.5">
+                                <span className={`text-xs font-extrabold font-mono ${isLight ? 'text-slate-800' : 'text-white'}`}>{codigo}</span>
+                                {categoria && (
+                                  <span className={`text-[9px] font-bold uppercase tracking-wider ${isLight ? 'text-rose-600' : 'text-rose-400'}`}>
+                                    {categoria}
+                                  </span>
+                                )}
+                              </div>
+                              <p className={`text-[10px] ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>
+                                {v.marca} {v.modelo}
+                                <span className={isLight ? 'text-slate-300' : 'text-slate-600'}> · </span>
+                                <span className="font-mono">{v.placa}</span>
+                              </p>
                             </td>
                             <td className={`${tdCls} text-right tabular-nums`}>{fmtKm(v.km_inicio)}</td>
                             <td className={`${tdCls} text-right tabular-nums`}>{fmtKm(v.km_fim)}</td>
@@ -223,6 +285,24 @@ export default function KmUtilizacao() {
             )
           })()}
         </>
+      )}
+
+      {/* Modal Detalhes */}
+      {detalheVeic && (
+        <VeiculoDetalhesModal
+          veiculo={detalheVeic.v}
+          isLight={isLight}
+          onClose={() => setDetalheVeic(null)}
+          alocacaoInfo={detalheVeic.a ? {
+            id: detalheVeic.a.id,
+            obraId: detalheVeic.a.obra_id,
+            obra: detalheVeic.a.obra?.nome,
+            responsavel: detalheVeic.a.responsavel_nome ?? undefined,
+            dataSaida: detalheVeic.a.data_saida,
+            dataRetornoPrev: detalheVeic.a.data_retorno_prev,
+            observacoes: detalheVeic.a.observacoes ?? undefined,
+          } : undefined}
+        />
       )}
     </div>
   )

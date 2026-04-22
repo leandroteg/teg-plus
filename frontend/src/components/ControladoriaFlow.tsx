@@ -84,16 +84,7 @@ export default function ControladoriaFlow({
         })}
       </div>
 
-      <section>
-        <div className="mb-3">
-          <p className={`text-[10px] font-bold uppercase tracking-[0.24em] ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>
-            Subaba atual
-          </p>
-          <h2 className={`mt-1 text-lg font-extrabold ${isLight ? 'text-slate-800' : 'text-white'}`}>{currentStep.label}</h2>
-          <p className={`mt-1 text-xs ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>{currentStep.description}</p>
-        </div>
-        {children}
-      </section>
+      <section>{children}</section>
     </div>
   )
 }
