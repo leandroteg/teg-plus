@@ -109,10 +109,13 @@ export default function KmUtilizacao() {
                         <th className={`${thCls} text-right`}>KM Fim</th>
                         <th className={`${thCls} text-right`}>KM Percorrido</th>
                         <th className={`${thCls} text-right whitespace-nowrap`}>Dias de Uso</th>
-                        <th className={`${thCls} text-right whitespace-nowrap`}>
+                        <th
+                          className={`${thCls} text-right whitespace-nowrap`}
+                          title="Dias de uso / (dias úteis do período − dias sem dados telemetria)"
+                        >
                           % Alocação
                           <span className="block text-[9px] font-normal opacity-70 normal-case tracking-normal">
-                            base: {diasUteis} d. úteis
+                            base: {diasUteis} d. úteis (ajustado)
                           </span>
                         </th>
                         <th className={`${thCls} min-w-[180px]`}>Utilização do período</th>
@@ -143,11 +146,21 @@ export default function KmUtilizacao() {
                             <td className={`${tdCls} text-right tabular-nums`}>{fmtKm(v.km_inicio)}</td>
                             <td className={`${tdCls} text-right tabular-nums`}>{fmtKm(v.km_fim)}</td>
                             <td className={`${tdCls} text-right tabular-nums font-bold`}>{fmtKm(v.km_percorrido)}</td>
-                            <td className={`${tdCls} text-right tabular-nums`}>
+                            <td
+                              className={`${tdCls} text-right tabular-nums`}
+                              title={util && util.dias_sem_dados > 0
+                                ? `${util.dias_sem_dados} dia(s) sem dados de telemetria no período (desconsiderados na % Alocação)`
+                                : undefined}
+                            >
                               {util ? (
                                 <>
                                   <span className="font-bold">{util.dias_uso}</span>
-                                  <span className="text-xs text-slate-400"> / {util.dias_uteis_periodo}</span>
+                                  <span className="text-xs text-slate-400"> / {util.dias_uteis_ajustado}</span>
+                                  {util.dias_sem_dados > 0 && (
+                                    <span className="block text-[9px] text-amber-600 dark:text-amber-400">
+                                      −{util.dias_sem_dados}d s/ dados
+                                    </span>
+                                  )}
                                 </>
                               ) : <span className="text-slate-300">—</span>}
                             </td>

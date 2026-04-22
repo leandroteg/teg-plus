@@ -130,6 +130,8 @@ interface RpcUtilizacaoRow {
   horas_total: number | string
   dias_uso: number
   dias_uteis_periodo: number
+  dias_uteis_ajustado: number
+  dias_sem_dados: number
 }
 
 export function useUtilizacaoVeiculos(inicio: string | undefined, fim: string | undefined) {
@@ -151,8 +153,11 @@ export function useUtilizacaoVeiculos(inicio: string | undefined, fim: string | 
         const pct_ocioso = horas_ligado > 0
           ? Math.round(((horas_ligado - horas_movimento) / horas_ligado) * 10000) / 100
           : 0
-        const pct_alocacao = r.dias_uteis_periodo > 0
-          ? Math.min(100, Math.round((r.dias_uso / r.dias_uteis_periodo) * 10000) / 100)
+        // % Alocacao ajustada: usa dias_uteis_ajustado (dias com dados) como denominador
+        // para nao penalizar veiculos que comecaram no meio do periodo ou tiveram queda
+        const denom = r.dias_uteis_ajustado > 0 ? r.dias_uteis_ajustado : r.dias_uteis_periodo
+        const pct_alocacao = denom > 0
+          ? Math.min(100, Math.round((r.dias_uso / denom) * 10000) / 100)
           : 0
         return {
           veiculo_id: r.veiculo_id,
@@ -166,6 +171,8 @@ export function useUtilizacaoVeiculos(inicio: string | undefined, fim: string | 
           pct_ocioso,
           dias_uso: r.dias_uso,
           dias_uteis_periodo: r.dias_uteis_periodo,
+          dias_uteis_ajustado: r.dias_uteis_ajustado,
+          dias_sem_dados: r.dias_sem_dados,
           pct_alocacao,
         }
       }).sort((a, b) => b.dias_uso - a.dias_uso)

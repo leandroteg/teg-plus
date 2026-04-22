@@ -79,7 +79,11 @@ export interface TelUtilizacao {
   dias_uso: number
   // Total de dias uteis (seg-sex) no periodo selecionado
   dias_uteis_periodo: number
-  // dias_uso / dias_uteis_periodo * 100 (clamped a 100)
+  // Dias uteis em que esse veiculo teve dados (descontando inicio da base / quedas)
+  dias_uteis_ajustado: number
+  // Dias uteis sem dados (= dias_uteis_periodo - dias_uteis_ajustado)
+  dias_sem_dados: number
+  // dias_uso / dias_uteis_ajustado * 100 (clamped a 100)
   pct_alocacao: number
 }
 
