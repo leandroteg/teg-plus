@@ -654,7 +654,6 @@ export default function NovaRequisicao() {
               const file = event.target.files?.[0]
               if (file) {
                 setReferenciaFile(file)
-                handleAiParse(file)
               }
             }}
           />
