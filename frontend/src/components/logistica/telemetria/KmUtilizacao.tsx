@@ -133,9 +133,14 @@ export default function KmUtilizacao() {
           {/* ── Utilização ───────────────────────────────────────────── */}
           {utilizacaoData.length > 0 && (
             <div>
-              <h3 className={`text-sm font-extrabold mb-3 ${isLight ? 'text-slate-800' : 'text-white'}`}>
-                Utilização
-              </h3>
+              <div className="flex items-baseline justify-between mb-3">
+                <h3 className={`text-sm font-extrabold ${isLight ? 'text-slate-800' : 'text-white'}`}>
+                  Utilização
+                </h3>
+                <span className={`text-[10px] ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>
+                  Dias úteis no período: <span className="font-bold">{utilizacaoData[0]?.dias_uteis_periodo ?? 0}</span>
+                </span>
+              </div>
               <div className="space-y-3">
                 {utilizacaoData.map(v => {
                   const horasOcioso = Math.max(0, v.horas_ligado - v.horas_movimento)
@@ -145,10 +150,17 @@ export default function KmUtilizacao() {
                   const pctOcioso = v.horas_total > 0 ? (horasOcioso / v.horas_total) * 100 : 0
                   const pctDesligado = v.horas_total > 0 ? (horasDesligado / v.horas_total) * 100 : 0
 
+                  // Cor do %alocacao: vermelho < 50%, amber < 75%, verde >= 75%
+                  const alocColor = v.pct_alocacao >= 75
+                    ? 'text-emerald-600 dark:text-emerald-400'
+                    : v.pct_alocacao >= 50
+                      ? 'text-amber-600 dark:text-amber-400'
+                      : 'text-rose-600 dark:text-rose-400'
+
                   return (
                     <div key={v.veiculo_id} className={`rounded-xl px-4 py-3 ${cardCls}`}>
-                      {/* Vehicle info */}
-                      <div className="flex items-center justify-between mb-2">
+                      {/* Vehicle info + metricas novas */}
+                      <div className="flex items-center justify-between mb-2 flex-wrap gap-2">
                         <div>
                           <span className={`text-sm font-bold ${isLight ? 'text-slate-800' : 'text-white'}`}>
                             {v.placa}
@@ -156,6 +168,20 @@ export default function KmUtilizacao() {
                           {v.marca && (
                             <span className="text-xs text-slate-400 ml-2">{v.marca} {v.modelo}</span>
                           )}
+                        </div>
+                        <div className="flex items-center gap-3 text-[11px]">
+                          <div className="text-right">
+                            <p className={`text-[9px] uppercase tracking-wider ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>Dias de Uso</p>
+                            <p className={`font-extrabold text-sm ${isLight ? 'text-slate-800' : 'text-white'}`}>
+                              {v.dias_uso} <span className={`text-[10px] font-normal ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>/ {v.dias_uteis_periodo}</span>
+                            </p>
+                          </div>
+                          <div className="text-right">
+                            <p className={`text-[9px] uppercase tracking-wider ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>% Alocação</p>
+                            <p className={`font-extrabold text-sm ${alocColor}`}>
+                              {v.pct_alocacao.toFixed(0)}%
+                            </p>
+                          </div>
                         </div>
                       </div>
 

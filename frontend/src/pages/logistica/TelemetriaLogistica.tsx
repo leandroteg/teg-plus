@@ -38,8 +38,8 @@ const STEPS: FlowStep[] = [
   },
   {
     key: 'km',
-    label: 'KM & Utilização',
-    description: 'Quilometragem rodada e percentual de utilização dos veículos no período.',
+    label: 'Utilização',
+    description: 'Quilometragem, horas ligadas, dias de uso e percentual de alocação por veículo.',
     icon: Gauge,
     accent: {
       bg: 'hover:bg-blue-50',

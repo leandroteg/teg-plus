@@ -169,17 +169,38 @@ export function useUtilizacaoVeiculos(inicio: string | undefined, fim: string | 
 
       const horas_total = (new Date(fim!).getTime() - new Date(inicio!).getTime()) / 3_600_000
 
-      // Group ignition events per vehicle, pair on/off
-      const ignicaoPorVeiculo = new Map<string, { placa: string; eventos: { tipo: string; ts: number }[] }>()
+      // Calcula dias uteis (segunda a sexta) no periodo — usado pra % alocacao
+      const inicioDt = new Date(inicio!)
+      const fimDt = new Date(fim!)
+      let dias_uteis_periodo = 0
+      {
+        const cur = new Date(inicioDt.getFullYear(), inicioDt.getMonth(), inicioDt.getDate())
+        const fimDay = new Date(fimDt.getFullYear(), fimDt.getMonth(), fimDt.getDate())
+        while (cur <= fimDay) {
+          const dow = cur.getDay()
+          if (dow !== 0 && dow !== 6) dias_uteis_periodo++
+          cur.setDate(cur.getDate() + 1)
+        }
+      }
+
+      // Group ignition events per vehicle, pair on/off + conta dias distintos com ignicao
+      const ignicaoPorVeiculo = new Map<string, {
+        placa: string
+        eventos: { tipo: string; ts: number }[]
+        diasComIgnicao: Set<string> // 'yyyy-mm-dd'
+      }>()
       for (const e of eventos ?? []) {
         if (!e.veiculo_id) continue
         if (!ignicaoPorVeiculo.has(e.veiculo_id)) {
-          ignicaoPorVeiculo.set(e.veiculo_id, { placa: e.placa, eventos: [] })
+          ignicaoPorVeiculo.set(e.veiculo_id, { placa: e.placa, eventos: [], diasComIgnicao: new Set() })
         }
-        ignicaoPorVeiculo.get(e.veiculo_id)!.eventos.push({
-          tipo: e.tipo_evento,
-          ts: new Date(e.cobli_ts).getTime(),
-        })
+        const reg = ignicaoPorVeiculo.get(e.veiculo_id)!
+        reg.eventos.push({ tipo: e.tipo_evento, ts: new Date(e.cobli_ts).getTime() })
+        if (e.tipo_evento === 'ignition_on') {
+          const d = new Date(e.cobli_ts)
+          const ymd = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+          reg.diasComIgnicao.add(ymd)
+        }
       }
 
       // Compute hours engine on per vehicle
@@ -228,6 +249,10 @@ export function useUtilizacaoVeiculos(inicio: string | undefined, fim: string | 
         const info = ignicaoPorVeiculo.get(vid)
         const horas_ligado = horasLigadoMap.get(vid) ?? 0
         const horas_movimento = (movPorVeiculo.get(vid)?.size ?? 0) / 60 // minutes to hours
+        const dias_uso = info?.diasComIgnicao.size ?? 0
+        const pct_alocacao = dias_uteis_periodo > 0
+          ? Math.min(100, Math.round((dias_uso / dias_uteis_periodo) * 10000) / 100)
+          : 0
 
         resultado.push({
           veiculo_id: vid,
@@ -241,6 +266,9 @@ export function useUtilizacaoVeiculos(inicio: string | undefined, fim: string | 
           pct_ocioso: horas_ligado > 0
             ? Math.round(((horas_ligado - horas_movimento) / horas_ligado) * 10000) / 100
             : 0,
+          dias_uso,
+          dias_uteis_periodo,
+          pct_alocacao,
         })
       }
 

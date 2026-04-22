@@ -75,6 +75,12 @@ export interface TelUtilizacao {
   horas_total: number
   pct_utilizacao: number
   pct_ocioso: number
+  // Contagem de dias distintos com ao menos um evento de ignicao ligada
+  dias_uso: number
+  // Total de dias uteis (seg-sex) no periodo selecionado
+  dias_uteis_periodo: number
+  // dias_uso / dias_uteis_periodo * 100 (clamped a 100)
+  pct_alocacao: number
 }
 
 // KPIs summary
