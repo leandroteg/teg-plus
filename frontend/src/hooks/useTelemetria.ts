@@ -80,199 +80,95 @@ export function useEventosTelemetria(filtros?: {
 }
 
 // ── KM por Veículo (período) ─────────────────────────────────────────────────
+// Usa RPC rpc_telemetria_km (agrega no DB) para evitar limite de 1000 rows.
+
+interface RpcKmRow {
+  veiculo_id: string
+  placa: string
+  marca: string
+  modelo: string
+  km_inicio: number | string
+  km_fim: number | string
+  km_percorrido: number | string
+}
 
 export function useKmPorVeiculo(inicio: string | undefined, fim: string | undefined) {
   return useQuery<TelKmVeiculo[]>({
     queryKey: ['tel_km_veiculo', inicio, fim],
     queryFn: async () => {
-      // Fetch all positions with hodometro in date range
-      const { data: posicoes, error } = await supabase
-        .from('tel_posicoes')
-        .select('veiculo_id, placa, hodometro, cobli_ts')
-        .gte('cobli_ts', inicio!)
-        .lte('cobli_ts', fim!)
-        .not('hodometro', 'is', null)
-        .order('cobli_ts', { ascending: true })
-
+      const { data, error } = await supabase.rpc('rpc_telemetria_km', {
+        p_inicio: inicio,
+        p_fim: fim,
+      })
       if (error) throw error
-
-      // Group by veiculo_id, get first and last hodometro
-      const porVeiculo = new Map<string, { placa: string; hodometros: number[] }>()
-      for (const p of posicoes ?? []) {
-        if (!p.veiculo_id || p.hodometro == null) continue
-        if (!porVeiculo.has(p.veiculo_id)) {
-          porVeiculo.set(p.veiculo_id, { placa: p.placa, hodometros: [] })
-        }
-        porVeiculo.get(p.veiculo_id)!.hodometros.push(p.hodometro)
-      }
-
-      // Fetch vehicle details
-      const veiculoIds = Array.from(porVeiculo.keys())
-      if (veiculoIds.length === 0) return []
-
-      const { data: veiculos } = await supabase
-        .from('fro_veiculos')
-        .select('id, placa, marca, modelo')
-        .in('id', veiculoIds)
-
-      const veiculoMap = new Map((veiculos ?? []).map(v => [v.id, v]))
-
-      const resultado: TelKmVeiculo[] = []
-      for (const [vid, info] of porVeiculo) {
-        const v = veiculoMap.get(vid)
-        const km_inicio = info.hodometros[0]
-        const km_fim = info.hodometros[info.hodometros.length - 1]
-        resultado.push({
-          veiculo_id: vid,
-          placa: v?.placa ?? info.placa,
-          marca: v?.marca ?? '',
-          modelo: v?.modelo ?? '',
-          km_inicio,
-          km_fim,
-          km_percorrido: km_fim - km_inicio,
-        })
-      }
-
-      return resultado.sort((a, b) => b.km_percorrido - a.km_percorrido)
+      const rows = (data ?? []) as RpcKmRow[]
+      return rows.map(r => ({
+        veiculo_id: r.veiculo_id,
+        placa: r.placa,
+        marca: r.marca ?? '',
+        modelo: r.modelo ?? '',
+        km_inicio: Number(r.km_inicio) || 0,
+        km_fim: Number(r.km_fim) || 0,
+        km_percorrido: Number(r.km_percorrido) || 0,
+      }))
     },
     enabled: !!inicio && !!fim,
   })
 }
 
 // ── Utilização de Veículos (período) ─────────────────────────────────────────
+// Agora usa RPC rpc_telemetria_utilizacao para agregar no DB, evitando
+// limite de 1000 rows do PostgREST (eventos/posicoes >1000 estavam sendo cortados).
+
+interface RpcUtilizacaoRow {
+  veiculo_id: string
+  placa: string
+  marca: string
+  modelo: string
+  horas_ligado: number | string
+  horas_movimento: number | string
+  horas_total: number | string
+  dias_uso: number
+  dias_uteis_periodo: number
+}
 
 export function useUtilizacaoVeiculos(inicio: string | undefined, fim: string | undefined) {
   return useQuery<TelUtilizacao[]>({
     queryKey: ['tel_utilizacao', inicio, fim],
     queryFn: async () => {
-      // 1. Fetch ignition events in range
-      const { data: eventos, error: errEv } = await supabase
-        .from('tel_eventos')
-        .select('veiculo_id, placa, tipo_evento, cobli_ts')
-        .in('tipo_evento', ['ignition_on', 'ignition_off'])
-        .gte('cobli_ts', inicio!)
-        .lte('cobli_ts', fim!)
-        .order('cobli_ts', { ascending: true })
+      const { data, error } = await supabase.rpc('rpc_telemetria_utilizacao', {
+        p_inicio: inicio,
+        p_fim: fim,
+      })
+      if (error) throw error
+      const rows = (data ?? []) as RpcUtilizacaoRow[]
 
-      if (errEv) throw errEv
-
-      // 2. Fetch positions with speed > 0 for movement hours
-      const { data: posMovimento, error: errPos } = await supabase
-        .from('tel_posicoes')
-        .select('veiculo_id, cobli_ts')
-        .gte('cobli_ts', inicio!)
-        .lte('cobli_ts', fim!)
-        .gt('velocidade', 0)
-        .order('cobli_ts', { ascending: true })
-
-      if (errPos) throw errPos
-
-      const horas_total = (new Date(fim!).getTime() - new Date(inicio!).getTime()) / 3_600_000
-
-      // Calcula dias uteis (segunda a sexta) no periodo — usado pra % alocacao
-      const inicioDt = new Date(inicio!)
-      const fimDt = new Date(fim!)
-      let dias_uteis_periodo = 0
-      {
-        const cur = new Date(inicioDt.getFullYear(), inicioDt.getMonth(), inicioDt.getDate())
-        const fimDay = new Date(fimDt.getFullYear(), fimDt.getMonth(), fimDt.getDate())
-        while (cur <= fimDay) {
-          const dow = cur.getDay()
-          if (dow !== 0 && dow !== 6) dias_uteis_periodo++
-          cur.setDate(cur.getDate() + 1)
-        }
-      }
-
-      // Group ignition events per vehicle, pair on/off + conta dias distintos com ignicao
-      const ignicaoPorVeiculo = new Map<string, {
-        placa: string
-        eventos: { tipo: string; ts: number }[]
-        diasComIgnicao: Set<string> // 'yyyy-mm-dd'
-      }>()
-      for (const e of eventos ?? []) {
-        if (!e.veiculo_id) continue
-        if (!ignicaoPorVeiculo.has(e.veiculo_id)) {
-          ignicaoPorVeiculo.set(e.veiculo_id, { placa: e.placa, eventos: [], diasComIgnicao: new Set() })
-        }
-        const reg = ignicaoPorVeiculo.get(e.veiculo_id)!
-        reg.eventos.push({ tipo: e.tipo_evento, ts: new Date(e.cobli_ts).getTime() })
-        if (e.tipo_evento === 'ignition_on') {
-          const d = new Date(e.cobli_ts)
-          const ymd = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-          reg.diasComIgnicao.add(ymd)
-        }
-      }
-
-      // Compute hours engine on per vehicle
-      const horasLigadoMap = new Map<string, number>()
-      for (const [vid, info] of ignicaoPorVeiculo) {
-        let horas = 0
-        let ultimoOn: number | null = null
-        for (const ev of info.eventos) {
-          if (ev.tipo === 'ignition_on') {
-            ultimoOn = ev.ts
-          } else if (ev.tipo === 'ignition_off' && ultimoOn != null) {
-            horas += (ev.ts - ultimoOn) / 3_600_000
-            ultimoOn = null
-          }
-        }
-        horasLigadoMap.set(vid, horas)
-      }
-
-      // Compute movement hours per vehicle (approximate: count distinct 1-min intervals with speed > 0)
-      const movPorVeiculo = new Map<string, Set<number>>()
-      for (const p of posMovimento ?? []) {
-        if (!p.veiculo_id) continue
-        if (!movPorVeiculo.has(p.veiculo_id)) {
-          movPorVeiculo.set(p.veiculo_id, new Set())
-        }
-        // Round to minute for dedup
-        const minuto = Math.floor(new Date(p.cobli_ts).getTime() / 60_000)
-        movPorVeiculo.get(p.veiculo_id)!.add(minuto)
-      }
-
-      // Merge all vehicle IDs
-      const todosVeiculos = new Set([...ignicaoPorVeiculo.keys(), ...movPorVeiculo.keys()])
-      const veiculoIds = Array.from(todosVeiculos)
-      if (veiculoIds.length === 0) return []
-
-      const { data: veiculos } = await supabase
-        .from('fro_veiculos')
-        .select('id, placa, marca, modelo')
-        .in('id', veiculoIds)
-
-      const veiculoMap = new Map((veiculos ?? []).map(v => [v.id, v]))
-
-      const resultado: TelUtilizacao[] = []
-      for (const vid of veiculoIds) {
-        const v = veiculoMap.get(vid)
-        const info = ignicaoPorVeiculo.get(vid)
-        const horas_ligado = horasLigadoMap.get(vid) ?? 0
-        const horas_movimento = (movPorVeiculo.get(vid)?.size ?? 0) / 60 // minutes to hours
-        const dias_uso = info?.diasComIgnicao.size ?? 0
-        const pct_alocacao = dias_uteis_periodo > 0
-          ? Math.min(100, Math.round((dias_uso / dias_uteis_periodo) * 10000) / 100)
+      return rows.map(r => {
+        const horas_ligado = Number(r.horas_ligado) || 0
+        const horas_movimento = Number(r.horas_movimento) || 0
+        const horas_total = Number(r.horas_total) || 0
+        const pct_utilizacao = horas_total > 0 ? Math.round((horas_ligado / horas_total) * 10000) / 100 : 0
+        const pct_ocioso = horas_ligado > 0
+          ? Math.round(((horas_ligado - horas_movimento) / horas_ligado) * 10000) / 100
           : 0
-
-        resultado.push({
-          veiculo_id: vid,
-          placa: v?.placa ?? info?.placa ?? '',
-          marca: v?.marca ?? '',
-          modelo: v?.modelo ?? '',
-          horas_ligado: Math.round(horas_ligado * 100) / 100,
-          horas_movimento: Math.round(horas_movimento * 100) / 100,
-          horas_total: Math.round(horas_total * 100) / 100,
-          pct_utilizacao: horas_total > 0 ? Math.round((horas_ligado / horas_total) * 10000) / 100 : 0,
-          pct_ocioso: horas_ligado > 0
-            ? Math.round(((horas_ligado - horas_movimento) / horas_ligado) * 10000) / 100
-            : 0,
-          dias_uso,
-          dias_uteis_periodo,
+        const pct_alocacao = r.dias_uteis_periodo > 0
+          ? Math.min(100, Math.round((r.dias_uso / r.dias_uteis_periodo) * 10000) / 100)
+          : 0
+        return {
+          veiculo_id: r.veiculo_id,
+          placa: r.placa,
+          marca: r.marca ?? '',
+          modelo: r.modelo ?? '',
+          horas_ligado,
+          horas_movimento,
+          horas_total,
+          pct_utilizacao,
+          pct_ocioso,
+          dias_uso: r.dias_uso,
+          dias_uteis_periodo: r.dias_uteis_periodo,
           pct_alocacao,
-        })
-      }
-
-      return resultado.sort((a, b) => b.pct_utilizacao - a.pct_utilizacao)
+        }
+      }).sort((a, b) => b.dias_uso - a.dias_uso)
     },
     enabled: !!inicio && !!fim,
   })
