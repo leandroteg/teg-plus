@@ -4,7 +4,7 @@ import {
   Sparkles, Send, PlusCircle, Trash2, ChevronLeft, ChevronRight,
   AlertCircle, Check, Layers, FileText, Search, Upload, FileUp,
   ChevronDown, X, FileImage, Eye, Pencil, CheckCircle2, Loader2,
-  Package, MapPin, Zap, Save,
+  Package, MapPin, Zap, Save, ExternalLink, Download,
 } from 'lucide-react'
 import { useCriarRequisicao, useAtualizarRequisicao, useRequisicao, useReenviarAposDevolucao } from '../hooks/useRequisicoes'
 import { useAiParse, readFileForAi, isBinaryFile, isImageFile } from '../hooks/useAiParse'
