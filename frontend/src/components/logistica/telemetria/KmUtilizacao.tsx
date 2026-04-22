@@ -87,143 +87,128 @@ export default function KmUtilizacao() {
         </div>
       ) : (
         <>
-          {/* ── KM Rodada ────────────────────────────────────────────── */}
-          {kmData.length > 0 && (
-            <div>
-              <h3 className={`text-sm font-extrabold mb-3 ${isLight ? 'text-slate-800' : 'text-white'}`}>
-                KM Rodada
-              </h3>
+          {/* ── Tabela Unica: KM + Utilizacao ────────────────────────── */}
+          {(() => {
+            // Mescla kmData + utilizacaoData por veiculo_id
+            const utilMap = new Map(utilizacaoData.map(u => [u.veiculo_id, u]))
+            const diasUteis = utilizacaoData[0]?.dias_uteis_periodo ?? 0
+            const rows = kmData.map(km => ({
+              km,
+              util: utilMap.get(km.veiculo_id),
+            }))
+            if (rows.length === 0) return null
+
+            return (
               <div className={`rounded-2xl overflow-hidden ${cardCls}`}>
-                <table className="w-full">
-                  <thead>
-                    <tr className={`border-b ${isLight ? 'border-slate-100' : 'border-white/[0.06]'}`}>
-                      <th className={thCls}>Veículo</th>
-                      <th className={`${thCls} text-right`}>KM Início</th>
-                      <th className={`${thCls} text-right`}>KM Fim</th>
-                      <th className={`${thCls} text-right`}>KM Percorrido</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {kmData.map(v => (
-                      <tr key={v.veiculo_id} className={`border-b last:border-b-0 ${isLight ? 'border-slate-50' : 'border-white/[0.03]'}`}>
-                        <td className={tdCls}>
-                          <span className="font-bold">{v.placa}</span>
-                          {v.marca && (
-                            <span className="text-xs text-slate-400 ml-2">{v.marca} {v.modelo}</span>
-                          )}
-                        </td>
-                        <td className={`${tdCls} text-right tabular-nums`}>{fmtKm(v.km_inicio)}</td>
-                        <td className={`${tdCls} text-right tabular-nums`}>{fmtKm(v.km_fim)}</td>
-                        <td className={`${tdCls} text-right tabular-nums font-bold`}>{fmtKm(v.km_percorrido)}</td>
-                      </tr>
-                    ))}
-                    {/* Totals row */}
-                    <tr className={`border-t-2 ${isLight ? 'border-slate-200' : 'border-white/[0.08]'}`}>
-                      <td className={`${tdCls} font-extrabold`}>Total</td>
-                      <td className={tdCls} />
-                      <td className={tdCls} />
-                      <td className={`${tdCls} text-right tabular-nums font-extrabold`}>{fmtKm(totalKm)}</td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          )}
-
-          {/* ── Utilização ───────────────────────────────────────────── */}
-          {utilizacaoData.length > 0 && (
-            <div>
-              <div className="flex items-baseline justify-between mb-3">
-                <h3 className={`text-sm font-extrabold ${isLight ? 'text-slate-800' : 'text-white'}`}>
-                  Utilização
-                </h3>
-                <span className={`text-[10px] ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>
-                  Dias úteis no período: <span className="font-bold">{utilizacaoData[0]?.dias_uteis_periodo ?? 0}</span>
-                </span>
-              </div>
-              <div className="space-y-3">
-                {utilizacaoData.map(v => {
-                  const horasOcioso = Math.max(0, v.horas_ligado - v.horas_movimento)
-                  const horasDesligado = Math.max(0, v.horas_total - v.horas_ligado)
-
-                  const pctMovimento = v.horas_total > 0 ? (v.horas_movimento / v.horas_total) * 100 : 0
-                  const pctOcioso = v.horas_total > 0 ? (horasOcioso / v.horas_total) * 100 : 0
-                  const pctDesligado = v.horas_total > 0 ? (horasDesligado / v.horas_total) * 100 : 0
-
-                  // Cor do %alocacao: vermelho < 50%, amber < 75%, verde >= 75%
-                  const alocColor = v.pct_alocacao >= 75
-                    ? 'text-emerald-600 dark:text-emerald-400'
-                    : v.pct_alocacao >= 50
-                      ? 'text-amber-600 dark:text-amber-400'
-                      : 'text-rose-600 dark:text-rose-400'
-
-                  return (
-                    <div key={v.veiculo_id} className={`rounded-xl px-4 py-3 ${cardCls}`}>
-                      {/* Vehicle info + metricas novas */}
-                      <div className="flex items-center justify-between mb-2 flex-wrap gap-2">
-                        <div>
-                          <span className={`text-sm font-bold ${isLight ? 'text-slate-800' : 'text-white'}`}>
-                            {v.placa}
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead>
+                      <tr className={`border-b ${isLight ? 'border-slate-100' : 'border-white/[0.06]'}`}>
+                        <th className={thCls}>Veículo</th>
+                        <th className={`${thCls} text-right`}>KM Início</th>
+                        <th className={`${thCls} text-right`}>KM Fim</th>
+                        <th className={`${thCls} text-right`}>KM Percorrido</th>
+                        <th className={`${thCls} text-right whitespace-nowrap`}>Dias de Uso</th>
+                        <th className={`${thCls} text-right whitespace-nowrap`}>
+                          % Alocação
+                          <span className="block text-[9px] font-normal opacity-70 normal-case tracking-normal">
+                            base: {diasUteis} d. úteis
                           </span>
-                          {v.marca && (
-                            <span className="text-xs text-slate-400 ml-2">{v.marca} {v.modelo}</span>
-                          )}
-                        </div>
-                        <div className="flex items-center gap-3 text-[11px]">
-                          <div className="text-right">
-                            <p className={`text-[9px] uppercase tracking-wider ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>Dias de Uso</p>
-                            <p className={`font-extrabold text-sm ${isLight ? 'text-slate-800' : 'text-white'}`}>
-                              {v.dias_uso} <span className={`text-[10px] font-normal ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>/ {v.dias_uteis_periodo}</span>
-                            </p>
-                          </div>
-                          <div className="text-right">
-                            <p className={`text-[9px] uppercase tracking-wider ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>% Alocação</p>
-                            <p className={`font-extrabold text-sm ${alocColor}`}>
-                              {v.pct_alocacao.toFixed(0)}%
-                            </p>
-                          </div>
-                        </div>
-                      </div>
+                        </th>
+                        <th className={`${thCls} min-w-[180px]`}>Utilização do período</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {rows.map(({ km: v, util }) => {
+                        const horasOcioso = util ? Math.max(0, util.horas_ligado - util.horas_movimento) : 0
+                        const horasDesligado = util ? Math.max(0, util.horas_total - util.horas_ligado) : 0
+                        const pctMovimento = util && util.horas_total > 0 ? (util.horas_movimento / util.horas_total) * 100 : 0
+                        const pctOcioso = util && util.horas_total > 0 ? (horasOcioso / util.horas_total) * 100 : 0
+                        const pctDesligado = util && util.horas_total > 0 ? (horasDesligado / util.horas_total) * 100 : 0
 
-                      {/* Stacked bar */}
-                      <div className="flex h-5 rounded-lg overflow-hidden">
-                        {pctMovimento > 0 && (
-                          <div
-                            className="bg-emerald-500 transition-all"
-                            style={{ width: `${pctMovimento}%` }}
-                            title={`Em movimento: ${fmtHoras(v.horas_movimento)}h (${pctMovimento.toFixed(1)}%)`}
-                          />
-                        )}
-                        {pctOcioso > 0 && (
-                          <div
-                            className="bg-yellow-400 transition-all"
-                            style={{ width: `${pctOcioso}%` }}
-                            title={`Ocioso: ${fmtHoras(horasOcioso)}h (${pctOcioso.toFixed(1)}%)`}
-                          />
-                        )}
-                        {pctDesligado > 0 && (
-                          <div
-                            className="bg-slate-300 dark:bg-slate-600 transition-all"
-                            style={{ width: `${pctDesligado}%` }}
-                            title={`Desligado: ${fmtHoras(horasDesligado)}h (${pctDesligado.toFixed(1)}%)`}
-                          />
-                        )}
-                      </div>
+                        const alocColor = !util || util.pct_alocacao < 50
+                          ? 'text-rose-600 dark:text-rose-400'
+                          : util.pct_alocacao < 75
+                            ? 'text-amber-600 dark:text-amber-400'
+                            : 'text-emerald-600 dark:text-emerald-400'
 
-                      {/* Labels */}
-                      <p className="mt-1.5 text-[10px] text-slate-400">
-                        <span className="text-emerald-600 dark:text-emerald-400 font-semibold">{fmtHoras(v.horas_movimento)}h movimento</span>
-                        <span className="mx-1.5">&middot;</span>
-                        <span className="text-yellow-600 dark:text-yellow-400 font-semibold">{fmtHoras(horasOcioso)}h ocioso</span>
-                        <span className="mx-1.5">&middot;</span>
-                        <span className="font-semibold">{fmtHoras(horasDesligado)}h desligado</span>
-                      </p>
-                    </div>
-                  )
-                })}
+                        return (
+                          <tr key={v.veiculo_id} className={`border-b last:border-b-0 ${isLight ? 'border-slate-50' : 'border-white/[0.03]'}`}>
+                            <td className={tdCls}>
+                              <span className="font-bold">{v.placa}</span>
+                              {v.marca && (
+                                <span className="text-xs text-slate-400 ml-2">{v.marca} {v.modelo}</span>
+                              )}
+                            </td>
+                            <td className={`${tdCls} text-right tabular-nums`}>{fmtKm(v.km_inicio)}</td>
+                            <td className={`${tdCls} text-right tabular-nums`}>{fmtKm(v.km_fim)}</td>
+                            <td className={`${tdCls} text-right tabular-nums font-bold`}>{fmtKm(v.km_percorrido)}</td>
+                            <td className={`${tdCls} text-right tabular-nums`}>
+                              {util ? (
+                                <>
+                                  <span className="font-bold">{util.dias_uso}</span>
+                                  <span className="text-xs text-slate-400"> / {util.dias_uteis_periodo}</span>
+                                </>
+                              ) : <span className="text-slate-300">—</span>}
+                            </td>
+                            <td className={`${tdCls} text-right tabular-nums`}>
+                              {util ? (
+                                <span className={`font-extrabold ${alocColor}`}>{util.pct_alocacao.toFixed(0)}%</span>
+                              ) : <span className="text-slate-300">—</span>}
+                            </td>
+                            <td className={tdCls}>
+                              {util ? (
+                                <div>
+                                  <div className={`flex h-1.5 rounded-full overflow-hidden ${isLight ? 'bg-slate-100' : 'bg-white/[0.04]'}`}>
+                                    {pctMovimento > 0 && (
+                                      <div
+                                        className="bg-emerald-500"
+                                        style={{ width: `${pctMovimento}%` }}
+                                        title={`Em movimento: ${fmtHoras(util.horas_movimento)}h (${pctMovimento.toFixed(1)}%)`}
+                                      />
+                                    )}
+                                    {pctOcioso > 0 && (
+                                      <div
+                                        className="bg-yellow-400"
+                                        style={{ width: `${pctOcioso}%` }}
+                                        title={`Ocioso: ${fmtHoras(horasOcioso)}h (${pctOcioso.toFixed(1)}%)`}
+                                      />
+                                    )}
+                                    {pctDesligado > 0 && (
+                                      <div
+                                        className="bg-slate-300 dark:bg-slate-600"
+                                        style={{ width: `${pctDesligado}%` }}
+                                        title={`Desligado: ${fmtHoras(horasDesligado)}h (${pctDesligado.toFixed(1)}%)`}
+                                      />
+                                    )}
+                                  </div>
+                                  <p className="mt-1 text-[9px] text-slate-400 whitespace-nowrap">
+                                    <span className="text-emerald-600 dark:text-emerald-400 font-semibold">{fmtHoras(util.horas_movimento)}h</span>
+                                    <span className="mx-1">·</span>
+                                    <span className="text-yellow-600 dark:text-yellow-500 font-semibold">{fmtHoras(horasOcioso)}h</span>
+                                    <span className="mx-1">·</span>
+                                    <span className="font-semibold">{fmtHoras(horasDesligado)}h</span>
+                                  </p>
+                                </div>
+                              ) : <span className="text-slate-300 text-xs">—</span>}
+                            </td>
+                          </tr>
+                        )
+                      })}
+                      {/* Totals row */}
+                      <tr className={`border-t-2 ${isLight ? 'border-slate-200' : 'border-white/[0.08]'}`}>
+                        <td className={`${tdCls} font-extrabold`}>Total</td>
+                        <td className={tdCls} />
+                        <td className={tdCls} />
+                        <td className={`${tdCls} text-right tabular-nums font-extrabold`}>{fmtKm(totalKm)}</td>
+                        <td className={tdCls} colSpan={3} />
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
               </div>
-            </div>
-          )}
+            )
+          })()}
         </>
       )}
     </div>
