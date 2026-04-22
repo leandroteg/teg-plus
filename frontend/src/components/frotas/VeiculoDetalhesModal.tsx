@@ -1,7 +1,11 @@
+import { useState } from 'react'
 import {
   Car, Cog, X, Tag, User, Radio, Building2,
   Gauge, Timer, FileText, ShieldAlert, Wrench, MapPin, ClipboardList, CornerDownLeft,
+  Pencil, Check, Loader2,
 } from 'lucide-react'
+import { useAtualizarAlocacao } from '../../hooks/useFrotas'
+import { useObras } from '../../hooks/useFinanceiro'
 import type { FroVeiculo } from '../../types/frotas'
 import { parseObsInfo } from './veiculoObs'
 
@@ -67,10 +71,14 @@ export interface VeiculoDetalhesModalProps {
   onRegistrarRetorno?: () => void
   /** Info extra da alocação corrente (se houver) */
   alocacaoInfo?: {
+    id?: string
+    obraId?: string
     obra?: string
     responsavel?: string
+    responsavelId?: string
     dataSaida?: string
     dataRetornoPrev?: string
+    observacoes?: string
   }
 }
 
@@ -80,6 +88,31 @@ export default function VeiculoDetalhesModal({
   alocacaoInfo,
 }: VeiculoDetalhesModalProps) {
   const isDark = !isLight
+  const atualizar = useAtualizarAlocacao()
+  const { data: obras = [] } = useObras()
+  const [editMode, setEditMode] = useState(false)
+  const [editResp, setEditResp] = useState(alocacaoInfo?.responsavel ?? '')
+  const [editObra, setEditObra] = useState(alocacaoInfo?.obraId ?? '')
+  const [editDataRet, setEditDataRet] = useState(alocacaoInfo?.dataRetornoPrev ?? '')
+  const [editObs, setEditObs] = useState(alocacaoInfo?.observacoes ?? '')
+
+  const canEdit = !!alocacaoInfo?.id
+
+  async function handleSaveAloc() {
+    if (!alocacaoInfo?.id) return
+    try {
+      await atualizar.mutateAsync({
+        id: alocacaoInfo.id,
+        responsavel_nome: editResp.trim() || undefined,
+        obra_id: editObra || undefined,
+        data_retorno_prev: editDataRet || undefined,
+        observacoes: editObs.trim() || undefined,
+      })
+      setEditMode(false)
+    } catch (err) {
+      alert('Erro ao atualizar: ' + (err instanceof Error ? err.message : 'desconhecido'))
+    }
+  }
   const isMaquina = v.tipo_ativo === 'maquina'
   const obs = parseObsInfo(v.observacoes)
   const prop = PROP_MAP[v.propriedade]
@@ -179,20 +212,118 @@ export default function VeiculoDetalhesModal({
             )}
           </div>
 
-          {/* Alocação atual (se fornecida) */}
+          {/* Alocação atual (se fornecida) — com modo de edição */}
           {alocacaoInfo && (
             <div className={`rounded-xl border p-4 ${border} ${
               isLight ? 'bg-rose-50/40 border-rose-200' : 'bg-rose-500/[0.04] border-rose-500/15'
             }`}>
-              <p className={`text-[10px] font-bold uppercase tracking-wider mb-3 ${isLight ? 'text-rose-700' : 'text-rose-300'}`}>
-                Alocação atual
-              </p>
-              <div className="grid grid-cols-2 gap-4">
-                <Info icon={Building2} label="Obra / CC" value={alocacaoInfo.obra} />
-                <Info icon={User}      label="Responsável" value={alocacaoInfo.responsavel} />
-                <Info icon={Tag}       label="Saída"       value={alocacaoInfo.dataSaida ? new Date(alocacaoInfo.dataSaida).toLocaleDateString('pt-BR') : undefined} />
-                <Info icon={Tag}       label="Retorno previsto" value={alocacaoInfo.dataRetornoPrev ? new Date(alocacaoInfo.dataRetornoPrev).toLocaleDateString('pt-BR') : undefined} />
+              <div className="flex items-center justify-between mb-3">
+                <p className={`text-[10px] font-bold uppercase tracking-wider ${isLight ? 'text-rose-700' : 'text-rose-300'}`}>
+                  Alocação atual
+                </p>
+                {canEdit && !editMode && (
+                  <button
+                    onClick={() => setEditMode(true)}
+                    className={`inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-1 rounded-lg transition-colors ${
+                      isLight ? 'bg-white text-rose-600 hover:bg-rose-50 border border-rose-200' : 'bg-white/[0.06] text-rose-300 hover:bg-white/[0.1]'
+                    }`}
+                  >
+                    <Pencil size={11} /> Editar
+                  </button>
+                )}
               </div>
+
+              {!editMode ? (
+                <div className="grid grid-cols-2 gap-4">
+                  <Info icon={Building2} label="Obra / CC" value={alocacaoInfo.obra} />
+                  <Info icon={User}      label="Responsável" value={alocacaoInfo.responsavel} />
+                  <Info icon={Tag}       label="Saída"       value={alocacaoInfo.dataSaida ? new Date(alocacaoInfo.dataSaida).toLocaleDateString('pt-BR') : undefined} />
+                  <Info icon={Tag}       label="Retorno previsto" value={alocacaoInfo.dataRetornoPrev ? new Date(alocacaoInfo.dataRetornoPrev).toLocaleDateString('pt-BR') : undefined} />
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className={`text-[10px] font-bold uppercase tracking-wider block mb-1 ${txtMuted}`}>
+                        Motorista / Responsável
+                      </label>
+                      <input
+                        value={editResp}
+                        onChange={e => setEditResp(e.target.value)}
+                        placeholder="Nome completo..."
+                        className={`w-full rounded-lg border px-2.5 py-1.5 text-xs outline-none focus:ring-2 focus:ring-rose-500/30 ${
+                          isLight ? 'bg-white border-slate-200' : 'bg-white/[0.04] border-white/[0.06] text-white'
+                        }`}
+                      />
+                    </div>
+                    <div>
+                      <label className={`text-[10px] font-bold uppercase tracking-wider block mb-1 ${txtMuted}`}>
+                        Retorno previsto
+                      </label>
+                      <input
+                        type="date"
+                        value={editDataRet}
+                        onChange={e => setEditDataRet(e.target.value)}
+                        className={`w-full rounded-lg border px-2.5 py-1.5 text-xs outline-none focus:ring-2 focus:ring-rose-500/30 ${
+                          isLight ? 'bg-white border-slate-200' : 'bg-white/[0.04] border-white/[0.06] text-white'
+                        }`}
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label className={`text-[10px] font-bold uppercase tracking-wider block mb-1 ${txtMuted}`}>
+                      Obra / Canteiro
+                    </label>
+                    <select
+                      value={editObra}
+                      onChange={e => setEditObra(e.target.value)}
+                      className={`w-full rounded-lg border px-2.5 py-1.5 text-xs outline-none focus:ring-2 focus:ring-rose-500/30 ${
+                        isLight ? 'bg-white border-slate-200' : 'bg-white/[0.04] border-white/[0.06] text-white'
+                      }`}
+                    >
+                      <option value="">— Manter atual —</option>
+                      {obras.map(o => <option key={o.id} value={o.id}>{o.nome}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className={`text-[10px] font-bold uppercase tracking-wider block mb-1 ${txtMuted}`}>
+                      Observações
+                    </label>
+                    <textarea
+                      value={editObs}
+                      onChange={e => setEditObs(e.target.value)}
+                      rows={2}
+                      className={`w-full rounded-lg border px-2.5 py-1.5 text-xs outline-none resize-none focus:ring-2 focus:ring-rose-500/30 ${
+                        isLight ? 'bg-white border-slate-200' : 'bg-white/[0.04] border-white/[0.06] text-white'
+                      }`}
+                    />
+                  </div>
+                  <div className="flex justify-end gap-2">
+                    <button
+                      onClick={() => {
+                        setEditMode(false)
+                        setEditResp(alocacaoInfo?.responsavel ?? '')
+                        setEditObra(alocacaoInfo?.obraId ?? '')
+                        setEditDataRet(alocacaoInfo?.dataRetornoPrev ?? '')
+                        setEditObs(alocacaoInfo?.observacoes ?? '')
+                      }}
+                      className={`px-3 py-1.5 rounded-lg text-[11px] font-semibold ${
+                        isLight ? 'bg-slate-100 text-slate-600 hover:bg-slate-200' : 'bg-white/[0.06] text-slate-300 hover:bg-white/[0.1]'
+                      }`}
+                    >
+                      Cancelar
+                    </button>
+                    <button
+                      onClick={handleSaveAloc}
+                      disabled={atualizar.isPending}
+                      className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-[11px] font-bold bg-rose-500 text-white hover:bg-rose-600 disabled:opacity-50"
+                    >
+                      {atualizar.isPending ? <Loader2 size={11} className="animate-spin" /> : <Check size={11} />}
+                      Salvar
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           )}
 

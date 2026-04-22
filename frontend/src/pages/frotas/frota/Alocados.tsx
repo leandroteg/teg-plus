@@ -663,10 +663,13 @@ export default function Alocados() {
           isLight={isLight}
           osCount={osCountMap[detalheAloc.veiculo_id] ?? 0}
           alocacaoInfo={{
+            id: detalheAloc.id,
+            obraId: detalheAloc.obra_id,
             obra: detalheAloc.obra?.nome,
             responsavel: detalheAloc.responsavel_nome ?? undefined,
             dataSaida: detalheAloc.data_saida,
             dataRetornoPrev: detalheAloc.data_retorno_prev,
+            observacoes: detalheAloc.observacoes ?? undefined,
           }}
           onClose={() => { setDetalheVeiculo(null); setDetalheAloc(null) }}
           onRegistrarRetorno={() => {

@@ -1320,10 +1320,13 @@ export default function AgendaAlocacao() {
           veiculo={detalheVeic.v}
           isLight={isLight}
           alocacaoInfo={detalheVeic.a ? {
+            id: detalheVeic.a.id,
+            obraId: detalheVeic.a.obra_id,
             obra: detalheVeic.a.obra?.nome,
             responsavel: detalheVeic.a.responsavel_nome ?? undefined,
             dataSaida: detalheVeic.a.data_saida,
             dataRetornoPrev: detalheVeic.a.data_retorno_prev,
+            observacoes: detalheVeic.a.observacoes ?? undefined,
           } : undefined}
           onClose={() => setDetalheVeic(null)}
           onRegistrarRetorno={detalheVeic.a && detalheVeic.a.status === 'ativa' ? () => {

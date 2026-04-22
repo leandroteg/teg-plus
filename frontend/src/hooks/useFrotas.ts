@@ -659,6 +659,29 @@ export function useCriarAlocacao() {
   })
 }
 
+export function useAtualizarAlocacao() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ id, ...payload }: Partial<FroAlocacao> & { id: string }) => {
+      const { id: _, veiculo, obra, created_at, updated_at, ...clean } = { id, ...payload } as Record<string, unknown>
+      void _; void veiculo; void obra; void created_at; void updated_at
+      const { data: updated, error } = await supabase
+        .from('fro_alocacoes')
+        .update({ ...clean, updated_at: new Date().toISOString() })
+        .eq('id', id)
+        .select()
+      if (error) throw error
+      if (!updated || updated.length === 0) {
+        throw new Error('Sem permissao para atualizar a alocacao.')
+      }
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['fro_alocacoes'] })
+      qc.invalidateQueries({ queryKey: ['fro_veiculos'] })
+    },
+  })
+}
+
 export function useEncerrarAlocacao() {
   const qc = useQueryClient()
   return useMutation({
