@@ -5,24 +5,25 @@ import { useAbastecimentos, useOcorrenciasTel } from '../../../hooks/useFrotas'
 import AgendaAlocacao from './AgendaAlocacao'
 import AbastecimentosOp from './AbastecimentosOp'
 import MultasPedagios from './MultasPedagios'
-import TelemetriaOp from './TelemetriaOp'
+// Reutiliza a tela completa de Telemetria da Logistica (Mapa ao Vivo + Alertas + KM)
+import TelemetriaLogistica from '../../logistica/TelemetriaLogistica'
 
 // ── Tab Config ───────────────────────────────────────────────────────────────
 
-type TabKey = 'agenda' | 'abastecimentos' | 'multas' | 'telemetria'
+type TabKey = 'agenda' | 'telemetria' | 'abastecimentos' | 'multas'
 
 const TABS: Array<{ key: TabKey; label: string }> = [
   { key: 'agenda',          label: 'Agenda'            },
+  { key: 'telemetria',      label: 'Telemetria'        },
   { key: 'abastecimentos',  label: 'Abastecimentos'    },
   { key: 'multas',          label: 'Multas & Pedágios' },
-  { key: 'telemetria',      label: 'Telemetria'        },
 ]
 
 const TAB_ICONS: Record<TabKey, React.ElementType> = {
   agenda:         CalendarDays,
+  telemetria:     Radio,
   abastecimentos: Fuel,
   multas:         AlertCircle,
-  telemetria:     Radio,
 }
 
 const TAB_ACCENT: Record<TabKey, {
@@ -77,9 +78,9 @@ const TAB_ACCENT_DARK: Record<TabKey, {
 
 const COMPS: Record<TabKey, React.ComponentType> = {
   agenda:         AgendaAlocacao,
+  telemetria:     TelemetriaLogistica, // mesma tela da Logistica (reutilizada)
   abastecimentos: AbastecimentosOp,
   multas:         MultasPedagios,
-  telemetria:     TelemetriaOp,
 }
 
 // ── Component ────────────────────────────────────────────────────────────────
@@ -91,9 +92,9 @@ export default function OperacaoHub() {
   const { data: ocorrencias = [] } = useOcorrenciasTel()
   const counts: Record<TabKey, number> = {
     agenda: 0,
+    telemetria: 0,
     abastecimentos: abastecimentos.length,
     multas: ocorrencias.length,
-    telemetria: 0,
   }
   const Comp = COMPS[active] ?? AgendaAlocacao
 
