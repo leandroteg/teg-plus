@@ -144,24 +144,16 @@ export default function KmUtilizacao() {
                   <table className="w-full">
                     <thead>
                       <tr className={`border-b ${isLight ? 'border-slate-100' : 'border-white/[0.06]'}`}>
-                        <th className={thCls}>Veículo</th>
-                        <th className={`${thCls} text-right`}>KM Início</th>
-                        <th className={`${thCls} text-right`}>KM Fim</th>
-                        <th className={`${thCls} text-right`}>KM Percorrido</th>
+                        <th className={`${thCls} whitespace-nowrap`} style={{ minWidth: 220 }}>Veículo</th>
+                        <th className={`${thCls} text-right whitespace-nowrap`}>KM Início</th>
+                        <th className={`${thCls} text-right whitespace-nowrap`}>KM Fim</th>
+                        <th className={`${thCls} text-right whitespace-nowrap`}>KM Percorrido</th>
                         <th className={`${thCls} text-right whitespace-nowrap`}>Dias de Uso</th>
                         <th
                           className={`${thCls} text-right whitespace-nowrap`}
-                          title="Dias de uso / dias úteis com dados da base telemetria (global)"
+                          title={`Dias de uso / dias úteis com dados (${utilizacaoData[0]?.dias_uteis_ajustado ?? diasUteis} de ${diasUteis})`}
                         >
                           % Alocação
-                          <span className="block text-[9px] font-normal opacity-70 normal-case tracking-normal">
-                            base ajustada: {utilizacaoData[0]?.dias_uteis_ajustado ?? diasUteis} de {diasUteis} d. úteis
-                            {(utilizacaoData[0]?.dias_sem_dados ?? 0) > 0 && (
-                              <span className="text-amber-600 dark:text-amber-400">
-                                {' '}(−{utilizacaoData[0]?.dias_sem_dados}d s/ telemetria)
-                              </span>
-                            )}
-                          </span>
                         </th>
                         <th className={`${thCls} min-w-[180px]`}>Utilização do período</th>
                       </tr>
@@ -195,8 +187,8 @@ export default function KmUtilizacao() {
                               isLight ? 'border-slate-50 hover:bg-slate-50' : 'border-white/[0.03] hover:bg-white/[0.02]'
                             }`}
                           >
-                            <td className={tdCls}>
-                              <div className="flex items-baseline gap-1.5">
+                            <td className={`${tdCls} whitespace-nowrap`} style={{ minWidth: 220 }}>
+                              <div className="flex items-baseline gap-1.5 whitespace-nowrap">
                                 <span className={`text-xs font-extrabold font-mono ${isLight ? 'text-slate-800' : 'text-white'}`}>{codigo}</span>
                                 {categoria && (
                                   <span className={`text-[9px] font-bold uppercase tracking-wider ${isLight ? 'text-rose-600' : 'text-rose-400'}`}>
@@ -204,7 +196,7 @@ export default function KmUtilizacao() {
                                   </span>
                                 )}
                               </div>
-                              <p className={`text-[10px] ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>
+                              <p className={`text-[10px] truncate max-w-[220px] ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>
                                 {v.marca} {v.modelo}
                                 <span className={isLight ? 'text-slate-300' : 'text-slate-600'}> · </span>
                                 <span className="font-mono">{v.placa}</span>
