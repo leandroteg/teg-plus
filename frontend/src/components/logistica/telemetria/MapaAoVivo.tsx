@@ -1,12 +1,14 @@
 import { useState, useMemo, useEffect } from 'react'
-import { Search, Radio, ChevronLeft, ChevronRight } from 'lucide-react'
+import { Search, Radio, ChevronLeft, ChevronRight, Info as InfoIcon } from 'lucide-react'
 import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet'
 import * as L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import { useTheme } from '../../../contexts/ThemeContext'
 import { useUltimasPosicoes } from '../../../hooks/useTelemetria'
-import { useVeiculos } from '../../../hooks/useFrotas'
+import { useVeiculos, useAlocacoes } from '../../../hooks/useFrotas'
 import type { TelUltimaPosicao } from '../../../types/telemetria'
+import type { FroVeiculo, FroAlocacao } from '../../../types/frotas'
+import VeiculoDetalhesModal from '../../frotas/VeiculoDetalhesModal'
 
 // Fix leaflet default icon issue (safely)
 try {
@@ -104,15 +106,36 @@ export default function MapaAoVivo() {
   const { isLightSidebar: isLight } = useTheme()
   const { data: posicoes = [], isLoading } = useUltimasPosicoes()
   const { data: veiculos = [] } = useVeiculos()
+  const { data: alocacoes = [] } = useAlocacoes({ status: 'ativa' })
   const [busca, setBusca] = useState('')
   const [selecionado, setSelecionado] = useState<string | null>(null)
   const [sidebarAberta, setSidebarAberta] = useState(true)
+  const [detalheVeiculo, setDetalheVeiculo] = useState<{
+    v: FroVeiculo
+    a?: FroAlocacao
+    pos?: TelUltimaPosicao
+  } | null>(null)
 
   // Map veiculos by id for quick lookup
   const veiculoMap = useMemo(
     () => new Map(veiculos.map(v => [v.id, v])),
     [veiculos],
   )
+
+  // Map alocacao ativa by veiculo_id
+  const alocByVeic = useMemo(
+    () => new Map(alocacoes.map(a => [a.veiculo_id, a])),
+    [alocacoes],
+  )
+
+  // Abre modal fusao Frotas + Telemetria
+  function openDetalhe(veiculo_id: string) {
+    const v = veiculoMap.get(veiculo_id)
+    if (!v) return
+    const a = alocByVeic.get(veiculo_id)
+    const pos = posicoes.find(p => p.veiculo_id === veiculo_id)
+    setDetalheVeiculo({ v, a, pos })
+  }
 
   // Filter positions by search
   const posicoesFiltradas = useMemo(() => {
@@ -215,11 +238,13 @@ export default function MapaAoVivo() {
                   <button
                     key={pos.veiculo_id}
                     onClick={() => setSelecionado(ativo ? null : pos.veiculo_id)}
+                    onDoubleClick={() => openDetalhe(pos.veiculo_id)}
                     className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-left transition-colors ${
                       ativo
                         ? isLight ? 'bg-orange-50 border border-orange-200' : 'bg-orange-500/10 border border-orange-500/25'
                         : isLight ? 'hover:bg-slate-50 border border-transparent' : 'hover:bg-white/[0.04] border border-transparent'
                     }`}
+                    title="Click = selecionar · Duplo click = ver detalhes"
                   >
                     <span
                       className="shrink-0 w-2.5 h-2.5 rounded-full"
@@ -301,7 +326,7 @@ export default function MapaAoVivo() {
                 }}
               >
                 <Popup>
-                  <div className="text-xs space-y-1.5 min-w-[170px]">
+                  <div className="text-xs space-y-1.5 min-w-[180px]">
                     <p className="font-bold text-sm text-slate-800">{pos.placa}</p>
                     {v && <p className="text-slate-500">{v.marca} {v.modelo}</p>}
                     <div className="flex items-center gap-2">
@@ -314,6 +339,12 @@ export default function MapaAoVivo() {
                       <p className="text-slate-400">Hodometro: {Math.round(pos.hodometro).toLocaleString('pt-BR')} km</p>
                     )}
                     <p className="text-slate-400">{tempoRelativo(pos.cobli_ts)}</p>
+                    <button
+                      onClick={() => openDetalhe(pos.veiculo_id)}
+                      className="w-full mt-2 inline-flex items-center justify-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-emerald-500 text-white text-[11px] font-bold hover:bg-emerald-600 transition-colors"
+                    >
+                      <InfoIcon size={11} /> Ver detalhes completos
+                    </button>
                   </div>
                 </Popup>
               </Marker>
@@ -321,6 +352,34 @@ export default function MapaAoVivo() {
           })}
         </MapContainer>
       </div>
+
+      {/* Modal fusao Frotas + Telemetria */}
+      {detalheVeiculo && (
+        <VeiculoDetalhesModal
+          veiculo={detalheVeiculo.v}
+          isLight={isLight}
+          onClose={() => setDetalheVeiculo(null)}
+          alocacaoInfo={detalheVeiculo.a ? {
+            id: detalheVeiculo.a.id,
+            obraId: detalheVeiculo.a.obra_id,
+            obra: detalheVeiculo.a.obra?.nome,
+            responsavel: detalheVeiculo.a.responsavel_nome ?? undefined,
+            dataSaida: detalheVeiculo.a.data_saida,
+            dataRetornoPrev: detalheVeiculo.a.data_retorno_prev,
+            observacoes: detalheVeiculo.a.observacoes ?? undefined,
+          } : undefined}
+          telemetriaInfo={detalheVeiculo.pos ? {
+            velocidade: detalheVeiculo.pos.velocidade,
+            statusLabel: getStatusLabel(detalheVeiculo.pos),
+            statusColor: getStatusColor(detalheVeiculo.pos),
+            ignicao: detalheVeiculo.pos.ignicao,
+            hodometro: detalheVeiculo.pos.hodometro ?? undefined,
+            ultimaAtualizacao: detalheVeiculo.pos.cobli_ts,
+            latitude: detalheVeiculo.pos.latitude,
+            longitude: detalheVeiculo.pos.longitude,
+          } : undefined}
+        />
+      )}
     </div>
   )
 }

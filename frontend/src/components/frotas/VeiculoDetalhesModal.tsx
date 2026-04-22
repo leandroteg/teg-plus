@@ -2,7 +2,7 @@ import { useState } from 'react'
 import {
   Car, Cog, X, Tag, User, Radio, Building2,
   Gauge, Timer, FileText, ShieldAlert, Wrench, MapPin, ClipboardList, CornerDownLeft,
-  Pencil, Check, Loader2,
+  Pencil, Check, Loader2, Activity, Navigation,
 } from 'lucide-react'
 import { useAtualizarAlocacao } from '../../hooks/useFrotas'
 import { useObras } from '../../hooks/useFinanceiro'
@@ -80,12 +80,23 @@ export interface VeiculoDetalhesModalProps {
     dataRetornoPrev?: string
     observacoes?: string
   }
+  /** Info de telemetria em tempo real (se houver) */
+  telemetriaInfo?: {
+    velocidade?: number
+    statusLabel?: string
+    statusColor?: string
+    ignicao?: boolean
+    hodometro?: number
+    ultimaAtualizacao?: string
+    latitude?: number
+    longitude?: number
+  }
 }
 
 export default function VeiculoDetalhesModal({
   veiculo: v, osCount = 0, isLight, onClose,
   onAlocar, onOS, onChecklist, onRegistrarRetorno,
-  alocacaoInfo,
+  alocacaoInfo, telemetriaInfo,
 }: VeiculoDetalhesModalProps) {
   const isDark = !isLight
   const atualizar = useAtualizarAlocacao()
@@ -211,6 +222,72 @@ export default function VeiculoDetalhesModal({
               </span>
             )}
           </div>
+
+          {/* Telemetria em tempo real (se fornecida) */}
+          {telemetriaInfo && (
+            <div className={`rounded-xl border p-4 ${border} ${
+              isLight ? 'bg-emerald-50/40 border-emerald-200' : 'bg-emerald-500/[0.04] border-emerald-500/15'
+            }`}>
+              <div className="flex items-center justify-between mb-3">
+                <p className={`text-[10px] font-bold uppercase tracking-wider flex items-center gap-1.5 ${isLight ? 'text-emerald-700' : 'text-emerald-300'}`}>
+                  <Activity size={11} className="animate-pulse" />
+                  Telemetria em tempo real
+                </p>
+                {telemetriaInfo.statusLabel && telemetriaInfo.statusColor && (
+                  <span
+                    className="text-[10px] font-bold px-2 py-0.5 rounded-full"
+                    style={{
+                      backgroundColor: telemetriaInfo.statusColor + '22',
+                      color: telemetriaInfo.statusColor,
+                    }}
+                  >
+                    ● {telemetriaInfo.statusLabel}
+                  </span>
+                )}
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <Info
+                  icon={Gauge}
+                  label="Velocidade"
+                  value={telemetriaInfo.velocidade != null ? `${telemetriaInfo.velocidade} km/h` : undefined}
+                />
+                <Info
+                  icon={Radio}
+                  label="Ignição"
+                  value={telemetriaInfo.ignicao != null ? (telemetriaInfo.ignicao ? 'Ligada' : 'Desligada') : undefined}
+                />
+                <Info
+                  icon={Gauge}
+                  label="Hodômetro (tel.)"
+                  value={telemetriaInfo.hodometro != null ? `${Math.round(telemetriaInfo.hodometro).toLocaleString('pt-BR')} km` : undefined}
+                />
+                <Info
+                  icon={Timer}
+                  label="Última atualização"
+                  value={telemetriaInfo.ultimaAtualizacao ? new Date(telemetriaInfo.ultimaAtualizacao).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : undefined}
+                />
+                {telemetriaInfo.latitude != null && telemetriaInfo.longitude != null && (
+                  <div className="col-span-2 flex items-start gap-2">
+                    <Navigation size={13} className={`mt-0.5 shrink-0 ${txtMuted}`} />
+                    <div className="min-w-0">
+                      <p className={`text-[10px] font-bold uppercase tracking-wider ${txtMuted}`}>Localização</p>
+                      <p className={`text-sm font-semibold ${txtMain}`}>
+                        {telemetriaInfo.latitude.toFixed(5)}, {telemetriaInfo.longitude.toFixed(5)}
+                      </p>
+                      <a
+                        href={`https://www.google.com/maps?q=${telemetriaInfo.latitude},${telemetriaInfo.longitude}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className={`text-[10px] font-semibold ${isLight ? 'text-emerald-600 hover:text-emerald-700' : 'text-emerald-400 hover:text-emerald-300'}`}
+                      >
+                        Abrir no Google Maps ↗
+                      </a>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
 
           {/* Alocação atual (se fornecida) — com modo de edição */}
           {alocacaoInfo && (
