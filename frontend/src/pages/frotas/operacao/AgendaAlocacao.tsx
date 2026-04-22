@@ -17,7 +17,8 @@ import {
   useVeiculos,
 } from '../../../hooks/useFrotas'
 import { useTheme } from '../../../contexts/ThemeContext'
-import type { FroAlocacao } from '../../../types/frotas'
+import { formatCodigoCategoria } from '../../../components/frotas/veiculoObs'
+import type { FroAlocacao, FroVeiculo } from '../../../types/frotas'
 
 // ── Types ────────────────────────────────────────────────────────────────────
 type ViewMode = 'tabela' | 'timeline' | 'calendario'
@@ -416,9 +417,11 @@ function ViewToggle({
 // ── Timeline / Gantt View ────────────────────────────────────────────────────
 function TimelineView({
   alocacoes,
+  veiculosMap,
   isLight,
 }: {
   alocacoes: FroAlocacao[]
+  veiculosMap: Map<string, FroVeiculo>
   isLight: boolean
 }) {
   const today = new Date()
@@ -434,22 +437,34 @@ function TimelineView({
   const days = useMemo(() => dateRange(rangeStart, rangeEnd), [rangeStart, rangeEnd])
   const totalDays = days.length
 
-  // Group allocations by vehicle placa
+  // Group allocations by vehicle placa (com codigo + categoria)
   const vehicleRows = useMemo(() => {
-    const map = new Map<string, { placa: string; info: string; allocations: FroAlocacao[] }>()
+    const map = new Map<string, {
+      placa: string
+      codigo: string
+      categoria: string
+      modelo: string
+      allocations: FroAlocacao[]
+    }>()
     for (const al of alocacoes) {
       const placa = al.veiculo?.placa ?? 'Sem placa'
       if (!map.has(placa)) {
+        const veic = al.veiculo_id ? veiculosMap.get(al.veiculo_id) : undefined
+        const { codigo, categoria } = veic
+          ? formatCodigoCategoria(veic)
+          : { codigo: placa, categoria: '' }
         map.set(placa, {
           placa,
-          info: `${al.veiculo?.marca ?? ''} ${al.veiculo?.modelo ?? ''}`.trim(),
+          codigo,
+          categoria,
+          modelo: `${al.veiculo?.marca ?? ''} ${al.veiculo?.modelo ?? ''}`.trim(),
           allocations: [],
         })
       }
       map.get(placa)!.allocations.push(al)
     }
-    return Array.from(map.values()).sort((a, b) => a.placa.localeCompare(b.placa))
-  }, [alocacoes])
+    return Array.from(map.values()).sort((a, b) => a.codigo.localeCompare(b.codigo))
+  }, [alocacoes, veiculosMap])
 
   function navigate(direction: 'prev' | 'next') {
     const shift = direction === 'prev' ? -14 : 14
@@ -602,20 +617,31 @@ function TimelineView({
                 isLight ? 'border-slate-100' : 'border-white/[0.04]'
               }`}
             >
-              {/* Vehicle label */}
+              {/* Vehicle label: CODIGO · CATEGORIA / MODELO · PLACA */}
               <div
-                className={`flex-shrink-0 w-36 sm:w-44 border-r px-3 py-2.5 ${
+                className={`flex-shrink-0 w-44 sm:w-52 border-r px-3 py-2.5 ${
                   isLight ? 'border-slate-200' : 'border-white/8'
                 }`}
               >
-                <p
-                  className={`text-xs font-bold truncate ${
+                <div className="flex items-baseline gap-1.5 truncate">
+                  <span className={`text-xs font-extrabold font-mono truncate ${
                     isLight ? 'text-slate-800' : 'text-white'
-                  }`}
-                >
-                  {row.placa}
+                  }`}>
+                    {row.codigo}
+                  </span>
+                  {row.categoria && (
+                    <span className={`text-[9px] font-bold uppercase tracking-wider ${
+                      isLight ? 'text-rose-600' : 'text-rose-400'
+                    }`}>
+                      {row.categoria}
+                    </span>
+                  )}
+                </div>
+                <p className="text-[10px] text-slate-500 truncate">
+                  {row.modelo}
+                  <span className={isLight ? 'text-slate-300' : 'text-slate-600'}> · </span>
+                  <span className="font-mono font-semibold">{row.placa}</span>
                 </p>
-                <p className="text-[10px] text-slate-500 truncate">{row.info}</p>
               </div>
               {/* Bars area */}
               <div className="flex-1 relative" style={{ minHeight: 40 }}>
@@ -941,15 +967,22 @@ export default function AgendaAlocacao() {
   const { data: alocacoesAtivas = [], isLoading: loadingAtivas } = useAlocacoes({ status: 'ativa' })
   // For timeline/calendar, load all statuses
   const { data: todasAlocacoes = [], isLoading: loadingTodas } = useAlocacoes()
+  // Veiculos para extrair codigo_interno + categoria
+  const { data: veiculosList = [] } = useVeiculos()
+  const veiculosMap = useMemo(() => {
+    const m = new Map<string, FroVeiculo>()
+    veiculosList.forEach(v => m.set(v.id, v))
+    return m
+  }, [veiculosList])
 
   const [novaModal, setNovaModal] = useState(false)
   const [retornoAloc, setRetornoAloc] = useState<FroAlocacao | null>(null)
 
-  // Filtros
+  // Filtros — default: mostrar so 'ativa' (sem canceladas/encerradas)
   const [filtroAtivo, setFiltroAtivo] = useState('')
   const [filtroPessoa, setFiltroPessoa] = useState('')
   const [filtroObra, setFiltroObra] = useState('')
-  const [filtroStatus, setFiltroStatus] = useState<'' | 'ativa' | 'encerrada'>('')
+  const [filtroStatus, setFiltroStatus] = useState<'' | 'ativa' | 'encerrada' | 'cancelada'>('ativa')
 
   const raw = viewMode === 'tabela' ? alocacoesAtivas : todasAlocacoes
 
@@ -1004,10 +1037,10 @@ export default function AgendaAlocacao() {
         </div>
       </div>
 
-      {/* Filtros */}
-      <div className={`flex flex-wrap items-center gap-2 ${hasFilters ? '' : ''}`}>
+      {/* Filtros — em uma unica linha com scroll horizontal em mobile */}
+      <div className="flex items-center gap-2 overflow-x-auto pb-1 -mx-1 px-1">
         <select value={filtroAtivo} onChange={e => setFiltroAtivo(e.target.value)}
-          className={`px-3 py-2 rounded-xl border text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-rose-500/30 ${
+          className={`shrink-0 px-3 py-2 rounded-xl border text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-rose-500/30 ${
             filtroAtivo
               ? isLight ? 'border-rose-300 bg-rose-50 text-rose-700' : 'border-rose-400/40 bg-rose-500/10 text-rose-300'
               : isLight ? 'border-slate-200 bg-white text-slate-600' : 'border-white/[0.08] bg-white/[0.03] text-slate-300'
@@ -1016,7 +1049,7 @@ export default function AgendaAlocacao() {
           {veiculosUnicos.map(p => <option key={p} value={p}>{p}</option>)}
         </select>
         <select value={filtroPessoa} onChange={e => setFiltroPessoa(e.target.value)}
-          className={`px-3 py-2 rounded-xl border text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-rose-500/30 ${
+          className={`shrink-0 px-3 py-2 rounded-xl border text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-rose-500/30 ${
             filtroPessoa
               ? isLight ? 'border-rose-300 bg-rose-50 text-rose-700' : 'border-rose-400/40 bg-rose-500/10 text-rose-300'
               : isLight ? 'border-slate-200 bg-white text-slate-600' : 'border-white/[0.08] bg-white/[0.03] text-slate-300'
@@ -1025,7 +1058,7 @@ export default function AgendaAlocacao() {
           {pessoasUnicas.map(p => <option key={p} value={p}>{p}</option>)}
         </select>
         <select value={filtroObra} onChange={e => setFiltroObra(e.target.value)}
-          className={`px-3 py-2 rounded-xl border text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-rose-500/30 ${
+          className={`shrink-0 px-3 py-2 rounded-xl border text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-rose-500/30 ${
             filtroObra
               ? isLight ? 'border-rose-300 bg-rose-50 text-rose-700' : 'border-rose-400/40 bg-rose-500/10 text-rose-300'
               : isLight ? 'border-slate-200 bg-white text-slate-600' : 'border-white/[0.08] bg-white/[0.03] text-slate-300'
@@ -1034,26 +1067,27 @@ export default function AgendaAlocacao() {
           {obrasUnicas.map(o => <option key={o} value={o}>{o}</option>)}
         </select>
         {viewMode !== 'tabela' && (
-          <select value={filtroStatus} onChange={e => setFiltroStatus(e.target.value as any)}
-            className={`px-3 py-2 rounded-xl border text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-rose-500/30 ${
+          <select value={filtroStatus} onChange={e => setFiltroStatus(e.target.value as '' | 'ativa' | 'encerrada' | 'cancelada')}
+            className={`shrink-0 px-3 py-2 rounded-xl border text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-rose-500/30 ${
               filtroStatus
                 ? isLight ? 'border-rose-300 bg-rose-50 text-rose-700' : 'border-rose-400/40 bg-rose-500/10 text-rose-300'
                 : isLight ? 'border-slate-200 bg-white text-slate-600' : 'border-white/[0.08] bg-white/[0.03] text-slate-300'
             }`}>
+            <option value="ativa">Ativas</option>
+            <option value="encerrada">Encerradas</option>
+            <option value="cancelada">Canceladas</option>
             <option value="">Todos status</option>
-            <option value="ativa">Ativa</option>
-            <option value="encerrada">Encerrada</option>
           </select>
         )}
         {hasFilters && (
           <button onClick={clearFilters}
-            className={`flex items-center gap-1 px-3 py-2 rounded-xl text-xs font-semibold transition-colors ${
+            className={`shrink-0 flex items-center gap-1 px-3 py-2 rounded-xl text-xs font-semibold transition-colors ${
               isLight ? 'text-slate-500 hover:bg-slate-100' : 'text-slate-400 hover:bg-white/[0.06]'
             }`}>
             <X size={12} /> Limpar
           </button>
         )}
-        <span className={`ml-auto text-[11px] ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>
+        <span className={`shrink-0 ml-auto pl-2 text-[11px] whitespace-nowrap ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>
           {alocacoes.length} resultado{alocacoes.length !== 1 ? 's' : ''}
         </span>
       </div>
@@ -1192,7 +1226,7 @@ export default function AgendaAlocacao() {
         )
       ) : viewMode === 'timeline' ? (
         /* ── Timeline View ───────────────────────────────────────────── */
-        <TimelineView alocacoes={alocacoes} isLight={isLight} />
+        <TimelineView alocacoes={alocacoes} veiculosMap={veiculosMap} isLight={isLight} />
       ) : (
         /* ── Calendar View ───────────────────────────────────────────── */
         <CalendarView alocacoes={alocacoes} isLight={isLight} />
