@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react'
 import {
   Search, Plus, Car, Cog, Gauge, Timer,
   FileText, ShieldAlert, Wrench, ClipboardList, MapPin, Warehouse,
-  LayoutGrid, LayoutList, X, Loader2, Landmark,
+  LayoutGrid, LayoutList, X, Loader2, Landmark, Tag, User, Radio, Building2,
 } from 'lucide-react'
 import { useTheme } from '../../../contexts/ThemeContext'
 import { useVeiculos, useOrdensServico, useSalvarVeiculo } from '../../../hooks/useFrotas'
@@ -78,18 +78,43 @@ const PROP_MAP = {
   cedida:  { label: 'Cedido',  light: 'bg-slate-100 text-slate-600',     dark: 'bg-slate-500/10 text-slate-400'    },
 }
 
+// Extrai campos estruturados do campo observacoes (formato: "Categoria origem: X | Cód. Sistema: Y | ...")
+interface ObsInfo {
+  categoriaOrigem?: string
+  codigo?: string
+  codFrota?: string
+  responsavel?: string
+  local?: string
+  rastreador?: string
+}
+function parseObsInfo(obs?: string): ObsInfo {
+  if (!obs) return {}
+  const info: ObsInfo = {}
+  obs.split('|').forEach(part => {
+    const p = part.trim()
+    if (p.startsWith('Categoria origem:')) info.categoriaOrigem = p.replace('Categoria origem:', '').trim()
+    else if (p.startsWith('Cód. Sistema:')) info.codigo = p.replace('Cód. Sistema:', '').trim()
+    else if (p.startsWith('Cód. Frota:'))   info.codFrota = p.replace('Cód. Frota:', '').trim()
+    else if (p.startsWith('Responsável:'))  info.responsavel = p.replace('Responsável:', '').trim()
+    else if (p.startsWith('Local:'))        info.local = p.replace('Local:', '').trim()
+    else if (p.startsWith('Rastreador:'))   info.rastreador = p.replace('Rastreador:', '').trim()
+  })
+  return info
+}
+
 // ── VeiculoCard ───────────────────────────────────────────────────────────────
 
 interface VeiculoCardProps {
   v: FroVeiculo
   osCount: number
   isLight: boolean
+  onOpen: (v: FroVeiculo) => void
   onAlocar: (id: string) => void
   onOS: (id: string) => void
   onChecklist: (id: string) => void
 }
 
-function VeiculoCard({ v, osCount, isLight, onAlocar, onOS, onChecklist }: VeiculoCardProps) {
+function VeiculoCard({ v, osCount, isLight, onOpen, onAlocar, onOS, onChecklist }: VeiculoCardProps) {
   const isMaquina = v.tipo_ativo === 'maquina'
   const prop = PROP_MAP[v.propriedade]
   const prevColor = preventivaColor(v.km_proxima_preventiva, v.hodometro_atual, v.data_proxima_preventiva, isLight)
@@ -100,14 +125,21 @@ function VeiculoCard({ v, osCount, isLight, onAlocar, onOS, onChecklist }: Veicu
   const crlvColor   = docAlertColor(diasCrlv, isLight)
   const seguroColor = docAlertColor(diasSeguro, isLight)
 
-  const identificador = isMaquina && v.numero_serie ? v.numero_serie : v.placa
+  const obs = parseObsInfo(v.observacoes)
+  // Primeira linha destaque: "CÓDIGO - CATEGORIA"
+  const codigo = obs.codigo || obs.codFrota || (isMaquina && v.numero_serie) || v.placa
+  const categoriaOrigem = obs.categoriaOrigem || v.categoria.toUpperCase()
+  // Segunda linha: "MODELO - PLACA"
+  const modelo = `${v.marca} ${v.modelo}${v.ano_mod ? ` · ${v.ano_mod}` : ''}`
 
   return (
-    <div className={`rounded-2xl border shadow-sm transition-all hover:shadow-md ${
-      isLight ? 'bg-white border-slate-200' : 'bg-[#1e293b] border-white/[0.06]'
+    <div
+      onClick={() => onOpen(v)}
+      className={`rounded-2xl border shadow-sm transition-all hover:shadow-md cursor-pointer ${
+      isLight ? 'bg-white border-slate-200 hover:border-rose-200' : 'bg-[#1e293b] border-white/[0.06] hover:border-rose-500/30'
     }`}>
       <div className="flex flex-col sm:flex-row sm:items-center gap-3 px-4 py-3">
-        {/* Top line: Icon + Placa/modelo */}
+        {/* Top line: Icon + Código/Categoria + Modelo/Placa */}
         <div className="flex items-center gap-3">
           {/* Icon box */}
           <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${
@@ -121,16 +153,20 @@ function VeiculoCard({ v, osCount, isLight, onAlocar, onOS, onChecklist }: Veicu
             }
           </div>
 
-          {/* Placa + modelo */}
-          <div className="min-w-0 sm:w-40 shrink-0">
+          {/* Código - Categoria / Modelo - Placa */}
+          <div className="min-w-0 sm:w-56 shrink-0">
             <div className="flex items-center gap-1.5">
-              <p className={`text-sm font-bold truncate ${isLight ? 'text-slate-800' : 'text-white'}`}>
-                {identificador}
+              <p className={`text-sm font-extrabold truncate ${isLight ? 'text-slate-800' : 'text-white'}`}>
+                <span className="font-mono">{codigo}</span>
+                <span className={`mx-1.5 ${isLight ? 'text-slate-300' : 'text-slate-600'}`}>·</span>
+                <span className={isLight ? 'text-rose-600' : 'text-rose-400'}>{categoriaOrigem}</span>
               </p>
               {osCount > 0 && <OSBadge count={osCount} isLight={isLight} />}
             </div>
-            <p className="text-[11px] text-slate-500 truncate">
-              {v.marca} {v.modelo}{v.ano_mod ? ` · ${v.ano_mod}` : ''}
+            <p className={`text-[11px] truncate ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
+              {modelo}
+              <span className={isLight ? 'text-slate-300' : 'text-slate-600'}> · </span>
+              <span className="font-mono font-semibold">{v.placa}</span>
             </p>
           </div>
         </div>
@@ -183,7 +219,7 @@ function VeiculoCard({ v, osCount, isLight, onAlocar, onOS, onChecklist }: Veicu
         <div className="hidden sm:block flex-1" />
 
         {/* Actions */}
-        <div className="flex items-center gap-2 w-full sm:w-auto">
+        <div className="flex items-center gap-2 w-full sm:w-auto" onClick={e => e.stopPropagation()}>
           <button
             onClick={() => onAlocar(v.id)}
             className={`flex-1 sm:flex-initial flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-xl border text-[11px] font-semibold transition-all ${
@@ -227,12 +263,13 @@ interface VeiculoRowProps {
   osCount: number
   isLight: boolean
   idx: number
+  onOpen: (v: FroVeiculo) => void
   onAlocar: (id: string) => void
   onOS: (id: string) => void
   onChecklist: (id: string) => void
 }
 
-function VeiculoRow({ v, osCount, isLight, idx, onAlocar, onOS, onChecklist }: VeiculoRowProps) {
+function VeiculoRow({ v, osCount, isLight, idx, onOpen, onAlocar, onOS, onChecklist }: VeiculoRowProps) {
   const isMaquina = v.tipo_ativo === 'maquina'
   const prop = PROP_MAP[v.propriedade]
   const prevColor = preventivaColor(v.km_proxima_preventiva, v.hodometro_atual, v.data_proxima_preventiva, isLight)
@@ -241,17 +278,20 @@ function VeiculoRow({ v, osCount, isLight, idx, onAlocar, onOS, onChecklist }: V
   const diasSeguro = diasAte(v.vencimento_seguro)
   const crlvColor   = docAlertColor(diasCrlv, isLight)
   const seguroColor = docAlertColor(diasSeguro, isLight)
-  const identificador = isMaquina && v.numero_serie ? v.numero_serie : v.placa
 
-  const trCls = `border-t transition-colors ${
+  const obs = parseObsInfo(v.observacoes)
+  const codigo = obs.codigo || obs.codFrota || (isMaquina && v.numero_serie) || v.placa
+  const categoriaOrigem = obs.categoriaOrigem || v.categoria.toUpperCase()
+
+  const trCls = `border-t transition-colors cursor-pointer ${
     isLight
       ? `border-slate-100 hover:bg-rose-50/30 ${idx % 2 === 0 ? '' : 'bg-slate-50/40'}`
       : `border-white/[0.04] hover:bg-white/[0.02] ${idx % 2 === 0 ? '' : 'bg-white/[0.01]'}`
   }`
 
   return (
-    <tr className={trCls}>
-      {/* Ativo */}
+    <tr className={trCls} onClick={() => onOpen(v)}>
+      {/* Ativo (Código - Categoria) */}
       <td className="px-4 py-3">
         <div className="flex items-center gap-2.5">
           <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${
@@ -262,8 +302,10 @@ function VeiculoRow({ v, osCount, isLight, idx, onAlocar, onOS, onChecklist }: V
             {isMaquina ? <Cog size={13} /> : <Car size={13} />}
           </div>
           <div>
-            <p className={`text-xs font-bold ${isLight ? 'text-slate-800' : 'text-white'}`}>
-              {identificador}
+            <p className={`text-xs font-extrabold ${isLight ? 'text-slate-800' : 'text-white'}`}>
+              <span className="font-mono">{codigo}</span>
+              <span className={`mx-1 ${isLight ? 'text-slate-300' : 'text-slate-600'}`}>·</span>
+              <span className={isLight ? 'text-rose-600' : 'text-rose-400'}>{categoriaOrigem}</span>
             </p>
             <p className={`text-[10px] ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>
               {isMaquina ? 'Máquina' : 'Veículo'}
@@ -272,14 +314,14 @@ function VeiculoRow({ v, osCount, isLight, idx, onAlocar, onOS, onChecklist }: V
         </div>
       </td>
 
-      {/* Marca/Modelo */}
+      {/* Marca/Modelo - Placa */}
       <td className="px-4 py-3">
         <p className={`text-xs font-medium ${isLight ? 'text-slate-700' : 'text-slate-200'}`}>
           {v.marca} {v.modelo}
         </p>
-        {v.ano_mod && (
-          <p className={`text-[10px] ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>{v.ano_mod}</p>
-        )}
+        <p className={`text-[10px] font-mono ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>
+          {v.placa}{v.ano_mod ? ` · ${v.ano_mod}` : ''}
+        </p>
       </td>
 
       {/* Propriedade */}
@@ -341,7 +383,7 @@ function VeiculoRow({ v, osCount, isLight, idx, onAlocar, onOS, onChecklist }: V
       </td>
 
       {/* Ações */}
-      <td className="px-4 py-3 text-right">
+      <td className="px-4 py-3 text-right" onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-end gap-1">
           <button
             onClick={() => onAlocar(v.id)}
@@ -383,6 +425,7 @@ export default function Patio() {
   const [search, setSearch] = useState('')
   const [viewMode, setViewMode] = useState<'cards' | 'table'>('cards')
   const [alocarVeiculo, setAlocarVeiculo] = useState<FroVeiculo | null>(null)
+  const [detalheVeiculo, setDetalheVeiculo] = useState<FroVeiculo | null>(null)
   const [showNovoAtivo, setShowNovoAtivo] = useState(false)
 
   const { data: veiculos = [], isLoading } = useVeiculos({ status: 'disponivel' })
@@ -523,6 +566,7 @@ export default function Patio() {
               v={v}
               osCount={osCountMap[v.id] ?? 0}
               isLight={isLight}
+              onOpen={setDetalheVeiculo}
               onAlocar={handleAlocar}
               onOS={handleOS}
               onChecklist={handleChecklist}
@@ -557,6 +601,7 @@ export default function Patio() {
                     osCount={osCountMap[v.id] ?? 0}
                     isLight={isLight}
                     idx={idx}
+                    onOpen={setDetalheVeiculo}
                     onAlocar={handleAlocar}
                     onOS={handleOS}
                     onChecklist={handleChecklist}
@@ -576,10 +621,210 @@ export default function Patio() {
         />
       )}
 
+      {/* Modal Detalhes */}
+      {detalheVeiculo && (
+        <VeiculoDetalhesModal
+          veiculo={detalheVeiculo}
+          osCount={osCountMap[detalheVeiculo.id] ?? 0}
+          isLight={isLight}
+          onClose={() => setDetalheVeiculo(null)}
+          onAlocar={() => { setDetalheVeiculo(null); handleAlocar(detalheVeiculo.id) }}
+          onOS={() => { setDetalheVeiculo(null); handleOS(detalheVeiculo.id) }}
+          onChecklist={() => { setDetalheVeiculo(null); handleChecklist(detalheVeiculo.id) }}
+        />
+      )}
+
       {/* Modal Novo Ativo */}
       {showNovoAtivo && (
         <NovoAtivoModal onClose={() => setShowNovoAtivo(false)} isLight={isLight} />
       )}
+    </div>
+  )
+}
+
+// ── VeiculoDetalhesModal ──────────────────────────────────────────────────────
+
+function VeiculoDetalhesModal({
+  veiculo: v, osCount, isLight, onClose, onAlocar, onOS, onChecklist,
+}: {
+  veiculo: FroVeiculo
+  osCount: number
+  isLight: boolean
+  onClose: () => void
+  onAlocar: () => void
+  onOS: () => void
+  onChecklist: () => void
+}) {
+  const isDark = !isLight
+  const isMaquina = v.tipo_ativo === 'maquina'
+  const obs = parseObsInfo(v.observacoes)
+  const prop = PROP_MAP[v.propriedade]
+  const prevColor = preventivaColor(v.km_proxima_preventiva, v.hodometro_atual, v.data_proxima_preventiva, isLight)
+  const prevStyle = PREV_STYLES[prevColor]
+
+  const diasCrlv   = diasAte(v.vencimento_crlv)
+  const diasSeguro = diasAte(v.vencimento_seguro)
+  const crlvColor   = docAlertColor(diasCrlv, isLight)
+  const seguroColor = docAlertColor(diasSeguro, isLight)
+
+  const codigo = obs.codigo || obs.codFrota || (isMaquina && v.numero_serie) || v.placa
+  const categoriaOrigem = obs.categoriaOrigem || v.categoria.toUpperCase()
+
+  const bg = isDark ? 'bg-[#1e293b]' : 'bg-white'
+  const border = isDark ? 'border-white/[0.06]' : 'border-slate-200'
+  const txtMain = isDark ? 'text-white' : 'text-slate-800'
+  const txtMuted = isDark ? 'text-slate-400' : 'text-slate-500'
+  const cardBg = isDark ? 'bg-white/[0.03]' : 'bg-slate-50'
+
+  function Info({ icon: Icon, label, value, color }: { icon: typeof Tag; label: string; value?: string | number | null; color?: string }) {
+    if (!value && value !== 0) return null
+    return (
+      <div className="flex items-start gap-2">
+        <Icon size={13} className={`mt-0.5 shrink-0 ${color || txtMuted}`} />
+        <div className="min-w-0">
+          <p className={`text-[10px] font-bold uppercase tracking-wider ${txtMuted}`}>{label}</p>
+          <p className={`text-sm font-semibold ${txtMain} break-words`}>{value}</p>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-black/60 backdrop-blur-sm" onClick={onClose}>
+      <div
+        onClick={e => e.stopPropagation()}
+        className={`rounded-2xl shadow-2xl w-full max-w-xl max-h-[90vh] overflow-y-auto border ${border} ${bg}`}
+      >
+        {/* Header */}
+        <div className={`sticky top-0 z-10 flex items-start justify-between gap-3 px-5 py-4 border-b ${border} ${bg} rounded-t-2xl`}>
+          <div className="flex items-start gap-3 min-w-0">
+            <div className={`w-11 h-11 rounded-xl flex items-center justify-center shrink-0 ${
+              isMaquina
+                ? (isLight ? 'bg-violet-50' : 'bg-violet-500/10')
+                : (isLight ? 'bg-sky-50'    : 'bg-sky-500/10')
+            }`}>
+              {isMaquina
+                ? <Cog  size={20} className={isLight ? 'text-violet-600' : 'text-violet-400'} />
+                : <Car  size={20} className={isLight ? 'text-sky-600'    : 'text-sky-400'} />
+              }
+            </div>
+            <div className="min-w-0">
+              <p className={`text-base font-extrabold ${txtMain}`}>
+                <span className="font-mono">{codigo}</span>
+                <span className={`mx-1.5 ${isLight ? 'text-slate-300' : 'text-slate-600'}`}>·</span>
+                <span className={isLight ? 'text-rose-600' : 'text-rose-400'}>{categoriaOrigem}</span>
+              </p>
+              <p className={`text-xs ${txtMuted}`}>
+                {v.marca} {v.modelo}
+                <span className={isLight ? 'text-slate-300' : 'text-slate-600'}> · </span>
+                <span className="font-mono font-semibold">{v.placa}</span>
+                {v.ano_mod && <> · {v.ano_mod}</>}
+              </p>
+            </div>
+          </div>
+          <button onClick={onClose} className={`p-1.5 rounded-lg transition-colors ${isLight ? 'hover:bg-slate-100 text-slate-400' : 'hover:bg-white/[0.06] text-slate-400'}`}>
+            <X size={16} />
+          </button>
+        </div>
+
+        <div className="p-5 space-y-4">
+          {/* Badges (prop + preventiva + OS) */}
+          <div className="flex flex-wrap gap-2">
+            <span className={`inline-flex items-center text-[10px] font-semibold px-2 py-0.5 rounded-full ${isLight ? prop.light : prop.dark}`}>
+              {prop.label}
+            </span>
+            <span className={`inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full border ${isLight ? prevStyle.light : prevStyle.dark}`}>
+              <Wrench size={9} />
+              {isMaquina && v.km_proxima_preventiva
+                ? `Prev. ${fmtNum(v.km_proxima_preventiva)} h`
+                : v.km_proxima_preventiva
+                ? `Prev. ${fmtNum(v.km_proxima_preventiva)} km`
+                : v.data_proxima_preventiva
+                ? `Prev. ${new Date(v.data_proxima_preventiva).toLocaleDateString('pt-BR')}`
+                : 'Preventiva OK'}
+            </span>
+            {osCount > 0 && <OSBadge count={osCount} isLight={isLight} />}
+          </div>
+
+          {/* Grupo 1: Identificação + Operacional */}
+          <div className={`rounded-xl border p-4 ${border} ${cardBg}`}>
+            <p className={`text-[10px] font-bold uppercase tracking-wider mb-3 ${txtMuted}`}>Operacional</p>
+            <div className="grid grid-cols-2 gap-4">
+              <Info icon={Tag}       label="Cód. Sistema" value={obs.codigo} />
+              <Info icon={Tag}       label="Cód. Frota"   value={obs.codFrota} />
+              <Info icon={isMaquina ? Timer : Gauge} label={isMaquina ? 'Horímetro' : 'Hodômetro'}
+                value={isMaquina
+                  ? (v.horimetro_atual !== undefined ? `${fmtNum(v.horimetro_atual)} h` : '—')
+                  : `${fmtNum(v.hodometro_atual)} km`} />
+              <Info icon={User}      label="Responsável"  value={obs.responsavel} />
+              <Info icon={Building2} label="Local / Sede" value={obs.local} />
+              <Info icon={Radio}     label="Rastreador"   value={obs.rastreador} />
+            </div>
+          </div>
+
+          {/* Grupo 2: Veículo */}
+          <div className={`rounded-xl border p-4 ${border} ${cardBg}`}>
+            <p className={`text-[10px] font-bold uppercase tracking-wider mb-3 ${txtMuted}`}>Dados do {isMaquina ? 'Ativo' : 'Veículo'}</p>
+            <div className="grid grid-cols-2 gap-4">
+              <Info icon={Tag} label="Marca"        value={v.marca} />
+              <Info icon={Tag} label="Modelo"       value={v.modelo} />
+              <Info icon={Tag} label="Cor"          value={v.cor} />
+              <Info icon={Tag} label="Ano Fab / Mod" value={v.ano_fab || v.ano_mod ? `${v.ano_fab ?? '—'} / ${v.ano_mod ?? '—'}` : null} />
+              <Info icon={Tag} label="RENAVAM"      value={v.renavam} />
+              <Info icon={Tag} label="Nº Série / Chassi" value={v.numero_serie} />
+              <Info icon={Tag} label="Categoria sistema" value={v.categoria} />
+              <Info icon={Tag} label="Combustível"  value={v.combustivel} />
+            </div>
+          </div>
+
+          {/* Grupo 3: Documentos */}
+          {(v.vencimento_crlv || v.vencimento_seguro || v.vencimento_tacografo) && (
+            <div className={`rounded-xl border p-4 ${border} ${cardBg}`}>
+              <p className={`text-[10px] font-bold uppercase tracking-wider mb-3 ${txtMuted}`}>Documentos</p>
+              <div className="grid grid-cols-2 gap-4">
+                {v.vencimento_crlv && (
+                  <Info icon={FileText} label={`CRLV ${diasCrlv !== null && diasCrlv <= 0 ? '(VENCIDO)' : diasCrlv !== null ? `(${diasCrlv}d)` : ''}`}
+                    value={new Date(v.vencimento_crlv).toLocaleDateString('pt-BR')} color={crlvColor} />
+                )}
+                {v.vencimento_seguro && (
+                  <Info icon={ShieldAlert} label={`Seguro ${diasSeguro !== null && diasSeguro <= 0 ? '(VENCIDO)' : diasSeguro !== null ? `(${diasSeguro}d)` : ''}`}
+                    value={new Date(v.vencimento_seguro).toLocaleDateString('pt-BR')} color={seguroColor} />
+                )}
+                {v.vencimento_tacografo && (
+                  <Info icon={FileText} label="Tacógrafo"
+                    value={new Date(v.vencimento_tacografo).toLocaleDateString('pt-BR')} />
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Ações */}
+        <div className={`sticky bottom-0 z-10 px-5 py-4 border-t flex flex-col sm:flex-row gap-2 ${border} ${bg}`}>
+          <button
+            onClick={onAlocar}
+            className="flex-1 inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl bg-rose-500 text-white text-sm font-bold hover:bg-rose-600 transition-colors shadow-sm shadow-rose-500/30"
+          >
+            <MapPin size={14} /> Alocar
+          </button>
+          <button
+            onClick={onOS}
+            className={`flex-1 inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl border text-sm font-semibold transition-colors ${
+              isLight ? 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100' : 'bg-white/[0.04] border-white/[0.06] text-slate-300 hover:bg-white/[0.08]'
+            }`}
+          >
+            <Wrench size={14} /> Abrir OS
+          </button>
+          <button
+            onClick={onChecklist}
+            className={`flex-1 inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl border text-sm font-semibold transition-colors ${
+              isLight ? 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100' : 'bg-white/[0.04] border-white/[0.06] text-slate-300 hover:bg-white/[0.08]'
+            }`}
+          >
+            <ClipboardList size={14} /> Checklist
+          </button>
+        </div>
+      </div>
     </div>
   )
 }
