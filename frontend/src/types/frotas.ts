@@ -52,6 +52,8 @@ export interface FroVeiculo {
   con_contrato_id?: string
   base_atual_id?: string
   responsavel_id?: string
+  // Código interno legado (ex.: UTFRO000001, MUNCK000003 — vem do cadastro original)
+  codigo_interno?: string
   created_at: string
   updated_at: string
 }
