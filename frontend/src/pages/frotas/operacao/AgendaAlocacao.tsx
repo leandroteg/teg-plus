@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useRef, useEffect } from 'react'
 import {
   CalendarDays,
   Plus,
@@ -18,6 +18,7 @@ import {
 } from '../../../hooks/useFrotas'
 import { useTheme } from '../../../contexts/ThemeContext'
 import { formatCodigoCategoria } from '../../../components/frotas/veiculoObs'
+import VeiculoDetalhesModal from '../../../components/frotas/VeiculoDetalhesModal'
 import type { FroAlocacao, FroVeiculo } from '../../../types/frotas'
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -419,10 +420,12 @@ function TimelineView({
   alocacoes,
   veiculosMap,
   isLight,
+  onVeiculoClick,
 }: {
   alocacoes: FroAlocacao[]
   veiculosMap: Map<string, FroVeiculo>
   isLight: boolean
+  onVeiculoClick?: (v: FroVeiculo, a?: FroAlocacao) => void
 }) {
   const today = new Date()
   today.setHours(0, 0, 0, 0)
@@ -491,6 +494,38 @@ function TimelineView({
     y: number
   } | null>(null)
 
+  // Scroll sincronizado entre barra superior e conteudo
+  const topScrollRef = useRef<HTMLDivElement>(null)
+  const mainScrollRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    const top = topScrollRef.current
+    const main = mainScrollRef.current
+    if (!top || !main) return
+    let syncing = false
+    const onTopScroll = () => {
+      if (syncing) { syncing = false; return }
+      syncing = true
+      main.scrollLeft = top.scrollLeft
+    }
+    const onMainScroll = () => {
+      if (syncing) { syncing = false; return }
+      syncing = true
+      top.scrollLeft = main.scrollLeft
+    }
+    top.addEventListener('scroll', onTopScroll)
+    main.addEventListener('scroll', onMainScroll)
+    return () => {
+      top.removeEventListener('scroll', onTopScroll)
+      main.removeEventListener('scroll', onMainScroll)
+    }
+  }, [])
+
+  // Largura da area de timeline (excluindo coluna de labels) em px aprox
+  // Minimo 800px, ou 28px por dia
+  const contentWidth = Math.max(800, days.length * 28)
+  const labelColW = 208 // 52 (sm:w-52) * 4
+
   const card = `rounded-2xl shadow-sm border ${
     isLight ? 'bg-white border-slate-200' : 'bg-[#1e293b] border-white/[0.06]'
   }`
@@ -546,21 +581,39 @@ function TimelineView({
           <p className="text-sm text-slate-500">Nenhuma alocação no período</p>
         </div>
       ) : (
-        <div className="overflow-x-auto relative pb-1">
-          {/* Day headers */}
-          <div className="flex min-w-[800px]">
-            {/* Vehicle label column */}
+        <div className="relative">
+          {/* Barra de rolagem superior — sincronizada com a timeline abaixo */}
+          <div
+            ref={topScrollRef}
+            className={`overflow-x-auto overflow-y-hidden h-3.5 ${
+              isLight ? 'bg-slate-50 border-b border-slate-100' : 'bg-white/[0.02] border-b border-white/[0.04]'
+            }`}
+            style={{ scrollbarWidth: 'thin' }}
+          >
+            {/* Spacer: label width + content width */}
+            <div style={{ width: labelColW + contentWidth, height: 1 }} />
+          </div>
+
+          {/* Timeline principal com scroll */}
+          <div ref={mainScrollRef} className="overflow-x-auto relative pb-1 max-h-[600px] overflow-y-auto">
+          {/* Day headers (sticky no topo) */}
+          <div
+            className={`flex sticky top-0 z-30 ${isLight ? 'bg-white' : 'bg-[#1e293b]'}`}
+            style={{ minWidth: labelColW + contentWidth }}
+          >
+            {/* Vehicle label column (tambem sticky na esquerda) */}
             <div
-              className={`flex-shrink-0 w-36 sm:w-44 border-r px-3 py-2 ${
+              className={`shrink-0 sticky left-0 z-10 border-r px-3 py-2 ${
                 isLight ? 'bg-slate-50 border-slate-200' : 'bg-white/4 border-white/8'
               }`}
+              style={{ width: labelColW }}
             >
               <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
                 Veículo
               </span>
             </div>
             {/* Day columns header */}
-            <div className="flex-1 flex relative">
+            <div className="flex-1 flex relative" style={{ minWidth: contentWidth }}>
               {days.map((d, i) => {
                 const isToday = isSameDay(d, today)
                 const isWknd = isWeekend(d)
@@ -610,18 +663,23 @@ function TimelineView({
           </div>
 
           {/* Vehicle rows */}
-          {vehicleRows.map(row => (
+          {vehicleRows.map(row => {
+            const veic = row.allocations[0]?.veiculo_id ? veiculosMap.get(row.allocations[0].veiculo_id) : undefined
+            return (
             <div
               key={row.placa}
-              className={`flex min-w-[800px] border-t ${
+              className={`flex border-t ${
                 isLight ? 'border-slate-100' : 'border-white/[0.04]'
               }`}
+              style={{ minWidth: labelColW + contentWidth }}
             >
-              {/* Vehicle label: CODIGO · CATEGORIA / MODELO · PLACA */}
+              {/* Vehicle label (sticky na esquerda, clicavel) */}
               <div
-                className={`flex-shrink-0 w-44 sm:w-52 border-r px-3 py-2.5 ${
-                  isLight ? 'border-slate-200' : 'border-white/8'
+                onClick={() => veic && onVeiculoClick?.(veic, row.allocations[0])}
+                className={`shrink-0 sticky left-0 z-[5] border-r px-3 py-2.5 cursor-pointer transition-colors ${
+                  isLight ? 'bg-white border-slate-200 hover:bg-rose-50/40' : 'bg-[#1e293b] border-white/8 hover:bg-white/[0.04]'
                 }`}
+                style={{ width: labelColW }}
               >
                 <div className="flex items-baseline gap-1.5 truncate">
                   <span className={`text-xs font-extrabold font-mono truncate ${
@@ -644,7 +702,7 @@ function TimelineView({
                 </p>
               </div>
               {/* Bars area */}
-              <div className="flex-1 relative" style={{ minHeight: 40 }}>
+              <div className="flex-1 relative" style={{ minHeight: 40, minWidth: contentWidth }}>
                 {/* Weekend stripes background */}
                 <div className="absolute inset-0 flex">
                   {days.map((d, i) => (
@@ -710,16 +768,25 @@ function TimelineView({
                         setTooltip({ al, x: rect.left + rect.width / 2, y: rect.top - 8 })
                       }}
                       onMouseLeave={() => setTooltip(null)}
+                      onClick={e => {
+                        e.stopPropagation()
+                        if (veic) onVeiculoClick?.(veic, al)
+                      }}
                     >
                       <span className="text-[9px] font-semibold text-white truncate whitespace-nowrap">
-                        {al.obra?.nome ?? al.responsavel_nome ?? ''}
+                        {al.obra?.nome ?? ''}
+                        {al.responsavel_nome && (
+                          <span className="opacity-80 ml-1">· {al.responsavel_nome}</span>
+                        )}
                       </span>
                     </div>
                   )
                 })}
               </div>
             </div>
-          ))}
+            )
+          })}
+          </div>{/* fecha mainScrollRef */}
 
           {/* Floating tooltip */}
           {tooltip && (
@@ -977,6 +1044,7 @@ export default function AgendaAlocacao() {
 
   const [novaModal, setNovaModal] = useState(false)
   const [retornoAloc, setRetornoAloc] = useState<FroAlocacao | null>(null)
+  const [detalheVeic, setDetalheVeic] = useState<{ v: FroVeiculo; a?: FroAlocacao } | null>(null)
 
   // Filtros — default: mostrar so 'ativa' (sem canceladas/encerradas)
   const [filtroAtivo, setFiltroAtivo] = useState('')
@@ -1226,7 +1294,12 @@ export default function AgendaAlocacao() {
         )
       ) : viewMode === 'timeline' ? (
         /* ── Timeline View ───────────────────────────────────────────── */
-        <TimelineView alocacoes={alocacoes} veiculosMap={veiculosMap} isLight={isLight} />
+        <TimelineView
+          alocacoes={alocacoes}
+          veiculosMap={veiculosMap}
+          isLight={isLight}
+          onVeiculoClick={(v, a) => setDetalheVeic({ v, a })}
+        />
       ) : (
         /* ── Calendar View ───────────────────────────────────────────── */
         <CalendarView alocacoes={alocacoes} isLight={isLight} />
@@ -1240,6 +1313,23 @@ export default function AgendaAlocacao() {
           alocacao={retornoAloc}
           onClose={() => setRetornoAloc(null)}
           isLight={isLight}
+        />
+      )}
+      {detalheVeic && (
+        <VeiculoDetalhesModal
+          veiculo={detalheVeic.v}
+          isLight={isLight}
+          alocacaoInfo={detalheVeic.a ? {
+            obra: detalheVeic.a.obra?.nome,
+            responsavel: detalheVeic.a.responsavel_nome ?? undefined,
+            dataSaida: detalheVeic.a.data_saida,
+            dataRetornoPrev: detalheVeic.a.data_retorno_prev,
+          } : undefined}
+          onClose={() => setDetalheVeic(null)}
+          onRegistrarRetorno={detalheVeic.a && detalheVeic.a.status === 'ativa' ? () => {
+            setRetornoAloc(detalheVeic.a!)
+            setDetalheVeic(null)
+          } : undefined}
         />
       )}
     </div>
