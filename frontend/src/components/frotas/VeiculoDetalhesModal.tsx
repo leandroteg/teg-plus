@@ -91,7 +91,7 @@ export default function VeiculoDetalhesModal({
   const crlvColor   = docAlertColor(diasCrlv, isLight)
   const seguroColor = docAlertColor(diasSeguro, isLight)
 
-  const codigo = obs.codigo || obs.codFrota || (isMaquina && v.numero_serie) || v.placa
+  const codigo = v.codigo_interno || obs.codigo || obs.codFrota || (isMaquina && v.numero_serie) || v.placa
   const categoriaOrigem = obs.categoriaOrigem || v.categoria.toUpperCase()
 
   const bg = isDark ? 'bg-[#1e293b]' : 'bg-white'
@@ -135,11 +135,12 @@ export default function VeiculoDetalhesModal({
               }
             </div>
             <div className="min-w-0">
-              <p className={`text-base font-extrabold ${txtMain}`}>
-                <span className="font-mono">{codigo}</span>
-                <span className={`mx-1.5 ${isLight ? 'text-slate-300' : 'text-slate-600'}`}>·</span>
-                <span className={isLight ? 'text-rose-600' : 'text-rose-400'}>{categoriaOrigem}</span>
-              </p>
+              <div className="flex items-baseline gap-2">
+                <span className={`text-base font-extrabold font-mono ${txtMain}`}>{codigo}</span>
+                <span className={`text-[10px] font-bold uppercase tracking-wider ${isLight ? 'text-rose-600' : 'text-rose-400'}`}>
+                  {categoriaOrigem}
+                </span>
+              </div>
               <p className={`text-xs ${txtMuted}`}>
                 {v.marca} {v.modelo}
                 <span className={isLight ? 'text-slate-300' : 'text-slate-600'}> · </span>

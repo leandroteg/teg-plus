@@ -1,9 +1,11 @@
 import { useState } from 'react'
-import { ClipboardCheck, Car, Cog, CheckCircle2, ClipboardList } from 'lucide-react'
+import { ClipboardCheck, Car, Cog, CheckCircle2, ClipboardList, Search } from 'lucide-react'
 import { useQueryClient } from '@tanstack/react-query'
 import { useTheme } from '../../../contexts/ThemeContext'
 import { useVeiculos } from '../../../hooks/useFrotas'
 import FrotasChecklistModal from '../../../components/frotas/FrotasChecklistModal'
+import VeiculoDetalhesModal from '../../../components/frotas/VeiculoDetalhesModal'
+import { formatCodigoCategoria } from '../../../components/frotas/veiculoObs'
 import type { FroVeiculo } from '../../../types/frotas'
 
 export default function ChecklistSaida() {
@@ -11,8 +13,19 @@ export default function ChecklistSaida() {
   const isLight = !isDark
   const queryClient = useQueryClient()
   const [selectedVeiculo, setSelectedVeiculo] = useState<FroVeiculo | null>(null)
+  const [detalheVeiculo, setDetalheVeiculo] = useState<FroVeiculo | null>(null)
+  const [busca, setBusca] = useState('')
 
-  const { data: veiculos = [], isLoading } = useVeiculos({ status: 'aguardando_saida' })
+  const { data: veiculosAll = [], isLoading } = useVeiculos({ status: 'aguardando_saida' })
+  const veiculos = busca
+    ? veiculosAll.filter(v => {
+        const q = busca.toLowerCase()
+        return v.placa?.toLowerCase().includes(q) ||
+          v.marca?.toLowerCase().includes(q) ||
+          v.modelo?.toLowerCase().includes(q) ||
+          (v.codigo_interno ?? '').toLowerCase().includes(q)
+      })
+    : veiculosAll
 
   return (
     <div className="p-4 md:p-6 space-y-5">
@@ -62,16 +75,33 @@ export default function ChecklistSaida() {
         </div>
       )}
 
+      {/* Busca */}
+      {!isLoading && veiculosAll.length > 0 && (
+        <div className="relative max-w-xs">
+          <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+          <input
+            type="text"
+            value={busca}
+            onChange={e => setBusca(e.target.value)}
+            placeholder="Buscar código, placa, modelo..."
+            className={`w-full pl-8 pr-3 py-2 rounded-xl border text-xs focus:outline-none focus:ring-2 focus:ring-rose-500/30 ${
+              isLight ? 'bg-white border-slate-200' : 'bg-white/[0.04] border-white/[0.06] text-slate-200'
+            }`}
+          />
+        </div>
+      )}
+
       {/* List */}
       {!isLoading && veiculos.length > 0 && (
         <div className="space-y-2">
           {veiculos.map(v => {
             const isMaquina = v.tipo_ativo === 'maquina'
-            const identificador = isMaquina && v.numero_serie ? v.numero_serie : v.placa
+            const { codigo, categoria } = formatCodigoCategoria(v)
             return (
               <div
                 key={v.id}
-                className={`flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4 p-4 rounded-2xl border transition-all ${
+                onClick={() => setDetalheVeiculo(v)}
+                className={`flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4 p-4 rounded-2xl border transition-all cursor-pointer ${
                   isLight
                     ? 'bg-white border-slate-200 hover:border-rose-300 hover:shadow-sm'
                     : 'bg-slate-800/50 border-white/[0.06] hover:border-rose-500/30'
@@ -88,17 +118,20 @@ export default function ChecklistSaida() {
                     {isMaquina ? <Cog size={18} /> : <Car size={18} />}
                   </div>
 
-                  {/* Info */}
+                  {/* Info: codigo + categoria (menor) / modelo - placa */}
                   <div className="flex-1 min-w-0">
-                    <p className={`font-bold text-sm ${isLight ? 'text-slate-800' : 'text-white'}`}>
-                      {identificador}
-                    </p>
+                    <div className="flex items-baseline gap-2">
+                      <span className={`font-extrabold text-sm font-mono ${isLight ? 'text-slate-800' : 'text-white'}`}>{codigo}</span>
+                      <span className={`text-[10px] font-bold uppercase tracking-wider ${isLight ? 'text-rose-600' : 'text-rose-400'}`}>
+                        {categoria}
+                      </span>
+                    </div>
                     <p className={`text-xs truncate ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
-                      {v.marca} {v.modelo}
+                      {v.marca} {v.modelo}<span className={isLight ? 'text-slate-300' : 'text-slate-600'}> · </span><span className="font-mono font-semibold">{v.placa}</span>
                     </p>
                   </div>
 
-                  {/* Status pill - visible on mobile inline */}
+                  {/* Status pill */}
                   <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full shrink-0 ${
                     isLight ? 'bg-rose-100 text-rose-700' : 'bg-rose-500/15 text-rose-400'
                   }`}>
@@ -108,7 +141,7 @@ export default function ChecklistSaida() {
 
                 {/* Action */}
                 <button
-                  onClick={() => setSelectedVeiculo(v)}
+                  onClick={e => { e.stopPropagation(); setSelectedVeiculo(v) }}
                   className={`flex items-center justify-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-xl transition-all whitespace-nowrap w-full sm:w-auto sm:ml-auto ${
                     isLight
                       ? 'bg-rose-500 text-white hover:bg-rose-600 shadow-sm shadow-rose-500/30'
@@ -131,6 +164,16 @@ export default function ChecklistSaida() {
             setSelectedVeiculo(null)
             queryClient.invalidateQueries({ queryKey: ['fro_veiculos'] })
           }}
+        />
+      )}
+
+      {/* Modal Detalhes */}
+      {detalheVeiculo && (
+        <VeiculoDetalhesModal
+          veiculo={detalheVeiculo}
+          isLight={isLight}
+          onClose={() => setDetalheVeiculo(null)}
+          onChecklist={() => { setDetalheVeiculo(null); setSelectedVeiculo(detalheVeiculo) }}
         />
       )}
     </div>

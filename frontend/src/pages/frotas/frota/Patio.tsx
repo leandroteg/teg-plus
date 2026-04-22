@@ -126,8 +126,9 @@ function VeiculoCard({ v, osCount, isLight, onOpen, onAlocar, onOS, onChecklist 
   const seguroColor = docAlertColor(diasSeguro, isLight)
 
   const obs = parseObsInfo(v.observacoes)
-  // Primeira linha destaque: "CÓDIGO - CATEGORIA"
-  const codigo = obs.codigo || obs.codFrota || (isMaquina && v.numero_serie) || v.placa
+  // Primeira linha: "CÓDIGO" em destaque + categoria menor ao lado (mesma cor)
+  // Prioridade: codigo_interno (formal) > Cód. Sistema (obs) > Cód. Frota (obs) > numero_serie > placa
+  const codigo = v.codigo_interno || obs.codigo || obs.codFrota || (isMaquina && v.numero_serie) || v.placa
   const categoriaOrigem = obs.categoriaOrigem || v.categoria.toUpperCase()
   // Segunda linha: "MODELO - PLACA"
   const modelo = `${v.marca} ${v.modelo}${v.ano_mod ? ` · ${v.ano_mod}` : ''}`
@@ -153,14 +154,15 @@ function VeiculoCard({ v, osCount, isLight, onOpen, onAlocar, onOS, onChecklist 
             }
           </div>
 
-          {/* Código - Categoria / Modelo - Placa */}
+          {/* Código + Categoria (menor) / Modelo - Placa */}
           <div className="min-w-0 sm:w-56 shrink-0">
-            <div className="flex items-center gap-1.5">
-              <p className={`text-sm font-extrabold truncate ${isLight ? 'text-slate-800' : 'text-white'}`}>
-                <span className="font-mono">{codigo}</span>
-                <span className={`mx-1.5 ${isLight ? 'text-slate-300' : 'text-slate-600'}`}>·</span>
-                <span className={isLight ? 'text-rose-600' : 'text-rose-400'}>{categoriaOrigem}</span>
-              </p>
+            <div className="flex items-baseline gap-2 truncate">
+              <span className={`text-sm font-extrabold font-mono truncate ${isLight ? 'text-slate-800' : 'text-white'}`}>
+                {codigo}
+              </span>
+              <span className={`text-[10px] font-bold uppercase tracking-wider ${isLight ? 'text-rose-600' : 'text-rose-400'}`}>
+                {categoriaOrigem}
+              </span>
               {osCount > 0 && <OSBadge count={osCount} isLight={isLight} />}
             </div>
             <p className={`text-[11px] truncate ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
@@ -280,7 +282,7 @@ function VeiculoRow({ v, osCount, isLight, idx, onOpen, onAlocar, onOS, onCheckl
   const seguroColor = docAlertColor(diasSeguro, isLight)
 
   const obs = parseObsInfo(v.observacoes)
-  const codigo = obs.codigo || obs.codFrota || (isMaquina && v.numero_serie) || v.placa
+  const codigo = v.codigo_interno || obs.codigo || obs.codFrota || (isMaquina && v.numero_serie) || v.placa
   const categoriaOrigem = obs.categoriaOrigem || v.categoria.toUpperCase()
 
   const trCls = `border-t transition-colors cursor-pointer ${
@@ -302,11 +304,14 @@ function VeiculoRow({ v, osCount, isLight, idx, onOpen, onAlocar, onOS, onCheckl
             {isMaquina ? <Cog size={13} /> : <Car size={13} />}
           </div>
           <div>
-            <p className={`text-xs font-extrabold ${isLight ? 'text-slate-800' : 'text-white'}`}>
-              <span className="font-mono">{codigo}</span>
-              <span className={`mx-1 ${isLight ? 'text-slate-300' : 'text-slate-600'}`}>·</span>
-              <span className={isLight ? 'text-rose-600' : 'text-rose-400'}>{categoriaOrigem}</span>
-            </p>
+            <div className="flex items-baseline gap-1.5">
+              <span className={`text-xs font-extrabold font-mono ${isLight ? 'text-slate-800' : 'text-white'}`}>
+                {codigo}
+              </span>
+              <span className={`text-[9px] font-bold uppercase tracking-wider ${isLight ? 'text-rose-600' : 'text-rose-400'}`}>
+                {categoriaOrigem}
+              </span>
+            </div>
             <p className={`text-[10px] ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>
               {isMaquina ? 'Máquina' : 'Veículo'}
             </p>

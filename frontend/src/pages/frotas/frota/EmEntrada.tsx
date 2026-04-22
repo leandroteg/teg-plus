@@ -6,6 +6,8 @@ import { useVeiculos } from '../../../hooks/useFrotas'
 import FrotasChecklistModal from '../../../components/frotas/FrotasChecklistModal'
 import ChecklistDivergenciasModal from '../../../components/frotas/ChecklistDivergenciasModal'
 import RegistrarEntradaModal from '../../../components/frotas/RegistrarEntradaModal'
+import VeiculoDetalhesModal from '../../../components/frotas/VeiculoDetalhesModal'
+import { formatCodigoCategoria } from '../../../components/frotas/veiculoObs'
 import type { FroVeiculo } from '../../../types/frotas'
 import type { DivergenciaItem, DivergenciaZona } from '../../../components/frotas/ChecklistDivergenciasModal'
 
@@ -15,11 +17,22 @@ export default function EmEntrada() {
   const queryClient = useQueryClient()
   const [openRegistrar, setOpenRegistrar] = useState(false)
   const [selectedVeiculo, setSelectedVeiculo] = useState<FroVeiculo | null>(null)
+  const [detalheVeiculo, setDetalheVeiculo] = useState<FroVeiculo | null>(null)
+  const [busca, setBusca] = useState('')
   const [divVeiculo, setDivVeiculo] = useState<FroVeiculo | null>(null)
   const [divItens, setDivItens] = useState<DivergenciaItem[]>([])
   const [divZonas, setDivZonas] = useState<DivergenciaZona[]>([])
 
-  const { data: veiculos = [], isLoading } = useVeiculos({ status: 'em_entrada' })
+  const { data: veiculosAll = [], isLoading } = useVeiculos({ status: 'em_entrada' })
+  const veiculos = busca
+    ? veiculosAll.filter(v => {
+        const q = busca.toLowerCase()
+        return v.placa?.toLowerCase().includes(q) ||
+          v.marca?.toLowerCase().includes(q) ||
+          v.modelo?.toLowerCase().includes(q) ||
+          (v.codigo_interno ?? '').toLowerCase().includes(q)
+      })
+    : veiculosAll
 
   return (
     <div className="p-4 md:p-6 space-y-5">
@@ -89,16 +102,32 @@ export default function EmEntrada() {
         </div>
       )}
 
+      {/* Busca */}
+      {!isLoading && veiculosAll.length > 0 && (
+        <div className="relative max-w-xs">
+          <input
+            type="text"
+            value={busca}
+            onChange={e => setBusca(e.target.value)}
+            placeholder="Buscar código, placa, modelo..."
+            className={`w-full px-3 py-2 rounded-xl border text-xs focus:outline-none focus:ring-2 focus:ring-amber-500/30 ${
+              isLight ? 'bg-white border-slate-200' : 'bg-white/[0.04] border-white/[0.06] text-slate-200'
+            }`}
+          />
+        </div>
+      )}
+
       {/* List */}
       {!isLoading && veiculos.length > 0 && (
         <div className="space-y-2">
           {veiculos.map(v => {
             const isMaquina = v.tipo_ativo === 'maquina'
-            const identificador = isMaquina && v.numero_serie ? v.numero_serie : v.placa
+            const { codigo, categoria } = formatCodigoCategoria(v)
             return (
               <div
                 key={v.id}
-                className={`flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4 p-4 rounded-2xl border transition-all ${
+                onClick={() => setDetalheVeiculo(v)}
+                className={`flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4 p-4 rounded-2xl border transition-all cursor-pointer ${
                   isLight
                     ? 'bg-white border-slate-200 hover:border-amber-300 hover:shadow-sm'
                     : 'bg-slate-800/50 border-white/[0.06] hover:border-amber-500/30'
@@ -115,13 +144,16 @@ export default function EmEntrada() {
                     {isMaquina ? <Cog size={18} /> : <Car size={18} />}
                   </div>
 
-                  {/* Info */}
+                  {/* Info: codigo + categoria (menor) / modelo - placa */}
                   <div className="flex-1 min-w-0">
-                    <p className={`font-bold text-sm ${isLight ? 'text-slate-800' : 'text-white'}`}>
-                      {identificador}
-                    </p>
+                    <div className="flex items-baseline gap-2">
+                      <span className={`font-extrabold text-sm font-mono ${isLight ? 'text-slate-800' : 'text-white'}`}>{codigo}</span>
+                      <span className={`text-[10px] font-bold uppercase tracking-wider ${isLight ? 'text-rose-600' : 'text-rose-400'}`}>
+                        {categoria}
+                      </span>
+                    </div>
                     <p className={`text-xs truncate ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
-                      {v.marca} {v.modelo}
+                      {v.marca} {v.modelo}<span className={isLight ? 'text-slate-300' : 'text-slate-600'}> · </span><span className="font-mono font-semibold">{v.placa}</span>
                     </p>
                   </div>
 
@@ -135,7 +167,7 @@ export default function EmEntrada() {
 
                 {/* Action */}
                 <button
-                  onClick={() => setSelectedVeiculo(v)}
+                  onClick={e => { e.stopPropagation(); setSelectedVeiculo(v) }}
                   className={`flex items-center justify-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-xl transition-all whitespace-nowrap w-full sm:w-auto sm:ml-auto ${
                     isLight
                       ? 'bg-slate-100 text-slate-600 hover:bg-slate-200'
@@ -152,6 +184,16 @@ export default function EmEntrada() {
       {/* Modal Registrar Entrada */}
       {openRegistrar && (
         <RegistrarEntradaModal onClose={() => setOpenRegistrar(false)} />
+      )}
+
+      {/* Modal Detalhes do Veículo */}
+      {detalheVeiculo && (
+        <VeiculoDetalhesModal
+          veiculo={detalheVeiculo}
+          isLight={isLight}
+          onClose={() => setDetalheVeiculo(null)}
+          onChecklist={() => { setDetalheVeiculo(null); setSelectedVeiculo(detalheVeiculo) }}
+        />
       )}
 
       {/* Checklist Modal (devolução / pós-viagem) */}

@@ -1,9 +1,11 @@
-import { useState } from 'react'
-import { MapPin, Wrench, CornerDownLeft, X, Car, Cog, CalendarDays, Building2, LayoutGrid, LayoutList, User } from 'lucide-react'
+import { useState, useMemo } from 'react'
+import { MapPin, Wrench, CornerDownLeft, X, Car, Cog, CalendarDays, Building2, LayoutGrid, LayoutList, User, Search } from 'lucide-react'
 import { UpperTextarea } from '../../../components/UpperInput'
 import { useTheme } from '../../../contexts/ThemeContext'
-import { useAlocacoes, useEncerrarAlocacao, useOrdensServico } from '../../../hooks/useFrotas'
-import type { FroAlocacao } from '../../../types/frotas'
+import { useAlocacoes, useEncerrarAlocacao, useOrdensServico, useVeiculos } from '../../../hooks/useFrotas'
+import VeiculoDetalhesModal from '../../../components/frotas/VeiculoDetalhesModal'
+import { formatCodigoCategoria } from '../../../components/frotas/veiculoObs'
+import type { FroAlocacao, FroVeiculo } from '../../../types/frotas'
 
 // ── OSBadge ───────────────────────────────────────────────────────────────────
 
@@ -197,22 +199,26 @@ function fmtDate(dateStr?: string): string {
 
 interface AlocacaoCardProps {
   a: FroAlocacao
+  veic?: FroVeiculo
   osCount: number
   isLight: boolean
   onRetorno: (a: FroAlocacao) => void
+  onOpen: (a: FroAlocacao) => void
 }
 
-function AlocacaoCard({ a, osCount, isLight, onRetorno }: AlocacaoCardProps) {
-  const identificador = a.veiculo?.placa ?? '—'
-  const isMaquina = a.horimetro_saida !== undefined && a.horimetro_saida !== null
+function AlocacaoCard({ a, veic, osCount, isLight, onRetorno, onOpen }: AlocacaoCardProps) {
+  const isMaquina = veic?.tipo_ativo === 'maquina'
   const retAtrasado = a.data_retorno_prev && new Date(a.data_retorno_prev) < new Date()
+  const { codigo, categoria } = veic ? formatCodigoCategoria(veic) : { codigo: a.veiculo?.placa ?? '—', categoria: '' }
 
   return (
-    <div className={`rounded-2xl border shadow-sm transition-all hover:shadow-md ${
-      isLight ? 'bg-white border-slate-200' : 'bg-[#1e293b] border-white/[0.06]'
-    }`}>
+    <div
+      onClick={() => onOpen(a)}
+      className={`rounded-2xl border shadow-sm transition-all hover:shadow-md cursor-pointer ${
+        isLight ? 'bg-white border-slate-200 hover:border-rose-200' : 'bg-[#1e293b] border-white/[0.06] hover:border-rose-500/30'
+      }`}>
       <div className="flex flex-col sm:flex-row sm:items-center gap-3 px-4 py-3">
-        {/* Top line: Icon + Placa/modelo */}
+        {/* Top line: Icon + Codigo/Categoria/Modelo-Placa */}
         <div className="flex items-center gap-3">
           {/* Icon box */}
           <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${
@@ -226,16 +232,21 @@ function AlocacaoCard({ a, osCount, isLight, onRetorno }: AlocacaoCardProps) {
             }
           </div>
 
-          {/* Placa + modelo */}
-          <div className="min-w-0 sm:w-40 shrink-0">
-            <div className="flex items-center gap-1.5">
-              <p className={`text-sm font-bold truncate ${isLight ? 'text-slate-800' : 'text-white'}`}>
-                {identificador}
-              </p>
+          {/* Codigo + Categoria (menor) / Modelo - Placa */}
+          <div className="min-w-0 sm:w-56 shrink-0">
+            <div className="flex items-baseline gap-2 truncate">
+              <span className={`text-sm font-extrabold font-mono truncate ${isLight ? 'text-slate-800' : 'text-white'}`}>{codigo}</span>
+              {categoria && (
+                <span className={`text-[10px] font-bold uppercase tracking-wider ${isLight ? 'text-rose-600' : 'text-rose-400'}`}>
+                  {categoria}
+                </span>
+              )}
               {osCount > 0 && <OSBadge count={osCount} isLight={isLight} />}
             </div>
             <p className="text-[11px] text-slate-500 truncate">
               {a.veiculo?.marca} {a.veiculo?.modelo}
+              <span className={isLight ? 'text-slate-300' : 'text-slate-600'}> · </span>
+              <span className="font-mono font-semibold">{a.veiculo?.placa}</span>
             </p>
           </div>
         </div>
@@ -270,7 +281,7 @@ function AlocacaoCard({ a, osCount, isLight, onRetorno }: AlocacaoCardProps) {
 
         {/* Action */}
         <button
-          onClick={() => onRetorno(a)}
+          onClick={e => { e.stopPropagation(); onRetorno(a) }}
           className={`flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-xl border text-[11px] font-semibold transition-all w-full sm:w-auto ${
             isLight
               ? 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-rose-50 hover:border-rose-200 hover:text-rose-600'
@@ -290,18 +301,71 @@ export default function Alocados() {
   const { isDark } = useTheme()
   const isLight = !isDark
   const [retornoAloc, setRetornoAloc] = useState<FroAlocacao | null>(null)
+  const [detalheVeiculo, setDetalheVeiculo] = useState<FroVeiculo | null>(null)
+  const [detalheAloc, setDetalheAloc] = useState<FroAlocacao | null>(null)
   const [viewMode, setViewMode] = useState<'table' | 'cards'>('table')
+  const [busca, setBusca] = useState('')
+  const [filtroObra, setFiltroObra] = useState<string>('todas')
+  const [filtroResp, setFiltroResp] = useState<string>('todos')
 
-  const { data: alocacoes = [], isLoading } = useAlocacoes({ status: 'ativa' })
+  const { data: alocacoesAll = [], isLoading } = useAlocacoes({ status: 'ativa' })
+  const { data: veiculosAll = [] } = useVeiculos()
   const { data: ordens    = [] } = useOrdensServico({
     status: ['pendente', 'aberta', 'em_cotacao', 'aguardando_aprovacao', 'aprovada', 'em_execucao'],
   })
   const encerrar = useEncerrarAlocacao()
 
+  // Mapa veiculo completo (pra modal)
+  const veicMap = useMemo(() => {
+    const m = new Map<string, FroVeiculo>()
+    veiculosAll.forEach(v => m.set(v.id, v))
+    return m
+  }, [veiculosAll])
+
+  // Filtros dinâmicos
+  const obrasUnicas = useMemo(() => {
+    const s = new Set<string>()
+    alocacoesAll.forEach(a => { if (a.obra?.nome) s.add(a.obra.nome) })
+    return Array.from(s).sort()
+  }, [alocacoesAll])
+
+  const respsUnicos = useMemo(() => {
+    const s = new Set<string>()
+    alocacoesAll.forEach(a => { if (a.responsavel_nome?.trim()) s.add(a.responsavel_nome.trim()) })
+    return Array.from(s).sort()
+  }, [alocacoesAll])
+
+  // Aplicar filtros
+  const alocacoes = useMemo(() => {
+    let list = alocacoesAll
+    if (busca) {
+      const q = busca.toLowerCase()
+      list = list.filter(a => {
+        const v = veicMap.get(a.veiculo_id)
+        return a.veiculo?.placa?.toLowerCase().includes(q) ||
+          a.veiculo?.marca?.toLowerCase().includes(q) ||
+          a.veiculo?.modelo?.toLowerCase().includes(q) ||
+          (v?.codigo_interno ?? '').toLowerCase().includes(q) ||
+          a.obra?.nome?.toLowerCase().includes(q) ||
+          a.responsavel_nome?.toLowerCase().includes(q)
+      })
+    }
+    if (filtroObra !== 'todas') list = list.filter(a => a.obra?.nome === filtroObra)
+    if (filtroResp !== 'todos') list = list.filter(a => a.responsavel_nome === filtroResp)
+    return list
+  }, [alocacoesAll, veicMap, busca, filtroObra, filtroResp])
+
   // map veiculo_id → OS count
   const osCountMap: Record<string, number> = {}
   for (const os of ordens) {
     osCountMap[os.veiculo_id] = (osCountMap[os.veiculo_id] ?? 0) + 1
+  }
+
+  function openDetalhe(a: FroAlocacao) {
+    const v = veicMap.get(a.veiculo_id)
+    if (!v) return
+    setDetalheVeiculo(v)
+    setDetalheAloc(a)
   }
 
   function handleConfirmarRetorno(params: {
@@ -341,7 +405,7 @@ export default function Alocados() {
           </p>
         </div>
 
-        {/* View toggle */}
+        {/* View toggle + total */}
         {alocacoes.length > 0 && (
           <div className={`flex items-center self-start sm:self-auto rounded-xl border overflow-hidden ${
             isLight ? 'border-slate-200 bg-slate-50' : 'border-white/[0.06] bg-slate-800/40'
@@ -376,6 +440,41 @@ export default function Alocados() {
       {isLoading && (
         <div className="flex items-center justify-center py-20">
           <div className="w-6 h-6 border-2 border-rose-500/30 border-t-rose-500 rounded-full animate-spin" />
+        </div>
+      )}
+
+      {/* Filtros inteligentes */}
+      {!isLoading && alocacoesAll.length > 0 && (
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="relative flex-1 min-w-[180px] max-w-xs">
+            <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+            <input
+              type="text"
+              value={busca}
+              onChange={e => setBusca(e.target.value)}
+              placeholder="Código, placa, modelo, obra, resp..."
+              className={`w-full pl-8 pr-3 py-2 rounded-xl border text-xs focus:outline-none focus:ring-2 focus:ring-rose-500/30 ${
+                isLight ? 'bg-white border-slate-200' : 'bg-white/[0.04] border-white/[0.06] text-slate-200'
+              }`}
+            />
+          </div>
+          <select value={filtroObra} onChange={e => setFiltroObra(e.target.value)}
+            className={`rounded-xl border px-3 py-2 text-xs font-semibold outline-none max-w-[220px] ${
+              isLight ? 'bg-white border-slate-200' : 'bg-white/[0.04] border-white/[0.06] text-slate-200'
+            }`}>
+            <option value="todas">Todas obras</option>
+            {obrasUnicas.map(o => <option key={o} value={o}>{o}</option>)}
+          </select>
+          <select value={filtroResp} onChange={e => setFiltroResp(e.target.value)}
+            className={`rounded-xl border px-3 py-2 text-xs font-semibold outline-none max-w-[200px] ${
+              isLight ? 'bg-white border-slate-200' : 'bg-white/[0.04] border-white/[0.06] text-slate-200'
+            }`}>
+            <option value="todos">Todos responsáveis</option>
+            {respsUnicos.map(r => <option key={r} value={r}>{r}</option>)}
+          </select>
+          <span className={`ml-auto text-[11px] ${isLight ? 'text-slate-500' : 'text-slate-400'}`}>
+            {alocacoes.length} resultado{alocacoes.length !== 1 ? 's' : ''}
+          </span>
         </div>
       )}
 
@@ -418,37 +517,43 @@ export default function Alocados() {
               </thead>
               <tbody>
                 {alocacoes.map((a, idx) => {
-                  const identificador = a.veiculo?.placa ?? '—'
+                  const v = veicMap.get(a.veiculo_id)
+                  const isMaquina = v?.tipo_ativo === 'maquina'
+                  const { codigo, categoria } = v ? formatCodigoCategoria(v) : { codigo: a.veiculo?.placa ?? '—', categoria: '' }
                   const osCount = osCountMap[a.veiculo_id] ?? 0
                   const retAtrasado = a.data_retorno_prev && new Date(a.data_retorno_prev) < new Date()
 
-                  const trCls = `border-t transition-colors ${
+                  const trCls = `border-t transition-colors cursor-pointer ${
                     isLight
                       ? `border-slate-100 hover:bg-rose-50/20 ${idx % 2 === 0 ? '' : 'bg-slate-50/40'}`
                       : `border-white/[0.04] hover:bg-white/[0.02] ${idx % 2 === 0 ? '' : 'bg-white/[0.01]'}`
                   }`
 
                   return (
-                    <tr key={a.id} className={trCls}>
+                    <tr key={a.id} className={trCls} onClick={() => openDetalhe(a)}>
                       {/* Ativo */}
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-2">
                           <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${
-                            a.horimetro_saida !== undefined && a.horimetro_saida !== null
+                            isMaquina
                               ? (isLight ? 'bg-violet-50 text-violet-600' : 'bg-violet-500/10 text-violet-400')
                               : (isLight ? 'bg-sky-50 text-sky-600'       : 'bg-sky-500/10 text-sky-400')
                           }`}>
-                            {a.horimetro_saida !== undefined && a.horimetro_saida !== null
-                              ? <Cog size={13} />
-                              : <Car size={13} />
-                            }
+                            {isMaquina ? <Cog size={13} /> : <Car size={13} />}
                           </div>
                           <div>
-                            <p className={`text-xs font-bold ${isLight ? 'text-slate-800' : 'text-white'}`}>
-                              {identificador}
-                            </p>
+                            <div className="flex items-baseline gap-1.5">
+                              <span className={`text-xs font-extrabold font-mono ${isLight ? 'text-slate-800' : 'text-white'}`}>{codigo}</span>
+                              {categoria && (
+                                <span className={`text-[9px] font-bold uppercase tracking-wider ${isLight ? 'text-rose-600' : 'text-rose-400'}`}>
+                                  {categoria}
+                                </span>
+                              )}
+                            </div>
                             <p className={`text-[10px] ${isLight ? 'text-slate-400' : 'text-slate-500'}`}>
                               {a.veiculo?.marca} {a.veiculo?.modelo}
+                              <span className={isLight ? 'text-slate-300' : 'text-slate-600'}> · </span>
+                              <span className="font-mono">{a.veiculo?.placa}</span>
                             </p>
                           </div>
                         </div>
@@ -502,7 +607,7 @@ export default function Alocados() {
                       </td>
 
                       {/* Ações */}
-                      <td className="px-4 py-3 text-right">
+                      <td className="px-4 py-3 text-right" onClick={e => e.stopPropagation()}>
                         <button
                           onClick={() => setRetornoAloc(a)}
                           className={`inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-xl transition-all ${
@@ -530,9 +635,11 @@ export default function Alocados() {
             <AlocacaoCard
               key={a.id}
               a={a}
+              veic={veicMap.get(a.veiculo_id)}
               osCount={osCountMap[a.veiculo_id] ?? 0}
               isLight={isLight}
               onRetorno={setRetornoAloc}
+              onOpen={openDetalhe}
             />
           ))}
         </div>
@@ -546,6 +653,27 @@ export default function Alocados() {
           onClose={() => setRetornoAloc(null)}
           onConfirm={handleConfirmarRetorno}
           isPending={encerrar.isPending}
+        />
+      )}
+
+      {/* Modal Detalhes */}
+      {detalheVeiculo && detalheAloc && (
+        <VeiculoDetalhesModal
+          veiculo={detalheVeiculo}
+          isLight={isLight}
+          osCount={osCountMap[detalheAloc.veiculo_id] ?? 0}
+          alocacaoInfo={{
+            obra: detalheAloc.obra?.nome,
+            responsavel: detalheAloc.responsavel_nome ?? undefined,
+            dataSaida: detalheAloc.data_saida,
+            dataRetornoPrev: detalheAloc.data_retorno_prev,
+          }}
+          onClose={() => { setDetalheVeiculo(null); setDetalheAloc(null) }}
+          onRegistrarRetorno={() => {
+            setRetornoAloc(detalheAloc)
+            setDetalheVeiculo(null)
+            setDetalheAloc(null)
+          }}
         />
       )}
     </div>
