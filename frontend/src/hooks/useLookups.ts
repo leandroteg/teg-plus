@@ -23,7 +23,7 @@ export function useLookups() {
         supabase.from('sys_centros_custo').select('id, codigo, descricao').eq('ativo', true).order('codigo'),
         supabase.from('fin_classes_financeiras').select('id, codigo, descricao, tipo').order('descricao'),
         supabase.from('cmp_categorias').select('id, nome').eq('ativo', true).order('nome'),
-        supabase.from('sys_empresas').select('id, razao_social, nome_fantasia, cnpj').order('razao_social'),
+        supabase.from('sys_empresas').select('id, razao_social, nome_fantasia, cnpjs').order('razao_social'),
       ])
 
       return {
@@ -36,8 +36,8 @@ export function useLookups() {
         centros_custo: (ccRes.data ?? []) as Lookups['centros_custo'],
         classes_financeiras: (cfRes.data ?? []) as Lookups['classes_financeiras'],
         categorias: (catRes.data ?? []) as Lookups['categorias'],
-        empresas: ((empRes.data ?? []) as Array<{ id: string; razao_social: string; nome_fantasia: string; cnpj: string }>).map(e => ({
-          id: e.id, razao_social: e.razao_social, nome_fantasia: e.nome_fantasia, cnpjs: e.cnpj ? [e.cnpj] : [],
+        empresas: ((empRes.data ?? []) as Array<{ id: string; razao_social: string; nome_fantasia: string; cnpjs: string[] }>).map(e => ({
+          id: e.id, razao_social: e.razao_social, nome_fantasia: e.nome_fantasia, cnpjs: e.cnpjs ?? [],
         })),
       }
     },

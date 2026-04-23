@@ -5,7 +5,7 @@
       "name": "teg-frontend",
       "runtimeExecutable": "node",
       "runtimeArgs": ["C:/Program Files/nodejs/node_modules/npm/bin/npm-cli.js", "run", "dev"],
-      "cwd": "C:/teg-plus/.claude/worktrees/musing-perlman/frontend",
+      "cwd": "C:/teg-plus/frontend",
       "port": 5173
     }
   ]
