@@ -6,6 +6,7 @@ import {
   Search, LayoutList, LayoutGrid, ArrowUp, ArrowDown,
   ClipboardList, ShieldCheck, BoxIcon, CreditCard, ArchiveIcon,
   Building2, Link2, RefreshCw, UserPlus,
+  Tag, Briefcase, Hash, Calendar, Receipt, CheckCircle2,
 } from 'lucide-react'
 import { useSearchParams } from 'react-router-dom'
 import jsPDF from 'jspdf'
@@ -1148,82 +1149,169 @@ function PedCard({ pedido, dark, onClick }: { pedido: PedidoListItem; dark: bool
   const isLiberado = statusPgto === 'liberado'
   const qtdTotal     = pedido.qtd_itens_total ?? 0
   const qtdRecebidos = pedido.qtd_itens_recebidos ?? 0
+  const categoria    = pedido.requisicao?.categoria
+  const obraNome     = pedido.requisicao?.obra_nome
+  const centroCusto  = pedido.centro_custo
+  const classeFinanceira = pedido.classe_financeira
+
+  // Avatar icon + color based on priority state
+  const avatarBg = atrasado
+    ? dark ? 'bg-red-500/15' : 'bg-red-50'
+    : isPago
+      ? dark ? 'bg-emerald-500/15' : 'bg-emerald-50'
+      : isLiberado
+        ? dark ? 'bg-orange-500/15' : 'bg-orange-50'
+        : entregue || parcial
+          ? dark ? 'bg-teal-500/15' : 'bg-teal-50'
+          : dark ? 'bg-slate-700/50' : 'bg-slate-50'
+  const AvatarIcon = atrasado ? AlertTriangle : isPago ? CheckCircle2 : isLiberado ? ShieldCheck : entregue ? CheckCircle : Receipt
+  const avatarIconCls = atrasado ? 'text-red-500' : isPago ? 'text-emerald-600' : isLiberado ? 'text-orange-500' : entregue ? 'text-teal-600' : dark ? 'text-slate-400' : 'text-slate-400'
+
+  const borderClass = dark
+    ? 'border-white/[0.07] hover:border-white/20'
+    : atrasado ? 'border-red-200' : isPago ? 'border-emerald-200' : isLiberado ? 'border-orange-200' : entregue ? 'border-teal-200' : 'border-slate-200'
 
   return (
     <div
       onClick={onClick}
-      className={`rounded-2xl border cursor-pointer transition-all hover:shadow-md ${
-        dark
-          ? `bg-[#1e293b] border-white/10 hover:border-white/20`
-          : `bg-white ${atrasado ? 'border-red-200' : isPago ? 'border-emerald-300' : isLiberado ? 'border-orange-200' : entregue ? 'border-emerald-200' : 'border-slate-200'} shadow-sm`
-      }`}
+      className={`rounded-2xl border cursor-pointer transition-all hover:shadow-md ${dark ? 'bg-[#1e293b]' : 'bg-white shadow-sm'} ${borderClass}`}
     >
-      <div className="p-4 space-y-2">
-        {/* Header: number + status + value */}
-        <div className="flex items-start justify-between gap-2">
-          <div className="min-w-0">
-            <span className={`text-[10px] font-mono ${dark ? 'text-slate-500' : 'text-slate-400'}`}>{getDisplayNumber(pedido)}</span>
-            <p className={`text-sm font-bold truncate ${dark ? 'text-white' : 'text-slate-800'}`}>{pedido.fornecedor_nome}</p>
+      <div className="p-4">
+        {/* ── Header: avatar + info + value ── */}
+        <div className="flex items-start gap-3">
+          {/* Status avatar */}
+          <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${avatarBg}`}>
+            <AvatarIcon size={16} className={avatarIconCls} />
           </div>
-          <p className="text-sm font-extrabold text-teal-500 flex-shrink-0">{fmt(pedido.valor_total)}</p>
+
+          {/* Main info */}
+          <div className="flex-1 min-w-0">
+            {/* Supplier + value */}
+            <div className="flex items-center justify-between gap-2 mb-0.5">
+              <p className={`text-sm font-bold truncate ${dark ? 'text-white' : 'text-slate-800'}`}>
+                {pedido.fornecedor_nome}
+              </p>
+              <p className={`text-sm font-extrabold shrink-0 ${atrasado ? 'text-red-600' : 'text-teal-500'}`}>
+                {fmt(pedido.valor_total)}
+              </p>
+            </div>
+
+            {/* Number + RC + Obra badges */}
+            <div className="flex items-center gap-1.5 flex-wrap mb-1.5">
+              <span className={`text-[10px] font-mono ${dark ? 'text-slate-500' : 'text-slate-400'}`}>
+                {getDisplayNumber(pedido)}
+              </span>
+              {pedido.requisicao?.numero && (
+                <span className={`inline-flex items-center gap-0.5 text-[10px] font-semibold rounded-full px-1.5 py-0.5 ${dark ? 'bg-indigo-500/15 text-indigo-400' : 'bg-indigo-50 text-indigo-600'}`}>
+                  <Hash size={8} />{pedido.requisicao.numero}
+                </span>
+              )}
+              {obraNome && (
+                <span className={`inline-flex items-center gap-0.5 text-[10px] font-semibold rounded-full px-1.5 py-0.5 ${dark ? 'bg-sky-500/15 text-sky-400' : 'bg-sky-50 text-sky-600'}`}>
+                  <Building2 size={8} />{obraNome}
+                </span>
+              )}
+            </div>
+
+            {/* Description */}
+            {pedido.requisicao?.descricao && (
+              <p className={`text-[11px] truncate mb-1.5 ${dark ? 'text-slate-400' : 'text-slate-500'}`}>
+                {pedido.requisicao.justificativa || pedido.requisicao.descricao}
+              </p>
+            )}
+
+            {/* Status badges */}
+            <div className="flex flex-wrap items-center gap-1.5 mb-2">
+              <span className={`inline-flex items-center gap-1 rounded-full font-semibold px-2 py-0.5 text-[10px] ${dark ? st.bgDark + ' ' + st.textDark : st.bg + ' ' + st.text}`}>
+                <span className="w-1.5 h-1.5 rounded-full bg-current opacity-70" />
+                {st.label}
+              </span>
+              {pending && (
+                <span className={`inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full text-[10px] font-bold ${dark ? 'bg-amber-500/15 text-amber-400' : 'bg-amber-50 text-amber-700'}`}>
+                  RC aprovada
+                </span>
+              )}
+              {isPago && (
+                <span className={`inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full text-[10px] font-bold ${dark ? 'bg-emerald-500/15 text-emerald-400' : 'bg-emerald-100 text-emerald-700'}`}>
+                  <CheckCircle2 size={9} /> Pago
+                </span>
+              )}
+              {isLiberado && !isPago && (
+                <span className={`inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full text-[10px] font-bold ${dark ? 'bg-orange-500/15 text-orange-400' : 'bg-orange-100 text-orange-700'}`}>
+                  <Clock size={9} /> Aguard. Pgto
+                </span>
+              )}
+              {atrasado && (
+                <span className="inline-flex items-center gap-0.5 text-[10px] text-red-600 font-bold">
+                  <AlertTriangle size={9} /> {Math.abs(dias!)}d atr.
+                </span>
+              )}
+              {parcial && qtdTotal > 0 && (
+                <span className={`inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full text-[10px] font-bold ${dark ? 'bg-amber-500/15 text-amber-400' : 'bg-amber-100 text-amber-700'}`}>
+                  <Package size={9} /> {qtdRecebidos}/{qtdTotal} receb.
+                </span>
+              )}
+              {!entregue && !parcial && pedido.requisicao?.urgencia && pedido.requisicao.urgencia !== 'normal' && (
+                <span className={`inline-flex items-center text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                  pedido.requisicao.urgencia === 'critica'
+                    ? dark ? 'bg-red-500/20 text-red-400' : 'bg-red-100 text-red-700'
+                    : dark ? 'bg-amber-500/20 text-amber-400' : 'bg-amber-100 text-amber-700'
+                }`}>
+                  ⚡ {pedido.requisicao.urgencia === 'critica' ? 'Crítica' : 'Urgente'}
+                </span>
+              )}
+              {(pedido as any).contrato_ativo && (
+                <a href="/contratos/gestao" onClick={e => e.stopPropagation()}
+                  className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold border transition-colors ${dark ? 'bg-violet-500/15 text-violet-400 border-violet-500/30 hover:bg-violet-500/25' : 'bg-violet-50 text-violet-700 border-violet-200 hover:bg-violet-100'}`}>
+                  <ExternalLink size={9} /> Ver Contrato
+                </a>
+              )}
+            </div>
+
+            {/* Metadata: dates + categoria + CC + classe */}
+            <div className={`flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] ${dark ? 'text-slate-500' : 'text-slate-400'}`}>
+              {pedido.data_pedido && (
+                <span className="flex items-center gap-1">
+                  <Calendar size={9} />{fmtData(pedido.data_pedido)}
+                </span>
+              )}
+              {pedido.data_prevista_entrega && !entregue && (
+                <span className={`flex items-center gap-1 ${atrasado ? 'text-red-500 font-semibold' : ''}`}>
+                  <Truck size={9} />
+                  Prev: {fmtDataISO(pedido.data_prevista_entrega)}
+                  {dias !== null && !pending && <span className="ml-0.5">({dias}d)</span>}
+                </span>
+              )}
+              {pedido.data_entrega_real && (
+                <span className={`flex items-center gap-1 font-medium ${dark ? 'text-emerald-400' : 'text-emerald-600'}`}>
+                  <CheckCircle size={9} />
+                  {fmtData(pedido.data_entrega_real)}
+                  {pedido.data_pedido && (() => {
+                    const d0 = new Date(pedido.data_pedido)
+                    const d1 = new Date(pedido.data_entrega_real!)
+                    const delta = Math.round((d1.getTime() - d0.getTime()) / 86400000)
+                    return <span className="ml-0.5 font-semibold">({delta}d)</span>
+                  })()}
+                </span>
+              )}
+              {categoria && (
+                <span className="flex items-center gap-1">
+                  <Tag size={9} />{categoria.replace(/_/g, ' ')}
+                </span>
+              )}
+              {centroCusto && (
+                <span className={`flex items-center gap-1 font-medium ${dark ? 'text-slate-400' : 'text-slate-500'}`}>
+                  <Briefcase size={9} />CC: {centroCusto}
+                </span>
+              )}
+              {classeFinanceira && (
+                <span className={`font-medium ${dark ? 'text-violet-400' : 'text-violet-500'}`}>
+                  {classeFinanceira}
+                </span>
+              )}
+            </div>
+          </div>
         </div>
-
-        {/* RC + Obra */}
-        {pedido.requisicao && (
-          <p className={`text-xs truncate ${dark ? 'text-slate-400' : 'text-slate-500'}`}>
-            <span className={`font-mono ${dark ? 'text-slate-500' : 'text-slate-300'}`}>{pedido.requisicao.numero}</span>
-            {' · '}{pedido.requisicao.justificativa || pedido.requisicao.descricao}
-            {pedido.requisicao.obra_nome && <span className={dark ? 'text-slate-500' : 'text-slate-400'}> · {pedido.requisicao.obra_nome}</span>}
-          </p>
-        )}
-
-        {/* Status badges + dates */}
-        <div className="flex flex-wrap items-center gap-1.5">
-          <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${dark ? st.bgDark + ' ' + st.textDark : st.bg + ' ' + st.text}`}>{st.label}</span>
-          {pending && <span className="text-[10px] text-amber-600 font-bold">RC aprovada</span>}
-          {isPago && <span className="flex items-center gap-0.5 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-700"><CheckCircle size={9} /> Pago</span>}
-          {isLiberado && !isPago && <span className="flex items-center gap-0.5 px-2 py-0.5 rounded-full text-[10px] font-bold bg-orange-100 text-orange-700"><Clock size={9} /> Aguard. Pgto</span>}
-          {atrasado && <span className="flex items-center gap-0.5 text-[10px] text-red-600 font-bold"><AlertTriangle size={10} /> {Math.abs(dias!)}d atr.</span>}
-          {parcial && qtdTotal > 0 && <span className="text-[10px] text-amber-600 font-bold">{qtdRecebidos}/{qtdTotal} receb.</span>}
-          {(pedido as any).contrato_ativo && (
-            <a href={`/contratos/gestao`} onClick={e => e.stopPropagation()}
-              className="flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-violet-50 text-violet-700 border border-violet-200 hover:bg-violet-100 transition-colors">
-              <ExternalLink size={9} /> Ver Contrato
-            </a>
-          )}
-        </div>
-
-        {/* Dates row */}
-        <div className={`flex flex-wrap gap-x-4 gap-y-1 text-[11px] ${dark ? 'text-slate-400' : 'text-slate-500'}`}>
-          <span>Pedido: {fmtData(pedido.data_pedido)}</span>
-          <span className={atrasado ? 'text-red-500 font-semibold' : ''}>
-            Prev: {fmtDataISO(pedido.data_prevista_entrega)}
-            {dias !== null && !entregue && !pending && <span className="ml-0.5">({dias}d)</span>}
-          </span>
-          {!entregue && !parcial && pedido.requisicao?.data_necessidade && (
-            <span>Necess: {fmtDataISO(pedido.requisicao.data_necessidade)}</span>
-          )}
-          {pedido.data_entrega_real && (
-            <span className="text-emerald-500">
-              Recebido: {fmtData(pedido.data_entrega_real)}
-              {pedido.data_pedido && (() => {
-                const d0 = new Date(pedido.data_pedido)
-                const d1 = new Date(pedido.data_entrega_real!)
-                const delta = Math.round((d1.getTime() - d0.getTime()) / 86400000)
-                return <span className="ml-0.5 font-semibold">({delta}d)</span>
-              })()}
-            </span>
-          )}
-        </div>
-
-        {/* Urgência flag (before delivery) */}
-        {!entregue && !parcial && pedido.requisicao?.urgencia && pedido.requisicao.urgencia !== 'normal' && (
-          <span className={`inline-flex items-center text-[10px] font-bold px-1.5 py-0.5 rounded ${
-            pedido.requisicao.urgencia === 'critica'
-              ? dark ? 'bg-red-500/20 text-red-400' : 'bg-red-100 text-red-700'
-              : dark ? 'bg-amber-500/20 text-amber-400' : 'bg-amber-100 text-amber-700'
-          }`}>{pedido.requisicao.urgencia === 'critica' ? '\u26a1 Cr\u00edtica' : '\u26a1 Urgente'}</span>
-        )}
       </div>
     </div>
   )
