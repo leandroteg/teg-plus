@@ -406,7 +406,7 @@ export default function ResumoExecutivoPage() {
   const isAutoGenerating = !showViewMode && !recomendacao.trim() && isGerandoIA
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-5" data-no-upper>
       <div className="flex items-start gap-3">
         <button
           onClick={() => nav(`/contratos/solicitacoes/${id}`)}

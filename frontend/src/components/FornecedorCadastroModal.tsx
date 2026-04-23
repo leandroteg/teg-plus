@@ -238,7 +238,7 @@ export default function FornecedorCadastroModal({
               Recebe por boleto
             </label>
             <p className={`text-[11px] mt-1 ${subtext}`}>
-              Ao marcar boleto, Banco, AgÃªncia, Conta e PIX deixam de ser obrigatÃ³rios.
+              Ao marcar boleto, Banco, Agência, Conta e PIX deixam de ser obrigatórios.
             </p>
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-4">

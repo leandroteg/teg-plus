@@ -16,12 +16,19 @@ interface Props {
   readOnly?: boolean
   /** Itens aprovados parcialmente (vindos do AprovAi) */
   itensSelecionados?: ItemSelecionado[]
+  /** Callback: clique numa célula item x fornecedor (modo sele\u00e7\u00e3o por item).
+   *  Quando definido, o componente fica interativo: cada item pode ser atribu\u00eddo
+   *  a um fornecedor. Passa a descri\u00e7\u00e3o do item + id do fornecedor. */
+  onSelectItem?: (itemDescricao: string, fornecedorId: string) => void
+  /** Mapa atual de sele\u00e7\u00e3o por item (descricao normalizada -> fornecedor_id).
+   *  Quando presente, destaca a c\u00e9lula selecionada em verde. */
+  selecaoPorItem?: Map<string, string>
 }
 
 // Normaliza descricao para matching entre fornecedores
 const normalizeKey = (s: string) => s.toLowerCase().trim()
 
-export default function CotacaoComparativo({ fornecedores, onSelect, readOnly = false, itensSelecionados }: Props) {
+export default function CotacaoComparativo({ fornecedores, onSelect, readOnly = false, itensSelecionados, onSelectItem, selecaoPorItem }: Props) {
   const viewFile = useCallback(async (path: string) => {
     const { data } = await supabase.storage.from('cotacoes-docs').createSignedUrl(path, 3600)
     if (data?.signedUrl) window.open(data.signedUrl, '_blank')
@@ -100,32 +107,57 @@ export default function CotacaoComparativo({ fornecedores, onSelect, readOnly = 
                     <span className="line-clamp-2 leading-tight">{label}</span>
                   </td>
                   {precos.map((p, fi) => {
+                    const forn = fornecedores[fi]
                     const isBestItem = p && minItemValor !== null && p.valor_total === minItemValor
                     const isPartialSel = itensSelecionados?.some(
-                      it => normalizeKey(it.descricao) === key && it.fornecedor_id === fornecedores[fi].id
+                      it => normalizeKey(it.descricao) === key && it.fornecedor_id === forn.id
                     )
+                    const isItemSelecionado = selecaoPorItem?.get(key) === forn.id
+                    const isInteractive = Boolean(onSelectItem && !readOnly && p)
+                    const handleClick = () => {
+                      if (isInteractive && p) onSelectItem!(label, forn.id)
+                    }
                     return (
                       <td key={fi} className="px-3 py-2 text-right">
                         {p ? (
-                          <div className={`inline-flex flex-col items-end gap-0.5 rounded-lg px-1.5 py-0.5 ${
-                            isPartialSel ? 'bg-emerald-50 border border-emerald-200' :
-                            isBestItem   ? 'bg-amber-50'  : ''
-                          }`}>
+                          <div
+                            role={isInteractive ? 'button' : undefined}
+                            tabIndex={isInteractive ? 0 : undefined}
+                            onClick={isInteractive ? handleClick : undefined}
+                            onKeyDown={isInteractive ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleClick() } } : undefined}
+                            className={`inline-flex flex-col items-end gap-0.5 rounded-lg px-1.5 py-0.5 transition-all ${
+                              isItemSelecionado ? 'bg-teal-50 border-2 border-teal-500 shadow-sm' :
+                              isPartialSel      ? 'bg-emerald-50 border border-emerald-200' :
+                              isBestItem        ? 'bg-amber-50'  : ''
+                            } ${
+                              isInteractive
+                                ? (isItemSelecionado
+                                    ? 'cursor-pointer'
+                                    : 'cursor-pointer hover:bg-teal-50 hover:ring-2 hover:ring-teal-300')
+                                : ''
+                            }`}
+                          >
                             <span className={`font-bold ${
-                              isPartialSel ? 'text-emerald-700' :
-                              isBestItem   ? 'text-teal-600'   : 'text-slate-700'
+                              isItemSelecionado ? 'text-teal-700' :
+                              isPartialSel      ? 'text-emerald-700' :
+                              isBestItem        ? 'text-teal-600'   : 'text-slate-700'
                             }`}>
                               {formatBRL(p.valor_total)}
                             </span>
                             <span className="text-[9px] text-slate-400">
                               {p.qtd} × {formatBRL(p.valor_unitario)}
                             </span>
-                            {isBestItem && !isPartialSel && (
+                            {isItemSelecionado && (
+                              <span className="text-[9px] font-bold text-teal-600 flex items-center gap-0.5">
+                                <Check size={8} /> escolhido
+                              </span>
+                            )}
+                            {!isItemSelecionado && isBestItem && !isPartialSel && (
                               <span className="text-[9px] font-bold text-amber-600 flex items-center gap-0.5">
                                 <Trophy size={8} /> menor
                               </span>
                             )}
-                            {isPartialSel && (
+                            {!isItemSelecionado && isPartialSel && (
                               <span className="text-[9px] font-bold text-emerald-600 flex items-center gap-0.5">
                                 <Check size={8} /> aprovado
                               </span>
@@ -142,8 +174,40 @@ export default function CotacaoComparativo({ fornecedores, onSelect, readOnly = 
             </tbody>
             {/* Totais */}
             <tfoot>
+              {/* Sub-total escolhido (quando h\u00e1 sele\u00e7\u00e3o por item) */}
+              {selecaoPorItem && selecaoPorItem.size > 0 && (
+                <tr className="border-t border-teal-200 bg-teal-50/40">
+                  <td className="px-3 py-2 text-[10px] font-bold text-teal-700 uppercase tracking-wider">Escolhido</td>
+                  {fornecedores.map(f => {
+                    const itensDoForn = matrizItens.filter(m => selecaoPorItem.get(m.key) === f.id)
+                    const totalEscolhido = itensDoForn.reduce((sum, m) => {
+                      const preco = m.precos[fornecedores.indexOf(f)]
+                      return sum + (preco?.valor_total ?? 0)
+                    }, 0)
+                    const qtdItens = itensDoForn.length
+                    return (
+                      <td key={f.id} className="px-3 py-2 text-right">
+                        {qtdItens > 0 ? (
+                          <>
+                            <span className="font-extrabold text-sm text-teal-700">
+                              {formatBRL(totalEscolhido)}
+                            </span>
+                            <div className="text-[9px] font-semibold text-teal-600 mt-0.5">
+                              {qtdItens} {qtdItens === 1 ? 'item' : 'itens'}
+                            </div>
+                          </>
+                        ) : (
+                          <span className="text-slate-300 text-[11px]">—</span>
+                        )}
+                      </td>
+                    )
+                  })}
+                </tr>
+              )}
+
+              {/* Total geral (todos os itens do fornecedor) */}
               <tr className="border-t-2 border-slate-200 bg-slate-50">
-                <td className="px-3 py-2 text-xs font-bold text-slate-600 uppercase">Total</td>
+                <td className="px-3 py-2 text-xs font-bold text-slate-600 uppercase">Total da proposta</td>
                 {fornecedores.map(f => {
                   const isBest = f.valor_total === minValor
                   const isSelected = f.selecionado

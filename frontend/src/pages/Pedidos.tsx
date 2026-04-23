@@ -886,6 +886,8 @@ function CompartilharModal({ pedido, onClose, dark }: { pedido: Pedido; onClose:
 const TIPO_OPTIONS: { value: PedidoAnexo['tipo']; label: string }[] = [
   { value: 'nota_fiscal',         label: 'Nota Fiscal'           },
   { value: 'comprovante_entrega', label: 'Comprovante de Entrega'},
+  { value: 'boleto',              label: 'Boleto'                },
+  { value: 'doc_financeiro',      label: 'Doc Financeiro'        },
   { value: 'medicao',             label: 'Planilha de Medição'   },
   { value: 'outro',               label: 'Outro'                 },
 ]
@@ -894,6 +896,7 @@ function LiberarPagamentoModal({ pedido, onClose }: { pedido: Pedido; onClose: (
   const uploadAnexo   = useUploadAnexo()
   const liberarPgto   = useLiberarPagamento()
   const fileRef       = useRef<HTMLInputElement>(null)
+  const { data: anexosExistentes } = useAnexosPedido(pedido.id)
 
   const [file, setFile]       = useState<File | null>(null)
   const [tipo, setTipo]       = useState<PedidoAnexo['tipo']>('nota_fiscal')
@@ -901,17 +904,22 @@ function LiberarPagamentoModal({ pedido, onClose }: { pedido: Pedido; onClose: (
   const [erro, setErro]       = useState('')
   const [loading, setLoading] = useState(false)
 
+  const docsExistentes = anexosExistentes?.filter(a => ['nota_fiscal', 'boleto', 'doc_financeiro'].includes(a.tipo)) ?? []
+  const temNF = docsExistentes.length > 0
+
   const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0]
     if (f) { setFile(f); setErro('') }
   }
 
   const handleSubmit = async () => {
-    if (!file) { setErro('Selecione um arquivo para continuar.'); return }
+    if (!file && !temNF) { setErro('Anexe a Nota Fiscal, Boleto ou Doc Financeiro para continuar.'); return }
     setLoading(true)
     setErro('')
     try {
-      await uploadAnexo.mutateAsync({ pedidoId: pedido.id, file, tipo, observacao: obs || undefined, origem: 'compras' })
+      if (file) {
+        await uploadAnexo.mutateAsync({ pedidoId: pedido.id, file, tipo, observacao: obs || undefined, origem: 'compras' })
+      }
       await liberarPgto.mutateAsync(pedido.id)
       onClose()
     } catch (e: any) {
@@ -939,8 +947,29 @@ function LiberarPagamentoModal({ pedido, onClose }: { pedido: Pedido; onClose: (
           </button>
         </div>
         <div className="p-5 space-y-4">
+          {temNF && (
+            <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-3 space-y-1.5">
+              <p className="text-xs font-bold text-emerald-700 flex items-center gap-1.5">
+                <CheckCircle size={13} className="shrink-0" />
+                Documentos já anexados
+              </p>
+              {docsExistentes.map(a => (
+                <a key={a.id} href={a.url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 text-[11px] text-emerald-600 hover:underline truncate">
+                  <FileText size={11} className="shrink-0" />
+                  <span className="font-semibold">{TIPO_LABEL[a.tipo]}</span>
+                  <span className="text-emerald-400">·</span>
+                  {a.nome_arquivo}
+                </a>
+              ))}
+              <p className="text-[10px] text-emerald-500 pt-0.5">Anexe outro arquivo abaixo somente se quiser substituir ou complementar.</p>
+            </div>
+          )}
           <div>
-            <label className="block text-xs font-semibold text-slate-600 mb-1.5">Anexar Documento <span className="text-red-500">*</span></label>
+            <label className="block text-xs font-semibold text-slate-600 mb-1.5">
+              {temNF ? 'Adicionar outro documento' : 'Anexar Documento'}{' '}
+              {!temNF && <span className="text-red-500">*</span>}
+              {temNF && <span className="text-slate-400 font-normal">(opcional)</span>}
+            </label>
             <div onClick={() => fileRef.current?.click()} className={`flex items-center gap-3 border-2 border-dashed rounded-xl px-4 py-4 cursor-pointer transition-colors ${file ? 'border-emerald-300 bg-emerald-50' : 'border-slate-200 bg-slate-50 hover:border-teal-300 hover:bg-teal-50'}`}>
               <Upload size={18} className={file ? 'text-emerald-500' : 'text-slate-400'} />
               <div className="min-w-0">
@@ -959,16 +988,18 @@ function LiberarPagamentoModal({ pedido, onClose }: { pedido: Pedido; onClose: (
             </div>
             <input ref={fileRef} type="file" accept=".pdf,.jpg,.jpeg,.png,.xls,.xlsx" onChange={handleFile} className="hidden" />
           </div>
-          <div>
-            <label className="block text-xs font-semibold text-slate-600 mb-1.5">Tipo do Documento</label>
-            <div className="grid grid-cols-2 gap-2">
-              {TIPO_OPTIONS.map(opt => (
-                <button key={opt.value} type="button" onClick={() => setTipo(opt.value)} className={`px-3 py-2 rounded-xl text-xs font-semibold border text-left transition-colors ${tipo === opt.value ? 'bg-teal-600 text-white border-teal-600' : 'bg-white text-slate-600 border-slate-200 hover:border-teal-300'}`}>
-                  {opt.label}
-                </button>
-              ))}
+          {file && (
+            <div>
+              <label className="block text-xs font-semibold text-slate-600 mb-1.5">Tipo do Documento</label>
+              <div className="grid grid-cols-2 gap-2">
+                {TIPO_OPTIONS.map(opt => (
+                  <button key={opt.value} type="button" onClick={() => setTipo(opt.value)} className={`px-3 py-2 rounded-xl text-xs font-semibold border text-left transition-colors ${tipo === opt.value ? 'bg-teal-600 text-white border-teal-600' : 'bg-white text-slate-600 border-slate-200 hover:border-teal-300'}`}>
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
             </div>
-          </div>
+          )}
           <div>
             <label className="block text-xs font-semibold text-slate-600 mb-1.5">Observação <span className="text-slate-400 font-normal">(opcional)</span></label>
             <textarea value={obs} onChange={e => setObs(e.target.value)} rows={2} placeholder="Ex: NF entregue junto com o material..." className="w-full text-sm border border-slate-200 rounded-xl px-3 py-2 resize-none focus:outline-none focus:ring-2 focus:ring-teal-400 placeholder:text-slate-300" />
@@ -1061,7 +1092,7 @@ function UploadAnexoInline({ pedidoId }: { pedidoId: string }) {
   )
 }
 
-function AnexosOrganizados({ pedidoId, cotacaoId }: { pedidoId: string; cotacaoId?: string }) {
+function AnexosOrganizados({ pedidoId, cotacaoId, canUpload = true }: { pedidoId: string; cotacaoId?: string; canUpload?: boolean }) {
   const { data: anexos, isLoading: loadingAnexos }  = useAnexosPedido(pedidoId)
   const { data: cotDocs, isLoading: loadingCot }     = useCotacaoDocs(cotacaoId)
   const isLoading = loadingAnexos || (cotacaoId ? loadingCot : false)
@@ -1074,7 +1105,7 @@ function AnexosOrganizados({ pedidoId, cotacaoId }: { pedidoId: string; cotacaoI
   const pagamentoDocs = anexos?.filter(a => a.tipo === 'comprovante_pagamento') ?? []
   const totalDocs     = cotacaoDocs.length + nfDocs.length + pedidoAnexos.length + pagamentoDocs.length
 
-  if (totalDocs === 0) return <div><p className="text-xs text-slate-400 italic py-1">Nenhum documento encontrado.</p><UploadAnexoInline pedidoId={pedidoId} /></div>
+  if (totalDocs === 0) return <div><p className="text-xs text-slate-400 italic py-1">Nenhum documento encontrado.</p>{canUpload && <UploadAnexoInline pedidoId={pedidoId} />}</div>
 
   return (
     <div className="space-y-3">
@@ -1098,7 +1129,7 @@ function AnexosOrganizados({ pedidoId, cotacaoId }: { pedidoId: string; cotacaoI
           {pagamentoDocs.map(a => <DocItem key={a.id} name={a.nome_arquivo} url={a.url} mime={a.mime_type} date={a.uploaded_at} origem={a.origem} />)}
         </DocSection>
       )}
-      <UploadAnexoInline pedidoId={pedidoId} />
+      {canUpload && <UploadAnexoInline pedidoId={pedidoId} />}
     </div>
   )
 }
@@ -1381,6 +1412,44 @@ function DetailModal({
             )}
           </div>
 
+          {/* Auditoria */}
+          <div className={`rounded-xl px-3 py-2.5 border text-[11px] space-y-1 ${dark ? 'border-white/10 bg-white/[0.02]' : 'border-slate-200 bg-slate-50'}`}>
+            {pedido.requisicao && (pedido.requisicao as any).solicitante_nome && (
+              <div className="flex items-center justify-between gap-2">
+                <span className={sub}>Solicitante</span>
+                <span className={`font-semibold ${txt}`}>{(pedido.requisicao as any).solicitante_nome}</span>
+              </div>
+            )}
+            {pedido.comprador?.nome && (
+              <div className="flex items-center justify-between gap-2">
+                <span className={sub}>Comprador</span>
+                <span className={`font-semibold ${txt}`}>{pedido.comprador.nome}</span>
+              </div>
+            )}
+            <div className="flex items-center justify-between gap-2">
+              <span className={sub}>Criado em</span>
+              <span className={`font-mono ${txt}`}>
+                {new Date(pedido.created_at).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                {pedido.criado_por_nome && <span className="ml-1 not-italic font-semibold">· {pedido.criado_por_nome}</span>}
+              </span>
+            </div>
+            {pedido.updated_at && pedido.updated_at !== pedido.created_at && (
+              <div className="flex items-center justify-between gap-2">
+                <span className={sub}>Última alteração</span>
+                <span className={`font-mono ${txt}`}>
+                  {new Date(pedido.updated_at).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                  {pedido.atualizado_por_nome && <span className="ml-1 not-italic font-semibold">· {pedido.atualizado_por_nome}</span>}
+                </span>
+              </div>
+            )}
+            {pedido.liberado_pagamento_por && (
+              <div className="flex items-center justify-between gap-2">
+                <span className={sub}>Liberado por</span>
+                <span className={`font-semibold ${txt}`}>{pedido.liberado_pagamento_por}</span>
+              </div>
+            )}
+          </div>
+
           {/* Observacoes */}
           {pedido.observacoes && (
             <div className={`rounded-xl p-3 border ${dark ? 'bg-white/[0.02] border-white/10' : 'bg-slate-50 border-slate-200'}`}>
@@ -1592,7 +1661,7 @@ function DetailModal({
               <p className={`text-[11px] font-semibold uppercase tracking-wide mb-2 flex items-center gap-1 ${sub}`}>
                 <Paperclip size={11} /> Documentos
               </p>
-              <AnexosOrganizados pedidoId={pedido.id} cotacaoId={pedido.cotacao_id} />
+              <AnexosOrganizados pedidoId={pedido.id} cotacaoId={pedido.cotacao_id} canUpload={!isLiberado && !isPago} />
             </div>
           )}
 

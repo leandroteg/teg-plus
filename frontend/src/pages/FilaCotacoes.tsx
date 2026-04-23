@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import {
   ShoppingCart, Clock, CheckCircle, AlertTriangle, ChevronRight, Info,
   XCircle, MessageSquare, FileText, ScrollText, Ban, Search, X, ArrowUp, ArrowDown,
-  LayoutList, LayoutGrid, Download, Loader2, Building2, Calendar,
+  LayoutList, LayoutGrid, Download, Loader2, Building2, Calendar, Sparkles,
 } from 'lucide-react'
 import { useTheme } from '../contexts/ThemeContext'
 import { supabase } from '../services/supabase'
@@ -219,6 +219,7 @@ function CotDetailModal({ cot, onClose, isDark, isAdmin, atLeastComprador, onDec
   onEmitir: () => void; onCancelar: () => void; isEmitting: boolean; isCancelling: boolean
   onOpenCotacao: () => void
 }) {
+  const navigate = useNavigate()
   const { data: categorias = [] } = useCategorias()
   const [observacao, setObservacao] = useState('')
   const valor = cot.valor_selecionado ?? (cot.requisicao as any)?.valor_estimado ?? 0
@@ -281,26 +282,19 @@ function CotDetailModal({ cot, onClose, isDark, isAdmin, atLeastComprador, onDec
             </span>
           )}
 
-          {/* Aprovação financeira */}
-          {isAdmin && concluida && reqStatus === 'cotacao_enviada' && (
-            <div className={`pt-3 space-y-3 ${isDark ? 'border-t border-white/[0.06]' : 'border-t border-teal-100'}`}>
-              <p className={`text-[10px] font-bold text-center uppercase tracking-wide ${isDark ? 'text-teal-400' : 'text-teal-600'}`}>Aprovação Financeira</p>
-              <UpperTextarea rows={2} className={`w-full border rounded-xl px-3 py-2 text-sm outline-none ${isDark ? 'bg-white/5 border-white/10 text-white placeholder:text-slate-500 focus:ring-2 focus:ring-teal-500/30' : 'border-slate-200 focus:ring-2 focus:ring-teal-400/30'}`}
-                placeholder="Observação..." value={observacao} onChange={e => setObservacao(e.target.value)} />
-              <div className="flex gap-2">
-                <button disabled={isProcessing} onClick={() => onDecisao('rejeitada', observacao)}
-                  className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-xs font-bold text-red-500 bg-red-50 border border-red-200 hover:bg-red-100 transition-all disabled:opacity-50">
-                  <XCircle size={14} /> Rejeitar
-                </button>
-                <button disabled={isProcessing} onClick={() => { if (!observacao.trim()) return; onDecisao('esclarecimento', observacao) }}
-                  className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-xs font-bold text-amber-600 bg-amber-50 border border-amber-200 hover:bg-amber-100 transition-all disabled:opacity-50">
-                  <MessageSquare size={14} /> Esclarecer
-                </button>
-                <button disabled={isProcessing} onClick={() => onDecisao('aprovada', observacao)}
-                  className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-xs font-bold text-emerald-600 bg-emerald-50 border border-emerald-200 hover:bg-emerald-100 transition-all disabled:opacity-50">
-                  {isProcessing ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle size={14} />} Aprovar
-                </button>
-              </div>
+          {/* Aprovação financeira — acontece em AprovAi (fonte única de verdade) */}
+          {concluida && reqStatus === 'cotacao_enviada' && (
+            <div className={`pt-3 ${isDark ? 'border-t border-white/[0.06]' : 'border-t border-teal-100'}`}>
+              <button
+                type="button"
+                onClick={() => { onClose(); navigate('/aprovaai') }}
+                className="w-full flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-xs font-bold text-white bg-indigo-500 hover:bg-indigo-600 shadow-sm shadow-indigo-500/20 transition-all"
+              >
+                <Sparkles size={14} /> Aprovar em AprovAi
+              </button>
+              <p className={`text-[10px] text-center mt-2 ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+                A aprovação financeira fica centralizada no AprovAi.
+              </p>
             </div>
           )}
 
@@ -427,7 +421,7 @@ export default function FilaCotacoes() {
     <div className="space-y-3">
       {/* Toast */}
       {toast && (
-        <div className={`fixed top-4 left-1/2 -translate-x-1/2 z-50 px-4 py-2.5 rounded-2xl shadow-lg text-sm font-bold flex items-center gap-2 ${
+        <div className={`fixed top-4 left-1/2 -translate-x-1/2 z-[70] px-4 py-2.5 rounded-2xl shadow-lg text-sm font-bold flex items-center gap-2 ${
           toast.type === 'success' ? 'bg-emerald-500 text-white' : 'bg-red-500 text-white'
         }`}>
           {toast.type === 'success' ? <CheckCircle size={16} /> : <XCircle size={16} />}
@@ -595,7 +589,7 @@ export default function FilaCotacoes() {
           onOpenCotacao={() => {
             const req = detail.requisicao
             if (isDetailLocked && req) {
-              setToast({ type: 'error', msg: `${detailBlockedByName ?? 'Outro usuÃ¡rio'} estÃ¡ editando ${req.numero}` })
+              setToast({ type: 'error', msg: `${detailBlockedByName ?? 'Outro usuário'} está editando ${req.numero}` })
               setTimeout(() => setToast(null), 5000)
               return
             }

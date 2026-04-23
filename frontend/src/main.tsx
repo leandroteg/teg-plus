@@ -4,7 +4,40 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { BrowserRouter } from 'react-router-dom'
 import App from './App'
 import ErrorBoundary from './components/ErrorBoundary'
+import { toUpperNorm } from './components/UpperInput'
 import './index.css'
+
+// ── Global uppercase enforcement ─────────────────────────────────────────────
+// Transforms text input values to uppercase before React processes the event.
+// Skips: readonly, disabled, email, url, password, number, date/time inputs,
+// and any element inside a [data-no-upper] container (e.g. contract printing).
+;(function installGlobalUppercase() {
+  const TEXT_TYPES = new Set(['', 'text', 'search', 'tel'])
+  const inputSetter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set
+  const textareaSetter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')?.set
+
+  document.addEventListener(
+    'input',
+    (e) => {
+      const target = e.target as HTMLInputElement | HTMLTextAreaElement
+      const tag = target.tagName
+      if (tag !== 'INPUT' && tag !== 'TEXTAREA') return
+      if (tag === 'INPUT' && !TEXT_TYPES.has((target as HTMLInputElement).type)) return
+      if (target.readOnly || target.disabled) return
+      if (target.closest('[data-no-upper]')) return
+
+      const upper = toUpperNorm(target.value)
+      if (upper === target.value) return
+
+      const start = target.selectionStart
+      const end = target.selectionEnd
+      const setter = tag === 'INPUT' ? inputSetter : textareaSetter
+      setter?.call(target, upper)
+      requestAnimationFrame(() => target.setSelectionRange(start, end))
+    },
+    true, // capture phase — runs before React's root-level handlers
+  )
+})()
 
 const CHUNK_RELOAD_KEY = 'teg_chunk_reload_at'
 

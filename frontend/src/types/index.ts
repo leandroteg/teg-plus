@@ -54,6 +54,9 @@ export interface Pedido {
   condicao_pagamento?: string
   parcelas_preview?: Array<{ numero: number; valor: number; data_vencimento: string; descricao?: string }>
   created_at: string
+  updated_at?: string
+  criado_por_nome?: string | null
+  atualizado_por_nome?: string | null
   // Recebimento tracking
   qtd_itens_total?: number
   qtd_itens_recebidos?: number
@@ -245,6 +248,27 @@ export interface AprovacaoHistorico {
   observacao?: string
   data_decisao?: string
   created_at: string
+  esclarecimento_historico?: {
+    tipo: 'pedido' | 'resposta'
+    autor: string
+    msg: string
+    data: string
+  }[]
+}
+
+export interface ItemPreco {
+  descricao: string
+  qtd: number
+  valor_unitario: number
+  valor_total: number
+  /** Quando true, este item será comprado deste fornecedor.
+   *  Permite split (vários fornecedores com itens selecionados na mesma cotação). */
+  selecionado?: boolean
+}
+
+export interface ItemSelecionado {
+  descricao: string
+  fornecedor_id: string
 }
 
 export interface CotacaoFornecedor {
@@ -258,7 +282,7 @@ export interface CotacaoFornecedor {
   valor_total: number
   prazo_entrega_dias?: number
   condicao_pagamento?: string
-  itens_precos: { descricao: string; qtd: number; valor_unitario: number; valor_total: number }[]
+  itens_precos: ItemPreco[]
   observacao?: string
   arquivo_url?: string
   selecionado: boolean
@@ -338,7 +362,7 @@ export interface NovaCotacaoPayload {
     valor_total: number
     prazo_entrega_dias?: number
     condicao_pagamento?: string
-    itens_precos: { descricao: string; qtd: number; valor_unitario: number; valor_total: number }[]
+    itens_precos: ItemPreco[]
     observacao?: string
   }[]
 }

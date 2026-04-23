@@ -138,6 +138,7 @@ export default function EmitirPedidoModal({
       if (reqError) throw reqError
 
       let cotacaoResolvida = cotacao ?? {}
+      let fornecedoresEscolhidos: { id: string; nome: string; valor: number }[] = []
 
       const hydrateCotacao = async (cotacaoId?: string) => {
         if (!cotacaoId) return null
@@ -149,6 +150,24 @@ export default function EmitirPedidoModal({
 
         if (cotError) throw cotError
         if (!cotacaoData) return null
+
+        // Detecta split: mais de 1 fornecedor com selecionado=true
+        const { data: selecionados } = await supabase
+          .from('cmp_cotacao_fornecedores')
+          .select('id, fornecedor_nome, valor_total, itens_precos')
+          .eq('cotacao_id', cotacaoId)
+          .eq('selecionado', true)
+        fornecedoresEscolhidos = (selecionados ?? []).map(s => {
+          const itens = (s.itens_precos ?? []) as { valor_total?: number; selecionado?: boolean }[]
+          const totalEscolhido = itens.reduce(
+            (sum, it) => sum + (it.selecionado ? (it.valor_total ?? 0) : 0), 0
+          )
+          return {
+            id: s.id,
+            nome: s.fornecedor_nome,
+            valor: totalEscolhido > 0 ? totalEscolhido : (s.valor_total ?? 0),
+          }
+        })
 
         let condicaoPagamento = cotacao?.condicaoPagamento
         let fornecedorCnpj: string | null = null
@@ -218,6 +237,7 @@ export default function EmitirPedidoModal({
         } as ModalRequisicao,
         cotacao: cotacaoResolvida,
         fornecedorDB: (cotacaoResolvida as any)?.fornecedorDB ?? null,
+        fornecedoresEscolhidos,
       }
     },
     staleTime: 30_000,
@@ -225,6 +245,8 @@ export default function EmitirPedidoModal({
 
   const requisicao = data?.requisicao
   const cotacaoResolvida = data?.cotacao
+  const fornecedoresEscolhidos = data?.fornecedoresEscolhidos ?? []
+  const temSplit = fornecedoresEscolhidos.length > 1
 
   const classeResumo = useMemo(
     () => resumirHomogeneidade(requisicao?.itens.map((item) => item.classe_financeira_codigo) ?? []),
@@ -480,6 +502,31 @@ export default function EmitirPedidoModal({
               <div>
                 <p className="font-bold">{blockedByName ?? 'Outro usuario'} esta editando</p>
                 <p className="text-xs mt-1">A emissao fica bloqueada ate essa pessoa finalizar a alteracao.</p>
+              </div>
+            </div>
+          )}
+
+          {temSplit && (
+            <div className="rounded-2xl border border-indigo-200 bg-indigo-50 px-4 py-3 text-sm text-indigo-800 space-y-2">
+              <div className="flex items-start gap-2">
+                <AlertTriangle size={16} className="mt-0.5 flex-shrink-0 text-indigo-500" />
+                <div className="min-w-0">
+                  <p className="font-bold">Cotação com compra dividida entre {fornecedoresEscolhidos.length} fornecedores</p>
+                  <p className="text-xs mt-1 text-indigo-600">
+                    Nesta versão, será emitido <strong>1 pedido único</strong> no fornecedor com maior valor escolhido
+                    ({cotacaoResolvida?.fornecedorNome}). A emissão automática de um pedido por fornecedor chega na próxima fase.
+                  </p>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-2 pt-2 border-t border-indigo-200">
+                {fornecedoresEscolhidos.map(f => (
+                  <div key={f.id} className="bg-white/60 rounded-lg px-2 py-1.5">
+                    <p className="text-[11px] font-semibold truncate">{f.nome}</p>
+                    <p className="text-[10px] text-indigo-600 font-bold">
+                      {f.valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                    </p>
+                  </div>
+                ))}
               </div>
             </div>
           )}

@@ -133,6 +133,14 @@ function formatDateShort(dateStr?: string): string {
   })
 }
 
+function formatDateFull(dateStr?: string): string {
+  if (!dateStr) return '--'
+  return new Date(dateStr).toLocaleString('pt-BR', {
+    day: '2-digit', month: '2-digit', year: 'numeric',
+    hour: '2-digit', minute: '2-digit',
+  })
+}
+
 // ── AprovacaoCard (requisicoes de compra — card completo) ──────────────────────
 
 function AprovacaoCard({ aprovacao, aprovadorNome, aprovadorEmail }: {
@@ -1448,6 +1456,7 @@ const decisaoOptions = [
 ] as const
 
 function HistoricoCard({ item }: { item: AprovacaoHistorico }) {
+  const navigate = useNavigate()
   const tipo = tipoConfig[item.tipo_aprovacao] || tipoConfig.requisicao_compra
   const statusColor = item.status === 'aprovada'
     ? { bg: 'bg-emerald-100', text: 'text-emerald-700', label: 'Aprovada' }
@@ -1457,8 +1466,36 @@ function HistoricoCard({ item }: { item: AprovacaoHistorico }) {
     ? { bg: 'bg-slate-100', text: 'text-slate-500', label: 'Expirada' }
     : { bg: 'bg-amber-100', text: 'text-amber-700', label: 'Esclarecimento' }
 
+  // Rota de detalhe conforme o tipo
+  const detalheRoute = (() => {
+    switch (item.tipo_aprovacao) {
+      case 'requisicao_compra':
+      case 'cotacao':
+        return `/requisicoes/${item.entidade_id}`
+      case 'autorizacao_pagamento':
+        return `/financeiro/contas-pagar`
+      case 'minuta_contratual':
+        return `/contratos/solicitacoes/${item.entidade_id}`
+      case 'aprovacao_transporte':
+        return `/logistica/solicitacoes`
+      default:
+        return null
+    }
+  })()
+
+  const isClickable = Boolean(detalheRoute)
+  const handleClick = () => { if (detalheRoute) navigate(detalheRoute) }
+
   return (
-    <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-4">
+    <div
+      role={isClickable ? 'button' : undefined}
+      tabIndex={isClickable ? 0 : undefined}
+      onClick={isClickable ? handleClick : undefined}
+      onKeyDown={isClickable ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleClick() } } : undefined}
+      className={`bg-white rounded-2xl shadow-sm border border-slate-100 p-4 ${
+        isClickable ? 'cursor-pointer hover:border-indigo-300 hover:shadow-md active:scale-[0.99] transition-all' : ''
+      }`}
+    >
       <div className="flex items-start justify-between mb-2">
         <div className="flex items-center gap-2">
           <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${tipo.badgeBg} ${tipo.badgeText}`}>
@@ -1473,16 +1510,56 @@ function HistoricoCard({ item }: { item: AprovacaoHistorico }) {
           {formatDateShort(item.data_decisao || item.created_at)}
         </span>
       </div>
-      <p className="text-sm font-bold text-slate-800 mb-0.5">
-        {item.entidade_numero || `#${item.entidade_id.slice(0, 8)}`}
-      </p>
-      <p className="text-xs text-slate-500 mb-1">
-        Nivel {item.nivel} | {item.aprovador_nome}
-      </p>
+      <div className="flex items-center justify-between">
+        <div className="min-w-0">
+          <p className="text-sm font-bold text-slate-800 mb-0.5 truncate">
+            {item.entidade_numero || `#${item.entidade_id.slice(0, 8)}`}
+          </p>
+          <p className="text-xs text-slate-500">
+            Nivel {item.nivel} | Por <span className="font-semibold text-slate-700">{item.aprovador_nome}</span>
+          </p>
+          <p className="text-[10px] text-slate-400 mt-0.5">
+            {formatDateFull(item.data_decisao || item.created_at)}
+          </p>
+        </div>
+        {isClickable && (
+          <ChevronRight size={16} className="text-slate-300 flex-shrink-0" />
+        )}
+      </div>
       {item.observacao && (
         <p className="text-xs text-slate-500 bg-slate-50 rounded-lg p-2 mt-2 italic">
           "{item.observacao}"
         </p>
+      )}
+      {item.esclarecimento_historico && item.esclarecimento_historico.length > 0 && (
+        <div className="mt-2 rounded-lg border border-amber-100 bg-amber-50/60 p-2 space-y-1.5">
+          <p className="text-[10px] font-bold uppercase tracking-wider text-amber-700 flex items-center gap-1">
+            <MessageSquare size={11} /> Esclarecimentos ({item.esclarecimento_historico.length})
+          </p>
+          {item.esclarecimento_historico.map((h, i) => {
+            const isResposta = h.tipo === 'resposta'
+            const msg = isResposta
+              ? h.msg.replace(/^Esclarecimento respondido por [^:]+:\s*/, '')
+              : h.msg
+            return (
+              <div key={`${h.tipo}-${h.data}-${i}`} className={`rounded-md px-2 py-1.5 ${
+                isResposta ? 'bg-emerald-50 border border-emerald-100' : 'bg-white border border-amber-100'
+              }`}>
+                <p className={`text-[9px] font-bold uppercase tracking-wider mb-0.5 ${
+                  isResposta ? 'text-emerald-700' : 'text-amber-700'
+                }`}>
+                  {isResposta ? 'Resposta' : 'Pedido'}{h.autor ? ` — ${h.autor}` : ''}
+                </p>
+                <p className={`text-[11px] leading-snug ${isResposta ? 'text-emerald-800' : 'text-amber-800'}`}>
+                  {msg}
+                </p>
+                {h.data && (
+                  <p className="text-[9px] text-slate-400 mt-0.5">{formatDateFull(h.data)}</p>
+                )}
+              </div>
+            )
+          })}
+        </div>
       )}
     </div>
   )

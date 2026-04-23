@@ -5,7 +5,7 @@ import { useAuth } from '../contexts/AuthContext'
 export interface PedidoAnexo {
   id: string
   pedido_id: string
-  tipo: 'nota_fiscal' | 'comprovante_entrega' | 'medicao' | 'comprovante_pagamento' | 'contrato' | 'outro'
+  tipo: 'nota_fiscal' | 'comprovante_entrega' | 'medicao' | 'comprovante_pagamento' | 'contrato' | 'boleto' | 'doc_financeiro' | 'outro'
   nome_arquivo: string
   url: string
   tamanho_bytes: number | null
@@ -31,6 +31,8 @@ export const TIPO_LABEL: Record<PedidoAnexo['tipo'], string> = {
   medicao:               'Planilha de Medição',
   comprovante_pagamento: 'Comprovante de Pagamento',
   contrato:              'Contrato',
+  boleto:                'Boleto',
+  doc_financeiro:        'Doc Financeiro',
   outro:                 'Outro',
 }
 

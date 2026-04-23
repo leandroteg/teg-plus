@@ -2052,7 +2052,7 @@ export default function PreparaMinuta() {
   const s = solicitacao
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-5" data-no-upper>
 
       {/* ── Header ──────────────────────────────────────────────────── */}
       <div className="flex items-start gap-3">

@@ -13,6 +13,7 @@ import { useEditorLock } from '../hooks/useEditorLock'
 import type { Cotacao, ItemPreco } from '../types'
 import CotacaoComparativo from '../components/CotacaoComparativo'
 import FluxoTimeline from '../components/FluxoTimeline'
+import FornecedorCadastroModal from '../components/FornecedorCadastroModal'
 import UploadCotacao from '../components/UploadCotacao'
 import EmitirPedidoModal from '../components/EmitirPedidoModal'
 import { supabase } from '../services/supabase'
@@ -242,10 +243,11 @@ function ItemPricingTable({
                 )}
               </div>
               <input
-                type="number" min="0.001" step="any"
-                className="text-[11px] bg-white border border-slate-200 rounded px-1 py-1 text-center outline-none focus:ring-1 focus:ring-teal-300 w-full"
+                type="number"
+                readOnly
+                className="text-[11px] bg-slate-50 border border-slate-200 rounded px-1 py-1 text-center outline-none text-slate-600 cursor-not-allowed w-full"
                 value={item.qtd || ''}
-                onChange={e => updateItem(i, 'qtd', e.target.value)}
+                title="Quantidade definida pela RC. Para alterar, devolva a requisição ao solicitante."
               />
               <input
                 type="number" min="0" step="0.01"
@@ -625,7 +627,20 @@ export default function CotacaoForm() {
   const [semCotacoesMinimas, setSemCotacoesMinimas] = useState(false)
   const [justificativa, setJustificativa] = useState('')
   const [toast, setToast] = useState<{ type: 'success' | 'error'; msg: string } | null>(null)
+  const toastRef = useRef<HTMLDivElement | null>(null)
+  useEffect(() => {
+    if (toast) {
+      toastRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    }
+  }, [toast])
+  // CNPJs detectados pelo parse que NÃO estão cadastrados em cmp_fornecedores.
+  // Guarda apenas os 14 dígitos. Usado para exibir chip "Cadastrar" no card.
+  const [naoCadastradosCnpjs, setNaoCadastradosCnpjs] = useState<Set<string>>(new Set())
+  const [cadastroModalIdx, setCadastroModalIdx] = useState<number | null>(null)
   const [triedSubmit, setTriedSubmit] = useState(false)
+  // Seleção manual por item: Map<descricaoNormalizada, fornecedorIndex>
+  const [selecaoPorItem, setSelecaoPorItem] = useState<Map<string, number>>(new Map())
+  const [selecaoTocada, setSelecaoTocada] = useState(false)
 
   // ── CNPJ auto-lookup state per fornecedor ─────────────────────────────────
   const [cnpjLoading, setCnpjLoading] = useState<Record<number, boolean>>({})
@@ -763,6 +778,36 @@ export default function CotacaoForm() {
     )
   }, [cotacao?.requisicao?.itens])
 
+  // ── Atalho: seleciona fornecedor de menor preço para TODOS os itens ────────
+  // Disparado apenas via botão explícito — o padrão é deixar o usuário decidir.
+  const selecionarMenorPrecoEmTodos = useCallback(() => {
+    const validosIdx: number[] = []
+    fornecedores.forEach((f, idx) => {
+      if (f.fornecedor_nome.trim() && f.valor_total > 0) validosIdx.push(idx)
+    })
+    if (validosIdx.length === 0) return
+
+    const chaveDescricao = (s: string) => s.toLowerCase().trim()
+    const candidatos = new Map<string, { precos: { idx: number; valor: number }[] }>()
+    for (const idx of validosIdx) {
+      for (const it of fornecedores[idx].itens_precos) {
+        const descricao = it.descricao?.trim()
+        if (!descricao || !it.valor_total || it.valor_total <= 0) continue
+        const key = chaveDescricao(descricao)
+        const entry = candidatos.get(key) ?? { precos: [] }
+        entry.precos.push({ idx, valor: it.valor_total })
+        candidatos.set(key, entry)
+      }
+    }
+    const novaSelecao = new Map<string, number>()
+    for (const [key, { precos }] of candidatos) {
+      const menor = precos.reduce((best, p) => (p.valor < best.valor ? p : best), precos[0])
+      novaSelecao.set(key, menor.idx)
+    }
+    setSelecaoPorItem(novaSelecao)
+    setSelecaoTocada(true)
+  }, [fornecedores])
+
   // ── AI Upload: preenche fornecedores automaticamente (incluindo itens) ───────
   const handleAiParsed = useCallback(async (parsed: {
     fornecedor_nome: string
@@ -838,6 +883,7 @@ export default function CotacaoForm() {
     }
 
     let itensForaEscopo = 0
+    let fornecedoresDescartados = 0
 
     setFornecedores(prev => {
       const vazios      = prev.filter(f => !f.fornecedor_nome.trim() && f.valor_total === 0)
@@ -862,9 +908,13 @@ export default function CotacaoForm() {
             }
           })
           .filter((x): x is ItemPreco => x !== null)
-        const totalItens = calcTotalItems(itensComValor)
-        // Se há itens com preço → usa a soma deles; senão usa o total do documento
-        const valorTotal = itensComValor.length > 0 ? totalItens : (p.valor_total || 0)
+        // Se nenhum item bateu com a RC, descarta o fornecedor inteiro
+        // (não preenche nome, CNPJ, contato nem valor do documento).
+        if (itensComValor.length === 0) {
+          fornecedoresDescartados++
+          return null
+        }
+        const valorTotal = calcTotalItems(itensComValor)
         const contatoSeparado = splitFornecedorContato(p.fornecedor_contato)
         const telefone = p.fornecedor_telefone || contatoSeparado.telefone
         const email = p.fornecedor_email || contatoSeparado.email
@@ -881,19 +931,54 @@ export default function CotacaoForm() {
           arquivo_url:        uploadedPath,
           itens_precos:       itensComValor,
         }
-      })
+      }).filter((f): f is FornecedorForm => f !== null)
 
+      // Se nenhum fornecedor foi aproveitado, preserva o estado anterior
+      // (não adiciona slots vazios extras só por causa do upload).
+      if (novos.length === 0) return prev
+
+      // Preenche primeiro os slots vazios existentes; o excedente é anexado.
       const result = [...preenchidos]
-      let slotIdx = 0
-      for (const novo of novos) {
-        if (slotIdx < vazios.length) { result.push(novo); slotIdx++ }
-        else result.push(novo)
+      const restantes = [...novos]
+      for (const _vazio of vazios) {
+        const novo = restantes.shift()
+        if (!novo) break
+        result.push(novo)
       }
-      while (result.length < 2) result.push(emptyFornecedor())
+      result.push(...restantes)
       return result
     })
 
-    if (itensForaEscopo > 0) {
+    // Verifica quais CNPJs extraídos do PDF ainda NÃO estão cadastrados.
+    const cnpjsParsed = Array.from(new Set(
+      parsed
+        .map(p => String(p.fornecedor_cnpj ?? '').replace(/\D/g, ''))
+        .filter(c => c.length === 14)
+    ))
+    if (cnpjsParsed.length > 0) {
+      try {
+        const { data: existing } = await supabase
+          .from('cmp_fornecedores')
+          .select('cnpj')
+          .in('cnpj', cnpjsParsed)
+        const existingSet = new Set((existing ?? []).map((f: any) => String(f.cnpj ?? '').replace(/\D/g, '')))
+        const naoCad = cnpjsParsed.filter(c => !existingSet.has(c))
+        if (naoCad.length > 0) {
+          setNaoCadastradosCnpjs(prev => {
+            const next = new Set(prev)
+            for (const c of naoCad) next.add(c)
+            return next
+          })
+        }
+      } catch { /* silencioso: chip deixa de aparecer, mas o form segue */ }
+    }
+
+    if (fornecedoresDescartados > 0) {
+      setToast({
+        type: 'error',
+        msg: `${fornecedoresDescartados} fornecedor(es) do PDF foram ignorados porque nenhum item bateu com a RC. Para incluí-los, devolva a requisição ao solicitante.`,
+      })
+    } else if (itensForaEscopo > 0) {
       setToast({
         type: 'error',
         msg: `${itensForaEscopo} item(ns) do PDF foram ignorados por não pertencerem à RC. Para incluí-los, devolva a requisição ao solicitante.`,
@@ -952,8 +1037,35 @@ export default function CotacaoForm() {
   const categoriaRegra = categorias.find(c => c.codigo === categoriaCodigo)?.cotacoes_regras
   const minCot = minCotacoesPorValor(valorRef, categoriaRegra)
 
+  // Bloqueia envio quando há fornecedor válido (nome + valor) com CNPJ não cadastrado.
+  const temNaoCadastrados = validos.some(f => {
+    const d = String(f.fornecedor_cnpj ?? '').replace(/\D/g, '')
+    return d.length === 14 && naoCadastradosCnpjs.has(d)
+  })
+
+  // Itens únicos precificados entre os fornecedores válidos — cada um precisa ter
+  // um fornecedor escolhido no mapa antes do envio.
+  const itensParaEscolher = (() => {
+    const keys = new Set<string>()
+    for (const f of validos) {
+      for (const it of f.itens_precos) {
+        if (it.descricao.trim() && it.valor_total > 0) {
+          keys.add(it.descricao.toLowerCase().trim())
+        }
+      }
+    }
+    return keys
+  })()
+  const itensEscolhidos = Array.from(itensParaEscolher).filter(k => selecaoPorItem.has(k)).length
+  const itensPendentes = itensParaEscolher.size - itensEscolhidos
+  const precisaEscolherFornecedores = validos.length >= 2 && itensParaEscolher.size > 0 && itensPendentes > 0
+
   // Validação + feedback claro em cada etapa
-  const canSubmit = validos.length > 0 && (semCotacoesMinimas || validos.length >= minCot) && (!semCotacoesMinimas || justificativa.trim().length > 0)
+  const canSubmit = validos.length > 0
+    && (semCotacoesMinimas || validos.length >= minCot)
+    && (!semCotacoesMinimas || justificativa.trim().length > 0)
+    && !temNaoCadastrados
+    && !precisaEscolherFornecedores
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -986,6 +1098,14 @@ export default function CotacaoForm() {
       setToast({ type: 'error', msg: 'Preencha ao menos 1 fornecedor (nome + valor total).' })
       return
     }
+    if (temNaoCadastrados) {
+      setToast({ type: 'error', msg: 'Há fornecedor(es) ainda não cadastrado(s). Clique em "Cadastrar agora" no card antes de enviar.' })
+      return
+    }
+    if (precisaEscolherFornecedores) {
+      setToast({ type: 'error', msg: `Escolha o fornecedor de cada item no mapa de cotação (${itensPendentes} pendente${itensPendentes > 1 ? 's' : ''}).` })
+      return
+    }
     if (!semCotacoesMinimas && validos.length < minCot) {
       setToast({ type: 'error', msg: `Mínimo de ${minCot} fornecedor${minCot > 1 ? 'es' : ''} obrigatório${minCot > 1 ? 's' : ''}, ou marque a opção para enviar sem o mínimo.` })
       return
@@ -996,24 +1116,46 @@ export default function CotacaoForm() {
     }
 
     try {
+      // Mapeia índice em 'fornecedores' (original) → índice em 'validos'
+      const validosIdxMap = new Map<number, number>()
+      let v = 0
+      fornecedores.forEach((f, i) => {
+        if (f.fornecedor_nome.trim() && f.valor_total > 0) {
+          validosIdxMap.set(i, v)
+          v++
+        }
+      })
+      const chaveDescricao = (s: string) => s.toLowerCase().trim()
+
       await submitMutation.mutateAsync({
         cotacao_id: id,
         requisicao_id: cotacao.requisicao_id,
-        fornecedores: validos.map(f => ({
-          fornecedor_nome:    toUpperNorm(f.fornecedor_nome),
-          fornecedor_contato: joinFornecedorContato(f.fornecedor_telefone, f.fornecedor_email, f.fornecedor_contato) || undefined,
-          fornecedor_telefone: f.fornecedor_telefone || undefined,
-          fornecedor_email:   f.fornecedor_email || undefined,
-          fornecedor_cnpj:    f.fornecedor_cnpj || undefined,
-          valor_total:        f.valor_total,
-          prazo_entrega_dias: f.prazo_entrega_dias || undefined,
-          condicao_pagamento: f.condicao_pagamento ? toUpperNorm(f.condicao_pagamento) : undefined,
-          observacao:         f.observacao ? toUpperNorm(f.observacao) : undefined,
-          arquivo_url:        f.arquivo_url || undefined,
-          itens_precos:       f.itens_precos.length > 0
-            ? f.itens_precos.map(item => ({ ...item, descricao: toUpperNorm(item.descricao) }))
-            : undefined,
-        })),
+        fornecedores: validos.map((f, validosIdx) => {
+          const itensComSelecao = f.itens_precos.map(item => {
+            const key = chaveDescricao(item.descricao)
+            const fornIdxOriginal = selecaoPorItem.get(key)
+            const fornIdxEmValidos = fornIdxOriginal !== undefined ? validosIdxMap.get(fornIdxOriginal) : undefined
+            const selecionado = fornIdxEmValidos === validosIdx
+            return {
+              ...item,
+              descricao: toUpperNorm(item.descricao),
+              selecionado,
+            }
+          })
+          return {
+            fornecedor_nome:    toUpperNorm(f.fornecedor_nome),
+            fornecedor_contato: joinFornecedorContato(f.fornecedor_telefone, f.fornecedor_email, f.fornecedor_contato) || undefined,
+            fornecedor_telefone: f.fornecedor_telefone || undefined,
+            fornecedor_email:   f.fornecedor_email || undefined,
+            fornecedor_cnpj:    f.fornecedor_cnpj || undefined,
+            valor_total:        f.valor_total,
+            prazo_entrega_dias: f.prazo_entrega_dias || undefined,
+            condicao_pagamento: f.condicao_pagamento ? toUpperNorm(f.condicao_pagamento) : undefined,
+            observacao:         f.observacao ? toUpperNorm(f.observacao) : undefined,
+            arquivo_url:        f.arquivo_url || undefined,
+            itens_precos:       itensComSelecao.length > 0 ? itensComSelecao : undefined,
+          }
+        }),
         sem_cotacoes_minimas: semCotacoesMinimas,
         justificativa_sem_cotacoes: semCotacoesMinimas ? toUpperNorm(justificativa.trim()) : undefined,
       })
@@ -1133,16 +1275,21 @@ export default function CotacaoForm() {
       </div>
 
       {/* Fornecedores */}
-      {fornecedores.map((forn, idx) => (
-        <div key={idx} className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
+      {fornecedores.map((forn, idx) => {
+        const cnpjDigits = String(forn.fornecedor_cnpj ?? '').replace(/\D/g, '')
+        const precisaCadastrar = cnpjDigits.length === 14 && naoCadastradosCnpjs.has(cnpjDigits)
+        return (
+        <div key={idx} className={`bg-white rounded-2xl shadow-sm overflow-hidden border-2 ${
+          precisaCadastrar ? 'border-amber-400 ring-2 ring-amber-200' : 'border-slate-200'
+        }`}>
           {/* Header do card */}
           <div className="flex justify-between items-center px-4 pt-4 pb-2">
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               <span className="w-6 h-6 rounded-lg bg-gradient-to-br from-teal-500 to-teal-600 flex items-center justify-center text-[10px] font-black text-white">
                 {idx + 1}
               </span>
               <span className="text-xs font-bold text-slate-700">Fornecedor {idx + 1}</span>
-              {forn.fornecedor_nome.trim() && forn.valor_total > 0 && (
+              {forn.fornecedor_nome.trim() && forn.valor_total > 0 && !precisaCadastrar && (
                 <span className="text-[9px] font-bold bg-emerald-50 text-emerald-600 px-1.5 py-0.5 rounded-full">✓ Válido</span>
               )}
             </div>
@@ -1153,6 +1300,26 @@ export default function CotacaoForm() {
               </button>
             )}
           </div>
+
+          {/* Banner — fornecedor não cadastrado (bloqueia envio) */}
+          {precisaCadastrar && (
+            <div className="mx-4 mb-3 rounded-xl border-2 border-amber-300 bg-amber-50 px-3 py-3 flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2 min-w-0">
+                <AlertTriangle size={18} className="text-amber-600 shrink-0" />
+                <div className="min-w-0">
+                  <p className="text-xs font-extrabold text-amber-900">Fornecedor não cadastrado</p>
+                  <p className="text-[11px] text-amber-700 leading-tight">É obrigatório cadastrar antes de enviar a cotação.</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setCadastroModalIdx(idx)}
+                className="shrink-0 inline-flex items-center gap-1.5 bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold px-3 py-2 rounded-lg shadow-sm transition-colors"
+              >
+                <PlusCircle size={14} /> Cadastrar agora
+              </button>
+            </div>
+          )}
 
           <div className="px-4 pb-4 space-y-3">
             <div className="relative">
@@ -1361,7 +1528,7 @@ export default function CotacaoForm() {
             </div>
           </div>
         </div>
-      ))}
+      )})}
 
       {/* Adicionar fornecedor */}
       <button
@@ -1381,27 +1548,83 @@ export default function CotacaoForm() {
         <PlusCircle size={14} /> Adicionar Fornecedor
       </button>
 
-      {/* Comparativo inline (quando ≥ 2 válidos) */}
-      {validos.length >= 2 && (
-        <CotacaoComparativo
-          readOnly
-          fornecedores={validos.map((f, i) => ({
-            id: String(i),
-            cotacao_id: id ?? '',
-            fornecedor_nome: f.fornecedor_nome,
-            fornecedor_contato: joinFornecedorContato(f.fornecedor_telefone, f.fornecedor_email, f.fornecedor_contato) || undefined,
-            fornecedor_telefone: f.fornecedor_telefone || undefined,
-            fornecedor_email: f.fornecedor_email || undefined,
-            fornecedor_cnpj: f.fornecedor_cnpj || undefined,
-            valor_total: f.valor_total,
-            prazo_entrega_dias: f.prazo_entrega_dias || undefined,
-            condicao_pagamento: f.condicao_pagamento || undefined,
-            itens_precos: f.itens_precos,
-            arquivo_url: f.arquivo_url || undefined,
-            selecionado: f.valor_total === Math.min(...validos.map(x => x.valor_total)),
-          }))}
-        />
+      {/* Barra de escolha do mapa — instrui o usuário e oferece atalho */}
+      {validos.length >= 2 && itensParaEscolher.size > 0 && (
+        <div className={`rounded-2xl border-2 px-4 py-3 flex items-center justify-between gap-3 ${
+          itensPendentes > 0 ? 'border-amber-300 bg-amber-50' : 'border-emerald-200 bg-emerald-50'
+        }`}>
+          <div className="flex items-center gap-2 min-w-0">
+            {itensPendentes > 0
+              ? <AlertTriangle size={18} className="text-amber-600 shrink-0" />
+              : <CheckCircle size={18} className="text-emerald-600 shrink-0" />}
+            <div className="min-w-0">
+              <p className={`text-xs font-extrabold ${itensPendentes > 0 ? 'text-amber-900' : 'text-emerald-900'}`}>
+                {itensPendentes > 0
+                  ? `Escolha o fornecedor de cada item (${itensEscolhidos}/${itensParaEscolher.size})`
+                  : `Todos os itens têm fornecedor escolhido (${itensEscolhidos}/${itensParaEscolher.size})`}
+              </p>
+              <p className={`text-[11px] leading-tight ${itensPendentes > 0 ? 'text-amber-700' : 'text-emerald-700'}`}>
+                Clique no valor do fornecedor na tabela abaixo para definir quem fornece cada item.
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={selecionarMenorPrecoEmTodos}
+            className="shrink-0 inline-flex items-center gap-1.5 bg-slate-700 hover:bg-slate-800 text-white text-xs font-bold px-3 py-2 rounded-lg shadow-sm transition-colors"
+            title="Preenche o mapa escolhendo o fornecedor de menor preço em cada item"
+          >
+            Menor preço em todos
+          </button>
+        </div>
       )}
+
+      {/* Comparativo inline (quando ≥ 2 válidos) */}
+      {validos.length >= 2 && (() => {
+        // Mapeia índice de 'validos' → índice original em 'fornecedores' (estado)
+        const idxMap: number[] = []
+        fornecedores.forEach((f, i) => {
+          if (f.fornecedor_nome.trim() && f.valor_total > 0) idxMap.push(i)
+        })
+        const chaveDescricao = (s: string) => s.toLowerCase().trim()
+        // selecaoPorItem guarda index ORIGINAL; o Comparativo precisa do 'id' (que é String(i) com i = idx em 'validos')
+        const selecaoPorItemParaComparativo = new Map<string, string>()
+        for (const [key, idxOriginal] of selecaoPorItem) {
+          const idxEmValidos = idxMap.indexOf(idxOriginal)
+          if (idxEmValidos >= 0) selecaoPorItemParaComparativo.set(key, String(idxEmValidos))
+        }
+        return (
+          <CotacaoComparativo
+            fornecedores={validos.map((f, i) => ({
+              id: String(i),
+              cotacao_id: id ?? '',
+              fornecedor_nome: f.fornecedor_nome,
+              fornecedor_contato: joinFornecedorContato(f.fornecedor_telefone, f.fornecedor_email, f.fornecedor_contato) || undefined,
+              fornecedor_telefone: f.fornecedor_telefone || undefined,
+              fornecedor_email: f.fornecedor_email || undefined,
+              fornecedor_cnpj: f.fornecedor_cnpj || undefined,
+              valor_total: f.valor_total,
+              prazo_entrega_dias: f.prazo_entrega_dias || undefined,
+              condicao_pagamento: f.condicao_pagamento || undefined,
+              itens_precos: f.itens_precos,
+              arquivo_url: f.arquivo_url || undefined,
+              selecionado: f.valor_total === Math.min(...validos.map(x => x.valor_total)),
+            }))}
+            selecaoPorItem={selecaoPorItemParaComparativo}
+            onSelectItem={(descricao, idStr) => {
+              const idxEmValidos = Number(idStr)
+              const idxOriginal = idxMap[idxEmValidos]
+              if (idxOriginal === undefined) return
+              setSelecaoTocada(true)
+              setSelecaoPorItem(prev => {
+                const next = new Map(prev)
+                next.set(chaveDescricao(descricao), idxOriginal)
+                return next
+              })
+            }}
+          />
+        )
+      })()}
 
       {/* Opção de envio sem cotações mínimas */}
       {validos.length < minCot && (
@@ -1435,7 +1658,7 @@ export default function CotacaoForm() {
 
       {/* Toast de feedback */}
       {toast && (
-        <div className={`flex items-center gap-2 rounded-2xl px-4 py-3 text-sm font-semibold animate-in fade-in slide-in-from-bottom-2 ${
+        <div ref={toastRef} className={`flex items-center gap-2 rounded-2xl px-4 py-3 text-sm font-semibold animate-in fade-in slide-in-from-bottom-2 ${
           toast.type === 'success'
             ? 'bg-emerald-50 border border-emerald-200 text-emerald-700'
             : 'bg-red-50 border border-red-200 text-red-700'
@@ -1482,14 +1705,18 @@ export default function CotacaoForm() {
       </button>
 
       {!canSubmit && !submitMutation.isPending && (
-        <p className="text-xs text-slate-400 text-center">
-          {validos.length === 0
-            ? 'Preencha ao menos 1 fornecedor (nome + valor) para habilitar o envio.'
-            : !semCotacoesMinimas && validos.length < minCot
-              ? `Adicione pelo menos ${minCot} fornecedor${minCot > 1 ? 'es' : ''} ou marque a opção acima para enviar sem o mínimo.`
-              : semCotacoesMinimas && !justificativa.trim()
-                ? 'Preencha a justificativa para prosseguir.'
-                : ''
+        <p className={`text-xs text-center ${(temNaoCadastrados || precisaEscolherFornecedores) ? 'text-amber-700 font-bold' : 'text-slate-400'}`}>
+          {temNaoCadastrados
+            ? 'Cadastre o(s) fornecedor(es) destacado(s) em amarelo antes de enviar.'
+            : precisaEscolherFornecedores
+              ? `Escolha o fornecedor de ${itensPendentes} item${itensPendentes > 1 ? 'ns' : ''} no mapa de cotação antes de enviar.`
+              : validos.length === 0
+                ? 'Preencha ao menos 1 fornecedor (nome + valor) para habilitar o envio.'
+                : !semCotacoesMinimas && validos.length < minCot
+                  ? `Adicione pelo menos ${minCot} fornecedor${minCot > 1 ? 'es' : ''} ou marque a opção acima para enviar sem o mínimo.`
+                  : semCotacoesMinimas && !justificativa.trim()
+                    ? 'Preencha a justificativa para prosseguir.'
+                    : ''
           }
         </p>
       )}
@@ -1590,6 +1817,45 @@ export default function CotacaoForm() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Modal: cadastrar novo fornecedor identificado pelo upload */}
+      {cadastroModalIdx !== null && fornecedores[cadastroModalIdx] && (
+        <FornecedorCadastroModal
+          open
+          title="Cadastrar fornecedor"
+          description="Fornecedor identificado no upload ainda não está cadastrado."
+          initialData={{
+            razao_social: fornecedores[cadastroModalIdx].fornecedor_nome,
+            nome_fantasia: fornecedores[cadastroModalIdx].fornecedor_nome,
+            cnpj: fornecedores[cadastroModalIdx].fornecedor_cnpj,
+            telefone: fornecedores[cadastroModalIdx].fornecedor_telefone,
+            email: fornecedores[cadastroModalIdx].fornecedor_email,
+          }}
+          onClose={() => setCadastroModalIdx(null)}
+          onSaved={(saved) => {
+            const savedDigits = String(saved.cnpj ?? '').replace(/\D/g, '')
+            setNaoCadastradosCnpjs(prev => {
+              const next = new Set(prev)
+              next.delete(savedDigits)
+              return next
+            })
+            setFornecedores(prev => prev.map((f, i) => i === cadastroModalIdx ? {
+              ...f,
+              fornecedor_nome: toUpperNorm(saved.nome_fantasia || saved.razao_social || f.fornecedor_nome),
+              fornecedor_cnpj: maskCNPJ(saved.cnpj || f.fornecedor_cnpj),
+              fornecedor_telefone: saved.telefone || f.fornecedor_telefone,
+              fornecedor_email: saved.email || f.fornecedor_email,
+              fornecedor_contato: joinFornecedorContato(
+                saved.telefone || f.fornecedor_telefone,
+                saved.email || f.fornecedor_email,
+                saved.contato_nome || '',
+              ),
+            } : f))
+            setCadastroModalIdx(null)
+            setToast({ type: 'success', msg: 'Fornecedor cadastrado com sucesso.' })
+          }}
+        />
       )}
     </form>
   )

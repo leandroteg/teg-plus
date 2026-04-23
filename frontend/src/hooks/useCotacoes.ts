@@ -178,32 +178,59 @@ export function useFinalizarCotacao() {
       const { data: fornInserted, error: fornError } = await supabase
         .from(TABLE_FORN)
         .insert(fornecedoresInsert)
-        .select('id, fornecedor_nome, valor_total')
+        .select('id, fornecedor_nome, valor_total, itens_precos')
 
       if (fornError) throw new Error(fornError.message)
 
-      // 2. Determina vencedor (menor preço)
-      const vencedor = (fornInserted ?? []).reduce(
-        (best, f) => (!best || f.valor_total < best.valor_total ? f : best),
-        null as { id: string; fornecedor_nome: string; valor_total: number } | null
-      )
+      // 2. Calcula total "escolhido" por fornecedor (soma dos itens com selecionado=true).
+      //    Se o comprador selecionou manualmente itens (split), o vencedor primário é o
+      //    fornecedor com maior valor escolhido. Se ninguém marcou itens (compat), cai
+      //    no menor preço total como antes.
+      const fornecedoresComTotalEscolhido = (fornInserted ?? []).map(f => {
+        const itens = (f.itens_precos ?? []) as ItemPreco[]
+        const totalEscolhido = itens.reduce(
+          (sum, it) => sum + (it.selecionado ? (it.valor_total ?? 0) : 0), 0
+        )
+        return { ...f, totalEscolhido }
+      })
+      const algumItemSelecionado = fornecedoresComTotalEscolhido.some(f => f.totalEscolhido > 0)
 
-      // Marca vencedor como selecionado
-      if (vencedor) {
+      const vencedor = algumItemSelecionado
+        ? fornecedoresComTotalEscolhido.reduce(
+            (best, f) => (!best || f.totalEscolhido > best.totalEscolhido ? f : best),
+            null as { id: string; fornecedor_nome: string; valor_total: number; totalEscolhido: number } | null
+          )
+        : fornecedoresComTotalEscolhido.reduce(
+            (best, f) => (!best || f.valor_total < best.valor_total ? f : best),
+            null as { id: string; fornecedor_nome: string; valor_total: number; totalEscolhido: number } | null
+          )
+
+      // Marca todos os fornecedores que tiveram algum item escolhido (split) OU só o primário
+      const fornecedoresEscolhidos = algumItemSelecionado
+        ? fornecedoresComTotalEscolhido.filter(f => f.totalEscolhido > 0).map(f => f.id)
+        : (vencedor ? [vencedor.id] : [])
+
+      if (fornecedoresEscolhidos.length > 0) {
         await supabase
           .from(TABLE_FORN)
           .update({ selecionado: true })
-          .eq('id', vencedor.id)
+          .in('id', fornecedoresEscolhidos)
       }
 
       // 3. Atualiza cotação → concluída
+      //    Quando há split (múltiplos fornecedores), valor_selecionado = soma dos
+      //    totais escolhidos. Sem split, é o valor_total do vencedor (comportamento legado).
+      const valorSelecionadoTotal = algumItemSelecionado
+        ? fornecedoresComTotalEscolhido.reduce((sum, f) => sum + f.totalEscolhido, 0)
+        : (vencedor?.valor_total ?? null)
+
       const { error: cotError } = await supabase
         .from(TABLE_COT)
         .update({
           status: 'concluida',
           fornecedor_selecionado_id: vencedor?.id ?? null,
           fornecedor_selecionado_nome: vencedor?.fornecedor_nome ?? null,
-          valor_selecionado: vencedor?.valor_total ?? null,
+          valor_selecionado: valorSelecionadoTotal,
           data_conclusao: new Date().toISOString(),
           sem_cotacoes_minimas: payload.sem_cotacoes_minimas ?? false,
           justificativa_sem_cotacoes: payload.justificativa_sem_cotacoes ?? null,

@@ -584,10 +584,48 @@ export function useHistoricoAprovacoes(filtros?: HistoricoFiltros) {
 
       const { data, error } = await query
       if (error) throw error
-      return (data ?? []).map(d => ({
+      const rows = (data ?? []).map(d => ({
         ...d,
         tipo_aprovacao: d.tipo_aprovacao || 'requisicao_compra',
       })) as AprovacaoHistorico[]
+
+      // Enriquecer com histórico de esclarecimentos por entidade
+      const entidadeIds = Array.from(new Set(rows.map(r => r.entidade_id).filter(Boolean)))
+      if (entidadeIds.length > 0) {
+        const { data: escData } = await supabase
+          .from(TABLE_APR)
+          .select('entidade_id, status, observacao, aprovador_nome, data_decisao, created_at')
+          .in('entidade_id', entidadeIds)
+          .not('observacao', 'is', null)
+          .order('created_at', { ascending: true })
+
+        const escMap = new Map<string, NonNullable<AprovacaoHistorico['esclarecimento_historico']>>()
+        for (const row of escData ?? []) {
+          const obs = String((row as { observacao?: string }).observacao ?? '').trim()
+          if (!obs) continue
+          const isResposta = obs.startsWith('Esclarecimento respondido')
+          const isPedido = (row as { status?: string }).status === 'esclarecimento'
+          if (!isResposta && !isPedido) continue
+          const entidadeId = String((row as { entidade_id?: string }).entidade_id ?? '')
+          if (!entidadeId) continue
+          const list = escMap.get(entidadeId) ?? []
+          list.push({
+            tipo: isResposta ? 'resposta' : 'pedido',
+            autor: String((row as { aprovador_nome?: string }).aprovador_nome ?? ''),
+            msg: obs,
+            data: String((row as { data_decisao?: string; created_at?: string }).data_decisao
+              ?? (row as { created_at?: string }).created_at
+              ?? ''),
+          })
+          escMap.set(entidadeId, list)
+        }
+        for (const r of rows) {
+          const hist = escMap.get(r.entidade_id)
+          if (hist && hist.length > 0) r.esclarecimento_historico = hist
+        }
+      }
+
+      return rows
     },
     staleTime: 30_000,
     retry: 1,
@@ -972,6 +1010,28 @@ export function useDecisaoGenerica() {
               })
               .eq('id', entidadeId)
           }
+        } else if (tipoAprovacao === 'cotacao') {
+          // Aprovação financeira da cotação — atualiza RC para cotacao_aprovada/rejeitada
+          const now = new Date().toISOString()
+          const updates: Record<string, unknown> = {}
+          if (decisao === 'aprovada') {
+            updates.status = 'cotacao_aprovada'
+            updates.data_aprovacao = now
+          } else if (decisao === 'rejeitada') {
+            updates.status = 'cotacao_rejeitada'
+          } else if (decisao === 'esclarecimento') {
+            // Devolve ao comprador para esclarecer a cotação
+            updates.status = 'em_esclarecimento'
+            updates.esclarecimento_msg = observacao || 'Esclarecimento solicitado na aprovação financeira'
+            updates.esclarecimento_por = aprovadorNome
+            updates.esclarecimento_em = now
+          }
+          if (Object.keys(updates).length > 0) {
+            await supabase
+              .from(TABLE_REQ)
+              .update(updates)
+              .eq('id', entidadeId)
+          }
         } else if (tipoAprovacao === 'aprovacao_transporte') {
           const now = new Date().toISOString()
           if (decisao === 'aprovada') {
@@ -1023,6 +1083,11 @@ export function useDecisaoGenerica() {
       qc.invalidateQueries({ queryKey: ['lotes-pagamento'] })
       qc.invalidateQueries({ queryKey: ['lote-detalhe'] })
       qc.invalidateQueries({ queryKey: ['log_solicitacoes'] })
+      qc.invalidateQueries({ queryKey: ['requisicoes'] })
+      qc.invalidateQueries({ queryKey: ['requisicao'] })
+      qc.invalidateQueries({ queryKey: ['cotacoes'] })
+      qc.invalidateQueries({ queryKey: ['cotacao'] })
+      qc.invalidateQueries({ queryKey: ['cotacao-req'] })
     },
   })
 }

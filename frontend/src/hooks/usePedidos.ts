@@ -14,7 +14,7 @@ export function usePedidos(status?: string) {
           id, requisicao_id, cotacao_id, comprador_id, fornecedor_id,
           numero_pedido, fornecedor_nome, valor_total, status,
           data_pedido, data_prevista_entrega, data_entrega_real,
-          nf_numero, observacoes, created_at,
+          nf_numero, observacoes, created_at, updated_at, criado_por_nome, atualizado_por_nome,
           status_pagamento, liberado_pagamento_em, liberado_pagamento_por, pago_em,
           centro_custo, centro_custo_id, classe_financeira, classe_financeira_id,
           condicao_pagamento, parcelas_preview,
@@ -42,6 +42,7 @@ export function usePedidos(status?: string) {
 
 export function useAtualizarPedido() {
   const qc = useQueryClient()
+  const { perfil } = useAuth()
   return useMutation({
     mutationFn: async ({ id, status, data_entrega_real }: {
       id: string
@@ -50,7 +51,7 @@ export function useAtualizarPedido() {
     }) => {
       const { error } = await supabase
         .from('cmp_pedidos')
-        .update({ status, ...(data_entrega_real ? { data_entrega_real } : {}) })
+        .update({ status, ...(data_entrega_real ? { data_entrega_real } : {}), atualizado_por_nome: perfil?.nome ?? null })
         .eq('id', id)
       if (error) throw error
     },
@@ -165,6 +166,7 @@ function buildDescricaoParcela(descricaoBase: string | null | undefined, parcela
 
 export function useEmitirPedido() {
   const qc = useQueryClient()
+  const { perfil } = useAuth()
 
   return useMutation({
     mutationFn: async (payload: EmitirPedidoPayload) => {
@@ -273,13 +275,14 @@ export function useEmitirPedido() {
           condicao_pagamento: condicaoPagamento || null,
           observacoes: [
             observacoes?.trim() || null,
-            formaPagamento === 'cartao' && cartaoNome ? `CartÃ£o selecionado: ${cartaoNome}` : null,
+            formaPagamento === 'cartao' && cartaoNome ? `Cartão selecionado: ${cartaoNome}` : null,
           ].filter(Boolean).join(' | ') || null,
           classe_financeira: classeFinanceira || null,
           classe_financeira_id: classeFinanceiraId || null,
           centro_custo: centroCusto || null,
           centro_custo_id: centroCustoId || null,
           parcelas_preview: parcelasResolvidas,
+          criado_por_nome: perfil?.nome ?? null,
         })
         .select('id, numero_pedido')
         .single()
